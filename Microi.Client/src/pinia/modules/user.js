@@ -6,6 +6,7 @@ import { DiyApi, DiyCommon } from "@/utils/microi.net.import";
 import { useTagsViewStore } from "./tagsView";
 import { usePermissionStore } from "./permission";
 import { useDiyStore } from "./diy";
+import { clearMicroAppRuntimeCache } from "@/utils/microAppRuntimeCache.js";
 
 export const useUserStore = defineStore("user", {
     state: () => ({
@@ -61,6 +62,7 @@ export const useUserStore = defineStore("user", {
             try {
                 await DiyCommon.PostAsync(DiyApi.Logout(), {}, null, null, "json");
             } catch (e) {}
+            await clearMicroAppRuntimeCache("logout");
             return new Promise((resolve) => {
                 this.setToken("");
                 this.setRoles([]);
@@ -85,7 +87,8 @@ export const useUserStore = defineStore("user", {
         },
 
         // remove token
-        resetToken() {
+        async resetToken() {
+            await clearMicroAppRuntimeCache("token-reset");
             return new Promise((resolve) => {
                 this.setToken("");
                 this.setRoles([]);
@@ -106,6 +109,7 @@ export const useUserStore = defineStore("user", {
 
         // dynamically modify permissions
         async changeRoles(role) {
+            await clearMicroAppRuntimeCache("role-change");
             const token = role + "-token";
 
             this.setToken(token);

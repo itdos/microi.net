@@ -129,10 +129,11 @@ const tables = [
   table('mci_ai_content_asset', 'AI内容图片、截图和视频资产', [
     field('AssetKey', '资产幂等Key', 'varchar(160)', 'Text', { tab: 'base', notEmpty: 1, unique: 1, sort: 10 }),
     field('ContentId', '内容Id', 'varchar(50)', 'Text', { tab: 'base', notEmpty: 1, sort: 20 }),
-    field('AssetType', '资产类型', 'varchar(50)', 'Select', { tab: 'base', configSource: option([['Cover', '封面'], ['BodyImage', '正文图'], ['Screenshot', '真实截图'], ['ImageCard', '竖版卡片'], ['VideoFirstFrame', '视频首帧'], ['VideoClip', '视频分镜原片'], ['VideoMaster', '唯一发布成片'], ['AudioMusic', 'MiniMax纯音乐']]), sort: 30 }),
+    field('AssetType', '资产类型', 'varchar(50)', 'Select', { tab: 'base', configSource: option([['Cover', '封面'], ['BodyImage', '正文图'], ['Screenshot', '真实截图'], ['ImageCard', '竖版卡片'], ['VideoFirstFrame', '视频首帧'], ['VideoClip', '视频分镜原片'], ['VideoMaster', '唯一发布成片'], ['AudioDialogue', 'MiniMax男女对白'], ['AudioMusic', 'MiniMax纯音乐']]), sort: 30 }),
     field('Platform', '目标平台', 'varchar(100)', 'Text', { tab: 'base', sort: 40 }),
     field('SequenceNo', '顺序', 'int', 'NumberText', { tab: 'base', sort: 50 }),
     field('Prompt', '生成提示词', 'mediumtext', 'Textarea', { tab: 'generation', formWidth: 24, sort: 60 }),
+    field('Speaker', '对白角色', 'varchar(20)', 'Select', { tab: 'generation', configSource: option([['female', '女主'], ['male', '男主']]), sort: 65 }),
     field('FirstFrameUrl', '首帧HTTPS地址', 'mediumtext', 'Text', { tab: 'generation', sort: 70 }),
     field('FileUrl', '资产地址', 'mediumtext', 'Text', { tab: 'generation', sort: 80 }),
     field('MiniMaxTaskHandle', 'MiniMax任务句柄', 'mediumtext', 'Text', { tab: 'generation', sort: 90, description: '服务器签名句柄，不是原始 task_id。' }),
@@ -217,6 +218,7 @@ const engineSpecs = [
   ['mci-ai-video-submit', 'MiniMax视频任务创建', 'mci_ai_video_submit.js', 'Managed', 0],
   ['mci-ai-video-refresh', 'MiniMax视频任务回读', 'mci_ai_video_refresh.js', 'Managed', 0],
   ['mci-ai-music-generate', 'MiniMax纯音乐生成', 'mci_ai_music_generate.js', 'Managed', 0],
+  ['mci-ai-speech-generate', 'MiniMax男女对白生成', 'mci_ai_speech_generate.js', 'Managed', 0],
   ['mci-ai-publish-prepare', '多平台发布队列准备', 'mci_ai_publish_prepare.js', 'Managed', 0],
   ['mci-ai-publish-claim', '本机连接器认领发布任务', 'mci_ai_publish_claim.js', 'Managed', 0],
   ['mci-ai-publish-complete', '本机连接器提交发布结果', 'mci_ai_publish_complete.js', 'Managed', 0],
@@ -288,7 +290,8 @@ const modules = [
   module('AI内容素材', 'mci_ai_content_asset', ['AssetKey', 'ContentId', 'AssetType', 'Platform', 'SequenceNo', 'Status', 'ReviewStatus', 'QualityScore'], ['AssetKey', 'ContentId', 'AssetType', 'Platform', 'Status'], ['AssetType', 'Platform', 'Status'], [
     rowButton('提交MiniMax视频', 'primary', 'mci-ai-video-submit', "V8.Result=V8.Form.AssetType=='VideoClip'&&['Draft','Failed'].indexOf(V8.Form.Status)>=0;"),
     rowButton('刷新视频状态', 'success', 'mci-ai-video-refresh', "V8.Result=V8.Form.AssetType=='VideoClip'&&['Queueing','Processing'].indexOf(V8.Form.Status)>=0;"),
-    rowButton('生成MiniMax纯音乐', 'warning', 'mci-ai-music-generate', "V8.Result=V8.Form.AssetType=='AudioMusic'&&['Draft','Failed'].indexOf(V8.Form.Status)>=0;")
+    rowButton('生成MiniMax纯音乐', 'warning', 'mci-ai-music-generate', "V8.Result=V8.Form.AssetType=='AudioMusic'&&['Draft','Failed'].indexOf(V8.Form.Status)>=0;"),
+    rowButton('生成MiniMax男女对白', 'primary', 'mci-ai-speech-generate', "V8.Result=V8.Form.AssetType=='AudioDialogue'&&['Draft','Failed'].indexOf(V8.Form.Status)>=0;")
   ]),
   module('AI发布队列', 'mci_ai_publish_task', ['Platform', 'AccountName', 'ContentMode', 'Status', 'AttemptCount', 'NextRetryTime', 'CompletedTime'], ['Platform', 'AccountName', 'ContentMode', 'Status'], ['Platform', 'AccountName', 'Status']),
   module('AI发布记录', 'mci_ai_publish_attempt', ['PublishTaskId', 'AttemptNo', 'Status', 'RemoteTaskId', 'PublicUrl', 'FinishedTime'], ['PublishTaskId', 'Status', 'RemoteTaskId'], ['Status', 'RemoteTaskId', 'FinishedTime'])

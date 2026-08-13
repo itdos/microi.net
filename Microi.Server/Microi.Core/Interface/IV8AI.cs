@@ -58,5 +58,15 @@ namespace Microi.net
         /// 平台管理员生成 MiniMax 无人声纯音乐并直接转存当前租户公有 HDFS。
         /// </summary>
         Task<DosResult> GenerateMiniMaxMusic(MiniMaxMusicGenerateParam param);
+
+        /// <summary>
+        /// 平台管理员生成固定男女音色的 MiniMax 短对白并转存当前租户 HDFS。
+        /// </summary>
+        Task<DosResult> GenerateMiniMaxSpeech(MiniMaxSpeechGenerateParam param);
+
+        /// <summary>
+        /// 平台管理员从 MiniMax 官方接口读取脱敏 Token Plan 用量。
+        /// </summary>
+        Task<DosResult> GetMiniMaxTokenPlanRemains();
     }
 }

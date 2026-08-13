@@ -268,6 +268,19 @@ $projectPath = Join-Path $env:MICROI_REPOSITORY_ROOT 'AI-Project\microi\Unity'
 `GameObject.CreatePrimitive`、反射或字符串类型名不会完整出现在静态调用图中。先用 `link.xml` 精确保留动态类型；若浏览器仍出现 `class ID`、`class has been stripped` 或碰撞体缺失，程序化 WebGL 构建应关闭 `PlayerSettings.stripEngineCode`，再用包体变化与零错误控制台验收。模板同时启用 `autoSyncPersistentDataPath`，避免旧式文件系统同步警告。
 :::
 
+## 超大 Unity 产物也能断点发布
+
+Unity 的 `Data`、WASM 与 Windows 安装包经常超过普通表单上传范围。吾码 MCP 与 CLI 会自动使用应用资产协议 v3，文件字节不进入 Base64、JSON 或 V8 引擎内存。
+
+<div class="unity-doc-gates">
+  <article><span>16 MiB</span><b>有界分片</b><p>5 GiB 文件自动规划为 320 片，内存占用不随文件整体增长。</p></article>
+  <article><span>RESUME</span><b>断点续传</b><p>网络或进程重启后读取同一会话，只上传缺失且摘要不一致的分片。</p></article>
+  <article><span>SHA-256</span><b>双重校验</b><p>逐片写后回读，完成时再核对 HDFS 中的整文件摘要。</p></article>
+  <article><span>AUDIT</span><b>管理员可见</b><p>系统引擎 → 超大文件上传记录，显示进度、心跳、错误与恢复建议。</p></article>
+</div>
+
+协议 v3 没有吾码产品级文件或目录字节上限；对象仍受分片协议、JavaScript 安全整数、对象存储、磁盘、反向代理和实际网络条件约束。成功后先保留带版本号的不可变地址，再切换稳定入口；公网下载完整文件并核对大小与 SHA-256 才算发布回读完成。
+
 <div class="unity-doc-checks">
   <span>✓ 正确的 WASM / Data MIME</span>
   <span>✓ gzip / Brotli Content-Encoding</span>
@@ -275,6 +288,7 @@ $projectPath = Join-Path $env:MICROI_REPOSITORY_ROOT 'AI-Project\microi\Unity'
   <span>✓ 桌面 64 位浏览器实测</span>
   <span>✓ Windows 安装、启动、卸载冒烟测试</span>
   <span>✓ 公网安装包 SHA-256 回读一致</span>
+  <span>✓ 大资产断点续传与后台审计终态</span>
   <span>✓ 两个独立访客互见昵称、位置与公屏</span>
   <span>✓ 异常断开 10 秒后角色消失</span>
 </div>

@@ -1405,13 +1405,17 @@ async function handleGiteeStarReturn() {
     }
     const starData = result.Data || {}
     if (result.Code !== 1 || !isVerifiedGiteeStar(starData)) {
-      const transientReasons = ['events_request_failed', 'events_response_invalid', 'events_temporarily_unavailable', 'star_page_temporarily_unavailable', 'star_page_response_invalid', 'star_page_limit_reached']
-      const fallbackMessage = transientReasons.includes(returnContext.reason)
+      const failureReason = returnContext.reason || String(starData.LastFailureReason || '').trim()
+      const identifiedAccount = returnContext.account || String(starData.GiteeLogin || '').trim()
+      const transientReasons = ['events_request_failed', 'events_response_invalid', 'events_temporarily_unavailable', 'star_page_temporarily_unavailable', 'star_page_response_invalid', 'star_page_response_incomplete', 'star_page_limit_reached']
+      const fallbackMessage = transientReasons.includes(failureReason)
         ? t('giteeStarStatusFailed')
-        : t('giteeStarNotVerified', {
-            account: returnContext.account || starData.GiteeLogin || '（未识别）',
+        : identifiedAccount
+          ? t('giteeStarNotVerified', {
+            account: identifiedAccount,
             repository: starData.Repository || 'ITdos/microi.net'
           })
+          : t('giteeAccountUnidentified')
       createError.value = localizeServerMessage(result.Msg) || fallbackMessage
       tenantProgress.value = createError.value
       return

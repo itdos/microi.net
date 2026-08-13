@@ -239,6 +239,14 @@ function appendMicroAppMeta(meta, item) {
     meta.MicroServiceRoutePath = item.MicroServiceRoutePath;
     meta.RoutePath = item.MicroServiceRoutePath;
     meta.ModuleEngineKey = item.ModuleEngineKey;
+    if (isMicroAppMenu(item)) {
+        // Vue only owns the short-lived host component. The micro-app runtime
+        // is the single state-cache owner and restores the child by stable tab
+        // identity; this avoids detached Vue hosts racing on route changes.
+        meta.keepAlive = false;
+        meta.microAppHost = true;
+        meta.microAppCacheMode = "runtime-keep-alive";
+    }
     return meta;
 }
 

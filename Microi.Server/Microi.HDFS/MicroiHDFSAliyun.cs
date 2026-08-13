@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Aliyun.OSS;
 using Aliyun.OSS.Common;
@@ -116,6 +117,58 @@ namespace Microi.net
             }
         }
 
+        public async Task<DosResult> CopyObjectToStream(HDFSParam param)
+        {
+            if (param?.FileStream == null || !param.FileStream.CanWrite)
+                return new DosResult(0, null, "HDFS流式读取需要可写的目标流。");
+            var clientModel = param.ClientModel;
+            var usePrivate = param.Limit == true;
+            var bucketName = usePrivate
+                ? clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>()
+                : clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
+            var endpoint = usePrivate
+                ? clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>()
+                : clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>();
+            var accessKeyId = usePrivate
+                ? clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>()
+                : clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>();
+            var accessKeySecret = usePrivate
+                ? clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>()
+                : clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>();
+            try
+            {
+                var timeoutSeconds = Math.Max(5, Math.Min(7200, param.TimeoutSeconds ?? 600));
+                var client = new OssClient(endpoint, accessKeyId, accessKeySecret, new ClientConfiguration
+                {
+                    ConnectionTimeout = checked(timeoutSeconds * 1000),
+                    MaxErrorRetry = 3,
+                    EnableCrcCheck = false
+                });
+                using var source = client.GetObject(bucketName, param.FileFullPath.DosTrimStart('/'));
+                await source.ResponseStream.CopyToAsync(
+                    param.FileStream,
+                    128 * 1024,
+                    param.CancellationToken).ConfigureAwait(false);
+                return new DosResult(1, new
+                {
+                    Size = source.Metadata?.ContentLength ?? 0,
+                    ETag = source.Metadata?.ETag ?? ""
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                return new DosResult(0, null, "HDFS流式读取已取消。");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, BuildOssFailureMessage(
+                    "对象流式读取",
+                    param,
+                    bucketName,
+                    ex));
+            }
+        }
+
         /// <summary>
         /// 上传文件。传入ClientModel、Limit、FileFullPath、FileStream
         /// </summary>
@@ -217,6 +270,37 @@ namespace Microi.net
                     }
                     
                     var objectKey = param.FileFullPath.DosTrimStart('/');
+
+                    var declaredLength = param.ContentLength
+                                         ?? (param.FileStream.CanSeek ? param.FileStream.Length : -1L);
+                    if (declaredLength < 0)
+                        return new DosResult(0, null, "阿里云OSS流式上传必须提供ContentLength。");
+
+                    // OSS multipart cannot complete an empty part list. A
+                    // non-seekable producer pipe may still represent a valid
+                    // zero-byte object, so route that boundary explicitly.
+                    if (declaredLength == 0)
+                    {
+                        using var empty = new MemoryStream(Array.Empty<byte>(), false);
+                        var emptyResult = param.Limit == true
+                            ? ossClientPrivate.PutObject(bucketNamePrivate, objectKey, empty)
+                            : ossClient.PutObject(bucketName, objectKey, empty);
+                        return new DosResult(1, emptyResult);
+                    }
+
+                    // OSS single PUT has a provider boundary.  Large and
+                    // non-seekable publisher streams therefore use the native
+                    // multipart API with a bounded window per part.
+                    if (declaredLength >= 64L * 1024 * 1024 || !param.FileStream.CanSeek)
+                    {
+                        return PutMultipartObject(
+                            param.Limit == true ? ossClientPrivate : ossClient,
+                            param.Limit == true ? bucketNamePrivate : bucketName,
+                            objectKey,
+                            param.FileStream,
+                            declaredLength,
+                            param.CancellationToken);
+                    }
                     
                     // 直接上传，让SDK自动处理
                     if (param.Limit == true)
@@ -235,6 +319,89 @@ namespace Microi.net
             {
                 var failedBucket = param.Limit == true ? bucketNamePrivate : bucketName;
                 return new DosResult(0, null, BuildOssFailureMessage("对象上传", param, failedBucket, ex));
+            }
+        }
+
+        internal static long CalculateMultipartPartSize(long totalBytes)
+        {
+            if (totalBytes < 0) throw new ArgumentOutOfRangeException(nameof(totalBytes));
+            const long minimum = 64L * 1024 * 1024;
+            const long unit = 1024L * 1024;
+            const long providerMaxPart = 5L * 1024 * 1024 * 1024;
+            var required = totalBytes == 0 ? minimum : (totalBytes + 9_999L) / 10_000L;
+            var rounded = ((required + unit - 1L) / unit) * unit;
+            var partSize = Math.Max(minimum, rounded);
+            if (partSize > providerMaxPart)
+                throw new ArgumentOutOfRangeException(
+                    nameof(totalBytes),
+                    "对象超过阿里云OSS原生multipart的10000分片/单片5GB能力边界。");
+            return partSize;
+        }
+
+        private static DosResult PutMultipartObject(
+            OssClient client,
+            string bucketName,
+            string objectKey,
+            Stream source,
+            long totalBytes,
+            CancellationToken cancellationToken)
+        {
+            InitiateMultipartUploadResult initiated = null;
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                initiated = client.InitiateMultipartUpload(
+                    new InitiateMultipartUploadRequest(bucketName, objectKey));
+                var partSize = CalculateMultipartPartSize(totalBytes);
+                var partETags = new List<PartETag>();
+                long offset = 0;
+                var partNumber = 1;
+                while (offset < totalBytes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var currentSize = Math.Min(partSize, totalBytes - offset);
+                    using var window = new BoundedReadStream(source, currentSize, cancellationToken);
+                    var upload = client.UploadPart(new UploadPartRequest(
+                        bucketName,
+                        objectKey,
+                        initiated.UploadId)
+                    {
+                        InputStream = window,
+                        PartNumber = partNumber,
+                        PartSize = currentSize
+                    });
+                    if (window.BytesRead != currentSize)
+                        throw new EndOfStreamException(
+                            $"OSS multipart第{partNumber}块长度不足，期望{currentSize}，实际{window.BytesRead}。");
+                    partETags.Add(upload.PartETag ?? new PartETag(partNumber, upload.ETag));
+                    offset += currentSize;
+                    partNumber++;
+                }
+
+                // Empty objects stay on the ordinary PutObject route, so a
+                // multipart completion always contains at least one part.
+                var complete = new CompleteMultipartUploadRequest(
+                    bucketName,
+                    objectKey,
+                    initiated.UploadId);
+                foreach (var part in partETags) complete.PartETags.Add(part);
+                var result = client.CompleteMultipartUpload(complete);
+                return new DosResult(1, result);
+            }
+            catch (Exception ex)
+            {
+                if (initiated != null && !initiated.UploadId.DosIsNullOrWhiteSpace())
+                {
+                    try
+                    {
+                        client.AbortMultipartUpload(new AbortMultipartUploadRequest(
+                            bucketName,
+                            objectKey,
+                            initiated.UploadId));
+                    }
+                    catch { }
+                }
+                return new DosResult(0, null, "阿里云OSS multipart上传失败：" + ex.Message);
             }
         }
 

@@ -24,6 +24,13 @@ namespace Microi.net
         /// <returns></returns>
         Task<DosResult> PutObject(HDFSParam param);
         /// <summary>
+        /// Streams one object into param.FileStream without materializing the
+        /// complete object as byte[].  This is the storage-level primitive used
+        /// by cross-node resumable uploads and multi-gigabyte integrity checks.
+        /// Pass ClientModel, Limit, FileFullPath, FileStream and CancellationToken.
+        /// </summary>
+        Task<DosResult> CopyObjectToStream(HDFSParam param);
+        /// <summary>
         /// 必须使用MicroiEngine.HDFSFactory调用，判断是否存在此文件。传入ClientModel、Limit、FileFullPath
         /// </summary>
         /// <param name="param"></param>

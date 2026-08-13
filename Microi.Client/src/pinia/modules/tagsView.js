@@ -1,5 +1,6 @@
 // Pinia Store - Tags View
 import { defineStore } from "pinia";
+import { releaseMicroAppRuntimeCacheForView } from "@/utils/microAppRuntimeCache.js";
 
 // 最大缓存页面数量，防止 keep-alive 缓存过多导致内存泄漏
 const MAX_CACHED_VIEWS = 15;
@@ -24,6 +25,7 @@ export const useTagsViewStore = defineStore("tagsView", {
                 if (oldestNonAffix) {
                     const index = this.visitedViews.indexOf(oldestNonAffix);
                     this.visitedViews.splice(index, 1);
+                    void releaseMicroAppRuntimeCacheForView(oldestNonAffix, "visited-view-limit");
                 }
             }
             this.visitedViews.push(
@@ -34,6 +36,10 @@ export const useTagsViewStore = defineStore("tagsView", {
         },
 
         addCachedView(view) {
+            // Micro-app menu pages deliberately bypass Vue keep-alive. Their
+            // child state is owned by the bounded native micro-app cache, so
+            // they must not consume or evict slots from the regular Vue cache.
+            if (view.meta?.microAppHost === true || view.meta?.keepAlive === false) return;
             if (this.cachedViews.includes(view.name)) return;
             if (!view.meta?.noCache) {
                 // 如果超过最大缓存数量，移除最早缓存的页面
@@ -69,15 +75,16 @@ export const useTagsViewStore = defineStore("tagsView", {
             });
         },
 
-        delView(view) {
-            return new Promise((resolve) => {
-                this.delVisitedView(view);
-                this.delCachedView(view);
-                resolve({
-                    visitedViews: [...this.visitedViews],
-                    cachedViews: [...this.cachedViews]
-                });
-            });
+        async delView(view) {
+            await Promise.all([
+                this.delVisitedView(view),
+                this.delCachedView(view),
+                releaseMicroAppRuntimeCacheForView(view, "tab-close")
+            ]);
+            return {
+                visitedViews: [...this.visitedViews],
+                cachedViews: [...this.cachedViews]
+            };
         },
 
         delOthersVisitedViews(view) {
@@ -101,15 +108,19 @@ export const useTagsViewStore = defineStore("tagsView", {
             });
         },
 
-        delOthersViews(view) {
-            return new Promise((resolve) => {
-                this.delOthersVisitedViews(view);
-                this.delOthersCachedViews(view);
-                resolve({
-                    visitedViews: [...this.visitedViews],
-                    cachedViews: [...this.cachedViews]
-                });
+        async delOthersViews(view) {
+            const removedViews = this.visitedViews.filter((candidate) => {
+                return !candidate.meta?.affix && candidate.fullPath !== view.fullPath;
             });
+            await Promise.all([
+                this.delOthersVisitedViews(view),
+                this.delOthersCachedViews(view),
+                ...removedViews.map((candidate) => releaseMicroAppRuntimeCacheForView(candidate, "close-other-tabs"))
+            ]);
+            return {
+                visitedViews: [...this.visitedViews],
+                cachedViews: [...this.cachedViews]
+            };
         },
 
         delAllVisitedViews() {
@@ -128,15 +139,17 @@ export const useTagsViewStore = defineStore("tagsView", {
             });
         },
 
-        delAllViews(view) {
-            return new Promise((resolve) => {
-                this.delAllVisitedViews();
-                this.delAllCachedViews();
-                resolve({
-                    visitedViews: [...this.visitedViews],
-                    cachedViews: [...this.cachedViews]
-                });
-            });
+        async delAllViews() {
+            const removedViews = this.visitedViews.filter((candidate) => !candidate.meta?.affix);
+            await Promise.all([
+                this.delAllVisitedViews(),
+                this.delAllCachedViews(),
+                ...removedViews.map((candidate) => releaseMicroAppRuntimeCacheForView(candidate, "close-all-tabs"))
+            ]);
+            return {
+                visitedViews: [...this.visitedViews],
+                cachedViews: [...this.cachedViews]
+            };
         },
 
         updateVisitedView(view) {

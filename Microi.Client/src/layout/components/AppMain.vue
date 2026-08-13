@@ -37,7 +37,12 @@ export default {
     },
     computed: {
         key() {
-            return this.$route.path;
+            // A micro-app host snapshots one exact top-level tab route. Query
+            // changes therefore create a new host and cannot mutate a host that
+            // Vue is removing while micro-app moves its child into native cache.
+            return this.$route.meta?.microAppHost === true
+                ? this.$route.fullPath
+                : this.$route.path;
         }
     },
     watch: {

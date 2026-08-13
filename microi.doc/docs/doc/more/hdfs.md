@@ -46,7 +46,7 @@ https://<API公网域名>/api/WeChatContentSecurity/Callback--OsClient--<OsClien
 
 ### 租户动态限制、灾难保护上限与每日配额
 
-所有 HTTP、FormEngine、V8 和移动端上传入口共用服务端限制。上传限制分为三层：租户业务配置、平台独立灾难保护上限、HTTP 请求解析上限。前端 `FileUpload` / `ImgUpload` 字段配置只能进一步收紧最终结果。
+普通 HTTP、FormEngine、V8 和移动端上传入口共用服务端限制。上传限制分为三层：租户业务配置、平台独立灾难保护上限、HTTP 请求解析上限。前端 `FileUpload` / `ImgUpload` 字段配置只能进一步收紧最终结果。受能力鉴权的 AI 应用资产协议 v3 使用下文独立的断点续传链路。
 
 业务值只按 `sys_osclients` 当前租户 → 代码默认值解析，管理员无需维护额外环境变量或修改 `appsettings.json`：
 
@@ -98,7 +98,7 @@ location @microi_upload_too_large {
 
 这些 `proxy_*` 指令可放在 API 域名的 `server` 层供代理 `location` 继承，也可合并进现有的 `location ^~ /`；不要新建第二个重复 location。`proxy_request_buffering off` 只关闭 nginx 预缓冲，不能用响应方向的 `proxy_buffering off` 代替，也不会绕过 API/HDFS 校验。
 
-修改 nginx 后先执行 `nginx -t`，成功后再 reload。吾码 API 已内置 2048 MB HTTP/Multipart 接收硬顶；无需增加上传相关环境变量。最终仍不能突破平台固定的单文件 1024 MB、单次总量 2048 MB 灾难保护上限。若前面还有 CDN、WAF、负载均衡或 Ingress，还要同步检查这些上游的请求体和空闲超时限制。
+修改 nginx 后先执行 `nginx -t`，成功后再 reload。吾码普通上传 API 已内置 2048 MB HTTP/Multipart 接收硬顶；无需增加上传相关环境变量。普通单请求仍不能突破平台固定的单文件 1024 MB、单次总量 2048 MB 灾难保护上限。AI 应用资产协议 v3 每次只发送一个有界原始分片，不继承整文件单请求上限。若前面还有 CDN、WAF、负载均衡或 Ingress，还要同步检查这些上游的请求体和空闲超时限制。
 
 请求进入吾码 API 后，如果 Kestrel 或 Multipart 再触发超限，全局异常处理会返回 HTTP 200、`Code=0`、`DataAppend.ErrorType=UploadRequestTooLarge`，并在响应头给出 `X-Microi-Upload-Max-Request-MB` 与 `X-Microi-Upload-Max-Multipart-MB`，方便定位实际生效的 API 启动配置。
 
@@ -113,7 +113,7 @@ Upgrade16 会在 `sys_osclients` 为每个租户补齐下列可空字段：
 | `FileUploadDailyUserQuotaMB` | 单帐号每日额度 | 使用平台默认额度 |
 | `FileUploadDailyTenantQuotaMB` | 单租户每日额度 | 使用平台默认额度 |
 
-租户配置可以高于代码业务默认值，但不能突破平台固定灾难保护、HTTP/Multipart/Form 解析上限以及反向代理限制。`FileUploadEnabled=0` 表示停止该租户的交互式上传，而不是关闭安全检查；平台内部受控任务仍受平台灾难保护上限。修改 SaaS 引擎配置后应通过平台现有的租户重载流程刷新共享 Redis 配置，使所有 API 节点生效。
+租户配置可以高于代码业务默认值，但普通上传不能突破平台固定灾难保护、HTTP/Multipart/Form 解析上限以及反向代理限制。`FileUploadEnabled=0` 会停止该租户普通上传和应用资产断点续传，而不是关闭安全检查；协议 v3 只移除产品级字节上限，不绕过身份、能力、版本、哈希和审计。修改 SaaS 引擎配置后应通过平台现有的租户重载流程刷新共享 Redis 配置，使所有 API 节点生效。
 
 #### “当前租户已停用文件上传”如何处理
 
@@ -154,8 +154,8 @@ Upgrade16 会在 `sys_osclients` 为每个租户补齐下列可空字段：
 
 Web、UniApp 和 MicroService 的真实编译目录应使用 MCP 工具 `microi_publish_application_directory_stream` 发布。该链路不会把文件转为 Base64，也不会让文件体进入接口引擎/Jint：
 
-1. MCP 在本机按文件流计算 SHA-256，先拒绝符号链接、`.git`、`node_modules`、密钥/环境文件、超过 20000 个文件或超过 20 GB 的异常目录。
-2. 每个文件以 `multipart/form-data` 原始字节流调用 `/api/V8Engine/UploadApplicationAssetStream`，API 校验登录租户、超级管理员身份、大小、每日额度和 SHA-256 后直接写入 HDFS 不可变版本目录。
+1. MCP 在本机按文件流计算 SHA-256，先拒绝符号链接、`.git`、`node_modules`、密钥/环境文件和超过 20000 个文件的异常目录；协议 v3 不设置 Microi 产品级文件/目录字节上限。
+2. 不超过 128 MiB 的文件兼容旧版单请求；更大文件自动创建确定性断点会话，默认以 16 MiB `application/octet-stream` 分片发送。每片校验精确 `Content-Length`、SHA-256，并从 HDFS 写后回读。
 3. 所有文件写完后，MCP 只提交路径、大小和摘要清单到 `/api/V8Engine/FinalizeApplicationStreamPublish`。API 回读版本对象与完整性标记，再使用阿里云 OSS、MinIO 或 S3 的服务端 `CopyObject` 切换稳定地址。
 4. 非入口资源先切换，`index.html` 最后切换；同一应用使用跨节点分布式锁串行发布，避免两个版本并发产生混合资源。
 
@@ -167,7 +167,7 @@ latest别名：{tenant}/ai-app-publish/{appKey}/latest/index.html
 
 微服务历史目录保持 `{tenant}/micro-app/{appKey}/v1.2.3/`，稳定入口同样不带版本号。数据库只保存路径、大小、SHA-256、版本和路由等元数据。失败后可以用相同版本和摘要安全重试；完整清单确认前不会切换稳定入口。
 
-几十 MB 不是 Jint 的固定内存上限，HDFS 本身也没有这种限制。旧发布流程的问题是先把二进制扩成约 `4/3` 大小的 Base64，再经 JSON、Jint 字符串和多层复制产生累计分配；具体何时失败取决于文件数量、并发和进程内存。普通小型 V8 上传可继续使用 `V8.Method.Upload`，真实编译目录和数百 MB 资产必须使用上述流式发布。最终可上传大小仍取反向代理、Kestrel/Multipart、单文件、单次和每日额度的最小值。
+几十 MB 不是 Jint 的固定内存上限，HDFS 本身也没有这种限制。旧发布流程的问题是先把二进制扩成约 `4/3` 大小的 Base64，再经 JSON、Jint 字符串和多层复制产生累计分配。普通小型 V8 上传可继续使用 `V8.Method.Upload`；真实编译目录和大型资产必须使用协议 v3。5 GiB 文件默认是 320 片，网络或进程重启后查询远端状态并只补缺片。每个会话在 `mci_ai_app_file` 以 `StorageScope=ApplicationAssetMultipartSession` 保留，管理员可从“系统引擎 → 超大文件上传记录”查看字节进度、分片数、心跳、错误与恢复建议。最终能力由协议技术边界、对象存储、磁盘、网关和网络共同决定，而不是普通表单的整文件上限。
 
 调用示例：
 
@@ -183,7 +183,7 @@ latest别名：{tenant}/ai-app-publish/{appKey}/latest/index.html
 
 普通交互式上传默认强制写入私有桶，即使篡改客户端 `Limit=false` 也不会变成公有文件；普通用户仅能使用 `file`、`img`、`avatar`、`editor` 四个安全一级目录，不能提交多级目录、绝对路径或 `..`。确需公开的产品图、Banner 等文件，应由经过授权的发布流程或超级管理员显式写入公有桶，不能把“是否公开”交给普通客户端决定。
 
-接口引擎、后端表单 V8 和平台内部任务调用 `V8.Method.Upload` 属于可信服务端上传，可以由业务代码选择安全路径和公私有桶；但仍受全局文件数量、单文件和单次总量硬限制。浏览器、移动端和普通 HTTP 客户端不能通过伪造 `_TrustedServerInvocation`、`Limit` 或 `Path` 获得这种信任。
+接口引擎、后端表单 V8 和平台内部任务调用 `V8.Method.Upload` 属于可信服务端普通上传，可以由业务代码选择安全路径和公私有桶，但仍受全局文件数量、单文件和单次总量硬限制。只有应用资产协议 v3 具有独立断点与无产品字节上限语义；浏览器、移动端和普通 HTTP 客户端不能通过伪造 `_TrustedServerInvocation`、`Limit` 或 `Path` 获得这种信任。
 
 ### 私有文件必须绑定业务记录
 

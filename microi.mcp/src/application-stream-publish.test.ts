@@ -153,14 +153,14 @@ test('buildLocalApplicationAssetManifest rejects secrets and runaway project dir
   }
 });
 
-test('application stream limits reject files above 128 MiB and manifests above 1 GiB before upload', async () => {
-  assert.throws(
-    () => validateLocalApplicationAssetSize('assets/oversize.bin', 128 * 1024 * 1024 + 1, 128 * 1024 * 1024 + 1),
-    /单文件超过硬上限 134217728 bytes.*上传前中止/u,
+test('application stream accepts 5 GiB logical assets and preserves optional caller safety cap', async () => {
+  const fiveGiB = 5 * 1024 * 1024 * 1024;
+  assert.doesNotThrow(
+    () => validateLocalApplicationAssetSize('assets/installer.exe', fiveGiB, fiveGiB),
   );
   assert.throws(
-    () => validateLocalApplicationAssetSize('assets/final.bin', 1, 1024 * 1024 * 1024 + 1),
-    /发布总大小超过上限 1073741824 bytes.*上传前中止/u,
+    () => validateLocalApplicationAssetSize('assets/final.bin', 1, fiveGiB + 1, fiveGiB),
+    /调用方安全上限 5368709120 bytes.*上传前中止/u,
   );
 
   const root = createTempDirectory();
@@ -349,6 +349,160 @@ test('uploadApplicationAssetStream retries through gzip multipart after raw prox
     assert.notEqual(captured.indexOf(Buffer.from([0x1f, 0x8b, 0x08])), -1);
   } finally {
     globalThis.fetch = originalFetch;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('protocol v3 resumable upload skips durable parts and sends only the missing raw range', async () => {
+  const root = createTempDirectory();
+  const filePath = path.join(root, 'resumable.bin');
+  const chunkSize = 16 * 1024 * 1024;
+  const first = Buffer.alloc(chunkSize, 0x31);
+  const second = Buffer.alloc(2 * 1024 * 1024 + 17, 0x72);
+  fs.writeFileSync(filePath, Buffer.concat([first, second]));
+  const fullSha = crypto.createHash('sha256').update(first).update(second).digest('hex');
+  const firstSha = crypto.createHash('sha256').update(first).digest('hex');
+  const secondSha = crypto.createHash('sha256').update(second).digest('hex');
+  const sessionId = `mciau-${'a'.repeat(30)}`;
+  const remoteParts: Array<Record<string, unknown>> = [
+    { Number: 1, Size: first.length, Sha256: firstSha, Path: 'parts/00001.part' },
+  ];
+  const binaryRequests: Array<{ partNumber: string; length: number; sha256: string }> = [];
+  let initiateCalls = 0;
+  let statusCalls = 0;
+  let completeCalls = 0;
+  const server = http.createServer((request, response) => {
+    const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
+    const json = (data: Record<string, unknown>, msg = '') => {
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({ Code: 1, Data: data, Msg: msg }));
+    };
+    if (requestUrl.pathname.endsWith('/InitiateApplicationAssetMultipart')) {
+      initiateCalls += 1;
+      request.resume();
+      request.on('end', () => json({
+        SessionId: sessionId,
+        Status: 'Uploading',
+        ChunkSize: chunkSize,
+        TotalParts: 2,
+        Parts: remoteParts,
+      }));
+      return;
+    }
+    if (requestUrl.pathname.endsWith('/GetApplicationAssetMultipartStatus')) {
+      statusCalls += 1;
+      request.resume();
+      request.on('end', () => json({
+        SessionId: sessionId,
+        Status: 'Uploading',
+        ChunkSize: chunkSize,
+        TotalParts: 2,
+        Parts: remoteParts,
+      }));
+      return;
+    }
+    if (requestUrl.pathname.endsWith('/UploadApplicationAssetMultipartPart')) {
+      const chunks: Buffer[] = [];
+      request.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      request.on('end', () => {
+        const raw = Buffer.concat(chunks);
+        const partNumber = requestUrl.searchParams.get('partNumber') || '';
+        const expectedPartSha = requestUrl.searchParams.get('expectedPartSha256') || '';
+        binaryRequests.push({
+          partNumber,
+          length: raw.length,
+          sha256: crypto.createHash('sha256').update(raw).digest('hex'),
+        });
+        assert.equal(request.headers['content-type'], 'application/octet-stream');
+        assert.equal(Number(request.headers['content-length']), second.length);
+        assert.equal(expectedPartSha, secondSha);
+        assert.equal(raw.equals(second), true);
+        remoteParts.push({ Number: 2, Size: second.length, Sha256: secondSha, Path: 'parts/00002.part' });
+        json({
+          SessionId: sessionId,
+          Status: 'Uploading',
+          ChunkSize: chunkSize,
+          TotalParts: 2,
+          Parts: remoteParts,
+        });
+      });
+      return;
+    }
+    if (requestUrl.pathname.endsWith('/CompleteApplicationAssetMultipart')) {
+      completeCalls += 1;
+      request.resume();
+      request.on('end', () => json({
+        ProtocolVersion: 3,
+        SessionId: sessionId,
+        Status: 'Succeeded',
+        ChunkSize: chunkSize,
+        TotalParts: 2,
+        Parts: remoteParts,
+        Completed: true,
+        PublishState: 'Prepared',
+        PointerState: 'Uncommitted',
+        Pending: true,
+      }));
+      return;
+    }
+    response.writeHead(404);
+    response.end();
+  });
+
+  const previousForce = process.env.MICROI_APPLICATION_ASSET_FORCE_RESUMABLE;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => resolve());
+    });
+    const address = server.address();
+    assert.ok(address && typeof address === 'object');
+    process.env.MICROI_APPLICATION_ASSET_FORCE_RESUMABLE = '1';
+    const client = new MicroiClient({
+      apiBaseUrl: `http://127.0.0.1:${address.port}`,
+      username: '',
+      password: '',
+      osClient: 'iTdos',
+      token: 'unit-test-token',
+    });
+    const result = await client.uploadApplicationAssetStream({
+      AppIdOrKey: 'resumable-app',
+      VersionNo: 'v1.4.0',
+      RelativePath: 'downloads/resumable.bin',
+      ExpectedSha256: fullSha,
+      RequestId: 'resumable-request-20260813',
+      FilePath: filePath,
+      ProtocolVersion: 3,
+      ExpectedGateEpoch: '1',
+      RequestFingerprint: 'b'.repeat(64),
+      DeliveryBatchId: 'resumable-batch-20260813',
+      SourceManifestHash: 'c'.repeat(64),
+      RuntimeManifestHash: 'd'.repeat(64),
+      RouteSnapshotJson: EMPTY_ROUTE_SNAPSHOT_JSON,
+      RouteSnapshotHash: EMPTY_ROUTE_SNAPSHOT_HASH,
+      ExpectedCurrentVersion: 0,
+      ExpectedAppVersion: null,
+      ExpectedPublishFence: '0',
+      ExpectedPublishRowVersion: '0',
+      ExpectedVersionRowVersion: null,
+      ExpectedActivePublishVersionId: null,
+      ExpectedCommittedPublishVersionId: null,
+    });
+    assert.equal(result.Code, 1);
+    assert.equal((result.Data as Record<string, unknown>).ResumedParts, 1);
+    assert.equal((result.Data as Record<string, unknown>).UploadedInThisRun, 1);
+    assert.equal(initiateCalls, 1);
+    assert.equal(statusCalls, 1);
+    assert.equal(completeCalls, 1);
+    assert.deepEqual(binaryRequests, [{
+      partNumber: '2',
+      length: second.length,
+      sha256: secondSha,
+    }]);
+  } finally {
+    if (previousForce === undefined) delete process.env.MICROI_APPLICATION_ASSET_FORCE_RESUMABLE;
+    else process.env.MICROI_APPLICATION_ASSET_FORCE_RESUMABLE = previousForce;
     await new Promise<void>(resolve => server.close(() => resolve()));
     fs.rmSync(root, { recursive: true, force: true });
   }

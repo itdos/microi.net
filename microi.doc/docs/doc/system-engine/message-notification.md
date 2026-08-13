@@ -216,7 +216,7 @@ await V8.Notification.MarkRead({ All: true });
 - 链接必须拒绝 `javascript:`、`data:`、协议相对 URL 等危险地址；渲染正文时不直接执行 HTML。
 - 日志和返回值不记录 Token、AppSecret、验证码、完整供应商响应或其它秘密。
 - 接收人扇出、正文和 Payload 都要设上限，避免单次 V8 调用拖垮节点。
-- 应用商城包只发布结构、菜单、接口和无敏感默认配置，不发布真实渠道数据和历史事件。
+- 应用商城包必须随 `mic_msgset`、`mic_msg_event_log`、`wx_tpl_msg` 一并发布 `wx_mp`、`wx_mini_program` 的结构与表单元数据；后两者不附带数据集。这样既满足 `sys_user.WxMpId` 等跨模块 Select 数据源依赖，也不会发布真实渠道密钥、用户配置和历史事件。
 
 ## 验收清单
 

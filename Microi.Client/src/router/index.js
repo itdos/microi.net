@@ -175,10 +175,15 @@ export const constantRoutes = [
                 path: "",
                 name: "micro_app_friendly",
                 component: MicroAppHost,
-                // The micro-app runtime already owns its keep-alive lifecycle.
-                // Caching the Vue host as well leaves a detached vnode that can
-                // win a tab-switch race and render the newly active host empty.
-                meta: { title: "微服务", microAppFriendlyRoute: true, keepAlive: false }
+                // Vue does not cache the host component. Child state is owned by
+                // micro-app native keep-alive with bounded platform eviction.
+                meta: {
+                    title: "微服务",
+                    microAppFriendlyRoute: true,
+                    microAppHost: true,
+                    microAppCacheMode: "runtime-keep-alive",
+                    keepAlive: false
+                }
             }
         ]
     }

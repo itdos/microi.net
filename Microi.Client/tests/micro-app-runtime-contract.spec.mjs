@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = relativePath => fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -27,7 +27,10 @@ test("friendly micro-app route exists before the catch-all and requires a page f
     assert.ok(friendly >= 0);
     assert.ok(catchAll > friendly);
     assert.match(router, /microAppFriendlyRoute:\s*true/);
-    assert.match(router, /microAppFriendlyRoute:\s*true,\s*keepAlive:\s*false/);
+    const friendlyRoute = router.slice(friendly, catchAll);
+    assert.match(friendlyRoute, /microAppHost:\s*true/);
+    assert.match(friendlyRoute, /microAppCacheMode:\s*["']runtime-keep-alive["']/);
+    assert.match(friendlyRoute, /keepAlive:\s*false/);
     assert.match(router, /import MicroAppHost from ["']@\/views\/micro-app\/host\.vue["']/);
     assert.match(router, /name:\s*["']micro_app_friendly["'][\s\S]*?component:\s*MicroAppHost/);
     assert.doesNotMatch(router, /name:\s*["']micro_app_friendly["'][\s\S]{0,240}?component:\s*\(\)\s*=>\s*import/);
@@ -37,8 +40,86 @@ test("friendly micro-app route exists before the catch-all and requires a page f
 
     const host = read("src/views/micro-app/host.vue");
     assert.match(host, /MicroApp\/Resolve/);
-    assert.match(host, /const requirePage\s*=\s*this\.\$route\?\.meta\?\.microAppFriendlyRoute\s*===\s*true/);
+    assert.match(host, /const requirePage\s*=\s*this\.ownedRouteMeta\?\.microAppFriendlyRoute\s*===\s*true/);
     assert.match(host, /RequirePage:\s*requirePage/);
+});
+
+test("generated micro-app menu routes never cache a second Vue host lifecycle", () => {
+    const permission = read("src/pinia/modules/permission.js");
+    const appendMetaStart = permission.indexOf("function appendMicroAppMeta(meta, item)");
+    const appendMetaEnd = permission.indexOf("\nfunction GetComponent", appendMetaStart);
+    const appendMeta = permission.slice(appendMetaStart, appendMetaEnd);
+
+    assert.ok(appendMetaStart >= 0, "dynamic menu metadata builder must exist");
+    assert.match(appendMeta, /if\s*\(isMicroAppMenu\(item\)\)\s*\{/);
+    assert.match(appendMeta, /meta\.keepAlive\s*=\s*false/);
+    assert.match(appendMeta, /meta\.microAppHost\s*=\s*true/);
+    assert.match(appendMeta, /meta\.microAppCacheMode\s*=\s*["']runtime-keep-alive["']/);
+});
+
+test("native micro-app cache keeps five LRU tab instances and destroys exact closed tabs", async (t) => {
+    const originalWindow = globalThis.window;
+    const destroyed = [];
+    globalThis.window = {
+        microApp: {
+            unmountApp: async (name, options) => {
+                destroyed.push({ name, options });
+                return true;
+            }
+        },
+        dispatchEvent: () => true
+    };
+
+    const cache = await import(`${pathToFileURL(path.join(root, "src/utils/microAppRuntimeCache.js")).href}?test=${Date.now()}`);
+    t.after(() => {
+        cache.resetMicroAppRuntimeCacheRegistry();
+        globalThis.window = originalWindow;
+    });
+
+    for (let index = 1; index <= cache.MICRO_APP_RUNTIME_CACHE_LIMIT; index += 1) {
+        cache.registerMicroAppRuntimeCache({ name: `app-${index}`, routeFullPath: `/route/${index}` });
+        await cache.markMicroAppRuntimeHidden(`app-${index}`);
+    }
+
+    cache.registerMicroAppRuntimeCache({ name: "app-6", routeFullPath: "/route/6" });
+    await cache.markMicroAppRuntimeHidden("app-6");
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.deepEqual(destroyed[0], {
+        name: "app-1",
+        options: { destroy: true, clearData: true }
+    });
+    assert.equal(cache.getMicroAppRuntimeCacheSnapshot().length, cache.MICRO_APP_RUNTIME_CACHE_LIMIT);
+
+    await cache.releaseMicroAppRuntimeCacheForView({ fullPath: "/route/5" }, "tab-close");
+    assert.equal(destroyed.some(item => item.name === "app-5"), true);
+    assert.equal(cache.getMicroAppRuntimeCacheSnapshot().some(item => item.routeFullPath === "/route/5"), false);
+
+    const identity = cache.createMicroAppRuntimeName({
+        osClient: "tenant",
+        appKey: "chemical-bid-management",
+        menuId: "menu",
+        routeFullPath: "/projects?secret=must-not-leak",
+        version: "v1",
+        entryUrl: "https://example.test/index.html?token=must-not-leak"
+    });
+    assert.ok(identity.length <= 64);
+    assert.doesNotMatch(identity, /secret|token|must-not-leak/);
+    assert.equal(identity, cache.createMicroAppRuntimeName({
+        osClient: "tenant",
+        appKey: "chemical-bid-management",
+        menuId: "menu-hydrated-after-first-render",
+        routeFullPath: "/projects?secret=must-not-leak",
+        version: "v1",
+        entryUrl: "https://example.test/index.html?token=must-not-leak"
+    }), "late menu metadata must not change an existing fullPath runtime identity");
+    assert.notEqual(identity, cache.createMicroAppRuntimeName({
+        osClient: "tenant",
+        appKey: "chemical-bid-management",
+        routeFullPath: "/my-projects",
+        version: "v1",
+        entryUrl: "https://example.test/index.html?token=must-not-leak"
+    }), "different fullPath values must still receive isolated runtimes");
 });
 
 test("render health requires real visible child content and permits only one automatic rebuild", async () => {
@@ -183,7 +264,9 @@ test("page host automatically heals one stuck first mount and then exposes a sta
     assert.match(host, /this\.hasRenderableMicroAppContent\(\)\s*===\s*true[\s\S]{0,120}?this\.markMicroAppReady\(\)/);
     assert.match(host, /shouldAutoRecoverMicroApp\(this\.autoMountRetryCount,\s*this\.entryUrl\)/);
     assert.match(health, /Number\(retryCount\s*\|\|\s*0\)\s*<\s*1/);
-    assert.match(host, /unmountApp\(this\.microAppName,\s*\{\s*destroy:\s*true,\s*clearData:\s*true\s*\}\)/);
+    assert.match(host, /destroyMicroAppRuntimeCache\(this\.microAppName,\s*["']host-recovery["']\)/);
+    const cache = read("src/utils/microAppRuntimeCache.js");
+    assert.match(cache, /unmountApp\(normalizedName,\s*\{\s*destroy:\s*true,\s*clearData:\s*true\s*\}\)/);
     assert.match(host, /MICRO_APP_MOUNT_TIMEOUT/);
     assert.match(host, /micro-app:ready/);
     assert.match(host, /startContentWatchdog/);
@@ -199,14 +282,32 @@ test("page host automatically heals one stuck first mount and then exposes a sta
     assert.match(host, /resolveGeneration/);
 });
 
-test("cached micro-app hosts only react while their own route is active", () => {
+test("menu micro-apps use one native cache owner and immutable fullPath host identities", () => {
     const host = read("src/views/micro-app/host.vue");
+    const appMain = read("src/layout/components/AppMain.vue");
+    const tagsView = read("src/pinia/modules/tagsView.js");
+    const user = read("src/pinia/modules/user.js");
 
     assert.match(host, /isHostActive:\s*true/);
-    assert.match(host, /ownedRoutePath:\s*this\.\$route\?\.path/);
-    assert.match(host, /activated\(\)\s*\{[\s\S]*?this\.isHostActive\s*=\s*true/);
-    assert.match(host, /deactivated\(\)\s*\{[\s\S]*?this\.isHostActive\s*=\s*false/);
-    assert.match(host, /if\s*\(!this\.isHostActive\s*\|\|\s*this\.\$route\?\.path\s*!==\s*this\.ownedRoutePath\)\s*return/);
+    assert.match(host, /const route\s*=\s*this\.\$route\s*\|\|\s*\{\}/);
+    assert.match(host, /ownedRoutePath:\s*route\.path/);
+    assert.match(host, /ownedRouteFullPath:\s*route\.fullPath/);
+    assert.match(host, /<micro-app[\s\S]*?\n\s+keep-alive\b/);
+    assert.match(host, /@beforeshow=["']handleBeforeShow["']/);
+    assert.match(host, /@aftershow=["']handleAfterShow["']/);
+    assert.match(host, /@afterhidden=["']handleAfterHidden["']/);
+    assert.match(host, /forceSetData\(this\.microAppName,\s*data\)/);
+    assert.match(host, /createMicroAppRuntimeName/);
     assert.match(host, /startViewportContract\(\)\s*\{\s*this\.stopViewportContract\(\)/);
-    assert.doesNotMatch(host, /<micro-app[\s\S]*?\n\s+keep-alive\b/);
+    assert.doesNotMatch(host, /\$route\.fullPath\s*:/);
+
+    assert.match(appMain, /microAppHost\s*===\s*true[\s\S]*?\$route\.fullPath/);
+    assert.match(tagsView, /releaseMicroAppRuntimeCacheForView/);
+    assert.match(tagsView, /view\.meta\?\.microAppHost\s*===\s*true\s*\|\|\s*view\.meta\?\.keepAlive\s*===\s*false/);
+    assert.match(tagsView, /visited-view-limit/);
+    assert.match(tagsView, /close-other-tabs/);
+    assert.match(tagsView, /close-all-tabs/);
+    assert.match(user, /clearMicroAppRuntimeCache\(["']logout["']\)/);
+    assert.match(user, /clearMicroAppRuntimeCache\(["']token-reset["']\)/);
+    assert.match(user, /clearMicroAppRuntimeCache\(["']role-change["']\)/);
 });

@@ -257,6 +257,29 @@ export interface ApplicationAssetStreamUploadRequest {
   ExpectedCommittedPublishVersionId?: string | null;
 }
 
+export interface ApplicationAssetMultipartPartEvidence {
+  Number: number;
+  Size: number;
+  Sha256: string;
+  Path?: string;
+  UploadedAt?: string;
+}
+
+export interface ApplicationAssetMultipartEvidence {
+  SessionId: string;
+  Status: string;
+  ChunkSize: number;
+  TotalParts: number;
+  UploadedParts?: number;
+  ReceivedBytes?: number;
+  Total?: number;
+  ProgressPercent?: number;
+  Parts?: ApplicationAssetMultipartPartEvidence[];
+  Completed?: boolean;
+  Idempotent?: boolean;
+  [key: string]: unknown;
+}
+
 export interface ApplicationAssetStreamFinalizeRequest {
   AppIdOrKey: string;
   VersionNo: string;
@@ -318,6 +341,9 @@ export interface ListEnvelope<T> {
 
 interface RequestOptions {
   timeoutMs?: number;
+  /** Ordinary JSON requests stay bounded to ten minutes unless an explicit
+   * long-running streaming operation raises this ceiling. */
+  maxTimeoutMs?: number;
   operationName?: string;
 }
 
@@ -357,6 +383,8 @@ const DEFAULT_READBACK_REQUEST_TIMEOUT_MS = 5_000;
 const WRITE_READBACK_DELAYS_MS = [0, 300, 800, 1_500, 3_000];
 const DEFAULT_STREAM_UPLOAD_TIMEOUT_MS = 30 * 60_000;
 const MAX_STREAM_UPLOAD_TIMEOUT_MS = 2 * 60 * 60_000;
+const LEGACY_APPLICATION_ASSET_STREAM_MAX_BYTES = 128 * 1024 * 1024;
+const DEFAULT_APPLICATION_ASSET_MULTIPART_CHUNK_BYTES = 16 * 1024 * 1024;
 const OCR_REQUEST_TIMEOUT_MS = 315_000;
 const TRANSLATE_REQUEST_TIMEOUT_MS = 315_000;
 const MENU_JSON_ARRAY_FIELDS = new Set([
@@ -377,10 +405,19 @@ const MENU_JSON_ARRAY_FIELDS = new Set([
   'CardBottomTagFields',
 ]);
 
-function resolveTimeoutMs(value: unknown, fallback: number): number {
+function resolveTimeoutMs(
+  value: unknown,
+  fallback: number,
+  maximum = 10 * 60_000,
+): number {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 1_000) return fallback;
-  return Math.min(10 * 60_000, Math.round(parsed));
+  const safeMaximum = Number.isFinite(maximum) && maximum >= 1_000
+    ? Math.round(maximum)
+    : 10 * 60_000;
+  if (!Number.isFinite(parsed) || parsed < 1_000) {
+    return Math.min(safeMaximum, fallback);
+  }
+  return Math.min(safeMaximum, Math.round(parsed));
 }
 
 function resolveStreamUploadTimeoutMs(value: unknown): number {
@@ -426,6 +463,46 @@ function buildMultipartFileBody(
   return {
     body: Readable.from(streamParts()),
     contentLength: prefix.length + fileSize + suffix.length,
+  };
+}
+
+async function sha256LocalFileRange(
+  filePath: string,
+  start: number,
+  length: number,
+): Promise<string> {
+  const hash = crypto.createHash('sha256');
+  if (length > 0) {
+    const stream = fs.createReadStream(filePath, {
+      start,
+      end: start + length - 1,
+    });
+    for await (const chunk of stream) hash.update(chunk);
+  }
+  return hash.digest('hex');
+}
+
+function applicationAssetV3ProtocolPayload(
+  data: ApplicationAssetStreamUploadRequest,
+): Record<string, string | null | number> {
+  if (data.ProtocolVersion !== 3) return {};
+  return {
+    ProtocolVersion: 3,
+    PublishMode: 'stage',
+    ExpectedGateEpoch: String(data.ExpectedGateEpoch ?? ''),
+    RequestFingerprint: String(data.RequestFingerprint ?? ''),
+    DeliveryBatchId: String(data.DeliveryBatchId ?? ''),
+    SourceManifestHash: String(data.SourceManifestHash ?? ''),
+    RuntimeManifestHash: String(data.RuntimeManifestHash ?? ''),
+    RouteSnapshotJson: String(data.RouteSnapshotJson ?? ''),
+    RouteSnapshotHash: String(data.RouteSnapshotHash ?? ''),
+    ExpectedCurrentVersion: Number(data.ExpectedCurrentVersion),
+    ExpectedAppVersion: data.ExpectedAppVersion ?? null,
+    ExpectedPublishFence: String(data.ExpectedPublishFence ?? ''),
+    ExpectedPublishRowVersion: String(data.ExpectedPublishRowVersion ?? ''),
+    ExpectedVersionRowVersion: data.ExpectedVersionRowVersion ?? null,
+    ExpectedActivePublishVersionId: data.ExpectedActivePublishVersionId ?? null,
+    ExpectedCommittedPublishVersionId: data.ExpectedCommittedPublishVersionId ?? null,
   };
 }
 
@@ -1067,7 +1144,11 @@ export class MicroiClient {
     if (this.config.osClient) headers.OsClient = this.config.osClient;
     if (method === 'POST') headers['Content-Type'] = 'application/json';
 
-    const timeoutMs = resolveTimeoutMs(options.timeoutMs, this.requestTimeoutMs);
+    const timeoutMs = resolveTimeoutMs(
+      options.timeoutMs,
+      this.requestTimeoutMs,
+      options.maxTimeoutMs,
+    );
     const operationName = options.operationName || `${method} ${reqPath}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -1499,6 +1580,156 @@ export class MicroiClient {
     } finally {
       multipart.body.destroy();
     }
+  }
+
+  /**
+   * Send one exact local byte range as application/octet-stream. Each retry
+   * opens a fresh range stream, so an interrupted request never depends on a
+   * partially consumed Node stream. The server binds the part number to a
+   * declared size and SHA-256 before committing its durable checkpoint.
+   */
+  private async requestBinaryFileRange<T = unknown>(
+    reqPath: string,
+    query: Record<string, string>,
+    filePath: string,
+    start: number,
+    length: number,
+    authRecoveryStage: AuthRecoveryStage = 'initial',
+    timeoutMs?: number,
+  ): Promise<ApiResponse<T>> {
+    if (!Number.isSafeInteger(start) || start < 0
+      || !Number.isSafeInteger(length) || length < 0) {
+      throw new Error('断点分片 start/length 必须是非负 JavaScript 安全整数');
+    }
+    const endpoint = new URL(`${this.config.apiBaseUrl}${reqPath}`);
+    for (const [key, value] of Object.entries(query)) endpoint.searchParams.set(key, value);
+    const requestToken = this.token;
+    const effectiveTimeout = resolveStreamUploadTimeoutMs(timeoutMs);
+    const requestModule = endpoint.protocol === 'https:' ? https : http;
+
+    const transport = await new Promise<{
+      status: number;
+      statusText: string;
+      headers: Headers;
+      text: string;
+    }>((resolve, reject) => {
+      let settled = false;
+      const finishReject = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      };
+      const req = requestModule.request({
+        protocol: endpoint.protocol,
+        hostname: endpoint.hostname,
+        port: endpoint.port || undefined,
+        path: `${endpoint.pathname}${endpoint.search}`,
+        method: 'POST',
+        timeout: effectiveTimeout,
+        headers: {
+          Authorization: `Bearer ${requestToken}`,
+          did: this.did,
+          ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': String(length),
+        },
+      }, response => {
+        const chunks: Buffer[] = [];
+        response.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        response.on('end', () => {
+          if (settled) return;
+          settled = true;
+          const status = response.statusCode || 0;
+          const headers = {
+            get(name: string): string | null {
+              const value = response.headers[name.toLowerCase()];
+              if (Array.isArray(value)) return value.join(', ');
+              return value === undefined ? null : String(value);
+            },
+          } as Headers;
+          resolve({
+            status,
+            statusText: response.statusMessage || '',
+            headers,
+            text: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      });
+      req.on('error', error => finishReject(new Error(error.message, { cause: error })));
+      req.on('timeout', () => {
+        req.destroy();
+        finishReject(new Error(`断点分片网络超时（${effectiveTimeout}ms）`));
+      });
+      if (length === 0) {
+        req.end();
+        return;
+      }
+      const fileStream = fs.createReadStream(filePath, {
+        start,
+        end: start + length - 1,
+      });
+      fileStream.on('error', error => {
+        req.destroy();
+        finishReject(new Error(`读取本地分片失败：${error.message}`, { cause: error }));
+      });
+      fileStream.pipe(req);
+    }).catch(error => {
+      throw new MicroiTransportError(
+        `断点分片上传网络失败：${error instanceof Error ? error.message : String(error)}`,
+        {
+          kind: /超时/u.test(String(error)) ? 'timeout' : 'network',
+          requestPath: reqPath,
+          uncertainOutcome: true,
+          cause: error,
+        },
+      );
+    });
+
+    const newToken = transport.headers.get('authorization');
+    if (newToken) {
+      this.token = normalizeAuthorizationToken(newToken);
+      this.writeTokenToFile();
+    }
+    if (transport.status === 401 && authRecoveryStage !== 'credential-token') {
+      const credentialOnly = authRecoveryStage !== 'initial';
+      if (await this.tryRecoverFromAuthFailure(requestToken, credentialOnly)) {
+        return this.requestBinaryFileRange<T>(
+          reqPath,
+          query,
+          filePath,
+          start,
+          length,
+          nextAuthRecoveryStage(authRecoveryStage),
+          timeoutMs,
+        );
+      }
+      throw new Error(`HTTP 401 Unauthorized — token recovery failed: ${transport.text.slice(0, 200)}`);
+    }
+    if (transport.status < 200 || transport.status >= 300) {
+      throw new Error(`HTTP ${transport.status} ${transport.statusText} — ${transport.text.slice(0, 200)}`);
+    }
+    if (!transport.text) throw new Error(`HTTP ${transport.status} — empty response body`);
+    let parsed: ApiResponse<T>;
+    try {
+      parsed = JSON.parse(transport.text) as ApiResponse<T>;
+    } catch {
+      throw new Error(`HTTP ${transport.status} — invalid JSON: ${transport.text.slice(0, 200)}`);
+    }
+    if (isAuthenticationFailureResponse(parsed) && authRecoveryStage !== 'credential-token') {
+      const credentialOnly = authRecoveryStage !== 'initial';
+      if (await this.tryRecoverFromAuthFailure(requestToken, credentialOnly)) {
+        return this.requestBinaryFileRange<T>(
+          reqPath,
+          query,
+          filePath,
+          start,
+          length,
+          nextAuthRecoveryStage(authRecoveryStage),
+          timeoutMs,
+        );
+      }
+    }
+    return parsed;
   }
 
   private isUncertainWriteError(error: unknown): error is MicroiTransportError {
@@ -2144,6 +2375,17 @@ export class MicroiClient {
     if (!relativeFileName || /[\r\n"]/u.test(relativeFileName)) {
       throw new Error('RelativePath 的文件名不合法');
     }
+    if (data.ProtocolVersion === 3
+      && (stat.size > LEGACY_APPLICATION_ASSET_STREAM_MAX_BYTES
+        || process.env.MICROI_APPLICATION_ASSET_FORCE_RESUMABLE === '1')) {
+      return this.uploadApplicationAssetResumable(data, localPath, stat.size);
+    }
+    if (stat.size > LEGACY_APPLICATION_ASSET_STREAM_MAX_BYTES) {
+      throw new Error(
+        `当前文件 ${stat.size} bytes 超过旧版 128MiB 单请求边界；`
+        + '请启用 ProtocolVersion=3，MCP 将自动使用 HDFS 分片断点续传。',
+      );
+    }
     // The server derives and validates the canonical asset name from
     // RelativePath, not from IFormFile.FileName. Keep the multipart transport
     // filename extension-neutral so reverse proxies do not reject ordinary
@@ -2187,6 +2429,187 @@ export class MicroiClient {
       'initial',
       data.TimeoutMs,
     );
+  }
+
+  private async getApplicationAssetMultipartStatus(
+    appIdOrKey: string,
+    sessionId: string,
+  ): Promise<ApiResponse<ApplicationAssetMultipartEvidence>> {
+    return this.post<ApplicationAssetMultipartEvidence>(
+      API.GET_APPLICATION_ASSET_MULTIPART_STATUS,
+      {
+        OsClient: this.config.osClient,
+        AppIdOrKey: appIdOrKey,
+        SessionId: sessionId,
+      },
+      {
+        timeoutMs: 2 * 60_000,
+        operationName: 'read resumable application asset status',
+      },
+    );
+  }
+
+  private async uploadApplicationAssetResumable(
+    data: ApplicationAssetStreamUploadRequest,
+    localPath: string,
+    totalSize: number,
+  ): Promise<ApiResponse> {
+    if (!Number.isSafeInteger(totalSize) || totalSize < 0) {
+      throw new Error('应用资产大小超出 JavaScript 安全整数范围');
+    }
+    const immutableProtocol = applicationAssetV3ProtocolPayload(data);
+    const initiate = await this.post<ApplicationAssetMultipartEvidence>(
+      API.INITIATE_APPLICATION_ASSET_MULTIPART,
+      {
+        OsClient: this.config.osClient,
+        AppIdOrKey: data.AppIdOrKey,
+        VersionNo: data.VersionNo,
+        RelativePath: data.RelativePath,
+        ExpectedSha256: data.ExpectedSha256,
+        TotalSize: totalSize,
+        RequestedChunkSize: DEFAULT_APPLICATION_ASSET_MULTIPART_CHUNK_BYTES,
+        RequestId: data.RequestId,
+        ...immutableProtocol,
+      },
+      {
+        timeoutMs: 2 * 60_000,
+        operationName: 'initiate resumable application asset upload',
+      },
+    );
+    if (initiate.Code !== 1) return initiate;
+    const initiated = initiate.Data;
+    const sessionId = String(initiated?.SessionId || '').trim();
+    const chunkSize = Number(initiated?.ChunkSize);
+    const totalParts = Number(initiated?.TotalParts);
+    if (!/^mciau-[a-f0-9]{30}$/u.test(sessionId)
+      || !Number.isSafeInteger(chunkSize) || chunkSize < 16 * 1024 * 1024
+      || !Number.isSafeInteger(totalParts) || totalParts < 0 || totalParts > 10_000
+      || totalParts !== (totalSize === 0 ? 0 : Math.ceil(totalSize / chunkSize))) {
+      throw new Error('服务端返回的断点上传 SessionId/ChunkSize/TotalParts 不合法');
+    }
+
+    let statusResult = await this.getApplicationAssetMultipartStatus(data.AppIdOrKey, sessionId);
+    if (statusResult.Code !== 1) return statusResult;
+    const completedStatus = String(statusResult.Data?.Status || '');
+    if (completedStatus === 'Succeeded') return statusResult;
+    const remoteParts = new Map<number, ApplicationAssetMultipartPartEvidence>();
+    for (const part of statusResult.Data?.Parts || []) {
+      const number = Number(part.Number);
+      if (Number.isSafeInteger(number) && number > 0 && number <= totalParts) {
+        remoteParts.set(number, part);
+      }
+    }
+
+    let uploadedParts = 0;
+    let resumedParts = 0;
+    for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
+      const start = (partNumber - 1) * chunkSize;
+      const length = Math.min(chunkSize, totalSize - start);
+      const sha256 = await sha256LocalFileRange(localPath, start, length);
+      const remote = remoteParts.get(partNumber);
+      if (remote) {
+        if (Number(remote.Size) !== length || String(remote.Sha256 || '') !== sha256) {
+          throw new Error(
+            `断点会话第 ${partNumber} 块与本地不可变文件不一致；`
+            + '已拒绝覆盖，请核对本地文件是否在上传期间发生变化。',
+          );
+        }
+        resumedParts += 1;
+        continue;
+      }
+
+      let partResult: ApiResponse<ApplicationAssetMultipartEvidence> | undefined;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+          partResult = await this.requestBinaryFileRange<ApplicationAssetMultipartEvidence>(
+            API.UPLOAD_APPLICATION_ASSET_MULTIPART_PART,
+            {
+              osClient: this.config.osClient || '',
+              sessionId,
+              partNumber: String(partNumber),
+              expectedPartSha256: sha256,
+            },
+            localPath,
+            start,
+            length,
+            'initial',
+            data.TimeoutMs,
+          );
+          if (partResult.Code === 1) break;
+          if (attempt === 4) return partResult;
+        } catch (error) {
+          // The response may have been lost after HDFS and the durable CAS both
+          // succeeded. Read the checkpoint before replaying the same bytes.
+          statusResult = await this.getApplicationAssetMultipartStatus(data.AppIdOrKey, sessionId);
+          const checkpoint = (statusResult.Data?.Parts || [])
+            .find(item => Number(item.Number) === partNumber);
+          if (statusResult.Code === 1
+            && checkpoint
+            && Number(checkpoint.Size) === length
+            && String(checkpoint.Sha256 || '') === sha256) {
+            partResult = statusResult;
+            break;
+          }
+          if (attempt === 4) throw error;
+          await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+        }
+      }
+      if (!partResult || partResult.Code !== 1) {
+        return partResult || {
+          Code: 0,
+          Data: null,
+          Msg: `第 ${partNumber} 块上传没有返回终态`,
+        };
+      }
+      uploadedParts += 1;
+      if (partNumber === 1 || partNumber % 20 === 0 || partNumber === totalParts) {
+        console.error(
+          `[microi-mcp] Resumable HDFS asset ${data.RelativePath}: ${partNumber}/${totalParts}`,
+        );
+      }
+    }
+
+    try {
+      const complete = await this.post<ApplicationAssetMultipartEvidence>(
+        API.COMPLETE_APPLICATION_ASSET_MULTIPART,
+        {
+          OsClient: this.config.osClient,
+          AppIdOrKey: data.AppIdOrKey,
+          SessionId: sessionId,
+        },
+        {
+          timeoutMs: MAX_STREAM_UPLOAD_TIMEOUT_MS,
+          maxTimeoutMs: MAX_STREAM_UPLOAD_TIMEOUT_MS,
+          operationName: 'complete resumable application asset upload',
+        },
+      );
+      if (complete.Code === 1 && complete.Data && typeof complete.Data === 'object') {
+        return {
+          ...complete,
+          Data: {
+            ...complete.Data,
+            UploadedInThisRun: uploadedParts,
+            ResumedParts: resumedParts,
+          },
+        };
+      }
+      return complete;
+    } catch (error) {
+      const recovered = await this.getApplicationAssetMultipartStatus(data.AppIdOrKey, sessionId);
+      if (recovered.Code === 1 && String(recovered.Data?.Status || '') === 'Succeeded') {
+        return {
+          ...recovered,
+          Data: {
+            ...recovered.Data,
+            RecoveredAfterTransportError: true,
+            UploadedInThisRun: uploadedParts,
+            ResumedParts: resumedParts,
+          },
+          Msg: '完成请求响应中断，但已通过会话回读确认最终对象 Prepared。',
+        };
+      }
+      throw error;
+    }
   }
 
   async finalizeApplicationStreamPublish(data: ApplicationAssetStreamFinalizeRequest): Promise<ApiResponse> {

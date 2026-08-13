@@ -13,7 +13,6 @@ namespace Microi.net.Api
     [EnableCors("any")]
     //[ApiController]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
-    [PlatformAdminOnly]
     //[Error]
     [Route("api/[controller]/[action]")]
     public class SysRoleController : Controller
@@ -33,6 +32,7 @@ namespace Microi.net.Api
         /// authorization boundary.
         /// </summary>
         [HttpGet, HttpPost]
+        [PlatformAdminOnly]
         public JsonResult GetDirectTableGrantPolicies()
         {
             return Json(new DosResult(
@@ -46,6 +46,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AddSysRole(SysRoleParam param)
         {
             await DefaultParam(param);
@@ -58,6 +59,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AddSysRoleFromBody([FromBody] SysRoleParam param)
         {
             await DefaultParam(param);
@@ -70,6 +72,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> DelSysRole(SysRoleParam param)
         {
             await DefaultParam(param);
@@ -82,6 +85,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> UptSysRole(SysRoleParam param)
         {
             await DefaultParam(param);
@@ -95,6 +99,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> UptSysRoleFromBody([FromBody] SysRoleParam param)
         {
             await DefaultParam(param);
@@ -108,6 +113,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpGet, HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> GetSysRoleModel(SysRoleParam param)
         {
             await DefaultParam(param);
@@ -123,6 +129,44 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetSysRole(SysRoleParam param)
         {
             await DefaultParam(param);
+            var currentUser = param._CurrentUser as JObject;
+            var isPlatformAdministrator =
+                PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(
+                    param.OsClient,
+                    currentUser);
+            if (!isPlatformAdministrator)
+            {
+                var authorization = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(
+                    new DiyTableRowParam
+                    {
+                        FormEngineKey = "sys_user",
+                        OsClient = param.OsClient,
+                        _CurrentUser = currentUser,
+                        _InvokeType = InvokeType.Client.ToString(),
+                        _Lang = param._Lang
+                    },
+                    "List");
+                if (authorization.Code != 1)
+                {
+                    Response.StatusCode = 403;
+                    return Json(authorization);
+                }
+                var dbSession = OsClientExtend.GetClient(param.OsClient)?.Db;
+                var catalog = SysUserManagementSecurity.GetAssignableRoleCatalog(
+                    dbSession,
+                    currentUser);
+                return Json(new DosResult(
+                    1,
+                    catalog.Select(role => new
+                    {
+                        role.Id,
+                        role.Name,
+                        role.Level
+                    }).ToList())
+                {
+                    DataCount = catalog.Count
+                });
+            }
             param.IsDeleted = 0;
             var result = await _sysRoleLogic.GetSysRole(param);
             return Json(result);
@@ -134,6 +178,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpGet, HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> GetSysRoleStep(SysRoleParam param)
         {
             await DefaultParam(param);
