@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
 const page = read('src/pages/native/checkin.vue')
+const nativeForm = read('src/pages/native-form/index.vue')
+const sharedFields = read('src/components/mci-visit-target-fields/mci-visit-target-fields.vue')
 const picker = read('src/components/mci-visit-target-combobox/mci-visit-target-combobox.vue')
 const business = read('src/tenants/xjy/business.js')
 const failures = []
@@ -21,7 +23,7 @@ const mappings = [
 ]
 
 for (const [type, moduleKey, table] of mappings) {
-  requireToken(page, `${type}: '${moduleKey}'`, `拜访对象类型“${type}”未映射到 ${moduleKey}`)
+  requireToken(sharedFields, `${type}: '${moduleKey}'`, `拜访对象类型“${type}”未映射到 ${moduleKey}`)
   requireToken(business, `${moduleKey}: native({`, `租户业务模块缺少 ${moduleKey}`)
   requireToken(business, `table: '${table}'`, `${moduleKey} 未绑定表 ${table}`)
 }
@@ -35,9 +37,18 @@ for (const [type, moduleKey, table] of mappings) {
   ['loadModuleRows(config, {', '选择器必须通过统一模块查询链路加载数据']
 ].forEach(([token, message]) => requireToken(picker, token, message))
 
-requireToken(page, ':module-key="targetModuleKey"', '页面未随拜访对象类型切换数据源')
-requireToken(page, 'this.$refs.targetCombobox.openOptions()', '选中对象类型后未立即加载对象数据')
+requireToken(sharedFields, ':module-key="moduleKey"', '共享组件未随拜访对象类型切换数据源')
+requireToken(sharedFields, 'this.$refs.targetCombobox.openOptions()', '选中对象类型后未立即加载对象数据')
 requireToken(page, "KehuID: this.form.targetType === '客户' ? this.targetId : ''", '非客户对象 Id 不得写入 KehuID')
+requireToken(page, '<mci-visit-target-fields', '拜访打卡未复用拜访对象共享组件')
+requireToken(nativeForm, '<mci-visit-target-fields', '人员定位新增/编辑页未复用拜访对象共享组件')
+requireToken(sharedFields, "'visit-target-fields__control--active': typeOpen }\" @tap.stop", '类型下拉控件内部未阻止点击冒泡')
+requireToken(sharedFields, "'visit-target-fields__control--active': targetOpen }\" @tap.stop", '对象下拉控件内部未阻止点击冒泡')
+requireToken(nativeForm, '@back="goBack" @tap="closeOpenVisitTarget"', '人员定位整页未监听下拉框外点击')
+requireToken(nativeForm, "typeof component.closeOptions === 'function'", '人员定位外部点击未调用共享组件关闭方法')
+requireToken(page, '@tap="closeDropdowns"', '拜访打卡整页未监听下拉框外点击')
+requireToken(sharedFields, "'visit-target-fields__control--active': typeOpen", '类型下拉未将高层级限制到当前控件')
+requireToken(sharedFields, "'visit-target-fields__control--active': targetOpen", '对象下拉未将高层级限制到当前控件')
 requireToken(business, "menuAliases: ['商家列表', '商家', '商家管理']", '商家选择器必须优先匹配绑定 Diy_Tenant 的商家列表菜单')
 
 if (failures.length) {

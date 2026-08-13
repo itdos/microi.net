@@ -197,6 +197,18 @@ export function getUser() {
   return currentUser;
 }
 
+export async function getVerifiedCurrentUser() {
+  const cached = getUser() || {};
+  if (cached.Id && (cached.Name || cached.Account)) return cached;
+  const result = await post('/api/SysUser/GetCurrentUser', {});
+  const refreshed = normalizeCurrentUser(result && result.Data);
+  if (!result || Number(result.Code) !== 1 || !refreshed || !refreshed.Id || !(refreshed.Name || refreshed.Account)) {
+    throw new Error((result && result.Msg) || '当前登录账号信息获取失败，请重新登录后再试');
+  }
+  setUser(refreshed);
+  return refreshed;
+}
+
 export function request(options = {}) {
   const {
     url,

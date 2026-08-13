@@ -10,7 +10,8 @@ import {
 import { normalizeUploadItems } from '@/platform/display.js'
 import {
   V8,
-  getUser
+  getUser,
+  getVerifiedCurrentUser
 } from '@/utils/request.js'
 import {
   calculateProposalCosts,
@@ -73,6 +74,7 @@ const CUSTOMER_LOCATION_FIELDS = {
   longitude: 'KehuDT_Lng'
 }
 const CHECKIN_FIELDS = {
+  targetType: 'BaifangDXLX',
   customerId: 'KehuID',
   customerName: 'BaifangDX',
   address: 'DakaDD',
@@ -450,6 +452,10 @@ function currentDate() {
   return currentTimestamp().slice(0, 10)
 }
 
+function currentMinuteTimestamp() {
+  return `${currentTimestamp().slice(0, 16)}:00`
+}
+
 function isEmptyFormValue(value) {
   return value === undefined || value === null || value === '' ||
     (Array.isArray(value) && value.length === 0) ||
@@ -599,6 +605,13 @@ function currentUserOption() {
         Name: name
       }
     : null
+}
+
+async function verifiedCurrentUserOption() {
+  const currentUser = await getVerifiedCurrentUser()
+  const name = String(currentUser.Name || currentUser.Account || '').trim()
+  if (!name) throw new Error('当前登录账号缺少姓名和账号，无法填写打卡人')
+  return { Id: currentUser.Id || '', Name: name }
 }
 
 function setLocalFieldOptions(field, rows) {
@@ -936,7 +949,7 @@ async function loadFollowupContacts(context, customerId, clearSelection = false)
 }
 
 function initializeFollowup(context) {
-  // zhy：新增跟进默认填充当前用户、当天日期，并将“是否有效拜访”设为开启。
+  // zhy：新增跟进默认填充当前用户、当前时分，并将“是否有效拜访”设为开启。
   const user = currentUserOption()
   const updates = {}
   const userName = fieldName(context, FOLLOWUP_FIELDS.user, '跟进人')
@@ -945,12 +958,24 @@ function initializeFollowup(context) {
 
   if (user) updates[userName] = [user]
   if (!String((context.defaultValues || {})[timeName] || '').trim()) {
-    updates[timeName] = currentDate()
+    updates[timeName] = currentMinuteTimestamp()
   }
   if (!Object.prototype.hasOwnProperty.call(context.defaultValues || {}, effectiveName)) {
     updates[effectiveName] = true
   }
   context.patchForm(updates)
+}
+
+function configureFollowupTimeField(context) {
+  const field = findField(context, FOLLOWUP_FIELDS.time, '跟进时间')
+  if (!field) return
+  field.component = 'DateTime'
+  field.Component = 'DateTime'
+  field.config = {
+    ...(field.config || {}),
+    DateTimeType: 'datetime'
+  }
+  field.Config = JSON.stringify(field.config)
 }
 
 function applyCustomerLocation(context, location) {
@@ -1223,20 +1248,24 @@ export async function initialize(context) {
     if (isCheckinAdd(context)) {
       context.state.currentTime = currentTimestamp()
       applyCheckinTime(context)
+      const targetTypeName = fieldName(context, CHECKIN_FIELDS.targetType, '拜访对象类型')
+      if (!String(context.form[targetTypeName] || '').trim()) {
+        context.patchForm({ [targetTypeName]: '客户' })
+      }
       // zhy：新增打卡记录时自动将当前登录用户 Name 填入打卡人。
-      const user = currentUserOption()
-      if (user) {
-        const userName = fieldName(context, CHECKIN_FIELDS.userName, '打卡人')
-        context.patchForm({ [userName]: user.Name })
-        context.state.checkinValues = {
-          ...(context.state.checkinValues || {}),
-          [userName]: user.Name
-        }
+      const user = await verifiedCurrentUserOption()
+      const userName = fieldName(context, CHECKIN_FIELDS.userName, '打卡人')
+      context.patchForm({ [userName]: user.Name })
+      context.state.checkinValues = {
+        ...(context.state.checkinValues || {}),
+        [userName]: user.Name
       }
       setTimeout(() => locateCheckin(context, false), 60)
     }
   }
   if (isFollowupForm(context)) {
+    // zhy：跟进时间与人员定位的打卡时间保持一致，移动端同时选择日期和时分。
+    configureFollowupTimeField(context)
     // zhy：新增时初始化默认值；新增、编辑和详情都加载联系人选项，避免详情直接显示联系人 Id。
     if (isFollowupAdd(context) && !context.state.followupInitialized) {
       context.state.followupInitialized = true
@@ -1412,6 +1441,13 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
+  if (isCheckinEditable(context) && field) {
+    const name = String(field.Name || '').toLowerCase()
+    const typeName = fieldName(context, CHECKIN_FIELDS.targetType, '拜访对象类型').toLowerCase()
+    const targetName = fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase()
+    if (name === typeName) return { type: 'visit-target-fields' }
+    if (name === targetName) return { type: 'visit-target-member', clearable: false }
+  }
   if (isCheckinEditable(context) && field &&
     String(field.Name || '').toLowerCase() === fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase()) {
     return {
@@ -1858,15 +1894,18 @@ export async function beforeSubmit(context) {
     const timeName = fieldName(context, CHECKIN_FIELDS.time, '打卡时间')
     const userName = fieldName(context, CHECKIN_FIELDS.userName, '打卡人')
     const customerIdName = fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')
+    const targetTypeName = fieldName(context, CHECKIN_FIELDS.targetType, '拜访对象类型')
+    const targetType = String(context.form[targetTypeName] || '').trim()
     const values = {
       ...context.state.checkinValues,
       [addressName]: context.form[addressName] || context.state.checkinLocation.address || '',
-      [customerIdName]: context.form[customerIdName] || ''
+      [customerIdName]: targetType === '客户' ? context.form[customerIdName] || '' : ''
     }
     if (isCheckinAdd(context)) {
-      const user = currentUserOption()
+      const user = await verifiedCurrentUserOption()
       values[timeName] = context.form[timeName] || context.state.currentTime || currentTimestamp()
-      values[userName] = context.form[userName] || (user && user.Name) || ''
+      values[userName] = user.Name
+      if (!String(values[userName] || '').trim()) throw new Error('打卡人获取失败，请重新登录后再试')
     }
     return values
   }
