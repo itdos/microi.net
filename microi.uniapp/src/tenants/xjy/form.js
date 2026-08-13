@@ -52,6 +52,7 @@ const CUSTOMER_CARE_TABLE = 'diy_kehuguanhuai'
 // zhy：客户方案表及设备联动字段集中配置。
 const PROPOSAL_TABLE = 'diy_kehufaxx'
 const PROPOSAL_FIELDS = {
+  proposalName: 'FanganMC',
   deviceModel: 'ShebeiXH',
   deviceModelId: 'ShebeiXHID',
   deviceName: 'ShebeiMC',
@@ -452,6 +453,10 @@ function currentTimestamp() {
 
 function currentDate() {
   return currentTimestamp().slice(0, 10)
+}
+
+function isProposalInstallationPointForm(context) {
+  return String(context.tableName || '').toLowerCase() === 'diy_anzhuang_dw'
 }
 
 function currentMinuteTimestamp() {
@@ -1971,8 +1976,10 @@ export async function beforeSubmit(context) {
   }
   if (isProposalForm(context)) {
     // zhy：保存前再次按最终表单值计算，确保落库金额与页面输入一致。
-    return calculateProposalCosts(context.form)
+    // 方案级成本字段由安装点位汇总/比价接口计算；主表不再读取已下沉的设备字段。
+    return {}
   }
+  if (isProposalInstallationPointForm(context)) return {}
   return {}
 }
 
