@@ -26,7 +26,7 @@ var result = await V8.AI.CreateMiniMaxVideo({
   Prompt: String(asset.Prompt || ''),
   Model: String(asset.Model || 'MiniMax-Hailuo-2.3'),
   Duration: Number(asset.Duration || 6),
-  Resolution: String(asset.Resolution || '768P'),
+  Resolution: String(asset.Resolution || '1080P'),
   FirstFrameImage: String(asset.FirstFrameUrl || '')
 });
 if (!result || result.Code !== 1 || !result.Data) {
@@ -38,7 +38,7 @@ V8.FormEngine.UptFormData('mci_ai_content_asset', {
   MiniMaxTaskHandle: String(result.Data.TaskHandle || ''),
   Model: String(result.Data.Model || asset.Model || ''),
   Duration: Number(result.Data.Duration || asset.Duration || 6),
-  Resolution: String(result.Data.Resolution || asset.Resolution || '768P'),
+  Resolution: String(result.Data.Resolution || asset.Resolution || '1080P'),
   Status: String(result.Data.Status || 'Queueing'),
   ReviewStatus: 'Pending',
   QualityScore: 0,

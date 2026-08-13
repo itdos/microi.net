@@ -108,7 +108,6 @@ public class FormEngineTenantBoundaryTests
     [InlineData("sys_menu")]
     [InlineData("sys_role")]
     [InlineData("sys_rolelimit")]
-    [InlineData("sys_user")]
     [InlineData("sys_userfk")]
     [InlineData("sys_onlineuser")]
     [InlineData("sys_datasource")]
@@ -151,6 +150,7 @@ public class FormEngineTenantBoundaryTests
     [Theory]
     [InlineData("mic_page")]
     [InlineData("mic_print")]
+    [InlineData("sys_user")]
     public void ClientFormEngine_RoleManagedRuntimeTablesUseExplicitRolePermissions(string tableName)
     {
         Assert.True(PlatformResourceSecurity.IsPlatformTable(tableName));
@@ -166,6 +166,49 @@ public class FormEngineTenantBoundaryTests
                     tableName,
                     permission,
                     DiyCommon.MaxRoleLevel - 1)));
+    }
+
+    [Fact]
+    public void ClientFormEngine_SysUserDelegatesOnlyBoundedCrudOperations()
+    {
+        Assert.False(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "Read"));
+        Assert.False(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "List"));
+        Assert.False(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "Add"));
+        Assert.False(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "Edit"));
+        Assert.False(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "Delete"));
+        Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "Import"));
+        Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "Export"));
+        Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "EditByWhere"));
+        Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "DeleteByWhere"));
+    }
+
+    [Fact]
+    public void ClientFormEngine_SysUserDelegatedWritesStripServerOwnedFields()
+    {
+        var row = new JObject
+        {
+            ["Id"] = "user-a",
+            ["Name"] = "allowed",
+            ["RoleIds"] = new JArray("role-a"),
+            ["level"] = 9999,
+            ["IsDeleted"] = 1,
+            ["PwdEncode"] = "DES",
+            ["TenantDatabaseQuota"] = 999,
+            ["GiteeStarVerified"] = 1,
+            ["LastLoginIP"] = "127.0.0.1"
+        };
+
+        SysUserManagementSecurity.RemoveServerOwnedFields(row);
+
+        Assert.Equal("user-a", row["Id"]?.Value<string>());
+        Assert.Equal("allowed", row["Name"]?.Value<string>());
+        Assert.NotNull(row["RoleIds"]);
+        Assert.Null(row["level"]);
+        Assert.Null(row["IsDeleted"]);
+        Assert.Null(row["PwdEncode"]);
+        Assert.Null(row["TenantDatabaseQuota"]);
+        Assert.Null(row["GiteeStarVerified"]);
+        Assert.Null(row["LastLoginIP"]);
     }
 
     [Theory]

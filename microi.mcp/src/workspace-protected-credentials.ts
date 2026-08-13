@@ -45,9 +45,10 @@ export function unprotectWithWindowsDpapi(ciphertext: Buffer): Buffer {
       encoding: 'utf8',
       windowsHide: true,
       maxBuffer: 4 * 1024 * 1024,
+      timeout: 15_000,
     },
   );
-  if (result.status !== 0 || !String(result.stdout || '').trim()) {
+  if (result.error || result.status !== 0 || !String(result.stdout || '').trim()) {
     throw new Error('Windows DPAPI unprotect failed');
   }
   return Buffer.from(String(result.stdout).trim(), 'base64');

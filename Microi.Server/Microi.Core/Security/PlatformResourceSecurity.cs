@@ -35,7 +35,13 @@ namespace Microi.net
             // Page/print definitions are runtime business resources. Their designers
             // and renderers already use explicit menu/direct-table authorization.
             "mic_page",
-            "mic_print"
+            "mic_print",
+
+            // Account CRUD is a tenant business-administration capability. A real
+            // sys_user menu/table grant controls Read/Add/Edit/Del, while the
+            // independent SysUserManagementSecurity boundary prevents self-role,
+            // peer/superior and administrator-role escalation.
+            "sys_user"
         };
 
         private static readonly string[] ReadOnlyTableNameValues =
@@ -69,7 +75,6 @@ namespace Microi.net
             "sys_menu",
             "sys_role",
             "sys_rolelimit",
-            "sys_user",
             "sys_userfk",
             "sys_onlineuser",
             "sys_datasource",
@@ -202,6 +207,17 @@ namespace Microi.net
             if (IsProtectedTable(tableName))
             {
                 return true;
+            }
+            if (string.Equals(tableName?.Trim(), "sys_user", StringComparison.OrdinalIgnoreCase))
+            {
+                // Delegated account administration intentionally exposes the four
+                // granular CRUD actions only. Bulk import/export and unbounded
+                // ByWhere mutations can bypass per-account hierarchy checks.
+                return !string.Equals(operation, "Read", StringComparison.OrdinalIgnoreCase)
+                       && !string.Equals(operation, "List", StringComparison.OrdinalIgnoreCase)
+                       && !string.Equals(operation, "Add", StringComparison.OrdinalIgnoreCase)
+                       && !string.Equals(operation, "Edit", StringComparison.OrdinalIgnoreCase)
+                       && !string.Equals(operation, "Delete", StringComparison.OrdinalIgnoreCase);
             }
             if (!IsReadOnlyTable(tableName))
             {

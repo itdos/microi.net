@@ -10,7 +10,7 @@ namespace Microi.net
         public string Prompt { get; set; }
         public string Model { get; set; } = "MiniMax-Hailuo-2.3";
         public int Duration { get; set; } = 6;
-        public string Resolution { get; set; } = "768P";
+        public string Resolution { get; set; } = "1080P";
         public string FirstFrameImage { get; set; }
         public string LastFrameImage { get; set; }
     }

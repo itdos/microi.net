@@ -2,12 +2,18 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-client-frontend-011 sha256=18261b2eb8de007296bc536802abaf995f0696fd44c54677e0f7141dcef3c5ca -->
+<!-- microi-progressive:chunk id=microi-client-frontend-011 sha256=cdb6c4e59594572e4c1264856f42f428af215c8515b6ee14d0da4442555cc268 -->
 ## Vue3 前端微服务宿主规则
 
 `sys_menu.OpenType=MicroService` 时，动态路由必须把 `MicroServiceId`、`MicroServicePageId`、`MicroServiceRoutePath` 和真实入口 `MicroAppUrl` 写入 route meta；浏览器侧菜单路由使用 `/#/micro-app/{MsKey}/{RoutePath}`，不要再生成 `/micro-app-host/{menuId}`，否则地址过长且刷新或直接访问菜单路由容易加载空白页。
 
 同一个编译后的微服务可以绑定多个后台菜单和内部页面。`MicroAppHost` 的 `<micro-app name>` 必须包含菜单 Id、路由路径或其它实例维度，避免多个菜单共享同一个 appKey 时触发 `app name conflict`。入口 URL 中的 `microRoute/routePath` 只用于解析，最终应通过 `data.microRoute` 传给子应用，入口文件 URL 保持稳定。
+
+菜单微服务的缓存所有权固定为一层：动态菜单和友好路由都设置 `meta.keepAlive=false`、`meta.microAppHost=true`，`AppMain` 不缓存 Vue 宿主；`host.vue` 的 `<micro-app keep-alive>` 才保存子应用 DOM、路由和状态。`AppMain` 对菜单微服务使用 `$route.fullPath` 作为宿主 key，宿主创建时立即快照 path/fullPath/meta/query，之后不得监听全局 `$route` 去改写即将隐藏的旧宿主。普通 Vue 页面继续使用原有 `KeepAlive`，菜单微服务也不得占用或淘汰 `cachedViews` 槽位。
+
+运行时缓存集中维护在 `utils/microAppRuntimeCache.js`：实例名必须由租户、AppKey、fullPath、版本和入口的安全指纹稳定生成，长度受限且不暴露 Token/查询原文。菜单 Id 可能在友好路由首屏之后才随动态菜单元数据补齐，只能进入权限上下文，禁止参与实例身份；否则首次返回同一路由会被误判为新实例。全局最多保留 5 个实例，只淘汰最久未使用的 hidden 实例。TagsView 的关闭当前/其它/全部和访问记录淘汰必须按 fullPath 精确销毁；退出登录、Token 重置、角色切换必须清空全部；同一路由版本/入口变化必须替换旧实例。销毁统一调用 `unmountApp(name,{destroy:true,clearData:true})`，不能只从本地 Map 删除。
+
+宿主监听 `beforeshow/aftershow/afterhidden`：恢复时用 `forceSetData` 下发最新 Token、OsClient、权限、主题、路由和视口，并重新执行可见 DOM 健康检查；隐藏时停止宿主看门狗并把实例放入 LRU。`microAppData.cache` 与 `hostCapabilities.lifecycle` 要公开缓存模式、所有者、上限和 `appstate-change` 状态，错误诊断同时显示 cacheMode/cacheState/cacheInstance。可见 DOM 不健康时只自动销毁重建一次，禁止恢复阶段无限重试。
 
 菜单型微服务的宿主操作集中维护在 `views/micro-app/host-bridge.js` 和 `host.vue`。
 `microAppData.hostCapabilities` 必须下发 `microi.host.v1` 协议、`tab` 模式、请求/结果事件名和动作清单；
@@ -64,7 +70,7 @@ VS Code 插件执行前端微服务构建前必须先安全清理当前项目自
 - `routes` 是页面源码、`microi.routes.json`、发布路由和菜单绑定的共同事实源；一条路由只生成一个页面文件，必须明确 `path/name/title/sourceFile/isHome`。不能为了提供默认首页额外生成一个未被需求或菜单使用的第三页面。
 - 脚手架完成后依次执行：`npm install`、本地构建、`microi_create_microservice`、`microi_sync_microservice_source`、`microi_publish_application_directory_stream`。真实编译目录优先流式发布；只有当前服务器尚未部署流式端点且产物很小时，才允许临时使用兼容的 `microi_publish_microservice`，并在交付结论中如实注明。
 - 发布回读取得 `sys_microiservice.Id` 与每条 `sys_microiservice_page.Id` 后，使用 `microi_create_module` 一次传入 `openType=MicroService`、`microServiceId`、`microServicePageId`、`microServiceRoutePath`、`microServiceKey`。菜单工具必须写后回读这些字段；不得长期依赖“先建普通 URL 菜单，再手工补字段”的两步绕路。
-- 最终通过 `microi_get_application_context`、`microi_get_microservice`、`microi_get_module` 和真实登录后的两个友好菜单路由逐层验收；连续切换两个菜单，检查页面标题、MicroApp 上下文、Vue 交互、无 404/5xx/白屏/实例冲突，并保存 fullPage 截图后用 `view_image` 复核。
+- 最终通过 `microi_get_application_context`、`microi_get_microservice`、`microi_get_module` 和真实登录后的友好菜单路由逐层验收；多个菜单至少往返切换 8 轮，检查标题与子路由不串页、缓存范围内输入/筛选/滚动保持、无 404/5xx/白屏/永久骨架屏/实例冲突。再打开第 6 个实例验证 LRU 冷启动，并关闭 Tab/退出登录验证精确销毁；保存 fullPage 截图后用 `view_image` 复核。
 
 ### 表单下拉 Data 动态对象选项
 

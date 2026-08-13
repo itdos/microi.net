@@ -434,6 +434,14 @@ namespace Microi.net
         [JsonIgnore]
         public FormEngineAuthorizationSnapshot _AuthorizationSnapshot { get; set; }
 
+        /// <summary>
+        /// Server-only projection marker set after an ordinary role is authorized
+        /// to read sys_user. Query builders use it to remove password storage fields
+        /// even when a legacy menu SelectFields list contains them.
+        /// </summary>
+        [JsonIgnore]
+        public bool _RedactSysUserSensitiveFields { get; set; }
+
         public List<dynamic> ExcelData { get; set; }
         public List<JObject> ExcelHeader { get; set; }
         public List<ExcelSheetParam> ExcelSheets { get; set; }

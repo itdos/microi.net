@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = relativePath => fs.readFileSync(path.join(root, relativePath), "utf8");
 const bridgeSource = read("src/views/micro-app/host-bridge.js");
-const bridge = await import(`data:text/javascript;base64,${Buffer.from(bridgeSource).toString("base64")}`);
+const bridge = await import(pathToFileURL(path.join(root, "src/views/micro-app/host-bridge.js")).href);
 
 test("menu micro-apps receive a versioned host capability contract", () => {
     assert.deepEqual(bridge.createMicroAppHostCapabilities(), {
@@ -15,7 +15,14 @@ test("menu micro-apps receive a versioned host capability contract", () => {
         mode: "tab",
         requestType: "micro-app:host-action",
         resultType: "micro-app:host-action-result",
-        actions: ["closeTab", "navigate", "replaceTab", "back", "forward", "reloadTab", "setTabTitle", "showMessage"]
+        actions: ["closeTab", "navigate", "replaceTab", "back", "forward", "reloadTab", "setTabTitle", "showMessage"],
+        lifecycle: {
+            cacheMode: "runtime-keep-alive",
+            cacheOwner: "micro-app",
+            maxCachedTabs: 5,
+            stateEvent: "appstate-change",
+            states: ["beforeshow", "aftershow", "afterhidden"]
+        }
     });
 });
 

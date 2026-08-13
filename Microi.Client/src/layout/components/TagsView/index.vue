@@ -505,8 +505,8 @@ export default {
             
             console.log('[TagsView] 关闭页面:', view.fullPath);
             
-            // 🔥 关键修复：关闭时不强制销毁 keep-alive，避免影响其他标签页
-            // 只从 store 中移除，依赖 keep-alive 的 max 属性自动淘汰缓存
+            // Store 会精确销毁该 fullPath 对应的 micro-app 原生缓存；
+            // 普通 Vue 页面仍沿用自身 keep-alive 淘汰规则。
             this.tagsViewStore.delView(view).then(({ visitedViews }) => {
                 // 如果关闭的是当前页面，需要跳转到其他页面
                 if (this.isActive(view)) {

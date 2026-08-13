@@ -205,6 +205,15 @@ namespace Microi.net
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// 使用可信服务端 Provider Key 查询 MiniMax Token Plan 脱敏用量。
+        /// </summary>
+        Task<DosResult> GetMiniMaxTokenPlanRemainsAsync(
+            string currentUserId,
+            string authenticatedOsClient,
+            object currentUser,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// 使用可信服务端身份和签名句柄查询 MiniMax 视频任务。
         /// </summary>
         Task<DosResult> GetMiniMaxVideoTaskAsync(
@@ -240,6 +249,16 @@ namespace Microi.net
             string authenticatedOsClient,
             object currentUser,
             MiniMaxMusicGenerateParam param,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 使用可信服务端身份生成 MiniMax 男女短对白并直接转存当前租户 HDFS。
+        /// </summary>
+        Task<DosResult> GenerateMiniMaxSpeechAsync(
+            string currentUserId,
+            string authenticatedOsClient,
+            object currentUser,
+            MiniMaxSpeechGenerateParam param,
             CancellationToken cancellationToken = default);
     }
 }

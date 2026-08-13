@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 namespace Microi.net
 {
@@ -12,6 +13,19 @@ namespace Microi.net
         public string FileFullPathOrigin { get; set; }
         public List<string> FileFullPaths { get; set; }
         public Stream FileStream { get; set; }
+        /// <summary>
+        /// Declared object length for bounded producer/consumer streams whose
+        /// Length property is intentionally unavailable.  Object-store adapters
+        /// must prefer this value when supplied and must never buffer the full
+        /// object merely to discover its size.
+        /// </summary>
+        public long? ContentLength { get; set; }
+        /// <summary>
+        /// Cancels long-running object reads/writes, including resumable
+        /// application publication.  Existing callers remain compatible because
+        /// the default token is not cancellable.
+        /// </summary>
+        public CancellationToken CancellationToken { get; set; }
         public bool Preview { get; set; }
         public string ReturnFileType { get; set; }
         public bool? NetworkIsInternet { get; set; }

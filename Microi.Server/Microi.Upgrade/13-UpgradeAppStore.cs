@@ -34,6 +34,8 @@ namespace Microi.net
         private const string SaaSEnginePackageResourceName = "app.microi.saas-engine.json";
         private const string AppStorePackageResourceName = "app.microi.store.json";
         private const string AppStoreMenuId = "61b7faee-35b2-4571-add2-5231a355f368";
+        private const string ApplicationAssetUploadAuditMenuId =
+            "a3000100-0000-4000-8000-000000000100";
         // Jint 4.14 的 MemoryLimitConstraint 统计一次执行的累计分配量，而非实时存活堆。
         // 大型官方应用包在 2GB 限额下会于约 2055MB 被终止；仅提升受信任导入器，
         // 普通接口引擎仍遵守原有默认值与平台硬上限。
@@ -319,6 +321,50 @@ WHERE Id=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     appStorePageTabs.Contains("社区应用"))
                 {
                     return RefreshRequired(osClient, "应用商城页面多Tab尚未合并为AI应用");
+                }
+
+                if (!client.Db.ColumnExists("mci_ai_app_file", "UploadRecoveryHint"))
+                {
+                    return RefreshRequired(osClient, "AI应用文件缺少超大文件断点上传审计列");
+                }
+
+                var uploadAuditFieldCount = client.Db.FromSql(@"SELECT COUNT(1)
+FROM diy_field f
+INNER JOIN diy_table t ON t.Id=f.TableId
+WHERE LOWER(t.Name)=LOWER(@p0) AND f.Name=@p1
+  AND (t.IsDeleted=0 OR t.IsDeleted IS NULL)
+  AND (f.IsDeleted=0 OR f.IsDeleted IS NULL)")
+                    .AddInParameter("p0", "mci_ai_app_file")
+                    .AddInParameter("p1", "UploadRecoveryHint")
+                    .ToScalar();
+                if (!HasRows(uploadAuditFieldCount))
+                {
+                    return RefreshRequired(osClient, "AI应用文件缺少超大文件断点上传审计元数据");
+                }
+
+                var uploadAuditMenuRow = client.Db.FromSql(@"SELECT Display, AppDisplay, SqlWhere,
+ModuleEngineKey, DiyTableId
+FROM sys_menu
+WHERE Id=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", ApplicationAssetUploadAuditMenuId)
+                    .First<dynamic>();
+                var uploadAuditMenu = uploadAuditMenuRow == null
+                    ? null
+                    : JObject.FromObject(uploadAuditMenuRow);
+                var uploadAuditSqlWhere = uploadAuditMenu?["SqlWhere"]?.ToString() ?? string.Empty;
+                if (uploadAuditMenu == null
+                    || uploadAuditMenu.Value<int?>("Display") != 1
+                    || uploadAuditMenu.Value<int?>("AppDisplay") != 0
+                    || !string.Equals(
+                        uploadAuditMenu["ModuleEngineKey"]?.ToString(),
+                        "application-asset-upload-audit",
+                        StringComparison.Ordinal)
+                    || !uploadAuditSqlWhere.Contains(
+                        "ApplicationAssetMultipartSession",
+                        StringComparison.Ordinal)
+                    || string.IsNullOrWhiteSpace(uploadAuditMenu["DiyTableId"]?.ToString()))
+                {
+                    return RefreshRequired(osClient, "缺少只读超大文件上传记录菜单或固定会话筛选");
                 }
 
                 var marketplaceListCode = client.Db.FromSql(@"SELECT ApiV8Code FROM sys_apiengine
@@ -664,7 +710,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var bulkEngineCode = bulkEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
                 var bulkEngineVersionText = bulkEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
-                    packageVersion < new System.Version(7, 0, 13) ||
+                    packageVersion < new System.Version(7, 3, 6) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
                     embeddedImporterVersion < new System.Version(1, 10, 8) ||
                     !System.Version.TryParse(bulkEngineVersionText, out var embeddedBulkVersion) ||
@@ -674,6 +720,9 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("TargetSysMenuId") ||
                     !content.Contains("01KXFSG7MZ40CY8KCWCZZZJH2M") ||
                     !content.Contains("01KXFSG8153B3VZPZ45WNCCFHR") ||
+                    !content.Contains(ApplicationAssetUploadAuditMenuId) ||
+                    !content.Contains("ApplicationAssetMultipartSession") ||
+                    !content.Contains("UploadRecoveryHint") ||
                     !content.Contains("RunBackground('bulk-import-microi-store-packages'") ||
                     !buildZipEngineCode.Contains("REAL_BUILD_ZIP_ASSETS_V1") ||
                     !sourceZipEngineCode.Contains("SOURCE_ONLY_ZIP_ROOT_V1") ||

@@ -10,6 +10,9 @@ const workerPath = path.join(engineRoot, '[官网]创建SaaS租户后台执行(o
 const progressPath = path.join(engineRoot, '[官网]创建SaaS租户进度(official_create_tenant_progress).js')
 const centerPath = path.join(engineRoot, '[官网]租户个人中心(official_tenant_center).js')
 const legacyEntryPath = path.join(engineRoot, '[官网]创建SaaS租户(official_create_tenant).js')
+const giteeCallbackPath = path.join(engineRoot, '[官网]Gitee Star OAuth回调(official_gitee_star_oauth_callback).js')
+const giteeStatusPath = path.join(engineRoot, '[官网]Gitee Star验证状态(official_gitee_star_status).js')
+const profileI18nPath = path.join(workspace, 'microi.doc/docs/.vitepress/theme/profile-i18n.ts')
 const sysUserLogicPath = path.join(workspace, 'Microi.Server/Microi.Core/Logic/SysUserLogic.cs')
 
 const read = file => fs.readFileSync(file, 'utf8')
@@ -86,8 +89,35 @@ test('persistent wrapper clears terminal task locks and cleans up failed worker 
   assert.match(legacy, /if \(durableResult\.Code !== 1\) \{\s*removeOwnedLock\(tenantLockKey\);\s*removeOwnedLock\(userLockKey\);\s*cleanupGiteeWorkerProof\(\);/s)
 })
 
+test('Gitee verification scans the current public Star list in bounded 100-item pages', () => {
+  const callback = read(giteeCallbackPath)
+  assert.match(callback, /STAR_PAGE_SIZE\s*=\s*100/)
+  assert.match(callback, /STAR_PAGE_LIMIT\s*=\s*20/)
+  assert.match(callback, /stared_projects\?page=' \+ page \+ '&per_page=' \+ STAR_PAGE_SIZE/)
+  assert.match(callback, /giteeUser\.stared \|\| giteeUser\.starred \|\| 0/)
+  assert.match(callback, /expectedPages > page[\s\S]*star_page_response_incomplete/)
+  assert.doesNotMatch(callback, /api\/v5\/user\/starred/)
+})
+
+test('Gitee callback and status preserve the OAuth account without persisting an unverified binding', () => {
+  const callback = read(giteeCallbackPath)
+  const status = read(giteeStatusPath)
+  const profile = read(profilePath)
+  const i18n = read(profileI18nPath)
+
+  assert.match(callback, /GiteeStarAttempt/)
+  assert.match(callback, /finish\(returnUrl, false, 'gitee_account_already_bound', giteeLogin\)/)
+  assert.match(callback, /finish\(returnUrl, false, 'user_update_failed', giteeLogin\)/)
+  assert.match(status, /GiteeStarAttempt/)
+  assert.match(status, /LastFailureReason/)
+  assert.match(profile, /returnContext\.reason \|\| String\(starData\.LastFailureReason/)
+  assert.match(profile, /identifiedAccount[\s\S]*giteeAccountUnidentified/)
+  assert.doesNotMatch(profile, /（未识别）/)
+  assert.match(i18n, /giteeAccountUnidentified:/)
+})
+
 test('all tenant V8 engines remain syntactically valid JavaScript functions', () => {
-  for (const file of [workerPath, progressPath, centerPath, legacyEntryPath]) {
+  for (const file of [workerPath, progressPath, centerPath, legacyEntryPath, giteeCallbackPath, giteeStatusPath]) {
     assert.doesNotThrow(() => new Function(read(file)), path.basename(file))
   }
 })

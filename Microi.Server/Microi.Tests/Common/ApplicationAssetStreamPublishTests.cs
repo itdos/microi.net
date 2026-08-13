@@ -9,7 +9,7 @@ namespace Dos.Common.Tests;
 public class ApplicationAssetStreamPublishTests
 {
     [Fact]
-    public void BuildStatusData_AdvertisesApplicationAssetStreamProtocolAndHardCaps()
+    public void BuildStatusData_AdvertisesLegacyCapsAndUncappedResumableTransport()
     {
         var data = JObject.FromObject(V8McpLogic.BuildStatusData(new CurrentToken
         {
@@ -31,6 +31,14 @@ public class ApplicationAssetStreamPublishTests
         Assert.Equal(1024L * 1024 * 1024, data.Value<long>("ApplicationAssetStreamMaxTotalBytes"));
         Assert.Equal(8, data.Value<int>("ApplicationAssetStreamIoConcurrency"));
         Assert.Equal(128L * 1024 * 1024, data.Value<long>("ApplicationAssetStreamReadBudgetBytes"));
+        Assert.Equal("legacy-single-request", data.Value<string>("ApplicationAssetStreamLimitsApplyTo"));
+        Assert.True(data.Value<bool>("ApplicationAssetResumableSupported"));
+        Assert.Equal(1, data.Value<int>("ApplicationAssetResumableProtocolVersion"));
+        Assert.Equal(16L * 1024 * 1024, data.Value<long>("ApplicationAssetResumableDefaultChunkBytes"));
+        Assert.Equal(1024L * 1024 * 1024, data.Value<long>("ApplicationAssetResumableMaxChunkBytes"));
+        Assert.Equal(10_000, data.Value<int>("ApplicationAssetResumableMaxParts"));
+        Assert.Equal(10_000L * 1024 * 1024 * 1024, data.Value<long>("ApplicationAssetResumableMaxObjectBytes"));
+        Assert.Equal(0, data.Value<long>("ApplicationAssetResumableProductSizeLimitBytes"));
     }
 
     [Fact]

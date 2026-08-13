@@ -326,6 +326,7 @@ namespace Microi.net
                 "file" => "mciaf-",
                 "version" => "mciav-",
                 "microservice" => "mcims-",
+                "upload" => "mciau-",
                 _ => throw new ArgumentException("recordType 只支持 file、version 或 microservice。", nameof(recordType))
             };
             if (string.IsNullOrWhiteSpace(osClient)) throw new ArgumentException("OsClient 不能为空。", nameof(osClient));
@@ -494,7 +495,9 @@ namespace Microi.net
             IMicroiHDFS hdfs,
             OsClientSecret clientModel,
             string path,
-            Stream stream)
+            Stream stream,
+            long? contentLength = null,
+            CancellationToken cancellationToken = default)
         {
             if (stream.CanSeek) stream.Position = 0;
             return await hdfs.PutObject(new HDFSParam
@@ -502,7 +505,9 @@ namespace Microi.net
                 ClientModel = clientModel,
                 Limit = false,
                 FileFullPath = path,
-                FileStream = stream
+                FileStream = stream,
+                ContentLength = contentLength,
+                CancellationToken = cancellationToken
             }).ConfigureAwait(false);
         }
 

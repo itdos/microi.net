@@ -21,9 +21,13 @@
             :default-page="microRoutePath || '/'"
             router-mode="pure"
             iframe
+            keep-alive
             @datachange="handleDataChange"
             @mounted="handleMounted"
             @unmount="handleUnmount"
+            @beforeshow="handleBeforeShow"
+            @aftershow="handleAfterShow"
+            @afterhidden="handleAfterHidden"
             @error="handleMicroAppError"
         />
     </div>
@@ -47,6 +51,15 @@ import {
     parseMicroAppHostAction
 } from "./host-bridge.js";
 import { applyMicroAppToken } from "./token-sync";
+import {
+    MICRO_APP_RUNTIME_CACHE_MODE,
+    createMicroAppRuntimeName,
+    destroyMicroAppRuntimeCache,
+    forgetMicroAppRuntimeCache,
+    markMicroAppRuntimeActive,
+    markMicroAppRuntimeHidden,
+    registerMicroAppRuntimeCache
+} from "@/utils/microAppRuntimeCache.js";
 
 function safeDecode(value) {
     if (DiyCommon.IsNull(value)) return "";
@@ -119,16 +132,6 @@ function parseMicroAppPath(value) {
     return result;
 }
 
-function normalizeMicroAppName(value) {
-    let name = String(value || "micro-app")
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-    if (!name) name = "micro-app";
-    if (!/^[a-z]/.test(name)) name = "app-" + name;
-    return name.substring(0, 64);
-}
-
 function removeMicroRouteQuery(url) {
     if (DiyCommon.IsNull(url)) return "";
     const rawUrl = String(url);
@@ -158,6 +161,7 @@ export default {
         return { diyStore: useDiyStore(), tagsViewStore: useTagsViewStore() };
     },
     data() {
+        const route = this.$route || {};
         return {
             loading: true,
             error: "",
@@ -182,33 +186,37 @@ export default {
             resizeObserver: null,
             visualViewportHandler: null,
             isHostActive: true,
-            ownedRoutePath: this.$route?.path || "",
-            ownedRouteFullPath: this.$route?.fullPath || ""
+            runtimeInstanceName: "",
+            cacheState: "cold",
+            ownedRoutePath: route.path || "",
+            ownedRouteFullPath: route.fullPath || "",
+            ownedRouteName: route.name || "",
+            ownedRouteMeta: { ...(route.meta || {}) },
+            ownedRouteQuery: { ...(route.query || {}) }
         };
     },
     computed: {
         microAppName() {
-            const routeKey = this.$route?.meta?.Id || this.$route?.path || this.microRoutePath || "";
-            return normalizeMicroAppName(`${this.appKey || this.$route?.meta?.title || this.$route?.name}-${routeKey}`);
+            return this.runtimeInstanceName;
         },
         microAppKey() {
             return `${this.microAppName}@${this.entryUrl}@${this.retryKey}`;
         },
         baseRoute() {
-            return this.$route?.path || "/";
+            return this.ownedRoutePath || "/";
         },
         microAppData() {
             const permissionContext = {
-                sysMenuId: this.$route?.meta?.Id || "",
-                moduleEngineKey: this.$route?.meta?.ModuleEngineKey || "",
-                diyTableId: this.$route?.meta?.DiyTableId || ""
+                sysMenuId: this.ownedRouteMeta?.Id || "",
+                moduleEngineKey: this.ownedRouteMeta?.ModuleEngineKey || "",
+                diyTableId: this.ownedRouteMeta?.DiyTableId || ""
             };
             return {
                 apiBase: DiyCommon.GetApiBase(),
                 osClient: DiyCommon.GetOsClient(),
                 token: DiyCommon.getToken(),
                 menuId: permissionContext.sysMenuId,
-                menuName: this.$route?.meta?.title || "",
+                menuName: this.ownedRouteMeta?.title || "",
                 moduleEngineKey: permissionContext.moduleEngineKey,
                 diyTableId: permissionContext.diyTableId,
                 permissionContext,
@@ -223,11 +231,17 @@ export default {
                 hostGeneration: this.resolveGeneration,
                 hostMountAttempt: this.retryKey,
                 hostViewport: this.hostViewport,
+                cache: {
+                    mode: MICRO_APP_RUNTIME_CACHE_MODE,
+                    state: this.cacheState,
+                    instanceName: this.microAppName,
+                    stateEvent: "appstate-change"
+                },
                 microRoute: this.microRoutePath,
                 route: {
-                    path: this.$route?.path || "",
-                    fullPath: this.$route?.fullPath || "",
-                    query: this.$route?.query || {},
+                    path: this.ownedRoutePath,
+                    fullPath: this.ownedRouteFullPath,
+                    query: this.ownedRouteQuery,
                     microRoute: this.microRoutePath,
                     microRoutePath: this.microRoutePath
                 }
@@ -244,6 +258,9 @@ export default {
                 publishStatus: this.publishStatus,
                 assetSource: this.assetSource,
                 mountState: this.mountState,
+                cacheMode: MICRO_APP_RUNTIME_CACHE_MODE,
+                cacheState: this.cacheState,
+                cacheInstance: this.microAppName,
                 childReadyRendered: this.childReadyRendered,
                 reasonCode: this.reasonCode
             };
@@ -256,43 +273,14 @@ export default {
         this.startViewportContract();
         window.addEventListener("page-refresh", this.handleHostPageRefresh);
     },
-    activated() {
-        this.isHostActive = true;
-        this.startViewportContract();
-        if (this.$route?.path !== this.ownedRoutePath) return;
-        if (this.$route?.fullPath !== this.ownedRouteFullPath) {
-            this.ownedRouteFullPath = this.$route?.fullPath || "";
-            this.autoMountRetryCount = 0;
-            this.resolveEntryUrl();
-            return;
-        }
-        this.$nextTick(() => {
-            this.updateViewportContract();
-            this.pushViewportContract();
-        });
-    },
-    deactivated() {
-        this.isHostActive = false;
-        this.clearMountWatchdog();
-        this.resolveGeneration += 1;
-        this.stopViewportContract();
-    },
     beforeUnmount() {
         this.isHostActive = false;
         this.clearMountWatchdog();
         this.resolveGeneration += 1;
         this.stopViewportContract();
         window.removeEventListener("page-refresh", this.handleHostPageRefresh);
-    },
-    watch: {
-        "$route.fullPath"(fullPath) {
-            // Every friendly microservice route owns one KeepAlive instance.
-            // Cached hosts still observe the global route; updating a detached
-            // vnode races Vue's DOM insert and can leave the first mount white.
-            if (!this.isHostActive || this.$route?.path !== this.ownedRoutePath) return;
-            this.ownedRouteFullPath = fullPath || "";
-            this.autoMountRetryCount = 0;
-            this.resolveEntryUrl();
+        if (this.microAppName && !this.$refs.microApp) {
+            forgetMicroAppRuntimeCache(this.microAppName, "host-cancelled-before-mount");
         }
     },
     methods: {
@@ -391,7 +379,7 @@ export default {
             });
         },
         getCurrentVisitedView() {
-            return this.tagsViewStore?.visitedViews?.find((view) => view.fullPath === this.$route?.fullPath) || null;
+            return this.tagsViewStore?.visitedViews?.find((view) => view.fullPath === this.ownedRouteFullPath) || null;
         },
         async closeCurrentHostTab() {
             const visitedViews = this.tagsViewStore?.visitedViews || [];
@@ -471,18 +459,56 @@ export default {
         },
         handleHostPageRefresh(event) {
             const detail = event?.detail || {};
-            if (detail.fullPath && detail.fullPath !== this.$route?.fullPath) return;
-            const menuId = this.$route?.meta?.Id || this.$route?.meta?.id || "";
+            if (detail.fullPath && detail.fullPath !== this.ownedRouteFullPath) return;
+            const menuId = this.ownedRouteMeta?.Id || this.ownedRouteMeta?.id || "";
             if (detail.sysMenuId && menuId && detail.sysMenuId !== menuId) return;
             this.retry();
         },
         handleMounted() {
+            this.cacheState = "active";
+            this.ensureRuntimeCacheRegistration();
+            markMicroAppRuntimeActive(this.microAppName);
             this.pushViewportContract();
             this.mountState = "settling";
             this.startContentWatchdog(this.resolveGeneration, this.retryKey);
         },
+        handleBeforeShow() {
+            this.cacheState = "showing";
+            this.mountState = "restoring";
+            this.ensureRuntimeCacheRegistration();
+            markMicroAppRuntimeActive(this.microAppName);
+        },
+        handleAfterShow() {
+            const generation = this.resolveGeneration;
+            this.cacheState = "active";
+            markMicroAppRuntimeActive(this.microAppName);
+            this.forcePushRuntimeContext("host:resume");
+            this.$nextTick(() => {
+                if (!this.isHostActive || generation !== this.resolveGeneration) return;
+                this.updateViewportContract();
+                this.mountState = "verifying";
+                this.startContentWatchdog(generation, this.retryKey);
+            });
+        },
+        handleAfterHidden() {
+            this.cacheState = "hidden";
+            this.mountState = "hidden";
+            this.clearMountWatchdog();
+            void markMicroAppRuntimeHidden(this.microAppName);
+        },
+        ensureRuntimeCacheRegistration() {
+            if (!this.microAppName) return;
+            void registerMicroAppRuntimeCache({
+                name: this.microAppName,
+                appKey: this.appKey,
+                routeFullPath: this.ownedRouteFullPath,
+                version: this.appVersion
+            });
+        },
         handleUnmount() {
             this.clearMountWatchdog();
+            forgetMicroAppRuntimeCache(this.microAppName);
+            this.cacheState = "destroyed";
             if (!this.error) this.mountState = "unmounted";
         },
         handleMicroAppError(event) {
@@ -535,6 +561,8 @@ export default {
             this.mountReadyGeneration = this.resolveGeneration;
             this.mountReadyAttempt = this.retryKey;
             this.mountState = "mounted";
+            this.cacheState = "active";
+            markMicroAppRuntimeActive(this.microAppName);
             this.pushViewportContract();
         },
         hasRenderableMicroAppContent() {
@@ -560,9 +588,7 @@ export default {
         },
         async destroyStuckMicroApp() {
             try {
-                if (typeof window.microApp?.unmountApp === "function") {
-                    await window.microApp.unmountApp(this.microAppName, { destroy: true, clearData: true });
-                }
+                await destroyMicroAppRuntimeCache(this.microAppName, "host-recovery");
             } catch (_) {
                 // 挂载失败实例可能尚未完成注册，继续使用 key 强制创建新实例。
             }
@@ -587,7 +613,7 @@ export default {
             this.setRuntimeError(message, { reasonCode });
         },
         async resolveManagedRuntime(config) {
-            const requirePage = this.$route?.meta?.microAppFriendlyRoute === true;
+            const requirePage = this.ownedRouteMeta?.microAppFriendlyRoute === true;
             let result = null;
             try {
                 result = await DiyCommon.PostAsync("/api/MicroApp/Resolve", {
@@ -717,10 +743,23 @@ export default {
                 app.setData({ ...this.microAppData, type: "host:resize" });
             }
         },
+        forcePushRuntimeContext(type = "host:context") {
+            const data = { ...this.microAppData, type };
+            if (this.microAppName && typeof window.microApp?.forceSetData === "function") {
+                window.microApp.forceSetData(this.microAppName, data);
+                return;
+            }
+            const app = this.$refs.microApp;
+            if (app && typeof app.setData === "function") app.setData(data);
+        },
         extractRouteConfig() {
-            const route = this.$route || {};
-            const meta = route.meta || {};
-            const query = route.query || {};
+            const route = {
+                path: this.ownedRoutePath,
+                fullPath: this.ownedRouteFullPath,
+                name: this.ownedRouteName
+            };
+            const meta = this.ownedRouteMeta || {};
+            const query = this.ownedRouteQuery || {};
             const metaParams = parseQueryString(meta.UrlParam);
             const all = {
                 ...metaParams,
@@ -791,6 +830,8 @@ export default {
             this.loading = true;
             this.error = "";
             this.entryUrl = "";
+            this.runtimeInstanceName = "";
+            this.cacheState = "cold";
             this.httpStatus = "";
             this.reasonCode = "";
             this.mountState = "resolving";
@@ -804,7 +845,7 @@ export default {
                 let url = config.microAppUrl;
                 if (config.urlApiEngineId) {
                     const result = await DiyCommon.ApiEngine.Run(config.urlApiEngineId, {
-                        MenuId: this.$route?.meta?.Id || "",
+                        MenuId: this.ownedRouteMeta?.Id || "",
                         AppKey: config.appKey,
                         Version: config.version
                     });
@@ -843,7 +884,22 @@ export default {
 
                 await this.probeEntry(url);
                 if (generation !== this.resolveGeneration) return;
+                this.runtimeInstanceName = createMicroAppRuntimeName({
+                    osClient: DiyCommon.GetOsClient(),
+                    appKey: this.appKey,
+                    menuId: this.ownedRouteMeta?.Id || this.ownedRoutePath,
+                    routeFullPath: this.ownedRouteFullPath,
+                    version: this.appVersion,
+                    entryUrl: url
+                });
+                void registerMicroAppRuntimeCache({
+                    name: this.runtimeInstanceName,
+                    appKey: this.appKey,
+                    routeFullPath: this.ownedRouteFullPath,
+                    version: this.appVersion
+                });
                 this.entryUrl = url;
+                this.cacheState = "starting";
                 this.mountState = "mounting";
                 this.startMountWatchdog(generation, this.retryKey);
             } catch (error) {

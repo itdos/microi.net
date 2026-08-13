@@ -465,14 +465,22 @@
                             <div>
                                 <span class="hero-kicker">MiniMax Token Plan</span>
                                 <h1>创建可追踪、可下载、可发布的 AI 视频</h1>
-                                <p>当前 Token Plan 的 Hailuo 2.3 视频档为 6 秒 / 768P，API 不提供 fps 参数，本轮实测固定 24 fps。10 秒 / 768P 与 6 秒 / 1080P 属于按量接口规格，不冒充当前订阅权益；需要更长成片时，应把多个分镜合成一条带声 VideoMaster。</p>
+                                <p>画质优先使用 Hailuo 2.3 的 6 秒 / 1080P：连续 3 个分镜合成为一条约 18 秒的带对白、配乐 VideoMaster。MiniMax API 不提供 fps 参数，最终帧率必须以媒体探针实测为准；10 秒 / 768P 是时长优先的另一种取舍。</p>
                             </div>
                             <div class="video-policy-tags">
-                                <el-tag type="success" effect="plain">Token Plan · 768P / 6 秒</el-tag>
-                                <el-tag type="warning" effect="plain">固定 24 fps</el-tag>
-                                <el-tag effect="plain">工作区 3 条 / 日</el-tag>
+                                <el-tag type="success" effect="plain">画质优先 · 1080P / 6 秒</el-tag>
+                                <el-tag type="warning" effect="plain">fps 以成片实测为准</el-tag>
+                                <el-tag effect="plain">3 分镜合成 1 条母版</el-tag>
                                 <el-tag effect="plain">分镜只合成，不单独发布</el-tag>
                             </div>
+                            <el-alert
+                                class="video-quota-alert"
+                                :title="videoQuotaTitle"
+                                :description="videoQuotaDescription"
+                                :type="videoQuotaError ? 'error' : (videoQuota ? 'success' : 'info')"
+                                :closable="false"
+                                show-icon
+                            />
                         </div>
                         <el-form label-position="top" class="video-create-form" @submit.prevent>
                             <el-form-item label="视频提示词">
@@ -510,8 +518,9 @@
                                     :loading="videoCreateLoading"
                                     data-testid="ai-video-create"
                                     @click="createMiniMaxVideo"
-                                >创建视频任务</el-button>
+                                >创建 1 个分镜（不发布）</el-button>
                                 <el-button :icon="Refresh" :loading="videoLoading" @click="loadVideoRecords">刷新记录</el-button>
+                                <el-button :icon="Refresh" :loading="videoQuotaLoading" @click="refreshMiniMaxQuota(false)">刷新套餐余量</el-button>
                             </div>
                         </el-form>
                     </div>
@@ -519,8 +528,8 @@
                     <div class="video-record-card">
                         <div class="video-section-heading compact-heading">
                             <div>
-                                <h2>视频创建记录</h2>
-                                <p>任务状态、持久文件、审核结论和失败原因均从 mci_ai_content_asset 回读。</p>
+                                <h2>视频与音轨记录</h2>
+                                <p>分镜、唯一母版、男女对白和配乐的持久文件、审核结论与失败原因均从 mci_ai_content_asset 回读。</p>
                             </div>
                             <el-tag effect="plain">{{ videoRows.length }} 条</el-tag>
                         </div>
@@ -528,7 +537,13 @@
                             <el-table-column type="expand">
                                 <template #default="scope">
                                     <div class="video-record-detail">
-                                        <video v-if="scope.row.FileUrl" :src="scope.row.FileUrl" controls preload="metadata"></video>
+                                        <audio
+                                            v-if="scope.row.FileUrl && ['AudioDialogue','AudioMusic'].includes(String(scope.row.AssetType || ''))"
+                                            :src="scope.row.FileUrl"
+                                            controls
+                                            preload="metadata"
+                                        ></audio>
+                                        <video v-else-if="scope.row.FileUrl" :src="scope.row.FileUrl" controls preload="metadata"></video>
                                         <div>
                                             <strong>完整提示词</strong>
                                             <p>{{ scope.row.Prompt || "-" }}</p>
@@ -571,11 +586,11 @@
                                         type="success"
                                         :icon="CircleCheck"
                                         @click="approveVideoRecord(scope.row)"
-                                    >验片通过</el-button>
+                                    >审核通过</el-button>
                                 </template>
                             </el-table-column>
                         </el-table>
-                        <el-empty v-if="!videoRows.length && !videoLoading" description="暂无视频创建记录" />
+                        <el-empty v-if="!videoRows.length && !videoLoading" description="暂无视频或音轨记录" />
                     </div>
                 </section>
             </template>
@@ -712,15 +727,32 @@ const videoCreateLoading = ref(false);
 const videoActionLoading = ref("");
 const videoRows = ref([]);
 const videoPlan = ref(null);
+const videoQuota = ref(null);
+const videoQuotaCheckedAt = ref("");
+const videoQuotaError = ref("");
+const videoQuotaLoading = ref(false);
 const videoPresetOptions = [
-    { value: "token-plan", label: "Token Plan · 6 秒 / 768P / 固定 24 fps", duration: 6, resolution: "768P" }
+    { value: "quality-first", label: "画质优先 · 6 秒 / 1080P / fps 实测", duration: 6, resolution: "1080P" }
 ];
 const videoForm = reactive({
     prompt: "",
     model: "MiniMax-Hailuo-2.3",
-    preset: "token-plan",
+    preset: "quality-first",
     duration: 6,
-    resolution: "768P"
+    resolution: "1080P"
+});
+const videoQuotaTitle = computed(() => {
+    if (videoQuotaLoading.value) return "正在从 MiniMax 官方接口读取 Token Plan 用量";
+    if (videoQuotaError.value) return "Token Plan 实时用量不可用，已禁止创建新分镜";
+    if (videoQuota.value) return "Token Plan 用量已实时回读";
+    return "创建前必须先读取 Token Plan 实时用量";
+});
+const videoQuotaDescription = computed(() => {
+    if (videoQuotaError.value) return videoQuotaError.value;
+    if (!videoQuota.value) return "套餐采用 5 小时固定窗口与周窗口，不再按本地“每天 3 个”计数判断。";
+    const raw = JSON.stringify(videoQuota.value);
+    const safeUsage = raw.length > 800 ? `${raw.slice(0, 800)}…` : raw;
+    return `${videoQuotaCheckedAt.value || "刚刚"} · ${safeUsage}`;
 });
 let videoPollTimer = null;
 let videoPollBusy = false;
@@ -1563,7 +1595,32 @@ async function openVideoWorkspace() {
         return;
     }
     activeWorkspace.value = "video";
-    await Promise.all([loadVideoPlan(), loadVideoRecords()]);
+    await Promise.all([loadVideoPlan(), loadVideoRecords(), refreshMiniMaxQuota(true)]);
+}
+
+async function refreshMiniMaxQuota(silent = false) {
+    if (!isAiAdmin.value || videoQuotaLoading.value) return !!videoQuota.value;
+    videoQuotaLoading.value = true;
+    try {
+        const result = await DiyCommon.GetAsync("/api/Ai/GetMiniMaxTokenPlanRemains", {});
+        if (!isOk(result)) throw new Error(unwrapDosResult(result)?.Msg || "MiniMax Token Plan 用量查询失败");
+        const data = getData(result) || {};
+        videoQuota.value = data.Usage || data;
+        videoQuotaCheckedAt.value = data.CheckedAtUtc
+            ? new Date(data.CheckedAtUtc).toLocaleString()
+            : new Date().toLocaleString();
+        videoQuotaError.value = "";
+        if (!silent) ElMessage.success("已从 MiniMax 官方接口实时回读套餐用量");
+        return true;
+    } catch (error) {
+        videoQuota.value = null;
+        videoQuotaCheckedAt.value = "";
+        videoQuotaError.value = String(error?.message || "MiniMax Token Plan 用量查询失败");
+        if (!silent) ElMessage.error(videoQuotaError.value);
+        return false;
+    } finally {
+        videoQuotaLoading.value = false;
+    }
 }
 
 async function loadVideoPlan() {
@@ -1587,7 +1644,7 @@ async function loadVideoRecords() {
     videoLoading.value = true;
     try {
         const result = await DiyCommon.FormEngine.GetTableData("mci_ai_content_asset", {
-            _Where: [["AssetType", "In", ["VideoClip", "VideoMaster", "Video"]]],
+            _Where: [["AssetType", "In", ["VideoClip", "VideoMaster", "Video", "AudioDialogue", "AudioMusic"]]],
             _OrderBy: "CreateTime",
             _OrderByType: "DESC",
             _PageSize: 200
@@ -1639,14 +1696,12 @@ async function createMiniMaxVideo() {
         ["VideoClip", "Video"].includes(String(row.AssetType || ""))
         && String(row.CreateTime || "").startsWith(localDatePrefix())
     )).length;
-    if (todayCount >= 3) {
-        ElMessage.warning("今天已记录 3 次视频创建；当前工作区的保守日门禁不会继续提交。MiniMax 实际余额请以 Token Plan 控制台为准。");
-        return;
-    }
-
     videoCreateLoading.value = true;
     let assetId = "";
     try {
+        if (!await refreshMiniMaxQuota(true)) {
+            throw new Error("无法实时确认 MiniMax Token Plan 用量，已按失败关闭策略停止创建");
+        }
         const plan = await loadVideoPlan();
         if (!plan?.Id) throw new Error("未找到启用的 AI 内容计划，请先安装或启用官方 AI 内容运营应用");
 
@@ -1658,7 +1713,7 @@ async function createMiniMaxVideo() {
             SlotKey: slotKey,
             PlanId: plan.Id,
             Title: prompt.slice(0, 120),
-            Angle: "MiniMax Token Plan 当前订阅档（6 秒 / 768P / 固定 24 fps）；分镜只能用于合成唯一带声 VideoMaster。",
+            Angle: "MiniMax 画质优先档（6 秒 / 1080P，fps 以媒体探针实测）；分镜只能用于合成唯一带对白与配乐的 VideoMaster。",
             ContentType: "Video",
             Status: "Queued",
             AiModel: videoForm.model,
@@ -1799,12 +1854,18 @@ async function refreshVideoRecord(row, silent = false) {
 
 async function approveVideoRecord(row) {
     if (!row?.Id || !row.FileUrl) return;
+    const assetType = String(row.AssetType || "");
+    const reviewText = assetType === "VideoMaster"
+        ? "管理员已完成唯一母版的画面、对白、字幕、配乐与媒体探针审核；可进入支持视频的平台发布流程。"
+        : assetType === "VideoClip" || assetType === "Video"
+            ? "管理员已完成分镜验片；该文件只能作为唯一 VideoMaster 的输入，禁止单独发布。"
+            : "管理员已完成音轨试听；该文件只能作为唯一 VideoMaster 的混音输入，禁止单独发布。";
     const result = await DiyCommon.FormEngine.UptFormData("mci_ai_content_asset", {
         Id: row.Id,
         Status: "Approved",
         ReviewStatus: "Approved",
         QualityScore: 100,
-        QualityReview: "管理员已在 AI 视频中心完成验片；可进入支持视频的平台发布流程。"
+        QualityReview: reviewText
     });
     if (!isOk(result)) {
         ElMessage.error(unwrapDosResult(result)?.Msg || "验片状态保存失败");
@@ -1817,7 +1878,7 @@ async function approveVideoRecord(row) {
 function downloadVideo(row) {
     const url = String(row?.FileUrl || "");
     if (!/^https:\/\//i.test(url)) {
-        ElMessage.warning("视频地址不是可下载的 HTTPS 地址");
+        ElMessage.warning("资产地址不是可下载的 HTTPS 地址");
         return;
     }
     const anchor = document.createElement("a");
@@ -1857,7 +1918,8 @@ function startVideoPolling() {
     if (activeWorkspace.value !== "video") return;
     videoPollTimer = window.setInterval(async () => {
         if (videoPollBusy || activeWorkspace.value !== "video") return;
-        const pending = videoRows.value.filter((row) => ["Preparing", "Queueing", "Processing"].includes(String(row.Status || "")));
+        const pending = videoRows.value.filter((row) => row.MiniMaxTaskHandle
+            && ["Preparing", "Queueing", "Processing"].includes(String(row.Status || "")));
         if (!pending.length) return;
         videoPollBusy = true;
         try {
@@ -3277,6 +3339,7 @@ async function copyText(text) {
 
 .video-section-heading {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
     gap: 24px;
@@ -3316,6 +3379,11 @@ async function copyText(text) {
     gap: 8px;
 }
 
+.video-quota-alert {
+    flex: 1 0 100%;
+    margin-top: 12px;
+}
+
 .video-create-form {
     max-width: 1040px;
 }
@@ -3349,6 +3417,11 @@ async function copyText(text) {
     max-height: 360px;
     border-radius: 12px;
     background: #111827;
+}
+
+.video-record-detail audio {
+    width: 100%;
+    align-self: center;
 }
 
 .video-record-detail strong {
