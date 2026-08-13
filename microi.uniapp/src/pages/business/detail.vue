@@ -10,7 +10,7 @@
 		</view>
 
 		<scroll-view class="detail-scroll" scroll-y refresher-enabled :refresher-triggered="refreshing"
-			@refresherrefresh="refresh">
+			:lower-threshold="120" @refresherrefresh="refresh" @scrolltolower="loadActiveRelatedPage">
 			<view v-if="loading" class="loading-state">
 				<view class="skeleton skeleton--hero"></view>
 				<view class="skeleton skeleton--line" v-for="index in 8" :key="index"></view>
@@ -166,7 +166,7 @@
 						:field="relatedTab.field"
 						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
-						parent-mode="View" display-mode="preview" show-preview-header :preview-limit="2"
+						parent-mode="View" display-mode="full"
 						:show-floating-add="false"
 						@floating-add-state="setStandaloneRelatedAddState(relatedTab, $event)"
 						@filter-open-state="setStandaloneRelatedFilterState(relatedTab, $event)" />
@@ -2120,6 +2120,19 @@
 						String(tab.field && (tab.field.Id || tab.field.id) || '')
 				) || candidates.find(Boolean)
 				if (target && typeof target.openAdd === 'function') target.openAdd()
+			},
+			// zhy：详情 Tab 直接复用完整关联列表；滚动到底按组件页码继续加载，
+			// 同时保留组件内“加载更多”按钮作为弱网和小程序滚动事件的交互兜底。
+			loadActiveRelatedPage() {
+				if (!this.standaloneChildTab || this.standaloneRelatedFilterOpen) return
+				const refs = this.$refs.standaloneRelatedList
+				const candidates = Array.isArray(refs) ? refs : [refs]
+				const target = candidates.find((item) =>
+					item && item.field && String(item.field.Id || item.field.id || '') ===
+						String(this.standaloneChildTab.field &&
+							(this.standaloneChildTab.field.Id || this.standaloneChildTab.field.id) || '')
+				) || candidates.find(Boolean)
+				if (target && typeof target.loadMore === 'function') target.loadMore()
 			},
 			initializeFormTabs() {
 				if (!this.formTabs.some((item) => item.key === this.activeFormTabKey)) {
