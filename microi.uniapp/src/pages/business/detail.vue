@@ -35,8 +35,10 @@
 						</view>
 						<text v-if="statusText" class="status-pill" :class="statusClass">{{ statusText }}</text>
 					</view>
-					<view v-if="heroMetrics.length" class="metric-row">
-						<view class="metric-item" v-for="metric in heroMetrics" :key="metric.label">
+					<view v-if="heroMetrics.length" class="metric-row"
+						:style="{ gridTemplateColumns: `repeat(${heroMetrics.length}, minmax(0, 1fr))` }">
+						<view class="metric-item" :class="{ 'metric-item--money': metric.format === 'compactMoney' }"
+							v-for="metric in heroMetrics" :key="metric.key || metric.label">
 							<text class="metric-value">{{ metric.value }}</text>
 							<text class="metric-label">{{ metric.label }}</text>
 						</view>
@@ -338,7 +340,9 @@
 		callApiEngine,
 		findMenu,
 		formatFieldValue,
-		openForm
+		loadModuleRows,
+		openForm,
+		statisticsFieldValue
 	} from '@/platform/business-runtime.js'
 	import {
 		isHtmlValue,
@@ -390,6 +394,15 @@
 		return ''
 	}
 
+	function formatCompactMoney(value) {
+		const amount = Number(value)
+		if (!Number.isFinite(amount)) return '-'
+		const absolute = Math.abs(amount)
+		if (absolute >= 100000000) return `¥${Number((amount / 100000000).toFixed(2))}亿`
+		if (absolute >= 10000) return `¥${Number((amount / 10000).toFixed(2))}万`
+		return `¥${amount.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`
+	}
+
 	const presets = {
 		customers: {
 			title: '客户详情',
@@ -399,14 +412,22 @@
 			metaField: 'KehuLX',
 			phoneFields: ['LianxiDH', 'FuzeRDH', 'ZhuanshuKFDH'],
 			metrics: [{
+					key: 'customer-device-count',
 					label: '设备',
-					field: 'ShebeiSL',
+					source: 'Runtime',
 					suffix: '台'
 				},
 				{
+					key: 'customer-order-count',
 					label: '订单',
-					field: 'DingdanSL',
+					source: 'Runtime',
 					suffix: '份'
+				},
+				{
+					key: 'customer-order-amount',
+					label: '金额',
+					source: 'Runtime',
+					format: 'compactMoney'
 				},
 				{
 					label: '综合评价',
@@ -1299,13 +1320,48 @@
 				return 'status-pill--info'
 			},
 			heroMetrics() {
-				return (this.preset.metrics || []).map((metric) => {
+				let metrics = [...(this.preset.metrics || [])]
+				if (this.key === 'customers') {
+					const configured = (label) => metrics.find((metric) => metric.label === label) || {}
+					// zhy：客户 Hero 的设备、订单与金额必须来自关联实表实时统计。
+					// ViewSchema 只保留标签/样式扩展，不能把指标重新指向未维护的主表冗余字段或可选接口。
+					metrics = [{
+						...configured('设备'),
+						key: 'customer-device-count',
+						label: '设备',
+						source: 'Runtime',
+						field: '',
+						apiEngineKey: '',
+						suffix: '台'
+					}, {
+						...configured('订单'),
+						key: 'customer-order-count',
+						label: '订单',
+						source: 'Runtime',
+						field: '',
+						apiEngineKey: '',
+						suffix: '份'
+					}, {
+						...configured('金额'),
+						key: 'customer-order-amount',
+						label: '金额',
+						source: 'Runtime',
+						format: 'compactMoney'
+					}, {
+						...configured('综合评价'),
+						label: '综合评价',
+						field: configured('综合评价').field || 'KehuZHPJ',
+						suffix: configured('综合评价').suffix || '分'
+					}]
+				}
+				return metrics.map((metric) => {
 					const key = metric.key || metric.field || metric.apiEngineKey
-					const remote = String(metric.source || '').toLowerCase() === 'apiengine'
-					const raw = remote ? this.metricValues[key] : this.detail[metric.field]
+					const metricSource = String(metric.source || '').toLowerCase()
+					const calculated = metricSource === 'apiengine' || metricSource === 'runtime'
+					const raw = calculated ? this.metricValues[key] : this.detail[metric.field]
 					const value = raw === null || raw === undefined || raw === '' || raw === '-' ?
 						'-' :
-						`${formatFieldValue(raw, metric.format)}${metric.suffix || ''}`
+						`${metric.format === 'compactMoney' ? formatCompactMoney(raw) : formatFieldValue(raw, metric.format)}${metric.suffix || ''}`
 					return {
 						...metric,
 						value
@@ -1861,6 +1917,7 @@
 							ModuleEngineKey: this.viewManifest?.Module?.ModuleEngineKey || ''
 						}
 					})
+					if (this.key === 'customers') await this.loadCustomerRelationMetrics()
 					if (!Object.keys(this.expandedSections).length) {
 						this.$nextTick(() => {
 							const first = this.visibleSections[0]
@@ -2120,6 +2177,37 @@
 						String(tab.field && (tab.field.Id || tab.field.id) || '')
 				) || candidates.find(Boolean)
 				if (target && typeof target.openAdd === 'function') target.openAdd()
+			},
+			// zhy：设备数、订单数和订单金额统一从关联模块实时统计，避免依赖
+			// Diy_Kehu.ShebeiSL / DingdanSL 这两个未必回写的冗余字段。
+			async loadCustomerRelationMetrics() {
+				const customerId = this.detail.Id || this.id
+				const loadSummary = async (moduleKey) => {
+					const config = getBusinessModule(moduleKey)
+					const menu = await findMenu(config.menuAliases || [], config.table)
+					return loadModuleRows({
+						...config,
+						menuId: menu?.Id || '',
+						moduleEngineKey: menu?.ModuleEngineKey || config.moduleEngineKey || config.table
+					}, {
+						pageIndex: 1,
+						pageSize: 1,
+						cacheAge: 0,
+						extraWhere: [{ Name: 'KehuID', Type: '=', Value: customerId }]
+					})
+				}
+				const [deviceSummary, orderSummary] = await Promise.allSettled([
+					loadSummary('devices'),
+					loadSummary('orders')
+				])
+				const values = { ...this.metricValues }
+				values['customer-device-count'] = deviceSummary.status === 'fulfilled'
+					? Number(deviceSummary.value.count || 0) : '-'
+				values['customer-order-count'] = orderSummary.status === 'fulfilled'
+					? Number(orderSummary.value.count || 0) : '-'
+				values['customer-order-amount'] = orderSummary.status === 'fulfilled'
+					? Number(statisticsFieldValue(orderSummary.value.append, 'DingdanJE', 0)) || 0 : '-'
+				this.metricValues = values
 			},
 			// zhy：详情 Tab 直接复用完整关联列表；滚动到底按组件页码继续加载，
 			// 同时保留组件内“加载更多”按钮作为弱网和小程序滚动事件的交互兜底。
@@ -3219,6 +3307,10 @@
 		justify-content: center;
 		gap: 10rpx;
 		line-height: 1;
+	}
+
+	.metric-item--money .metric-value {
+		font-size: 24rpx;
 	}
 
 	.action-button--edit,
