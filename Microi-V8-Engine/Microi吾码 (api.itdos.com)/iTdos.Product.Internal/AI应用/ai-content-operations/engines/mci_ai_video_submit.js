@@ -16,7 +16,7 @@ if (!assetId) return { Code: 0, Msg: 'AssetId 不能为空。请先在“AI内�
 var assetResult = V8.FormEngine.GetFormData('mci_ai_content_asset', { Id: assetId });
 if (!assetResult || assetResult.Code !== 1 || !assetResult.Data) return { Code: 0, Msg: '视频资产不存在。' };
 var asset = assetResult.Data;
-if (String(asset.AssetType || '') !== 'Video') return { Code: 0, Msg: '只有 Video 类型资产可以提交视频生成。' };
+if (String(asset.AssetType || '') !== 'VideoClip') return { Code: 0, Msg: '只有 VideoClip 分镜资产可以提交视频生成；VideoMaster 成片必须由审核通过的分镜与音乐合成。' };
 var contentResult = V8.FormEngine.GetFormData('mci_ai_content_item', { Id: asset.ContentId });
 if (!contentResult || contentResult.Code !== 1 || !contentResult.Data) return { Code: 0, Msg: '关联内容稿件不存在。' };
 var content = contentResult.Data;

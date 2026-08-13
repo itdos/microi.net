@@ -3,7 +3,7 @@ name: microi-form-engine
 description: Microi 表单引擎设计与控件配置指南。用于创建或修改 diy_table、diy_field、表单组件、字段属性、选项/SQL/数据源引擎数据源、子表、关联表单、定制组件、表单布局和字段事件。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi 表单引擎设计
 
@@ -12,7 +12,7 @@ description: Microi 表单引擎设计与控件配置指南。用于创建或修
 Config/Data、菜单查询列与缓存保持一致。
 
 平台创建 DIY 表时会自动加入 `DiyCommon.FixedDiyField` 定义的 Id、创建/更新时间、
-创建人、租户等固定字段。业务 Manifest 不重复声明这些字段；读取 `db.json` 时也不能
+创建人、租户等固定字段。业务 Manifest 不重复声明这些字段；读取实时 Schema 或离线快照时也不能
 因为 `_Fields` 只列出可配置字段，就误判物理表缺少固定字段。
 
 ## 必读参考

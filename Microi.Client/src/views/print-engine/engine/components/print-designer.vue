@@ -12,70 +12,70 @@
       </div>
       <div class="mpe-toolbar__center">
         <div class="mpe-btn-group">
-          <button class="mpe-btn" @click.stop="undo" title="撤销 (Ctrl+Z)">
+          <button class="mpe-btn" @click.stop="undo" :title="$t('Msg.PrintEngine.undo') + ' (Ctrl+Z)'">
             <el-icon :size="15"><Back /></el-icon>
-            <span>撤销</span>
+            <span>{{ $t("Msg.PrintEngine.undo") }}</span>
           </button>
-          <button class="mpe-btn" @click.stop="redo" title="重做 (Ctrl+Y)">
+          <button class="mpe-btn" @click.stop="redo" :title="$t('Msg.PrintEngine.redo') + ' (Ctrl+Y)'">
             <el-icon :size="15"><Right /></el-icon>
-            <span>重做</span>
+            <span>{{ $t("Msg.PrintEngine.redo") }}</span>
           </button>
         </div>
         <div class="mpe-divider-v"></div>
         <div class="mpe-btn-group">
-          <button class="mpe-btn" @click.stop="rotatePaper" title="旋转纸张">
+          <button class="mpe-btn" @click.stop="rotatePaper" :title="$t('Msg.PrintEngine.rotatePaper')">
             <el-icon :size="15"><RefreshRight /></el-icon>
-            <span>旋转</span>
+            <span>{{ $t("Msg.PrintEngine.rotate") }}</span>
           </button>
-          <el-popconfirm width="200" confirm-button-text="确定" cancel-button-text="再想想" title="您确定要清空纸张吗?" @confirm="clearPaper">
+          <el-popconfirm width="200" :confirm-button-text="$t('Msg.PrintEngine.confirm')" :cancel-button-text="$t('Msg.PrintEngine.reconsider')" :title="$t('Msg.PrintEngine.clearConfirm')" @confirm="clearPaper">
             <template #reference>
-              <button class="mpe-btn" title="清空纸张">
+            <button class="mpe-btn" :title="$t('Msg.PrintEngine.clearPaper')">
                 <el-icon :size="15"><Delete /></el-icon>
-                <span>清空</span>
+              <span>{{ $t("Msg.PrintEngine.clear") }}</span>
               </button>
             </template>
           </el-popconfirm>
-          <button class="mpe-btn" @click.stop="exportJson" title="导出JSON">
+          <button class="mpe-btn" @click.stop="exportJson" :title="$t('Msg.PrintEngine.exportJson')">
             <el-icon :size="15"><Memo /></el-icon>
             <span>JSON</span>
           </button>
-          <el-popconfirm width="200" confirm-button-text="确定" cancel-button-text="再想想" title="加载模拟数据会覆盖当前纸张,您确定操作吗?" @confirm="loadMockData">
+          <el-popconfirm width="200" :confirm-button-text="$t('Msg.PrintEngine.confirm')" :cancel-button-text="$t('Msg.PrintEngine.reconsider')" :title="$t('Msg.PrintEngine.mockConfirm')" @confirm="loadMockData">
             <template #reference>
-              <button class="mpe-btn" title="加载模板">
+            <button class="mpe-btn" :title="$t('Msg.PrintEngine.loadTemplate')">
                 <el-icon :size="15"><Star /></el-icon>
-                <span>模板</span>
+              <span>{{ $t("Msg.PrintEngine.template") }}</span>
               </button>
             </template>
           </el-popconfirm>
-          <button class="mpe-btn" @click.stop="showDataDialog" title="数据管理">
+          <button class="mpe-btn" @click.stop="showDataDialog" :title="$t('Msg.PrintEngine.dataManager')">
             <el-icon :size="15"><Tickets /></el-icon>
-            <span>数据</span>
+            <span>{{ $t("Msg.PrintEngine.data") }}</span>
           </button>
         </div>
         <div class="mpe-divider-v"></div>
         <div class="mpe-btn-group">
-          <button class="mpe-btn mpe-btn--success" @click.stop="getHtml" title="预览">
+          <button class="mpe-btn mpe-btn--success" @click.stop="getHtml" :title="$t('Msg.PrintEngine.preview')">
             <el-icon :size="15"><Monitor /></el-icon>
-            <span>预览</span>
+            <span>{{ $t("Msg.PrintEngine.preview") }}</span>
           </button>
-          <button class="mpe-btn mpe-btn--primary" @click.stop="doPrint" title="浏览器打印">
+          <button class="mpe-btn mpe-btn--primary" @click.stop="doPrint" :title="$t('Msg.PrintEngine.browserPrint')">
             <el-icon :size="15"><Printer /></el-icon>
-            <span>打印</span>
+            <span>{{ $t("Msg.PrintEngine.print") }}</span>
           </button>
-          <el-popconfirm class="box-item" title="确定直接打印吗?" placement="top-start" @confirm="onlyPrint2" confirm-button-text="确定" cancel-button-text="取消">
+          <el-popconfirm class="box-item" :title="$t('Msg.PrintEngine.directConfirm')" placement="top-start" @confirm="onlyPrint2" :confirm-button-text="$t('Msg.PrintEngine.confirm')" :cancel-button-text="$t('Msg.PrintEngine.cancel')">
             <template #reference>
-              <button class="mpe-btn mpe-btn--primary" title="直接打印">
+            <button class="mpe-btn mpe-btn--primary" :title="$t('Msg.PrintEngine.directPrint')">
                 <el-icon :size="15"><Printer /></el-icon>
-                <span>直接打印</span>
+              <span>{{ $t("Msg.PrintEngine.directPrint") }}</span>
               </button>
             </template>
           </el-popconfirm>
         </div>
       </div>
       <div class="mpe-toolbar__right">
-        <button class="mpe-btn mpe-btn--warning" @click.stop="saveFormData" title="保存模板">
+          <button class="mpe-btn mpe-btn--warning" @click.stop="saveFormData" :title="$t('Msg.PrintEngine.saveTemplate')">
           <el-icon :size="15"><Collection /></el-icon>
-          <span>保存</span>
+            <span>{{ $t("Msg.PrintEngine.save") }}</span>
         </button>
       </div>
     </div>
@@ -90,7 +90,7 @@
               <template #label>
                 <span class="mpe-tab-label">
                   <el-icon :size="14"><Rank /></el-icon>
-                  基础组件
+              {{ $t("Msg.PrintEngine.basicComponents") }}
                 </span>
               </template>
             </el-tab-pane>
@@ -98,7 +98,7 @@
               <template #label>
                 <span class="mpe-tab-label">
                   <el-icon :size="14"><Cpu /></el-icon>
-                  扩展组件
+              {{ $t("Msg.PrintEngine.extendedComponents") }}
                 </span>
               </template>
             </el-tab-pane>
@@ -118,19 +118,19 @@
             <template v-for="(value, type) in paperTypes" :key="type">
               <button class="mpe-paper-btn" :class="{ 'mpe-paper-btn--active': curPaperType === type }" @click="setPaper(type, value)">{{ type }}</button>
             </template>
-            <button class="mpe-paper-btn" @click="showPaperPop">自定义</button>
+            <button class="mpe-paper-btn" @click="showPaperPop">{{ $t("Msg.PrintEngine.custom") }}</button>
           </div>
           <div class="mpe-popover-anchor">
             <div class="mpe-popover" v-show="paperPopVisible">
-              <div class="mpe-popover__title">设置纸张宽高(mm)</div>
+              <div class="mpe-popover__title">{{ $t("Msg.PrintEngine.paperSize") }}</div>
               <div class="mpe-popover__row">
-                <el-input size="small" v-model="paperWidth" placeholder="宽(mm)" />
+                <el-input size="small" v-model="paperWidth" :placeholder="$t('Msg.PrintEngine.width')" />
                 <span class="mpe-popover__sep">×</span>
-                <el-input size="small" v-model="paperHeight" placeholder="高(mm)" />
+                <el-input size="small" v-model="paperHeight" :placeholder="$t('Msg.PrintEngine.height')" />
               </div>
               <div class="mpe-popover__actions">
-                <el-button size="small" type="primary" @click.stop="setPaperOther">确定</el-button>
-                <el-button size="small" @click.stop="paperPopVisible = false">取消</el-button>
+                <el-button size="small" type="primary" @click.stop="setPaperOther">{{ $t("Msg.PrintEngine.confirm") }}</el-button>
+                <el-button size="small" @click.stop="paperPopVisible = false">{{ $t("Msg.PrintEngine.cancel") }}</el-button>
               </div>
             </div>
           </div>
@@ -152,24 +152,24 @@
         <div class="mpe-sidebar__header">
           <div class="mpe-panel-title">
             <el-icon :size="14"><Operation /></el-icon>
-            <span>属性面板</span>
+            <span>{{ $t("Msg.PrintEngine.properties") }}</span>
           </div>
         </div>
         <div class="mpe-sidebar__body">
           <el-form label-position="top" class="mpe-prop-form">
-            <el-form-item label="模板编号">
+            <el-form-item :label="$t('Msg.PrintEngine.templateCode')">
               <el-input disabled v-model="pageInfo.remoteData.Number" placeholder="" size="small"></el-input>
             </el-form-item>
-            <el-form-item label="模板标题">
+            <el-form-item :label="$t('Msg.PrintEngine.templateTitle')">
               <el-input v-model="pageInfo.remoteData.Title" placeholder="" size="small"></el-input>
             </el-form-item>
-            <el-form-item label="模板简介">
+            <el-form-item :label="$t('Msg.PrintEngine.templateDescription')">
               <el-input v-model="pageInfo.remoteData.Desc" placeholder="" type="textarea" :rows="2" size="small"></el-input>
             </el-form-item>
-            <el-form-item label="接口引擎">
+            <el-form-item :label="$t('Msg.PrintEngine.apiEngine')">
               <el-select
                 v-model="selectedApiEngineId"
-                placeholder="选择接口引擎快速填充"
+                  :placeholder="$t('Msg.PrintEngine.selectApi')"
                 size="small"
                 filterable
                 clearable
@@ -184,8 +184,8 @@
                 />
               </el-select>
             </el-form-item>
-            <el-form-item label="数据接口">
-              <el-input v-model="pageInfo.remoteData.DataApi" placeholder="请输入动态数据webapi接口地址" type="textarea" :rows="2" size="small"></el-input>
+            <el-form-item :label="$t('Msg.PrintEngine.dataApi')">
+              <el-input v-model="pageInfo.remoteData.DataApi" :placeholder="$t('Msg.PrintEngine.dataApiPlaceholder')" type="textarea" :rows="2" size="small"></el-input>
             </el-form-item>
           </el-form>
           <div class="mpe-element-options">
@@ -198,7 +198,7 @@
 
   <print-preview ref="previewDialog" />
 
-  <el-drawer size="50%" title="页面数据" v-model="pageInfo.pageDialog" direction="ltr">
+    <el-drawer size="50%" :title="$t('Msg.PrintEngine.pageData')" v-model="pageInfo.pageDialog" direction="ltr">
     <el-form>
       <el-form-item label="">
         <JsonEditor v-if="pageInfo.pageDialog" height="600px" v-model="pageInfo.pageStr" :option="jsonEditorOption" />
@@ -206,10 +206,10 @@
     </el-form>
   </el-drawer>
 
-  <el-drawer size="50%" title="动态数据" v-model="pageInfo.dataDialog" direction="ltr" @closed="updateData">
+    <el-drawer size="50%" :title="$t('Msg.PrintEngine.dynamicData')" v-model="pageInfo.dataDialog" direction="ltr" @closed="updateData">
     <el-form>
       <el-form-item label="">
-        <el-button @click="getDataTemp">查看动态数据JSON结构</el-button>
+          <el-button @click="getDataTemp">{{ $t("Msg.PrintEngine.viewDataJson") }}</el-button>
       </el-form-item>
       <el-form-item label="">
         <JsonEditor v-if="pageInfo.dataDialog" height="600px" v-model="pageInfo.printStr" :option="jsonEditorOption" />
@@ -220,7 +220,7 @@
   <!-- 代码编辑器弹窗 (用于增强hiprint函数类配置项) -->
   <el-dialog
     v-model="codeEditorState.visible"
-    :title="'编辑代码 - ' + codeEditorState.fieldName"
+      :title="$t('Msg.PrintEngine.editCode', { field: codeEditorState.fieldName })"
     width="70%"
     top="5vh"
     destroy-on-close
@@ -239,8 +239,8 @@
       height="500px"
     />
     <template #footer>
-      <el-button @click="codeEditorState.visible = false">取 消</el-button>
-      <el-button type="primary" @click="saveCodeEditorValue">确 定</el-button>
+        <el-button @click="codeEditorState.visible = false">{{ $t("Msg.PrintEngine.cancel") }}</el-button>
+        <el-button type="primary" @click="saveCodeEditorValue">{{ $t("Msg.PrintEngine.confirm") }}</el-button>
     </template>
   </el-dialog>
 </template>
@@ -256,6 +256,7 @@ import {
   defineAsyncComponent,
 } from 'vue'
 import { ElMessage, ElNotification } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { hiprint } from 'vue-plugin-hiprint'
 import { DiyCommon } from '@/utils/diy.common'
 import { buildDefaultRemoteData } from '../utils/util.js'
@@ -264,6 +265,7 @@ import { usePrintEngineStore } from '../stores/printEngine'
 import { get } from '../utils/axiosInstance'
 import { isObjectOrArray } from '../utils/util'
 const printEngineStore = usePrintEngineStore()
+const { t } = useI18n()
 
 import {
   Moon,
@@ -333,7 +335,7 @@ const props = defineProps({
 //页面配置信息
 const pageInfo = reactive({
   setting: {
-    title: '打印引擎',
+    title: t('Msg.PrintEngine.title'),
     version: 'V1.0.0',
     activeName: 'first', //选项卡索引
   },
@@ -408,7 +410,7 @@ const loadApiEngines = async () => {
       apiEngineList.value = res.Data || []
     }
   } catch (e) {
-    console.error('[PrintEngine] 加载接口引擎列表失败:', e)
+      console.error('[PrintEngine] API Engine list load failed:', e)
   }
 }
 const selectedApiEngineId = ref(null)
@@ -484,7 +486,7 @@ const isFuncTextarea = (textarea) => {
   if (FUNC_LABEL_KEYWORDS.test(labelText)) return labelText
   // 也检查 placeholder 是否包含 function 关键字
   const placeholder = textarea.getAttribute('placeholder') || ''
-  if (placeholder.startsWith('function')) return labelText || '函数'
+  if (placeholder.startsWith('function')) return labelText || t('Msg.PrintEngine.functionLabel')
   return null
 }
 
@@ -500,7 +502,7 @@ const enhanceTextarea = (textarea) => {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mpe-code-edit-btn'
-  btn.innerHTML = '<svg viewBox="0 0 1024 1024" width="14" height="14" style="vertical-align:-2px;margin-right:4px;fill:currentColor"><path d="M149.6 904.8h64.8l534.4-534.4-64.8-64.8-534.4 534.4v64.8zm-80 80v-113.6l614.4-614.4 113.6 113.6-614.4 614.4H69.6zm693.2-693.2l-48-48 50.4-50.4c13.2-13.2 34.8-13.2 48 0l0.8 0.8c13.2 13.2 13.2 34.8 0 48l-51.2 49.6z"/></svg>编辑代码'
+    btn.innerHTML = '<svg viewBox="0 0 1024 1024" width="14" height="14" style="vertical-align:-2px;margin-right:4px;fill:currentColor"><path d="M149.6 904.8h64.8l534.4-534.4-64.8-64.8-534.4 534.4v64.8zm-80 80v-113.6l614.4-614.4 113.6 113.6-614.4 614.4H69.6zm693.2-693.2l-48-48 50.4-50.4c13.2-13.2 34.8-13.2 48 0l0.8 0.8c13.2 13.2 13.2 34.8 0 48l-51.2 49.6z"/></svg>' + t('Msg.PrintEngine.editCodeButton')
   btn.addEventListener('click', (e) => {
     e.preventDefault()
     e.stopPropagation()
@@ -566,19 +568,19 @@ const buildDesigner = () => {
     template: pageInfo.remoteData.PageObj, // 页面对象json(object)
     settingContainer: '#PrintElementOptionSetting', // 元素参数容器
     paginationContainer: '.hiprint-printPagination',
-    defaultPanelName: '默认面板名称',
+    defaultPanelName: t('Msg.PrintEngine.defaultPanel'),
     history: true, // 启用撤销/重做功能
     onDataChanged: (type, json) => {
       console.log('[PrintEngine] 模板变更:', type)
     },
     onPanelAddClick: (panel, createPanel) => {
-      panel.name = '新面板' + (panel.index + 1)
+        panel.name = t('Msg.PrintEngine.newPanel', { index: panel.index + 1 })
 
       createPanel(panel)
 
       ElNotification({
         title: panel.name,
-        message: '新面板创建成功',
+          message: t('Msg.PrintEngine.newPanelSuccess'),
         type: 'success',
       })
     },
@@ -728,12 +730,12 @@ const onlyPrint2 = () => {
       hiprintTemplate.print2(pageInfo.remoteData.PrintObj, {
         client: key,
         printer: nodeTransition.printer,
-        title: '直接打印',
+        title: t('Msg.PrintEngine.directPrintTitle'),
         printByFragments: dataType === 'array' ? true : false, // 是否需要分批打印，分批打印能够支持连续打印大量数据，但会增加打印所需时间
       })
     } else {
       hiprintTemplate.print2(pageInfo.remoteData.PrintObj, {
-        title: '直接打印',
+        title: t('Msg.PrintEngine.directPrintTitle'),
         printByFragments: dataType === 'array' ? true : false, // 是否需要分批打印，分批打印能够支持连续打印大量数据，但会增加打印所需时间
       })
     }
@@ -742,16 +744,16 @@ const onlyPrint2 = () => {
     hiprintTemplate.off && hiprintTemplate.off('printSuccess')
     hiprintTemplate.on('printSuccess', function () {
       ElNotification({
-        title: '打印回调',
-        message: '打印成功',
+      title: t('Msg.PrintEngine.printCallback'),
+      message: t('Msg.PrintEngine.printSuccess'),
         type: 'success',
       })
     })
     return
   } else {
     ElNotification({
-      title: '客户端未连接',
-      message: '连接【' + window.hiwebSocket.host + '】失败！',
+      title: t('Msg.PrintEngine.clientDisconnected'),
+      message: t('Msg.PrintEngine.connectFailed', { host: window.hiwebSocket.host }),
       type: 'error',
     })
   }
@@ -774,7 +776,7 @@ const rotatePaper = () => {
   hiprintTemplate.rotatePaper()
 
   ElMessage({
-    message: '纸张已旋转',
+      message: t('Msg.PrintEngine.paperRotated'),
     type: 'success',
   })
 }
@@ -845,8 +847,8 @@ const loadDataApi = async (url) => {
       buildDesigner()
     }
   } catch (error) {
-    console.error('[PrintEngine] 加载数据接口失败:', error)
-    ElMessage.error('加载数据接口失败')
+    console.error('[PrintEngine] data API load failed:', error)
+    ElMessage.error(t('Msg.PrintEngine.dataLoadFailed'))
   }
 }
 
@@ -973,7 +975,7 @@ const saveFormData = async () => {
   window.parent.postMessage({ key: 'savePrintJson', value: dataToSend }, '*')
 
   ElMessage({
-    message: '保存成功',
+      message: t('Msg.PrintEngine.saveSuccess'),
     type: 'success',
   })
 

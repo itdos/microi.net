@@ -3,7 +3,7 @@ name: microi-microservice
 description: Microi 前端微服务 MicroService 开发与交付指南。用于创建、读取、修改、构建、发布或修复 Vue3 微应用，维护 microi.routes.json，绑定 sys_menu，使用 V8.OpenAppDialog，或通过 MCP 管理 Web、UniApp、MicroService 应用源码和运行时。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi 前端微服务
 
@@ -179,6 +179,13 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 子应用根容器使用 `min-height: var(--micro-app-available-height, 100vh)`；`100vh` 只能作为脱离
 吾码宿主独立预览时的回退值。不得直接写死 `min-height: 100vh`、`calc(100vh - 100px)` 等
 只适配浏览器视口或某个主站布局的高度，否则嵌入 TagsView、弹窗或移动端时会被裁剪或产生双滚动。
+
+菜单型微服务必须只有一个纵向滚动所有者：宿主外层隐藏溢出，`<micro-app>` 边界提供默认
+`overflow-y:auto` 兜底。普通长页面保持自然高度即可；子应用若需要 sticky 工具栏、虚拟列表等
+内部滚动，则自己的滚动容器必须具有基于 `--micro-app-available-height` 的确定高度和
+`overflow-y:auto`。真实子滚动容器会把内容约束在边界内，框架兜底条自动不出现；只给自动高度
+根节点写 `overflow:auto` 不算自滚动容器。验收需分别覆盖框架兜底和子应用自滚动，断言任一时刻
+只有一个 `scrollHeight > clientHeight` 的纵向滚动所有者。
 
 加载/协议/运行时异常只由宿主兜底显示；子应用业务错误标记 `handled=true` 后宿主不得重复提示。
 加载失败页至少显示 AppKey、PageKey、路由、版本、入口、HTTP 状态、发布状态、资产来源、挂载状态和安全原因码，并提供重试、返回与复制诊断。

@@ -122,7 +122,7 @@ export default {
             var detail = {
                 pageId: this.remoteObj.Id,
                 routeFullPath: this.$route.fullPath,
-                title: this.remoteObj.Title || "界面引擎"
+                title: this.remoteObj.Title || this.$t("Msg.PageEngine.title")
             };
             this.$route.meta.PageEngineId = this.remoteObj.Id;
             window.dispatchEvent(new CustomEvent("microi:page-engine-design-context", { detail: detail }));

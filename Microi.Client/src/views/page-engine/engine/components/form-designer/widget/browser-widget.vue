@@ -13,7 +13,7 @@
       sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-downloads"
       referrerpolicy="no-referrer"
     >
-      <p>你的浏览器不支持iframe标签</p>
+      <p>{{ $pet('你的浏览器不支持iframe标签') }}</p>
     </iframe>
 
     <!-- 遮罩层 -->

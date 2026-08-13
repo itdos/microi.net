@@ -51,7 +51,7 @@ function engineVersion(source) {
 
 const defaultBulkImporter = engineSource(
   'bulk-import-microi-store-packages',
-  'v1.1.3',
+  'v1.1.4',
   'return { Code: 1 };',
 );
 
@@ -502,8 +502,8 @@ test('共同基线已有内嵌引擎但官网副本缺失时自动恢复且不�
   );
   const localBulk = engineSource(
     'bulk-import-microi-store-packages',
-    'v1.1.3',
-    'return { Code: 1, Data: { Version: 3 } };',
+    'v1.1.4',
+    'return { Code: 1, Data: { Version: 4 } };',
   );
   const basePackage = applicationStorePackage({ importer, publisher, builder, bulk: baseBulk });
   const localPackage = applicationStorePackage({ importer, publisher, builder, bulk: localBulk });
@@ -569,7 +569,7 @@ test('官网缺失副本但共同基线引擎 Id 已被其它 Key 占用时阻�
   const importer = engineSource('import-microi-store-package', 'v1.0.0', 'return { Code: 1 };');
   const publisher = engineSource('ai_app_publish_store', 'v1.5.3', 'return { Code: 1 };');
   const builder = engineSource('ai_app_build', 'v1.3.0', 'return { Code: 1 };');
-  const bulk = engineSource('bulk-import-microi-store-packages', 'v1.1.3', 'return { Code: 1 };');
+  const bulk = engineSource('bulk-import-microi-store-packages', 'v1.1.4', 'return { Code: 1 };');
   const basePackage = applicationStorePackage({ importer, publisher, builder, bulk });
   const remoteModel = JSON.parse(basePackage);
   remoteModel.SysApiEngines.find(

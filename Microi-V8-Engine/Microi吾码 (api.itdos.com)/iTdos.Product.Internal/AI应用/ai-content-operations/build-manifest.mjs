@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = dirname(fileURLToPath(import.meta.url))
-const builtAt = '2026-08-09 00:00:00'
+const builtAt = '2026-08-13 00:00:00'
 
 const option = (items) => ({
   sourceType: 'KeyValue',
@@ -129,7 +129,7 @@ const tables = [
   table('mci_ai_content_asset', 'AI内容图片、截图和视频资产', [
     field('AssetKey', '资产幂等Key', 'varchar(160)', 'Text', { tab: 'base', notEmpty: 1, unique: 1, sort: 10 }),
     field('ContentId', '内容Id', 'varchar(50)', 'Text', { tab: 'base', notEmpty: 1, sort: 20 }),
-    field('AssetType', '资产类型', 'varchar(50)', 'Select', { tab: 'base', configSource: option([['Cover', '封面'], ['BodyImage', '正文图'], ['Screenshot', '真实截图'], ['ImageCard', '竖版卡片'], ['VideoFirstFrame', '视频首帧'], ['Video', '视频']]), sort: 30 }),
+    field('AssetType', '资产类型', 'varchar(50)', 'Select', { tab: 'base', configSource: option([['Cover', '封面'], ['BodyImage', '正文图'], ['Screenshot', '真实截图'], ['ImageCard', '竖版卡片'], ['VideoFirstFrame', '视频首帧'], ['VideoClip', '视频分镜原片'], ['VideoMaster', '唯一发布成片'], ['AudioMusic', 'MiniMax纯音乐']]), sort: 30 }),
     field('Platform', '目标平台', 'varchar(100)', 'Text', { tab: 'base', sort: 40 }),
     field('SequenceNo', '顺序', 'int', 'NumberText', { tab: 'base', sort: 50 }),
     field('Prompt', '生成提示词', 'mediumtext', 'Textarea', { tab: 'generation', formWidth: 24, sort: 60 }),
@@ -140,10 +140,13 @@ const tables = [
     field('Model', '生成模型', 'varchar(200)', 'Text', { tab: 'generation', sort: 110 }),
     field('Duration', '视频秒数', 'int', 'NumberText', { tab: 'generation', sort: 120 }),
     field('Resolution', '分辨率', 'varchar(50)', 'Text', { tab: 'generation', sort: 130 }),
-    field('Status', '状态', 'varchar(50)', 'Select', { tab: 'review', configSource: option([['Draft', '待生成'], ['Queueing', '排队中'], ['Processing', '生成中'], ['ReviewRequired', '待验片'], ['Approved', '已通过'], ['Rejected', '已拒绝'], ['Failed', '失败']]), sort: 140 }),
-    field('ReviewStatus', '审核状态', 'varchar(50)', 'Select', { tab: 'review', configSource: option([['Pending', '待审核'], ['Approved', '已通过'], ['Rejected', '已拒绝']]), sort: 150 }),
-    field('QualityScore', '质量分', 'int', 'NumberText', { tab: 'review', sort: 160 }),
-    field('QualityReview', '质量审核说明', 'mediumtext', 'Textarea', { tab: 'review', formWidth: 24, sort: 170 })
+    field('HasAudio', '包含可听音轨', 'int', 'Switch', { tab: 'review', defaultValue: '0', sort: 140, description: '只有 ffprobe 已确认音轨且响度达标的唯一 VideoMaster 才可设为 1。' }),
+    field('ArtifactHash', '文件SHA-256', 'varchar(100)', 'Text', { tab: 'review', readonly: 1, sort: 150 }),
+    jsonField('MediaInfoJson', '媒体探测证据', 160, 'review', '保存 ffprobe、音轨、响度、实际分辨率、FPS、时长和编码器证据；不得保存密钥。'),
+    field('Status', '状态', 'varchar(50)', 'Select', { tab: 'review', configSource: option([['Draft', '待生成'], ['Generating', '生成中'], ['Queueing', '排队中'], ['Processing', '生成中'], ['ReviewRequired', '待验片'], ['Approved', '已通过'], ['Rejected', '已拒绝'], ['Failed', '失败']]), sort: 170 }),
+    field('ReviewStatus', '审核状态', 'varchar(50)', 'Select', { tab: 'review', configSource: option([['Pending', '待审核'], ['Approved', '已通过'], ['Rejected', '已拒绝']]), sort: 180 }),
+    field('QualityScore', '质量分', 'int', 'NumberText', { tab: 'review', sort: 190 }),
+    field('QualityReview', '质量审核说明', 'mediumtext', 'Textarea', { tab: 'review', formWidth: 24, sort: 200 })
   ], [
     { name: 'uk_mci_ai_content_asset_key', columns: ['AssetKey'], unique: true, purpose: '资产稳定幂等键' },
     { name: 'idx_mci_ai_content_asset_content_status', columns: ['ContentId', 'Status'], unique: false, purpose: '稿件资产与验片列表' },
@@ -213,6 +216,7 @@ const engineSpecs = [
   ['mci-ai-content-quality-gate', '内容平台质量门禁', 'mci_ai_content_quality_gate.js', 'Managed', 0],
   ['mci-ai-video-submit', 'MiniMax视频任务创建', 'mci_ai_video_submit.js', 'Managed', 0],
   ['mci-ai-video-refresh', 'MiniMax视频任务回读', 'mci_ai_video_refresh.js', 'Managed', 0],
+  ['mci-ai-music-generate', 'MiniMax纯音乐生成', 'mci_ai_music_generate.js', 'Managed', 0],
   ['mci-ai-publish-prepare', '多平台发布队列准备', 'mci_ai_publish_prepare.js', 'Managed', 0],
   ['mci-ai-publish-claim', '本机连接器认领发布任务', 'mci_ai_publish_claim.js', 'Managed', 0],
   ['mci-ai-publish-complete', '本机连接器提交发布结果', 'mci_ai_publish_complete.js', 'Managed', 0],
@@ -235,7 +239,8 @@ const buttonIds = {
   'mci-ai-content-quality-gate': '01KZKB8A000000000000000002',
   'mci-ai-video-submit': '01KZKB8A000000000000000003',
   'mci-ai-video-refresh': '01KZKB8A000000000000000004',
-  'mci-ai-scheduler-reconcile': '01KZKB8A000000000000000005'
+  'mci-ai-scheduler-reconcile': '01KZKB8A000000000000000005',
+  'mci-ai-music-generate': '01KZKB8A000000000000000006'
 }
 
 const rowButton = (name, style, engine, show = 'V8.Result=true;') => ({
@@ -281,8 +286,9 @@ const modules = [
     rowButton('执行质量门禁', 'warning', 'mci-ai-content-quality-gate', "V8.Result=['QualityReview','Ready','BlockedQuality','NeedsReview'].indexOf(V8.Form.Status)>=0;")
   ]),
   module('AI内容素材', 'mci_ai_content_asset', ['AssetKey', 'ContentId', 'AssetType', 'Platform', 'SequenceNo', 'Status', 'ReviewStatus', 'QualityScore'], ['AssetKey', 'ContentId', 'AssetType', 'Platform', 'Status'], ['AssetType', 'Platform', 'Status'], [
-    rowButton('提交MiniMax视频', 'primary', 'mci-ai-video-submit', "V8.Result=V8.Form.AssetType=='Video'&&['Draft','Failed'].indexOf(V8.Form.Status)>=0;"),
-    rowButton('刷新视频状态', 'success', 'mci-ai-video-refresh', "V8.Result=V8.Form.AssetType=='Video'&&['Queueing','Processing'].indexOf(V8.Form.Status)>=0;")
+    rowButton('提交MiniMax视频', 'primary', 'mci-ai-video-submit', "V8.Result=V8.Form.AssetType=='VideoClip'&&['Draft','Failed'].indexOf(V8.Form.Status)>=0;"),
+    rowButton('刷新视频状态', 'success', 'mci-ai-video-refresh', "V8.Result=V8.Form.AssetType=='VideoClip'&&['Queueing','Processing'].indexOf(V8.Form.Status)>=0;"),
+    rowButton('生成MiniMax纯音乐', 'warning', 'mci-ai-music-generate', "V8.Result=V8.Form.AssetType=='AudioMusic'&&['Draft','Failed'].indexOf(V8.Form.Status)>=0;")
   ]),
   module('AI发布队列', 'mci_ai_publish_task', ['Platform', 'AccountName', 'ContentMode', 'Status', 'AttemptCount', 'NextRetryTime', 'CompletedTime'], ['Platform', 'AccountName', 'ContentMode', 'Status'], ['Platform', 'AccountName', 'Status']),
   module('AI发布记录', 'mci_ai_publish_attempt', ['PublishTaskId', 'AttemptNo', 'Status', 'RemoteTaskId', 'PublicUrl', 'FinishedTime'], ['PublishTaskId', 'Status', 'RemoteTaskId'], ['Status', 'RemoteTaskId', 'FinishedTime'])
@@ -308,13 +314,23 @@ const jobs = [
     JobType: '1',
     ApiEngineKey: 'mci-ai-content-dispatch',
     JobParam: JSON.stringify({ PlanKey: 'microi-ai-content-default', Slot: 'pm', Timezone: 'Asia/Shanghai' })
+  },
+  {
+    JobName: 'MciAiMusicWorker',
+    JobDesc: '每分钟认领一个待生成的MiniMax纯音乐资产',
+    CronDesc: '每分钟执行一次',
+    CronExpression: '0 0/1 * * * ?',
+    TimeZoneId: 'Asia/Shanghai',
+    JobType: '1',
+    ApiEngineKey: 'mci-ai-music-generate',
+    JobParam: JSON.stringify({ Worker: 'MciAiMusicWorker', BatchSize: 1 })
   }
 ]
 
 const manifest = {
   name: 'Microi吾码 AI 内容创作与发布',
-  version: 'v1.0.10',
-  description: '在线AI文章生成、MiniMax视频、短视频平台质量门禁、持久发布队列与本机多平台连接器协同。',
+  version: 'v1.1.0',
+  description: '在线AI文章生成、MiniMax视频与纯音乐、唯一带音轨成片质量门禁、持久发布队列与本机多平台连接器协同。',
   tables,
   engines,
   events: [],

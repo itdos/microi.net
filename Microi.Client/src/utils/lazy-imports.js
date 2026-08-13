@@ -71,19 +71,9 @@ export const loadFullCalendar = () => {
     return import('@fullcalendar/vue3');
 };
 
-// Chart.js 图表懒加载(如果只在特定页面使用)
-export const loadChart = () => {
-    return import('vue-chart-3');
-};
-
 // Excel 处理懒加载
 export const loadXlsx = () => {
     return import('xlsx');
-};
-
-// CodeMirror 懒加载
-export const loadCodeMirror = () => {
-    return import('codemirror');
 };
 
 // 打印库懒加载

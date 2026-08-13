@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -707,6 +708,45 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 将当前管理员的视频文件从 MiniMax 临时地址转存到本租户公有 HDFS，
+        /// 返回可供后台下载和发布连接器读取的持久地址。
+        /// </summary>
+        [HttpPost]
+        [PlatformAdminOnly]
+        public async Task<JsonResult> PersistMiniMaxVideoFile([FromBody] MiniMaxVideoFileParam param)
+        {
+            var token = await DiyToken.GetCurrentToken();
+            var currentUser = token?.CurrentUser == null
+                ? null
+                : JObject.FromObject(token.CurrentUser);
+            var userId = currentUser?["Id"]?.ToString();
+            return Json(await _proxyService.PersistAuthenticatedVideoFileAsync(
+                userId,
+                token?.OsClient ?? string.Empty,
+                currentUser,
+                param,
+                HttpContext.RequestAborted));
+        }
+
+        /// <summary>
+        /// 生成 MiniMax 无人声纯音乐并直接写入当前租户 HDFS。供应商 Key、
+        /// 临时响应和音频十六进制数据不会返回浏览器。
+        /// </summary>
+        [HttpPost]
+        [PlatformAdminOnly]
+        public async Task<JsonResult> GenerateMiniMaxMusic([FromBody] MiniMaxMusicGenerateParam param)
+        {
+            var token = await DiyToken.GetCurrentToken();
+            var currentUser = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
+            return Json(await _proxyService.GenerateAuthenticatedMusicAsync(
+                currentUser?["Id"]?.ToString(),
+                token?.OsClient ?? string.Empty,
+                currentUser,
+                param,
+                HttpContext.RequestAborted));
+        }
+
+        /// <summary>
         /// 查询当前用户的额度和订阅状态（给 OpenClaw 客户端用）
         /// </summary>
         [HttpGet, HttpPost]
@@ -727,6 +767,64 @@ namespace Microi.net.Api
         //   API Key:      sk-microi-xxx
         //   Model:        MiniMax-M2.7-highspeed（或平台上其它已上线模型）
         // ============================================================
+
+        /// <summary>
+        /// POST /v1/video_generation —— Microi.AI 中转站的 MiniMax 视频兼容入口。
+        /// 必须同时传 Bearer 平台 APIKey 与稳定 Idempotency-Key。
+        /// </summary>
+        [HttpPost("/v1/video_generation")]
+        [AllowAnonymous]
+        public async Task<ContentResult> MiniMaxRelayCreateVideo()
+        {
+            string rawBody;
+            using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
+            {
+                rawBody = await reader.ReadToEndAsync();
+            }
+            var result = await _proxyService.ExecuteMiniMaxVideoRelayCreateAsync(
+                Request.Headers["Authorization"].ToString(),
+                rawBody,
+                Request.Headers["Idempotency-Key"].ToString(),
+                HttpContext.RequestAborted);
+            return MiniMaxRelayContent(result);
+        }
+
+        /// <summary>
+        /// GET /v1/query/video_generation —— 查询属于当前平台 APIKey 的视频任务。
+        /// </summary>
+        [HttpGet("/v1/query/video_generation")]
+        [AllowAnonymous]
+        public async Task<ContentResult> MiniMaxRelayQueryVideo([FromQuery(Name = "task_id")] string taskId)
+        {
+            var result = await _proxyService.ExecuteMiniMaxVideoRelayTaskAsync(
+                Request.Headers["Authorization"].ToString(),
+                taskId,
+                HttpContext.RequestAborted);
+            return MiniMaxRelayContent(result);
+        }
+
+        /// <summary>
+        /// GET /v1/files/retrieve —— 获取属于当前平台 APIKey 的 MiniMax 文件信息。
+        /// </summary>
+        [HttpGet("/v1/files/retrieve")]
+        [AllowAnonymous]
+        public async Task<ContentResult> MiniMaxRelayRetrieveVideo([FromQuery(Name = "file_id")] string fileId)
+        {
+            var result = await _proxyService.ExecuteMiniMaxVideoRelayFileAsync(
+                Request.Headers["Authorization"].ToString(),
+                fileId,
+                HttpContext.RequestAborted);
+            return MiniMaxRelayContent(result);
+        }
+
+        private ContentResult MiniMaxRelayContent(AiProxyExecutionResult result)
+        {
+            Response.StatusCode = result?.StatusCode > 0 ? result.StatusCode : 502;
+            return Content(
+                result?.ResponseBody ?? "{\"base_resp\":{\"status_code\":502,\"status_msg\":\"MiniMax relay error.\"}}",
+                "application/json",
+                Encoding.UTF8);
+        }
 
         /// <summary>
         /// POST /v1/chat/completions —— 完全兼容 OpenAI Chat Completions API
