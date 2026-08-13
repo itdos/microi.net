@@ -94,7 +94,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 10, 3) ||
+                    importerVersion < new System.Version(1, 10, 8) ||
                     !long.TryParse(importerLimitMemoryText, out var importerLimitMemory) ||
                     importerLimitMemory < ImporterLimitMemoryMb ||
                     !long.TryParse(importerLimitRecursionText, out var importerLimitRecursion) ||
@@ -128,10 +128,16 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !code.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
                     !code.Contains("PLATFORM_API_ENGINE_PRESERVE_NEWER_V1") ||
+                    !code.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
+                    !code.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
+                    !code.Contains("BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1") ||
+                    !code.Contains("OBJECT_STORAGE_FORBIDDEN") ||
                     !code.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
                     !code.Contains("LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1") ||
                     !code.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
-                    !code.Contains("ADMIN_MENU_PERMISSION_V1"))
+                    !code.Contains("ADMIN_MENU_PERMISSION_V1") ||
+                    !code.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
+                    !code.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
                 }
@@ -150,11 +156,13 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 if (bulkEngine == null
                     || !bulkVersionMatch.Success
                     || !System.Version.TryParse(bulkVersionMatch.Groups[1].Value, out bulkVersion)
-                    || bulkVersion < new System.Version(1, 1, 1)
+                    || bulkVersion < new System.Version(1, 1, 6)
                     || bulkEngine.Value<int?>("IsEnable") != 1
                     || bulkEngine.Value<int?>("StopHttp") != 0
                     || !bulkCode.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2")
-                    || !bulkCode.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1"))
+                    || !bulkCode.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1")
+                    || !bulkCode.Contains("BULK_STORAGE_FAILURE_RECOVERY_V1")
+                    || !bulkCode.Contains("BULK_MONOTONIC_CHILD_PROGRESS_V1"))
                 {
                     return RefreshRequired(osClient, "应用商城全部安装/更新接口缺失或版本过低");
                 }
@@ -516,7 +524,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 10, 3) ||
+                    importerVersion < new System.Version(1, 10, 8) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -544,10 +552,16 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !content.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
                     !content.Contains("PLATFORM_API_ENGINE_PRESERVE_NEWER_V1") ||
+                    !content.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
+                    !content.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
+                    !content.Contains("BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1") ||
+                    !content.Contains("OBJECT_STORAGE_FORBIDDEN") ||
                     !content.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
                     !content.Contains("LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1") ||
                     !content.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
-                    !content.Contains("ADMIN_MENU_PERMISSION_V1"))
+                    !content.Contains("ADMIN_MENU_PERMISSION_V1") ||
+                    !content.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
+                    !content.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
                 }
@@ -608,6 +622,29 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 throw new InvalidOperationException($"升级资源[{resourceName}]数据包名称不匹配，期望[{expectedPackageName}]，实际[{actualPackageName}]。");
             }
 
+            if (string.Equals(resourceName, SaaSEnginePackageResourceName, StringComparison.Ordinal))
+            {
+                var bundle = (package["ApplicationBundles"] as JArray)?.FirstOrDefault() as JObject;
+                var sourceFiles = bundle?["SourceFiles"] as JArray;
+                var buildAssets = bundle?["BuildAssets"] as JArray;
+                var buildBytes = buildAssets?.Sum(item => item?["Size"]?.Value<long?>() ?? 0L) ?? 0L;
+                if (package["PackageInfo"]?["IncludeSource"]?.Value<bool?>() != false
+                    || bundle?["IncludeSource"]?.Value<bool?>() != false
+                    || (sourceFiles?.Count ?? 0) != 0
+                    || bundle?["PackageAssets"]?["SourceZip"] != null
+                    || !string.Equals(bundle?["MicroService"]?["StorageMode"]?.ToString(), "db", StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(bundle?["AssetStoragePolicy"]?["Source"]?.ToString(), "NotIncluded", StringComparison.Ordinal)
+                    || !string.Equals(bundle?["AssetStoragePolicy"]?["Build"]?.ToString(), "DatabaseOnly", StringComparison.Ordinal)
+                    || (buildAssets?.Count ?? 0) < 1
+                    || buildAssets.Count > 256
+                    || buildBytes > 5L * 1024 * 1024)
+                {
+                    throw new InvalidOperationException(
+                        $"升级资源[{resourceName}]必须以无伪源码、256 文件/5MB 内的 DatabaseOnly 平台内置微服务发布。"
+                    );
+                }
+            }
+
             if (string.Equals(resourceName, AppStorePackageResourceName, StringComparison.Ordinal))
             {
                 var packageVersionText = package["PackageInfo"]?["Version"]?.ToString()?.TrimStart('v', 'V');
@@ -629,9 +666,9 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
                     packageVersion < new System.Version(7, 0, 13) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
-                    embeddedImporterVersion < new System.Version(1, 10, 3) ||
+                    embeddedImporterVersion < new System.Version(1, 10, 8) ||
                     !System.Version.TryParse(bulkEngineVersionText, out var embeddedBulkVersion) ||
-                    embeddedBulkVersion < new System.Version(1, 1, 1) ||
+                    embeddedBulkVersion < new System.Version(1, 1, 6) ||
                     bulkEngine?["IsEnable"]?.Value<int>() != 1 ||
                     bulkEngine?["StopHttp"]?.Value<int>() != 0 ||
                     !content.Contains("TargetSysMenuId") ||
@@ -654,13 +691,21 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !importerEngineCode.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !importerEngineCode.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
                     !importerEngineCode.Contains("PLATFORM_API_ENGINE_PRESERVE_NEWER_V1") ||
+                    !importerEngineCode.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
+                    !importerEngineCode.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
+                    !importerEngineCode.Contains("BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1") ||
+                    !importerEngineCode.Contains("OBJECT_STORAGE_FORBIDDEN") ||
                     !importerEngineCode.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
                     !importerEngineCode.Contains("LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1") ||
                     !importerEngineCode.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_V1") ||
+                    !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
+                    !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1") ||
                     !content.Contains("OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1") ||
                     !bulkEngineCode.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2") ||
-                    !bulkEngineCode.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1"))
+                    !bulkEngineCode.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1") ||
+                    !bulkEngineCode.Contains("BULK_STORAGE_FAILURE_RECOVERY_V1") ||
+                    !bulkEngineCode.Contains("BULK_MONOTONIC_CHILD_PROGRESS_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少页面Tab关联模块配置，拒绝覆盖客户数据库。");
                 }

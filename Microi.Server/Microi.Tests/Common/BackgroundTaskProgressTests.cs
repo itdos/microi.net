@@ -34,7 +34,7 @@ public sealed class BackgroundTaskProgressTests
             now.AddMinutes(-1),
             current: 25,
             total: 100,
-            explicitProgress: 90,
+            explicitProgress: null,
             previousSampleTime: now.AddSeconds(-10),
             previousSampleCurrent: 20,
             previousThroughput: 0.5,
@@ -46,6 +46,36 @@ public sealed class BackgroundTaskProgressTests
         Assert.Equal("Medium", estimate.EstimateConfidence);
         Assert.Equal(150, estimate.RemainingSeconds);
         Assert.Equal(now.AddSeconds(150), estimate.EstimatedEndTime);
+    }
+
+    [Fact]
+    public void ExplicitHierarchicalProgress_UsesCommittedUnitsForEtaWithoutRegressingPercent()
+    {
+        var now = new DateTime(2026, 8, 13, 7, 24, 0, DateTimeKind.Utc);
+        var estimate = BackgroundTaskProgress.Calculate(
+            now,
+            now.AddMinutes(-1),
+            current: 25,
+            total: 100,
+            explicitProgress: 55,
+            previousSampleTime: now.AddSeconds(-10),
+            previousSampleCurrent: 20,
+            previousThroughput: 0.5,
+            previousSampleCount: 2,
+            minimumProgress: 56);
+
+        Assert.Equal("Units", estimate.ProgressMode);
+        Assert.Equal(56, estimate.Progress);
+        Assert.Equal(150, estimate.RemainingSeconds);
+        Assert.Equal(now.AddSeconds(150), estimate.EstimatedEndTime);
+    }
+
+    [Fact]
+    public void SameUnitScale_CurrentCannotMoveBackwardAcrossTaskSlices()
+    {
+        Assert.Equal(55, BackgroundTaskProgress.PreserveMonotonicCurrent(55, 100, 3, 100));
+        Assert.Equal(60, BackgroundTaskProgress.PreserveMonotonicCurrent(55, 100, 60, 100));
+        Assert.Equal(3, BackgroundTaskProgress.PreserveMonotonicCurrent(55, 100, 3, 200));
     }
 
     [Fact]

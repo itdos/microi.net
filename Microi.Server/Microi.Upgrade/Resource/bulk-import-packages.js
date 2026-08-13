@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.1.4
+ * Version: v1.1.6
  * Function:
  * - 只规划并安装“未安装/可更新”应用，绝不重新安装已是最新版的应用。
  * - 计划和子检查点写入后台任务 CheckpointJson，支持多节点租约转移、进程重启和幂等重试。
@@ -59,6 +59,47 @@ function childFailureDetail(result) {
         }
     }
     return details.join('；');
+}
+// BULK_STORAGE_FAILURE_RECOVERY_V1：存储类失败不能再给出“处理冲突或数据问题”
+// 这种无关建议。按子导入器的稳定 ErrorType/HTTP 线索返回可执行恢复步骤。
+function childRecoveryHint(message, completed) {
+    var value = text(message).toLowerCase();
+    if (value.indexOf('object_storage_forbidden') >= 0
+        || value.indexOf('403') >= 0
+        || value.indexOf('forbidden') >= 0
+        || value.indexOf('accessdenied') >= 0) {
+        return '目标租户对象存储拒绝访问：请核对 SaaS 引擎 HDFS 类型、桶与 Endpoint，'
+            + '并为当前凭证补齐对象读取存在性和写入权限；不要修改已完成应用。修复后重新发起，前 '
+            + completed + ' 个应用会幂等跳过。';
+    }
+    if (value.indexOf('object_storage_unreachable') >= 0
+        || value.indexOf('hdfs') >= 0
+        || value.indexOf('minio') >= 0
+        || value.indexOf('oss') >= 0) {
+        return '请检查目标租户 SaaS 引擎中的 HDFS/OSS/MinIO Endpoint、网络路由、桶和凭证完整性；'
+            + '修复后重新发起，前 ' + completed + ' 个应用会幂等跳过。';
+    }
+    return '先按失败详情处理冲突或数据问题，再重新发起全部安装/更新；前 '
+        + completed + ' 个已完成应用会幂等跳过。';
+}
+// BULK_MONOTONIC_CHILD_PROGRESS_V1：批量协调器每次恢复子导入器前，必须继承
+// 子检查点的精确 Progress；兼容旧检查点时按阶段取保守下限。否则即使子导入器
+// 已保持 55%，外层仍会在每个分片开头按已完成应用数把进度压回 3%。
+function childCheckpointProgress(value) {
+    value = value && typeof value == 'object' ? value : {};
+    var exact = parseInt(value.Progress, 10);
+    if (!isNaN(exact)) return Math.max(0, Math.min(99, exact));
+    var phaseFloors = {
+        Ddl: toInt(value.Index, 0) > 0 ? 10 : 0,
+        Tables: 25,
+        PlanFields: 40,
+        Fields: 40,
+        Physical: 55,
+        ApplicationAssets: 65,
+        PostSchema: 70,
+        ScheduleJobs: 97
+    };
+    return phaseFloors[text(value.Phase)] || 0;
 }
 
 var currentUser = V8.CurrentUser || {};
@@ -299,6 +340,7 @@ if (currentIndex >= total) {
 
 var item = installPlan[currentIndex];
 var childCheckpoint = parseJson(checkpoint.ChildCheckpoint, {}) || {};
+var resumedChildProgress = childCheckpointProgress(childCheckpoint);
 var childParam = {
     StoreId: item.StoreId,
     AppId: item.AppId,
@@ -318,7 +360,9 @@ var childParam = {
     _BackgroundTaskCheckpoint: childCheckpoint,
     _TrustedServerInvocation: true
 };
-report(Math.max(3, Math.floor((currentIndex / total) * 100)), currentIndex, total,
+report(Math.max(3, Math.min(99,
+    Math.floor(((currentIndex + resumedChildProgress / 100) / total) * 100))),
+    currentIndex + resumedChildProgress / 100, total,
     '[' + (currentIndex + 1) + '/' + total + '] 正在' + (item.InstallAction == 'Update' ? '更新' : '安装') + item.AppName);
 var childResult = V8.ApiEngine.Run('import-microi-store-package', childParam);
 childResult = parseJson(childResult, childResult);
@@ -336,7 +380,7 @@ if (!childResult || childResult.Code != 1) {
             FailedItem: item,
             ChildData: childResult && childResult.Data ? childResult.Data : null
         },
-        '先按失败详情处理冲突或数据问题，再重新发起全部安装/更新；前 ' + currentIndex + ' 个已完成应用会幂等跳过。'
+        childRecoveryHint(childMsg + '；' + childDetail, currentIndex)
     );
 }
 

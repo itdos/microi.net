@@ -29,8 +29,10 @@ namespace Microi.net
             DateTime? previousSampleTime,
             int previousSampleCurrent,
             double? previousThroughput,
-            int previousSampleCount)
+            int previousSampleCount,
+            int minimumProgress = 0)
         {
+            var progressFloor = Clamp(minimumProgress, 0, 99);
             var result = new Estimate
             {
                 Progress = explicitProgress.HasValue
@@ -44,11 +46,17 @@ namespace Microi.net
 
             if (total <= 0 || current < 0)
             {
+                result.Progress = Math.Max(result.Progress, progressFloor);
                 return result;
             }
 
             result.ProgressMode = "Units";
-            result.Progress = Clamp((int)Math.Floor(current * 100m / total), 0, 99);
+            var unitProgress = Clamp((int)Math.Floor(current * 100m / total), 0, 99);
+            // Explicit progress may represent a hierarchical child phase while
+            // Current/Total remain the committed top-level units used for ETA.
+            // Never let either representation move the visible percentage back.
+            result.Progress = Math.Max(result.Progress, unitProgress);
+            result.Progress = Math.Max(result.Progress, progressFloor);
             if (current <= 0 || current >= total)
             {
                 return result;
@@ -101,6 +109,18 @@ namespace Microi.net
                     ? "Medium"
                     : "Low";
             return result;
+        }
+
+        public static int PreserveMonotonicCurrent(
+            int previousCurrent,
+            int previousTotal,
+            int requestedCurrent,
+            int requestedTotal)
+        {
+            var normalized = Math.Max(0, requestedCurrent);
+            return previousTotal > 0 && requestedTotal == previousTotal
+                ? Math.Max(Math.Max(0, previousCurrent), normalized)
+                : normalized;
         }
 
         private static int Clamp(int value, int min, int max)
