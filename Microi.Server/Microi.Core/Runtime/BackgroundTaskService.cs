@@ -293,6 +293,11 @@ namespace Microi.net
                 var now = DateTime.Now;
                 var nextCurrent = current.HasValue ? Math.Max(0, current.Value) : item.Current;
                 var nextTotal = total.HasValue && total.Value > 0 ? total.Value : item.Total;
+                nextCurrent = BackgroundTaskProgress.PreserveMonotonicCurrent(
+                    item.Current,
+                    item.Total,
+                    nextCurrent,
+                    nextTotal);
                 var estimate = BackgroundTaskProgress.Calculate(
                     now,
                     item.StartTime ?? now,
@@ -302,7 +307,8 @@ namespace Microi.net
                     item.ProgressSampleTime,
                     item.ProgressSampleCurrent,
                     item.ThroughputPerSecond,
-                    item.ProgressSampleCount);
+                    item.ProgressSampleCount,
+                    item.Progress);
 
                 item.Current = nextCurrent;
                 item.Total = nextTotal;
@@ -667,7 +673,10 @@ namespace Microi.net
                         item.BusinessTaskIdField,
                         item.BusinessProgressField,
                         item.BusinessEtaField,
-                        item.LeaseOwner
+                        item.LeaseOwner,
+                        item.Progress,
+                        item.Current,
+                        item.Total
                     });
 
                     dynamic rawResult;

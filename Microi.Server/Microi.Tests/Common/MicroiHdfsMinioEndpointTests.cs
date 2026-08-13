@@ -64,6 +64,26 @@ public class MicroiHdfsMinioEndpointTests
         return (string)method!.Invoke(null, new object?[] { exception, bucket, objectName })!;
     }
 
+    private static string BuildAliyunFailureDiagnostic(
+        string operation,
+        bool limit,
+        string bucket,
+        string objectName,
+        Exception exception)
+    {
+        var method = typeof(MicroiHDFSAliyun).GetMethod(
+            "BuildOssFailureMessage",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (string)method!.Invoke(null, new object?[]
+        {
+            operation,
+            new HDFSParam { Limit = limit, FileFullPath = objectName },
+            bucket,
+            exception
+        })!;
+    }
+
     private static bool IsRangeReadbackObjectPresent(
         int statusCode,
         long? contentLength,
@@ -226,6 +246,25 @@ public class MicroiHdfsMinioEndpointTests
         Assert.Contains("proxy_cache_convert_head off", message, StringComparison.Ordinal);
         Assert.Contains("签名 Range GET", message, StringComparison.Ordinal);
         Assert.Contains("不会跳过上传后回读校验", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AliyunForbiddenDiagnostic_IdentifiesScopeObjectPermissionsAndSolution()
+    {
+        var message = BuildAliyunFailureDiagnostic(
+            "对象存在性检查",
+            true,
+            "tenant-private",
+            "tenant/ai-app-source/app/SOURCE-PROVENANCE.json",
+            new InvalidOperationException("Response status code does not indicate success: 403 (Forbidden)."));
+
+        Assert.Contains("ErrorType=OBJECT_STORAGE_FORBIDDEN", message, StringComparison.Ordinal);
+        Assert.Contains("StorageScope=私有桶", message, StringComparison.Ordinal);
+        Assert.Contains("Bucket=tenant-private", message, StringComparison.Ordinal);
+        Assert.Contains("SOURCE-PROVENANCE.json", message, StringComparison.Ordinal);
+        Assert.Contains("oss:GetObject", message, StringComparison.Ordinal);
+        Assert.Contains("oss:PutObject", message, StringComparison.Ordinal);
+        Assert.Contains("解决方案=", message, StringComparison.Ordinal);
     }
 
     [Theory]

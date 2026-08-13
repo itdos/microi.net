@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import vm from "node:vm";
 
 const resourceUrl = new URL("./", import.meta.url);
 const packageModel = JSON.parse(await readFile(new URL("app.microi.store.json", resourceUrl), "utf8"));
@@ -14,6 +15,18 @@ function normalizeSource(value) {
 
 function parseButtons(value) {
   return value ? JSON.parse(value) : [];
+}
+
+function extractNamedFunction(sourceText, name) {
+  const start = sourceText.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `missing function ${name}`);
+  const brace = sourceText.indexOf("{", start);
+  let depth = 0;
+  for (let index = brace; index < sourceText.length; index += 1) {
+    if (sourceText[index] === "{") depth += 1;
+    if (sourceText[index] === "}" && --depth === 0) return sourceText.slice(start, index + 1);
+  }
+  assert.fail(`unterminated function ${name}`);
 }
 
 function compareSemver(actual, minimum) {
@@ -83,6 +96,11 @@ test("bulk install persists its plan in the shared background-task checkpoint", 
   assert.match(bulkSource, /BULK_PLATFORM_ONLY_PLAN_V1/);
   assert.match(bulkSource, /BULK_ADAPTIVE_SINGLE_SLICE_V1/);
   assert.match(bulkSource, /BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1/);
+  assert.match(bulkSource, /BULK_STORAGE_FAILURE_RECOVERY_V1/);
+  assert.match(bulkSource, /BULK_MONOTONIC_CHILD_PROGRESS_V1/);
+  assert.match(bulkSource, /resumedChildProgress = childCheckpointProgress\(childCheckpoint\)/);
+  assert.match(bulkSource, /currentIndex \+ resumedChildProgress \/ 100/);
+  assert.match(bulkSource, /object_storage_forbidden/i);
   assert.match(bulkSource, /RecoveryHint/);
   assert.match(bulkSource, /FailureStage/);
   assert.match(bulkSource, /ApplicationType: bulkApplicationType/);
@@ -92,6 +110,18 @@ test("bulk install persists its plan in the shared background-task checkpoint", 
   assert.match(bulkSource, /childFailureDetail\(childResult\)/);
   assert.match(bulkSource, /ChildData:/);
   assert.doesNotMatch(bulkSource, /localStorage|sessionStorage|static\s+/i);
+
+  const fixture = {
+    text: value => value === null || value === undefined ? "" : String(value),
+    toInt: (value, fallback) => Number.isNaN(Number.parseInt(value, 10)) ? fallback : Number.parseInt(value, 10),
+  };
+  vm.runInNewContext(
+    `${extractNamedFunction(bulkSource, "childCheckpointProgress")}\nresult = childCheckpointProgress;`,
+    fixture,
+  );
+  assert.equal(fixture.result({ Phase: "Physical", Index: 4 }), 55);
+  assert.equal(fixture.result({ Phase: "PostSchema" }), 70);
+  assert.equal(fixture.result({ Phase: "Physical", Progress: 58 }), 58);
 });
 
 test("every install action reports one stable operation to the authoritative counter", () => {
@@ -121,7 +151,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.1.4");
+  assert.equal(engine.Version, "v1.1.6");
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
   assert.equal(engine.ApiV8Code, normalizeSource(bulkSource));
@@ -129,8 +159,11 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v1\.10\.3/);
+  assert.match(importerSource, /Version: v1\.10\.8/);
   assert.match(importerSource, /ADMIN_MENU_PERMISSION_V1/);
+  assert.match(importerSource, /ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/);
+  assert.match(importerSource, /ADMIN_MENU_PERMISSION_DB_TIME_V1/);
+  assert.match(importerSource, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);
   assert.match(importerSource, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(importerSource, /BULK_SMALL_PACKAGE_SINGLE_SLICE_V1/);
   assert.match(importerSource, /MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/);
@@ -153,6 +186,9 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /UpgradePolicy == 'CreateIfMissing'/);
   assert.match(importerSource, /TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1/);
   assert.match(importerSource, /PLATFORM_API_ENGINE_PRESERVE_NEWER_V1/);
+  assert.match(importerSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
+  assert.match(importerSource, /OBJECT_STORAGE_FORBIDDEN/);
+  assert.match(importerSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
   assert.match(importerSource, /managedDecision == 'PreserveNewer'/);
   assert.match(importerSource, /接口引擎升级冲突/);
 
@@ -160,6 +196,6 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v1.10.3");
+  assert.equal(embeddedImporter.Version, "v1.10.8");
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
 });

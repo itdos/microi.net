@@ -15,6 +15,29 @@ namespace Microi.net
     /// </summary>
     public class MicroiHDFSAliyun : MicroiHDFS, IMicroiHDFS
     {
+        private static string BuildOssFailureMessage(
+            string operation,
+            HDFSParam param,
+            string bucketName,
+            Exception exception)
+        {
+            var scope = param?.Limit == true ? "私有桶" : "公有桶";
+            var objectKey = (param?.FileFullPath ?? "").DosTrimStart('/');
+            var original = exception?.GetBaseException()?.Message ?? exception?.Message ?? "未知错误";
+            if (original.Length > 1200) original = original.Substring(0, 1200);
+            var forbidden = original.IndexOf("403", StringComparison.OrdinalIgnoreCase) >= 0
+                            || original.IndexOf("Forbidden", StringComparison.OrdinalIgnoreCase) >= 0
+                            || original.IndexOf("AccessDenied", StringComparison.OrdinalIgnoreCase) >= 0
+                            || original.IndexOf("Access Denied", StringComparison.OrdinalIgnoreCase) >= 0;
+            var errorType = forbidden ? "OBJECT_STORAGE_FORBIDDEN" : "OBJECT_STORAGE_OPERATION_FAILED";
+            var solution = forbidden
+                ? "请核对目标租户 SaaS 引擎中的 AliOss Endpoint、Bucket 与 AccessKey 是否属于同一账号/地域，"
+                  + "并为该对象前缀补齐 oss:GetObject 与 oss:PutObject；若使用 RAM 临时凭证，还需检查凭证是否过期。"
+                : "请检查目标租户 SaaS 引擎的 AliOss Endpoint、Bucket、网络路由和凭证完整性后重试。";
+            return $"阿里云 OSS {operation}失败；ErrorType={errorType}；StorageScope={scope}；"
+                   + $"Bucket={bucketName}；Object={objectKey}；原始错误={original}；解决方案={solution}";
+        }
+
         /// <summary>
         /// 判断是否存在此文件。传入ClientModel、Limit、FileFullPath
         /// 注意，当Limit为false时，也要判断为true时是否存在，因为原图要在私有oss存1次，原图不存公有。
@@ -78,14 +101,18 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
+                var bucketName = param?.Limit == true
+                    ? param.ClientModel?.OsClientModel?["AliOssPrivateBucketName"].Val<string>()
+                    : param?.ClientModel?.OsClientModel?["AliOssPublicBucketName"].Val<string>();
+                var diagnostic = BuildOssFailureMessage("对象存在性检查", param, bucketName ?? "", ex);
                 MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                 {
                     Type = "OSS日志",
                     Title = "OSS判断文件是否存在失败",
-                    Content = $"FileFullPath: {param.FileFullPath}, Limit: {param.Limit}, Error: {ex.Message}, InnerException: {ex.InnerException?.Message}",
+                    Content = diagnostic,
                     OsClient = param.ClientModel?.OsClient
                 });
-                return new DosResult<bool>(0, false, ex.Message);
+                return new DosResult<bool>(0, false, diagnostic);
             }
         }
 
@@ -97,18 +124,27 @@ namespace Microi.net
         public async Task<DosResult> PutObject(HDFSParam param)
         {
             var clientModel = param.ClientModel;
-            if (clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>().DosIsNullOrWhiteSpace()
-                    || clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>().DosIsNullOrWhiteSpace()
-                    || clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>().DosIsNullOrWhiteSpace()
-                    || clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>().DosIsNullOrWhiteSpace()
-
-                    || clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>().DosIsNullOrWhiteSpace()
-                    || clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>().DosIsNullOrWhiteSpace()
-                    || clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>().DosIsNullOrWhiteSpace()
-                    || clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>().DosIsNullOrWhiteSpace()
-                    )
+            var requiredConfig = new[]
             {
-                return new DosResult(0, null, "阿里云oss分布式存储配置不完整！");
+                "AliOssPrivateBucketName", "AliOssPrivateEndpoint",
+                "AliOssPrivateAccessKeyId", "AliOssPrivateAccessKeySecret",
+                "AliOssPublicBucketName", "AliOssPublicEndpoint",
+                "AliOssPublicAccessKeyId", "AliOssPublicAccessKeySecret"
+            };
+            var missingConfig = requiredConfig
+                .Where(name => clientModel == null
+                    || clientModel.OsClientModel == null
+                    || clientModel.OsClientModel[name].Val<string>().DosIsNullOrWhiteSpace())
+                .ToArray();
+            if (missingConfig.Length > 0)
+            {
+                return new DosResult(
+                    0,
+                    null,
+                    "阿里云 OSS 配置不完整；ErrorType=OBJECT_STORAGE_CONFIG_INCOMPLETE；"
+                    + "缺失字段=" + string.Join(",", missingConfig)
+                    + "；解决方案=请在目标租户 SaaS 引擎补齐私有桶与公有桶配置并刷新租户缓存后重试。"
+                );
             }
             var bucketName = "";
             var bucketNamePrivate = "";
@@ -197,9 +233,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-
-
-                return new DosResult(0, null, "Aliyun Oss Upload Error:" + ex.Message);
+                var failedBucket = param.Limit == true ? bucketNamePrivate : bucketName;
+                return new DosResult(0, null, BuildOssFailureMessage("对象上传", param, failedBucket, ex));
             }
         }
 
