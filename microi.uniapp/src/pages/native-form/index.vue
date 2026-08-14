@@ -1,6 +1,9 @@
 <template>
 	<!-- zhy: 下拉打开时提升表单正文层级，避免被固定栏和悬浮入口遮挡。 -->
-	<mci-page-shell class="native-form-page" :class="{ 'native-form-page--select-open': !!openSelectorField }"
+	<mci-page-shell class="native-form-page" :class="{
+		'native-form-page--select-open': !!openSelectorField,
+		'native-form-page--standalone-list': standaloneListMode
+	}"
 		:style="mciTokenStyle" :title="pageTitle" :subtitle="tableDescription"
 		@back="goBack" @tap="closeOpenVisitTarget">
 		<mci-skeleton v-if="loading" type="form" :rows="7" />
@@ -13,7 +16,7 @@
 				<text>重新加载</text></view>
 		</view>
 
-		<view v-else class="native-form">
+		<view v-else class="native-form" :class="{ 'native-form--standalone-list': standaloneListMode }">
 			<view v-if="stale" class="stale-tip"><text>当前展示了缓存配置，网络恢复后将自动更新</text></view>
 
 			<view v-if="tenantFormPresentation.clock || tenantFormPresentation.location"
@@ -193,12 +196,15 @@
 
 			<!-- 平台同一 Tab 中的普通字段按 Sort 展示在关联子表标题之前。 -->
 			<view v-for="relatedTab in standaloneRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
-				<mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
+				<mci-business-related-list v-if="relatedTab.type === 'child'" ref="standaloneRelatedList"
+					class="standalone-related-list" :field="relatedTab.field"
 					:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
 					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
 					:parent-table-child-auth="tableChildAuth"
 					:parent-mode="mode"
 					display-mode="full"
+					:independent-scroll="standaloneListMode"
+					:viewport-height="relatedListViewportHeight"
 					@data-count="handleRelatedCount" />
 				<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
 					:parent-form="form" :parent-mode="mode" :readonly="mode === 'View'" />
@@ -353,6 +359,8 @@
 				activeFormTabKey: '',
 				// zhy: 标识最近一次表单加载，防止编辑或重试并发时旧响应覆盖新页面。
 				formLoadId: 0,
+				relatedListViewportHeight: 0,
+				relatedViewportMeasureTimers: [],
 				tenantFloatingActionX: null,
 				tenantFloatingActionY: null,
 				tenantFloatingActionMetrics: null,
@@ -432,6 +440,12 @@
 			standaloneRelatedTabs() {
 				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
 			},
+			standaloneChildTab() {
+				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
+			},
+			standaloneListMode() {
+				return !this.loading && !this.error && Boolean(this.standaloneChildTab)
+			},
 			tenantFormPresentation() {
 				return getTenantFormPresentation(this.tenantFormContext())
 			},
@@ -486,18 +500,44 @@
 		onShow() {
 			if (this.loading || !this.definition) return
 			this.refreshTenantFloatingActionMetrics()
+			this.scheduleRelatedViewportMeasure()
 			refreshTenantFormDerivedValues(this.tenantFormContext()).catch(() => {})
+		},
+		onReady() {
+			this.scheduleRelatedViewportMeasure()
 		},
 		onResize() {
 			this.refreshTenantFloatingActionMetrics()
+			this.scheduleRelatedViewportMeasure()
 		},
 		onUnload() {
 			// zhy: 页面销毁后作废仍在执行的异步加载，避免卸载后继续写入页面状态。
 			this.formLoadId += 1
+			this.clearRelatedViewportMeasureTimers()
 			this.openSelectorField = ''
 			disposeTenantForm(this.tenantFormContext())
 		},
 		methods: {
+			clearRelatedViewportMeasureTimers() {
+				this.relatedViewportMeasureTimers.forEach((timer) => clearTimeout(timer))
+				this.relatedViewportMeasureTimers = []
+			},
+			scheduleRelatedViewportMeasure() {
+				if (!this.standaloneListMode) return
+				this.clearRelatedViewportMeasureTimers()
+				this.relatedViewportMeasureTimers = [0, 80, 220].map((delay) => setTimeout(() => {
+					this.measureRelatedViewport()
+				}, delay))
+			},
+			measureRelatedViewport() {
+				if (!this.standaloneListMode || typeof uni.createSelectorQuery !== 'function') return
+				this.$nextTick(() => {
+					uni.createSelectorQuery().in(this).select('.related-tab-panel').boundingClientRect((rect) => {
+						const height = Math.floor(Number(rect && rect.height))
+						if (Number.isFinite(height) && height >= 120) this.relatedListViewportHeight = height
+					}).exec()
+				})
+			},
 			tenantFloatingActionStorageKey() {
 				const actionKey = this.tenantFormPresentation.floatingAction?.key || 'default'
 				return `mci:form-floating-action:${String(this.tableName || '').toLowerCase()}:${actionKey}`
@@ -728,6 +768,7 @@
 					this.initializeFormTabs()
 					this.loading = false
 					await this.$nextTick()
+					this.scheduleRelatedViewportMeasure()
 					// 必须更新页面持有的响应式定义。直接修改上面的原始 definition 会绕过
 					//zhy Vue 代理，导致接口已有数据但 Radio/Checkbox 等控件仍保留空选项。
 					const liveDefinition = this.definition
@@ -803,6 +844,7 @@
 				if (!tab || !tab.key) return
 				this.activeFormTabKey = tab.key
 				this.initializeGroupExpansion(this.groups)
+				this.$nextTick(() => this.scheduleRelatedViewportMeasure())
 			},
 			// zhy: 必填校验失败时自动展开对应分组，方便用户直接补充字段。
 			expandFirstInvalidGroup() {
@@ -1098,6 +1140,45 @@
 	/* zhy: 下拉打开时让正文高于固定底栏和 AI 悬浮入口。 */
 	.native-form-page--select-open :deep(.mci-page-shell__body) {
 		z-index: 1000;
+	}
+
+	.native-form-page--standalone-list :deep(.mci-page-shell__body) {
+		height: calc(100vh - var(--mci-header-height, 44px));
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	.native-form--standalone-list {
+		display: flex;
+		box-sizing: border-box;
+		flex-direction: column;
+		height: 100%;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	.native-form--standalone-list .form-tabs--full {
+		flex: none;
+	}
+
+	.native-form--standalone-list .related-tab-panel {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	.native-form--standalone-list .related-tab-panel :deep(.related-business-list),
+	.native-form--standalone-list .standalone-related-list {
+		display: block;
+		flex: 1;
+		width: 100%;
+		min-height: 0;
+	}
+
+	.native-form--standalone-list .form-bottom-space {
+		display: none;
 	}
 
 	.edit-command {
