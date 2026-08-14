@@ -152,6 +152,10 @@ export function buildPeriodRange(period, customRange = null) {
 export async function loadModuleRows(moduleConfig, options = {}) {
   const pageIndex = Number(options.pageIndex || 1)
   const pageSize = Number(options.pageSize || moduleConfig.pageSize || 15)
+  const menuId = String(moduleConfig.menuId || '').trim()
+  if (moduleConfig.requireAuthorizedMenu === true && !menuId) {
+    throw new Error('当前账号无权查看该业务数据')
+  }
   const moduleEngineKey = String(
     moduleConfig.moduleEngineKey ||
     moduleConfig.ModuleEngineKey ||
@@ -168,7 +172,7 @@ export async function loadModuleRows(moduleConfig, options = {}) {
     _OrderByType: options.orderType || moduleConfig.defaultOrderType || 'DESC',
     _Where: [...(moduleConfig.fixedWhere || []), ...(options.extraWhere || [])]
   }
-  if (moduleConfig.menuId) payload._SysMenuId = moduleConfig.menuId
+  if (menuId) payload._SysMenuId = menuId
   if (Array.isArray(moduleConfig.selectFields) && moduleConfig.selectFields.length) {
     payload._SelectFields = moduleConfig.selectFields
   }

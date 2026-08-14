@@ -468,6 +468,7 @@ export const businessModules = {
   attendanceRecords: native({
     title: '打卡记录', table: 'Diy_location', menuAliases: ['打卡记录', '拜访打卡', '人员定位'],
     fileMenuAliases: ['人员定位'],
+    requireAuthorizedMenu: true,
     titleField: 'BaifangDX', tagFields: ['DakaR'],
     lines: [{ label: '打卡人', field: 'DakaR' }, { label: '打卡时间', field: 'DakaSJ', format: 'datetime' }, { label: '打卡地点', field: 'DakaDD' }],
     summaryField: 'Beizhu', periodField: 'DakaSJ'
