@@ -312,7 +312,7 @@ test('uploadApplicationAssetStream retries through gzip multipart after raw prox
         fs.rmSync(root, { recursive: true, force: true });
     }
 });
-test('protocol v3 resumable upload skips durable parts and sends only the missing raw range', async () => {
+test('protocol v3 always resumes through durable multipart and sends only the missing raw range', async () => {
     const root = createTempDirectory();
     const filePath = path.join(root, 'resumable.bin');
     const chunkSize = 16 * 1024 * 1024;
@@ -407,7 +407,6 @@ test('protocol v3 resumable upload skips durable parts and sends only the missin
         response.writeHead(404);
         response.end();
     });
-    const previousForce = process.env.MICROI_APPLICATION_ASSET_FORCE_RESUMABLE;
     try {
         await new Promise((resolve, reject) => {
             server.once('error', reject);
@@ -415,7 +414,6 @@ test('protocol v3 resumable upload skips durable parts and sends only the missin
         });
         const address = server.address();
         assert.ok(address && typeof address === 'object');
-        process.env.MICROI_APPLICATION_ASSET_FORCE_RESUMABLE = '1';
         const client = new MicroiClient({
             apiBaseUrl: `http://127.0.0.1:${address.port}`,
             username: '',
@@ -459,10 +457,6 @@ test('protocol v3 resumable upload skips durable parts and sends only the missin
             }]);
     }
     finally {
-        if (previousForce === undefined)
-            delete process.env.MICROI_APPLICATION_ASSET_FORCE_RESUMABLE;
-        else
-            process.env.MICROI_APPLICATION_ASSET_FORCE_RESUMABLE = previousForce;
         await new Promise(resolve => server.close(() => resolve()));
         fs.rmSync(root, { recursive: true, force: true });
     }
@@ -517,19 +511,41 @@ test('publishMicroService falls back to native HTTP with the exact JSON body', a
         await new Promise(resolve => server.close(() => resolve()));
     }
 });
-test('protocol v3 multipart forwards canonical bigint strings and explicit null baselines as PascalCase fields', async () => {
+test('protocol v3 resumable initiation forwards canonical bigint strings and explicit null baselines as PascalCase fields', async () => {
     const root = createTempDirectory();
     const filePath = path.join(root, 'index.html');
     fs.writeFileSync(filePath, '<!doctype html><body>v3 multipart</body>');
     const originalFetch = globalThis.fetch;
-    let captured = '';
+    const sessionId = `mciau-${'a'.repeat(30)}`;
+    const chunkSize = 16 * 1024 * 1024;
+    let captured = {};
     try {
-        globalThis.fetch = (async (_input, init) => {
-            const pieces = [];
-            for await (const chunk of init?.body)
-                pieces.push(Buffer.from(chunk));
-            captured = Buffer.concat(pieces).toString('utf8');
-            return new Response(JSON.stringify({ Code: 1, Data: {}, Msg: '' }), {
+        globalThis.fetch = (async (input, init) => {
+            const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+            let data = {
+                SessionId: sessionId,
+                Status: 'Uploading',
+                ChunkSize: chunkSize,
+                TotalParts: 1,
+                Parts: [],
+            };
+            if (url.pathname.endsWith('/InitiateApplicationAssetMultipart')) {
+                captured = JSON.parse(String(init?.body || '{}'));
+            }
+            else if (url.pathname.endsWith('/GetApplicationAssetMultipartStatus')) {
+                data = { ...data, Status: 'Succeeded', Completed: true, PublishState: 'Prepared' };
+            }
+            else if (url.pathname.endsWith('/UploadApplicationAssetMultipartPart')) {
+                const pieces = [];
+                for await (const chunk of init?.body) {
+                    pieces.push(Buffer.from(chunk));
+                }
+                assert.equal(Buffer.concat(pieces).length, fs.statSync(filePath).size);
+            }
+            else if (url.pathname.endsWith('/CompleteApplicationAssetMultipart')) {
+                data = { ...data, Status: 'Succeeded', Completed: true, PublishState: 'Prepared' };
+            }
+            return new Response(JSON.stringify({ Code: 1, Data: data, Msg: '' }), {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -564,23 +580,22 @@ test('protocol v3 multipart forwards canonical bigint strings and explicit null 
             ExpectedActivePublishVersionId: null,
             ExpectedCommittedPublishVersionId: 'version-old',
         });
-        const field = (name, value) => new RegExp(`name="${name}"\\r\\n\\r\\n${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\r\\n`, 'u');
-        assert.match(captured, field('ProtocolVersion', '3'));
-        assert.match(captured, field('PublishMode', 'stage'));
-        assert.match(captured, field('ExpectedGateEpoch', '9007199254740993'));
-        assert.match(captured, field('RequestId', 'catalog-v3-shared-request-id'));
-        assert.match(captured, field('RequestFingerprint', 'b'.repeat(64)));
-        assert.match(captured, field('RouteSnapshotJson', EMPTY_ROUTE_SNAPSHOT_JSON));
-        assert.match(captured, field('RouteSnapshotHash', EMPTY_ROUTE_SNAPSHOT_HASH));
-        assert.match(captured, field('ExpectedPublishFence', '9007199254740995'));
-        assert.match(captured, field('ExpectedPublishRowVersion', '9007199254740997'));
-        assert.match(captured, field('ExpectedVersionRowVersion', 'null'));
-        assert.match(captured, field('ExpectedActivePublishVersionId', 'null'));
-        assert.match(captured, field('ExpectedAppVersion', 'null'));
+        assert.equal(captured.ProtocolVersion, 3);
+        assert.equal(captured.PublishMode, 'stage');
+        assert.equal(captured.ExpectedGateEpoch, '9007199254740993');
+        assert.equal(captured.RequestId, 'catalog-v3-shared-request-id');
+        assert.equal(captured.RequestFingerprint, 'b'.repeat(64));
+        assert.equal(captured.RouteSnapshotJson, EMPTY_ROUTE_SNAPSHOT_JSON);
+        assert.equal(captured.RouteSnapshotHash, EMPTY_ROUTE_SNAPSHOT_HASH);
+        assert.equal(captured.ExpectedPublishFence, '9007199254740995');
+        assert.equal(captured.ExpectedPublishRowVersion, '9007199254740997');
+        assert.equal(captured.ExpectedVersionRowVersion, null);
+        assert.equal(captured.ExpectedActivePublishVersionId, null);
+        assert.equal(captured.ExpectedAppVersion, null);
     }
     finally {
         globalThis.fetch = originalFetch;
-        fs.rmSync(root, { recursive: true, force: true });
+        fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
 });
 test('protocol v3 paths are NFC and segment-encoded, with unsafe or oversized immutable paths rejected', () => {

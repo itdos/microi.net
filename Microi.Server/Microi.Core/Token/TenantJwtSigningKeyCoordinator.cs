@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text;
 using Dos.Common;
 using Dos.ORM;
 using Newtonsoft.Json.Linq;
@@ -52,9 +53,17 @@ namespace Microi.net
                 var dbInfo = DiyCommon.GetDbInfo(databaseType);
                 var tableName = $"{dbInfo.L}{OsClientTableName}{dbInfo.R}";
                 var schemaUpdated = EnsureAuthSecretStorage(configurationDb, dbInfo);
-                var totalUpdated = 0;
-                var generatedSecretCount = 0;
+                var bootstrappedTenantCount = EnsureConfiguredTenantRow(
+                    configurationDb,
+                    tableName,
+                    dbInfo);
+                var totalUpdated = bootstrappedTenantCount;
+                var generatedSecretCount = bootstrappedTenantCount;
                 var updatedOsClients = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (bootstrappedTenantCount > 0)
+                {
+                    updatedOsClients.Add(OsClientDefault.OsClient);
+                }
 
                 for (var attempt = 1; attempt <= MaxConvergenceAttempts; attempt++)
                 {
@@ -255,6 +264,45 @@ namespace Microi.net
                 random.GetBytes(bytes);
             }
             return BitConverter.ToString(bytes).Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// 子租户数据库被直接配置为后端主库时，历史库通常保留 sys_osclients 物理表，
+        /// 但表内没有任何 SaaS 租户行。只有这种完全空表场景才允许从十项宿主启动配置
+        /// 建立最小主租户锚点；表内已有任意记录时仍要求显式修正三参数或启用状态，
+        /// 防止把 OsClient 拼写错误静默创建成新租户。
+        /// </summary>
+        internal static bool ShouldBootstrapConfiguredTenant(
+            IEnumerable<JObject> existingRows,
+            string configuredOsClient)
+        {
+            return !configuredOsClient.DosIsNullOrWhiteSpace()
+                   && !(existingRows ?? Enumerable.Empty<JObject>()).Any();
+        }
+
+        /// <summary>
+        /// 多节点同时启动空库时使用相同主键竞争插入；密钥仍由各节点独立 CSPRNG
+        /// 生成，最终只有数据库胜出行的随机密钥生效。
+        /// </summary>
+        internal static string CreateBootstrapTenantRowId(
+            string osClient,
+            string osClientType,
+            string osClientNetwork)
+        {
+            var identity = string.Join("|", new[]
+            {
+                "microi-sys-osclients-bootstrap-v1",
+                (osClient ?? string.Empty).Trim().ToLowerInvariant(),
+                (osClientType ?? string.Empty).Trim().ToLowerInvariant(),
+                (osClientNetwork ?? string.Empty).Trim().ToLowerInvariant()
+            });
+            using (var sha256 = SHA256.Create())
+            {
+                var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
+                var guidBytes = new byte[16];
+                Array.Copy(hash, guidBytes, guidBytes.Length);
+                return new Guid(guidBytes).ToString();
+            }
         }
 
         public static List<string> FindDivergentTenants(IEnumerable<JObject> rows)
@@ -497,6 +545,125 @@ WHERE IsDeleted=0 AND IsEnable=1")
             return rows.Select(JObject.FromObject).ToList();
         }
 
+        private static int EnsureConfiguredTenantRow(
+            DbSession configurationDb,
+            string tableName,
+            DbInfo dbInfo)
+        {
+            var existingRows = configurationDb.FromSql($@"
+SELECT {dbInfo.L}Id{dbInfo.R}, {dbInfo.L}OsClient{dbInfo.R},
+       {dbInfo.L}IsEnable{dbInfo.R}, {dbInfo.L}IsDeleted{dbInfo.R}
+FROM {tableName}")
+                .ToList<dynamic>()
+                .Select(JObject.FromObject)
+                .ToList();
+            if (!ShouldBootstrapConfiguredTenant(existingRows, OsClientDefault.OsClient))
+            {
+                return 0;
+            }
+
+            var osClient = OsClientDefault.OsClient.Trim();
+            var osClientType = (OsClientDefault.OsClientType ?? string.Empty).Trim();
+            var osClientNetwork = (OsClientDefault.OsClientNetwork ?? string.Empty).Trim();
+            var rowId = CreateBootstrapTenantRowId(osClient, osClientType, osClientNetwork);
+            var bootstrapSecret = GenerateStrongAuthSecret();
+            var now = DateTime.Now;
+            var fromDual = dbInfo.DbType == DatabaseType.Oracle
+                           || dbInfo.DbType == DatabaseType.DaMeng
+                ? " FROM DUAL"
+                : string.Empty;
+            var insertSql = $@"
+INSERT INTO {tableName}
+({dbInfo.L}Id{dbInfo.R}, {dbInfo.L}CreateTime{dbInfo.R}, {dbInfo.L}UpdateTime{dbInfo.R},
+ {dbInfo.L}IsDeleted{dbInfo.R}, {dbInfo.L}OsClient{dbInfo.R}, {dbInfo.L}ClientName{dbInfo.R},
+ {dbInfo.L}OsClientType{dbInfo.R}, {dbInfo.L}OsClientNetwork{dbInfo.R},
+ {dbInfo.L}IsEnable{dbInfo.R}, {dbInfo.L}{AuthSecretFieldName}{dbInfo.R},
+ {dbInfo.L}{AuthSecretRotateVersionFieldName}{dbInfo.R})
+SELECT @Id, @CreateTime, @UpdateTime, 0, @OsClient, @ClientName,
+       @OsClientType, @OsClientNetwork, 1, @AuthSecret, @AuthSecretRotateVersion{fromDual}
+WHERE NOT EXISTS (SELECT 1 FROM {tableName})";
+
+            try
+            {
+                var affected = configurationDb.FromSql(insertSql)
+                    .AddInParameter("Id", DbType.String, rowId)
+                    .AddInParameter("CreateTime", DbType.DateTime, now)
+                    .AddInParameter("UpdateTime", DbType.DateTime, now)
+                    .AddInParameter("OsClient", DbType.String, osClient)
+                    .AddInParameter("ClientName", DbType.String, osClient)
+                    .AddInParameter("OsClientType", DbType.String, osClientType)
+                    .AddInParameter("OsClientNetwork", DbType.String, osClientNetwork)
+                    .AddInParameter("AuthSecret", DbType.String, bootstrapSecret)
+                    .AddInParameter("AuthSecretRotateVersion", DbType.String, string.Empty)
+                    .ExecuteNonQuery();
+                if (affected > 0)
+                {
+                    return affected;
+                }
+            }
+            catch
+            {
+                // 相同主键用于多节点并发竞争；也覆盖请求已提交但响应中断的情况。
+                // 只有数据库回读确认了完整、活动且强密钥的宿主行才可继续启动。
+                if (IsPersistedBootstrapRowReady(
+                        configurationDb,
+                        tableName,
+                        dbInfo,
+                        rowId,
+                        osClient,
+                        osClientType,
+                        osClientNetwork))
+                {
+                    return 0;
+                }
+                throw;
+            }
+
+            if (IsPersistedBootstrapRowReady(
+                    configurationDb,
+                    tableName,
+                    dbInfo,
+                    rowId,
+                    osClient,
+                    osClientType,
+                    osClientNetwork))
+            {
+                return 0;
+            }
+
+            throw new InvalidOperationException(
+                $"空 sys_osclients 表未能为宿主租户[{osClient}]建立持久化 JWT 密钥锚点。" +
+                "请检查主库 INSERT 权限及 OsClient/OsClientType/OsClientNetwork 启动配置。");
+        }
+
+        private static bool IsPersistedBootstrapRowReady(
+            DbSession configurationDb,
+            string tableName,
+            DbInfo dbInfo,
+            string rowId,
+            string osClient,
+            string osClientType,
+            string osClientNetwork)
+        {
+            var rows = configurationDb.FromSql($@"
+SELECT {dbInfo.L}Id{dbInfo.R}, {dbInfo.L}OsClient{dbInfo.R},
+       {dbInfo.L}OsClientType{dbInfo.R}, {dbInfo.L}OsClientNetwork{dbInfo.R},
+       {dbInfo.L}IsEnable{dbInfo.R}, {dbInfo.L}IsDeleted{dbInfo.R},
+       {dbInfo.L}{AuthSecretFieldName}{dbInfo.R}
+FROM {tableName}
+WHERE {dbInfo.L}Id{dbInfo.R}=@Id")
+                .AddInParameter("Id", DbType.String, rowId)
+                .ToList<dynamic>();
+            var row = rows.Select(JObject.FromObject).FirstOrDefault();
+            return row != null
+                   && string.Equals(ReadString(row, "OsClient"), osClient, StringComparison.OrdinalIgnoreCase)
+                   && string.Equals(ReadString(row, "OsClientType"), osClientType, StringComparison.OrdinalIgnoreCase)
+                   && string.Equals(ReadString(row, "OsClientNetwork"), osClientNetwork, StringComparison.OrdinalIgnoreCase)
+                   && ReadFlag(row, "IsEnable")
+                   && !ReadFlag(row, "IsDeleted")
+                   && !DiyToken.IsWeakJwtSecret(ReadString(row, AuthSecretFieldName), osClient);
+        }
+
         private static TenantJwtSigningKeyConvergenceResult Failed(
             string message,
             IReadOnlyCollection<JObject> rows = null,
@@ -525,6 +692,22 @@ WHERE IsDeleted=0 AND IsEnable=1")
         private static string ReadString(JObject row, string fieldName)
         {
             return row?.GetValue(fieldName, StringComparison.OrdinalIgnoreCase)?.Val<string>() ?? string.Empty;
+        }
+
+        private static bool ReadFlag(JObject row, string fieldName)
+        {
+            var token = row?.GetValue(fieldName, StringComparison.OrdinalIgnoreCase);
+            if (token == null || token.Type == JTokenType.Null)
+            {
+                return false;
+            }
+            if (token.Type == JTokenType.Boolean)
+            {
+                return token.Val<bool>();
+            }
+            var text = token.Val<string>();
+            return string.Equals(text, "1", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(text, "true", StringComparison.OrdinalIgnoreCase);
         }
 
         private static DateTime ReadDateTime(JObject row, string fieldName, DateTime fallback)

@@ -7,6 +7,7 @@ import {
   architectureData,
   architectureFeatureLabels,
   architectureVersion,
+  platformVersion,
   buildArchitectureMarkdown
 } from '../scripts/ai-platform-architecture-data.mjs'
 
@@ -29,7 +30,7 @@ test('架构图以 V8引擎为唯一运行核心并覆盖平台关键能力', as
   ])
   assert.doesNotMatch(`${generator}\n${dataSource}\n${svg}`, /Jint/i)
   for (const text of [
-    'Microi吾码 AI平台 架构图', 'V8引擎', '10×+', '更省 Token', '更快开发', '几十+', '成熟引擎 · 更稳定', '开箱即用', '更快交付',
+    'Microi吾码 AI平台 架构图', platformVersion, 'V8引擎', '10×+', 'Token 更省', '典型交付更快', '20+', '成熟引擎复用', '在线生效', 'V8 无需编译发布',
     '表单引擎', '模块引擎', '界面引擎', '打印引擎', '报表引擎', '审批流 v4', '业务架构蓝图', 'JSON ↔ Vue',
     '发布计划', '不可变审批', '断点续发', '服务注册', 'W3C Trace', '热 / 温 / 冷', '导入预检', '应用商城',
     'Microi.VSCode', 'MCP / Skills', 'Codex / OpenClaw', 'Microi.UI / 物料', 'Unity / WebGL', 'Office / 蓝牙打印'
@@ -58,6 +59,7 @@ test('资产清单锁定数据源哈希、尺寸和每个输出文件内容', as
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
   assert.equal(manifest.schemaVersion, 1)
   assert.equal(manifest.architectureVersion, architectureVersion)
+  assert.equal(manifest.platformVersion, platformVersion)
   assert.equal(manifest.capabilitySourceHash, sourceHash)
   assert.equal(manifest.uniqueFeatureLabels, architectureFeatureLabels().length)
   assert.equal(manifest.outputs.length, 3)

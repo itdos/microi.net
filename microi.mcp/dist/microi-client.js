@@ -1596,9 +1596,12 @@ export class MicroiClient {
         if (!relativeFileName || /[\r\n"]/u.test(relativeFileName)) {
             throw new Error('RelativePath 的文件名不合法');
         }
-        if (data.ProtocolVersion === 3
-            && (stat.size > LEGACY_APPLICATION_ASSET_STREAM_MAX_BYTES
-                || process.env.MICROI_APPLICATION_ASSET_FORCE_RESUMABLE === '1')) {
+        // Protocol v3 always uses the durable multipart transport, including for
+        // small files. Besides making every stage reconnect-safe, this keeps
+        // controlled application releases out of the ordinary interactive-upload
+        // daily quota namespace. Legacy v2 callers retain the bounded multipart
+        // request below for backwards compatibility.
+        if (data.ProtocolVersion === 3) {
             return this.uploadApplicationAssetResumable(data, localPath, stat.size);
         }
         if (stat.size > LEGACY_APPLICATION_ASSET_STREAM_MAX_BYTES) {

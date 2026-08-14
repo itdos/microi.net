@@ -34,7 +34,7 @@ tests/
 - 匿名模式可以承载公开多人玩法，但必须使用服务端签发、只存哈希、可过期的会话秘密；个人持久化接口仍要求 DiyToken。
 - `ApplicationType=Web`，独立入口为 `index.html`。
 - 构建状态明确区分 `available` 与 `publishable`；无真实 Unity WASM/Data 时禁止正式发布。
-- WebGL 公屏优先使用可访问的 DOM 输入控件，并在 Unity Player 设置 `WebGLInput.captureAllKeyboardInput = false`；输入区同时隔离键盘、`beforeinput`、组合输入与指针事件。Windows 可使用原生 UI/UIToolkit。不要在外壳和 Unity 中重复绘制同一组操作提示。
+- WebGL 公屏优先使用可访问的 DOM 输入控件，并在 Unity Player 将 `WebGLInput.captureAllKeyboardInput` 设为 `false`；输入区同时隔离键盘、`beforeinput`、组合输入与指针事件。Unity 6 若未向 Player 编译响应文件引用 `UnityEngine.WebGLModule`，可用 `link.xml` 保留类型后反射设置，并必须以真实键盘输入回归。Windows 可使用原生 UI/UIToolkit。不要在外壳和 Unity 中重复绘制同一组操作提示。
 - 语音字幕由真实播放器时间轴逐 cue 驱动，中英文分行放在底部安全区；WebGL DOM 与 Windows 原生 UI 复用同一份字幕数据。固定 `setTimeout` 只能做无音轨占位，不算同步验收。
 
 ## 多人租约与公屏交付

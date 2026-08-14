@@ -231,6 +231,8 @@ namespace Microi.net
     /// </summary>
     public static class FileUploadSecurity
     {
+        public const string DefaultQuotaScope = "UploadQuota";
+        public const string ApplicationPublishQuotaScope = "ApplicationPublishQuota";
         private const string DailyQuotaReservationScript = @"
 local increment = tonumber(ARGV[1])
 local userLimit = tonumber(ARGV[2])
@@ -431,7 +433,8 @@ return {1, userNext, tenantNext}";
             string osClient,
             string userId,
             long bytes,
-            FileUploadSecurityOptions options = null)
+            FileUploadSecurityOptions options = null,
+            string quotaScope = null)
         {
             if (osClient.DosIsNullOrWhiteSpace() || userId.DosIsNullOrWhiteSpace() || bytes <= 0)
             {
@@ -444,7 +447,7 @@ return {1, userNext, tenantNext}";
                 return CreateTenantUploadDisabledResult(osClient);
             }
             var utcNow = DateTime.UtcNow;
-            var keys = BuildDailyQuotaKeys(osClient, userId, utcNow);
+            var keys = BuildDailyQuotaKeys(osClient, userId, utcNow, quotaScope);
             var ttlSeconds = Math.Max(
                 3600L,
                 (long)Math.Ceiling((utcNow.Date.AddDays(2) - utcNow).TotalSeconds));
@@ -488,16 +491,18 @@ return {1, userNext, tenantNext}";
         public static FileUploadQuotaKeys BuildDailyQuotaKeys(
             string osClient,
             string userId,
-            DateTime utcNow)
+            DateTime utcNow,
+            string quotaScope = null)
         {
             if (osClient.DosIsNullOrWhiteSpace()) throw new ArgumentException("OsClient不能为空！", nameof(osClient));
             if (userId.DosIsNullOrWhiteSpace()) throw new ArgumentException("UserId不能为空！", nameof(userId));
 
+            var scope = NormalizeQuotaScope(quotaScope);
             var date = utcNow.ToUniversalTime().ToString("yyyyMMdd");
             var tenantPart = EncodeKeyPart(osClient.Trim().ToLowerInvariant());
             var userPart = EncodeKeyPart(userId.Trim());
-            var hashTag = $"{{UploadQuota:{tenantPart}:{date}}}";
-            var prefix = $"Microi:{osClient.Trim()}:UploadQuota:{date}:{hashTag}";
+            var hashTag = $"{{{scope}:{tenantPart}:{date}}}";
+            var prefix = $"Microi:{osClient.Trim()}:{scope}:{date}:{hashTag}";
             return new FileUploadQuotaKeys
             {
                 UserKey = $"{prefix}:User:{userPart}",
@@ -558,6 +563,24 @@ return {1, userNext, tenantNext}";
 
         private static long FormatMegabytes(long bytes) =>
             Math.Max(1, bytes / (1024L * 1024L));
+
+        private static string NormalizeQuotaScope(string quotaScope)
+        {
+            var scope = string.IsNullOrWhiteSpace(quotaScope)
+                ? DefaultQuotaScope
+                : quotaScope.Trim();
+            if (scope.Length > 64
+                || scope.Any(character =>
+                    !(character >= 'A' && character <= 'Z')
+                    && !(character >= 'a' && character <= 'z')
+                    && !(character >= '0' && character <= '9')
+                    && character != '-'
+                    && character != '_'))
+            {
+                throw new ArgumentException("Quota scope must contain only ASCII letters, digits, '-' or '_'.", nameof(quotaScope));
+            }
+            return scope;
+        }
 
         private static string EncodeKeyPart(string value)
         {
