@@ -234,6 +234,12 @@ return {
 
 未配置 Card 视图时继续兼容 `MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields`。移动端卡片会保留至少 40 至 44px 的触控目标、清晰的选择状态和底部批量操作条；不要通过业务定制 CSS 写死表名、菜单名或字段名。
 
+卡片字段引用配置 `ShowLabel=true` 时，移动端会优先使用字段对象显式配置的 `Label`；未显式配置时，从当前模块已授权加载的 `diy_field.Label` 自动补充。`ShowLabel=false` 明确隐藏标签，未配置 `ShowLabel` 时继续兼容历史显式 `Label` 行为。
+
+小程序列表卡片内容区按实际配置字段展示，不再固定截取前四行；空值和与标题、状态、顶部标签重复的字段仍按客户端去重规则隐藏。
+
+仅使用旧式 `MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields` 时，小程序以这三组配置作为卡片字段顺序的事实源：优先采用配置项自身的 `Label`，并将三组字段全部并入列表查询，避免底部字段因不在普通列表列中而缺失。此时旧的跨端 ViewSchema 不再覆盖卡片标题、正文和标签区域；底部字段无值时仍不渲染，并回退显示创建/更新时间。
+
 ### 按钮统计角标
 
 `PageTabs`、`MoreBtns`、`PageBtns`、`BatchSelectMoreBtns`、`ExportMoreBtns`、`FormBtns` 的对象都可增加：

@@ -227,7 +227,7 @@
 
 <script>
 import { themeMixin } from '@/utils/theme.js'
-import { V8, getUser, post } from '@/utils/request.js'
+import { V8, getToken, getUser, post } from '@/utils/request.js'
 import { getBusinessEntry, getBusinessModule } from '@/platform/business.js'
 import {
   canAddMenuRecord,
@@ -243,6 +243,7 @@ import {
   loadModuleViewManifest
 } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
+import { appendStandardDeleteAction } from '@/platform/module-delete.js'
 import { fieldDisplayValue, parseJson } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
 import { shouldKeepEmptyCardLine } from '@/platform/card-field-policy.mjs'
@@ -315,7 +316,8 @@ export default {
       loadRequestId: 0,
       searchTimer: null,
       proposalSelection: [],
-      proposalComparing: false
+      proposalComparing: false,
+      authTokenSnapshot: ''
     }
   },
   computed: {
@@ -364,8 +366,18 @@ export default {
     this.config = { ...this.baseConfig }
     this.entry = getBusinessEntry(this.key) || { icon: '/static/xjy/business/kehu.png', accent: '#0B86D4' }
     this.currentUser = getUser() || {}
+    this.authTokenSnapshot = getToken()
     const restored = this.restoreMciListSnapshot()
     this.initializeList(restored)
+  },
+  onShow() {
+    const token = getToken()
+    if (this.authTokenSnapshot === token) return
+    this.authTokenSnapshot = token
+    this.currentUser = getUser() || {}
+    // 登录恢复后废弃旧页面请求结果，并使用新 Token 重新加载菜单与列表。
+    this.loadRequestId += 1
+    this.initializeList(false, true)
   },
   onUnload() {
     clearTimeout(this.searchTimer)
@@ -477,7 +489,7 @@ export default {
             refresh
           })
         }
-        const dynamic = compileListConfig(manifest)
+        const dynamic = compileListConfig(manifest, merged.definition?.fields || [])
         if (!dynamic) {
           this.config = merged
           return
@@ -487,6 +499,7 @@ export default {
         merged.menuId = this.menuId
         const arrayFields = ['tagFields', 'lines', 'statusOptions']
         arrayFields.forEach((name) => {
+          if (merged.hasConfiguredCardFields && ['tagFields', 'lines'].includes(name)) return
           if (dynamic[name]?.length) merged[name] = dynamic[name]
         })
         const scalarFields = [
@@ -500,10 +513,15 @@ export default {
           'statisticsFormat'
         ]
         scalarFields.forEach((name) => {
+          // ViewSchema.StatusField 是右上角状态位的最高优先级，不能被旧式卡片字段配置拦截。
+          if (merged.hasConfiguredCardFields && ['titleField', 'summaryField', 'imageField'].includes(name)) return
           if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') {
             merged[name] = dynamic[name]
           }
         })
+        if (dynamic.statusField) {
+          merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.statusField])]
+        }
         if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema
         this.config = merged
       } catch (error) {}
@@ -774,7 +792,7 @@ export default {
         // “负责人”是卡片的固定业务信息，暂未分配时也要保留标签和空值占位。
         if (shouldKeepEmptyCardLine(line)) return true
         return row[line.field] !== undefined && row[line.field] !== null && row[line.field] !== ''
-      }).slice(0, 4)
+      })
     },
     displayValue(row, line) {
       return this.configuredFieldValue(row, line.field, line.format)
@@ -807,7 +825,10 @@ export default {
     },
     cardBottomText(row) {
       const values = (this.config.bottomFields || [])
-        .map((field) => this.configuredFieldValue(row, field))
+        .map((item) => {
+          const descriptor = typeof item === 'string' ? { field: item } : item
+          return this.configuredFieldValue(row, descriptor.field, descriptor.format)
+        })
         .filter((value) => value && value !== '-')
       return values.length
         ? values.join(' · ')
@@ -817,11 +838,19 @@ export default {
       return formatDateTime(value)
     },
     rowActions(row) {
-      const nativeActions = getBusinessRowActions(this.key, row, this.currentUser)
+      const nativeActions = getBusinessRowActions(this.key, row, this.currentUser, this.menuId)
       const nativeKeys = new Set(nativeActions.map((action) => String(action.key || '').toLowerCase()))
-      const viewActions = (this.config.actionSchema || [])
+      const configuredViewActions = (this.config.actionSchema || [])
         .filter((action) => isActionVisible(action, row))
         .filter((action) => !nativeKeys.has(String(action.Key || '').toLowerCase()))
+      const viewActions = appendStandardDeleteAction(nativeActions.concat(configuredViewActions), {
+        row,
+        user: this.currentUser,
+        menuId: this.menuId,
+        tableName: this.config.table,
+        moduleEngineKey: this.config.key,
+        title: this.getTitle(row)
+      }).filter((action) => !nativeActions.includes(action))
         .map((action) => ({
           key: `view:${action.Key}`,
           label: action.Label,
@@ -844,10 +873,11 @@ export default {
             form: row,
             user: this.currentUser,
             menu: {
-              Id: this.viewManifest?.Module?.Id || '',
-              ModuleEngineKey: this.viewManifest?.Module?.ModuleEngineKey || ''
+              Id: this.menuId || this.viewManifest?.Module?.Id || '',
+              ModuleEngineKey: this.config.key || this.viewManifest?.Module?.ModuleEngineKey || ''
             },
             tableName: this.config.table,
+            refreshData: () => this.loadData(true, true),
             refresh: async () => {
               await this.loadViewConfig(true)
               await this.loadData(true, true)
@@ -945,7 +975,10 @@ export default {
       this.actionSubmitting = true
       uni.showLoading({ title: '正在处理', mask: true })
       try {
-        const result = await executeBusinessRowAction(action.key, row, input, this.currentUser)
+        const result = await executeBusinessRowAction(action.key, row, input, this.currentUser, {
+          menuId: this.menuId,
+          moduleEngineKey: this.config.key || ''
+        })
         if (result && result.rowPatch) this.patchListRow(row.Id, result.rowPatch)
         this.activeAction = null
         this.activeRow = {}

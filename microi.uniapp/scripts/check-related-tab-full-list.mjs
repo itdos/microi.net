@@ -31,6 +31,12 @@ assert.match(relatedList, /related-business-list--independent-scroll[\s\S]*?disp
 	'独立子表必须建立固定头部与列表滚动区的高度约束')
 assert.match(businessDetail, /:viewport-height="relatedListViewportHeight"/,
 	'客户详情必须向子表传递 Tab 面板的明确可视高度')
+assert.match(nativeForm, /:independent-scroll="standaloneListMode"/,
+	'客户新增和编辑页的独立关联 Tab 必须与客户详情页使用相同的组件内滚动模式')
+assert.match(nativeForm, /:viewport-height="relatedListViewportHeight"/,
+	'客户新增和编辑页必须向关联列表传入可视高度')
+assert.match(nativeForm, /native-form--standalone-list[\s\S]*?\.related-tab-panel[\s\S]*?flex:\s*1/,
+	'客户新增和编辑页的关联 Tab 必须占满表单剩余空间')
 assert.match(relatedList, /independentRootStyle[\s\S]*?height:[\s\S]*?this\.viewportHeight[\s\S]*?maxHeight:/,
 	'子表根节点必须使用客户详情传入的像素高度约束滚动区域')
 assert.match(relatedList, /relatedListBodyStyle[\s\S]*?this\.listBodyHeight[\s\S]*?maxHeight:/,

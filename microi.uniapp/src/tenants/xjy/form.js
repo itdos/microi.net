@@ -460,7 +460,7 @@ function isProposalInstallationPointForm(context) {
 }
 
 function currentMinuteTimestamp() {
-  return `${currentTimestamp().slice(0, 16)}:00`
+  return currentTimestamp().slice(0, 16)
 }
 
 function isEmptyFormValue(value) {

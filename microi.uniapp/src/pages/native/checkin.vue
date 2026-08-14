@@ -386,7 +386,14 @@ export default {
 .nav-row { display: grid; grid-template-columns: 72rpx 1fr 72rpx; align-items: center; min-height: 88rpx; padding: 0 calc(20rpx + var(--mci-capsule-right)) 0 20rpx; }
 .nav-icon { display: flex; align-items: center; justify-content: center; width: 64rpx; height: 64rpx; border-radius: 50%; font-size: 44rpx; }
 .nav-title { text-align: center; font-size: 32rpx; font-weight: 650; }
-.nav-record { color: #0b86d4; text-align: center; font-size: 24rpx; }
+.nav-record {
+  justify-self: start;
+  min-width: 64rpx;
+  padding: 16rpx 12rpx;
+  color: #0b86d4;
+  text-align: center;
+  font-size: 24rpx;
+}
 .page-scroll { height: calc(100vh - 178rpx - var(--mci-safe-top) - var(--mci-safe-bottom)); }
 .content { padding: 22rpx 24rpx 160rpx; }
 .time-panel { position: relative; display: flex; flex-direction: column; padding: 28rpx; border-radius: 16rpx; overflow: hidden; background: linear-gradient(120deg, #0b86d4, #12a6b3 65%, #31af81); color: #fff; box-shadow: 0 10rpx 28rpx rgba(11, 134, 212, 0.16); }

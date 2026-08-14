@@ -3,7 +3,7 @@ import { cachedRequest } from '@/platform/cache.js'
 import { findMenu, loadMenuTree } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition, parseJson } from '@/platform/native-form.js'
 import { normalizeStringList } from '@/platform/view-schema-core.mjs'
-import { appendSystemAuditFields, resolveConfiguredFieldNames } from '@/platform/card-field-policy.mjs'
+import { appendSystemAuditFields, resolveConfiguredFieldNames, resolveConfiguredFields } from '@/platform/card-field-policy.mjs'
 
 const DEFAULT_ICON = '/static/microi-blue-256.png'
 const HEAVY_COMPONENTS = new Set([
@@ -41,6 +41,12 @@ export function configuredFieldNames(value, fields) {
   // 菜单卡片配置仍应能通过字段名引用它们。
   const availableFields = appendSystemAuditFields(fields)
   return resolveConfiguredFieldNames(list, availableFields)
+}
+
+export function configuredFields(value, fields) {
+  const rows = parseJson(value, value)
+  const list = Array.isArray(rows) ? rows : normalizeStringList(rows)
+  return resolveConfiguredFields(list, appendSystemAuditFields(fields))
 }
 
 function uniqueFieldNames(values = []) {
@@ -175,10 +181,13 @@ export async function loadAccessibleModuleGroups(refresh = false) {
 
 function createModuleDefinition(module, definition) {
   const fields = definition.fields || []
-  const configuredMobile = configuredFieldNames(module.menu.MobileListFields, fields)
+  const configuredMobileFields = configuredFields(module.menu.MobileListFields, fields)
+  const configuredMobile = configuredMobileFields.map((item) => item.queryField)
   const configuredList = configuredFieldNames(module.menu.SelectFields, fields)
-  const configuredTags = configuredFieldNames(module.menu.CardTitleTagFields, fields)
-  const configuredBottom = configuredFieldNames(module.menu.CardBottomTagFields, fields)
+  const configuredTagFields = configuredFields(module.menu.CardTitleTagFields, fields)
+  const configuredTags = configuredTagFields.map((item) => item.field)
+  const configuredBottomFields = configuredFields(module.menu.CardBottomTagFields, fields)
+  const configuredBottom = configuredBottomFields.map((item) => item.field)
   const configuredSearch = configuredFieldNames(module.menu.SearchFieldIds, fields)
   const configuredStatistics = configuredFieldNames(module.menu.StatisticsFields, fields)
   // 后台已配置“移动端/卡片显示列”时必须严格使用该顺序；
@@ -190,14 +199,18 @@ function createModuleDefinition(module, definition) {
     [/名称|标题|编号|姓名|name|title|code|no/i]
   )
   const excluded = new Set([titleField && titleField.Name].filter(Boolean))
-  const statusField = preferredField(fields, [/状态|status|stage/i], excluded, false)
+  // 显式卡片标题标签优先占用右上角状态位；只有后台未配置时才按字段名/标签自动推断。
+  const configuredStatus = configuredTagFields[0] || null
+  const statusField = configuredStatus
+    ? fields.find((field) => String(field.Name || '').toLowerCase() === String(configuredStatus.queryField || '').toLowerCase()) || null
+    : preferredField(fields, [/状态|status|stage/i], excluded, false)
   if (statusField) excluded.add(statusField.Name)
   let lines = preferred.filter((field) =>
     !excluded.has(field.Name) && !HEAVY_COMPONENTS.has(field.component)
-  ).slice(0, 4)
+  )
   if (!configuredMobile.length && lines.length < 3) {
     fields.forEach((field) => {
-      if (lines.length >= 4 || excluded.has(field.Name) || HEAVY_COMPONENTS.has(field.component)) return
+      if (excluded.has(field.Name) || HEAVY_COMPONENTS.has(field.component)) return
       if (!field.visible || lines.some((item) => item.Name === field.Name)) return
       lines.push(field)
     })
@@ -207,30 +220,54 @@ function createModuleDefinition(module, definition) {
     .find(Boolean)
   const periodField = preferredField(fields, [/时间|日期|date|time/i], new Set(), false) ||
     fields.find((field) => field.Name === 'CreateTime')
+  const configuredMobileByName = new Map(configuredMobileFields.map((item) => [item.queryField.toLowerCase(), item]))
+  const queryFields = uniqueFieldNames([
+    'Id',
+    ...configuredList,
+    ...configuredMobileFields.map((item) => item.queryField),
+    ...configuredTagFields.map((item) => item.queryField),
+    ...configuredBottomFields.map((item) => item.queryField),
+    titleField && titleField.Name,
+    statusField && statusField.Name,
+    periodField && periodField.Name,
+    'CreateTime',
+    'UpdateTime'
+  ])
   return {
     ...module,
     definition,
     titleField: titleField && titleField.Name || 'Id',
-    statusField: statusField && statusField.Name || '',
+    statusField: configuredStatus ? configuredStatus.field : (statusField && statusField.Name || ''),
     statusOptions: statusField ? (statusField.options || []).map((item) => item.value) : [],
     tagFields: configuredTags.slice(0, 3),
-    bottomFields: configuredBottom.slice(0, 3),
+    bottomFields: configuredBottomFields.slice(0, 3),
+    hasConfiguredCardFields: Boolean(configuredMobileFields.length || configuredTagFields.length || configuredBottomFields.length),
+    selectFields: queryFields,
     // 弹窗表格等通用卡片必须保留平台配置顺序，不再自行截取前 4 个可见字段。
     cardFields: uniqueFieldNames([
       ...preferredNames,
-      ...configuredTags,
-      ...configuredBottom
+      ...configuredTagFields.map((item) => item.queryField),
+      ...configuredBottomFields.map((item) => item.queryField)
     ]),
     searchFields: configuredSearch,
     lines: lines.map((field) => ({
-      field: field.Name,
-      label: field.Label || field.Name,
+      field: configuredMobileByName.get(field.Name.toLowerCase())?.field || field.Name,
+      label: configuredMobileByName.get(field.Name.toLowerCase())?.label || field.Label || field.Name,
       component: field.component
     })),
     statisticsField: statisticField && statisticField.Name || '',
     statisticsLabel: statisticField && (statisticField.Label || statisticField.Name) || '',
     periodField: periodField && periodField.Name || 'CreateTime'
   }
+}
+
+// Related tabs already own the authorized menu, table and field definition. Compile those
+// objects locally so they share list-page card configuration without another metadata request.
+export function createMenuModuleDefinition(menu, definition, table = null) {
+  if (!menu || !definition) return null
+  const module = baseModule(menu, null, table || definition.table || null)
+  if (!module.table) return null
+  return createModuleDefinition(module, definition)
 }
 
 export async function loadModuleDefinition(menuId, refresh = false) {
@@ -265,6 +302,7 @@ export async function loadGrantedMenuDefinition(menuId, refresh = false) {
 export default {
   loadAccessibleModules,
   loadAccessibleModuleGroups,
+  createMenuModuleDefinition,
   loadModuleDefinition,
   loadGrantedMenuDefinition
 }
