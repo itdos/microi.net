@@ -15,7 +15,7 @@ export const businessGroups = [
       { key: 'performance', title: '业绩统计', icon: asset('business/yeji.png') },
       { key: 'cases', title: '客户案例', icon: asset('business/anlice.png') },
       { key: 'casebooks', title: '案例册', icon: asset('business/anlice.png') },
-      { key: 'proposals', title: '客户方案', icon: asset('business/shenqing.png') },
+      { key: 'proposals', title: '需求方案', icon: asset('business/shenqing.png') },
       { key: 'customerCare', title: '客户关怀', icon: asset('business/tixing.png') },
       { key: 'customerMap', title: '客户地图', icon: asset('business/customerMap.png') },
       { key: 'contactMap', title: '联系人地图', icon: asset('business/dw.png') },
