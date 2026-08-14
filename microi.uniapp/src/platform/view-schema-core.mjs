@@ -11,7 +11,8 @@ const ACTION_TYPES = [
   'Map',
   'Refresh',
   'Back',
-  'Copy'
+  'Copy',
+  'Delete'
 ]
 const CONDITION_OPERATORS = [
   '=',
@@ -123,6 +124,9 @@ function normalizeField(field, index = 0) {
   if (format) result.Format = format
   if (Number.isFinite(width) && width > 0) result.Width = Math.min(24, width)
   if (Number.isFinite(mobileWidth) && mobileWidth > 0) result.MobileWidth = Math.min(24, mobileWidth)
+  if (firstValue(source, ['ShowLabel', 'showLabel']) !== undefined) {
+    result.ShowLabel = toBoolean(firstValue(source, ['ShowLabel', 'showLabel']))
+  }
   if (firstValue(source, ['Hidden', 'hidden']) !== undefined) {
     result.Hidden = toBoolean(firstValue(source, ['Hidden', 'hidden']))
   }
@@ -631,7 +635,16 @@ export function compileFormConfig(manifest) {
   }
 }
 
-export function compileListConfig(manifest) {
+function configuredFieldLabel(field, definitions = []) {
+  const name = cleanString(field && field.Name, 100)
+  const definition = (Array.isArray(definitions) ? definitions : []).find((item) => {
+    const candidates = [item && item.Name, item && item.AsName]
+    return candidates.some((candidate) => String(candidate || '').toLowerCase() === name.toLowerCase())
+  })
+  return cleanString(definition && (definition.Label || definition.Name), 100) || name
+}
+
+export function compileListConfig(manifest, fieldDefinitions = []) {
   const layout = manifest && manifest.View && manifest.View.Layout
   if (!layout) return null
   const card = layout.Card || {}
@@ -639,11 +652,18 @@ export function compileListConfig(manifest) {
     titleField: card.TitleField,
     statusField: card.StatusField,
     tagFields: card.TagFields || [],
-    lines: (card.Fields || []).map((field) => compactObject({
-      label: field.Label,
-      field: field.Name,
-      format: field.Format
-    })),
+    lines: (card.Fields || []).map((field) => {
+      const showLabel = field.ShowLabel
+      const label = showLabel === false
+        ? ''
+        : (field.Label || (showLabel === true ? configuredFieldLabel(field, fieldDefinitions) : ''))
+      return compactObject({
+        label,
+        field: field.Name,
+        format: field.Format,
+        showLabel
+      })
+    }),
     summaryField: card.SummaryField,
     imageField: card.ImageField,
     periodField: layout.Search.PeriodField || card.PeriodField,

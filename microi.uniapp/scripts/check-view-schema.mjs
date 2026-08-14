@@ -98,7 +98,11 @@ const menu = {
               TitleField: 'KehuMC',
               StatusField: 'Zhuangtai',
               TagFields: ['KehuLX'],
-              Fields: [{ Name: 'FuzeR', Label: '负责人' }]
+              Fields: [
+                { Name: 'FuzeR', ShowLabel: true },
+                { Name: 'InternalCode', Label: '内部编号', ShowLabel: false },
+                { Name: 'KehuLX', Label: '客户类型' }
+              ]
             },
             Statistics: { Field: 'YuqiJYJE', Label: '预期交易额', Format: 'money' }
           }
@@ -172,9 +176,18 @@ const cardManifest = buildRenderManifest(menu, {
   device: 'Mobile',
   user: { RoleIds: ['sales'] }
 })
-const cardConfig = compileListConfig(cardManifest)
+const cardConfig = compileListConfig(cardManifest, [
+  { Name: 'FuzeR', Label: '负责人' },
+  { Name: 'InternalCode', Label: '内部编号' },
+  { Name: 'KehuLX', Label: '客户类型' }
+])
 assert.equal(cardConfig.titleField, 'KehuMC')
 assert.equal(cardConfig.statisticsField, 'YuqiJYJE')
+assert.equal(cardConfig.lines[0].label, '负责人', 'ShowLabel=true 应从 diy_field 元数据补充中文标签')
+assert.equal(cardConfig.lines[0].showLabel, true)
+assert.equal(cardConfig.lines[1].label, undefined, 'ShowLabel=false 应隐藏显式 Label')
+assert.equal(cardConfig.lines[1].showLabel, false)
+assert.equal(cardConfig.lines[2].label, '客户类型', '未配置 ShowLabel 时应继续兼容显式 Label')
 
 const validation = validateViewSchema(menu)
 assert.equal(validation.valid, true)

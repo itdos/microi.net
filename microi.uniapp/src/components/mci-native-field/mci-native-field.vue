@@ -706,12 +706,12 @@ export default {
     },
     changeDate(event) {
       const value = event.detail.value
-      if (this.dateHasTime) this.emitValue(`${value} ${this.timePart || '00:00'}:00`)
+      if (this.dateHasTime) this.emitValue(`${value} ${this.timePart || '00:00'}`)
       else this.emitValue(value)
     },
     changeTime(event) {
       if (this.dateMode === 'time') this.emitValue(event.detail.value)
-      else this.emitValue(`${this.datePart || new Date().toISOString().slice(0, 10)} ${event.detail.value}:00`)
+      else this.emitValue(`${this.datePart || new Date().toISOString().slice(0, 10)} ${event.detail.value}`)
     },
     addTag() {
       const value = this.tagDraft.trim()
