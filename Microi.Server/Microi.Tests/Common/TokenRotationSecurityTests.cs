@@ -176,6 +176,47 @@ public class TokenRotationSecurityTests
         Assert.Equal(new[] { "tenant-a" }, TenantJwtSigningKeyCoordinator.FindDivergentTenants(rows));
     }
 
+    [Fact]
+    public void RuntimeVariants_WithOnlyWeakSecrets_AreBootstrappedFromStableOldestRow()
+    {
+        var rows = new[]
+        {
+            CreateRuntimeVariant("newer", "Product", "Internal", "2022-01-02", "2026-08-13", "short", string.Empty),
+            CreateRuntimeVariant("oldest", "Product", "Internet", "2022-01-01", "2026-08-12", string.Empty, string.Empty)
+        };
+
+        Assert.Null(TenantJwtSigningKeyCoordinator.SelectCanonicalRow(rows));
+        Assert.Equal(
+            "oldest",
+            TenantJwtSigningKeyCoordinator.SelectBootstrapRow(rows)?["Id"]?.Value<string>());
+        Assert.Equal(new[] { "iTdos" }, TenantJwtSigningKeyCoordinator.FindDivergentTenants(rows));
+    }
+
+    [Fact]
+    public void BootstrapSecret_MatchesInstallerRuleAndIsStrong()
+    {
+        var first = TenantJwtSigningKeyCoordinator.GenerateStrongAuthSecret();
+        var second = TenantJwtSigningKeyCoordinator.GenerateStrongAuthSecret();
+
+        Assert.Matches("^[a-f0-9]{48}$", first);
+        Assert.False(DiyToken.IsWeakJwtSecret(first, "iTdos"));
+        Assert.NotEqual(first, second);
+    }
+
+    [Theory]
+    [InlineData("varchar", true)]
+    [InlineData("nvarchar", true)]
+    [InlineData("character varying", true)]
+    [InlineData("text", true)]
+    [InlineData("clob", true)]
+    [InlineData("int", false)]
+    public void LegacyAuthSecretColumnType_IsValidatedBeforeStartup(
+        string dataType,
+        bool expected)
+    {
+        Assert.Equal(expected, TenantJwtSigningKeyCoordinator.IsStringColumnType(dataType));
+    }
+
     [Theory]
     [InlineData("VSCode")]
     [InlineData("MCP")]

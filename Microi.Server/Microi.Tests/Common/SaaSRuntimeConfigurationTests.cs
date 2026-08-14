@@ -571,6 +571,35 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
+    public void StartupSigningKeyGate_RepairsLegacySchemaBeforeReadingTenantRows()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.Core",
+            "Token",
+            "TenantJwtSigningKeyCoordinator.cs"));
+        var convergeStart = source.IndexOf(
+            "public static TenantJwtSigningKeyConvergenceResult Converge",
+            StringComparison.Ordinal);
+        var schemaRepair = source.IndexOf(
+            "var schemaUpdated = EnsureAuthSecretStorage",
+            convergeStart,
+            StringComparison.Ordinal);
+        var tenantRead = source.IndexOf(
+            "var rows = ReadActiveRows",
+            convergeStart,
+            StringComparison.Ordinal);
+
+        Assert.True(convergeStart >= 0 && schemaRepair > convergeStart);
+        Assert.True(tenantRead > schemaRepair);
+        Assert.Contains("AuthSecretRotateVersionFieldName", source, StringComparison.Ordinal);
+        Assert.Contains("AuthSecretStorageLength = 100", source, StringComparison.Ordinal);
+        Assert.Contains("DatabaseType.SqlServer9", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SaaSReload_IsPublishedOnlyAfterTheConfigurationTransactionCommits()
     {
         var root = FindRepositoryRoot();
