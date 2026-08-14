@@ -587,16 +587,23 @@ public class SaaSRuntimeConfigurationTests
             "var schemaUpdated = EnsureAuthSecretStorage",
             convergeStart,
             StringComparison.Ordinal);
+        var tenantBootstrap = source.IndexOf(
+            "var bootstrappedTenantCount = EnsureConfiguredTenantRow",
+            convergeStart,
+            StringComparison.Ordinal);
         var tenantRead = source.IndexOf(
             "var rows = ReadActiveRows",
             convergeStart,
             StringComparison.Ordinal);
 
         Assert.True(convergeStart >= 0 && schemaRepair > convergeStart);
-        Assert.True(tenantRead > schemaRepair);
+        Assert.True(tenantBootstrap > schemaRepair);
+        Assert.True(tenantRead > tenantBootstrap);
         Assert.Contains("AuthSecretRotateVersionFieldName", source, StringComparison.Ordinal);
         Assert.Contains("AuthSecretStorageLength = 100", source, StringComparison.Ordinal);
         Assert.Contains("DatabaseType.SqlServer9", source, StringComparison.Ordinal);
+        Assert.Contains("WHERE NOT EXISTS (SELECT 1 FROM {tableName})", source, StringComparison.Ordinal);
+        Assert.Contains("ShouldBootstrapConfiguredTenant", source, StringComparison.Ordinal);
     }
 
     [Fact]

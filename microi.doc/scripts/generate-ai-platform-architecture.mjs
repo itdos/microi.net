@@ -7,6 +7,7 @@ import {
   architectureData,
   architectureFeatureLabels,
   architectureVersion,
+  platformVersion,
   buildArchitectureMarkdown,
   channels,
   deliveryFlow,
@@ -143,7 +144,7 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="architecture-title architecture-desc" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
   <title id="architecture-title">Microi吾码 AI平台 架构图</title>
   <desc id="architecture-desc">以 V8引擎为运行核心，连接 AI、低代码、治理、服务观测、多端入口、安全、多租户和数据存储的 Microi吾码 AI 平台全景架构。</desc>
-  <metadata id="architecture-source">${esc(JSON.stringify({ architectureVersion, capabilitySourceHash: sourceHash }))}</metadata>
+  <metadata id="architecture-source">${esc(JSON.stringify({ architectureVersion, platformVersion, capabilitySourceHash: sourceHash }))}</metadata>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#020716"/><stop offset=".48" stop-color="#07152b"/><stop offset="1" stop-color="#020713"/></linearGradient>
     <linearGradient id="header-line" x1="0" x2="1"><stop stop-color="#4de8ff"/><stop offset=".5" stop-color="#b995ff"/><stop offset="1" stop-color="#48e7a6"/></linearGradient>
@@ -157,6 +158,8 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
       text { font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",Arial,sans-serif; }
       .title { fill:#f5fbff; font-size:31px; font-weight:800; letter-spacing:1.8px; }
       .subtitle { fill:#9eb8d8; font-size:12px; font-weight:600; letter-spacing:.8px; }
+      .version-badge { fill:#122e4d; stroke:#57e4f6; stroke-opacity:.58; }
+      .version-text { fill:#bdf6ff; font-family:Consolas,"Microsoft YaHei UI",sans-serif; font-size:13px; font-weight:800; letter-spacing:.7px; }
       .value-shell { fill:#071a31; stroke:#7bdcff; stroke-opacity:.34; }
       .value-main { fill:#f4fbff; font-size:23px; font-weight:900; }
       .value-sub { fill:#b9cee6; font-size:11.5px; font-weight:700; }
@@ -202,6 +205,8 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
 
   <path d="M22 16H718L734 32H898" fill="none" stroke="url(#header-line)" stroke-width="2"/>
   <text x="40" y="55" class="title">Microi吾码 AI平台 架构图</text>
+  <rect x="475" y="28" width="86" height="34" rx="17" class="version-badge"/>
+  <text x="518" y="50" text-anchor="middle" class="version-text">${esc(platformVersion)}</text>
   <text x="40" y="82" class="subtitle">AI-NATIVE LOW-CODE · DESIGN → BUILD → GOVERN → DELIVER → OBSERVE → RECOVER</text>
   ${valueCards.map(valueCardSvg).join('')}
 
@@ -295,6 +300,7 @@ const outputs = [
 const manifest = {
   schemaVersion: 1,
   architectureVersion,
+  platformVersion,
   capabilitySourceHash: sourceHash,
   uniqueFeatureLabels: architectureFeatureLabels().length,
   outputs
@@ -312,6 +318,7 @@ for (const markdownPath of [readmePath, indexPath]) {
 
 console.log(JSON.stringify({
   architectureVersion,
+  platformVersion,
   capabilitySourceHash: sourceHash,
   uniqueFeatureLabels: architectureFeatureLabels().length,
   manifestPath,

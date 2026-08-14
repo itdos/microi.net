@@ -213,7 +213,7 @@ unityInstance.SendMessage('MicroiApiClient', 'ApplyMicroiHostContext', JSON.stri
 
 - 匿名多人接口使用服务端签发的 `SessionId + SessionSecret`；数据库只存 SHA-256，不把秘密、用户身份或内部字段放进公开快照。
 - 在线事实进入共享数据库或 Redis；2 秒心跳和 10 秒租约只是本样板参数，不能以进程内字典代替。
-- 公屏消息限制长度、表情白名单、单位时间发送数和稳定 `RequestId`。WebGL DOM 输入框还必须设置 `WebGLInput.captureAllKeyboardInput = false`，隔离键盘、`beforeinput`、组合输入和指针事件；只拦截冒泡阶段会漏掉数字或 Shift 符号。
+- 公屏消息限制长度、表情白名单、单位时间发送数和稳定 `RequestId`。WebGL DOM 输入框还必须将 `WebGLInput.captureAllKeyboardInput` 设为 `false`，隔离键盘、`beforeinput`、组合输入和指针事件；只拦截冒泡阶段会漏掉数字或 Shift 符号。Unity 6 若未向 Player 编译响应文件引用 `UnityEngine.WebGLModule`，可用 `link.xml` 保留类型后反射设置，并用真实键盘 E2E 验收。
 
 <details class="unity-doc-details">
   <summary>查看幂等保存核心片段</summary>

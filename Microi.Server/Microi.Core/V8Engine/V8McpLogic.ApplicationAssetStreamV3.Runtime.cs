@@ -1704,10 +1704,8 @@ namespace Microi.net
                         MaxFileBytes = MaxStreamPublishFileBytes,
                         MaxTotalBytes = MaxStreamPublishFileBytes,
                         MaxFileCount = 1,
-                        DailyUserQuotaBytes = MaxStreamPublishTotalBytes,
-                        DailyTenantQuotaBytes = Math.Max(
-                            MaxStreamPublishTotalBytes,
-                            tenantUploadOptions.DailyTenantQuotaBytes),
+                        DailyUserQuotaBytes = ApplicationPublishDailyQuotaBytes,
+                        DailyTenantQuotaBytes = ApplicationPublishDailyQuotaBytes,
                         UploadEnabled = tenantUploadOptions.UploadEnabled
                     };
                     if (!uploadOptions.UploadEnabled)
@@ -1741,7 +1739,8 @@ namespace Microi.net
                                 osClient,
                                 SafeJString(currentUser, "Id", SafeJString(currentUser, "UserId")),
                                 totalBytes,
-                                uploadOptions)).ConfigureAwait(false);
+                                uploadOptions,
+                                FileUploadSecurity.ApplicationPublishQuotaScope)).ConfigureAwait(false);
                         if (quotaError != null)
                         {
                             uploadResult = quotaError;

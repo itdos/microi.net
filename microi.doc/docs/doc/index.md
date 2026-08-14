@@ -4,7 +4,9 @@
 
 # Microi 吾码
 
-<p class="mci-doc-home-subtitle">AI 深度融合 V8 引擎的开源低代码平台</p>
+<p class="mci-doc-home-subtitle"><strong>典型业务场景，相比传统 AI 开发：</strong>Token 更省 10 倍+、交付更快 10 倍+、20+ 成熟引擎开箱复用；深度融合 V8 引擎，业务逻辑无需编译发布。</p>
+
+<p><a href="https://blog.csdn.net/qq973702/article/details/163763831" target="_blank" rel="noopener noreferrer">阅读门头文章：为什么 AI 开发的 Token 和交付时间，能同时降一个数量级？ →</a></p>
 
 <p style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px;">
   <img src="https://static.itdos.com/upload/img/NET-10.svg" alt=".NET 10" />
@@ -35,7 +37,7 @@
 > SVG 负责展示整体关系；下面的同步索引由同一份架构能力数据自动生成，便于新用户、搜索引擎和 AI 完整识别平台边界。
 
 <!-- MICROI_ARCHITECTURE_CAPABILITIES:START -->
-<!-- capability-source-sha256:06319e9efe22a4a304cae2a39607d20d3849c55418db2d055b5b4e4e3bfd9473 -->
+<!-- capability-source-sha256:948e503e69a80ed5249356d9438cdec52564c67dff31946f34d68b1ecd15d36b -->
 | 架构层 | 核心职责 | 关键能力 |
 |---|---|---|
 | **AI 智能与设计控制面** | 理解需求、设计系统、生成并校验变更 | 多模型网关、RAG、NL2SQL / NL2V8、Agent / Tool Calling、MCP / Skills、业务架构蓝图、AI Workflow、Manifest、Preview / Diff |
@@ -50,7 +52,7 @@
 <details>
 <summary>查看架构图完整功能索引（253 个唯一标签）</summary>
 
-- **平台价值：** 10×+、更省 Token、10×+、更快开发、几十+、成熟引擎 · 更稳定、开箱即用、更快交付
+- **平台价值：** 10×+、Token 更省、10×+、典型交付更快、20+、成熟引擎复用、在线生效、V8 无需编译发布
 - **全端入口：** PC 管理端、Vue 3、WebOS、桌面多任务、移动自适应、H5 / 触控、UniApp / App、Android / iOS、微信小程序、多端复用、AI 应用 / Agent、Web / UniApp、前端微服务、多页路由、Microi.VSCode、资源树 / 调试、MCP / Skills、Codex / OpenClaw、OpenAPI / SDK、HTTP / JS
 - **AI 智能与设计控制面：** 多模型网关、智能模型路由、密钥隔离、Token 统计、流式对话、多模态输入、知识库 RAG、向量检索、NL2SQL、NL2V8、Agent、Tool Calling、MCP 编排、Skills、Prompt 模板、上下文记忆、AI 应用工作台、在线源码、业务架构蓝图、系统关系图谱、AI Workflow、状态机、Automation Flow、流程挖掘、Manifest 建模、解决方案规划、影响面分析、代码生成、测试计划生成、AI 辅助调试、根因诊断、Preview / Diff
 - **低代码与多端体验引擎：** 表单引擎、40+ 控件、Tabs / 分组、栅格布局、主子表、关联表单、字段 V8 事件、表单 V8 事件、数据过滤、模块引擎、列表 / 搜索、统计 / 角标、PC 复合列、移动卡片、左右树表、界面引擎、JSON ↔ Vue、源码预览、Undo / Redo、页面版本、语义 Diff、Microi.UI / 物料、资产依赖、打印引擎、报表引擎、审批流 v4、模板引擎、Office / 蓝牙打印、图表 / 地图 / 甘特、Unity / WebGL、3D / CAD / 大屏、前端微服务

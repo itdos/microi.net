@@ -134,6 +134,17 @@ test("compiled wrapper, nested app HTML, and legacy paths all receive fresh runt
   assert.match(source, /legacyRefreshRoot\s*=\s*text\(V8\.OsClient\)\.toLowerCase\(\)\s*\+\s*"\/micro-app\/"/);
   assert.match(source, /legacyRefreshPaths\.length > 100/);
   assert.match(source, /refreshStableCdnPaths\(scopedLegacyRefreshPaths, true\)/);
+  assert.match(source, /RESUMABLE_PUBLIC_DOWNLOAD_REGISTRATION_V1/);
+  assert.match(source, /requestedAction\s*===\s*"RegisterResumablePublicDownload"/);
+  assert.match(source, /requestedAction\s*===\s*"PromoteResumablePublicDownload"/);
+  assert.match(source, /StorageScope", "=", "ApplicationAssetMultipartSession"/);
+  assert.match(source, /text\(downloadState\.Status\) !== "Succeeded"/);
+  assert.match(source, /text\(downloadState\.ExpectedSha256\)\.toLowerCase\(\) !== downloadExpectedSha256/);
+  assert.match(source, /downloadTargetPath\s*=\s*downloadSourcePath/);
+  assert.doesNotMatch(source, /movePublicObject\(downloadSourcePath, downloadTargetPath\)/);
+  assert.match(source, /DownloadRegisteredAt/);
+  assert.match(source, /DownloadRegisteredAt\s*=\s*now\(\)/);
+  assert.match(source, /DownloadPublicPath = downloadTargetPath/);
   assert.match(source, /requestedAction\s*===\s*"PromoteStableAssetsBatch"/);
   assert.match(source, /function promoteStableStoreAssets\(/);
   assert.match(source, /function publishBase64ToExactPublicPath\(/);
@@ -208,7 +219,7 @@ test("all compiled and marketplace promotion paths wrap raw UniApp entries only"
 test("application-store package and server upgrade both carry the fixed builder", () => {
   const packaged = packageModel.SysApiEngines.find(item => item.ApiEngineKey === "ai_app_build");
   assert.ok(packaged);
-  assert.equal(packaged.Version, "v1.6.0");
+  assert.equal(packaged.Version, "v1.6.4");
   assert.equal(packaged.ApiV8Code.replace(/\r\n/g, "\n"), source.replace(/\r\n/g, "\n"));
   assert.ok(
     compareSemver(packageModel.PackageInfo.Version, "v6.5.4") >= 0,

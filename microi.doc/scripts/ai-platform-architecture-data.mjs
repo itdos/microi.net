@@ -1,10 +1,11 @@
-export const architectureVersion = '2026.08.12'
+export const architectureVersion = '2026.08.15'
+export const platformVersion = 'v7.3.9'
 
 export const valueCards = [
-  ['10×+', '更省 Token'],
-  ['10×+', '更快开发'],
-  ['几十+', '成熟引擎 · 更稳定'],
-  ['开箱即用', '更快交付']
+  ['10×+', 'Token 更省'],
+  ['10×+', '典型交付更快'],
+  ['20+', '成熟引擎复用'],
+  ['在线生效', 'V8 无需编译发布']
 ]
 
 export const channels = [
@@ -141,6 +142,7 @@ export const architectureLayers = [
 
 export const architectureData = {
   architectureVersion,
+  platformVersion,
   valueCards,
   channels,
   panels: panels.map(({ code, title, subtitle, items }) => ({ code, title, subtitle, items })),

@@ -23,6 +23,8 @@ namespace Microi.net
         private const int MaxStreamPublishAssetCount = 20_000;
         private const long MaxStreamPublishFileBytes = 128L * 1024 * 1024;
         private const long MaxStreamPublishTotalBytes = 1L * 1024 * 1024 * 1024;
+        private const long ApplicationPublishDailyQuotaBytes =
+            FileUploadSecurityOptions.DefaultAbsoluteDailyQuotaMegabytes * 1024L * 1024L;
         private const int DefaultStreamPublishIoConcurrency = 8;
         private const int MaxStreamPublishIoConcurrency = 8;
         private const long StreamPublishReadBudgetUnitBytes = 1L * 1024 * 1024;
@@ -1351,10 +1353,8 @@ namespace Microi.net
                     MaxFileBytes = MaxStreamPublishFileBytes,
                     MaxTotalBytes = MaxStreamPublishFileBytes,
                     MaxFileCount = 1,
-                    DailyUserQuotaBytes = MaxStreamPublishTotalBytes,
-                    DailyTenantQuotaBytes = Math.Max(
-                        MaxStreamPublishTotalBytes,
-                        tenantUploadOptions.DailyTenantQuotaBytes),
+                    DailyUserQuotaBytes = ApplicationPublishDailyQuotaBytes,
+                    DailyTenantQuotaBytes = ApplicationPublishDailyQuotaBytes,
                     UploadEnabled = true
                 };
                 var payload = new DiyUploadParam
@@ -1530,7 +1530,8 @@ namespace Microi.net
                                 osClient,
                                 userId,
                                 totalBytes,
-                                uploadOptions)).ConfigureAwait(false);
+                                uploadOptions,
+                                FileUploadSecurity.ApplicationPublishQuotaScope)).ConfigureAwait(false);
                         if (quotaError != null)
                         {
                             uploadResult = quotaError;

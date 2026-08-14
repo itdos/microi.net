@@ -2,7 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="architecture-title architecture-desc" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
   <title id="architecture-title">Microi吾码 AI平台 架构图</title>
   <desc id="architecture-desc">以 V8引擎为运行核心，连接 AI、低代码、治理、服务观测、多端入口、安全、多租户和数据存储的 Microi吾码 AI 平台全景架构。</desc>
-  <metadata id="architecture-source">{&quot;architectureVersion&quot;:&quot;2026.08.12&quot;,&quot;capabilitySourceHash&quot;:&quot;06319e9efe22a4a304cae2a39607d20d3849c55418db2d055b5b4e4e3bfd9473&quot;}</metadata>
+  <metadata id="architecture-source">{&quot;architectureVersion&quot;:&quot;2026.08.15&quot;,&quot;platformVersion&quot;:&quot;v7.3.9&quot;,&quot;capabilitySourceHash&quot;:&quot;948e503e69a80ed5249356d9438cdec52564c67dff31946f34d68b1ecd15d36b&quot;}</metadata>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#020716"/><stop offset=".48" stop-color="#07152b"/><stop offset="1" stop-color="#020713"/></linearGradient>
     <linearGradient id="header-line" x1="0" x2="1"><stop stop-color="#4de8ff"/><stop offset=".5" stop-color="#b995ff"/><stop offset="1" stop-color="#48e7a6"/></linearGradient>
@@ -16,6 +16,8 @@
       text { font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",Arial,sans-serif; }
       .title { fill:#f5fbff; font-size:31px; font-weight:800; letter-spacing:1.8px; }
       .subtitle { fill:#9eb8d8; font-size:12px; font-weight:600; letter-spacing:.8px; }
+      .version-badge { fill:#122e4d; stroke:#57e4f6; stroke-opacity:.58; }
+      .version-text { fill:#bdf6ff; font-family:Consolas,"Microsoft YaHei UI",sans-serif; font-size:13px; font-weight:800; letter-spacing:.7px; }
       .value-shell { fill:#071a31; stroke:#7bdcff; stroke-opacity:.34; }
       .value-main { fill:#f4fbff; font-size:23px; font-weight:900; }
       .value-sub { fill:#b9cee6; font-size:11.5px; font-weight:700; }
@@ -61,27 +63,29 @@
 
   <path d="M22 16H718L734 32H898" fill="none" stroke="url(#header-line)" stroke-width="2"/>
   <text x="40" y="55" class="title">Microi吾码 AI平台 架构图</text>
+  <rect x="475" y="28" width="86" height="34" rx="17" class="version-badge"/>
+  <text x="518" y="50" text-anchor="middle" class="version-text">v7.3.9</text>
   <text x="40" y="82" class="subtitle">AI-NATIVE LOW-CODE · DESIGN → BUILD → GOVERN → DELIVER → OBSERVE → RECOVER</text>
   <g transform="translate(930 20)">
     <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
     <path d="M12 62H210" stroke="#4de8ff" stroke-width="2"/>
     <text x="16" y="31" class="value-main">10×+</text>
-    <text x="16" y="53" class="value-sub">更省 Token</text>
+    <text x="16" y="53" class="value-sub">Token 更省</text>
   </g><g transform="translate(1168 20)">
     <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
     <path d="M12 62H210" stroke="#b995ff" stroke-width="2"/>
     <text x="16" y="31" class="value-main">10×+</text>
-    <text x="16" y="53" class="value-sub">更快开发</text>
+    <text x="16" y="53" class="value-sub">典型交付更快</text>
   </g><g transform="translate(1406 20)">
     <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
     <path d="M12 62H210" stroke="#48e7a6" stroke-width="2"/>
-    <text x="16" y="31" class="value-main">几十+</text>
-    <text x="16" y="53" class="value-sub">成熟引擎 · 更稳定</text>
+    <text x="16" y="31" class="value-main">20+</text>
+    <text x="16" y="53" class="value-sub">成熟引擎复用</text>
   </g><g transform="translate(1644 20)">
     <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
     <path d="M12 62H210" stroke="#ffbd59" stroke-width="2"/>
-    <text x="16" y="31" class="value-main">开箱即用</text>
-    <text x="16" y="53" class="value-sub">更快交付</text>
+    <text x="16" y="31" class="value-main">在线生效</text>
+    <text x="16" y="53" class="value-sub">V8 无需编译发布</text>
   </g>
 
   <g transform="translate(40 112)">

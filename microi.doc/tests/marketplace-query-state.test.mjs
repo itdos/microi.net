@@ -13,6 +13,20 @@ test('reads shareable marketplace filters from stable English query keys', () =>
   )
 })
 
+test('keeps the virtual recommended category shareable in the URL', () => {
+  assert.deepEqual(
+    readMarketplaceState('?category=recommended'),
+    { ...DEFAULT_MARKETPLACE_STATE, category: 'recommended' }
+  )
+  assert.equal(
+    buildMarketplaceHref(
+      { pathname: '/apps.html', search: '', hash: '#ai-apps' },
+      { ...DEFAULT_MARKETPLACE_STATE, category: 'recommended' }
+    ),
+    '/apps.html?category=recommended#ai-apps'
+  )
+})
+
 test('falls back safely for invalid category and sort values', () => {
   assert.deepEqual(
     readMarketplaceState('?category=%3Cscript%3E&sort=drop-table&q=%20%20Texas%20%20'),

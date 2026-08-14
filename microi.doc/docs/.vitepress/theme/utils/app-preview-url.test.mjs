@@ -23,3 +23,14 @@ test('keeps unrelated query parameters while normalizing the latest entry', () =
     'https://static.itdos.com/itdos/ai-app-publish/demo/index.html?mode=share'
   )
 })
+
+test('Unity Taoyuan always launches from its public stable entry without a version segment', () => {
+  const actual = withPreviewVersion(
+    '/micro-app/v3/tenants/itdos/kinds/runtime/apps/microi-unity-taoyuan/releases/v1.4.9/assets/index.html?v=1.4.9',
+    { AppKey: 'microi-unity-taoyuan', AppVersion: 'v1.4.9' },
+    'https://microi.net'
+  )
+
+  assert.equal(actual, 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html')
+  assert.doesNotMatch(actual, /\/v\d+(?:\.\d+)+\//)
+})

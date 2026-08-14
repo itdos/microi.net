@@ -160,6 +160,35 @@ public class FileUploadSecurityTests
     }
 
     [Fact]
+    public void DailyQuotaKeys_KeepApplicationPublishingSeparateFromOrdinaryUploads()
+    {
+        var day = new DateTime(2026, 8, 15, 0, 0, 0, DateTimeKind.Utc);
+        var ordinary = FileUploadSecurity.BuildDailyQuotaKeys("iTdos", "admin", day);
+        var publishing = FileUploadSecurity.BuildDailyQuotaKeys(
+            "iTdos",
+            "admin",
+            day,
+            FileUploadSecurity.ApplicationPublishQuotaScope);
+
+        Assert.NotEqual(ordinary.UserKey, publishing.UserKey);
+        Assert.NotEqual(ordinary.TenantKey, publishing.TenantKey);
+        Assert.NotEqual(ordinary.HashTag, publishing.HashTag);
+        Assert.Contains(":UploadQuota:", ordinary.UserKey);
+        Assert.Contains(":ApplicationPublishQuota:", publishing.UserKey);
+        Assert.Contains(publishing.HashTag, publishing.UserKey);
+        Assert.Contains(publishing.HashTag, publishing.TenantKey);
+    }
+
+    [Fact]
+    public void DailyQuotaKeys_RejectUnsafeCustomScopes()
+    {
+        var day = new DateTime(2026, 8, 15, 0, 0, 0, DateTimeKind.Utc);
+
+        Assert.Throws<ArgumentException>(() =>
+            FileUploadSecurity.BuildDailyQuotaKeys("iTdos", "admin", day, "bad:scope"));
+    }
+
+    [Fact]
     public void TenantOverrides_TakePriorityOverFallbackWithinAbsoluteCaps()
     {
         var hardLimits = new FileUploadSecurityOptions
