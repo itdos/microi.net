@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_build
- * Version: v1.5.6
+ * Version: v1.6.0
  * Function:
- * - AI应用编译发布、固定最新版发布与受控静态资源热修；保留私有源码指针，并在发布前拒绝 HTTP 错误、Code=0、长度或哈希不一致的源文件。
+ * - AI应用编译发布、固定最新版发布与受控静态资源热修；支持按应用身份发布并刷新 legacy micro-app 兼容入口；保留私有源码指针，并在发布前拒绝 HTTP 错误、Code=0、长度或哈希不一致的源文件。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || "成功" }; }
@@ -306,6 +306,32 @@ function movePublicObject(sourcePath, targetPath) {
   } catch (e) {
     return { Code: 0, Msg: "MoveObject不可用：" + e.message };
   }
+}
+function legacyRedirectHtml(targetUrl, versionNo) {
+  var targetJson = JSON.stringify(text(targetUrl));
+  return '<!doctype html>\n' +
+    '<html lang="zh-CN">\n<head>\n' +
+    '  <meta charset="utf-8">\n' +
+    '  <meta name="viewport" content="width=device-width,initial-scale=1">\n' +
+    '  <meta http-equiv="refresh" content="0;url=' + text(targetUrl) + '">\n' +
+    '  <title>Microi AI Application ' + text(versionNo) + '</title>\n' +
+    '</head>\n<body>\n' +
+    '  <p>Loading Microi AI Application ' + text(versionNo) + '...</p>\n' +
+    '  <script>location.replace(' + targetJson + ');<\/script>\n' +
+    '</body>\n</html>\n';
+}
+function immutableRuntimeBaseUrl(appKey, versionNo, rawBaseUrl) {
+  var fileServer = "";
+  try { fileServer = text(V8.SysConfig && V8.SysConfig.FileServer).replace(/\/+$/, ""); } catch (error) { fileServer = ""; }
+  var tenantKey = text(V8.OsClient).toLowerCase();
+  var baseUrl = text(rawBaseUrl).replace(/\/+$/, "");
+  if (!/^https:\/\//i.test(fileServer) || !/^v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(versionNo)) return "";
+  if (baseUrl.indexOf("?") >= 0 || baseUrl.indexOf("#") >= 0) return "";
+  var expectedPrefix = fileServer + "/microi/application-assets/v3/tenants/" + tenantKey
+    + "/kinds/runtime/apps/" + appKey + "/releases/" + versionNo + "/requests/";
+  if (baseUrl.toLowerCase().indexOf(expectedPrefix.toLowerCase()) !== 0) return "";
+  var suffix = baseUrl.substring(expectedPrefix.length);
+  return /^[a-f0-9]{64}\/assets$/i.test(suffix) ? baseUrl : "";
 }
 function normalizeAppKey(value, fallback) {
   var raw = text(value);
@@ -1130,6 +1156,102 @@ if (isBlank(appId)) return fail("AppId不能为空");
 var app = getApp(appId);
 if (!app || app.Code !== 1 || !app.Data) return { Code: 2, Data: null, Msg: "AI应用不存在" };
 var requestedAction = text(V8.Param.Action || "Build");
+/* LEGACY_MICRO_APP_REDIRECT_PUBLISH_V1
+ * 兼容入口只允许指向当前租户、当前应用、当前语义版本的 v3 不可变
+ * committed runtime。版本目录先发布，固定入口最后切换，避免先暴露
+ * 一个尚未具备历史回退地址的新版本。 */
+if (requestedAction === "PublishLegacyMicroAppRedirects") {
+  var redirectAppKey = ensureAppKey(app.Data);
+  var redirectVersionNo = text(V8.Param.VersionNo || V8.Param.AppVersion);
+  var redirectBaseUrl = immutableRuntimeBaseUrl(redirectAppKey, redirectVersionNo, V8.Param.ImmutableBaseUrl);
+  if (isBlank(redirectBaseUrl)) {
+    return fail("ImmutableBaseUrl必须是当前租户、当前应用、当前版本的v3不可变运行时目录");
+  }
+  var redirectRoot = text(V8.OsClient).toLowerCase() + "/micro-app/" + redirectAppKey + "/";
+  var redirectEntries = [
+    { RelativePath: redirectVersionNo + "/index.html", TargetUrl: redirectBaseUrl + "/index.html" },
+    { RelativePath: redirectVersionNo + "/unity/index.html", TargetUrl: redirectBaseUrl + "/unity/index.html" },
+    { RelativePath: "unity/index.html", TargetUrl: redirectBaseUrl + "/unity/index.html" },
+    { RelativePath: "index.html", TargetUrl: redirectBaseUrl + "/index.html" }
+  ];
+  var redirectStageRoot = "legacy-micro-app-redirect-stage/" + redirectAppKey + "/" + text(newId());
+  var redirectPublished = [];
+  var redirectRefreshPaths = [];
+  for (var redirectIndex = 0; redirectIndex < redirectEntries.length; redirectIndex++) {
+    var redirectEntry = redirectEntries[redirectIndex];
+    var redirectTargetPath = redirectRoot + redirectEntry.RelativePath;
+    var redirectUpload = uploadText(
+      redirectStageRoot,
+      redirectEntry.RelativePath,
+      legacyRedirectHtml(redirectEntry.TargetUrl, redirectVersionNo),
+      false
+    );
+    if (!redirectUpload || redirectUpload.Code !== 1) return redirectUpload || fail("兼容入口上传失败");
+    var redirectUploadedPath = redirectUpload.Data ? redirectUpload.Data.HdfsPath || "" : "";
+    var redirectMove = movePublicObject(redirectUploadedPath, redirectTargetPath);
+    if (!redirectMove || redirectMove.Code !== 1) {
+      return fail("兼容入口提升失败：" + redirectEntry.RelativePath
+        + "；源=" + redirectUploadedPath
+        + "；目标=" + redirectTargetPath
+        + "；存储错误=" + text(redirectMove && redirectMove.Msg, "未知"));
+    }
+    redirectRefreshPaths.push(redirectTargetPath);
+    redirectPublished.push({
+      RelativePath: redirectEntry.RelativePath,
+      TargetUrl: redirectEntry.TargetUrl,
+      FilePathName: redirectTargetPath
+    });
+  }
+  var redirectRefreshResult = refreshStableCdnPaths(redirectRefreshPaths, true);
+  if (!redirectRefreshResult || redirectRefreshResult.Code !== 1) {
+    return redirectRefreshResult || fail("兼容入口已发布，但CDN刷新失败");
+  }
+  return ok({
+    AppId: appId,
+    AppKey: redirectAppKey,
+    VersionNo: redirectVersionNo,
+    ImmutableBaseUrl: redirectBaseUrl,
+    Published: redirectPublished,
+    CdnRefresh: redirectRefreshResult.Data
+  }, "兼容入口已发布并提交CDN刷新");
+}
+/* LEGACY_MICRO_APP_CDN_REFRESH_V1
+ * v3 的权威入口是 versionless resolver，但历史外链仍可能位于
+ * /{tenant}/micro-app/{appKey}/。这里只允许刷新当前应用自己的显式路径，
+ * 不复制对象、不接受通配符，也不能跨应用或跨租户刷新。 */
+if (requestedAction === "RefreshLegacyMicroAppCdn") {
+  var legacyRefreshAppKey = ensureAppKey(app.Data);
+  var legacyRefreshRoot = text(V8.OsClient).toLowerCase() + "/micro-app/" + legacyRefreshAppKey + "/";
+  var legacyRefreshPaths = [];
+  if (!isBlank(V8.Param.PathsJson)) {
+    try { legacyRefreshPaths = toArray(JSON.parse(text(V8.Param.PathsJson))); }
+    catch (legacyRefreshJsonError) { return fail("PathsJson不是有效的JSON数组：" + legacyRefreshJsonError.message); }
+  }
+  if (!legacyRefreshPaths.length) return fail("至少传入1个需要刷新的兼容入口路径");
+  if (legacyRefreshPaths.length > 100) return fail("单次CDN刷新不能超过100个显式路径");
+  var scopedLegacyRefreshPaths = [];
+  for (var legacyRefreshIndex = 0; legacyRefreshIndex < legacyRefreshPaths.length; legacyRefreshIndex++) {
+    var legacyExplicitPath = normalizePath(legacyRefreshPaths[legacyRefreshIndex]);
+    if (isBlank(legacyExplicitPath)) return fail("CDN刷新路径不能为空");
+    var legacyFullPath = legacyExplicitPath.toLowerCase().indexOf(legacyRefreshRoot.toLowerCase()) === 0
+      ? legacyExplicitPath
+      : legacyRefreshRoot + legacyExplicitPath;
+    if (legacyFullPath.toLowerCase().indexOf(legacyRefreshRoot.toLowerCase()) !== 0) {
+      return fail("CDN刷新路径超出当前应用兼容发布目录");
+    }
+    scopedLegacyRefreshPaths.push(legacyFullPath);
+  }
+  var legacyRefreshResult = refreshStableCdnPaths(scopedLegacyRefreshPaths, true);
+  if (!legacyRefreshResult || legacyRefreshResult.Code !== 1) {
+    return legacyRefreshResult || fail("兼容入口CDN刷新失败");
+  }
+  return ok({
+    AppId: appId,
+    AppKey: legacyRefreshAppKey,
+    ExplicitPathCount: scopedLegacyRefreshPaths.length,
+    CdnRefresh: legacyRefreshResult.Data
+  }, "兼容入口CDN刷新任务已提交");
+}
 if (requestedAction === "RefreshStableCdn") {
   var refreshAppKey = ensureAppKey(app.Data);
   var refreshAppRoot = text(V8.OsClient).toLowerCase() + "/ai-app-publish/" + refreshAppKey + "/";

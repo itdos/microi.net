@@ -5828,6 +5828,20 @@ namespace Microi.net
         /// 将本地 Web、UniApp 或 MicroService 源码同步到在线 AI 应用。
         /// 源码存私有桶；该方法不安装运行态 sys_microiservice。
         /// </summary>
+        internal static string ResolveMicroServiceSourceApplicationType(JObject source, JObject existingApp)
+        {
+            var requestedType = source?["ApplicationType"]?.Val<string>() ?? source?["AppType"]?.Val<string>();
+            var applicationType = !IsBlank(requestedType)
+                ? requestedType
+                : existingApp == null
+                    ? "MicroService"
+                    : SafeJString(existingApp, "ApplicationType", SafeJString(existingApp, "AppType", "MicroService"));
+
+            return new[] { "Web", "UniApp", "MicroService" }
+                .FirstOrDefault(item => string.Equals(item, applicationType, StringComparison.OrdinalIgnoreCase))
+                ?? applicationType;
+        }
+
         public static async Task<DosResult<object>> SyncMicroServiceSource(string osClient, JObject param, dynamic currentToken)
         {
             try
@@ -5836,12 +5850,6 @@ namespace Microi.net
                 var source = UnwrapMicroServiceParam(param);
                 var msKey = NormalizeMicroServiceKey(source?["MsKey"]?.Val<string>() ?? source?["MicroServiceKey"]?.Val<string>() ?? source?["AppKey"]?.Val<string>());
                 if (IsBlank(msKey)) return new DosResult<object>(0, null, "MsKey 不能为空，只允许英文、数字、-、_");
-                var applicationType = source?["ApplicationType"]?.Val<string>() ?? source?["AppType"]?.Val<string>() ?? "MicroService";
-                if (!new[] { "Web", "UniApp", "MicroService" }.Contains(applicationType, StringComparer.OrdinalIgnoreCase))
-                    return new DosResult<object>(0, null, "ApplicationType 仅支持 Web、UniApp 或 MicroService");
-                applicationType = new[] { "Web", "UniApp", "MicroService" }
-                    .First(item => string.Equals(item, applicationType, StringComparison.OrdinalIgnoreCase));
-
                 var files = GetArrayParam(param, "SourceFiles", "sourceFiles", "Files", "files");
                 if (files.Count == 0) return new DosResult<object>(0, null, "SourceFiles 不能为空");
                 if (files.Count > 1000) return new DosResult<object>(0, null, "单次最多同步 1000 个源码文件");
@@ -5854,9 +5862,12 @@ namespace Microi.net
                 });
 
                 var appId = appResult.Code == 1 && appResult.Data != null ? Convert.ToString(appResult.Data.Id) : Ulid.NewUlid().ToString();
-                var existingApp = appResult.Code == 1 && appResult.Data != null
+                JObject existingApp = appResult.Code == 1 && appResult.Data != null
                     ? JObject.FromObject(appResult.Data)
                     : null;
+                var applicationType = ResolveMicroServiceSourceApplicationType((JObject)source, existingApp);
+                if (!new[] { "Web", "UniApp", "MicroService" }.Contains(applicationType, StringComparer.OrdinalIgnoreCase))
+                    return new DosResult<object>(0, null, "ApplicationType 仅支持 Web、UniApp 或 MicroService");
                 var requestedDescription = source?["Description"]?.Val<string>() ?? source?["Remark"]?.Val<string>();
                 var appData = new JObject
                 {

@@ -13,7 +13,7 @@ outline: [2, 3]
     <p class="unity-doc-lead">Unity 负责实时 3D，Microi.Unity 负责浏览器桥接，V8 接口引擎负责身份、权限与数据。游戏、数字孪生、展厅，都沿用同一条交付链。</p>
     <div class="unity-doc-actions">
       <a class="is-primary" href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html" target="_blank" rel="noreferrer">在线进入桃源</a>
-      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/external/v1.4.0/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.4.0.exe">下载 Windows v1.4</a>
+      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/v1.4.4/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.4.4.exe">下载 Windows v1.4.4</a>
       <a href="#五分钟接入">五分钟接入</a>
     </div>
     <div class="unity-doc-badges" aria-label="核心能力">
@@ -99,19 +99,19 @@ Microi 已有大屏 Unity 加载能力与项目级工具。现在补齐的是公
   <div class="unity-doc-app__body">
     <p class="unity-doc-eyebrow">MICROI AI APPLICATION · WEBGL + WINDOWS</p>
     <h3>走进云海桃园，寻回九枚桃花灵韵</h3>
-    <p>v1.4 专业角色预览版支持操控古风女主行走、奔跑、跳跃；浏览器即开即玩，也可下载安装 Windows x64 本地版。每位访客拥有唯一随机昵称，同场角色与左下角公屏实时同步；登录后再由 V8 接口引擎恢复并保存个人进度。</p>
+    <p>WebGL v1.4.4 专业角色预览版支持操控古风女主行走、奔跑、跳跃；开场女声按真实音轨时间显示中英双语电影字幕。每位访客拥有唯一随机昵称，同场角色与左下角公屏实时同步；公屏完整支持中文、字母、数字、标点、Shift 符号与输入法组合文本，登录后再由 V8 接口引擎恢复并保存个人进度。</p>
     <ul>
       <li><b>可追溯实时角色</b><span>AI 设定图约束造型，CC0 基础网格二次创作；设定图与实机证据分开标注</span></li>
-      <li><b>双端同版</b><span>WebGL 在线全屏与 Windows 安装包统一使用 v1.4.0</span></li>
+      <li><b>中英音轨字幕</b><span>中文与英语分行显示，跟随 AudioSource 播放时间逐句切换</span></li>
       <li><b>视觉状态透明</b><span>当前是专业角色预览；正式原创云绮 AAA 高模仍在制作与实机近景验收中</span></li>
       <li><b>多人桃源</b><span>随机昵称、2 秒心跳、10 秒掉线消失、头顶名牌与角色插值</span></li>
-      <li><b>实时公屏</b><span>左下角文字聊天、表情选择、输入隔离、限频与幂等</span></li>
-      <li><b>完整商城包</b><span>Web 产物、4 张表、9 个接口和 4 个运营菜单</span></li>
+      <li><b>实时公屏</b><span>中文、字母、数字、符号、组合输入与表情选择，服务端限频且幂等</span></li>
+      <li><b>完整商城包</b><span>Web 产物、4 张表、10 个接口、0 个平台侧栏菜单</span></li>
       <li><b>租户可扩展</b><span>保存后 Hook 首次创建，官方升级永不覆盖</span></li>
     </ul>
     <div class="unity-doc-actions">
       <a class="is-primary" href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html" target="_blank" rel="noreferrer">在线游玩</a>
-      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/external/v1.4.0/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.4.0.exe">Windows v1.4 本地版</a>
+      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/v1.4.4/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.4.4.exe">Windows v1.4.4 本地版</a>
       <a href="/apps.html">前往 AI 应用列表</a>
       <a href="/app-detail.html?app=microi-unity-taoyuan">应用详情</a>
     </div>
@@ -127,7 +127,7 @@ Microi 已有大屏 Unity 加载能力与项目级工具。现在补齐的是公
   <article><b>幂等台账</b><p><code>app_unity_taoyuan_save_log</code> 抵御重试与节点切换。</p></article>
   <article><b>在线租约</b><p><code>app_unity_taoyuan_presence</code> 保存随机昵称、位置与 10 秒到期时间。</p></article>
   <article><b>公屏消息</b><p><code>app_unity_taoyuan_chat</code> 保存经过会话校验、限频与幂等处理的文字和表情。</p></article>
-  <article><b>运营菜单</b><p>分别查看玩家进度、在线访客与公屏消息；会话秘密永不展示。</p></article>
+  <article><b>AI 应用边界</b><p>安装表与接口但不创建平台侧栏菜单；系统管理员仍可从应用与审计记录追踪发布。</p></article>
 </div>
 
 ## 多人在线与公屏如何工作
@@ -213,7 +213,7 @@ unityInstance.SendMessage('MicroiApiClient', 'ApplyMicroiHostContext', JSON.stri
 
 - 匿名多人接口使用服务端签发的 `SessionId + SessionSecret`；数据库只存 SHA-256，不把秘密、用户身份或内部字段放进公开快照。
 - 在线事实进入共享数据库或 Redis；2 秒心跳和 10 秒租约只是本样板参数，不能以进程内字典代替。
-- 公屏消息限制长度、表情白名单、单位时间发送数和稳定 `RequestId`；页面输入框必须阻止键盘事件继续驱动角色。
+- 公屏消息限制长度、表情白名单、单位时间发送数和稳定 `RequestId`。WebGL DOM 输入框还必须设置 `WebGLInput.captureAllKeyboardInput = false`，隔离键盘、`beforeinput`、组合输入和指针事件；只拦截冒泡阶段会漏掉数字或 Shift 符号。
 
 <details class="unity-doc-details">
   <summary>查看幂等保存核心片段</summary>
@@ -291,10 +291,12 @@ Unity 的 `Data`、WASM 与 Windows 安装包经常超过普通表单上传范�
   <span>✓ 公网安装包 SHA-256 回读一致</span>
   <span>✓ 大资产断点续传与后台审计终态</span>
   <span>✓ 两个独立访客互见昵称、位置与公屏</span>
+  <span>✓ 真实按键输入中文、数字、标点与 Shift 符号</span>
+  <span>✓ 开场女声与中英双语字幕逐句同步</span>
   <span>✓ 异常断开 10 秒后角色消失</span>
 </div>
 
-Unity 2022.3 的官方 WebGL 支持以桌面浏览器为主。移动端需要单独做触控、内存、画质和弱网分档，不能用桌面构建通过代替。
+Unity 6 Web 平台要求浏览器具备 WebGL 2、HTML5、64 位与 WebAssembly 能力；移动端虽有明确支持范围，仍需要单独做触控、内存、画质和弱网分档，不能用桌面构建通过代替。
 
 ## 验收不是一句“能运行”
 
@@ -319,5 +321,5 @@ AI 角色设定图用于约束脸型、发式、衣料与色彩，不是运行�
   <a href="/doc/system-engine/visualization-engine"><b>3D、CAD 与数据大屏</b><span>场景承载与可视化入口 →</span></a>
   <a href="/doc/v8-engine/api-engine"><b>接口引擎</b><span>编写可即时生效的后端 API →</span></a>
   <a href="/doc/system-engine/app-store"><b>应用商城</b><span>打包、安装与版本升级 →</span></a>
-  <a href="https://docs.unity3d.com/cn/2022.3/Manual/webgl-browsercompatibility.html" target="_blank" rel="noreferrer"><b>Unity WebGL 兼容性</b><span>查看 Unity 2022.3 官方说明 ↗</span></a>
+  <a href="https://docs.unity3d.com/cn/6000.0/Manual/webgl-browsercompatibility.html" target="_blank" rel="noreferrer"><b>Unity Web 兼容性</b><span>查看 Unity 6 官方说明 ↗</span></a>
 </div>
