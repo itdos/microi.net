@@ -29,22 +29,22 @@
     <!-- zhy：列表长文本按模块配置限制行数，超出部分显示省略号，避免撑高卡片。 -->
     <text v-if="summary" class="card-summary" :style="summaryClampStyle">{{ summary }}</text>
 
-    <view v-if="actions.length" class="card-actions" @tap.stop>
-      <view v-for="action in actions" :key="action.key" class="card-action"
-        :class="[`card-action--${action.tone || 'default'}`]"
-        hover-class="card-action--pressed" @tap.stop="$emit('action', action, row)">
-        <text>{{ action.label }}</text>
-      </view>
-    </view>
-
     <view class="card-bottom">
       <text>{{ time }}</text>
-      <text class="detail-link">查看详情 ›</text>
+      <view class="card-bottom__links">
+        <text class="detail-link" @tap.stop="$emit('open', row)">查看详情</text>
+        <view v-if="actions.length" class="more-link" hover-class="more-link--pressed" @tap.stop="showActionMenu">
+          <view class="more-icon" aria-hidden="true"><view></view><view></view><view></view></view>
+          <text>更多</text>
+        </view>
+      </view>
     </view>
   </view>
 </template>
 
 <script>
+import { showRowActionSheet } from '@/platform/row-action-sheet.js'
+
 export default {
   name: 'MciBusinessCard',
   props: {
@@ -68,6 +68,11 @@ export default {
     }
   },
   methods: {
+    showActionMenu() {
+      const actions = this.actions
+      if (!actions.length) return
+      showRowActionSheet(actions, (action) => this.$emit('action', action, this.row))
+    },
     lineClampStyle(line) {
       if (Number(line?.maxLines) <= 1) return null
       const lines = Math.min(8, Math.max(2, Number(line.maxLines) || 3))
@@ -81,7 +86,7 @@ export default {
 <style scoped>
 .data-card { margin-bottom: 18rpx; padding: 22rpx 24rpx 18rpx; border: 1rpx solid #e3edf1; border-radius: 16rpx; background: #fff; box-shadow: 0 6rpx 18rpx rgba(25, 78, 101, .05); transition: transform 150ms ease, box-shadow 150ms ease; }
 .data-card--pressed { transform: scale(.985); box-shadow: 0 2rpx 8rpx rgba(25, 78, 101, .04); }
-.card-top, .card-title-wrap, .field-row, .card-bottom { display: flex; align-items: center; }
+.card-top, .card-title-wrap, .field-row, .card-bottom, .card-bottom__links, .more-link, .more-icon { display: flex; align-items: center; }
 .card-top { justify-content: space-between; gap: 18rpx; }
 .card-title-wrap { min-width: 0; }
 .card-index { flex: 0 0 auto; width: 36rpx; height: 36rpx; margin-right: 12rpx; border-radius: 50%; color: #0b86d4; background: #eaf5fa; font-size: 20rpx; line-height: 36rpx; text-align: center; }
@@ -104,12 +109,13 @@ export default {
 .phone-action { display: flex; align-items: center; justify-content: center; width: 52rpx; height: 44rpx; }
 .phone-action image { width: 28rpx; height: 28rpx; }
 .card-summary { display: -webkit-box; max-height: 108rpx; margin-top: 12rpx; overflow: hidden; color: #607b87; font-size: 23rpx; line-height: 36rpx; text-overflow: ellipsis; white-space: pre-wrap; word-break: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-.card-actions { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 14rpx; padding-top: 14rpx; border-top: 1rpx solid #edf3f5; }
-.card-action { min-width: 90rpx; height: 50rpx; padding: 0 16rpx; border: 1rpx solid #dce8ed; border-radius: 8rpx; color: #58727d; background: #f8fbfc; font-size: 21rpx; line-height: 50rpx; text-align: center; transition: transform 140ms ease, background 140ms ease; }
-.card-action--primary { border-color: rgba(11, 134, 212, .3); color: #0b78ba; background: #eaf5fa; }
-.card-action--danger { border-color: rgba(217, 71, 43, .24); color: #cb4329; background: #fff1ee; }
-.card-action--pressed { transform: scale(.94); }
 .card-bottom { justify-content: space-between; margin-top: 14rpx; padding-top: 14rpx; border-top: 1rpx solid #edf3f5; color: #9aabb2; font-size: 21rpx; }
+.card-bottom__links { flex: 0 0 auto; gap: 8rpx; }
 .detail-link { color: #0b86d4; }
-@media (prefers-reduced-motion: reduce) { .data-card, .card-action { transition: none; } }
+.detail-link, .more-link { padding: 12rpx 8rpx; }
+.more-link { min-width: 92rpx; height: 52rpx; justify-content: center; gap: 8rpx; border-radius: 8rpx; color: #526d78; }
+.more-link--pressed { background: #edf5f8; }
+.more-icon { gap: 4rpx; }
+.more-icon > view { width: 6rpx; height: 6rpx; border-radius: 50%; background: currentColor; }
+@media (prefers-reduced-motion: reduce) { .data-card { transition: none; } }
 </style>
