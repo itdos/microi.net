@@ -1,10 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.10.11
+ * Version: v2.0.0
  * Function:
- * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
- * - 接口引擎按 Managed/CreateIfMissing 资源策略升级，并用安装基线阻止覆盖租户修改。
+ * - Unified marketplace importer with resumable slices and strict SharedPublicRuntime support for official versioned Web/UniApp assets.
  */
 
 // ==================== 参数接收与校验 ====================

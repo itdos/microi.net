@@ -464,8 +464,8 @@ if (!OsClient.EnsureHydrated(osClientName))
 }
 var clientModel = OsClient.GetClient(osClientName);
 
-// 第二道门禁覆盖首次安装时“所有变体均为弱密钥”的场景：UseMicroi 会先为
-// 当前变体生成强密钥，这里立即把它收敛到同租户的其它运行时变体并复读验收。
+// 第二道幂等门禁复读 UseMicroi 已完成的旧库字段补齐、弱密钥持久化和
+// 同租户运行时变体收敛结果；并发节点刚写入新值时，这里会按数据库胜出值重载。
 var tenantSigningKeyConvergence = TenantJwtSigningKeyCoordinator.Converge(
     clientModel.Db,
     clientModel.OsClientModel["DbType"]?.Val<string>() ?? OsClientDefault.OsClientDbType);

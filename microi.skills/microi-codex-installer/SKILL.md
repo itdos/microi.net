@@ -1,17 +1,17 @@
 ---
 name: microi-codex-installer
-description: 当用户在 Codex、WorkBuddy、CodeBuddy、Qoder、Comate、Trae、Cursor、Claude Code 或其它 AI 编程软件中说“安装 @microi.net/cli”“初始化 Microi吾码插件”“添加吾码服务器/MCP”“拉取某连接的所有 V8 代码”，或要求安装、自动升级、启用、诊断吾码 AI 插件时使用。吾码 CLI、Codex 插件及既有工作区 AI/MCP 默认后台自动更新；失败只延后和提示，不得阻断任何工作。
+description: 当用户在 Codex、DeepSeek Harness、WorkBuddy、CodeBuddy、Qoder、Comate、Trae、Cursor、Claude Code 或其它 AI 编程软件中说“安装 @microi.net/cli”“初始化 Microi吾码插件”“添加吾码服务器/MCP”“拉取某连接的所有 V8 代码”，或要求安装、自动升级、启用、诊断吾码 AI 插件时使用。吾码 CLI、Codex/DSH 插件及既有工作区 AI/MCP 默认后台自动更新；失败只延后和提示，不得阻断任何工作。
 ---
 
 # Microi吾码 AI 插件与 CLI 安装
 
-本技能负责发现、安装、初始化、升级和诊断 Microi吾码 AI 开发能力。唯一 npm 包为 `@microi.net/cli`；该包同时提供 `microi` CLI、Codex Plugin、WorkBuddy/CodeBuddy 兼容插件清单、完整 Skills 与同源 MCP。正式 marketplace 名称固定为 `microi-net`，插件选择器固定为 `microi@microi-net`，禁止新建 `microi-official` 或第二个 npm 包。
+本技能负责发现、安装、初始化、升级和诊断 Microi吾码 AI 开发能力。唯一 npm 包为 `@microi.net/cli`；该包同时提供 `microi` CLI、Codex Plugin、DeepSeek Harness 原生 profile bundle、WorkBuddy/CodeBuddy 兼容插件清单、完整 Skills 与同源 MCP。Codex marketplace 名称固定为 `microi-net`，插件选择器固定为 `microi@microi-net`，禁止新建 `microi-official` 或第二个 npm 包。
 
 只要本技能已经由 Microi.VSCode、工作区 `microi.skills` 或已安装插件提供，用户说“帮我初始化 Microi吾码插件”时就必须识别该意图，用户不需要再次说出 npm 包名。全新 Codex 与空目录尚未加载任何吾码 Skill 时，用户只需在首次请求中明确 `@microi.net/cli`，例如“通过 `@microi.net/cli` 安装吾码 Codex 插件”；具备终端与网络权限的 AI 必须直接执行本技能中的确定性安装命令。安装完成后，更短的“初始化吾码”“添加服务器/MCP”“拉取全部 V8”均由插件 Skill 自动识别。
 
 ## 非阻塞自动更新（强制）
 
-只要当前宿主已装有 Microi VS Code 扩展、`@microi.net/cli` 或 Codex 插件，就应由宿主/CLI 在后台投递自动更新。更新检查与业务工作并行，绝不能成为分析、MCP 调用、源码修改、构建、测试、发布或新任务的前置门禁。
+只要当前宿主已装有 Microi VS Code 扩展、`@microi.net/cli`、Codex 插件或 DeepSeek Harness bundle，就应由宿主/CLI 在后台投递自动更新。更新检查与业务工作并行，绝不能成为分析、MCP 调用、源码修改、构建、测试、发布或新任务的前置门禁。
 
 自动更新只从 npm 官方 registry 读取 CLI 最新版：
 
@@ -24,6 +24,7 @@ CLI、Codex 插件与工作区状态仍可用以下命令只读核对，但核�
 ```bash
 microi version --json
 microi codex status --json
+microi dsh status --json
 microi doctor --workspace "<工作区绝对路径>" --json
 ```
 
@@ -35,16 +36,16 @@ microi doctor --workspace "<工作区绝对路径>" --json
 microi update --background --workspace "<工作区绝对路径>" --json
 ```
 
-后台进程会依次检查/安装全局 CLI、幂等更新 Codex 插件、执行 `microi ai init`、`microi doctor` 和 `microi codex status`。`codex install --yes` 的 `--yes` 只保留给旧脚本兼容，不再表示必须先取得用户授权。VS Code 扩展同时使用官方扩展宿主的 `workbench.extensions.installExtension` / 自动更新机制；当前 Extension Host 不强制重载。
+后台进程会依次检查/安装全局 CLI、幂等更新 Codex 插件与已存在 DSH 宿主的 profile bundle、执行 `microi ai init`、`microi doctor`、`microi codex status` 和 `microi dsh status`。`codex install --yes` 的 `--yes` 只保留给旧脚本兼容，不再表示必须先取得用户授权。VS Code 扩展同时使用官方扩展宿主的 `workbench.extensions.installExtension` / 自动更新机制；当前 Extension Host 不强制重载。
 
-当前运行中的扩展、CLI、Codex Router 与 MCP 必须继续使用已加载版本，禁止为了升级终止进程、强制重载窗口、结束对话或拒绝新任务。新版本写入版本隔离目录，只在后续新进程或宿主自然重启时接管。npm registry 不可用、版本无法解析、权限不足、文件被占用或安装失败时，写入 `~/.microi/updater/status.json` 并延后重试；可非模态提示“立即重试/查看日志”，但无论用户是否处理，当前、正在进行和新建工作都必须继续。禁止改用第三方 registry 或不明镜像冒充最新版。
+当前运行中的扩展、CLI、Codex Router、DSH 会话与 MCP 必须继续使用已加载版本，禁止为了升级终止进程、强制重载窗口、结束对话或拒绝新任务。新版本写入版本隔离目录，只在后续新进程或宿主自然重启时接管。npm registry 不可用、版本无法解析、权限不足、文件被占用或安装失败时，写入 `~/.microi/updater/status.json` 并延后重试；可非模态提示“立即重试/查看日志”，但无论用户是否处理，当前、正在进行和新建工作都必须继续。禁止改用第三方 registry 或不明镜像冒充最新版。
 
 ## 自然语言入口规则
 
 - 任一 AI 宿主开始处理 Microi吾码低代码、V8、MCP、表单/模块/流程、微应用或平台源码任务时，先判断当前任务是否已经提供 `microi` 的 Skills/MCP/CLI 能力。
 - 能力不明确时可立即做只读检测或后台投递 `microi update`，但不得等待检测/更新完成才开始用户工作。
 - 用户明确说“安装 `@microi.net/cli`”“初始化 Microi吾码插件”“添加服务器/MCP”或“拉取某连接全部 V8”时，直接执行确定性命令，不再询问“是否允许升级”。连接地址、帐号、密码以及远端业务写入仍遵守各自原有确认边界。
-- 普通 Microi 对话发现 CLI、Codex 插件、AI bundle 或 MCP 不是最新版时，自动更新并继续任务；如自动更新做不到，只给出不阻塞的重试提示，不得把升级选择变成继续工作的条件。
+- 普通 Microi 对话发现 CLI、Codex/DSH 插件、AI bundle 或 MCP 不是最新版时，自动更新并继续任务；如自动更新做不到，只给出不阻塞的重试提示，不得把升级选择变成继续工作的条件。
 - 用户关闭自动更新、忽略提示或暂不重载时，当前版本能力照常可用。只在任务确实依赖一个旧版本不存在的具体能力时，准确说明该能力边界并提供降级方案，不能用笼统“版本未通过”拒绝整个任务。
 
 ## 检测
@@ -54,6 +55,7 @@ microi update --background --workspace "<工作区绝对路径>" --json
 ```bash
 microi version --json
 microi codex status --json
+microi dsh status --json
 microi doctor --workspace "<工作区绝对路径>" --json
 ```
 
@@ -71,6 +73,7 @@ codex plugin list
 - `microi@microi-net` 显示 `installed, enabled`；
 - 已安装版本等于 CLI 内置 marketplace 的目标版本。
 - 插件路径位于 `microi-net-marketplace/plugins/microi`，且 `.codex-plugin/plugin.json` 的显示名为 `Microi吾码`。
+- DSH 已安装时，目标 profile 的依赖、`node_modules/@microi.net/cli` 版本、`cordis.patch.yml` 和 `dsh.profile.bundles` 激活项全部一致；DSH 未安装不是其它宿主的失败。
 - `doctor.coexistence.aiBundleVersion` 不低于当前 CLI，MCP provider 没有 `legacy` 或 `upgrade-available`；`newer-provider-preserved` 表示较新的 VS Code/CLI 提供者已被安全保留，可以通过。
 
 `microi-official` 和 `microi@microi-official` 仅是旧标识，不得写入新文档或新配置；安装器会在新版安装成功后迁移并清理旧标识。
@@ -82,6 +85,7 @@ codex plugin list
 ```bash
 npm install --global @microi.net/cli@latest
 microi codex install --yes
+microi dsh install
 ```
 
 全局安装受宿主限制时可使用下面的临时执行方式；它不能证明一个既有旧版全局 CLI 已被升级：
@@ -104,12 +108,13 @@ npx --yes @microi.net/cli@latest codex install --yes
 microi codex install --yes --force
 ```
 
-CLI 或 Codex 插件安装/升级完成后，后台幂等重新初始化当前工作区 AI 配置并更新 MCP，然后双重验收：
+CLI、Codex 或 DSH 插件安装/升级完成后，后台幂等重新初始化当前工作区 AI 配置并更新 MCP，然后分别验收：
 
 ```bash
 microi ai init --workspace "<工作区绝对路径>" --json
 microi doctor --workspace "<工作区绝对路径>" --json
 microi codex status --json
+microi dsh status --json
 ```
 
 不得用单独的 `microi mcp init` 代替完整 AI 重新初始化；`ai init` 已默认包含 MCP 更新。只有诊断表明 MCP 仍有明确残留问题时，才追加 `microi mcp init` 做定向恢复。初始化写入采用幂等/原子方式，不终止已启动的 MCP；当前进程继续旧版本，新进程读取新版本。
@@ -121,6 +126,19 @@ microi codex install --yes --source <Microi.VSCode目录>
 ```
 
 普通用户不得被引导到来历不明的 Git、本地目录或第三方 registry。不得通过 VPN、伪造地区/企业身份或共享账号绕过 OpenAI 地区与身份政策。
+
+## DeepSeek Harness 原生 Profile Bundle
+
+用户要求“安装吾码 DeepSeek Harness 插件”“让 DSH 支持吾码”时，在已安装官方 `@deepseek-ai/dsh` 且 `dsh`、`pnpm` 可用的前提下直接执行：
+
+```bash
+npx --yes @microi.net/cli@latest dsh install
+microi dsh status --json
+```
+
+安装器必须调用 DSH 官方 `dsh plugin --profile <name> add <package>` 协议。唯一包 `@microi.net/cli` 通过 `dsh.bundle.patch=./cordis.patch.yml` 贡献 `@deepseek-ai/dsh-mcp-client` 配置，禁止另建 npm 包，也禁止把 `.mcp.json` 写给 DSH 后声称已安装。默认安装官方 `web` 与 `headless` profile；指定单个 profile 使用 `--profile <名称>`。
+
+`status` 验收必须回读 `$DSH_HOME/profiles/<profile>/package.json`、安装包版本、bundle patch 与激活列表；工具入口应为 `mcp__microi__microi_codex`。安装后只说明“新 DSH 会话将加载”，不得终止或冒充热更新当前会话。开发者从可信源码验收使用 `microi dsh install --source <Microi.VSCode目录> --force`；普通用户只允许 npm 官方 registry 的精确版本。
 
 ## 空工作区与多宿主初始化
 
@@ -148,6 +166,7 @@ microi init --workspace <工作区> --pull
 - 百度 Comate：`.agents/skills/microi/SKILL.md`、`.comate/skills/microi/SKILL.md` 与 `.comate/mcp.json`。
 - Trae：`AGENTS.md` 与 `.trae/mcp.json`；首次仍需开启项目级 MCP。
 - Codex：`AGENTS.md`、完整 Skills、项目及用户 `config.toml`；全局插件是可选增强。
+- DeepSeek Harness：读取 `AGENTS.md`，MCP 必须通过 `@microi.net/cli` 的原生 profile bundle 注入，不读取项目 `.mcp.json`。
 
 完成后运行：
 
@@ -189,6 +208,7 @@ CodeBuddy CLI 可把该 `packageRoot` 作为本地 marketplace 添加，再安�
 
 ```bash
 microi codex status --json
+microi dsh status --json
 ```
 
 返回 `ok: true` 且选择器、状态和版本全部正确时可报告安装完成；必要时再用 `codex plugin list` 核对路径。若宿主尚未热加载，只说明“新版将在下一次自然启动时生效”，不得要求用户立即新建任务或重载才能继续当前工作。
