@@ -3,6 +3,13 @@
     <section class="ai-studio-hero" aria-labelledby="ai-studio-title">
       <p class="ai-studio-brand"><span aria-hidden="true"></span>Microi AI Studio</p>
       <h1 id="ai-studio-title">{{ copy.title }}</h1>
+      <a
+        v-if="locale === 'zh-CN'"
+        class="ai-studio-proof-link"
+        href="https://blog.csdn.net/qq973702/article/details/163763831"
+        target="_blank"
+        rel="noopener noreferrer"
+      >查看可复现实测与适用边界 →</a>
 
       <div class="ai-studio-chat" :class="{ 'has-messages': messages.length }">
         <div v-if="messages.length" ref="messageArea" class="ai-studio-messages" aria-live="polite">
@@ -88,7 +95,7 @@ const copy = computed(() => locale.value === 'en-US' ? {
   loginDesc: 'The official-site AI never reads or changes private tenant data.',
   loginAction: 'Sign in / Register'
 } : {
-  title: '你的全能 AI，创造、工作与想象皆可抵达',
+  title: '典型业务场景，相比传统 AI 开发：Token 更省 10 倍+、交付更快 10 倍+、20+ 成熟引擎开箱复用；深度融合 V8 引擎，业务逻辑无需编译发布。',
   placeholder: '描述你想创造、了解、分析或完成的任何事情...',
   chatLabel: '与 Microi AI 对话',
   aboutTitle: '了解 Microi吾码', aboutPrompt: 'Microi吾码适合开发哪些企业应用？',
@@ -164,7 +171,9 @@ onBeforeUnmount(() => {
 .ai-studio-hero { width: min(920px, calc(100% - 40px)); margin: 0 auto; padding: 154px 0 38px; text-align: center; }
 .ai-studio-brand { display: inline-flex; align-items: center; gap: 15px; min-height: 76px; margin: 0 0 16px; padding: 0 16px; border: 1px solid rgba(244,211,94,.2); border-radius: 999px; background: linear-gradient(180deg, rgba(244,211,94,.09), rgba(255,255,255,.025)); color: #fff4c8; box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 30px rgba(0,0,0,.18); font-size: 50px; font-weight: 760; letter-spacing: .015em; }
 .ai-studio-brand span { width: 28px; height: 28px; border: 2px solid rgba(255,244,200,.72); border-radius: 50%; background: #f4d35e; box-shadow: 0 0 0 4px rgba(244,211,94,.1), 0 0 22px rgba(244,211,94,.62); }
-.ai-studio-hero h1 { max-width: 780px; margin: 16px auto 32px; color: #f7f7f7; font-size: clamp(26px, 3.2vw, 26px); font-weight: 680; line-height: 1.16; letter-spacing: -.04em; }
+.ai-studio-hero h1 { max-width: 860px; margin: 16px auto 14px; color: #f7f7f7; font-size: clamp(26px, 3.2vw, 26px); font-weight: 680; line-height: 1.32; letter-spacing: -.035em; }
+.ai-studio-proof-link { display: inline-flex; align-items: center; min-height: 34px; margin: 0 auto 24px; padding: 0 14px; border: 1px solid rgba(244,211,94,.28); border-radius: 999px; background: rgba(244,211,94,.08); color: #f7df86; font-size: 12px; font-weight: 650; text-decoration: none; transition: background-color .18s, border-color .18s, transform .18s; }
+.ai-studio-proof-link:hover { border-color: rgba(244,211,94,.55); background: rgba(244,211,94,.14); transform: translateY(-1px); }
 .ai-studio-chat { position: relative; width: min(760px, 100%); min-height: 156px; margin: 0 auto; overflow: hidden; border: 1px solid #3b3b3b; border-radius: 18px; background: #242424; box-shadow: 0 18px 50px rgba(0,0,0,.22); text-align: left; }
 .ai-studio-chat.has-messages { min-height: 320px; }
 .ai-studio-messages { max-height: 300px; overflow-y: auto; padding: 22px 22px 4px; scrollbar-width: thin; scrollbar-color: #515151 transparent; }
@@ -197,6 +206,6 @@ onBeforeUnmount(() => {
 .ai-studio-login-mask a { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; border-radius: 9px; background: #efefef; color: #151515; font-size: 12px; font-weight: 650; line-height: 1; text-decoration: none; }
 .ai-studio-error { margin: 12px auto 0; color: #ff8b8b; font-size: 12px; }
 @keyframes chat-thinking { to { opacity: .25; transform: translateY(-3px); } }
-@media (max-width: 767px) { .ai-studio-hero { width: min(100% - 28px, 920px); padding-top: 52px; } .ai-studio-brand { min-height: 42px; gap: 10px; padding: 0 14px; font-size: 22px; } .ai-studio-brand span { width: 18px; height: 18px; } .ai-studio-hero h1 { max-width: 560px; margin: 18px auto 26px; font-size: 22px; line-height: 1.28; letter-spacing: -.025em; } .ai-studio-safety { display: none; } .ai-studio-chat { border-radius: 15px; } }
+@media (max-width: 767px) { .ai-studio-hero { width: min(100% - 28px, 920px); padding-top: 52px; } .ai-studio-brand { min-height: 42px; gap: 10px; padding: 0 14px; font-size: 22px; } .ai-studio-brand span { width: 18px; height: 18px; } .ai-studio-hero h1 { max-width: 560px; margin: 18px auto 12px; font-size: 21px; line-height: 1.42; letter-spacing: -.025em; } .ai-studio-proof-link { margin-bottom: 20px; } .ai-studio-safety { display: none; } .ai-studio-chat { border-radius: 15px; } }
 @media (prefers-reduced-motion: reduce) { .ai-studio-message.thinking i, .ai-studio-send { animation: none; transition: none; } }
 </style>

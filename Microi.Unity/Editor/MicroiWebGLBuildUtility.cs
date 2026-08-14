@@ -22,7 +22,11 @@ namespace Microi.Unity.Editor
             Build(output, scenes);
         }
 
-        public static BuildReport Build(string outputDirectory, string[] scenes, bool developmentBuild = false)
+        public static BuildReport Build(
+            string outputDirectory,
+            string[] scenes,
+            bool developmentBuild = false,
+            WebGLCompressionFormat compressionFormat = WebGLCompressionFormat.Gzip)
         {
             if (scenes == null || scenes.Length == 0)
             {
@@ -30,7 +34,7 @@ namespace Microi.Unity.Editor
             }
 
             Directory.CreateDirectory(outputDirectory);
-            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
+            PlayerSettings.WebGL.compressionFormat = compressionFormat;
             PlayerSettings.WebGL.decompressionFallback = true;
             PlayerSettings.WebGL.nameFilesAsHashes = true;
             PlayerSettings.runInBackground = true;

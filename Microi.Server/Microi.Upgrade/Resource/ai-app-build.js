@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_build
- * Version: v1.6.0
+ * Version: v1.6.4
  * Function:
- * - AI应用编译发布、固定最新版发布与受控静态资源热修；支持按应用身份发布并刷新 legacy micro-app 兼容入口；保留私有源码指针，并在发布前拒绝 HTTP 错误、Code=0、长度或哈希不一致的源文件。
+ * - AI应用编译发布、固定最新版发布、可恢复大文件下载登记与受控静态资源热修；支持按应用身份发布并刷新 legacy micro-app 兼容入口；保留私有源码指针，并在发布前拒绝 HTTP 错误、Code=0、长度或哈希不一致的源文件。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || "成功" }; }
@@ -1156,6 +1156,77 @@ if (isBlank(appId)) return fail("AppId不能为空");
 var app = getApp(appId);
 if (!app || app.Code !== 1 || !app.Data) return { Code: 2, Data: null, Msg: "AI应用不存在" };
 var requestedAction = text(V8.Param.Action || "Build");
+/* RESUMABLE_PUBLIC_DOWNLOAD_REGISTRATION_V1
+ * 大安装包先通过 ApplicationAsset Protocol v3 完成分片、断点续传、逐片
+ * SHA-256 与服务端合并校验；这里只登记已经 Succeeded 的不可变公有对象，
+ * 不再跨存储上下文二次移动。禁止 Jint 读取大文件或绕过会话审计。
+ * PromoteResumablePublicDownload 作为已发布调用名继续兼容。 */
+if (requestedAction === "RegisterResumablePublicDownload"
+  || requestedAction === "PromoteResumablePublicDownload") {
+  var downloadAppKey = ensureAppKey(app.Data);
+  var downloadSessionId = text(V8.Param.SessionId);
+  var downloadVersionNo = text(V8.Param.VersionNo || V8.Param.AppVersion);
+  var downloadRelativePath = normalizePath(V8.Param.RelativePath);
+  var downloadExpectedSha256 = text(V8.Param.ExpectedSha256).toLowerCase();
+  var downloadExpectedSize = parseInt(V8.Param.ExpectedSize || -1);
+  if (!/^mciau-[a-f0-9]{30,64}$/i.test(downloadSessionId)) return fail("SessionId不合法");
+  if (!/^v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(downloadVersionNo)) return fail("VersionNo不合法");
+  if (!/^downloads\/[A-Za-z0-9._-]+$/.test(downloadRelativePath)) return fail("RelativePath只允许当前应用downloads目录中的安全文件名");
+  if (!/^[a-f0-9]{64}$/.test(downloadExpectedSha256)) return fail("ExpectedSha256不合法");
+  if (!(downloadExpectedSize > 0)) return fail("ExpectedSize必须大于0");
+
+  var downloadSession = V8.FormEngine.GetFormData("mci_ai_app_file", {
+    _Where: [
+      ["Id", "=", downloadSessionId],
+      ["AND", "StorageScope", "=", "ApplicationAssetMultipartSession"]
+    ],
+    _PageSize: 1
+  });
+  if (!downloadSession || downloadSession.Code !== 1 || !downloadSession.Data) return fail("可恢复上传会话不存在");
+  var downloadState;
+  try { downloadState = JSON.parse(text(downloadSession.Data.Remark)); }
+  catch (downloadStateError) { return fail("可恢复上传会话检查点不是有效JSON"); }
+  var downloadSourceRoot = "microi/application-assets/v3/tenants/" + text(V8.OsClient).toLowerCase()
+    + "/kinds/runtime/apps/" + downloadAppKey + "/releases/" + downloadVersionNo + "/requests/";
+  var downloadSourcePath = normalizePath(downloadState.FinalPath);
+  if (text(downloadState.Status) !== "Succeeded"
+    || text(downloadState.Phase) !== "Prepared"
+    || parseInt(downloadState.ProgressPercent || 0) !== 100
+    || parseInt(downloadState.ReceivedBytes || -1) !== downloadExpectedSize
+    || parseInt(downloadState.TotalSize || -1) !== downloadExpectedSize
+    || text(downloadState.AppId) !== text(app.Data.Id)
+    || text(downloadState.AppKey) !== downloadAppKey
+    || text(downloadState.VersionNo) !== downloadVersionNo
+    || normalizePath(downloadState.RelativePath) !== downloadRelativePath
+    || text(downloadState.ExpectedSha256).toLowerCase() !== downloadExpectedSha256
+    || downloadSourcePath.toLowerCase().indexOf(downloadSourceRoot.toLowerCase()) !== 0
+    || downloadSourcePath.toLowerCase().slice(-("/assets/" + downloadRelativePath).length)
+       !== ("/assets/" + downloadRelativePath).toLowerCase()) {
+    return fail("上传会话尚未完成或应用、版本、路径、大小、哈希证据不一致");
+  }
+  var downloadTargetPath = downloadSourcePath;
+  downloadState.DownloadRegisteredAt = now();
+  downloadState.DownloadPublicPath = downloadTargetPath;
+  downloadState.DownloadPublicUrl = publicDomainUrl(downloadTargetPath);
+  var downloadAudit = V8.FormEngine.UptFormData("mci_ai_app_file", {
+    Id: downloadSessionId,
+    Remark: JSON.stringify(downloadState)
+  });
+  if (!downloadAudit || downloadAudit.Code !== 1) {
+    return fail("大文件公有地址登记失败：" + text(downloadAudit && downloadAudit.Msg, "未知错误"));
+  }
+  return ok({
+    AppId: app.Data.Id,
+    AppKey: downloadAppKey,
+    VersionNo: downloadVersionNo,
+    SessionId: downloadSessionId,
+    RelativePath: downloadRelativePath,
+    Sha256: downloadExpectedSha256,
+    Size: downloadExpectedSize,
+    FilePathName: downloadTargetPath,
+    Url: publicDomainUrl(downloadTargetPath)
+  }, "可恢复大文件公有地址已登记并写回审计");
+}
 /* LEGACY_MICRO_APP_REDIRECT_PUBLISH_V1
  * 兼容入口只允许指向当前租户、当前应用、当前语义版本的 v3 不可变
  * committed runtime。版本目录先发布，固定入口最后切换，避免先暴露

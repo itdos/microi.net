@@ -84,7 +84,7 @@ did: {DeviceId}
 - 匿名多人由服务端签发 `SessionId + SessionSecret`；数据库只保存秘密哈希，公开快照不得返回秘密、UserId、设备指纹或内部权限字段。
 - 在线角色、房间版本和掉线到期时间进入共享数据库/Redis；客户端心跳、接口重试和节点切换都不能依赖进程内字典。
 - 位置心跳由服务端限制地图边界、最大速度和递增序列；过期查询以服务端时间为准，正常离场与租约超时都必须幂等。
-- 公屏文字限制长度、频率、表情白名单与稳定请求 ID。WebGL 使用 DOM 输入时必须在 Player 端设置 `WebGLInput.captureAllKeyboardInput = false`，并阻止输入区的键盘、`beforeinput`、组合输入与指针事件继续驱动角色；只拦截冒泡阶段不足以保证数字、标点和 Shift 符号可输入。
+- 公屏文字限制长度、频率、表情白名单与稳定请求 ID。WebGL 使用 DOM 输入时必须在 Player 端将 `WebGLInput.captureAllKeyboardInput` 设为 `false`，并阻止输入区的键盘、`beforeinput`、组合输入与指针事件继续驱动角色；只拦截冒泡阶段不足以保证数字、标点和 Shift 符号可输入。若 Unity 6 的 Player 编译响应文件未引用 `UnityEngine.WebGLModule`，使用受 `link.xml` 显式保留的反射设置并以真实键盘 E2E 验收，不得跳过该行为。
 - 接口引擎 `Code=1` 自动提交，失败返回其它 Code 自动回滚，不手动 Commit/Rollback。
 - 表、索引、菜单、接口与权限通过应用 Manifest 安装，不为游戏资源新增 `Microi.Upgrade` 定制迁移。
 - 所有接口必须声明 `ResourcePolicies.ApiEngines`：官方核心 `Managed`；租户扩展 `CreateIfMissing`，后续升级不覆盖。

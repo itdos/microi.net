@@ -170,7 +170,11 @@
       <div ref="sentinel" class="ai-app-sentinel" aria-live="polite">
         <span v-if="isLoading && liveApps.length" class="ai-app-loading"><i></i>{{ copy.loadingMore }}</span>
         <button v-else-if="loadError && liveApps.length" type="button" @click="loadApplications">{{ copy.retry }}</button>
-        <span v-else-if="liveApps.length && !hasMore" class="ai-app-finished">{{ copy.finished }}</span>
+        <button v-else-if="liveApps.length && hasMore" type="button" class="ai-app-load-more" @click="loadApplications">
+          <span>{{ copy.loadMore }}</span>
+          <small>{{ paginationProgress }}</small>
+        </button>
+        <span v-else-if="liveApps.length" class="ai-app-finished">{{ finishedText }}</span>
       </div>
     </div>
   </section>
@@ -198,7 +202,8 @@ const route = useRoute()
 // 官网应用广场始终读取 iTdos 的公开白名单接口，避免本地开发 API 误指向其它租户。
 const API_BASE = OFFICIAL_MICROI_API_BASE
 const OS_CLIENT = 'iTdos'
-const pageSize = 12
+// 一次多取一屏，减少大应用库滚动到底时的往返次数。
+const pageSize = 24
 
 const liveApps = ref([])
 const suggestedApps = ref([])
@@ -225,6 +230,7 @@ let requestController = null
 let keywordTimer = null
 let observer = null
 let requestSequence = 0
+let sentinelCheckFrame = 0
 
 const isEnglish = computed(() => props.locale === 'en-US' || /^\/en(?:\/|$)/.test(route.path || ''))
 const copy = computed(() => isEnglish.value ? {
@@ -234,7 +240,7 @@ const copy = computed(() => isEnglish.value ? {
   relatedDescription: 'Matched by role, industry, or workflow. They may not fully satisfy your original requirement.',
   popularBadge: 'Popular suggestions', popularTitle: 'No exact match — here are popular apps to explore',
   popularDescription: 'These are clearly labeled popular suggestions, not exact search results.',
-  describeNeed: 'Describe and generate my software', tryNow: 'Try now', loadingMore: 'Loading more applications', retry: 'Loading failed, retry', finished: 'All applications loaded'
+  describeNeed: 'Describe and generate my software', tryNow: 'Try now', loadingMore: 'Loading more applications', retry: 'Loading failed, retry', loadMore: 'Load more applications', finished: 'All applications loaded'
 } : {
   apps: 'AI 应用', categories: '应用分类', sort: '排序', sortLabel: '应用排序', search: '搜索应用',
   empty: '暂时没有找到精确或相关应用。', emptyHelp: '请描述你要解决的问题；只有点击继续后，需求才会被明确提交。',
@@ -242,11 +248,12 @@ const copy = computed(() => isEnglish.value ? {
   relatedDescription: '这些候选按行业、角色或流程匹配，可能不能完整替代你原本想找的软件。',
   popularBadge: '热门推荐', popularTitle: '没有完全匹配，先看看热门软件',
   popularDescription: '以下是明确标注的热门推荐，不是对搜索词的精确命中。',
-  describeNeed: '描述并生成我要的软件', tryNow: '立即体验', loadingMore: '正在加载更多应用', retry: '加载失败，点击重试', finished: '已加载全部应用'
+  describeNeed: '描述并生成我要的软件', tryNow: '立即体验', loadingMore: '正在加载更多应用', retry: '加载失败，点击重试', loadMore: '加载更多应用', finished: '已加载全部应用'
 })
 
 const defaultBusinessCategories = [
   { label: '全部', value: 'all' },
+  { label: '推荐', value: 'recommended' },
   { label: '企业应用', value: 'business' },
   { label: '办公协同', value: 'office' },
   { label: '数据分析', value: 'data' },
@@ -261,7 +268,7 @@ const defaultBusinessCategories = [
   { label: '其它', value: 'other' }
 ]
 const businessCategories = ref(defaultBusinessCategories)
-const categoryEnglishLabels = { all: 'All', business: 'Business', office: 'Collaboration', data: 'Analytics', tools: 'Productivity', industry: 'Industry', education: 'Education', lifestyle: 'Lifestyle', game: 'Games', creative: 'Creative', marketing: 'Marketing', platform: 'Platform', other: 'Other' }
+const categoryEnglishLabels = { all: 'All', recommended: 'Recommended', business: 'Business', office: 'Collaboration', data: 'Analytics', tools: 'Productivity', industry: 'Industry', education: 'Education', lifestyle: 'Lifestyle', game: 'Games', creative: 'Creative', marketing: 'Marketing', platform: 'Platform', other: 'Other' }
 const sortOptions = computed(() => isEnglish.value ? [
   { label: 'Recently updated', value: 'AppUpdateTime' },
   { label: 'Recently published', value: 'AppPublishTime' },
@@ -285,6 +292,8 @@ const suggestionBadge = computed(() => searchMeta.value.MatchMode === 'related' 
 const suggestionTitle = computed(() => searchMeta.value.MatchMode === 'related' ? copy.value.relatedTitle : copy.value.popularTitle)
 const suggestionDescription = computed(() => searchMeta.value.MatchMode === 'related' ? copy.value.relatedDescription : copy.value.popularDescription)
 const showInitialSkeleton = computed(() => isLoading.value && !displayApps.value.length)
+const paginationProgress = computed(() => totalCount.value > 0 ? `${liveApps.value.length} / ${totalCount.value}` : String(liveApps.value.length))
+const finishedText = computed(() => `${copy.value.finished} · ${liveApps.value.length}`)
 
 function plainText(value) {
   return String(value || '')
@@ -365,9 +374,13 @@ function keyValueOptions(value) {
   if (!Array.isArray(value) || !value.length) return defaultBusinessCategories.map(localize)
   const normalized = value
     .map(item => ({ label: String(item?.Value || '').trim(), value: String(item?.Key || '').trim() }))
-    .filter(item => item.label && item.value)
+    .filter(item => item.label && item.value && !['all', 'recommended'].includes(item.value.toLowerCase()))
     .map(localize)
-  return normalized.length ? [{ label: isEnglish.value ? 'All' : '全部', value: 'all' }, ...normalized] : defaultBusinessCategories.map(localize)
+  return normalized.length ? [
+    { label: isEnglish.value ? 'All' : '全部', value: 'all' },
+    { label: isEnglish.value ? 'Recommended' : '推荐', value: 'recommended' },
+    ...normalized
+  ] : defaultBusinessCategories.map(localize)
 }
 
 function compactNumber(value) {
@@ -450,7 +463,8 @@ async function loadApplications() {
       SortBy: sortBy.value,
       SortOrder: 'DESC'
     }
-    if (activeCategory.value !== 'all') payload.Category = activeCategory.value
+    if (activeCategory.value === 'recommended') payload.Recommended = true
+    else if (activeCategory.value !== 'all') payload.Category = activeCategory.value
     if (keyword.value.trim()) payload.Keyword = keyword.value.trim()
     const response = await fetch(`${API_BASE}/apiengine/official_ai_apps?OsClient=${OS_CLIENT}`, {
       method: 'POST',
@@ -481,7 +495,8 @@ async function loadApplications() {
     const known = new Set(liveApps.value.map(item => item.Id || item.AppKey))
     const appended = rows.filter(item => !known.has(item.Id || item.AppKey))
     liveApps.value = [...liveApps.value, ...appended]
-    hasMore.value = rows.length === pageSize && liveApps.value.length < totalCount.value
+    const responsePageSize = Math.max(1, Number(result.DataAppend?.PageSize || pageSize))
+    hasMore.value = rows.length >= responsePageSize && liveApps.value.length < totalCount.value
     pageIndex.value += 1
     await loadFavoriteStatus([...appended, ...suggestedApps.value].map(item => item.Id).filter(Boolean))
   } catch (error) {
@@ -499,6 +514,14 @@ function maybeLoadVisibleSentinel() {
   nextTick(() => {
     const rect = sentinel.value?.getBoundingClientRect()
     if (rect && rect.top <= window.innerHeight + 600 && rect.bottom >= -600) loadApplications()
+  })
+}
+
+function scheduleVisibleSentinelCheck() {
+  if (typeof window === 'undefined' || sentinelCheckFrame) return
+  sentinelCheckFrame = window.requestAnimationFrame(() => {
+    sentinelCheckFrame = 0
+    maybeLoadVisibleSentinel()
   })
 }
 
@@ -598,7 +621,9 @@ function markPreviewBroken(key) {
 }
 
 function openDetail(app) {
-  if (typeof window !== 'undefined') window.location.href = `/app-detail.html?app=${encodeURIComponent(app.AppKey || app.Id)}`
+  if (typeof window === 'undefined') return
+  const detailUrl = `/app-detail.html?app=${encodeURIComponent(app.AppKey || app.Id)}`
+  window.open(detailUrl, '_blank', 'noopener,noreferrer')
 }
 
 function openPreview(app) {
@@ -664,7 +689,7 @@ function setupObserver() {
   observer?.disconnect()
   if (!sentinel.value || typeof IntersectionObserver === 'undefined') return
   observer = new IntersectionObserver(entries => {
-    if (entries.some(entry => entry.isIntersecting)) loadApplications()
+    if (entries.some(entry => entry.isIntersecting)) scheduleVisibleSentinelCheck()
   }, { rootMargin: '600px 0px' })
   observer.observe(sentinel.value)
 }
@@ -688,6 +713,8 @@ onMounted(() => {
   window.addEventListener('microi-login-success', handleAuthChange)
   window.addEventListener('microi-logout', handleAuthChange)
   window.addEventListener('microi-token-refreshed', handleAuthChange)
+  window.addEventListener('scroll', scheduleVisibleSentinelCheck, { passive: true })
+  window.addEventListener('resize', scheduleVisibleSentinelCheck)
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   loadApplications()
 })
@@ -701,6 +728,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('microi-login-success', handleAuthChange)
   window.removeEventListener('microi-logout', handleAuthChange)
   window.removeEventListener('microi-token-refreshed', handleAuthChange)
+  window.removeEventListener('scroll', scheduleVisibleSentinelCheck)
+  window.removeEventListener('resize', scheduleVisibleSentinelCheck)
+  if (sentinelCheckFrame) window.cancelAnimationFrame(sentinelCheckFrame)
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
 })
 </script>
@@ -788,11 +818,15 @@ onBeforeUnmount(() => {
 .ai-app-empty strong { color: var(--mci-text-primary, #f8fafc); font-size: var(--mci-text-lg, 17px); }
 .ai-app-empty p { max-width: 560px; color: var(--mci-text-secondary, #cbd5e1); line-height: 1.6; }
 .ai-app-state button, .ai-app-sentinel button { min-height: 38px; padding: 0 16px; border: 1px solid #444; border-radius: 10px; background: #232323; color: #ddd; cursor: pointer; }
+.ai-app-state button:hover, .ai-app-sentinel button:hover { border-color: #666; background: #2b2b2b; color: #fff; }
+.ai-app-state button:focus-visible, .ai-app-sentinel button:focus-visible { outline: 2px solid #26d8d8; outline-offset: 3px; }
 .ai-app-empty button { background: var(--mci-color-primary, #b51220); color: var(--mci-text-on-primary, #fff); }
-.ai-app-sentinel { min-height: 76px; display: grid; place-items: center; color: #696969; font-size: 12px; }
+.ai-app-sentinel { min-height: 76px; display: grid; place-items: center; color: #a3a3a3; font-size: 12px; }
+.ai-app-load-more { display: inline-flex; align-items: center; justify-content: center; gap: 9px; }
+.ai-app-load-more small { color: #a3a3a3; font-size: 11px; }
 .ai-app-loading { display: inline-flex; align-items: center; gap: 8px; }
 .ai-app-loading i { width: 14px; height: 14px; border: 2px solid #444; border-top-color: #eee; border-radius: 50%; animation: app-spin .8s linear infinite; }
-.ai-app-finished { opacity: .75; }
+.ai-app-finished { color: #a3a3a3; font-weight: 500; }
 .skeleton { display: block; border-radius: 8px; background: linear-gradient(100deg, #202020 20%, #2b2b2b 38%, #202020 56%); background-size: 220% 100%; animation: app-shimmer 1.4s linear infinite; }
 .skeleton-preview { aspect-ratio: 16 / 9; border-radius: 12px; }
 .skeleton-meta { display: flex; gap: 10px; padding: 10px 6px 0; }

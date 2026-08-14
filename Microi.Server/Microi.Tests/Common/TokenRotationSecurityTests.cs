@@ -203,6 +203,45 @@ public class TokenRotationSecurityTests
         Assert.NotEqual(first, second);
     }
 
+    [Fact]
+    public void DirectTenantDatabase_WithEmptySaaSTable_CreatesOneHostBootstrapAnchor()
+    {
+        Assert.True(TenantJwtSigningKeyCoordinator.ShouldBootstrapConfiguredTenant(
+            Array.Empty<JObject>(),
+            "nbcmcdev"));
+
+        var firstId = TenantJwtSigningKeyCoordinator.CreateBootstrapTenantRowId(
+            "nbcmcdev",
+            "Product",
+            "Internal");
+        var secondId = TenantJwtSigningKeyCoordinator.CreateBootstrapTenantRowId(
+            "NBCMCDEV",
+            "product",
+            "internal");
+
+        Assert.True(Guid.TryParse(firstId, out _));
+        Assert.Equal(firstId, secondId);
+    }
+
+    [Fact]
+    public void ExistingSaaSRows_DisableAutomaticHostBootstrap()
+    {
+        var existingDisabledRow = new JObject
+        {
+            ["Id"] = "disabled-row",
+            ["OsClient"] = "nbcmcdev",
+            ["IsEnable"] = 0,
+            ["IsDeleted"] = 0
+        };
+
+        Assert.False(TenantJwtSigningKeyCoordinator.ShouldBootstrapConfiguredTenant(
+            new[] { existingDisabledRow },
+            "nbcmcdev"));
+        Assert.False(TenantJwtSigningKeyCoordinator.ShouldBootstrapConfiguredTenant(
+            Array.Empty<JObject>(),
+            string.Empty));
+    }
+
     [Theory]
     [InlineData("varchar", true)]
     [InlineData("nvarchar", true)]
