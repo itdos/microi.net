@@ -27,7 +27,7 @@
     "check:formengine-writes": "node scripts/check-formengine-write-contract.mjs",
     "check:upload-paths": "node scripts/check-upload-path-policy.mjs",
     "check:content-security": "node scripts/check-content-security.mjs && node --test scripts/test-content-security-batch.mjs",
-    "check:auth-session": "node scripts/check-auth-session-race.mjs",
+    "check:auth-session": "node scripts/check-auth-session-race.mjs && node --test scripts/test-login-navigation.mjs scripts/test-auth-expired-policy.mjs",
     "check:update": "node --test scripts/test-mini-program-update.mjs && node scripts/check-mini-program-update.mjs",
     "check:share": "node scripts/check-share-policy.js",
     "check:view-schema": "node scripts/check-view-schema.mjs",
