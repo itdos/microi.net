@@ -70,7 +70,7 @@
           :status-class="getStatusClass(row)" :tags="getTags(row)" :lines="cardLines(row)"
           :summary="config.summaryField ? summaryValue(row) : ''"
           :summary-lines="config.summaryLines || 3" :actions="rowActions(row)"
-          :time="formatCreateTime(row.CreateTime || row.UpdateTime)"
+          :time="cardBottomText(row)"
           @open="openDetail" @phone="callPhone" @action="triggerRowAction" />
       </template>
       <view v-if="!isPreview && !finished" class="load-more" hover-class="load-more--pressed" @tap="loadMore">
@@ -205,6 +205,7 @@ import {
 import { compileListConfig, loadModuleViewManifest } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { loadNativeFormDefinition, loadNativeTableModel, parseJson } from '@/platform/native-form.js'
+import { createMenuModuleDefinition } from '@/platform/module-registry.js'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
 import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
@@ -373,6 +374,7 @@ export default {
       previewExpanded: true,
       searchTimer: null,
       loadRequestId: 0,
+      appliedRequestId: 0,
       metricLoading: false,
       metricValues: {},
       listBodyHeight: 0,
@@ -577,8 +579,25 @@ export default {
         )
         this.menu = menu || null
         this.menuId = menu?.Id || this.childMenuId || ''
+        const menuConfig = menu
+          ? createMenuModuleDefinition(menu, this.definition, this.table)
+          : null
+        const platformCardConfig = menuConfig
+          ? {
+              definition: menuConfig.definition,
+              titleField: menuConfig.titleField,
+              statusField: menuConfig.statusField,
+              statusOptions: menuConfig.statusOptions,
+              tagFields: menuConfig.tagFields,
+              bottomFields: menuConfig.bottomFields,
+              hasConfiguredCardFields: menuConfig.hasConfiguredCardFields,
+              cardFields: menuConfig.cardFields,
+              lines: menuConfig.lines
+            }
+          : {}
         this.config = {
           ...matched.config,
+          ...platformCardConfig,
           table: this.table.Name,
           tableId: this.table.Id,
           menuId: this.menuId,
@@ -616,7 +635,7 @@ export default {
         field.visible && field.Name && !LAYOUT_COMPONENTS.has(field.component)
       )
       const titleField = fields.find((field) => /名称|标题|姓名|编号|客户/.test(field.Label || '')) || fields[0]
-      const lines = fields.filter((field) => field !== titleField).slice(0, 4).map((field) => ({
+      const lines = fields.filter((field) => field !== titleField).map((field) => ({
         label: field.Label || field.Name,
         field: field.Name
       }))
@@ -648,14 +667,16 @@ export default {
           })
         }
         this.applyMenuSearchFields(manifest?.Legacy?.SearchFieldIds)
-        const dynamic = compileListConfig(manifest)
+        const dynamic = compileListConfig(manifest, this.definition?.fields || [])
         if (!dynamic) return
         this.viewManifest = manifest
         const merged = { ...this.config }
         ;['tagFields', 'lines', 'statusOptions'].forEach((name) => {
+          if (merged.hasConfiguredCardFields && ['tagFields', 'lines'].includes(name)) return
           if (dynamic[name]?.length) merged[name] = dynamic[name]
         })
         ;['titleField', 'statusField', 'summaryField', 'periodField'].forEach((name) => {
+          if (merged.hasConfiguredCardFields && ['titleField', 'statusField', 'summaryField'].includes(name)) return
           if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') merged[name] = dynamic[name]
         })
         if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema
@@ -723,12 +744,14 @@ export default {
             extraWhere
           })
         }
-        if (requestId !== this.loadRequestId) return
         const rawIncomingRows = Array.isArray(result.rows) ? result.rows : []
         const incomingRows = this.moduleKey === 'installationPositions'
           ? await hydrateInstallationPositionRows(rawIncomingRows)
           : rawIncomingRows
-        if (requestId !== this.loadRequestId) return
+        // Keep the newest completed response. A later request starting must not discard every
+        // usable response and leave the related tab permanently displaying its skeleton.
+        if (requestId < this.appliedRequestId) return
+        this.appliedRequestId = requestId
         const combinedRows = uniqueRowsById(reset ? incomingRows : [...this.rows, ...incomingRows])
         const combinedSourceCount = reset ? incomingRows.length : this.rows.length + incomingRows.length
         this.duplicateRowCount += Math.max(0, combinedSourceCount - combinedRows.length)
@@ -738,9 +761,9 @@ export default {
         if (!this.finished) this.pageIndex += 1
         if (notifyCount) this.emitDataCount()
       } catch (error) {
-        if (requestId === this.loadRequestId) this.error = error.message || error.Msg || '关联数据加载失败'
+        if (requestId >= this.appliedRequestId) this.error = error.message || error.Msg || '关联数据加载失败'
       } finally {
-        if (requestId === this.loadRequestId) this.loading = false
+        this.loading = false
       }
     },
     monthRange() {
@@ -1001,7 +1024,6 @@ export default {
     visibleLines(row) {
       return (this.config.lines || [])
         .filter((line) => row[line.field] !== undefined && row[line.field] !== null && row[line.field] !== '')
-        .slice(0, 4)
     },
     cardLines(row) {
       return this.visibleLines(row).map((line) => ({
@@ -1019,6 +1041,19 @@ export default {
       const summaryField = String(this.config.summaryField || '').toLowerCase()
       const renderedAsLine = this.visibleLines(row).some((line) => String(line.field || '').toLowerCase() === summaryField)
       return renderedAsLine ? '' : formatFieldValue(row[this.config.summaryField], '', { empty: '' })
+    },
+    cardBottomText(row) {
+      try {
+        const values = (this.config.bottomFields || [])
+          .map((item) => {
+            const descriptor = typeof item === 'string' ? { field: item } : (item || {})
+            if (!descriptor.field) return ''
+            return formatFieldValue(row[descriptor.field], descriptor.format, { empty: '' })
+          })
+          .filter((value) => value && value !== '-')
+        if (values.length) return values.join(' · ')
+      } catch (error) {}
+      return this.formatCreateTime(row.CreateTime || row.UpdateTime)
     },
     formatCreateTime(value) { return formatDateTime(value) },
     taskCardRow(row) {

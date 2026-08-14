@@ -477,7 +477,7 @@ export default {
             refresh
           })
         }
-        const dynamic = compileListConfig(manifest)
+        const dynamic = compileListConfig(manifest, merged.definition?.fields || [])
         if (!dynamic) {
           this.config = merged
           return
@@ -487,6 +487,7 @@ export default {
         merged.menuId = this.menuId
         const arrayFields = ['tagFields', 'lines', 'statusOptions']
         arrayFields.forEach((name) => {
+          if (merged.hasConfiguredCardFields && ['tagFields', 'lines'].includes(name)) return
           if (dynamic[name]?.length) merged[name] = dynamic[name]
         })
         const scalarFields = [
@@ -500,6 +501,7 @@ export default {
           'statisticsFormat'
         ]
         scalarFields.forEach((name) => {
+          if (merged.hasConfiguredCardFields && ['titleField', 'statusField', 'summaryField', 'imageField'].includes(name)) return
           if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') {
             merged[name] = dynamic[name]
           }
@@ -774,7 +776,7 @@ export default {
         // “负责人”是卡片的固定业务信息，暂未分配时也要保留标签和空值占位。
         if (shouldKeepEmptyCardLine(line)) return true
         return row[line.field] !== undefined && row[line.field] !== null && row[line.field] !== ''
-      }).slice(0, 4)
+      })
     },
     displayValue(row, line) {
       return this.configuredFieldValue(row, line.field, line.format)
@@ -807,7 +809,10 @@ export default {
     },
     cardBottomText(row) {
       const values = (this.config.bottomFields || [])
-        .map((field) => this.configuredFieldValue(row, field))
+        .map((item) => {
+          const descriptor = typeof item === 'string' ? { field: item } : item
+          return this.configuredFieldValue(row, descriptor.field, descriptor.format)
+        })
         .filter((value) => value && value !== '-')
       return values.length
         ? values.join(' · ')

@@ -63,7 +63,7 @@
           <view v-if="rowActions(row).length" class="action-row" @tap.stop>
             <view v-for="action in rowActions(row)" :key="action.Key" @tap.stop="runAction(action, row)">{{ action.Label }}</view>
           </view>
-          <view class="data-card__foot"><text>{{ formatTime(row.CreateTime || row.UpdateTime) }}</text><text>查看详情 ›</text></view>
+          <view class="data-card__foot"><text>{{ cardBottomText(row) }}</text><text>查看详情 ›</text></view>
         </view>
         <view class="load-state">{{ loading ? '正在加载…' : finished ? `已加载全部 ${count} 条` : '继续上拉加载' }}</view>
       </view>
@@ -168,15 +168,17 @@ export default {
           refresh
         })
       }
-      const dynamic = compileListConfig(manifest)
+      const dynamic = compileListConfig(manifest, this.baseConfig.definition?.fields || [])
       if (!dynamic) return
       this.viewManifest = manifest
       const merged = { ...this.baseConfig }
       ;['tagFields', 'lines', 'statusOptions'].forEach((name) => {
+        if (merged.hasConfiguredCardFields && ['tagFields', 'lines'].includes(name)) return
         if (dynamic[name] && dynamic[name].length) merged[name] = dynamic[name]
       })
       ;['titleField', 'statusField', 'summaryField', 'imageField', 'periodField',
         'statisticsField', 'statisticsLabel', 'statisticsFormat'].forEach((name) => {
+        if (merged.hasConfiguredCardFields && ['titleField', 'statusField', 'summaryField', 'imageField'].includes(name)) return
         if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') merged[name] = dynamic[name]
       })
       if (dynamic.actionSchema && dynamic.actionSchema.length) merged.actionSchema = dynamic.actionSchema
@@ -281,11 +283,18 @@ export default {
       return (this.config.tagFields || []).map((name) => this.optionLabel(name, row[name])).filter((value) => value && value !== '-').slice(0, 3)
     },
     visibleLines(row) {
-      return (this.config.lines || []).filter((line) => row[line.field] !== undefined && row[line.field] !== null && row[line.field] !== '').slice(0, 4)
+      return (this.config.lines || []).filter((line) => row[line.field] !== undefined && row[line.field] !== null && row[line.field] !== '')
     },
     displayLine(row, line) {
       const field = this.field(line.field)
       return field ? fieldDisplayValue(field, row[line.field]) : String(row[line.field] ?? '-')
+    },
+    cardBottomText(row) {
+      const values = (this.config.bottomFields || []).map((item) => {
+        const descriptor = typeof item === 'string' ? { field: item } : item
+        return this.optionLabel(descriptor.field, row[descriptor.field])
+      }).filter((value) => value && value !== '-')
+      return values.length ? values.join(' · ') : this.formatTime(row.CreateTime || row.UpdateTime)
     },
     formatTime(value) { return formatDateTime(value) },
     rowActions(row) {
