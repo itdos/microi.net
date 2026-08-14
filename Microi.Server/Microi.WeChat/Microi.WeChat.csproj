@@ -11,9 +11,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,AI,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：微信平台相关功能依赖注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>7.3.7</Version>
-    <AssemblyVersion>7.3.7</AssemblyVersion>
-    <FileVersion>7.3.7</FileVersion>
+    <Version>7.3.8</Version>
+    <AssemblyVersion>7.3.8</AssemblyVersion>
+    <FileVersion>7.3.8</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
