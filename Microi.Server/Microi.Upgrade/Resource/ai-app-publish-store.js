@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.7.9
+ * Version: v1.8.2
  * Function:
- * - 统一应用商城发布器：v3 committed proof、精确版本、资源所有权与共享公共运行时包合同。
+ * - 统一应用商城发布器：V3 committed proof、精确版本、零菜单 AI 应用、共享公共运行时描述符及商城版本一致性。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -779,6 +779,10 @@ var existingStore = getExistingStore(app.AppKey);
 // 应用商城“开始制作”历史上调用 PackageOnly，随后再下载 AppPakcet。
 // 这个动作同样必须生成完全自包含的离线 JSON，不能只保存发布端 ZIP 地址。
 var isOfflineAction = action === 'OfflinePackage' || action === 'Download' || action === 'PackageOnly';
+var requestedSharedPublicRuntime = V8.Param.SharedPublicRuntime || null;
+if (typeof requestedSharedPublicRuntime === 'string') {
+  requestedSharedPublicRuntime = parseObject(requestedSharedPublicRuntime, null);
+}
 var preparedList = parseArray(V8.Param.PreparedAssets || V8.Param.AiAppPackageManifest);
 var packageAssets = null;
 for (var preparedIndex = 0; preparedIndex < preparedList.length; preparedIndex++) {
@@ -790,6 +794,25 @@ for (var preparedIndex = 0; preparedIndex < preparedList.length; preparedIndex++
 }
 if (!packageAssets && V8.Param.PreparedAssets && !Array.isArray(V8.Param.PreparedAssets) && typeof V8.Param.PreparedAssets === 'object') {
   packageAssets = V8.Param.PreparedAssets;
+}
+// v3 SharedPublicRuntime 已由 Core 的 committed pointer、manifest hash 与
+// stable resolver 完整证明。它不能为了满足历史 BuildZip 字段，再把数百 MB
+// 乃至数 GB 的运行时读回 Base64/Jint 重复压包；这里保存不可变运行时描述符。
+if (!packageAssets && protocolV3 && requestedSharedPublicRuntime) {
+  packageAssets = {
+    SchemaVersion: 3,
+    AppId: app.Id,
+    AppKey: app.AppKey,
+    AppName: app.Name || app.AppName,
+    ApplicationType: appType,
+    PackageVersion: text(committedVersion && committedVersion.VersionNo),
+    IncludeSource: false,
+    BuildZip: null,
+    SourceZip: null,
+    PreparedTime: DateNow('yyyy-MM-dd HH:mm:ss'),
+    SharedPublicRuntimeOnly: true,
+    RuntimeManifestHash: committedProof.RuntimeManifestHash
+  };
 }
 if (protocolV3 && !packageAssets) return fail('ProtocolVersion=3 必须显式提供 finalize 前准备的不可变 PreparedAssets');
 var forcePrepareAssets = V8.Param.ForcePrepareAssets === true
@@ -814,7 +837,9 @@ if (!packageAssets && !isOfflineAction) {
   var preparedManifest = toArray(prepareResult.Data.Manifest);
   packageAssets = preparedManifest.length ? preparedManifest[0] : null;
 }
-if (!isOfflineAction && (!packageAssets || !packageAssets.BuildZip)) return fail('当前应用没有可安装的编译ZIP。');
+if (!isOfflineAction && (!packageAssets || (!packageAssets.BuildZip && !packageAssets.SharedPublicRuntimeOnly))) {
+  return fail('当前应用没有可安装的编译ZIP或已提交 SharedPublicRuntime。');
+}
 var sourceFiles = [];
 var buildAssets = [];
 var infrastructure = getApplicationInfrastructure();
@@ -855,8 +880,7 @@ var deliveryVersions = resolveDeliveryVersions({
 });
 var runtimeVersionNo = deliveryVersions.RuntimeVersion;
 var versionNo = deliveryVersions.PackageVersion;
-var sharedPublicRuntime = V8.Param.SharedPublicRuntime || null;
-if (typeof sharedPublicRuntime === 'string') sharedPublicRuntime = parseObject(sharedPublicRuntime, null);
+var sharedPublicRuntime = requestedSharedPublicRuntime;
 if (sharedPublicRuntime) {
   if (!protocolV3) return fail('SharedPublicRuntime 只允许 ProtocolVersion=3 的已提交不可变运行时。');
   if (includeSource) return fail('SharedPublicRuntime 必须使用 IncludeSource=false；源码交付请使用普通 HDFS 或离线包。');
@@ -1095,6 +1119,9 @@ if (action === 'Publish') {
   var hasParam = function (name) {
     return V8.Param[name] !== undefined && V8.Param[name] !== null && !isBlank(V8.Param[name]);
   };
+  var packageZipFiles = [];
+  if (packageAssets.BuildZip) packageZipFiles.push(packageAssets.BuildZip);
+  if (packageAssets.SourceZip) packageZipFiles.push(packageAssets.SourceZip);
   var storeRow = {
     AppName: packageModel.PackageInfo.Name,
     Name: packageModel.PackageInfo.Name,
@@ -1140,7 +1167,7 @@ if (action === 'Publish') {
           ? selectionJson(apiEngineKeys)
           : selectionJson(existingStore && existingStore.SelectApiEngine)),
     SelectAiApp: JSON.stringify([{ AppId: app.Id, AppKey: app.AppKey, AppName: app.Name, ApplicationType: appType, IncludeSource: !!packageAssets.SourceZip }]),
-    AiAppZipFiles: JSON.stringify([packageAssets.BuildZip].concat(packageAssets.SourceZip ? [packageAssets.SourceZip] : [])),
+    AiAppZipFiles: JSON.stringify(packageZipFiles),
     AiAppPackageManifest: JSON.stringify([packageAssets])
   };
   if (protocolV3) {
@@ -1149,6 +1176,9 @@ if (action === 'Publish') {
     var packageFields = {
       AppName: storeRow.AppName,
       Name: storeRow.Name,
+      // 普通表单修改 SelectMenu 等字段会触发版本自动递增事件；v3 写包必须
+      // 把展示版本重新钉回 committed runtime，避免商城版本与不可变目录错位。
+      AppVersion: storeRow.AppVersion,
       AppId: storeRow.AppId,
       AppKey: storeRow.AppKey,
       AppType: storeRow.AppType,

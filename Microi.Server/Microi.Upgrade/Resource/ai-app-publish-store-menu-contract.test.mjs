@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.7.9 V3 source", () => {
+test("publisher package metadata matches the v1.8.2 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.7.9");
+  assert.equal(packagedPublisher.Version, "v1.8.2");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -458,11 +458,12 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.7\.9/);
+  assert.match(publisherSource, /Version: v1\.8\.2/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,
   );
+  assert.match(publisherSource, /AppVersion: storeRow\.AppVersion/u);
   for (const field of [
     "CommittedPublishVersionId",
     "CommittedRuntimeManifestHash",
@@ -525,4 +526,12 @@ test("v3 publisher emits a hash-pinned shared public runtime only for immutable 
   assert.match(publisherSource, /sharedEntryUrl\.toLowerCase\(\)\.indexOf\('\/' \+ runtimeVersionNo\.toLowerCase\(\) \+ '\/'\)/);
   assert.match(publisherSource, /Build: 'SharedPublicRuntime'/);
   assert.match(publisherSource, /packageModel\.ApplicationBundle\.SharedPublicRuntime = sharedPublicRuntime/);
+  assert.match(publisherSource, /SharedPublicRuntimeOnly: true/u);
+  assert.match(publisherSource, /RuntimeManifestHash: committedProof\.RuntimeManifestHash/u);
+  assert.match(publisherSource, /if \(packageAssets\.BuildZip\) packageZipFiles\.push/u);
+  assert.match(publisherSource, /AiAppZipFiles: JSON\.stringify\(packageZipFiles\)/u);
+  assert.doesNotMatch(
+    publisherSource,
+    /!packageAssets \|\| !packageAssets\.BuildZip\)\) return fail\('当前应用没有可安装的编译ZIP/u,
+  );
 });
