@@ -1,6 +1,7 @@
 import { callApiEngine, openForm } from '@/platform/business-runtime.js'
 import { V8, getUser } from '@/utils/request.js'
 import { removeCachePrefix } from '@/platform/cache.js'
+import { canDeleteMenuRecord } from '@/platform/menu-permission.js'
 
 const MENU_IDS = {
   orders: 'fc56123e-cfa1-4690-a6a4-929f202a817b',
@@ -156,7 +157,7 @@ export async function openInstallationPositionDevice(row = {}) {
   return deviceResult.Data
 }
 
-export function getBusinessRowActions(key, row = {}, user = getUser() || {}) {
+export function getBusinessRowActions(key, row = {}, user = getUser() || {}, menuId = '') {
   const actions = []
   if (key === 'orders' && sameTenant(row, user)) {
     const state = String(row.DingdanZT || '')
@@ -175,11 +176,15 @@ export function getBusinessRowActions(key, row = {}, user = getUser() || {}) {
   if (key === 'installationPositions') {
     if (row._DeviceDetailAvailable === true) actions.push({ key: 'position-device', label: '设备详情' })
     actions.push({ key: 'position-copy', label: '复制', confirm: '确认复制当前安装位置吗？' })
-    actions.push({ key: 'position-delete', label: '删除', tone: 'danger', confirm: '确认删除当前安装位置吗？删除后无法恢复。' })
+    if (canDeleteMenuRecord(menuId, user)) {
+      actions.push({ key: 'position-delete', label: '删除', tone: 'danger', confirm: '确认删除当前安装位置吗？删除后可由平台管理员在回收站恢复。' })
+    }
   }
   if (key === 'proposals' && sameTenant(row, user)) {
     actions.push({ key: 'proposal-copy', label: '复制', confirm: '确认复制当前客户方案吗？' })
-    actions.push({ key: 'proposal-delete', label: '删除', tone: 'danger', confirm: '确认删除当前客户方案吗？删除后无法恢复。' })
+    if (canDeleteMenuRecord(menuId, user)) {
+      actions.push({ key: 'proposal-delete', label: '删除', tone: 'danger', confirm: '确认删除当前客户方案吗？删除后可由平台管理员在回收站恢复。' })
+    }
   }
   if (key === 'members' && Number(user.Level || 0) >= 999 && String(row.Id || '') !== String(user.Id || '')) {
     actions.push({ key: 'member-remove', label: '移出', tone: 'danger', confirm: `确认将${row.Name || row.Account || '该成员'}移出当前组织吗？` })
@@ -226,7 +231,7 @@ export async function loadApprovalOpinions() {
   }
 }
 
-export async function executeBusinessRowAction(actionKey, row = {}, input = '', user = getUser() || {}) {
+export async function executeBusinessRowAction(actionKey, row = {}, input = '', user = getUser() || {}, context = {}) {
   const id = row.Id
   let rowPatch = null
   if (!id) throw new Error('缺少业务数据编号')
@@ -247,14 +252,28 @@ export async function executeBusinessRowAction(actionKey, row = {}, input = '', 
     }), '安装位置复制失败')
   }
   if (actionKey === 'position-delete') {
-    ensure(await V8.FormEngine.DelFormData({ FormEngineKey: 'diy_shebeiwz', Id: id, _InvokeType: 'Client' }), '安装位置删除失败')
+    ensure(await V8.FormEngine.DelFormData({
+      FormEngineKey: 'diy_shebeiwz',
+      Id: id,
+      _SysMenuId: context.menuId || undefined,
+      ModuleEngineKey: context.moduleEngineKey || undefined,
+      _TableChildAuth: context.tableChildAuth || undefined,
+      _InvokeType: 'Client'
+    }), '安装位置删除失败')
     if (row.DingdanSPID) {
       const result = await callApiEngine('position-delete', { Id: row.DingdanSPID })
       if (result && Number(result.Code) === 0) throw new Error(result.Msg || '订单设备数量同步失败')
     }
   }
   if (actionKey === 'proposal-copy') ensure(await callApiEngine('add_datacopy', { FormEngineKey: 'diy_kehufaxx', Id: id }), '客户方案复制失败')
-  if (actionKey === 'proposal-delete') ensure(await V8.FormEngine.DelFormData({ FormEngineKey: 'Diy_kehufaxx', Id: id, _InvokeType: 'Client' }), '客户方案删除失败')
+  if (actionKey === 'proposal-delete') ensure(await V8.FormEngine.DelFormData({
+    FormEngineKey: 'Diy_kehufaxx',
+    Id: id,
+    _SysMenuId: context.menuId || undefined,
+    ModuleEngineKey: context.moduleEngineKey || undefined,
+    _TableChildAuth: context.tableChildAuth || undefined,
+    _InvokeType: 'Client'
+  }), '客户方案删除失败')
   if (actionKey === 'member-remove') ensure(await callApiEngine('remove_menber', { Id: id }), '成员移出失败')
   if (actionKey === 'device-qrcode') {
     const result = ensure(await callApiEngine('AddSBCode', { Id: id }), '二维码生成失败')

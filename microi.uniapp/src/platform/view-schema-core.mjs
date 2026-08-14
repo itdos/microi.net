@@ -11,7 +11,8 @@ const ACTION_TYPES = [
   'Map',
   'Refresh',
   'Back',
-  'Copy'
+  'Copy',
+  'Delete'
 ]
 const CONDITION_OPERATORS = [
   '=',
