@@ -243,6 +243,7 @@ import {
   loadModuleViewManifest
 } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
+import { appendStandardDeleteAction } from '@/platform/module-delete.js'
 import { fieldDisplayValue, parseJson } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
 import { shouldKeepEmptyCardLine } from '@/platform/card-field-policy.mjs'
@@ -822,11 +823,19 @@ export default {
       return formatDateTime(value)
     },
     rowActions(row) {
-      const nativeActions = getBusinessRowActions(this.key, row, this.currentUser)
+      const nativeActions = getBusinessRowActions(this.key, row, this.currentUser, this.menuId)
       const nativeKeys = new Set(nativeActions.map((action) => String(action.key || '').toLowerCase()))
-      const viewActions = (this.config.actionSchema || [])
+      const configuredViewActions = (this.config.actionSchema || [])
         .filter((action) => isActionVisible(action, row))
         .filter((action) => !nativeKeys.has(String(action.Key || '').toLowerCase()))
+      const viewActions = appendStandardDeleteAction(nativeActions.concat(configuredViewActions), {
+        row,
+        user: this.currentUser,
+        menuId: this.menuId,
+        tableName: this.config.table,
+        moduleEngineKey: this.config.key,
+        title: this.getTitle(row)
+      }).filter((action) => !nativeActions.includes(action))
         .map((action) => ({
           key: `view:${action.Key}`,
           label: action.Label,
@@ -849,10 +858,11 @@ export default {
             form: row,
             user: this.currentUser,
             menu: {
-              Id: this.viewManifest?.Module?.Id || '',
-              ModuleEngineKey: this.viewManifest?.Module?.ModuleEngineKey || ''
+              Id: this.menuId || this.viewManifest?.Module?.Id || '',
+              ModuleEngineKey: this.config.key || this.viewManifest?.Module?.ModuleEngineKey || ''
             },
             tableName: this.config.table,
+            refreshData: () => this.loadData(true, true),
             refresh: async () => {
               await this.loadViewConfig(true)
               await this.loadData(true, true)
@@ -950,7 +960,10 @@ export default {
       this.actionSubmitting = true
       uni.showLoading({ title: '正在处理', mask: true })
       try {
-        const result = await executeBusinessRowAction(action.key, row, input, this.currentUser)
+        const result = await executeBusinessRowAction(action.key, row, input, this.currentUser, {
+          menuId: this.menuId,
+          moduleEngineKey: this.config.key || ''
+        })
         if (result && result.rowPatch) this.patchListRow(row.Id, result.rowPatch)
         this.activeAction = null
         this.activeRow = {}

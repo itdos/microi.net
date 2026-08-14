@@ -204,6 +204,7 @@ import {
 } from '@/platform/business-runtime.js'
 import { compileListConfig, loadModuleViewManifest } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
+import { appendStandardDeleteAction } from '@/platform/module-delete.js'
 import { loadNativeFormDefinition, loadNativeTableModel, parseJson } from '@/platform/native-form.js'
 import { createMenuModuleDefinition } from '@/platform/module-registry.js'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
@@ -1078,11 +1079,21 @@ export default {
       return 'status-pill--todo'
     },
     rowActions(row) {
-      const nativeActions = this.moduleKey ? getBusinessRowActions(this.moduleKey, row, this.currentUser) : []
+      const nativeActions = this.moduleKey
+        ? getBusinessRowActions(this.moduleKey, row, this.currentUser, this.menuId || this.childMenuId)
+        : []
       const nativeKeys = new Set(nativeActions.map((action) => String(action.key || '').toLowerCase()))
-      const viewActions = (this.config.actionSchema || [])
+      const configuredViewActions = (this.config.actionSchema || [])
         .filter((action) => isActionVisible(action, row))
         .filter((action) => !nativeKeys.has(String(action.Key || '').toLowerCase()))
+      const viewActions = appendStandardDeleteAction(nativeActions.concat(configuredViewActions), {
+        row,
+        user: this.currentUser,
+        menuId: this.menuId || this.childMenuId,
+        tableName: this.config.table,
+        moduleEngineKey: this.config.moduleEngineKey || this.menu?.ModuleEngineKey || '',
+        title: this.getTitle(row)
+      }).filter((action) => !nativeActions.includes(action))
         .map((action) => ({
           key: `view:${action.Key}`,
           label: action.Label,
@@ -1103,9 +1114,14 @@ export default {
             user: this.currentUser,
             menu: {
               Id: this.viewManifest?.Module?.Id || this.menuId,
-              ModuleEngineKey: this.viewManifest?.Module?.ModuleEngineKey || ''
+              ModuleEngineKey: this.config.moduleEngineKey || this.viewManifest?.Module?.ModuleEngineKey || ''
             },
             tableName: this.config.table,
+            tableChildAuth: this.tableChildAuth,
+            refreshData: () => Promise.all([
+              this.loadData(true, true, true),
+              this.loadRelatedMetrics(true)
+            ]),
             refresh: () => this.loadData(true, true)
           })
         } finally {
@@ -1193,13 +1209,17 @@ export default {
       this.actionSubmitting = true
       uni.showLoading({ title: '正在处理', mask: true })
       try {
-        await executeBusinessRowAction(action.key, row, input, this.currentUser)
+        await executeBusinessRowAction(action.key, row, input, this.currentUser, {
+          menuId: this.menuId || this.childMenuId,
+          moduleEngineKey: this.config.moduleEngineKey || this.menu?.ModuleEngineKey || '',
+          tableChildAuth: this.tableChildAuth
+        })
         this.activeAction = null
         this.activeRow = {}
         this.actionInput = ''
         this.approvalOpinions = []
         uni.showToast({ title: `${action.label}成功`, icon: 'success' })
-        await this.loadData(true, true, true)
+        await Promise.all([this.loadData(true, true, true), this.loadRelatedMetrics(true)])
       } catch (error) {
         uni.showToast({ title: error.message || `${action.label}失败`, icon: 'none' })
       } finally {

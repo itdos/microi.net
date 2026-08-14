@@ -60,10 +60,17 @@
               <text>{{ line.label }}</text><text>{{ displayLine(row, line) }}</text>
             </view>
           </view>
-          <view v-if="rowActions(row).length" class="action-row" @tap.stop>
-            <view v-for="action in rowActions(row)" :key="action.Key" @tap.stop="runAction(action, row)">{{ action.Label }}</view>
+          <view class="data-card__foot">
+            <text>{{ cardBottomText(row) }}</text>
+            <view class="data-card__links">
+              <text class="data-card__detail" @tap.stop="openDetail(row)">查看详情</text>
+              <view v-if="rowActions(row).length" class="data-card__more" hover-class="data-card__more--pressed"
+                @tap.stop="openActionMenu(row)">
+                <view class="more-icon" aria-hidden="true"><view></view><view></view><view></view></view>
+                <text>更多</text>
+              </view>
+            </view>
           </view>
-          <view class="data-card__foot"><text>{{ cardBottomText(row) }}</text><text>查看详情 ›</text></view>
         </view>
         <view class="load-state">{{ loading ? '正在加载…' : finished ? `已加载全部 ${count} 条` : '继续上拉加载' }}</view>
       </view>
@@ -92,6 +99,8 @@ import { fieldDisplayValue } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
 import { compileListConfig, loadModuleViewManifest } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
+import { appendStandardDeleteAction } from '@/platform/module-delete.js'
+import { showRowActionSheet } from '@/platform/row-action-sheet.js'
 import { listReturnMixin } from '@/platform/list-return.js'
 
 export default {
@@ -298,7 +307,20 @@ export default {
     },
     formatTime(value) { return formatDateTime(value) },
     rowActions(row) {
-      return (this.config.actionSchema || []).filter((action) => isActionVisible(action, row))
+      const actions = (this.config.actionSchema || []).filter((action) => isActionVisible(action, row))
+      return appendStandardDeleteAction(actions, {
+        row,
+        user: getUser() || {},
+        menuId: this.config.menuId || this.menuId,
+        tableName: this.config.table,
+        moduleEngineKey: this.config.key,
+        title: this.titleValue(row)
+      })
+    },
+    openActionMenu(row) {
+      const actions = this.rowActions(row)
+      if (!actions.length) return
+      showRowActionSheet(actions, (action) => this.runAction(action, row))
     },
     async runAction(action, row) {
       if (this.actionRunning) return
@@ -390,10 +412,14 @@ export default {
 .field-row { display: grid; grid-template-columns: 150rpx minmax(0, 1fr); gap: 18rpx; padding: 8rpx 0; font-size: 24rpx; line-height: 1.55; }
 .field-row text:first-child { color: #85979e; }
 .field-row text:last-child { color: #334f59; overflow-wrap: anywhere; }
-.action-row { display: flex; flex-wrap: wrap; gap: 12rpx; padding: 0 24rpx 18rpx; }
-.action-row view { min-width: 120rpx; height: 58rpx; display: flex; align-items: center; justify-content: center; padding: 0 18rpx; border: 1px solid #b7dce8; border-radius: 7px; color: #087da8; font-size: 22rpx; }
-.data-card__foot { display: flex; justify-content: space-between; padding: 16rpx 24rpx; border-top: 1px solid #edf2f4; color: #98a7ac; font-size: 21rpx; }
-.data-card__foot text:last-child { color: #087da8; }
+.data-card__foot, .data-card__links, .data-card__more, .more-icon { display: flex; align-items: center; }
+.data-card__foot { justify-content: space-between; gap: 16rpx; min-height: 64rpx; padding: 8rpx 16rpx 8rpx 24rpx; border-top: 1px solid #edf2f4; color: #98a7ac; font-size: 21rpx; }
+.data-card__links { flex: 0 0 auto; gap: 8rpx; }
+.data-card__detail { padding: 14rpx 10rpx; color: #087da8; }
+.data-card__more { min-width: 102rpx; height: 64rpx; justify-content: center; gap: 8rpx; border-radius: 8px; color: #526d78; }
+.data-card__more--pressed { background: #edf5f8; }
+.more-icon { gap: 4rpx; }
+.more-icon > view { width: 6rpx; height: 6rpx; border-radius: 50%; background: currentColor; }
 .load-state { padding: 28rpx; color: #8a9ba1; font-size: 22rpx; text-align: center; }
 .state-panel { min-height: 45vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14rpx; padding: 40rpx; text-align: center; }
 .state-panel__title { font-size: 30rpx; font-weight: 750; }
