@@ -74,6 +74,30 @@ const moduleRegistrySource = readFileSync(new URL('../src/platform/module-regist
 const businessRuntimeSource = readFileSync(new URL('../src/platform/business-runtime.js', import.meta.url), 'utf8')
 assert.match(moduleRegistrySource, /hasConfiguredCardFields:/, '模块配置应标记旧式卡片字段，阻止旧 ViewSchema 覆盖')
 assert.match(moduleRegistrySource, /configuredBottomFields\.map\(\(item\) => item\.queryField\)/, '卡片底部字段应并入查询字段')
+assert.match(moduleRegistrySource, /const configuredStatus = configuredTagFields\[0\] \|\| null/, '卡片标题标签第一项应明确控制右上角状态位')
+assert.match(moduleRegistrySource, /configuredStatus[\s\S]{0,120}: preferredField\(fields, \[\/状态\|status\|stage\/i\]/, '仅未配置标题标签时才应自动推断状态字段')
 assert.match(businessRuntimeSource, /payload\._SelectFields = moduleConfig\.selectFields/, '列表查询应显式携带卡片所需字段')
+
+const statusOverrideSources = [
+  '../src/pages/business/list.vue',
+  '../src/pages/module/list.vue',
+  '../src/components/mci-business-related-list/mci-business-related-list.vue'
+]
+statusOverrideSources.forEach((file) => {
+  const source = readFileSync(new URL(file, import.meta.url), 'utf8')
+  assert.doesNotMatch(
+    source,
+    /hasConfiguredCardFields[^\n]+\[[^\]]*['"]statusField['"]/,
+    `${file} 不应阻止显式 ViewSchema.StatusField 覆盖旧式自动值`
+  )
+})
+;['../src/pages/business/list.vue', '../src/pages/module/list.vue'].forEach((file) => {
+  const source = readFileSync(new URL(file, import.meta.url), 'utf8')
+  assert.match(
+    source,
+    /merged\.selectFields = \[\.\.\.new Set\(\[\.\.\.\(merged\.selectFields \|\| \[\]\), dynamic\.statusField\]\)\]/,
+    `${file} 应把显式 ViewSchema.StatusField 并入列表查询字段`
+  )
+})
 
 console.log('card field display checks passed')
