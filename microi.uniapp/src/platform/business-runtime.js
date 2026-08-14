@@ -169,6 +169,9 @@ export async function loadModuleRows(moduleConfig, options = {}) {
     _Where: [...(moduleConfig.fixedWhere || []), ...(options.extraWhere || [])]
   }
   if (moduleConfig.menuId) payload._SysMenuId = moduleConfig.menuId
+  if (Array.isArray(moduleConfig.selectFields) && moduleConfig.selectFields.length) {
+    payload._SelectFields = moduleConfig.selectFields
+  }
   if (options.tableChildAuth) payload._TableChildAuth = options.tableChildAuth
   if (options.status && moduleConfig.statusField) {
     payload._Where.push({ Name: moduleConfig.statusField, Type: '=', Value: options.status })
@@ -179,6 +182,7 @@ export async function loadModuleRows(moduleConfig, options = {}) {
     'module', currentIdentityKey(), moduleEngineKey, moduleConfig.menuId || '', moduleConfig.table,
     pageIndex, pageSize, options.keyword || '', options.status || '',
     options.period || 'all', options.orderBy || '', options.orderType || '',
+    JSON.stringify(moduleConfig.selectFields || []),
     JSON.stringify(options.customRange || []), JSON.stringify(payload._Where),
     JSON.stringify(options.tableChildAuth || {})
   ].join(':')
