@@ -80,7 +80,24 @@ namespace Microi.Unity
                     return;
                 }
 
-                Configure(context.ApiBaseUrl, context.OsClient, context.Did);
+                // A standalone/static Web host may legitimately have no authenticated
+                // Microi runtime context. Do not let an empty host object erase defaults
+                // authored by the Unity application (for example public iTdos engines).
+                var nextBaseUrl = NormalizeBaseUrl(context.ApiBaseUrl);
+                var nextOsClient = NormalizeHeaderValue(context.OsClient, 128);
+                var nextDid = NormalizeHeaderValue(context.Did, 256);
+                if (!string.IsNullOrWhiteSpace(nextBaseUrl))
+                {
+                    apiBaseUrl = nextBaseUrl;
+                }
+                if (!string.IsNullOrWhiteSpace(nextOsClient))
+                {
+                    osClient = nextOsClient;
+                }
+                if (!string.IsNullOrWhiteSpace(nextDid))
+                {
+                    deviceId = nextDid;
+                }
                 SetAuthorization(context.Authorization);
                 HostContextApplied?.Invoke(context);
             }

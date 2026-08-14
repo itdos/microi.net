@@ -1,7 +1,7 @@
 {
   "name": "com.microi.unity",
   "displayName": "Microi Unity SDK",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "unity": "2022.3",
   "description": "Microi吾码 Unity/WebGL SDK：V8接口引擎通讯、宿主桥接、可恢复Editor工具箱与WebGL构建。",
   "keywords": [
