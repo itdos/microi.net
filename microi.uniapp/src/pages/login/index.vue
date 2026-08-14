@@ -183,6 +183,7 @@ import { post, setToken, setUser, getToken, removeToken } from '@/utils/request.
 import { encryptPassword } from '@/utils/crypto.js'
 import { captureInvitation, invitationPayload } from '@/platform/invitation.js'
 import { getLoginProvider, getAuthLoginApi, getClientType, supportsAuthLogin, getPlatformName, getPlatformNameEn } from '@/utils/platform.js'
+import { shouldResumePreviousPage } from '@/platform/login-navigation.mjs'
 
 function isEnabledFlag(value) {
   if (value === true || value === 1) return true
@@ -758,7 +759,24 @@ export default {
      */
     navigateAfterLogin() {
       setTimeout(() => {
-        // 如果有重定向地址（从其他页面跳转来的），回到该页面
+        const pages = getCurrentPages()
+        const previousPage = pages.length > 1 ? pages[pages.length - 2] : null
+
+        // 登录页由失效业务页 navigateTo 打开时，原页面仍在栈中；直接返回并触发其 onShow。
+        // 禁止 redirectTo 同一路由，否则会形成“旧详情页 + 新详情页”的重复页面栈。
+        if (this.redirectUrl && shouldResumePreviousPage(previousPage, this.redirectUrl)) {
+          console.log('[Login] navigateBack: 恢复登录前页面...')
+          uni.navigateBack({
+            delta: 1,
+            fail: () => uni.redirectTo({
+              url: this.redirectUrl,
+              fail: () => uni.switchTab({ url: this.redirectUrl })
+            })
+          })
+          return
+        }
+
+        // 分享、扫码或冷启动没有可恢复页面时，才创建重定向目标页。
         if (this.redirectUrl) {
           console.log('[Login] redirectTo:', this.redirectUrl)
           uni.redirectTo({
@@ -773,7 +791,6 @@ export default {
 
         // 默认返回上一页（用户从哪来就回到哪）
         console.log('[Login] navigateBack: 返回上一页...')
-        const pages = getCurrentPages()
         if (pages.length > 1) {
           uni.navigateBack({
             fail: () => {

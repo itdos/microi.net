@@ -199,7 +199,11 @@ function createModuleDefinition(module, definition) {
     [/名称|标题|编号|姓名|name|title|code|no/i]
   )
   const excluded = new Set([titleField && titleField.Name].filter(Boolean))
-  const statusField = preferredField(fields, [/状态|status|stage/i], excluded, false)
+  // 显式卡片标题标签优先占用右上角状态位；只有后台未配置时才按字段名/标签自动推断。
+  const configuredStatus = configuredTagFields[0] || null
+  const statusField = configuredStatus
+    ? fields.find((field) => String(field.Name || '').toLowerCase() === String(configuredStatus.queryField || '').toLowerCase()) || null
+    : preferredField(fields, [/状态|status|stage/i], excluded, false)
   if (statusField) excluded.add(statusField.Name)
   let lines = preferred.filter((field) =>
     !excluded.has(field.Name) && !HEAVY_COMPONENTS.has(field.component)
@@ -233,7 +237,7 @@ function createModuleDefinition(module, definition) {
     ...module,
     definition,
     titleField: titleField && titleField.Name || 'Id',
-    statusField: statusField && statusField.Name || '',
+    statusField: configuredStatus ? configuredStatus.field : (statusField && statusField.Name || ''),
     statusOptions: statusField ? (statusField.options || []).map((item) => item.value) : [],
     tagFields: configuredTags.slice(0, 3),
     bottomFields: configuredBottomFields.slice(0, 3),

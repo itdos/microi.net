@@ -1,5 +1,6 @@
 import appConfig from '../config.js';
 import { createMicroiV8 } from './microi.v8.js';
+import { shouldPromptAuthExpired } from '../platform/auth-expired-policy.mjs';
 
 const TOKEN_KEY = 'microi_token';
 const USER_KEY = 'microi_user';
@@ -139,6 +140,12 @@ export const V8 = createMicroiV8({
     removeToken();
     const runtimeUni = getRuntimeUni();
     const message = body && body.Msg ? String(body.Msg) : '当前登录身份已过期，请重新登录。';
+    if (!shouldPromptAuthExpired(body, getCurrentRoute())) {
+      authExpiredPrompting = false;
+      // 让业务页已经发起的 navigateTo 先完成；届时 redirectToLogin 会识别登录页并退出。
+      setTimeout(() => redirectToLogin(), 50);
+      return;
+    }
     if (!runtimeUni || typeof runtimeUni.showModal !== 'function' || authExpiredPrompting) {
       redirectToLogin();
       return;
@@ -170,6 +177,16 @@ export function removeToken() {
   if (runtimeUni && typeof runtimeUni.$emit === 'function') {
     runtimeUni.$emit('mci:auth-changed');
     runtimeUni.$emit('xjy-auth-changed');
+  }
+}
+
+function getCurrentRoute() {
+  try {
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+    const current = pages && pages.length ? pages[pages.length - 1] : null;
+    return current && current.route ? String(current.route) : '';
+  } catch (error) {
+    return '';
   }
 }
 

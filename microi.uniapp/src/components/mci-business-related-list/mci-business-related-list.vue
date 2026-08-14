@@ -677,7 +677,7 @@ export default {
           if (dynamic[name]?.length) merged[name] = dynamic[name]
         })
         ;['titleField', 'statusField', 'summaryField', 'periodField'].forEach((name) => {
-          if (merged.hasConfiguredCardFields && ['titleField', 'statusField', 'summaryField'].includes(name)) return
+          if (merged.hasConfiguredCardFields && ['titleField', 'summaryField'].includes(name)) return
           if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') merged[name] = dynamic[name]
         })
         if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema

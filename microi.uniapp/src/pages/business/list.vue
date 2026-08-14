@@ -227,7 +227,7 @@
 
 <script>
 import { themeMixin } from '@/utils/theme.js'
-import { V8, getUser, post } from '@/utils/request.js'
+import { V8, getToken, getUser, post } from '@/utils/request.js'
 import { getBusinessEntry, getBusinessModule } from '@/platform/business.js'
 import {
   canAddMenuRecord,
@@ -316,7 +316,8 @@ export default {
       loadRequestId: 0,
       searchTimer: null,
       proposalSelection: [],
-      proposalComparing: false
+      proposalComparing: false,
+      authTokenSnapshot: ''
     }
   },
   computed: {
@@ -365,8 +366,18 @@ export default {
     this.config = { ...this.baseConfig }
     this.entry = getBusinessEntry(this.key) || { icon: '/static/xjy/business/kehu.png', accent: '#0B86D4' }
     this.currentUser = getUser() || {}
+    this.authTokenSnapshot = getToken()
     const restored = this.restoreMciListSnapshot()
     this.initializeList(restored)
+  },
+  onShow() {
+    const token = getToken()
+    if (this.authTokenSnapshot === token) return
+    this.authTokenSnapshot = token
+    this.currentUser = getUser() || {}
+    // 登录恢复后废弃旧页面请求结果，并使用新 Token 重新加载菜单与列表。
+    this.loadRequestId += 1
+    this.initializeList(false, true)
   },
   onUnload() {
     clearTimeout(this.searchTimer)
@@ -502,11 +513,15 @@ export default {
           'statisticsFormat'
         ]
         scalarFields.forEach((name) => {
-          if (merged.hasConfiguredCardFields && ['titleField', 'statusField', 'summaryField', 'imageField'].includes(name)) return
+          // ViewSchema.StatusField 是右上角状态位的最高优先级，不能被旧式卡片字段配置拦截。
+          if (merged.hasConfiguredCardFields && ['titleField', 'summaryField', 'imageField'].includes(name)) return
           if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') {
             merged[name] = dynamic[name]
           }
         })
+        if (dynamic.statusField) {
+          merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.statusField])]
+        }
         if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema
         this.config = merged
       } catch (error) {}
