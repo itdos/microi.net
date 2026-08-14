@@ -16,17 +16,37 @@ export function shouldKeepEmptyCardLine(line) {
 }
 
 export function resolveConfiguredFieldNames(items = [], fields = []) {
+  // 查询、筛选等旧调用方需要数据库真实字段名；卡片渲染若需要 AsName，
+  // 应直接使用 resolveConfiguredFields 返回的 field。
+  return resolveConfiguredFields(items, fields).map((item) => item.queryField)
+}
+
+export function resolveConfiguredFields(items = [], fields = []) {
   const byId = new Map(fields.map((field) => [String(field.Id || '').toLowerCase(), field]))
   const byName = new Map(fields.map((field) => [String(field.Name || '').toLowerCase(), field]))
   return items.map((item) => {
     const candidates = item && typeof item === 'object'
-      ? [item.Id, item.id, item.Name, item.name, item.Field, item.field]
+      ? [
+          item.Id, item.id,
+          item.FieldId, item.fieldId,
+          item.DiyFieldId, item.diyFieldId,
+          item.Name, item.name,
+          item.Field, item.field
+        ]
       : [item]
     const field = candidates
       .map((candidate) => String(candidate || '').toLowerCase())
       .filter(Boolean)
       .map((candidate) => byId.get(candidate) || byName.get(candidate))
       .find(Boolean)
-    return field && field.Name
+    if (!field || !field.Name) return null
+    const source = item && typeof item === 'object' ? item : {}
+    const asName = String(source.AsName || source.asName || field.AsName || '').trim()
+    return {
+      field: asName || field.Name,
+      queryField: field.Name,
+      label: String(source.Label || source.label || field.Label || field.Name).trim(),
+      format: String(source.Format || source.format || '').trim()
+    }
   }).filter(Boolean)
 }

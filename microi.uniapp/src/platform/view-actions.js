@@ -1,5 +1,5 @@
 import { callApiEngine, openForm } from '@/platform/business-runtime.js'
-import { getUser } from '@/utils/request.js'
+import { getUser, V8 } from '@/utils/request.js'
 import { isActionVisible, resolveActionParams } from './view-schema-core.mjs'
 
 function modal(options) {
@@ -38,6 +38,12 @@ function actionParams(action, context) {
   if (params.Id === undefined && context.form && context.form.Id) params.Id = context.form.Id
   if (params._SysMenuId === undefined && context.menu && context.menu.Id) {
     params._SysMenuId = context.menu.Id
+  }
+  if (params.ModuleEngineKey === undefined && context.menu && context.menu.ModuleEngineKey) {
+    params.ModuleEngineKey = context.menu.ModuleEngineKey
+  }
+  if (params._TableChildAuth === undefined && context.tableChildAuth) {
+    params._TableChildAuth = context.tableChildAuth
   }
   return params
 }
@@ -93,7 +99,11 @@ async function runAction(action, context) {
       return { Code: 1 }
     }
     case 'Refresh':
-      if (typeof context.refresh === 'function') await context.refresh()
+      if (action.Target === 'Data' && typeof context.refreshData === 'function') {
+        await context.refreshData()
+      } else if (typeof context.refresh === 'function') {
+        await context.refresh()
+      }
       return { Code: 1 }
     case 'Back':
       uni.navigateBack()
@@ -103,6 +113,17 @@ async function runAction(action, context) {
       if (!data) throw new Error('未配置复制内容')
       uni.setClipboardData({ data })
       return { Code: 1 }
+    }
+    case 'Delete': {
+      const tableName = action.TableName || params.FormEngineKey || params.TableName || context.tableName
+      const id = params.Id || context.form && context.form.Id
+      if (!tableName || !id) throw new Error('删除操作缺少表名或数据编号')
+      return V8.FormEngine.DelFormData({
+        ...params,
+        FormEngineKey: tableName,
+        Id: id,
+        _InvokeType: 'Client'
+      })
     }
     default:
       throw new Error(`不支持的 ActionType：${action.ActionType}`)
@@ -116,7 +137,8 @@ export async function executeViewAction(action, context = {}) {
       title: action.Label || '确认操作',
       content: action.Confirm,
       confirmText: '确定',
-      cancelText: '取消'
+      cancelText: '取消',
+      confirmColor: String(action.Tone || '').toLowerCase() === 'danger' ? '#D9472B' : '#087DA8'
     })
     if (!result.confirm) return null
   }
