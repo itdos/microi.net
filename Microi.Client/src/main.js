@@ -75,6 +75,9 @@ app.directive("drag", drag);
 // 注册安全 HTML 指令 v-safe-html，替代直接 v-html，防止 XSS
 import { SafeHtmlDirective } from "@/utils/safe-html";
 app.directive("safe-html", SafeHtmlDirective);
+// 统一内容骨架屏：替代半透明遮罩式 v-loading，并保持主题与布局语义。
+import { MciLoadingDirective } from "@/utils/mci-loading";
+app.directive("mci-loading", MciLoadingDirective);
 // 注册 chat 组件 (Vue 3 方式)
 import chatComponents from "@/views/chat/components.js";
 app.use(chatComponents);
@@ -160,6 +163,7 @@ import VePlus from 've-plus';
 import 've-plus/dist/ve-plus.css';
 // 管理后台主题桥接层必须晚于第三方组件样式加载，保证浅色/暗色令牌生效。
 import './styles/mci-admin-theme.scss';
+import './styles/mci-loading.scss';
 app.use(VePlus);
 // WebOS 样式（使用 glob 动态加载，webos 目录不存在时静默跳过）
 import.meta.glob('@/views/webos/styles/*.scss', { eager: true });

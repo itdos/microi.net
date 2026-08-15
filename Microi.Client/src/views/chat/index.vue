@@ -66,12 +66,8 @@
                         </ul>
                     </div>
                 </div>
-                <div class="flex1 flexbox">
+                <div class="flex1 flexbox" v-mci-loading:page="FirstConnectWebsocket">
                     <!-- <record-list></record-list> -->
-                    <div v-if="FirstConnectWebsocket" style="z-index: 2; height: 30px; position: absolute; width: 250px; color: var(--el-text-color-primary); font-size: 13px; top: calc(50% - 15px); left: calc(50% - 60px)">
-                        <el-icon><Loading /></el-icon> 正在连接消息服务器...
-                    </div>
-                    <div v-if="FirstConnectWebsocket" style="z-index: 1; height: 100%; background-color: #ccc; position: absolute; width: calc(100% - 60px); opacity: 0.5"></div>
                     <div v-if="ChatMiddlebarType == 'RecentContacts'" class="vChat-middlebar flexbox flex__direction-column">
                         <div class="vc-searArea">
                             <div class="iptbox flexbox">
@@ -135,13 +131,13 @@
                             </ul>
                             <div class="vc_addrTotal">{{ AllContactsList.length }}位联系人</div>
                             <!-- 加载更多按钮 -->
-                            <div v-if="contactsHasMore" style="padding: 10px; text-align: center;">
-                                <el-button 
-                                    @click="loadMoreContacts" 
-                                    :loading="contactsLoading"
+                            <div v-if="contactsHasMore" v-mci-loading:compact="contactsLoading" style="padding: 10px; text-align: center;">
+                                <el-button
+                                    v-if="!contactsLoading"
+                                    @click="loadMoreContacts"
                                     size="small"
                                     style="width: 90%;">
-                                    {{ contactsLoading ? '加载中...' : '加载更多' }}
+                                    加载更多
                                 </el-button>
                             </div>
                             <div v-else-if="AllContactsList.length > 0" style="padding: 10px; text-align: center; color: #999; font-size: 12px;">

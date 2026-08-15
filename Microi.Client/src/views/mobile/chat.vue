@@ -25,10 +25,7 @@
             </div>
 
             <div class="messages-inner">
-                <div v-if="loading" class="loading-more">
-                    <el-icon class="rot"><Loading /></el-icon>
-                    <span>{{ $t("Msg.Mobile.common.loading") }}</span>
-                </div>
+                <div v-if="loading" class="loading-more" v-mci-loading:compact="true"></div>
 
                 <div
                     v-for="(msg, index) in messages"

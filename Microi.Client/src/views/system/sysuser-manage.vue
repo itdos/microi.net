@@ -68,7 +68,7 @@
                         </el-form-item>
                     </el-form>
                     <template v-if="DataViewType == 'Table'">
-                        <el-table v-loading="tableLoading" :data="SysUserList" style="width: 100%" class="diy-table no-border-outside" stripe border>
+                        <el-table v-mci-loading:table="tableLoading" :data="SysUserList" style="width: 100%" class="diy-table no-border-outside" stripe border>
                             <el-table-column type="index" width="50" />
                             <el-table-column :label="$t('Msg.Account')" width="150">
                                 <template #default="scope">
@@ -152,7 +152,14 @@
                                         <div>
                                             <div>
                                                 <div class="pull-left marginRight5">
-                                                    <el-avatar class="sys-user-avatar" :size="28" :src="GetUserAvatar(model)"></el-avatar>
+                                                    <span
+                                                        v-if="IsUserAvatarLoading(model)"
+                                                        class="mci-avatar-skeleton sys-user-avatar"
+                                                        style="--mci-skeleton-size: 28px"
+                                                        role="status"
+                                                        aria-label="头像加载中"
+                                                    ></span>
+                                                    <el-avatar v-else class="sys-user-avatar" :size="28" :src="GetUserAvatar(model)"></el-avatar>
                                                 </div>
                                                 <div class="pull-left marginRight5 title">
                                                     {{ model.Name }}
@@ -264,7 +271,14 @@
                                 :on-success="ImgUploadSuccess"
                                 :before-upload="UploadImgBefore"
                             >
-                                <img v-if="!DiyCommon.IsNull(CurrentSysUserModel.Avatar)" :src="CurrentSysUserAvatarUrl || './static/img/loading.gif'" class="avatar" style="object-fit: cover" />
+                                <span
+                                    v-if="CurrentSysUserAvatarLoading"
+                                    class="mci-avatar-skeleton avatar"
+                                    style="--mci-skeleton-size: 100px"
+                                    role="status"
+                                    aria-label="头像加载中"
+                                ></span>
+                                <img v-else-if="!DiyCommon.IsNull(CurrentSysUserModel.Avatar)" :src="CurrentSysUserAvatarUrl || GetDefaultUserAvatar(CurrentSysUserModel)" class="avatar" style="object-fit: cover" alt="" />
                                 <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
                             </el-upload>
                         </el-form-item>
@@ -480,7 +494,10 @@ export default {
             SysDeptList: [],
             SysDeptListJainZhi: [],
             SysUserAvatarUrls: {},
+            SysUserAvatarSources: {},
+            SysUserAvatarLoading: {},
             CurrentSysUserAvatarUrl: "",
+            CurrentSysUserAvatarLoading: false,
             ShowAccessKeyDialog: false,
             AccessKeyUser: {}
         };
@@ -500,26 +517,41 @@ export default {
             this.AccessKeyUser = user || {};
             this.ShowAccessKeyDialog = true;
         },
+        GetDefaultUserAvatar(m) {
+            return m && (m.Sex == "女" || m.Sex == "0" || m.Sex == 0)
+                ? "./static/img/nohead-girl.png"
+                : "./static/img/nohead-boy.png";
+        },
         GetUserAvatar(m) {
-            var self = this;
-            if (self.DiyCommon.IsNull(m.Avatar)) {
-                if (m.Sex == "女" || m.Sex == "0" || m.Sex == 0) {
-                    return "./static/img/nohead-girl.png";
-                    // return require('../../microi/img/nohead-girl.png');
-                }
-                return "./static/img/nohead-boy.png";
-                // return require('../../microi/img/nohead-boy.png');
-            }
-            return self.SysUserAvatarUrls[m.Id] || "./static/img/loading.gif";
+            return this.SysUserAvatarUrls[m.Id] || this.GetDefaultUserAvatar(m);
+        },
+        IsUserAvatarLoading(m) {
+            return !!(m && !this.DiyCommon.IsNull(m.Avatar) && this.SysUserAvatarLoading[m.Id]);
         },
         async ResolveSysUserAvatar(m) {
             var self = this;
             if (!m || self.DiyCommon.IsNull(m.Avatar)) return;
-            var url = await self.DiyCommon.GetUserAvatarUrl(m.Avatar, m.Id);
-            if (url) {
-                self.SysUserAvatarUrls = Object.assign({}, self.SysUserAvatarUrls, { [m.Id]: url });
-                if (self.CurrentSysUserModel && self.CurrentSysUserModel.Id === m.Id) {
-                    self.CurrentSysUserAvatarUrl = url;
+            var userId = m.Id;
+            var avatar = m.Avatar;
+            if (self.SysUserAvatarSources[userId] === avatar && (self.SysUserAvatarLoading[userId] || self.SysUserAvatarUrls[userId])) return;
+            self.SysUserAvatarSources = Object.assign({}, self.SysUserAvatarSources, { [userId]: avatar });
+            self.SysUserAvatarLoading = Object.assign({}, self.SysUserAvatarLoading, { [userId]: true });
+            if (self.CurrentSysUserModel && self.CurrentSysUserModel.Id === userId) self.CurrentSysUserAvatarLoading = true;
+            try {
+                var url = await self.DiyCommon.GetUserAvatarUrl(avatar, userId);
+                if (self.SysUserAvatarSources[userId] !== avatar) return;
+                if (url) self.SysUserAvatarUrls = Object.assign({}, self.SysUserAvatarUrls, { [userId]: url });
+                if (self.CurrentSysUserModel && self.CurrentSysUserModel.Id === userId && self.CurrentSysUserModel.Avatar === avatar) {
+                    self.CurrentSysUserAvatarUrl = url || self.GetDefaultUserAvatar(m);
+                }
+            } catch (error) {
+                console.warn("加载系统用户头像失败：", error);
+            } finally {
+                if (self.SysUserAvatarSources[userId] === avatar) {
+                    self.SysUserAvatarLoading = Object.assign({}, self.SysUserAvatarLoading, { [userId]: false });
+                }
+                if (self.CurrentSysUserModel && self.CurrentSysUserModel.Id === userId && self.CurrentSysUserModel.Avatar === avatar) {
+                    self.CurrentSysUserAvatarLoading = false;
                 }
             }
         },
@@ -594,7 +626,8 @@ export default {
             var self = this;
             if (self.DiyCommon.Result(result)) {
                 self.CurrentSysUserModel["Avatar"] = result.Data.Path;
-                self.CurrentSysUserAvatarUrl = "./static/img/loading.gif";
+                self.CurrentSysUserAvatarUrl = "";
+                self.CurrentSysUserAvatarLoading = true;
                 self.ResolveSysUserAvatar(self.CurrentSysUserModel);
                 self.DiyCommon.Tips(self.$t("Msg.UploadSuccess"));
             }
@@ -757,6 +790,7 @@ export default {
                     RoleIds: []
                 };
                 self.CurrentSysUserAvatarUrl = "";
+                self.CurrentSysUserAvatarLoading = false;
                 // self.CurrentSysUserRoleIds = [];
             } else {
                 title = m.Name;
@@ -791,7 +825,8 @@ export default {
                 //---END
 
                 self.CurrentSysUserModel = m;
-                self.CurrentSysUserAvatarUrl = self.SysUserAvatarUrls[m.Id] || "./static/img/loading.gif";
+                self.CurrentSysUserAvatarUrl = self.SysUserAvatarUrls[m.Id] || "";
+                self.CurrentSysUserAvatarLoading = !self.DiyCommon.IsNull(m.Avatar) && !self.CurrentSysUserAvatarUrl;
                 self.ResolveSysUserAvatar(m);
 
                 // var maxLavel = 0;

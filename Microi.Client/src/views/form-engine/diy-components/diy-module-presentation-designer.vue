@@ -1,5 +1,5 @@
 <template>
-    <div class="module-presentation-designer" v-loading="loading">
+    <div class="module-presentation-designer" v-mci-loading:form="loading">
         <header class="designer-head">
             <div class="head-copy">
                 <div class="designer-title">模块展示设计器</div>

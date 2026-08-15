@@ -122,21 +122,27 @@ watch([rawValue, component], resolveQrCode, { immediate: true });
     <div class="diy-special-cell" :class="[`is-${component.toLowerCase()}`, { 'is-compact': compact }]" @click.stop>
         <template v-if="component === 'ImgUpload'">
             <div v-if="uploadItems.length" class="diy-special-images" :aria-label="`${uploadItems.length} 张图片`">
-                <el-image
-                    v-for="(item, index) in visibleImages"
-                    :key="`${item.Path}-${index}`"
-                    v-show="resolvedUrls[index] && !failedImageUrls.has(resolvedUrls[index])"
-                    class="diy-special-image"
-                    :src="resolvedUrls[index]"
-                    :preview-src-list="previewUrls"
-                    :initial-index="index"
-                    :preview-teleported="true"
-                    :z-index="50000"
-                    fit="cover"
-                    lazy
-                    :alt="item.Name || field.Label"
-                    @error="markImageFailed(resolvedUrls[index])"
-                />
+                <template v-for="(item, index) in visibleImages" :key="`${item.Path}-${index}`">
+                    <span
+                        v-if="!resolvedUrls[index]"
+                        class="mci-media-skeleton diy-special-image"
+                        role="status"
+                        aria-label="图片加载中"
+                    ></span>
+                    <el-image
+                        v-else-if="!failedImageUrls.has(resolvedUrls[index])"
+                        class="diy-special-image"
+                        :src="resolvedUrls[index]"
+                        :preview-src-list="previewUrls"
+                        :initial-index="index"
+                        :preview-teleported="true"
+                        :z-index="50000"
+                        fit="cover"
+                        lazy
+                        :alt="item.Name || field.Label"
+                        @error="markImageFailed(resolvedUrls[index])"
+                    />
+                </template>
                 <span v-if="uploadItems.length > visibleImages.length" class="diy-special-more">+{{ uploadItems.length - visibleImages.length }}</span>
             </div>
             <span v-else class="diy-special-empty"><fa-icon icon="far fa-image" /> 暂无图片</span>
@@ -144,21 +150,27 @@ watch([rawValue, component], resolveQrCode, { immediate: true });
 
         <template v-else-if="component === 'FileUpload'">
             <div v-if="uploadItems.length" class="diy-special-files">
-                <a
-                    v-for="(item, index) in visibleFiles"
-                    :key="`${item.Path}-${index}`"
-                    class="diy-special-file"
-                    :class="{ 'is-loading': !resolvedUrls[index] }"
-                    :href="resolvedUrls[index] || undefined"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    :title="item.Name"
-                    @click.stop
-                >
-                    <fa-icon :icon="getFileIcon(item)" />
-                    <span class="diy-special-file-name">{{ item.Name }}</span>
-                    <span v-if="formatFileSize(item.Size)" class="diy-special-file-size">{{ formatFileSize(item.Size) }}</span>
-                </a>
+                <template v-for="(item, index) in visibleFiles" :key="`${item.Path}-${index}`">
+                    <span
+                        v-if="!resolvedUrls[index]"
+                        class="mci-inline-value-skeleton diy-special-file-loading"
+                        role="status"
+                        aria-label="文件链接加载中"
+                    ></span>
+                    <a
+                        v-else
+                        class="diy-special-file"
+                        :href="resolvedUrls[index]"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        :title="item.Name"
+                        @click.stop
+                    >
+                        <fa-icon :icon="getFileIcon(item)" />
+                        <span class="diy-special-file-name">{{ item.Name }}</span>
+                        <span v-if="formatFileSize(item.Size)" class="diy-special-file-size">{{ formatFileSize(item.Size) }}</span>
+                    </a>
+                </template>
                 <el-popover
                     v-if="uploadItems.length > visibleFiles.length"
                     placement="right"
@@ -172,21 +184,27 @@ watch([rawValue, component], resolveQrCode, { immediate: true });
                         </button>
                     </template>
                     <div class="diy-special-file-list" :aria-label="`${uploadItems.length} 个文件`">
-                        <a
-                            v-for="(item, index) in uploadItems"
-                            :key="`all-${item.Path}-${index}`"
-                            class="diy-special-file"
-                            :class="{ 'is-loading': !resolvedUrls[index] }"
-                            :href="resolvedUrls[index] || undefined"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            :title="item.Name"
-                            @click.stop
-                        >
-                            <fa-icon :icon="getFileIcon(item)" />
-                            <span class="diy-special-file-name">{{ item.Name }}</span>
-                            <span v-if="formatFileSize(item.Size)" class="diy-special-file-size">{{ formatFileSize(item.Size) }}</span>
-                        </a>
+                        <template v-for="(item, index) in uploadItems" :key="`all-${item.Path}-${index}`">
+                            <span
+                                v-if="!resolvedUrls[index]"
+                                class="mci-inline-value-skeleton diy-special-file-loading"
+                                role="status"
+                                aria-label="文件链接加载中"
+                            ></span>
+                            <a
+                                v-else
+                                class="diy-special-file"
+                                :href="resolvedUrls[index]"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                :title="item.Name"
+                                @click.stop
+                            >
+                                <fa-icon :icon="getFileIcon(item)" />
+                                <span class="diy-special-file-name">{{ item.Name }}</span>
+                                <span v-if="formatFileSize(item.Size)" class="diy-special-file-size">{{ formatFileSize(item.Size) }}</span>
+                            </a>
+                        </template>
                     </div>
                 </el-popover>
             </div>
@@ -322,7 +340,11 @@ watch([rawValue, component], resolveQrCode, { immediate: true });
     line-height: 20px;
 }
 .diy-special-file:hover .diy-special-file-name { text-decoration: underline; }
-.diy-special-file.is-loading { pointer-events: none; color: var(--el-text-color-placeholder); }
+.diy-special-file-loading {
+    width: min(128px, 100%);
+    height: 18px;
+    flex: none;
+}
 .diy-special-file-name,
 .diy-special-truncate {
     min-width: 0;

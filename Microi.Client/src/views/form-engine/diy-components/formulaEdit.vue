@@ -34,7 +34,7 @@
                                     <el-input prefix-:icon="Search" v-model="variableSearch" placeholder="搜索变量" @input="querySearchAsync" clearable></el-input>
                                 </span></div
                         ></template>
-                        <div class="addCodeDetail" v-loading="loading">
+                        <div class="addCodeDetail" v-mci-loading:list="loading">
                             <div
                                 v-show="newVariableList.length > 0"
                                 :class="varValue == item.Label ? 'list-item selectColor' : 'list-item'"
@@ -60,7 +60,7 @@
                                     <el-input prefix-:icon="Search" v-model="funSearch" placeholder="搜索函数" @input="queryFun" clearable></el-input>
                                 </span></div
                         ></template>
-                        <div class="addCodeDetail" v-loading="funLoading">
+                        <div class="addCodeDetail" v-mci-loading:list="funLoading">
                             <el-collapse v-if="!showFun" v-model="activeNames" @change="handleChange">
                                 <el-collapse-item v-for="(item, index) in funList" :key="index" :title="item.label" :name="index" class="minHeight">
                                     <div

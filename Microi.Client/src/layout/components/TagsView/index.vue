@@ -10,22 +10,24 @@
         </el-tabs>
 
         <!-- 🔥 使用 keep-alive 保持页面状态，支持通过 meta.keepAlive 配置是否缓存 -->
-        <router-view v-slot="{ Component }">
-            <template v-if="$route.meta?.keepAlive === false">
-                <component 
-                    v-if="Component" 
-                    :is="Component" 
-                    :key="$route.fullPath" 
-                />
-            </template>
-            <keep-alive v-else :max="5">
-                <component 
-                    v-if="Component" 
-                    :is="Component" 
-                    :key="$route.fullPath" 
-                />
-            </keep-alive>
-        </router-view>
+        <div class="mci-route-view-host" v-mci-loading:page="routeLoading">
+            <router-view v-slot="{ Component }">
+                <template v-if="$route.meta?.keepAlive === false">
+                    <component
+                        v-if="Component"
+                        :is="Component"
+                        :key="$route.fullPath"
+                    />
+                </template>
+                <keep-alive v-else :max="5">
+                    <component
+                        v-if="Component"
+                        :is="Component"
+                        :key="$route.fullPath"
+                    />
+                </keep-alive>
+            </router-view>
+        </div>
 
         <!-- 全屏提示 -->
         <transition name="fade">
@@ -217,6 +219,7 @@ import path from "@/utils/path";
 import Item from "../Sidebar/Item"; // by itdos
 import { useDiyStore, useTagsViewStore, usePermissionStore } from "@/pinia";
 import { computed, defineAsyncComponent } from "vue";
+import { routeLoading } from "@/utils/mci-loading";
 
 import { AppMain } from "../../components";
 
@@ -246,6 +249,7 @@ export default {
             ShowClassicTop,
             visitedViews,
             cachedViews,
+            routeLoading,
             routes
         };
     },
@@ -769,6 +773,12 @@ export default {
             }
         }
     }
+}
+
+.mci-route-view-host {
+    position: relative;
+    min-height: calc(100vh - 83px);
+    background: var(--mci-bg-page, var(--el-bg-color-page, #f7f9fc));
 }
 
 // 保留嵌套tabs样式（如diy-form内部的tabs）

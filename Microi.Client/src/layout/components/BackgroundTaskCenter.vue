@@ -70,9 +70,9 @@
                         v-if="!notificationLoading && platformNotifications.length === 0"
                         :description="$t('Msg.NoPlatformMessages')"
                     />
-                    <div v-else-if="notificationLoading" class="task-empty">{{ $t("Msg.Loading") }}</div>
                     <el-table
                         v-else
+                        v-mci-loading:table="notificationLoading"
                         :data="platformNotifications"
                         size="small"
                         row-key="Id"
@@ -128,9 +128,10 @@
                     <div class="task-sub-actions">
                         <el-button link size="small" :icon="Delete" @click="clearCompleted">{{ $t("Msg.ClearCompleted") }}</el-button>
                     </div>
-                    <el-empty v-if="tasks.length === 0" :description="$t('Msg.NoBackgroundTasks')" />
+                    <el-empty v-if="!loading && tasks.length === 0" :description="$t('Msg.NoBackgroundTasks')" />
                     <el-table
                         v-else
+                        v-mci-loading:table="loading"
                         :data="tasks"
                         size="small"
                         row-key="Id"
@@ -224,8 +225,7 @@
                         <el-button type="primary" link size="small" @click="goAppStore">{{ $t("Msg.GoAppStore") }}</el-button>
                     </div>
                     <el-empty v-if="!storeLoading && storeNotices.length === 0" :description="$t('Msg.NoOfficialAppUpdates')" />
-                    <div v-else-if="storeLoading" class="task-empty">{{ $t("Msg.Loading") }}</div>
-                    <el-table v-else :data="storeNotices" size="small" class="online-table notification-compact-table app-notice-table" max-height="420">
+                    <el-table v-else v-mci-loading:table="storeLoading" :data="storeNotices" size="small" class="online-table notification-compact-table app-notice-table" max-height="420">
                         <el-table-column :label="$t('Msg.Name')" min-width="220" show-overflow-tooltip>
                             <template #default="{ row }">{{ row.AppName || row.AppId || $t("Msg.Unnamed") }}</template>
                         </el-table-column>
@@ -256,7 +256,7 @@
                         <span v-if="myTerminals.length > 0" class="tab-count success">{{ myTerminals.length }}</span>
                     </template>
                     <el-empty v-if="!terminalLoading && myTerminals.length === 0" :description="$t('Msg.NoOnlineTerminals')" />
-                    <el-table v-else :data="myTerminals" size="small" class="online-table notification-compact-table" max-height="420">
+                    <el-table v-else v-mci-loading:table="terminalLoading" :data="myTerminals" size="small" class="online-table notification-compact-table" max-height="420">
                         <el-table-column prop="ClientType" :label="$t('Msg.TerminalType')" min-width="110" />
                         <el-table-column prop="Ip" :label="$t('Msg.LoginIp')" min-width="130" />
                         <el-table-column prop="Did" :label="$t('Msg.TerminalDid')" min-width="180" show-overflow-tooltip />
@@ -280,7 +280,7 @@
                         <span v-if="onlineUsers.length > 0" class="tab-count admin">{{ onlineUsers.length }}</span>
                     </template>
                     <el-empty v-if="!terminalLoading && onlineUsers.length === 0" :description="$t('Msg.NoOnlineUsers')" />
-                    <el-table v-else :data="onlineUsers" size="small" class="online-table notification-compact-table online-users-table" row-key="UserId" max-height="420">
+                    <el-table v-else v-mci-loading:table="terminalLoading" :data="onlineUsers" size="small" class="online-table notification-compact-table online-users-table" row-key="UserId" max-height="420">
                         <el-table-column type="expand">
                             <template #default="{ row }">
                                 <div class="terminal-list">

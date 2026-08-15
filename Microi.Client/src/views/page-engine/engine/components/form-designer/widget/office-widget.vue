@@ -1,7 +1,6 @@
 <template>
-  <div class="office-widget" ref="officeWidgetRef" @wheel.capture="handleOfficeWheel">
-    <div v-if="loading" class="office-state">{{ $pet('文档加载中...') }}</div>
-    <div v-else-if="error" class="office-state office-state-error">{{ error }}</div>
+  <div class="office-widget" ref="officeWidgetRef" v-mci-loading:detail="loading" @wheel.capture="handleOfficeWheel">
+    <div v-if="error" class="office-state office-state-error">{{ error }}</div>
     <iframe
       v-else-if="isPdfPreview && previewSrc"
       ref="pdfFrameRef"

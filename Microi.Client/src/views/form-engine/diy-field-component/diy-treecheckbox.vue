@@ -18,7 +18,7 @@
         <!-- 树形表格 -->
         <el-table
             ref="treeTableRef"
-            v-loading="loading"
+            v-mci-loading:tree="loading"
             :data="filteredTreeData"
             row-key="Id"
             :tree-props="{ children: '_Child' }"

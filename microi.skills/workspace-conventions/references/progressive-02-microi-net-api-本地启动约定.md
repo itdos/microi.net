@@ -199,7 +199,7 @@ AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果
 7. Microi.VSCode 生成 MCP 配置时应清理旧的中文/横杠 Microi MCP key，只保留 `microi_<osClient>` 或 `microi_<osClient>_<host>` 形式，避免不同 AI 客户端因 namespace 不稳定而无法注入工具。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-037 sha256=d0c37c1f0c5ec999b10ed6f0ccbb4f1f32aa8b0fc998a433d020d6552cc6fb5c -->
+<!-- microi-progressive:chunk id=workspace-conventions-037 sha256=e8ddd5ad53787087f8e50a13618ee5626686cc72b0b21c1b12b0dc60ea515713 -->
 ## Windows MCP 控制台闪窗复盘
 
 当用户反馈“打开 Microi.VSCode、添加服务器或初始化 MCP 后连续弹出并立即关闭多个 cmd 窗口”时，应按进程风暴排查，不能只给已有 `spawn` 补 `windowsHide`：
@@ -209,6 +209,8 @@ AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果
 3. VS Code 已配置 `chat.mcp.autostart` 时，插件后台监测只能检查配置和状态，禁止在侧栏显示、定时轮询、登录、添加连接或初始化流程里再次执行 `workbench.mcp.startServer('*')`。
 4. 握手诊断会真实启动每个 stdio MCP，只能由用户显式点击“诊断 MCP 可调用性”触发；常规配置成功提示不得暗中运行整组诊断。
 5. Windows 的 VS Code/Cursor 配置优先复用 GUI Electron 宿主 `process.execPath` 并设置 `ELECTRON_RUN_AS_NODE=1`，避免把控制台子系统的外部 `node.exe` 持久化为每个 MCP 的启动命令。Trae 若因空格路径兼容必须经过 `cmd.exe`，仍需使用固定 launcher 并隐藏窗口。
-6. 回归测试至少静态断言：Codex CLI 批量注册函数不存在、后台 monitor 不包含 `startServer`、自动配置不包含诊断、Codex 配置内容不变时不改写、Windows GUI 宿主检查早于外部 Node 探测。再在扩展开发宿主中覆盖打开侧栏、添加连接、初始化 MCP，观察无连续控制台闪窗。
+6. CLI 或初始化器运行在 VS Code/Cursor Electron 宿主内时，必须通过 `process.versions.electron` 或等价事实识别宿主，并把 `ELECTRON_RUN_AS_NODE=1` 同步写入 `.vscode/mcp.json`、`.cursor/mcp.json`、根 `.mcp.json` 以及 `.codex/config.toml` 的对应 stdio 配置。禁止只把 `Code.exe`/`Cursor.exe` 写成 `command` 却遗漏 Node 模式；否则 Windows 会把 `mcp-codex-stdio-adapter.js` 当普通文件交给编辑器打开，每次启动或切换 AI 对话都可能新增一棵 GUI 进程树。
+7. Codex 仍只能生成一个 `microi_codex` 路由块，禁止按 Profile 注册多个 Codex MCP。验收必须同时回读配置和进程：凡 `Code.exe`/`Cursor.exe` 命令都带 Node 模式，且不得存在以 `mcp-codex-stdio-adapter.js`、`microi-codex-router.js` 为普通文件参数的可见编辑器根进程；多个对话的 Router 应复用共享 Broker，而不是各自再拉起全部真实 Profile MCP。
+8. 回归测试至少静态断言：Codex CLI 批量注册函数不存在、后台 monitor 不包含 `startServer`、自动配置不包含诊断、Codex 配置内容不变时不改写、Windows GUI 宿主检查早于外部 Node 探测、CLI 与 Codex 路由配置都保留 `ELECTRON_RUN_AS_NODE=1`。再在扩展开发宿主中覆盖打开侧栏、添加连接、初始化 MCP，观察无连续控制台闪窗或脚本文件被自动打开。
 
 <!-- /microi-progressive:chunk -->

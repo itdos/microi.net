@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-13T15:04:59.034Z",
+  "generatedAt": "2026-08-15T08:58:00.771Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,8 +169,8 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "0cd7f005debd9bc307e9a0c4beffcd9368a2b0ee1b2afa7869c749882267cd38",
-      "originalLines": 638,
+      "originalSha256": "036e90f87d34b16249c2087a20247a0c574ddfcff34f325f3945f81e4bec7187",
+      "originalLines": 647,
       "prefixSha256": "65cd4f270c1895c459014ab1ce7c376f69ec5469fe94ddf0f82827eb8616d579",
       "prefixBytes": 781,
       "entryLines": 198,
@@ -243,8 +243,8 @@
           "id": "microi-client-frontend-008",
           "ordinal": 8,
           "destination": "microi-client-frontend/references/progressive-02-8-运行时高频坑复盘.md",
-          "sha256": "964ef109b4cf0a27f73517252c145506f7ca73dc78cc311a50b44728c8c8ff3f",
-          "lines": 135,
+          "sha256": "4824b3271515717979847b142c1cad88e468c5904d93b23950c59cc90b90c5a4",
+          "lines": 144,
           "heading": "8. 运行时高频坑复盘"
         },
         {
@@ -1610,18 +1610,18 @@
       ]
     },
     "ui-design": {
-      "originalSha256": "9c1821a85924f4b787da2fc8536199cef806cca3a826f1484047a808b41a1dd3",
-      "originalLines": 1622,
+      "originalSha256": "3d4dc66359626b24983aa01de74064151425f5119091b228e3a913f5f5b7666d",
+      "originalLines": 1632,
       "prefixSha256": "d557bbba4ba5ade3f10f5d8cc672d038f5136ce2eda7eaefbcfe2dd2eb65812a",
       "prefixBytes": 1106,
-      "entryLines": 187,
+      "entryLines": 188,
       "chunks": [
         {
           "id": "ui-design-000",
           "ordinal": 0,
           "destination": "ui-design/SKILL.md",
-          "sha256": "797a033d2fc8b97fe60762028751d41e89fc03582f5267785fba97fe1e76694f",
-          "lines": 28,
+          "sha256": "4b6409ab265eb741b2f4b28b51b7de12cde79ff4a19c8a6e8acf80ac867444be",
+          "lines": 29,
           "heading": "整体风格定义"
         },
         {
@@ -1708,8 +1708,8 @@
           "id": "ui-design-011",
           "ordinal": 11,
           "destination": "ui-design/references/progressive-02-字体.md",
-          "sha256": "1d31f1333c8853380d4e624d3798fddecf7bc26c861afc2dce9df82c566ffa25",
-          "lines": 33,
+          "sha256": "fba089e9a092efca57bfad2a34a4b9bada857c1072b09488e29b3cf28eefaba1",
+          "lines": 42,
           "heading": "骨架屏 Loading 设计规范"
         },
         {
@@ -3196,8 +3196,8 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "58812f002d909c3fda3dc6f3b3ba04926da23c09b09fcd15c18f1e8fc401f9a6",
-      "originalLines": 551,
+      "originalSha256": "1823ec6270e562b72e45507901acee88f7f47f3413f93025144fc206276809e9",
+      "originalLines": 553,
       "prefixSha256": "b58cd0a59d3643525695b94a5941278a5088c33cbe2ce81620359f37db69878e",
       "prefixBytes": 252,
       "entryLines": 201,
@@ -3502,8 +3502,8 @@
           "id": "workspace-conventions-037",
           "ordinal": 37,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "d0c37c1f0c5ec999b10ed6f0ccbb4f1f32aa8b0fc998a433d020d6552cc6fb5c",
-          "lines": 12,
+          "sha256": "e8ddd5ad53787087f8e50a13618ee5626686cc72b0b21c1b12b0dc60ea515713",
+          "lines": 14,
           "heading": "Windows MCP 控制台闪窗复盘"
         },
         {

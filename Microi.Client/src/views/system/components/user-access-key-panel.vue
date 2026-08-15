@@ -67,7 +67,7 @@
                             </template>
                         </el-input>
                     </div>
-                    <div class="check-panel" v-loading="optionLoading">
+                    <div class="check-panel" v-mci-loading:list="optionLoading">
                         <el-checkbox-group v-model="form.SelectedRoutes" @change="handleRoutesChange">
                             <el-checkbox
                                 v-for="option in filteredRouteOptions"
@@ -143,7 +143,7 @@
                     :closable="false"
                     show-icon
                 />
-                <div v-else class="check-panel table-panel" v-loading="optionLoading">
+                <div v-else class="check-panel table-panel" v-mci-loading:list="optionLoading">
                     <el-checkbox-group v-model="form.SelectedTables">
                         <el-checkbox
                             v-for="option in tableOptions"
@@ -191,7 +191,7 @@
             <span>入口：【系统账号】→ 用户行【访问密钥】。密钥创建后只显示一次。</span>
         </div>
 
-        <el-table :data="keys" v-loading="loading" border stripe>
+        <el-table :data="keys" v-mci-loading:table="loading" border stripe>
             <el-table-column prop="Name" label="名称" min-width="150" />
             <el-table-column prop="KeyPrefix" label="密钥前缀" min-width="160" />
             <el-table-column label="到期时间" width="175">

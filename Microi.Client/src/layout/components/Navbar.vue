@@ -72,7 +72,14 @@
 
             <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="hover">
                 <div class="avatar-wrapper">
-                    <img :src="GetCurrentUserAvatar()" class="user-avatar" />
+                    <span
+                        v-if="CurrentUserAvatarLoading"
+                        class="mci-avatar-skeleton user-avatar"
+                        style="--mci-skeleton-size: 20px"
+                        role="status"
+                        aria-label="头像加载中"
+                    ></span>
+                    <img v-else :src="GetCurrentUserAvatar()" class="user-avatar" alt="" />
                     <span style="margin-left: 5px; font-size: 14px">
                         {{ GetCurrentUser.Name }}
                     </span>
@@ -183,6 +190,7 @@ export default {
             ChatType: "",
             ShowUnreadCount: true,
             CurrentUserAvatarUrl: "./static/img/icon/personal.png",
+            CurrentUserAvatarLoading: false,
             isBrowserFullScreen: !!document.fullscreenElement
         };
     },
@@ -381,11 +389,25 @@ export default {
             var user = self.GetCurrentUser || {};
             if (self.DiyCommon.IsNull(user.Avatar)) {
                 self.CurrentUserAvatarUrl = "./static/img/icon/personal.png";
+                self.CurrentUserAvatarLoading = false;
                 return;
             }
-            self.CurrentUserAvatarUrl = "./static/img/loading.gif";
-            var url = await self.DiyCommon.GetUserAvatarUrl(user.Avatar, user.Id);
-            self.CurrentUserAvatarUrl = url || "./static/img/icon/personal.png";
+            var avatar = user.Avatar;
+            var userId = user.Id;
+            self.CurrentUserAvatarLoading = true;
+            try {
+                var url = await self.DiyCommon.GetUserAvatarUrl(avatar, userId);
+                if (self.GetCurrentUser?.Avatar === avatar && self.GetCurrentUser?.Id === userId) {
+                    self.CurrentUserAvatarUrl = url || "./static/img/icon/personal.png";
+                }
+            } catch (error) {
+                console.warn("加载当前用户头像失败：", error);
+                self.CurrentUserAvatarUrl = "./static/img/icon/personal.png";
+            } finally {
+                if (self.GetCurrentUser?.Avatar === avatar && self.GetCurrentUser?.Id === userId) {
+                    self.CurrentUserAvatarLoading = false;
+                }
+            }
         },
         GotoDesktop() {
             this.diyStore.setState("ShowGotoWebOS", true);
