@@ -35,7 +35,14 @@
         <!-- 单图片显示 - 编辑/新增模式 -->
         <div v-if="FormMode != 'View' && field.Visible && !getMultipleFlag && isValidSingleImgValue(modelValue)"
             class="single-img-display">
+            <div
+                v-if="isImagePathLoading(getImageDisplayPath())"
+                class="mci-media-skeleton preview-image"
+                role="status"
+                aria-label="图片加载中"
+            ></div>
             <el-image
+                v-else
                 :src="getImageDisplayPath()"
                 :preview-src-list="[getImageDisplayPath()]"
                 fit="cover"
@@ -66,7 +73,14 @@
         <!-- 查看模式 - 单图片 -->
         <div v-if="FormMode == 'View' && !getMultipleFlag && isValidSingleImgValue(modelValue)"
             class="single-img-display view-mode">
+            <div
+                v-if="isImagePathLoading(getImageDisplayPath())"
+                class="mci-media-skeleton preview-image"
+                role="status"
+                aria-label="图片加载中"
+            ></div>
             <el-image
+                v-else
                 :src="getImageDisplayPath()"
                 :preview-src-list="[getImageDisplayPath()]"
                 fit="cover"
@@ -93,7 +107,14 @@
             >
                 <el-icon class="drag-handle"><Rank /></el-icon>
                 <!-- zhy取消浏览器图片预览@click="openImagePreview(img)" ，开通遮罩层取消图片预览:hide-on-click-modal='true'  ，:initial-index="index"该属性主要是支持多图预览可以点击预览对应图片而不是默认第一张---->
+                <div
+                    v-if="isImagePathLoading(FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath'])"
+                    class="mci-media-skeleton card-image"
+                    role="status"
+                    aria-label="图片加载中"
+                ></div>
                 <el-image
+                    v-else
                     :src="FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath']"
                     :preview-src-list="GetImgUploadImgs()"
                     :initial-index="index"
@@ -536,9 +557,11 @@ const getImageDisplayPath = () => {
         return realPath;
     }
 
-    // 如果RealPath还未设置，返回loading图片
-    return './static/img/loading.gif';
+    // 内部仍保留 loading.gif 哨兵兼容旧表单逻辑，但不再把它交给图片标签发起请求。
+    return '';
 };
+
+const isImagePathLoading = (path) => DiyCommon.IsNull(path) || path === './static/img/loading.gif';
 
 // 初始化拖动排序
 const initSortable = () => {

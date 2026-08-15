@@ -494,6 +494,15 @@ function applySurfaceVars(profile, mode) {
     }
 
     const surfaceRgb = hexToRgb(surface.surface);
+    const skeletonBase = isDark
+        ? mixColors(surface.fill, profile.value, 0.10)
+        : mixColors(surface.fill, profile.value, 0.045);
+    const skeletonHighlight = isDark
+        ? mixColors(surface.soft, "#FFFFFF", 0.13)
+        : mixColors(surface.soft, "#FFFFFF", 0.64);
+    const skeletonHeader = isDark
+        ? mixColors(surface.soft, profile.value, 0.08)
+        : mixColors(surface.soft, profile.value, 0.035);
     const presentationPrimaryText = getReadableAccent(profile.value, surface.surface);
     const presentationHeaderBg = `linear-gradient(105deg, rgba(${r}, ${g}, ${b}, ${isDark ? 0.16 : 0.10}) 0%, rgba(${r}, ${g}, ${b}, ${isDark ? 0.07 : 0.035}) 36%, transparent 64%), ${surface.surface}`;
     const presentationHeaderBgSubtle = `linear-gradient(105deg, rgba(${r}, ${g}, ${b}, ${isDark ? 0.10 : 0.055}) 0%, transparent 44%), ${surface.surface}`;
@@ -566,6 +575,13 @@ function applySurfaceVars(profile, mode) {
         "--mci-bg-glass": `rgba(${surfaceRgb.r}, ${surfaceRgb.g}, ${surfaceRgb.b}, 0.94)`,
         "--mci-bg-glass-border": surface.border,
         "--mci-bg-mask": isDark ? "rgba(2, 6, 23, 0.72)" : "rgba(15, 23, 42, 0.42)",
+        "--mci-skeleton-surface": surface.surface,
+        "--mci-skeleton-card": isDark ? surface.overlay : surface.surface,
+        "--mci-skeleton-header": skeletonHeader,
+        "--mci-skeleton-base": skeletonBase,
+        "--mci-skeleton-highlight": skeletonHighlight,
+        "--mci-skeleton-accent": `rgba(${r}, ${g}, ${b}, ${isDark ? 0.22 : 0.14})`,
+        "--mci-skeleton-border": surface.border,
         "--mci-text-primary": surface.ink,
         "--mci-text-secondary": surface.text,
         "--mci-text-tertiary": surface.muted,

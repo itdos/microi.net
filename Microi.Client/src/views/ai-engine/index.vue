@@ -73,7 +73,7 @@
                         <small>{{ archivedConversationCount }}</small>
                     </button>
                 </div>
-                <div class="conversation-list" v-loading="historyLoading">
+                <div class="conversation-list" v-mci-loading:list="historyLoading">
                     <div
                         v-for="item in filteredConversations"
                         :key="item.key || `${item.source || SOURCE}:${item.id}`"
@@ -175,7 +175,7 @@
                         <p>描述目标即可连续对话，我会结合 Skills、MCP 建模能力和当前租户上下文，辅助你分析数据、编写 V8、创建低代码模块。</p>
                         <p class="hero-local-tip">AI 深度融合 V8 引擎，强烈建议使用本地 VS Code Codex / Copilot / Claude / Cursor + MCP + Skills，进行真正意义的零代码 AI 编程。</p>
                     </div>
-                    <div v-if="isAiAdmin" class="platform-stats" v-loading="statsLoading">
+                    <div v-if="isAiAdmin" class="platform-stats" v-mci-loading:stats="statsLoading">
                         <div v-for="stat in statCards" :key="stat.key" class="platform-stat" :data-stat="stat.key">
                             <span>{{ stat.label }}</span>
                             <strong>{{ stat.value }}</strong>
@@ -205,7 +205,14 @@
                         :class="'is-' + message.role"
                     >
                         <div class="message-avatar">
-                            <img v-if="message.role === 'user' && currentUserAvatar" :src="currentUserAvatar" alt="" />
+                            <span
+                                v-if="message.role === 'user' && currentUserAvatarLoading"
+                                class="mci-avatar-skeleton"
+                                style="--mci-skeleton-size: 34px"
+                                role="status"
+                                aria-label="头像加载中"
+                            ></span>
+                            <img v-else-if="message.role === 'user' && currentUserAvatar" :src="currentUserAvatar" alt="" />
                             <el-icon v-else-if="message.role === 'user'"><User /></el-icon>
                             <el-icon v-else><Cpu /></el-icon>
                         </div>
@@ -533,7 +540,7 @@
                             </div>
                             <el-tag effect="plain">{{ videoRows.length }} 条</el-tag>
                         </div>
-                        <el-table :data="videoRows" v-loading="videoLoading" row-key="Id" class="video-record-table">
+                        <el-table :data="videoRows" v-mci-loading:table="videoLoading" row-key="Id" class="video-record-table">
                             <el-table-column type="expand">
                                 <template #default="scope">
                                     <div class="video-record-detail">
@@ -900,15 +907,30 @@ const currentUserName = computed(() => {
     return user.Name || user.Account || "你";
 });
 const currentUserAvatar = ref("");
+const currentUserAvatarLoading = ref(false);
 const loadCurrentUserAvatar = async () => {
     const user = currentUser.value || {};
     const avatar = user.Avatar || user.HeadIcon || user.HeadImg || "";
     if (!avatar) {
         currentUserAvatar.value = "";
+        currentUserAvatarLoading.value = false;
         return;
     }
-    currentUserAvatar.value = "./static/img/loading.gif";
-    currentUserAvatar.value = await DiyCommon.GetUserAvatarUrl(avatar, user.Id) || "";
+    const userId = user.Id;
+    currentUserAvatarLoading.value = true;
+    try {
+        const url = await DiyCommon.GetUserAvatarUrl(avatar, userId);
+        const latestUser = currentUser.value || {};
+        const latestAvatar = latestUser.Avatar || latestUser.HeadIcon || latestUser.HeadImg || "";
+        if (latestAvatar === avatar && latestUser.Id === userId) currentUserAvatar.value = url || "";
+    } catch (error) {
+        console.warn("加载 AI 助手用户头像失败：", error);
+        currentUserAvatar.value = "";
+    } finally {
+        const latestUser = currentUser.value || {};
+        const latestAvatar = latestUser.Avatar || latestUser.HeadIcon || latestUser.HeadImg || "";
+        if (latestAvatar === avatar && latestUser.Id === userId) currentUserAvatarLoading.value = false;
+    }
 };
 const statCards = computed(() => [
     { key: "table", label: "表单数量", value: platformStats.DiyTableCount || 0, desc: "Form Engine" },

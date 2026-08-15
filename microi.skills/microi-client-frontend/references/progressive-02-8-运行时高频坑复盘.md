@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-client-frontend-008 sha256=964ef109b4cf0a27f73517252c145506f7ca73dc78cc311a50b44728c8c8ff3f -->
+<!-- microi-progressive:chunk id=microi-client-frontend-008 sha256=4824b3271515717979847b142c1cad88e468c5904d93b23950c59cc90b90c5a4 -->
 ## 8. 运行时高频坑复盘
 
 ### 前端 V8.Http 与后端同构契约
@@ -136,6 +136,15 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - 弹窗内部的表格、树、编辑区要设置稳定高度或最大高度，避免内容撑出视口导致默认居中失效。
 - 修改后验收默认打开态和拖动后状态：弹窗仍在可视区域内，标题/按钮/输入框不被导航、遮罩或浏览器边缘遮挡。
 - 对长内容弹窗还要分别滚到顶部、中部和底部触发一次错误反馈/二次确认，断言提示层仍以当前视口为基准居中；静态扫描同时禁止 `window.alert`、`window.confirm`、`window.prompt` 及对应全局别名。
+
+### 内容 Loading 统一使用主题骨架
+
+- `Microi.Client` 的异步内容区统一使用 `v-mci-loading:<variant>`，语义变体为 `table/cards/form/detail/page/stats/list/tree/compact`；菜单异步路由在守卫开始/结束时驱动页面骨架，全屏内容导入使用 `openMciLoading()`。
+- 平台主题由 `theme-color.js` 同步生成 `--mci-skeleton-surface/card/header/base/highlight/accent/border`；骨架样式只能消费这些语义令牌，禁止在组件里写亮/暗两套硬编码颜色，禁止新增半透明 `.el-loading-mask`。
+- `diy-table` 首屏/筛选重载使用表格或卡片骨架，移动追加使用底部 `compact` 骨架；`diy-form` 把骨架挂在根容器，不能依赖尚未加载完成的 Tabs。请求完成前禁止渲染空态。
+- 头像、验证码、私有图片/文件缩略图使用圆形或媒体骨架；旧表单依赖的 `./static/img/loading.gif` 可继续作为内存中的状态哨兵，但渲染前必须拦截，禁止作为 `<img>`、`<el-image>` 或背景图 URL 发起网络请求。
+- 保存/提交/登录验证等动作保留按钮 Loading，可信百分比保留真实进度；其余 spinner、转圈图标和“加载中”文案不得充当内容加载态。
+- 修改后运行静态门禁，确认源码不存在内容型 `v-loading`、`ElLoading.service`、硬编码黑色 Loading mask 或加载期空态；再用真实浏览器验证菜单、首页、表格、表单详情在亮色、暗色、自定义主题和移动端下的骨架几何、对比度、`aria-busy`、reduced-motion 及请求失败收口。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=microi-client-frontend-009 sha256=11a3c4fd1667c1309832387d79dd98ca14b64d8c60b5a54c0b8ac4237e22d0e4 -->

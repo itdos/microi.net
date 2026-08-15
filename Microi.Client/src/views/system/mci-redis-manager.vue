@@ -123,7 +123,7 @@
                     <el-button type="danger" plain size="small" :icon="Delete" @click="deleteSelectedKeys">批量删除</el-button>
                 </div>
 
-                <div class="mci-key-table-wrap" v-loading="keyLoading">
+                <div class="mci-key-table-wrap" v-mci-loading:table="keyLoading">
                     <el-empty v-if="!activeConnection && !keyLoading" :image-size="90" description="请先从左侧选择 Redis 连接" />
                     <el-empty v-else-if="activeConnection && keyList.length === 0 && !keyLoading" :image-size="90" description="当前条件没有匹配的 Key">
                         <el-button type="primary" plain @click="openCreateKey">新建 Key</el-button>
@@ -179,7 +179,7 @@
                 </div>
 
                 <el-empty v-if="!selectedDetail && !detailLoading" :image-size="76" description="从 Key 列表选择一条数据" />
-                <div v-else class="mci-detail-content" v-loading="detailLoading">
+                <div v-else class="mci-detail-content" v-mci-loading:detail="detailLoading">
                     <div v-if="selectedDetail" class="mci-detail-metrics">
                         <div><span>类型</span><strong>{{ typeLabel(selectedDetail.Type) }}</strong></div>
                         <div><span>元素/长度</span><strong>{{ selectedDetail.Length ?? '-' }}</strong></div>
@@ -301,7 +301,7 @@
         </el-dialog>
 
         <el-drawer v-model="statisticsVisible" title="Redis 运行统计" size="520px">
-            <div class="mci-statistics" v-loading="statisticsLoading">
+            <div class="mci-statistics" v-mci-loading:stats="statisticsLoading">
                 <div v-if="statistics" class="mci-stat-grid">
                     <div class="mci-stat-card"><span>Key 总数</span><strong>{{ statistics.KeyCount?.toLocaleString() }}</strong></div>
                     <div class="mci-stat-card"><span>Ping</span><strong>{{ statistics.PingMilliseconds }} ms</strong></div>

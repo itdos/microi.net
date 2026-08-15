@@ -210,7 +210,7 @@
                 </div>
                 <el-button size="small" @click="loadHistoryPage(historyPage)" :loading="historyLoading">刷新</el-button>
             </div>
-            <el-table v-loading="historyLoading" :data="historyItems" stripe max-height="520">
+            <el-table v-mci-loading:table="historyLoading" :data="historyItems" stripe max-height="520">
                 <el-table-column prop="Version" label="版本" width="110" />
                 <el-table-column prop="ChangeSummary" label="变更说明" min-width="220" show-overflow-tooltip />
                 <el-table-column prop="CreateUserName" label="保存人" width="120" />

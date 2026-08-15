@@ -23,7 +23,7 @@
                     <el-button size="small" @click="openCreate('MicroService')">新建微服务</el-button>
                 </div>
             </header>
-            <div class="app-gallery-grid" v-loading="appLoading">
+            <div class="app-gallery-grid" v-mci-loading:cards="appLoading">
                 <article
                     v-for="app in pagedApps"
                     :key="app.Id"
@@ -314,7 +314,7 @@
                         </button>
                     </div>
 
-                    <div v-show="activeView === 'preview'" v-loading="previewLoading" class="preview-pane">
+                    <div v-show="activeView === 'preview'" v-mci-loading:page="previewLoading" class="preview-pane">
                         <div v-if="previewUrl" class="preview-toolbar">
                             <span>预览设备</span>
                             <el-radio-group v-model="previewDeviceMode" size="small">

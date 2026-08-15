@@ -14,7 +14,7 @@
                         </el-form-item>
                     </el-form>
                     <template v-if="DataViewType == 'Table'">
-                        <el-table v-loading="tableLoading" :data="DiyTableList" style="width: 100%" class="diy-table no-border-outside" stripe border>
+                        <el-table v-mci-loading:table="tableLoading" :data="DiyTableList" style="width: 100%" class="diy-table no-border-outside" stripe border>
                             <el-table-column type="index" width="50" />
                             <el-table-column label="表名" width="180">
                                 <template #default="scope">

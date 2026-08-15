@@ -1,10 +1,8 @@
 <template>
-    <div class="onlyoffice-editor-shell">
+    <div class="onlyoffice-editor-shell" v-mci-loading:page="loading">
         <!-- 编辑器容器 -->
         <div id="onlyoffice-editor" class="onlyoffice-editor"></div>
 
-        <!-- 加载状态 -->
-        <div v-if="loading" class="loading">ONLYOFFICE编辑器加载中...</div>
         <div v-if="error" class="error">编辑器加载失败: {{ error }}</div>
     </div>
 </template>

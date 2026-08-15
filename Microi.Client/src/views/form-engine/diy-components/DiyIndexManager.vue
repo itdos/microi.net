@@ -40,7 +40,7 @@
                         </div>
                     </div>
                 </template>
-                <el-table v-loading="loading" :data="indexList" style="width: 100%" stripe border size="small" class="diy-table">
+                <el-table v-mci-loading:table="loading" :data="indexList" style="width: 100%" stripe border size="small" class="diy-table">
                     <el-table-column prop="Key_name" :label="$t('Msg.IndexName')" min-width="180" show-overflow-tooltip />
                     <el-table-column prop="Column_name" :label="$t('Msg.Field')" min-width="140" show-overflow-tooltip />
                     <el-table-column :label="$t('Msg.Unique')" width="80" align="center">

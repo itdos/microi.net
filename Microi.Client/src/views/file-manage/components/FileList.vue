@@ -1,5 +1,5 @@
 <template>
-  <div class="file-list" v-loading="loading" element-loading-text="加载中...">
+  <div class="file-list" v-mci-loading:list="loading">
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
@@ -225,9 +225,8 @@
         </div>
         
         <!-- 加载更多提示 -->
-        <div v-if="hasMore" class="load-more-tip" @click="loadMore">
-          <el-icon v-if="loadingMore" class="is-loading"><Loading /></el-icon>
-          <template v-else>
+        <div v-if="hasMore" class="load-more-tip" v-mci-loading:compact="loadingMore" @click="!loadingMore && loadMore()">
+          <template v-if="!loadingMore">
             <el-button type="primary" link>
               <el-icon><ArrowDown /></el-icon>
               <span>点击加载更多</span>
@@ -314,9 +313,8 @@
         </el-table>
         
         <!-- 加载更多提示 -->
-        <div v-if="hasMore" class="load-more-tip" @click="loadMore">
-          <el-icon v-if="loadingMore" class="is-loading"><Loading /></el-icon>
-          <template v-else>
+        <div v-if="hasMore" class="load-more-tip" v-mci-loading:compact="loadingMore" @click="!loadingMore && loadMore()">
+          <template v-if="!loadingMore">
             <el-button type="primary" link>
               <el-icon><ArrowDown /></el-icon>
               <span>点击加载更多</span>
@@ -506,7 +504,6 @@ import {
   ArrowUp,
   FolderOpened,
   Folder,
-  Loading,
   Upload,
   View,
   Download,

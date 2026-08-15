@@ -47,7 +47,7 @@
                             </el-button>
                         </el-tooltip>
                     </div>
-                    <div class="datalog-timeline" v-loading="dataLogListLoading">
+                    <div class="datalog-timeline" v-mci-loading:list="dataLogListLoading">
                         <el-timeline v-if="dataLogList && dataLogList.length > 0">
                             <el-timeline-item
                                 v-for="item in dataLogList"
@@ -92,9 +92,9 @@
                                 </div>
                             </el-timeline-item>
                         </el-timeline>
-                        <div v-else class="panel-empty">
+                        <div v-else-if="!dataLogListLoading" class="panel-empty">
                             <el-icon><Document /></el-icon>
-                            <span>{{ dataLogListLoading ? ($t ? $t('Msg.DataLoading') : '加载中...') : ($t ? $t('Msg.NoData') : '暂无数据') }}</span>
+                            <span>{{ $t ? $t('Msg.NoData') : '暂无数据' }}</span>
                         </div>
                     </div>
                 </div>
@@ -166,7 +166,7 @@
                         </div>
                     </div>
 
-                    <div class="datalog-timeline" v-loading="dataCommentListLoading">
+                    <div class="datalog-timeline" v-mci-loading:list="dataCommentListLoading">
                         <el-timeline v-if="dataCommentList && dataCommentList.length > 0">
                             <el-timeline-item
                                 v-for="item in dataCommentList"
@@ -206,9 +206,9 @@
                                 </div>
                             </el-timeline-item>
                         </el-timeline>
-                        <div v-else class="panel-empty">
+                        <div v-else-if="!dataCommentListLoading" class="panel-empty">
                             <el-icon><ChatDotRound /></el-icon>
-                            <span>{{ dataCommentListLoading ? ($t ? $t('Msg.DataLoading') : '加载中...') : ($t ? $t('Msg.NoData') : '暂无评论') }}</span>
+                            <span>{{ $t ? $t('Msg.NoData') : '暂无评论' }}</span>
                         </div>
                     </div>
                 </div>
@@ -238,7 +238,7 @@
                             </el-button>
                         </el-tooltip>
                     </div>
-                    <div class="version-list" v-loading="dataVersionListLoading">
+                    <div class="version-list" v-mci-loading:list="dataVersionListLoading">
                         <div v-if="dataVersionList && dataVersionList.length > 0">
                             <div v-for="item in dataVersionList" :key="item.Id" class="version-card">
                                 <div class="version-card-main">
@@ -267,9 +267,9 @@
                                 </div>
                             </div>
                         </div>
-                        <div v-else class="panel-empty">
+                        <div v-else-if="!dataVersionListLoading" class="panel-empty">
                             <el-icon><Clock /></el-icon>
-                            <span>{{ dataVersionListLoading ? ($t ? $t('Msg.DataLoading') : '加载中...') : ($t ? $t('Msg.NoVersion') : '暂无版本') }}</span>
+                            <span>{{ $t ? $t('Msg.NoVersion') : '暂无版本' }}</span>
                         </div>
                     </div>
                 </div>

@@ -1,0 +1,29 @@
+{
+  "action": "publish",
+  "desc": "\u003cdesc\u003e",
+  "platforms": [
+    "头条号"
+  ],
+  "publishArgs": {
+    "accountForms": [
+      {
+        "contentPublishForm": {
+          "advertisement": 3,
+          "covers": [],
+          "declaration": 1,
+          "formType": "task",
+          "isFirst": false,
+          "original": false,
+          "originalType": 0,
+          "pubType": 1,
+          "statement": 1,
+          "title": "\u003ctitle\u003e"
+        },
+        "platformAccountId": "\u003cplatformAccountId\u003e"
+      }
+    ],
+    "content": "\u003ccontent\u003e"
+  },
+  "publishChannel": "cloud",
+  "publishType": "article"
+}

@@ -1,5 +1,5 @@
 <template>
-  <div class="go-view-preview-wrapper" :data-theme="goViewTheme" :style="wrapperStyle" v-loading="loading">
+  <div class="go-view-preview-wrapper" :data-theme="goViewTheme" :style="wrapperStyle" v-mci-loading:page="loading">
     <n-config-provider :theme="darkTheme" :theme-overrides="overridesTheme">
       <n-message-provider>
         <n-dialog-provider>

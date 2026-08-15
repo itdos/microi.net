@@ -119,17 +119,23 @@
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-011 sha256=1d31f1333c8853380d4e624d3798fddecf7bc26c861afc2dce9df82c566ffa25 -->
+<!-- microi-progressive:chunk id=ui-design-011 sha256=fba089e9a092efca57bfad2a34a4b9bada857c1072b09488e29b3cf28eefaba1 -->
 ## 骨架屏 Loading 设计规范
 
 所有依赖接口、数据库、远程资源或异步计算的数据区域，首屏加载态必须使用骨架屏（Skeleton Screen），不能只显示 spinner、进度圈、空图标或“数据加载中...”文案。骨架屏属于基础体验规范，适用于 PC、移动端 H5、uni-app、小程序和 WebView。
 
+- 覆盖范围包括菜单/路由切换、首页工作台、表格、卡片、表单与详情首开、右侧面板、弹窗、树、文件/文档/3D 等远程内容容器；不能只改某一个 `diy-table` 页面。
 - 骨架屏形态必须接近最终内容版式：列表用行骨架，表格用表头+行骨架，卡片/商品用网格骨架，详情页用大图区+标题/段落骨架，仪表盘用指标卡骨架。
 - 加载期间不能提前显示“暂无数据/暂无明细/空空如也”；空态只能在请求完成且确认无数据后出现。
-- 骨架颜色使用主题变量或中性色阶，不要使用高饱和主色大面积闪烁；亮色主题推荐 `rgba(255,255,255,.72)` 与 `rgba(232,221,205,.9)`，暗色主题推荐低对比深灰阶。
+- 骨架表面必须不透明，禁止复用 `.el-loading-mask` 的半透明黑/灰遮罩。颜色只引用语义令牌：`--mci-skeleton-surface/card/header/base/highlight/accent/border`；运行时从当前 `--mci-*` 表面与主题色低饱和派生，必须同时兼容 `data-theme="light|dark"`、`html.dark`、租户自定义主题色和系统主题切换。
+- 主色只允许作为低占比边缘/高光染色，不能把高饱和主题色铺满骨架；切换亮色、暗色或任意自定义主题后，骨架层级要可辨认且不闪白、不变黑幕。
 - 动画只允许使用 `background-position`、`opacity` 或 `transform`，节奏控制在 1.0s 到 1.4s；必须支持 `prefers-reduced-motion` 关闭或弱化动画。
 - 分页加载下一页时，只在列表底部追加紧凑骨架，不覆盖已有内容；切换筛选/分类重载第一页时才显示首屏骨架。
 - 骨架块必须有稳定尺寸、圆角和间距，加载前后不能造成明显布局跳动。
+- 内容加载与操作反馈必须区分：查询/渲染内容使用骨架；保存、提交、删除、登录验证等短操作继续使用按钮内 `loading`；文件上传、后台任务、Unity/WebGL 等已有可信百分比时继续显示真实进度。禁止用骨架伪装可量化进度，也禁止用按钮 spinner 代替内容骨架。
+- Microi.Client 内容区优先使用全局 `v-mci-loading:<table|cards|form|detail|page|stats|list|tree|compact>`；全屏内容切换使用 `openMciLoading()`。不得新增内容型 `v-loading` / `ElLoading.service`。第三方遗留 Loading 必须由主题骨架兜底，不能恢复暗色遮罩。
+- 头像、验证码、私有图片/文件缩略图等局部远程资源使用消费同一主题令牌的圆形或媒体骨架；历史 `./static/img/loading.gif` 只能作为内部兼容哨兵，必须在渲染层拦截，禁止传给 `<img>`、`<el-image>` 或 CSS `url()` 发起真实请求。
+- 自动验收至少扫描 `v-loading`、`ElLoading.service`、硬编码 `.el-loading-mask rgba(...)` 和加载期空态文案；浏览器截图覆盖 1440/1920 桌面、390 移动、亮色、暗色、至少一种非默认自定义主题，以及菜单切换、表格、表单详情、首页。检查控制台、404/5xx、`aria-busy` 和 reduced-motion。
 
 参考样式：
 
@@ -137,7 +143,10 @@
 .mci-skeleton {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(90deg, rgba(255,255,255,.72), rgba(232,221,205,.9), rgba(255,255,255,.72));
+  background: var(--mci-skeleton-surface);
+}
+.mci-skeleton__block {
+  background: linear-gradient(90deg, var(--mci-skeleton-base), var(--mci-skeleton-highlight), var(--mci-skeleton-base));
   background-size: 240% 100%;
   animation: mciSkeleton 1.15s ease-in-out infinite;
 }
@@ -146,7 +155,7 @@
   100% { background-position: -120% 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .mci-skeleton { animation: none; }
+  .mci-skeleton__block { animation: none; }
 }
 ```
 

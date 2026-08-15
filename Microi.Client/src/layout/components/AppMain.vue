@@ -1,5 +1,5 @@
 <template>
-    <section :class="'app-main-microi' + (isPhoneView ? ' mobile-view' : '')">
+    <section :class="'app-main-microi' + (isPhoneView ? ' mobile-view' : '')" v-mci-loading:page="routeLoading">
         <router-view v-slot="{ Component }">
             <!-- 移动端不使用动画，PC端保留动画 -->
             <transition :name="isPhoneView ? '' : 'fade-transform'" mode="out-in">
@@ -20,6 +20,7 @@
 <script>
 import { useTagsViewStore, useDiyStore } from "@/pinia";
 import { computed, watch } from "vue";
+import { routeLoading } from "@/utils/mci-loading";
 
 export default {
     name: "AppMain",
@@ -32,6 +33,7 @@ export default {
         return {
             cachedViews,
             isPhoneView,
+            routeLoading,
             tagsViewStore
         };
     },

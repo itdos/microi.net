@@ -1,5 +1,5 @@
 <template>
-  <div class="go-view-editor-wrapper" :data-theme="goViewTheme" :style="wrapperStyle" v-loading="loading">
+  <div class="go-view-editor-wrapper" :data-theme="goViewTheme" :style="wrapperStyle" v-mci-loading:page="loading">
     <!-- NaiveUI 主题提供器 -->
     <n-config-provider :theme="darkTheme" :theme-overrides="overridesTheme">
       <n-message-provider>

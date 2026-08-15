@@ -33,7 +33,7 @@
                             <el-button type="primary" :icon="Plus" @click="OpenSysRole()">{{ $t("Msg.Add") }}</el-button>
                         </el-form-item>
                     </el-form>
-                    <el-table v-loading="tableLoading" :data="SysRoleList" style="width: 100%" class="diy-table no-border-outside cell-br" stripe border>
+                    <el-table v-mci-loading:table="tableLoading" :data="SysRoleList" style="width: 100%" class="diy-table no-border-outside cell-br" stripe border>
                         <el-table-column type="index" width="50" />
                         <el-table-column :label="$t('Msg.Name')" width="180">
                             <template #default="scope">
@@ -126,7 +126,7 @@
                     </el-col>
                     <el-col :span="24" :xs="24">
                         <el-form-item label="权限明细">
-                            <div v-loading="MenuLoading" class="role-menu-permission-tree">
+                            <div v-mci-loading:tree="MenuLoading" class="role-menu-permission-tree">
                                 <div class="role-menu-header">
                                     <div>名称</div>
                                     <div>权限</div>
@@ -162,7 +162,7 @@
             :title="`AI数据权限 - ${AiPolicyRole.Name || ''}`"
             :close-on-click-modal="false"
         >
-            <div v-loading="AiPolicyLoading" class="ai-policy-editor">
+            <div v-mci-loading:form="AiPolicyLoading" class="ai-policy-editor">
                 <el-alert
                     v-if="!AiPolicyAvailable"
                     title="当前租户尚未启用 AI 角色策略表，请先完成平台升级或创建 mci_ai_role_policy。"

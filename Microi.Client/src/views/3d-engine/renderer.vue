@@ -1,7 +1,7 @@
 <template>
   <div class="engine-renderer">
     <!-- 视口（全画面） -->
-    <div class="renderer-viewport" ref="containerRef">
+    <div class="renderer-viewport" ref="containerRef" v-mci-loading:page="loading">
       <!-- 浮动播放控制条 -->
       <Transition name="fade-up">
         <div v-if="waypoints.length >= 2" class="playbar">
@@ -27,11 +27,6 @@
         </button>
       </div>
 
-      <!-- 加载 -->
-      <div v-if="loading" class="loading-overlay">
-        <div class="ring"></div>
-        <div class="lt">加载中...</div>
-      </div>
     </div>
   </div>
 </template>

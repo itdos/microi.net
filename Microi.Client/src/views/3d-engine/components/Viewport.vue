@@ -1,6 +1,7 @@
 <template>
   <div
     class="viewport-container"
+    v-mci-loading:page="loading"
     @dragover.prevent="onDragOver"
     @dragleave="onDragLeave"
     @drop.prevent="onDrop"
@@ -32,13 +33,6 @@
       </div>
     </div>
 
-    <!-- 加载 -->
-    <div v-if="loading" class="loading-overlay">
-      <div class="loading-ring">
-        <div class="ring"></div>
-      </div>
-      <div class="loading-text">加载中...</div>
-    </div>
   </div>
 </template>
 

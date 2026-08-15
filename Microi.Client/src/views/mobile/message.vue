@@ -115,7 +115,7 @@
                 </div>
             </div>
 
-            <div v-if="contactLoadingMore" class="loading-more-hint">{{ $t("Msg.Mobile.common.loading") }}</div>
+            <div v-if="contactLoadingMore" class="loading-more-hint" v-mci-loading:compact="true"></div>
             <div v-else-if="!contactHasMore && contactList.length > 0" class="loading-more-hint">{{ $t("Msg.Mobile.message.loadingAll") }}</div>
 
             <div v-if="!contactLoading && contactList.length === 0" class="empty-state mci-card">

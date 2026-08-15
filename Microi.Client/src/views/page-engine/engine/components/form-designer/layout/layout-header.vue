@@ -115,7 +115,7 @@
       <el-tag v-else type="info" effect="plain">{{ $t("Msg.PageEngine.historyMissing") }}</el-tag>
     </div>
     <el-table
-      v-loading="historyLoading"
+      v-mci-loading:table="historyLoading"
       :data="historyItems"
       row-key="Id"
       max-height="500"
@@ -225,7 +225,7 @@
       :closable="false"
       show-icon
     />
-    <div v-loading="assetLoading" class="asset-library-grid">
+    <div v-mci-loading:cards="assetLoading" class="asset-library-grid">
       <article v-for="item in filteredAssets" :key="item.Id" class="asset-library-card">
         <header><span>{{ assetTypeLabel(item.AssetType) }}</span><el-tag size="small" effect="plain">{{ item.Scope || 'Tenant' }}</el-tag></header>
         <strong>{{ item.Name }}</strong>
@@ -260,7 +260,8 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { EventBus } from '../../../utils/eventBus.js'
 import { usePageEngineStore } from '../../../stores/pageEngine'
-import { ElMessageBox, ElNotification, ElLoading } from 'element-plus'
+import { ElMessageBox, ElNotification } from 'element-plus'
+import { openMciLoading } from '@/utils/mci-loading'
 import PageVersionApi from '../../../../version-api.js'
 import PageSourceBridge from '../../../../source-bridge.js'
 import formRenderer from '../../form-renderer/index.vue'
@@ -907,22 +908,22 @@ const mockClick = (index) => {
     type: 'warning',
   })
     .then(async () => {
-      const loadingInstance = ElLoading.service({ fullscreen: true })
+      const loadingInstance = openMciLoading({ fullscreen: true, variant: 'page', label: t('Msg.DataLoading') })
       btnLoading.value = true
-
-      let mockData = await importTempData(index)
-      formData.value.JsonObj = { ...mockData.JsonObj }
-
-      nextTick(() => {
+      try {
+        let mockData = await importTempData(index)
+        formData.value.JsonObj = { ...mockData.JsonObj }
+        await nextTick()
+        ElNotification({
+          type: 'success',
+          title: t('Msg.PageEngine.prompt'),
+          message: t('Msg.PageEngine.templateChanged', { index: index + 1 }),
+          duration: 1000,
+        })
+      } finally {
         btnLoading.value = false
         loadingInstance.close()
-      })
-      ElNotification({
-        type: 'success',
-        title: t('Msg.PageEngine.prompt'),
-        message: t('Msg.PageEngine.templateChanged', { index: index + 1 }),
-        duration: 1000,
-      })
+      }
     })
     .catch(() => {
       // console.log('取消')

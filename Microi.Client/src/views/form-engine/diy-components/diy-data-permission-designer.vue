@@ -1,5 +1,5 @@
 <template>
-    <div class="data-permission-designer" v-loading="loading">
+    <div class="data-permission-designer" v-mci-loading:form="loading">
         <div class="designer-head">
             <div>
                 <div class="designer-title">数据权限设计器</div>

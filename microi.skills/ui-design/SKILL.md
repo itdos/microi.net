@@ -16,7 +16,7 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 ---
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=ui-design-000 sha256=797a033d2fc8b97fe60762028751d41e89fc03582f5267785fba97fe1e76694f -->
+<!-- microi-progressive:chunk id=ui-design-000 sha256=4b6409ab265eb741b2f4b28b51b7de12cde79ff4a19c8a6e8acf80ac867444be -->
 ## 整体风格定义
 
 - **风格关键词**：高级、通透、科技感、品牌化、轻量精致、视觉张力。
@@ -29,6 +29,7 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 - 当需求只描述“高级、主流、好看”而没有明确视觉方向时，先从 Microi 内置模式中确定一种主结构：品牌叙事、真实产品流程、趋势构图、沉浸互动、动态首屏或数据工作台；再选择至多两种辅助能力。禁止把多套视觉语言堆成拼盘。
 - 设计结果必须被拆成可执行规则：首屏目标、信息层级、栅格与最大宽度、字体层级、语义颜色、间距、圆角/阴影、组件状态、动效时间线、响应式重排、低性能降级和 `prefers-reduced-motion`。
 - 先完成默认、加载、空、错误、成功、权限、禁用等真实业务状态，再增加装饰和动效；任何看起来可点击的元素都必须有真实结果。
+- 所有异步内容加载统一使用贴合最终几何的主题骨架；菜单切换、首页、表格、表单/详情、弹窗和远程媒体都不得退回半透明黑色遮罩。具体实现、主题令牌与状态边界读取 [references/progressive-02-字体.md](references/progressive-02-字体.md)。
 - 所有成品只使用 Microi 自有内容、`--mci-*` token、`mci-*` 组件/类名和项目合法资产。禁止复制第三方页面、源码、图片、字体、3D 模型、商标或原始设计 token。
 - 设计前必须读取 [references/design-pattern-library.md](references/design-pattern-library.md)；涉及登录、订阅、支付、权限、搜索、设置等流程时再读 [references/product-flow-recipes.md](references/product-flow-recipes.md)；涉及滚动、3D、Canvas/WebGL 或动态 Hero 时再读 [references/motion-and-media.md](references/motion-and-media.md)；生成整站或交给 AI 延续设计时使用 [references/mci-design-contract.md](references/mci-design-contract.md)。
 - 可运行原创案例位于 [assets/pattern-showcase/index.html](assets/pattern-showcase/index.html)，用于理解结构和状态，不作为需要逐像素复制的模板。

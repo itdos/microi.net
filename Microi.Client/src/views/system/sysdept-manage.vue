@@ -32,7 +32,7 @@
                         </el-form-item>
                     </el-form>
                     <el-table
-                        v-loading="tableLoading"
+                        v-mci-loading:table="tableLoading"
                         :data="SysDeptList"
                         row-key="Id"
                         :tree-props="{ children: '_Child' }"

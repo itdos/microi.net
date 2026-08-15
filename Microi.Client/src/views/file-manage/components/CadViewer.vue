@@ -1,5 +1,5 @@
 <template>
-  <div class="cad-viewer">
+  <div class="cad-viewer" v-mci-loading:page="loading">
     <div class="viewer-toolbar">
       <el-button-group>
         <el-button :icon="ZoomIn" size="small" @click="zoomIn">放大</el-button>
@@ -13,24 +13,20 @@
       <span class="view-mode-tip">{{ viewModeTip }}</span>
     </div>
     <div ref="viewerContainer" class="viewer-container">
-      <div v-if="loading" class="loading-overlay">
-        <el-icon class="is-loading" :size="40"><Loading /></el-icon>
-        <p>正在加载 CAD 文件...</p>
-      </div>
-      <div v-else-if="error" class="error-message">
+      <div v-if="error" class="error-message">
         <el-icon :size="60" color="#f56c6c"><CircleClose /></el-icon>
         <h3>文件加载失败</h3>
         <p>{{ errorMessage }}</p>
         <p class="tip">DWG/STEP/STP 文件需要服务端转换后才能预览</p>
       </div>
-      <canvas ref="canvas" v-show="!loading && !error"></canvas>
+      <canvas ref="canvas" v-show="!error"></canvas>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
-import { ZoomIn, ZoomOut, Refresh, FullScreen, Loading, CircleClose } from '@element-plus/icons-vue'
+import { ZoomIn, ZoomOut, Refresh, FullScreen, CircleClose } from '@element-plus/icons-vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'

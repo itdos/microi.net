@@ -99,7 +99,7 @@
                     <!-- 我的待办表格（wf_work）—— PC端 -->
                     <el-table
                         v-show="!useFormEngineWorkTable && WorkType == 'Todo' && !diyStore.IsPhoneView"
-                        v-loading="TableLoading"
+                        v-mci-loading:table="TableLoading"
                         :data="MyWorkList"
                         @selection-change="TableRowSelectionChange"
                         style="width: 100%"
@@ -151,14 +151,14 @@
                             </template>
                         </el-table-column>
                         <template #empty>
-                            <el-empty :description="TableLoading ? '加载数据中...' : '暂无数据'" />
+                            <el-empty v-if="!TableLoading" description="暂无数据" />
                         </template>
                     </el-table>
 
                     <!-- 我发起的/我处理的/抄送我的/我相关的表格（wf_flow）—— PC端 -->
                     <el-table
                         v-show="!useFormEngineWorkTable && WorkType != 'Todo' && !diyStore.IsPhoneView"
-                        v-loading="TableLoading"
+                        v-mci-loading:table="TableLoading"
                         :data="MyWorkList"
                         style="width: 100%"
                         class="work-table"
@@ -214,7 +214,7 @@
                             </template>
                         </el-table-column>
                         <template #empty>
-                            <el-empty :description="TableLoading ? '加载数据中...' : '暂无数据'" />
+                            <el-empty v-if="!TableLoading" description="暂无数据" />
                         </template>
                     </el-table>
 
@@ -233,7 +233,7 @@
                     />
 
                     <!-- ====== 移动端卡片列表 ====== -->
-                    <div v-if="!useFormEngineWorkTable && diyStore.IsPhoneView" class="wf-mobile-cards" v-loading="TableLoading && MyWorkList.length === 0">
+                    <div v-if="!useFormEngineWorkTable && diyStore.IsPhoneView" class="wf-mobile-cards" v-mci-loading:cards="TableLoading && MyWorkList.length === 0">
                         <!-- 移动端搜索 -->
                         <div class="wf-mobile-search">
                             <el-input v-model="Keyword" :placeholder="$t('Msg.Search')" @input="GetList({ PageIndex: 1 })" clearable>
@@ -290,12 +290,8 @@
                         </div>
 
                         <!-- 移动端加载更多 -->
-                        <div v-if="MyWorkList.length < DataCount" class="wf-mobile-load-more">
-                            <div v-if="mobileLoadingMore" class="wf-loading-text">
-                                <el-icon class="is-loading"><Loading /></el-icon>
-                                <span>正在加载更多... ({{ MyWorkList.length }}/{{ DataCount }})</span>
-                            </div>
-                            <div v-else class="wf-load-more-text">
+                        <div v-if="MyWorkList.length < DataCount" class="wf-mobile-load-more" v-mci-loading:compact="mobileLoadingMore">
+                            <div v-if="!mobileLoadingMore" class="wf-load-more-text">
                                 <span>上拉加载更多 ({{ MyWorkList.length }}/{{ DataCount }})</span>
                             </div>
                         </div>
@@ -327,7 +323,7 @@
                         </span>
                     </el-badge>
                 </template>
-                <div class="notice-section" v-loading="noticeLoading">
+                <div class="notice-section" v-mci-loading:list="noticeLoading">
                     <div class="notice-list" v-if="noticeList.length > 0">
                         <div class="notice-item" v-for="item in noticeList" :key="item.Id" @click="toggleNoticeExpand(item)">
                             <div class="notice-header">
@@ -340,7 +336,7 @@
                             <div class="notice-body" v-if="item._expanded" v-safe-html="item.Neirong"></div>
                         </div>
                     </div>
-                    <el-empty v-else :description="noticeLoading ? '加载中...' : '暂无公告'" />
+                    <el-empty v-else-if="!noticeLoading" description="暂无公告" />
                     <el-pagination
                         v-if="noticeCount > noticePageSize"
                         class="notice-pagination"

@@ -10,6 +10,7 @@ import getPageTitle from "@/utils/get-page-title";
 import { DiyCommon, DiyApi } from "@/utils/microi.net.import";
 import Cookies from "js-cookie";
 import { normalizeAccessRoute } from "@/views/system/components/user-access-key-utils";
+import { finishRouteLoading, startRouteLoading } from "@/utils/mci-loading";
 const whiteList = ["/login", "/auth-redirect", "/access-login", "/mci-redis-manager"]; // no redirect whitelist
 
 function removeCredentialParameter(paramName) {
@@ -104,6 +105,7 @@ function getPermissionFallbackPath(routes, targetPath) {
 }
 
 router.beforeEach(async (to, from, next) => {
+    startRouteLoading();
     // 安全/稳定性修复：整个守卫包一层 try/catch 兜底，
     // 避免任意 await 抛错导致 next() 不被调用而出现"白屏永久无法导航"。
     try {
@@ -414,6 +416,7 @@ router.beforeEach(async (to, from, next) => {
 });
 
 router.afterEach((to) => {
+    finishRouteLoading();
     // 5+App 返回键使用：路由完成后立即更新"是否在根页面"标志
     // 在根页面（Tab 首页/登录页）按返回键应双击退出，而不是继续 router.back()
     const ROOT_PATHS = [
@@ -484,4 +487,8 @@ router.afterEach((to) => {
             }
         }, 350);
     }
+});
+
+router.onError(() => {
+    finishRouteLoading();
 });

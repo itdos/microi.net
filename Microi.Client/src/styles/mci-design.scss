@@ -47,6 +47,15 @@
     --mci-bg-glass-border: #E2E8F0;
     --mci-bg-mask: rgba(15, 23, 42, 0.42);
 
+    /* 内容骨架：低饱和主色染色，保持不透明表面与稳定层级。 */
+    --mci-skeleton-surface: #FFFFFF;
+    --mci-skeleton-card: #FFFFFF;
+    --mci-skeleton-header: #F4F1FA;
+    --mci-skeleton-base: #E7E3F0;
+    --mci-skeleton-highlight: #F7F5FB;
+    --mci-skeleton-accent: rgba(108, 43, 217, 0.16);
+    --mci-skeleton-border: #E2E8F0;
+
     /* 文字 */
     --mci-text-primary: #0F172A;
     --mci-text-secondary: #334155;
@@ -100,6 +109,14 @@
     --mci-bg-glass: rgba(17, 24, 39, 0.94);
     --mci-bg-glass-border: #273449;
     --mci-bg-mask: rgba(2, 6, 23, 0.72);
+
+    --mci-skeleton-surface: #111827;
+    --mci-skeleton-card: #141D2D;
+    --mci-skeleton-header: #17233A;
+    --mci-skeleton-base: #25324A;
+    --mci-skeleton-highlight: #354761;
+    --mci-skeleton-accent: rgba(91, 140, 255, 0.22);
+    --mci-skeleton-border: #273449;
 
     --mci-text-primary: #F8FAFC;
     --mci-text-secondary: #CBD5E1;
@@ -498,10 +515,6 @@ html.dark .el-upload-dragger:hover {
     border-color: var(--el-color-primary);
 }
 
-html.dark .el-loading-mask {
-    background: rgba(0, 0, 0, 0.6);
-}
-
 /* --- 滚动条 --- */
 html.dark ::-webkit-scrollbar-track {
     background: var(--mci-bg-base, #0A0A0F);
@@ -629,11 +642,6 @@ html.dark {
         .el-step__head.is-wait .el-step__icon {
             background: var(--el-bg-color);
         }
-    }
-
-    /* 骨架屏 */
-    .el-skeleton__item {
-        background: var(--el-fill-color);
     }
 
     /* 分割线 */

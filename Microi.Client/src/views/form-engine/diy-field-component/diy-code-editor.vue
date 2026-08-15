@@ -270,7 +270,7 @@
                 </el-button>
             </div>
         </div>
-        <div class="code-version-list" v-loading="codeVersionLoading">
+        <div class="code-version-list" v-mci-loading:list="codeVersionLoading">
             <div v-if="codeVersionList.length > 0">
                 <div v-for="item in codeVersionList" :key="item.Id" class="code-version-item">
                     <div class="code-version-main">
