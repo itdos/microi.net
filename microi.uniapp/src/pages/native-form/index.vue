@@ -178,6 +178,7 @@
 					</view>
 					<mci-business-related-list
 						v-for="relatedTab in embeddedChildRelatedForGroup(group)"
+						ref="embeddedRelatedList"
 						:key="relatedTab.key"
 						class="form-section__related-preview"
 						:field="relatedTab.field"
@@ -185,6 +186,7 @@
 						:parent-form="form"
 						:parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+						:parent-table-name="tableName"
 						:parent-table-child-auth="tableChildAuth"
 						:parent-mode="mode"
 						display-mode="preview"
@@ -200,6 +202,7 @@
 					class="standalone-related-list" :field="relatedTab.field"
 					:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
 					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+					:parent-table-name="tableName"
 					:parent-table-child-auth="tableChildAuth"
 					:parent-mode="mode"
 					display-mode="full"
@@ -501,6 +504,7 @@
 			if (this.loading || !this.definition) return
 			this.refreshTenantFloatingActionMetrics()
 			this.scheduleRelatedViewportMeasure()
+			this.refreshRelatedChildLists()
 			refreshTenantFormDerivedValues(this.tenantFormContext()).catch(() => {})
 		},
 		onReady() {
@@ -518,6 +522,19 @@
 			disposeTenantForm(this.tenantFormContext())
 		},
 		methods: {
+			refreshRelatedChildLists() {
+				this.$nextTick(() => {
+					const collect = (value) => Array.isArray(value) ? value : (value ? [value] : [])
+					const refs = [
+						...collect(this.$refs.embeddedRelatedList),
+						...collect(this.$refs.standaloneRelatedList)
+					]
+					const unique = refs.filter((item, index) => refs.indexOf(item) === index)
+					unique.forEach((list) => {
+						if (typeof list.refreshData === 'function') list.refreshData()
+					})
+				})
+			},
 			clearRelatedViewportMeasureTimers() {
 				this.relatedViewportMeasureTimers.forEach((timer) => clearTimeout(timer))
 				this.relatedViewportMeasureTimers = []
