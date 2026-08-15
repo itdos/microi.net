@@ -175,7 +175,7 @@ if (!childTable.includes('删除此条') ||
 if (!businessList.includes('<mci-business-card') ||
   !businessList.includes('components: { MciBusinessCard }') ||
   !relatedBusinessList.includes('<mci-business-card') ||
-  !relatedBusinessList.includes('components: { MciBusinessCard, MciTaskCard }') ||
+  !relatedBusinessList.includes('components: { MciBusinessCard, MciTaskCard') ||
   !relatedBusinessList.includes('getBusinessRowActions') ||
   !relatedBusinessList.includes('loadModuleViewManifest') ||
   !relatedBusinessList.includes('class="floating-add"')) {

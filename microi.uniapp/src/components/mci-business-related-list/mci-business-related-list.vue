@@ -58,7 +58,50 @@
     </view>
 
     <view v-else-if="previewContentVisible && rows.length" class="related-data-list">
-      <template v-if="moduleKey === 'tasks'">
+      <template v-if="isProposalInstallationQuickMode">
+        <view v-for="(row, index) in displayedRows" :key="row.Id" class="proposal-point-card">
+          <view class="proposal-point-card__title">
+            <text>点位{{ index + 1 }}</text>
+            <text class="proposal-point-card__id">ID {{ String(row.Id || '').slice(-8) }}</text>
+          </view>
+          <view v-for="item in proposalInstallationQuickFields" :key="`${row.Id}-${item.key}`"
+            class="proposal-point-field">
+            <text class="proposal-point-field__label">{{ item.label }}</text>
+            <mci-native-field v-if="item.key === 'deviceModel'"
+              class="proposal-point-field__control"
+              :model-value="row[item.name]" :field="item.field"
+              :readonly="!proposalPointCanEdit(row)" :table-name="config.table"
+              :form-data="row" :form-data-id="row.Id" :menu-id="menuId"
+              :table-child-auth="tableChildAuth"
+              @change="updateProposalPointValue(row, item.name, $event)"
+              @select="selectProposalPointDevice(row, $event)" />
+            <input v-else-if="proposalPointCanEdit(row) && item.key !== 'deviceName'"
+              class="proposal-point-field__input" :value="row[item.name]"
+              :type="item.numeric ? 'number' : 'text'" :placeholder="item.placeholder"
+              @input="updateProposalPointValue(row, item.name, $event.detail.value)"
+              @blur="saveProposalPointField(row, item.name, $event.detail.value)" />
+            <text v-else class="proposal-point-field__value"
+              :class="{ 'proposal-point-field__value--empty': proposalPointValueEmpty(row[item.name]) }">
+              {{ proposalPointDisplayValue(row, item) }}
+            </text>
+          </view>
+          <view class="proposal-point-actions">
+            <view v-if="proposalPointCanEdit(row)" class="proposal-point-action" hover-class="proposal-point-action--pressed"
+              @tap.stop="openProposalPointEdit(row)">
+              <text>✎ 编辑</text>
+            </view>
+            <view v-if="proposalPointCanDelete(row)" class="proposal-point-action proposal-point-action--delete"
+              hover-class="proposal-point-action--pressed" @tap.stop="deleteProposalPoint(row)">
+              <text>× 删除</text>
+            </view>
+            <view v-if="canAdd" class="proposal-point-action proposal-point-action--copy"
+              hover-class="proposal-point-action--pressed" @tap.stop="copyProposalPoint(row)">
+              <text>⧉ 复制</text>
+            </view>
+          </view>
+        </view>
+      </template>
+      <template v-else-if="moduleKey === 'tasks'">
         <mci-task-card v-for="(row, index) in displayedRows" :key="row.Id || index"
           :item="taskCardRow(row)" :index="index" :state-class="taskStatusClass(row)"
           @open="openDetail" @phone="callPhone" />
@@ -100,11 +143,13 @@
       hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
 
     <view v-if="previewContentVisible && isPreview && !waitingForParentSave" class="preview-actions"
-      :class="{ 'preview-actions--single': !canAdd }">
-      <view class="preview-action preview-action--more" hover-class="preview-action--pressed" @tap="openMore">
+      :class="{ 'preview-actions--single': !canAdd || (isProposalInstallationQuickMode && !proposalInstallationHasMore) }">
+      <view v-if="!isProposalInstallationQuickMode || proposalInstallationHasMore"
+        class="preview-action preview-action--more" hover-class="preview-action--pressed" @tap="openMore">
         <text class="preview-action__icon">···</text><text>查看更多</text>
       </view>
-      <view v-if="canAdd" class="preview-action preview-action--add" hover-class="preview-action--pressed" @tap="openAdd">
+      <view v-if="canAdd" class="preview-action preview-action--add"
+        hover-class="preview-action--pressed" @tap="openAdd">
         <text class="preview-action__icon">＋</text><text>新增</text>
       </view>
     </view>
@@ -205,14 +250,26 @@ import {
 import { compileListConfig, loadModuleViewManifest } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { appendStandardDeleteAction } from '@/platform/module-delete.js'
+import { canDeleteMenuRecord } from '@/platform/menu-permission.js'
 import { loadNativeFormDefinition, loadNativeTableModel, parseJson } from '@/platform/native-form.js'
 import { createMenuModuleDefinition } from '@/platform/module-registry.js'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
 import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
+import MciNativeField from '@/components/mci-native-field/mci-native-field.vue'
+import {
+  PROPOSAL_INSTALLATION_FIELDS,
+  createProposalInstallationId,
+  isProposalInstallationQuickContext,
+  proposalInstallationCopyValues,
+  proposalInstallationDeviceValues,
+  proposalInstallationDraft,
+  proposalInstallationWriteValues
+} from '@/tenants/xjy/proposal-installation-points.mjs'
 import {
   canAddMenuRecord,
+  canEditMenuRecord,
   executeBusinessRowAction,
   getBusinessRowActions,
   hydrateInstallationPositionRows,
@@ -326,13 +383,14 @@ function buildKeywordWhere(fields = [], keyword = '') {
 
 export default {
   name: 'MciBusinessRelatedList',
-  components: { MciBusinessCard, MciTaskCard },
+  components: { MciBusinessCard, MciTaskCard, MciNativeField },
   props: {
     field: { type: Object, required: true },
     parentId: { type: [String, Number], default: '' },
     parentForm: { type: Object, default: () => ({}) },
     parentMenuId: { type: String, default: '' },
     parentTableId: { type: String, default: '' },
+    parentTableName: { type: String, default: '' },
     parentMode: { type: String, default: 'View' },
     displayMode: { type: String, default: 'full' },
     previewLimit: { type: Number, default: 2 },
@@ -379,7 +437,8 @@ export default {
       metricLoading: false,
       metricValues: {},
       listBodyHeight: 0,
-      layoutMeasureTimers: []
+      layoutMeasureTimers: [],
+      proposalPointSavingId: ''
     }
   },
   computed: {
@@ -393,7 +452,60 @@ export default {
     },
     isPreview() { return String(this.displayMode || '').toLowerCase() === 'preview' },
     previewContentVisible() { return !this.isPreview || !this.showPreviewHeader || this.previewExpanded },
-    displayedRows() { return this.isPreview ? this.rows.slice(0, Math.max(1, this.previewLimit)) : this.rows },
+    displayedRows() {
+      return this.isPreview
+        ? this.rows.slice(0, Math.max(1, this.previewLimit))
+        : this.rows
+    },
+    isProposalInstallationQuickMode() {
+      // zhy：安装点位只有嵌入需求方案详情的预览区使用快速编辑卡片；
+      // “查看更多”独立列表必须回到通用子表卡片，完整遵循后台 ViewSchema/菜单字段配置。
+      return this.isPreview &&
+        isProposalInstallationQuickContext(this.parentTableName, this.config.table || this.table?.Name)
+    },
+    proposalInstallationHasMore() {
+      return this.isProposalInstallationQuickMode &&
+        Number(this.count || this.rows.length) > Math.max(1, this.previewLimit)
+    },
+    proposalInstallationQuickFields() {
+      const definitions = this.definition?.fields || []
+      const resolve = (key, label, fallback = {}) => {
+        const expectedName = PROPOSAL_INSTALLATION_FIELDS[key]
+        const field = definitions.find((item) => String(item.Name || '').toLowerCase() === expectedName.toLowerCase()) ||
+          definitions.find((item) => String(item.Label || '').trim() === label) || {}
+        return {
+          key,
+          name: field.Name || expectedName,
+          label,
+          placeholder: key === 'deviceModel' ? '请选择设备型号' : `请填写${label}`,
+          numeric: ['deviceQuantity', 'people'].includes(key),
+          field: {
+            Name: field.Name || expectedName,
+            Label: field.Label || label,
+            component: field.component || (key === 'deviceModel' ? 'Select' : 'Text'),
+            options: field.options || [],
+            config: field.config || {},
+            ...fallback,
+            ...field
+          }
+        }
+      }
+      return [
+        resolve('place', '安装场所'),
+        resolve('deviceModel', '设备型号'),
+        resolve('deviceName', '设备名称'),
+        resolve('deviceQuantity', '设备数量'),
+        resolve('people', '人数')
+      ]
+    },
+    proposalInstallationFieldNames() {
+      return this.proposalInstallationQuickFields.reduce((result, item) => ({
+        ...result,
+        [item.key]: item.name
+      }), {
+        deviceModelId: this.proposalInstallationDefinitionField('deviceModelId', '设备型号Id')?.Name || ''
+      })
+    },
     relationValue() {
       if (this.relationValueOverride !== '' && this.relationValueOverride !== null && this.relationValueOverride !== undefined) {
         return unwrapValue(this.relationValueOverride)
@@ -523,6 +635,161 @@ export default {
   },
   methods: {
     noop() {},
+    refreshData() {
+      if (!this.relationValue || !this.config.table) return Promise.resolve()
+      return Promise.all([this.loadData(true, true), this.loadRelatedMetrics(true)])
+    },
+    async hydrateProposalInstallationPointRows(rows = []) {
+      if (!this.isProposalInstallationQuickMode || !rows.length) return rows
+      // zhy：安装点位列表接口会按列表契约裁剪字段，而编辑页 GetFormData 返回完整表单。
+      // 卡片只展示两条，逐条补齐详情可确保型号、名称、人数与编辑页保存值一致。
+      return Promise.all(rows.map(async (row) => {
+        if (!row?.Id) return row
+        try {
+          const detail = await V8.FormEngine.GetFormData(this.config.table, {
+            Id: row.Id,
+            ...(this.menuId ? { _SysMenuId: this.menuId } : {}),
+            ...(this.tableChildAuth ? { _TableChildAuth: this.tableChildAuth } : {})
+          })
+          return detail && Number(detail.Code) === 1 && detail.Data
+            ? { ...row, ...detail.Data, Id: detail.Data.Id || row.Id }
+            : row
+        } catch (error) {
+          return row
+        }
+      }))
+    },
+    proposalInstallationDefinitionField(key, label) {
+      const expectedName = PROPOSAL_INSTALLATION_FIELDS[key]
+      return (this.definition?.fields || []).find((item) =>
+        String(item.Name || '').toLowerCase() === String(expectedName || '').toLowerCase()
+      ) || (this.definition?.fields || []).find((item) => String(item.Label || '').trim() === label) || null
+    },
+    proposalPointCanEdit(row) {
+      return Boolean(canEditMenuRecord(this.menuId || this.childMenuId, this.currentUser))
+    },
+    proposalPointCanDelete(row) {
+      return Boolean(canDeleteMenuRecord(this.menuId || this.childMenuId, this.currentUser))
+    },
+    proposalPointValueEmpty(value) {
+      return value === undefined || value === null || value === ''
+    },
+    proposalPointDisplayValue(row, item) {
+      const value = row && row[item.name]
+      if (!this.proposalPointValueEmpty(value)) return value
+      return item.key === 'deviceName' ? '选择设备型号后自动带出' : '-'
+    },
+    updateProposalPointValue(row, name, value) {
+      if (!row || !name) return
+      row[name] = value
+    },
+    async selectProposalPointDevice(row, selection = {}) {
+      const values = proposalInstallationDeviceValues(selection)
+      const names = this.proposalInstallationFieldNames
+      row[names.deviceModel] = values[PROPOSAL_INSTALLATION_FIELDS.deviceModel]
+      row[names.deviceName] = values[PROPOSAL_INSTALLATION_FIELDS.deviceName]
+      if (names.deviceModelId) {
+        row[names.deviceModelId] = values[PROPOSAL_INSTALLATION_FIELDS.deviceModelId]
+      }
+      await this.saveProposalPoint(row)
+    },
+    saveProposalPointField(row, name, value) {
+      this.updateProposalPointValue(row, name, value)
+      return this.saveProposalPoint(row)
+    },
+    openProposalPointEdit(row) {
+      if (!row?.Id) return
+      openForm({
+        table: this.config.table,
+        rowId: row.Id,
+        mode: 'Edit',
+        title: `编辑${this.config.title || this.sectionTitle}`,
+        menuId: this.menuId,
+        menuAliases: this.config.menuAliases || [],
+        tableChildAuth: this.tableChildAuth,
+        includeRelated: true
+      })
+    },
+    proposalPointCopyValues(row) {
+      return proposalInstallationCopyValues(row, this.definition?.fields || [])
+    },
+    proposalPointWriteEnvelope(row, id, copyAllFields = false) {
+      const quickValues = proposalInstallationWriteValues(row, this.proposalInstallationFieldNames)
+      const values = copyAllFields
+        ? { ...this.proposalPointCopyValues(row), ...quickValues }
+        : quickValues
+      const defaults = this.callbackDefaults()
+      return {
+        FormEngineKey: this.config.table,
+        Id: id,
+        ...(this.menuId ? { _SysMenuId: this.menuId } : {}),
+        ...(this.tableChildAuth ? { _TableChildAuth: this.tableChildAuth } : {}),
+        _InvokeType: 'Client',
+        _RowModel: { ...values, ...defaults, Id: id }
+      }
+    },
+    async saveProposalPoint(row) {
+      if (!row?.Id || !this.proposalPointCanEdit(row)) return
+      const id = String(row.Id)
+      this.proposalPointSavingId = id
+      try {
+        const values = proposalInstallationWriteValues(row, this.proposalInstallationFieldNames)
+        const result = await V8.FormEngine.UptFormData(this.config.table, {
+          Id: id,
+          ...values,
+          ...(this.menuId ? { _SysMenuId: this.menuId } : {}),
+          ...(this.tableChildAuth ? { _TableChildAuth: this.tableChildAuth } : {}),
+          _InvokeType: 'Client'
+        })
+        if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '安装点位保存失败')
+      } catch (error) {
+        uni.showToast({ title: error.message || error.Msg || '安装点位保存失败', icon: 'none' })
+      } finally {
+        this.proposalPointSavingId = ''
+      }
+    },
+    async copyProposalPoint(row) {
+      if (!row?.Id || this.proposalPointSavingId) return
+      const id = createProposalInstallationId()
+      this.proposalPointSavingId = id
+      uni.showLoading({ title: '正在复制', mask: true })
+      try {
+        const result = await V8.FormEngine.AddFormData(this.proposalPointWriteEnvelope(row, id, true))
+        if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '安装点位复制失败')
+        await Promise.all([this.loadData(true, true, true), this.loadRelatedMetrics(true)])
+        const copied = this.rows.find((item) => String(item.Id) === id) || { ...row, Id: id }
+        this.rows = [copied, ...this.rows.filter((item) => String(item.Id) !== id)]
+        uni.showToast({ title: '复制成功', icon: 'success' })
+      } catch (error) {
+        uni.showToast({ title: error.message || error.Msg || '安装点位复制失败', icon: 'none' })
+      } finally {
+        uni.hideLoading()
+        this.proposalPointSavingId = ''
+      }
+    },
+    async deleteProposalPoint(row) {
+      if (!row?.Id || this.proposalPointSavingId) return
+      if (!(await this.confirmAction('删除后无法恢复，是否继续？'))) return
+      this.proposalPointSavingId = String(row.Id)
+      uni.showLoading({ title: '正在删除', mask: true })
+      try {
+        const result = await V8.FormEngine.DelFormData({
+          FormEngineKey: this.config.table,
+          Id: row.Id,
+          ...(this.menuId ? { _SysMenuId: this.menuId } : {}),
+          ...(this.tableChildAuth ? { _TableChildAuth: this.tableChildAuth } : {}),
+          _InvokeType: 'Client'
+        })
+        if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '安装点位删除失败')
+        await Promise.all([this.loadData(true, true, true), this.loadRelatedMetrics(true)])
+        uni.showToast({ title: '删除成功', icon: 'success' })
+      } catch (error) {
+        uni.showToast({ title: error.message || error.Msg || '安装点位删除失败', icon: 'none' })
+      } finally {
+        uni.hideLoading()
+        this.proposalPointSavingId = ''
+      }
+    },
     clearLayoutMeasureTimers() {
       this.layoutMeasureTimers.forEach((timer) => clearTimeout(timer))
       this.layoutMeasureTimers = []
@@ -746,9 +1013,10 @@ export default {
           })
         }
         const rawIncomingRows = Array.isArray(result.rows) ? result.rows : []
-        const incomingRows = this.moduleKey === 'installationPositions'
+        let incomingRows = this.moduleKey === 'installationPositions'
           ? await hydrateInstallationPositionRows(rawIncomingRows)
           : rawIncomingRows
+        incomingRows = await this.hydrateProposalInstallationPointRows(incomingRows)
         // Keep the newest completed response. A later request starting must not discard every
         // usable response and leave the related tab permanently displaying its skeleton.
         if (requestId < this.appliedRequestId) return
@@ -870,6 +1138,7 @@ export default {
         `parentId=${encodeURIComponent(this.parentId || '')}`,
         `parentMenuId=${encodeURIComponent(this.parentMenuId || '')}`,
         `parentTableId=${encodeURIComponent(this.parentTableId || '')}`,
+        `parentTableName=${encodeURIComponent(this.parentTableName || '')}`,
         `relationValue=${encodeURIComponent(this.relationValue || '')}`,
         `parentTableChildAuth=${encodeURIComponent(JSON.stringify(this.parentTableChildAuth || null))}`,
         `title=${encodeURIComponent(this.config.title || this.sectionTitle || '关联列表')}`
@@ -883,6 +1152,7 @@ export default {
             parentForm: this.parentForm,
             parentMenuId: this.parentMenuId,
             parentTableId: this.parentTableId,
+            parentTableName: this.parentTableName,
             parentMode: this.parentMode,
             parentTableChildAuth: this.parentTableChildAuth,
             relationValue: this.relationValue,
@@ -1251,9 +1521,41 @@ export default {
       if (this.moduleKey === 'contacts' && !result.Guid70) result.Guid70 = relationshipId()
       return result
     },
-    openAdd() {
+    async openAdd() {
       if (!this.canAdd) {
         uni.showToast({ title: '当前账号没有新增权限', icon: 'none' })
+        return
+      }
+      if (this.isProposalInstallationQuickMode) {
+        const id = createProposalInstallationId()
+        const source = proposalInstallationDraft(id)
+        const names = this.proposalInstallationFieldNames
+        const draft = {
+          Id: id,
+          [names.place]: source[PROPOSAL_INSTALLATION_FIELDS.place],
+          [names.deviceModel]: source[PROPOSAL_INSTALLATION_FIELDS.deviceModel],
+          [names.deviceName]: source[PROPOSAL_INSTALLATION_FIELDS.deviceName],
+          [names.deviceQuantity]: source[PROPOSAL_INSTALLATION_FIELDS.deviceQuantity],
+          [names.people]: source[PROPOSAL_INSTALLATION_FIELDS.people]
+        }
+        if (names.deviceModelId) {
+          draft[names.deviceModelId] = source[PROPOSAL_INSTALLATION_FIELDS.deviceModelId]
+        }
+        this.proposalPointSavingId = id
+        uni.showLoading({ title: '正在新增', mask: true })
+        try {
+          const result = await V8.FormEngine.AddFormData(this.proposalPointWriteEnvelope(draft, id))
+          if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '安装点位新增失败')
+          await Promise.all([this.loadData(true, true, true), this.loadRelatedMetrics(true)])
+          const created = this.rows.find((item) => String(item.Id) === id) || draft
+          this.rows = [created, ...this.rows.filter((item) => String(item.Id) !== id)]
+          uni.showToast({ title: '新增成功，可直接填写', icon: 'success' })
+        } catch (error) {
+          uni.showToast({ title: error.message || error.Msg || '安装点位新增失败', icon: 'none' })
+        } finally {
+          uni.hideLoading()
+          this.proposalPointSavingId = ''
+        }
         return
       }
       if (this.moduleKey === 'members') {
@@ -1350,6 +1652,14 @@ export default {
       if (String(payload.table || '').toLowerCase() === String(this.config.table || '').toLowerCase()) {
         // zhy：草稿父记录优先使用保存回传数据，避免空的远程查询覆盖刚新增的联系人。
         if (this.mergeDraftChangedRow(payload)) return
+        // zhy：编辑子表返回前先把保存事件中的完整记录合并到当前卡片，
+        // 随后 onShow 再从服务端回读，避免导航返回期间旧请求把字段短暂覆盖为空。
+        const changedId = String(payload.id || payload.row?.Id || '')
+        if (changedId && payload.row && typeof payload.row === 'object') {
+          this.rows = this.rows.map((item) =>
+            String(item.Id || '') === changedId ? { ...item, ...payload.row, Id: changedId } : item
+          )
+        }
         // zhy：只有子表真实保存后才通知父表更新派生总数，普通打开、搜索和筛选不改主表字段。
         Promise.all([this.loadData(true, true, true), this.loadRelatedMetrics(true)])
       }
@@ -1470,6 +1780,75 @@ export default {
   font-weight: 600;
 }
 .related-data-list, .related-skeleton { width: 100%; }
+.proposal-point-card {
+  margin-bottom: 18rpx;
+  padding: 22rpx 22rpx 18rpx;
+  border: 1rpx solid #e5ecef;
+  border-radius: 18rpx;
+  background: #fff;
+  box-shadow: 0 5rpx 18rpx rgba(32, 67, 81, .05);
+}
+.proposal-point-card__title {
+  min-height: 54rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  border-bottom: 1rpx solid #edf1f3;
+  color: #c83d25;
+}
+.proposal-point-card__title > text:first-child { font-size: 29rpx; font-weight: 750; }
+.proposal-point-card__id { color: #a1adb2; font-size: 18rpx; font-weight: 500; }
+.proposal-point-field {
+  min-height: 72rpx;
+  display: grid;
+  grid-template-columns: 176rpx minmax(0, 1fr);
+  gap: 14rpx;
+  align-items: center;
+  border-bottom: 1rpx solid #edf1f3;
+}
+.proposal-point-field__label { color: #30393d; font-size: 24rpx; }
+.proposal-point-field__control { min-width: 0; }
+.proposal-point-field__input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 64rpx;
+  padding: 0 14rpx;
+  border-radius: 8rpx;
+  color: #24343b;
+  background: #f7f9fa;
+  font-size: 23rpx;
+}
+.proposal-point-field__value {
+  overflow: hidden;
+  color: #3a4b52;
+  font-size: 23rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proposal-point-field__value--empty { color: #aab4b8; }
+.proposal-point-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10rpx;
+  padding-top: 16rpx;
+}
+.proposal-point-action {
+  height: 64rpx;
+  border: 1rpx solid #aab4b8;
+  border-radius: 8rpx;
+  color: #46555b;
+  font-size: 22rpx;
+  line-height: 64rpx;
+  text-align: center;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+.proposal-point-action--delete { border-color: rgba(226, 63, 59, .55); color: #d83e3b; background: rgba(226, 63, 59, .04); }
+.proposal-point-action--copy { border-color: #d9472b; color: #fff; background: #d9472b; }
+.proposal-point-action--pressed { transform: scale(.97); opacity: .8; }
+.proposal-point-field :deep(.native-field) { min-height: 64rpx; }
+.proposal-point-field :deep(.native-select),
+.proposal-point-field :deep(.native-input) { min-height: 64rpx; background: #f7f9fa; }
 .skeleton-card { margin-bottom: 18rpx; padding: 22rpx 24rpx; border: 1rpx solid #e3edf1; border-radius: 16rpx; background: #fff; }
 .skeleton-line { width: 58%; height: 24rpx; margin: 18rpx 0; border-radius: 6rpx; background: linear-gradient(90deg, #eef3f5 25%, #f7fafb 50%, #eef3f5 75%); background-size: 300% 100%; animation: shimmer 1.4s infinite; }
 .skeleton-line.wide { width: 82%; height: 30rpx; }
