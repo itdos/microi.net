@@ -638,8 +638,8 @@
   .el-notification { background: var(--oc-bg-elevated) !important; border: 1px solid var(--oc-border) !important; .el-notification__title { color: var(--oc-text-primary) !important; } .el-notification__content { color: var(--oc-text-secondary) !important; } }
   .el-message-box { background: var(--oc-bg-elevated) !important; border: 1px solid var(--oc-border) !important; .el-message-box__title { color: var(--oc-text-primary) !important; } .el-message-box__message { color: var(--oc-text-secondary) !important; } }
 
-  // ===== 加载 =====
-  .el-loading-mask { background: rgba(10,10,15,0.8) !important; }
+  // ===== 加载：统一使用平台不透明主题骨架，禁止暗色半透明蒙层 =====
+  .el-loading-mask { background: var(--mci-skeleton-surface, var(--oc-bg-elevated)) !important; }
   .el-loading-text { color: var(--oc-text-muted) !important; }
 
   // ===== Tooltip =====

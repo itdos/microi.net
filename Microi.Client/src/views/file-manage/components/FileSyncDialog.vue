@@ -88,7 +88,7 @@
                         @click="refreshRemoteCaptcha(form.source)"
                       >
                         <img v-if="form.source.captchaImage && !form.source.loadingCaptcha" :src="form.source.captchaImage" alt="登录验证码" />
-                        <el-icon v-else class="is-loading"><Loading /></el-icon>
+                        <span v-else class="mci-captcha-skeleton" aria-label="验证码加载中"></span>
                       </button>
                     </div>
                   </div>
@@ -225,7 +225,7 @@
                         @click="refreshRemoteCaptcha(form.target)"
                       >
                         <img v-if="form.target.captchaImage && !form.target.loadingCaptcha" :src="form.target.captchaImage" alt="登录验证码" />
-                        <el-icon v-else class="is-loading"><Loading /></el-icon>
+                        <span v-else class="mci-captcha-skeleton" aria-label="验证码加载中"></span>
                       </button>
                     </div>
                   </div>
@@ -320,7 +320,7 @@
                   <el-button type="primary" plain @click="selectAllSource">全选</el-button>
                 </div>
               </div>
-              <el-scrollbar v-loading="loadingSource" class="tree-body">
+              <el-scrollbar v-mci-loading:tree="loadingSource" class="tree-body">
                 <el-empty v-if="sourceTree.length === 0 && !loadingSource" description="未加载源文件树" />
                 <el-tree
                   v-else
@@ -355,7 +355,7 @@
                   <span>{{ bucketLabel(form.target.limit) }} · 选择同步落点</span>
                 </div>
               </div>
-              <el-scrollbar v-loading="loadingTarget" class="tree-body">
+              <el-scrollbar v-mci-loading:tree="loadingTarget" class="tree-body">
                 <el-empty v-if="targetTree.length === 0 && !loadingTarget" description="未加载目标文件树" />
                 <el-tree
                   v-else
@@ -422,7 +422,7 @@
             </el-button>
           </div>
           <el-table
-            v-loading="logsLoading"
+            v-mci-loading:table="logsLoading"
             class="log-table"
             :data="syncLogs"
             height="520"
@@ -432,7 +432,7 @@
             <el-table-column type="expand" width="46">
               <template #default="{ row }">
                 <div class="log-detail">
-                  <el-table v-loading="syncLogItemsLoading[row.Id]" :data="syncLogItems[row.Id] || []" size="small">
+                  <el-table v-mci-loading:table="syncLogItemsLoading[row.Id]" :data="syncLogItems[row.Id] || []" size="small">
                     <el-table-column prop="Name" label="名称" min-width="170" show-overflow-tooltip />
                     <el-table-column prop="SourcePath" label="源路径" min-width="240" show-overflow-tooltip />
                     <el-table-column prop="TargetPath" label="目标路径" min-width="240" show-overflow-tooltip />
@@ -499,7 +499,6 @@ import {
   FolderOpened,
   Key,
   Link,
-  Loading,
   Refresh,
   Switch,
   SwitchButton,

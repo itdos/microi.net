@@ -1,12 +1,6 @@
 <template>
-  <div class="file-manage-container">
-    <!-- 初始化加载遮罩 -->
-    <div v-if="initializing" class="initializing-overlay">
-      <el-icon class="is-loading" :size="50"><Loading /></el-icon>
-      <p>正在初始化文件管理器...</p>
-    </div>
-    
-    <template v-else>
+  <div class="file-manage-container" v-mci-loading:page="initializing">
+    <template>
       <!-- 左侧文件夹树 -->
       <div class="sidebar" :style="{ width: sidebarWidth + 'px' }">
         <div class="bucket-switcher">
@@ -150,7 +144,7 @@
           </div>
         </div>
         <!-- 图片预览 -->
-        <div v-else-if="isImageType(previewFile?.type)" class="image-preview">
+        <div v-else-if="isImageType(previewFile?.type)" class="image-preview" v-mci-loading:detail="!previewFileUrl">
           <el-image
             v-if="previewFileUrl"
             :src="previewFileUrl"
@@ -158,10 +152,6 @@
             :preview-src-list="[previewFileUrl]"
             style="max-width: 100%; max-height: calc(80vh - 120px);"
           />
-          <div v-else class="preview-loading">
-            <el-icon class="is-loading" :size="40"><Loading /></el-icon>
-            <p>正在加载图片...</p>
-          </div>
           <div class="preview-actions">
             <el-button type="primary" :icon="Download" @click="handleDownload(previewFile)">
               下载文件
@@ -169,17 +159,13 @@
           </div>
         </div>
         <!-- PDF预览 -->
-        <div v-else-if="previewFile?.type?.toLowerCase() === 'pdf'" class="pdf-preview">
+        <div v-else-if="previewFile?.type?.toLowerCase() === 'pdf'" class="pdf-preview" v-mci-loading:detail="!previewFileUrl">
           <iframe
             v-if="previewFileUrl"
             :src="previewFileUrl"
             style="width: 100%; height: calc(80vh - 120px); border: none;"
             @error="handleIframeError"
           />
-          <div v-else class="preview-loading">
-            <el-icon class="is-loading" :size="40"><Loading /></el-icon>
-            <p>正在加载PDF...</p>
-          </div>
           <div class="preview-actions">
             <el-button type="primary" :icon="Download" @click="handleDownload(previewFile)">
               下载文件
@@ -187,7 +173,7 @@
           </div>
         </div>
         <!-- 视频预览 -->
-        <div v-else-if="isVideoType(previewFile?.type)" class="video-preview">
+        <div v-else-if="isVideoType(previewFile?.type)" class="video-preview" v-mci-loading:detail="!previewFileUrl">
           <video
             v-if="previewFileUrl"
             controls
@@ -197,10 +183,6 @@
             <source :src="previewFileUrl" :type="'video/' + previewFile?.type?.toLowerCase()">
             您的浏览器不支持视频播放
           </video>
-          <div v-else class="preview-loading">
-            <el-icon class="is-loading" :size="40"><Loading /></el-icon>
-            <p>正在加载视频...</p>
-          </div>
           <div class="preview-actions">
             <el-button type="primary" :icon="Download" @click="handleDownload(previewFile)">
               下载文件
@@ -208,7 +190,7 @@
           </div>
         </div>
         <!-- 音频预览 -->
-        <div v-else-if="isAudioType(previewFile?.type)" class="audio-preview">
+        <div v-else-if="isAudioType(previewFile?.type)" class="audio-preview" v-mci-loading:detail="!previewFileUrl">
           <FileIcon :type="previewFile?.type" :size="120" />
           <h3>{{ previewFile?.name }}</h3>
           <audio
@@ -220,10 +202,6 @@
             <source :src="previewFileUrl" :type="'audio/' + previewFile?.type?.toLowerCase()">
             您的浏览器不支持音频播放
           </audio>
-          <div v-else class="preview-loading" style="margin-top: 16px;">
-            <el-icon class="is-loading" :size="40"><Loading /></el-icon>
-            <p>正在加载音频...</p>
-          </div>
           <div class="preview-actions">
             <el-button type="primary" :icon="Download" @click="handleDownload(previewFile)">
               下载文件
@@ -231,12 +209,8 @@
           </div>
         </div>
         <!-- 文本文件预览 -->
-        <div v-else-if="isTextType(previewFile?.type)" class="text-preview">
+        <div v-else-if="isTextType(previewFile?.type)" class="text-preview" v-mci-loading:detail="previewTextContent === null">
           <pre v-if="previewTextContent !== null" class="text-content">{{ previewTextContent }}</pre>
-          <div v-else class="preview-loading">
-            <el-icon class="is-loading" :size="40"><Loading /></el-icon>
-            <p>正在加载文件...</p>
-          </div>
           <div class="preview-actions">
             <el-button type="primary" :icon="Download" @click="handleDownload(previewFile)">
               下载文件
@@ -260,7 +234,7 @@
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, Loading } from '@element-plus/icons-vue'
+import { Download } from '@element-plus/icons-vue'
 import FolderTree from './components/FolderTree.vue'
 import FileList from './components/FileList.vue'
 import FileIcon from './components/FileIcon.vue'

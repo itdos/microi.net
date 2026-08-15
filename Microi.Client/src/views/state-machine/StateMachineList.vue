@@ -14,7 +14,7 @@
             </el-button>
         </div>
 
-        <el-table :data="list" v-loading="loading" border style="margin-top: 12px;">
+        <el-table :data="list" v-mci-loading:table="loading" border style="margin-top: 12px;">
             <el-table-column prop="Name" label="名称" min-width="180" />
             <el-table-column prop="Code" label="编码" width="160" />
             <el-table-column prop="TableName" label="绑定表" width="160" />

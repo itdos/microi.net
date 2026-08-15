@@ -283,7 +283,7 @@
                         </div>
                     </template>
                     <el-table
-                        v-loading="licenseServersLoading"
+                        v-mci-loading:table="licenseServersLoading"
                         :data="licenseServers"
                         size="small"
                         border

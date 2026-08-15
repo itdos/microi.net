@@ -1,6 +1,6 @@
 <template>
     <div class="captcha">
-        <div class="captcha__main" :style="imgWrapperStyle">
+        <div class="captcha__main" :style="imgWrapperStyle" v-mci-loading:detail="showGenerateLoadding">
             <img v-if="src" :src="src" class="captcha_background" alt="background" ref="background" />
             <img v-if="sliderSrc" :src="sliderSrc" class="captcha_slider" alt="slider" ref="slider" :class="{ goFirst: isOk, goKeep: isKeep }" />
             <div class="captcha_message" v-if="showVerifyTip">
@@ -21,10 +21,6 @@
                 <div class="captcha_message__text">
                     {{ isPassing ? successTip : failTip }}
                 </div>
-            </div>
-            <div class="captcha_message loadding" v-if="showGenerateLoadding">
-                <div class="captcha_message__icon captcha_message__icon--loadding"></div>
-                <div class="captcha_message__text">加载中...</div>
             </div>
             <div class="captcha_message" v-if="showVerifyLoadding">
                 <div class="captcha_message__icon captcha_message__icon--loadding"></div>

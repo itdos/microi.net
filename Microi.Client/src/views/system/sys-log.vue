@@ -117,7 +117,7 @@
 
                 <!-- 表格区域 -->
                 <el-card shadow="never" class="table-card">
-                    <el-table v-loading="tableLoading" :data="SysLogList" style="width: 100%" class="diy-table no-border-outside" stripe border @row-click="OpenDetail" highlight-current-row>
+                    <el-table v-mci-loading:table="tableLoading" :data="SysLogList" style="width: 100%" class="diy-table no-border-outside" stripe border @row-click="OpenDetail" highlight-current-row>
                         <el-table-column type="index" width="50" align="center" fixed="left" />
                         <el-table-column label="级别" width="80" align="center" fixed="left">
                             <template #default="scope">
@@ -211,11 +211,8 @@
                     </el-form>
                 </el-card>
                 <el-card shadow="never" class="docker-card">
-                    <div class="docker-terminal" ref="dockerTerminal">
-                        <div v-if="dockerLoading && DockerLogs.length === 0" class="docker-loading">
-                            <el-icon class="is-loading"><Loading /></el-icon> 正在获取日志...
-                        </div>
-                        <div v-else-if="DockerLogs.length === 0" class="docker-empty">
+                    <div class="docker-terminal" ref="dockerTerminal" v-mci-loading:list="dockerLoading && DockerLogs.length === 0">
+                        <div v-if="!dockerLoading && DockerLogs.length === 0" class="docker-empty">
                             暂无日志数据，请点击查询
                         </div>
                         <div v-else class="docker-lines">
@@ -272,7 +269,7 @@
                             <el-button size="small" :icon="Refresh" :loading="securityLoading" @click="GetSecurityGuard">刷新</el-button>
                         </div>
                     </template>
-                    <el-table v-loading="securityLoading" :data="SecurityBlockedList" style="width: 100%" class="diy-table no-border-outside" stripe border>
+                    <el-table v-mci-loading:table="securityLoading" :data="SecurityBlockedList" style="width: 100%" class="diy-table no-border-outside" stripe border>
                         <el-table-column prop="Ip" label="IP" width="150" fixed="left" />
                         <el-table-column label="类型" width="90" align="center">
                             <template #default="scope">
@@ -307,7 +304,7 @@
                             <span class="security-note">默认只显示异常状态码和封锁后的访问，避免正常访问明细拖垮数据库。</span>
                         </div>
                     </template>
-                    <el-table v-loading="securityLoading" :data="SecurityAccessList" style="width: 100%" class="diy-table no-border-outside" stripe border>
+                    <el-table v-mci-loading:table="securityLoading" :data="SecurityAccessList" style="width: 100%" class="diy-table no-border-outside" stripe border>
                         <el-table-column prop="Ip" label="IP" width="140" fixed="left" />
                         <el-table-column prop="StatusCode" label="状态" width="90" align="center" />
                         <el-table-column prop="Method" label="方法" width="90" align="center" />
@@ -399,12 +396,12 @@
 </template>
 
 <script>
-import { Search, Refresh, Notebook, CircleCloseFilled, WarningFilled, Collection, Loading, Timer, Stopwatch, WarnTriangleFilled } from "@element-plus/icons-vue";
+import { Search, Refresh, Notebook, CircleCloseFilled, WarningFilled, Collection, Timer, Stopwatch, WarnTriangleFilled } from "@element-plus/icons-vue";
 
 export default {
     name: "sys_log",
     components: {
-        Search, Notebook, CircleCloseFilled, WarningFilled, Collection, Loading, Timer, Stopwatch, WarnTriangleFilled
+        Search, Notebook, CircleCloseFilled, WarningFilled, Collection, Timer, Stopwatch, WarnTriangleFilled
     },
     data() {
         return {

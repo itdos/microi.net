@@ -37,7 +37,7 @@
                     <div class="module-metric-content">
                         <div class="module-metric-label">{{ item.Label }}</div>
                         <div class="module-metric-value">
-                            <span v-if="item.Loading" class="module-metric-loading">···</span>
+                            <span v-if="item.Loading" class="module-metric-loading mci-inline-value-skeleton" aria-label="统计数据加载中"></span>
                             <template v-else><small v-if="item.Prefix">{{ item.Prefix }}</small>{{ FormatTableReportValue(item.Value) }}<small v-if="item.Suffix">{{ item.Suffix }}</small></template>
                         </div>
                     </div>
@@ -119,7 +119,7 @@
                         >
                             <div class="module-metric-label">{{ item.Label }}</div>
                             <div class="module-metric-value">
-                                <span v-if="item.Loading" class="module-metric-loading">···</span>
+                                <span v-if="item.Loading" class="module-metric-loading mci-inline-value-skeleton" aria-label="统计数据加载中"></span>
                                 <template v-else><small v-if="item.Prefix">{{ item.Prefix }}</small>{{ FormatTableReportValue(item.Value) }}<small v-if="item.Suffix">{{ item.Suffix }}</small></template>
                             </div>
                         </div>
@@ -530,7 +530,7 @@
                 <el-table
                     :id="'diy-table-' + TableId"
                     :ref="'diy-table-' + TableId"
-                    v-loading="tableLoading"
+                    v-mci-loading:table="tableLoading"
                     :data="RenderedTableRowList"
                     style="width: 100%"
                     :show-summary="StatisticsFields != null"
@@ -899,10 +899,10 @@
                         </template>
                     </el-table-column>
                     <template #empty>
-                        <div v-if="!TableChildConfig">
+                        <div v-if="!tableLoading && !TableChildConfig">
                             <img :src="'./static/img/no-data.svg'" style="width: 200px" />
                         </div>
-                        <div>{{ tableLoading ? $t('Msg.DataLoading') : $t('Msg.NoData') }}</div>
+                        <div v-if="!tableLoading">{{ $t('Msg.NoData') }}</div>
                     </template>
                 </el-table>
                 <div
@@ -916,6 +916,8 @@
                     v-if="TableDisplayMode == 'Card'"
                     class="table-card-el-row"
                     :gutter="16"
+                    :aria-busy="tableLoading ? 'true' : 'false'"
+                    aria-live="polite"
                 >
                     <!-- 🔥 骨架屏：PC端loading时都显示，移动端仅首次加载显示 -->
                     <template v-if="tableLoading && (!diyStore.IsPhoneView || DiyTableRowList.length === 0)">
@@ -1397,12 +1399,9 @@
                 <div v-if="diyStore.IsPhoneView && (_mobileTotalLoaded || DiyTableRowList.length) < DiyTableRowCount"
                     class="mobile-load-more"
                     :class="{ 'is-clickable': !mobileLoadingMore }"
+                    v-mci-loading:compact="mobileLoadingMore"
                     @click="!mobileLoadingMore && loadMoreMobileData()">
-                    <div v-if="mobileLoadingMore" class="loading-text">
-                        <el-icon class="is-loading"><Loading /></el-icon>
-                        <span>{{ $t('Msg.LoadingMoreData') }} ({{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
-                    </div>
-                    <div v-else class="load-more-text">
+                    <div v-if="!mobileLoadingMore" class="load-more-text">
                         <span>{{ $t('Msg.PullOrClickLoadMore') }} ({{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
                     </div>
                 </div>

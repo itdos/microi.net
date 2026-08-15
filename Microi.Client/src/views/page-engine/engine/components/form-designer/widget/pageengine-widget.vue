@@ -1,5 +1,5 @@
 <template>
-  <div class="pageengine-widget">
+  <div class="pageengine-widget" v-mci-loading:page="Boolean(pageId) && loading">
     <button
       v-if="pageId && canDesignPage"
       type="button"
@@ -13,10 +13,6 @@
     <div v-if="!pageId" class="pageengine-widget__placeholder">
       <el-icon :size="34"><DataBoard /></el-icon>
       <span>{{ $pet('请选择要嵌入的界面引擎') }}</span>
-    </div>
-    <div v-else-if="loading" class="pageengine-widget__placeholder">
-      <el-icon class="is-loading" :size="30"><Loading /></el-icon>
-      <span>{{ $pet('正在加载界面引擎...') }}</span>
     </div>
     <el-alert
       v-else-if="error"

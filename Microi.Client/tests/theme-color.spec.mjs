@@ -50,6 +50,13 @@ function applyPalette(nextMode, palette) {
         "--mci-bg-content",
         "--mci-bg-header",
         "--mci-bg-overlay",
+        "--mci-skeleton-surface",
+        "--mci-skeleton-card",
+        "--mci-skeleton-header",
+        "--mci-skeleton-base",
+        "--mci-skeleton-highlight",
+        "--mci-skeleton-accent",
+        "--mci-skeleton-border",
         "--sidebar-bg-color",
         "--sidebar-active-bg",
         "--sidebar-footer-wave-bg",
@@ -171,6 +178,25 @@ test("every palette keeps primary controls readable in both modes", () => {
             theme.getContrastRatio(palette.onPrimary, palette.value) >= 4.5,
             `${palette.key} swatch contrast`
         );
+    }
+});
+
+test("every palette exposes distinct, low-saturation skeleton surfaces in both modes", () => {
+    for (const nextMode of ["light", "dark"]) {
+        for (const palette of theme.getThemePalettes(nextMode)) {
+            const tokens = applyPalette(nextMode, palette);
+            assert.ok(tokens["--mci-skeleton-surface"], `${nextMode} ${palette.key} surface`);
+            assert.ok(tokens["--mci-skeleton-card"], `${nextMode} ${palette.key} card`);
+            assert.notEqual(tokens["--mci-skeleton-base"], tokens["--mci-skeleton-highlight"], `${nextMode} ${palette.key} shimmer`);
+            assert.match(tokens["--mci-skeleton-accent"], /^rgba\(/, `${nextMode} ${palette.key} accent`);
+            assert.ok(
+                theme.getContrastRatio(
+                    tokens["--mci-skeleton-base"],
+                    tokens["--mci-skeleton-highlight"]
+                ) >= 1.04,
+                `${nextMode} ${palette.key} skeleton hierarchy`
+            );
+        }
     }
 });
 

@@ -1,5 +1,5 @@
 <template>
-    <div :class="rootClass">
+    <div :class="rootClass" v-mci-loading:form="!GetDiyTableRowModelFinish">
         <el-tabs
             id="field-form-tabs"
             v-model="FieldActiveTab"
@@ -12,21 +12,6 @@
                     <template #label
                         ><span><fa-icon v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}</span></template
                     >
-                    <!-- 骨架屏：表单数据加载中 -->
-                    <div v-if="!GetDiyTableRowModelFinish && (!renderedTabs.has(tab.Id || tab.Name) || !DiyTableModel || !DiyTableModel.Id)" class="form-skeleton-container">
-                        <el-skeleton animated :rows="0" :loading="true">
-                            <template #template>
-                                <div class="form-skeleton">
-                                    <div v-for="row in 4" :key="'skeleton-row-' + row" class="skeleton-row">
-                                        <div v-for="col in 2" :key="'skeleton-col-' + col" class="skeleton-field">
-                                            <el-skeleton-item variant="text" style="width: 80px; height: 14px; margin-bottom: 8px;" />
-                                            <el-skeleton-item variant="rect" style="width: 100%; height: 32px;" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        </el-skeleton>
-                    </div>
                     <!-- 性能优化：只渲染已访问过的 tab，实现懒加载 -->
                     <!-- 数据就绪检查：确保 DiyTableModel 和 DiyFieldList 都已加载 -->
                     <div v-if="renderedTabs.has(tab.Id || tab.Name) && DiyTableModel && DiyTableModel.Id"

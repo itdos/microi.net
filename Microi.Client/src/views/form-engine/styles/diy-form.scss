@@ -31,24 +31,6 @@
     }
 }
 
-/* ==================== 骨架屏样式 ==================== */
-.form-skeleton-container {
-    padding: 20px;
-}
-
-.form-skeleton {
-    .skeleton-row {
-        display: flex;
-        gap: 20px;
-        margin-bottom: 24px;
-
-        .skeleton-field {
-            flex: 1;
-            min-width: 0;
-        }
-    }
-}
-
 /* ==================== 设计器样式 ==================== */
 
 /* 设计模式下的字段样式 */

@@ -9,7 +9,7 @@ import qs from "qs";
 import axios from "axios";
 import { DosCommon } from "./dos.common.js";
 import i18n, { setI18nLocale, normalizeLocale, ensureLocaleMessage } from "@/lang";
-import { ElNotification, ElMessageBox, ElMessage, ElLoading } from "element-plus";
+import { ElNotification, ElMessageBox, ElMessage } from "element-plus";
 import { getToken, getTokenExpires, removeToken, setToken, setTokenExpires } from "@/utils/auth.js";
 import { DiyApi } from "./api.itdos";
 import packageInfo from "../../package.json";

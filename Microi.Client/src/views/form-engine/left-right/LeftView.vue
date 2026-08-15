@@ -141,8 +141,7 @@
             <!-- 树形控件 -->
             <div
                 class="custom-tree-wrapper"
-                v-loading="TreeLoading"
-                element-loading-text="正在加载项目..."
+                v-mci-loading:tree="TreeLoading"
             >
                 <div class="custom-tree-scroll">
                     <div
@@ -164,7 +163,7 @@
                         :load="lazy ? loadNode : null"
                         @node-click="handleCategoryClick"
                         :lazy="lazy"
-                        :empty-text="TreeLoading ? '正在加载...' : '暂无数据'"
+                        :empty-text="TreeLoading ? '' : '暂无数据'"
                         :key="'tree-' + lazy + '-' + TreeData.treeRenderKey"
                         ref="categoryTree"
                     >

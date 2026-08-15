@@ -1,5 +1,5 @@
 <template>
-  <div class="microi-print-engine" v-loading="loading">
+  <div class="microi-print-engine" v-mci-loading:page="loading">
     <div class="mpe-print-canvas">
       <div ref="hiprintPrintContainer"></div>
     </div>

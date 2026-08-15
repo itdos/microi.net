@@ -28,14 +28,21 @@
             <template v-else>
                 <div class="profile-hero__user">
                     <div class="profile-hero__avatar-wrap">
-                        <el-avatar :size="72" :src="userAvatar" class="profile-hero__avatar">
+                        <span
+                            v-if="userAvatarLoading"
+                            class="mci-avatar-skeleton profile-hero__avatar"
+                            style="--mci-skeleton-size: 72px"
+                            role="status"
+                            aria-label="头像加载中"
+                        ></span>
+                        <el-avatar v-else :size="72" :src="userAvatar" class="profile-hero__avatar">
                             {{ currentUser.Name?.charAt(0) || 'U' }}
                         </el-avatar>
                         <span class="profile-hero__avatar-glow"></span>
                     </div>
                     <div class="profile-hero__detail">
                         <div class="profile-hero__name-row">
-                            <h2 class="profile-hero__name">{{ currentUser.Name || currentUser.Account || 'Loading...' }}</h2>
+                            <h2 class="profile-hero__name">{{ currentUser.Name || currentUser.Account || '' }}</h2>
                             <span v-if="currentUser.TenantName" class="mci-tag mci-tag--cyan">{{ currentUser.TenantName }}</span>
                         </div>
                         <p class="profile-hero__account">{{ currentUser.Account || '' }}</p>
@@ -270,14 +277,30 @@ onMounted(() => {
 
 const currentUser = computed(() => diyStore.GetCurrentUser);
 const userAvatar = ref('./static/img/nohead-girl.png');
+const userAvatarLoading = ref(false);
 const loadUserAvatar = async () => {
     const user = currentUser.value || {};
     if (!user.Avatar) {
         userAvatar.value = './static/img/nohead-girl.png';
+        userAvatarLoading.value = false;
         return;
     }
-    userAvatar.value = './static/img/loading.gif';
-    userAvatar.value = await DiyCommon.GetUserAvatarUrl(user.Avatar, user.Id) || './static/img/nohead-girl.png';
+    const avatar = user.Avatar;
+    const userId = user.Id;
+    userAvatarLoading.value = true;
+    try {
+        const url = await DiyCommon.GetUserAvatarUrl(avatar, userId);
+        if (currentUser.value?.Avatar === avatar && currentUser.value?.Id === userId) {
+            userAvatar.value = url || './static/img/nohead-girl.png';
+        }
+    } catch (error) {
+        console.warn('加载移动端用户头像失败：', error);
+        userAvatar.value = './static/img/nohead-girl.png';
+    } finally {
+        if (currentUser.value?.Avatar === avatar && currentUser.value?.Id === userId) {
+            userAvatarLoading.value = false;
+        }
+    }
 };
 
 watch(

@@ -4,7 +4,7 @@
 
 # Microi 吾码
 
-<p class="mci-doc-home-subtitle"><strong>典型业务场景，相比传统 AI 开发：</strong>Token 更省 10 倍+、交付更快 10 倍+、20+ 成熟引擎开箱复用；深度融合 V8 引擎，业务逻辑无需编译发布。</p>
+<p class="mci-doc-home-subtitle"><strong>相比传统 AI 开发：</strong>Token 更省 10 倍+、交付更快 10 倍+、20+ 成熟引擎开箱复用；深度融合 V8 引擎，业务逻辑无需编译发布。</p>
 
 <p><a href="https://blog.csdn.net/qq973702/article/details/163763831" target="_blank" rel="noopener noreferrer">阅读门头文章：为什么 AI 开发的 Token 和交付时间，能同时降一个数量级？ →</a></p>
 

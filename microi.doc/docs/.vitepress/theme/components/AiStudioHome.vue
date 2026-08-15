@@ -95,7 +95,7 @@ const copy = computed(() => locale.value === 'en-US' ? {
   loginDesc: 'The official-site AI never reads or changes private tenant data.',
   loginAction: 'Sign in / Register'
 } : {
-  title: '典型业务场景，相比传统 AI 开发：Token 更省 10 倍+、交付更快 10 倍+、20+ 成熟引擎开箱复用；深度融合 V8 引擎，业务逻辑无需编译发布。',
+  title: '相比传统 AI 开发：Token 更省 10 倍+、交付更快 10 倍+、20+ 成熟引擎开箱复用；深度融合 V8 引擎，业务逻辑无需编译发布。',
   placeholder: '描述你想创造、了解、分析或完成的任何事情...',
   chatLabel: '与 Microi AI 对话',
   aboutTitle: '了解 Microi吾码', aboutPrompt: 'Microi吾码适合开发哪些企业应用？',
