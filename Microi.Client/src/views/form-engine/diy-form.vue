@@ -366,6 +366,11 @@ export default {
             type: String,
             default: ""
         },
+        // ViewSchema 表单工作台的纯展示模式；不改变字段、权限、校验或 V8 提交行为。
+        PresentationMode: {
+            type: String,
+            default: ""
+        },
         // ['FieldName1','FieldName2']
         ReadonlyFields: {
             type: Array,

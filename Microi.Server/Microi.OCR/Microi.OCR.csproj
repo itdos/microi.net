@@ -10,9 +10,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,AI,OCR,PaddleOCR,PaddleX,Microi吾码,Microi</PackageTags>
     <PackageReleaseNotes>Microi吾码通用 OCR 网关。</PackageReleaseNotes>
-    <Version>7.4.1</Version>
-    <AssemblyVersion>7.4.1</AssemblyVersion>
-    <FileVersion>7.4.1</FileVersion>
+    <Version>7.4.2</Version>
+    <AssemblyVersion>7.4.2</AssemblyVersion>
+    <FileVersion>7.4.2</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>

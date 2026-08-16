@@ -141,6 +141,21 @@ function normalizeCard(value) {
     };
 }
 
+function normalizeFormWorkbench(value) {
+    const source = parseObject(value);
+    const selector = parseObject(source.RecordSelector || source.recordSelector);
+    return {
+        Presentation: canonical(source.Presentation || source.presentation, ["SettingsCenter", "Standard"], "SettingsCenter"),
+        Mode: canonical(source.Mode || source.mode, ["Edit", "View"], "Edit"),
+        ShowClassicList: ![false, 0, "0", "false"].includes(source.ShowClassicList ?? source.showClassicList),
+        RecordSelector: {
+            Display: canonical(selector.Display || selector.display, ["Both", "Dropdown", "List"], "Both"),
+            LabelFields: stringList(selector.LabelFields || selector.labelFields).slice(0, 8),
+            Placeholder: String(selector.Placeholder || selector.placeholder || "")
+        }
+    };
+}
+
 function normalizeCondition(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
     const rules = (Array.isArray(value.Rules || value.rules) ? (value.Rules || value.rules) : [])
@@ -243,6 +258,7 @@ function normalizeLayout(value) {
     const heroSource = source.Hero || source.hero || {};
     const listSource = source.List || source.list || {};
     const cardSource = source.Card || source.card || {};
+    const formSource = source.Form || source.form || {};
     const blocks = source.Blocks || source.blocks || source.Sections || source.sections || [];
     const metrics = heroSource.Metrics || heroSource.metrics || [];
     const actions = source.Actions || source.actions || source.ActionSchema || source.actionSchema || [];
@@ -267,6 +283,7 @@ function normalizeLayout(value) {
             Columns: (Array.isArray(columns) ? columns : []).map(normalizeColumn).filter(Boolean).slice(0, 80)
         },
         Card: normalizeCard(cardSource),
+        Form: normalizeFormWorkbench(formSource),
         Blocks: (Array.isArray(blocks) ? blocks : []).map(normalizeBlock).slice(0, 50),
         Actions: (Array.isArray(actions) ? actions : []).map(normalizeAction).filter(Boolean).slice(0, 30)
     };
