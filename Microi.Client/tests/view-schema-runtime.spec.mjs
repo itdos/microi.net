@@ -232,6 +232,14 @@ test("List FormWorkbench normalizes record switching without enabling custom det
     assert.deepEqual(view.Layout.Form, {
         Presentation: "SettingsCenter",
         Mode: "Edit",
+        Density: "Compact",
+        SectionNavigation: "Auto",
+        Eyebrow: "",
+        Description: "",
+        NavigationTitle: "",
+        SectionEyebrow: "",
+        SaveText: "",
+        Sections: [],
         ShowClassicList: false,
         RecordSelector: {
             Display: "Both",
@@ -240,4 +248,30 @@ test("List FormWorkbench normalizes record switching without enabling custom det
         }
     });
     assert.equal(selectModuleView(workbenchMenu, { scene: "Detail", device: "PC" }), null);
+});
+
+test("FormWorkbench normalizes the reusable control-center presentation contract", () => {
+    const view = selectModuleView({
+        ViewSchema: {
+            Views: [{
+                Scene: "List",
+                Device: "PC",
+                Layout: {
+                    Preset: "FormWorkbench",
+                    Form: {
+                        Presentation: "ControlCenter",
+                        Density: "Comfortable",
+                        SectionNavigation: "Sidebar",
+                        Eyebrow: "CUSTOMER CONTROL",
+                        Sections: [{ Key: "base", Title: "基础资料", Description: "客户主档", Icon: "far fa-user" }]
+                    }
+                }
+            }]
+        }
+    }, { scene: "List", device: "PC" });
+
+    assert.equal(view.Layout.Form.Presentation, "ControlCenter");
+    assert.equal(view.Layout.Form.Density, "Comfortable");
+    assert.equal(view.Layout.Form.SectionNavigation, "Sidebar");
+    assert.equal(view.Layout.Form.Sections[0].Title, "基础资料");
 });

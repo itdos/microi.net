@@ -49,11 +49,16 @@ export default {
         // ==================== 性能优化：预计算 tabs class ====================
         tabsClass() {
             var self = this;
+            var classes = ['field-form-tabs'];
             if (self.FormTabs.length == 1 &&
                 (self.FormTabs[0].Name == 'none' || self.FormTabs[0].Name == 'info' || !self.FormTabs[0].Name)) {
-                return 'field-form-tabs tab-pane-hide';
+                classes.push('tab-pane-hide');
+            } else {
+                classes.push('tab-pane-show');
             }
-            return 'field-form-tabs tab-pane-show';
+            if (self.IsControlCenterPresentation) classes.push('is-control-center-tabs');
+            if (self.ShowPresentationSectionNavigation) classes.push('presentation-tabs-nav-hidden');
+            return classes.join(' ');
         },
         // ==================== 性能优化：预计算表单容器 class ====================
         formContainerClass() {
@@ -61,6 +66,9 @@ export default {
             var classes = [self.DiyTableModel.Name || '', 'field-form'];
             if (self.DiyTableModel.FieldBorder === 'Border') {
                 classes.push('field-border');
+            }
+            if (self.IsControlCenterPresentation) {
+                classes.push('presentation-density-' + String(self.PresentationConfig.Density || 'Compact').toLowerCase());
             }
             return classes.join(' ');
         },
@@ -157,8 +165,58 @@ export default {
             });
             return grouped;
         },
+        IsControlCenterPresentation() {
+            var presentation = String(this.PresentationMode || '').trim().toLowerCase();
+            return presentation === 'controlcenter' || presentation === 'settingscenter';
+        },
+        PresentationSections() {
+            var self = this;
+            var configured = Array.isArray(self.PresentationConfig.Sections) ? self.PresentationConfig.Sections : [];
+            return (self.FormTabs || []).filter((tab) => tab && tab.Display !== false).map((tab, index) => {
+                var key = tab.Id || tab.Name || 'section-' + index;
+                var meta = configured.find((item) => {
+                    if (!item || typeof item !== 'object') return false;
+                    var declaredKey = item.Key || item.Id || item.Name;
+                    return String(declaredKey || '').toLowerCase() === String(key).toLowerCase()
+                        || String(declaredKey || '').toLowerCase() === String(tab.Name || '').toLowerCase();
+                }) || {};
+                var fields = self.DiyFieldListGrouped[key] || [];
+                return {
+                    Key: key,
+                    Index: index,
+                    Title: String(meta.Title || meta.Label || tab.Name || '基础信息'),
+                    Description: String(meta.Description || tab.Description || ''),
+                    Icon: String(meta.Icon || tab.Icon || ''),
+                    FieldCount: fields.filter((field) => field && field._isShow !== false).length
+                };
+            });
+        },
+        ActivePresentationSection() {
+            return this.PresentationSections.find((section) => section.Key === this.FieldActiveTab)
+                || this.PresentationSections[0]
+                || { Key: '', Title: '基础信息', Description: '', Icon: '', FieldCount: 0, Index: 0 };
+        },
+        ShowPresentationSectionNavigation() {
+            if (!this.IsControlCenterPresentation || this.PresentationSections.length <= 1) return false;
+            return String(this.PresentationConfig.SectionNavigation || 'Auto').toLowerCase() !== 'tabs';
+        },
+        presentationLayoutClass() {
+            return [
+                'diy-form-presentation-layout',
+                this.IsControlCenterPresentation ? 'is-control-center' : 'is-standard',
+                this.ShowPresentationSectionNavigation ? 'has-section-nav' : 'has-tab-nav'
+            ].join(' ');
+        },
     },
     methods: {
+        ActivatePresentationSection(section) {
+            if (!section || !section.Key || section.Key === this.FieldActiveTab) return;
+            this.tabClickField({ name: section.Key, index: section.Index });
+        },
+        GetPresentationFieldClass(field) {
+            if (!this.IsControlCenterPresentation || !field) return '';
+            return 'diy-presentation-field-card';
+        },
         CanShowHiddenFields() {
             var self = this;
             var currentUser = self.GetCurrentUser || {};

@@ -1,5 +1,38 @@
 <template>
     <div :class="rootClass" v-mci-loading:form="!GetDiyTableRowModelFinish">
+        <div :class="presentationLayoutClass">
+            <aside v-if="ShowPresentationSectionNavigation" class="diy-form-section-nav" aria-label="表单分组导航">
+                <div class="diy-form-section-nav__head">
+                    <span>{{ PresentationConfig.NavigationTitle || '配置分组' }}</span>
+                    <small>{{ PresentationSections.length }} 项</small>
+                </div>
+                <button
+                    v-for="section in PresentationSections"
+                    :key="section.Key"
+                    type="button"
+                    class="diy-form-section-nav__item"
+                    :class="{ active: section.Key === FieldActiveTab }"
+                    :aria-current="section.Key === FieldActiveTab ? 'page' : undefined"
+                    @click="ActivatePresentationSection(section)"
+                >
+                    <span class="diy-form-section-nav__icon">
+                        <fa-icon :icon="section.Icon || 'far fa-folder-open'" />
+                    </span>
+                    <span class="diy-form-section-nav__copy">
+                        <b>{{ section.Title }}</b>
+                        <small>{{ section.Description || `${section.FieldCount} 个字段` }}</small>
+                    </span>
+                </button>
+            </aside>
+            <section class="diy-form-presentation-main">
+                <header v-if="IsControlCenterPresentation" class="diy-form-section-head">
+                    <div>
+                        <span>{{ PresentationConfig.SectionEyebrow || 'FORM SECTION' }}</span>
+                        <h3>{{ ActivePresentationSection.Title }}</h3>
+                        <p v-if="ActivePresentationSection.Description">{{ ActivePresentationSection.Description }}</p>
+                    </div>
+                    <el-tag effect="plain">{{ ActivePresentationSection.FieldCount }} 个字段</el-tag>
+                </header>
         <el-tabs
             id="field-form-tabs"
             v-model="FieldActiveTab"
@@ -49,7 +82,8 @@
                                             'field-drag-handle',
                                             'design-mode-field',
                                             CurrentDiyFieldModel.Id == field.Id ? field._activeClass + ' selected-field' : field._class,
-                                            field._collapseClass
+                                            field._collapseClass,
+                                            GetPresentationFieldClass(field)
                                         ]"
                                         :key="'el_col_fieldid_' + field.Id"
                                         :span="field._span"
@@ -163,7 +197,7 @@
                                 <el-col
                                     v-for="field in GetRenderedTabFields(tab.Id || tab.Name)"
                                     v-show="field._isShow"
-                                    :class="[CurrentDiyFieldModel.Id == field.Id ? field._activeClass : field._class, field._collapseClass]"
+                                    :class="[CurrentDiyFieldModel.Id == field.Id ? field._activeClass : field._class, field._collapseClass, GetPresentationFieldClass(field)]"
                                     :key="'el_col_fieldid_' + field.Id"
                                     :span="field._span"
                                     :xs="24"
@@ -249,6 +283,8 @@
                 </div>
             </template>
         </el-tabs>
+            </section>
+        </div>
         <DiyCustomDialog
             :DataAppend="GetDiyCustomDialogDataAppend()"
             :OpenType="DiyCustomDialogConfig.OpenType"
@@ -370,6 +406,12 @@ export default {
         PresentationMode: {
             type: String,
             default: ""
+        },
+        // ViewSchema FormWorkbench 的展示配置。仅控制分组导航、密度和文案，
+        // 字段组件、权限、校验、V8 事件与提交仍由当前 DiyForm 负责。
+        PresentationConfig: {
+            type: Object,
+            default: () => ({})
         },
         // ['FieldName1','FieldName2']
         ReadonlyFields: {
