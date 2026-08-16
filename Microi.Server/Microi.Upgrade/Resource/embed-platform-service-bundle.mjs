@@ -17,8 +17,8 @@ const argumentValue = (name, fallback = '') => {
   return argument ? argument.slice(prefix.length) : fallback;
 };
 
-const version = argumentValue('--version', 'v1.5.7');
-const applicationVersion = Number(argumentValue('--application-version', '14'));
+const version = argumentValue('--version', 'v1.5.8');
+const applicationVersion = Number(argumentValue('--application-version', '15'));
 const sourceManifestHashOverride = argumentValue('--source-manifest-hash');
 const runtimeManifestHashOverride = argumentValue('--runtime-manifest-hash');
 const timestamp = new Date(argumentValue('--timestamp', new Date().toISOString()));
@@ -66,6 +66,7 @@ function contentType(path) {
 }
 
 const packageModel = JSON.parse(await readFile(packagePath, 'utf8'));
+const routeDefinitions = JSON.parse(await readFile(resolve(applicationRoot, 'microi.routes.json'), 'utf8'));
 const bundle = (packageModel.ApplicationBundles || []).find(
   item => item?.Application?.AppKey === 'microi-platform-service',
 );
@@ -156,7 +157,34 @@ bundle.MicroService.DistHash = runtimeManifestHash;
 bundle.MicroService.AssetCount = buildAssets.length;
 bundle.MicroService.TotalSize = String(totalSize);
 bundle.MicroService.PublishTime = localTime;
-for (const route of bundle.Routes || []) {
+const existingRoutes = new Map((bundle.Routes || []).map(route => [route.RoutePath, route]));
+bundle.Routes = routeDefinitions.map(routeDefinition => {
+  const routePath = String(routeDefinition.path || '').trim();
+  if (!routePath.startsWith('/')) throw new Error(`微服务路由必须以 / 开头：${routePath}`);
+  const existing = existingRoutes.get(routePath) || {};
+  return {
+    Id: existing.Id || sha256(`microi-platform-service:${routePath}`).slice(0, 26).toUpperCase(),
+    CreateTime: existing.CreateTime || localTime,
+    UpdateTime: localTime,
+    UserId: existing.UserId || bundle.MicroService.UserId || bundle.Application.OwnerUserId || '',
+    UserName: existing.UserName || bundle.MicroService.UserName || bundle.Application.OwnerName || '',
+    IsDeleted: 0,
+    MicroServiceId: bundle.MicroService.Id,
+    MicroServiceKey: 'microi-platform-service',
+    PageKey: String(routeDefinition.name || routePath.slice(1)),
+    PageTitle: String(routeDefinition.title || routeDefinition.name || routePath),
+    RoutePath: routePath,
+    EntryPath: 'index.html',
+    MenuUrl: `/micro-app/microi-platform-service${routePath}`,
+    Sort: Number(routeDefinition.sort || 0),
+    IsHome: routeDefinition.isHome === true || Number(routeDefinition.isHome) === 1 ? 1 : 0,
+    IsEnable: 1,
+    BuildVersion: version,
+    RouteMetaJson: existing.RouteMetaJson || '{}',
+    SourceDirName: 'microi-platform-service',
+  };
+});
+for (const route of bundle.Routes) {
   route.UpdateTime = localTime;
   route.BuildVersion = version;
 }

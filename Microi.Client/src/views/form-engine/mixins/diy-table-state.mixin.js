@@ -85,6 +85,44 @@ export default {
         secondaryTableReportItems() {
             return (this.tableReportItems || []).filter(function (item) { return item.Source !== 'ViewSchema'; });
         },
+        // 移动端只保留“总记录 + 首要业务指标”两个摘要，视觉与 UniApp 原生列表保持一致。
+        // 其余统计仍在桌面端完整展示，避免改变旧模块的数据协议与统计请求。
+        MobileSummaryItems() {
+            var source = [].concat(this.ModuleMetricItems || [], this.secondaryTableReportItems || []);
+            var unique = [];
+            var used = new Set();
+            source.forEach(function (item, index) {
+                if (!item) return;
+                var key = String(item.Id || item.Key || item.Label || index);
+                if (used.has(key)) return;
+                used.add(key);
+                unique.push(item);
+            });
+
+            var countItem = unique.find(function (item) {
+                return /(?:AutoDataCount|DataCount)/i.test(String(item.Key || ''))
+                    || /(?:筛选结果|总记录|全部记录|记录总数)/.test(String(item.Label || ''));
+            });
+            var businessItem = unique.find(function (item) {
+                if (item === countItem) return false;
+                return /(?:金额|总价|价格|余额|数量|合计|总额|积分)/.test(String(item.Label || ''));
+            });
+            var result = [];
+            var append = function (item) {
+                if (item && result.indexOf(item) === -1 && result.length < 2) result.push(item);
+            };
+            append(countItem);
+            append(businessItem);
+            unique.forEach(append);
+
+            return result.map(function (item) {
+                var label = String(item.Label || '');
+                var currencyPrefix = /(?:金额|总价|价格|余额|总额)/.test(label) ? '¥' : '';
+                return Object.assign({}, item, {
+                    Prefix: item.Prefix || currencyPrefix
+                });
+            });
+        },
         // 性能优化：将频繁调用的方法转换为计算属性
         _IsTableChild() {
             return !this.DiyCommon.IsNull(this.TableChildTableId);

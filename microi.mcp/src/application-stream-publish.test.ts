@@ -16,6 +16,7 @@ import {
   isLegacyApplicationStreamJValueFailure,
   resolveApplicationAssetStreamV3Contract,
   resolveLegacyApplicationStreamFallbackPolicy,
+  runApplicationAssetStreamUpload,
   runApplicationDirectoryStreamPublish,
   tryLegacyMicroServiceStreamPublishFallback,
   validateLocalApplicationAssetSize,
@@ -184,6 +185,93 @@ test('application stream accepts 5 GiB logical assets and preserves optional cal
     assert.equal(result.isError, true);
     assert.match(result.content[0].type === 'text' ? result.content[0].text : '', /上传前中止/u);
     assert.equal(uploadCalls, 0);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('low-level asset tool preserves the complete v3 contract and selects resumable multipart transport', async () => {
+  const root = createTempDirectory();
+  const filePath = path.join(root, 'installer.exe');
+  const raw = Buffer.from('microi-v3-resumable-installer', 'utf8');
+  fs.writeFileSync(filePath, raw);
+  const requestId = 'single-v3-release-request-id';
+  const fingerprint = '3'.repeat(64);
+  const sourceManifestHash = '4'.repeat(64);
+  const runtimeManifestHash = '5'.repeat(64);
+  const relativePath = 'downloads/Microi-Setup-v1.0.0.exe';
+  let uploadCalls = 0;
+  try {
+    const fakeClient = {
+      uploadApplicationAssetStream: async (input: Parameters<MicroiClient['uploadApplicationAssetStream']>[0]) => {
+        uploadCalls += 1;
+        assert.equal(input.ProtocolVersion, 3);
+        assert.equal(input.RequestId, requestId);
+        assert.equal(input.RequestFingerprint, fingerprint);
+        assert.equal(input.RuntimeManifestHash, runtimeManifestHash);
+        assert.equal(input.ExpectedVersionRowVersion, null);
+        return {
+          Code: 1,
+          Data: {
+            ProtocolVersion: 3,
+            PublishMode: 'stage',
+            GateEpoch: input.ExpectedGateEpoch,
+            RequestId: input.RequestId,
+            RequestFingerprint: input.RequestFingerprint,
+            RouteSnapshotJson: input.RouteSnapshotJson,
+            RouteSnapshotHash: input.RouteSnapshotHash,
+            VersionNo: 'v1.0.0',
+            Path: input.RelativePath,
+            Sha256: input.ExpectedSha256,
+            Size: raw.byteLength,
+            PublishState: 'Prepared',
+            PointerState: 'Uncommitted',
+            Pending: true,
+            FencingToken: '13',
+            ReleaseFilePath: `microi/application-assets/v3/tenants/iTdos/kinds/Web/apps/single-v3-app/releases/v1.0.0/requests/${fingerprint}/assets/downloads/Microi-Setup-v1.0.0.exe`,
+          },
+          Msg: '',
+        };
+      },
+    } as unknown as MicroiClient;
+    const input = {
+      appIdOrKey: 'single-v3-app',
+      versionNo: 'v1.0.0',
+      relativePath,
+      localFilePath: filePath,
+      routes: [],
+      routeSnapshotJson: EMPTY_ROUTE_SNAPSHOT_JSON,
+      routeSnapshotHash: EMPTY_ROUTE_SNAPSHOT_HASH,
+      sourceManifestHash,
+      runtimeManifestHash,
+      deliveryBatchId: 'single-v3-delivery',
+      protocolVersion: 3 as const,
+      expectedGateEpoch: '7',
+      requestId,
+      requestFingerprint: fingerprint,
+      expectedCurrentVersion: 4,
+      expectedAppVersion: 'v0.9.0',
+      expectedPublishFence: '12',
+      expectedPublishRowVersion: '18',
+      expectedVersionRowVersion: null,
+      expectedActivePublishVersionId: 'version-active',
+      expectedCommittedPublishVersionId: 'version-committed',
+    };
+
+    const preflight = parseToolJson(await runApplicationAssetStreamUpload(fakeClient, input));
+    assert.equal(preflight.dryRun, true);
+    assert.equal(preflight.protocolVersion, 3);
+    assert.equal(preflight.resumable, true);
+    assert.equal(uploadCalls, 0);
+
+    const uploaded = parseToolJson(await runApplicationAssetStreamUpload(fakeClient, {
+      ...input,
+      confirmExecution: 'single-v3-app',
+    }));
+    assert.equal(uploaded.ProtocolVersion, 3);
+    assert.equal(uploaded.requestFingerprint, fingerprint);
+    assert.equal(uploaded.resumable, true);
+    assert.equal(uploadCalls, 1);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

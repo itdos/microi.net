@@ -45,8 +45,40 @@
             </div>
         </section>
 
+        <!-- ViewSchema 可选的通用表单工作台。它复用真实 DiyForm，不改变旧表格和旧表单执行链。 -->
+        <ModuleFormWorkbench
+            v-if="ModuleFormWorkbenchEnabled"
+            :table-id="TableId"
+            :table-name="CurrentDiyTableModel.Name || ''"
+            :sys-menu-id="SysMenuId"
+            :rows="DiyTableRowList"
+            :fields="DiyFieldList"
+            :config="ModuleFormWorkbenchConfig"
+            :page-buttons="SysMenuModel.PageBtns || []"
+            :form-buttons="SysMenuModel.FormBtns || []"
+            :row-count="Number(DiyTableRowCount || 0)"
+            :page-index="DiyTableRowPageIndex"
+            :page-size="DiyTableRowPageSize"
+            :can-add="Boolean(_LimitAdd && IsVisibleAdd == true && !TableChildField.Readonly)"
+            :can-edit="Boolean(_LimitEdit && TableChildFormMode != 'View' && !TableChildField.Readonly)"
+            :loading="tableLoading"
+            :initial-record-id="String($route.query.RecordId || '')"
+            @refresh="GetDiyTableRow({ _PageIndex: DiyTableRowPageIndex || 1 })"
+            @load-page="HandleModuleWorkbenchPage"
+            @record-change="HandleModuleWorkbenchRecordChange"
+            @form-ready="HandleModuleWorkbenchFormReady"
+            @switch-classic="SwitchModuleWorkbenchToClassic"
+            @open-form="HandleModuleWorkbenchOpenForm"
+            @run-action="HandleModuleWorkbenchAction"
+        />
+
         <!-- type="border-card" -->
         <!-- 设备tabs(设备、服务数据) -->
+        <template v-else>
+        <div v-if="ModuleFormWorkbenchClassicEnabled" class="module-workbench-return-bar">
+            <span>当前为经典表格视图</span>
+            <el-button type="primary" plain size="small" @click="SwitchClassicToModuleWorkbench">返回表单工作台</el-button>
+        </div>
         <el-tabs
             id="table-rowlist-tabs"
             v-model="TableRowListActiveTab"
@@ -103,28 +135,6 @@
                         </el-icon>
                     </div> -->
                 </div>
-
-                <!-- 移动端沿用原生标题，仅显示可横向滚动的动态指标，避免重复门头。 -->
-                <section v-if="diyStore.IsPhoneView && ModuleMetricItems.length" class="module-presentation-mobile-metrics">
-                    <div class="module-metric-strip">
-                        <div
-                            v-for="(item, metricIndex) in ModuleMetricItems"
-                            :key="'mobile_' + item.Id"
-                            class="module-metric-item"
-                            :class="item.Tone ? 'is-' + item.Tone.toLowerCase() : ''"
-                            :style="[
-                                item.Color ? { '--metric-color': item.Color } : undefined,
-                                { '--metric-index': metricIndex > 6 ? 6 : metricIndex }
-                            ]"
-                        >
-                            <div class="module-metric-label">{{ item.Label }}</div>
-                            <div class="module-metric-value">
-                                <span v-if="item.Loading" class="module-metric-loading mci-inline-value-skeleton" aria-label="统计数据加载中"></span>
-                                <template v-else><small v-if="item.Prefix">{{ item.Prefix }}</small>{{ FormatTableReportValue(item.Value) }}<small v-if="item.Suffix">{{ item.Suffix }}</small></template>
-                            </div>
-                        </div>
-                    </div>
-                </section>
 
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
                 <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
@@ -404,8 +414,26 @@
                     </div>
                 </div>
 
-                <!-- 旧 TableReport/StatisticsFields 兼容区；ViewSchema 指标已由上方紧凑指标条展示。 -->
-                <div v-if="secondaryTableReportItems.length > 0" class="table-report-panel" :style="{ 'grid-template-columns': tableReportGridCols }">
+                <!-- 移动端把总数与首要业务指标合并成 UniApp 式摘要条，避免多个统计面板挤占首屏。 -->
+                <section v-if="diyStore.IsPhoneView && MobileSummaryItems.length" class="mobile-list-summary" aria-label="列表摘要">
+                    <div
+                        v-for="(item, summaryIndex) in MobileSummaryItems"
+                        :key="'mobile_summary_' + (item.Id || item.Key || summaryIndex)"
+                        class="mobile-list-summary__item"
+                    >
+                        <div class="mobile-list-summary__value" :title="String(item.Value ?? '')">
+                            <span v-if="item.Loading" class="module-metric-loading mci-inline-value-skeleton" aria-label="统计数据加载中"></span>
+                            <template v-else><small v-if="item.Prefix">{{ item.Prefix }}</small>{{ FormatTableReportValue(item.Value) }}<small v-if="item.Suffix">{{ item.Suffix }}</small></template>
+                        </div>
+                        <div class="mobile-list-summary__label">{{ item.Label }}</div>
+                    </div>
+                    <div class="mobile-list-summary__icon" aria-hidden="true">
+                        <fa-icon :icon="MobileSummaryItems[0].Icon || 'fas fa-layer-group'" />
+                    </div>
+                </section>
+
+                <!-- 旧 TableReport/StatisticsFields 兼容区；桌面端继续完整展示，移动端已折叠到摘要条。 -->
+                <div v-if="!diyStore.IsPhoneView && secondaryTableReportItems.length > 0" class="table-report-panel" :style="{ 'grid-template-columns': tableReportGridCols }">
                     <div
                         v-for="item in secondaryTableReportItems"
                         :key="item.Id || item.Label"
@@ -1028,7 +1056,18 @@
                                     <div class="card-body" style="flex: 1;">
                                         <!-- ====== 卡片头：头像/序号、顶部标签、标题、右侧多字段 ====== -->
                                         <div class="card-title-row" v-if="CardPrimaryField">
-                                            <template v-if="!SysMenuModel.TableCardImgField || !GetCardImageValue(item, SysMenuModel.TableCardImgField)">
+                                            <button
+                                                v-if="diyStore.IsPhoneView && (IsOpenTableSingleSelect() || CanUseTableSelection())"
+                                                type="button"
+                                                class="mobile-card-select-toggle"
+                                                :class="{ 'is-selected': IsOpenTableSingleSelect() ? (TableSelectedRow && TableSelectedRow.Id === item.Id) : isCardSelected(item) }"
+                                                :aria-label="(IsOpenTableSingleSelect() ? '选择' : (isCardSelected(item) ? '取消选择' : '选择')) + (GetPresentationFieldValue(item, CardPrimaryField) || '当前记录')"
+                                                @click.stop="IsOpenTableSingleSelect() ? selectOpenTableSingleRow(item) : toggleCardSelection(item)"
+                                            >
+                                                <el-icon v-if="IsOpenTableSingleSelect() ? (TableSelectedRow && TableSelectedRow.Id === item.Id) : isCardSelected(item)"><Check /></el-icon>
+                                                <span v-else>{{ getCardIndex(index) }}</span>
+                                            </button>
+                                            <template v-else-if="!SysMenuModel.TableCardImgField || !GetCardImageValue(item, SysMenuModel.TableCardImgField)">
                                                 <span v-if="CardAvatarField" class="card-avatar">{{ GetCardAvatarText(item) }}</span>
                                                 <span v-else-if="SysMenuModel.TableCardImgField" class="card-avatar card-avatar--fallback" aria-hidden="true">{{ GetCardImageFallbackText(item) }}</span>
                                                 <span v-else-if="!PresentationCardConfig || !PresentationCardConfig.HideIndex" class="card-index-badge">{{ getCardIndex(index) }}</span>
@@ -1223,7 +1262,15 @@
                                             </template>
                                         </div>
                                         <!-- ====== 底部行：CardBottomTagFields + 创建时间/更新时间 ====== -->
-                                        <div class="card-bottom-row">
+                                        <div
+                                            v-if="HasAnyPresentationFieldValue(item, CardBottomFieldList)
+                                                || (CardBottomFieldList.length === 0 && item.UpdateTime && (!PresentationCardConfig || PresentationCardConfig.ShowUpdateTime))
+                                                || (item.CreateTime && (!PresentationCardConfig || PresentationCardConfig.ShowCreateTime))
+                                                || (diyStore.IsPhoneView && HasAnyPresentationFieldValue(item, CardTopFieldList.slice(1)))
+                                                || (diyStore.IsPhoneView && ((PropsTableType !== 'OpenTable' && IsPermission('NoDetail')) || ShouldShowMobileCardMoreAction(item)))"
+                                            class="card-bottom-row"
+                                            @click.stop
+                                        >
                                             <div class="card-bottom-tags">
                                                 <template v-if="CardBottomFieldList.length > 0">
                                                     <template v-for="tagField in CardBottomFieldList" :key="'bottom-tag-' + tagField.Id">
@@ -1247,16 +1294,56 @@
                                                         </template>
                                                     </template>
                                                 </template>
+                                                <template v-else-if="diyStore.IsPhoneView && HasAnyPresentationFieldValue(item, CardTopFieldList.slice(1))">
+                                                    <template v-for="tagField in CardTopFieldList.slice(1)" :key="'mobile-footer-meta-' + tagField.Id">
+                                                        <template v-if="HasPresentationFieldValue(item, tagField)">
+                                                            <span v-if="isMuban(tagField, { row: item })" v-safe-html:template="item[tagField.Name + '_TmpEngineResult']" class="card-mobile-footer-meta__item"></span>
+                                                            <DiyTableSpecialCell
+                                                                v-else-if="IsSpecialTableField(tagField)"
+                                                                class="card-mobile-footer-meta__item"
+                                                                compact
+                                                                :field="tagField"
+                                                                :row="item"
+                                                                :display-value="GetPresentationFieldValue(item, tagField)"
+                                                                :table-name="(CurrentDiyTableModel && CurrentDiyTableModel.Name) || TableName"
+                                                                :sys-menu-id="SysMenuId"
+                                                                @open-table-child="OpenTableChildCell"
+                                                                @open-detail="OpenSpecialCellDetail"
+                                                            />
+                                                            <span v-else class="card-mobile-footer-meta__item" :style="GetPresentationFieldStyle(tagField)">{{ GetPresentationFieldValue(item, tagField) }}</span>
+                                                        </template>
+                                                    </template>
+                                                </template>
                                                 <template v-else-if="!PresentationCardConfig || PresentationCardConfig.ShowUpdateTime">
                                                     <span class="card-update-time" v-if="item.UpdateTime">更新 {{ formatCardTime(item.UpdateTime) }}</span>
                                                 </template>
                                             </div>
                                             <span class="card-create-time" v-if="item.CreateTime && (!PresentationCardConfig || PresentationCardConfig.ShowCreateTime)">创建 {{ formatCardTime(item.CreateTime) }}</span>
+                                            <div v-if="diyStore.IsPhoneView" class="card-mobile-footer-actions">
+                                                <button
+                                                    v-if="ShouldShowMobileCardMoreAction(item)"
+                                                    type="button"
+                                                    class="card-mobile-more"
+                                                    aria-label="更多操作"
+                                                    @click.stop="showMoreMenu($event, item)"
+                                                >
+                                                    <el-icon><MoreFilled /></el-icon><span>更多</span>
+                                                </button>
+                                                <button
+                                                    v-if="PropsTableType !== 'OpenTable' && IsPermission('NoDetail')"
+                                                    type="button"
+                                                    class="card-mobile-detail"
+                                                    aria-label="查看详情"
+                                                    @click.stop="CardItemClick(item)"
+                                                >
+                                                    <span>查看详情</span><el-icon aria-hidden="true"><ArrowRight /></el-icon>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                                 <!-- ====== 操作按钮区域 ====== -->
-                                <div class="card-actions" @click.stop>
+                                <div v-if="!diyStore.IsPhoneView" class="card-actions" @click.stop>
                                     <!--Fix by Anderson for 小赵：移动端也需要选中功能以便V8按钮操作，下面不能增加【&&!diyStore.IsPhoneView】-->
                                     <div v-if="IsOpenTableSingleSelect()"
                                         class="card-radio-wrapper"
@@ -1289,7 +1376,8 @@
                                     </el-button>
                                     <el-button
                                         v-if="!IsWorkFlowMenu() && _LimitEdit && TableChildFormMode != 'View' && !TableChildField.Readonly && item.IsVisibleEdit"
-                                        class="card-action-btn"
+                                        class="card-action-btn card-action-btn-edit"
+                                        :aria-label="$t('Msg.Edit')"
                                         @click.stop="OpenDetail(item, 'Edit')"
                                         size="small"
                                         type="primary"
@@ -1363,15 +1451,6 @@
                                             </el-dropdown-menu>
                                         </template>
                                     </el-dropdown>
-                                    <button
-                                        v-if="diyStore.IsPhoneView && PropsTableType !== 'OpenTable' && IsPermission('NoDetail')"
-                                        type="button"
-                                        class="card-mobile-detail"
-                                        aria-label="查看详情"
-                                        @click.stop="CardItemClick(item)"
-                                    >
-                                        <span>查看详情</span><span aria-hidden="true">›</span>
-                                    </button>
                                 </div>
                             </el-card>
                         </el-col>
@@ -1406,8 +1485,12 @@
                 <div v-if="diyStore.IsPhoneView && (_mobileTotalLoaded || DiyTableRowList.length) < DiyTableRowCount"
                     class="mobile-load-more"
                     :class="{ 'is-clickable': !mobileLoadingMore }"
+                    :role="!mobileLoadingMore ? 'button' : undefined"
+                    :tabindex="!mobileLoadingMore ? 0 : -1"
                     v-mci-loading:compact="mobileLoadingMore"
-                    @click="!mobileLoadingMore && loadMoreMobileData()">
+                    @click="!mobileLoadingMore && loadMoreMobileData()"
+                    @keydown.enter.prevent="!mobileLoadingMore && loadMoreMobileData()"
+                    @keydown.space.prevent="!mobileLoadingMore && loadMoreMobileData()">
                     <div v-if="!mobileLoadingMore" class="load-more-text">
                         <span>{{ $t('Msg.PullOrClickLoadMore') }} ({{ _mobileTotalLoaded || DiyTableRowList.length }}/{{ DiyTableRowCount }})</span>
                     </div>
@@ -1417,25 +1500,54 @@
                 </div>
             </el-card>
         </el-tabs>
+        </template>
 
         <!-- 性能优化V3：全局共享的更多操作菜单，只实例化一次 -->
         <teleport to="body">
             <div
+                v-show="_moreMenuVisible && diyStore.IsPhoneView"
+                class="global-more-menu-mask"
+                aria-hidden="true"
+                @click="hideMoreMenu"
+            ></div>
+            <div
                 v-show="_moreMenuVisible"
                 ref="globalMoreMenu"
                 class="global-more-menu"
-                :style="{ top: _moreMenuPosition.top + 'px', left: _moreMenuPosition.left + 'px' }"
+                :class="{ 'is-mobile-card-menu': diyStore.IsPhoneView }"
+                :style="diyStore.IsPhoneView ? undefined : { top: _moreMenuPosition.top + 'px', left: _moreMenuPosition.left + 'px' }"
                 @click.stop
             >
+                <div v-if="diyStore.IsPhoneView" class="global-more-menu-header">
+                    <span>更多操作</span>
+                    <button type="button" aria-label="关闭更多操作" @click="hideMoreMenu"><el-icon><Close /></el-icon></button>
+                </div>
                 <div
-                    v-if="!IsWorkFlowMenu() && _LimitEdit && _moreMenuRow && _moreMenuRow._IsInTableAdd !== true && _moreMenuRow.IsVisibleEdit == true"
+                    v-if="!IsTrashMode && !IsWorkFlowMenu() && _LimitEdit && _moreMenuRow && _moreMenuRow._IsInTableAdd !== true && _moreMenuRow.IsVisibleEdit == true && (!diyStore.IsPhoneView || (TableChildFormMode != 'View' && !TableChildField.Readonly))"
                     class="global-more-menu-item"
                     @click="handleMoreMenuAction('edit')"
                 >
                     <el-icon><Edit /></el-icon>
                     <span>{{ $t("Msg.Edit") }}</span>
                 </div>
-                <template v-if="!IsTrashMode && _moreMenuRow && _moreMenuRow._RowMoreBtnsIn && _moreMenuRow._RowMoreBtnsIn.length > 0">
+                <div
+                    v-if="diyStore.IsPhoneView && _moreMenuRow && IsWorkFlowMenu() && _moreMenuRow._IsInTableAdd !== true"
+                    class="global-more-menu-item"
+                    @click="handleMoreMenuAction('workflow')"
+                >
+                    <fa-icon icon="far fa-clipboard-check" />
+                    <span>去处理</span>
+                </div>
+                <template v-if="diyStore.IsPhoneView && !IsTrashMode && !TableChildField.Readonly && _moreMenuRow && _moreMenuRow._RowMoreBtnsOut && _moreMenuRow._RowMoreBtnsOut.length > 0">
+                    <template v-for="(btn, btnIndex) in _moreMenuRow._RowMoreBtnsOut" :key="'global_more_btn_out_' + btnIndex">
+                        <div v-if="btn.IsVisible" class="global-more-menu-item" @click="handleMoreMenuAction('custom', btn)">
+                            <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
+                            <span>{{ btn.Name }}</span>
+                            <span v-if="GetButtonBadge(btn, _moreMenuRow) !== null" class="global-more-menu-badge" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn, _moreMenuRow) }}</span>
+                        </div>
+                    </template>
+                </template>
+                <template v-if="!IsTrashMode && _moreMenuRow && _moreMenuRow._RowMoreBtnsIn && _moreMenuRow._RowMoreBtnsIn.length > 0 && (!diyStore.IsPhoneView || !TableChildField.Readonly)">
                     <template v-for="(btn, btnIndex) in _moreMenuRow._RowMoreBtnsIn" :key="'global_more_btn_' + btnIndex">
                         <div v-if="btn.IsVisible" class="global-more-menu-item" @click="handleMoreMenuAction('custom', btn)">
                             <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
@@ -1445,7 +1557,15 @@
                     </template>
                 </template>
                 <div
-                    v-if="_LimitDel && _moreMenuRow && _moreMenuRow.IsVisibleDel == true"
+                    v-if="diyStore.IsPhoneView && IsTrashMode && _moreMenuRow && _moreMenuRow._IsInTableAdd !== true"
+                    class="global-more-menu-item"
+                    @click="handleMoreMenuAction('restore')"
+                >
+                    <el-icon><RefreshLeft /></el-icon>
+                    <span>恢复</span>
+                </div>
+                <div
+                    v-if="!IsTrashMode && _LimitDel && _moreMenuRow && _moreMenuRow.IsVisibleDel == true && (!diyStore.IsPhoneView || (TableChildFormMode != 'View' && !TableChildField.Readonly))"
                     class="global-more-menu-item global-more-menu-item-danger"
                     @click="handleMoreMenuAction('delete')"
                 >
@@ -1965,6 +2085,7 @@ export default {
         DiyTableSpecialCell,
         DiySearch,
         DiyModleSearch,
+        ModuleFormWorkbench: defineAsyncComponent(() => import("@/views/form-engine/diy-components/module-form-workbench.vue")),
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
         DiyTableChild: defineAsyncComponent(() => import("@/views/form-engine/diy-table"))
     },

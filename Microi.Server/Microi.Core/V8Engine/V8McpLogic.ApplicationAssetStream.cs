@@ -328,8 +328,9 @@ namespace Microi.net
                 "file" => "mciaf-",
                 "version" => "mciav-",
                 "microservice" => "mcims-",
+                "microservice-page" => "mcimp-",
                 "upload" => "mciau-",
-                _ => throw new ArgumentException("recordType 只支持 file、version 或 microservice。", nameof(recordType))
+                _ => throw new ArgumentException("recordType 只支持 file、version、microservice、microservice-page 或 upload。", nameof(recordType))
             };
             if (string.IsNullOrWhiteSpace(osClient)) throw new ArgumentException("OsClient 不能为空。", nameof(osClient));
             if (string.IsNullOrWhiteSpace(appId)) throw new ArgumentException("AppId 不能为空。", nameof(appId));
