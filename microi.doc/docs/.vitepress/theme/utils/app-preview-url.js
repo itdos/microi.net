@@ -1,5 +1,8 @@
 const stableApplicationEntries = Object.freeze({
-  'microi-unity-taoyuan': 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html'
+  // The fixed query key bypasses the one legacy CDN object that cached a
+  // redirect page. The entry shell itself is evergreen and resolves the
+  // committed current release inside its full-screen iframe.
+  'microi-unity-taoyuan': 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current'
 })
 
 export function withPreviewVersion(previewUrl, application = {}, baseUrl = 'https://microi.net', runtime = {}) {

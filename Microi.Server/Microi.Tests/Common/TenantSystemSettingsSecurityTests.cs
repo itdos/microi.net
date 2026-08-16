@@ -6,6 +6,40 @@ namespace Dos.Common.Tests;
 public class TenantSystemSettingsSecurityTests
 {
     [Fact]
+    public void V8Projection_ExposesAllEnabledBackendValuesAtRoot()
+    {
+        var projection = TenantSystemSettingsSecurity.CreateV8Projection(new[]
+        {
+            new TenantSystemSettingValue
+            {
+                Key = "Login.GitHub.Display",
+                Value = "0",
+                ValueType = "Bool",
+                IsEnabled = true
+            },
+            new TenantSystemSettingValue
+            {
+                Key = "Business.ApiKey",
+                Value = "backend-only-value",
+                ValueType = "String",
+                IsEnabled = true
+            },
+            new TenantSystemSettingValue
+            {
+                Key = "Disabled.Value",
+                Value = "ignored",
+                ValueType = "String",
+                IsEnabled = false
+            }
+        });
+
+        Assert.False(projection["Login.GitHub.Display"]?.Value<bool>());
+        Assert.Equal("backend-only-value", projection["Business.ApiKey"]?.ToString());
+        Assert.Null(projection["Disabled.Value"]);
+        Assert.Null(projection["PublicSettings"]);
+    }
+
+    [Fact]
     public void PublicProjection_IsDynamicPerRowAndKeepsTypedValues()
     {
         var projection = TenantSystemSettingsSecurity.CreatePublicProjection(new[]

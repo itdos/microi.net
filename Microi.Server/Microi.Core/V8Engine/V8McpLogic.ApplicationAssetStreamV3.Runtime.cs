@@ -2773,6 +2773,11 @@ namespace Microi.net
             if (serviceId.DosIsNullOrWhiteSpace()) return "MicroService 派生缓存 Id 为空";
             desiredService["Id"] = serviceId;
             var now = DateTime.Now;
+            // sys_microiservice.PublishTime is a legacy varchar field. Bind the
+            // platform's canonical 19-character timestamp instead of relying on
+            // provider-specific DateTime serialization (which can include
+            // fractional seconds and overflow varchar(25)).
+            var publishTime = now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
             if (existingService == null)
             {
                 var columns = new[]
@@ -2784,7 +2789,7 @@ namespace Microi.net
                 var values = new[]
                 {
                     "@id", "@msKey", "@msName", "@msType", "@runtime", "@storage", "@url", "1",
-                    "@now", "@entry", "@assetCount", "@totalSize", "@distHash", "@description",
+                    "@publishTime", "@entry", "@assetCount", "@totalSize", "@distHash", "@description",
                     "@buildVersion", "@assetsJson", "@manifest", "0", "@now", "@now"
                 };
                 var inserted = trans.FromSql(BuildApplicationAssetV3InsertSql(
@@ -2799,6 +2804,7 @@ namespace Microi.net
                     .AddInParameter("@runtime", "micro-app")
                     .AddInParameter("@storage", "file")
                     .AddInParameter("@url", SafeJString(desiredService, "MsUrl"))
+                    .AddInParameter("@publishTime", publishTime)
                     .AddInParameter("@now", System.Data.DbType.DateTime, now)
                     .AddInParameter("@entry", plan.EntryPath)
                     .AddInParameter("@assetCount", plan.FileCount)
@@ -2816,7 +2822,7 @@ namespace Microi.net
                 var updateSql =
                     $"UPDATE {Q("sys_microiservice")} SET {Q("MsName")}=@msName,{Q("MsType")}=@msType," +
                     $"{Q("Runtime")}=@runtime,{Q("StorageMode")}=@storage,{Q("MsUrl")}=@url," +
-                    $"{Q("IsEnable")}=1,{Q("PublishTime")}=@now,{Q("EntryPath")}=@entry," +
+                    $"{Q("IsEnable")}=1,{Q("PublishTime")}=@publishTime,{Q("EntryPath")}=@entry," +
                     $"{Q("AssetCount")}=@assetCount,{Q("TotalSize")}=@totalSize,{Q("DistHash")}=@distHash," +
                     $"{Q("Description")}=@description,{Q("BuildVersion")}=@buildVersion," +
                     $"{Q("AssetsJson")}=@assetsJson,{Q("AssetManifestJson")}=@manifest," +
@@ -2831,6 +2837,7 @@ namespace Microi.net
                     .AddInParameter("@runtime", "micro-app")
                     .AddInParameter("@storage", "file")
                     .AddInParameter("@url", SafeJString(desiredService, "MsUrl"))
+                    .AddInParameter("@publishTime", publishTime)
                     .AddInParameter("@now", System.Data.DbType.DateTime, now)
                     .AddInParameter("@entry", plan.EntryPath)
                     .AddInParameter("@assetCount", plan.FileCount)

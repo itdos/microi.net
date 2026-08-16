@@ -331,7 +331,15 @@
                                     </div>
                                     <button type="button" class="login-methods-close" aria-label="关闭登录方式" @click="CloseLoginMethods">×</button>
                                 </header>
-                                <div class="login-method-bubbles" role="list">
+                                <div v-if="DefaultLoginMethodsHidden" class="login-methods-empty" role="status">
+                                    <span class="login-methods-empty__icon" aria-hidden="true">!</span>
+                                    <span>
+                                        <strong>常用登录方式暂未开放</strong>
+                                        <small v-if="LoginMethodItems.length">五种常用登录方式均已隐藏，下方仍可使用系统已启用的其他验证方式。</small>
+                                        <small v-else>请使用账号密码登录，或联系系统管理员开启至少一种登录方式。</small>
+                                    </span>
+                                </div>
+                                <div v-if="LoginMethodItems.length" class="login-method-bubbles" role="list">
                                     <button
                                         v-for="(method, methodIndex) in LoginMethodItems"
                                         :key="method.key"
@@ -607,6 +615,10 @@ import { getStoredLanguage, resolveSysLocale } from "@/lang";
 import { resolveLoginResourceUrl, resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
 import { normalizeLoginWallpapers, pickNextLoginWallpaper } from "@/utils/login-wallpaper.js";
 import {
+    DEFAULT_LOGIN_METHOD_KEYS,
+    isLoginMethodDisplayEnabled
+} from "@/utils/login-method-visibility.js";
+import {
     getIdentityCapabilities,
     isPasskeySupported,
     runExternalLogin,
@@ -761,10 +773,13 @@ export default {
         LoginThemeSignature() {
             return String(this.diyStore?.themeColor || this.SysConfig?.ThemeColor || "#409eff").trim().toLowerCase();
         },
+        DefaultLoginMethodsHidden() {
+            return DEFAULT_LOGIN_METHOD_KEYS.every((methodKey) => !isLoginMethodDisplayEnabled(this.SysConfig, methodKey));
+        },
         LoginMethodItems() {
             const capabilities = this.IdentityCapabilities || {};
             const methods = [];
-            if (capabilities.PasskeyEnabled || !this.IdentityCapabilitiesLoaded) {
+            if (isLoginMethodDisplayEnabled(this.SysConfig, "Passkey")) {
                 methods.push({
                     key: "Passkey",
                     name: "生物登录",
@@ -774,10 +789,10 @@ export default {
                     available: !!capabilities.PasskeyEnabled && this.PasskeyAvailable,
                     status: !this.IdentityCapabilitiesLoaded
                         ? "读取中"
-                        : (!this.PasskeyAvailable ? "需 HTTPS" : "免账号密码")
+                        : (!capabilities.PasskeyEnabled ? "未开启" : (!this.PasskeyAvailable ? "需 HTTPS" : "免账号密码"))
                 });
             }
-            if (capabilities.TotpEnabled || !this.IdentityCapabilitiesLoaded) {
+            if (isLoginMethodDisplayEnabled(this.SysConfig, "Totp")) {
                 methods.push({
                     key: "Totp",
                     name: "Authenticator",
@@ -785,7 +800,7 @@ export default {
                     glyph: "6",
                     tone: "totp",
                     available: !!capabilities.TotpEnabled,
-                    status: this.IdentityCapabilitiesLoaded ? "动态口令" : "读取中"
+                    status: !this.IdentityCapabilitiesLoaded ? "读取中" : (capabilities.TotpEnabled ? "动态口令" : "未开启")
                 });
             }
             if (capabilities.FaceEnabled) {
@@ -799,19 +814,29 @@ export default {
                     status: "活体核验"
                 });
             }
-            const providerTone = { gitee: "gitee", wechat: "wechat", github: "github" };
-            const providerGlyph = { gitee: "G", wechat: "微", github: "GH" };
-            (capabilities.ExternalProviders || []).forEach((provider) => {
-                const normalized = String(provider.Key || "").toLowerCase();
+            const externalDefaults = [
+                { key: "Gitee", name: "Gitee", description: "使用 Gitee 账号授权登录", glyph: "G", tone: "gitee" },
+                { key: "WeChat", name: "微信", description: "使用微信开放平台扫码登录", glyph: "微", tone: "wechat" },
+                { key: "GitHub", name: "GitHub", description: "使用 GitHub 账号授权登录", glyph: "GH", tone: "github" }
+            ];
+            const externalProviders = new Map(
+                (capabilities.ExternalProviders || []).map((provider) => [String(provider.Key || "").toLowerCase(), provider])
+            );
+            externalDefaults.forEach((definition) => {
+                if (!isLoginMethodDisplayEnabled(this.SysConfig, definition.key)) return;
+                const provider = externalProviders.get(definition.key.toLowerCase());
+                const providerAvailable = !!provider?.Available;
                 methods.push({
-                    key: `External:${provider.Key}`,
-                    provider: provider.Key,
-                    name: provider.Name,
-                    description: provider.Description,
-                    glyph: providerGlyph[normalized] || String(provider.Name || "外").slice(0, 2),
-                    tone: providerTone[normalized] || "external",
-                    available: !!provider.Available,
-                    status: provider.Available ? (provider.Kind === "qr" ? "扫码登录" : "授权登录") : (provider.Enabled ? "待配置" : "未开启")
+                    key: `External:${definition.key}`,
+                    provider: provider?.Key || definition.key,
+                    name: provider?.Name || definition.name,
+                    description: provider?.Description || definition.description,
+                    glyph: definition.glyph,
+                    tone: definition.tone,
+                    available: providerAvailable,
+                    status: !this.IdentityCapabilitiesLoaded
+                        ? "读取中"
+                        : (providerAvailable ? (provider?.Kind === "qr" ? "扫码登录" : "授权登录") : (provider?.Enabled ? "待配置" : "未开启"))
                 });
             });
             return methods;
@@ -3387,6 +3412,50 @@ export default {
     gap: 14px;
 }
 
+.login-methods-empty {
+    position: relative;
+    z-index: 1;
+    min-height: 112px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 20px;
+    border: 1px dashed color-mix(in srgb, var(--el-color-warning) 45%, var(--el-border-color-light));
+    border-radius: 20px;
+    color: var(--el-text-color-primary);
+    background: color-mix(in srgb, var(--el-color-warning) 8%, var(--el-fill-color-lighter));
+}
+
+.login-methods-empty__icon {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: #fff;
+    background: var(--el-color-warning);
+    font-size: 22px;
+    font-weight: 800;
+}
+
+.login-methods-empty > span:last-child {
+    min-width: 0;
+    display: grid;
+    gap: 6px;
+}
+
+.login-methods-empty strong {
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.login-methods-empty small {
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
 .login-method-bubble {
     --bubble-accent: var(--el-color-primary);
     min-width: 0;
@@ -4265,6 +4334,12 @@ export default {
     .login-method-bubbles {
         grid-template-columns: 1fr;
         gap: 10px;
+    }
+
+    .login-methods-empty {
+        min-height: 96px;
+        padding: 15px;
+        border-radius: 18px;
     }
 
     .login-method-bubble {

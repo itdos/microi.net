@@ -39,7 +39,7 @@ AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员
 - DES 是现有兼容格式，不得宣称能抵抗服务器所有者或代码执行者。新高价值秘密优先使用带版本的现代认证加密与集中密钥管理；基础设施密钥仍不得进入可编辑 V8。
 - 登录后的敏感操作优先用 `V8.Identity.Verify` 申请 Passkey、Authenticator TOTP 或严格人脸一次性票据，接口引擎从权威数据重算 `ActionHash` 后调用 `V8.Method.ConsumeIdentityVerificationTicket` 原子消费。票据不能代替菜单/表/行权限、状态机、幂等、事务或审计。
 - Windows Hello、Touch ID、Face ID 和 Android 设备验证优先采用 WebAuthn/Passkey；Microsoft/Google Authenticator 采用标准 TOTP，两者都不增加模型服务。只有服务端严格人脸与活体检测才接入独立 `Microi Face Gateway v1` 云服务或 Docker/集群。完整规范读取 `microi.skills/v8-security/SKILL.md` 与 `microi.doc/docs/doc/more/identity-verification.md`。
-- 外部登录统一在登录页【登录方式】中展示；Gitee、微信、GitHub 等 Provider 只登录个人中心已绑定的吾码用户，最终签发 DiyToken。Provider 固定协议端点，租户自己的 ClientId/ClientSecret 放 `mci_system_setting`，Secret 不进入 `V8.SysConfig.PublicSettings`、普通 V8 或浏览器。
+- 外部登录统一在登录页【登录方式】中展示；Gitee、微信、GitHub 等 Provider 只登录个人中心已绑定的吾码用户，最终签发 DiyToken。Provider 固定协议端点，租户自己的 ClientId/ClientSecret 放 `mci_system_setting`；Secret 不进入浏览器/前端 `V8.SysConfig`，但后端接口引擎和后端 V8 事件可从当前租户根级 `V8.SysConfig[ConfigKey]` 使用，禁止回传或记录原文。
 - 一键安装恢复客户旧库时只允许定位精确主租户三元组；缺失则幂等创建，重复则停止，不能批量重写其它子租户。新主租户行不得持久化数据库、MongoDB 或 Redis 连接，安装器对 MinIO/OCR 等业务配置的后续更新也必须带同一三元组、活动状态条件并做唯一回读。
 
 <!-- /microi-progressive:chunk -->

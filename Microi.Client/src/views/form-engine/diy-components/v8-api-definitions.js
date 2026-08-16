@@ -62,7 +62,7 @@ export const V8ApiDefinitions = {
             SysConfig: {
                 label: "SysConfig",
                 kind: "Property",
-                documentation: "访问当前租户允许公开给浏览器的系统设置脱敏投影。\n\n数据库、Redis、对象存储、MQ、密码、Secret、Token、Key、Connection、ClientSecrets、GlobalServerV8Code 等敏感字段不会注入前端。\n\n示例:\nvar sysTitle = V8.SysConfig.SysTitle;\nvar apiBase = V8.SysConfig.ApiBase;",
+                documentation: "访问当前租户允许公开给浏览器的系统设置脱敏投影。公开的租户动态设置直接位于 SysConfig 根对象，不存在 PublicSettings 包装层。\n\n数据库、Redis、对象存储、MQ、密码、Secret、Token、Key、Connection、ClientSecrets、GlobalServerV8Code 等敏感字段不会注入前端。\n\n示例:\nvar sysTitle = V8.SysConfig.SysTitle;\nvar loginEnabled = V8.SysConfig['Login.GitHub.Display'];",
                 insertText: "SysConfig"
             },
             SelectedData: {

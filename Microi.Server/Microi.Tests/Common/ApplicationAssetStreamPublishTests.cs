@@ -1820,6 +1820,15 @@ public class ApplicationAssetStreamPublishTests
         Assert.DoesNotContain(
             ".AddInParameter(\"@now\", now)",
             runtimeSource);
+        Assert.Contains(
+            "var publishTime = now.ToString(\"yyyy-MM-dd HH:mm:ss\", CultureInfo.InvariantCulture);",
+            runtimeSource);
+        Assert.Equal(
+            2,
+            CountOccurrences(runtimeSource, ".AddInParameter(\"@publishTime\", publishTime)"));
+        Assert.DoesNotContain(
+            "Q(\"PublishTime\")}=@now",
+            runtimeSource);
         Assert.Equal(
             16,
             CountOccurrences(

@@ -137,12 +137,6 @@ namespace Microi.net
                 "ClientSecrets", "GlobalServerV8Code"
             };
 
-        private static readonly HashSet<string> V8SysConfigAlwaysHiddenFieldSet =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "ClientSecrets", "PwdV8", "GlobalServerV8Code"
-            };
-
         public static IReadOnlyCollection<string> SharedInfrastructureFields =>
             SharedInfrastructureFieldSet.ToArray();
 
@@ -417,35 +411,36 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 创建接口引擎可见的 sys_config 独立快照。服务器端全局代码及所有疑似凭据
-        /// 不进入 V8；普通租户自有业务配置保持原值。PwdV8 由后端认证流程内部消费，
-        /// 不需要作为 V8.SysConfig 数据再次暴露。
+        /// 创建接口引擎和后端 V8 事件可见的完整、独立 SysConfig 快照。
+        /// 后端 V8 属于可信执行面，保留 sys_config 的全部字段，并把当前租户全部启用的
+        /// mci_system_setting（含后端解密后的 Secret）直接平铺到根对象。历史
+        /// PublicSettings 包装层不再进入任何 V8.SysConfig。
         /// </summary>
-        public static JObject CreateV8SysConfigProjection(object source)
+        public static JObject CreateV8SysConfigProjection(object source, string osClient = null)
         {
             var projection = ToIndependentJObject(source);
-            foreach (var property in projection.Properties().ToList())
+            RemovePropertyIgnoreCase(projection, "PublicSettings");
+            if (!string.IsNullOrWhiteSpace(osClient))
             {
-                if (V8SysConfigAlwaysHiddenFieldSet.Contains(property.Name)
-                    || IsSensitiveSysConfigField(property.Name))
-                {
-                    property.Remove();
-                }
+                MergeRootProjection(
+                    projection,
+                    TenantSystemSettingsSecurity.LoadV8Projection(osClient));
             }
             return projection;
         }
 
         /// <summary>
-        /// 创建匿名 GetSysConfig API 的公开快照。GlobalV8Code 与 PwdV8 是既有前端协议，
-        /// 可继续返回；服务器端代码、ClientSecrets 及其它疑似凭据必须隐藏。
+        /// 创建匿名 GetSysConfig API 的公开快照。GlobalV8Code 是必须下发并在浏览器
+        /// 执行的前端代码；PwdV8 只应由后端登录逻辑执行，不得再作为历史兼容字段
+        /// 公开。服务器端代码、ClientSecrets 及其它疑似凭据同样必须隐藏。
         /// </summary>
         public static JObject CreatePublicSysConfigProjection(object source, string osClient = null)
         {
             var projection = ToIndependentJObject(source);
+            RemovePropertyIgnoreCase(projection, "PublicSettings");
             foreach (var property in projection.Properties().ToList())
             {
-                if (string.Equals(property.Name, "PwdV8", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(property.Name, "GlobalV8Code", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(property.Name, "GlobalV8Code", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -457,11 +452,33 @@ namespace Microi.net
             }
             if (!string.IsNullOrWhiteSpace(osClient))
             {
-                // 未来新增业务设置不再依赖硬编码字段白名单。每个租户可在
-                // mci_system_setting 中逐项决定是否公开；Secret 与敏感 Key 永远拒绝下发。
-                projection["PublicSettings"] = TenantSystemSettingsSecurity.LoadPublicProjection(osClient);
+                // 公开普通设置直接进入前端 SysConfig 根对象，不再产生 PublicSettings
+                // 包装层。Secret 与敏感 Key 仍由 LoadPublicProjection 永久拒绝下发。
+                MergeRootProjection(
+                    projection,
+                    TenantSystemSettingsSecurity.LoadPublicProjection(osClient));
             }
             return projection;
+        }
+
+        private static void MergeRootProjection(JObject target, JObject values)
+        {
+            if (target == null || values == null) return;
+            foreach (var property in values.Properties())
+            {
+                RemovePropertyIgnoreCase(target, property.Name);
+                target[property.Name] = property.Value.DeepClone();
+            }
+        }
+
+        private static void RemovePropertyIgnoreCase(JObject target, string propertyName)
+        {
+            if (target == null || string.IsNullOrWhiteSpace(propertyName)) return;
+            foreach (var property in target.Properties().Where(item =>
+                         string.Equals(item.Name, propertyName, StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                property.Remove();
+            }
         }
 
         private static JObject ToIndependentJObject(object source)

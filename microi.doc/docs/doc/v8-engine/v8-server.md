@@ -1723,20 +1723,22 @@ return V8.Office.SendEmail({
 ```
 
 ## 系统设置 V8.SysConfig
->* 访问当前租户系统设置中的非敏感业务与展示字段；返回值是独立脱敏副本，脚本修改不会写回缓存或数据库。
->* `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 以及 Password/Secret/Token/Key/Connection 等疑似凭据字段不会注入 V8。`V8.FormEngine.GetSysConfig(...)` 同样强制绑定当前租户并应用此安全边界。
+>* 后端接口引擎与后端 V8 事件访问当前租户完整系统配置；返回值是独立副本，脚本修改不会写回缓存或数据库。
+>* `sys_config` 的全部字段和 `mci_system_setting` 的全部启用设置都直接位于根对象，Secret 在可信后端按当前租户解密；不存在 `PublicSettings` 属性。
+>* `V8.FormEngine.GetSysConfig(...)` 强制绑定当前 V8 租户，显式传其它 `OsClient` 也不能跨租户读取。
 ```js
 var sysTitle = V8.SysConfig.SysTitle;
-var publicLoginName = V8.SysConfig.PublicSettings?.['Login.Gitee.Name'];
-// V8.SysConfig.ClientSecrets / GlobalServerV8Code 为 undefined
+var loginName = V8.SysConfig['Login.Gitee.Name'];
+var clientSecret = V8.SysConfig['Login.Gitee.ClientSecret'];
+// clientSecret 只能用于当前后端逻辑，禁止 return 或写日志。
 ```
 
-`V8.SysConfig.PublicSettings` 是当前租户 `mci_system_setting` 的动态公开投影。租户管理员逐条控制 `IsPublic`，但 Secret 和固定敏感 Key 规则永远优先，不能通过勾选公开绕过。后端 V8 若需要第三方 Secret，应调用封装好租户隔离与固定协议的受控原子能力；不要查询 `mci_system_setting.SecretCipher`、自行解密或把原文写入日志/返回值。
+匿名 `FormEngine/GetSysConfig` 与前端 V8 使用另一条公开投影：只有 `IsPublic=1` 且非敏感的普通设置会根级返回，Secret 永远不进入浏览器。后端 V8 不需要查询 `mci_system_setting.SecretCipher` 或自行解密，直接按 Key 读取 `V8.SysConfig`；任何 Secret 都不得返回客户端、写日志、写审计或保存到前端可读字段。
 
 ## SaaS引擎信息 V8.OsClientModel / V8.ClientModel
 >* 两者是当前租户 SaaS 配置的独立脱敏副本，脚本修改不会写回服务端运行配置。
 >* 数据库连接、鉴权密钥以及共享 Redis、对象存储、RabbitMQ、MQTT、Search 的地址、账号和密码不会注入 V8；即使接口错误地 `return V8.ClientModel`，也不会泄露主库基础设施凭据。
->* `sys_osclients` 自定义业务字段只作为存量兼容；新增租户业务设置使用当前租户库的 `mci_system_setting`。普通值按需进入 `V8.SysConfig.PublicSettings`，Secret 只能由封装好的后端协议能力使用，不通过 `V8.OsClientModel` 暴露。
+>* `sys_osclients` 自定义业务字段只作为存量兼容；新增租户业务设置使用当前租户库的 `mci_system_setting`。普通值与 Secret 在后端根级 `V8.SysConfig` 中使用，前端只得到明确公开的普通值；这些设置不通过 `V8.OsClientModel` 暴露。
 >* 存储类型 `HDFS` 与公开文件域名可以读取；访问缓存、文件、MQ、MQTT 和 Search 必须使用对应的 `V8.*` 受控能力，服务端自动添加当前租户命名空间。
 ```js
 var title = V8.OsClientModel.SysTitle;
