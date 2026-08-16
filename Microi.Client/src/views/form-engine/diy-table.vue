@@ -1260,8 +1260,7 @@
                                     <!--Fix by Anderson for 小赵：移动端也需要选中功能以便V8按钮操作，下面不能增加【&&!diyStore.IsPhoneView】-->
                                     <div v-if="IsOpenTableSingleSelect()"
                                         class="card-radio-wrapper"
-                                        @click.stop="selectOpenTableSingleRow(item)"
-                                        style="flex:1;justify-content:left;">
+                                        @click.stop="selectOpenTableSingleRow(item)">
                                         <el-radio
                                             class="open-table-row-radio"
                                             :model-value="TableSelectedRow && TableSelectedRow.Id"
@@ -1270,8 +1269,7 @@
                                     </div>
                                     <div v-else-if="CanUseTableSelection()"
                                         class="card-checkbox-wrapper"
-                                        @click.stop="toggleCardSelection(item)"
-                                        style="flex:1;justify-content:left;">
+                                        @click.stop="toggleCardSelection(item)">
                                         <el-checkbox :model-value="isCardSelected(item)" />
                                     </div>
                                     <el-button
@@ -1365,6 +1363,15 @@
                                             </el-dropdown-menu>
                                         </template>
                                     </el-dropdown>
+                                    <button
+                                        v-if="diyStore.IsPhoneView && PropsTableType !== 'OpenTable' && IsPermission('NoDetail')"
+                                        type="button"
+                                        class="card-mobile-detail"
+                                        aria-label="查看详情"
+                                        @click.stop="CardItemClick(item)"
+                                    >
+                                        <span>查看详情</span><span aria-hidden="true">›</span>
+                                    </button>
                                 </div>
                             </el-card>
                         </el-col>

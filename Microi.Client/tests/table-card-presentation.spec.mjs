@@ -100,6 +100,8 @@ test("card template and styles keep visible surfaces and no longer index rows by
     assert.match(component, /@keydown\.enter\.prevent="CardItemClick\(item\)"/);
     assert.match(component, /@keydown\.space\.prevent="CardItemClick\(item\)"/);
     assert.match(component, /class="card-action-more-label">更多<\/span>/);
+    assert.match(component, /class="card-mobile-detail"[\s\S]*?@click\.stop="CardItemClick\(item\)"/);
+    assert.match(component, /PropsTableType !== 'OpenTable' && IsPermission\('NoDetail'\)/);
     assert.match(presentation, /device === "PC" \? "Mobile" : "PC"/);
     assert.match(presentation, /function withoutUsedFields\([\s\S]*?CardBottomFieldList\(\)[\s\S]*?withoutUsedFields/);
     assert.match(presentation, /const hasRawValue =[\s\S]*?return hasRawValue[\s\S]*?templateValue/);
@@ -107,7 +109,13 @@ test("card template and styles keep visible surfaces and no longer index rows by
     assert.match(styles, /\.card-avatar--fallback\s*\{/);
     assert.match(styles, /\.card-action-btn-more\s*\{[\s\S]*?width:\s*34px;[\s\S]*?\.card-action-more-label/);
     assert.match(styles, /\.card-actions\s+:deep\(\.card-action-btn\s*>\s*span\)[\s\S]*?color:\s*inherit\s*!important/);
-    assert.match(styles, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    assert.doesNotMatch(styles, /\.card-actions\s*\{\s*display:\s*grid/);
+    assert.match(styles, /\.card-actions\s*\{[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?overflow-x:\s*auto;/);
+    assert.match(styles, /\.card-mobile-detail\s*\{[\s\S]*?min-height:\s*44px;[\s\S]*?margin:\s*0 0 0 auto;/);
+    assert.match(styles, /\.card-title-main\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\) auto;/);
+    assert.match(styles, /\.card-field-row\s*\{[\s\S]*?min-height:\s*24px;[\s\S]*?padding:\s*2px 0;/);
+    assert.match(styles, /\.card-field-value\s*\{[\s\S]*?-webkit-line-clamp:\s*2;/);
+    assert.match(styles, /\.card-actions\s*\{[\s\S]*?min-height:\s*52px;[\s\S]*?padding:\s*4px 8px;/);
     assert.match(styles, /\.box-card\.card-redesign\s*\{[\s\S]*?&:focus-visible/);
     assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.box-card\.card-data-animate/);
 });
