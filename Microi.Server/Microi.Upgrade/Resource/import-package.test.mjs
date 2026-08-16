@@ -1268,6 +1268,51 @@ test("SaaS engine ships its built-in microservice as a bounded database-only run
   assert.ok(assets.some((asset) => asset.Path === bundle.EntryPath));
 });
 
+test("SaaS engine ships the complete audited Gitee binding recovery and tenant creation chain", () => {
+  const requiredEngineKeys = [
+    "official_tenant_center",
+    "official_create_tenant_progress",
+    "official_gitee_star_oauth_start",
+    "official_gitee_star_oauth_callback",
+    "official_gitee_star_status",
+    "official_gitee_star_binding_transfer",
+    "official_create_tenant",
+    "official_create_tenant_worker",
+  ];
+  const enginesByKey = new Map(
+    (saasPackageModel.SysApiEngines || []).map(engine => [engine.ApiEngineKey, engine]),
+  );
+  for (const key of requiredEngineKeys) {
+    const engine = enginesByKey.get(key);
+    assert.ok(engine, `SaaS package is missing ${key}`);
+    assert.doesNotThrow(() => new Function(engine.ApiV8Code), `${key} must remain valid JavaScript`);
+    assert.deepEqual(saasPackageModel.ResourcePolicies?.ApiEngines?.[key], {
+      Ownership: "Platform",
+      UpgradePolicy: "Managed",
+    });
+  }
+
+  assert.equal(enginesByKey.get("official_gitee_star_oauth_callback").AllowAnonymous, 1);
+  assert.equal(enginesByKey.get("official_create_tenant_worker").StopHttp, 1);
+  assert.match(enginesByKey.get("official_gitee_star_status").ApiV8Code, /BindingTransferAvailable/);
+  assert.match(enginesByKey.get("official_gitee_star_binding_transfer").ApiV8Code, /binding_transferred/);
+  assert.match(enginesByKey.get("official_gitee_star_binding_transfer").ApiV8Code, /UptTableData/);
+  assert.match(enginesByKey.get("official_create_tenant_worker").ApiV8Code, /GiteeBindingTransferLock/);
+
+  assert.ok(
+    (saasPackageModel.DiyTables || []).some(table => table.Name === "mci_gitee_star_audit"),
+    "Gitee verification audit table must be installable with the package",
+  );
+  assert.ok(
+    (saasPackageModel.DDLStatements || []).some(row => row.TableName === "mci_gitee_star_audit"),
+    "Gitee verification audit DDL must be installable with the package",
+  );
+  assert.equal(saasPackageModel.PackageInfo.ApiEngineCount, saasPackageModel.SysApiEngines.length);
+  assert.equal(saasPackageModel.PackageInfo.TableCount, saasPackageModel.DiyTables.length);
+  assert.equal(saasPackageModel.PackageInfo.FieldCount, saasPackageModel.DiyFields.length);
+  assert.equal(saasPackageModel.PackageInfo.PhysicalColumnCount, saasPackageModel.PhysicalColumns.length);
+});
+
 test("application-store package embeds the canonical publisher", () => {
   const packagePublisher = packageModel.SysApiEngines.find(
     engine => engine.ApiEngineKey === "ai_app_publish_store"

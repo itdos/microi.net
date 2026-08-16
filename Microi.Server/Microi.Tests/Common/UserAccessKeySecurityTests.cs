@@ -462,6 +462,8 @@ public class UserAccessKeySecurityTests
         var deniedPaths = new[]
         {
             "/api/SysUser/GetSysUserPassword",
+            "/api/SysUser/GetOwnedTenantAdminPassword",
+            "/api/SysUser/ResetOwnedTenantAdminPassword",
             "/api/SysUserAccessKey/Create",
             "/api/SysMenu/UptSysMenu",
             "/api/WorkFlow/SaveWFFlowDesign",

@@ -1,5 +1,54 @@
 @import "@/styles/diy-form.scss";
 
+/* ViewSchema FormWorkbench 的设置中心外观。仅改变排版，不分叉 DiyForm 的数据和 V8 执行链。 */
+.diy-form--settingscenter {
+    padding: 2px;
+
+    :deep(.field-form-tabs > .el-tabs__header) {
+        margin-bottom: 12px;
+        padding: 6px;
+        border: 1px solid var(--el-border-color-lighter, #e7edf5);
+        border-radius: 13px;
+        background: var(--el-fill-color-extra-light, #f5f8fc);
+    }
+
+    :deep(.field-form-tabs > .el-tabs__header .el-tabs__nav-wrap::after) { display: none; }
+    :deep(.field-form-tabs > .el-tabs__header .el-tabs__item) {
+        height: 34px;
+        padding: 0 14px;
+        border-radius: 9px;
+        color: var(--el-text-color-secondary);
+        font-size: 12px;
+    }
+    :deep(.field-form-tabs > .el-tabs__header .el-tabs__item.is-active) {
+        color: var(--el-color-primary);
+        background: var(--el-bg-color);
+        box-shadow: 0 6px 16px rgba(31, 63, 104, .08);
+    }
+    :deep(.field-form-tabs > .el-tabs__header .el-tabs__active-bar) { display: none; }
+    :deep(.field-form) {
+        padding: 13px 12px 3px;
+        border: 1px solid var(--el-border-color-lighter, #e7edf5);
+        border-radius: 14px;
+        background: color-mix(in srgb, var(--el-bg-color) 94%, var(--el-fill-color-extra-light));
+    }
+    :deep(.el-form-item) { margin-bottom: 14px; }
+    :deep(.el-form-item__label) { color: var(--el-text-color-regular); font-size: 12px; font-weight: 650; }
+    :deep(.el-input__wrapper),
+    :deep(.el-select__wrapper),
+    :deep(.el-textarea__inner) {
+        border-radius: 9px;
+        box-shadow: 0 0 0 1px var(--el-border-color-lighter, #e7edf5) inset;
+    }
+}
+
+@media (max-width: 620px) {
+    .diy-form--settingscenter {
+        :deep(.field-form-tabs > .el-tabs__header) { overflow-x: auto; }
+        :deep(.field-form) { padding: 10px 8px 1px; }
+    }
+}
+
 /* 校验失败时在当前控件内展示错误，不占行高，也不遮挡下一行字段。 */
 .itdos-diy-form {
     :deep(.el-form-item__content) {

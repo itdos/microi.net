@@ -791,15 +791,16 @@ namespace Microi.net
                 return new DosResult(0, null, "租户和用户Id不能为空");
             }
 
-            return await RevokeUserSessionsAsync(osClient, targetUserId, reason)
+            return await RevokeUserSessionsFromTrustedHostAsync(osClient, targetUserId, reason)
                 .ConfigureAwait(false);
         }
 
         /// <summary>
-        /// 服务端用户生命周期逻辑专用：吊销指定用户的全部终端会话。
-        /// 仅在当前程序集内开放，外部管理接口仍必须经过 ClearUserLoginInfoAsync 的管理员校验。
+        /// 服务端可信用户生命周期逻辑专用：吊销指定用户的全部终端会话。
+        /// 该方法不暴露为 HTTP 或 V8 能力；调用方必须先完成不可伪造的服务端授权，
+        /// 外部管理接口仍必须经过 ClearUserLoginInfoAsync 的管理员校验。
         /// </summary>
-        internal static async Task<DosResult> RevokeUserSessionsAsync(
+        public static async Task<DosResult> RevokeUserSessionsFromTrustedHostAsync(
             string osClient,
             string targetUserId,
             string reason = null)

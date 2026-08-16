@@ -126,6 +126,8 @@ test("compiled wrapper, nested app HTML, and legacy paths all receive fresh runt
   const stableLoaderSource = extractFunction("legacyRedirectHtml");
   assert.match(stableLoaderSource, /<iframe src=/);
   assert.match(stableLoaderSource, /allowfullscreen/);
+  assert.match(stableLoaderSource, /allow="autoplay \*; fullscreen \*; gamepad \*; clipboard-write \*"/);
+  assert.doesNotMatch(stableLoaderSource, /allow="autoplay; fullscreen; gamepad; clipboard-write"/);
   assert.doesNotMatch(stableLoaderSource, /location\.replace|http-equiv="refresh"/);
   assert.match(source, /function immutableRuntimeBaseUrl\(/);
   assert.match(source, /function stableRuntimeResolverBaseUrl\(/);
@@ -225,7 +227,7 @@ test("all compiled and marketplace promotion paths wrap raw UniApp entries only"
 test("application-store package and server upgrade both carry the fixed builder", () => {
   const packaged = packageModel.SysApiEngines.find(item => item.ApiEngineKey === "ai_app_build");
   assert.ok(packaged);
-  assert.equal(packaged.Version, "v1.6.7");
+  assert.equal(packaged.Version, "v1.6.9");
   assert.equal(packaged.ApiV8Code.replace(/\r\n/g, "\n"), source.replace(/\r\n/g, "\n"));
   assert.ok(
     compareSemver(packageModel.PackageInfo.Version, "v6.5.4") >= 0,

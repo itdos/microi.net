@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_build
- * Version: v1.6.7
+ * Version: v1.6.9
  * Function:
  * - AI应用编译发布、固定最新版发布、可恢复大文件下载登记与受控静态资源热修；固定入口使用永久加载壳解析数据库已提交的当前版本，历史入口保留不可变产物；并在发布前拒绝 HTTP 错误、Code=0、长度或哈希不一致的源文件。
  */
@@ -317,7 +317,7 @@ function legacyRedirectHtml(targetUrl, versionNo) {
     '  <style>html,body,iframe{width:100%;height:100%;margin:0;border:0}body{overflow:hidden;background:#071617}iframe{display:block}</style>\n' +
     '</head>\n<body>\n' +
     '  <iframe src="' + safeTarget + '" title="Microi AI Application ' + text(versionNo) + '"' +
-    ' allow="autoplay; fullscreen; gamepad; clipboard-write" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>\n' +
+    ' allow="autoplay *; fullscreen *; gamepad *; clipboard-write *" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>\n' +
     '  <noscript><a href="' + safeTarget + '">打开 Microi AI Application ' + text(versionNo) + '</a></noscript>\n' +
     '</body>\n</html>\n';
 }
