@@ -55,6 +55,7 @@
             :fields="DiyFieldList"
             :config="ModuleFormWorkbenchConfig"
             :page-buttons="SysMenuModel.PageBtns || []"
+            :batch-buttons="SysMenuModel.BatchSelectMoreBtns || []"
             :form-buttons="SysMenuModel.FormBtns || []"
             :row-count="Number(DiyTableRowCount || 0)"
             :page-index="DiyTableRowPageIndex"
@@ -62,6 +63,7 @@
             :can-add="Boolean(_LimitAdd && IsVisibleAdd == true && !TableChildField.Readonly)"
             :can-edit="Boolean(_LimitEdit && TableChildFormMode != 'View' && !TableChildField.Readonly)"
             :loading="tableLoading"
+            :action-loading="BtnV8Loading"
             :initial-record-id="String($route.query.RecordId || '')"
             @refresh="GetDiyTableRow({ _PageIndex: DiyTableRowPageIndex || 1 })"
             @load-page="HandleModuleWorkbenchPage"
@@ -75,10 +77,6 @@
         <!-- type="border-card" -->
         <!-- 设备tabs(设备、服务数据) -->
         <template v-else>
-        <div v-if="ModuleFormWorkbenchClassicEnabled" class="module-workbench-return-bar">
-            <span>当前为经典表格视图</span>
-            <el-button type="primary" plain size="small" @click="SwitchClassicToModuleWorkbench">返回表单工作台</el-button>
-        </div>
         <el-tabs
             id="table-rowlist-tabs"
             v-model="TableRowListActiveTab"
@@ -374,17 +372,20 @@
                             >
                         </el-popover>
                     </div>
-                    <el-dropdown v-if="!PropsHideMoreFunctions && !diyStore.IsPhoneView" trigger="click">
+                    <el-dropdown v-if="(!PropsHideMoreFunctions || ModuleFormWorkbenchClassicEnabled) && !diyStore.IsPhoneView" trigger="click">
                         <el-button type="primary" :loading="BusinessDataTranslateLoading">
                             <el-icon style="margin-right: 4px"><MoreFilled /></el-icon>{{ $t('Msg.MoreFunctions') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
                         </el-button>
                         <template #dropdown>
                             <el-dropdown-menu>
-                                <el-dropdown-item @click="ShiftTableDisplayMode()">
+                                <el-dropdown-item v-if="!PropsHideMoreFunctions" @click="ShiftTableDisplayMode()">
                                     <el-icon><List /></el-icon>{{ $t('Msg.SwitchTableDisplay') }}
                                 </el-dropdown-item>
-                                <el-dropdown-item @click="TranslateBusinessData()">
+                                <el-dropdown-item v-if="!PropsHideMoreFunctions" @click="TranslateBusinessData()">
                                     <fa-icon icon="fas fa-language" class="mr-1" />{{ $t('Msg.TranslateBusinessData') }}
+                                </el-dropdown-item>
+                                <el-dropdown-item v-if="ModuleFormWorkbenchClassicEnabled" divided @click="SwitchClassicToModuleWorkbench">
+                                    <fa-icon icon="fas fa-table-columns" class="mr-1" />返回表单工作台（当前为经典表格视图）
                                 </el-dropdown-item>
                             </el-dropdown-menu>
                         </template>
@@ -451,7 +452,7 @@
                 </div>
 
                 <!--DIY移动端浮动操作按钮（FAB）-->
-                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !PropsEmbedded && ShowAddByRoute && !IsTrashMode && cardSelection.length === 0" :style="GetFabContainerStyle()">
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !PropsEmbedded && (ShowAddByRoute || ModuleFormWorkbenchClassicEnabled) && !IsTrashMode && cardSelection.length === 0" :style="GetFabContainerStyle()">
                     <!--遮罩层-->
                     <transition name="fab-overlay">
                         <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
@@ -459,6 +460,10 @@
                     <!--弹出菜单-->
                     <transition name="fab-menu">
                         <div class="mobile-fab-menu" v-if="showMobileFabMenu">
+                            <div class="mobile-fab-menu-item" v-if="ModuleFormWorkbenchClassicEnabled" @click="showMobileFabMenu = false; SwitchClassicToModuleWorkbench()">
+                                <div class="mobile-fab-menu-icon v8"><fa-icon icon="fas fa-table-columns" /></div>
+                                <span class="mobile-fab-menu-label">返回表单工作台</span>
+                            </div>
                             <!--工作流-发起申请按钮-->
                             <div class="mobile-fab-menu-item" v-if="IsWorkFlowMenu() && _LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; StartWorkFlow()">
                                 <div class="mobile-fab-menu-icon add"><fa-icon icon="far fa-paper-plane" /></div>

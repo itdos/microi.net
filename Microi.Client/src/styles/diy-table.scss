@@ -2224,20 +2224,6 @@
 /* Module presentation: compact title/metrics, composite cells and card views */
 /* ========================================================================== */
 
-.module-workbench-return-bar {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    margin: 0 6px 6px;
-    padding: 7px 10px;
-    border: 1px solid var(--el-border-color-lighter, #e7edf5);
-    border-radius: 9px;
-    color: var(--el-text-color-secondary, #64748b);
-    background: var(--el-fill-color-extra-light, #f7f9fc);
-    font-size: 12px;
-}
-
 .module-presentation-header {
     position: relative;
     isolation: isolate;
