@@ -144,9 +144,28 @@ function normalizeCard(value) {
 function normalizeFormWorkbench(value) {
     const source = parseObject(value);
     const selector = parseObject(source.RecordSelector || source.recordSelector);
+    const sections = Array.isArray(source.Sections || source.sections) ? (source.Sections || source.sections) : [];
     return {
-        Presentation: canonical(source.Presentation || source.presentation, ["SettingsCenter", "Standard"], "SettingsCenter"),
+        Presentation: canonical(source.Presentation || source.presentation, ["ControlCenter", "SettingsCenter", "Standard"], "ControlCenter"),
         Mode: canonical(source.Mode || source.mode, ["Edit", "View"], "Edit"),
+        Density: canonical(source.Density || source.density, ["Compact", "Comfortable"], "Compact"),
+        SectionNavigation: canonical(source.SectionNavigation || source.sectionNavigation, ["Auto", "Sidebar", "Tabs"], "Auto"),
+        Eyebrow: String(source.Eyebrow || source.eyebrow || ""),
+        Description: String(source.Description || source.description || ""),
+        NavigationTitle: String(source.NavigationTitle || source.navigationTitle || ""),
+        SectionEyebrow: String(source.SectionEyebrow || source.sectionEyebrow || ""),
+        SaveText: String(source.SaveText || source.saveText || ""),
+        Sections: sections.map((section) => {
+            const item = section && typeof section === "object" ? section : {};
+            const key = String(item.Key || item.key || item.Id || item.id || item.Name || item.name || "").trim();
+            if (!key) return null;
+            return {
+                Key: key,
+                Title: String(item.Title || item.title || item.Label || item.label || ""),
+                Description: String(item.Description || item.description || ""),
+                Icon: String(item.Icon || item.icon || "")
+            };
+        }).filter(Boolean).slice(0, 30),
         ShowClassicList: ![false, 0, "0", "false"].includes(source.ShowClassicList ?? source.showClassicList),
         RecordSelector: {
             Display: canonical(selector.Display || selector.display, ["Both", "Dropdown", "List"], "Both"),
