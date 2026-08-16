@@ -22,6 +22,10 @@ const engineSource = await readFile(
   ),
   'utf8'
 )
+const previewUrlSource = await readFile(
+  path.join(testDir, '../docs/.vitepress/theme/utils/app-preview-url.js'),
+  'utf8'
+)
 
 test('推荐是紧跟全部的虚拟分类，并转换为独立接口筛选参数', () => {
   const categories = componentSource.match(/const defaultBusinessCategories = \[[\s\S]*?\n\]/)?.[0] || ''
@@ -43,6 +47,15 @@ test('应用列表同时提供 observer、滚动兜底、手动加载和明确�
   assert.match(componentSource, /class="ai-app-finished"/)
   assert.match(componentSource, /aria-live="polite"/)
   assert.match(componentSource, /const pageSize = 24/)
+})
+
+test('Unity 桃源立即体验使用固定永久壳而不是不可变版本产物', () => {
+  const stableEntry = previewUrlSource.match(/'microi-unity-taoyuan':\s*'([^']+)'/)?.[1] || ''
+  assert.equal(
+    stableEntry,
+    'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current'
+  )
+  assert.doesNotMatch(stableEntry, /\/releases\/|\/requests\/|\/versions\/|v\d+\.\d+\.\d+/i)
 })
 
 test('official_ai_apps only returns recommended published applications when requested', () => {

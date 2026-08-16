@@ -24,7 +24,7 @@ public class FormEngineTenantBoundaryTests
     }
 
     [Fact]
-    public void NonMasterV8SysConfigReturn_IsSanitizedDeepCopyWithoutMutatingRawModel()
+    public void BackendV8SysConfigReturn_IsCompleteDeepCopyWithoutMutatingRawModel()
     {
         var engine = new ExposedFormEngine();
         var source = new JObject
@@ -43,8 +43,8 @@ public class FormEngineTenantBoundaryTests
 
         Assert.NotSame(source, projection);
         Assert.Equal("Tenant title", projection["SysTitle"]?.ToString());
-        Assert.Null(projection["ClientSecrets"]);
-        Assert.Null(projection["GlobalServerV8Code"]);
+        Assert.Equal("raw-secret", projection["ClientSecrets"]?.ToString());
+        Assert.Equal("raw-server-code", projection["GlobalServerV8Code"]?.ToString());
         Assert.Equal("raw-secret", source["ClientSecrets"]?.ToString());
         Assert.Equal("raw-server-code", source["GlobalServerV8Code"]?.ToString());
 
@@ -1651,7 +1651,7 @@ public class FormEngineTenantBoundaryTests
     {
         public dynamic ProjectSysConfigForCaller(dynamic source)
         {
-            return ProtectSysConfigForV8Return(source);
+            return ProtectSysConfigForV8Return(source, V8TenantContext.Current?.OsClient);
         }
     }
 

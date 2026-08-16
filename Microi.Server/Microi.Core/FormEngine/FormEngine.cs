@@ -127,6 +127,12 @@ namespace Microi.net
                 await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(sysConfigCacheKey);
                 await MicroiEngine.CacheTenant.Default().RemoveAsync(sysConfigCacheKey);
             }
+            else if (normalizedTableName == TenantSystemSettingsSecurity.TableName)
+            {
+                var settingsCacheKey = TenantSystemSettingsSecurity.GetSnapshotCacheKey(osClient);
+                await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(settingsCacheKey);
+                await MicroiEngine.CacheTenant.Default().RemoveAsync(settingsCacheKey);
+            }
             //如果【增删改】diy_field表
             if(normalizedTableName == "diy_field")
             {

@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_build
- * Version: v1.6.4
+ * Version: v1.6.7
  * Function:
- * - AI应用编译发布、固定最新版发布、可恢复大文件下载登记与受控静态资源热修；支持按应用身份发布并刷新 legacy micro-app 兼容入口；保留私有源码指针，并在发布前拒绝 HTTP 错误、Code=0、长度或哈希不一致的源文件。
+ * - AI应用编译发布、固定最新版发布、可恢复大文件下载登记与受控静态资源热修；固定入口使用永久加载壳解析数据库已提交的当前版本，历史入口保留不可变产物；并在发布前拒绝 HTTP 错误、Code=0、长度或哈希不一致的源文件。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || "成功" }; }
@@ -308,16 +308,17 @@ function movePublicObject(sourcePath, targetPath) {
   }
 }
 function legacyRedirectHtml(targetUrl, versionNo) {
-  var targetJson = JSON.stringify(text(targetUrl));
+  var safeTarget = escapeHtml(text(targetUrl));
   return '<!doctype html>\n' +
     '<html lang="zh-CN">\n<head>\n' +
     '  <meta charset="utf-8">\n' +
     '  <meta name="viewport" content="width=device-width,initial-scale=1">\n' +
-    '  <meta http-equiv="refresh" content="0;url=' + text(targetUrl) + '">\n' +
     '  <title>Microi AI Application ' + text(versionNo) + '</title>\n' +
+    '  <style>html,body,iframe{width:100%;height:100%;margin:0;border:0}body{overflow:hidden;background:#071617}iframe{display:block}</style>\n' +
     '</head>\n<body>\n' +
-    '  <p>Loading Microi AI Application ' + text(versionNo) + '...</p>\n' +
-    '  <script>location.replace(' + targetJson + ');<\/script>\n' +
+    '  <iframe src="' + safeTarget + '" title="Microi AI Application ' + text(versionNo) + '"' +
+    ' allow="autoplay; fullscreen; gamepad; clipboard-write" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>\n' +
+    '  <noscript><a href="' + safeTarget + '">打开 Microi AI Application ' + text(versionNo) + '</a></noscript>\n' +
     '</body>\n</html>\n';
 }
 function immutableRuntimeBaseUrl(appKey, versionNo, rawBaseUrl) {
@@ -332,6 +333,13 @@ function immutableRuntimeBaseUrl(appKey, versionNo, rawBaseUrl) {
   if (baseUrl.toLowerCase().indexOf(expectedPrefix.toLowerCase()) !== 0) return "";
   var suffix = baseUrl.substring(expectedPrefix.length);
   return /^[a-f0-9]{64}\/assets$/i.test(suffix) ? baseUrl : "";
+}
+function stableRuntimeResolverBaseUrl(appKey) {
+  var apiBase = "";
+  try { apiBase = text(V8.SysConfig && V8.SysConfig.ApiBase).replace(/\/+$/, ""); } catch (error) { apiBase = ""; }
+  if (!/^https:\/\//i.test(apiBase)) return "";
+  return apiBase + "/micro-app/v3/tenants/" + encodeURIComponent(text(V8.OsClient).toLowerCase())
+    + "/kinds/runtime/apps/" + encodeURIComponent(appKey) + "/assets";
 }
 function normalizeAppKey(value, fallback) {
   var raw = text(value);
@@ -1229,8 +1237,9 @@ if (requestedAction === "RegisterResumablePublicDownload"
 }
 /* LEGACY_MICRO_APP_REDIRECT_PUBLISH_V1
  * 兼容入口只允许指向当前租户、当前应用、当前语义版本的 v3 不可变
- * committed runtime。版本目录先发布，固定入口最后切换，避免先暴露
- * 一个尚未具备历史回退地址的新版本。 */
+ * committed runtime。版本目录保留不可变目标；固定当前入口使用 v3
+ * resolver 作为永久 iframe 目标，即使 CDN 长期缓存入口壳也仍解析数据库
+ * 已提交的最新版本。版本目录先发布，固定入口最后切换。 */
 if (requestedAction === "PublishLegacyMicroAppRedirects") {
   var redirectAppKey = ensureAppKey(app.Data);
   var redirectVersionNo = text(V8.Param.VersionNo || V8.Param.AppVersion);
@@ -1238,12 +1247,13 @@ if (requestedAction === "PublishLegacyMicroAppRedirects") {
   if (isBlank(redirectBaseUrl)) {
     return fail("ImmutableBaseUrl必须是当前租户、当前应用、当前版本的v3不可变运行时目录");
   }
+  var stableResolverBaseUrl = stableRuntimeResolverBaseUrl(redirectAppKey);
   var redirectRoot = text(V8.OsClient).toLowerCase() + "/micro-app/" + redirectAppKey + "/";
   var redirectEntries = [
     { RelativePath: redirectVersionNo + "/index.html", TargetUrl: redirectBaseUrl + "/index.html" },
     { RelativePath: redirectVersionNo + "/unity/index.html", TargetUrl: redirectBaseUrl + "/unity/index.html" },
-    { RelativePath: "unity/index.html", TargetUrl: redirectBaseUrl + "/unity/index.html" },
-    { RelativePath: "index.html", TargetUrl: redirectBaseUrl + "/index.html" }
+    { RelativePath: "unity/index.html", TargetUrl: (stableResolverBaseUrl || redirectBaseUrl) + "/unity/index.html" },
+    { RelativePath: "index.html", TargetUrl: (stableResolverBaseUrl || redirectBaseUrl) + "/index.html" }
   ];
   var redirectStageRoot = "legacy-micro-app-redirect-stage/" + redirectAppKey + "/" + text(newId());
   var redirectPublished = [];
