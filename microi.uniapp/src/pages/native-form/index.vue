@@ -785,8 +785,9 @@
 					})
 					// zhy: 核心定义和记录成功后立即结束整页骨架屏，选项数据在页面显示后补齐。
 					this.definition = definition
-					// zhy: 初始化新增和编辑页的字段分组折叠状态。
-					this.initializeGroupExpansion(definition.groups || [])
+					// zhy: 初始化源必须与页面渲染一致。仅含 TableChild/OpenTable 等关联内容的
+					// CollapseGroup 只存在于 relatedGroups，不能因 groups 过滤普通字段而漏掉默认展开。
+					this.initializeGroupExpansion(definition.relatedGroups || definition.groups || [])
 					this.initializeFormTabs()
 					this.loading = false
 					await this.$nextTick()
