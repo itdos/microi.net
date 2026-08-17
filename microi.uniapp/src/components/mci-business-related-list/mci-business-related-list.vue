@@ -77,7 +77,6 @@
         <view v-for="(row, index) in displayedRows" :key="row.Id" class="proposal-point-card">
           <view class="proposal-point-card__title">
             <text>点位{{ index + 1 }}</text>
-            <text class="proposal-point-card__id">ID {{ String(row.Id || '').slice(-8) }}</text>
           </view>
           <view v-for="item in proposalInstallationQuickFields" :key="`${row.Id}-${item.key}`"
             class="proposal-point-field">
@@ -1990,7 +1989,6 @@ export default {
   color: #c83d25;
 }
 .proposal-point-card__title > text:first-child { font-size: 29rpx; font-weight: 750; }
-.proposal-point-card__id { color: #a1adb2; font-size: 18rpx; font-weight: 500; }
 .proposal-point-field {
   min-height: 72rpx;
   display: grid;
