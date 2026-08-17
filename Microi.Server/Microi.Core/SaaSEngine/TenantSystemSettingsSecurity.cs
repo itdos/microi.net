@@ -84,9 +84,27 @@ namespace Microi.net
         public static IReadOnlyDictionary<string, TenantSystemSettingValue> LoadSnapshot(string osClient)
         {
             var output = new Dictionary<string, TenantSystemSettingValue>(StringComparer.OrdinalIgnoreCase);
+            try { osClient = TenantConfigurationSecurity.NormalizeTenantId(osClient); }
+            catch { return output; }
+
+            var cacheKey = GetSnapshotCacheKey(osClient);
             try
             {
-                osClient = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+                var cached = MicroiEngine.CacheTenant.Cache(osClient)
+                    .Get<List<TenantSystemSettingValue>>(cacheKey);
+                if (cached != null)
+                {
+                    AddSnapshotValues(output, cached, osClient);
+                    return output;
+                }
+            }
+            catch
+            {
+                // Redis 不可用时继续回源当前租户数据库。
+            }
+
+            try
+            {
                 var client = OsClientExtend.GetClient(osClient);
                 if (client?.Db == null) return output;
                 var rows = client.Db.FromSql(
@@ -94,16 +112,14 @@ namespace Microi.net
                         $"FROM {TableName} WHERE (IsDeleted<>1 OR IsDeleted IS NULL) AND (IsEnabled=1 OR IsEnabled IS NULL) " +
                         "ORDER BY Sort ASC, ConfigKey ASC")
                     .ToList<dynamic>() ?? new List<dynamic>();
+                var values = new List<TenantSystemSettingValue>();
                 foreach (var raw in rows)
                 {
                     var row = raw as JObject ?? JObject.FromObject((object)raw);
-                    var key = NormalizeKey(row["ConfigKey"]?.ToString());
-                    // 重复 Key 失败关闭：只接受排序后的第一条，数据库唯一索引是最终约束。
-                    if (output.ContainsKey(key)) continue;
-                    output[key] = new TenantSystemSettingValue
+                    values.Add(new TenantSystemSettingValue
                     {
                         Id = row["Id"]?.ToString(),
-                        Key = key,
+                        Key = row["ConfigKey"]?.ToString(),
                         Value = row["ConfigValue"]?.ToString() ?? string.Empty,
                         SecretCipher = row["SecretCipher"]?.ToString() ?? string.Empty,
                         ValueType = NormalizeValueType(row["ValueType"]?.ToString()),
@@ -115,7 +131,22 @@ namespace Microi.net
                         Sort = row["Sort"]?.Val<int>() ?? 0,
                         ValueSource = row["ValueSource"]?.ToString() ?? string.Empty,
                         TenantOsClient = osClient
-                    };
+                    });
+                }
+                AddSnapshotValues(output, values, osClient);
+                if (output.Count > 0)
+                {
+                    try
+                    {
+                        MicroiEngine.CacheTenant.Cache(osClient).Set(
+                            cacheKey,
+                            output.Values.ToList(),
+                            TimeSpan.FromMinutes(10));
+                    }
+                    catch
+                    {
+                        // 缓存写入失败不影响当前请求使用数据库结果。
+                    }
                 }
             }
             catch
@@ -123,6 +154,31 @@ namespace Microi.net
                 // 兼容尚未安装官方应用包的旧租户；调用方继续使用历史 sys_config/sys_osclients。
             }
             return output;
+        }
+
+        public static string GetSnapshotCacheKey(string osClient)
+        {
+            osClient = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            return $"Microi:{osClient}:TenantSystemSettings:Snapshot:v1";
+        }
+
+        private static void AddSnapshotValues(
+            IDictionary<string, TenantSystemSettingValue> output,
+            IEnumerable<TenantSystemSettingValue> values,
+            string osClient)
+        {
+            foreach (var item in values ?? Enumerable.Empty<TenantSystemSettingValue>())
+            {
+                if (item == null) continue;
+                string key;
+                try { key = NormalizeKey(item.Key); }
+                catch { continue; }
+                // 重复 Key 失败关闭：只接受排序后的第一条，数据库唯一索引是最终约束。
+                if (output.ContainsKey(key)) continue;
+                item.Key = key;
+                item.TenantOsClient = osClient;
+                output[key] = item;
+            }
         }
 
         public static JObject LoadPublicProjection(string osClient)
@@ -137,6 +193,51 @@ namespace Microi.net
                 ["IsEnabled"] = item.IsEnabled ? 1 : 0
             });
             return CreatePublicProjection(rows);
+        }
+
+        /// <summary>
+        /// 创建后端 V8 可用的当前租户设置投影。后端接口引擎和后端 V8 事件属于
+        /// 可信执行面，因此可以读取全部启用设置；Secret 只在这里按当前租户解密，
+        /// 不会进入匿名 GetSysConfig 或浏览器 V8.SysConfig。
+        /// </summary>
+        public static JObject LoadV8Projection(string osClient)
+        {
+            return CreateV8Projection(LoadSnapshot(osClient).Values);
+        }
+
+        public static JObject CreateV8Projection(IEnumerable<TenantSystemSettingValue> settings)
+        {
+            var result = new JObject();
+            foreach (var item in settings ?? Enumerable.Empty<TenantSystemSettingValue>())
+            {
+                if (item == null || !item.IsEnabled) continue;
+
+                string key;
+                try { key = NormalizeKey(item.Key); }
+                catch { continue; }
+
+                if (!item.IsSecret)
+                {
+                    result[key] = ParseTypedValue(new JValue(item.Value ?? string.Empty), item.ValueType);
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(item.SecretCipher)
+                    || string.IsNullOrWhiteSpace(item.TenantOsClient))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    result[key] = UnprotectSecret(item.TenantOsClient, key, item.SecretCipher);
+                }
+                catch
+                {
+                    // 单条损坏或不可解密的 Secret 失败关闭，不影响其它后端配置。
+                }
+            }
+            return result;
         }
 
         public static string GetText(

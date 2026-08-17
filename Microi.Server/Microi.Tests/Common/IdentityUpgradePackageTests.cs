@@ -41,7 +41,7 @@ public class IdentityUpgradePackageTests
             Version.TryParse(packageVersionText, out var packageVersion)
             && packageVersion >= new Version(6, 5, 1),
             $"SaaS 引擎身份数据包版本过低：{packageVersionText ?? "(空)"}");
-        Assert.True(package["PackageInfo"]?["IncludeSource"]?.Value<bool>());
+        Assert.False(package["PackageInfo"]?["IncludeSource"]?.Value<bool>());
 
         var tables = package["DiyTables"]?.Children<JObject>().ToList() ?? [];
         var fields = package["DiyFields"]?.Children<JObject>().ToList() ?? [];
@@ -105,20 +105,37 @@ public class IdentityUpgradePackageTests
         var settingsDataSet = Assert.Single(package["DataSets"]?.Children<JObject>()
             .Where(item => item["TableName"]?.Value<string>() == "mci_system_setting") ?? []);
         Assert.Equal("InsertIfMissing", settingsDataSet["ConflictPolicy"]?.Value<string>());
-        Assert.Equal(9, settingsDataSet["Rows"]?.Children().Count());
+        var settingRows = settingsDataSet["Rows"]?.Children<JObject>().ToList() ?? [];
+        Assert.Equal(14, settingRows.Count);
+        foreach (var key in new[]
+                 {
+                     "Login.Passkey.Display",
+                     "Login.Authenticator.Display",
+                     "Login.Gitee.Display",
+                     "Login.WeChat.Display",
+                     "Login.GitHub.Display"
+                 })
+        {
+            var displaySetting = Assert.Single(settingRows,
+                row => row["ConfigKey"]?.Value<string>() == key);
+            Assert.Equal("1", displaySetting["ConfigValue"]?.Value<string>());
+            Assert.Equal("Bool", displaySetting["ValueType"]?.Value<string>());
+            Assert.Equal(1, displaySetting["IsPublic"]?.Value<int>());
+        }
 
         var bundle = Assert.Single(package["ApplicationBundles"]?.Children<JObject>()
             .Where(item => item["Application"]?["AppKey"]?.Value<string>() == "microi-platform-service") ?? []);
-        Assert.Equal("v1.5.6", bundle["VersionNo"]?.Value<string>());
-        Assert.True(bundle["IncludeSource"]?.Value<bool>());
-        Assert.Equal(13, bundle["Application"]?["CurrentVersion"]?.Value<int>());
-        Assert.Equal("v1.5.6", bundle["Application"]?["BuildVersion"]?.Value<string>());
-        Assert.Equal("v1.5.6", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal("v1.5.7", bundle["VersionNo"]?.Value<string>());
+        Assert.False(bundle["IncludeSource"]?.Value<bool>());
+        Assert.Equal(14, bundle["Application"]?["CurrentVersion"]?.Value<int>());
+        Assert.Equal("v1.5.7", bundle["Application"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal("v1.5.7", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal("db", bundle["MicroService"]?["StorageMode"]?.Value<string>());
         Assert.All(bundle["Routes"]?.Children<JObject>() ?? [], route =>
-            Assert.Equal("v1.5.6", route["BuildVersion"]?.Value<string>()));
-        Assert.NotNull(bundle["PackageAssets"]?["SourceZip"]);
-        Assert.False(string.IsNullOrWhiteSpace(
-            bundle["PackageAssets"]?["SourceZip"]?["Sha256"]?.Value<string>()));
+            Assert.Equal("v1.5.7", route["BuildVersion"]?.Value<string>()));
+        Assert.False(bundle["PackageAssets"]?["IncludeSource"]?.Value<bool>());
+        Assert.Null(bundle["PackageAssets"]?["SourceZip"]);
+        Assert.Null(bundle["PackageAssets"]?["BuildZip"]);
         var routes = bundle["Routes"]?.Children<JObject>().ToList() ?? [];
         Assert.DoesNotContain(routes, route => route["RoutePath"]?.Value<string>() == "/");
         Assert.Contains(routes, route =>
@@ -131,14 +148,7 @@ public class IdentityUpgradePackageTests
         Assert.NotEmpty(buildAssets);
         Assert.Contains(buildAssets, asset =>
             asset["Path"]?.Value<string>()?.Contains("identity-tech-banner", StringComparison.Ordinal) == true);
-        var sourceFiles = bundle["SourceFiles"]?.Children<JObject>().ToList() ?? [];
-        Assert.Equal(23, sourceFiles.Count);
-        Assert.Contains(sourceFiles, file =>
-            file["Path"]?.Value<string>() == "src/PersonalSettings.vue"
-            && !string.IsNullOrWhiteSpace(file["FileByteBase64"]?.Value<string>()));
-        Assert.Contains(sourceFiles, file =>
-            file["Path"]?.Value<string>() == "src/identity-verification.js"
-            && !string.IsNullOrWhiteSpace(file["Sha256"]?.Value<string>()));
+        Assert.Empty(bundle["SourceFiles"]?.Children<JObject>() ?? []);
     }
 
     [Fact]

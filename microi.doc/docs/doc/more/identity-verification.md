@@ -129,10 +129,10 @@ return V8.FormEngine.UptFormData('payment_order', {
 
 每条设置都可以动态选择“浏览器公开”“服务端私有”或“Secret”，不需要在 C# 中维护一份不断增长的公开字段白名单：
 
-- `IsPublic=1` 且不是 Secret、Key 名也不命中固定敏感片段时，才进入 `SysConfig.PublicSettings`。
+- `IsPublic=1` 且不是 Secret、Key 名也不命中固定敏感片段时，才直接进入前端 `SysConfig` 根对象；不存在 `PublicSettings` 包装层。
 - `Password`、`Secret`、`Token`、`Credential`、`PrivateKey`、`AccessKey`、`ApiKey`、`ConnectionString`、`DbConn`、`Redis`、`MinIO`、`ClientSecret` 等名称始终不公开；租户勾选公开也无效。
 - Secret 只通过可信后端写入租户绑定的认证密文，列表永远掩码。临时显示原文必须先完成 Passkey、TOTP 或严格人脸二次验证；响应使用 `no-store`，30 秒后前端清除，审计不记录原文。
-- 普通 V8、FormEngine、匿名请求和访问密钥会话不能读取 Secret。第三方协议调用由最小后端网关读取，ClientSecret 从不进入浏览器。
+- 前端 V8、普通 FormEngine HTTP、匿名请求和访问密钥会话不能读取 Secret。后端接口引擎/后端 V8 事件可从当前租户根级 `V8.SysConfig[ConfigKey]` 使用 Secret，但不得回传、记录或写入前端可读数据；ClientSecret 从不进入浏览器。
 
 登录与身份常用设置如下：
 

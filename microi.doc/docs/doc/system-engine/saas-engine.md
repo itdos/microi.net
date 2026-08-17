@@ -56,7 +56,7 @@
 | 系统标题、主题、公开地址等传统系统配置 | 子租户库 `sys_config` | 按系统设置权限维护 |
 | OAuth ClientId/ClientSecret、租户业务开关、第三方业务参数 | 子租户库 `mci_system_setting` | 是，仅租户超级管理员维护 |
 
-`mci_system_setting` 的公开性是每条记录动态配置的：普通设置可选择进入 `V8.SysConfig.PublicSettings`；Secret 只保存租户绑定的认证密文。平台不是固定指定“哪些字段可以公开”，而是固定一组永远不能公开的敏感 Key 规则——Password、Secret、Token、Credential、PrivateKey、AccessKey、ApiKey、ConnectionString、DbConn、Redis、MinIO、ClientSecret 等名称即使勾选公开也会被后端拒绝。这样既允许租户和低代码开发者随时增加公开/私有业务设置，又不会让一个错误开关泄露基础设施或第三方密钥。
+`mci_system_setting` 的公开性是每条记录动态配置的：普通设置可选择直接平铺到前端 `V8.SysConfig` 根对象；任何运行端都不存在 `PublicSettings` 属性。Secret 只保存租户绑定的认证密文，在后端接口引擎/后端 V8 事件的根级 `V8.SysConfig[ConfigKey]` 中按当前租户解密使用。平台固定一组永远不能公开到浏览器的敏感 Key 规则——Password、Secret、Token、Credential、PrivateKey、AccessKey、ApiKey、ConnectionString、DbConn、Redis、MinIO、ClientSecret 等名称即使勾选公开也会被后端拒绝。后端使用 Secret 时禁止回传、日志或审计原文。
 
 Secret 的列表接口只返回“已配置”状态；显示原文需要租户超级管理员先完成 Passkey、Authenticator 或严格人脸二次验证，原文响应禁止缓存并在前端 30 秒后清除，审计只记录 Key/记录 Id/结果，不记录明文。登录方式的完整配置见 [登录方式、Passkey、Authenticator、第三方登录与严格人脸验证](../more/identity-verification)。
 

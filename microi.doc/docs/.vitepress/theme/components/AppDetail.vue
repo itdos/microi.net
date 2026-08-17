@@ -864,6 +864,97 @@ onBeforeUnmount(() => {
   overflow-x: auto;
 }
 
+.app-detail-richtext :deep(.mci-app-lead),
+.app-detail-richtext :deep(.mci-app-section),
+.app-detail-richtext :deep(.mci-app-boundary) {
+  margin: 0 0 22px;
+  padding: 24px;
+  border: 1px solid #e4eaf2;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #fff 0%, #f8fafc 100%);
+  box-shadow: 0 12px 34px rgba(36, 55, 81, .06);
+}
+
+.app-detail-richtext :deep(.mci-app-lead) {
+  padding: 30px;
+  border-color: rgba(96, 79, 196, .2);
+  background: radial-gradient(circle at 92% 10%, rgba(124, 98, 227, .14), transparent 36%), linear-gradient(145deg, #fbfaff 0%, #f4f7ff 100%);
+}
+
+.app-detail-richtext :deep(.mci-app-kicker),
+.app-detail-richtext :deep(.mci-app-section > header p) {
+  margin: 0 0 7px;
+  color: #6251c7;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .09em;
+}
+
+.app-detail-richtext :deep(.mci-app-lead h2),
+.app-detail-richtext :deep(.mci-app-section h2),
+.app-detail-richtext :deep(.mci-app-boundary h2) {
+  margin: 0 0 12px;
+  color: #152039;
+  line-height: 1.35;
+}
+
+.app-detail-richtext :deep(.mci-app-lead h2) { font-size: clamp(24px, 3vw, 34px); }
+.app-detail-richtext :deep(.mci-app-section h2) { font-size: 22px; }
+.app-detail-richtext :deep(.mci-app-lead > p:last-of-type) { max-width: 900px; }
+
+.app-detail-richtext :deep(.mci-app-tags),
+.app-detail-richtext :deep(.mci-flow) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.app-detail-richtext :deep(.mci-app-tags span),
+.app-detail-richtext :deep(.mci-flow span) {
+  padding: 7px 11px;
+  border: 1px solid rgba(98, 81, 199, .18);
+  border-radius: 999px;
+  color: #4436a2;
+  background: rgba(255, 255, 255, .78);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-detail-richtext :deep(.mci-flow i) { color: #8b97aa; font-style: normal; }
+
+.app-detail-richtext :deep(.mci-tech-grid) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.app-detail-richtext :deep(.mci-tech-card) {
+  padding: 17px;
+  border: 1px solid #e5eaf1;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .82);
+}
+
+.app-detail-richtext :deep(.mci-tech-card b) { color: #27304a; }
+.app-detail-richtext :deep(.mci-tech-card p) { margin: 8px 0 0; color: #5c687a; font-size: 13px; line-height: 1.7; }
+.app-detail-richtext :deep(.mci-check-list) { padding-left: 20px; }
+.app-detail-richtext :deep(.mci-check-list li) { margin: 8px 0; padding-left: 3px; }
+.app-detail-richtext :deep(.mci-check-list.is-two-columns) { columns: 2; column-gap: 34px; }
+.app-detail-richtext :deep(.mci-check-list.is-two-columns li) { break-inside: avoid; }
+.app-detail-richtext :deep(.mci-app-note) { margin-top: 18px; padding: 13px 15px; border-left: 3px solid #7864d7; background: #f5f3ff; }
+.app-detail-richtext :deep(.mci-app-boundary) { border-color: rgba(211, 139, 78, .26); background: linear-gradient(145deg, #fffdf9, #fff8ef); }
+
+@media (max-width: 760px) {
+  .app-detail-richtext :deep(.mci-tech-grid) { grid-template-columns: 1fr; }
+  .app-detail-richtext :deep(.mci-check-list.is-two-columns) { columns: 1; }
+  .app-detail-richtext :deep(.mci-app-lead),
+  .app-detail-richtext :deep(.mci-app-section),
+  .app-detail-richtext :deep(.mci-app-boundary) { padding: 18px; }
+}
+
 .app-detail-description-empty {
   display: grid;
   min-height: 300px;
@@ -880,6 +971,15 @@ onBeforeUnmount(() => {
 .app-detail-description-empty p { max-width: 560px; margin: 0; line-height: 1.75; }
 
 :global(html.dark .app-detail-richtext) { color: #cbd5e1; }
+:global(html.dark .app-detail-richtext .mci-app-lead),
+:global(html.dark .app-detail-richtext .mci-app-section),
+:global(html.dark .app-detail-richtext .mci-app-boundary) { border-color: rgba(148, 163, 184, .2); background: #121a2a; }
+:global(html.dark .app-detail-richtext .mci-app-lead h2),
+:global(html.dark .app-detail-richtext .mci-app-section h2),
+:global(html.dark .app-detail-richtext .mci-app-boundary h2),
+:global(html.dark .app-detail-richtext .mci-tech-card b) { color: #f4f6fb; }
+:global(html.dark .app-detail-richtext .mci-tech-card) { border-color: rgba(148, 163, 184, .16); background: rgba(15, 23, 42, .72); }
+:global(html.dark .app-detail-richtext .mci-tech-card p) { color: #b8c2d3; }
 :global(html.dark .app-detail-description-empty) { border-color: rgba(148, 163, 184, .24); color: #94a3b8; }
 :global(html.dark .app-detail-description-empty strong) { color: #f8fafc; }
 

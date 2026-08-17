@@ -139,6 +139,33 @@ export interface ApplicationDirectoryStreamPublishInput {
   confirmExecution?: string;
 }
 
+export interface ApplicationAssetStreamUploadInput {
+  appIdOrKey: string;
+  versionNo: string;
+  relativePath: string;
+  localFilePath: string;
+  sha256?: string;
+  routes?: Array<Record<string, unknown>>;
+  routeSnapshotJson?: string;
+  routeSnapshotHash?: string;
+  sourceManifestHash?: string;
+  runtimeManifestHash?: string;
+  deliveryBatchId?: string;
+  protocolVersion?: 3;
+  expectedGateEpoch?: string;
+  requestId?: string;
+  requestFingerprint?: string;
+  expectedCurrentVersion?: number;
+  expectedAppVersion?: string | null;
+  expectedPublishFence?: string;
+  expectedPublishRowVersion?: string;
+  expectedVersionRowVersion?: string | null;
+  expectedActivePublishVersionId?: string | null;
+  expectedCommittedPublishVersionId?: string | null;
+  timeoutMs?: number;
+  confirmExecution?: string;
+}
+
 export type ApplicationStreamGateMode = 'LegacyOpen' | 'Drain' | 'V3Only';
 
 export interface ApplicationStreamGateTransitionInput {
@@ -1299,6 +1326,161 @@ function validateApplicationFinalizeEvidence(
   if (String(evidence.PublishStatus || '') !== 'Published') throw new Error(`${context} 返回证据 PublishStatus 必须为 Published`);
   if (String(evidence.VerificationStatus || '') !== 'Verified') throw new Error(`${context} 返回证据 VerificationStatus 必须为 Verified`);
   return evidence;
+}
+
+/**
+ * Upload one immutable application asset through the same protocol contract as
+ * the directory publisher. Protocol v3 callers must supply the frozen release
+ * identity and CAS baselines; files are then transferred through the durable
+ * multipart/HDFS path regardless of size. Keeping this logic outside tool
+ * registration prevents the MCP schema and transport implementation drifting
+ * apart again.
+ */
+export async function runApplicationAssetStreamUpload(
+  client: MicroiClient,
+  input: ApplicationAssetStreamUploadInput,
+): Promise<CallToolResult> {
+  try {
+    const absolutePath = path.resolve(input.localFilePath);
+    const stat = fs.lstatSync(absolutePath);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new Error(`本地资产必须是普通文件且不能是符号链接：${absolutePath}`);
+    }
+    const actualSha256 = await sha256LocalFile(absolutePath);
+    if (input.sha256 && input.sha256.toLowerCase() !== actualSha256) {
+      throw new Error('本地文件 SHA-256 与传入值不一致');
+    }
+
+    const normalizedPath = input.protocolVersion === 3
+      ? input.relativePath
+      : normalizeLocalApplicationRelativePath(input.relativePath);
+    const v3 = input.protocolVersion === 3
+      ? resolveApplicationAssetStreamV3Contract({
+        appIdOrKey: input.appIdOrKey,
+        versionNo: input.versionNo,
+        directory: path.dirname(absolutePath),
+        entryPath: normalizedPath,
+        routes: input.routes ?? [],
+        routeSnapshotJson: input.routeSnapshotJson,
+        routeSnapshotHash: input.routeSnapshotHash,
+        sourceManifestHash: input.sourceManifestHash,
+        runtimeManifestHash: input.runtimeManifestHash,
+        deliveryBatchId: input.deliveryBatchId,
+        publishMode: 'stage',
+        protocolVersion: 3,
+        expectedGateEpoch: input.expectedGateEpoch,
+        requestId: input.requestId,
+        requestFingerprint: input.requestFingerprint,
+        expectedCurrentVersion: input.expectedCurrentVersion,
+        expectedAppVersion: input.expectedAppVersion,
+        expectedPublishFence: input.expectedPublishFence,
+        expectedPublishRowVersion: input.expectedPublishRowVersion,
+        expectedVersionRowVersion: input.expectedVersionRowVersion,
+        expectedActivePublishVersionId: input.expectedActivePublishVersionId,
+        expectedCommittedPublishVersionId: input.expectedCommittedPublishVersionId,
+        allowLegacyFallback: false,
+      }, String(input.runtimeManifestHash || '').toLowerCase())
+      : null;
+    const encodedRelativePath = v3
+      ? buildConservativeApplicationAssetStreamV3ImmutablePath({
+        appIdOrKey: input.appIdOrKey,
+        versionNo: input.versionNo,
+        requestFingerprint: v3.requestFingerprint,
+        relativePath: normalizedPath,
+      }).encodedRelativePath
+      : '';
+    const deliveryBatchId = v3?.deliveryBatchId || `mcp-low-${deterministicApplicationPublishId([
+      input.appIdOrKey,
+      normalizedApplicationVersion(input.versionNo),
+      normalizedPath,
+      actualSha256,
+    ]).slice(0, 48)}`;
+    const requestId = v3?.requestId || buildApplicationAssetRequestId({
+      deliveryBatchId,
+      appIdOrKey: input.appIdOrKey,
+      versionNo: input.versionNo,
+      relativePath: normalizedPath,
+      sha256: actualSha256,
+    });
+    const summary = {
+      appIdOrKey: input.appIdOrKey,
+      versionNo: input.versionNo,
+      relativePath: normalizedPath,
+      size: stat.size,
+      sha256: actualSha256,
+      requestId,
+      ...(v3 ? {
+        protocolVersion: 3,
+        requestFingerprint: v3.requestFingerprint,
+        deliveryBatchId: v3.deliveryBatchId,
+        resumable: true,
+      } : {
+        protocolVersion: 2,
+        resumable: false,
+      }),
+    };
+    if (input.confirmExecution !== input.appIdOrKey) {
+      return {
+        content: [{ type: 'text', text: JSON.stringify({
+          dryRun: true,
+          confirmationRequired: input.appIdOrKey,
+          ...summary,
+        }, null, 2) }],
+      };
+    }
+
+    const result = await client.uploadApplicationAssetStream({
+      AppIdOrKey: input.appIdOrKey,
+      VersionNo: input.versionNo,
+      RelativePath: normalizedPath,
+      ExpectedSha256: actualSha256,
+      RequestId: requestId,
+      FilePath: absolutePath,
+      TimeoutMs: input.timeoutMs,
+      ...(v3 ? {
+        ProtocolVersion: 3 as const,
+        ExpectedGateEpoch: v3.expectedGateEpoch,
+        RequestFingerprint: v3.requestFingerprint,
+        DeliveryBatchId: v3.deliveryBatchId,
+        SourceManifestHash: v3.sourceManifestHash,
+        RuntimeManifestHash: v3.runtimeManifestHash,
+        RouteSnapshotJson: v3.routeSnapshotJson,
+        RouteSnapshotHash: v3.routeSnapshotHash,
+        ExpectedCurrentVersion: v3.expectedCurrentVersion,
+        ExpectedAppVersion: v3.expectedAppVersion,
+        ExpectedPublishFence: v3.expectedPublishFence,
+        ExpectedPublishRowVersion: v3.expectedPublishRowVersion,
+        ExpectedVersionRowVersion: v3.expectedVersionRowVersion,
+        ExpectedActivePublishVersionId: v3.expectedActivePublishVersionId,
+        ExpectedCommittedPublishVersionId: v3.expectedCommittedPublishVersionId,
+      } : {}),
+    });
+    if (result.Code !== 1) {
+      return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+    }
+    const evidence = v3
+      ? validateApplicationAssetV3UploadEvidence(result, {
+        ...v3,
+        versionNo: input.versionNo,
+        relativePath: normalizedPath,
+        encodedRelativePath,
+        sha256: actualSha256,
+        size: stat.size,
+      })
+      : validateApplicationAssetUploadEvidence(result, {
+        requestId,
+        versionNo: input.versionNo,
+        relativePath: normalizedPath,
+        sha256: actualSha256,
+        size: stat.size,
+      });
+    return { content: [{ type: 'text', text: JSON.stringify({ ...evidence, ...summary }, null, 2) }] };
+  } catch (error) {
+    return {
+      content: [{ type: 'text', text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+      isError: true,
+    };
+  }
 }
 
 /**
@@ -6676,63 +6858,34 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_upload_application_asset_stream',
-    `Stream one local built asset directly to the immutable HDFS version directory for OsClient "${osClient}". The file is never encoded as Base64 and never enters Jint. This is a low-level resumable primitive; normally use microi_publish_application_directory_stream to upload and atomically promote a complete directory.`,
+    `Stream one local built asset directly to the immutable HDFS version directory for OsClient "${osClient}". Protocol v3 uses durable HDFS multipart sessions with status readback and reconnect resume for ordinary files through multi-GiB installers; bytes are never encoded as Base64 and never enter Jint. This is a low-level primitive inside a frozen release contract; normally use microi_publish_application_directory_stream to upload and atomically promote a complete directory.`,
     {
       appIdOrKey: z.string().min(1).describe('Existing sys_microistore Id or AppKey.'),
       versionNo: z.string().regex(/^v?\d+\.\d+\.\d+$/u).describe('Immutable semantic version, e.g. v1.2.3.'),
       relativePath: z.string().min(1).describe('POSIX-style path inside the compiled output, e.g. assets/index-abcd.js.'),
       localFilePath: z.string().min(1).describe('Absolute or workspace-relative path of one local ordinary file.'),
       sha256: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional().describe('Optional expected SHA-256. MCP computes and verifies it when omitted.'),
+      routes: z.array(jsonRecordSchema).optional().default([]).describe('Canonical v3 route snapshot input; missing routes are frozen explicitly as [].'),
+      routeSnapshotJson: z.string().max(1024 * 1024).optional().describe('Protocol v3 requires the exact recursive-key-sorted, array-order-preserving UTF-8 canonical JSON for routes.'),
+      routeSnapshotHash: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 requires the lowercase SHA-256 of RouteSnapshotJson.'),
+      sourceManifestHash: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional().describe('Protocol v3 source-manifest SHA-256 tying this asset to the release.'),
+      runtimeManifestHash: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 exact runtime-manifest SHA-256 for the frozen release.'),
+      deliveryBatchId: z.string().min(8).max(50).optional().describe('Protocol v3 stable delivery batch id.'),
+      protocolVersion: z.literal(3).optional().describe('Enable durable v3 multipart/resume. All v3 release identity and CAS fields then become required.'),
+      expectedGateEpoch: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 gate epoch as a canonical decimal bigint string.'),
+      requestId: z.string().regex(/^[A-Za-z0-9._:-]{8,100}$/u).optional().describe('Protocol v3 stable release RequestId; every asset and stage/finalize replay must reuse it exactly.'),
+      requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 immutable release fingerprint.'),
+      expectedCurrentVersion: z.number().int().min(0).optional().describe('Protocol v3 application CurrentVersion baseline.'),
+      expectedAppVersion: z.string().nullable().optional().describe('Protocol v3 application AppVersion baseline; explicit null means empty.'),
+      expectedPublishFence: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 sys_microistore.PublishFence baseline.'),
+      expectedPublishRowVersion: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 sys_microistore.PublishRowVersion baseline.'),
+      expectedVersionRowVersion: z.string().regex(/^(0|[1-9]\d*)$/u).nullable().optional().describe('Protocol v3 target version RowVersion; explicit null means absent.'),
+      expectedActivePublishVersionId: z.string().min(1).nullable().optional().describe('Protocol v3 active version id baseline; explicit null means empty.'),
+      expectedCommittedPublishVersionId: z.string().min(1).nullable().optional().describe('Protocol v3 committed version id baseline; explicit null means empty.'),
       timeoutMs: z.number().int().min(1_000).max(2 * 60 * 60_000).optional().describe('Per-file upload timeout. Default 30 minutes; maximum 2 hours.'),
       confirmExecution: z.string().optional().describe('Required for the real upload and must exactly equal appIdOrKey.'),
     },
-    async ({ appIdOrKey, versionNo, relativePath, localFilePath, sha256, timeoutMs, confirmExecution }) => {
-      try {
-        const normalizedPath = normalizeLocalApplicationRelativePath(relativePath);
-        const absolutePath = path.resolve(localFilePath);
-        const stat = fs.lstatSync(absolutePath);
-        if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`本地资产必须是普通文件且不能是符号链接：${absolutePath}`);
-        const actualSha256 = await sha256LocalFile(absolutePath);
-        if (sha256 && sha256.toLowerCase() !== actualSha256) throw new Error('本地文件 SHA-256 与传入值不一致');
-        const deliveryBatchId = `mcp-low-${deterministicApplicationPublishId([
-          appIdOrKey,
-          normalizedApplicationVersion(versionNo),
-          normalizedPath,
-          actualSha256,
-        ]).slice(0, 48)}`;
-        const requestId = buildApplicationAssetRequestId({
-          deliveryBatchId,
-          appIdOrKey,
-          versionNo,
-          relativePath: normalizedPath,
-          sha256: actualSha256,
-        });
-        const summary = { appIdOrKey, versionNo, relativePath: normalizedPath, size: stat.size, sha256: actualSha256, requestId };
-        if (confirmExecution !== appIdOrKey) {
-          return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, confirmationRequired: appIdOrKey, ...summary }, null, 2) }] };
-        }
-        const result = await client.uploadApplicationAssetStream({
-          AppIdOrKey: appIdOrKey,
-          VersionNo: versionNo,
-          RelativePath: normalizedPath,
-          ExpectedSha256: actualSha256,
-          RequestId: requestId,
-          FilePath: absolutePath,
-          TimeoutMs: timeoutMs,
-        });
-        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
-        const evidence = validateApplicationAssetUploadEvidence(result, {
-          requestId,
-          versionNo,
-          relativePath: normalizedPath,
-          sha256: actualSha256,
-          size: stat.size,
-        });
-        return { content: [{ type: 'text', text: JSON.stringify(evidence, null, 2) }] };
-      } catch (e: unknown) {
-        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
-      }
-    },
+    async (input) => runApplicationAssetStreamUpload(client, input),
   );
 
   // ========================
