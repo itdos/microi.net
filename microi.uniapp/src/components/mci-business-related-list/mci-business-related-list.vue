@@ -42,6 +42,21 @@
       </view>
     </view>
 
+    <!-- zhy：客户详情“需求方案”Tab 与首页普通列表保持同一套比价入口和选择规则。 -->
+    <view v-if="proposalCompareEnabled" class="proposal-compare-tools">
+      <view class="proposal-select-all" :class="{ active: areAllProposalsSelected }"
+        @tap="toggleAllProposals">
+        <text>{{ areAllProposalsSelected ? '✓' : '' }}</text>
+        <text>{{ areAllProposalsSelected ? '取消全选' : '全选' }}</text>
+      </view>
+      <view class="proposal-compare-button"
+        :class="{ disabled: proposalSelection.length < 2 || proposalComparing }"
+        hover-class="proposal-compare-button--pressed" @tap="compareProposals">
+        <text>{{ proposalComparing ? '比价中...' : '一键比价' }}</text>
+        <text v-if="proposalSelection.length">{{ proposalSelection.length }}</text>
+      </view>
+    </view>
+
     <scroll-view class="related-list-body" :class="{ 'related-list-body--scroll': independentScroll && !isPreview }"
       :style="relatedListBodyStyle"
       :scroll-y="independentScroll && !isPreview"
@@ -108,13 +123,19 @@
       </template>
       <template v-else>
         <!-- zhy：关联列表中的跟进卡片同步使用摘要最大行数。 -->
-        <mci-business-card v-for="(row, index) in displayedRows" :key="row.Id || index"
-          :row="row" :index="index" :title="getTitle(row)" :status="getStatus(row)"
-          :status-class="getStatusClass(row)" :tags="getTags(row)" :lines="cardLines(row)"
-          :summary="config.summaryField ? summaryValue(row) : ''"
-          :summary-lines="config.summaryLines || 3" :actions="rowActions(row)"
-          :time="cardBottomText(row)"
-          @open="openDetail" @phone="callPhone" @action="triggerRowAction" />
+        <view v-for="(row, index) in displayedRows" :key="row.Id || index" class="selectable-card">
+          <view v-if="proposalCompareEnabled" class="proposal-select"
+            :class="{ active: isProposalSelected(row) }" @tap.stop="toggleProposal(row)">
+            <text>{{ isProposalSelected(row) ? '✓' : '' }}</text>
+          </view>
+          <mci-business-card
+            :row="row" :index="index" :title="getTitle(row)" :status="getStatus(row)"
+            :status-class="getStatusClass(row)" :tags="getTags(row)" :lines="cardLines(row)"
+            :summary="config.summaryField ? summaryValue(row) : ''"
+            :summary-lines="config.summaryLines || 3" :actions="rowActions(row)"
+            :time="cardBottomText(row)"
+            @open="openDetail" @phone="callPhone" @action="triggerRowAction" />
+        </view>
       </template>
       <view v-if="!isPreview && !finished" class="load-more" hover-class="load-more--pressed" @tap="loadMore">
         <text>{{ loading ? '正在加载' : '加载更多' }}</text>
@@ -438,7 +459,9 @@ export default {
       metricValues: {},
       listBodyHeight: 0,
       layoutMeasureTimers: [],
-      proposalPointSavingId: ''
+      proposalPointSavingId: '',
+      proposalSelection: [],
+      proposalComparing: false
     }
   },
   computed: {
@@ -452,6 +475,10 @@ export default {
     },
     isPreview() { return String(this.displayMode || '').toLowerCase() === 'preview' },
     previewContentVisible() { return !this.isPreview || !this.showPreviewHeader || this.previewExpanded },
+    proposalCompareEnabled() { return !this.isPreview && this.moduleKey === 'proposals' },
+    areAllProposalsSelected() {
+      return Boolean(this.rows.length) && this.rows.every((row) => this.isProposalSelected(row))
+    },
     displayedRows() {
       return this.isPreview
         ? this.rows.slice(0, Math.max(1, this.previewLimit))
@@ -634,6 +661,46 @@ export default {
     this.$emit('filter-open-state', false)
   },
   methods: {
+    isProposalSelected(row) {
+      return Boolean(row && row.Id) && this.proposalSelection.some((item) => String(item.Id) === String(row.Id))
+    },
+    toggleProposal(row) {
+      if (!row || !row.Id) return
+      const index = this.proposalSelection.findIndex((item) => String(item.Id) === String(row.Id))
+      if (index >= 0) this.proposalSelection.splice(index, 1)
+      else this.proposalSelection.push(row)
+    },
+    toggleAllProposals() {
+      if (this.areAllProposalsSelected) {
+        const visibleIds = new Set(this.rows.map((row) => String(row.Id)))
+        this.proposalSelection = this.proposalSelection.filter((item) => !visibleIds.has(String(item.Id)))
+        return
+      }
+      const selectedIds = new Set(this.proposalSelection.map((item) => String(item.Id)))
+      this.rows.forEach((row) => {
+        if (row && row.Id && !selectedIds.has(String(row.Id))) this.proposalSelection.push(row)
+      })
+    },
+    async compareProposals() {
+      if (this.proposalComparing) return
+      if (this.proposalSelection.length < 2) {
+        uni.showToast({ title: '请至少选择两个方案', icon: 'none' })
+        return
+      }
+      this.proposalComparing = true
+      try {
+        const ids = this.proposalSelection.map((item) => item.Id).filter(Boolean).join(',')
+        await new Promise((resolve, reject) => uni.navigateTo({
+          url: `/pages/business/proposal-compare?ids=${encodeURIComponent(ids)}`,
+          success: resolve,
+          fail: reject
+        }))
+      } catch (error) {
+        uni.showToast({ title: error.message || '打开比价失败', icon: 'none' })
+      } finally {
+        this.proposalComparing = false
+      }
+    },
     noop() {},
     refreshData() {
       if (!this.relationValue || !this.config.table) return Promise.resolve()
@@ -1719,6 +1786,51 @@ export default {
 .related-metric--success .related-metric__value { color: #008660; }
 .related-metric--primary { border-color: #d8e5fa; background: #f2f7ff; }
 .related-metric--primary .related-metric__value { color: #1768d8; }
+.proposal-compare-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 28rpx;
+  min-height: 72rpx;
+  margin: -2rpx 2rpx 16rpx;
+}
+.proposal-compare-button {
+  box-sizing: border-box;
+  min-width: 190rpx;
+  height: 68rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  padding: 0 28rpx;
+  border-radius: 14rpx;
+  color: #fff;
+  background: linear-gradient(135deg, #0787c9, #17b5a6);
+  box-shadow: 0 8rpx 20rpx rgba(7, 135, 201, .2);
+  font-size: 25rpx;
+  font-weight: 700;
+}
+.proposal-compare-button > text:last-child:not(:first-child) {
+  min-width: 30rpx;
+  height: 30rpx;
+  padding: 0 5rpx;
+  border-radius: 15rpx;
+  color: #0787c9;
+  background: #fff;
+  font-size: 19rpx;
+  line-height: 30rpx;
+  text-align: center;
+}
+.proposal-compare-button.disabled { opacity: .48; box-shadow: none; }
+.proposal-compare-button--pressed { transform: scale(.97); }
+.proposal-select-all { height: 64rpx; display: flex; align-items: center; gap: 10rpx; color: #607d8b; font-size: 25rpx; }
+.proposal-select-all > text:first-child,
+.proposal-select { box-sizing: border-box; width: 38rpx; height: 38rpx; display: flex; align-items: center; justify-content: center; border: 2rpx solid #aebfc7; border-radius: 10rpx; }
+.proposal-select-all.active { color: #0787c9; font-weight: 650; }
+.proposal-select-all.active > text:first-child,
+.proposal-select.active { border-color: #0787c9; color: #fff; background: #0787c9; }
+.selectable-card { position: relative; }
+.proposal-select { position: absolute; top: 16rpx; right: 16rpx; z-index: 5; color: transparent; background: rgba(255, 255, 255, .96); box-shadow: 0 3rpx 10rpx rgba(21, 68, 88, .12); }
 @media (max-width: 360px) {
   .related-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
