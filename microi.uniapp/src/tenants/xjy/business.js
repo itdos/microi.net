@@ -109,7 +109,13 @@ const customerFilterFields = [
 const visitFilterFields = [
   { key: 'visitType', label: '跟进方式', field: 'GenjinFS', type: 'options', multiple: true, source: 'baseData', parentKey: 'GenjinFS', valueField: 'Value', labelField: 'Value' },
   { key: 'customerState', label: '客户合作状态', field: 'KehuHZZT', type: 'options', multiple: true, source: 'baseData', parentKey: 'KehuZT', valueField: 'Value', labelField: 'Value' },
-  { key: 'customer', label: '客户名称', field: 'KehuMC', type: 'text' },
+  { key: 'targetType', label: '拜访对象类型', field: 'BaifangDXLX', type: 'options', options: [
+    { label: '客户', value: '客户' },
+    { label: '项目合伙人', value: '项目合伙人' },
+    { label: '供应商', value: '供应商' },
+    { label: '商家', value: '商家' }
+  ] },
+  { key: 'target', label: '拜访对象', field: 'KehuMC', type: 'text' },
   { key: 'visitor', label: '跟进人', field: 'BaifangR', type: 'text' },
   { key: 'approval', label: '审批状态', field: 'ShenpiZT', type: 'text' },
   { key: 'visitSort', label: '排序方式', type: 'sort', options: [
@@ -130,6 +136,15 @@ export const businessModules = {
     ],
     statisticsField: 'YuqiJYJE', statisticsLabel: '预期交易额', defaultOrderBy: 'CreateTime',
     statusOptions: ['目标客户', '意向客户', '合作客户', '断约客户', '非目标客户'],
+    restrictedLookup: {
+      apiEngineKey: 'xjy-search-private-customers',
+      minKeywordLength: 2,
+      fuzzyKeywordLength: 4,
+      debounce: 600,
+      limit: 10,
+      title: '客户查重结果',
+      description: '以下客户不在您的普通列表权限内，仅用于确认是否已有人员负责'
+    },
     filterFields: customerFilterFields
   }),
   cooperativeCustomers: native({
@@ -175,13 +190,14 @@ export const businessModules = {
   }),
   visits: native({
     title: '跟进记录', table: 'Diy_GenjinJL', menuAliases: ['跟进记录', '拜访记录'],
-    titleField: 'KehuMC', statusField: 'GenjinFS', tagFields: ['ShenpiZT'],
+    titleField: 'KehuMC', statusField: 'GenjinFS', tagFields: ['ShenpiZT', 'BaifangDXLX'],
     relatedMetrics: [
       { key: 'valid', label: '有效跟进', where: [{ Name: 'GuanjianJCR', Type: '=', Value: 1 }], tone: 'success' },
       { key: 'month', label: '本月跟进', monthField: 'GenjinSJ', tone: 'primary' },
       { key: 'total', label: '跟进总量', tone: 'neutral' }
     ],
     lines: [
+      { label: '拜访对象', field: 'KehuMC' },
       { label: '跟进人', field: 'BaifangR' },
       { label: '跟进时间', field: 'GenjinSJ', format: 'datetime' },
       { label: '下次跟进', field: 'XiaciGJRQ', format: 'datetime' }
@@ -191,7 +207,7 @@ export const businessModules = {
   }),
   orders: native({
     title: '合同订单', table: 'Diy_Dingdan', menuAliases: ['合同订单', '订单管理', '我的订单'],
-    titleField: 'DingdanBH', statusField: 'DingdanZT', tagFields: ['XinLDD', 'DingdanHZFS'],
+    titleField: 'KehuMC', statusField: 'DingdanZT', tagFields: ['XinLDD', 'DingdanHZFS'],
     fixedWhere: [{ Name: 'DingdanZT', Type: '!=', Value: '已作废' }],
     relatedMetrics: [
       { key: 'pending', label: '待审批', where: [{ Name: 'DingdanZT', Type: '=', Value: '待审批' }], tone: 'warning' },

@@ -106,7 +106,7 @@ if (!renderer.includes("this.isMultiple && raw && typeof raw === 'object'") ||
 }
 // zhy: 确保新增和编辑页的字段分组保持可折叠能力。
 if (!nativeForm.includes('@tap="toggleGroup(group, groupIndex)"') ||
-  !nativeForm.includes('initializeGroupExpansion(definition.groups || [])') ||
+  !nativeForm.includes('initializeGroupExpansion(definition.relatedGroups || definition.groups || [])') ||
   !nativeForm.includes("group.defaultExpanded !== false") ||
   !nativeForm.includes('.form-section__toggle.expanded') ||
   !nativeForm.includes('this.expandFirstInvalidGroup()')) {
@@ -173,9 +173,9 @@ if (!childTable.includes('删除此条') ||
   fail('child table actions must keep add separate from toggle and place a large delete action below each row')
 }
 if (!businessList.includes('<mci-business-card') ||
-  !businessList.includes('components: { MciBusinessCard }') ||
+  !/components:\s*\{[^}]*\bMciBusinessCard\b/.test(businessList) ||
   !relatedBusinessList.includes('<mci-business-card') ||
-  !relatedBusinessList.includes('components: { MciBusinessCard, MciTaskCard }') ||
+  !relatedBusinessList.includes('components: { MciBusinessCard, MciTaskCard') ||
   !relatedBusinessList.includes('getBusinessRowActions') ||
   !relatedBusinessList.includes('loadModuleViewManifest') ||
   !relatedBusinessList.includes('class="floating-add"')) {
