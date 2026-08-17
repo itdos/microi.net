@@ -201,3 +201,43 @@ test("composite list auxiliaries do not repeat as ordinary columns and primary f
     );
     assert.equal(filterStandaloneListFields(fields, null), fields);
 });
+
+test("List FormWorkbench normalizes record switching without enabling custom detail rendering", () => {
+    const workbenchMenu = {
+        EnableViewSchema: 0,
+        ViewSchema: {
+            Views: [{
+                Key: "settings-workbench",
+                Scene: "List",
+                Device: "PC",
+                Layout: {
+                    Preset: "FormWorkbench",
+                    Form: {
+                        Presentation: "SettingsCenter",
+                        Mode: "Edit",
+                        ShowClassicList: false,
+                        RecordSelector: {
+                            Display: "Both",
+                            LabelFields: ["Name", "Key"],
+                            Placeholder: "选择配置"
+                        }
+                    }
+                }
+            }]
+        }
+    };
+    const view = selectModuleView(workbenchMenu, { scene: "List", device: "PC" });
+
+    assert.equal(view.Layout.Preset, "FormWorkbench");
+    assert.deepEqual(view.Layout.Form, {
+        Presentation: "SettingsCenter",
+        Mode: "Edit",
+        ShowClassicList: false,
+        RecordSelector: {
+            Display: "Both",
+            LabelFields: ["Name", "Key"],
+            Placeholder: "选择配置"
+        }
+    });
+    assert.equal(selectModuleView(workbenchMenu, { scene: "Detail", device: "PC" }), null);
+});

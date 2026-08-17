@@ -40,6 +40,9 @@ export default {
             if (!self.DiyCommon.IsNull(self.TableName)) {
                 classes.push('itdos-diy-form-' + self.TableName);
             }
+            if (!self.DiyCommon.IsNull(self.PresentationMode)) {
+                classes.push('diy-form--' + String(self.PresentationMode).replace(/[^A-Za-z0-9_-]/g, '').toLowerCase());
+            }
             classes.push(self.DiyCommon.IsNull(self.DiyTableModel.InputBorderStyle) ? 'Border' : self.DiyTableModel.InputBorderStyle);
             return classes.join(' ');
         },

@@ -84,6 +84,8 @@ tests/
 3. 本地完成类型检查、测试、真实 Unity 构建和 dist 完整性校验。
 4. 先同步私有源码；生成的 Unity、安装包与构建证据目录不得混入源码清单。任何期望版本不一致都停止重基线。
 5. 发布不可变 Web 运行版本，回读入口、文件数、哈希、状态与公开 URL。
+   - 官网、二维码、分享与商城“立即体验”必须指向不带版本号的固定当前入口，且游戏加载完成后地址栏仍保持该入口；不能把 `SharedPublicRuntime.EntryUrl`、`/releases/{Version}/requests/...` 或 `/versions/{Version}/` 当作当前体验地址，也不能用 30x、`meta refresh`、`location.replace` 伪装稳定入口。
+   - 不可变版本 URL 只写入历史版本记录、回滚和审计。固定入口可以使用同源全屏加载壳承载当前不可变产物，并必须透传 `autoplay`、`fullscreen` 与 `gamepad` 权限。
 6. 若同时交付 Windows，从稳定公网地址下载完整安装包并核对大小、SHA-256 和版本；在线入口还要加载真实 WASM/Data。
 7. 调用官方 `ai_app_publish_store` 生成并发布精确版本的应用商城包。超时属于结果不确定，必须回读包正文和 ZIP 后才能决定是否重试。
 8. 回读 `sys_microistore` 的 AppKey、版本、状态、预览图、包摘要与资源策略，断言 `AppVersion == PackageInfo.Version == PreparedAssets.PackageVersion`。

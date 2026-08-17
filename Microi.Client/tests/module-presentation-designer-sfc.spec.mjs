@@ -99,7 +99,7 @@ test("module presentation designer defers every internal pane and remote-pages a
     assert.deepEqual(parsed.errors, []);
     const template = parsed.descriptor.template.content;
 
-    for (const paneName of ["hero", "list", "card", "form-json", "json"]) {
+    for (const paneName of ["hero", "list", "form-workbench", "card", "form-json", "json"]) {
         assert.match(openingTagForNamedPane(template, paneName), /\blazy\b/i);
     }
 

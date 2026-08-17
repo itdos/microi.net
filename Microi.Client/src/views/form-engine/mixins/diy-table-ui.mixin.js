@@ -592,7 +592,8 @@ LoadFabPosition() {
             event.stopPropagation();
 
             // 计算菜单位置
-            const rect = event.target.getBoundingClientRect();
+            const trigger = event.currentTarget || event.target;
+            const rect = trigger.getBoundingClientRect();
             self._moreMenuPosition = {
                 top: rect.bottom + 5,
                 left: rect.right - 150 // 菜单宽度约150px，右对齐
@@ -666,12 +667,42 @@ LoadFabPosition() {
                 case 'delete':
                     self.DelDiyTableRow(row);
                     break;
+                case 'workflow':
+                    self.OpenWorkFlowProcess(row);
+                    break;
+                case 'restore':
+                    self.RestoreTrashRow(row);
+                    break;
                 case 'custom':
                     if (btn) {
                         self.RunMoreBtn(btn, row);
                     }
                     break;
             }
+        },
+        ShouldShowMobileCardMoreAction(row) {
+            var self = this;
+            if (!row || !self.diyStore || !self.diyStore.IsPhoneView) return false;
+            if (self.IsTrashMode) return row._IsInTableAdd !== true;
+            if (self.IsWorkFlowMenu() && row._IsInTableAdd !== true) return true;
+
+            var tableChildReadonly = !!(self.TableChildField && self.TableChildField.Readonly);
+            var hasVisibleOutsideButton = !tableChildReadonly
+                && Array.isArray(row._RowMoreBtnsOut)
+                && row._RowMoreBtnsOut.some(function (button) { return button && button.IsVisible; });
+            var hasVisibleInsideButton = !tableChildReadonly
+                && Array.isArray(row._RowMoreBtnsIn)
+                && row._RowMoreBtnsIn.some(function (button) { return button && button.IsVisible; });
+            var canEdit = !tableChildReadonly
+                && self.TableChildFormMode != 'View'
+                && self._LimitEdit
+                && row._IsInTableAdd !== true
+                && row.IsVisibleEdit == true;
+            var canDelete = !tableChildReadonly
+                && self.TableChildFormMode != 'View'
+                && self._LimitDel
+                && row.IsVisibleDel == true;
+            return hasVisibleOutsideButton || hasVisibleInsideButton || canEdit || canDelete;
         },
         // ========== 性能优化V3 END ==========
 

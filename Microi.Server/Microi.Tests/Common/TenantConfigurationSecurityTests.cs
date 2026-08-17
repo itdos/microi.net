@@ -365,7 +365,7 @@ public class TenantConfigurationSecurityTests
     }
 
     [Fact]
-    public void V8SysConfigProjection_HidesLegacyMainSecretsAndKeepsTenantBusinessValues()
+    public void V8SysConfigProjection_KeepsCompleteBackendValuesAndRemovesLegacyWrapper()
     {
         var main = new JObject
         {
@@ -382,24 +382,26 @@ public class TenantConfigurationSecurityTests
             ["GlobalServerV8Code"] = main["GlobalServerV8Code"]!.DeepClone(),
             ["ThirdPartyKey"] = main["ThirdPartyKey"]!.DeepClone(),
             ["BusinessTheme"] = "tenant-owned-theme",
-            ["EnableCaptcha"] = true
+            ["EnableCaptcha"] = true,
+            ["PublicSettings"] = new JObject { ["Legacy"] = true }
         };
 
         var projection = TenantConfigurationSecurity.CreateV8SysConfigProjection(historicalTenant);
 
-        Assert.Null(projection["ClientSecrets"]);
-        Assert.Null(projection["PwdV8"]);
-        Assert.Null(projection["GlobalServerV8Code"]);
-        Assert.Null(projection["ThirdPartyKey"]);
+        Assert.Equal("main-client-secret", projection["ClientSecrets"]?.ToString());
+        Assert.Equal("main-password-v8", projection["PwdV8"]?.ToString());
+        Assert.Equal("main-server-code", projection["GlobalServerV8Code"]?.ToString());
+        Assert.Equal("main-key", projection["ThirdPartyKey"]?.ToString());
         Assert.Equal("tenant-owned-theme", projection["BusinessTheme"]?.ToString());
         Assert.True(projection["EnableCaptcha"]?.Value<bool>());
+        Assert.Null(projection["PublicSettings"]);
 
         projection["BusinessTheme"] = "changed";
         Assert.Equal("tenant-owned-theme", historicalTenant["BusinessTheme"]?.ToString());
     }
 
     [Fact]
-    public void PublicSysConfigProjection_HidesServerSecretsButKeepsFrontendProtocolFields()
+    public void PublicSysConfigProjection_HidesBackendPasswordV8AndKeepsFrontendCode()
     {
         var source = new JObject
         {
@@ -407,9 +409,10 @@ public class TenantConfigurationSecurityTests
             ["GlobalServerV8Code"] = "server-code",
             ["AccessToken"] = "token",
             ["ThirdPartyKey"] = "key",
-            ["PwdV8"] = "frontend-password-v8",
+            ["PwdV8"] = "backend-password-v8",
             ["GlobalV8Code"] = "frontend-global-v8",
-            ["SysTitle"] = "Tenant Title"
+            ["SysTitle"] = "Tenant Title",
+            ["PublicSettings"] = new JObject { ["Legacy"] = true }
         };
 
         var projection = TenantConfigurationSecurity.CreatePublicSysConfigProjection(source);
@@ -418,9 +421,10 @@ public class TenantConfigurationSecurityTests
         Assert.Null(projection["GlobalServerV8Code"]);
         Assert.Null(projection["AccessToken"]);
         Assert.Null(projection["ThirdPartyKey"]);
-        Assert.Equal("frontend-password-v8", projection["PwdV8"]?.ToString());
+        Assert.Null(projection["PwdV8"]);
         Assert.Equal("frontend-global-v8", projection["GlobalV8Code"]?.ToString());
         Assert.Equal("Tenant Title", projection["SysTitle"]?.ToString());
+        Assert.Null(projection["PublicSettings"]);
     }
 
     [Fact]

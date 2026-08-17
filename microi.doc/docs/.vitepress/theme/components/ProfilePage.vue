@@ -375,6 +375,7 @@ const authToken = ref('')
 const currentUser = ref(null)
 const tenantCenter = ref({})
 const tenants = ref([])
+const tenantAdminCredentials = ref({})
 const isLoading = ref(false)
 const isCreating = ref(false)
 const tenantKey = ref('')
@@ -429,10 +430,12 @@ let profileNoticeTimer = null
 let tenantProgressTraceId = ''
 let tenantProgressRestorePending = false
 let openClawAuthBridge = null
+const tenantAdminCredentialTimers = new Map()
 
 const GITEE_STAR_DRAFT_KEY = 'microi_gitee_star_tenant_draft'
 const GITEE_STAR_DRAFT_TTL_MS = 10 * 60 * 1000
 const TENANT_BOOTSTRAP_CREDENTIAL_TTL_MS = 10 * 60 * 1000
+const TENANT_ADMIN_CREDENTIAL_TTL_MS = 60 * 1000
 const tenantBootstrapCredentials = new Map()
 const tenantCredentialDeliveryIds = new Map()
 
@@ -554,8 +557,33 @@ const TenantList = defineComponent({
       ]),
       h('div', { class: 'tenant-password-tip' }, [
         h('span', t('defaultAdmin')),
-        h('b', tenant.AdminDefaultPassword ? `admin / ${tenant.AdminDefaultPassword}` : 'admin'),
-        h('small', tenant.AdminDefaultPassword ? t('changePassword') : t('initialPasswordHidden'))
+        h('div', { class: 'tenant-password-main' }, [
+          h('b', { 'aria-live': 'polite' }, tenantAdminPasswordDisplay(tenant)),
+          h('div', { class: 'tenant-password-actions' }, [
+            h('button', {
+              type: 'button',
+              disabled: tenantAdminCredentialState(tenant).loading || tenantAdminCredentialState(tenant).resetting,
+              'aria-label': tenantAdminCredentialState(tenant).visible ? t('hidePassword') : t('showPassword'),
+              onClick: () => toggleTenantAdminPassword(tenant)
+            }, tenantAdminCredentialState(tenant).loading
+              ? t('readingPassword')
+              : (tenantAdminCredentialState(tenant).visible ? t('hidePassword') : t('showPassword'))),
+            tenantAdminPassword(tenant) ? h('button', {
+              type: 'button',
+              disabled: tenantAdminCredentialState(tenant).loading || tenantAdminCredentialState(tenant).resetting,
+              onClick: () => copyTenantAdminPassword(tenant)
+            }, t('copyPassword')) : null,
+            h('button', {
+              class: 'danger',
+              type: 'button',
+              disabled: tenantAdminCredentialState(tenant).loading || tenantAdminCredentialState(tenant).resetting,
+              onClick: () => resetTenantAdminPassword(tenant)
+            }, tenantAdminCredentialState(tenant).resetting ? t('resettingPassword') : t('resetPassword'))
+          ])
+        ]),
+        h('small', { class: tenantAdminCredentialState(tenant).error ? 'error' : '' },
+          tenantAdminCredentialState(tenant).error
+            || (tenantAdminCredentialState(tenant).visible ? t('passwordVisibleHint') : t('passwordHiddenHint')))
       ]),
       h('div', { class: 'tenant-card-actions' }, [
         h('a', {
@@ -573,6 +601,147 @@ const TenantList = defineComponent({
     ])))
   }
 })
+
+function tenantAdminCredentialKey(tenantOrKey) {
+  const tenantKey = typeof tenantOrKey === 'string' ? tenantOrKey : tenantOrKey?.OsClient
+  return String(tenantKey || '').trim().toLowerCase()
+}
+
+function tenantAdminCredentialState(tenant) {
+  return tenantAdminCredentials.value[tenantAdminCredentialKey(tenant)] || {}
+}
+
+function updateTenantAdminCredential(tenant, patch) {
+  const key = tenantAdminCredentialKey(tenant)
+  if (!key) return
+  tenantAdminCredentials.value = {
+    ...tenantAdminCredentials.value,
+    [key]: { ...(tenantAdminCredentials.value[key] || {}), ...patch }
+  }
+}
+
+function tenantAdminPassword(tenant) {
+  return String(tenantAdminCredentialState(tenant).password || tenant?.AdminDefaultPassword || '')
+}
+
+function tenantAdminPasswordDisplay(tenant) {
+  const password = tenantAdminPassword(tenant)
+  const visible = tenantAdminCredentialState(tenant).visible && !!password
+  return visible ? `admin / ${password}` : 'admin / ••••••••••••'
+}
+
+function scrubTenantAdminPassword(tenantKey) {
+  const key = tenantAdminCredentialKey(tenantKey)
+  if (!key) return
+  const ownerUserId = currentProfileUserId()
+  tenantBootstrapCredentials.delete(`${ownerUserId}:${key}`)
+  const tenant = tenants.value.find(item => tenantAdminCredentialKey(item) === key)
+  if (tenant) tenant.AdminDefaultPassword = ''
+  const next = { ...tenantAdminCredentials.value }
+  delete next[key]
+  tenantAdminCredentials.value = next
+  const timer = tenantAdminCredentialTimers.get(key)
+  if (timer) clearTimeout(timer)
+  tenantAdminCredentialTimers.delete(key)
+}
+
+function scheduleTenantAdminPasswordScrub(tenant) {
+  const key = tenantAdminCredentialKey(tenant)
+  if (!key) return
+  const previous = tenantAdminCredentialTimers.get(key)
+  if (previous) clearTimeout(previous)
+  tenantAdminCredentialTimers.set(key, setTimeout(() => {
+    scrubTenantAdminPassword(key)
+  }, TENANT_ADMIN_CREDENTIAL_TTL_MS))
+}
+
+function clearAllTenantAdminCredentials() {
+  for (const timer of tenantAdminCredentialTimers.values()) clearTimeout(timer)
+  tenantAdminCredentialTimers.clear()
+  tenantAdminCredentials.value = {}
+  for (const tenant of tenants.value) tenant.AdminDefaultPassword = ''
+  tenantBootstrapCredentials.clear()
+}
+
+async function requestTenantAdminPassword(tenant, reset = false) {
+  const key = tenantAdminCredentialKey(tenant)
+  if (!key) return
+  updateTenantAdminCredential(tenant, {
+    loading: !reset,
+    resetting: reset,
+    error: ''
+  })
+  try {
+    const action = reset ? 'ResetOwnedTenantAdminPassword' : 'GetOwnedTenantAdminPassword'
+    const response = await authenticatedFetch(`${API_BASE}/api/SysUser/${action}?OsClient=${OS_CLIENT}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
+      body: JSON.stringify({ TenantKey: tenant.OsClient, ConfirmReset: reset })
+    })
+    const result = await response.json()
+    if (isSessionExpiredResult(result)) {
+      handleSessionExpired()
+      return
+    }
+    const password = String(result?.Data?.Password || '')
+    if (!response.ok || Number(result?.Code) !== 1 || !password) {
+      throw new Error(localizeServerMessage(result?.Msg)
+        || (reset ? t('passwordResetFailed') : t('passwordReadFailed')))
+    }
+    updateTenantAdminCredential(tenant, {
+      password,
+      visible: true,
+      loading: false,
+      resetting: false,
+      error: ''
+    })
+    tenant.AdminDefaultPassword = ''
+    scheduleTenantAdminPasswordScrub(tenant)
+    showProfileNotice(
+      result?.Data?.SessionsRevoked === false ? 'error' : 'success',
+      result?.Data?.SessionsRevoked === false
+        ? String(result?.Msg || t('passwordResetFailed'))
+        : (reset ? t('passwordResetSuccess') : t('passwordReadSuccess')))
+  } catch (error) {
+    const message = error?.message || (reset ? t('passwordResetFailed') : t('passwordReadFailed'))
+    updateTenantAdminCredential(tenant, {
+      loading: false,
+      resetting: false,
+      visible: false,
+      error: message
+    })
+    showProfileNotice('error', message)
+  }
+}
+
+async function toggleTenantAdminPassword(tenant) {
+  const state = tenantAdminCredentialState(tenant)
+  if (state.loading || state.resetting) return
+  if (state.visible) {
+    updateTenantAdminCredential(tenant, { visible: false })
+    return
+  }
+  if (tenantAdminPassword(tenant)) {
+    updateTenantAdminCredential(tenant, { visible: true, error: '' })
+    scheduleTenantAdminPasswordScrub(tenant)
+    return
+  }
+  await requestTenantAdminPassword(tenant, false)
+}
+
+async function copyTenantAdminPassword(tenant) {
+  const password = tenantAdminPassword(tenant)
+  if (!password) return
+  const copied = await copyTextValue(password)
+  showProfileNotice(copied ? 'success' : 'error', copied ? t('copySuccess') : t('copyFailed'))
+}
+
+async function resetTenantAdminPassword(tenant) {
+  if (typeof window === 'undefined' || !window.confirm(t('passwordResetConfirm', { tenant: tenant.OsClient || '' }))) return
+  await requestTenantAdminPassword(tenant, true)
+}
 
 const EmptyTenants = defineComponent({
   emits: ['create'],
@@ -729,6 +898,7 @@ async function saveProfile() {
 function syncMenuFromHash() {
   if (typeof window === 'undefined') return
   const nextKey = normalizeProfileRoute(window.location.hash)
+  if (nextKey !== 'overview') clearAllTenantAdminCredentials()
   activeMenu.value = nextKey
   if (nextKey === 'create') {
     restoreActiveTenantProgress()
@@ -740,6 +910,7 @@ function syncMenuFromHash() {
 
 function navigateProfile(key) {
   const nextKey = normalizeProfileRoute(key)
+  if (nextKey !== 'overview') clearAllTenantAdminCredentials()
   activeMenu.value = nextKey
   if (typeof window !== 'undefined') {
     const nextHash = `#/${nextKey}`
@@ -891,6 +1062,7 @@ function isSessionExpiredResult(result) {
 }
 
 function clearSession() {
+  clearAllTenantAdminCredentials()
   localStorage.removeItem('microi_doc_user')
   localStorage.removeItem('microi_doc_token')
   localStorage.removeItem('microi_doc_tenant')
@@ -1236,6 +1408,9 @@ async function requestTenantCreation() {
     const starRequired = data.Required === true || data.Required === 1 || String(data.Required || '') === '1'
     if (!starRequired || isVerifiedGiteeStar(data)) {
       createImmediately = true
+    } else if (isTrueFlag(data.BindingConflict)) {
+      createImmediately = await tryTransferGiteeBinding(data, tenantKey.value)
+      if (!createImmediately) return
     } else {
       showStarReminder.value = true
       await nextTick()
@@ -1376,6 +1551,95 @@ function isVerifiedGiteeStar(data) {
   return value === true || value === 1 || String(value || '') === '1'
 }
 
+function isTrueFlag(value) {
+  return value === true || value === 1 || String(value || '').toLowerCase() === 'true'
+}
+
+function giteeStarFailureMessage(reason, account, repository, data = {}) {
+  const normalizedReason = String(reason || '').trim()
+  const identifiedAccount = String(account || '').trim()
+  const targetRepository = String(repository || 'ITdos/microi.net').trim()
+  if (normalizedReason === 'gitee_account_bound_with_tenant') {
+    return t('giteeBindingConflictWithTenant', { account: identifiedAccount || t('giteeUnknownAccount') })
+  }
+  if (normalizedReason === 'current_gitee_account_conflict') {
+    return t('giteeCurrentBindingConflict')
+  }
+  if (normalizedReason === 'binding_recovery_evidence_expired') {
+    return t('giteeBindingRecoveryExpired')
+  }
+  if (['gitee_binding_recovery_unavailable', 'binding_check_failed', 'binding_transfer_in_progress', 'binding_transfer_lock_failed', 'gitee_binding_source_busy'].includes(normalizedReason)) {
+    return t('giteeBindingRecoveryUnavailable')
+  }
+  const transientReasons = ['events_request_failed', 'events_response_invalid', 'events_temporarily_unavailable', 'star_page_temporarily_unavailable', 'star_page_response_invalid', 'star_page_response_incomplete', 'star_page_limit_reached']
+  if (transientReasons.includes(normalizedReason)) return t('giteeStarStatusFailed')
+  if (identifiedAccount) {
+    return t('giteeStarNotVerified', {
+      account: identifiedAccount,
+      repository: targetRepository
+    })
+  }
+  return data?.BindingConflict ? t('giteeBindingRecoveryUnavailable') : t('giteeAccountUnidentified')
+}
+
+async function tryTransferGiteeBinding(starData, requestedTenantKey) {
+  if (!isTrueFlag(starData?.BindingConflict)) return false
+  const identifiedAccount = String(starData?.GiteeLogin || '').trim()
+  const repository = String(starData?.Repository || 'ITdos/microi.net').trim()
+  const failureReason = String(starData?.LastFailureReason || '').trim()
+  if (!isTrueFlag(starData?.BindingTransferAvailable)) {
+    createError.value = giteeStarFailureMessage(failureReason, identifiedAccount, repository, starData)
+    tenantProgress.value = createError.value
+    return false
+  }
+
+  const confirmed = typeof window !== 'undefined' && window.confirm(t('giteeBindingTransferConfirm', {
+    account: identifiedAccount || t('giteeUnknownAccount'),
+    repository
+  }))
+  if (!confirmed) {
+    createError.value = t('giteeBindingTransferCanceled')
+    tenantProgress.value = createError.value
+    return false
+  }
+
+  tenantProgress.value = t('giteeBindingTransferring')
+  try {
+    const resp = await authenticatedFetch(apiEngineUrl('official_gitee_star_binding_transfer'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        TenantKey: requestedTenantKey,
+        ConfirmBindingTransfer: true,
+        // 仅供接口引擎分布式锁按账号分片；服务端始终从 OAuth 审计重新读取权威身份。
+        GiteeLogin: identifiedAccount,
+        _Lang: locale.value
+      })
+    })
+    const result = await resp.json()
+    if (isSessionExpiredResult(result)) {
+      handleSessionExpired()
+      return false
+    }
+    const transferData = result.Data || {}
+    if (result.Code !== 1 || !isVerifiedGiteeStar(transferData)) {
+      const transferReason = String(transferData.FailureReason || failureReason).trim()
+      createError.value = localizeServerMessage(result.Msg)
+        || giteeStarFailureMessage(transferReason, identifiedAccount, repository, transferData)
+      tenantProgress.value = createError.value
+      return false
+    }
+    tenantProgress.value = t('giteeBindingTransferSucceeded', {
+      account: String(transferData.GiteeLogin || identifiedAccount).trim()
+    })
+    return true
+  } catch {
+    createError.value = t('giteeBindingRecoveryUnavailable')
+    tenantProgress.value = createError.value
+    return false
+  }
+}
+
 async function handleGiteeStarReturn() {
   if (isCheckingGiteeStar.value || isCreating.value) return
   const returnContext = readGiteeStarReturnContext()
@@ -1404,18 +1668,19 @@ async function handleGiteeStarReturn() {
       return
     }
     const starData = result.Data || {}
-    if (result.Code !== 1 || !isVerifiedGiteeStar(starData)) {
+    if (result.Code === 1 && !isVerifiedGiteeStar(starData) && isTrueFlag(starData.BindingConflict)) {
+      const transferred = await tryTransferGiteeBinding(starData, draft.TenantKey)
+      if (!transferred) return
+      tenantProgress.value = t('giteeStarVerified')
+    } else if (result.Code !== 1 || !isVerifiedGiteeStar(starData)) {
       const failureReason = returnContext.reason || String(starData.LastFailureReason || '').trim()
       const identifiedAccount = returnContext.account || String(starData.GiteeLogin || '').trim()
-      const transientReasons = ['events_request_failed', 'events_response_invalid', 'events_temporarily_unavailable', 'star_page_temporarily_unavailable', 'star_page_response_invalid', 'star_page_response_incomplete', 'star_page_limit_reached']
-      const fallbackMessage = transientReasons.includes(failureReason)
-        ? t('giteeStarStatusFailed')
-        : identifiedAccount
-          ? t('giteeStarNotVerified', {
-            account: identifiedAccount,
-            repository: starData.Repository || 'ITdos/microi.net'
-          })
-          : t('giteeAccountUnidentified')
+      const fallbackMessage = giteeStarFailureMessage(
+        failureReason,
+        identifiedAccount,
+        starData.Repository || 'ITdos/microi.net',
+        starData
+      )
       createError.value = localizeServerMessage(result.Msg) || fallbackMessage
       tenantProgress.value = createError.value
       return
@@ -1688,6 +1953,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  clearAllTenantAdminCredentials()
   openClawAuthBridge?.destroy()
   openClawAuthBridge = null
   stopTenantProgress()
@@ -2511,12 +2777,58 @@ onUnmounted(() => {
 
 .profile-page :deep(.tenant-password-tip b) {
   color: #c2410c;
+  overflow-wrap: anywhere;
 }
 
 .profile-page :deep(.tenant-password-tip small) {
   grid-column: 2;
   color: #64748b;
   line-height: 1.5;
+}
+
+.profile-page :deep(.tenant-password-tip small.error) {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.profile-page :deep(.tenant-password-main) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.profile-page :deep(.tenant-password-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.profile-page :deep(.tenant-password-actions button) {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #9a3412;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.profile-page :deep(.tenant-password-actions button:hover:not(:disabled)) {
+  border-color: #fb923c;
+  background: #fff7ed;
+}
+
+.profile-page :deep(.tenant-password-actions button.danger) {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.profile-page :deep(.tenant-password-actions button:disabled) {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .profile-page :deep(.tenant-card-actions) {
@@ -2927,6 +3239,22 @@ onUnmounted(() => {
 .dark .profile-page :deep(.tenant-password-tip) {
   background: rgba(251, 146, 60, 0.1);
   border-color: rgba(251, 146, 60, 0.22);
+}
+
+.dark .profile-page :deep(.tenant-password-actions button) {
+  border-color: rgba(251, 146, 60, 0.28);
+  background: rgba(15, 23, 42, 0.88);
+  color: #fdba74;
+}
+
+.dark .profile-page :deep(.tenant-password-actions button:hover:not(:disabled)) {
+  border-color: #fb923c;
+  background: rgba(124, 45, 18, 0.28);
+}
+
+.dark .profile-page :deep(.tenant-password-actions button.danger) {
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
 }
 
 .dark .profile-page :deep(.tenant-copy) {

@@ -59,6 +59,27 @@ export default {
                 user: this.GetCurrentUser
             });
         },
+        ModuleFormWorkbenchConfig() {
+            return this.ModuleListView?.Layout?.Form || {};
+        },
+        ModuleFormWorkbenchEnabled() {
+            const preset = String(this.ModuleListView?.Layout?.Preset || "").toLowerCase();
+            const requestedMode = String(this.$route?.query?.ViewMode || this.$route?.query?.viewMode || "").toLowerCase();
+            return preset === "formworkbench"
+                && requestedMode !== "table"
+                && !this._IsTableChild
+                && this.PropsEmbedded !== true
+                && this.PropsIsJoinTable !== true;
+        },
+        ModuleFormWorkbenchClassicEnabled() {
+            const preset = String(this.ModuleListView?.Layout?.Preset || "").toLowerCase();
+            const requestedMode = String(this.$route?.query?.ViewMode || this.$route?.query?.viewMode || "").toLowerCase();
+            return preset === "formworkbench"
+                && requestedMode === "table"
+                && !this._IsTableChild
+                && this.PropsEmbedded !== true
+                && this.PropsIsJoinTable !== true;
+        },
         ModuleCardView() {
             const device = this.diyStore.IsPhoneView ? "Mobile" : "PC";
             const preferred = selectModuleView(this.SysMenuModel, {
@@ -171,7 +192,11 @@ export default {
             return this.ResolvePresentationField(card?.AvatarField || card?.AvatarTextField);
         },
         CardSubtitleFieldList() {
-            return this.ResolvePresentationFields(this.PresentationCardConfig?.SubtitleFields);
+            // 同一字段若已经作为顶部状态展示，不再在副标题重复一次。
+            return withoutUsedFields(
+                this.ResolvePresentationFields(this.PresentationCardConfig?.SubtitleFields),
+                this.CardTopFieldList
+            );
         },
         CardTopFieldList() {
             const configured = this.ResolvePresentationFields([
@@ -240,6 +265,42 @@ export default {
         }
     },
     methods: {
+        HandleModuleWorkbenchOpenForm(row, mode) {
+            return this.OpenDetail(row, mode);
+        },
+        HandleModuleWorkbenchAction(btn, row) {
+            const current = row || {};
+            return this.RunMoreBtn(btn, current, current._V8);
+        },
+        HandleModuleWorkbenchFormReady(form) {
+            const buttons = this.SysMenuModel?.FormBtns;
+            if (!Array.isArray(buttons) || buttons.length === 0) return;
+            this.HandlerBtns(buttons, form || {});
+        },
+        HandleModuleWorkbenchPage(pageIndex) {
+            return this.GetDiyTableRow({ _PageIndex: pageIndex });
+        },
+        HandleModuleWorkbenchRecordChange(recordId) {
+            if (!recordId || !this.$router || !this.$route) return;
+            const query = { ...(this.$route.query || {}) };
+            if (query.RecordId === recordId) return;
+            query.RecordId = recordId;
+            this.$router.replace({ path: this.$route.path, query }).catch(() => {});
+        },
+        SwitchModuleWorkbenchToClassic() {
+            if (!this.$router || !this.$route) return;
+            this.$router.replace({
+                path: this.$route.path,
+                query: { ...(this.$route.query || {}), ViewMode: "Table" }
+            }).catch(() => {});
+        },
+        SwitchClassicToModuleWorkbench() {
+            if (!this.$router || !this.$route) return;
+            const query = { ...(this.$route.query || {}) };
+            delete query.ViewMode;
+            delete query.viewMode;
+            this.$router.replace({ path: this.$route.path, query }).catch(() => {});
+        },
         ResolvePresentationField(reference) {
             const source = typeof reference === "string" ? { Name: reference } : (reference || {});
             const name = source.Name || source.Field;
@@ -305,8 +366,12 @@ export default {
             return `${prefix}${value}${suffix}`;
         },
         GetCardAvatarText(row) {
-            const field = this.CardAvatarField || this.CardPrimaryField;
-            const value = field ? String(this.GetPresentationFieldValue(row, field) || "") : "";
+            const avatarField = this.CardAvatarField;
+            let value = avatarField ? String(this.GetPresentationFieldValue(row, avatarField) || "") : "";
+            // 头像字段为空时回退到标题首字，不能把所有卡片都渲染成没有辨识度的“#”。
+            if (!value.trim() && this.CardPrimaryField) {
+                value = String(this.GetPresentationFieldValue(row, this.CardPrimaryField) || "");
+            }
             return value.trim().slice(0, 1).toUpperCase() || "#";
         },
         GetPresentationTone(field) {
