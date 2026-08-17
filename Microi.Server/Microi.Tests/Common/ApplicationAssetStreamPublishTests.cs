@@ -319,14 +319,21 @@ public class ApplicationAssetStreamPublishTests
             "iTdos",
             "app-id",
             "landlord-arena");
+        var microServicePageId = V8McpLogic.BuildApplicationStreamRecordId(
+            "microservice-page",
+            "iTdos",
+            microServiceId,
+            "/marketplace");
 
         Assert.Equal(fileId, sameFileId);
         Assert.Equal(36, fileId.Length);
         Assert.Equal(36, versionId.Length);
         Assert.Equal(36, microServiceId.Length);
+        Assert.Equal(36, microServicePageId.Length);
         Assert.StartsWith("mciaf-", fileId, StringComparison.Ordinal);
         Assert.StartsWith("mciav-", versionId, StringComparison.Ordinal);
         Assert.StartsWith("mcims-", microServiceId, StringComparison.Ordinal);
+        Assert.StartsWith("mcimp-", microServicePageId, StringComparison.Ordinal);
         Assert.NotEqual(fileId, otherFileId);
         Assert.NotEqual(fileId, versionId);
         Assert.Throws<ArgumentException>(() => V8McpLogic.BuildApplicationStreamRecordId(
@@ -1819,6 +1826,15 @@ public class ApplicationAssetStreamPublishTests
             runtimeSource);
         Assert.DoesNotContain(
             ".AddInParameter(\"@now\", now)",
+            runtimeSource);
+        Assert.Contains(
+            "var publishTime = now.ToString(\"yyyy-MM-dd HH:mm:ss\", CultureInfo.InvariantCulture);",
+            runtimeSource);
+        Assert.Equal(
+            2,
+            CountOccurrences(runtimeSource, ".AddInParameter(\"@publishTime\", publishTime)"));
+        Assert.DoesNotContain(
+            "Q(\"PublishTime\")}=@now",
             runtimeSource);
         Assert.Equal(
             16,

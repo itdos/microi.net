@@ -85,6 +85,12 @@ namespace Microi.net.Api
             public string SystemName { get; set; }
         }
 
+        public class OwnedTenantAdminCredentialRequest
+        {
+            public string TenantKey { get; set; }
+            public bool ConfirmReset { get; set; }
+        }
+
         public class UpdateCurrentProfileRequest
         {
             public string Name { get; set; }
@@ -146,6 +152,87 @@ namespace Microi.net.Api
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             param._CurrentUser = currentTokenDynamic?.CurrentUser;
             param.OsClient = currentTokenDynamic?.OsClient;
+        }
+
+        private void SetSensitiveCredentialResponseHeaders()
+        {
+            Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+            Response.Headers.Pragma = "no-cache";
+            Response.Headers["Referrer-Policy"] = "no-referrer";
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+        }
+
+        private static DosResult AuthorizeOwnedTenantAdminCredential(
+            CurrentToken currentToken,
+            OwnedTenantAdminCredentialRequest request,
+            out string ownerUserId)
+        {
+            ownerUserId = "";
+            if (currentToken?.CurrentUser == null)
+            {
+                return new DosResult(1001, null, "登录身份已过期，请重新登录。");
+            }
+            if (UserAccessKeySecurity.IsSession(currentToken.CurrentUser))
+            {
+                return new DosResult(1002, null, "访问密钥会话不能查看或重置租户管理员密码。");
+            }
+            if (!string.Equals(currentToken.OsClient, OsClientDefault.OsClient,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult(1002, null, "仅主租户官网账号可管理名下 SaaS 租户密码。");
+            }
+            ownerUserId = currentToken.CurrentUser["Id"]?.ToString() ?? "";
+            if (ownerUserId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(1002, null, "登录用户无效，请重新登录。");
+            }
+            if (request?.TenantKey.DosIsNullOrWhiteSpace() != false)
+            {
+                return new DosResult(0, null, "租户标识不能为空。");
+            }
+            return null;
+        }
+
+        private void QueueOwnedTenantAdminCredentialAudit(
+            CurrentToken currentToken,
+            string tenantKey,
+            string action,
+            bool success,
+            string message)
+        {
+            try
+            {
+                MicroiEngine.QueueSysLog(new SysLogParam
+                {
+                    OsClient = currentToken?.OsClient ?? OsClientDefault.OsClient,
+                    UserId = currentToken?.CurrentUser?["Id"]?.ToString(),
+                    UserName = currentToken?.CurrentUser?["Name"]?.ToString(),
+                    Category = "Security",
+                    Action = action,
+                    Source = "ServerEndpoint",
+                    TargetType = "OwnedSaasTenantAdmin",
+                    TargetId = (tenantKey ?? "").Trim(),
+                    Type = "安全审计",
+                    Title = action == "ResetOwnedTenantAdminPassword"
+                        ? "租户所有者重置管理员密码"
+                        : "租户所有者查看管理员密码",
+                    Content = JsonConvert.SerializeObject(new
+                    {
+                        TenantKey = (tenantKey ?? "").Trim(),
+                        Account = "admin",
+                        Result = success ? "Success" : "Rejected",
+                        Message = message ?? ""
+                    }),
+                    IP = IPHelper.GetClientIP(HttpContext).Data ?? "",
+                    Success = success,
+                    OccurredAt = DateTime.Now,
+                    Level = success ? 2 : 3
+                });
+            }
+            catch
+            {
+                // 审计队列异常不能把密码或内部异常写回客户端；正式日志仍不得包含明文。
+            }
         }
 
         private static bool IsPlatformAdmin(JObject currentUser)
@@ -943,6 +1030,96 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, $"创建租户异常：{ex.Message}"));
             }
+        }
+
+        /// <summary>
+        /// 查看当前官网账号名下 SaaS 租户的默认 admin 密码。
+        /// 密码不会进入接口引擎、FormEngine、URL、缓存或审计日志。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> GetOwnedTenantAdminPassword(
+            OwnedTenantAdminCredentialRequest param)
+        {
+            SetSensitiveCredentialResponseHeaders();
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            var authorization = AuthorizeOwnedTenantAdminCredential(
+                currentToken,
+                param,
+                out var ownerUserId);
+            if (authorization != null)
+            {
+                Response.StatusCode = authorization.Code == 1001
+                    ? 401
+                    : authorization.Code == 1002 ? 403 : 400;
+                QueueOwnedTenantAdminCredentialAudit(
+                    currentToken,
+                    param?.TenantKey,
+                    "RevealOwnedTenantAdminPassword",
+                    false,
+                    authorization.Msg);
+                return Json(authorization);
+            }
+
+            var result = new TenantProvisioningService()
+                .GetOwnedTenantAdminCredential(ownerUserId, param.TenantKey);
+            QueueOwnedTenantAdminCredentialAudit(
+                currentToken,
+                param.TenantKey,
+                "RevealOwnedTenantAdminPassword",
+                result.Code == 1,
+                result.Msg);
+            return Json(result);
+        }
+
+        /// <summary>
+        /// 为当前官网账号名下 SaaS 租户生成新的高强度随机 admin 密码，
+        /// 并立即吊销该 admin 的全部旧登录态。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> ResetOwnedTenantAdminPassword(
+            OwnedTenantAdminCredentialRequest param)
+        {
+            SetSensitiveCredentialResponseHeaders();
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            var authorization = AuthorizeOwnedTenantAdminCredential(
+                currentToken,
+                param,
+                out var ownerUserId);
+            if (authorization != null)
+            {
+                Response.StatusCode = authorization.Code == 1001
+                    ? 401
+                    : authorization.Code == 1002 ? 403 : 400;
+                QueueOwnedTenantAdminCredentialAudit(
+                    currentToken,
+                    param?.TenantKey,
+                    "ResetOwnedTenantAdminPassword",
+                    false,
+                    authorization.Msg);
+                return Json(authorization);
+            }
+            if (param?.ConfirmReset != true)
+            {
+                Response.StatusCode = 400;
+                var confirmResult = new DosResult(0, null, "请确认后再重置租户管理员密码。");
+                QueueOwnedTenantAdminCredentialAudit(
+                    currentToken,
+                    param?.TenantKey,
+                    "ResetOwnedTenantAdminPassword",
+                    false,
+                    confirmResult.Msg);
+                return Json(confirmResult);
+            }
+
+            var result = await new TenantProvisioningService()
+                .ResetOwnedTenantAdminCredentialAsync(ownerUserId, param.TenantKey);
+            QueueOwnedTenantAdminCredentialAudit(
+                currentToken,
+                param.TenantKey,
+                "ResetOwnedTenantAdminPassword",
+                result.Code == 1,
+                result.Msg);
+            return Json(result);
         }
 
         /// <summary>

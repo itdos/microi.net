@@ -56,6 +56,10 @@ namespace Microi.net
             }
 
             var encoding = (passwordEncoding ?? "").Trim();
+            if (PasswordHashSecurity.IsSupportedEncoding(encoding))
+            {
+                return new DosResult<string>(0, null, "该帐号使用现代单向密码哈希，原密码不可恢复。");
+            }
             if (encoding.Equals("V8", StringComparison.OrdinalIgnoreCase))
             {
                 return new DosResult<string>(0, null, "该帐号使用自定义V8密码编码，无法执行通用解密。");
@@ -1044,13 +1048,60 @@ namespace Microi.net
         /// <exception cref="Exception"></exception>
         public async Task<EncodePwdResult> GetEncodePwd(dynamic sysUser, string osClient, string needEncodePwd, string dbEncodedPwd, string encodedPwd, string needEncodeAccount)
         {
-            var desEncodePwd = EncryptHelper.DESEncode(needEncodePwd);
-            string v8EncodePwd = null; // 改为 null，便于区分"未执行V8"和"V8返回空字符串"
             DbSession dbSession = OsClientExtend.GetClient(osClient).Db;
             DbSession dbRead = OsClientExtend.GetClient(osClient).DbRead;
-            
             var sysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
-            
+
+            var userPwdEncode = "";
+            try { userPwdEncode = (string)sysUser.PwdEncode ?? ""; } catch { }
+
+            var configPwdEncode = "";
+            try { configPwdEncode = sysConfig.Code == 1 ? (string)sysConfig.Data.PwdEncode ?? "" : ""; } catch { }
+
+            // Older generated SysUser field lists do not contain the later PwdEncode
+            // column. Detect the self-describing hash from either the comparison value
+            // or the row's Pwd property so login and password-change flows remain safe
+            // even when that metadata column was not projected by the ORM.
+            var storedUserPassword = "";
+            try { storedUserPassword = (string)sysUser.Pwd ?? ""; } catch { }
+
+            var usePasswordHash = PasswordHashSecurity.IsSupportedEncoding(userPwdEncode)
+                || (userPwdEncode.DosIsNullOrWhiteSpace()
+                    && PasswordHashSecurity.IsSupportedEncoding(configPwdEncode))
+                || PasswordHashSecurity.IsRecognizedHash(dbEncodedPwd)
+                || PasswordHashSecurity.IsRecognizedHash(storedUserPassword);
+            if (usePasswordHash)
+            {
+                // A stored password hash is never accepted as a client-side pre-encoded
+                // password: otherwise the database value itself would become a reusable
+                // login secret. Only the plaintext supplied over the authenticated login
+                // protocol is verified against the salted hash.
+                if (!encodedPwd.DosIsNullOrWhiteSpace())
+                {
+                    return new EncodePwdResult
+                    {
+                        EncodePwd = encodedPwd,
+                        IsPass = false
+                    };
+                }
+                if (dbEncodedPwd.DosIsNullOrWhiteSpace())
+                {
+                    return new EncodePwdResult
+                    {
+                        EncodePwd = PasswordHashSecurity.HashPassword(needEncodePwd),
+                        IsPass = false
+                    };
+                }
+                return new EncodePwdResult
+                {
+                    EncodePwd = dbEncodedPwd,
+                    IsPass = PasswordHashSecurity.VerifyPassword(needEncodePwd, dbEncodedPwd)
+                };
+            }
+
+            var desEncodePwd = EncryptHelper.DESEncode(needEncodePwd);
+            string v8EncodePwd = null; // 改为 null，便于区分"未执行V8"和"V8返回空字符串"
+
             // 如果调用方已经传入了加密后的密码，直接比对
             if (!encodedPwd.DosIsNullOrWhiteSpace())
             {
@@ -1070,12 +1121,6 @@ namespace Microi.net
             }
             
             // 判断是否需要执行 V8 加密
-            var userPwdEncode = "";
-            try { userPwdEncode = (string)sysUser.PwdEncode ?? ""; } catch { }
-            
-            var configPwdEncode = "";
-            try { configPwdEncode = sysConfig.Code == 1 ? (string)sysConfig.Data.PwdEncode ?? "" : ""; } catch { }
-            
             var needV8Encode = userPwdEncode == "V8" || configPwdEncode == "V8";
             
             // 只有配置了 V8 加密方式时才执行 V8 引擎
@@ -2298,7 +2343,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
 
                     if (model.State != 1 || model.IsDeleted == 1)
                     {
-                        await OnlineTerminalService.RevokeUserSessionsAsync(
+                        await OnlineTerminalService.RevokeUserSessionsFromTrustedHostAsync(
                             param.OsClient,
                             model.Id,
                             model.IsDeleted == 1
@@ -2371,7 +2416,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             if (count > 0)
             {
                 await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
-                await OnlineTerminalService.RevokeUserSessionsAsync(
+                await OnlineTerminalService.RevokeUserSessionsFromTrustedHostAsync(
                     param.OsClient,
                     model.Id,
                     "账号已被删除，请重新联系管理员。");

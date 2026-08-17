@@ -18,11 +18,12 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。新增租户业务配置使用当前租户数据库的 `mci_system_setting`；数据库、Redis、MongoDB、MinIO、MQ 等部署控制面仍由主库 `sys_osclients` 托管，子租户不能修改。
 
 ```javascript
-// ✅ 浏览器/前端 V8 只能读取管理员明确公开的普通设置
-var loginName = V8.SysConfig.PublicSettings['Login.Gitee.Name'];
+// ✅ 浏览器/前端 V8 只能读取管理员明确公开的普通设置，直接位于根对象
+var loginName = V8.SysConfig['Login.Gitee.Name'];
 
-// ✅ Secret 由固定协议的可信后端原子能力读取和使用
-//    V8 只传业务参数，不能拿到 ClientSecret 原文。
+// ✅ 后端接口引擎/后端 V8 事件可读取当前租户完整配置（包括 Secret）
+var clientSecret = V8.SysConfig['Login.Gitee.ClientSecret'];
+// 只能在后端使用，禁止 return、日志、审计或写入前端可读数据。
 
 // ❌ 危险：密钥泄漏 / 跨租户串号
 var openaiKey = 'sk-xxxxxxxxxx';
@@ -30,9 +31,9 @@ var openaiKey = 'sk-xxxxxxxxxx';
 
 `V8.OsClientModel` 与兼容别名 `V8.ClientModel` 均为独立脱敏副本：数据库连接、AuthSecret、Redis、对象存储、MQ、MQTT、Search 的地址与凭据不会注入脚本。存量租户业务字段只作兼容，新增 Secret 不得继续依赖 `V8.OsClientModel`。
 
-`V8.SysConfig` 也是独立脱敏副本，`ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 及疑似 Password/Secret/Token/Key/Connection 字段不会注入脚本。`V8.SysConfig.PublicSettings` 来自当前租户 `mci_system_setting`：每条记录可以动态设置 `IsPublic`，但 `IsSecret=1` 或 Key 命中 Password、Secret、Token、Credential、PrivateKey、AccessKey、ApiKey、ConnectionString、DbConn、Redis、MinIO、ClientSecret 等固定敏感片段时永远失败关闭。子租户调用 `V8.FormEngine.GetSysConfig(...)` 时服务端会强制使用当前 `OsClient`，不能借缓存命中读取主租户配置。
+`V8.SysConfig` 按运行端采用不同权限投影，且任何运行端都不存在 `PublicSettings` 属性。浏览器/前端 V8 只得到匿名 `GetSysConfig` 的独立脱敏副本；当前租户 `mci_system_setting` 中 `IsPublic=1` 的普通设置直接平铺到根对象，Secret 或 Key 命中 Password、Secret、Token、Credential、PrivateKey、AccessKey、ApiKey、ConnectionString、DbConn、Redis、MinIO、ClientSecret 等敏感片段时永远失败关闭。后端接口引擎和后端 V8 事件得到当前租户完整、独立的 `sys_config`，并在根对象中获得全部启用的 `mci_system_setting`，Secret 由可信后端按租户解密。子租户调用 `V8.FormEngine.GetSysConfig(...)` 时仍强制使用当前 `OsClient`，不能借缓存命中读取其它租户配置。
 
-Secret 只通过租户管理员专用端点写入租户绑定的认证密文。列表不返回密文或原文；临时显示必须消费 Passkey/TOTP/严格人脸一次性票据，设置 `no-store`，30 秒清除，审计不含原文。普通 FormEngine、可编辑 V8、匿名请求和访问密钥会话不得读取 `SecretCipher` 或获得通用解密器。
+Secret 只通过租户管理员专用端点写入租户绑定的认证密文。列表不返回密文或原文；临时显示必须消费 Passkey/TOTP/严格人脸一次性票据，设置 `no-store`，30 秒清除，审计不含原文。前端 V8、普通 FormEngine HTTP、匿名请求和访问密钥会话不得读取 `SecretCipher` 或 Secret 原文；后端 V8 只能通过当前租户 `V8.SysConfig[ConfigKey]` 使用已解密值，不获得通用解密器，也不得返回或记录原文。
 
 共享基础设施只能通过受控能力访问：`V8.Cache` 自动绑定 `Microi:{OsClient}:*`，文件路径绑定 `/{OsClient}/...`，RabbitMQ 队列绑定 `microi.{OsClient}.*`，MQTT Topic 绑定 `tenant/{OsClient}/...`，Search 索引绑定 `{OsClient}_*`。V8 不得获得 Redis `IDatabase`、HDFS `ClientModel` 或原始基础设施配置。
 

@@ -29,11 +29,10 @@ V8.OsClientType        // 'Normal' / 'App' / 'Wechat'
 V8.OsClientNetwork     // 'Intranet' / 'Outernet'
 V8.OsClientModel       // 当前租户 SaaS 配置的脱敏副本
 V8.ClientModel         // OsClientModel 的兼容别名，同样是脱敏副本
-V8.SysConfig           // 当前租户 sys_config 的独立脱敏副本
-V8.SysConfig.PublicSettings // 当前租户 mci_system_setting 的动态公开投影
+V8.SysConfig           // 当前租户系统配置根对象；不存在 PublicSettings 属性
 ```
 
-`V8.SysConfig` 与 `V8.FormEngine.GetSysConfig(...)` 不暴露 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 或疑似凭据字段；子租户显式传其它 `OsClient` 也会被强制改回当前租户。`PublicSettings` 由每条设置的 `IsPublic` 动态决定，但 Secret 及固定敏感 Key 规则永远优先。
+前端 V8 的 `V8.SysConfig` 是匿名 `GetSysConfig` 的独立脱敏副本，`mci_system_setting` 中允许公开的普通值直接平铺到根对象；不会暴露 `ClientSecrets`、`GlobalServerV8Code` 或疑似凭据字段。后端接口引擎与后端 V8 事件的 `V8.SysConfig` 是当前租户完整、独立的 `sys_config`，并把全部启用的租户设置（含后端解密后的 Secret）平铺到根对象。两端都不存在 `PublicSettings` 包装层。后端可使用 Secret，但严禁返回前端、写日志或写审计。子租户显式传其它 `OsClient` 仍会被强制改回当前租户。
 
 ### V8.OsClientModel 常用字段
 
@@ -148,14 +147,15 @@ var erpUrl = (V8.OsClientNetwork === 'Intranet')
 // ❌ 危险：密钥写在代码里，所有租户共用，无法独立轮换
 var ak = 'AKIDxxxxxxxx';
 
-// ✅ 普通可公开业务值：每个租户在 mci_system_setting 动态维护
-var loginName = V8.SysConfig.PublicSettings['Login.Gitee.Name'];
+// ✅ 普通业务值：每个租户在 mci_system_setting 动态维护
+var loginName = V8.SysConfig['Login.Gitee.Name'];
 
-// ✅ Secret：由固定协议的可信后端能力读取并直接调用供应商
-// V8 只传业务参数，不获得 ak/secret 原文。
+// ✅ 后端 V8 可读取当前租户 Secret 并直接调用供应商
+var secret = V8.SysConfig['Login.Gitee.ClientSecret'];
+// 禁止 return secret、console.log(secret) 或写入前端可读字段。
 ```
 
-> `mci_system_setting` 位于每个租户自己的数据库。普通设置可以逐条动态公开到 `V8.SysConfig.PublicSettings`；Secret 保存认证密文，普通 V8/FormEngine/匿名/访问密钥会话不能读取 `SecretCipher` 或调用通用解密器。`sys_osclients` 自定义业务字段只保留存量兼容；共享基础设施字段由服务端强制移除，不能用自定义同义字段绕过安全代理。
+> `mci_system_setting` 位于每个租户自己的数据库。普通设置可逐条动态公开并直接平铺到前端 `V8.SysConfig`；Secret 保存认证密文，只在后端 V8 的当前租户 `V8.SysConfig` 中解密使用。前端 V8、普通 FormEngine HTTP、匿名/访问密钥会话不能读取 Secret，后端 V8 也不能获得通用解密器。`sys_osclients` 自定义业务字段只保留存量兼容；共享基础设施字段由服务端强制移除，不能用自定义同义字段绕过安全代理。
 
 ## 用户扩展字段访问（同理）
 
