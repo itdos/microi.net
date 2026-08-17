@@ -15,6 +15,23 @@ export function shouldKeepEmptyCardLine(line) {
   return String(line && line.label || '').trim() === '负责人'
 }
 
+export function cardFieldKey(field) {
+  if (field && typeof field === 'object') return String(field.field || field.Name || field.name || '').trim().toLowerCase()
+  return String(field || '').trim().toLowerCase()
+}
+
+export function filterVisibleCardLines(lines = [], row = {}, occupiedFields = [], keepEmpty = shouldKeepEmptyCardLine) {
+  const usedFields = new Set(occupiedFields.map(cardFieldKey).filter(Boolean))
+  return lines.filter((line) => {
+    const key = cardFieldKey(line)
+    if (!key || usedFields.has(key)) return false
+    usedFields.add(key)
+    if (keepEmpty(line)) return true
+    const field = line && typeof line === 'object' ? line.field : line
+    return row[field] !== undefined && row[field] !== null && row[field] !== ''
+  })
+}
+
 export function resolveConfiguredFieldNames(items = [], fields = []) {
   // 查询、筛选等旧调用方需要数据库真实字段名；卡片渲染若需要 AsName，
   // 应直接使用 resolveConfiguredFields 返回的 field。

@@ -187,11 +187,14 @@ export default {
       })
       ;['titleField', 'statusField', 'summaryField', 'imageField', 'periodField',
         'statisticsField', 'statisticsLabel', 'statisticsFormat'].forEach((name) => {
-        if (merged.hasConfiguredCardFields && ['titleField', 'summaryField', 'imageField'].includes(name)) return
+        if (merged.hasConfiguredCardFields && ['summaryField', 'imageField'].includes(name)) return
         if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') merged[name] = dynamic[name]
       })
       if (dynamic.statusField) {
         merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.statusField])]
+      }
+      if (dynamic.titleField) {
+        merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.titleField])]
       }
       if (dynamic.actionSchema && dynamic.actionSchema.length) merged.actionSchema = dynamic.actionSchema
       this.config = merged

@@ -4,9 +4,9 @@
       <view class="visit-target-fields__heading"><text>拜访对象类型</text></view>
       <view class="visit-target-fields__type" :class="{ 'visit-target-fields__control--active': typeOpen }" @tap.stop>
         <view class="visit-target-fields__type-control" :class="{ focused: typeOpen }">
-          <input :value="targetType" class="visit-target-fields__type-input" placeholder="输入关键词检索"
+          <input :value="targetType" :disabled="readonly" class="visit-target-fields__type-input" placeholder="输入关键词检索"
             @focus="openTypeOptions" @input="handleTypeInput" />
-          <text class="visit-target-fields__arrow" :class="{ open: typeOpen }" @tap.stop="toggleTypeOptions">›</text>
+          <text v-if="!readonly" class="visit-target-fields__arrow" :class="{ open: typeOpen }" @tap.stop="toggleTypeOptions">›</text>
         </view>
         <view v-if="typeOpen" class="visit-target-fields__type-dropdown">
           <view v-for="option in filteredTypes" :key="option" class="visit-target-fields__type-option"
@@ -21,7 +21,7 @@
     <view class="visit-target-fields__field">
       <view class="visit-target-fields__heading"><text>拜访对象</text></view>
       <view class="visit-target-fields__target" :class="{ 'visit-target-fields__control--active': targetOpen }" @tap.stop>
-        <mci-visit-target-combobox ref="targetCombobox" :model-value="targetName" :selected-id="targetId"
+        <mci-visit-target-combobox ref="targetCombobox" :model-value="targetName" :selected-id="targetId" :readonly="readonly"
           :module-key="moduleKey" :target-type="targetType" @update:model-value="updateTargetName"
           @select="selectTarget" @clear="clearTarget" @open-change="handleTargetOpen" />
       </view>
@@ -42,7 +42,8 @@ export default {
   props: {
     targetType: { type: String, default: '客户' },
     targetName: { type: String, default: '' },
-    targetId: { type: [String, Number], default: '' }
+    targetId: { type: [String, Number], default: '' },
+    readonly: { type: Boolean, default: false }
   },
   emits: ['update:targetType', 'update:targetName', 'update:targetId', 'select', 'open-change'],
   data() { return { typeOpen: false, targetOpen: false, typeSearchActive: false } },
@@ -56,12 +57,13 @@ export default {
   },
   methods: {
     emitOpenState() { this.$emit('open-change', this.typeOpen || this.targetOpen) },
-    openTypeOptions() { this.typeOpen = true; this.typeSearchActive = false; this.closeTargetOptions(); this.emitOpenState() },
+    openTypeOptions() { if (this.readonly) return; this.typeOpen = true; this.typeSearchActive = false; this.closeTargetOptions(); this.emitOpenState() },
     toggleTypeOptions() { this.typeOpen ? this.closeTypeOptions() : this.openTypeOptions() },
     closeTypeOptions() { this.typeOpen = false; this.typeSearchActive = false; this.emitOpenState() },
     closeTargetOptions() { if (this.$refs.targetCombobox) this.$refs.targetCombobox.closeOptions() },
     closeOptions() { this.typeOpen = false; this.typeSearchActive = false; this.closeTargetOptions(); this.targetOpen = false; this.emitOpenState() },
     handleTypeInput(event) {
+      if (this.readonly) return
       this.typeSearchActive = true
       this.typeOpen = true
       this.$emit('update:targetType', String(event?.detail?.value || ''))
@@ -70,6 +72,7 @@ export default {
       this.emitOpenState()
     },
     selectType(option) {
+      if (this.readonly) return
       const changed = option !== this.targetType
       this.$emit('update:targetType', option)
       this.typeOpen = false
@@ -81,15 +84,17 @@ export default {
       this.$nextTick(() => { if (this.$refs.targetCombobox) this.$refs.targetCombobox.openOptions() })
     },
     updateTargetName(value) {
+      if (this.readonly) return
       this.$emit('update:targetName', value)
       if (this.targetId) this.$emit('update:targetId', '')
     },
     selectTarget(payload) {
+      if (this.readonly) return
       this.$emit('update:targetName', String(payload?.name || ''))
       this.$emit('update:targetId', String(payload?.id || ''))
       this.$emit('select', payload)
     },
-    clearTarget() { this.$emit('update:targetName', ''); this.$emit('update:targetId', '') },
+    clearTarget() { if (this.readonly) return; this.$emit('update:targetName', ''); this.$emit('update:targetId', '') },
     handleTargetOpen(open) { this.targetOpen = Boolean(open); if (open) this.typeOpen = false; this.emitOpenState() }
   }
 }
