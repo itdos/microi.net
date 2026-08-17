@@ -15,10 +15,24 @@ function roleCacheKey(user) {
   return JSON.stringify(values)
 }
 
+function matchingConfiguredMenu(moduleConfig) {
+  const menu = moduleConfig && moduleConfig.menu
+  if (!menu || typeof menu !== 'object') return null
+  const configuredMenuId = String(moduleConfig.menuId || '').trim().toLowerCase()
+  const menuId = String(menu.Id || '').trim().toLowerCase()
+  if (configuredMenuId && menuId !== configuredMenuId) return null
+  const configuredTableId = String(moduleConfig.tableId || '').trim().toLowerCase()
+  const menuTableId = String(menu.DiyTableId || '').trim().toLowerCase()
+  if (configuredTableId && menuTableId && menuTableId !== configuredTableId) return null
+  return menu
+}
+
 export async function loadModuleViewManifest(moduleConfig, options = {}) {
   if (!moduleConfig || !moduleConfig.table) return null
   const user = options.user || getUser() || {}
-  const menu = await findMenu(
+  // 模块定义和 ViewManifest 必须使用同一份菜单快照。若这里重新查询菜单，
+  // 旧菜单缓存可能在完整模块配置之后返回，并把 Card-Mobile 标题覆盖回旧值。
+  const menu = matchingConfiguredMenu(moduleConfig) || await findMenu(
     moduleConfig.menuAliases || [],
     moduleConfig.table,
     options.refresh === true,
