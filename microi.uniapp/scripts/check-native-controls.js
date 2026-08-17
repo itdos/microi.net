@@ -106,7 +106,7 @@ if (!renderer.includes("this.isMultiple && raw && typeof raw === 'object'") ||
 }
 // zhy: 确保新增和编辑页的字段分组保持可折叠能力。
 if (!nativeForm.includes('@tap="toggleGroup(group, groupIndex)"') ||
-  !nativeForm.includes('initializeGroupExpansion(definition.groups || [])') ||
+  !nativeForm.includes('initializeGroupExpansion(definition.relatedGroups || definition.groups || [])') ||
   !nativeForm.includes("group.defaultExpanded !== false") ||
   !nativeForm.includes('.form-section__toggle.expanded') ||
   !nativeForm.includes('this.expandFirstInvalidGroup()')) {
