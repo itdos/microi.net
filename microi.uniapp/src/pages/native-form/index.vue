@@ -89,7 +89,8 @@
 				</view>
 
 				<!-- zhy: 折叠后按需移除字段控件，已填写值仍保存在 form 中。 -->
-				<view v-if="isGroupExpanded(group, groupIndex)" class="form-section__content">
+				<view v-if="isGroupExpanded(group, groupIndex)" class="form-section__content"
+					:class="{ 'form-section__content--select-open': isSelectorGroupOpen(group) }">
 					<view v-if="embeddedOpenTableRelatedForGroup(group).length"
 						class="form-section__selector-grid">
 						<mci-table-selector v-for="relatedTab in embeddedOpenTableRelatedForGroup(group)"
@@ -103,8 +104,9 @@
 						:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name, 'form-field--visit-target-member': tenantFieldPresentation(field).type === 'visit-target-member' }">
 						<mci-visit-target-fields v-if="tenantFieldPresentation(field).type === 'visit-target-fields'"
 							ref="visitTargetFields" :target-type="checkinTargetType" :target-name="checkinTargetName"
-							:target-id="checkinTargetId" @update:target-type="updateCheckinTargetType"
+							:target-id="checkinTargetId" :readonly="mode === 'View'" @update:target-type="updateCheckinTargetType"
 							@update:target-name="updateCheckinTargetName" @update:target-id="updateCheckinTargetId"
+							@select="selectVisitTarget"
 							@open-change="handleVisitTargetOpen(field, $event)" />
 						<template v-else-if="tenantFieldPresentation(field).type !== 'visit-target-member'">
 						<view class="form-field__label">
@@ -178,6 +180,7 @@
 					</view>
 					<mci-business-related-list
 						v-for="relatedTab in embeddedChildRelatedForGroup(group)"
+						ref="embeddedRelatedList"
 						:key="relatedTab.key"
 						class="form-section__related-preview"
 						:field="relatedTab.field"
@@ -185,6 +188,7 @@
 						:parent-form="form"
 						:parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+						:parent-table-name="tableName"
 						:parent-table-child-auth="tableChildAuth"
 						:parent-mode="mode"
 						display-mode="preview"
@@ -200,6 +204,7 @@
 					class="standalone-related-list" :field="relatedTab.field"
 					:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
 					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+					:parent-table-name="tableName"
 					:parent-table-child-auth="tableChildAuth"
 					:parent-mode="mode"
 					display-mode="full"
@@ -435,7 +440,10 @@
 				return fieldName ? this.form[fieldName] || '' : ''
 			},
 			checkinTargetType() { return String(this.form.BaifangDXLX || '客户') },
-			checkinTargetName() { return String(this.form.BaifangDX || '') },
+			checkinTargetName() {
+				const isFollowup = String(this.tableName || '').toLowerCase() === 'diy_genjinjl'
+				return String((isFollowup ? this.form.KehuMC : this.form.BaifangDX) || '')
+			},
 			checkinTargetId() { return String(this.form.KehuID || '') },
 			standaloneRelatedTabs() {
 				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
@@ -501,6 +509,7 @@
 			if (this.loading || !this.definition) return
 			this.refreshTenantFloatingActionMetrics()
 			this.scheduleRelatedViewportMeasure()
+			this.refreshRelatedChildLists()
 			refreshTenantFormDerivedValues(this.tenantFormContext()).catch(() => {})
 		},
 		onReady() {
@@ -518,6 +527,19 @@
 			disposeTenantForm(this.tenantFormContext())
 		},
 		methods: {
+			refreshRelatedChildLists() {
+				this.$nextTick(() => {
+					const collect = (value) => Array.isArray(value) ? value : (value ? [value] : [])
+					const refs = [
+						...collect(this.$refs.embeddedRelatedList),
+						...collect(this.$refs.standaloneRelatedList)
+					]
+					const unique = refs.filter((item, index) => refs.indexOf(item) === index)
+					unique.forEach((list) => {
+						if (typeof list.refreshData === 'function') list.refreshData()
+					})
+				})
+			},
 			clearRelatedViewportMeasureTimers() {
 				this.relatedViewportMeasureTimers.forEach((timer) => clearTimeout(timer))
 				this.relatedViewportMeasureTimers = []
@@ -763,8 +785,9 @@
 					})
 					// zhy: 核心定义和记录成功后立即结束整页骨架屏，选项数据在页面显示后补齐。
 					this.definition = definition
-					// zhy: 初始化新增和编辑页的字段分组折叠状态。
-					this.initializeGroupExpansion(definition.groups || [])
+					// zhy: 初始化源必须与页面渲染一致。仅含 TableChild/OpenTable 等关联内容的
+					// CollapseGroup 只存在于 relatedGroups，不能因 groups 过滤普通字段而漏掉默认展开。
+					this.initializeGroupExpansion(definition.relatedGroups || definition.groups || [])
 					this.initializeFormTabs()
 					this.loading = false
 					await this.$nextTick()
@@ -967,13 +990,42 @@
 				})
 			},
 			updateCheckinTargetType(value) {
-				this.form = { ...this.form, BaifangDXLX: String(value || '') }
+				const targetType = String(value || '')
+				const isFollowup = String(this.tableName || '').toLowerCase() === 'diy_genjinjl'
+				this.form = {
+					...this.form,
+					BaifangDXLX: targetType,
+					...(isFollowup && targetType !== '客户'
+						? { KehuID: '', KehuMCCD: '', BeibaiFR: [] }
+						: {})
+				}
 			},
 			updateCheckinTargetName(value) {
-				this.form = { ...this.form, BaifangDX: String(value || '') }
+				const isFollowup = String(this.tableName || '').toLowerCase() === 'diy_genjinjl'
+				this.form = {
+					...this.form,
+					[isFollowup ? 'KehuMC' : 'BaifangDX']: String(value || '')
+				}
 			},
 			updateCheckinTargetId(value) {
 				this.form = { ...this.form, KehuID: this.checkinTargetType === '客户' ? String(value || '') : '' }
+			},
+			async selectVisitTarget(payload) {
+				const isFollowup = String(this.tableName || '').toLowerCase() === 'diy_genjinjl'
+				const targetFieldName = isFollowup ? 'kehumc' : 'baifangdx'
+				const targetField = (this.definition?.fields || []).find((field) =>
+					String(field.Name || '').toLowerCase() === targetFieldName)
+				if (!targetField) return
+				await handleTenantFormFieldSelect(this.tenantFormContext(), {
+					field: targetField,
+					value: String(payload && payload.name || ''),
+					raw: payload && payload.row || {},
+					option: { raw: payload && payload.row || {} },
+					cleared: false,
+					multiple: false,
+					visitTarget: true,
+					targetType: this.checkinTargetType
+				})
 			},
 			 handleVisitTargetOpen(field, open) {
 				this.handleSelectorToggle(field, open)
@@ -1440,6 +1492,16 @@
 	/* zhy: 展开字段分组时使用克制动效，保持与子表折叠交互一致。 */
 	.form-section__content {
 		animation: mciFormSectionExpand .18s ease both;
+	}
+
+	/* zhy：展开动画的 transform 会创建独立层叠上下文；下拉打开时必须释放它，
+	   否则后续表单卡片仍可能盖住当前选项列表。 */
+	.form-section__content--select-open {
+		position: relative;
+		z-index: 100;
+		overflow: visible;
+		animation: none;
+		transform: none;
 	}
 
 	.form-section__selector-grid {

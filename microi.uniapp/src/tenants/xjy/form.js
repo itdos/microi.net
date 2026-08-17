@@ -86,6 +86,8 @@ const CHECKIN_FIELDS = {
 }
 // zhy：集中维护跟进表单联动字段，避免在初始化和客户切换逻辑中散落字段名。
 const FOLLOWUP_FIELDS = {
+  targetType: 'BaifangDXLX',
+  targetName: 'KehuMC',
   customerId: 'KehuID',
   customerName: 'KehuMC',
   contacts: 'BeibaiFR',
@@ -226,6 +228,19 @@ function isFollowupForm(context) {
     FOLLOWUP_FIELDS.user,
     FOLLOWUP_FIELDS.time
   ].every((name) => Boolean(findField(context, name)))
+}
+
+function isVisitTargetPresentationForm(context) {
+  return (isCheckinForm(context) || isPrimaryFollowupForm(context)) &&
+    ['Add', 'Edit', 'View'].includes(context.mode)
+}
+
+function visitTargetNameField(context) {
+  return fieldName(
+    context,
+    isPrimaryFollowupForm(context) ? FOLLOWUP_FIELDS.targetName : CHECKIN_FIELDS.customerName,
+    '拜访对象'
+  )
 }
 
 function isContactForm(context) {
@@ -786,46 +801,26 @@ function selectedCustomer(context, payload = {}) {
       : {}
   const fromSelection = Boolean(payload.field)
   const customerIdName = fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')
-  const customerNameField = fieldName(context, FOLLOWUP_FIELDS.customerName, '客户名称')
+  const legacyCustomerNameField = fieldName(context, FOLLOWUP_FIELDS.customerName, '客户名称')
+  const targetNameField = fieldName(context, FOLLOWUP_FIELDS.targetName, '拜访对象')
+  const targetTypeField = fieldName(context, FOLLOWUP_FIELDS.targetType, '拜访对象类型')
+  const targetType = String(payload.targetType || context.form[targetTypeField] ||
+    (context.form[customerIdName] || context.form[legacyCustomerNameField] ? '客户' : '')).trim()
+  if (targetType && targetType !== '客户') return { id: '', name: '' }
   return {
     id: personValue(row, ['Id', 'ID', 'id', 'KehuID', 'KehuId', 'CustomerId', 'CustomerID']) ||
       (fromSelection ? '' : context.form[customerIdName] || context.state.followupCustomerId || ''),
     name: personValue(row, ['KehuMC', 'Name', 'name', 'CustomerName']) ||
-      payload.value || (fromSelection ? '' : context.form[customerNameField] || context.state.followupCustomerName || '')
+      payload.value || (fromSelection ? '' : context.form[targetNameField] || context.form[legacyCustomerNameField] || context.state.followupCustomerName || '')
   }
 }
 
-async function resolveFollowupCustomer(context, requireUnique = false) {
+async function resolveFollowupCustomer(context) {
   const current = selectedCustomer(context)
   const normalizedId = String(current.id || '').trim()
   const normalizedName = String(current.name || '').trim()
   if (normalizedId) return { id: normalizedId, name: normalizedName }
-  if (!normalizedName) {
-    if (requireUnique) throw new Error('请选择客户')
-    return { id: '', name: '' }
-  }
-
-  const result = await V8.FormEngine.GetTableData(CUSTOMER_TABLE, {
-    _Where: [['KehuMC', '=', normalizedName]],
-    _SelectFields: ['Id', 'KehuMC'],
-    _PageIndex: 1,
-    _PageSize: 2
-  })
-  if (!result || Number(result.Code) !== 1) {
-    if (requireUnique) throw new Error((result && result.Msg) || '客户关联信息加载失败')
-    return { id: '', name: normalizedName }
-  }
-  const rows = Array.isArray(result.Data) ? result.Data : []
-  if (rows.length !== 1) {
-    if (requireUnique) {
-      throw new Error(rows.length > 1 ? '存在同名客户，请重新选择客户' : '未找到所选客户，请重新选择')
-    }
-    return { id: '', name: normalizedName }
-  }
-  return {
-    id: String(personValue(rows[0], ['Id', 'ID', 'id']) || '').trim(),
-    name: String(personValue(rows[0], ['KehuMC', 'Name', 'name']) || normalizedName).trim()
-  }
+  return { id: '', name: normalizedName }
 }
 
 function selectedContactCustomer(context, payload = {}) {
@@ -962,8 +957,10 @@ function initializeFollowup(context) {
   const userName = fieldName(context, FOLLOWUP_FIELDS.user, '跟进人')
   const timeName = fieldName(context, FOLLOWUP_FIELDS.time, '跟进时间')
   const effectiveName = fieldName(context, FOLLOWUP_FIELDS.effective, '是否有效拜访')
+  const targetTypeName = fieldName(context, FOLLOWUP_FIELDS.targetType, '拜访对象类型')
 
   if (user) updates[userName] = [user]
+  if (!String((context.defaultValues || {})[targetTypeName] || '').trim()) updates[targetTypeName] = '客户'
   if (!String((context.defaultValues || {})[timeName] || '').trim()) {
     updates[timeName] = currentMinuteTimestamp()
   }
@@ -971,6 +968,20 @@ function initializeFollowup(context) {
     updates[effectiveName] = true
   }
   context.patchForm(updates)
+}
+
+function initializeFollowupTarget(context) {
+  const targetTypeName = fieldName(context, FOLLOWUP_FIELDS.targetType, '拜访对象类型')
+  const targetName = fieldName(context, FOLLOWUP_FIELDS.targetName, '拜访对象')
+  const customerIdName = fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')
+  const legacyCustomerName = fieldName(context, FOLLOWUP_FIELDS.customerName, '客户名称')
+  const updates = {}
+  if (!String(context.form[targetTypeName] || '').trim()) updates[targetTypeName] = '客户'
+  if (!String(context.form[targetName] || '').trim() &&
+    (context.form[customerIdName] || context.form[legacyCustomerName])) {
+    updates[targetName] = String(context.form[legacyCustomerName] || '').trim()
+  }
+  if (Object.keys(updates).length) context.patchForm(updates)
 }
 
 function configureFollowupTimeField(context) {
@@ -1304,6 +1315,7 @@ export async function initialize(context) {
       context.state.followupInitialized = true
       initializeFollowup(context)
     }
+    initializeFollowupTarget(context)
     const customer = await resolveFollowupCustomer(context)
     context.state.followupCustomerId = customer.id
     context.state.followupCustomerName = customer.name
@@ -1474,15 +1486,15 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
-  if (isCheckinEditable(context) && field) {
+  if (isVisitTargetPresentationForm(context) && field) {
     const name = String(field.Name || '').toLowerCase()
     const typeName = fieldName(context, CHECKIN_FIELDS.targetType, '拜访对象类型').toLowerCase()
-    const targetName = fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase()
+    const targetName = visitTargetNameField(context).toLowerCase()
     if (name === typeName) return { type: 'visit-target-fields' }
     if (name === targetName) return { type: 'visit-target-member', clearable: false }
   }
-  if (isCheckinEditable(context) && field &&
-    String(field.Name || '').toLowerCase() === fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase()) {
+  if (isVisitTargetPresentationForm(context) && field &&
+    String(field.Name || '').toLowerCase() === visitTargetNameField(context).toLowerCase()) {
     return {
       clearable: true,
       clearFields: [fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')]
@@ -1545,7 +1557,7 @@ export function getFieldActions(context, field) {
   const name = String(field.Name || '').toLowerCase()
   const label = String(field.Label || '').trim()
   if (isCheckinEditable(context) &&
-    (name === fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase() || label === '拜访对象')) {
+    (name === visitTargetNameField(context).toLowerCase() || label === '拜访对象')) {
     return [{
       key: 'xjy-checkin-customer',
       label: '选择客户',
@@ -1570,7 +1582,7 @@ export async function runFieldAction(context, field, action) {
     return {
       handled: true,
       customerPicker: {
-        fieldName: fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象'),
+        fieldName: visitTargetNameField(context),
         idFieldName: fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')
       }
     }
@@ -1696,25 +1708,20 @@ export async function handleFieldSelect(context, payload) {
   if (isFollowupForm(context) && payload && !payload.multiple) {
     // zhy：用户切换客户后同步客户 Id，清空旧联系人并重新加载该客户的联系人。
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
-    if (selectedFieldName === FOLLOWUP_FIELDS.customerName.toLowerCase()) {
-      let customer = selectedCustomer(context, payload)
+    if ([FOLLOWUP_FIELDS.customerName, FOLLOWUP_FIELDS.targetName].map((name) => name.toLowerCase()).includes(selectedFieldName)) {
+      const targetTypeName = fieldName(context, FOLLOWUP_FIELDS.targetType, '拜访对象类型')
+      const targetNameField = fieldName(context, FOLLOWUP_FIELDS.targetName, '拜访对象')
       const customerIdName = fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')
-      const customerNameField = fieldName(context, FOLLOWUP_FIELDS.customerName, '客户名称')
+      const targetType = String(payload.targetType || context.form[targetTypeName] || '客户').trim()
+      const targetName = String(payload.value || '').trim()
+      const customer = targetType === '客户' ? selectedCustomer(context, payload) : { id: '', name: '' }
       context.state.followupCustomerId = String(customer.id || '').trim()
       context.state.followupCustomerName = String(customer.name || '').trim()
       context.patchForm({
-        [customerIdName]: context.state.followupCustomerId,
-        [customerNameField]: context.state.followupCustomerName
+        [targetTypeName]: targetType,
+        [targetNameField]: targetName,
+        [customerIdName]: context.state.followupCustomerId
       })
-      if (!context.state.followupCustomerId && context.state.followupCustomerName) {
-        customer = await resolveFollowupCustomer(context)
-        context.state.followupCustomerId = customer.id
-        context.state.followupCustomerName = customer.name
-        context.patchForm({
-          [customerIdName]: customer.id,
-          [customerNameField]: customer.name
-        })
-      }
       await loadFollowupContacts(context, context.state.followupCustomerId, true)
       return { handled: true }
     }
@@ -1769,7 +1776,7 @@ export async function handleFieldSelect(context, payload) {
 export async function handleFieldChange(context, payload) {
   if (isCheckinEditable(context) && payload &&
     String(payload.field && payload.field.Name || '').toLowerCase() ===
-      fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase()) {
+      visitTargetNameField(context).toLowerCase()) {
     // 手动修改拜访对象后解除旧客户 Id；通过客户选择器回填时会同时写入新 Id。
     context.patchForm({ [fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')]: '' })
     return { handled: true }
@@ -1962,16 +1969,23 @@ export async function beforeSubmit(context) {
       ? contactField.options.map((option) => option.raw).filter(Boolean)
       : []
     normalizeFollowupContactSelection(context, contactRows, true)
-    const customer = await resolveFollowupCustomer(context, true)
+    const customer = await resolveFollowupCustomer(context)
     const customerIdName = fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')
     const customerNameField = fieldName(context, FOLLOWUP_FIELDS.customerName, '客户名称')
     const customerTransferName = fieldName(context, 'KehuMCCD', '客户名称（传递）')
+    const targetTypeName = fieldName(context, FOLLOWUP_FIELDS.targetType, '拜访对象类型')
+    const targetNameField = fieldName(context, FOLLOWUP_FIELDS.targetName, '拜访对象')
+    const targetType = String(context.form[targetTypeName] || '客户').trim()
+    const linkedCustomer = targetType === '客户' && customer.id ? customer : { id: '', name: '' }
+    const targetName = String(context.form[targetNameField] || '').trim()
     context.state.followupCustomerId = customer.id
     context.state.followupCustomerName = customer.name
     return {
-      [customerIdName]: customer.id,
-      [customerNameField]: customer.name,
-      [customerTransferName]: customer.name
+      [targetTypeName]: targetType,
+      [targetNameField]: targetName,
+      [customerIdName]: linkedCustomer.id,
+      [customerNameField]: targetName,
+      [customerTransferName]: linkedCustomer.name
     }
   }
   if (isProposalForm(context)) {

@@ -74,15 +74,15 @@
     </view>
 
     <view v-if="key === 'proposals'" class="proposal-compare-tools">
+      <view class="proposal-select-all" :class="{ active: areAllProposalsSelected }" @tap="toggleAllProposals">
+        <text>{{ areAllProposalsSelected ? '✓' : '' }}</text><text>{{ areAllProposalsSelected ? '取消全选' : '全选' }}</text>
+      </view>
       <view
         class="proposal-compare-button"
         :class="{ disabled: proposalSelection.length < 2 || proposalComparing }"
         hover-class="proposal-compare-button--pressed"
         @tap="compareProposals"
       ><text>{{ proposalComparing ? '比价中...' : '一键比价' }}</text><text v-if="proposalSelection.length">{{ proposalSelection.length }}</text></view>
-      <view class="proposal-select-all" :class="{ active: areAllProposalsSelected }" @tap="toggleAllProposals">
-        <text>{{ areAllProposalsSelected ? '✓' : '' }}</text><text>{{ areAllProposalsSelected ? '取消全选' : '全选' }}</text>
-      </view>
     </view>
 
     <scroll-view
@@ -96,7 +96,7 @@
       @refresherrefresh="refresh"
       @scrolltolower="loadMore"
     >
-      <view v-if="loading && pageIndex === 1" class="skeleton-list">
+      <view v-if="loading && pageIndex === 1 && !restrictedRows.length" class="skeleton-list">
         <view v-for="item in 5" :key="item" class="skeleton-card">
           <view class="skeleton-line wide"></view>
           <view class="skeleton-line"></view>
@@ -104,7 +104,27 @@
         </view>
       </view>
 
-      <view v-else-if="rows.length" class="data-list">
+      <view v-else-if="rows.length || restrictedRows.length || restrictedLoading || restrictedError" class="data-list">
+        <view v-if="showRestrictedLookup" class="restricted-results">
+          <view class="restricted-results__head">
+            <view>
+              <text class="restricted-results__title">{{ restrictedLookupConfig.title || '客户查重结果' }}</text>
+              <text class="restricted-results__description">{{ restrictedLookupConfig.description }}</text>
+            </view>
+            <text v-if="restrictedRows.length" class="restricted-results__count">{{ restrictedRows.length }} 条</text>
+          </view>
+          <view v-if="restrictedLoading" class="restricted-results__state"><text>正在核对私有客户与其他商家跟进情况...</text></view>
+          <view v-else-if="restrictedError" class="restricted-results__state restricted-results__state--error" @tap="loadRestrictedRows(true)">
+            <text>{{ restrictedError }}，点击重试</text>
+          </view>
+          <mci-restricted-record-card
+            v-for="(row, index) in restrictedRows"
+            :key="`${row.RelationType || 'restricted'}-${row.CustomerName || index}-${index}`"
+            :row="row"
+          />
+          <view v-if="restrictedTruncated" class="restricted-results__state"><text>匹配较多，请输入更完整的客户名称</text></view>
+        </view>
+
         <!-- zhy：把租户配置的摘要最大行数传给卡片组件。 -->
         <view v-for="(row, index) in rows" :key="row.Id || index" class="selectable-card">
           <view v-if="key === 'proposals'" class="proposal-select" :class="{ active: isProposalSelected(row) }" @tap.stop="toggleProposal(row)">
@@ -128,10 +148,13 @@
         />
         </view>
 
-        <view class="load-state">
+        <view v-if="rows.length" class="load-state">
           <text v-if="loading">正在加载...</text>
           <text v-else-if="finished">已加载全部 {{ count }} 条</text>
           <text v-else>继续上拉加载</text>
+        </view>
+        <view v-if="!rows.length && restrictedRows.length" class="restricted-normal-empty">
+          <text>当前权限列表中没有其他匹配客户</text>
         </view>
       </view>
 
@@ -246,8 +269,9 @@ import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { appendStandardDeleteAction } from '@/platform/module-delete.js'
 import { fieldDisplayValue, parseJson } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
-import { shouldKeepEmptyCardLine } from '@/platform/card-field-policy.mjs'
+import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
+import MciRestrictedRecordCard from '@/components/mci-restricted-record-card/mci-restricted-record-card.vue'
 import {
   formatDateTime,
   formatFieldValue,
@@ -255,6 +279,7 @@ import {
   PERIOD_OPTIONS,
   loadModulePeriodCounts,
   loadModuleRows,
+  loadRestrictedLookup,
   openForm,
   findMenu,
   statisticsFieldValue
@@ -270,12 +295,8 @@ function createRelationshipId() {
   })
 }
 
-function cardFieldKey(field) {
-  return String(field || '').trim().toLowerCase()
-}
-
 export default {
-  components: { MciBusinessCard },
+  components: { MciBusinessCard, MciRestrictedRecordCard },
   mixins: [themeMixin, listReturnMixin],
   data() {
     return {
@@ -315,6 +336,12 @@ export default {
       viewManifest: null,
       loadRequestId: 0,
       searchTimer: null,
+      restrictedRows: [],
+      restrictedLoading: false,
+      restrictedError: '',
+      restrictedTruncated: false,
+      restrictedRequestId: 0,
+      restrictedSearchTimer: null,
       proposalSelection: [],
       proposalComparing: false,
       authTokenSnapshot: ''
@@ -323,6 +350,17 @@ export default {
   computed: {
     canAddRecord() {
       return canAddMenuRecord(this.menuId, this.currentUser)
+    },
+    restrictedLookupConfig() {
+      return this.config.restrictedLookup || this.baseConfig.restrictedLookup || {}
+    },
+    showRestrictedLookup() {
+      const minimum = Math.max(2, Number(this.restrictedLookupConfig.minKeywordLength || 2))
+      return Boolean(
+        this.restrictedLookupConfig.apiEngineKey &&
+        this.keyword.trim().length >= minimum &&
+        (this.restrictedLoading || this.restrictedError || this.restrictedRows.length)
+      )
     },
     periodLabel() {
       const item = this.periods.find((option) => option.value === this.period)
@@ -377,10 +415,12 @@ export default {
     this.currentUser = getUser() || {}
     // 登录恢复后废弃旧页面请求结果，并使用新 Token 重新加载菜单与列表。
     this.loadRequestId += 1
+    this.clearRestrictedLookup()
     this.initializeList(false, true)
   },
   onUnload() {
     clearTimeout(this.searchTimer)
+    this.clearRestrictedLookup()
   },
   methods: {
     isProposalSelected(row) {
@@ -436,6 +476,7 @@ export default {
       this.config = { ...this.config, menuId: this.menuId }
       await this.loadViewConfig(refresh)
       if (!restored) await this.loadData(true, refresh)
+      if (restored && this.keyword.trim()) await this.loadRestrictedRows(refresh)
     },
     getMciListSnapshotKey() {
       return [this.key, this.whereField, this.whereValue].join('|')
@@ -513,14 +554,17 @@ export default {
           'statisticsFormat'
         ]
         scalarFields.forEach((name) => {
-          // ViewSchema.StatusField 是右上角状态位的最高优先级，不能被旧式卡片字段配置拦截。
-          if (merged.hasConfiguredCardFields && ['titleField', 'summaryField', 'imageField'].includes(name)) return
+          // ViewSchema 的显式标题/状态是最终展示事实源，不能被旧式卡片字段配置拦截。
+          if (merged.hasConfiguredCardFields && ['summaryField', 'imageField'].includes(name)) return
           if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') {
             merged[name] = dynamic[name]
           }
         })
         if (dynamic.statusField) {
           merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.statusField])]
+        }
+        if (dynamic.titleField) {
+          merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.titleField])]
         }
         if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema
         this.config = merged
@@ -583,16 +627,63 @@ export default {
     },
     search() {
       clearTimeout(this.searchTimer)
+      clearTimeout(this.restrictedSearchTimer)
       this.loadData(true, true)
+      this.loadRestrictedRows(true)
     },
     // zhy：关键词输入采用 350ms 防抖自动检索。
     scheduleSearch() {
       clearTimeout(this.searchTimer)
+      this.clearRestrictedLookup()
       this.searchTimer = setTimeout(() => this.loadData(true, true), 350)
+      const minimum = Math.max(2, Number(this.restrictedLookupConfig.minKeywordLength || 2))
+      if (this.restrictedLookupConfig.apiEngineKey && this.keyword.trim().length >= minimum) {
+        this.restrictedSearchTimer = setTimeout(
+          () => this.loadRestrictedRows(true),
+          Math.max(350, Number(this.restrictedLookupConfig.debounce || 600))
+        )
+      }
+    },
+    clearRestrictedLookup() {
+      clearTimeout(this.restrictedSearchTimer)
+      this.restrictedRequestId += 1
+      this.restrictedRows = []
+      this.restrictedLoading = false
+      this.restrictedError = ''
+      this.restrictedTruncated = false
+    },
+    async loadRestrictedRows(refresh = false) {
+      const lookup = this.restrictedLookupConfig
+      const keyword = this.keyword.trim()
+      const minimum = Math.max(2, Number(lookup.minKeywordLength || 2))
+      if (!lookup.apiEngineKey || keyword.length < minimum) {
+        this.clearRestrictedLookup()
+        return
+      }
+      const requestId = ++this.restrictedRequestId
+      this.restrictedLoading = true
+      this.restrictedError = ''
+      if (refresh) this.restrictedTruncated = false
+      try {
+        const result = await loadRestrictedLookup(this.config, {
+          keyword,
+          menuId: this.menuId
+        })
+        if (requestId !== this.restrictedRequestId || keyword !== this.keyword.trim()) return
+        this.restrictedRows = result.rows
+        this.restrictedTruncated = result.truncated
+      } catch (error) {
+        if (requestId !== this.restrictedRequestId) return
+        this.restrictedRows = []
+        this.restrictedError = error.message || '客户查重失败'
+      } finally {
+        if (requestId === this.restrictedRequestId) this.restrictedLoading = false
+      }
     },
     // zhy：重置搜索栏、筛选面板、状态和时间范围，恢复列表默认条件。
     resetSearch() {
       clearTimeout(this.searchTimer)
+      this.clearRestrictedLookup()
       this.keyword = ''
       this.filterValues = {}
       this.filterOpen = false
@@ -606,6 +697,7 @@ export default {
     clearKeyword() {
       if (!this.keyword) return
       clearTimeout(this.searchTimer)
+      this.clearRestrictedLookup()
       this.keyword = ''
       this.loadData(true, true)
     },
@@ -634,7 +726,10 @@ export default {
       this.refreshing = true
       try {
         await this.loadViewConfig(true)
-        await this.loadData(true, true)
+        await Promise.all([
+          this.loadData(true, true),
+          this.loadRestrictedRows(true)
+        ])
       } finally {
         this.refreshing = false
       }
@@ -779,20 +874,12 @@ export default {
       }).map((field) => this.configuredFieldValue(row, field)).filter((value) => value && value !== '-').slice(0, 3)
     },
     visibleLines(row) {
-      const usedFields = new Set([
+      return filterVisibleCardLines(this.config.lines || [], row, [
         this.config.titleField,
         this.config.statusField,
         this.config.summaryField,
         ...(this.config.tagFields || [])
-      ].map(cardFieldKey).filter(Boolean))
-      return (this.config.lines || []).filter((line) => {
-        const key = cardFieldKey(line.field)
-        if (!key || usedFields.has(key)) return false
-        usedFields.add(key)
-        // “负责人”是卡片的固定业务信息，暂未分配时也要保留标签和空值占位。
-        if (shouldKeepEmptyCardLine(line)) return true
-        return row[line.field] !== undefined && row[line.field] !== null && row[line.field] !== ''
-      })
+      ])
     },
     displayValue(row, line) {
       return this.configuredFieldValue(row, line.field, line.format)
@@ -1377,6 +1464,32 @@ export default {
   padding: 0 24rpx calc(140rpx + var(--mci-safe-bottom));
 }
 
+.restricted-results {
+  margin-bottom: 22rpx;
+  padding: 22rpx 20rpx 2rpx;
+  border: 1rpx solid rgba(245, 158, 11, 0.22);
+  border-radius: 20rpx;
+  background: rgba(255, 249, 237, 0.72);
+}
+
+.restricted-results__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+  margin-bottom: 18rpx;
+}
+
+.restricted-results__head > view { min-width: 0; }
+.restricted-results__title,
+.restricted-results__description { display: block; }
+.restricted-results__title { color: #754600; font-size: 28rpx; font-weight: 700; }
+.restricted-results__description { margin-top: 7rpx; color: #957245; font-size: 22rpx; line-height: 1.5; }
+.restricted-results__count { flex: none; color: #a86100; font-size: 22rpx; }
+.restricted-results__state { padding: 22rpx 10rpx 28rpx; color: #987348; font-size: 23rpx; text-align: center; }
+.restricted-results__state--error { color: #c34a2e; }
+.restricted-normal-empty { padding: 12rpx 0 40rpx; color: #91a4ac; font-size: 22rpx; text-align: center; }
+
 .data-card,
 .skeleton-card {
   margin-bottom: 18rpx;
@@ -1630,7 +1743,7 @@ export default {
   transform: scale(0.9);
 }
 
-.proposal-compare-tools { display: flex; align-items: center; justify-content: flex-end; gap: 36rpx; height: 72rpx; margin: -2rpx 24rpx 18rpx; padding: 0 8rpx; }
+.proposal-compare-tools { display: flex; align-items: center; justify-content: flex-start; gap: 28rpx; height: 72rpx; margin: -2rpx 24rpx 18rpx; padding: 0 8rpx; }
 .proposal-compare-button { display: flex; align-items: center; justify-content: center; gap: 10rpx; min-width: 190rpx; height: 68rpx; padding: 0 28rpx; border-radius: 14rpx; color: #fff; background: linear-gradient(135deg, #0787c9, #17b5a6); box-shadow: 0 8rpx 20rpx rgba(7, 135, 201, .2); font-size: 25rpx; font-weight: 700; box-sizing: border-box; }
 .proposal-compare-button > text:last-child:not(:first-child) { min-width: 30rpx; height: 30rpx; padding: 0 5rpx; border-radius: 15rpx; color: #0787c9; background: #fff; font-size: 19rpx; line-height: 30rpx; text-align: center; }
 .proposal-compare-button.disabled { opacity: .48; box-shadow: none; }
