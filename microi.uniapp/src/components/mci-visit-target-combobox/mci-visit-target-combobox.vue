@@ -5,15 +5,16 @@
       <input
         class="visit-target-combobox__input"
         :value="modelValue"
+        :disabled="readonly"
         confirm-type="search"
         :placeholder="`选择已有${targetLabel}或输入新对象`"
         @focus="openOptions"
         @input="handleInput"
         @confirm="searchNow"
       />
-      <view v-if="modelValue" class="visit-target-combobox__clear" @tap.stop="clear"><text>×</text></view>
+      <view v-if="modelValue && !readonly" class="visit-target-combobox__clear" @tap.stop="clear"><text>×</text></view>
       <view v-else class="visit-target-combobox__clear-placeholder"></view>
-      <text class="visit-target-combobox__arrow" :class="{ open }" @tap.stop="toggleOptions">›</text>
+      <text v-if="!readonly" class="visit-target-combobox__arrow" :class="{ open }" @tap.stop="toggleOptions">›</text>
     </view>
 
     <view v-if="open" class="visit-target-combobox__dropdown">
@@ -60,7 +61,8 @@ export default {
     modelValue: { type: String, default: '' },
     selectedId: { type: [String, Number], default: '' },
     moduleKey: { type: String, required: true },
-    targetType: { type: String, default: '' }
+    targetType: { type: String, default: '' },
+    readonly: { type: Boolean, default: false }
   },
   emits: ['update:modelValue', 'select', 'clear', 'open-change'],
   data() {
@@ -136,11 +138,13 @@ export default {
       return this.moduleConfig
     },
     openOptions() {
+      if (this.readonly) return
       this.open = true
       this.$emit('open-change', true)
       this.loadRows(true)
     },
     toggleOptions() {
+      if (this.readonly) return
       this.open = !this.open
       this.$emit('open-change', this.open)
       if (this.open) this.loadRows(true)
@@ -151,6 +155,7 @@ export default {
       this.$emit('open-change', false)
     },
     handleInput(event) {
+      if (this.readonly) return
       const value = String(event && event.detail && event.detail.value || '')
       this.$emit('update:modelValue', value)
       clearTimeout(this.searchTimer)
@@ -161,6 +166,7 @@ export default {
       this.loadRows(true)
     },
     clear() {
+      if (this.readonly) return
       this.$emit('update:modelValue', '')
       this.$emit('clear')
       this.open = true

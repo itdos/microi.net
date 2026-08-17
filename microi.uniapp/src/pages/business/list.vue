@@ -74,15 +74,15 @@
     </view>
 
     <view v-if="key === 'proposals'" class="proposal-compare-tools">
+      <view class="proposal-select-all" :class="{ active: areAllProposalsSelected }" @tap="toggleAllProposals">
+        <text>{{ areAllProposalsSelected ? '✓' : '' }}</text><text>{{ areAllProposalsSelected ? '取消全选' : '全选' }}</text>
+      </view>
       <view
         class="proposal-compare-button"
         :class="{ disabled: proposalSelection.length < 2 || proposalComparing }"
         hover-class="proposal-compare-button--pressed"
         @tap="compareProposals"
       ><text>{{ proposalComparing ? '比价中...' : '一键比价' }}</text><text v-if="proposalSelection.length">{{ proposalSelection.length }}</text></view>
-      <view class="proposal-select-all" :class="{ active: areAllProposalsSelected }" @tap="toggleAllProposals">
-        <text>{{ areAllProposalsSelected ? '✓' : '' }}</text><text>{{ areAllProposalsSelected ? '取消全选' : '全选' }}</text>
-      </view>
     </view>
 
     <scroll-view
@@ -1630,7 +1630,7 @@ export default {
   transform: scale(0.9);
 }
 
-.proposal-compare-tools { display: flex; align-items: center; justify-content: flex-end; gap: 36rpx; height: 72rpx; margin: -2rpx 24rpx 18rpx; padding: 0 8rpx; }
+.proposal-compare-tools { display: flex; align-items: center; justify-content: flex-start; gap: 28rpx; height: 72rpx; margin: -2rpx 24rpx 18rpx; padding: 0 8rpx; }
 .proposal-compare-button { display: flex; align-items: center; justify-content: center; gap: 10rpx; min-width: 190rpx; height: 68rpx; padding: 0 28rpx; border-radius: 14rpx; color: #fff; background: linear-gradient(135deg, #0787c9, #17b5a6); box-shadow: 0 8rpx 20rpx rgba(7, 135, 201, .2); font-size: 25rpx; font-weight: 700; box-sizing: border-box; }
 .proposal-compare-button > text:last-child:not(:first-child) { min-width: 30rpx; height: 30rpx; padding: 0 5rpx; border-radius: 15rpx; color: #0787c9; background: #fff; font-size: 19rpx; line-height: 30rpx; text-align: center; }
 .proposal-compare-button.disabled { opacity: .48; box-shadow: none; }
