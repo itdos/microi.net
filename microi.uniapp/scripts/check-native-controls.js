@@ -173,7 +173,7 @@ if (!childTable.includes('删除此条') ||
   fail('child table actions must keep add separate from toggle and place a large delete action below each row')
 }
 if (!businessList.includes('<mci-business-card') ||
-  !businessList.includes('components: { MciBusinessCard }') ||
+  !/components:\s*\{[^}]*\bMciBusinessCard\b/.test(businessList) ||
   !relatedBusinessList.includes('<mci-business-card') ||
   !relatedBusinessList.includes('components: { MciBusinessCard, MciTaskCard') ||
   !relatedBusinessList.includes('getBusinessRowActions') ||

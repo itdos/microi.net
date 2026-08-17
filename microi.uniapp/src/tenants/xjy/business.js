@@ -136,6 +136,15 @@ export const businessModules = {
     ],
     statisticsField: 'YuqiJYJE', statisticsLabel: '预期交易额', defaultOrderBy: 'CreateTime',
     statusOptions: ['目标客户', '意向客户', '合作客户', '断约客户', '非目标客户'],
+    restrictedLookup: {
+      apiEngineKey: 'xjy-search-private-customers',
+      minKeywordLength: 2,
+      fuzzyKeywordLength: 4,
+      debounce: 600,
+      limit: 10,
+      title: '客户查重结果',
+      description: '以下客户不在您的普通列表权限内，仅用于确认是否已有人员负责'
+    },
     filterFields: customerFilterFields
   }),
   cooperativeCustomers: native({
@@ -198,7 +207,7 @@ export const businessModules = {
   }),
   orders: native({
     title: '合同订单', table: 'Diy_Dingdan', menuAliases: ['合同订单', '订单管理', '我的订单'],
-    titleField: 'DingdanBH', statusField: 'DingdanZT', tagFields: ['XinLDD', 'DingdanHZFS'],
+    titleField: 'KehuMC', statusField: 'DingdanZT', tagFields: ['XinLDD', 'DingdanHZFS'],
     fixedWhere: [{ Name: 'DingdanZT', Type: '!=', Value: '已作废' }],
     relatedMetrics: [
       { key: 'pending', label: '待审批', where: [{ Name: 'DingdanZT', Type: '=', Value: '待审批' }], tone: 'warning' },

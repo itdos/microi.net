@@ -272,8 +272,9 @@ import { compileListConfig, loadModuleViewManifest } from '@/platform/view-manif
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { appendStandardDeleteAction } from '@/platform/module-delete.js'
 import { canDeleteMenuRecord } from '@/platform/menu-permission.js'
-import { loadNativeFormDefinition, loadNativeTableModel, parseJson } from '@/platform/native-form.js'
-import { createMenuModuleDefinition } from '@/platform/module-registry.js'
+import { fieldDisplayValue, loadNativeFormDefinition, loadNativeTableModel, parseJson } from '@/platform/native-form.js'
+import { createMenuModuleDefinition, loadModuleDefinition } from '@/platform/module-registry.js'
+import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
 import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
@@ -432,6 +433,7 @@ export default {
       config: {},
       menuId: '',
       viewManifest: null,
+      presentationRequestId: 0,
       rows: [],
       count: 0,
       duplicateRowCount: 0,
@@ -655,6 +657,7 @@ export default {
     this.scheduleListBodyMeasure()
   },
   beforeUnmount() {
+    this.presentationRequestId += 1
     uni.$off('microi:data-changed', this.handleDataChanged)
     clearTimeout(this.searchTimer)
     this.clearLayoutMeasureTimers()
@@ -886,6 +889,7 @@ export default {
       })
     },
     async initialize(refresh = false) {
+      this.presentationRequestId += 1
       if (!this.childTableId) {
         this.error = '关联表未配置数据表'
         this.loading = false
@@ -933,13 +937,13 @@ export default {
         this.config = {
           ...matched.config,
           ...platformCardConfig,
+          menu,
           table: this.table.Name,
           tableId: this.table.Id,
           menuId: this.menuId,
           moduleEngineKey: menu?.ModuleEngineKey || ''
         }
         this.applyMenuSearchFields(menu?.SearchFieldIds)
-        await this.loadViewConfig(refresh)
         if (this.waitingForParentSave) {
           this.rows = []
           this.count = 0
@@ -947,12 +951,48 @@ export default {
           this.loading = false
           return
         }
+        // 展示配置与关联数据并行加载。完整菜单或 ViewSchema 暂时不可用时，
+        // 先用当前授权菜单的本地编译结果展示数据，不能让配置请求把页面卡在骨架屏。
+        void this.loadPresentationConfig(refresh)
         await Promise.all([this.loadData(true, refresh), this.loadRelatedMetrics(refresh)])
         this.scheduleListBodyMeasure()
       } catch (error) {
         this.error = error.message || error.Msg || '关联数据加载失败'
         this.loading = false
       }
+    },
+    applyCardPresentationConfig(menuConfig) {
+      if (!menuConfig || String(menuConfig.table || '').toLowerCase() !== String(this.table?.Name || '').toLowerCase()) return
+      const presentationFields = [
+        'menu', 'definition', 'titleField', 'statusField', 'statusOptions', 'tagFields',
+        'bottomFields', 'hasConfiguredCardFields', 'cardFields', 'lines',
+        'selectFields', 'summaryField', 'imageField', 'periodField'
+      ]
+      const next = { ...this.config }
+      presentationFields.forEach((name) => {
+        if (menuConfig[name] !== undefined) next[name] = menuConfig[name]
+      })
+      // 与普通业务列表保持一致：后台菜单字段完整接管卡片后不再使用租户摘要占位。
+      next.summaryField = ''
+      this.config = next
+    },
+    async loadPresentationConfig(refresh = false) {
+      const requestId = ++this.presentationRequestId
+      let manifestRefresh = refresh
+      try {
+        if (this.menuId) {
+          // 客户详情可能在后台配置更新前已打开，展示配置必须主动刷新；
+          // 数据查询仍并行执行，因此刷新元数据不会让列表停留在骨架屏。
+          const menuConfig = await loadModuleDefinition(this.menuId, true)
+          if (requestId !== this.presentationRequestId) return
+          this.applyCardPresentationConfig(menuConfig)
+          manifestRefresh = true
+        }
+      } catch (error) {
+        // 子表菜单仍负责权限；完整展示配置失败时保留初始化阶段的安全回退配置。
+      }
+      if (requestId !== this.presentationRequestId) return
+      await this.loadViewConfig(manifestRefresh, requestId)
     },
     resolveBusinessModule(tableName) {
       const targetTable = String(tableName || '').toLowerCase()
@@ -985,7 +1025,7 @@ export default {
         }
       }
     },
-    async loadViewConfig(refresh = false) {
+    async loadViewConfig(refresh = false, expectedRequestId = 0) {
       try {
         let manifest = await loadModuleViewManifest(this.config, {
           scene: 'Card',
@@ -1001,6 +1041,7 @@ export default {
             refresh
           })
         }
+        if (expectedRequestId && expectedRequestId !== this.presentationRequestId) return
         this.applyMenuSearchFields(manifest?.Legacy?.SearchFieldIds)
         const dynamic = compileListConfig(manifest, this.definition?.fields || [])
         if (!dynamic) return
@@ -1011,7 +1052,8 @@ export default {
           if (dynamic[name]?.length) merged[name] = dynamic[name]
         })
         ;['titleField', 'statusField', 'summaryField', 'periodField'].forEach((name) => {
-          if (merged.hasConfiguredCardFields && ['titleField', 'summaryField'].includes(name)) return
+          // Card-Mobile 的显式标题是最终展示事实源；旧式字段只保留正文/标签兼容规则。
+          if (merged.hasConfiguredCardFields && name === 'summaryField') return
           if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') merged[name] = dynamic[name]
         })
         if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema
@@ -1332,19 +1374,35 @@ export default {
       this.filterOpen = false
       this.loadData(true, true)
     },
+    isCustomerOrderList() {
+      // 该组件只负责详情页关联列表。实际客户详情没有传 parentTableName，
+      // 因此直接以已授权的订单子表识别，不能再让缺失的父表参数使规则失效。
+      const tableName = this.config.table || this.table?.Name || ''
+      return String(tableName).toLowerCase() === 'diy_dingdan'
+    },
+    effectiveTitleField() {
+      // 客户详情订单卡片禁止使用订单编号作为标题。即使旧缓存或旧 ViewSchema
+      // 仍返回 DingdanBH，也只能在正文“订单编号”一行展示。
+      return this.isCustomerOrderList() ? 'KehuMC' : this.config.titleField
+    },
     getTitle(row) {
-      const configured = row[this.config.titleField]
-      if (configured) return formatFieldValue(configured, '', { empty: '' })
+      const titleField = this.effectiveTitleField()
+      const configured = this.configuredFieldValue(row, titleField)
+      if (configured && configured !== '-') return configured
+      if (this.isCustomerOrderList()) {
+        const parentCustomerName = this.configuredFieldValue(this.parentForm || {}, 'KehuMC')
+        return parentCustomerName && parentCustomerName !== '-' ? parentCustomerName : '订单'
+      }
       const fallback = ['Name', 'Title', 'Biaoti', 'KehuMC', 'DingdanBH', 'ShouhouFWBH', 'Xingming']
         .find((field) => row[field])
-      return fallback ? formatFieldValue(row[fallback], '', { empty: '' }) : `记录 ${String(row.Id || '').slice(-6)}`
+      return fallback ? this.configuredFieldValue(row, fallback) : `记录 ${String(row.Id || '').slice(-6)}`
     },
     getStatus(row) {
       if (this.moduleKey === 'customerAddresses') {
         const defaultAddressCode = String(this.parentForm?.AddressBH || '')
         if (defaultAddressCode && String(row.AddressBH || '') === defaultAddressCode) return '默认地址'
       }
-      return formatFieldValue(row[this.config.statusField], '', { empty: '' })
+      return this.configuredFieldValue(row, this.config.statusField)
     },
     getStatusClass(row) {
       const text = String(this.getStatus(row))
@@ -1354,19 +1412,41 @@ export default {
       return 'is-info'
     },
     getTags(row) {
-      return (this.config.tagFields || [])
-        .map((field) => formatFieldValue(row[field], '', { empty: '' }))
-        .filter(Boolean)
+      const usedFields = new Set([
+        cardFieldKey(this.effectiveTitleField()),
+        cardFieldKey(this.config.statusField)
+      ].filter(Boolean))
+      return (this.config.tagFields || []).filter((field) => {
+        const key = cardFieldKey(field)
+        if (!key || usedFields.has(key)) return false
+        usedFields.add(key)
+        return true
+      })
+        .map((field) => this.configuredFieldValue(row, field))
+        .filter((value) => value && value !== '-')
         .slice(0, 3)
     },
     visibleLines(row) {
-      return (this.config.lines || [])
-        .filter((line) => row[line.field] !== undefined && row[line.field] !== null && row[line.field] !== '')
+      return filterVisibleCardLines(this.config.lines || [], row, [
+        this.effectiveTitleField(),
+        this.config.statusField,
+        this.config.summaryField,
+        ...(this.config.tagFields || [])
+      ])
+    },
+    fieldDefinition(name) {
+      return (this.config.definition?.fields || []).find((field) => field.Name === name)
+    },
+    configuredFieldValue(row, name, format = '') {
+      const field = this.fieldDefinition(name)
+      return field
+        ? fieldDisplayValue(field, row[name])
+        : formatFieldValue(row[name], format, { empty: '' })
     },
     cardLines(row) {
       return this.visibleLines(row).map((line) => ({
         ...line,
-        value: formatFieldValue(row[line.field], line.format),
+        value: this.configuredFieldValue(row, line.field, line.format),
         rawValue: row[line.field],
         // zhy：动态清单把摘要字段作为普通行返回时，限制为配置的最大行数。
         maxLines: String(line.field || '').toLowerCase() === String(this.config.summaryField || '').toLowerCase()
@@ -1378,7 +1458,7 @@ export default {
       // zhy：摘要已经作为带标签字段行展示时，不在卡片底部重复输出。
       const summaryField = String(this.config.summaryField || '').toLowerCase()
       const renderedAsLine = this.visibleLines(row).some((line) => String(line.field || '').toLowerCase() === summaryField)
-      return renderedAsLine ? '' : formatFieldValue(row[this.config.summaryField], '', { empty: '' })
+      return renderedAsLine ? '' : this.configuredFieldValue(row, this.config.summaryField)
     },
     cardBottomText(row) {
       try {
@@ -1386,7 +1466,7 @@ export default {
           .map((item) => {
             const descriptor = typeof item === 'string' ? { field: item } : (item || {})
             if (!descriptor.field) return ''
-            return formatFieldValue(row[descriptor.field], descriptor.format, { empty: '' })
+            return this.configuredFieldValue(row, descriptor.field, descriptor.format)
           })
           .filter((value) => value && value !== '-')
         if (values.length) return values.join(' · ')

@@ -238,6 +238,42 @@ export async function callApiEngine(key, data = {}) {
   return V8.ApiEngine.RunLegacy(key, data, { checkCode: false })
 }
 
+// 受限查重接口的权限拒绝不能触发兼容重试，避免同一敏感查询被重复执行。
+export async function loadRestrictedLookup(moduleConfig, options = {}) {
+  const lookup = moduleConfig && moduleConfig.restrictedLookup
+  if (!lookup || !lookup.apiEngineKey) return { rows: [], count: 0, truncated: false }
+  const keyword = String(options.keyword || '').trim()
+  const minimum = Math.max(2, Number(lookup.minKeywordLength || 2))
+  if (keyword.length < minimum) return { rows: [], count: 0, truncated: false }
+  const menuId = String(options.menuId || moduleConfig.menuId || '').trim()
+  if (!menuId) throw new Error('当前账号无权使用客户查重')
+  let response
+  try {
+    response = await V8.ApiEngine.Run(lookup.apiEngineKey, {
+      Keyword: keyword,
+      MenuId: menuId,
+      Limit: Math.min(10, Math.max(1, Number(lookup.limit || 10)))
+    }, { checkCode: false })
+  } catch (error) {
+    response = await V8.ApiEngine.RunLegacy(lookup.apiEngineKey, {
+      Keyword: keyword,
+      MenuId: menuId,
+      Limit: Math.min(10, Math.max(1, Number(lookup.limit || 10)))
+    }, { checkCode: false })
+  }
+  if (!response || response.Code !== 1) {
+    throw new Error((response && response.Msg) || '客户查重失败')
+  }
+  const data = response.Data || {}
+  const rows = Array.isArray(data.Matches) ? data.Matches : []
+  return {
+    rows,
+    count: Number(data.MatchCount || rows.length),
+    truncated: data.Truncated === true,
+    searchMode: data.SearchMode || ''
+  }
+}
+
 export async function loadHomeSummary(options = {}) {
   const user = getUser() || {}
   if (!tenantRuntime || typeof tenantRuntime.loadHomeSummary !== 'function') {
@@ -421,6 +457,7 @@ export default {
   buildPeriodRange,
   loadModuleRows,
   callApiEngine,
+  loadRestrictedLookup,
   loadHomeSummary,
   resolveDiyTableId,
   loadMenuTree,
