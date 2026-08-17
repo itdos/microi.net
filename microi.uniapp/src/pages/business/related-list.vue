@@ -27,6 +27,7 @@
 				:parent-form="parentForm"
 				:parent-menu-id="parentMenuId"
 				:parent-table-id="parentTableId"
+				:parent-table-name="parentTableName"
 				:parent-table-child-auth="parentTableChildAuth"
 				:parent-mode="parentMode"
 				:relation-value-override="relationValue"
@@ -60,6 +61,7 @@
 				parentForm: {},
 				parentMenuId: '',
 				parentTableId: '',
+				parentTableName: '',
 				parentTableChildAuth: null,
 				parentMode: 'View',
 				relationValue: '',
@@ -73,6 +75,7 @@
 			this.parentId = decodeOption(options.parentId)
 			this.parentMenuId = decodeOption(options.parentMenuId)
 			this.parentTableId = decodeOption(options.parentTableId)
+			this.parentTableName = decodeOption(options.parentTableName)
 			try {
 				this.parentTableChildAuth = JSON.parse(decodeOption(options.parentTableChildAuth) || 'null')
 			} catch (error) {
@@ -101,6 +104,7 @@
 				this.parentForm = context.parentForm || this.parentForm
 				this.parentMenuId = context.parentMenuId || this.parentMenuId
 				this.parentTableId = context.parentTableId || this.parentTableId
+				this.parentTableName = context.parentTableName || this.parentTableName
 				this.parentTableChildAuth = context.parentTableChildAuth || this.parentTableChildAuth
 				this.parentMode = context.parentMode || this.parentMode
 				this.relationValue = context.relationValue ?? this.relationValue
@@ -124,6 +128,7 @@
 					const table = await loadNativeTableModel(this.parentTableId, {
 						menuId: this.parentMenuId
 					})
+					this.parentTableName = table.Name || this.parentTableName
 					const definition = await loadNativeFormDefinition(table.Name, false, {
 						menuId: this.parentMenuId
 					})
