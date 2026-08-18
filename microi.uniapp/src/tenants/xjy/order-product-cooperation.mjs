@@ -4,11 +4,29 @@ export function orderProductNumberValue(value) {
   return Number.isFinite(number) ? number : 0
 }
 
+function fixedNumber(value) {
+  return Number(orderProductNumberValue(value).toFixed(2))
+}
+
 function safePercent(value, baseValue) {
   const base = orderProductNumberValue(baseValue)
   if (base === 0) return 0
   const percent = orderProductNumberValue(value) / base * 100
   return Number.isFinite(percent) ? Number(percent.toFixed(2)) : 0
+}
+
+// zhy：与 PC 端实际单价字段 V8 事件保持一致，集中计算设备、滤芯的优惠幅度与数量总价。
+export function calculateOrderProductPriceBinding(form = {}) {
+  const quantity = orderProductNumberValue(form.Shuliang)
+  const deviceActualUnitPrice = orderProductNumberValue(form.ShebeiSJDJ)
+  const filterActualUnitPrice = orderProductNumberValue(form.LvxinSJDJ)
+
+  return {
+    ShebeiYHFD: safePercent(deviceActualUnitPrice, form.Xianjia),
+    Zongjia: fixedNumber(deviceActualUnitPrice * quantity),
+    YouhuiFD: safePercent(filterActualUnitPrice, form.LvxinYJ),
+    LvxinZJ: fixedNumber(filterActualUnitPrice * quantity)
+  }
 }
 
 export function calculateOrderProductCooperation({
@@ -46,19 +64,14 @@ export function calculateOrderProductCooperation({
     productActualPrice = rentalPrice
   }
 
-  const deviceDiscountBase = cooperation === '包年换芯' ? buyoutPrice : devicePrice
-  return {
+  const values = {
     HezuoFSZ: cooperationKey,
     Yuanjia: deviceOriginalPrice,
     Xianjia: cooperation === '包年换芯' ? buyoutPrice : devicePrice,
     ShijiJG: productActualPrice,
     ShebeiSJDJ: devicePrice,
-    ShebeiYHFD: safePercent(devicePrice, deviceDiscountBase),
-    Zongjia: devicePrice * quantity,
     LvxinYJ: filterOriginalPrice,
-    LvxinSJDJ: filterPrice,
-    YouhuiFD: safePercent(filterPrice, filterOriginalPrice),
-    LvxinZJ: filterPrice * quantity
+    LvxinSJDJ: filterPrice
   }
+  return { ...values, ...calculateOrderProductPriceBinding({ ...form, ...values, Shuliang: quantity }) }
 }
-

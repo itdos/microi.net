@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
-import { calculateOrderProductCooperation } from '../src/tenants/xjy/order-product-cooperation.mjs'
+import fs from 'node:fs'
+import {
+  calculateOrderProductCooperation,
+  calculateOrderProductPriceBinding
+} from '../src/tenants/xjy/order-product-cooperation.mjs'
 
 const product = {
   Yuanjia: 2000,
@@ -39,5 +43,35 @@ const zeroBase = calculateOrderProductCooperation({
 })
 assert.equal(zeroBase.YouhuiFD, 0)
 
-console.log('xjy order product cooperation checks passed')
+assert.deepEqual(calculateOrderProductPriceBinding({
+  Shuliang: 6,
+  Xianjia: 11000,
+  ShebeiSJDJ: 9000,
+  LvxinYJ: 2180,
+  LvxinSJDJ: 1360
+}), {
+  ShebeiYHFD: 81.82,
+  Zongjia: 54000,
+  YouhuiFD: 62.39,
+  LvxinZJ: 8160
+})
 
+assert.deepEqual(calculateOrderProductPriceBinding({
+  Shuliang: '3',
+  Xianjia: 0,
+  ShebeiSJDJ: '',
+  LvxinYJ: 0,
+  LvxinSJDJ: '100.125'
+}), {
+  ShebeiYHFD: 0,
+  Zongjia: 0,
+  YouhuiFD: 0,
+  LvxinZJ: 300.38
+})
+
+const formSource = fs.readFileSync(new URL('../src/tenants/xjy/form.js', import.meta.url), 'utf8')
+assert.match(formSource, /\['shuliang', 'shebeisjdj', 'lvxinsjdj'\]/)
+assert.match(formSource, /calculateOrderProductPriceBinding\(context\.form\)/)
+assert.match(formSource, /\.\.\.priceValues,\s*_InvokeType: 'Client'/)
+
+console.log('xjy order product cooperation checks passed')
