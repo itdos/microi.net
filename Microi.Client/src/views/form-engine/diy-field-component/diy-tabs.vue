@@ -19,14 +19,14 @@
             @tab-change="handleTabChange"
         >
             <el-tab-pane
-                v-for="pane in panes"
+                v-for="(pane, paneIndex) in panes"
                 :key="pane.Key"
                 :name="pane.Key"
                 :disabled="pane.Disabled === true"
             >
                 <template #label>
                     <span class="diy-field-tabs__label" :class="{ 'is-active': pane.Key === activeKey }">
-                        <fa-icon v-if="pane.Icon" :icon="pane.Icon" class="diy-field-tabs__icon" />
+                        <fa-icon :icon="resolveTabIcon(pane.Icon, paneIndex)" class="diy-field-tabs__icon mci-tab-icon" />
                         <span class="diy-field-tabs__title">{{ pane.Title }}</span>
                         <span
                             v-if="showFieldCount"
@@ -200,6 +200,7 @@
 <script setup>
 import { computed, getCurrentInstance, ref, watch } from "vue";
 import { ArrowDown, ArrowUp, Delete, Plus } from "@element-plus/icons-vue";
+import { resolveTabIcon } from "@/utils/tab-icon.js";
 
 defineOptions({
     name: "diy-tabs",
@@ -583,19 +584,19 @@ defineExpose({
         align-items: center !important;
         min-height: 44px !important;
         margin: 0 !important;
-        padding: 4px !important;
+        padding: 0 !important;
         overflow: hidden !important;
-        border: 1px solid color-mix(in srgb, var(--field-tabs-color) 14%, var(--field-tabs-border));
-        border-radius: 12px;
-        background: color-mix(in srgb, var(--field-tabs-color) 5%, var(--el-fill-color-extra-light, #f6f8fb));
+        border: 0;
+        border-radius: 0;
+        background: transparent;
     }
 
     :deep(.el-tabs__nav) {
         border: 0 !important;
         display: flex;
         align-items: center;
-        gap: 6px;
-        height: 34px !important;
+        gap: 0;
+        height: 40px !important;
         padding: 0;
         box-sizing: border-box;
         background: transparent !important;
@@ -604,14 +605,14 @@ defineExpose({
     }
 
     :deep(.el-tabs__item) {
-        height: 34px;
-        min-height: 34px;
+        height: 40px;
+        min-height: 40px;
         line-height: 1 !important;
         margin: 0 !important;
         padding: 0 14px;
         box-sizing: border-box;
-        border: 1px solid transparent !important;
-        border-radius: 9px !important;
+        border: 0 !important;
+        border-radius: 0 !important;
         background: transparent !important;
         color: var(--el-text-color-regular);
         display: inline-flex;
@@ -622,16 +623,16 @@ defineExpose({
 
     :deep(.el-tabs__item:hover) {
         color: var(--field-tabs-color);
-        background: color-mix(in srgb, var(--field-tabs-color) 8%, var(--el-bg-color) 92%) !important;
+        background: transparent !important;
     }
 
     :deep(.el-tabs__item.is-active) {
         z-index: 1;
         margin-bottom: 0 !important;
         color: var(--field-tabs-color) !important;
-        background: color-mix(in srgb, var(--field-tabs-color) 10%, var(--el-bg-color) 90%) !important;
-        border-color: color-mix(in srgb, var(--field-tabs-color) 22%, var(--field-tabs-border) 78%) !important;
-        box-shadow: 0 5px 14px color-mix(in srgb, var(--field-tabs-color) 13%, transparent), 0 1px 2px rgba(15, 23, 42, .05);
+        background: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none;
     }
 
     :deep(.el-tabs__item.is-active .diy-field-tabs__icon) {
@@ -644,16 +645,23 @@ defineExpose({
         border-color: color-mix(in srgb, var(--field-tabs-color) 22%, transparent) !important;
     }
 
-    :deep(.el-tabs__item.is-active::before) {
-        display: none !important;
-    }
-
     :deep(.el-tabs__content) {
         display: none;
     }
 
     :deep(.el-tabs__nav-wrap::after) {
-        display: none;
+        display: block;
+        height: 1px;
+        background-color: var(--el-border-color-light);
+    }
+
+    :deep(.el-tabs__active-bar) {
+        display: block;
+        height: 2px;
+        border-radius: 999px;
+        background-color: var(--field-tabs-color);
+        transition: width .3s cubic-bezier(.645, .045, .355, 1),
+            transform .3s cubic-bezier(.645, .045, .355, 1);
     }
 
     &--success { --field-tabs-color: var(--el-color-success); }
@@ -662,7 +670,10 @@ defineExpose({
 }
 
 :global(.field-tabs-header) .diy-field-tabs {
-    border-radius: 0 !important;
+    border-top-left-radius: 8px !important;
+    border-top-right-radius: 8px !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
 }
 
 :global(.field-tabs-header),

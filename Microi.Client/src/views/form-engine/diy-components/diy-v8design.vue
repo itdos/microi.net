@@ -1,6 +1,6 @@
 <template>
     <div class="diy-v8design-compat">
-        <el-button class="edit" type="primary" @click="show">代码设计器</el-button>
+        <el-button v-if="!hideTrigger" class="edit" type="primary" @click="show">代码设计器</el-button>
         <DiyCodeDesign
             ref="designerRef"
             v-model:model="innerModel"
@@ -27,6 +27,10 @@ const props = defineProps({
     model: {
         type: [String, Number, Object, Array],
         default: ""
+    },
+    hideTrigger: {
+        type: Boolean,
+        default: false
     }
 });
 

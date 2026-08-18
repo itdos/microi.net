@@ -94,8 +94,9 @@
                                 color: TableRowListActiveTab !== tab.Id ? ' var(--el-text-color-regular, #606266) !important' : ''
                             }"
                         >
-                            <i
-                                :class="DiyCommon.IsNull(tab.Icon) ? 'fas fa-list-ol marginRight5' : tab.Icon + ' marginRight5'"
+                            <fa-icon
+                                class="mci-tab-icon marginRight5"
+                                :icon="ResolveTabIcon(tab.Icon, tabIndex)"
                                 :style="{
                                     color: TableRowListActiveTab !== tab.Id ? ' var(--el-text-color-regular, #606266) !important' : ''
                                 }"
@@ -2076,6 +2077,7 @@ import DiyTableSpecialCell from "@/views/form-engine/diy-components/DiyTableSpec
 import DiySearch from "@/views/form-engine/diy-search.vue";
 import DiyModleSearch from "@/views/form-engine/diy-mobile-search.vue";
 import { getFieldConfig, isSpecialTableField } from "@/views/form-engine/utils/table-special-field";
+import { resolveTabIcon } from "@/utils/tab-icon.js";
 export default {
     name: "DiyTableRowlist",
     directives: {},
@@ -2237,6 +2239,9 @@ export default {
         }
     },
     methods: {
+        ResolveTabIcon(icon, index) {
+            return resolveTabIcon(icon, index);
+        },
         IsSpecialTableField(field) {
             return isSpecialTableField(field);
         },

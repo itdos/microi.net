@@ -161,7 +161,12 @@ export default {
             var self = this;
             if (!self.SysDataSourceList || self.SysDataSourceList.length > 0) return;
             self.DiyCommon.GetDiyTableRow(
-                { TableName: "Sys_DataSource" },
+                {
+                    TableName: "Sys_DataSource",
+                    _SelectFields: ["Id", "DataSourceName", "DataSourceKey"],
+                    _PageIndex: 1,
+                    _PageSize: 20
+                },
                 function (data) {
                     if (data && data.Data) {
                         self.SysDataSourceList = data.Data;
@@ -179,7 +184,9 @@ export default {
             self.DiyCommon.GetDiyTableRow(
                 {
                     TableName: "sys_apiengine",
-                    _SelectFields: ["Id", "ApiName", "ApiEngineKey", "ApiAddress", "IsEnable"]
+                    _SelectFields: ["Id", "ApiName", "ApiEngineKey", "ApiAddress", "IsEnable"],
+                    _PageIndex: 1,
+                    _PageSize: 20
                 },
                 function (data) {
                     if (data && data.Data) {

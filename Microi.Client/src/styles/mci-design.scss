@@ -1128,14 +1128,28 @@ html.dark {
  * Dialog 使用大圆角、可拖动、无顶部强调线；Drawer 保持直角侧滑语义。
  * Tabs 的选中态使用轻量浮层和直线指示器，横向/纵向均保持同一视觉语言。
  * ============================================================ */
-.el-dialog.mci-unified-dialog {
+/* Element Plus 的 draggable 会在拖动时重绘根 class。基础几何放在结构
+   选择器上，保证观察器重新补类之前也不会闪回旧的方角/顶部粗线。 */
+.el-overlay-dialog > .el-dialog {
+    overflow: hidden;
+    border-top: 0 !important;
+    border-radius: 22px !important;
+}
+
+.el-overlay-dialog > .el-dialog > .el-dialog__header {
+    border-top: 0 !important;
+}
+
+.el-dialog.mci-unified-dialog,
+.el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog {
     --mci-dialog-surface: var(--mci-bg-card, var(--el-bg-color, #fff));
     --mci-dialog-line: var(--mci-border-color, var(--el-border-color-lighter, #e1e8f0));
     overflow: hidden;
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 32px);
     border: 1px solid var(--mci-dialog-line);
-    border-radius: 22px;
+    border-top: 0 !important;
+    border-radius: 22px !important;
     background: var(--mci-dialog-surface);
     box-shadow: 0 24px 64px rgba(9, 24, 48, .22), 0 6px 18px rgba(9, 24, 48, .08);
 
@@ -1162,6 +1176,73 @@ html.dark {
     }
 }
 
+/* 原生 title 属性的统一标题：自定义表单 Header 不受影响。 */
+.el-dialog.mci-unified-dialog > .el-dialog__header:has(> .el-dialog__title),
+.el-dialog.mci-unified-dialog > .el-dialog__header:has(> .mci-field-config-heading),
+.el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog > .el-dialog__header:has(> .el-dialog__title),
+.el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog > .el-dialog__header:has(> .mci-field-config-heading) {
+    position: relative;
+    gap: 12px;
+    min-height: 78px;
+    padding-right: 64px;
+
+    &::before {
+        display: inline-flex;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid color-mix(in srgb, var(--el-color-primary, #3478f6) 24%, transparent);
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--el-color-primary, #3478f6) 12%, var(--mci-dialog-surface));
+        color: var(--el-color-primary, #3478f6);
+        content: "✦";
+        font-size: 18px;
+        font-weight: 800;
+        box-shadow: 0 6px 16px color-mix(in srgb, var(--el-color-primary, #3478f6) 12%, transparent);
+    }
+
+    > .el-dialog__title {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        color: var(--el-text-color-primary, #152238);
+        font-size: 19px;
+        font-weight: 750;
+        line-height: 1.25;
+
+        &::before {
+            margin-bottom: 4px;
+            color: var(--el-color-primary, #3478f6);
+            content: "MICROI DIALOG";
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .16em;
+            line-height: 1;
+        }
+    }
+}
+
+.el-dialog.mci-field-config-dialog > .el-dialog__header:has(> .el-dialog__title),
+.el-dialog.mci-field-config-dialog > .el-dialog__header:has(> .mci-field-config-heading),
+.el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog > .el-dialog__header:has(> .el-dialog__title),
+.el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog > .el-dialog__header:has(> .mci-field-config-heading) {
+    &::before { content: "⚙"; }
+    > .el-dialog__title::before { content: "FIELD SETTINGS"; }
+}
+
+.el-dialog.microi-notification-dialog > .el-dialog__header:has(> .el-dialog__title) {
+    &::before { content: "◉"; }
+    > .el-dialog__title::before { content: "NOTIFICATION CENTER"; }
+}
+
+.el-dialog.microi-message-detail-dialog > .el-dialog__header:has(> .el-dialog__title) {
+    &::before { content: "✉"; }
+    > .el-dialog__title::before { content: "MESSAGE DETAILS"; }
+}
+
 .mci-unified-overlay {
     background: color-mix(in srgb, #111827 44%, transparent) !important;
     backdrop-filter: blur(12px) saturate(120%);
@@ -1181,20 +1262,238 @@ html.dark {
     transition: none !important;
 }
 
-.el-dialog.mci-field-config-dialog {
-    width: min(760px, calc(100vw - 32px));
+.el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog {
+    display: flex;
+    overflow: hidden;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.el-dialog.mci-field-config-dialog,
+.el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog {
+    --el-dialog-width: min(960px, calc(100vw - 32px));
+    --mci-field-canvas: color-mix(in srgb, var(--el-fill-color-extra-light, #f6f8fb) 72%, var(--mci-dialog-surface, #fff));
+    width: min(960px, calc(100vw - 32px)) !important;
+    max-width: calc(100vw - 32px) !important;
+    margin: auto !important;
+    border-radius: 22px !important;
+
+    &.is-dragging,
+    &.is-draggable {
+        width: min(960px, calc(100vw - 32px)) !important;
+        border-top: 0 !important;
+        border-radius: 22px !important;
+    }
 
     > .el-dialog__body {
-        max-height: min(70vh, 720px);
+        max-height: min(68vh, 720px);
         overflow: auto;
+        padding: 22px 28px;
+        background: var(--mci-field-canvas);
     }
 
     > .el-dialog__footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
         box-sizing: border-box;
         margin: 0;
-        padding: 12px 18px 16px;
+        padding: 16px 24px 20px;
         border-top: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter, #e1e8f0));
         background: var(--mci-dialog-surface, var(--el-bg-color, #fff));
+
+        .el-button {
+            min-width: 96px;
+            height: 42px;
+            margin-left: 0;
+            padding: 0 22px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 7px 18px rgba(15, 23, 42, .09);
+        }
+
+        .el-button--primary {
+            border-color: transparent;
+            box-shadow: 0 10px 24px color-mix(in srgb, var(--el-color-primary, #3478f6) 28%, transparent);
+        }
+    }
+
+    > .el-dialog__header > .el-dialog__headerbtn {
+        top: 50%;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        transform: translateY(-50%);
+    }
+
+    > .el-dialog__header > .mci-field-config-heading__close {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        align-self: center;
+        margin: 0 0 0 auto;
+        border-radius: 10px;
+        color: var(--el-text-color-secondary, #708098);
+        font-size: 22px;
+    }
+
+    /* 原生控件弹层在打开前由设计器注入字段上下文。旧 title 只保留给
+       无 JS / 降级场景，正常渲染时不与结构化标题重复。 */
+    .mci-field-config-original-title {
+        display: none !important;
+    }
+
+    .mci-field-config-heading {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        justify-content: center;
+
+        > span {
+            color: var(--el-color-primary, #3478f6);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .16em;
+            line-height: 1;
+        }
+
+        > h2 {
+            display: flex;
+            min-width: 0;
+            align-items: baseline;
+            gap: 9px;
+            margin: 5px 0 0;
+            overflow: hidden;
+            color: var(--el-text-color-primary, #152238);
+            font-size: 21px;
+            font-weight: 750;
+            line-height: 1.25;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+
+            > strong {
+                overflow: hidden;
+                font: inherit;
+                text-overflow: ellipsis;
+            }
+
+            > em {
+                overflow: hidden;
+                color: var(--el-color-primary, #3478f6);
+                font-size: 14px;
+                font-style: normal;
+                font-weight: 650;
+                text-overflow: ellipsis;
+            }
+        }
+
+        > p {
+            margin: 4px 0 0;
+            overflow: hidden;
+            color: var(--el-text-color-secondary, #708098);
+            font-size: 12px;
+            line-height: 1.35;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    &.mci-runtime-draggable > .el-dialog__header {
+        cursor: move;
+        touch-action: none;
+    }
+
+    /* 单一连续画布：旧控件的表单结构可以不同，但外层不再重复套卡片。 */
+    > .el-dialog__body > .el-form,
+    > .el-dialog__body > div > .el-form,
+    .mci-component-config-form {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    > .el-dialog__body > .el-form.el-form--inline,
+    > .el-dialog__body > div > .el-form.el-form--inline {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 24px;
+
+        > .el-divider {
+            grid-column: 1 / -1;
+        }
+
+        > .el-form-item {
+            width: 100%;
+            margin-right: 0;
+        }
+    }
+
+    .el-form-item {
+        margin-bottom: 15px;
+    }
+
+    .el-form-item__label {
+        padding-bottom: 6px;
+        color: var(--el-text-color-primary, #26354d);
+        font-size: 13px;
+        font-weight: 650;
+        line-height: 1.3;
+    }
+
+    .el-divider {
+        margin: 18px 0 16px;
+        border-color: color-mix(in srgb, var(--el-color-primary, #3478f6) 10%, var(--mci-dialog-line));
+    }
+
+    .el-divider__text {
+        padding: 0 10px;
+        background: var(--mci-field-canvas);
+        color: var(--el-text-color-primary, #26354d);
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .el-input__wrapper,
+    .el-select__wrapper,
+    .el-textarea__inner,
+    .el-input-number {
+        box-shadow: 0 0 0 1px var(--el-border-color, #d8e1ec) inset;
+    }
+
+    .el-input__wrapper:hover,
+    .el-select__wrapper:hover,
+    .el-textarea__inner:hover,
+    .el-input-number:hover {
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--el-color-primary, #3478f6) 46%, var(--el-border-color)) inset;
+    }
+}
+
+@media (max-width: 720px) {
+    .el-dialog.mci-field-config-dialog,
+    .el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog {
+        width: calc(100vw - 20px) !important;
+        max-width: calc(100vw - 20px) !important;
+        border-radius: 18px !important;
+
+        > .el-dialog__body {
+            max-height: 72vh;
+            padding: 16px;
+        }
+
+        > .el-dialog__body > .el-form.el-form--inline,
+        > .el-dialog__body > div > .el-form.el-form--inline {
+            grid-template-columns: 1fr;
+        }
     }
 }
 
@@ -1212,17 +1511,12 @@ html.dark {
 
     .el-tabs__nav-wrap {
         box-sizing: border-box;
-        min-height: 40px;
+        // min-height: 40px;
         padding: 2px 0;
         overflow: hidden;
         border: 0;
         border-radius: 0;
         background: transparent;
-    }
-
-    .el-tabs__nav-wrap::after,
-    .el-tabs__active-bar {
-        display: none;
     }
 
     .el-tabs__nav {
@@ -1233,14 +1527,18 @@ html.dark {
 
     .el-tabs__item {
         position: relative;
-        height: 34px;
+        height: 24px;
         padding: 0 16px;
         border: 0 !important;
         border-radius: 10px;
         color: var(--el-text-color-regular, #526078);
         font-size: 13px;
         font-weight: 550;
-        line-height: 34px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
         transition: color .18s ease, background-color .18s ease, box-shadow .18s ease;
     }
 
@@ -1258,8 +1556,85 @@ html.dark {
     }
 }
 
+/* 未配置图标的原生 Element Plus 页签仍提供稳定、按序号区分的视觉锚点。
+   已由业务插槽渲染 fa-icon/el-icon/svg 的页签不会重复插入。 */
+.el-tabs__item:not(:has(.mci-tab-icon, .el-icon, .svg-inline--fa, svg, i[class*="fa-"].mci-tab-icon))::before {
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    align-items: center;
+    justify-content: center;
+    margin-right: 6px;
+    color: currentColor;
+    content: "◈";
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    opacity: .82;
+}
+
+.el-tabs__item:nth-child(10n + 2):not(:has(.mci-tab-icon, .el-icon, .svg-inline--fa, svg))::before { content: "◆"; }
+.el-tabs__item:nth-child(10n + 3):not(:has(.mci-tab-icon, .el-icon, .svg-inline--fa, svg))::before { content: "▣"; }
+.el-tabs__item:nth-child(10n + 4):not(:has(.mci-tab-icon, .el-icon, .svg-inline--fa, svg))::before { content: "●"; }
+.el-tabs__item:nth-child(10n + 5):not(:has(.mci-tab-icon, .el-icon, .svg-inline--fa, svg))::before { content: "▲"; }
+.el-tabs__item:nth-child(10n + 6):not(:has(.mci-tab-icon, .el-icon, .svg-inline--fa, svg))::before { content: "✦"; }
+.el-tabs__item:nth-child(10n + 7):not(:has(.mci-tab-icon, .el-icon, .svg-inline--fa, svg))::before { content: "⌁"; }
+.el-tabs__item:nth-child(10n + 8):not(:has(.mci-tab-icon, .el-icon, .svg-inline--fa, svg))::before { content: "✚"; }
+.el-tabs__item:nth-child(10n + 9):not(:has(.mci-tab-icon, .el-icon, .svg-inline--fa, svg))::before { content: "◷"; }
+.el-tabs__item:nth-child(10n):not(:has(.mci-tab-icon, .el-icon, .svg-inline--fa, svg))::before { content: "⋯"; }
+
+.mci-tab-icon,
+.el-tabs__item .el-icon,
+.el-tabs__item .svg-inline--fa {
+    flex: 0 0 auto;
+    align-self: center;
+    line-height: 1;
+}
+
+/* 横向页签回归 Element Plus 的经典导航语义：透明底、主题色文字和
+   原生 active-bar。active-bar 的 transform/width 由 Element Plus 计算，
+   保留其 cubic-bezier 过渡，因此工作区、表格和表单切换时都有一致动画。 */
+.mci-tabs:not(.el-tabs--left):not(.el-tabs--right) {
+    > .el-tabs__header .el-tabs__nav-wrap {
+        padding: 0;
+    }
+
+    > .el-tabs__header .el-tabs__nav-wrap::after {
+        display: block;
+        height: 1px;
+        background-color: var(--el-border-color-light, #e4e7ed);
+    }
+
+    > .el-tabs__header .el-tabs__active-bar {
+        display: block;
+        height: 2px;
+        border-radius: 999px;
+        background-color: var(--mci-tabs-accent);
+        transition: width .3s cubic-bezier(.645, .045, .355, 1),
+            transform .3s cubic-bezier(.645, .045, .355, 1);
+    }
+
+    > .el-tabs__header .el-tabs__nav {
+        gap: 0;
+    }
+
+    > .el-tabs__header .el-tabs__item,
+    > .el-tabs__header .el-tabs__item:hover,
+    > .el-tabs__header .el-tabs__item.is-active {
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+}
+
 .mci-tabs.el-tabs--left,
 .mci-tabs.el-tabs--right {
+    > .el-tabs__header .el-tabs__nav-wrap::after,
+    > .el-tabs__header .el-tabs__active-bar {
+        display: none;
+    }
+
     > .el-tabs__header .el-tabs__nav-wrap {
         min-width: 164px;
         min-height: 0;
@@ -1321,7 +1696,7 @@ html.dark {
 }
 
 .mci-tabs--workspace .el-tabs__nav-wrap {
-    min-height: 34px;
+    // min-height: 34px;
 }
 
 .mci-tabs--workspace .el-tabs__item {

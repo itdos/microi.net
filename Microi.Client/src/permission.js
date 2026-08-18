@@ -11,6 +11,7 @@ import { DiyCommon, DiyApi } from "@/utils/microi.net.import";
 import Cookies from "js-cookie";
 import { normalizeAccessRoute } from "@/views/system/components/user-access-key-utils";
 import { cancelRouteLoading, finishRouteLoading, startRouteLoading } from "@/utils/mci-loading";
+import { createDynamicRouteRematch, shouldStartInitialRouteLoading } from "@/router/navigation-state";
 const whiteList = ["/login", "/auth-redirect", "/access-login", "/mci-redis-manager"]; // no redirect whitelist
 
 function removeCredentialParameter(paramName) {
@@ -107,10 +108,12 @@ function getPermissionFallbackPath(routes, targetPath) {
 router.beforeEach(async (to, from, next) => {
     // 已经进入平台壳层后的路由切换保留当前内容，目标页面及表单各自负责
     // 局部骨架屏。整页骨架会在首次加载异步模块时遮住旧页面，造成明显闪屏。
-    if (Array.isArray(from?.matched) && from.matched.length > 0) {
-        cancelRouteLoading();
-    } else {
+    const shellMounted = typeof document !== "undefined"
+        && Boolean(document.querySelector("#tags-view-container-microi, .app-main-microi"));
+    if (shouldStartInitialRouteLoading(from, shellMounted)) {
         startRouteLoading();
+    } else {
+        cancelRouteLoading();
     }
     // 安全/稳定性修复：整个守卫包一层 try/catch 兜底，
     // 避免任意 await 抛错导致 next() 不被调用而出现"白屏永久无法导航"。
@@ -176,7 +179,7 @@ router.beforeEach(async (to, from, next) => {
             // 优先级：当前目标 > redirect > 用户个人首页 > 系统默认首页 > /
             // 1. 当前目标路径不是/login，说明用户要直接访问该页面
             if (to.path && to.path !== '/login' && to.path !== '/') {
-                next({ ...to, replace: true });
+                next(createDynamicRouteRematch(to));
                 return;
             }
             // 2. 检查路由redirect参数
@@ -324,7 +327,7 @@ router.beforeEach(async (to, from, next) => {
                         next();
                         return;
                     }
-                    next({ ...to, replace: true });
+                    next(createDynamicRouteRematch(to));
                     return;
                 }
                 if (targetPath === "/") {
@@ -380,7 +383,7 @@ router.beforeEach(async (to, from, next) => {
                     if (fallbackPath) {
                         next({ path: fallbackPath, replace: true });
                     } else {
-                        next({ ...to, replace: true });
+                        next(createDynamicRouteRematch(to));
                     }
                 } catch (error) {
                     console.error("[permission] 动态路由初始化失败：", error);
@@ -389,7 +392,7 @@ router.beforeEach(async (to, from, next) => {
                     if (!DiyCommon.getToken() || isAuthenticationFailure(error)) {
                         await userStore.resetToken();
                         if (isAnonymousRoute) {
-                            next({ ...to, replace: true });
+                            next(createDynamicRouteRematch(to));
                         } else {
                             next({ path: "/login", query: { redirect: to.fullPath } });
                         }

@@ -2,6 +2,10 @@
     <!--颜色-->
     <el-color-picker
         v-model="ModelValue"
+        :show-alpha="ColorPickerConfig.ShowAlpha === true"
+        :color-format="ColorPickerConfig.Format || 'hex'"
+        :size="ColorPickerConfig.Size || 'default'"
+        :predefine="ColorPickerConfig.Predefine || []"
         :disabled="GetFieldReadOnly(field)"
         @change="
             (item) => {
@@ -10,12 +14,14 @@
         "
         @focus="SelectField(field)"
     />
+    <DiySimpleFieldConfigDialog ref="simpleConfig" component="ColorPicker" component-label="颜色选择" :field="field" :DiyTableModel="DiyTableModel" />
 </template>
 
 <script>
 import _ from "underscore";
+import DiySimpleFieldConfigDialog from "./shared/DiySimpleFieldConfigDialog.vue";
 export default {
-    name: "diy-radio",
+    name: "diy-colorpicker",
     inheritAttrs: false,
     emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     data() {
@@ -105,9 +111,13 @@ export default {
         }
     },
 
-    components: {},
+    components: { DiySimpleFieldConfigDialog },
 
-    computed: {},
+    computed: {
+        ColorPickerConfig() {
+            return this.field?.Config?.ColorPicker || {};
+        }
+    },
 
     mounted() {
         var self = this;
@@ -119,6 +129,9 @@ export default {
     },
 
     methods: {
+        openConfig() {
+            this.$refs.simpleConfig.open();
+        },
         Init() {
             var self = this;
             self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);

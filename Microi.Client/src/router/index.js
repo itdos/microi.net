@@ -186,6 +186,22 @@ export const constantRoutes = [
                 }
             }
         ]
+    },
+    // 404 必须在路由器创建时就存在。租户菜单是登录后异步注入的，如果把
+    // catch-all 也延迟到权限路由阶段，浏览器直接打开 /mci-full-test 等菜单
+    // 地址时，Vue Router 会先产生一次 "No match found"。精确的动态菜单路由
+    // 注入后具有更高匹配优先级，守卫 replace 当前地址即可落到真实页面。
+    {
+        path: "/:pathMatch(.*)*",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "",
+                name: "page_404",
+                component: () => import("@/views/error-page/404.vue")
+            }
+        ]
     }
 ];
 
@@ -535,18 +551,6 @@ export const asyncRoutes = [
             { path: "settings", name: "openclaw_settings", component: () => import("@/views/openclaw/settings/index.vue"), meta: { title: "系统设置" } }
         ]
     },
-    // Vue Router 4: 使用 pathMatch 替代 * ，此路由放到最后
-    {
-        path: "/:pathMatch(.*)*",
-        component: Layout,
-        children: [
-            {
-                path: "",
-                name: "page_404",
-                component: () => import("@/views/error-page/404.vue")
-            }
-        ]
-    }
 ];
 const router = createRouter({
     history: createWebHashHistory(),

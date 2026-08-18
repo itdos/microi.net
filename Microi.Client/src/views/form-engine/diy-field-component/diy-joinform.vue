@@ -44,6 +44,8 @@
         v-if="configDialogVisible"
         v-model="configDialogVisible"
         title="关联表单配置"
+        class="mci-unified-dialog mci-field-config-dialog"
+        modal-class="mci-unified-overlay mci-field-config-overlay"
         draggable
         align-center
         width="70%"
@@ -59,11 +61,14 @@
                     v-model="configForm.TableId" 
                     placeholder="请选择关联表格"
                     filterable
-                    :filter-method="filterTableMethod"
+                    remote
+                    :remote-method="remoteSearchTables"
+                    :loading="tableListLoading"
+                    @visible-change="handleTableSelectVisible"
                     style="width: 100%"
                 >
                     <el-option
-                        v-for="table in filteredTableList"
+                        v-for="table in DiyTableList"
                         :key="table.Id"
                         :label="table.Description || table.Name"
                         :value="table.Id"
@@ -114,8 +119,9 @@
 </template>
 
 <script setup>
-import { ref, computed, defineAsyncComponent, getCurrentInstance, watch, nextTick } from "vue";
+import { ref, computed, defineAsyncComponent, getCurrentInstance, watch, nextTick, onBeforeUnmount } from "vue";
 import { InfoFilled } from '@element-plus/icons-vue';
+import { hasScalarRecordId, normalizeRecordId } from "@/utils/record-id.js";
 
 const DiyFormChildComponent = defineAsyncComponent(() => import("@/views/form-engine/diy-form"));
 
@@ -180,18 +186,8 @@ const internalConfig = ref(null);
 // 配置弹窗相关
 const configDialogVisible = ref(false);
 const DiyTableList = ref([]);
-const tableFilterText = ref('');
-const filteredTableList = computed(() => {
-    if (!tableFilterText.value) return DiyTableList.value;
-    const keyword = tableFilterText.value.toLowerCase();
-    return DiyTableList.value.filter(table =>
-        (table.Description || '').toLowerCase().includes(keyword) ||
-        (table.Name || '').toLowerCase().includes(keyword)
-    );
-});
-const filterTableMethod = (val) => {
-    tableFilterText.value = val;
-};
+const tableListLoading = ref(false);
+let tableSearchTimer = null;
 const parentFieldListOptions = ref([]);  // 重命名避免与props冲突
 const fieldFilterText = ref('');
 const filteredFieldList = computed(() => {
@@ -249,13 +245,13 @@ const hasIdOrSearch = computed(() => {
     // 先检查是否能从JoinFieldName获取ID
     if (config.JoinFieldName && props.FormDiyTableModel) {
         const fieldValue = props.FormDiyTableModel[config.JoinFieldName];
-        if (!DiyCommon.IsNull(fieldValue)) {
+        if (hasScalarRecordId(fieldValue)) {
             return true;
         }
     }
     
     // 再检查是否有固定的ID或搜索条件
-    return !DiyCommon.IsNull(config.Id) || (config._SearchEqual && Object.keys(config._SearchEqual).length > 0);
+    return hasScalarRecordId(config.Id) || (config._SearchEqual && Object.keys(config._SearchEqual).length > 0);
 });
 
 // 检查是否应该渲染关联表单
@@ -302,7 +298,7 @@ const debugInfo = computed(() => {
         currentTableName: props.TableName,
         joinFormConfig: config,
         hasInternalConfig: !!internalConfig.value,
-        hasId: !DiyCommon.IsNull(config?.Id),
+        hasId: hasScalarRecordId(config?.Id),
         hasTableId: !DiyCommon.IsNull(config?.TableId) && config?.TableId !== '',
         hasTableName: !DiyCommon.IsNull(config?.TableName) && config?.TableName !== '',
         isTableDifferent: isTableDifferent.value,
@@ -403,16 +399,16 @@ const getJoinFormId = () => {
     // 如果配置了JoinFieldName，从FormDiyTableModel中获取对应字段的值
     if (config.JoinFieldName && props.FormDiyTableModel) {
         const fieldValue = props.FormDiyTableModel[config.JoinFieldName];
-        if (!DiyCommon.IsNull(fieldValue)) {
-            console.log(`[JoinForm] 从 FormDiyTableModel[${config.JoinFieldName}] 获取关联ID: ${fieldValue}`);
-            return fieldValue;
+        const normalizedFieldValue = normalizeRecordId(fieldValue);
+        if (normalizedFieldValue) {
+            return normalizedFieldValue;
         } else {
             console.warn(`[JoinForm] FormDiyTableModel[${config.JoinFieldName}] 为空`);
         }
     }
     
     // 否则使用配置中的固定ID
-    return config.Id || '';
+    return normalizeRecordId(config.Id);
 };
 
 const toggleDebugPanel = () => {
@@ -437,7 +433,8 @@ const LoadJoinForm = async (options) => {
     
     const { TableId, TableName, Id, FormMode } = options;
     
-    if (!Id || !FormMode) {
+    const normalizedId = normalizeRecordId(Id);
+    if (!normalizedId || !FormMode) {
         warn('LoadJoinForm 缺少必要参数', { TableId, TableName, Id, FormMode });
         DiyCommon.Tips('关联表单参数错误：缺少 Id 或 FormMode！', false);
         return;
@@ -455,7 +452,7 @@ const LoadJoinForm = async (options) => {
     const newConfig = {
         TableName: TableName || '',
         TableId: TableId || '',
-        Id: Id,
+        Id: normalizedId,
         FormMode: FormMode,
         _SearchEqual: props.field.Config?.JoinForm?._SearchEqual || {}
     };
@@ -495,20 +492,56 @@ watch(
 );
 
 // 获取DIY表格列表
-const GetDiyTableList = () => {
+const mergeTableOptions = (rows) => {
+    const selectedId = normalizeRecordId(configForm.value.TableId);
+    const selected = DiyTableList.value.find(item => String(item.Id) === selectedId);
+    const nextRows = Array.isArray(rows) ? rows : [];
+    DiyTableList.value = selected && !nextRows.some(item => String(item.Id) === selectedId)
+        ? [selected, ...nextRows]
+        : nextRows;
+};
+
+// Only the first 20 rows are loaded. Typing performs a server-side search so
+// tenants with thousands of form definitions do not freeze the designer.
+const GetDiyTableList = (keyword = '') => {
+    tableListLoading.value = true;
+    const request = {
+        FormEngineKey: 'diy_table',
+        _SelectFields: ['Id','Name','Description'],
+        _PageIndex: 1,
+        _PageSize: 20,
+        _OrderBy: 'Description',
+        _OrderByType: 'ASC'
+    };
+    const normalizedKeyword = String(keyword || '').trim();
+    if (normalizedKeyword) {
+        request._Where = [
+            ['Name', 'Like', normalizedKeyword],
+            ['OR', 'Description', 'Like', normalizedKeyword]
+        ];
+    }
     DiyCommon.Post(
         proxy.DiyApi.GetTableData,
-        {
-            FormEngineKey : 'diy_table',
-            _SelectFields: ['Id','Name','Description']
-        },
+        request,
         (result) => {
+            tableListLoading.value = false;
             if (DiyCommon.Result(result)) {
-                DiyTableList.value = result.Data || [];
+                mergeTableOptions(result.Data);
             }
         }
     );
 };
+
+const remoteSearchTables = (keyword) => {
+    window.clearTimeout(tableSearchTimer);
+    tableSearchTimer = window.setTimeout(() => GetDiyTableList(keyword), 220);
+};
+
+const handleTableSelectVisible = (visible) => {
+    if (visible && DiyTableList.value.length === 0) GetDiyTableList();
+};
+
+onBeforeUnmount(() => window.clearTimeout(tableSearchTimer));
 
 // 获取父表字段列表（从当前表单的字段列表中获取）
 const GetParentFieldList = () => {
@@ -561,15 +594,13 @@ const openConfig = () => {
     }
     
     configForm.value = {
-        TableId: props.field.Config.JoinForm.TableId || '',
+        TableId: normalizeRecordId(props.field.Config.JoinForm.TableId),
         JoinFieldName: props.field.Config.JoinForm.JoinFieldName || '',
         FormMode: props.field.Config.JoinForm.FormMode || ''
     };
     
     // 加载DIY表格列表
-    if (DiyTableList.value.length === 0) {
-        GetDiyTableList();
-    }
+    GetDiyTableList();
     
     // 获取父表字段列表
     GetParentFieldList();

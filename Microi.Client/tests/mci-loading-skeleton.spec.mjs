@@ -75,7 +75,9 @@ test("table, form and menu navigation expose skeletons before empty content", ()
     assert.match(diyForm, /v-mci-loading:form="!GetDiyTableRowModelFinish"/);
     assert.doesNotMatch(diyForm, /form-skeleton-container/);
     assert.match(permission, /startRouteLoading\(\)/);
-    assert.match(permission, /from\?\.matched[\s\S]*?cancelRouteLoading\(\)/);
+    assert.match(permission, /shouldStartInitialRouteLoading\(from, shellMounted\)/);
+    assert.match(permission, /#tags-view-container-microi, \.app-main-microi/);
+    assert.match(permission, /cancelRouteLoading\(\)/);
     assert.match(permission, /finishRouteLoading\(\)/);
     assert.match(directive, /export function cancelRouteLoading\(\)/);
     assert.match(appMain, /v-mci-loading:page="routeLoading"/);

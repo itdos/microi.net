@@ -376,9 +376,13 @@
 
         .diy-field-tabs {
             min-height: 44px;
-            border-bottom-color: var(--field-tabs-border);
+            border: 1px solid var(--field-tabs-border) !important;
+            border-bottom: 0 !important;
+            border-top-left-radius: 8px !important;
+            border-top-right-radius: 8px !important;
             border-bottom-left-radius: 0;
             border-bottom-right-radius: 0;
+            background: color-mix(in srgb, var(--field-tabs-color) 3%, var(--el-bg-color) 97%);
             box-shadow: none !important;
         }
 

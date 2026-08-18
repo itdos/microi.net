@@ -246,13 +246,12 @@
         line-height: 40px;
         background: transparent !important;
         color: var(--sidebar-text-color, #fff) !important;
-        transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+        transition: background-color 0.16s ease, color 0.16s ease;
 
         &:hover,
         &:focus-visible {
             background: var(--sidebar-hover-bg, rgba(255, 255, 255, 0.14)) !important;
             color: var(--sidebar-active-text-color, var(--sidebar-text-color, #fff)) !important;
-            transform: translateX(2px);
         }
 
         &.is-active {
@@ -341,13 +340,12 @@
         background: transparent;
         color: var(--sidebar-text-color, #fff);
         cursor: pointer;
-        transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+        transition: background-color 0.16s ease, color 0.16s ease;
 
         &:hover,
         &:focus-visible {
             background: var(--sidebar-hover-bg, rgba(255, 255, 255, 0.14));
             color: var(--sidebar-active-text-color, var(--sidebar-text-color, #fff));
-            transform: translateX(2px);
         }
 
         &.is-active {

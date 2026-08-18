@@ -4,7 +4,7 @@
             <!-- 🔥 使用 fullPath 作为唯一标识，确保每个标签都能正确保存完整的路由信息（包括查询参数） -->
             <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath" :name="tab.fullPath">
                 <template #label>
-                    <item v-if="tab.meta" :icon="tab.meta && tab.meta.icon" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" @contextmenu.prevent="openMenu(tab, $event)" @dblclick="toggleFullScreenCurrentTab()" />
+                    <item v-if="tab.meta" :icon="ResolveTabIcon(tab.meta && tab.meta.icon, index)" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" @contextmenu.prevent="openMenu(tab, $event)" @dblclick="toggleFullScreenCurrentTab()" />
                 </template>
             </el-tab-pane>
         </el-tabs>
@@ -66,12 +66,12 @@
 #tags-view-container-microi {
     :deep(.parent-tabs.mci-tabs) {
         .el-tabs__header { margin: 0; }
-        .el-tabs__nav { gap: 4px; }
+        .el-tabs__nav { gap: 0; }
         .el-tabs__item {
             height: 28px;
             margin: 0;
             padding: 0 10px;
-            border-radius: 8px;
+            border-radius: 0;
             font-size: 13px;
             font-weight: 500;
             line-height: 28px;
@@ -80,7 +80,7 @@
             span { color: inherit !important; }
         }
         .el-tabs__nav-wrap::after,
-        .el-tabs__active-bar { display: none; }
+        .el-tabs__active-bar { display: block; }
     }
 
     // 全屏提示样式
@@ -155,6 +155,7 @@ import Item from "../Sidebar/Item"; // by itdos
 import { useDiyStore, useTagsViewStore, usePermissionStore } from "@/pinia";
 import { computed, defineAsyncComponent } from "vue";
 import { routeLoading } from "@/utils/mci-loading";
+import { resolveTabIcon } from "@/utils/tab-icon.js";
 
 import { AppMain } from "../../components";
 
@@ -285,6 +286,9 @@ export default {
         }
     },
     methods: {
+        ResolveTabIcon(icon, index) {
+            return resolveTabIcon(icon, index);
+        },
         removeTab(targetName) {
             let item = this.visitedViews.find((item) => item.fullPath === targetName);
             if (item) {

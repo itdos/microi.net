@@ -420,11 +420,14 @@
     .el-avatar > img {
         width: 100%;
     }
-    .table-rowlist-tabs,.itdos-diy-form{
+    .table-rowlist-tabs,
+    .itdos-diy-form,
+    .form-right-panel
+    {
         .el-tabs__nav{
-            background: color-mix(in srgb, var(--mci-tabs-accent) 6%, transparent);
+            background: color-mix(in srgb, var(--mci-tabs-accent) 10%, transparent);
             padding:5px;
-            border-radius: 10px;
+            border-radius: 10px 10px 0 0;
         }
     }
     .itdos-diy-form {

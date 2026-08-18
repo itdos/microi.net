@@ -100,7 +100,7 @@
 
         <!-- 数据源引擎 -->
         <el-form-item v-if="config.DataSource == 'DataSource'" label="请选择数据源">
-            <el-select :model-value="config.DataSourceId" @update:model-value="updateConfig('DataSourceId', $event)" clearable filterable value-key="Id" placeholder="搜索数据源" style="width: 100%">
+            <el-select :model-value="config.DataSourceId" @update:model-value="updateConfig('DataSourceId', $event)" clearable filterable remote :remote-method="searchSysDataSources" :loading="sysDataSourceLoading" value-key="Id" placeholder="搜索数据源（最多显示20条）" style="width: 100%">
                 <el-option v-for="item in SysDataSourceList" :key="item.Id" :label="item.DataSourceName" :value="item.Id">
                     <span style="float: left">{{ item.DataSourceName }}</span>
                     <span style="float: right; color: #8492a6; font-size: 13px">{{ item.DataSourceKey }}</span>
@@ -110,7 +110,7 @@
 
         <!-- 接口引擎 -->
         <el-form-item v-if="config.DataSource == 'ApiEngine'" label="请选择接口引擎">
-            <el-select :model-value="config.DataSourceApiEngineKey" @update:model-value="updateConfig('DataSourceApiEngineKey', $event)" clearable filterable value-key="ApiEngineKey" placeholder="搜索接口引擎" style="width: 100%">
+            <el-select :model-value="config.DataSourceApiEngineKey" @update:model-value="updateConfig('DataSourceApiEngineKey', $event)" clearable filterable remote :remote-method="searchApiEngines" :loading="apiEngineLoading" value-key="ApiEngineKey" placeholder="搜索接口引擎（最多显示20条）" style="width: 100%">
                 <el-option v-for="item in ApiEngineList" :key="item.ApiEngineKey" :label="item.ApiName" :value="item.ApiEngineKey">
                     <span style="float: left">{{ item.ApiName }}</span>
                     <span style="float: right; color: #8492a6; font-size: 13px">{{ item.ApiEngineKey }}</span>
@@ -182,6 +182,10 @@ export default {
         return {
             SysDataSourceList: [],
             ApiEngineList: [],
+            sysDataSourceLoading: false,
+            apiEngineLoading: false,
+            sysDataSourceSearchTimer: null,
+            apiEngineSearchTimer: null,
             newDataItem: '',
             newKeyValueItem: { Key: '', Value: '' },
             Delete,
@@ -191,6 +195,10 @@ export default {
     mounted() {
         this.loadSysDataSourceList();
         this.loadApiEngineList();
+    },
+    beforeUnmount() {
+        window.clearTimeout(this.sysDataSourceSearchTimer);
+        window.clearTimeout(this.apiEngineSearchTimer);
     },
     methods: {
         updateConfig(key, value) {
@@ -241,27 +249,69 @@ export default {
             this.$emit('update:keyValueList', []);
         },
         
-        loadSysDataSourceList() {
+        mergeOptions(current, rows, selectedValue, valueField) {
+            const selected = current.find(item => String(item[valueField]) === String(selectedValue || ''));
+            const nextRows = Array.isArray(rows) ? rows : [];
+            return selected && !nextRows.some(item => String(item[valueField]) === String(selectedValue || ''))
+                ? [selected, ...nextRows]
+                : nextRows;
+        },
+        searchSysDataSources(keyword) {
+            window.clearTimeout(this.sysDataSourceSearchTimer);
+            this.sysDataSourceSearchTimer = window.setTimeout(() => this.loadSysDataSourceList(keyword), 220);
+        },
+        searchApiEngines(keyword) {
+            window.clearTimeout(this.apiEngineSearchTimer);
+            this.apiEngineSearchTimer = window.setTimeout(() => this.loadApiEngineList(keyword), 220);
+        },
+        loadSysDataSourceList(keyword = '') {
             var self = this;
+            const request = {
+                TableName: "Sys_DataSource",
+                _SelectFields: ["Id", "DataSourceName", "DataSourceKey"],
+                _PageIndex: 1,
+                _PageSize: 20
+            };
+            const normalizedKeyword = String(keyword || '').trim();
+            if (normalizedKeyword) {
+                request._Where = [
+                    ["DataSourceName", "Like", normalizedKeyword],
+                    ["OR", "DataSourceKey", "Like", normalizedKeyword]
+                ];
+            }
+            self.sysDataSourceLoading = true;
             self.DiyCommon.GetDiyTableRow(
-                { TableName: "Sys_DataSource" },
+                request,
                 function (data) {
+                    self.sysDataSourceLoading = false;
                     if (data && data.Data) {
-                        self.SysDataSourceList = data.Data;
+                        self.SysDataSourceList = self.mergeOptions(self.SysDataSourceList, data.Data, self.config.DataSourceId, "Id");
                     }
                 }
             );
         },
-        loadApiEngineList() {
+        loadApiEngineList(keyword = '') {
             var self = this;
+            const request = {
+                TableName: "sys_apiengine",
+                _SelectFields: ["Id", "ApiName", "ApiEngineKey", "ApiAddress", "IsEnable"],
+                _PageIndex: 1,
+                _PageSize: 20
+            };
+            const normalizedKeyword = String(keyword || '').trim();
+            if (normalizedKeyword) {
+                request._Where = [
+                    ["ApiName", "Like", normalizedKeyword],
+                    ["OR", "ApiEngineKey", "Like", normalizedKeyword]
+                ];
+            }
+            self.apiEngineLoading = true;
             self.DiyCommon.GetDiyTableRow(
-                {
-                    TableName: "sys_apiengine",
-                    _SelectFields: ["Id", "ApiName", "ApiEngineKey", "ApiAddress", "IsEnable"]
-                },
+                request,
                 function (data) {
+                    self.apiEngineLoading = false;
                     if (data && data.Data) {
-                        self.ApiEngineList = data.Data;
+                        self.ApiEngineList = self.mergeOptions(self.ApiEngineList, data.Data, self.config.DataSourceApiEngineKey, "ApiEngineKey");
                     }
                 }
             );

@@ -484,6 +484,10 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetFormData([FromBody] JObject param)
         {
             param = await DefaultParam(param);
+            if (TryGetInvalidRecordIdField(param, out var invalidField))
+            {
+                return InvalidRecordIdResult(invalidField);
+            }
             var result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
             result = ApplyControlPlaneSharedInfrastructureProjection(param, result);
             await TrackDetailOpened(param.ToObject<DiyTableRowParam>(), result).ConfigureAwait(false);
@@ -502,7 +506,12 @@ namespace Microi.net.Api
             //{
             //    return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             //}
+            param ??= new JObject();
             EnsureLang(param);
+            if (TryGetInvalidRecordIdField(param, out var invalidField))
+            {
+                return InvalidRecordIdResult(invalidField);
+            }
             param["_InvokeType"] = "Client";//JTokenEx.FromObject(InvokeType.Client);
             param["_IsAnonymous"] = true;
             param["IsDeleted"] = 0;
@@ -518,6 +527,11 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> GetFormDataAnonymousDefault([FromBody] JObject param)
         {
+            param ??= new JObject();
+            if (TryGetInvalidRecordIdField(param, out var invalidField))
+            {
+                return InvalidRecordIdResult(invalidField);
+            }
             param["OsClient"] = OsClient.GetConfigOsClient();
             EnsureLang(param);
             param["_InvokeType"] = "Client";//JTokenEx.FromObject(InvokeType.Client);
@@ -769,6 +783,38 @@ namespace Microi.net.Api
             param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             return Json(result);
+        }
+
+        private JsonResult InvalidRecordIdResult(string field)
+        {
+            return Json(new DosResult(0, null, $"参数错误：{field} 必须是字符串或数字。[GetFormData]", 0, new
+            {
+                ReasonCode = "InvalidRecordId",
+                Field = field
+            }));
+        }
+
+        private static bool TryGetInvalidRecordIdField(JObject param, out string field)
+        {
+            field = null;
+            if (param == null) return false;
+
+            foreach (var candidate in new[] { "Id", "_TableRowId" })
+            {
+                var token = param[candidate];
+                if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+                {
+                    continue;
+                }
+                if (token.Type != JTokenType.String
+                    && token.Type != JTokenType.Integer
+                    && token.Type != JTokenType.Float)
+                {
+                    field = candidate;
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

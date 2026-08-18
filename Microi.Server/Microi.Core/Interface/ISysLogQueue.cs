@@ -26,6 +26,7 @@ namespace Microi.net
         public long OverflowPending { get; set; }
         public long EmergencySpooled { get; set; }
         public long Dropped { get; set; }
+        public long SkippedUnconfigured { get; set; }
         public long FailedBatches { get; set; }
         public string LastError { get; set; }
         public DateTime? LastPersistedAt { get; set; }
