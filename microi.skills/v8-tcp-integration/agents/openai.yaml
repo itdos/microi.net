@@ -1,0 +1,4 @@
+interface:
+  display_name: "V8 TCP 原始字节"
+  short_description: "通过后端 V8 安全发送和接收 TCP 原始字节数据"
+  default_prompt: "使用 $v8-tcp-integration 编写一个安全、可验证的 Microi 后端 V8 TCP 设备集成。"

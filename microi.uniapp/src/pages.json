@@ -87,6 +87,7 @@
       "pages": [
         { "path": "list", "style": { "navigationBarTitleText": "售后任务", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
         { "path": "detail", "style": { "navigationBarTitleText": "任务详情", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "devices", "style": { "navigationBarTitleText": "任务设备", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa", "enablePullDownRefresh": false } },
         { "path": "device", "style": { "navigationBarTitleText": "设备处理", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
         { "path": "consumable", "style": { "navigationBarTitleText": "设备耗材", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
         { "path": "add-devices", "style": { "navigationBarTitleText": "选择售后设备", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
