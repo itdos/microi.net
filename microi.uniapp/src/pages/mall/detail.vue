@@ -123,7 +123,7 @@
         <view class="specs-grid">
           <view class="spec-item" v-for="field in dynamicFields" :key="field.Name">
             <text class="spec-label">{{ field.Label }}</text>
-            <text class="spec-value">{{ dynamicData[field.Name] || '-' }}</text>
+            <text class="spec-value">{{ formatProductParameterValue(dynamicData[field.Name]) }}</text>
           </view>
         </view>
       </view>
@@ -252,6 +252,7 @@
 import { getProductDetail, getProductDynamicInfo, parseImages, getImageUrl, checkFavorite, toggleFavorite, reserveProduct } from '@/utils/api.js'
 import { getToken } from '@/utils/request.js'
 import { themeMixin } from '@/utils/theme.js'
+import { filterProductParameterFields, formatProductParameterValue } from './product-params.mjs'
 
 export default {
   mixins: [themeMixin],
@@ -296,6 +297,8 @@ export default {
   },
 
   methods: {
+    formatProductParameterValue,
+
     formatNum(val) {
       if (!val && val !== 0) return '0.00'
       return Number(val).toFixed(2)
@@ -324,7 +327,7 @@ export default {
         if (res.Code === 1) {
           this.dynamicData = res.Data || {}
           if (res.DataAppend && res.DataAppend.FieldList) {
-            this.dynamicFields = res.DataAppend.FieldList
+            this.dynamicFields = filterProductParameterFields(res.DataAppend.FieldList)
           }
         }
       } catch (e) {
