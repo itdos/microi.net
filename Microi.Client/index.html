@@ -310,6 +310,13 @@
             line-height: 52px;
             font-variant-numeric: tabular-nums;
         }
+        .mci-load-percent.is-status {
+            min-width: 220px;
+            font-size: 22px;
+            line-height: 52px;
+            letter-spacing: 1px;
+            text-align: center;
+        }
         @keyframes mciPercentPulse {
             0%, 100% { opacity: 1; }
             50%      { opacity: 0.78; }
@@ -343,6 +350,13 @@
             min-height: 20px;
             line-height: 20px;
             text-align: center;
+        }
+        .mci-load-info--startup {
+            width: min(520px, calc(100vw - 48px));
+            min-height: 24px;
+            margin: 0 0 4px;
+            color: var(--mci-text-secondary);
+            line-height: 1.65;
         }
         .mci-load-info--speed {
             font-size: 13px;
@@ -554,6 +568,9 @@
             <!-- 进度条 -->
             <div class="mci-progress-wrap"><div class="mci-progress-bar" id="progressBar"></div></div>
 
+            <!-- 100% 之后仍展示真实启动阶段，避免后端慢或不可用时出现无说明空白页 -->
+            <div class="mci-load-info mci-load-info--startup" id="startupStatus" aria-live="polite">正在准备应用运行环境…</div>
+
             <!-- 圆点动画 -->
             <div class="mci-load-dots" id="loadDots">
                 <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
@@ -675,7 +692,7 @@
       })();
     </script>
     <div id="app_microi"></div>
-    <script src="/static/js/microi.loading.js?d=20260805" type="text/javascript"></script>
+    <script src="/static/js/microi.loading.js?d=2026081703" type="text/javascript"></script>
     <!-- Vite 入口 -->
     <script type="module" src="/src/main.js"></script>
 </body>

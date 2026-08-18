@@ -15,7 +15,9 @@ const TAB_ACTIONS = Object.freeze([
     "forward",
     "reloadTab",
     "setTabTitle",
-    "showMessage"
+    "showMessage",
+    "setGlobalOverlay",
+    "openForm"
 ]);
 
 const ACTION_ALIASES = Object.freeze({
@@ -41,7 +43,12 @@ const ACTION_ALIASES = Object.freeze({
     showmessage: "showMessage",
     message: "showMessage",
     tips: "showMessage",
-    toast: "showMessage"
+    toast: "showMessage",
+    setglobaloverlay: "setGlobalOverlay",
+    globaloverlay: "setGlobalOverlay",
+    overlay: "setGlobalOverlay",
+    openform: "openForm",
+    openanyform: "openForm"
 });
 
 function isPlainObject(value) {

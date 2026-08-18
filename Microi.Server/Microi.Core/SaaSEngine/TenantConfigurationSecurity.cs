@@ -18,6 +18,7 @@ namespace Microi.net
     /// </summary>
     public static class TenantConfigurationSecurity
     {
+        public const string ServerPrivateSettingsProperty = "ServerPrivateSettings";
         private static readonly Regex TenantIdRegex = new Regex(
             @"^[A-Za-z0-9][A-Za-z0-9_-]{0,49}$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -412,19 +413,19 @@ namespace Microi.net
 
         /// <summary>
         /// 创建接口引擎和后端 V8 事件可见的完整、独立 SysConfig 快照。
-        /// 后端 V8 属于可信执行面，保留 sys_config 的全部字段，并把当前租户全部启用的
-        /// mci_system_setting（含后端解密后的 Secret）直接平铺到根对象。历史
-        /// PublicSettings 包装层不再进入任何 V8.SysConfig。
+        /// 后端 V8 属于可信执行面，保留 sys_config 的全部字段；当前租户全部启用的
+        /// mci_system_setting（含后端解密后的 Secret）只放入 ServerPrivateSettings，
+        /// 防止动态 Key 覆盖 sys_config 实体字段。该节点不会进入浏览器投影。
         /// </summary>
         public static JObject CreateV8SysConfigProjection(object source, string osClient = null)
         {
             var projection = ToIndependentJObject(source);
             RemovePropertyIgnoreCase(projection, "PublicSettings");
+            RemovePropertyIgnoreCase(projection, ServerPrivateSettingsProperty);
             if (!string.IsNullOrWhiteSpace(osClient))
             {
-                MergeRootProjection(
-                    projection,
-                    TenantSystemSettingsSecurity.LoadV8Projection(osClient));
+                projection[ServerPrivateSettingsProperty] =
+                    TenantSystemSettingsSecurity.LoadV8Projection(osClient);
             }
             return projection;
         }
@@ -438,6 +439,7 @@ namespace Microi.net
         {
             var projection = ToIndependentJObject(source);
             RemovePropertyIgnoreCase(projection, "PublicSettings");
+            RemovePropertyIgnoreCase(projection, ServerPrivateSettingsProperty);
             foreach (var property in projection.Properties().ToList())
             {
                 if (string.Equals(property.Name, "GlobalV8Code", StringComparison.OrdinalIgnoreCase))
@@ -450,25 +452,7 @@ namespace Microi.net
                     property.Remove();
                 }
             }
-            if (!string.IsNullOrWhiteSpace(osClient))
-            {
-                // 公开普通设置直接进入前端 SysConfig 根对象，不再产生 PublicSettings
-                // 包装层。Secret 与敏感 Key 仍由 LoadPublicProjection 永久拒绝下发。
-                MergeRootProjection(
-                    projection,
-                    TenantSystemSettingsSecurity.LoadPublicProjection(osClient));
-            }
             return projection;
-        }
-
-        private static void MergeRootProjection(JObject target, JObject values)
-        {
-            if (target == null || values == null) return;
-            foreach (var property in values.Properties())
-            {
-                RemovePropertyIgnoreCase(target, property.Name);
-                target[property.Name] = property.Value.DeepClone();
-            }
         }
 
         private static void RemovePropertyIgnoreCase(JObject target, string propertyName)

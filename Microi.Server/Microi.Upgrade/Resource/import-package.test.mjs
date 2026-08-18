@@ -1121,7 +1121,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_007_008/);
-  assert.match(refreshSource, /versionNumber\s*<\s*7_000_013/);
+  assert.match(refreshSource, /versionNumber\s*<\s*7_004_002/);
   assert.match(refreshSource, /importerVersionNumber\s*<\s*1_010_011/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
@@ -1798,6 +1798,9 @@ test("managed micro-app assets proxy stable HDFS paths instead of cross-origin r
   assert.match(microAppControllerSource, /assetUri\.Host\.Equals\(fileServerUri\.Host[\s\S]*?assetUri\.Port == fileServerUri\.Port/);
   assert.match(microAppControllerSource, /MicroApp file asset could not be read from managed storage/);
   assert.doesNotMatch(microAppControllerSource, /return Redirect\(redirectUrl\);/);
+  assert.match(microAppControllerSource, /CurrentV3[\s\S]*?ProxyApplicationAssetV3\(/);
+  assert.match(microAppControllerSource, /ProxyApplicationAssetV3[\s\S]*?HttpCompletionOption\.ResponseHeadersRead[\s\S]*?CopyToAsync\(Response\.Body/);
+  assert.doesNotMatch(microAppControllerSource, /CurrentV3[\s\S]{0,5000}?return Redirect\(immutableUrl\);/);
 });
 
 test("updating an existing menu preserves customer desktop and mobile visibility", () => {

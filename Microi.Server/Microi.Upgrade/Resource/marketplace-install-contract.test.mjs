@@ -48,7 +48,7 @@ test("application-store package hides every install mutation on the official pla
     compareSemver(packageModel.PackageInfo.Version, "v7.1.3") >= 0,
     `application-store package must be at least v7.1.3, got ${packageModel.PackageInfo.Version}`
   );
-  const menu = packageModel.SysMenus.find((item) => item.Url === "/microi-store");
+  const menu = packageModel.SysMenus.find((item) => item.Url === "/microi-store" && item.Display === 1);
   assert.ok(menu, "application-store menu is missing");
 
   const rowButtons = parseButtons(menu.MoreBtns);
@@ -151,7 +151,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.1.6");
+  assert.equal(engine.Version, "v1.2.0");
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
   assert.equal(engine.ApiV8Code, normalizeSource(bulkSource));
@@ -159,7 +159,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.0\.0/);
+  assert.match(importerSource, /Version: v2\.1\.0/);
   assert.match(importerSource, /REMOTE_ZIP_SINGLE_ASSET_SLICE_V1/);
   assert.match(importerSource, /ADMIN_MENU_PERMISSION_V1/);
   assert.match(importerSource, /ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/);
@@ -197,6 +197,6 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.0.0");
+  assert.equal(embeddedImporter.Version, "v2.1.0");
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
 });

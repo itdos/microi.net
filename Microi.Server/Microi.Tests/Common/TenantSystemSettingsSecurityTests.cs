@@ -40,7 +40,7 @@ public class TenantSystemSettingsSecurityTests
     }
 
     [Fact]
-    public void PublicProjection_IsDynamicPerRowAndKeepsTypedValues()
+    public void PublicProjection_NeverExposesDynamicRows()
     {
         var projection = TenantSystemSettingsSecurity.CreatePublicProjection(new[]
         {
@@ -50,10 +50,12 @@ public class TenantSystemSettingsSecurityTests
             Row("Ui.ServerOnly", "hidden", "String", isPublic: false)
         });
 
-        Assert.True(projection["Login.Branding.Enabled"]?.Value<bool>());
-        Assert.Equal(12, projection["Ui.MaxRecentItems"]?.Value<int>());
-        Assert.Equal("green", projection["Ui.AccentPalette"]?[1]?.ToString());
-        Assert.Null(projection["Ui.ServerOnly"]);
+        Assert.Empty(projection.Properties());
+        Assert.All(new[]
+        {
+            Row("Login.Branding.Enabled", "true", "Bool", isPublic: true),
+            Row("Ui.MaxRecentItems", "12", "Int", isPublic: true)
+        }, row => Assert.False(TenantSystemSettingsSecurity.CanExposePublicly(row)));
     }
 
     [Theory]
@@ -97,14 +99,10 @@ public class TenantSystemSettingsSecurityTests
     }
 
     [Fact]
-    public void InvalidJsonPublicValue_FailsClosedAsNull()
+    public void InvalidJsonTypedValue_FailsClosedAsNull()
     {
-        var projection = TenantSystemSettingsSecurity.CreatePublicProjection(new[]
-        {
-            Row("Ui.DynamicPayload", "{broken", "Json", isPublic: true)
-        });
-
-        Assert.Equal(JTokenType.Null, projection["Ui.DynamicPayload"]?.Type);
+        var parsed = TenantSystemSettingsSecurity.ParseTypedValue(new JValue("{broken"), "Json");
+        Assert.Equal(JTokenType.Null, parsed.Type);
     }
 
     [Fact]

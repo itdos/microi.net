@@ -269,16 +269,18 @@ function GetComponent(item) {
         item.ComponentPath = item.ComponentPath.replace("/views/", "/");
     }
     if (item.ComponentPath.indexOf("diy-table-rowlist") > -1) {
-        return DiyTable;
+        // 路由必须直接返回 import loader，让 Vue Router 在确认导航前等待
+        // 首个异步 chunk；defineAsyncComponent 会先卸载旧页再留下空白占位。
+        return () => import("@/views/form-engine/diy-table.vue");
     }
     if (item.ComponentPath.indexOf("microi/workflow/my-work") > -1) {
-        return DiyMyWork;
+        return () => import("@/views/workflow/my-work.vue");
     }
     if (item.ComponentPath.indexOf("microi/workflow/index") > -1) {
-        return DiyFlowIndex;
+        return () => import("@/views/workflow/index.vue");
     }
     if (item.ComponentPath.indexOf("diy/diy-table") > -1) {
-        return DiyTable;
+        return () => import("@/views/form-engine/diy-table.vue");
     }
     if (item.ComponentPath.indexOf("micro-app/host") > -1) {
         return () => import("@/views/micro-app/host.vue");

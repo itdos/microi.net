@@ -1,30 +1,4 @@
-// 只有实际暴露 openConfig() 的字段组件才显示“组件配置”。
-// Switch 等基础组件仍可在右侧字段属性中配置，但没有独立配置弹窗。
-const standaloneConfigComponents = new Set([
-    "Text",
-    "Guid",
-    "Input",
-    "Textarea",
-    "NumberText",
-    "InputNumber",
-    "DateTime",
-    "Select",
-    "MultipleSelect",
-    "Radio",
-    "Checkbox",
-    "Autocomplete",
-    "Cascader",
-    "SelectTree",
-    "Department",
-    "AutoNumber",
-    "Button",
-    "Slider",
-    "TagInput",
-    "Transfer",
-    "Html",
-    "HTML",
-    "JsonTable"
-]);
+import { hasNativeFieldConfig } from "../field-component-config-registry.js";
 
 export default {
     methods: {
@@ -219,31 +193,63 @@ hideFieldToolbar() {
                 }
             }, 200);
         },
-hasComponentConfig(field) {
-            var self = this;
+        hasComponentConfig(field) {
             if (!field) return false;
-            var refComponent = field.Name ? self.getRefComponent(field.Name) : null;
-            return Boolean(
-                (refComponent && typeof refComponent.openConfig === "function") ||
-                standaloneConfigComponents.has(field.Component)
-            );
+            return hasNativeFieldConfig(field.Component);
         },
-openComponentConfig(field) {
+        markLatestFieldConfigDialog() {
+            var mark = function () {
+                var dialogs = Array.from(document.querySelectorAll(".el-overlay .el-dialog"))
+                    .filter(function (dialog) {
+                        var overlay = dialog.closest(".el-overlay");
+                        return overlay && window.getComputedStyle(overlay).display !== "none";
+                    });
+                var dialog = dialogs[dialogs.length - 1];
+                if (!dialog) return;
+                dialog.classList.add("mci-unified-dialog", "mci-field-config-dialog");
+                var overlay = dialog.closest(".el-overlay");
+                if (overlay) {
+                    overlay.classList.add("mci-unified-overlay", "mci-field-config-overlay");
+                }
+            };
+            this.$nextTick(function () {
+                window.requestAnimationFrame(mark);
+                window.setTimeout(mark, 60);
+            });
+        },
+        openComponentConfig(field) {
             var self = this;
             if (!field) return;
 
-            // 双击基础组件仍然选中字段并打开右侧属性，不能误报“不支持配置”。
             self.SelectField(field);
-            if (!self.hasComponentConfig(field)) return;
+            if (!hasNativeFieldConfig(field.Component)) {
+                if (self.UseParentFieldSettingsDialog) {
+                    self.$emit("CallbackOpenFieldSettings", field);
+                }
+                return;
+            }
 
-            self.$nextTick(function () {
-                var refComponent = self.getRefComponent(field.Name);
+            // 字段组件通过 defineAsyncComponent 加载；不能因为首个 nextTick 尚无 ref
+            // 就错误回退到通用字段配置。限定等待约 900ms，期间只检查当前字段实例。
+            var attempts = 0;
+            var tryOpen = function () {
+                var refComponent = field.Name ? self.getRefComponent(field.Name) : null;
                 if (refComponent && typeof refComponent.openConfig === "function") {
                     refComponent.openConfig();
+                    self.markLatestFieldConfigDialog();
                     return;
                 }
-                self.DiyCommon.Tips("组件配置正在加载，请稍后重试", false);
-            });
+                attempts += 1;
+                if (attempts < 30) {
+                    self.safeTimeout(tryOpen, 30);
+                    return;
+                }
+                self.DiyCommon.Tips("组件专项配置加载失败，请稍后重试", false);
+            };
+            self.$nextTick(tryOpen);
+        },
+        openNativeComponentConfig(field) {
+            this.openComponentConfig(field);
         },
 duplicateField(field) {
             var self = this;

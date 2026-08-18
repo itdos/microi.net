@@ -147,6 +147,8 @@ export default {
             ShowDiyFieldList: null,
             DiyFieldList: [],
             FormMode: "View",
+            FormFieldSearchKeyword: "",
+            FormRefreshing: false,
             BtnLoading: false,
             BtnV8Loading: false,
             ShowFormBottomBtns: {
@@ -189,6 +191,11 @@ export default {
             DataCommentList: [],
             DataVersionListLoading: false,
             DataVersionList: [],
+            FormRelatedCounts: {
+                DataLog: 0,
+                DataComment: 0,
+                DataVersion: 0
+            },
             CommentContent: "",
             ReplyComment: null,
             ShowDataVersionPreviewDialog: false,

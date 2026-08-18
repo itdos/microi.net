@@ -19,6 +19,7 @@ export default {
             self.ShowDeleteBtn = true;
             self.ShowSaveBtn = true;
             self.CurrentDraftId = "";
+            self.FormRelatedCounts = { DataLog: 0, DataComment: 0, DataVersion: 0 };
 
             self.TableRowId = self.DiyCommon.IsNull(tableRowModel) ? "" : tableRowModel.Id;
             if (self.FormMode == "Add" || self.FormMode == "Insert") {
@@ -40,8 +41,9 @@ export default {
                     });
                 }
             } else {
-                self.$nextTick(function () {
-                    self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
+                self.$nextTick(async function () {
+                    await self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
+                    self.LoadFormRelatedCounts();
                 });
 
                 // 日志、评论、版本由 FormRightPanel 在对应 Tab 首次可见时按需加载。
@@ -97,8 +99,10 @@ export default {
                                 }
                             });
                             self.DataLogList = result.Data;
+                            self.FormRelatedCounts.DataLog = Number(result.DataCount ?? result.Data.length) || 0;
                         } else {
                             self.DataLogList = [];
+                            self.FormRelatedCounts.DataLog = 0;
                         }
                     } finally {
                         self.DataLogListLoading = false;
@@ -121,6 +125,23 @@ export default {
                 },
                 callback
             );
+        },
+        LoadFormRelatedCounts() {
+            var self = this;
+            if (self.DiyCommon.IsNull(self.TableRowId)
+                || self.FormMode == "Add"
+                || self.FormMode == "Insert") {
+                self.FormRelatedCounts = { DataLog: 0, DataComment: 0, DataVersion: 0 };
+                return;
+            }
+            self.GetFormRelatedData("Counts", function (result) {
+                if (!result || result.Code != 1 || !result.Data) return;
+                self.FormRelatedCounts = {
+                    DataLog: Number(result.Data.DataLog) || 0,
+                    DataComment: Number(result.Data.DataComment) || 0,
+                    DataVersion: Number(result.Data.DataVersion) || 0
+                };
+            });
         },
         // ========== 加载数据评论（可重复调用） ==========
         LoadDataComment() {
@@ -153,8 +174,10 @@ export default {
                     try {
                         if (result && result.Code == 1 && Array.isArray(result.Data)) {
                             self.DataVersionList = result.Data;
+                            self.FormRelatedCounts.DataVersion = Number(result.DataCount ?? result.Data.length) || 0;
                         } else {
                             self.DataVersionList = [];
+                            self.FormRelatedCounts.DataVersion = 0;
                         }
                     } finally {
                         self.DataVersionListLoading = false;
@@ -398,7 +421,7 @@ export default {
                 return self.Width;
             }
 
-            var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "50%" : self.CurrentDiyTableModel.FormOpenWidth;
+            var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "80%" : self.CurrentDiyTableModel.FormOpenWidth;
             return result;
         },
         GetOpenFormStyle() {

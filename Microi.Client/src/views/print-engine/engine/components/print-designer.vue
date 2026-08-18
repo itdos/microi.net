@@ -1397,7 +1397,7 @@ $text-secondary: #718096;
 
     &__header {
       flex-shrink: 0;
-      padding: 0 12px;
+      padding: 0 10px;
       border-bottom: 1px solid $border;
     }
 

@@ -1,10 +1,12 @@
 {
   "PackageInfo": {
     "Name": "表单引擎",
-    "Version": "v6.9.9",
+    "Version": "v7.4.2",
     "CreateTime": "2026-08-08T18:11:58.929Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
+    "Description": "表单引擎基础资源。v6.9.10 将表单遮罩配置改为默认开启、显式关闭的 DisableFormMaskBlur，并保留旧 FormMaskBlur 数据兼容读取。",
+    "ChangeHistory": "2026-08-18 v6.9.10 新增 diy_table.DisableFormMaskBlur（关闭表单遮罩毛玻璃），默认 0；安装或升级后继续默认显示毛玻璃，仅显式开启该负向开关时关闭。",
     "MenuCount": 4,
     "TableCount": 7,
     "FieldCount": 131,
@@ -47,7 +49,7 @@
     {
       "TableName": "diy_table",
       "TableId": "39bc4abe-98ee-46a7-b9d1-a7d649691193",
-      "DDL": "CREATE TABLE IF NOT EXISTS `diy_table` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `V8Unlimited` int NULL COMMENT 'V8无运行限制',\n  `Remark` mediumtext NULL COMMENT '表说明/备注',\n  `EnableTrash` int NULL COMMENT '启用回收站',\n  `EnableDataVersion` int NULL COMMENT '启用数据版本',\n  `DataLogRole` mediumtext NULL COMMENT '数据日志权限',\n  `DisplayDefaultField` int NULL COMMENT '显示默认字段',\n  `EnableDataComment` int NULL COMMENT '启用数据评论',\n  `DataSourceId` varchar(36) NULL,\n  `ReportId` varchar(36) NULL COMMENT '报表引擎Id',\n  `ReportName` varchar(100) NULL COMMENT '报表引擎',\n  `EnableDataLog` int NULL COMMENT '启用数据日志',\n  `DataBaseName` varchar(100) NULL COMMENT '所属数据库',\n  `DataBaseId` varchar(36) NULL,\n  `SubmitAfterServerV8` mediumtext NULL COMMENT '后端表单提交后V8事件',\n  `SubmitBeforeServerV8` mediumtext NULL COMMENT '后端表单提交前V8事件',\n  `RowAction` mediumtext NULL,\n  `OutFormV8` mediumtext NULL COMMENT '前端表单提交后V8事件',\n  `Column` int(11) NULL COMMENT '电脑端布局',\n  `InputBorderStyle` varchar(255) NULL COMMENT '输入框样式',\n  `DataEncryptSave` int NULL COMMENT '数据加密存储',\n  `TableTabs` mediumtext NULL COMMENT '表单分组',\n  `ApiReplace` mediumtext NULL COMMENT '接口替换',\n  `IsAnonymousRead` int NULL COMMENT '允许匿名读取',\n  `FieldBorder` varchar(255) NULL,\n  `Description` mediumtext NULL COMMENT '表中文名',\n  `Tabs` mediumtext NULL COMMENT '表单分组',\n  `BindRole` mediumtext NULL COMMENT '访问权限',\n  `TableTabsPosition` varchar(255) NULL,\n  `TabsPosition` varchar(255) NULL COMMENT '分组标签位置',\n  `Name` varchar(255) NULL COMMENT '表名',\n  `TreeParentFields` mediumtext NULL COMMENT '完整父级列',\n  `TreeHasChildren` varchar(50) NULL COMMENT '是否有子级列',\n  `ServerDataV8` mediumtext NULL COMMENT '后端数据处理V8事件',\n  `IsTree` int NULL COMMENT '树形结构',\n  `FormOpenWidth` varchar(255) NULL COMMENT '弹窗/抽屉宽度',\n  `TableArticle` mediumtext NULL,\n  `DataEncryptTransfer` int NULL,\n  `InFormV8` mediumtext NULL COMMENT '前端表单进入V8事件',\n  `TreeParentField` varchar(50) NULL COMMENT '父级列',\n  `TreeLazy` int NULL COMMENT '树形懒加载',\n  `FormArticle` mediumtext NULL,\n  `EnableCache` int NULL,\n  `IsAnonymousAdd` int NULL COMMENT '允许匿名新增',\n  `CacheParentKey` varchar(255) NULL,\n  `FormOpenType` varchar(255) NULL COMMENT '表单打开方式',\n  `SubmitFormV8` mediumtext NULL COMMENT '前端表单提交前V8事件',\n  `FormLabelPosition` varchar(255) NULL COMMENT '标签对齐方式'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+      "DDL": "CREATE TABLE IF NOT EXISTS `diy_table` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `V8Unlimited` int NULL COMMENT 'V8无运行限制',\n  `Remark` mediumtext NULL COMMENT '表说明/备注',\n  `EnableTrash` int NULL COMMENT '启用回收站',\n  `EnableDataVersion` int NULL COMMENT '启用数据版本',\n  `DataLogRole` mediumtext NULL COMMENT '数据日志权限',\n  `DisplayDefaultField` int NULL COMMENT '显示默认字段',\n  `EnableDataComment` int NULL COMMENT '启用数据评论',\n  `DataSourceId` varchar(36) NULL,\n  `ReportId` varchar(36) NULL COMMENT '报表引擎Id',\n  `ReportName` varchar(100) NULL COMMENT '报表引擎',\n  `EnableDataLog` int NULL COMMENT '启用数据日志',\n  `DataBaseName` varchar(100) NULL COMMENT '所属数据库',\n  `DataBaseId` varchar(36) NULL,\n  `SubmitAfterServerV8` mediumtext NULL COMMENT '后端表单提交后V8事件',\n  `SubmitBeforeServerV8` mediumtext NULL COMMENT '后端表单提交前V8事件',\n  `RowAction` mediumtext NULL,\n  `OutFormV8` mediumtext NULL COMMENT '前端表单提交后V8事件',\n  `Column` int(11) NULL COMMENT '电脑端布局',\n  `InputBorderStyle` varchar(255) NULL COMMENT '输入框样式',\n  `DataEncryptSave` int NULL COMMENT '数据加密存储',\n  `TableTabs` mediumtext NULL COMMENT '表单分组',\n  `ApiReplace` mediumtext NULL COMMENT '接口替换',\n  `IsAnonymousRead` int NULL COMMENT '允许匿名读取',\n  `FieldBorder` varchar(255) NULL,\n  `Description` mediumtext NULL COMMENT '表中文名',\n  `Tabs` mediumtext NULL COMMENT '表单分组',\n  `BindRole` mediumtext NULL COMMENT '访问权限',\n  `TableTabsPosition` varchar(255) NULL,\n  `TabsPosition` varchar(255) NULL COMMENT '分组标签位置',\n  `Name` varchar(255) NULL COMMENT '表名',\n  `TreeParentFields` mediumtext NULL COMMENT '完整父级列',\n  `TreeHasChildren` varchar(50) NULL COMMENT '是否有子级列',\n  `ServerDataV8` mediumtext NULL COMMENT '后端数据处理V8事件',\n  `IsTree` int NULL COMMENT '树形结构',\n  `FormOpenWidth` varchar(255) NULL COMMENT '弹窗/抽屉宽度',\n  `DisableFormMaskBlur` int NULL COMMENT '关闭表单遮罩毛玻璃',\n  `TableArticle` mediumtext NULL,\n  `DataEncryptTransfer` int NULL,\n  `InFormV8` mediumtext NULL COMMENT '前端表单进入V8事件',\n  `TreeParentField` varchar(50) NULL COMMENT '父级列',\n  `TreeLazy` int NULL COMMENT '树形懒加载',\n  `FormArticle` mediumtext NULL,\n  `EnableCache` int NULL,\n  `IsAnonymousAdd` int NULL COMMENT '允许匿名新增',\n  `CacheParentKey` varchar(255) NULL,\n  `FormOpenType` varchar(255) NULL COMMENT '表单打开方式',\n  `SubmitFormV8` mediumtext NULL COMMENT '前端表单提交前V8事件',\n  `FormLabelPosition` varchar(255) NULL COMMENT '标签对齐方式'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     },
     {
       "TableName": "diy_component",
@@ -1788,6 +1790,18 @@
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 58
+    },
+    {
+      "TABLE_NAME": "diy_table",
+      "COLUMN_NAME": "DisableFormMaskBlur",
+      "COLUMN_TYPE": "int(11)",
+      "DATA_TYPE": "int",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "关闭表单遮罩毛玻璃",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 59
     },
     {
       "TABLE_NAME": "diy_component",
@@ -7634,6 +7648,7 @@
       "AppVisible": 1,
       "Type": "varchar(255)",
       "Name": "FormOpenWidth",
+      "DefaultValue": "80%",
       "InTableEdit": 0,
       "Unique": 0,
       "NameConfirm": 1,
@@ -7880,6 +7895,7 @@
       "AppVisible": 1,
       "Type": "varchar(255)",
       "Name": "FormOpenType",
+      "DefaultValue": "Dialog",
       "InTableEdit": 0,
       "Unique": 0,
       "V8TmpEngineTable": "var raw = V8.Form[\"FormOpenType\"];\nvar labels = {\"Dialog\":\"Dialog\",\"Drawer\":\"Drawer\",\"Page\":\"Page\"};\nvar key = raw === null || raw === undefined ? \"\" : String(raw);\nvar mapped = Object.prototype.hasOwnProperty.call(labels, key);\nvar label = mapped ? labels[key] : (key === \"\" ? \"—\" : (\"未映射（\" + key + \"）\"));\nfunction escapeHtml(value) {\n  return String(value).replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\").replace(/\"/g, \"&quot;\").replace(/'/g, \"&#39;\");\n}\nvar signal = (key + \" \" + label).toLowerCase();\nvar tone = key === \"\" ? \"secondary\" : \"info\";\nif (!mapped && key !== \"\") tone = \"warning\";\nelse if (/失败|异常|禁用|停用|下线|删除|驳回|封锁|拦截|失效|作废|禁止外部|failed|blocked|rejected|offline|invalid/.test(signal)) tone = \"danger\";\nelse if (/待|草稿|未发布|未登录|缺答案|无答案|需人工|忙碌|可疑|执行中|构建中|部分|过期|pending|running|partial|warn|changed|building|expired/.test(signal)) tone = \"warning\";\nelse if (/启用|成功|完成|在线|已发布|有效|通过|生效|可用|有答案|首页|显示|允许|跨端|active|success|enabled|published|issued|resolved/.test(signal)) tone = \"success\";\nvar palette = {\n  success:{bg:\"#ecfdf5\",fg:\"#047857\",bd:\"#a7f3d0\",dot:\"#10b981\"},\n  warning:{bg:\"#fffbeb\",fg:\"#b45309\",bd:\"#fde68a\",dot:\"#f59e0b\"},\n  danger:{bg:\"#fff1f2\",fg:\"#be123c\",bd:\"#fecdd3\",dot:\"#f43f5e\"},\n  info:{bg:\"#eff6ff\",fg:\"#1d4ed8\",bd:\"#bfdbfe\",dot:\"#3b82f6\"},\n  secondary:{bg:\"#f8fafc\",fg:\"#64748b\",bd:\"#e2e8f0\",dot:\"#94a3b8\"}\n};\nvar color = palette[tone];\nV8.Result = '<span title=\"' + escapeHtml(\"表单打开方式\") + '\" style=\"display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 9px;border:1px solid ' + color.bd + ';border-radius:999px;background:' + color.bg + ';color:' + color.fg + ';font-size:12px;font-weight:600;line-height:18px;white-space:nowrap;box-sizing:border-box;\"><span aria-hidden=\"true\" style=\"width:6px;height:6px;border-radius:50%;background:' + color.dot + ';box-shadow:0 0 0 3px ' + color.bg + ';flex:none;\"></span><span style=\"overflow:hidden;text-overflow:ellipsis;\">' + escapeHtml(label) + '</span></span>';",
@@ -7925,6 +7941,32 @@
       "Label": "前端表单提交前V8事件",
       "Id": "0d358b92-cfa9-4129-93fd-240985b483c9",
       "CreateTime": "2022-08-08 21:32:48"
+    },
+    {
+      "TableName": "diy_table",
+      "AppVisible": 1,
+      "Type": "int",
+      "Name": "DisableFormMaskBlur",
+      "InTableEdit": 0,
+      "Unique": 0,
+      "NameConfirm": 1,
+      "TableWidth": 150,
+      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"Sql\":\"\",\"EnableSearch\":false,\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"DividerPosition\":\"left\",\"DataSource\":\"\",\"DataSourceSqlRemote\":false,\"DataSourceSqlRemoteLoading\":false,\"DataSourceId\":\"\",\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"SelectLabel\":\"\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\",\"DataSourceApiEngineKey\":\"\",\"Unique\":{\"Type\":\"Alone\"}}",
+      "TableId": "39bc4abe-98ee-46a7-b9d1-a7d649691193",
+      "Readonly": 0,
+      "Encrypt": 0,
+      "BindRole": "[]",
+      "Description": "默认保持毛玻璃遮罩；只有明确打开此负向开关时才使用普通遮罩。系统设置中的同名开关可全局关闭。",
+      "Component": "Switch",
+      "Visible": 1,
+      "IsLockField": 1,
+      "Data": "[]",
+      "Sort": 1850,
+      "NotEmpty": 0,
+      "Label": "关闭表单遮罩毛玻璃",
+      "Id": "01M071WPKYQBB7YVXJK3PN67FE",
+      "CreateTime": "2026-08-17 00:00:00",
+      "DefaultValue": "0"
     },
     {
       "TableName": "diy_table",

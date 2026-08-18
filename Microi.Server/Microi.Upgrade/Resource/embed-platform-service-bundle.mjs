@@ -17,8 +17,8 @@ const argumentValue = (name, fallback = '') => {
   return argument ? argument.slice(prefix.length) : fallback;
 };
 
-const version = argumentValue('--version', 'v1.5.8');
-const applicationVersion = Number(argumentValue('--application-version', '15'));
+const version = argumentValue('--version', 'v1.6.0');
+const applicationVersion = Number(argumentValue('--application-version', '18'));
 const sourceManifestHashOverride = argumentValue('--source-manifest-hash');
 const runtimeManifestHashOverride = argumentValue('--runtime-manifest-hash');
 const timestamp = new Date(argumentValue('--timestamp', new Date().toISOString()));
@@ -66,6 +66,25 @@ function contentType(path) {
 }
 
 const packageModel = JSON.parse(await readFile(packagePath, 'utf8'));
+let databaseBackupDialogCount = 0;
+for (const menu of packageModel.SysMenus || []) {
+  if (!menu.PageBtns) continue;
+  let buttons;
+  try { buttons = typeof menu.PageBtns === 'string' ? JSON.parse(menu.PageBtns) : menu.PageBtns; }
+  catch { continue; }
+  if (!Array.isArray(buttons)) continue;
+  for (const button of buttons) {
+    if (button?.Id !== 'database-backup-page-btn') continue;
+    button.V8Code = String(button.V8Code || '')
+      .replace(/Width:\s*'[^']*'/, "Width: '80%'")
+      .replace("Width: '80%',", "Width: '80%',\n  BodyHeight: 'min(820px, calc(100vh - 160px))',");
+    databaseBackupDialogCount++;
+  }
+  menu.PageBtns = typeof menu.PageBtns === 'string' ? JSON.stringify(buttons) : buttons;
+}
+if (databaseBackupDialogCount !== 1) {
+  throw new Error(`数据库定时备份弹层契约数量异常：${databaseBackupDialogCount}`);
+}
 const routeDefinitions = JSON.parse(await readFile(resolve(applicationRoot, 'microi.routes.json'), 'utf8'));
 const bundle = (packageModel.ApplicationBundles || []).find(
   item => item?.Application?.AppKey === 'microi-platform-service',

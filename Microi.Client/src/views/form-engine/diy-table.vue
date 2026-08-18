@@ -55,6 +55,7 @@
             :fields="DiyFieldList"
             :config="ModuleFormWorkbenchConfig"
             :page-buttons="SysMenuModel.PageBtns || []"
+            :batch-buttons="SysMenuModel.BatchSelectMoreBtns || []"
             :form-buttons="SysMenuModel.FormBtns || []"
             :row-count="Number(DiyTableRowCount || 0)"
             :page-index="DiyTableRowPageIndex"
@@ -62,6 +63,7 @@
             :can-add="Boolean(_LimitAdd && IsVisibleAdd == true && !TableChildField.Readonly)"
             :can-edit="Boolean(_LimitEdit && TableChildFormMode != 'View' && !TableChildField.Readonly)"
             :loading="tableLoading"
+            :action-loading="BtnV8Loading"
             :initial-record-id="String($route.query.RecordId || '')"
             @refresh="GetDiyTableRow({ _PageIndex: DiyTableRowPageIndex || 1 })"
             @load-page="HandleModuleWorkbenchPage"
@@ -75,15 +77,11 @@
         <!-- type="border-card" -->
         <!-- 设备tabs(设备、服务数据) -->
         <template v-else>
-        <div v-if="ModuleFormWorkbenchClassicEnabled" class="module-workbench-return-bar">
-            <span>当前为经典表格视图</span>
-            <el-button type="primary" plain size="small" @click="SwitchClassicToModuleWorkbench">返回表单工作台</el-button>
-        </div>
         <el-tabs
             id="table-rowlist-tabs"
             v-model="TableRowListActiveTab"
             @tab-click="tabClickRowList"
-            :class="(!IsPageTabs() ? 'table-rowlist-tabs tab-pane-hide' : 'table-rowlist-tabs box-card-top-tabs')
+            :class="(!IsPageTabs() ? 'table-rowlist-tabs tab-pane-hide mci-tabs mci-tabs--module' : 'table-rowlist-tabs box-card-top-tabs mci-tabs mci-tabs--module')
                 + (diyStore.IsMiniProgram ? ' mini-program' : '')"
         >
             <!-- 之前是使用GetPageTabs()，使用改成了预渲染  -->
@@ -139,7 +137,8 @@
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
                 <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
                 <!--移动端隐藏此工具栏，改用右下角FAB浮动按钮展示-->
-                <div class="keyword-search" style="margin-bottom: 5px;">
+                <el-config-provider size="small">
+                    <div class="keyword-search" style="margin-bottom: 5px;">
                     <div class="search-action-group">
                         <!-- 工作流菜单（OpenType=='WorkFlow' && FlowDesignId 存在）：发起申请按钮，替代普通新增 -->
                         <el-button
@@ -273,10 +272,9 @@
                             <el-dropdown
                                 v-if="_LimitExport && IsVisibleExport == true && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0"
                                 trigger="click"
-                                style="margin-left: 10px"
                             >
                                 <!-- {{ $t('Msg.Export') }} -->
-                                <el-button class="mr-10">
+                                <el-button>
                                     {{ $t("Msg.Export") }}
                                     <el-icon class="el-icon--right"><ArrowDown /></el-icon>
                                 </el-button>
@@ -374,17 +372,20 @@
                             >
                         </el-popover>
                     </div>
-                    <el-dropdown v-if="!PropsHideMoreFunctions && !diyStore.IsPhoneView" trigger="click">
+                    <el-dropdown v-if="(!PropsHideMoreFunctions || ModuleFormWorkbenchClassicEnabled) && !diyStore.IsPhoneView" trigger="click">
                         <el-button type="primary" :loading="BusinessDataTranslateLoading">
                             <el-icon style="margin-right: 4px"><MoreFilled /></el-icon>{{ $t('Msg.MoreFunctions') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
                         </el-button>
                         <template #dropdown>
                             <el-dropdown-menu>
-                                <el-dropdown-item @click="ShiftTableDisplayMode()">
+                                <el-dropdown-item v-if="!PropsHideMoreFunctions" @click="ShiftTableDisplayMode()">
                                     <el-icon><List /></el-icon>{{ $t('Msg.SwitchTableDisplay') }}
                                 </el-dropdown-item>
-                                <el-dropdown-item @click="TranslateBusinessData()">
+                                <el-dropdown-item v-if="!PropsHideMoreFunctions" @click="TranslateBusinessData()">
                                     <fa-icon icon="fas fa-language" class="mr-1" />{{ $t('Msg.TranslateBusinessData') }}
+                                </el-dropdown-item>
+                                <el-dropdown-item v-if="ModuleFormWorkbenchClassicEnabled" divided @click="SwitchClassicToModuleWorkbench">
+                                    <fa-icon icon="fas fa-table-columns" class="mr-1" />返回表单工作台（当前为经典表格视图）
                                 </el-dropdown-item>
                             </el-dropdown-menu>
                         </template>
@@ -413,6 +414,7 @@
                         </el-dropdown>
                     </div>
                 </div>
+                </el-config-provider>
 
                 <!-- 移动端把总数与首要业务指标合并成 UniApp 式摘要条，避免多个统计面板挤占首屏。 -->
                 <section v-if="diyStore.IsPhoneView && MobileSummaryItems.length" class="mobile-list-summary" aria-label="列表摘要">
@@ -451,7 +453,7 @@
                 </div>
 
                 <!--DIY移动端浮动操作按钮（FAB）-->
-                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !PropsEmbedded && ShowAddByRoute && !IsTrashMode && cardSelection.length === 0" :style="GetFabContainerStyle()">
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !PropsEmbedded && (ShowAddByRoute || ModuleFormWorkbenchClassicEnabled) && !IsTrashMode && cardSelection.length === 0" :style="GetFabContainerStyle()">
                     <!--遮罩层-->
                     <transition name="fab-overlay">
                         <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
@@ -459,6 +461,10 @@
                     <!--弹出菜单-->
                     <transition name="fab-menu">
                         <div class="mobile-fab-menu" v-if="showMobileFabMenu">
+                            <div class="mobile-fab-menu-item" v-if="ModuleFormWorkbenchClassicEnabled" @click="showMobileFabMenu = false; SwitchClassicToModuleWorkbench()">
+                                <div class="mobile-fab-menu-icon v8"><fa-icon icon="fas fa-table-columns" /></div>
+                                <span class="mobile-fab-menu-label">返回表单工作台</span>
+                            </div>
                             <!--工作流-发起申请按钮-->
                             <div class="mobile-fab-menu-item" v-if="IsWorkFlowMenu() && _LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; StartWorkFlow()">
                                 <div class="mobile-fab-menu-icon add"><fa-icon icon="far fa-paper-plane" /></div>
@@ -1587,6 +1593,15 @@
                 :style="{ top: _colMenuPosition.top + 'px', left: _colMenuPosition.left + 'px', maxHeight: _colMenuPosition.maxHeight ? _colMenuPosition.maxHeight + 'px' : undefined }"
                 @click.stop
             >
+                <div class="user-column-settings-head global-col-menu-head">
+                    <div class="user-column-settings-title">
+                        <span class="user-column-settings-title-icon"><el-icon><Setting /></el-icon></span>
+                        <div>
+                            <strong>列设置</strong>
+                            <small>{{ _colMenuField ? ((_colMenuField.Label || _colMenuField.Name || '当前列') + ' · 排序、冻结与筛选') : '排序、冻结与筛选' }}</small>
+                        </div>
+                    </div>
+                </div>
                 <!-- 升序 -->
                 <div class="global-col-menu-item" :class="{ 'is-active': _colMenuSortState === 'asc' }" @click="colMenuSort('asc')">
                     <el-icon><SortUp /></el-icon>
@@ -1861,19 +1876,20 @@
             :close-on-press-escape="false"
             :destroy-on-close="true"
             :show-close="false"
-            class="dialog-opentable"
+            class="dialog-opentable diy-open-table-dialog"
+            :modal-class="GetOpenAnyTableOverlayClass()"
         >
             <template #header>
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
-                        <fa-icon :icon="'fas fa-table'" />
-                        {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
+                <div class="diy-open-table-head">
+                    <div class="diy-open-table-head__title">
+                        <span>RELATED TABLE</span>
+                        <strong><fa-icon :icon="'fas fa-table'" /> {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? " · " + OpenAnyTableParam.TableName : "" }}</strong>
                     </div>
-                    <div class="pull-right">
-                        <el-button v-if="typeof OpenAnyTableParam.SubmitEvent === 'function'" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
+                    <div class="diy-open-table-head__actions">
+                        <el-button size="small" v-if="typeof OpenAnyTableParam.SubmitEvent === 'function'" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
                             {{ $t("Msg.Submit") }}
                         </el-button>
-                        <el-button :icon="Close" @click="CloseOpenAnyTable">
+                        <el-button size="small" :icon="Close" @click="CloseOpenAnyTable">
                             {{ $t("Msg.Close") }}
                         </el-button>
                     </div>
@@ -1921,19 +1937,20 @@
             :close-on-press-escape="false"
             :destroy-on-close="true"
             :show-close="false"
-            class="drawer-opentable"
+            class="drawer-opentable diy-open-table-drawer"
+            :modal-class="GetOpenAnyTableOverlayClass()"
         >
             <template #header>
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
-                        <fa-icon :icon="'fas fa-table'" />
-                        {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
+                <div class="diy-open-table-head">
+                    <div class="diy-open-table-head__title">
+                        <span>RELATED TABLE</span>
+                        <strong><fa-icon :icon="'fas fa-table'" /> {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? " · " + OpenAnyTableParam.TableName : "" }}</strong>
                     </div>
-                    <div class="pull-right">
-                        <el-button v-if="typeof OpenAnyTableParam.SubmitEvent === 'function'" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
+                    <div class="diy-open-table-head__actions">
+                        <el-button size="small" v-if="typeof OpenAnyTableParam.SubmitEvent === 'function'" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
                             {{ $t("Msg.Submit") }}
                         </el-button>
-                        <el-button :icon="Close" @click="CloseOpenAnyTable">
+                        <el-button size="small" :icon="Close" @click="CloseOpenAnyTable">
                             {{ $t("Msg.Close") }}
                         </el-button>
                     </div>
@@ -2310,6 +2327,18 @@ export default {
             var param = this.OpenAnyTableParam || {};
             var dialogType = param.DialogType || param.OpenType || param.Type || "";
             return String(dialogType).toLowerCase() === "drawer";
+        },
+        GetOpenAnyTableOverlayClass() {
+            var value = this.SysConfig ? this.SysConfig.DisableFormMaskBlur : undefined;
+            var blurDisabled = value === 1
+                || value === "1"
+                || value === true
+                || String(value || "").trim().toLowerCase() === "true";
+            return [
+                "diy-open-table-overlay",
+                "mci-unified-overlay",
+                blurDisabled ? "diy-open-table-overlay--plain mci-unified-overlay--plain" : ""
+            ].filter(Boolean).join(" ");
         },
         GetOpenAnyTableWidth() {
             var param = this.OpenAnyTableParam || {};

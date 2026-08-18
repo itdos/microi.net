@@ -242,7 +242,20 @@ public class SaaSRuntimeConfigurationTests
             @"cat > ""\$\{APP_DIR\}/docker-compose\.yml"" <<EOF[\s\S]*?microi-install-api:\s*[\s\S]*?\n\s+environment:\s*(?<environment>[\s\S]*?)\n\s+volumes:");
         Assert.True(block.Success, "未找到 microi-install-api.environment 编排块。");
 
-        var keys = Regex.Matches(block.Groups["environment"].Value,
+        var environmentSource = block.Groups["environment"].Value;
+        if (environmentSource.Contains("${OS_CLIENT_DB_CONN_ENV_ENTRY}", StringComparison.Ordinal))
+        {
+            Assert.Contains(
+                "OS_CLIENT_DB_CONN_ENV_ENTRY=$(compose_yaml_double_quote \"OsClientDbConn=${OS_CLIENT_DB_CONN}\")",
+                source,
+                StringComparison.Ordinal);
+            environmentSource = environmentSource.Replace(
+                "${OS_CLIENT_DB_CONN_ENV_ENTRY}",
+                "OsClientDbConn=${OS_CLIENT_DB_CONN}",
+                StringComparison.Ordinal);
+        }
+
+        var keys = Regex.Matches(environmentSource,
                 @"^\s*-\s*([A-Za-z][A-Za-z0-9_]*)=", RegexOptions.Multiline)
             .Select(match => match.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);

@@ -1,52 +1,545 @@
 @import "@/styles/diy-form.scss";
 
-/* ViewSchema FormWorkbench 的设置中心外观。仅改变排版，不分叉 DiyForm 的数据和 V8 执行链。 */
-.diy-form--settingscenter {
-    padding: 2px;
+/* ViewSchema FormWorkbench 的通用控制中心外观。
+ * SettingsCenter 是旧配置别名；两者只改变呈现层，不分叉 DiyForm 数据和 V8 执行链。 */
+.diy-form--settingscenter,
+.diy-form--controlcenter {
+    --form-center-accent: var(--mci-color-primary, var(--el-color-primary, #3478f6));
+    --form-center-line: var(--mci-border-color, var(--el-border-color-lighter, #e7edf5));
+    --form-center-soft: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f5f8fc));
+    --form-center-card: var(--mci-bg-card, var(--el-bg-color, #fff));
+    padding: 0;
 
-    :deep(.field-form-tabs > .el-tabs__header) {
-        margin-bottom: 12px;
-        padding: 6px;
-        border: 1px solid var(--el-border-color-lighter, #e7edf5);
-        border-radius: 13px;
-        background: var(--el-fill-color-extra-light, #f5f8fc);
+    .diy-form-presentation-layout.is-control-center {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        grid-template-areas: "section-nav section-main";
+        align-items: start;
+        gap: 10px;
     }
+    .diy-form-presentation-layout.is-control-center:not(.has-section-nav) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .diy-form-section-nav {
+        grid-area: section-nav;
+        position: sticky;
+        top: 10px;
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 5px;
+        padding: 8px;
+        border: 1px solid color-mix(in srgb, var(--form-center-line) 62%, transparent);
+        border-radius: var(--mci-radius-lg, 15px);
+        background: color-mix(in srgb, var(--form-center-soft) 78%, transparent);
+    }
+    .diy-form-section-nav__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 3px 6px 7px;
+        color: var(--el-text-color-primary);
+        font-size: 12px;
+        font-weight: 750;
+    }
+    .diy-form-section-nav__head small { color: var(--el-text-color-secondary); font-size: 10px; font-weight: 500; }
+    .diy-form-section-nav__item {
+        position: relative;
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        align-items: center;
+        gap: 9px;
+        padding: 9px;
+        border: 1px solid transparent;
+        border-radius: 11px;
+        color: var(--el-text-color-regular);
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+    }
+    .diy-form-section-nav__item:hover {
+        border-color: color-mix(in srgb, var(--form-center-accent) 22%, var(--form-center-line));
+        background: color-mix(in srgb, var(--form-center-card) 88%, var(--form-center-accent));
+    }
+    .diy-form-section-nav__item.active {
+        border-color: color-mix(in srgb, var(--form-center-accent) 36%, var(--form-center-line));
+        color: var(--form-center-accent);
+        background: var(--form-center-card);
+        box-shadow: 0 2px 8px rgba(25, 48, 82, .035);
+    }
+    .diy-form-section-nav__item.active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        width: 4px;
+        height: 54%;
+        min-height: 18px;
+        max-height: 26px;
+        border-radius: 999px;
+        background: var(--form-center-accent);
+        transform: translateY(-50%);
+    }
+    .diy-form-section-nav__icon {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        place-items: center;
+        border-radius: 10px;
+        color: var(--form-center-accent);
+        background: color-mix(in srgb, var(--form-center-accent) 10%, transparent);
+    }
+    .diy-form-section-nav__copy { min-width: 0; flex: 1; }
+    .diy-form-section-nav__copy b,
+    .diy-form-section-nav__copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .diy-form-section-nav__copy b { font-size: 12px; }
+    .diy-form-section-nav__copy small { margin-top: 3px; color: var(--el-text-color-secondary); font-size: 9px; font-weight: 500; }
+    .diy-form-section-nav__count,
+    .diy-form-tab-count {
+        display: inline-grid;
+        min-width: 20px;
+        height: 18px;
+        place-items: center;
+        padding: 0 5px;
+        border-radius: 999px;
+        color: var(--form-center-accent);
+        background: color-mix(in srgb, var(--form-center-accent) 12%, transparent);
+        font-size: 9px;
+        font-weight: 750;
+        line-height: 18px;
+    }
+    .diy-form-tab-label { display: inline-flex; align-items: center; gap: 6px; }
+    .diy-form-presentation-main {
+        grid-area: section-main;
+        min-width: 0;
+        padding: 10px;
+        border: 1px solid color-mix(in srgb, var(--form-center-line) 58%, transparent);
+        border-radius: var(--mci-radius-lg, 15px);
+        background: var(--form-center-card);
+    }
+    .diy-form-section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+        padding: 2px 3px 6px;
+        border-bottom: 0;
+    }
+    .diy-form-section-head span { color: var(--form-center-accent); font-size: 9px; font-weight: 800; letter-spacing: 1.25px; }
+    .diy-form-section-head h3 { margin: 3px 0 0; color: var(--el-text-color-primary); font-size: 17px; line-height: 24px; }
+    .diy-form-section-head p { margin: 3px 0 0; color: var(--el-text-color-secondary); font-size: 11px; line-height: 17px; }
 
+    :deep(.field-form-tabs.presentation-tabs-nav-hidden > .el-tabs__header) { display: none; }
+    :deep(.field-form-tabs.is-control-center-tabs:not(.presentation-tabs-nav-hidden) > .el-tabs__header) {
+        margin-bottom: 8px;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+    }
     :deep(.field-form-tabs > .el-tabs__header .el-tabs__nav-wrap::after) { display: none; }
-    :deep(.field-form-tabs > .el-tabs__header .el-tabs__item) {
-        height: 34px;
-        padding: 0 14px;
-        border-radius: 9px;
+    :deep(.field-form-tabs.is-control-center-tabs > .el-tabs__header .el-tabs__item) {
+        height: 32px;
+        padding: 0 13px;
+        border-radius: 8px;
         color: var(--el-text-color-secondary);
         font-size: 12px;
     }
-    :deep(.field-form-tabs > .el-tabs__header .el-tabs__item.is-active) {
-        color: var(--el-color-primary);
-        background: var(--el-bg-color);
-        box-shadow: 0 6px 16px rgba(31, 63, 104, .08);
+    :deep(.field-form-tabs.is-control-center-tabs > .el-tabs__header .el-tabs__item.is-active) {
+        color: var(--form-center-accent);
+        background: var(--form-center-card);
+        box-shadow: 0 2px 8px rgba(31, 63, 104, .045);
     }
     :deep(.field-form-tabs > .el-tabs__header .el-tabs__active-bar) { display: none; }
     :deep(.field-form) {
-        padding: 13px 12px 3px;
-        border: 1px solid var(--el-border-color-lighter, #e7edf5);
-        border-radius: 14px;
-        background: color-mix(in srgb, var(--el-bg-color) 94%, var(--el-fill-color-extra-light));
+        padding: 3px;
+        border: 0;
+        border-radius: 13px;
+        background: color-mix(in srgb, var(--form-center-soft) 38%, transparent);
     }
-    :deep(.el-form-item) { margin-bottom: 14px; }
-    :deep(.el-form-item__label) { color: var(--el-text-color-regular); font-size: 12px; font-weight: 650; }
+    :deep(.diy-presentation-field-card) { box-sizing: border-box; padding-top: 3px; padding-bottom: 3px; }
+    :deep(.diy-presentation-field-card > .container-form-item) {
+        box-sizing: border-box;
+        height: 100%;
+        min-height: 76px;
+        padding: 9px 10px;
+        border: 1px solid color-mix(in srgb, var(--form-center-line) 58%, transparent);
+        border-radius: 12px;
+        background: var(--form-center-card);
+        transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+    :deep(.diy-presentation-field-card > .container-form-item:hover) {
+        border-color: color-mix(in srgb, var(--form-center-accent) 28%, var(--form-center-line));
+        box-shadow: 0 2px 8px rgba(25, 48, 82, .035);
+    }
+    :deep(.diy-presentation-field-card .el-form-item) { margin-bottom: 0; }
+    :deep(.diy-presentation-field-card .el-form-item__label) {
+        color: var(--el-text-color-primary);
+        font-size: 12px;
+        font-weight: 680;
+    }
+    &.diy-form--label-top {
+        :deep(.diy-presentation-field-card .el-form-item) { display: block; }
+        :deep(.diy-presentation-field-card .el-form-item__label) {
+            width: 100% !important;
+            height: auto;
+            justify-content: flex-start;
+            margin-bottom: 4px;
+            padding: 0;
+            line-height: 18px;
+            text-align: left;
+        }
+        :deep(.diy-presentation-field-card .el-form-item__content) { margin-left: 0 !important; }
+    }
     :deep(.el-input__wrapper),
     :deep(.el-select__wrapper),
     :deep(.el-textarea__inner) {
         border-radius: 9px;
-        box-shadow: 0 0 0 1px var(--el-border-color-lighter, #e7edf5) inset;
+        box-shadow: 0 0 0 1px var(--form-center-line) inset;
+    }
+    :deep(.presentation-density-compact .diy-presentation-field-card > .container-form-item) { min-height: 70px; padding: 8px 9px; }
+
+    .diy-form-presentation-layout.section-nav-right {
+        grid-template-columns: minmax(0, 1fr) 190px;
+        grid-template-areas: "section-main section-nav";
+    }
+    .diy-form-presentation-layout.section-nav-right .diy-form-section-nav__item.active::before {
+        right: 0;
+        left: auto;
+    }
+    .diy-form-presentation-layout.section-nav-top,
+    .diy-form-presentation-layout.section-nav-bottom {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .diy-form-presentation-layout.section-nav-top { grid-template-areas: "section-nav" "section-main"; }
+    .diy-form-presentation-layout.section-nav-bottom { grid-template-areas: "section-main" "section-nav"; }
+    .section-nav-top .diy-form-section-nav,
+    .section-nav-bottom .diy-form-section-nav {
+        position: static;
+        flex-direction: row;
+        overflow-x: auto;
+    }
+    .section-nav-top .diy-form-section-nav__head,
+    .section-nav-bottom .diy-form-section-nav__head { min-width: 126px; }
+    .section-nav-top .diy-form-section-nav__item,
+    .section-nav-bottom .diy-form-section-nav__item { min-width: 170px; width: auto; }
+    .section-nav-top .diy-form-section-nav__item.active::before,
+    .section-nav-bottom .diy-form-section-nav__item.active::before {
+        display: none;
+    }
+}
+
+/* ================================================================
+ * DiyForm 现代默认外观
+ * - 只升级呈现层，不改变字段组件、权限、校验、V8 事件或提交链。
+ * - PresentationMode="Classic"/"Legacy" 可作为历史页面的显式兼容出口。
+ * - left / right / top 三种标签对齐完全沿用表单引擎配置。
+ * ================================================================ */
+.diy-form--modern {
+    --diy-modern-accent: var(--mci-color-primary, var(--el-color-primary, #3478f6));
+    --diy-modern-surface: var(--mci-bg-card, var(--el-bg-color, #fff));
+    --diy-modern-soft: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f6f8fb));
+    --diy-modern-line: var(--mci-border-color, var(--el-border-color-lighter, #e1e8f0));
+    --diy-modern-text: var(--mci-text-primary, var(--el-text-color-primary, #172033));
+    --diy-modern-muted: var(--mci-text-secondary, var(--el-text-color-secondary, #66758a));
+    box-sizing: border-box;
+    padding: 4px;
+
+    .diy-form-presentation-main { min-width: 0; }
+
+    :deep(.field-form-tabs:not(.mci-tabs) > .el-tabs__header) {
+        margin: 0 0 10px;
+        padding: 0 6px;
+        border: 0;
+        border-bottom: 1px solid color-mix(in srgb, var(--diy-modern-line) 72%, transparent);
+        border-radius: 0;
+        background: transparent;
+    }
+    :deep(.field-form-tabs:not(.mci-tabs) > .el-tabs__header .el-tabs__nav-wrap::after),
+    :deep(.field-form-tabs:not(.mci-tabs) > .el-tabs__header .el-tabs__active-bar) { display: none; }
+    :deep(.field-form-tabs:not(.mci-tabs) > .el-tabs__header .el-tabs__item) {
+        height: 33px;
+        padding: 0 15px;
+        border: 1px solid transparent;
+        border-top: 0 !important;
+        border-bottom: 0;
+        border-radius: 10px 10px 0 0;
+        color: var(--diy-modern-muted);
+        font-size: 13px;
+        transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+    }
+    :deep(.field-form-tabs:not(.mci-tabs) > .el-tabs__header .el-tabs__item:hover) { color: var(--diy-modern-accent); }
+    :deep(.field-form-tabs:not(.mci-tabs) > .el-tabs__header .el-tabs__item.is-active) {
+        color: var(--diy-modern-accent);
+        border-color: color-mix(in srgb, var(--diy-modern-accent) 18%, var(--diy-modern-line));
+        border-top: 0 !important;
+        border-bottom-color: color-mix(in srgb, var(--diy-modern-accent) 9%, var(--diy-modern-surface));
+        background: color-mix(in srgb, var(--diy-modern-accent) 9%, var(--diy-modern-surface));
+        box-shadow: none;
+    }
+    /* 普通表单使用连续的柔和画布：字段外壳透明，只有真正的控件保持白色表面。
+     * ControlCenter/SettingsCenter 仍沿用上方专用分区卡片，不被此规则扁平化。 */
+    &:not(.diy-form--settingscenter):not(.diy-form--controlcenter) {
+        :deep(.field-form) {
+            box-sizing: border-box;
+            padding: 6px 5px;
+            border: 0;
+            border-radius: 14px;
+            background: color-mix(in srgb, var(--diy-modern-soft) 82%, transparent);
+        }
+        :deep(.diy-modern-field-card) {
+            box-sizing: border-box;
+            padding-top: 2px;
+            padding-bottom: 2px;
+        }
+        :deep(.diy-modern-field-card > .container-form-item) {
+            box-sizing: border-box;
+            height: 100%;
+            // min-height: 38px;
+            padding: 0px 6px;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            transition: background-color 160ms ease;
+        }
+        :deep(.diy-modern-field-card > .container-form-item:hover) {
+            background: color-mix(in srgb, var(--diy-modern-surface) 28%, transparent);
+        }
+        :deep(.diy-modern-field-card .el-form-item) {
+            min-width: 0;
+            margin-bottom: 0;
+        }
+        :deep(.diy-modern-field-card .el-form-item__label) {
+            box-sizing: border-box;
+            color: var(--diy-modern-text);
+            font-size: 12px;
+            font-weight: 680;
+            line-height: 32px;
+        }
+        :deep(.diy-modern-field-card .el-form-item__content) {
+            min-width: 0;
+            min-height: 32px;
+            line-height: 32px;
+        }
+        :deep(.diy-modern-field-card .el-input__wrapper),
+        :deep(.diy-modern-field-card .el-select__wrapper),
+        :deep(.diy-modern-field-card .el-textarea__inner),
+        :deep(.diy-modern-field-card .el-date-editor) {
+            border-radius: 9px;
+            background: var(--diy-modern-surface);
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--diy-modern-line) 88%, transparent) inset;
+            transition: box-shadow 160ms ease, background-color 160ms ease;
+        }
+        :deep(.diy-modern-field-card .el-input__wrapper:hover),
+        :deep(.diy-modern-field-card .el-select__wrapper:hover),
+        :deep(.diy-modern-field-card .el-textarea__inner:hover) {
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--diy-modern-accent) 42%, var(--diy-modern-line)) inset;
+        }
+        :deep(.diy-modern-field-card .el-input__wrapper.is-focus),
+        :deep(.diy-modern-field-card .el-select__wrapper.is-focused),
+        :deep(.diy-modern-field-card .el-textarea__inner:focus) {
+            background: var(--diy-modern-surface);
+            box-shadow: 0 0 0 1px var(--diy-modern-accent) inset, 0 0 0 3px color-mix(in srgb, var(--diy-modern-accent) 10%, transparent);
+        }
+        :deep(.diy-modern-field-card .el-input__wrapper),
+        :deep(.diy-modern-field-card .el-select__wrapper) { min-height: 34px; }
+        :deep(.diy-modern-field-card .el-date-editor.el-input),
+        :deep(.diy-modern-field-card .el-date-editor.el-input__wrapper),
+        :deep(.diy-modern-field-card .el-input-number),
+        :deep(.diy-modern-field-card .el-radio-group) { width: 100%; }
+        :deep(.diy-modern-field-card .el-radio-group) {
+            display: flex;
+            min-height: 34px;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px 16px;
+        }
+        :deep(.diy-modern-field-card .el-radio) {
+            height: 34px;
+            margin-right: 0;
+            align-items: center;
+        }
+        :deep(.diy-modern-field-card .el-input-number__increase),
+        :deep(.diy-modern-field-card .el-input-number__decrease) {
+            box-sizing: border-box;
+            right: 1px;
+            width: 30px;
+            height: 16px;
+            border-left: 1px solid var(--diy-modern-line);
+            line-height: 15px;
+        }
+        :deep(.diy-modern-field-card .el-input-number__increase) { top: 1px; border-bottom: 0; }
+        :deep(.diy-modern-field-card .el-input-number__decrease) { bottom: 1px; border-top: 1px solid var(--diy-modern-line); }
+
+        /* 折叠分组的边框属于整组，不是子字段的内容起点。给组内字段保留稳定内边距，
+         * 尤其避免 TableChild 等整行控件紧贴左侧分组线。 */
+        :deep(.collapse-group-item.diy-modern-field-card > .container-form-item) {
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+    }
+
+    &.diy-form--label-top {
+        :deep(.diy-modern-field-card .el-form-item) { display: block; }
+        :deep(.diy-modern-field-card .el-form-item__label) {
+            width: 100% !important;
+            height: auto;
+            justify-content: flex-start;
+            margin-bottom: 3px;
+            padding: 0;
+            line-height: 18px;
+            text-align: left;
+        }
+        :deep(.diy-modern-field-card .el-form-item__content) { margin-left: 0 !important; }
+    }
+    &.diy-form--label-left :deep(.diy-modern-field-card .el-form-item__label) {
+        justify-content: flex-start;
+        text-align: left;
+    }
+    &.diy-form--label-right :deep(.diy-modern-field-card .el-form-item__label) {
+        justify-content: flex-end;
+        text-align: right;
+    }
+    &.diy-form--label-left,
+    &.diy-form--label-right {
+        :deep(.diy-modern-field-card .el-form-item) {
+            align-items: center;
+        }
+        :deep(.diy-modern-field-card .el-form-item__label) {
+            min-height: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            align-self: center;
+            margin-bottom: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            line-height: 18px;
+        }
+        :deep(.diy-modern-field-card .el-form-item__content) {
+            min-height: 34px;
+            display: flex;
+            align-items: center;
+            line-height: 18px;
+        }
+        :deep(.diy-modern-field-card .el-date-editor.el-input) {
+            height: 34px;
+            min-height: 34px;
+            display: inline-flex;
+            align-items: center;
+            align-self: center;
+        }
+        :deep(.diy-modern-field-card .el-date-editor .el-input__wrapper) {
+            box-sizing: border-box;
+            height: 34px;
+            min-height: 34px;
+            align-items: center;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        :deep(.diy-modern-field-card .el-date-editor .el-input__inner) {
+            height: 32px;
+            padding-top: 0;
+            padding-bottom: 0;
+            line-height: 32px;
+        }
+        :deep(.diy-modern-field-card .el-date-editor .el-input__prefix),
+        :deep(.diy-modern-field-card .el-date-editor .el-input__prefix-inner) {
+            height: 100%;
+            align-items: center;
+            line-height: 1;
+        }
+        :deep(.diy-modern-field-card .el-date-editor .el-input__icon) {
+            width: 1em;
+            height: 1em;
+            flex: 0 0 auto;
+        }
+        :deep(.diy-modern-field-card--tall .el-form-item) { align-items: flex-start; }
+        :deep(.diy-modern-field-card--tall .el-form-item__label) {
+            align-items: flex-start;
+            padding-top: 2px;
+        }
+        :deep(.diy-modern-field-card--tall .el-form-item__content) { align-items: flex-start; }
+    }
+    :deep(.diy-modern-field-card .el-input__prefix),
+    :deep(.diy-modern-field-card .el-input__suffix),
+    :deep(.diy-modern-field-card .el-input__prefix-inner),
+    :deep(.diy-modern-field-card .el-input__suffix-inner),
+    :deep(.diy-modern-field-card .el-input__icon) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+    :deep(.diy-modern-switch-card .el-form-item__content) {
+        width: 100%;
+        margin-left: 0 !important;
+    }
+    :deep(.diy-modern-layout-field) { padding-top: 2px; padding-bottom: 2px; }
+
+    &.diy-form--design-mode:not(.diy-form--settingscenter):not(.diy-form--controlcenter) :deep(.diy-modern-field-card > .container-form-item) {
+        border: 1px dashed color-mix(in srgb, var(--diy-modern-accent) 25%, var(--diy-modern-line));
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--diy-modern-surface) 58%, transparent);
+    }
+}
+
+:global(html.dark) .diy-form--modern,
+:global(body.dark) .diy-form--modern,
+:global(body.Dark) .diy-form--modern {
+    --diy-modern-surface: var(--el-bg-color-overlay, #172033);
+    --diy-modern-soft: var(--el-fill-color-light, #111827);
+    --diy-modern-line: var(--el-border-color, #2d3a4f);
+    --diy-modern-text: var(--el-text-color-primary, #f3f6fb);
+    --diy-modern-muted: var(--el-text-color-secondary, #a8b3c5);
+}
+
+@media (max-width: 768px) {
+    .diy-form--modern {
+        padding: 0;
+        :deep(.field-form-tabs > .el-tabs__header) { margin-bottom: 8px; border-radius: 0; }
+        &:not(.diy-form--settingscenter):not(.diy-form--controlcenter) {
+            :deep(.field-form) { padding: 4px 2px; border-radius: 12px; }
+            :deep(.diy-modern-field-card) { padding-top: 2px; padding-bottom: 2px; }
+            :deep(.diy-modern-field-card > .container-form-item) { min-height: 44px; padding: 4px 5px; }
+        }
+    }
+}
+
+@media (max-width: 900px) {
+    .diy-form--settingscenter,
+    .diy-form--controlcenter {
+        .diy-form-presentation-layout.is-control-center { grid-template-columns: minmax(0, 1fr); }
+        .diy-form-presentation-layout.is-control-center { grid-template-areas: "section-nav" "section-main"; }
+        .diy-form-section-nav { position: static; flex-direction: row; overflow-x: auto; }
+        .diy-form-section-nav__head { display: none; }
+        .diy-form-section-nav__item { min-width: 155px; }
+        .diy-form-section-nav__item.active { box-shadow: none; }
+        .diy-form-section-nav__item.active::before { display: none; }
     }
 }
 
 @media (max-width: 620px) {
-    .diy-form--settingscenter {
+    .diy-form--settingscenter,
+    .diy-form--controlcenter {
+        .diy-form-presentation-main { padding: 8px; border-radius: 12px; }
+        .diy-form-section-head { margin-bottom: 7px; }
+        .diy-form-section-head p,.diy-form-section-head :deep(.el-tag) { display: none; }
+        :deep(.field-form) { padding: 1px; }
+        :deep(.diy-presentation-field-card) { padding-top: 4px; padding-bottom: 4px; }
+        :deep(.diy-presentation-field-card > .container-form-item) { min-height: 72px; padding: 9px; }
         :deep(.field-form-tabs > .el-tabs__header) { overflow-x: auto; }
-        :deep(.field-form) { padding: 10px 8px 1px; }
     }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .diy-form--settingscenter *,
+    .diy-form--controlcenter * { transition: none !important; }
 }
 
 /* 校验失败时在当前控件内展示错误，不占行高，也不遮挡下一行字段。 */

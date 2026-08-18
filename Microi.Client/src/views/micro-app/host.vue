@@ -1,5 +1,25 @@
 <template>
-    <div ref="host" class="micro-app-host" data-mci-ui-root>
+    <div
+        ref="host"
+        class="micro-app-host"
+        :class="{ 'micro-app-host--modal-active': globalOverlayVisible }"
+        data-mci-ui-root
+    >
+        <teleport to="body">
+            <div
+                v-if="globalOverlayVisible"
+                class="micro-app-host__global-overlay"
+                :class="{ 'micro-app-host__global-overlay--plain': !globalOverlayBlur }"
+                aria-hidden="true"
+            >
+                <span
+                    v-for="(segment, index) in globalOverlaySegments"
+                    :key="index"
+                    class="micro-app-host__global-overlay-segment"
+                    :style="segment"
+                />
+            </div>
+        </teleport>
         <micro-app-runtime-error
             v-if="error"
             :message="error"
@@ -30,11 +50,13 @@
             @afterhidden="handleAfterHidden"
             @error="handleMicroAppError"
         />
+        <DiyFormFull v-if="formDialogVisible" ref="refMicroAppFormDialog" />
     </div>
 </template>
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
+import { defineAsyncComponent } from "vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
 import { buildMicroAppEntryUrl, shouldUseMicroAppResolveFallback } from "@/utils/microAppEntryUrl.js";
 import { resolveMicroAppHostViewport } from "@/utils/microAppViewport.js";
@@ -156,7 +178,11 @@ function joinUrl(baseUrl, path) {
 
 export default {
     name: "MicroAppHost",
-    components: { MicroAppLoadingSkeleton, MicroAppRuntimeError },
+    components: {
+        MicroAppLoadingSkeleton,
+        MicroAppRuntimeError,
+        DiyFormFull: defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"))
+    },
     setup() {
         return { diyStore: useDiyStore(), tagsViewStore: useTagsViewStore() };
     },
@@ -185,9 +211,17 @@ export default {
             hostViewport: { width: 0, height: 0, safeAreaBottom: 0 },
             resizeObserver: null,
             visualViewportHandler: null,
+            themeObserver: null,
+            runtimeThemeMode: document.documentElement.classList.contains("dark") ? "dark" : "light",
+            runtimeThemeColor: "",
             isHostActive: true,
             runtimeInstanceName: "",
             cacheState: "cold",
+            globalOverlayVisible: false,
+            globalOverlayBlur: true,
+            globalOverlayHole: { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 },
+            globalOverlayScrollState: null,
+            formDialogVisible: false,
             ownedRoutePath: route.path || "",
             ownedRouteFullPath: route.fullPath || "",
             ownedRouteName: route.name || "",
@@ -222,11 +256,22 @@ export default {
                 permissionContext,
                 appKey: this.appKey,
                 version: this.appVersion,
-                themeColor: this.diyStore.themeColor || this.diyStore.SysConfig?.ThemeColor || "#409eff",
-                themeMode: document.documentElement.classList.contains("dark") ? "dark" : "light",
+                themeColor: this.runtimeThemeColor || this.diyStore.themeColor || this.diyStore.SysConfig?.ThemeColor || "#409eff",
+                themeMode: this.runtimeThemeMode,
                 systemStyle: this.diyStore.SystemStyle || "Classic",
                 systemTitle: this.diyStore.SysConfig?.SysTitle || this.diyStore.SysConfig?.SysShortTitle || DiyCommon.GetOsClient(),
                 systemShortTitle: this.diyStore.SysConfig?.SysShortTitle || "",
+                fileServer: this.diyStore.SysConfig?.FileServer || "",
+                isOfficialPlatform: this.diyStore.SysConfig?.IsOfficialPlatform === true
+                    || Number(this.diyStore.SysConfig?.IsOfficialPlatform || 0) === 1,
+                disableFormMaskBlur: this.diyStore.SysConfig?.DisableFormMaskBlur === true
+                    || Number(this.diyStore.SysConfig?.DisableFormMaskBlur || 0) === 1,
+                currentUser: {
+                    Id: this.diyStore.GetCurrentUser?.Id || "",
+                    Name: this.diyStore.GetCurrentUser?.Name || this.diyStore.GetCurrentUser?.Account || "",
+                    Account: this.diyStore.GetCurrentUser?.Account || "",
+                    Level: this.diyStore.GetCurrentUser?.Level ?? 0
+                },
                 hostCapabilities: createMicroAppHostCapabilities(),
                 hostGeneration: this.resolveGeneration,
                 hostMountAttempt: this.retryKey,
@@ -264,12 +309,31 @@ export default {
                 childReadyRendered: this.childReadyRendered,
                 reasonCode: this.reasonCode
             };
+        },
+        globalOverlaySegments() {
+            const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || 0;
+            const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || 0;
+            const hole = this.globalOverlayHole || {};
+            if (!(hole.width > 0) || !(hole.height > 0)) {
+                return [{ inset: "0" }];
+            }
+            const left = Math.max(0, Math.min(viewportWidth, hole.left));
+            const top = Math.max(0, Math.min(viewportHeight, hole.top));
+            const right = Math.max(left, Math.min(viewportWidth, hole.right));
+            const bottom = Math.max(top, Math.min(viewportHeight, hole.bottom));
+            return [
+                { left: "0", top: "0", width: "100%", height: `${top}px` },
+                { left: "0", top: `${bottom}px`, width: "100%", height: `${Math.max(0, viewportHeight - bottom)}px` },
+                { left: "0", top: `${top}px`, width: `${left}px`, height: `${Math.max(0, bottom - top)}px` },
+                { left: `${right}px`, top: `${top}px`, width: `${Math.max(0, viewportWidth - right)}px`, height: `${Math.max(0, bottom - top)}px` }
+            ];
         }
     },
     created() {
         this.resolveEntryUrl();
     },
     mounted() {
+        this.startThemeContract();
         this.startViewportContract();
         window.addEventListener("page-refresh", this.handleHostPageRefresh);
     },
@@ -277,8 +341,11 @@ export default {
         this.isHostActive = false;
         this.clearMountWatchdog();
         this.resolveGeneration += 1;
+        this.stopThemeContract();
         this.stopViewportContract();
         window.removeEventListener("page-refresh", this.handleHostPageRefresh);
+        this.syncGlobalOverlayScrollLock(false);
+        this.globalOverlayVisible = false;
         if (this.microAppName && !this.$refs.microApp) {
             forgetMicroAppRuntimeCache(this.microAppName, "host-cancelled-before-mount");
         }
@@ -351,6 +418,12 @@ export default {
                     case "showMessage":
                         result = this.showHostMessage(request.data);
                         break;
+                    case "setGlobalOverlay":
+                        result = this.setGlobalOverlay(request.data);
+                        break;
+                    case "openForm":
+                        result = await this.openMarketplaceForm(request.data);
+                        break;
                     default:
                         throw Object.assign(new Error("宿主不支持该微服务操作"), { code: "HOST_ACTION_UNSUPPORTED" });
                 }
@@ -377,6 +450,130 @@ export default {
                 data,
                 error
             });
+        },
+        setGlobalOverlay(input) {
+            const visible = input?.visible ?? input?.Visible ?? input?.open ?? input?.Open;
+            this.globalOverlayVisible = visible === true || visible === 1 || String(visible).toLowerCase() === "true";
+            const blur = input?.blur ?? input?.Blur;
+            const disabledBySystem = this.diyStore.SysConfig?.DisableFormMaskBlur === true
+                || Number(this.diyStore.SysConfig?.DisableFormMaskBlur || 0) === 1;
+            this.globalOverlayBlur = !disabledBySystem && blur !== false && String(blur).toLowerCase() !== "false";
+            this.syncGlobalOverlayScrollLock(this.globalOverlayVisible);
+            if (this.globalOverlayVisible) this.$nextTick(() => this.updateGlobalOverlayHole());
+            else this.globalOverlayHole = { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
+            return {
+                visible: this.globalOverlayVisible,
+                blur: this.globalOverlayBlur,
+                scrollLocked: Boolean(this.globalOverlayScrollState)
+            };
+        },
+        syncGlobalOverlayScrollLock(locked) {
+            const html = document.documentElement;
+            const body = document.body;
+            if (!html || !body) return;
+
+            if (locked) {
+                if (this.globalOverlayScrollState) return;
+                const microApp = this.$refs.microApp;
+                const scrollbarWidth = Math.max(0, (window.innerWidth || 0) - html.clientWidth);
+                const computedPaddingRight = Number.parseFloat(window.getComputedStyle(body).paddingRight) || 0;
+                // 某些同源微应用会在发送宿主遮罩消息前先锁住父级 html，
+                // 但不会同步锁住 body。它和本次全屏弹层属于同一个锁，不能
+                // 把这段临时 hidden 当作“打开前状态”保存，否则关闭后页面会
+                // 永久失去滚动。真正由其它平台弹层持有的锁会同时作用于 body。
+                const childPrelockedHtmlOnly = html.style.overflow === "hidden"
+                    && body.style.overflow !== "hidden";
+                this.globalOverlayScrollState = {
+                    htmlOverflow: childPrelockedHtmlOnly ? "" : html.style.overflow,
+                    htmlOverscrollBehavior: html.style.overscrollBehavior,
+                    bodyOverflow: body.style.overflow,
+                    bodyOverscrollBehavior: body.style.overscrollBehavior,
+                    bodyPaddingRight: body.style.paddingRight,
+                    scrollX: window.scrollX,
+                    scrollY: window.scrollY,
+                    microAppScrollLeft: microApp?.scrollLeft || 0,
+                    microAppScrollTop: microApp?.scrollTop || 0
+                };
+                html.style.overflow = "hidden";
+                html.style.overscrollBehavior = "none";
+                body.style.overflow = "hidden";
+                body.style.overscrollBehavior = "none";
+                if (scrollbarWidth > 0) body.style.paddingRight = `${computedPaddingRight + scrollbarWidth}px`;
+                return;
+            }
+
+            const state = this.globalOverlayScrollState;
+            if (!state) return;
+            html.style.overflow = state.htmlOverflow;
+            html.style.overscrollBehavior = state.htmlOverscrollBehavior;
+            body.style.overflow = state.bodyOverflow;
+            body.style.overscrollBehavior = state.bodyOverscrollBehavior;
+            body.style.paddingRight = state.bodyPaddingRight;
+            this.globalOverlayScrollState = null;
+            this.$nextTick(() => {
+                const microApp = this.$refs.microApp;
+                if (microApp) {
+                    microApp.scrollLeft = state.microAppScrollLeft;
+                    microApp.scrollTop = state.microAppScrollTop;
+                }
+                if (Math.abs(window.scrollX - state.scrollX) > 1 || Math.abs(window.scrollY - state.scrollY) > 1) {
+                    window.scrollTo(state.scrollX, state.scrollY);
+                }
+            });
+        },
+        updateGlobalOverlayHole() {
+            const host = this.$refs.host;
+            if (!host || !this.globalOverlayVisible) return;
+            // The runtime element can be a few pixels shorter than its host because
+            // the platform reserves scrollbar/layout space.  Cut the overlay hole
+            // from the real micro-app surface so no uncovered strip remains.
+            const surface = this.$refs.microApp || host;
+            const rect = surface.getBoundingClientRect();
+            const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || rect.right;
+            const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || rect.bottom;
+            const left = Math.max(0, Math.min(viewportWidth, rect.left));
+            const top = Math.max(0, Math.min(viewportHeight, rect.top));
+            const right = Math.max(left, Math.min(viewportWidth, rect.right));
+            const bottom = Math.max(top, Math.min(viewportHeight, rect.bottom));
+            this.globalOverlayHole = {
+                left,
+                top,
+                right,
+                bottom,
+                width: right - left,
+                height: bottom - top
+            };
+        },
+        async openMarketplaceForm(input) {
+            const tableName = String(input?.tableName || input?.TableName || "").trim();
+            if (tableName.toLowerCase() !== "sys_microistore") {
+                throw Object.assign(new Error("微服务只允许打开应用商城表单"), { code: "HOST_FORM_NOT_ALLOWED" });
+            }
+            const formModeRaw = String(input?.formMode || input?.FormMode || "View").trim().toLowerCase();
+            const formMode = formModeRaw === "add" ? "Add" : formModeRaw === "edit" ? "Edit" : "View";
+            const tableRowId = String(input?.id || input?.Id || input?.tableRowId || input?.TableRowId || "").trim();
+            if (formMode !== "Add" && !tableRowId) {
+                throw Object.assign(new Error("查看或编辑应用时缺少记录 Id"), { code: "HOST_FORM_ID_REQUIRED" });
+            }
+            this.formDialogVisible = true;
+            await this.$nextTick();
+            const dialog = this.$refs.refMicroAppFormDialog;
+            if (!dialog?.Init) throw new Error("应用表单组件尚未就绪，请稍后重试");
+            dialog.Init({
+                TableName: "sys_microistore",
+                TableRowId: tableRowId,
+                DialogType: "Dialog",
+                Width: "80%",
+                FormMode: formMode,
+                DefaultValues: input?.defaultValues || input?.DefaultValues || {},
+                SubmitEvent: () => {
+                    this.$refs.microApp?.setData?.({
+                        type: "micro-app:form-saved",
+                        data: { tableName: "sys_microistore", id: tableRowId, formMode }
+                    });
+                }
+            });
+            return { accepted: true, tableName: "sys_microistore", formMode, id: tableRowId };
         },
         getCurrentVisitedView() {
             return this.tagsViewStore?.visitedViews?.find((view) => view.fullPath === this.ownedRouteFullPath) || null;
@@ -735,6 +932,7 @@ export default {
             host.style.minHeight = `${this.hostViewport.height}px`;
             host.style.setProperty("--micro-app-available-width", `${this.hostViewport.width}px`);
             host.style.setProperty("--micro-app-available-height", `${this.hostViewport.height}px`);
+            if (this.globalOverlayVisible) this.updateGlobalOverlayHole();
             this.pushViewportContract();
         },
         pushViewportContract() {
@@ -751,6 +949,32 @@ export default {
             }
             const app = this.$refs.microApp;
             if (app && typeof app.setData === "function") app.setData(data);
+        },
+        resolveRuntimeThemeColor() {
+            return String(
+                this.diyStore.themeColor
+                || this.diyStore.SysConfig?.ThemeColor
+                || getComputedStyle(document.documentElement).getPropertyValue("--el-color-primary")
+                || "#409eff"
+            ).trim();
+        },
+        syncRuntimeTheme(push = true) {
+            const nextMode = document.documentElement.classList.contains("dark") ? "dark" : "light";
+            const nextColor = this.resolveRuntimeThemeColor();
+            const changed = nextMode !== this.runtimeThemeMode || nextColor !== this.runtimeThemeColor;
+            this.runtimeThemeMode = nextMode;
+            this.runtimeThemeColor = nextColor;
+            if (push && changed) this.$nextTick(() => this.forcePushRuntimeContext("host:theme"));
+        },
+        startThemeContract() {
+            this.syncRuntimeTheme(false);
+            if (typeof MutationObserver === "undefined") return;
+            this.themeObserver = new MutationObserver(() => this.syncRuntimeTheme(true));
+            this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] });
+        },
+        stopThemeContract() {
+            this.themeObserver?.disconnect?.();
+            this.themeObserver = null;
         },
         extractRouteConfig() {
             const route = {
@@ -939,6 +1163,35 @@ export default {
     background: var(--mci-bg-base, var(--el-bg-color));
 }
 
+.micro-app-host--modal-active {
+    position: relative;
+    z-index: 10001;
+    overflow: visible;
+    contain: none;
+    isolation: auto;
+}
+
+.micro-app-host__global-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+.micro-app-host__global-overlay-segment {
+    position: absolute;
+    display: block;
+    pointer-events: auto;
+    background: color-mix(in srgb, #0f172a 58%, transparent);
+    backdrop-filter: blur(8px) saturate(112%);
+    -webkit-backdrop-filter: blur(8px) saturate(112%);
+}
+
+.micro-app-host__global-overlay--plain .micro-app-host__global-overlay-segment {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
 .micro-app-host__app {
     display: block;
     flex: 1 1 auto;
@@ -953,5 +1206,12 @@ export default {
     box-sizing: border-box;
     contain: layout paint;
     isolation: isolate;
+}
+
+.micro-app-host--modal-active .micro-app-host__app {
+    overflow: visible !important;
+    overscroll-behavior: none;
+    contain: none;
+    isolation: auto;
 }
 </style>

@@ -145,4 +145,7 @@ var hex = result.Data.Hex;
 - 编辑器：`Microi.Client/.../v8-api-server-definitions.js` 与 `Microi.VSCode/src/editor/typingsManager.ts`。
 - 文档与知识：官网中文后端 V8 页面、`microi.skills/README.md`、`v8-utilities` 索引、`Microi.AI/Resource` 镜像和向量资源列表。
 - 验收：目标测试、后端构建、精确重启与健康检查、独立 TCP 回环；真实打印机出纸必须单独报告，不能用回环测试替代。
+<<<<<<< HEAD
 
+=======
+>>>>>>> 79781472ddad81fb5217c2f25438dec3c9894dba

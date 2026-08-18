@@ -251,7 +251,7 @@
     }
 }
 :deep(.el-input__wrapper){
-    width: 80px !important;
+    min-width: 80px;
   }
 // 复选框搜索区域
 .search-checkbox-wrapper {
@@ -287,8 +287,9 @@
         padding: 6px 12px;
         // font-weight: 500;
         // background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, #f5f7fa 100%);
-        border: 1px solid rgba(64, 158, 255, 0.2);
-        color: #666;//var(--color-primary, #409eff);
+        border: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #e4e7ed));
+        background: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f5f7fa));
+        color: var(--mci-text-secondary, var(--el-text-color-regular, #606266));
 
         .el-icon {
             margin-right: 4px;
@@ -355,7 +356,7 @@
 .search-fields-wrapper {
     display: flex;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 10px;
+    gap: 8px;
     margin-bottom: 0px;//这里要设置0，不然卡片模式会多出空隙
     // align-items: start;
     align-items: center;
@@ -403,8 +404,9 @@
         padding: 6px 12px;
         // font-weight: 500;
         // background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, #f5f7fa 100%);
-        border: 1px solid rgba(64, 158, 255, 0.2);
-        color: #666;//var(--color-primary, #409eff);
+        border: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #e4e7ed));
+        background: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f5f7fa));
+        color: var(--mci-text-secondary, var(--el-text-color-regular, #606266));
 
         .el-icon {
             margin-right: 4px;
@@ -421,11 +423,12 @@
 
     .el-input__wrapper {
         border-radius: 8px 0 0 8px;
-        box-shadow: 0 0 0 1px #dcdfe6 inset;
+        background: var(--mci-bg-card, var(--el-bg-color-overlay, #fff));
+        box-shadow: 0 0 0 1px var(--mci-border-color, var(--el-border-color, #dcdfe6)) inset;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
         &:hover {
-            box-shadow: 0 0 0 1px #c0c4cc inset;
+            box-shadow: 0 0 0 1px var(--el-border-color-hover, #c0c4cc) inset;
         }
 
         &.is-focus {
@@ -443,17 +446,16 @@
 .text-input {
     :deep(.el-input-group__prepend) {
         box-shadow: none;
-        background: linear-gradient(135deg, var(--color-primary, #409eff) 0%, var(--color-primary-light, #6ba3ff) 100%);
-        border: 1px solid rgba(64, 158, 255, 0.2);
-        color: var(--color-primary-text, #ffffff);
+        background: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f5f7fa));
+        color: var(--mci-text-secondary, var(--el-text-color-regular, #606266));
         border-radius: 8px 0 0 8px;
-        border: 1px solid #dcdfe6;
+        border: 1px solid var(--mci-border-color, var(--el-border-color, #dcdfe6));
         border-right: none;
         // font-weight: 500;
 
         .el-icon {
             margin-right: 4px;
-            color: var(--color-primary-text, #ffffff);
+            color: var(--mci-text-secondary, var(--el-text-color-secondary, #909399));
         }
     }
 
