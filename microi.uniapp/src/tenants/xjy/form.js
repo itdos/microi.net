@@ -7,6 +7,7 @@ import {
   normalizeOptions,
   parseJson
 } from '@/platform/native-form.js'
+import { formatRegion } from '@/platform/business-runtime.js'
 import { normalizeUploadItems } from '@/platform/display.js'
 import {
   V8,
@@ -26,6 +27,7 @@ import {
 } from './customer-follow-scope.mjs'
 import {
   calculateOrderProductCooperation,
+  calculateOrderProductPriceBinding,
   orderProductNumberValue
 } from './order-product-cooperation.mjs'
 import {
@@ -43,6 +45,11 @@ const ORDER_RENEWAL_TYPE = '老客户续签订单'
 const INSTALLATION_POSITION_TABLE = 'diy_shebeiwz'
 const INSTALLATION_POSITION_CODE_FIELD = 'ShangpinBH'
 const INSTALLATION_POSITION_CODE_ENGINE = 'create_unique_value'
+const INSTALLATION_POSITION_LOCATION_FIELDS = {
+  address: 'AnzhuangWZ',
+  latitude: 'AnzhuangWZ_Lat',
+  longitude: 'AnzhuangWZ_Lng'
+}
 const CUSTOMER_ADDRESS_TABLE = 'diy_kehudz'
 const CHECKIN_TABLE = 'diy_location'
 // zhy：跟进记录及联系人表，用于新增跟进时按客户加载联系人。
@@ -176,9 +183,17 @@ function isOrderProductForm(context) {
   return String(context.tableName || '').toLowerCase() === ORDER_PRODUCT_TABLE
 }
 
+function isInstallationPositionForm(context) {
+  return String(context.tableName || '').toLowerCase() === INSTALLATION_POSITION_TABLE
+}
+
 function isInstallationPositionAdd(context) {
-  return String(context.tableName || '').toLowerCase() === INSTALLATION_POSITION_TABLE &&
+  return isInstallationPositionForm(context) &&
     context.mode === 'Add' && !context.rowId
+}
+
+function isInstallationPositionEditable(context) {
+  return isInstallationPositionForm(context) && ['Add', 'Edit'].includes(context.mode)
 }
 
 function installationPositionCodeField(context) {
@@ -1070,6 +1085,131 @@ async function locateCustomer(context, chooseFromMap) {
   }
 }
 
+function validCoordinatePair(latitude, longitude) {
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+  return Number.isFinite(lat) && lat >= -90 && lat <= 90 &&
+    Number.isFinite(lng) && lng >= -180 && lng <= 180 &&
+    !(lat === 0 && lng === 0)
+}
+
+function applyInstallationPositionLocation(context, location, options = {}) {
+  const latitudeName = fieldName(context, INSTALLATION_POSITION_LOCATION_FIELDS.latitude)
+  const longitudeName = fieldName(context, INSTALLATION_POSITION_LOCATION_FIELDS.longitude)
+  const addressName = fieldName(context, INSTALLATION_POSITION_LOCATION_FIELDS.address, '安装位置')
+  const latitude = Number(location && location.latitude)
+  const longitude = Number(location && location.longitude)
+  const updates = {}
+  const submitValues = {}
+
+  if (validCoordinatePair(latitude, longitude)) {
+    updates[latitudeName] = latitude
+    updates[longitudeName] = longitude
+    submitValues[latitudeName] = latitude
+    submitValues[longitudeName] = longitude
+  }
+  if (location && location.address &&
+    (!options.addressOnlyWhenEmpty || isEmptyFormValue(context.form[addressName]))) {
+    // 安装位置保留完整地图地址；用户仍可在定位后补充楼层、房间或点位说明。
+    updates[addressName] = String(location.address).trim()
+  }
+
+  if (Object.keys(updates).length) context.patchForm(updates)
+  context.state.installationLocationValues = {
+    ...(context.state.installationLocationValues || {}),
+    ...submitValues
+  }
+}
+
+async function installationPositionCustomer(context) {
+  const orderProductId = String(
+    context.form.DingdanSPID ||
+    (context.defaultValues || {}).DingdanSPID ||
+    ''
+  ).trim()
+  if (!orderProductId) return null
+
+  const productResult = await V8.FormEngine.GetFormData(ORDER_PRODUCT_TABLE, {
+    Id: orderProductId,
+    _SelectFields: ['Id', 'DingdanID', 'KehuID']
+  })
+  if (!productResult || Number(productResult.Code) !== 1 || !productResult.Data) return null
+
+  let customerId = String(productResult.Data.KehuID || '').trim()
+  if (!customerId && productResult.Data.DingdanID) {
+    const orderResult = await V8.FormEngine.GetFormData(ORDER_TABLE, {
+      Id: productResult.Data.DingdanID,
+      _SelectFields: ['Id', 'KehuID']
+    })
+    customerId = String(orderResult && orderResult.Data && orderResult.Data.KehuID || '').trim()
+  }
+  if (!customerId) return null
+
+  const customerResult = await V8.FormEngine.GetFormData(CUSTOMER_TABLE, {
+    Id: customerId,
+    _SelectFields: ['Id', 'Chengshi', 'XiangxiDZ', 'KehuDT_Lat', 'KehuDT_Lng']
+  })
+  return customerResult && Number(customerResult.Code) === 1 ? customerResult.Data : null
+}
+
+async function initializeInstallationPositionLocation(context) {
+  if (!isInstallationPositionEditable(context) || context.state.installationLocationInitialized) return
+  context.state.installationLocationInitialized = true
+
+  const latitudeName = fieldName(context, INSTALLATION_POSITION_LOCATION_FIELDS.latitude)
+  const longitudeName = fieldName(context, INSTALLATION_POSITION_LOCATION_FIELDS.longitude)
+  if (validCoordinatePair(context.form[latitudeName], context.form[longitudeName])) {
+    applyInstallationPositionLocation(context, {
+      latitude: context.form[latitudeName],
+      longitude: context.form[longitudeName]
+    })
+    return
+  }
+
+  try {
+    const customer = await installationPositionCustomer(context)
+    if (!customer || !validCoordinatePair(customer.KehuDT_Lat, customer.KehuDT_Lng)) return
+    const region = formatRegion(customer.Chengshi)
+    const detail = String(customer.XiangxiDZ || '').trim()
+    const address = detail && region && !detail.startsWith(region) ? `${region}${detail}` : (detail || region)
+    applyInstallationPositionLocation(context, {
+      latitude: customer.KehuDT_Lat,
+      longitude: customer.KehuDT_Lng,
+      address
+    }, { addressOnlyWhenEmpty: true })
+  } catch (error) {
+    // 客户默认坐标是便捷兜底；读取失败不阻断安装点位表单，用户仍可手动定位。
+  }
+}
+
+async function locateInstallationPosition(context) {
+  if (!isInstallationPositionEditable(context) || context.state.locating) return
+  context.state.locating = true
+  try {
+    const source = await requestChosenLocation()
+    let geocode = null
+    try {
+      geocode = await reverseGeocode(source.longitude, source.latitude, {
+        apiEngineKey: AMAP_REVERSE_GEOCODE_ENGINE
+      })
+    } catch (error) {
+      // 微信地图选点自带有效地址时，逆地理编码失败不阻断用户保存。
+    }
+    const location = normalizeChosenLocation(source, geocode)
+    if (!validCoordinatePair(location.latitude, location.longitude)) throw new Error('定位坐标无效')
+    if (!location.address) throw new Error('未获取到详细地址')
+    applyInstallationPositionLocation(context, location)
+    uni.showToast({ title: '安装位置已更新', icon: 'success' })
+  } catch (error) {
+    const message = String(error && error.errMsg || error && error.message || '')
+    if (!/cancel/i.test(message)) {
+      uni.showToast({ title: error.message || '位置选择失败', icon: 'none' })
+    }
+  } finally {
+    context.state.locating = false
+  }
+}
+
 function applyCheckinTime(context) {
   const timeName = fieldName(context, CHECKIN_FIELDS.time, '打卡时间')
   const value = context.state.currentTime || currentTimestamp()
@@ -1232,12 +1372,19 @@ export function createState() {
     installationCodeInitialized: false,
     installationCodeInitializing: false,
     installationCodeField: '',
-    installationCodeValue: ''
+    installationCodeValue: '',
+    installationLocationInitialized: false,
+    installationLocationValues: {}
   }
 }
 
 export async function initialize(context) {
   await initializeInstallationPositionCode(context)
+  await initializeInstallationPositionLocation(context)
+  // 详情、编辑、新增统一按当前单价和数量展示派生价格，修复历史记录中的不一致值。
+  if (isOrderProductForm(context)) {
+    context.patchForm(calculateOrderProductPriceBinding(context.form))
+  }
   // zhy：所有入口进入订单新增页时统一初始化，避免各页面分别维护相同逻辑。
   if (isOrderAdd(context) && !context.state.orderInitialized) {
     context.state.orderInitialized = true
@@ -1365,17 +1512,23 @@ export async function handleRelatedCount(context, payload = {}) {
   if (isOrderProductForm(context) && isOrderProductInstallationChild(payload.field)) {
     const field = fieldName(context, 'Shuliang', '设备数量')
     if (Number(context.form[field] || 0) === value) return
+    const quantityValues = { [field]: value }
+    const priceValues = calculateOrderProductPriceBinding({ ...context.form, ...quantityValues })
     if (context.rowId) {
       const result = await V8.FormEngine.UptFormData(ORDER_PRODUCT_TABLE, {
         Id: context.rowId,
-        [field]: value,
+        ...quantityValues,
+        ...priceValues,
         _InvokeType: 'Client'
       })
       if (!result || Number(result.Code) !== 1) {
         throw new Error((result && result.Msg) || '设备数量同步失败')
       }
     }
-    context.patchForm({ [field]: value })
+    context.patchForm({
+      ...quantityValues,
+      ...priceValues
+    })
     return
   }
 
@@ -1574,6 +1727,16 @@ export function getFieldActions(context, field) {
       disabled: Boolean(context.state.locating)
     }]
   }
+  if (isInstallationPositionEditable(context) &&
+    (name === INSTALLATION_POSITION_LOCATION_FIELDS.address.toLowerCase() || label === '安装位置')) {
+    return [{
+      key: 'xjy-installation-position-location',
+      label: context.state.locating ? '定位中…' : '定位',
+      icon: '⌖',
+      position: 'label',
+      disabled: Boolean(context.state.locating)
+    }]
+  }
   return []
 }
 
@@ -1589,6 +1752,10 @@ export async function runFieldAction(context, field, action) {
   }
   if (action && action.key === 'xjy-customer-location') {
     await locateCustomer(context, true)
+    return { handled: true }
+  }
+  if (action && action.key === 'xjy-installation-position-location') {
+    await locateInstallationPosition(context)
     return { handled: true }
   }
   return { handled: false }
@@ -1785,6 +1952,17 @@ export async function handleFieldChange(context, payload) {
     String(payload.field && payload.field.Name || '').toLowerCase() === 'hezuofs') {
     return updateOrderProductCooperation(context, payload)
   }
+  if (isOrderProductForm(context) && payload) {
+    const changedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
+    if (['shuliang', 'shebeisjdj', 'lvxinsjdj'].includes(changedFieldName)) {
+      const changedValues = { [payload.field.Name]: payload.value }
+      context.patchForm({
+        ...changedValues,
+        ...calculateOrderProductPriceBinding({ ...context.form, ...changedValues })
+      })
+      return { handled: true }
+    }
+  }
   // 非续签订单必须清空历史续签编号，与平台订单类型字段事件保持一致。
   if (isOrderForm(context) && payload &&
     String(payload.field && payload.field.Name || '').toLowerCase() === ORDER_FIELDS.orderType.toLowerCase()) {
@@ -1860,13 +2038,22 @@ export async function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
-  if (isInstallationPositionAdd(context)) {
-    const codeField = context.state.installationCodeField ||
-      installationPositionCodeField(context)
-    const codeValue = context.state.installationCodeValue || context.form[codeField]
-    if (isEmptyFormValue(codeValue)) throw new Error('设备编号尚未生成，请重新进入页面后重试')
-    // 只读字段不进入通用 editable 字段集合，必须作为受控额外值显式提交。
-    return { [codeField]: codeValue }
+  if (isOrderProductForm(context)) {
+    // 派生字段可能为只读或隐藏，显式随主表单保存，保证落库值与页面联动结果一致。
+    return calculateOrderProductPriceBinding(context.form)
+  }
+  if (isInstallationPositionForm(context)) {
+    if (context.state.locating) throw new Error('正在获取安装位置，请稍候')
+    const values = { ...(context.state.installationLocationValues || {}) }
+    if (isInstallationPositionAdd(context)) {
+      const codeField = context.state.installationCodeField ||
+        installationPositionCodeField(context)
+      const codeValue = context.state.installationCodeValue || context.form[codeField]
+      if (isEmptyFormValue(codeValue)) throw new Error('设备编号尚未生成，请重新进入页面后重试')
+      // 只读编号和隐藏坐标不进入通用 editable 字段集合，必须显式提交。
+      values[codeField] = codeValue
+    }
+    return values
   }
   // zhy：提交前补入隐藏关联字段，并为新增订单兜底默认值；编辑订单不覆盖历史值。
   if (isOrderForm(context)) {
