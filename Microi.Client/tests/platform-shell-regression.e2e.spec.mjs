@@ -108,6 +108,22 @@ async function expectUnifiedDialog(dialog, page) {
     expect(typeof overlayStyle.backdropFilter).toBe("string");
 }
 
+test("动态菜单首次直达与刷新都重新匹配真实路由而不是404", async ({ page }) => {
+    test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    await openRoute(page, "#/api-engine");
+
+    const apiHeader = page.locator(".module-presentation-header")
+        .filter({ hasText: /接口引擎|API Engine/i })
+        .first();
+    await expect(apiHeader).toBeVisible({ timeout: 45_000 });
+    await expect(page.locator(".error-page, .page-404, [data-testid='page-404']")).toHaveCount(0);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(apiHeader).toBeVisible({ timeout: 45_000 });
+    await expect(page).toHaveURL(/#\/api-engine(?:\?|$)/);
+    await expect(page.locator(".error-page, .page-404, [data-testid='page-404']")).toHaveCount(0);
+});
+
 test("首次进入系统设置：路由内容不整页闪烁且负向毛玻璃配置可见", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await openRoute(page, "#/api-engine");
@@ -185,7 +201,9 @@ test("统一 Tabs：工作区、表格和表单右侧关系面板使用同一视
     await expect(moduleTabs).toBeVisible({ timeout: 45_000 });
     for (const tabs of [workspaceTabs, moduleTabs]) {
         const active = tabs.locator(".el-tabs__item.is-active").first();
+        const activeBar = tabs.locator(".el-tabs__active-bar").first();
         await expect(active).toBeVisible();
+        await expect(activeBar).toBeVisible();
         const style = await active.evaluate((element) => ({
             activeBackground: getComputedStyle(element).backgroundColor,
             activeShadow: getComputedStyle(element).boxShadow,
@@ -195,10 +213,27 @@ test("统一 Tabs：工作区、表格和表单右侧关系面板使用同一视
         }));
         expect(style.navBorder).toBe(0);
         expect(["transparent", "rgba(0, 0, 0, 0)"]).toContain(style.navBackground);
-        expect(["transparent", "rgba(0, 0, 0, 0)"]).not.toContain(style.activeBackground);
-        expect(style.activeShadow).not.toBe("none");
+        expect(["transparent", "rgba(0, 0, 0, 0)"]).toContain(style.activeBackground);
+        expect(style.activeShadow).toBe("none");
         expect(["none", "normal", ""]).toContain(style.indicatorContent.replaceAll('"', ""));
+        const barStyle = await activeBar.evaluate((element) => ({
+            display: getComputedStyle(element).display,
+            height: Number.parseFloat(getComputedStyle(element).height),
+            transitionDuration: getComputedStyle(element).transitionDuration,
+            background: getComputedStyle(element).backgroundColor
+        }));
+        expect(barStyle.display).not.toBe("none");
+        expect(barStyle.height).toBeGreaterThanOrEqual(2);
+        expect(barStyle.transitionDuration).not.toBe("0s");
+        expect(["transparent", "rgba(0, 0, 0, 0)"]).not.toContain(barStyle.background);
     }
+    const moduleBar = moduleTabs.locator(".el-tabs__active-bar").first();
+    const moduleItems = moduleTabs.locator(".el-tabs__item");
+    const beforeTransform = await moduleBar.evaluate((element) => getComputedStyle(element).transform);
+    await moduleItems.nth(1).click();
+    await expect(moduleItems.nth(1)).toHaveClass(/is-active/);
+    await expect.poll(() => moduleBar.evaluate((element) => getComputedStyle(element).transform))
+        .not.toBe(beforeTransform);
     const moduleHeader = page.locator(".module-presentation-header.has-metrics").first();
     await expect(moduleHeader).toBeVisible();
     const moduleCards = await moduleHeader.evaluate((header) => {
@@ -229,6 +264,7 @@ test("统一 Tabs：工作区、表格和表单右侧关系面板使用同一视
     await expect(rightTabs).toBeVisible({ timeout: 30_000 });
     await expect(rightTabs.locator(".el-tabs__item")).toHaveCount(3);
     await expect(rightTabs.locator(".mci-tab-badge")).toHaveCount(3);
+    await expect(rightTabs.locator(".el-tabs__active-bar").first()).toBeVisible();
     const badges = await rightTabs.locator(".mci-tab-badge").allTextContents();
     expect(badges.every((value) => /^\d+$/.test(value.trim()))).toBe(true);
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "06-form-related-tabs-with-counts.png"), fullPage: false });

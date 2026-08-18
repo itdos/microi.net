@@ -4923,4 +4923,171 @@ body.dark .ai-engine-page,
         margin-left: 0;
     }
 }
+
+/* ============================================================
+ * Microi 清爽界面收口
+ * 取消大面积光晕、网格、扫光和层层重阴影；用一层浅表面、一层细边框
+ * 和极轻阴影表达层级。主题色只承担焦点和动作，不作为大块背景。
+ * ============================================================ */
+.ai-engine-page {
+    --ai-shadow: 0 3px 12px rgba(15, 23, 42, .035);
+    --ai-shadow-hover: 0 6px 18px rgba(15, 23, 42, .055);
+    border: 1px solid var(--ai-border);
+    background: var(--ai-bg);
+    box-shadow: none;
+}
+
+.ai-engine-sidebar {
+    overflow: visible;
+    border-right: 1px solid var(--ai-border);
+    background: var(--ai-panel);
+}
+
+.ai-engine-sidebar::before,
+.ai-engine-main:not(.is-apps)::before,
+.ai-engine-main:not(.is-apps)::after,
+.composer-box::before,
+.composer-box::after,
+.platform-stat::before,
+.platform-stat::after,
+.quick-prompt::before,
+.conversation-item::before {
+    display: none !important;
+    animation: none !important;
+}
+
+.ai-engine-main,
+.ai-engine-main:not(.is-apps),
+.inline-project-workbench {
+    isolation: auto;
+    background: var(--ai-bg);
+}
+
+.ai-engine-header {
+    border-bottom: 1px solid var(--ai-border);
+    background: var(--ai-panel);
+    box-shadow: none;
+}
+
+.workspace-tab,
+.conversation-item,
+.app-sidebar-intro,
+.header-workspace-switch,
+.composer-box,
+.mcp-action-item,
+.platform-stat,
+.quick-prompt {
+    border: 1px solid var(--ai-border);
+    background: var(--ai-card);
+    box-shadow: var(--ai-shadow);
+}
+
+.conversation-list {
+    padding: 5px 10px 14px;
+}
+
+.conversation-item {
+    overflow: visible;
+    border-color: transparent;
+    border-radius: 9px;
+    background: transparent;
+    box-shadow: none;
+    transition: border-color .16s ease, background-color .16s ease, color .16s ease;
+}
+
+.conversation-item:hover,
+.conversation-item.active {
+    transform: none;
+    border-color: color-mix(in srgb, var(--ai-primary) 16%, var(--ai-border));
+    background: color-mix(in srgb, var(--ai-primary) 7%, var(--ai-panel));
+    box-shadow: none;
+}
+
+.empty-hero h1 {
+    color: var(--ai-text);
+    text-shadow: none;
+}
+
+.hero-kicker {
+    border: 1px solid color-mix(in srgb, var(--ai-primary) 20%, var(--ai-border));
+    background: color-mix(in srgb, var(--ai-primary) 7%, var(--ai-card));
+    box-shadow: none;
+}
+
+.platform-stats {
+    gap: 10px;
+}
+
+.platform-stat {
+    min-height: 76px;
+    overflow: visible;
+    border-color: var(--ai-border);
+    border-radius: 12px;
+    background: var(--ai-card);
+    box-shadow: var(--ai-shadow);
+    transform: none;
+    transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+.platform-stat strong {
+    font-size: 24px;
+}
+
+.platform-stat:hover {
+    transform: none;
+    border-color: color-mix(in srgb, var(--ai-primary) 28%, var(--ai-border));
+    box-shadow: var(--ai-shadow-hover);
+}
+
+.quick-prompts {
+    gap: 10px;
+}
+
+.quick-prompt {
+    min-height: 92px;
+    overflow: visible;
+    border-color: var(--ai-border);
+    border-radius: 12px;
+    background: var(--ai-card);
+    box-shadow: var(--ai-shadow);
+    transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+.quick-prompt:hover {
+    transform: none;
+    border-color: color-mix(in srgb, var(--ai-primary) 28%, var(--ai-border));
+    background: color-mix(in srgb, var(--ai-primary) 4%, var(--ai-card));
+    box-shadow: var(--ai-shadow-hover);
+}
+
+.quick-prompt .el-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ai-primary) 8%, var(--ai-card));
+}
+
+.composer {
+    background: var(--ai-bg);
+}
+
+.composer-box {
+    border: 1px solid var(--ai-border);
+    background: var(--ai-panel);
+    box-shadow: 0 4px 16px rgba(15, 23, 42, .055);
+}
+
+.composer-box:focus-within {
+    border-color: color-mix(in srgb, var(--ai-primary) 42%, var(--ai-border));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ai-primary) 8%, transparent),
+        0 4px 16px rgba(15, 23, 42, .055);
+}
+
+.new-chat-btn,
+.send-btn,
+.store-link-btn {
+    border-color: var(--ai-primary);
+    background: var(--ai-primary);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--ai-primary) 16%, transparent);
+}
 </style>

@@ -1,21 +1,24 @@
 <template>
     <div class="diy-qrcode">
-        <el-button type="success" :loading="loading" :disabled="!imageDataUrl" @click="downloadQrCode">
-            下载二维码
+        <el-button v-if="qrConfig.ShowDownload !== false" type="success" :loading="loading" :disabled="!imageDataUrl" @click="downloadQrCode">
+            {{ qrConfig.DownloadText || '下载二维码' }}
         </el-button>
         <img
             v-if="imageDataUrl"
             class="diy-qrcode__card"
             :src="imageDataUrl"
             :alt="payload.titleText || '二维码'"
+            :style="{ width: `${Number(qrConfig.DisplayWidth || 400)}px` }"
         />
         <el-alert v-else-if="errorMessage" class="diy-qrcode__error" type="warning" :closable="false" :title="errorMessage" />
     </div>
+    <DiySimpleFieldConfigDialog ref="simpleConfig" component="Qrcode" component-label="二维码" :field="field" :DiyTableModel="DiyTableModel" />
 </template>
 
 <script setup>
 import { computed, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
+import DiySimpleFieldConfigDialog from "./shared/DiySimpleFieldConfigDialog.vue";
 import {
     createLegacyQrCodeCardDataUrl,
     downloadLegacyQrCode,
@@ -35,16 +38,19 @@ const props = defineProps({
     FormDiyTableModel: {
         type: Object,
         default: () => ({})
-    }
+    },
+    DiyTableModel: { type: Object, default: () => ({}) }
 });
 
 const emit = defineEmits(["update:modelValue", "send-data"]);
 const imageDataUrl = ref("");
 const errorMessage = ref("");
 const loading = ref(false);
+const simpleConfig = ref(null);
 let renderVersion = 0;
 
 const payload = computed(() => normalizeLegacyQrCodePayload(props.field?.DataAppend || {}));
+const qrConfig = computed(() => props.field?.Config?.Qrcode || {});
 
 watch(
     () => props.field?.DataAppend,
@@ -80,6 +86,12 @@ async function downloadQrCode() {
         ElMessage.error(error?.message || "二维码下载失败");
     }
 }
+
+function openConfig() {
+    simpleConfig.value?.open();
+}
+
+defineExpose({ openConfig });
 </script>
 
 <style scoped>

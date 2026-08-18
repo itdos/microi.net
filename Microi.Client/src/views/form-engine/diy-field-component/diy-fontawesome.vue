@@ -1,15 +1,18 @@
 <template>
     <section v-if="field.Component == 'FontAwesome' || field.Component == 'Fontawesome'">
-        <div @click="IconClick()" style="height: 25px; width: 25px; background: #f5f5f5; cursor: pointer; text-align: center; border-radius: 5px; display: flex; align-items: center; justify-content: center;">
-            <DynamicIcon :name="DiyCommon.IsNull(ModelValue) ? 'Operation' : ModelValue" />
+        <div class="diy-fontawesome-preview" :style="FontAwesomePreviewStyle" @click="IconClick()">
+            <fa-icon :icon="DiyCommon.IsNull(ModelValue) ? (FontAwesomeConfig.DefaultIcon || 'Operation') : ModelValue" />
         </div>
+        <el-button v-if="FontAwesomeConfig.AllowClear !== false && ModelValue && !GetFieldReadOnly(field)" link type="danger" @click.stop="handleIconChange('')">清空</el-button>
         <Fontawesome :ref="'control_' + field.Name" :model="ModelValue" @update:model="handleIconChange"> </Fontawesome>
     </section>
+    <DiySimpleFieldConfigDialog ref="simpleConfig" component="FontAwesome" component-label="图标库" :field="field" :DiyTableModel="DiyTableModel" />
 </template>
 
 <script>
+import DiySimpleFieldConfigDialog from "./shared/DiySimpleFieldConfigDialog.vue";
 export default {
-    name: "diy-input",
+    name: "diy-fontawesome",
     inheritAttrs: false,
     emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     data() {
@@ -30,6 +33,10 @@ export default {
             default() {
                 return {};
             }
+        },
+        DiyTableModel: {
+            type: Object,
+            default: () => ({})
         },
         FormDiyTableModel: {
             type: Object,
@@ -91,10 +98,17 @@ export default {
         }
     },
 
-    components: {
-    },
+    components: { DiySimpleFieldConfigDialog },
 
-    computed: {},
+    computed: {
+        FontAwesomeConfig() {
+            return this.field?.Config?.FontAwesome || {};
+        },
+        FontAwesomePreviewStyle() {
+            const size = Number(this.FontAwesomeConfig.PreviewSize || 32);
+            return { width: `${size}px`, height: `${size}px` };
+        }
+    },
 
     //注意：表单打开一次后，再次打开，这个不会第二次执行，导致值不会变
     mounted() {
@@ -103,6 +117,9 @@ export default {
     },
 
     methods: {
+        openConfig() {
+            this.$refs.simpleConfig.open();
+        },
         //必须
         Init() {
             var self = this;
@@ -182,4 +199,16 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+section { display: flex; align-items: center; gap: 6px; }
+.diy-fontawesome-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 9px;
+    background: var(--el-fill-color-light);
+    color: var(--el-color-primary);
+    cursor: pointer;
+}
+</style>

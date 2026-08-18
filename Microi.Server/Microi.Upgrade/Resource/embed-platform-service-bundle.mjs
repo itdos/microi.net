@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../../../');
 const packagePath = resolve(scriptDirectory, 'app.microi.saas-engine.json');
+const storePackagePath = resolve(scriptDirectory, 'app.microi.store.json');
 const applicationRoot = resolve(repositoryRoot, 'AI-Project/microi/AI应用/microi-platform-service');
 const distRoot = resolve(applicationRoot, 'dist');
 
@@ -34,6 +35,71 @@ for (const [label, value] of [
 
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const normalizePath = value => value.replaceAll('\\', '/');
+const deepClone = value => JSON.parse(JSON.stringify(value));
+
+function replaceByIdentity(target, source, identity) {
+  const sourceItems = source.filter(identity);
+  const sourceKeys = new Set(sourceItems.map(item => identity(item)));
+  const preserved = target.filter(item => !sourceKeys.has(identity(item)));
+  return [...preserved, ...deepClone(sourceItems)];
+}
+
+function synchronizeStoreRuntimeSchema(storePackage, saasPackage) {
+  const requiredTableNames = new Set(['sys_microiservice', 'sys_microiservice_page']);
+  const sourceTables = (saasPackage.DiyTables || []).filter(table => requiredTableNames.has(table?.Name));
+  if (sourceTables.length !== requiredTableNames.size) {
+    throw new Error('SaaS 引擎包缺少 sys_microiservice / sys_microiservice_page 元数据');
+  }
+  const sourceTableIds = new Set(sourceTables.map(table => String(table.Id || '')));
+  const sourceFields = (saasPackage.DiyFields || []).filter(field => (
+    requiredTableNames.has(field?.TableName) || sourceTableIds.has(String(field?.TableId || ''))
+  ));
+  const sourceDdls = (saasPackage.DDLStatements || []).filter(statement => {
+    const text = JSON.stringify(statement || '').toLowerCase();
+    return text.includes('sys_microiservice');
+  });
+  if (!sourceFields.length || sourceDdls.length < requiredTableNames.size) {
+    throw new Error('SaaS 引擎包的微服务表字段或 DDL 不完整');
+  }
+
+  storePackage.DiyTables = replaceByIdentity(
+    storePackage.DiyTables || [],
+    sourceTables,
+    item => String(item?.Name || '').toLowerCase(),
+  );
+  storePackage.DiyFields = replaceByIdentity(
+    storePackage.DiyFields || [],
+    sourceFields,
+    item => String(item?.Id || `${item?.TableName || ''}:${item?.Name || ''}`).toLowerCase(),
+  );
+  storePackage.DDLStatements = replaceByIdentity(
+    storePackage.DDLStatements || [],
+    sourceDdls,
+    item => String(item?.Id || item?.TableName || item?.Name || JSON.stringify(item)).toLowerCase(),
+  );
+}
+
+function refreshPackageCounts(packageModel) {
+  const info = packageModel.PackageInfo || (packageModel.PackageInfo = {});
+  const dataSets = Array.isArray(packageModel.DataSets) ? packageModel.DataSets : [];
+  info.MenuCount = (packageModel.SysMenus || []).length;
+  info.TableCount = (packageModel.DiyTables || []).length;
+  info.FieldCount = (packageModel.DiyFields || []).length;
+  info.FlowCount = (packageModel.WorkFlows || packageModel.Workflows || []).length;
+  info.NodeCount = (packageModel.WFNodes || packageModel.WorkFlowNodes || []).length;
+  info.LineCount = (packageModel.WFLines || packageModel.WorkFlowLines || []).length;
+  info.DDLCount = (packageModel.DDLStatements || []).length;
+  // 旧数据包没有单独的 PhysicalColumns 数组；此计数由发布器按目标数据库口径
+  // 生成，不能在仅同步微服务元数据时误清零。
+  if (Array.isArray(packageModel.PhysicalColumns)) {
+    info.PhysicalColumnCount = packageModel.PhysicalColumns.length;
+  }
+  info.ApiEngineCount = (packageModel.SysApiEngines || []).length;
+  info.DataSetCount = dataSets.length;
+  info.DataRowCount = dataSets.reduce((sum, item) => sum + ((item?.Rows || item?.Data || []).length || 0), 0);
+  info.AiApplicationCount = (packageModel.ApplicationBundles || []).length;
+  info.IncludeSource = false;
+}
 
 async function collectFiles(root, excludedDirectories = new Set()) {
   const output = [];
@@ -66,6 +132,7 @@ function contentType(path) {
 }
 
 const packageModel = JSON.parse(await readFile(packagePath, 'utf8'));
+const storePackageModel = JSON.parse(await readFile(storePackagePath, 'utf8'));
 let databaseBackupDialogCount = 0;
 for (const menu of packageModel.SysMenus || []) {
   if (!menu.PageBtns) continue;
@@ -203,6 +270,18 @@ bundle.Routes = routeDefinitions.map(routeDefinition => {
     SourceDirName: 'microi-platform-service',
   };
 });
+const marketplaceRoute = bundle.Routes.find(route => route.RoutePath === '/marketplace');
+if (!marketplaceRoute) throw new Error('平台微服务缺少 /marketplace 路由');
+let marketplaceRouteMeta = {};
+try { marketplaceRouteMeta = JSON.parse(marketplaceRoute.RouteMetaJson || '{}') || {}; }
+catch { marketplaceRouteMeta = {}; }
+const legacyMarketplaceUrls = Array.isArray(marketplaceRouteMeta.LegacyMenuUrls)
+  ? marketplaceRouteMeta.LegacyMenuUrls
+  : [];
+if (!legacyMarketplaceUrls.includes('/microi-store')) legacyMarketplaceUrls.push('/microi-store');
+marketplaceRouteMeta.LegacyMenuUrls = legacyMarketplaceUrls;
+marketplaceRoute.LegacyMenuUrls = legacyMarketplaceUrls;
+marketplaceRoute.RouteMetaJson = JSON.stringify(marketplaceRouteMeta);
 for (const route of bundle.Routes) {
   route.UpdateTime = localTime;
   route.BuildVersion = version;
@@ -210,9 +289,32 @@ for (const route of bundle.Routes) {
 bundle.BuildAssets = buildAssets;
 bundle.SourceFiles = [];
 
+// 应用商城菜单本身由平台内置微服务承载。商城包必须能被一个尚未安装 SaaS
+// 引擎包的普通租户独立安装；不能只交付菜单，再把运行时隐式留在另一个应用包。
+const marketplaceMenus = (storePackageModel.SysMenus || []).filter(menu => menu?.Url === '/microi-store');
+if (marketplaceMenus.length !== 1) {
+  throw new Error(`应用商城主菜单数量异常：${marketplaceMenus.length}`);
+}
+Object.assign(marketplaceMenus[0], {
+  OpenType: 'MicroService',
+  IsMicroiService: 1,
+  ComponentPath: '/micro-app/host',
+  MicroServiceKey: 'microi-platform-service',
+  MsKey: 'microi-platform-service',
+  MicroServiceRoutePath: '/marketplace',
+  LegacyMenuUrl: '/microi-store',
+});
+storePackageModel.ApplicationBundles = (storePackageModel.ApplicationBundles || [])
+  .filter(item => item?.Application?.AppKey !== 'microi-platform-service');
+storePackageModel.ApplicationBundles.push(deepClone(bundle));
+synchronizeStoreRuntimeSchema(storePackageModel, packageModel);
+refreshPackageCounts(storePackageModel);
+
 await writeFile(packagePath, `${JSON.stringify(packageModel, null, 2)}\n`, 'utf8');
+await writeFile(storePackagePath, `${JSON.stringify(storePackageModel, null, 2)}\n`, 'utf8');
 process.stdout.write(JSON.stringify({
   packagePath,
+  storePackagePath,
   version,
   applicationVersion,
   files: buildAssets.length,

@@ -45,7 +45,7 @@
                 <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Id || tab.Name" v-if="tab.Display !== false">
                     <template #label>
                         <span class="diy-form-tab-label">
-                            <fa-icon v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}
+                            <fa-icon class="mci-tab-icon marginRight5" :icon="ResolveTabIcon(tab.Icon, tabIndex)" />{{ tab.Name }}
                             <small v-if="IsControlCenterPresentation" class="diy-form-tab-count">{{ GetPresentationSectionFieldCount(tab) }}</small>
                         </span>
                     </template>
@@ -104,7 +104,7 @@
                                                 <el-button size="small" :icon="Setting" circle @click.stop="openComponentConfig(field)" />
                                             </el-tooltip>
                                             <el-tooltip :content="$t('Msg.CopyField')" placement="top">
-                                                <el-button size="small" :icon="DocumentCopy" circle @click.stop="duplicateField(field)" />
+                                                <el-button data-testid="duplicate-field-button" size="small" :icon="DocumentCopy" circle @click.stop="duplicateField(field)" />
                                             </el-tooltip>
                                             <el-tooltip :content="$t('Msg.DeleteField')" placement="top">
                                                 <el-button size="small" :icon="Delete" type="danger" circle @click.stop="deleteField(field)" />
@@ -317,6 +317,7 @@ import { initV8ScanCode } from "@/utils/v8-scan-code.js";
 import { initV8IdentityVerification } from "@/utils/v8-identity-verification.js";
 import { initV8Print } from "@/utils/v8-print.js";
 import { formTrace } from "@/utils/form-engine-trace.js";
+import { resolveTabIcon } from "@/utils/tab-icon.js";
 
 // Mixins
 import {
@@ -574,6 +575,9 @@ export default {
         window.addEventListener("microi:lang-change", self._handleLangChange);
     },
     methods: {
+        ResolveTabIcon(icon, index) {
+            return resolveTabIcon(icon, index);
+        },
                 /**
          * 安全获取组件 ref 实例（兼容 Vue 2/3）
          * @param {string} fieldName - 字段名称

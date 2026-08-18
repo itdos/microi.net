@@ -45,9 +45,11 @@
                                 <el-select
                                     v-model="sqlForm.table"
                                     filterable
+                                    remote
                                     clearable
-                                    placeholder="请选择表"
+                                    placeholder="搜索表（最多显示20条）"
                                     :loading="tableLoading"
+                                    :remote-method="searchTables"
                                     @change="onSqlTableChange"
                                 >
                                     <el-option v-for="item in tableList" :key="item.Id || item.Name" :label="tableLabel(item)" :value="item.Name" />
@@ -113,7 +115,7 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, nextTick, reactive, ref, watch } from "vue";
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { Check, DocumentCopy, MagicStick, Plus } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 
@@ -161,6 +163,7 @@ const fieldLoading = ref(false);
 const tableList = ref([]);
 const sqlFieldList = ref([]);
 let tableLoaded = false;
+let tableSearchTimer = null;
 
 const sqlForm = reactive({
     table: "",
@@ -383,9 +386,12 @@ function selectDefaultSnippet() {
 
 function open(options = {}) {
     activeTab.value = options.tab || props.defaultTab || "v8";
+    if (options.resetPreview) {
+        previewCode.value = currentModelCode();
+    }
     visible.value = true;
     nextTick(() => {
-        if (!previewCode.value || options.resetPreview) {
+        if (!previewCode.value && !options.resetPreview) {
             if (activeTab.value === "sql") {
                 generateSqlCode();
             } else {
@@ -404,19 +410,45 @@ function onDialogOpen() {
     if (!previewCode.value) selectDefaultSnippet();
 }
 
+function mergeSelectedTable(rows) {
+    const nextRows = Array.isArray(rows) ? rows : [];
+    const selected = tableList.value.find((item) => item && item.Name === sqlForm.table);
+    return selected && !nextRows.some((item) => item && item.Name === sqlForm.table)
+        ? [selected, ...nextRows]
+        : nextRows;
+}
+
 async function loadTablesOnce() {
     if (tableLoaded || tableLoading.value) return;
+    await loadTables("");
+    tableLoaded = true;
+}
+
+async function loadTables(keyword = "") {
     tableLoading.value = true;
     try {
-        const result = await DiyCommon.PostAsync("/api/FormEngine/GetDiyTableList", { _Keyword: "" });
-        tableList.value = result && result.Code === 1 && Array.isArray(result.Data) ? result.Data : [];
-        tableLoaded = true;
+        const result = await DiyCommon.PostAsync("/api/FormEngine/GetDiyTableList", {
+            _Keyword: String(keyword || "").trim(),
+            _PageIndex: 1,
+            _PageSize: 20
+        });
+        const rows = result && result.Code === 1 && Array.isArray(result.Data) ? result.Data : [];
+        tableList.value = mergeSelectedTable(rows);
     } catch (error) {
         console.warn("[DiyCodeDesign] load tables failed", error);
     } finally {
         tableLoading.value = false;
     }
 }
+
+function searchTables(keyword) {
+    window.clearTimeout(tableSearchTimer);
+    tableSearchTimer = window.setTimeout(() => loadTables(keyword), 220);
+}
+
+onBeforeUnmount(() => {
+    window.clearTimeout(tableSearchTimer);
+});
 
 async function onSqlTableChange() {
     sqlForm.fields = [];

@@ -125,25 +125,27 @@ export default {
                 console.error('[form-utils] GetFieldComponent: 字段数据无效', field);
                 return null;
             }
-            if (!field.Component) {
-                console.error('[form-utils] GetFieldComponent: 字段缺少Component属性', field);
-                return null;
-            }
-            if (!field.Config || typeof field.Config !== 'object') {
-                console.warn('[form-utils] GetFieldComponent: 字段缺少Config，使用默认配置', field);
-                field.Config = {};
-            }
+            // Id、创建时间等框架固定字段来自 RawMetadata，历史数据中合法地没有
+            // Component/Config。它们不是损坏的设计器字段，不应在每次表单渲染时
+            // 刷屏报错；需要渲染时按只读文本控件安全降级即可。
+            var component = typeof field.Component === 'string'
+                ? field.Component.trim()
+                : '';
+            if (!component) component = 'Input';
+            var config = field.Config && typeof field.Config === 'object'
+                ? field.Config
+                : {};
             
             // V8模板引擎组件（只在查看模式下）
             if (!self.DiyCommon.IsNull(field.V8TmpEngineForm) && self.FormMode == 'View') {
                 return 'DiyV8TmpEngine';
             }
             // 定制开发组件
-            if (!self.DiyCommon.IsNull(field.Config.DevComponentName)) {
+            if (!self.DiyCommon.IsNull(config.DevComponentName)) {
                 return 'DiyDevComponent';
             }
             // 默认使用 field.Component
-            return 'Diy' + field.Component;
+            return 'Diy' + component;
         },
         
         /**

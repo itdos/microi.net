@@ -6,26 +6,35 @@ import { isEmbeddedWebosWindowRuntime } from './webos-embedded-runtime.js';
 
 const STORAGE_KEY = 'microi.net';
 const isReadOnlyEmbeddedRuntime = isEmbeddedWebosWindowRuntime();
+let cachedRawStorage = null;
+let cachedStorage = null;
 
-// 初始化存储结构
-const initStorage = () => {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            return JSON.parse(stored);
+if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (event) => {
+        if (event.key === STORAGE_KEY) {
+            cachedRawStorage = null;
+            cachedStorage = null;
         }
-    } catch (e) {
-        console.error('Microi：[LocalStorage] 初始化失败:', e);
-    }
-    return {};
+    });
+}
+
+const cloneStorageValue = (value) => {
+    if (value === null || typeof value !== 'object') return value;
+    if (typeof globalThis.structuredClone === 'function') return globalThis.structuredClone(value);
+    return JSON.parse(JSON.stringify(value));
 };
 
 // 获取整个存储对象
 const getStorage = () => {
     try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        return stored ? JSON.parse(stored) : {};
+        const stored = localStorage.getItem(STORAGE_KEY) || '';
+        if (cachedStorage && stored === cachedRawStorage) return cachedStorage;
+        cachedRawStorage = stored;
+        cachedStorage = stored ? JSON.parse(stored) : {};
+        return cachedStorage;
     } catch (e) {
+        cachedRawStorage = null;
+        cachedStorage = null;
         return {};
     }
 };
@@ -34,7 +43,10 @@ const getStorage = () => {
 const saveStorage = (data) => {
     if (isReadOnlyEmbeddedRuntime) return false;
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        const serialized = JSON.stringify(data);
+        localStorage.setItem(STORAGE_KEY, serialized);
+        cachedRawStorage = serialized;
+        cachedStorage = data;
         return true;
     } catch (e) {
         console.error('Microi：[LocalStorage] 保存失败:', e);
@@ -56,7 +68,7 @@ const LocalStorageManager = {
      */
     get(key) {
         const storage = getStorage();
-        return storage[key];
+        return cloneStorageValue(storage[key]);
     },
 
     /**
@@ -90,7 +102,7 @@ const LocalStorageManager = {
      * 获取所有数据
      */
     getAll() {
-        return getStorage();
+        return cloneStorageValue(getStorage());
     },
 
     /**

@@ -427,14 +427,13 @@ export default {
         border-bottom: 0 !important;
         border-radius: 10px;
         background: transparent !important;
-        transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+        transition: background-color 0.18s ease, color 0.18s ease;
         overflow: hidden;
         color: var(--sidebar-text-color, rgba(255, 255, 255, 0.9)) !important;
 
         &:hover {
             background: var(--sidebar-hover-bg, rgba(255, 255, 255, 0.12)) !important;
             border-color: color-mix(in srgb, var(--sidebar-text-color, #fff) 10%, transparent);
-            transform: translateX(2px);
             box-shadow: none;
             color: var(--sidebar-text-color, #ffffff) !important;
 

@@ -107,7 +107,7 @@
 
             <!-- 数据源引擎 -->
             <el-form-item v-if="configForm.DataSource == 'DataSource'" label="请选择数据源">
-                <el-select v-model="configForm.DataSourceId" clearable filterable value-key="Id" placeholder="搜索数据源" style="width: 100%">
+                <el-select v-model="configForm.DataSourceId" clearable filterable remote :remote-method="searchSysDataSources" :loading="sysDataSourceLoading" value-key="Id" placeholder="搜索数据源（最多显示20条）" style="width: 100%">
                     <el-option v-for="item in SysDataSourceList" :key="item.Id" :label="item.DataSourceName" :value="item.Id">
                         <span style="float: left">{{ item.DataSourceName }}</span>
                         <span style="float: right; color: #8492a6; font-size: 13px">{{ item.DataSourceKey }}</span>
@@ -117,7 +117,7 @@
 
             <!-- 接口引擎 -->
             <el-form-item v-if="configForm.DataSource == 'ApiEngine'" label="请选择接口引擎">
-                <el-select v-model="configForm.DataSourceApiEngineKey" clearable filterable value-key="ApiEngineKey" placeholder="搜索接口引擎" style="width: 100%">
+                <el-select v-model="configForm.DataSourceApiEngineKey" clearable filterable remote :remote-method="searchApiEngines" :loading="apiEngineLoading" value-key="ApiEngineKey" placeholder="搜索接口引擎（最多显示20条）" style="width: 100%">
                     <el-option v-for="item in ApiEngineList" :key="item.ApiEngineKey" :label="item.ApiName" :value="item.ApiEngineKey">
                         <span style="float: left">{{ item.ApiName }}</span>
                         <span style="float: right; color: #8492a6; font-size: 13px">{{ item.ApiEngineKey }}</span>
@@ -141,7 +141,7 @@
 <script>
 import _ from "underscore";
 export default {
-    name: "diy-autocomplete",
+    name: "diy-select-tree",
     inheritAttrs: false,
     emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     data() {
@@ -175,7 +175,11 @@ export default {
                 }
             },
             SysDataSourceList: [],
-            ApiEngineList: []
+            ApiEngineList: [],
+            sysDataSourceLoading: false,
+            apiEngineLoading: false,
+            sysDataSourceSearchTimer: null,
+            apiEngineSearchTimer: null
         };
     },
     model: {
@@ -266,6 +270,11 @@ export default {
     mounted() {
         var self = this;
         self.Init();
+    },
+
+    beforeUnmount() {
+        window.clearTimeout(this.sysDataSourceSearchTimer);
+        window.clearTimeout(this.apiEngineSearchTimer);
     },
     
     watch: {
@@ -981,29 +990,71 @@ export default {
                 self.configDialogVisible = false;
             });
         },
-        loadSysDataSourceList() {
+        mergeRemoteOptions(current, rows, selectedValue, valueField) {
+            var selected = (current || []).find(function (item) {
+                return String(item[valueField]) === String(selectedValue || "");
+            });
+            var nextRows = Array.isArray(rows) ? rows : [];
+            return selected && !nextRows.some(function (item) {
+                return String(item[valueField]) === String(selectedValue || "");
+            }) ? [selected].concat(nextRows) : nextRows;
+        },
+        searchSysDataSources(keyword) {
             var self = this;
-            if (!self.SysDataSourceList || self.SysDataSourceList.length > 0) return;
+            window.clearTimeout(self.sysDataSourceSearchTimer);
+            self.sysDataSourceSearchTimer = window.setTimeout(function () {
+                self.loadSysDataSourceList(keyword);
+            }, 220);
+        },
+        searchApiEngines(keyword) {
+            var self = this;
+            window.clearTimeout(self.apiEngineSearchTimer);
+            self.apiEngineSearchTimer = window.setTimeout(function () {
+                self.loadApiEngineList(keyword);
+            }, 220);
+        },
+        loadSysDataSourceList(keyword = "") {
+            var self = this;
+            var request = {
+                TableName: "Sys_DataSource",
+                _SelectFields: ["Id", "DataSourceName", "DataSourceKey"],
+                _PageIndex: 1,
+                _PageSize: 20
+            };
+            var normalizedKeyword = String(keyword || "").trim();
+            if (normalizedKeyword) {
+                request._Where = [["DataSourceName", "Like", normalizedKeyword], ["OR", "DataSourceKey", "Like", normalizedKeyword]];
+            }
+            self.sysDataSourceLoading = true;
             self.DiyCommon.GetDiyTableRow(
-                { TableName: "Sys_DataSource" },
+                request,
                 function (data) {
+                    self.sysDataSourceLoading = false;
                     if (data && data.Data) {
-                        self.SysDataSourceList = data.Data;
+                        self.SysDataSourceList = self.mergeRemoteOptions(self.SysDataSourceList, data.Data, self.configForm.DataSourceId, "Id");
                     }
                 }
             );
         },
-        loadApiEngineList() {
+        loadApiEngineList(keyword = "") {
             var self = this;
-            if (!self.ApiEngineList || self.ApiEngineList.length > 0) return;
+            var request = {
+                TableName: "sys_apiengine",
+                _SelectFields: ["Id", "ApiName", "ApiEngineKey", "ApiAddress", "IsEnable"],
+                _PageIndex: 1,
+                _PageSize: 20
+            };
+            var normalizedKeyword = String(keyword || "").trim();
+            if (normalizedKeyword) {
+                request._Where = [["ApiName", "Like", normalizedKeyword], ["OR", "ApiEngineKey", "Like", normalizedKeyword]];
+            }
+            self.apiEngineLoading = true;
             self.DiyCommon.GetDiyTableRow(
-                {
-                    TableName: "sys_apiengine",
-                    _SelectFields: ["Id", "ApiName", "ApiEngineKey", "ApiAddress", "IsEnable"]
-                },
+                request,
                 function (data) {
+                    self.apiEngineLoading = false;
                     if (data && data.Data) {
-                        self.ApiEngineList = data.Data;
+                        self.ApiEngineList = self.mergeRemoteOptions(self.ApiEngineList, data.Data, self.configForm.DataSourceApiEngineKey, "ApiEngineKey");
                     }
                 }
             );

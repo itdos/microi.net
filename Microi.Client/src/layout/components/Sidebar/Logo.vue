@@ -5,15 +5,19 @@
         :class="{ collapse: collapse }"
     >
         <router-link class="sidebar-logo-microi-link" @click="GetSysLogoLink()" to="">
-            <img
-                ref="logoImage"
-                class="sidebar-logo-microi"
-                :style="{ height: GetSysLogoHeight() }"
-                :src="logoSource"
-                alt="系统 Logo"
-                @load="HandleSysLogoLoad"
-                @error="HandleSysLogoError"
-            />
+            <span
+                class="sidebar-logo-microi-shell"
+                :style="{ width: GetSysLogoHeight(), height: GetSysLogoHeight() }"
+            >
+                <img
+                    ref="logoImage"
+                    class="sidebar-logo-microi"
+                    :src="logoSource"
+                    alt="系统 Logo"
+                    @load="HandleSysLogoLoad"
+                    @error="HandleSysLogoError"
+                />
+            </span>
             <h1
                 class="sidebar-title-microi"
                 v-if="!collapse && IsDisplayShortTitle()"
@@ -40,7 +44,11 @@ import { computed } from "vue";
 import { useDiyStore, useSettingsStore } from "@/pinia";
 import { resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
 
-const LOCAL_LOGO_FALLBACK = "./static/img/logo/itdos.svg";
+// Hash 路由切换后，相对路径会被错误解析到业务路由。始终从当前站点根目录
+// 解析本地兜底 Logo，保证微服务页面切换也不会让 Logo 消失。
+const LOCAL_LOGO_FALLBACK = typeof window === "undefined"
+    ? "/static/img/logo/itdos.svg"
+    : new URL("/static/img/logo/itdos.svg", window.location.origin).href;
 export default {
     name: "SidebarLogo",
     props: {
@@ -175,9 +183,20 @@ export default {
         justify-content: left; //2025-05-08 LOGO+系统标题靠左显示 --by Anderson
         padding: 0 20px;
 
-        & .sidebar-logo-microi {
+        & .sidebar-logo-microi-shell {
             width: 32px;
             height: 32px;
+            flex: 0 0 auto;
+            overflow: hidden;
+            background: url("/static/img/logo/itdos.svg") center / contain no-repeat;
+            border-radius: 7px;
+        }
+
+        & .sidebar-logo-microi {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
             vertical-align: middle;
             //margin-left: 40px;
         }
@@ -203,7 +222,7 @@ export default {
             padding: 0;
             justify-content: center;
         }
-        .sidebar-logo-microi {
+        .sidebar-logo-microi-shell {
             margin-right: 0px;
             margin-left: 0;
         }

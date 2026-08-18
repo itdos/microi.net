@@ -34,6 +34,7 @@
                 </template>
             </el-dropdown>
             <el-select v-if="DiyFieldList && DiyFieldList.length > 0"
+                data-testid="designer-field-search"
                 v-model="CurrentDiyFieldModel"
                 @change="SelectFieldChange"
                 :filter-method="SelectFieldFilterMethod"
@@ -75,7 +76,11 @@
             <el-aside class="aside aside-left" width="250px">
                 <el-row id="row-field" :gutter="10" class="row-field">
                     <el-col :span="24">
-                        <el-divider content-position="center">表单控件</el-divider>
+                        <div class="designer-palette-header">
+                            <span>FORM CONTROLS</span>
+                            <strong>表单控件</strong>
+                            <small>拖入画布，双击字段配置控件参数</small>
+                        </div>
                     </el-col>
                     <draggable
                         class="draggable-components-wrapper"
@@ -244,8 +249,17 @@
             <template #header>
                 <div class="diy-designer-field-dialog__title">
                     <span>FIELD SETTINGS</span>
-                    <h2>{{ CurrentDiyFieldModel ? (CurrentDiyFieldModel.Label || CurrentDiyFieldModel.Name || '字段设置') : '字段设置' }}</h2>
-                    <p v-if="CurrentDiyFieldModel">{{ CurrentDiyFieldModel.Name }} · {{ CurrentDiyFieldModel.Component }}</p>
+                    <h2 v-if="CurrentDiyFieldModel">
+                        {{ CurrentDiyFieldModel.Label || CurrentDiyFieldModel.Name || '字段设置' }}
+                        <em>{{ CurrentDiyFieldModel.Name || '未命名字段' }}</em>
+                    </h2>
+                    <h2 v-else>字段设置</h2>
+                    <p v-if="CurrentDiyFieldModel">
+                        {{ (CurrentDiyTableModel && (CurrentDiyTableModel.Description || CurrentDiyTableModel.Label)) || '当前表单' }}
+                        <template v-if="CurrentDiyTableModel && CurrentDiyTableModel.Name"> · 表名：{{ CurrentDiyTableModel.Name }}</template>
+                        · {{ CurrentDiyFieldModel.Component }}
+                        <template v-if="CurrentDiyFieldModel.Description"> · {{ CurrentDiyFieldModel.Description }}</template>
+                    </p>
                 </div>
                 <el-button class="diy-designer-field-dialog__close" text :icon="Close" @click="ShowFieldSettingsDialog = false" />
             </template>
@@ -283,17 +297,17 @@
             <template #footer>
                 <div class="diy-designer-field-dialog__footer">
                     <span class="diy-designer-field-dialog__footer-spacer"></span>
-                    <el-button size="small" @click="ShowFieldSettingsDialog = false">取消</el-button>
-                    <el-button size="small" type="primary" :loading="SaveAllDiyFieldLoding" @click="SaveFieldSettingsDialog">保存字段配置</el-button>
+                    <el-button @click="ShowFieldSettingsDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="SaveAllDiyFieldLoding" @click="SaveFieldSettingsDialog">保存字段配置</el-button>
                 </div>
             </template>
         </el-dialog>
         
         <!-- 共享的V8设计器，替代多个实例 -->
         <DiyV8Design
-            v-show="false"
             ref="sharedV8Designer"
             v-if="DiyFieldList && DiyFieldList.length > 0"
+            hide-trigger
             :fields="DiyFieldList"
             v-model:model="currentV8Model"
         ></DiyV8Design>
@@ -316,10 +330,16 @@ import DiyV8Design from "./diy-components/diy-v8design";
 import lodash, { set } from "lodash";
 import { defineAsyncComponent } from "vue";
 import LocalDiyComponentList from "./diy-field-component/diy-component-list.json";
+import { buildDuplicateFieldPayload } from "./field-duplicate.js";
 import {
     ensureDiyFieldUniqueConfig,
     isDiyFieldUniqueEnabled
 } from "../../utils/diy-field-unique.js";
+import {
+    hydrateFieldValueChangeV8,
+    persistFieldValueChangeV8,
+    setFieldValueChangeV8
+} from "../../utils/diy-field-v8.js";
 
 // 异步加载完整表单组件用于预览（与 diy-table 保持一致的复用方式）
 const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"));
@@ -370,6 +390,9 @@ export default {
             if (this.currentV8ModelPath) {
                 try {
                     eval("this." + this.currentV8ModelPath + " = newValue");
+                    if (this.currentV8ModelPath === "CurrentDiyFieldModel.V8Code") {
+                        setFieldValueChangeV8(this.CurrentDiyFieldModel, newValue);
+                    }
                 } catch (e) {
                     console.error('Failed to sync V8 model:', e);
                 }
@@ -435,8 +458,6 @@ export default {
             // SysMenuNeedConvertField: ['TableDiyFieldIds', 'SearchFieldIds', 'SortFieldIds', 'StatisticsFields'],
             //'ImgUpload', 'FileUpload','Map',
             CantUptComponentList: [], //'DevComponent', 'TableChild', 'Divider'
-            SysDataSourceList: [],
-            ApiEngineList: [],
             ExceptionFieldList: [],
             DeletedDiyField: [],
 
@@ -545,8 +566,6 @@ export default {
         self.GetDiyComponent();
         self.GetSysRole();
         self.GetSysMenu();
-        self.GetSysDataSourceList();
-        self.GetApiEngineList();
         self.LoadDesignRouteData();
         // self.$nextTick(function () {
         //     // self.LoadDragula();
@@ -641,7 +660,6 @@ export default {
         },
         CallbackFormValueChange_DiyField(field, value) {
             var self = this;
-            console.log("CallbackFormValueChange_DiyField", field, value);
 
             // var diyFieldModel = self.DiyFieldList.find(item => item.Id === field.Id);
             // if (diyFieldModel) {
@@ -656,10 +674,15 @@ export default {
 
             // self.FlowDesignModel[field.Name] = _rowModel[field.Name];
             self.CurrentDiyFieldModel[field.Name] = _rowModel[field.Name];
+            if (field.Name === "V8Code") {
+                setFieldValueChangeV8(self.CurrentDiyFieldModel, _rowModel[field.Name]);
+            }
             if (field.Name === "Unique" && isDiyFieldUniqueEnabled(self.CurrentDiyFieldModel)) {
                 ensureDiyFieldUniqueConfig(self.CurrentDiyFieldModel);
             }
-            self.$refs.fieldForm.UptDiyFieldArr(self.CurrentDiyFieldModel);
+            if (self.$refs.fieldForm && typeof self.$refs.fieldForm.UptDiyFieldArr === "function") {
+                self.$refs.fieldForm.UptDiyFieldArr(self.CurrentDiyFieldModel);
+            }
             
             // self.CurrentDiyFieldModel[field.Name] = value;
         },
@@ -773,34 +796,6 @@ export default {
                                 }
                             });
                         }
-                    }
-                }
-            );
-        },
-        GetSysDataSourceList() {
-            var self = this;
-            self.DiyCommon.GetDiyTableRow(
-                {
-                    TableName: "Sys_DataSource"
-                },
-                function (data) {
-                    if (data && data.Data) {
-                        self.SysDataSourceList = data.Data;
-                    }
-                }
-            );
-        },
-        GetApiEngineList() {
-            var self = this;
-            // console.log("获取ApiEngineList-1");
-            self.DiyCommon.GetDiyTableRow(
-                {
-                    TableName: "sys_apiengine",
-                    _SelectFields: ["Id", "ApiName", "ApiEngineKey", "ApiAddress", "IsEnable"]
-                },
-                function (data) {
-                    if (data && data.Data) {
-                        self.ApiEngineList = data.Data;
                     }
                 }
             );
@@ -1209,6 +1204,14 @@ export default {
         CallbackGetDiyField(diyFieldList) {
             var self = this;
             self.NormalizeLegacyFieldTabs(diyFieldList);
+            // 列表接口返回后立即还原通用属性表单使用的 V8Code 编辑别名。
+            // 否则随后触发的异步选中/单字段回读可能用一个未水合的新对象覆盖当前字段，
+            // 表现为后端 Config.V8Code 已保存，但刷新后编辑器仍显示空白。
+            if (Array.isArray(diyFieldList)) {
+                diyFieldList.forEach(function (field) {
+                    hydrateFieldValueChangeV8(field);
+                });
+            }
             self.DiyFieldList = diyFieldList;
             self.DiyFieldListClone = lodash.cloneDeep(self.DiyFieldList);
         },
@@ -1337,32 +1340,19 @@ export default {
          */
         CallbackDuplicateField(field) {
             var self = this;
-            // 找到当前字段的位置
             var fieldIndex = self.DiyFieldList.findIndex(f => f.Id === field.Id);
-            
-            // 获取字段的组件类型
-            var componentModel = _.where(self.DiyComponentList, {
-                Control: field.Component
-            })[0];
-            
-            if (componentModel) {
-                // 使用 AddDiyField 创建新字段（和拖入字段相同的方式）
-                self.AddDiyField({
-                    Name: field.Name + '_Copy',  // 名称添加 _Copy
-                    Label: field.Label + '(副本)',
-                    Type: field.Type || componentModel.FieldType,
-                    Component: field.Component,
-                    Visible: 1,
-                    AppVisible: 1,
-                    Tab: field.Tab || self.$refs.fieldForm.FieldActiveTab,
-                    TableWidth: field.TableWidth || 120,
-                    FormWidth: field.FormWidth,  // 保留宽度
-                    NameConfirm: 0,
-                    Readonly: field.Readonly || (componentModel.Readonly ? 1 : 0),
-                    Config: field.Config ? JSON.parse(JSON.stringify(field.Config)) : {},  // 复制配置
-                    _insertIndex: fieldIndex + 1  // 插入到当前字段后面
-                });
-            }
+            var duplicate = buildDuplicateFieldPayload(
+                field,
+                self.DiyFieldList,
+                fieldIndex > -1 ? fieldIndex + 1 : self.DiyFieldList.length
+            );
+
+            // AddDiyField 的 ASP.NET 模型要求 Config/Data 等 JSON 字段为字符串。
+            // 复制必须复用保存时的完整序列化链，既保留当前控件配置和 V8 事件，
+            // 又不能把源字段 Id、审计信息或 Vue 运行态对象带给后端。
+            self.DiyCommon.Base64EncodeDiyField(duplicate);
+            self.DiyFieldJsonToStr(duplicate);
+            self.AddDiyField(duplicate);
         },
         /**
          * 删除字段
@@ -1433,10 +1423,8 @@ export default {
             if(field.Name == 'ShengchengZQRW'){
                 debugger;
             }
-            // 值变更V8事件代码迁移
-            if(field.Config && field.Config.V8Code && !field.V8Code){
-                field.V8Code = field.Config.V8Code;
-            }
+            // V8Code 是右侧通用属性表单的编辑别名，真实持久化位置为 Config.V8Code。
+            hydrateFieldValueChangeV8(field);
 
             //是否需要解密？？
             self.CurrentDiyFieldModel = field;
@@ -1600,6 +1588,15 @@ export default {
             var self = this;
             self.SaveAllDiyFieldLoding = true;
             try {
+                // 右侧属性面板（特别是 CodeEditor 的 V8Code）可能刚完成一次
+                // model 更新。保存前再把当前响应式字段显式同步回画布数组，避免
+                // 用户点击“保存”的同一帧仍序列化到旧对象。
+                if (self.CurrentDiyFieldModel
+                    && self.$refs.fieldForm
+                    && typeof self.$refs.fieldForm.UptDiyFieldArr === "function") {
+                    persistFieldValueChangeV8(self.CurrentDiyFieldModel);
+                    self.$refs.fieldForm.UptDiyFieldArr(self.CurrentDiyFieldModel);
+                }
                 // 先保存DiyTable
                 // var param = {
                 //     ...self.CurrentDiyTableModel
@@ -1628,6 +1625,9 @@ export default {
                 // });
                 //2022-07-13这种方式copy，不会引用
                 self.NormalizeLegacyFieldTabs(self.DiyFieldList);
+                self.DiyFieldList.forEach(function (field) {
+                    persistFieldValueChangeV8(field);
+                });
                 var fieldList = lodash.cloneDeep(self.DiyFieldList);
 
                 // 这里copy过来被引用了
@@ -1687,6 +1687,7 @@ export default {
                 // var param = {
                 //     ...self.CurrentDiyFieldModel
                 // }
+                persistFieldValueChangeV8(self.CurrentDiyFieldModel);
                 var param = lodash.cloneDeep(self.CurrentDiyFieldModel);
                 // param.OsClient = self.OsClient
                 // param.BaiduMapConfig = {};  放到DiyFieldJsonToStr里面
@@ -1823,6 +1824,7 @@ export default {
                     self.DiyCommon.DiyFieldConfigStrToJson(result.Data);
                     self.$refs.fieldForm.DiyFieldStrToJson(result.Data);
                     self.DiyCommon.Base64DecodeDiyField(result.Data);
+                    hydrateFieldValueChangeV8(result.Data);
 
                     var needBool2Int = ["NameConfirm", "NotEmpty", "Visible", "AppVisible", "Readonly", "Unique", "InTableEdit", "IsLockField", "Encrypt"];
                     needBool2Int.forEach((item) => {
@@ -1910,6 +1912,7 @@ export default {
         },
         DiyFieldJsonToStr(data) {
             var self = this;
+            persistFieldValueChangeV8(data);
             var needBool2Int = ["NameConfirm", "NotEmpty", "Visible", "AppVisible", "Readonly", "Unique", "InTableEdit", "IsLockField", "Encrypt"];
             needBool2Int.forEach((item) => {
                 data[item] = data[item] ? 1 : 0;
@@ -2040,6 +2043,12 @@ export default {
                 CollapseGroup: ["CollapseGroup"],
                 Tabs: ["FieldTabs"],
                 Alert: ["Alert"],
+                Address: ["Address"],
+                ColorPicker: ["ColorPicker"],
+                FontAwesome: ["FontAwesome"],
+                Progress: ["Progress"],
+                Qrcode: ["Qrcode"],
+                Rate: ["Rate"],
                 StaticText: ["StaticText"],
                 Html: ["Html"]
             };
@@ -2073,8 +2082,16 @@ export default {
                         if (isDiyFieldUniqueEnabled(result.Data)) {
                             ensureDiyFieldUniqueConfig(result.Data);
                         }
+                        hydrateFieldValueChangeV8(result.Data);
                         self.CurrentDiyFieldModel = result.Data;
                         self.FormDiyTableModel[self.CurrentDiyFieldModel.Name] = self.CurrentDiyFieldModel.Data;
+                        self.$nextTick(function () {
+                            [self.$refs.diyform_diy_field, self.$refs.diyform_diy_field_dialog].forEach(function (fieldPropertyForm) {
+                                if (fieldPropertyForm && typeof fieldPropertyForm.SetFormData === "function") {
+                                    fieldPropertyForm.SetFormData(self.CurrentDiyFieldModel);
+                                }
+                            });
+                        });
                     }
                 }
             );
@@ -2169,11 +2186,17 @@ export default {
 
     .aside-left {
         border-right: 1px solid var(--mci-divider-color, var(--el-border-color, #e6ebf5)) !important;
-        padding-bottom: 0;
+        padding: 10px 9px 0;
+        background: color-mix(in srgb, var(--el-fill-color-extra-light, #f5f7fa) 52%, var(--el-bg-color-overlay, #fff));
         
         // vuedraggable 组件包装器样式
         .draggable-components-wrapper {
-            display: contents; // 使用 display: contents 让 draggable 不影响布局
+            display: grid;
+            width: 100%;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 3px;
+            box-sizing: border-box;
+            padding: 0 5px 14px;
         }
     }
 
@@ -2300,6 +2323,44 @@ export default {
     }
 
     .row-field {
+        margin: 0 !important;
+
+        .designer-palette-header {
+            display: flex;
+            flex-direction: column;
+            margin: 4px 3px 13px;
+            padding: 3px 4px 10px;
+            border-bottom: 1px solid color-mix(in srgb, var(--el-color-primary, #409eff) 11%, var(--el-border-color-lighter, #e6ebf5));
+
+            > span {
+                color: var(--el-color-primary, #409eff);
+                font-size: 9px;
+                font-weight: 800;
+                letter-spacing: .15em;
+            }
+
+            > strong {
+                margin-top: 3px;
+                color: var(--el-text-color-primary, #1f2d3d);
+                font-size: 16px;
+                line-height: 1.35;
+            }
+
+            > small {
+                margin-top: 3px;
+                color: var(--el-text-color-secondary, #7a879a);
+                font-size: 11px;
+                line-height: 1.45;
+            }
+        }
+
+        .field-drag {
+            width: 100% !important;
+            max-width: none !important;
+            flex: none !important;
+            padding: 0 !important;
+        }
+
         .icon {
             width: 20px;
             margin-right: 0px;
@@ -2310,59 +2371,53 @@ export default {
 
         .el-tag {
             width: 100%;
-            height: 28px;
+            height: 34px;
             text-align: left;
-            line-height: 28px;
-            // border-radius: 0;
+            line-height: 34px;
             color: var(--el-text-color-regular, #171717);
-            padding-left: 7px;
-            // border: solid 1px rgba(255, 106, 0, 0.1);
-            // background-color: rgba(255, 106, 0, 0.1);
-            margin-bottom: 5px;
-            // border-left: solid 2px #242B49;
-            border-radius: 4px;
+            padding: 0 9px;
+            margin: 0;
+            border-radius: 9px;
         }
 
         .component-tag {
-            border: 1px solid transparent;
-            font-weight: 500;
+            border: 1px solid var(--el-border-color-lighter, #e5eaf2);
+            background: var(--el-bg-color-overlay, #fff);
+            color: var(--el-text-color-regular, #3f4d63);
+            font-weight: 550;
+            box-shadow: 0 2px 7px rgba(15, 23, 42, .025);
+            transition: border-color .16s ease, background-color .16s ease, color .16s ease, box-shadow .16s ease;
 
             .svg-inline--fa,
             .fa-icon,
             i {
-                margin-right: 5px;
+                width: 18px;
+                margin-right: 7px;
+                color: var(--component-accent, var(--el-color-primary, #409eff));
             }
         }
 
         .component-tag--base {
-            color: var(--el-color-primary, #1f3f78);
-            background: color-mix(in srgb, var(--el-color-primary, #409eff) 12%, var(--el-bg-color-overlay, #fff));
-            border-color: color-mix(in srgb, var(--el-color-primary, #409eff) 28%, transparent);
+            --component-accent: var(--el-color-primary, #409eff);
         }
 
         .component-tag--layout {
-            color: var(--el-color-info, #5b32a3);
-            background: color-mix(in srgb, var(--el-color-info, #909399) 12%, var(--el-bg-color-overlay, #fff));
-            border-color: color-mix(in srgb, var(--el-color-info, #909399) 28%, transparent);
+            --component-accent: var(--el-color-info, #7a879a);
         }
 
         .component-tag--advanced {
-            color: var(--el-color-success, #0f5f59);
-            background: color-mix(in srgb, var(--el-color-success, #67c23a) 12%, var(--el-bg-color-overlay, #fff));
-            border-color: color-mix(in srgb, var(--el-color-success, #67c23a) 28%, transparent);
+            --component-accent: var(--el-color-success, #35a06f);
         }
 
         .component-tag--relation {
-            color: var(--el-color-warning, #7a4a08);
-            background: color-mix(in srgb, var(--el-color-warning, #e6a23c) 13%, var(--el-bg-color-overlay, #fff));
-            border-color: color-mix(in srgb, var(--el-color-warning, #e6a23c) 30%, transparent);
+            --component-accent: var(--el-color-warning, #d89224);
         }
 
         .el-tag:hover {
-            background-color: var(--mci-bg-primary-soft, var(--el-color-primary-light-9, #ecf5ff));
-            border: 1px dashed var(--el-color-primary, #409eff);
-            // border-left: solid 2px #242B49;
-            color: var(--el-text-color-primary, #171717);
+            background: color-mix(in srgb, var(--component-accent, var(--el-color-primary, #409eff)) 6%, var(--el-bg-color-overlay, #fff));
+            border-color: color-mix(in srgb, var(--component-accent, var(--el-color-primary, #409eff)) 32%, var(--el-border-color-lighter, #e5eaf2));
+            color: var(--component-accent, var(--el-color-primary, #409eff));
+            box-shadow: 0 5px 14px rgba(15, 23, 42, .06);
             cursor: move;
         }
     }
@@ -2433,12 +2488,12 @@ export default {
     > .el-dialog__body {
         max-height: min(68vh, 720px);
         overflow: auto;
-        padding: 12px 14px;
+        padding: 22px 28px;
         background: color-mix(in srgb, var(--designer-dialog-soft) 72%, var(--designer-dialog-surface));
     }
 
     > .el-dialog__footer {
-        padding: 12px 16px;
+        padding: 16px 24px 20px;
         border-top: 1px solid var(--designer-dialog-line);
         background: var(--designer-dialog-surface);
     }
@@ -2462,18 +2517,27 @@ export default {
         font-size: 11px;
     }
     .diy-designer-field-dialog__close {
-        width: 38px;
-        height: 38px;
+        display: inline-flex;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        align-self: center;
+        align-items: center;
+        justify-content: center;
+        margin-left: auto;
         border-radius: 10px;
         color: var(--el-text-color-secondary);
         cursor: pointer;
     }
     .diy-designer-field-dialog__body { min-height: 220px; }
     .diy-designer-field-dialog__body .unique-mode-config.is-dialog {
-        margin: 10px 5px 4px;
-        border: 1px solid var(--designer-dialog-line);
-        border-radius: 12px;
-        background: var(--designer-dialog-surface);
+        margin: 12px 0 0;
+        padding: 14px 0 0;
+        border: 0;
+        border-top: 1px solid var(--designer-dialog-line);
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
     }
     .diy-designer-field-dialog__footer {
         display: flex;
@@ -2482,10 +2546,14 @@ export default {
     }
     .diy-designer-field-dialog__footer-spacer { flex: 1; }
     .diy-designer-field-dialog__footer .el-button {
-        min-height: 30px;
+        min-width: 96px;
+        height: 42px;
         margin-left: 0;
-        border-radius: 10px;
-        font-weight: 650;
+        padding: 0 22px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 700;
+        box-shadow: 0 7px 18px rgba(15, 23, 42, .09);
     }
     .diy-designer-field-dialog__footer .el-button--primary {
         border-color: transparent;
@@ -2504,9 +2572,9 @@ body.Dark .diy-designer-field-dialog.el-dialog {
 @media (max-width: 720px) {
     .diy-designer-field-dialog.el-dialog {
         width: 96vw !important;
-        border-radius: 15px;
+        border-radius: 18px;
         > .el-dialog__header { min-height: 62px; padding: 10px 12px; }
-        > .el-dialog__body { max-height: 72vh; padding: 8px; }
+        > .el-dialog__body { max-height: 72vh; padding: 16px; }
         .diy-designer-field-dialog__title h2 { font-size: 16px; }
         .diy-designer-field-dialog__title p { display: none; }
     }

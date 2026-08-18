@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.2.0
+ * Version: v1.2.1
  * Function:
  * - 只规划并安装“未安装/可更新”应用，绝不重新安装已是最新版的应用。
  * - 计划和子检查点写入后台任务 CheckpointJson，支持多节点租约转移、进程重启和幂等重试。
@@ -78,18 +78,45 @@ function loadMarketplaceSourceCredential(credentialKey, expectedApiBase, expecte
 function childFailureDetail(result) {
     var data = result && result.Data;
     data = parseJson(data, data);
-    if (!data || typeof data != 'object') return '';
     var details = [];
-    for (var key in data) {
-        if (!Object.prototype.hasOwnProperty.call(data, key)
-            || text(key).indexOf('失败详情') !== 0) continue;
-        var rows = toArray(data[key]);
-        for (var rowIndex = 0; rowIndex < rows.length && details.length < 3; rowIndex++) {
-            var row = rows[rowIndex] || {};
-            var detail = trim(row.详情 || row.Detail || row.Msg || row.Message || row);
-            if (detail) details.push(detail);
+    var seen = {};
+    var addDetail = function (value) {
+        var detail = trim(value);
+        if (!detail || seen[detail] || details.length >= 3) return;
+        seen[detail] = true;
+        details.push(detail);
+    };
+    var scan = function (value, depth, force) {
+        if (details.length >= 3 || value === null || value === undefined || depth > 3) return;
+        value = parseJson(value, value);
+        if (typeof value != 'object') {
+            if (force) addDetail(value);
+            return;
         }
-    }
+        if (value.length !== undefined) {
+            var rows = toArray(value);
+            for (var rowIndex = 0; rowIndex < rows.length && details.length < 3; rowIndex++) {
+                scan(rows[rowIndex], depth + 1, true);
+            }
+            return;
+        }
+        var direct = value.详情 || value.Detail || value.Msg || value.Message
+            || value.错误信息 || value.Error || value.error;
+        if (direct !== null && direct !== undefined) scan(direct, depth + 1, true);
+        for (var key in value) {
+            if (!Object.prototype.hasOwnProperty.call(value, key) || details.length >= 3) continue;
+            var normalizedKey = text(key).toLowerCase();
+            var isDetailKey = text(key).indexOf('失败详情') === 0
+                || text(key) == '错误信息'
+                || normalizedKey == 'errors'
+                || normalizedKey == 'error'
+                || normalizedKey == 'details';
+            if (isDetailKey) scan(value[key], depth + 1, true);
+        }
+    };
+    // BULK_STRUCTURED_CHILD_ERRORS_V1：同时支持导入器预检的 Data.Errors、
+    // catch 分支的错误信息，以及旧版“失败详情（共N条）”结构。
+    scan(data, 0, false);
     return details.join('；');
 }
 // BULK_STORAGE_FAILURE_RECOVERY_V1：存储类失败不能再给出“处理冲突或数据问题”

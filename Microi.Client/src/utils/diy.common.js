@@ -23,6 +23,7 @@ import { createV8AI } from "./v8-ai.js";
 import { reportApiServiceFailure, reportApiServiceRecovered } from "./api-service-status.js";
 import { applyLegacySysMenuConfigFallback } from "./sys-menu-legacy-compat.js";
 import { prepareCodeEditorTransport } from "./code-editor-transport.js";
+import { decodeLegacyDiyFieldSources } from "./field-source-codec.js";
 import { normalizeTableChildFieldRelations } from "./table-child-relations.js";
 import { createPlatformNotificationApi } from "./platform-notification.js";
 import {
@@ -2790,6 +2791,42 @@ var DiyCommon = {
                 Effect: "light",
                 ShowIcon: true
             },
+            Address: {
+                ShowAllLevels: true,
+                CheckStrictly: false,
+                Separator: " / "
+            },
+            ColorPicker: {
+                ShowAlpha: false,
+                Format: "hex",
+                Size: "default",
+                Predefine: []
+            },
+            FontAwesome: {
+                AllowClear: true,
+                PreviewSize: 32,
+                DefaultIcon: "Operation"
+            },
+            Progress: {
+                Type: "line",
+                StrokeWidth: 18,
+                ShowText: true,
+                TextInside: true,
+                Status: "",
+                Color: ""
+            },
+            Qrcode: {
+                DisplayWidth: 400,
+                ShowDownload: true,
+                DownloadText: "下载二维码"
+            },
+            Rate: {
+                Max: 5,
+                AllowHalf: false,
+                Clearable: true,
+                ShowScore: false,
+                ScoreTemplate: "{value} 分"
+            },
             StaticText: {
                 Title: "",
                 Content: "",
@@ -5501,58 +5538,7 @@ var DiyCommon = {
         }
     },
     Base64DecodeDiyField(diyFieldModel) {
-        var self = this;
-        if (Base64 && Base64.isValid) {
-            if (diyFieldModel.KeyupV8Code && Base64.isValid(diyFieldModel.KeyupV8Code)) {
-                try {
-                    diyFieldModel.KeyupV8Code = Base64.decode(diyFieldModel.KeyupV8Code);
-                } catch (error) {}
-            }
-            if (diyFieldModel.V8TmpEngineForm && Base64.isValid(diyFieldModel.V8TmpEngineForm)) {
-                try {
-                    diyFieldModel.V8TmpEngineForm = Base64.decode(diyFieldModel.V8TmpEngineForm);
-                } catch (error) {}
-            }
-            if (diyFieldModel.V8TmpEngineTable && Base64.isValid(diyFieldModel.V8TmpEngineTable)) {
-                try {
-                    diyFieldModel.V8TmpEngineTable = Base64.decode(diyFieldModel.V8TmpEngineTable);
-                } catch (error) {}
-            }
-            if (diyFieldModel.Config) {
-                if (diyFieldModel.Config.Sql && Base64.isValid(diyFieldModel.Config.Sql)) {
-                    try {
-                        diyFieldModel.Config.Sql = Base64.decode(diyFieldModel.Config.Sql);
-                    } catch (error) {}
-                }
-                if (diyFieldModel.Config.V8Code && Base64.isValid(diyFieldModel.Config.V8Code)) {
-                    try {
-                        diyFieldModel.Config.V8Code = Base64.decode(diyFieldModel.Config.V8Code);
-                    } catch (error) {}
-                }
-                if (diyFieldModel.Config.V8CodeBlur && Base64.isValid(diyFieldModel.Config.V8CodeBlur)) {
-                    try {
-                        diyFieldModel.Config.V8CodeBlur = Base64.decode(diyFieldModel.Config.V8CodeBlur);
-                    } catch (error) {}
-                }
-                if (diyFieldModel.Config.TableChildRowClickV8 && Base64.isValid(diyFieldModel.Config.TableChildRowClickV8)) {
-                    try {
-                        diyFieldModel.Config.TableChildRowClickV8 = Base64.decode(diyFieldModel.Config.TableChildRowClickV8);
-                    } catch (error) {}
-                }
-                if (diyFieldModel.Config.OpenTable) {
-                    if (diyFieldModel.Config.OpenTable.SubmitV8 && Base64.isValid(diyFieldModel.Config.OpenTable.SubmitV8)) {
-                        try {
-                            diyFieldModel.Config.OpenTable.SubmitV8 = Base64.decode(diyFieldModel.Config.OpenTable.SubmitV8);
-                        } catch (error) {}
-                    }
-                    if (diyFieldModel.Config.OpenTable.BeforeOpenV8 && Base64.isValid(diyFieldModel.Config.OpenTable.BeforeOpenV8)) {
-                        try {
-                            diyFieldModel.Config.OpenTable.BeforeOpenV8 = Base64.decode(diyFieldModel.Config.OpenTable.BeforeOpenV8);
-                        } catch (error) {}
-                    }
-                }
-            }
-        }
+        return decodeLegacyDiyFieldSources(diyFieldModel);
     },
     DateDiff(startTime, endTime, interval) {
         if (DiyCommon.IsNull(startTime) || DiyCommon.IsNull(endTime) || DiyCommon.IsNull(interval)) {

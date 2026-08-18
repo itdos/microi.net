@@ -1,4 +1,6 @@
 import { hasNativeFieldConfig } from "../field-component-config-registry.js";
+import fieldComponentCatalog from "../diy-field-component/diy-component-list.json";
+import { enhanceMciDialog } from "../../../utils/mci-dialog-runtime.js";
 
 export default {
     methods: {
@@ -197,25 +199,77 @@ hideFieldToolbar() {
             if (!field) return false;
             return hasNativeFieldConfig(field.Component);
         },
-        markLatestFieldConfigDialog() {
-            var mark = function () {
-                var dialogs = Array.from(document.querySelectorAll(".el-overlay .el-dialog"))
-                    .filter(function (dialog) {
-                        var overlay = dialog.closest(".el-overlay");
-                        return overlay && window.getComputedStyle(overlay).display !== "none";
-                    });
-                var dialog = dialogs[dialogs.length - 1];
-                if (!dialog) return;
-                dialog.classList.add("mci-unified-dialog", "mci-field-config-dialog");
-                var overlay = dialog.closest(".el-overlay");
-                if (overlay) {
-                    overlay.classList.add("mci-unified-overlay", "mci-field-config-overlay");
-                }
-            };
-            this.$nextTick(function () {
-                window.requestAnimationFrame(mark);
-                window.setTimeout(mark, 60);
+        markLatestFieldConfigDialog(field) {
+            if (typeof MutationObserver === "undefined") return;
+            if (this._mciPendingFieldDialogObserver) this._mciPendingFieldDialogObserver.disconnect();
+
+            var self = this;
+            var visibleBeforeOpen = new Set(
+                Array.from(document.querySelectorAll(".el-overlay .el-dialog")).filter(function (dialog) {
+                    var overlay = dialog.closest(".el-overlay");
+                    return overlay && window.getComputedStyle(overlay).display !== "none";
+                })
+            );
+            var componentInfo = fieldComponentCatalog.find(function (item) {
+                return item.Control === field.Component;
             });
+            var componentLabel = componentInfo ? componentInfo.Name : (field.Component || "字段控件");
+            var description = field.Description || field.Placeholder || "";
+
+            // DiyTableModel is replaced after metadata loading. Do not capture the
+            // pre-replacement object here: async component dialogs may be mounted
+            // after that replacement and would otherwise lose the physical table name.
+            var buildDialogContext = function () {
+                var tableModel = self.DiyTableModel || self.CurrentDiyTableModel || {};
+                return {
+                    variant: "field",
+                    eyebrow: "FIELD SETTINGS",
+                    label: field.Label || field.Name || "字段设置",
+                    name: field.Name || "未命名字段",
+                    tableLabel: tableModel.Description || tableModel.Label || "当前表单",
+                    tableName: tableModel.Name || self.TableName || field.TableName || "",
+                    componentLabel: componentLabel,
+                    description: description
+                };
+            };
+
+            var decorate = function () {
+                var candidates = Array.from(document.querySelectorAll(".el-overlay .el-dialog")).filter(function (dialog) {
+                    var overlay = dialog.closest(".el-overlay");
+                    return overlay
+                        && window.getComputedStyle(overlay).display !== "none"
+                        && !visibleBeforeOpen.has(dialog);
+                });
+                var dialog = candidates[candidates.length - 1];
+                if (!dialog) return false;
+                enhanceMciDialog(dialog, buildDialogContext());
+                // Element Plus/async component rendering can finish in the next
+                // frame. Refresh once more from the live model so the enhanced
+                // heading never keeps an early, partial metadata snapshot.
+                window.requestAnimationFrame(function () {
+                    if (document.body.contains(dialog)) enhanceMciDialog(dialog, buildDialogContext());
+                });
+                return true;
+            };
+
+            this._mciPendingFieldDialogObserver = new MutationObserver(function () {
+                if (decorate()) {
+                    self._mciPendingFieldDialogObserver.disconnect();
+                    self._mciPendingFieldDialogObserver = null;
+                }
+            });
+            this._mciPendingFieldDialogObserver.observe(document.body, {
+                subtree: true,
+                childList: true,
+                attributes: true,
+                attributeFilter: ["class", "style"]
+            });
+            this.safeTimeout(function () {
+                if (self._mciPendingFieldDialogObserver) {
+                    self._mciPendingFieldDialogObserver.disconnect();
+                    self._mciPendingFieldDialogObserver = null;
+                }
+            }, 1200);
         },
         openComponentConfig(field) {
             var self = this;
@@ -235,8 +289,8 @@ hideFieldToolbar() {
             var tryOpen = function () {
                 var refComponent = field.Name ? self.getRefComponent(field.Name) : null;
                 if (refComponent && typeof refComponent.openConfig === "function") {
+                    self.markLatestFieldConfigDialog(field);
                     refComponent.openConfig();
-                    self.markLatestFieldConfigDialog();
                     return;
                 }
                 attempts += 1;
@@ -353,11 +407,20 @@ AddDiyFieldArr(field, insertIndex) {
         },
 UptDiyFieldArr(field) {
             var self = this;
-            self.DiyFieldList.forEach((element) => {
-                if (element.Id == field.Id) {
-                    element = field;
-                }
-            });
+            if (!field || !field.Id || !Array.isArray(self.DiyFieldList)) return;
+            var index = self.DiyFieldList.findIndex((element) => element && element.Id == field.Id);
+            if (index < 0) return;
+
+            // 原实现只给 forEach 的局部变量重新赋值，数组中的字段从未更新，导致
+            // 右侧属性（尤其 V8Code）看似保存成功，刷新后却恢复为旧值。
+            // 保留现有响应式对象引用并显式 splice，兼顾设计画布、右侧属性表单和
+            // 已挂载字段组件对同一对象的引用。
+            var current = self.DiyFieldList[index];
+            if (current !== field) Object.assign(current, field);
+            self.DiyFieldList.splice(index, 1, current);
+            if (typeof self.RefreshDiyFieldRuntimeState === "function") {
+                self.RefreshDiyFieldRuntimeState();
+            }
         },
 UptDiyFieldDataSource(fieldName, dataSource) {
             var self = this;

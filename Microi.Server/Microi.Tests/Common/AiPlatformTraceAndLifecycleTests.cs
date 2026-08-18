@@ -43,7 +43,7 @@ public sealed class AiPlatformTraceAndLifecycleTests
                 mongo,
                 NullLogger<SysLogQueueService>.Instance,
                 environment,
-                new SysLogQueueOptions { SpoolDirectory = spool });
+                new SysLogQueueOptions { SpoolDirectory = spool, PersistenceConfigured = _ => true });
             using var activity = MicroiTraceContext.StartActivity("snapshot");
             activity.SetTag("component", "test");
 

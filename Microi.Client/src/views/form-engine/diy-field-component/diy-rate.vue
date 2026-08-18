@@ -2,6 +2,11 @@
     <!--评分-->
     <el-rate
         v-model="ModelValue"
+        :max="Number(RateConfig.Max || 5)"
+        :allow-half="RateConfig.AllowHalf === true"
+        :clearable="RateConfig.Clearable !== false"
+        :show-score="RateConfig.ShowScore === true"
+        :score-template="RateConfig.ScoreTemplate || '{value} 分'"
         :disabled="GetFieldReadOnly(field)"
         @change="
             (item) => {
@@ -10,12 +15,14 @@
         "
         @focus="SelectField(field)"
     />
+    <DiySimpleFieldConfigDialog ref="simpleConfig" component="Rate" component-label="评分" :field="field" :DiyTableModel="DiyTableModel" />
 </template>
 
 <script>
 import _ from "underscore";
+import DiySimpleFieldConfigDialog from "./shared/DiySimpleFieldConfigDialog.vue";
 export default {
-    name: "diy-radio",
+    name: "diy-rate",
     inheritAttrs: false,
     emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     data() {
@@ -105,9 +112,13 @@ export default {
         }
     },
 
-    components: {},
+    components: { DiySimpleFieldConfigDialog },
 
-    computed: {},
+    computed: {
+        RateConfig() {
+            return this.field?.Config?.Rate || {};
+        }
+    },
 
     mounted() {
         var self = this;
@@ -119,6 +130,9 @@ export default {
     },
 
     methods: {
+        openConfig() {
+            this.$refs.simpleConfig.open();
+        },
         Init() {
             var self = this;
             self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel) || 0;

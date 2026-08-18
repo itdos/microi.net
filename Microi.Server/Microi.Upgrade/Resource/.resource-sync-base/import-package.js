@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.1.0
+ * Version: v2.1.3
  * Function:
  * - Unified marketplace importer with resumable slices and strict SharedPublicRuntime support for official versioned Web/UniApp assets.
  */
@@ -693,9 +693,83 @@ var validateScheduleJobPackage = function (packageModel) {
 };
 var scheduleJobContract = validateScheduleJobPackage(Package);
 
+// PACKAGE_MENU_RUNTIME_PREFLIGHT_V1：菜单唯一键和菜单依赖的微服务运行时必须
+// 在任何 DDL、字段、菜单写入之前完成校验。禁止把一个已知无法运行的菜单先写入
+// 租户，再到 98% 才因唯一索引或“微服务不存在”失败。
+var validatePackageMenuRuntimeContract = function (packageModel) {
+    packageModel = packageModel || {};
+    var errors = [];
+    var menuUrls = {};
+    var menus = packageModel.SysMenus || [];
+    for (var menuIndex = 0; menuIndex < listSize(menus); menuIndex++) {
+        var menu = menus[menuIndex] || {};
+        var url = String(menu.Url || '').replace(/^\s+|\s+$/g, '');
+        if (!url) continue;
+        var normalizedUrl = url.toLowerCase();
+        var currentLabel = String(menu.Name || menu.Id || ('第' + (menuIndex + 1) + '个菜单'));
+        if (menuUrls[normalizedUrl] && menuUrls[normalizedUrl].Id != String(menu.Id || '')) {
+            errors.push('菜单 Url 重复：' + url + '，同时被【' + menuUrls[normalizedUrl].Label
+                + '】和【' + currentLabel + '】占用');
+        } else {
+            menuUrls[normalizedUrl] = { Id: String(menu.Id || ''), Label: currentLabel };
+        }
+    }
+
+    var runtimeBundles = {};
+    var bundles = packageModel.ApplicationBundles || [];
+    for (var bundleIndex = 0; bundleIndex < listSize(bundles); bundleIndex++) {
+        var bundle = bundles[bundleIndex] || {};
+        var application = bundle.Application || {};
+        var microService = bundle.MicroService || {};
+        var appKey = firstTextParam([application.AppKey, bundle.AppKey, microService.MsKey]).toLowerCase();
+        if (!appKey) continue;
+        var routeMap = {};
+        var routes = bundle.Routes || [];
+        for (var routeIndex = 0; routeIndex < listSize(routes); routeIndex++) {
+            var routePath = String((routes[routeIndex] || {}).RoutePath || '').replace(/^\s+|\s+$/g, '');
+            if (routePath) routeMap[routePath.toLowerCase()] = true;
+        }
+        runtimeBundles[appKey] = { Routes: routeMap };
+    }
+
+    for (var runtimeMenuIndex = 0; runtimeMenuIndex < listSize(menus); runtimeMenuIndex++) {
+        var runtimeMenu = menus[runtimeMenuIndex] || {};
+        var isMicroServiceMenu = String(runtimeMenu.OpenType || '').toLowerCase() == 'microservice'
+            || runtimeMenu.IsMicroiService === true
+            || Number(runtimeMenu.IsMicroiService || 0) === 1;
+        if (!isMicroServiceMenu) continue;
+        var menuKey = firstTextParam([
+            runtimeMenu.MicroServiceKey,
+            runtimeMenu.MsKey,
+            runtimeMenu.MicroServiceAppKey
+        ]).toLowerCase();
+        var menuLabel = String(runtimeMenu.Name || runtimeMenu.Id || ('第' + (runtimeMenuIndex + 1) + '个菜单'));
+        if (!menuKey) {
+            errors.push('微服务菜单【' + menuLabel + '】缺少 MicroServiceKey');
+            continue;
+        }
+        var runtimeBundle = runtimeBundles[menuKey];
+        if (!runtimeBundle) {
+            errors.push('微服务菜单【' + menuLabel + '】引用 ' + menuKey
+                + '，但当前应用包未交付对应 ApplicationBundle');
+            continue;
+        }
+        var menuRoutePath = firstTextParam([runtimeMenu.MicroServiceRoutePath, runtimeMenu.RoutePath]);
+        if (menuRoutePath && !runtimeBundle.Routes[String(menuRoutePath).toLowerCase()]) {
+            errors.push('微服务菜单【' + menuLabel + '】引用路由 ' + menuRoutePath
+                + '，但 ' + menuKey + ' 的 ApplicationBundle 未包含该路由');
+        }
+    }
+    return { Errors: errors };
+};
+var packageMenuRuntimeContract = validatePackageMenuRuntimeContract(Package);
+
 // 仅检查包体结构，不写数据库、不上传文件。用于发布前及跨平台安装前的安全验收。
 if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase() == 'validate') {
     var validationErrors = [];
+    for (var validationRuntimeErrorIndex = 0; validationRuntimeErrorIndex < packageMenuRuntimeContract.Errors.length; validationRuntimeErrorIndex++) {
+        validationErrors.push(packageMenuRuntimeContract.Errors[validationRuntimeErrorIndex]);
+    }
     for (var validationJobErrorIndex = 0; validationJobErrorIndex < scheduleJobContract.Errors.length; validationJobErrorIndex++) {
         validationErrors.push(scheduleJobContract.Errors[validationJobErrorIndex]);
     }
@@ -843,6 +917,14 @@ if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase(
             JobCount: scheduleJobContract.Jobs.length
         },
         Msg: '应用数据包结构校验通过，未执行写入'
+    };
+}
+
+if (packageMenuRuntimeContract.Errors.length > 0) {
+    return {
+        Code: 0,
+        Data: { Errors: packageMenuRuntimeContract.Errors },
+        Msg: '应用数据包预检失败：' + packageMenuRuntimeContract.Errors.join('；')
     };
 }
 
@@ -4464,6 +4546,85 @@ try {
         );
     }
 
+    // POST_SCHEMA_MICROSERVICE_BINDING_RESTORE_V1：大型应用包会在
+    // ApplicationAssets 执行片写入运行时后切换到 PostSchema。执行片切换会
+    // 清空内存中的 applicationMenuBindings；如果不从已提交的服务/页面重建，
+    // 后续菜单虽然带 RoutePath，却不会写入 MicroServiceId/PageId，最终宿主会
+    // 把菜单 Id 当成 AppKey 并报 MICRO_APP_NOT_AVAILABLE。
+    var restoreApplicationMenuBindingsFromPackage = function () {
+        if (applicationMenuBindings.length > 0
+            || !backgroundChunkingEnabled
+            || backgroundCheckpointPhase != 'PostSchema') return;
+
+        var restoreBundles = [];
+        var packageApplicationBundles = Package.ApplicationBundles;
+        if (packageApplicationBundles && packageApplicationBundles.length != null) {
+            for (var restoreBundleIndex = 0; restoreBundleIndex < packageApplicationBundles.length; restoreBundleIndex++) {
+                if (packageApplicationBundles[restoreBundleIndex]) restoreBundles.push(packageApplicationBundles[restoreBundleIndex]);
+            }
+        }
+        var restoreSingleBundle = Package.ApplicationBundle || Package.AiApplication || Package.FrontendApplication;
+        if (restoreSingleBundle) restoreBundles.push(restoreSingleBundle);
+
+        for (var restoreIndex = 0; restoreIndex < restoreBundles.length; restoreIndex++) {
+            var restoreBundle = restoreBundles[restoreIndex] || {};
+            var restoreApp = restoreBundle.Application || restoreBundle.App || {};
+            var restoreAppType = firstTextParam([
+                restoreBundle.ApplicationType,
+                restoreApp.ApplicationType,
+                restoreApp.AppType,
+                Package.PackageInfo.ApplicationType,
+                'Web'
+            ]);
+            if (restoreAppType != 'MicroService') continue;
+
+            var restoreAppKey = firstTextParam([
+                restoreApp.AppKey,
+                restoreApp.MsKey,
+                restoreBundle.MicroService && restoreBundle.MicroService.MsKey,
+                V8.Param.AppId,
+                Package.PackageInfo.AppId
+            ]);
+            if (!restoreAppKey) throw new Error('PostSchema 恢复菜单绑定失败：MicroService AppKey 为空');
+
+            var restoredService = getApplicationRow('sys_microiservice', '', [['MsKey', '=', restoreAppKey]]);
+            if (!restoredService || !restoredService.Id) {
+                throw new Error('PostSchema 恢复菜单绑定失败：未找到微服务 ' + restoreAppKey);
+            }
+            var restoredApplication = getApplicationRow('sys_microistore', '', [['AppKey', '=', restoreAppKey]]);
+            var restoreRoutes = restoreBundle.Routes || restoreBundle.Pages || [];
+            if (!restoreRoutes.length) {
+                restoreRoutes = [{ RoutePath: '/', PageKey: 'home', PageName: '首页' }];
+            }
+            for (var restoreRouteIndex = 0; restoreRouteIndex < restoreRoutes.length; restoreRouteIndex++) {
+                var restoreRoute = restoreRoutes[restoreRouteIndex] || {};
+                var restoreRouteMeta = normalizeRouteMeta(restoreRoute);
+                var restoreRoutePath = firstTextParam([
+                    restoreRoute.RoutePath,
+                    restoreRoute.Path,
+                    restoreRouteMeta.RoutePath,
+                    '/'
+                ]);
+                var restoredPage = getApplicationRow('sys_microiservice_page', '', [
+                    ['MicroServiceId', '=', restoredService.Id],
+                    ['AND', 'RoutePath', '=', restoreRoutePath]
+                ]);
+                if (!restoredPage || !restoredPage.Id) {
+                    throw new Error('PostSchema 恢复菜单绑定失败：未找到页面 ' + restoreAppKey + restoreRoutePath);
+                }
+                applicationMenuBindings.push({
+                    ServiceId: restoredService.Id,
+                    ServiceKey: restoreAppKey,
+                    PageId: restoredPage.Id,
+                    RoutePath: restoreRoutePath,
+                    PreserveExistingNativeMenus: !!(restoredApplication && restoredApplication.Id),
+                    LegacyMenuUrls: legacyRouteValues(restoreRouteMeta, 'LegacyMenuUrls', 'LegacyMenuUrl'),
+                    LegacyComponentPaths: legacyRouteValues(restoreRouteMeta, 'LegacyComponentPaths', 'LegacyComponentPath')
+                });
+            }
+        }
+    };
+
     if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'ScheduleJobs') {
         reportProgress(98, '正在幂等安装定时任务');
         savePackageScheduleJobs();
@@ -5124,18 +5285,56 @@ try {
 
     var migratedMenuIds = {};
     var migrateLegacyMenus = function (binding, fieldName, values) {
-        if (!binding || !values || !values.length) return;
-        var menuResult = V8.FormEngine.GetTableData('sys_menu', {
-            _Where: [[fieldName, 'In', values]],
-            _PageIndex: 1,
-            _PageSize: 1000
-        });
-        var menus = menuResult && menuResult.Code == 1 && menuResult.Data ? menuResult.Data : [];
+        if (!binding) return;
+        values = values || [];
+        // PACKAGE_BOUND_MICROSERVICE_MENU_V1：新应用包已经把菜单声明为
+        // MicroService 时，不能仍要求 RouteMeta 额外配置 LegacyMenuUrls 才绑定
+        // 运行时。否则菜单会有 RoutePath，却没有 MicroServiceId/PageId，最终把
+        // 菜单 Id 当 AppKey 并报 MICRO_APP_NOT_AVAILABLE。
+        if (!values.length && fieldName != 'Url') return;
+        var menus = [];
+        if (values.length) {
+            var menuResult = V8.FormEngine.GetTableData('sys_menu', {
+                _Where: [[fieldName, 'In', values]],
+                _PageIndex: 1,
+                _PageSize: 1000
+            });
+            menus = menuResult && menuResult.Code == 1 && menuResult.Data ? menuResult.Data : [];
+        }
+        var packageBoundMenuIds = [];
+        for (var packageBoundMenuIndex = 0; packageBoundMenuIndex < sysMenus.length; packageBoundMenuIndex++) {
+            var packageBoundMenu = sysMenus[packageBoundMenuIndex] || {};
+            var packageBoundKey = firstTextParam([
+                packageBoundMenu.MicroServiceKey,
+                packageBoundMenu.MsKey,
+                packageBoundMenu.MicroServiceAppKey
+            ]).toLowerCase();
+            var packageBoundRoute = firstTextParam([
+                packageBoundMenu.MicroServiceRoutePath,
+                packageBoundMenu.RoutePath
+            ]).toLowerCase();
+            if (packageBoundMenu.Id
+                && packageBoundKey == String(binding.ServiceKey || '').toLowerCase()
+                && packageBoundRoute == String(binding.RoutePath || '').toLowerCase()) {
+                packageBoundMenuIds.push(packageBoundMenu.Id);
+            }
+        }
+        var packageBoundMenus = [];
+        if (packageBoundMenuIds.length) {
+            var packageBoundResult = V8.FormEngine.GetTableData('sys_menu', {
+                _Where: [['Id', 'In', packageBoundMenuIds]],
+                _PageIndex: 1,
+                _PageSize: 1000
+            });
+            packageBoundMenus = packageBoundResult && packageBoundResult.Code == 1 && packageBoundResult.Data
+                ? packageBoundResult.Data
+                : [];
+        }
         // v1.4.1 曾把旧 Url 覆盖成稳定微服务 Url。再次安装时同时按微服务绑定回查，
         // 才能恢复旧书签，而不是因为旧 Url 已丢失就永远无法命中。
         var recoverBoundMicroserviceMenus = V8.FormEngine.GetTableData('sys_menu', {
             _Where: [
-                ['MicroServiceKey', '=', binding.ServiceKey],
+                ['MicroServiceId', '=', binding.ServiceId],
                 ['AND', 'MicroServiceRoutePath', '=', binding.RoutePath]
             ],
             _PageIndex: 1,
@@ -5156,6 +5355,7 @@ try {
             }
         };
         appendMenus(menus);
+        appendMenus(packageBoundMenus);
         appendMenus(boundMenus);
         menus = mergedMenus;
         for (var legacyMenuIndex = 0; legacyMenuIndex < menus.length; legacyMenuIndex++) {
@@ -5206,6 +5406,7 @@ try {
             }
         }
     };
+    restoreApplicationMenuBindingsFromPackage();
     for (var bindingIndex = 0; bindingIndex < applicationMenuBindings.length; bindingIndex++) {
         var binding = applicationMenuBindings[bindingIndex];
         migrateLegacyMenus(binding, 'Url', binding.LegacyMenuUrls);

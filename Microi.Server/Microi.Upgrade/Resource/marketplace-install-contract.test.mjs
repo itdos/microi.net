@@ -151,7 +151,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.2.0");
+  assert.equal(engine.Version, "v1.2.1");
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
   assert.equal(engine.ApiV8Code, normalizeSource(bulkSource));
@@ -159,7 +159,8 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.1\.0/);
+  assert.match(importerSource, /Version: v2\.1\.3/);
+  assert.match(importerSource, /PACKAGE_MENU_RUNTIME_PREFLIGHT_V1/);
   assert.match(importerSource, /REMOTE_ZIP_SINGLE_ASSET_SLICE_V1/);
   assert.match(importerSource, /ADMIN_MENU_PERMISSION_V1/);
   assert.match(importerSource, /ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/);
@@ -190,6 +191,15 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(importerSource, /OBJECT_STORAGE_FORBIDDEN/);
   assert.match(importerSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
+  assert.match(importerSource, /POST_SCHEMA_MICROSERVICE_BINDING_RESTORE_V1/);
+  assert.match(
+    importerSource,
+    /backgroundCheckpointPhase != 'PostSchema'[\s\S]*?getApplicationRow\('sys_microiservice'[\s\S]*?getApplicationRow\('sys_microiservice_page'/,
+  );
+  assert.match(
+    importerSource,
+    /restoreApplicationMenuBindingsFromPackage\(\);[\s\S]*?migrateLegacyMenus\(binding, 'Url'/,
+  );
   assert.match(importerSource, /managedDecision == 'PreserveNewer'/);
   assert.match(importerSource, /接口引擎升级冲突/);
 
@@ -197,6 +207,6 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.1.0");
+  assert.equal(embeddedImporter.Version, "v2.1.3");
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
 });

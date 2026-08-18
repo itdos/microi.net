@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store-model
- * Version: v1.2.0
+ * Version: v1.2.2
  * Function:
  * - 按公开/私有权限读取当前或历史应用包；详情模式不返回大型数据包。
  */
@@ -27,13 +27,19 @@ function parseData(value) {
 }
 function stripPackage(row) {
   if (!row) return row;
-  delete row.AppPakcet;
-  delete row.AiAppZipFiles;
-  delete row.AiAppPackageManifest;
-  delete row.SelectData;
-  delete row.SelectAiApp;
-  delete row.PrivateSourcePath;
-  return row;
+  // MARKETPLACE_PLAIN_OBJECT_STRIP_V1
+  // FormEngine 返回的行在 Jint 中可能是 CLR/JObject 代理，直接 delete 会触发
+  // "The method or operation is not implemented"。先序列化为纯 JS 对象，
+  // 再裁剪详情页不需要的大字段。
+  var plain = parseData(JSON.stringify(row));
+  if (!plain) return row;
+  delete plain.AppPakcet;
+  delete plain.AiAppZipFiles;
+  delete plain.AiAppPackageManifest;
+  delete plain.SelectData;
+  delete plain.SelectAiApp;
+  delete plain.PrivateSourcePath;
+  return plain;
 }
 
 var id = trim(V8.Param.Id || V8.Param.StoreId);
@@ -61,5 +67,5 @@ if (versionId) {
 }
 selected.IsPublic = isPublic ? 1 : 0;
 selected.Visibility = isPublic ? "Public" : "Private";
-if (!flag(V8.Param.IncludePackage, true)) stripPackage(selected);
+if (!flag(V8.Param.IncludePackage, true)) selected = stripPackage(selected);
 return { Code: 1, Data: selected, Msg: "成功" };

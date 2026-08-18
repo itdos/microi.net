@@ -6,9 +6,11 @@
         :clearable="true"
         :disabled="GetFieldReadOnly(field)"
         :options="regionData"
+        :show-all-levels="AddressConfig.ShowAllLevels !== false"
+        :separator="AddressConfig.Separator || ' / '"
         @change="CommonV8CodeChange"
         :collapse-tags="LoadType == 'Table' ? true : false"
-        :props="props"
+        :props="AddressCascaderProps"
     >
     </el-cascader>
     <!-- zhy此处只针对地移动端地区选择 -->
@@ -23,14 +25,16 @@
         @change="treeNodeClick()"
 
     />
+    <DiySimpleFieldConfigDialog ref="simpleConfig" component="Address" component-label="地址" :field="field" :DiyTableModel="DiyTableModel" />
 </template>
 
 <script>
 import { regionDataPlus } from "element-china-area-data";
 import _ from "underscore";
 import { useDiyStore } from "@/pinia";
+import DiySimpleFieldConfigDialog from "./shared/DiySimpleFieldConfigDialog.vue";
 export default {
-    name: "diy-autocomplete",
+    name: "diy-address",
     inheritAttrs: false,
     emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     setup(props) {
@@ -64,6 +68,12 @@ export default {
         modelValue: {},
         ModelProps: {},
         field: {
+            type: Object,
+            default() {
+                return {};
+            }
+        },
+        DiyTableModel: {
             type: Object,
             default() {
                 return {};
@@ -124,9 +134,16 @@ export default {
         }
     },
 
-    components: {},
+    components: { DiySimpleFieldConfigDialog },
 
-    computed: {},
+    computed: {
+        AddressConfig() {
+            return this.field?.Config?.Address || {};
+        },
+        AddressCascaderProps() {
+            return { ...this.props, checkStrictly: this.AddressConfig.CheckStrictly === true };
+        }
+    },
 
     mounted() {
         var self = this;
@@ -138,6 +155,9 @@ export default {
     },
 
     methods: {
+        openConfig() {
+            this.$refs.simpleConfig.open();
+        },
         // zhy递归处理树形数据，修改树形节点名称为完整路径，添加fullPath属性，并处理"全部"选项改为上级value值拼接一个0，防止选中全部时错乱
         addFullPath(nodes, parentPath = '', parentCode = '') {
               if (!nodes || !nodes.length) return [];
