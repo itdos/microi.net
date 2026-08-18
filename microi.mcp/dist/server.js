@@ -337,6 +337,40 @@ export function buildApplicationAssetStreamV3RouteSnapshot(routes = []) {
         routeSnapshotHash: crypto.createHash('sha256').update(routeSnapshotJson, 'utf8').digest('hex'),
     };
 }
+function validateApplicationAssetStreamV3RouteFacts(routes) {
+    const routePaths = new Set();
+    const pageKeys = new Set();
+    routes.forEach((route, index) => {
+        if (!route || typeof route !== 'object' || Array.isArray(route)) {
+            throw new Error(`RouteSnapshotJson[${index}] 必须是对象`);
+        }
+        if (typeof route.RoutePath !== 'string') {
+            throw new Error(`RouteSnapshotJson[${index}].RoutePath 必须显式提供字符串；请使用 v3 PascalCase 路由字段`);
+        }
+        const routePath = route.RoutePath;
+        if (!routePath.startsWith('/') || routePath.includes('\\') || /[?#]/u.test(routePath)
+            || (routePath.length > 1 && routePath.endsWith('/'))) {
+            throw new Error(`RouteSnapshotJson[${index}].RoutePath 必须是 canonical route path`);
+        }
+        const routePathKey = routePath.toLowerCase();
+        if (routePaths.has(routePathKey))
+            throw new Error(`RouteSnapshotJson.RoutePath 重复：${routePath}`);
+        routePaths.add(routePathKey);
+        if (typeof route.PageKey !== 'string' || !route.PageKey.trim()) {
+            throw new Error(`RouteSnapshotJson[${index}].PageKey 必须显式提供非空字符串；请使用 v3 PascalCase 路由字段`);
+        }
+        const pageKey = route.PageKey.toLowerCase();
+        if (pageKeys.has(pageKey))
+            throw new Error(`RouteSnapshotJson.PageKey 重复：${route.PageKey}`);
+        pageKeys.add(pageKey);
+        if (route.EntryPath !== undefined) {
+            if (typeof route.EntryPath !== 'string') {
+                throw new Error(`RouteSnapshotJson[${index}].EntryPath 必须显式提供字符串`);
+            }
+            encodeApplicationAssetStreamV3RelativePath(route.EntryPath, `RouteSnapshotJson[${index}].EntryPath`);
+        }
+    });
+}
 function canonicalV3Decimal(value, label, { positive = false } = {}) {
     if (typeof value !== 'string' || !APPLICATION_ASSET_V3_DECIMAL.test(value)) {
         throw new Error(`${label} 必须是规范十进制 bigint 字符串`);
@@ -386,6 +420,7 @@ export function resolveApplicationAssetStreamV3Contract(input, runtimeManifestHa
         throw new Error('RuntimeManifestHash 与 MCP 本地流式清单不一致');
     }
     const routeSnapshot = buildApplicationAssetStreamV3RouteSnapshot(input.routes ?? []);
+    validateApplicationAssetStreamV3RouteFacts(input.routes ?? []);
     if (typeof input.routeSnapshotJson !== 'string' || input.routeSnapshotJson !== routeSnapshot.routeSnapshotJson) {
         throw new Error('RouteSnapshotJson 必须与 Routes 的递归键排序/UTF-8 canonical JSON 精确一致');
     }
@@ -986,6 +1021,156 @@ function validateApplicationFinalizeEvidence(result, expected) {
     if (String(evidence.VerificationStatus || '') !== 'Verified')
         throw new Error(`${context} 返回证据 VerificationStatus 必须为 Verified`);
     return evidence;
+}
+/**
+ * Upload one immutable application asset through the same protocol contract as
+ * the directory publisher. Protocol v3 callers must supply the frozen release
+ * identity and CAS baselines; files are then transferred through the durable
+ * multipart/HDFS path regardless of size. Keeping this logic outside tool
+ * registration prevents the MCP schema and transport implementation drifting
+ * apart again.
+ */
+export async function runApplicationAssetStreamUpload(client, input) {
+    try {
+        const absolutePath = path.resolve(input.localFilePath);
+        const stat = fs.lstatSync(absolutePath);
+        if (!stat.isFile() || stat.isSymbolicLink()) {
+            throw new Error(`本地资产必须是普通文件且不能是符号链接：${absolutePath}`);
+        }
+        const actualSha256 = await sha256LocalFile(absolutePath);
+        if (input.sha256 && input.sha256.toLowerCase() !== actualSha256) {
+            throw new Error('本地文件 SHA-256 与传入值不一致');
+        }
+        const normalizedPath = input.protocolVersion === 3
+            ? input.relativePath
+            : normalizeLocalApplicationRelativePath(input.relativePath);
+        const v3 = input.protocolVersion === 3
+            ? resolveApplicationAssetStreamV3Contract({
+                appIdOrKey: input.appIdOrKey,
+                versionNo: input.versionNo,
+                directory: path.dirname(absolutePath),
+                entryPath: normalizedPath,
+                routes: input.routes ?? [],
+                routeSnapshotJson: input.routeSnapshotJson,
+                routeSnapshotHash: input.routeSnapshotHash,
+                sourceManifestHash: input.sourceManifestHash,
+                runtimeManifestHash: input.runtimeManifestHash,
+                deliveryBatchId: input.deliveryBatchId,
+                publishMode: 'stage',
+                protocolVersion: 3,
+                expectedGateEpoch: input.expectedGateEpoch,
+                requestId: input.requestId,
+                requestFingerprint: input.requestFingerprint,
+                expectedCurrentVersion: input.expectedCurrentVersion,
+                expectedAppVersion: input.expectedAppVersion,
+                expectedPublishFence: input.expectedPublishFence,
+                expectedPublishRowVersion: input.expectedPublishRowVersion,
+                expectedVersionRowVersion: input.expectedVersionRowVersion,
+                expectedActivePublishVersionId: input.expectedActivePublishVersionId,
+                expectedCommittedPublishVersionId: input.expectedCommittedPublishVersionId,
+                allowLegacyFallback: false,
+            }, String(input.runtimeManifestHash || '').toLowerCase())
+            : null;
+        const encodedRelativePath = v3
+            ? buildConservativeApplicationAssetStreamV3ImmutablePath({
+                appIdOrKey: input.appIdOrKey,
+                versionNo: input.versionNo,
+                requestFingerprint: v3.requestFingerprint,
+                relativePath: normalizedPath,
+            }).encodedRelativePath
+            : '';
+        const deliveryBatchId = v3?.deliveryBatchId || `mcp-low-${deterministicApplicationPublishId([
+            input.appIdOrKey,
+            normalizedApplicationVersion(input.versionNo),
+            normalizedPath,
+            actualSha256,
+        ]).slice(0, 48)}`;
+        const requestId = v3?.requestId || buildApplicationAssetRequestId({
+            deliveryBatchId,
+            appIdOrKey: input.appIdOrKey,
+            versionNo: input.versionNo,
+            relativePath: normalizedPath,
+            sha256: actualSha256,
+        });
+        const summary = {
+            appIdOrKey: input.appIdOrKey,
+            versionNo: input.versionNo,
+            relativePath: normalizedPath,
+            size: stat.size,
+            sha256: actualSha256,
+            requestId,
+            ...(v3 ? {
+                protocolVersion: 3,
+                requestFingerprint: v3.requestFingerprint,
+                deliveryBatchId: v3.deliveryBatchId,
+                resumable: true,
+            } : {
+                protocolVersion: 2,
+                resumable: false,
+            }),
+        };
+        if (input.confirmExecution !== input.appIdOrKey) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            dryRun: true,
+                            confirmationRequired: input.appIdOrKey,
+                            ...summary,
+                        }, null, 2) }],
+            };
+        }
+        const result = await client.uploadApplicationAssetStream({
+            AppIdOrKey: input.appIdOrKey,
+            VersionNo: input.versionNo,
+            RelativePath: normalizedPath,
+            ExpectedSha256: actualSha256,
+            RequestId: requestId,
+            FilePath: absolutePath,
+            TimeoutMs: input.timeoutMs,
+            ...(v3 ? {
+                ProtocolVersion: 3,
+                ExpectedGateEpoch: v3.expectedGateEpoch,
+                RequestFingerprint: v3.requestFingerprint,
+                DeliveryBatchId: v3.deliveryBatchId,
+                SourceManifestHash: v3.sourceManifestHash,
+                RuntimeManifestHash: v3.runtimeManifestHash,
+                RouteSnapshotJson: v3.routeSnapshotJson,
+                RouteSnapshotHash: v3.routeSnapshotHash,
+                ExpectedCurrentVersion: v3.expectedCurrentVersion,
+                ExpectedAppVersion: v3.expectedAppVersion,
+                ExpectedPublishFence: v3.expectedPublishFence,
+                ExpectedPublishRowVersion: v3.expectedPublishRowVersion,
+                ExpectedVersionRowVersion: v3.expectedVersionRowVersion,
+                ExpectedActivePublishVersionId: v3.expectedActivePublishVersionId,
+                ExpectedCommittedPublishVersionId: v3.expectedCommittedPublishVersionId,
+            } : {}),
+        });
+        if (result.Code !== 1) {
+            return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        const evidence = v3
+            ? validateApplicationAssetV3UploadEvidence(result, {
+                ...v3,
+                versionNo: input.versionNo,
+                relativePath: normalizedPath,
+                encodedRelativePath,
+                sha256: actualSha256,
+                size: stat.size,
+            })
+            : validateApplicationAssetUploadEvidence(result, {
+                requestId,
+                versionNo: input.versionNo,
+                relativePath: normalizedPath,
+                sha256: actualSha256,
+                size: stat.size,
+            });
+        return { content: [{ type: 'text', text: JSON.stringify({ ...evidence, ...summary }, null, 2) }] };
+    }
+    catch (error) {
+        return {
+            content: [{ type: 'text', text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+            isError: true,
+        };
+    }
 }
 /**
  * Bridge a rolling-upgrade window without retrying the broken stream endpoint.
@@ -4052,13 +4237,13 @@ export function createMcpServer(client, context) {
         isTree: z.number().optional().describe('Enable tree structure (1=tree table with ParentId self-referencing, 0=flat). Default: 0'),
         column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 2 (双列，更紧凑现代)'),
         formOpenType: z.string().optional().describe('How to open form: "Dialog" (弹窗), "Drawer" (抽屉), "Page" (新页面). Default: Dialog'),
-        formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "60%"). Default: auto'),
+        formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "80%"). Default: 80%'),
         v8Unlimited: z.boolean().optional().describe('Default false for new tables; omit to preserve an existing table. true removes Jint per-execution budgets only for this table\'s backend V8 events while retaining the process resident-memory guard.'),
     }, async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth, v8Unlimited }) => {
         try {
             const result = await client.createTable(name, description, {
                 Tabs: tabs, IsTree: isTree, Column: column ?? 2,
-                FormOpenType: formOpenType, FormOpenWidth: formOpenWidth,
+                FormOpenType: formOpenType || 'Dialog', FormOpenWidth: formOpenWidth || '80%',
                 V8Unlimited: v8Unlimited === undefined ? undefined : (v8Unlimited ? 1 : 0),
             });
             if (result.Code !== 1) {
@@ -5858,65 +6043,32 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 流式上传单个应用资产
     // ========================
-    server.tool('microi_upload_application_asset_stream', `Stream one local built asset directly to the immutable HDFS version directory for OsClient "${osClient}". The file is never encoded as Base64 and never enters Jint. This is a low-level resumable primitive; normally use microi_publish_application_directory_stream to upload and atomically promote a complete directory.`, {
+    server.tool('microi_upload_application_asset_stream', `Stream one local built asset directly to the immutable HDFS version directory for OsClient "${osClient}". Protocol v3 uses durable HDFS multipart sessions with status readback and reconnect resume for ordinary files through multi-GiB installers; bytes are never encoded as Base64 and never enter Jint. This is a low-level primitive inside a frozen release contract; normally use microi_publish_application_directory_stream to upload and atomically promote a complete directory.`, {
         appIdOrKey: z.string().min(1).describe('Existing sys_microistore Id or AppKey.'),
         versionNo: z.string().regex(/^v?\d+\.\d+\.\d+$/u).describe('Immutable semantic version, e.g. v1.2.3.'),
         relativePath: z.string().min(1).describe('POSIX-style path inside the compiled output, e.g. assets/index-abcd.js.'),
         localFilePath: z.string().min(1).describe('Absolute or workspace-relative path of one local ordinary file.'),
         sha256: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional().describe('Optional expected SHA-256. MCP computes and verifies it when omitted.'),
+        routes: z.array(jsonRecordSchema).optional().default([]).describe('Canonical v3 route snapshot input; missing routes are frozen explicitly as [].'),
+        routeSnapshotJson: z.string().max(1024 * 1024).optional().describe('Protocol v3 requires the exact recursive-key-sorted, array-order-preserving UTF-8 canonical JSON for routes.'),
+        routeSnapshotHash: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 requires the lowercase SHA-256 of RouteSnapshotJson.'),
+        sourceManifestHash: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional().describe('Protocol v3 source-manifest SHA-256 tying this asset to the release.'),
+        runtimeManifestHash: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 exact runtime-manifest SHA-256 for the frozen release.'),
+        deliveryBatchId: z.string().min(8).max(50).optional().describe('Protocol v3 stable delivery batch id.'),
+        protocolVersion: z.literal(3).optional().describe('Enable durable v3 multipart/resume. All v3 release identity and CAS fields then become required.'),
+        expectedGateEpoch: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 gate epoch as a canonical decimal bigint string.'),
+        requestId: z.string().regex(/^[A-Za-z0-9._:-]{8,100}$/u).optional().describe('Protocol v3 stable release RequestId; every asset and stage/finalize replay must reuse it exactly.'),
+        requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 immutable release fingerprint.'),
+        expectedCurrentVersion: z.number().int().min(0).optional().describe('Protocol v3 application CurrentVersion baseline.'),
+        expectedAppVersion: z.string().nullable().optional().describe('Protocol v3 application AppVersion baseline; explicit null means empty.'),
+        expectedPublishFence: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 sys_microistore.PublishFence baseline.'),
+        expectedPublishRowVersion: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 sys_microistore.PublishRowVersion baseline.'),
+        expectedVersionRowVersion: z.string().regex(/^(0|[1-9]\d*)$/u).nullable().optional().describe('Protocol v3 target version RowVersion; explicit null means absent.'),
+        expectedActivePublishVersionId: z.string().min(1).nullable().optional().describe('Protocol v3 active version id baseline; explicit null means empty.'),
+        expectedCommittedPublishVersionId: z.string().min(1).nullable().optional().describe('Protocol v3 committed version id baseline; explicit null means empty.'),
         timeoutMs: z.number().int().min(1_000).max(2 * 60 * 60_000).optional().describe('Per-file upload timeout. Default 30 minutes; maximum 2 hours.'),
         confirmExecution: z.string().optional().describe('Required for the real upload and must exactly equal appIdOrKey.'),
-    }, async ({ appIdOrKey, versionNo, relativePath, localFilePath, sha256, timeoutMs, confirmExecution }) => {
-        try {
-            const normalizedPath = normalizeLocalApplicationRelativePath(relativePath);
-            const absolutePath = path.resolve(localFilePath);
-            const stat = fs.lstatSync(absolutePath);
-            if (!stat.isFile() || stat.isSymbolicLink())
-                throw new Error(`本地资产必须是普通文件且不能是符号链接：${absolutePath}`);
-            const actualSha256 = await sha256LocalFile(absolutePath);
-            if (sha256 && sha256.toLowerCase() !== actualSha256)
-                throw new Error('本地文件 SHA-256 与传入值不一致');
-            const deliveryBatchId = `mcp-low-${deterministicApplicationPublishId([
-                appIdOrKey,
-                normalizedApplicationVersion(versionNo),
-                normalizedPath,
-                actualSha256,
-            ]).slice(0, 48)}`;
-            const requestId = buildApplicationAssetRequestId({
-                deliveryBatchId,
-                appIdOrKey,
-                versionNo,
-                relativePath: normalizedPath,
-                sha256: actualSha256,
-            });
-            const summary = { appIdOrKey, versionNo, relativePath: normalizedPath, size: stat.size, sha256: actualSha256, requestId };
-            if (confirmExecution !== appIdOrKey) {
-                return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, confirmationRequired: appIdOrKey, ...summary }, null, 2) }] };
-            }
-            const result = await client.uploadApplicationAssetStream({
-                AppIdOrKey: appIdOrKey,
-                VersionNo: versionNo,
-                RelativePath: normalizedPath,
-                ExpectedSha256: actualSha256,
-                RequestId: requestId,
-                FilePath: absolutePath,
-                TimeoutMs: timeoutMs,
-            });
-            if (result.Code !== 1)
-                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
-            const evidence = validateApplicationAssetUploadEvidence(result, {
-                requestId,
-                versionNo,
-                relativePath: normalizedPath,
-                sha256: actualSha256,
-                size: stat.size,
-            });
-            return { content: [{ type: 'text', text: JSON.stringify(evidence, null, 2) }] };
-        }
-        catch (e) {
-            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
-        }
-    });
+    }, async (input) => runApplicationAssetStreamUpload(client, input));
     // ========================
     // Tool: 流式发布完整应用目录
     // ========================

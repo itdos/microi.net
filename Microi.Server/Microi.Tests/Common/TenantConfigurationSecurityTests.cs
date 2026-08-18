@@ -10,17 +10,20 @@ public class TenantConfigurationSecurityTests
     public void ControlPlaneDetailUsesMainRuntimeWithoutInitializingTargetTenant()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !Directory.Exists(Path.Combine(directory.FullName, "Microi.net.Api")))
+        string? sourcePath = null;
+        while (directory != null && sourcePath == null)
         {
-            directory = directory.Parent;
+            var serverRootCandidate = Path.Combine(
+                directory.FullName, "Microi.net.Api", "Controllers", "FormEngineController.cs");
+            var repositoryRootCandidate = Path.Combine(
+                directory.FullName, "Microi.Server", "Microi.net.Api", "Controllers", "FormEngineController.cs");
+            if (File.Exists(serverRootCandidate)) sourcePath = serverRootCandidate;
+            else if (File.Exists(repositoryRootCandidate)) sourcePath = repositoryRootCandidate;
+            else directory = directory.Parent;
         }
-        Assert.NotNull(directory);
+        Assert.NotNull(sourcePath);
 
-        var source = File.ReadAllText(Path.Combine(
-            directory!.FullName,
-            "Microi.net.Api",
-            "Controllers",
-            "FormEngineController.cs"));
+        var source = File.ReadAllText(sourcePath!);
 
         Assert.Contains("OsClient.GetClient(configOsClient)?.OsClientModel", source, StringComparison.Ordinal);
         Assert.DoesNotContain("OsClient.GetClient(targetOsClient)", source, StringComparison.Ordinal);
@@ -383,7 +386,8 @@ public class TenantConfigurationSecurityTests
             ["ThirdPartyKey"] = main["ThirdPartyKey"]!.DeepClone(),
             ["BusinessTheme"] = "tenant-owned-theme",
             ["EnableCaptcha"] = true,
-            ["PublicSettings"] = new JObject { ["Legacy"] = true }
+            ["PublicSettings"] = new JObject { ["Legacy"] = true },
+            ["ServerPrivateSettings"] = new JObject { ["MustBeReloaded"] = "secret" }
         };
 
         var projection = TenantConfigurationSecurity.CreateV8SysConfigProjection(historicalTenant);
@@ -395,6 +399,7 @@ public class TenantConfigurationSecurityTests
         Assert.Equal("tenant-owned-theme", projection["BusinessTheme"]?.ToString());
         Assert.True(projection["EnableCaptcha"]?.Value<bool>());
         Assert.Null(projection["PublicSettings"]);
+        Assert.Null(projection["ServerPrivateSettings"]);
 
         projection["BusinessTheme"] = "changed";
         Assert.Equal("tenant-owned-theme", historicalTenant["BusinessTheme"]?.ToString());
@@ -412,7 +417,8 @@ public class TenantConfigurationSecurityTests
             ["PwdV8"] = "backend-password-v8",
             ["GlobalV8Code"] = "frontend-global-v8",
             ["SysTitle"] = "Tenant Title",
-            ["PublicSettings"] = new JObject { ["Legacy"] = true }
+            ["PublicSettings"] = new JObject { ["Legacy"] = true },
+            ["ServerPrivateSettings"] = new JObject { ["Secret"] = "must-not-leak" }
         };
 
         var projection = TenantConfigurationSecurity.CreatePublicSysConfigProjection(source);
@@ -425,6 +431,7 @@ public class TenantConfigurationSecurityTests
         Assert.Equal("frontend-global-v8", projection["GlobalV8Code"]?.ToString());
         Assert.Equal("Tenant Title", projection["SysTitle"]?.ToString());
         Assert.Null(projection["PublicSettings"]);
+        Assert.Null(projection["ServerPrivateSettings"]);
     }
 
     [Fact]

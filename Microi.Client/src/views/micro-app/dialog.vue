@@ -30,6 +30,7 @@
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
+import { useDiyStore } from "@/pinia";
 import { buildMicroAppEntryUrl, shouldUseMicroAppResolveFallback } from "@/utils/microAppEntryUrl.js";
 import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
 import MicroAppRuntimeError from "./runtime-error.vue";
@@ -49,6 +50,9 @@ function normalizeRoute(value) {
 export default {
     name: "MicroAppDialog",
     components: { MicroAppLoadingSkeleton, MicroAppRuntimeError },
+    setup() {
+        return { diyStore: useDiyStore() };
+    },
     props: {
         DataAppend: { type: Object, default: () => ({}) }
     },
@@ -68,6 +72,9 @@ export default {
             hostViewport: { width: 0, height: 0, safeAreaBottom: 0 },
             resizeObserver: null,
             visualViewportHandler: null,
+            themeObserver: null,
+            runtimeThemeMode: document.documentElement.classList.contains("dark") ? "dark" : "light",
+            runtimeThemeColor: "",
             instanceId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         };
     },
@@ -101,6 +108,22 @@ export default {
                 permissionContext,
                 appKey: this.appKey,
                 version: this.appVersion,
+                themeColor: this.runtimeThemeColor || this.diyStore.themeColor || this.diyStore.SysConfig?.ThemeColor || "#409eff",
+                themeMode: this.runtimeThemeMode,
+                systemStyle: this.diyStore.SystemStyle || "Classic",
+                systemTitle: this.diyStore.SysConfig?.SysTitle || this.diyStore.SysConfig?.SysShortTitle || DiyCommon.GetOsClient(),
+                systemShortTitle: this.diyStore.SysConfig?.SysShortTitle || "",
+                fileServer: this.diyStore.SysConfig?.FileServer || "",
+                isOfficialPlatform: this.diyStore.SysConfig?.IsOfficialPlatform === true
+                    || Number(this.diyStore.SysConfig?.IsOfficialPlatform || 0) === 1,
+                disableFormMaskBlur: this.diyStore.SysConfig?.DisableFormMaskBlur === true
+                    || Number(this.diyStore.SysConfig?.DisableFormMaskBlur || 0) === 1,
+                currentUser: {
+                    Id: this.diyStore.GetCurrentUser?.Id || "",
+                    Name: this.diyStore.GetCurrentUser?.Name || this.diyStore.GetCurrentUser?.Account || "",
+                    Account: this.diyStore.GetCurrentUser?.Account || "",
+                    Level: this.diyStore.GetCurrentUser?.Level ?? 0
+                },
                 hostViewport: this.hostViewport,
                 microRoute: this.routePath,
                 dialog: true,
@@ -127,9 +150,11 @@ export default {
         this.resolveEntryUrl();
     },
     mounted() {
+        this.startThemeContract();
         this.startViewportContract();
     },
     beforeUnmount() {
+        this.stopThemeContract();
         this.stopViewportContract();
     },
     methods: {
@@ -281,6 +306,41 @@ export default {
         pushViewportContract() {
             const app = this.$refs.microApp;
             if (app && typeof app.setData === "function") app.setData({ ...this.microAppData, type: "host:resize" });
+        },
+        resolveRuntimeThemeColor() {
+            return String(
+                this.diyStore.themeColor
+                || this.diyStore.SysConfig?.ThemeColor
+                || getComputedStyle(document.documentElement).getPropertyValue("--el-color-primary")
+                || "#409eff"
+            ).trim();
+        },
+        syncRuntimeTheme(push = true) {
+            const nextMode = document.documentElement.classList.contains("dark") ? "dark" : "light";
+            const nextColor = this.resolveRuntimeThemeColor();
+            const changed = nextMode !== this.runtimeThemeMode || nextColor !== this.runtimeThemeColor;
+            this.runtimeThemeMode = nextMode;
+            this.runtimeThemeColor = nextColor;
+            if (push && changed) this.$nextTick(() => this.pushRuntimeContext("host:theme"));
+        },
+        startThemeContract() {
+            this.syncRuntimeTheme(false);
+            if (typeof MutationObserver === "undefined") return;
+            this.themeObserver = new MutationObserver(() => this.syncRuntimeTheme(true));
+            this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] });
+        },
+        stopThemeContract() {
+            this.themeObserver?.disconnect?.();
+            this.themeObserver = null;
+        },
+        pushRuntimeContext(type = "host:context") {
+            const data = { ...this.microAppData, type };
+            if (this.microAppName && typeof window.microApp?.forceSetData === "function") {
+                window.microApp.forceSetData(this.microAppName, data);
+                return;
+            }
+            const app = this.$refs.microApp;
+            if (app && typeof app.setData === "function") app.setData(data);
         },
         invokeCallback(name, data) {
             const callback = this.DataAppend?.[name];

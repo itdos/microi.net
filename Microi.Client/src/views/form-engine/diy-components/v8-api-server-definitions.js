@@ -342,6 +342,44 @@ export const V8ServerApiDefinitions = {
                 }
             },
 
+            // ========== TCP 原始字节 ==========
+            Tcp: {
+                label: "Tcp",
+                kind: "Module",
+                documentation: "后端一次性 TCP 客户端。用于网络小票机、串口服务器、PLC 等设备的原始字节发送/收发；Host 与 Port 必须来自可信配置，不能直接透传用户输入。",
+                insertText: "Tcp",
+                methods: {
+                    Send: {
+                        label: "Send",
+                        kind: "Method",
+                        documentation: "连接、发送并关闭。Bytes、ByteBase64、Hex、Text 必须且只能提供一种。Code=1 仅表示字节已写入 TCP 连接，不代表设备已完成打印。",
+                        insertText: "Send",
+                        snippet: 'Send({\n\tHost: "${1:192.168.1.88}",\n\tPort: ${2:9100},\n\tBytes: [27, 64, ${3:10}],\n\tConnectTimeout: ${4:10},\n\tSendTimeout: ${5:10}\n})'
+                    },
+                    SendAsync: {
+                        label: "SendAsync",
+                        kind: "Method",
+                        documentation: "请求内异步连接、发送并关闭；使用 await，不能代替后台任务。",
+                        insertText: "SendAsync",
+                        snippet: 'SendAsync({\n\tHost: "${1:192.168.1.88}",\n\tPort: ${2:9100},\n\tByteBase64: "${3:base64}",\n\tConnectTimeout: ${4:10},\n\tSendTimeout: ${5:10}\n})'
+                    },
+                    SendAndReceive: {
+                        label: "SendAndReceive",
+                        kind: "Method",
+                        documentation: "发送后读取有界响应。Data 包含 RawBytes、ByteBase64、Hex、BytesReceived、ReceiveEndReason 与 Truncated。",
+                        insertText: "SendAndReceive",
+                        snippet: 'SendAndReceive({\n\tHost: "${1:192.168.1.88}",\n\tPort: ${2:9100},\n\tHex: "${3:1B 40}",\n\tReceiveTimeout: ${4:3},\n\tMaxReceiveBytes: ${5:65536}\n})'
+                    },
+                    SendAndReceiveAsync: {
+                        label: "SendAndReceiveAsync",
+                        kind: "Method",
+                        documentation: "请求内异步发送并读取有界响应；使用 await。",
+                        insertText: "SendAndReceiveAsync",
+                        snippet: 'SendAndReceiveAsync({\n\tHost: "${1:192.168.1.88}",\n\tPort: ${2:9100},\n\tHex: "${3:1B 40}",\n\tReceiveTimeout: ${4:3},\n\tMaxReceiveBytes: ${5:65536}\n})'
+                    }
+                }
+            },
+
             // ========== Microi.AI ==========
             AI: {
                 label: "AI",

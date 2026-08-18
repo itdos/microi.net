@@ -290,8 +290,9 @@ export default {
     /*
     这里的 - 75px，跟【.el-tabs.el-tabs--top.parent-tabs】的margin-btoom:10px是有关系的，
     否则上面空隙就不对等
+    2026-08-18 Anderson：修改为-85px，否则底部没有空隙
     */
-    height: calc(100vh - 75px);
+    height: calc(100vh - 85px);
     min-height: 520px;
     padding: 0;
     margin-top: 0;

@@ -29,7 +29,7 @@ import i18n, { translateEngineLiteral } from "./lang"; // internationalization
 // Vite SVG 图标注册
 import "virtual:svg-icons-register";
 import "./permission"; // permission control
-import "./utils/error-log"; // error log
+import { setupErrorHandler } from "./utils/error-log"; // error log
 import "animate.css";
 import "./styles/itdos.diy.scss";
 // MCI (Microi Cool Interface) 设计系统 — 移动端及全局变量
@@ -175,19 +175,26 @@ app.use(i18n);
 // Vue 3 生产环境配置
 app.config.performance = import.meta.env.DEV;
 app.config.warnHandler = import.meta.env.DEV ? undefined : () => {};
+// 必须在 mount 前安装。除常规错误上报外，它会精确兜住 Element Plus Tabs
+// 卸载竞态，避免路由地址已改变而 RouterView 仍停留在旧页面。
+setupErrorHandler(app);
 // 挂载应用
 app.mount("#app_microi");
 // 通知独立 Loading 脚本：Vue 入口已被浏览器执行并成功挂载。
-// legacy 构建和现代构建共用该信号，避免脚本未启动时 Loading 到 100% 后静默白屏。
+// 注意：挂载不等于业务就绪。租户配置与后端初始化完成后才发送 microi:app-ready，
+// 避免 Loading 到 100% 后提前消失并露出尚未初始化的空白页面。
 window.__MICROI_APP_MOUNTED__ = true;
 window.__MICROI_APP_BUILD_TARGET__ = import.meta.env.LEGACY ? "legacy" : "modern";
-try {
-    window.dispatchEvent(new Event("microi:app-mounted"));
-} catch (error) {
-    var mountedEvent = document.createEvent("Event");
-    mountedEvent.initEvent("microi:app-mounted", false, false);
-    window.dispatchEvent(mountedEvent);
+function dispatchMicroiBootEvent(eventName, detail) {
+    try {
+        window.dispatchEvent(new CustomEvent(eventName, { detail: detail || {} }));
+    } catch (error) {
+        var bootEvent = document.createEvent("CustomEvent");
+        bootEvent.initCustomEvent(eventName, false, false, detail || {});
+        window.dispatchEvent(bootEvent);
+    }
 }
+dispatchMicroiBootEvent("microi:app-mounted", { buildTarget: window.__MICROI_APP_BUILD_TARGET__ });
 // 将一些方法和属性暴露到全局（用于兼容旧代码）
 window.__VUE_APP__ = app;
 // ============= 应用生命周期逻辑 =============
@@ -486,8 +493,23 @@ window.addEventListener("beforeunload", () => {
         }
     }
 });
-// 执行初始化
-initApp().catch(function (error) {
+// 执行初始化。只有租户配置、主题和后端基础数据初始化完成，启动页才允许退出。
+initApp().then(async function () {
+    // 租户配置完成后仍需等待首个路由组件解析并至少完成两帧绘制。
+    // 否则启动层虽然等到了后端，仍可能在异步路由尚未呈现时露出短暂白屏。
+    await router.isReady();
+    await nextTick();
+    await new Promise(function (resolve) {
+        requestAnimationFrame(function () {
+            requestAnimationFrame(resolve);
+        });
+    });
+    window.__MICROI_APP_READY__ = true;
+    window.__MICROI_APP_BOOT_ERROR__ = "";
+    dispatchMicroiBootEvent("microi:app-ready", {
+        buildTarget: window.__MICROI_APP_BUILD_TARGET__
+    });
+}).catch(function (error) {
     var failedApiBase = "";
     var failedOsClient = "";
     try { failedApiBase = DiyCommon.GetApiBase(); } catch (readApiBaseError) {}
@@ -496,6 +518,12 @@ initApp().catch(function (error) {
         apiBase: failedApiBase,
         osClient: failedOsClient,
         url: error?.config?.url || (failedApiBase ? failedApiBase + "/api/FormEngine/GetSysConfig" : "")
+    });
+    window.__MICROI_APP_BOOT_ERROR__ = error?.message || String(error || "应用初始化失败");
+    dispatchMicroiBootEvent("microi:app-boot-failed", {
+        message: window.__MICROI_APP_BOOT_ERROR__,
+        apiBase: failedApiBase,
+        osClient: failedOsClient
     });
     console.error("[Microi] 应用初始化失败：", error);
 });

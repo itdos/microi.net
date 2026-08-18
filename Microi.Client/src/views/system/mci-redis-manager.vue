@@ -919,7 +919,7 @@ onBeforeUnmount(() => window.removeEventListener('microi-redis-auth-expired', on
 .mci-stat-card span { display: block; margin-bottom: 7px; color: var(--mci-redis-muted); font-size: 12px; }
 .mci-stat-card strong { font-size: 20px; }
 .mci-stat-section { margin-top: 22px; }
-.mci-stat-section h3 { margin: 0 0 12px; font-size: 15px; }
+.mci-stat-section h3 { margin: 0 0 10px; font-size: 15px; }
 .mci-stat-section h3 small { margin-left: 7px; color: var(--mci-redis-muted); font-size: 11px; font-weight: 400; }
 .mci-type-row { display: grid; grid-template-columns: 95px 1fr 38px; align-items: center; gap: 9px; margin-bottom: 10px; }
 

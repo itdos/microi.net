@@ -4,6 +4,29 @@
 
 ---
 
+## 公开配置与服务端私密配置
+
+系统设置采用明确的双表边界：
+
+- `sys_config` 保存需要向浏览器公开的租户配置。新增公开项必须创建真实物理字段和 `diy_field` 元数据；前端 `V8.SysConfig` 读取它的安全投影。
+- `mci_system_setting` 只保存敏感配置或仅供后端使用的普通值。历史 `IsPublic` 字段已停用，任何记录都不会进入匿名 `GetSysConfig` 或浏览器。
+- 后端接口引擎和后端 V8 事件仍可读取 `sys_config` 全部字段；私密值统一从 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 读取。禁止返回、记录或复制整个 `ServerPrivateSettings`。
+- `mci_system_setting` 的 Secret 使用租户绑定认证加密，列表默认掩码；临时显示原文要求 Passkey、Authenticator 或严格人脸的一次性步进验证，并使用 `no-store`。
+
+```js
+// 前端或后端均可读取公开实体字段
+var title = V8.SysConfig.SysTitle;
+
+// 仅后端接口引擎、SubmitBeforeServerV8、SubmitAfterServerV8 等可信后端事件可用
+var privateSettings = V8.SysConfig.ServerPrivateSettings || {};
+var clientSecret = privateSettings['Login.Gitee.ClientSecret'];
+// clientSecret 只能参与当前后端调用，禁止 return 或 console.log。
+```
+
+`DisableFormMaskBlur` 与 `DisableAiAssistant` 均为负向开关：缺失、空值或 `0/false` 表示保持默认效果；只有显式 `1/true` 才分别关闭表单遮罩毛玻璃和 AI 助手图标。表级 `diy_table.DisableFormMaskBlur` 也可单独关闭某张表的毛玻璃效果，全局或表级任一显式关闭即生效。应用商城升级必须复用旧 `FormMaskBlur`、`IsShowAiAssistant` 的字段元数据 Id 完成就地改名；为兼容未升级前的数据可以暂留旧物理列，但旧字段元数据必须在 PC 与移动端隐藏，禁止让用户同时看到正向、负向两套开关。
+
+---
+
 ## 🔐 验证码
 
 ### 获取验证码图片

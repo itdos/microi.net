@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { MicroiClient } from './microi-client.js';
-import { buildConservativeApplicationAssetStreamV3ImmutablePath, buildApplicationAssetStreamV3RouteSnapshot, buildApplicationAssetRequestId, buildApplicationFinalizeRequestId, buildLocalApplicationAssetManifest, encodeApplicationAssetStreamV3RelativePath, isLegacyApplicationStreamJValueFailure, resolveApplicationAssetStreamV3Contract, resolveLegacyApplicationStreamFallbackPolicy, runApplicationDirectoryStreamPublish, tryLegacyMicroServiceStreamPublishFallback, validateLocalApplicationAssetSize, } from './server.js';
+import { buildConservativeApplicationAssetStreamV3ImmutablePath, buildApplicationAssetStreamV3RouteSnapshot, buildApplicationAssetRequestId, buildApplicationFinalizeRequestId, buildLocalApplicationAssetManifest, encodeApplicationAssetStreamV3RelativePath, isLegacyApplicationStreamJValueFailure, resolveApplicationAssetStreamV3Contract, resolveLegacyApplicationStreamFallbackPolicy, runApplicationAssetStreamUpload, runApplicationDirectoryStreamPublish, tryLegacyMicroServiceStreamPublishFallback, validateLocalApplicationAssetSize, } from './server.js';
 const EMPTY_ROUTE_SNAPSHOT_JSON = '[]';
 const EMPTY_ROUTE_SNAPSHOT_HASH = crypto.createHash('sha256').update(EMPTY_ROUTE_SNAPSHOT_JSON, 'utf8').digest('hex');
 test('MCP route canonical JSON 与 Node/Core 固定 UTF-8 hash 向量一致并拒绝非 safe integer', () => {
@@ -17,6 +17,45 @@ test('MCP route canonical JSON 与 Node/Core 固定 UTF-8 hash 向量一致并�
     assert.equal(snapshot.routeSnapshotHash, '39ac0b5c44884edcb6497dbf6a0fa8a2e95a1f2a968e8eaa10e7557e0443d47e');
     assert.throws(() => buildApplicationAssetStreamV3RouteSnapshot([{ order: 0.5 }]), /safe integer/u);
     assert.throws(() => buildApplicationAssetStreamV3RouteSnapshot([{ order: 9007199254740992 }]), /safe integer/u);
+});
+test('protocol v3 preflight rejects lower-camel route objects before any immutable asset upload', () => {
+    const base = {
+        appIdOrKey: 'v3-route-shape',
+        versionNo: 'v1.0.0',
+        directory: '.',
+        publishMode: 'stage',
+        protocolVersion: 3,
+        expectedGateEpoch: '1',
+        requestId: 'v3-route-shape-request',
+        requestFingerprint: 'a'.repeat(64),
+        deliveryBatchId: 'v3-route-shape-batch',
+        sourceManifestHash: 'b'.repeat(64),
+        runtimeManifestHash: 'c'.repeat(64),
+        expectedCurrentVersion: 0,
+        expectedAppVersion: null,
+        expectedPublishFence: '0',
+        expectedPublishRowVersion: '0',
+        expectedVersionRowVersion: null,
+        expectedActivePublishVersionId: null,
+        expectedCommittedPublishVersionId: null,
+        allowLegacyFallback: false,
+    };
+    const lowerCamelRoutes = [{ routePath: '/marketplace', pageKey: 'marketplace', entryPath: 'index.html' }];
+    const lowerCamelSnapshot = buildApplicationAssetStreamV3RouteSnapshot(lowerCamelRoutes);
+    assert.throws(() => resolveApplicationAssetStreamV3Contract({
+        ...base,
+        routes: lowerCamelRoutes,
+        routeSnapshotJson: lowerCamelSnapshot.routeSnapshotJson,
+        routeSnapshotHash: lowerCamelSnapshot.routeSnapshotHash,
+    }, base.runtimeManifestHash), /RoutePath.*PascalCase/u);
+    const protocolRoutes = [{ RoutePath: '/marketplace', PageKey: 'marketplace', EntryPath: 'index.html' }];
+    const protocolSnapshot = buildApplicationAssetStreamV3RouteSnapshot(protocolRoutes);
+    assert.ok(resolveApplicationAssetStreamV3Contract({
+        ...base,
+        routes: protocolRoutes,
+        routeSnapshotJson: protocolSnapshot.routeSnapshotJson,
+        routeSnapshotHash: protocolSnapshot.routeSnapshotHash,
+    }, base.runtimeManifestHash));
 });
 test('protocol v3 nullable baselines reject empty strings to preserve Oracle/MySQL/SQL Server CAS parity', () => {
     const base = {
@@ -147,6 +186,91 @@ test('application stream accepts 5 GiB logical assets and preserves optional cal
         assert.equal(result.isError, true);
         assert.match(result.content[0].type === 'text' ? result.content[0].text : '', /上传前中止/u);
         assert.equal(uploadCalls, 0);
+    }
+    finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+test('low-level asset tool preserves the complete v3 contract and selects resumable multipart transport', async () => {
+    const root = createTempDirectory();
+    const filePath = path.join(root, 'installer.exe');
+    const raw = Buffer.from('microi-v3-resumable-installer', 'utf8');
+    fs.writeFileSync(filePath, raw);
+    const requestId = 'single-v3-release-request-id';
+    const fingerprint = '3'.repeat(64);
+    const sourceManifestHash = '4'.repeat(64);
+    const runtimeManifestHash = '5'.repeat(64);
+    const relativePath = 'downloads/Microi-Setup-v1.0.0.exe';
+    let uploadCalls = 0;
+    try {
+        const fakeClient = {
+            uploadApplicationAssetStream: async (input) => {
+                uploadCalls += 1;
+                assert.equal(input.ProtocolVersion, 3);
+                assert.equal(input.RequestId, requestId);
+                assert.equal(input.RequestFingerprint, fingerprint);
+                assert.equal(input.RuntimeManifestHash, runtimeManifestHash);
+                assert.equal(input.ExpectedVersionRowVersion, null);
+                return {
+                    Code: 1,
+                    Data: {
+                        ProtocolVersion: 3,
+                        PublishMode: 'stage',
+                        GateEpoch: input.ExpectedGateEpoch,
+                        RequestId: input.RequestId,
+                        RequestFingerprint: input.RequestFingerprint,
+                        RouteSnapshotJson: input.RouteSnapshotJson,
+                        RouteSnapshotHash: input.RouteSnapshotHash,
+                        VersionNo: 'v1.0.0',
+                        Path: input.RelativePath,
+                        Sha256: input.ExpectedSha256,
+                        Size: raw.byteLength,
+                        PublishState: 'Prepared',
+                        PointerState: 'Uncommitted',
+                        Pending: true,
+                        FencingToken: '13',
+                        ReleaseFilePath: `microi/application-assets/v3/tenants/iTdos/kinds/Web/apps/single-v3-app/releases/v1.0.0/requests/${fingerprint}/assets/downloads/Microi-Setup-v1.0.0.exe`,
+                    },
+                    Msg: '',
+                };
+            },
+        };
+        const input = {
+            appIdOrKey: 'single-v3-app',
+            versionNo: 'v1.0.0',
+            relativePath,
+            localFilePath: filePath,
+            routes: [],
+            routeSnapshotJson: EMPTY_ROUTE_SNAPSHOT_JSON,
+            routeSnapshotHash: EMPTY_ROUTE_SNAPSHOT_HASH,
+            sourceManifestHash,
+            runtimeManifestHash,
+            deliveryBatchId: 'single-v3-delivery',
+            protocolVersion: 3,
+            expectedGateEpoch: '7',
+            requestId,
+            requestFingerprint: fingerprint,
+            expectedCurrentVersion: 4,
+            expectedAppVersion: 'v0.9.0',
+            expectedPublishFence: '12',
+            expectedPublishRowVersion: '18',
+            expectedVersionRowVersion: null,
+            expectedActivePublishVersionId: 'version-active',
+            expectedCommittedPublishVersionId: 'version-committed',
+        };
+        const preflight = parseToolJson(await runApplicationAssetStreamUpload(fakeClient, input));
+        assert.equal(preflight.dryRun, true);
+        assert.equal(preflight.protocolVersion, 3);
+        assert.equal(preflight.resumable, true);
+        assert.equal(uploadCalls, 0);
+        const uploaded = parseToolJson(await runApplicationAssetStreamUpload(fakeClient, {
+            ...input,
+            confirmExecution: 'single-v3-app',
+        }));
+        assert.equal(uploaded.ProtocolVersion, 3);
+        assert.equal(uploaded.requestFingerprint, fingerprint);
+        assert.equal(uploaded.resumable, true);
+        assert.equal(uploadCalls, 1);
     }
     finally {
         fs.rmSync(root, { recursive: true, force: true });

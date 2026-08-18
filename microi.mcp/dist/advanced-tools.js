@@ -213,12 +213,20 @@ export function analyzeBackgroundWorkload(buttonInput) {
         reasons.push(`预计外部调用 ${externalCalls} 次 >= 100 次`);
     if (getBoolean(workload, 'UnknownTotal', 'unknownTotal') === true)
         reasons.push('总工作量未知且可能长时间运行');
+    const v8Code = getString(button, 'V8Code', 'v8Code');
     const semanticText = [
         getString(button, 'Name', 'name'),
         getString(button, 'ApiEngineKey', 'apiEngineKey'),
-        getString(button, 'V8Code', 'v8Code'),
+        v8Code,
     ].join(' ');
-    if (/(批量.{0,4}(导入|生成|修复|处理)|安装|初始化|全量同步|数据迁移|数据库备份|批量任务)/i.test(semanticText)) {
+    // Opening a management page is navigation, not the long-running operation named by that page.
+    // For example, “数据库定时备份” opens a settings/records micro-app; the user starts the
+    // durable task from inside that page. Treating the navigation button as a queued ApiEngine
+    // action both blocks valid menu updates and can accidentally bypass the intended confirmation UI.
+    const isNavigationOnly = /\bV8\.OpenAppDialog\s*\(/i.test(v8Code)
+        && !/\bV8\.(?:ApiEngine\.RunBackground|Method\.QueueBackgroundTask)\s*\(/i.test(v8Code);
+    if (!isNavigationOnly
+        && /(批量.{0,4}(导入|生成|修复|处理)|安装|初始化|全量同步|数据迁移|数据库备份|批量任务)/i.test(semanticText)) {
         reasons.push('动作语义属于典型长任务');
     }
     return { required: reasons.length > 0, reasons };
@@ -1817,6 +1825,23 @@ function modulePayload(module, tableIdByName, moduleIdByName, fieldLookup) {
     });
     return payload;
 }
+function buildDefaultFormOpen(table) {
+    const explicitType = getString(table, 'formOpenType', 'FormOpenType');
+    const explicitWidth = getString(table, 'formOpenWidth', 'FormOpenWidth');
+    if (explicitType)
+        return { type: explicitType, width: explicitWidth || '80%' };
+    const fields = getArray(table, 'fields', 'Fields');
+    const businessFields = fields.filter((field) => !LAYOUT_COMPONENTS.has(tableFieldComponent(field)));
+    const childTableCount = businessFields.filter((field) => tableFieldComponent(field) === 'tablechild').length;
+    const heavyCount = businessFields.filter((field) => [
+        'tablechild', 'richtext', 'codeeditor', 'jsontable', 'imgupload', 'fileupload', 'map', 'maparea', 'devcomponent'
+    ].includes(tableFieldComponent(field))).length;
+    const requiresDrawer = businessFields.length >= 36
+        || childTableCount >= 2
+        || (businessFields.length >= 28 && childTableCount >= 1)
+        || heavyCount >= 7;
+    return { type: requiresDrawer ? 'Drawer' : 'Dialog', width: explicitWidth || '80%' };
+}
 function normalizeRelationCardinality(value) {
     const normalized = value.trim().toLowerCase().replace(/\s+/gu, '').replace(/[×＊*]/gu, ':');
     if (['1:1', 'one:one', 'one-to-one', 'onetoone'].includes(normalized))
@@ -2366,6 +2391,8 @@ export function manifestGuide(osClient) {
             tables: {
                 tabs: 'diy_table.Tabs form groups. When omitted and the table has more than 12 business fields, generator creates Basic/Contact/Business/Attachment/Extra tabs and assigns empty field tab values.',
                 column: 'Form column count. Omit to use 2 columns for generated systems unless the user asks for a single-column form.',
+                formOpenType: 'Default Dialog. Use Drawer only for extremely large forms (roughly 36+ business fields, 2+ child tables, or similarly heavy content).',
+                formOpenWidth: 'Default 80% for generated Dialog forms. Preserve an explicit business-specific width.',
                 indexes: 'Physical database indexes. Declare ordered columns and unique. Required indexes must be created by microi_create_table_index or manifest generation, never by ad-hoc SQL. Tenant tables should usually lead with OsClient.',
                 v8Unlimited: 'Default false. Set true only when this table\'s backend V8 events must keep one database transaction and the user explicitly accepts unbounded Jint per-execution budgets. Process resident-memory protection remains active.',
             },
@@ -2415,6 +2442,7 @@ export function manifestGuide(osClient) {
             'EnableViewSchema controls Detail/Edit custom forms only. List/Card presentation and generated Hero/metrics remain active when it is 0.',
             'Do not use diy_table.DiyConfig, diy_field.DiyConfig or sys_menu.DiyConfig for new configuration. Add dedicated physical columns and expose them through DIY metadata.',
             'For forms with many fields, use diy_table.Tabs first. Use CollapseGroup for optional/secondary sections and field component Tabs for nested in-page grouping.',
+            'Open generated forms in an 80% Dialog by default. Use Drawer only for extremely large forms with many fields, multiple TableChild controls, or comparable heavy content; never make Drawer the blanket module default.',
             'Use dryRun=true until the user explicitly asks to write.',
             'For Page Engine pages, save only the JsonObj layer to mic_page.JsonObj: {formConfig, wrapperList}. Do not wrap it in formData.',
             'For Print Engine templates, PageObj must be a hiprint object with panels[].printElements; PrintObj is sample/runtime data.',
@@ -2532,12 +2560,13 @@ export function registerAdvancedTools(server, client, context) {
             for (const table of manifestTables) {
                 const tableName = getString(table, 'name', 'Name');
                 const tableLayout = buildDefaultTableLayout(table);
+                const formOpen = buildDefaultFormOpen(table);
                 const response = await client.createTable(tableName, getString(table, 'description', 'Description'), {
                     Tabs: stringifyConfig(table.tabs ?? table.Tabs ?? tableLayout.tabs),
                     IsTree: getNumber(table, 'isTree', 'IsTree'),
                     Column: getNumber(table, 'column', 'Column') ?? tableLayout.column ?? 2,
-                    FormOpenType: getString(table, 'formOpenType', 'FormOpenType'),
-                    FormOpenWidth: getString(table, 'formOpenWidth', 'FormOpenWidth'),
+                    FormOpenType: formOpen.type,
+                    FormOpenWidth: formOpen.width,
                     V8Unlimited: getBoolean(table, 'v8Unlimited', 'V8Unlimited') === undefined
                         ? undefined
                         : (getBoolean(table, 'v8Unlimited', 'V8Unlimited') ? 1 : 0),

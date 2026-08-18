@@ -1,17 +1,54 @@
 <template>
     <div :class="rootClass" v-mci-loading:form="!GetDiyTableRowModelFinish">
+        <div :class="presentationLayoutClass">
+            <aside v-if="ShowPresentationSectionNavigation" class="diy-form-section-nav" aria-label="表单分组导航">
+                <div class="diy-form-section-nav__head">
+                    <span>{{ PresentationConfig.NavigationTitle || '配置分组' }}</span>
+                    <small>{{ PresentationSections.length }} 项</small>
+                </div>
+                <button
+                    v-for="section in PresentationSections"
+                    :key="section.Key"
+                    type="button"
+                    class="diy-form-section-nav__item"
+                    :class="{ active: section.Key === FieldActiveTab }"
+                    :aria-current="section.Key === FieldActiveTab ? 'page' : undefined"
+                    @click="ActivatePresentationSection(section)"
+                >
+                    <span class="diy-form-section-nav__icon">
+                        <fa-icon :icon="section.Icon || 'far fa-folder-open'" />
+                    </span>
+                    <span class="diy-form-section-nav__copy">
+                        <b>{{ section.Title }}</b>
+                        <small>{{ GetPresentationSectionSubtitle(section) }}</small>
+                    </span>
+                    <span class="diy-form-section-nav__count">{{ section.FieldCount }}</span>
+                </button>
+            </aside>
+            <section class="diy-form-presentation-main">
+                <header v-if="IsControlCenterPresentation" class="diy-form-section-head">
+                    <div>
+                        <span>{{ PresentationConfig.SectionEyebrow || 'FORM SECTION' }}</span>
+                        <h3>{{ ActivePresentationSection.Title }}</h3>
+                        <p v-if="ActivePresentationSection.Description">{{ ActivePresentationSection.Description }}</p>
+                    </div>
+                    <el-tag effect="plain">{{ ActivePresentationSection.FieldCount }} 项</el-tag>
+                </header>
         <el-tabs
             id="field-form-tabs"
             v-model="FieldActiveTab"
             :tab-position="GetTabsPosition()"
-            :class="tabsClass"
+            :class="[tabsClass, 'mci-tabs', 'mci-tabs--form']"
             @tab-click="tabClickField"
         >
             <template v-for="(tab, tabIndex) in FormTabs">
                 <el-tab-pane :key="'tab_name_' + tab.Name" :name="tab.Id || tab.Name" v-if="tab.Display !== false">
-                    <template #label
-                        ><span><fa-icon v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}</span></template
-                    >
+                    <template #label>
+                        <span class="diy-form-tab-label">
+                            <fa-icon v-if="!DiyCommon.IsNull(tab.Icon)" :class="tab.Icon + ' marginRight5'" />{{ tab.Name }}
+                            <small v-if="IsControlCenterPresentation" class="diy-form-tab-count">{{ GetPresentationSectionFieldCount(tab) }}</small>
+                        </span>
+                    </template>
                     <!-- 性能优化：只渲染已访问过的 tab，实现懒加载 -->
                     <!-- 数据就绪检查：确保 DiyTableModel 和 DiyFieldList 都已加载 -->
                     <div v-if="renderedTabs.has(tab.Id || tab.Name) && DiyTableModel && DiyTableModel.Id"
@@ -24,7 +61,7 @@
                             ref="FormDiyTableModel"
                             status-icon
                             :model="FormDiyTableModel"
-                            label-width="135px"
+                            :label-width="GetFormLabelWidth()"
                             :label-position="GetLabelPosition()"
                         >
                             <!-- 设计模式：使用 draggable 支持拖拽排序和从设计器拖入 -->
@@ -44,12 +81,13 @@
                             >
                                 <template #item="{ element: field }">
                                     <el-col
-                                        v-show="field._isShow"
+                                        v-show="field._isShow && MatchesPresentationFieldSearch(field)"
                                         :class="[
                                             'field-drag-handle',
                                             'design-mode-field',
                                             CurrentDiyFieldModel.Id == field.Id ? field._activeClass + ' selected-field' : field._class,
-                                            field._collapseClass
+                                            field._collapseClass,
+                                            GetPresentationFieldClass(field)
                                         ]"
                                         :key="'el_col_fieldid_' + field.Id"
                                         :span="field._span"
@@ -58,11 +96,11 @@
                                         @mouseenter="showFieldToolbar(field, $event)"
                                         @mouseleave="hideFieldToolbar"
                                         @dblclick.stop="openComponentConfig(field)"
-                                        :title="hasComponentConfig(field) ? '双击打开组件配置，单击选中字段' : '单击选中字段'"
+                                        :title="hasComponentConfig(field) ? '双击打开组件专项配置，单击选中字段' : (UseParentFieldSettingsDialog ? '双击打开字段设置，单击选中字段' : '单击选中字段')"
                                     >
                                         <!-- 字段操作工具栏 -->
                                         <div v-if="CurrentDiyFieldModel.Id == field.Id" class="field-toolbar">
-                                            <el-tooltip v-if="hasComponentConfig(field)" content="组件配置" placement="top">
+                                            <el-tooltip v-if="UseParentFieldSettingsDialog || hasComponentConfig(field)" :content="hasComponentConfig(field) ? '组件专项配置' : '字段设置'" placement="top">
                                                 <el-button size="small" :icon="Setting" circle @click.stop="openComponentConfig(field)" />
                                             </el-tooltip>
                                             <el-tooltip :content="$t('Msg.CopyField')" placement="top">
@@ -162,8 +200,8 @@
                             <el-row v-else :gutter="10" @click="handleFieldClick">
                                 <el-col
                                     v-for="field in GetRenderedTabFields(tab.Id || tab.Name)"
-                                    v-show="field._isShow"
-                                    :class="[CurrentDiyFieldModel.Id == field.Id ? field._activeClass : field._class, field._collapseClass]"
+                                    v-show="field._isShow && MatchesPresentationFieldSearch(field)"
+                                    :class="[CurrentDiyFieldModel.Id == field.Id ? field._activeClass : field._class, field._collapseClass, GetPresentationFieldClass(field)]"
                                     :key="'el_col_fieldid_' + field.Id"
                                     :span="field._span"
                                     :xs="24"
@@ -249,6 +287,8 @@
                 </div>
             </template>
         </el-tabs>
+            </section>
+        </div>
         <DiyCustomDialog
             :DataAppend="GetDiyCustomDialogDataAppend()"
             :OpenType="DiyCustomDialogConfig.OpenType"
@@ -366,8 +406,24 @@ export default {
             type: String,
             default: ""
         },
+        // 设计器可接管双击行为，统一打开字段属性工作台；默认关闭以兼容组件自身配置弹层。
+        UseParentFieldSettingsDialog: {
+            type: Boolean,
+            default: false
+        },
         // ViewSchema 表单工作台的纯展示模式；不改变字段、权限、校验或 V8 提交行为。
         PresentationMode: {
+            type: String,
+            default: ""
+        },
+        // ViewSchema FormWorkbench 的展示配置。仅控制分组导航、密度和文案，
+        // 字段组件、权限、校验、V8 事件与提交仍由当前 DiyForm 负责。
+        PresentationConfig: {
+            type: Object,
+            default: () => ({})
+        },
+        // 外层弹窗/抽屉/页面可直接传入字段搜索词；工作台仍可通过 PresentationConfig 传入。
+        FieldSearchKeyword: {
             type: String,
             default: ""
         },
@@ -448,6 +504,12 @@ export default {
         LabelPosition: {
             type: String,
             default: "" //left,top,bottom,right
+        },
+        // 标签宽度只影响 left/right 两种排版；top 模式由 Element Plus 自动忽略。
+        // 兼容历史调用方传入数字或 "100px" 字符串。
+        LabelWidth: {
+            type: [String, Number],
+            default: ""
         },
         CurrentTableData: {
             type: Array,
@@ -1578,8 +1640,8 @@ export default {
                     }
                 }
             });
-            if (needRefreshRuntime && typeof self.RefreshDiyFieldRuntimeState === 'function') {
-                self.RefreshDiyFieldRuntimeState();
+            if (needRefreshRuntime && typeof self.ScheduleRefreshDiyFieldRuntimeState === 'function') {
+                self.ScheduleRefreshDiyFieldRuntimeState();
             }
         },
         NumberTextChange(currentValue, oldValue, field) {

@@ -47,21 +47,24 @@
 
             <div>
                 <!--PC端表单头部操作栏（移动端改用FAB浮动按钮）-->
-                <div v-if="!diyStore.IsPhoneView" class="form-header" style="margin-bottom: 5px;">
-                    <div class="" style="font-size: 15px; line-height: 32px;min-width: 200px;">
-                        <i :class="GetOpenTitleIcon()" />
-                        {{ GetOpenTitlePage() }}
+                <div v-if="!diyStore.IsPhoneView" class="form-header diy-form-page-header">
+                    <div class="diy-form-dialog-title">
+                        <span class="diy-form-dialog-title__eyebrow">FORM WORKSPACE</span>
+                        <div class="diy-form-dialog-title__heading">
+                            <i :class="GetOpenTitleIcon()" />
+                            <span>{{ GetOpenTitlePage() }}</span>
+                        </div>
                     </div>
                     <div class="form-actions">
                         <!-- 工作流：醒目的【发起流程/处理工作】按钮（PageMode 顶部） -->
-                        <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
+                        <el-button v-if="ShowWfTopSubmitBtn" size="small" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
                             {{ WfTopSubmitBtnText }}
                         </el-button>
-                        <el-button v-if="FormMode != 'View' && !ShowWfTopSubmitBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
+                        <el-button v-if="FormMode != 'View' && !ShowWfTopSubmitBtn" size="small" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
                             {{ $t("Msg.Save") }}
                         </el-button>
-                        <el-dropdown trigger="click">
-                            <el-button>
+                        <el-dropdown trigger="click" size="small">
+                            <el-button size="small">
                                 {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                             </el-button>
                             <template #dropdown>
@@ -81,11 +84,12 @@
                                 </el-dropdown-menu>
                             </template>
                         </el-dropdown>
-                        <el-button v-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
+                        <el-button v-if="FormMode == 'View' && ShowUpdateBtn" size="small" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
                             {{ $t("Msg.Edit") }}
                         </el-button>
                         <el-button
                             v-if="UseViewSchemaDetail && ShowFormRight() && !diyStore.IsPhoneView"
+                            size="small"
                             @click="showDesktopRightPanel = !showDesktopRightPanel"
                         >
                             <fa-icon icon="far fa-clipboard" class="mr-1" />
@@ -93,6 +97,7 @@
                         </el-button>
                         <el-button
                             v-if="FormMode == 'Edit'"
+                            size="small"
                             type="info"
                             @click="FormMode = 'View'"
                         >
@@ -103,6 +108,7 @@
                                 <el-button
                                     :key="'more_btn_formbtns_page_' + btnIndex"
                                     v-if="btn.IsVisible"
+                                    size="small"
                                     type="primary"
                                     :loading="BtnLoading"
                                     @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
@@ -112,7 +118,7 @@
                                 </el-button>
                             </template>
                         </template>
-                        <el-button type="default" :icon="Back" @click="Go_1()">
+                        <el-button size="small" type="default" :icon="Back" @click="Go_1()">
                             {{ $t("Msg.Back") }}
                         </el-button>
                     </div>
@@ -129,6 +135,17 @@
                             :get-server-path="DiyCommon.GetServerPath"
                             @action="HandleViewAction"
                         />
+                        <div v-if="!UseViewSchemaDetail && !diyStore.IsPhoneView" class="diy-form-field-search-toolbar">
+                            <el-input
+                                v-model.trim="FormFieldSearchKeyword"
+                                clearable
+                                :prefix-icon="Search"
+                                placeholder="搜索字段名称、字段名或说明"
+                                aria-label="搜索当前表单字段"
+                            />
+                            <span v-if="FormFieldSearchKeyword" class="diy-form-field-search-count">{{ FormFieldSearchMatchCount }} 项匹配</span>
+                            <el-button :icon="Refresh" :loading="FormRefreshing" @click="RefreshCurrentForm">刷新当前记录</el-button>
+                        </div>
                         <DiyForm
                             v-if="TableId && TableRowId"
                             v-show="!UseViewSchemaDetail"
@@ -139,6 +156,7 @@
                             :TableId="TableId"
                             :SysMenuId="SysMenuId"
                             :TableRowId="TableRowId"
+                            :FieldSearchKeyword="FormFieldSearchKeyword"
                             @CallbackFormSubmit="CallbackFormSubmitPage"
                             @CallbackSetFormData="CallbackSetFormData"
                             @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
@@ -185,6 +203,7 @@
                             :dataCommentListLoading="DataCommentListLoading"
                             :dataVersionList="DataVersionList"
                             :dataVersionListLoading="DataVersionListLoading"
+                            :relatedCounts="FormRelatedCounts"
                             :diyFieldList="DiyFieldList"
                             :replyComment="ReplyComment"
                             :btnLoading="BtnLoading"
@@ -270,14 +289,14 @@
         <!--以弹窗形式打开Form-->
         <el-dialog
             v-if="ShowFieldForm"
-            class="diy-form-container"
+            class="diy-form-container diy-form-modern-dialog"
             :class="{ 'diy-form-fixed-height': !!Height }"
             draggable
             align-center
             :width="GetOpenFormWidth()"
             :style="GetOpenFormStyle()"
             :modal="true"
-            :modal-class="Height ? 'diy-form-fixed-height-overlay' : ''"
+            :modal-class="GetModernOverlayClass(Height ? 'diy-form-fixed-height-overlay' : '')"
             :modal-append-to-body="true"
             :model-value="ShowFieldForm"
             @update:model-value="ShowFieldForm = $event"
@@ -286,21 +305,29 @@
             :show-close="false"
             :append-to-body="true"
             :destroy-on-close="true"
+            @open="HandleModernOverlayOpen"
+            @close="HandleModernOverlayClose"
             @closed="onDialogClosed"
         >
             <template #header>
-                <div>
-                    <fa-icon :class="GetOpenTitleIcon()" />
-                    {{ GetOpenTitle() }}
+                <div class="diy-form-dialog-title">
+                    <span class="diy-form-dialog-title__eyebrow">
+                        {{ FormMode == 'View' ? 'VIEW RECORD' : (FormMode == 'Add' || FormMode == 'Insert' ? 'CREATE RECORD' : 'EDIT RECORD') }}
+                    </span>
+                    <div class="diy-form-dialog-title__heading">
+                        <fa-icon :class="GetOpenTitleIcon()" />
+                        <span>{{ GetOpenTitle() }}</span>
+                    </div>
                 </div>
-                <div v-if="!diyStore.IsPhoneView" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
+                <div v-if="!diyStore.IsPhoneView" class="diy-form-dialog-actions">
                     <!-- 工作流：醒目的【发起流程/处理工作】按钮（Dialog模式顶部） -->
-                    <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
+                    <el-button v-if="ShowWfTopSubmitBtn" size="small" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
                         {{ WfTopSubmitBtnText }}
                     </el-button>
                     <el-dropdown
                         v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
                         split-button
+                        size="small"
                         type="primary"
                         trigger="click"
                         @click="SaveDiyTableCommon(true, 'Close')"
@@ -330,6 +357,7 @@
                         v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
                         :loading="BtnLoading"
                         :icon="Edit"
+                        size="small"
                         type="primary"
                         @click="FormMode = 'Edit'"
                         >{{ $t("Msg.Edit") }}</el-button
@@ -341,10 +369,12 @@
                             && OpenDiyFormWorkFlowType.WorkType != 'StartWork'
                             && !diyStore.IsPhoneView
                         "
+                        class="diy-form-cancel-edit"
+                        size="small"
                         type="info"
-                        icon="ArrowLeft"
                         @click="FormMode = 'View'"
                     >
+                        <el-icon><ArrowLeft /></el-icon>
                         {{ $t('Msg.Cancel') + $t('Msg.Edit') }}
                     </el-button>
                     <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -352,6 +382,7 @@
                             <el-button
                                 :key="'more_btn_formbtns_' + btnIndex"
                                 v-if="btn.IsVisible"
+                                size="small"
                                 :type="GetMoreBtnStyle(btn)"
                                 :loading="BtnLoading"
                                 @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
@@ -361,8 +392,8 @@
                             </el-button>
                         </template>
                     </template>
-                    <el-dropdown trigger="click">
-                        <el-button>
+                    <el-dropdown trigger="click" size="small">
+                        <el-button size="small">
                             {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                         </el-button>
                         <template #dropdown>
@@ -406,15 +437,16 @@
                     </el-dropdown>
                     <el-button
                         v-if="UseViewSchemaDetail && ShowFormRight() && !diyStore.IsPhoneView"
+                        size="small"
                         @click="showDesktopRightPanel = !showDesktopRightPanel"
                     >
                         <fa-icon icon="far fa-clipboard" class="mr-1" />
                         {{ showDesktopRightPanel ? '收起记录' : '查看记录' }}
                     </el-button>
-                    <el-button :icon="Close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
+                    <el-button size="small" :icon="Close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
                 </div>
                 <!--移动端仅显示关闭按钮-->
-                <div v-if="diyStore.IsPhoneView" style="display: flex;align-items: center;">
+                <div v-if="diyStore.IsPhoneView" class="diy-form-dialog-actions is-mobile">
                     <el-button :icon="Close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)" />
                 </div>
             </template>
@@ -430,6 +462,17 @@
                         :get-server-path="DiyCommon.GetServerPath"
                         @action="HandleViewAction"
                     />
+                    <div v-if="!UseViewSchemaDetail && !diyStore.IsPhoneView" class="diy-form-field-search-toolbar">
+                        <el-input
+                            v-model.trim="FormFieldSearchKeyword"
+                            clearable
+                            :prefix-icon="Search"
+                            placeholder="搜索字段名称、字段名或说明"
+                            aria-label="搜索当前表单字段"
+                        />
+                        <span v-if="FormFieldSearchKeyword" class="diy-form-field-search-count">{{ FormFieldSearchMatchCount }} 项匹配</span>
+                        <el-button :icon="Refresh" :loading="FormRefreshing" @click="RefreshCurrentForm">刷新当前记录</el-button>
+                    </div>
                     <DiyForm
                         v-show="!UseViewSchemaDetail"
                         ref="fieldForm"
@@ -443,6 +486,7 @@
                         :SysMenuId="SysMenuId"
                         :TableName="TableName"
                         :TableRowId="TableRowId"
+                        :FieldSearchKeyword="FormFieldSearchKeyword"
                         :DefaultValues="FieldFormDefaultValues"
                         :SelectFields="FieldFormSelectFields"
                         :FixedTabs="FieldFormFixedTabs"
@@ -469,7 +513,7 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowDesktopFormRight" :span="5" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
+                <el-col v-if="ShowDesktopFormRight" :span="5" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 10px; padding-right: 10px">
                     <FormRightPanel
                         ref="formRightPanel"
                         v-model="FormRightType"
@@ -485,6 +529,7 @@
                         :dataCommentListLoading="DataCommentListLoading"
                         :dataVersionList="DataVersionList"
                         :dataVersionListLoading="DataVersionListLoading"
+                        :relatedCounts="FormRelatedCounts"
                         :diyFieldList="DiyFieldList"
                         :replyComment="ReplyComment"
                         :btnLoading="BtnLoading"
@@ -582,8 +627,8 @@
         <!--以抽屉形式打开Form-->
         <el-drawer
             v-if="ShowFieldFormDrawer"
-            class="diy-form-container"
-            style=""
+            class="diy-form-container diy-form-modern-drawer"
+            :modal-class="GetModernOverlayClass()"
             :modal="true"
             :size="GetOpenFormWidth()"
             :modal-append-to-body="true"
@@ -594,22 +639,30 @@
             :show-close="false"
             :append-to-body="true"
             :destroy-on-close="true"
+            @open="HandleModernOverlayOpen"
+            @close="HandleModernOverlayClose"
             @closed="onDrawerClosed"
             @opened="onDrawerOpened"
         >
             <template #header>
-                <div style="color: var(--el-text-color-primary); font-size: 15px;min-width: 200px;">
-                    <fa-icon :class="GetOpenTitleIcon()" />
-                    {{ GetOpenTitle() }}
+                <div class="diy-form-dialog-title">
+                    <span class="diy-form-dialog-title__eyebrow">
+                        {{ FormMode == 'View' ? 'VIEW RECORD' : (FormMode == 'Add' || FormMode == 'Insert' ? 'CREATE RECORD' : 'EDIT RECORD') }}
+                    </span>
+                    <div class="diy-form-dialog-title__heading">
+                        <fa-icon :class="GetOpenTitleIcon()" />
+                        <span>{{ GetOpenTitle() }}</span>
+                    </div>
                 </div>
-                <div v-if="!diyStore.IsPhoneView" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
+                <div v-if="!diyStore.IsPhoneView" class="diy-form-dialog-actions diy-form-drawer-actions">
                     <!-- 工作流：醒目的【发起流程/处理工作】按钮（Drawer模式顶部） -->
-                    <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
+                    <el-button v-if="ShowWfTopSubmitBtn" size="small" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
                         {{ WfTopSubmitBtnText }}
                     </el-button>
                     <el-dropdown
                         v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
                         split-button
+                        size="small"
                         type="primary"
                         trigger="click"
                         @click="SaveDiyTableCommon(true, 'Close')"
@@ -650,6 +703,7 @@
                         v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
                         :loading="BtnLoading"
                         :icon="Edit"
+                        size="small"
                         type="primary"
                         @click="FormMode = 'Edit'"
                         >{{ $t("Msg.Edit") }}</el-button
@@ -661,10 +715,12 @@
                             && OpenDiyFormWorkFlowType.WorkType != 'StartWork'
                             && !diyStore.IsPhoneView
                         "
+                        class="diy-form-cancel-edit"
+                        size="small"
                         type="info"
-                        icon="ArrowLeft"
                         @click="FormMode = 'View'"
                     >
+                        <el-icon><ArrowLeft /></el-icon>
                         {{ $t('Msg.Cancel') + $t('Msg.Edit') }}
                     </el-button>
                     <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
@@ -672,6 +728,7 @@
                             <el-button
                                 :key="'more_btn_formbtns_' + btnIndex"
                                 v-if="btn.IsVisible"
+                                size="small"
                                 :type="GetMoreBtnStyle(btn)"
                                 :loading="BtnLoading"
                                 @click="RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)"
@@ -681,8 +738,8 @@
                             </el-button>
                         </template>
                     </template>
-                    <el-dropdown trigger="click">
-                        <el-button>
+                    <el-dropdown trigger="click" size="small">
+                        <el-button size="small">
                             {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                         </el-button>
                         <template #dropdown>
@@ -726,15 +783,16 @@
                     </el-dropdown>
                     <el-button
                         v-if="UseViewSchemaDetail && ShowFormRight() && !diyStore.IsPhoneView"
+                        size="small"
                         @click="showDesktopRightPanel = !showDesktopRightPanel"
                     >
                         <fa-icon icon="far fa-clipboard" class="mr-1" />
                         {{ showDesktopRightPanel ? '收起记录' : '查看记录' }}
                     </el-button>
-                    <el-button :icon="Close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
+                    <el-button size="small" :icon="Close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
                 </div>
                 <!--移动端仅显示关闭按钮-->
-                <div v-if="diyStore.IsPhoneView" style="display: flex;align-items: center;">
+                <div v-if="diyStore.IsPhoneView" class="diy-form-dialog-actions is-mobile">
                     <el-button type="primary" :icon="Close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)" />
                 </div>
             </template>
@@ -751,6 +809,17 @@
                         :get-server-path="DiyCommon.GetServerPath"
                         @action="HandleViewAction"
                     />
+                    <div v-if="!UseViewSchemaDetail && !diyStore.IsPhoneView" class="diy-form-field-search-toolbar">
+                        <el-input
+                            v-model.trim="FormFieldSearchKeyword"
+                            clearable
+                            :prefix-icon="Search"
+                            placeholder="搜索字段名称、字段名或说明"
+                            aria-label="搜索当前表单字段"
+                        />
+                        <span v-if="FormFieldSearchKeyword" class="diy-form-field-search-count">{{ FormFieldSearchMatchCount }} 项匹配</span>
+                        <el-button :icon="Refresh" :loading="FormRefreshing" @click="RefreshCurrentForm">刷新当前记录</el-button>
+                    </div>
                     <DiyForm
                         v-show="!UseViewSchemaDetail"
                         ref="fieldForm"
@@ -764,6 +833,7 @@
                         :SysMenuId="SysMenuId"
                         :TableName="TableName"
                         :TableRowId="TableRowId"
+                        :FieldSearchKeyword="FormFieldSearchKeyword"
                         :DefaultValues="FieldFormDefaultValues"
                         :SelectFields="FieldFormSelectFields"
                         :FixedTabs="FieldFormFixedTabs"
@@ -790,7 +860,7 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowDesktopFormRight" :span="5" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
+                <el-col v-if="ShowDesktopFormRight" :span="5" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 10px; padding-right: 10px">
                     <FormRightPanel
                         ref="formRightPanel"
                         v-model="FormRightType"
@@ -806,6 +876,7 @@
                         :dataCommentListLoading="DataCommentListLoading"
                         :dataVersionList="DataVersionList"
                         :dataVersionListLoading="DataVersionListLoading"
+                        :relatedCounts="FormRelatedCounts"
                         :diyFieldList="DiyFieldList"
                         :replyComment="ReplyComment"
                         :btnLoading="BtnLoading"
@@ -933,6 +1004,7 @@
                 :dataCommentListLoading="DataCommentListLoading"
                 :dataVersionList="DataVersionList"
                 :dataVersionListLoading="DataVersionListLoading"
+                :relatedCounts="FormRelatedCounts"
                 :diyFieldList="DiyFieldList"
                 :replyComment="ReplyComment"
                 :btnLoading="BtnLoading"
@@ -1072,6 +1144,7 @@
 
 <script>
 import { defineAsyncComponent, computed } from "vue";
+import { Refresh, Search } from "@element-plus/icons-vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
 import _ from "underscore";
 import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode, runV8ButtonVisibilityCodeAsync } from "@/utils/v8-button-visibility";
@@ -1116,6 +1189,16 @@ export default {
         ShowDesktopFormRight() {
             if (this.diyStore.IsPhoneView || !this.ShowFormRight()) return false;
             return !this.UseViewSchemaDetail || this.showDesktopRightPanel;
+        },
+        FormFieldSearchMatchCount() {
+            const keyword = String(this.FormFieldSearchKeyword || "").trim().toLowerCase();
+            const fields = Array.isArray(this.DiyFieldList) ? this.DiyFieldList : [];
+            if (!keyword) return fields.filter((field) => field && field._isShow !== false).length;
+            return fields.filter((field) => {
+                if (!field || field._isShow === false) return false;
+                return [field.Label, field.Name, field.AsName, field.Description, field.Component]
+                    .some((value) => String(value || "").toLowerCase().includes(keyword));
+            }).length;
         }
     },
     setup() {
@@ -1127,7 +1210,9 @@ export default {
             diyStore,
             tagsViewStore,
             GetCurrentUser,
-            OsClient
+            OsClient,
+            Refresh,
+            Search
         };
     },
     props: {
@@ -1196,6 +1281,56 @@ export default {
     //  3) ParentV8_Data 闭包持有
     //  4) Element Plus 子组件 ref（fieldForm、refWFHistory 等）
     methods: {
+        async RefreshCurrentForm() {
+            const formRef = this.$refs.fieldFormPage || this.$refs.fieldForm;
+            if (!formRef || typeof formRef.Init !== "function" || this.FormRefreshing) return;
+            this.FormRefreshing = true;
+            try {
+                await formRef.Init();
+                this.DiyCommon.Tips("当前记录已刷新", true);
+            } catch (error) {
+                this.DiyCommon.Tips("刷新当前记录失败：" + (error?.message || error), false);
+            } finally {
+                this.FormRefreshing = false;
+            }
+        },
+        GetModernOverlayClass(extraClass) {
+            const tableModel = this.CurrentDiyTableModel || {};
+            let tableValue = tableModel.DisableFormMaskBlur;
+            if ((tableValue === null || tableValue === undefined || tableValue === "")
+                && Object.prototype.hasOwnProperty.call(tableModel, "FormMaskBlur")) {
+                const legacyValue = tableModel.FormMaskBlur;
+                tableValue = legacyValue === 0 || legacyValue === "0" || legacyValue === false ? 1 : 0;
+            }
+            const globalValue = this.diyStore && this.diyStore.SysConfig
+                ? this.diyStore.SysConfig.DisableFormMaskBlur
+                : undefined;
+            const isExplicitlyDisabled = (value) => value === 1
+                || value === "1"
+                || value === true
+                || String(value || "").trim().toLowerCase() === "true";
+            const blurDisabled = isExplicitlyDisabled(globalValue) || isExplicitlyDisabled(tableValue);
+            return [
+                "diy-form-modern-overlay",
+                "mci-unified-overlay",
+                blurDisabled ? "diy-form-modern-overlay--plain mci-unified-overlay--plain" : "",
+                extraClass || ""
+            ].filter(Boolean).join(" ");
+        },
+        HandleModernOverlayOpen() {
+            this.$nextTick(() => {
+                if (typeof document === "undefined") return;
+                const overlays = document.querySelectorAll(".diy-form-modern-overlay");
+                const overlay = overlays[overlays.length - 1];
+                if (overlay) overlay.classList.remove("is-closing");
+            });
+        },
+        HandleModernOverlayClose() {
+            if (typeof document === "undefined") return;
+            const overlays = document.querySelectorAll(".diy-form-modern-overlay");
+            const overlay = overlays[overlays.length - 1];
+            if (overlay) overlay.classList.add("is-closing");
+        },
         ResolveViewActionValue(value) {
             if (Array.isArray(value)) {
                 return value.map((item) => this.ResolveViewActionValue(item));
@@ -1332,6 +1467,9 @@ export default {
         Init(param) {
             var self = this;
 
+            // 每次打开一条新记录都从完整字段视图开始，避免沿用上一条记录的筛选状态。
+            self.FormFieldSearchKeyword = "";
+
             // 通过 Init 方法打开的表单，明确标记为非直接页面模式（即使在页面路由下也是弹窗/抽屉）
             self._isDirectPageMode = false;
 
@@ -1415,7 +1553,8 @@ export default {
             } else if (self.CurrentDiyTableModel.FormOpenType == "Page") {
                 dialogType = "Page";
             } else {
-                dialogType = "Drawer";
+                // 未配置的新旧模块统一回落到 80% Dialog；只有显式配置 Drawer 的复杂表单才使用抽屉。
+                dialogType = "Dialog";
             }
 
             // 工作流模式不支持Page路由跳转（路由无法传递工作流参数），强制使用Drawer
