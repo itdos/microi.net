@@ -27,6 +27,7 @@ import {
 } from './customer-follow-scope.mjs'
 import {
   calculateOrderProductCooperation,
+  calculateOrderProductPriceBinding,
   orderProductNumberValue
 } from './order-product-cooperation.mjs'
 import {
@@ -1380,6 +1381,10 @@ export function createState() {
 export async function initialize(context) {
   await initializeInstallationPositionCode(context)
   await initializeInstallationPositionLocation(context)
+  // 详情、编辑、新增统一按当前单价和数量展示派生价格，修复历史记录中的不一致值。
+  if (isOrderProductForm(context)) {
+    context.patchForm(calculateOrderProductPriceBinding(context.form))
+  }
   // zhy：所有入口进入订单新增页时统一初始化，避免各页面分别维护相同逻辑。
   if (isOrderAdd(context) && !context.state.orderInitialized) {
     context.state.orderInitialized = true
@@ -1507,17 +1512,23 @@ export async function handleRelatedCount(context, payload = {}) {
   if (isOrderProductForm(context) && isOrderProductInstallationChild(payload.field)) {
     const field = fieldName(context, 'Shuliang', '设备数量')
     if (Number(context.form[field] || 0) === value) return
+    const quantityValues = { [field]: value }
+    const priceValues = calculateOrderProductPriceBinding({ ...context.form, ...quantityValues })
     if (context.rowId) {
       const result = await V8.FormEngine.UptFormData(ORDER_PRODUCT_TABLE, {
         Id: context.rowId,
-        [field]: value,
+        ...quantityValues,
+        ...priceValues,
         _InvokeType: 'Client'
       })
       if (!result || Number(result.Code) !== 1) {
         throw new Error((result && result.Msg) || '设备数量同步失败')
       }
     }
-    context.patchForm({ [field]: value })
+    context.patchForm({
+      ...quantityValues,
+      ...priceValues
+    })
     return
   }
 
@@ -1941,6 +1952,17 @@ export async function handleFieldChange(context, payload) {
     String(payload.field && payload.field.Name || '').toLowerCase() === 'hezuofs') {
     return updateOrderProductCooperation(context, payload)
   }
+  if (isOrderProductForm(context) && payload) {
+    const changedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
+    if (['shuliang', 'shebeisjdj', 'lvxinsjdj'].includes(changedFieldName)) {
+      const changedValues = { [payload.field.Name]: payload.value }
+      context.patchForm({
+        ...changedValues,
+        ...calculateOrderProductPriceBinding({ ...context.form, ...changedValues })
+      })
+      return { handled: true }
+    }
+  }
   // 非续签订单必须清空历史续签编号，与平台订单类型字段事件保持一致。
   if (isOrderForm(context) && payload &&
     String(payload.field && payload.field.Name || '').toLowerCase() === ORDER_FIELDS.orderType.toLowerCase()) {
@@ -2016,6 +2038,10 @@ export async function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
+  if (isOrderProductForm(context)) {
+    // 派生字段可能为只读或隐藏，显式随主表单保存，保证落库值与页面联动结果一致。
+    return calculateOrderProductPriceBinding(context.form)
+  }
   if (isInstallationPositionForm(context)) {
     if (context.state.locating) throw new Error('正在获取安装位置，请稍候')
     const values = { ...(context.state.installationLocationValues || {}) }
