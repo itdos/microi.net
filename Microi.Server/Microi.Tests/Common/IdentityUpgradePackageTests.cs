@@ -79,12 +79,37 @@ public class IdentityUpgradePackageTests
 
         var tenantSettingsTable = Assert.Single(tables,
             table => table["Name"]?.Value<string>() == "mci_system_setting");
-        Assert.Contains(fields, field =>
+        var legacyPublicField = Assert.Single(fields, field =>
             field["TableId"]?.Value<string>() == tenantSettingsTable["Id"]?.Value<string>()
             && field["Name"]?.Value<string>() == "IsPublic");
+        Assert.Equal(0, legacyPublicField["Visible"]?.Value<int>());
+        Assert.Equal(0, legacyPublicField["AppVisible"]?.Value<int>());
         Assert.Contains(fields, field =>
             field["TableId"]?.Value<string>() == tenantSettingsTable["Id"]?.Value<string>()
             && field["Name"]?.Value<string>() == "IsSecret");
+
+        var sysConfigTable = Assert.Single(tables,
+            table => string.Equals(table["Name"]?.Value<string>(), "sys_config", StringComparison.OrdinalIgnoreCase));
+        foreach (var (name, defaultValue) in new[]
+                 {
+                     ("DisableAiAssistant", "0"),
+                     ("DisableFormMaskBlur", "0"),
+                     ("LoginPasskeyDisplay", "1"),
+                     ("LoginAuthenticatorDisplay", "1"),
+                     ("LoginGiteeDisplay", "1"),
+                     ("LoginWeChatDisplay", "1"),
+                     ("LoginGitHubDisplay", "1")
+                 })
+        {
+            var field = Assert.Single(fields, item =>
+                item["TableId"]?.Value<string>() == sysConfigTable["Id"]?.Value<string>()
+                && item["Name"]?.Value<string>() == name);
+            Assert.Equal(defaultValue, field["DefaultValue"]?.Value<string>());
+            Assert.Contains(package["PhysicalColumns"]?.Children<JObject>() ?? [], column =>
+                string.Equals(column["TABLE_NAME"]?.Value<string>(), "sys_config", StringComparison.OrdinalIgnoreCase)
+                && column["COLUMN_NAME"]?.Value<string>() == name);
+        }
+        Assert.DoesNotContain(fields, field => field["Name"]?.Value<string>() == "IsShowAiAssistant");
 
         Assert.Single(tables,
             table => table["Name"]?.Value<string>() == "mci_user_external_identity");
@@ -106,33 +131,21 @@ public class IdentityUpgradePackageTests
             .Where(item => item["TableName"]?.Value<string>() == "mci_system_setting") ?? []);
         Assert.Equal("InsertIfMissing", settingsDataSet["ConflictPolicy"]?.Value<string>());
         var settingRows = settingsDataSet["Rows"]?.Children<JObject>().ToList() ?? [];
-        Assert.Equal(14, settingRows.Count);
-        foreach (var key in new[]
-                 {
-                     "Login.Passkey.Display",
-                     "Login.Authenticator.Display",
-                     "Login.Gitee.Display",
-                     "Login.WeChat.Display",
-                     "Login.GitHub.Display"
-                 })
-        {
-            var displaySetting = Assert.Single(settingRows,
-                row => row["ConfigKey"]?.Value<string>() == key);
-            Assert.Equal("1", displaySetting["ConfigValue"]?.Value<string>());
-            Assert.Equal("Bool", displaySetting["ValueType"]?.Value<string>());
-            Assert.Equal(1, displaySetting["IsPublic"]?.Value<int>());
-        }
+        Assert.Equal(9, settingRows.Count);
+        Assert.All(settingRows, setting => Assert.Equal(0, setting["IsPublic"]?.Value<int>()));
+        Assert.DoesNotContain(settingRows,
+            row => row["ConfigKey"]?.Value<string>()?.EndsWith(".Display", StringComparison.Ordinal) == true);
 
         var bundle = Assert.Single(package["ApplicationBundles"]?.Children<JObject>()
             .Where(item => item["Application"]?["AppKey"]?.Value<string>() == "microi-platform-service") ?? []);
-        Assert.Equal("v1.5.7", bundle["VersionNo"]?.Value<string>());
+        Assert.Equal("v1.6.0", bundle["VersionNo"]?.Value<string>());
         Assert.False(bundle["IncludeSource"]?.Value<bool>());
-        Assert.Equal(14, bundle["Application"]?["CurrentVersion"]?.Value<int>());
-        Assert.Equal("v1.5.7", bundle["Application"]?["BuildVersion"]?.Value<string>());
-        Assert.Equal("v1.5.7", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal(18, bundle["Application"]?["CurrentVersion"]?.Value<int>());
+        Assert.Equal("v1.6.0", bundle["Application"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal("v1.6.0", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
         Assert.Equal("db", bundle["MicroService"]?["StorageMode"]?.Value<string>());
         Assert.All(bundle["Routes"]?.Children<JObject>() ?? [], route =>
-            Assert.Equal("v1.5.7", route["BuildVersion"]?.Value<string>()));
+            Assert.Equal("v1.6.0", route["BuildVersion"]?.Value<string>()));
         Assert.False(bundle["PackageAssets"]?["IncludeSource"]?.Value<bool>());
         Assert.Null(bundle["PackageAssets"]?["SourceZip"]);
         Assert.Null(bundle["PackageAssets"]?["BuildZip"]);
@@ -149,6 +162,30 @@ public class IdentityUpgradePackageTests
         Assert.Contains(buildAssets, asset =>
             asset["Path"]?.Value<string>()?.Contains("identity-tech-banner", StringComparison.Ordinal) == true);
         Assert.Empty(bundle["SourceFiles"]?.Children<JObject>() ?? []);
+    }
+
+    [Fact]
+    public void BundledFormEngineUsesNegativeMaskBlurSwitch()
+    {
+        var loader = typeof(UpgradeAppStore).GetMethod(
+            "LoadBundledResources",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(loader);
+
+        var resources = Assert.IsType<Dictionary<string, string>>(loader!.Invoke(null, null));
+        var package = JObject.Parse(resources["app.microi.form-engine.json"]);
+        var table = Assert.Single(package["DiyTables"]?.Children<JObject>()
+            .Where(item => string.Equals(item["Name"]?.Value<string>(), "diy_table", StringComparison.OrdinalIgnoreCase)) ?? []);
+        var fields = package["DiyFields"]?.Children<JObject>().ToList() ?? [];
+        var field = Assert.Single(fields, item =>
+            item["TableId"]?.Value<string>() == table["Id"]?.Value<string>()
+            && item["Name"]?.Value<string>() == "DisableFormMaskBlur");
+        Assert.Equal("关闭表单遮罩毛玻璃", field["Label"]?.Value<string>());
+        Assert.Equal("0", field["DefaultValue"]?.Value<string>());
+        Assert.DoesNotContain(fields, item => item["Name"]?.Value<string>() == "FormMaskBlur");
+        Assert.Contains(package["PhysicalColumns"]?.Children<JObject>() ?? [], column =>
+            string.Equals(column["TABLE_NAME"]?.Value<string>(), "diy_table", StringComparison.OrdinalIgnoreCase)
+            && column["COLUMN_NAME"]?.Value<string>() == "DisableFormMaskBlur");
     }
 
     [Fact]

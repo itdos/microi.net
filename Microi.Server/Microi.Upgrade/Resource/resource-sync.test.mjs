@@ -61,12 +61,33 @@ const defaultAssetPreparer = engineSource(
   'return { Code: 1 };',
 );
 
+const defaultStoreList = engineSource(
+  'get-microi-store',
+  'v1.4.0',
+  'return { Code: 1, Data: [] };',
+);
+
+const defaultStoreModel = engineSource(
+  'get-microi-store-model',
+  'v1.2.0',
+  'return { Code: 1, Data: {} };',
+);
+
+const defaultStoreVersions = engineSource(
+  'get-microi-store-versions',
+  'v1.0.0',
+  'return { Code: 1, Data: [] };',
+);
+
 function applicationStorePackage({
   importer,
   publisher,
   builder,
   bulk = defaultBulkImporter,
   preparer = defaultAssetPreparer,
+  storeList = defaultStoreList,
+  storeModel = defaultStoreModel,
+  storeVersions = defaultStoreVersions,
   version = 'v6.6.1',
 }) {
   return JSON.stringify({
@@ -101,6 +122,27 @@ function applicationStorePackage({
         StopHttp: 0,
       },
       {
+        Id: 'engine-store-list',
+        ApiEngineKey: 'get-microi-store',
+        Version: engineVersion(storeList),
+        ApiV8Code: storeList,
+        StopHttp: 0,
+      },
+      {
+        Id: 'engine-store-model',
+        ApiEngineKey: 'get-microi-store-model',
+        Version: engineVersion(storeModel),
+        ApiV8Code: storeModel,
+        StopHttp: 0,
+      },
+      {
+        Id: 'engine-store-versions',
+        ApiEngineKey: 'get-microi-store-versions',
+        Version: engineVersion(storeVersions),
+        ApiV8Code: storeVersions,
+        StopHttp: 0,
+      },
+      {
         Id: 'engine-asset-preparer',
         ApiEngineKey: 'ai_app_prepare_store_assets',
         Version: engineVersion(preparer),
@@ -117,10 +159,16 @@ function replicaMaps({
   builder,
   bulk = defaultBulkImporter,
   preparer = defaultAssetPreparer,
+  storeList = defaultStoreList,
+  storeModel = defaultStoreModel,
+  storeVersions = defaultStoreVersions,
 }) {
   return new Map([
     ['import-package.js', importer],
     ['bulk-import-packages.js', bulk],
+    ['get-microi-store-list.js', storeList],
+    ['get-microi-store-model.js', storeModel],
+    ['get-microi-store-versions.js', storeVersions],
     ['ai-app-publish-store.js', publisher],
     ['ai-app-prepare-store-assets.js', preparer],
     ['ai-app-build.js', builder],
@@ -468,12 +516,8 @@ test('首次新增内嵌商城引擎时允许从一致的本地事实源建立�
     applicationStorePackage({ importer, publisher, builder, bulk }),
     'bulk-import-microi-store-packages',
   );
-  const establishedReplicas = new Map([
-    ['import-package.js', importer],
-    ['ai-app-publish-store.js', publisher],
-    ['ai-app-prepare-store-assets.js', defaultAssetPreparer],
-    ['ai-app-build.js', builder],
-  ]);
+  const establishedReplicas = replicaMaps({ importer, publisher, builder, bulk });
+  establishedReplicas.delete('bulk-import-packages.js');
 
   const merged = await mergeApplicationStoreReplicas({
     basePackageContent: basePackage,

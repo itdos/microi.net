@@ -3107,7 +3107,7 @@ async function copyText(text) {
     background: rgba(255, 255, 255, .38);
     color: #435044;
     cursor: pointer;
-    padding: 0 12px;
+    padding: 0 10px;
     font-weight: 650;
     justify-content: center;
     text-align: center;
@@ -3488,7 +3488,7 @@ async function copyText(text) {
     color: var(--ai-text-secondary, #697386);
     cursor: pointer;
     font-weight: 650;
-    padding: 0 12px;
+    padding: 0 10px;
 }
 
 .header-workspace-switch button.active,

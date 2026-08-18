@@ -234,6 +234,7 @@ defineExpose({
         align-items: center;
         gap: 8px;
         padding: 9px 12px 9px 13px;
+        background: var(--group-bg);
     }
 
     &__arrow,
@@ -289,6 +290,11 @@ defineExpose({
     }
 
     &--primary { --group-color: var(--el-color-primary); }
+    &--default {
+        --group-color: var(--mci-color-primary, var(--el-color-primary));
+        --group-bg: color-mix(in srgb, var(--group-color) 7%, var(--el-bg-color) 93%);
+        --group-border: color-mix(in srgb, var(--group-color) 28%, var(--el-border-color-light) 72%);
+    }
     &--success { --group-color: var(--el-color-success); }
     &--warning { --group-color: var(--el-color-warning); }
     &--danger { --group-color: var(--el-color-danger); }

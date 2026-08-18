@@ -1,6 +1,6 @@
 <template>
     <div id="tags-view-container-microi" class="tags-view-container-microi" :style="GetTagsViewContainerMicroiStyle()">
-        <el-tabs class="parent-tabs" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick">
+        <el-tabs class="parent-tabs mci-tabs mci-tabs--workspace" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick">
             <!-- 🔥 使用 fullPath 作为唯一标识，确保每个标签都能正确保存完整的路由信息（包括查询参数） -->
             <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath" :name="tab.fullPath">
                 <template #label>
@@ -64,88 +64,23 @@
 <style lang="scss" scoped>
 // TagsView 现代化样式
 #tags-view-container-microi {
-    :deep(.parent-tabs) {
-        .el-tabs__header {
-            margin: 0;
-            background: transparent;
-            // border-bottom: 2px solid #e4e7ed;
-            padding: 0;
-        }
-
-        .el-tabs__nav {
-            display: flex;
-            gap: 6px;
-            border: none;
-        }
-
+    :deep(.parent-tabs.mci-tabs) {
+        .el-tabs__header { margin: 0; }
+        .el-tabs__nav { gap: 4px; }
         .el-tabs__item {
-            position: relative;
-            padding: 4px 5px;
-            // border: 1px solid #e4e7ed;
-            border-bottom: none;
-            border-radius: 20px;
-            font-weight: 400;
-            font-size: 13px;
-            color: var(--el-text-color-regular, #606266);
-            transition: all 0.2s ease;
-            // background: #f5f7fa;
+            height: 28px;
             margin: 0;
-            height: auto;
-            line-height: normal;
+            padding: 0 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            line-height: 28px;
 
-            &:hover {
-                color: var(--color-primary, #409eff);
-                background: var(--color-primary-08);
-            }
-
-            &.is-active {
-                color: var(--color-primary-text, #ffffff) !important;
-                background: var(--color-primary, #409eff);
-                border-color: var(--color-primary, #409eff) !important;
-                border-bottom-color: transparent !important;
-                z-index: 1;
-                // font-weight: 500;
-                box-shadow: 0 2px 8px var(--color-primary-25);
-
-                &::before {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    height: 50%;
-                    background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
-                    border-radius: 4px 4px 0 0;
-                    pointer-events: none;
-                }
-
-                i {
-                    color: var(--color-primary-text, #ffffff) !important;
-                }
-
-                span {
-                    color: var(--color-primary-text, #ffffff) !important;
-                }
-            }
-
-            .el-icon {
-                margin-right: 4px;
-                font-size: 13px;
-                transition: transform 0.3s ease;
-            }
-
-            &:hover .el-icon {
-                transform: scale(1.1);
-            }
+            i,
+            span { color: inherit !important; }
         }
-
-        .el-tabs__nav-wrap::after {
-            display: none;
-        }
-
-        .el-tabs__active-bar {
-            display: none;
-        }
+        .el-tabs__nav-wrap::after,
+        .el-tabs__active-bar { display: none; }
     }
 
     // 全屏提示样式
@@ -195,7 +130,7 @@
             cursor: pointer;
             color: var(--el-text-color-regular, #606266);
             font-size: 13px;
-            transition: all 0.2s ease;
+            transition: color 0.2s ease, background-color 0.2s ease;
 
             &:hover {
                 background: var(--color-primary-10);
@@ -707,27 +642,28 @@ export default {
 
 <style lang="scss" scoped>
 .tags-view-container-microi {
-    height: 33px; //修改了值
+    height: 36px;
     width: 100%;
-    background: var(--el-bg-color, #fff);
+    background: transparent;
     border: 0;
-    box-shadow:
-        0 1px 3px 0 rgba(0, 0, 0, 0.12),
-        0 0 3px 0 rgba(0, 0, 0, 0.04);
+    box-shadow: none;
     .tags-view-wrapper-microi {
         .tags-view-item-microi {
             display: inline-block;
             position: relative;
             cursor: pointer;
-            height: 26px;
-            line-height: 26px;
-            border: 1px solid var(--el-border-color, #d8dce5);
+            height: 30px;
+            line-height: 29px;
+            border: 1px solid transparent;
+            border-bottom: 0;
+            border-radius: 9px 9px 2px 2px;
             color: var(--el-text-color-regular, #495060);
-            background: var(--el-bg-color-overlay, #fff);
-            padding: 0 8px;
+            background: transparent;
+            padding: 0 10px;
             font-size: 12px;
-            margin-left: 5px;
-            margin-top: 4px;
+            margin-left: 4px;
+            margin-top: 6px;
+            transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
             &:first-of-type {
                 margin-left: 15px;
             }
@@ -735,19 +671,18 @@ export default {
                 margin-right: 15px;
             }
             &.active {
-                background-color: var(--color-primary, #409eff);
-                color: var(--mci-text-on-primary, #fff);
-                border-color: var(--color-primary, #409eff);
+                background: color-mix(in srgb, var(--color-primary, #409eff) 10%, var(--el-bg-color-overlay, #fff));
+                color: var(--color-primary, #409eff);
+                border-color: color-mix(in srgb, var(--color-primary, #409eff) 16%, transparent);
+                box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary, #409eff) 10%, transparent);
                 &::before {
-                    content: "";
-                    background: currentColor;
-                    display: inline-block;
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                    position: relative;
-                    margin-right: 2px;
+                    display: none;
                 }
+            }
+
+            &:not(.active):hover {
+                color: var(--el-text-color-primary, #303133);
+                background: color-mix(in srgb, var(--el-fill-color-light, #f5f7fa) 72%, transparent);
             }
         }
     }
@@ -778,12 +713,12 @@ export default {
 .mci-route-view-host {
     position: relative;
     min-height: calc(100vh - 83px);
-    background: var(--mci-bg-page, var(--el-bg-color-page, #f7f9fc));
+    background: transparent;
 }
 
-// 保留嵌套tabs样式（如diy-form内部的tabs）
+// 仅保留经典嵌套 Tabs 的兼容外观，统一 mci-tabs 不再被旧下划线规则覆盖。
 .parent-tabs :deep(.el-tabs__content) {
-    .el-tabs {
+    .el-tabs:not(.mci-tabs) {
         .el-tabs__item {
             border-top-left-radius: 0px;
             border-top-right-radius: 0px;
@@ -809,7 +744,7 @@ export default {
             vertical-align: 2px;
             border-radius: 50%;
             text-align: center;
-            transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+            transition: color 0.3s cubic-bezier(0.645, 0.045, 0.355, 1), background-color 0.3s cubic-bezier(0.645, 0.045, 0.355, 1), transform 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
             transform-origin: 100% 50%;
             &:before {
                 transform: scale(0.6);

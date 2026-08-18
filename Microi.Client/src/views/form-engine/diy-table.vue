@@ -81,7 +81,7 @@
             id="table-rowlist-tabs"
             v-model="TableRowListActiveTab"
             @tab-click="tabClickRowList"
-            :class="(!IsPageTabs() ? 'table-rowlist-tabs tab-pane-hide' : 'table-rowlist-tabs box-card-top-tabs')
+            :class="(!IsPageTabs() ? 'table-rowlist-tabs tab-pane-hide mci-tabs mci-tabs--module' : 'table-rowlist-tabs box-card-top-tabs mci-tabs mci-tabs--module')
                 + (diyStore.IsMiniProgram ? ' mini-program' : '')"
         >
             <!-- 之前是使用GetPageTabs()，使用改成了预渲染  -->
@@ -137,7 +137,8 @@
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
                 <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
                 <!--移动端隐藏此工具栏，改用右下角FAB浮动按钮展示-->
-                <div class="keyword-search" style="margin-bottom: 5px;">
+                <el-config-provider size="small">
+                    <div class="keyword-search" style="margin-bottom: 5px;">
                     <div class="search-action-group">
                         <!-- 工作流菜单（OpenType=='WorkFlow' && FlowDesignId 存在）：发起申请按钮，替代普通新增 -->
                         <el-button
@@ -271,10 +272,9 @@
                             <el-dropdown
                                 v-if="_LimitExport && IsVisibleExport == true && !DiyCommon.IsNull(SysMenuModel.ExportMoreBtns) && SysMenuModel.ExportMoreBtns.length > 0"
                                 trigger="click"
-                                style="margin-left: 10px"
                             >
                                 <!-- {{ $t('Msg.Export') }} -->
-                                <el-button class="mr-10">
+                                <el-button>
                                     {{ $t("Msg.Export") }}
                                     <el-icon class="el-icon--right"><ArrowDown /></el-icon>
                                 </el-button>
@@ -414,6 +414,7 @@
                         </el-dropdown>
                     </div>
                 </div>
+                </el-config-provider>
 
                 <!-- 移动端把总数与首要业务指标合并成 UniApp 式摘要条，避免多个统计面板挤占首屏。 -->
                 <section v-if="diyStore.IsPhoneView && MobileSummaryItems.length" class="mobile-list-summary" aria-label="列表摘要">
@@ -1592,6 +1593,15 @@
                 :style="{ top: _colMenuPosition.top + 'px', left: _colMenuPosition.left + 'px', maxHeight: _colMenuPosition.maxHeight ? _colMenuPosition.maxHeight + 'px' : undefined }"
                 @click.stop
             >
+                <div class="user-column-settings-head global-col-menu-head">
+                    <div class="user-column-settings-title">
+                        <span class="user-column-settings-title-icon"><el-icon><Setting /></el-icon></span>
+                        <div>
+                            <strong>列设置</strong>
+                            <small>{{ _colMenuField ? ((_colMenuField.Label || _colMenuField.Name || '当前列') + ' · 排序、冻结与筛选') : '排序、冻结与筛选' }}</small>
+                        </div>
+                    </div>
+                </div>
                 <!-- 升序 -->
                 <div class="global-col-menu-item" :class="{ 'is-active': _colMenuSortState === 'asc' }" @click="colMenuSort('asc')">
                     <el-icon><SortUp /></el-icon>
@@ -1866,19 +1876,20 @@
             :close-on-press-escape="false"
             :destroy-on-close="true"
             :show-close="false"
-            class="dialog-opentable"
+            class="dialog-opentable diy-open-table-dialog"
+            :modal-class="GetOpenAnyTableOverlayClass()"
         >
             <template #header>
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
-                        <fa-icon :icon="'fas fa-table'" />
-                        {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
+                <div class="diy-open-table-head">
+                    <div class="diy-open-table-head__title">
+                        <span>RELATED TABLE</span>
+                        <strong><fa-icon :icon="'fas fa-table'" /> {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? " · " + OpenAnyTableParam.TableName : "" }}</strong>
                     </div>
-                    <div class="pull-right">
-                        <el-button v-if="typeof OpenAnyTableParam.SubmitEvent === 'function'" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
+                    <div class="diy-open-table-head__actions">
+                        <el-button size="small" v-if="typeof OpenAnyTableParam.SubmitEvent === 'function'" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
                             {{ $t("Msg.Submit") }}
                         </el-button>
-                        <el-button :icon="Close" @click="CloseOpenAnyTable">
+                        <el-button size="small" :icon="Close" @click="CloseOpenAnyTable">
                             {{ $t("Msg.Close") }}
                         </el-button>
                     </div>
@@ -1926,19 +1937,20 @@
             :close-on-press-escape="false"
             :destroy-on-close="true"
             :show-close="false"
-            class="drawer-opentable"
+            class="drawer-opentable diy-open-table-drawer"
+            :modal-class="GetOpenAnyTableOverlayClass()"
         >
             <template #header>
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <div class="pull-left" style="color: rgb(0, 0, 0); font-size: 15px">
-                        <fa-icon :icon="'fas fa-table'" />
-                        {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
+                <div class="diy-open-table-head">
+                    <div class="diy-open-table-head__title">
+                        <span>RELATED TABLE</span>
+                        <strong><fa-icon :icon="'fas fa-table'" /> {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? " · " + OpenAnyTableParam.TableName : "" }}</strong>
                     </div>
-                    <div class="pull-right">
-                        <el-button v-if="typeof OpenAnyTableParam.SubmitEvent === 'function'" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
+                    <div class="diy-open-table-head__actions">
+                        <el-button size="small" v-if="typeof OpenAnyTableParam.SubmitEvent === 'function'" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
                             {{ $t("Msg.Submit") }}
                         </el-button>
-                        <el-button :icon="Close" @click="CloseOpenAnyTable">
+                        <el-button size="small" :icon="Close" @click="CloseOpenAnyTable">
                             {{ $t("Msg.Close") }}
                         </el-button>
                     </div>
@@ -2315,6 +2327,18 @@ export default {
             var param = this.OpenAnyTableParam || {};
             var dialogType = param.DialogType || param.OpenType || param.Type || "";
             return String(dialogType).toLowerCase() === "drawer";
+        },
+        GetOpenAnyTableOverlayClass() {
+            var value = this.SysConfig ? this.SysConfig.DisableFormMaskBlur : undefined;
+            var blurDisabled = value === 1
+                || value === "1"
+                || value === true
+                || String(value || "").trim().toLowerCase() === "true";
+            return [
+                "diy-open-table-overlay",
+                "mci-unified-overlay",
+                blurDisabled ? "diy-open-table-overlay--plain mci-unified-overlay--plain" : ""
+            ].filter(Boolean).join(" ");
         },
         GetOpenAnyTableWidth() {
             var param = this.OpenAnyTableParam || {};

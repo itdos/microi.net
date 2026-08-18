@@ -35,6 +35,50 @@ test('MCP route canonical JSON 与 Node/Core 固定 UTF-8 hash 向量一致并�
   assert.throws(() => buildApplicationAssetStreamV3RouteSnapshot([{ order: 9007199254740992 }]), /safe integer/u);
 });
 
+test('protocol v3 preflight rejects lower-camel route objects before any immutable asset upload', () => {
+  const base = {
+    appIdOrKey: 'v3-route-shape',
+    versionNo: 'v1.0.0',
+    directory: '.',
+    publishMode: 'stage' as const,
+    protocolVersion: 3 as const,
+    expectedGateEpoch: '1',
+    requestId: 'v3-route-shape-request',
+    requestFingerprint: 'a'.repeat(64),
+    deliveryBatchId: 'v3-route-shape-batch',
+    sourceManifestHash: 'b'.repeat(64),
+    runtimeManifestHash: 'c'.repeat(64),
+    expectedCurrentVersion: 0,
+    expectedAppVersion: null,
+    expectedPublishFence: '0',
+    expectedPublishRowVersion: '0',
+    expectedVersionRowVersion: null,
+    expectedActivePublishVersionId: null,
+    expectedCommittedPublishVersionId: null,
+    allowLegacyFallback: false,
+  };
+  const lowerCamelRoutes = [{ routePath: '/marketplace', pageKey: 'marketplace', entryPath: 'index.html' }];
+  const lowerCamelSnapshot = buildApplicationAssetStreamV3RouteSnapshot(lowerCamelRoutes);
+  assert.throws(
+    () => resolveApplicationAssetStreamV3Contract({
+      ...base,
+      routes: lowerCamelRoutes,
+      routeSnapshotJson: lowerCamelSnapshot.routeSnapshotJson,
+      routeSnapshotHash: lowerCamelSnapshot.routeSnapshotHash,
+    }, base.runtimeManifestHash),
+    /RoutePath.*PascalCase/u,
+  );
+
+  const protocolRoutes = [{ RoutePath: '/marketplace', PageKey: 'marketplace', EntryPath: 'index.html' }];
+  const protocolSnapshot = buildApplicationAssetStreamV3RouteSnapshot(protocolRoutes);
+  assert.ok(resolveApplicationAssetStreamV3Contract({
+    ...base,
+    routes: protocolRoutes,
+    routeSnapshotJson: protocolSnapshot.routeSnapshotJson,
+    routeSnapshotHash: protocolSnapshot.routeSnapshotHash,
+  }, base.runtimeManifestHash));
+});
+
 test('protocol v3 nullable baselines reject empty strings to preserve Oracle/MySQL/SQL Server CAS parity', () => {
   const base = {
     appIdOrKey: 'v3-nullable-baseline',

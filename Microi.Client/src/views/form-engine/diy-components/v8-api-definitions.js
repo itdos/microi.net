@@ -62,7 +62,7 @@ export const V8ApiDefinitions = {
             SysConfig: {
                 label: "SysConfig",
                 kind: "Property",
-                documentation: "访问当前租户允许公开给浏览器的系统设置脱敏投影。公开的租户动态设置直接位于 SysConfig 根对象，不存在 PublicSettings 包装层。\n\n数据库、Redis、对象存储、MQ、密码、Secret、Token、Key、Connection、ClientSecrets、GlobalServerV8Code 等敏感字段不会注入前端。\n\n示例:\nvar sysTitle = V8.SysConfig.SysTitle;\nvar loginEnabled = V8.SysConfig['Login.GitHub.Display'];",
+                documentation: "访问当前租户 sys_config 的浏览器安全投影。公开配置必须建成 sys_config 实体字段；mci_system_setting 只保存后端私有值与 Secret，不会注入前端。\n\n数据库、Redis、对象存储、MQ、密码、Secret、Token、Key、Connection、ClientSecrets、GlobalServerV8Code、ServerPrivateSettings 等敏感字段不会注入前端。\n\n示例:\nvar sysTitle = V8.SysConfig.SysTitle;\nvar githubVisible = V8.SysConfig.LoginGitHubDisplay;\nvar maskBlurDisabled = V8.SysConfig.DisableFormMaskBlur === 1;",
                 insertText: "SysConfig"
             },
             SelectedData: {

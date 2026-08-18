@@ -3,11 +3,12 @@
         <!--以弹窗形式打开Form-->
         <el-dialog
             v-if="OpenType != 'Drawer'"
-            class="diy-form-container"
+            class="diy-form-container mci-unified-dialog"
             draggable
             align-center
             :width="width"
             :modal="true"
+            :modal-class="GetUnifiedOverlayClass()"
             :modal-append-to-body="false"
             v-model="ShowDialog"
             :close-on-click-modal="false"
@@ -15,6 +16,8 @@
             :destroy-on-close="true"
             :show-close="false"
             append-to-body
+            @open="HandleUnifiedOverlayOpen"
+            @close="HandleUnifiedOverlayClose"
         >
             <template #header>
                 <div class="diy-custom-dialog__header">
@@ -121,7 +124,7 @@ export default {
         },
         width: {
             type: String,
-            default: "50%"
+            default: "80%"
         },
         BodyHeight: {
             type: String,
@@ -154,6 +157,34 @@ export default {
         var self = this;
     },
     methods: {
+        GetUnifiedOverlayClass() {
+            const value = this.diyStore && this.diyStore.SysConfig
+                ? this.diyStore.SysConfig.DisableFormMaskBlur
+                : undefined;
+            const blurDisabled = value === 1
+                || value === "1"
+                || value === true
+                || String(value || "").trim().toLowerCase() === "true";
+            return [
+                "diy-form-modern-overlay",
+                "mci-unified-overlay",
+                blurDisabled ? "diy-form-modern-overlay--plain mci-unified-overlay--plain" : ""
+            ].filter(Boolean).join(" ");
+        },
+        HandleUnifiedOverlayOpen() {
+            this.$nextTick(() => {
+                if (typeof document === "undefined") return;
+                const overlays = document.querySelectorAll(".mci-unified-overlay");
+                const overlay = overlays[overlays.length - 1];
+                if (overlay) overlay.classList.remove("is-closing");
+            });
+        },
+        HandleUnifiedOverlayClose() {
+            if (typeof document === "undefined") return;
+            const overlays = document.querySelectorAll(".mci-unified-overlay");
+            const overlay = overlays[overlays.length - 1];
+            if (overlay) overlay.classList.add("is-closing");
+        },
         FormSet() {
             var self = this;
         },

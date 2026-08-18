@@ -24,6 +24,6 @@ test('all built-in micro app hosts use the shared skeleton', () => {
 
   for (const file of ['diy-table-navigation.mixin.js', 'diy-form-navigation.mixin.js']) {
     const source = read(`src/views/form-engine/mixins/${file}`)
-    assert.match(source, /BodyHeight:\s*"min\(680px, calc\(100vh - 190px\)\)"/)
+    assert.match(source, /BodyHeight:\s*param\.BodyHeight\s*\|\|\s*"min\(780px, calc\(100vh - 160px\)\)"/)
   }
 })

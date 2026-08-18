@@ -53,7 +53,7 @@ const router = useRouter();
 const route = useRoute();
 const diyStore = useDiyStore();
 
-// 与小程序保持同一开关：只有当前租户明确开启 IsShowAiAssistant 时才展示。
+// PC、移动端共用负向开关：默认显示，只有租户明确开启 DisableAiAssistant 才关闭。
 const aiAssistantEnabled = computed(() => isMobileAiAssistantEnabled(diyStore.SysConfig));
 
 // 支持 URL 参数 hideTabBar=1 隐藏底部菜单（小程序 webview 跳转场景）

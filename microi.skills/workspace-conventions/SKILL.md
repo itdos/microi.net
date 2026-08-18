@@ -58,7 +58,7 @@ Microi 平台后端功能必须默认按多节点部署设计：多个 API/Worke
 
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-003 sha256=5f3c011e88d1e36398a23a917949fcc8beaf6adee91e2a360d24bedd4ba322bb -->
+<!-- microi-progressive:chunk id=workspace-conventions-003 sha256=f11353ab84b85f319d592dac979e9a44fac3bc5aa50f827ad5aaa728f83fa18d -->
 ## 本地资源与 OOM 保护规范（强制）
 
 AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker build、浏览器自动化、压力测试或其他可能长时间占用 CPU/内存的进程前，必须先评估资源，不得为了“让构建跑过”无限抬高堆内存或 Worker 数。
@@ -69,6 +69,13 @@ AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker
 - 禁止将 `--max-old-space-size`、JVM heap、Docker memory 或类似上限设为接近物理内存总量。除非用户明确授权独占构建窗口，单个 AI 启动的进程树不得持续占用超过物理内存的 25%。
 - 后台/长任务必须记录根 PID、子进程、启动时间和独立日志，每 15-30 秒监测一次进程树内存与全机可用内存。任务失败、中断或达阈值时必须停止整个子进程树，不得遗留孤儿 Node/dotnet/Java 进程。
 - 全量构建无法在上述阈值内完成时，先停止并改用定向 lint、类型检查、按模块构建或按测试文件验证。如仍必须进行全量验收，应明确报告资源瓶颈，交由 CI/专用构建机或经用户明确同意的独占时段执行，禁止在用户正在使用的 VS Code 会话里硬跑。
+
+### `Microi.Client` 框架前端构建频率（强制）
+
+- 修改吾码低代码平台框架前端 `Microi.Client/` 时，开发阶段必须优先复用已运行的 Vite 开发服务，通过热模块更新（HMR）、定向静态测试和浏览器回归验证改动。禁止把 `npm run build` 当作每轮修改后的常规检查，禁止因切换需求、修改单个组件或上下文压缩而重复执行全量构建。
+- 只有全部框架前端源码修改、定向测试和浏览器验收均已完成后，才允许在最终收尾阶段执行一次 `npm run build`，用于确认正式产物能否生成。执行前仍须按本节检查内存、同类进程和构建预算；已经成功且之后没有再修改框架前端源码时不得重复构建。
+- Vite 热更新未生效时，先检查页面、控制台、文件监听和当前 61500 开发服务归属；确需重启时按共享进程与发布锁规范精确停止本工作区原有 `npm run dev`，再重新执行 `npm run dev`。不得用 `npm run build` 代替开发服务重启，也不得结束所有 `node`、浏览器或其它对话的进程。
+- 本规则只约束 `Microi.Client/` 吾码框架前端源码。独立 MicroService、Web、UniApp 等应用源码仍按其交付 Skill 在发布前执行自身必要的构建；不得因为本规则跳过微服务正式产物生成。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=workspace-conventions-004 sha256=5cd341a0dd0a827f16129a8587422b53c186d104a562ecb6640e6167567f9c0f -->
