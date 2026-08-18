@@ -510,7 +510,9 @@ async function loadApplications() {
 }
 
 function maybeLoadVisibleSentinel() {
-  if (!hasMore.value || typeof window === 'undefined') return
+  // 失败后只允许用户主动重试。否则仍在视口内的 sentinel 会在 finally、
+  // scroll、resize 和 IntersectionObserver 之间相互唤醒，网关 5xx 时形成死循环。
+  if (!hasMore.value || isLoading.value || loadError.value || typeof window === 'undefined') return
   nextTick(() => {
     const rect = sentinel.value?.getBoundingClientRect()
     if (rect && rect.top <= window.innerHeight + 600 && rect.bottom >= -600) loadApplications()

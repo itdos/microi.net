@@ -36,17 +36,17 @@ description: Microi吾码 AI 平台治理中心设计、调用、扩展、应用
 - Secret 只保存引用；列表、Diff、错误、日志、截图、导出和运行台账不得出现密码、Token、私钥或连接串原文。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-002 sha256=682eba607296c69de8b3dd9b6d0e72dadf380f839b15f66b5ff271b3d2bae0a9 -->
+<!-- microi-progressive:chunk id=ai-platform-governance-002 sha256=527f1cda978f88d0d1507d90aac71089f7585699f0ad7d5266dc7e40ba026b7c -->
 ## 官方应用事实
 
-应用 Key：`ai-platform-studio`，当前资源合同版本：`v2.0.4`。
+应用 Key：`ai-platform-studio`，当前资源合同版本：`v2.0.9`。
 
 - 40 张 `mci_` 治理表和 5 张运行基础表，应用包共 45 张表、873 个字段；
-- 42 个后台菜单：1 个 `AI平台治理` 父菜单、1 个 `AI平台治理工作台` 微服务菜单和 40 个数据菜单；
+- 42 条后台菜单兼容记录：仅 `AI平台治理` 作为可见 MicroService 入口；历史工作台和 40 个数据菜单保留原 Id、权限与升级身份，但统一隐藏；
 - 64 个接口引擎：57 个 `Managed`，7 个 `CreateIfMissing`；
 - 1 个 `MciAiPlatformMinuteSweep` 维护任务；
 - 10 个微服务路由：`overview`、`portal`、`identity`、`access`、`configuration`、`release`、`services`、`observability`、`assets`、`import`。
-- v2.0.4 保持数据资源合同不变；内部菜单只切换异步内容区并显示局部骨架屏，主题/reset/装饰样式限定在 `[data-mci-ui-root="ai-platform-studio"]`，不得重挂宿主 Tab 或污染吾码 Logo 与主菜单。
+- v2.0.9 保持表、接口、任务和菜单 Id 合同不变；10 个业务域页面及 40 类治理资源全部由工作台内部路由、操作面板和台账入口承载。隐藏的历史工作台菜单必须使用独立兼容 URL，不能与新的唯一入口争用 `sys_menu.Url`。发行版本、Manifest 版本与 `.microi-micro-app.json` 运行时版本必须同时提升并保持一致。内部切换只更新异步内容区并显示局部骨架屏，主题/reset/装饰样式限定在 `[data-mci-ui-root="ai-platform-studio"]`，不得重挂宿主 Tab 或污染吾码 Logo 与主菜单。
 
 租户 Hook：
 
@@ -63,19 +63,17 @@ mci-release-execute-extension
 Hook 首次创建后归租户维护，升级永不覆盖，也不得把同 Key 改回 `Managed`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ai-platform-governance-003 sha256=d70597d2cd0cdc2cf7e96d18613a3a65ba8da5c28312bf913f6abe1c0850cf9d -->
+<!-- microi-progressive:chunk id=ai-platform-governance-003 sha256=3d43295846e19e8b5cb526442ff8aff8f0317db88f5be803b5798e63118546e2 -->
 ## 菜单层级与语义
 
-应用安装或升级后必须形成以下层级，禁止把 40 个数据菜单平铺到根级或直接平铺在系统引擎下：
+应用安装或升级后只保留一个可见入口，禁止把历史工作台或 40 个数据菜单继续暴露到导航：
 
 ```text
 系统引擎 (cdc0844b-7249-4d64-a9c3-563a15c9cd20)
-└─ AI平台治理 (SecondMenu)
-   ├─ AI平台治理工作台 (MicroService: /micro-app/ai-platform-studio/overview)
-   └─ 40 个 AI平台治理·* 数据菜单
+└─ AI平台治理 (MicroService: /micro-app/ai-platform-studio/overview)
 ```
 
-`AI平台治理工作台` 是 10 个治理页面的统一操作入口，必须同时绑定 `MicroServiceId`、`MicroServicePageId`、`MicroServiceRoutePath=/overview` 和 `MicroServiceKey=ai-platform-studio`；不得只创建普通 URL 菜单。`system.manifest.json.menuCatalog` 是数据菜单用途与排序的事实源。40 个数据菜单按以下 9 个业务域排序：
+`AI平台治理` 是 10 个治理页面的唯一可见操作入口，必须同时绑定 `MicroServiceId`、`MicroServicePageId`、`MicroServiceRoutePath=/overview` 和 `MicroServiceKey=ai-platform-studio`；不得只创建普通 URL 菜单。历史菜单记录必须保持稳定 Id 并设置 `Display=0`、`AppDisplay=0`，避免删除后破坏旧角色权限、收藏与升级定位。`system.manifest.json.menuCatalog` 是 40 类治理资源用途与工作台内部分组的事实源，它们按以下 9 个业务域组织：
 
 | 业务域 | 数据菜单 | 主要作用 |
 |---|---|---|

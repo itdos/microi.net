@@ -7,16 +7,28 @@
         <router-link class="sidebar-logo-microi-link" @click="GetSysLogoLink()" to="">
             <span
                 class="sidebar-logo-microi-shell"
-                :style="{ width: GetSysLogoHeight(), height: GetSysLogoHeight() }"
+                :class="{
+                    'is-fallback': !logoSource || logoLoadFailed || !logoLoadReady
+                }"
+                :style="logoShellStyle"
             >
                 <img
+                    v-if="logoSource && !logoLoadFailed"
                     ref="logoImage"
                     class="sidebar-logo-microi"
                     :src="logoSource"
-                    alt="系统 Logo"
+                    alt=""
+                    aria-hidden="true"
                     @load="HandleSysLogoLoad"
                     @error="HandleSysLogoError"
                 />
+                <span
+                    v-if="!logoSource || logoLoadFailed || !logoLoadReady"
+                    class="sidebar-logo-microi-fallback"
+                    aria-hidden="true"
+                >
+                    {{ logoFallbackText }}
+                </span>
             </span>
             <h1
                 class="sidebar-title-microi"
@@ -42,10 +54,13 @@
 <script>
 import { computed } from "vue";
 import { useDiyStore, useSettingsStore } from "@/pinia";
-import { resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
+import {
+    resolveSidebarSystemLogoUrl,
+    resolveTenantBrandFallbackText
+} from "@/utils/login-branding.js";
 
-// Hash 路由切换后，相对路径会被错误解析到业务路由。始终从当前站点根目录
-// 解析本地兜底 Logo，保证微服务页面切换也不会让 Logo 消失。
+// 官方内置图只能作为 iTdos 自身的缺省值。子租户没有 Logo 或图片加载
+// 失败时必须显示自己的标题首字，不能泄露为吾码官方品牌。
 const LOCAL_LOGO_FALLBACK = typeof window === "undefined"
     ? "/static/img/logo/itdos.svg"
     : new URL("/static/img/logo/itdos.svg", window.location.origin).href;
@@ -83,24 +98,62 @@ export default {
     },
     computed: {
         configuredLogoSource() {
-            return resolveLoginSystemLogoUrl(this.SysConfig && this.SysConfig.SysLogo, (path, returnNoImg) =>
-                this.DiyCommon.GetServerPath(path, returnNoImg)
-            ) || LOCAL_LOGO_FALLBACK;
+            return resolveSidebarSystemLogoUrl(
+                this.SysConfig && this.SysConfig.SysLogo,
+                this.OsClient,
+                (path, returnNoImg) => this.DiyCommon.GetServerPath(path, returnNoImg),
+                LOCAL_LOGO_FALLBACK
+            );
+        },
+        logoFallbackText() {
+            return resolveTenantBrandFallbackText(
+                this.SysConfig && this.SysConfig.SysShortTitle,
+                this.ShortTitle,
+                this.WebTitle,
+                this.OsClient
+            );
+        },
+        logoShellStyle() {
+            const logoSize = this.GetSysLogoHeight();
+            return {
+                width: logoSize,
+                height: logoSize,
+                backgroundImage: this.logoLoadReady && this.logoSource
+                    ? `url(${JSON.stringify(this.logoSource)})`
+                    : "none"
+            };
         }
     },
     data() {
         return {
-            logoSource: LOCAL_LOGO_FALLBACK
+            logoSource: "",
+            logoLoadFailed: false,
+            logoLoadReady: false,
+            logoRetryAttempt: 0,
+            logoHealthTimers: []
         };
     },
     watch: {
         configuredLogoSource: {
             immediate: true,
             handler(value) {
-                this.logoSource = value || LOCAL_LOGO_FALLBACK;
-                if (this.$refs.logoImage) this.$refs.logoImage.style.visibility = "visible";
+                this.logoSource = value || "";
+                this.logoLoadFailed = false;
+                this.logoLoadReady = false;
+                this.logoRetryAttempt = 0;
+                this.QueueSysLogoHealthCheck();
             }
+        },
+        "$route.fullPath"() {
+            this.logoRetryAttempt = 0;
+            this.QueueSysLogoHealthCheck();
         }
+    },
+    mounted() {
+        this.QueueSysLogoHealthCheck();
+    },
+    beforeUnmount() {
+        this.ClearSysLogoHealthTimers();
     },
     methods: {
         // ... 其他方法
@@ -111,18 +164,55 @@ export default {
             return str;
         },
         GetSysLogo() {
-            return this.configuredLogoSource;
+            return this.logoSource;
         },
         HandleSysLogoLoad(event) {
-            if (event && event.target) event.target.style.visibility = "visible";
+            this.logoLoadReady = Boolean(event && event.target && event.target.naturalWidth > 0);
+            this.logoLoadFailed = !this.logoLoadReady;
         },
-        HandleSysLogoError(event) {
-            if (this.logoSource !== LOCAL_LOGO_FALLBACK) {
-                this.logoSource = LOCAL_LOGO_FALLBACK;
+        HandleSysLogoError() {
+            this.logoLoadReady = false;
+            this.RetrySysLogoLoad();
+        },
+        ClearSysLogoHealthTimers() {
+            (this.logoHealthTimers || []).forEach((timer) => window.clearTimeout(timer));
+            this.logoHealthTimers = [];
+        },
+        QueueSysLogoHealthCheck() {
+            if (typeof window === "undefined") return;
+            this.ClearSysLogoHealthTimers();
+            [400, 1400, 3200].forEach((delay) => {
+                this.logoHealthTimers.push(window.setTimeout(() => {
+                    this.EnsureSysLogoHealthy();
+                }, delay));
+            });
+        },
+        EnsureSysLogoHealthy() {
+            if (!this.logoSource) return;
+            const image = this.$refs.logoImage;
+            if (image && image.naturalWidth > 0) {
+                this.logoLoadReady = true;
+                this.logoLoadFailed = false;
                 return;
             }
-            // 本地兜底资源若也不可用，只隐藏损坏图标；标题仍正常显示。
-            if (event && event.target) event.target.style.visibility = "hidden";
+            if (image && !image.complete) return;
+            this.RetrySysLogoLoad();
+        },
+        RetrySysLogoLoad() {
+            const configuredSource = this.configuredLogoSource;
+            if (!configuredSource || this.logoRetryAttempt >= 2) {
+                this.logoLoadReady = false;
+                this.logoLoadFailed = true;
+                return;
+            }
+
+            this.logoRetryAttempt += 1;
+            this.logoLoadReady = false;
+            this.logoLoadFailed = false;
+            this.logoSource = "";
+            this.$nextTick(() => {
+                this.logoSource = configuredSource;
+            });
         },
         GetSysLogoHeight() {
             var self = this;
@@ -187,18 +277,41 @@ export default {
             width: 32px;
             height: 32px;
             flex: 0 0 auto;
+            position: relative;
+            display: grid;
+            place-items: center;
             overflow: hidden;
-            background: url("/static/img/logo/itdos.svg") center / contain no-repeat;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: contain;
             border-radius: 7px;
+
+            &.is-fallback {
+                background: rgba(255, 255, 255, 0.18);
+                box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+            }
         }
 
         & .sidebar-logo-microi {
             display: block;
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
             object-fit: contain;
+            opacity: 0;
+            pointer-events: none;
             vertical-align: middle;
-            //margin-left: 40px;
+        }
+
+        & .sidebar-logo-microi-fallback {
+            position: relative;
+            z-index: 1;
+            color: var(--sidebar-text-color, #ffffff);
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1;
+            text-transform: uppercase;
         }
 
         & .sidebar-title-microi {

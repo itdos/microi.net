@@ -168,3 +168,87 @@ test("AI 平台治理中心 10 路由在 PC 与 390px 视口真实可见", async
     contentType: "application/json"
   });
 });
+
+test("AI 平台治理新建门户使用统一大圆角居中可拖动弹层", async ({ page }) => {
+  test.skip(!PASSWORD, "PW_TEST_PASSWORD is required for the real UI login.");
+  await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+  await loginThroughUi(page);
+  await assertRoute(page, "portal", "门户编排", "1920x1080");
+  const frame = await waitForStudioFrame(page);
+  await frame.getByRole("button", { name: "新建门户", exact: true }).click();
+
+  const mask = frame.locator(".dialog-mask");
+  const dialog = frame.getByRole("dialog", { name: "新建门户项目", exact: true });
+  await expect(mask).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator(".dialog__icon svg")).toBeVisible();
+  await expect(dialog.locator(".dialog__heading small")).toHaveText("MICROI CONTROL");
+  await expect(dialog.locator(".dialog__heading h2")).toHaveText("新建门户项目");
+  await expect(dialog.locator(".dialog__heading p")).not.toBeEmpty();
+  const close = dialog.getByRole("button", { name: "关闭弹层", exact: true });
+  await expect(close).toBeVisible();
+  const footerButtons = dialog.locator(".dialog__footer button");
+  await expect(footerButtons).toHaveCount(2);
+  await expect(footerButtons.nth(0)).toContainText("关闭");
+  await expect(footerButtons.nth(1)).toContainText("创建草稿");
+  await expect(footerButtons.locator("svg")).toHaveCount(2);
+
+  const contract = await dialog.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    const body = element.querySelector(".dialog__body");
+    const closeButton = element.querySelector(".dialog__close");
+    const maskElement = element.closest(".dialog-mask");
+    const maskBox = maskElement?.getBoundingClientRect();
+    return {
+      left: box.left,
+      top: box.top,
+      right: box.right,
+      bottom: box.bottom,
+      width: box.width,
+      height: box.height,
+      viewportWidth: innerWidth,
+      viewportHeight: innerHeight,
+      maskLeft: maskBox?.left || 0,
+      maskTop: maskBox?.top || 0,
+      maskWidth: maskBox?.width || innerWidth,
+      maskHeight: maskBox?.height || innerHeight,
+      radius: Number.parseFloat(style.borderTopLeftRadius),
+      bodyBackground: body ? getComputedStyle(body).backgroundColor : "",
+      closeBackground: closeButton ? getComputedStyle(closeButton).backgroundColor : "",
+      maskPosition: maskElement ? getComputedStyle(maskElement).position : ""
+    };
+  });
+  expect(Math.abs(contract.left + contract.width / 2 - (contract.maskLeft + contract.maskWidth / 2)), JSON.stringify(contract)).toBeLessThanOrEqual(2);
+  expect(Math.abs(contract.top + contract.height / 2 - (contract.maskTop + contract.maskHeight / 2)), JSON.stringify(contract)).toBeLessThanOrEqual(2);
+  expect(contract.radius).toBeGreaterThanOrEqual(24);
+  expect(contract.maskPosition).toBe("fixed");
+  expect(["transparent", "rgba(0, 0, 0, 0)"]).not.toContain(contract.bodyBackground);
+  expect(["transparent", "rgba(0, 0, 0, 0)"]).not.toContain(contract.closeBackground);
+
+  const header = dialog.locator(".dialog__header");
+  const start = await header.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { x: box.left + 160, y: box.top + 46 };
+  });
+  await header.dispatchEvent("pointerdown", { button: 0, clientX: start.x, clientY: start.y, pointerId: 9 });
+  await frame.evaluate(() => {
+    window.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, button: 0, clientX: 9_000, clientY: 9_000, pointerId: 9 }));
+    window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, clientX: 9_000, clientY: 9_000, pointerId: 9 }));
+  });
+  await frame.waitForTimeout(100);
+  const dragged = await dialog.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, viewportWidth: innerWidth, viewportHeight: innerHeight };
+  });
+  expect(dragged.left).toBeGreaterThanOrEqual(17);
+  expect(dragged.top).toBeGreaterThanOrEqual(17);
+  expect(dragged.right).toBeLessThanOrEqual(dragged.viewportWidth - 17);
+  expect(dragged.bottom).toBeLessThanOrEqual(dragged.viewportHeight - 17);
+  expect(dragged.left).toBeGreaterThan(contract.left + 10);
+  expect(dragged.top).toBeGreaterThan(contract.top + 10);
+
+  await page.screenshot({ path: path.join(SCREENSHOT_DIR, "portal-unified-dialog-after-drag.png"), fullPage: false });
+  await close.click();
+  await expect(dialog).toHaveCount(0);
+});
