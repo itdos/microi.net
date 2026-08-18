@@ -314,8 +314,9 @@ html.dark .hamburger { color: var(--el-text-color-primary) !important; }
 /* --- 标签页栏 --- */
 html.dark .tags-view-container,
 html.dark .tags-view-container-microi {
-    background: var(--el-bg-color);
-    border-bottom: 1px solid var(--el-border-color);
+    background: transparent;
+    border-bottom: 0;
+    box-shadow: none;
 }
 
 html.dark .tags-view-container .tags-view-item,
@@ -327,10 +328,12 @@ html.dark .tags-view-container-microi .tags-view-item-microi {
 
 html.dark .tags-view-container .tags-view-item.active,
 html.dark .tags-view-container-microi .tags-view-item-microi.is-active,
-html.dark .tags-view-container-microi .el-tabs__item.is-active {
-    background: var(--el-color-primary) !important;
-    color: var(--mci-text-on-primary, #fff) !important;
-    border-color: var(--el-color-primary) !important;
+html.dark .tags-view-container-microi .el-tabs:not(.mci-tabs) .el-tabs__item.is-active {
+    background: color-mix(in srgb, var(--el-color-primary) 14%, var(--el-bg-color-overlay)) !important;
+    color: var(--el-color-primary) !important;
+    border-color: color-mix(in srgb, var(--el-color-primary) 24%, transparent) !important;
+    border-bottom-color: transparent !important;
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--el-color-primary) 12%, transparent) !important;
 }
 
 /* --- Element Plus 表格 --- */
@@ -1121,7 +1124,254 @@ html.dark {
 }
 
 /* ============================================================
- * 7. 头像 / 状态点 / 徽章
+ * 7. 吾码统一弹层与 Tabs
+ * Dialog 使用大圆角、可拖动、无顶部强调线；Drawer 保持直角侧滑语义。
+ * Tabs 的选中态使用轻量浮层和直线指示器，横向/纵向均保持同一视觉语言。
+ * ============================================================ */
+.el-dialog.mci-unified-dialog {
+    --mci-dialog-surface: var(--mci-bg-card, var(--el-bg-color, #fff));
+    --mci-dialog-line: var(--mci-border-color, var(--el-border-color-lighter, #e1e8f0));
+    overflow: hidden;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+    border: 1px solid var(--mci-dialog-line);
+    border-radius: 22px;
+    background: var(--mci-dialog-surface);
+    box-shadow: 0 24px 64px rgba(9, 24, 48, .22), 0 6px 18px rgba(9, 24, 48, .08);
+
+    > .el-dialog__header {
+        display: flex;
+        min-height: 68px;
+        align-items: center;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 16px 22px;
+        border-top: 0 !important;
+        border-bottom: 1px solid var(--mci-dialog-line);
+        background:
+            linear-gradient(115deg, color-mix(in srgb, var(--el-color-primary, #3478f6) 7%, transparent), transparent 45%),
+            var(--mci-dialog-surface);
+        cursor: move;
+    }
+
+    > .el-dialog__body {
+        box-sizing: border-box;
+        min-height: 0;
+        padding: 14px;
+        background: color-mix(in srgb, var(--el-fill-color-extra-light, #f6f8fb) 82%, var(--mci-dialog-surface));
+    }
+}
+
+.mci-unified-overlay {
+    background: color-mix(in srgb, #111827 44%, transparent) !important;
+    backdrop-filter: blur(12px) saturate(120%);
+    -webkit-backdrop-filter: blur(12px) saturate(120%);
+}
+
+.mci-unified-overlay.mci-unified-overlay--plain {
+    background: color-mix(in srgb, #111827 52%, transparent) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.mci-unified-overlay.is-closing {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transition: none !important;
+}
+
+.el-dialog.mci-field-config-dialog {
+    width: min(760px, calc(100vw - 32px));
+
+    > .el-dialog__body {
+        max-height: min(70vh, 720px);
+        overflow: auto;
+    }
+
+    > .el-dialog__footer {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 12px 18px 16px;
+        border-top: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter, #e1e8f0));
+        background: var(--mci-dialog-surface, var(--el-bg-color, #fff));
+    }
+}
+
+.mci-tabs {
+    --mci-tabs-accent: var(--mci-color-primary, var(--el-color-primary, #3478f6));
+    --mci-tabs-surface: var(--el-bg-color, #fff);
+    --mci-tabs-muted-surface: color-mix(in srgb, var(--el-fill-color-extra-light, #f6f8fb) 76%, transparent);
+
+    .el-tabs__header {
+        margin: 0 0 0px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+    }
+
+    .el-tabs__nav-wrap {
+        box-sizing: border-box;
+        min-height: 40px;
+        padding: 2px 0;
+        overflow: hidden;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+    }
+
+    .el-tabs__nav-wrap::after,
+    .el-tabs__active-bar {
+        display: none;
+    }
+
+    .el-tabs__nav {
+        display: flex;
+        gap: 6px;
+        border: 0 !important;
+    }
+
+    .el-tabs__item {
+        position: relative;
+        height: 34px;
+        padding: 0 16px;
+        border: 0 !important;
+        border-radius: 10px;
+        color: var(--el-text-color-regular, #526078);
+        font-size: 13px;
+        font-weight: 550;
+        line-height: 34px;
+        transition: color .18s ease, background-color .18s ease, box-shadow .18s ease;
+    }
+
+    .el-tabs__item:hover {
+        color: var(--mci-tabs-accent);
+        background: color-mix(in srgb, var(--mci-tabs-accent) 6%, transparent);
+    }
+
+    .el-tabs__item.is-active {
+        z-index: 1;
+        color: var(--mci-tabs-accent) !important;
+        background: color-mix(in srgb, var(--mci-tabs-accent) 24%, var(--mci-tabs-surface));
+        box-shadow: 0 3px 10px color-mix(in srgb, var(--mci-tabs-accent) 9%, transparent),
+            0 1px 2px rgba(15, 23, 42, .04);
+    }
+}
+
+.mci-tabs.el-tabs--left,
+.mci-tabs.el-tabs--right {
+    > .el-tabs__header .el-tabs__nav-wrap {
+        min-width: 164px;
+        min-height: 0;
+        padding: 8px;
+        border: 1px solid color-mix(in srgb, var(--mci-tabs-accent) 10%, var(--el-border-color-lighter, #e1e8f0));
+        border-radius: 16px;
+        background: var(--mci-tabs-muted-surface);
+    }
+
+    > .el-tabs__header .el-tabs__nav {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    > .el-tabs__header .el-tabs__item {
+        width: 100%;
+        min-height: 46px;
+        justify-content: flex-start;
+        padding: 0 14px;
+        text-align: left;
+    }
+
+    > .el-tabs__header .el-tabs__item::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: auto;
+        left: 1px;
+        width: 4px;
+        height: 54%;
+        min-height: 18px;
+        max-height: 26px;
+        border-radius: 999px;
+        background: var(--mci-tabs-accent);
+        opacity: 0;
+        transform: translateY(-50%) scaleY(.55);
+        transition: opacity .18s ease, transform .18s ease;
+    }
+
+    > .el-tabs__header .el-tabs__item.is-active {
+        background: var(--mci-tabs-surface);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, .055);
+    }
+
+    > .el-tabs__header .el-tabs__item.is-active::before {
+        opacity: 1;
+        transform: translateY(-50%) scaleY(1);
+    }
+}
+
+.mci-tabs.el-tabs--right > .el-tabs__header .el-tabs__item::before {
+    right: 1px;
+    left: auto;
+}
+
+.mci-tabs--workspace .el-tabs__header,
+.mci-tabs--right-panel .el-tabs__header {
+    margin-bottom: 8px;
+}
+
+.mci-tabs--workspace .el-tabs__nav-wrap {
+    min-height: 34px;
+}
+
+.mci-tabs--workspace .el-tabs__item {
+    height: 28px;
+    line-height: 28px;
+}
+
+.mci-tab-badge {
+    display: inline-flex;
+    min-width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    margin-left: 3px;
+    padding: 0 5px;
+    border: 1px solid color-mix(in srgb, var(--mci-tabs-accent, var(--el-color-primary)) 24%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mci-tabs-accent, var(--el-color-primary)) 10%, var(--el-bg-color, #fff));
+    color: var(--mci-tabs-accent, var(--el-color-primary));
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 16px;
+}
+
+@media (max-width: 768px) {
+    .el-dialog.mci-unified-dialog {
+        width: calc(100vw - 20px) !important;
+        max-width: calc(100vw - 20px);
+        border-radius: 16px;
+    }
+
+    .mci-tabs .el-tabs__item {
+        padding: 0 11px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mci-unified-overlay {
+        transition: none !important;
+    }
+
+    .mci-tabs .el-tabs__item,
+    .mci-tabs .el-tabs__item::before {
+        transition: none !important;
+    }
+}
+
+/* ============================================================
+ * 8. 头像 / 状态点 / 徽章
  * ============================================================ */
 .mci-avatar {
     display: inline-flex;
@@ -1344,11 +1594,13 @@ html.dark {
 
     /* TagsView 顶部 tabs */
     .tags-view-container-microi {
-        background: var(--el-bg-color) !important;
+        background: transparent !important;
+        border-bottom: 0 !important;
+        box-shadow: none !important;
         .tags-view-item-microi {
-            background: var(--el-fill-color-light) !important;
+            background: transparent !important;
             color: var(--el-text-color-regular) !important;
-            border-color: var(--el-border-color) !important;
+            border-color: transparent !important;
         }
     }
 

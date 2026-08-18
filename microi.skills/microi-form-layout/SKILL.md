@@ -13,6 +13,13 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 
 控件事实源：`Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json` 中 `Sort=1000` 附近的 `Divider`、`CollapseGroup`、`Tabs`、`Alert`、`StaticText`、`Html`、`RichText` 等都属于 Advanced 布局控件。
 
+表单遮罩统一使用负向开关 `diy_table.DisableFormMaskBlur`：字段缺失、空值或 `0/false` 时默认启用毛玻璃，只有显式 `1/true` 才关闭；`sys_config.DisableFormMaskBlur` 可以全局关闭。商城升级必须复用旧 `FormMaskBlur` 的字段元数据 Id 就地改名，允许暂留旧物理列供兼容读取，但旧字段元数据必须设置 `Visible=0`、`AppVisible=0`，不得同时向用户展示正向与负向开关。
+
+表单打开方式与分组是两个独立决策：新表默认 `FormOpenType=Dialog`、
+`FormOpenWidth=80%`。只有约 36 个以上业务字段、至少 2 个大型子表，或同等密度的重型控件
+才评估 Drawer；不能用 Drawer 代替 Tabs/CollapseGroup 的信息架构。Dialog 统一使用居中、可拖动、
+大圆角弹层；Drawer 贴边且不使用大圆角。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=microi-form-layout-000 sha256=cade6a415454aa04f5fcf840e6d9df1323ac9751c0e3c8e1b07b360007413819 -->
 ## 1. 三种分组能力速查
@@ -118,7 +125,7 @@ Q1: 核心可见字段数、子表和强任务域？
 V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.ClickFormTab('tabId')` 动态控制 Tab 显隐和默认选中。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-form-layout-003 sha256=eebf51aec08023443964d82e1140026ec7cef627b3d2ed6ead169e1fd14353a3 -->
+<!-- microi-progressive:chunk id=microi-form-layout-003 sha256=c737fc8b0d488548e5a3de616ff172b8b645553c818fb09e70a196f4e9c0e2ae -->
 ## 5. 必填与禁止
 
 ### 5.1 必填
@@ -127,6 +134,8 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 - 创建 CollapseGroup 分组时，必须设置 `Icon`（如 `fas fa-calculator` / `fas fa-info-circle`），不要默认空白。
 - 任何 Tab / CollapseGroup 都必须有 `Description` 解释分组用途，不要只放一个标题。
 - 每个 CollapseGroup 必须回读到 `FormWidth=24`；`Config.CollapseGroup.ShowFieldCount` 默认必须为 `true`。
+- 表级 Tab 与 CollapseGroup 的 `Description` 作为副标题显示；开启计数时统一追加 `x 项`，禁止继续显示 `x 个字段`。运行时动态显隐字段后必须重算计数，已有数字角标配置继续生效，不能被静态字段数覆盖。
+- 表级分组方向完整支持 `TabsPosition=left/top/right/bottom`；每个方向都要检查标题、副标题、动态角标和选中指示线，纵向指示线端点固定为直角。
 - 修改 `diy_table.Tabs` 或 `diy_field.Tab` / `Config.CollapseGroup` / `Config.FieldTabs` 后，必须调用 `microi_refresh_schema_cache`。
 - Tab 内嵌套 CollapseGroup 时，CollapseGroup 必须设 `DefaultCollapsed=true`（默认收起），避免 Tab 内继续被折叠分组抢首屏空间。
 - 新增布局节点后必须同时回读 `diy_field` 元数据和目标业务表结构，确认没有新增物理业务列；若当前工具不提供仅元数据能力，只报告设计建议，不得绕过后端直接写表。

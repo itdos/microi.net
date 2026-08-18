@@ -148,142 +148,82 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-$primary-color: #4785ff;
-$success-color: #34c759;
-$info-color: #8b5cf6;
-$warning-color: #f59e0b;
-$danger-color: #ef4444;
-
 .tech-divider {
+    --divider-color: var(--mci-color-primary, var(--el-color-primary, #3478f6));
+    --divider-line: color-mix(in srgb, var(--divider-color) 18%, var(--el-border-color-lighter, #e7edf5));
+    --divider-soft: color-mix(in srgb, var(--divider-color) 8%, transparent);
     position: relative;
+    display: flex;
+    width: 100%;
+    min-height: 30px;
+    align-items: center;
     margin: 0;
     padding: 0;
-    width: 100%;
-    display: flex;
-    align-items: center;
 
-    // 左右横线
     &::before,
     &::after {
         content: '';
+        min-width: 12px;
         flex: 1;
         height: 1px;
-        background: linear-gradient(90deg, var(--line-fade-start, transparent), var(--line-color, #e5e7eb) 12%, var(--line-color, #e5e7eb) 88%, var(--line-fade-end, transparent));
+        background: linear-gradient(90deg, transparent, var(--divider-line));
     }
+    &::after { background: linear-gradient(90deg, var(--divider-line), transparent); }
 
-    // 根据位置控制横线显隐
     &[data-position="left"] {
-        &::before { flex: 0; max-width: 0; }
-        &::after  { flex: 1; }
-        .tech-divider__container { padding-left: 0; padding-right: 12px; }
-    }
-    &[data-position="center"] {
-        &::before,
-        &::after { flex: 1; }
+        &::before { display: none; }
+        .tech-divider__container { padding-left: 0; padding-right: 10px; }
     }
     &[data-position="right"] {
-        &::before { flex: 1; }
-        &::after  { flex: 0; max-width: 0; }
-        .tech-divider__container { padding-left: 12px; padding-right: 0; }
+        &::after { display: none; }
+        .tech-divider__container { padding-left: 10px; padding-right: 0; }
     }
 
-    // 主容器
     &__container {
         position: relative;
-        flex-shrink: 0;
         display: flex;
+        flex-shrink: 0;
         align-items: center;
-        padding: 0 14px;
+        padding: 0 10px;
     }
 
-    // 标签样式（有背景色的小胶囊）
-    &__tag {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 3px 14px;
-        background: var(--tag-bg, #{$primary-color});
-        border-radius: 12px;
-        color: #fff;
-        font-weight: 600;
-        font-size: 13px;
-        line-height: 20px;
-        letter-spacing: 0.3px;
-        box-shadow: 0 1px 3px var(--tag-shadow, rgba(71, 133, 255, 0.25));
-        transition: box-shadow 0.2s ease;
-    }
-
-    // 普通标签（轻量边框 + 色条）
+    &__tag,
     &__label {
         position: relative;
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 3px 12px 3px 14px;
-        background: var(--label-bg, rgba(71, 133, 255, 0.06));
-        border-radius: 6px;
-        border-left: 3px solid var(--divider-color, #{$primary-color});
-        font-weight: 600;
+        padding: 3px 10px 3px 13px;
+        border: 0;
+        border-radius: 7px;
+        color: var(--divider-color);
+        background: var(--divider-soft);
+        box-shadow: none;
         font-size: 13px;
+        font-weight: 680;
         line-height: 20px;
-        letter-spacing: 0.2px;
-        color: var(--divider-color, #{$primary-color});
-        transition: background 0.2s ease;
+        letter-spacing: .15px;
     }
 
-    // 图标
-    &__icon {
-        font-size: 13px;
-        opacity: 0.85;
+    &__tag::before,
+    &__label::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        width: 3px;
+        height: 18px;
+        border-radius: 0 4px 4px 0;
+        background: var(--divider-color);
+        transform: translateY(-50%);
     }
 
-    // 文字
-    &__text {
-        position: relative;
-        z-index: 2;
-        white-space: nowrap;
-    }
+    &__icon { font-size: 13px; opacity: .88; }
+    &__text { position: relative; z-index: 1; white-space: nowrap; }
 
-    // ========== 颜色主题 ==========
-    &--primary {
-        --divider-color: #{$primary-color};
-        --line-color: #{rgba($primary-color, 0.18)};
-        --tag-bg: #{$primary-color};
-        --tag-shadow: #{rgba($primary-color, 0.25)};
-        --label-bg: #{rgba($primary-color, 0.06)};
-    }
-    &--success {
-        --divider-color: #{$success-color};
-        --line-color: #{rgba($success-color, 0.22)};
-        --tag-bg: #{$success-color};
-        --tag-shadow: #{rgba($success-color, 0.25)};
-        --label-bg: #{rgba($success-color, 0.06)};
-    }
-    &--info {
-        --divider-color: #{$info-color};
-        --line-color: #{rgba($info-color, 0.18)};
-        --tag-bg: #{$info-color};
-        --tag-shadow: #{rgba($info-color, 0.25)};
-        --label-bg: #{rgba($info-color, 0.06)};
-    }
-    &--warning {
-        --divider-color: #{$warning-color};
-        --line-color: #{rgba($warning-color, 0.25)};
-        --tag-bg: #{$warning-color};
-        --tag-shadow: #{rgba($warning-color, 0.25)};
-        --label-bg: #{rgba($warning-color, 0.06)};
-    }
-    &--danger {
-        --divider-color: #{$danger-color};
-        --line-color: #{rgba($danger-color, 0.2)};
-        --tag-bg: #{$danger-color};
-        --tag-shadow: #{rgba($danger-color, 0.25)};
-        --label-bg: #{rgba($danger-color, 0.06)};
-    }
-    &--default {
-        --divider-color: #{$primary-color};
-        --line-color: #e5e7eb;
-        --label-bg: #{rgba($primary-color, 0.06)};
-    }
+    &--success { --divider-color: var(--el-color-success, #34c759); }
+    &--info { --divider-color: var(--el-color-info, #7c8da6); }
+    &--warning { --divider-color: var(--el-color-warning, #f59e0b); }
+    &--danger { --divider-color: var(--el-color-danger, #ef4444); }
 }
 </style>

@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.0.0
+ * Version: v2.1.0
  * Function:
  * - Unified marketplace importer with resumable slices and strict SharedPublicRuntime support for official versioned Web/UniApp assets.
  */
@@ -386,6 +386,43 @@ var trimRightSlash = function (url) {
     return firstTextParam([url]).replace(/\/+$/g, '');
 };
 
+// MARKETPLACE_PRIVATE_SOURCE_CREDENTIAL_V1：私有源 Token 只存在当前租户后端
+// ServerPrivateSettings。前端和后台任务参数只携带稳定 Key，检查点、日志、审计
+// 与安装版本表均不得保存 Token 原文。
+var loadMarketplaceSourceCredential = function (credentialKey, expectedApiBase, expectedOsClient) {
+    var key = firstTextParam([credentialKey]).replace(/^\s+|\s+$/g, '');
+    if (!key) return null;
+    var privateSettings = V8.SysConfig && V8.SysConfig.ServerPrivateSettings
+        ? V8.SysConfig.ServerPrivateSettings
+        : {};
+    var raw = privateSettings[key];
+    if (!raw) throw new Error('商城源登录已失效，请在商城源管理中重新登录。');
+    var credential = raw;
+    if (typeof credential == 'string') {
+        try { credential = JSON.parse(credential); }
+        catch (parseError) { throw new Error('商城源登录凭据格式无效，请重新登录。'); }
+    }
+    var token = firstTextParam([credential.Token, credential.token]).replace(/^Bearer\s+/i, '');
+    var boundBase = trimRightSlash(firstTextParam([credential.ApiBase, credential.apiBase]));
+    var boundOsClient = firstTextParam([credential.OsClient, credential.osClient]);
+    if (!token) throw new Error('商城源登录 Token 为空，请重新登录。');
+    if (boundBase.toLowerCase() != trimRightSlash(expectedApiBase).toLowerCase()
+        || boundOsClient.toLowerCase() != String(expectedOsClient || '').toLowerCase()) {
+        throw new Error('商城源登录凭据与当前 ApiBase/OsClient 不匹配，请重新发现并登录该来源。');
+    }
+    var expiresAt = firstTextParam([credential.ExpiresAtUtc, credential.expiresAtUtc]);
+    if (expiresAt) {
+        var expiresAtTime = Date.parse(expiresAt);
+        if (!isNaN(expiresAtTime) && expiresAtTime <= Date.now()) {
+            throw new Error('商城源登录已过期，请重新登录。');
+        }
+    }
+    return {
+        authorization: token,
+        did: firstTextParam([credential.Did, credential.did])
+    };
+};
+
 var syncStoreMetaFromRow = function () {
     var row = V8.Param.Form || V8.Param.Row || V8.Param.StoreRow || {};
     if (!row) row = {};
@@ -396,12 +433,21 @@ var syncStoreMetaFromRow = function () {
     if (!V8.Param.AppAuthor) V8.Param.AppAuthor = firstTextParam([row.AppAuthor, row.Author]);
     if (!V8.Param.StoreApiBase) V8.Param.StoreApiBase = firstTextParam([row.StoreApiBase, row.AppStoreApiBase]);
     if (!V8.Param.StoreOsClient) V8.Param.StoreOsClient = firstTextParam([row.StoreOsClient, row.AppStoreOsClient, row.SourceOsClient]);
+    if (!V8.Param.StoreCredentialKey) V8.Param.StoreCredentialKey = firstTextParam([row.StoreCredentialKey, row.CredentialKey]);
+    if (!V8.Param.StoreVersionId) V8.Param.StoreVersionId = firstTextParam([row.StoreVersionId, row.DataVersionId]);
     return row;
 };
 
 var storeRow = syncStoreMetaFromRow();
 var storeApiBase = trimRightSlash(firstTextParam([V8.Param.StoreApiBase, storeRow.StoreApiBase, storeRow.AppStoreApiBase, 'https://api.itdos.com']));
 var storeOsClient = firstTextParam([V8.Param.StoreOsClient, V8.Param.AppStoreOsClient, storeRow.StoreOsClient, storeRow.AppStoreOsClient, storeRow.SourceOsClient, 'iTdos']);
+var storeCredentialKey = firstTextParam([V8.Param.StoreCredentialKey, storeRow.StoreCredentialKey, storeRow.CredentialKey]);
+var storeRequestHeaders = {};
+try {
+    storeRequestHeaders = loadMarketplaceSourceCredential(storeCredentialKey, storeApiBase, storeOsClient) || {};
+} catch (credentialError) {
+    return { Code: 0, Msg: credentialError.message || String(credentialError) };
+}
 var authoritativeStoreModel = null;
 if (!Package && storeRow && storeRow.AppPakcet) {
     Package = storeRow.AppPakcet;
@@ -411,8 +457,12 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
     var storeId = firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id]);
     var storeModelResult = V8.Http.Post({
         Url: storeApiBase + '/apiengine/get-microi-store-model?OsClient=' + encodeURIComponent(storeOsClient),
-        PostParam: { Id: storeId },
+        PostParam: {
+            Id: storeId,
+            StoreVersionId: firstTextParam([V8.Param.StoreVersionId, storeRow.StoreVersionId, storeRow.DataVersionId])
+        },
         ParamType: 'json',
+        Headers: storeRequestHeaders,
         Timeout: 120
     });
     if (typeof (storeModelResult) == 'string') {

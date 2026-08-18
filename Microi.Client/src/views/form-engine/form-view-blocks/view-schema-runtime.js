@@ -150,6 +150,7 @@ function normalizeFormWorkbench(value) {
         Mode: canonical(source.Mode || source.mode, ["Edit", "View"], "Edit"),
         Density: canonical(source.Density || source.density, ["Compact", "Comfortable"], "Compact"),
         SectionNavigation: canonical(source.SectionNavigation || source.sectionNavigation, ["Auto", "Sidebar", "Tabs"], "Auto"),
+        SectionNavigationPosition: canonical(source.SectionNavigationPosition || source.sectionNavigationPosition, ["Left", "Top", "Right", "Bottom"], "Left"),
         Eyebrow: String(source.Eyebrow || source.eyebrow || ""),
         Description: String(source.Description || source.description || ""),
         NavigationTitle: String(source.NavigationTitle || source.navigationTitle || ""),

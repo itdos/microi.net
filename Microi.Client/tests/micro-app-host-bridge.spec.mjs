@@ -15,7 +15,18 @@ test("menu micro-apps receive a versioned host capability contract", () => {
         mode: "tab",
         requestType: "micro-app:host-action",
         resultType: "micro-app:host-action-result",
-        actions: ["closeTab", "navigate", "replaceTab", "back", "forward", "reloadTab", "setTabTitle", "showMessage"],
+        actions: [
+            "closeTab",
+            "navigate",
+            "replaceTab",
+            "back",
+            "forward",
+            "reloadTab",
+            "setTabTitle",
+            "showMessage",
+            "setGlobalOverlay",
+            "openForm"
+        ],
         lifecycle: {
             cacheMode: "runtime-keep-alive",
             cacheOwner: "micro-app",
@@ -84,4 +95,7 @@ test("the page host connects dispatch actions to router and TagsView behavior", 
     assert.match(host, /this\.\$router\.replace\(target\)/);
     assert.match(host, /window\.addEventListener\("page-refresh"/);
     assert.match(host, /MICRO_APP_HOST_ACTION_RESULT_TYPE/);
+    assert.match(host, /childPrelockedHtmlOnly/);
+    assert.match(host, /htmlOverflow:\s*childPrelockedHtmlOnly\s*\?\s*""\s*:\s*html\.style\.overflow/);
+    assert.match(host, /html\.style\.overflow\s*=\s*state\.htmlOverflow/);
 });

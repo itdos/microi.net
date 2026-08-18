@@ -20,6 +20,21 @@ export const applicationStoreReplicaMappings = Object.freeze([
     publishedStandalone: false,
   }),
   Object.freeze({
+    resourceName: 'get-microi-store-list.js',
+    apiEngineKey: 'get-microi-store',
+    publishedStandalone: false,
+  }),
+  Object.freeze({
+    resourceName: 'get-microi-store-model.js',
+    apiEngineKey: 'get-microi-store-model',
+    publishedStandalone: false,
+  }),
+  Object.freeze({
+    resourceName: 'get-microi-store-versions.js',
+    apiEngineKey: 'get-microi-store-versions',
+    publishedStandalone: false,
+  }),
+  Object.freeze({
     resourceName: 'ai-app-publish-store.js',
     apiEngineKey: 'ai_app_publish_store',
     publishedStandalone: true,

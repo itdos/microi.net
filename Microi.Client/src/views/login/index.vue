@@ -2323,7 +2323,7 @@ export default {
 .login-appearance-button {
     height: 44px;
     min-width: 44px;
-    padding: 0 12px;
+    padding: 0 10px;
     border: 0;
     border-radius: var(--mci-login-control-radius);
     display: inline-flex;

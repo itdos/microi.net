@@ -10,7 +10,7 @@ import getPageTitle from "@/utils/get-page-title";
 import { DiyCommon, DiyApi } from "@/utils/microi.net.import";
 import Cookies from "js-cookie";
 import { normalizeAccessRoute } from "@/views/system/components/user-access-key-utils";
-import { finishRouteLoading, startRouteLoading } from "@/utils/mci-loading";
+import { cancelRouteLoading, finishRouteLoading, startRouteLoading } from "@/utils/mci-loading";
 const whiteList = ["/login", "/auth-redirect", "/access-login", "/mci-redis-manager"]; // no redirect whitelist
 
 function removeCredentialParameter(paramName) {
@@ -105,7 +105,13 @@ function getPermissionFallbackPath(routes, targetPath) {
 }
 
 router.beforeEach(async (to, from, next) => {
-    startRouteLoading();
+    // 已经进入平台壳层后的路由切换保留当前内容，目标页面及表单各自负责
+    // 局部骨架屏。整页骨架会在首次加载异步模块时遮住旧页面，造成明显闪屏。
+    if (Array.isArray(from?.matched) && from.matched.length > 0) {
+        cancelRouteLoading();
+    } else {
+        startRouteLoading();
+    }
     // 安全/稳定性修复：整个守卫包一层 try/catch 兜底，
     // 避免任意 await 抛错导致 next() 不被调用而出现"白屏永久无法导航"。
     try {

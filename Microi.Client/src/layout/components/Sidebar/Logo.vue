@@ -4,37 +4,43 @@
         class="sidebar-logo-microi-container-microi"
         :class="{ collapse: collapse }"
     >
-        <transition name="sidebarLogoFade">
-            <router-link v-if="collapse" key="collapse" class="sidebar-logo-microi-link" @click="GetSysLogoLink()" to="">
-                <img class="sidebar-logo-microi" :style="{ height: GetSysLogoHeight() }" :src="GetSysLogo()" />
-            </router-link>
-            <router-link v-else key="expand" class="sidebar-logo-microi-link" @click="GetSysLogoLink()" to="">
-                <img class="sidebar-logo-microi" :style="{ height: GetSysLogoHeight() }" :src="GetSysLogo()" />
-                <h1
-                    class="sidebar-title-microi"
-                    v-if="IsDisplayShortTitle()"
-                    :title="SysConfig.SysShortTitle"
-                    :style="{
-                        color: 'var(--sidebar-text-color, #ffffff)',
-                        fontSize: SysConfig.SysTitleFontSize ? SysConfig.SysTitleFontSize + 'px' : '20px'
-                    }"
-                >
-                    {{
-                        !DiyCommon.IsNull(SysConfig.SysShortTitle)
-                            ? truncateString(SysConfig.SysShortTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
-                            : DiyCommon.IsNull(ShortTitle)
-                              ? truncateString(WebTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
-                              : truncateString(ShortTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
-                    }}
-                </h1>
-            </router-link>
-        </transition>
+        <router-link class="sidebar-logo-microi-link" @click="GetSysLogoLink()" to="">
+            <img
+                ref="logoImage"
+                class="sidebar-logo-microi"
+                :style="{ height: GetSysLogoHeight() }"
+                :src="logoSource"
+                alt="系统 Logo"
+                @load="HandleSysLogoLoad"
+                @error="HandleSysLogoError"
+            />
+            <h1
+                class="sidebar-title-microi"
+                v-if="!collapse && IsDisplayShortTitle()"
+                :title="SysConfig.SysShortTitle"
+                :style="{
+                    color: 'var(--sidebar-text-color, #ffffff)',
+                    fontSize: SysConfig.SysTitleFontSize ? SysConfig.SysTitleFontSize + 'px' : '20px'
+                }"
+            >
+                {{
+                    !DiyCommon.IsNull(SysConfig.SysShortTitle)
+                        ? truncateString(SysConfig.SysShortTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
+                        : DiyCommon.IsNull(ShortTitle)
+                          ? truncateString(WebTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
+                          : truncateString(ShortTitle, SysConfig.BiaotiJQ ? SysConfig.BiaotiJQ : 12)
+                }}
+            </h1>
+        </router-link>
     </div>
 </template>
 
 <script>
 import { computed } from "vue";
 import { useDiyStore, useSettingsStore } from "@/pinia";
+import { resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
+
+const LOCAL_LOGO_FALLBACK = "./static/img/logo/itdos.svg";
 export default {
     name: "SidebarLogo",
     props: {
@@ -67,14 +73,27 @@ export default {
             ShowClassicTop
         };
     },
-    computed: {},
+    computed: {
+        configuredLogoSource() {
+            return resolveLoginSystemLogoUrl(this.SysConfig && this.SysConfig.SysLogo, (path, returnNoImg) =>
+                this.DiyCommon.GetServerPath(path, returnNoImg)
+            ) || LOCAL_LOGO_FALLBACK;
+        }
+    },
     data() {
         return {
-            //   title: '吾码 Microi 低代码平台',
-            //   logo: 'https://wpimg.wallstcn.com/69a1c46c-eb1c-4b46-8bd4-e9e686ef5251.png'
+            logoSource: LOCAL_LOGO_FALLBACK
         };
     },
-    mounted() {},
+    watch: {
+        configuredLogoSource: {
+            immediate: true,
+            handler(value) {
+                this.logoSource = value || LOCAL_LOGO_FALLBACK;
+                if (this.$refs.logoImage) this.$refs.logoImage.style.visibility = "visible";
+            }
+        }
+    },
     methods: {
         // ... 其他方法
         truncateString(str, maxLength) {
@@ -84,11 +103,18 @@ export default {
             return str;
         },
         GetSysLogo() {
-            var self = this;
-            if (!self.DiyCommon.IsNull(self.SysConfig.SysLogo)) {
-                return self.DiyCommon.GetServerPath(self.SysConfig.SysLogo);
+            return this.configuredLogoSource;
+        },
+        HandleSysLogoLoad(event) {
+            if (event && event.target) event.target.style.visibility = "visible";
+        },
+        HandleSysLogoError(event) {
+            if (this.logoSource !== LOCAL_LOGO_FALLBACK) {
+                this.logoSource = LOCAL_LOGO_FALLBACK;
+                return;
             }
-            return self.DiyCommon.GetServerPath("/static/img/logo/itdos.svg");
+            // 本地兜底资源若也不可用，只隐藏损坏图标；标题仍正常显示。
+            if (event && event.target) event.target.style.visibility = "hidden";
         },
         GetSysLogoHeight() {
             var self = this;

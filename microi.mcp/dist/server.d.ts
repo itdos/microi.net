@@ -78,6 +78,32 @@ export interface ApplicationDirectoryStreamPublishInput {
     allowLegacyFallback?: boolean;
     confirmExecution?: string;
 }
+export interface ApplicationAssetStreamUploadInput {
+    appIdOrKey: string;
+    versionNo: string;
+    relativePath: string;
+    localFilePath: string;
+    sha256?: string;
+    routes?: Array<Record<string, unknown>>;
+    routeSnapshotJson?: string;
+    routeSnapshotHash?: string;
+    sourceManifestHash?: string;
+    runtimeManifestHash?: string;
+    deliveryBatchId?: string;
+    protocolVersion?: 3;
+    expectedGateEpoch?: string;
+    requestId?: string;
+    requestFingerprint?: string;
+    expectedCurrentVersion?: number;
+    expectedAppVersion?: string | null;
+    expectedPublishFence?: string;
+    expectedPublishRowVersion?: string;
+    expectedVersionRowVersion?: string | null;
+    expectedActivePublishVersionId?: string | null;
+    expectedCommittedPublishVersionId?: string | null;
+    timeoutMs?: number;
+    confirmExecution?: string;
+}
 export type ApplicationStreamGateMode = 'LegacyOpen' | 'Drain' | 'V3Only';
 export interface ApplicationStreamGateTransitionInput {
     osClient: string;
@@ -213,6 +239,15 @@ export declare function resolveLegacyApplicationStreamFallbackPolicy(result: Par
     attemptFallback: boolean;
     requireMultipartStream: boolean;
 };
+/**
+ * Upload one immutable application asset through the same protocol contract as
+ * the directory publisher. Protocol v3 callers must supply the frozen release
+ * identity and CAS baselines; files are then transferred through the durable
+ * multipart/HDFS path regardless of size. Keeping this logic outside tool
+ * registration prevents the MCP schema and transport implementation drifting
+ * apart again.
+ */
+export declare function runApplicationAssetStreamUpload(client: MicroiClient, input: ApplicationAssetStreamUploadInput): Promise<CallToolResult>;
 /**
  * Bridge a rolling-upgrade window without retrying the broken stream endpoint.
  * The fallback is deliberately restricted to small existing MicroServices: it

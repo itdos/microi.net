@@ -833,6 +833,48 @@ namespace Microi.net.Api
                 relatedParam["_CurrentUser"] = param["_CurrentUser"].DeepClone();
             }
 
+            if (string.Equals(relatedType, "Counts", StringComparison.OrdinalIgnoreCase))
+            {
+                JObject BuildCountParam(string formEngineKey, JArray conditions)
+                {
+                    var countParam = (JObject)relatedParam.DeepClone();
+                    countParam["FormEngineKey"] = formEngineKey;
+                    countParam["_Where"] = conditions;
+                    countParam["_PageSize"] = 1;
+                    return countParam;
+                }
+
+                var dataLogTask = MicroiEngine.FormEngine.GetTableDataCountAsync(BuildCountParam(
+                    "microi_datalog",
+                    new JArray
+                    {
+                        new JArray("DataId", "=", parentTableRowId),
+                        new JArray("TableId", "=", parentParam.TableId)
+                    }));
+                var dataCommentTask = MicroiEngine.FormEngine.GetTableDataCountAsync(BuildCountParam(
+                    "diy_comment",
+                    new JArray { new JArray("TableRowId", "=", parentTableRowId) }));
+                var dataVersionTask = MicroiEngine.FormEngine.GetTableDataCountAsync(BuildCountParam(
+                    "mic_data_version",
+                    new JArray
+                    {
+                        new JArray("TableRowId", "=", parentTableRowId),
+                        new JArray("TableId", "=", parentParam.TableId)
+                    }));
+
+                await Task.WhenAll(dataLogTask, dataCommentTask, dataVersionTask);
+                if (dataLogTask.Result.Code != 1) return Json(dataLogTask.Result);
+                if (dataCommentTask.Result.Code != 1) return Json(dataCommentTask.Result);
+                if (dataVersionTask.Result.Code != 1) return Json(dataVersionTask.Result);
+
+                return Json(new DosResult(1, new
+                {
+                    DataLog = dataLogTask.Result.DataCount,
+                    DataComment = dataCommentTask.Result.DataCount,
+                    DataVersion = dataVersionTask.Result.DataCount
+                }));
+            }
+
             var where = new JArray();
             switch (relatedType?.ToLowerInvariant())
             {

@@ -56,6 +56,11 @@ body.mci-loading-service-active {
     background: var(--mci-skeleton-accent, rgba(108, 43, 217, 0.16));
 }
 
+/* 表格骨架屏依赖真实列宽表达层级，不再使用左侧强调线，避免加载态比内容态更抢眼。 */
+.mci-loading-skeleton--table::after {
+    display: none;
+}
+
 .mci-loading-skeleton__layout {
     box-sizing: border-box;
     width: 100%;

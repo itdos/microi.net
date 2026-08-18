@@ -35,6 +35,11 @@ export default {
             var self = this;
             // 不显示 label 的组件类型
             var noLabelComponents = ['Divider', 'CollapseGroup', 'Tabs', 'Alert', 'StaticText', 'Html', 'HTML'];
+            // Switch 的说明卡片已在组件内部完整呈现标题与说明，避免外部 Label 重复占位。
+            var switchConfig = field && field.Config && field.Config.Switch;
+            if (field.Component === 'Switch' && switchConfig && String(switchConfig.DisplayMode || '').toLowerCase() === 'card') {
+                return false;
+            }
             // 如果是子表，并且 Label 为空，也不显示
             if (field.Component === 'TableChild' && !field.Label) {
                 return false;

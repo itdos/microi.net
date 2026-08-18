@@ -411,19 +411,21 @@ export default {
 :deep(.sidebar-main-menu) {
     border-right: none;
     background: transparent !important;
-    padding: 4px 0 8px;
+    padding: 6px 0 10px;
 
     .el-sub-menu__title {
-        height: 46px;
-        line-height: 46px;
+        height: 42px;
+        line-height: 42px;
     }
 
     .el-menu-item,
     .el-sub-menu__title {
         position: relative;
         box-sizing: border-box;
-        margin: 2px 8px;
-        border-radius: 8px;
+        margin: 3px 8px;
+        border: 1px solid transparent;
+        border-bottom: 0 !important;
+        border-radius: 10px;
         background: transparent !important;
         transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
         overflow: hidden;
@@ -431,7 +433,8 @@ export default {
 
         &:hover {
             background: var(--sidebar-hover-bg, rgba(255, 255, 255, 0.12)) !important;
-            transform: translateX(1px);
+            border-color: color-mix(in srgb, var(--sidebar-text-color, #fff) 10%, transparent);
+            transform: translateX(2px);
             box-shadow: none;
             color: var(--sidebar-text-color, #ffffff) !important;
 
@@ -448,8 +451,9 @@ export default {
         // 活动状态
         &.is-active {
             background: var(--sidebar-active-bg, rgba(255, 255, 255, 0.25)) !important;
+            border-color: color-mix(in srgb, var(--sidebar-active-text-color, var(--sidebar-text-color, #fff)) 18%, transparent);
             color: var(--sidebar-active-text-color, var(--sidebar-text-color, #ffffff)) !important;
-            box-shadow: none;
+            box-shadow: 0 6px 18px rgba(7, 18, 38, .08);
             font-weight: 600;
 
             &::before {
@@ -459,7 +463,7 @@ export default {
                 top: 50%;
                 transform: translateY(-50%);
                 width: 3px;
-                height: 56%;
+                height: 48%;
                 background: var(--sidebar-active-text-color, var(--sidebar-text-color, #ffffff));
                 border-radius: 0 3px 3px 0;
                 box-shadow: none;
@@ -519,6 +523,9 @@ export default {
 
     // 子菜单样式
     .el-sub-menu {
+        border-bottom: 0 !important;
+        box-shadow: none !important;
+
         &.is-opened {
             > .el-sub-menu__title {
                 background: var(--sidebar-opened-title-bg, transparent) !important;
@@ -544,6 +551,7 @@ export default {
             margin: 2px 0 6px;
             padding: 2px 0 6px;
             border-radius: 0;
+            border-bottom: 0 !important;
             background: transparent !important;
             box-shadow: none;
 
@@ -552,6 +560,7 @@ export default {
                 min-width: 0 !important;
                 width: calc(100% - 16px);
                 margin: 2px 8px;
+                border-bottom: 0 !important;
                 background: var(--sidebar-submenu-item-bg, transparent) !important;
 
                 &:hover {

@@ -119,6 +119,7 @@
                     ref="fieldForm"
                     :LoadMode="'Design'"
                     :RawMetadata="true"
+                    :UseParentFieldSettingsDialog="true"
                     :TableId="TableId"
                     :TableRowId="TableRowId"
                     :ColSpan="FormClient == 'Mobile' ? 24 : 0"
@@ -130,6 +131,7 @@
                     @CallbackDuplicateField="CallbackDuplicateField"
                     @CallbackDeleteField="CallbackDeleteField"
                     @CallbackFieldWidthChanged="CallbackFieldWidthChanged"
+                    @CallbackOpenFieldSettings="OpenFieldSettingsDialog"
                 />
                 <el-dialog draggable width="550px" :modal-append-to-body="false" v-model="ShowDiyTableEditor" append-to-body destroy-on-close :title="''">
                     <template #footer>
@@ -225,6 +227,67 @@
                 </el-container>
             </el-aside>
         </el-container>
+
+        <!-- 双击字段后的统一设置工作台。右侧即时属性栏继续保留。 -->
+        <el-dialog
+            v-model="ShowFieldSettingsDialog"
+            class="diy-designer-field-dialog mci-unified-dialog mci-field-config-dialog"
+            modal-class="diy-designer-field-overlay mci-unified-overlay mci-field-config-overlay"
+            width="min(920px, 92vw)"
+            draggable
+            align-center
+            append-to-body
+            destroy-on-close
+            :show-close="false"
+            :close-on-click-modal="false"
+        >
+            <template #header>
+                <div class="diy-designer-field-dialog__title">
+                    <span>FIELD SETTINGS</span>
+                    <h2>{{ CurrentDiyFieldModel ? (CurrentDiyFieldModel.Label || CurrentDiyFieldModel.Name || '字段设置') : '字段设置' }}</h2>
+                    <p v-if="CurrentDiyFieldModel">{{ CurrentDiyFieldModel.Name }} · {{ CurrentDiyFieldModel.Component }}</p>
+                </div>
+                <el-button class="diy-designer-field-dialog__close" text :icon="Close" @click="ShowFieldSettingsDialog = false" />
+            </template>
+
+            <div v-if="CurrentDiyFieldModel && CurrentDiyFieldModel.Id" class="diy-designer-field-dialog__body">
+                <DiyForm
+                    ref="diyform_diy_field_dialog"
+                    :LoadMode="''"
+                    :RawMetadata="true"
+                    :FormMode="'Edit'"
+                    :TableName="'diy_field'"
+                    :TableRowId="CurrentDiyFieldModel.Id"
+                    :ColSpan="12"
+                    :LabelPosition="'top'"
+                    :CodeEditorMini="true"
+                    :FormData="CurrentDiyFieldModel"
+                    @CallbackForm="CallbackForm_Field"
+                    @CallbackGetDiyField="CallbackGetDiyField_FieldProperties"
+                    @CallbackFormValueChange="CallbackFormValueChange_DiyField"
+                />
+                <div v-if="IsUniqueFieldEnabled(CurrentDiyFieldModel)" class="unique-mode-config is-dialog">
+                    <div class="unique-mode-config__label">唯一方式</div>
+                    <el-radio-group
+                        v-model="CurrentDiyFieldModel.Config.Unique.Type"
+                        class="unique-mode-config__options"
+                        @change="CallbackUniqueModeChange"
+                    >
+                        <el-radio value="Alone">单独唯一（允许空值重复）</el-radio>
+                        <el-radio value="All">同时唯一（组合约束）</el-radio>
+                    </el-radio-group>
+                    <div class="unique-mode-config__tip">“同时唯一”会把本表中所有选择该方式的字段组成一组联合唯一条件。</div>
+                </div>
+            </div>
+
+            <template #footer>
+                <div class="diy-designer-field-dialog__footer">
+                    <span class="diy-designer-field-dialog__footer-spacer"></span>
+                    <el-button size="small" @click="ShowFieldSettingsDialog = false">取消</el-button>
+                    <el-button size="small" type="primary" :loading="SaveAllDiyFieldLoding" @click="SaveFieldSettingsDialog">保存字段配置</el-button>
+                </div>
+            </template>
+        </el-dialog>
         
         <!-- 共享的V8设计器，替代多个实例 -->
         <DiyV8Design
@@ -358,6 +421,7 @@ export default {
             },
             // ShowV8CodeEditor: false,
             ShowDiyTableEditor: false,
+            ShowFieldSettingsDialog: false,
             CurrentDiyTableTabModel: {},
             CurrentDiyFieldModel: null,
             CurrentDiyTableModel: {},
@@ -554,11 +618,26 @@ export default {
         },
         RefreshDiyFieldTabDataSource() {
             var self = this;
-            var fieldPropertyForm = self.$refs.diyform_diy_field;
-            if (!fieldPropertyForm || typeof fieldPropertyForm.UptDiyFieldDataSource !== "function") {
-                return;
-            }
-            fieldPropertyForm.UptDiyFieldDataSource("Tab", self.GetCurrentDiyTableTabs());
+            [self.$refs.diyform_diy_field, self.$refs.diyform_diy_field_dialog].forEach(function (fieldPropertyForm) {
+                if (fieldPropertyForm && typeof fieldPropertyForm.UptDiyFieldDataSource === "function") {
+                    fieldPropertyForm.UptDiyFieldDataSource("Tab", self.GetCurrentDiyTableTabs());
+                }
+            });
+        },
+        OpenFieldSettingsDialog(field) {
+            var self = this;
+            if (!field || !field.Id) return;
+            self.ShowFieldSettingsDialog = true;
+            self.$nextTick(function () {
+                var dialogForm = self.$refs.diyform_diy_field_dialog;
+                if (dialogForm && typeof dialogForm.SetFormData === "function") {
+                    dialogForm.SetFormData(self.CurrentDiyFieldModel);
+                }
+                self.RefreshDiyFieldTabDataSource();
+            });
+        },
+        SaveFieldSettingsDialog() {
+            this.UptDiyField(true);
         },
         CallbackFormValueChange_DiyField(field, value) {
             var self = this;
@@ -1376,7 +1455,12 @@ export default {
                     // 2026-02-05 Anderson：已实现diy-form.vue组件的自动初始化，
                     // 因此这里没必要调用.Init()初始化，直接改变FormData值即可
                     // self.$refs.diyform_diy_field.Init(false);
-                    self.$refs.diyform_diy_field.SetFormData(self.CurrentDiyFieldModel);
+                    if (self.$refs.diyform_diy_field && typeof self.$refs.diyform_diy_field.SetFormData === "function") {
+                        self.$refs.diyform_diy_field.SetFormData(self.CurrentDiyFieldModel);
+                    }
+                    if (self.$refs.diyform_diy_field_dialog && typeof self.$refs.diyform_diy_field_dialog.SetFormData === "function") {
+                        self.$refs.diyform_diy_field_dialog.SetFormData(self.CurrentDiyFieldModel);
+                    }
                     // 右侧本身也是表单引擎。若其字段元数据已经加载完成，立即注入；
                     // 首次挂载的异步场景由 CallbackGetDiyField_FieldProperties 再补一次。
                     self.RefreshDiyFieldTabDataSource();
@@ -1596,7 +1680,7 @@ export default {
                 console.log(error);
             }
         },
-        UptDiyField() {
+        UptDiyField(closeDialogOnSuccess) {
             var self = this;
             self.SaveAllDiyFieldLoding = true;
             try {
@@ -1624,6 +1708,7 @@ export default {
                 param.OsClient = "";
                 if (!param.Name) {
                     self.DiyCommon.Tips("字段名不能为空！", false);
+                    self.SaveAllDiyFieldLoding = false;
                     return;
                 }
                 self.DiyCommon.Post(
@@ -1642,6 +1727,7 @@ export default {
 
                             // self.GetDiyField();
                             self.$refs.fieldForm.UptDiyFieldArr(result.Data);
+                            if (closeDialogOnSuccess) self.ShowFieldSettingsDialog = false;
                         }
                     },
                     function () {
@@ -2035,13 +2121,14 @@ export default {
 }
 .diy-design-container {
     margin-top: 10px;
-    border-radius: 4px;
+    border-radius: 20px;
     height: calc(100vh - 80px);
     overflow: hidden;
     background-color: var(--el-bg-color-page, #f5f7fa);
     color: var(--el-text-color-regular, #334155);
     border: 1px solid var(--el-border-color, #e4e7ed);
-    box-shadow: var(--mci-shadow-card, 0 10px 28px rgba(15, 23, 42, 0.08));
+    // box-shadow: var(--mci-shadow-card, 0 10px 28px rgba(15, 23, 42, 0.08));
+    box-shadow: 0 2px 10px rgba(27, 44, 72, 0.035);
     :deep(.keyword-search) {
         // border-bottom: solid 1px #ccc;
         padding-left: 20px;
@@ -2306,5 +2393,122 @@ export default {
 
 .diy-design-container :deep(.w-e-text-placeholder) {
     color: var(--el-text-color-placeholder, #a8abb2) !important;
+}
+</style>
+
+<style lang="scss">
+.diy-designer-field-overlay {
+    background: color-mix(in srgb, #111827 60%, transparent) !important;
+    backdrop-filter: blur(11px) saturate(112%);
+    -webkit-backdrop-filter: blur(11px) saturate(112%);
+}
+
+.diy-designer-field-dialog.el-dialog {
+    --designer-dialog-surface: var(--mci-bg-card, var(--el-bg-color, #fff));
+    --designer-dialog-soft: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f5f7fa));
+    --designer-dialog-line: var(--mci-border-color, var(--el-border-color-lighter, #e1e8f0));
+    --designer-dialog-accent: var(--mci-color-primary, var(--el-color-primary, #3478f6));
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--designer-dialog-accent) 18%, var(--designer-dialog-line));
+    border-top: 0;
+    border-radius: 20px;
+    background: var(--designer-dialog-surface);
+    box-shadow: 0 30px 90px rgba(10, 22, 42, .32), 0 8px 28px rgba(10, 22, 42, .14);
+
+    > .el-dialog__header {
+        display: flex;
+        min-height: 76px;
+        align-items: center;
+        justify-content: space-between;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--designer-dialog-line);
+        background:
+            linear-gradient(115deg, color-mix(in srgb, var(--designer-dialog-accent) 9%, transparent), transparent 48%),
+            var(--designer-dialog-surface);
+        cursor: move;
+    }
+
+    > .el-dialog__body {
+        max-height: min(68vh, 720px);
+        overflow: auto;
+        padding: 12px 14px;
+        background: color-mix(in srgb, var(--designer-dialog-soft) 72%, var(--designer-dialog-surface));
+    }
+
+    > .el-dialog__footer {
+        padding: 12px 16px;
+        border-top: 1px solid var(--designer-dialog-line);
+        background: var(--designer-dialog-surface);
+    }
+
+    .diy-designer-field-dialog__title span {
+        display: block;
+        color: var(--designer-dialog-accent);
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 1.6px;
+    }
+    .diy-designer-field-dialog__title h2 {
+        margin: 3px 0 0;
+        color: var(--mci-text-primary, var(--el-text-color-primary));
+        font-size: 20px;
+        line-height: 27px;
+    }
+    .diy-designer-field-dialog__title p {
+        margin: 2px 0 0;
+        color: var(--mci-text-secondary, var(--el-text-color-secondary));
+        font-size: 11px;
+    }
+    .diy-designer-field-dialog__close {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        color: var(--el-text-color-secondary);
+        cursor: pointer;
+    }
+    .diy-designer-field-dialog__body { min-height: 220px; }
+    .diy-designer-field-dialog__body .unique-mode-config.is-dialog {
+        margin: 10px 5px 4px;
+        border: 1px solid var(--designer-dialog-line);
+        border-radius: 12px;
+        background: var(--designer-dialog-surface);
+    }
+    .diy-designer-field-dialog__footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .diy-designer-field-dialog__footer-spacer { flex: 1; }
+    .diy-designer-field-dialog__footer .el-button {
+        min-height: 30px;
+        margin-left: 0;
+        border-radius: 10px;
+        font-weight: 650;
+    }
+    .diy-designer-field-dialog__footer .el-button--primary {
+        border-color: transparent;
+        box-shadow: 0 8px 20px color-mix(in srgb, var(--designer-dialog-accent) 25%, transparent);
+    }
+}
+
+html.dark .diy-designer-field-dialog.el-dialog,
+body.dark .diy-designer-field-dialog.el-dialog,
+body.Dark .diy-designer-field-dialog.el-dialog {
+    --designer-dialog-surface: var(--el-bg-color-overlay, #172033);
+    --designer-dialog-soft: var(--el-fill-color-light, #111827);
+    --designer-dialog-line: var(--el-border-color, #2d3a4f);
+}
+
+@media (max-width: 720px) {
+    .diy-designer-field-dialog.el-dialog {
+        width: 96vw !important;
+        border-radius: 15px;
+        > .el-dialog__header { min-height: 62px; padding: 10px 12px; }
+        > .el-dialog__body { max-height: 72vh; padding: 8px; }
+        .diy-designer-field-dialog__title h2 { font-size: 16px; }
+        .diy-designer-field-dialog__title p { display: none; }
+    }
 }
 </style>

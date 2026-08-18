@@ -125,29 +125,30 @@ return V8.FormEngine.UptFormData('payment_order', {
 
 ## 四、租户系统设置与安全边界
 
-数据库、Redis、MongoDB、MinIO、MQ 等部署级连接仍放在主控数据库的 `sys_osclients`，子租户不能修改。登录方式开关、品牌文字、OAuth ClientId/ClientSecret 等租户自有业务配置则放在每个租户自己数据库的 `mci_system_setting`，由【系统设置 → 登录与身份】维护，不新增 API 环境变量或 `appsettings` 节点。
+数据库、Redis、MongoDB、MinIO、MQ 等部署级连接仍放在主控数据库的 `sys_osclients`，子租户不能修改。需要浏览器读取的登录入口显示、品牌文字等公开配置在当前租户 `sys_config` 创建实体字段；OAuth 开关、ClientId/ClientSecret 等后端私密配置放在当前租户的 `mci_system_setting`，由【系统设置 → 登录与身份】关联维护，不新增 API 环境变量或 `appsettings` 节点。
 
-每条设置都可以动态选择“浏览器公开”“服务端私有”或“Secret”，不需要在 C# 中维护一份不断增长的公开字段白名单：
+两张表的边界固定，不允许用运行时勾选把私密记录临时公开：
 
-- `IsPublic=1` 且不是 Secret、Key 名也不命中固定敏感片段时，才直接进入前端 `SysConfig` 根对象；不存在 `PublicSettings` 包装层。
-- `Password`、`Secret`、`Token`、`Credential`、`PrivateKey`、`AccessKey`、`ApiKey`、`ConnectionString`、`DbConn`、`Redis`、`MinIO`、`ClientSecret` 等名称始终不公开；租户勾选公开也无效。
+- `sys_config` 的实体字段进入前端 `SysConfig` 安全投影；不存在 `PublicSettings` 包装层。
+- `mci_system_setting.IsPublic` 是停用的历史兼容字段，所有普通值与 Secret 都仅供后端，任何记录都不会进入浏览器。
 - Secret 只通过可信后端写入租户绑定的认证密文，列表永远掩码。临时显示原文必须先完成 Passkey、TOTP 或严格人脸二次验证；响应使用 `no-store`，30 秒后前端清除，审计不记录原文。
-- 前端 V8、普通 FormEngine HTTP、匿名请求和访问密钥会话不能读取 Secret。后端接口引擎/后端 V8 事件可从当前租户根级 `V8.SysConfig[ConfigKey]` 使用 Secret，但不得回传、记录或写入前端可读数据；ClientSecret 从不进入浏览器。
+- 前端 V8、普通 FormEngine HTTP、匿名请求和访问密钥会话不能读取私密设置。后端接口引擎/后端 V8 事件从当前租户 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 使用普通私密值或 Secret，但不得回传、记录或写入前端可读数据；ClientSecret 从不进入浏览器。
 
 登录与身份常用设置如下：
 
 | Key | 类型/可见性 | 说明 | 默认值 |
 |---|---|---|---|
-| `Login.Identity.Enabled` | Bool / 公开 | 登录方式总开关 | `true` |
-| `Login.Passkey.Enabled` | Bool / 公开 | Passkey/WebAuthn | `true` |
-| `Login.Authenticator.Enabled` | Bool / 公开 | TOTP Authenticator | `true` |
-| `Security.PasswordChange.RequireStepUp` | Bool / 公开 | 已有强因子时改密需二次验证 | `true` |
-| `Login.External.Enabled` | Bool / 公开 | 第三方登录总开关 | `true` |
-| `Login.Face.Enabled` | Bool / 公开 | 严格人脸入口 | `false` |
-| `Login.Gitee.Enabled` / `Login.WeChat.Enabled` / `Login.GitHub.Enabled` | Bool / 公开 | 对应外部登录入口 | `false` |
-| `Login.{Provider}.ClientId` | String / 服务端私有 | OAuth 应用 ClientId；建议不要公开 | 无 |
+| `Login.Identity.Enabled` | Bool / 服务端私有 | 登录方式总开关 | `true` |
+| `Login.Passkey.Enabled` | Bool / 服务端私有 | Passkey/WebAuthn | `true` |
+| `Login.Authenticator.Enabled` | Bool / 服务端私有 | TOTP Authenticator | `true` |
+| `Security.PasswordChange.RequireStepUp` | Bool / 服务端私有 | 已有强因子时改密需二次验证 | `true` |
+| `Login.External.Enabled` | Bool / 服务端私有 | 第三方登录总开关 | `true` |
+| `Login.Face.Enabled` | Bool / 服务端私有 | 严格人脸入口 | `false` |
+| `Login.Gitee.Enabled` / `Login.WeChat.Enabled` / `Login.GitHub.Enabled` | Bool / 服务端私有 | 对应外部登录能力 | `false` |
+| `sys_config.LoginPasskeyDisplay` 等五个实体字段 | Bool / 浏览器公开 | 登录页入口是否显示；缺失或空值默认显示 | `1` |
+| `Login.{Provider}.ClientId` | String / 服务端私有 | OAuth 应用 ClientId | 无 |
 | `Login.{Provider}.ClientSecret` | String / Secret | OAuth 应用 ClientSecret | 无 |
-| `Login.{Provider}.Name` / `.Description` / `.Scope` | String / 可按需公开 | 气泡名称、简介和授权 Scope | 平台安全默认值 |
+| `Login.{Provider}.Name` / `.Description` / `.Scope` | String / 服务端私有 | 名称、简介和授权 Scope | 平台安全默认值 |
 
 `{Provider}` 目前支持 `Gitee`、`WeChat`、`GitHub`。回调地址由后端按当前 API 域名固定生成：`/api/ExternalLogin/Callback?OsClient={租户}&Provider={Provider}`，应把【开始授权】接口返回的 `CallbackUrl` 原样登记到第三方平台。生产环境必须使用 HTTPS；`localhost` 仅用于受控开发。RP ID、Origin 或第三方回调域名配错时，浏览器/供应商会正确拒绝验证。
 
@@ -161,7 +162,7 @@ return V8.FormEngine.UptFormData('payment_order', {
 - `mci_identity_device`：凭据与设备摘要、可信状态和最后在线信息。
 - `mci_identity_face`：人脸供应商、不透明主体引用、登记和验证状态；不保存人脸原图或模板。
 - `mci_identity_totp`：认证加密后的 TOTP 密钥、用途策略、最近接受计数器和状态；列表、日志和 API 不返回明文密钥。
-- `mci_system_setting`：当前租户动态业务设置、公开策略、Secret 密文、来源和排序；不保存部署级连接配置。
+- `mci_system_setting`：当前租户后端私密业务设置、Secret 密文、来源和排序；不保存公开配置或部署级连接配置。
 - `mci_user_external_identity`：吾码用户与 Gitee/微信/GitHub 不透明主体标识的绑定；不会保存第三方 access token。
 
 `CredentialIdHash` 必须有唯一索引，登记还会使用租户隔离的分布式租约；唯一约束与幂等检查共同防止双节点重复登记。challenge 保存到共享 Redis 五分钟，敏感操作票据保存两分钟并使用原子 `GETDEL` 消费，不能用进程内字典代替。

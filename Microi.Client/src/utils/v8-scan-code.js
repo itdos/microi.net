@@ -231,7 +231,7 @@ function createScanDialog() {
             .microi-scan-input {
                 flex: 1;
                 height: 36px;
-                padding: 0 12px;
+                padding: 0 10px;
                 border: 1px solid #dcdfe6;
                 border-radius: 6px;
                 font-size: 13px;
