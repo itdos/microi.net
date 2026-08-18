@@ -15,8 +15,9 @@ namespace Microi.net
     /// 租户自有系统设置的可信读取与加密边界。
     ///
     /// mci_system_setting 存在于每个租户自己的业务库中；共享数据库、Redis、MinIO 等
-    /// 部署级配置仍由主控面的 sys_osclients 管理。公开设置由每条记录的 IsPublic 动态
-    /// 决定，但 Secret/Token/Password/Connection 等高风险名称始终失败关闭。
+    /// 部署级配置仍由主控面的 sys_osclients 管理。mci_system_setting 只属于后端私有
+    /// 执行面，任何记录都不得进入匿名 SysConfig 或浏览器 V8.SysConfig。公开展示配置
+    /// 必须建模为 sys_config 的实体字段。
     /// </summary>
     public static class TenantSystemSettingsSecurity
     {
@@ -61,24 +62,13 @@ namespace Microi.net
 
         public static bool CanExposePublicly(JObject row)
         {
-            if (row == null || !Flag(row["IsEnabled"], true) || !Flag(row["IsPublic"], false)) return false;
-            if (Flag(row["IsSecret"], false)) return false;
-            var key = row["ConfigKey"]?.ToString();
-            try { key = NormalizeKey(key); }
-            catch { return false; }
-            return !IsSensitiveKey(key);
+            // IsPublic 仅作为历史物理字段保留；新安全边界不再允许动态设置下发浏览器。
+            return false;
         }
 
         public static JObject CreatePublicProjection(IEnumerable<JObject> rows)
         {
-            var result = new JObject();
-            foreach (var row in rows ?? Enumerable.Empty<JObject>())
-            {
-                if (!CanExposePublicly(row)) continue;
-                var key = NormalizeKey(row["ConfigKey"]?.ToString());
-                result[key] = ParseTypedValue(row["ConfigValue"], row["ValueType"]?.ToString());
-            }
-            return result;
+            return new JObject();
         }
 
         public static IReadOnlyDictionary<string, TenantSystemSettingValue> LoadSnapshot(string osClient)
@@ -183,16 +173,7 @@ namespace Microi.net
 
         public static JObject LoadPublicProjection(string osClient)
         {
-            var rows = LoadSnapshot(osClient).Values.Select(item => new JObject
-            {
-                ["ConfigKey"] = item.Key,
-                ["ConfigValue"] = item.Value,
-                ["ValueType"] = item.ValueType,
-                ["IsPublic"] = item.IsPublic ? 1 : 0,
-                ["IsSecret"] = item.IsSecret ? 1 : 0,
-                ["IsEnabled"] = item.IsEnabled ? 1 : 0
-            });
-            return CreatePublicProjection(rows);
+            return new JObject();
         }
 
         /// <summary>

@@ -4,14 +4,14 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-14 05:20:59
+# 版本：v2026-08-17 06:47:47
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
-#   microi-install-database   - 主数据库（安装前按编号选择）
+#   microi-install-database   - 主数据库（可选择复用已有 MySQL，此时不生成）
 #   microi-install-redis      - Redis 7.4.2 缓存
 #   microi-install-mongodb    - MongoDB 数据库
-#   microi-install-minio      - MinIO 对象存储
+#   microi-install-minio      - MinIO 对象存储（可选择复用已有服务，此时不生成）
 #   microi-install-ocr        - PaddleX/PaddleOCR CPU 文字识别服务（默认安装）
 #   microi-install-app        - 平台应用（API + Web）
 #   microi-install-watchtower - 自动更新服务
@@ -22,14 +22,15 @@
 # 端口分配规则：
 #   默认从 61600 开始寻找连续端口块，候选起点冲突时每次 +1，最多递增 100 次
 #   61600 高于 Linux 默认临时端口上限 60999；实际临时端口范围仍以宿主机 ip_local_port_range 为准
-#   第 1 个端口分配给 Web，第 2 个分配给 API；基础组件（含 OCR）占 8 个端口
-#   基础端口顺序: Web, API, 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console, OCR
+#   第 1 个端口分配给 Web，第 2 个分配给 API；默认新装基础组件（含 OCR）占 8 个端口
+#   默认顺序: Web, API, 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console, OCR
+#   复用已有 MySQL 时去掉主数据库端口；复用已有 MinIO 时去掉其 API/Console 两个端口
 #   LibreTranslate（默认安装）排在 OCR 之后；已停用的 Ollama/Qdrant 端口保留在所有推荐组件之后
 # ============================================================
 
 set -e
 
-SCRIPT_VERSION="v2026-08-14 05:20:59"
+SCRIPT_VERSION="v2026-08-17 06:47:47"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -52,6 +53,8 @@ LIBRETRANSLATE_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:
 LIBRETRANSLATE_CONTAINER_NAME="microi-install-libretranslate"
 LIBRETRANSLATE_INTERNAL_PORT=5000
 LIBRETRANSLATE_SERVICE_ENDPOINT="http://${LIBRETRANSLATE_CONTAINER_NAME}:${LIBRETRANSLATE_INTERNAL_PORT}"
+MYSQL_CLIENT_IMAGE="${MICROI_INSTALL_MYSQL_CLIENT_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0}"
+MINIO_MC_IMAGE="${MICROI_INSTALL_MINIO_MC_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/minio-mc:RELEASE.2025-08-13T08-35-41Z}"
 
 # ============================================================
 # 已安装环境的 API + Web 原地更新/修复
@@ -411,6 +414,9 @@ repair_migrate_app_to_internal_network() {
   local candidate=""
   local existing_db_count=0
   local db_conn_recovered=0
+  local external_db_connection=0
+  local database_mode_label=""
+  local minio_mode_label=""
   local network_driver=""
   local override_file="${REPAIR_TEMP_DIR}/internal-network.override.yml"
   local migrated_file="${REPAIR_TEMP_DIR}/internal-network.compose.yml"
@@ -432,6 +438,12 @@ repair_migrate_app_to_internal_network() {
   db_type=$(repair_read_api_environment_value "${environment_block}" OsClientDbType)
   db_conn=$(repair_read_api_environment_value "${environment_block}" OsClientDbConn)
   mongo_conn=$(repair_read_api_environment_value "${environment_block}" OsClientDbMongoConn)
+  database_mode_label=$(docker inspect microi-install-api \
+    --format '{{ index .Config.Labels "com.microi.database.mode" }}' 2>/dev/null || true)
+  minio_mode_label=$(docker inspect microi-install-api \
+    --format '{{ index .Config.Labels "com.microi.minio.mode" }}' 2>/dev/null || true)
+  [ "${database_mode_label}" != '<no value>' ] || database_mode_label=""
+  [ "${minio_mode_label}" != '<no value>' ] || minio_mode_label=""
   case "${db_type}" in
     MySql)
       db_candidates=(microi-install-mysql57 microi-install-mysql80)
@@ -460,11 +472,20 @@ repair_migrate_app_to_internal_network() {
       existing_db_count=$((existing_db_count + 1))
     fi
   done
-  if [ "${existing_db_count}" -ne 1 ]; then
+  if [ "${database_mode_label}" = 'external' ] && [ "${db_type}" = 'MySql' ]; then
+    if ! repair_db_connection_has_required_shape "${db_type}" "${db_conn}"; then
+      echo 'Microi：错误：已有 MySQL 模式的启动连接串不完整，且安装器没有数据库容器可用于恢复凭据。'
+      echo 'Microi：未删除任何应用容器；请从安装备份恢复完整连接串后重试。'
+      return 1
+    fi
+    external_db_connection=1
+    echo 'Microi：检测到已有 MySQL 模式；修复器将保留外部地址、端口、帐号和密码，不改写为容器 DNS ✓'
+  elif [ "${existing_db_count}" -ne 1 ]; then
     echo "Microi：错误：数据库类型 ${db_type} 应精确匹配一个安装器数据库容器，实际匹配 ${existing_db_count} 个。"
     return 1
   fi
-  if ! repair_db_connection_has_required_shape "${db_type}" "${db_conn}"; then
+  if [ "${external_db_connection}" != '1' ] \
+    && ! repair_db_connection_has_required_shape "${db_type}" "${db_conn}"; then
     database_name=$(repair_read_container_database_label "${db_container}")
     if [ -z "${database_name}" ]; then
       case "${db_type}" in
@@ -487,12 +508,19 @@ repair_migrate_app_to_internal_network() {
     fi
     db_conn_recovered=1
   fi
-  repair_connect_container_to_microi_network "${db_container}" || return 1
+  if [ "${external_db_connection}" != '1' ]; then
+    repair_connect_container_to_microi_network "${db_container}" || return 1
+  fi
   repair_connect_container_to_microi_network microi-install-redis || return 1
   repair_connect_container_to_microi_network microi-install-mongodb || return 1
-  repair_connect_container_to_microi_network microi-install-minio || return 1
+  if [ "${minio_mode_label}" = 'external' ]; then
+    echo 'Microi：检测到已有 MinIO 模式；修复器不会查找或重建 MinIO 容器，存储配置继续由 SaaS 引擎提供 ✓'
+  else
+    repair_connect_container_to_microi_network microi-install-minio || return 1
+  fi
 
-  case "${db_type}" in
+  if [ "${external_db_connection}" != '1' ]; then
+    case "${db_type}" in
     MySql)
       db_conn=$(printf '%s' "${db_conn}" | sed -E \
         "s/((Data Source|Server|Host)=)[^;]*/\\1${db_container}/I;s/(Port=)[0-9]+/\\1${db_internal_port}/I")
@@ -509,7 +537,8 @@ repair_migrate_app_to_internal_network() {
       db_conn=$(printf '%s' "${db_conn}" | sed -E \
         "s/(Host=)[^;]*/\\1${db_container}/I;s/(Port=)[0-9]+/\\1${db_internal_port}/I")
       ;;
-  esac
+    esac
+  fi
   if ! repair_db_connection_has_required_shape "${db_type}" "${db_conn}"; then
     echo "Microi：错误：${db_type} 启动连接串在迁移 Docker DNS 后仍不完整。"
     echo 'Microi：未输出任何连接串或密码，未删除任何应用容器。'
@@ -552,7 +581,11 @@ EOF
   if [ "${db_conn_recovered}" -eq 1 ]; then
     echo "Microi：检测到原 API 数据库连接串被截断，已从 ${db_container} 的安装环境无明文输出地恢复完整凭据 ✓"
   fi
-  echo "Microi：API 启动连接已迁移为 Docker DNS：${db_container}:${db_internal_port}、microi-install-redis:6379、microi-install-mongodb:27017 ✓"
+  if [ "${external_db_connection}" = '1' ]; then
+    echo 'Microi：API 已保留已有 MySQL 连接；Redis、MongoDB 已迁移为容器 DNS/内部端口 ✓'
+  else
+    echo "Microi：API 启动连接已迁移为 Docker DNS：${db_container}:${db_internal_port}、microi-install-redis:6379、microi-install-mongodb:27017 ✓"
+  fi
 }
 
 repair_validate_runtime_environment() {
@@ -560,6 +593,7 @@ repair_validate_runtime_environment() {
   local required_key=""
   local db_type=""
   local db_conn=""
+  local database_mode_label=""
   local required_keys=(
     OsClient OsClientType OsClientNetwork OsClientDbType OsClientDbConn
     OsClientRedisHost OsClientRedisPort OsClientRedisPwd
@@ -576,22 +610,29 @@ repair_validate_runtime_environment() {
   done
   db_type=$(sed -n -E 's/^OsClientDbType=//p' "${env_file}" | head -1)
   db_conn=$(sed -n -E 's/^OsClientDbConn=//p' "${env_file}" | head -1)
+  database_mode_label=$(docker inspect microi-install-api \
+    --format '{{ index .Config.Labels "com.microi.database.mode" }}' 2>/dev/null || true)
+  [ "${database_mode_label}" != '<no value>' ] || database_mode_label=""
   if ! repair_db_connection_has_required_shape "${db_type}" "${db_conn}"; then
     echo 'Microi：错误：重建后的 API 容器数据库启动连接串结构仍不完整。'
     return 1
   fi
   if ! grep -Fxq 'OsClientRedisHost=microi-install-redis' "${env_file}" \
     || ! grep -Fxq 'OsClientRedisPort=6379' "${env_file}" \
-    || ! grep -Eq '^OsClientDbConn=.*microi-install-' "${env_file}" \
     || ! grep -Eq '^OsClientDbMongoConn=.*@microi-install-mongodb:27017/' "${env_file}"; then
     echo 'Microi：错误：API 容器启动配置未完整切换到 Docker DNS/容器内部端口。'
+    return 1
+  fi
+  if [ "${database_mode_label}" != 'external' ] \
+    && ! grep -Eq '^OsClientDbConn=.*microi-install-' "${env_file}"; then
+    echo 'Microi：错误：安装器管理的数据库连接未使用 Docker DNS/容器内部端口。'
     return 1
   fi
   if [ "$(docker inspect microi-install-api --format '{{if index .NetworkSettings.Networks "microi"}}yes{{end}}' 2>/dev/null || true)" != "yes" ]; then
     echo 'Microi：错误：API 容器未接入 microi 共享内网。'
     return 1
   fi
-  echo 'Microi：API 十项启动配置及 Docker DNS 内网连接已逐项回读通过 ✓'
+  echo 'Microi：API 十项启动配置及数据库/内部依赖连接已逐项回读通过 ✓'
 }
 
 repair_wait_for_api() {
@@ -865,6 +906,8 @@ INSTALL_SUMMARY_PRINTED=0
 SQL_TMP_DIR=""
 SQL_ZIP_IS_TEMP=0
 SQL_ZIP_FILE=""
+MYSQL_CLIENT_CONFIG_FILE=""
+MINIO_MC_CONFIG_DIR=""
 API_LIVENESS_READY=0
 API_READINESS_READY=0
 OCR_SAAS_CONFIG_READY=0
@@ -882,6 +925,19 @@ cleanup_database_import_temp() {
   SQL_TMP_DIR=""
   SQL_ZIP_IS_TEMP=0
   SQL_ZIP_FILE=""
+}
+
+cleanup_external_service_temp() {
+  if [[ "${MYSQL_CLIENT_CONFIG_FILE:-}" == /tmp/microi_mysql_client_*.cnf ]] \
+    && [ -f "${MYSQL_CLIENT_CONFIG_FILE}" ]; then
+    rm -f -- "${MYSQL_CLIENT_CONFIG_FILE}"
+  fi
+  if [[ "${MINIO_MC_CONFIG_DIR:-}" == /tmp/microi_minio_mc_* ]] \
+    && [ -d "${MINIO_MC_CONFIG_DIR}" ]; then
+    rm -rf -- "${MINIO_MC_CONFIG_DIR}"
+  fi
+  MYSQL_CLIENT_CONFIG_FILE=""
+  MINIO_MC_CONFIG_DIR=""
 }
 
 print_generated_install_configuration() {
@@ -908,11 +964,21 @@ print_generated_install_configuration() {
   echo '------------------------------------------------------------------'
   [ -n "${VUE_PORT:-}" ] && printf '  %-18s %s\n' "Web:" "${VUE_PORT}"
   [ -n "${API_PORT:-}" ] && printf '  %-18s %s\n' "API:" "${API_PORT}"
-  [ -n "${DATABASE_PORT:-}" ] && printf '  %-18s %s\n' "${DATABASE_PORT_NAME:-Database}:" "${DATABASE_PORT}"
+  if [ "${DATABASE_SERVICE_MODE:-managed}" = 'external' ]; then
+    printf '  %-18s %s\n' "MySQL(已有服务):" "${MYSQL_EXTERNAL_HOST_DISPLAY:-未生成}:${DATABASE_PORT:-未生成}（不占用本机分配端口）"
+  elif [ -n "${DATABASE_PORT:-}" ]; then
+    printf '  %-18s %s\n' "${DATABASE_PORT_NAME:-Database}:" "${DATABASE_PORT}"
+  fi
   [ -n "${REDIS_PORT:-}" ] && printf '  %-18s %s\n' "Redis:" "${REDIS_PORT}"
   [ -n "${MONGO_PORT:-}" ] && printf '  %-18s %s\n' "MongoDB:" "${MONGO_PORT}"
-  [ -n "${MINIO_PORT:-}" ] && printf '  %-18s %s\n' "MinIO API:" "${MINIO_PORT}"
-  [ -n "${MINIO_CONSOLE_PORT:-}" ] && printf '  %-18s %s\n' "MinIO Console:" "${MINIO_CONSOLE_PORT}"
+  if [ "${MINIO_SERVICE_MODE:-managed}" = 'external' ]; then
+    printf '  %-18s %s\n' "MinIO(已有服务):" "${MINIO_EXTERNAL_INTERNAL_URL:-未生成}（不占用本机分配端口）"
+    [ -n "${MINIO_PUBLIC_BASE_URL:-}" ] \
+      && printf '  %-18s %s\n' "MinIO公有地址:" "${MINIO_PUBLIC_BASE_URL}/${MINIO_PUBLIC_BUCKET:-mci-public}"
+  else
+    [ -n "${MINIO_PORT:-}" ] && printf '  %-18s %s\n' "MinIO API:" "${MINIO_PORT}"
+    [ -n "${MINIO_CONSOLE_PORT:-}" ] && printf '  %-18s %s\n' "MinIO Console:" "${MINIO_CONSOLE_PORT}"
+  fi
   [ -n "${OCR_PORT:-}" ] && printf '  %-18s %s\n' "OCR:" "${OCR_PORT}（仅绑定 127.0.0.1）"
   if [ "${INSTALL_LIBRETRANSLATE:-0}" = "1" ] && [ -n "${LIBRETRANSLATE_PORT:-}" ]; then
     printf '  %-18s %s\n' "LibreTranslate:" "${LIBRETRANSLATE_PORT}（仅绑定 127.0.0.1）"
@@ -924,14 +990,23 @@ print_generated_install_configuration() {
   fi
   echo ''
   echo '------------------------------------------------------------------'
-  echo '本次已生成的凭据与数据目录：'
+  echo '本次服务配置、凭据与数据目录：'
   echo '------------------------------------------------------------------'
   if [ -n "${DATABASE_PASSWORD:-}" ]; then
-    echo "${DATABASE_DISPLAY_NAME:-主数据库}:  Dos.ORM类型 ${DATABASE_TYPE:-未生成}, 容器 ${DATABASE_CONTAINER_NAME:-未生成}, 端口 ${DATABASE_PORT:-未生成}, 管理员密码: ${DATABASE_PASSWORD}"
-    echo "             业务数据库: ${DATABASE_NAME:-未生成}（来源：${DATABASE_NAME_SOURCE:-未生成}）"
-    echo "             初始化包来源: ${SQL_SOURCE_DISPLAY:-未生成}"
-    echo "             数据目录: ${DATABASE_DATA_DIR:-未生成}"
-    echo "             编排目录: ${DATABASE_DIR:-${COMPOSE_BASE_DIR:-未生成}/microi-install-database}/"
+    if [ "${DATABASE_SERVICE_MODE:-managed}" = 'external' ]; then
+      echo "MySQL:       已有服务 ${MYSQL_EXTERNAL_HOST_DISPLAY:-未生成}:${DATABASE_PORT:-未生成}, 帐号 ${DATABASE_USER:-未生成}"
+      echo '             密码: 已读取并写入受限应用编排，不在终端回显'
+      echo "             版本: ${MYSQL_DETECTED_SERVER_VERSION:-待连接校验}（要求与所选 ${MYSQL_VERSION:-5.7}.x 匹配）"
+      echo "             业务数据库: ${DATABASE_NAME:-未生成}（来源：${DATABASE_NAME_SOURCE:-未生成}）"
+      echo "             初始化包来源: ${SQL_SOURCE_DISPLAY:-未生成}"
+      echo '             MySQL 容器、数据目录与数据库编排: 未创建'
+    else
+      echo "${DATABASE_DISPLAY_NAME:-主数据库}:  Dos.ORM类型 ${DATABASE_TYPE:-未生成}, 容器 ${DATABASE_CONTAINER_NAME:-未生成}, 端口 ${DATABASE_PORT:-未生成}, 管理员密码: ${DATABASE_PASSWORD}"
+      echo "             业务数据库: ${DATABASE_NAME:-未生成}（来源：${DATABASE_NAME_SOURCE:-未生成}）"
+      echo "             初始化包来源: ${SQL_SOURCE_DISPLAY:-未生成}"
+      echo "             数据目录: ${DATABASE_DATA_DIR:-未生成}"
+      echo "             编排目录: ${DATABASE_DIR:-${COMPOSE_BASE_DIR:-未生成}/microi-install-database}/"
+    fi
     echo ''
   fi
   if [ -n "${REDIS_PASSWORD:-}" ]; then
@@ -947,11 +1022,19 @@ print_generated_install_configuration() {
     echo ''
   fi
   if [ -n "${MINIO_ACCESS_KEY:-}" ] && [ -n "${MINIO_SECRET_KEY:-}" ]; then
-    echo "MinIO:       容器 microi-install-minio,      API端口 ${MINIO_PORT:-未生成},  控制台端口 ${MINIO_CONSOLE_PORT:-未生成}"
-    echo "             Access Key: ${MINIO_ACCESS_KEY},  Secret Key: ${MINIO_SECRET_KEY}"
-    echo "             私有桶: ${MINIO_PRIVATE_BUCKET:-mci-private}, 公有桶: ${MINIO_PUBLIC_BUCKET:-mci-public}（public 下载）"
-    echo "             数据目录: ${MINIO_DATA_DIR:-未生成}"
-    echo "             编排目录: ${COMPOSE_BASE_DIR:-未生成}/microi-install-minio/"
+    if [ "${MINIO_SERVICE_MODE:-managed}" = 'external' ]; then
+      echo "MinIO:       已有服务 ${MINIO_EXTERNAL_INTERNAL_URL:-未生成}"
+      echo "             浏览器公有地址: ${MINIO_PUBLIC_BASE_URL:-未生成}/${MINIO_PUBLIC_BUCKET:-mci-public}"
+      echo '             Access Key / Secret Key: 已读取并写入 SaaS 配置，不在终端回显'
+      echo "             私有桶: ${MINIO_PRIVATE_BUCKET:-mci-private}, 公有桶: ${MINIO_PUBLIC_BUCKET:-mci-public}（public 下载）, Region: ${MINIO_REGION:-留空}"
+      echo '             MinIO 容器、数据目录与 MinIO 编排: 未创建'
+    else
+      echo "MinIO:       容器 microi-install-minio,      API端口 ${MINIO_PORT:-未生成},  控制台端口 ${MINIO_CONSOLE_PORT:-未生成}"
+      echo "             Access Key: ${MINIO_ACCESS_KEY},  Secret Key: ${MINIO_SECRET_KEY}"
+      echo "             私有桶: ${MINIO_PRIVATE_BUCKET:-mci-private}, 公有桶: ${MINIO_PUBLIC_BUCKET:-mci-public}（public 下载）"
+      echo "             数据目录: ${MINIO_DATA_DIR:-未生成}"
+      echo "             编排目录: ${COMPOSE_BASE_DIR:-未生成}/microi-install-minio/"
+    fi
     echo ''
   fi
   if [ "${summary_mode}" = "recovery" ] \
@@ -1001,7 +1084,10 @@ print_install_recovery_summary() {
   fi
   echo ''
   echo 'Microi：建议先查看 docker logs --tail 200 microi-install-api，并核对上方 API 镜像与 Upgrade29/Upgrade31 日志。'
-  echo 'Microi：不要删除数据库、MinIO、MongoDB、Redis 数据目录，也不要执行 docker compose down -v。'
+  echo 'Microi：不要删除脚本新装服务的数据目录，也不要执行 docker compose down -v。'
+  if [ "${DATABASE_SERVICE_MODE:-managed}" = 'external' ] || [ "${MINIO_SERVICE_MODE:-managed}" = 'external' ]; then
+    echo 'Microi：已有 MySQL/MinIO 属于客户外部服务；排障时不要删除、重建、清空或覆盖其中的数据。'
+  fi
   echo ''
   echo '------------------------------------------------------------------'
   echo '当前容器状态（仅供排查，不等同 readiness）：'
@@ -1014,6 +1100,7 @@ on_install_exit() {
   local exit_code="${1:-1}"
   trap - EXIT
   cleanup_database_import_temp || true
+  cleanup_external_service_temp || true
   if [ "${exit_code}" -ne 0 ] \
     && [ "${INSTALL_RECOVERY_SUMMARY_ENABLED:-0}" = "1" ] \
     && [ "${INSTALL_SUMMARY_PRINTED:-0}" != "1" ]; then
@@ -1149,6 +1236,446 @@ configure_database_profile() {
   esac
 
   SQL_ZIP_URL="${SQL_ZIP_BASE_URL}/${SQL_ZIP_FILE_NAME}"
+}
+
+external_service_host_is_safe() {
+  local host="${1:-}"
+  local octet
+  local -a octets=()
+
+  [ -n "${host}" ] && [ "${#host}" -le 253 ] || return 1
+  if [[ "${host}" =~ ^[0-9.]+$ ]]; then
+    [[ "${host}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+    IFS='.' read -r -a octets <<< "${host}"
+    [ "${#octets[@]}" -eq 4 ] || return 1
+    for octet in "${octets[@]}"; do
+      [[ "${octet}" =~ ^[0-9]{1,3}$ ]] || return 1
+      [ $((10#${octet})) -le 255 ] || return 1
+    done
+    [ "${host}" != '0.0.0.0' ] && [ "${host}" != '255.255.255.255' ]
+    return
+  fi
+
+  [[ "${host}" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] \
+    && [[ "${host}" != *..* ]] \
+    && [[ "${host}" != *.-* ]] \
+    && [[ "${host}" != *-.* ]]
+}
+
+configure_mysql_service_mode() {
+  local service_mode_input=""
+  local host_input=""
+  local port_input=""
+  local user_input=""
+  local password_input=""
+
+  DATABASE_SERVICE_MODE='managed'
+  MYSQL_EXTERNAL_USE_HOST_GATEWAY=0
+  MYSQL_EXTERNAL_CONNECTION_HOST=""
+  MYSQL_EXTERNAL_HOST_DISPLAY=""
+  MYSQL_EXTERNAL_PORT=""
+  MYSQL_EXTERNAL_PASSWORD=""
+  APP_API_EXTRA_HOSTS=""
+
+  [ "${DATABASE_TYPE}" = 'MySql' ] || return 0
+
+  echo ''
+  echo 'Microi：请选择 MySQL 服务来源：'
+  echo '  1. 由本脚本安装新的 MySQL 容器（默认）'
+  echo '  2. 使用已有 MySQL 服务（不创建 MySQL 容器和数据目录）'
+  echo 'Microi：请输入 1 或 2，直接按 Enter 默认选择 1：'
+  if [ -n "${MICROI_MYSQL_SERVICE_MODE:-}" ]; then
+    service_mode_input="${MICROI_MYSQL_SERVICE_MODE}"
+    echo "Microi：使用环境变量 MICROI_MYSQL_SERVICE_MODE=${service_mode_input}"
+  else
+    read -r service_mode_input
+  fi
+
+  case "${service_mode_input:-1}" in
+    1|managed|install)
+      DATABASE_SERVICE_MODE='managed'
+      echo "Microi：将安装新的 ${DATABASE_DISPLAY_NAME} 容器 ✓"
+      return 0
+      ;;
+    2|external|existing)
+      DATABASE_SERVICE_MODE='external'
+      ;;
+    *)
+      echo 'Microi：错误：MySQL 服务来源只能是 1（新装）或 2（已有服务）。'
+      return 1
+      ;;
+  esac
+
+  echo 'Microi：请输入已有 MySQL 服务 IP 或 DNS 名；直接按 Enter 表示本机 MySQL：'
+  if [ "${MICROI_EXTERNAL_MYSQL_HOST+x}" = x ]; then
+    host_input="${MICROI_EXTERNAL_MYSQL_HOST}"
+    if [ -n "${host_input}" ]; then
+      echo "Microi：使用环境变量 MICROI_EXTERNAL_MYSQL_HOST=${host_input}"
+    else
+      echo 'Microi：MICROI_EXTERNAL_MYSQL_HOST 为空，按本机 MySQL 处理'
+    fi
+  else
+    read -r host_input
+  fi
+  case "${host_input,,}" in
+    ''|localhost|127.0.0.1|::1|host.docker.internal)
+      MYSQL_EXTERNAL_CONNECTION_HOST='host.docker.internal'
+      MYSQL_EXTERNAL_HOST_DISPLAY='本机（Docker host-gateway）'
+      MYSQL_EXTERNAL_USE_HOST_GATEWAY=1
+      APP_API_EXTRA_HOSTS=$'    extra_hosts:\n      - "host.docker.internal:host-gateway"'
+      ;;
+    *)
+      if ! external_service_host_is_safe "${host_input}"; then
+        echo 'Microi：错误：MySQL 地址必须是合法 IPv4 或 DNS 名，不能包含协议、端口、路径或空白。'
+        return 1
+      fi
+      MYSQL_EXTERNAL_CONNECTION_HOST="${host_input}"
+      MYSQL_EXTERNAL_HOST_DISPLAY="${host_input}"
+      ;;
+  esac
+
+  echo 'Microi：请输入已有 MySQL 端口；直接按 Enter 使用 3306：'
+  if [ -n "${MICROI_EXTERNAL_MYSQL_PORT:-}" ]; then
+    port_input="${MICROI_EXTERNAL_MYSQL_PORT}"
+    echo "Microi：使用环境变量 MICROI_EXTERNAL_MYSQL_PORT=${port_input}"
+  else
+    read -r port_input
+  fi
+  port_input="${port_input:-3306}"
+  if ! [[ "${port_input}" =~ ^[0-9]+$ ]] \
+    || [ $((10#${port_input})) -lt 1 ] \
+    || [ $((10#${port_input})) -gt 65535 ]; then
+    echo 'Microi：错误：MySQL 端口必须是 1-65535 的整数。'
+    return 1
+  fi
+  MYSQL_EXTERNAL_PORT=$((10#${port_input}))
+
+  echo 'Microi：请输入已有 MySQL 帐号；直接按 Enter 使用 root：'
+  if [ -n "${MICROI_EXTERNAL_MYSQL_USER:-}" ]; then
+    user_input="${MICROI_EXTERNAL_MYSQL_USER}"
+    echo "Microi：使用环境变量 MICROI_EXTERNAL_MYSQL_USER=${user_input}"
+  else
+    read -r user_input
+  fi
+  user_input="${user_input:-root}"
+  if [[ "${user_input}" == *$'\n'* || "${user_input}" == *$'\r'* ]]; then
+    echo 'Microi：错误：MySQL 帐号不能包含换行符。'
+    return 1
+  fi
+
+  if [ "${MICROI_EXTERNAL_MYSQL_PASSWORD+x}" = x ]; then
+    password_input="${MICROI_EXTERNAL_MYSQL_PASSWORD}"
+    echo 'Microi：已有 MySQL 密码已从环境变量读取（不会回显）'
+  else
+    echo 'Microi：请输入已有 MySQL 密码（输入时不会回显）：'
+    read -r -s password_input
+    echo ''
+  fi
+  unset MICROI_EXTERNAL_MYSQL_PASSWORD || true
+  if [ -z "${password_input}" ]; then
+    echo 'Microi：错误：已有 MySQL 密码不能为空。'
+    return 1
+  fi
+  if [[ "${password_input}" == *$'\n'* || "${password_input}" == *$'\r'* ]]; then
+    echo 'Microi：错误：MySQL 密码不能包含换行符。'
+    return 1
+  fi
+
+  DATABASE_USER="${user_input}"
+  MYSQL_EXTERNAL_PASSWORD="${password_input}"
+  DATABASE_CONTAINER_NAME=""
+  echo "Microi：将复用 ${MYSQL_EXTERNAL_HOST_DISPLAY}:${MYSQL_EXTERNAL_PORT}，帐号 ${DATABASE_USER}；不会安装 MySQL 服务 ✓"
+}
+
+minio_bucket_name_is_safe() {
+  local bucket_name="${1:-}"
+  # S3 本身允许 63 位，但 Microi 当前 SaaS 字段长度为 50，必须取更严格上限。
+  [ "${#bucket_name}" -ge 3 ] && [ "${#bucket_name}" -le 50 ] \
+    && [[ "${bucket_name}" =~ ^[a-z0-9][a-z0-9.-]*[a-z0-9]$ ]] \
+    && [[ "${bucket_name}" != *..* ]] \
+    && [[ "${bucket_name}" != *.-* ]] \
+    && [[ "${bucket_name}" != *-.* ]] \
+    && [[ ! "${bucket_name}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
+normalize_minio_public_endpoint() {
+  local endpoint="${1:-}"
+  local default_scheme="${2:-http}"
+  local scheme="${default_scheme}"
+  local remainder=""
+  local host=""
+  local endpoint_port=""
+
+  while [[ "${endpoint}" == */ ]]; do endpoint="${endpoint%/}"; done
+  case "${endpoint,,}" in
+    http://*)
+      scheme='http'
+      remainder="${endpoint#*://}"
+      ;;
+    https://*)
+      scheme='https'
+      remainder="${endpoint#*://}"
+      ;;
+    *)
+      remainder="${endpoint}"
+      ;;
+  esac
+  if [ -z "${remainder}" ] \
+    || [[ "${remainder}" == */* ]] \
+    || [[ "${remainder}" == *'@'* ]] \
+    || [[ "${remainder}" == *'?'* ]] \
+    || [[ "${remainder}" == *'#'* ]] \
+    || [[ "${remainder}" =~ [[:space:]] ]]; then
+    return 1
+  fi
+  if [[ "${remainder}" == *:* ]]; then
+    [ "${remainder//[^:]/}" = ':' ] || return 1
+    host="${remainder%:*}"
+    endpoint_port="${remainder##*:}"
+    [[ "${endpoint_port}" =~ ^[0-9]+$ ]] \
+      && [ $((10#${endpoint_port})) -ge 1 ] \
+      && [ $((10#${endpoint_port})) -le 65535 ] || return 1
+    endpoint_port=$((10#${endpoint_port}))
+  else
+    host="${remainder}"
+  fi
+  external_service_host_is_safe "${host}" || return 1
+
+  MINIO_PUBLIC_SSL_FLAG=0
+  [ "${scheme}" = 'https' ] && MINIO_PUBLIC_SSL_FLAG=1
+  if [ -n "${endpoint_port}" ]; then
+    MINIO_PUBLIC_BASE_URL="${scheme}://${host}:${endpoint_port}"
+    MINIO_INTERNET_ENDPOINT="${host}:${endpoint_port}"
+  else
+    MINIO_PUBLIC_BASE_URL="${scheme}://${host}"
+    MINIO_INTERNET_ENDPOINT="${host}"
+  fi
+}
+
+configure_minio_service_mode() {
+  local service_mode_input=""
+  local host_input=""
+  local port_input=""
+  local ssl_input=""
+  local access_key_input=""
+  local secret_key_input=""
+  local private_bucket_input=""
+  local public_bucket_input=""
+  local public_endpoint_input=""
+  local default_public_host=""
+  local region_input=""
+  local stored_internal_endpoint=""
+
+  MINIO_SERVICE_MODE='managed'
+  MINIO_EXTERNAL_USE_HOST_GATEWAY=0
+  MINIO_EXTERNAL_CONNECTION_HOST=""
+  MINIO_EXTERNAL_HOST_DISPLAY=""
+  MINIO_EXTERNAL_PORT=""
+  MINIO_PRIVATE_SSL_FLAG=0
+  MINIO_PUBLIC_SSL_FLAG=0
+  MINIO_PUBLIC_BASE_URL=""
+  MINIO_INTERNET_ENDPOINT=""
+  MINIO_REGION=""
+  MINIO_PRIVATE_BUCKET='mci-private'
+  MINIO_PUBLIC_BUCKET='mci-public'
+  MINIO_EXTERNAL_ACCESS_KEY=""
+  MINIO_EXTERNAL_SECRET_KEY=""
+
+  echo ''
+  echo 'Microi：请选择 MinIO 服务来源：'
+  echo '  1. 由本脚本安装新的 MinIO 容器（默认）'
+  echo '  2. 使用已有 MinIO 服务（不创建 MinIO 容器和数据目录）'
+  echo 'Microi：请输入 1 或 2，直接按 Enter 默认选择 1：'
+  if [ -n "${MICROI_MINIO_SERVICE_MODE:-}" ]; then
+    service_mode_input="${MICROI_MINIO_SERVICE_MODE}"
+    echo "Microi：使用环境变量 MICROI_MINIO_SERVICE_MODE=${service_mode_input}"
+  else
+    read -r service_mode_input
+  fi
+  case "${service_mode_input:-1}" in
+    1|managed|install)
+      echo 'Microi：将安装新的 MinIO 容器 ✓'
+      return 0
+      ;;
+    2|external|existing)
+      MINIO_SERVICE_MODE='external'
+      ;;
+    *)
+      echo 'Microi：错误：MinIO 服务来源只能是 1（新装）或 2（已有服务）。'
+      return 1
+      ;;
+  esac
+
+  echo 'Microi：请输入已有 MinIO API 服务 IP 或 DNS 名；直接按 Enter 表示本机 MinIO：'
+  if [ "${MICROI_EXTERNAL_MINIO_HOST+x}" = x ]; then
+    host_input="${MICROI_EXTERNAL_MINIO_HOST}"
+    if [ -n "${host_input}" ]; then
+      echo "Microi：使用环境变量 MICROI_EXTERNAL_MINIO_HOST=${host_input}"
+    else
+      echo 'Microi：MICROI_EXTERNAL_MINIO_HOST 为空，按本机 MinIO 处理'
+    fi
+  else
+    read -r host_input
+  fi
+  case "${host_input,,}" in
+    ''|localhost|127.0.0.1|::1|host.docker.internal)
+      MINIO_EXTERNAL_CONNECTION_HOST='host.docker.internal'
+      MINIO_EXTERNAL_HOST_DISPLAY='本机（Docker host-gateway）'
+      MINIO_EXTERNAL_USE_HOST_GATEWAY=1
+      APP_API_EXTRA_HOSTS=$'    extra_hosts:\n      - "host.docker.internal:host-gateway"'
+      default_public_host="${ACCESS_IP:-127.0.0.1}"
+      ;;
+    *)
+      if ! external_service_host_is_safe "${host_input}"; then
+        echo 'Microi：错误：MinIO 地址必须是合法 IPv4 或 DNS 名，不能包含协议、端口、路径或空白。'
+        return 1
+      fi
+      MINIO_EXTERNAL_CONNECTION_HOST="${host_input}"
+      MINIO_EXTERNAL_HOST_DISPLAY="${host_input}"
+      default_public_host="${host_input}"
+      ;;
+  esac
+
+  echo 'Microi：请输入已有 MinIO API 端口；直接按 Enter 使用 9000：'
+  if [ -n "${MICROI_EXTERNAL_MINIO_PORT:-}" ]; then
+    port_input="${MICROI_EXTERNAL_MINIO_PORT}"
+    echo "Microi：使用环境变量 MICROI_EXTERNAL_MINIO_PORT=${port_input}"
+  else
+    read -r port_input
+  fi
+  port_input="${port_input:-9000}"
+  if ! [[ "${port_input}" =~ ^[0-9]+$ ]] \
+    || [ $((10#${port_input})) -lt 1 ] \
+    || [ $((10#${port_input})) -gt 65535 ]; then
+    echo 'Microi：错误：MinIO API 端口必须是 1-65535 的整数。'
+    return 1
+  fi
+  MINIO_EXTERNAL_PORT=$((10#${port_input}))
+
+  echo 'Microi：已有 MinIO API 是否使用 HTTPS？输入 1=HTTPS，0=HTTP；直接按 Enter 默认 0：'
+  if [ -n "${MICROI_EXTERNAL_MINIO_USE_SSL:-}" ]; then
+    ssl_input="${MICROI_EXTERNAL_MINIO_USE_SSL}"
+    echo "Microi：使用环境变量 MICROI_EXTERNAL_MINIO_USE_SSL=${ssl_input}"
+  else
+    read -r ssl_input
+  fi
+  case "${ssl_input:-0}" in
+    0|http|no) MINIO_PRIVATE_SSL_FLAG=0 ;;
+    1|https|yes) MINIO_PRIVATE_SSL_FLAG=1 ;;
+    *)
+      echo 'Microi：错误：MinIO HTTPS 选项只能是 0 或 1。'
+      return 1
+      ;;
+  esac
+
+  echo 'Microi：请输入已有 MinIO Access Key（输入时不会回显）：'
+  if [ "${MICROI_EXTERNAL_MINIO_ACCESS_KEY+x}" = x ]; then
+    access_key_input="${MICROI_EXTERNAL_MINIO_ACCESS_KEY}"
+    echo 'Microi：MinIO Access Key 已从环境变量读取（不会回显）'
+  else
+    read -r -s access_key_input
+    echo ''
+  fi
+  echo 'Microi：请输入已有 MinIO Secret Key（输入时不会回显）：'
+  if [ "${MICROI_EXTERNAL_MINIO_SECRET_KEY+x}" = x ]; then
+    secret_key_input="${MICROI_EXTERNAL_MINIO_SECRET_KEY}"
+    echo 'Microi：MinIO Secret Key 已从环境变量读取（不会回显）'
+  else
+    read -r -s secret_key_input
+    echo ''
+  fi
+  unset MICROI_EXTERNAL_MINIO_ACCESS_KEY MICROI_EXTERNAL_MINIO_SECRET_KEY || true
+  if [ -z "${access_key_input}" ] || [ -z "${secret_key_input}" ]; then
+    echo 'Microi：错误：已有 MinIO 的 Access Key 和 Secret Key 均不能为空。'
+    return 1
+  fi
+  if [ "${#access_key_input}" -gt 50 ] || [ "${#secret_key_input}" -gt 50 ]; then
+    echo 'Microi：错误：MinIO Access Key / Secret Key 不能超过平台 SaaS 字段上限 50 个字符。'
+    return 1
+  fi
+  if [[ "${access_key_input}" == *$'\n'* || "${access_key_input}" == *$'\r'* \
+    || "${secret_key_input}" == *$'\n'* || "${secret_key_input}" == *$'\r'* ]]; then
+    echo 'Microi：错误：MinIO 凭据不能包含换行符。'
+    return 1
+  fi
+
+  echo 'Microi：请输入私有桶名称；直接按 Enter 使用 mci-private：'
+  if [ -n "${MICROI_EXTERNAL_MINIO_PRIVATE_BUCKET:-}" ]; then
+    private_bucket_input="${MICROI_EXTERNAL_MINIO_PRIVATE_BUCKET}"
+    echo "Microi：使用环境变量 MICROI_EXTERNAL_MINIO_PRIVATE_BUCKET=${private_bucket_input}"
+  else
+    read -r private_bucket_input
+  fi
+  echo 'Microi：请输入公有桶名称；直接按 Enter 使用 mci-public：'
+  if [ -n "${MICROI_EXTERNAL_MINIO_PUBLIC_BUCKET:-}" ]; then
+    public_bucket_input="${MICROI_EXTERNAL_MINIO_PUBLIC_BUCKET}"
+    echo "Microi：使用环境变量 MICROI_EXTERNAL_MINIO_PUBLIC_BUCKET=${public_bucket_input}"
+  else
+    read -r public_bucket_input
+  fi
+  private_bucket_input="${private_bucket_input:-mci-private}"
+  public_bucket_input="${public_bucket_input:-mci-public}"
+  if ! minio_bucket_name_is_safe "${private_bucket_input}" \
+    || ! minio_bucket_name_is_safe "${public_bucket_input}" \
+    || [ "${private_bucket_input}" = "${public_bucket_input}" ]; then
+    echo 'Microi：错误：MinIO 桶名必须是不同的 3-50 位小写 S3 桶名（受平台 SaaS 字段长度限制）。'
+    return 1
+  fi
+
+  echo 'Microi：请输入浏览器可访问的 MinIO 地址（可含 http:// 或 https://，不含桶名）；'
+  echo 'Microi：直接按 Enter 使用所填服务地址和端口：'
+  if [ "${MICROI_EXTERNAL_MINIO_PUBLIC_ENDPOINT+x}" = x ]; then
+    public_endpoint_input="${MICROI_EXTERNAL_MINIO_PUBLIC_ENDPOINT}"
+    if [ -n "${public_endpoint_input}" ]; then
+      echo "Microi：使用环境变量 MICROI_EXTERNAL_MINIO_PUBLIC_ENDPOINT=${public_endpoint_input}"
+    fi
+  else
+    read -r public_endpoint_input
+  fi
+  if [ -z "${public_endpoint_input}" ]; then
+    public_endpoint_input="${default_public_host}:${MINIO_EXTERNAL_PORT}"
+  fi
+  if [ "${MINIO_PRIVATE_SSL_FLAG}" = '1' ]; then
+    MINIO_EXTERNAL_INTERNAL_URL="https://${MINIO_EXTERNAL_CONNECTION_HOST}:${MINIO_EXTERNAL_PORT}"
+    if ! normalize_minio_public_endpoint "${public_endpoint_input}" 'https'; then
+      echo 'Microi：错误：MinIO 浏览器访问地址必须是无路径、无帐号信息的 HTTP(S) 主机地址。'
+      return 1
+    fi
+  else
+    MINIO_EXTERNAL_INTERNAL_URL="http://${MINIO_EXTERNAL_CONNECTION_HOST}:${MINIO_EXTERNAL_PORT}"
+    if ! normalize_minio_public_endpoint "${public_endpoint_input}" 'http'; then
+      echo 'Microi：错误：MinIO 浏览器访问地址必须是无路径、无帐号信息的 HTTP(S) 主机地址。'
+      return 1
+    fi
+  fi
+
+  echo 'Microi：请输入 MinIO Region；直接按 Enter 留空：'
+  if [ "${MICROI_EXTERNAL_MINIO_REGION+x}" = x ]; then
+    region_input="${MICROI_EXTERNAL_MINIO_REGION}"
+    [ -z "${region_input}" ] || echo "Microi：使用环境变量 MICROI_EXTERNAL_MINIO_REGION=${region_input}"
+  else
+    read -r region_input
+  fi
+  if [ -n "${region_input}" ] && [[ ! "${region_input}" =~ ^[A-Za-z0-9._-]{1,50}$ ]]; then
+    echo 'Microi：错误：MinIO Region 只能包含 1-50 位字母、数字、点、下划线和短横线。'
+    return 1
+  fi
+  stored_internal_endpoint="${MINIO_EXTERNAL_CONNECTION_HOST}:${MINIO_EXTERNAL_PORT}"
+  if [ "${#stored_internal_endpoint}" -gt 50 ]; then
+    echo 'Microi：错误：MinIO 内部 Endpoint 超过平台 SaaS 字段上限 50 个字符。'
+    return 1
+  fi
+  if [ "${#MINIO_INTERNET_ENDPOINT}" -gt 50 ]; then
+    echo 'Microi：错误：MinIO 浏览器 Endpoint 超过平台 SaaS 字段上限 50 个字符。'
+    return 1
+  fi
+
+  MINIO_EXTERNAL_ACCESS_KEY="${access_key_input}"
+  MINIO_EXTERNAL_SECRET_KEY="${secret_key_input}"
+  MINIO_PRIVATE_BUCKET="${private_bucket_input}"
+  MINIO_PUBLIC_BUCKET="${public_bucket_input}"
+  MINIO_REGION="${region_input}"
+  echo "Microi：将复用 ${MINIO_EXTERNAL_INTERNAL_URL}，公有访问 ${MINIO_PUBLIC_BASE_URL}/${MINIO_PUBLIC_BUCKET}；不会安装 MinIO 服务 ✓"
 }
 
 print_database_profile() {
@@ -1597,6 +2124,48 @@ if [ "${MICROI_INSTALL_PROFILE_ONLY:-0}" = "1" ]; then
   exit 0
 fi
 
+# 已有 MySQL / MinIO 的无副作用输入规划入口：只校验与归一化配置，不访问网络或 Docker。
+if [ "${MICROI_INSTALL_EXTERNAL_MYSQL_PLAN_ONLY:-0}" = "1" ]; then
+  configure_database_profile "${MICROI_DATABASE_CHOICE:-1}"
+  if [ "${DATABASE_TYPE}" != 'MySql' ]; then
+    echo 'Microi：错误：已有 MySQL 规划仅支持数据库选项 1 或 2。'
+    exit 1
+  fi
+  MICROI_MYSQL_SERVICE_MODE="${MICROI_MYSQL_SERVICE_MODE:-external}"
+  configure_mysql_service_mode
+  if [ "${DATABASE_SERVICE_MODE}" != 'external' ]; then
+    echo 'Microi：错误：已有 MySQL 规划入口必须使用 external 模式。'
+    exit 1
+  fi
+  echo "DATABASE_SERVICE_MODE=${DATABASE_SERVICE_MODE}"
+  echo "MYSQL_EXPECTED_VERSION=${MYSQL_VERSION}"
+  echo "MYSQL_CONNECTION_HOST=${MYSQL_EXTERNAL_CONNECTION_HOST}"
+  echo "MYSQL_CONNECTION_PORT=${MYSQL_EXTERNAL_PORT}"
+  echo "MYSQL_CONNECTION_USER=${DATABASE_USER}"
+  echo 'MYSQL_PASSWORD_CONFIGURED=1'
+  echo 'MYSQL_CONTAINER_CREATED=0'
+  exit 0
+fi
+if [ "${MICROI_INSTALL_EXTERNAL_MINIO_PLAN_ONLY:-0}" = "1" ]; then
+  ACCESS_IP="${MICROI_PLAN_ACCESS_IP:-192.0.2.10}"
+  APP_API_EXTRA_HOSTS=""
+  MICROI_MINIO_SERVICE_MODE="${MICROI_MINIO_SERVICE_MODE:-external}"
+  configure_minio_service_mode
+  if [ "${MINIO_SERVICE_MODE}" != 'external' ]; then
+    echo 'Microi：错误：已有 MinIO 规划入口必须使用 external 模式。'
+    exit 1
+  fi
+  echo "MINIO_SERVICE_MODE=${MINIO_SERVICE_MODE}"
+  echo "MINIO_INTERNAL_URL=${MINIO_EXTERNAL_INTERNAL_URL}"
+  echo "MINIO_PUBLIC_BASE_URL=${MINIO_PUBLIC_BASE_URL}"
+  echo "MINIO_PRIVATE_BUCKET=${MINIO_PRIVATE_BUCKET}"
+  echo "MINIO_PUBLIC_BUCKET=${MINIO_PUBLIC_BUCKET}"
+  echo "MINIO_REGION=${MINIO_REGION}"
+  echo 'MINIO_CREDENTIALS_CONFIGURED=1'
+  echo 'MINIO_CONTAINER_CREATED=0'
+  exit 0
+fi
+
 # OCR 安装计划的无副作用验收入口：不读取交互、不访问网络、不修改 Docker。
 if [ "${MICROI_INSTALL_OCR_PLAN_ONLY:-0}" = "1" ]; then
   echo "OCR_IMAGE=${OCR_IMAGE}"
@@ -1760,6 +2329,7 @@ echo "Microi：主租户 OsClient/ClientName 将设置为 ${OS_CLIENT} ✓"
 # === 主数据库选择 ===
 echo ''
 echo 'Microi：请选择主数据库类型（强烈推荐 MySQL 5.7 / MySQL 8.0）：'
+echo 'Microi：说明：MySQL 正式系列是 5.7 和 8.0，没有 5.8；复用已有服务时还会自动校验实际版本。'
 echo '  1. MySQL 5.7（默认，强烈推荐）'
 echo '  2. MySQL 8.0（强烈推荐）'
 echo '  3. SQL Server 2022'
@@ -1778,6 +2348,7 @@ fi
 configure_database_profile "${database_choice_input:-1}"
 echo "Microi：已选择 ${DATABASE_DISPLAY_NAME}，Dos.ORM 类型 ${DATABASE_TYPE} ✓"
 echo "Microi：对应标准空数据库包：${SQL_ZIP_URL}"
+configure_mysql_service_mode
 
 # 所有未完成的数据库适配都在 Docker 安装/网络创建之前失败，绝不以跳过冒充成功。
 if ! validate_database_install_preflight; then
@@ -1838,9 +2409,11 @@ else
   exit 1
 fi
 
+configure_minio_service_mode
+
 # === Microi Docker 共享内网（可选固定网段）===
 echo ''
-echo 'Microi：所有编排都会接入共享的 microi Docker bridge 网络，并通过容器名访问内部依赖。'
+echo 'Microi：脚本生成的所有编排都会接入共享的 microi Docker bridge 网络；新装依赖使用容器名，已有 MySQL/MinIO 使用所填地址。'
 echo 'Microi：是否为该网络手工指定固定 subnet/gateway？'
 echo 'Microi：输入 1 手工指定，输入 0 由 Docker 自动分配网段：'
 echo 'Microi：默认是0（自动分配），一般情况请直接按Enter。'
@@ -2000,7 +2573,16 @@ fi
 
 # === 数据库类型与初始化包最终确认 ===
 echo ''
-echo "Microi：将安装 ${DATABASE_DISPLAY_NAME}，数据库初始化包：${SQL_SOURCE_DISPLAY} ✓"
+if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
+  echo "Microi：将使用已有 ${DATABASE_DISPLAY_NAME} ${MYSQL_EXTERNAL_HOST_DISPLAY}:${MYSQL_EXTERNAL_PORT}，不安装 MySQL 容器；数据库初始化包：${SQL_SOURCE_DISPLAY} ✓"
+else
+  echo "Microi：将安装 ${DATABASE_DISPLAY_NAME}，数据库初始化包：${SQL_SOURCE_DISPLAY} ✓"
+fi
+if [ "${MINIO_SERVICE_MODE}" = 'external' ]; then
+  echo "Microi：将使用已有 MinIO ${MINIO_EXTERNAL_INTERNAL_URL}，不安装 MinIO 容器；公有文件地址：${MINIO_PUBLIC_BASE_URL}/${MINIO_PUBLIC_BUCKET} ✓"
+else
+  echo 'Microi：将安装新的 MinIO 容器，并初始化 mci-private / mci-public 桶 ✓'
+fi
 
 echo ''
 echo '[步骤1/11] 环境检测完成 ✓'
@@ -2362,7 +2944,15 @@ generate_random_data_dir() {
 }
 
 # === 端口检测 ===
-PORT_LABELS=("Web(microi-install-client)" "API(microi-install-api)" "${DATABASE_PORT_NAME}" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "OCR")
+PORT_LABELS=("Web(microi-install-client)" "API(microi-install-api)")
+if [ "${DATABASE_SERVICE_MODE}" = 'managed' ]; then
+  PORT_LABELS+=("${DATABASE_PORT_NAME}")
+fi
+PORT_LABELS+=("Redis" "MongoDB")
+if [ "${MINIO_SERVICE_MODE}" = 'managed' ]; then
+  PORT_LABELS+=("MinIO-API" "MinIO-Console")
+fi
+PORT_LABELS+=("OCR")
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   PORT_LABELS+=("LibreTranslate")
 fi
@@ -2445,17 +3035,35 @@ if [ "${PORT_ALLOCATED}" = false ]; then
   exit 1
 fi
 
-# 分配端口
-VUE_PORT=$((PORT_BASE + 0))
-API_PORT=$((PORT_BASE + 1))
-MYSQL_PORT=$((PORT_BASE + 2))
-DATABASE_PORT=${MYSQL_PORT}
-REDIS_PORT=$((PORT_BASE + 3))
-MONGO_PORT=$((PORT_BASE + 4))
-MINIO_PORT=$((PORT_BASE + 5))
-MINIO_CONSOLE_PORT=$((PORT_BASE + 6))
-OCR_PORT=$((PORT_BASE + 7))
-NEXT_PORT_OFFSET=8
+# 只为本脚本实际创建的服务分配宿主机端口；已有服务使用用户填写的原端口。
+NEXT_PORT_OFFSET=0
+VUE_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
+API_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
+if [ "${DATABASE_SERVICE_MODE}" = 'managed' ]; then
+  MYSQL_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+  DATABASE_PORT=${MYSQL_PORT}
+  NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
+else
+  MYSQL_PORT=""
+  DATABASE_PORT="${MYSQL_EXTERNAL_PORT}"
+fi
+REDIS_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
+MONGO_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
+if [ "${MINIO_SERVICE_MODE}" = 'managed' ]; then
+  MINIO_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+  NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
+  MINIO_CONSOLE_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+  NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
+else
+  MINIO_PORT="${MINIO_EXTERNAL_PORT}"
+  MINIO_CONSOLE_PORT=""
+fi
+OCR_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   LIBRETRANSLATE_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
   NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
@@ -2478,11 +3086,20 @@ echo 'Microi：端口分配方案：'
 echo '------------------------------------------------------------------'
 printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
 printf '  %-18s %s\n' "API:"           "${API_PORT}"
-printf '  %-18s %s\n' "${DATABASE_PORT_NAME}:" "${DATABASE_PORT}"
+if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
+  printf '  %-18s %s\n' "MySQL(已有服务):" "${MYSQL_EXTERNAL_HOST_DISPLAY}:${DATABASE_PORT}（不占用本机分配端口）"
+else
+  printf '  %-18s %s\n' "${DATABASE_PORT_NAME}:" "${DATABASE_PORT}"
+fi
 printf '  %-18s %s\n' "Redis:"         "${REDIS_PORT}"
 printf '  %-18s %s\n' "MongoDB:"       "${MONGO_PORT}"
-printf '  %-18s %s\n' "MinIO API:"     "${MINIO_PORT}"
-printf '  %-18s %s\n' "MinIO Console:" "${MINIO_CONSOLE_PORT}"
+if [ "${MINIO_SERVICE_MODE}" = 'external' ]; then
+  printf '  %-18s %s\n' "MinIO(已有服务):" "${MINIO_EXTERNAL_INTERNAL_URL}（不占用本机分配端口）"
+  printf '  %-18s %s\n' "MinIO公有地址:" "${MINIO_PUBLIC_BASE_URL}/${MINIO_PUBLIC_BUCKET}"
+else
+  printf '  %-18s %s\n' "MinIO API:"     "${MINIO_PORT}"
+  printf '  %-18s %s\n' "MinIO Console:" "${MINIO_CONSOLE_PORT}"
+fi
 printf '  %-18s %s\n' "OCR:"           "${OCR_PORT}（仅绑定 127.0.0.1）"
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   printf '  %-18s %s\n' "LibreTranslate:" "127.0.0.1:${LIBRETRANSLATE_PORT}（API 走 Docker 内网）"
@@ -2494,8 +3111,19 @@ if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
 fi
 echo '------------------------------------------------------------------'
 
-ALL_PORTS="${VUE_PORT} ${API_PORT} ${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT} ${OCR_PORT}"
-FIREWALL_PORTS="${VUE_PORT} ${API_PORT} ${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
+ALL_PORTS="${VUE_PORT} ${API_PORT}"
+FIREWALL_PORTS="${VUE_PORT} ${API_PORT}"
+if [ "${DATABASE_SERVICE_MODE}" = 'managed' ]; then
+  ALL_PORTS="${ALL_PORTS} ${DATABASE_PORT}"
+  FIREWALL_PORTS="${FIREWALL_PORTS} ${DATABASE_PORT}"
+fi
+ALL_PORTS="${ALL_PORTS} ${REDIS_PORT} ${MONGO_PORT}"
+FIREWALL_PORTS="${FIREWALL_PORTS} ${REDIS_PORT} ${MONGO_PORT}"
+if [ "${MINIO_SERVICE_MODE}" = 'managed' ]; then
+  ALL_PORTS="${ALL_PORTS} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
+  FIREWALL_PORTS="${FIREWALL_PORTS} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
+fi
+ALL_PORTS="${ALL_PORTS} ${OCR_PORT}"
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   ALL_PORTS="${ALL_PORTS} ${LIBRETRANSLATE_PORT}"
 fi
@@ -2513,13 +3141,26 @@ echo ''
 echo '[步骤4/11] 生成密码与数据目录'
 echo '------------------------------------------------------------------'
 
-DATABASE_PASSWORD=$(generate_random_password)
-# 保留旧变量名，避免 MySQL 5.7/8.0 既有安装路径发生兼容性回退。
-MYSQL_ROOT_PASSWORD="${DATABASE_PASSWORD}"
+if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
+  DATABASE_PASSWORD="${MYSQL_EXTERNAL_PASSWORD}"
+  MYSQL_EXTERNAL_PASSWORD=""
+  MYSQL_ROOT_PASSWORD=""
+else
+  DATABASE_PASSWORD=$(generate_random_password)
+  # 保留旧变量名，避免 MySQL 5.7/8.0 既有安装路径发生兼容性回退。
+  MYSQL_ROOT_PASSWORD="${DATABASE_PASSWORD}"
+fi
 REDIS_PASSWORD=$(generate_random_password)
 MONGO_ROOT_PASSWORD=$(generate_random_password)
-MINIO_ACCESS_KEY=$(generate_random_password)
-MINIO_SECRET_KEY=$(generate_random_password)
+if [ "${MINIO_SERVICE_MODE}" = 'external' ]; then
+  MINIO_ACCESS_KEY="${MINIO_EXTERNAL_ACCESS_KEY}"
+  MINIO_SECRET_KEY="${MINIO_EXTERNAL_SECRET_KEY}"
+  MINIO_EXTERNAL_ACCESS_KEY=""
+  MINIO_EXTERNAL_SECRET_KEY=""
+else
+  MINIO_ACCESS_KEY=$(generate_random_password)
+  MINIO_SECRET_KEY=$(generate_random_password)
+fi
 AUTH_SECRET=$(generate_random_auth_secret)
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   QDRANT_API_KEY=$(generate_random_password)
@@ -2543,18 +3184,27 @@ fi
 for _pw_var in ${_REQUIRED_PW_VARS}; do
   eval _pw_val="\${${_pw_var}}"
   if [ -z "${_pw_val}" ]; then
-    echo "Microi：错误：密码生成失败（${_pw_var}为空），请检查 openssl 是否安装正确。"
+    echo "Microi：错误：凭据准备失败（${_pw_var}为空），请检查输入或 openssl。"
     exit 1
   fi
 done
-echo 'Microi：各服务密码/密钥已随机生成 ✓'
+echo 'Microi：已有服务凭据已安全读取，其余服务密码/密钥已随机生成 ✓'
 
-DATABASE_DATA_DIR=$(generate_random_data_dir "database-${DATABASE_ENGINE_KEY}")
-MYSQL_DATA_DIR="${DATABASE_DATA_DIR}"
+if [ "${DATABASE_SERVICE_MODE}" = 'managed' ]; then
+  DATABASE_DATA_DIR=$(generate_random_data_dir "database-${DATABASE_ENGINE_KEY}")
+  MYSQL_DATA_DIR="${DATABASE_DATA_DIR}"
+else
+  DATABASE_DATA_DIR=""
+  MYSQL_DATA_DIR=""
+fi
 REDIS_DATA_DIR=$(generate_random_data_dir "redis")
 MONGO_DATA_DIR=$(generate_random_data_dir "mongodb")
-MINIO_DATA_DIR=$(generate_random_data_dir "minio")
-echo 'Microi：各服务数据目录已创建 ✓'
+if [ "${MINIO_SERVICE_MODE}" = 'managed' ]; then
+  MINIO_DATA_DIR=$(generate_random_data_dir "minio")
+else
+  MINIO_DATA_DIR=""
+fi
+echo 'Microi：本次新装服务的数据目录已创建；已有 MySQL/MinIO 未创建数据目录 ✓'
 
 echo ''
 echo '[步骤4/11] 密码与数据目录就绪 ✓'
@@ -2682,12 +3332,129 @@ echo '=================================================================='
 
 
 # ============================================================
-# 步骤6：部署用户选择的主数据库编排
+# 步骤6：部署或连接用户选择的主数据库
 # ============================================================
 echo ''
-echo "[步骤6/11] 部署 ${DATABASE_DISPLAY_NAME}"
+echo "[步骤6/11] 部署或连接 ${DATABASE_DISPLAY_NAME}"
 echo '------------------------------------------------------------------'
 
+prepare_external_mysql_client_config() {
+  local escaped_host=""
+  local escaped_user=""
+  local escaped_password=""
+  MYSQL_CLIENT_CONFIG_FILE=$(mktemp '/tmp/microi_mysql_client_XXXXXX.cnf')
+  escaped_host="${MYSQL_EXTERNAL_CONNECTION_HOST//\\/\\\\}"
+  escaped_host="${escaped_host//\"/\\\"}"
+  escaped_user="${DATABASE_USER//\\/\\\\}"
+  escaped_user="${escaped_user//\"/\\\"}"
+  escaped_password="${DATABASE_PASSWORD//\\/\\\\}"
+  escaped_password="${escaped_password//\"/\\\"}"
+  cat > "${MYSQL_CLIENT_CONFIG_FILE}" <<EOF
+[client]
+host="${escaped_host}"
+port=${DATABASE_PORT}
+user="${escaped_user}"
+password="${escaped_password}"
+protocol=TCP
+ssl-mode=PREFERRED
+EOF
+  chmod 600 "${MYSQL_CLIENT_CONFIG_FILE}"
+}
+
+run_mysql_client() {
+  local use_database="${1:-0}"
+  shift
+  local -a database_args=()
+  local -a docker_args=()
+  if [ "${use_database}" = '1' ]; then
+    database_args+=("${DATABASE_NAME}")
+  fi
+  if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
+    docker_args=(run --rm -i --network microi --user '0:0')
+    if [ "${MYSQL_EXTERNAL_USE_HOST_GATEWAY}" = '1' ]; then
+      docker_args+=(--add-host 'host.docker.internal:host-gateway')
+    fi
+    docker_args+=(
+      -v "${MYSQL_CLIENT_CONFIG_FILE}:/tmp/microi-client.cnf:ro,Z"
+      --entrypoint mysql
+      "${MYSQL_CLIENT_IMAGE}"
+    )
+    docker "${docker_args[@]}" \
+      --defaults-extra-file=/tmp/microi-client.cnf \
+      --default-character-set=utf8mb4 \
+      "${database_args[@]}" "$@"
+  else
+    docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" \
+      mysql --default-character-set=utf8mb4 -u"${DATABASE_USER}" \
+      "${database_args[@]}" "$@"
+  fi
+}
+
+MYSQL_EXTERNAL_TARGET_DATABASE_EXISTS=0
+MYSQL_DETECTED_SERVER_VERSION=""
+if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
+  DATABASE_DIR=""
+  echo "Microi：已有 MySQL 模式不会创建数据库容器、数据目录、编排或宿主机端口。"
+  echo "Microi：拉取/复用临时 MySQL 客户端镜像，仅用于连通性、版本校验和数据库导入；客户端容器每次执行后自动删除。"
+  if ! docker image inspect "${MYSQL_CLIENT_IMAGE}" > /dev/null 2>&1; then
+    docker pull "${MYSQL_CLIENT_IMAGE}"
+  fi
+  prepare_external_mysql_client_config
+  if ! MYSQL_VERSION_READBACK=$(run_mysql_client 0 --batch --skip-column-names -e 'SELECT VERSION();' 2>&1); then
+    echo "Microi：错误：无法从 microi Docker 网络连接已有 MySQL ${MYSQL_EXTERNAL_HOST_DISPLAY}:${DATABASE_PORT}。"
+    echo 'Microi：请检查地址、端口、帐号、密码、防火墙、授权来源和 bind-address；本机服务不能只监听 127.0.0.1。'
+    printf '%s\n' "${MYSQL_VERSION_READBACK}" | tail -10
+    exit 1
+  fi
+  MYSQL_DETECTED_SERVER_VERSION=$(printf '%s\n' "${MYSQL_VERSION_READBACK}" | tr -d '\r' | awk 'NF {value=$0} END {print value}')
+  if [[ "${MYSQL_DETECTED_SERVER_VERSION}" == *MariaDB* ]]; then
+    echo "Microi：错误：检测到 ${MYSQL_DETECTED_SERVER_VERSION}，当前一键安装只验收 MySQL 5.7.x / 8.0.x，不把 MariaDB 冒充 MySQL。"
+    exit 1
+  fi
+  if [ "${MYSQL_VERSION}" = '5.7' ] && [[ ! "${MYSQL_DETECTED_SERVER_VERSION}" =~ ^5\.7\. ]]; then
+    echo "Microi：错误：已选择 MySQL 5.7，但已有服务实际版本为 ${MYSQL_DETECTED_SERVER_VERSION}。请重新运行并选择匹配版本。"
+    exit 1
+  fi
+  if [ "${MYSQL_VERSION}" = '8.0' ] && [[ ! "${MYSQL_DETECTED_SERVER_VERSION}" =~ ^8\.0\. ]]; then
+    echo "Microi：错误：已选择 MySQL 8.0，但已有服务实际版本为 ${MYSQL_DETECTED_SERVER_VERSION}。当前未把其它 8.x 系列视为已验收。"
+    exit 1
+  fi
+  echo "Microi：已有 MySQL 连接及版本校验通过：${MYSQL_DETECTED_SERVER_VERSION} ✓"
+
+  if ! MYSQL_SCHEMA_EXISTS=$(run_mysql_client 0 --batch --skip-column-names -e \
+    "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='${DATABASE_NAME}';" 2>&1); then
+    echo 'Microi：错误：无法检查已有 MySQL 上的目标数据库状态。'
+    printf '%s\n' "${MYSQL_SCHEMA_EXISTS}" | tail -10
+    exit 1
+  fi
+  MYSQL_SCHEMA_EXISTS=$(printf '%s' "${MYSQL_SCHEMA_EXISTS}" | tr -d '[:space:]')
+  if [ "${MYSQL_SCHEMA_EXISTS}" = '1' ]; then
+    MYSQL_EXTERNAL_TARGET_DATABASE_EXISTS=1
+    if ! MYSQL_TARGET_OBJECT_COUNT=$(run_mysql_client 0 --batch --skip-column-names -e \
+      "SELECT (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='${DATABASE_NAME}') + (SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA='${DATABASE_NAME}') + (SELECT COUNT(*) FROM information_schema.EVENTS WHERE EVENT_SCHEMA='${DATABASE_NAME}');" 2>&1); then
+      echo 'Microi：错误：无法检查已有 MySQL 目标数据库中的对象数量。'
+      printf '%s\n' "${MYSQL_TARGET_OBJECT_COUNT}" | tail -10
+      exit 1
+    fi
+    MYSQL_TARGET_OBJECT_COUNT=$(printf '%s' "${MYSQL_TARGET_OBJECT_COUNT}" | tr -d '[:space:]')
+    if ! [[ "${MYSQL_TARGET_OBJECT_COUNT}" =~ ^[0-9]+$ ]]; then
+      echo 'Microi：错误：已有 MySQL 返回了无法识别的目标数据库对象数量。'
+      exit 1
+    fi
+    if [ "${MYSQL_TARGET_OBJECT_COUNT}" -ne 0 ]; then
+      echo "Microi：错误：已有 MySQL 的目标数据库 ${DATABASE_NAME} 已包含 ${MYSQL_TARGET_OBJECT_COUNT} 个对象。"
+      echo 'Microi：为保护客户数据，安装器不会覆盖、合并或删除非空数据库；请改用未占用的 OsClient/目标库，或先由管理员准备空库。'
+      exit 1
+    fi
+    echo "Microi：目标数据库 ${DATABASE_NAME} 已存在且为空，将直接导入 ✓"
+  elif [ "${MYSQL_SCHEMA_EXISTS}" = '0' ]; then
+    echo "Microi：目标数据库 ${DATABASE_NAME} 尚不存在，将使用所填帐号创建并导入 ✓"
+  else
+    echo 'Microi：错误：已有 MySQL 返回了无法识别的数据库存在性结果。'
+    exit 1
+  fi
+  echo "Microi：已有 ${DATABASE_DISPLAY_NAME} 已连接就绪 ✓"
+else
 DATABASE_DIR="${COMPOSE_BASE_DIR}/microi-install-database"
 
 # 检查数据库数据盘空间；大 SQL 包按解压大小动态提高门槛。
@@ -2838,6 +3605,7 @@ EOF
     exit 1
     ;;
 esac
+chmod 600 "${DATABASE_DIR}/docker-compose.yml"
 echo "Microi：数据库编排文件已生成: ${DATABASE_DIR}/docker-compose.yml ✓"
 
 compose_up "${DATABASE_DIR}"
@@ -2868,7 +3636,7 @@ for i in $(seq 1 60); do
   fi
   case "${DATABASE_CHOICE}" in
     1|2)
-      docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot -e 'SELECT 1' > /dev/null 2>&1 && DATABASE_READY=true
+      run_mysql_client 0 -e 'SELECT 1' > /dev/null 2>&1 && DATABASE_READY=true
       ;;
     3)
       docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -Q 'SELECT 1' > /dev/null 2>&1 && DATABASE_READY=true
@@ -2892,13 +3660,14 @@ if [ "${DATABASE_READY}" != true ]; then
   exit 1
 fi
 echo "Microi：${DATABASE_DISPLAY_NAME} 已启动就绪 ✓"
+fi
 
 # 后续安装阶段统一通过此函数执行数据库配置，不在业务服务层散落数据库方言。
 database_exec_sql() {
   local sql="$1"
   case "${DATABASE_CHOICE}" in
     1|2)
-      docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot "${DATABASE_NAME}" -e "${sql}"
+      run_mysql_client 1 -e "${sql}"
       ;;
     3)
       docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d "${DATABASE_NAME}" -Q "${sql}"
@@ -3055,15 +3824,16 @@ ensure_runtime_main_tenant() {
   echo "Microi：主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} 已唯一就绪，JWT AuthSecret 已持久化且原有子租户保持不变 ✓"
 }
 
-if [ "${DATABASE_CHOICE}" = "1" ] || [ "${DATABASE_CHOICE}" = "2" ]; then
+if { [ "${DATABASE_CHOICE}" = "1" ] || [ "${DATABASE_CHOICE}" = "2" ]; } \
+  && [ "${DATABASE_SERVICE_MODE}" = 'managed' ]; then
   echo 'Microi：配置 MySQL 远程访问权限...'
   if [ "${MYSQL_VERSION}" = "8.0" ]; then
     MYSQL_GRANT_SQL="CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${DATABASE_PASSWORD}'; ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${DATABASE_PASSWORD}'; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;"
   else
     MYSQL_GRANT_SQL="USE mysql; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${DATABASE_PASSWORD}' WITH GRANT OPTION;"
   fi
-  docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot -e "${MYSQL_GRANT_SQL}"
-  docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot -e 'FLUSH PRIVILEGES;' > /dev/null 2>&1 || true
+  run_mysql_client 0 -e "${MYSQL_GRANT_SQL}"
+  run_mysql_client 0 -e 'FLUSH PRIVILEGES;' > /dev/null 2>&1 || true
 fi
 
 # 获取、复核并安全展开数据库包。自定义原文件只读使用，清理时绝不删除。
@@ -3108,15 +3878,22 @@ fi
 echo "Microi：还原 ${DATABASE_DISPLAY_NAME} 数据库（${SQL_ARCHIVE_ENTRY}，可能需要几分钟）..."
 case "${DATABASE_CHOICE}" in
   1|2)
-    docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot -e "CREATE DATABASE IF NOT EXISTS \`${DATABASE_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    if [ "${DATABASE_SERVICE_MODE}" = 'managed' ] \
+      || [ "${MYSQL_EXTERNAL_TARGET_DATABASE_EXISTS}" != '1' ]; then
+      run_mysql_client 0 -e "CREATE DATABASE IF NOT EXISTS \`${DATABASE_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    fi
     # 仅本次恢复会话关闭 InnoDB 严格建表校验，兼容来源库中已存在的超宽 Dynamic 表；
     # 同时关闭本会话 binlog 并按事务批量提交，避免几十万条单行 INSERT 每条 fsync。
     # 不修改 global 配置，平台恢复完成后的所有新连接仍保持 MySQL 默认严格和安全落盘行为。
     emit_mysql_import_preamble() {
-      printf "SET SESSION innodb_strict_mode=OFF; SET SESSION sql_mode='NO_ENGINE_SUBSTITUTION'; SET SESSION sql_log_bin=0; SET autocommit=0;\n"
+      if [ "${DATABASE_SERVICE_MODE}" = 'managed' ]; then
+        printf "SET SESSION innodb_strict_mode=OFF; SET SESSION sql_mode='NO_ENGINE_SUBSTITUTION'; SET SESSION sql_log_bin=0; SET autocommit=0;\n"
+      else
+        printf "SET SESSION innodb_strict_mode=OFF; SET SESSION sql_mode='NO_ENGINE_SUBSTITUTION'; SET autocommit=0;\n"
+      fi
     }
     run_mysql_import_stream() {
-      docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 --binary-mode=1 -uroot "${DATABASE_NAME}"
+      run_mysql_client 1 --binary-mode=1
     }
     set +e
     if grep -q '^-- View structure' "${SQL_FILE}"; then
@@ -3133,7 +3910,7 @@ case "${DATABASE_CHOICE}" in
         emit_mysql_import_preamble
         sed -n '/^-- View structure/,$p' "${SQL_FILE}"
         printf '\nCOMMIT;\n'
-      } | docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 --force --binary-mode=1 -uroot "${DATABASE_NAME}" > "${SQL_TMP_DIR}/view-seed.log" 2>&1
+      } | run_mysql_client 1 --force --binary-mode=1 > "${SQL_TMP_DIR}/view-seed.log" 2>&1
       MYSQL_VIEW_SEED_PIPE_STATUSES=("${PIPESTATUS[@]}")
 
       {
@@ -3230,10 +4007,10 @@ echo "Microi：核对并初始化 SaaS 主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIEN
 ensure_runtime_main_tenant
 
 cleanup_database_import_temp
-echo 'Microi：临时文件已清理 ✓'
+echo 'Microi：数据库导入临时文件已清理；外部服务受限凭据将在整次安装退出时清理 ✓'
 
 echo ''
-echo "[步骤6/11] ${DATABASE_DISPLAY_NAME} 部署完成 ✓"
+echo "[步骤6/11] ${DATABASE_DISPLAY_NAME} 配置/部署完成 ✓"
 
 
 # ============================================================
@@ -3374,10 +4151,10 @@ echo '[步骤8/11] MongoDB 部署完成 ✓'
 
 
 # ============================================================
-# 步骤9：部署 MinIO 编排
+# 步骤9：部署或连接 MinIO
 # ============================================================
 echo ''
-echo '[步骤9/11] 部署 MinIO'
+echo '[步骤9/11] 部署或连接 MinIO'
 echo '------------------------------------------------------------------'
 
 # MinIO 配置写入发生在 API/Upgrade 启动前，只能依赖空库与存量库共同具备的
@@ -3416,12 +4193,12 @@ if ! printf '%s\n' "${MINIO_TENANT_READBACK}" | grep -q 'MICROI_MINIO_TENANT_OK'
 fi
 echo "Microi：MinIO 配置前置检查通过：唯一主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} ✓"
 
-MINIO_DIR="${COMPOSE_BASE_DIR}/microi-install-minio"
-
-echo "Microi：MinIO API端口: ${MINIO_PORT}, Console端口: ${MINIO_CONSOLE_PORT}"
-
-mkdir -p "${MINIO_DIR}"
-cat > "${MINIO_DIR}/docker-compose.yml" <<EOF
+MINIO_DIR=""
+if [ "${MINIO_SERVICE_MODE}" = 'managed' ]; then
+  MINIO_DIR="${COMPOSE_BASE_DIR}/microi-install-minio"
+  echo "Microi：MinIO API端口: ${MINIO_PORT}, Console端口: ${MINIO_CONSOLE_PORT}"
+  mkdir -p "${MINIO_DIR}"
+  cat > "${MINIO_DIR}/docker-compose.yml" <<EOF
 services:
   microi-install-minio:
     image: registry.cn-hangzhou.aliyuncs.com/microios/minio:latest
@@ -3448,86 +4225,126 @@ ${COMPOSE_SERVICE_NETWORK}
         max-file: "10"
 ${COMPOSE_EXTERNAL_NETWORKS}
 EOF
-echo "Microi：MinIO 编排文件已生成 ✓"
+  chmod 600 "${MINIO_DIR}/docker-compose.yml"
+  echo "Microi：MinIO 编排文件已生成 ✓"
 
-compose_up "${MINIO_DIR}"
+  compose_up "${MINIO_DIR}"
 
-echo 'Microi：等待 MinIO API 就绪...'
-MINIO_READY=false
-for _minio_wait in $(seq 1 60); do
-  if curl -fsS --connect-timeout 2 "http://127.0.0.1:${MINIO_PORT}/minio/health/live" > /dev/null 2>&1; then
-    MINIO_READY=true
-    break
+  echo 'Microi：等待 MinIO API 就绪...'
+  MINIO_READY=false
+  for _minio_wait in $(seq 1 60); do
+    if curl -fsS --connect-timeout 2 "http://127.0.0.1:${MINIO_PORT}/minio/health/live" > /dev/null 2>&1; then
+      MINIO_READY=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "${MINIO_READY}" != "true" ]; then
+    echo 'Microi：错误：MinIO 在 120 秒内未就绪，请检查容器日志。'
+    docker logs microi-install-minio 2>&1 | tail -50 || true
+    exit 1
   fi
-  sleep 2
-done
-if [ "${MINIO_READY}" != "true" ]; then
-  echo 'Microi：错误：MinIO 在 120 秒内未就绪，请检查容器日志。'
-  docker logs microi-install-minio 2>&1 | tail -50 || true
-  exit 1
+  echo 'Microi：MinIO API 已就绪 ✓'
+  MINIO_MC_ENDPOINT='http://microi-install-minio:9000'
+else
+  echo "Microi：已有 MinIO 模式不会创建 MinIO 容器、数据目录、编排、API 端口或 Console 端口。"
+  MINIO_MC_ENDPOINT="${MINIO_EXTERNAL_INTERNAL_URL}"
 fi
-echo 'Microi：MinIO API 已就绪 ✓'
 
 # 使用吾码阿里云镜像中的官方 mc 客户端初始化桶，避免服务器直接访问海外下载站。
-MINIO_MC_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/minio-mc:RELEASE.2025-08-13T08-35-41Z"
-MINIO_MC_CONFIG_DIR="/tmp/microi-minio-mc-config"
-rm -rf "${MINIO_MC_CONFIG_DIR}"
-mkdir -p "${MINIO_MC_CONFIG_DIR}"
-echo "Microi：拉取吾码 MinIO mc 镜像 ${MINIO_MC_IMAGE}..."
-if ! docker pull "${MINIO_MC_IMAGE}"; then
-  echo 'Microi：错误：吾码 MinIO mc 镜像拉取失败。'
-  exit 1
+MINIO_MC_CONFIG_DIR=$(mktemp -d '/tmp/microi_minio_mc_XXXXXX')
+chmod 700 "${MINIO_MC_CONFIG_DIR}"
+if ! docker image inspect "${MINIO_MC_IMAGE}" > /dev/null 2>&1; then
+  echo "Microi：拉取吾码 MinIO mc 镜像 ${MINIO_MC_IMAGE}..."
+  if ! docker pull "${MINIO_MC_IMAGE}"; then
+    echo 'Microi：错误：吾码 MinIO mc 镜像拉取失败。'
+    exit 1
+  fi
+else
+  echo "Microi：复用本机 MinIO mc 镜像 ${MINIO_MC_IMAGE} ✓"
 fi
 
 run_minio_mc() {
-  docker run --rm \
-    --network microi \
-    -v "${MINIO_MC_CONFIG_DIR}:/root/.mc" \
-    "${MINIO_MC_IMAGE}" --config-dir /root/.mc "$@"
+  local -a docker_args=(run --rm --network microi --user '0:0')
+  if [ "${MINIO_EXTERNAL_USE_HOST_GATEWAY:-0}" = '1' ]; then
+    docker_args+=(--add-host 'host.docker.internal:host-gateway')
+  fi
+  docker_args+=(
+    -v "${MINIO_MC_CONFIG_DIR}:/root/.mc:Z"
+    "${MINIO_MC_IMAGE}"
+    --config-dir /root/.mc
+  )
+  docker "${docker_args[@]}" "$@"
 }
 
 MINIO_MC_ALIAS="microi-local"
-MINIO_PRIVATE_BUCKET="mci-private"
-MINIO_PUBLIC_BUCKET="mci-public"
-if ! run_minio_mc alias set "${MINIO_MC_ALIAS}" 'http://microi-install-minio:9000' "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"; then
-  echo 'Microi：错误：MinIO mc 无法连接已安装的 MinIO 服务。'
-  rm -rf "${MINIO_MC_CONFIG_DIR}"
+if ! run_minio_mc alias set "${MINIO_MC_ALIAS}" "${MINIO_MC_ENDPOINT}" "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"; then
+  echo 'Microi：错误：MinIO mc 无法使用所填端点和凭据连接 MinIO 服务。'
   exit 1
 fi
 if ! run_minio_mc mb --ignore-existing "${MINIO_MC_ALIAS}/${MINIO_PRIVATE_BUCKET}"; then
   echo "Microi：错误：MinIO 私有桶 ${MINIO_PRIVATE_BUCKET} 创建失败。"
-  rm -rf "${MINIO_MC_CONFIG_DIR}"
   exit 1
 fi
 if ! run_minio_mc mb --ignore-existing "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
   echo "Microi：错误：MinIO 公有桶 ${MINIO_PUBLIC_BUCKET} 创建失败。"
-  rm -rf "${MINIO_MC_CONFIG_DIR}"
+  exit 1
+fi
+if ! run_minio_mc anonymous set none "${MINIO_MC_ALIAS}/${MINIO_PRIVATE_BUCKET}"; then
+  echo "Microi：错误：MinIO 私有桶 ${MINIO_PRIVATE_BUCKET} 的匿名权限清理失败。"
   exit 1
 fi
 if ! run_minio_mc anonymous set download "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
   echo "Microi：错误：MinIO 公有桶 ${MINIO_PUBLIC_BUCKET} 的 public 下载权限设置失败。"
-  rm -rf "${MINIO_MC_CONFIG_DIR}"
   exit 1
 fi
-run_minio_mc anonymous get "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"
-rm -rf "${MINIO_MC_CONFIG_DIR}"
+if ! run_minio_mc anonymous get "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
+  echo "Microi：错误：MinIO 公有桶 ${MINIO_PUBLIC_BUCKET} 的匿名下载权限回读失败。"
+  exit 1
+fi
+rm -rf -- "${MINIO_MC_CONFIG_DIR}"
+MINIO_MC_CONFIG_DIR=""
 echo "Microi：MinIO 桶已初始化：${MINIO_PRIVATE_BUCKET}（私有）、${MINIO_PUBLIC_BUCKET}（public）✓"
 
-# 服务端内部流量使用 Docker DNS 与容器端口；浏览器/外部下载继续使用宿主机访问地址。
-MINIO_INTERNAL_ENDPOINT="microi-install-minio:9000"
-MINIO_INTERNET_ENDPOINT="${ACCESS_IP}:${MINIO_PORT}"
+# 新装服务使用 Docker DNS；已有服务保留经 mc 实测的内部端点和单独填写的浏览器端点。
+if [ "${MINIO_SERVICE_MODE}" = 'managed' ]; then
+  MINIO_INTERNAL_ENDPOINT="microi-install-minio:9000"
+  MINIO_INTERNET_ENDPOINT="${ACCESS_IP}:${MINIO_PORT}"
+  MINIO_PRIVATE_SSL_FLAG=0
+  MINIO_PUBLIC_SSL_FLAG=0
+  MINIO_PUBLIC_BASE_URL="http://${ACCESS_IP}:${MINIO_PORT}"
+  MINIO_REGION=""
+else
+  MINIO_INTERNAL_ENDPOINT="${MINIO_EXTERNAL_CONNECTION_HOST}:${MINIO_EXTERNAL_PORT}"
+fi
+
+sql_escape_runtime_literal() {
+  local value="$1"
+  if [ "${DATABASE_TYPE}" = 'MySql' ]; then
+    printf '%s' "${value}" | sed -e 's/\\/\\\\/g' -e "s/'/''/g"
+  else
+    printf '%s' "${value}" | sed -e "s/'/''/g"
+  fi
+}
+MINIO_ACCESS_KEY_SQL=$(sql_escape_runtime_literal "${MINIO_ACCESS_KEY}")
+MINIO_SECRET_KEY_SQL=$(sql_escape_runtime_literal "${MINIO_SECRET_KEY}")
+MINIO_INTERNAL_ENDPOINT_SQL=$(sql_escape_runtime_literal "${MINIO_INTERNAL_ENDPOINT}")
+MINIO_INTERNET_ENDPOINT_SQL=$(sql_escape_runtime_literal "${MINIO_INTERNET_ENDPOINT}")
+MINIO_PRIVATE_BUCKET_SQL=$(sql_escape_runtime_literal "${MINIO_PRIVATE_BUCKET}")
+MINIO_PUBLIC_BUCKET_SQL=$(sql_escape_runtime_literal "${MINIO_PUBLIC_BUCKET}")
+MINIO_REGION_SQL=$(sql_escape_runtime_literal "${MINIO_REGION}")
 case "${DATABASE_CHOICE}" in
   1|2)
-    MINIO_CONFIG_SQL="UPDATE sys_osclients SET HDFS='MinIO', MinIOAccessKey='${MINIO_ACCESS_KEY}', MinIOSecretKey='${MINIO_SECRET_KEY}', MinIOEndPoint='${MINIO_INTERNAL_ENDPOINT}', MinIOEndPointInternet='${MINIO_INTERNET_ENDPOINT}', MinIOEndPointSSL=0, MinIOPrivateEndPointSSL=0, MinIOPrivateBucketName='${MINIO_PRIVATE_BUCKET}', MinIOPublicBucketName='${MINIO_PUBLIC_BUCKET}', MinIORegion='' WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
-    MINIO_CONFIG_VERIFY_SQL="SELECT 'MICROI_MINIO_CONFIG_OK' AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 AND HDFS='MinIO' AND MinIOAccessKey='${MINIO_ACCESS_KEY}' AND MinIOSecretKey='${MINIO_SECRET_KEY}' AND MinIOEndPoint='${MINIO_INTERNAL_ENDPOINT}' AND MinIOEndPointInternet='${MINIO_INTERNET_ENDPOINT}' AND MinIOEndPointSSL=0 AND MinIOPrivateEndPointSSL=0 AND MinIOPrivateBucketName='${MINIO_PRIVATE_BUCKET}' AND MinIOPublicBucketName='${MINIO_PUBLIC_BUCKET}' AND IFNULL(MinIORegion,'')='' GROUP BY OsClient,OsClientType,OsClientNetwork HAVING COUNT(*)=1;"
+    MINIO_CONFIG_SQL="UPDATE sys_osclients SET HDFS='MinIO', MinIOAccessKey='${MINIO_ACCESS_KEY_SQL}', MinIOSecretKey='${MINIO_SECRET_KEY_SQL}', MinIOEndPoint='${MINIO_INTERNAL_ENDPOINT_SQL}', MinIOEndPointInternet='${MINIO_INTERNET_ENDPOINT_SQL}', MinIOEndPointSSL=${MINIO_PUBLIC_SSL_FLAG}, MinIOPrivateEndPointSSL=${MINIO_PRIVATE_SSL_FLAG}, MinIOPrivateBucketName='${MINIO_PRIVATE_BUCKET_SQL}', MinIOPublicBucketName='${MINIO_PUBLIC_BUCKET_SQL}', MinIORegion='${MINIO_REGION_SQL}' WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
+    MINIO_CONFIG_VERIFY_SQL="SELECT 'MICROI_MINIO_CONFIG_OK' AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 AND HDFS='MinIO' AND MinIOAccessKey='${MINIO_ACCESS_KEY_SQL}' AND MinIOSecretKey='${MINIO_SECRET_KEY_SQL}' AND MinIOEndPoint='${MINIO_INTERNAL_ENDPOINT_SQL}' AND MinIOEndPointInternet='${MINIO_INTERNET_ENDPOINT_SQL}' AND MinIOEndPointSSL=${MINIO_PUBLIC_SSL_FLAG} AND MinIOPrivateEndPointSSL=${MINIO_PRIVATE_SSL_FLAG} AND MinIOPrivateBucketName='${MINIO_PRIVATE_BUCKET_SQL}' AND MinIOPublicBucketName='${MINIO_PUBLIC_BUCKET_SQL}' AND IFNULL(MinIORegion,'')='${MINIO_REGION_SQL}' GROUP BY OsClient,OsClientType,OsClientNetwork HAVING COUNT(*)=1;"
     ;;
   3)
-    MINIO_CONFIG_SQL="UPDATE [dbo].[sys_osclients] SET [HDFS]=N'MinIO', [MinIOAccessKey]=N'${MINIO_ACCESS_KEY}', [MinIOSecretKey]=N'${MINIO_SECRET_KEY}', [MinIOEndPoint]=N'${MINIO_INTERNAL_ENDPOINT}', [MinIOEndPointInternet]=N'${MINIO_INTERNET_ENDPOINT}', [MinIOEndPointSSL]=0, [MinIOPrivateEndPointSSL]=0, [MinIOPrivateBucketName]=N'${MINIO_PRIVATE_BUCKET}', [MinIOPublicBucketName]=N'${MINIO_PUBLIC_BUCKET}', [MinIORegion]=N'' WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
-    MINIO_CONFIG_VERIFY_SQL="SELECT N'MICROI_MINIO_CONFIG_OK' AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 AND [HDFS]=N'MinIO' AND [MinIOAccessKey]=N'${MINIO_ACCESS_KEY}' AND [MinIOSecretKey]=N'${MINIO_SECRET_KEY}' AND [MinIOEndPoint]=N'${MINIO_INTERNAL_ENDPOINT}' AND [MinIOEndPointInternet]=N'${MINIO_INTERNET_ENDPOINT}' AND [MinIOEndPointSSL]=0 AND [MinIOPrivateEndPointSSL]=0 AND [MinIOPrivateBucketName]=N'${MINIO_PRIVATE_BUCKET}' AND [MinIOPublicBucketName]=N'${MINIO_PUBLIC_BUCKET}' AND COALESCE([MinIORegion],N'')=N'' GROUP BY [OsClient],[OsClientType],[OsClientNetwork] HAVING COUNT(*)=1;"
+    MINIO_CONFIG_SQL="UPDATE [dbo].[sys_osclients] SET [HDFS]=N'MinIO', [MinIOAccessKey]=N'${MINIO_ACCESS_KEY_SQL}', [MinIOSecretKey]=N'${MINIO_SECRET_KEY_SQL}', [MinIOEndPoint]=N'${MINIO_INTERNAL_ENDPOINT_SQL}', [MinIOEndPointInternet]=N'${MINIO_INTERNET_ENDPOINT_SQL}', [MinIOEndPointSSL]=${MINIO_PUBLIC_SSL_FLAG}, [MinIOPrivateEndPointSSL]=${MINIO_PRIVATE_SSL_FLAG}, [MinIOPrivateBucketName]=N'${MINIO_PRIVATE_BUCKET_SQL}', [MinIOPublicBucketName]=N'${MINIO_PUBLIC_BUCKET_SQL}', [MinIORegion]=N'${MINIO_REGION_SQL}' WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
+    MINIO_CONFIG_VERIFY_SQL="SELECT N'MICROI_MINIO_CONFIG_OK' AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 AND [HDFS]=N'MinIO' AND [MinIOAccessKey]=N'${MINIO_ACCESS_KEY_SQL}' AND [MinIOSecretKey]=N'${MINIO_SECRET_KEY_SQL}' AND [MinIOEndPoint]=N'${MINIO_INTERNAL_ENDPOINT_SQL}' AND [MinIOEndPointInternet]=N'${MINIO_INTERNET_ENDPOINT_SQL}' AND [MinIOEndPointSSL]=${MINIO_PUBLIC_SSL_FLAG} AND [MinIOPrivateEndPointSSL]=${MINIO_PRIVATE_SSL_FLAG} AND [MinIOPrivateBucketName]=N'${MINIO_PRIVATE_BUCKET_SQL}' AND [MinIOPublicBucketName]=N'${MINIO_PUBLIC_BUCKET_SQL}' AND COALESCE([MinIORegion],N'')=N'${MINIO_REGION_SQL}' GROUP BY [OsClient],[OsClientType],[OsClientNetwork] HAVING COUNT(*)=1;"
     ;;
   5|6)
-    MINIO_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"HDFS\"='MinIO', \"MinIOAccessKey\"='${MINIO_ACCESS_KEY}', \"MinIOSecretKey\"='${MINIO_SECRET_KEY}', \"MinIOEndPoint\"='${MINIO_INTERNAL_ENDPOINT}', \"MinIOEndPointInternet\"='${MINIO_INTERNET_ENDPOINT}', \"MinIOEndPointSSL\"=0, \"MinIOPrivateEndPointSSL\"=0, \"MinIOPrivateBucketName\"='${MINIO_PRIVATE_BUCKET}', \"MinIOPublicBucketName\"='${MINIO_PUBLIC_BUCKET}', \"MinIORegion\"='' WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
-    MINIO_CONFIG_VERIFY_SQL="SELECT 'MICROI_MINIO_CONFIG_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 AND \"HDFS\"='MinIO' AND \"MinIOAccessKey\"='${MINIO_ACCESS_KEY}' AND \"MinIOSecretKey\"='${MINIO_SECRET_KEY}' AND \"MinIOEndPoint\"='${MINIO_INTERNAL_ENDPOINT}' AND \"MinIOEndPointInternet\"='${MINIO_INTERNET_ENDPOINT}' AND \"MinIOEndPointSSL\"=0 AND \"MinIOPrivateEndPointSSL\"=0 AND \"MinIOPrivateBucketName\"='${MINIO_PRIVATE_BUCKET}' AND \"MinIOPublicBucketName\"='${MINIO_PUBLIC_BUCKET}' AND COALESCE(\"MinIORegion\",'')='' GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+    MINIO_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"HDFS\"='MinIO', \"MinIOAccessKey\"='${MINIO_ACCESS_KEY_SQL}', \"MinIOSecretKey\"='${MINIO_SECRET_KEY_SQL}', \"MinIOEndPoint\"='${MINIO_INTERNAL_ENDPOINT_SQL}', \"MinIOEndPointInternet\"='${MINIO_INTERNET_ENDPOINT_SQL}', \"MinIOEndPointSSL\"=${MINIO_PUBLIC_SSL_FLAG}, \"MinIOPrivateEndPointSSL\"=${MINIO_PRIVATE_SSL_FLAG}, \"MinIOPrivateBucketName\"='${MINIO_PRIVATE_BUCKET_SQL}', \"MinIOPublicBucketName\"='${MINIO_PUBLIC_BUCKET_SQL}', \"MinIORegion\"='${MINIO_REGION_SQL}' WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
+    MINIO_CONFIG_VERIFY_SQL="SELECT 'MICROI_MINIO_CONFIG_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 AND \"HDFS\"='MinIO' AND \"MinIOAccessKey\"='${MINIO_ACCESS_KEY_SQL}' AND \"MinIOSecretKey\"='${MINIO_SECRET_KEY_SQL}' AND \"MinIOEndPoint\"='${MINIO_INTERNAL_ENDPOINT_SQL}' AND \"MinIOEndPointInternet\"='${MINIO_INTERNET_ENDPOINT_SQL}' AND \"MinIOEndPointSSL\"=${MINIO_PUBLIC_SSL_FLAG} AND \"MinIOPrivateEndPointSSL\"=${MINIO_PRIVATE_SSL_FLAG} AND \"MinIOPrivateBucketName\"='${MINIO_PRIVATE_BUCKET_SQL}' AND \"MinIOPublicBucketName\"='${MINIO_PUBLIC_BUCKET_SQL}' AND COALESCE(\"MinIORegion\",'')='${MINIO_REGION_SQL}' GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
     ;;
 esac
 echo 'Microi：写入 SaaS 引擎 MinIO 配置...'
@@ -3544,7 +4361,7 @@ else
 fi
 
 SYS_CONFIG_API_BASE="http://${ACCESS_IP}:${API_PORT}"
-SYS_CONFIG_FILE_SERVER="http://${ACCESS_IP}:${MINIO_PORT}/${MINIO_PUBLIC_BUCKET}"
+SYS_CONFIG_FILE_SERVER="${MINIO_PUBLIC_BASE_URL}/${MINIO_PUBLIC_BUCKET}"
 case "${DATABASE_CHOICE}" in
   1|2) SYS_CONFIG_SQL="UPDATE sys_config SET ApiBase='${SYS_CONFIG_API_BASE}', FileServer='${SYS_CONFIG_FILE_SERVER}' WHERE IFNULL(IsDeleted, 0) = 0;" ;;
   3) SYS_CONFIG_SQL="UPDATE [dbo].[sys_config] SET [ApiBase]=N'${SYS_CONFIG_API_BASE}', [FileServer]=N'${SYS_CONFIG_FILE_SERVER}' WHERE COALESCE([IsDeleted], 0) = 0;" ;;
@@ -3559,7 +4376,7 @@ else
 fi
 
 echo ''
-echo '[步骤9/11] MinIO 部署完成 ✓'
+echo '[步骤9/11] MinIO 配置/部署完成 ✓'
 
 
 # ============================================================
@@ -3882,7 +4699,13 @@ APP_DIR="${COMPOSE_BASE_DIR}/microi-install-app"
 
 case "${DATABASE_CHOICE}" in
   1|2)
-    OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME};Database=${DATABASE_NAME};User Id=root;Password=${DATABASE_PASSWORD};Port=${DATABASE_INTERNAL_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;"
+    if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
+      MYSQL_CONNECTION_USER=$(repair_encode_connection_value "${DATABASE_USER}")
+      MYSQL_CONNECTION_PASSWORD=$(repair_encode_connection_value "${DATABASE_PASSWORD}")
+      OS_CLIENT_DB_CONN="Data Source=${MYSQL_EXTERNAL_CONNECTION_HOST};Database=${DATABASE_NAME};User Id=${MYSQL_CONNECTION_USER};Password=${MYSQL_CONNECTION_PASSWORD};Port=${DATABASE_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;SslMode=Preferred;"
+    else
+      OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME};Database=${DATABASE_NAME};User Id=root;Password=${DATABASE_PASSWORD};Port=${DATABASE_INTERNAL_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;"
+    fi
     ;;
   3)
     OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME},${DATABASE_INTERNAL_PORT};Initial Catalog=${DATABASE_NAME};User ID=sa;Password=${DATABASE_PASSWORD};Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;"
@@ -3894,6 +4717,19 @@ case "${DATABASE_CHOICE}" in
     OS_CLIENT_DB_CONN="Host=${DATABASE_CONTAINER_NAME};Port=${DATABASE_INTERNAL_PORT};Database=${DATABASE_NAME};Username=postgres;Password=${DATABASE_PASSWORD};Pooling=true;Maximum Pool Size=500;"
     ;;
 esac
+
+compose_yaml_double_quote() {
+  local value="$1"
+  local escaped=""
+  case "${value}" in
+    *$'\r'*|*$'\n'*) return 1 ;;
+  esac
+  escaped="${value//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  escaped="${escaped//\$/\$\$}"
+  printf '"%s"' "${escaped}"
+}
+OS_CLIENT_DB_CONN_ENV_ENTRY=$(compose_yaml_double_quote "OsClientDbConn=${OS_CLIENT_DB_CONN}")
 
 echo "Microi：Web端口: ${VUE_PORT}, API端口: ${API_PORT}"
 if [ "${APP_API_PULL_POLICY}" = "always" ] || [ "${APP_CLIENT_PULL_POLICY}" = "always" ]; then
@@ -3910,7 +4746,11 @@ services:
     image: ${API_IMAGE}
     pull_policy: ${APP_API_PULL_POLICY}
     container_name: microi-install-api
+    labels:
+      com.microi.database.mode: ${DATABASE_SERVICE_MODE}
+      com.microi.minio.mode: ${MINIO_SERVICE_MODE}
 ${APP_API_SERVICE_NETWORK}
+${APP_API_EXTRA_HOSTS}
     restart: always
     tty: true
     stdin_open: true
@@ -3922,7 +4762,7 @@ ${APP_API_SERVICE_NETWORK}
       - OsClientType=${RUNTIME_OS_CLIENT_TYPE}
       - OsClientNetwork=${RUNTIME_OS_CLIENT_NETWORK}
       - OsClientDbType=${DATABASE_TYPE}
-      - OsClientDbConn=${OS_CLIENT_DB_CONN}
+      - ${OS_CLIENT_DB_CONN_ENV_ENTRY}
       - OsClientRedisHost=microi-install-redis
       - OsClientRedisPort=6379
       - OsClientRedisPwd=${REDIS_PASSWORD}
@@ -3960,6 +4800,7 @@ ${COMPOSE_SERVICE_NETWORK}
         max-file: "10"
 ${APP_COMPOSE_EXTERNAL_NETWORKS}
 EOF
+chmod 600 "${APP_DIR}/docker-compose.yml"
 echo "Microi：平台应用编排文件已生成 ✓"
 
 compose_up "${APP_DIR}"
@@ -4240,7 +5081,7 @@ INSTALL_SUMMARY_PRINTED=1
 echo ''
 echo ''
 echo '=================================================================='
-echo 'Microi：所有服务已成功安装！'
+echo 'Microi：所有服务已成功安装或接入！'
 echo '=================================================================='
 echo ''
 print_generated_install_configuration "success"
@@ -4305,7 +5146,21 @@ else
   MICROI_ACTUAL_GATEWAY=$(docker network inspect microi --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' 2>/dev/null | head -1 || true)
   echo "Docker网络:  microi（bridge，Docker自动分配 subnet ${MICROI_ACTUAL_SUBNET:-未知}，gateway ${MICROI_ACTUAL_GATEWAY:-未知}）"
 fi
-echo '             数据库、Redis、MongoDB、MinIO 与 API 通过容器 DNS/内部端口通信'
+if [ "${DATABASE_SERVICE_MODE}" = 'managed' ] && [ "${MINIO_SERVICE_MODE}" = 'managed' ]; then
+  echo '             数据库、Redis、MongoDB、MinIO 与 API 通过容器 DNS/内部端口通信'
+else
+  echo '             Redis、MongoDB 与 API 通过容器 DNS/内部端口通信'
+  if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
+    echo "             MySQL 使用已有服务 ${MYSQL_EXTERNAL_HOST_DISPLAY}:${DATABASE_PORT}"
+  else
+    echo "             ${DATABASE_DISPLAY_NAME} 使用容器 DNS ${DATABASE_CONTAINER_NAME}:${DATABASE_INTERNAL_PORT}"
+  fi
+  if [ "${MINIO_SERVICE_MODE}" = 'external' ]; then
+    echo "             MinIO 使用已有服务 ${MINIO_EXTERNAL_INTERNAL_URL}"
+  else
+    echo '             MinIO 使用容器 DNS microi-install-minio:9000'
+  fi
+fi
 echo "             API 同时接入 OCR/翻译内部网络 ${OCR_RUNTIME_NETWORK}"
 echo ''
 echo '------------------------------------------------------------------'

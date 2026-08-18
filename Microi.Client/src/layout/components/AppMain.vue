@@ -1,17 +1,13 @@
 <template>
     <section :class="'app-main-microi' + (isPhoneView ? ' mobile-view' : '')" v-mci-loading:page="routeLoading">
         <router-view v-slot="{ Component }">
-            <!-- 移动端不使用动画，PC端保留动画 -->
-            <transition :name="isPhoneView ? '' : 'fade-transform'" mode="out-in">
-                <!-- 🔥 支持通过 meta.keepAlive 控制是否缓存 -->
-                <template v-if="$route.meta?.keepAlive === false">
-                    <!-- 不缓存的页面，每次都重新创建 -->
-                    <component :is="Component" :key="key" />
-                </template>
-                <keep-alive v-else :include="isPhoneView ? undefined : cachedViews" :max="20">
-                    <component :is="Component" :key="key" />
-                </keep-alive>
-            </transition>
+            <!-- 路由内容不使用 out-in 淡出；异步路由加载期间保留旧页面，避免整页闪白。 -->
+            <template v-if="$route.meta?.keepAlive === false">
+                <component :is="Component" :key="key" />
+            </template>
+            <keep-alive v-else :include="isPhoneView ? undefined : cachedViews" :max="20">
+                <component :is="Component" :key="key" />
+            </keep-alive>
         </router-view>
         <section id="MicroiService"></section>
     </section>

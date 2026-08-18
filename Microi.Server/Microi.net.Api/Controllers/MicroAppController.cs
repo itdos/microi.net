@@ -101,9 +101,10 @@ namespace Microi.net.Api
 
         /// <summary>
         /// Resolves the protocol-v3 stable runtime URL through the committed
-        /// database pointer. The response always redirects to one immutable
-        /// release object; PreviewUrl and the legacy root/latest aliases are
-        /// deliberately not part of this decision.
+        /// database pointer. The immutable release object is streamed through
+        /// this same-origin endpoint so local development, private deployments
+        /// and CDNs without browser CORS headers all load identically.
+        /// PreviewUrl and legacy root/latest aliases are deliberately excluded.
         /// </summary>
         [HttpGet("~/micro-app/v3/tenants/{osClient}/kinds/{kind}/apps/{appKey}/assets/{*assetPath}")]
         [HttpHead("~/micro-app/v3/tenants/{osClient}/kinds/{kind}/apps/{appKey}/assets/{*assetPath}")]
@@ -146,7 +147,78 @@ namespace Microi.net.Api
             Response.Headers["X-Microi-Application-Asset-Protocol"] = "3";
             Response.Headers["X-Microi-Application-Version"] = GetText(snapshot.Version, "VersionNo");
             Response.Headers["X-Microi-Application-Publish-Fence"] = snapshot.PublishFence;
-            return Redirect(immutableUrl);
+            return await ProxyApplicationAssetV3(
+                osClient,
+                immutableUrl,
+                assetPath,
+                snapshot.Asset);
+        }
+
+        private async Task<IActionResult> ProxyApplicationAssetV3(
+            string osClient,
+            string immutableUrl,
+            string assetPath,
+            JObject asset)
+        {
+            if (!await IsTrustedPublicFileUrl(osClient, immutableUrl))
+            {
+                return StatusCode(502, "Application v3 storage URL is outside the configured file server.");
+            }
+
+            try
+            {
+                var isHead = string.Equals(Request.Method, "HEAD", StringComparison.OrdinalIgnoreCase);
+                using var upstreamRequest = new HttpRequestMessage(
+                    isHead ? HttpMethod.Head : HttpMethod.Get,
+                    immutableUrl);
+                upstreamRequest.Headers.UserAgent.ParseAdd("Microi-MicroApp/3.0");
+                using var upstreamResponse = await PublicFileHttpClient.SendAsync(
+                    upstreamRequest,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    HttpContext.RequestAborted);
+
+                if (!upstreamResponse.IsSuccessStatusCode)
+                {
+                    return StatusCode(
+                        (int)upstreamResponse.StatusCode,
+                        "Application v3 immutable asset is unavailable.");
+                }
+
+                var contentType = upstreamResponse.Content.Headers.ContentType?.ToString();
+                if (contentType.DosIsNullOrWhiteSpace())
+                {
+                    contentType = GuessContentType(assetPath);
+                }
+                Response.ContentType = contentType;
+                if (upstreamResponse.Content.Headers.ContentLength.HasValue)
+                {
+                    Response.ContentLength = upstreamResponse.Content.Headers.ContentLength.Value;
+                }
+                var sha256 = GetText(asset, "Sha256", "sha256");
+                if (!sha256.DosIsNullOrWhiteSpace())
+                {
+                    Response.Headers["ETag"] = $"\"{sha256}\"";
+                }
+                Response.Headers["X-Content-Type-Options"] = "nosniff";
+
+                if (isHead)
+                {
+                    return new EmptyResult();
+                }
+
+                await using var upstreamStream = await upstreamResponse.Content.ReadAsStreamAsync(
+                    HttpContext.RequestAborted);
+                await upstreamStream.CopyToAsync(Response.Body, HttpContext.RequestAborted);
+                return new EmptyResult();
+            }
+            catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                return new EmptyResult();
+            }
+            catch
+            {
+                return StatusCode(502, "Application v3 immutable asset proxy failed.");
+            }
         }
 
         [HttpGet("~/micro-app/{osClient}/{appKey}/{version}/{*assetPath}")]

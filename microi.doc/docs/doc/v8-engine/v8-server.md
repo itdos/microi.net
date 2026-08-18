@@ -1141,6 +1141,99 @@ return result;
 
 后端流式回调会占用本次 Jint 请求，只适合确实需要由同一脚本消费增量的场景；面向页面的打字机效果仍优先让浏览器使用前端 `V8.AI.ChatStream`。MCP 直接使用专用 `microi_chat` 获取最终结果，不再绕到 `microi_run_engine` 包装接口。不要把 Token、完整问题或回答写入日志。完整代码与授权矩阵见 [AI 引擎与 Microi.AI 中转站](../system-engine/ai-engine.md)。
 
+## V8.Tcp
+
+> 后端接口引擎和后端表单事件可通过 `V8.Tcp` 连接 TCP 服务端并发送原始字节，适用于 ESC/POS 网络小票机、串口服务器、PLC 等设备。它是一次性客户端，不提供 TCP 监听、持久 Socket 或 TLS 隧道。
+
+| 方法 | 说明 | 返回值 |
+|---|---|---|
+| `V8.Tcp.Send` | 连接、发送、关闭 | `DosResult` |
+| `await V8.Tcp.SendAsync` | 当前请求内异步连接、发送、关闭 | `Promise<DosResult>` |
+| `V8.Tcp.SendAndReceive` | 发送后读取有界响应，再关闭 | `DosResult` |
+| `await V8.Tcp.SendAndReceiveAsync` | 当前请求内异步发送并读取有界响应 | `Promise<DosResult>` |
+
+所有方法使用同一个对象参数：
+
+| 参数 | 必填 | 说明 |
+|---|---|---|
+| `Host` | 是 | 主机名或 IP，不能传 URL |
+| `Port` | 是 | 1-65535；RAW/JetDirect 打印常用 9100 |
+| `Bytes` / `RawBytes` / `ByteArray` | 四选一 | 0-255 的整数数组 |
+| `ByteBase64` / `BytesBase64` / `Base64` | 四选一 | Base64 编码的原始字节 |
+| `Hex` | 四选一 | 十六进制；可包含空格、`0x`、连字符、冒号或逗号 |
+| `Text` | 四选一 | 按 `Encoding` 编码后发送 |
+| `Encoding` | 否 | 默认 `utf-8`；支持 `ascii`、`gb18030`、`gbk/gb2312`、UTF-16/UTF-32 大小端 |
+| `ConnectTimeout` | 否 | 连接超时秒数，默认 10，范围 1-120 |
+| `SendTimeout` | 否 | 发送超时秒数，默认 10，范围 1-120 |
+| `ReceiveTimeout` | 否 | 收发方法的总接收超时秒数，默认 3，范围 1-120 |
+| `MaxReceiveBytes` | 否 | 最大响应字节数，默认 65536，最大 1048576 |
+| `NoDelay` | 否 | 是否禁用 Nagle，默认 `true` |
+
+```javascript
+// ESC/POS 网络小票机。实际地址必须从后端可信配置或受权限保护的设备表读取。
+var printResult = V8.Tcp.Send({
+  Host: '192.168.1.88',
+  Port: 9100,
+  // 初始化、ASCII 小票正文、换行、切纸
+  Bytes: [
+    27, 64,
+    77, 105, 99, 114, 111, 105, 10,
+    84, 111, 116, 97, 108, 58, 32, 49, 50, 46, 48, 48, 10,
+    10, 10,
+    29, 86, 0
+  ],
+  ConnectTimeout: 5,
+  SendTimeout: 5
+});
+if (printResult.Code !== 1) return printResult;
+return {
+  Code: 1,
+  Data: {
+    BytesSent: printResult.Data.BytesSent,
+    RemoteEndPoint: printResult.Data.RemoteEndPoint
+  }
+};
+```
+
+如果打印机需要 GBK/GB18030 文本，可直接发送文本；若同一帧还包含 ESC/POS 控制命令，应在调用前把完整帧编码为一个 `Bytes`、`ByteBase64` 或 `Hex` 载荷：
+
+```javascript
+var textResult = await V8.Tcp.SendAsync({
+  Host: '192.168.1.88',
+  Port: 9100,
+  Text: '吾码小票\n合计：12.00\n\n',
+  Encoding: 'gb18030'
+});
+if (textResult.Code !== 1) return textResult;
+```
+
+需要读取设备响应时：
+
+```javascript
+var deviceResult = V8.Tcp.SendAndReceive({
+  Host: '192.168.1.20',
+  Port: 4001,
+  Hex: '01 03 00 00 00 02 C4 0B',
+  ReceiveTimeout: 3,
+  MaxReceiveBytes: 4096
+});
+if (deviceResult.Code !== 1) return deviceResult;
+
+// Data.RawBytes、Data.ByteBase64、Data.Hex
+// ReceiveEndReason: RemoteClosed / Timeout / MaxReceiveBytes
+return deviceResult;
+```
+
+`Send` 成功时 `Data` 包含 `BytesSent` 和 `RemoteEndPoint`。收发方法还返回 `BytesReceived`、`RawBytes`、`ByteBase64`、`Hex`、`ReceiveEndReason` 和 `Truncated`。发送载荷最大 4 MiB。收到部分数据后达到接收超时，会以 `Code=1` 返回已收到的数据并标记 `ReceiveEndReason='Timeout'`；一个字节也未收到则返回失败。
+
+安全与验收边界：
+
+- `Host`、`Port` 必须来自 SaaS 可信配置或受权限保护的设备表，并在业务代码中做精确白名单校验；禁止直接透传 `V8.Param`。匿名接口尤其不能开放任意 TCP 目标。
+- TCP 不经过 `V8.Http` 的 SSRF 防护。生产网络应再用容器网络策略或防火墙只放行打印机/设备网段与端口，且不要记录原始票据、设备口令或响应秘密。
+- 每次调用都会新建并关闭连接。`Code=1` 只证明字节已写入 TCP 连接，不证明设备已执行、更不证明小票已经出纸；正式验收仍需设备状态或实物小票证据。
+- 写入结果不确定时不要盲目自动重试：打印不是天然幂等，重试可能产生重复小票。需要可靠打印时使用业务幂等号、设备回执以及 Job/MQ/outbox 编排。
+- 在 Docker 中，`Host` 是从后端容器视角解析；`localhost` 指容器自身。部署前必须验证容器到设备 IP/端口的实际路由。
+
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
 
@@ -1724,21 +1817,22 @@ return V8.Office.SendEmail({
 
 ## 系统设置 V8.SysConfig
 >* 后端接口引擎与后端 V8 事件访问当前租户完整系统配置；返回值是独立副本，脚本修改不会写回缓存或数据库。
->* `sys_config` 的全部字段和 `mci_system_setting` 的全部启用设置都直接位于根对象，Secret 在可信后端按当前租户解密；不存在 `PublicSettings` 属性。
+>* `sys_config` 的全部字段位于根对象；`mci_system_setting` 的全部启用设置位于独立的 `ServerPrivateSettings` 节点，Secret 在可信后端按当前租户解密。不存在 `PublicSettings` 属性。
 >* `V8.FormEngine.GetSysConfig(...)` 强制绑定当前 V8 租户，显式传其它 `OsClient` 也不能跨租户读取。
 ```js
 var sysTitle = V8.SysConfig.SysTitle;
-var loginName = V8.SysConfig['Login.Gitee.Name'];
-var clientSecret = V8.SysConfig['Login.Gitee.ClientSecret'];
+var privateSettings = V8.SysConfig.ServerPrivateSettings || {};
+var loginName = privateSettings['Login.Gitee.Name'];
+var clientSecret = privateSettings['Login.Gitee.ClientSecret'];
 // clientSecret 只能用于当前后端逻辑，禁止 return 或写日志。
 ```
 
-匿名 `FormEngine/GetSysConfig` 与前端 V8 使用另一条公开投影：只有 `IsPublic=1` 且非敏感的普通设置会根级返回，Secret 永远不进入浏览器。后端 V8 不需要查询 `mci_system_setting.SecretCipher` 或自行解密，直接按 Key 读取 `V8.SysConfig`；任何 Secret 都不得返回客户端、写日志、写审计或保存到前端可读字段。
+匿名 `FormEngine/GetSysConfig` 与前端 V8 使用另一条公开投影：只返回 `sys_config` 的浏览器安全字段，整个 `ServerPrivateSettings` 节点永远不进入浏览器。后端 V8 不需要查询 `mci_system_setting.SecretCipher` 或自行解密，直接按 Key 读取 `V8.SysConfig.ServerPrivateSettings`；任何 Secret 都不得返回客户端、写日志、写审计或保存到前端可读字段。
 
 ## SaaS引擎信息 V8.OsClientModel / V8.ClientModel
 >* 两者是当前租户 SaaS 配置的独立脱敏副本，脚本修改不会写回服务端运行配置。
 >* 数据库连接、鉴权密钥以及共享 Redis、对象存储、RabbitMQ、MQTT、Search 的地址、账号和密码不会注入 V8；即使接口错误地 `return V8.ClientModel`，也不会泄露主库基础设施凭据。
->* `sys_osclients` 自定义业务字段只作为存量兼容；新增租户业务设置使用当前租户库的 `mci_system_setting`。普通值与 Secret 在后端根级 `V8.SysConfig` 中使用，前端只得到明确公开的普通值；这些设置不通过 `V8.OsClientModel` 暴露。
+>* `sys_osclients` 自定义业务字段只作为存量兼容；新增公开配置使用当前租户库的 `sys_config` 实体字段，新增私密业务设置使用 `mci_system_setting`。后端通过 `V8.SysConfig.ServerPrivateSettings` 使用私密值与 Secret；这些设置不通过 `V8.OsClientModel` 暴露。
 >* 存储类型 `HDFS` 与公开文件域名可以读取；访问缓存、文件、MQ、MQTT 和 Search 必须使用对应的 `V8.*` 受控能力，服务端自动添加当前租户命名空间。
 ```js
 var title = V8.OsClientModel.SysTitle;

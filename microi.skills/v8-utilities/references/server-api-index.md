@@ -90,8 +90,8 @@ MD5/SHA1 仅为兼容摘要；任何摘要都不能直接作为新密码存储�
 
 ## 内置与自定义扩展
 
-`V8.Alipay`、`V8.AlipayV3`、`V8.WeChat`、`V8.Alidns`、`V8.System` 和
-`V8.Image` 由当前 `Microi.V8Engine/V8Extend.cs` 注册。扩展可被裁剪或二次
+`V8.Alipay`、`V8.AlipayV3`、`V8.WeChat`、`V8.Alidns`、`V8.System`、
+`V8.Image` 和 `V8.Tcp` 由当前 `Microi.V8Engine/V8Extend.cs` 注册。扩展可被裁剪或二次
 开发，调用前以目标部署源码和编辑器定义为准。
 
 - `V8.Alipay.CreatePay(...)` 创建支付宝支付参数；
@@ -109,6 +109,7 @@ MD5/SHA1 仅为兼容摘要；任何摘要都不能直接作为新密码存储�
 |---|---|
 | 缓存 | `V8.Cache.Set/Get/Remove/Exists/KeyExist/HashSet/HashGet/HashGetAll/HashDelete/HashIncrement` |
 | HTTP | `V8.Http.Get/Post/Patch`、`GetResponse/PostResponse/PatchResponse` 及真实 `*Async` 版本 |
+| TCP | `V8.Tcp.Send/SendAsync/SendAndReceive/SendAndReceiveAsync`；原始字节与出站安全见 `v8-tcp-integration` |
 | 图片 | `V8.Image.Create/Merge/Overlay/Watermark/Resize/Crop/Rotate/Flip/Draw/Convert/GetInfo/CreateQRCode` |
 | Office | `V8.Office.ExportExcel/ExcelToList/ExportWord/ExportPowerPoint/SendEmail` |
 | OCR | `await V8.OCR.Recognize({...})`；服务端租户配置与调用参数隔离，详见 `ocr-engine` |

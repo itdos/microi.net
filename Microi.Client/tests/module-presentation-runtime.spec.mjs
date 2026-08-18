@@ -166,6 +166,8 @@ test("module header, metric strip and compound search consume runtime theme toke
     const buttonSource = fs.readFileSync(new URL("../src/styles/itdos.diy.scss", import.meta.url), "utf8");
     const headerStart = styleSource.indexOf(".module-presentation-header {");
     const headerBlock = headerStart >= 0 ? styleSource.slice(headerStart, headerStart + 9000) : "";
+    const metricItemStart = styleSource.indexOf(".module-presentation-header .module-metric-item {");
+    const metricItemBlock = metricItemStart >= 0 ? styleSource.slice(metricItemStart, metricItemStart + 1200) : "";
     const searchStart = styleSource.indexOf(".keyword-search {");
     const searchBlock = searchStart >= 0 ? styleSource.slice(searchStart, searchStart + 6500) : "";
 
@@ -174,11 +176,15 @@ test("module header, metric strip and compound search consume runtime theme toke
     assert.match(headerBlock, /--metric-icon-surface/);
     assert.match(headerBlock, /--mci-presentation-accent-gradient/);
     assert.match(headerBlock, /grid-template-columns:\s*minmax\(250px,\s*0\.78fr\)\s*minmax\(0,\s*2\.22fr\)/);
-    assert.match(headerBlock, /\.module-presentation-header \.module-metric-strip[\s\S]*?border:\s*0/);
-    assert.match(headerBlock, /\.module-presentation-header \.module-metric-item[\s\S]*?background:\s*var\(--metric-surface\)/);
+    assert.match(styleSource, /\.module-presentation-header \.module-metric-strip[\s\S]*?border:\s*0/);
+    assert.match(metricItemBlock, /background:\s*color-mix\(in srgb,\s*var\(--metric-color/);
     assert.doesNotMatch(headerBlock, /background:\s*rgba\(248,\s*250,\s*252,\s*0\.68\)/);
     assert.match(searchBlock, /focus-within/);
-    assert.match(searchBlock, /--mci-gradient-primary/);
+    assert.match(searchBlock, /--mci-keyword-action-width:\s*34px/);
+    assert.match(searchBlock, /flex:\s*0 0 var\(--mci-keyword-action-width\)/);
+    assert.match(searchBlock, /--mci-text-secondary/);
+    assert.match(searchBlock, /\.el-input__inner::placeholder/);
+    assert.doesNotMatch(searchBlock, /--mci-text-on-primary/);
     assert.match(searchBlock, /overflow:\s*hidden/);
     assert.match(buttonSource, /height:\s*100%[\s\S]*?border-radius:\s*inherit/);
 });

@@ -345,6 +345,7 @@ async function copyDiagnostic() {
     width: 82%;
     height: 82%;
     object-fit: contain;
+    border-radius: 50%;
 }
 
 .api-service-unavailable__brand {

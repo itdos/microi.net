@@ -22,6 +22,19 @@ test('does not force a small synchronous row action into the queue', () => {
   assert.deepEqual(result, { required: false, reasons: [] });
 });
 
+test('does not misclassify a long-task management dialog as the task itself', () => {
+  const result = analyzeBackgroundWorkload({
+    Name: '数据库定时备份',
+    V8Code: `V8.OpenAppDialog({
+      AppKey: 'microi-platform-service',
+      RoutePath: '/database-backup',
+      Title: '数据库定时备份',
+      Width: '80%'
+    });`,
+  });
+  assert.deepEqual(result, { required: false, reasons: [] });
+});
+
 test('accepts an explicit resumable client chunking contract', () => {
   const result = analyzeClientChunking({
     Name: '批量生成主构件码',

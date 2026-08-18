@@ -275,3 +275,311 @@
         }
     }
 }
+
+/* ================================================================
+ * 表单工作台与新增/编辑/查看弹层的现代默认外观。
+ * 仅调整视觉层；顶部显式 V8 FormBtns、工作流、保存与权限判断均保留原位。
+ * ================================================================ */
+.diy-form-modern-overlay {
+    background: color-mix(in srgb, #111827 44%, transparent) !important;
+    backdrop-filter: blur(12px) saturate(120%);
+    -webkit-backdrop-filter: blur(12px) saturate(120%);
+    transition: background-color 120ms ease, backdrop-filter 120ms ease;
+}
+
+.diy-form-modern-overlay.diy-form-modern-overlay--plain {
+    background: color-mix(in srgb, #111827 52%, transparent) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.diy-form-modern-overlay.is-closing {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transition: none !important;
+}
+
+.diy-form-container.el-dialog.diy-form-modern-dialog {
+    --diy-dialog-surface: var(--mci-bg-card, var(--el-bg-color, #fff));
+    --diy-dialog-soft: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f6f8fb));
+    --diy-dialog-line: var(--mci-border-color, var(--el-border-color-lighter, #e1e8f0));
+    --diy-dialog-accent: var(--mci-color-primary, var(--el-color-primary, #3478f6));
+    overflow: hidden;
+    border: 1px solid var(--diy-dialog-line);
+    border-radius: 20px;
+    background: var(--diy-dialog-surface);
+    box-shadow: 0 18px 48px rgba(10, 22, 42, .18), 0 3px 12px rgba(10, 22, 42, .08);
+
+    > .el-dialog__header {
+        display: flex;
+        min-height: 66px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 14px 18px;
+        border-top: 0 !important;
+        border-bottom: 1px solid var(--diy-dialog-line);
+        background:
+            linear-gradient(115deg, color-mix(in srgb, var(--diy-dialog-accent) 8%, transparent), transparent 45%),
+            var(--diy-dialog-surface);
+        cursor: move;
+    }
+
+    > .el-dialog__body {
+        box-sizing: border-box;
+        padding: 12px 14px 14px;
+        background: color-mix(in srgb, var(--diy-dialog-soft) 84%, var(--diy-dialog-surface));
+    }
+
+    .diy-form-dialog-scroll-content {
+        margin-right: 0 !important;
+        margin-left: 0 !important;
+    }
+
+    .diy-form-dialog-actions {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        cursor: default;
+    }
+
+    .diy-form-dialog-actions .el-button,
+    .diy-form-dialog-actions .el-dropdown .el-button {
+        min-height: 30px;
+        height: 30px;
+        margin-left: 0;
+        border-radius: 10px;
+        font-weight: 650;
+    }
+
+    .diy-form-dialog-actions .el-button--primary,
+    .diy-form-dialog-actions .el-dropdown .el-button--primary {
+        border-color: transparent;
+        box-shadow: 0 7px 18px color-mix(in srgb, var(--diy-dialog-accent) 24%, transparent);
+    }
+}
+
+.diy-form-container.el-drawer.diy-form-modern-drawer {
+    --diy-dialog-surface: var(--mci-bg-card, var(--el-bg-color, #fff));
+    --diy-dialog-soft: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f6f8fb));
+    --diy-dialog-line: var(--mci-border-color, var(--el-border-color-lighter, #e1e8f0));
+    --diy-dialog-accent: var(--mci-color-primary, var(--el-color-primary, #3478f6));
+    overflow: hidden;
+    border: 1px solid var(--diy-dialog-line);
+    border-radius: 0 !important;
+    background: var(--diy-dialog-surface);
+    box-shadow: -18px 0 48px rgba(10, 22, 42, .18), -4px 0 14px rgba(10, 22, 42, .07);
+
+    &.rtl,
+    &.ltr,
+    &.ttb,
+    &.btt { border-radius: 0 !important; }
+
+    > .el-drawer__header {
+        display: flex;
+        min-height: 66px;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 12px 16px;
+        border-top: 2px solid var(--diy-dialog-accent) !important;
+        border-bottom: 1px solid var(--diy-dialog-line);
+        background:
+            linear-gradient(115deg, color-mix(in srgb, var(--diy-dialog-accent) 8%, transparent), transparent 45%),
+            var(--diy-dialog-surface);
+    }
+
+    > .el-drawer__body {
+        box-sizing: border-box;
+        padding: 12px 14px 14px;
+        background: color-mix(in srgb, var(--diy-dialog-soft) 84%, var(--diy-dialog-surface));
+    }
+
+    .diy-form-dialog-actions {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+
+    .diy-form-dialog-actions .el-button,
+    .diy-form-dialog-actions .el-dropdown .el-button {
+        min-height: 30px;
+        height: 30px;
+        margin-left: 0;
+        border-radius: 10px;
+        font-weight: 650;
+    }
+
+    .diy-form-dialog-actions .el-button--primary,
+    .diy-form-dialog-actions .el-dropdown .el-button--primary {
+        border-color: transparent;
+        box-shadow: 0 7px 18px color-mix(in srgb, var(--diy-dialog-accent) 24%, transparent);
+    }
+}
+
+.diy-form-dialog-actions .el-dropdown .el-button-group {
+    display: inline-flex;
+    overflow: hidden;
+    gap: 0;
+    border-radius: 10px;
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--diy-dialog-accent, var(--el-color-primary)) 20%, transparent);
+}
+
+.diy-form-dialog-actions .el-dropdown .el-button-group > .el-button {
+    margin: 0 !important;
+    box-shadow: none !important;
+}
+
+.diy-form-dialog-actions .el-dropdown .el-button-group > .el-button:first-child {
+    border-radius: 10px 0 0 10px !important;
+}
+
+.diy-form-dialog-actions .el-dropdown .el-button-group > .el-dropdown__caret-button {
+    margin-left: 0 !important;
+    padding-right: 9px;
+    padding-left: 9px;
+    border-left: 1px solid color-mix(in srgb, #fff 34%, transparent) !important;
+    border-radius: 0 10px 10px 0 !important;
+}
+
+.diy-form-cancel-edit {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+}
+
+.diy-form-cancel-edit .el-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    opacity: 1;
+}
+
+.diy-form-dialog-title {
+    min-width: 180px;
+    color: var(--mci-text-primary, var(--el-text-color-primary));
+}
+
+.diy-form-dialog-title__eyebrow {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--mci-color-primary, var(--el-color-primary));
+    font-size: 9px;
+    font-weight: 850;
+    line-height: 13px;
+    letter-spacing: 1.5px;
+}
+
+.diy-form-dialog-title__heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--mci-text-primary, var(--el-text-color-primary));
+    font-size: 17px;
+    font-weight: 760;
+    line-height: 24px;
+}
+
+.diy-form-page-header {
+    box-sizing: border-box;
+    min-height: 64px;
+    margin: 0 0 10px !important;
+    padding: 12px 14px;
+    border: 1px solid var(--mci-border-color, var(--el-border-color-lighter));
+    border-radius: 15px;
+    background:
+        linear-gradient(110deg, color-mix(in srgb, var(--mci-color-primary, var(--el-color-primary)) 7%, transparent), transparent 44%),
+        var(--mci-bg-card, var(--el-bg-color));
+    box-shadow: 0 8px 24px rgba(31, 48, 78, .045);
+}
+
+.diy-form-page-header .form-actions {
+    gap: 8px;
+}
+
+.diy-form-page-header .form-actions .el-button {
+    min-height: 36px;
+    margin-left: 0;
+    border-radius: 10px;
+}
+
+.diy-form-field-search-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 5px;
+    padding: 0px;
+    // border: 1px solid color-mix(in srgb, var(--diy-dialog-line, var(--el-border-color-lighter)) 72%, transparent);
+    // border-radius: 12px;
+    // background: color-mix(in srgb, var(--diy-dialog-soft, var(--el-fill-color-extra-light)) 62%, transparent);
+}
+
+.diy-form-field-search-toolbar .el-input { min-width: 180px; flex: 1; }
+.diy-form-field-search-toolbar .el-input__wrapper {
+    border-radius: 9px;
+    background: var(--diy-dialog-surface, var(--el-bg-color));
+    box-shadow: 0 0 0 1px var(--diy-dialog-line, var(--el-border-color-lighter)) inset;
+}
+.diy-form-field-search-toolbar .el-button { margin-left: 0; border-radius: 9px; }
+.diy-form-field-search-count {
+    flex: 0 0 auto;
+    color: var(--mci-color-primary, var(--el-color-primary));
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+html.dark .diy-form-container.el-dialog.diy-form-modern-dialog,
+body.dark .diy-form-container.el-dialog.diy-form-modern-dialog,
+body.Dark .diy-form-container.el-dialog.diy-form-modern-dialog {
+    --diy-dialog-surface: var(--el-bg-color-overlay, #172033);
+    --diy-dialog-soft: var(--el-fill-color-light, #111827);
+    --diy-dialog-line: var(--el-border-color, #2d3a4f);
+}
+
+html.dark .diy-form-container.el-drawer.diy-form-modern-drawer,
+body.dark .diy-form-container.el-drawer.diy-form-modern-drawer,
+body.Dark .diy-form-container.el-drawer.diy-form-modern-drawer {
+    --diy-dialog-surface: var(--el-bg-color-overlay, #172033);
+    --diy-dialog-soft: var(--el-fill-color-light, #111827);
+    --diy-dialog-line: var(--el-border-color, #2d3a4f);
+}
+
+@media (max-width: 900px) {
+    .diy-form-container.el-dialog.diy-form-modern-dialog {
+        width: min(96vw, 760px) !important;
+        border-radius: 16px;
+
+        > .el-dialog__header { min-height: 58px; padding: 10px 12px; }
+        > .el-dialog__body { padding: 8px; }
+        .diy-form-dialog-title { min-width: 0; }
+        .diy-form-dialog-title__eyebrow { display: none; }
+        .diy-form-dialog-title__heading { font-size: 15px; }
+        .diy-form-dialog-actions.is-mobile .el-button { min-width: 38px; padding: 8px; }
+    }
+
+    .diy-form-container.el-drawer.diy-form-modern-drawer {
+        width: min(96vw, 760px) !important;
+        border-radius: 0 !important;
+
+        > .el-drawer__header { min-height: 58px; padding: 10px 12px; }
+        > .el-drawer__body { padding: 8px; }
+        .diy-form-dialog-title { min-width: 0; }
+        .diy-form-dialog-title__eyebrow { display: none; }
+        .diy-form-dialog-title__heading { font-size: 15px; }
+        .diy-form-dialog-actions.is-mobile .el-button { min-width: 38px; padding: 8px; }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .diy-form-modern-overlay { transition: none !important; }
+}

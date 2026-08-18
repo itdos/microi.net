@@ -473,7 +473,7 @@ export default {
     position: relative;
     background: var(--el-bg-color, #fff);
     color: var(--el-text-color-regular, #334155);
-    border-bottom: 1px solid var(--el-border-color, #e2e8f0);
+    //border-bottom: 1px solid var(--el-border-color, #e2e8f0);
     box-shadow: var(--mci-shadow-card, 0 1px 4px rgba(0, 21, 41, 0.08));
     display: flex;
     align-items: center;

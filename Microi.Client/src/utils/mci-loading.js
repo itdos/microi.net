@@ -219,6 +219,19 @@ let routeVisibleAt = 0;
 
 export const routeLoading = readonly(routeLoadingState);
 
+export function cancelRouteLoading() {
+    if (routeShowTimer) {
+        clearTimeout(routeShowTimer);
+        routeShowTimer = null;
+    }
+    if (routeHideTimer) {
+        clearTimeout(routeHideTimer);
+        routeHideTimer = null;
+    }
+    routeVisibleAt = 0;
+    routeLoadingState.value = false;
+}
+
 export function startRouteLoading() {
     if (routeHideTimer) {
         clearTimeout(routeHideTimer);

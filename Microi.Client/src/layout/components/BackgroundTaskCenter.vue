@@ -7,13 +7,14 @@
 
     <el-dialog
         v-model="visible"
-        class="microi-notification-dialog"
+        class="microi-notification-dialog mci-unified-dialog"
         :title="$t('Msg.NotificationCenter')"
-        width="min(1080px, calc(100vw - 24px))"
+        width="80%"
+        :modal-class="GetUnifiedOverlayClass()"
         align-center
         draggable
         destroy-on-close
-        @open="refreshAll"
+        @opened="handleCenterOpened"
     >
         <div class="notification-shell">
             <div class="notification-summary">
@@ -46,12 +47,12 @@
 
             <div class="notification-toolbar">
                 <span class="notification-tip">{{ $t("Msg.NotificationCenterTip") }}</span>
-                <el-button size="small" :icon="Refresh" :loading="loading || storeLoading || terminalLoading" @click="refreshAll">
+                <el-button size="small" :icon="Refresh" :loading="loading || notificationLoading || storeLoading || terminalLoading" @click="refreshAll">
                     {{ $t("Msg.Refresh") }}
                 </el-button>
             </div>
 
-            <el-tabs v-model="activeTab" class="notification-tabs">
+            <el-tabs v-model="activeTab" class="notification-tabs mci-tabs mci-tabs--module">
                 <el-tab-pane name="platformMessages">
                     <template #label>
                         <span>{{ $t("Msg.PlatformMessages") }}</span>
@@ -78,6 +79,7 @@
                         row-key="Id"
                         class="online-table notification-compact-table platform-message-table"
                         max-height="420"
+                        @row-click="openNotificationDetail"
                     >
                         <el-table-column :label="$t('Msg.Name')" min-width="180" show-overflow-tooltip>
                             <template #default="{ row }">
@@ -99,27 +101,20 @@
                                 </el-tag>
                             </template>
                         </el-table-column>
-                        <el-table-column :label="$t('Msg.Operation')" width="150" fixed="right">
+                        <el-table-column :label="$t('Msg.Operation')" width="90" fixed="right">
                             <template #default="{ row }">
                                 <el-button
-                                    v-if="Number(row.IsRead || 0) !== 1"
-                                    link
-                                    size="small"
-                                    @click="markNotificationRead(row)"
-                                >{{ $t("Msg.MarkRead") }}</el-button>
-                                <el-button
-                                    v-if="row.LinkUrl"
                                     link
                                     type="primary"
                                     size="small"
-                                    @click="openNotificationLink(row)"
-                                >{{ $t("Msg.Open") }}</el-button>
+                                    @click.stop="openNotificationDetail(row)"
+                                >{{ $t("Msg.View") }}</el-button>
                             </template>
                         </el-table-column>
                     </el-table>
                 </el-tab-pane>
 
-                <el-tab-pane name="tasks">
+                <el-tab-pane name="tasks" lazy>
                     <template #label>
                         <span>{{ $t("Msg.BackgroundTasks") }}</span>
                         <span v-if="tasks.length > 0" class="tab-count">{{ tasks.length }}</span>
@@ -214,7 +209,7 @@
                     </el-table>
                 </el-tab-pane>
 
-                <el-tab-pane v-if="isAdmin" name="apps">
+                <el-tab-pane v-if="isAdmin" name="apps" lazy>
                     <template #label>
                         <span>{{ $t("Msg.OfficialApps") }}</span>
                         <span v-if="appNoticeCount > 0" class="tab-count warning">{{ appNoticeCount }}</span>
@@ -250,7 +245,7 @@
                     </el-table>
                 </el-tab-pane>
 
-                <el-tab-pane name="myTerminals">
+                <el-tab-pane name="myTerminals" lazy>
                     <template #label>
                         <span>{{ $t("Msg.MyOnlineTerminals") }}</span>
                         <span v-if="myTerminals.length > 0" class="tab-count success">{{ myTerminals.length }}</span>
@@ -274,7 +269,7 @@
                     </el-table>
                 </el-tab-pane>
 
-                <el-tab-pane v-if="isSuperAdmin" name="onlineUsers">
+                <el-tab-pane v-if="isSuperAdmin" name="onlineUsers" lazy>
                     <template #label>
                         <span>{{ $t("Msg.CurrentOnlineUsers") }}</span>
                         <span v-if="onlineUsers.length > 0" class="tab-count admin">{{ onlineUsers.length }}</span>
@@ -317,6 +312,33 @@
             </el-tabs>
         </div>
     </el-dialog>
+
+    <el-dialog
+        v-model="messageDetailVisible"
+        class="microi-message-detail-dialog mci-unified-dialog"
+        :title="activeMessage.Title || $t('Msg.PlatformMessages')"
+        width="60%"
+        :modal-class="GetUnifiedOverlayClass()"
+        align-center
+        draggable
+        append-to-body
+        destroy-on-close
+    >
+        <article class="message-detail">
+            <header class="message-detail__meta">
+                <el-tag size="small" type="info">{{ formatDateTime(activeMessage.CreateTime) }}</el-tag>
+                <span v-if="activeMessage.SenderName || activeMessage.CreateUserName">
+                    {{ activeMessage.SenderName || activeMessage.CreateUserName }}
+                </span>
+            </header>
+            <div class="message-detail__content">{{ activeMessage.MsgContent || activeMessage.Content || '-' }}</div>
+            <pre v-if="notificationDetailPayload" class="message-detail__payload">{{ notificationDetailPayload }}</pre>
+        </article>
+        <template #footer>
+            <el-button v-if="activeMessage.LinkUrl" @click="openNotificationLink(activeMessage)">{{ $t("Msg.Open") }}</el-button>
+            <el-button type="primary" @click="messageDetailVisible = false">{{ $t("Msg.Close") }}</el-button>
+        </template>
+    </el-dialog>
 </template>
 
 <script>
@@ -356,7 +378,9 @@ export default {
     data() {
         return {
             visible: false,
-            activeTab: "tasks",
+            activeTab: "platformMessages",
+            messageDetailVisible: false,
+            activeMessage: {},
             tasks: [],
             platformNotifications: [],
             notificationUnreadCount: 0,
@@ -407,7 +431,18 @@ export default {
             return this.isAdmin ? this.storeNotices.length : 0;
         },
         badgeCount() {
-            return this.notificationUnreadCount + this.runningCount + this.failedCount + this.appNoticeCount;
+            // 顶部通知角标只代表需要用户处理的消息：未读系统消息 + 未安装平台应用。
+            return this.notificationUnreadCount + this.appNoticeCount;
+        },
+        notificationDetailPayload() {
+            const payload = this.activeMessage?.Payload || this.activeMessage?.DataAppend;
+            if (!payload) return "";
+            try {
+                const value = typeof payload === "string" ? JSON.parse(payload) : payload;
+                return JSON.stringify(value, null, 2);
+            } catch (_) {
+                return String(payload);
+            }
         }
     },
     mounted() {
@@ -452,12 +487,31 @@ export default {
         },
         tasks() {
             this.scheduleTaskPolling();
+        },
+        activeTab(value) {
+            if (!this.visible) return;
+            this.loadActiveTab(value);
         }
     },
     methods: {
         openCenter() {
             this.visible = true;
-            this.refreshAll();
+        },
+        handleCenterOpened() {
+            // 先展示弹层，再并行刷新摘要；终端等重请求只在对应 Tab 打开时执行。
+            window.requestAnimationFrame(() => this.refreshAll());
+        },
+        GetUnifiedOverlayClass() {
+            const value = this.diyStore?.SysConfig?.DisableFormMaskBlur;
+            const blurDisabled = value === 1
+                || value === "1"
+                || value === true
+                || String(value || "").trim().toLowerCase() === "true";
+            return [
+                "diy-form-modern-overlay",
+                "mci-unified-overlay",
+                blurDisabled ? "diy-form-modern-overlay--plain mci-unified-overlay--plain" : ""
+            ].filter(Boolean).join(" ");
         },
         getWebsocket() {
             return this.$websocket || window?.app?.config?.globalProperties?.$websocket;
@@ -480,7 +534,7 @@ export default {
             this.bindWebsocket();
             this.loadTasks();
             this.loadPlatformNotifications();
-            if (this.visible) {
+            if (this.visible && (this.activeTab === "myTerminals" || this.activeTab === "onlineUsers")) {
                 this.loadTerminals();
             }
         },
@@ -508,6 +562,7 @@ export default {
                     onClick: () => {
                         this.visible = true;
                         this.activeTab = "platformMessages";
+                        this.$nextTick(() => this.openNotificationDetail(data));
                     }
                 });
             }
@@ -519,7 +574,7 @@ export default {
             this.scheduleTaskPolling();
         },
         handleOnlineTerminalChanged() {
-            if (this.visible) {
+            if (this.visible && (this.activeTab === "myTerminals" || this.activeTab === "onlineUsers")) {
                 this.loadTerminals();
             }
         },
@@ -528,13 +583,18 @@ export default {
             await this.userStore.logout();
             this.$router.push(`/login?redirect=${this.$route.fullPath}`);
         },
-        refreshAll() {
-            this.refreshTasks();
-            this.loadPlatformNotifications();
-            this.loadTerminals();
-            if (this.isAdmin) {
-                this.checkOfficialApps(true);
-            }
+        async refreshAll() {
+            const jobs = [this.loadPlatformNotifications()];
+            if (this.isAdmin) jobs.push(this.checkOfficialApps(true));
+            if (this.activeTab === "tasks") jobs.push(this.refreshTasks());
+            if (this.activeTab === "myTerminals" || this.activeTab === "onlineUsers") jobs.push(this.loadTerminals());
+            await Promise.allSettled(jobs);
+        },
+        loadActiveTab(tabName) {
+            if (tabName === "tasks") return this.refreshTasks();
+            if (tabName === "apps" && this.isAdmin) return this.checkOfficialApps(true);
+            if (tabName === "myTerminals" || tabName === "onlineUsers") return this.loadTerminals();
+            return this.loadPlatformNotifications();
         },
         startOfficialAppChecker(force = false) {
             if (!this.isAdmin) return;
@@ -603,6 +663,12 @@ export default {
                 this.notificationUnreadCount = 0;
             }
         },
+        async openNotificationDetail(row) {
+            if (!row) return;
+            this.activeMessage = row;
+            this.messageDetailVisible = true;
+            await this.markNotificationRead(row);
+        },
         async openNotificationLink(row) {
             await this.markNotificationRead(row);
             const link = normalizeNotificationLink(row?.LinkUrl, window.location.origin);
@@ -636,12 +702,15 @@ export default {
             if (this.terminalLoading) return;
             this.terminalLoading = true;
             try {
-                const mine = await DiyCommon.PostAsync("/api/OnlineTerminal/Mine", {}, null, null, "json");
+                const mineTask = DiyCommon.PostAsync("/api/OnlineTerminal/Mine", {}, null, null, "json");
+                const listTask = this.isSuperAdmin
+                    ? DiyCommon.PostAsync("/api/OnlineTerminal/List", {}, null, null, "json")
+                    : Promise.resolve(null);
+                const [mine, list] = await Promise.all([mineTask, listTask]);
                 if (mine && mine.Code === 1) {
                     this.myTerminals = Array.isArray(mine.Data?.Terminals) ? mine.Data.Terminals : [];
                 }
                 if (this.isSuperAdmin) {
-                    const list = await DiyCommon.PostAsync("/api/OnlineTerminal/List", {}, null, null, "json");
                     if (list && list.Code === 1) {
                         this.onlineUsers = Array.isArray(list.Data) ? list.Data : [];
                     }
@@ -1118,6 +1187,50 @@ export default {
 .app-notice-table :deep(.el-tag) {
     height: 21px;
     line-height: 19px;
+}
+
+.platform-message-table :deep(.el-table__row) {
+    cursor: pointer;
+}
+
+.message-detail {
+    display: grid;
+    gap: 16px;
+    min-height: 220px;
+    padding: 8px;
+}
+
+.message-detail__meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--el-text-color-secondary);
+    font-size: 13px;
+}
+
+.message-detail__content {
+    padding: 18px 20px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 12px;
+    background: var(--el-bg-color);
+    color: var(--el-text-color-primary);
+    font-size: 14px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.message-detail__payload {
+    max-height: 260px;
+    margin: 0;
+    padding: 14px 16px;
+    overflow: auto;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 10px;
+    background: var(--el-fill-color-light);
+    color: var(--el-text-color-regular);
+    font: 12px/1.6 Consolas, Monaco, monospace;
+    white-space: pre-wrap;
 }
 
 @media (max-width: 768px) {

@@ -25,16 +25,18 @@ const miniappRobot = fs.readFileSync(
     path.resolve(testDir, "../../microi.uniapp/src/static/mci/ai/assistant-robot.png")
 );
 
-test("AI entry is fail-closed and accepts supported enabled flag values", () => {
-    assert.equal(isMobileAiAssistantEnabled(), false);
-    assert.equal(isMobileAiAssistantEnabled({}), false);
+test("AI entry is enabled by default and only an explicit negative switch hides it", () => {
+    assert.equal(isMobileAiAssistantEnabled(), true);
+    assert.equal(isMobileAiAssistantEnabled({}), true);
+    assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: 0 }), true);
+    assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: "0" }), true);
+    assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: false }), true);
+    assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: 1 }), false);
+    assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: "1" }), false);
+    assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: true }), false);
+    assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: "true" }), false);
     assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: 0 }), false);
-    assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: "0" }), false);
-    assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: false }), false);
     assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: 1 }), true);
-    assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: "1" }), true);
-    assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: true }), true);
-    assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: "true" }), true);
 });
 
 test("AI entry targets the dedicated data assistant page", () => {

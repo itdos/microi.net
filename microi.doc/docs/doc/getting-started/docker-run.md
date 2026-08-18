@@ -6,7 +6,7 @@
 
 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
 
-默认安装 **主数据库 + Redis + MinIO + MongoDB + PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）+ Watchtower + 低代码平台程序（API + Web）**。全套服务基于 Docker Compose 独立编排部署，支持宝塔面板 Docker 编排模块可视化管理；各独立编排统一接入 `microi` Docker bridge 网络，API 通过容器 DNS 和内部端口访问数据库、Redis、MongoDB、MinIO。明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
+默认安装 **主数据库 + Redis + MinIO + MongoDB + PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）+ Watchtower + 低代码平台程序（API + Web）**。已有 MySQL 或 MinIO 的客户也可在交互中选择复用，安装器会跳过对应容器、数据目录、编排和宿主机端口。其余独立编排统一接入 `microi` Docker bridge 网络；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
 
 :::: warning 不再推荐安装 Ollama、nomic-embed-text 和 Qdrant
 对于 Microi吾码默认的 **NL2SQL、NL2V8、在线 AI 数据分析与 AI 编程** 场景，平台内置的“**大模型关键词扩展 + 当前用户权限范围内的 Schema/Skill 搜索 + 精确表/字段回读**”已经完整替代原来的 **Ollama + `nomic-embed-text` + Qdrant** 方案。一键安装脚本已固定跳过这三项：安装更快、资源占用更低，也不会连接或同步向量数据库。
@@ -20,22 +20,36 @@
 url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh
 ```
 
+#### 复用已有 MySQL / MinIO
+
+- 选择 MySQL 5.7 或 MySQL 8.0 后，可选择“使用已有 MySQL 服务”，再填写 IP/DNS、端口、帐号和密码。IP 直接按 Enter 表示本机服务，容器通过 `host.docker.internal` 的 host-gateway 访问；安装器会实测连接和服务端版本，只接受与所选项一致的 MySQL 5.7.x / 8.0.x，不接受 MariaDB，也不存在“MySQL 5.8”这个版本选项。
+- MySQL 连接信息确认后，仍可选择吾码官方标准空业务数据库，或指定服务器上的自定义 SQL ZIP。目标数据库不存在时会创建，已存在但为空时会导入；若已经含有表、视图、存储过程或事件，安装器为保护客户数据会停止，不覆盖、不合并、不删除。
+- 数据库初始化包选定后，可选择“使用已有 MinIO 服务”，填写 API IP/DNS、端口、HTTP/HTTPS、Access Key、Secret Key、私有桶、公有桶、浏览器可访问地址和可选 Region。安装器使用临时 `mc` 客户端验证凭据，创建或复用两个桶，并确保私有桶禁止匿名访问、公有桶允许匿名下载，然后把端点和桶配置写回当前 SaaS 主租户。
+- 本机已有 MySQL/MinIO 不能只监听 `127.0.0.1`，必须允许 Docker host-gateway 到达；远程服务还需提前放通来自安装服务器的网络和帐号权限。客户已有服务的密码/密钥不会在安装结果或失败恢复摘要中回显。
+
+自动化运行可预置以下选择，其余既有提示仍按脚本要求提供输入：
+
+- MySQL：`MICROI_DATABASE_CHOICE=1|2`、`MICROI_MYSQL_SERVICE_MODE=external`、`MICROI_EXTERNAL_MYSQL_HOST`、`MICROI_EXTERNAL_MYSQL_PORT`、`MICROI_EXTERNAL_MYSQL_USER`、`MICROI_EXTERNAL_MYSQL_PASSWORD`。
+- MinIO：`MICROI_MINIO_SERVICE_MODE=external`、`MICROI_EXTERNAL_MINIO_HOST`、`MICROI_EXTERNAL_MINIO_PORT`、`MICROI_EXTERNAL_MINIO_USE_SSL`、`MICROI_EXTERNAL_MINIO_ACCESS_KEY`、`MICROI_EXTERNAL_MINIO_SECRET_KEY`、`MICROI_EXTERNAL_MINIO_PRIVATE_BUCKET`、`MICROI_EXTERNAL_MINIO_PUBLIC_BUCKET`、`MICROI_EXTERNAL_MINIO_PUBLIC_ENDPOINT`、`MICROI_EXTERNAL_MINIO_REGION`。
+
+密码和 Secret Key 应只通过当前安装进程的临时环境注入，不要写入命令历史或长期配置文件。
+
 ### ⚠️ 注意事项
 
 | 序号 | 说明 |
 | :--: | ---- |
-| 1 | 执行脚本时会提示选择【公网 IP `g` / 内网 IP `n`】、主租户 `OsClient`（直接 Enter 默认为 `iTdos`）和主数据库类型/版本 |
+| 1 | 执行脚本时会提示选择【公网 IP `g` / 内网 IP `n`】、主租户 `OsClient`（直接 Enter 默认为 `iTdos`）、主数据库类型/版本，以及是否复用已有 MySQL / MinIO |
 | 2 | Docker 环境不存在时脚本会**自动安装** Docker 及 Docker Compose V2 插件 |
-| 3 | MySQL 性能配置会**自动根据服务器内存**生成（支持 1G ~ 32G+ 多档位） |
+| 3 | 新装 MySQL 的性能配置会**自动根据服务器内存**生成（支持 1G ~ 32G+ 多档位）；复用已有 MySQL 时不修改其全局配置 |
 | 4 | 数据库还原后会自动同步 `sys_osclients.OsClient/ClientName` 和 API、Web 编排中的 `OsClient` |
-| 5 | MinIO 会自动创建私有桶 `mci-private`、公有桶 `mci-public`，为公有桶开放匿名下载权限，并把端点、密钥、桶名、SSL 等配置写回 `sys_osclients` |
-| 6 | 根据安装模式选择的访问 IP 和实际分配端口，自动把 `sys_config.ApiBase` 写为 API 地址，把 `sys_config.FileServer` 写为 `http://<访问IP>:<MinIO API端口>/mci-public` |
-| 7 | 端口从 **61600 开始顺序 +1 分配**；基础服务（含 OCR）占用 8 个连续端口，LibreTranslate 增加 1 个端口。候选端口段有冲突时起点每次 +1，最多尝试 100 次 |
-| 8 | 安装器始终创建/复用 `microi` 共享 Docker bridge 网络；API 使用容器名和容器内部端口访问数据库、Redis、MongoDB、MinIO，不绕宿主机局域网 IP。宿主机映射端口仍保留给运维/外部访问；OCR 与 LibreTranslate 的诊断端口只绑定 `127.0.0.1` |
+| 5 | 新装或复用 MinIO 都会创建/复用私有桶和公有桶（默认 `mci-private` / `mci-public`，已有服务可改名），清理私有桶匿名权限、为公有桶开放匿名下载，并把端点、密钥、桶名、SSL 等配置写回 `sys_osclients` |
+| 6 | 根据安装模式选择的访问 IP 和实际端点，自动把 `sys_config.ApiBase` 写为 API 地址，把 `sys_config.FileServer` 写为最终公有桶 HTTP(S) 地址 |
+| 7 | 端口从 **61600 开始顺序 +1 分配**；默认新装基础服务（含 OCR）占用 8 个连续端口，LibreTranslate 增加 1 个端口。复用已有 MySQL 时减少 1 个本机端口，复用已有 MinIO 时减少 2 个；已有服务原端口不参与分配或自动开放防火墙 |
+| 8 | 安装器始终创建/复用 `microi` 共享 Docker bridge 网络；新装依赖使用容器 DNS 和内部端口，已有 MySQL/MinIO 使用所填地址（本机默认映射为 host-gateway）。OCR 与 LibreTranslate 的诊断端口只绑定 `127.0.0.1` |
 | 9 | OCR 国内固定版本镜像会默认安装。服务健康且 API 完成 Upgrade29 后，脚本才把 `OcrEnabled`、服务地址与限额写入当前唯一的 SaaS 主租户，并以数据库回读确认；任一阶段失败都不会启用错误配置 |
 | 10 | API/Web 使用官方浮动标签时会在部署前强制回源拉取最新镜像，避免宿主机缓存的旧 `latest` 通过 liveness 后却缺少 Upgrade29/Upgrade31 |
-| 11 | 密码与端口生成后若任一后段门禁失败，脚本仍保持非零退出码，同时打印“安装未完成”恢复汇总，包含已分配端口、已生成凭据、数据/编排目录和当前容器状态；该汇总不代表服务可用 |
-| 12 | 检测到已有安装或中断编排时不要直接重跑、删卷或删除数据目录；先按失败汇总和 API 日志排查，确需停编排时使用对应目录的 `docker compose down`，禁止附加 `-v` |
+| 11 | 密码与端口准备后若任一后段门禁失败，脚本仍保持非零退出码，同时打印“安装未完成”恢复汇总；新装凭据按既有规则展示，客户已有 MySQL/MinIO 的密码和密钥只标记为已读取，绝不回显 |
+| 12 | 检测到已有安装或中断编排时不要直接重跑、删卷、删除数据目录或清空外部服务；先按失败汇总和 API 日志排查，确需停编排时使用对应目录的 `docker compose down`，禁止附加 `-v` |
 | 13 | 若脚本中文显示为乱码/问号，请先执行 `export LANG=en_US.UTF-8` 或 `export LANG=C.UTF-8` 后重新运行 |
 
 ### 📋 端口分配表（默认从 61600 开始）
@@ -54,7 +68,9 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 
 > 上表是一直按 Enter 的吾码官方默认组合，共使用 9 个端口。只有明确输入 `0` 跳过 LibreTranslate 时才使用 `61600`～`61607`；若候选段冲突，脚本把起点从 `61600` 逐次加一后重新检查整段。
 
-> 容器内的 `127.0.0.1` / `localhost` 只代表该容器自身，不能作为 API 连接其它容器的地址；宿主机局域网 IP 虽然可通过端口映射访问，但会额外经过宿主机网络、防火墙和 NAT。安装器因此固定采用 Docker DNS：Redis 为 `microi-install-redis:6379`，MongoDB 为 `microi-install-mongodb:27017`，数据库使用实际数据库容器名及内部端口，MinIO 服务端地址为 `microi-install-minio:9000`。只有宿主机本地健康探测才使用 `127.0.0.1:<映射端口>`，浏览器需要访问的 `ApiBase`、`FileServer` 和 MinIO 外网端点仍使用实际公网/局域网访问地址。
+> 复用已有 MySQL 会从上表移除主数据库映射端口，复用已有 MinIO 会移除 MinIO API/Console 两个映射端口，其后新装组件会自动前移；两者都复用时默认基础组合减少 3 个本机端口。用户填写的已有服务端口保持原值，不计入本机连续端口段。
+
+> 容器内的 `127.0.0.1` / `localhost` 只代表该容器自身，不能作为 API 连接其它容器或宿主机服务的地址。新装模式采用 Docker DNS：Redis 为 `microi-install-redis:6379`，MongoDB 为 `microi-install-mongodb:27017`，数据库使用实际数据库容器名及内部端口，MinIO 为 `microi-install-minio:9000`。复用本机 MySQL/MinIO 时安装器改用 `host.docker.internal` 并添加 host-gateway；浏览器访问的 `ApiBase`、`FileServer` 和 MinIO 公有端点仍使用实际公网/局域网地址。
 
 > OCR 的宿主机端口不会写入防火墙规则。API 与 OCR 均接入 external bridge 网络 `microi-ocr`，实际调用地址为 `http://microi-install-ocr:8080/ocr`，不经过公网或宿主机 LAN 地址。
 
@@ -70,11 +86,11 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 修复流程如下：
 
 1. 回读现有 API/Web 容器的 Compose project、配置文件和镜像，静态校验 API 十项启动配置及数据库连接串结构；先把 Compose、容器元数据和旧镜像恢复点保存到应用编排目录的 `.repair-backups/<时间>/`。
-2. 创建/复用 `microi` 共享 bridge 网络，将现有数据库、Redis、MongoDB、MinIO 容器接入该网络；把 API 的数据库、Redis、MongoDB 启动连接迁移为容器 DNS 与内部端口。如果一键安装环境中的数据库连接串缺少用户、密码或端口，修复器会从唯一匹配的现有数据库容器安装环境中恢复完整连接串，全程不输出密码；无法精确匹配容器或凭据时会在删除应用容器前停止。
+2. 创建/复用 `microi` 共享 bridge 网络，将脚本新装的数据库、Redis、MongoDB、MinIO 容器接入该网络；通过安装标签识别已有 MySQL/MinIO，保留外部连接串、host-gateway 和 SaaS 存储配置，不查找或重建对应容器。如果脚本管理的数据库连接串缺少用户、密码或端口，修复器会从唯一匹配的现有数据库容器安装环境中恢复完整连接串，全程不输出密码；无法精确匹配容器或凭据时会在删除应用容器前停止。
 3. 按现场 Compose 拉取镜像，临时停止 Watchtower，只删除并重建 `microi-install-api`、`microi-install-client` 两个无状态应用容器，从而接管丢失标签或归属漂移造成的同名容器冲突。
 4. 重建后回读十项启动配置和 `microi` 网络，依次验证 API liveness、readiness；失败时自动尝试用修复前镜像恢复。最后恢复原本正在运行的 Watchtower。
 
-> 该命令不会删除或重建主数据库、Redis、MongoDB、MinIO 容器，不会删除它们的数据目录或 Docker volume，也不会执行 `docker compose down -v`。API、Web 前端重建时会有短暂中断。宝塔标准编排目录存在而应用编排仅位于 `/microi/compose` 时，修复器会把已经完整解析的应用配置恢复到宝塔目录后再重建，使编排重新可管理。
+> 该命令不会删除或重建主数据库、Redis、MongoDB、MinIO 容器，不会删除它们的数据目录或 Docker volume，也不会改动客户已有 MySQL/MinIO 服务，更不会执行 `docker compose down -v`。API、Web 前端重建时会有短暂中断。宝塔标准编排目录存在而应用编排仅位于 `/microi/compose` 时，修复器会把已经完整解析的应用配置恢复到宝塔目录后再重建，使编排重新可管理。
 
 ### 🗑️ 删除所有已安装容器/编排
 

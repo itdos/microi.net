@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-15T08:58:00.771Z",
+  "generatedAt": "2026-08-18T02:40:05.582Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -316,11 +316,11 @@
       ]
     },
     "microi-form-layout": {
-      "originalSha256": "668302c4fd4a17fa1932dcd37a11caa5d01590052077adc60f4c665be372b802",
-      "originalLines": 389,
-      "prefixSha256": "cc48453f10bd727874a5a9598ce71d115105ea490f61b131a0caef358155f2eb",
-      "prefixBytes": 1673,
-      "entryLines": 183,
+      "originalSha256": "f062cd46b4a1736796f727ddc5d184e2b38d94556cf39a0f2d941bf7da4596d0",
+      "originalLines": 398,
+      "prefixSha256": "e54e2fa2f5a398f6dcd63cd2ef8a245ca95d9e24c5b18643d4e59647904f78a0",
+      "prefixBytes": 2518,
+      "entryLines": 192,
       "chunks": [
         {
           "id": "microi-form-layout-000",
@@ -350,8 +350,8 @@
           "id": "microi-form-layout-003",
           "ordinal": 4,
           "destination": "microi-form-layout/SKILL.md",
-          "sha256": "eebf51aec08023443964d82e1140026ec7cef627b3d2ed6ead169e1fd14353a3",
-          "lines": 25,
+          "sha256": "c737fc8b0d488548e5a3de616ff172b8b645553c818fb09e70a196f4e9c0e2ae",
+          "lines": 27,
           "heading": "5. 必填与禁止"
         },
         {
@@ -1614,7 +1614,7 @@
       "originalLines": 1632,
       "prefixSha256": "d557bbba4ba5ade3f10f5d8cc672d038f5136ce2eda7eaefbcfe2dd2eb65812a",
       "prefixBytes": 1106,
-      "entryLines": 188,
+      "entryLines": 205,
       "chunks": [
         {
           "id": "ui-design-000",
@@ -2786,18 +2786,18 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "bfc586ceb46a851c1c2fc6d2bca97975b607910f327055c2088fce1ff84f0725",
-      "originalLines": 488,
+      "originalSha256": "9ca4d19e632aa28e49ee7322e10e9bac489b51ed3162b4a885a66adc36c1e1a7",
+      "originalLines": 491,
       "prefixSha256": "529a335f022a9c01309e2aca8254abf8aa72ea9b3bd4f0e73ec737697118ae51",
       "prefixBytes": 1071,
-      "entryLines": 175,
+      "entryLines": 178,
       "chunks": [
         {
           "id": "v8-security-000",
           "ordinal": 0,
           "destination": "v8-security/SKILL.md",
-          "sha256": "5cf3d472c04eb49aee9dc8f251bdb825b73574e046c968547e51af7c8492b9b3",
-          "lines": 43,
+          "sha256": "683f6fb48592b050fc31caec6b45e39c8109b0a67baa48c0a2e6d1385a0e4ce1",
+          "lines": 46,
           "heading": "0. 租户动态系统设置与密钥边界"
         },
         {
@@ -3196,11 +3196,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "1823ec6270e562b72e45507901acee88f7f47f3413f93025144fc206276809e9",
-      "originalLines": 553,
+      "originalSha256": "cc49d8186eb37f06fcfedb4630df658ca141f3e8e39d5eaa5627d3341a8ee7dc",
+      "originalLines": 560,
       "prefixSha256": "b58cd0a59d3643525695b94a5941278a5088c33cbe2ce81620359f37db69878e",
       "prefixBytes": 252,
-      "entryLines": 201,
+      "entryLines": 208,
       "chunks": [
         {
           "id": "workspace-conventions-000",
@@ -3230,8 +3230,8 @@
           "id": "workspace-conventions-003",
           "ordinal": 3,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "5f3c011e88d1e36398a23a917949fcc8beaf6adee91e2a360d24bedd4ba322bb",
-          "lines": 12,
+          "sha256": "f11353ab84b85f319d592dac979e9a44fac3bc5aa50f827ad5aaa728f83fa18d",
+          "lines": 19,
           "heading": "本地资源与 OOM 保护规范（强制）"
         },
         {
@@ -3310,7 +3310,7 @@
           "id": "workspace-conventions-013",
           "ordinal": 13,
           "destination": "workspace-conventions/references/progressive-01-版本更新日志保护规则-强制.md",
-          "sha256": "f71d409558e941597f9d66c10005885e228441df606e97011c798e41f91eff49",
+          "sha256": "dbf22caaf1673270e6abf2277704505481f632c68c1da61df992c81a577e24df",
           "lines": 12,
           "heading": "身份、可逆业务秘密与敏感操作统一规范（强制）"
         },

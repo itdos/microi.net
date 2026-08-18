@@ -37,6 +37,10 @@ Config/Data、菜单查询列与缓存保持一致。
    `FormWidth=24`，且 `Config.CollapseGroup.ShowFieldCount` 默认补为 `true`。
 6. 绑定菜单后补齐/允许平台推断列表列、搜索列、隐藏列、排序列、移动端列和默认排序。
 7. 回读 `diy_field`、刷新 schema 缓存，再在真实新增/编辑/查看表单中验收。
+
+新建表/模块时，除非用户显式指定或表单达到极重阈值（约 36+ 业务字段、2+ 子表或同等
+重型控件密度），默认保存 `diy_table.FormOpenType=Dialog` 与 `FormOpenWidth=80%`。
+Drawer 只服务超长复杂表单，不能作为所有 CRUD 模块的模板默认值。
    若设计器显示而运行态不显示，先检查 `InFormV8`/字段 V8 是否调用
    `V8.FieldSet(..., 'Visible', false)`、`hideField` 或传入 `HideFields`，再判断前端源码。
 

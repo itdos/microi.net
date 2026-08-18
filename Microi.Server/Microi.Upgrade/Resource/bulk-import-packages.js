@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.1.6
+ * Version: v1.2.0
  * Function:
  * - 只规划并安装“未安装/可更新”应用，绝不重新安装已是最新版的应用。
  * - 计划和子检查点写入后台任务 CheckpointJson，支持多节点租约转移、进程重启和幂等重试。
@@ -39,6 +39,38 @@ function parseJson(value, fallback) {
 function toInt(value, fallback) {
     var parsed = parseInt(value, 10);
     return isNaN(parsed) ? (fallback || 0) : parsed;
+}
+// MARKETPLACE_PRIVATE_SOURCE_CREDENTIAL_V1：后台任务和检查点只保存凭据 Key；
+// Token 原文仅从当前租户后端 V8.SysConfig.ServerPrivateSettings 读取。
+function loadMarketplaceSourceCredential(credentialKey, expectedApiBase, expectedOsClient) {
+    var key = trim(credentialKey);
+    if (!key) return null;
+    var privateSettings = V8.SysConfig && V8.SysConfig.ServerPrivateSettings
+        ? V8.SysConfig.ServerPrivateSettings
+        : {};
+    var raw = privateSettings[key];
+    if (!raw) throw new Error('商城源登录已失效，请在商城源管理中重新登录。');
+    var credential = raw;
+    if (typeof credential == 'string') {
+        try { credential = JSON.parse(credential); }
+        catch (parseError) { throw new Error('商城源登录凭据格式无效，请重新登录。'); }
+    }
+    var token = trim(credential.Token || credential.token).replace(/^Bearer\s+/i, '');
+    var boundBase = trim(credential.ApiBase || credential.apiBase).replace(/\/+$/, '');
+    var boundOsClient = trim(credential.OsClient || credential.osClient);
+    if (!token) throw new Error('商城源登录 Token 为空，请重新登录。');
+    if (boundBase.toLowerCase() != String(expectedApiBase || '').replace(/\/+$/, '').toLowerCase()
+        || boundOsClient.toLowerCase() != String(expectedOsClient || '').toLowerCase()) {
+        throw new Error('商城源登录凭据与当前 ApiBase/OsClient 不匹配，请重新发现并登录该来源。');
+    }
+    var expiresAt = trim(credential.ExpiresAtUtc || credential.expiresAtUtc);
+    if (expiresAt) {
+        var expiresAtTime = Date.parse(expiresAt);
+        if (!isNaN(expiresAtTime) && expiresAtTime <= Date.now()) {
+            throw new Error('商城源登录已过期，请重新登录。');
+        }
+    }
+    return { authorization: token, did: trim(credential.Did || credential.did) };
 }
 // BULK_CHILD_FAILURE_DETAIL_V1：子导入器会把字段级异常放在
 // Data['失败详情（共N条）'] 中。批量任务必须把首批详情带到任务中心，
@@ -146,6 +178,11 @@ var sourceOsClient = trim(
     || V8.Param.AppStoreOsClient
     || 'iTdos'
 );
+var sourceCredentialKey = trim(
+    checkpoint.SourceCredentialKey
+    || V8.Param.StoreCredentialKey
+    || V8.Param.SourceCredentialKey
+);
 var pageSize = 100;
 
 function report(progress, current, total, message) {
@@ -252,6 +289,20 @@ if (phase == 'Discover') {
     var plan = normalizePlan(checkpoint.Plan);
     var installedVersions = loadInstalledVersions();
     report(1, pageIndex - 1, null, '正在盘点商城中未安装和可更新的应用');
+    var sourceRequestHeaders = {};
+    try {
+        sourceRequestHeaders = loadMarketplaceSourceCredential(
+            sourceCredentialKey,
+            sourceApiBase,
+            sourceOsClient
+        ) || {};
+    } catch (credentialError) {
+        return failure(
+            credentialError.message || String(credentialError),
+            { FailureStage: 'SourceAuthentication', SourceApiBase: sourceApiBase, SourceOsClient: sourceOsClient },
+            '在应用商城的来源管理中重新登录该私有来源，然后重新发起全部安装/更新。'
+        );
+    }
     var listResult = V8.Http.Post({
         Url: sourceApiBase + '/apiengine/get-microi-store-list?OsClient=' + encodeURIComponent(sourceOsClient),
         PostParam: {
@@ -261,6 +312,7 @@ if (phase == 'Discover') {
             InstalledVersions: installedVersions
         },
         ParamType: 'json',
+        Headers: sourceRequestHeaders,
         Timeout: 120
     });
     listResult = parseJson(listResult, listResult);
@@ -282,14 +334,15 @@ if (phase == 'Discover') {
     var dataCount = toInt(listResult.DataCount, rows.length);
     if (pageIndex * pageSize < dataCount) {
         return continuation({
-            Version: 3,
+            Version: 4,
             TaskId: taskId,
             Phase: 'Discover',
             PageIndex: pageIndex + 1,
             Plan: plan,
             ApplicationType: bulkApplicationType,
             SourceApiBase: sourceApiBase,
-            SourceOsClient: sourceOsClient
+            SourceOsClient: sourceOsClient,
+            SourceCredentialKey: sourceCredentialKey
         }, 2, pageIndex * pageSize, dataCount, '商城应用盘点已完成一页，将从后台任务检查点继续');
     }
 
@@ -302,7 +355,7 @@ if (phase == 'Discover') {
         };
     }
     return continuation({
-        Version: 3,
+        Version: 4,
         TaskId: taskId,
         Phase: 'Install',
         CurrentIndex: 0,
@@ -312,7 +365,8 @@ if (phase == 'Discover') {
         Plan: plan,
         ApplicationType: bulkApplicationType,
         SourceApiBase: sourceApiBase,
-        SourceOsClient: sourceOsClient
+        SourceOsClient: sourceOsClient,
+        SourceCredentialKey: sourceCredentialKey
     }, 3, 0, plan.length, '批量安装计划已写入后台任务检查点，开始逐个安装/更新');
 }
 
@@ -348,6 +402,7 @@ var childParam = {
     AppVersion: item.AppVersion,
     StoreApiBase: sourceApiBase,
     StoreOsClient: sourceOsClient,
+    StoreCredentialKey: sourceCredentialKey,
     ResumeInstall: true,
     InstallAction: item.InstallAction,
     InstallOperationId: taskId + ':' + (item.StoreId || item.AppId),
@@ -390,7 +445,7 @@ if (childBackground && childBackground.HasMore === true) {
     var overallProgress = Math.max(3, Math.min(99,
         Math.floor(((currentIndex + childProgress / 100) / total) * 100)));
     return continuation({
-        Version: 3,
+        Version: 4,
         TaskId: taskId,
         Phase: 'Install',
         CurrentIndex: currentIndex,
@@ -400,7 +455,8 @@ if (childBackground && childBackground.HasMore === true) {
         Plan: installPlan,
         ApplicationType: bulkApplicationType,
         SourceApiBase: sourceApiBase,
-        SourceOsClient: sourceOsClient
+        SourceOsClient: sourceOsClient,
+        SourceCredentialKey: sourceCredentialKey
     }, overallProgress, currentIndex + childProgress / 100, total,
     '[' + (currentIndex + 1) + '/' + total + '] ' + (childBackground.Msg || '应用安装分片已提交'));
 }
@@ -409,7 +465,7 @@ if (item.InstallAction == 'Update') updatedCount++;
 else installedCount++;
 currentIndex++;
 return continuation({
-    Version: 3,
+    Version: 4,
     TaskId: taskId,
     Phase: 'Install',
     CurrentIndex: currentIndex,
@@ -419,6 +475,7 @@ return continuation({
     Plan: installPlan,
     ApplicationType: bulkApplicationType,
     SourceApiBase: sourceApiBase,
-    SourceOsClient: sourceOsClient
+    SourceOsClient: sourceOsClient,
+    SourceCredentialKey: sourceCredentialKey
 }, Math.min(99, Math.floor((currentIndex / total) * 100)), currentIndex, total,
 '已完成【' + item.AppName + '】，继续处理剩余应用');

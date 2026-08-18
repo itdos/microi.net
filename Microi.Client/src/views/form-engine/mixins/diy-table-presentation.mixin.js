@@ -268,11 +268,27 @@ export default {
         HandleModuleWorkbenchOpenForm(row, mode) {
             return this.OpenDetail(row, mode);
         },
-        HandleModuleWorkbenchAction(btn, row) {
+        SyncModuleWorkbenchSelection(row) {
+            const current = row && row.Id
+                ? ((this.DiyTableRowList || []).find((item) => item && item.Id === row.Id) || row)
+                : null;
+            const selection = current ? [current] : [];
+            this.TableMultipleSelection = selection;
+            this.cardSelection = selection;
+            this.cardSelectAll = false;
+            this.TableSelectedRow = current || {};
+            this.CurrentSelectedRowModel = current || {};
+            return current || {};
+        },
+        HandleModuleWorkbenchAction(btn, row, scope, selectedRecord) {
+            // FormWorkbench 的当前记录就是默认勾选记录，确保批量/页面 V8 中
+            // V8.TableRowSelected 与 V8.SelectedData 不会因隐藏了表格复选框而丢失。
+            this.SyncModuleWorkbenchSelection(selectedRecord || row);
             const current = row || {};
             return this.RunMoreBtn(btn, current, current._V8);
         },
         HandleModuleWorkbenchFormReady(form) {
+            this.SyncModuleWorkbenchSelection(form || {});
             const buttons = this.SysMenuModel?.FormBtns;
             if (!Array.isArray(buttons) || buttons.length === 0) return;
             this.HandlerBtns(buttons, form || {});
@@ -281,7 +297,14 @@ export default {
             return this.GetDiyTableRow({ _PageIndex: pageIndex });
         },
         HandleModuleWorkbenchRecordChange(recordId) {
-            if (!recordId || !this.$router || !this.$route) return;
+            if (!recordId) return;
+            const current = (this.DiyTableRowList || []).find((item) => item && item.Id === recordId) || {};
+            this.SyncModuleWorkbenchSelection(current);
+            const batchButtons = this.SysMenuModel?.BatchSelectMoreBtns;
+            if (Array.isArray(batchButtons) && batchButtons.length > 0) {
+                this.HandlerBtns(batchButtons, current);
+            }
+            if (!this.$router || !this.$route) return;
             const query = { ...(this.$route.query || {}) };
             if (query.RecordId === recordId) return;
             query.RecordId = recordId;

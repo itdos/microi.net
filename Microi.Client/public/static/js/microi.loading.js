@@ -1,7 +1,7 @@
 /*
     * Microi Loading Animation Script
     注意：修改此文件一定要去【Microi.Client\index.html】修改
-    【/static/js/microi.loading.js?d=20260805】时间戳，防止浏览器缓存不更新
+    【/static/js/microi.loading.js?d=2026081703】时间戳，防止浏览器缓存不更新
 */
 var isApkEnv = !!(window.plus || navigator.userAgent.indexOf('Html5Plus') > -1);
 var loadingRate = window.__microi_apk_start || 0;
@@ -13,19 +13,49 @@ var completionStarted = false;
 var loadingFinished = false;
 var appBootError = '';
 var appReadyTimer = null;
+var finishTimer = null;
+var startupFailed = false;
+var appMounted = window.__MICROI_APP_MOUNTED__ === true;
+var bootWaitStartedAt = 0;
+var lastWaitingSecond = -1;
 
 function updateLoadUI(rate) {
+    if (startupFailed) return;
     var r = Math.min(rate, 100);
     if (rateEl) rateEl.textContent = r + '%';
     if (barEl) barEl.style.width = r + '%';
 }
 
 function isMicroiAppReady() {
-    if (window.__MICROI_APP_MOUNTED__ === true) {
-        return true;
+    return window.__MICROI_APP_READY__ === true;
+}
+
+function setStartupCopy(title, status, value) {
+    var subtitleEl = document.querySelector('.mci-app-subtitle');
+    var statusEl = document.getElementById('startupStatus');
+    if (subtitleEl && title) subtitleEl.textContent = title;
+    if (statusEl && status) statusEl.textContent = status;
+    if (rateEl && value) {
+        rateEl.textContent = value;
+        rateEl.classList.add('is-status');
     }
-    var appEl = document.getElementById('app_microi');
-    return !!(appEl && appEl.childNodes && appEl.childNodes.length > 0);
+}
+
+function updateWaitingCopy(waited) {
+    var seconds = Math.max(0, Math.floor(waited / 1000));
+    if (seconds === lastWaitingSecond) return;
+    lastWaitingSecond = seconds;
+    if (!appMounted) {
+        setStartupCopy('正在启动应用', '正在等待页面脚本加载…', '启动中');
+        return;
+    }
+    if (seconds < 8) {
+        setStartupCopy('正在连接后端服务', '正在读取租户配置与基础数据，请稍候…', '连接中');
+    } else if (seconds < 30) {
+        setStartupCopy('后端服务响应较慢', '已等待 ' + seconds + ' 秒，连接仍在继续，请不要关闭页面。', '等待响应');
+    } else {
+        setStartupCopy('仍在等待后端服务', '已等待 ' + seconds + ' 秒。服务可能繁忙或暂不可用，您可以继续等待或刷新重试。', '等待服务');
+    }
 }
 
 function unlockPageScroll() {
@@ -53,27 +83,44 @@ function unlockPageScroll() {
 }
 
 function finishLoading() {
-    if (loadingFinished) return;
-    loadingFinished = true;
+    if (loadingFinished || finishTimer) return;
+    // 即使业务初始化很快，也必须先把 100% 真实绘制出来，再退出启动层。
+    // 直接在 app-ready 事件里移除遮罩会让用户看到“进度未满 -> 白屏”的闪烁。
+    loadingRate = 100;
+    startupFailed = false;
+    updateLoadUI(100);
+    if (rateEl) {
+        rateEl.classList.remove('is-status');
+        rateEl.textContent = '100%';
+    }
+    var subtitleEl = document.querySelector('.mci-app-subtitle');
+    var statusEl = document.getElementById('startupStatus');
+    if (subtitleEl) subtitleEl.textContent = '启动完成';
+    if (statusEl) statusEl.textContent = '应用已就绪，正在进入…';
     if (appReadyTimer) {
         clearInterval(appReadyTimer);
         appReadyTimer = null;
     }
-    unlockPageScroll();
-    var loadEl = document.getElementById('microi_loading');
-    if (loadEl != null) {
-        loadEl.classList.add('fade-out');
-        setTimeout(function () {
-            if (loadEl.parentNode) {
-                loadEl.parentNode.removeChild(loadEl);
-            }
-            if (isNeedLogin) {
-                var loginEl = document.getElementById('divLogin');
-                if (loginEl) loginEl.style.top = '0%';
-            }
-            firstLoginCover = false;
-        }, 500);
-    }
+    // 至少保留一个可感知的完整进度帧；同时给路由首屏完成布局和绘制的时间。
+    finishTimer = setTimeout(function () {
+        finishTimer = null;
+        loadingFinished = true;
+        unlockPageScroll();
+        var loadEl = document.getElementById('microi_loading');
+        if (loadEl != null) {
+            loadEl.classList.add('fade-out');
+            setTimeout(function () {
+                if (loadEl.parentNode) {
+                    loadEl.parentNode.removeChild(loadEl);
+                }
+                if (isNeedLogin) {
+                    var loginEl = document.getElementById('divLogin');
+                    if (loginEl) loginEl.style.top = '0%';
+                }
+                firstLoginCover = false;
+            }, 500);
+        }
+    }, 360);
 }
 
 function getBrowserCoreDescription() {
@@ -85,7 +132,7 @@ function getBrowserCoreDescription() {
     return '';
 }
 
-function showStartupFailure() {
+function showStartupFailure(kind) {
     if (loadingFinished || isMicroiAppReady()) {
         finishLoading();
         return;
@@ -94,24 +141,35 @@ function showStartupFailure() {
         clearInterval(appReadyTimer);
         appReadyTimer = null;
     }
+    startupFailed = true;
+    completionStarted = true;
+    loadingRate = 100;
     var loadEl = document.getElementById('microi_loading');
     var subtitleEl = document.querySelector('.mci-app-subtitle');
+    var statusEl = document.getElementById('startupStatus');
     var messageEl = document.getElementById('startupErrorMessage');
     var retryEl = document.getElementById('startupRetry');
     if (loadEl) loadEl.classList.add('startup-failed');
-    if (subtitleEl) subtitleEl.textContent = '页面脚本未能启动';
-    if (rateEl) rateEl.textContent = '!';
+    var isServiceFailure = kind === 'service';
+    if (subtitleEl) subtitleEl.textContent = isServiceFailure ? '后端服务暂时不可用' : '页面脚本未能启动';
+    if (statusEl) statusEl.textContent = isServiceFailure
+        ? '系统初始化尚未完成，请检查服务后重新加载。'
+        : '页面脚本未能完成挂载，请刷新或更换浏览器后重试。';
+    if (rateEl) {
+        rateEl.textContent = '连接失败';
+        rateEl.classList.add('is-status');
+    }
     if (barEl) {
         barEl.style.width = '100%';
         barEl.style.background = '#E8294A';
     }
     if (messageEl) {
-        var detail = appBootError
-            ? '启动错误：' + appBootError + ' '
-            : '';
-        messageEl.textContent = detail + getBrowserCoreDescription()
-            + '请先按 Ctrl+F5 强制刷新；如仍无法打开，请升级到此电脑可安装的较新 Chrome，'
-            + '或将 360 安全浏览器切换到较新的极速内核。';
+        var detail = appBootError ? '错误信息：' + appBootError + ' ' : '';
+        messageEl.textContent = isServiceFailure
+            ? detail + '请检查后端服务与网络连接后重试。页面不会再停留在无提示的空白状态。'
+            : detail + getBrowserCoreDescription()
+                + '请先按 Ctrl+F5 强制刷新；如仍无法打开，请升级到此电脑可安装的较新 Chrome，'
+                + '或将 360 安全浏览器切换到较新的极速内核。';
     }
     if (retryEl) {
         retryEl.onclick = function () {
@@ -124,21 +182,25 @@ function waitForAppReady() {
     if (completionStarted) return;
     completionStarted = true;
     updateLoadUI(100);
+    bootWaitStartedAt = Date.now();
     if (isMicroiAppReady()) {
         finishLoading();
         return;
     }
-    var subtitleEl = document.querySelector('.mci-app-subtitle');
-    if (subtitleEl) subtitleEl.textContent = '正在启动应用';
+    appMounted = window.__MICROI_APP_MOUNTED__ === true;
+    updateWaitingCopy(0);
     var waited = 0;
     appReadyTimer = setInterval(function () {
         if (isMicroiAppReady()) {
             finishLoading();
             return;
         }
-        waited += 250;
-        if (waited >= 15000) {
-            showStartupFailure();
+        appMounted = appMounted || window.__MICROI_APP_MOUNTED__ === true;
+        waited = Date.now() - bootWaitStartedAt;
+        updateWaitingCopy(waited);
+        // 只有页面脚本始终没有挂载才判定为启动故障；后端慢响应则持续展示可理解的等待状态。
+        if (!appMounted && waited >= 15000) {
+            showStartupFailure('script');
         }
     }, 250);
 }
@@ -160,9 +222,18 @@ function LoadRate(step, t) {
 }
 
 window.addEventListener('microi:app-mounted', function () {
-    if (completionStarted) {
-        finishLoading();
-    }
+    appMounted = true;
+    if (completionStarted) updateWaitingCopy(Date.now() - bootWaitStartedAt);
+});
+window.addEventListener('microi:app-ready', function () {
+    window.__MICROI_APP_READY__ = true;
+    // finishLoading 会先固定显示 100% 与“启动完成”，不会提前撤掉遮罩。
+    finishLoading();
+});
+window.addEventListener('microi:app-boot-failed', function (event) {
+    var detail = event && event.detail;
+    appBootError = (detail && detail.message) || window.__MICROI_APP_BOOT_ERROR__ || appBootError;
+    showStartupFailure('service');
 });
 window.addEventListener('error', function (event) {
     if (isMicroiAppReady()) return;

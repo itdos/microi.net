@@ -12,6 +12,7 @@ globs: ["**/*.{vue,js,ts,jsx,tsx,css,scss,json,md,mdc,cs,csproj,xml,yml,yaml}", 
 - @microi.skills/v8-table-event/SKILL.md — Microi V8 表单事件开发
 - @microi.skills/v8-cache-pattern/SKILL.md — Microi V8 Redis 缓存模式
 - @microi.skills/v8-http-integration/SKILL.md — Microi V8 HTTP 外部接口集成
+- @microi.skills/v8-tcp-integration/SKILL.md — Microi 后端 V8 TCP 原始字节、小票机与设备集成
 - @microi.skills/v8-mongodb/SKILL.md — Microi V8 MongoDB 操作
 - @microi.skills/v8-mq-mqtt/SKILL.md — Microi V8 消息队列与 MQTT
 - @microi.skills/v8-workflow/SKILL.md — Microi V8 工作流事件开发

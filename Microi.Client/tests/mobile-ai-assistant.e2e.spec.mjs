@@ -25,11 +25,11 @@ function enableAiAssistant(json) {
     if (!json || typeof json !== "object") return json;
 
     if (json.Data && typeof json.Data === "object" && !Array.isArray(json.Data)) {
-        json.Data.IsShowAiAssistant = 1;
+        json.Data.DisableAiAssistant = 0;
     }
 
     if (json.DataAppend?.SysConfig && typeof json.DataAppend.SysConfig === "object") {
-        json.DataAppend.SysConfig.IsShowAiAssistant = 1;
+        json.DataAppend.SysConfig.DisableAiAssistant = 0;
     }
 
     return json;
@@ -146,7 +146,7 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
         (response) => /\/api\/SysUser\/Login(?:\?|$)/i.test(response.url()),
         { timeout: 30_000 }
     );
-    await page.getByRole("button", { name: /登\s*录/ }).click();
+    await page.locator("button.login-button").click();
     const loginResponse = await loginResponsePromise;
     const loginResult = await loginResponse.json();
     expect(Number(loginResult.Code), loginResult.Msg || "UI login failed").toBe(1);
@@ -181,7 +181,7 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
     await aiEntry.click();
     await expect(page).toHaveURL(/\/mobile\/ai-assistant(?:\?|$)/, { timeout: 20_000 });
     await expect(page.getByTestId("mobile-ai-assistant")).toBeVisible();
-    await expect(page.getByText("AI助手", { exact: true })).toBeVisible();
+    await expect(page.getByText(/^(?:AI助手|AI Assistant)$/i)).toBeVisible();
     const mobileAiAvatar = page.getByTestId("mobile-ai-avatar");
     await expect(mobileAiAvatar).toBeVisible();
     expect(await mobileAiAvatar.evaluate((image) => ({
@@ -200,7 +200,7 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
     await expect(page.getByTestId("mobile-ai-history")).toBeVisible();
     await expect(page.getByTestId("mobile-ai-input")).toBeVisible();
     await expect(page.getByTestId("mobile-ai-send")).toBeVisible();
-    await expect(page.getByText("内容由人工智能生成，请注意甄别")).toBeVisible();
+    await expect(page.getByText(/内容由人工智能生成，请注意甄别|AI-generated content may be inaccurate/i)).toBeVisible();
 
     const historyResponsePromise = page.waitForResponse(
         (response) => isAiActionResponse(response, "History"),
@@ -209,9 +209,10 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
     await page.getByTestId("mobile-ai-history").click();
     const historyResponse = await historyResponsePromise;
     expect(historyResponse.status()).toBe(200);
-    await expect(page.getByRole("complementary", { name: "AI对话记录" })).toBeVisible();
-    await page.getByRole("button", { name: "关闭对话记录" }).click();
-    await expect(page.getByRole("complementary", { name: "AI对话记录" })).toBeHidden();
+    const historyPanel = page.getByRole("complementary", { name: /AI对话记录|Conversation history/i });
+    await expect(historyPanel).toBeVisible();
+    await page.getByRole("button", { name: /关闭对话记录|Close (?:conversation )?history/i }).click();
+    await expect(historyPanel).toBeHidden();
     await expect(page.locator(".el-message, .el-notification")).toHaveCount(0, {
         timeout: 15_000
     });
@@ -293,7 +294,7 @@ test("PC 顶栏机器人打开并拖动完整 AI 助手弹窗", async ({ page },
         (response) => /\/api\/SysUser\/Login(?:\?|$)/i.test(response.url()),
         { timeout: 30_000 }
     );
-    await page.getByRole("button", { name: /登\s*录/ }).click();
+    await page.locator("button.login-button").click();
     const loginResult = await (await loginResponsePromise).json();
     expect(Number(loginResult.Code), loginResult.Msg || "UI login failed").toBe(1);
 

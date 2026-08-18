@@ -346,7 +346,7 @@ export default {
     background: #075b78;
 }
 .mci-form-view__metric-block h3 {
-    margin: 0 0 12px;
+    margin: 0 0 10px;
     font-size: 16px;
 }
 .mci-form-view__images {

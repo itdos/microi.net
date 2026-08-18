@@ -33,6 +33,7 @@ beforeUnmount() {
             self.DataCommentList = [];
             if (Array.isArray(self.DataVersionList)) self.DataVersionList.length = 0;
             self.DataVersionList = [];
+            self.FormRelatedCounts = { DataLog: 0, DataComment: 0, DataVersion: 0 };
             if (Array.isArray(self.DraftList)) self.DraftList.length = 0;
             self.DraftList = [];
             self.CurrentDraftId = "";
