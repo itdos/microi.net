@@ -69,4 +69,26 @@ export function resolveLoginSystemLogoUrl(value, getServerPath) {
     return resolveLoginResourceUrl(value, getServerPath);
 }
 
+/**
+ * Resolve the classic sidebar logo without leaking the official Microi brand
+ * into a child tenant. Only the official iTdos tenant may use the bundled
+ * official asset when SysLogo is empty; every other tenant falls back to its
+ * own title initial in the component.
+ */
+export function resolveSidebarSystemLogoUrl(value, osClient, getServerPath, officialFallback = "") {
+    const configured = resolveLoginSystemLogoUrl(value, getServerPath);
+    if (configured) return configured;
+
+    return String(osClient || "").trim().toLowerCase() === "itdos"
+        ? String(officialFallback || "").trim()
+        : "";
+}
+
+export function resolveTenantBrandFallbackText(...values) {
+    const title = values
+        .map((value) => String(value || "").trim())
+        .find(Boolean);
+    return title ? title.charAt(0).toUpperCase() : "M";
+}
+
 export { unwrapFileReference };

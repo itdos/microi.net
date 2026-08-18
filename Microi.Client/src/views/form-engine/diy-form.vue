@@ -139,13 +139,13 @@
                                                     + (GetFieldReadOnly(field) ? ' is-field-readonly ' : '')"
                                         >
                                             <template #label>
-                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
-                                                    <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
-                                                        <template #default>
-                                                            <el-icon><InfoFilled /></el-icon>
-                                                        </template>
-                                                    </el-tooltip>
-                                                    {{ GetFormItemLabel(field) }}
+                                                <span class="diy-field-label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
+                                                    <span class="diy-field-label__text">{{ GetFormItemLabel(field) }}</span>
+                                                    <small
+                                                        v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) === 'top'"
+                                                        class="diy-field-description diy-field-description--inline"
+                                                        :title="field.Description"
+                                                    >{{ field.Description }}</small>
                                                 </span>
                                             </template>
                                             <!--通用组件渲染-->
@@ -189,6 +189,11 @@
                                                 @CallbackFieldTabsChange="handleFieldTabsChange"
                                             />
                                         </el-form-item>
+                                        <small
+                                            v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) !== 'top'"
+                                            class="diy-field-description diy-field-description--below"
+                                            :title="field.Description"
+                                        >{{ field.Description }}</small>
                                     </div>
                                     </el-col>
                                 </template>
@@ -220,13 +225,13 @@
                                         >
                                             <!-- v-if="shouldShowLabel(field)" -->
                                             <template #label>
-                                                <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
-                                                    <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
-                                                        <template #default>
-                                                            <el-icon><InfoFilled /></el-icon>
-                                                        </template>
-                                                    </el-tooltip>
-                                                    {{ GetFormItemLabel(field) }}
+                                                <span class="diy-field-label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
+                                                    <span class="diy-field-label__text">{{ GetFormItemLabel(field) }}</span>
+                                                    <small
+                                                        v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) === 'top'"
+                                                        class="diy-field-description diy-field-description--inline"
+                                                        :title="field.Description"
+                                                    >{{ field.Description }}</small>
                                                 </span>
                                             </template>
                                             <!--通用组件渲染-->
@@ -271,6 +276,11 @@
                                                 @CallbackFieldTabsChange="handleFieldTabsChange"
                                             />
                                         </el-form-item>
+                                        <small
+                                            v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) !== 'top'"
+                                            class="diy-field-description diy-field-description--below"
+                                            :title="field.Description"
+                                        >{{ field.Description }}</small>
                                     </div>
                                 </el-col>
                             </el-row>

@@ -2323,6 +2323,17 @@ namespace Microi.net.Api
 
             var tableName = diyTable.Name;
 
+            // 菜单字段元数据可能包含逻辑租户字段、历史字段或 TEXT/BLOB 等不能直接建立
+            // 普通索引的长字段。自动索引只使用当前数据库真实存在且无需前缀长度的物理列；
+            // 租户独立库中的 sys_apiengine 没有 OsClient，ApiRole/ApiRemark 也是 TEXT。
+            var physicalColumnResult = V8McpLogic.GetTableAutoIndexableColumns(param.OsClient, tableName);
+            if (physicalColumnResult?.Code != 1 || physicalColumnResult.Data == null)
+                return Json(new DosResult(0, null,
+                    physicalColumnResult?.Msg ?? $"读取物理表 [{tableName}] 可索引字段失败"));
+            var physicalColumns = new HashSet<string>(
+                physicalColumnResult.Data,
+                StringComparer.OrdinalIgnoreCase);
+
             // 3. 查询该表所有字段，建立Id→Name的映射
             var fieldList = db.From<DiyField>()
                 .Where(DiyField._.TableId == sysMenu.DiyTableId && DiyField._.IsDeleted == 0)
@@ -2455,34 +2466,24 @@ namespace Microi.net.Api
             sortColumns.Remove("Id");
             statColumns.Remove("Id");
 
+            // 跳过已从物理表移除、但仍残留在菜单或字段元数据中的列。
+            orderByColumns.RemoveAll(column => !physicalColumns.Contains(column));
+            searchColumns.RemoveAll(column => !physicalColumns.Contains(column));
+            sortColumns.RemoveAll(column => !physicalColumns.Contains(column));
+            statColumns.RemoveAll(column => !physicalColumns.Contains(column));
+
             // 5. 生成少量、租户优先的组合索引建议。
             // 不再把 StatisticsFields/所有排序字段机械转换成单列索引；低选择性字段单列索引通常无效，
             // 且会带来明显写放大。第一个搜索条件与默认排序合成一个最左前缀索引。
             const int maxIndexes = 6;
-            var indexSpecs = new List<List<string>>();
             var primaryOrderColumn = orderByColumns.FirstOrDefault()
                 ?? sortColumns.FirstOrDefault()
                 ?? "CreateTime";
-            if (searchColumns.Count > 0)
-            {
-                var first = new List<string> { "OsClient", searchColumns[0] };
-                if (!primaryOrderColumn.DosIsNullOrWhiteSpace()
-                    && !first.Contains(primaryOrderColumn, StringComparer.OrdinalIgnoreCase))
-                {
-                    first.Add(primaryOrderColumn);
-                }
-                indexSpecs.Add(first);
-
-                foreach (var column in searchColumns.Skip(1))
-                {
-                    if (indexSpecs.Count >= maxIndexes) break;
-                    indexSpecs.Add(new List<string> { "OsClient", column });
-                }
-            }
-            else if (!primaryOrderColumn.DosIsNullOrWhiteSpace())
-            {
-                indexSpecs.Add(new List<string> { "OsClient", primaryOrderColumn });
-            }
+            var indexSpecs = V8McpLogic.BuildAutoIndexSpecifications(
+                searchColumns,
+                primaryOrderColumn,
+                physicalColumns,
+                maxIndexes);
 
             var totalRequested = indexSpecs.Count;
             var truncated = searchColumns.Count + (primaryOrderColumn.DosIsNullOrWhiteSpace() ? 0 : 1) > maxIndexes;
