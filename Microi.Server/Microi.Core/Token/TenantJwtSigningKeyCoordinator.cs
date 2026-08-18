@@ -187,7 +187,11 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                return Failed("JWT 租户级签名密钥收敛异常：" + ex.Message);
+                // 数据库连接、超时等基础设施异常必须保留原始异常链，供启动器
+                // 判断是否属于可重试故障；业务上的收敛不一致仍通过 Success=false 返回。
+                throw new InvalidOperationException(
+                    "JWT 租户级签名密钥收敛异常：" + ex.Message,
+                    ex);
             }
         }
 

@@ -151,6 +151,17 @@ function validateReleaseCandidate(name, content) {
         : null;
       const buildAssets = Array.isArray(bundle?.BuildAssets) ? bundle.BuildAssets : [];
       const buildBytes = buildAssets.reduce((sum, asset) => sum + (Number(asset?.Size) || 0), 0);
+      const bundleVersion = String(bundle?.VersionNo || '').replace(/^v/i, '').split('.').map(item => Number(item) || 0);
+      const bundleVersionNumber = (bundleVersion[0] || 0) * 1_000_000
+        + (bundleVersion[1] || 0) * 1_000
+        + (bundleVersion[2] || 0);
+      let backupButton = null;
+      for (const menu of packageModel.SysMenus || []) {
+        try {
+          const buttons = typeof menu.PageBtns === 'string' ? JSON.parse(menu.PageBtns) : menu.PageBtns;
+          backupButton = (Array.isArray(buttons) ? buttons : []).find(button => button?.Id === 'database-backup-page-btn') || backupButton;
+        } catch { /* 单个旧菜单不影响目标按钮定位 */ }
+      }
       if (packageModel?.PackageInfo?.IncludeSource !== false
         || bundle?.IncludeSource !== false
         || (Array.isArray(bundle?.SourceFiles) && bundle.SourceFiles.length > 0)
@@ -160,8 +171,11 @@ function validateReleaseCandidate(name, content) {
         || bundle?.AssetStoragePolicy?.Build !== 'DatabaseOnly'
         || buildAssets.length < 1
         || buildAssets.length > 256
-        || buildBytes > 5 * 1024 * 1024) {
-        throw new Error(`${name} 必须以无伪源码、256 文件/5MB 内的 DatabaseOnly 平台内置微服务发布`);
+        || buildBytes > 5 * 1024 * 1024
+        || bundleVersionNumber < 1_006_000
+        || !String(backupButton?.V8Code || '').includes("Width: '80%'")
+        || !String(backupButton?.V8Code || '').includes('BodyHeight:')) {
+        throw new Error(`${name} 必须以 v1.6.0+、无伪源码、256 文件/5MB 内的 DatabaseOnly 平台内置微服务发布，并保留数据库备份 80% 统一弹层契约`);
       }
     }
     if (name === 'app.microi.store.json') {
@@ -221,6 +235,14 @@ function validateReleaseCandidate(name, content) {
       const importerEngine = engines.find(engine => engine.ApiEngineKey === 'import-microi-store-package');
       const publisherEngine = engines.find(engine => engine.ApiEngineKey === 'ai_app_publish_store');
       const bulkEngine = engines.find(engine => engine.ApiEngineKey === 'bulk-import-microi-store-packages');
+      const listEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-store');
+      const modelEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-store-model');
+      const versionsEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-store-versions');
+      const visibilityField = fields.find(field => field.TableName === 'sys_microistore' && field.Name === 'IsPublic');
+      const deprecatedMenusValid = ['01KXFSG8153B3VZPZ45WNCCFHR', '01KXFSG7MZ40CY8KCWCZZZJH2M'].every(id => {
+        const menu = menus.find(item => String(item?.Id || '') === id);
+        return menu && Number(menu.Display) === 0 && Number(menu.AppDisplay) === 0 && String(menu.Url) === '/microi-store';
+      });
       const engineVersionNumber = engine => {
         const parts = String(engine?.Version || '')
           .replace(/^v/i, '')
@@ -236,7 +258,7 @@ function validateReleaseCandidate(name, content) {
         + (importerVersionParts[1] || 0) * 1_000
         + (importerVersionParts[2] || 0);
       const importerCode = String(importerEngine?.ApiV8Code || '');
-      if (versionNumber < 7_000_013
+      if (versionNumber < 7_004_002
         || !content.includes('TargetSysMenuId')
         || !content.includes('01KXFSG7MZ40CY8KCWCZZZJH2M')
         || !content.includes('01KXFSG8153B3VZPZ45WNCCFHR')
@@ -282,6 +304,18 @@ function validateReleaseCandidate(name, content) {
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STORAGE_FAILURE_RECOVERY_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_MONOTONIC_CHILD_PROGRESS_V1')
+        || visibilityField?.Component !== 'Switch'
+        || String(visibilityField?.DefaultValue) !== '1'
+        || !deprecatedMenusValid
+        || engineVersionNumber(listEngine) < 1_004_000
+        || !String(listEngine?.ApiV8Code || '').includes('ownedOnly')
+        || !String(listEngine?.ApiV8Code || '').includes('V8.Param.Visibility')
+        || engineVersionNumber(modelEngine) < 1_002_000
+        || !String(modelEngine?.ApiV8Code || '').includes('delete row.PrivateSourcePath')
+        || engineVersionNumber(versionsEngine) < 1_000_000
+        || !String(versionsEngine?.ApiV8Code || '').includes('mic_data_version')
+        || !importerCode.includes('MARKETPLACE_PRIVATE_SOURCE_CREDENTIAL_V1')
+        || !importerCode.includes('StoreVersionId')
         || !content.includes("RunBackground('bulk-import-microi-store-packages'")
         || !content.includes('BULK_QUEUE_PREFLIGHT_DIAGNOSTICS_V1')
         || !content.includes("ApplicationType: 'Platform'")

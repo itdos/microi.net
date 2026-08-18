@@ -453,7 +453,7 @@ export default {
                     // var height = $('#diy-table-' + self.TableId).height();
                     var isLeftRightTable = typeof self.ContainerClass === "string" && self.ContainerClass.indexOf("left-right-diy-table") > -1;
                     var bottomReserved = isLeftRightTable ? 115 : 55;
-                    var result = `calc(100vh - ${top}px - ${bottomReserved}px)`;
+                    var result = `calc(100vh - ${top}px - ${bottomReserved}px - 10px)`;//2026-08-18 Anderson：新增多-10px，底部留点空隙好看些
                     // $('#diy-table-' + self.TableId).height(result);
                     return result;
                 }

@@ -12,8 +12,9 @@ using Newtonsoft.Json.Linq;
 namespace Microi.net.Api
 {
     /// <summary>
-    /// 租户自有系统设置管理。普通值保存在当前租户业务库；Secret 只接受明文写入此
-    /// 可信端点并立即转换为认证密文，列表永不返回密文或明文。
+    /// 租户自有后端私有设置管理。普通私有值保存在当前租户业务库；Secret 只接受明文
+    /// 写入此可信端点并立即转换为认证密文，列表永不返回密文或明文。公开配置必须进入
+    /// sys_config 实体字段，mci_system_setting 不提供浏览器公开通道。
     /// </summary>
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
@@ -51,7 +52,7 @@ namespace Microi.net.Api
                 if (OsClientExtend.GetClient(osClient) == null)
                     return Json(new DosResult(0, null, "租户不存在。"));
                 Response.Headers.CacheControl = "no-store";
-                return Json(new DosResult(1, TenantSystemSettingsSecurity.LoadPublicProjection(osClient)));
+                return Json(new DosResult(1, new JObject()));
             }
             catch
             {
@@ -102,7 +103,7 @@ namespace Microi.net.Api
             var value = request.Value ?? string.Empty;
             if (value.Length > 1024 * 1024) return Json(new DosResult(0, null, "设置值不能超过 1MB。"));
             var isSecret = request.IsSecret || TenantSystemSettingsSecurity.IsSensitiveKey(key);
-            var isPublic = request.IsPublic && !isSecret;
+            const bool isPublic = false;
 
             var existing = await FindSettingAsync(osClient, request.Id, key).ConfigureAwait(false);
             var id = existing?["Id"]?.ToString() ?? Guid.NewGuid().ToString();

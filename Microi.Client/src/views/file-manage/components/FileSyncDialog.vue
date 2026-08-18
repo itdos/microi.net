@@ -1941,7 +1941,7 @@ const normalizeProgress = (value) => Math.max(0, Math.min(100, Number(value || 0
 
 .sync-tabs {
   :deep(.el-tabs__header) {
-    margin: 0 0 12px;
+    margin: 0 0 10px;
   }
 
   :deep(.el-tabs__item) {

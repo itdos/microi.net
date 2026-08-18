@@ -234,6 +234,7 @@ test("List FormWorkbench normalizes record switching without enabling custom det
         Mode: "Edit",
         Density: "Compact",
         SectionNavigation: "Auto",
+        SectionNavigationPosition: "Left",
         Eyebrow: "",
         Description: "",
         NavigationTitle: "",

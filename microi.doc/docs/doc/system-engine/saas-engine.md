@@ -39,7 +39,7 @@
 `sys_osclients` 包含数据库、认证、Redis、对象存储、MQ/MQTT、搜索等基础设施机密，不能通过普通 FormEngine、前端 V8 或接口返回整行数据。
 
 - `V8.OsClientModel` / `V8.ClientModel` 是当前租户的独立脱敏副本，不包含数据库连接、`AuthSecret`、Redis、对象存储、MQ/MQTT、搜索凭据。
-- `V8.SysConfig` 同样是脱敏副本，不包含 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 和疑似 Password/Secret/Token/Key/Connection 字段。
+- 浏览器 `V8.SysConfig` 是 `sys_config` 的脱敏副本，不包含 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code`、`ServerPrivateSettings` 和疑似 Password/Secret/Token/Key/Connection 字段。
 - 存量项目可能在 `sys_osclients` 扩展微信、支付、ERP 等业务密钥；新增配置应迁移到当前租户库的 `mci_system_setting`，由受控后端使用，禁止把整个配置对象或具体密钥返回前端。
 - 普通帐号即使拥有 Token 或错误配置了菜单/高级表权限，也不能通过通用 FormEngine 访问 SaaS 配置、接口引擎、菜单角色、任务、数据源等管理员专用平台表。相关控制面管理接口会用当前租户主库复核活动用户及有效管理员角色，要求 `Level >= 9999`；请求体自报管理员身份无效。
 - 主租户由运行环境中的 `OsClient` 或 `AppSettings:OsClient` 决定，不应在业务代码中写死为 `master`、`iTdos` 或其它固定值。
@@ -53,10 +53,10 @@
 | 配置类型 | 事实源 | 子租户能否自行维护 |
 |---|---|---|
 | 数据库连接、Redis、MongoDB、MinIO、MQ/MQTT、搜索、签名与部署信任链 | 主库 `sys_osclients` | 否，只能由平台控制面维护 |
-| 系统标题、主题、公开地址等传统系统配置 | 子租户库 `sys_config` | 按系统设置权限维护 |
-| OAuth ClientId/ClientSecret、租户业务开关、第三方业务参数 | 子租户库 `mci_system_setting` | 是，仅租户超级管理员维护 |
+| 系统标题、主题、公开地址、登录入口显示等浏览器公开配置 | 子租户库 `sys_config` 实体字段 | 按系统设置权限维护 |
+| OAuth ClientId/ClientSecret、后端业务开关、第三方私密参数 | 子租户库 `mci_system_setting` | 是，仅租户超级管理员维护 |
 
-`mci_system_setting` 的公开性是每条记录动态配置的：普通设置可选择直接平铺到前端 `V8.SysConfig` 根对象；任何运行端都不存在 `PublicSettings` 属性。Secret 只保存租户绑定的认证密文，在后端接口引擎/后端 V8 事件的根级 `V8.SysConfig[ConfigKey]` 中按当前租户解密使用。平台固定一组永远不能公开到浏览器的敏感 Key 规则——Password、Secret、Token、Credential、PrivateKey、AccessKey、ApiKey、ConnectionString、DbConn、Redis、MinIO、ClientSecret 等名称即使勾选公开也会被后端拒绝。后端使用 Secret 时禁止回传、日志或审计原文。
+`mci_system_setting` 只属于后端私密执行面，历史 `IsPublic` 字段已停用，普通值与 Secret 都不会下发浏览器。后端接口引擎/后端 V8 事件通过 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 按当前租户读取，Secret 由可信后端解密；该独立节点避免动态 Key 覆盖 `sys_config` 实体字段。后端使用私密值时禁止整体返回节点，Secret 还禁止写入日志、审计或前端可读字段。
 
 Secret 的列表接口只返回“已配置”状态；显示原文需要租户超级管理员先完成 Passkey、Authenticator 或严格人脸二次验证，原文响应禁止缓存并在前端 30 秒后清除，审计只记录 Key/记录 Id/结果，不记录明文。登录方式的完整配置见 [登录方式、Passkey、Authenticator、第三方登录与严格人脸验证](../more/identity-verification)。
 

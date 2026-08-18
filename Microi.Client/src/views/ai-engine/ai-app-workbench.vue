@@ -2350,9 +2350,9 @@ function scrollAppChat() {
 .active-file-meta {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     min-height: 34px;
-    padding: 0 12px;
+    padding: 0 10px;
     border-bottom: 1px solid #edf1f7;
     color: #7a8599;
     font-size: 12px;
@@ -2372,9 +2372,9 @@ function scrollAppChat() {
 .publish-meta {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     min-height: 34px;
-    padding: 0 12px;
+    padding: 0 10px;
     border-bottom: 1px solid #edf1f7;
     background: #fffaf7;
     color: #7a8599;
@@ -2446,7 +2446,7 @@ function scrollAppChat() {
     background: #fff;
     color: #596273;
     cursor: pointer;
-    padding: 0 12px;
+    padding: 0 10px;
 }
 
 .viewer-tabs button.active {

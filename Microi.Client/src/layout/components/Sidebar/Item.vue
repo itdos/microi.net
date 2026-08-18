@@ -63,6 +63,17 @@ export default {
         let requestGeneration = 0;
 
         const badgeConfigModel = computed(() => normalizeMenuBadgeConfig(props.badgeConfig));
+        const badgeWatchSignature = computed(() => {
+            const config = badgeConfigModel.value;
+            return [
+                props.menuId,
+                config.Enabled,
+                config.ApiEngineKey,
+                config.ValuePath,
+                config.RefreshSeconds,
+                JSON.stringify(config.ParamMap || {})
+            ].join('|');
+        });
         const badgeText = computed(() => formatBadgeValue(badgeRawValue.value, badgeConfigModel.value));
 
         // 解析图标名称
@@ -121,7 +132,7 @@ export default {
             }
         };
 
-        watch(() => [props.menuId, props.badgeConfig], () => loadBadge(true), { deep: true });
+        watch(badgeWatchSignature, () => loadBadge(true));
         onMounted(() => loadBadge());
         onBeforeUnmount(() => {
             requestGeneration++;

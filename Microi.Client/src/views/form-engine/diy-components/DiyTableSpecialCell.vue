@@ -211,7 +211,7 @@ watch([rawValue, component], resolveQrCode, { immediate: true });
             <span v-else class="diy-special-empty"><fa-icon icon="far fa-file" /> 暂无文件</span>
         </template>
 
-        <button v-else-if="component === 'TableChild'" type="button" class="diy-special-action" @click.stop="openTableChild">
+        <button v-else-if="component === 'TableChild'" type="button" class="diy-special-action diy-special-action--table-child" @click.stop="openTableChild">
             <fa-icon icon="fas fa-table-list" />
             <span>查看子表</span>
             <fa-icon class="diy-special-action-arrow" icon="fas fa-chevron-right" />
@@ -386,6 +386,26 @@ watch([rawValue, component], resolveQrCode, { immediate: true });
 }
 .diy-special-action:hover { background: var(--el-color-primary-light-9); border-color: var(--el-color-primary-light-5); }
 .diy-special-action-arrow { color: var(--el-text-color-placeholder); font-size: 10px; }
+.diy-special-action--table-child {
+    min-height: 26px;
+    gap: 6px;
+    padding: 3px 8px;
+    border-color: color-mix(in srgb, var(--el-color-primary) 18%, var(--el-border-color));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--el-color-primary) 7%, var(--el-bg-color));
+    box-shadow: none;
+    font-size: 12px;
+    line-height: 18px;
+    transition: color .15s ease, border-color .15s ease, background-color .15s ease, transform .15s ease;
+}
+.diy-special-action--table-child:hover,
+.diy-special-action--table-child:focus-visible {
+    outline: 0;
+    border-color: color-mix(in srgb, var(--el-color-primary) 36%, var(--el-border-color));
+    background: color-mix(in srgb, var(--el-color-primary) 12%, var(--el-bg-color));
+    transform: translateY(-1px);
+}
+.diy-special-action--table-child .diy-special-action-arrow { margin-left: -1px; }
 .diy-special-empty { display: inline-flex; align-items: center; gap: 6px; color: var(--el-text-color-placeholder); }
 .diy-special-font-icon,
 .diy-special-color,

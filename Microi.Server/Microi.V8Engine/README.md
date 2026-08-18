@@ -47,6 +47,7 @@
 │                  用户 JavaScript 脚本                        │
 │  var result = V8.Alipay.CreatePay({...});                   │
 │  var info = V8.System.GetOSInfo();                          │
+│  var sent = V8.Tcp.Send({Host:'10.0.0.8',Port:9100,...});  │
 │  var sign = V8.Method.HmacSha256Sign(data, key);           │
 └────────────────────────────┬────────────────────────────────┘
                              │ 调用
@@ -62,6 +63,7 @@
 │  Register("Alipay",  () => new Alipay());                   │
 │  Register("WeChat",  () => new WeChat());                   │
 │  Register("System",  () => new SystemInfo());               │
+│  Register("Tcp",     () => new V8Tcp());                    │
 │  Register("YourExt", () => new YourExtension());  ← 你的扩展 │
 └────────────────────────────┬────────────────────────────────┘
                              │ 配置
@@ -577,6 +579,21 @@ var io = V8.System.GetDiskIO();
 
 主机监控属于运维能力，只能由 `Level >= 9999` 的管理链路使用，不得从普通或匿名接口返回机器名、磁盘、网络、进程或基础设施信息。
 
+### V8.Tcp — 一次性 TCP 原始字节客户端
+
+```javascript
+var result = V8.Tcp.Send({
+    Host: '192.168.1.88',
+    Port: 9100,
+    Bytes: [27, 64, 29, 86, 0],
+    ConnectTimeout: 5,
+    SendTimeout: 5
+});
+if (result.Code !== 1) return result;
+```
+
+`Send/SendAsync` 用于发送；`SendAndReceive/SendAndReceiveAsync` 用于发送后读取有界响应。目标必须来自可信配置，不能直接透传用户参数；`Code=1` 只表示 TCP 写入完成，不代表设备执行或小票出纸。完整契约、安全和幂等边界见官网后端 V8 文档与 `microi.skills/v8-tcp-integration/SKILL.md`。
+
 ---
 
 ## 完整示例：实现一个短信服务扩展
@@ -739,6 +756,10 @@ Microi.V8Engine/
 │   │   └── WeChat.cs            # 微信支付 & 消息加解密
 │   ├── System/
 │   │   └── SystemInfo.cs        # 系统硬件监控（Docker 友好）
+│   ├── Image/
+│   │   └── V8Image.cs           # 服务端内存图片处理
+│   ├── Tcp/
+│   │   └── V8Tcp.cs             # 一次性 TCP 原始字节发送与收发
 │   └── DwgConvert/
 │       └── DwgConverter.cs      # DWG→DXF 文件格式转换
 ├── Examples/                    # 使用示例

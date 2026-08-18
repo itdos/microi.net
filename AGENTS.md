@@ -245,6 +245,23 @@ var resp = V8.Http.PatchResponse({
 
 ---
 
+## V8.Tcp — TCP 原始字节
+
+```js
+var result = V8.Tcp.Send({
+  Host: '192.168.1.88',       // 必须来自可信配置
+  Port: 9100,
+  Bytes: [27, 64, 29, 86, 0],
+  ConnectTimeout: 10,
+  SendTimeout: 10
+});
+// 需要响应时使用 SendAndReceive / SendAndReceiveAsync
+```
+
+`Bytes`、`ByteBase64`、`Hex`、`Text` 必须且只能提供一种；目标不得直接透传 `V8.Param`。`Code=1` 只表示 TCP 写入完成，不代表设备执行或小票出纸；结果未知时盲目重试可能重复打印。
+
+---
+
 ## V8.ApiEngine — 调用其他接口引擎
 
 ```js
@@ -607,12 +624,13 @@ console.log('调试信息')                                  // 控制台输出�
 
 ## Microi 项目技能规范
 
-处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付复盘时，必须先按任务类型读取相关 skill 文件；不要只在编写 V8 代码时才参考 skills（共 58 个）。普通用户在空工作区安装插件后，只要通过插件执行初始化或拉取，AI 就应自动识别这些规则，不需要再手动要求“严格遵循 skills”：
+处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付复盘时，必须先按任务类型读取相关 skill 文件；不要只在编写 V8 代码时才参考 skills（共 59 个）。普通用户在空工作区安装插件后，只要通过插件执行初始化或拉取，AI 就应自动识别这些规则，不需要再手动要求“严格遵循 skills”：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
 - `microi.skills/v8-cache-pattern/SKILL.md` — Microi V8 Redis 缓存模式
 - `microi.skills/v8-http-integration/SKILL.md` — Microi V8 HTTP 外部接口集成
+- `microi.skills/v8-tcp-integration/SKILL.md` — Microi 后端 V8 TCP 原始字节、小票机与设备集成
 - `microi.skills/v8-mongodb/SKILL.md` — Microi V8 MongoDB 操作
 - `microi.skills/v8-mq-mqtt/SKILL.md` — Microi V8 消息队列与 MQTT
 - `microi.skills/v8-workflow/SKILL.md` — Microi V8 工作流事件开发

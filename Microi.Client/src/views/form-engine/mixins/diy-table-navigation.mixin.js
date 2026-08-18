@@ -301,8 +301,8 @@ export default {
                 ComponentName: "MicroAppDialog",
                 Title: param.Title || "应用",
                 TitleIcon: param.TitleIcon || "fas fa-window-maximize",
-                Width: param.Width || "min(920px, calc(100vw - 32px))",
-                BodyHeight: "min(680px, calc(100vh - 190px))",
+                Width: param.Width || "80%",
+                BodyHeight: param.BodyHeight || "min(780px, calc(100vh - 160px))",
                 OpenType: param.OpenType || "Dialog",
                 DataAppend: {
                     AppKey: param.AppKey,

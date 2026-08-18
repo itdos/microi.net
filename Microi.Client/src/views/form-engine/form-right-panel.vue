@@ -1,6 +1,6 @@
 <template>
     <div class="form-right-panel" :class="{ 'is-mobile-drawer': isMobileDrawer }">
-        <el-tabs v-model="innerActiveTab" class="form-right-tabs" @update:model-value="OnTabChange">
+        <el-tabs v-model="innerActiveTab" class="form-right-tabs mci-tabs mci-tabs--right-panel" @update:model-value="OnTabChange">
             <el-tab-pane v-if="openDiyFormWorkFlow" name="WorkFlow">
                 <template #label>
                     <span class="tab-label">
@@ -28,6 +28,7 @@
                     <span class="tab-label">
                         <el-icon><Document /></el-icon>
                         <span>{{ $t ? $t('Msg.DataLog') || '数据日志' : '数据日志' }}</span>
+                        <span class="mci-tab-badge">{{ GetRelatedCount('DataLog') }}</span>
                     </span>
                 </template>
                 <div class="panel-card">
@@ -105,6 +106,7 @@
                     <span class="tab-label">
                         <el-icon><ChatDotRound /></el-icon>
                         <span>{{ $t ? $t('Msg.DataComment') || '数据评论' : '数据评论' }}</span>
+                        <span class="mci-tab-badge">{{ GetRelatedCount('DataComment') }}</span>
                     </span>
                 </template>
                 <div class="panel-card">
@@ -219,6 +221,7 @@
                     <span class="tab-label">
                         <el-icon><Clock /></el-icon>
                         <span>{{ $t ? $t('Msg.DataVersion') : '数据版本' }}</span>
+                        <span class="mci-tab-badge">{{ GetRelatedCount('DataVersion') }}</span>
                     </span>
                 </template>
                 <div class="panel-card">
@@ -315,6 +318,7 @@ export default {
         dataCommentListLoading: { type: Boolean, default: false },
         dataVersionList: { type: Array, default: () => [] },
         dataVersionListLoading: { type: Boolean, default: false },
+        relatedCounts: { type: Object, default: () => ({ DataLog: 0, DataComment: 0, DataVersion: 0 }) },
         diyFieldList: { type: Array, default: () => [] },
         commentContent: { type: String, default: "" },
         replyComment: { type: Object, default: null },
@@ -389,6 +393,10 @@ export default {
         this.EnsureActiveTab();
     },
     methods: {
+        GetRelatedCount(type) {
+            var value = Number(this.relatedCounts && this.relatedCounts[type]);
+            return Number.isFinite(value) && value > 0 ? value : 0;
+        },
         GetFirstAvailableTab() {
             return this.availableTabs.length > 0 ? this.availableTabs[0] : "";
         },
@@ -575,14 +583,10 @@ export default {
 
     :deep(.form-right-tabs) {
         .el-tabs__header {
-            margin: 0 0 12px 0;
-        }
-        .el-tabs__nav-wrap::after {
-            background: var(--el-border-color-lighter, #e4e7ed);
-            height: 1px;
+            margin: 0 0 10px 0;
         }
         .el-tabs__item {
-            padding: 0 12px;
+            padding: 0 10px;
             font-size: 13px;
             font-weight: 500;
 
@@ -594,10 +598,6 @@ export default {
                     font-size: 14px;
                 }
             }
-        }
-        .el-tabs__active-bar {
-            height: 3px;
-            border-radius: 2px;
         }
     }
 

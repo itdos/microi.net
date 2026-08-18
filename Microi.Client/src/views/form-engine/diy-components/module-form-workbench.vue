@@ -44,7 +44,7 @@
                 >
                     <fa-icon :icon="actionIcon(action)" class="action-icon" />{{ actionLabel(action) }}
                 </el-button>
-                <el-button :icon="Refresh" :loading="loading" @click="$emit('refresh')">刷新</el-button>
+                <el-button :icon="Refresh" :loading="loading" @click="refreshCurrentRecord">刷新</el-button>
                 <el-button v-if="canAdd" :icon="Plus" @click="$emit('open-form', null, 'Add')">新增记录</el-button>
                 <el-dropdown v-if="config.ShowClassicList !== false" trigger="click">
                     <el-button :icon="MoreFilled">更多功能<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
@@ -59,8 +59,13 @@
             </div>
         </header>
 
-        <div v-if="loading && records.length === 0" class="workbench-skeleton" aria-label="数据加载中">
-            <aside></aside><main><i v-for="index in 8" :key="index"></i></main>
+        <div
+            v-if="loading && records.length === 0"
+            class="workbench-skeleton"
+            :class="{ 'has-record-navigator': showRecordNavigator }"
+            aria-label="数据加载中"
+        >
+            <aside v-if="showRecordNavigator"></aside><main><i v-for="index in 10" :key="index"></i></main>
         </div>
 
         <el-empty
@@ -157,9 +162,20 @@
                         >{{ config.SaveText || '保存当前记录' }}</el-button>
                     </div>
                 </div>
+                <div class="form-field-toolbar">
+                    <el-input
+                        v-model="fieldKeyword"
+                        clearable
+                        :prefix-icon="Search"
+                        placeholder="搜索字段名称、字段名或说明"
+                        aria-label="搜索当前表单字段"
+                    />
+                    <span v-if="fieldKeyword" class="field-match-count">{{ matchingFieldCount }} 项匹配</span>
+                    <el-button :icon="Refresh" :loading="loading" @click="refreshCurrentRecord">刷新当前记录</el-button>
+                </div>
                 <DiyForm
                     v-if="selectedId && tableId"
-                    :key="`${tableId}:${selectedId}:${formMode}`"
+                    :key="`${tableId}:${selectedId}:${formMode}:${formRefreshVersion}`"
                     ref="formRef"
                     :TableId="tableId"
                     :TableName="tableName"
@@ -168,7 +184,7 @@
                     :FormMode="formMode"
                     :LoadMode="'Workbench'"
                     :PresentationMode="presentation"
-                    :PresentationConfig="config"
+                    :PresentationConfig="resolvedPresentationConfig"
                     :CurrentTableData="records"
                     @CallbackFormSubmit="handleRequestedSubmit"
                     @CallbackSetFormData="handleFormData"
@@ -208,7 +224,9 @@ const props = defineProps({
 const emit = defineEmits(["refresh", "switch-classic", "open-form", "run-action", "load-page", "record-change", "form-ready", "saved"]);
 const selectedId = ref("");
 const keyword = ref("");
+const fieldKeyword = ref("");
 const saving = ref(false);
+const formRefreshVersion = ref(0);
 const formRef = ref(null);
 const currentForm = ref({});
 
@@ -232,6 +250,21 @@ const visibleRowOutsideActions = computed(() => visibleActions(selectedRecord.va
 const visibleRowInsideActions = computed(() => visibleActions(selectedRecord.value?._RowMoreBtnsIn));
 const workspaceEyebrow = computed(() => String(props.config.Eyebrow || "FORM WORKBENCH"));
 const workspaceDescription = computed(() => String(props.config.Description || "集中维护当前记录的业务信息，原有字段事件、表单事件与权限规则保持不变。"));
+const resolvedPresentationConfig = computed(() => ({
+    ...(props.config || {}),
+    FieldSearchKeyword: fieldKeyword.value
+}));
+const matchingFieldCount = computed(() => {
+    const value = fieldKeyword.value.trim().toLowerCase();
+    if (!value) return (Array.isArray(props.fields) ? props.fields : []).length;
+    return (Array.isArray(props.fields) ? props.fields : []).filter((field) => [
+        field?.Label,
+        field?.Name,
+        field?.AsName,
+        field?.Description,
+        field?.Component
+    ].some((item) => String(item || "").toLowerCase().includes(value))).length;
+});
 
 watch(selectedId, (value, previous) => {
     if (!value || value === previous) return;
@@ -290,6 +323,10 @@ function actionType(action) {
 function selectRecord(id) {
     selectedId.value = id;
 }
+function refreshCurrentRecord() {
+    formRefreshVersion.value += 1;
+    emit("refresh");
+}
 function runAction(action, scope) {
     let row = selectedRecord.value || {};
     if (scope === "Page") row = {};
@@ -329,11 +366,11 @@ async function saveCurrent(overrides = {}) {
     --workbench-accent: var(--mci-color-primary, var(--el-color-primary, #3478f6));
     --workbench-line: var(--mci-border-color, var(--el-border-color-lighter, #e7edf5));
     --workbench-soft: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f5f8fc));
-    padding: 14px;
-    border: 1px solid var(--workbench-line);
-    border-radius: var(--mci-radius-lg, 18px);
-    background: var(--mci-bg-card, var(--el-bg-color, #fff));
-    box-shadow: var(--mci-shadow-md, 0 14px 42px rgba(25, 48, 82, .06));
+    padding: 8px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
 .workbench-toolbar,
 .workbench-record-select,
@@ -341,37 +378,41 @@ async function saveCurrent(overrides = {}) {
 .form-workspace-head,
 .form-scope-actions,
 .record-pagination { display: flex; align-items: center; }
-.workbench-toolbar { justify-content: space-between; gap: 12px; padding-bottom: 13px; border-bottom: 1px solid var(--workbench-line); }
+.workbench-toolbar { justify-content: space-between; gap: 10px; padding: 2px 0 8px; border-bottom: 0; }
 .workbench-record-select { min-width: 0; flex: 1; gap: 9px; }
 .workbench-record-select :deep(.el-select) { width: min(460px, 50vw); }
 .toolbar-label { color: var(--el-text-color-secondary); font-size: 12px; white-space: nowrap; }
 .record-count { padding: 3px 8px; border-radius: 999px; color: var(--workbench-accent); background: color-mix(in srgb, var(--workbench-accent) 9%, transparent); font-size: 11px; white-space: nowrap; }
 .workbench-actions,.form-scope-actions { justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
 .workbench-actions :deep(.el-button + .el-button),.form-scope-actions :deep(.el-button + .el-button) { margin-left: 0; }
-.workbench-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 14px; }
+.workbench-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 10px; }
 .workbench-layout.has-record-navigator { grid-template-columns: 230px minmax(0, 1fr); }
-.record-navigator { display: flex; min-height: 520px; flex-direction: column; padding: 10px; border: 1px solid var(--workbench-line); border-radius: 15px; background: var(--workbench-soft); }
+.record-navigator { display: flex; min-height: 520px; flex-direction: column; padding: 8px; border: 1px solid color-mix(in srgb, var(--workbench-line) 58%, transparent); border-radius: 13px; background: color-mix(in srgb, var(--workbench-soft) 68%, transparent); }
 .record-search { margin-bottom: 9px; }
 .record-list { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 6px; overflow: auto; }
 .record-item { display: flex; width: 100%; align-items: center; gap: 9px; padding: 9px; border: 1px solid transparent; border-radius: 11px; color: var(--el-text-color-regular); background: transparent; text-align: left; cursor: pointer; transition: .16s ease; }
 .record-item:hover { border-color: color-mix(in srgb, var(--workbench-accent) 20%, var(--workbench-line)); background: var(--el-bg-color); }
-.record-item.active { border-color: color-mix(in srgb, var(--workbench-accent) 34%, var(--workbench-line)); color: var(--workbench-accent); background: var(--el-bg-color); box-shadow: inset 3px 0 var(--workbench-accent), var(--mci-shadow-sm, 0 8px 18px rgba(25, 48, 82, .06)); }
+.record-item.active { border-color: color-mix(in srgb, var(--workbench-accent) 30%, var(--workbench-line)); color: var(--workbench-accent); background: var(--el-bg-color); box-shadow: inset 3px 0 var(--workbench-accent), 0 2px 8px rgba(25, 48, 82, .035); }
 .record-mark { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 10px; color: var(--workbench-accent); background: color-mix(in srgb, var(--workbench-accent) 10%, transparent); font-weight: 750; }
 .record-copy { min-width: 0; flex: 1; }
 .record-copy b,.record-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .record-copy b { font-size: 12px; }
 .record-copy small { margin-top: 3px; color: var(--el-text-color-secondary); font-size: 9px; }
 .record-pagination { justify-content: space-between; gap: 4px; padding-top: 8px; color: var(--el-text-color-secondary); font-size: 10px; }
-.form-workspace { min-width: 0; padding: 15px; border: 1px solid var(--workbench-line); border-radius: 15px; background: var(--mci-bg-card, var(--el-bg-color, #fff)); }
-.form-workspace-head { justify-content: space-between; gap: 16px; margin-bottom: 12px; padding: 2px 2px 12px; border-bottom: 1px solid var(--workbench-line); }
+.form-workspace { min-width: 0; padding: 10px; border: 0; border-radius: 14px; background: transparent; }
+.form-workspace-head { justify-content: space-between; gap: 14px; margin-bottom: 8px; padding: 2px 2px 6px; border-bottom: 0; }
+.form-field-toolbar { display: flex; align-items: center; gap: 8px; margin: 0 2px 10px; padding: 8px; border: 1px solid color-mix(in srgb, var(--workbench-line) 64%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--workbench-soft) 55%, transparent); }
+.form-field-toolbar :deep(.el-input) { min-width: 220px; flex: 1; }
+.field-match-count { color: var(--el-text-color-secondary); font-size: 11px; white-space: nowrap; }
 .workspace-copy { min-width: 240px; flex: 1; }
 .form-workspace-head h2 { margin: 3px 0 0; color: var(--el-text-color-primary); font-size: 18px; line-height: 25px; }
 .form-workspace-head p { margin: 4px 0 0; color: var(--el-text-color-secondary); font-size: 11px; line-height: 17px; }
 .workspace-eyebrow { color: var(--workbench-accent); font-size: 9px; font-weight: 800; letter-spacing: 1.4px; }
 .workbench-empty { min-height: 420px; }
-.workbench-skeleton { display: grid; grid-template-columns: 230px 1fr; gap: 14px; margin-top: 14px; }
+.workbench-skeleton { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 10px; }
+.workbench-skeleton.has-record-navigator { grid-template-columns: 230px minmax(0, 1fr); }
 .workbench-skeleton aside,.workbench-skeleton main { min-height: 520px; border-radius: 15px; background: linear-gradient(90deg, var(--workbench-soft), var(--el-bg-color), var(--workbench-soft)); background-size: 220% 100%; animation: workbench-shimmer 1.2s infinite; }
-.workbench-skeleton main { display: grid; grid-template-columns: 1fr 1fr; align-content: start; gap: 12px; padding: 64px 18px 18px; }
+.workbench-skeleton main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 12px; padding: 26px 18px 18px; overflow: hidden; }
 .workbench-skeleton i { height: 58px; border-radius: 10px; background: color-mix(in srgb, var(--el-bg-color) 58%, transparent); }
 .action-icon { margin-right: 6px; }
 @keyframes workbench-shimmer { to { background-position: -220% 0; } }
@@ -382,18 +423,21 @@ async function saveCurrent(overrides = {}) {
 @media (max-width: 900px) {
     .workbench-record-select :deep(.el-select) { width: 100%; }
     .workbench-layout,.workbench-layout.has-record-navigator { grid-template-columns: 1fr; }
+    .workbench-skeleton,.workbench-skeleton.has-record-navigator { grid-template-columns: 1fr; }
+    .workbench-skeleton aside { display: none; }
     .record-navigator { min-height: auto; }
     .record-list { max-height: 240px; }
 }
 @media (max-width: 620px) {
-    .module-form-workbench { padding: 9px; border-radius: 12px; }
+    .module-form-workbench { padding: 4px; border-radius: 0; }
     .workbench-record-select { align-items: stretch; flex-direction: column; }
     .toolbar-label { display: none; }
     .workbench-actions,.form-scope-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .workbench-actions :deep(.el-button),.workbench-actions :deep(.el-dropdown),.workbench-actions :deep(.el-dropdown .el-button),
     .form-scope-actions :deep(.el-button),.form-scope-actions :deep(.el-dropdown),.form-scope-actions :deep(.el-dropdown .el-button) { width: 100%; }
-    .form-workspace { padding: 10px; }
+    .form-workspace { padding: 6px; }
     .form-workspace-head p { display: none; }
+    .form-field-toolbar { align-items: stretch; flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>

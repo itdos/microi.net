@@ -75,9 +75,12 @@ test("table, form and menu navigation expose skeletons before empty content", ()
     assert.match(diyForm, /v-mci-loading:form="!GetDiyTableRowModelFinish"/);
     assert.doesNotMatch(diyForm, /form-skeleton-container/);
     assert.match(permission, /startRouteLoading\(\)/);
+    assert.match(permission, /from\?\.matched[\s\S]*?cancelRouteLoading\(\)/);
     assert.match(permission, /finishRouteLoading\(\)/);
+    assert.match(directive, /export function cancelRouteLoading\(\)/);
     assert.match(appMain, /v-mci-loading:page="routeLoading"/);
     assert.match(tagsView, /mci-route-view-host[^>]*v-mci-loading:page="routeLoading"/);
+    assert.doesNotMatch(appMain, /mode="out-in"/);
 });
 
 test("light, dark and custom palettes drive skeleton tokens without black loading masks", () => {

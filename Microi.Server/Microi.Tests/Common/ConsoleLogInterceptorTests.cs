@@ -23,6 +23,12 @@ namespace Microi.Tests.Common
 
             interceptor.WriteLine("Microi：【❌Error】【2026-07-30 00:00:01】【MQ消息队列】插件启动失败：连接不可用");
             Assert.Contains("【MQ消息队列】插件启动失败", original.ToString());
+
+            interceptor.WriteLine("Microi：【Error异常】SaaS引擎初始化异常：数据库连接失败");
+            Assert.Contains("SaaS引擎初始化异常", original.ToString());
+
+            interceptor.WriteLine("Microi：【❌启动失败】主租户[iTdos]SaaS配置数据库加载失败");
+            Assert.Contains("SaaS配置数据库加载失败", original.ToString());
         }
 
         [Fact]

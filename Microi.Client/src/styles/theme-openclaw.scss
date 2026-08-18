@@ -440,8 +440,8 @@
   }
 
   // ===== Tab 选项卡头部 =====
-  #table-rowlist-tabs,
-  #field-form-tabs {
+  #table-rowlist-tabs:not(.mci-tabs),
+  #field-form-tabs:not(.mci-tabs) {
     .el-tabs__header {
       background: rgba(255,255,255,0.02) !important;
       border-color: var(--oc-border) !important;

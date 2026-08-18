@@ -483,8 +483,10 @@ export default {
                                 }
                             });
                             self.DataCommentList = result.Data;
+                            self.FormRelatedCounts.DataComment = Number(result.DataCount ?? result.Data.length) || 0;
                         } else {
                             self.DataCommentList = [];
+                            self.FormRelatedCounts.DataComment = 0;
                         }
                     } finally {
                         self.DataCommentListLoading = false;

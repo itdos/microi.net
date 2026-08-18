@@ -227,3 +227,15 @@ test("login SFC wires branding, remembered accounts, classic default, and AI mot
     assert.match(component, /@media \(min-width: 1200px\)[\s\S]*?width:\s*620px/);
     assert.doesNotMatch(component, /@media \(min-width: 1365px\)/);
 });
+
+test("sidebar logo keeps one stable image node with local fallback", () => {
+    const component = readFileSync(new URL("../src/layout/components/Sidebar/Logo.vue", import.meta.url), "utf8");
+
+    assert.equal((component.match(/class="sidebar-logo-microi"/g) || []).length, 1);
+    assert.match(component, /resolveLoginSystemLogoUrl/);
+    assert.match(component, /LOCAL_LOGO_FALLBACK\s*=\s*"\.\/static\/img\/logo\/itdos\.svg"/);
+    assert.match(component, /@load="HandleSysLogoLoad"/);
+    assert.match(component, /@error="HandleSysLogoError"/);
+    assert.match(component, /this\.logoSource\s*=\s*LOCAL_LOGO_FALLBACK/);
+    assert.doesNotMatch(component, /<transition[\s>]/);
+});

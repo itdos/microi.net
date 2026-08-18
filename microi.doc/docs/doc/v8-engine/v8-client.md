@@ -1063,10 +1063,11 @@ var clientType = V8.ClientType;
 ```js
 var sysTitle = V8.SysConfig.SysTitle;
 var apiBase = V8.SysConfig.ApiBase;
-var loginLabel = V8.SysConfig['Login.Gitee.Name'];
+var githubVisible = V8.SysConfig.LoginGitHubDisplay;
+var maskBlurDisabled = V8.SysConfig.DisableFormMaskBlur === 1;
 ```
 
-前端 `V8.SysConfig` 不是 `sys_config`/SaaS 配置整行，也不存在 `PublicSettings` 属性。当前租户 `mci_system_setting` 中勾选“浏览器公开”的普通设置直接平铺到 `SysConfig` 根对象，不需要修改前端代码；但是 Secret 以及名称包含 Password、Secret、Token、Credential、PrivateKey、AccessKey、ApiKey、ConnectionString、DbConn、Redis、MinIO、ClientSecret 等敏感片段的设置始终不会公开。数据库、对象存储、MQ、搜索凭据、`ClientSecrets`、`GlobalServerV8Code` 等同样不会注入浏览器。需要业务密钥的逻辑必须放到后端接口引擎或后端 V8 事件中，禁止尝试从前端读取。
+前端 `V8.SysConfig` 不是数据库原行，而是当前租户 `sys_config` 的浏览器安全投影；新增公开配置必须在 `sys_config` 创建实体字段。它不存在 `PublicSettings` 或 `ServerPrivateSettings` 属性，`mci_system_setting` 的任何普通值或 Secret 都不会注入浏览器。数据库、对象存储、MQ、搜索凭据、`ClientSecrets`、`GlobalServerV8Code` 等同样不会公开。需要业务密钥的逻辑必须放到后端接口引擎或后端 V8 事件中。
 
 ## V8.FormEngine
 >* 前端表单引擎 facade，用于受权限约束的单表 CRUD。完整查询参数见：[FormEngine用法](https://microi.net/doc/v8-engine/form-engine.html)

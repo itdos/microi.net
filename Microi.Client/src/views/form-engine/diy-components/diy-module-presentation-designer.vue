@@ -219,6 +219,15 @@
                             </el-select>
                         </label>
                         <label class="compact-field">
+                            <span>导航方向</span>
+                            <el-select v-model="listView.Layout.Form.SectionNavigationPosition" :disabled="readonly || !formWorkbenchEnabled || listView.Layout.Form.SectionNavigation === 'Tabs'">
+                                <el-option label="左侧" value="Left" />
+                                <el-option label="顶部" value="Top" />
+                                <el-option label="右侧" value="Right" />
+                                <el-option label="底部" value="Bottom" />
+                            </el-select>
+                        </label>
+                        <label class="compact-field">
                             <span>默认模式</span>
                             <el-select v-model="listView.Layout.Form.Mode" :disabled="readonly || !formWorkbenchEnabled">
                                 <el-option label="可编辑" value="Edit" />
@@ -678,6 +687,7 @@ function ensureEditorViews(root) {
     if (!form.value.Mode) { form.value.Mode = "Edit"; changed = true; }
     if (!form.value.Density) { form.value.Density = "Compact"; changed = true; }
     if (!form.value.SectionNavigation) { form.value.SectionNavigation = "Auto"; changed = true; }
+    if (!form.value.SectionNavigationPosition) { form.value.SectionNavigationPosition = "Left"; changed = true; }
     ["Eyebrow", "Description", "NavigationTitle", "SectionEyebrow", "SaveText"].forEach((key) => {
         if (form.value[key] === undefined) { form.value[key] = ""; changed = true; }
     });

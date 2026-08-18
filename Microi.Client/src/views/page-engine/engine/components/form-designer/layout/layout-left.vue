@@ -131,7 +131,7 @@ const handleDragWrapperStart = (e) => {
     }
     .el-tabs__item {
       font-size: 13px;
-      padding: 0 12px;
+      padding: 0 10px;
     }
   }
   .iconfont {

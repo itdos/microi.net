@@ -13,26 +13,27 @@ export default {
         ShowHideField() {
             this.ScheduleRefreshDiyFieldRuntimeState();
         },
-        ShowFields: {
-            deep: true,
-            handler() {
-                this.ScheduleRefreshDiyFieldRuntimeState();
-            }
+        ShowFieldsSignature() {
+            this.ScheduleRefreshDiyFieldRuntimeState();
         },
-        HideFields: {
-            deep: true,
-            handler() {
-                this.ScheduleRefreshDiyFieldRuntimeState();
-            }
+        HideFieldsSignature() {
+            this.ScheduleRefreshDiyFieldRuntimeState();
         }
     },
     computed: {
+        ShowFieldsSignature() {
+            return this.GetFieldFilterSignature(this.ShowFields);
+        },
+        HideFieldsSignature() {
+            return this.GetFieldFilterSignature(this.HideFields);
+        },
         // ==================== 性能优化：预计算根元素 class ====================
         rootClass() {
             var self = this;
             var classes = [
                 'itdos-diy-form',
-                'diy-form'
+                'diy-form',
+                'diy-form--label-' + self.GetLabelPosition()
             ];
             if (!self.DiyCommon.IsNull(self.TableId)) {
                 classes.push('itdos-diy-form-' + self.TableId);
@@ -43,6 +44,9 @@ export default {
             if (!self.DiyCommon.IsNull(self.PresentationMode)) {
                 classes.push('diy-form--' + String(self.PresentationMode).replace(/[^A-Za-z0-9_-]/g, '').toLowerCase());
             }
+            var presentation = String(self.PresentationMode || '').trim().toLowerCase();
+            classes.push(presentation === 'classic' || presentation === 'legacy' ? 'diy-form--classic' : 'diy-form--modern');
+            if (self.LoadMode === 'Design') classes.push('diy-form--design-mode');
             classes.push(self.DiyCommon.IsNull(self.DiyTableModel.InputBorderStyle) ? 'Border' : self.DiyTableModel.InputBorderStyle);
             return classes.join(' ');
         },
@@ -200,11 +204,23 @@ export default {
             if (!this.IsControlCenterPresentation || this.PresentationSections.length <= 1) return false;
             return String(this.PresentationConfig.SectionNavigation || 'Auto').toLowerCase() !== 'tabs';
         },
+        PresentationSectionNavigationPosition() {
+            var configured = String(this.PresentationConfig.SectionNavigationPosition || '').trim().toLowerCase();
+            if (['left', 'right', 'top', 'bottom'].indexOf(configured) > -1) return configured;
+            var tablePosition = typeof this.GetTabsPosition === 'function'
+                ? String(this.GetTabsPosition() || '').trim().toLowerCase()
+                : '';
+            return ['left', 'right', 'top', 'bottom'].indexOf(tablePosition) > -1 ? tablePosition : 'left';
+        },
+        PresentationFieldSearchKeyword() {
+            return String(this.FieldSearchKeyword || this.PresentationConfig.FieldSearchKeyword || '').trim().toLowerCase();
+        },
         presentationLayoutClass() {
             return [
                 'diy-form-presentation-layout',
                 this.IsControlCenterPresentation ? 'is-control-center' : 'is-standard',
-                this.ShowPresentationSectionNavigation ? 'has-section-nav' : 'has-tab-nav'
+                this.ShowPresentationSectionNavigation ? 'has-section-nav' : 'has-tab-nav',
+                'section-nav-' + this.PresentationSectionNavigationPosition
             ].join(' ');
         },
     },
@@ -213,15 +229,75 @@ export default {
             if (!section || !section.Key || section.Key === this.FieldActiveTab) return;
             this.tabClickField({ name: section.Key, index: section.Index });
         },
+        GetPresentationSectionSubtitle(section) {
+            if (!section) return '0 项';
+            var countText = String(section.FieldCount || 0) + ' 项';
+            return section.Description ? String(section.Description) + ' · ' + countText : countText;
+        },
+        GetPresentationSectionFieldCount(tab) {
+            if (!tab) return 0;
+            var key = tab.Id || tab.Name;
+            var section = this.PresentationSections.find(function (item) { return item.Key === key; });
+            return section ? section.FieldCount : 0;
+        },
+        MatchesPresentationFieldSearch(field) {
+            var keyword = this.PresentationFieldSearchKeyword;
+            if (!keyword || !field) return true;
+            var values = [
+                field.Label,
+                field.Name,
+                field.AsName,
+                field.Description,
+                field.Component
+            ];
+            return values.some(function (value) {
+                return String(value || '').toLowerCase().indexOf(keyword) > -1;
+            });
+        },
         GetPresentationFieldClass(field) {
-            if (!this.IsControlCenterPresentation || !field) return '';
-            return 'diy-presentation-field-card';
+            if (!field) return '';
+            var layoutComponents = [
+                'CollapseGroup', 'Tabs', 'Divider', 'Empty', 'Alert',
+                'StaticText', 'Html', 'HTML', 'Button'
+            ];
+            var tallComponents = [
+                'Textarea', 'RichText', 'CodeEditor', 'Upload', 'FileUpload',
+                'ImageUpload', 'TableChild', 'DiyTable', 'Map', 'MapArea',
+                'JsonTable', 'Html', 'HTML', 'Tabs', 'CollapseGroup',
+                'Radio', 'Checkbox', 'TreeCheckbox'
+            ];
+            var classes = [];
+            if (this.IsControlCenterPresentation) classes.push('diy-presentation-field-card');
+            if (layoutComponents.indexOf(field.Component) === -1) classes.push('diy-modern-field-card');
+            else classes.push('diy-modern-layout-field');
+            if (tallComponents.indexOf(field.Component) > -1) classes.push('diy-modern-field-card--tall');
+            var switchConfig = field.Config && field.Config.Switch;
+            if (field.Component === 'Switch' && switchConfig && String(switchConfig.DisplayMode || '').toLowerCase() === 'card') {
+                classes.push('diy-modern-switch-card');
+            }
+            return classes.join(' ');
+        },
+        GetFormLabelWidth() {
+            if (this.diyStore && this.diyStore.IsPhoneView) return 'auto';
+            var configured = this.LabelWidth;
+            if (configured !== undefined && configured !== null && String(configured).trim() !== '') {
+                return typeof configured === 'number' ? configured + 'px' : configured;
+            }
+            return '120px';
         },
         CanShowHiddenFields() {
             var self = this;
             var currentUser = self.GetCurrentUser || {};
             var isAdmin = currentUser._IsAdmin === true || currentUser._IsAdmin === 1 || currentUser._IsAdmin === "1" || currentUser._IsAdmin === "true";
             return self.ShowHideField === true && isAdmin;
+        },
+        GetFieldFilterSignature(fields) {
+            if (!Array.isArray(fields) || fields.length === 0) return '';
+            return fields.map(function (field) {
+                if (field === null || field === undefined) return '';
+                if (typeof field === 'object') return field.Id || field.Name || '';
+                return String(field);
+            }).join('|');
         },
         ScheduleRefreshDiyFieldRuntimeState() {
             var self = this;
@@ -877,7 +953,7 @@ export default {
             self.CollapseGroupState = Object.assign({}, self.CollapseGroupState, {
                 [stateKey]: collapsed
             });
-            self.RefreshDiyFieldRuntimeState();
+            self.ScheduleRefreshDiyFieldRuntimeState();
         },
         handleFieldTabsChange(field, activeKey, options) {
             var self = this;
@@ -893,7 +969,7 @@ export default {
             self.FieldTabsState = Object.assign({}, self.FieldTabsState, {
                 [stateKey]: activeKey
             });
-            self.RefreshDiyFieldRuntimeState();
+            self.ScheduleRefreshDiyFieldRuntimeState();
         }
     },
     data() {

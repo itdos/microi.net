@@ -12,7 +12,7 @@
         <div v-if="description" class="diy-field-tabs__desc" v-safe-html="description"></div>
         <el-tabs
             v-model="activeKey"
-            class="diy-field-tabs__nav"
+            class="diy-field-tabs__nav mci-tabs mci-tabs--form"
             :type="tabType"
             :tab-position="tabPosition"
             :stretch="stretch"
@@ -276,6 +276,18 @@ const panes = computed(() => {
     return normalizePanes(runtimePanes);
 });
 
+// 页签切换只关心能够改变导航结构的少量属性。旧版对 panes 做深度监听，
+// 运行时字段数量等临时属性变化也会触发整棵页签导航的深比较，复杂表单中会
+// 放大成明显的切换停顿。
+const paneSignature = computed(() => panes.value.map((pane) => [
+    pane.Key,
+    pane.Title,
+    pane.Icon,
+    pane.Disabled === true ? 1 : 0,
+    pane.FieldCount,
+    pane._fieldCount
+].join("\u0001")).join("\u0002"));
+
 const description = computed(() => config.value.Description || "");
 const theme = computed(() => config.value.Theme || "default");
 const isRuntimeHeader = computed(() => {
@@ -319,14 +331,14 @@ watch(
 );
 
 watch(
-    panes,
+    paneSignature,
     () => {
         var nextKey = getDefaultActiveKey();
         if (activeKey.value !== nextKey) {
             activeKey.value = nextKey;
         }
     },
-    { deep: true, flush: "post" }
+    { flush: "post" }
 );
 
 const getPaneCount = (pane) => {
@@ -335,8 +347,7 @@ const getPaneCount = (pane) => {
 };
 
 const getPaneCountStyle = (pane) => {
-    if (!pane || pane.Key !== activeKey.value) return "";
-    return "color: var(--field-tabs-color) !important; background-color: #fff !important; border-color: #fff !important;";
+    return "";
 };
 
 const handleTabChange = (key) => {
@@ -478,23 +489,19 @@ defineExpose({
 <style lang="scss" scoped>
 .diy-field-tabs {
     --field-tabs-color: var(--el-color-primary);
+    --mci-tabs-accent: var(--field-tabs-color);
     --field-tabs-bg: color-mix(in srgb, var(--field-tabs-color) 5%, var(--el-bg-color) 95%);
     --field-tabs-border: var(--el-border-color-light);
     width: 100%;
     min-height: 44px;
-    border: 1px solid var(--field-tabs-border);
-    border-radius: 8px;
-    background: var(--field-tabs-bg);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     padding: 0;
-    overflow: hidden;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-
-    &:hover {
-        border-color: color-mix(in srgb, var(--field-tabs-color) 42%, var(--field-tabs-border) 58%);
-    }
+    overflow: visible;
 
     &.is-field-tabs-header {
-        border-radius: 8px 8px 0 0 !important;
+        border-radius: 0 !important;
     }
 
     &__desc {
@@ -520,13 +527,13 @@ defineExpose({
 
         &.is-active {
             .diy-field-tabs__icon {
-                color: var(--color-primary-text, #fff) !important;
+                color: var(--field-tabs-color) !important;
             }
 
             .diy-field-tabs__count {
                 color: var(--field-tabs-color) !important;
-                background-color: #fff !important;
-                border-color: #fff !important;
+                background-color: color-mix(in srgb, var(--field-tabs-color) 10%, var(--el-bg-color) 90%) !important;
+                border-color: color-mix(in srgb, var(--field-tabs-color) 22%, transparent) !important;
             }
         }
     }
@@ -566,7 +573,7 @@ defineExpose({
         margin: 0 !important;
         background: transparent !important;
         border: 0 !important;
-        border-radius: 0 !important;
+        border-radius: 12px !important;
         box-shadow: none !important;
         padding: 0 !important;
     }
@@ -574,10 +581,13 @@ defineExpose({
     :deep(.el-tabs__nav-wrap) {
         display: flex !important;
         align-items: center !important;
-        height: 42px !important;
+        min-height: 44px !important;
         margin: 0 !important;
-        padding: 0 !important;
+        padding: 4px !important;
         overflow: hidden !important;
+        border: 1px solid color-mix(in srgb, var(--field-tabs-color) 14%, var(--field-tabs-border));
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--field-tabs-color) 5%, var(--el-fill-color-extra-light, #f6f8fb));
     }
 
     :deep(.el-tabs__nav) {
@@ -585,8 +595,8 @@ defineExpose({
         display: flex;
         align-items: center;
         gap: 6px;
-        height: 42px !important;
-        padding: 5px 12px;
+        height: 34px !important;
+        padding: 0;
         box-sizing: border-box;
         background: transparent !important;
         border-radius: 0 !important;
@@ -594,14 +604,14 @@ defineExpose({
     }
 
     :deep(.el-tabs__item) {
-        height: 32px;
-        min-height: 32px;
+        height: 34px;
+        min-height: 34px;
         line-height: 1 !important;
         margin: 0 !important;
         padding: 0 14px;
         box-sizing: border-box;
         border: 1px solid transparent !important;
-        border-radius: 6px !important;
+        border-radius: 9px !important;
         background: transparent !important;
         color: var(--el-text-color-regular);
         display: inline-flex;
@@ -616,20 +626,22 @@ defineExpose({
     }
 
     :deep(.el-tabs__item.is-active) {
-        color: var(--color-primary-text, #fff) !important;
-        background: var(--field-tabs-color) !important;
-        border-color: var(--field-tabs-color) !important;
-        box-shadow: 0 2px 6px color-mix(in srgb, var(--field-tabs-color) 22%, transparent);
+        z-index: 1;
+        margin-bottom: 0 !important;
+        color: var(--field-tabs-color) !important;
+        background: color-mix(in srgb, var(--field-tabs-color) 10%, var(--el-bg-color) 90%) !important;
+        border-color: color-mix(in srgb, var(--field-tabs-color) 22%, var(--field-tabs-border) 78%) !important;
+        box-shadow: 0 5px 14px color-mix(in srgb, var(--field-tabs-color) 13%, transparent), 0 1px 2px rgba(15, 23, 42, .05);
     }
 
     :deep(.el-tabs__item.is-active .diy-field-tabs__icon) {
-        color: var(--color-primary-text, #fff) !important;
+        color: var(--field-tabs-color) !important;
     }
 
     :deep(.el-tabs__item.is-active .diy-field-tabs__count) {
         color: var(--field-tabs-color) !important;
-        background-color: #fff !important;
-        border-color: #fff !important;
+        background-color: color-mix(in srgb, var(--field-tabs-color) 10%, var(--el-bg-color) 90%) !important;
+        border-color: color-mix(in srgb, var(--field-tabs-color) 22%, transparent) !important;
     }
 
     :deep(.el-tabs__item.is-active::before) {
@@ -650,7 +662,7 @@ defineExpose({
 }
 
 :global(.field-tabs-header) .diy-field-tabs {
-    border-radius: 8px 8px 0 0 !important;
+    border-radius: 0 !important;
 }
 
 :global(.field-tabs-header),

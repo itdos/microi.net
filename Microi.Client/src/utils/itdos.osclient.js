@@ -118,6 +118,19 @@ var DiyOsClient = {
             DiyCommon.Tips("获取系统设置信息失败：" + sysConfigResult.Msg, false);
         }
 
+        // 租户配置是应用进入可交互状态的必要条件。这里必须显式失败，不能让
+        // main.js 把“请求已结束但配置不可用”误判为启动成功并撤掉 Loading，
+        // 否则用户只会看到没有任何解释的空白页面。
+        if (DiyCommon.IsNull(sysConfig)) {
+            var sysConfigError = new Error(
+                (sysConfigResult && sysConfigResult.Msg)
+                    ? "获取系统设置失败：" + sysConfigResult.Msg
+                    : "后端未返回可用的系统设置"
+            );
+            sysConfigError.code = "MICROI_SYSCONFIG_UNAVAILABLE";
+            throw sysConfigError;
+        }
+
         //-----------------end
         if (!DiyCommon.IsNull(sysConfig)) {
             store.commit("DiyStore/SetSysConfig", sysConfig);

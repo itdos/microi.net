@@ -70,7 +70,7 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 - PC 与移动端复用 `mci_ai_data_assistant`。`Bootstrap` 返回的 `Enabled`、`Models`、`AllowedDomains` 和 `Prompts` 是跨端共同事实源；快捷问题来自启用的 `mci_ai_data_domain.PromptExamples`，前端不能维护另一套固定文案。
 - 普通角色必须匹配启用的 `mci_ai_role_policy`。只有后端可信的 `V8.CurrentUser.Level >= 9999` 可以在新安装租户缺少角色策略时获得安全兜底：从目标租户动态读取已启用业务域和模型，范围为 `All`，仍保持 `AllowRawSql=false`、敏感字段默认关闭。不得相信客户端提交的 Level、角色名或账号名。
 - 当租户要求“所有角色均可使用 AI 助手”时，必须为 `sys_role` 中每个目标角色建立显式启用策略；受限角色使用 `Self`/`Department` 与最小业务域，管理角色才可使用经确认的 `All`。禁止把“人人可打开助手”实现成普通角色默认全库可读。
-- 开启 `Sys_Config.IsShowAiAssistant` 前后都要做策略覆盖验收：回读 `sys_role` 与 `mci_ai_role_policy`，断言每个目标角色都有唯一启用策略，`AllowedDomains`、`AllowedModels` 均非空且模型仍处于启用状态；再至少用超级管理员、普通员工和客户身份分别调用 `Bootstrap`，确认 `Enabled=true` 且返回范围符合角色。仅看到入口图标不算可用。
+- `Sys_Config.DisableAiAssistant` 是负向开关：缺失、空值或 `0/false` 都显示 AI 助手，只有显式 `1/true` 才关闭图标。商城升级应复用旧 `IsShowAiAssistant` 的字段元数据 Id 就地改名；兼容读取可以保留旧物理列，但旧字段元数据必须在 PC 与移动端隐藏，禁止同时暴露正向、负向两个开关。关闭该开关前后都要做策略覆盖验收：回读 `sys_role` 与 `mci_ai_role_policy`，断言每个目标角色都有唯一启用策略，`AllowedDomains`、`AllowedModels` 均非空且模型仍处于启用状态；再至少用超级管理员、普通员工和客户身份分别调用 `Bootstrap`，确认 `Enabled=true` 且返回范围符合角色。仅看到入口图标不算可用。
 - 角色策略存在但 `AllowedModels` 为空时，客户端最终仍会得到无可用模型；不得把它误判为前端角色拦截。应补齐当前租户启用模型白名单并回读，而不是删除 `mci_ai_role_policy` 校验或在客户端强制把 `Enabled` 改成 `true`。
 - 商城包不能携带发布租户的角色 Id、模型 Id 或密钥；应携带业务域定义和接口引擎，由安装后的目标租户动态发现自己的启用模型。发布后回读 `sys_microistore.AppVersion/AppPakcet`，并真实执行 `Bootstrap` 验证超级管理员可用、模型非空、快捷问题存在。
 

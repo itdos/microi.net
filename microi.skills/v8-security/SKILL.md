@@ -12,17 +12,19 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 访问密钥由 `microi_list_my_access_keys`、`microi_create_my_access_key`、`microi_revoke_my_access_key` 管理，只允许当前用户、限期、最小 scope，明文仅创建时返回一次。外部身份回调固定为 `/api/ExternalLogin/Callback`，服务端校验租户、Provider、state、redirect 和回调域名，验证成功后仍签发 DiyToken。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-security-000 sha256=5cf3d472c04eb49aee9dc8f251bdb825b73574e046c968547e51af7c8492b9b3 -->
+<!-- microi-progressive:chunk id=v8-security-000 sha256=683f6fb48592b050fc31caec6b45e39c8109b0a67baa48c0a2e6d1385a0e4ce1 -->
 ## 0. 租户动态系统设置与密钥边界
 
-第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。新增租户业务配置使用当前租户数据库的 `mci_system_setting`；数据库、Redis、MongoDB、MinIO、MQ 等部署控制面仍由主库 `sys_osclients` 托管，子租户不能修改。
+第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。公开的租户配置必须建成当前租户 `sys_config` 的实体字段；敏感或仅供后端使用的租户业务配置保存到 `mci_system_setting`。数据库、Redis、MongoDB、MinIO、MQ 等部署控制面仍由主库 `sys_osclients` 托管，子租户不能修改。
 
 ```javascript
-// ✅ 浏览器/前端 V8 只能读取管理员明确公开的普通设置，直接位于根对象
-var loginName = V8.SysConfig['Login.Gitee.Name'];
+// ✅ 浏览器/前端 V8 只读取 sys_config 的浏览器安全投影
+var sysTitle = V8.SysConfig.SysTitle;
+var githubVisible = V8.SysConfig.LoginGitHubDisplay;
 
-// ✅ 后端接口引擎/后端 V8 事件可读取当前租户完整配置（包括 Secret）
-var clientSecret = V8.SysConfig['Login.Gitee.ClientSecret'];
+// ✅ 后端接口引擎/后端 V8 事件从独立节点读取私密设置
+var privateSettings = V8.SysConfig.ServerPrivateSettings || {};
+var clientSecret = privateSettings['Login.Gitee.ClientSecret'];
 // 只能在后端使用，禁止 return、日志、审计或写入前端可读数据。
 
 // ❌ 危险：密钥泄漏 / 跨租户串号
@@ -31,9 +33,9 @@ var openaiKey = 'sk-xxxxxxxxxx';
 
 `V8.OsClientModel` 与兼容别名 `V8.ClientModel` 均为独立脱敏副本：数据库连接、AuthSecret、Redis、对象存储、MQ、MQTT、Search 的地址与凭据不会注入脚本。存量租户业务字段只作兼容，新增 Secret 不得继续依赖 `V8.OsClientModel`。
 
-`V8.SysConfig` 按运行端采用不同权限投影，且任何运行端都不存在 `PublicSettings` 属性。浏览器/前端 V8 只得到匿名 `GetSysConfig` 的独立脱敏副本；当前租户 `mci_system_setting` 中 `IsPublic=1` 的普通设置直接平铺到根对象，Secret 或 Key 命中 Password、Secret、Token、Credential、PrivateKey、AccessKey、ApiKey、ConnectionString、DbConn、Redis、MinIO、ClientSecret 等敏感片段时永远失败关闭。后端接口引擎和后端 V8 事件得到当前租户完整、独立的 `sys_config`，并在根对象中获得全部启用的 `mci_system_setting`，Secret 由可信后端按租户解密。子租户调用 `V8.FormEngine.GetSysConfig(...)` 时仍强制使用当前 `OsClient`，不能借缓存命中读取其它租户配置。
+`V8.SysConfig` 按运行端采用不同权限投影，且任何运行端都不存在 `PublicSettings` 属性。浏览器/前端 V8 只得到匿名 `GetSysConfig` 的独立脱敏 `sys_config` 投影；`mci_system_setting` 的任何记录都不会进入浏览器。后端接口引擎和后端 V8 事件得到当前租户完整、独立的 `sys_config`，全部启用的 `mci_system_setting` 则放在 `V8.SysConfig.ServerPrivateSettings`，Secret 由可信后端按租户解密。独立节点避免动态 Key 覆盖 `sys_config` 实体字段，也让前后端边界可审计。子租户调用 `V8.FormEngine.GetSysConfig(...)` 时仍强制使用当前 `OsClient`，不能借缓存命中读取其它租户配置。
 
-Secret 只通过租户管理员专用端点写入租户绑定的认证密文。列表不返回密文或原文；临时显示必须消费 Passkey/TOTP/严格人脸一次性票据，设置 `no-store`，30 秒清除，审计不含原文。前端 V8、普通 FormEngine HTTP、匿名请求和访问密钥会话不得读取 `SecretCipher` 或 Secret 原文；后端 V8 只能通过当前租户 `V8.SysConfig[ConfigKey]` 使用已解密值，不获得通用解密器，也不得返回或记录原文。
+Secret 只通过租户管理员专用端点写入租户绑定的认证密文。列表不返回密文或原文；临时显示必须消费 Passkey/TOTP/严格人脸一次性票据，设置 `no-store`，30 秒清除，审计不含原文。前端 V8、普通 FormEngine HTTP、匿名请求和访问密钥会话不得读取 `SecretCipher`、`ServerPrivateSettings` 或 Secret 原文；后端 V8 只能通过当前租户 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 使用已解密值，不获得通用解密器，也不得返回或记录原文。
 
 共享基础设施只能通过受控能力访问：`V8.Cache` 自动绑定 `Microi:{OsClient}:*`，文件路径绑定 `/{OsClient}/...`，RabbitMQ 队列绑定 `microi.{OsClient}.*`，MQTT Topic 绑定 `tenant/{OsClient}/...`，Search 索引绑定 `{OsClient}_*`。V8 不得获得 Redis `IDatabase`、HDFS `ClientModel` 或原始基础设施配置。
 

@@ -200,7 +200,7 @@
     }
 
     .collapse-group-header {
-        margin-top: 8px;
+        margin-top: 5px;
 
         .container-form-item {
             margin-bottom: 0;
@@ -230,13 +230,13 @@
         .container-form-item {
             position: relative;
             z-index: 1;
-            padding: 10px 12px 2px;
+            padding: 6px 16px 1px;
             border-radius: 0;
             background: transparent;
         }
 
         .el-form-item {
-            margin-bottom: 12px;
+            margin-bottom: 6px;
         }
     }
 
@@ -247,8 +247,8 @@
 
     .collapse-group-row-last {
         border-bottom-width: 0;
-        padding-bottom: 10px;
-        margin-bottom: 10px;
+        padding-bottom: 6px;
+        margin-bottom: 6px;
     }
 
     .collapse-group-row-start {
@@ -303,8 +303,8 @@
             background: transparent;
 
             .container-form-item {
-                padding-left: 10px;
-                padding-right: 10px;
+                padding-left: 14px;
+                padding-right: 14px;
             }
         }
 
@@ -678,7 +678,7 @@
         }
     }
 
-    #field-form-tabs {
+    #field-form-tabs:not(.mci-tabs) {
         // 优化的 tabs 样式 - 简洁高效
         :deep(.el-tabs__header) {
             margin-bottom: 5px;

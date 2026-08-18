@@ -576,6 +576,41 @@ export function buildApplicationAssetStreamV3RouteSnapshot(routes: Array<Record<
   };
 }
 
+function validateApplicationAssetStreamV3RouteFacts(routes: Array<Record<string, unknown>>): void {
+  const routePaths = new Set<string>();
+  const pageKeys = new Set<string>();
+  routes.forEach((route, index) => {
+    if (!route || typeof route !== 'object' || Array.isArray(route)) {
+      throw new Error(`RouteSnapshotJson[${index}] 必须是对象`);
+    }
+    if (typeof route.RoutePath !== 'string') {
+      throw new Error(`RouteSnapshotJson[${index}].RoutePath 必须显式提供字符串；请使用 v3 PascalCase 路由字段`);
+    }
+    const routePath = route.RoutePath;
+    if (!routePath.startsWith('/') || routePath.includes('\\') || /[?#]/u.test(routePath)
+      || (routePath.length > 1 && routePath.endsWith('/'))) {
+      throw new Error(`RouteSnapshotJson[${index}].RoutePath 必须是 canonical route path`);
+    }
+    const routePathKey = routePath.toLowerCase();
+    if (routePaths.has(routePathKey)) throw new Error(`RouteSnapshotJson.RoutePath 重复：${routePath}`);
+    routePaths.add(routePathKey);
+
+    if (typeof route.PageKey !== 'string' || !route.PageKey.trim()) {
+      throw new Error(`RouteSnapshotJson[${index}].PageKey 必须显式提供非空字符串；请使用 v3 PascalCase 路由字段`);
+    }
+    const pageKey = route.PageKey.toLowerCase();
+    if (pageKeys.has(pageKey)) throw new Error(`RouteSnapshotJson.PageKey 重复：${route.PageKey}`);
+    pageKeys.add(pageKey);
+
+    if (route.EntryPath !== undefined) {
+      if (typeof route.EntryPath !== 'string') {
+        throw new Error(`RouteSnapshotJson[${index}].EntryPath 必须显式提供字符串`);
+      }
+      encodeApplicationAssetStreamV3RelativePath(route.EntryPath, `RouteSnapshotJson[${index}].EntryPath`);
+    }
+  });
+}
+
 function canonicalV3Decimal(value: unknown, label: string, { positive = false }: { positive?: boolean } = {}): string {
   if (typeof value !== 'string' || !APPLICATION_ASSET_V3_DECIMAL.test(value)) {
     throw new Error(`${label} 必须是规范十进制 bigint 字符串`);
@@ -617,6 +652,7 @@ export function resolveApplicationAssetStreamV3Contract(
     throw new Error('RuntimeManifestHash 与 MCP 本地流式清单不一致');
   }
   const routeSnapshot = buildApplicationAssetStreamV3RouteSnapshot(input.routes ?? []);
+  validateApplicationAssetStreamV3RouteFacts(input.routes ?? []);
   if (typeof input.routeSnapshotJson !== 'string' || input.routeSnapshotJson !== routeSnapshot.routeSnapshotJson) {
     throw new Error('RouteSnapshotJson 必须与 Routes 的递归键排序/UTF-8 canonical JSON 精确一致');
   }
@@ -4962,14 +4998,14 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       isTree: z.number().optional().describe('Enable tree structure (1=tree table with ParentId self-referencing, 0=flat). Default: 0'),
       column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 2 (双列，更紧凑现代)'),
       formOpenType: z.string().optional().describe('How to open form: "Dialog" (弹窗), "Drawer" (抽屉), "Page" (新页面). Default: Dialog'),
-      formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "60%"). Default: auto'),
+      formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "80%"). Default: 80%'),
       v8Unlimited: z.boolean().optional().describe('Default false for new tables; omit to preserve an existing table. true removes Jint per-execution budgets only for this table\'s backend V8 events while retaining the process resident-memory guard.'),
     },
     async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth, v8Unlimited }) => {
       try {
         const result = await client.createTable(name, description, {
           Tabs: tabs, IsTree: isTree, Column: column ?? 2,
-          FormOpenType: formOpenType, FormOpenWidth: formOpenWidth,
+          FormOpenType: formOpenType || 'Dialog', FormOpenWidth: formOpenWidth || '80%',
           V8Unlimited: v8Unlimited === undefined ? undefined : (v8Unlimited ? 1 : 0),
         });
         if (result.Code !== 1) {

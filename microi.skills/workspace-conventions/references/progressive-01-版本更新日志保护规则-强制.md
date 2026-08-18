@@ -30,7 +30,7 @@ AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员
 - 修改后必须用源码测试扫描生产 `.cs`、API `appsettings.json` 及在线/离线 Compose，精确断言十项白名单。不能用注释约定代替自动化守卫。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-013 sha256=f71d409558e941597f9d66c10005885e228441df606e97011c798e41f91eff49 -->
+<!-- microi-progressive:chunk id=workspace-conventions-013 sha256=dbf22caaf1673270e6abf2277704505481f632c68c1da61df992c81a577e24df -->
 ## 身份、可逆业务秘密与敏感操作统一规范（强制）
 
 - DiyToken 是吾码多租户、多终端、V8 和低代码权限体系的唯一会话入口。新增密码、SSO、OAuth、Passkey、人脸或其它登录方式时，验证成功后必须继续签发 DiyToken，并复用现有角色、部门、菜单、表权限、数据范围、终端吊销和 Token 轮换；禁止整体替换为 ASP.NET Identity 或并行建立第二套用户/权限 Token。
@@ -39,7 +39,7 @@ AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员
 - DES 是现有兼容格式，不得宣称能抵抗服务器所有者或代码执行者。新高价值秘密优先使用带版本的现代认证加密与集中密钥管理；基础设施密钥仍不得进入可编辑 V8。
 - 登录后的敏感操作优先用 `V8.Identity.Verify` 申请 Passkey、Authenticator TOTP 或严格人脸一次性票据，接口引擎从权威数据重算 `ActionHash` 后调用 `V8.Method.ConsumeIdentityVerificationTicket` 原子消费。票据不能代替菜单/表/行权限、状态机、幂等、事务或审计。
 - Windows Hello、Touch ID、Face ID 和 Android 设备验证优先采用 WebAuthn/Passkey；Microsoft/Google Authenticator 采用标准 TOTP，两者都不增加模型服务。只有服务端严格人脸与活体检测才接入独立 `Microi Face Gateway v1` 云服务或 Docker/集群。完整规范读取 `microi.skills/v8-security/SKILL.md` 与 `microi.doc/docs/doc/more/identity-verification.md`。
-- 外部登录统一在登录页【登录方式】中展示；Gitee、微信、GitHub 等 Provider 只登录个人中心已绑定的吾码用户，最终签发 DiyToken。Provider 固定协议端点，租户自己的 ClientId/ClientSecret 放 `mci_system_setting`；Secret 不进入浏览器/前端 `V8.SysConfig`，但后端接口引擎和后端 V8 事件可从当前租户根级 `V8.SysConfig[ConfigKey]` 使用，禁止回传或记录原文。
+- 外部登录统一在登录页【登录方式】中展示；Gitee、微信、GitHub 等 Provider 只登录个人中心已绑定的吾码用户，最终签发 DiyToken。Provider 固定协议端点，租户自己的 ClientId/ClientSecret 放 `mci_system_setting`；Secret 不进入浏览器/前端 `V8.SysConfig`，后端接口引擎和后端 V8 事件只能从当前租户 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 使用，禁止回传或记录原文。
 - 一键安装恢复客户旧库时只允许定位精确主租户三元组；缺失则幂等创建，重复则停止，不能批量重写其它子租户。新主租户行不得持久化数据库、MongoDB 或 Redis 连接，安装器对 MinIO/OCR 等业务配置的后续更新也必须带同一三元组、活动状态条件并做唯一回读。
 
 <!-- /microi-progressive:chunk -->
