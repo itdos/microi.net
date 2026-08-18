@@ -193,6 +193,48 @@ test("本地接口引擎：通用关键词搜索在亮色与暗色主题下保�
     await keywordInput.screenshot({ path: path.join(SCREENSHOT_DIR, "00-keyword-search-dark.png") });
 });
 
+test("本地接口引擎表单：字段说明以紧凑灰字直显，不再使用信息图标", async ({ page }) => {
+    test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/api-engine");
+    const firstRow = page.locator(".el-table__body-wrapper tbody tr").first();
+    await expect(firstRow).toBeVisible({ timeout: 45_000 });
+    await firstRow.dblclick();
+
+    const form = page.locator(".diy-form-container.el-dialog, .diy-form-container.el-drawer").last();
+    await expect(form).toBeVisible({ timeout: 30_000 });
+    const visibleDescriptions = form.locator(".diy-field-description:visible");
+    await expect(visibleDescriptions.first()).toBeVisible({ timeout: 30_000 });
+    expect(await visibleDescriptions.count()).toBeGreaterThan(0);
+    await expect(form.locator(".diy-field-label > .el-icon")).toHaveCount(0);
+
+    const descriptionMetrics = await visibleDescriptions.evaluateAll((elements) => elements.map((element) => {
+        const style = getComputedStyle(element);
+        const box = element.getBoundingClientRect();
+        return {
+            className: element.className,
+            color: style.color,
+            fontSize: Number.parseFloat(style.fontSize),
+            lineHeight: Number.parseFloat(style.lineHeight),
+            height: box.height,
+            overflow: style.overflow,
+            whiteSpace: style.whiteSpace,
+            title: element.getAttribute("title") || ""
+        };
+    }));
+    for (const metrics of descriptionMetrics) {
+        expect(metrics.fontSize, JSON.stringify(metrics)).toBeLessThanOrEqual(11.5);
+        expect(metrics.lineHeight, JSON.stringify(metrics)).toBeLessThanOrEqual(15.5);
+        expect(metrics.height, JSON.stringify(metrics)).toBeLessThanOrEqual(31);
+        expect(metrics.title.length, JSON.stringify(metrics)).toBeGreaterThan(0);
+        if (metrics.className.includes("diy-field-description--inline")) {
+            expect(metrics.overflow).toBe("hidden");
+            expect(metrics.whiteSpace).toBe("nowrap");
+        }
+    }
+    await form.screenshot({ path: path.join(SCREENSHOT_DIR, "00b-api-engine-field-descriptions.png") });
+});
+
 test("本地系统设置：Logo、直线分组、项数、字段搜索与当前记录刷新", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });

@@ -57,6 +57,101 @@ namespace Microi.net
             return fallback;
         }
 
+        private static DosResult<List<string>> ReadPhysicalTableColumns(
+            string osClient,
+            string tableName,
+            Dos.ORM.IMicroiORM orm,
+            Dos.ORM.DbSession db)
+        {
+            var columnResult = orm.GetColumns(new DbServiceParam
+            {
+                TableName = tableName,
+                DbSession = db,
+                OsClient = osClient
+            });
+            if (columnResult?.Code != 1 || columnResult.Data == null)
+                return new DosResult<List<string>>(0, null,
+                    $"读取表 [{tableName}] 物理字段失败：{columnResult?.Msg}");
+
+            var physicalColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var token in JArray.FromObject(columnResult.Data))
+            {
+                var row = token as JObject ?? JObject.FromObject(token);
+                var name = IndexToken(row, "column_name", "ColumnName", "COLUMN_NAME", "Name");
+                if (!name.DosIsNullOrWhiteSpace()) physicalColumns.Add(name);
+            }
+            if (physicalColumns.Count == 0)
+                return new DosResult<List<string>>(0, null,
+                    $"物理表 [{tableName}] 不存在或没有可用字段");
+
+            return new DosResult<List<string>>(1,
+                physicalColumns.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToList());
+        }
+
+        /// <summary>
+        /// 自动索引只接受数据库可以不带前缀长度直接建立普通 B-Tree 索引的列。
+        /// 长文本、LOB、JSON/XML、空间类型和超长字符列必须由 MCP 按真实 SQL 显式建模，
+        /// 避免 MySQL 的 TEXT/BLOB key length 错误以及跨数据库不可移植的隐式行为。
+        /// </summary>
+        public static bool IsDirectlyIndexableColumn(
+            string dataType,
+            string columnType,
+            long? characterMaximumLength)
+        {
+            var normalizedType = (SafeString(dataType) + " " + SafeString(columnType))
+                .Trim()
+                .ToLowerInvariant();
+            if (normalizedType.DosIsNullOrWhiteSpace()) return false;
+
+            var unsupportedType = Regex.IsMatch(normalizedType,
+                @"(^|[^a-z0-9])(tinytext|mediumtext|longtext|text|tinyblob|mediumblob|longblob|blob|clob|nclob|image|json|jsonb|xml|geometry|geography|array)([^a-z0-9]|$)",
+                RegexOptions.IgnoreCase);
+            if (unsupportedType) return false;
+
+            var lengthBoundType = Regex.IsMatch(normalizedType,
+                @"char|varchar|nvarchar|nchar|character varying|binary|varbinary|raw",
+                RegexOptions.IgnoreCase);
+            if (lengthBoundType && characterMaximumLength.HasValue
+                && (characterMaximumLength.Value < 0 || characterMaximumLength.Value > 512))
+                return false;
+
+            return true;
+        }
+
+        private static DosResult<List<string>> ReadAutoIndexableTableColumns(
+            string osClient,
+            string tableName,
+            Dos.ORM.IMicroiORM orm,
+            Dos.ORM.DbSession db)
+        {
+            var columnResult = orm.GetColumns(new DbServiceParam
+            {
+                TableName = tableName,
+                DbSession = db,
+                OsClient = osClient
+            });
+            if (columnResult?.Code != 1 || columnResult.Data == null)
+                return new DosResult<List<string>>(0, null,
+                    $"读取表 [{tableName}] 可索引物理字段失败：{columnResult?.Msg}");
+
+            var columns = columnResult.Data
+                .Where(column => column != null
+                    && !column.column_name.DosIsNullOrWhiteSpace()
+                    && IsDirectlyIndexableColumn(
+                        column.data_type,
+                        column.column_type,
+                        column.character_maximum_length))
+                .Select(column => column.column_name)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (columns.Count == 0)
+                return new DosResult<List<string>>(0, null,
+                    $"物理表 [{tableName}] 没有可直接建立普通索引的字段");
+
+            return new DosResult<List<string>>(1, columns);
+        }
+
         private static string NormalizeIndexName(string tableName, string indexName, IEnumerable<string> columns)
         {
             var value = SafeString(indexName).Trim();
@@ -118,24 +213,12 @@ namespace Microi.net
                     return new DosResult<object>(0, null, $"未找到租户 [{osClient}] 的数据库连接");
                 orm = MicroiEngine.ORM(db.Db.DbProvider.DatabaseType);
 
-                var columnResult = orm.GetColumns(new DbServiceParam
-                {
-                    TableName = tableName,
-                    DbSession = db,
-                    OsClient = osClient
-                });
-                if (columnResult?.Code != 1 || columnResult.Data == null)
-                    return new DosResult<object>(0, null, $"读取表 [{tableName}] 物理字段失败：{columnResult?.Msg}");
-
-                var physicalColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var token in JArray.FromObject(columnResult.Data))
-                {
-                    var row = token as JObject ?? JObject.FromObject(token);
-                    var name = IndexToken(row, "column_name", "ColumnName", "COLUMN_NAME", "Name");
-                    if (!name.DosIsNullOrWhiteSpace()) physicalColumns.Add(name);
-                }
-                if (physicalColumns.Count == 0)
-                    return new DosResult<object>(0, null, $"物理表 [{tableName}] 不存在或没有可用字段");
+                var physicalColumnResult = ReadPhysicalTableColumns(osClient, tableName, orm, db);
+                if (physicalColumnResult.Code != 1)
+                    return new DosResult<object>(physicalColumnResult.Code ?? 0, null, physicalColumnResult.Msg);
+                var physicalColumns = new HashSet<string>(
+                    physicalColumnResult.Data,
+                    StringComparer.OrdinalIgnoreCase);
 
                 var missingColumns = normalizedColumns
                     .Where(column => !physicalColumns.Contains(column))
@@ -150,6 +233,89 @@ namespace Microi.net
             }
 
             return new DosResult<object>(1, null);
+        }
+
+        public static DosResult<List<string>> GetTablePhysicalColumns(string osClient, string tableName)
+        {
+            var validation = ValidateIndexRequest(
+                osClient, tableName, "", Array.Empty<string>(), false,
+                out var orm, out var db, out _);
+            if (validation.Code != 1)
+                return new DosResult<List<string>>(validation.Code ?? 0, null, validation.Msg);
+            return ReadPhysicalTableColumns(osClient, tableName, orm, db);
+        }
+
+        public static DosResult<List<string>> GetTableAutoIndexableColumns(string osClient, string tableName)
+        {
+            var validation = ValidateIndexRequest(
+                osClient, tableName, "", Array.Empty<string>(), false,
+                out var orm, out var db, out _);
+            if (validation.Code != 1)
+                return new DosResult<List<string>>(validation.Code ?? 0, null, validation.Msg);
+            return ReadAutoIndexableTableColumns(osClient, tableName, orm, db);
+        }
+
+        /// <summary>
+        /// 根据真实物理字段生成后台“自动添加索引”的有限候选集。
+        /// 租户独立数据库通常没有 OsClient 列；只有物理列存在时才加入最左前缀。
+        /// </summary>
+        public static List<List<string>> BuildAutoIndexSpecifications(
+            IEnumerable<string> searchColumns,
+            string primaryOrderColumn,
+            IEnumerable<string> physicalColumns,
+            int maxIndexes = 6)
+        {
+            var available = new HashSet<string>(
+                (physicalColumns ?? Array.Empty<string>())
+                    .Select(value => SafeString(value))
+                    .Select(value => value.Trim())
+                    .Where(value => !value.DosIsNullOrWhiteSpace()),
+                StringComparer.OrdinalIgnoreCase);
+            var searches = (searchColumns ?? Array.Empty<string>())
+                .Select(value => SafeString(value))
+                .Select(value => value.Trim())
+                .Where(value => !value.DosIsNullOrWhiteSpace() && available.Contains(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var orderColumn = SafeString(primaryOrderColumn).Trim();
+            if (!available.Contains(orderColumn)) orderColumn = "";
+            var tenantColumn = available.Contains("OsClient") ? "OsClient" : "";
+            var limit = Math.Max(1, maxIndexes);
+            var result = new List<List<string>>();
+
+            List<string> Build(string searchColumn, bool includeOrder)
+            {
+                var columns = new List<string>();
+                if (!tenantColumn.DosIsNullOrWhiteSpace()) columns.Add(tenantColumn);
+                if (!searchColumn.DosIsNullOrWhiteSpace()
+                    && !columns.Contains(searchColumn, StringComparer.OrdinalIgnoreCase))
+                    columns.Add(searchColumn);
+                if (includeOrder && !orderColumn.DosIsNullOrWhiteSpace()
+                    && !columns.Contains(orderColumn, StringComparer.OrdinalIgnoreCase))
+                    columns.Add(orderColumn);
+                return columns;
+            }
+
+            if (searches.Count > 0)
+            {
+                var first = Build(searches[0], true);
+                if (first.Count > 0) result.Add(first);
+                foreach (var search in searches.Skip(1))
+                {
+                    if (result.Count >= limit) break;
+                    var candidate = Build(search, false);
+                    if (candidate.Count > 0
+                        && !result.Any(existing => existing.SequenceEqual(candidate, StringComparer.OrdinalIgnoreCase)))
+                        result.Add(candidate);
+                }
+            }
+            else
+            {
+                var candidate = Build("", true);
+                if (candidate.Count > 0) result.Add(candidate);
+            }
+
+            return result.Take(limit).ToList();
         }
 
         private static DosResult<List<TableIndexInfo>> ReadTableIndexes(

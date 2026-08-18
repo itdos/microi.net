@@ -69,8 +69,8 @@ test('平台微服务包包含商城路由', async () => {
 
   assert.ok(bundle);
   assert.ok(bundle.Routes.some(route => route.RoutePath === '/marketplace'));
-  assert.equal(bundle.VersionNo, 'v1.6.0');
-  assert.equal(bundle.Application.CurrentVersion, 18);
+  assert.equal(bundle.VersionNo, 'v1.6.3');
+  assert.equal(bundle.Application.CurrentVersion, 20);
   assert.equal(bundle.MicroService.StorageMode, 'db');
 
   const saasMenu = packageModel.SysMenus.find(item => item.Id === '42078414-512a-4840-9843-9b75ab79ba79');
@@ -89,8 +89,16 @@ test('联邦商城包包含公开范围、私有凭据和历史版本契约', as
   assert.match(packageModel.DiyTables.find(item => item.Name === 'sys_microistore').SubmitBeforeServerV8, /MARKETPLACE_VISIBILITY_DEFAULT_V1/);
   assert.match(engines.get('get-microi-store').ApiV8Code, /ownedOnly/);
   assert.match(engines.get('get-microi-store').ApiV8Code, /V8\.Param\.Visibility/);
-  assert.match(engines.get('get-microi-store-model').ApiV8Code, /delete row\.PrivateSourcePath/);
-  assert.match(engines.get('get-microi-store-versions').ApiV8Code, /mic_data_version/);
+  assert.match(engines.get('get-microi-store-model').ApiV8Code, /delete plain\.PrivateSourcePath/);
+  const versionsEngine = engines.get('get-microi-store-versions');
+  assert.match(versionsEngine.ApiV8Code, /mic_data_version/);
+  assert.equal(versionsEngine.Version, 'v1.1.0');
+  assert.match(versionsEngine.ApiV8Code, /PaginationVersion:\s*1/);
+  assert.match(versionsEngine.ApiV8Code, /V8\.Param\._PageIndex/);
+  assert.match(versionsEngine.ApiV8Code, /V8\.Param\._PageSize/);
+  assert.match(versionsEngine.ApiV8Code, /V8\.Param\._Keyword/);
+  assert.match(versionsEngine.ApiV8Code, /_PageSize:\s*pageSize/);
+  assert.doesNotMatch(versionsEngine.ApiV8Code, /_PageSize:\s*500/);
   assert.match(engines.get('import-microi-store-package').ApiV8Code, /MARKETPLACE_PRIVATE_SOURCE_CREDENTIAL_V1/);
   assert.match(engines.get('import-microi-store-package').ApiV8Code, /StoreVersionId/);
 

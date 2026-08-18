@@ -124,6 +124,34 @@ test("动态菜单首次直达与刷新都重新匹配真实路由而不是404",
     await expect(page.locator(".error-page, .page-404, [data-testid='page-404']")).toHaveCount(0);
 });
 
+test("接口引擎自动添加索引：只使用 sys_apiengine 真实物理字段", async ({ page }) => {
+    test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    await openRoute(page, "#/api-engine");
+    const development = page.getByRole("button", { name: /开发设计|Dev Design/i }).first();
+    await expect(development).toBeVisible({ timeout: 45_000 });
+    await development.click();
+    const indexEntry = page.locator(".el-dropdown-menu:visible").getByText(/索引管理|Index Manager/i).first();
+    await expect(indexEntry).toBeVisible();
+    await indexEntry.click();
+
+    const dialog = page.locator(".el-dialog:visible").filter({ hasText: /索引管理|Index Manager/i }).last();
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    const responsePromise = page.waitForResponse(
+        (response) => /\/api\/FormEngine\/AutoGenerateIndexes(?:\?|$)/i.test(response.url()),
+        { timeout: 60_000 }
+    );
+    const autoAdd = dialog.getByRole("button", { name: /自动添加索引|Auto Add Index/i }).first();
+    await autoAdd.click();
+    const response = await responsePromise;
+    const result = await response.json();
+    expect(Number(result.Code), result.Msg || "auto index generation failed").toBe(1);
+    expect(Array.isArray(result.Data?.Failed) ? result.Data.Failed : []).toEqual([]);
+    expect(JSON.stringify(result)).not.toMatch(/索引字段[^\n]*OsClient|物理表[^\n]*不存在[^\n]*OsClient/i);
+    await expect(autoAdd).toBeEnabled();
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "04b-api-engine-auto-index.png"), fullPage: false });
+});
+
 test("首次进入系统设置：路由内容不整页闪烁且负向毛玻璃配置可见", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await openRoute(page, "#/api-engine");
@@ -364,6 +392,100 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     await expect(detail).toBeVisible({ timeout: 30_000 });
     await expect(detail.locator(".detail-fields")).toBeVisible();
     await expect(detail.locator(".versions-panel")).toContainText("选择安装版本");
+    const versionToolbar = detail.locator(".version-toolbar");
+    const versionKeyword = versionToolbar.getByPlaceholder("版本号、备注、发布人或动作");
+    const versionPageSize = versionToolbar.locator("select");
+    await expect(versionKeyword).toBeVisible();
+    await expect(versionPageSize).toHaveValue("8");
+
+    const isVersionsQuery = (response, expected = {}) => {
+        const proxyRequest = /\/api\/MarketplaceSource\/Query(?:\?|$)/i.test(response.url());
+        const directRequest = /\/apiengine\/get-microi-store-versions(?:\?|$)/i.test(response.url());
+        if (!proxyRequest && !directRequest) return false;
+        let payload;
+        try {
+            payload = response.request().postDataJSON();
+        } catch (_) {
+            return false;
+        }
+        const param = proxyRequest ? payload?.Param : payload;
+        return (!proxyRequest || payload?.Operation === "Versions")
+            && (expected.pageSize === undefined || Number(param?._PageSize) === expected.pageSize)
+            && (expected.pageIndex === undefined || Number(param?._PageIndex) === expected.pageIndex)
+            && (expected.keyword === undefined || String(param?._Keyword || "") === expected.keyword);
+    };
+    const pageSizeResponsePromise = page.waitForResponse(
+        (response) => isVersionsQuery(response, { pageSize: 5, pageIndex: 1 }),
+        { timeout: 30_000 }
+    );
+    await versionPageSize.selectOption("5");
+    const pageSizeResponse = await pageSizeResponsePromise;
+    const pageSizeResult = await pageSizeResponse.json();
+    expect(Number(pageSizeResult.Code), pageSizeResult.Msg || "version pagination failed").toBe(1);
+    expect(Number(pageSizeResult.DataAppend?.PaginationVersion || 0)).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(pageSizeResult.Data) ? pageSizeResult.Data.length : 0).toBeLessThanOrEqual(5);
+    await expect(versionToolbar.getByRole("button", { name: "搜索", exact: true })).toBeEnabled();
+
+    const firstVersionLabel = detail.locator(".version-list label").first();
+    await expect(firstVersionLabel).toBeVisible();
+    const firstVersion = (await firstVersionLabel.locator("b").innerText()).trim();
+    const searchResponsePromise = page.waitForResponse(
+        (response) => isVersionsQuery(response, { pageSize: 5, pageIndex: 1, keyword: firstVersion }),
+        { timeout: 30_000 }
+    );
+    await versionKeyword.fill(firstVersion);
+    await versionToolbar.getByRole("button", { name: "搜索", exact: true }).click();
+    const searchResponse = await searchResponsePromise;
+    const searchResult = await searchResponse.json();
+    expect(Number(searchResult.Code), searchResult.Msg || "version search failed").toBe(1);
+    expect(Array.isArray(searchResult.Data) ? searchResult.Data.length : 0).toBeLessThanOrEqual(5);
+    await expect(detail.locator(".version-list")).toContainText(firstVersion);
+
+    const clearResponsePromise = page.waitForResponse(
+        (response) => isVersionsQuery(response, { pageSize: 5, pageIndex: 1, keyword: "" }),
+        { timeout: 30_000 }
+    );
+    await versionToolbar.getByRole("button", { name: "清空", exact: true }).click();
+    await clearResponsePromise;
+    const versionPager = detail.locator('.version-pager[aria-label="历史版本分页"]');
+    await expect(versionPager).toBeVisible();
+    const nextVersionResponsePromise = page.waitForResponse(
+        (response) => isVersionsQuery(response, { pageSize: 5, pageIndex: 2, keyword: "" }),
+        { timeout: 30_000 }
+    );
+    await versionPager.getByRole("button", { name: "下一页", exact: true }).click();
+    const nextVersionResponse = await nextVersionResponsePromise;
+    const nextVersionResult = await nextVersionResponse.json();
+    expect(Number(nextVersionResult.Code), nextVersionResult.Msg || "version next page failed").toBe(1);
+    expect(Array.isArray(nextVersionResult.Data) ? nextVersionResult.Data.length : 0).toBeLessThanOrEqual(5);
+    await expect(versionPager).toContainText("第 2 /");
+
+    const detailHeader = detail.locator(".modal-header.draggable");
+    const dragTo = async (clientX, clientY) => {
+        const start = await detailHeader.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            return { x: box.left + Math.min(120, box.width / 2), y: box.top + Math.min(40, box.height / 2) };
+        });
+        await detailHeader.dispatchEvent("pointerdown", { button: 0, clientX: start.x, clientY: start.y, pointerId: 7 });
+        await store.evaluate(({ x, y }) => {
+            window.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, button: 0, clientX: x, clientY: y, pointerId: 7 }));
+            window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, clientX: x, clientY: y, pointerId: 7 }));
+        }, { x: clientX, y: clientY });
+    };
+    const expectDetailInViewport = async () => {
+        const geometry = await detail.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, viewportWidth: innerWidth, viewportHeight: innerHeight };
+        });
+        expect(geometry.left, JSON.stringify(geometry)).toBeGreaterThanOrEqual(17);
+        expect(geometry.top, JSON.stringify(geometry)).toBeGreaterThanOrEqual(17);
+        expect(geometry.right, JSON.stringify(geometry)).toBeLessThanOrEqual(geometry.viewportWidth - 17);
+        expect(geometry.bottom, JSON.stringify(geometry)).toBeLessThanOrEqual(geometry.viewportHeight - 17);
+    };
+    await dragTo(-5_000, -5_000);
+    await expectDetailInViewport();
+    await dragTo(5_000, 5_000);
+    await expectDetailInViewport();
     const globalOverlay = page.locator(".micro-app-host__global-overlay");
     await expect(globalOverlay).toBeVisible();
     await expect(globalOverlay).toHaveCSS("pointer-events", "none");

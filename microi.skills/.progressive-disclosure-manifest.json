@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-18T02:40:05.582Z",
+  "generatedAt": "2026-08-18T21:52:02.147Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -8,11 +8,11 @@
   },
   "skills": {
     "ai-platform-governance": {
-      "originalSha256": "606692e87154209148312ad78b8f028c80dc915e0e1d7bb1ce383903173d359f",
-      "originalLines": 325,
+      "originalSha256": "05f3d5e9251f98c5e1ad91d21999ad689e820c403056327b7bf30c364b787636",
+      "originalLines": 323,
       "prefixSha256": "dba917e613767e37f033527a17d009ba3e94b44ac9970ef59556d689f92a8bda",
       "prefixBytes": 765,
-      "entryLines": 180,
+      "entryLines": 178,
       "chunks": [
         {
           "id": "ai-platform-governance-000",
@@ -34,7 +34,7 @@
           "id": "ai-platform-governance-002",
           "ordinal": 2,
           "destination": "ai-platform-governance/SKILL.md",
-          "sha256": "682eba607296c69de8b3dd9b6d0e72dadf380f839b15f66b5ff271b3d2bae0a9",
+          "sha256": "527f1cda978f88d0d1507d90aac71089f7585699f0ad7d5266dc7e40ba026b7c",
           "lines": 26,
           "heading": "官方应用事实"
         },
@@ -42,8 +42,8 @@
           "id": "ai-platform-governance-003",
           "ordinal": 3,
           "destination": "ai-platform-governance/SKILL.md",
-          "sha256": "d70597d2cd0cdc2cf7e96d18613a3a65ba8da5c28312bf913f6abe1c0850cf9d",
-          "lines": 28,
+          "sha256": "3d43295846e19e8b5cb526442ff8aff8f0317db88f5be803b5798e63118546e2",
+          "lines": 26,
           "heading": "菜单层级与语义"
         },
         {

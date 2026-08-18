@@ -222,6 +222,14 @@ test("marketplace keeps source, install, publish, offline and historical-version
     assert.match(marketplace, /key:'published'/);
     assert.match(marketplace, /key:'offline'/);
     assert.match(marketplace, /StoreVersionId:selected\.VersionId/);
+    assert.match(marketplace, /_PageIndex:versionPageIndex\.value/);
+    assert.match(marketplace, /_PageSize:versionPageSize\.value/);
+    assert.match(marketplace, /_Keyword:versionKeyword\.value/);
+    assert.match(marketplace, /class="version-toolbar"/);
+    assert.match(marketplace, /class="version-pager"/);
+    assert.match(marketplace, /function clampDrag\(name,shell/);
+    assert.match(marketplace, /data-drag-name="detail"/);
+    assert.match(marketplace, /window\.addEventListener\('resize',clampOpenDialogs\)/);
     assert.match(marketplace, /sourceCredentialKey\(effectiveSource\.value\)/);
     assert.match(marketplace, /source\?\.HasCredential\?/);
     assert.match(marketplace, /action:'setGlobalOverlay'/);
@@ -239,6 +247,8 @@ test("marketplace keeps source, install, publish, offline and historical-version
     assert.match(host, /pointer-events:\s*none/);
     assert.match(host, /pointer-events:\s*auto/);
     assert.match(modalStyles, /z-index:\s*12000/);
+    assert.match(modalStyles, /height:\s*100dvh/);
+    assert.match(modalStyles, /\.version-toolbar/);
     assert.match(host, /Width:\s*"80%"/);
 });
 

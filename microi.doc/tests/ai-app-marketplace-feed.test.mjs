@@ -49,6 +49,15 @@ test('应用列表同时提供 observer、滚动兜底、手动加载和明确�
   assert.match(componentSource, /const pageSize = 24/)
 })
 
+test('应用接口失败后停止自动触底重试，只保留用户主动重试入口', () => {
+  assert.match(
+    componentSource,
+    /if \(!hasMore\.value \|\| isLoading\.value \|\| loadError\.value \|\| typeof window === 'undefined'\) return/
+  )
+  assert.match(componentSource, /v-else-if="loadError && liveApps\.length"[^>]*@click="loadApplications"/)
+  assert.match(componentSource, /v-if="!showInitialSkeleton && loadError && !displayApps\.length"/)
+})
+
 test('Unity 桃源立即体验使用固定永久壳而不是不可变版本产物', () => {
   const stableEntry = previewUrlSource.match(/'microi-unity-taoyuan':\s*'([^']+)'/)?.[1] || ''
   assert.equal(
