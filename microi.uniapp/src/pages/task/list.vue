@@ -5,6 +5,10 @@
     </template>
 
     <view class="task-toolbar">
+      <view class="task-map-entry" hover-class="task-map-entry--pressed" @tap="openTaskMap">
+        <image src="/static/xjy/business/customerMap.png" mode="aspectFit" />
+        <text>任务地图</text>
+      </view>
       <view class="search-box">
         <text class="search-box__icon">⌕</text>
         <input v-model="keyword" confirm-type="search" placeholder="客户、任务编号、类型或服务人员" @input="scheduleSearch" @confirm="search" />
@@ -154,6 +158,7 @@ export default {
       pageIndex: 1,
       pageSize: 15,
       keyword: '',
+      customerId: '',
       state: '',
       type: '',
       period: 'month',
@@ -322,6 +327,10 @@ export default {
       }
     },
     openTask(item) { this.mciNavigateToDetail(`/pages/task/detail?id=${encodeURIComponent(item.Id)}`) },
+    openTaskMap() {
+      const customerQuery = this.customerId ? `&customerId=${encodeURIComponent(this.customerId)}` : ''
+      uni.navigateTo({ url: `/pages/task/map?mode=task${customerQuery}` })
+    },
     addTask() { this.mciMarkDetailReturn(); openForm({ table: 'Diy_ShouhouDD', mode: 'Add', title: '新增售后任务', menuAliases: ['售后订单', '售后任务'] }) },
     scan() { scanDevice() },
     callPhone(phone) { uni.makePhoneCall({ phoneNumber: String(phone) }) },
@@ -335,7 +344,11 @@ export default {
 .nav-scan { width: 68rpx; height: 68rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; transition: transform .18s ease; }
 .nav-scan image { width: 48rpx; height: 48rpx; border-radius: 8rpx; }
 .nav-scan--pressed { transform: scale(.92); }
-.task-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12rpx; padding: 18rpx 22rpx 12rpx; background: #fff; }
+.task-toolbar { display: grid; grid-template-columns: 78rpx minmax(0, 1fr) auto; gap: 12rpx; padding: 18rpx 22rpx 12rpx; background: #fff; }
+.task-map-entry { height: 72rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #dce8ec; border-radius: 8px; background: #fff; box-sizing: border-box; transition: transform .16s ease, background-color .16s ease; }
+.task-map-entry image { width: 34rpx; height: 34rpx; }
+.task-map-entry text { margin-top: 1rpx; color: #087da8; font-size: 16rpx; font-weight: 650; line-height: 19rpx; white-space: nowrap; }
+.task-map-entry--pressed { transform: scale(.94); background: #eef8fb; }
 .search-box { height: 72rpx; display: grid; grid-template-columns: 48rpx minmax(0, 1fr) 48rpx; align-items: center; padding: 0 10rpx; border: 1px solid #dce8ec; border-radius: 8px; background: #f3f7f9; box-sizing: border-box; }
 .search-box input { width: 100%; height: 100%; font-size: 25rpx; }
 .search-box__icon { color: #63808b; font-size: 35rpx; text-align: center; }
@@ -430,5 +443,5 @@ export default {
 .sheet-button--plain { color: #486671; background: #edf3f5; }
 .sheet-button--primary { color: #fff; background: #e54625; }
 @keyframes sheetUp { from { transform: translateY(100%); opacity: .7; } to { transform: translateY(0); opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .task-card, .filter-sheet, .floating-add { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .task-card, .filter-sheet, .floating-add, .task-map-entry { animation: none; transition: none; } }
 </style>
