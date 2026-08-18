@@ -579,7 +579,7 @@ export default {
 
 <style lang="scss" scoped>
 .form-right-panel {
-    padding: 8px 0;
+    padding: 0px 0;
 
     :deep(.form-right-tabs) {
         .el-tabs__header {

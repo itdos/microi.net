@@ -268,6 +268,16 @@ namespace Microi.net.Api
                 var credential = LoadCredential(tokenResult.Data.OsClient, sourceId, apiBase, remoteOsClient);
                 var result = await SendJsonAsync(apiBase, path, remoteOsClient,
                     request?.Param ?? new JObject(), credential).ConfigureAwait(false);
+                if (result.Body == null
+                    && string.Equals(operation, "Versions", StringComparison.OrdinalIgnoreCase)
+                    && result.StatusCode == HttpStatusCode.NotFound)
+                {
+                    result = await BuildCurrentVersionFallbackAsync(
+                        apiBase,
+                        remoteOsClient,
+                        request?.Param ?? new JObject(),
+                        credential).ConfigureAwait(false);
+                }
                 if (result.Body == null)
                     return Json(new DosResult(0, null, $"商城源未返回 JSON（HTTP {(int)result.StatusCode}）。"));
                 Response.Headers.CacheControl = "no-store";
@@ -284,6 +294,46 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, SafeRemoteError(ex)));
             }
+        }
+
+        private async Task<RemoteResult> BuildCurrentVersionFallbackAsync(
+            string apiBase,
+            string osClient,
+            JObject payload,
+            SourceCredential credential)
+        {
+            var modelResult = await SendJsonAsync(
+                apiBase,
+                "/apiengine/get-microi-store-model",
+                osClient,
+                payload,
+                credential).ConfigureAwait(false);
+            if (modelResult.Body?["Code"]?.Val<int>() != 1 || modelResult.Body?["Data"] is not JObject current)
+                return modelResult;
+
+            var version = FirstText(current, "AppVersion", "Version", "PackageVersion") ?? string.Empty;
+            var versionTime = FirstText(current, "AppUpdateTime", "UpdateTime", "CreateTime") ?? string.Empty;
+            modelResult.Body = new JObject
+            {
+                ["Code"] = 1,
+                ["Data"] = new JArray
+                {
+                    new JObject
+                    {
+                        ["VersionId"] = string.Empty,
+                        ["AppVersion"] = version,
+                        ["DataVersion"] = "CURRENT",
+                        ["VersionTime"] = versionTime,
+                        ["UserName"] = FirstText(current, "UserName", "OwnerName", "AppAuthor") ?? string.Empty,
+                        ["IsCurrent"] = true,
+                        ["CompatibilityFallback"] = true
+                    }
+                },
+                ["DataCount"] = 1,
+                ["Msg"] = "商城源尚未部署历史版本接口，已兼容返回当前版本。"
+            };
+            modelResult.StatusCode = HttpStatusCode.OK;
+            return modelResult;
         }
 
         [HttpPost]

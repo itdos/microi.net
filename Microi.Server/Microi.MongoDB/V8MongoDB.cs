@@ -329,8 +329,12 @@ namespace Microi.net
 
                 foreach (var group in groups)
                 {
-                    var host = CreateTenantMongoHost(group.Key.OsClient, "log_" + group.Key.Month);
-                    var circuitKey = host.Connection + "|" + host.DataBase;
+                    // Group key is lower-cased only for case-insensitive batching. Runtime SaaS
+                    // lookup must retain/canonicalize the configured OsClient casing (for example
+                    // iTdos), otherwise OsClient.GetClient("itdos") cannot find a case-sensitive
+                    // ClientList entry and every log batch is needlessly sent to spool.
+                    var host = CreateTenantMongoHost(group.First().OsClient, "log_" + group.Key.Month);
+                    var circuitKey = BuildSysLogCircuitKey(host);
                     if (_sysLogCircuitOpenUntil.TryGetValue(circuitKey, out var openUntil) && openUntil > DateTime.UtcNow)
                         return new DosResult(0, null, "MongoDB sys log is temporarily unavailable.");
 
@@ -1032,7 +1036,8 @@ namespace Microi.net
             if (osClient.DosIsNullOrWhiteSpace())
                 throw new InvalidOperationException("系统日志不可用：当前登录租户为空，请重新登录后重试。");
 
-            var client = Microi.net.OsClient.GetClient(osClient);
+            var tenantKey = ResolveRuntimeTenantKey(osClient);
+            var client = Microi.net.OsClient.GetClient(tenantKey);
             var connection = client?.OsClientModel?["DbMongoConnection"]?.Val<string>();
             if (connection.DosIsNullOrWhiteSpace())
             {
@@ -1046,9 +1051,31 @@ namespace Microi.net
             return new MongodbHost
             {
                 Connection = connection,
-                DataBase = "sys_log_" + osClient.ToLowerInvariant(),
+                DataBase = "sys_log_" + tenantKey.ToLowerInvariant(),
                 Table = tableName ?? ""
             };
+        }
+
+        private static string ResolveRuntimeTenantKey(string osClient)
+        {
+            var normalized = osClient?.Trim() ?? string.Empty;
+            if (Microi.net.OsClient.ClientList.ContainsKey(normalized)) return normalized;
+
+            foreach (var candidate in Microi.net.OsClient.ClientList.Keys)
+            {
+                if (string.Equals(candidate, normalized, StringComparison.OrdinalIgnoreCase))
+                    return candidate;
+            }
+            return normalized;
+        }
+
+        private static string BuildSysLogCircuitKey(MongodbHost host)
+        {
+            // A transient failure while replaying one historical monthly collection must not
+            // block the current month's live log collection for the entire circuit-break window.
+            return (host?.Connection ?? string.Empty) + "|"
+                   + (host?.DataBase ?? string.Empty) + "|"
+                   + (host?.Table ?? string.Empty);
         }
 
         private static MongodbHost CreateSystemLogHost(string osClient, string month)

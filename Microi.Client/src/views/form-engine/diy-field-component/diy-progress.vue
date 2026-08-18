@@ -25,13 +25,24 @@
         :stroke-width="(field.Config && field.Config.Progress && field.Config.Progress.StrokeWidth) || 6"
         :type="(field.Config && field.Config.Progress && field.Config.Progress.Type) || 'line'" -->
 
-    <el-progress v-else :percentage="ModelValue" :color="customColorMethod" :text-inside="true" :stroke-width="18"> </el-progress>
+    <el-progress
+        v-else
+        :percentage="ModelValue"
+        :color="ProgressConfig.Color || customColorMethod"
+        :type="ProgressConfig.Type || 'line'"
+        :text-inside="(ProgressConfig.Type || 'line') === 'line' && ProgressConfig.TextInside !== false"
+        :show-text="ProgressConfig.ShowText !== false"
+        :stroke-width="Number(ProgressConfig.StrokeWidth || 18)"
+        :status="ProgressConfig.Status || ''"
+    />
+    <DiySimpleFieldConfigDialog ref="simpleConfig" component="Progress" component-label="进度条" :field="field" :DiyTableModel="DiyTableModel" />
 </template>
 
 <script>
 import _ from "underscore";
+import DiySimpleFieldConfigDialog from "./shared/DiySimpleFieldConfigDialog.vue";
 export default {
-    name: "diy-input-number",
+    name: "diy-progress",
     inheritAttrs: false,
     emits: ['ModelChange', 'CallbackRunV8Code', 'CallbackSelectField', 'CallbakOnKeyup', 'CallbackFormValueChange', 'CallbackInTableEditSave', 'update:modelValue'],
     data() {
@@ -110,9 +121,13 @@ export default {
         }
     },
 
-    components: {},
+    components: { DiySimpleFieldConfigDialog },
 
-    computed: {},
+    computed: {
+        ProgressConfig() {
+            return this.field?.Config?.Progress || {};
+        }
+    },
 
     //注意：表单打开一次后，再次打开，这个不会第二次执行，导致值不会变
     mounted() {
@@ -121,6 +136,9 @@ export default {
     },
 
     methods: {
+        openConfig() {
+            this.$refs.simpleConfig.open();
+        },
         Init() {
             var self = this;
             self.ModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel) || 0;

@@ -216,7 +216,8 @@ public class CacheAndUpgradeRegressionTests
                     Capacity = 2,
                     OverflowCapacity = 1,
                     BatchSize = 10,
-                    SpoolDirectory = spool
+                    SpoolDirectory = spool,
+                    PersistenceConfigured = _ => true
                 });
 
             for (var index = 0; index < 5; index++)
@@ -474,6 +475,140 @@ public class CacheAndUpgradeRegressionTests
         Assert.Null(exception);
     }
 
+    [Fact]
+    public async Task SysLogQueue_UnconfiguredTenantSkipsPersistenceWithoutCreatingSpool()
+    {
+        var spool = Path.Combine(Path.GetTempPath(), "microi-syslog-unconfigured-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(spool);
+        try
+        {
+            var service = new SysLogQueueService(
+                DispatchProxy.Create<IMongoDB, NoopMongoProxy>(),
+                NullLogger<SysLogQueueService>.Instance,
+                new BoundedQueueHostEnvironment { ContentRootPath = spool },
+                new SysLogQueueOptions
+                {
+                    SpoolDirectory = spool,
+                    PersistenceConfigured = _ => false
+                });
+
+            await service.StartAsync(TestContext.Current.CancellationToken);
+            Assert.True(service.Enqueue(new SysLogParam
+            {
+                OsClient = "without-mongo",
+                EventId = "without-mongo-1",
+                Action = "Skip"
+            }));
+
+            var deadline = DateTime.UtcNow.AddSeconds(3);
+            while (service.GetHealth().Pending > 0 && DateTime.UtcNow < deadline)
+                await Task.Delay(20, TestContext.Current.CancellationToken);
+            await service.StopAsync(TestContext.Current.CancellationToken);
+
+            var health = service.GetHealth();
+            Assert.Equal(1, health.Enqueued);
+            Assert.Equal(1, health.SkippedUnconfigured);
+            Assert.Equal(0, health.Pending);
+            Assert.Empty(Directory.EnumerateFiles(spool));
+        }
+        finally
+        {
+            if (Directory.Exists(spool)) Directory.Delete(spool, true);
+        }
+    }
+
+    [Fact]
+    public async Task SysLogQueue_SpoolCapacityDirectWriteIsolatesTenants()
+    {
+        var spool = Path.Combine(Path.GetTempPath(), "microi-syslog-partition-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(spool);
+        File.WriteAllText(Path.Combine(spool, "existing.json"), "[]");
+        try
+        {
+            var mongo = DispatchProxy.Create<IMongoDB, PartitionedMongoProxy>();
+            var recorder = Assert.IsAssignableFrom<PartitionedMongoProxy>(mongo);
+            var service = new SysLogQueueService(
+                mongo,
+                NullLogger<SysLogQueueService>.Instance,
+                new BoundedQueueHostEnvironment { ContentRootPath = spool },
+                new SysLogQueueOptions
+                {
+                    BatchSize = 10,
+                    MaxSpoolFiles = 1,
+                    SpoolDirectory = spool,
+                    PersistenceConfigured = _ => true
+                });
+            var persist = typeof(SysLogQueueService).GetMethod(
+                "JournalAndPersistAsync",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(persist);
+
+            var task = Assert.IsAssignableFrom<Task>(persist!.Invoke(service, new object[]
+            {
+                new List<SysLogParam>
+                {
+                    new() { OsClient = "goodTenant", EventId = "good-1", OccurredAt = DateTime.Now },
+                    new() { OsClient = "badTenant", EventId = "bad-1", OccurredAt = DateTime.Now }
+                },
+                TestContext.Current.CancellationToken
+            }));
+            await task;
+
+            var health = service.GetHealth();
+            Assert.Equal(1, health.Persisted);
+            Assert.Equal(1, health.Dropped);
+            Assert.Equal(1, health.FailedBatches);
+            Assert.Contains("badtenant", health.LastError, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(new[] { "badTenant", "goodTenant" }, recorder.TenantCalls.OrderBy(value => value));
+        }
+        finally
+        {
+            if (Directory.Exists(spool)) Directory.Delete(spool, true);
+        }
+    }
+
+    [Fact]
+    public void MongoSysLog_ResolvesRuntimeTenantKeyWithoutChangingConfiguredCase()
+    {
+        var resolve = typeof(V8MongoDB).GetMethod(
+            "ResolveRuntimeTenantKey",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(resolve);
+
+        const string configuredTenant = "CaseSensitiveTenantForSysLog";
+        var added = Microi.net.OsClient.ClientList.TryAdd(
+            configuredTenant,
+            new OsClientSecret { OsClient = configuredTenant, OsClientModel = new JObject() });
+        try
+        {
+            Assert.Equal(
+                configuredTenant,
+                Assert.IsType<string>(resolve!.Invoke(null, new object[] { configuredTenant.ToLowerInvariant() })));
+        }
+        finally
+        {
+            if (added) Microi.net.OsClient.ClientList.TryRemove(configuredTenant, out _);
+        }
+    }
+
+    [Fact]
+    public void MongoSysLog_CircuitBreakerIsIsolatedPerMonthlyCollection()
+    {
+        var buildCircuitKey = typeof(V8MongoDB).GetMethod(
+            "BuildSysLogCircuitKey",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(buildCircuitKey);
+
+        var july = new MongodbHost { Connection = "mongodb://example", DataBase = "sys_log_itdos", Table = "log_202607" };
+        var august = new MongodbHost { Connection = "mongodb://example", DataBase = "sys_log_itdos", Table = "log_202608" };
+        var julyKey = Assert.IsType<string>(buildCircuitKey!.Invoke(null, new object[] { july }));
+        var augustKey = Assert.IsType<string>(buildCircuitKey.Invoke(null, new object[] { august }));
+
+        Assert.NotEqual(julyKey, augustKey);
+        Assert.EndsWith("|log_202607", julyKey, StringComparison.Ordinal);
+        Assert.EndsWith("|log_202608", augustKey, StringComparison.Ordinal);
+    }
+
     private static void AssertEngineVersionAtLeast(JObject engine, System.Version minimum)
     {
         var versionText = engine["Version"]?.ToString();
@@ -493,6 +628,25 @@ public class NoopMongoProxy : DispatchProxy
     protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
     {
         throw new NotSupportedException($"Bounded queue test did not expect IMongoDB.{targetMethod?.Name}");
+    }
+}
+
+public class PartitionedMongoProxy : DispatchProxy
+{
+    public List<string> TenantCalls { get; } = new();
+
+    protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+    {
+        if (targetMethod?.Name == nameof(IMongoDB.AddSysLogs))
+        {
+            var batch = Assert.IsAssignableFrom<IReadOnlyCollection<SysLogParam>>(args![0]);
+            var tenant = batch.First().OsClient;
+            TenantCalls.Add(tenant);
+            return Task.FromResult(string.Equals(tenant, "badTenant", StringComparison.OrdinalIgnoreCase)
+                ? new DosResult(0, null, "simulated tenant failure")
+                : new DosResult(1, batch.Count));
+        }
+        throw new NotSupportedException($"Partitioned queue test did not expect IMongoDB.{targetMethod?.Name}");
     }
 }
 

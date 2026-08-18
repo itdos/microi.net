@@ -40,6 +40,7 @@ import { reportApiServiceFailure } from "./utils/api-service-status.js";
 import { syncClassicShellVisibilityFromUrl } from "./utils/classic-shell-visibility.js";
 import { isEmbeddedWebosWindowRuntime } from "./utils/webos-embedded-runtime.js";
 import { installLegacyQrCodeDownload } from "./utils/legacy-qrcode.js";
+import { installMciDialogRuntime } from "./utils/mci-dialog-runtime.js";
 // 主题色工具 - 360 极速浏览器兼容方案
 import { initThemeColor, setThemeColor } from "./utils/theme-color";
 import $ from "jquery";
@@ -51,6 +52,9 @@ window.__MICROI_WEBOS_EMBEDDED_RUNTIME__ = isWebosEmbeddedRuntime;
 
 // 初始化主题色系统（必须在样式加载后执行）
 initThemeColor();
+// 统一 Element Plus Dialog：大圆角、主题标题及拖动兜底。运行时观察器会
+// 在 Vue 内部拖动重渲染后恢复契约，避免 class 被组件补丁覆盖。
+installMciDialogRuntime();
 
 // 前端微服务运行时。MicroApp 用于承载按租户从数据库/独立地址发布的 Vue3 定制页面。
 microApp.start();
@@ -159,12 +163,13 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 library.add(fas, far, fab);
 app.component('font-awesome-icon', FontAwesomeIcon);
 // ve-plus（WebOS 桌面弹层/上下文菜单）
-import VePlus from 've-plus';
+// WebOS 内部按需导入 Layer/layer。不要在宿主应用全量 app.use(VePlus)：
+// 其 Avatar、Grid、Link、Loading、Menu、Select、Switch 等短组件名会与
+// Element Plus 图标/组件重复注册，并在每次冷启动/HMR 时产生 Vue 警告。
 import 've-plus/dist/ve-plus.css';
 // 管理后台主题桥接层必须晚于第三方组件样式加载，保证浅色/暗色令牌生效。
 import './styles/mci-admin-theme.scss';
 import './styles/mci-loading.scss';
-app.use(VePlus);
 // WebOS 样式（使用 glob 动态加载，webos 目录不存在时静默跳过）
 import.meta.glob('@/views/webos/styles/*.scss', { eager: true });
 // ======== WebOS 依赖注册结束 ========
@@ -173,7 +178,13 @@ import.meta.glob('@/views/webos/styles/*.scss', { eager: true });
 app.use(router);
 app.use(i18n);
 // Vue 3 生产环境配置
-app.config.performance = import.meta.env.DEV;
+// Vue 的逐组件 Performance API 标记在大型表格重新激活时会产生数百次
+// mark/measure/clear 调用，开发环境一次菜单切换就可能额外阻塞主线程
+// 150ms 以上。性能追踪改为显式开启，日常 Vite 热更新不再默认承担该开销。
+const enableVuePerformanceTracing = import.meta.env.DEV
+    && (new URLSearchParams(window.location.search).get("VuePerf") === "1"
+        || localStorage.getItem("Microi.Debug.VuePerformance") === "1");
+app.config.performance = enableVuePerformanceTracing;
 app.config.warnHandler = import.meta.env.DEV ? undefined : () => {};
 // 必须在 mount 前安装。除常规错误上报外，它会精确兜住 Element Plus Tabs
 // 卸载竞态，避免路由地址已改变而 RouterView 仍停留在旧页面。

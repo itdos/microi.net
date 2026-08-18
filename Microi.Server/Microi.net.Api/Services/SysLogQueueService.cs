@@ -15,7 +15,13 @@ public sealed class SysLogQueueOptions
     public int Capacity { get; init; } = 4096;
     public int OverflowCapacity { get; init; } = 512;
     public int BatchSize { get; init; } = 250;
+    public int MaxSpoolFiles { get; init; } = 10000;
     public string? SpoolDirectory { get; init; }
+    /// <summary>
+    /// 测试注入点。生产环境为空时只从当前租户运行时 SaaS 配置判断，
+    /// 禁止通过环境变量或 appsettings 另开一套业务配置来源。
+    /// </summary>
+    public Func<string, bool>? PersistenceConfigured { get; init; }
 
     public static SysLogQueueOptions CreateDefault()
     {
@@ -24,6 +30,7 @@ public sealed class SysLogQueueOptions
             Capacity = 4096,
             OverflowCapacity = 512,
             BatchSize = 250,
+            MaxSpoolFiles = 10000,
             SpoolDirectory = null
         };
     }
@@ -44,6 +51,8 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
 
     private readonly Channel<SysLogParam> _channel;
     private readonly ConcurrentQueue<SysLogParam> _overflow = new();
+    private readonly ConcurrentDictionary<string, (bool Configured, long ExpiresAtTicks)> _persistenceConfiguration =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly SysLogQueueOptions _options;
     private readonly IMongoDB _mongo;
     private readonly ILogger<SysLogQueueService> _logger;
@@ -60,8 +69,12 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
     private long _overflowCount;
     private long _emergencySpooled;
     private long _dropped;
+    private long _skippedUnconfigured;
+    private long _spoolFileCount;
     private long _lastOverflowDiagnosticTicks;
+    private long _lastPersistenceWarningTicks;
     private int _stopping;
+    private int _replayFailureStreak;
     private string? _lastError;
     private long _lastPersistedTicks;
 
@@ -107,6 +120,7 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
         _serviceVersion = Limit(Assembly.GetEntryAssembly()?.GetName().Version?.ToString(), 64);
         _environmentName = Limit(environment.EnvironmentName, 64);
         RecoverTempSpools();
+        _spoolFileCount = CountSpoolFiles();
     }
 
     public bool Enqueue(SysLogParam param)
@@ -119,6 +133,9 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             if (string.IsNullOrWhiteSpace(snapshot.OsClient)) return false;
 
             Interlocked.Increment(ref _enqueued);
+            // 入队可能发生在 MicroiEngine 初始化缓存之前。这里绝不能读取租户配置，
+            // 否则 OsClient -> Cache -> 启动日志 -> Enqueue 会形成初始化依赖环。
+            // 是否配置 MongoDB 统一由后台单消费者在持久化前判定。
             Interlocked.Increment(ref _inMemory);
             if (Volatile.Read(ref _stopping) == 1)
                 return TryEmergencySpool(snapshot, "服务正在停机");
@@ -138,13 +155,7 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
         DateTime? last = null;
         var ticks = Interlocked.Read(ref _lastPersistedTicks);
         if (ticks > 0) last = new DateTime(ticks, DateTimeKind.Local);
-        long spoolFiles = 0;
-        try
-        {
-            spoolFiles = Directory.EnumerateFiles(_spoolDirectory, "*.json").LongCount()
-                         + Directory.EnumerateFiles(_spoolDirectory, "*.tmp").LongCount();
-        }
-        catch { }
+        var spoolFiles = Math.Max(0, Interlocked.Read(ref _spoolFileCount));
         return new SysLogQueueHealth
         {
             NodeId = _nodeId,
@@ -157,6 +168,7 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             OverflowPending = Interlocked.Read(ref _overflowCount),
             EmergencySpooled = Interlocked.Read(ref _emergencySpooled),
             Dropped = Interlocked.Read(ref _dropped),
+            SkippedUnconfigured = Interlocked.Read(ref _skippedUnconfigured),
             FailedBatches = Interlocked.Read(ref _failedBatches),
             LastError = _lastError,
             LastPersistedAt = last,
@@ -168,15 +180,15 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
     {
         while (Interlocked.Read(ref _inMemory) > 0)
             await Task.Delay(25, cancellationToken).ConfigureAwait(false);
-        await ReplaySpoolAsync(cancellationToken, int.MaxValue).ConfigureAwait(false);
+        await ReplaySpoolAsync(cancellationToken, 20).ConfigureAwait(false);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Microi异步日志队列已启动，NodeId={NodeId}, Capacity={Capacity}, OverflowCapacity={OverflowCapacity}, BatchSize={BatchSize}, Spool={Spool}",
-            _nodeId, _options.Capacity, _options.OverflowCapacity, _options.BatchSize, _spoolDirectory);
-        await ReplaySpoolAsync(stoppingToken, int.MaxValue).ConfigureAwait(false);
-        var nextReplay = DateTime.UtcNow.Add(ReplayInterval);
+        _logger.LogInformation("Microi异步日志队列已启动，NodeId={NodeId}, Capacity={Capacity}, OverflowCapacity={OverflowCapacity}, BatchSize={BatchSize}, MaxSpoolFiles={MaxSpoolFiles}, Spool={Spool}",
+            _nodeId, _options.Capacity, _options.OverflowCapacity, _options.BatchSize, _options.MaxSpoolFiles, _spoolDirectory);
+        var replaySucceeded = await ReplaySpoolAsync(stoppingToken, 20).ConfigureAwait(false);
+        var nextReplay = DateTime.UtcNow.Add(GetReplayDelay(replaySucceeded));
 
         try
         {
@@ -187,8 +199,8 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
 
                 if (DateTime.UtcNow >= nextReplay)
                 {
-                    await ReplaySpoolAsync(stoppingToken, 20).ConfigureAwait(false);
-                    nextReplay = DateTime.UtcNow.Add(ReplayInterval);
+                    replaySucceeded = await ReplaySpoolAsync(stoppingToken, 20).ConfigureAwait(false);
+                    nextReplay = DateTime.UtcNow.Add(GetReplayDelay(replaySucceeded));
                 }
             }
         }
@@ -228,6 +240,44 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
     private async Task JournalAndPersistAsync(List<SysLogParam> batch, CancellationToken cancellationToken)
     {
         if (batch.Count == 0) return;
+        batch = FilterPersistableBatch(batch);
+        if (batch.Count == 0) return;
+        if (IsSpoolAtCapacity())
+        {
+            // 已有 spool 超出硬上限时仍优先直写 Mongo；成功则不需要 journal，
+            // 失败则丢弃当前可选日志并显式计数，绝不继续侵占磁盘。
+            // 必须按租户和月份隔离直写：一个租户的 Mongo 熔断不能连带丢弃
+            // 同一队列批次内其它健康租户的日志。
+            Interlocked.Add(ref _inMemory, -batch.Count);
+            var failed = false;
+            var isolatedBatches = batch.GroupBy(item => new
+            {
+                OsClient = item.OsClient?.Trim().ToLowerInvariant() ?? string.Empty,
+                Month = item.OccurredAt.GetValueOrDefault(DateTime.Now).ToString("yyyyMM")
+            });
+            foreach (var isolatedBatch in isolatedBatches)
+            {
+                var tenantBatch = isolatedBatch.ToList();
+                try
+                {
+                    var directResult = await _mongo.AddSysLogs(tenantBatch).ConfigureAwait(false);
+                    if (directResult.Code != 1)
+                        throw new InvalidOperationException(directResult.Msg ?? "MongoDB批量写日志失败。");
+                    MarkPersisted(tenantBatch.Count);
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
+                {
+                    failed = true;
+                    Interlocked.Increment(ref _failedBatches);
+                    Interlocked.Add(ref _dropped, tenantBatch.Count);
+                    _lastError = $"日志spool已达到{_options.MaxSpoolFiles}个文件的硬上限，租户{isolatedBatch.Key.OsClient}的MongoDB直写失败：{ex.Message}";
+                    LogPersistenceWarning(ex, "Microi日志持久化暂不可用；spool已达硬上限，仅丢弃失败租户批次；OsClient={OsClient}, Count={Count}, SpoolFiles={SpoolFiles}",
+                        isolatedBatch.Key.OsClient, tenantBatch.Count, Interlocked.Read(ref _spoolFileCount));
+                }
+            }
+            if (!failed) _lastError = null;
+            return;
+        }
         string? spoolPath = null;
         try
         {
@@ -237,13 +287,14 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             var result = await _mongo.AddSysLogs(batch).ConfigureAwait(false);
             if (result.Code != 1) throw new InvalidOperationException(result.Msg ?? "MongoDB批量写日志失败。");
             File.Delete(spoolPath);
+            Interlocked.Decrement(ref _spoolFileCount);
             MarkPersisted(batch.Count);
         }
         catch (Exception ex) when (!(ex is OperationCanceledException && cancellationToken.IsCancellationRequested))
         {
             Interlocked.Increment(ref _failedBatches);
             _lastError = ex.Message;
-            _logger.LogWarning(ex, "Microi日志批次持久化失败，已保留spool；Count={Count}, File={File}", batch.Count, spoolPath);
+            LogPersistenceWarning(ex, "Microi日志批次持久化失败，已保留spool；Count={Count}, File={File}", batch.Count, spoolPath);
             if (spoolPath == null)
             {
                 // 内存重试区也必须有硬上限；超过上限时同步尝试耐久化，禁止无界堆积。
@@ -255,11 +306,13 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
         }
     }
 
-    private async Task ReplaySpoolAsync(CancellationToken cancellationToken, int maxFiles)
+    private async Task<bool> ReplaySpoolAsync(CancellationToken cancellationToken, int maxFiles)
     {
         string[] files;
-        try { files = Directory.GetFiles(_spoolDirectory, "*.json").OrderBy(d => d).Take(maxFiles).ToArray(); }
-        catch (Exception ex) { _lastError = ex.Message; return; }
+        // 不再对全部历史文件进行 OrderBy。19万文件时，每5秒全量排序本身就会
+        // 造成明显的磁盘/CPU抖动；文件名已含时间，重放只需有界枚举。
+        try { files = Directory.EnumerateFiles(_spoolDirectory, "*.json").Take(Math.Max(1, maxFiles)).ToArray(); }
+        catch (Exception ex) { _lastError = ex.Message; return false; }
 
         foreach (var file in files)
         {
@@ -268,10 +321,22 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             {
                 var json = await File.ReadAllTextAsync(file, cancellationToken).ConfigureAwait(false);
                 var batch = JsonConvert.DeserializeObject<List<SysLogParam>>(json) ?? new List<SysLogParam>();
-                if (batch.Count == 0) { File.Delete(file); continue; }
+                if (batch.Count == 0)
+                {
+                    File.Delete(file);
+                    Interlocked.Decrement(ref _spoolFileCount);
+                    continue;
+                }
+                if (batch.Any(item => !IsPersistenceConfigured(item?.OsClient)))
+                {
+                    // 历史文件保留给运维处理，不删除、不反复报警；通过退避降低扫描频率。
+                    _lastError = "历史日志spool所属租户未配置DbMongoConnection，已暂停重放且保留原文件。";
+                    return false;
+                }
                 var result = await _mongo.AddSysLogs(batch).ConfigureAwait(false);
                 if (result.Code != 1) throw new InvalidOperationException(result.Msg ?? "MongoDB重放日志失败。");
                 File.Delete(file);
+                Interlocked.Decrement(ref _spoolFileCount);
                 Interlocked.Add(ref _retried, batch.Count);
                 MarkPersisted(batch.Count);
                 _lastError = null;
@@ -280,9 +345,11 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             {
                 _lastError = ex.Message;
                 Interlocked.Increment(ref _failedBatches);
-                break; // Mongo熔断期间不空转扫描其余文件。
+                LogPersistenceWarning(ex, "Microi历史日志spool重放失败，已进入退避；File={File}", file);
+                return false; // Mongo熔断期间不空转扫描其余文件。
             }
         }
+        return true;
     }
 
     private async Task DrainToSpoolAsync()
@@ -366,6 +433,7 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
 
     private async Task<string> WriteSpoolAsync(List<SysLogParam> batch, CancellationToken cancellationToken)
     {
+        if (IsSpoolAtCapacity()) throw new IOException($"日志spool已达到{_options.MaxSpoolFiles}个文件的硬上限。");
         Directory.CreateDirectory(_spoolDirectory);
         // NodeId使共享持久卷上的批次来源可定位；EventId upsert保证多节点并发重放仍然幂等。
         var name = $"{DateTime.UtcNow:yyyyMMddHHmmssfffffff}_{_nodeId}_{batch[0].EventId}.json";
@@ -381,11 +449,13 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             stream.Flush(true);
         }
         File.Move(temp, final);
+        Interlocked.Increment(ref _spoolFileCount);
         return final;
     }
 
     private string WriteSpoolSynchronously(List<SysLogParam> batch)
     {
+        if (IsSpoolAtCapacity()) throw new IOException($"日志spool已达到{_options.MaxSpoolFiles}个文件的硬上限。");
         Directory.CreateDirectory(_spoolDirectory);
         var name = $"{DateTime.UtcNow:yyyyMMddHHmmssfffffff}_{_nodeId}_{batch[0].EventId}.json";
         var final = Path.Combine(_spoolDirectory, name);
@@ -398,7 +468,134 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             stream.Flush(true);
         }
         File.Move(temp, final);
+        Interlocked.Increment(ref _spoolFileCount);
         return final;
+    }
+
+    private bool IsPersistenceConfigured(string? osClient)
+    {
+        if (string.IsNullOrWhiteSpace(osClient)) return false;
+        if (_options.PersistenceConfigured != null) return _options.PersistenceConfigured(osClient);
+        var normalized = osClient.Trim();
+        var now = DateTime.UtcNow.Ticks;
+        if (_persistenceConfiguration.TryGetValue(normalized, out var cached)
+            && cached.ExpiresAtTicks > now)
+            return cached.Configured;
+        try
+        {
+            // 日志后台线程只能读取 SaaS 引擎已水合的进程内快照；禁止调用 GetClient，
+            // 后者会访问二级缓存，而缓存构造又依赖 GetClient，启动早期会递归。
+            // ReloadSingleOsClient 会同步更新 ClientList，因此这里仍能感知运行期配置变化。
+            var clients = Microi.net.OsClient.ClientList;
+            var found = clients.TryGetValue(normalized, out var client);
+            if (!found)
+            {
+                // ClientList 的键历史上存在大小写差异；先做无关大小写的规范化查找。
+                foreach (var candidate in clients.Keys)
+                {
+                    if (!string.Equals(candidate, normalized, StringComparison.OrdinalIgnoreCase)) continue;
+                    found = clients.TryGetValue(candidate, out client);
+                    break;
+                }
+            }
+            if (!found)
+            {
+                // 启动极早期 ClientList 尚为空时仍保守保留日志；一旦租户快照已经水合，
+                // 明确不存在的租户就是已删除/无效历史租户，不应反复交给 MongoDB 报错。
+                if (clients.Count == 0) return true;
+                _persistenceConfiguration[normalized] = (false, now + TimeSpan.FromSeconds(30).Ticks);
+                return false;
+            }
+            if (client?.OsClientModel == null) return true;
+            var connection = client.OsClientModel["DbMongoConnection"]?.Val<string>();
+            var configured = !connection.DosIsNullOrWhiteSpace();
+            var ttl = configured ? TimeSpan.FromMinutes(1) : TimeSpan.FromMinutes(5);
+            _persistenceConfiguration[normalized] = (configured, now + ttl.Ticks);
+            return configured;
+        }
+        catch
+        {
+            // 配置读取异常不能被误判为“租户明确关闭持久化”，否则会静默丢日志。
+            _persistenceConfiguration.TryRemove(normalized, out _);
+            return true;
+        }
+    }
+
+    private List<SysLogParam> FilterPersistableBatch(List<SysLogParam> batch)
+    {
+        var tenantStates = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        var persistable = new List<SysLogParam>(batch.Count);
+        var skipped = 0;
+        foreach (var item in batch)
+        {
+            var osClient = item?.OsClient?.Trim() ?? string.Empty;
+            if (!tenantStates.TryGetValue(osClient, out var configured))
+            {
+                configured = IsPersistenceConfigured(osClient);
+                tenantStates[osClient] = configured;
+            }
+            if (configured) persistable.Add(item!);
+            else skipped++;
+        }
+
+        if (skipped > 0)
+        {
+            Interlocked.Add(ref _inMemory, -skipped);
+            Interlocked.Add(ref _skippedUnconfigured, skipped);
+        }
+        return persistable;
+    }
+
+    private bool IsSpoolAtCapacity()
+    {
+        return _options.MaxSpoolFiles > 0
+               && Interlocked.Read(ref _spoolFileCount) >= _options.MaxSpoolFiles;
+    }
+
+    private long CountSpoolFiles()
+    {
+        try
+        {
+            // 健康判断只关心是否达到硬上限。历史目录可能已有十几万文件，
+            // 启动时全量 LongCount 会无谓扫描整个目录并拖慢 API 就绪。
+            var limit = _options.MaxSpoolFiles > 0 ? _options.MaxSpoolFiles : long.MaxValue;
+            long count = 0;
+            foreach (var pattern in new[] { "*.json", "*.tmp" })
+            {
+                foreach (var _ in Directory.EnumerateFiles(_spoolDirectory, pattern))
+                {
+                    count++;
+                    if (count >= limit) return count;
+                }
+            }
+            return count;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private TimeSpan GetReplayDelay(bool replaySucceeded)
+    {
+        if (replaySucceeded)
+        {
+            _replayFailureStreak = 0;
+            return ReplayInterval;
+        }
+
+        _replayFailureStreak = Math.Min(_replayFailureStreak + 1, 8);
+        var seconds = Math.Min(900, ReplayInterval.TotalSeconds * Math.Pow(2, _replayFailureStreak));
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    private void LogPersistenceWarning(Exception exception, string message, params object[] args)
+    {
+        var now = DateTime.UtcNow.Ticks;
+        var previous = Interlocked.Read(ref _lastPersistenceWarningTicks);
+        if (previous > 0 && new TimeSpan(now - previous) < TimeSpan.FromMinutes(5)) return;
+        if (Interlocked.CompareExchange(ref _lastPersistenceWarningTicks, now, previous) != previous) return;
+        _logger.LogWarning(exception, message, args);
     }
 
     private void RecoverTempSpools()

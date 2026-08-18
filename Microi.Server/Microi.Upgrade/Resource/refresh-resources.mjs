@@ -239,10 +239,25 @@ function validateReleaseCandidate(name, content) {
       const modelEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-store-model');
       const versionsEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-store-versions');
       const visibilityField = fields.find(field => field.TableName === 'sys_microistore' && field.Name === 'IsPublic');
-      const deprecatedMenusValid = ['01KXFSG8153B3VZPZ45WNCCFHR', '01KXFSG7MZ40CY8KCWCZZZJH2M'].every(id => {
+      const deprecatedMenuUrls = new Map([
+        ['01KXFSG8153B3VZPZ45WNCCFHR', '/microi-store-installed'],
+        ['01KXFSG7MZ40CY8KCWCZZZJH2M', '/microi-store-published'],
+      ]);
+      const deprecatedMenusValid = [...deprecatedMenuUrls].every(([id, url]) => {
         const menu = menus.find(item => String(item?.Id || '') === id);
-        return menu && Number(menu.Display) === 0 && Number(menu.AppDisplay) === 0 && String(menu.Url) === '/microi-store';
+        return menu && Number(menu.Display) === 0 && Number(menu.AppDisplay) === 0 && String(menu.Url) === url;
       });
+      const normalizedMenuUrls = menus.map(menu => String(menu?.Url || '').trim().toLowerCase()).filter(Boolean);
+      const menuUrlsUnique = new Set(normalizedMenuUrls).size === normalizedMenuUrls.length;
+      const runtimeBundle = (packageModel.ApplicationBundles || [])
+        .find(item => item?.Application?.AppKey === 'microi-platform-service');
+      const runtimeTableNames = new Set((packageModel.DiyTables || []).map(item => item?.Name));
+      const runtimeBundleValid = Boolean(runtimeBundle)
+        && runtimeBundle?.MicroService?.StorageMode === 'db'
+        && (runtimeBundle?.Routes || []).some(route => route?.RoutePath === '/marketplace')
+        && (runtimeBundle?.BuildAssets || []).length > 0
+        && runtimeTableNames.has('sys_microiservice')
+        && runtimeTableNames.has('sys_microiservice_page');
       const engineVersionNumber = engine => {
         const parts = String(engine?.Version || '')
           .replace(/^v/i, '')
@@ -288,6 +303,7 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('DATABASE_ONLY_BUILD_ASSETS_V1')
         || !importerCode.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')
         || !importerCode.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
+        || !importerCode.includes('PACKAGE_MENU_RUNTIME_PREFLIGHT_V1')
         || !importerCode.includes('OBJECT_STORAGE_FORBIDDEN')
         || engineVersionNumber(publisherEngine) < 1_007_008
         || !String(publisherEngine?.ApiV8Code || '').includes('buildApiEngineResourcePolicies')
@@ -304,14 +320,17 @@ function validateReleaseCandidate(name, content) {
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STORAGE_FAILURE_RECOVERY_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_MONOTONIC_CHILD_PROGRESS_V1')
+        || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STRUCTURED_CHILD_ERRORS_V1')
         || visibilityField?.Component !== 'Switch'
         || String(visibilityField?.DefaultValue) !== '1'
         || !deprecatedMenusValid
+        || !menuUrlsUnique
+        || !runtimeBundleValid
         || engineVersionNumber(listEngine) < 1_004_000
         || !String(listEngine?.ApiV8Code || '').includes('ownedOnly')
         || !String(listEngine?.ApiV8Code || '').includes('V8.Param.Visibility')
         || engineVersionNumber(modelEngine) < 1_002_000
-        || !String(modelEngine?.ApiV8Code || '').includes('delete row.PrivateSourcePath')
+        || !String(modelEngine?.ApiV8Code || '').includes('MARKETPLACE_PLAIN_OBJECT_STRIP_V1')
         || engineVersionNumber(versionsEngine) < 1_000_000
         || !String(versionsEngine?.ApiV8Code || '').includes('mic_data_version')
         || !importerCode.includes('MARKETPLACE_PRIVATE_SOURCE_CREDENTIAL_V1')
@@ -357,6 +376,14 @@ function validateReleaseCandidate(name, content) {
             bulkVersion: bulkEngine?.Version || '',
             bulkMarker: String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_CHECKPOINT_PLAN_V2'),
             bulkTrustedBootstrap: String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1'),
+            visibilityFieldComponent: visibilityField?.Component || '',
+            visibilityFieldDefault: String(visibilityField?.DefaultValue ?? ''),
+            deprecatedMenusValid,
+            menuUrlsUnique,
+            runtimeBundleValid,
+            listVersion: listEngine?.Version || '',
+            modelVersion: modelEngine?.Version || '',
+            versionsVersion: versionsEngine?.Version || '',
             missingPackageMarkers: [
               'TargetSysMenuId',
               '01KXFSG7MZ40CY8KCWCZZZJH2M',

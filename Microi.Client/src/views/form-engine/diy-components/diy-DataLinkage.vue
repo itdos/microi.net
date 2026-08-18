@@ -2,12 +2,12 @@
     <div>
         <el-button class="edit" @click="show = true" type="primary">数据联动设置</el-button>
 
-        <el-dialog v-model="show" width="60%" title="数据联动设置" :modal-append-to-body="false" append-to-body>
+        <el-dialog v-model="show" width="60%" title="数据联动设置" class="mci-rounded-dialog mci-field-config-dialog" :modal-append-to-body="false" append-to-body>
             <div class="showhide">
                 <el-row>
                     <el-col class="head">联动表单</el-col>
                     <el-col :span="10">
-                        <el-select v-model="table" filterable placeholder="请选择联动表单" style="width: 100%" @change="changeTable">
+                        <el-select v-model="table" filterable remote :remote-method="searchTables" :loading="tableLoading" placeholder="搜索联动表单（最多显示20条）" style="width: 100%" @change="changeTable">
                             <el-option v-for="item in tableList" :key="item.Id" :label="item.Description" :value="item.Id"> </el-option>
                         </el-select>
                     </el-col>
@@ -75,11 +75,11 @@ export default {
         },
         fields: {
             type: Array,
-            default: []
+            default: () => []
         },
         chooseData: {
             type: Object,
-            default: {}
+            default: () => ({})
         }
     },
     data() {
@@ -87,6 +87,8 @@ export default {
             show: false,
             table: "",
             tableList: [],
+            tableLoading: false,
+            tableSearchTimer: null,
             currentModel: this.model,
             https: "",
             fieldList: [],
@@ -222,15 +224,20 @@ export default {
                     console.log(error);
                 });
         },
-        getTable() {
+        searchTables(keyword) {
+            window.clearTimeout(this.tableSearchTimer);
+            this.tableSearchTimer = window.setTimeout(() => this.getTable(keyword), 220);
+        },
+        getTable(keyword = "") {
             let self = this;
+            self.tableLoading = true;
             this.$axios
                 .post(
                     this.https + "/api/FormEngine/GetDiyTableList",
                     qs.stringify({
-                        // _PageSize: 50,
-                        // _PageIndex: 1,
-                        _Keyword: ""
+                        _PageSize: 20,
+                        _PageIndex: 1,
+                        _Keyword: String(keyword || "").trim()
                     }),
                     {
                         headers: {
@@ -242,11 +249,18 @@ export default {
                 )
                 .then(function (response) {
                     if (response.data.Code == 1) {
-                        self.tableList = response.data.Data;
+                        const rows = Array.isArray(response.data.Data) ? response.data.Data : [];
+                        const selected = self.tableList.find((item) => item && item.Id === self.table);
+                        self.tableList = selected && !rows.some((item) => item && item.Id === self.table)
+                            ? [selected].concat(rows)
+                            : rows;
                     }
                 })
                 .catch(function (error) {
                     console.log(error);
+                })
+                .finally(function () {
+                    self.tableLoading = false;
                 });
         },
         newGuid() {
@@ -335,8 +349,11 @@ export default {
     },
     mounted() {
         this.getDiyApiBase();
-        this.getTable();
         this.getV8();
+        this.getTable();
+    },
+    beforeUnmount() {
+        window.clearTimeout(this.tableSearchTimer);
     }
 };
 </script>

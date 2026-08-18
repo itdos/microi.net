@@ -141,7 +141,7 @@
         border-radius: 0;
         background: transparent;
     }
-    :deep(.field-form-tabs > .el-tabs__header .el-tabs__nav-wrap::after) { display: none; }
+    :deep(.field-form-tabs:not(.el-tabs--left):not(.el-tabs--right) > .el-tabs__header .el-tabs__nav-wrap::after) { display: block; }
     :deep(.field-form-tabs.is-control-center-tabs > .el-tabs__header .el-tabs__item) {
         height: 32px;
         padding: 0 13px;
@@ -151,10 +151,10 @@
     }
     :deep(.field-form-tabs.is-control-center-tabs > .el-tabs__header .el-tabs__item.is-active) {
         color: var(--form-center-accent);
-        background: var(--form-center-card);
-        box-shadow: 0 2px 8px rgba(31, 63, 104, .045);
+        background: transparent;
+        box-shadow: none;
     }
-    :deep(.field-form-tabs > .el-tabs__header .el-tabs__active-bar) { display: none; }
+    :deep(.field-form-tabs:not(.el-tabs--left):not(.el-tabs--right) > .el-tabs__header .el-tabs__active-bar) { display: block; }
     :deep(.field-form) {
         padding: 3px;
         border: 0;
@@ -483,9 +483,14 @@
     :deep(.diy-modern-layout-field) { padding-top: 2px; padding-bottom: 2px; }
 
     &.diy-form--design-mode:not(.diy-form--settingscenter):not(.diy-form--controlcenter) :deep(.diy-modern-field-card > .container-form-item) {
-        border: 1px dashed color-mix(in srgb, var(--diy-modern-accent) 25%, var(--diy-modern-line));
+        border: 1px solid transparent;
         border-radius: 10px;
-        background: color-mix(in srgb, var(--diy-modern-surface) 58%, transparent);
+        background: transparent;
+    }
+
+    &.diy-form--design-mode:not(.diy-form--settingscenter):not(.diy-form--controlcenter) :deep(.diy-modern-field-card:hover > .container-form-item) {
+        border-color: color-mix(in srgb, var(--diy-modern-accent) 13%, var(--diy-modern-line));
+        background: color-mix(in srgb, var(--diy-modern-surface) 32%, transparent);
     }
 }
 
