@@ -1,11 +1,13 @@
 <template>
   <mci-page-shell class="map-page" :style="mciTokenStyle" :title="pageTitle" :subtitle="pageSubtitle" @back="goBack">
-    <template #right><view class="refresh-action" hover-class="refresh-action--pressed" @tap="loadNearby"><text>↻</text></view></template>
-    <view class="range-band"><text>范围</text><slider class="range-slider" :value="radius" min="1" max="50" step="1" active-color="#087DA8" background-color="#dce7eb" block-size="18" @change="changeRadius" /><text>{{ radius }} km</text></view>
+    <template #right><view class="refresh-action" hover-class="refresh-action--pressed" @tap="reload"><text>↻</text></view></template>
+    <view v-if="mode === 'task'" class="task-map-summary"><text>{{ markers.length }} 个任务有坐标</text><text>共 {{ rows.length }} 个任务</text></view>
+    <view v-else-if="!taskId" class="range-band"><text>范围</text><slider class="range-slider" :value="radius" min="1" max="50" step="1" active-color="#087DA8" background-color="#dce7eb" block-size="18" @change="changeRadius" /><text>{{ radius }} km</text></view>
+    <view v-else class="status-legend"><view><text class="status-dot unfinished"></text><text>未完成设备</text></view><view><text class="status-dot complete"></text><text>已完成设备</text></view></view>
     <view class="map-wrap">
       <view v-if="loading" class="map-loading"><mci-skeleton type="detail" :rows="4" /><text>正在获取位置与数据</text></view>
       <map v-else class="business-map" :latitude="latitude" :longitude="longitude" :markers="markers" :include-points="markers" :show-location="true" :enable-zoom="true" @markertap="selectMarker" />
-      <view v-if="!loading && !markers.length" class="map-empty"><text>当前范围内暂无{{ entityLabel }}</text></view>
+      <view v-if="!loading && !markers.length" class="map-empty"><text>{{ emptyText }}</text></view>
     </view>
     <view v-if="selected" class="entity-sheet">
       <view class="entity-sheet__handle"></view>
@@ -16,7 +18,13 @@
 
       <template v-if="mode === 'device'">
         <view class="entity-sheet__row"><text>安装位置</text><text>{{ selected.AnzhuangWZ || '-' }}</text></view>
+        <view v-if="taskId" class="entity-sheet__row"><text>任务状态</text><text :class="selectedTaskComplete ? 'status-complete' : 'status-unfinished'">{{ selected.TaskDeviceStatus || '未完成' }}</text></view>
         <view class="entity-sheet__row"><text>设备状态</text><text>{{ selected.ShebeiZT || '-' }}</text></view>
+      </template>
+      <template v-else-if="mode === 'task'">
+        <view class="entity-sheet__row"><text>任务状态</text><text>{{ selected.state || '-' }}</text></view>
+        <view class="entity-sheet__row"><text>服务人员</text><text>{{ selected.serviceUser || '-' }}</text></view>
+        <view class="entity-sheet__row"><text>现场地址</text><text>{{ selected.address || '-' }}</text></view>
       </template>
       <template v-else>
         <view class="entity-sheet__row"><text>订单数量</text><text>{{ selected.DingdanSL || 0 }}</text></view>
@@ -43,8 +51,10 @@
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
 import { callApiEngine, openForm } from '@/platform/business-runtime.js'
+import { loadAllTaskDevices, loadTasks } from '@/utils/xjy-task.js'
 
 const MODE_META = {
+  task: { title: '任务地图', entity: '任务', action: '查看任务详情' },
   device: { title: '设备地图', entity: '设备', action: '查看设备详情' },
   customer: { title: '客户地图', entity: '客户', action: '查看客户详情' },
   contacts: { title: '联系人地图', entity: '客户', action: '查看全部联系人' },
@@ -55,7 +65,7 @@ export default {
   mixins: [themeMixin],
   data() {
     return {
-      mode: 'device', customerId: '', radius: 15, latitude: 30.2741, longitude: 120.1551,
+      mode: 'device', customerId: '', taskId: '', taskType: '', radius: 15, latitude: 30.2741, longitude: 120.1551,
       rows: [], markers: [], selected: null, loading: true, contactsLoading: false, contacts: []
     }
   },
@@ -63,15 +73,19 @@ export default {
     meta() { return MODE_META[this.mode] || MODE_META.device },
     pageTitle() { return this.meta.title },
     entityLabel() { return this.meta.entity },
-    pageSubtitle() { return this.markers.length ? `附近 ${this.markers.length} 个${this.entityLabel}` : `按现场位置查找${this.entityLabel}` },
-    selectedTitle() { return this.mode === 'device' ? (this.selected.KehuMC || '客户设备') : (this.selected.KehuMC || '客户') },
-    selectedSubtitle() { return this.mode === 'device' ? (this.selected.ShebeiBH || this.selected.ShebeiXH || '') : ([this.selected.Chengshi, this.selected.XiangxiDZ].filter(Boolean).join(' ') || this.selected.LianxiR || '') },
-    primaryActionLabel() { return this.meta.action }
+    pageSubtitle() { return this.mode === 'task' ? `${this.markers.length}/${this.rows.length} 个任务有坐标` : (this.taskId ? `${this.markers.length}/${this.rows.length} 台设备有位置` : (this.markers.length ? `附近 ${this.markers.length} 个${this.entityLabel}` : `按现场位置查找${this.entityLabel}`)) },
+    emptyText() { return this.mode === 'task' ? '当前可查看的售后任务暂无有效坐标' : (this.taskId ? '本任务设备暂无有效定位' : `当前范围内暂无${this.entityLabel}`) },
+    selectedTitle() { return this.mode === 'device' ? (this.selected.ShebeiMC || this.selected.ShangpinMC || this.selected.KehuMC || '客户设备') : (this.mode === 'task' ? (this.selected.customer || this.selected.KehuMC || '售后任务') : (this.selected.KehuMC || '客户')) },
+    selectedSubtitle() { return this.mode === 'device' ? (this.selected.ShebeiBH || this.selected.ShebeiXH || '') : (this.mode === 'task' ? ([this.selected.no, this.selected.type].filter(Boolean).join(' · ')) : ([this.selected.Chengshi, this.selected.XiangxiDZ].filter(Boolean).join(' ') || this.selected.LianxiR || '')) },
+    primaryActionLabel() { return this.taskId ? '处理任务设备' : this.meta.action },
+    selectedTaskComplete() { return !!(this.selected && (String(this.selected.FuwuZTZ) === '1' || this.selected.TaskDeviceStatus === '已完成')) }
   },
   onLoad(options) {
     this.mode = MODE_META[options.mode] ? options.mode : 'device'
     this.customerId = decodeURIComponent(options.customerId || '')
-    this.customerId && this.mode === 'device' ? this.loadCustomerDevices() : this.loadNearby()
+    this.taskId = decodeURIComponent(options.taskId || '')
+    this.taskType = decodeURIComponent(options.taskType || '')
+    this.reload()
   },
   methods: {
     coordinates(item) {
@@ -82,7 +96,21 @@ export default {
     markerRows(rows) {
       return (rows || []).map((item, index) => ({ item, index, ...this.coordinates(item) }))
         .filter((entry) => Number.isFinite(entry.latitude) && entry.latitude !== 0 && Number.isFinite(entry.longitude) && entry.longitude !== 0)
-        .map((entry) => ({ id: entry.index, latitude: entry.latitude, longitude: entry.longitude, width: 28, height: 36, title: this.mode === 'device' ? (entry.item.KehuMC || entry.item.ShebeiBH || '设备') : (entry.item.KehuMC || '客户') }))
+        .map((entry) => {
+          const complete = String(entry.item.FuwuZTZ) === '1' || entry.item.TaskDeviceStatus === '已完成'
+          const markerTitle = this.mode === 'device'
+            ? (entry.item.ShebeiMC || entry.item.ShebeiBH || '设备')
+            : (this.mode === 'task' ? (entry.item.customer || entry.item.KehuMC || entry.item.no || '售后任务') : (entry.item.KehuMC || '客户'))
+          const marker = { id: entry.index, latitude: entry.latitude, longitude: entry.longitude, width: 28, height: 36, title: markerTitle }
+          if (this.taskId) {
+            marker.iconPath = complete ? '/static/xjy/business/dw.png' : '/static/xjy/business/dwRed.png'
+            marker.label = { content: complete ? '已完成' : '未完成', color: '#ffffff', fontSize: 10, borderRadius: 10, bgColor: complete ? '#0091eb' : '#e5484d', padding: 4, textAlign: 'center' }
+          } else if (this.mode === 'task') {
+            marker.iconPath = '/static/xjy/business/customerMap.png'
+            marker.label = { content: entry.item.state || '售后任务', color: '#ffffff', fontSize: 10, borderRadius: 10, bgColor: '#087da8', padding: 4, textAlign: 'center' }
+          }
+          return marker
+        })
     },
     applyRows(rows) {
       this.rows = Array.isArray(rows) ? rows : []
@@ -91,16 +119,130 @@ export default {
       this.contacts = []
       if (this.markers.length) { this.latitude = this.markers[0].latitude; this.longitude = this.markers[0].longitude }
     },
+    async withCustomerCoordinateDefaults(rows) {
+      const devices = Array.isArray(rows) ? rows : []
+      const missingCustomerIds = [...new Set(devices
+        .filter((item) => {
+          const latitude = Number(item.KehuSB_Lat)
+          const longitude = Number(item.KehuSB_Lng)
+          return item.KehuID && !(Number.isFinite(latitude) && latitude !== 0 &&
+            Number.isFinite(longitude) && longitude !== 0)
+        })
+        .map((item) => String(item.KehuID)))]
+      if (!missingCustomerIds.length) return devices
+
+      const customers = []
+      for (let index = 0; index < missingCustomerIds.length; index += 200) {
+        const result = await V8.FormEngine.GetTableData('Diy_Kehu', {
+          _Where: [{ Name: 'Id', Type: 'In', Value: missingCustomerIds.slice(index, index + 200) }],
+          _SelectFields: ['Id', 'KehuDT_Lat', 'KehuDT_Lng'],
+          _PageIndex: 1,
+          _PageSize: 200
+        })
+        if (result && Number(result.Code) === 1) customers.push(...(result.Data || []))
+      }
+      const customerById = new Map(customers.map((item) => [String(item.Id), item]))
+      return devices.map((device) => {
+        const customer = customerById.get(String(device.KehuID))
+        if (!customer) return device
+        return {
+          ...device,
+          KehuSB_Lat: customer.KehuDT_Lat,
+          KehuSB_Lng: customer.KehuDT_Lng,
+          CoordinateSource: 'customer-default'
+        }
+      })
+    },
     async loadCustomerDevices() {
       this.loading = true
       try {
         const result = await V8.FormEngine.GetTableData('Diy_KehuSB', { _Where: [{ Name: 'KehuID', Type: '=', Value: this.customerId }], _PageIndex: 1, _PageSize: 500 })
         if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '设备加载失败')
-        this.applyRows(result.Data)
+        this.applyRows(await this.withCustomerCoordinateDefaults(result.Data))
       } catch (error) { uni.showToast({ title: error.message || '设备加载失败', icon: 'none' }) }
       finally { this.loading = false }
     },
+    async loadTaskDevices() {
+      this.loading = true
+      try {
+        const taskDevices = await loadAllTaskDevices(this.taskId, true)
+        const result = await callApiEngine('get_location_shebei-v2', { TaskId: this.taskId })
+        if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '设备位置加载失败')
+        const equipmentWithDefaults = Array.isArray(result.Data) ? result.Data : []
+        const equipmentById = new Map(equipmentWithDefaults.map((item) => [String(item.Id), item]))
+        const equipmentByCode = new Map(equipmentWithDefaults.filter((item) => item.ShebeiBH).map((item) => [String(item.ShebeiBH), item]))
+        const equipmentByTaskDeviceId = new Map(equipmentWithDefaults.filter((item) => item.TaskDeviceId).map((item) => [String(item.TaskDeviceId), item]))
+        this.applyRows(taskDevices.map((taskDevice) => {
+          const source = equipmentByTaskDeviceId.get(String(taskDevice.Id)) ||
+            equipmentById.get(String(taskDevice.KehuSBID)) ||
+            equipmentByCode.get(String(taskDevice.code)) || {}
+          return {
+            ...source,
+            TaskDeviceId: taskDevice.Id,
+            TaskDeviceStatus: taskDevice.status,
+            FuwuZTZ: taskDevice.FuwuZTZ,
+            FuwuZT: taskDevice.FuwuZT,
+            ShebeiMC: taskDevice.name || source.ShebeiMC,
+            ShebeiXH: taskDevice.model || source.ShebeiXH,
+            ShebeiBH: taskDevice.code || source.ShebeiBH,
+            AnzhuangWZ: taskDevice.position || source.AnzhuangWZ
+          }
+        }))
+      } catch (error) { uni.showToast({ title: error.message || '任务设备地图加载失败', icon: 'none' }) }
+      finally { this.loading = false }
+    },
+    async loadTaskMap() {
+      this.loading = true
+      try {
+        const tasks = []
+        const pageSize = 300
+        let pageIndex = 1
+        let count = 0
+        do {
+          const result = await loadTasks({
+            pageIndex, pageSize, period: 'all', mineOnly: false,
+            customerId: this.customerId || '', refresh: pageIndex === 1
+          })
+          tasks.push(...result.rows)
+          count = result.count
+          if (!result.rows.length) break
+          pageIndex += 1
+        } while (tasks.length < count)
+
+        const customerIds = [...new Set(tasks.map((item) => item.KehuID).filter(Boolean).map(String))]
+        const customers = []
+        for (let index = 0; index < customerIds.length; index += 200) {
+          const result = await V8.FormEngine.GetTableData('Diy_Kehu', {
+            _Where: [{ Name: 'Id', Type: 'In', Value: customerIds.slice(index, index + 200) }],
+            _SelectFields: ['Id', 'KehuMC', 'Chengshi', 'XiangxiDZ', 'KehuDT_Lat', 'KehuDT_Lng'],
+            _PageIndex: 1,
+            _PageSize: 200
+          })
+          if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '客户坐标加载失败')
+          customers.push(...(result.Data || []))
+        }
+        const customerById = new Map(customers.map((item) => [String(item.Id), item]))
+        this.applyRows(tasks.map((task) => {
+          const customer = customerById.get(String(task.KehuID)) || {}
+          return {
+            ...task,
+            KehuMC: task.customer || customer.KehuMC,
+            KehuDT_Lat: task.KehuDT_Lat || customer.KehuDT_Lat,
+            KehuDT_Lng: task.KehuDT_Lng || customer.KehuDT_Lng,
+            address: task.address || [customer.Chengshi, customer.XiangxiDZ].filter(Boolean).join(' ')
+          }
+        }))
+      } catch (error) { uni.showToast({ title: error.message || '任务地图加载失败', icon: 'none' }) }
+      finally { this.loading = false }
+    },
+    reload() {
+      if (this.mode === 'task') { this.loadTaskMap(); return }
+      if (this.taskId && this.mode === 'device') { this.loadTaskDevices(); return }
+      if (this.customerId && this.mode === 'device') { this.loadCustomerDevices(); return }
+      this.loadNearby()
+    },
     loadNearby() {
+      if (this.taskId && this.mode === 'device') { this.loadTaskDevices(); return }
       if (this.customerId && this.mode === 'device') { this.loadCustomerDevices(); return }
       this.loading = true
       uni.getLocation({
@@ -136,6 +278,11 @@ export default {
     openContact(contact) { openForm({ table: 'Diy_LianxiR', rowId: contact.Id, mode: 'View', title: '联系人详情', menuAliases: ['联系人'] }) },
     openSelected() {
       if (!this.selected) return
+      if (this.mode === 'task') { uni.navigateTo({ url: `/pages/task/detail?id=${encodeURIComponent(this.selected.Id)}` }); return }
+      if (this.taskId && this.selected.TaskDeviceId) {
+        uni.navigateTo({ url: `/pages/task/device?id=${encodeURIComponent(this.selected.TaskDeviceId)}&taskId=${encodeURIComponent(this.taskId)}&taskType=${encodeURIComponent(this.taskType)}` })
+        return
+      }
       if (this.mode === 'device') { openForm({ table: 'Diy_KehuSB', rowId: this.selected.Id, mode: 'View', title: '设备详情', menuAliases: ['客户设备', '设备管理'] }); return }
       if (this.mode === 'customer') { uni.navigateTo({ url: `/pages/business/detail?key=customers&id=${encodeURIComponent(this.selected.Id)}` }); return }
       const key = this.mode === 'visit' ? 'visits' : 'contacts'
@@ -158,6 +305,9 @@ export default {
 .range-band { box-sizing: border-box; display: grid; grid-template-columns: 70rpx minmax(0,1fr) 90rpx; align-items: center; height: 86rpx; padding: 0 24rpx; border-bottom: 1rpx solid #e2ebee; background: #fff; color: #55727c; font-size: 22rpx; }
 .range-band > text:last-child { color: #087da8; font-weight: 700; text-align: right; }
 .range-slider { margin: 0; }
+.task-map-summary { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; height: 86rpx; padding: 0 24rpx; border-bottom: 1rpx solid #e2ebee; background: #fff; color: #617982; font-size: 21rpx; }
+.task-map-summary text:first-child { color: #087da8; font-weight: 700; }
+.status-legend { box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 42rpx; height: 86rpx; border-bottom: 1rpx solid #e2ebee; background: #fff; color: #617982; font-size: 21rpx; }.status-legend view { display: flex; align-items: center; gap: 10rpx; }.status-dot { width: 18rpx; height: 18rpx; border-radius: 50%; }.status-dot.unfinished { background: #e5484d; }.status-dot.complete { background: #0091eb; }
 .map-wrap { position: relative; height: calc(100vh - var(--mci-safe-top) - 92rpx - 86rpx); }
 .business-map { width: 100%; height: 100%; }
 .map-loading { position: absolute; inset: 0; padding: 22rpx; background: #f3f7f9; }
@@ -173,6 +323,7 @@ export default {
 .entity-sheet__row { display: grid; grid-template-columns: 130rpx minmax(0,1fr); align-items: center; min-height: 65rpx; border-bottom: 1rpx solid #f0f4f5; }
 .entity-sheet__row text:first-child { color: #788c94; font-size: 21rpx; }
 .entity-sheet__row text:last-child { color: #294b57; font-size: 22rpx; text-align: right; }
+.entity-sheet__row text.status-complete { color: #0091eb; font-weight: 700; }.entity-sheet__row text.status-unfinished { color: #e5484d; font-weight: 700; }
 .contacts-block { padding: 14rpx 0 5rpx; border-bottom: 1rpx solid #edf2f4; }
 .contacts-label { color: #788c94; font-size: 21rpx; }
 .contact-chips { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 10rpx; }

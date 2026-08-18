@@ -66,6 +66,14 @@ function ensureSuccess(result, fallback = '操作失败') {
   return result
 }
 
+function validCoordinatePair(latitude, longitude) {
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+  return Number.isFinite(lat) && lat >= -90 && lat <= 90 &&
+    Number.isFinite(lng) && lng >= -180 && lng <= 180 &&
+    !(lat === 0 && lng === 0)
+}
+
 export function normalizeTask(row = {}) {
   return {
     ...row,
@@ -236,33 +244,133 @@ export async function loadTask(id, refresh = false) {
   return { task: normalizeTask(result.Data), stale: cached.stale === true }
 }
 
-export async function loadTaskDevices(taskId, refresh = false) {
-  const cached = await cachedRequest(`task:devices:${taskIdentity()}:${taskId}`, () => V8.FormEngine.GetTableData('diy_shouhousp', {
-    _Where: [{ Name: 'ShouhouDDID', Type: '=', Value: taskId }],
-    _OrderBy: 'CreateTime',
-    _OrderByType: 'ASC',
-    _PageIndex: 1,
-    _PageSize: 300
-  }), { maxAge: 20 * 1000, refresh, allowStale: true })
-  const result = ensureSuccess(cached.data, '售后设备加载失败')
-  return (result.Data || []).map((row) => ({
+function normalizeTaskDevice(row = {}) {
+  return {
     ...row,
     status: row.FuwuZT || '未完成',
     name: row.ShebeiMC || row.ShangpinMC || '售后设备',
     model: row.ShebeiXH || row.ShangpinXH || '',
     code: row.ShebeiBH || '',
     position: row.AnzhuangWZ || ''
-  }))
+  }
+}
+
+export async function loadTaskDevicesPage(taskId, options = {}) {
+  const pageIndex = Math.max(1, Number(options.pageIndex || 1))
+  const pageSize = Math.min(300, Math.max(1, Number(options.pageSize || 20)))
+  const refresh = options.refresh === true
+  const keyword = String(options.keyword || '').trim()
+  const where = [{ Name: 'ShouhouDDID', Type: '=', Value: taskId }]
+  if (keyword) {
+    where.push(
+      { GroupStart: true, Name: 'ShebeiMC', Type: 'Like', Value: keyword },
+      { AndOr: 'OR', Name: 'ShangpinMC', Type: 'Like', Value: keyword },
+      { AndOr: 'OR', Name: 'ShebeiXH', Type: 'Like', Value: keyword },
+      { AndOr: 'OR', Name: 'ShangpinXH', Type: 'Like', Value: keyword },
+      { AndOr: 'OR', Name: 'ShebeiBH', Type: 'Like', Value: keyword },
+      { AndOr: 'OR', Name: 'AnzhuangWZ', Type: 'Like', Value: keyword, GroupEnd: true }
+    )
+  }
+  const cacheKey = `task:devices:${taskIdentity()}:${taskId}:${pageIndex}:${pageSize}:${keyword}`
+  const cached = await cachedRequest(cacheKey, () => V8.FormEngine.GetTableData('diy_shouhousp', {
+    _Where: where,
+    _OrderBys: { FuwuZTZ: 'DESC', CreateTime: 'ASC', Id: 'ASC' },
+    _PageIndex: pageIndex,
+    _PageSize: pageSize
+  }), { maxAge: 20 * 1000, refresh, allowStale: true })
+  const result = ensureSuccess(cached.data, '售后设备加载失败')
+  const rows = (result.Data || []).map(normalizeTaskDevice)
+  return { rows, count: Number(result.DataCount ?? rows.length), stale: cached.stale === true }
+}
+
+export async function loadTaskDeviceSummary(taskId, refresh = false) {
+  const cacheKey = `task:device-summary:${taskIdentity()}:${taskId}`
+  const cached = await cachedRequest(cacheKey, () => V8.FormEngine.GetTableData('diy_shouhousp', {
+    _Where: [
+      { Name: 'ShouhouDDID', Type: '=', Value: taskId },
+      { Name: 'FuwuZTZ', Type: '=', Value: '1' }
+    ],
+    _SelectFields: ['Id'],
+    _PageIndex: 1,
+    _PageSize: 1
+  }), { maxAge: 20 * 1000, refresh, allowStale: true })
+  const result = ensureSuccess(cached.data, '任务设备统计加载失败')
+  return { completed: Number(result.DataCount ?? (result.Data || []).length), stale: cached.stale === true }
+}
+
+export async function loadTaskDevices(taskId, refresh = false) {
+  const result = await loadTaskDevicesPage(taskId, { pageIndex: 1, pageSize: 300, refresh })
+  return result.rows
+}
+
+export async function loadAllTaskDevices(taskId, refresh = false) {
+  const rows = []
+  let pageIndex = 1
+  let count = 0
+  do {
+    const page = await loadTaskDevicesPage(taskId, { pageIndex, pageSize: 300, refresh })
+    rows.push(...page.rows)
+    count = page.count
+    if (!page.rows.length) break
+    pageIndex += 1
+  } while (rows.length < count)
+  return rows
 }
 
 export async function loadTaskDeviceDetail(id) {
+  let taskDevice
   try {
     const result = ensureSuccess(await callApiEngine('shouhou_equipmentDetail', { Id: id }), '设备详情加载失败')
-    return result.Data || {}
+    taskDevice = result.Data || {}
   } catch (error) {
     const result = ensureSuccess(await V8.FormEngine.GetFormData('diy_shouhousp', { Id: id }), '设备详情加载失败')
-    return result.Data || {}
+    taskDevice = result.Data || {}
   }
+
+  // 客户设备是任务设备坐标的权威来源；历史设备无坐标时再回退到客户默认位置。
+  const customerDeviceId = String(taskDevice.KehuSBID || '').trim()
+  let customerDevice = null
+  if (customerDeviceId) {
+    try {
+      const result = await V8.FormEngine.GetFormData('Diy_KehuSB', {
+        Id: customerDeviceId,
+        _SelectFields: ['Id', 'KehuID', 'DingdanSPID', 'ShebeiBH', 'AnzhuangWZ', 'KehuSB_Lat', 'KehuSB_Lng']
+      })
+      if (result && Number(result.Code) === 1 && result.Data) customerDevice = result.Data
+    } catch (error) {
+      // 坐标增强读取失败时仍展示售后设备详情，避免非关键数据阻断现场处理。
+    }
+  }
+
+  const merged = {
+    ...taskDevice,
+    KehuID: taskDevice.KehuID || (customerDevice && customerDevice.KehuID) || '',
+    DingdanSPID: taskDevice.DingdanSPID || (customerDevice && customerDevice.DingdanSPID) || '',
+    ShebeiBH: taskDevice.ShebeiBH || (customerDevice && customerDevice.ShebeiBH) || '',
+    AnzhuangWZ: taskDevice.AnzhuangWZ || (customerDevice && customerDevice.AnzhuangWZ) || ''
+  }
+  if (customerDevice && validCoordinatePair(customerDevice.KehuSB_Lat, customerDevice.KehuSB_Lng)) {
+    merged.KehuSB_Lat = customerDevice.KehuSB_Lat
+    merged.KehuSB_Lng = customerDevice.KehuSB_Lng
+    return merged
+  }
+
+  const customerId = String(merged.KehuID || '').trim()
+  if (!customerId) return merged
+  try {
+    const customerResult = await V8.FormEngine.GetFormData('Diy_Kehu', {
+      Id: customerId,
+      _SelectFields: ['Id', 'KehuDT_Lat', 'KehuDT_Lng']
+    })
+    const customer = customerResult && Number(customerResult.Code) === 1 ? customerResult.Data : null
+    if (customer && validCoordinatePair(customer.KehuDT_Lat, customer.KehuDT_Lng)) {
+      merged.KehuSB_Lat = customer.KehuDT_Lat
+      merged.KehuSB_Lng = customer.KehuDT_Lng
+    }
+  } catch (error) {
+    // 客户默认坐标同样是兜底能力，失败时返回原任务设备数据。
+  }
+  return merged
 }
 
 export async function loadTaskEquipmentPackage(taskDeviceId) {
@@ -319,24 +427,84 @@ export async function runTaskAction(action, task, values = {}) {
 }
 
 export async function saveTaskDevice(id, taskType, values, device = {}) {
-  const payload = { Id: id, ...values, FuwuZT: '已完成', FuwuZTZ: 1, _InvokeType: 'Client' }
+  const {
+    KehuSB_Lat: latitude,
+    KehuSB_Lng: longitude,
+    _LocationUpdated: locationUpdated,
+    ...taskValues
+  } = values || {}
+
+  // 先更新客户设备档案，再完成任务设备；失败时不会留下“任务已完成但坐标未保存”的状态。
+  const customerDeviceId = String(device.KehuSBID || taskValues.KehuSBID || '').trim()
+  if (customerDeviceId) {
+    const customerDeviceValues = {
+      Id: customerDeviceId,
+      AnzhuangWZ: taskValues.AnzhuangWZ || '',
+      _InvokeType: 'Client'
+    }
+    if (validCoordinatePair(latitude, longitude)) {
+      customerDeviceValues.KehuSB_Lat = Number(latitude)
+      customerDeviceValues.KehuSB_Lng = Number(longitude)
+    }
+    if (locationUpdated && taskValues.AnzhuangWZ) {
+      customerDeviceValues.KehuSB = JSON.stringify({
+        Name: String(taskValues.AnzhuangWZ).trim(),
+        Detail: ''
+      })
+    }
+    ensureSuccess(
+      await V8.FormEngine.UptFormData('Diy_KehuSB', customerDeviceValues),
+      '客户设备安装位置保存失败'
+    )
+  }
+
+  // 任务设备的安装位置也必须回写订单商品安装位置子表，确保 PC 与小程序看到同一份点位数据。
+  const deviceNumber = String(device.ShebeiBH || device.ShangpinBH || taskValues.ShebeiBH || taskValues.ShangpinBH || '').trim()
+  const orderProductId = String(device.DingdanSPID || taskValues.DingdanSPID || '').trim()
+  if (deviceNumber) {
+    const installationWhere = [{ Name: 'ShangpinBH', Type: '=', Value: deviceNumber }]
+    if (orderProductId) installationWhere.unshift({ Name: 'DingdanSPID', Type: '=', Value: orderProductId })
+    const installationResult = await V8.FormEngine.GetFormData('diy_shebeiwz', {
+      _Where: installationWhere,
+      _SelectFields: ['Id']
+    })
+    if (installationResult && Number(installationResult.Code) === 1 && installationResult.Data && installationResult.Data.Id) {
+      const installationValues = {
+        Id: installationResult.Data.Id,
+        AnzhuangWZ: taskValues.AnzhuangWZ || '',
+        _InvokeType: 'Client'
+      }
+      if (validCoordinatePair(latitude, longitude)) {
+        installationValues.AnzhuangWZ_Lat = Number(latitude)
+        installationValues.AnzhuangWZ_Lng = Number(longitude)
+      }
+      ensureSuccess(
+        await V8.FormEngine.UptFormData('diy_shebeiwz', installationValues),
+        '订单商品安装位置同步失败'
+      )
+    } else if (installationResult && ![1, 2].includes(Number(installationResult.Code))) {
+      ensureSuccess(installationResult, '订单商品安装位置查询失败')
+    }
+  }
+
+  const payload = { Id: id, ...taskValues, FuwuZT: '已完成', FuwuZTZ: 1, _InvokeType: 'Client' }
   ensureSuccess(await V8.FormEngine.UptFormData('diy_shouhousp', payload), '设备处理结果保存失败')
   const syncResult = await callApiEngine('DevicePic', {
-    JieguoZP: values.JieguoTP || '',
-    ShebeiBH: device.ShebeiBH || values.ShebeiBH || '',
-    DingdanID: device.DingdanID || values.DingdanID || ''
+    JieguoZP: taskValues.JieguoTP || '',
+    ShebeiBH: device.ShebeiBH || taskValues.ShebeiBH || '',
+    DingdanID: device.DingdanID || taskValues.DingdanID || ''
   })
   if (syncResult && Number(syncResult.Code) === 0) throw new Error(syncResult.Msg || '设备结果照片同步失败')
   if (/安装/.test(taskType || '')) {
     const installResult = await callApiEngine('Synchronize_photos', {
-      Id: device.ShebeiBH || values.ShebeiBH || '',
-      ZhengmianZP: values.ZhengmianZP || '',
-      LvxinZP: values.LvxinZP || '',
-      GuanluZP: values.GuanluZP || '',
-      MingpaiCSZP: values.MingpaiCSZP || '',
-      TiaoxingMZP: values.TiaoxingMZP || '',
-      JixieBHZP: values.JixieBHZP || '',
-      farZP: values.farZP || ''
+      Id: device.ShebeiBH || taskValues.ShebeiBH || '',
+      ZhengmianZP: taskValues.ZhengmianZP || '',
+      LvxinZP: taskValues.LvxinZP || '',
+      GuanluZP: taskValues.GuanluZP || '',
+      MingpaiCSZP: taskValues.MingpaiCSZP || '',
+      TiaoxingMZP: taskValues.TiaoxingMZP || '',
+      JixieBHZP: taskValues.JixieBHZP || '',
+      farZP: taskValues.farZP || ''
     })
     if (installResult && Number(installResult.Code) === 0) throw new Error(installResult.Msg || '安装照片同步失败')
   }
@@ -389,6 +557,9 @@ export default {
   loadTaskStateCounts,
   loadTask,
   loadTaskDevices,
+  loadTaskDevicesPage,
+  loadTaskDeviceSummary,
+  loadAllTaskDevices,
   loadTaskDeviceDetail,
   loadTaskEquipmentPackage,
   loadServiceUsers,
