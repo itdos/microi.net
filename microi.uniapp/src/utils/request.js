@@ -2,6 +2,7 @@ import appConfig from '../config.js';
 import { createMicroiV8 } from './microi.v8.js';
 import { shouldPromptAuthExpired } from '../platform/auth-expired-policy.mjs';
 import { removeCachePrefix } from '../platform/cache.js';
+import { clearRetainedListSessions } from '../platform/list-session.mjs';
 
 const TOKEN_KEY = 'microi_token';
 const USER_KEY = 'microi_user';
@@ -176,6 +177,7 @@ export function removeToken() {
   V8.clearToken();
   // 登录用户维度的首页统计属于会话数据，退出或失效后不能继续从本地快照恢复。
   removeCachePrefix('tab:summary:');
+  clearRetainedListSessions();
   const runtimeUni = getRuntimeUni();
   if (runtimeUni && typeof runtimeUni.$emit === 'function') {
     runtimeUni.$emit('mci:auth-changed');
