@@ -16,6 +16,14 @@ const nativeFieldSource = readFileSync(
   new URL('../src/components/mci-native-field/mci-native-field.vue', import.meta.url),
   'utf8'
 )
+const tenantFormSource = readFileSync(
+  new URL('../src/tenants/xjy/form.js', import.meta.url),
+  'utf8'
+)
+const nativeFormPageSource = readFileSync(
+  new URL('../src/pages/native-form/index.vue', import.meta.url),
+  'utf8'
+)
 
 test('定位详细地址过滤完整省市区前缀', () => {
   assert.equal(
@@ -40,6 +48,27 @@ test('定位详细地址只过滤开头，不误删道路或地点中的同名�
     stripRegionFromAddress('浙江杭州西湖大道1号', ['浙江省', '杭州市', '西湖区']),
     '西湖大道1号'
   )
+})
+
+test('合同订单与售后任务手动定位回填城市、过滤后的地址及后台坐标字段', () => {
+  assert.match(tenantFormSource, /const ORDER_LOCATION_FIELDS = \{[\s\S]*region: 'Chengshi',[\s\S]*address: 'XiangxiDZ'/)
+  assert.match(tenantFormSource, /const AFTER_SALES_LOCATION_FIELDS = \{[\s\S]*region: 'Chengshi',[\s\S]*address: 'Dizhi'/)
+  assert.match(tenantFormSource, /configuredCoordinateFieldName\(context, fields\.latitude, 'latitude'\)/)
+  assert.match(tenantFormSource, /configuredCoordinateFieldName\(context, fields\.longitude, 'longitude'\)/)
+  assert.match(tenantFormSource, /updates\[config\.regionName\] = JSON\.stringify\(location\.region\)/)
+  assert.match(tenantFormSource, /updates\[config\.addressName\] = stripRegionFromAddress\(location\.address, location\.region\)/)
+  assert.match(tenantFormSource, /key: 'xjy-business-address-location'/)
+  assert.match(tenantFormSource, /label: context\.state\.locating \? '定位中…' : '手动定位'/)
+  assert.match(nativeFormPageSource, /action\.iconType === 'location'/)
+})
+
+test('客户表重新定位按钮统一更名为手动定位', () => {
+  const customerAction = tenantFormSource.slice(
+    tenantFormSource.indexOf("key: 'xjy-customer-location'"),
+    tenantFormSource.indexOf("key: 'xjy-business-address-location'")
+  )
+  assert.match(customerAction, /'手动定位'/)
+  assert.doesNotMatch(customerAction, /'重新定位'/)
 })
 
 test('地区选择器只在市和区首项加入全部', () => {
