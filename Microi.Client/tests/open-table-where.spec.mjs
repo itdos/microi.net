@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
     arrayWhereToLegacy,
+    buildSearchWhere,
     cloneWhereList,
-    composeTableWhere
+    composeTableWhere,
+    whereListHasField
 } from '../src/views/form-engine/utils/diy-table-where.js';
+import { scheduleTableInit } from '../src/views/form-engine/utils/diy-table-init.js';
 
 test('OpenTable fixed where remains after advanced column filters', () => {
     const fixedWhere = [
@@ -75,4 +78,54 @@ test('new where groups convert to legacy AND/OR parentheses without changing sem
         arrayWhereToLegacy(['OR', 'Status', '=', 'active', ')']),
         { AndOr: 'OR', Name: 'Status', Type: '=', Value: 'active', GroupEnd: true }
     );
+});
+
+test('empty tree relation and empty checkbox do not create filters', () => {
+    assert.deepEqual(
+        buildSearchWhere({ ProjectId: '' }, { ApprovalStatus: [], ExecutionStatus: [] }),
+        []
+    );
+});
+
+test('exact and checkbox searches are represented only as _Where conditions', () => {
+    assert.deepEqual(
+        buildSearchWhere(
+            { ProjectId: '01M09M3QBV88TCHXQEGC274566', Enabled: false, Count: 0 },
+            { ApprovalStatus: ['Draft', 'Approved'], Empty: [] }
+        ),
+        [
+            { Name: 'ProjectId', Value: '01M09M3QBV88TCHXQEGC274566', Type: '=' },
+            { Name: 'Enabled', Value: false, Type: '=' },
+            { Name: 'Count', Value: 0, Type: '=' },
+            { Name: 'ApprovalStatus', Value: ['Draft', 'Approved'], Type: 'In' }
+        ]
+    );
+});
+
+test('an explicit relation in _Where suppresses the redundant exact relation filter', () => {
+    assert.equal(whereListHasField([{ Name: 'ProjectId', Value: 'P1', Type: '=' }], 'ProjectId'), true);
+    assert.equal(whereListHasField([['DeptIds', 'Like', 'D1']], 'DeptIds'), true);
+    assert.equal(whereListHasField([], 'ProjectId'), false);
+});
+
+test('same-tick table prop changes coalesce into one initialization', async () => {
+    let initCount = 0;
+    const pendingTicks = [];
+    const context = {
+        ParentFormLoadFinish: null,
+        Init() {
+            initCount += 1;
+        },
+        $nextTick(callback) {
+            const promise = Promise.resolve().then(callback);
+            pendingTicks.push(promise);
+            return promise;
+        }
+    };
+
+    scheduleTableInit(context, []);
+    scheduleTableInit(context, []);
+    await Promise.all(pendingTicks);
+
+    assert.equal(initCount, 1);
 });

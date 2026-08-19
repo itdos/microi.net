@@ -510,6 +510,16 @@ function normalizeCodeForComparison(value: unknown): string {
   return String(value ?? '').replace(/\r\n/g, '\n').trim();
 }
 
+function apiEngineV8LimitValue(value: ApiEngine | undefined): number {
+  if (value?.V8Limit !== undefined && value.V8Limit !== null) {
+    return Number(value.V8Limit) === 1 ? 1 : 0;
+  }
+  if (value?.V8Unlimited !== undefined && value.V8Unlimited !== null) {
+    return Number(value.V8Unlimited) === 1 ? 0 : 1;
+  }
+  return 0;
+}
+
 function stripMenuRuntimeFields(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stripMenuRuntimeFields);
   if (!value || typeof value !== 'object') return value;
@@ -595,6 +605,8 @@ export interface ApiEngine {
   Code?: string;
   ApiRemark?: string;
   Description?: string;
+  V8Limit?: number;
+  /** @deprecated Compatibility alias returned by older servers. Prefer V8Limit. */
   V8Unlimited?: number;
   Version?: string;
   ChangeHistory?: string;
@@ -2115,6 +2127,8 @@ export class MicroiClient {
     functionDescription?: string;
     changeSummary?: string;
     confirmLargeReduction?: boolean;
+    v8Limit?: boolean;
+    /** @deprecated Compatibility alias. true maps to v8Limit=false. */
     v8Unlimited?: boolean;
   }): Promise<ApiResponse> {
     assertSourceIntegrity(code, `保存接口引擎 ${apiEngineKey}`);
@@ -2144,34 +2158,37 @@ export class MicroiClient {
       functionDescription: options?.functionDescription,
       changeSummary: options?.changeSummary || `保存接口引擎 ${apiEngineKey}`,
     });
+    const requestedV8Limit = options?.v8Limit ?? (options?.v8Unlimited === undefined
+      ? undefined
+      : !options.v8Unlimited);
     const payload = {
       OsClient: this.config.osClient,
       ApiEngineKey: apiEngineKey,
       ApiV8CodeBase64: Buffer.from(prepared.code, 'utf8').toString('base64'),
       Version: prepared.version,
       ChangeHistory: prepared.changeHistory,
-      ...(options?.v8Unlimited === undefined ? {} : { V8Unlimited: options.v8Unlimited ? 1 : 0 }),
+      ...(requestedV8Limit === undefined ? {} : { V8Limit: requestedV8Limit ? 1 : 0 }),
     };
     const matchesReadback = (data: ApiEngine | undefined) =>
       normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
         === normalizeCodeForComparison(prepared.code)
-      && (options?.v8Unlimited === undefined
-        || Number(data?.V8Unlimited || 0) === (options.v8Unlimited ? 1 : 0));
+      && (requestedV8Limit === undefined
+        || apiEngineV8LimitValue(data) === (requestedV8Limit ? 1 : 0));
     try {
       const result = await this.post(API.UPDATE_ENGINE_CODE, payload, {
         timeoutMs: this.writeRequestTimeoutMs,
         operationName: `保存接口引擎 ${apiEngineKey}`,
       });
-      if (result.Code !== 1 || options?.v8Unlimited === undefined) return result;
+      if (result.Code !== 1 || requestedV8Limit === undefined) return result;
       const verification = await this.pollReadback(
-        () => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Unlimited`)),
+        () => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Limit`)),
         matchesReadback,
       );
       if (!verification.matched) {
         return {
           Code: 0,
           Data: { ApiEngineKey: apiEngineKey, UpdateResponse: result.Data },
-          Msg: `保存接口引擎 ${apiEngineKey} 返回成功，但 V8Unlimited 写后回读不一致：${verification.lastError || '代码或配置不一致'}`,
+          Msg: `保存接口引擎 ${apiEngineKey} 返回成功，但 V8Limit 写后回读不一致：${verification.lastError || '代码或配置不一致'}`,
         };
       }
       return {
@@ -2179,7 +2196,7 @@ export class MicroiClient {
         Data: {
           ...(result.Data && typeof result.Data === 'object' ? result.Data as Record<string, unknown> : {}),
           ApiEngineKey: apiEngineKey,
-          V8Unlimited: options.v8Unlimited ? 1 : 0,
+          V8Limit: requestedV8Limit ? 1 : 0,
           Verified: true,
           Verification: 'readback',
         },
@@ -2203,20 +2220,20 @@ export class MicroiClient {
     }
   }
 
-  async updateEngineRuntimeConfig(apiEngineKey: string, v8Unlimited: boolean): Promise<ApiResponse> {
+  async updateEngineRuntimeLimit(apiEngineKey: string, v8Limit: boolean): Promise<ApiResponse> {
     const payload = {
       OsClient: this.config.osClient,
       ApiEngineKey: apiEngineKey,
-      V8Unlimited: v8Unlimited ? 1 : 0,
+      V8Limit: v8Limit ? 1 : 0,
     };
     const verify = () => this.pollReadback(
       () => this.getEngineCode(
         apiEngineKey,
-        this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Unlimited`),
+        this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Limit`),
       ),
-      (remote) => Number(remote?.V8Unlimited || 0) === (v8Unlimited ? 1 : 0),
+      (remote) => apiEngineV8LimitValue(remote) === (v8Limit ? 1 : 0),
     );
-    const operation = `更新接口引擎 ${apiEngineKey} V8Unlimited`;
+    const operation = `更新接口引擎 ${apiEngineKey} V8Limit`;
     try {
       const result = await this.post(API.UPDATE_ENGINE_CODE, payload, {
         timeoutMs: this.writeRequestTimeoutMs,
@@ -2236,7 +2253,7 @@ export class MicroiClient {
         Data: {
           ...(result.Data && typeof result.Data === 'object' ? result.Data as Record<string, unknown> : {}),
           ApiEngineKey: apiEngineKey,
-          V8Unlimited: v8Unlimited ? 1 : 0,
+          V8Limit: v8Limit ? 1 : 0,
           Verified: true,
           Verification: 'readback',
         },
@@ -2247,12 +2264,17 @@ export class MicroiClient {
       if (verification.matched) {
         return this.recoveredWriteResult(operation, error, {
           ApiEngineKey: apiEngineKey,
-          V8Unlimited: v8Unlimited ? 1 : 0,
+          V8Limit: v8Limit ? 1 : 0,
           Verified: true,
         });
       }
       throw this.uncertainWriteFailure(operation, error, verification.lastError);
     }
+  }
+
+  /** @deprecated Use updateEngineRuntimeLimit with positive semantics. */
+  async updateEngineRuntimeConfig(apiEngineKey: string, v8Unlimited: boolean): Promise<ApiResponse> {
+    return this.updateEngineRuntimeLimit(apiEngineKey, !v8Unlimited);
   }
 
   async createEngine(data: {
@@ -2261,6 +2283,8 @@ export class MicroiClient {
     Category?: string;
     Code?: string;
     ApiAddress?: string;
+    V8Limit?: number;
+    /** @deprecated Compatibility alias. true maps to V8Limit=0. */
     V8Unlimited?: number;
     functionDescription?: string;
     changeSummary?: string;
@@ -2270,6 +2294,10 @@ export class MicroiClient {
       OsClient: this.config.osClient,
       ...data,
     };
+    if (payload.V8Limit === undefined && payload.V8Unlimited !== undefined) {
+      payload.V8Limit = Number(payload.V8Unlimited) === 1 ? 0 : 1;
+    }
+    delete payload.V8Unlimited;
     const code = typeof payload.Code === 'string' ? payload.Code : (typeof payload.ApiV8Code === 'string' ? payload.ApiV8Code : '');
     assertSourceIntegrity(code, `创建接口引擎 ${data.ApiEngineKey}`);
     const prepared = prepareV8VersionedCode({
@@ -2302,8 +2330,8 @@ export class MicroiClient {
       (remote) => String(remote?.ApiEngineKey || '') === data.ApiEngineKey
         && normalizeCodeForComparison(remote?.ApiV8Code || remote?.Code)
           === normalizeCodeForComparison(prepared.code)
-        && (data.V8Unlimited === undefined
-          || Number(remote?.V8Unlimited || 0) === (data.V8Unlimited === 1 ? 1 : 0)),
+        && (payload.V8Limit === undefined
+          || apiEngineV8LimitValue(remote) === (Number(payload.V8Limit) === 1 ? 1 : 0)),
     );
 
     try {

@@ -496,7 +496,7 @@ test('createEngine confirms an uncertain write by readback', async () => {
           ApiEngineKey: payload.ApiEngineKey,
           ApiName: payload.ApiName,
           ApiAddress: payload.ApiAddress,
-          V8Unlimited: payload.V8Unlimited,
+          V8Limit: payload.V8Limit,
           ApiV8Code: Buffer.from(String(payload.ApiV8CodeBase64 || ''), 'base64').toString('utf8'),
           Version: payload.Version,
         };
@@ -514,26 +514,26 @@ test('createEngine confirms an uncertain write by readback', async () => {
       ApiEngineKey: 'create-transport-probe',
       ApiName: 'Create transport probe',
       Code: 'return { Code: 1, Data: "ok" };',
-      V8Unlimited: 1,
+      V8Limit: 0,
       functionDescription: '创建接口引擎传输恢复测试',
     });
 
     assert.equal(result.Code, 1);
     assert.equal((result.Data as Record<string, unknown>).RecoveredAfterTransportError, true);
     assert.equal((result.Data as Record<string, unknown>).Verified, true);
-    assert.equal(storedEngine?.V8Unlimited, 1);
+    assert.equal(storedEngine?.V8Limit, 0);
     assert.match(String(storedEngine?.ApiV8Code || ''), /return \{ Code: 1, Data: "ok" \};/);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test('updateEngineRuntimeConfig updates only V8Unlimited and verifies explicit false', async () => {
+test('updateEngineRuntimeLimit updates only V8Limit and verifies explicit true', async () => {
   const originalFetch = globalThis.fetch;
   const storedEngine: Record<string, unknown> = {
     ApiEngineKey: 'runtime-policy-probe',
     ApiV8Code: 'return { Code: 1 };',
-    V8Unlimited: 1,
+    V8Limit: 0,
   };
   try {
     globalThis.fetch = async (input, init) => {
@@ -541,11 +541,11 @@ test('updateEngineRuntimeConfig updates only V8Unlimited and verifies explicit f
       if (url.endsWith('/api/V8Engine/UpdateApiEngineCode')) {
         const payload = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
         assert.equal(payload.ApiEngineKey, 'runtime-policy-probe');
-        assert.equal(payload.V8Unlimited, 0);
+        assert.equal(payload.V8Limit, 1);
         assert.equal(payload.ApiV8CodeBase64, undefined);
         assert.equal(payload.ApiV8Code, undefined);
-        storedEngine.V8Unlimited = payload.V8Unlimited;
-        return jsonResponse({ Code: 1, Data: { V8Unlimited: 0 }, Msg: '' });
+        storedEngine.V8Limit = payload.V8Limit;
+        return jsonResponse({ Code: 1, Data: { V8Limit: 1 }, Msg: '' });
       }
       if (url.endsWith('/api/V8Engine/GetApiEngineCode')) {
         return jsonResponse({ Code: 1, Data: storedEngine, Msg: '' });
@@ -553,11 +553,11 @@ test('updateEngineRuntimeConfig updates only V8Unlimited and verifies explicit f
       throw new Error(`Unexpected URL: ${url}`);
     };
 
-    const result = await createClient().updateEngineRuntimeConfig('runtime-policy-probe', false);
+    const result = await createClient().updateEngineRuntimeLimit('runtime-policy-probe', true);
 
     assert.equal(result.Code, 1);
     assert.equal((result.Data as Record<string, unknown>).Verified, true);
-    assert.equal((result.Data as Record<string, unknown>).V8Unlimited, 0);
+    assert.equal((result.Data as Record<string, unknown>).V8Limit, 1);
     assert.equal(storedEngine.ApiV8Code, 'return { Code: 1 };');
   } finally {
     globalThis.fetch = originalFetch;

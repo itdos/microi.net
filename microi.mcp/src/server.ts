@@ -4396,11 +4396,14 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
 
         const lines = [
           `# API Engines (${engines.length})\n`,
-          '| # | Engine Key | Name | Category | V8 Unlimited | Description |',
+          '| # | Engine Key | Name | Category | V8 Runtime Limit | Description |',
           '|---|-----------|------|----------|--------------|-------------|',
         ];
         engines.forEach((e, i) => {
-          lines.push(`| ${i + 1} | ${e.ApiEngineKey || ''} | ${e.ApiName || ''} | ${e.Category || ''} | ${Number(e.V8Unlimited || 0) === 1 ? 'ON' : 'OFF'} | ${e.ApiRemark || e.Description || ''} |`);
+          const v8Limit = e.V8Limit !== undefined
+            ? Number(e.V8Limit || 0)
+            : (Number(e.V8Unlimited || 0) === 1 ? 0 : 1);
+          lines.push(`| ${i + 1} | ${e.ApiEngineKey || ''} | ${e.ApiName || ''} | ${e.Category || ''} | ${v8Limit === 1 ? 'ON' : 'OFF'} | ${e.ApiRemark || e.Description || ''} |`);
         });
 
         return { content: [{ type: 'text', text: lines.join('\n') }] };
@@ -4442,7 +4445,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           engine?.Category ? `- **Category**: ${engine.Category}` : '',
           engine?.ApiAddress ? `- **Address**: ${engine.ApiAddress}` : '',
           engine?.ApiRemark ? `- **Remark**: ${engine.ApiRemark}` : '',
-          `- **V8Unlimited**: ${Number(engine?.V8Unlimited || 0) === 1 ? 'true' : 'false'}`,
+          `- **V8Limit**: ${engine?.V8Limit !== undefined ? Number(engine.V8Limit || 0) === 1 : Number(engine?.V8Unlimited || 0) !== 1}`,
           `- **Source completeness**: ${hasMore || start > 0 ? 'PARTIAL CHUNK — do not save this chunk alone' : 'COMPLETE'}`,
           `- **Character range**: [${start}, ${end}) of ${code.length}`,
           `- **Full source SHA-256**: ${sha256}`,
@@ -4653,21 +4656,22 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_save_engine_code',
-    `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Optional v8Unlimited is an explicit high-risk opt-in and is always verified by remote readback. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`,
+    `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Optional v8Limit uses positive semantics: false/default means no Jint per-execution budget, true enables the configured timeout/statement/recursion/allocation limits. The value is verified by remote readback. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`,
     {
       apiEngineKey: z.string().describe('The unique key of the API engine'),
       code: z.string().describe('The complete JavaScript source code to save'),
       functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
       changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
-      v8Unlimited: z.boolean().optional().describe('Explicit high-risk switch. true removes this engine\'s Jint timeout/statement/recursion/allocation budgets but keeps the process resident-memory guard. It does not inherit to nested engines. Omit to preserve the current value.'),
+      v8Limit: z.boolean().optional().describe('Positive switch. false/default means unrestricted Jint execution budgets; true applies this engine\'s configured timeout/statement/recursion/allocation limits. Omit to preserve the current value.'),
+      v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
       confirmLargeReduction: z.string().optional().describe('Required only when replacing source >=8000 chars with code shorter by more than 15%. Use apiEngineKey or EXECUTE.'),
     },
-    async ({ apiEngineKey, code, functionDescription, changeSummary, v8Unlimited, confirmLargeReduction }) => {
+    async ({ apiEngineKey, code, functionDescription, changeSummary, v8Limit, v8Unlimited, confirmLargeReduction }) => {
       try {
         const result = await client.saveEngineCode(apiEngineKey, code, {
           functionDescription,
           changeSummary,
-          v8Unlimited,
+          v8Limit: v8Limit ?? (v8Unlimited === undefined ? undefined : !v8Unlimited),
           confirmLargeReduction: confirmLargeReduction === apiEngineKey || confirmLargeReduction === 'EXECUTE',
         });
         if (result.Code !== 1) {
@@ -4690,7 +4694,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_create_engine',
-    `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table. WARNING: Do NOT create API engines for basic CRUD operations — the low-code platform handles CRUD automatically when a menu module is bound to a diy_table. Only create engines for complex business logic, third-party integrations, scheduled tasks, or custom calculations. v8Unlimited defaults to false and must never be inferred from data volume alone.`,
+    `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table. WARNING: Do NOT create API engines for basic CRUD operations — the low-code platform handles CRUD automatically when a menu module is bound to a diy_table. Only create engines for complex business logic, third-party integrations, scheduled tasks, or custom calculations. v8Limit defaults to false: limits are applied only when explicitly enabled.`,
     {
       apiEngineKey: z.string().describe('Unique key for the new engine (lowercase, hyphens allowed, e.g. "my-new-api")'),
       apiName: z.string().describe('Display name of the engine'),
@@ -4699,9 +4703,10 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       functionDescription: z.string().optional().describe('Complete function description to keep in the initial code header. No change history here.'),
       changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
       apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
-      v8Unlimited: z.boolean().optional().describe('Default false. Set true only for an explicit single-transaction requirement after accepting DB lock/rollback/timeout and memory risks. Process resident-memory guard remains active.'),
+      v8Limit: z.boolean().optional().describe('Default false. false means no Jint per-execution budget; true applies the configured runtime limits. Process resident-memory guard always remains active.'),
+      v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
     },
-    async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress, v8Unlimited }) => {
+    async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress, v8Limit, v8Unlimited }) => {
       try {
         const result = await client.createEngine({
           ApiEngineKey: apiEngineKey,
@@ -4711,7 +4716,9 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           functionDescription,
           changeSummary,
           ApiAddress: apiAddress,
-          V8Unlimited: v8Unlimited === undefined ? undefined : (v8Unlimited ? 1 : 0),
+          V8Limit: (v8Limit ?? (v8Unlimited === undefined ? undefined : !v8Unlimited)) === undefined
+            ? undefined
+            : ((v8Limit ?? !v8Unlimited) ? 1 : 0),
         });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };

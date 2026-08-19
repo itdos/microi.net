@@ -53,6 +53,45 @@ export function appendWhereList(baseWhere, appendWhere) {
     return cloneWhereList(baseWhere).concat(cloneWhereList(appendWhere));
 }
 
+export function hasSearchFilterValue(value) {
+    if (value === undefined || value === null) {
+        return false;
+    }
+    if (typeof value === "string") {
+        return value.trim() !== "";
+    }
+    if (Array.isArray(value)) {
+        return value.length > 0;
+    }
+    return true;
+}
+
+export function buildSearchWhere(searchEqual, searchCheckbox) {
+    var result = [];
+    Object.keys(searchEqual || {}).forEach(function(fieldName) {
+        var value = searchEqual[fieldName];
+        if (!hasSearchFilterValue(value)) return;
+        result.push({ Name: fieldName, Value: value, Type: "=" });
+    });
+    Object.keys(searchCheckbox || {}).forEach(function(fieldName) {
+        var value = searchCheckbox[fieldName];
+        if (!Array.isArray(value) || value.length === 0) return;
+        result.push({ Name: fieldName, Value: value.slice(), Type: "In" });
+    });
+    return result;
+}
+
+export function whereListHasField(whereList, fieldName) {
+    if (!fieldName || !Array.isArray(whereList)) return false;
+    return whereList.some(function(item) {
+        if (Array.isArray(item)) {
+            var normalized = arrayWhereToLegacy(item);
+            return normalized && normalized.Name === fieldName;
+        }
+        return item && item.Name === fieldName;
+    });
+}
+
 export function arrayWhereToLegacy(item) {
     if (!Array.isArray(item) || item.length < 3) {
         return cloneWhereItem(item);

@@ -59,6 +59,8 @@ description: Microi 吾码模块引擎“树形+表格/表单”左右结构配�
 
 左树按数据表对待，默认每页 20 条，允许 10/20/50/100 条切换。无论当前只有多少数据，都不能用 `_PageSize:500` 一次拉完整主表。搜索时把页码重置为 1，并在服务端按关键字过滤后返回真实总数。
 
+当初始化 V8 使用 `V8.FormEngine.GetTableTree/GetTableDataTree` 时，左侧来源 `diy_table.IsTree` 必须为 `1`，并显式配置真实存在的 `TreeParentField`（通常是 `ParentId`）；否则接口会成功返回 `Code=0`，页面只显示“暂无数据”。应用包必须同时携带这两项表元数据，并在发布前通过真实树接口回读，不能只验收 `diy_LeftJoinRightView` 配置行。
+
 ```js
 var form = V8.Form || {};
 var pageIndex = Math.max(1, parseInt(form._PageIndex || 1, 10));
@@ -126,8 +128,11 @@ V8.Result = {
 ## 验收清单
 
 - 当前菜单只匹配一条配置，模块路径正确。
+- 使用树接口的左表已启用 `IsTree=1`，`TreeParentField` 与物理父级字段一致。
 - 左树标题无 `undefined`、`{}`、空白重复项。
 - 点击“全部”清空右侧外键条件；点击节点只显示该节点数据。
+- 后端 `_HasChild=true` 表示可展开，Element Plus 的 `isLeaf` 必须映射为独立 `_IsLeaf=!_HasChild`，不得把 `_HasChild` 直接当叶子标记。
+- 页面初始已处于“全部”时，再次点击“全部”不得先清空已加载列表；只清除树节点外键条件并避免重复请求。
 - 右侧新增数据自动写入正确外键，切换节点后不会串数据。
 - 普通用户不出现仅管理员可用的“页面配置”。
 - 桌面左树每页默认 20 条，可翻页并切换 10/20/50/100；加载时不出现错误的空状态。

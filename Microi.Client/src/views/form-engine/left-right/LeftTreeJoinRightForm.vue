@@ -103,7 +103,9 @@ export default {
             tableChildRelation: {},
             selectedParentRow: {},
             selectedParentValue: "",
-            LastClickNode: {},
+            // “全部”是左右布局的初始选中态。保持点击态与筛选态一致，
+            // 避免首次点击“全部”时把已经加载好的右表数据误清空。
+            LastClickNode: { _IsAllCategory: true },
             MobileTreeDrawer: false,
             MobileTreeTitle: "全部项目"
         };
@@ -179,11 +181,6 @@ export default {
                 }
                 self.LastClickNode = data;
                 self.ShowRightClick(true);
-                if (self.$refs.ref_RightDiyTable) {
-                    self.$refs.ref_RightDiyTable.DiyTableRowList = [];
-                    self.$refs.ref_RightDiyTable.TableMultipleSelection = [];
-                    self.$refs.ref_RightDiyTable.TableSelectedRow = {};
-                }
                 self.clickData = {
                     Origin: "BomProject",
                     IsAllCategory: true

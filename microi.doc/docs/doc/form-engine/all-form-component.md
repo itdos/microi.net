@@ -181,6 +181,52 @@ if(V8.Form.Phone.length != 11){
 ## 图标库 FontAwesome
 >* 集成FontAwesome
 
+## 二维码 Qrcode
+
+`Qrcode` 是表单中的二维码卡片展示控件。字段设置里的“显示宽度、显示下载按钮、下载按钮文案”只控制外观；真正要编码的内容必须放在字段运行态的 `DataAppend.Code` 中。`Code` 可以是网址、编号或任意需要扫码得到的文本。
+
+最常用的做法是在当前表的【进入表单前端 V8 事件（InFormV8）】中设置：
+
+```js
+// 设计器保存字段时不要把运行态数据固化进字段配置。
+if (V8.LoadMode !== 'Design') {
+  var code = V8.Form.OrderNo || V8.Form.Id || 'https://microi.net';
+  V8.FieldSet('Qrcode116', 'DataAppend', {
+    Code: code,                         // 必填：二维码实际内容
+    title: '订单二维码',                // 可选：卡片标题
+    titleValue: V8.Form.OrderNo || '',  // 可选：标题右侧值
+    fields: [                           // 可选：二维码下方说明
+      { Label: '客户：', Value: V8.Form.CustomerName || '' },
+      { Label: '状态：', Value: V8.Form.StatusName || '' }
+    ],
+    Color: '#000000',                   // 可选：二维码颜色
+    CardColor: '#3161a6',               // 可选：卡片头尾颜色
+    FileName: '订单-' + (V8.Form.OrderNo || '二维码'),
+    createTime: false                   // 下载文件名是否追加时间戳
+  });
+}
+```
+
+兼容旧配置时，说明项也可写为 `DataConfig: [{ label:'客户：', key:'张三' }]`；`code`、`fileName` 小写写法同样支持。字段专项配置对应：
+
+```json
+{
+  "Qrcode": {
+    "DisplayWidth": 400,
+    "ShowDownload": true,
+    "DownloadText": "下载二维码"
+  }
+}
+```
+
+使用时注意：
+
+- `DataAppend.Code` 为空时不生成二维码；仅设置 `Config.Qrcode` 不会自动猜测业务字段。
+- 表单中的 `Qrcode` 会生成 PNG Data URL 并回写当前字段以兼容历史代码。纯展示场景应将二维码字段设为 `IsVirtual=1`，或在进入表单事件中把该字段加入 `V8.NotSaveField`，不要用短 `varchar` 保存整张 Base64 图片。
+- 若需要保存扫码原文，另建普通 `varchar` 字段保存网址/编号，再把该值传给 `DataAppend.Code`。列表中的二维码列直接把该普通字段值渲染为二维码即可。
+- 批量下载可在可信前端 V8 中调用 `await window.downloadQRCode(payloadList)`；每项 payload 与上例结构相同。文件名会自动移除 Windows 非法字符。
+- 二维码只能承载内容，不会自动赋予访问权限。扫码后的 URL 仍必须执行正常登录、菜单、表和数据范围校验，禁止把 Token 或长期密钥写入二维码。
+
 ## 定制组件 DevComponent
 >* 自定义定制开发的组件嵌入到表单中
 
@@ -338,4 +384,4 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 | Cascader / SelectTree / Department / Address / TreeCheckbox | `Lazy`、`Filterable`、`Value`、`Label`、`Children`、`ParentField`、`ParentFields`、`Multiple`、`EmitPath`、`TreeCheckbox.*` |
 | OpenTable / JoinForm / JoinTable | `OpenTable.BtnName`、`OpenTable.MultipleSelect`、`OpenTable.BeforeOpenV8`、`OpenTable.SubmitV8`、`JoinForm.*`、`JoinTable.*` |
 | CodeEditor / JsonTable / Html / RichText | `CodeEditor.Height`、`JsonTable.Columns`、`JsonTable.Columns[].Config`、JSON/HTML/富文本内容配置 |
-| Map / MapArea / Qrcode / FontAwesome / DevComponent | `MapCompany`、二维码源字段、图标类名、`DevComponentName`、`DevComponentPath` |
+| Map / MapArea / Qrcode / FontAwesome / DevComponent | `MapCompany`；`Qrcode.DisplayWidth`、`Qrcode.ShowDownload`、`Qrcode.DownloadText`（二维码内容由 `DataAppend.Code` 提供）；图标类名；`DevComponentName`、`DevComponentPath` |
