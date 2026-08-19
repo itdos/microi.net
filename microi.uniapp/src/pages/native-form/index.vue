@@ -117,9 +117,13 @@
 							<view v-if="tenantLabelFieldActions(field).length" class="tenant-field-label-actions">
 								<view v-for="action in tenantLabelFieldActions(field)" :key="action.key"
 									class="tenant-field-label-action"
-									:class="{ 'tenant-field-label-action--disabled': action.disabled }"
+									:class="{
+										'tenant-field-label-action--disabled': action.disabled,
+										'tenant-field-label-action--location': action.iconType === 'location'
+									}"
 									hover-class="tenant-field-action--pressed" @tap="runTenantFieldAction(field, action)">
 									<view v-if="action.iconType === 'search'" class="tenant-field-label-action__search"></view>
+									<view v-else-if="action.iconType === 'location'" class="tenant-field-label-action__location"></view>
 									<text v-else-if="action.icon" class="tenant-field-action__icon">{{ action.icon }}</text>
 									<text>{{ action.label }}</text>
 								</view>
@@ -169,7 +173,8 @@
 								class="tenant-field-action"
 								:class="{ 'tenant-field-action--disabled': action.disabled }"
 								hover-class="tenant-field-action--pressed" @tap="runTenantFieldAction(field, action)">
-								<text v-if="action.icon" class="tenant-field-action__icon">{{ action.icon }}</text>
+								<view v-if="action.iconType === 'location'" class="tenant-field-label-action__location"></view>
+								<text v-else-if="action.icon" class="tenant-field-action__icon">{{ action.icon }}</text>
 								<text>{{ action.label }}</text>
 							</view>
 						</view>
@@ -1602,6 +1607,41 @@
 		border-radius: 1rpx;
 		background: currentColor;
 		transform: rotate(45deg);
+		content: '';
+	}
+
+	/* zhy：原生表单安装位置复用任务设备“现场定位”的胶囊按钮观感。 */
+	.tenant-field-label-action--location {
+		min-height: 52rpx;
+		padding: 0 17rpx;
+		border-color: #8bcada;
+		border-radius: 26rpx;
+		color: #087da8;
+		background: #eef9fb;
+		font-size: 20rpx;
+		font-weight: 650;
+		transition: transform .16s ease, opacity .16s ease;
+	}
+
+	.tenant-field-label-action__location {
+		position: relative;
+		width: 22rpx;
+		height: 22rpx;
+		border: 2rpx solid currentColor;
+		border-radius: 50% 50% 50% 0;
+		box-sizing: border-box;
+		transform: rotate(-45deg);
+	}
+
+	.tenant-field-label-action__location::after {
+		position: absolute;
+		top: 5rpx;
+		left: 5rpx;
+		width: 6rpx;
+		height: 6rpx;
+		border: 2rpx solid currentColor;
+		border-radius: 50%;
+		box-sizing: border-box;
 		content: '';
 	}
 
