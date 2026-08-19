@@ -552,9 +552,45 @@ function validateV8Unlimited(
   }
   if (value) {
     warnings.push(
-      `${path}.v8Unlimited=true 会取消该接口或该表后端 V8 事件的单次 Jint 超时、语句、递归和累计分配预算；`
+      `${path}.v8Unlimited=true 会取消该表后端 V8 事件的单次 Jint 超时、语句、递归和累计分配预算；`
       + '仅在业务明确要求单事务且已评估数据库锁、回滚、连接超时与进程内存风险时开启。进程常驻内存保护仍生效，且不会向嵌套接口继承。',
     );
+  }
+  return value;
+}
+
+function getEngineV8Limit(record: JsonRecord): boolean | undefined {
+  const positive = getBoolean(record, 'v8Limit', 'V8Limit');
+  if (positive !== undefined) return positive;
+  const legacy = getBoolean(record, 'v8Unlimited', 'V8Unlimited');
+  return legacy === undefined ? undefined : !legacy;
+}
+
+function validateEngineV8Limit(
+  record: JsonRecord,
+  path: string,
+  errors: string[],
+  warnings: string[],
+): boolean | undefined {
+  const rawPositive = getValue(record, 'v8Limit', 'V8Limit');
+  const rawLegacy = getValue(record, 'v8Unlimited', 'V8Unlimited');
+  if ((rawPositive === undefined || rawPositive === null || rawPositive === '')
+    && (rawLegacy === undefined || rawLegacy === null || rawLegacy === '')) return undefined;
+  const hasPositive = rawPositive !== undefined && rawPositive !== null && rawPositive !== '';
+  const value = hasPositive
+    ? getBoolean(record, 'v8Limit', 'V8Limit')
+    : getEngineV8Limit(record);
+  if (value === undefined) {
+    errors.push(`${path}.v8Limit 必须是 boolean 或 0/1`);
+    return undefined;
+  }
+  if (hasPositive && rawLegacy !== undefined) {
+    const legacyLimit = getBoolean(record, 'v8Unlimited', 'V8Unlimited');
+    if (legacyLimit !== undefined && value !== !legacyLimit) {
+      errors.push(`${path}.v8Limit 与兼容字段 v8Unlimited 的语义冲突`);
+    }
+  } else if (rawLegacy !== undefined) {
+    warnings.push(`${path}.v8Unlimited 已弃用；接口引擎请改用正向字段 v8Limit（false=不限，true=启用限制）`);
   }
   return value;
 }
@@ -1477,7 +1513,7 @@ export function buildPlan(manifest: JsonRecord): { plan: string[]; errors: strin
   engines.forEach((item, engineIndex) => {
     const key = getString(item, 'apiEngineKey', 'ApiEngineKey');
     if (!key) errors.push(`engines[${engineIndex}].apiEngineKey 不能为空`);
-    validateV8Unlimited(item, `engines[${engineIndex}]`, errors, warnings);
+    validateEngineV8Limit(item, `engines[${engineIndex}]`, errors, warnings);
     plan.push(`upsert_engine ${key}`);
   });
   events.forEach((item) => plan.push(`save_event ${getString(item, 'formEngineKey', 'FormEngineKey')}/${getString(item, 'eventType', 'EventType')}`));
@@ -1782,27 +1818,27 @@ async function upsertEngine(client: MicroiClient, engine: JsonRecord): Promise<A
   const rawCode = getValue(engine, 'code', 'Code', 'ApiV8Code');
   const codeProvided = typeof rawCode === 'string';
   const code = codeProvided ? String(rawCode) : '';
-  const v8Unlimited = getBoolean(engine, 'v8Unlimited', 'V8Unlimited');
+  const v8Limit = getEngineV8Limit(engine);
   const existing = await client.getEngineCode(apiEngineKey);
   if (existing.Code === 1) {
-    if (!codeProvided && v8Unlimited !== undefined) {
-      return client.updateEngineRuntimeConfig(apiEngineKey, v8Unlimited);
+    if (!codeProvided && v8Limit !== undefined) {
+      return client.updateEngineRuntimeLimit(apiEngineKey, v8Limit);
     }
     if (!codeProvided) {
       return {
         Code: 1,
         Data: {
           ApiEngineKey: apiEngineKey,
-          V8Unlimited: Number(existing.Data?.V8Unlimited || 0),
+          V8Limit: Number(existing.Data?.V8Limit || 0),
           Skipped: true,
         },
-        Msg: '接口引擎已存在，Manifest 未提供 code 或 V8Unlimited，保持原配置',
+        Msg: '接口引擎已存在，Manifest 未提供 code 或 V8Limit，保持原配置',
       };
     }
     return client.saveEngineCode(apiEngineKey, code, {
       functionDescription: getString(engine, 'functionDescription', 'FunctionDescription') || undefined,
       changeSummary: getString(engine, 'changeSummary', 'ChangeSummary') || undefined,
-      v8Unlimited,
+      v8Limit,
     });
   }
   return client.createEngine({
@@ -1810,7 +1846,7 @@ async function upsertEngine(client: MicroiClient, engine: JsonRecord): Promise<A
     ApiName: apiName,
     Category: category,
     Code: code,
-    V8Unlimited: v8Unlimited === undefined ? undefined : (v8Unlimited ? 1 : 0),
+    V8Limit: v8Limit === undefined ? undefined : (v8Limit ? 1 : 0),
     functionDescription: getString(engine, 'functionDescription', 'FunctionDescription') || undefined,
     changeSummary: getString(engine, 'changeSummary', 'ChangeSummary') || undefined,
   });
@@ -2315,7 +2351,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
         ],
       }],
       engines: [
-        { apiEngineKey: 'biz_order_submit', apiName: 'Submit order', category: 'Biz_Order', v8Unlimited: false, code: "return { Code: 1, Data: V8.Param };" },
+        { apiEngineKey: 'biz_order_submit', apiName: 'Submit order', category: 'Biz_Order', v8Limit: false, code: "return { Code: 1, Data: V8.Param };" },
         {
           apiEngineKey: 'biz_order_metrics',
           apiName: 'Order metrics',
@@ -2471,7 +2507,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
         v8Unlimited: 'Default false. Set true only when this table\'s backend V8 events must keep one database transaction and the user explicitly accepts unbounded Jint per-execution budgets. Process resident-memory protection remains active.',
       },
       engines: {
-        v8Unlimited: 'Default false. Explicit high-risk opt-in for one API engine. It does not inherit to nested API engines; each child must opt in separately. Omit to preserve an existing engine setting during upsert.',
+        v8Limit: 'Default false. false means no Jint per-execution budget; true applies this engine\'s configured timeout, statement, allocation and recursion limits. Omit to preserve an existing engine setting during upsert.',
       },
       fields: {
         component: 'Use the real Microi component name. Available controls include Text, Textarea, NumberText, DateTime, Select, MultipleSelect, Radio, Checkbox, Switch, Rate, Progress, Slider, ColorPicker, AutoNumber, Divider, CollapseGroup, Tabs, Alert, StaticText, Html, RichText, CodeEditor, JsonTable, ImgUpload, FileUpload, Autocomplete, TagInput, Transfer, Cascader, Address, Department, SelectTree, TreeCheckbox, OpenTable, JoinTable, JoinForm, TableChild, Map, MapArea, Qrcode, FontAwesome, DevComponent.',
@@ -2507,7 +2543,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
       'For workflow manifests, include exactly one start node, at least one end node, valid FromNodeId/ToNodeId lines, and stable LineName values in the form "{from node} 到 {to node}".',
       'For multi-route workflow nodes, generate LineValueV8 with the visual condition marker and prefer assigning V8.NextNodeId; then call microi_check_workflow_package and microi_test_workflow_condition before microi_save_workflow_package.',
       'Use parameterized V8.Db SQL or V8.FormEngine CRUD in engine/event code.',
-      'Never infer v8Unlimited=true from data volume alone. Enable it only for an explicit single-transaction requirement after warning about database locks, rollback cost, connection timeout and process memory; the resident-memory guard remains active.',
+      'Interface engines use positive v8Limit semantics: false/default means no Jint per-execution budget; true enables the configured limits. Process resident-memory, cancellation, concurrency, permissions and database protections remain active in both modes.',
       'Leave diy_field.FormWidth null/omitted for normal fields; use formWidth: 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.',
       'Do not leave sys_menu list configuration empty. If the user does not specify it, rely on the generator defaults for NotShowFields, SearchFieldIds, SortFieldIds, StatisticsFields, MobileListFields, CardTitleTagFields and CardBottomTagFields.',
       'Every visible bound business module must have a compact Hero title, a real business subtitle and 2-4 meaningful dynamic metrics. Prefer pending/overdue/amount/capacity/risk aggregates; DataCount/PageCount are truthful fallback only. Never generate random or fabricated statistics.',
@@ -2983,7 +3019,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
     return apiText('Update Module', await client.updateModule(normalized.data));
   });
 
-  server.tool('microi_upsert_engine', `Create an API engine if missing, otherwise update only the supplied code and/or v8Unlimited setting. Omitted v8Unlimited preserves the current value; omitted code never clears existing source. v8Unlimited is a high-risk explicit opt-in, keeps the resident-memory guard, and does not inherit to nested engines. OsClient ${osClient}.`, { engine: jsonRecordSchema.describe('Fields include apiEngineKey, apiName, category, code and optional boolean v8Unlimited'), confirmExecution: z.string().optional() }, async ({ engine, confirmExecution }) => {
+  server.tool('microi_upsert_engine', `Create an API engine if missing, otherwise update only the supplied code and/or v8Limit setting. Omitted v8Limit preserves the current value; omitted code never clears existing source. v8Limit=false/default means unrestricted Jint per-execution budgets; true enables the configured runtime limits. OsClient ${osClient}.`, { engine: jsonRecordSchema.describe('Fields include apiEngineKey, apiName, category, code and optional boolean v8Limit'), confirmExecution: z.string().optional() }, async ({ engine, confirmExecution }) => {
     const key = getString(engine, 'apiEngineKey', 'ApiEngineKey');
     if (!key) return textResult('ApiEngineKey 不能为空', true);
     if (confirmExecution !== key && confirmExecution !== 'EXECUTE') return textResult(`写入已拦截：请传 confirmExecution="${key}" 或 "EXECUTE"。`, true);

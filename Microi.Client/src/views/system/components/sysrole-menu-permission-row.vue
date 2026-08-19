@@ -13,7 +13,7 @@
                 </button>
                 <span v-else class="role-menu-expand-placeholder"></span>
                 <label class="role-menu-check">
-                    <input type="checkbox" :checked="row._Check === true" @change="emitNameChange" />
+                    <input type="checkbox" :checked="row._Check === true" :disabled="disabled" @change="emitNameChange" />
                     <i v-if="row.IconClass" :class="['icon', 'mr-2', row.IconClass]"></i>
                     <span>{{ row.Name || row.EnName }}</span>
                 </label>
@@ -23,12 +23,13 @@
                     <input
                         type="checkbox"
                         :checked="hasPermission(permission.value)"
+                        :disabled="disabled"
                         @change="emitPermissionChange($event, permission.value)"
                     />
                     {{ permission.label }}
                 </label>
                 <label v-for="btn in customButtons" :key="btn.Id" class="perm-cb">
-                    <input type="checkbox" :checked="hasPermission(btn.Id)" @change="emitTogglePermission($event, btn.Id)" />
+                    <input type="checkbox" :checked="hasPermission(btn.Id)" :disabled="disabled" @change="emitTogglePermission($event, btn.Id)" />
                     {{ btn.Name }}
                 </label>
             </div>
@@ -40,6 +41,7 @@
                 :row="child"
                 :level="level + 1"
                 :permission-labels="permissionLabels"
+                :disabled="disabled"
                 @name-change="forwardNameChange"
                 @permission-change="forwardPermissionChange"
                 @toggle-permission="forwardTogglePermission"
@@ -63,6 +65,10 @@ export default {
         permissionLabels: {
             type: Object,
             required: true
+        },
+        disabled: {
+            type: Boolean,
+            default: false
         }
     },
     emits: ["name-change", "permission-change", "toggle-permission"],
@@ -83,9 +89,7 @@ export default {
                 { value: "Edit", label: this.permissionLabels.Edit },
                 { value: "Del", label: this.permissionLabels.Del },
                 { value: "Import", label: this.permissionLabels.Import },
-                { value: "Export", label: this.permissionLabels.Export },
-                { value: "NoDetail", label: this.permissionLabels.NoDetail },
-                { value: "NoSearch", label: this.permissionLabels.NoSearch }
+                { value: "Export", label: this.permissionLabels.Export }
             ];
         },
         customButtons() {

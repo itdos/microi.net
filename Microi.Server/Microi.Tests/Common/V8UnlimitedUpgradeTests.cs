@@ -69,6 +69,43 @@ public class V8UnlimitedUpgradeTests
                 out _));
     }
 
+    [Fact]
+    public void Upgrade32_ReplacesLegacyVisibilityBlockAndIsIdempotent()
+    {
+        const string custom = "V8.FieldSet('LockKey', 'Visible', !!V8.Form.Lock);";
+        var legacy = Upgrade27.ReconcileApiEngineInFormV8(custom, out _);
+
+        var once = Upgrade32.ReconcileApiEngineInFormV8(legacy, out var firstChanged);
+        var twice = Upgrade32.ReconcileApiEngineInFormV8(once, out var secondChanged);
+
+        Assert.True(firstChanged);
+        Assert.False(secondChanged);
+        Assert.StartsWith(custom, once, StringComparison.Ordinal);
+        Assert.DoesNotContain(Upgrade27.BeginMarker, once, StringComparison.Ordinal);
+        Assert.Equal(1, Count(once, Upgrade32.BeginMarker));
+        Assert.Contains("var limited = V8.Form.V8Limit", once, StringComparison.Ordinal);
+        Assert.Contains("V8.FieldSet(limitFields[i], 'Visible', limited)", once, StringComparison.Ordinal);
+        Assert.Equal("6.9.8.7", Upgrade32.Version);
+    }
+
+    [Fact]
+    public void Upgrade32_OneTimeResetAndPositiveRuntimeSemanticsAreWired()
+    {
+        var root = FindRepositoryRoot();
+        var migration = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "32-UpgradeV8RuntimeLimit.cs"));
+        var upgrade = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
+        var apiEngine = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net", "ApiEngine", "ApiEngine.cs"));
+
+        Assert.Contains("UPDATE sys_apiengine", migration, StringComparison.Ordinal);
+        Assert.Contains("SET V8Limit = @p0", migration, StringComparison.Ordinal);
+        Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade32.Version)", upgrade, StringComparison.Ordinal);
+        Assert.Contains("UnlimitedRuntime = !DynamicHelper.GetDynamicBoolValue", apiEngine, StringComparison.Ordinal);
+        Assert.Contains("\"V8Limit\"", apiEngine, StringComparison.Ordinal);
+    }
+
     private static int Count(string value, string needle)
     {
         var count = 0;

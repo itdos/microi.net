@@ -1,15 +1,7 @@
 <template>
-    <el-form-item v-show="GetFieldIsShow(field)" class="form-item diy-devcomponent-form-item">
-        <template #label>
-            <span :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
-                <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
-                    <template #default>
-                        <el-icon><InfoFilled /></el-icon>
-                    </template>
-                </el-tooltip>
-                {{ GetFormItemLabel(field) }}
-            </span>
-        </template>
+    <!-- diy-form 已统一负责字段 Label 与说明；这里不能再嵌套 el-form-item，
+         否则所有 DevComponent 都会出现双 Label 和多余的左侧缩进。 -->
+    <div v-show="GetFieldIsShow(field)" class="diy-devcomponent-form-item">
         <component
             v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
             ref="devComponentRef"
@@ -36,7 +28,7 @@
             @ParentFormSet="ParentFormSet"
             @FormSet="FormSet"
         />
-    </el-form-item>
+    </div>
 
     <!-- 配置弹窗 - 设计模式下可用 -->
     <el-dialog
@@ -68,7 +60,6 @@
 
 <script setup>
 import { ref, reactive, getCurrentInstance } from "vue";
-import { InfoFilled } from "@element-plus/icons-vue";
 
 // 禁用属性继承
 defineOptions({
@@ -158,10 +149,6 @@ const configForm = reactive({
 
 const GetFieldIsShow = (field) => {
     return DiyCommon.IsNull(field.Visible) ? true : field.Visible;
-};
-
-const GetFormItemLabel = (field) => {
-    return field.Label || field.Name;
 };
 
 const GetDataAppend = (field) => {

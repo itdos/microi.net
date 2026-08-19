@@ -106,6 +106,7 @@
 
 <script>
 import { defineAsyncComponent } from "vue";
+import { normalizeFormSwitchValue } from "@/utils/form-switch-value.js";
 
 const Fontawesome = defineAsyncComponent(() => import("./dos.fontawesome/Fontawesome.vue"));
 
@@ -195,7 +196,7 @@ export default {
         modelValue: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = newVal ? 1 : 0;
+                self.ModelValue = normalizeFormSwitchValue(newVal);
                 // 标记初始化已完成
                 if (self.isInitializing) {
                     self.$nextTick(() => {
@@ -207,7 +208,7 @@ export default {
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = self.ModelProps ? 1 : 0;
+                self.ModelValue = normalizeFormSwitchValue(self.ModelProps);
                 // 标记初始化已完成
                 if (self.isInitializing) {
                     self.$nextTick(() => {
@@ -327,14 +328,14 @@ export default {
         GetFieldValue(field, form) {
             var self = this;
             if (field.AsName) {
-                return form[field.AsName] ? 1 : 0;
+                return normalizeFormSwitchValue(form[field.AsName]);
             }
-            return form[field.Name] ? 1 : 0;
+            return normalizeFormSwitchValue(form[field.Name]);
         },
         //必须
         ModelChangeMethods(item) {
             var self = this;
-            self.ModelValue = item ? 1 : 0;
+            self.ModelValue = normalizeFormSwitchValue(item);
             self.$emit("ModelChange", self.ModelValue);
             self.$emit("update:modelValue", self.ModelValue);
         },

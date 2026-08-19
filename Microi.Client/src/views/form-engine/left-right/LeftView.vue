@@ -266,7 +266,7 @@ export default {
                 defaultProps: {
                     children: "_Child",
                     label: this.LeftTreeData.ShuxianSZDM,
-                    isLeaf: "_HasChild"
+                    isLeaf: "_IsLeaf"
                 },
                 ExpandedKeys: [],
                 CheckedKeys: [],
@@ -345,8 +345,12 @@ export default {
             if (!Array.isArray(data)) return [];
             data.forEach(function (item) {
                 if (!item) return;
-                item._HasChild = item._HasChild ? true : false;
-                if (Array.isArray(item._Child) && item._Child.length > 0) {
+                var hasLoadedChildren = Array.isArray(item._Child) && item._Child.length > 0;
+                item._HasChild = Boolean(item._HasChild) || hasLoadedChildren;
+                // Element Plus 的 isLeaf=true 表示“叶子节点”，与后端
+                // _HasChild 的语义正好相反，不能直接绑定同一个字段。
+                item._IsLeaf = !item._HasChild;
+                if (hasLoadedChildren) {
                     self.NormalizeTreeData(item._Child);
                 }
             });

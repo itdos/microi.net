@@ -557,10 +557,13 @@
         gap: 7px;
     }
 
-    .diy-field-label__text {
-        flex: 0 1 auto;
-        overflow: hidden;
-        text-overflow: ellipsis;
+    // 旧全局主题包含 `.container-form-item label span { overflow: hidden; }`。
+    // 增加结构特异性，保证显示名称完整，省略号只作用于后面的字段说明。
+    .container-form-item .diy-field-label > .diy-field-label__text {
+        // 显示名称优先完整展示；仅字段说明占用剩余空间并截断。
+        flex: 0 0 auto;
+        overflow: visible;
+        text-overflow: clip;
         white-space: nowrap;
     }
 
@@ -573,7 +576,7 @@
 
     .diy-field-description--inline {
         min-width: 0;
-        flex: 1 1 auto;
+        flex: 1 1 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;

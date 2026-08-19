@@ -1,5 +1,6 @@
 import { getTableChildFieldRelations } from "@/utils/table-child-relations.js";
 import { getVisiblePageTabs } from "./page-tab-runtime.js";
+import { appendWhereList, buildSearchWhere, hasSearchFilterValue, whereListHasField } from "../utils/diy-table-where.js";
 
 export default {
     methods: {
@@ -379,6 +380,7 @@ export default {
             //注意：这个是由主表传过来的主表行Id，需要在这里子表加入条件：where 外键Id=TableChildFkFieldName
             if (!self.DiyCommon.IsNull(self.TableChildFkFieldName)) {
                 // param[self.TableChildFkFieldName] = self.TableChildFkValue;
+                var relationValue;
                 if (!self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
                     // if (!self.DiyCommon.IsNull(self.FatherFormModel.Id)) {
                     // self.SearchModel[self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
@@ -386,19 +388,28 @@ export default {
                     //2022-02-14 关联表修改为等值条件
                     //2022-07-23新增也可能不跟主表的Id进行关联
                     if (self.PrimaryTableFieldName) {
-                        self.SearchEqual[self.TableChildFkFieldName] = self.FatherFormModel_Data[self.PrimaryTableFieldName];
+                        relationValue = self.FatherFormModel_Data[self.PrimaryTableFieldName];
                     } else {
-                        self.SearchEqual[self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
+                        relationValue = self.FatherFormModel_Data.Id;
                     }
                 } else {
                     // self.SearchModel[self.TableChildFkFieldName] = self.TableChildTableRowId;
                     //2022-02-14 关联表修改为等值条件
-                    self.SearchEqual[self.TableChildFkFieldName] = self.TableChildTableRowId;
+                    relationValue = self.TableChildTableRowId;
+                }
+                var activeWhere = [];
+                activeWhere = appendWhereList(activeWhere, self.SearchWhere);
+                activeWhere = appendWhereList(activeWhere, self.PropsWhere);
+                activeWhere = appendWhereList(activeWhere, self.Where);
+                if (whereListHasField(activeWhere, self.TableChildFkFieldName)) {
+                    delete self.SearchEqual[self.TableChildFkFieldName];
+                } else if (hasSearchFilterValue(relationValue)) {
+                    self.SearchEqual[self.TableChildFkFieldName] = relationValue;
+                } else {
+                    delete self.SearchEqual[self.TableChildFkFieldName];
                 }
             }
             param._Search = self.SearchModel;
-            param._SearchEqual = self.SearchEqual;
-            param._SearchCheckbox = self.SearchCheckbox;
             param._SearchDateTime = self.SearchDateTime;
             if (self.SearchNumber) {
                 for (let key in self.SearchNumber) {
@@ -426,6 +437,10 @@ export default {
                 self.Where.forEach(function(item) {
                     param._Where.push(self.cloneWhereItem(item));
                 });
+            }
+            var exactSearchWhere = buildSearchWhere(self.SearchEqual, self.SearchCheckbox);
+            if (exactSearchWhere.length > 0) {
+                param._Where = appendWhereList(param._Where, exactSearchWhere);
             }
 
             self.DiyCommon.FormExportFileV2(
