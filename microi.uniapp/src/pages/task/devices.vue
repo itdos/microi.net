@@ -17,7 +17,7 @@
         <view><text>{{ unfinishedCount }}</text><text>未完成</text></view>
       </view>
 
-      <scroll-view class="device-scroll" scroll-y :refresher-enabled="true" :refresher-triggered="refreshing" :lower-threshold="120" @refresherrefresh="refresh" @scrolltolower="loadMore">
+      <scroll-view class="device-scroll" scroll-y :scroll-top="mciScrollCommand" :refresher-enabled="true" :refresher-triggered="refreshing" :lower-threshold="120" @scroll="handleMciListScroll" @refresherrefresh="refresh" @scrolltolower="loadMore">
         <view class="search-band">
           <view class="search-box">
             <view class="search-icon"></view>
@@ -37,7 +37,7 @@
           </view>
         </view>
         <view v-if="devices.length" class="device-list">
-          <view v-for="device in devices" :key="device.Id" class="device-card" hover-class="device-card--pressed" @tap="openDevice(device)">
+          <view v-for="device in devices" :id="deviceAnchorId(device)" :key="device.Id" class="device-card device-list-session-item" hover-class="device-card--pressed" @tap="openDevice(device)">
             <image src="/static/xjy/business/shebei.png" mode="aspectFit" />
             <view class="device-copy">
               <text class="device-name">{{ device.name }}</text>
@@ -63,10 +63,11 @@
 <script>
 import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
+import { listReturnMixin } from '@/platform/list-return.js'
 import { loadTask, loadTaskDeviceSummary, loadTaskDevicesPage } from '@/utils/xjy-task.js'
 
 export default {
-  mixins: [themeMixin],
+  mixins: [themeMixin, listReturnMixin],
   data() {
     return {
       taskId: '',
@@ -88,7 +89,8 @@ export default {
       searchTimer: null,
       keyword: '',
       searching: false,
-      error: ''
+      error: '',
+      deviceListSessionKey: ''
     }
   },
   computed: {
@@ -101,16 +103,98 @@ export default {
     this.taskId = decodeURIComponent(options.taskId || '')
     this.taskType = decodeURIComponent(options.taskType || '')
     this.currentUser = getUser() || {}
-    this.load()
+    this.deviceListSessionKey = [
+      'task-devices:v2',
+      this.currentUser.Id || this.currentUser.Account || 'guest',
+      this.taskId || 'missing-task'
+    ].join('|')
+    const restored = this.restoreDeviceListSession()
+    if (!restored) this.load()
+    else setTimeout(() => this.refreshRestoredDeviceList(restored), 0)
   },
-  onShow() { if (!this.loading && this.task.Id) this.load(true, false) },
   onUnload() { if (this.searchTimer) clearTimeout(this.searchTimer); this.searchRequestId += 1 },
   methods: {
+    shouldMciRetainListSession() { return !!this.taskId && !!this.deviceListSessionKey },
+    getMciListSnapshotKey() { return this.deviceListSessionKey },
+    getMciListAnchorConfig() { return { container: '.device-scroll', items: '.device-list-session-item' } },
+    deviceAnchorId(device = {}) { return `mci-device-${String(device.Id || device.id || '').replace(/[^A-Za-z0-9_-]/g, '')}` },
+    getMciListSnapshot() {
+      return {
+        taskType: this.taskType,
+        task: { ...this.task },
+        devices: [...this.devices],
+        count: this.count,
+        totalCount: this.totalCount,
+        completedCount: this.completedCount,
+        pageIndex: this.pageIndex,
+        keyword: this.keyword,
+        finished: this.finished
+      }
+    },
+    restoreDeviceListSession() {
+      const snapshot = this.mciReadRetainedListSnapshot()
+      const payload = snapshot && snapshot.payload
+      if (!payload || !Array.isArray(payload.devices)) return null
+      const fields = ['taskType', 'task', 'devices', 'count', 'totalCount', 'completedCount', 'pageIndex', 'keyword', 'finished']
+      fields.forEach((field) => {
+        if (Object.prototype.hasOwnProperty.call(payload, field)) this[field] = payload[field]
+      })
+      this.loading = false
+      this.loadingMore = false
+      this.refreshing = false
+      this.error = ''
+      this.mciApplyListSnapshotPosition(snapshot)
+      return snapshot
+    },
+    async loadDeviceRange(targetCount, refresh = false) {
+      const expected = Math.max(this.pageSize, Math.ceil(Number(targetCount || 0) / this.pageSize) * this.pageSize)
+      const rangePageSize = Math.min(300, expected)
+      const rows = []
+      let count = 0
+      let rangePageIndex = 1
+      while (rows.length < expected) {
+        const page = await loadTaskDevicesPage(this.taskId, {
+          pageIndex: rangePageIndex,
+          pageSize: rangePageSize,
+          keyword: this.keyword,
+          refresh
+        })
+        rows.push(...page.rows)
+        count = page.count
+        if (!page.rows.length || rows.length >= count || page.rows.length < rangePageSize) break
+        rangePageIndex += 1
+      }
+      return { rows: rows.slice(0, expected), count }
+    },
+    async refreshRestoredDeviceList(snapshot) {
+      if (!this.taskId) return
+      const requestId = ++this.loadRequestId
+      const loadedCount = Math.max(this.pageSize, this.devices.length)
+      try {
+        const [taskResult, page, summary] = await Promise.all([
+          loadTask(this.taskId, true),
+          this.loadDeviceRange(loadedCount, true),
+          loadTaskDeviceSummary(this.taskId, true)
+        ])
+        if (requestId !== this.loadRequestId) return
+        this.task = taskResult.task
+        this.devices = page.rows
+        this.count = page.count
+        if (!String(this.keyword || '').trim()) this.totalCount = page.count
+        this.completedCount = summary.completed
+        this.finished = this.devices.length >= this.count
+        this.pageIndex = Math.ceil(this.devices.length / this.pageSize) + 1
+        this.$nextTick(() => this.mciRestoreListAnchor(snapshot.anchor, snapshot.scrollTop))
+      } catch (error) {
+        // 后台校验失败时继续展示会话快照，避免用户丢失当前位置。
+      }
+    },
     async load(reset = true, showLoading = true) {
       if (!this.taskId) { this.error = '缺少任务编号'; this.loading = false; return }
       if (!reset && (this.loadingMore || this.finished)) return
       const requestId = ++this.loadRequestId
       if (reset) { this.pageIndex = 1; this.finished = false }
+      if (reset) this.mciRestoreListPosition(0)
       if (showLoading) this.loading = true
       else if (!reset) this.loadingMore = true
       this.error = ''
@@ -163,16 +247,24 @@ export default {
     },
     async refresh() { this.refreshing = true; await this.load(true, false) },
     loadMore() { if (!this.searching) this.load(false, false) },
+    async onMciListDetailReturned(scrollTop) {
+      const snapshot = {
+        anchor: { id: this.mciListAnchorId, offset: this.mciListAnchorOffset },
+        scrollTop
+      }
+      await this.refreshRestoredDeviceList(snapshot)
+    },
     openDevice(device) {
       const type = this.taskType || this.task.type || ''
-      uni.navigateTo({ url: `/pages/task/device?id=${encodeURIComponent(device.Id)}&taskId=${encodeURIComponent(this.taskId)}&taskType=${encodeURIComponent(type)}` })
+      this.mciNavigateToDetail(`/pages/task/device?id=${encodeURIComponent(device.Id)}&taskId=${encodeURIComponent(this.taskId)}&taskType=${encodeURIComponent(type)}`)
     },
     openMap() {
       const type = this.taskType || this.task.type || ''
-      uni.navigateTo({ url: `/pages/task/map?mode=device&taskId=${encodeURIComponent(this.taskId)}&taskType=${encodeURIComponent(type)}` })
+      const filters = { keyword: String(this.keyword || '').trim() }
+      this.mciNavigateToDetail(`/pages/task/map?mode=device&taskId=${encodeURIComponent(this.taskId)}&taskType=${encodeURIComponent(type)}&filters=${encodeURIComponent(JSON.stringify(filters))}`)
     },
     addDevices() {
-      uni.navigateTo({ url: `/pages/task/add-devices?taskId=${encodeURIComponent(this.taskId)}&customerId=${encodeURIComponent(this.task.KehuID || '')}` })
+      this.mciNavigateToDetail(`/pages/task/add-devices?taskId=${encodeURIComponent(this.taskId)}&customerId=${encodeURIComponent(this.task.KehuID || '')}`)
     },
     goBack() { uni.navigateBack({ fail: () => uni.redirectTo({ url: `/pages/task/detail?id=${encodeURIComponent(this.taskId)}` }) }) }
   }

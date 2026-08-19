@@ -2,9 +2,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
+  PROPOSAL_INSTALLATION_BATCH_ENGINE,
   createProposalInstallationId,
   isProposalInstallationQuickContext,
+  proposalInstallationBatchFields,
+  proposalInstallationBatchPatch,
   proposalInstallationCopyValues,
+  proposalInstallationDeviceBatchValues,
   proposalInstallationDeviceValues,
   proposalInstallationDraft,
   proposalInstallationWriteValues
@@ -16,6 +20,10 @@ const relatedListSource = readFileSync(
 )
 const nativeFormSource = readFileSync(
   new URL('../src/pages/native-form/index.vue', import.meta.url),
+  'utf8'
+)
+const relatedListPageSource = readFileSync(
+  new URL('../src/pages/business/related-list.vue', import.meta.url),
   'utf8'
 )
 
@@ -43,6 +51,19 @@ test('device selection fills model id and device name', () => {
     ShebeiXH: 'A100',
     ShebeiXHID: 'product-1',
     ShebeiMC: '碧丽直饮机'
+  })
+})
+
+test('batch device selection also fills prices and the hidden model id dependency', () => {
+  assert.deepEqual(proposalInstallationDeviceBatchValues({
+    value: 'FY-150K',
+    raw: {
+      Id: 'product-2', ShangpinMC: '世纪丰源饮水设备', Xianjia: 3200,
+      ZulinXJ: 180, GenghuanLXJG: 260
+    }
+  }), {
+    ShebeiXH: 'FY-150K', ShebeiXHID: 'product-2', ShebeiMC: '世纪丰源饮水设备',
+    ShebeiDJ: 3200, ShebeiDJZL: 180, GenghuanLXJG: 260
   })
 })
 
@@ -100,13 +121,68 @@ test('copy keeps every business field while excluding id and audit fields', () =
   assert.match(relatedListSource, /proposalPointWriteEnvelope\(row, id, true\)/)
 })
 
-test('preview actions share one row only when view-more and add are both visible', () => {
-  assert.match(relatedListSource, /isProposalInstallationQuickMode && !proposalInstallationHasMore/)
+test('all 17 visible installation business fields can participate in one batch patch', () => {
+  const businessFields = [
+    ['AnzhuangCS', 'Text'], ['ShebeiXH', 'Select'], ['ShebeiMC', 'Text'],
+    ['ShebeiSL', 'NumberText', 'int'], ['Renshu', 'NumberText', 'int'],
+    ['XianchangZP', 'ImgUpload'], ['ShipinSC', 'FileUpload'], ['AnzhuangXGT', 'ImgUpload'],
+    ['ShuizhiYQ', 'Select'], ['DashuiFS', 'Select'], ['JiareFS', 'Select'],
+    ['ShuiwenYQ', 'Select'], ['GaofengSDKSL', 'NumberText', 'int'],
+    ['ShebeiDJZL', 'NumberText', 'decimal'], ['ShebeiDJ', 'NumberText', 'decimal'],
+    ['GenghuanLXJG', 'NumberText', 'decimal'], ['Paixu', 'NumberText', 'int']
+  ].map(([Name, component, Type = 'varchar'], Sort) => ({
+    Name, Label: Name, component, Type, Sort, visible: true, editable: true
+  }))
+  businessFields.find((field) => field.Name === 'ShebeiMC').editable = false
+  const excluded = [
+    { Name: 'Id', component: 'Text', Type: 'varchar', visible: true, editable: true },
+    { Name: 'AnzhuangdianweiId', component: 'Text', Type: 'varchar', visible: true, editable: true },
+    { Name: 'Layout', component: 'CollapseGroup', Type: 'varchar', visible: true, editable: true },
+    { Name: 'HiddenSecret', component: 'Text', Type: 'varchar', visible: false, editable: true },
+    { Name: 'ReadonlyValue', component: 'Text', Type: 'varchar', visible: true, editable: false },
+    { Name: 'VirtualValue', component: 'Text', Type: 'varchar', visible: true, editable: true, IsVirtual: 1 },
+    { Name: 'EncryptedValue', component: 'Text', Type: 'varchar', visible: true, editable: true, Encrypt: 1 }
+  ]
+  const allowed = proposalInstallationBatchFields([...businessFields, ...excluded])
+  assert.equal(allowed.length, 17)
+  assert.deepEqual(allowed.map((field) => field.Name), businessFields.map((field) => field.Name))
+})
+
+test('batch patch only includes explicitly enabled fields and controlled dependencies', () => {
+  assert.deepEqual(proposalInstallationBatchPatch(
+    { ShebeiMC: '统一设备名', Renshu: 80, DashuiFS: '' },
+    { ShebeiMC: true, Renshu: false, DashuiFS: true },
+    { ShebeiXHID: 'product-2' }
+  ), {
+    ShebeiMC: '统一设备名', DashuiFS: '', ShebeiXHID: 'product-2'
+  })
+})
+
+test('preview exposes batch entry and full list switches to selectable installation cards', () => {
+  assert.equal(PROPOSAL_INSTALLATION_BATCH_ENGINE, 'xjy_batch_update_proposal_installation_points')
+  assert.match(relatedListSource, /proposalInstallationBatchPreviewAvailable/)
+  assert.match(relatedListSource, /openRelatedList\('installation-batch'\)/)
+  assert.match(relatedListSource, /isProposalInstallationContext && !isPreview/)
+  assert.match(relatedListSource, /proposalBatchSelectedRows\.length < 2/)
+  assert.match(relatedListSource, /<root-portal v-if="proposalBatchEditorOpen">/)
+  assert.match(relatedListSource, /Ids: JSON\.stringify\(/)
+  assert.match(relatedListSource, /Versions: JSON\.stringify\(/)
+  assert.match(relatedListSource, /Patches: JSON\.stringify\(patches\)/)
+  assert.match(relatedListSource, /hydrateNativeFormOptions\(this\.definition, this\.proposalBatchControlForm/)
+  assert.match(relatedListSource, /Id: firstPoint\.Id \|\| this\.relationValue/)
+  assert.doesNotMatch(relatedListSource, /ParentId: this\.relationValue,\s*ParentMenuId:/)
+  assert.match(relatedListPageSource, /:batch-entry-mode="batchEntryMode"/)
+  assert.match(relatedListPageSource, /options\.entryMode/)
+})
+
+test('preview actions support batch, view-more, and add in one responsive row', () => {
+  assert.match(relatedListSource, /preview-actions--three/)
   assert.doesNotMatch(relatedListSource, /preview-action--quick-add/)
 })
 
-test('special installation cards are limited to proposal preview, not the full list page', () => {
-  assert.match(relatedListSource, /return this\.isPreview &&\s*isProposalInstallationQuickContext/)
+test('inline installation cards stay preview-only while the full page keeps standard cards', () => {
+  assert.match(relatedListSource, /return this\.isPreview && this\.isProposalInstallationContext/)
   assert.match(relatedListSource, /<template v-else-if="moduleKey === 'tasks'">/)
-  assert.match(relatedListSource, /<mci-business-card v-for="\(row, index\) in displayedRows"/)
+  assert.match(relatedListSource, /<template v-else-if="isProposalInstallationContext && !isPreview">/)
+  assert.match(relatedListSource, /<mci-business-card/)
 })
