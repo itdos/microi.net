@@ -48,7 +48,7 @@
 		 <!-- zhy自定义多选下拉：通讯录人员类型筛选 -->
 		  <view class="filter-section" v-if="isLoggedIn && activeTab === 'contacts'">
 			<view class="filter-button">
-			  <view class="filter-lef" @tap="showTypeDropdown = !showTypeDropdown">
+			  <view class="filter-lef" @tap="toggleRoleDropdown">
 			  	<text class="filter-bt">人员角色：</text>
 			  	<view class="filter-label">
 			  		<text class="">{{selectedTypes.length?selectedTypesString : ' 请选择 '}}</text>
@@ -63,7 +63,9 @@
 			<!-- 遮罩层：覆盖页面，点击关闭下拉 -->
 			<view v-if="showTypeDropdown" class="dropdown-mask" @tap="showTypeDropdown = false"></view>
 			<view v-if="showTypeDropdown" class="type-dropdown">
+			  <view v-if="roleLoading" class="type-status">角色加载中...</view>
 			  <view
+				v-else
 				v-for="type in personTypes"
 				:key="type.id"
 				class="type-option"
@@ -74,6 +76,7 @@
 				</view>
 				<text class="type-text">{{ type.label }}</text>
 			  </view>
+			  <view v-if="!roleLoading && personTypes.length === 0" class="type-status">暂无可选角色</view>
 			</view>
 		  </view>
 	
@@ -212,6 +215,12 @@
 	} from '@/utils/signalr.js'
 	import { readCache, writeCache } from '@/platform/cache.js'
 	import { getAiAssistantEnabled } from '@/utils/sysconfig.js'
+	import {
+		SYS_USER_ROLE_FIELD_ID,
+		buildContactRequest,
+		extractRoleOptions,
+		normalizeContact
+	} from './contact-role-filter.mjs'
 
 	export default {
 		components: {
@@ -245,18 +254,14 @@
 				_onReceiveLastContacts: null,
 				_onReceiveMessage: null,
 				_onReceiveUnreadCount: null  ,
-				  // zhy自定义人员类型筛选，待对接接口后
-				  personTypes: [
-					{ id: 'employee', label: '员工' },
-					{ id: 'external', label: '外部' },
-					{ id: 'manager', label: '管理' },
-					{ id: 'supplier', label: '供应商' },
-					{ id: 'customer', label: '客户' }
-				  ],
+				  // 通讯录角色来自 Sys_User.RoleIds 的实时数据源
+				  personTypes: [],
 				  selectedTypes: [],//id数组
 				  selectedTypesLabelArry:[],//label数组
 				  selectedTypesString:'',//label字符串
-				  showTypeDropdown: false
+				  showTypeDropdown: false,
+				  roleLoading: false,
+				  contactRequestSeq: 0
 			}
 		},
 
@@ -312,12 +317,19 @@
 				}
 			},
 			persistMessageCache() {
+				const canCacheContacts = !this.searchKeyword && this.selectedTypesLabelArry.length === 0
 				writeCache(this.messageCacheKey(), {
 					messageList: this.messageList,
-					contactList: this.contactList,
-					contactPageIndex: this.contactPageIndex,
-					contactHasMore: this.contactHasMore
+					contactList: canCacheContacts ? this.contactList : [],
+					contactPageIndex: canCacheContacts ? this.contactPageIndex : 1,
+					contactHasMore: canCacheContacts ? this.contactHasMore : true
 				})
+			},
+			toggleRoleDropdown() {
+				this.showTypeDropdown = !this.showTypeDropdown
+				if (this.showTypeDropdown && !this.personTypes.length && !this.roleLoading) {
+					this.loadRoles()
+				}
 			},
 			// zhy多选人员角色筛选方法
 			    toggleTypeSelection(typeId,typeLabel) {
@@ -331,7 +343,9 @@
 					   this.selectedTypesLabelArry.splice(idx, 1);
 				  }
 				  this.selectedTypesString = this.selectedTypesLabelArry.join(',');
-			      // 关闭下拉（保留为可按需调整，这里不自动关闭以便多选）
+				  this.contactPageIndex = 1
+				  this.contactHasMore = true
+				  this.loadContacts(false)
 			    },
 			    //选中数据打勾
 			    isTypeSelected(typeId) {
@@ -342,7 +356,6 @@
 					this.selectedTypes = [];
 					this.selectedTypesLabelArry = [];
 					this.selectedTypesString = '';
-					this.searchKeyword = '';
 					this.contactPageIndex = 1;
 					this.contactHasMore = true;
 					this.loadContacts(false);
@@ -356,6 +369,7 @@
 					this.messageList = []
 					return
 				}
+				if (!this.personTypes.length && !this.roleLoading) this.loadRoles()
 				if (!this.messageList.length) this.restoreMessageCache()
 				this.initSignalR()
 			},
@@ -550,26 +564,57 @@
 				}
 			},
 
+			// 从 Sys_User.RoleIds 字段数据源加载当前租户的真实角色。
+			async loadRoles() {
+				if (this.roleLoading || !getToken()) return
+				this.roleLoading = true
+				try {
+					const res = await post('/api/FormEngine/GetFieldsData', {
+						FieldIds: [SYS_USER_ROLE_FIELD_ID],
+						FieldNames: ['RoleIds']
+					}, true)
+					if (!res || Number(res.Code) !== 1) {
+						throw new Error((res && res.Msg) || '人员角色加载失败')
+					}
+					this.personTypes = extractRoleOptions(res)
+				} catch (e) {
+					this.personTypes = []
+					console.error('[Message] loadRoles error:', e)
+				} finally {
+					this.roleLoading = false
+				}
+			},
+
 			// 加载通讯录（支持分页和远端搜索）
 			async loadContacts(isLoadMore = false) {
+				const requestSeq = ++this.contactRequestSeq
+				const requestPageIndex = this.contactPageIndex
+				const roleNames = [...this.selectedTypesLabelArry]
+				const request = buildContactRequest({
+					pageIndex: requestPageIndex,
+					pageSize: this.contactPageSize,
+					keyword: this.searchKeyword,
+					roleNames
+				})
 				if (isLoadMore) {
 					this.contactLoadingMore = true
 				} else {
 					this.contactLoading = true
 				}
 				try {
-					const res = await post('/api/SysUser/GetSysUserPublicInfo', {
-						State: 1,
-						_PageIndex: this.contactPageIndex,
-						_PageSize: this.contactPageSize,
-						_Keyword: this.searchKeyword || ''
-					}, true)
-					if (res.Code === 1 && res.Data) {
-						const data = (res.Data || []).filter(item => this.aiAssistantEnabled || !this.isAiIdentity(item))
+					const res = await post(request.url, request.data, true)
+					if (!res || Number(res.Code) !== 1) {
+						throw new Error((res && res.Msg) || '通讯录加载失败')
+					}
+					if (requestSeq !== this.contactRequestSeq) return
+					if (Array.isArray(res.Data)) {
+						const data = res.Data
+							.map(normalizeContact)
+							.filter(item => this.aiAssistantEnabled || !this.isAiIdentity(item))
 						if (isLoadMore) {
 							this.contactList = this.contactList.concat(data)
 						} else {
-							if (!this.searchKeyword && this.aiAssistantEnabled) {
+							if (!this.searchKeyword && roleNames.length === 0 && this.aiAssistantEnabled) {
 								this.contactList = [{
 										Id: 'AI',
 										Name: 'AI助手',
@@ -582,16 +627,29 @@
 							}
 						}
 						// 判断是否还有更多
-						const aiOffset = (this.aiAssistantEnabled && !this.searchKeyword && this.contactPageIndex === 1) ? 1 : 0
+						const aiOffset = (this.aiAssistantEnabled && !this.searchKeyword && roleNames.length === 0 && requestPageIndex === 1) ? 1 : 0
 						const loadedCount = this.contactList.length - aiOffset
-						this.contactHasMore = loadedCount < Number(res.Total || res.DataCount || 0)
+						const total = Number(res.DataCount ?? res.Total)
+						this.contactHasMore = Number.isFinite(total)
+							? loadedCount < total
+							: data.length >= this.contactPageSize
 						this.persistMessageCache()
 					}
 				} catch (e) {
 					console.error('[Message] loadContacts error:', e)
+					if (requestSeq === this.contactRequestSeq) {
+						if (!isLoadMore) this.contactList = []
+						this.contactHasMore = false
+						uni.showToast({
+							title: (e && e.message) || '人员角色筛选失败',
+							icon: 'none'
+						})
+					}
 				} finally {
-					this.contactLoading = false
-					this.contactLoadingMore = false
+					if (requestSeq === this.contactRequestSeq) {
+						this.contactLoading = false
+						this.contactLoadingMore = false
+					}
 				}
 			},
 
@@ -939,6 +997,12 @@
 	  align-items: center;
 	  padding: 10rpx 8rpx;
 	  border-radius: 8rpx;
+	}
+	.type-status {
+	  padding: 20rpx 12rpx;
+	  color: #999;
+	  font-size: 26rpx;
+	  text-align: center;
 	}
 	.checkbox {
 	  width: 36rpx;
