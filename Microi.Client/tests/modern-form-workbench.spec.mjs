@@ -206,7 +206,12 @@ test("notification center opens immediately as a unified dialog and badges only 
     assert.match(center, /activeTab:\s*"platformMessages"/);
     assert.match(center, /<el-tab-pane name="tasks" lazy>/);
     assert.match(center, /return this\.notificationUnreadCount \+ this\.appNoticeCount/);
-    assert.match(center, /item\.Status === "Uninstalled"/);
+    assert.match(center, /item\.Status === "Uninstalled" \|\| item\.Status === "Outdated"/);
+    assert.match(center, /installOrUpdateAllPlatformApps/);
+    assert.match(center, /DiyCommon\.ApiEngine\.RunBackground\([\s\S]*?"bulk-import-microi-store-packages"/);
+    assert.match(center, /ApplicationType:\s*"Platform"/);
+    assert.match(center, /ConcurrencyKey:\s*"bulk-import-microi-store-packages"/);
+    assert.match(center, /return this\.isSuperAdmin && !this\.isOfficialPlatform/);
     assert.match(center, /@row-click="openNotificationDetail"/);
     assert.match(center, /class="microi-message-detail-dialog mci-unified-dialog"/);
 });

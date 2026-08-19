@@ -217,7 +217,18 @@
 
                     <div class="app-panel-toolbar">
                         <span class="app-panel-tip">{{ $t("Msg.OfficialAppUpdateTip") }}</span>
-                        <el-button type="primary" link size="small" @click="goAppStore">{{ $t("Msg.GoAppStore") }}</el-button>
+                        <div class="app-panel-actions">
+                            <el-button
+                                v-if="canBulkMaintainPlatformApps"
+                                type="primary"
+                                size="small"
+                                :loading="bulkPlatformAppsLoading"
+                                @click="installOrUpdateAllPlatformApps"
+                            >
+                                {{ $t("Msg.InstallUpdateAllPlatformApps") }}
+                            </el-button>
+                            <el-button type="primary" link size="small" @click="goAppStore">{{ $t("Msg.GoAppStore") }}</el-button>
+                        </div>
                     </div>
                     <el-empty v-if="!storeLoading && storeNotices.length === 0" :description="$t('Msg.NoOfficialAppUpdates')" />
                     <el-table v-else v-mci-loading:table="storeLoading" :data="storeNotices" size="small" class="online-table notification-compact-table app-notice-table" max-height="420">
@@ -390,6 +401,7 @@ export default {
             loading: false,
             notificationLoading: false,
             storeLoading: false,
+            bulkPlatformAppsLoading: false,
             terminalLoading: false,
             taskPollTimer: null,
             lastStoreCheckTime: 0,
@@ -412,7 +424,8 @@ export default {
         isAdmin() {
             if (this.isAccessKeySession) return false;
             const user = this.currentUser;
-            return user._IsAdmin === true
+            return Number(user?.Level || 0) >= 9999
+                || user._IsAdmin === true
                 || user._IsAdmin === 1
                 || user._IsAdmin === "1"
                 || user._IsAdmin === "true";
@@ -420,6 +433,16 @@ export default {
         isSuperAdmin() {
             return !this.isAccessKeySession
                 && Number(this.currentUser?.Level || 0) >= 9999;
+        },
+        isOfficialPlatform() {
+            const value = this.diyStore?.SysConfig?.IsOfficialPlatform;
+            return value === true
+                || value === 1
+                || String(value ?? "").trim().toLowerCase() === "true"
+                || String(value ?? "").trim() === "1";
+        },
+        canBulkMaintainPlatformApps() {
+            return this.isSuperAdmin && !this.isOfficialPlatform;
         },
         runningCount() {
             return this.tasks.filter((item) => item.Status === "Pending" || item.Status === "Running").length;
@@ -431,7 +454,7 @@ export default {
             return this.isAdmin ? this.storeNotices.length : 0;
         },
         badgeCount() {
-            // 顶部通知角标只代表需要用户处理的消息：未读系统消息 + 未安装平台应用。
+            // 顶部通知角标只代表需要用户处理的消息：未读系统消息 + 待安装/更新平台应用。
             return this.notificationUnreadCount + this.appNoticeCount;
         },
         notificationDetailPayload() {
@@ -803,13 +826,88 @@ export default {
                     const rows = Array.isArray(result.Data) ? result.Data : [];
                     this.storeNotices = rows
                         .map(this.normalizeOfficialAppNotice)
-                        .filter((item) => item.ApplicationType === "Platform" && item.Status === "Uninstalled");
+                        .filter((item) => item.ApplicationType === "Platform"
+                            && (item.Status === "Uninstalled" || item.Status === "Outdated"));
                     this.lastStoreCheckTime = now;
                 }
             } catch (error) {
                 console.warn("[BackgroundTask] platform app check failed", error);
             } finally {
                 this.storeLoading = false;
+            }
+        },
+        async installOrUpdateAllPlatformApps() {
+            if (!this.canBulkMaintainPlatformApps || this.bulkPlatformAppsLoading) return;
+            try {
+                await ElMessageBox.confirm(
+                    this.$t("Msg.ConfirmInstallUpdateAllPlatformApps"),
+                    this.$t("Msg.InstallUpdateAllPlatformApps"),
+                    {
+                        type: "warning",
+                        confirmButtonText: this.$t("Msg.Ok"),
+                        cancelButtonText: this.$t("Msg.Cancel")
+                    }
+                );
+            } catch (_) {
+                return;
+            }
+
+            this.bulkPlatformAppsLoading = true;
+            try {
+                let workerStatus = null;
+                try {
+                    workerStatus = await DiyCommon.PostAsync({
+                        url: "/api/BackgroundTask/WorkerStatus",
+                        data: {},
+                        dataType: "json",
+                        suppressErrorNotification: true
+                    });
+                } catch (_) {
+                    // 兼容尚未提供就绪探针的旧 API 节点，最终仍由任务提交接口做权威校验。
+                }
+                const worker = workerStatus?.Code === 1 ? workerStatus.Data : null;
+                const readiness = worker?.Readiness;
+                if (worker && (worker.LoopHealthy !== true || readiness?.SchemaReady === false)) {
+                    const reason = readiness?.Reason || worker.LastError || this.$t("Msg.BackgroundTaskWorkerUnavailable");
+                    ElMessage.error(this.$t("Msg.PlatformAppsWorkerNotReady", { reason }));
+                    return;
+                }
+
+                const operationId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                const result = await DiyCommon.ApiEngine.RunBackground(
+                    "bulk-import-microi-store-packages",
+                    {
+                        StoreApiBase: "https://api.itdos.com",
+                        StoreOsClient: "iTdos",
+                        ApplicationType: "Platform"
+                    },
+                    this.$t("Msg.PlatformAppsBulkTaskTitle"),
+                    {
+                        IdempotencyKey: `microi-store-bulk:${operationId}`,
+                        ConcurrencyKey: "bulk-import-microi-store-packages",
+                        MaxAttempts: 3,
+                        RetryOnFailure: true
+                    }
+                );
+                if (!result || result.Code !== 1) {
+                    const message = result?.Msg || result?.Message || this.$t("Msg.UnknownError");
+                    ElMessage.error(this.$t("Msg.PlatformAppsBulkTaskFailed", { message }));
+                    return;
+                }
+
+                const task = result.Data || {};
+                const taskId = task.Id || task.TaskId || task.BackgroundTaskId || "";
+                ElMessage.success(taskId
+                    ? this.$t("Msg.PlatformAppsBulkTaskQueuedWithId", { taskId })
+                    : this.$t("Msg.PlatformAppsBulkTaskQueued"));
+                this.activeTab = "tasks";
+                await this.refreshTasks();
+            } catch (error) {
+                ElMessage.error(this.$t("Msg.PlatformAppsBulkTaskFailed", {
+                    message: error?.message || String(error || this.$t("Msg.UnknownError"))
+                }));
+            } finally {
+                this.bulkPlatformAppsLoading = false;
             }
         },
         goAppStore() {
@@ -1031,6 +1129,13 @@ export default {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+}
+
+.app-panel-actions {
+    display: flex;
+    align-items: center;
+    flex: none;
+    gap: 8px;
 }
 
 .notification-toolbar {

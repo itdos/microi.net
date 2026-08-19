@@ -5,7 +5,7 @@
 ---
 
 ## 一、📌 平台介绍
-- 平台定位：开源 AI 低代码平台（.NET10 + Vue3 + Element-Plus + Redis + 跨数据库）
+- 平台定位：不只是开源 AI 低代码，更是企业级 AI 应用开发框架（.NET 10 + Vue 3 + Element Plus + Redis + 跨数据库）
 - 核心理念：**"万物皆表单引擎"**
 - 架构总览：PC端 / 移动端UniApp / WebOS
 - 版本对比：开源版 / 个人版 / 企业版

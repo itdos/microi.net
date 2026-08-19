@@ -34,6 +34,9 @@ namespace Microi.net
         private const string SaaSEnginePackageResourceName = "app.microi.saas-engine.json";
         private const string AppStorePackageResourceName = "app.microi.store.json";
         private const string AppStoreMenuId = "61b7faee-35b2-4571-add2-5231a355f368";
+        private const string PlatformMicroServiceKey = "microi-platform-service";
+        private const string MarketplaceRoutePath = "/marketplace";
+        private const string MicroAppHostComponentPath = "/micro-app/host";
         private const string ApplicationAssetUploadAuditMenuId =
             "a3000100-0000-4000-8000-000000000100";
         // Jint 4.14 的 MemoryLimitConstraint 统计一次执行的累计分配量，而非实时存活堆。
@@ -281,11 +284,52 @@ WHERE LOWER(t.Name)=LOWER(@p0)
                     return RefreshRequired(osClient, "应用商城缺少统一应用类型、分类或统计字段");
                 }
 
-                var menuId = client.Db.FromSql(@"SELECT Id FROM sys_menu
+                var appStoreMenuRow = client.Db.FromSql(@"SELECT Id, OpenType, IsMicroiService,
+ComponentPath, MicroServiceId, MicroServicePageId, MicroServiceRoutePath
+FROM sys_menu
 WHERE ModuleEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     .AddInParameter("p0", "sys_microistore")
-                    .ToScalar()?.ToString();
+                    .First<dynamic>();
+                var appStoreMenu = appStoreMenuRow == null
+                    ? null
+                    : JObject.FromObject((object)appStoreMenuRow);
+                var menuId = appStoreMenu?["Id"]?.ToString();
                 if (menuId.DosIsNullOrWhiteSpace()) return RefreshRequired(osClient, "缺少应用商城菜单");
+
+                var marketplaceServiceRow = client.Db.FromSql(@"SELECT Id, MsKey, IsEnable,
+Runtime, StorageMode, MsUrl, EntryPath, BuildVersion, AssetCount, AssetsJson, AssetManifestJson
+FROM sys_microiservice
+WHERE MsKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", PlatformMicroServiceKey)
+                    .First<dynamic>();
+                var marketplaceService = marketplaceServiceRow == null
+                    ? null
+                    : JObject.FromObject((object)marketplaceServiceRow);
+                var marketplaceServiceId = marketplaceService?["Id"]?.ToString();
+
+                JObject marketplacePage = null;
+                if (!marketplaceServiceId.DosIsNullOrWhiteSpace())
+                {
+                    var marketplacePageRow = client.Db.FromSql(@"SELECT Id, MicroServiceId,
+MicroServiceKey, RoutePath, EntryPath, BuildVersion, IsEnable
+FROM sys_microiservice_page
+WHERE MicroServiceId=@p0 AND RoutePath=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                        .AddInParameter("p0", marketplaceServiceId)
+                        .AddInParameter("p1", MarketplaceRoutePath)
+                        .First<dynamic>();
+                    marketplacePage = marketplacePageRow == null
+                        ? null
+                        : JObject.FromObject((object)marketplacePageRow);
+                }
+
+                var marketplaceRuntimeReason = GetMarketplaceRuntimeRepairReason(
+                    appStoreMenu,
+                    marketplaceService,
+                    marketplacePage);
+                if (!marketplaceRuntimeReason.DosIsNullOrWhiteSpace())
+                {
+                    return RefreshRequired(osClient, marketplaceRuntimeReason);
+                }
 
                 var relatedMenuCount = client.Db.FromSql(@"SELECT COUNT(1) FROM sys_menu
 WHERE Id IN (@p0,@p1) AND (IsDeleted=0 OR IsDeleted IS NULL)")
@@ -401,6 +445,100 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
         private static bool HasRows(object value)
         {
             return long.TryParse(value?.ToString(), out var count) && count > 0;
+        }
+
+        private static string GetMarketplaceRuntimeRepairReason(
+            JObject menu,
+            JObject service,
+            JObject page)
+        {
+            if (menu == null) return "缺少应用商城菜单";
+            if (!string.Equals(menu["OpenType"]?.ToString(), "MicroService", StringComparison.OrdinalIgnoreCase)
+                || menu.Value<int?>("IsMicroiService") != 1
+                || !string.Equals(menu["ComponentPath"]?.ToString(), MicroAppHostComponentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return "应用商城菜单尚未切换到微服务宿主";
+            }
+
+            var menuServiceId = menu["MicroServiceId"]?.ToString();
+            var menuPageId = menu["MicroServicePageId"]?.ToString();
+            if (menuServiceId.DosIsNullOrWhiteSpace() || menuPageId.DosIsNullOrWhiteSpace()
+                || !string.Equals(menu["MicroServiceRoutePath"]?.ToString(), MarketplaceRoutePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return "应用商城菜单缺少 microi-platform-service 页面绑定";
+            }
+
+            if (service == null) return "缺少应用商城平台微服务运行记录";
+            var serviceId = service["Id"]?.ToString();
+            if (!string.Equals(serviceId, menuServiceId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(service["MsKey"]?.ToString(), PlatformMicroServiceKey, StringComparison.OrdinalIgnoreCase))
+            {
+                return "应用商城菜单绑定的平台微服务不匹配";
+            }
+            if (service.Value<int?>("IsEnable") != 1)
+            {
+                return "应用商城平台微服务已停用";
+            }
+            if (!string.Equals(service["Runtime"]?.ToString(), "micro-app", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(service["StorageMode"]?.ToString(), "db", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(service["MsUrl"]?.ToString(), "db", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(NormalizeRuntimeAssetPath(service["EntryPath"]?.ToString()), "index.html", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(service["BuildVersion"]?.ToString()))
+            {
+                return "应用商城平台微服务运行配置不完整";
+            }
+            if (!HasDatabaseRuntimeEntryAsset(service))
+            {
+                return "应用商城平台微服务缺少数据库内联入口资产";
+            }
+
+            if (page == null) return "缺少应用商城 /marketplace 页面";
+            if (!string.Equals(page["Id"]?.ToString(), menuPageId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(page["MicroServiceId"]?.ToString(), serviceId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(page["MicroServiceKey"]?.ToString(), PlatformMicroServiceKey, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(page["RoutePath"]?.ToString(), MarketplaceRoutePath, StringComparison.OrdinalIgnoreCase)
+                || page.Value<int?>("IsEnable") != 1)
+            {
+                return "应用商城 /marketplace 页面绑定不完整或已停用";
+            }
+
+            return null;
+        }
+
+        private static bool HasDatabaseRuntimeEntryAsset(JObject service)
+        {
+            if (service == null) return false;
+            try
+            {
+                var assetsToken = service.GetValue("AssetsJson", StringComparison.OrdinalIgnoreCase);
+                var assets = assetsToken as JArray ?? JArray.Parse(assetsToken?.ToString() ?? string.Empty);
+                return assets.Children<JObject>().Any(asset =>
+                    string.Equals(
+                        NormalizeRuntimeAssetPath(asset["Path"]?.ToString() ?? asset["FileName"]?.ToString()),
+                        "index.html",
+                        StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(
+                        asset["ContentBase64"]?.ToString()
+                        ?? asset["FileByteBase64"]?.ToString()
+                        ?? asset["Base64"]?.ToString()));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string NormalizeRuntimeAssetPath(string value)
+        {
+            var normalized = (value ?? string.Empty)
+                .Replace('\\', '/')
+                .Trim()
+                .TrimStart('/');
+            while (normalized.StartsWith("./", StringComparison.Ordinal))
+            {
+                normalized = normalized.Substring(2);
+            }
+            return normalized;
         }
 
         private static bool HasExpectedPublisherSettings(JObject settings)
@@ -754,15 +892,83 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_V1") ||
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1") ||
+                    !importerEngineCode.Contains("POST_SCHEMA_MICROSERVICE_BINDING_RESTORE_V1") ||
+                    !importerEngineCode.Contains("PACKAGE_BOUND_MICROSERVICE_MENU_V1") ||
                     !content.Contains("OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1") ||
                     !bulkEngineCode.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2") ||
                     !bulkEngineCode.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1") ||
                     !bulkEngineCode.Contains("BULK_STORAGE_FAILURE_RECOVERY_V1") ||
-                    !bulkEngineCode.Contains("BULK_MONOTONIC_CHILD_PROGRESS_V1"))
+                    !bulkEngineCode.Contains("BULK_MONOTONIC_CHILD_PROGRESS_V1") ||
+                    !HasPackagedMarketplaceRuntime(package))
                 {
-                    throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少页面Tab关联模块配置，拒绝覆盖客户数据库。");
+                    throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧，或缺少商城微服务运行时、页面绑定及批量安装能力，拒绝覆盖客户数据库。");
                 }
             }
+        }
+
+        private static bool HasPackagedMarketplaceRuntime(JObject package)
+        {
+            if (package == null) return false;
+
+            var menu = package["SysMenus"]?.Children<JObject>().FirstOrDefault(item =>
+                string.Equals(item["Id"]?.ToString(), AppStoreMenuId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item["ModuleEngineKey"]?.ToString(), "sys_microistore", StringComparison.Ordinal));
+            if (menu == null
+                || !string.Equals(menu["OpenType"]?.ToString(), "MicroService", StringComparison.OrdinalIgnoreCase)
+                || menu.Value<int?>("IsMicroiService") != 1
+                || !string.Equals(menu["ComponentPath"]?.ToString(), MicroAppHostComponentPath, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(menu["MicroServiceKey"]?.ToString() ?? menu["MsKey"]?.ToString(), PlatformMicroServiceKey, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(menu["MicroServiceRoutePath"]?.ToString(), MarketplaceRoutePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var bundle = package["ApplicationBundles"]?.Children<JObject>().FirstOrDefault(item =>
+                string.Equals(
+                    item["Application"]?["AppKey"]?.ToString()
+                    ?? item["Application"]?["AppId"]?.ToString()
+                    ?? item["MicroService"]?["MsKey"]?.ToString(),
+                    PlatformMicroServiceKey,
+                    StringComparison.OrdinalIgnoreCase));
+            var application = bundle?["Application"] as JObject;
+            var service = bundle?["MicroService"] as JObject;
+            var buildAssets = bundle?["BuildAssets"] as JArray;
+            var routes = bundle?["Routes"] as JArray;
+            if (bundle == null
+                || !string.Equals(bundle["ApplicationType"]?.ToString(), "MicroService", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(application?["AppKey"]?.ToString(), PlatformMicroServiceKey, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(service?["MsKey"]?.ToString(), PlatformMicroServiceKey, StringComparison.OrdinalIgnoreCase)
+                || (service?.Value<int?>("IsEnable") ?? 0) != 1
+                || !string.Equals(service?["Runtime"]?.ToString(), "micro-app", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(service?["StorageMode"]?.ToString(), "db", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(NormalizeRuntimeAssetPath(service?["EntryPath"]?.ToString()), "index.html", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(bundle["AssetStoragePolicy"]?["Source"]?.ToString(), "NotIncluded", StringComparison.Ordinal)
+                || !string.Equals(bundle["AssetStoragePolicy"]?["Build"]?.ToString(), "DatabaseOnly", StringComparison.Ordinal)
+                || (buildAssets?.Count ?? 0) < 1)
+            {
+                return false;
+            }
+
+            var entryAsset = buildAssets.Children<JObject>().FirstOrDefault(asset =>
+                string.Equals(
+                    NormalizeRuntimeAssetPath(asset["Path"]?.ToString() ?? asset["FileName"]?.ToString()),
+                    "index.html",
+                    StringComparison.OrdinalIgnoreCase));
+            if (entryAsset == null
+                || string.IsNullOrWhiteSpace(
+                    entryAsset["FileByteBase64"]?.ToString()
+                    ?? entryAsset["ContentBase64"]?.ToString()
+                    ?? entryAsset["Base64"]?.ToString())
+                || string.IsNullOrWhiteSpace(entryAsset["Sha256"]?.ToString()))
+            {
+                return false;
+            }
+
+            return routes?.Children<JObject>().Any(route =>
+                string.Equals(route["RoutePath"]?.ToString(), MarketplaceRoutePath, StringComparison.OrdinalIgnoreCase)
+                && route.Value<int?>("IsEnable") == 1
+                && !string.IsNullOrWhiteSpace(route["Id"]?.ToString())
+                && string.Equals(NormalizeRuntimeAssetPath(route["EntryPath"]?.ToString()), "index.html", StringComparison.OrdinalIgnoreCase)) == true;
         }
 
         private static async Task InstallUpgradePackage(string osClient, List<string> msgs, string resourceName, string packageName, IReadOnlyDictionary<string, string> resources)
