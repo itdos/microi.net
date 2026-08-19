@@ -54,6 +54,7 @@ test('安装位置在卡片展示并随设备表单提交', () => {
 test('任务设备现场定位同步客户设备坐标且不向售后子表提交未知字段', () => {
   assert.match(detailSource, /@tap="locateDevice"/)
   assert.match(detailSource, /locating \? '定位中…' : '现场定位'/)
+  assert.match(detailSource, /stripRegionFromAddress\(location\.address, location\.region\)/)
   assert.match(detailSource, /this\.form\.KehuSB_Lat = Number\(location\.latitude\)/)
   assert.match(detailSource, /this\.form\.KehuSB_Lng = Number\(location\.longitude\)/)
   assert.match(saveTaskDeviceSource, /KehuSB_Lat: latitude,[\s\S]*KehuSB_Lng: longitude,[\s\S]*_LocationUpdated: locationUpdated,[\s\S]*\.\.\.taskValues/)
@@ -99,10 +100,13 @@ test('任务设备地图使用红色未完成与蓝色已完成定位样式', ()
 
 test('订单安装位置表单提供定位按钮并显式提交隐藏坐标', () => {
   assert.match(tenantFormSource, /key: 'xjy-installation-position-location'/)
+  assert.match(tenantFormSource, /label: context\.state\.locating \? '定位中…' : '现场定位'/)
+  assert.match(tenantFormSource, /iconType: 'location'/)
   assert.match(tenantFormSource, /position: 'label'/)
   assert.match(tenantFormSource, /await locateInstallationPosition\(context\)/)
   assert.match(tenantFormSource, /installationPositionCustomer\(context\)/)
   assert.match(tenantFormSource, /KehuDT_Lat/)
+  assert.match(tenantFormSource, /stripRegionFromAddress\(location\.address, location\.region\)/)
   assert.match(tenantFormSource, /installationLocationValues/)
 })
 

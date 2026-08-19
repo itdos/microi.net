@@ -80,7 +80,7 @@
 <script>
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
-import { normalizeChosenLocation, reverseGeocode } from '@/platform/location.js'
+import { normalizeChosenLocation, reverseGeocode, stripRegionFromAddress } from '@/platform/location.js'
 import {
   TASK_PHOTO_FIELDS,
   loadTaskDeviceDetail,
@@ -192,7 +192,8 @@ export default {
         const location = normalizeChosenLocation(source, geocode)
         if (!validCoordinatePair(location.latitude, location.longitude)) throw new Error('定位坐标无效')
         if (!location.address) throw new Error('未获取到详细地址')
-        this.form.AnzhuangWZ = location.address
+        // 设备处理与订单安装位置保持一致，只保存街道、门牌及地图点名称。
+        this.form.AnzhuangWZ = stripRegionFromAddress(location.address, location.region)
         this.form.KehuSB_Lat = Number(location.latitude)
         this.form.KehuSB_Lng = Number(location.longitude)
         this.locationUpdated = true
