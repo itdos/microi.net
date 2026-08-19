@@ -522,8 +522,8 @@ export default {
         resolve('place', '安装场所'),
         resolve('deviceModel', '设备型号'),
         resolve('deviceName', '设备名称'),
-        resolve('deviceQuantity', '设备数量'),
-        resolve('people', '人数')
+        // resolve('deviceQuantity', '设备数量'),
+        // resolve('people', '人数')
       ]
     },
     proposalInstallationFieldNames() {
