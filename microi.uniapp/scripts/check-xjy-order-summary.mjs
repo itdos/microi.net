@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import {
+  emptyOrderAmountValues,
   installationPositionText,
   orderSummarySubmitValues,
   orderSummaryValues
@@ -30,6 +31,13 @@ assert.deepEqual(orderSummarySubmitValues(orderSummaryValues(products, positions
   DingdanHZFS: '买断+包年换芯,租赁',
   AllDingdanHZFS: '["买断+包年换芯","租赁"]',
   ShebeiAZWZ: 'CXS-FR100/三楼茶水间 * 2\nCXS-FR100/一楼前台 * 1'
+})
+assert.deepEqual(emptyOrderAmountValues(), {
+  DingdanJE: 0,
+  DingdanXJ: 0,
+  YouhuiHHTZJ: 0,
+  YouhuiFD: 0,
+  HuanxinJE: 0
 })
 
 const formSource = fs.readFileSync(new URL('../src/tenants/xjy/form.js', import.meta.url), 'utf8')

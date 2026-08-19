@@ -35,6 +35,21 @@ test('任务设备列表可按名称型号编号和安装位置检索', () => {
   assert.match(taskSource, /GroupEnd: true/)
 })
 
+test('任务设备地图跟随列表关键词并分页加载全部匹配设备', () => {
+  assert.match(listSource, /const filters = \{ keyword: String\(this\.keyword \|\| ''\)\.trim\(\) \}/)
+  assert.match(listSource, /filters=\$\{encodeURIComponent\(JSON\.stringify\(filters\)\)\}/)
+  assert.match(mapSource, /deviceFilters: \{\}/)
+  assert.match(mapSource, /loadAllTaskDevices\(this\.taskId, \{ refresh: true, keyword: this\.deviceFilters\.keyword \|\| '' \}\)/)
+  assert.match(taskSource, /keyword: config\.keyword \|\| ''/)
+})
+
+test('任务设备地图将完全相同坐标聚合并允许选择具体设备', () => {
+  assert.match(mapSource, /this\.mode === 'task' \|\| \(this\.mode === 'device' && this\.taskId\)/)
+  assert.match(mapSource, /count > 1 \? `\$\{count\}\$\{deviceGroup \? '台设备' : \(customerGroup \? '个客户' : '个任务'\)\}`/)
+  assert.match(mapSource, /v-for="item in selectedGroup"[^>]*selectedTaskDeviceKey/)
+  assert.match(mapSource, /this\.selectedGroup = group \? group\.rows : \[\]/)
+})
+
 test('任务设备列表在默认配置和 xjy Profile 中均已注册', () => {
   for (const config of pageConfigs) {
     const taskPackage = config.subPackages.find((item) => item.root === 'pages/task')
