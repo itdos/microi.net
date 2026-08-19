@@ -50,3 +50,14 @@ export function orderSummarySubmitValues(values = {}) {
     ShebeiAZWZ: text(values.ShebeiAZWZ)
   }
 }
+
+// 新增订单尚未保存商品子表时，显式提交零金额，避免只读字段或历史数据库默认值进入订单。
+export function emptyOrderAmountValues() {
+  return {
+    DingdanJE: 0,
+    DingdanXJ: 0,
+    YouhuiHHTZJ: 0,
+    YouhuiFD: 0,
+    HuanxinJE: 0
+  }
+}

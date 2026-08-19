@@ -57,6 +57,32 @@
       </view>
     </view>
 
+    <view v-if="proposalInstallationBatchAvailable" class="proposal-batch-tools">
+      <view v-if="!proposalBatchSelecting" class="proposal-batch-entry"
+        hover-class="proposal-batch-entry--pressed" @tap="startProposalInstallationBatchSelection">
+        <text class="proposal-batch-entry__icon">▦</text>
+        <view><text>批量配置安装点位</text><text>选择多个点位后统一修改全部业务字段</text></view>
+        <text>›</text>
+      </view>
+      <template v-else>
+        <view class="proposal-batch-select-all" :class="{ active: proposalBatchAllLoadedSelected }"
+          @tap="toggleAllProposalBatchRows">
+          <text>{{ proposalBatchAllLoadedSelected ? '✓' : '' }}</text>
+          <view><text>{{ proposalBatchAllLoadedSelected ? '取消全选' : '全选已加载' }}</text>
+            <text>已选 {{ proposalBatchSelectedRows.length }} 项</text></view>
+        </view>
+        <view class="proposal-batch-tool-button" @tap="cancelProposalInstallationBatchSelection"><text>取消</text></view>
+        <view class="proposal-batch-tool-button proposal-batch-tool-button--primary"
+          :class="{ disabled: proposalBatchSelectedRows.length < 2 }"
+          hover-class="proposal-batch-tool-button--pressed" @tap="openProposalInstallationBatchEditor">
+          <text>统一配置</text><text v-if="proposalBatchSelectedRows.length">{{ proposalBatchSelectedRows.length }}</text>
+        </view>
+      </template>
+      <text v-if="proposalBatchSelecting && rows.length < count" class="proposal-batch-load-hint">
+        当前已加载 {{ rows.length }}/{{ count }}，继续下拉可选择更多点位
+      </text>
+    </view>
+
     <scroll-view class="related-list-body" :class="{ 'related-list-body--scroll': independentScroll && !isPreview }"
       :style="relatedListBodyStyle"
       :scroll-y="independentScroll && !isPreview"
@@ -120,6 +146,22 @@
           :item="taskCardRow(row)" :index="index" :state-class="taskStatusClass(row)"
           @open="openDetail" @phone="callPhone" />
       </template>
+      <template v-else-if="isProposalInstallationContext && !isPreview">
+        <view v-for="(row, index) in displayedRows" :key="row.Id || index"
+          class="proposal-batch-card" :class="{ selected: isProposalBatchRowSelected(row) }">
+          <view v-if="proposalBatchSelecting" class="proposal-batch-card__select"
+            :class="{ active: isProposalBatchRowSelected(row) }" @tap.stop="toggleProposalBatchRow(row)">
+            <text>{{ isProposalBatchRowSelected(row) ? '✓' : '' }}</text>
+          </view>
+          <mci-business-card
+            :row="row" :index="index" :title="getTitle(row)" :status="getStatus(row)"
+            :status-class="getStatusClass(row)" :tags="getTags(row)" :lines="cardLines(row)"
+            :summary="config.summaryField ? summaryValue(row) : ''"
+            :summary-lines="config.summaryLines || 3" :actions="proposalBatchSelecting ? [] : rowActions(row)"
+            :time="cardBottomText(row)"
+            @open="openProposalInstallationBatchRow(row)" @phone="callPhone" @action="triggerRowAction" />
+        </view>
+      </template>
       <template v-else>
         <!-- zhy：关联列表中的跟进卡片同步使用摘要最大行数。 -->
         <view v-for="(row, index) in displayedRows" :key="row.Id || index" class="selectable-card">
@@ -159,11 +201,16 @@
     </view>
     </scroll-view>
 
-    <view v-if="showFloatingAdd && canAdd && !isPreview" class="floating-add" :style="floatingStyle"
+    <view v-if="showFloatingAdd && canAdd && !isPreview && !proposalBatchSelecting" class="floating-add" :style="floatingStyle"
       hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
 
     <view v-if="previewContentVisible && isPreview && !waitingForParentSave" class="preview-actions"
-      :class="{ 'preview-actions--single': !canAdd || (isProposalInstallationQuickMode && !proposalInstallationHasMore) }">
+      :class="{ 'preview-actions--single': previewActionCount === 1, 'preview-actions--three': previewActionCount === 3 }">
+      <view v-if="proposalInstallationBatchPreviewAvailable"
+        class="preview-action preview-action--batch" hover-class="preview-action--pressed"
+        @tap="openProposalInstallationBatch">
+        <text class="preview-action__icon">▦</text><text>批量配置</text>
+      </view>
       <view v-if="!isProposalInstallationQuickMode || proposalInstallationHasMore"
         class="preview-action preview-action--more" hover-class="preview-action--pressed" @tap="openMore">
         <text class="preview-action__icon">···</text><text>查看更多</text>
@@ -229,6 +276,61 @@
       </view>
     </root-portal>
 
+    <root-portal v-if="proposalBatchEditorOpen">
+      <view class="proposal-batch-mask" @tap="closeProposalInstallationBatchEditor" @touchmove.stop.prevent="noop">
+        <view class="proposal-batch-sheet" @tap.stop @touchmove.stop>
+          <view class="proposal-batch-sheet__head">
+            <view>
+              <text>统一配置安装点位</text>
+              <text>已选 {{ proposalBatchSelectedRows.length }} 个点位 · 已启用 {{ proposalBatchEnabledCount }} 个字段</text>
+            </view>
+            <view class="proposal-batch-sheet__close" @tap="closeProposalInstallationBatchEditor"><text>×</text></view>
+          </view>
+          <view class="proposal-batch-tip">
+            <text>只修改已勾选的字段；未勾选字段保持原值。勾选后留空表示统一清空。</text>
+          </view>
+          <scroll-view class="proposal-batch-sheet__scroll" scroll-y :show-scrollbar="false">
+            <view v-for="group in proposalInstallationBatchGroups" :key="group.key" class="proposal-batch-group">
+              <view class="proposal-batch-group__title">
+                <text>{{ group.name }}</text><text>{{ group.fields.length }} 项</text>
+              </view>
+              <view v-for="batchField in group.fields" :key="batchField.Id || batchField.Name"
+                class="proposal-batch-field" :class="{ enabled: proposalBatchFieldEnabled(batchField), 'selector-open': proposalBatchActiveSelector === batchField.Name }">
+                <view class="proposal-batch-field__head" @tap="toggleProposalBatchField(batchField)">
+                  <view class="proposal-batch-field__check" :class="{ active: proposalBatchFieldEnabled(batchField) }">
+                    <text>{{ proposalBatchFieldEnabled(batchField) ? '✓' : '' }}</text>
+                  </view>
+                  <view><text>{{ batchField.Label || batchField.Name }}</text>
+                    <text>{{ proposalBatchFieldEnabled(batchField) ? '将统一修改' : '保持各点位原值' }}</text></view>
+                  <text v-if="batchField.required">必填</text>
+                </view>
+                <view v-if="proposalBatchFieldEnabled(batchField)" class="proposal-batch-field__body">
+                  <mci-native-field
+                    :model-value="proposalBatchForm[batchField.Name]" :field="batchField" :readonly="false"
+                    :table-name="config.table" :form-data="proposalBatchControlForm"
+                    :menu-id="menuId" :module-engine-key="config.moduleEngineKey"
+                    :table-child-auth="tableChildAuth"
+                    @change="setProposalBatchFieldValue(batchField, $event)"
+                    @select="selectProposalBatchFieldOption(batchField, $event)"
+                    @selector-toggle="setProposalBatchSelectorState(batchField, $event)"
+                    @upload-state="setProposalBatchUploadState(batchField, $event)" />
+                  <view class="proposal-batch-field__clear" hover-class="proposal-batch-field__clear--pressed"
+                    @tap="clearProposalBatchField(batchField)"><text>清空该字段</text></view>
+                </view>
+              </view>
+            </view>
+            <view class="proposal-batch-sheet__safe"></view>
+          </scroll-view>
+          <view class="proposal-batch-sheet__footer">
+            <view @tap="resetProposalBatchFields"><text>重置字段</text></view>
+            <view :class="{ disabled: !proposalBatchCanSubmit }" @tap="submitProposalInstallationBatch">
+              <text>{{ proposalBatchSubmitting ? '保存中...' : `确认配置 ${proposalBatchSelectedRows.length} 个点位` }}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </root-portal>
+
     <view v-if="activeAction" class="action-mask" @tap="closeActionInput">
       <view class="action-dialog" @tap.stop>
         <view class="action-dialog__head">
@@ -271,7 +373,13 @@ import { compileListConfig, loadModuleViewManifest } from '@/platform/view-manif
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { appendStandardDeleteAction } from '@/platform/module-delete.js'
 import { canDeleteMenuRecord } from '@/platform/menu-permission.js'
-import { fieldDisplayValue, loadNativeFormDefinition, loadNativeTableModel, parseJson } from '@/platform/native-form.js'
+import {
+  fieldDisplayValue,
+  hydrateNativeFormOptions,
+  loadNativeFormDefinition,
+  loadNativeTableModel,
+  parseJson
+} from '@/platform/native-form.js'
 import { createMenuModuleDefinition, loadModuleDefinition } from '@/platform/module-registry.js'
 import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
 import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
@@ -281,9 +389,13 @@ import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
 import MciNativeField from '@/components/mci-native-field/mci-native-field.vue'
 import {
   PROPOSAL_INSTALLATION_FIELDS,
+  PROPOSAL_INSTALLATION_BATCH_ENGINE,
   createProposalInstallationId,
   isProposalInstallationQuickContext,
+  proposalInstallationBatchFields,
+  proposalInstallationBatchPatch,
   proposalInstallationCopyValues,
+  proposalInstallationDeviceBatchValues,
   proposalInstallationDeviceValues,
   proposalInstallationDraft,
   proposalInstallationWriteValues
@@ -420,7 +532,8 @@ export default {
     showFloatingAdd: { type: Boolean, default: true },
     independentScroll: { type: Boolean, default: false },
     viewportHeight: { type: Number, default: 0 },
-    parentTableChildAuth: { type: Object, default: null }
+    parentTableChildAuth: { type: Object, default: null },
+    batchEntryMode: { type: String, default: '' }
   },
   emits: ['floating-add-state', 'filter-open-state', 'data-count'],
   data() {
@@ -462,7 +575,18 @@ export default {
       layoutMeasureTimers: [],
       proposalPointSavingId: '',
       proposalSelection: [],
-      proposalComparing: false
+      proposalComparing: false,
+      proposalBatchSelecting: false,
+      proposalBatchSelection: [],
+      proposalBatchEditorOpen: false,
+      proposalBatchForm: {},
+      proposalBatchEnabled: {},
+      proposalBatchDependencies: {},
+      proposalBatchUploadStates: {},
+      proposalBatchActiveSelector: '',
+      proposalBatchSubmitting: false,
+      proposalBatchOptionsLoading: false,
+      proposalBatchRequestId: ''
     }
   },
   computed: {
@@ -485,11 +609,70 @@ export default {
         ? this.rows.slice(0, Math.max(1, this.previewLimit))
         : this.rows
     },
+    isProposalInstallationContext() {
+      return isProposalInstallationQuickContext(this.parentTableName, this.config.table || this.table?.Name)
+    },
     isProposalInstallationQuickMode() {
       // zhy：安装点位只有嵌入需求方案详情的预览区使用快速编辑卡片；
       // “查看更多”独立列表必须回到通用子表卡片，完整遵循后台 ViewSchema/菜单字段配置。
-      return this.isPreview &&
-        isProposalInstallationQuickContext(this.parentTableName, this.config.table || this.table?.Name)
+      return this.isPreview && this.isProposalInstallationContext
+    },
+    proposalInstallationBatchAvailable() {
+      return !this.isPreview && this.isProposalInstallationContext && Boolean(this.relationValue) &&
+        Number(this.count || this.rows.length) >= 2 &&
+        Boolean(canEditMenuRecord(this.parentMenuId || this.menuId || this.childMenuId, this.currentUser))
+    },
+    proposalInstallationBatchPreviewAvailable() {
+      return this.isProposalInstallationQuickMode && Number(this.count || this.rows.length) >= 2 &&
+        Boolean(canEditMenuRecord(this.parentMenuId || this.menuId || this.childMenuId, this.currentUser))
+    },
+    previewActionCount() {
+      return Number(this.proposalInstallationBatchPreviewAvailable) +
+        Number(!this.isProposalInstallationQuickMode || this.proposalInstallationHasMore) +
+        Number(this.canAdd)
+    },
+    proposalBatchSelectedRows() {
+      const currentRows = new Map(this.rows.map((row) => [String(row?.Id || ''), row]))
+      return this.proposalBatchSelection.map((row) => currentRows.get(String(row?.Id || '')) || row).filter((row) => row?.Id)
+    },
+    proposalBatchAllLoadedSelected() {
+      return Boolean(this.rows.length) && this.rows.every((row) => this.isProposalBatchRowSelected(row))
+    },
+    proposalBatchFields() {
+      return proposalInstallationBatchFields(this.definition?.fields || [])
+    },
+    proposalInstallationBatchGroups() {
+      const allowed = new Set(this.proposalBatchFields.map((field) => String(field.Name || '').toLowerCase()))
+      const groups = (this.definition?.groups || []).map((group, index) => ({
+        key: group.key || `batch-group-${index}`,
+        name: group.name || '其他信息',
+        fields: (group.fields || []).filter((field) => allowed.has(String(field.Name || '').toLowerCase()))
+      })).filter((group) => group.fields.length)
+      const grouped = new Set(groups.flatMap((group) => group.fields.map((field) => String(field.Name || '').toLowerCase())))
+      const remaining = this.proposalBatchFields.filter((field) => !grouped.has(String(field.Name || '').toLowerCase()))
+      if (remaining.length) groups.push({ key: 'batch-group-other', name: '其他信息', fields: remaining })
+      return groups
+    },
+    proposalBatchEnabledCount() {
+      return Object.keys(this.proposalBatchEnabled || {}).filter((name) => this.proposalBatchEnabled[name] === true).length
+    },
+    proposalBatchHasPendingUploads() {
+      return Object.values(this.proposalBatchUploadStates || {}).some((state) => Number(state?.pendingCount || 0) > 0)
+    },
+    proposalBatchCanSubmit() {
+      return this.proposalBatchSelectedRows.length >= 2 && this.proposalBatchEnabledCount > 0 &&
+        !this.proposalBatchHasPendingUploads && !this.proposalBatchSubmitting
+    },
+    proposalBatchControlForm() {
+      const firstPoint = this.proposalBatchSelectedRows[0] || {}
+      return {
+        ...this.parentForm,
+        ...firstPoint,
+        ...this.proposalBatchForm,
+        // 远程选项的数据源可能引用当前子表记录字段，批量配置必须沿用安装点位表单上下文，
+        // 不能把需求方案 Id 伪装成安装点位 Id。
+        Id: firstPoint.Id || this.relationValue
+      }
     },
     proposalInstallationHasMore() {
       return this.isProposalInstallationQuickMode &&
@@ -522,8 +705,8 @@ export default {
         resolve('place', '安装场所'),
         resolve('deviceModel', '设备型号'),
         resolve('deviceName', '设备名称'),
-        resolve('deviceQuantity', '设备数量'),
-        resolve('people', '人数')
+        // resolve('deviceQuantity', '设备数量'),
+        // resolve('people', '人数')
       ]
     },
     proposalInstallationFieldNames() {
@@ -663,6 +846,221 @@ export default {
     this.$emit('filter-open-state', false)
   },
   methods: {
+    isProposalBatchRowSelected(row) {
+      return Boolean(row?.Id) && this.proposalBatchSelection.some((item) => String(item?.Id) === String(row.Id))
+    },
+    startProposalInstallationBatchSelection() {
+      if (!this.proposalInstallationBatchAvailable) {
+        uni.showToast({ title: '当前账号没有批量修改权限', icon: 'none' })
+        return
+      }
+      this.proposalBatchSelecting = true
+      this.proposalBatchSelection = []
+      this.resetProposalBatchFields()
+    },
+    cancelProposalInstallationBatchSelection() {
+      this.proposalBatchSelecting = false
+      this.proposalBatchSelection = []
+      this.proposalBatchEditorOpen = false
+      this.resetProposalBatchFields()
+    },
+    toggleProposalBatchRow(row) {
+      if (!row?.Id || !this.proposalBatchSelecting) return
+      const index = this.proposalBatchSelection.findIndex((item) => String(item?.Id) === String(row.Id))
+      if (index >= 0) this.proposalBatchSelection.splice(index, 1)
+      else this.proposalBatchSelection.push(row)
+    },
+    toggleAllProposalBatchRows() {
+      if (!this.proposalBatchSelecting) return
+      const loadedIds = new Set(this.rows.map((row) => String(row?.Id || '')).filter(Boolean))
+      if (this.proposalBatchAllLoadedSelected) {
+        this.proposalBatchSelection = this.proposalBatchSelection.filter((row) => !loadedIds.has(String(row?.Id || '')))
+        return
+      }
+      const selected = new Map(this.proposalBatchSelection.map((row) => [String(row?.Id || ''), row]))
+      this.rows.forEach((row) => { if (row?.Id) selected.set(String(row.Id), row) })
+      this.proposalBatchSelection = [...selected.values()]
+    },
+    openProposalInstallationBatchRow(row) {
+      if (this.proposalBatchSelecting) {
+        this.toggleProposalBatchRow(row)
+        return
+      }
+      this.openDetail(row)
+    },
+    proposalBatchEmptyValue(field) {
+      if (field?.multiple || ['ImgUpload', 'FileUpload'].includes(field?.component)) return []
+      if (field?.component === 'Switch') return false
+      return ''
+    },
+    cloneProposalBatchValue(value) {
+      if (!value || typeof value !== 'object') return value
+      try { return JSON.parse(JSON.stringify(value)) } catch (error) { return value }
+    },
+    proposalBatchCommonValue(field) {
+      const rows = this.proposalBatchSelectedRows
+      if (!rows.length) return this.proposalBatchEmptyValue(field)
+      const values = rows.map((row) => row?.[field.Name])
+      const signature = (value) => {
+        try { return JSON.stringify(value ?? null) } catch (error) { return String(value ?? '') }
+      }
+      const first = signature(values[0])
+      return values.every((value) => signature(value) === first)
+        ? this.cloneProposalBatchValue(values[0])
+        : this.proposalBatchEmptyValue(field)
+    },
+    proposalBatchFieldEnabled(field) {
+      return Boolean(field?.Name && this.proposalBatchEnabled[field.Name] === true)
+    },
+    toggleProposalBatchField(field) {
+      if (!field?.Name || this.proposalBatchSubmitting) return
+      const enabled = !this.proposalBatchFieldEnabled(field)
+      this.proposalBatchEnabled = { ...this.proposalBatchEnabled, [field.Name]: enabled }
+      if (enabled && !Object.prototype.hasOwnProperty.call(this.proposalBatchForm, field.Name)) {
+        this.proposalBatchForm = { ...this.proposalBatchForm, [field.Name]: this.proposalBatchCommonValue(field) }
+      }
+      if (!enabled && String(field.Name).toLowerCase() === PROPOSAL_INSTALLATION_FIELDS.deviceModel.toLowerCase()) {
+        const dependencies = { ...this.proposalBatchDependencies }
+        delete dependencies[PROPOSAL_INSTALLATION_FIELDS.deviceModelId]
+        this.proposalBatchDependencies = dependencies
+      }
+      this.proposalBatchRequestId = ''
+    },
+    setProposalBatchFieldValue(field, value) {
+      if (!field?.Name) return
+      this.proposalBatchForm = { ...this.proposalBatchForm, [field.Name]: value }
+      this.proposalBatchRequestId = ''
+    },
+    clearProposalBatchField(field) {
+      if (!field?.Name) return
+      this.setProposalBatchFieldValue(field, this.proposalBatchEmptyValue(field))
+      if (String(field.Name).toLowerCase() === PROPOSAL_INSTALLATION_FIELDS.deviceModel.toLowerCase()) {
+        this.selectProposalBatchFieldOption(field, { cleared: true })
+      }
+    },
+    selectProposalBatchFieldOption(field, selection = {}) {
+      if (!field?.Name || String(field.Name).toLowerCase() !== PROPOSAL_INSTALLATION_FIELDS.deviceModel.toLowerCase()) return
+      const values = proposalInstallationDeviceBatchValues(selection)
+      const dependencies = { ...this.proposalBatchDependencies }
+      Object.keys(values).forEach((name) => {
+        if (name === PROPOSAL_INSTALLATION_FIELDS.deviceModelId) {
+          dependencies[name] = values[name]
+          return
+        }
+        const target = this.proposalBatchFields.find((item) => String(item.Name || '').toLowerCase() === name.toLowerCase())
+        if (!target) return
+        this.proposalBatchForm = { ...this.proposalBatchForm, [target.Name]: values[name] }
+        this.proposalBatchEnabled = { ...this.proposalBatchEnabled, [target.Name]: true }
+      })
+      this.proposalBatchDependencies = dependencies
+      this.proposalBatchRequestId = ''
+    },
+    setProposalBatchUploadState(field, state = {}) {
+      if (!field?.Name) return
+      this.proposalBatchUploadStates = { ...this.proposalBatchUploadStates, [field.Name]: state || {} }
+    },
+    setProposalBatchSelectorState(field, open) {
+      this.proposalBatchActiveSelector = open && field?.Name ? field.Name : ''
+    },
+    resetProposalBatchFields() {
+      this.proposalBatchForm = {}
+      this.proposalBatchEnabled = {}
+      this.proposalBatchDependencies = {}
+      this.proposalBatchUploadStates = {}
+      this.proposalBatchActiveSelector = ''
+      this.proposalBatchRequestId = ''
+    },
+    async openProposalInstallationBatchEditor() {
+      if (this.proposalBatchSelectedRows.length < 2) {
+        uni.showToast({ title: '请至少选择两个安装点位', icon: 'none' })
+        return
+      }
+      if (this.proposalBatchOptionsLoading) return
+      this.proposalBatchOptionsLoading = true
+      uni.showLoading({ title: '正在加载配置项', mask: true })
+      try {
+        // Radio/Checkbox 的 Data 允许为空并由 SQL、数据源或接口引擎实时供数。
+        // 批量编辑器复用普通表单的同一加载器，确保水质要求、加热方式等字段先有选项再渲染。
+        await hydrateNativeFormOptions(this.definition, this.proposalBatchControlForm, {
+          menuId: this.menuId,
+          moduleEngineKey: this.config.moduleEngineKey,
+          tableChildAuth: this.tableChildAuth,
+          timeoutMs: 8000
+        })
+        this.proposalBatchEditorOpen = true
+      } catch (error) {
+        uni.showToast({ title: error.message || error.Msg || '配置项加载失败，请稍后重试', icon: 'none' })
+      } finally {
+        uni.hideLoading()
+        this.proposalBatchOptionsLoading = false
+      }
+    },
+    closeProposalInstallationBatchEditor() {
+      if (this.proposalBatchSubmitting) return
+      this.proposalBatchEditorOpen = false
+    },
+    proposalBatchValueEmpty(value) {
+      if (value === null || value === undefined || value === '') return true
+      if (Array.isArray(value)) return value.length === 0
+      if (typeof value === 'object') return Object.keys(value).length === 0
+      return false
+    },
+    async submitProposalInstallationBatch() {
+      if (!this.proposalBatchCanSubmit) {
+        const title = this.proposalBatchHasPendingUploads
+          ? '请等待文件上传完成'
+          : (this.proposalBatchEnabledCount ? '请至少选择两个安装点位' : '请先勾选要统一修改的字段')
+        uni.showToast({ title, icon: 'none' })
+        return
+      }
+      const enabledFields = this.proposalBatchFields.filter((field) => this.proposalBatchFieldEnabled(field))
+      const invalid = enabledFields.find((field) => field.required && this.proposalBatchValueEmpty(this.proposalBatchForm[field.Name]))
+      if (invalid) {
+        uni.showToast({ title: `${invalid.Label || invalid.Name}不能为空`, icon: 'none' })
+        return
+      }
+      if (!(await this.confirmAction(`确定将 ${enabledFields.length} 个字段统一配置到 ${this.proposalBatchSelectedRows.length} 个点位吗？`))) return
+
+      const rows = this.proposalBatchSelectedRows
+      const patches = proposalInstallationBatchPatch(
+        this.proposalBatchForm,
+        this.proposalBatchEnabled,
+        this.proposalBatchDependencies
+      )
+      if (!this.proposalBatchRequestId) {
+        this.proposalBatchRequestId = `batch-${createProposalInstallationId().replace(/-/g, '')}`
+      }
+      this.proposalBatchSubmitting = true
+      uni.showLoading({ title: '正在统一配置', mask: true })
+      try {
+        const result = await V8.ApiEngine.Run(PROPOSAL_INSTALLATION_BATCH_ENGINE, {
+          Action: 'BatchUpdate',
+          RequestId: this.proposalBatchRequestId,
+          ParentId: this.relationValue,
+          // 接口引擎中的 .NET 集合不是标准 JavaScript Array/Object；显式 JSON 化可避免
+          // 微信端、HTTP 参数绑定和 Jint 三端对嵌套参数产生不同判定。
+          Ids: JSON.stringify(rows.map((row) => row.Id)),
+          Versions: JSON.stringify(rows.map((row) => ({ Id: row.Id, UpdateTime: row.UpdateTime || '' }))),
+          Patches: JSON.stringify(patches)
+        })
+        if (!result || Number(result.Code) !== 1) {
+          this.proposalBatchRequestId = ''
+          throw new Error(result?.Msg || '安装点位批量配置失败')
+        }
+        const updated = Number(result.Data?.Updated || rows.length)
+        this.proposalBatchEditorOpen = false
+        this.proposalBatchSelecting = false
+        this.proposalBatchSelection = []
+        this.resetProposalBatchFields()
+        await Promise.all([this.loadData(true, true, true), this.loadRelatedMetrics(true)])
+        uni.showToast({ title: `已统一配置 ${updated} 个点位`, icon: 'success' })
+      } catch (error) {
+        uni.showToast({ title: error.message || error.Msg || '安装点位批量配置失败', icon: 'none' })
+      } finally {
+        uni.hideLoading()
+        this.proposalBatchSubmitting = false
+      }
+    },
     isProposalSelected(row) {
       return Boolean(row && row.Id) && this.proposalSelection.some((item) => String(item.Id) === String(row.Id))
     },
@@ -954,6 +1352,9 @@ export default {
         // 先用当前授权菜单的本地编译结果展示数据，不能让配置请求把页面卡在骨架屏。
         void this.loadPresentationConfig(refresh)
         await Promise.all([this.loadData(true, refresh), this.loadRelatedMetrics(refresh)])
+        if (String(this.batchEntryMode || '').toLowerCase() === 'installation-batch' && this.proposalInstallationBatchAvailable) {
+          this.startProposalInstallationBatchSelection()
+        }
         this.scheduleListBodyMeasure()
       } catch (error) {
         this.error = error.message || error.Msg || '关联数据加载失败'
@@ -1240,7 +1641,13 @@ export default {
       })
     },
     loadMore() { this.loadData(false) },
+    openProposalInstallationBatch() {
+      this.openRelatedList('installation-batch')
+    },
     openMore() {
+      this.openRelatedList('')
+    },
+    openRelatedList(entryMode = '') {
       const query = [
         `fieldId=${encodeURIComponent(this.field.Id || '')}`,
         `parentId=${encodeURIComponent(this.parentId || '')}`,
@@ -1249,7 +1656,8 @@ export default {
         `parentTableName=${encodeURIComponent(this.parentTableName || '')}`,
         `relationValue=${encodeURIComponent(this.relationValue || '')}`,
         `parentTableChildAuth=${encodeURIComponent(JSON.stringify(this.parentTableChildAuth || null))}`,
-        `title=${encodeURIComponent(this.config.title || this.sectionTitle || '关联列表')}`
+        `title=${encodeURIComponent(this.config.title || this.sectionTitle || '关联列表')}`,
+        `entryMode=${encodeURIComponent(entryMode || '')}`
       ].join('&')
       uni.navigateTo({
         url: `/pages/business/related-list?${query}`,
@@ -1264,7 +1672,8 @@ export default {
             parentMode: this.parentMode,
             parentTableChildAuth: this.parentTableChildAuth,
             relationValue: this.relationValue,
-            title: this.config.title || this.sectionTitle
+            title: this.config.title || this.sectionTitle,
+            entryMode
           })
         }
       })
@@ -1910,6 +2319,34 @@ export default {
 .proposal-select.active { border-color: #0787c9; color: #fff; background: #0787c9; }
 .selectable-card { position: relative; }
 .proposal-select { position: absolute; top: 16rpx; right: 16rpx; z-index: 5; color: transparent; background: rgba(255, 255, 255, .96); box-shadow: 0 3rpx 10rpx rgba(21, 68, 88, .12); }
+.proposal-batch-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12rpx; margin: -2rpx 0 16rpx; }
+.proposal-batch-entry { box-sizing: border-box; width: 100%; min-height: 88rpx; display: grid; grid-template-columns: 58rpx minmax(0, 1fr) 30rpx; gap: 12rpx; align-items: center; padding: 12rpx 18rpx; border: 1rpx solid #f0d6d0; border-radius: 14rpx; color: #cc442b; background: #fff8f6; transition: transform 150ms ease, opacity 150ms ease; }
+.proposal-batch-entry--pressed { transform: scale(.985); opacity: .82; }
+.proposal-batch-entry__icon { width: 48rpx; height: 48rpx; border-radius: 12rpx; color: #fff; background: #e94b2c; font-size: 28rpx; line-height: 48rpx; text-align: center; }
+.proposal-batch-entry > view { min-width: 0; }
+.proposal-batch-entry > view text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proposal-batch-entry > view text:first-child { color: #8c2e1c; font-size: 25rpx; font-weight: 700; }
+.proposal-batch-entry > view text:last-child { margin-top: 4rpx; color: #a87166; font-size: 20rpx; }
+.proposal-batch-entry > text:last-child { color: #d99384; font-size: 38rpx; text-align: right; }
+.proposal-batch-select-all { flex: 1 1 250rpx; min-height: 76rpx; display: flex; align-items: center; gap: 12rpx; }
+.proposal-batch-select-all > text:first-child { box-sizing: border-box; width: 42rpx; height: 42rpx; display: flex; align-items: center; justify-content: center; border: 2rpx solid #aebfc7; border-radius: 10rpx; color: transparent; background: #fff; }
+.proposal-batch-select-all.active > text:first-child { border-color: #e94b2c; color: #fff; background: #e94b2c; }
+.proposal-batch-select-all > view text { display: block; }
+.proposal-batch-select-all > view text:first-child { color: #405963; font-size: 24rpx; font-weight: 650; }
+.proposal-batch-select-all > view text:last-child { margin-top: 3rpx; color: #81949c; font-size: 19rpx; }
+.proposal-batch-tool-button { flex: 0 0 auto; min-width: 100rpx; height: 68rpx; padding: 0 18rpx; border-radius: 12rpx; color: #647a83; background: #eaf1f4; font-size: 23rpx; font-weight: 650; line-height: 68rpx; text-align: center; }
+.proposal-batch-tool-button--primary { display: flex; align-items: center; justify-content: center; gap: 8rpx; min-width: 152rpx; color: #fff; background: #e94b2c; }
+.proposal-batch-tool-button--primary > text:last-child:not(:first-child) { min-width: 28rpx; height: 28rpx; padding: 0 4rpx; border-radius: 14rpx; color: #e94b2c; background: #fff; font-size: 18rpx; line-height: 28rpx; }
+.proposal-batch-tool-button.disabled { opacity: .45; }
+.proposal-batch-tool-button--pressed { transform: scale(.97); }
+.proposal-batch-load-hint { flex: 0 0 100%; color: #879aa2; font-size: 20rpx; }
+.proposal-batch-card { position: relative; margin-bottom: 16rpx; border: 2rpx solid transparent; border-radius: 18rpx; transition: border-color 150ms ease, background 150ms ease; }
+.proposal-batch-card.selected { border-color: #e94b2c; background: #fff5f2; }
+.proposal-batch-card__select { position: absolute; top: 0; right: 0; z-index: 8; box-sizing: border-box; width: 84rpx; height: 84rpx; display: flex; align-items: center; justify-content: center; color: transparent; }
+.proposal-batch-card__select::before { content: ''; position: absolute; width: 40rpx; height: 40rpx; border: 2rpx solid #aebfc7; border-radius: 10rpx; background: rgba(255,255,255,.96); box-shadow: 0 3rpx 10rpx rgba(21,68,88,.12); }
+.proposal-batch-card__select text { position: relative; z-index: 1; font-size: 24rpx; }
+.proposal-batch-card__select.active { color: #fff; }
+.proposal-batch-card__select.active::before { border-color: #e94b2c; background: #e94b2c; }
 @media (max-width: 360px) {
   .related-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -2049,7 +2486,10 @@ export default {
 .load-more--pressed { opacity: .7; }
 .preview-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; margin-top: 18rpx; }
 .preview-actions--single { grid-template-columns: 1fr; }
+.preview-actions--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .preview-action { height: 76rpx; display: flex; align-items: center; justify-content: center; gap: 8rpx; border: 1rpx solid rgba(229, 70, 37, .45); border-radius: 10rpx; color: #d9472b; background: rgba(229, 70, 37, .05); font-size: 25rpx; font-weight: 650; transition: transform 150ms ease, opacity 150ms ease; }
+.preview-actions--three .preview-action { gap: 5rpx; font-size: 22rpx; }
+.preview-action--batch { border-color: rgba(11, 134, 212, .38); color: #087dad; background: #edf8fc; }
 .preview-action--add { border-color: #d9472b; color: #fff; background: #d9472b; }
 .preview-action__icon { font-size: 28rpx; line-height: 1; }
 .preview-action--pressed { transform: scale(.98); opacity: .82; }
@@ -2089,6 +2529,39 @@ export default {
 .filter-loading > view > view { height: 22rpx; margin-bottom: 14rpx; border-radius: 5rpx; background: linear-gradient(90deg, #eef3f5 25%, #f7fafb 50%, #eef3f5 75%); background-size: 300% 100%; animation: shimmer 1.4s infinite; }
 .filter-loading > view > view:first-child { width: 28%; }
 .filter-loading > view > view:last-child { width: 72%; height: 54rpx; }
+.proposal-batch-mask { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: flex-end; overflow: hidden; background: rgba(13, 37, 48, .48); }
+.proposal-batch-sheet { box-sizing: border-box; width: 100%; height: min(92vh, 1420rpx); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border-radius: 20rpx 20rpx 0 0; overflow: hidden; background: #f5f8f9; }
+.proposal-batch-sheet__head { min-height: 104rpx; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 0 26rpx; border-bottom: 1rpx solid #e5ecef; background: #fff; }
+.proposal-batch-sheet__head > view:first-child { min-width: 0; }
+.proposal-batch-sheet__head > view:first-child text { display: block; }
+.proposal-batch-sheet__head > view:first-child text:first-child { color: #17313b; font-size: 30rpx; font-weight: 750; }
+.proposal-batch-sheet__head > view:first-child text:last-child { margin-top: 5rpx; color: #7d929b; font-size: 21rpx; }
+.proposal-batch-sheet__close { flex: 0 0 auto; width: 58rpx; height: 58rpx; border-radius: 50%; color: #69818b; background: #eff5f7; font-size: 34rpx; line-height: 56rpx; text-align: center; }
+.proposal-batch-tip { padding: 14rpx 26rpx; color: #8c5c2c; background: #fff8e8; font-size: 21rpx; line-height: 1.55; }
+.proposal-batch-sheet__scroll { height: 100%; }
+.proposal-batch-group { margin: 18rpx 20rpx 0; }
+.proposal-batch-group__title { display: flex; align-items: center; justify-content: space-between; padding: 0 4rpx 10rpx; }
+.proposal-batch-group__title text:first-child { color: #36515c; font-size: 25rpx; font-weight: 750; }
+.proposal-batch-group__title text:last-child { color: #91a2a9; font-size: 19rpx; }
+.proposal-batch-field { position: relative; margin-bottom: 12rpx; border: 1rpx solid #e1e9ec; border-radius: 14rpx; background: #fff; }
+.proposal-batch-field.enabled { border-color: rgba(233,75,44,.38); box-shadow: 0 5rpx 14rpx rgba(58,79,88,.05); }
+.proposal-batch-field.selector-open { z-index: 30; }
+.proposal-batch-field__head { box-sizing: border-box; min-height: 88rpx; display: grid; grid-template-columns: 48rpx minmax(0, 1fr) auto; gap: 12rpx; align-items: center; padding: 12rpx 18rpx; }
+.proposal-batch-field__check { box-sizing: border-box; width: 40rpx; height: 40rpx; display: flex; align-items: center; justify-content: center; border: 2rpx solid #afbec5; border-radius: 10rpx; color: transparent; }
+.proposal-batch-field__check.active { border-color: #e94b2c; color: #fff; background: #e94b2c; }
+.proposal-batch-field__head > view:nth-child(2) { min-width: 0; }
+.proposal-batch-field__head > view:nth-child(2) text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proposal-batch-field__head > view:nth-child(2) text:first-child { color: #29434e; font-size: 24rpx; font-weight: 650; }
+.proposal-batch-field__head > view:nth-child(2) text:last-child { margin-top: 4rpx; color: #91a0a6; font-size: 19rpx; }
+.proposal-batch-field__head > text:last-child { color: #d9472b; font-size: 19rpx; }
+.proposal-batch-field__body { position: relative; padding: 0 18rpx 18rpx 78rpx; }
+.proposal-batch-field__clear { min-height: 56rpx; display: flex; align-items: center; justify-content: flex-end; color: #8a9ba2; font-size: 20rpx; }
+.proposal-batch-field__clear--pressed { color: #d9472b; }
+.proposal-batch-sheet__safe { height: 24rpx; }
+.proposal-batch-sheet__footer { display: grid; grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr); gap: 14rpx; padding: 16rpx max(24rpx, var(--mci-safe-right)) calc(16rpx + var(--mci-safe-bottom)) max(24rpx, var(--mci-safe-left)); border-top: 1rpx solid #e4ebee; background: #fff; }
+.proposal-batch-sheet__footer > view { height: 78rpx; border-radius: 10rpx; color: #5e737c; background: #edf3f5; font-size: 24rpx; font-weight: 700; line-height: 78rpx; text-align: center; }
+.proposal-batch-sheet__footer > view:last-child { color: #fff; background: #e94b2c; }
+.proposal-batch-sheet__footer > view.disabled { opacity: .46; }
 .action-mask { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; background: rgba(13, 37, 48, .42); }
 .action-dialog { width: 100%; padding: 28rpx 28rpx calc(24rpx + var(--mci-safe-bottom)); border-radius: 20rpx 20rpx 0 0; background: #fff; box-sizing: border-box; }
 .action-dialog__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; }

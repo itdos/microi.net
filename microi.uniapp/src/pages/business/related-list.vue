@@ -31,6 +31,7 @@
 				:parent-table-child-auth="parentTableChildAuth"
 				:parent-mode="parentMode"
 				:relation-value-override="relationValue"
+				:batch-entry-mode="batchEntryMode"
 			/>
 		</scroll-view>
 	</view>
@@ -65,6 +66,7 @@
 				parentTableChildAuth: null,
 				parentMode: 'View',
 				relationValue: '',
+				batchEntryMode: '',
 				pageTitle: '关联列表',
 				contextLoading: true,
 				contextError: ''
@@ -82,6 +84,7 @@
 				this.parentTableChildAuth = null
 			}
 			this.relationValue = decodeOption(options.relationValue)
+			this.batchEntryMode = decodeOption(options.entryMode)
 			this.pageTitle = decodeOption(options.title) || '关联列表'
 			this.parentForm = { Id: this.parentId }
 
@@ -108,6 +111,7 @@
 				this.parentTableChildAuth = context.parentTableChildAuth || this.parentTableChildAuth
 				this.parentMode = context.parentMode || this.parentMode
 				this.relationValue = context.relationValue ?? this.relationValue
+				this.batchEntryMode = context.entryMode || this.batchEntryMode
 				this.pageTitle = context.title || this.pageTitle
 				this.contextLoading = false
 				this.contextError = ''

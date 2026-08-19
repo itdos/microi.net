@@ -41,6 +41,7 @@ const genericPaths = [
   'src/platform/business-runtime.js',
   'src/platform/form-extension.js',
   'src/platform/list-return.js',
+  'src/platform/list-session.mjs',
   'src/platform/module-registry.js',
   'src/platform/native-form.js',
   'src/platform/native-table.js',

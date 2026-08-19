@@ -68,9 +68,12 @@
       <mci-skeleton v-if="loading && pageIndex === 1" type="list" :rows="6" />
 
       <view v-else-if="rows.length" class="task-list">
-        <mci-task-card v-for="(item, index) in rows" :key="item.Id || index"
-          :item="taskCardItem(item)" :index="index"
-          :state-class="taskStateClass(item.state)" @open="openTask" @phone="callPhone" />
+        <view v-for="(item, index) in rows" :id="taskAnchorId(item)" :key="item.Id || index" class="task-list-session-item">
+          <mci-task-card
+            :item="taskCardItem(item)" :index="index"
+            :state-class="taskStateClass(item.state)" @open="openTask" @phone="callPhone"
+          />
+        </view>
         <view class="load-state"><text v-if="loading">正在加载...</text><text v-else-if="finished">共 {{ count }} 个任务，已全部加载</text><text v-else>上拉加载更多</text></view>
       </view>
 
@@ -125,6 +128,7 @@
 import { themeMixin } from '@/utils/theme.js'
 import { formatDateTime, openForm, scanDevice } from '@/platform/business-runtime.js'
 import { listReturnMixin } from '@/platform/list-return.js'
+import { getUser } from '@/utils/request.js'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
 import {
   TASK_DATE_FIELDS,
@@ -176,7 +180,8 @@ export default {
       taskDataChanged: false,
       changedListener: null,
       loadRequestId: 0,
-      searchTimer: null
+      searchTimer: null,
+      taskListSessionKey: ''
     }
   },
   computed: {
@@ -193,7 +198,16 @@ export default {
   onLoad(options) {
     if (options.customerId) this.customerId = decodeURIComponent(options.customerId)
     if (options.state) this.state = decodeURIComponent(options.state)
-    this.loadData(true, true)
+    const user = getUser() || {}
+    this.taskListSessionKey = [
+      'task-list:v2',
+      user.Id || user.Account || 'guest',
+      this.customerId || 'all-customers',
+      options.state ? `entry-state:${this.state}` : 'default-state'
+    ].join('|')
+    const restored = this.restoreTaskListSession()
+    if (!restored) this.loadData(true, true)
+    else setTimeout(() => this.refreshRestoredTaskList(restored), 0)
     this.changedListener = () => { this.taskDataChanged = true }
     uni.$on('xjy:task-changed', this.changedListener)
   },
@@ -203,18 +217,95 @@ export default {
   },
   methods: {
     taskStateClass,
+    shouldMciRetainListSession() { return !!this.taskListSessionKey },
+    getMciListSnapshotKey() { return this.taskListSessionKey },
+    getMciListAnchorConfig() { return { container: '.task-scroll', items: '.task-list-session-item' } },
+    taskAnchorId(item = {}) { return `mci-task-${String(item.Id || item.id || '').replace(/[^A-Za-z0-9_-]/g, '')}` },
+    getMciListSnapshot() {
+      return {
+        rows: [...this.rows],
+        count: this.count,
+        stateCounts: { ...this.stateCounts },
+        typeCounts: { ...this.typeCounts },
+        periodCounts: { ...this.periodCounts },
+        pageIndex: this.pageIndex,
+        keyword: this.keyword,
+        customerId: this.customerId,
+        state: this.state,
+        type: this.type,
+        period: this.period,
+        dateField: this.dateField,
+        customStart: this.customStart,
+        customEnd: this.customEnd,
+        city: this.city,
+        mineOnly: this.mineOnly,
+        orderType: this.orderType,
+        finished: this.finished,
+        stale: this.stale
+      }
+    },
+    restoreTaskListSession() {
+      const snapshot = this.mciReadRetainedListSnapshot()
+      const payload = snapshot && snapshot.payload
+      if (!payload || !Array.isArray(payload.rows)) return null
+      const fields = [
+        'rows', 'count', 'stateCounts', 'typeCounts', 'periodCounts', 'pageIndex', 'keyword',
+        'customerId', 'state', 'type', 'period', 'dateField', 'customStart', 'customEnd',
+        'city', 'mineOnly', 'orderType', 'finished', 'stale'
+      ]
+      fields.forEach((field) => {
+        if (Object.prototype.hasOwnProperty.call(payload, field)) this[field] = payload[field]
+      })
+      this.loading = false
+      this.refreshing = false
+      this.mciApplyListSnapshotPosition(snapshot)
+      return snapshot
+    },
+    taskFilters(overrides = {}) {
+      return {
+        pageIndex: this.pageIndex,
+        pageSize: this.pageSize,
+        keyword: this.keyword.trim(),
+        state: this.state,
+        type: this.type,
+        period: this.period,
+        customRange: this.customRange,
+        dateField: this.dateField,
+        city: this.city.trim(),
+        mineOnly: this.mineOnly,
+        orderBy: this.dateField,
+        orderType: this.orderType,
+        customerId: this.customerId || '',
+        ...overrides
+      }
+    },
+    async refreshRestoredTaskList(snapshot) {
+      if (!this.rows.length) return this.loadData(true, true)
+      const requestId = ++this.loadRequestId
+      const loadedCount = Math.max(this.pageSize, Math.ceil(this.rows.length / this.pageSize) * this.pageSize)
+      try {
+        const result = await loadTasks(this.taskFilters({ pageIndex: 1, pageSize: loadedCount, refresh: true }))
+        if (requestId !== this.loadRequestId) return
+        this.rows = result.rows
+        this.count = result.count
+        this.stale = result.stale
+        this.finished = this.rows.length >= this.count || result.rows.length < loadedCount
+        this.pageIndex = Math.ceil(this.rows.length / this.pageSize) + 1
+        this.loadAuxiliaryCounts(this.taskFilters({ pageIndex: 1, refresh: true }), requestId)
+        this.$nextTick(() => this.mciRestoreListAnchor(snapshot.anchor, snapshot.scrollTop))
+      } catch (error) {
+        // 已恢复的会话仍可继续使用；网络恢复后用户可下拉刷新。
+        if (requestId === this.loadRequestId) this.stale = true
+      }
+    },
     async loadData(reset = false, refresh = false) {
       if (this.loading && !reset) return
       if (!reset && this.finished) return
       const requestId = ++this.loadRequestId
       if (reset) { this.pageIndex = 1; this.finished = false }
       this.loading = true
-      const filters = {
-        pageIndex: this.pageIndex, pageSize: this.pageSize, keyword: this.keyword.trim(), state: this.state,
-        type: this.type, period: this.period, customRange: this.customRange, dateField: this.dateField,
-        city: this.city.trim(), mineOnly: this.mineOnly, orderBy: this.dateField, orderType: this.orderType,
-        customerId: this.customerId || '', refresh
-      }
+      if (reset) this.mciRestoreListPosition(0)
+      const filters = this.taskFilters({ refresh })
       try {
         const result = await loadTasks(filters)
         if (requestId !== this.loadRequestId) return
@@ -305,34 +396,36 @@ export default {
     async onMciListDetailReturned(scrollTop) {
       if (!this.taskDataChanged || !this.rows.length) return
       this.taskDataChanged = false
-      const loadedCount = Math.max(this.pageSize, this.rows.length)
+      const requestId = ++this.loadRequestId
+      const loadedCount = Math.max(this.pageSize, Math.ceil(this.rows.length / this.pageSize) * this.pageSize)
+      const anchor = { id: this.mciListAnchorId, offset: this.mciListAnchorOffset }
       try {
-        const filters = {
-          pageIndex: 1, pageSize: loadedCount, keyword: this.keyword.trim(), state: this.state,
-          type: this.type, period: this.period, customRange: this.customRange, dateField: this.dateField,
-          city: this.city.trim(), mineOnly: this.mineOnly, orderBy: this.dateField, orderType: this.orderType,
-          customerId: this.customerId || '', refresh: true
-        }
+        const filters = this.taskFilters({ pageIndex: 1, pageSize: loadedCount, refresh: true })
         const result = await loadTasks(filters)
+        if (requestId !== this.loadRequestId) return
         this.rows = result.rows
         this.count = result.count
         this.finished = this.rows.length >= this.count
         this.pageIndex = Math.ceil(this.rows.length / this.pageSize) + 1
-        this.loadAuxiliaryCounts(filters, this.loadRequestId)
+        this.loadAuxiliaryCounts(filters, requestId)
       } catch (error) {
         console.warn('[TaskList] detail return refresh failed:', error && (error.message || error))
       } finally {
-        this.mciScrollCommand = Math.max(0, scrollTop - 1)
-        this.$nextTick(() => { this.mciScrollCommand = scrollTop })
+        if (requestId === this.loadRequestId) this.mciRestoreListAnchor(anchor, scrollTop)
       }
     },
     openTask(item) { this.mciNavigateToDetail(`/pages/task/detail?id=${encodeURIComponent(item.Id)}`) },
     openTaskMap() {
-      const customerQuery = this.customerId ? `&customerId=${encodeURIComponent(this.customerId)}` : ''
-      uni.navigateTo({ url: `/pages/task/map?mode=task${customerQuery}` })
+      const filters = {
+        keyword: this.keyword.trim(), state: this.state, type: this.type, period: this.period,
+        customRange: this.customRange, dateField: this.dateField, city: this.city.trim(),
+        mineOnly: this.mineOnly, orderBy: this.dateField, orderType: this.orderType,
+        customerId: this.customerId || ''
+      }
+      this.mciNavigateToDetail(`/pages/task/map?mode=task&filters=${encodeURIComponent(JSON.stringify(filters))}`)
     },
     addTask() { this.mciMarkDetailReturn(); openForm({ table: 'Diy_ShouhouDD', mode: 'Add', title: '新增售后任务', menuAliases: ['售后订单', '售后任务'] }) },
-    scan() { scanDevice() },
+    scan() { this.mciMarkDetailReturn(); scanDevice() },
     callPhone(phone) { uni.makePhoneCall({ phoneNumber: String(phone) }) },
     goBack() { uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/workspace/index' }) }) }
   }

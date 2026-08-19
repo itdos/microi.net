@@ -31,6 +31,7 @@ import {
   orderProductNumberValue
 } from './order-product-cooperation.mjs'
 import {
+  emptyOrderAmountValues,
   orderSummarySubmitValues,
   orderSummaryValues
 } from './order-summary.mjs'
@@ -80,6 +81,19 @@ const CUSTOMER_LOCATION_FIELDS = {
   address: 'XiangxiDZ',
   latitude: 'KehuDT_Lat',
   longitude: 'KehuDT_Lng'
+}
+const ORDER_LOCATION_FIELDS = {
+  region: 'Chengshi',
+  address: 'XiangxiDZ',
+  latitude: ['DingdanDT_Lat', 'DingdanDZ_Lat', 'KehuDT_Lat'],
+  longitude: ['DingdanDT_Lng', 'DingdanDZ_Lng', 'KehuDT_Lng']
+}
+const AFTER_SALES_TABLE = 'diy_shouhoudd'
+const AFTER_SALES_LOCATION_FIELDS = {
+  region: 'Chengshi',
+  address: 'Dizhi',
+  latitude: ['ShouhouDT_Lat', 'ShouhouDZ_Lat', 'KehuDT_Lat'],
+  longitude: ['ShouhouDT_Lng', 'ShouhouDZ_Lng', 'KehuDT_Lng']
 }
 const CHECKIN_FIELDS = {
   targetType: 'BaifangDXLX',
@@ -177,6 +191,10 @@ function isOrderForm(context) {
 
 function isOrderAdd(context) {
   return isOrderForm(context) && context.mode === 'Add' && !context.rowId
+}
+
+function isAfterSalesForm(context) {
+  return String(context.tableName || '').toLowerCase() === AFTER_SALES_TABLE
 }
 
 function isOrderProductForm(context) {
@@ -318,6 +336,49 @@ function findField(context, expectedName, expectedLabel = '') {
     (expectedLabel
       ? fields.find((item) => String(item.Label || '').trim() === expectedLabel)
       : null)
+}
+
+function definitionFields(context) {
+  const definition = context.definition || {}
+  const groupedFields = (definition.groups || []).reduce(
+    (result, group) => result.concat(group.fields || []),
+    []
+  )
+  const fields = groupedFields.concat(definition.fields || [], definition.layoutFields || [])
+  return fields.filter((field, index) => field && fields.indexOf(field) === index)
+}
+
+function configuredCoordinateFieldName(context, candidates, axis) {
+  const fields = definitionFields(context)
+  const expectedNames = (Array.isArray(candidates) ? candidates : [candidates])
+    .map((name) => String(name || '').toLowerCase())
+    .filter(Boolean)
+  const exact = fields.find((field) => expectedNames.includes(String(field.Name || '').toLowerCase()))
+  if (exact && exact.Name) return exact.Name
+
+  const labelPattern = axis === 'latitude' ? /纬度|latitude/i : /经度|longitude/i
+  const namePattern = axis === 'latitude'
+    ? /(?:^|_)(?:lat|latitude)$/i
+    : /(?:^|_)(?:lng|longitude)$/i
+  const configured = fields.find((field) =>
+    labelPattern.test(String(field.Label || '')) || namePattern.test(String(field.Name || ''))
+  )
+  return configured && configured.Name ? configured.Name : ''
+}
+
+function businessAddressLocationConfig(context) {
+  const fields = isOrderForm(context)
+    ? ORDER_LOCATION_FIELDS
+    : isAfterSalesForm(context)
+      ? AFTER_SALES_LOCATION_FIELDS
+      : null
+  if (!fields) return null
+  return {
+    regionName: fieldName(context, fields.region, '城市'),
+    addressName: fieldName(context, fields.address, isOrderForm(context) ? '详细地址' : '地址'),
+    latitudeName: configuredCoordinateFieldName(context, fields.latitude, 'latitude'),
+    longitudeName: configuredCoordinateFieldName(context, fields.longitude, 'longitude')
+  }
 }
 
 function findFieldCopies(context, expectedName, expectedLabel = '') {
@@ -1085,6 +1146,62 @@ async function locateCustomer(context, chooseFromMap) {
   }
 }
 
+function applyBusinessAddressLocation(context, location) {
+  const config = businessAddressLocationConfig(context)
+  if (!config) return
+  const latitude = Number(location && location.latitude)
+  const longitude = Number(location && location.longitude)
+  const updates = {}
+
+  if (Array.isArray(location.region) && location.region.length) {
+    updates[config.regionName] = JSON.stringify(location.region)
+  }
+  if (location.address) {
+    // 合同订单和售后任务的地址只保留街道、门牌及地图点名称。
+    updates[config.addressName] = stripRegionFromAddress(location.address, location.region)
+  }
+  if (validCoordinatePair(latitude, longitude) && config.latitudeName && config.longitudeName) {
+    updates[config.latitudeName] = latitude
+    updates[config.longitudeName] = longitude
+  }
+
+  context.patchForm(updates)
+  context.state.businessLocationValues = {
+    ...(context.state.businessLocationValues || {}),
+    ...updates
+  }
+}
+
+async function locateBusinessAddress(context) {
+  if ((!isOrderForm(context) && !isAfterSalesForm(context)) ||
+    !['Add', 'Edit'].includes(context.mode) || context.state.locating) return
+  context.state.locating = true
+  try {
+    const source = await requestChosenLocation()
+    let geocode = null
+    try {
+      geocode = await reverseGeocode(source.longitude, source.latitude, {
+        apiEngineKey: AMAP_REVERSE_GEOCODE_ENGINE
+      })
+    } catch (error) {
+      // 地图选点已经包含地址时，逆地理编码失败不阻断保存。
+    }
+    const location = normalizeChosenLocation(source, geocode)
+    if (!validCoordinatePair(location.latitude, location.longitude)) throw new Error('定位坐标无效')
+    if (!location.address) throw new Error('未获取到详细地址')
+    if (!Array.isArray(location.region) || !location.region.length) throw new Error('未获取到省市区信息')
+    applyBusinessAddressLocation(context, location)
+    uni.showToast({ title: '位置已更新', icon: 'success' })
+  } catch (error) {
+    const message = String(error && error.errMsg || error && error.message || '')
+    if (!/cancel/i.test(message)) {
+      uni.showToast({ title: error.message || '位置选择失败', icon: 'none' })
+    }
+  } finally {
+    context.state.locating = false
+  }
+}
+
 function validCoordinatePair(latitude, longitude) {
   const lat = Number(latitude)
   const lng = Number(longitude)
@@ -1110,8 +1227,8 @@ function applyInstallationPositionLocation(context, location, options = {}) {
   }
   if (location && location.address &&
     (!options.addressOnlyWhenEmpty || isEmptyFormValue(context.form[addressName]))) {
-    // 安装位置保留完整地图地址；用户仍可在定位后补充楼层、房间或点位说明。
-    updates[addressName] = String(location.address).trim()
+    // 定位返回值去掉省、市、区三级，只保留街道、门牌与地图点名称。
+    updates[addressName] = stripRegionFromAddress(location.address, location.region)
   }
 
   if (Object.keys(updates).length) context.patchForm(updates)
@@ -1347,6 +1464,7 @@ export function createState() {
     locating: false,
     locationInitialized: false,
     locationValues: {},
+    businessLocationValues: {},
     personnelValues: {},
     checkinInitialized: false,
     checkinValues: {},
@@ -1722,8 +1840,18 @@ export function getFieldActions(context, field) {
     (name === CUSTOMER_LOCATION_FIELDS.address.toLowerCase() || label === '详细地址')) {
     return [{
       key: 'xjy-customer-location',
-      label: context.state.locating ? '定位中…' : '重新定位',
-      icon: '⌖',
+      label: context.state.locating ? '定位中…' : '手动定位',
+      iconType: 'location',
+      disabled: Boolean(context.state.locating)
+    }]
+  }
+  const businessLocation = businessAddressLocationConfig(context)
+  if (businessLocation && ['Add', 'Edit'].includes(context.mode) &&
+    name === String(businessLocation.addressName || '').toLowerCase()) {
+    return [{
+      key: 'xjy-business-address-location',
+      label: context.state.locating ? '定位中…' : '手动定位',
+      iconType: 'location',
       disabled: Boolean(context.state.locating)
     }]
   }
@@ -1731,8 +1859,8 @@ export function getFieldActions(context, field) {
     (name === INSTALLATION_POSITION_LOCATION_FIELDS.address.toLowerCase() || label === '安装位置')) {
     return [{
       key: 'xjy-installation-position-location',
-      label: context.state.locating ? '定位中…' : '定位',
-      icon: '⌖',
+      label: context.state.locating ? '定位中…' : '现场定位',
+      iconType: 'location',
       position: 'label',
       disabled: Boolean(context.state.locating)
     }]
@@ -1752,6 +1880,10 @@ export async function runFieldAction(context, field, action) {
   }
   if (action && action.key === 'xjy-customer-location') {
     await locateCustomer(context, true)
+    return { handled: true }
+  }
+  if (action && action.key === 'xjy-business-address-location') {
+    await locateBusinessAddress(context)
     return { handled: true }
   }
   if (action && action.key === 'xjy-installation-position-location') {
@@ -2057,7 +2189,11 @@ export async function beforeSubmit(context) {
   }
   // zhy：提交前补入隐藏关联字段，并为新增订单兜底默认值；编辑订单不覆盖历史值。
   if (isOrderForm(context)) {
-    const values = { ...(context.state.orderValues || {}) }
+    if (context.state.locating) throw new Error('正在获取位置，请稍候')
+    const values = {
+      ...(context.state.orderValues || {}),
+      ...(context.state.businessLocationValues || {})
+    }
     if (context.state.orderSummaryValues) {
       Object.assign(values, orderSummarySubmitValues(context.state.orderSummaryValues))
     }
@@ -2068,6 +2204,8 @@ export async function beforeSubmit(context) {
       ? '已上传'
       : '未上传'
     if (isOrderAdd(context)) {
+      // 新增订单的商品尚未落入子表，金额必须从 0 开始；后端事件会在存在商品时重新权威汇总。
+      Object.assign(values, emptyOrderAmountValues())
       const defaults = {
         [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',
         [orderFieldName(context, 'orderDate', '下单日期')]: currentDate(),
@@ -2082,6 +2220,10 @@ export async function beforeSubmit(context) {
       values[orderFieldName(context, 'renewalOrderNumber', '续签订单编号')] = ''
     }
     return values
+  }
+  if (isAfterSalesForm(context)) {
+    if (context.state.locating) throw new Error('正在获取位置，请稍候')
+    return { ...(context.state.businessLocationValues || {}) }
   }
   if (context.state.locating) throw new Error('正在获取位置，请稍候')
   if (isCustomerForm(context)) {
