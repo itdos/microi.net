@@ -370,6 +370,83 @@ public class CacheAndUpgradeRegressionTests
     }
 
     [Fact]
+    public void AppStoreBundle_DeliversMarketplaceRuntimeAndDetectsBrokenRuntimeBindings()
+    {
+        var loadResources = typeof(UpgradeAppStore).GetMethod(
+            "LoadBundledResources",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var hasPackagedRuntime = typeof(UpgradeAppStore).GetMethod(
+            "HasPackagedMarketplaceRuntime",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var getRepairReason = typeof(UpgradeAppStore).GetMethod(
+            "GetMarketplaceRuntimeRepairReason",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(loadResources);
+        Assert.NotNull(hasPackagedRuntime);
+        Assert.NotNull(getRepairReason);
+
+        var resources = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
+            loadResources!.Invoke(null, null));
+        var package = JObject.Parse(resources["app.microi.store.json"]);
+        Assert.True(Assert.IsType<bool>(hasPackagedRuntime!.Invoke(null, new object[] { package })));
+
+        var brokenPackage = (JObject)package.DeepClone();
+        var brokenBundle = Assert.Single(brokenPackage["ApplicationBundles"]!.Children<JObject>(),
+            item => item["Application"]?["AppKey"]?.ToString() == "microi-platform-service");
+        var marketplaceRoute = Assert.Single(brokenBundle["Routes"]!.Children<JObject>(),
+            item => item["RoutePath"]?.ToString() == "/marketplace");
+        marketplaceRoute.Remove();
+        Assert.False(Assert.IsType<bool>(hasPackagedRuntime.Invoke(null, new object[] { brokenPackage })));
+
+        var bundle = Assert.Single(package["ApplicationBundles"]!.Children<JObject>(),
+            item => item["Application"]?["AppKey"]?.ToString() == "microi-platform-service");
+        var serviceId = bundle["MicroService"]!["Id"]!.ToString();
+        var route = Assert.Single(bundle["Routes"]!.Children<JObject>(),
+            item => item["RoutePath"]?.ToString() == "/marketplace");
+        var pageId = route["Id"]!.ToString();
+        var runtimeAssets = new JArray(bundle["BuildAssets"]!.Children<JObject>().Select(asset => new JObject
+        {
+            ["Path"] = asset["Path"]?.ToString(),
+            ["ContentBase64"] = asset["FileByteBase64"]?.ToString()
+        }));
+        var menu = new JObject
+        {
+            ["Id"] = "61b7faee-35b2-4571-add2-5231a355f368",
+            ["OpenType"] = "MicroService",
+            ["IsMicroiService"] = 1,
+            ["ComponentPath"] = "/micro-app/host",
+            ["MicroServiceId"] = serviceId,
+            ["MicroServicePageId"] = pageId,
+            ["MicroServiceRoutePath"] = "/marketplace"
+        };
+        var service = new JObject
+        {
+            ["Id"] = serviceId,
+            ["MsKey"] = "microi-platform-service",
+            ["IsEnable"] = 1,
+            ["Runtime"] = "micro-app",
+            ["StorageMode"] = "db",
+            ["MsUrl"] = "db",
+            ["EntryPath"] = "index.html",
+            ["BuildVersion"] = bundle["MicroService"]!["BuildVersion"]?.ToString(),
+            ["AssetsJson"] = runtimeAssets.ToString()
+        };
+        var page = new JObject
+        {
+            ["Id"] = pageId,
+            ["MicroServiceId"] = serviceId,
+            ["MicroServiceKey"] = "microi-platform-service",
+            ["RoutePath"] = "/marketplace",
+            ["IsEnable"] = 1
+        };
+
+        Assert.Null(getRepairReason!.Invoke(null, new object[] { menu, service, page }));
+        menu["MicroServicePageId"] = null;
+        var reason = Assert.IsType<string>(getRepairReason.Invoke(null, new object[] { menu, service, page }));
+        Assert.Contains("页面绑定", reason);
+    }
+
+    [Fact]
     public void OfficialBundles_DoNotPersistRecursionAboveRuntimeHardCeiling()
     {
         var loadResources = typeof(UpgradeAppStore).GetMethod(
