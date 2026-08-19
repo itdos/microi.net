@@ -41,13 +41,13 @@
       <template v-else-if="mode === 'customer'">
         <scroll-view v-if="selectedGroup.length > 1" class="task-group-list" :style="{ height: selectedGroupHeight }" scroll-y :show-scrollbar="false">
           <view v-for="item in selectedGroup" :key="item.Id" class="task-group-item" :class="{ active: selected && selected.Id === item.Id }" @tap="selectGroupTask(item)">
-            <view><text>{{ item.KehuMC || '未命名客户' }}</text><text>{{ [item.Chengshi, item.XiangxiDZ].filter(Boolean).join(' ') || '暂无详细地址' }}</text></view>
+            <view><text>{{ item.KehuMC || '未命名客户' }}</text><text>{{ item.XiangxiDZ || '暂无详细地址' }}</text></view>
             <text>客户</text>
           </view>
         </scroll-view>
         <view class="entity-sheet__row"><text>负责人</text><text>{{ selected.FuzeR || '-' }}</text></view>
         <view class="entity-sheet__row"><text>联系电话</text><text>{{ selected.FuzeRDH || selected.LianxiDH || '-' }}</text></view>
-        <view class="entity-sheet__row"><text>详细地址</text><text>{{ [selected.Chengshi, selected.XiangxiDZ].filter(Boolean).join(' ') || '-' }}</text></view>
+        <view class="entity-sheet__row"><text>详细地址</text><text>{{ selected.XiangxiDZ || '-' }}</text></view>
       </template>
       <template v-else>
         <view class="entity-sheet__row"><text>订单数量</text><text>{{ selected.DingdanSL || 0 }}</text></view>
@@ -125,7 +125,7 @@ export default {
     pageSubtitle() { return this.mode === 'task' ? `${this.positionedTaskCount}/${this.rows.length} 个任务有坐标 · ${this.markers.length} 个位置` : (this.taskId ? `${this.positionedTaskCount}/${this.rows.length} 台设备有位置 · ${this.markers.length} 个位置` : (this.hasListCustomerFilters ? `${this.positionedTaskCount}/${this.rows.length} 个客户有坐标 · ${this.markers.length} 个位置` : (this.markers.length ? `附近 ${this.markers.length} 个${this.entityLabel}` : `按现场位置查找${this.entityLabel}`))) },
     emptyText() { return this.mode === 'task' ? '当前可查看的售后任务暂无有效坐标' : (this.taskId ? '本任务设备暂无有效定位' : (this.hasListCustomerFilters ? '当前筛选到的客户暂无有效坐标' : `当前范围内暂无${this.entityLabel}`)) },
     selectedTitle() { return this.mode === 'device' ? (this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 台任务设备` : (this.selected.ShebeiMC || this.selected.ShangpinMC || this.selected.KehuMC || '客户设备')) : (this.mode === 'task' ? (this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 个售后任务` : (this.selected.customer || this.selected.KehuMC || '售后任务')) : (this.mode === 'customer' && this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 个客户` : (this.selected.KehuMC || '客户'))) },
-    selectedSubtitle() { return this.mode === 'device' ? (this.selectedGroup.length > 1 ? '位于同一安装坐标，请选择设备' : (this.selected.ShebeiBH || this.selected.ShebeiXH || '')) : (this.mode === 'task' ? (this.selectedGroup.length > 1 ? '位于同一服务坐标，请选择任务' : ([this.selected.no, this.selected.type].filter(Boolean).join(' · '))) : (this.mode === 'customer' && this.selectedGroup.length > 1 ? '位于同一客户坐标，请选择客户' : ([this.selected.Chengshi, this.selected.XiangxiDZ].filter(Boolean).join(' ') || this.selected.LianxiR || ''))) },
+    selectedSubtitle() { return this.mode === 'device' ? (this.selectedGroup.length > 1 ? '位于同一安装坐标，请选择设备' : (this.selected.ShebeiBH || this.selected.ShebeiXH || '')) : (this.mode === 'task' ? (this.selectedGroup.length > 1 ? '位于同一服务坐标，请选择任务' : ([this.selected.no, this.selected.type].filter(Boolean).join(' · '))) : (this.mode === 'customer' ? (this.selectedGroup.length > 1 ? '位于同一客户坐标，请选择客户' : (this.selected.XiangxiDZ || this.selected.LianxiR || '')) : ([this.selected.Chengshi, this.selected.XiangxiDZ].filter(Boolean).join(' ') || this.selected.LianxiR || ''))) },
     selectedGroupHeight() { return `${Math.min(this.selectedGroup.length, 3) * 82}rpx` },
     primaryActionLabel() { return this.taskId ? (this.selectedGroup.length > 1 ? '处理选中设备' : '处理任务设备') : ((this.mode === 'task' || this.mode === 'customer') && this.selectedGroup.length > 1 ? `查看选中${this.entityLabel}` : this.meta.action) },
     selectedTaskComplete() { return !!(this.selected && (String(this.selected.FuwuZTZ) === '1' || this.selected.TaskDeviceStatus === '已完成')) }

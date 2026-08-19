@@ -30,3 +30,10 @@ test('客户地图加载全部筛选分页并按完全相同坐标聚合', () =>
   assert.match(mapSource, /const key = `\$\{latitude\},\$\{longitude\}`/)
   assert.match(mapSource, /customerGroup \? '个客户'/)
 })
+
+test('客户地图弹层只展示详细地址且不拼接城市字段', () => {
+  assert.match(mapSource, /<text>详细地址<\/text><text>\{\{ selected\.XiangxiDZ \|\| '-' \}\}<\/text>/)
+  assert.match(mapSource, /this\.mode === 'customer' \? \(this\.selectedGroup\.length > 1 \? '位于同一客户坐标，请选择客户' : \(this\.selected\.XiangxiDZ/)
+  assert.doesNotMatch(mapSource, /\[item\.Chengshi, item\.XiangxiDZ\]/)
+  assert.doesNotMatch(mapSource, /\[selected\.Chengshi, selected\.XiangxiDZ\][\s\S]*?mode === 'customer'/)
+})
