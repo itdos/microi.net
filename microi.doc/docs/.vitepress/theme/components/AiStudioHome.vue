@@ -1,20 +1,16 @@
 <template>
-  <main class="microi-ai-studio-home">
-    <section class="ai-studio-hero" aria-labelledby="ai-studio-title">
-      <p class="ai-studio-brand"><span aria-hidden="true"></span>Microi AI Studio</p>
-      <h1 id="ai-studio-title">{{ copy.title }}</h1>
-      <a
-        v-if="locale === 'zh-CN'"
-        class="ai-studio-proof-link"
-        href="https://blog.csdn.net/qq973702/article/details/163763831"
-        target="_blank"
-        rel="noopener noreferrer"
-      >查看可复现实测与适用边界 →</a>
+  <main class="microi-ai-studio-home" data-mci-ui-root>
+    <section class="ai-studio-stage ai-studio-stage--lead" aria-labelledby="ai-studio-chat-title">
+      <div class="mci-home-section-heading">
+        <p class="ai-studio-brand"><span aria-hidden="true"></span>Microi AI Studio</p>
+        <h2 id="ai-studio-chat-title">{{ copy.chatTitle }}</h2>
+        <span>{{ copy.chatDesc }}</span>
+      </div>
 
       <div class="ai-studio-chat" :class="{ 'has-messages': messages.length }">
         <div v-if="messages.length" ref="messageArea" class="ai-studio-messages" aria-live="polite">
           <div v-for="(message, index) in messages" :key="index" class="ai-studio-message" :class="message.role">
-            <span>{{ message.role === 'assistant' ? 'AI' : '你' }}</span>
+            <span>{{ message.role === 'assistant' ? 'AI' : (locale === 'en-US' ? 'You' : '你') }}</span>
             <p>{{ message.content }}</p>
           </div>
           <div v-if="isThinking" class="ai-studio-message assistant thinking"><span>AI</span><p><i></i><i></i><i></i></p></div>
@@ -30,7 +26,7 @@
           @keydown.enter.exact.prevent="sendMessage"
         ></textarea>
         <div class="ai-studio-chat-actions">
-          <div class="ai-studio-prompts" aria-label="快捷问题">
+          <div class="ai-studio-prompts" :aria-label="copy.quickLabel">
             <button type="button" :title="copy.aboutTitle" :disabled="!isAuthed" @click="usePrompt(copy.aboutPrompt)">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20"/></svg>
             </button>
@@ -42,7 +38,7 @@
             </button>
           </div>
           <span class="ai-studio-safety">{{ copy.safety }}</span>
-          <button class="ai-studio-send" type="button" :disabled="!isAuthed || isThinking || !inputText.trim()" aria-label="发送" @click="sendMessage">
+          <button class="ai-studio-send" type="button" :disabled="!isAuthed || isThinking || !inputText.trim()" :aria-label="copy.sendLabel" @click="sendMessage">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></svg>
           </button>
         </div>
@@ -59,6 +55,91 @@
         </div>
       </div>
       <p v-if="chatError" class="ai-studio-error" role="alert">{{ chatError }}</p>
+    </section>
+
+    <section class="mci-home-hero" aria-labelledby="mci-home-title">
+      <div class="mci-home-hero__copy">
+        <p class="mci-home-eyebrow"><span aria-hidden="true"></span>{{ copy.eyebrow }}</p>
+        <h1 id="mci-home-title">
+          <span class="mci-home-title-lead"><span v-for="part in copy.titleLeadParts" :key="part">{{ part }}</span></span>
+          <strong><span v-for="line in copy.titleEmphasisLines" :key="line">{{ line }}</span></strong>
+        </h1>
+        <p class="mci-home-hero__lead">{{ copy.lead }}</p>
+
+        <div class="mci-home-actions">
+          <a class="mci-home-action mci-home-action--primary" href="/doc/getting-started/start-use">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+            {{ copy.primaryAction }}
+          </a>
+          <a class="mci-home-action mci-home-action--secondary" href="/doc/getting-started/source-code-architecture">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z"/><path d="m4 12 8 4.5 8-4.5M4 16.5l8 4.5 8-4.5"/></svg>
+            {{ copy.secondaryAction }}
+          </a>
+        </div>
+
+        <a
+          v-if="locale === 'zh-CN'"
+          class="mci-home-proof-link"
+          href="https://blog.csdn.net/qq973702/article/details/163763831"
+          target="_blank"
+          rel="noopener noreferrer"
+        >{{ copy.proofAction }} <span aria-hidden="true">↗</span></a>
+
+        <ul class="mci-home-proof-points" :aria-label="copy.proofLabel">
+          <li v-for="item in copy.proofPoints" :key="item"><span aria-hidden="true"></span>{{ item }}</li>
+        </ul>
+      </div>
+
+      <div class="mci-home-map" role="group" aria-labelledby="mci-home-map-title">
+        <div class="mci-home-map__header">
+          <div>
+            <span>{{ copy.mapEyebrow }}</span>
+            <h2 id="mci-home-map-title">{{ copy.mapTitle }}</h2>
+          </div>
+          <p>{{ copy.mapDesc }}</p>
+        </div>
+
+        <div class="mci-home-map__ai">
+          <span>{{ copy.aiLayer }}</span>
+          <ul>
+            <li v-for="tool in copy.aiTools" :key="tool">{{ tool }}</li>
+          </ul>
+        </div>
+
+        <div class="mci-home-map__flow" aria-hidden="true"><i></i><i></i><i></i></div>
+
+        <div class="mci-home-modes">
+          <article v-for="mode in copy.developmentModes" :key="mode.level" :class="{ 'is-featured': mode.featured }">
+            <div class="mci-home-mode__top"><span>{{ mode.level }}</span><em>{{ mode.label }}</em></div>
+            <h3>{{ mode.title }}</h3>
+            <p>{{ mode.description }}</p>
+            <strong>{{ mode.note }}</strong>
+          </article>
+        </div>
+
+        <div class="mci-home-map__flow mci-home-map__flow--down" aria-hidden="true"><i></i><i></i><i></i></div>
+
+        <div class="mci-home-foundation">
+          <span>{{ copy.foundationTitle }}</span>
+          <ul><li v-for="item in copy.foundations" :key="item">{{ item }}</li></ul>
+        </div>
+
+        <div class="mci-home-outputs">
+          <span>{{ copy.outputTitle }}</span>
+          <ul><li v-for="item in copy.outputs" :key="item">{{ item }}</li></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="mci-home-values" :aria-label="copy.valueLabel">
+      <article v-for="(item, index) in copy.values" :key="item.kicker">
+        <span>0{{ index + 1 }}</span>
+        <div>
+          <p>{{ item.kicker }}</p>
+          <h2>{{ item.title }}</h2>
+          <small>{{ item.description }}</small>
+        </div>
+      </article>
     </section>
 
     <MciNugetStats variant="home" :locale="locale" />
@@ -85,9 +166,33 @@ const isAuthed = computed(() => Boolean(authToken.value && currentUser.value?.Id
 const loginUrl = computed(() => `/login.html?redirect=${encodeURIComponent(route.path || '/')}`)
 const locale = computed(() => /^\/en(?:\/|$)/.test(route.path || '') ? 'en-US' : 'zh-CN')
 const copy = computed(() => locale.value === 'en-US' ? {
-  title: 'Your all-purpose AI for work, creation, and imagination',
+  eyebrow: 'Open-source AI application development platform',
+  titleLeadParts: ['More than open-source AI', 'low-code.'],
+  titleEmphasisLines: ['An enterprise development framework', 'built for AI.'],
+  lead: 'Visual modeling, online V8 code, .NET and Vue source extensions, and AI agents share one delivery path—so large applications can start fast without losing room to grow.',
+  primaryAction: 'Start building', secondaryAction: 'Explore the architecture',
+  proofAction: 'See the reproducible 10×+ benchmark and scope', proofLabel: 'Platform facts',
+  proofPoints: ['Evolving since 2014', 'MIT open source', '.NET 10 + Vue 3', '20+ mature engines'],
+  mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: 'Use the right layer for each problem',
+  mapDesc: 'Reuse standard work, keep differentiated logic flexible, and extend the foundation in source code.',
+  aiLayer: 'AI collaboration', aiTools: ['Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
+  developmentModes: [
+    { level: '01', label: 'Standard workflows', title: 'Visual low-code', description: 'Forms · modules · workflows · reports', note: 'FAST' },
+    { level: '02', label: 'Business differentiation', title: 'Online V8 coding', description: 'APIs · events · integrations · automation', note: 'FLEXIBLE', featured: true },
+    { level: '03', label: 'Deep extension', title: 'Professional code', description: '.NET · Vue · microservices · SDKs', note: 'DEEP' }
+  ],
+  foundationTitle: 'Shared enterprise foundation', foundations: ['Tenancy & identity', 'Data & cache', 'Workflow & messaging', 'Delivery & governance'],
+  outputTitle: 'Build once, deliver everywhere', outputs: ['PC / WebOS', 'H5 / UniApp', 'SaaS / on-prem', 'AI apps / agents'],
+  valueLabel: 'Why teams choose Microi',
+  values: [
+    { kicker: 'Build less boilerplate', title: 'Keep AI focused on business change', description: 'Mature engines absorb recurring CRUD, identity, workflow, and deployment work.' },
+    { kicker: 'No low-code ceiling', title: 'Extend one layer at a time', description: 'Move from metadata to V8, frontend microservices, and .NET or Vue source as complexity grows.' },
+    { kicker: 'Built for long-term delivery', title: 'Develop, govern, and upgrade together', description: 'MCP, Skills, tests, the app store, and private deployment create an auditable delivery loop.' }
+  ],
+  chatTitle: 'Let AI build on mature engines and focus on business change',
+  chatDesc: 'With 20+ mature engines beneath visual low-code, V8, and .NET / Vue source extensions, Microi helps enterprise applications ship faster and evolve without a rewrite.',
   placeholder: 'Describe what you want to create, understand, analyze, or accomplish...',
-  chatLabel: 'Chat with Microi AI',
+  chatLabel: 'Chat with Microi AI', quickLabel: 'Quick questions', sendLabel: 'Send',
   aboutTitle: 'About Microi', aboutPrompt: 'What enterprise applications is Microi best suited for?',
   archTitle: 'Architecture', archPrompt: 'Explain the Microi architecture and V8 engine.',
   appsTitle: 'Browse AI apps', safety: 'Public knowledge only — no business database access',
@@ -95,9 +200,33 @@ const copy = computed(() => locale.value === 'en-US' ? {
   loginDesc: 'The official-site AI never reads or changes private tenant data.',
   loginAction: 'Sign in / Register'
 } : {
-  title: '相比传统 AI 开发：Token 更省 10 倍+、交付更快 10 倍+、20+ 成熟引擎开箱复用；深度融合 V8 引擎，业务逻辑无需编译发布。',
+  eyebrow: '开源 AI 应用开发平台',
+  titleLeadParts: ['不只是开源 AI', '低代码'],
+  titleEmphasisLines: ['更是企业级 AI', '应用开发框架'],
+  lead: '把可视化建模、V8 在线编程、.NET / Vue 源码扩展与 AI Agent 放进同一条交付链。中大型应用既能快速起步，也能持续深度开发。',
+  primaryAction: '免费开始开发', secondaryAction: '查看源码架构',
+  proofAction: '查看 10 倍+ 实测与适用边界', proofLabel: '平台事实',
+  proofPoints: ['始于 2014', 'MIT 开源', '.NET 10 + Vue 3', '20+ 成熟引擎'],
+  mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: '用合适的层，解决合适的问题',
+  mapDesc: '标准业务不重复写，差异逻辑不受限，底层能力可源码扩展。',
+  aiLayer: 'AI 协作层', aiTools: ['Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
+  developmentModes: [
+    { level: '01', label: '标准业务', title: '可视化低代码', description: '表单 · 模块 · 流程 · 报表', note: '快' },
+    { level: '02', label: '差异业务', title: 'V8 在线编程', description: '接口 · 事件 · 集成 · 自动化', note: '活', featured: true },
+    { level: '03', label: '深度扩展', title: '专业代码', description: '.NET · Vue · 微服务 · SDK', note: '深' }
+  ],
+  foundationTitle: '共享企业级底座', foundations: ['多租户与权限', '数据与缓存', '工作流与消息', '发布与治理'],
+  outputTitle: '一次构建，多端交付', outputs: ['PC / WebOS', 'H5 / UniApp', 'SaaS / 私有化', 'AI 应用 / Agent'],
+  valueLabel: '选择 Microi吾码的核心理由',
+  values: [
+    { kicker: '少造轮子', title: '让 AI 聚焦业务增量', description: '成熟引擎承载 CRUD、权限、流程和部署等通用能力，不再反复生成胶水代码。' },
+    { kicker: '不设低代码天花板', title: '复杂度增长，扩展路径仍清晰', description: '从元数据到 V8、前端微服务，再到 .NET / Vue 源码，逐层深入而不是推倒重来。' },
+    { kicker: '面向长期交付', title: '开发、治理、升级同一条链', description: 'MCP、Skills、测试、应用商城与私有部署形成可审计、可持续的交付闭环。' }
+  ],
+  chatTitle: '让 AI 站在成熟引擎上，专注业务增量',
+  chatDesc: '以 20+ 成熟引擎为底座，贯通可视化低代码、V8 与 .NET / Vue 源码扩展，让中大型应用快速交付，也能持续深度演进。',
   placeholder: '描述你想创造、了解、分析或完成的任何事情...',
-  chatLabel: '与 Microi AI 对话',
+  chatLabel: '与 Microi AI 对话', quickLabel: '快捷问题', sendLabel: '发送',
   aboutTitle: '了解 Microi吾码', aboutPrompt: 'Microi吾码适合开发哪些企业应用？',
   archTitle: '了解技术架构', archPrompt: '介绍一下 Microi吾码的技术架构和 V8 引擎。',
   appsTitle: '查看 AI 应用', safety: '仅回答公开内容，不连接业务数据库',
@@ -121,7 +250,8 @@ function usePrompt(value) {
 }
 
 function scrollToApps() {
-  document.querySelector('#ai-apps')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  document.querySelector('#ai-apps')?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' })
 }
 
 function sendMessage() {
@@ -165,47 +295,3 @@ onBeforeUnmount(() => {
   window.removeEventListener('microi-token-refreshed', handleAuthChange)
 })
 </script>
-
-<style scoped>
-.microi-ai-studio-home { min-height: 100vh; overflow: hidden; background: #141414; color: #f7f7f7; }
-.ai-studio-hero { width: min(920px, calc(100% - 40px)); margin: 0 auto; padding: 154px 0 38px; text-align: center; }
-.ai-studio-brand { display: inline-flex; align-items: center; gap: 15px; min-height: 76px; margin: 0 0 16px; padding: 0 16px; border: 1px solid rgba(244,211,94,.2); border-radius: 999px; background: linear-gradient(180deg, rgba(244,211,94,.09), rgba(255,255,255,.025)); color: #fff4c8; box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 30px rgba(0,0,0,.18); font-size: 50px; font-weight: 760; letter-spacing: .015em; }
-.ai-studio-brand span { width: 28px; height: 28px; border: 2px solid rgba(255,244,200,.72); border-radius: 50%; background: #f4d35e; box-shadow: 0 0 0 4px rgba(244,211,94,.1), 0 0 22px rgba(244,211,94,.62); }
-.ai-studio-hero h1 { max-width: 860px; margin: 16px auto 14px; color: #f7f7f7; font-size: clamp(26px, 3.2vw, 26px); font-weight: 680; line-height: 1.32; letter-spacing: -.035em; }
-.ai-studio-proof-link { display: inline-flex; align-items: center; min-height: 34px; margin: 0 auto 24px; padding: 0 14px; border: 1px solid rgba(244,211,94,.28); border-radius: 999px; background: rgba(244,211,94,.08); color: #f7df86; font-size: 12px; font-weight: 650; text-decoration: none; transition: background-color .18s, border-color .18s, transform .18s; }
-.ai-studio-proof-link:hover { border-color: rgba(244,211,94,.55); background: rgba(244,211,94,.14); transform: translateY(-1px); }
-.ai-studio-chat { position: relative; width: min(760px, 100%); min-height: 156px; margin: 0 auto; overflow: hidden; border: 1px solid #3b3b3b; border-radius: 18px; background: #242424; box-shadow: 0 18px 50px rgba(0,0,0,.22); text-align: left; }
-.ai-studio-chat.has-messages { min-height: 320px; }
-.ai-studio-messages { max-height: 300px; overflow-y: auto; padding: 22px 22px 4px; scrollbar-width: thin; scrollbar-color: #515151 transparent; }
-.ai-studio-message { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; margin-bottom: 16px; }
-.ai-studio-message > span { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: #333; color: #aaa; font-size: 10px; font-weight: 700; }
-.ai-studio-message.assistant > span { background: #ececec; color: #181818; }
-.ai-studio-message p { margin: 2px 0 0; color: #d6d6d6; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
-.ai-studio-message.user p { color: #aaa; }
-.ai-studio-message.thinking p { display: flex; gap: 5px; padding-top: 7px; }
-.ai-studio-message.thinking i { width: 5px; height: 5px; border-radius: 50%; background: #aaa; animation: chat-thinking 1s ease-in-out infinite alternate; }
-.ai-studio-message.thinking i:nth-child(2) { animation-delay: .16s; }
-.ai-studio-message.thinking i:nth-child(3) { animation-delay: .32s; }
-.ai-studio-chat textarea { width: 100%; min-height: 96px; resize: none; display: block; box-sizing: border-box; padding: 19px 20px 8px; border: 0; outline: 0; background: transparent; color: #f2f2f2; font: inherit; font-size: 14px; line-height: 1.6; }
-.ai-studio-chat textarea::placeholder { color: #747474; }
-.ai-studio-chat-actions { min-height: 50px; display: flex; align-items: center; gap: 8px; padding: 5px 8px 9px 13px; }
-.ai-studio-prompts { display: flex; gap: 3px; }
-.ai-studio-prompts button, .ai-studio-send { width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: #848484; cursor: pointer; }
-.ai-studio-prompts button:hover:not(:disabled) { background: #303030; color: #ddd; }
-.ai-studio-prompts svg, .ai-studio-send svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.ai-studio-safety { margin-left: 4px; color: #696969; font-size: 11px; }
-.ai-studio-send { margin-left: auto; border-radius: 11px; background: #b7b7b7; color: #1e1e1e; transition: background-color .18s, transform .18s; }
-.ai-studio-send:hover:not(:disabled) { background: #f1f1f1; transform: translateY(-1px); }
-.ai-studio-send:disabled, .ai-studio-prompts button:disabled { opacity: .38; cursor: not-allowed; }
-.ai-studio-login-mask { position: absolute; z-index: 3; inset: 0; display: flex; align-items: center; justify-content: center; padding: 12px 20px; background: rgba(20,20,20,.36); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); text-align: center; }
-.ai-studio-login-mask > div { min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.ai-studio-lock { width: 32px; height: 32px; display: grid; place-items: center; margin-bottom: 7px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(255,255,255,.07); color: #ddd; }
-.ai-studio-lock svg { width: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; }
-.ai-studio-login-mask strong { color: #f4f4f4; font-size: 14px; }
-.ai-studio-login-mask p { margin: 4px 0 9px; color: #999; font-size: 11px; }
-.ai-studio-login-mask a { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; border-radius: 9px; background: #efefef; color: #151515; font-size: 12px; font-weight: 650; line-height: 1; text-decoration: none; }
-.ai-studio-error { margin: 12px auto 0; color: #ff8b8b; font-size: 12px; }
-@keyframes chat-thinking { to { opacity: .25; transform: translateY(-3px); } }
-@media (max-width: 767px) { .ai-studio-hero { width: min(100% - 28px, 920px); padding-top: 52px; } .ai-studio-brand { min-height: 42px; gap: 10px; padding: 0 14px; font-size: 22px; } .ai-studio-brand span { width: 18px; height: 18px; } .ai-studio-hero h1 { max-width: 560px; margin: 18px auto 12px; font-size: 21px; line-height: 1.42; letter-spacing: -.025em; } .ai-studio-proof-link { margin-bottom: 20px; } .ai-studio-safety { display: none; } .ai-studio-chat { border-radius: 15px; } }
-@media (prefers-reduced-motion: reduce) { .ai-studio-message.thinking i, .ai-studio-send { animation: none; transition: none; } }
-</style>

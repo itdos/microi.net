@@ -4,6 +4,21 @@ Microi吾码不是单一的后台管理模板。完整工程由低代码运行�
 
 官方主仓库同时维护 [GitHub](https://github.com/itdos/microi.net) 与 [Gitee](https://gitee.com/ITdos/microi.net)。本文按当前源码职责说明每个目录，帮助二次开发者先找到正确扩展点，再决定使用低代码配置、接口引擎、前端源码或后端模块。
 
+## 中大型应用不是高代码与低代码二选一
+
+中大型软件的长期优势通常来自**分层组合**：高频、标准化能力交给平台复用；差异化业务留给可测试的代码；底层性能、协议和安全边界继续由专业源码承担；AI 贯穿各层，但不替代架构、权限、测试与治理。
+
+| 开发层 | 最适合解决 | Microi吾码的承载方式 | 核心收益 |
+|---|---|---|---|
+| **可视化低代码** | 表单、CRUD、菜单、权限、流程、报表、常规工作台 | 表单 / 模块 / 界面 / 工作流 / 报表等成熟引擎 | 少造轮子，快速形成可运行基线 |
+| **V8 在线编程** | 业务校验、接口编排、事务事件、第三方集成、自动化 | 接口引擎、表单事件和平台原子能力 | 保留代码表达力，保存即生效，复用租户与权限上下文 |
+| **专业源码扩展** | 复杂交互、微服务、原生能力、高吞吐处理、协议与安全内核 | Vue / UniApp / .NET / SDK 与前端微服务 | 性能、体验与底层边界不受低代码天花板限制 |
+| **AI 协作与治理** | 结构理解、建模、生成、调试、测试、发布和回读 | VS Code / Codex / Copilot / Cursor / Claude + MCP + Skills | AI 获得真实上下文，并在同一套交付规则中工作 |
+
+这类组合在行业中通常称为 Fusion Development 或平台工程：微软强调低代码与 code-first 组件协同，AWS 的内部开发平台指南强调可复用服务与“黄金路径”，Spotify 也通过统一开发门户、模板和标准降低工程认知负担。Microi吾码的定位因此不是“用低代码替代专业开发”，而是**把低代码、V8、专业源码与 AI 组织成一条连续开发路径**。
+
+> 公开实践参考：[Microsoft Fusion Development](https://learn.microsoft.com/en-us/power-platform/developer/fusion-development) · [AWS Internal Developer Platform](https://docs.aws.amazon.com/prescriptive-guidance/latest/internal-developer-platform/introduction.html) · [Spotify Developer Platform](https://engineering.atspotify.com/2026/6/code-with-claude-coding-is-no-longer-the-constraint)
+
 ## 先判断应该改哪一层
 
 | 需求 | 首选实现位置 | 说明 |

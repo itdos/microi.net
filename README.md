@@ -4,7 +4,7 @@
 
 # Microi吾码
 
-<p><strong>典型业务场景，相比传统 AI 开发：</strong>Token 更省 10 倍+、交付更快 10 倍+、20+ 成熟引擎开箱复用；深度融合 V8 引擎，业务逻辑无需编译发布。</p>
+<p><strong>不只是开源 AI 低代码，更是企业级 AI 应用开发框架：</strong>可视化建模、V8 在线编程、.NET / Vue 源码扩展与 AI Agent 共用一条交付链。</p>
 
 <p><a href="https://blog.csdn.net/qq973702/article/details/163763831" target="_blank" rel="noopener noreferrer">阅读门头文章：为什么 AI 开发的 Token 和交付时间，能同时降一个数量级？ →</a></p>
 
@@ -15,7 +15,7 @@
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="./microi.doc/docs/public/images/readme/qq-group-51050055.png" alt="QQ 交流群 51050055" width="126" height="20" /></a>
 </p>
 
-开源 AI 低代码平台：`.NET 10 + Vue 3 + Redis`，以 V8 引擎连接 AI 编程、可视化建模与企业级交付。<br>
+开源 AI 应用开发平台：`.NET 10 + Vue 3 + Redis`，以 V8 引擎连接低代码建模、专业源码扩展与企业级交付。<br>
 支持 VS Code / Codex / Copilot / Cursor / Claude + MCP + Skills，本地或在线开发，保存即生效。
 
 [在线体验](https://microi.net/) · [快速开始](https://microi.net/doc/getting-started/start-use.html) · [完整文档](https://microi.net/doc/index.html) · [Docker 部署](https://microi.net/doc/getting-started/docker-run.html) · [Gitee](https://gitee.com/ITdos/microi.net) · [GitHub](https://github.com/itdos/microi.net)
@@ -111,7 +111,7 @@
 
 ## 📖 平台简介
 
-**Microi吾码** 是一款面向开发者的开源 AI 低代码平台，**低代码与 AI 编程深度融合**——VS Code 插件一键拉取业务代码与数据库结构，自动为 GitHub Copilot / Claude Code / Cursor 生成知识库，AI 不仅懂平台 API，更了解你的每一张表、每一个字段。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2025 年正式开源**。
+**Microi吾码** 是面向中大型企业应用的**开源 AI 应用开发平台与开发框架**。它保留低代码快速建模的效率，同时通过 V8 在线编程、前端微服务和 .NET / Vue 源码扩展覆盖差异化与深层开发；VS Code 插件、MCP 与 Skills 会把平台 API、业务代码和数据库结构交给 AI，使低代码开发者、专业开发者与 AI Agent 在同一套工程和治理体系中协作。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2025 年正式开源**。
 
 强大的 [**API 接口引擎**](https://microi.net/doc/v8-engine/api-engine)，在线使用 JavaScript 编写后端 API 接口，支持[**在线 AI 编程**](https://microi.net/doc/v8-engine/ai-apiengine)与[**本地 AI 编程（VS Code 插件）**](https://microi.net/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件)。
 
