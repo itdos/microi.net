@@ -116,7 +116,7 @@
 
 <script>
 import appConfig from '@/config.js'
-import { getToken, getUser } from '@/utils/request.js'
+import { getToken, getUser, removeToken } from '@/utils/request.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
 import { themeMixin } from '@/utils/theme.js'
 import {
@@ -229,10 +229,21 @@ export default {
     warmPrimaryTabs(80)
   },
   onShow() {
-    this.currentUser = getUser() || {}
-    this.isLoggedIn = !!getToken()
-    if (this.isLoggedIn && this.featureEnabled('business')) this.loadSummary()
-    if (this.isLoggedIn && this.featureEnabled('dynamicModules')) this.loadRuntimeModules()
+    const token = getToken()
+    const currentUser = getUser() || {}
+    this.isLoggedIn = !!token && !!currentUser.Id
+    this.currentUser = this.isLoggedIn ? currentUser : {}
+    if (!this.isLoggedIn) {
+      if (token) removeToken()
+      // Tab 页面退出登录后不会销毁；主动失效旧请求并清空仍留在实例内的登录态数据。
+      this.summaryRequestId += 1
+      this.summaryLoading = false
+      this.summary = { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 }
+      this.runtimeBusinessGroups = []
+      return
+    }
+    if (this.featureEnabled('business')) this.loadSummary()
+    if (this.featureEnabled('dynamicModules')) this.loadRuntimeModules()
   },
   methods: {
     featureEnabled(name) {

@@ -7,7 +7,11 @@
         <view class="nav-icon nav-icon--placeholder" aria-hidden="true"></view>
       </view>
 
-      <view class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
+      <view class="search-row" :class="{ 'search-row--simple': !filterFields.length, 'search-row--map': key === 'customers' }">
+        <view v-if="key === 'customers'" class="customer-map-entry" hover-class="customer-map-entry--pressed" @tap="openCustomerMap">
+          <image src="/static/xjy/business/customerMap.png" mode="aspectFit" />
+          <text>客户地图</text>
+        </view>
         <view class="search-input-wrap">
           <input
             v-model="keyword"
@@ -423,6 +427,21 @@ export default {
     this.clearRestrictedLookup()
   },
   methods: {
+    openCustomerMap() {
+      const sort = this.selectedSort()
+      const filters = {
+        fromList: true,
+        menuId: this.menuId,
+        keyword: this.keyword.trim(),
+        period: this.period,
+        customRange: this.customStart && this.customEnd ? [`${this.customStart} 00:00:00`, `${this.customEnd} 23:59:59`] : null,
+        status: this.status,
+        orderBy: sort.field,
+        orderType: sort.order,
+        extraWhere: this.buildFilterWhere()
+      }
+      uni.navigateTo({ url: `/pages/task/map?mode=customer&filters=${encodeURIComponent(JSON.stringify(filters))}` })
+    },
     isProposalSelected(row) {
       return this.proposalSelection.some((item) => String(item.Id) === String(row.Id))
     },
@@ -1247,7 +1266,26 @@ export default {
 }
 
 .search-row--simple { grid-template-columns: minmax(0, 1fr) auto; }
+.search-row--map { grid-template-columns: 72rpx minmax(0, 1fr) auto auto; }
+.search-row--simple.search-row--map { grid-template-columns: 72rpx minmax(0, 1fr) auto; }
 .search-input-wrap { position: relative; min-width: 0; }
+
+.customer-map-entry {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 72rpx;
+  height: 72rpx;
+  border: 1rpx solid #dce8ed;
+  border-radius: 12rpx;
+  background: #fff;
+  transition: transform 150ms ease, background-color 150ms ease;
+}
+.customer-map-entry image { width: 34rpx; height: 34rpx; }
+.customer-map-entry text { margin-top: 1rpx; color: #087da8; font-size: 16rpx; font-weight: 650; line-height: 19rpx; white-space: nowrap; }
+.customer-map-entry--pressed { transform: scale(.94); background: #eef8fb; }
 
 .filter-button {
   position: relative;
