@@ -336,6 +336,14 @@ export default {
                 return "top";
             }
             if (field) {
+                // 字段级配置优先于组件默认值。代码编辑器、子表等重型组件
+                // 仍默认置顶，但用户显式选择 left/right 时必须尊重配置。
+                if (!self.DiyCommon.IsNull(field.FormLabelPosition)) {
+                    var fieldPosition = String(field.FormLabelPosition).toLowerCase();
+                    if (["left", "right", "top"].includes(fieldPosition)) {
+                        return fieldPosition;
+                    }
+                }
                 if (field.Component == "CodeEditor"
                     || field.Component == "JsonTable"
                     || field.Component == "RichText"

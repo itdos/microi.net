@@ -35,7 +35,7 @@ description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、Ap
 - 嵌套调用不重复占用全局/租户并发名额，同一调用树重入同 Key 也不会自锁；不同子接口 Key 仍受自己的 Key 并发门保护。
 - `V8.Limits` 可读取本片有效预算和当前深度。异常优先检查 `DataAppend.V8Limit.Code`，不要看到“2GB”就判断服务器真实吃满 2GB。
 - 后台任务使用同一执行引擎。总任务可以运行数小时，但单片仍受 `Timeout/MaxStatements/LimitMemory` 约束；超过 10 分钟必须返回 `HasMore + Checkpoint` 分片续跑，不能只把 `Timeout` 调到 1800/3600。
-- 只有业务明确要求整条链在一个共享数据库事务中原子提交/回滚、且分片会改变业务语义时，才允许开启接口引擎的 `V8Unlimited`。它仅解除当前 Jint Engine 的超时、语句、函数递归、累计分配和 Promise 固定等待限制；常驻内存保护、取消令牌、并发、接口嵌套深度、权限沙箱及数据库限制仍保留。下游接口和表后端事件不继承，需分别评估并开启。
+- 接口引擎使用正向 `V8Limit`：默认 `0/false`，不设置当前 Jint Engine 的单次超时、语句、函数递归、累计分配和 Promise 固定等待预算；只有 `1/true` 才应用 `Timeout/MaxStatements/LimitMemory/LimitRecursion`。常驻内存保护、取消令牌、并发、接口嵌套深度、权限沙箱及数据库限制在两种状态下都保留。老 `V8Unlimited` 只作协议兼容；MCP/Manifest 新配置统一写 `v8Limit`。
 
 ### 通用实时事件（SignalR）
 
@@ -264,7 +264,7 @@ return { Code: 1, Data: { Upstream: resp.Content, Summary: summary.Data } };
 - [ ] 是否没有使用 `setTimeout` / `Task.Run` 承担请求外后台任务？
 - [ ] 大任务是否按阈值主动使用后台任务，超过 10 分钟是否有 `HasMore + Checkpoint`？
 - [ ] 是否区分累计分配、调用树预算、JS递归与接口嵌套，而不是盲目抬高全部限制？
-- [ ] 若开启 `V8Unlimited`，是否有不可分片的单事务依据，并已评估数据库锁、日志、回滚、并发与节点故障重试？
+- [ ] 是否确认 `V8Limit=false` 表示接口不限 Jint 单次预算、`true` 才启用限制，并避免继续写入旧 `V8Unlimited` 字段？
 - [ ] 保存后是否通过稳定路径 `/apiengine/{key}` + `osclient` Header 做过 HTTP 复测？特殊 GET/HEAD 路径是否仅用于无法设置 Header/Form/Query 的场景？
 
 ## 常见错误

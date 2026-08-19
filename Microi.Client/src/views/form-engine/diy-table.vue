@@ -2077,6 +2077,7 @@ import DiyTableSpecialCell from "@/views/form-engine/diy-components/DiyTableSpec
 import DiySearch from "@/views/form-engine/diy-search.vue";
 import DiyModleSearch from "@/views/form-engine/diy-mobile-search.vue";
 import { getFieldConfig, isSpecialTableField } from "@/views/form-engine/utils/table-special-field";
+import { scheduleTableInit } from "@/views/form-engine/utils/diy-table-init.js";
 import { resolveTabIcon } from "@/utils/tab-icon.js";
 export default {
     name: "DiyTableRowlist",
@@ -2239,6 +2240,9 @@ export default {
         }
     },
     methods: {
+        ScheduleInit(...args) {
+            return scheduleTableInit(this, args);
+        },
         ResolveTabIcon(icon, index) {
             return resolveTabIcon(icon, index);
         },

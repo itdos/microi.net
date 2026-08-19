@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "模块引擎",
-    "Version": "v6.9.6",
+    "Version": "v7.4.6",
     "CreateTime": "2026-08-08T06:31:30.327Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -2929,6 +2929,18 @@
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 32
+    },
+    {
+      "TABLE_NAME": "sys_apiengine",
+      "COLUMN_NAME": "V8Limit",
+      "COLUMN_TYPE": "int(11)",
+      "DATA_TYPE": "int",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": "0",
+      "COLUMN_COMMENT": "V8运行限制",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 33
     },
     {
       "TABLE_NAME": "wf_line",

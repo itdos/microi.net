@@ -25,6 +25,7 @@ import { applyLegacySysMenuConfigFallback } from "./sys-menu-legacy-compat.js";
 import { prepareCodeEditorTransport } from "./code-editor-transport.js";
 import { decodeLegacyDiyFieldSources } from "./field-source-codec.js";
 import { normalizeTableChildFieldRelations } from "./table-child-relations.js";
+import { normalizeFormSwitchValue } from "./form-switch-value.js";
 import { createPlatformNotificationApi } from "./platform-notification.js";
 import {
     hasAuthorizationIdentityChanged,
@@ -3472,7 +3473,7 @@ var DiyCommon = {
             valueType: "number",
             defaultValue: 0,
             process: function(field, formData, ctx) {
-                return formData && formData[field.Name] ? 1 : 0;
+                return normalizeFormSwitchValue(formData && formData[field.Name]);
             }
         },
         
@@ -3637,6 +3638,8 @@ var DiyCommon = {
         }
         return handler.defaultValue;
     },
+
+    NormalizeFormSwitchValue: normalizeFormSwitchValue,
     
     /**
      * 获取字段JSON值（内部方法）

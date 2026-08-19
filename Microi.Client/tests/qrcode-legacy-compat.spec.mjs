@@ -76,3 +76,15 @@ test("Qrcode field is a real renderer and main installs the compatibility bridge
     assert.doesNotMatch(fieldComponent, /QrCodeGenerator 组件已注释/);
     assert.match(main, /installLegacyQrCodeDownload\(window/);
 });
+
+test("official docs and form-engine skill explain the runtime QR payload", () => {
+    const docs = read("../microi.doc/docs/doc/form-engine/all-form-component.md");
+    const skill = read("../microi.skills/microi-form-engine/references/component-catalog.md");
+
+    for (const source of [docs, skill]) {
+        assert.match(source, /DataAppend\.Code/);
+        assert.match(source, /V8\.FieldSet\('Qrcode116', 'DataAppend'/);
+        assert.match(source, /IsVirtual=1/);
+        assert.match(source, /V8\.LoadMode !== 'Design'/);
+    }
+});

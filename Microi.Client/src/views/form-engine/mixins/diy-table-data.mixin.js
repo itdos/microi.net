@@ -3,10 +3,13 @@ import { markRaw } from "vue";
 import { debounce } from "lodash";
 import {
     appendWhereList,
+    buildSearchWhere,
     cloneWhereItem,
     cloneWhereList,
     composeTableWhere,
-    mergeWhereList
+    hasSearchFilterValue,
+    mergeWhereList,
+    whereListHasField
 } from "../utils/diy-table-where.js";
 
 export default {
@@ -25,6 +28,9 @@ export default {
         },
         composeTableWhere(requestWhere, runtimeWhere, fixedWhere) {
             return composeTableWhere(requestWhere, runtimeWhere, fixedWhere);
+        },
+        buildSearchWhere(searchEqual, searchCheckbox) {
+            return buildSearchWhere(searchEqual, searchCheckbox);
         },
         IsDiyTableTreeLazy() {
             var model = this.CurrentDiyTableModel || {};
@@ -759,6 +765,7 @@ export default {
             if (!self.DiyCommon.IsNull(self.TableChildFkFieldName)) {
                 // param[self.TableChildFkFieldName] = self.TableChildFkValue;
                 //2021-10-25 新增：如果是传过来的父级formModel，以这个为准
+                var relationValue;
                 if (!self.DiyCommon.IsNull(self.FatherFormModel_Data)) {
                     // if (!self.DiyCommon.IsNull(self.FatherFormModel.Id)) {
                     // self.SearchModel[self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
@@ -766,14 +773,21 @@ export default {
                     //2022-02-14 关联表修改为等值条件
                     //2022-07-23新增也可能不跟主表的Id进行关联
                     if (self.PrimaryTableFieldName) {
-                        self.SearchEqual[self.TableChildFkFieldName] = self.FatherFormModel_Data[self.PrimaryTableFieldName];
+                        relationValue = self.FatherFormModel_Data[self.PrimaryTableFieldName];
                     } else {
-                        self.SearchEqual[self.TableChildFkFieldName] = self.FatherFormModel_Data.Id;
+                        relationValue = self.FatherFormModel_Data.Id;
                     }
                 } else {
                     // self.SearchModel[self.TableChildFkFieldName] = self.TableChildTableRowId;
                     //2022-02-14 关联表修改为等值条件
-                    self.SearchEqual[self.TableChildFkFieldName] = self.TableChildTableRowId;
+                    relationValue = self.TableChildTableRowId;
+                }
+                if (whereListHasField(param._Where, self.TableChildFkFieldName)) {
+                    delete self.SearchEqual[self.TableChildFkFieldName];
+                } else if (hasSearchFilterValue(relationValue)) {
+                    self.SearchEqual[self.TableChildFkFieldName] = relationValue;
+                } else {
+                    delete self.SearchEqual[self.TableChildFkFieldName];
                 }
             }
 
@@ -810,11 +824,9 @@ export default {
             if (self.SearchModel && !_u.isEqual(self.SearchModel, {})) {
                 param._Search = self.SearchModel;
             }
-            if (self.SearchEqual && !_u.isEqual(self.SearchEqual, {})) {
-                param._SearchEqual = self.SearchEqual;
-            }
-            if (self.SearchCheckbox && !_u.isEqual(self.SearchCheckbox, {})) {
-                param._SearchCheckbox = self.SearchCheckbox;
+            var exactSearchWhere = buildSearchWhere(self.SearchEqual, self.SearchCheckbox);
+            if (exactSearchWhere.length > 0) {
+                param._Where = appendWhereList(param._Where, exactSearchWhere);
             }
             if (self.SearchDateTime && !_u.isEqual(self.SearchDateTime, {})) {
                 param._SearchDateTime = self.SearchDateTime;

@@ -167,6 +167,10 @@ V8.OpenDialog({
 
 按钮应设置稳定 `Id`、`ShowRow:true`、`Icon:"fas fa-key"`。前端显隐只改善体验，创建、查询、吊销等接口仍必须在服务端重新校验普通登录会话以及本人/平台管理员权限。
 
+复杂策略编辑器（例如角色 AI 数据权限）应把行按钮持久化到菜单 `MoreBtns`，按钮只通过
+`V8.OpenDialog({ ComponentName, DataAppend })` 打开已注册的 Vue 组件。验收需同时回读菜单按钮 JSON、
+确认组件进入生产构建，并在真实列表行打开弹层；只保留旧定制页面里的按钮不算低代码菜单已迁移。
+
 <!-- /microi-progressive:chunk -->
 ## 详细参考路由（渐进披露）
 

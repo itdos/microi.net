@@ -64,7 +64,7 @@
 | `TableChild` | 主表内嵌 0..N 条明细列表 | 独立子表、子表真实外键、隐藏子菜单、回查索引 |
 | `Map` | 点位 | `varchar(200)`/`mediumtext`，明确坐标格式 |
 | `MapArea` | 区域 | `mediumtext`，限制点数/体积 |
-| `Qrcode` | 二维码展示 | `varchar(500)` |
+| `Qrcode` | 二维码卡片展示 | 优先 `IsVirtual=1`；扫码原文另存普通 `varchar` 字段 |
 | `FontAwesome` | 图标选择 | `varchar(200)` |
 | `DevComponent` | 主前端定制 Vue 控件 | 仅用于长期复用且标准控件无法满足的场景 |
 
@@ -79,6 +79,35 @@
   `order_detail.OrderId`。不得创建主表 `DetailId` 后用 `JoinForm` 冒充明细。
 - 生成前先问“一个父记录最多有几条目标记录”：答案可能大于 1 就选 `TableChild`；只有
   明确恰好一个目标 Id 且需要嵌入完整目标表单时才选 `JoinForm`。不确定时先询问，不写入。
+
+### `Qrcode` 的数据契约
+
+- 字段 `Config.Qrcode` 只保存 `DisplayWidth`、`ShowDownload`、`DownloadText` 等外观项，
+  不指定扫码内容。表单运行态必须通过
+  `V8.FieldSet('<字段名>', 'DataAppend', payload)` 提供数据。
+- `payload.Code` 为必填扫码原文，兼容小写 `code`；可选 `title`、`titleValue`、
+  `fields:[{Label,Value}]`（或旧版 `DataConfig:[{label,key}]`）、`Color`、
+  `CardColor`、`FileName/fileName`、`createTime`。
+- 在 `InFormV8` 中设置时必须跳过 `V8.LoadMode === 'Design'`，否则设计器保存可能把
+  运行态 `DataAppend` 固化到字段模型。
+- 表单控件会生成 PNG Data URL 并回写控件值以兼容旧页面。纯展示字段优先设
+  `IsVirtual=1`；若历史表已有物理字段，则通过 `V8.NotSaveField` 排除保存。不要把 Base64
+  图片写入短 `varchar`。需要持久化时保存原始 URL/编号，再把它传给 `Code`。
+- 列表二维码列直接渲染原始字段值；表单二维码卡片读取 `DataAppend.Code`，两种场景不得
+  混为同一输入协议。
+- 二维码中的 URL 仍需服务端鉴权，不得嵌入 DiyToken、访问密钥或长期业务秘密。
+
+```js
+if (V8.LoadMode !== 'Design') {
+  V8.FieldSet('Qrcode116', 'DataAppend', {
+    Code: V8.Form.OrderNo || V8.Form.Id || 'https://microi.net',
+    title: '订单二维码',
+    titleValue: V8.Form.OrderNo || '',
+    fields: [{ Label: '客户：', Value: V8.Form.CustomerName || '' }],
+    FileName: '订单-' + (V8.Form.OrderNo || '二维码')
+  });
+}
+```
 
 ## 官网历史名称
 
@@ -104,6 +133,7 @@
 | JoinForm | `JoinForm.TableId`、`JoinForm.TableName`、`JoinForm.JoinFieldName`、`JoinForm.FormMode`、`JoinForm.Id`、`JoinForm._SearchEqual` |
 | TableChild | Config 根节点的 `TableChildTableId`、`TableChildSysMenuId`、`TableChildFkFieldName`；`TableChild.PrimaryTableFieldName`（默认 `Id`）及分页/导入选项 |
 | ImgUpload | `ImgUpload.Multiple`；导出时会按最大图片数展开列 |
+| Qrcode | `Qrcode.DisplayWidth`、`Qrcode.ShowDownload`、`Qrcode.DownloadText`；扫码内容使用运行态 `DataAppend.Code` |
 
 其余选择、树、上传、关联和布局选项以当前字段设计器和
 `microi-db-schema/references/form-component-options.md` 为事实源；不要凭旧截图

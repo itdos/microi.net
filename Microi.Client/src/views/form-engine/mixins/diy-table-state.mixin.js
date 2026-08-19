@@ -391,29 +391,29 @@ export default {
     },
     watch: {
         PropsWhere(newVal, oldVal) {
-            if (!_u.isEqual(newVal, oldVal)) this.Init();
+            if (!_u.isEqual(newVal, oldVal)) this.ScheduleInit();
         },
         ParentFormLoadFinish(newVal) {
-            if (newVal === true) this.Init();
+            if (newVal === true) this.ScheduleInit();
         },
         TableChildSysMenuId() {
-            if (this.ParentFormLoadFinish !== false) this.Init();
+            if (this.ParentFormLoadFinish !== false) this.ScheduleInit();
         },
         TableChildFkFieldName() {
-            if (this.ParentFormLoadFinish !== false) this.Init();
+            if (this.ParentFormLoadFinish !== false) this.ScheduleInit();
         },
         PrimaryTableFieldName() {
-            if (this.ParentFormLoadFinish !== false) this.Init();
+            if (this.ParentFormLoadFinish !== false) this.ScheduleInit();
         },
         // 2025-10-29 liucheng新增：监听PropsSysMenuId和PropsTableId的变化，确保OpenTable模式下正确初始化
         PropsSysMenuId() {
-            if (this.ParentFormLoadFinish !== false) this.Init();
+            if (this.ParentFormLoadFinish !== false) this.ScheduleInit();
         },
         PropsTableId() {
-            if (this.ParentFormLoadFinish !== false) this.Init();
+            if (this.ParentFormLoadFinish !== false) this.ScheduleInit();
         },
         PropsModuleEngineKey() {
-            if (this.ParentFormLoadFinish !== false) this.Init();
+            if (this.ParentFormLoadFinish !== false) this.ScheduleInit();
         },
 
         // TableChildFkValue: function (newVal, oldVal) {
@@ -454,7 +454,7 @@ export default {
             //2022-07-13注释
             if (self.ParentFormLoadFinish !== false) {
                 //如果主表重新打开了其它的rowModel，Field-Form的TableChildTableRowId会变，这里监控到需要重新加载数据
-                self.Init();
+                self.ScheduleInit();
             }
         },
         FatherFormModel: function (newVal, oldVal) {

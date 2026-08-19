@@ -40,6 +40,23 @@ namespace Microi.net.Api
             return Encoding.UTF8.GetString(Convert.FromBase64String(codeBase64));
         }
 
+        private static int? ResolveRequestedV8Limit(JObject param)
+        {
+            var v8Limit = param?["V8Limit"] ?? param?["v8Limit"];
+            if (v8Limit != null)
+            {
+                return v8Limit.Val<int>() == 1 ? 1 : 0;
+            }
+            // Backward-compatible transport alias. Legacy V8Unlimited=true means
+            // the new positive V8Limit switch is off.
+            var v8Unlimited = param?["V8Unlimited"] ?? param?["v8Unlimited"];
+            if (v8Unlimited != null)
+            {
+                return v8Unlimited.Val<int>() == 1 ? 0 : 1;
+            }
+            return null;
+        }
+
         private static int IntOrDefault(JObject param, string name, int defaultValue)
         {
             var token = param?[name];
@@ -153,7 +170,7 @@ namespace Microi.net.Api
                 osClient, apiEngineKey, code,
                 param.Value<string>("Version"),
                 param.Value<string>("ChangeHistory") ?? param.Value<string>("ChangeSummary"),
-                param["V8Unlimited"]?.Val<int?>(),
+                ResolveRequestedV8Limit(param),
                 hasCodePayload);
             return Ok(result);
         }
@@ -188,7 +205,7 @@ namespace Microi.net.Api
                 param["IsEnable"]?.Val<int>() ?? 1, param["Category"].Val<string>(), code,
                 param.Value<string>("Version"),
                 param.Value<string>("ChangeHistory") ?? param.Value<string>("ChangeSummary"),
-                param["V8Unlimited"]?.Val<int?>() == 1 ? 1 : 0);
+                ResolveRequestedV8Limit(param));
             return Ok(result);
         }
 

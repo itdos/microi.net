@@ -86,6 +86,7 @@ const DiyCodeEditor = defineAsyncComponent(() => import("@/views/form-engine/diy
 const PrintEngineView = defineAsyncComponent(() => import("@/views/print-engine/renderer.vue"));
 const OpenIframe = defineAsyncComponent(() => import("@/views/page-engine/dialogiframe.vue"));
 const UserAccessKeyPanel = defineAsyncComponent(() => import("@/views/system/components/user-access-key-panel.vue"));
+const SysroleAiPolicyPanel = defineAsyncComponent(() => import("@/views/system/components/sysrole-ai-policy-panel.vue"));
 
 // ==================== DIY组件（diy-components）====================
 const DiyLoadNonDiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-components/DiyLoadNonDiyTable.vue"));
@@ -198,6 +199,7 @@ function RegMicroiComponents(app) {
     app.component("DiyCodeEditor", DiyCodeEditor);
     app.component("PrintEngineView", PrintEngineView);
     app.component("UserAccessKeyPanel", UserAccessKeyPanel);
+    app.component("SysroleAiPolicyPanel", SysroleAiPolicyPanel);
     // 兼容历史 V8 弹窗入口；打印场景在组件内转交当前内置打印引擎。
     app.component("OpenIframe", OpenIframe);
 
@@ -265,6 +267,7 @@ export {
     DiyCustomDialog,
     MicroAppDialog,
     UserAccessKeyPanel,
+    SysroleAiPolicyPanel,
     Fontawesome,
     DiyCodeEditor,
     DiyLoadNonDiyTable

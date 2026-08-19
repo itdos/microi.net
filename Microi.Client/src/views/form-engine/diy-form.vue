@@ -141,11 +141,14 @@
                                             <template #label>
                                                 <span class="diy-field-label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                                                     <span class="diy-field-label__text">{{ GetFormItemLabel(field) }}</span>
-                                                    <small
+                                                    <el-tooltip
                                                         v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) === 'top'"
-                                                        class="diy-field-description diy-field-description--inline"
-                                                        :title="field.Description"
-                                                    >{{ field.Description }}</small>
+                                                        :content="field.Description"
+                                                        placement="top"
+                                                        :show-after="300"
+                                                    >
+                                                        <small class="diy-field-description diy-field-description--inline">{{ field.Description }}</small>
+                                                    </el-tooltip>
                                                 </span>
                                             </template>
                                             <!--通用组件渲染-->
@@ -189,11 +192,14 @@
                                                 @CallbackFieldTabsChange="handleFieldTabsChange"
                                             />
                                         </el-form-item>
-                                        <small
+                                        <el-tooltip
                                             v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) !== 'top'"
-                                            class="diy-field-description diy-field-description--below"
-                                            :title="field.Description"
-                                        >{{ field.Description }}</small>
+                                            :content="field.Description"
+                                            placement="top"
+                                            :show-after="300"
+                                        >
+                                            <small class="diy-field-description diy-field-description--below">{{ field.Description }}</small>
+                                        </el-tooltip>
                                     </div>
                                     </el-col>
                                 </template>
@@ -227,11 +233,14 @@
                                             <template #label>
                                                 <span class="diy-field-label" :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
                                                     <span class="diy-field-label__text">{{ GetFormItemLabel(field) }}</span>
-                                                    <small
+                                                    <el-tooltip
                                                         v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) === 'top'"
-                                                        class="diy-field-description diy-field-description--inline"
-                                                        :title="field.Description"
-                                                    >{{ field.Description }}</small>
+                                                        :content="field.Description"
+                                                        placement="top"
+                                                        :show-after="300"
+                                                    >
+                                                        <small class="diy-field-description diy-field-description--inline">{{ field.Description }}</small>
+                                                    </el-tooltip>
                                                 </span>
                                             </template>
                                             <!--通用组件渲染-->
@@ -276,11 +285,14 @@
                                                 @CallbackFieldTabsChange="handleFieldTabsChange"
                                             />
                                         </el-form-item>
-                                        <small
+                                        <el-tooltip
                                             v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) !== 'top'"
-                                            class="diy-field-description diy-field-description--below"
-                                            :title="field.Description"
-                                        >{{ field.Description }}</small>
+                                            :content="field.Description"
+                                            placement="top"
+                                            :show-after="300"
+                                        >
+                                            <small class="diy-field-description diy-field-description--below">{{ field.Description }}</small>
+                                        </el-tooltip>
                                     </div>
                                 </el-col>
                             </el-row>
@@ -1355,7 +1367,9 @@ export default {
                             //处理字段默认值
                             self.DiyFieldList.forEach((field) => {
                                 if (field.DefaultValue && self.FormMode == "Add") {
-                                    if (field.DefaultValue[0] == "{" || field.DefaultValue[0] == "[") {
+                                    if (field.Component === "Switch") {
+                                        self.FormSet(field.Name, self.DiyCommon.NormalizeFormSwitchValue(field.DefaultValue));
+                                    } else if (field.DefaultValue[0] == "{" || field.DefaultValue[0] == "[") {
                                         self.FormSet(field.Name, JSON.parse(field.DefaultValue));
                                     } else {
                                         self.FormSet(field.Name, field.DefaultValue);

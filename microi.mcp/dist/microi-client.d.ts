@@ -293,6 +293,8 @@ export interface ApiEngine {
     Code?: string;
     ApiRemark?: string;
     Description?: string;
+    V8Limit?: number;
+    /** @deprecated Compatibility alias returned by older servers. Prefer V8Limit. */
     V8Unlimited?: number;
     Version?: string;
     ChangeHistory?: string;
@@ -567,8 +569,12 @@ export declare class MicroiClient {
         functionDescription?: string;
         changeSummary?: string;
         confirmLargeReduction?: boolean;
+        v8Limit?: boolean;
+        /** @deprecated Compatibility alias. true maps to v8Limit=false. */
         v8Unlimited?: boolean;
     }): Promise<ApiResponse>;
+    updateEngineRuntimeLimit(apiEngineKey: string, v8Limit: boolean): Promise<ApiResponse>;
+    /** @deprecated Use updateEngineRuntimeLimit with positive semantics. */
     updateEngineRuntimeConfig(apiEngineKey: string, v8Unlimited: boolean): Promise<ApiResponse>;
     createEngine(data: {
         ApiEngineKey: string;
@@ -576,6 +582,8 @@ export declare class MicroiClient {
         Category?: string;
         Code?: string;
         ApiAddress?: string;
+        V8Limit?: number;
+        /** @deprecated Compatibility alias. true maps to V8Limit=0. */
         V8Unlimited?: number;
         functionDescription?: string;
         changeSummary?: string;

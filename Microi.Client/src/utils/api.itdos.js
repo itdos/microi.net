@@ -17,6 +17,7 @@ var DiyApi = {
         GetFormData: "/api/FormEngine/GetFormData",
         GetFormDataAnonymous: "/api/FormEngine/GetFormDataAnonymous",
         GetTableData: "/api/FormEngine/GetTableData",
+        GetTableTree: "/api/FormEngine/GetTableDataTree",
         AddFormData: "/api/FormEngine/AddFormData",
         AddFormDataBatch: "/api/FormEngine/AddFormDataBatch",
         UptFormData: "/api/FormEngine/UptFormData",

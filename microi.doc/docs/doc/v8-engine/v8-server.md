@@ -284,13 +284,17 @@ console.log(JSON.stringify(V8.Limits));
 
 后台任务仍通过接口引擎执行，所以**一个未分片的 30 分钟脚本仍会受同一套单片超时、语句和累计分配预算约束**。后台任务的总时长可以是数小时，但每片应控制在默认 600 秒以内，在提交本片事务后返回 `HasMore + Checkpoint`，由 Worker 创建新的执行片段继续；新片会获得新的超时、语句和累计分配预算。
 
-### 必须保持单一事务时的受控例外
+### 接口引擎的“V8运行限制”
 
-如果每片可以独立提交并以幂等键恢复，仍应使用后台任务的 `HasMore + Checkpoint`。但有些业务链必须满足“上万条读写和全部下游调用要么一起提交、要么一起回滚”，任何中间提交都会破坏业务原子性；此时可以在接口引擎表单开启 `V8无运行限制`。若复杂逻辑位于表的 `SubmitBeforeServerV8`、`SubmitAfterServerV8` 或 `ServerDataV8`，则在对应 `diy_table` 表单开启同名开关。
+接口引擎使用正向开关 `sys_apiengine.V8Limit`，表单显示名称为 `V8运行限制`：
 
-该开关只解除**当前 Jint Engine** 的执行超时、最大语句数、JavaScript 函数递归和累计分配预算，并同时取消 Promise 的固定等待时限。它不是“关闭平台安全”：进程/容器常驻内存保护、HTTP 断开与后台任务取消、节点停机取消、执行并发、接口嵌套深度、CLR 类型沙箱、租户权限、SQL/ORM/HTTP/文件限制仍然生效。接口调用的下游接口以及触发的表后端事件分别读取自己的开关，不会继承上游设置。
+- 默认关闭（`0`）：不为该接口设置 Jint 单次执行超时、最大语句数、JavaScript 函数递归和累计分配预算，同时取消 Promise 的固定等待时限；
+- 打开（`1`）：按 `Timeout / MaxStatements / LimitMemory / LimitRecursion` 配置执行限制，并在表单中显示这些配置项；
+- 老字段 `sys_apiengine.V8Unlimited` 仅作滚动升级兼容，新的表单、MCP 和 Manifest 均使用 `V8Limit/v8Limit`。
 
-开启后表单会隐藏 `Timeout / MaxStatements / LimitMemory / LimitRecursion`，已有值仍保留，关闭开关后重新显示并继续生效。建议同时满足以下条件：
+无论开关状态如何，进程/容器常驻内存保护、HTTP 断开与后台任务取消、节点停机取消、执行并发、接口嵌套深度、CLR 类型沙箱、租户权限、SQL/ORM/HTTP/文件限制都始终生效。接口调用的下游接口分别读取自己的 `V8Limit`，不会继承上游设置。
+
+若复杂逻辑位于表的 `SubmitBeforeServerV8`、`SubmitAfterServerV8` 或 `ServerDataV8`，仍使用 `diy_table.V8Unlimited`：只有事件链必须保持一个事务且无法安全分片时才开启。建议同时满足以下条件：
 
 - 由后台任务承载，避免依赖长时间浏览器连接；
 - 已评估数据库长事务的锁等待、事务日志/Undo、回滚耗时和连接超时；
@@ -1907,7 +1911,7 @@ WFNodeStart：流程节点开始V8事件
 
 常见上下文包括 `V8.Param`、`V8.Header`、`V8.CurrentUser`、`V8.OsClient`、`V8.Form`、`V8.OldForm`、`V8.TableModel`、`V8.TableData`、`V8.FormSubmitAction`、`V8.EventName`、`V8.InvokeType`、`V8.RowIndex`、`V8.CacheData`、`V8.NotSaveField`、`V8.LineValue`、`V8.NextNodeId`、`V8.FilesByteBase64` 和 `V8.WF`。`Engine`、`HttpContext`、执行租约等宿主对象属于内部实现，不要保存到静态变量、缓存或延迟回调。
 
-平台的 `SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 以及 V8 并发门共同限制单次脚本和单节点资源。V8 的默认/最大超时、语句数、单层累计分配、调用树累计分配、JavaScript 递归、接口嵌套深度和并发等待可在 `sys_config` 的开发配置中查看；单个接口可用 `sys_apiengine.Timeout/MaxStatements/LimitMemory/LimitRecursion` 下调或在节点硬上限内覆盖。只有确实不能分片且必须保持单一事务的受控逻辑才开启 `sys_apiengine.V8Unlimited`；表后端事件使用 `diy_table.V8Unlimited`。进程内并发门不是集群级配额或分布式锁；多节点副作用仍必须依赖 Redis/数据库租约、幂等键、唯一约束、状态机或 outbox/inbox。
+平台的 `SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 以及 V8 并发门共同保护单次脚本和单节点资源。V8 的默认/最大超时、语句数、单层累计分配、调用树累计分配、JavaScript 递归、接口嵌套深度和并发等待可在 `sys_config` 的开发配置中查看；接口引擎默认 `sys_apiengine.V8Limit=0`，不设置 Jint 单次预算，只有打开 `V8运行限制` 后才应用 `Timeout/MaxStatements/LimitMemory/LimitRecursion`。表后端事件继续使用 `diy_table.V8Unlimited` 作为受控例外。进程内并发门不是集群级配额或分布式锁；多节点副作用仍必须依赖 Redis/数据库租约、幂等键、唯一约束、状态机或 outbox/inbox。
 
 脚本应主动控制：
 
