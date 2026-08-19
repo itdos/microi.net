@@ -199,8 +199,15 @@ export default {
     })
   },
   onShow() {
-    this.isLoggedIn = !!getToken()
-    this.currentUser = getUser() || {}
+    const token = getToken()
+    const currentUser = getUser() || {}
+    this.isLoggedIn = !!token && !!currentUser.Id
+    this.currentUser = this.isLoggedIn ? currentUser : {}
+    if (!this.isLoggedIn) {
+      if (token) removeToken()
+      this.summary = { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 }
+      this.summaryLoading = false
+    }
     this.resolveAvatar()
     if (this.isLoggedIn) this.loadSummary()
   },

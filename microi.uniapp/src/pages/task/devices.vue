@@ -169,7 +169,8 @@ export default {
     },
     openMap() {
       const type = this.taskType || this.task.type || ''
-      uni.navigateTo({ url: `/pages/task/map?mode=device&taskId=${encodeURIComponent(this.taskId)}&taskType=${encodeURIComponent(type)}` })
+      const filters = { keyword: String(this.keyword || '').trim() }
+      uni.navigateTo({ url: `/pages/task/map?mode=device&taskId=${encodeURIComponent(this.taskId)}&taskType=${encodeURIComponent(type)}&filters=${encodeURIComponent(JSON.stringify(filters))}` })
     },
     addDevices() {
       uni.navigateTo({ url: `/pages/task/add-devices?taskId=${encodeURIComponent(this.taskId)}&customerId=${encodeURIComponent(this.task.KehuID || '')}` })

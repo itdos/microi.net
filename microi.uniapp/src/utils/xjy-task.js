@@ -303,12 +303,18 @@ export async function loadTaskDevices(taskId, refresh = false) {
   return result.rows
 }
 
-export async function loadAllTaskDevices(taskId, refresh = false) {
+export async function loadAllTaskDevices(taskId, options = false) {
+  const config = typeof options === 'boolean' ? { refresh: options } : (options || {})
   const rows = []
   let pageIndex = 1
   let count = 0
   do {
-    const page = await loadTaskDevicesPage(taskId, { pageIndex, pageSize: 300, refresh })
+    const page = await loadTaskDevicesPage(taskId, {
+      pageIndex,
+      pageSize: 300,
+      keyword: config.keyword || '',
+      refresh: config.refresh === true
+    })
     rows.push(...page.rows)
     count = page.count
     if (!page.rows.length) break

@@ -31,6 +31,7 @@ import {
   orderProductNumberValue
 } from './order-product-cooperation.mjs'
 import {
+  emptyOrderAmountValues,
   orderSummarySubmitValues,
   orderSummaryValues
 } from './order-summary.mjs'
@@ -2203,6 +2204,8 @@ export async function beforeSubmit(context) {
       ? '已上传'
       : '未上传'
     if (isOrderAdd(context)) {
+      // 新增订单的商品尚未落入子表，金额必须从 0 开始；后端事件会在存在商品时重新权威汇总。
+      Object.assign(values, emptyOrderAmountValues())
       const defaults = {
         [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',
         [orderFieldName(context, 'orderDate', '下单日期')]: currentDate(),
