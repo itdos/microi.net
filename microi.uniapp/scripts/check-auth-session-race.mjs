@@ -80,10 +80,19 @@ await verifySdk('project sdk', createProjectSdk)
 await verifySdk('standard sdk', createStandardSdk)
 
 const loginSource = readFileSync(fileURLToPath(new URL('../src/pages/login/index.vue', import.meta.url)), 'utf8')
+const requestSource = readFileSync(fileURLToPath(new URL('../src/utils/request.js', import.meta.url)), 'utf8')
+const workspaceSource = readFileSync(fileURLToPath(new URL('../src/pages/workspace/index.vue', import.meta.url)), 'utf8')
+const profileSource = readFileSync(fileURLToPath(new URL('../src/pages/profile/index.vue', import.meta.url)), 'utf8')
 assert.equal(
   (loginSource.match(/if \(!isValidLoginSession\(currentUser, token\)\)/g) || []).length,
   3,
   '三种登录入口都必须同时校验 Token 和用户 Id'
 )
 assert.ok(!loginSource.includes('setUser(result.Data)'), '登录页不得缓存未经归一化和校验的响应包装对象')
+assert.match(requestSource, /removeToken\(\)[\s\S]*?removeCachePrefix\('tab:summary:'\)/,
+  '退出或登录失效时必须清除用户维度的首页统计快照')
+assert.match(workspaceSource, /this\.isLoggedIn = !!token && !!currentUser\.Id[\s\S]*?this\.summaryRequestId \+= 1[\s\S]*?this\.summary = \{ orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 \}/,
+  '首页恢复显示时必须校验完整会话、失效旧统计请求并清空旧值')
+assert.match(profileSource, /this\.isLoggedIn = !!token && !!currentUser\.Id[\s\S]*?if \(!this\.isLoggedIn\)[\s\S]*?this\.summary = \{ orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 \}/,
+  '我的页在退出或半登录状态下必须清空统计值')
 console.log('auth session race checks passed')

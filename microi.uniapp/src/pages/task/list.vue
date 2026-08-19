@@ -328,8 +328,13 @@ export default {
     },
     openTask(item) { this.mciNavigateToDetail(`/pages/task/detail?id=${encodeURIComponent(item.Id)}`) },
     openTaskMap() {
-      const customerQuery = this.customerId ? `&customerId=${encodeURIComponent(this.customerId)}` : ''
-      uni.navigateTo({ url: `/pages/task/map?mode=task${customerQuery}` })
+      const filters = {
+        keyword: this.keyword.trim(), state: this.state, type: this.type, period: this.period,
+        customRange: this.customRange, dateField: this.dateField, city: this.city.trim(),
+        mineOnly: this.mineOnly, orderBy: this.dateField, orderType: this.orderType,
+        customerId: this.customerId || ''
+      }
+      uni.navigateTo({ url: `/pages/task/map?mode=task&filters=${encodeURIComponent(JSON.stringify(filters))}` })
     },
     addTask() { this.mciMarkDetailReturn(); openForm({ table: 'Diy_ShouhouDD', mode: 'Add', title: '新增售后任务', menuAliases: ['售后订单', '售后任务'] }) },
     scan() { scanDevice() },
