@@ -1425,9 +1425,30 @@ docker_push_plan() {
     fi
 
     # 使用 Docker 内容摘要缓存；publish/dist 内容变化会自动使 COPY 层失效。
-    # --pull 仍会检查基础镜像更新，不会因为启用缓存而固化旧基础镜像。
+    # 优先检查基础镜像更新；远端 Registry 短暂不可达时重试，最终只允许回退到
+    # Docker 已缓存且能被本地解析的基础镜像，避免一次 TLS 超时中断整轮发布。
     print_step "构建镜像: $local_image"
-    (cd "$build_dir" && docker build --pull -t "$local_image" .)
+    local _docker_build_ok=false
+    local _docker_build_attempt=1
+    while [ "$_docker_build_attempt" -le 3 ]; do
+        if (cd "$build_dir" && docker build --pull -t "$local_image" .); then
+            _docker_build_ok=true
+            break
+        fi
+        if [ "$_docker_build_attempt" -lt 3 ]; then
+            print_warning "基础镜像更新检查失败，5 秒后重试（${_docker_build_attempt}/3）..."
+            sleep 5
+        fi
+        _docker_build_attempt=$((_docker_build_attempt + 1))
+    done
+    if [ "$_docker_build_ok" != true ]; then
+        print_warning "远端基础镜像连续拉取失败，尝试使用 Docker 本地缓存完成本次构建..."
+        if (cd "$build_dir" && docker build --pull=false -t "$local_image" .); then
+            print_warning "已使用本地缓存的基础镜像完成构建；发布后请关注远端 Registry 连通性。"
+        else
+            print_fail "Docker 镜像构建失败，远端拉取和本地缓存均不可用: $local_image"
+        fi
+    fi
 
     # 推送每个远程镜像
     IFS=',' read -ra _images <<< "$remote_images"

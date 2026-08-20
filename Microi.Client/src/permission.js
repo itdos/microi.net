@@ -118,6 +118,18 @@ router.beforeEach(async (to, from, next) => {
     // 安全/稳定性修复：整个守卫包一层 try/catch 兜底，
     // 避免任意 await 抛错导致 next() 不被调用而出现"白屏永久无法导航"。
     try {
+    // AI 应用主数据与管理入口已统一到应用商城。旧租户菜单、收藏夹或
+    // 外部链接仍可能访问 /mci-ai-app，因此在权限和动态路由装载前做
+    // 稳定兼容跳转；携带 appId 时继续进入对应应用的开发工作台。
+    if (to.path === "/mci-ai-app") {
+        const legacyAppId = String(to.query?.appId || "").trim();
+        if (legacyAppId) {
+            next({ name: "mic_ai_app_detail", params: { appId: legacyAppId }, replace: true });
+        } else {
+            next({ path: "/microi-store", replace: true });
+        }
+        return;
+    }
     const isAnonymousRoute = to.matched.some((record) => record.meta?.anonymous === true);
     // The access-key exchange page must not wait for unrelated SSO discovery.
     // A fresh browser may have no tenant cache yet; the URL carries OsClient.

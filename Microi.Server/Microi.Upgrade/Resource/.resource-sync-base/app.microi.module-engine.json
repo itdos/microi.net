@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "模块引擎",
-    "Version": "v7.4.6",
+    "Version": "v7.4.8",
     "CreateTime": "2026-08-08T06:31:30.327Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -5547,7 +5547,7 @@
       "Unique": 0,
       "NameConfirm": 1,
       "TableWidth": 50,
-      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"Sql\":\"select A.Id,A.Name,A.Label,A.TableId,B.Name TableName,B.Description TableDescription,\nCONCAT(A.Name, ' - ', A.Label, '(', B.Name, ' - ', B.Description, ')') _Name\nfrom diy_field A\nleft join diy_table B ON A.TableId=B.Id\nwhere A.IsDeleted<>1 and B.IsDeleted<>1\nand ('$V8.Form.DiyTableId$' like CONCAT('%', A.TableId, '%') OR '$V8.Form.JoinTables$' like CONCAT('%', A.TableId, '%'))\norder by B.Name asc,A.Name asc\",\"EnableSearch\":true,\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"DataSource\":\"Sql\",\"DataSourceSqlRemote\":false,\"DataSourceId\":\"\",\"SelectLabel\":\"_Name\",\"SelectSaveField\":\"\",\"SelectSaveFormat\":\"Text\",\"DataSourceApiEngineKey\":\"\",\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"DividerPosition\":\"left\",\"DataSourceSqlRemoteLoading\":false,\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\"}",
+      "Config": "{\"ParamData\":{},\"KeysAddVisible\":false,\"KeysAddVModel\":\"\",\"Sql\":\"select A.Id,A.Name,A.Label,A.TableId,B.Name TableName,B.Description TableDescription,\\nCONCAT(A.Label, ' - ', A.Name, '（', B.Description, ' - ', B.Name, '）') _Name\\nfrom diy_field A\\nleft join diy_table B ON A.TableId=B.Id\\nwhere A.IsDeleted<>1 and B.IsDeleted<>1\\nand ('$V8.Form.DiyTableId$' like CONCAT('%', A.TableId, '%') OR '$V8.Form.JoinTables$' like CONCAT('%', A.TableId, '%'))\\norder by B.Name asc,A.Name asc\",\"EnableSearch\":true,\"V8Code\":\"\",\"V8CodeBlur\":\"\",\"DataSource\":\"Sql\",\"DataSourceSqlRemote\":false,\"DataSourceId\":\"\",\"SelectLabel\":\"_Name\",\"SelectSaveField\":\"Id\",\"SelectSaveFormat\":\"Text\",\"DataSourceApiEngineKey\":\"\",\"NumberTextStep\":1,\"NumberTextPrecision\":0,\"NumberText\":0,\"NumberTextMath\":\"\",\"NumberTextBtn\":true,\"NumberTextBtnPosition\":\"right\",\"DividerPosition\":\"left\",\"DataSourceSqlRemoteLoading\":false,\"TextShowPassword\":false,\"TextIcon\":\"\",\"TextIconPosition\":\"\",\"TextApend\":\"\",\"TextApendPosition\":\"\",\"DateTimeType\":\"date\",\"TextAutocomplete\":false,\"AutoNumberFixed\":\"\",\"AutoNumberLength\":1,\"AutoNumberFields\":[],\"DevComponentName\":\"\",\"DevComponentPath\":\"\",\"TableChildTableId\":\"\",\"TableChildSysMenuId\":\"\",\"TableChildSysMenuName\":\"\",\"TableChildFkFieldName\":\"\",\"TableChildCallbackField\":\"\",\"TableChildRowClickV8\":\"\",\"MapCompany\":\"Baidu\"}",
       "TableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",
       "Readonly": 0,
       "Encrypt": 0,
