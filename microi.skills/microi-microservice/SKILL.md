@@ -67,7 +67,7 @@ src/
 AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，删除/新增路由后由
 发布流程同步 `sys_microiservice_page`，不要从 Vue 源码猜路由。
 
-本地项目必须位于当前连接对应的 `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}`。该应用目录同时承载 MicroService 源码、Manifest、接口引擎、资源策略、测试和应用商城上传素材，是唯一事实源；禁止创建平行的 `microi.apps/` 发行根，也不得在应用内嵌套第二份可编辑 `microservice/` 工程。
+普通本地项目必须位于当前连接对应的 `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}`。该应用目录同时承载 MicroService 源码、Manifest、接口引擎、资源策略、测试和应用商城上传素材，是唯一事实源。受审计的官方内置应用若由独立 Git 仓库维护，必须有版本管理的发布契约唯一指向该源码根，所有构建、跨工程测试和发行包都读取契约；同名租户同步目录只能是只读镜像。禁止自动在多份副本中择新、创建平行 `microi.apps/` 发行根，或在应用内嵌套第二份可编辑 `microservice/` 工程。
 
 构建前遵守本地 OOM 保护；已有 dev server 可复用时不重复启动。新脚手架必须支持独立
 访问时的平台帐号登录，但独立 Vite 预览仍没有菜单/弹窗等完整宿主上下文，不能替代宿主验收。
@@ -109,11 +109,12 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - `mci_ai_app_file` 同时存在私有源码和公有编译产物。源码拉取/差异比较必须优先按 `StorageScope=PublicBuildStream|PublicBuildStreamArchived|PublicBuildOnly` 排除公有产物，并保留旧数据中 `HdfsPath == PublishHdfsPath` 的兼容判断；不能仅靠两个路径相等识别，否则版本路径与稳定别名不同的流式产物会被误读成私有源码。
 - 只有服务器不支持流式端点且产物很小时，才兼容 `microi_publish_microservice`。
 - 正常发布支持最多 20,000 个文件、总计 20GB；逐文件从磁盘流入 HDFS，不生成整包 Buffer/Base64。几百 MB、1GB 级项目不得自动降级到旧 Base64 发布器。
-- `StorageMode=db` 仅是显式的小型应急恢复模式，不是正常发布容量；当前最多 256 文件/5MB。超过该边界必须修复租户 HDFS/网关并恢复流式文件模式，不能调大数据库内联上限来承载大项目。
-- 每次交付使用同一 `DeliveryBatchId`，并保存 `SourceManifestHash` 与 `RuntimeManifestHash`；源码同步、运行清单、页面切换和入口探测必须能关联到同一批次。
+- 普通应用的 `StorageMode=db` 仅是显式的小型应急恢复模式，不是正常发布容量；当前最多 256 文件/5MB。超过该边界必须修复租户 HDFS/网关并恢复流式文件模式，不能调大数据库内联上限来承载大项目。
+- 受信任的平台启动应用可把 `Source=NotIncluded + Build=DatabaseOnly + StorageMode=db` 作为长期启动/恢复介质，但只能携带已校验编译产物，仍受 256 文件/5MB 限制，不得携带可编辑源码或租户秘密。其数据库产物是离线权威；HDFS/CDN 只能作为逐文件回读哈希一致后的镜像，镜像故障或漂移时继续使用数据库产物。
+- 每次交付使用同一 `DeliveryBatchId`，并保存 `SourceManifestHash` 与 `RuntimeManifestHash`；源码同步、运行清单、页面切换和入口探测必须能关联到同一批次。官方内置应用还必须在发布前核对唯一源码版本、源码清单、`dist`、路由与所有内置包，任何一处哈希漂移都失败关闭。
 - 发布后用 `microi_get_application_context`、`microi_get_microservice` 回读。
 - 回读成功还不等于页面可用：必须直接请求稳定入口、版本入口和清单内的 JS/CSS；入口 `502` 且运行时/清单存在时，优先检查 API 节点是否能通过租户 MinIO 内网端点读取公有桶对象。不要反复发布同一份产物掩盖存储读取故障。
-- 服务器暂未部署修复且产物很小时，可把 `StorageMode=db` 与内联 `ContentBase64` 作为短期恢复手段；必须明确记录为临时方案。修复部署后重新流式发布到公有 HDFS，并恢复 `StorageMode=file`，禁止长期把大 JS/CSS 放在数据库 JSON。
+- 服务器暂未部署修复且普通应用产物很小时，可把 `StorageMode=db` 与内联 `ContentBase64` 作为短期恢复手段；必须明确记录为临时方案。修复部署后重新流式发布到公有 HDFS，并恢复 `StorageMode=file`。只有上一条满足严格资源策略的受信任平台启动应用允许长期保留小型数据库产物；禁止借此把普通或大体积 JS/CSS 长期放进数据库 JSON。
 - 子租户发布时，源码、版本资产、回读验签、页面与缓存全部绑定当前 Token 的 `OsClient`；禁止回退到主租户或宿主服务器默认租户。切换前必须由当前 API 节点通过该子租户 HDFS 配置读回每个版本文件并校验大小/SHA-256。
 
 ## 菜单、弹窗与表单嵌入

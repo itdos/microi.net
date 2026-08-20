@@ -42,13 +42,31 @@ Microi吾码不是单一的后台管理模板。完整工程由低代码运行�
 | `microi.mcp/` | TypeScript MCP Server，让 AI 按租户读取结构、生成系统、维护 V8/页面/流程/微服务并回读验收 | [MCP Server](/doc/v8-engine/mcp-server) |
 | `microi.skills/` | 面向 AI Agent 的平台规范、工作流和安全边界，避免只知道函数名却不知道正确交付顺序 | [AI 编程](/doc/v8-engine/ai-apiengine) |
 | `microi.doc/` | 当前官网与官方文档，VitePress 构建；中文 `docs/doc/` 是维护源 | [平台介绍](/doc/index) |
-| `Microi-V8-Engine/.../AI应用/{appKey}/` | 当前服务器与租户的 AI 应用唯一源码根：界面、微服务、Manifest、接口引擎、资源策略、测试、离线包与应用商城上传素材 | [应用商城](/doc/system-engine/app-store) |
+| `Microi-V8-Engine/.../AI应用/{appKey}/` | 插件或 CLI 面向当前服务器、租户生成的 AI 应用工作副本；普通租户应用默认以此为可编辑源码根 | [应用商城](/doc/system-engine/app-store) |
 | `数据库、案例、文档、资料/` | 演示库、空库、案例和部署辅助资料；使用前核对版本与目标数据库类型 | [数据库扩展](/doc/system-engine/databases) |
 
-以下两个目录常在完整开发工作区中出现，但用途与主仓库源码不同：
+以下目录常在完整开发工作区中出现，但用途与主仓库源码不同：
 
 - `Microi.VSCode/` 是 VS Code 插件与 `@microi.net/cli` 的伴随源码仓库，包含同步、远程执行、调试、MCP 打包和 AI 配置生成。详见 [AI 开发工具](/doc/v8-engine/vs-code-plugin)。
-- `Microi-V8-Engine/` 通常由插件或 CLI 在本机生成，按服务器与 OsClient 保存接口引擎、事件、数据库快照和同步基线；Web、UniApp、MicroService 及无前端的平台 AI 应用都以对应租户的 `AI应用/{appKey}` 作为唯一源码根，Manifest、接口引擎、资源策略、测试和商城上传素材不得拆到平行目录。它可能包含本机 Token 或租户代码，不是应整体提交到公开仓库的产品源码目录；只有经过明确白名单审计的官方应用才可单独纳入版本控制。
+- `Microi-V8-Engine/` 通常由插件或 CLI 在本机生成，按服务器与 OsClient 保存接口引擎、事件、数据库快照和同步基线。普通 Web、UniApp、MicroService 及无前端 AI 应用默认以对应租户的 `AI应用/{appKey}` 作为唯一可编辑源码根；它可能包含本机 Token 或租户代码，不应整体提交到公开产品仓库。
+- `AI-Project/` 可以是单独版本管理的官方或客户项目源码仓库，不属于主产品仓库。只有发布契约明确指向其中某个应用时，该目录才是该应用的正式源码根；同名 `Microi-V8-Engine` 目录此时只是在线租户同步镜像，不能再参与构建或测试取源。禁止同时把两处都当作可编辑事实源。
+
+### 平台内置微服务的源码与运行链
+
+`microi-platform-service` 承载应用商城、个人中心、租户系统设置、数据库备份和离线包安装等平台页面。它采用“一个可编辑源码根、两个相同内置包、一个稳定宿主入口”的交付链，而不是把完整业务源码再复制到 `Microi.Client`：
+
+```text
+platform-service-release.json 指定的独立 Git 源码根
+  → Vue/Vite dist 与 SourceManifestHash / RuntimeManifestHash
+  → app.microi.saas-engine.json + app.microi.store.json（同一份 DatabaseOnly 资产）
+  → Microi.Upgrade 幂等导入目标租户数据库
+  → MicroAppController 稳定入口 /micro-app/{OsClient}/microi-platform-service/index.html
+  → Microi.Client/src/views/micro-app/ 宿主、Resolve 与兼容入口回退
+```
+
+正式构建和跨工程测试必须读取 `Microi.Server/Microi.Upgrade/Resource/platform-service-release.json`，不得硬编码 `AI-Project` 或某个 `Microi-V8-Engine` 镜像路径。`embed-platform-service-bundle.mjs --verify-only` 会同时核对源码版本、源码清单哈希、`dist` 逐文件哈希、路由以及两个内置包；官网资源正式发布还要求源码根来自无未提交修改的 Git 提交，任一处漂移即阻止发布。
+
+数据库内联产物是平台启动和恢复权威，受 256 文件、5MB、无可编辑源码的严格边界约束。HDFS/CDN 可以保存正式源码或作为运行资产镜像，但只有回读哈希与同一 `RuntimeManifestHash` 完全一致后才可启用；HDFS 不可用或镜像不一致时继续使用数据库产物，不能反向覆盖它。`Microi.Client` 只保留通用宿主、错误诊断和通知中心恢复入口，不保留第二份平台业务实现。
 
 ## 后端项目
 
@@ -56,7 +74,7 @@ Microi吾码不是单一的后台管理模板。完整工程由低代码运行�
 
 | 项目 | 主要职责 | 对应文档 |
 |---|---|---|
-| `Microi.net.Api` | ASP.NET Core HTTP 入口、Controller、中间件、后台 Worker、健康与运行诊断 | [安全基线](/doc/more/security) |
+| `Microi.net.Api` | ASP.NET Core HTTP 入口、Controller、中间件、后台 Worker、健康与运行诊断；`V8EngineController.cs` 承担 MCP/V8 HTTP 网关，`MicroAppController.cs` 解析并输出前端微服务运行资产 | [安全基线](/doc/more/security) |
 | `Microi.net` | 表单、接口、模块、工作流、数据源、应用商城等核心业务运行时 | [系统引擎](/doc/index#核心引擎) |
 | `Microi.Core` | 公共接口、模型、租户上下文、FormEngine 基础实现、V8/MCP 领域逻辑 | [表单引擎](/doc/form-engine/form-engine-info) |
 | `Microi.AI` | AI 代理、模型订阅、Schema/V8 文档上下文、NL2V8 与系统级 AI 工作流 | [AI 引擎](/doc/system-engine/ai-engine) |
