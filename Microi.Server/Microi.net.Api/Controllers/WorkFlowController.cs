@@ -468,87 +468,17 @@ namespace Microi.net.Api.Controllers
         public async Task<JsonResult> GetWFStats(WFParam param)
         {
             await DefaultParam(param);
-            if (param._CurrentUser == null)
-                return Json(new { Code = 0, Msg = "参数错误" });
+            return Json(await _workFlowLogic.GetWFStats(param));
+        }
 
-            var userId = param._CurrentUser?["Id"].Val<string>();
-            var osClient = param.OsClient;
-            var currentUser = param._CurrentUser;
-
-            // 5 个统计并行执行
-            var todoTask = MicroiEngine.FormEngine.GetTableDataCountAsync(new
-            {
-                FormEngineKey = "WF_Work",
-                _SearchEqual = new Dictionary<string, string>
-                {
-                    { "ReceiverId", userId },
-                    { "WorkState", "Todo" }
-                },
-                IsDeleted = 0,
-                OsClient = osClient,
-                _CurrentUser = currentUser
-            });
-            var senderTask = MicroiEngine.FormEngine.GetTableDataCountAsync(new
-            {
-                FormEngineKey = "WF_Flow",
-                _SearchEqual = new Dictionary<string, string>
-                {
-                    { "SenderId", userId }
-                },
-                IsDeleted = 0,
-                OsClient = osClient,
-                _CurrentUser = currentUser
-            });
-            var doneTask = MicroiEngine.FormEngine.GetTableDataCountAsync(new
-            {
-                FormEngineKey = "WF_Work",
-                _SearchEqual = new Dictionary<string, string>
-                {
-                    { "ReceiverId", userId },
-                    { "WorkState", "Done" }
-                },
-                IsDeleted = 0,
-                OsClient = osClient,
-                _CurrentUser = currentUser
-            });
-            var copyTask = MicroiEngine.FormEngine.GetTableDataCountAsync(new
-            {
-                FormEngineKey = "WF_Flow",
-                _Where = new List<DiyWhere>
-                {
-                    new DiyWhere { Name = "CopyUsers", Value = userId, Type = "Like" }
-                },
-                IsDeleted = 0,
-                OsClient = osClient,
-                _CurrentUser = currentUser
-            });
-            var connectTask = MicroiEngine.FormEngine.GetTableDataCountAsync(new
-            {
-                FormEngineKey = "WF_Work",
-                _SearchEqual = new Dictionary<string, string>
-                {
-                    { "ReceiverId", userId },
-                    { "WorkState", "OtherDone" }
-                },
-                IsDeleted = 0,
-                OsClient = osClient,
-                _CurrentUser = currentUser
-            });
-
-            await Task.WhenAll(todoTask, senderTask, doneTask, copyTask, connectTask);
-
-            return Json(new
-            {
-                Code = 1,
-                Data = new
-                {
-                    Todo = todoTask.Result?.DataCount ?? 0,
-                    Sender = senderTask.Result?.DataCount ?? 0,
-                    Done = doneTask.Result?.DataCount ?? 0,
-                    Copy = copyTask.Result?.DataCount ?? 0,
-                    Connect = connectTask.Result?.DataCount ?? 0
-                }
-            });
+        /// <summary>
+        /// 当前用户打开抄送流程时，将该流程内属于自己的显式未读抄送项标记为已读。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> MarkCopyRead(WFParam param)
+        {
+            await DefaultParam(param);
+            return Json(await _workFlowLogic.MarkCopyRead(param));
         }
 
         /// <summary>

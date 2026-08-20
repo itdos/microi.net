@@ -1068,7 +1068,7 @@ export function buildDefaultModulePresentation(moduleName, rawFields, tableDescr
         if (isDateField(field))
             return 70;
         return listFieldScore(field);
-    }).slice(0, 2);
+    }).slice(0, 1);
     const trailingFields = uniqueFields([...statusCandidates.slice(0, 1), ...numericCandidates.slice(0, 1)]);
     const requiredFields = uniqueFields([primary, ...lineCandidates, ...trailingFields].filter(Boolean))
         .map((field) => field.name);
