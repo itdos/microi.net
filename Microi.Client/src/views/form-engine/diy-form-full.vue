@@ -1147,6 +1147,7 @@ import { defineAsyncComponent, computed } from "vue";
 import { Refresh, Search } from "@element-plus/icons-vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
 import _ from "underscore";
+import { isFormMaskBlurEnabled } from "@/utils/form-mask-blur.js";
 import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode, runV8ButtonVisibilityCodeAsync } from "@/utils/v8-button-visibility";
 import { hasModuleDetailView } from "./form-view-blocks/view-schema-runtime";
 import {
@@ -1302,14 +1303,12 @@ export default {
                 const legacyValue = tableModel.FormMaskBlur;
                 tableValue = legacyValue === 0 || legacyValue === "0" || legacyValue === false ? 1 : 0;
             }
-            const globalValue = this.diyStore && this.diyStore.SysConfig
-                ? this.diyStore.SysConfig.DisableFormMaskBlur
-                : undefined;
             const isExplicitlyDisabled = (value) => value === 1
                 || value === "1"
                 || value === true
                 || String(value || "").trim().toLowerCase() === "true";
-            const blurDisabled = isExplicitlyDisabled(globalValue) || isExplicitlyDisabled(tableValue);
+            const blurDisabled = !isFormMaskBlurEnabled(this.diyStore?.SysConfig)
+                || isExplicitlyDisabled(tableValue);
             return [
                 "diy-form-modern-overlay",
                 "mci-unified-overlay",

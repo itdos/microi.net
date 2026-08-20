@@ -25,3 +25,13 @@ export function setRoleMenuChecked(row, checked) {
         row._Child.forEach((child) => setRoleMenuChecked(child, checked));
     }
 }
+
+export function ensureRoleMenuPathReadable(row, parentById) {
+    let current = row;
+    while (current) {
+        current._Check = true;
+        if (!Array.isArray(current.Permission)) current.Permission = [];
+        if (!current.Permission.includes("Read")) current.Permission.unshift("Read");
+        current = parentById?.[current.Id];
+    }
+}

@@ -110,7 +110,7 @@ test("managed API-engine policies preserve compatible official baseline hashes",
   assert.match(source, /ApplyCompatibleBase/);
   assert.match(source, /OFFICIAL_HISTORY_BASELINE_RECOVERY_V1/);
   assert.match(source, /installedVersionLookup\.Data\.AppVersionInstall/);
-  assert.match(source, /get-microi-store-versions\?OsClient=/);
+  assert.match(source, /marketplaceEngineParam\('get-microi-store-versions'/);
   assert.match(source, /StoreVersionId: versionIds\[historicalVersionIndex\]/);
   assert.match(source, /String\(historicalModel\.ApplicationType \|\| ''\)\.toLowerCase\(\) != 'platform'/);
   assert.match(source, /String\(historicalModel\.Status \|\| ''\)\.toLowerCase\(\) != 'published'/);
@@ -164,6 +164,9 @@ test("marketplace package reads retry empty transient responses without acceptin
   assert.equal(calls.post, 2);
   assert.equal(calls.sleep, 1);
   assert.match(source, /MARKETPLACE_SOURCE_READ_RETRY_V1/);
+  assert.match(source, /MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1/);
+  assert.match(source, /marketplaceEngineRunUrl/);
+  assert.match(source, /marketplaceEngineParam\('get-microi-store-model'/);
 });
 
 function runAdminMenuPermissionFixture(options = {}) {

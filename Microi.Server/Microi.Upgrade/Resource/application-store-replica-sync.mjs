@@ -238,6 +238,14 @@ async function reconcileReplicaPair(resourceName, sideName, baseSource, standalo
 function maskReplicatedEngineFields(packageContent, basePackageContent) {
   const packageModel = parsePackage(packageContent);
   const basePackageModel = parsePackage(basePackageContent);
+  // PackageInfo.Version is delivery metadata, not mergeable business content.
+  // A failed release rerun can leave the local package at the target platform
+  // version while the official store independently increments its package
+  // version. Mask it during the structural three-way merge and restore the
+  // highest observed version after the merge so retries stay monotonic.
+  if (packageModel.PackageInfo && basePackageModel.PackageInfo) {
+    packageModel.PackageInfo.Version = basePackageModel.PackageInfo.Version;
+  }
   for (const mapping of applicationStoreReplicaMappings) {
     const engine = findEmbeddedEngine(packageModel, mapping.apiEngineKey);
     const baseEngine = findEmbeddedEngine(basePackageModel, mapping.apiEngineKey);
@@ -517,8 +525,21 @@ export async function mergeApplicationStoreReplicas({
     maskedLocalPackage,
     maskedRemotePackage,
   );
+  const mergedPackageModel = parsePackage(mergedPackage);
+  const observedPackageVersions = [
+    parsePackage(basePackageContent)?.PackageInfo?.Version,
+    parsePackage(localPackageContent)?.PackageInfo?.Version,
+    parsePackage(remotePackageContent)?.PackageInfo?.Version,
+  ].filter(Boolean);
+  const highestObservedPackageVersion = observedPackageVersions.reduce(
+    (highest, version) => compareSemanticVersions(version, highest) > 0 ? version : highest,
+    observedPackageVersions[0] || '',
+  );
+  if (mergedPackageModel.PackageInfo && highestObservedPackageVersion) {
+    mergedPackageModel.PackageInfo.Version = highestObservedPackageVersion;
+  }
   const synchronizedPackage = synchronizeApplicationStoreEngines(
-    mergedPackage,
+    canonicalizeResource(applicationStorePackageName, JSON.stringify(mergedPackageModel)),
     resolvedStandaloneContents,
   );
 

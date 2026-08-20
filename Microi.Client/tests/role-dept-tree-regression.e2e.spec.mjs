@@ -177,8 +177,10 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     const legacyCalls = [];
     page.on("request", (request) => {
-        if (/\/api\/(?:SysRole|SysDept)\//i.test(new URL(request.url()).pathname)) {
-            legacyCalls.push(new URL(request.url()).pathname);
+        const pathname = new URL(request.url()).pathname;
+        if (/\/api\/(?:SysRole|SysDept)\//i.test(pathname)
+            && !/\/api\/SysRole\/GetDirectTableGrantPolicies$/i.test(pathname)) {
+            legacyCalls.push(pathname);
         }
     });
 
@@ -195,6 +197,10 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
     await expect(firstRoleRow).toBeVisible({ timeout: 15_000 });
     const addRole = rolePage.getByRole("button", { name: /^(?:新增(?:记录)?|Add)$/i }).first();
     await expect(addRole).toBeVisible({ timeout: 45_000 });
+    const directTablePolicyResponse = page.waitForResponse(
+        (response) => /\/api\/SysRole\/GetDirectTableGrantPolicies(?:\?|$)/i.test(response.url()),
+        { timeout: 30_000 }
+    );
     await addRole.click();
 
     const roleDialog = page.locator(".diy-form-container.el-dialog:visible, .diy-form-container.el-drawer:visible").last();
@@ -209,7 +215,17 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
     await expect(roleDialog).toContainText("接口引擎等平台控制面仍要求 9999 级管理员");
     await expect(roleDialog.locator(".mci-role-permission-field__tree")).toBeVisible({ timeout: 30_000 });
     await expect(permissionField.getByText(/无详情|无搜索/)).toHaveCount(0);
+    const directTablePolicyResult = await (await directTablePolicyResponse).json();
+    expect(Number(directTablePolicyResult.Code), directTablePolicyResult.Msg || "direct-table policy failed").toBe(1);
+    expect(Array.isArray(directTablePolicyResult.Data)).toBe(true);
+    const directTableSection = permissionField.locator(".mci-role-permission-field__direct-table");
+    await expect(directTableSection).toBeVisible({ timeout: 30_000 });
+    await expect(directTableSection.getByRole("heading", { name: "表直连权限", exact: true })).toBeVisible();
+    await expect(directTableSection.getByRole("combobox").first()).toBeEnabled();
+    await expect(directTableSection).toContainText("平台保护");
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "01-role-low-code-permissions.png"), fullPage: false });
+    await directTableSection.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03-role-direct-table-permission.png"), fullPage: false });
     await roleDialog.getByRole("button", { name: /^(?:Close|关闭)$/i }).first().click();
     await expect(roleDialog).toBeHidden({ timeout: 15_000 });
 
@@ -272,6 +288,33 @@ test("角色和部门低代码表单完成事务新增、修改、删除", async
             await apiEngineRow.getByRole("checkbox", { name: permission, exact: true }).check();
         }
 
+        const tablePicker = permissionField.locator(".mci-table-permission").getByRole("combobox").first();
+        await expect(tablePicker).toBeEnabled({ timeout: 30_000 });
+        const tableSearchResponse = page.waitForResponse((response) => {
+            if (endpointName(response.url()) !== "GetTableData") return false;
+            return String(requestBody(response.request()).FormEngineKey || "").toLowerCase() === "diy_table";
+        }, { timeout: 30_000 });
+        await tablePicker.fill("mic_print");
+        const tableSearchResult = await (await tableSearchResponse).json();
+        const printTable = (tableSearchResult.Data || []).find((item) =>
+            String(item.Name || "").toLowerCase() === "mic_print"
+        );
+        expect(printTable, JSON.stringify(tableSearchResult).slice(0, 800)).toBeTruthy();
+        const printOption = page.locator(".el-select-dropdown:visible .el-select-dropdown__item")
+            .filter({ hasText: /mic_print/i }).first();
+        await expect(printOption).toBeVisible({ timeout: 15_000 });
+        await printOption.click();
+        const directTableRow = permissionField.locator(".mci-table-permission .el-table__row")
+            .filter({ hasText: /mic_print/i }).first();
+        await expect(directTableRow).toBeVisible({ timeout: 15_000 });
+        for (const permission of ["增", "改", "删"]) {
+            const checkbox = directTableRow.locator("label.el-checkbox")
+                .filter({ hasText: new RegExp(`^${permission}$`) }).first();
+            await expect(checkbox).toBeVisible({ timeout: 10_000 });
+            await checkbox.click();
+            await expect(checkbox.getByRole("checkbox")).toBeChecked();
+        }
+
         const addRoleResponse = page.waitForResponse(
             (response) => isFormWriteResponse(response, "AddFormData"),
             { timeout: 30_000 }
@@ -305,6 +348,13 @@ test("角色和部门低代码表单完成事务新增、修改、删除", async
             }
         });
         expect(parentReadLimit, "System Engine parent menu Read permission was not persisted").toBeTruthy();
+        const directTableLimit = (limitResult.Data || []).find((item) =>
+            String(item.Type || "").toLowerCase() === "table"
+            && item.FkId === printTable.Id
+        );
+        expect(directTableLimit, "mic_print direct-table permission was not persisted").toBeTruthy();
+        expect(JSON.parse(directTableLimit.Permission || "[]"))
+            .toEqual(expect.arrayContaining(["Read", "Add", "Edit", "Del"]));
         await formItem(dialog, /^(?:Role Name|角色名称)/i).locator('input[type="text"]').first().fill(roleNameUpdated);
         const updateRoleResponse = page.waitForResponse(
             (response) => isFormWriteResponse(response, "UptFormData"),

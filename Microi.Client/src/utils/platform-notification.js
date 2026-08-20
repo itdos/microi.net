@@ -4,6 +4,10 @@ export const PLATFORM_NOTIFICATION_ENGINE_KEYS = Object.freeze({
     MarkRead: "msg_internal_mark_read"
 });
 
+export const PLATFORM_SYSTEM_CONTACT_ID = "MICROI_PLATFORM_ADMIN";
+export const PLATFORM_NOTIFICATION_EVENT = "microi-platform-notification";
+export const PLATFORM_NOTIFICATION_SNAPSHOT_EVENT = "microi-platform-notifications-snapshot";
+
 function callEngine(runEngine, engineKey, param, callback) {
     const promise = Promise.resolve(runEngine(engineKey, param || {}));
     if (typeof callback === "function") {
@@ -58,6 +62,88 @@ export function mergePlatformNotification(rows, incoming, limit = 100) {
     const identity = String(incoming.Id || incoming.EventId);
     return [incoming, ...source.filter((item) => String(item?.Id || item?.EventId || "") !== identity)]
         .slice(0, Math.max(1, Number(limit) || 100));
+}
+
+function parseNotificationPayload(value) {
+    if (!value) return {};
+    if (typeof value === "object") return value;
+    try {
+        const parsed = JSON.parse(String(value));
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_) {
+        return {};
+    }
+}
+
+export function getPlatformNotificationSender(notification) {
+    const payload = parseNotificationPayload(notification?.Payload || notification?.DataAppend);
+    return String(
+        notification?.SenderAccount
+        || notification?.SystemSenderAccount
+        || payload.SenderAccount
+        || payload.SystemSenderAccount
+        || "admin"
+    ).trim() || "admin";
+}
+
+export function toPlatformChatRecord(notification, currentUser = {}) {
+    const title = String(notification?.Title || "平台消息").trim();
+    const content = String(notification?.MsgContent || notification?.Content || "").trim();
+    return {
+        Id: String(notification?.Id || notification?.EventId || ""),
+        NotificationId: String(notification?.Id || ""),
+        EventId: String(notification?.EventId || ""),
+        FromUserId: PLATFORM_SYSTEM_CONTACT_ID,
+        FromUserName: getPlatformNotificationSender(notification),
+        FromUserAvatar: "./static/img/logo.svg",
+        ToUserId: String(currentUser?.Id || ""),
+        ToUserName: String(currentUser?.Name || currentUser?.Account || ""),
+        Content: title && content && title !== content ? `${title}\n${content}` : (content || title),
+        CreateTime: notification?.CreateTime || new Date().toISOString(),
+        Type: "platform-system",
+        IsRead: Number(notification?.IsRead || 0) === 1,
+        IsPlatformNotification: true,
+        LinkUrl: String(notification?.LinkUrl || "")
+    };
+}
+
+export function createPlatformSystemContact(rows = [], unreadCount = 0) {
+    const latest = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    return {
+        ContactId: PLATFORM_SYSTEM_CONTACT_ID,
+        ContactUserId: PLATFORM_SYSTEM_CONTACT_ID,
+        ContactUserName: getPlatformNotificationSender(latest),
+        ContactUserAvatar: "./static/img/logo.svg",
+        LastMessage: latest?.MsgContent || latest?.Content || "平台消息将在这里同步显示",
+        UpdateTime: latest?.CreateTime || "",
+        UnRead: Math.max(0, Number(unreadCount || 0)),
+        IsPlatformSystem: true
+    };
+}
+
+function dispatchPlatformEvent(eventName, detail, target) {
+    const eventTarget = target || (typeof window !== "undefined" ? window : null);
+    if (!eventTarget || typeof eventTarget.dispatchEvent !== "function") return;
+    if (typeof CustomEvent === "function") {
+        eventTarget.dispatchEvent(new CustomEvent(eventName, { detail }));
+        return;
+    }
+    if (typeof document !== "undefined" && document.createEvent) {
+        const event = document.createEvent("CustomEvent");
+        event.initCustomEvent(eventName, false, false, detail);
+        eventTarget.dispatchEvent(event);
+    }
+}
+
+export function dispatchPlatformNotification(notification, target) {
+    dispatchPlatformEvent(PLATFORM_NOTIFICATION_EVENT, notification || {}, target);
+}
+
+export function dispatchPlatformNotificationSnapshot(rows, unreadCount, target) {
+    dispatchPlatformEvent(PLATFORM_NOTIFICATION_SNAPSHOT_EVENT, {
+        rows: Array.isArray(rows) ? rows : [],
+        unreadCount: Math.max(0, Number(unreadCount || 0))
+    }, target);
 }
 
 export function normalizeNotificationLink(value, currentOrigin = "") {

@@ -12,7 +12,7 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 访问密钥由 `microi_list_my_access_keys`、`microi_create_my_access_key`、`microi_revoke_my_access_key` 管理，只允许当前用户、限期、最小 scope，明文仅创建时返回一次。外部身份回调固定为 `/api/ExternalLogin/Callback`，服务端校验租户、Provider、state、redirect 和回调域名，验证成功后仍签发 DiyToken。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-security-000 sha256=683f6fb48592b050fc31caec6b45e39c8109b0a67baa48c0a2e6d1385a0e4ce1 -->
+<!-- microi-progressive:chunk id=v8-security-000 sha256=0346bd9ca3fe98dd2b589d1777aa1e55cd24cf7dedc69ee65d4ca91461db7dee -->
 ## 0. 租户动态系统设置与密钥边界
 
 第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。公开的租户配置必须建成当前租户 `sys_config` 的实体字段；敏感或仅供后端使用的租户业务配置保存到 `mci_system_setting`。数据库、Redis、MongoDB、MinIO、MQ 等部署控制面仍由主库 `sys_osclients` 托管，子租户不能修改。
@@ -20,7 +20,7 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 ```javascript
 // ✅ 浏览器/前端 V8 只读取 sys_config 的浏览器安全投影
 var sysTitle = V8.SysConfig.SysTitle;
-var githubVisible = V8.SysConfig.LoginGitHubDisplay;
+var githubVisible = V8.SysConfig.DisableLoginGitHub !== 1;
 
 // ✅ 后端接口引擎/后端 V8 事件从独立节点读取私密设置
 var privateSettings = V8.SysConfig.ServerPrivateSettings || {};

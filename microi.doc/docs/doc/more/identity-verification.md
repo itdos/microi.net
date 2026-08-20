@@ -145,12 +145,14 @@ return V8.FormEngine.UptFormData('payment_order', {
 | `Login.External.Enabled` | Bool / 服务端私有 | 第三方登录总开关 | `true` |
 | `Login.Face.Enabled` | Bool / 服务端私有 | 严格人脸入口 | `false` |
 | `Login.Gitee.Enabled` / `Login.WeChat.Enabled` / `Login.GitHub.Enabled` | Bool / 服务端私有 | 对应外部登录能力 | `false` |
-| `sys_config.LoginPasskeyDisplay` 等五个实体字段 | Bool / 浏览器公开 | 登录页入口是否显示；缺失或空值默认显示 | `1` |
+| `sys_config.DisableLoginPasskey` 等五个实体字段 | Bool / 浏览器公开 | 关闭对应登录入口；缺失、空值或 `0` 默认显示，显式 `1` 才关闭 | `0` |
 | `Login.{Provider}.ClientId` | String / 服务端私有 | OAuth 应用 ClientId | 无 |
 | `Login.{Provider}.ClientSecret` | String / Secret | OAuth 应用 ClientSecret | 无 |
 | `Login.{Provider}.Name` / `.Description` / `.Scope` | String / 服务端私有 | 名称、简介和授权 Scope | 平台安全默认值 |
 
 `{Provider}` 目前支持 `Gitee`、`WeChat`、`GitHub`。回调地址由后端按当前 API 域名固定生成：`/api/ExternalLogin/Callback?OsClient={租户}&Provider={Provider}`，应把【开始授权】接口返回的 `CallbackUrl` 原样登记到第三方平台。生产环境必须使用 HTTPS；`localhost` 仅用于受控开发。RP ID、Origin 或第三方回调域名配错时，浏览器/供应商会正确拒绝验证。
+
+五个浏览器公开字段完整名称为 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub`。旧 `LoginPasskeyDisplay`、`LoginAuthenticatorDisplay`、`LoginGiteeDisplay`、`LoginWeChatDisplay`、`LoginGitHubDisplay` 只用于兼容尚未升级的租户，不再作为新配置入口。
 
 官方应用商城 `app.microi.saas-engine` 会幂等安装身份表、动态设置表、外部身份表、默认设置、个人中心和租户系统设置微服务。默认行使用 `InsertIfMissing + ConfigKey`：老租户升级后自动看见功能，租户后来明确保存的值不会被下一次升级覆盖。为了兼容旧配置，默认行仍允许历史 `sys_osclients` 身份开关在租户首次保存新设置前生效；一旦保存，`ValueSource=Tenant` 的租户值成为事实源。
 

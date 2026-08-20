@@ -414,6 +414,8 @@ public class TenantConfigurationSecurityTests
             ["GlobalServerV8Code"] = "server-code",
             ["AccessToken"] = "token",
             ["ThirdPartyKey"] = "key",
+            ["DisableLoginPasskey"] = 0,
+            ["PasskeyPrivateKey"] = "must-not-leak",
             ["PwdV8"] = "backend-password-v8",
             ["GlobalV8Code"] = "frontend-global-v8",
             ["SysTitle"] = "Tenant Title",
@@ -427,11 +429,15 @@ public class TenantConfigurationSecurityTests
         Assert.Null(projection["GlobalServerV8Code"]);
         Assert.Null(projection["AccessToken"]);
         Assert.Null(projection["ThirdPartyKey"]);
+        Assert.Equal(0, projection["DisableLoginPasskey"]?.Value<int>());
+        Assert.Null(projection["PasskeyPrivateKey"]);
         Assert.Null(projection["PwdV8"]);
         Assert.Equal("frontend-global-v8", projection["GlobalV8Code"]?.ToString());
         Assert.Equal("Tenant Title", projection["SysTitle"]?.ToString());
         Assert.Null(projection["PublicSettings"]);
         Assert.Null(projection["ServerPrivateSettings"]);
+        Assert.True(TenantConfigurationSecurity.ShouldCopySysConfigFromMain("DisableLoginPasskey"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopySysConfigFromMain("PasskeyPrivateKey"));
     }
 
     [Fact]

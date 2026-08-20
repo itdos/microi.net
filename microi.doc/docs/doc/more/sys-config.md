@@ -23,7 +23,9 @@ var clientSecret = privateSettings['Login.Gitee.ClientSecret'];
 // clientSecret 只能参与当前后端调用，禁止 return 或 console.log。
 ```
 
-`DisableFormMaskBlur` 与 `DisableAiAssistant` 均为负向开关：缺失、空值或 `0/false` 表示保持默认效果；只有显式 `1/true` 才分别关闭表单遮罩毛玻璃和 AI 助手图标。表级 `diy_table.DisableFormMaskBlur` 也可单独关闭某张表的毛玻璃效果，全局或表级任一显式关闭即生效。应用商城升级必须复用旧 `FormMaskBlur`、`IsShowAiAssistant` 的字段元数据 Id 完成就地改名；为兼容未升级前的数据可以暂留旧物理列，但旧字段元数据必须在 PC 与移动端隐藏，禁止让用户同时看到正向、负向两套开关。
+`FormMaskBlur` 是全局正向开关：缺失、空值或 `0/false` 默认关闭遮罩毛玻璃，只有显式 `1/true` 才开启。表级 `diy_table.DisableFormMaskBlur` 仍是负向开关；全局开启后，某张表显式配置 `1/true` 可单独关闭。旧 `sys_config.DisableFormMaskBlur` 只用于未升级租户的前端兼容回退，字段元数据必须在 PC 与移动端隐藏。
+
+登录页入口统一使用 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub` 五个负向开关，字段标签分别为“关闭生物登录入口”“关闭Authenticator登录入口”“关闭Gitee登录入口”“关闭微信登录入口”“关闭GitHub登录入口”。它们缺失、空值或 `0/false` 时默认显示入口，只有显式 `1/true` 才关闭；旧 `Login*Display` 字段仅作兼容回退并隐藏。`DisableAiAssistant` 同样保持负向开关语义。
 
 ---
 

@@ -32,6 +32,8 @@
         /* === 官网白：与 microi.doc mainstream 主题保持相同表面层级 === */
         :root[data-theme="light"], :root {
             --mci-color-primary: #6C2BD9;
+            --mci-color-primary-on-surface: #6C2BD9;
+            --mci-text-on-primary: #FFFFFF;
             --mci-color-primary-light: #8B5CF6;
             --mci-color-primary-glow: rgba(108, 43, 217, 0.2);
             --mci-color-accent-blue: #2196F3;
@@ -68,6 +70,8 @@
         /* === 官网暗：中性蓝灰表面，不随品牌主色整页染色 === */
         :root[data-theme="dark"] {
             --mci-color-primary: #722BFF;
+            --mci-color-primary-on-surface: #9B5FFF;
+            --mci-text-on-primary: #FFFFFF;
             --mci-color-primary-light: #9B5FFF;
             --mci-color-primary-glow: rgba(114, 43, 255, 0.35);
             --mci-color-accent-blue: #29B8FF;
@@ -258,7 +262,7 @@
         .mci-logo-core svg {
             width: 40px;
             height: 40px;
-            fill: #fff;
+            fill: var(--mci-text-on-primary, #fff);
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
         }
         .mci-logo-core img {
@@ -288,6 +292,7 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            color: var(--mci-color-primary-on-surface, var(--mci-text-primary));
             text-shadow: 0 2px 30px var(--mci-color-primary-glow);
         }
         .mci-app-subtitle {
@@ -335,7 +340,7 @@
         .mci-progress-bar {
             height: 100%;
             width: 0%;
-            background: var(--mci-gradient-primary);
+            background: var(--mci-gradient-primary, var(--mci-color-primary-on-surface));
             border-radius: var(--mci-radius-full);
             transition: width 0.3s ease;
             box-shadow: 0 0 8px var(--mci-color-primary-glow);
@@ -374,7 +379,7 @@
         .mci-load-dots .dot {
             width: 10px;
             height: 10px;
-            background: var(--mci-color-primary);
+            background: var(--mci-color-primary-on-surface, var(--mci-color-primary));
             border-radius: 50%;
             animation: mciDotBounce 1.4s ease-in-out infinite both;
             box-shadow: 0 0 6px var(--mci-color-primary-glow);
@@ -410,9 +415,9 @@
             min-width: 108px;
             margin: 12px auto 0;
             padding: 8px 18px;
-            color: #fff;
+            color: var(--mci-text-on-primary, #fff);
             background: #6C2BD9;
-            background: var(--mci-color-primary);
+            background: var(--mci-color-primary-on-surface, var(--mci-color-primary));
             border: 0;
             border-radius: 8px;
             font: inherit;

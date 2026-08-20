@@ -423,17 +423,16 @@ export default {
         position: relative;
         box-sizing: border-box;
         margin: 3px 8px;
-        border: 1px solid transparent;
-        border-bottom: 0 !important;
+        border: 0 !important;
         border-radius: 10px;
         background: transparent !important;
+        box-shadow: none !important;
         transition: background-color 0.18s ease, color 0.18s ease;
         overflow: hidden;
         color: var(--sidebar-text-color, rgba(255, 255, 255, 0.9)) !important;
 
         &:hover {
             background: var(--sidebar-hover-bg, rgba(255, 255, 255, 0.12)) !important;
-            border-color: color-mix(in srgb, var(--sidebar-text-color, #fff) 10%, transparent);
             box-shadow: none;
             color: var(--sidebar-text-color, #ffffff) !important;
 
@@ -450,9 +449,8 @@ export default {
         // 活动状态
         &.is-active {
             background: var(--sidebar-active-bg, rgba(255, 255, 255, 0.25)) !important;
-            border-color: color-mix(in srgb, var(--sidebar-active-text-color, var(--sidebar-text-color, #fff)) 18%, transparent);
             color: var(--sidebar-active-text-color, var(--sidebar-text-color, #ffffff)) !important;
-            box-shadow: 0 6px 18px rgba(7, 18, 38, .08);
+            box-shadow: none !important;
             font-weight: 600;
 
             &::before {
@@ -462,7 +460,7 @@ export default {
                 top: 50%;
                 transform: translateY(-50%);
                 width: 3px;
-                height: 48%;
+                height: 42%;
                 background: var(--sidebar-active-text-color, var(--sidebar-text-color, #ffffff));
                 border-radius: 0 3px 3px 0;
                 box-shadow: none;
@@ -522,20 +520,30 @@ export default {
 
     // 子菜单样式
     .el-sub-menu {
+        border: 0 !important;
         border-bottom: 0 !important;
         box-shadow: none !important;
+
+        > .el-sub-menu__title {
+            border: 0 !important;
+            border-bottom: 0 !important;
+            box-shadow: none !important;
+        }
 
         &.is-opened {
             > .el-sub-menu__title {
                 background: var(--sidebar-opened-title-bg, transparent) !important;
-                box-shadow: none;
+                border: 0 !important;
+                box-shadow: none !important;
             }
         }
 
         &.is-active {
             > .el-sub-menu__title {
                 background: var(--sidebar-parent-active-bg, rgba(255, 255, 255, 0.1)) !important;
+                border: 0 !important;
                 color: var(--sidebar-active-text-color, var(--sidebar-text-color, #ffffff)) !important;
+                box-shadow: none !important;
 
                 i,
                 span {
@@ -559,8 +567,9 @@ export default {
                 min-width: 0 !important;
                 width: calc(100% - 16px);
                 margin: 2px 8px;
-                border-bottom: 0 !important;
                 background: var(--sidebar-submenu-item-bg, transparent) !important;
+                border: 0 !important;
+                box-shadow: none !important;
 
                 &:hover {
                     background: var(--sidebar-submenu-hover-bg, var(--sidebar-hover-bg, rgba(255, 255, 255, 0.12))) !important;

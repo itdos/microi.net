@@ -12,10 +12,15 @@
 
             <!-- 聊天图标 -->
             <div v-if="ShowChat" class="right-menu-item hover-effect" @click="SwitchDiyChatShow()">
-                <el-badge :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount"
-                    style="display: flex;">
-                    <el-icon class="menu-icon" :style="{ color: WebSocketOnline ? 'var(--mci-color-primary, #409eff)' : 'var(--el-text-color-regular)' }"><ChatDotRound /></el-icon>
-                </el-badge>
+                <el-tooltip :content="RealtimeStatusText" placement="bottom" popper-class="mci-realtime-tooltip">
+                    <span class="chat-realtime-indicator" :class="`is-${RealtimeState.toLowerCase()}`">
+                        <el-badge class="mci-header-badge" :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount"
+                            style="display: flex;">
+                            <el-icon class="menu-icon"><ChatDotRound /></el-icon>
+                        </el-badge>
+                        <i class="chat-realtime-indicator__dot" aria-hidden="true"></i>
+                    </span>
+                </el-tooltip>
             </div>
 
             <!-- 搜索 -->
@@ -130,6 +135,7 @@ import BluetoothPrinterEntry from "@/components/BluetoothPrinterEntry/index.vue"
 import { useDiyStore, useAppStore, useUserStore } from "@/pinia";
 import { computed } from "vue";
 import { hasWebOS } from "@/utils/webos-detect.js";
+import { getRealtimeStatusText } from "@/utils/realtime-connection.js";
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
 export default {
@@ -189,6 +195,9 @@ export default {
             ShowChat: false,
             ChatType: "",
             ShowUnreadCount: true,
+            RealtimeState: window.__MICROI_REALTIME_STATE__?.state || "Disconnected",
+            RealtimeRetryCount: window.__MICROI_REALTIME_STATE__?.retryCount || 0,
+            RealtimeRetryDelay: window.__MICROI_REALTIME_STATE__?.retryDelay ?? null,
             CurrentUserAvatarUrl: "./static/img/icon/personal.png",
             CurrentUserAvatarLoading: false,
             isBrowserFullScreen: !!document.fullscreenElement
@@ -196,7 +205,14 @@ export default {
     },
     computed: {
         WebSocketOnline: function () {
-            return !(this.$websocket == null || this.$websocket.state != "Connected");
+            return this.RealtimeState === "Connected";
+        },
+        RealtimeStatusText: function () {
+            return getRealtimeStatusText(
+                this.RealtimeState,
+                this.RealtimeRetryCount,
+                this.RealtimeRetryDelay
+            );
         },
         currentLang: function () {
             return this.SysConfig?.SysLang;
@@ -239,10 +255,17 @@ export default {
             this.isBrowserFullScreen = !!document.fullscreenElement;
         };
         document.addEventListener('fullscreenchange', this._fullscreenChangeHandler);
+        this._realtimeStateHandler = (event) => this.HandleRealtimeState(event?.detail);
+        window.addEventListener("microi-realtime-state-changed", this._realtimeStateHandler);
+        this.HandleRealtimeState(window.__MICROI_REALTIME_STATE__);
     },
     beforeUnmount() {
         if (this._fullscreenChangeHandler) {
             document.removeEventListener('fullscreenchange', this._fullscreenChangeHandler);
+        }
+        if (this._realtimeStateHandler) {
+            window.removeEventListener("microi-realtime-state-changed", this._realtimeStateHandler);
+            this._realtimeStateHandler = null;
         }
         // 清理未读计数闪烁定时器
         if (this._blinkTimer) {
@@ -251,6 +274,11 @@ export default {
         }
     },
     methods: {
+        HandleRealtimeState(detail) {
+            this.RealtimeState = detail?.state || "Disconnected";
+            this.RealtimeRetryCount = Number(detail?.retryCount || 0);
+            this.RealtimeRetryDelay = detail?.retryDelay ?? null;
+        },
         OpenPersonalSettings() {
             this.$router.push("/micro-app/microi-platform-service/personal-settings").catch(() => {});
         },
@@ -335,11 +363,11 @@ export default {
         },
         SwitchDiyChatShow() {
             var self = this;
-            
+            const willShow = !self.DiyChatShow;
             // 切换聊天显示状态
-            self.diyStore.setState("DiyChat", { ...self.diyStore.DiyChat, Show: !self.DiyChatShow });
+            self.diyStore.setState("DiyChat", { ...self.diyStore.DiyChat, Show: willShow });
             
-            if (self.DiyChatShow && self.ChatType == "吾码IM") {
+            if (willShow && self.ChatType == "吾码IM") {
                 // 检查WebSocket连接状态
                 const globalWs = window.__VUE_APP__?.config?.globalProperties?.$websocket;
                 const wsConnected = globalWs?.state === 'Connected';
@@ -357,7 +385,7 @@ export default {
                         const result = window.tryConnectWebSocket(true);  // forceRetry=true
                         console.log('[聊天图标] 重连结果:', result);
                         
-                        if (!result.success) {
+                        if (!result.success && result.reason !== "手动重试过于频繁，请稍后再试") {
                             self.$message?.warning(`聊天服务连接失败: ${result.reason}`);
                         }
                     }
@@ -555,6 +583,43 @@ export default {
             font-size: 20px;
         }
 
+        .chat-realtime-indicator {
+            position: relative;
+            display: inline-flex;
+            color: var(--el-text-color-regular, #5a5e66);
+
+            &.is-connected {
+                color: var(--el-color-success, #67c23a);
+            }
+
+            &.is-connecting,
+            &.is-reconnecting {
+                color: var(--el-color-warning, #e6a23c);
+            }
+
+            &.is-exhausted,
+            &.is-disconnected {
+                color: var(--el-color-danger, #f56c6c);
+            }
+        }
+
+        .chat-realtime-indicator__dot {
+            position: absolute;
+            right: -3px;
+            bottom: -2px;
+            width: 8px;
+            height: 8px;
+            border: 2px solid var(--el-bg-color, #fff);
+            border-radius: 50%;
+            background: currentColor;
+            box-sizing: content-box;
+        }
+
+        .is-connecting .chat-realtime-indicator__dot,
+        .is-reconnecting .chat-realtime-indicator__dot {
+            animation: microi-realtime-pulse 1.2s ease-in-out infinite;
+        }
+
         .avatar-container {
             margin-right: 0;
 
@@ -584,5 +649,10 @@ export default {
     color: var(--el-text-color-secondary, #909399);
     font-size: 12px;
     line-height: 1.6;
+}
+
+@keyframes microi-realtime-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.15); }
 }
 </style>

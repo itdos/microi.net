@@ -46,6 +46,12 @@ import { initThemeColor, setThemeColor } from "./utils/theme-color";
 import $ from "jquery";
 window.$ = window.jQuery = window.jquery = $;
 import * as websocket from "@microsoft/signalr";
+import {
+    REALTIME_CONNECTED_EVENT,
+    buildRealtimeHubUrl,
+    dispatchRealtimeState,
+    getRealtimeRetryDelay
+} from "./utils/realtime-connection.js";
 import microApp from "@micro-zoe/micro-app";
 const isWebosEmbeddedRuntime = isEmbeddedWebosWindowRuntime();
 window.__MICROI_WEBOS_EMBEDDED_RUNTIME__ = isWebosEmbeddedRuntime;
@@ -280,159 +286,206 @@ function onAppMounted() {
     if (!isWebosEmbeddedRuntime) tryConnectWebSocket();
 }
 
-// WebSocket连接管理
-let websocketRetryCount = 0;  // 重连次数
-const MAX_RETRY_COUNT = 3;    // 最多重连3次
-let lastConnectAttempt = 0;   // 上次尝试连接时间
+// SignalR 连接管理：首次连接和断线重连都使用有限退避。达到上限后保持
+// Exhausted，只有用户再次点击聊天图标或登录身份变化才会重置，避免无限风暴。
+let websocketInitialRetryCount = 0;
+let websocketInitialRetryTimer = null;
+let websocketStartPromise = null;
+let websocketStoppedByClient = false;
+let lastForcedRetryAt = 0;
 
-// 导出全局方法供外部调用（登录后、点击聊天图标时）
-window.tryConnectWebSocket = function(forceRetry = false) {
-    if (isWebosEmbeddedRuntime) {
-        return { success: false, reason: 'WebOS嵌入窗口复用父页面实时通道' };
-    }
+function currentRealtimeIdentity() {
     const diyStore = useDiyStore();
-    const GetCurrentUser = diyStore.GetCurrentUser;
-    const ChatType = diyStore.ChatType || "吾码IM";
-    const token = DiyCommon.getToken();
-    const currentWebsocket = app.config.globalProperties.$websocket;
-    const IsPhoneView = diyStore.IsPhoneView;  // 是否移动端
-    
-    // 检查设备类型：PC端不连接聊天（由移动端连接）
-    if (IsPhoneView !== true && IsPhoneView !== false) {
-        console.log('[WebSocket] 设备类型未确定，跳过连接');
-        return { success: false, reason: '设备类型未确定' };
-    }
-    
-    // 平台内部通知、后台任务和在线终端始终依赖平台 SignalR；聊天类型
-    // 只决定聊天 UI 的实现，不得关闭系统级实时通道。
-    const needConnect = !!token && !DiyCommon.IsNull(GetCurrentUser?.Id);
-    
-    if (!needConnect) {
-        console.log('[WebSocket] 不满足连接条件，跳过');
-        return { success: false, reason: '未登录' };
-    }
-    
-    // 检查已连接
-    if (currentWebsocket?.state === "Connected") {
-        console.log('[WebSocket] 已连接，无需重连');
-        return { success: true, reason: '已连接' };
-    }
-    
-    // 强制重试时重置计数器
-    if (forceRetry) {
-        console.log('[WebSocket] 强制重试，重置计数器');
-        websocketRetryCount = 0;
-    }
-    
-    // 检查重连次数
-    if (websocketRetryCount >= MAX_RETRY_COUNT) {
-        console.warn(`[WebSocket] 已达到最大重连次数(${MAX_RETRY_COUNT})，停止尝试`);
-        return { success: false, reason: `已达到最大重连次数(${MAX_RETRY_COUNT})` };
-    }
-    
-    // 防止短时间内多次连接
-    const now = Date.now();
-    if (now - lastConnectAttempt < 2000) {
-        console.log('[WebSocket] 连接请求过于频繁，跳过');
-        return { success: false, reason: '连接请求过于频繁' };
-    }
-    lastConnectAttempt = now;
-    
-    // 执行连接
-    websocketRetryCount++;
-    console.log(`[WebSocket] 第${websocketRetryCount}次尝试连接...`);
-    
-    return InitDiyWebcoket();
-};
+    const user = diyStore.GetCurrentUser || {};
+    const apiBase = String(DiyCommon.GetApiBase() || "").replace(/\/+$/, "");
+    const osClient = String(DiyCommon.GetOsClient() || diyStore.OsClient || "").trim();
+    const userId = String(user.Id || "").trim();
+    return {
+        apiBase,
+        osClient,
+        userId,
+        key: `${apiBase}|${osClient.toLowerCase()}|${userId}`
+    };
+}
 
-// 导出重置重连计数器的方法（用户刷新页面时自动重置）
-window.resetWebSocketRetry = function() {
-    websocketRetryCount = 0;
-    console.log('[WebSocket] 重连计数器已重置');
-};
+function emitRealtimeState(state, detail = {}) {
+    const identity = currentRealtimeIdentity();
+    return dispatchRealtimeState({ state, osClient: identity.osClient, ...detail });
+}
 
-// WebSocket 初始化
-function InitDiyWebcoket() {
-    const diyStore = useDiyStore();
-    const GetCurrentUser = diyStore.GetCurrentUser;
-    const ChatType = diyStore.ChatType || "吾码IM";
-    const token = DiyCommon.getToken();
-
-    console.log('[WebSocket] 检查初始化条件:', {
-        UserId: GetCurrentUser?.Id,
-        UserName: GetCurrentUser?.Name,
-        ChatType: ChatType,
-        HasToken: !!token
-    });
-
-    // 未登录时不连接WebSocket
-    if (!token) {
-        console.log('[WebSocket] 未登录，跳过连接');
-        return { success: false, reason: '未登录' };
-    }
-
-    // 平台内部通知、后台任务和在线终端共用该鉴权 Hub；即使租户聊天
-    // 选择了腾讯 IM，也必须保持平台 SignalR 连接以接收系统级消息。
-    if (!DiyCommon.IsNull(GetCurrentUser?.Id)) {
-        const currentWebsocket = app.config.globalProperties.$websocket;
-        console.log('[WebSocket] 当前连接状态:', currentWebsocket?.state || 'null');
-        
-        if (currentWebsocket == null || (currentWebsocket.state != "Connected" && currentWebsocket.state != "Connecting")) {
-            const deviceClientId = DiyCommon.GetDid();
-            const url = DiyCommon.GetApiBase() + `/diy-websocket?DeviceClientId=${encodeURIComponent(deviceClientId)}`;
-            const token = DiyCommon.getToken();
-            
-            console.log('[WebSocket] 开始连接:', url);
-            try {
-                const ws = new websocket.HubConnectionBuilder()
-                    .withUrl(url, {
-                        accessTokenFactory: () => {
-                            return token;
-                        }
-                    })
-                    .withAutomaticReconnect({
-                        nextRetryDelayInMilliseconds: (retryContext) => {
-                            return 5000;
-                        }
-                    })
-                    .build();
-                app.config.globalProperties.$websocket = ws;
-                ws.serverTimeoutInMilliseconds = 1000 * 60 * 20;
-                ws.keepAliveIntervalInMilliseconds = 1000 * 60 * 20;
-                ws.start().then(function () {
-                    console.log("[成功] 连接消息服务器成功！");
-                    window.dispatchEvent(new CustomEvent("microi-websocket-connected", { detail: { state: "Connected" } }));
-                    // 连接成功后重置重连计数器
-                    if (window.resetWebSocketRetry) {
-                        window.resetWebSocketRetry();
-                    }
-                }).catch(function(error) {
-                    console.error("[错误] 连接消息服务器失败:", error);
-                });
-                ws.onclose((error) => {
-                    console.log("消息服务器已断开！", error);
-                });
-                ws.onreconnected((connectionId) => {
-                    console.log("消息服务器已重新连接！", connectionId);
-                    window.dispatchEvent(new CustomEvent("microi-websocket-connected", { detail: { state: "Reconnected", connectionId } }));
-                });
-                ws.onreconnecting((error) => {
-                    console.log("消息服务器正在重连...", error);
-                });
-                return { success: true, reason: '连接中' };
-            } catch (error) {
-                console.error("[错误] 消息服务器连接异常:", error);
-                return { success: false, reason: error.toString() };
-            }
-        } else {
-            console.log('[WebSocket] 已连接或正在连接中，跳过');
-            return { success: true, reason: '已连接或连接中' };
-        }
-    } else {
-        console.warn('[WebSocket] 未满足初始化条件，跳过');
-        return { success: false, reason: '未满足初始化条件' };
+function clearInitialRealtimeRetry() {
+    if (websocketInitialRetryTimer) {
+        window.clearTimeout(websocketInitialRetryTimer);
+        websocketInitialRetryTimer = null;
     }
 }
+
+function emitRealtimeConnected(state, connectionId) {
+    const detail = emitRealtimeState("Connected", {
+        connectionId,
+        reason: state === "Reconnected" ? "连接已恢复" : "连接成功"
+    });
+    window.dispatchEvent(new CustomEvent(REALTIME_CONNECTED_EVENT, {
+        detail: { ...detail, state }
+    }));
+}
+
+function scheduleInitialRealtimeRetry(identity, error) {
+    clearInitialRealtimeRetry();
+    const retryDelay = getRealtimeRetryDelay({ previousRetryCount: websocketInitialRetryCount });
+    if (retryDelay === null) {
+        emitRealtimeState("Exhausted", {
+            retryCount: websocketInitialRetryCount,
+            reason: error?.message || String(error || "首次连接重试已达上限")
+        });
+        return;
+    }
+    websocketInitialRetryCount++;
+    emitRealtimeState("Reconnecting", {
+        retryCount: websocketInitialRetryCount,
+        retryDelay,
+        reason: error?.message || String(error || "首次连接失败")
+    });
+    websocketInitialRetryTimer = window.setTimeout(() => {
+        websocketInitialRetryTimer = null;
+        startRealtimeConnection(identity);
+    }, retryDelay);
+}
+
+function createRealtimeConnection(identity) {
+    const url = buildRealtimeHubUrl(identity.apiBase, identity.osClient, DiyCommon.GetDid());
+    let ws = null;
+    ws = new websocket.HubConnectionBuilder()
+        .withUrl(url, {
+            // Token 可能在长页面会话中续签；每次握手都读取最新值，不能捕获旧 Token。
+            accessTokenFactory: () => DiyCommon.getToken() || ""
+        })
+        .withAutomaticReconnect({
+            nextRetryDelayInMilliseconds(retryContext) {
+                const retryDelay = getRealtimeRetryDelay(retryContext);
+                ws.__microiAutomaticRetryCount = Number(retryContext.previousRetryCount || 0) + 1;
+                ws.__microiAutomaticRetryDelay = retryDelay;
+                return retryDelay;
+            }
+        })
+        .build();
+    ws.__microiIdentityKey = identity.key;
+    ws.__microiEverConnected = false;
+    ws.__microiAutomaticRetryCount = 0;
+    ws.__microiAutomaticRetryDelay = null;
+    // 15 秒心跳、45 秒失联判断能及时显示真实状态，又不会制造高频流量。
+    ws.keepAliveIntervalInMilliseconds = 15000;
+    ws.serverTimeoutInMilliseconds = 45000;
+
+    ws.onreconnecting((error) => {
+        emitRealtimeState("Reconnecting", {
+            retryCount: ws.__microiAutomaticRetryCount || 1,
+            retryDelay: ws.__microiAutomaticRetryDelay,
+            reason: error?.message || String(error || "连接中断")
+        });
+    });
+    ws.onreconnected((connectionId) => {
+        websocketInitialRetryCount = 0;
+        ws.__microiEverConnected = true;
+        ws.__microiAutomaticRetryCount = 0;
+        ws.__microiAutomaticRetryDelay = null;
+        emitRealtimeConnected("Reconnected", connectionId);
+    });
+    ws.onclose((error) => {
+        if (websocketStoppedByClient || app.config.globalProperties.$websocket !== ws) return;
+        emitRealtimeState(ws.__microiEverConnected ? "Exhausted" : "Disconnected", {
+            retryCount: ws.__microiAutomaticRetryCount,
+            reason: error?.message || String(error || "连接已断开")
+        });
+    });
+    return ws;
+}
+
+async function startRealtimeConnection(identity) {
+    if (websocketStartPromise) return websocketStartPromise;
+    websocketStartPromise = (async () => {
+        let ws = app.config.globalProperties.$websocket;
+        if (ws && ws.__microiIdentityKey !== identity.key) {
+            websocketStoppedByClient = true;
+            clearInitialRealtimeRetry();
+            try { await ws.stop(); } catch (_) {}
+            websocketStoppedByClient = false;
+            if (app.config.globalProperties.$websocket === ws) {
+                app.config.globalProperties.$websocket = null;
+            }
+            ws = null;
+        }
+        if (!ws) {
+            ws = createRealtimeConnection(identity);
+            app.config.globalProperties.$websocket = ws;
+        }
+        if (ws.state === "Connected") {
+            emitRealtimeConnected("Connected", ws.connectionId);
+            return;
+        }
+        if (ws.state === "Connecting" || ws.state === "Reconnecting") return;
+
+        emitRealtimeState("Connecting", { retryCount: websocketInitialRetryCount });
+        try {
+            await ws.start();
+            websocketInitialRetryCount = 0;
+            clearInitialRealtimeRetry();
+            ws.__microiEverConnected = true;
+            emitRealtimeConnected("Connected", ws.connectionId);
+        } catch (error) {
+            console.error("[Realtime] 连接消息服务器失败:", error);
+            scheduleInitialRealtimeRetry(identity, error);
+        }
+    })().finally(() => {
+        websocketStartPromise = null;
+    });
+    return websocketStartPromise;
+}
+
+// 登录后、点击聊天图标时共用。同步返回启动结果，实际状态通过
+// microi-realtime-state-changed 通知各组件。
+window.tryConnectWebSocket = function(forceRetry = false) {
+    if (isWebosEmbeddedRuntime) {
+        emitRealtimeState("Unavailable", { reason: "WebOS 嵌入窗口复用父页面实时通道" });
+        return { success: false, reason: "WebOS嵌入窗口复用父页面实时通道" };
+    }
+    const diyStore = useDiyStore();
+    const identity = currentRealtimeIdentity();
+    if (diyStore.IsPhoneView !== true && diyStore.IsPhoneView !== false) {
+        return { success: false, reason: "设备类型未确定" };
+    }
+    if (!DiyCommon.getToken() || !identity.userId || !identity.osClient || !identity.apiBase) {
+        emitRealtimeState("Disconnected", { reason: "未登录或租户上下文未就绪" });
+        return { success: false, reason: "未登录" };
+    }
+
+    const current = app.config.globalProperties.$websocket;
+    if (current?.state === "Connected" && current.__microiIdentityKey === identity.key) {
+        return { success: true, reason: "已连接" };
+    }
+    if (forceRetry) {
+        const now = Date.now();
+        if (now - lastForcedRetryAt < 2000) {
+            return { success: false, reason: "手动重试过于频繁，请稍后再试" };
+        }
+        lastForcedRetryAt = now;
+        websocketInitialRetryCount = 0;
+        clearInitialRealtimeRetry();
+    } else if (websocketInitialRetryTimer || current?.state === "Connecting" || current?.state === "Reconnecting") {
+        return { success: true, reason: "连接或有限重试进行中" };
+    }
+
+    startRealtimeConnection(identity);
+    return { success: true, reason: forceRetry ? "已开始手动重试" : "连接中" };
+};
+
+window.getRealtimeConnectionState = function() {
+    return window.__MICROI_REALTIME_STATE__ || { state: "Disconnected", retryCount: 0 };
+};
+
+emitRealtimeState(isWebosEmbeddedRuntime ? "Unavailable" : "Disconnected", {
+    reason: isWebosEmbeddedRuntime ? "复用父页面实时通道" : "尚未连接"
+});
 
 // 内存监控设置
 function setupMemoryMonitor() {
@@ -498,6 +551,8 @@ window.addEventListener("beforeunload", () => {
     const ws = app.config.globalProperties.$websocket;
     if (ws) {
         try {
+            websocketStoppedByClient = true;
+            clearInitialRealtimeRetry();
             ws.stop();
         } catch (error) {
             console.log("关闭 WebSocket 连接失败:", error);
