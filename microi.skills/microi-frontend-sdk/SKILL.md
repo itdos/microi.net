@@ -180,3 +180,10 @@ uni.request({ url: apiBase + '/apiengine/' + key, header: { Token: token } });
 
 - [references/progressive-01-token-当前登录用户与当前终端登录协议.md](references/progressive-01-token-当前登录用户与当前终端登录协议.md)：Token、当前登录用户与当前终端登录协议；仅支持 Vue 3；Key-Value 枚举的跨端约定（强制）；界面层独立；验证；搭配 MCI-UI；MicroApp 宿主 Token 同步
 <!-- microi-progressive:end -->
+
+## 复盘：FormEngine 新增请求只在外层保留 Id
+
+- 触发场景：uni-app/微信小程序预生成记录 Id 后调用 `V8.FormEngine.AddFormData(table, row)`，服务端表单事件中 `V8.Form.Id` 仍为空，按父 Id 查询子表时误命中外键为空的孤儿数据。
+- 根因：SDK 将 `Id` 从业务行模型 `_RowModel` 中移出后只写到请求外层；外层 Id 可用于接口寻址，但不会稳定进入表单事件的 `V8.Form`。
+- 通用规则：新增请求遇到 `Id` 时必须同时保留 `request.Id` 与 `request._RowModel.Id`；服务端涉及父子表聚合或删除的事件还必须对父 Id 做非空熔断，禁止使用空值或 `Like` 查询子表。
+- 自动化检查：FormEngine 写入契约测试必须断言预生成 Id 在请求外层和 `_RowModel` 中完全一致，并覆盖后端事件在空 Id 时拒绝执行、有效 Id 时只查询对应子记录。

@@ -90,7 +90,8 @@ test('任务设备坐标按客户设备优先、客户默认位置兜底', () =>
   assert.match(taskSource, /customer\.KehuDT_Lat/)
   assert.match(taskSource, /customer\.KehuDT_Lng/)
   assert.match(mapSource, /withCustomerCoordinateDefaults\(rows\)/)
-  assert.match(mapSource, /_SelectFields: \['Id', 'KehuDT_Lat', 'KehuDT_Lng'\]/)
+  assert.match(mapSource, /authorizedCustomerModule\(\['Id', 'KehuDT_Lat', 'KehuDT_Lng'\]\)/)
+  assert.match(mapSource, /ModuleEngineKey: 'Diy_Kehu'/)
   assert.match(mapSource, /CoordinateSource: 'customer-default'/)
 })
 

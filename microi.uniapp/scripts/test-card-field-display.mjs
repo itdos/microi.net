@@ -68,6 +68,7 @@ unlimitedCardSources.forEach((file) => {
   assert.equal(/(?:lines|visibleLines)[\s\S]{0,300}\.slice\(0,\s*4\)/.test(source), false, `${file} 不应把卡片内容限制为四行`)
 })
 const relatedListSource = readFileSync(new URL('../src/components/mci-business-related-list/mci-business-related-list.vue', import.meta.url), 'utf8')
+const relatedListPageSource = readFileSync(new URL('../src/pages/business/related-list.vue', import.meta.url), 'utf8')
 assert.doesNotMatch(
   relatedListSource,
   /loadGrantedMenuDefinition/,
@@ -75,7 +76,16 @@ assert.doesNotMatch(
 )
 
 assert.match(relatedListSource, /createMenuModuleDefinition\(menu, this\.definition, this\.table\)/, '详情 Tab 应复用独立列表的菜单卡片编译逻辑')
-assert.match(relatedListSource, /loadModuleDefinition\(this\.menuId, true\)/, '详情 Tab 应主动刷新并读取与普通列表相同的完整模块展示配置')
+assert.match(relatedListSource, /title:\s*menuConfig\.title/, '独立子表标题必须使用当前子菜单名称')
+assert.match(relatedListSource, /'titleField', 'title', 'statusField'/, '后台刷新完整菜单时必须同步模块标题')
+assert.match(relatedListSource, /\$emit\('title-change', title\)/, '子表模块名称刷新后必须通知独立页面更新导航标题')
+assert.match(relatedListPageSource, /@title-change="handleTitleChange"/, '独立子表页面必须接收当前子菜单名称')
+assert.match(relatedListPageSource, /handleTitleChange\(title\)[\s\S]{0,160}this\.pageTitle = nextTitle/, '独立子表顶部标题必须跟随后台模块名称')
+assert.match(
+  relatedListSource,
+  /loadModuleDefinition\(this\.menuId, true, \{ includeHidden: true \}\)/,
+  '只有详情关联子表可显式刷新隐藏菜单的完整展示配置'
+)
 assert.match(relatedListSource, /'menu', 'definition', 'titleField'/, '详情 Tab 应把完整模块的菜单快照交给 ViewManifest')
 assert.match(relatedListSource, /void this\.loadPresentationConfig\(refresh\)/, '完整展示配置不得阻塞关联数据加载和骨架屏关闭')
 assert.match(relatedListSource, /filterVisibleCardLines\(this\.config\.lines \|\| \[\], row/, '详情 Tab 必须复用普通列表的标题与正文去重规则')
@@ -85,6 +95,8 @@ assert.match(relatedListSource, /parentCustomerName[\s\S]{0,120}'订单'/, '订�
 assert.doesNotMatch(relatedListSource, /payload\._SelectFields = this\.config\.selectFields/, '详情 Tab 的父子授权查询不应套用普通列表字段裁剪')
 assert.doesNotMatch(relatedListSource, /\.\.\.\(menuConfig \|\| \{\}\)/, '详情 Tab 不应整体继承普通列表的排序、分页和查询配置')
 assert.match(relatedListSource, /:time="cardBottomText\(row\)"/, '详情 Tab 应按平台底部字段配置渲染卡片底部')
+assert.match(relatedListSource, /_SelectFields: this\.relatedSelectFields\(\)/, 'TableChild 查询必须显式补齐移动卡片引用字段')
+assert.match(relatedListSource, /\.\.\.\(this\.config\.selectFields \|\| \[\]\)/, 'TableChild 查询字段应包含模块卡片完整字段集')
 assert.doesNotMatch(relatedListSource, /if \(requestId !== this\.loadRequestId\) return/, '详情 Tab 不应因并发刷新丢弃所有已成功返回的数据并停留在骨架屏')
 assert.match(relatedListSource, /finally \{[\s\S]{0,80}this\.loading = false/, '详情 Tab 请求结束后必须无条件关闭骨架屏')
 
@@ -93,11 +105,20 @@ const businessRuntimeSource = readFileSync(new URL('../src/platform/business-run
 const viewManifestSource = readFileSync(new URL('../src/platform/view-manifest.js', import.meta.url), 'utf8')
 const tenantBusinessSource = readFileSync(new URL('../src/tenants/xjy/business.js', import.meta.url), 'utf8')
 assert.match(tenantBusinessSource, /orders: native\(\{[\s\S]{0,240}titleField: 'KehuMC'/, '订单本地回退配置不得再把订单编号设为标题')
+assert.match(tenantBusinessSource, /proposals: native\(\{[\s\S]{0,100}title: '需求方案'/, '需求方案页面的离线兜底标题应与平台菜单一致')
 assert.match(viewManifestSource, /matchingConfiguredMenu\(moduleConfig\) \|\| await findMenu/, 'ViewManifest 应优先复用模块定义中的同一菜单快照')
 assert.match(moduleRegistrySource, /hasConfiguredCardFields:/, '模块配置应标记旧式卡片字段，阻止旧 ViewSchema 覆盖')
+assert.match(moduleRegistrySource, /hasConfiguredMobileFields:/, '模块配置应分别标记移动正文配置')
+assert.match(moduleRegistrySource, /const titleField = configuredMobile\.length[\s\S]{0,100}\(preferred\[0\] \|\| null\)/, '移动卡片第一配置字段必须固定作为标题')
 assert.match(moduleRegistrySource, /configuredBottomFields\.map\(\(item\) => item\.queryField\)/, '卡片底部字段应并入查询字段')
-assert.match(moduleRegistrySource, /const configuredStatus = configuredTagFields\[0\] \|\| null/, '卡片标题标签第一项应明确控制右上角状态位')
-assert.match(moduleRegistrySource, /configuredStatus[\s\S]{0,120}: preferredField\(fields, \[\/状态\|status\|stage\/i\]/, '仅未配置标题标签时才应自动推断状态字段')
+assert.doesNotMatch(moduleRegistrySource, /configuredStatus\s*=\s*configuredTagFields\[0\]/, '旧式卡片标题标签不得再冒充跨端状态字段')
+assert.match(moduleRegistrySource, /const statusField = preferredField\(fields, \[\/状态\|status\|stage\/i\]/, '旧模块只能按真实状态字段名称提供安全兜底')
+assert.match(moduleRegistrySource, /!module && options\.includeHidden === true/, '隐藏菜单回读必须由关联子表显式开启')
+assert.match(moduleRegistrySource, /findMenu\(\[\], '', refresh, menuId\)/, '隐藏关联菜单仍必须按精确 Id 刷新完整卡片配置')
+;['../src/pages/business/list.vue', '../src/pages/module/list.vue'].forEach((file) => {
+  const source = readFileSync(new URL(file, import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /includeHidden/, `${file} 主列表不得开启隐藏子菜单解析`)
+})
 assert.match(businessRuntimeSource, /payload\._SelectFields = moduleConfig\.selectFields/, '列表查询应显式携带卡片所需字段')
 
 const statusOverrideSources = [
@@ -110,21 +131,42 @@ statusOverrideSources.forEach((file) => {
   assert.doesNotMatch(
     source,
     /hasConfiguredCardFields[^\n]+\[[^\]]*['"]statusField['"]/,
-    `${file} 不应阻止显式 ViewSchema.StatusField 覆盖旧式自动值`
+    `${file} 不应阻止显式 ViewSchema 状态字段覆盖旧式自动值`
   )
-  assert.doesNotMatch(
+  assert.match(
     source,
-    /hasConfiguredCardFields[^\n]+\[[^\]]*['"]titleField['"]/,
-    `${file} 不应阻止显式 ViewSchema.TitleField 覆盖旧式自动标题`
+    /name === 'titleField' && merged\.hasConfiguredMobileFields/,
+    `${file} 标题必须优先使用模块 MobileListFields 第一项`
   )
+  assert.match(
+    source,
+    /dynamic\.tagsFromViewSchema[\s\S]{0,80}merged\.tagFields = dynamic\.tagFields \|\| \[\]/,
+    `${file} 标签必须由跨端 TopFields 明确覆盖或清空`
+  )
+  assert.match(
+    source,
+    /dynamic\.statusFromViewSchema[\s\S]{0,100}merged\.statusField = dynamic\.statusField \|\| ''/,
+    `${file} 应在跨端 StatusFields 为空时明确清除旧状态`
+  )
+  assert.match(
+    source,
+    /merged\.statusOptions = dynamic\.statusOptions \|\| \[\]/,
+    `${file} 状态筛选项应同步跟随跨端状态字段`
+  )
+  assert.match(
+    source,
+    /\.\.\.\(dynamic\.requiredFields \|\| \[\]\)/,
+    `${file} 应把跨端卡片全部引用字段并入列表查询`
+  )
+  assert.match(source, /value === '-' \? '' : value/, `${file} 状态字段为空时不应显示占位横线`)
+  assert.match(source, /hasConfiguredMobileFields[\s\S]{0,60}\? ''[\s\S]{0,20}:/, `${file} 模块未配置底部字段时不得擅自回退创建时间`)
 })
 ;['../src/pages/business/list.vue', '../src/pages/module/list.vue'].forEach((file) => {
   const source = readFileSync(new URL(file, import.meta.url), 'utf8')
-  assert.match(
-    source,
-    /merged\.selectFields = \[\.\.\.new Set\(\[\.\.\.\(merged\.selectFields \|\| \[\]\), dynamic\.statusField\]\)\]/,
-    `${file} 应把显式 ViewSchema.StatusField 并入列表查询字段`
-  )
+  assert.match(source, /dynamic\.requiredFields/, `${file} 应统一查询跨端 Card-Mobile 所有字段`)
 })
+const businessListSource = readFileSync(new URL('../src/pages/business/list.vue', import.meta.url), 'utf8')
+assert.match(businessListSource, /title: menu\.Name \|\| this\.baseConfig\.title/, '业务列表页面标题必须跟随后台模块名称')
+assert.match(businessListSource, /!restored \|\| !this\.rowsContainConfiguredCardFields\(\)/, '旧页面快照缺少新卡片字段时必须重新查询')
 
 console.log('card field display checks passed')
