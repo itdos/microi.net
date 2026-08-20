@@ -47,6 +47,20 @@ test('column settings are immediate, non-blocking and scoped to account plus mod
   assert.match(cleanup, /hideColumnSettings/);
 });
 
+test('column header filter retains the v6.5 clear and filter actions without horizontal clipping', async () => {
+  const [source, ui, styles] = await Promise.all([
+    read('src/views/form-engine/diy-table.vue'),
+    read('src/views/form-engine/mixins/diy-table-ui.mixin.js'),
+    read('src/styles/diy-table.scss')
+  ]);
+
+  assert.match(source, /<el-button[^>]*@click="colMenuClearFilter\(\)"[^>]*>清除<\/el-button>/);
+  assert.match(source, /<el-button[^>]*type="primary"[^>]*@click="colMenuApplyAllFilters\(\)"[^>]*>筛选<\/el-button>/);
+  assert.match(ui, /colMenuApplyAllFilters\(\)\s*\{[\s\S]*?syncColFilterModel\(\);[\s\S]*?syncColPageFilterModel\(\);[\s\S]*?refreshColMenuFilterResult\(\);/);
+  assert.match(styles, />\s*\.global-col-menu-filter\s*\{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?width:\s*calc\(100%\s*-\s*16px\);[\s\S]*?min-width:\s*0;/);
+  assert.match(styles, /\.col-filter-actions\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;[\s\S]*?>\s*\.el-button\s*\{[\s\S]*?flex:\s*0\s+1\s+88px;[\s\S]*?margin-left:\s*0\s*!important;/);
+});
+
 test('fixed action column keeps normal, striped and hover backgrounds aligned', async () => {
   const [rowStyles, popupStyles] = await Promise.all([
     read('src/views/form-engine/styles/diy-table-rowlist.scss'),
