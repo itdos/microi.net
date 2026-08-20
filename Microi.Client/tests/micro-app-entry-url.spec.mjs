@@ -5,7 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
     appendMicroAppVersionQuery,
-    buildMicroAppEntryUrl
+    buildMicroAppEntryUrl,
+    shouldUseMicroAppResolveFallback
 } from "../src/utils/microAppEntryUrl.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -39,4 +40,14 @@ test("all built-in hosts use the stable entry helper instead of a version path s
         assert.match(source, /buildMicroAppEntryUrl/);
         assert.doesNotMatch(source, /versionPart/);
     }
+});
+
+test("host only falls back to the stable managed entry for compatible old backends", () => {
+    assert.equal(shouldUseMicroAppResolveFallback({ Code: 0, Msg: "route unavailable" }), true);
+    assert.equal(shouldUseMicroAppResolveFallback({
+        Code: 0,
+        Data: { ReasonCode: "MICRO_APP_NOT_AVAILABLE" }
+    }), false);
+    assert.equal(shouldUseMicroAppResolveFallback(null, { requestedVersion: "v1.6.3" }), false);
+    assert.equal(shouldUseMicroAppResolveFallback(null, { requirePage: true }), false);
 });

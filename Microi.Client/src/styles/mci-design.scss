@@ -1154,9 +1154,12 @@ html.dark {
     box-shadow: 0 24px 64px rgba(9, 24, 48, .22), 0 6px 18px rgba(9, 24, 48, .08);
 
     > .el-dialog__header {
+        position: relative;
         display: flex;
         min-height: 68px;
         align-items: center;
+        justify-content: flex-start;
+        flex-wrap: nowrap;
         box-sizing: border-box;
         margin: 0;
         padding: 16px 22px;
@@ -1174,6 +1177,71 @@ html.dark {
         padding: 14px;
         background: color-mix(in srgb, var(--el-fill-color-extra-light, #f6f8fb) 82%, var(--mci-dialog-surface));
     }
+
+    > .el-dialog__header > .el-dialog__headerbtn {
+        top: 50%;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        border: 1px solid color-mix(in srgb, var(--el-border-color, #d8e0ea) 82%, transparent);
+        border-radius: 11px;
+        background: var(--el-fill-color-light, #eef2f6);
+        color: var(--el-text-color-secondary, #66758a);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+        transform: translateY(-50%);
+        transition: background-color .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+
+        &:hover,
+        &:focus-visible {
+            border-color: color-mix(in srgb, var(--el-color-primary, #3478f6) 28%, var(--el-border-color, #d8e0ea));
+            background: var(--el-fill-color, #e5eaf0);
+            color: var(--el-color-primary, #3478f6);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary, #3478f6) 14%, transparent);
+        }
+
+        .el-dialog__close {
+            color: currentColor;
+            font-size: 20px;
+            font-weight: 700;
+        }
+    }
+
+    > .el-dialog__footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 16px 24px 20px;
+        border-top: 1px solid var(--mci-dialog-line);
+        background: var(--mci-dialog-surface);
+
+        .el-button {
+            min-width: 96px;
+            height: 42px;
+            margin-left: 0;
+            padding: 0 22px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 7px 18px rgba(15, 23, 42, .09);
+        }
+
+        .el-button--primary {
+            border-color: transparent;
+            box-shadow: 0 10px 24px color-mix(in srgb, var(--el-color-primary, #3478f6) 28%, transparent);
+        }
+    }
+}
+
+.mci-unified-overlay > .el-overlay-dialog {
+    display: flex;
+    overflow: auto;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
 }
 
 /* 原生 title 属性的统一标题：自定义表单 Header 不受影响。 */
@@ -1241,6 +1309,159 @@ html.dark {
 .el-dialog.microi-message-detail-dialog > .el-dialog__header:has(> .el-dialog__title) {
     &::before { content: "✉"; }
     > .el-dialog__title::before { content: "MESSAGE DETAILS"; }
+}
+
+.el-dialog.mci-import-dialog {
+    width: min(760px, calc(100vw - 32px)) !important;
+    margin: auto !important;
+
+    > .el-dialog__header:has(> .el-dialog__title) {
+        &::before { content: "⇧"; }
+        > .el-dialog__title::before { content: "DATA IMPORT"; }
+    }
+
+    > .el-dialog__body {
+        max-height: min(68vh, 720px);
+        overflow: auto;
+        padding: 22px 28px;
+    }
+}
+
+.mci-import-dialog__description {
+    margin: 0 0 16px;
+    color: var(--el-text-color-secondary, #66758a);
+    font-size: 14px;
+    line-height: 1.65;
+}
+
+.mci-import-dialog__upload {
+    width: 100%;
+
+    .el-upload,
+    .el-upload-dragger {
+        width: 100%;
+    }
+
+    .el-upload-dragger {
+        min-height: 154px;
+        box-sizing: border-box;
+        border: 1px dashed color-mix(in srgb, var(--el-color-primary, #3478f6) 34%, var(--el-border-color, #d8e0ea));
+        border-radius: 16px;
+        background: color-mix(in srgb, var(--el-color-primary, #3478f6) 4%, var(--mci-dialog-surface, #fff));
+        transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
+
+        &:hover,
+        &:focus-within {
+            border-color: var(--el-color-primary, #3478f6);
+            background: color-mix(in srgb, var(--el-color-primary, #3478f6) 8%, var(--mci-dialog-surface, #fff));
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--el-color-primary, #3478f6) 10%, transparent);
+        }
+    }
+
+    .el-upload__tip {
+        margin-top: 8px;
+        color: var(--el-text-color-secondary, #66758a);
+        text-align: left;
+    }
+}
+
+.mci-import-dialog__upload-icon {
+    margin-bottom: 8px;
+    color: var(--el-color-primary, #3478f6);
+    font-size: 34px;
+}
+
+.mci-import-dialog__status {
+    margin-top: 18px;
+    padding: 18px;
+    border: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter, #e1e8f0));
+    border-radius: 16px;
+    background: var(--mci-dialog-surface, var(--el-bg-color, #fff));
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+}
+
+.mci-import-dialog__status-head,
+.mci-import-dialog__file-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.mci-import-dialog__status-label,
+.mci-import-dialog__results-title {
+    margin-bottom: 5px;
+    color: var(--el-text-color-secondary, #66758a);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+
+.mci-import-dialog__file-summary {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--el-fill-color-light, #eef2f6);
+    color: var(--el-text-color-regular, #3f4d62);
+    font-size: 13px;
+}
+
+.mci-import-dialog__progress {
+    margin-top: 16px;
+}
+
+.mci-import-dialog__message,
+.mci-import-dialog__error {
+    margin: 10px 0 0;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.mci-import-dialog__message {
+    color: var(--el-text-color-regular, #3f4d62);
+}
+
+.mci-import-dialog__error {
+    color: var(--el-color-danger, #f56c6c);
+}
+
+.mci-import-dialog__results {
+    max-height: 220px;
+    overflow: auto;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter, #e1e8f0));
+}
+
+.mci-import-dialog__result-row {
+    padding: 5px 0;
+    color: var(--el-text-color-regular, #3f4d62);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.mci-import-dialog__legacy-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 16px 0 12px;
+
+    .el-button {
+        height: 38px;
+        margin-left: 0;
+        border-radius: 10px;
+    }
+}
+
+.mci-import-dialog__legacy-progress {
+    min-height: 44px;
+    padding: 12px 14px;
+    border: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter, #e1e8f0));
+    border-radius: 12px;
+    background: var(--mci-dialog-surface, var(--el-bg-color, #fff));
+    color: var(--el-text-color-secondary, #66758a);
+    font-size: 13px;
+    line-height: 1.65;
 }
 
 .mci-unified-overlay {

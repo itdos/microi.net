@@ -171,6 +171,18 @@ var dataList = parsed.Data;  // [{ 列标题: 值, ... }, ...]
 return { Code: 1, Data: dataList, DataCount: dataList.length };
 ```
 
+### 固定版式模板与后台自定义导入
+
+默认导入适合首行即字段标题的标准表格。多行表头、合并单元格、项目名称位于固定单元格、或需按规格/材质查询存货等模板，页面按钮使用 `V8.OpenImportDialog({...})` 声明工作表、单元格和列映射；平台弹层负责浏览器解析、后台任务提交、真实进度轮询与结果呈现。
+
+- 页面 V8 只声明 `ApiEngineKey`、`Workbook.Cells/Columns/DataStartRow/DataEndRow/KeyField`，不得拼上传 DOM、传完整工作簿 Base64 或自行轮询。
+- 后台接口引擎从 `V8.Param._ImportRowsJson` 和 `_ImportMetaJson` 取值，必须重做模板、权限、字段、唯一性和状态校验。
+- 先校验全部行再写入；接口引擎返回 `Code != 1` 时依靠平台事务整体回滚，禁止手动 Commit/Rollback。
+- 用 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报真实校验/写入工作量；未知总量保持不确定进度，不伪造百分比。
+- 业务幂等键使用后台任务 Id 或明确的导入操作 Id；重试前回读批次，避免重复写入。
+
+完整前端参数见 `microi.doc/docs/doc/v8-engine/v8-client.md#v8openimportdialog`。
+
 <!-- /microi-progressive:chunk -->
 ## 详细参考路由（渐进披露）
 

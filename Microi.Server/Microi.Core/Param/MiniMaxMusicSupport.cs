@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Microi.net
 {
@@ -25,6 +26,22 @@ namespace Microi.net
     /// </summary>
     public static class MiniMaxMusicSupport
     {
+        public static bool LooksLikeMusicGeneration(string value)
+        {
+            var text = CollapseWhitespace(value);
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            var hasMusicTarget = Regex.IsMatch(
+                text,
+                @"(音乐|歌曲|配乐|背景音乐|纯音乐|旋律|伴奏|bgm)",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var hasGenerationAction = Regex.IsMatch(
+                text,
+                @"(生成|创作|制作|作曲|谱曲|编曲|写一首|来一首|做一首|给我一首|帮我.{0,8}(做|写|生成|创作))",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            return hasMusicTarget && hasGenerationAction
+                || Regex.IsMatch(text, @"(text[- ]?to[- ]?music|music generation)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
+
         public static bool TryNormalize(
             MiniMaxMusicGenerateParam param,
             out NormalizedMiniMaxMusicRequest normalized,
@@ -55,10 +72,10 @@ namespace Microi.net
                 error = "当前安全原子能力只允许生成无人声纯音乐；带歌词歌曲需要独立版权审核流程。";
                 return false;
             }
-            var model = (param.Model ?? "music-3.0").Trim().ToLowerInvariant();
-            if (model != "music-3.0" && model != "music-2.6")
+            var model = (param.Model ?? "music-2.6").Trim().ToLowerInvariant();
+            if (model != "music-2.6")
             {
-                error = "音乐模型只允许 music-3.0 或 music-2.6。";
+                error = "当前 MiniMax 官方音乐生成只允许 music-2.6。";
                 return false;
             }
             var sampleRate = param.SampleRate == 0 ? 44100 : param.SampleRate;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readPlatformServiceSource } from "./helpers/platform-service-source.mjs";
 
 const root = new URL("../", import.meta.url);
 
@@ -178,9 +179,9 @@ test("micro-app hosts and platform pages keep the live theme contract", async fu
     const [dialogHost, routeHost, runtime, settings, marketplace] = await Promise.all([
         source("src/views/micro-app/dialog.vue"),
         source("src/views/micro-app/host.vue"),
-        source("../AI-Project/microi/AI应用/microi-platform-service/src/microi.js"),
-        source("../AI-Project/microi/AI应用/microi-platform-service/src/SystemSettings.vue"),
-        source("../AI-Project/microi/AI应用/microi-platform-service/src/Marketplace.vue")
+        readPlatformServiceSource("src/microi.js"),
+        readPlatformServiceSource("src/SystemSettings.vue"),
+        readPlatformServiceSource("src/Marketplace.vue")
     ]);
 
     for (const host of [dialogHost, routeHost]) {
@@ -218,8 +219,8 @@ test("notification center opens immediately as a unified dialog and badges only 
 
 test("marketplace keeps source, install, publish, offline and historical-version workflows on one page", async function () {
     const [marketplace, modalStyles, host] = await Promise.all([
-        source("../AI-Project/microi/AI应用/microi-platform-service/src/Marketplace.vue"),
-        source("../AI-Project/microi/AI应用/microi-platform-service/src/marketplace-modal.css"),
+        readPlatformServiceSource("src/Marketplace.vue"),
+        readPlatformServiceSource("src/marketplace-modal.css"),
         source("src/views/micro-app/host.vue")
     ]);
     assert.match(marketplace, /平台官方应用源/);
