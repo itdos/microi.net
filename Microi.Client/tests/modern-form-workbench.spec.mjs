@@ -38,6 +38,40 @@ test("startup screen distinguishes mount, readiness, slow service and recoverabl
     assert.match(osClient, /throw sysConfigError/);
 });
 
+test("white palette uses readable semantic accents across splash, login, shell and micro-apps", async function () {
+    const [theme, design, adminTheme, html, login, sidebar, host, dialog] = await Promise.all([
+        source("src/utils/theme-color.js"),
+        source("src/styles/mci-design.scss"),
+        source("src/styles/mci-admin-theme.scss"),
+        source("index.html"),
+        source("src/views/login/index.vue"),
+        source("src/layout/components/Sidebar/index.vue"),
+        source("src/views/micro-app/host.vue"),
+        source("src/views/micro-app/dialog.vue")
+    ]);
+
+    assert.match(theme, /function createInteractiveProfile/);
+    assert.match(theme, /getReadableAccent\(profile\.value, mode === "dark" \? "#1D293B" : "#FFFFFF"\)/);
+    assert.match(theme, /"--mci-color-primary-on-surface": primary/);
+    assert.match(theme, /"--mci-brand-primary": paletteProfile\.value/);
+    assert.match(design, /--mci-color-primary-on-surface:/);
+    assert.match(adminTheme, /data-mci-palette="white"/);
+    assert.match(html, /\.mci-app-title[\s\S]*?--mci-color-primary-on-surface/);
+    assert.match(html, /\.mci-startup-error__retry[\s\S]*?--mci-text-on-primary/);
+    assert.match(login, /\.login-methods-orbit[\s\S]*?--mci-color-primary-on-surface/);
+    assert.match(login, /\.login-methods-footnote \.el-icon[\s\S]*?--mci-color-primary-on-surface/);
+    assert.match(sidebar, /margin: 3px 8px;[\s\S]{0,120}?border:\s*0 !important/);
+    assert.match(sidebar, /&\.is-active[\s\S]*?box-shadow:\s*none !important/);
+    assert.match(sidebar, /height:\s*42%/);
+    assert.match(adminTheme, /data-mci-palette="white"[\s\S]*?\.el-sub-menu__title[\s\S]*?border-bottom:\s*0 !important/);
+    for (const runtimeHost of [host, dialog]) {
+        assert.match(runtimeHost, /themePalette:/);
+        assert.match(runtimeHost, /themePrimaryText:/);
+        assert.match(runtimeHost, /themeTokens:/);
+        assert.match(runtimeHost, /--mci-color-primary-on-surface/);
+    }
+});
+
 test("modern form remains the default while classic mode and all label positions stay supported", async function () {
     const [form, state, styles, formUtils, switchComponent] = await Promise.all([
         source("src/views/form-engine/diy-form.vue"),
@@ -64,6 +98,10 @@ test("modern form remains the default while classic mode and all label positions
     assert.match(state, /diy-modern-field-card--tall/);
     assert.match(styles, /\.diy-modern-field-card--tall \.el-form-item__label[\s\S]*?align-items:\s*flex-start/);
     assert.match(styles, /\.diy-modern-field-card \.el-input__prefix[\s\S]*?align-items:\s*center/);
+    assert.equal((form.match(/popper-class="diy-field-description-tooltip"/g) || []).length, 4);
+    assert.equal((form.match(/:teleported="true"/g) || []).length >= 4, true);
+    assert.match(form, /class="diy-field-description diy-field-description--inline"[\s\S]*?tabindex="0"[\s\S]*?:aria-label="field\.Description"/);
+    assert.match(styles, /\.diy-field-description\s*\{[\s\S]*?pointer-events:\s*auto !important/);
     assert.match(formUtils, /Switch.*DisplayMode[\s\S]*?return false/);
     assert.match(switchComponent, /UseCardDisplay/);
     assert.match(switchComponent, /class="diy-switch-card"/);
@@ -131,9 +169,9 @@ test("visual modernization retains page, batch and both row V8 action surfaces",
     assert.match(tableStyles, /\.card-wrapper-desktop \.card-actions[\s\S]*?border-top:\s*0;[\s\S]*?background:\s*transparent/);
     assert.match(full, /SysMenuModel\.FormBtns/);
     assert.match(full, /RunMoreBtn\(btn, CurrentRowModel, CurrentRowModel\._V8\)/);
-    assert.match(full, /DisableFormMaskBlur/);
-    assert.match(full, /diyStore\.SysConfig\.DisableFormMaskBlur/);
-    assert.match(full, /isExplicitlyDisabled\(globalValue\)\s*\|\|\s*isExplicitlyDisabled\(tableValue\)/);
+    assert.match(full, /isFormMaskBlurEnabled/);
+    assert.match(full, /!isFormMaskBlurEnabled\(this\.diyStore\?\.SysConfig\)/);
+    assert.match(full, /isExplicitlyDisabled\(tableValue\)/);
     assert.match(table, /global-col-menu-head/);
     assert.match(tableStyles, /\.global-col-menu-head/);
     assert.match(specialCell, /diy-special-action--table-child/);
@@ -188,7 +226,9 @@ test("micro-app hosts and platform pages keep the live theme contract", async fu
         assert.match(host, /themeMode:\s*this\.runtimeThemeMode/);
         assert.match(host, /themeColor:\s*this\.runtimeThemeColor/);
         assert.match(host, /new MutationObserver\(\(\) => this\.syncRuntimeTheme\(true\)\)/);
-        assert.match(host, /attributeFilter:\s*\["class", "style"\]/);
+        assert.match(host, /attributeFilter:\s*\["class", "style", "data-theme", "data-mci-palette"\]/);
+        assert.match(host, /themePrimaryText:/);
+        assert.match(host, /themeTokens:\s*\{ \.\.\.this\.runtimeThemeTokens \}/);
     }
     assert.match(runtime, /export function subscribeContext/);
     assert.match(runtime, /microApp\?\.addDataListener/);
@@ -217,11 +257,27 @@ test("notification center opens immediately as a unified dialog and badges only 
     assert.match(center, /class="microi-message-detail-dialog mci-unified-dialog"/);
 });
 
-test("marketplace keeps source, install, publish, offline and historical-version workflows on one page", async function () {
-    const [marketplace, modalStyles, host] = await Promise.all([
+test("header badges share one visual contract and realtime tooltip uses a triangle", async function () {
+    const [navbar, center, theme] = await Promise.all([
+        source("src/layout/components/Navbar.vue"),
+        source("src/layout/components/BackgroundTaskCenter.vue"),
+        source("src/styles/mci-admin-theme.scss")
+    ]);
+
+    assert.match(navbar, /popper-class="mci-realtime-tooltip"/);
+    assert.match(navbar, /class="mci-header-badge"/);
+    assert.match(center, /class="mci-header-badge"/);
+    assert.doesNotMatch(center, /task-badge-flash|microi-task-badge-pulse/);
+    assert.match(theme, /\.mci-header-badge > \.el-badge__content\.is-fixed/);
+    assert.match(theme, /\.mci-realtime-tooltip[\s\S]*?clip-path:\s*polygon\(50% 0, 100% 100%, 0 100%\)/);
+});
+
+test("marketplace keeps workflows in a sanitized browser top-layer dialog", async function () {
+    const [marketplace, modalStyles, host, safeHtml] = await Promise.all([
         readPlatformServiceSource("src/Marketplace.vue"),
         readPlatformServiceSource("src/marketplace-modal.css"),
-        source("src/views/micro-app/host.vue")
+        source("src/views/micro-app/host.vue"),
+        readPlatformServiceSource("src/safe-html.js")
     ]);
     assert.match(marketplace, /平台官方应用源/);
     assert.match(marketplace, /key:'installed'/);
@@ -239,6 +295,12 @@ test("marketplace keeps source, install, publish, offline and historical-version
     assert.match(marketplace, /sourceCredentialKey\(effectiveSource\.value\)/);
     assert.match(marketplace, /source\?\.HasCredential\?/);
     assert.match(marketplace, /action:'setGlobalOverlay'/);
+    assert.match(marketplace, /nativeTopLayer/);
+    assert.match(marketplace, /dialog\.showModal\(\)/);
+    assert.match(marketplace, /<dialog ref="detailDialog"/);
+    assert.match(marketplace, /v-html="detailHtml"/);
+    assert.match(marketplace, /sanitizeMarketplaceHtml/);
+    assert.doesNotMatch(marketplace, /<p>\{\{\s*detailModel\?\.AppDetail/);
     assert.match(marketplace, /syncModalDocumentScrollLock\(visible\)/);
     assert.match(marketplace, /lockScroll:visible/);
     assert.match(marketplace, /action:'openForm'/);
@@ -248,13 +310,22 @@ test("marketplace keeps source, install, publish, offline and historical-version
     assert.match(host, /globalOverlaySegments\(\)/);
     assert.match(host, /updateGlobalOverlayHole\(\)/);
     assert.match(host, /syncGlobalOverlayScrollLock\(this\.globalOverlayVisible\)/);
+    assert.match(host, /globalOverlayMaskVisible/);
+    assert.match(host, /globalOverlayPromote/);
+    assert.match(host, /!nativeTopLayer/);
     assert.match(host, /html\.style\.overflow\s*=\s*"hidden"/);
     assert.match(host, /\.micro-app-host--modal-active \.micro-app-host__app/);
     assert.match(host, /pointer-events:\s*none/);
     assert.match(host, /pointer-events:\s*auto/);
     assert.match(modalStyles, /z-index:\s*12000/);
     assert.match(modalStyles, /height:\s*100dvh/);
+    assert.match(modalStyles, /dialog\.modal-backdrop::backdrop/);
+    assert.match(modalStyles, /browser top layer/);
+    assert.match(modalStyles, /\.detail-rich/);
     assert.match(modalStyles, /\.version-toolbar/);
+    assert.match(safeHtml, /DOMPurify/);
+    assert.match(safeHtml, /FORBID_TAGS/);
+    assert.match(safeHtml, /noopener noreferrer nofollow/);
     assert.match(host, /Width:\s*"80%"/);
 });
 

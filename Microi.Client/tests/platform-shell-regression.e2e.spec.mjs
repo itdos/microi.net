@@ -390,7 +390,12 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     const detail = store.locator(".modal-shell.app-detail");
     const detailBackdrop = store.locator(".modal-backdrop").filter({ has: detail });
     await expect(detail).toBeVisible({ timeout: 30_000 });
+    await expect(detailBackdrop).toHaveAttribute("open", "");
+    expect(await detailBackdrop.evaluate((element) => element.matches(":modal"))).toBe(true);
     await expect(detail.locator(".detail-fields")).toBeVisible();
+    const detailRich = detail.locator(".detail-rich");
+    await expect(detailRich).toBeVisible();
+    expect(await detailRich.innerText()).not.toMatch(/<\/?(?:section|div|p|h[1-6])\b/i);
     await expect(detail.locator(".versions-panel")).toContainText("选择安装版本");
     const versionToolbar = detail.locator(".version-toolbar");
     const versionKeyword = versionToolbar.getByPlaceholder("版本号、备注、发布人或动作");
@@ -487,11 +492,8 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     await dragTo(5_000, 5_000);
     await expectDetailInViewport();
     const globalOverlay = page.locator(".micro-app-host__global-overlay");
-    await expect(globalOverlay).toBeVisible();
-    await expect(globalOverlay).toHaveCSS("pointer-events", "none");
-    await expect(globalOverlay.locator(".micro-app-host__global-overlay-segment")).toHaveCount(4);
-    await expect(page.locator(".micro-app-host--modal-active .micro-app-host__app")).toHaveCSS("overflow", "visible");
-    await expect(page.locator(".micro-app-host--modal-active .micro-app-host__app")).toHaveCSS("contain", "none");
+    await expect(globalOverlay).toHaveCount(0);
+    await expect(page.locator(".micro-app-host--modal-active")).toHaveCount(0);
     const hostScrollLock = await page.evaluate(() => ({
         html: getComputedStyle(document.documentElement).overflow,
         body: getComputedStyle(document.body).overflow,
@@ -508,26 +510,25 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     expect(childScrollLock.body).toBe("hidden");
     const backdropGeometry = await detailBackdrop.evaluate((element) => {
         const box = element.getBoundingClientRect();
-        return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height, viewportWidth: innerWidth, viewportHeight: innerHeight, zIndex: Number(getComputedStyle(element).zIndex) };
+        const backdrop = getComputedStyle(element, "::backdrop");
+        return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height, viewportWidth: innerWidth, viewportHeight: innerHeight, zIndex: Number(getComputedStyle(element).zIndex), backdropColor: backdrop.backgroundColor, backdropFilter: backdrop.backdropFilter || backdrop.webkitBackdropFilter };
     });
-    const hostGeometry = await page.locator(".micro-app-host--modal-active .micro-app-host__app").evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        return { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
+    const topLayerCoverage = await page.evaluate(() => {
+        const dialog = [...document.querySelectorAll("dialog.modal-backdrop")].find((element) => element.matches(":modal"));
+        const hit = document.elementFromPoint(8, Math.round(innerHeight / 2));
+        return {
+            found: Boolean(dialog),
+            coversSidebar: Boolean(dialog && (hit === dialog || dialog.contains(hit)))
+        };
     });
-    const globalOverlayGeometry = await globalOverlay.evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        return { left: box.left, top: box.top, width: box.width, height: box.height, viewportWidth: innerWidth, viewportHeight: innerHeight, zIndex: Number(getComputedStyle(element).zIndex) };
-    });
-    expect(Math.abs(globalOverlayGeometry.left)).toBeLessThanOrEqual(1);
-    expect(Math.abs(globalOverlayGeometry.top)).toBeLessThanOrEqual(1);
-    expect(Math.abs(globalOverlayGeometry.width - globalOverlayGeometry.viewportWidth)).toBeLessThanOrEqual(1);
-    expect(Math.abs(globalOverlayGeometry.height - globalOverlayGeometry.viewportHeight)).toBeLessThanOrEqual(1);
-    expect(globalOverlayGeometry.zIndex).toBeGreaterThanOrEqual(10_000);
-    expect(backdropGeometry.left).toBeLessThanOrEqual(hostGeometry.left + 1);
-    expect(backdropGeometry.top).toBeLessThanOrEqual(hostGeometry.top + 1);
-    expect(backdropGeometry.right).toBeGreaterThanOrEqual(hostGeometry.right - 1);
-    expect(backdropGeometry.bottom).toBeGreaterThanOrEqual(Math.min(hostGeometry.bottom, backdropGeometry.viewportHeight) - 1);
+    expect(Math.abs(backdropGeometry.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(backdropGeometry.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(backdropGeometry.width - backdropGeometry.viewportWidth)).toBeLessThanOrEqual(1);
+    expect(Math.abs(backdropGeometry.height - backdropGeometry.viewportHeight)).toBeLessThanOrEqual(1);
     expect(backdropGeometry.zIndex).toBeGreaterThanOrEqual(12_000);
+    expect(backdropGeometry.backdropColor).not.toBe("rgba(0, 0, 0, 0)");
+    expect(topLayerCoverage.found).toBe(true);
+    expect(topLayerCoverage.coversSidebar).toBe(true);
     await page.mouse.wheel(0, 900);
     await page.waitForTimeout(200);
     expect(await page.evaluate(() => window.scrollY)).toBe(hostScrollLock.scrollY);
@@ -535,6 +536,7 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     expect(page.url()).toBe(routeBeforeModes);
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "09-marketplace-detail-top-layer.png"), fullPage: false });
     await detail.getByRole("button", { name: "关闭", exact: true }).first().click({ timeout: 10_000 });
+    await expect(detailBackdrop).toHaveCount(0);
     await expect(globalOverlay).toHaveCount(0);
     await page.waitForTimeout(500);
     const unlockedState = await page.evaluate(() => ({
@@ -553,7 +555,10 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
 
     await store.getByRole("button", { name: "管理商城源", exact: true }).click();
     const sourceDialog = store.locator(".modal-shell.source-editor");
+    const sourceBackdrop = store.locator(".modal-backdrop").filter({ has: sourceDialog });
     await expect(sourceDialog).toBeVisible();
+    await expect(sourceBackdrop).toHaveAttribute("open", "");
+    expect(await sourceBackdrop.evaluate((element) => element.matches(":modal"))).toBe(true);
     await expect(sourceDialog.getByText("来源修改后立即保存，不再需要“保存全部来源”。", { exact: true })).toBeVisible();
     await expect(sourceDialog.getByText("保存全部来源", { exact: true })).toHaveCount(0);
     await expect(sourceDialog.getByText(/个可访问应用/).first()).toBeVisible();
@@ -563,7 +568,7 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     }));
     expect(sourceStyle.radius).toBeGreaterThanOrEqual(20);
     expect(["move", "grab"]).toContain(sourceStyle.cursor);
-    await expect(page.locator(".micro-app-host__global-overlay")).toBeVisible();
+    await expect(page.locator(".micro-app-host__global-overlay")).toHaveCount(0);
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "09-marketplace-source-dialog.png"), fullPage: false });
 });

@@ -145,9 +145,15 @@
                                                         v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) === 'top'"
                                                         :content="field.Description"
                                                         placement="top"
-                                                        :show-after="300"
+                                                        popper-class="diy-field-description-tooltip"
+                                                        :show-after="180"
+                                                        :teleported="true"
                                                     >
-                                                        <small class="diy-field-description diy-field-description--inline">{{ field.Description }}</small>
+                                                        <small
+                                                            class="diy-field-description diy-field-description--inline"
+                                                            tabindex="0"
+                                                            :aria-label="field.Description"
+                                                        >{{ field.Description }}</small>
                                                     </el-tooltip>
                                                 </span>
                                             </template>
@@ -196,9 +202,15 @@
                                             v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) !== 'top'"
                                             :content="field.Description"
                                             placement="top"
-                                            :show-after="300"
+                                            popper-class="diy-field-description-tooltip"
+                                            :show-after="180"
+                                            :teleported="true"
                                         >
-                                            <small class="diy-field-description diy-field-description--below">{{ field.Description }}</small>
+                                            <small
+                                                class="diy-field-description diy-field-description--below"
+                                                tabindex="0"
+                                                :aria-label="field.Description"
+                                            >{{ field.Description }}</small>
                                         </el-tooltip>
                                     </div>
                                     </el-col>
@@ -237,9 +249,15 @@
                                                         v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) === 'top'"
                                                         :content="field.Description"
                                                         placement="top"
-                                                        :show-after="300"
+                                                        popper-class="diy-field-description-tooltip"
+                                                        :show-after="180"
+                                                        :teleported="true"
                                                     >
-                                                        <small class="diy-field-description diy-field-description--inline">{{ field.Description }}</small>
+                                                        <small
+                                                            class="diy-field-description diy-field-description--inline"
+                                                            tabindex="0"
+                                                            :aria-label="field.Description"
+                                                        >{{ field.Description }}</small>
                                                     </el-tooltip>
                                                 </span>
                                             </template>
@@ -289,9 +307,15 @@
                                             v-if="!DiyCommon.IsNull(field.Description) && GetLabelPosition(field) !== 'top'"
                                             :content="field.Description"
                                             placement="top"
-                                            :show-after="300"
+                                            popper-class="diy-field-description-tooltip"
+                                            :show-after="180"
+                                            :teleported="true"
                                         >
-                                            <small class="diy-field-description diy-field-description--below">{{ field.Description }}</small>
+                                            <small
+                                                class="diy-field-description diy-field-description--below"
+                                                tabindex="0"
+                                                :aria-label="field.Description"
+                                            >{{ field.Description }}</small>
                                         </el-tooltip>
                                     </div>
                                 </el-col>

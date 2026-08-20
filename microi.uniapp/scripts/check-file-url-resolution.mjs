@@ -43,11 +43,13 @@ assert.equal(
   'private files must use the newly signed URL'
 )
 assert.equal(requests.length, 1, 'a private file with a durable Path should be re-signed')
-assert.match(
+assert.equal(
   requests[0].url,
-  new RegExp(`/api/HDFS/GetPrivateFileUrl\\?FilePathName=${encodeURIComponent(durablePath)}`),
-  'the signing request must use the durable Path'
+  'https://api.example.test/api/HDFS/GetPrivateFileUrl',
+  'the signing request must use the private-file endpoint'
 )
+assert.equal(requests[0].method, 'POST', 'private-file context must not be exposed in the query string')
+assert.equal(requests[0].data.FilePathName, durablePath, 'the signing request must use the durable Path')
 
 assert.equal(
   V8.extractUploadPath({ Url: expiredUrl }),

@@ -59,10 +59,14 @@ function applyPalette(nextMode, palette) {
         "--mci-skeleton-border",
         "--sidebar-bg-color",
         "--sidebar-active-bg",
+        "--sidebar-active-border",
         "--sidebar-footer-wave-bg",
         "--sidebar-footer-text-color",
         "--sidebar-active-text-color",
         "--mci-color-primary",
+        "--mci-color-primary-on-surface",
+        "--mci-brand-primary",
+        "--el-color-primary",
         "--mci-text-on-primary",
         "--mci-presentation-header-bg",
         "--mci-presentation-metric-strip-bg",
@@ -163,6 +167,14 @@ test("every palette keeps primary controls readable in both modes", () => {
                 ) >= 4.5,
                 `${nextMode} ${palette.key} presentation contrast`
             );
+            assert.equal(tokens["--mci-color-primary-on-surface"], tokens["--el-color-primary"]);
+            assert.ok(
+                theme.getContrastRatio(
+                    tokens["--mci-color-primary-on-surface"],
+                    properties.get("--mci-bg-card")
+                ) >= 4.5,
+                `${nextMode} ${palette.key} foreground accent contrast`
+            );
             const primaryRgb = theme.hexToRgb(tokens["--mci-color-primary"]);
             assert.match(
                 tokens["--mci-presentation-header-bg"],
@@ -179,6 +191,20 @@ test("every palette keeps primary controls readable in both modes", () => {
             `${palette.key} swatch contrast`
         );
     }
+});
+
+test("white palette keeps white surfaces but derives a readable interaction color", () => {
+    const white = theme.getThemePalettes("light").find(item => item.key === "white");
+    const tokens = applyPalette("light", white);
+
+    assert.equal(tokens["--mci-brand-primary"], "#F8FAFC");
+    assert.equal(tokens["--sidebar-bg-color"], "#F8FAFC");
+    assert.notEqual(tokens["--mci-color-primary"], tokens["--mci-brand-primary"]);
+    assert.equal(tokens["--mci-color-primary"], tokens["--el-color-primary"]);
+    assert.ok(tokens["--sidebar-active-border"]);
+    assert.ok(
+        theme.getContrastRatio(tokens["--mci-color-primary"], properties.get("--mci-bg-card")) >= 4.5
+    );
 });
 
 test("every palette exposes distinct, low-saturation skeleton surfaces in both modes", () => {
@@ -205,12 +231,17 @@ test("dark custom near-white and near-black colors stay usable", () => {
 
     assert.equal(theme.setThemeColor("#FFFFFF"), "#2563EB");
     assert.equal(attributes.get("data-mci-palette"), "blue");
-    assert.equal(properties.get("--mci-color-primary"), "#2563EB");
+    assert.ok(
+        theme.getContrastRatio(
+            properties.get("--mci-color-primary"),
+            properties.get("--mci-bg-card")
+        ) >= 4.5
+    );
 
     assert.equal(theme.setThemeColor("#000000"), "#000000");
     assert.equal(attributes.get("data-mci-palette"), "custom");
     assert.equal(properties.get("--mci-palette-value"), "#000000");
-    assert.equal(properties.get("--mci-color-primary"), "#64748B");
+    assert.notEqual(properties.get("--mci-color-primary"), "#000000");
     assert.ok(
         theme.getContrastRatio(
             properties.get("--mci-text-on-primary"),

@@ -35,19 +35,37 @@
             />
             <el-empty v-if="visibleMenus.length === 0" description="没有匹配的菜单" :image-size="64" />
         </div>
+        <section v-if="isAdministrator && !loading && !loadError" class="mci-role-permission-field__direct-table">
+            <div class="mci-role-permission-field__section-heading">
+                <div>
+                    <h3>表直连权限</h3>
+                    <p>仅用于没有菜单上下文的集成或工具；普通页面优先使用上方菜单权限。</p>
+                </div>
+                <el-tag type="danger" effect="plain">高级权限</el-tag>
+            </div>
+            <SysroleTablePermission
+                ref="tablePermission"
+                :model-value="tableLimits"
+                :readonly="readonly"
+                @update:model-value="handleTableLimitsChange"
+            />
+        </section>
     </section>
 </template>
 
 <script>
+import { computed } from "vue";
+import { useDiyStore } from "@/pinia";
 import SysroleMenuPermissionRow from "./sysrole-menu-permission-row.vue";
-import { setRoleMenuChecked } from "../utils/sysrole-menu-permission.js";
+import SysroleTablePermission from "./sysrole-table-permission.vue";
+import { ensureRoleMenuPathReadable, setRoleMenuChecked } from "../utils/sysrole-menu-permission.js";
 
 const BASE_PERMISSION_NAMES = ["Read", "Add", "Edit", "Del", "Export", "Import"];
 const BUTTON_GROUPS = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
 
 export default {
     name: "SysrolePermissionField",
-    components: { SysroleMenuPermissionRow },
+    components: { SysroleMenuPermissionRow, SysroleTablePermission },
     props: {
         modelValue: { default: "" },
         FormData: { type: Object, default: () => ({}) },
@@ -58,9 +76,15 @@ export default {
         field: { type: Object, default: () => ({}) }
     },
     emits: ["update:modelValue", "CallbackFormValueChange"],
+    setup() {
+        const diyStore = useDiyStore();
+        const currentUser = computed(() => diyStore.GetCurrentUser || {});
+        return { currentUser };
+    },
     data() {
         return {
             menus: [],
+            tableLimits: [],
             parentById: Object.create(null),
             keyword: "",
             loading: false,
@@ -72,6 +96,13 @@ export default {
         };
     },
     computed: {
+        isAdministrator() {
+            const value = this.currentUser?._IsAdmin;
+            return value === true
+                || value === 1
+                || String(value || "").toLowerCase() === "true"
+                || Number(this.currentUser?.Level || 0) >= 9999;
+        },
         readonly() {
             return this.FieldReadonly
                 || this.FormMode === "View"
@@ -141,7 +172,7 @@ export default {
                             if (button?.Name) allowed.add(button.Name);
                         });
                     });
-                    const permissions = [];
+                    const permissions = ["Read"];
                     (row.Permission || []).forEach((permission) => {
                         if (!allowed.has(permission) || permissions.includes(permission)) return;
                         permissions.push(permission);
@@ -157,7 +188,13 @@ export default {
             return result;
         },
         emitValue(notifyChange = true) {
-            const value = JSON.stringify({ Menu: this.collectLimits(this.menus, []) });
+            const value = JSON.stringify({
+                Menu: this.collectLimits(this.menus, []),
+                Table: (this.tableLimits || []).map((item) => ({
+                    Id: item.Id || item.FkId,
+                    Permission: item.Permission
+                })).filter((item) => item.Id)
+            });
             this.$emit("update:modelValue", value);
             if (notifyChange) {
                 this.$emit("CallbackFormValueChange", this.field, value);
@@ -193,8 +230,8 @@ export default {
                 ];
                 if (roleId) {
                     requests.push(this.DiyCommon.FormEngine.GetTableData("sys_rolelimit", {
-                        _Where: [["RoleId", "=", roleId], ["Type", "=", "Menu"]],
-                        _SelectFields: ["Id", "FkId", "Permission"],
+                        _Where: [["RoleId", "=", roleId]],
+                        _SelectFields: ["Id", "FkId", "Type", "Permission"],
                         _PageIndex: 1,
                         _PageSize: 5000
                     }));
@@ -212,7 +249,11 @@ export default {
                     throw new Error(results[1]?.Msg || "角色权限加载失败");
                 }
                 const limits = roleId ? results[1].Data || [] : [];
-                this.applyLimits(menuResult.Data, new Map(limits.map((item) => [item.FkId || item.Id, item])));
+                const menuLimits = limits.filter((item) => String(item.Type || "Menu").toLowerCase() === "menu");
+                this.tableLimits = limits
+                    .filter((item) => String(item.Type || "").toLowerCase() === "table")
+                    .map((item) => ({ Id: item.FkId || item.Id, Permission: item.Permission }));
+                this.applyLimits(menuResult.Data, new Map(menuLimits.map((item) => [item.FkId || item.Id, item])));
                 this.menus = menuResult.Data;
                 // 初始化只同步虚拟字段值，不应把刚打开的表单标记成“已修改”。
                 this.emitValue(false);
@@ -240,6 +281,9 @@ export default {
             }
             this.emitValue();
         },
+        ensureMenuPathReadable(row) {
+            ensureRoleMenuPathReadable(row, this.parentById);
+        },
         handlePermissionChange(checked, row, permission) {
             if (this.readonly) return;
             if (!Array.isArray(row.Permission)) row.Permission = [];
@@ -247,11 +291,9 @@ export default {
             if (!checked) row.Permission = row.Permission.filter((item) => item !== permission);
             this.propagatePermission(row, permission, checked);
             if (checked) {
-                let parent = this.parentById[row.Id];
-                while (parent) {
-                    parent._Check = true;
-                    parent = this.parentById[parent.Id];
-                }
+                this.ensureMenuPathReadable(row);
+            } else if (permission === "Read" && (row.Permission || []).length > 0) {
+                this.ensureMenuPathReadable(row);
             }
             this.emitValue();
         },
@@ -262,6 +304,8 @@ export default {
                 child._Check = true;
                 if (checked && !child.Permission.includes(permission)) child.Permission.push(permission);
                 if (!checked) child.Permission = child.Permission.filter((item) => item !== permission);
+                if (checked && !child.Permission.includes("Read")) child.Permission.unshift("Read");
+                if (!checked && permission === "Read" && child.Permission.length > 0) child.Permission.unshift("Read");
                 this.propagatePermission(child, permission, checked);
             });
         },
@@ -270,7 +314,12 @@ export default {
             if (!Array.isArray(row.Permission)) row.Permission = [];
             if (checked && !row.Permission.includes(permission)) row.Permission.push(permission);
             if (!checked) row.Permission = row.Permission.filter((item) => item !== permission);
-            if (checked) row._Check = true;
+            if (checked) this.ensureMenuPathReadable(row);
+            this.emitValue();
+        },
+        handleTableLimitsChange(value) {
+            if (this.readonly) return;
+            this.tableLimits = Array.isArray(value) ? value : [];
             this.emitValue();
         },
         async flushPendingSync() {
@@ -284,6 +333,10 @@ export default {
             if (this.loadError) {
                 this.DiyCommon.Tips(this.loadError, false);
                 return false;
+            }
+            if (this.isAdministrator && this.$refs.tablePermission) {
+                const tableReady = await this.$refs.tablePermission.flushPendingSync();
+                if (tableReady === false) return false;
             }
             this.emitValue();
             return true;
@@ -399,6 +452,36 @@ export default {
 .mci-role-permission-field__tree :deep(input[type="checkbox"]) {
     margin-right: 5px;
     accent-color: var(--el-color-primary);
+}
+
+.mci-role-permission-field__direct-table {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--el-border-color-light);
+}
+
+.mci-role-permission-field__section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.mci-role-permission-field__section-heading h3,
+.mci-role-permission-field__section-heading p {
+    margin: 0;
+}
+
+.mci-role-permission-field__section-heading h3 {
+    color: var(--el-text-color-primary);
+    font-size: 15px;
+}
+
+.mci-role-permission-field__section-heading p {
+    margin-top: 4px;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
 }
 
 @media (max-width: 767px) {

@@ -837,6 +837,7 @@ namespace Microi.net
         {
             var appId = SafeJString(app, "Id");
             var filePath = "dist/" + asset.RelativePath;
+            var deterministicRecordId = BuildApplicationStreamRecordId("file", osClient, appId, filePath);
             var existing = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app_file", new
             {
                 OsClient = osClient,
@@ -844,13 +845,32 @@ namespace Microi.net
                 {
                     new List<object> { "AppId", "=", appId },
                     new List<object> { "AND", "FilePath", "=", filePath },
-                    new List<object>
-                    {
-                        "AND", "StorageScope", "In",
-                        new[] { ActiveStreamBuildStorageScope, ArchivedStreamBuildStorageScope }
-                    }
+                    new List<object> { "AND", "StorageScope", "=", ActiveStreamBuildStorageScope }
                 }
             }).ConfigureAwait(false);
+
+            if (existing.Code == 2)
+            {
+                // Older releases could leave several immutable archived rows for
+                // the same path. Never pick one by an ambiguous business-key
+                // query. Only the deterministic stream-owned record is eligible
+                // for reactivation; otherwise a new deterministic row is added.
+                existing = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app_file", new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>
+                    {
+                        new List<object> { "Id", "=", deterministicRecordId },
+                        new List<object> { "AND", "AppId", "=", appId },
+                        new List<object> { "AND", "FilePath", "=", filePath },
+                        new List<object>
+                        {
+                            "AND", "StorageScope", "In",
+                            new[] { ActiveStreamBuildStorageScope, ArchivedStreamBuildStorageScope }
+                        }
+                    }
+                }).ConfigureAwait(false);
+            }
 
             var row = new JObject
             {
@@ -929,7 +949,7 @@ namespace Microi.net
                 return updateResult;
             }
 
-            row["Id"] = BuildApplicationStreamRecordId("file", osClient, appId, filePath);
+            row["Id"] = deterministicRecordId;
             var addResult = await ExecuteApplicationAssetSideEffect(
                 lease,
                 () => MicroiEngine.FormEngine.AddFormDataAsync(
@@ -946,13 +966,10 @@ namespace Microi.net
                 OsClient = osClient,
                 _Where = new List<object>
                 {
-                    new List<object> { "AppId", "=", appId },
+                    new List<object> { "Id", "=", deterministicRecordId },
+                    new List<object> { "AND", "AppId", "=", appId },
                     new List<object> { "AND", "FilePath", "=", filePath },
-                    new List<object>
-                    {
-                        "AND", "StorageScope", "In",
-                        new[] { ActiveStreamBuildStorageScope, ArchivedStreamBuildStorageScope }
-                    }
+                    new List<object> { "AND", "StorageScope", "=", ActiveStreamBuildStorageScope }
                 }
             }).ConfigureAwait(false);
             if (concurrent.Code == 1 && concurrent.Data != null)
@@ -1042,7 +1059,7 @@ namespace Microi.net
             string expectedAppId)
         {
             if (rows == null) return "既有发布文件元数据清单不存在";
-            var businessKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var activeBusinessKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var row in rows.Where(item => item != null))
             {
                 var idError = ValidateApplicationStreamExistingRecordId(row, "发布文件元数据");
@@ -1052,8 +1069,18 @@ namespace Microi.net
                     return $"既有发布文件元数据 AppId 不一致：Expected={expectedAppId}，Actual={appId}";
                 var filePath = SafeJString(row, "FilePath");
                 if (filePath.DosIsNullOrWhiteSpace()) return "既有发布文件元数据缺少 FilePath";
-                if (!businessKeys.Add(filePath))
-                    return "同一 AppId 存在重复的流式发布文件业务键，拒绝非确定性更新：" + filePath;
+                // Archived rows are immutable release history and multiple old
+                // versions may legitimately share a path. Only active rows form
+                // the current business key and therefore must remain unique.
+                var storageScope = SafeJString(row, "StorageScope");
+                if (!string.Equals(
+                        storageScope,
+                        ArchivedStreamBuildStorageScope,
+                        StringComparison.Ordinal)
+                    && !activeBusinessKeys.Add(filePath))
+                {
+                    return "同一 AppId 存在重复的活动流式发布文件业务键，拒绝非确定性更新：" + filePath;
+                }
             }
             return null;
         }

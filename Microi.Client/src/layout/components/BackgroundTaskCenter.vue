@@ -1,6 +1,6 @@
 <template>
     <div class="right-menu-item hover-effect task-entry" :title="$t('Msg.NotificationCenter')" @click="openCenter">
-        <el-badge :value="badgeCount" :max="99" :hidden="badgeCount === 0" :class="{ 'task-badge-flash': badgeCount > 0 }">
+        <el-badge class="mci-header-badge" :value="badgeCount" :max="99" :hidden="badgeCount === 0">
             <el-icon class="task-icon"><Bell /></el-icon>
         </el-badge>
     </div>
@@ -187,8 +187,8 @@
                         <el-table-column prop="Msg" :label="$t('Msg.BackgroundTaskMessage')" min-width="220" show-overflow-tooltip>
                             <template #default="{ row }">{{ row.Msg || "-" }}</template>
                         </el-table-column>
-                        <el-table-column :label="$t('Msg.CreateTime')" width="92">
-                            <template #default="{ row }">{{ formatTime(row.CreateTime) }}</template>
+                        <el-table-column :label="$t('Msg.CreateTime')" width="168">
+                            <template #default="{ row }">{{ formatDateTime(row.CreateTime) }}</template>
                         </el-table-column>
                         <el-table-column :label="$t('Msg.Elapsed')" width="78">
                             <template #default="{ row }">{{ row.ElapsedText || "-" }}</template>
@@ -358,14 +358,16 @@ import { Bell, CircleClose, Delete, Download, Monitor, Refresh, SwitchButton, Us
 import { ElMessage, ElMessageBox, ElNotification } from "element-plus";
 import { useDiyStore } from "@/pinia";
 import { useUserStore } from "@/pinia/modules/user";
+import { isFormMaskBlurDisabled } from "@/utils/form-mask-blur.js";
 import {
     getBackgroundTaskEta,
     getBackgroundTaskProgress,
     isActiveBackgroundTask,
-    isTerminalBackgroundTask,
-    shouldPollBackgroundTasks
+    isTerminalBackgroundTask
 } from "@/utils/background-task-display";
 import {
+    dispatchPlatformNotification,
+    dispatchPlatformNotificationSnapshot,
     mergePlatformNotification,
     normalizeNotificationLink,
     normalizePlatformNotificationResult
@@ -403,7 +405,6 @@ export default {
             storeLoading: false,
             bulkPlatformAppsLoading: false,
             terminalLoading: false,
-            taskPollTimer: null,
             lastStoreCheckTime: 0,
             storeCheckTimer: null,
             Delete,
@@ -481,7 +482,6 @@ export default {
         window.removeEventListener("microi-websocket-connected", this.handleWebSocketConnected);
         window.removeEventListener("microi-background-task-started", this.handleBackgroundTaskStarted);
         document.removeEventListener("visibilitychange", this.handleTaskVisibilityChange);
-        this.stopTaskPolling();
         this.stopOfficialAppChecker();
         const ws = this.getWebsocket();
         if (ws && typeof ws.off === "function") {
@@ -508,9 +508,6 @@ export default {
                 this.activeTab = "tasks";
             }
         },
-        tasks() {
-            this.scheduleTaskPolling();
-        },
         activeTab(value) {
             if (!this.visible) return;
             this.loadActiveTab(value);
@@ -525,11 +522,7 @@ export default {
             window.requestAnimationFrame(() => this.refreshAll());
         },
         GetUnifiedOverlayClass() {
-            const value = this.diyStore?.SysConfig?.DisableFormMaskBlur;
-            const blurDisabled = value === 1
-                || value === "1"
-                || value === true
-                || String(value || "").trim().toLowerCase() === "true";
+            const blurDisabled = isFormMaskBlurDisabled(this.diyStore?.SysConfig);
             return [
                 "diy-form-modern-overlay",
                 "mci-unified-overlay",
@@ -537,7 +530,7 @@ export default {
             ].filter(Boolean).join(" ");
         },
         getWebsocket() {
-            return this.$websocket || window?.app?.config?.globalProperties?.$websocket;
+            return this.$websocket || window.__VUE_APP__?.config?.globalProperties?.$websocket;
         },
         bindWebsocket() {
             const ws = this.getWebsocket();
@@ -575,6 +568,7 @@ export default {
                 String(item?.Id || item?.EventId || "") === String(data?.Id || data?.EventId || "")
             );
             this.platformNotifications = mergePlatformNotification(this.platformNotifications, data, 100);
+            dispatchPlatformNotification(data);
             if (!existed && Number(data?.IsRead || 0) !== 1) {
                 this.notificationUnreadCount++;
                 ElNotification({
@@ -591,10 +585,11 @@ export default {
             }
         },
         handleTaskVisibilityChange() {
-            if (!document.hidden && shouldPollBackgroundTasks(this.tasks)) {
+            // 页面从休眠恢复时只做一次权威补读，弥补浏览器冻结期间可能错过的
+            // SignalR 事件；不再按 3/5/10 秒循环刷新任务整表。
+            if (!document.hidden && this.tasks.some((item) => isActiveBackgroundTask(item))) {
                 this.loadTasks();
             }
-            this.scheduleTaskPolling();
         },
         handleOnlineTerminalChanged() {
             if (this.visible && (this.activeTab === "myTerminals" || this.activeTab === "onlineUsers")) {
@@ -648,7 +643,6 @@ export default {
                 }
             } finally {
                 this.loading = false;
-                this.scheduleTaskPolling();
             }
         },
         async loadPlatformNotifications() {
@@ -660,6 +654,7 @@ export default {
                     const normalized = normalizePlatformNotificationResult(result);
                     this.platformNotifications = normalized.rows;
                     this.notificationUnreadCount = normalized.unreadCount;
+                    dispatchPlatformNotificationSnapshot(normalized.rows, normalized.unreadCount);
                 }
             } catch (error) {
                 console.warn("[PlatformNotification] load failed", error);
@@ -674,6 +669,7 @@ export default {
                 row.IsRead = 1;
                 row.ReadTime = result.Data?.ReadTime || row.ReadTime;
                 this.notificationUnreadCount = Math.max(0, this.notificationUnreadCount - 1);
+                dispatchPlatformNotificationSnapshot(this.platformNotifications, this.notificationUnreadCount);
             }
         },
         async markAllNotificationsRead() {
@@ -684,6 +680,7 @@ export default {
                     item.ReadTime = result.Data?.ReadTime || item.ReadTime;
                 });
                 this.notificationUnreadCount = 0;
+                dispatchPlatformNotificationSnapshot(this.platformNotifications, 0);
             }
         },
         async openNotificationDetail(row) {
@@ -705,21 +702,6 @@ export default {
                 return;
             }
             window.open(link, "_blank", "noopener,noreferrer");
-        },
-        scheduleTaskPolling() {
-            this.stopTaskPolling();
-            if (!shouldPollBackgroundTasks(this.tasks)) return;
-            const delay = document.hidden ? 10000 : this.visible ? 3000 : 5000;
-            this.taskPollTimer = window.setTimeout(async () => {
-                this.taskPollTimer = null;
-                await this.loadTasks();
-            }, delay);
-        },
-        stopTaskPolling() {
-            if (this.taskPollTimer) {
-                window.clearTimeout(this.taskPollTimer);
-                this.taskPollTimer = null;
-            }
         },
         async loadTerminals() {
             if (this.terminalLoading) return;
@@ -995,16 +977,6 @@ export default {
                 return String(item.Result);
             }
         },
-        formatTime(value) {
-            if (!value) return "";
-            try {
-                const date = new Date(value);
-                const pad = (n) => String(n).padStart(2, "0");
-                return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-            } catch (_) {
-                return value;
-            }
-        },
         formatDateTime(value) {
             if (!value) return "-";
             try {
@@ -1037,14 +1009,18 @@ export default {
 }
 
 .task-entry :deep(.el-badge__content) {
-    top: 7px;
-    right: 4px;
-    min-width: 16px;
-    height: 16px;
-    line-height: 16px;
-    border: 1px solid #fff;
+    top: 0;
+    right: 0;
+    min-width: 18px;
+    height: 18px;
+    line-height: 14px;
+    border: 2px solid var(--el-bg-color, #fff);
     padding: 0 4px;
-    box-shadow: 0 2px 8px rgba(255, 74, 35, 0.28);
+    transform: translate(55%, -42%);
+    box-shadow: 0 2px 7px rgba(245, 108, 108, 0.25);
+    box-sizing: border-box;
+    font-size: 11px;
+    font-weight: 700;
 }
 
 .platform-message-title--unread {
@@ -1055,10 +1031,6 @@ export default {
 .task-icon {
     font-size: 21px;
     line-height: 1;
-}
-
-.task-badge-flash :deep(.el-badge__content) {
-    animation: microi-task-badge-pulse 1s ease-in-out infinite;
 }
 
 .notification-shell {
@@ -1353,15 +1325,4 @@ export default {
     }
 }
 
-@keyframes microi-task-badge-pulse {
-    0%,
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    50% {
-        transform: scale(1.12);
-        opacity: 0.75;
-    }
-}
 </style>

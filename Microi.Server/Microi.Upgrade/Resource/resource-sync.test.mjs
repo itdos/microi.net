@@ -240,6 +240,27 @@ async function mergeReplicaFixture({
   });
 }
 
+test('应用商城包允许失败重跑版本与官网独立升版并保留最高版本', async () => {
+  const importer = engineSource('import-microi-store-package', 'v1.0.0', 'return { Code: 1 };');
+  const publisher = engineSource('ai_app_publish_store', 'v1.0.0', 'return { Code: 1 };');
+  const builder = engineSource('ai_app_build', 'v1.0.0', 'return { Code: 1 };');
+  const basePackage = applicationStorePackage({ importer, publisher, builder, version: 'v7.4.14' });
+  const localPackage = applicationStorePackage({ importer, publisher, builder, version: 'v7.5.0' });
+  const remotePackage = applicationStorePackage({ importer, publisher, builder, version: 'v7.4.15' });
+  const replicas = replicaMaps({ importer, publisher, builder });
+
+  const merged = await mergeApplicationStoreReplicas({
+    basePackageContent: basePackage,
+    localPackageContent: localPackage,
+    remotePackageContent: remotePackage,
+    baseStandaloneContents: replicas,
+    localStandaloneContents: replicas,
+    remoteStandaloneContents: replicas,
+  });
+
+  assert.equal(JSON.parse(merged.packageContent).PackageInfo.Version, 'v7.5.0');
+});
+
 test('JSON 三方合并保留本地与官网的非冲突修改', () => {
   const base = JSON.stringify({ PackageInfo: { Version: 'v1.0.0' }, Config: { Local: 1, Remote: 1 } });
   const local = JSON.stringify({ PackageInfo: { Version: 'v1.0.0' }, Config: { Local: 2, Remote: 1 } });

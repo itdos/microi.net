@@ -10,12 +10,14 @@
 }
 .diy-chat {
     position: fixed;
-    right: 50px;
-    bottom: 43px;
+    right: 24px;
+    bottom: 24px;
     z-index: 99999 !important; /* 最高层级，确保在所有元素之上 */
-    width: 800px;
-    height: 500px;
-    border-radius: 10px; /* 可根据实际需求调整数值 */
+    width: 1120px;
+    height: 720px;
+    max-width: calc(100vw - 48px);
+    max-height: calc(100vh - 48px);
+    border-radius: 14px;
     overflow: hidden; /* 确保 iframe 内容也被裁剪成圆角 */
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.15); /* 多层阴影效果 */
     p,
@@ -129,17 +131,22 @@
     transition: all 0.3s;
 }
 .wc__badge {
-    background-color: #ff3b30;
-    border-radius: 18px;
+    background-color: var(--el-color-danger, #f56c6c);
+    border: 2px solid var(--el-bg-color, #fff);
+    border-radius: 9px;
+    box-sizing: border-box;
     color: #fff;
     display: inline-block;
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: 700;
     font-family: arial;
     text-align: center;
     padding: 0 4px;
+    height: 18px;
     line-height: 14px;
-    min-width: 8px;
+    min-width: 18px;
     vertical-align: middle;
+    box-shadow: 0 2px 7px rgba(245, 108, 108, 0.25);
 }
 .wc__badge-dot {
     padding: 5px;
@@ -209,10 +216,9 @@
     background-size: cover;
 }
 .vChat-inner {
-    /*background-color: rgba(255, 255, 255, .95);*/
-    background-color: rgba(245, 245, 245, 0.95);
+    background-color: var(--el-bg-color-page, #f5f7fa);
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    border-radius: 3px;
+    border-radius: 14px;
     height: 100%;
     width: 100%;
     position: relative;
@@ -245,7 +251,7 @@
     /*background-image: linear-gradient(180deg,#29292c 50%,#3b3534,#29292c);*/
     // background-image: linear-gradient(180deg, #232d42 0%, #3b4b6b 100%);
     background-color: var(--color-primary, #12b7f5);
-    border-radius: 3px 0 0 3px;
+    border-radius: 14px 0 0 14px;
     width: 60px;
 }
 .vChat-sidebar .avator {
@@ -318,8 +324,11 @@
     right: 10px;
 }
 .vChat-middlebar {
-    background-image: linear-gradient(180deg, rgba(238, 234, 232, 0.8) 50%, rgba(230, 230, 230, 0.8));
-    width: 200px;
+    flex: 0 0 252px;
+    width: 252px;
+    min-width: 0;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--el-fill-color-light, #f5f7fa) 92%, transparent);
     position: relative;
     padding-top: 40px;
 }
@@ -344,12 +353,24 @@
     line-height: 32px;
 }
 .vc-recordList {
+    min-width: 0;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
     user-select: none;
     -webkit-user-select: none;
 }
+.vc-recordList ul {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
 .vc-recordList ul li {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
     font-family: "Microsoft Yahei";
-    padding: 10px;
+    padding: 9px 10px;
     position: relative;
     transition: all 0.3s;
 }
@@ -360,6 +381,7 @@
     background-color: #dfdcdb;
 }
 .vc-recordList ul li .img {
+    flex: 0 0 40px;
     margin-right: 10px;
     height: 40px;
     width: 40px;
@@ -387,6 +409,10 @@
     top: -7px;
     right: -5px;
 }
+.vc-recordList ul li .info {
+    min-width: 0;
+    overflow: hidden;
+}
 .vc-recordList ul li .title {
     color: #191919;
     font-size: 13px;
@@ -399,8 +425,9 @@
     word-break: break-all;
 }
 .vc-recordList ul li .time {
+    flex: 0 0 auto;
     color: #bbb;
-    font-size: 0.2rem;
+    font-size: 10px;
     font-family: arial;
     margin-top: 0.15rem;
     text-align: right;
@@ -497,25 +524,30 @@
 }
 /* __右侧(内容区) */
 .vChat-container {
-    border-radius: 0 3px 3px 0;
+    overflow: hidden;
+    border-radius: 0 14px 14px 0;
+    background: var(--el-bg-color, #fff);
     /* width: 540px; */
     width: auto;
     padding-top: 40px;
 }
 .vChat__header {
-    height: 60px;
+    height: 52px;
+    background: var(--el-bg-color, #fff);
 }
 .vChat__header .inner {
     border-bottom: 1px solid rgba(150, 150, 150, 0.1);
     padding-right: 10px;
-    height: 60px;
+    display: flex;
+    align-items: center;
+    height: 52px;
 }
 .vChat__header .inner .barTit {
-    color: #35495e;
+    color: var(--el-text-color-primary, #303133);
     font-size: 17px;
     font-family: arial;
-    margin-left: 25px;
-    padding-top: 23px;
+    margin-left: 20px;
+    padding-top: 0;
 }
 .vChat__header .inner .lk {
     cursor: pointer;
@@ -586,8 +618,11 @@
 }
 
 .vChatMsg-cnt {
-    padding: 15px;
+    padding: 14px 18px;
     position: relative;
+}
+.vChat__main {
+    background: var(--el-fill-color-extra-light, #fafcff);
 }
 .vChatMsg-cnt ul li {
     display: -webkit-box;
@@ -595,7 +630,7 @@
     display: flex;
     display: -ms-flexbox;
     font-family: simsun;
-    margin-bottom: 30px;
+    margin-bottom: 16px;
 }
 .vChatMsg-cnt ul li.time span {
     background: rgba(0, 0, 0, 0.13);
@@ -644,7 +679,7 @@
     flex: 1;
 }
 .vChatMsg-cnt ul li .content .author {
-    color: #aaa;
+    color: var(--el-text-color-secondary, #909399);
     font-size: 12px;
     font-family: simsun;
     margin: 0 10px;
@@ -661,7 +696,7 @@
     word-wrap: break-word;
     word-break: break-all;
     min-height: 30px;
-    max-width: 400px;
+    max-width: min(680px, calc(100% - 96px));
     position: relative;
     transition: all 0.3s;
 }
@@ -820,7 +855,7 @@
 .wc__editor-panel {
     background-color: rgba(255, 255, 255, 0.9);
     border-radius: 3px;
-    padding: 10px 15px;
+    padding: 8px 12px 10px;
     align-items: flex-end;
 }
 .wc__editor-panel.wc__borT:before {
@@ -834,19 +869,22 @@
     cursor: pointer;
     color: #666;
     font-size: 20px;
-    display: inline-block;
-    vertical-align: top;
-    margin-right: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    margin-right: 0;
     overflow: hidden;
     text-align: center;
-    height: 24px;
-    line-height: 24px;
-    width: 24px;
+    height: 30px;
+    line-height: 30px;
+    width: 30px;
     position: relative;
     padding: 0px;
 }
 .wc__editor-panel .wrap-toolbar .btn input[type="file"] {
-    opacity: 1;
+    cursor: pointer;
+    opacity: 0;
     height: 100%;
     width: 100%;
     position: absolute;
@@ -871,7 +909,8 @@
     word-break: break-all;
     padding: 10px 0;
     line-height: 20px;
-    height: 80px;
+    min-height: 58px;
+    height: 68px;
     max-width: 100%;
     transition: border-color 0.3s;
 }

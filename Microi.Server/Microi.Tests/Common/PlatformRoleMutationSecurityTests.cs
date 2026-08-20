@@ -187,6 +187,19 @@ public class PlatformRoleMutationSecurityTests
     }
 
     [Fact]
+    public void V8DirectGrantPolicyCatalog_UsesTheAuthoritativeServerPolicy()
+    {
+        var contractMethod = typeof(IV8Method).GetMethod(nameof(IV8Method.GetDirectTableGrantPolicies));
+        var runtimeMethod = typeof(V8Method).GetMethod(nameof(V8Method.GetDirectTableGrantPolicies));
+        Assert.NotNull(contractMethod);
+        Assert.NotNull(runtimeMethod);
+
+        var result = new V8Method().GetDirectTableGrantPolicies();
+        Assert.Equal(1, result.Code);
+        Assert.Same(PlatformResourceSecurity.DirectTableGrantPolicies, result.Data);
+    }
+
+    [Fact]
     public void DelegatedUserManager_CannotChangeOwnRoleMembership()
     {
         var result = EvaluateUserMutation(

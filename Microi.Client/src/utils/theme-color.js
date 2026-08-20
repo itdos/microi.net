@@ -435,9 +435,33 @@ function applyVePlusVars(profile, surface) {
     });
 }
 
-function applySurfaceVars(profile, mode) {
+function createInteractiveProfile(profile, mode) {
+    // palette 表达整体品牌倾向，interactive color 则必须能作为文字、图标、
+    // 边框和按钮出现在当前表面上。白色/黄色等浅色 palette 不能直接承担后者，
+    // 深色模式中的近黑色也需要被抬亮。
+    const value = getReadableAccent(profile.value, mode === "dark" ? "#1D293B" : "#FFFFFF");
+    if (value === profile.value) {
+        return {
+            ...profile,
+            onPrimary: getReadableText(value)
+        };
+    }
+    const { r, g, b } = hexToRgb(value);
+    const strong = darken(value, 18);
+    return {
+        ...profile,
+        value,
+        strong,
+        onPrimary: getReadableText(value),
+        borderGlow: `rgba(${r}, ${g}, ${b}, 0.24)`,
+        gradient: `linear-gradient(135deg, ${value} 0%, ${strong} 100%)`
+    };
+}
+
+function applySurfaceVars(profile, mode, interactiveProfile = profile) {
     const root = document.documentElement;
     const { r, g, b } = hexToRgb(profile.value);
+    const interactiveRgb = hexToRgb(interactiveProfile.value);
     const isDark = mode === "dark";
     let surface;
     if (isDark) {
@@ -465,7 +489,7 @@ function applySurfaceVars(profile, mode) {
             borderHover: getReadableAccent(profile.value, sidebar),
             tooltip: mixColors("#202A3C", tint, 0.12),
             tooltipText: "#F8FAFC",
-            primarySoft: `rgba(${r}, ${g}, ${b}, 0.18)`
+            primarySoft: `rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, 0.18)`
         };
     } else {
         surface = {
@@ -489,7 +513,7 @@ function applySurfaceVars(profile, mode) {
             borderHover: "#B9CCF8",
             tooltip: "#1E293B",
             tooltipText: "#F8FAFC",
-            primarySoft: `rgba(${r}, ${g}, ${b}, 0.10)`
+            primarySoft: `rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, 0.10)`
         };
     }
 
@@ -503,11 +527,11 @@ function applySurfaceVars(profile, mode) {
     const skeletonHeader = isDark
         ? mixColors(surface.soft, profile.value, 0.08)
         : mixColors(surface.soft, profile.value, 0.035);
-    const presentationPrimaryText = getReadableAccent(profile.value, surface.surface);
-    const presentationHeaderBg = `linear-gradient(105deg, rgba(${r}, ${g}, ${b}, ${isDark ? 0.16 : 0.10}) 0%, rgba(${r}, ${g}, ${b}, ${isDark ? 0.07 : 0.035}) 36%, transparent 64%), ${surface.surface}`;
-    const presentationHeaderBgSubtle = `linear-gradient(105deg, rgba(${r}, ${g}, ${b}, ${isDark ? 0.10 : 0.055}) 0%, transparent 44%), ${surface.surface}`;
-    const presentationMetricStripBg = `linear-gradient(135deg, rgba(${surfaceRgb.r}, ${surfaceRgb.g}, ${surfaceRgb.b}, ${isDark ? 0.96 : 0.90}) 0%, rgba(${r}, ${g}, ${b}, ${isDark ? 0.10 : 0.055}) 100%)`;
-    const presentationMetricBg = `linear-gradient(135deg, ${surface.surface} 0%, rgba(${r}, ${g}, ${b}, ${isDark ? 0.12 : 0.045}) 100%)`;
+    const presentationPrimaryText = getReadableAccent(interactiveProfile.value, surface.surface);
+    const presentationHeaderBg = `linear-gradient(105deg, rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, ${isDark ? 0.16 : 0.10}) 0%, rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, ${isDark ? 0.07 : 0.035}) 36%, transparent 64%), ${surface.surface}`;
+    const presentationHeaderBgSubtle = `linear-gradient(105deg, rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, ${isDark ? 0.10 : 0.055}) 0%, transparent 44%), ${surface.surface}`;
+    const presentationMetricStripBg = `linear-gradient(135deg, rgba(${surfaceRgb.r}, ${surfaceRgb.g}, ${surfaceRgb.b}, ${isDark ? 0.96 : 0.90}) 0%, rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, ${isDark ? 0.10 : 0.055}) 100%)`;
+    const presentationMetricBg = `linear-gradient(135deg, ${surface.surface} 0%, rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, ${isDark ? 0.12 : 0.045}) 100%)`;
     const footerTint = isDark && profile.key === "black" ? profile.value : surface.tint;
     const footerWave = isDark
         ? mixColors(surface.sidebar, footerTint, 0.42)
@@ -580,7 +604,7 @@ function applySurfaceVars(profile, mode) {
         "--mci-skeleton-header": skeletonHeader,
         "--mci-skeleton-base": skeletonBase,
         "--mci-skeleton-highlight": skeletonHighlight,
-        "--mci-skeleton-accent": `rgba(${r}, ${g}, ${b}, ${isDark ? 0.22 : 0.14})`,
+        "--mci-skeleton-accent": `rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, ${isDark ? 0.22 : 0.14})`,
         "--mci-skeleton-border": surface.border,
         "--mci-text-primary": surface.ink,
         "--mci-text-secondary": surface.text,
@@ -597,16 +621,16 @@ function applySurfaceVars(profile, mode) {
         "--mci-tooltip-text": surface.tooltipText,
         "--mci-presentation-header-bg": presentationHeaderBg,
         "--mci-presentation-header-bg-subtle": presentationHeaderBgSubtle,
-        "--mci-presentation-header-border": `rgba(${r}, ${g}, ${b}, ${isDark ? 0.28 : 0.17})`,
+        "--mci-presentation-header-border": `rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, ${isDark ? 0.28 : 0.17})`,
         "--mci-presentation-header-shadow": isDark
             ? "0 4px 16px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.035)"
             : "0 2px 12px rgba(15, 23, 42, 0.065), inset 0 1px 0 rgba(255, 255, 255, 0.72)",
-        "--mci-presentation-accent-gradient": `linear-gradient(180deg, ${lighten(profile.value, isDark ? 16 : 22)} 0%, ${profile.value} 55%, ${profile.strong} 100%)`,
-        "--mci-presentation-sheen": `linear-gradient(90deg, transparent, rgba(${r}, ${g}, ${b}, ${isDark ? 0.82 : 0.68}), transparent)`,
+        "--mci-presentation-accent-gradient": `linear-gradient(180deg, ${lighten(interactiveProfile.value, isDark ? 16 : 22)} 0%, ${interactiveProfile.value} 55%, ${interactiveProfile.strong} 100%)`,
+        "--mci-presentation-sheen": `linear-gradient(90deg, transparent, rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, ${isDark ? 0.82 : 0.68}), transparent)`,
         "--mci-presentation-metric-strip-bg": presentationMetricStripBg,
         "--mci-presentation-metric-bg": presentationMetricBg,
-        "--mci-presentation-metric-border": `rgba(${r}, ${g}, ${b}, ${isDark ? 0.24 : 0.12})`,
-        "--mci-presentation-metric-hover-border": `rgba(${r}, ${g}, ${b}, ${isDark ? 0.48 : 0.30})`,
+        "--mci-presentation-metric-border": `rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, ${isDark ? 0.24 : 0.12})`,
+        "--mci-presentation-metric-hover-border": `rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, ${isDark ? 0.48 : 0.30})`,
         "--mci-presentation-metric-icon-bg": surface.primarySoft,
         "--mci-presentation-primary-text": presentationPrimaryText,
         "--mci-presentation-success-text": isDark ? "#34D399" : "#047857",
@@ -614,8 +638,8 @@ function applySurfaceVars(profile, mode) {
         "--mci-presentation-danger-text": isDark ? "#FB7185" : "#BE123C",
         "--mci-presentation-info-text": isDark ? "#A5B4FC" : "#475569",
         "--mci-presentation-muted-text": surface.muted,
-        "--mci-primary-color": profile.value,
-        "--mci-primary-rgb": `${r}, ${g}, ${b}`,
+        "--mci-primary-color": interactiveProfile.value,
+        "--mci-primary-rgb": `${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}`,
         "--mci-gradient-surface": `linear-gradient(180deg, ${surface.surface} 0%, ${surface.pageAlt} 100%)`,
         "--mci-gradient-bg": `linear-gradient(180deg, ${surface.page} 0%, ${surface.pageAlt} 100%)`,
         "--sidebar-bg-gradient": sidebarGradient,
@@ -626,7 +650,7 @@ function applySurfaceVars(profile, mode) {
             : "0 1px 2px rgba(15, 23, 42, 0.09), 0 8px 24px rgba(15, 23, 42, 0.11), 0 20px 46px rgba(15, 23, 42, 0.06)",
         "--mci-shadow-card-hover": isDark
             ? "0 20px 48px rgba(0, 0, 0, 0.38)"
-            : `0 2px 4px rgba(15, 23, 42, 0.10), 0 14px 34px rgba(15, 23, 42, 0.15), 0 28px 64px rgba(${r}, ${g}, ${b}, 0.10)`,
+            : `0 2px 4px rgba(15, 23, 42, 0.10), 0 14px 34px rgba(15, 23, 42, 0.15), 0 28px 64px rgba(${interactiveRgb.r}, ${interactiveRgb.g}, ${interactiveRgb.b}, 0.10)`,
         "--mci-shadow-dialog": isDark
             ? "0 24px 72px rgba(0, 0, 0, 0.48)"
             : "0 24px 72px rgba(15, 23, 42, 0.18)",
@@ -644,6 +668,7 @@ function applySurfaceVars(profile, mode) {
             "--sidebar-text-color": surface.text,
             "--sidebar-hover-bg": sidebarHover,
             "--sidebar-active-bg": sidebarActive,
+            "--sidebar-active-border": surface.borderStrong,
             "--sidebar-parent-active-bg": sidebarParentActive,
             "--sidebar-active-text-color": getReadableAccent(profile.value, sidebarActive),
             "--sidebar-opened-title-bg": "transparent",
@@ -664,6 +689,9 @@ function applySurfaceVars(profile, mode) {
             "--sidebar-active-bg": getBrightness(profile.value) > 180
                 ? "rgba(15, 23, 42, 0.10)"
                 : "rgba(255, 255, 255, 0.24)",
+            "--sidebar-active-border": getBrightness(profile.value) > 180
+                ? "rgba(15, 23, 42, 0.22)"
+                : "rgba(255, 255, 255, 0.30)",
             "--sidebar-active-text-color": profile.onPrimary,
             "--sidebar-opened-title-bg": "transparent",
             "--sidebar-submenu-item-bg": "transparent",
@@ -676,7 +704,7 @@ function applySurfaceVars(profile, mode) {
         });
     }
 
-    applyVePlusVars(profile, surface);
+    applyVePlusVars(interactiveProfile, surface);
 }
 
 /**
@@ -708,12 +736,14 @@ export function setThemeColor(primaryColor) {
             gradient: "linear-gradient(135deg, #64748B 0%, #475569 100%)"
         }
         : selectedProfile;
-    const profile = {
+    const paletteProfile = {
         ...renderedProfile,
         onPrimary: getReadableText(renderedProfile.value)
     };
+    const profile = createInteractiveProfile(paletteProfile, mode);
     const primary = profile.value;
     const { r, g, b } = hexToRgb(primary);
+    const paletteRgb = hexToRgb(paletteProfile.value);
     const isDark = mode === "dark";
 
     // 保证 data-theme、Element Plus 的 html.dark 与令牌永远处于同一状态。
@@ -729,6 +759,9 @@ export function setThemeColor(primaryColor) {
     setProperties(root, {
         "--color-primary": primary,
         "--mci-palette-value": selectedProfile.value,
+        "--mci-brand-primary": paletteProfile.value,
+        "--mci-brand-primary-rgb": `${paletteRgb.r}, ${paletteRgb.g}, ${paletteRgb.b}`,
+        "--mci-brand-on-primary": paletteProfile.onPrimary,
         "--color-primary-rgb": `${r}, ${g}, ${b}`,
         "--color-primary-light": lighten(primary, 15),
         "--color-primary-dark": profile.strong,
@@ -738,6 +771,8 @@ export function setThemeColor(primaryColor) {
         "--el-color-primary-rgb": `${r}, ${g}, ${b}`,
         "--el-color-primary-dark-2": profile.strong,
         "--mci-color-primary": primary,
+        "--mci-color-primary-readable": primary,
+        "--mci-color-primary-on-surface": primary,
         "--mci-color-primary-rgb": `${r}, ${g}, ${b}`,
         "--mci-color-primary-light": lighten(primary, 25),
         "--mci-color-primary-dark": profile.strong,
@@ -770,7 +805,7 @@ export function setThemeColor(primaryColor) {
         });
     }
 
-    applySurfaceVars(profile, mode);
+    applySurfaceVars(paletteProfile, mode, profile);
     return selectedProfile.value;
 }
 

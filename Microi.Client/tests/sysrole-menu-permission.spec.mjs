@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setRoleMenuChecked } from "../src/views/system/utils/sysrole-menu-permission.js";
+import {
+    ensureRoleMenuPathReadable,
+    setRoleMenuChecked
+} from "../src/views/system/utils/sysrole-menu-permission.js";
 
 // zhy：静态核对角色管理界面与保存白名单，防止后续重构再次隐藏或过滤 Read。
 const rolePermissionRowSource = readFileSync(new URL("../src/views/system/components/sysrole-menu-permission-row.vue", import.meta.url), "utf8");
@@ -59,4 +62,17 @@ test("勾选父菜单会递归同步当前行和所有子菜单", () => {
     assert.equal(row._Child[0]._Check, false);
     assert.deepEqual(row.Permission, []);
     assert.deepEqual(row._Child[0].Permission, []);
+});
+
+test("勾选子菜单操作会自动补齐整条父菜单读取路径", () => {
+    const systemEngine = { Id: "system-engine", _Check: false, Permission: [] };
+    const apiEngine = { Id: "api-engine", _Check: false, Permission: ["Edit"] };
+    const parentById = { "api-engine": systemEngine };
+
+    ensureRoleMenuPathReadable(apiEngine, parentById);
+
+    assert.equal(apiEngine._Check, true);
+    assert.equal(systemEngine._Check, true);
+    assert.equal(apiEngine.Permission.includes("Read"), true);
+    assert.deepEqual(systemEngine.Permission, ["Read"]);
 });

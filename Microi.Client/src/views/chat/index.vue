@@ -74,12 +74,12 @@
                                 <el-input placeholder="搜索" prefix-:icon="Search" v-model="kw"></el-input>
                             </div>
                         </div>
-                        <div class="vc-recordList flex1 flexbox flex__direction-column" style="overflow: auto">
+                        <div class="vc-recordList flex1 flexbox flex__direction-column">
                             <ul class="clearfix J__recordList">
                                 <li v-for="contact in GetLastContacts" :key="contact.ContactId" class="flexbox flex-alignc wc__material-cell" @click="SelectCurrentLastContact(contact)">
                                     <div class="img">
-                                        <em v-if="contact.UnRead > 0" class="wc__badge" style="z-index: 1">{{ contact.UnRead }}</em>
-                                        <el-image :fit="'cover'" :src="DiyCommon.GetServerPath(contact.ContactUserAvatar)"></el-image>
+                                        <em v-if="contact.UnRead > 0" class="wc__badge" style="z-index: 1">{{ formatBadgeCount(contact.UnRead) }}</em>
+                                        <el-image :fit="'cover'" :src="getContactAvatar(contact)"></el-image>
                                     </div>
                                     <div class="info flex1">
                                         <h2 class="title clamp1">{{ contact.ContactUserName }}</h2>
@@ -92,6 +92,10 @@
                                     </label>
                                 </li>
                             </ul>
+                            <div v-if="GetLastContacts.length === 0" class="chat-list-empty">
+                                <div>没有匹配的聊天对象</div>
+                                <el-button link type="primary" @click="kw = ''">清除搜索</el-button>
+                            </div>
                         </div>
                     </div>
                     <div v-else-if="ChatMiddlebarType == 'Contacts'" class="vChat-middlebar flexbox flex__direction-column">
@@ -123,7 +127,7 @@
                                     >
                                         <!-- <h2 class="initial wc__borT">A</h2> -->
                                         <router-link to="" class="row flexbox flex-alignc wc__material-cell">
-                                            <img class="uimg" :src="DiyCommon.GetServerPath(user.Avatar)" />
+                                            <img class="uimg" :src="getContactAvatar(user)" />
                                             <span class="name flex1">{{ user.Name }}</span>
                                         </router-link>
                                     </div>
@@ -181,6 +185,16 @@
                                 </template>
                             </el-dialog>
                         </div>
+                        <div v-if="RealtimeState !== 'Connected'" class="realtime-status-banner" :data-state="RealtimeState">
+                            <span class="realtime-status-dot"></span>
+                            <span class="flex1">{{ RealtimeStatusText }}</span>
+                            <el-button
+                                v-if="RealtimeState !== 'Unavailable'"
+                                link
+                                type="primary"
+                                @click="retryRealtimeConnection"
+                            >立即重试</el-button>
+                        </div>
                         <!-- <div class="vChat__notice J__vChatNotice">18条新消息</div> -->
                         <div class="fixGeminiscrollHeight" v-show="fixGeminiscrollHeight" style="font-size: 0; height: 1px"></div>
                         <div class="vChat__main flex1 flexbox flex__direction-column" style="overflow: auto">
@@ -195,7 +209,7 @@
                                     <!-- <li class="time"><span>2019年04月01日 晚上22:30</span></li> -->
                                     <li v-for="(chat, index) in ChatRecord" :key="chat.FromUserId + index" :class="chat.FromUserId == GetCurrentUser.Id ? 'me' : 'others'">
                                         <router-link v-if="chat.FromUserId != GetCurrentUser.Id" class="avatar" to="">
-                                            <img :src="DiyCommon.GetServerPath(chat.FromUserAvatar)" style="object-fit: cover" />
+                                            <img :src="getChatAvatar(chat)" style="object-fit: cover" />
                                         </router-link>
                                         <div class="content">
                                             <p class="author">
@@ -220,12 +234,19 @@
                                                 <div v-safe-html="renderDataTable(chat.Content)"></div>
                                             </div>
                                             <!-- 普通消息 -->
-                                            <div v-else class="msg" :class="{ 'streaming-message': chat.isStreaming }">
+                                            <div v-else class="msg" :class="{ 'streaming-message': chat.isStreaming, 'message-error': chat.isError }">
                                                 <span v-if="chat.isThinking" class="thinking-indicator">
                                                     <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span> 正在思考
                                                 </span>
                                                 <span v-else v-safe-html="formatMessageContent(chat.Content)"></span>
                                                 <span v-if="chat.isStreaming && !chat.isThinking" class="typing-cursor">▌</span>
+                                                <el-button
+                                                    v-if="chat.IsPlatformNotification && chat.LinkUrl"
+                                                    class="platform-message-link"
+                                                    link
+                                                    type="primary"
+                                                    @click="openPlatformMessageLink(chat.LinkUrl)"
+                                                >查看详情</el-button>
                                             </div>
                                         </div>
                                         <router-link v-if="chat.FromUserId == GetCurrentUser.Id" class="avatar" to="">
@@ -233,7 +254,16 @@
                                         </router-link>
                                     </li>
                                 </ul>
-                                <div style="color: #666" v-if="ChatRecord.length == 0">暂无消息记录...</div>
+                                <div v-if="!HasCurrentContact" class="chat-conversation-empty">
+                                    <div class="empty-title">开始一段对话</div>
+                                    <div class="empty-desc">左侧已为你固定 AI助手 和 admin 平台消息，选择一个即可开始。</div>
+                                </div>
+                                <div v-else-if="ChatRecord.length == 0" class="chat-conversation-empty">
+                                    <div class="empty-title">还没有消息</div>
+                                    <div class="empty-desc">
+                                        {{ IsPlatformSystemContact ? '通知中心的平台消息会同步显示在这里。' : '发送第一条消息，或稍后重试加载历史记录。' }}
+                                    </div>
+                                </div>
                             </div>
                             <!-- </geminiScrollbar> -->
                         </div>
@@ -243,31 +273,35 @@
                             <div
                                 class="wc__editor-panel wc__borT flexbox flex__direction-column"
                                 :style="{
-                                    backgroundColor: DiyCommon.IsNull(GetCurrentLastContact.ContactUserId) ? 'rgba(245, 245, 245, .95)' : 'rgba(255,255,255,.9)'
+                                    backgroundColor: CanSendCurrentMessage ? 'var(--el-bg-color, #fff)' : 'var(--el-fill-color-light, #f5f7fa)'
                                 }"
                             >
                                 <div class="wrap-toolbar">
-                                    <div class="flexbox">
-                                        <div class="flex1">
-                                            <el-icon class="btn btn-face hand" title="选择表情" style="font-size: 20px;" @click="toggleEmojiPanel"><Star /></el-icon>
-                                            <el-icon class="btn btn-image hand" title="发送图片" style="font-size: 20px; position: relative;">
-                                                <Document />
-                                                <input type="file" accept="image/*" id="J__chooseImg" class="hand" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
-                                            </el-icon>
-                                            <el-icon class="btn btn-attachment hand" title="发送文件" style="font-size: 20px; position: relative;">
-                                                <Folder />
-                                                <input type="file" accept="*" id="J__chooseFile" class="hand" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
-                                            </el-icon>
+                                    <div class="chat-toolbar-row flexbox flex-alignc">
+                                        <div class="chat-toolbar-main flex1 flexbox flex-alignc">
+                                            <div class="chat-toolbar-actions flexbox flex-alignc" aria-label="聊天附件工具">
+                                                <button type="button" class="btn chat-toolbar-button btn-face" title="选择表情" aria-label="选择表情" @click="toggleEmojiPanel">
+                                                    <span class="chat-emoji-glyph" aria-hidden="true">☺</span>
+                                                </button>
+                                                <label class="btn chat-toolbar-button btn-image" title="发送图片" aria-label="发送图片">
+                                                    <el-icon><Picture /></el-icon>
+                                                    <input type="file" accept="image/*" id="J__chooseImg" class="chat-file-input" />
+                                                </label>
+                                                <label class="btn chat-toolbar-button btn-attachment" title="发送文件" aria-label="发送文件">
+                                                    <el-icon><Folder /></el-icon>
+                                                    <input type="file" accept="*" id="J__chooseFile" class="chat-file-input" />
+                                                </label>
+                                            </div>
                                             <!-- AI聊天时显示模型选择器 -->
-                                            <span v-if="GetCurrentLastContact.ContactUserId === 'AI'" style="margin-left: 10px; display: inline-flex; align-items: center; vertical-align: middle;">
-                                                <span style="font-size: 12px; color: #999; margin-right: 4px;">AI模型：</span>
+                                            <div v-if="GetCurrentLastContact.ContactUserId === 'AI'" class="chat-ai-model flex1 flexbox flex-alignc">
+                                                <span class="chat-ai-model__label">AI模型：</span>
                                                 <el-select
                                                     v-model="selectedAiModel"
                                                     value-key="Id"
                                                     size="small"
                                                     placeholder="选择AI模型"
                                                     :loading="aiModelLoading"
-                                                    style="width: 200px;"
+                                                    class="chat-ai-model__select"
                                                 >
                                                     <el-option
                                                         v-for="model in aiModelList"
@@ -276,10 +310,14 @@
                                                         :value="model"
                                                     />
                                                 </el-select>
-                                            </span>
+                                            </div>
                                         </div>
                                         <el-popover title="Tips" placement="top" width="200" trigger="hover" content="截屏、截图可直接粘贴至文本框进行发送！">
-                                            <template #reference><el-icon class="btn btn-help" style="font-size: 20px;"><QuestionFilled /></el-icon></template>
+                                            <template #reference>
+                                                <button type="button" class="btn chat-toolbar-button btn-help" aria-label="输入帮助">
+                                                    <el-icon><QuestionFilled /></el-icon>
+                                                </button>
+                                            </template>
                                         </el-popover>
                                     </div>
                                 </div>
@@ -287,8 +325,8 @@
                                     <div
                                         class="editor J__wcEditor"
                                         id="J__wcEditor"
-                                        :placeholder="!DiyCommon.IsNull(GetCurrentLastContact.ContactUserId) ? '输入文字或Ctrl+V粘贴图片...' : '请选择一个聊天对象！'"
-                                        :contenteditable="!DiyCommon.IsNull(GetCurrentLastContact.ContactUserId) ? true : false"
+                                        :placeholder="EditorPlaceholder"
+                                        :contenteditable="CanSendCurrentMessage"
                                         style="user-select: text; -webkit-user-select: text"
                                         @keydown="handleEditorKeydown"
                                     ></div>
@@ -298,9 +336,9 @@
                                     :icon="Position"
                                     :loading="BtnLoading"
                                     class="btn-submit J__wchatSubmit"
-                                    :disabled="DiyCommon.IsNull(GetCurrentLastContact.ContactUserId)"
+                                    :disabled="!CanSendCurrentMessage"
                                     :style="{
-                                        backgroundColor: DiyCommon.IsNull(GetCurrentLastContact.ContactUserId) ? '#d5d5d5' : ''
+                                        backgroundColor: CanSendCurrentMessage ? '' : '#d5d5d5'
                                     }"
                                     @click="SendMessage"
                                 >
@@ -308,7 +346,7 @@
                                 </el-button>
                             </div>
                             <!-- Emoji表情选择面板 -->
-                            <div class="wc__choose-panel emoji-panel" v-show="showEmojiPanel" style="display: block;">
+                            <div class="wc__choose-panel emoji-panel" v-show="showEmojiPanel">
                                 <div class="wrap-emotion">
                                     <div class="emoji-container">
                                         <div class="emoji-categories">
@@ -357,18 +395,33 @@ import Swiper from "swiper";
 //import { DiyStore } from 'itdos.diy'
 import _ from "underscore";
 import { useDiyStore } from "@/pinia";
-import { computed } from "vue";
 import drag from "@/utils/dos.common";
 import { 
     formatMessageContent, 
     renderDataTable, 
     escapeHtml,
-    formatTime,
+    splitTypewriterUnits,
     initWebSocketEvents,
-    cleanupWebSocketEvents,
-    isDuplicateMessage,
-    clearMessageDuplicateCache
+    cleanupWebSocketEvents
 } from "@/utils/chat.common";
+import {
+    REALTIME_STATE_EVENT,
+    getRealtimeStatusText,
+    normalizeRealtimeState
+} from "@/utils/realtime-connection";
+import {
+    PLATFORM_NOTIFICATION_EVENT,
+    PLATFORM_NOTIFICATION_SNAPSHOT_EVENT,
+    PLATFORM_SYSTEM_CONTACT_ID,
+    createPlatformSystemContact,
+    mergePlatformNotification,
+    normalizeNotificationLink,
+    normalizePlatformNotificationResult,
+    toPlatformChatRecord
+} from "@/utils/platform-notification";
+
+const AI_ASSISTANT_AVATAR = "/static/mci/ai/assistant-robot.png";
+const AI_TYPEWRITER_INTERVAL = 18;
 
 export default {
     name: "diy-chat",
@@ -401,6 +454,17 @@ export default {
             AllContactsGroup: [],
             // 流式消息相关
             currentStreamMessage: null,  // 当前正在接收的流式消息
+            aiTypewriterQueue: [],
+            aiTypewriterTimer: null,
+            aiTypewriterCompletePending: false,
+            lastAITypewriterCompletedContent: "",
+            lastAITypewriterCompletedAt: 0,
+            RealtimeState: normalizeRealtimeState(window.__MICROI_REALTIME_STATE__?.state),
+            RealtimeRetryCount: Number(window.__MICROI_REALTIME_STATE__?.retryCount || 0),
+            RealtimeRetryDelay: window.__MICROI_REALTIME_STATE__?.retryDelay ?? null,
+            platformNotifications: [],
+            platformUnreadCount: 0,
+            boundWebsocket: null,
             // 联系人分页
             contactsPageIndex: 1,
             contactsPageSize: 15,
@@ -414,9 +478,6 @@ export default {
             panelLeft: null,
             panelTop: null,
             diyChatElement: null,
-            // WebSocket连接检查定时器
-            wsCheckTimer: null,
-            wsCheckCount: 0,
             // Emoji表情数据
             emojiData: {
                 categories: [
@@ -467,6 +528,11 @@ export default {
         };
     },
     watch: {
+        DiyChatShow: function (show) {
+            if (show) {
+                this.activateChat();
+            }
+        },
         CurrentLastContact: function (newVal, oldVal) {
             var self = this;
             if (!self.DiyCommon.IsNull(newVal) && newVal != oldVal && self.CurrentLastContact.ContactUserId != newVal.ContactUserId) {
@@ -486,6 +552,30 @@ export default {
         },
         GetCurrentUser() {
             return this.diyStore.GetCurrentUser;
+        },
+        HasCurrentContact() {
+            return !this.DiyCommon.IsNull(this.GetCurrentLastContact?.ContactUserId);
+        },
+        IsPlatformSystemContact() {
+            return this.GetCurrentLastContact?.ContactUserId === PLATFORM_SYSTEM_CONTACT_ID;
+        },
+        CanSendCurrentMessage() {
+            return this.HasCurrentContact
+                && !this.IsPlatformSystemContact
+                && this.RealtimeState === "Connected";
+        },
+        EditorPlaceholder() {
+            if (!this.HasCurrentContact) return "请选择一个聊天对象！";
+            if (this.IsPlatformSystemContact) return "平台消息由 admin 发送，此会话只读";
+            if (this.RealtimeState !== "Connected") return "实时通信未连接，请先重试";
+            return "输入文字或Ctrl+V粘贴图片...";
+        },
+        RealtimeStatusText() {
+            return getRealtimeStatusText(
+                this.RealtimeState,
+                this.RealtimeRetryCount,
+                this.RealtimeRetryDelay
+            );
         },
         // 面板位置样式（拖动时移动wrapper）
         panelStyle() {
@@ -522,9 +612,36 @@ export default {
         GetLastContacts: {
             get() {
                 var self = this;
-                var result = [];
-                var index = 0;
-                return self.LastContacts;
+                const recent = Array.isArray(self.LastContacts) ? self.LastContacts : [];
+                const byUserId = new Map(
+                    recent.map(item => [String(item?.ContactUserId || item?.Id || ""), item])
+                );
+                const aiContact = {
+                    ContactId: "AI",
+                    ContactUserId: "AI",
+                    ContactUserName: "AI助手",
+                    ContactUserAvatar: AI_ASSISTANT_AVATAR,
+                    LastMessage: "点击开始与AI助手聊天",
+                    UpdateTime: "",
+                    UnRead: 0,
+                    ...(byUserId.get("AI") || {}),
+                    ContactUserAvatar: AI_ASSISTANT_AVATAR
+                };
+                const platformContact = createPlatformSystemContact(
+                    self.platformNotifications,
+                    self.platformUnreadCount
+                );
+                const pinnedIds = new Set(["AI", PLATFORM_SYSTEM_CONTACT_ID]);
+                const merged = [
+                    aiContact,
+                    platformContact,
+                    ...recent.filter(item => !pinnedIds.has(String(item?.ContactUserId || item?.Id || "")))
+                ];
+                const keyword = String(self.kw || "").trim().toLowerCase();
+                if (!keyword) return merged;
+                return merged.filter(item => `${item?.ContactUserName || ""} ${item?.LastMessage || ""}`
+                    .toLowerCase()
+                    .includes(keyword));
                 // self.LastContacts.forEach(element => {
                 //     var search = _.where(self.UserIdsInfo, {Id : element.contactUserId});
                 //     if(search.length > 0){
@@ -922,6 +1039,13 @@ export default {
 
         // Enter键监听已迁移到模板 @keydown="handleEditorKeydown"
 
+        self._onRealtimeState = self.handleRealtimeState.bind(self);
+        self._onPlatformNotification = self.handlePlatformNotification.bind(self);
+        self._onPlatformSnapshot = self.handlePlatformNotificationSnapshot.bind(self);
+        window.addEventListener(REALTIME_STATE_EVENT, self._onRealtimeState);
+        window.addEventListener(PLATFORM_NOTIFICATION_EVENT, self._onPlatformNotification);
+        window.addEventListener(PLATFORM_NOTIFICATION_SNAPSHOT_EVENT, self._onPlatformSnapshot);
+
         self.$nextTick(function () {
             // 检查设备类型：只有PC端才初始化聊天
             if (self.diyStore.IsPhoneView) {
@@ -931,38 +1055,15 @@ export default {
             }
             
             console.log('[聊天组件] PC端模式，开始初始化聊天');
-            
-            // 轮询检查WebSocket连接状态
-            let checkCount = 0;
-            const maxChecks = 50; // 最多检查50次，共10秒
-            
-            const checkConnection = () => {
-                checkCount++;
-                
-                // 直接检查全局实例
-                const globalWs = window.__VUE_APP__?.config?.globalProperties?.$websocket;
-                
-                console.log(`[检查WebSocket] 第${checkCount}次`, {
-                    存在: !!globalWs,
-                    状态: globalWs?.state
-                });
-                
-                if (globalWs && globalWs.state === 'Connected') {
-                    console.log('[检查WebSocket] 连接成功，初始化事件');
-                    // 同步this.$websocket引用
-                    self.$websocket = globalWs;
-                    self.InitSignalROnEvent();
-                } else if (checkCount >= maxChecks) {
-                    console.warn('[检查WebSocket] 连接超时，关闭loading');
-                    self.FirstConnectWebsocket = false;
-                } else {
-                    // 继续检查
-                    setTimeout(checkConnection, 200);
+
+            // 连接状态由 main.js 统一广播，不再用 200ms 定时器反复探测。
+            self.FirstConnectWebsocket = false;
+            self.handleRealtimeState({
+                detail: window.__MICROI_REALTIME_STATE__ || {
+                    state: window.__VUE_APP__?.config?.globalProperties?.$websocket?.state
                 }
-            };
-            
-            // 延迟500ms开始检查，给WebSocket时间初始化
-            setTimeout(checkConnection, 500);
+            });
+            self.loadPlatformNotifications();
         });
 
         // 添加鼠标移动和松开事件监听
@@ -975,17 +1076,230 @@ export default {
     },
     beforeUnmount() {
         var self = this;
+        self.cancelAITypewriter();
         // 移除事件监听
         document.removeEventListener('mousemove', self.onDrag);
         document.removeEventListener('mouseup', self.stopDrag);
+        window.removeEventListener(REALTIME_STATE_EVENT, self._onRealtimeState);
+        window.removeEventListener(PLATFORM_NOTIFICATION_EVENT, self._onPlatformNotification);
+        window.removeEventListener(PLATFORM_NOTIFICATION_SNAPSHOT_EVENT, self._onPlatformSnapshot);
         
         // 使用公共模块清理WebSocket事件
         if (self.websocketEventsRegistered) {
-            cleanupWebSocketEvents(self.$websocket, '[PC聊天]', 'pc-chat');
+            cleanupWebSocketEvents(self.boundWebsocket || self.$websocket, '[PC聊天]', 'pc-chat');
             self.websocketEventsRegistered = false;
+            self.boundWebsocket = null;
         }
     },
     methods: {
+        formatBadgeCount(value) {
+            const count = Number(value) || 0;
+            return count > 99 ? "99+" : count;
+        },
+        getChatAvatar(chat) {
+            if (String(chat?.FromUserId || "") === "AI") return AI_ASSISTANT_AVATAR;
+            return this.DiyCommon.GetServerPath(chat?.FromUserAvatar || "./static/img/icon/personal.png");
+        },
+        getContactAvatar(contact) {
+            if (String(contact?.ContactUserId || contact?.Id || "") === "AI") return AI_ASSISTANT_AVATAR;
+            return this.DiyCommon.GetServerPath(contact?.ContactUserAvatar || contact?.Avatar || "./static/img/icon/personal.png");
+        },
+        prefersReducedMotion() {
+            return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+        },
+        cancelAITypewriter(options = {}) {
+            const activeMessage = this.currentStreamMessage;
+            if (this.aiTypewriterTimer) {
+                window.clearTimeout(this.aiTypewriterTimer);
+            }
+            this.aiTypewriterTimer = null;
+            this.aiTypewriterQueue = [];
+            this.aiTypewriterCompletePending = false;
+            if (activeMessage && options.preserveMessage !== false) {
+                activeMessage.isThinking = false;
+                activeMessage.isStreaming = false;
+            }
+            this.currentStreamMessage = null;
+            return activeMessage;
+        },
+        queueAITypewriterChunk(chunk) {
+            if (!this.currentStreamMessage || !chunk) return;
+            this.currentStreamMessage.isThinking = false;
+            this.aiTypewriterQueue.push(...splitTypewriterUnits(chunk));
+            this.scheduleAITypewriter();
+        },
+        scheduleAITypewriter() {
+            if (this.aiTypewriterTimer || !this.currentStreamMessage) return;
+            const reducedMotion = this.prefersReducedMotion();
+            this.aiTypewriterTimer = window.setTimeout(() => {
+                this.aiTypewriterTimer = null;
+                if (!this.currentStreamMessage) return;
+
+                const remaining = this.aiTypewriterQueue.length;
+                const batchSize = reducedMotion
+                    ? Math.max(remaining, 1)
+                    : remaining > 600
+                        ? 12
+                        : remaining > 240
+                            ? 6
+                            : remaining > 100
+                                ? 3
+                                : 1;
+                const nextText = this.aiTypewriterQueue.splice(0, batchSize).join("");
+                if (nextText) this.currentStreamMessage.Content += nextText;
+                this.$nextTick(() => this.wchat_ToBottom());
+
+                if (this.aiTypewriterQueue.length > 0) {
+                    this.scheduleAITypewriter();
+                } else if (this.aiTypewriterCompletePending) {
+                    this.finishAITypewriter();
+                }
+            }, reducedMotion ? 0 : AI_TYPEWRITER_INTERVAL);
+        },
+        completeAITypewriter() {
+            this.aiTypewriterCompletePending = true;
+            if (this.aiTypewriterQueue.length > 0 || this.aiTypewriterTimer) {
+                this.scheduleAITypewriter();
+                return;
+            }
+            this.finishAITypewriter();
+        },
+        finishAITypewriter() {
+            const completedMessage = this.currentStreamMessage;
+            if (completedMessage) {
+                completedMessage.isThinking = false;
+                completedMessage.isStreaming = false;
+                this.lastAITypewriterCompletedContent = String(completedMessage.Content || "");
+                this.lastAITypewriterCompletedAt = Date.now();
+            }
+            this.currentStreamMessage = null;
+            this.aiTypewriterCompletePending = false;
+            this.BtnLoading = false;
+            this.$nextTick(() => this.wchat_ToBottom());
+        },
+        startAITypewriterMessage(message) {
+            const completeContent = String(message?.Content || "");
+            if (
+                !this.currentStreamMessage
+                && completeContent
+                && completeContent === this.lastAITypewriterCompletedContent
+                && Date.now() - this.lastAITypewriterCompletedAt < 5000
+            ) {
+                return;
+            }
+
+            const activeMessage = this.cancelAITypewriter({ preserveMessage: false });
+            const typewriterMessage = activeMessage || {};
+            Object.assign(typewriterMessage, message, {
+                FromUserId: message?.FromUserId || "AI",
+                FromUserName: message?.FromUserName || "AI助手",
+                FromUserAvatar: AI_ASSISTANT_AVATAR,
+                Content: "",
+                CreateTime: message?.CreateTime || new Date().toISOString(),
+                Type: message?.Type || "text",
+                isThinking: false,
+                isStreaming: true,
+                isLocalRealtime: true
+            });
+            this.currentStreamMessage = typewriterMessage;
+            if (!activeMessage) this.ChatRecord.push(typewriterMessage);
+            this.queueAITypewriterChunk(completeContent);
+            this.completeAITypewriter();
+        },
+        activateChat() {
+            this.handleRealtimeState({
+                detail: window.__MICROI_REALTIME_STATE__ || {
+                    state: window.__VUE_APP__?.config?.globalProperties?.$websocket?.state
+                }
+            });
+            this.loadPlatformNotifications();
+            if (this.RealtimeState !== "Connected") {
+                window.tryConnectWebSocket?.(false);
+            }
+        },
+        retryRealtimeConnection() {
+            window.tryConnectWebSocket?.(true);
+        },
+        handleRealtimeState(event) {
+            const detail = event?.detail || event || {};
+            this.RealtimeState = normalizeRealtimeState(detail.state);
+            this.RealtimeRetryCount = Number(detail.retryCount || 0);
+            this.RealtimeRetryDelay = detail.retryDelay ?? null;
+            this.FirstConnectWebsocket = false;
+
+            if (this.RealtimeState !== "Connected") return;
+            const websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket;
+            if (!websocket || websocket.state !== "Connected") return;
+
+            if (this.boundWebsocket && this.boundWebsocket !== websocket) {
+                cleanupWebSocketEvents(this.boundWebsocket, '[PC聊天]', 'pc-chat');
+                this.websocketEventsRegistered = false;
+            }
+            this.$websocket = websocket;
+            this.boundWebsocket = websocket;
+            this.InitSignalROnEvent();
+            if (this.IsPlatformSystemContact) {
+                this.loadPlatformNotifications();
+            }
+        },
+        async loadPlatformNotifications() {
+            if (!this.DiyCommon.Notification?.List) return;
+            try {
+                const result = await this.DiyCommon.Notification.List({
+                    _PageIndex: 1,
+                    _PageSize: 100
+                });
+                const normalized = normalizePlatformNotificationResult(result);
+                this.platformNotifications = normalized.rows;
+                this.platformUnreadCount = normalized.unreadCount;
+                this.syncPlatformChatRecords();
+            } catch (error) {
+                console.warn('[PC聊天] 平台消息读取失败', error);
+            }
+        },
+        handlePlatformNotification(event) {
+            const notification = event?.detail || event || {};
+            const identity = String(notification?.Id || notification?.EventId || "");
+            const existed = this.platformNotifications.some(item =>
+                String(item?.Id || item?.EventId || "") === identity
+            );
+            this.platformNotifications = mergePlatformNotification(
+                this.platformNotifications,
+                notification,
+                100
+            );
+            if (!existed && Number(notification?.IsRead || 0) !== 1) {
+                this.platformUnreadCount++;
+            }
+            this.syncPlatformChatRecords();
+        },
+        handlePlatformNotificationSnapshot(event) {
+            const detail = event?.detail || event || {};
+            this.platformNotifications = Array.isArray(detail.rows) ? detail.rows : [];
+            this.platformUnreadCount = Math.max(0, Number(detail.unreadCount || 0));
+            this.syncPlatformChatRecords();
+        },
+        syncPlatformChatRecords() {
+            if (!this.IsPlatformSystemContact) return;
+            const records = this.platformNotifications.map(item =>
+                toPlatformChatRecord(item, this.GetCurrentUser)
+            );
+            this.ChatRecord.splice(0, this.ChatRecord.length, ...records.reverse());
+            this.$nextTick(() => this.wchat_ToBottom());
+        },
+        openPlatformMessageLink(value) {
+            const link = normalizeNotificationLink(value, window.location.origin);
+            if (!link) return;
+            if (link.startsWith('#')) {
+                window.location.hash = link.slice(1);
+                return;
+            }
+            if (link.startsWith('/') && !link.startsWith('//')) {
+                this.$router.push(link);
+                return;
+            }
+            window.open(link, '_blank', 'noopener,noreferrer');
+        },
         // 加载AI模型列表
         loadAiModelList() {
             var self = this;
@@ -1039,7 +1353,7 @@ export default {
                                 const aiAssistant = {
                                     Id: 'AI',
                                     Name: 'AI助手',
-                                    Avatar: './static/img/icon/personal.png',
+                                    Avatar: AI_ASSISTANT_AVATAR,
                                     State: 1
                                 };
                                 contactsList.unshift(aiAssistant);
@@ -1088,19 +1402,37 @@ export default {
         },
         SelectCurrentLastContact(contact) {
             var self = this;
-            
-            console.log('[选择联系人]', contact);
+            const contactUserId = contact?.ContactUserId || contact?.Id;
+            const knownContact = self.GetLastContacts.find(item =>
+                String(item?.ContactUserId || item?.Id || "") === String(contactUserId || "")
+            );
+            const selectedContact = {
+                ...(knownContact || {}),
+                ...(contact || {}),
+                ContactUserId: contactUserId,
+                ContactUserName: contact?.ContactUserName || contact?.Name || knownContact?.ContactUserName || "",
+                ContactUserAvatar: contact?.ContactUserAvatar || contact?.Avatar || knownContact?.ContactUserAvatar || ""
+            };
+
+            console.log('[选择联系人]', selectedContact);
             
             // 重置流式消息状态（切换联系人时）
-            self.currentStreamMessage = null;
+            self.cancelAITypewriter();
             
             // 如果选择的是AI助手，加载AI模型列表
-            if (contact.ContactUserId === 'AI' || contact.Id === 'AI') {
+            if (contactUserId === 'AI') {
                 self.loadAiModelList();
             }
             
             //切换当前聊天人
-            self.diyStore.setDiyChatCurrentLastContact(contact);
+            self.diyStore.setDiyChatCurrentLastContact(selectedContact);
+            self.ChatRecord.splice(0, self.ChatRecord.length);
+
+            // 平台消息以数据库为权威历史源，SignalR 只负责新消息即时到达。
+            if (contactUserId === PLATFORM_SYSTEM_CONTACT_ID) {
+                self.loadPlatformNotifications();
+                return;
+            }
             
             // 直接使用this.$websocket（已在checkConnection中同步）
             // 如果this.$websocket为null，尝试从全局获取
@@ -1120,36 +1452,34 @@ export default {
             // 检查websocket连接状态
             if (!ws || !ws.invoke) {
                 console.error('[聊天] WebSocket 未初始化，无法获取聊天记录');
-                self.$message?.error('聊天服务未连接，请稍后重试');
+                window.tryConnectWebSocket?.(false);
                 return;
             }
             
             // 检查连接状态是否为Connected
             if (ws.state !== 'Connected') {
                 console.error('[聊天] WebSocket 未连接，当前状态:', ws.state);
-                self.$message?.error('聊天服务未就绪，请稍后重试');
+                window.tryConnectWebSocket?.(false);
                 return;
             }
             
             //获取跟这个人的聊天记录
-            console.log('[获取聊天记录] 开始请求', contact.ContactUserName);
+            console.log('[获取聊天记录] 开始请求', selectedContact.ContactUserName);
             ws.invoke("SendChatRecordToUser", {
                     FromUserId: self.GetCurrentUser.Id,
-                    ToUserId: contact.ContactUserId,
+                    ToUserId: selectedContact.ContactUserId,
                     OsClient: self.DiyCommon.GetOsClient()
                 })
                 .then((res) => {
                     console.log('[获取聊天记录] 请求成功，等待ReceiveSendChatRecordToUser事件');
                 })
                 .catch((err) => {
-                    console.error(`获取与[${contact.ContactUserName}]的聊天记录失败：`, err);
-                    self.$message?.error(`获取聊天记录失败: ${err.message || err}`);
+                    console.error(`获取与[${selectedContact.ContactUserName}]的聊天记录失败：`, err);
                 });
         },
-        InitSignalROnEvent(timer) {
+        InitSignalROnEvent() {
             var self = this;
-            // 使用computed的$websocket引用
-            const websocket = self.$websocket;
+            const websocket = window.__VUE_APP__?.config?.globalProperties?.$websocket || self.$websocket;
             
             if (!websocket) {
                 console.warn('[聊天] WebSocket尚未初始化，请稍后...');
@@ -1159,13 +1489,11 @@ export default {
             
             if (websocket.state !== "Connected") {
                 console.warn('[聊天] WebSocket连接状态:', websocket.state);
-                if (websocket.state === "Disconnected") {
-                    console.error('[聊天] WebSocket连接已断开');
-                    // 只在确实断开时才显示错误
-                    self.$message?.error('聊天服务连接已断开，请刷新页面重试');
-                }
                 return;
             }
+
+            self.$websocket = websocket;
+            self.boundWebsocket = websocket;
             
             console.log("开始初始化消息服务器监听函数...");
             
@@ -1175,9 +1503,6 @@ export default {
                 // 只执行必要的请求
                 self.SendLastContacts();
                 self.SendUnreadCountToUser();
-                if (timer != undefined) {
-                    clearInterval(timer);
-                }
                 return;
             }
             
@@ -1191,9 +1516,6 @@ export default {
             self.SendLastContacts();
             //这里请求一次未读消息数量
             self.SendUnreadCountToUser();
-            if (timer != undefined) {
-                clearInterval(timer);
-            }
         },
         InitReceiveEvent() {
             var self = this;
@@ -1221,10 +1543,7 @@ export default {
                             // 如果是AI助手的消息，直接添加到聊天记录
                             if (message.FromUserId === 'AI') {
                                 console.log('[AI消息] 收到AI回复');
-                                self.ChatRecord.push(message);
-                                self.$nextTick(() => {
-                                    self.wchat_ToBottom();
-                                });
+                                self.startAITypewriterMessage(message);
                             } else {
                                 // 防止频繁请求聊天记录
                                 if (self._loadingChatRecord) {
@@ -1254,6 +1573,7 @@ export default {
                     
                     // 接收AI流式数据块
                     onReceiveAIChunk: (chunk, fromUserId, toUserId, isComplete) => {
+                        const complete = isComplete === true || isComplete === 'true';
                         // 检查是否是当前聊天对象
                         const isCurrentContact = 
                             self.CurrentLastContact.ContactUserId === fromUserId ||
@@ -1261,6 +1581,13 @@ export default {
                         
                         if (!isCurrentContact) {
                             console.log('[AI流式] 不是当前联系人，忽略');
+                            return;
+                        }
+
+                        // 失败通知会先关闭占位消息，随后服务端仍会发送一次完成信号。
+                        // 此处不要再为纯完成信号创建空白气泡。
+                        if (complete && !chunk && !self.currentStreamMessage) {
+                            self.BtnLoading = false;
                             return;
                         }
                         
@@ -1271,7 +1598,7 @@ export default {
                                 self.currentStreamMessage = {
                                     FromUserId: fromUserId,
                                     FromUserName: 'AI助手',
-                                    FromUserAvatar: './static/img/icon/personal.png',
+                                    FromUserAvatar: AI_ASSISTANT_AVATAR,
                                     ToUserId: toUserId,
                                     ToUserName: self.GetCurrentUser.Name,
                                     ToUserAvatar: self.GetCurrentUser.Avatar,
@@ -1280,6 +1607,7 @@ export default {
                                     Type: 'text',
                                     IsRead: false,
                                     isStreaming: true,
+                                    isLocalRealtime: true,
                                     isThinking: true  // 思考中状态
                                 };
                                 self.ChatRecord.push(self.currentStreamMessage);
@@ -1294,40 +1622,63 @@ export default {
                             self.currentStreamMessage = {
                                 FromUserId: fromUserId,
                                 FromUserName: 'AI助手',
-                                FromUserAvatar: './static/img/icon/personal.png',
+                                FromUserAvatar: AI_ASSISTANT_AVATAR,
                                 ToUserId: toUserId,
                                 ToUserName: self.GetCurrentUser.Name,
                                 ToUserAvatar: self.GetCurrentUser.Avatar,
-                                Content: chunk,
+                                Content: '',
                                 CreateTime: new Date().toISOString(),
                                 Type: 'text',
                                 IsRead: false,
-                                isStreaming: true
+                                isStreaming: true,
+                                isLocalRealtime: true
                             };
                             
                             // 添加到聊天记录
                             self.ChatRecord.push(self.currentStreamMessage);
-                        } else {
-                            // 后续数据块 - 追加内容，取消思考中状态
-                            if (self.currentStreamMessage.isThinking) {
-                                self.currentStreamMessage.isThinking = false;
-                            }
-                            self.currentStreamMessage.Content += chunk;
                         }
+
+                        // 思考过程和正式答复都进入同一个逐字队列，完成信号要等队列清空。
+                        self.queueAITypewriterChunk(chunk || '');
                         
                         // 滚动到底部
                         self.$nextTick(() => {
                             self.wchat_ToBottom();
                         });
                         
-                        if (isComplete) {
-                            // 流式输出完成
+                        if (complete) {
                             console.log('[AI流式] 完成');
-                            if (self.currentStreamMessage) {
-                                self.currentStreamMessage.isStreaming = false;
-                            }
-                            self.currentStreamMessage = null;
+                            self.completeAITypewriter();
                         }
+                    },
+
+                    onReceiveAIError: (message, fromUserId, toUserId) => {
+                        const isCurrentContact =
+                            self.CurrentLastContact.ContactUserId === fromUserId
+                            || self.CurrentLastContact.Id === fromUserId;
+                        if (!isCurrentContact) return;
+
+                        let failedMessage = self.cancelAITypewriter({ preserveMessage: false });
+                        if (!failedMessage) {
+                            failedMessage = {
+                                FromUserId: fromUserId || 'AI',
+                                FromUserName: 'AI助手',
+                                FromUserAvatar: AI_ASSISTANT_AVATAR,
+                                ToUserId: toUserId || self.GetCurrentUser.Id,
+                                ToUserName: self.GetCurrentUser.Name,
+                                ToUserAvatar: self.GetCurrentUser.Avatar,
+                                CreateTime: new Date().toISOString(),
+                                Type: 'text',
+                                IsRead: false
+                            };
+                            self.ChatRecord.push(failedMessage);
+                        }
+                        failedMessage.Content = `AI回复失败：${message || '服务暂不可用，请稍后重试。'}`;
+                        failedMessage.isThinking = false;
+                        failedMessage.isStreaming = false;
+                        failedMessage.isError = true;
+                        self.BtnLoading = false;
+                        self.$nextTick(() => self.wchat_ToBottom());
                     },
                     
                     // 接收聊天记录
@@ -1337,8 +1688,33 @@ export default {
                         // 重置加载标志
                         self._loadingChatRecord = false;
                         
-                        // 使用splice确保响应式更新
-                        self.ChatRecord.splice(0, self.ChatRecord.length, ...message);
+                        // 首次历史请求可能比刚发出的消息/AI流式回复更晚返回。
+                        // 直接替换会把用户刚看到的成功回复清空；保留本地待发送、
+                        // 实时流和失败气泡，并按发送人/接收人/内容与持久记录去重。
+                        const incoming = Array.isArray(message) ? message : [];
+                        const localPending = self.ChatRecord.filter(item => item && (
+                            item.tempId
+                            || item.isLocalRealtime
+                            || item.isStreaming
+                            || item.isError
+                            || item.SendFailed
+                        ));
+                        const signature = item => [
+                            String(item?.FromUserId || ''),
+                            String(item?.ToUserId || ''),
+                            String(item?.Type || 'text'),
+                            String(item?.Content || '')
+                        ].join('\u001f');
+                        const known = new Set(incoming.map(signature));
+                        const merged = incoming.slice();
+                        localPending.forEach(item => {
+                            const key = signature(item);
+                            if (!known.has(key)) {
+                                known.add(key);
+                                merged.push(item);
+                            }
+                        });
+                        self.ChatRecord.splice(0, self.ChatRecord.length, ...merged);
                         self.$nextTick(() => {
                             self.wchat_ToBottom();
                         });
@@ -1491,10 +1867,12 @@ export default {
         },
         SendMessage() {
             var self = this;
+
+            if (self.IsPlatformSystemContact) return;
             
-            if (!self.$websocket || !self.$websocket.invoke) {
+            if (!self.$websocket || !self.$websocket.invoke || self.$websocket.state !== 'Connected') {
                 console.error('[SendMessage] WebSocket 未连接，无法发送消息');
-                self.$message?.error('聊天服务未连接，无法发送消息');
+                window.tryConnectWebSocket?.(false);
                 return;
             }
             
@@ -1519,15 +1897,16 @@ export default {
                 //发送到websocket
                 // self.$websocket.invoke("SendMessage", self.GetCurrentUser.Id, user.groupName, target.value)
                 // self.$websocket.invoke("SendMessage", self.GetCurrentUser.Id, 'iTdosGroup', msgTpl)
-                var tempId = "随机生成";
-                self.ChatRecord.push({
+                var tempId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                const optimisticMessage = {
                     Content: _html, //msgTpl,
                     ToUserId: self.GetCurrentLastContact.ContactUserId,
                     FromUserId: self.GetCurrentUser.Id,
-                    CreateTime: new Date().Format("HH:mm yyyy/MM/dd"),
+                    CreateTime: new Date().toISOString(),
                     LastMessage: _html,
                     tempId: tempId
-                });
+                };
+                self.ChatRecord.push(optimisticMessage);
                 self.$websocket
                     .invoke("SendToUser", {
                         Content: _html, //msgTpl,
@@ -1538,7 +1917,12 @@ export default {
                         FromUserId: self.GetCurrentUser.Id,
                         FromUserName: self.GetCurrentUser.Name,
                         FromUserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar),
-                        OtherInfo: self.GetCurrentLastContact.ContactUserId === 'AI' && self.selectedAiModel ? JSON.stringify({ AiModel: self.selectedAiModel.AiModel }) : ''
+                        OtherInfo: self.GetCurrentLastContact.ContactUserId === 'AI' && self.selectedAiModel
+                            ? JSON.stringify({
+                                AiModel: self.selectedAiModel.AiModel,
+                                AiModelId: self.selectedAiModel.Id || ''
+                            })
+                            : ''
                     }) //, self.GetCurrentUser.Id
                     .then((res) => {
                         console.log('[发送消息] ✅ 发送成功', { 
@@ -1579,6 +1963,7 @@ export default {
                         });
                         self.$message?.error('消息发送失败: ' + err.toString());
                         //根据tempId标记发送失败
+                        optimisticMessage.SendFailed = true;
                         self.BtnLoading = false;
                     });
             } catch (error) {
@@ -1614,8 +1999,8 @@ export default {
             let newTop = e.clientY - self.dragStartY;
             
             // 边界检查 - 确保聊天框至少有50px可见
-            const wrapperWidth = 1050;
-            const wrapperHeight = 600;
+            const wrapperWidth = self.diyChatElement.offsetWidth || 1120;
+            const wrapperHeight = self.diyChatElement.offsetHeight || 720;
             const minVisibleSize = 50;
             
             const maxLeft = window.innerWidth - minVisibleSize;
@@ -1703,6 +2088,151 @@ export default {
 @import "@/views/chat/css/fonts/iconfont.css";
 @import "@/views/chat/css/reset.scss";
 @import "@/views/chat/css/layout.scss";
+
+.realtime-status-banner {
+    min-height: 34px;
+    padding: 4px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #8a6200;
+    background: #fff8e6;
+    border-bottom: 1px solid #f3dfab;
+}
+
+.realtime-status-banner[data-state="Exhausted"],
+.realtime-status-banner[data-state="Disconnected"] {
+    color: #b33a3a;
+    background: #fff1f0;
+    border-bottom-color: #ffd1ce;
+}
+
+.realtime-status-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.chat-list-empty,
+.chat-conversation-empty {
+    color: #8a8f99;
+    text-align: center;
+    font-size: 13px;
+}
+
+.chat-list-empty {
+    padding: 32px 12px;
+}
+
+.chat-conversation-empty {
+    padding: 70px 24px 24px;
+}
+
+.chat-conversation-empty .empty-title {
+    margin-bottom: 8px;
+    color: #4f5969;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.chat-conversation-empty .empty-desc {
+    line-height: 1.7;
+}
+
+.platform-message-link {
+    display: block;
+    margin-top: 6px;
+    padding: 0;
+}
+
+.message-error {
+    color: #b42318 !important;
+    background: #fff1f0 !important;
+    border: 1px solid #ffd1ce;
+}
+
+.chat-toolbar-row,
+.chat-toolbar-main,
+.chat-toolbar-actions,
+.chat-ai-model {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+}
+
+.chat-toolbar-row {
+    gap: 8px;
+}
+
+.chat-toolbar-main {
+    gap: 10px;
+}
+
+.chat-toolbar-actions {
+    flex: 0 0 auto;
+    gap: 3px;
+}
+
+.wc__editor-panel .wrap-toolbar .chat-toolbar-button {
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--el-text-color-secondary, #606266);
+    cursor: pointer;
+    transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.wc__editor-panel .wrap-toolbar .chat-toolbar-button:hover,
+.wc__editor-panel .wrap-toolbar .chat-toolbar-button:focus-visible {
+    background: var(--el-fill-color-light, #f5f7fa);
+    color: var(--el-color-primary, #409eff);
+    outline: none;
+}
+
+.chat-toolbar-button .el-icon {
+    font-size: 20px;
+}
+
+.chat-emoji-glyph {
+    font: 22px/1 "Segoe UI Symbol", "Microsoft YaHei", sans-serif;
+}
+
+.chat-file-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    opacity: 0;
+}
+
+.chat-ai-model {
+    flex: 1 1 auto;
+    gap: 6px;
+}
+
+.chat-ai-model__label {
+    flex: 0 0 auto;
+    color: var(--el-text-color-secondary, #909399);
+    font-size: 12px;
+    line-height: 30px;
+}
+
+.chat-ai-model__select.el-select {
+    width: clamp(180px, 32vw, 300px);
+    max-width: 100%;
+}
+
+.chat-ai-model__select .el-select__wrapper {
+    min-height: 30px;
+}
+
+.btn-help {
+    flex: 0 0 30px;
+}
 
 /* 聊天框包装器 - 填充父容器.diy-chat */
 .vChat-wrapper {
@@ -1989,6 +2519,28 @@ export default {
     color: #4CAF50;
     font-size: 18px;
     vertical-align: text-bottom;
+}
+
+@media (max-width: 820px) {
+    .vChat-middlebar {
+        flex-basis: 220px;
+        width: 220px;
+    }
+
+    .chat-ai-model__label {
+        display: none;
+    }
+
+    .chat-ai-model__select.el-select {
+        width: min(220px, 100%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .typing-cursor,
+    .thinking-dots span {
+        animation: none !important;
+    }
 }
 
 .thinking-indicator {

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
     getBackgroundTaskEta,
     getBackgroundTaskProgress,
@@ -49,4 +50,17 @@ test("active tasks trigger polling fallback and eta is explicit", () => {
     assert.match(eta, /10:30:00/);
     assert.match(eta, /10m 0s/);
     assert.match(eta, /中等可信/);
+});
+
+test("task center is event driven and shows a full creation datetime", () => {
+    const component = readFileSync(
+        new URL("../src/layout/components/BackgroundTaskCenter.vue", import.meta.url),
+        "utf8"
+    );
+
+    assert.match(component, /ws\.on\("ReceiveBackgroundTaskList", this\.handleTaskList\)/);
+    assert.match(component, /formatDateTime\(row\.CreateTime\)/);
+    assert.match(component, /getFullYear\(\)[\s\S]*?getMonth\(\)[\s\S]*?getDate\(\)[\s\S]*?getHours\(\)/);
+    assert.doesNotMatch(component, /taskPollTimer|scheduleTaskPolling|shouldPollBackgroundTasks/);
+    assert.doesNotMatch(component, /setInterval\([\s\S]{0,220}BackgroundTask\/List/);
 });

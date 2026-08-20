@@ -166,6 +166,11 @@
             pointer-events: auto !important;
             cursor: pointer !important;
         }
+        // 字段说明本身就是 Tooltip 触发器，不能随 label 一起禁用鼠标事件。
+        .diy-field-description {
+            pointer-events: auto !important;
+            cursor: help !important;
+        }
     }
     .el-button>span{
         gap: 3px;

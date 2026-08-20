@@ -12,6 +12,10 @@ function fail(message) {
   process.exit(1)
 }
 
+function readText(filePath) {
+  return fs.readFileSync(filePath, 'utf8').replace(/\r\n?/g, '\n')
+}
+
 if (!fs.existsSync(officialPath)) fail(`official control source not found: ${officialPath}`)
 
 const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'))
@@ -27,32 +31,23 @@ if (duplicate.length) fail(`duplicate controls: ${[...new Set(duplicate)].join('
 if (missing.length) fail(`unmapped official controls: ${missing.join(', ')}`)
 if (unknown.length) fail(`unknown controls: ${unknown.join(', ')}`)
 
-const renderer = fs.readFileSync(path.join(root, 'src/components/mci-native-field/mci-native-field.vue'), 'utf8')
-const nativeForm = fs.readFileSync(path.join(root, 'src/pages/native-form/index.vue'), 'utf8')
-const formRuntime = fs.readFileSync(path.join(root, 'src/platform/native-form.js'), 'utf8')
-const xjyTenantForm = fs.readFileSync(path.join(root, 'src/tenants/xjy/form.js'), 'utf8')
-const xjyProposalCalculation = fs.readFileSync(
-  path.join(root, 'src/tenants/xjy/proposal-calculation.js'),
-  'utf8'
-)
-const businessDetail = fs.readFileSync(path.join(root, 'src/pages/business/detail.vue'), 'utf8')
-const moduleDetail = fs.readFileSync(path.join(root, 'src/pages/module/detail.vue'), 'utf8')
-const tableSelector = fs.readFileSync(
-  path.join(root, 'src/components/mci-table-selector/mci-table-selector.vue'),
-  'utf8'
-)
-const moduleRegistry = fs.readFileSync(path.join(root, 'src/platform/module-registry.js'), 'utf8')
-const formTabs = fs.readFileSync(path.join(root, 'src/components/mci-related-tabs/mci-related-tabs.vue'), 'utf8')
-const childTable = fs.readFileSync(path.join(root, 'src/components/mci-child-table/mci-child-table.vue'), 'utf8')
-const businessCard = fs.readFileSync(path.join(root, 'src/components/mci-business-card/mci-business-card.vue'), 'utf8')
-const relatedBusinessList = fs.readFileSync(
-  path.join(root, 'src/components/mci-business-related-list/mci-business-related-list.vue'),
-  'utf8'
-)
-const relatedBusinessPage = fs.readFileSync(path.join(root, 'src/pages/business/related-list.vue'), 'utf8')
-const businessList = fs.readFileSync(path.join(root, 'src/pages/business/list.vue'), 'utf8')
-const taskCard = fs.readFileSync(path.join(root, 'src/components/mci-task-card/mci-task-card.vue'), 'utf8')
-const taskList = fs.readFileSync(path.join(root, 'src/pages/task/list.vue'), 'utf8')
+const renderer = readText(path.join(root, 'src/components/mci-native-field/mci-native-field.vue'))
+const nativeForm = readText(path.join(root, 'src/pages/native-form/index.vue'))
+const formRuntime = readText(path.join(root, 'src/platform/native-form.js'))
+const xjyTenantForm = readText(path.join(root, 'src/tenants/xjy/form.js'))
+const xjyProposalCalculation = readText(path.join(root, 'src/tenants/xjy/proposal-calculation.js'))
+const businessDetail = readText(path.join(root, 'src/pages/business/detail.vue'))
+const moduleDetail = readText(path.join(root, 'src/pages/module/detail.vue'))
+const tableSelector = readText(path.join(root, 'src/components/mci-table-selector/mci-table-selector.vue'))
+const moduleRegistry = readText(path.join(root, 'src/platform/module-registry.js'))
+const formTabs = readText(path.join(root, 'src/components/mci-related-tabs/mci-related-tabs.vue'))
+const childTable = readText(path.join(root, 'src/components/mci-child-table/mci-child-table.vue'))
+const businessCard = readText(path.join(root, 'src/components/mci-business-card/mci-business-card.vue'))
+const relatedBusinessList = readText(path.join(root, 'src/components/mci-business-related-list/mci-business-related-list.vue'))
+const relatedBusinessPage = readText(path.join(root, 'src/pages/business/related-list.vue'))
+const businessList = readText(path.join(root, 'src/pages/business/list.vue'))
+const taskCard = readText(path.join(root, 'src/components/mci-task-card/mci-task-card.vue'))
+const taskList = readText(path.join(root, 'src/pages/task/list.vue'))
 
 for (const control of ['ImgUpload', 'FileUpload', 'DateTime', 'Address', 'Map', 'Radio', 'Checkbox', 'Switch', 'Rate', 'RichText']) {
   if (!renderer.includes(control)) fail(`renderer does not cover ${control}`)
@@ -218,7 +213,10 @@ for (const page of [nativeForm, moduleDetail, businessDetail]) {
     fail('form tab child tables must use the same business list presentation as standalone entries')
   }
 }
-if (!businessCard.includes('card-actions') || !businessCard.includes('查看详情')) {
+if (!businessCard.includes('card-bottom__links') ||
+  !businessCard.includes('查看详情') ||
+  !businessCard.includes('showActionMenu') ||
+  !businessCard.includes("this.$emit('action'")) {
   fail('shared business card must preserve list row actions and detail navigation')
 }
 // zhy：跟进记录列表必须从基础租户配置识别长文本，并在微信端保留静态三行截断兜底。
@@ -296,7 +294,7 @@ if (!relatedBusinessList.includes('<root-portal v-if="filterOpen && !isPreview">
 // zhy：跟进详情必须将联系人 Id 解析为姓名，保存时必须显式补入隐藏客户 Id。
 for (const token of [
   'isFollowupForm(context)',
-  'resolveFollowupCustomer(context, true)',
+  'resolveFollowupCustomer(context)',
   "fieldName(context, 'KehuMCCD', '客户名称（传递）')",
   'await loadFollowupContacts(context, customer.id)',
   "SelectSaveField: ''",
@@ -423,7 +421,7 @@ for (const token of [
     fail(`follow-up checkin floating action is missing: ${token}`)
   }
 }
-const nativeCheckin = fs.readFileSync(path.join(root, 'src/pages/native/checkin.vue'), 'utf8')
+const nativeCheckin = readText(path.join(root, 'src/pages/native/checkin.vue'))
 for (const token of [
   "this.returnToFollowup = String(options.returnToFollowup || '0') === '1'",
   "eventChannel.emit('checkinSuccess'",
@@ -431,8 +429,8 @@ for (const token of [
 ]) {
   if (!nativeCheckin.includes(token)) fail(`follow-up checkin return flow is missing: ${token}`)
 }
-const mediaUploader = fs.readFileSync(path.join(root, 'src/components/mci-media-uploader/mci-media-uploader.vue'), 'utf8')
-const microiV8 = fs.readFileSync(path.join(root, 'src/utils/microi.v8.js'), 'utf8')
+const mediaUploader = readText(path.join(root, 'src/components/mci-media-uploader/mci-media-uploader.vue'))
+const microiV8 = readText(path.join(root, 'src/utils/microi.v8.js'))
 const hdfsController = fs.readFileSync(
   path.join(workspaceRoot, 'Microi.Server/Microi.net.Api/Controllers/HDFSController.cs'),
   'utf8'
@@ -501,8 +499,9 @@ if (businessDetail.includes('display-mode="preview" show-preview-header') ||
   nativeForm.includes(':show-preview-header="mode === \'View\'"')) {
   fail('standalone TableChild tabs must not render a collapsible title or preview-only list')
 }
-if (!businessDetail.includes('@scrolltolower="loadActiveRelatedPage"') ||
-  !businessDetail.includes('loadActiveRelatedPage()')) {
+if (!businessDetail.includes(':independent-scroll="standaloneListMode"') ||
+  !relatedBusinessList.includes('@scrolltolower="loadMore"') ||
+  !relatedBusinessList.includes('loadMore() { this.loadData(false) }')) {
   fail('business detail related tabs must load the next page when the detail scroll reaches the bottom')
 }
 for (const [source, name] of [

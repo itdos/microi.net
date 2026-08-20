@@ -427,16 +427,70 @@ html[data-theme="dark"] .el-table__body tr.current-row > td.el-table__cell {
     background-color: var(--el-fill-color-light) !important;
 }
 
-/* 白色 palette 的侧栏依靠边框建立层级，避免与内容区融成一片。 */
+/* 白色 palette 以轻表面和短侧标识建立层级，避免菜单项出现成排描边。 */
 html[data-theme="light"][data-mci-palette="white"] .sidebar-container-microi {
-    border-right: 1px solid var(--mci-border-strong, #cbd5e1);
-    box-shadow: 8px 0 26px rgba(15, 23, 42, 0.05);
+    border-right: 1px solid color-mix(in srgb, var(--mci-border-strong, #cbd5e1) 52%, transparent);
+    box-shadow: 8px 0 24px rgba(15, 23, 42, 0.035);
 }
 
 html[data-theme="light"][data-mci-palette="white"] .sidebar-container-microi,
 html[data-theme="light"][data-mci-palette="white"] .sidebar-container-microi .el-menu {
     background-color: var(--sidebar-bg-color, #f8fafc) !important;
     color: var(--sidebar-text-color, #111827) !important;
+}
+
+/* 顶栏聊天与通知共用同一角标规格，避免视觉尺寸、偏移和动画不一致。 */
+.mci-header-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mci-header-badge > .el-badge__content.is-fixed {
+    top: 0;
+    right: 0;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border: 2px solid var(--el-bg-color, #fff);
+    border-radius: 9px;
+    box-sizing: border-box;
+    box-shadow: 0 2px 7px rgba(245, 108, 108, 0.25);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 14px;
+    transform: translate(55%, -42%);
+    animation: none !important;
+}
+
+/* Element 默认箭头是旋转方块；实时通信提示使用真正的三角形。 */
+.mci-realtime-tooltip.el-popper[data-popper-placement^="bottom"] > .el-popper__arrow {
+    top: -7px !important;
+    width: 12px;
+    height: 7px;
+}
+
+.mci-realtime-tooltip.el-popper[data-popper-placement^="bottom"] > .el-popper__arrow::before {
+    width: 12px !important;
+    height: 7px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--mci-tooltip-bg, #273449) !important;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    transform: none !important;
+}
+
+html[data-theme="light"][data-mci-palette="white"] .sidebar-container-microi .el-menu-item,
+html[data-theme="light"][data-mci-palette="white"] .sidebar-container-microi .el-sub-menu,
+html[data-theme="light"][data-mci-palette="white"] .sidebar-container-microi .el-sub-menu__title {
+    border: 0 !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+}
+
+html[data-theme="light"][data-mci-palette="white"] .sidebar-container-microi .el-menu-item.is-active {
+    background: var(--sidebar-active-bg, rgba(15, 23, 42, 0.075)) !important;
+    box-shadow: none !important;
 }
 
 html[data-theme="dark"] .sidebar-container-microi,
@@ -458,6 +512,13 @@ html[data-theme="dark"] .sidebar-container-microi .el-sub-menu__title:hover {
 html[data-theme="dark"] .sidebar-container-microi .el-menu-item.is-active {
     color: var(--sidebar-active-text-color, var(--el-color-primary, #5b8cff)) !important;
     background-color: var(--sidebar-active-bg, rgba(91, 140, 255, 0.18)) !important;
+}
+
+.diy-field-description-tooltip {
+    max-width: min(520px, calc(100vw - 32px));
+    line-height: 1.65;
+    white-space: normal;
+    word-break: break-word;
 }
 
 @media (prefers-reduced-motion: reduce) {

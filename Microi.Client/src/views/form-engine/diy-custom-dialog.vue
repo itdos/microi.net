@@ -82,6 +82,7 @@
 <script>
 import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
+import { isFormMaskBlurDisabled } from "@/utils/form-mask-blur.js";
 import MicroAppLoadingSkeleton from "@/views/micro-app/loading-skeleton.vue";
 export default {
     name: "DiyCustomDialog",
@@ -158,13 +159,7 @@ export default {
     },
     methods: {
         GetUnifiedOverlayClass() {
-            const value = this.diyStore && this.diyStore.SysConfig
-                ? this.diyStore.SysConfig.DisableFormMaskBlur
-                : undefined;
-            const blurDisabled = value === 1
-                || value === "1"
-                || value === true
-                || String(value || "").trim().toLowerCase() === "true";
+            const blurDisabled = isFormMaskBlurDisabled(this.diyStore?.SysConfig);
             return [
                 "diy-form-modern-overlay",
                 "mci-unified-overlay",

@@ -2048,6 +2048,7 @@ import DiyCardSelect from "@/views/form-engine/diy-card-select.vue";
 import { initV8ScanCode } from "@/utils/v8-scan-code.js";
 import { initV8IdentityVerification } from "@/utils/v8-identity-verification.js";
 import { initV8Print } from "@/utils/v8-print.js";
+import { isFormMaskBlurDisabled } from "@/utils/form-mask-blur.js";
 import {
     resolveV8ButtonVisibility,
     runV8ButtonVisibilityCode,
@@ -2340,11 +2341,7 @@ export default {
             return String(dialogType).toLowerCase() === "drawer";
         },
         GetOpenAnyTableOverlayClass() {
-            var value = this.SysConfig ? this.SysConfig.DisableFormMaskBlur : undefined;
-            var blurDisabled = value === 1
-                || value === "1"
-                || value === true
-                || String(value || "").trim().toLowerCase() === "true";
+            var blurDisabled = isFormMaskBlurDisabled(this.SysConfig);
             return [
                 "diy-open-table-overlay",
                 "mci-unified-overlay",

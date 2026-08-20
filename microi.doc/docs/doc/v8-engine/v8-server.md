@@ -419,9 +419,14 @@ V8.Method.AddSysLog({
 
 // microi_database 后端提交后事件专用：事务提交后刷新全部节点的 V8.Dbs
 var refreshResult = V8.Method.RefreshExtensionDatabases();
+
+// sys_role 后端提交前事件专用：读取服务端唯一的表直连授权策略
+var directTablePolicies = V8.Method.GetDirectTableGrantPolicies();
 ```
 
 `RefreshExtensionDatabases(osClient?)` 绑定当前 V8 租户。存在 `V8.DbTrans` 时只注册提交后回调：真实事务提交成功才递增共享 Redis 版本，回滚不刷新；没有事务时立即刷新。它适合“数据库扩展”应用的 `microi_database.SubmitAfterServerV8`，不应暴露成匿名或普通业务接口。
+
+`GetDirectTableGrantPolicies()` 返回平台统一维护的表直连授权模式和允许操作。它只供角色管理等可信后端表单事件校验，不能替代当前用户、菜单、表和行级权限判断，也不能直接作为匿名业务接口返回。
 
 ### V8.Method.Upload
 

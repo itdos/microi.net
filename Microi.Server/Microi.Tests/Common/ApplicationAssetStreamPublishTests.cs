@@ -462,13 +462,14 @@ public class ApplicationAssetStreamPublishTests
     }
 
     [Fact]
-    public void ExistingStreamFileRows_FailClosedForMissingIdsWrongAppsAndDuplicateBusinessKeys()
+    public void ExistingStreamFileRows_AllowArchivedHistoryButRejectDuplicateActiveBusinessKeys()
     {
         var valid = new JObject
         {
             ["Id"] = "file-row",
             ["AppId"] = "app-id",
-            ["FilePath"] = "dist/index.html"
+            ["FilePath"] = "dist/index.html",
+            ["StorageScope"] = "PublicBuildStream"
         };
         Assert.Null(V8McpLogic.ValidateApplicationStreamExistingFileRows(new[] { valid }, "app-id"));
 
@@ -486,6 +487,14 @@ public class ApplicationAssetStreamPublishTests
         duplicate["Id"] = "file-row-2";
         Assert.Contains("重复", V8McpLogic.ValidateApplicationStreamExistingFileRows(
             new[] { valid, duplicate }, "app-id"));
+
+        var archivedV1 = (JObject)valid.DeepClone();
+        archivedV1["Id"] = "archived-v1";
+        archivedV1["StorageScope"] = "PublicBuildStreamArchived";
+        var archivedV2 = (JObject)archivedV1.DeepClone();
+        archivedV2["Id"] = "archived-v2";
+        Assert.Null(V8McpLogic.ValidateApplicationStreamExistingFileRows(
+            new[] { valid, archivedV1, archivedV2 }, "app-id"));
     }
 
     [Fact]
@@ -1678,6 +1687,9 @@ public class ApplicationAssetStreamPublishTests
         Assert.Contains("ArchivedStreamBuildStorageScope = \"PublicBuildStreamArchived\"", publisherSource);
         Assert.Contains("\"AND\", \"FilePath\", \"StartLike\", \"dist/\"", publisherSource);
         Assert.Contains("new[] { ActiveStreamBuildStorageScope, ArchivedStreamBuildStorageScope }", publisherSource);
+        Assert.Contains("new List<object> { \"Id\", \"=\", deterministicRecordId }", publisherSource);
+        Assert.Contains("new List<object> { \"AND\", \"StorageScope\", \"=\", ActiveStreamBuildStorageScope }", publisherSource);
+        Assert.Contains("Archived rows are immutable release history", publisherSource);
         Assert.Contains("[\"StorageScope\"] = ActiveStreamBuildStorageScope", publisherSource);
         Assert.Contains("Key = $\"V8Mcp:ApplicationAsset:{TenantConfigurationSecurity.NormalizeTenantId(osClient).ToLowerInvariant()}:{appId}", publisherSource);
         Assert.Contains("Key = BuildApplicationAssetPublishLockKey(osClient, appId)", publisherSource);

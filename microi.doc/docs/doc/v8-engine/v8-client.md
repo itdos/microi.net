@@ -1115,8 +1115,8 @@ var clientType = V8.ClientType;
 ```js
 var sysTitle = V8.SysConfig.SysTitle;
 var apiBase = V8.SysConfig.ApiBase;
-var githubVisible = V8.SysConfig.LoginGitHubDisplay;
-var maskBlurDisabled = V8.SysConfig.DisableFormMaskBlur === 1;
+var githubVisible = V8.SysConfig.DisableLoginGitHub !== 1;
+var maskBlurEnabled = V8.SysConfig.FormMaskBlur === 1;
 ```
 
 前端 `V8.SysConfig` 不是数据库原行，而是当前租户 `sys_config` 的浏览器安全投影；新增公开配置必须在 `sys_config` 创建实体字段。它不存在 `PublicSettings` 或 `ServerPrivateSettings` 属性，`mci_system_setting` 的任何普通值或 Secret 都不会注入浏览器。数据库、对象存储、MQ、搜索凭据、`ClientSecrets`、`GlobalServerV8Code` 等同样不会公开。需要业务密钥的逻辑必须放到后端接口引擎或后端 V8 事件中。

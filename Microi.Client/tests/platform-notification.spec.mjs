@@ -3,10 +3,14 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
     PLATFORM_NOTIFICATION_ENGINE_KEYS,
+    PLATFORM_SYSTEM_CONTACT_ID,
+    createPlatformSystemContact,
     createPlatformNotificationApi,
+    getPlatformNotificationSender,
     mergePlatformNotification,
     normalizeNotificationLink,
-    normalizePlatformNotificationResult
+    normalizePlatformNotificationResult,
+    toPlatformChatRecord
 } from "../src/utils/platform-notification.js";
 
 test("frontend V8 notification API maps stable overloads to server engines", async () => {
@@ -65,6 +69,30 @@ test("realtime hints merge by durable notification identity", () => {
     ]);
 });
 
+test("platform notification is projected as a read-only admin system conversation", () => {
+    const notification = {
+        Id: "notice-1",
+        EventId: "event-1",
+        Title: "平台维护",
+        MsgContent: "今晚升级",
+        CreateTime: "2026-08-20T21:30:00",
+        Payload: JSON.stringify({ SystemSenderAccount: "admin" }),
+        IsRead: 0
+    };
+    const contact = createPlatformSystemContact([notification], 3);
+    const record = toPlatformChatRecord(notification, { Id: "user-1", Name: "管理员" });
+
+    assert.equal(getPlatformNotificationSender(notification), "admin");
+    assert.equal(contact.ContactUserId, PLATFORM_SYSTEM_CONTACT_ID);
+    assert.equal(contact.ContactUserName, "admin");
+    assert.equal(contact.UnRead, 3);
+    assert.equal(record.FromUserId, PLATFORM_SYSTEM_CONTACT_ID);
+    assert.equal(record.FromUserName, "admin");
+    assert.equal(record.ToUserId, "user-1");
+    assert.equal(record.Type, "platform-system");
+    assert.match(record.Content, /平台维护\n今晚升级/);
+});
+
 test("notification links reject script schemes and keep safe routes", () => {
     assert.equal(normalizeNotificationLink("javascript:alert(1)", "https://microi.example"), "");
     assert.equal(normalizeNotificationLink("data:text/html,x", "https://microi.example"), "");
@@ -85,5 +113,6 @@ test("notification center binds the fixed SignalR event and performs authoritati
     assert.match(component, /mounted\(\)\s*\{[\s\S]*?this\.loadPlatformNotifications\(\)/);
     assert.match(component, /DiyCommon\.Notification\.List/);
     assert.match(component, /DiyCommon\.Notification\.MarkRead/);
+    assert.match(component, /dispatchPlatformNotificationSnapshot/);
     assert.doesNotMatch(main, /ChatType\s*==\s*"吾码IM"/);
 });

@@ -13,7 +13,7 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 
 控件事实源：`Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json` 中 `Sort=1000` 附近的 `Divider`、`CollapseGroup`、`Tabs`、`Alert`、`StaticText`、`Html`、`RichText` 等都属于 Advanced 布局控件。
 
-表单遮罩统一使用负向开关 `diy_table.DisableFormMaskBlur`：字段缺失、空值或 `0/false` 时默认启用毛玻璃，只有显式 `1/true` 才关闭；`sys_config.DisableFormMaskBlur` 可以全局关闭。商城升级必须复用旧 `FormMaskBlur` 的字段元数据 Id 就地改名，允许暂留旧物理列供兼容读取，但旧字段元数据必须设置 `Visible=0`、`AppVisible=0`，不得同时向用户展示正向与负向开关。
+全局遮罩毛玻璃使用正向开关 `sys_config.FormMaskBlur`：缺失、空值或 `0/false` 默认关闭，只有显式 `1/true` 才开启。表级仍使用负向开关 `diy_table.DisableFormMaskBlur`；全局开启后，某张表显式 `1/true` 可单独关闭。旧全局字段 `sys_config.DisableFormMaskBlur` 只作未升级租户兼容回退，元数据必须设置 `Visible=0`、`AppVisible=0`，不得同时向用户展示两套开关。
 
 表单打开方式与分组是两个独立决策：新表默认 `FormOpenType=Dialog`、
 `FormOpenWidth=80%`。只有约 36 个以上业务字段、至少 2 个大型子表，或同等密度的重型控件

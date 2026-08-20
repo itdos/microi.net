@@ -32,6 +32,11 @@ namespace Microi.net
         DosResult ClearTenantCache(string osClient);
 
         /// <summary>
+        /// 读取服务端统一维护的平台表直连授权策略，供受信任的角色表单事件校验。
+        /// </summary>
+        DosResult GetDirectTableGrantPolicies();
+
+        /// <summary>
         /// 解析查询条件
         /// </summary>
         List<DiyWhere> ParseWhere(object whereParam);
