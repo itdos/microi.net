@@ -59,6 +59,23 @@ export default {
                 user: this.GetCurrentUser
             });
         },
+        ModuleChromeMenu() {
+            return this.PageTabHostMenuModel || this.SysMenuModel;
+        },
+        ModuleChromeView() {
+            if (!this.PageTabHostMenuModel) return this.ActiveModulePresentationView;
+            const scene = this.TableDisplayMode === "Card" ? "Card" : "List";
+            const device = this.diyStore.IsPhoneView ? "Mobile" : "PC";
+            return selectModuleView(this.PageTabHostMenuModel, {
+                scene,
+                device,
+                user: this.GetCurrentUser
+            }) || selectModuleView(this.PageTabHostMenuModel, {
+                scene: "List",
+                device,
+                user: this.GetCurrentUser
+            });
+        },
         ModuleFormWorkbenchConfig() {
             return this.ModuleListView?.Layout?.Form || {};
         },
@@ -104,9 +121,9 @@ export default {
         },
         ModulePresentationHeader() {
             return resolveListPresentationHeader({
-                menu: this.SysMenuModel,
-                table: this.CurrentDiyTableModel,
-                view: this.ActiveModulePresentationView,
+                menu: this.ModuleChromeMenu,
+                table: this.PageTabHostTableModel || this.CurrentDiyTableModel,
+                view: this.ModuleChromeView,
                 fields: uniqueFields([
                     ...(this.DiyFieldList || []),
                     ...(this._allFieldList || []),

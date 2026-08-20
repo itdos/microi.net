@@ -1,13 +1,13 @@
 ---
 name: ai-engine
-description: Microi AI 引擎、模型代理、NL2SQL/NL2V8 与知识库规范。用于模型路由、密钥和订阅配额、Schema/Skill 关键词检索与可选向量融合、提示词安全、流式响应、租户隔离和验收。
+description: Microi AI 引擎、MiniMax 图片/音乐/视频生成与预览、模型代理、NL2SQL/NL2V8 和知识库规范。用于媒体生成、模型路由、密钥与订阅配额、Schema/Skill 检索、流式响应、租户隔离和验收。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi AI Engine
 
-平台视频生成的受控 HTTP 入口为 `/api/Ai/CreateMiniMaxVideo`、`/api/Ai/GetMiniMaxVideoTask`、`/api/Ai/GetMiniMaxVideoFile`、`/api/Ai/PersistMiniMaxVideoFile`；AI 工作流入口统一位于 `/api/AIWorkFlow/*`。调用方只提交业务参数和模型选择，供应商密钥、租户配额、任务归属和文件读取权限由服务端判定。`PersistMiniMaxVideoFile` 只能将当前登录用户所属、且已成功完成的 MiniMax 视频任务文件持久化到当前租户 HDFS；禁止把该入口作为任意 URL 搬运器，任务归属、文件来源和租户边界必须由服务端重新校验。
+平台媒体生成的受控 HTTP 入口包括 `/api/Ai/GenerateMiniMaxImage`、`/api/Ai/GenerateMiniMaxMusic`、`/api/Ai/CreateMiniMaxVideo`、`/api/Ai/GetMiniMaxVideoTask`、`/api/Ai/GetMiniMaxVideoFile`、`/api/Ai/PersistMiniMaxVideoFile`；AI 工作流入口统一位于 `/api/AIWorkFlow/*`。调用方只提交业务参数和模型选择，供应商密钥、租户配额、任务归属和文件读取权限由服务端判定。生成结果必须先进入当前租户 HDFS 或受控临时句柄，浏览器不接触供应商密钥、图片 Base64、音频十六进制或原始视频任务 Id。`PersistMiniMaxVideoFile` 只能转存当前登录用户所属且已完成的任务，禁止作为任意 URL 搬运器。
 
 ## 能力
 
@@ -53,12 +53,17 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 
 - 模型 Provider、Endpoint、ApiKey、AuthPrefix 和上游模型 Id 只保存在服务端受保护配置。
 - 普通用户使用平台签发的受限 API Key/订阅身份，不能枚举或读取上游密钥。
+- MiniMax 对话媒体必须区分意图模型与生成模型：`MiniMax-M3` 只负责识别普通对话、绘图或音乐意图；图片固定走 `GenerateMiniMaxImage + image-01`，纯音乐固定走 `GenerateMiniMaxMusic + music-2.6`。不得让文本模型用说明文字冒充媒体生成，也不得声称图片/音乐是 `MiniMax-M3` 原生输出。
+- 图片请求限制为 1～4 张和受控比例，音乐当前仅向平台管理员开放且固定无人声、44.1kHz、256kbps、MP3。两者都使用稳定 `RequestId` 和共享幂等；相同参数回放、参数冲突拒绝，上游结果不确定时禁止换 Id 盲重试。成功内容由服务端校验后直接写入当前租户公有 HDFS。
+- 聊天附件的公有媒体 URL 优先按当前运行租户 `FileServer + FilePath` 解析，禁止写死域名或沿用其它租户的前缀。图片使用 Element Plus `el-image` 的 `preview-src-list` 原页放大，不能套 `target="_blank"`；音乐使用 `<audio controls preload="metadata">` 在线播放。媒体是结构化附件，文本才走安全 Markdown 渲染，禁止拼接任意 HTML 绕过 URL/类型校验。
+- Provider/中转账号未开通音乐产品、额度不足或上游停用时必须返回可诊断失败，不生成占位音频、不伪报成功。图片、音乐和视频的真实可用性都需用目标租户登录态调用及媒体 GET/播放回读证明，源码存在或接口 HTTP 200 不能替代生成成功。
 - MiniMax 视频生成属于可复用供应商原子能力，应实现在 `Microi.AI`，Controller 只读取可信用户/`OsClient`、绑定参数并传递取消信号。理由是上游密钥隔离、异步 `task_id → file_id → download_url` 协议、订阅额度和跨节点幂等都不是某个可编辑接口引擎应复制的业务逻辑；具体文章、提示词和分发编排仍可留在 Job/接口引擎/发布 Skill。
 - MiniMax Token Plan Key 与按量 API Key 是相互独立的凭据，必须复用现有服务器端 Provider/ApiKey 受保护配置，不新增 API `AppSettings`、`MICROI_*` 环境变量或浏览器可见 Key。视频创建、查询和下载仅允许官方 HTTPS Host `api.minimaxi.com`。
 - 视频创建必须要求调用方稳定 `RequestId`，先在当前租户共享 Redis 以 `OsClient + 用户 + RequestId` 原子 `NX` 占位；Redis 不可用时失败关闭。相同 RequestId/参数回放返回原任务，不同参数冲突拒绝；上游 POST 超时或结果不确定时禁止自动换 RequestId 重试。查询不再次扣生成额度。
 - 原始 MiniMax `task_id`/`file_id` 不下发。服务端返回由供应商 Key 签名、绑定当前用户和用途的短句柄；查询/下载验签后才还原。Key 轮换会使旧句柄失效，应先完成或重新登记在途任务。
 - 当前官方模型边界必须实时校准：`MiniMax-Hailuo-2.3` 支持文生/图生，`MiniMax-Hailuo-2.3-Fast` 仅图生且必须有首帧，首尾帧使用 `MiniMax-Hailuo-02`。Hailuo 2.3 的画质优先上限与平台默认值是 6 秒 / 1080P，时长优先上限是 10 秒 / 768P，两者不能同时最大；API 不提供 fps 参数，必须用媒体探针记录真实帧率，禁止把插帧/画布规格冒充模型原生能力。当前 Token Plan 使用统一用量条、5 小时固定窗口和周窗口，控制台是剩余额度事实源，不再把固定“每天 N 条”写成官方配额。需要自动生成时，在 `Microi.AI` 增加只读、脱敏、管理员限定的 `https://www.minimaxi.com/v1/token_plan/remains` 安全原子能力；不得由浏览器或可编辑 V8 读取 Provider Key，也不得把客户端今日计数当成供应商权威额度。
 - MiniMax 视频任务返回静音画面。需要人物对白时，男/女语音必须通过 `Microi.AI` 的 `GenerateMiniMaxSpeech` 受保护原子能力生成：固定 `speech-2.8-hd`、固定男女系统音色、稳定 RequestId、共享 Redis 幂等，并直接转存租户 HDFS；再由可靠 Worker 按时间轴混音、加准确字幕。无法证明口型同步时使用画外音或反打镜头。背景音乐使用 `GenerateMiniMaxMusic` 并在人声下压低。运行节点尚未部署 Speech 能力、额度未核实或母版混音/探针证据缺失时失败关闭，禁止静音、仅配乐、浏览器直连供应商或伪称模型原生带声。
+- 管理端【AI视频】应按 `TaskHandle` 轮询任务，成功后优先转存 HDFS，并用 `<video controls preload="metadata">` 原页预览和明确下载按钮消费同一个已校验地址。临时 URL、生成完成、HDFS 转存、媒体可播放和外部平台发布是五个不同事实，必须分别验收。
 - 使用 Microi.AI 中转站时，租户侧 AI Bootstrap 通过官方 `official_ai_relay_models` 发现可用运行模型。该接口是跨租户只读公共契约，必须保持启用、允许匿名 HTTP 调用，并且只返回模型标识、展示名等公开白名单字段，绝不能返回中转密钥或上游 Endpoint。消费者不得把 `NoAuth` 静默伪装为“没有配置模型”；应返回可诊断错误，同时前端显示明确空态。
 - PC、UniApp 和其它客户端通过 `POST /apiengine/{key}` 发送的 JSON Body 必须完整进入 `V8.Param`；兼容入口 `/api/ApiEngine/Run` 的 JSON Body 还必须包含 `ApiEngineKey`。API 层只负责请求绑定和清除客户端伪造的可信字段，模型选择、权限策略与对话逻辑仍全部位于 `Microi.AI` 或受控 AI 接口引擎中。
 - 当前计量记录除问题摘要外还可能持久化完整 `Question`、`Answer`，部分诊断日志也会输出问题或摘要。处理现有版本时必须把这些字段视为敏感业务数据，限制查询权限和留存；不要声称已经全面脱敏。

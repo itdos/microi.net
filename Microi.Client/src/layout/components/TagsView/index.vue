@@ -16,14 +16,14 @@
                     <component
                         v-if="Component"
                         :is="Component"
-                        :key="$route.fullPath"
+                        :key="GetRouteViewKey($route)"
                     />
                 </template>
                 <keep-alive v-else :max="5">
                     <component
                         v-if="Component"
                         :is="Component"
-                        :key="$route.fullPath"
+                        :key="GetRouteViewKey($route)"
                     />
                 </keep-alive>
             </router-view>
@@ -156,6 +156,7 @@ import { useDiyStore, useTagsViewStore, usePermissionStore } from "@/pinia";
 import { computed, defineAsyncComponent } from "vue";
 import { routeLoading } from "@/utils/mci-loading";
 import { resolveTabIcon } from "@/utils/tab-icon.js";
+import { getPageTabRouteViewKey } from "@/utils/page-tab-route-runtime.js";
 
 import { AppMain } from "../../components";
 
@@ -286,6 +287,9 @@ export default {
         }
     },
     methods: {
+        GetRouteViewKey(route) {
+            return getPageTabRouteViewKey(route);
+        },
         ResolveTabIcon(icon, index) {
             return resolveTabIcon(icon, index);
         },

@@ -2307,6 +2307,154 @@
     }
 }
 
+.module-shell-skeleton,
+.module-page-tabs-skeleton {
+    --module-skeleton-fill: var(--el-fill-color, #f0f2f5);
+    --module-skeleton-fill-light: var(--el-fill-color-light, #f5f7fa);
+    --module-skeleton-border: var(--el-border-color-lighter, #ebeef5);
+}
+
+.module-shell-skeleton {
+    animation: none;
+
+    .module-shell-skeleton__copy::before { animation: none; }
+}
+
+.module-shell-skeleton__eyebrow,
+.module-shell-skeleton__title,
+.module-shell-skeleton__description,
+.module-shell-skeleton__metric-icon,
+.module-shell-skeleton__metric-label,
+.module-shell-skeleton__metric-value,
+.module-page-tabs-skeleton__tab,
+.module-page-tabs-skeleton__toolbar > span,
+.module-page-tabs-skeleton__toolbar > i,
+.module-page-tabs-skeleton__table-head,
+.module-page-tabs-skeleton__row > span {
+    display: block;
+    border-radius: 999px;
+    background: linear-gradient(
+        100deg,
+        var(--module-skeleton-fill) 28%,
+        var(--module-skeleton-fill-light) 42%,
+        var(--module-skeleton-fill) 58%
+    );
+    background-size: 220% 100%;
+    animation: mciModuleSkeletonShift 1.35s ease-in-out infinite;
+}
+
+.module-shell-skeleton__eyebrow {
+    grid-column: 1;
+    grid-row: 1;
+    width: 72px;
+    height: 8px;
+}
+
+.module-shell-skeleton__title {
+    grid-column: 2;
+    grid-row: 1;
+    width: min(180px, 68%);
+    height: 17px;
+}
+
+.module-shell-skeleton__description {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: min(280px, 82%);
+    height: 9px;
+}
+
+.module-shell-skeleton__metrics {
+    pointer-events: none;
+}
+
+.module-shell-skeleton__metric {
+    display: grid !important;
+    grid-template-columns: 28px minmax(42px, 1fr) 34px;
+    gap: 7px !important;
+    align-items: center !important;
+}
+
+.module-shell-skeleton__metric-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+}
+
+.module-shell-skeleton__metric-label { width: 74%; height: 9px; }
+.module-shell-skeleton__metric-value { width: 34px; height: 13px; }
+
+.module-page-tabs-skeleton {
+    box-sizing: border-box;
+    margin: 0 6px;
+}
+
+.module-page-tabs-skeleton__tabs {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 40px;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--module-skeleton-border);
+}
+
+.module-page-tabs-skeleton__tab {
+    width: 88px;
+    height: 28px;
+    margin-bottom: 6px;
+    border-radius: 8px;
+
+    &.is-active { width: 102px; }
+}
+
+.module-page-tabs-skeleton__panel {
+    box-sizing: border-box;
+    min-height: 330px;
+    padding: 12px;
+    border: 1px solid var(--module-skeleton-border);
+    border-top: 0;
+    border-radius: 0 0 12px 12px;
+    background: var(--el-bg-color, #fff);
+}
+
+.module-page-tabs-skeleton__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    margin-bottom: 12px;
+
+    > span { width: 72px; height: 30px; border-radius: 8px; }
+    > i { width: min(280px, 32%); height: 30px; margin-left: auto; border-radius: 8px; }
+}
+
+.module-page-tabs-skeleton__table-head {
+    width: 100%;
+    height: 34px;
+    margin-bottom: 8px;
+    border-radius: 7px;
+}
+
+.module-page-tabs-skeleton__row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr .8fr .6fr;
+    gap: 22px;
+    align-items: center;
+    height: 40px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--module-skeleton-border);
+
+    > span { width: 78%; height: 9px; }
+    > span:nth-child(2) { width: 62%; }
+    > span:nth-child(3) { width: 70%; }
+    > span:nth-child(4) { width: 52%; }
+}
+
+@keyframes mciModuleSkeletonShift {
+    from { background-position: 120% 0; }
+    to { background-position: -120% 0; }
+}
+
 .module-presentation-copy {
     position: relative;
     display: grid;
@@ -2695,7 +2843,18 @@
     .module-presentation-header::after,
     .module-presentation-header .module-metric-item,
     .module-presentation-dot,
-    .module-metric-loading {
+    .module-metric-loading,
+    .module-shell-skeleton__eyebrow,
+    .module-shell-skeleton__title,
+    .module-shell-skeleton__description,
+    .module-shell-skeleton__metric-icon,
+    .module-shell-skeleton__metric-label,
+    .module-shell-skeleton__metric-value,
+    .module-page-tabs-skeleton__tab,
+    .module-page-tabs-skeleton__toolbar > span,
+    .module-page-tabs-skeleton__toolbar > i,
+    .module-page-tabs-skeleton__table-head,
+    .module-page-tabs-skeleton__row > span {
         animation: none !important;
         transition: none !important;
         transform: none !important;

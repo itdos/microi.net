@@ -8,7 +8,27 @@
     >
         <!-- 模块门头始终位于 PageTabs 上方：默认紧凑标题，ViewSchema 可追加副标题与动态指标。 -->
         <section
-            v-if="HasModuleHero && !diyStore.IsPhoneView"
+            v-if="ShowModuleHeroSkeleton"
+            class="module-presentation-header module-presentation-header--desktop module-shell-skeleton"
+            :class="{ 'has-metrics': ModuleShellSkeletonHasMetrics }"
+            aria-busy="true"
+            aria-label="模块标题与统计加载中"
+        >
+            <div class="module-presentation-copy module-shell-skeleton__copy">
+                <span class="module-shell-skeleton__eyebrow"></span>
+                <span class="module-shell-skeleton__title"></span>
+                <span class="module-shell-skeleton__description"></span>
+            </div>
+            <div v-if="ModuleShellSkeletonHasMetrics" class="module-metric-strip module-shell-skeleton__metrics">
+                <div v-for="metricIndex in 3" :key="'module_metric_skeleton_' + metricIndex" class="module-metric-item module-shell-skeleton__metric">
+                    <span class="module-shell-skeleton__metric-icon"></span>
+                    <span class="module-shell-skeleton__metric-label"></span>
+                    <span class="module-shell-skeleton__metric-value"></span>
+                </div>
+            </div>
+        </section>
+        <section
+            v-else-if="HasModuleHero && !diyStore.IsPhoneView"
             class="module-presentation-header module-presentation-header--desktop"
             :class="{
                 'has-metrics': ModuleMetricItems.length > 0,
@@ -46,8 +66,34 @@
         </section>
 
         <!-- ViewSchema 可选的通用表单工作台。它复用真实 DiyForm，不改变旧表格和旧表单执行链。 -->
+        <section
+            v-if="ShowPageTabsSkeleton"
+            class="module-page-tabs-skeleton"
+            aria-busy="true"
+            aria-label="页面多 Tab 与列表加载中"
+        >
+            <div class="module-page-tabs-skeleton__tabs">
+                <span
+                    v-for="tabIndex in ModuleShellSkeletonTabCount"
+                    :key="'page_tab_skeleton_' + tabIndex"
+                    class="module-page-tabs-skeleton__tab"
+                    :class="{ 'is-active': tabIndex === 1 }"
+                ></span>
+            </div>
+            <div class="module-page-tabs-skeleton__panel">
+                <div class="module-page-tabs-skeleton__toolbar">
+                    <span v-for="buttonIndex in 4" :key="'toolbar_skeleton_' + buttonIndex"></span>
+                    <i></i>
+                </div>
+                <div class="module-page-tabs-skeleton__table-head"></div>
+                <div v-for="rowIndex in 6" :key="'table_row_skeleton_' + rowIndex" class="module-page-tabs-skeleton__row">
+                    <span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+        </section>
+
         <ModuleFormWorkbench
-            v-if="ModuleFormWorkbenchEnabled"
+            v-else-if="ModuleFormWorkbenchEnabled"
             :table-id="TableId"
             :table-name="CurrentDiyTableModel.Name || ''"
             :sys-menu-id="SysMenuId"
@@ -2081,6 +2127,10 @@ import DiyModleSearch from "@/views/form-engine/diy-mobile-search.vue";
 import { getFieldConfig, isSpecialTableField } from "@/views/form-engine/utils/table-special-field";
 import { scheduleTableInit } from "@/views/form-engine/utils/diy-table-init.js";
 import { resolveTabIcon } from "@/utils/tab-icon.js";
+import {
+    buildPageTabQuery,
+    findPageTabTargetRoute
+} from "@/utils/page-tab-route-runtime.js";
 export default {
     name: "DiyTableRowlist",
     directives: {},
@@ -2240,6 +2290,35 @@ export default {
     computed: {
         TablePageSizes() {
             return this.GetConfiguredPageSizes();
+        },
+        IsTopLevelModuleContext() {
+            return !this._IsTableChild
+                && this.PropsEmbedded !== true
+                && this.PropsIsJoinTable !== true
+                && this.PropsTableType !== "OpenTable";
+        },
+        IsTopLevelModuleShell() {
+            return this.IsTopLevelModuleContext && !this.diyStore.IsPhoneView;
+        },
+        ShowModuleHeroSkeleton() {
+            return this.IsTopLevelModuleShell && this.moduleShellLoading === true;
+        },
+        ModuleShellSkeletonHasMetrics() {
+            if (typeof this._moduleShellHadMetrics === "boolean") return this._moduleShellHadMetrics;
+            if (typeof this.$route?.meta?.HasModuleMetrics === "boolean") {
+                return this.$route.meta.HasModuleMetrics;
+            }
+            return true;
+        },
+        ShowPageTabsSkeleton() {
+            if (!this.ShowModuleHeroSkeleton) return false;
+            return this.PageTabHostTabs.length > 0
+                || this.$route?.meta?.HasPageTabs === true
+                || Boolean(this.$route?.query?.Tab);
+        },
+        ModuleShellSkeletonTabCount() {
+            const visibleCount = (this.PageTabHostTabs || []).filter((tab) => tab && tab.IsVisible == true).length;
+            return visibleCount > 0 ? Math.min(Math.max(visibleCount, 2), 6) : 4;
         }
     },
     methods: {
@@ -2428,6 +2507,18 @@ export default {
         },
         async Init(parentFormModel, v8) {
             var self = this;
+            var establishPageTabHost = self.IsTopLevelModuleContext;
+            if (establishPageTabHost) {
+                self._moduleContextVersion = Number(self._moduleContextVersion || 0) + 1;
+                self.moduleShellLoading = true;
+                self.pageTabSwitching = false;
+                self.PageTabHostMenuModel = null;
+                self.PageTabHostTableModel = null;
+                self.PageTabHostTabs = [];
+                self.PageTabHostSysMenuId = "";
+                self.PageTabHostTableId = "";
+                self._moduleShellHadMetrics = null;
+            }
 
             if (self._IsTableChild) {
             }
@@ -2526,7 +2617,12 @@ export default {
                 self.DiyTableRowPageSize = self.GetDefaultTablePageSize();
             }
             //这里修改，应该是先取SysMenuModel，再取DiyTableRow数据，因为SysMenuModel可能包含Tabs设置的条件
-            self.GetAllData({ IsInit: true });
+            await self.GetAllData({
+                IsInit: true,
+                ContextVersion: self._moduleContextVersion,
+                EstablishPageTabHost: establishPageTabHost,
+                ResolveInitialPageTabTarget: establishPageTabHost
+            });
 
             self.$nextTick(function () {
                 self.SetDiyTableMaxHeight();
@@ -2936,39 +3032,142 @@ export default {
         async NavigatePageTabModule(tabModel) {
             var self = this;
             var targetSysMenuId = self.GetPageTabTargetSysMenuId(tabModel);
-            if (!targetSysMenuId || targetSysMenuId === String(self.SysMenuId || "")) return "current";
-
-            var routes = self.$router.getRoutes ? self.$router.getRoutes() : [];
-            var targetRoute = routes.find(function (route) {
-                var meta = route.meta || {};
-                return String(meta.Id || meta.SysMenuId || route.Id || "") === targetSysMenuId;
+            if (!targetSysMenuId || targetSysMenuId === String(self.SysMenuId || "")) {
+                await self.ReplacePageTabRoute(tabModel);
+                return "current";
+            }
+            return await self.SwitchPageTabModule(tabModel, { UpdateRoute: true });
+        },
+        MarkPageTabRouteInPlace() {
+            var route = this.$route || {};
+            if (route.meta) route.meta.pageTabsInPlace = true;
+            (route.matched || []).forEach(function (record) {
+                if (record && record.meta) record.meta.pageTabsInPlace = true;
             });
-            if (!targetRoute || !targetRoute.name) {
+        },
+        async ReplacePageTabRoute(tabModel) {
+            var self = this;
+            var currentRoute = self.$route || {};
+            var nextQuery = buildPageTabQuery(currentRoute.query, tabModel && tabModel.Name);
+            var currentTabName = String(currentRoute.query && currentRoute.query.Tab || "");
+            if (currentTabName === String(nextQuery.Tab || "")) return;
+            self.MarkPageTabRouteInPlace();
+            await self.$router.replace({
+                path: currentRoute.path,
+                query: nextQuery
+            }).catch(function (error) {
+                if (!/duplicated|redundant/i.test(String(error && error.message || ""))) throw error;
+            });
+            // activated() 不能把同一实例内的 query 变化误判成跨菜单复用。
+            self._lastLoadedRoute = self.$route.fullPath;
+        },
+        async ResolvePageTabModuleContext(targetSysMenuId) {
+            var self = this;
+            var routes = self.$router.getRoutes ? self.$router.getRoutes() : [];
+            var targetRoute = findPageTabTargetRoute(routes, targetSysMenuId);
+            if (!targetRoute || !targetRoute.name) return null;
+
+            var targetMeta = targetRoute.meta || {};
+            var tableId = String(targetMeta.DiyTableId || targetMeta.TableId || "").trim();
+            if (!tableId) {
+                var menuResult = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
+                    Id: targetSysMenuId
+                });
+                if (!menuResult || Number(menuResult.Code) !== 1) return null;
+                tableId = String(menuResult.Data && menuResult.Data.DiyTableId || "").trim();
+            }
+            if (!tableId) return null;
+            return { Route: targetRoute, TableId: tableId };
+        },
+        PreparePageTabModuleContext(tabModel, targetSysMenuId, targetTableId) {
+            var self = this;
+            self._moduleShellHadMetrics = (self.ModuleMetricItems || []).length > 0;
+            self.moduleShellLoading = true;
+            self.pageTabSwitching = true;
+            self.tableLoading = true;
+            self._moduleContextVersion = Number(self._moduleContextVersion || 0) + 1;
+            self._presentationRequestGeneration = Number(self._presentationRequestGeneration || 0) + 1;
+            if (self._moduleMetricRefreshTimer) {
+                window.clearTimeout(self._moduleMetricRefreshTimer);
+                self._moduleMetricRefreshTimer = null;
+            }
+            if (self._currentAbortController) {
+                try { self._currentAbortController.abort(); } catch (error) {}
+                self._currentAbortController = null;
+            }
+            self.InitSearch();
+            self.Where = [];
+            self.DiyTableRowList = [];
+            self.OldDiyTableRowList = [];
+            self.DiyTableRowCount = 0;
+            self.DiyFieldList = [];
+            self.ShowDiyFieldList = null;
+            self._allFieldList = null;
+            self._cachedDiyFieldList = null;
+            self._cachedDiyFieldListVersion = 0;
+            self.CurrentDiyTableModel = {};
+            self.StatisticsFields = null;
+            self.ModuleMetricValues = {};
+            self.ButtonBadgeValues = {};
+            self.TableMultipleSelection = [];
+            self.cardSelection = [];
+            self.SysMenuId = targetSysMenuId;
+            self.TableId = targetTableId;
+            self.TableRowListActiveTab = tabModel.Id;
+            self.CurrentTableRowListActiveTab = tabModel;
+            return self._moduleContextVersion;
+        },
+        async SwitchPageTabModule(tabModel, options = {}) {
+            var self = this;
+            var targetSysMenuId = self.GetPageTabTargetSysMenuId(tabModel);
+            if (!targetSysMenuId) return "current";
+            if (targetSysMenuId === String(self.SysMenuId || "")) {
+                if (options.UpdateRoute !== false) await self.ReplacePageTabRoute(tabModel);
+                return "current";
+            }
+
+            var targetContext = await self.ResolvePageTabModuleContext(targetSysMenuId);
+            if (!targetContext) {
                 self.DiyCommon.Tips("关联模块不存在、未分配权限或尚未刷新菜单，请重新登录后重试。", false);
                 return "blocked";
             }
 
-            var currentRoute = self.$route;
-            var currentView = Object.assign({}, currentRoute, {
-                meta: Object.assign({}, currentRoute.meta || {}),
-                query: Object.assign({}, currentRoute.query || {})
+            var previousContext = {
+                SysMenuId: self.SysMenuId,
+                TableId: self.TableId,
+                Tab: self.CurrentTableRowListActiveTab
+            };
+            var contextVersion = self.PreparePageTabModuleContext(
+                tabModel,
+                targetSysMenuId,
+                targetContext.TableId
+            );
+            var loadResult = await self.GetAllData({
+                IsInit: true,
+                ContextVersion: contextVersion,
+                UsePageTabHost: true,
+                ResolveInitialPageTabTarget: false,
+                PageTabName: tabModel.Name
             });
-            var nextQuery = Object.assign({}, currentRoute.query || {}, {
-                Tab: tabModel.Name || ""
-            });
-            delete nextQuery.FormDataId;
-            delete nextQuery.SysMenuId;
-            delete nextQuery.Id;
-
-            // 页面 Tab 切换属于同一业务入口：替换当前路由和顶部访问标签，
-            // 让目标模块以自己的 sys_menu / diy_table / diy_field 完整重新初始化。
-            await self.$router.replace({
-                name: targetRoute.name,
-                query: nextQuery
-            });
-            if (self.tagsViewStore && typeof self.tagsViewStore.delView === "function") {
-                await self.tagsViewStore.delView(currentView);
+            if (loadResult && loadResult.Stale) return "navigated";
+            if (!loadResult || loadResult.Ok !== true) {
+                var rollbackVersion = Number(self._moduleContextVersion || 0) + 1;
+                self._moduleContextVersion = rollbackVersion;
+                self.SysMenuId = previousContext.SysMenuId;
+                self.TableId = previousContext.TableId;
+                self.CurrentTableRowListActiveTab = previousContext.Tab || {};
+                self.TableRowListActiveTab = previousContext.Tab && previousContext.Tab.Id || "";
+                await self.GetAllData({
+                    IsInit: true,
+                    ContextVersion: rollbackVersion,
+                    UsePageTabHost: true,
+                    ResolveInitialPageTabTarget: false,
+                    PageTabName: previousContext.Tab && previousContext.Tab.Name
+                });
+                self.DiyCommon.Tips("关联模块加载失败，已恢复到原页签。", false);
+                return "blocked";
             }
+            if (options.UpdateRoute !== false) await self.ReplacePageTabRoute(tabModel);
             return "navigated";
         },
         async RunPageTabV8Code(v8code) {
