@@ -537,13 +537,21 @@ export default {
             this.baseConfig.table,
             refresh
           )
-          if (menu && menu.Id) this.menuId = menu.Id
+          if (menu && menu.Id) {
+            this.menuId = menu.Id
+            // 移动端页面标题以后台模块名称（sys_menu.Name）为事实源；租户标题仅作无菜单兜底。
+            this.baseConfig = {
+              ...this.baseConfig,
+              menu,
+              title: menu.Name || this.baseConfig.title
+            }
+          }
         } catch (error) {}
       }
       this.baseConfig = { ...this.baseConfig, menuId: this.menuId }
       this.config = { ...this.config, menuId: this.menuId }
       await this.loadViewConfig(refresh)
-      if (!restored) await this.loadData(true, refresh)
+      if (!restored || !this.rowsContainConfiguredCardFields()) await this.loadData(true, refresh)
       if (restored && this.keyword.trim()) await this.loadRestrictedRows(refresh)
     },
     getMciListSnapshotKey() {
@@ -612,11 +620,9 @@ export default {
         this.viewManifest = manifest
         if (manifest.Module && manifest.Module.Id) this.menuId = manifest.Module.Id
         merged.menuId = this.menuId
-        const arrayFields = ['tagFields', 'lines', 'statusOptions']
-        arrayFields.forEach((name) => {
-          if (merged.hasConfiguredCardFields && ['tagFields', 'lines'].includes(name)) return
-          if (dynamic[name]?.length) merged[name] = dynamic[name]
-        })
+        if (!merged.hasConfiguredMobileFields && dynamic.lines?.length) merged.lines = dynamic.lines
+        if (!merged.hasConfiguredMobileFields && dynamic.bottomFields?.length) merged.bottomFields = dynamic.bottomFields
+        if (dynamic.tagsFromViewSchema) merged.tagFields = dynamic.tagFields || []
         const scalarFields = [
           'titleField',
           'statusField',
@@ -628,18 +634,20 @@ export default {
           'statisticsFormat'
         ]
         scalarFields.forEach((name) => {
-          // ViewSchema 的显式标题/状态是最终展示事实源，不能被旧式卡片字段配置拦截。
+          if (name === 'titleField' && merged.hasConfiguredMobileFields) return
           if (merged.hasConfiguredCardFields && ['summaryField', 'imageField'].includes(name)) return
           if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') {
             merged[name] = dynamic[name]
           }
         })
-        if (dynamic.statusField) {
-          merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.statusField])]
+        if (dynamic.statusFromViewSchema) {
+          merged.statusField = dynamic.statusField || ''
+          merged.statusOptions = dynamic.statusOptions || []
         }
-        if (dynamic.titleField) {
-          merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.titleField])]
-        }
+        merged.selectFields = [...new Set([
+          ...(merged.selectFields || []),
+          ...(dynamic.requiredFields || [])
+        ].filter(Boolean))]
         if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema
         this.config = merged
       } catch (error) {}
@@ -800,11 +808,10 @@ export default {
     async refresh() {
       this.refreshing = true
       try {
-        await this.loadViewConfig(true)
-        await Promise.all([
-          this.loadData(true, true),
-          this.loadRestrictedRows(true)
-        ])
+        // 平台修改模块名称或卡片字段后，下拉刷新必须重新读取菜单本身，
+        // 不能只刷新 ViewSchema 和数据而继续显示旧标题。
+        await this.initializeList(false, true)
+        await this.loadRestrictedRows(true)
       } finally {
         this.refreshing = false
       }
@@ -963,7 +970,10 @@ export default {
       return key ? formatFieldValue(row[key], '', { empty: '' }) : `记录 ${String(row.Id || '').slice(-6)}`
     },
     getStatus(row) {
-      return formatFieldValue(row[this.config.statusField], '', { empty: '' })
+      const value = this.config.statusField
+        ? this.configuredFieldValue(row, this.config.statusField)
+        : ''
+      return value === '-' ? '' : value
     },
     getStatusClass(row) {
       const statusText = String(this.getStatus(row))
@@ -1000,6 +1010,17 @@ export default {
         this.config.summaryField,
         ...(this.config.tagFields || [])
       ])
+    },
+    rowsContainConfiguredCardFields() {
+      if (!this.rows.length) return true
+      const fields = [
+        this.config.titleField,
+        ...(this.config.lines || []).map((line) => line.field),
+        ...(this.config.bottomFields || []).map((item) => typeof item === 'string' ? item : item?.field),
+        ...(this.config.tagFields || []).map((item) => typeof item === 'string' ? item : item?.field),
+        this.config.statusField
+      ].filter(Boolean)
+      return this.rows.every((row) => fields.every((field) => Object.prototype.hasOwnProperty.call(row, field)))
     },
     displayValue(row, line) {
       return this.configuredFieldValue(row, line.field, line.format)
@@ -1039,7 +1060,7 @@ export default {
         .filter((value) => value && value !== '-')
       return values.length
         ? values.join(' · ')
-        : this.formatCreateTime(row.CreateTime || row.UpdateTime)
+        : (this.config.hasConfiguredMobileFields ? '' : this.formatCreateTime(row.CreateTime || row.UpdateTime))
     },
     formatCreateTime(value) {
       return formatDateTime(value)

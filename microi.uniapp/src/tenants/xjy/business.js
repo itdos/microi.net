@@ -450,7 +450,7 @@ export const businessModules = {
     ]
   }),
   proposals: native({
-    title: '客户方案', table: 'Diy_kehufaxx', menuAliases: ['客户方案', '方案管理'],
+    title: '需求方案', table: 'Diy_kehufaxx', menuAliases: ['需求方案', '客户方案', '方案管理'],
     titleField: 'FanganMC', tagFields: ['YujiHZSJ'],
     relatedMetrics: [
       { key: 'positions', label: '场所点位数量合计', aggregateField: 'ChangsuoDWSL', tone: 'primary' },

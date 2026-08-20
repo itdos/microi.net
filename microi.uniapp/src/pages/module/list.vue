@@ -181,21 +181,23 @@ export default {
       if (!dynamic) return
       this.viewManifest = manifest
       const merged = { ...this.baseConfig }
-      ;['tagFields', 'lines', 'statusOptions'].forEach((name) => {
-        if (merged.hasConfiguredCardFields && ['tagFields', 'lines'].includes(name)) return
-        if (dynamic[name] && dynamic[name].length) merged[name] = dynamic[name]
-      })
+      if (!merged.hasConfiguredMobileFields && dynamic.lines?.length) merged.lines = dynamic.lines
+      if (!merged.hasConfiguredMobileFields && dynamic.bottomFields?.length) merged.bottomFields = dynamic.bottomFields
+      if (dynamic.tagsFromViewSchema) merged.tagFields = dynamic.tagFields || []
       ;['titleField', 'statusField', 'summaryField', 'imageField', 'periodField',
         'statisticsField', 'statisticsLabel', 'statisticsFormat'].forEach((name) => {
+        if (name === 'titleField' && merged.hasConfiguredMobileFields) return
         if (merged.hasConfiguredCardFields && ['summaryField', 'imageField'].includes(name)) return
         if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') merged[name] = dynamic[name]
       })
-      if (dynamic.statusField) {
-        merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.statusField])]
+      if (dynamic.statusFromViewSchema) {
+        merged.statusField = dynamic.statusField || ''
+        merged.statusOptions = dynamic.statusOptions || []
       }
-      if (dynamic.titleField) {
-        merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.titleField])]
-      }
+      merged.selectFields = [...new Set([
+        ...(merged.selectFields || []),
+        ...(dynamic.requiredFields || [])
+      ].filter(Boolean))]
       if (dynamic.actionSchema && dynamic.actionSchema.length) merged.actionSchema = dynamic.actionSchema
       this.config = merged
     },
@@ -292,7 +294,8 @@ export default {
       return this.optionLabel(this.config.titleField, row[this.config.titleField]) || `记录 ${String(row.Id || '').slice(-6)}`
     },
     statusValue(row) {
-      return this.config.statusField ? this.optionLabel(this.config.statusField, row[this.config.statusField]) : ''
+      const value = this.config.statusField ? this.optionLabel(this.config.statusField, row[this.config.statusField]) : ''
+      return value === '-' ? '' : value
     },
     tagValues(row) {
       return (this.config.tagFields || []).map((name) => this.optionLabel(name, row[name])).filter((value) => value && value !== '-').slice(0, 3)
@@ -309,7 +312,9 @@ export default {
         const descriptor = typeof item === 'string' ? { field: item } : item
         return this.optionLabel(descriptor.field, row[descriptor.field])
       }).filter((value) => value && value !== '-')
-      return values.length ? values.join(' · ') : this.formatTime(row.CreateTime || row.UpdateTime)
+      return values.length
+        ? values.join(' · ')
+        : (this.config.hasConfiguredMobileFields ? '' : this.formatTime(row.CreateTime || row.UpdateTime))
     },
     formatTime(value) { return formatDateTime(value) },
     rowActions(row) {

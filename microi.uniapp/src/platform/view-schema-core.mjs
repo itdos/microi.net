@@ -287,22 +287,38 @@ function normalizeHero(hero) {
 
 function normalizeCard(card) {
   const source = card || {}
-  const result = {}
-  const stringFields = {
-    TitleField: ['TitleField', 'titleField'],
-    StatusField: ['StatusField', 'statusField'],
-    SummaryField: ['SummaryField', 'summaryField'],
-    ImageField: ['ImageField', 'imageField'],
-    PeriodField: ['PeriodField', 'periodField']
+  const normalizeFields = (...names) => {
+    const raw = names.map((name) => source[name])
+      .find((item) => item !== undefined && item !== null) || []
+    return (Array.isArray(raw) ? raw : normalizeStringList(raw))
+      .map(normalizeField)
+      .filter(Boolean)
+      .slice(0, 12)
   }
-  Object.entries(stringFields).forEach(([target, names]) => {
-    const value = cleanString(firstValue(source, names), 100)
-    if (value) result[target] = value
-  })
-  result.TagFields = normalizeStringList(firstValue(source, ['TagFields', 'tagFields'])).slice(0, 6)
-  const fields = firstValue(source, ['Fields', 'fields', 'Lines', 'lines'], [])
-  result.Fields = (Array.isArray(fields) ? fields : []).map(normalizeField).filter(Boolean).slice(0, 12)
-  return result
+  const statusFields = normalizeFields('StatusFields', 'statusFields')
+  const legacyStatusField = cleanString(firstValue(source, ['StatusField', 'statusField']), 100)
+  if (legacyStatusField && !statusFields.some((item) => item.Name.toLowerCase() === legacyStatusField.toLowerCase())) {
+    statusFields.unshift(normalizeField({ Name: legacyStatusField, DisplayStyle: 'Tag' }))
+  }
+  return {
+    AvatarTextField: cleanString(firstValue(source, ['AvatarTextField', 'avatarTextField']), 100),
+    TitleField: cleanString(firstValue(source, ['TitleField', 'titleField']), 100),
+    StatusFields: statusFields.filter(Boolean),
+    TopFields: normalizeFields('TopFields', 'topFields'),
+    SubtitleFields: normalizeFields('SubtitleFields', 'subtitleFields'),
+    RightFields: normalizeFields('RightFields', 'rightFields'),
+    Fields: normalizeFields('Fields', 'fields', 'Lines', 'lines'),
+    MetaFields: normalizeFields('MetaFields', 'metaFields'),
+    BottomFields: normalizeFields('BottomFields', 'bottomFields'),
+    // 兼容早期 UniApp ViewSchema；新平台设计器使用上面的分区字段。
+    TagFields: normalizeFields('TagFields', 'tagFields'),
+    SummaryField: cleanString(firstValue(source, ['SummaryField', 'summaryField']), 100),
+    ImageField: cleanString(firstValue(source, ['ImageField', 'imageField']), 100),
+    PeriodField: cleanString(firstValue(source, ['PeriodField', 'periodField']), 100),
+    HideIndex: toBoolean(firstValue(source, ['HideIndex', 'hideIndex']), false),
+    ShowCreateTime: toBoolean(firstValue(source, ['ShowCreateTime', 'showCreateTime']), true),
+    ShowUpdateTime: toBoolean(firstValue(source, ['ShowUpdateTime', 'showUpdateTime']), false)
+  }
 }
 
 function normalizeLayout(layout) {
@@ -463,8 +479,10 @@ export function resolveMetricParams(metric, context = {}) {
 
 export function selectViewDefinition(menuOrConfig, options = {}) {
   const schema = extractViewSchema(menuOrConfig)
-  if (!schema.Enabled) return null
   const scene = canonical(options.scene, SCENES)
+  // EnableViewSchema 只控制 Detail/Edit 自定义表单。List/Card 属于模块展示配置，
+  // 只要存在对应视图就必须生效，与 PC 端协议保持一致。
+  if (!schema.Enabled && ['Detail', 'Edit'].includes(scene)) return null
   const device = canonical(options.device, DEVICES, 'All')
   const roleIds = normalizeUserRoleIds(options.roleIds || options.user)
   const candidates = schema.Views.filter((view) => {
@@ -644,33 +662,83 @@ function configuredFieldLabel(field, definitions = []) {
   return cleanString(definition && (definition.Label || definition.Name), 100) || name
 }
 
+function compileCardField(field, definitions = []) {
+  if (!field || !field.Name) return null
+  const showLabel = field.ShowLabel
+  const label = showLabel === false
+    ? ''
+    : (field.Label || (showLabel === true ? configuredFieldLabel(field, definitions) : ''))
+  return compactObject({
+    label,
+    field: field.Name,
+    format: field.Format,
+    showLabel
+  })
+}
+
+function uniqueCardFields(fields = []) {
+  const seen = new Set()
+  return fields.filter((field) => {
+    const key = String(field && field.Name || '').trim().toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 export function compileListConfig(manifest, fieldDefinitions = []) {
   const layout = manifest && manifest.View && manifest.View.Layout
   if (!layout) return null
   const card = layout.Card || {}
-  return compactObject({
+  const statusFields = card.StatusFields || []
+  const statusField = statusFields[0] || null
+  const statusDefinition = statusField && (Array.isArray(fieldDefinitions) ? fieldDefinitions : [])
+    .find((field) => [field && field.Name, field && field.AsName]
+      .some((name) => String(name || '').toLowerCase() === statusField.Name.toLowerCase()))
+  const configuredStatusOptions = layout.Search.StatusOptions || []
+  const statusOptions = configuredStatusOptions.length
+    ? configuredStatusOptions
+    : ((statusDefinition && statusDefinition.options) || []).map((item) => item.value)
+  const tagFields = uniqueCardFields([
+    ...(statusFields.slice(1)),
+    ...(card.TopFields || []),
+    ...(card.TagFields || [])
+  ])
+  const lineFields = uniqueCardFields([
+    ...(card.SubtitleFields || []),
+    ...(card.RightFields || []),
+    ...(card.Fields || []),
+    ...(card.MetaFields || [])
+  ])
+  const bottomFields = uniqueCardFields(card.BottomFields || [])
+  const requiredFields = uniqueCardFields([
+    card.AvatarTextField ? { Name: card.AvatarTextField } : null,
+    card.TitleField ? { Name: card.TitleField } : null,
+    ...statusFields,
+    ...tagFields,
+    ...lineFields,
+    ...bottomFields
+  ].filter(Boolean)).map((field) => field.Name)
+  return {
     titleField: card.TitleField,
-    statusField: card.StatusField,
-    tagFields: card.TagFields || [],
-    lines: (card.Fields || []).map((field) => {
-      const showLabel = field.ShowLabel
-      const label = showLabel === false
-        ? ''
-        : (field.Label || (showLabel === true ? configuredFieldLabel(field, fieldDefinitions) : ''))
-      return compactObject({
-        label,
-        field: field.Name,
-        format: field.Format,
-        showLabel
-      })
-    }),
+    // 选中 Card-Mobile 视图后，状态唯一来自 StatusFields；空数组表示不显示状态。
+    statusField: statusField && statusField.Name || '',
+    statusFromViewSchema: true,
+    tagFields: tagFields.map((field) => field.Name),
+    tagsFromViewSchema: true,
+    lines: lineFields.map((field) => compileCardField(field, fieldDefinitions)).filter(Boolean),
+    bottomFields: bottomFields.map((field) => compileCardField(field, fieldDefinitions)).filter(Boolean),
+    requiredFields,
     summaryField: card.SummaryField,
     imageField: card.ImageField,
     periodField: layout.Search.PeriodField || card.PeriodField,
-    statusOptions: layout.Search.StatusOptions || [],
+    statusOptions,
     statisticsField: layout.Statistics.Field,
     statisticsLabel: layout.Statistics.Label,
     statisticsFormat: layout.Statistics.Format,
-    actionSchema: manifest.Actions || []
-  })
+    actionSchema: manifest.Actions || [],
+    hideIndex: card.HideIndex === true,
+    showCreateTime: card.ShowCreateTime !== false,
+    showUpdateTime: card.ShowUpdateTime === true
+  }
 }
