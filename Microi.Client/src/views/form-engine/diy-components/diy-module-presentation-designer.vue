@@ -60,6 +60,7 @@
                         <el-button size="small" :icon="Plus" :disabled="readonly" @click="addMetric">添加指标</el-button>
                     </div>
                     <el-empty v-if="listView.Layout.Hero.Metrics.length === 0" description="尚未配置统计指标" :image-size="52" />
+                    <div v-if="listView.Layout.Hero.Metrics.length" class="metric-table-scroll">
                     <div v-for="(metric, index) in listView.Layout.Hero.Metrics" :key="`metric_${index}`" class="metric-row">
                         <el-input v-model="metric.Key" :disabled="readonly" placeholder="Key" title="指标唯一 Key" />
                         <el-input v-model="metric.Label" :disabled="readonly" placeholder="显示名称" />
@@ -99,6 +100,7 @@
                         <el-color-picker v-model="metric.Color" :disabled="readonly" show-alpha title="自定义颜色" />
                         <el-input-number v-model="metric.RefreshSeconds" :disabled="readonly" :min="0" :max="3600" controls-position="right" title="刷新秒数，0 表示不轮询" />
                         <el-button text type="danger" :icon="Delete" :disabled="readonly" title="删除指标" @click="removeMetric(index)" />
+                    </div>
                     </div>
                 </section>
             </el-tab-pane>
@@ -144,7 +146,7 @@
 
                         <div class="subsection">
                             <div class="subsection-head">
-                                <div><b>次要行</b><span>显示在主字段下方，最多 6 项</span></div>
+                                <div><b>次要行</b><span>常规仅 1 项，与主字段组成紧凑双行；更多信息请新增复合列</span></div>
                                 <el-button text size="small" :icon="Plus" :disabled="readonly || column.Lines.length >= 6" @click="addDescriptor(column.Lines)">添加</el-button>
                             </div>
                             <div v-for="(item, index) in column.Lines" :key="`line_${columnIndex}_${index}`" class="descriptor-row">
@@ -1221,6 +1223,7 @@ defineExpose({ flushPendingSync });
 .module-presentation-designer {
     width: 100%;
     min-width: 0;
+    container-type: inline-size;
     color: var(--mci-text-primary, var(--el-text-color-primary));
     box-sizing: border-box;
 }
@@ -1286,9 +1289,18 @@ defineExpose({ flushPendingSync });
 }
 .workbench-config-grid.disabled { opacity: .56; }
 .workbench-placeholder { grid-column: span 2; }
+.metric-table-scroll {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-gutter: stable;
+    padding-bottom: 4px;
+}
 .metric-row {
     display: grid;
-    grid-template-columns: 110px 120px 110px minmax(150px, 1fr) minmax(180px, 1.2fr) minmax(155px, 1fr) 72px 72px 100px 34px 118px 34px;
+    grid-template-columns: 110px 120px 110px minmax(150px, 1fr) minmax(180px, 1.2fr) minmax(155px, 1fr) 120px 88px 72px 72px 118px 96px 34px 106px 34px;
+    min-width: 1649px;
     gap: 6px;
     align-items: center;
     padding: 8px 0;
@@ -1323,7 +1335,7 @@ defineExpose({ flushPendingSync });
 .descriptor-row { margin-top: 6px; }
 .descriptor-editor {
     display: grid;
-    grid-template-columns: minmax(170px, 1fr) minmax(150px, .9fr) 105px 34px 96px 34px;
+    grid-template-columns: minmax(170px, 1fr) minmax(150px, .9fr) 88px 88px 96px 34px 104px 34px;
     gap: 6px;
     align-items: center;
 }
@@ -1334,7 +1346,7 @@ defineExpose({ flushPendingSync });
 .zone-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
 .zone-grid .designer-card { margin-top: 0; }
 .zone-head { margin-bottom: 4px; }
-.descriptor-row--card .descriptor-editor { grid-template-columns: minmax(140px, 1fr) minmax(130px, .8fr) 95px 34px 92px 34px; }
+.descriptor-row--card .descriptor-editor { grid-template-columns: minmax(140px, 1fr) minmax(130px, .8fr) 82px 82px 92px 34px 104px 34px; }
 .json-card :deep(textarea) { font-family: Consolas, "SFMono-Regular", monospace; font-size: 12px; line-height: 1.55; tab-size: 2; }
 .json-error { margin-top: 8px; }
 .designer-footer {
@@ -1349,8 +1361,13 @@ defineExpose({ flushPendingSync });
 }
 .dirty-text { color: var(--el-color-warning); }
 
+@container (max-width: 1200px) {
+    .zone-grid { grid-template-columns: 1fr; }
+    .card-core-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+}
+
 @media (max-width: 1500px) {
-    .metric-row { grid-template-columns: 100px 110px 100px minmax(135px, 1fr) minmax(160px, 1.1fr) minmax(140px, 1fr) 64px 64px 92px 34px 106px 34px; }
+    .metric-row { grid-template-columns: 100px 110px 100px minmax(135px, 1fr) minmax(160px, 1.1fr) minmax(140px, 1fr) 110px 80px 64px 64px 106px 88px 34px 96px 34px; }
     .card-core-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)) repeat(3, 130px); }
 }
 @media (max-width: 1180px) {

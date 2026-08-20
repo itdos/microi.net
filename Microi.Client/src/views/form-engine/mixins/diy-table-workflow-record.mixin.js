@@ -67,6 +67,21 @@ export default {
             return result?.Code === 1 && result.Data ? result.Data : {};
         },
 
+        async MarkWorkflowCopyRead(flowId) {
+            if (!flowId) return false;
+            const result = await this.DiyCommon.PostAsync("/api/WorkFlow/markCopyRead", { FlowId: flowId });
+            if (!result || result.Code !== 1) {
+                console.warn("[OpenWorkflowRecord] 抄送已读状态更新失败：", result?.Msg || "未知错误");
+                return false;
+            }
+
+            // 立即刷新当前列表和 PageTabs 角标；侧边菜单仍会按自身短周期自动刷新。
+            if (typeof this.GetDiyTableRow === "function") {
+                this.GetDiyTableRow({ _PageIndex: 1 });
+            }
+            return true;
+        },
+
         async InitWorkflowRecordDialog(options) {
             const self = this;
             const openFormDialogToken = (self._openFormDialogToken || 0) + 1;
@@ -164,6 +179,9 @@ export default {
             if (!currentFlowId || !currentNodeId || !record.FlowDesignId) {
                 self.DiyCommon.Tips("当前流程记录缺少流程、节点或流程图信息。", false);
                 return false;
+            }
+            if (workType === "Copy") {
+                await self.MarkWorkflowCopyRead(currentFlowId);
             }
             const workModel = await self.ResolveWorkflowRecordWorkModel(
                 record,

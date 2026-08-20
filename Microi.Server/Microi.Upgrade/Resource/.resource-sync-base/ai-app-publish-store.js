@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.8.2
+ * Version: v1.8.3
  * Function:
- * - 统一应用商城发布器：V3 committed proof、精确版本、零菜单 AI 应用、共享公共运行时描述符及商城版本一致性。
+ * - 统一应用商城发布器：V3 committed proof、精确版本、共享公共运行时，以及受管接口历史兼容基线的连续发布。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -381,6 +381,23 @@ function apiEngineMap(engines) {
   }
   return result;
 }
+function normalizeSha256Hashes(value) {
+  var source = value;
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source || '[]'); }
+    catch (error) { source = text(source).split(','); }
+  }
+  source = toArray(source);
+  var result = [];
+  var seen = {};
+  for (var i = 0; i < source.length; i++) {
+    var hash = text(source[i]).trim().toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(hash) || seen[hash]) continue;
+    seen[hash] = true;
+    result.push(hash);
+  }
+  return result;
+}
 function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStore, publicationContext) {
   var rows = toArray(engines);
   if (rows.length === 0) return null;
@@ -405,8 +422,9 @@ function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStor
     var key = originalKey.toLowerCase();
     if (!key) continue;
     var requestedSource = requested[key] || requested[originalKey] || null;
+    var previousPolicy = previousPolicies[key] || previousPolicies[originalKey] || {};
     var source = requestedSource
-      || previousPolicies[key] || previousPolicies[originalKey] || {};
+      || previousPolicy;
     if (typeof source === 'string') source = { UpgradePolicy: source };
     var policy = text(source.UpgradePolicy || source.Policy || 'Managed');
     if (policy !== 'Managed' && policy !== 'CreateIfMissing') {
@@ -427,6 +445,22 @@ function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStor
         ? sha256Hex(text(previousEngine.ApiV8Code))
         : text(source.BaseHash).toLowerCase();
       if (baseHash) entry.BaseHash = baseHash;
+      var compatibleBaseHashes = normalizeSha256Hashes(
+        source.CompatibleBaseHashes || source.LegacyBaseHashes || []
+      );
+      var previousCompatibleHashes = normalizeSha256Hashes(
+        previousPolicy.CompatibleBaseHashes || previousPolicy.LegacyBaseHashes || []
+      );
+      var compatibilityCandidates = compatibleBaseHashes.concat(previousCompatibleHashes, [
+        text(source.BaseHash).toLowerCase(),
+        text(previousPolicy.BaseHash).toLowerCase()
+      ]);
+      compatibleBaseHashes = normalizeSha256Hashes(compatibilityCandidates);
+      var filteredCompatibleHashes = [];
+      for (var compatibleIndex = 0; compatibleIndex < compatibleBaseHashes.length; compatibleIndex++) {
+        if (compatibleBaseHashes[compatibleIndex] !== baseHash) filteredCompatibleHashes.push(compatibleBaseHashes[compatibleIndex]);
+      }
+      if (filteredCompatibleHashes.length) entry.CompatibleBaseHashes = filteredCompatibleHashes;
     }
     result.ApiEngines[key] = entry;
   }

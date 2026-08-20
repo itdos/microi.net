@@ -128,9 +128,32 @@ public class V8McpMenuBadgeTokenTests
         var list = Assert.IsType<JObject>(listLayout["List"]);
         var columns = Assert.IsType<JArray>(list["Columns"]);
         Assert.True(columns[0]?["MinWidth"]?.Val<int>() >= 340);
+        Assert.All(columns, column => Assert.True(
+            (column?["Lines"] as JArray ?? new JArray()).Count <= 1,
+            "默认 PC 复合列最多只能包含一个次要行字段"));
         var metrics = Assert.IsType<JArray>(listLayout["Hero"]?["Metrics"]);
         Assert.Equal(new[] { "Field", "DataCount", "PageCount" }, metrics.Select(metric => metric["Source"]?.ToString()));
         Assert.Empty(result["Warnings"] as JArray ?? new JArray());
+    }
+
+    [Fact]
+    public void BuildDefaultModuleMenuConfigFromRows_LimitsPcCompositeColumnToTwoVisualRows()
+    {
+        var method = typeof(V8McpLogic).GetMethod(
+            "BuildDefaultModuleMenuConfigFromRows",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var rows = new List<dynamic>
+        {
+            new JObject { ["Id"] = "title", ["Name"] = "Title", ["Label"] = "标题", ["Component"] = "Text", ["Type"] = "varchar(200)", ["Sort"] = 10 },
+            new JObject { ["Id"] = "customer", ["Name"] = "CustomerName", ["Label"] = "客户", ["Component"] = "Text", ["Type"] = "varchar(100)", ["Sort"] = 20 },
+            new JObject { ["Id"] = "owner", ["Name"] = "OwnerName", ["Label"] = "负责人", ["Component"] = "Text", ["Type"] = "varchar(100)", ["Sort"] = 30 }
+        };
+
+        var defaults = method!.Invoke(null, [rows, "table-orders", "订单", "订单管理"]);
+        var schema = JObject.Parse(JObject.FromObject(defaults!)["ViewSchema"]?.ToString() ?? "{}");
+        var lines = Assert.IsType<JArray>(schema["Views"]?[0]?["Layout"]?["List"]?["Columns"]?[0]?["Lines"]);
+        Assert.Single(lines);
     }
 
     [Fact]

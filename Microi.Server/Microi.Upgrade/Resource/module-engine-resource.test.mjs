@@ -8,7 +8,7 @@ const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const resource = JSON.parse(fs.readFileSync(path.join(resourceDir, "app.microi.module-engine.json"), "utf8"));
 
 test("module engine package version and physical menu badge columns are current", () => {
-    assert.equal(resource.PackageInfo.Version, "v6.9.6");
+    assert.equal(resource.PackageInfo.Version, "v7.4.8");
     const physicalNames = new Set((resource.PhysicalColumns || []).map((item) => item.COLUMN_NAME));
     for (const name of ["MenuBadgeEnabled", "MenuBadgeApiEngineKey", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema"]) {
         assert.ok(physicalNames.has(name), `missing physical sys_menu column ${name}`);
@@ -56,6 +56,15 @@ test("menu badge engine selector uses bounded remote keyword search", () => {
     assert.match(config.Sql, /ApiName\s+like\s+'%\$Keyword\$%'/i);
     assert.match(config.Sql, /ApiEngineKey\s+like\s+'%\$Keyword\$%'/i);
     assert.match(config.Sql, /limit\s+0\s*,\s*50/i);
+});
+
+test("hidden-column selector stores stable ids and renders readable field labels", () => {
+    const config = configOf(field("NotShowFields"));
+    assert.equal(config.DataSource, "Sql");
+    assert.equal(config.SelectSaveField, "Id");
+    assert.equal(config.SelectLabel, "_Name");
+    assert.match(config.Sql, /CONCAT\(A\.Label,\s*' - ',\s*A\.Name/);
+    assert.match(config.Sql, /B\.Description,\s*' - ',\s*B\.Name/);
 });
 
 test("all button collections and PageTabs expose the complete badge contract", () => {

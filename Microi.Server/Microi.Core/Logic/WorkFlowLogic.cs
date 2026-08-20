@@ -344,6 +344,189 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 获取“我的工作”统一统计。菜单角标为待办 + 未读抄送；各 Tab 使用各自业务口径。
+        /// </summary>
+        public async Task<DosResult<dynamic>> GetWFStats(WFParam param)
+        {
+            if (param._CurrentUser == null)
+            {
+                return new DosResult<dynamic>(0, null, "参数错误！");
+            }
+
+            var userId = param._CurrentUser?["Id"].Val<string>();
+            if (userId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult<dynamic>(0, null, "未获取到当前用户！");
+            }
+
+            var todoTask = MicroiEngine.FormEngine.GetTableDataCountAsync(new
+            {
+                FormEngineKey = "WF_Work",
+                _SearchEqual = new Dictionary<string, string>
+                {
+                    { "ReceiverId", userId },
+                    { "WorkState", "Todo" }
+                },
+                IsDeleted = 0,
+                OsClient = param.OsClient,
+                _CurrentUser = param._CurrentUser
+            });
+            var senderTask = MicroiEngine.FormEngine.GetTableDataCountAsync(new
+            {
+                FormEngineKey = "WF_Flow",
+                _SearchEqual = new Dictionary<string, string> { { "SenderId", userId } },
+                IsDeleted = 0,
+                OsClient = param.OsClient,
+                _CurrentUser = param._CurrentUser
+            });
+            var doneTask = MicroiEngine.FormEngine.GetTableDataCountAsync(new
+            {
+                FormEngineKey = "WF_Flow",
+                _Where = new List<DiyWhere>
+                {
+                    new DiyWhere { Name = "HandlerUsers", Value = userId, Type = "Like" }
+                },
+                IsDeleted = 0,
+                OsClient = param.OsClient,
+                _CurrentUser = param._CurrentUser
+            });
+            var connectTask = MicroiEngine.FormEngine.GetTableDataCountAsync(new
+            {
+                FormEngineKey = "WF_Flow",
+                _Where = new List<DiyWhere>
+                {
+                    new DiyWhere { Name = "NotHandlerUsers", Value = userId, Type = "Like" }
+                },
+                IsDeleted = 0,
+                OsClient = param.OsClient,
+                _CurrentUser = param._CurrentUser
+            });
+            var copyTask = GetUnreadCopyCount(param, userId);
+
+            await Task.WhenAll(todoTask, senderTask, doneTask, connectTask, copyTask);
+            var countResults = new[] { todoTask.Result, senderTask.Result, doneTask.Result, connectTask.Result };
+            var failedCount = countResults.FirstOrDefault(result => result == null || result.Code != 1);
+            if (failedCount != null)
+            {
+                return new DosResult<dynamic>(0, null, failedCount.Msg ?? "工作流统计失败！");
+            }
+            if (copyTask.Result.Code != 1)
+            {
+                return new DosResult<dynamic>(0, null, copyTask.Result.Msg);
+            }
+
+            var todo = todoTask.Result.DataCount ?? 0;
+            var sender = senderTask.Result.DataCount ?? 0;
+            var done = doneTask.Result.DataCount ?? 0;
+            var copy = copyTask.Result.Data;
+            var connect = connectTask.Result.DataCount ?? 0;
+            return new DosResult<dynamic>(1, new
+            {
+                Value = todo + copy,
+                Todo = todo,
+                Sender = sender,
+                Done = done,
+                Copy = copy,
+                Connect = connect,
+                Buttons = new Dictionary<string, int>
+                {
+                    { "mic_home_work_tab_todo", todo },
+                    { "mic_home_work_tab_sender", sender },
+                    { "mic_home_work_tab_done", done },
+                    { "mic_home_work_tab_copy", copy },
+                    { "mic_home_work_tab_connect", connect }
+                }
+            });
+        }
+
+        /// <summary>
+        /// 将当前用户在指定流程中的显式未读抄送项标记为已读。
+        /// </summary>
+        public async Task<DosResult<dynamic>> MarkCopyRead(WFParam param)
+        {
+            if (param._CurrentUser == null || param.FlowId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult<dynamic>(0, null, "参数错误！");
+            }
+
+            var userId = param._CurrentUser?["Id"].Val<string>();
+            var flowResult = await MicroiEngine.FormEngine.GetFormDataAsync<WFFlow>(new DiyTableRowParam
+            {
+                TableName = "WF_Flow",
+                Id = param.FlowId,
+                OsClient = param.OsClient,
+                _CurrentUser = param._CurrentUser
+            });
+            if (flowResult.Code != 1 || flowResult.Data == null)
+            {
+                return new DosResult<dynamic>(flowResult.Code, null, flowResult.Msg);
+            }
+            if (!WorkflowCopyReadState.ContainsRecipient(flowResult.Data.CopyUsers, userId))
+            {
+                return new DosResult<dynamic>(0, null, "当前流程未抄送给您！");
+            }
+
+            var copyUsers = WorkflowCopyReadState.MarkRead(
+                flowResult.Data.CopyUsers,
+                userId,
+                DateTime.Now,
+                out var changed);
+            if (changed)
+            {
+                var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
+                {
+                    FormEngineKey = "WF_Flow",
+                    Id = param.FlowId,
+                    CopyUsers = copyUsers,
+                    OsClient = param.OsClient,
+                    _CurrentUser = param._CurrentUser
+                });
+                if (updateResult.Code != 1)
+                {
+                    return new DosResult<dynamic>(0, null, updateResult.Msg);
+                }
+            }
+
+            return new DosResult<dynamic>(1, new { IsRead = true, Changed = changed });
+        }
+
+        private async Task<DosResult<int>> GetUnreadCopyCount(WFParam param, string userId)
+        {
+            const int pageSize = 500;
+            var pageIndex = 1;
+            var unread = 0;
+            while (true)
+            {
+                var pageResult = await MicroiEngine.FormEngine.GetTableDataAsync<WFFlow>(new
+                {
+                    FormEngineKey = "WF_Flow",
+                    _Where = new List<DiyWhere>
+                    {
+                        new DiyWhere { Name = "CopyUsers", Value = userId, Type = "Like" }
+                    },
+                    _PageIndex = pageIndex,
+                    _PageSize = pageSize,
+                    IsDeleted = 0,
+                    OsClient = param.OsClient,
+                    _CurrentUser = param._CurrentUser
+                });
+                if (pageResult.Code != 1)
+                {
+                    return new DosResult<int>(0, 0, pageResult.Msg);
+                }
+
+                var rows = pageResult.Data ?? new List<WFFlow>();
+                unread += WorkflowCopyReadState.CountUnreadForUser(rows, userId);
+                if (rows.Count < pageSize || pageIndex * pageSize >= (pageResult.DataCount ?? rows.Count))
+                {
+                    break;
+                }
+                pageIndex++;
+            }
+            return new DosResult<int>(1, unread);
+        }
+
+        /// <summary>
         /// 传入FlowId
         /// 传入：WorkType（Todo/Sender/Done//）
         /// </summary>
