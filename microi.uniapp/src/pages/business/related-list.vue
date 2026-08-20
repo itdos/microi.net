@@ -32,6 +32,7 @@
 				:parent-mode="parentMode"
 				:relation-value-override="relationValue"
 				:batch-entry-mode="batchEntryMode"
+				@title-change="handleTitleChange"
 			/>
 		</scroll-view>
 	</view>
@@ -101,6 +102,10 @@
 			}, 0)
 		},
 		methods: {
+			handleTitleChange(title) {
+				const nextTitle = String(title || '').trim()
+				if (nextTitle) this.pageTitle = nextTitle
+			},
 			applyContext(context = {}) {
 				this.field = context.field || this.field
 				this.parentId = context.parentId || this.parentId
