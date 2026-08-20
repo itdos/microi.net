@@ -60,7 +60,7 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - 按钮调用后台安装接口时，前端只传应用/版本/安装 Id；目标租户和管理员身份由 Token 确定。
 - 每次安装、更新、重新安装生成稳定 `OperationId`。官方计数服务用共享数据库事件表唯一约束去重，并在同一事务内登记事件和递增 `InstallCount`；重试、跨节点和响应丢失不得重复计数。
 - “全部安装/更新”固定只处理 `ApplicationType=Platform` 的官方平台应用中未安装与存在新版本的项目，不得把 UniApp、Web、MicroService 或其它社区/AI 应用整库安装；已是最新版的应用不重新安装。批量计划、子项状态、checkpoint 和进度必须持久化到共享数据库/后台任务，支持多节点抢占、失败重试和重启恢复，不能依赖进程内集合或浏览器状态。
-- 必须随所有后端版本自动落地的平台基础能力，仍要封装成受信任的官方 Platform 应用包，再由升级器调用统一 `import-microi-store-package` 幂等导入；禁止把表、字段、页面或微服务复制成定制 C# 迁移。身份验证、登录方式、个人中心与租户系统设置使用 `app.microi.saas-engine.json`：携带 `mci_system_setting`、`mci_user_external_identity`、默认设置和 `microi-platform-service`。默认行必须使用 `InsertIfMissing + ConfigKey`，只补缺失，不覆盖 `ValueSource=Tenant` 的租户值或租户后来明确关闭的功能。
+- 必须随所有后端版本自动落地的平台基础能力，仍要封装成受信任的官方 Platform 应用包，再由升级器调用统一 `import-microi-store-package` 幂等导入；禁止把表、字段、页面或微服务复制成定制 C# 迁移。身份验证、登录方式、个人中心与租户系统设置使用 `app.microi.saas-engine.json`：携带 `mci_system_setting`、`mci_user_external_identity`、默认设置和平台内置微服务。默认行必须使用 `InsertIfMissing + ConfigKey`，只补缺失，不覆盖 `ValueSource=Tenant` 的租户值或租户后来明确关闭的功能。小型平台启动微服务应以 `Source=NotIncluded + Build=DatabaseOnly + StorageMode=db` 随程序集交付并接受 256 文件/5MB、逐文件哈希和无源码门禁，使新租户在 HDFS 故障时仍能打开商城与恢复入口；普通应用安装、源码编辑和文件能力继续失败关闭，不得伪装成全平台健康。
 - 批量任务已经以“一个应用”为外层持久化恢复单元。规模可控的小型官方包应在一个事务中完成，避免对同一包体按 8 个字段反复下载、解析和重新排队；超过字段、表、DDL、流程、随包数据或资产安全阈值的大包继续使用内部 checkpoint 分片。热更新发现旧版批量计划不含 `ApplicationType` 时，必须丢弃旧计划并重新盘点，不能继续安装历史计划中的社区应用。
 - MySQL 宽表触发 65,535 字节行内上限时，只允许把不参与索引的 `varchar` 配置列无损提升为 `mediumtext`，并把类型覆盖持久化到后台任务 checkpoint；索引列和非行宽错误必须失败关闭。发布包对长连接串、密钥、回调地址、域名/白名单等字段应直接使用 `mediumtext`，同时更新 `DiyFields` 与建表 DDL，不能长期依赖安装时猜测。
 - 卸载是破坏性操作，必须明确列出将删除/保留的资源、二次确认并优先软删除/归档业务数据。
@@ -82,6 +82,7 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - 发布器必须把用户请求的精确版本传给资产准备器，并断言 `RequestedVersion == Prepared.PackageVersion == AppPakcet.PackageInfo.Version`；版本不存在就失败，禁止静默改用最新版本。
 - `SelectMenu`、`SelectTable`、`SelectApiEngine` 必须从当前发布包的显式选择持久化；不能读取商城行上一次保存的选择来决定本次包内容。
 - 发布完成后同时回读商城版本行、包正文和构建资产，逐项核对版本、数量与 SHA-256；任一处漂移即发布失败。
+- 官方内置前端应用只能有一个发布源码根。默认租户工作副本与受审计的独立 Git 源码仓库不能同时成为事实源；若使用独立仓库，必须提交一个发布契约并让构建、跨工程测试、所有程序集内置包共同读取它，正式发布还要证明源码根来自无未提交修改的 Git 提交。前端主包只提供通用宿主、诊断和恢复入口，不复制完整业务源码。HDFS/CDN 运行镜像必须回读到同一 `RuntimeManifestHash` 后才可启用，不能用较新的镜像静默覆盖较旧数据库包，也不能用较新的数据库包静默覆盖未验签镜像。
 - `ScheduleJobs` 是一等包资源，必须在 `PostSchema` 之后独立安装、持久化 checkpoint 并回读运行状态；任务失败时不得写入成功版本。
 
 ## MCP 工作流

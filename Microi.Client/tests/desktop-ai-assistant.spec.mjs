@@ -63,3 +63,19 @@ test("unified core preserves both conversation protocols and security boundaries
     assert.match(aiEngineSource, /title:\s*text,[\s\S]*?desc:\s*`查询范围：\$\{secureAssistantScopeLabel\.value\}`/);
     assert.doesNotMatch(aiEngineSource, /title:\s*`安全数据分析\$\{/);
 });
+
+test("unified core renders safe Markdown and keeps the assistant chrome quiet", () => {
+    const markdownSource = fs.readFileSync(
+        path.resolve(testDir, "../src/utils/ai-markdown.js"),
+        "utf8"
+    );
+    assert.match(markdownSource, /marked\.parse\(String\(value\), MARKDOWN_OPTIONS\)/);
+    assert.match(markdownSource, /sanitizeHtml\(/);
+    assert.match(aiEngineSource, /v-safe-html="renderAiMarkdown\(message\.content\)"/);
+    assert.doesNotMatch(aiEngineSource, /<pre v-if="message\.content"/);
+    assert.match(aiEngineSource, /\.slice\(0, 4\)/);
+    assert.match(aiEngineSource, /class="quick-prompt-content"/);
+    assert.match(aiEngineSource, /class="composer-settings-trigger"/);
+    assert.match(aiEngineSource, /data-testid="unified-ai-settings"/);
+    assert.match(aiEngineSource, /popper-class="ai-composer-settings-popper"/);
+});
