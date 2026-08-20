@@ -887,6 +887,58 @@ window.microApp.dispatch({
 
 复杂定制界面优先使用 `V8.OpenAppDialog`；按钮 V8 代码只负责传参、接收结果和刷新页面，数据校验及业务事务仍应放在接口引擎或后端服务中。子应用提示“没权限”时，应先核对登录 Token、OsClient、`ModuleEngineKey` 和角色授权，禁止删除权限参数、改成匿名接口或把管理员 Token 写入前端。
 
+## V8.OpenImportDialog
+
+> 在数据表格的页面按钮 V8 中打开平台统一 Excel 导入弹层。适合多行表头、合并单元格、固定单元格元数据等无法由默认首行表头导入器表达的模板。弹层在浏览器内按声明式映射读取工作簿，将精简后的行 JSON 提交给持久化后台接口引擎任务，并实时显示真实进度和返回结果。
+
+```js
+V8.OpenImportDialog({
+  Title: '项目材料自定义导入',
+  Description: '读取固定模板并在后台完成校验、匹配和写入。',
+  ApiEngineKey: 'project_material_custom_import',
+  TaskTitle: '项目材料自定义导入',
+  Param: {
+    TemplateVersion: '2026-08'
+  },
+  Workbook: {
+    SheetIndex: 0,
+    Cells: {
+      ProjectText: 'A4'
+    },
+    Columns: [
+      { Name: 'LineNo', Column: 'A' },
+      { Name: 'Specification', Column: 'C' },
+      { Name: 'Material', Column: 'D' },
+      { Name: 'Weight', Column: 'G' }
+    ],
+    DataStartRow: 7,
+    DataEndRow: 1000,
+    KeyField: 'LineNo'
+  },
+  BackgroundOptions: {
+    ConcurrencyKey: 'project-material-custom-import',
+    MaxAttempts: 1
+  }
+});
+```
+
+| 参数 | 类型 | 必传 | 说明 |
+|------|------|------|------|
+| `ApiEngineKey` | `string` | 是 | 后台执行的接口引擎 Key。 |
+| `Title` / `Description` / `TaskTitle` | `string` | 否 | 弹层标题、说明和后台任务标题。 |
+| `Param` | `object` | 否 | 追加给接口引擎的固定参数。 |
+| `Workbook.SheetIndex` / `SheetName` | `number/string` | 否 | 工作表索引或名称，默认第一张。 |
+| `Workbook.Cells` | `object` | 否 | 元数据名称到 A1 单元格地址的映射。 |
+| `Workbook.Columns` | `array` | 是 | 行字段名到 Excel 列字母或零基列号的映射。 |
+| `DataStartRow` / `DataEndRow` | `number` | 是/否 | 一基数据起止行；结束行省略时读取工作表已用区域。 |
+| `KeyField` | `string` | 否 | 为空时跳过该行的业务键字段。 |
+| `MaxFileSizeMB` / `MaxRows` | `number` | 否 | 客户端文件和行数上限，默认 20 MB / 5000 行。 |
+| `BackgroundOptions` | `object` | 否 | 传给 `RunBackground` 的并发、重试等选项。 |
+
+接口引擎从 `V8.Param._ImportRowsJson`、`_ImportMetaJson`、`_ImportFileName` 和 `_ImportFileSize` 读取数据。业务端必须再次校验模板、字段、权限和数据状态，并通过 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报真实工作量。返回 `Code != 1` 会回滚当前接口引擎事务；应先完整校验再写入，避免部分成功。页面 V8 不应读取 Base64、拼接上传 DOM 或自行实现任务轮询。
+
+默认的单行表头导入仍使用模块自带【导入】按钮；只有模板结构或业务匹配规则超出默认能力时才使用 `OpenImportDialog`。
+
 ## V8.NewGuid
 >* 生成一个前端Guid值
 ```js

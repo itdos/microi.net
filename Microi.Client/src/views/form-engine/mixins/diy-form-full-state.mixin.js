@@ -82,6 +82,16 @@ export default {
             if (wt !== 'StartWork' && wt !== 'DoWork') return false;
             return self.FormMode == 'Add' || self.FormMode == 'Edit';
         },
+        // 工作流提交态必须走 StartWorkWithForm / SendWorkWithForm，不能再暴露普通 CRUD 保存入口。
+        IsWorkflowSubmitMode() {
+            var wt = this.OpenDiyFormWorkFlowType && this.OpenDiyFormWorkFlowType.WorkType;
+            return wt === 'StartWork' || wt === 'DoWork';
+        },
+        // 审核或只读查看流程时，只保留流程动作、流转记录和关闭，隐藏草稿、删除等普通表单动作。
+        IsWorkflowReviewContext() {
+            var wt = this.OpenDiyFormWorkFlowType && this.OpenDiyFormWorkFlowType.WorkType;
+            return wt === 'DoWork' || wt === 'ViewWork';
+        },
         WfTopSubmitBtnText() {
             var self = this;
             var wt = self.OpenDiyFormWorkFlowType && self.OpenDiyFormWorkFlowType.WorkType;
@@ -98,6 +108,7 @@ export default {
         // Page模式：FAB菜单是否有内容（取消编辑 / 表单更多按钮）
         HasFabMenuItemsPage() {
             var self = this;
+            if (self.IsWorkflowReviewContext) return self.ShowFormRight && self.ShowFormRight();
             if (self.FormMode == 'Edit') return true;
             if (self.FormMode != 'View') return true;
             if (self.HasVisibleFormBtns) return true;
@@ -107,12 +118,13 @@ export default {
         // Dialog模式：FAB菜单是否有内容（取消编辑 / FormBtns / 删除）
         HasFabMenuItemsDialog() {
             var self = this;
-            if (self.FormMode == 'Edit' && self.OpenDiyFormWorkFlowType.WorkType != 'StartWork') return true;
+            if (self.IsWorkflowReviewContext) return self.ShowFormRight && self.ShowFormRight();
+            if (self.FormMode == 'Edit' && !self.IsWorkflowSubmitMode) return true;
             if (self.FormMode != 'View') return true;
             if (self.HasVisibleFormBtns) return true;
             if (self.LimitDel && typeof self.LimitDel == 'function' && self.LimitDel()
                 && self.FormMode != 'Add' && self.ShowDeleteBtn
-                && self.OpenDiyFormWorkFlowType.WorkType != 'StartWork') return true;
+                && !self.IsWorkflowSubmitMode) return true;
             if (!self.DiyCommon.IsNull(self.TableId) || !self.DiyCommon.IsNull(self.CurrentDiyTableModel && self.CurrentDiyTableModel.Id)) return true;
             return false;
         },

@@ -2970,7 +2970,7 @@ namespace Microi.net
                 .OrderByDescending(field => McpHasKeyword(field,
                     "customer", "member", "user", "owner", "contact", "客户", "会员", "用户", "负责人", "联系人") ? 100 : McpListScore(field))
                 .ThenBy(field => field.Sort)
-                .Take(2)
+                .Take(1)
                 .ToList();
             var trailingFields = statusFields.Take(1).Concat(numericFields.Take(1))
                 .GroupBy(field => field.Name, StringComparer.OrdinalIgnoreCase)
@@ -4422,7 +4422,7 @@ namespace Microi.net
                 }
                 var allowed = new[] {
                     "Name", "Description", "DiyTableId", "DiyTableName", "ParentId", "Sort", "ComponentName", "ComponentPath", "Display", "AppDisplay",
-                    "OpenType", "Url", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds", "DefaultOrderBy", "SqlWhere",
+                    "OpenType", "FlowDesignId", "Url", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds", "DefaultOrderBy", "SqlWhere",
                     "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema",
                     "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns", "SortFieldIds", "NotShowFields",
                     "SqlJoin", "JoinTables", "SelectFields", "StatisticsFields", "InTableEdit", "InTableEditFields", "MobileListFields",

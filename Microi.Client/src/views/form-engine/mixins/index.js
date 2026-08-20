@@ -24,6 +24,7 @@ export { default as diyTableDataMixin } from './diy-table-data.mixin.js';
 export { default as diyTableSelectionMixin } from './diy-table-selection.mixin.js';
 export { default as diyTableNavigationMixin } from './diy-table-navigation.mixin.js';
 export { default as diyTableOperationsMixin } from './diy-table-operations.mixin.js';
+export { default as diyTableWorkflowRecordMixin } from './diy-table-workflow-record.mixin.js';
 
 // diy-form.vue split mixins
 export { default as diyFormCleanupMixin } from './diy-form-cleanup.mixin.js';

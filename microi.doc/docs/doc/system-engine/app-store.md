@@ -60,6 +60,19 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 
 更新后端源码并重启 API 时，基础应用完整性检查不仅核对应用商城菜单和导入接口，还会核对 `microi-platform-service` 是否启用、`/marketplace` 页面是否启用、菜单是否绑定到对应服务/页面，以及数据库内联 `index.html` 是否存在。任一项缺失、停用或绑定错误都会触发应用商城包的幂等重导入；在线官方资源必须通过相同运行时契约校验，否则整组回退程序集内置资源，不能把不完整资源写入客户库。
 
+这里的数据库内联不是把所有微服务长期塞进数据库，而是平台启动面专用的受信任例外。`microi-platform-service` 的已校验编译产物同时内置在 SaaS 引擎包和应用商城包中，固定声明 `Source=NotIncluded`、`Build=DatabaseOnly`、`StorageMode=db`，最多 256 个文件、5MB。新环境即使尚未安装 MinIO、OSS 或 S3，仍应能打开应用商城、个人中心和系统设置；前端通过通用微服务宿主先调用 `Resolve`，旧后端才回退稳定 `/micro-app/.../index.html` 入口，不携带第二份平台业务源码。
+
+HDFS 故障时按能力降级，不能把“应用商城页面可打开”和“任意应用都可安装”混为一件事：
+
+| 能力 | HDFS 未安装或不可用时 |
+|---|---|
+| 平台内置微服务、应用商城页面 | 使用程序集内置包导入的数据库运行产物，继续可用 |
+| 通知中心的平台应用恢复入口 | 继续可用，不依赖商城微服务页面挂载成功 |
+| 同样满足 `DatabaseOnly` 严格边界的受信任小型平台包 | 可安装，但仍要校验包、哈希、事务和回读 |
+| 普通 MicroService / Web / UniApp 安装、源码在线编辑、上传与文件预览 | 明确显示对象存储不可用并停止相关动作；不得写入半套数据库记录 |
+
+官方发布源维护 `microi-platform-service` 时，正式源码根由 `platform-service-release.json` 唯一指定。发布前运行 `embed-platform-service-bundle.mjs --verify-only`，确认源码版本、源码清单哈希、`dist` 哈希、路由、SaaS 引擎包和应用商城包完全一致；官网资源发布器还会要求源码根来自无未提交修改的 Git 提交。HDFS/CDN 若作为镜像，必须回读到同一 `RuntimeManifestHash` 后才可切换。租户同步目录和前端主包都不是该应用的第二事实源。
+
 右上角【通知中心 → 平台应用】为超级管理员提供【安装/更新全部平台应用】。该入口直接提交 `bulk-import-microi-store-packages` 持久化后台任务，不依赖应用商城微服务页面能否打开；任务固定只处理 `ApplicationType=Platform` 且状态为 `Uninstalled / Outdated` 的应用，已是最新版和其它应用类型均跳过。官方应用源节点不会显示该按钮。
 
 遇到 `MICRO_APP_NOT_AVAILABLE` 或“微服务不存在或已停用”时：

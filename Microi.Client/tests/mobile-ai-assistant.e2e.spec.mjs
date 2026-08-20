@@ -331,8 +331,9 @@ test("PC 顶栏机器人打开并拖动完整 AI 助手弹窗", async ({ page },
     await expect(unifiedAssistant.getByTestId("unified-ai-new-conversation")).toBeVisible();
     await expect(unifiedAssistant.getByTestId("unified-ai-history-active")).toBeVisible();
     await expect(unifiedAssistant.getByTestId("unified-ai-history-archived")).toBeVisible();
-    await expect(unifiedAssistant.getByTestId("unified-ai-model")).toBeVisible({ timeout: 30_000 });
-    await expect(unifiedAssistant.getByTestId("unified-ai-mode")).toBeVisible();
+    await unifiedAssistant.getByTestId("unified-ai-settings").click();
+    await expect(page.getByTestId("unified-ai-model")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("unified-ai-mode")).toBeVisible();
     await expect(unifiedAssistant.getByTestId("unified-ai-input")).toBeVisible();
     await expect(unifiedAssistant.getByTestId("unified-ai-send")).toBeVisible();
     await expect(unifiedAssistant.locator(".secure-scope-tag")).toBeVisible();

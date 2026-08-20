@@ -104,7 +104,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 **2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.VSCode 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=a5df177a3a8dbdaee503667e45497378cbd3f04820090c3d69cc2b90b3456894 -->
+<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=fff5f355bea04077c15039b668f0a02b1ed018f5e76aaee47113b6be777fef4a -->
 ## Microi 源码路径速查（工作区根相对路径）
 
 当用户提到“吾码后端源码”“吾码前端源码”“表单引擎源码”“官网源码”等简称时，默认按下列路径定位；如果当前工作区缺少对应目录，再用 `rg --files` 或目录搜索确认实际位置。
@@ -124,11 +124,11 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 吾码 App 源码 | `microi.app/` |
 | 吾码 UniApp 源码 | `microi.uniapp/` |
 | 吾码官方网站 / 文档源码 | `microi.doc/` |
-| 吾码 AI 应用及应用商城发行源码 | `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}/` |
+| 吾码 AI 应用及应用商城发行源码 | 默认位于 `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}/`；受审计的独立源码仓库必须由发布契约显式指定 |
 
 以上路径只作为通用工作区相对路径规范，不写入具体本机盘符。跨仓库、空工作区或普通用户项目中，如果路径不存在，以插件生成的 `AGENTS.md`、MCP 配置和实际文件树为准。
 
-每个 `AI应用/{appKey}` 必须是界面、微服务、Manifest、接口引擎、资源策略、测试、构建脚本与商城上传素材的唯一事实源。纯平台应用没有前端时仍使用该目录；禁止另建 `microi.apps/` 平行发行根。
+每个 `AI应用/{appKey}` 必须只有一个可编辑事实源，统一承载界面、微服务、Manifest、接口引擎、资源策略、测试、构建脚本与商城上传素材。普通应用默认使用当前连接下的 `Microi-V8-Engine` 目录；受审计的官方内置应用若由独立 Git 仓库维护，必须由版本管理的发布契约唯一指向该源码根，并让构建、跨工程测试和发行包共同读取契约。此时同名 `Microi-V8-Engine` 目录只是远端同步镜像，不得回退为构建源。禁止靠目录探测在多份副本之间自动择新，也禁止另建无契约的 `microi.apps/` 平行发行根。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=workspace-conventions-006 sha256=2e2b93098fa72390e148e305ed6cc8cfb154d9a64028cdecb10b39a016e41f41 -->

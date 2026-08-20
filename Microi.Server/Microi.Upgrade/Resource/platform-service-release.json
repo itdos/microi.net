@@ -1,0 +1,16 @@
+{
+  "SchemaVersion": 1,
+  "AppKey": "microi-platform-service",
+  "SourceRoot": "AI-Project/microi/AI应用/microi-platform-service",
+  "SourceRole": "CanonicalReleaseSource",
+  "RuntimeDelivery": {
+    "Primary": "DatabaseOnly",
+    "Mirror": "HashVerifiedHdfsOrCdn",
+    "MaxAssetCount": 256,
+    "MaxTotalBytes": 5242880
+  },
+  "PackageTargets": [
+    "Microi.Server/Microi.Upgrade/Resource/app.microi.saas-engine.json",
+    "Microi.Server/Microi.Upgrade/Resource/app.microi.store.json"
+  ]
+}

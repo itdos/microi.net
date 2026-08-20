@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.1.3
+ * Version: v2.1.6
  * Function:
- * - Unified marketplace importer with resumable slices and strict SharedPublicRuntime support for official versioned Web/UniApp assets.
+ * - Unified marketplace importer with resumable slices, strict SharedPublicRuntime support, and verified current/history baselines for legacy managed API engines.
  */
 
 // ==================== 参数接收与校验 ====================
@@ -448,6 +448,42 @@ try {
 } catch (credentialError) {
     return { Code: 0, Msg: credentialError.message || String(credentialError) };
 }
+
+// MARKETPLACE_SOURCE_READ_RETRY_V1：后台分片每次都要从商城源重新读取权威包。
+// 代理切换、连接复用或上游瞬时超时时，V8.Http 可能短暂返回空字符串；直接
+// JSON.parse 会让整个大型应用从外层任务重试。这里只对固定的只读商城请求做
+// 有界重试，绝不重试安装写入，也不接受空响应或非成功业务结果。
+var postMarketplaceReadWithRetry = function (label, url, postParam, timeoutSeconds) {
+    var lastError = '';
+    var maxAttempts = 3;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            var response = V8.Http.Post({
+                Url: url,
+                PostParam: postParam || {},
+                ParamType: 'json',
+                Headers: storeRequestHeaders,
+                Timeout: timeoutSeconds || 120
+            });
+            if (typeof response == 'string') {
+                var responseText = String(response || '').replace(/^\s+|\s+$/g, '');
+                if (!responseText) throw new Error('商城源返回空响应');
+                response = JSON.parse(responseText);
+            }
+            if (response && response.Code == 1) return response;
+            lastError = String((response && response.Msg) || '商城源返回非成功状态');
+        } catch (readError) {
+            lastError = readError && readError.message ? readError.message : String(readError);
+        }
+        if (attempt < maxAttempts) {
+            try {
+                if (V8.Action && V8.Action.Sleep) V8.Action.Sleep(250 * attempt);
+                else System.Threading.Thread.Sleep(250 * attempt);
+            } catch (sleepError) { }
+        }
+    }
+    throw new Error(label + '失败（已重试' + maxAttempts + '次）：' + (lastError || '商城源无返回'));
+};
 var authoritativeStoreModel = null;
 if (!Package && storeRow && storeRow.AppPakcet) {
     Package = storeRow.AppPakcet;
@@ -455,19 +491,15 @@ if (!Package && storeRow && storeRow.AppPakcet) {
 if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
     reportProgress(3, '正在从应用商城源获取应用数据包');
     var storeId = firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id]);
-    var storeModelResult = V8.Http.Post({
-        Url: storeApiBase + '/apiengine/get-microi-store-model?OsClient=' + encodeURIComponent(storeOsClient),
-        PostParam: {
+    var storeModelResult = postMarketplaceReadWithRetry(
+        '读取商城应用包',
+        storeApiBase + '/apiengine/get-microi-store-model?OsClient=' + encodeURIComponent(storeOsClient),
+        {
             Id: storeId,
             StoreVersionId: firstTextParam([V8.Param.StoreVersionId, storeRow.StoreVersionId, storeRow.DataVersionId])
         },
-        ParamType: 'json',
-        Headers: storeRequestHeaders,
-        Timeout: 120
-    });
-    if (typeof (storeModelResult) == 'string') {
-        storeModelResult = JSON.parse(storeModelResult);
-    }
+        120
+    );
     if (storeModelResult && storeModelResult.Code == 1 && storeModelResult.Data) {
         var storeModel = storeModelResult.Data;
         authoritativeStoreModel = storeModel;
@@ -5654,8 +5686,30 @@ try {
     // PLATFORM_API_ENGINE_PRESERVE_NEWER_V1：官方平台应用可能携带发布时的旧版
     // 共享接口引擎。若当前租户已经运行更高语义版本，保留该版本并继续安装；
     // 同版本异哈希、无版本、普通应用及低版本本地修改仍按三方基线冲突回滚。
-    function decideManagedApiEngineUpdate(ownership, baseHash, localHash, incomingHash, localVersion, incomingVersion) {
+    function normalizeApiEngineBaseHashes(value) {
+        var source = value;
+        if (typeof source == 'string') {
+            try { source = JSON.parse(source || '[]'); }
+            catch (parseError) { source = String(source || '').split(','); }
+        }
+        if (!source || source.length === undefined || typeof source == 'string') source = source ? [source] : [];
+        var result = [];
+        var seen = {};
+        for (var hashIndex = 0; hashIndex < source.length; hashIndex++) {
+            var hash = String(source[hashIndex] || '').trim().toLowerCase();
+            if (!/^[a-f0-9]{64}$/.test(hash) || seen[hash]) continue;
+            seen[hash] = true;
+            result.push(hash);
+        }
+        return result;
+    }
+
+    function decideManagedApiEngineUpdate(ownership, baseHash, localHash, incomingHash, localVersion, incomingVersion, compatibleBaseHashes) {
         if (localHash == incomingHash || (baseHash && localHash == baseHash)) return 'Apply';
+        var compatibleHashes = normalizeApiEngineBaseHashes(compatibleBaseHashes);
+        for (var compatibleIndex = 0; compatibleIndex < compatibleHashes.length; compatibleIndex++) {
+            if (localHash == compatibleHashes[compatibleIndex]) return 'ApplyCompatibleBase';
+        }
         if (String(ownership || '').toLowerCase() == 'platform'
             && localVersion && incomingVersion
             && compareApiEngineVersion(localVersion, incomingVersion) > 0) {
@@ -5669,6 +5723,139 @@ try {
             throw new Error('接口引擎资源升级需要 V8.EncryptHelper.Sha256Hex');
         }
         return String(V8.EncryptHelper.Sha256Hex(String(code || ''))).toLowerCase();
+    }
+
+    // API_ENGINE_EXECUTABLE_EQUIVALENCE_V1：历史官方包曾只重写文件头说明，
+    // 导致完全相同的可执行正文产生不同 SHA。仅移除源码开头第一个块注释并统一
+    // 换行/尾部空白；正文中的任意字符、注释或语句变化仍会产生不同摘要。
+    function normalizeApiEngineExecutableSource(code) {
+        var source = String(code || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+        source = source.replace(/^\s*\/\*[\s\S]*?\*\/\s*/, '');
+        return source.replace(/\s+$/g, '');
+    }
+    function apiEngineExecutableHash(code) {
+        return apiEngineHash(normalizeApiEngineExecutableSource(code));
+    }
+
+    // OFFICIAL_HISTORY_BASELINE_RECOVERY_V1：早期安装记录没有 ResourceState，
+    // 旧应用包也没有 BaseHash。仅当本次包来自固定 iTdos 官方 Platform 商城、
+    // 且安装版本能精确命中官网公开历史快照时，计算该快照内接口源码摘要作为
+    // 一次性三方基线。未知本地代码仍然冲突，绝不因版本号较低而直接覆盖。
+    var officialHistoricalApiEngineHashes = null;
+    var officialHistoricalApiEngineLookupError = '';
+    function normalizeMarketplaceVersion(value) {
+        return String(value || '').replace(/^\s+|\s+$/g, '').replace(/^v/i, '').toLowerCase();
+    }
+    function loadOfficialHistoricalApiEngineHashes() {
+        if (officialHistoricalApiEngineHashes !== null) return officialHistoricalApiEngineHashes;
+        officialHistoricalApiEngineHashes = {};
+        if (!trustedOfficialPlatformPackage || !installedVersionLookup || !installedVersionLookup.Data) {
+            return officialHistoricalApiEngineHashes;
+        }
+
+        var historicalStoreId = firstText([
+            installedVersionIdentity && installedVersionIdentity.StoreId,
+            V8.Param.StoreId,
+            V8.Param.MicroiStoreId,
+            V8.Param.Id
+        ]);
+        var installedPackageVersion = normalizeMarketplaceVersion(firstText([
+            installedVersionLookup.Data.AppVersionInstall,
+            installedVersionLookup.Data.AppVersion,
+            installedVersionLookup.Data.Version
+        ]));
+        if (!historicalStoreId || !installedPackageVersion) return officialHistoricalApiEngineHashes;
+
+        try {
+            var versionIds = [];
+            var seenVersionIds = {};
+            var pageSize = 20;
+            for (var historyPage = 1; historyPage <= 50; historyPage++) {
+                var versionsResult = postMarketplaceReadWithRetry(
+                    '读取商城历史版本列表',
+                    storeApiBase + '/apiengine/get-microi-store-versions?OsClient=' + encodeURIComponent(storeOsClient),
+                    {
+                        Id: historicalStoreId,
+                        _PageIndex: historyPage,
+                        _PageSize: pageSize
+                    },
+                    120
+                );
+                var versionRows = versionsResult.Data || [];
+                for (var versionRowIndex = 0; versionRowIndex < versionRows.length; versionRowIndex++) {
+                    var versionRow = versionRows[versionRowIndex] || {};
+                    var versionId = String(versionRow.VersionId || '');
+                    if (normalizeMarketplaceVersion(versionRow.AppVersion) != installedPackageVersion
+                        || !versionId || seenVersionIds[versionId]) continue;
+                    seenVersionIds[versionId] = true;
+                    versionIds.push(versionId);
+                }
+                var historyCount = parseInt(versionsResult.DataCount || 0, 10);
+                if (!versionRows.length || (historyCount > 0 && historyPage * pageSize >= historyCount)) break;
+            }
+
+            for (var historicalVersionIndex = 0; historicalVersionIndex < versionIds.length; historicalVersionIndex++) {
+                var historicalModelResult = postMarketplaceReadWithRetry(
+                    '读取商城历史版本快照',
+                    storeApiBase + '/apiengine/get-microi-store-model?OsClient=' + encodeURIComponent(storeOsClient),
+                    {
+                        Id: historicalStoreId,
+                        StoreVersionId: versionIds[historicalVersionIndex]
+                    },
+                    120
+                );
+                var historicalModel = historicalModelResult && historicalModelResult.Code == 1
+                    ? historicalModelResult.Data
+                    : null;
+                if (!historicalModel
+                    || String(historicalModel.Id || '') != historicalStoreId
+                    || normalizeMarketplaceVersion(historicalModel.AppVersion || historicalModel.Version) != installedPackageVersion
+                    || String(historicalModel.ApplicationType || '').toLowerCase() != 'platform'
+                    || (String(historicalModel.PublisherType || '') != '官方应用'
+                        && String(historicalModel.PublisherType || '') != '平台应用')
+                    || String(historicalModel.Status || '').toLowerCase() != 'published'
+                    || Number(historicalModel.IsApprove || 0) !== 1) {
+                    continue;
+                }
+                var historicalPackage = historicalModel.AppPakcet;
+                if (typeof historicalPackage == 'string') historicalPackage = JSON.parse(historicalPackage);
+                if (!historicalPackage || !historicalPackage.PackageInfo
+                    || normalizeMarketplaceVersion(
+                        historicalPackage.PackageInfo.Version || historicalPackage.PackageInfo.AppVersion
+                    ) != installedPackageVersion) {
+                    continue;
+                }
+                var historicalEngines = historicalPackage.SysApiEngines || [];
+                for (var historicalEngineIndex = 0; historicalEngineIndex < historicalEngines.length; historicalEngineIndex++) {
+                    var historicalEngine = historicalEngines[historicalEngineIndex] || {};
+                    var historicalEngineKey = String(historicalEngine.ApiEngineKey || '').toLowerCase();
+                    if (!historicalEngineKey) continue;
+                    var historicalHash = apiEngineHash(historicalEngine.ApiV8Code);
+                    if (!officialHistoricalApiEngineHashes[historicalEngineKey]) {
+                        officialHistoricalApiEngineHashes[historicalEngineKey] = [];
+                    }
+                    if (officialHistoricalApiEngineHashes[historicalEngineKey].indexOf(historicalHash) < 0) {
+                        officialHistoricalApiEngineHashes[historicalEngineKey].push(historicalHash);
+                    }
+                }
+            }
+            debugLog.official_history_baseline_recovery = '已核验官方历史应用版本 ' + installedPackageVersion
+                + '，快照数=' + versionIds.length;
+        } catch (historyError) {
+            officialHistoricalApiEngineLookupError = historyError && historyError.message
+                ? historyError.message
+                : String(historyError);
+            debugLog.official_history_baseline_error = officialHistoricalApiEngineLookupError;
+        }
+        return officialHistoricalApiEngineHashes;
+    }
+
+    function matchesOfficialHistoricalApiEngineHash(apiEngineKey, localHash) {
+        var historicalHashes = loadOfficialHistoricalApiEngineHashes()[String(apiEngineKey || '').toLowerCase()] || [];
+        for (var historicalHashIndex = 0; historicalHashIndex < historicalHashes.length; historicalHashIndex++) {
+            if (String(localHash || '').toLowerCase() == historicalHashes[historicalHashIndex]) return true;
+        }
+        return false;
     }
 
     var resourcePolicies = parseJsonObject(Package.ResourcePolicies, {});
@@ -5691,7 +5878,10 @@ try {
         return {
             UpgradePolicy: upgradePolicy,
             Ownership: ownership,
-            BaseHash: String(source.BaseHash || '').toLowerCase()
+            BaseHash: String(source.BaseHash || '').toLowerCase(),
+            CompatibleBaseHashes: normalizeApiEngineBaseHashes(
+                source.CompatibleBaseHashes || source.LegacyBaseHashes || []
+            )
         };
     }
 
@@ -5886,8 +6076,29 @@ try {
                     localHash,
                     incomingHash,
                     localVersion,
-                    incomingVersion
+                    incomingVersion,
+                    apiEnginePolicy.CompatibleBaseHashes
                 );
+                if (managedDecision == 'Conflict'
+                    && apiEngineExecutableHash(existingApiEngine && existingApiEngine.ApiV8Code)
+                        == apiEngineExecutableHash(apiEngine.ApiV8Code)) {
+                    managedDecision = 'ApplyEquivalentExecutableSource';
+                    debugLog['apiengine_equivalent_source_' + i] =
+                        '接口可执行正文完全一致，仅文件头或换行不同：' + apiEngine.ApiEngineKey;
+                }
+                if (managedDecision == 'Conflict'
+                    && String(apiEnginePolicy.Ownership || '').toLowerCase() == 'platform'
+                    && matchesOfficialHistoricalApiEngineHash(apiEngine.ApiEngineKey, localHash)) {
+                    managedDecision = 'ApplyHistoricalOfficialBase';
+                    debugLog['apiengine_official_history_base_' + i] =
+                        '命中官网已发布历史应用包基线：' + apiEngine.ApiEngineKey
+                        + '，local=' + localHash;
+                }
+                if (managedDecision == 'ApplyCompatibleBase') {
+                    debugLog['apiengine_compatible_base_' + i] =
+                        '命中应用声明的官方历史基线：' + apiEngine.ApiEngineKey
+                        + '，local=' + localHash;
+                }
                 if (managedDecision == 'PreserveNewer') {
                     stats.ApiEngineSkipped++;
                     debugLog['apiengine_platform_newer_skip_' + i] =
@@ -5905,6 +6116,8 @@ try {
                         + '，Local=' + localHash + '，Incoming=' + incomingHash
                         + '，LocalVersion=' + (localVersion ? localVersion.join('.') : 'unknown')
                         + '，IncomingVersion=' + (incomingVersion ? incomingVersion.join('.') : 'unknown')
+                        + '，CompatibleBaseCount=' + apiEnginePolicy.CompatibleBaseHashes.length
+                        + '，OfficialHistoryLookup=' + (officialHistoricalApiEngineLookupError || 'checked')
                     );
                 }
             }

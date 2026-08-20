@@ -10,6 +10,32 @@ async function readPackage(name) {
   return JSON.parse(await readFile(resolve(directory, name), 'utf8'));
 }
 
+test('官方平台应用包的 PC 复合列默认保持紧凑双行', async () => {
+  for (const name of [
+    'app.microi.form-engine.json',
+    'app.microi.module-engine.json',
+    'app.microi.saas-engine.json',
+    'app.microi.store.json',
+  ]) {
+    const packageModel = await readPackage(name);
+    for (const menu of packageModel.SysMenus || []) {
+      if (!menu.ViewSchema) continue;
+      const schema = typeof menu.ViewSchema === 'string' ? JSON.parse(menu.ViewSchema) : menu.ViewSchema;
+      for (const view of schema.Views || []) {
+        if (String(view.Scene || '').toLowerCase() !== 'list') continue;
+        const device = String(view.Device || 'All').toLowerCase();
+        if (device !== 'pc' && device !== 'all') continue;
+        for (const column of view?.Layout?.List?.Columns || []) {
+          assert.ok(
+            !Array.isArray(column.Lines) || column.Lines.length <= 1,
+            `${name}/${menu.Name || menu.Id} must use at most one secondary line`,
+          );
+        }
+      }
+    }
+  }
+});
+
 test('系统设置通过 ViewSchema 使用通用表单工作台并保留经典列表', async () => {
   const packageModel = await readPackage('app.microi.saas-engine.json');
   const menu = packageModel.SysMenus.find(item => item.Id === 'ea6b79e8-2c6b-4d0f-9b6a-44d01a3479bf');
@@ -65,12 +91,20 @@ test('应用商城包独立交付菜单依赖的微服务运行时且菜单 Url 
 
 test('平台微服务包包含商城路由', async () => {
   const packageModel = await readPackage('app.microi.saas-engine.json');
+  const storePackageModel = await readPackage('app.microi.store.json');
+  const sourcePackageModel = JSON.parse(await readFile(
+    resolve(directory, '../../../AI-Project/microi/AI应用/microi-platform-service/package.json'),
+    'utf8',
+  ));
   const bundle = packageModel.ApplicationBundles.find(item => item.Application?.AppKey === 'microi-platform-service');
+  const storeBundle = storePackageModel.ApplicationBundles.find(item => item.Application?.AppKey === 'microi-platform-service');
 
   assert.ok(bundle);
+  assert.ok(storeBundle);
   assert.ok(bundle.Routes.some(route => route.RoutePath === '/marketplace'));
-  assert.equal(bundle.VersionNo, 'v1.6.3');
-  assert.equal(bundle.Application.CurrentVersion, 20);
+  assert.equal(bundle.VersionNo, `v${sourcePackageModel.version}`);
+  assert.equal(bundle.Application.CurrentVersion, storeBundle.Application.CurrentVersion);
+  assert.ok(Number.isInteger(bundle.Application.CurrentVersion) && bundle.Application.CurrentVersion > 0);
   assert.equal(bundle.MicroService.StorageMode, 'db');
 
   const saasMenu = packageModel.SysMenus.find(item => item.Id === '42078414-512a-4840-9843-9b75ab79ba79');

@@ -476,7 +476,7 @@ export const V8ServerApiDefinitions = {
                         detail: "生成 MiniMax 纯音乐并转存当前租户 HDFS（仅平台管理员）",
                         kind: "function",
                         insertText: "GenerateMiniMaxMusic",
-                        snippet: 'GenerateMiniMaxMusic({ RequestId: "${1:music-request-id}", Prompt: "${2:克制的企业科技感纯音乐}", Model: "${3:music-3.0}", IsInstrumental: true, SampleRate: 44100, Bitrate: 256000, Format: "mp3" })'
+                        snippet: 'GenerateMiniMaxMusic({ RequestId: "${1:music-request-id}", Prompt: "${2:克制的企业科技感纯音乐}", Model: "${3:music-2.6}", IsInstrumental: true, SampleRate: 44100, Bitrate: 256000, Format: "mp3" })'
                     },
                     GenerateMiniMaxSpeech: {
                         label: "GenerateMiniMaxSpeech",

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import {
   canonicalizeResource,
@@ -42,6 +44,31 @@ const publishEndpoint = process.env.MICROI_UPGRADE_RESOURCE_PUBLISH_API
   || 'https://api.itdos.com/apiengine/get-microi-upgrade-resource--OsClient--iTdos--';
 const outputDirectory = dirname(fileURLToPath(import.meta.url));
 const baseDirectory = resolve(outputDirectory, '.resource-sync-base');
+const execFileAsync = promisify(execFile);
+
+async function verifyPlatformServiceReleaseSource() {
+  const verifierPath = resolve(outputDirectory, 'embed-platform-service-bundle.mjs');
+  try {
+    const result = await execFileAsync(
+      process.execPath,
+      [verifierPath, '--verify-only', '--require-clean-source'],
+      {
+      cwd: resolve(outputDirectory, '../../..'),
+      encoding: 'utf8',
+      maxBuffer: 4 * 1024 * 1024,
+      timeout: 60_000,
+      windowsHide: true,
+      },
+    );
+    const summary = JSON.parse(String(result.stdout || '{}'));
+    process.stdout.write(
+      `microi-platform-service\t唯一源码与两个内置包一致\t${summary.version || ''}\t${summary.runtimeManifestHash || ''}\n`,
+    );
+  } catch (error) {
+    const detail = String(error?.stderr || error?.stdout || error?.message || error).trim();
+    throw new Error(`正式发布已阻止：平台内置微服务唯一源码、dist、路由或两个内置包存在漂移。${detail ? `\n${detail}` : ''}`);
+  }
+}
 
 function validateReleaseCandidate(name, content) {
   if (!content.trim()) throw new Error(`${name} 内容为空`);
@@ -850,6 +877,8 @@ if (process.argv.includes('--synchronize-local')) {
       await writeFile(resolve(outputDirectory, name), resolvedSource, 'utf8');
     }
   }
+
+  if (publish) await verifyPlatformServiceReleaseSource();
 
   if (remoteChanges.length && !publish) {
     throw new Error(

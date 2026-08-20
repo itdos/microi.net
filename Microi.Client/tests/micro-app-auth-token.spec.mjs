@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createMicroiV8 } from '../../microi.skills/microi.v8.js'
+import { platformServiceSourcePath } from './helpers/platform-service-source.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
@@ -66,7 +67,7 @@ test('micro app SDK keeps rotated tokens across normal requests and uploads', as
 })
 
 test('tenant micro app uses one V8 instance and synchronizes rotated tokens with its host', () => {
-  const appRoot = resolve(root, '../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTDos.Product.Internal/AI应用/microi-platform-service/src')
+  const appRoot = platformServiceSourcePath('src')
   const bridge = readFileSync(resolve(appRoot, 'microi.js'), 'utf8')
   const sdk = readFileSync(resolve(appRoot, 'utils/microi.v8.js'), 'utf8')
 
