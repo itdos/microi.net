@@ -4,6 +4,7 @@ import { findMenu, loadMenuTree } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition, parseJson } from '@/platform/native-form.js'
 import { normalizeStringList } from '@/platform/view-schema-core.mjs'
 import { appendSystemAuditFields, resolveConfiguredFieldNames, resolveConfiguredFields } from '@/platform/card-field-policy.mjs'
+import { compileModuleFilterFields } from '@/platform/list-filter-fields.mjs'
 
 const DEFAULT_ICON = '/static/microi-blue-256.png'
 const HEAVY_COMPONENTS = new Set([
@@ -189,6 +190,7 @@ function createModuleDefinition(module, definition) {
   const configuredBottomFields = configuredFields(module.menu.CardBottomTagFields, fields)
   const configuredBottom = configuredBottomFields.map((item) => item.field)
   const configuredSearch = configuredFieldNames(module.menu.SearchFieldIds, fields)
+  const filterFields = compileModuleFilterFields(module.menu.SearchFieldIds, appendSystemAuditFields(fields))
   const configuredStatistics = configuredFieldNames(module.menu.StatisticsFields, fields)
   // 后台已配置“移动端/卡片显示列”时必须严格使用该顺序；
   // SelectFields 只在未配置移动端列时作为兼容回退，不能混入卡片造成展示漂移。
@@ -250,6 +252,7 @@ function createModuleDefinition(module, definition) {
       ...configuredBottomFields.map((item) => item.queryField)
     ]),
     searchFields: configuredSearch,
+    filterFields,
     lines: lines.map((field) => ({
       field: configuredMobileByName.get(field.Name.toLowerCase())?.field || field.Name,
       label: configuredMobileByName.get(field.Name.toLowerCase())?.label || field.Label || field.Name,

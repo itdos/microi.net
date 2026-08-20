@@ -1,4 +1,5 @@
-export const SYS_USER_ROLE_FIELD_ID = 'bb6b3659-9f82-47c9-92b1-e2988a5845ae'
+export const CONTACT_ROLE_API = '/apiengine/get-sys-user-roles'
+export const CONTACT_USER_API = '/apiengine/get-sysUser-list'
 
 function firstDefined(...values) {
 	return values.find(value => value !== undefined && value !== null && String(value).trim() !== '')
@@ -44,36 +45,27 @@ export function normalizeRoleOptions(items = []) {
 }
 
 export function extractRoleOptions(response) {
-	const fieldResult = response && Array.isArray(response.Data) ? response.Data[0] : null
-	const data = fieldResult && fieldResult.Result ? fieldResult.Result.Data : null
+	const data = response && Array.isArray(response.Data) ? response.Data : []
 	return normalizeRoleOptions(data)
 }
 
-export function buildContactRequest({ pageIndex, pageSize, keyword, roleNames }) {
+export function buildContactRequest({ pageIndex, pageSize, keyword, roleIds, roleNames }) {
+	const selectedRoleIds = Array.isArray(roleIds)
+		? roleIds.map(id => String(id || '').trim()).filter(Boolean)
+		: []
 	const selectedRoleNames = Array.isArray(roleNames)
 		? roleNames.map(name => String(name || '').trim()).filter(Boolean)
 		: []
 	const normalizedKeyword = String(keyword || '').trim()
 
-	if (selectedRoleNames.length > 0) {
-		return {
-			url: '/apiengine/get-sysUser-list',
-			data: {
-				_PageIndex: pageIndex,
-				_PageSize: pageSize,
-				Keyword: normalizedKeyword,
-				RoleNames: selectedRoleNames
-			}
-		}
-	}
-
 	return {
-		url: '/api/SysUser/GetSysUserPublicInfo',
+		url: CONTACT_USER_API,
 		data: {
-			State: 1,
 			_PageIndex: pageIndex,
 			_PageSize: pageSize,
-			_Keyword: normalizedKeyword
+			Keyword: normalizedKeyword,
+			RoleIds: selectedRoleIds,
+			RoleNames: selectedRoleNames
 		}
 	}
 }

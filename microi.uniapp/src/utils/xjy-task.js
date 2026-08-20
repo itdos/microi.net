@@ -36,6 +36,13 @@ export const TASK_PHOTO_FIELDS = [
   { name: 'XianchangZP', label: '现场环境', max: 6 }
 ]
 
+const TASK_MAP_SELECT_FIELDS = [
+  'Id', 'ShouhouFWBH', 'DingdanBH', 'KehuID', 'KehuMC',
+  'KehuLXRR', 'KehuDH', 'Chengshi', 'Dizhi', 'Leixing',
+  'ShouhouLX', 'Zhuangtai', 'ShouhouRY', 'ShouhouRYID',
+  'YujiSHSJ', 'KehuDT_Lat', 'KehuDT_Lng'
+]
+
 const TASK_PERMISSION_ID = 'aab7df97-4009-4d9f-89f7-ed30e5eba3fb'
 let taskMenuPromise = null
 
@@ -118,7 +125,10 @@ export async function loadTasks(options = {}) {
   const pageIndex = Number(options.pageIndex || 1)
   const pageSize = Number(options.pageSize || 15)
   const range = buildPeriodRange(options.period || 'all', options.customRange)
-  const where = [...rangeWhere(options.dateField || 'YujiSHSJ', range)]
+  const where = [
+    ...rangeWhere(options.dateField || 'YujiSHSJ', range),
+    ...(Array.isArray(options.extraWhere) ? options.extraWhere : [])
+  ]
   if (options.state) where.push({ Name: 'Zhuangtai', Type: 'Like', Value: options.state })
   if (options.type) where.push({ Name: 'Leixing', Type: '=', Value: options.type })
   if (options.city) where.push({ Name: 'Chengshi', Type: 'Like', Value: options.city })
@@ -133,6 +143,7 @@ export async function loadTasks(options = {}) {
     _OrderByType: options.orderType || 'ASC',
     _Where: where
   }
+  if (options.includeCoordinates === true) payload._SelectFields = TASK_MAP_SELECT_FIELDS
   const menuId = await taskMenuId(options.refresh === true)
   if (menuId) payload._SysMenuId = menuId
   const key = `task:list:${taskIdentity()}:${JSON.stringify(payload)}`
