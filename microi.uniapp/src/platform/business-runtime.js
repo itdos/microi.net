@@ -5,6 +5,7 @@ import { getBusinessEntry, getBusinessModule, getRoleProfile } from '@/platform/
 import { cachedRequest } from '@/platform/cache.js'
 import { formatRegionValue, formatStructuredValue } from '@/platform/display.js'
 import { selectAuthorizedMenu } from '@/platform/menu-resolution.mjs'
+import { buildListApiEnginePayload, normalizeListApiEngineResponse } from '@/platform/list-api-engine.mjs'
 import tenantRuntime from '@/generated/tenant-runtime.js'
 
 const TABLE_CACHE_KEY = 'microi_diy_table_ids_v2'
@@ -152,6 +153,31 @@ export function buildPeriodRange(period, customRange = null) {
 export async function loadModuleRows(moduleConfig, options = {}) {
   const pageIndex = Number(options.pageIndex || 1)
   const pageSize = Number(options.pageSize || moduleConfig.pageSize || 15)
+  const listApiEngineKey = String(moduleConfig.listApiEngineKey || '').trim()
+  if (listApiEngineKey) {
+    const periodRange = buildPeriodRange(options.period, options.customRange)
+    const payload = buildListApiEnginePayload(moduleConfig, { ...options, pageIndex, pageSize }, periodRange)
+    const requestKey = [
+      'api-engine-list', currentIdentityKey(), listApiEngineKey,
+      pageIndex, pageSize, payload.Keyword,
+      payload._OrderBy, payload._OrderByType,
+      JSON.stringify(payload._SearchDateTime || {}),
+      JSON.stringify(payload._Where)
+    ].join(':')
+    const cached = await cachedRequest(
+      requestKey,
+      () => V8.ApiEngine.Run(listApiEngineKey, payload, { checkCode: false }),
+      {
+        maxAge: Number(options.cacheAge ?? (pageIndex === 1 ? 45 * 1000 : 10 * 1000)),
+        refresh: options.refresh === true,
+        allowStale: true
+      }
+    )
+    return {
+      ...normalizeListApiEngineResponse(cached.data),
+      stale: cached.stale === true
+    }
+  }
   const menuId = String(moduleConfig.menuId || '').trim()
   if (moduleConfig.requireAuthorizedMenu === true && !menuId) {
     throw new Error('当前账号无权查看该业务数据')
