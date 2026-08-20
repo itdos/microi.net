@@ -17,6 +17,8 @@ namespace Microi.net
         public string NodeId { get; set; }
         public string NodeName { get; set; }
         public DateTime CopyTime { get; set; }
+        public bool? IsRead { get; set; }
+        public DateTime? ReadTime { get; set; }
     }
     public class NotHandlerUsersModel
     {

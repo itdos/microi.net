@@ -199,3 +199,34 @@ test("composite MinWidth remains the flex minimum and unconfigured fields receiv
     assert.match(block, /return 170/);
     assert.match(block, /return 140/);
 });
+
+test("presentation designer wide rows declare one grid track per control", () => {
+    const source = fs.readFileSync(new URL("../src/views/form-engine/diy-components/diy-module-presentation-designer.vue", import.meta.url), "utf8");
+    const gridTracks = (value) => {
+        const tracks = [];
+        let depth = 0;
+        let current = "";
+        for (const character of String(value || "").trim()) {
+            if (/\s/.test(character) && depth === 0) {
+                if (current) tracks.push(current);
+                current = "";
+                continue;
+            }
+            if (character === "(") depth += 1;
+            if (character === ")") depth -= 1;
+            current += character;
+        }
+        if (current) tracks.push(current);
+        return tracks;
+    };
+    const metricGrid = source.match(/\.metric-row\s*\{[\s\S]*?grid-template-columns:\s*([^;]+);/)?.[1];
+    const descriptorGrid = source.match(/\.descriptor-editor\s*\{[\s\S]*?grid-template-columns:\s*([^;]+);/)?.[1];
+
+    assert.equal(gridTracks(metricGrid).length, 15);
+    assert.equal(gridTracks(descriptorGrid).length, 8);
+    assert.match(source, /class="metric-table-scroll"/);
+    assert.match(source, /\.metric-table-scroll\s*\{[\s\S]*?overflow-x:\s*auto/);
+    assert.match(source, /container-type:\s*inline-size/);
+    assert.match(source, /@container\s*\(max-width:\s*1200px\)[\s\S]*?\.zone-grid\s*\{\s*grid-template-columns:\s*1fr/);
+    assert.match(source, /常规仅 1 项.*紧凑双行/);
+});

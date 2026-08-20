@@ -28,10 +28,14 @@ const physicalNotNullBackfillSource = source.match(
 const mysqlOffpageHelpersSource = source.match(
   /var isMysqlRowSizeTooLargeError = function \(error\) \{[\s\S]*?(?=\n    var applyPersistedMysqlOffpageOverrides)/
 );
+const marketplaceReadRetrySource = source.match(
+  /var postMarketplaceReadWithRetry = function \(label, url, postParam, timeoutSeconds\) \{[\s\S]*?\n\};/
+);
 
 assert.ok(functionSource, "countPageTabs helper should exist");
 assert.ok(physicalNotNullBackfillSource, "NOT NULL physical-column backfill helper should exist");
 assert.ok(mysqlOffpageHelpersSource, "MySQL row-size fallback helpers should exist");
+assert.ok(marketplaceReadRetrySource, "marketplace read retry helper should exist");
 
 const context = {};
 vm.runInNewContext(`${functionSource[0]}\nresult = countPageTabs;`, context);
@@ -78,6 +82,7 @@ test("managed API-engine conflict decisions preserve only newer trusted platform
   const fixture = { String };
   vm.runInNewContext(`
     ${extractNamedFunction(source, "compareApiEngineVersion")}
+    ${extractNamedFunction(source, "normalizeApiEngineBaseHashes")}
     ${extractNamedFunction(source, "decideManagedApiEngineUpdate")}
     result = decideManagedApiEngineUpdate;
   `, fixture);
@@ -89,6 +94,76 @@ test("managed API-engine conflict decisions preserve only newer trusted platform
   assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 3], [1, 7, 4]), "Conflict");
   assert.equal(decide("Platform", "base", "base", "incoming", [1, 7, 3], [1, 7, 4]), "Apply");
   assert.equal(decide("Platform", "base", "incoming", "incoming", null, null), "Apply");
+  const legacyOfficialHash = "3f877b2f71deb2c553ed6d3515839e307a1e82ecbf45d7bbc865ca1380cc4df0";
+  assert.equal(
+    decide("Platform", "", legacyOfficialHash, "incoming", [1, 1, 4], [1, 2, 8], [legacyOfficialHash]),
+    "ApplyCompatibleBase",
+  );
+  assert.equal(
+    decide("Platform", "", "tenant-edit", "incoming", [1, 1, 4], [1, 2, 8], [legacyOfficialHash]),
+    "Conflict",
+  );
+});
+
+test("managed API-engine policies preserve compatible official baseline hashes", () => {
+  assert.match(source, /CompatibleBaseHashes:\s*normalizeApiEngineBaseHashes/);
+  assert.match(source, /ApplyCompatibleBase/);
+  assert.match(source, /OFFICIAL_HISTORY_BASELINE_RECOVERY_V1/);
+  assert.match(source, /installedVersionLookup\.Data\.AppVersionInstall/);
+  assert.match(source, /get-microi-store-versions\?OsClient=/);
+  assert.match(source, /StoreVersionId: versionIds\[historicalVersionIndex\]/);
+  assert.match(source, /String\(historicalModel\.ApplicationType \|\| ''\)\.toLowerCase\(\) != 'platform'/);
+  assert.match(source, /String\(historicalModel\.Status \|\| ''\)\.toLowerCase\(\) != 'published'/);
+  assert.match(source, /Number\(historicalModel\.IsApprove \|\| 0\) !== 1/);
+  assert.match(source, /ApplyHistoricalOfficialBase/);
+  assert.match(publishSource, /previousPolicy\.CompatibleBaseHashes/);
+  assert.match(publishSource, /entry\.CompatibleBaseHashes = filteredCompatibleHashes/);
+});
+
+test("managed API-engine comparison ignores only generated leading headers", () => {
+  const fixture = {};
+  vm.runInNewContext(`
+    ${extractNamedFunction(source, "normalizeApiEngineExecutableSource")}
+    result = normalizeApiEngineExecutableSource;
+  `, fixture);
+
+  const normalize = fixture.result;
+  const local = "\uFEFF/* legacy generated header */\r\n\r\nvar value = 1;\r\nreturn value;\r\n";
+  const incoming = "/* current generated header\n * Ownership: Platform / Managed\n */\nvar value = 1;\nreturn value;\n\n";
+  const tenantEdit = "/* current generated header */\nvar value = 2;\nreturn value;\n";
+
+  assert.equal(normalize(local), normalize(incoming));
+  assert.notEqual(normalize(local), normalize(tenantEdit));
+  assert.match(source, /API_ENGINE_EXECUTABLE_EQUIVALENCE_V1/);
+  assert.match(source, /ApplyEquivalentExecutableSource/);
+});
+
+test("marketplace package reads retry empty transient responses without accepting failures", () => {
+  const responses = ["", '{"Code":1,"Data":{"Id":"store-1"}}'];
+  const calls = { post: 0, sleep: 0 };
+  const fixture = {
+    storeRequestHeaders: { did: "test" },
+    V8: {
+      Http: {
+        Post() {
+          calls.post += 1;
+          return responses.shift();
+        },
+      },
+      Action: {
+        Sleep() { calls.sleep += 1; },
+      },
+    },
+    System: { Threading: { Thread: { Sleep() {} } } },
+  };
+  vm.runInNewContext(`${marketplaceReadRetrySource[0]}\nresult = postMarketplaceReadWithRetry;`, fixture);
+
+  const result = fixture.result("读取测试包", "https://api.itdos.com/test", { Id: "store-1" }, 120);
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.Id, "store-1");
+  assert.equal(calls.post, 2);
+  assert.equal(calls.sleep, 1);
+  assert.match(source, /MARKETPLACE_SOURCE_READ_RETRY_V1/);
 });
 
 function runAdminMenuPermissionFixture(options = {}) {
