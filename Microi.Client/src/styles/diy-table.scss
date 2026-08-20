@@ -983,6 +983,11 @@
 }
 .global-col-header-menu > :not(.global-col-menu-head) { margin-inline: 8px; }
 .global-col-header-menu > .el-divider { width: calc(100% - 16px); }
+.global-col-header-menu > .global-col-menu-filter {
+    box-sizing: border-box;
+    width: calc(100% - 16px);
+    min-width: 0;
+}
 .global-col-menu-head {
     position: sticky;
     top: 0;
@@ -1184,7 +1189,15 @@
     .col-filter-actions {
         display: flex;
         justify-content: flex-end;
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
         gap: 8px;
+        > .el-button {
+            flex: 0 1 88px;
+            min-width: 0;
+            margin-left: 0 !important;
+        }
     }
 }
 .col-page-filter {
