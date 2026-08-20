@@ -535,7 +535,7 @@ export default {
     parentTableChildAuth: { type: Object, default: null },
     batchEntryMode: { type: String, default: '' }
   },
-  emits: ['floating-add-state', 'filter-open-state', 'data-count'],
+  emits: ['floating-add-state', 'filter-open-state', 'data-count', 'title-change'],
   data() {
     return {
       table: null,
@@ -1320,6 +1320,7 @@ export default {
           : null
         const platformCardConfig = menuConfig
           ? {
+              title: menuConfig.title,
               definition: menuConfig.definition,
               titleField: menuConfig.titleField,
               statusField: menuConfig.statusField,
@@ -1327,6 +1328,9 @@ export default {
               tagFields: menuConfig.tagFields,
               bottomFields: menuConfig.bottomFields,
               hasConfiguredCardFields: menuConfig.hasConfiguredCardFields,
+              hasConfiguredMobileFields: menuConfig.hasConfiguredMobileFields,
+              hasConfiguredTagFields: menuConfig.hasConfiguredTagFields,
+              hasConfiguredBottomFields: menuConfig.hasConfiguredBottomFields,
               cardFields: menuConfig.cardFields,
               lines: menuConfig.lines
             }
@@ -1340,6 +1344,7 @@ export default {
           menuId: this.menuId,
           moduleEngineKey: menu?.ModuleEngineKey || ''
         }
+        this.emitTitleChange()
         this.applyMenuSearchFields(menu?.SearchFieldIds)
         if (this.waitingForParentSave) {
           this.rows = []
@@ -1364,8 +1369,9 @@ export default {
     applyCardPresentationConfig(menuConfig) {
       if (!menuConfig || String(menuConfig.table || '').toLowerCase() !== String(this.table?.Name || '').toLowerCase()) return
       const presentationFields = [
-        'menu', 'definition', 'titleField', 'statusField', 'statusOptions', 'tagFields',
-        'bottomFields', 'hasConfiguredCardFields', 'cardFields', 'lines',
+        'menu', 'definition', 'titleField', 'title', 'statusField', 'statusOptions', 'tagFields',
+        'bottomFields', 'hasConfiguredCardFields', 'hasConfiguredMobileFields',
+        'hasConfiguredTagFields', 'hasConfiguredBottomFields', 'cardFields', 'lines',
         'selectFields', 'summaryField', 'imageField', 'periodField'
       ]
       const next = { ...this.config }
@@ -1375,6 +1381,11 @@ export default {
       // 与普通业务列表保持一致：后台菜单字段完整接管卡片后不再使用租户摘要占位。
       next.summaryField = ''
       this.config = next
+      this.emitTitleChange()
+    },
+    emitTitleChange() {
+      const title = String(this.config?.title || this.menu?.Name || this.sectionTitle || '').trim()
+      if (title) this.$emit('title-change', title)
     },
     async loadPresentationConfig(refresh = false) {
       const requestId = ++this.presentationRequestId
@@ -1383,7 +1394,7 @@ export default {
         if (this.menuId) {
           // 客户详情可能在后台配置更新前已打开，展示配置必须主动刷新；
           // 数据查询仍并行执行，因此刷新元数据不会让列表停留在骨架屏。
-          const menuConfig = await loadModuleDefinition(this.menuId, true)
+          const menuConfig = await loadModuleDefinition(this.menuId, true, { includeHidden: true })
           if (requestId !== this.presentationRequestId) return
           this.applyCardPresentationConfig(menuConfig)
           manifestRefresh = true
@@ -1447,15 +1458,22 @@ export default {
         if (!dynamic) return
         this.viewManifest = manifest
         const merged = { ...this.config }
-        ;['tagFields', 'lines', 'statusOptions'].forEach((name) => {
-          if (merged.hasConfiguredCardFields && ['tagFields', 'lines'].includes(name)) return
-          if (dynamic[name]?.length) merged[name] = dynamic[name]
-        })
+        if (!merged.hasConfiguredMobileFields && dynamic.lines?.length) merged.lines = dynamic.lines
+        if (!merged.hasConfiguredMobileFields && dynamic.bottomFields?.length) merged.bottomFields = dynamic.bottomFields
+        if (dynamic.tagsFromViewSchema) merged.tagFields = dynamic.tagFields || []
         ;['titleField', 'statusField', 'summaryField', 'periodField'].forEach((name) => {
-          // Card-Mobile 的显式标题是最终展示事实源；旧式字段只保留正文/标签兼容规则。
+          if (name === 'titleField' && merged.hasConfiguredMobileFields) return
           if (merged.hasConfiguredCardFields && name === 'summaryField') return
           if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') merged[name] = dynamic[name]
         })
+        if (dynamic.statusFromViewSchema) {
+          merged.statusField = dynamic.statusField || ''
+          merged.statusOptions = dynamic.statusOptions || []
+        }
+        merged.selectFields = [...new Set([
+          ...(merged.selectFields || []),
+          ...(dynamic.requiredFields || [])
+        ].filter(Boolean))]
         if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema
         this.config = merged
       } catch (error) {}
@@ -1468,6 +1486,17 @@ export default {
         ...this.config,
         filterFields: mergeFilterFields(this.config.filterFields || [], configured)
       }
+    },
+    relatedSelectFields() {
+      // TableChild 授权查询仍由 _TableChildAuth 限定父记录范围；这里只补齐当前子菜单
+      // 卡片实际引用的字段，避免服务端按 SelectFields 裁剪掉 MobileListFields 中的列。
+      return [...new Set([
+        ...(this.config.selectFields || []),
+        this.childFkField,
+        'Id',
+        'CreateTime',
+        'UpdateTime'
+      ].filter(Boolean))]
     },
     async loadData(reset = false, refresh = false, notifyCount = false) {
       if (!this.relationValue || !this.config.table || (this.loading && !reset) || (!reset && this.finished)) return
@@ -1502,6 +1531,7 @@ export default {
             _OrderBy: this.config.defaultOrderBy || 'CreateTime',
             _OrderByType: this.config.defaultOrderType || 'DESC',
             _Where: extraWhere,
+            _SelectFields: this.relatedSelectFields(),
             _TableChildAuth: this.tableChildAuth
           })
           if (!response || Number(response.Code) !== 1) {
@@ -1810,7 +1840,10 @@ export default {
         const defaultAddressCode = String(this.parentForm?.AddressBH || '')
         if (defaultAddressCode && String(row.AddressBH || '') === defaultAddressCode) return '默认地址'
       }
-      return this.configuredFieldValue(row, this.config.statusField)
+      const value = this.config.statusField
+        ? this.configuredFieldValue(row, this.config.statusField)
+        : ''
+      return value === '-' ? '' : value
     },
     getStatusClass(row) {
       const text = String(this.getStatus(row))
@@ -1879,7 +1912,9 @@ export default {
           .filter((value) => value && value !== '-')
         if (values.length) return values.join(' · ')
       } catch (error) {}
-      return this.formatCreateTime(row.CreateTime || row.UpdateTime)
+      return this.config.hasConfiguredMobileFields
+        ? ''
+        : this.formatCreateTime(row.CreateTime || row.UpdateTime)
     },
     formatCreateTime(value) { return formatDateTime(value) },
     taskCardRow(row) {

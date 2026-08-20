@@ -64,19 +64,26 @@
 			<view v-if="showTypeDropdown" class="dropdown-mask" @tap="showTypeDropdown = false"></view>
 			<view v-if="showTypeDropdown" class="type-dropdown">
 			  <view v-if="roleLoading" class="type-status">角色加载中...</view>
-			  <view
-				v-else
-				v-for="type in personTypes"
-				:key="type.id"
-				class="type-option"
-				@tap="toggleTypeSelection(type.id,type.label)"
+			  <scroll-view
+				v-else-if="personTypes.length"
+				class="role-options-scroll"
+				scroll-y
+				:show-scrollbar="true"
+				:style="roleOptionsStyle"
 			  >
-				<view class="checkbox" :class="{ checked: isTypeSelected(type.id) }">
-				  <text v-if="isTypeSelected(type.id)">✔</text>
+				<view
+				  v-for="type in personTypes"
+				  :key="type.id"
+				  class="type-option"
+				  @tap="toggleTypeSelection(type.id,type.label)"
+				>
+				  <view class="checkbox" :class="{ checked: isTypeSelected(type.id) }">
+					<text v-if="isTypeSelected(type.id)">✔</text>
+				  </view>
+				  <text class="type-text">{{ type.label }}</text>
 				</view>
-				<text class="type-text">{{ type.label }}</text>
-			  </view>
-			  <view v-if="!roleLoading && personTypes.length === 0" class="type-status">暂无可选角色</view>
+			  </scroll-view>
+			  <view v-else class="type-status">暂无可选角色</view>
 			</view>
 		  </view>
 	
@@ -216,7 +223,7 @@
 	import { readCache, writeCache } from '@/platform/cache.js'
 	import { getAiAssistantEnabled } from '@/utils/sysconfig.js'
 	import {
-		SYS_USER_ROLE_FIELD_ID,
+		CONTACT_ROLE_API,
 		buildContactRequest,
 		extractRoleOptions,
 		normalizeContact
@@ -254,7 +261,7 @@
 				_onReceiveLastContacts: null,
 				_onReceiveMessage: null,
 				_onReceiveUnreadCount: null  ,
-				  // 通讯录角色来自 Sys_User.RoleIds 的实时数据源
+				  // 角色选项来自 Sys_Role 接口，人员关系以 Sys_User.RoleIds 为准
 				  personTypes: [],
 				  selectedTypes: [],//id数组
 				  selectedTypesLabelArry:[],//label数组
@@ -279,7 +286,11 @@
 					(m.ContactUserName || '').toLowerCase().includes(kw) ||
 					(m.LastMessage || '').toLowerCase().includes(kw)
 				)
-			} 
+			},
+			roleOptionsStyle() {
+				const visibleRows = Math.min(Math.max(this.personTypes.length, 1), 6)
+				return { height: `${visibleRows * 72}rpx` }
+			}
 		},
 
 		onLoad() {
@@ -564,15 +575,12 @@
 				}
 			},
 
-			// 从 Sys_User.RoleIds 字段数据源加载当前租户的真实角色。
+			// 通过受登录保护的接口引擎加载当前商家的全部角色。
 			async loadRoles() {
 				if (this.roleLoading || !getToken()) return
 				this.roleLoading = true
 				try {
-					const res = await post('/api/FormEngine/GetFieldsData', {
-						FieldIds: [SYS_USER_ROLE_FIELD_ID],
-						FieldNames: ['RoleIds']
-					}, true)
+					const res = await post(CONTACT_ROLE_API, {}, true)
 					if (!res || Number(res.Code) !== 1) {
 						throw new Error((res && res.Msg) || '人员角色加载失败')
 					}
@@ -589,11 +597,13 @@
 			async loadContacts(isLoadMore = false) {
 				const requestSeq = ++this.contactRequestSeq
 				const requestPageIndex = this.contactPageIndex
+				const roleIds = [...this.selectedTypes]
 				const roleNames = [...this.selectedTypesLabelArry]
 				const request = buildContactRequest({
 					pageIndex: requestPageIndex,
 					pageSize: this.contactPageSize,
 					keyword: this.searchKeyword,
+					roleIds,
 					roleNames
 				})
 				if (isLoadMore) {
@@ -979,7 +989,13 @@
 	  border-radius: 12rpx;
 	  box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.08);
 	  padding: 12rpx;
+	  overflow: hidden;
+	  box-sizing: border-box;
 	  z-index: 50;
+	}
+	.role-options-scroll {
+	  width: 100%;
+	  max-height: 432rpx;
 	}
 
 	/* 下拉遮罩，位于页面之上但低于下拉内容 */
@@ -995,6 +1011,8 @@
 	.type-option {
 	  display: flex;
 	  align-items: center;
+	  min-height: 72rpx;
+	  box-sizing: border-box;
 	  padding: 10rpx 8rpx;
 	  border-radius: 8rpx;
 	}

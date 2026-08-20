@@ -1,8 +1,7 @@
 <template>
   <mci-page-shell class="map-page" :style="mciTokenStyle" :title="pageTitle" :subtitle="pageSubtitle" @back="goBack">
     <template #right><view class="refresh-action" hover-class="refresh-action--pressed" @tap="reload"><text>↻</text></view></template>
-    <view v-if="mode === 'task' || hasListCustomerFilters" class="task-map-summary"><text>{{ positionedTaskCount }} 个{{ entityLabel }}有坐标</text><text>{{ markers.length }} 个位置 · 共 {{ rows.length }} 个{{ entityLabel }}</text></view>
-    <view v-else-if="!taskId" class="range-band"><text>范围</text><slider class="range-slider" :value="radius" min="1" max="50" step="1" active-color="#087DA8" background-color="#dce7eb" block-size="18" @change="changeRadius" /><text>{{ radius }} km</text></view>
+    <view v-if="mode === 'task' || !taskId" class="range-band"><text>范围</text><slider class="range-slider" :value="radius" min="1" :max="rangeMax" step="1" active-color="#087DA8" background-color="#dce7eb" block-size="18" @change="changeRadius" /><text>{{ radius }} km</text></view>
     <view v-else class="status-legend"><view><text class="status-dot unfinished"></text><text>未完成设备</text></view><view><text class="status-dot complete"></text><text>已完成设备</text></view></view>
     <view class="map-wrap">
       <view v-if="loading" class="map-loading"><mci-skeleton type="detail" :rows="4" /><text>正在获取位置与数据</text></view>
@@ -73,7 +72,7 @@
 <script>
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
-import { callApiEngine, loadModuleRows, openForm } from '@/platform/business-runtime.js'
+import { callApiEngine, findMenu, loadModuleRows, openForm } from '@/platform/business-runtime.js'
 import { getBusinessModule } from '@/platform/business.js'
 import { loadAllTaskDevices, loadTasks } from '@/utils/xjy-task.js'
 
@@ -91,6 +90,29 @@ const CUSTOMER_MAP_SELECT_FIELDS = [
   'Id', 'KehuMC', 'FuzeR', 'FuzeRDH', 'LianxiDH',
   'Chengshi', 'XiangxiDZ', 'KehuDT_Lat', 'KehuDT_Lng'
 ]
+
+function buildMapRangeBounds(latitude, longitude, radiusKm) {
+  const latitudeDelta = radiusKm / 111.32
+  const longitudeDelta = radiusKm / (111.32 * Math.max(Math.cos(latitude * Math.PI / 180), 0.01))
+  return {
+    minLatitude: (latitude - latitudeDelta).toFixed(7),
+    maxLatitude: (latitude + latitudeDelta).toFixed(7),
+    minLongitude: (longitude - longitudeDelta).toFixed(7),
+    maxLongitude: (longitude + longitudeDelta).toFixed(7)
+  }
+}
+
+function mapDistanceKm(sourceLatitude, sourceLongitude, targetLatitude, targetLongitude) {
+  const toRadians = (value) => value * Math.PI / 180
+  const latitudeDelta = toRadians(targetLatitude - sourceLatitude)
+  const longitudeDelta = toRadians(targetLongitude - sourceLongitude)
+  const sourceRadians = toRadians(sourceLatitude)
+  const targetRadians = toRadians(targetLatitude)
+  const value = Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(sourceRadians) * Math.cos(targetRadians) * Math.sin(longitudeDelta / 2) ** 2
+  const clamped = Math.min(1, Math.max(0, value))
+  return 6371 * 2 * Math.atan2(Math.sqrt(clamped), Math.sqrt(1 - clamped))
+}
 
 function parseTaskFilters(value) {
   if (!value) return {}
@@ -119,11 +141,12 @@ export default {
   computed: {
     meta() { return MODE_META[this.mode] || MODE_META.device },
     hasListCustomerFilters() { return this.mode === 'customer' && this.customerFilters.fromList === true },
+    rangeMax() { return (this.mode === 'task' || this.hasListCustomerFilters) ? 300 : 50 },
     pageTitle() { return this.meta.title },
     entityLabel() { return this.meta.entity },
     positionedTaskCount() { return this.markerGroups.reduce((total, group) => total + group.rows.length, 0) },
     pageSubtitle() { return this.mode === 'task' ? `${this.positionedTaskCount}/${this.rows.length} 个任务有坐标 · ${this.markers.length} 个位置` : (this.taskId ? `${this.positionedTaskCount}/${this.rows.length} 台设备有位置 · ${this.markers.length} 个位置` : (this.hasListCustomerFilters ? `${this.positionedTaskCount}/${this.rows.length} 个客户有坐标 · ${this.markers.length} 个位置` : (this.markers.length ? `附近 ${this.markers.length} 个${this.entityLabel}` : `按现场位置查找${this.entityLabel}`))) },
-    emptyText() { return this.mode === 'task' ? '当前可查看的售后任务暂无有效坐标' : (this.taskId ? '本任务设备暂无有效定位' : (this.hasListCustomerFilters ? '当前筛选到的客户暂无有效坐标' : `当前范围内暂无${this.entityLabel}`)) },
+    emptyText() { return this.mode === 'task' ? '当前范围内暂无可查看的售后任务' : (this.taskId ? '本任务设备暂无有效定位' : (this.hasListCustomerFilters ? '当前筛选到的客户暂无有效坐标' : `当前范围内暂无${this.entityLabel}`)) },
     selectedTitle() { return this.mode === 'device' ? (this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 台任务设备` : (this.selected.ShebeiMC || this.selected.ShangpinMC || this.selected.KehuMC || '客户设备')) : (this.mode === 'task' ? (this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 个售后任务` : (this.selected.customer || this.selected.KehuMC || '售后任务')) : (this.mode === 'customer' && this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 个客户` : (this.selected.KehuMC || '客户'))) },
     selectedSubtitle() { return this.mode === 'device' ? (this.selectedGroup.length > 1 ? '位于同一安装坐标，请选择设备' : (this.selected.ShebeiBH || this.selected.ShebeiXH || '')) : (this.mode === 'task' ? (this.selectedGroup.length > 1 ? '位于同一服务坐标，请选择任务' : ([this.selected.no, this.selected.type].filter(Boolean).join(' · '))) : (this.mode === 'customer' ? (this.selectedGroup.length > 1 ? '位于同一客户坐标，请选择客户' : (this.selected.XiangxiDZ || this.selected.LianxiR || '')) : ([this.selected.Chengshi, this.selected.XiangxiDZ].filter(Boolean).join(' ') || this.selected.LianxiR || ''))) },
     selectedGroupHeight() { return `${Math.min(this.selectedGroup.length, 3) * 82}rpx` },
@@ -205,6 +228,41 @@ export default {
       this.contacts = []
       if (this.markers.length) { this.latitude = this.markers[0].latitude; this.longitude = this.markers[0].longitude }
     },
+    async authorizedCustomerModule(selectFields = CUSTOMER_MAP_SELECT_FIELDS, preferredMenuId = '') {
+      const customerModule = getBusinessModule('customers')
+      const table = customerModule.table || 'Diy_Kehu'
+      const menu = await findMenu(customerModule.menuAliases || [], table, false, preferredMenuId)
+      const menuId = String(menu && menu.Id || '').trim()
+      if (!menuId || (preferredMenuId && menuId !== String(preferredMenuId))) {
+        throw new Error('当前账号无权查看客户坐标')
+      }
+      return {
+        ...customerModule,
+        ModuleEngineKey: 'Diy_Kehu',
+        menuId,
+        requireAuthorizedMenu: true,
+        selectFields
+      }
+    },
+    async loadAuthorizedCustomerRows(config, options = {}) {
+      const rows = []
+      const pageSize = Number(options.pageSize || 500)
+      let pageIndex = 1
+      let count = 0
+      do {
+        const result = await loadModuleRows(config, {
+          ...options,
+          pageIndex,
+          pageSize,
+          refresh: options.refresh === true && pageIndex === 1
+        })
+        if (!result.rows.length) break
+        rows.push(...result.rows)
+        count = result.count
+        pageIndex += 1
+      } while (rows.length < count)
+      return rows
+    },
     async withCustomerCoordinateDefaults(rows) {
       const devices = Array.isArray(rows) ? rows : []
       const missingCustomerIds = [...new Set(devices
@@ -218,14 +276,15 @@ export default {
       if (!missingCustomerIds.length) return devices
 
       const customers = []
+      const config = await this.authorizedCustomerModule(['Id', 'KehuDT_Lat', 'KehuDT_Lng'])
       for (let index = 0; index < missingCustomerIds.length; index += 200) {
-        const result = await V8.FormEngine.GetTableData('Diy_Kehu', {
-          _Where: [{ Name: 'Id', Type: 'In', Value: missingCustomerIds.slice(index, index + 200) }],
-          _SelectFields: ['Id', 'KehuDT_Lat', 'KehuDT_Lng'],
-          _PageIndex: 1,
-          _PageSize: 200
+        const result = await loadModuleRows(config, {
+          extraWhere: [{ Name: 'Id', Type: 'In', Value: missingCustomerIds.slice(index, index + 200) }],
+          pageIndex: 1,
+          pageSize: 200,
+          refresh: index === 0
         })
-        if (result && Number(result.Code) === 1) customers.push(...(result.Data || []))
+        customers.push(...result.rows)
       }
       const customerById = new Map(customers.map((item) => [String(item.Id), item]))
       return devices.map((device) => {
@@ -280,56 +339,124 @@ export default {
     async loadTaskMap() {
       this.loading = true
       try {
-        const tasks = []
+        const position = await new Promise((resolve, reject) => {
+          uni.getLocation({ type: 'gcj02', isHighAccuracy: true, success: resolve, fail: reject })
+        })
+        this.latitude = Number(position.latitude)
+        this.longitude = Number(position.longitude)
+        const radius = Number(this.radius)
+        const bounds = buildMapRangeBounds(this.latitude, this.longitude, radius)
+        const rangeWhere = [
+          { Name: 'KehuDT_Lat', Type: '>=', Value: bounds.minLatitude },
+          { Name: 'KehuDT_Lat', Type: '<=', Value: bounds.maxLatitude },
+          { Name: 'KehuDT_Lng', Type: '>=', Value: bounds.minLongitude },
+          { Name: 'KehuDT_Lng', Type: '<=', Value: bounds.maxLongitude }
+        ]
+        const baseExtraWhere = Array.isArray(this.taskFilters.extraWhere) ? this.taskFilters.extraWhere : []
+        const tasksById = new Map()
         const pageSize = 300
-        let pageIndex = 1
-        let count = 0
-        do {
-          const result = await loadTasks({
-            period: 'all', mineOnly: false, ...this.taskFilters,
-            pageIndex, pageSize, customerId: this.customerId || '', refresh: pageIndex === 1
-          })
-          tasks.push(...result.rows)
-          count = result.count
-          if (!result.rows.length) break
-          pageIndex += 1
-        } while (tasks.length < count)
-
-        const customerIds = [...new Set(tasks.map((item) => item.KehuID).filter(Boolean).map(String))]
-        const customers = []
-        for (let index = 0; index < customerIds.length; index += 200) {
-          const result = await V8.FormEngine.GetTableData('Diy_Kehu', {
-            _Where: [{ Name: 'Id', Type: 'In', Value: customerIds.slice(index, index + 200) }],
-            _SelectFields: ['Id', 'KehuMC', 'Chengshi', 'XiangxiDZ', 'KehuDT_Lat', 'KehuDT_Lng'],
-            _PageIndex: 1,
-            _PageSize: 200
-          })
-          if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '客户坐标加载失败')
-          customers.push(...(result.Data || []))
+        let refreshTaskMenu = true
+        const loadScopedTasks = async (extraWhere) => {
+          const tasks = []
+          let pageIndex = 1
+          let count = 0
+          do {
+            const result = await loadTasks({
+              period: 'all', mineOnly: false, ...this.taskFilters,
+              pageIndex, pageSize, customerId: this.customerId || '',
+              includeCoordinates: true, extraWhere,
+              refresh: refreshTaskMenu && pageIndex === 1
+            })
+            refreshTaskMenu = false
+            tasks.push(...result.rows)
+            count = result.count
+            if (!result.rows.length) break
+            pageIndex += 1
+          } while (tasks.length < count)
+          tasks.forEach((task) => tasksById.set(String(task.Id || task.id), task))
         }
-        const customerById = new Map(customers.map((item) => [String(item.Id), item]))
-        this.applyRows(tasks.map((task) => {
-          const customer = customerById.get(String(task.KehuID)) || {}
+
+        // Newer tasks already carry coordinates; keep this query limited by the selected range.
+        await loadScopedTasks([...baseExtraWhere, ...rangeWhere])
+
+        // Historical tasks may have no task coordinate. Read nearby customers through the
+        // customer module so its SqlWhere/data scope is applied, then query linked tasks
+        // again through the task module so task permissions remain authoritative.
+        const customerConfig = await this.authorizedCustomerModule()
+        const customerExtraWhere = [...rangeWhere]
+        if (this.customerId) customerExtraWhere.push({ Name: 'Id', Type: '=', Value: this.customerId })
+        const customers = (await this.loadAuthorizedCustomerRows(customerConfig, {
+          extraWhere: customerExtraWhere,
+          pageSize: 500,
+          refresh: true
+        })).filter((customer) => {
+          const latitude = Number(customer.KehuDT_Lat)
+          const longitude = Number(customer.KehuDT_Lng)
+          return Number.isFinite(latitude) && latitude !== 0 &&
+            Number.isFinite(longitude) && longitude !== 0 &&
+            mapDistanceKm(this.latitude, this.longitude, latitude, longitude) <= radius
+        })
+        const customerById = new Map(customers.map((customer) => [String(customer.Id), customer]))
+        const customerIds = [...customerById.keys()]
+        for (let index = 0; index < customerIds.length; index += 200) {
+          await loadScopedTasks([
+            ...baseExtraWhere,
+            { Name: 'KehuID', Type: 'In', Value: customerIds.slice(index, index + 200) }
+          ])
+        }
+
+        const tasks = [...tasksById.values()].map((task) => {
+          const taskLatitude = Number(task.KehuDT_Lat)
+          const taskLongitude = Number(task.KehuDT_Lng)
+          const taskHasCoordinate = Number.isFinite(taskLatitude) && taskLatitude !== 0 &&
+            Number.isFinite(taskLongitude) && taskLongitude !== 0
+          if (taskHasCoordinate) return task
+          const customer = customerById.get(String(task.KehuID || ''))
+          if (!customer) return task
           return {
             ...task,
-            KehuMC: task.customer || customer.KehuMC,
-            KehuDT_Lat: task.KehuDT_Lat || customer.KehuDT_Lat,
-            KehuDT_Lng: task.KehuDT_Lng || customer.KehuDT_Lng,
-            address: task.address || [customer.Chengshi, customer.XiangxiDZ].filter(Boolean).join(' ')
+            customer: task.customer || customer.KehuMC || '',
+            address: task.address || customer.XiangxiDZ || '',
+            KehuDT_Lat: customer.KehuDT_Lat,
+            KehuDT_Lng: customer.KehuDT_Lng,
+            CoordinateSource: 'customer-default'
           }
+        })
+
+        this.applyRows(tasks.filter((task) => {
+          const latitude = Number(task.KehuDT_Lat)
+          const longitude = Number(task.KehuDT_Lng)
+          return Number.isFinite(latitude) && latitude !== 0 &&
+            Number.isFinite(longitude) && longitude !== 0 &&
+            mapDistanceKm(this.latitude, this.longitude, latitude, longitude) <= radius
         }))
-      } catch (error) { uni.showToast({ title: error.message || '任务地图加载失败', icon: 'none' }) }
+      } catch (error) {
+        const message = String(error && (error.errMsg || error.message) || '')
+        const locationDenied = /getLocation:fail auth deny|location permission|定位权限/i.test(message)
+        uni.showToast({ title: locationDenied ? '请授权定位后重试' : (message || '任务地图加载失败'), icon: 'none' })
+      }
       finally { this.loading = false }
     },
     async loadFilteredCustomers() {
       this.loading = true
       try {
+        const position = await new Promise((resolve, reject) => {
+          uni.getLocation({ type: 'gcj02', isHighAccuracy: true, success: resolve, fail: reject })
+        })
+        this.latitude = Number(position.latitude)
+        this.longitude = Number(position.longitude)
         const filters = this.customerFilters || {}
-        const config = {
-          ...getBusinessModule('customers'),
-          menuId: filters.menuId || '',
-          selectFields: CUSTOMER_MAP_SELECT_FIELDS
-        }
+        const menuId = String(filters.menuId || '').trim()
+        if (!menuId) throw new Error('当前账号无权查看客户地图')
+        const radius = Number(this.radius)
+        const bounds = buildMapRangeBounds(this.latitude, this.longitude, radius)
+        const rangeWhere = [
+          { Name: 'KehuDT_Lat', Type: '>=', Value: bounds.minLatitude },
+          { Name: 'KehuDT_Lat', Type: '<=', Value: bounds.maxLatitude },
+          { Name: 'KehuDT_Lng', Type: '>=', Value: bounds.minLongitude },
+          { Name: 'KehuDT_Lng', Type: '<=', Value: bounds.maxLongitude }
+        ]
+        const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS, menuId)
         const pageSize = 500
         const customers = []
         let pageIndex = 1
@@ -344,7 +471,10 @@ export default {
             status: filters.status || '',
             orderBy: filters.orderBy || '',
             orderType: filters.orderType || '',
-            extraWhere: Array.isArray(filters.extraWhere) ? filters.extraWhere : [],
+            extraWhere: [
+              ...(Array.isArray(filters.extraWhere) ? filters.extraWhere : []),
+              ...rangeWhere
+            ],
             refresh: true
           })
           if (!result.rows.length) break
@@ -352,8 +482,18 @@ export default {
           count = result.count
           pageIndex += 1
         } while (customers.length < count)
-        this.applyRows(customers)
-      } catch (error) { uni.showToast({ title: error.message || '客户地图加载失败', icon: 'none' }) }
+        this.applyRows(customers.filter((customer) => {
+          const latitude = Number(customer.KehuDT_Lat)
+          const longitude = Number(customer.KehuDT_Lng)
+          return Number.isFinite(latitude) && latitude !== 0 &&
+            Number.isFinite(longitude) && longitude !== 0 &&
+            mapDistanceKm(this.latitude, this.longitude, latitude, longitude) <= radius
+        }))
+      } catch (error) {
+        const message = String(error && (error.errMsg || error.message) || '')
+        const locationDenied = /getLocation:fail auth deny|location permission|定位权限/i.test(message)
+        uni.showToast({ title: locationDenied ? '请授权定位后重试' : (message || '客户地图加载失败'), icon: 'none' })
+      }
       finally { this.loading = false }
     },
     reload() {
@@ -382,7 +522,12 @@ export default {
         complete: () => { this.loading = false }
       })
     },
-    changeRadius(event) { this.radius = Number(event.detail.value || 15); if (!this.customerId) this.loadNearby() },
+    changeRadius(event) {
+      this.radius = Number(event.detail.value || 15)
+      if (this.mode === 'task') { this.loadTaskMap(); return }
+      if (this.hasListCustomerFilters) { this.loadFilteredCustomers(); return }
+      if (!this.customerId) this.loadNearby()
+    },
     async selectMarker(event) {
       const index = Number(event.detail.markerId)
       if (this.mode === 'task' || (this.mode === 'device' && this.taskId) || this.hasListCustomerFilters) {
