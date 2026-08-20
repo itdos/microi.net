@@ -32,6 +32,7 @@
 import { DiyCommon } from "@/utils/diy.common";
 import { useDiyStore } from "@/pinia";
 import { buildMicroAppEntryUrl, shouldUseMicroAppResolveFallback } from "@/utils/microAppEntryUrl.js";
+import { isFormMaskBlurEnabled } from "@/utils/form-mask-blur.js";
 import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
 import MicroAppRuntimeError from "./runtime-error.vue";
 import { applyMicroAppToken } from "./token-sync";
@@ -75,6 +76,7 @@ export default {
             themeObserver: null,
             runtimeThemeMode: document.documentElement.classList.contains("dark") ? "dark" : "light",
             runtimeThemeColor: "",
+            runtimeThemeTokens: {},
             instanceId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         };
     },
@@ -98,6 +100,7 @@ export default {
                 moduleEngineKey: suppliedPermission.moduleEngineKey || suppliedPermission.ModuleEngineKey || this.DataAppend?.ModuleEngineKey || "",
                 diyTableId: suppliedPermission.diyTableId || suppliedPermission.DiyTableId || this.DataAppend?.DiyTableId || ""
             };
+            const formMaskBlur = isFormMaskBlurEnabled(this.diyStore.SysConfig);
             return {
                 apiBase: DiyCommon.GetApiBase(),
                 osClient: DiyCommon.GetOsClient(),
@@ -110,14 +113,19 @@ export default {
                 version: this.appVersion,
                 themeColor: this.runtimeThemeColor || this.diyStore.themeColor || this.diyStore.SysConfig?.ThemeColor || "#409eff",
                 themeMode: this.runtimeThemeMode,
+                themePalette: this.runtimeThemeTokens.palette || "custom",
+                themeOnPrimary: this.runtimeThemeTokens.onPrimary || "#ffffff",
+                themePrimaryText: this.runtimeThemeTokens.primaryText || this.runtimeThemeColor || "#409eff",
+                themeColorStrong: this.runtimeThemeTokens.primaryStrong || this.runtimeThemeColor || "#337ecc",
+                themeTokens: { ...this.runtimeThemeTokens },
                 systemStyle: this.diyStore.SystemStyle || "Classic",
                 systemTitle: this.diyStore.SysConfig?.SysTitle || this.diyStore.SysConfig?.SysShortTitle || DiyCommon.GetOsClient(),
                 systemShortTitle: this.diyStore.SysConfig?.SysShortTitle || "",
                 fileServer: this.diyStore.SysConfig?.FileServer || "",
                 isOfficialPlatform: this.diyStore.SysConfig?.IsOfficialPlatform === true
                     || Number(this.diyStore.SysConfig?.IsOfficialPlatform || 0) === 1,
-                disableFormMaskBlur: this.diyStore.SysConfig?.DisableFormMaskBlur === true
-                    || Number(this.diyStore.SysConfig?.DisableFormMaskBlur || 0) === 1,
+                formMaskBlur,
+                disableFormMaskBlur: !formMaskBlur,
                 currentUser: {
                     Id: this.diyStore.GetCurrentUser?.Id || "",
                     Name: this.diyStore.GetCurrentUser?.Name || this.diyStore.GetCurrentUser?.Account || "",
@@ -308,26 +316,49 @@ export default {
             if (app && typeof app.setData === "function") app.setData({ ...this.microAppData, type: "host:resize" });
         },
         resolveRuntimeThemeColor() {
+            const styles = getComputedStyle(document.documentElement);
             return String(
                 this.diyStore.themeColor
                 || this.diyStore.SysConfig?.ThemeColor
-                || getComputedStyle(document.documentElement).getPropertyValue("--el-color-primary")
+                || styles.getPropertyValue("--mci-brand-primary")
+                || styles.getPropertyValue("--el-color-primary")
                 || "#409eff"
             ).trim();
         },
         syncRuntimeTheme(push = true) {
-            const nextMode = document.documentElement.classList.contains("dark") ? "dark" : "light";
+            const root = document.documentElement;
+            const styles = getComputedStyle(root);
+            const nextMode = root.classList.contains("dark") ? "dark" : "light";
             const nextColor = this.resolveRuntimeThemeColor();
-            const changed = nextMode !== this.runtimeThemeMode || nextColor !== this.runtimeThemeColor;
+            const nextTokens = {
+                palette: root.getAttribute("data-mci-palette") || "custom",
+                onPrimary: styles.getPropertyValue("--mci-text-on-primary").trim() || "#ffffff",
+                primaryText: styles.getPropertyValue("--mci-color-primary-on-surface").trim()
+                    || styles.getPropertyValue("--mci-color-primary-readable").trim()
+                    || styles.getPropertyValue("--el-color-primary").trim()
+                    || nextColor,
+                primaryStrong: styles.getPropertyValue("--mci-color-primary-strong").trim()
+                    || styles.getPropertyValue("--el-color-primary-dark-2").trim()
+                    || nextColor,
+                surface: styles.getPropertyValue("--mci-bg-card").trim() || styles.getPropertyValue("--el-bg-color").trim() || "#ffffff",
+                surfaceSoft: styles.getPropertyValue("--mci-bg-soft").trim() || styles.getPropertyValue("--el-fill-color-light").trim() || "#f1f5f9",
+                textPrimary: styles.getPropertyValue("--mci-text-primary").trim() || styles.getPropertyValue("--el-text-color-primary").trim() || "#0f172a",
+                textSecondary: styles.getPropertyValue("--mci-text-secondary").trim() || styles.getPropertyValue("--el-text-color-regular").trim() || "#334155",
+                border: styles.getPropertyValue("--mci-border-color").trim() || styles.getPropertyValue("--el-border-color").trim() || "#e2e8f0"
+            };
+            const changed = nextMode !== this.runtimeThemeMode
+                || nextColor !== this.runtimeThemeColor
+                || JSON.stringify(nextTokens) !== JSON.stringify(this.runtimeThemeTokens);
             this.runtimeThemeMode = nextMode;
             this.runtimeThemeColor = nextColor;
+            this.runtimeThemeTokens = nextTokens;
             if (push && changed) this.$nextTick(() => this.pushRuntimeContext("host:theme"));
         },
         startThemeContract() {
             this.syncRuntimeTheme(false);
             if (typeof MutationObserver === "undefined") return;
             this.themeObserver = new MutationObserver(() => this.syncRuntimeTheme(true));
-            this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] });
+            this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme", "data-mci-palette"] });
         },
         stopThemeContract() {
             this.themeObserver?.disconnect?.();

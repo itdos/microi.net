@@ -15,6 +15,7 @@
 #endregion
 using System;
 using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -59,6 +60,7 @@ namespace Microi.net
     //internal
     public class DiyWebSocket : Hub<IClient>, IConnectionHub, ISuppertToClientInvoke
     {
+        private const string IdentityItemKey = "Microi.DiyWebSocket.Identity";
         private readonly IMicroiAI _microiAI;
         private readonly IHubContext<DiyWebSocket, IClient> _backgroundHubContext;
         
@@ -90,6 +92,107 @@ namespace Microi.net
             return !IsBlank(value);
         }
 
+        private async Task<WebSocketIdentity> ResolveIdentityAsync()
+        {
+            if (Context?.Items != null
+                && Context.Items.TryGetValue(IdentityItemKey, out var cached)
+                && cached is WebSocketIdentity cachedIdentity)
+            {
+                return cachedIdentity;
+            }
+
+            var httpContext = Context?.GetHttpContext();
+            var token = ReadAccessToken(httpContext);
+            if (token.DosIsNullOrWhiteSpace()) return null;
+            var requestedOsClient = httpContext?.Request.Query["OsClient"].ToString()?.Trim();
+            var currentToken = await DiyToken.GetCurrentToken(token, requestedOsClient)
+                .ConfigureAwait(false);
+            var currentUser = currentToken?.CurrentUser;
+            var userId = currentUser?["Id"].Val<string>()?.Trim();
+            if (currentUser == null
+                || currentToken.OsClient.DosIsNullOrWhiteSpace()
+                || userId.DosIsNullOrWhiteSpace())
+            {
+                return null;
+            }
+
+            JwtSecurityToken jwtToken;
+            try
+            {
+                jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            }
+            catch
+            {
+                return null;
+            }
+            if (jwtToken.ValidTo != DateTime.MinValue && jwtToken.ValidTo < DateTime.UtcNow)
+                return null;
+            var activeTokenEntry = DiyToken.GetActiveCachedTokenEntry(currentToken, token);
+            if (activeTokenEntry == null) return null;
+            var clientType = jwtToken.Claims
+                .FirstOrDefault(claim => claim.Type == "ClientType")?.Value;
+            var clientModel = OsClient.GetClient(currentToken.OsClient);
+            var activeTokenUpdateTime = activeTokenEntry.UpdateTime == default
+                ? currentToken.UpdateTime
+                : activeTokenEntry.UpdateTime;
+            if (activeTokenUpdateTime != default
+                && DateTime.Now - activeTokenUpdateTime
+                > DiyToken.ResolveClientTokenLifetime(clientModel, clientType))
+            {
+                return null;
+            }
+
+            var name = currentUser["Name"].Val<string>();
+            var account = currentUser["Account"].Val<string>();
+            var identity = new WebSocketIdentity
+            {
+                OsClient = currentToken.OsClient,
+                UserId = userId,
+                UserName = string.IsNullOrWhiteSpace(name) ? account : name,
+                UserAvatar = currentUser["Avatar"].Val<string>(),
+                CurrentUser = currentUser,
+                Token = token
+            };
+            Context.Items[IdentityItemKey] = identity;
+            return identity;
+        }
+
+        private async Task<WebSocketIdentity> RequireIdentityAsync()
+        {
+            var identity = await ResolveIdentityAsync().ConfigureAwait(false);
+            if (identity == null)
+            {
+                throw new HubException("登录身份已失效，请重新登录。");
+            }
+            return identity;
+        }
+
+        private static string ReadAccessToken(HttpContext httpContext)
+        {
+            var token = httpContext?.Request.Query["access_token"].ToString();
+            if (token.DosIsNullOrWhiteSpace())
+            {
+                token = httpContext?.Request.Headers["Authorization"].FirstOrDefault();
+            }
+            if (token.DosIsNullOrWhiteSpace()) return string.Empty;
+            token = token.Trim();
+            if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                token = token.Substring("Bearer ".Length).Trim();
+            }
+            return token.Length <= 8192 ? token : string.Empty;
+        }
+
+        private sealed class WebSocketIdentity
+        {
+            public string OsClient { get; set; }
+            public string UserId { get; set; }
+            public string UserName { get; set; }
+            public string UserAvatar { get; set; }
+            public JObject CurrentUser { get; set; }
+            public string Token { get; set; }
+        }
+
         public DiyWebSocket(
             IMicroiAI microiAI,
             IHubContext<DiyWebSocket, IClient> backgroundHubContext = null)
@@ -108,57 +211,26 @@ namespace Microi.net
         public override async Task OnConnectedAsync()
         {
             string connid = base.Context.ConnectionId;
-            var currentToken = await DiyToken.GetCurrentToken();
-            var sysUser = currentToken?.CurrentUser;
-            var osClient = currentToken?.OsClient;
-            var userId = sysUser?["Id"].Val<string>();
-            var diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
-            var name = sysUser?["Name"]?.Val<string>();
-            var account = sysUser?["Account"]?.Val<string>();
-            var userName = string.IsNullOrWhiteSpace(name) ? account : name;
-            var userAvatar = sysUser?["Avatar"].Val<string>();
-            
-            // SignalR 特殊处理：如果 GetCurrentToken 返回空用户，尝试从 Context.User 获取
-            if(currentToken?.CurrentUser == null && Context.User?.Identity?.IsAuthenticated == true)
+            var identity = await ResolveIdentityAsync().ConfigureAwait(false);
+            if (identity == null)
             {
-                userId = Context.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
-                osClient = Context.User.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
-                
-                if (!string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(osClient))
-                {
-                    // 尝试重新从缓存获取完整用户信息
-                    diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
-                    currentToken = await diyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
-                    
-                    if (currentToken != null && currentToken.CurrentUser != null)
-                    {
-                        currentToken.OsClient = osClient;
-                    }
-                    else
-                    {
-                        WriteWebSocketLog(osClient, "TokenCacheMiss", "WebSocket 未找到登录缓存", "Claims 有效但缓存中没有完整用户信息。", 2, userId);
-                    }
-                }
-            }
-            
-            if(currentToken?.CurrentUser == null)
-            {
-                WriteWebSocketLog(osClient, "UnauthorizedConnectionRejected", "WebSocket 未授权连接已拒绝", $"IsAuthenticated={Context.User?.Identity?.IsAuthenticated}; ClaimsCount={Context.User?.Claims?.Count() ?? 0}", 3, userId);
-                // 只 return 会让 SignalR 把未初始化的匿名连接保留到超时；明确中止，
-                // 既不恢复旧版按 UserId/OsClient 直接信任的安全漏洞，也避免空连接占用资源。
+                var requestedOsClient = Context.GetHttpContext()?.Request.Query["OsClient"].ToString();
+                WriteWebSocketLog(
+                    requestedOsClient,
+                    "UnauthorizedConnectionRejected",
+                    "WebSocket 未授权连接已拒绝",
+                    "access_token 无法解析为当前租户的有效登录身份。",
+                    3);
                 Context.Abort();
                 return;
-                // throw new HubException("身份验证失败：未提供有效的访问令牌。请在连接时传入 token（查询参数: ?access_token=xxx 或请求头: Authorization: Bearer xxx）");
             }
-            sysUser = currentToken.CurrentUser;
-            osClient = currentToken.OsClient;
-            userId = sysUser?["Id"].Val<string>();
-            diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
-            name = sysUser?["Name"]?.Val<string>();
-            account = sysUser?["Account"]?.Val<string>();
-            userName = string.IsNullOrWhiteSpace(name) ? account : name;
-            userAvatar = sysUser?["Avatar"].Val<string>();
 
+            var sysUser = identity.CurrentUser;
+            var osClient = identity.OsClient;
+            var userId = identity.UserId;
+            var userName = identity.UserName;
+            var userAvatar = identity.UserAvatar;
+            var diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
             HttpContext httpContext = base.Context.GetHttpContext();
             httpContext.Request.Query.TryGetValue("groupName", out var groupName);
             // httpContext.Request.Query.TryGetValue("UserId", out var userId);
@@ -168,8 +240,7 @@ namespace Microi.net
             // httpContext.Request.Query.TryGetValue("IP", out var ip);
             // httpContext.Request.Query.TryGetValue("OsClient", out var OsClient);
             httpContext.Request.Query.TryGetValue("DeviceClientId", out var deviceClientId);
-            httpContext.Request.Query.TryGetValue("access_token", out var accessToken);
-            var requestToken = accessToken.ToString().DosIsNullOrWhiteSpace(currentToken.Token);
+            var requestToken = identity.Token;
 
             if (!string.IsNullOrEmpty(userId))
             {
@@ -238,7 +309,7 @@ namespace Microi.net
                     requestToken).ConfigureAwait(false);
                 try
                 {
-                    await SendLastContacts(new MessageChatContactListParam
+                    await SendLastContactsCore(new MessageChatContactListParam
                     {
                         UserId = userId,
                         UserName = userName,
@@ -253,6 +324,7 @@ namespace Microi.net
                 {
                 }
             }
+            await base.OnConnectedAsync().ConfigureAwait(false);
         }
 
         /// <summary>
@@ -267,16 +339,9 @@ namespace Microi.net
             string userId = null;
             try
             {
-                var currentToken = await DiyToken.GetCurrentToken();
-                osClient = currentToken?.OsClient;
-                userId = currentToken?.CurrentUser?["Id"].Val<string>();
-                
-                // 如果通过 token 获取不到用户信息，尝试从 Claims 获取
-                if (string.IsNullOrEmpty(userId) && Context.User?.Identity?.IsAuthenticated == true)
-                {
-                    userId = Context.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
-                    osClient = Context.User.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
-                }
+                var identity = await ResolveIdentityAsync().ConfigureAwait(false);
+                osClient = identity?.OsClient;
+                userId = identity?.UserId;
                 
                 if (!string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(osClient))
                 {
@@ -333,34 +398,9 @@ namespace Microi.net
         /// </summary>
         public async Task SendBackgroundTaskList()
         {
-            try
-            {
-                var currentToken = await DiyToken.GetCurrentToken();
-                var osClient = currentToken?.OsClient;
-                var userKey = currentToken?.CurrentUser?["Id"].Val<string>();
-                if (IsBlank(userKey))
-                {
-                    userKey = currentToken?.CurrentUser?["Account"].Val<string>();
-                }
-
-                if ((IsBlank(osClient) || IsBlank(userKey))
-                    && Context.User?.Identity?.IsAuthenticated == true)
-                {
-                    osClient = Context.User.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
-                    userKey = Context.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
-                }
-
-                if (IsBlank(osClient) || IsBlank(userKey))
-                {
-                    return;
-                }
-
-                await BackgroundTaskService.SendTaskListToUserAsync(osClient, userKey).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                WriteWebSocketLog(OsClientDefault.OsClient, "BackgroundTaskPushFailed", "WebSocket 推送后台任务列表失败", ex.ToString(), 2);
-            }
+            var identity = await RequireIdentityAsync().ConfigureAwait(false);
+            await BackgroundTaskService.SendTaskListToUserAsync(identity.OsClient, identity.UserId)
+                .ConfigureAwait(false);
         }
 
         /// <summary>
@@ -425,6 +465,38 @@ namespace Microi.net
         /// <returns></returns>
         public async Task SendToUser(MessageBodyParam msg)
         {
+            WebSocketIdentity callerIdentity = null;
+            if (Context?.GetHttpContext() != null)
+            {
+                callerIdentity = await RequireIdentityAsync().ConfigureAwait(false);
+                msg ??= new MessageBodyParam();
+                msg.OsClient = callerIdentity.OsClient;
+                msg.FromUserId = callerIdentity.UserId;
+                msg.FromUserName = callerIdentity.UserName;
+                msg.FromUserAvatar = callerIdentity.UserAvatar;
+                if (IsBlank(msg.ToUserId) || IsBlank(msg.Content))
+                    throw new HubException("接收用户和消息内容不能为空。");
+
+                if (string.Equals(msg.ToUserId, "AI", StringComparison.OrdinalIgnoreCase))
+                {
+                    msg.ToUserId = "AI";
+                    msg.ToUserName = "AI助手";
+                    msg.ToUserAvatar = "";
+                    if (_microiAI == null || _backgroundHubContext == null)
+                        throw new HubException("AI聊天服务暂不可用，请稍后重试。");
+                }
+                else
+                {
+                    var targetUserResult = await MicroiEngine.FormEngine.GetFormDataAsync(
+                        "sys_user",
+                        new { Id = msg.ToUserId, OsClient = callerIdentity.OsClient });
+                    if (targetUserResult == null || targetUserResult.Code != 1 || targetUserResult.Data == null)
+                        throw new HubException("接收用户不存在或已停用。");
+                    msg.ToUserName = targetUserResult.Data.Name;
+                    msg.ToUserAvatar = targetUserResult.Data.Avatar;
+                }
+            }
+
             msg.CreateTime = DateTime.Now;
             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
 
@@ -498,7 +570,7 @@ namespace Microi.net
 
                 await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 //更新发送者最近联系人列表
-                await SendLastContacts(new MessageChatContactListParam
+                await SendLastContactsCore(new MessageChatContactListParam
                 {
                     UserId = msg.FromUserId,
                     UserName = msg.FromUserName,
@@ -514,7 +586,7 @@ namespace Microi.net
                     _iHubContext = msg._iHubContext
                 });
                 //更新接收者最近联系人列表
-                await SendLastContacts(new MessageChatContactListParam
+                await SendLastContactsCore(new MessageChatContactListParam
                 {
                     UserId = msg.ToUserId,
                     UserName = msg.ToUserName,
@@ -529,7 +601,7 @@ namespace Microi.net
                     _IsUpdateTime = true,//2021-05-08修改为true，why before is false？
                     _iHubContext = msg._iHubContext
                 });
-                await SendUnreadCountToUser(new MessageBodyParam
+                await SendUnreadCountToUserCore(new MessageBodyParam
                 {
                     ToUserId = msg.ToUserId,
                     OsClient = msg.OsClient,
@@ -539,11 +611,11 @@ namespace Microi.net
                 // 如果接收者是AI用户，自动触发AI回复
                 if (msg.ToUserId == "AI")
                 {
-                    var trustedAiToken = await DiyToken.GetCurrentToken();
-                    var trustedAiUser = trustedAiToken?.CurrentUser;
-                    var trustedAiOsClient = trustedAiToken?.OsClient?.Trim();
-                    var trustedAiUserId =
-                        trustedAiUser?["Id"].Val<string>()?.Trim();
+                    var trustedAiIdentity = callerIdentity
+                        ?? await ResolveIdentityAsync().ConfigureAwait(false);
+                    var trustedAiUser = trustedAiIdentity?.CurrentUser;
+                    var trustedAiOsClient = trustedAiIdentity?.OsClient?.Trim();
+                    var trustedAiUserId = trustedAiIdentity?.UserId?.Trim();
                     if (trustedAiUser == null
                         || string.IsNullOrWhiteSpace(trustedAiOsClient)
                         || string.IsNullOrWhiteSpace(trustedAiUserId)
@@ -563,7 +635,7 @@ namespace Microi.net
                     if (_microiAI == null || _backgroundHubContext == null)
                     {
                         WriteWebSocketLog(msg.OsClient, "AiServiceUnavailable", "AI 自动回复服务不可用", "IMicroiAI 或 HubContext 未注入，已拒绝后台调用。", 3, msg.FromUserId);
-                        return;
+                        throw new HubException("AI聊天服务暂不可用，请稍后重试。");
                     }
 
                     // 不把瞬态 Hub 实例传入后台状态机。AI 服务、可信身份和
@@ -580,8 +652,14 @@ namespace Microi.net
                     // Console.WriteLine($"[WebSocket] 普通消息: {msg.FromUserName} -> {msg.ToUserName}");
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                WriteWebSocketLog(msg?.OsClient, "ChatMessageFailed", "聊天消息处理失败", ex.ToString(), 2, msg?.FromUserId);
+                if (Context?.GetHttpContext() != null)
+                {
+                    if (ex is HubException) throw;
+                    throw new HubException("消息处理失败，请稍后重试。");
+                }
             }
         }
 
@@ -683,6 +761,48 @@ namespace Microi.net
             catch (Exception ex)
             {
                 WriteWebSocketLog(trustedOsClient, "AiBackgroundReplyFailed", "AI 后台自动回复失败", ex.ToString(), 2, originalMsg?.FromUserId);
+                try
+                {
+                    var clientInfoTo = await GetOnlineUserInfo(
+                        trustedOsClient,
+                        originalMsg?.FromUserId);
+                    if (clientInfoTo?.ConnectionIds?.Any() == true)
+                    {
+                        await hubContext.Clients
+                            .Clients(clientInfoTo.ConnectionIds)
+                            .ReceiveAIError(
+                                "AI助手暂时无法回复，请检查当前租户的AI模型配置后重试。",
+                                "AI",
+                                originalMsg.FromUserId);
+                    }
+                }
+                catch (Exception notifyEx)
+                {
+                    WriteWebSocketLog(trustedOsClient, "AiErrorPushFailed", "AI 失败状态推送异常", notifyEx.ToString(), 2, originalMsg?.FromUserId);
+                }
+            }
+            finally
+            {
+                try
+                {
+                    var clientInfoTo = await GetOnlineUserInfo(
+                        trustedOsClient,
+                        originalMsg?.FromUserId);
+                    if (clientInfoTo?.ConnectionIds?.Any() == true)
+                    {
+                        await hubContext.Clients
+                            .Clients(clientInfoTo.ConnectionIds)
+                            .ReceiveAIChunk(
+                                "",
+                                "AI",
+                                originalMsg.FromUserId,
+                                true);
+                    }
+                }
+                catch (Exception completeEx)
+                {
+                    WriteWebSocketLog(trustedOsClient, "AiCompletePushFailed", "AI 完成状态推送异常", completeEx.ToString(), 2, originalMsg?.FromUserId);
+                }
             }
         }
 
@@ -793,15 +913,35 @@ namespace Microi.net
                         trustedOsClient,
                         streamCallback);
 
-                // 发送完成信号
-                if (clientInfoTo != null)
+                if (aiResult == null || !aiResult.Success)
                 {
-                    await hubContext.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveAIChunk(
-                        "", 
-                        aiUser.Id, 
-                        originalMsg.FromUserId, 
-                        true  // 已完成
-                    );
+                    throw new InvalidOperationException(
+                        string.IsNullOrWhiteSpace(aiResult?.Content)
+                            ? "AI服务未返回有效结果。"
+                            : aiResult.Content);
+                }
+
+                // 非流式模型可能只在最终结果返回 Content。此时补推一次，
+                // 避免服务成功但聊天窗口仍然没有任何可见回复。
+                if (fullResponse.Length == 0
+                    && !string.IsNullOrWhiteSpace(aiResult.Content)
+                    && clientInfoTo?.ConnectionIds?.Any() == true)
+                {
+                    await hubContext.Clients
+                        .Clients(clientInfoTo.ConnectionIds)
+                        .ReceiveAIChunk(
+                            aiResult.Content,
+                            aiUser.Id,
+                            originalMsg.FromUserId,
+                            false);
+                    fullResponse.Append(aiResult.Content);
+                }
+
+                if (fullResponse.Length == 0
+                    && string.IsNullOrWhiteSpace(aiResult.Content)
+                    && aiResult.QueryResult == null)
+                {
+                    throw new InvalidOperationException("AI服务返回了空响应。");
                 }
 
                 // 如果是NL2SQL查询且有详细数据，额外发送一条包含QueryResult的消息
@@ -858,7 +998,9 @@ namespace Microi.net
                         ToUserId = originalMsg.FromUserId,
                         ToUserName = originalMsg.FromUserName,
                         ToUserAvatar = originalMsg.FromUserAvatar,
-                        Content = aiResult.Content,
+                        Content = string.IsNullOrWhiteSpace(aiResult.Content)
+                            ? fullResponse.ToString()
+                            : aiResult.Content,
                         CreateTime = DateTime.Now,
                         Type = "text",
                         IsRead = false
@@ -874,6 +1016,7 @@ namespace Microi.net
             catch (Exception ex)
             {
                 WriteWebSocketLog(trustedOsClient, "AiReplyFailed", "AI 自动回复异常", ex.ToString(), 2, originalMsg.FromUserId);
+                throw;
             }
         }
         /// <summary>
@@ -882,6 +1025,17 @@ namespace Microi.net
         /// <param name="msg"></param>
         /// <returns></returns>
         public async Task SendChatRecordToUser(MessageBody msg)
+        {
+            var identity = await RequireIdentityAsync().ConfigureAwait(false);
+            msg ??= new MessageBody();
+            msg.FromUserId = identity.UserId;
+            msg.FromUserName = identity.UserName;
+            msg.FromUserAvatar = identity.UserAvatar;
+            msg.OsClient = identity.OsClient;
+            await SendChatRecordToUserCore(msg).ConfigureAwait(false);
+        }
+
+        private async Task SendChatRecordToUserCore(MessageBody msg)
         {
             if (IsBlank(msg.FromUserId) || IsBlank(msg.ToUserId) || IsBlank(msg.OsClient))
             {
@@ -950,14 +1104,14 @@ namespace Microi.net
                 }).ToList();
                 await base.Clients.Clients(clientInfoFrom2.ConnectionIds).ReceiveSendChatRecordToUser(result2Dto);
                 await TMongodbHelper<MessageBody>.UpdateManayAsync(hostChat, new Dictionary<string, object> { { "IsRead", true } }, Builders<MessageBody>.Filter.And(Builders<MessageBody>.Filter.Eq("FromUserId", msg.ToUserId) & Builders<MessageBody>.Filter.Eq("ToUserId", msg.FromUserId)));
-                await SendLastContacts(new MessageChatContactListParam
+                await SendLastContactsCore(new MessageChatContactListParam
                 {
                     OsClient = msg.OsClient,
                     UserId = msg.FromUserId,
                     ContactUserId = msg.ToUserId,
                     _IsUpdateTime = false
                 });
-                await SendUnreadCountToUser(new MessageBodyParam
+                await SendUnreadCountToUserCore(new MessageBodyParam
                 {
                     ToUserId = msg.FromUserId,
                     OsClient = msg.OsClient
@@ -965,17 +1119,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-
-
-                await SendToUser(new MessageBodyParam
-                {
-                    Content = ex.Message,
-                    FromUserId = "446c7239-e0d0-412d-b84c-a9c2f82af44c",
-                    ToUserId = msg.FromUserId,
-                    OsClient = msg.OsClient,
-                    Type = "系统消息",
-                    CreateTime = DateTime.Now
-                });
+                WriteWebSocketLog(msg.OsClient, "ChatHistoryFailed", "读取聊天记录失败", ex.ToString(), 2, msg.FromUserId);
+                throw new HubException("读取聊天记录失败，请稍后重试。");
             }
         }
         /// <summary>
@@ -984,6 +1129,16 @@ namespace Microi.net
         /// <param name="msg"></param>
         /// <returns></returns>
         public async Task SendUnreadCountToUser(MessageBodyParam msg)
+        {
+            var identity = await RequireIdentityAsync().ConfigureAwait(false);
+            msg ??= new MessageBodyParam();
+            msg.FromUserId = identity.UserId;
+            msg.ToUserId = identity.UserId;
+            msg.OsClient = identity.OsClient;
+            await SendUnreadCountToUserCore(msg).ConfigureAwait(false);
+        }
+
+        private async Task SendUnreadCountToUserCore(MessageBodyParam msg)
         {
             if (IsBlank(msg.ToUserId) || IsBlank(msg.OsClient))
             {
@@ -1045,18 +1200,8 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-
-
-                await SendToUser(new MessageBodyParam
-                {
-                    Content = ex.Message,
-                    FromUserId = "446c7239-e0d0-412d-b84c-a9c2f82af44c",
-                    ToUserId = msg.FromUserId,
-                    OsClient = msg.OsClient,
-                    Type = "系统消息",
-                    CreateTime = DateTime.Now,
-                    _iHubContext = msg._iHubContext
-                });
+                WriteWebSocketLog(msg.OsClient, "UnreadCountFailed", "读取聊天未读数失败", ex.ToString(), 2, msg.ToUserId);
+                throw new HubException("读取聊天未读数失败，请稍后重试。");
             }
         }
         /// <summary>
@@ -1066,6 +1211,12 @@ namespace Microi.net
         /// <returns></returns>
         public async Task SendConnectToUser(MessageBody msg)
         {
+            var identity = await RequireIdentityAsync().ConfigureAwait(false);
+            msg ??= new MessageBody();
+            msg.FromUserId = identity.UserId;
+            msg.FromUserName = identity.UserName;
+            msg.FromUserAvatar = identity.UserAvatar;
+            msg.OsClient = identity.OsClient;
             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
             ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
             if (IsBlank(msg.FromUserId) || IsBlank(msg.ToUserId) || IsBlank(msg.OsClient))
@@ -1091,7 +1242,7 @@ namespace Microi.net
             }
             else
             {
-                await SendLastContacts(new MessageChatContactListParam
+                await SendLastContactsCore(new MessageChatContactListParam
                 {
                     UserId = msg.FromUserId,
                     UserName = msg.FromUserName,
@@ -1111,6 +1262,21 @@ namespace Microi.net
         /// <param name="msg"></param>
         /// <returns></returns>
         public async Task SendLastContacts(MessageChatContactListParam msg)
+        {
+            var identity = await RequireIdentityAsync().ConfigureAwait(false);
+            msg ??= new MessageChatContactListParam();
+            msg.UserId = identity.UserId;
+            msg.UserName = identity.UserName;
+            msg.UserAvatar = identity.UserAvatar;
+            msg.OsClient = identity.OsClient;
+            msg.ContactUserId = "";
+            msg.LastMessage = "";
+            msg.LastMessageType = "";
+            msg._IsUpdateTime = false;
+            await SendLastContactsCore(msg).ConfigureAwait(false);
+        }
+
+        private async Task SendLastContactsCore(MessageChatContactListParam msg)
         {
             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
             ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
@@ -1301,6 +1467,12 @@ namespace Microi.net
         /// <returns></returns>
         public async Task SendDelLastContact(MessageChatContactList msg)
         {
+            var identity = await RequireIdentityAsync().ConfigureAwait(false);
+            msg ??= new MessageChatContactList();
+            msg.UserId = identity.UserId;
+            msg.UserName = identity.UserName;
+            msg.UserAvatar = identity.UserAvatar;
+            msg.OsClient = identity.OsClient;
             if (IsBlank(msg.UserId) || IsBlank(msg.OsClient) || IsBlank(msg.ContactUserId))
             {
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);

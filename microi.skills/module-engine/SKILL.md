@@ -39,7 +39,7 @@ description: Microi 模块引擎与 sys_menu 配置指南。用于创建或修�
   `TableChild`、28 个以上字段且含大型子表，或 7 个以上子表/富文本/代码编辑/上传/地图等
   重型控件。达到阈值仍应先用 `diy_table.Tabs` 与 CollapseGroup 整理信息架构。
 - 用户显式指定 `Dialog/Drawer/Page` 或宽度时以用户配置为准。Drawer 是贴边直角容器；
-  Dialog 使用平台统一大圆角、可拖动、居中弹层，遮罩服从 `sys_config.DisableFormMaskBlur`。
+  Dialog 使用平台统一大圆角、可拖动、居中弹层，遮罩服从正向开关 `sys_config.FormMaskBlur`，缺失或 `0/false` 默认关闭毛玻璃。
 7. 为管理员/目标角色分配菜单权限，并以真实登录用户验收。
 
 ## 绑定表菜单不能只写两个字段

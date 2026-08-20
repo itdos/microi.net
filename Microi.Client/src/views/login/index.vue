@@ -3349,7 +3349,7 @@ export default {
 }
 
 .login-methods-kicker {
-    color: color-mix(in srgb, var(--el-color-primary) 78%, var(--el-text-color-primary));
+    color: var(--mci-color-primary-on-surface, var(--el-color-primary));
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 2.4px;
@@ -3359,10 +3359,10 @@ export default {
     width: 58px;
     height: 58px;
     position: relative;
-    border: 1px solid color-mix(in srgb, var(--el-color-primary) 35%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mci-color-primary-on-surface, var(--el-color-primary)) 35%, transparent);
     border-radius: 20px;
-    background: linear-gradient(145deg, color-mix(in srgb, var(--el-color-primary) 18%, var(--el-bg-color)), color-mix(in srgb, var(--el-color-primary) 5%, var(--el-bg-color)));
-    box-shadow: 0 14px 34px color-mix(in srgb, var(--el-color-primary) 18%, transparent), inset 0 1px color-mix(in srgb, #fff 70%, transparent);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--mci-color-primary-on-surface, var(--el-color-primary)) 18%, var(--el-bg-color)), color-mix(in srgb, var(--mci-color-primary-on-surface, var(--el-color-primary)) 5%, var(--el-bg-color)));
+    box-shadow: 0 14px 34px color-mix(in srgb, var(--mci-color-primary-on-surface, var(--el-color-primary)) 18%, transparent), inset 0 1px color-mix(in srgb, #fff 70%, transparent);
     animation: mciLoginOrbitFloat 5s ease-in-out infinite;
 }
 
@@ -3373,8 +3373,8 @@ export default {
     top: 50%;
     left: 50%;
     border-radius: 50%;
-    background: var(--el-color-primary);
-    box-shadow: 0 0 13px color-mix(in srgb, var(--el-color-primary) 70%, transparent);
+    background: var(--mci-color-primary-on-surface, var(--el-color-primary));
+    box-shadow: 0 0 13px color-mix(in srgb, var(--mci-color-primary-on-surface, var(--el-color-primary)) 70%, transparent);
 }
 
 .login-methods-orbit i:nth-child(1) { transform: translate(-50%, -50%); }
@@ -3400,7 +3400,7 @@ export default {
 .login-methods-close:focus-visible {
     transform: rotate(6deg) scale(1.05);
     border-color: color-mix(in srgb, var(--el-color-primary) 46%, var(--el-border-color));
-    color: var(--el-color-primary);
+    color: var(--mci-color-primary-on-surface, var(--el-color-primary));
     outline: none;
 }
 
@@ -3592,7 +3592,7 @@ export default {
 
 .login-methods-footnote .el-icon {
     flex: 0 0 auto;
-    color: var(--el-color-primary);
+    color: var(--mci-color-primary-on-surface, var(--el-color-primary));
 }
 
 @keyframes mciLoginBubbleIn {

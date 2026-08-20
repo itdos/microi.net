@@ -16,7 +16,7 @@
                 reserve-keyword
                 :remote-method="searchTables"
                 :loading="searchLoading"
-                :disabled="!policyReady"
+                :disabled="readonly || !policyReady"
                 placeholder="输入表名或说明，添加直连授权"
                 style="width: 100%"
                 @change="addTable"
@@ -58,16 +58,16 @@
             <el-table-column label="允许操作" min-width="330">
                 <template #default="{ row }">
                     <el-checkbox-group v-model="row.Permission" @change="emitValue">
-                        <el-checkbox value="Read" :disabled="!isPermissionAllowed(row.Name, 'Read')">查</el-checkbox>
-                        <el-checkbox value="Add" :disabled="!isPermissionAllowed(row.Name, 'Add')">增</el-checkbox>
-                        <el-checkbox value="Edit" :disabled="!isPermissionAllowed(row.Name, 'Edit')">改</el-checkbox>
-                        <el-checkbox value="Del" :disabled="!isPermissionAllowed(row.Name, 'Del')">删</el-checkbox>
+                        <el-checkbox value="Read" :disabled="readonly || !isPermissionAllowed(row.Name, 'Read')">查</el-checkbox>
+                        <el-checkbox value="Add" :disabled="readonly || !isPermissionAllowed(row.Name, 'Add')">增</el-checkbox>
+                        <el-checkbox value="Edit" :disabled="readonly || !isPermissionAllowed(row.Name, 'Edit')">改</el-checkbox>
+                        <el-checkbox value="Del" :disabled="readonly || !isPermissionAllowed(row.Name, 'Del')">删</el-checkbox>
                     </el-checkbox-group>
                 </template>
             </el-table-column>
             <el-table-column label="操作" width="90" align="center">
                 <template #default="{ $index }">
-                    <el-button type="danger" link :disabled="!policyReady" @click="removeTable($index)">移除</el-button>
+                    <el-button type="danger" link :disabled="readonly || !policyReady" @click="removeTable($index)">移除</el-button>
                 </template>
             </el-table-column>
         </el-table>
@@ -86,6 +86,10 @@ export default {
         modelValue: {
             type: Array,
             default: () => []
+        },
+        readonly: {
+            type: Boolean,
+            default: false
         }
     },
     emits: ["update:modelValue"],
@@ -98,7 +102,9 @@ export default {
             loadingVersion: 0,
             policyByTableName: Object.create(null),
             policyReady: false,
-            policyLoadFailed: false
+            policyLoadFailed: false,
+            policyPromise: null,
+            rowLoadPromise: null
         };
     },
     computed: {
@@ -114,12 +120,12 @@ export default {
             immediate: true,
             deep: true,
             handler(value) {
-                this.loadRows(value || []);
+                this.rowLoadPromise = this.loadRows(value || []);
             }
         }
     },
     mounted() {
-        this.loadGrantPolicies();
+        this.policyPromise = this.loadGrantPolicies();
     },
     methods: {
         parsePermission(value) {
@@ -300,7 +306,7 @@ export default {
             this.emitValue();
         },
         emitValue() {
-            if (!this.policyReady) return;
+            if (!this.policyReady || this.readonly) return;
             this.$emit(
                 "update:modelValue",
                 this.rows.map((row) => ({
@@ -312,6 +318,16 @@ export default {
                     )
                 }))
             );
+        },
+        async flushPendingSync() {
+            if (this.policyPromise) await this.policyPromise;
+            if (this.rowLoadPromise) await this.rowLoadPromise;
+            if (!this.policyReady || this.policyLoadFailed) {
+                this.DiyCommon.Tips("表直连授权策略尚未加载完成，请刷新表单后重试。", false);
+                return false;
+            }
+            if (!this.readonly) this.emitValue();
+            return true;
         }
     }
 };

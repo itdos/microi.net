@@ -635,6 +635,13 @@ export const V8ServerApiDefinitions = {
                         insertText: "ClearUserLoginInfo",
                         snippet: 'ClearUserLoginInfo("${1:userId}", "${2:osClient}")'
                     },
+                    GetDirectTableGrantPolicies: {
+                        label: "GetDirectTableGrantPolicies",
+                        kind: "Method",
+                        documentation: "读取服务端统一维护的平台表直连授权策略。仅用于角色管理等可信后端表单事件进行最终授权校验，不承载角色保存逻辑。",
+                        insertText: "GetDirectTableGrantPolicies",
+                        snippet: "GetDirectTableGrantPolicies()"
+                    },
                     ConsumeIdentityVerificationTicket: {
                         label: "ConsumeIdentityVerificationTicket",
                         kind: "Method",

@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.1.6
+ * Version: v2.1.8
  * Function:
  * - Unified marketplace importer with resumable slices, strict SharedPublicRuntime support, and verified current/history baselines for legacy managed API engines.
  */
@@ -484,6 +484,19 @@ var postMarketplaceReadWithRetry = function (label, url, postParam, timeoutSecon
     }
     throw new Error(label + '失败（已重试' + maxAttempts + '次）：' + (lastError || '商城源无返回'));
 };
+// MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1：自定义 /apiengine/* 地址依赖网关
+// 动态路由，在部分部署拓扑中可能直接返回 404。商城跨租户调用统一走稳定的
+// ApiEngine 控制器入口，并把引擎 Key 放入 JSON 参数；私有商城凭据仍由上面的
+// storeRequestHeaders 原样传递。
+var marketplaceEngineRunUrl = storeApiBase + '/api/ApiEngine/Run?OsClient=' + encodeURIComponent(storeOsClient);
+var marketplaceEngineParam = function (apiEngineKey, postParam) {
+    var result = { ApiEngineKey: apiEngineKey };
+    postParam = postParam || {};
+    for (var key in postParam) {
+        if (Object.prototype.hasOwnProperty.call(postParam, key)) result[key] = postParam[key];
+    }
+    return result;
+};
 var authoritativeStoreModel = null;
 if (!Package && storeRow && storeRow.AppPakcet) {
     Package = storeRow.AppPakcet;
@@ -493,11 +506,11 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
     var storeId = firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id]);
     var storeModelResult = postMarketplaceReadWithRetry(
         '读取商城应用包',
-        storeApiBase + '/apiengine/get-microi-store-model?OsClient=' + encodeURIComponent(storeOsClient),
-        {
+        marketplaceEngineRunUrl,
+        marketplaceEngineParam('get-microi-store-model', {
             Id: storeId,
             StoreVersionId: firstTextParam([V8.Param.StoreVersionId, storeRow.StoreVersionId, storeRow.DataVersionId])
-        },
+        }),
         120
     );
     if (storeModelResult && storeModelResult.Code == 1 && storeModelResult.Data) {
@@ -2164,8 +2177,8 @@ try {
                         marketplaceInstallIdentity + '|' + V8.OsClient + '|' + installOperationId
                     );
                     var remoteStat = V8.Http.Post({
-                        Url: storeApiBase + '/apiengine/official_marketplace_install_stat?OsClient=' + encodeURIComponent(storeOsClient),
-                        PostParam: {
+                        Url: marketplaceEngineRunUrl,
+                        PostParam: marketplaceEngineParam('official_marketplace_install_stat', {
                             StoreId: model.StoreId,
                             AppId: model.AppId,
                             AppName: model.AppName,
@@ -2174,7 +2187,7 @@ try {
                             InstallAction: installAction,
                             OperationId: installOperationId,
                             InstallationKey: installationKey
-                        },
+                        }),
                         ParamType: 'json',
                         Timeout: 30
                     });
@@ -5773,12 +5786,12 @@ try {
             for (var historyPage = 1; historyPage <= 50; historyPage++) {
                 var versionsResult = postMarketplaceReadWithRetry(
                     '读取商城历史版本列表',
-                    storeApiBase + '/apiengine/get-microi-store-versions?OsClient=' + encodeURIComponent(storeOsClient),
-                    {
+                    marketplaceEngineRunUrl,
+                    marketplaceEngineParam('get-microi-store-versions', {
                         Id: historicalStoreId,
                         _PageIndex: historyPage,
                         _PageSize: pageSize
-                    },
+                    }),
                     120
                 );
                 var versionRows = versionsResult.Data || [];
@@ -5797,11 +5810,11 @@ try {
             for (var historicalVersionIndex = 0; historicalVersionIndex < versionIds.length; historicalVersionIndex++) {
                 var historicalModelResult = postMarketplaceReadWithRetry(
                     '读取商城历史版本快照',
-                    storeApiBase + '/apiengine/get-microi-store-model?OsClient=' + encodeURIComponent(storeOsClient),
-                    {
+                    marketplaceEngineRunUrl,
+                    marketplaceEngineParam('get-microi-store-model', {
                         Id: historicalStoreId,
                         StoreVersionId: versionIds[historicalVersionIndex]
-                    },
+                    }),
                     120
                 );
                 var historicalModel = historicalModelResult && historicalModelResult.Code == 1

@@ -58,6 +58,26 @@ export function formatMessageContent(content) {
 }
 
 /**
+ * 将 AI 流式内容拆成适合打字机逐帧追加的单元。
+ * HTML/think 标签整体入队，避免逐字符输出标签时产生短暂乱码；
+ * 普通文本按 Unicode code point 拆分，中文和 emoji 都能自然显示。
+ */
+export function splitTypewriterUnits(content) {
+    const source = String(content ?? '');
+    if (!source) return [];
+
+    const units = [];
+    source.split(/(<[^>]+>)/g).filter(Boolean).forEach(part => {
+        if (/^<[^>]+>$/.test(part)) {
+            units.push(part);
+        } else {
+            units.push(...Array.from(part));
+        }
+    });
+    return units;
+}
+
+/**
  * 格式化时间
  */
 export function formatTime(dateString) {
@@ -247,17 +267,27 @@ export function initWebSocketEvents(websocket, callbacks, options = {}) {
         scope = 'default'              // 作用域标识（pc/mobile等）
     } = options;
     
-    // 使用作用域标志防止同一作用域重复注册
+    callbacks = callbacks || {};
+
+    // 每个作用域保存实际函数引用。SignalR 的 off(event, handler)
+    // 必须拿到同一个 handler 才能真正解绑，不能只删除一个布尔标志。
     if (!window._chatEventsScopes) window._chatEventsScopes = {};
-    if (window._chatEventsScopes[scope]) {
+    if (!window._chatEventHandlers) window._chatEventHandlers = {};
+    const existing = window._chatEventHandlers[scope];
+    if (existing && existing.websocket === websocket) {
         console.warn(`${logPrefix} ⚠️ [${scope}] 聊天事件已注册，阻止重复注册`);
         return false;
+    }
+    if (existing) {
+        cleanupWebSocketEvents(existing.websocket, logPrefix, scope);
     }
     
     console.log(`${logPrefix} 开始注册 WebSocket 事件监听器`);
     
     // 接收普通消息
-    websocket.on("ReceiveSendToUser", (message) => {
+    const handlers = {};
+
+    handlers.ReceiveSendToUser = (message) => {
         // 调试计数器
         if (!window._receiveSendToUserCount) window._receiveSendToUserCount = 0;
         window._receiveSendToUserCount++;
@@ -277,58 +307,74 @@ export function initWebSocketEvents(websocket, callbacks, options = {}) {
         if (callbacks.onReceiveMessage) {
             callbacks.onReceiveMessage(message);
         }
-    });
+    };
+    websocket.on("ReceiveSendToUser", handlers.ReceiveSendToUser);
     
     // 接收AI流式数据块
-    websocket.on("ReceiveAIChunk", (chunk, fromUserId, toUserId, isComplete) => {
+    handlers.ReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
         console.log(`${logPrefix} [AI流式]`, { chunk: chunk?.substring(0, 50), fromUserId, toUserId, isComplete });
         if (callbacks.onReceiveAIChunk) {
             callbacks.onReceiveAIChunk(chunk, fromUserId, toUserId, isComplete);
         }
-    });
+    };
+    websocket.on("ReceiveAIChunk", handlers.ReceiveAIChunk);
+
+    handlers.ReceiveAIError = (message, fromUserId, toUserId) => {
+        console.warn(`${logPrefix} [AI失败]`, { message, fromUserId, toUserId });
+        if (callbacks.onReceiveAIError) {
+            callbacks.onReceiveAIError(message, fromUserId, toUserId);
+        }
+    };
+    websocket.on("ReceiveAIError", handlers.ReceiveAIError);
     
     // 接收聊天记录
-    websocket.on("ReceiveSendChatRecordToUser", (message) => {
+    handlers.ReceiveSendChatRecordToUser = (message) => {
         console.log(`${logPrefix} [接收聊天记录] 收到${message?.length || 0}条消息`);
         if (callbacks.onReceiveChatRecord) {
             callbacks.onReceiveChatRecord(message);
         }
-    });
+    };
+    websocket.on("ReceiveSendChatRecordToUser", handlers.ReceiveSendChatRecordToUser);
     
     // 接收最近联系人列表
-    websocket.on("ReceiveSendLastContacts", (message) => {
+    handlers.ReceiveSendLastContacts = (message) => {
         console.log(`${logPrefix} 获取最近联系人列表成功！`);
         if (callbacks.onReceiveLastContacts) {
             callbacks.onReceiveLastContacts(message);
         }
-    });
+    };
+    websocket.on("ReceiveSendLastContacts", handlers.ReceiveSendLastContacts);
     
     // 接收未读消息数
-    websocket.on("ReceiveSendUnreadCountToUser", (message) => {
+    handlers.ReceiveSendUnreadCountToUser = (message) => {
         console.log(`${logPrefix} 获取到未读消息条数:`, message);
         if (callbacks.onReceiveUnreadCount) {
             callbacks.onReceiveUnreadCount(message);
         }
-    });
+    };
+    websocket.on("ReceiveSendUnreadCountToUser", handlers.ReceiveSendUnreadCountToUser);
     
     // 接收连接事件
-    websocket.on("ReceiveConnection", (message) => {
+    handlers.ReceiveConnection = (message) => {
         console.log(`${logPrefix} ReceiveConnection:`, message);
         if (callbacks.onConnection) {
             callbacks.onConnection(message);
         }
-    });
+    };
+    websocket.on("ReceiveConnection", handlers.ReceiveConnection);
     
     // 接收断开连接事件
-    websocket.on("ReceiveDisConnection", (message) => {
+    handlers.ReceiveDisConnection = (message) => {
         console.log(`${logPrefix} ReceiveDisConnection:`, message);
         if (callbacks.onDisconnection) {
             callbacks.onDisconnection(message);
         }
-    });
+    };
+    websocket.on("ReceiveDisConnection", handlers.ReceiveDisConnection);
     
     // 设置作用域标志
     window._chatEventsScopes[scope] = true;
+    window._chatEventHandlers[scope] = { websocket, handlers };
     console.log(`${logPrefix} ✅ WebSocket 事件监听器注册完成（作用域: ${scope}）`);
     
     return true;
@@ -338,9 +384,18 @@ export function initWebSocketEvents(websocket, callbacks, options = {}) {
  * 清理WebSocket事件监听
  */
 export function cleanupWebSocketEvents(websocket, logPrefix = '[ChatCommon]', scope = 'default') {
-    if (!websocket) return;
+    const entry = window._chatEventHandlers && window._chatEventHandlers[scope];
+    const target = entry?.websocket || websocket;
+    if (!target) return;
     
-    console.log(`${logPrefix} 清理聊天事件标志 (作用域: ${scope})`);
+    console.log(`${logPrefix} 清理聊天事件监听 (作用域: ${scope})`);
+
+    if (entry?.handlers && typeof target.off === 'function') {
+        Object.keys(entry.handlers).forEach(eventName => {
+            target.off(eventName, entry.handlers[eventName]);
+        });
+        delete window._chatEventHandlers[scope];
+    }
     
     if (window._chatEventsScopes && window._chatEventsScopes[scope]) {
         delete window._chatEventsScopes[scope];
@@ -437,7 +492,10 @@ export function loadAiModelList(DiyCommon, callback) {
  */
 export function buildAiOtherInfo(toUserId, selectedAiModel) {
     if (toUserId === 'AI' && selectedAiModel && selectedAiModel.AiModel) {
-        return JSON.stringify({ AiModel: selectedAiModel.AiModel });
+        return JSON.stringify({
+            AiModel: selectedAiModel.AiModel,
+            AiModelId: selectedAiModel.Id || ''
+        });
     }
     return '';
 }

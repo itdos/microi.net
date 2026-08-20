@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-19T19:46:28.459Z",
+  "generatedAt": "2026-08-20T15:12:13.816Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -316,10 +316,10 @@
       ]
     },
     "microi-form-layout": {
-      "originalSha256": "f062cd46b4a1736796f727ddc5d184e2b38d94556cf39a0f2d941bf7da4596d0",
+      "originalSha256": "a279abf5400932ba725da58ec510407ea1155ac95ce330ea46a19abde98655bb",
       "originalLines": 398,
-      "prefixSha256": "e54e2fa2f5a398f6dcd63cd2ef8a245ca95d9e24c5b18643d4e59647904f78a0",
-      "prefixBytes": 2518,
+      "prefixSha256": "e1876f78d666d81d6aba19c4c6515b2312d4b78b965199f518f4105f3a595131",
+      "prefixBytes": 2508,
       "entryLines": 192,
       "chunks": [
         {
@@ -1614,7 +1614,7 @@
       "originalLines": 1632,
       "prefixSha256": "d557bbba4ba5ade3f10f5d8cc672d038f5136ce2eda7eaefbcfe2dd2eb65812a",
       "prefixBytes": 1106,
-      "entryLines": 205,
+      "entryLines": 206,
       "chunks": [
         {
           "id": "ui-design-000",
@@ -2786,7 +2786,7 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "9ca4d19e632aa28e49ee7322e10e9bac489b51ed3162b4a885a66adc36c1e1a7",
+      "originalSha256": "f84dc7ac07651b87d1e35a0f170c0059e5a42f04a27d75ea654fe4670df92151",
       "originalLines": 491,
       "prefixSha256": "529a335f022a9c01309e2aca8254abf8aa72ea9b3bd4f0e73ec737697118ae51",
       "prefixBytes": 1071,
@@ -2796,7 +2796,7 @@
           "id": "v8-security-000",
           "ordinal": 0,
           "destination": "v8-security/SKILL.md",
-          "sha256": "683f6fb48592b050fc31caec6b45e39c8109b0a67baa48c0a2e6d1385a0e4ce1",
+          "sha256": "0346bd9ca3fe98dd2b589d1777aa1e55cd24cf7dedc69ee65d4ca91461db7dee",
           "lines": 46,
           "heading": "0. 租户动态系统设置与密钥边界"
         },

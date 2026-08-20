@@ -106,6 +106,7 @@
 
 <script>
 import { defineAsyncComponent } from "vue";
+import { isFormMaskBlurDisabled } from "@/utils/form-mask-blur.js";
 import { normalizeFormSwitchValue } from "@/utils/form-switch-value.js";
 
 const Fontawesome = defineAsyncComponent(() => import("./dos.fontawesome/Fontawesome.vue"));
@@ -257,8 +258,7 @@ export default {
             return { "--el-switch-on-color": this.SwitchToneColor };
         },
         SwitchOverlayClass() {
-            var value = this.SysConfig ? this.SysConfig.DisableFormMaskBlur : false;
-            var blurDisabled = value === true || value === 1 || value === "1" || String(value || "").toLowerCase() === "true";
+            var blurDisabled = isFormMaskBlurDisabled(this.SysConfig);
             return [
                 "mci-unified-overlay",
                 "mci-field-config-overlay",

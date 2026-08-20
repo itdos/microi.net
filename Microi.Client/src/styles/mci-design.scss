@@ -14,6 +14,9 @@
 :root {
     /* 主色 — 紫蓝渐变 */
     --mci-color-primary: #6C2BD9;
+    --mci-color-primary-readable: #6C2BD9;
+    --mci-color-primary-on-surface: #6C2BD9;
+    --mci-brand-primary: #6C2BD9;
     --mci-color-primary-light: #8B5CF6;
     --mci-color-primary-dark: #5521B5;
     --mci-color-primary-glow: rgba(108, 43, 217, 0.2);
@@ -80,6 +83,9 @@
 /* 暗色层级的静态回退值；运行时由 theme-color.js 按 palette 低饱和染色。 */
 :root[data-theme="dark"] {
     --mci-color-primary: #5B8CFF;
+    --mci-color-primary-readable: #82A8FF;
+    --mci-color-primary-on-surface: #82A8FF;
+    --mci-brand-primary: #5B8CFF;
     --mci-color-primary-light: #82A8FF;
     --mci-color-primary-dark: #246BFD;
     --mci-color-primary-glow: rgba(91, 140, 255, 0.28);

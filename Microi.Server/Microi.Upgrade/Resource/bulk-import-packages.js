@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.2.1
+ * Version: v1.2.3
  * Function:
  * - 只规划并安装“未安装/可更新”应用，绝不重新安装已是最新版的应用。
  * - 计划和子检查点写入后台任务 CheckpointJson，支持多节点租约转移、进程重启和幂等重试。
@@ -330,9 +330,12 @@ if (phase == 'Discover') {
             '在应用商城的来源管理中重新登录该私有来源，然后重新发起全部安装/更新。'
         );
     }
+    // MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1：跨租户商城读取不依赖网关动态
+    // /apiengine/* 路由，统一使用稳定的 ApiEngine 控制器入口。
     var listResult = V8.Http.Post({
-        Url: sourceApiBase + '/apiengine/get-microi-store-list?OsClient=' + encodeURIComponent(sourceOsClient),
+        Url: sourceApiBase + '/api/ApiEngine/Run?OsClient=' + encodeURIComponent(sourceOsClient),
         PostParam: {
+            ApiEngineKey: 'get-microi-store',
             _PageIndex: pageIndex,
             _PageSize: pageSize,
             ApplicationType: bulkApplicationType,

@@ -88,5 +88,14 @@ namespace Microi.net
         /// <param name="isComplete">是否是最后一个数据块</param>
         /// <returns></returns>
         Task ReceiveAIChunk(string chunk, string fromUserId, string toUserId, bool isComplete);
+
+        /// <summary>
+        /// 接收AI回复失败通知，避免客户端一直停留在“思考中”。
+        /// </summary>
+        /// <param name="message">可直接展示给当前用户的安全错误信息</param>
+        /// <param name="fromUserId">AI用户ID</param>
+        /// <param name="toUserId">接收者ID</param>
+        /// <returns></returns>
+        Task ReceiveAIError(string message, string fromUserId, string toUserId);
     }
 }

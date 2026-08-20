@@ -215,15 +215,8 @@ export default {
             };
         })();
 
-        if (!isWebosEmbeddedRuntime) self.$nextTick(function () {
-            var timer = setInterval(function () {
-                try {
-                    self.$refs.refDiyChat.InitSignalROnEvent(timer);
-                } catch (error) {}
-            }, 1000);
-            // 保存定时器引用
-            self.timers.push(timer);
-        });
+        // 聊天组件通过 microi-realtime-state-changed 订阅连接状态；根组件不再
+        // 每秒访问一个并不存在的 refDiyChat，也不会用异常吞噬制造隐形轮询。
     },
     beforeUnmount() {
         var self = this;

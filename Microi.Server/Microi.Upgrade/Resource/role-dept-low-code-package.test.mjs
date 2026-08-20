@@ -56,8 +56,17 @@ test("SaaS engine delivers role and department management as low-code tree-table
   assert.ok(roleTable);
   assert.ok(departmentTable);
   assert.ok(roleLimitTable);
-  assert.match(roleTable.SubmitBeforeServerV8, /Version: v1\.0\.2/u);
-  assert.match(roleTable.SubmitAfterServerV8, /Version: v1\.0\.1/u);
+  assert.match(roleTable.SubmitBeforeServerV8, /Version: v1\.0\.5/u);
+  assert.match(roleTable.SubmitAfterServerV8, /Version: v1\.0\.3/u);
+  assert.match(roleTable.SubmitBeforeServerV8, /GetDirectTableGrantPolicies/u);
+  assert.match(roleTable.SubmitBeforeServerV8, /parentLimit = \{ Id: parentId, Permission: '\["Read"\]' \}/u);
+  assert.match(roleTable.SubmitBeforeServerV8, /isRootMenuParentId/u);
+  assert.match(roleTable.SubmitBeforeServerV8, /00000000-0000-0000-0000-000000000000/u);
+  assert.match(roleTable.SubmitAfterServerV8, /Type: 'Table'/u);
+  assert.match(roleTable.SubmitAfterServerV8, /\['Type', '=', 'Table'\]/u);
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    "V8.Method.GetDirectTableGrantPolicies",
+  ));
   assert.match(departmentTable.SubmitBeforeServerV8, /Version: v1\.0\.1/u);
   assert.match(departmentTable.SubmitAfterServerV8, /Version: v1\.0\.0/u);
   assert.equal(departmentTable.IsTree, 1);

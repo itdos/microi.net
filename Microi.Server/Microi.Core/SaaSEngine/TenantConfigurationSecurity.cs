@@ -138,6 +138,17 @@ namespace Microi.net
                 "ClientSecrets", "GlobalServerV8Code"
             };
 
+        private static readonly HashSet<string> PublicSysConfigExplicitlySafeFieldSet =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "FormMaskBlur",
+                "DisableLoginPasskey",
+                "DisableLoginAuthenticator",
+                "DisableLoginGitee",
+                "DisableLoginWeChat",
+                "DisableLoginGitHub"
+            };
+
         public static IReadOnlyCollection<string> SharedInfrastructureFields =>
             SharedInfrastructureFieldSet.ToArray();
 
@@ -251,6 +262,7 @@ namespace Microi.net
             var name = (fieldName ?? string.Empty).Trim();
             if (name.Length == 0) return true;
             if (SysConfigNeverCopyFieldSet.Contains(name)) return true;
+            if (PublicSysConfigExplicitlySafeFieldSet.Contains(name)) return false;
 
             return IsSensitiveConfigurationField(name)
                    || name.IndexOf("key", StringComparison.OrdinalIgnoreCase) >= 0
