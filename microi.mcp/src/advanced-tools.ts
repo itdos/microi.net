@@ -1141,7 +1141,7 @@ export function buildDefaultModulePresentation(
     if (hasKeyword(text, ['customer', 'member', 'user', 'owner', 'contact', '客户', '会员', '用户', '负责人', '联系人'])) return 90;
     if (isDateField(field)) return 70;
     return listFieldScore(field);
-  }).slice(0, 2);
+  }).slice(0, 1);
   const trailingFields = uniqueFields([...statusCandidates.slice(0, 1), ...numericCandidates.slice(0, 1)]);
   const requiredFields = uniqueFields([primary, ...lineCandidates, ...trailingFields].filter(Boolean) as FieldMeta[])
     .map((field) => field.name);

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -7,8 +8,47 @@ const packageModel = JSON.parse(await readFile(
   "utf8",
 ));
 
+function sourceHash(value) {
+  return createHash("sha256").update(String(value || ""), "utf8").digest("hex");
+}
+
+test("SaaS engine declares every changed legacy managed-engine baseline", () => {
+  const fixtures = {
+    admin_get_empty_database_sanitization_sql: {
+      current: "4431ff8e4de593cc2a67b2656cfb4455f90e3aa05de6e60492331139b52efa8c",
+      base: "3f877b2f71deb2c553ed6d3515839e307a1e82ecbf45d7bbc865ca1380cc4df0",
+      compatible: ["db42fca3c905fdd1ecf42586c3cfc40bb3b292a647118ca14c416743f7dbccc6"],
+    },
+    admin_build_sanitized_empty_database: {
+      current: "edfb9655511decd2d6660d61077d521a811bcab923a45e889ac54969b0ae205d",
+      base: "85b761933d95ab62267a5dbd3bdd480c47b841897214dfae2f5c2ded70260508",
+      compatible: [],
+    },
+  };
+
+  for (const [key, expected] of Object.entries(fixtures)) {
+    const engine = packageModel.SysApiEngines.find((item) => item.ApiEngineKey === key);
+    const policy = packageModel.ResourcePolicies.ApiEngines[key];
+    assert.ok(engine, `${key} engine missing`);
+    assert.equal(sourceHash(engine.ApiV8Code), expected.current);
+    assert.equal(policy.UpgradePolicy, "Managed");
+    assert.equal(policy.BaseHash, expected.base);
+    assert.deepEqual(policy.CompatibleBaseHashes || [], expected.compatible);
+  }
+});
+
 test("SaaS engine delivers role and department management as low-code tree-table resources", () => {
-  assert.equal(packageModel.PackageInfo.Version, "v7.4.8");
+  const versionParts = String(packageModel.PackageInfo.Version || "")
+    .replace(/^v/u, "")
+    .split(".")
+    .map(Number);
+  assert.ok(versionParts.length === 3 && versionParts.every(Number.isInteger));
+  assert.ok(
+    versionParts[0] > 7
+      || (versionParts[0] === 7 && versionParts[1] > 4)
+      || (versionParts[0] === 7 && versionParts[1] === 4 && versionParts[2] >= 8),
+    `SaaS engine package version ${packageModel.PackageInfo.Version} predates the low-code role/dept delivery`,
+  );
 
   const roleTable = packageModel.DiyTables.find((item) => item.Name === "sys_role");
   const departmentTable = packageModel.DiyTables.find((item) => item.Name === "sys_dept");

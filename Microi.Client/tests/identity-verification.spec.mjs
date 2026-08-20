@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { platformServiceSourcePath } from "./helpers/platform-service-source.mjs";
 import {
     IdentityVerification,
     createPasswordChangeActionHash,
@@ -273,13 +274,12 @@ test("Authenticator 免密码登录使用独立安全弹层并兼顾移动端与
 });
 
 test("登录方式弹层、宿主浮层收起和个人中心公开头像保持完整契约", async () => {
-    const microAppRoot = new URL("../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTDos.Product.Internal/AI应用/microi-platform-service/src/", import.meta.url);
     const [login, headerSearch, host, microAppMain, personalSettings, profileController] = await Promise.all([
         readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/components/HeaderSearch/index.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/views/micro-app/host.vue", import.meta.url), "utf8"),
-        readFile(new URL("main.js", microAppRoot), "utf8"),
-        readFile(new URL("PersonalSettings.vue", microAppRoot), "utf8"),
+        readFile(platformServiceSourcePath("src/main.js"), "utf8"),
+        readFile(platformServiceSourcePath("src/PersonalSettings.vue"), "utf8"),
         readFile(new URL("../../Microi.Server/Microi.net.Api/Controllers/SysUserController.cs", import.meta.url), "utf8")
     ]);
 

@@ -75,7 +75,7 @@
         <template v-else>
         <aside class="app-panel develop-chat-panel">
             <div class="app-develop-head">
-                <el-button class="back-gallery" text :icon="Back" @click="backToGallery">应用宫格</el-button>
+                <el-button class="back-gallery" text :icon="Back" @click="backToGallery">应用商城</el-button>
                 <div>
                     <strong>{{ currentApp?.Name || "应用开发" }}</strong>
                     <span>{{ appTypeLabel(currentApp?.AppType || "") }} · {{ currentApp?.AppKey || currentApp?.Id || "-" }}</span>
@@ -1325,8 +1325,7 @@ async function getPublishedPreviewUrl(app) {
 }
 
 async function backToGallery() {
-    appViewMode.value = "gallery";
-    await router.push({ path: "/mci-ai-app" });
+    await router.push({ path: "/microi-store" });
 }
 
 async function loadAppChatHistory(appId) {

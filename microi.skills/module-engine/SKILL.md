@@ -77,7 +77,9 @@ description: Microi 模块引擎与 sys_menu 配置指南。用于创建或修�
    ExportMoreBtns` 的有用数量也应设计角标，但同页统计必须批量返回，禁止 N+1。
 5. PC 至少设计一个 `Field + Lines + TrailingFields` 复合主列。已放入次要行或右侧图标/
    状态的字段必须从普通独立列去重；主字段、次要行、右侧字段及其 `RequiredFields` 都要
-   进入查询结果，宽度必须足以容纳多行和尾随标签。
+   进入查询结果，宽度必须足以容纳多行和尾随标签。一般情况下每个复合列最多两行，即
+   一个主字段加一个 `Lines` 次要字段；可以配置多个各自两行的复合列，但不要在同一列放
+   两个 `Lines` 形成三行高表格。确有特殊层级价值时才允许三行，并必须完成桌面视觉验收。
 6. 移动端卡片按真实字段规划图片/头像、标题、副标题、顶部标签、状态、右侧金额、正文、
    Meta、底部区域；同一字段不得在多个区域机械重复，空区域应隐藏而不是留下占位。
 7. `EnableViewSchema` 只控制 Detail/Edit 自定义表单。Hero、指标、列表密度、PC 复合列、
@@ -142,8 +144,9 @@ PC 列表的固定结构顺序是“模块 Hero（标题/副标题/动态指标�
 - Hero 指标可用 `Source=DataCount` 读取当前筛选总记录数、用 `Source=PageCount` 读取本页
   已加载记录数；两者复用列表结果，不调用额外接口。字段汇总继续用 `Field`，跨表或复合
   统计才用 `ApiEngineKey + ValuePath`。
-- `Layout.List.Columns[]` 用 `Field + Lines + TrailingFields` 配置双行/多行列和右侧
-  图标状态；声明支持 `Tone/Color/Icon/ShowLabel/Prefix/Suffix`，引用字段必须进入查询列。
+- `Layout.List.Columns[]` 用 `Field + Lines + TrailingFields` 配置复合列和右侧图标状态；
+  默认按 `Field + 1 个 Lines` 形成双行，多个信息组应拆成多个双行复合列，避免单列三行
+  抬高整张表。声明支持 `Tone/Color/Icon/ShowLabel/Prefix/Suffix`，引用字段必须进入查询列。
 - `Scene=Card, Device=Mobile` 用 `Layout.Card` 配置 `AvatarTextField/TitleField/TopFields/
   SubtitleFields/RightFields/Fields/MetaFields/BottomFields`。未配置时继续兼容
   `MobileListFields/CardTitleTagFields/CardBottomTagFields`。

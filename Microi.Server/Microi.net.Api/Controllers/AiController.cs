@@ -665,6 +665,23 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 对话图片生成。MiniMax-M3 负责语义路由，image-01 负责图片输出；
+        /// 供应商 Key 与 Base64 不离开后端，结果先持久化到当前租户 HDFS。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> GenerateMiniMaxImage([FromBody] MiniMaxImageGenerateParam param)
+        {
+            var token = await DiyToken.GetCurrentToken();
+            var currentUser = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
+            return Json(await _proxyService.GenerateAuthenticatedImageAsync(
+                currentUser?["Id"]?.ToString(),
+                token?.OsClient ?? string.Empty,
+                currentUser,
+                param,
+                HttpContext.RequestAborted));
+        }
+
+        /// <summary>
         /// 创建 MiniMax 视频异步任务。RequestId 必须由调用方按业务槽位稳定生成；
         /// 同一租户、用户和 RequestId 不会重复调用上游。
         /// </summary>
@@ -803,6 +820,27 @@ namespace Microi.net.Api
         //   API Key:      sk-microi-xxx
         //   Model:        MiniMax-M2.7-highspeed（或平台上其它已上线模型）
         // ============================================================
+
+        /// <summary>
+        /// POST /v1/music_generation —— Microi.AI 中转站的 MiniMax 音乐兼容入口。
+        /// 必须同时传 Bearer 平台 APIKey 与稳定 Idempotency-Key。
+        /// </summary>
+        [HttpPost("/v1/music_generation")]
+        [AllowAnonymous]
+        public async Task<ContentResult> MiniMaxRelayGenerateMusic()
+        {
+            string rawBody;
+            using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
+            {
+                rawBody = await reader.ReadToEndAsync();
+            }
+            var result = await _proxyService.ExecuteMiniMaxMusicRelayAsync(
+                Request.Headers["Authorization"].ToString(),
+                rawBody,
+                Request.Headers["Idempotency-Key"].ToString(),
+                HttpContext.RequestAborted);
+            return MiniMaxRelayContent(result);
+        }
 
         /// <summary>
         /// POST /v1/video_generation —— Microi.AI 中转站的 MiniMax 视频兼容入口。

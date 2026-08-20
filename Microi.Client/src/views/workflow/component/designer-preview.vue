@@ -84,22 +84,22 @@ export default {
     directives: {},
     computed: {},
     props: {
-        PropsFlowTableRowId: {
+        propsFlowTableRowId: {
             type: String,
             default: ""
         },
-        PropsCurrentNodeId: {
+        propsCurrentNodeId: {
             type: String,
             default: ""
         }
     },
     mounted() {
         var self = this;
-        if (self.DiyCommon.IsNull(self.$route.params.Id)) {
-            self.DiyTableRowId_Flow = self.PropsFlowTableRowId;
-        } else {
-            self.DiyTableRowId_Flow = self.$route.params.Id;
-        }
+        // 预览弹窗没有 route.params.Id；不能用 IsNull(undefined) 的旧判断
+        // 覆盖父组件明确传入的流程设计 Id，否则会按空 FlowDesignId 查询脏数据。
+        var routeFlowId = self.$route && self.$route.params ? self.$route.params.Id : "";
+        self.DiyTableRowId_Flow = String(routeFlowId || "").trim()
+            || String(self.propsFlowTableRowId || "").trim();
         self.jsPlumb = jsPlumb.getInstance();
         //先从数据库取出流程实体类，为了获取流程图Json
         //获取所有节点
@@ -116,6 +116,7 @@ export default {
                 Url: self.DiyApi.GetDiyTableRow,
                 Param: {
                     TableName: "WF_Node",
+                    _PageSize: 1000,
                     _SearchEqual: {
                         FlowDesignId: self.DiyTableRowId_Flow
                     }
@@ -125,6 +126,7 @@ export default {
                 Url: self.DiyApi.GetDiyTableRow,
                 Param: {
                     TableName: "WF_Line",
+                    _PageSize: 1000,
                     _SearchEqual: {
                         FlowDesignId: self.DiyTableRowId_Flow
                     }
@@ -167,7 +169,7 @@ export default {
             var result = {
                 top: nodeModel.PositionTop,
                 left: nodeModel.PositionLeft,
-                backgroundColor: self.PropsCurrentNodeId == nodeModel.Id ? "#ccc" : "#fff"
+                backgroundColor: self.propsCurrentNodeId == nodeModel.Id ? "#ccc" : "#fff"
             };
             return result;
         },

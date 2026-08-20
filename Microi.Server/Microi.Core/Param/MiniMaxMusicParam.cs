@@ -8,7 +8,7 @@ namespace Microi.net
     {
         public string RequestId { get; set; }
         public string Prompt { get; set; }
-        public string Model { get; set; } = "music-3.0";
+        public string Model { get; set; } = "music-2.6";
         public bool IsInstrumental { get; set; } = true;
         public int SampleRate { get; set; } = 44100;
         public int Bitrate { get; set; } = 256000;
