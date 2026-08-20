@@ -15,6 +15,7 @@ import { DiyApi } from "./api.itdos";
 import packageInfo from "../../package.json";
 import $ from "jquery";
 import _ from "underscore";
+import { pinyin as convertChineseToPinyin } from "pinyin";
 import LocalStorageManager from "./localStorage-manager.js";
 import { initV8ScanCode } from "./v8-scan-code.js";
 import { initV8Print } from "./v8-print.js";
@@ -4784,7 +4785,9 @@ var DiyCommon = {
                 type = 1;
             }
             var pyStr = "";
-            var pinyin = require("pinyin");
+            // pinyin 3.x exposes the converter as a named export. Calling the
+            // CommonJS module object directly silently returned an empty value.
+            var pinyin = convertChineseToPinyin;
             if (chinese.length > fullPyLen) {
                 // 先把前2个的全拼音取出来
                 var label1 = chinese.substring(0, fullPyLen);

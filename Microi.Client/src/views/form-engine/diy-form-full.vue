@@ -63,7 +63,7 @@
                         <el-button v-if="FormMode != 'View' && !ShowWfTopSubmitBtn" size="small" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
                             {{ $t("Msg.Save") }}
                         </el-button>
-                        <el-dropdown trigger="click" size="small">
+                        <el-dropdown v-if="!IsWorkflowReviewContext" trigger="click" size="small">
                             <el-button size="small">
                                 {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                             </el-button>
@@ -84,7 +84,7 @@
                                 </el-dropdown-menu>
                             </template>
                         </el-dropdown>
-                        <el-button v-if="FormMode == 'View' && ShowUpdateBtn" size="small" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
+                        <el-button v-if="FormMode == 'View' && ShowUpdateBtn && !IsWorkflowReviewContext" size="small" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
                             {{ $t("Msg.Edit") }}
                         </el-button>
                         <el-button
@@ -96,14 +96,14 @@
                             {{ showDesktopRightPanel ? '收起记录' : '查看记录' }}
                         </el-button>
                         <el-button
-                            v-if="FormMode == 'Edit'"
+                            v-if="FormMode == 'Edit' && !IsWorkflowReviewContext"
                             size="small"
                             type="info"
                             @click="FormMode = 'View'"
                         >
                             {{ $t('Msg.Cancel')}}
                         </el-button>
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                        <template v-if="!IsWorkflowReviewContext && !DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                                 <el-button
                                     :key="'more_btn_formbtns_page_' + btnIndex"
@@ -228,16 +228,16 @@
                 </el-row>
 
                 <!--移动端底部固定操作条（Page模式）：保存/编辑/发起流程常驻在底部 -->
-                <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (ShowWfTopSubmitBtn || FormMode != 'View' || (FormMode == 'View' && ShowUpdateBtn))">
+                <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (ShowWfTopSubmitBtn || (!IsWorkflowReviewContext && (FormMode != 'View' || (FormMode == 'View' && ShowUpdateBtn))))">
                     <el-button v-if="ShowWfTopSubmitBtn"
                         :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                         @click="TriggerWfSubmit()">
                         {{ WfTopSubmitBtnText }}
                     </el-button>
-                    <el-button v-else-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn" @click="SaveDiyTableCommonPage(true)">
+                    <el-button v-else-if="FormMode != 'View' && !IsWorkflowReviewContext" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn" @click="SaveDiyTableCommonPage(true)">
                         {{ $t('Msg.Save') }}
                     </el-button>
-                    <el-button v-else-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" class="mobile-form-bottom-btn" @click="GotoEdit()">
+                    <el-button v-else-if="FormMode == 'View' && ShowUpdateBtn && !IsWorkflowReviewContext" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" class="mobile-form-bottom-btn" @click="GotoEdit()">
                         {{ $t('Msg.Edit') }}
                     </el-button>
                 </div>
@@ -255,20 +255,20 @@
                                 <span class="mobile-fab-menu-label">{{ $t('Msg.WorkflowInfo') }}</span>
                             </div>
                             <!--取消编辑-->
-                            <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit'" @click="showMobileFabMenu = false; FormMode = 'View'">
+                            <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && !IsWorkflowReviewContext" @click="showMobileFabMenu = false; FormMode = 'View'">
                                 <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
                                 <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
                             </div>
-                            <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveToDraftBox()">
+                            <div class="mobile-fab-menu-item" v-if="FormMode != 'View' && !IsWorkflowReviewContext" @click="showMobileFabMenu = false; SaveToDraftBox()">
                                 <div class="mobile-fab-menu-icon draft"><fa-icon icon="far fa-save" /></div>
                                 <span class="mobile-fab-menu-label">{{ $t('Msg.SaveToDraftBox') }}</span>
                             </div>
-                            <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; OpenDraftDialog()">
+                            <div class="mobile-fab-menu-item" v-if="!IsWorkflowReviewContext" @click="showMobileFabMenu = false; OpenDraftDialog()">
                                 <div class="mobile-fab-menu-icon draft-list"><fa-icon icon="far fa-folder-open" /></div>
                                 <span class="mobile-fab-menu-label">{{ $t('Msg.LoadFromDraftBox') }}</span>
                             </div>
                             <!--表单更多按钮 FormBtns-->
-                            <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                            <template v-if="!IsWorkflowReviewContext && !DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                                 <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns" :key="'fab_formbtn_' + btnIndex">
                                     <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)">
                                         <div class="mobile-fab-menu-icon v8"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
@@ -325,7 +325,7 @@
                         {{ WfTopSubmitBtnText }}
                     </el-button>
                     <el-dropdown
-                        v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
+                        v-if="FormMode != 'View' && !IsWorkflowSubmitMode && ShowSaveBtn"
                         split-button
                         size="small"
                         type="primary"
@@ -354,7 +354,7 @@
                         >
                     </el-dropdown>
                     <el-button
-                        v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                        v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && !TableChildField.Readonly && ShowUpdateBtn && !IsWorkflowSubmitMode"
                         :loading="BtnLoading"
                         :icon="Edit"
                         size="small"
@@ -366,7 +366,7 @@
                         v-if="
                             FormMode == 'Edit'
                             && TableChildFormMode !== 'View'
-                            && OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+                            && !IsWorkflowSubmitMode
                             && !diyStore.IsPhoneView
                         "
                         class="diy-form-cancel-edit"
@@ -377,7 +377,7 @@
                         <el-icon><ArrowLeft /></el-icon>
                         {{ $t('Msg.Cancel') + $t('Msg.Edit') }}
                     </el-button>
-                    <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                    <template v-if="!IsWorkflowReviewContext && !DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                         <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                             <el-button
                                 :key="'more_btn_formbtns_' + btnIndex"
@@ -392,7 +392,7 @@
                             </el-button>
                         </template>
                     </template>
-                    <el-dropdown trigger="click" size="small">
+                    <el-dropdown v-if="!IsWorkflowReviewContext" trigger="click" size="small">
                         <el-button size="small">
                             {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                         </el-button>
@@ -417,7 +417,7 @@
                                         FormMode != 'Add' &&
                                         !TableChildField.Readonly &&
                                         ShowDeleteBtn &&
-                                        OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+                                        !IsWorkflowSubmitMode
                                     "
                                     :loading="BtnLoading"
                                     :icon="BtnLoading ? undefined : Delete"
@@ -556,20 +556,20 @@
             <!--移动端底部固定操作条（Dialog模式）：保存/编辑/发起流程常驻在底部 -->
             <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (
                 ShowWfTopSubmitBtn
-                || (FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
-                || (FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
+                || (FormMode != 'View' && ShowSaveBtn && !IsWorkflowSubmitMode)
+                || (FormMode == 'View' && LimitEdit() && ShowUpdateBtn && !IsWorkflowSubmitMode)
             )">
                 <el-button v-if="ShowWfTopSubmitBtn"
                     :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                     @click="TriggerWfSubmit()">
                     {{ WfTopSubmitBtnText }}
                 </el-button>
-                <el-button v-else-if="FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                <el-button v-else-if="FormMode != 'View' && ShowSaveBtn && !IsWorkflowSubmitMode"
                     :loading="BtnLoading" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                     @click="SaveDiyTableCommon(true, 'Close')">
                     {{ $t('Msg.Save') }}
                 </el-button>
-                <el-button v-else-if="FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                <el-button v-else-if="FormMode == 'View' && LimitEdit() && ShowUpdateBtn && !IsWorkflowSubmitMode"
                     :loading="BtnLoading" type="primary" :icon="Edit" class="mobile-form-bottom-btn"
                     @click="FormMode = 'Edit'">
                     {{ $t('Msg.Edit') }}
@@ -589,20 +589,20 @@
                             <span class="mobile-fab-menu-label">{{ $t('Msg.WorkflowInfo') }}</span>
                         </div>
                         <!--取消编辑-->
-                        <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; FormMode = 'View'">
+                        <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; FormMode = 'View'">
                             <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
                         </div>
-                        <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveToDraftBox()">
+                        <div class="mobile-fab-menu-item" v-if="FormMode != 'View' && !IsWorkflowReviewContext" @click="showMobileFabMenu = false; SaveToDraftBox()">
                             <div class="mobile-fab-menu-icon draft"><fa-icon icon="far fa-save" /></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.SaveToDraftBox') }}</span>
                         </div>
-                        <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; OpenDraftDialog()">
+                        <div class="mobile-fab-menu-item" v-if="!IsWorkflowReviewContext" @click="showMobileFabMenu = false; OpenDraftDialog()">
                             <div class="mobile-fab-menu-icon draft-list"><fa-icon icon="far fa-folder-open" /></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.LoadFromDraftBox') }}</span>
                         </div>
                         <!--表单更多按钮 FormBtns-->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                        <template v-if="!IsWorkflowReviewContext && !DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns" :key="'dialog_fab_btn_' + btnIndex">
                                 <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)">
                                     <div class="mobile-fab-menu-icon v8"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
@@ -611,7 +611,7 @@
                             </template>
                         </template>
                         <!--删除-->
-                        <div class="mobile-fab-menu-item" v-if="LimitDel() && FormMode != 'Add' && ShowDeleteBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')">
+                        <div class="mobile-fab-menu-item" v-if="LimitDel() && FormMode != 'Add' && ShowDeleteBtn && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')">
                             <div class="mobile-fab-menu-icon delete"><el-icon><Delete /></el-icon></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Delete') }}</span>
                         </div>
@@ -660,7 +660,7 @@
                         {{ WfTopSubmitBtnText }}
                     </el-button>
                     <el-dropdown
-                        v-if="FormMode != 'View' && OpenDiyFormWorkFlowType.WorkType != 'StartWork' && ShowSaveBtn"
+                        v-if="FormMode != 'View' && !IsWorkflowSubmitMode && ShowSaveBtn"
                         split-button
                         size="small"
                         type="primary"
@@ -700,7 +700,7 @@
                         >
                     </el-dropdown>
                     <el-button
-                        v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                        v-if="FormMode == 'View' && LimitEdit() && TableChildFormMode !== 'View' && ShowUpdateBtn && !IsWorkflowSubmitMode"
                         :loading="BtnLoading"
                         :icon="Edit"
                         size="small"
@@ -712,7 +712,7 @@
                         v-if="
                             FormMode == 'Edit'
                             && TableChildFormMode !== 'View'
-                            && OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+                            && !IsWorkflowSubmitMode
                             && !diyStore.IsPhoneView
                         "
                         class="diy-form-cancel-edit"
@@ -723,7 +723,7 @@
                         <el-icon><ArrowLeft /></el-icon>
                         {{ $t('Msg.Cancel') + $t('Msg.Edit') }}
                     </el-button>
-                    <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                    <template v-if="!IsWorkflowReviewContext && !DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                         <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns">
                             <el-button
                                 :key="'more_btn_formbtns_' + btnIndex"
@@ -738,7 +738,7 @@
                             </el-button>
                         </template>
                     </template>
-                    <el-dropdown trigger="click" size="small">
+                    <el-dropdown v-if="!IsWorkflowReviewContext" trigger="click" size="small">
                         <el-button size="small">
                             {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                         </el-button>
@@ -763,7 +763,7 @@
                                         FormMode != 'Add' &&
                                         !TableChildField.Readonly &&
                                         ShowDeleteBtn &&
-                                        OpenDiyFormWorkFlowType.WorkType != 'StartWork'
+                                        !IsWorkflowSubmitMode
                                     "
                                     :loading="BtnLoading"
                                     :icon="BtnLoading ? undefined : Delete"
@@ -903,20 +903,20 @@
             <!--移动端底部固定操作条（Drawer模式）：保存/编辑/发起流程常驻在底部 -->
             <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (
                 ShowWfTopSubmitBtn
-                || (FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
-                || (FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
+                || (FormMode != 'View' && ShowSaveBtn && !IsWorkflowSubmitMode)
+                || (FormMode == 'View' && LimitEdit() && ShowUpdateBtn && !IsWorkflowSubmitMode)
             )">
                 <el-button v-if="ShowWfTopSubmitBtn"
                     :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                     @click="TriggerWfSubmit()">
                     {{ WfTopSubmitBtnText }}
                 </el-button>
-                <el-button v-else-if="FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                <el-button v-else-if="FormMode != 'View' && ShowSaveBtn && !IsWorkflowSubmitMode"
                     :loading="BtnLoading" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                     @click="SaveDiyTableCommon(true, 'Close')">
                     {{ $t('Msg.Save') }}
                 </el-button>
-                <el-button v-else-if="FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
+                <el-button v-else-if="FormMode == 'View' && LimitEdit() && ShowUpdateBtn && !IsWorkflowSubmitMode"
                     :loading="BtnLoading" type="primary" :icon="Edit" class="mobile-form-bottom-btn"
                     @click="FormMode = 'Edit'">
                     {{ $t('Msg.Edit') }}
@@ -936,20 +936,20 @@
                             <span class="mobile-fab-menu-label">{{ $t('Msg.WorkflowInfo') }}</span>
                         </div>
                         <!--取消编辑-->
-                        <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; FormMode = 'View'">
+                        <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; FormMode = 'View'">
                             <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
                         </div>
-                        <div class="mobile-fab-menu-item" v-if="FormMode != 'View'" @click="showMobileFabMenu = false; SaveToDraftBox()">
+                        <div class="mobile-fab-menu-item" v-if="FormMode != 'View' && !IsWorkflowReviewContext" @click="showMobileFabMenu = false; SaveToDraftBox()">
                             <div class="mobile-fab-menu-icon draft"><fa-icon icon="far fa-save" /></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.SaveToDraftBox') }}</span>
                         </div>
-                        <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; OpenDraftDialog()">
+                        <div class="mobile-fab-menu-item" v-if="!IsWorkflowReviewContext" @click="showMobileFabMenu = false; OpenDraftDialog()">
                             <div class="mobile-fab-menu-icon draft-list"><fa-icon icon="far fa-folder-open" /></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.LoadFromDraftBox') }}</span>
                         </div>
                         <!--表单更多按钮 FormBtns-->
-                        <template v-if="!DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
+                        <template v-if="!IsWorkflowReviewContext && !DiyCommon.IsNull(SysMenuModel) && !DiyCommon.IsNull(SysMenuModel.FormBtns) && SysMenuModel.FormBtns.length > 0">
                             <template v-for="(btn, btnIndex) in SysMenuModel.FormBtns" :key="'drawer_fab_btn_' + btnIndex">
                                 <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn, CurrentRowModel, CurrentRowModel._V8)">
                                     <div class="mobile-fab-menu-icon v8"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
@@ -958,7 +958,7 @@
                             </template>
                         </template>
                         <!--删除-->
-                        <div class="mobile-fab-menu-item" v-if="LimitDel() && FormMode != 'Add' && ShowDeleteBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'" @click="showMobileFabMenu = false; DelDiyTableRow(CurrentRowModel, 'ShowFieldFormDrawer')">
+                        <div class="mobile-fab-menu-item" v-if="LimitDel() && FormMode != 'Add' && ShowDeleteBtn && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; DelDiyTableRow(CurrentRowModel, 'ShowFieldFormDrawer')">
                             <div class="mobile-fab-menu-icon delete"><el-icon><Delete /></el-icon></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Delete') }}</span>
                         </div>
@@ -1479,6 +1479,18 @@ export default {
             self.DialogType = param.DialogType;
             self.SysMenuId = param.SysMenuId;
             self.TableChildAuth = param.TableChildAuth || null;
+
+            // 工作流上下文必须在抽屉/弹窗首次渲染前就可用，否则普通保存、
+            // 取消编辑和更多按钮会在 InitWorkFlow 异步完成前短暂闪现。
+            if (param.IsOpenWorkFlowForm === true) {
+                self.OpenDiyFormWorkFlow = true;
+                self.OpenDiyFormWorkFlowType = Object.assign({}, param.WFParam || {}, {
+                    FormMode: param.FormMode
+                });
+            } else {
+                self.OpenDiyFormWorkFlow = false;
+                self.OpenDiyFormWorkFlowType = {};
+            }
 
             // 设置表单相关参数，优先使用 param 传入的值，其次使用 props，最后使用默认值
             self.FieldFormSelectFields = param.SelectFields || self.SelectFields || [];

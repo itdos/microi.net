@@ -17,7 +17,7 @@ test('builds mandatory List/Card presentation without enabling or inventing cust
     const hero = views[0].Layout.Hero;
     assert.equal(list.Density, 'Compact');
     assert.ok(list.Columns[0].MinWidth >= 340);
-    assert.ok(list.Columns[0].Lines.length >= 1);
+    assert.equal(list.Columns[0].Lines.length, 1);
     assert.ok(list.Columns[0].TrailingFields.length >= 1);
     assert.deepEqual(hero.Metrics.map((metric) => metric.Source), ['Field', 'DataCount', 'PageCount']);
     const card = views[1].Layout.Card;
