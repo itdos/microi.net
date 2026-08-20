@@ -2067,7 +2067,8 @@ import {
     diyTableDataMixin,
     diyTableSelectionMixin,
     diyTableNavigationMixin,
-    diyTableOperationsMixin
+    diyTableOperationsMixin,
+    diyTableWorkflowRecordMixin
 } from "./mixins";
 // 独立组件
 import DiyImportDialog from "@/views/form-engine/diy-components/DiyImportDialog.vue";
@@ -2094,7 +2095,8 @@ export default {
         diyTableDataMixin,
         diyTableSelectionMixin,
         diyTableNavigationMixin,
-        diyTableOperationsMixin
+        diyTableOperationsMixin,
+        diyTableWorkflowRecordMixin
     ],
     components: {
         DiyCardSelect,
@@ -2818,6 +2820,19 @@ export default {
             V8.OpenAnyTable = self.OpenAnyTable;
             V8.OpenDialog = self.OpenDialog;
             V8.OpenAppDialog = self.OpenAppDialog;
+            V8.OpenWorkflowRecord = self.OpenWorkflowRecord;
+            V8.BatchApproveWorkflowRecords = self.BatchApproveWorkflowRecords;
+            // 页面按钮只负责声明模板映射与接口引擎 Key。文件读取、后台任务提交、
+            // 进度轮询和结果呈现统一由平台导入弹层完成，租户 V8 不拼接上传 DOM。
+            V8.OpenImportDialog = function(options) {
+                var dialog = self.$refs.refDiyImportDialog;
+                if (!dialog || typeof dialog.show !== "function") {
+                    self.DiyCommon.Tips("当前页面未加载导入弹层，请刷新后重试。", false);
+                    return false;
+                }
+                dialog.show(options || {});
+                return true;
+            };
             self.FormWF = self.GetFormWF();
             V8.FormWF = self.FormWF;
             V8.TableId = self.TableId;
