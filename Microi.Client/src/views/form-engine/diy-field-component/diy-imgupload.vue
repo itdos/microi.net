@@ -285,6 +285,8 @@ import { ElMessageBox } from 'element-plus';
 import Sortable from 'sortablejs';
 import { useDiyStore } from "@/pinia";
 import { getUploadErrorMessage } from "@/utils/upload-error";
+// zhy：统一解析上传接口返回的实际私有策略、短期预览地址和可持久化元数据。
+import { getUploadPreviewUrl, resolveUploadLimit, sanitizeUploadMeta } from "@/utils/upload-response";
 
 // 禁用属性继承
 defineOptions({
@@ -720,6 +722,19 @@ const ImgUploadSuccess = (result, file, fileList) => {
         const responseData = file.response?.Data || result.Data;
         const uploadedImgId = responseData.Id || file.uid;
         const uploadedImgPath = responseData.Path;
+        // zhy：以服务端实际 Limit 为准，并复用本次上传返回的短期地址，避免未保存记录二次鉴权失败。
+        const uploadedPreviewUrl = getUploadPreviewUrl(responseData);
+        const effectiveLimit = resolveUploadLimit(responseData, props.field.Config.ImgUpload.Limit);
+        // zhy：业务字段只保存稳定路径和文件元数据，不保存短期 URL、完整地址或 Limit。
+        const uploadedImgMeta = {
+            ...sanitizeUploadMeta(responseData),
+            Id: uploadedImgId,
+            Name: responseData.Name || file.name,
+            Size: responseData.Size,
+            CreateTime: responseData.CreateTime,
+            Path: uploadedImgPath,
+            State: 1
+        };
 
         if (getMultipleFlag.value) {
             // 多图片模式
@@ -745,18 +760,15 @@ const ImgUploadSuccess = (result, file, fileList) => {
 
             if (!isHave) {
                 console.log('【多图片】× 未找到匹配图片，添加新图片');
-                const pushed = responseData || {};
-                if (!pushed.Id) pushed.Id = file.uid;
-                pushed.State = 1;
-                imgsJson.push(pushed);
+                imgsJson.push(uploadedImgMeta);
             }
 
+            // zhy：先写运行时 RealPath 再更新字段值，避免监听器对未保存记录提前发起取址请求。
+            setRealPath(uploadedImgId, uploadedImgPath, effectiveLimit, uploadedPreviewUrl);
             props.FormDiyTableModel[props.field.Name] = imgsJson;
             emit('update:modelValue', imgsJson);
             console.log('【多图片】更新后的图片列表:', JSON.parse(JSON.stringify(imgsJson)));
 
-            // 立即设置RealPath
-            setRealPath(uploadedImgId, uploadedImgPath, props.field.Config.ImgUpload.Limit);
         } else {
             // 单图片模式 - 存储为JSON字符串
             console.log('【单图片】上传成功，Path:', uploadedImgPath);
@@ -770,16 +782,13 @@ const ImgUploadSuccess = (result, file, fileList) => {
             };
             // 存储为JSON字符串
             const jsonString = JSON.stringify(singleImgObject);
+            // zhy：单图片同样先注入本次上传的短期地址，再触发表单值更新。
+            setRealPath(props.field.Name, uploadedImgPath, effectiveLimit, uploadedPreviewUrl);
             props.FormDiyTableModel[props.field.Name] = jsonString;
             emit('update:modelValue', jsonString);
             console.log('【单图片】存储的JSON字符串:', jsonString);
             console.log('【单图片】验证存储类型:', typeof props.FormDiyTableModel[props.field.Name]);
             console.log('【单图片】验证字符串是否正确:', props.FormDiyTableModel[props.field.Name].charAt ? '是字符串' : '不是字符串');
-
-            nextTick(() => {
-                console.log('【单图片】nextTick - modelValue已更新:', props.modelValue);
-                setRealPath(props.field.Name, uploadedImgPath, props.field.Config.ImgUpload.Limit);
-            });
         }
 
         // 上传成功后V8事件
@@ -799,8 +808,8 @@ const ImgUploadSuccess = (result, file, fileList) => {
     }
 };
 
-// 设置RealPath
-const setRealPath = (imgId, imgPath, isLimit) => {
+// zhy：上传成功时优先复用短期地址；历史图片仍按原流程调用 GetPrivateFileUrl 校验记录权限。
+const setRealPath = (imgId, imgPath, isLimit, uploadedPreviewUrl = '') => {
     const pathKey = props.field.Name + '_' + imgId + '_RealPath';
     console.log('=== setRealPath START ===');
     console.log('参数 imgId:', imgId);
@@ -809,6 +818,11 @@ const setRealPath = (imgId, imgPath, isLimit) => {
     console.log('计算出的 pathKey:', pathKey);
 
     if (isLimit === true) {
+        // zhy：短期地址只写入运行时 RealPath，绝不写入图片业务字段。
+        if (!DiyCommon.IsNull(uploadedPreviewUrl)) {
+            props.FormDiyTableModel[pathKey] = uploadedPreviewUrl;
+            return;
+        }
         // 私有图片，需要获取临时URL
         props.FormDiyTableModel[pathKey] = './static/img/loading.gif';
         console.log('【私有图片】设置loading状态');

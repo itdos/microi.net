@@ -1492,8 +1492,11 @@ export function createMicroiV8(options = {}) {
       if (rowModelMode) {
         data._RowModel = {};
         Object.keys(source).forEach((key) => {
-          if (key === 'Id') data.Id = source[key];
-          else data._RowModel[key] = source[key];
+          if (key === 'Id') {
+            // 新增接口的外层 Id 用于请求寻址，行模型中的 Id 才会进入表单 V8 上下文。
+            data.Id = source[key];
+            data._RowModel.Id = source[key];
+          } else data._RowModel[key] = source[key];
         });
       } else {
         data = { ...data, ...source };
