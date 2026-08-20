@@ -2568,6 +2568,7 @@ export default {
                 self.LoadMoreTreeLazyChildren(row);
                 return;
             }
+            self.ToggleTableRowSelectionByClick(row, column, event);
             // 🔥 性能优化：用纯 DOM 方式高亮当前行，替代 Element Plus 的 highlight-current-row。
             // highlight-current-row 会在每次点击时改变表格 store 的 currentRow，导致整个表体重新渲染、
             // 重跑所有单元格函数（isMuban/ShowSelectLabel/GetColValue 等），100~200 行时点击/双击会明显卡顿。

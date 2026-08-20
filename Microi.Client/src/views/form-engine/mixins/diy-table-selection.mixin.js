@@ -207,6 +207,63 @@ export default {
         CanUseTableSelection() {
             return this.TableEnableBatch === true && (this.HasBatchSelectMoreBtns() || this.EnableMultipleSelect === true);
         },
+        ShouldToggleTableRowSelectionByClick(row, column, event) {
+            if (this.TableDisplayMode !== 'Table' || !this.CanUseTableSelection() || this.IsOpenTableSingleSelect()) {
+                return false;
+            }
+            if (!row || row.Id === undefined || row.Id === null || row.Id === '' || row.__TreeLazyLoadMore) {
+                return false;
+            }
+            if (column && (column.type === 'selection' || column.type === 'expand')) {
+                return false;
+            }
+            if (event && event.defaultPrevented) {
+                return false;
+            }
+
+            var target = event && event.target;
+            if (!target || typeof target.closest !== 'function') {
+                return true;
+            }
+
+            // 行内控件继续执行自身动作，不能因为事件冒泡顺带勾选整行。
+            // diy-special-cell 覆盖“查看子表”等专用单元格，即使后续模板漏写 stop 也不会冲突。
+            var interactiveSelector = [
+                'button',
+                'a',
+                'input',
+                'textarea',
+                'select',
+                'option',
+                'label',
+                '[role="button"]',
+                '[contenteditable="true"]',
+                '.el-checkbox',
+                '.el-radio',
+                '.el-switch',
+                '.el-select',
+                '.el-input',
+                '.el-input-number',
+                '.el-date-editor',
+                '.el-dropdown',
+                '.el-table__expand-icon',
+                '.diy-special-cell',
+                '.diy-table-action-content'
+            ].join(',');
+            return !target.closest(interactiveSelector);
+        },
+        ToggleTableRowSelectionByClick(row, column, event) {
+            if (!this.ShouldToggleTableRowSelectionByClick(row, column, event)) {
+                return false;
+            }
+            var tableRef = this.$refs["diy-table-" + this.TableId];
+            if (!tableRef || typeof tableRef.toggleRowSelection !== 'function') {
+                return false;
+            }
+            // 点击行与点击复选框保持一致：未选中则选中，已选中则取消。
+            tableRef.toggleRowSelection(row, !this.IsRowSelected(row));
+            return true;
+        },
         CanShowContinuousSelection() {
             if (!this.CanUseTableSelection() || !this.TableMultipleSelection || this.TableMultipleSelection.length === 0) {
                 return false;
