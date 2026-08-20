@@ -386,8 +386,11 @@ export default {
                 "json"
             );
         },
-        GetAllData(param) {
+        async GetAllData(param = {}) {
             var self = this;
+            var contextVersion = Object.prototype.hasOwnProperty.call(param, "ContextVersion")
+                ? Number(param.ContextVersion || 0)
+                : Number(self._moduleContextVersion || 0);
             var params = [
                 {
                     Url: self.DiyApi.GetSysMenuModel,
@@ -418,12 +421,39 @@ export default {
                     })
                 }
             ];
-            //同时获SysMenuModel、DiyTableModel、DiyFieldList（包含了SysMenu中配置的JoinTables）
-            self.DiyCommon.PostAll(params, async function (results) {
+            try {
+                // 同时获取 SysMenuModel、DiyTableModel、DiyFieldList。跨模块 PageTabs
+                // 会产生并行上下文请求，只有最新版本允许提交到当前实例。
+                var results = await self.DiyCommon.PostAllAsync(params);
+                if (contextVersion !== Number(self._moduleContextVersion || 0) || self._isDestroyed) {
+                    return { Ok: false, Stale: true };
+                }
                 if (self.DiyCommon.Result(results[0]) && self.DiyCommon.Result(results[1])) {
-                    // && self.DiyCommon.Result(results[2])
-                    // console.log(6666666,results[0])
-                    await self.GetSysMenuModelAfter(results[0]);
+                    if (param.EstablishPageTabHost === true) {
+                        self.PageTabHostTableModel = results[1] && results[1].Data
+                            ? Object.assign({}, results[1].Data)
+                            : null;
+                    }
+                    var menuState = await self.GetSysMenuModelAfter(results[0], {
+                        EstablishPageTabHost: param.EstablishPageTabHost === true,
+                        UsePageTabHost: param.UsePageTabHost === true
+                            || (self.PageTabHostTabs.length > 0
+                                && String(self.SysMenuId || "") !== String(self.PageTabHostSysMenuId || "")),
+                        PageTabName: param.PageTabName
+                    });
+                    if (contextVersion !== Number(self._moduleContextVersion || 0) || self._isDestroyed) {
+                        return { Ok: false, Stale: true };
+                    }
+                    var selectedTab = menuState && menuState.PageTabModel;
+                    var selectedTargetId = typeof self.GetPageTabTargetSysMenuId === "function"
+                        ? self.GetPageTabTargetSysMenuId(selectedTab)
+                        : "";
+                    if (param.ResolveInitialPageTabTarget !== false
+                        && selectedTargetId
+                        && selectedTargetId !== String(self.SysMenuId || "")) {
+                        var switchState = await self.SwitchPageTabModule(selectedTab, { UpdateRoute: false });
+                        return { Ok: switchState === "navigated", Switched: true };
+                    }
                     self.GetDiyTableModelAfter(results[1]);
                     //这里注释是因为需要先获取到SysMenu中的JoinTables，再去获取 DiyFields
                     // self.GetDiyField();
@@ -440,11 +470,24 @@ export default {
                     //2022-05-14 新增：全部After处理好了再获取数据
                     var isInit = param && param.IsInit ? true : false;
                     self.GetDiyTableRow({ _PageIndex: 1, IsInit: isInit });
+                    self.moduleShellLoading = false;
+                    self.pageTabSwitching = false;
+                    self.$nextTick(function () {
+                        self._moduleShellHadMetrics = (self.ModuleMetricItems || []).length > 0;
+                    });
+                    return { Ok: true };
                 }
-            });
-            // self.GetSysMenuModel();
-            // self.GetDiyTableModel()
-            // self.GetDiyField()
+                self.moduleShellLoading = false;
+                self.pageTabSwitching = false;
+                return { Ok: false, Error: "Module metadata request failed" };
+            } catch (error) {
+                if (contextVersion === Number(self._moduleContextVersion || 0)) {
+                    self.moduleShellLoading = false;
+                    self.pageTabSwitching = false;
+                }
+                console.error("[DiyTableRowlist] 模块上下文加载失败：", error);
+                return { Ok: false, Error: error };
+            }
         },
         GetDiyTableMaxHeight() {
             var self = this;

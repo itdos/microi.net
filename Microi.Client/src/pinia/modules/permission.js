@@ -6,6 +6,10 @@ import Layout from "@/layout";
 import { DiyOsClient } from "@/utils/itdos.osclient";
 import _ from "underscore";
 import { buildMicroAppRouteAliases, resolveMicroAppMenuPaths } from "@/router/micro-app-route-alias";
+import {
+    hasConfiguredModuleMetrics,
+    hasConfiguredPageTabs
+} from "@/utils/page-tab-route-runtime.js";
 // Vue Router 4 支持直接使用 () => import() 形式，不需要 defineAsyncComponent
 
 /**
@@ -340,6 +344,8 @@ function buildMeta(item, extra = {}) {
     return appendMicroAppMeta({
         Id: item.Id,
         DiyTableId: item.DiyTableId,
+        HasPageTabs: hasConfiguredPageTabs(item.PageTabs),
+        HasModuleMetrics: hasConfiguredModuleMetrics(item.ViewSchema),
         Display: item.Display,
         AppDisplay : item.AppDisplay,
         MenuBadgeConfig: Object.assign({}, menuBadgeOptions, {

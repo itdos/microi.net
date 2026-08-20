@@ -691,7 +691,7 @@ export default {
                 }
             );
         },
-        async GetSysMenuModelAfter(result) {
+        async GetSysMenuModelAfter(result, options = {}) {
             var self = this;
             self.DiyCommon.ForConvertSysMenu(result.Data);
             if (self.PropsMenuModelPatch && typeof self.PropsMenuModelPatch === "object") {
@@ -710,10 +710,21 @@ export default {
             self.HandlerBtns(result.Data.PageBtns);
             //注意：表单按钮，一定要先打开表单后再进行判断IsVisible
             // self.HandlerBtns(result.Data.FormBtns);
+            var hasPageTabHost = Array.isArray(self.PageTabHostTabs) && self.PageTabHostTabs.length > 0;
+            var usePageTabHost = hasPageTabHost && (
+                options.UsePageTabHost === true
+                || (options.UsePageTabHost !== false
+                    && String(self.SysMenuId || "") !== String(self.PageTabHostSysMenuId || ""))
+            );
+            if (usePageTabHost) {
+                result.Data.PageTabs = self.PageTabHostTabs;
+            }
             result.Data.PageTabs = Array.isArray(result.Data.PageTabs)
                 ? result.Data.PageTabs.sort((a, b) => a.Sort - b.Sort)
                 : [];
-            self.HandlerBtns(result.Data.PageTabs);
+            // 入口模块已经完成 PageTabs 的按钮权限判断。目标模块复用同一组
+            // 运行态对象，不能再按隐藏目标菜单的按钮权限重复过滤。
+            if (!usePageTabHost) self.HandlerBtns(result.Data.PageTabs);
             self.HandlerBtns(result.Data.BatchSelectMoreBtns);
             self.TableEnableBatch = self.HasBatchSelectMoreBtns(result.Data) || self.EnableMultipleSelect === true;
             self.HandlerBtns(result.Data.ExportMoreBtns);
@@ -723,7 +734,11 @@ export default {
             //-------GetPageTabs()提前预生成
             if (!self.DiyCommon.IsNull(result.Data) && !self.DiyCommon.IsNull(result.Data.PageTabs) && result.Data.PageTabs.length > 0) {
                 //url带上tab参数，  2022-06-01
-                var queryTab = self.$route.query.Tab;
+                // 跨模块切换会在目标上下文成功加载后才更新 URL。加载期间必须使用
+                // 本次点击的 Tab，而不能让旧 URL 中的 Tab 覆盖新上下文的活动状态。
+                var queryTab = Object.prototype.hasOwnProperty.call(options, "PageTabName")
+                    ? options.PageTabName
+                    : self.$route.query.Tab;
                 if (self.IsTableChild()) {
                     queryTab = "";
                 }
@@ -763,6 +778,20 @@ export default {
             }
             //-----
             self.SysMenuModel = result.Data;
+            var hasCrossModuleTabs = result.Data.PageTabs.some(function (item) {
+                return Boolean(self.GetPageTabTargetSysMenuId && self.GetPageTabTargetSysMenuId(item));
+            });
+            if (options.EstablishPageTabHost === true && hasCrossModuleTabs) {
+                self.PageTabHostTabs = result.Data.PageTabs;
+                self.PageTabHostSysMenuId = String(self.SysMenuId || "");
+                self.PageTabHostTableId = String(self.TableId || "");
+                self.PageTabHostMenuModel = Object.assign({}, result.Data, {
+                    PageTabs: self.PageTabHostTabs
+                });
+                if (typeof self.MarkPageTabRouteInPlace === "function") {
+                    self.MarkPageTabRouteInPlace();
+                }
+            }
             if(self.diyStore.IsPhoneView || self.SysMenuModel.ComponentName == '搜索+卡片'){
                 self.TableDisplayMode = 'Card'
             }else{
@@ -796,6 +825,7 @@ export default {
             if (self.DiyCommon.IsNull(self.SysMenuModel.PageTabs) || self.SysMenuModel.PageTabs.length == 0) {
                 // self.GetDiyTableRow({_PageIndex : 1});
             }
+            return { PageTabModel: tabModel || null };
         },
         // IsSortField(fieldId) {
         //     var self = this;

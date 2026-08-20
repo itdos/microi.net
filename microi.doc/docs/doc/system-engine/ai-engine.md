@@ -131,6 +131,62 @@ microi_chat({
 
 `microi_chat` 只暴露对话白名单参数，实际 `OsClient`、用户和 Token 来自当前 MCP 连接，HTTP 来源再由服务端归一；Tool 不接受 Endpoint、ApiKey、Authorization 或身份覆盖。它返回最终 `DosResult`，不冒充逐 token MCP 流。如果 Agent 本身需要模型协议流，使用 `/v1/chat/completions` 的 `stream:true`；平台事实写入仍调用对应 MCP 写工具并遵守确认与回读。
 
+## MiniMax 图片与音乐生成
+
+`/#/mic-ai-engine` 的【自动识别】会先判断用户是在普通对话、绘图还是音乐创作，也可以手工选择【AI绘图】或【AI音乐】。这里必须区分“对话/意图模型”和“媒体生成模型”：`MiniMax-M3` 负责理解与路由，真正输出图片的是 `image-01`，真正输出纯音乐的是 `music-2.6`。不能因为当前聊天行选择了 `MiniMax-M3`，就把图片或音频伪装成文本模型原生输出。
+
+| 能力 | 登录态入口 | 当前白名单 | 结果与页面呈现 |
+|---|---|---|---|
+| 图片 | `POST /api/Ai/GenerateMiniMaxImage` | `image-01`；1～4 张；比例为 `1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16` 或 `21:9` | 服务端解码并写入当前租户公有 HDFS；对话附件使用 Element Plus 图片查看器原页放大 |
+| 音乐 | `POST /api/Ai/GenerateMiniMaxMusic` | 当前仅管理员；`music-2.6`；无人声纯音乐；44.1kHz、256kbps、MP3 | 服务端校验 MP3 后写入当前租户 HDFS；对话附件使用 `<audio controls preload="metadata">` 在线播放 |
+
+图片请求示例：
+
+```http
+POST /api/Ai/GenerateMiniMaxImage
+Content-Type: application/json
+Authorization: <当前吾码登录 Token>
+
+{
+  "RequestId": "image:conversation-id:message-id",
+  "Prompt": "一张现代办公室团队协作的横版插画",
+  "Model": "image-01",
+  "AspectRatio": "16:9",
+  "Count": 1
+}
+```
+
+音乐请求示例：
+
+```http
+POST /api/Ai/GenerateMiniMaxMusic
+Content-Type: application/json
+Authorization: <当前吾码管理员登录 Token>
+
+{
+  "RequestId": "music:conversation-id:message-id",
+  "Prompt": "轻快、克制、适合产品演示的科技感纯音乐",
+  "Model": "music-2.6",
+  "IsInstrumental": true,
+  "SampleRate": 44100,
+  "Bitrate": 256000,
+  "Format": "mp3"
+}
+```
+
+两类请求都必须使用稳定 `RequestId`。服务端按当前 `OsClient + 用户 + RequestId` 做共享幂等；相同请求可回放，参数冲突或上游结果不确定时不能换随机 Id 盲目重试。供应商 Key、图片 Base64、音频十六进制和中转站真实密钥都不能返回浏览器。
+
+### 媒体预览与文件地址
+
+生成成功后，浏览器只消费服务端返回的 `FilePath`、`FileUrl`、`ContentType`、文件大小等附件元数据：
+
+- 公有 HDFS 附件优先使用**当前运行租户**的 `sys_config.FileServer + FilePath` 生成最终 URL。不能写死官网域名，也不能继续沿用另一个租户或旧环境返回 URL 的域名前缀。
+- 图片使用 `<el-image :preview-src-list="[url]" preview-teleported>` 在当前页面放大、缩放和关闭；图片卡片不能再套 `target="_blank"` 跳到新浏览器页面。
+- 音频使用浏览器原生播放器并显示真实时长；加载失败应显示接口或媒体错误，不能只输出“已生成”。
+- AI 文本回答继续经过安全 Markdown 渲染；图片、音频、视频是结构化附件，不通过拼接 Markdown/HTML 来绕过 URL 与内容类型校验。
+
+音乐接口是否可用取决于当前服务端 Provider/中转账号是否已开通供应商音乐产品。上游返回未开通、停用或额度不足时，应原样形成可诊断失败，不得生成伪音频、重复扣减或把文本回答冒充音乐成功。
+
 ## MiniMax 视频生成
 
 吾码把 MiniMax 视频接入放在 `Microi.AI`，而不是让每个接口引擎各自保存 Key、拼接异步任务协议。这里复用的是供应商级底层能力：服务端密钥隔离、MiniMax 创建/查询/下载三段协议、当前用户绑定、订阅额度保护和跨节点幂等；文章主题、业务提示词、定时触发和内容平台分发仍由接口引擎、Job 或 Agent 编排。
@@ -192,7 +248,7 @@ Content-Type: application/json
 { "FileHandle": "<任务查询返回的签名句柄>" }
 ```
 
-后台 `/#/mic-ai-engine` 的管理员【AI视频】页读取 `mci_ai_content_asset`，可以创建、刷新、预览、审核和下载视频；对话记录仍由 `mic_ai_record` 提供。临时/永久下载地址只代表视频生成或持久化完成，不代表已经发布到抖音、快手或其它平台。分发端仍要执行目标平台的上传、字段校验、dry-run、一次正式发布、任务详情和公开页面回读，并按平台规则如实标记 AI 生成内容。
+后台 `/#/mic-ai-engine` 的管理员【AI视频】页读取 `mci_ai_content_asset`，可以创建、刷新、预览、审核和下载视频；生成中的记录按任务句柄轮询，完成后优先调用 `PersistMiniMaxVideoFile` 转存当前租户 HDFS，再用 `<video controls preload="metadata">` 原页播放，并通过明确的下载按钮读取同一个已校验文件地址。对话记录仍由 `mic_ai_record` 提供。临时/永久下载地址只代表视频生成或持久化完成，不代表已经发布到抖音、快手或其它平台。分发端仍要执行目标平台的上传、字段校验、dry-run、一次正式发布、任务详情和公开页面回读，并按平台规则如实标记 AI 生成内容。
 
 当租户经 `Microi.AI中转站` 创建视频时，中转节点使用 `/v1/video_generation`、`/v1/query/video_generation`、`/v1/files/retrieve` 对接 MiniMax 协议；创建请求必须带稳定 `Idempotency-Key`。平台 ApiKey 只允许查询自己创建的原始 `task_id` / `file_id`，中转节点只访问直连官方 Provider，不能递归调用自己。
 

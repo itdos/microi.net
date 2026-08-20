@@ -121,6 +121,10 @@ Iframe 不把长期 Token、密码或连接串放 URL。第三方单点登录使
 
 PC 列表的固定结构顺序是“模块 Hero（标题/副标题/动态指标）→ PageTabs → 查询与表格”，Hero 必须渲染在页面多 Tab 上方。头部只使用一次性入场和一次性轻量光效，禁止持续循环动画；`prefers-reduced-motion: reduce` 必须关闭动画和过渡。
 
+PageTabs 通过 `TargetSysMenuId` 切换不同模块/表时，入口模块必须作为稳定宿主：客户端在同一个 `diy-table` 实例内加载目标模块的菜单、表、字段与列表数据，只更新当前 URL 的 `Tab` 查询参数，不替换路由、面包屑、顶部访问标签或宿主 Hero。入口模块只配置一组 PageTabs；目标菜单可隐藏导航，但只需保留目标表格设计和角色权限，不得复制同一组 PageTabs。切换时必须中止旧请求并以模块上下文版本丢弃迟到响应，失败时回滚原模块。
+
+模块首屏或跨模块切换期间，Hero 标题/指标、PageTabs、工具栏与列表必须显示与最终布局同尺寸的主题化骨架屏；不能先渲染空白旧布局再整体位移。骨架屏同样遵守 `prefers-reduced-motion: reduce`，并在无指标或无 PageTabs 时按元数据提示隐藏对应占位。
+
 `ViewSchema` 是模块级视图，不写入已废弃的通用 `DiyConfig`。优先通过 sys_menu“跨端视图”的 `DiyModulePresentationDesigner` 配置；Detail/Edit 使用独立的“自定义表单视图 JSON”，需要完整协议、角色优先级或未知扩展字段时再使用高级 JSON。启用自定义表单视图后仍须：
 
 - 配置 `EnableViewSchema=1`；`ViewSchemaVersion/ViewConfigVersion` 可为空，分别按 `1.0/1` 处理并在后续变更时递增配置版本。
