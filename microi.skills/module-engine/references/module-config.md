@@ -185,13 +185,15 @@ ApiEngineKey、Workload、幂等字段、并发 Key、业务状态/任务 Id/进
 ## PageTabs 两种模式
 
 - 无目标菜单：在当前模块执行 V8，通常 `V8.SearchSet(...)`。
-- 有 `TargetSysMenuId`：加载目标模块。目标菜单即使隐藏导航，也必须给角色权限。
+- 有 `TargetSysMenuId`：在当前 `diy-table` 实例内加载目标模块的菜单、表、字段和列表数据。目标菜单即使隐藏导航，也必须给角色权限。
 
 PageTabs 可以通过 `BadgeApiEngineKey` 显示数字角标。接口按 `ButtonKeys` 一次返回所有 Tab 数量到 `Data.Buttons`，`BadgeValuePath` 可显式指定 `Data.Buttons.{TabId}`；失败只隐藏角标，不能阻断页签切换。
 
 PageTabs 只表达当前模块的数据类别/状态，不能取代模块 Hero，也不能渲染到 Hero 上方。
 
-跨表 Tab 应让每个目标菜单配置同一组 PageTabs，不在前端按菜单名写死。
+跨表 Tab 由入口模块统一配置一组 PageTabs，目标菜单只保留各自的模块设计、表绑定和角色权限，不复制 PageTabs。切换只更新当前 URL 的 `Tab` 查询参数；路由、面包屑、顶部访问标签和入口模块 Hero 保持稳定，表格上下文在原实例中切换。实现时必须取消旧请求、丢弃迟到响应并在失败时回滚，禁止按菜单名或业务表名写死。
+
+首屏和跨模块切换应为 Hero 标题/统计、PageTabs、工具栏和列表提供与最终几何尺寸一致的主题化骨架屏；根据模块元数据判断是否预留指标区和 PageTabs，并支持 `prefers-reduced-motion: reduce`。
 
 ## URL 参数
 

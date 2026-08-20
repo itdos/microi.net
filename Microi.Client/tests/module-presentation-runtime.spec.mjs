@@ -165,7 +165,7 @@ test("module header, metric strip and compound search consume runtime theme toke
     const styleSource = fs.readFileSync(new URL("../src/styles/diy-table.scss", import.meta.url), "utf8");
     const buttonSource = fs.readFileSync(new URL("../src/styles/itdos.diy.scss", import.meta.url), "utf8");
     const headerStart = styleSource.indexOf(".module-presentation-header {");
-    const headerBlock = headerStart >= 0 ? styleSource.slice(headerStart, headerStart + 9000) : "";
+    const headerBlock = headerStart >= 0 ? styleSource.slice(headerStart, headerStart + 18000) : "";
     const metricItemStart = styleSource.indexOf(".module-presentation-header .module-metric-item {");
     const metricItemBlock = metricItemStart >= 0 ? styleSource.slice(metricItemStart, metricItemStart + 1200) : "";
     const searchStart = styleSource.indexOf(".keyword-search {");

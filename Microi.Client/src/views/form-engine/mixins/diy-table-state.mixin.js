@@ -488,6 +488,17 @@ export default {
             hbParam4: [], //zhy合并PC端更多搜索和Pc端外部搜索diy-search组件的搜索参数
             TableDisplayMode: "", //Table、Card
             ShowDiyModule: false,
+            // 顶层模块首屏与跨模块 PageTabs 共用一个稳定外壳。目标菜单只替换
+            // 表格上下文，标题、指标和 PageTabs 继续由入口模块负责。
+            moduleShellLoading: true,
+            pageTabSwitching: false,
+            PageTabHostMenuModel: null,
+            PageTabHostTableModel: null,
+            PageTabHostTabs: [],
+            PageTabHostSysMenuId: "",
+            PageTabHostTableId: "",
+            _moduleShellHadMetrics: null,
+            _moduleContextVersion: 0,
             // ========== 定时器ID存储（用于防止内存泄漏） ==========
             _importStepTimer: null,
             _debounceTimer: null,
