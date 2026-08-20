@@ -65,12 +65,20 @@ test('应用商城包独立交付菜单依赖的微服务运行时且菜单 Url 
 
 test('平台微服务包包含商城路由', async () => {
   const packageModel = await readPackage('app.microi.saas-engine.json');
+  const storePackageModel = await readPackage('app.microi.store.json');
+  const sourcePackageModel = JSON.parse(await readFile(
+    resolve(directory, '../../../AI-Project/microi/AI应用/microi-platform-service/package.json'),
+    'utf8',
+  ));
   const bundle = packageModel.ApplicationBundles.find(item => item.Application?.AppKey === 'microi-platform-service');
+  const storeBundle = storePackageModel.ApplicationBundles.find(item => item.Application?.AppKey === 'microi-platform-service');
 
   assert.ok(bundle);
+  assert.ok(storeBundle);
   assert.ok(bundle.Routes.some(route => route.RoutePath === '/marketplace'));
-  assert.equal(bundle.VersionNo, 'v1.6.3');
-  assert.equal(bundle.Application.CurrentVersion, 20);
+  assert.equal(bundle.VersionNo, `v${sourcePackageModel.version}`);
+  assert.equal(bundle.Application.CurrentVersion, storeBundle.Application.CurrentVersion);
+  assert.ok(Number.isInteger(bundle.Application.CurrentVersion) && bundle.Application.CurrentVersion > 0);
   assert.equal(bundle.MicroService.StorageMode, 'db');
 
   const saasMenu = packageModel.SysMenus.find(item => item.Id === '42078414-512a-4840-9843-9b75ab79ba79');

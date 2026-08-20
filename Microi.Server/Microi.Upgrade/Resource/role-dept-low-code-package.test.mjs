@@ -8,7 +8,17 @@ const packageModel = JSON.parse(await readFile(
 ));
 
 test("SaaS engine delivers role and department management as low-code tree-table resources", () => {
-  assert.equal(packageModel.PackageInfo.Version, "v7.4.8");
+  const versionParts = String(packageModel.PackageInfo.Version || "")
+    .replace(/^v/u, "")
+    .split(".")
+    .map(Number);
+  assert.ok(versionParts.length === 3 && versionParts.every(Number.isInteger));
+  assert.ok(
+    versionParts[0] > 7
+      || (versionParts[0] === 7 && versionParts[1] > 4)
+      || (versionParts[0] === 7 && versionParts[1] === 4 && versionParts[2] >= 8),
+    `SaaS engine package version ${packageModel.PackageInfo.Version} predates the low-code role/dept delivery`,
+  );
 
   const roleTable = packageModel.DiyTables.find((item) => item.Name === "sys_role");
   const departmentTable = packageModel.DiyTables.find((item) => item.Name === "sys_dept");

@@ -25,15 +25,6 @@
                     <el-icon><VideoPlay /></el-icon>
                     <span>AI视频</span>
                 </button>
-                <button
-                    v-if="isAiAdmin"
-                    type="button"
-                    class="workspace-tab"
-                    @click="goAiApps"
-                >
-                    <el-icon><FolderOpened /></el-icon>
-                    <span>AI应用</span>
-                </button>
             </div>
 
             <template v-if="activeWorkspace === 'chat'">
@@ -190,9 +181,11 @@
                             class="quick-prompt"
                             @click="useQuickPrompt(prompt)"
                         >
-                            <el-icon><component :is="prompt.icon" /></el-icon>
-                            <strong>{{ prompt.title }}</strong>
-                            <span>{{ prompt.desc }}</span>
+                            <span class="quick-prompt-content">
+                                <strong>{{ prompt.title }}</strong>
+                                <small v-if="prompt.desc">{{ prompt.desc }}</small>
+                            </span>
+                            <el-icon class="quick-prompt-arrow"><ArrowRight /></el-icon>
                         </button>
                     </div>
                 </div>
@@ -256,17 +249,54 @@
                                 <em>正在思考</em>
                             </div>
 
-                            <pre v-if="message.content" class="message-text" :class="{ streaming: message.streaming }">{{ message.content }}</pre>
+                            <div
+                                v-if="message.content"
+                                v-safe-html="renderAiMarkdown(message.content)"
+                                class="message-text message-markdown"
+                                :class="{ streaming: message.streaming }"
+                            ></div>
 
                             <div v-if="message.attachments && message.attachments.length" class="message-attachments">
-                                <span
+                                <template
                                     v-for="file in message.attachments"
-                                    :key="`${message.id}_${file.FileName}_${file.Size}`"
-                                    class="attachment-chip readonly"
+                                    :key="`${message.id}_${file.FileName}_${file.Size || file.FileSize}`"
                                 >
-                                    <el-icon><Paperclip /></el-icon>
-                                    {{ file.FileName }}
-                                </span>
+                                    <div
+                                        v-if="isImageAttachment(file)"
+                                        class="generated-image-card"
+                                    >
+                                        <el-image
+                                            :src="imageAttachmentUrl(file)"
+                                            :alt="file.FileName || 'AI 生成图片'"
+                                            :preview-src-list="imagePreviewList(file)"
+                                            :initial-index="0"
+                                            fit="contain"
+                                            lazy
+                                            preview-teleported
+                                            hide-on-click-modal
+                                        />
+                                        <span>{{ file.FileName || "AI 生成图片" }}</span>
+                                    </div>
+                                    <div v-else-if="isAudioAttachment(file)" class="generated-audio-card">
+                                        <audio
+                                            :src="audioAttachmentUrl(file)"
+                                            controls
+                                            preload="metadata"
+                                        >
+                                            当前浏览器不支持在线播放音频。
+                                        </audio>
+                                        <span>
+                                            {{ file.FileName || "AI 生成音乐" }}
+                                            <small v-if="formatMediaDuration(file.DurationMilliseconds)">
+                                                {{ formatMediaDuration(file.DurationMilliseconds) }}
+                                            </small>
+                                        </span>
+                                    </div>
+                                    <span v-else class="attachment-chip readonly">
+                                        <el-icon><Paperclip /></el-icon>
+                                        {{ file.FileName }}
+                                    </span>
+                                </template>
                             </div>
 
                             <div v-if="message.code" class="code-block">
@@ -334,7 +364,7 @@
                         data-testid="unified-ai-input"
                         type="textarea"
                         resize="none"
-                        :autosize="{ minRows: 2, maxRows: 8 }"
+                        :autosize="{ minRows: 1, maxRows: 8 }"
                         placeholder="描述你想做什么，或上传图片/文件让 AI 分析"
                         :disabled="sending"
                         @keydown.enter.exact="handleEnter"
@@ -367,79 +397,112 @@
                             <el-tooltip content="上传文件或图片" placement="top">
                                 <el-button class="icon-action" text :icon="Paperclip" @click="triggerAttachmentPicker" />
                             </el-tooltip>
-                            <span class="semantic-label">语义分析</span>
-                            <el-select
-                                v-model="semanticMode"
-                                data-testid="unified-ai-mode"
-                                size="small"
-                                class="semantic-select"
-                                :disabled="sending"
+                            <el-popover
+                                placement="top-start"
+                                :width="360"
+                                trigger="click"
+                                popper-class="ai-composer-settings-popper"
                             >
-                                <el-option
-                                    v-for="item in semanticModeOptions"
-                                    :key="item.value"
-                                    :label="item.label"
-                                    :value="item.value"
-                                    :disabled="item.disabled"
-                                />
-                            </el-select>
-                            <el-tooltip
-                                :content="reasoningEffortTooltip"
-                                placement="top"
-                            >
-                                <span class="semantic-label reasoning-label">推理强度</span>
-                            </el-tooltip>
-                            <el-select
-                                v-model="reasoningEffort"
-                                size="small"
-                                class="reasoning-select"
-                                :disabled="sending || !selectedModelSupportsReasoning"
-                            >
-                                <el-option
-                                    v-for="item in reasoningEffortOptions"
-                                    :key="item.value"
-                                    :label="item.label"
-                                    :value="item.value"
-                                />
-                            </el-select>
-                            <el-tooltip :content="schemaSearchModeTooltip" placement="top">
-                                <el-tag class="schema-mode-tag" size="small" effect="plain">
-                                    {{ schemaSearchModeLabel }}
-                                </el-tag>
-                            </el-tooltip>
+                                <template #reference>
+                                    <el-button
+                                        class="composer-settings-trigger"
+                                        data-testid="unified-ai-settings"
+                                        text
+                                        :icon="Operation"
+                                    >
+                                        <span>对话设置</span>
+                                        <small>{{ composerSettingSummary }}</small>
+                                    </el-button>
+                                </template>
+                                <div class="composer-settings" aria-label="AI 对话设置">
+                                    <label class="composer-setting-field">
+                                        <span>语义分析</span>
+                                        <el-select
+                                            v-model="semanticMode"
+                                            data-testid="unified-ai-mode"
+                                            size="small"
+                                            class="semantic-select"
+                                            aria-label="语义分析"
+                                            :disabled="sending"
+                                        >
+                                            <el-option
+                                                v-for="item in semanticModeOptions"
+                                                :key="item.value"
+                                                :label="item.label"
+                                                :value="item.value"
+                                                :disabled="item.disabled"
+                                            />
+                                        </el-select>
+                                    </label>
+                                    <label class="composer-setting-field">
+                                        <el-tooltip :content="reasoningEffortTooltip" placement="left">
+                                            <span class="reasoning-label">推理强度</span>
+                                        </el-tooltip>
+                                        <el-select
+                                            v-model="reasoningEffort"
+                                            size="small"
+                                            class="reasoning-select"
+                                            aria-label="推理强度"
+                                            :disabled="sending || !selectedModelSupportsReasoning"
+                                        >
+                                            <el-option
+                                                v-for="item in reasoningEffortOptions"
+                                                :key="item.value"
+                                                :label="item.label"
+                                                :value="item.value"
+                                            />
+                                        </el-select>
+                                    </label>
+                                    <label v-if="isRelayStationSelected" class="composer-setting-field">
+                                        <span>中转模型</span>
+                                        <el-select
+                                            v-model="selectedRelayModel"
+                                            filterable
+                                            :loading="relayModelsLoading"
+                                            placeholder="选择中转模型"
+                                            class="composer-model-select relay-model-select"
+                                            aria-label="中转模型"
+                                        >
+                                            <el-option
+                                                v-for="model in relayModelList"
+                                                :key="model.id"
+                                                :label="model.id"
+                                                :value="model.id"
+                                            />
+                                        </el-select>
+                                    </label>
+                                    <label class="composer-setting-field">
+                                        <span>AI 模型</span>
+                                        <el-select
+                                            v-model="selectedAiModel"
+                                            data-testid="unified-ai-model"
+                                            value-key="Id"
+                                            filterable
+                                            :loading="modelLoading"
+                                            placeholder="选择模型"
+                                            class="composer-model-select"
+                                            aria-label="AI 模型"
+                                        >
+                                            <el-option
+                                                v-for="model in aiModelList"
+                                                :key="model.Id"
+                                                :label="formatModelName(model)"
+                                                :value="model"
+                                            />
+                                        </el-select>
+                                    </label>
+                                    <div class="composer-setting-status">
+                                        <span>Schema 检索</span>
+                                        <el-tooltip :content="schemaSearchModeTooltip" placement="left">
+                                            <el-tag class="schema-mode-tag" size="small" effect="plain">
+                                                {{ schemaSearchModeLabel }}
+                                            </el-tag>
+                                        </el-tooltip>
+                                    </div>
+                                </div>
+                            </el-popover>
                         </div>
                         <div class="composer-right">
-                            <el-select
-                                v-if="isRelayStationSelected"
-                                v-model="selectedRelayModel"
-                                filterable
-                                :loading="relayModelsLoading"
-                                placeholder="选择中转模型"
-                                class="composer-model-select relay-model-select"
-                            >
-                                <el-option
-                                    v-for="model in relayModelList"
-                                    :key="model.id"
-                                    :label="model.id"
-                                    :value="model.id"
-                                />
-                            </el-select>
-                            <el-select
-                                v-model="selectedAiModel"
-                                data-testid="unified-ai-model"
-                                value-key="Id"
-                                filterable
-                                :loading="modelLoading"
-                                placeholder="选择模型"
-                                class="composer-model-select"
-                            >
-                                <el-option
-                                    v-for="model in aiModelList"
-                                    :key="model.Id"
-                                    :label="formatModelName(model)"
-                                    :value="model"
-                                />
-                            </el-select>
                             <el-button v-if="sending" class="stop-btn" :icon="CircleClose" @click="cancelRequest">停止</el-button>
                             <el-button
                                 v-else
@@ -630,17 +693,15 @@ import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onBeforeU
 import { useRoute } from "vue-router";
 import { useDiyStore } from "@/pinia";
 import {
+    ArrowRight,
     Box,
     CircleClose,
     CircleCheck,
     CopyDocument,
     Cpu,
-    DataAnalysis,
     EditPen,
     Download,
-    FolderOpened,
     Grid,
-    MagicStick,
     Operation,
     Paperclip,
     RefreshLeft,
@@ -652,6 +713,7 @@ import {
     VideoPlay
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { renderAiMarkdown } from "@/utils/ai-markdown.js";
 import {
     MOBILE_AI_BOOTSTRAP_FAILURES,
     classifyMobileAiBootstrapFailure,
@@ -787,6 +849,12 @@ let abortController = null;
 const semanticModeOptions = computed(() => [
     { label: "自动识别", value: "auto" },
     { label: "AI对话", value: "chat" },
+    { label: "AI绘图", value: "image" },
+    {
+        label: isAiAdmin.value ? "AI音乐" : "AI音乐（仅管理员）",
+        value: "music",
+        disabled: !isAiAdmin.value
+    },
     {
         label: secureAssistantAvailable.value
             ? "安全业务数据"
@@ -806,42 +874,39 @@ const reasoningEffortOptions = [
 ];
 
 const quickPrompts = computed(() => {
-    const securePromptCards = secureAssistantPrompts.value
+    const securePromptItems = secureAssistantPrompts.value
         .map((text) => String(text || "").trim())
         .filter(Boolean)
         .map((text, index) => ({
             key: `secure-data:${index}:${text}`,
             title: text,
             desc: `查询范围：${secureAssistantScopeLabel.value}`,
-            icon: DataAnalysis,
             text,
             mode: "secure-data"
         }));
 
-    return [
-        ...securePromptCards,
+    const defaultPromptItems = [
         {
             key: "builder",
             title: "创建业务模块",
             desc: "生成表、字段、菜单和按钮方案",
-            icon: MagicStick,
             text: "帮我创建一个客户跟进管理模块，包含客户、联系人、跟进记录三张表，并生成后台菜单。"
         },
         {
             key: "v8-code",
             title: "编写 V8 代码",
             desc: "根据需求生成接口引擎或表单事件代码",
-            icon: Cpu,
             text: "帮我写一个接口引擎，查询最近 30 天新增客户数量，并按天分组返回。"
         },
         {
             key: "data-analysis",
             title: "分析数据",
             desc: "用自然语言查询当前租户数据",
-            icon: DataAnalysis,
             text: "帮我分析本月新增数据最多的业务表。"
         }
     ];
+
+    return [...securePromptItems, ...defaultPromptItems].slice(0, 4);
 });
 
 const filteredConversations = computed(() => {
@@ -893,6 +958,13 @@ const schemaSearchModeTooltip = computed(() =>
         ? "先由大模型扩展关键词，再检索当前用户有权访问的表和字段；Qdrant 向量召回只作为可选增强，连接失败会安全回退到关键词检索。"
         : "由大模型扩展关键词后，在当前用户有权访问的 Schema 中检索；不会连接或同步 Ollama、Embedding、Qdrant。"
 );
+const composerSettingSummary = computed(() => {
+    const mode = semanticModeOptions.value.find((item) => item.value === semanticMode.value)?.label || "自动识别";
+    const model = isRelayStationSelected.value
+        ? selectedRelayModel.value
+        : formatModelName(selectedAiModel.value);
+    return [mode, model || "选择模型"].filter(Boolean).join(" · ");
+});
 const isAiAdmin = computed(() => {
     const user = currentUser.value || {};
     return user._IsAdmin === true || user.IsAdmin === true || Number(user.Level || 0) >= 9999;
@@ -1036,6 +1108,8 @@ function modeName(mode) {
     const map = {
         auto: "自动识别",
         chat: "AI对话",
+        image: "AI绘图",
+        music: "AI音乐",
         code: "V8 编程",
         "secure-data": "安全业务数据",
         data: "高级数据查询",
@@ -1384,9 +1458,10 @@ function firstLine(text) {
 function newConversation() {
     cancelRequest();
     historyView.value = "active";
-    const secureMode = semanticMode.value === "secure-data";
-    currentConversationSource.value = secureMode ? SECURE_DATA_SOURCE : SOURCE;
-    currentConversationId.value = secureMode ? "" : makeId("chat");
+    semanticMode.value = "auto";
+    resolvedMode.value = "chat";
+    currentConversationSource.value = SOURCE;
+    currentConversationId.value = makeId("chat");
     messages.value = [];
     inputText.value = "";
     selectedFiles.value = [];
@@ -1605,10 +1680,6 @@ async function openModelDrawer() {
 
 function goMicroiStore() {
     proxy.$router.push({ path: "/microi-store" });
-}
-
-function goAiApps() {
-    proxy.$router.push({ path: "/mci-ai-app" });
 }
 
 async function openVideoWorkspace() {
@@ -1964,7 +2035,7 @@ async function redirectLegacyAiAppWorkspace() {
         return true;
     }
     if (route.query.workspace === "apps") {
-        await proxy.$router.replace({ path: "/mci-ai-app" });
+        await proxy.$router.replace({ path: "/microi-store" });
         return true;
     }
     return false;
@@ -2053,6 +2124,10 @@ async function sendMessage() {
 
         if (mode === "secure-data") {
             await sendSecureDataQuestion(visibleText, assistantMessage);
+        } else if (mode === "image") {
+            await sendImageQuestion(visibleText, assistantMessage);
+        } else if (mode === "music") {
+            await sendMusicQuestion(visibleText, assistantMessage);
         } else if (mode === "code") {
             await sendCodeQuestion(visibleText, assistantMessage);
         } else if (mode === "data") {
@@ -2100,6 +2175,17 @@ function normalizeWorkMode(mode) {
         chat: "chat",
         ai对话: "chat",
         对话: "chat",
+        image: "image",
+        drawing: "image",
+        ai绘图: "image",
+        图片生成: "image",
+        文生图: "image",
+        music: "music",
+        ai音乐: "music",
+        音乐生成: "music",
+        生成音乐: "music",
+        作曲: "music",
+        配乐: "music",
         data: "data",
         数据分析: "data",
         "secure-data": "secure-data",
@@ -2178,6 +2264,9 @@ function getModePermissionDeniedText(mode) {
     }
     if (mode === "data" && !hasAiPermission(AI_DATA_PERMISSION)) {
         return "当前角色未配置 AI 数据分析权限，请联系管理员在角色权限中授权后再使用。";
+    }
+    if (mode === "music" && !isAiAdmin.value) {
+        return "当前账号没有 AI 音乐生成权限。音乐生成会消耗供应商额度并写入租户文件存储，目前仅向平台管理员开放。";
     }
     if ((mode === "builder" || mode === "project") && !isAiAdmin.value) {
         return "当前账号没有低代码建模权限。为避免误操作创建或修改表、字段、菜单、接口引擎，只有管理员可以执行该能力。";
@@ -2335,6 +2424,168 @@ async function sendChatQuestion(text, assistantMessage, attachments = []) {
     }, assistantMessage);
 }
 
+async function sendImageQuestion(text, assistantMessage) {
+    abortController = new AbortController();
+    const requestId = `image:${currentConversationId.value}:${assistantMessage.id}`
+        .replace(/[^a-zA-Z0-9._:-]/g, "-")
+        .slice(0, 160);
+    const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/GenerateMiniMaxImage`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            authorization: DiyCommon.getToken() ? `Bearer ${DiyCommon.getToken()}` : ""
+        },
+        body: JSON.stringify({
+            RequestId: requestId,
+            Prompt: text,
+            Model: "image-01",
+            AspectRatio: "1:1",
+            Count: 1
+        }),
+        signal: abortController.signal
+    });
+    let result = {};
+    try {
+        result = await response.json();
+    } catch {
+        throw new Error(`图片生成服务返回了无法解析的响应（HTTP ${response.status}）。`);
+    }
+    const current = unwrapDosResult(result);
+    if (!response.ok || Number(current?.Code ?? current?.code) !== 1) {
+        throw new Error(current?.Msg || current?.msg || `图片生成失败（HTTP ${response.status}）。`);
+    }
+    const data = current?.Data || current?.data || {};
+    const images = Array.isArray(data.Images) ? data.Images : [];
+    const attachments = images
+        .map((item) => ({
+            FileName: item?.FileName || "AI 生成图片",
+            FileUrl: item?.FileUrl || "",
+            FilePath: item?.FilePath || "",
+            ContentType: item?.ContentType || "image/png",
+            Size: Number(item?.FileSize || 0),
+            Storage: item?.Storage || "Microi.HDFS",
+            Permanent: item?.Permanent === true
+        }))
+        .filter((item) => isImageAttachment(item));
+    if (!attachments.length) {
+        throw new Error("图片已生成，但没有获得可安全展示的 HDFS 地址。");
+    }
+    assistantMessage.modelId = String(data.Model || "image-01");
+    assistantMessage.thinking = "";
+    assistantMessage.thinkingCollapsed = true;
+    assistantMessage.attachments = attachments;
+    assistantMessage.content = `已生成 ${attachments.length} 张图片，并保存到吾码文件存储。`;
+    assistantMessage.rawContent = assistantMessage.content;
+}
+
+async function sendMusicQuestion(text, assistantMessage) {
+    abortController = new AbortController();
+    const requestId = `music:${currentConversationId.value}:${assistantMessage.id}`
+        .replace(/[^a-zA-Z0-9._:-]/g, "-")
+        .slice(0, 160);
+    const response = await fetch(`${DiyCommon.GetApiBase()}/api/Ai/GenerateMiniMaxMusic`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            authorization: DiyCommon.getToken() ? `Bearer ${DiyCommon.getToken()}` : ""
+        },
+        body: JSON.stringify({
+            RequestId: requestId,
+            Prompt: text,
+            Model: "music-2.6",
+            IsInstrumental: true,
+            SampleRate: 44100,
+            Bitrate: 256000,
+            Format: "mp3"
+        }),
+        signal: abortController.signal
+    });
+    let result = {};
+    try {
+        result = await response.json();
+    } catch {
+        throw new Error(`音乐生成服务返回了无法解析的响应（HTTP ${response.status}）。`);
+    }
+    const current = unwrapDosResult(result);
+    if (!response.ok || Number(current?.Code ?? current?.code) !== 1) {
+        throw new Error(current?.Msg || current?.msg || `音乐生成失败（HTTP ${response.status}）。`);
+    }
+    const data = current?.Data || current?.data || {};
+    const attachment = {
+        FileName: data.FileName || "AI 生成音乐.mp3",
+        FileUrl: data.FileUrl || "",
+        FilePath: data.FilePath || "",
+        ContentType: "audio/mpeg",
+        Size: Number(data.FileSize || 0),
+        DurationMilliseconds: Number(data.DurationMilliseconds || 0),
+        SampleRate: Number(data.SampleRate || 0),
+        Bitrate: Number(data.Bitrate || 0),
+        Storage: data.Storage || "Microi.HDFS",
+        Permanent: data.Permanent === true
+    };
+    if (!isAudioAttachment(attachment)) {
+        throw new Error("音乐已生成，但没有获得可在线播放的 HDFS 地址。");
+    }
+    assistantMessage.modelId = String(data.Model || "music-2.6");
+    assistantMessage.thinking = "";
+    assistantMessage.thinkingCollapsed = true;
+    assistantMessage.attachments = [attachment];
+    assistantMessage.content = "已生成一段无人声纯音乐，并保存到吾码文件存储，可直接在线播放。";
+    assistantMessage.rawContent = assistantMessage.content;
+}
+
+function publicHdfsAttachmentUrl(file) {
+    const fileServer = String(DiyCommon.GetFileServer?.() || "").trim().replace(/\/+$/, "");
+    let filePath = String(file?.FilePath || file?.Path || "").trim();
+    const fileUrl = String(file?.FileUrl || file?.Url || "").trim();
+    const isHdfs = String(file?.Storage || "").toLowerCase() === "microi.hdfs";
+    if (!filePath && isHdfs && fileUrl) {
+        try {
+            filePath = new URL(fileUrl, window.location.origin).pathname;
+        } catch {
+            filePath = fileUrl;
+        }
+    }
+    if (filePath && fileServer) {
+        return `${fileServer}/${filePath.replace(/^\/+/, "")}`;
+    }
+    if (/^https?:\/\//i.test(fileUrl) || fileUrl.startsWith("/")) return fileUrl;
+    return "";
+}
+
+function imageAttachmentUrl(file) {
+    return publicHdfsAttachmentUrl(file);
+}
+
+function imagePreviewList(file) {
+    const url = imageAttachmentUrl(file);
+    return url ? [url] : [];
+}
+
+function isImageAttachment(file) {
+    const contentType = String(file?.ContentType || "").toLowerCase();
+    return contentType.startsWith("image/") && Boolean(imageAttachmentUrl(file));
+}
+
+function audioAttachmentUrl(file) {
+    return publicHdfsAttachmentUrl(file);
+}
+
+function isAudioAttachment(file) {
+    const contentType = String(file?.ContentType || "").toLowerCase();
+    const fileName = String(file?.FileName || file?.FilePath || "").toLowerCase();
+    return (contentType.startsWith("audio/") || /\.(mp3|wav|flac|m4a|aac)$/i.test(fileName))
+        && Boolean(audioAttachmentUrl(file));
+}
+
+function formatMediaDuration(milliseconds) {
+    const seconds = Math.round(Number(milliseconds || 0) / 1000);
+    if (!Number.isFinite(seconds) || seconds <= 0) return "";
+    const minutes = Math.floor(seconds / 60);
+    const rest = String(seconds % 60).padStart(2, "0");
+    return `${minutes}:${rest}`;
+}
+
 async function sendProjectQuestion(text, assistantMessage) {
     const appType = inferProjectType(text);
     const appName = inferProjectName(text, appType);
@@ -2351,9 +2602,13 @@ async function sendProjectQuestion(text, assistantMessage) {
         `已创建 ${appType} AI应用：${data.Name || appName}`,
         `应用Id：${data.Id || ""}`,
         `已生成源码文件：${Array.isArray(data.Files) ? data.Files.length : 0} 个`,
-        "已自动切换到【AI应用】，你可以查看源码树、编辑文件并运行预览。"
+        "应用已登记到【应用商城】，并已打开开发工作台；后续也可从商城行操作进入预览或开发。"
     ].join("\n");
-    activeWorkspace.value = "apps";
+    if (data.Id) {
+        await proxy.$router.push({ name: "mic_ai_app_detail", params: { appId: data.Id } });
+    } else {
+        await proxy.$router.push({ path: "/microi-store" });
+    }
 }
 
 function inferProjectType(text) {
@@ -3869,6 +4124,53 @@ async function copyText(text) {
     margin-top: 8px;
 }
 
+.generated-image-card {
+    width: min(520px, 100%);
+    display: grid;
+    gap: 7px;
+    color: var(--ai-text-secondary, #445064);
+    font-size: 12px;
+}
+
+.generated-image-card :deep(.el-image) {
+    width: 100%;
+    max-height: 520px;
+    display: block;
+    object-fit: contain;
+    border: 1px solid var(--ai-border, #e2e7f0);
+    border-radius: 14px;
+    background: var(--ai-card, #fff);
+}
+
+.generated-image-card :deep(.el-image__inner) {
+    max-height: 518px;
+    cursor: zoom-in;
+}
+
+.generated-audio-card {
+    width: min(520px, 100%);
+    display: grid;
+    gap: 7px;
+    color: var(--ai-text-secondary, #445064);
+    font-size: 12px;
+}
+
+.generated-audio-card audio {
+    width: 100%;
+    min-height: 40px;
+}
+
+.generated-audio-card > span {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.generated-audio-card small {
+    color: var(--ai-text-muted, #7b8494);
+}
+
 .attachment-list {
     padding: 0 12px 8px;
 }
@@ -5039,55 +5341,374 @@ body.dark .ai-engine-page,
     box-shadow: var(--ai-shadow-hover);
 }
 
+.ai-engine-page:not(.is-compact) {
+    grid-template-columns: 248px minmax(0, 1fr);
+}
+
+.workspace-tabs,
+.workspace-tabs.single-tab {
+    display: flex;
+    grid-template-columns: none;
+    gap: 2px;
+    margin: 12px 12px 4px;
+    padding: 3px;
+    border: 1px solid var(--ai-border);
+    border-radius: 10px;
+    background: var(--ai-surface);
+}
+
+.workspace-tab {
+    flex: 1 1 0;
+    height: 34px;
+    gap: 6px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ai-text-secondary);
+    padding: 0 8px;
+    font-size: 13px;
+    font-weight: 550;
+}
+
+.workspace-tab:hover {
+    border: 0;
+    background: color-mix(in srgb, var(--ai-card) 72%, transparent);
+    box-shadow: none;
+    color: var(--ai-text);
+}
+
+.workspace-tab.active {
+    border: 0;
+    background: var(--ai-card);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .08);
+    color: var(--ai-primary);
+}
+
+.sidebar-actions {
+    gap: 8px;
+    padding: 8px 12px 12px;
+}
+
+.new-chat-btn {
+    height: 36px;
+    border: 1px solid color-mix(in srgb, var(--ai-primary) 26%, var(--ai-border));
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--ai-primary) 6%, var(--ai-card));
+    box-shadow: none;
+    color: var(--ai-primary);
+    font-weight: 600;
+}
+
+.new-chat-btn:hover,
+.new-chat-btn:focus-visible {
+    border-color: color-mix(in srgb, var(--ai-primary) 45%, var(--ai-border));
+    background: color-mix(in srgb, var(--ai-primary) 10%, var(--ai-card));
+    box-shadow: none;
+    color: var(--ai-primary);
+}
+
 .quick-prompts {
-    gap: 10px;
+    width: min(680px, 100%);
+    display: block;
+    margin-top: 8px;
+    border-top: 1px solid var(--ai-border);
 }
 
 .quick-prompt {
-    min-height: 92px;
+    width: 100%;
+    min-height: 44px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
     overflow: visible;
-    border-color: var(--ai-border);
-    border-radius: 12px;
-    background: var(--ai-card);
-    box-shadow: var(--ai-shadow);
-    transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+    border: 0;
+    border-bottom: 1px solid var(--ai-border);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 9px 4px;
+    transition: color .16s ease, background-color .16s ease;
 }
 
 .quick-prompt:hover {
     transform: none;
-    border-color: color-mix(in srgb, var(--ai-primary) 28%, var(--ai-border));
-    background: color-mix(in srgb, var(--ai-primary) 4%, var(--ai-card));
-    box-shadow: var(--ai-shadow-hover);
+    border-color: var(--ai-border);
+    background: color-mix(in srgb, var(--ai-primary) 4%, transparent);
+    box-shadow: none;
 }
 
-.quick-prompt .el-icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--ai-primary) 8%, var(--ai-card));
+.quick-prompt-content {
+    min-width: 0;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--ai-text);
+}
+
+.quick-prompt .quick-prompt-content strong {
+    display: block;
+    overflow: hidden;
+    color: var(--ai-text);
+    font-size: 14px;
+    font-weight: 550;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    -webkit-line-clamp: unset;
+}
+
+.quick-prompt .quick-prompt-content small {
+    overflow: hidden;
+    color: var(--ai-text-tertiary);
+    font-size: 12px;
+    line-height: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.quick-prompt .quick-prompt-arrow {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ai-text-tertiary);
+    font-size: 14px;
+    transition: color .16s ease, transform .16s ease;
+}
+
+.quick-prompt:hover .quick-prompt-arrow {
+    color: var(--ai-primary);
+    transform: translateX(2px);
+}
+
+.message-markdown {
+    white-space: normal;
+}
+
+.message-markdown :deep(> :first-child) {
+    margin-top: 0;
+}
+
+.message-markdown :deep(> :last-child) {
+    margin-bottom: 0;
+}
+
+.message-markdown :deep(p),
+.message-markdown :deep(ul),
+.message-markdown :deep(ol),
+.message-markdown :deep(blockquote),
+.message-markdown :deep(pre),
+.message-markdown :deep(table) {
+    margin: 0 0 12px;
+}
+
+.message-markdown :deep(h1),
+.message-markdown :deep(h2),
+.message-markdown :deep(h3),
+.message-markdown :deep(h4) {
+    margin: 18px 0 8px;
+    color: var(--ai-text);
+    font-weight: 650;
+    line-height: 1.4;
+}
+
+.message-markdown :deep(h1) { font-size: 20px; }
+.message-markdown :deep(h2) { font-size: 18px; }
+.message-markdown :deep(h3) { font-size: 16px; }
+.message-markdown :deep(h4) { font-size: 15px; }
+
+.message-markdown :deep(ul),
+.message-markdown :deep(ol) {
+    padding-left: 24px;
+}
+
+.message-markdown :deep(li + li) {
+    margin-top: 4px;
+}
+
+.message-markdown :deep(blockquote) {
+    border-left: 3px solid color-mix(in srgb, var(--ai-primary) 42%, var(--ai-border));
+    background: var(--ai-surface);
+    color: var(--ai-text-secondary);
+    padding: 8px 12px;
+}
+
+.message-markdown :deep(code) {
+    border-radius: 5px;
+    background: var(--ai-surface);
+    color: var(--ai-text);
+    padding: 2px 5px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: .92em;
+}
+
+.message-markdown :deep(pre) {
+    overflow-x: auto;
+    border: 1px solid var(--ai-border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ai-surface) 86%, #111827);
+    padding: 12px 14px;
+}
+
+.message-markdown :deep(pre code) {
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    white-space: pre;
+}
+
+.message-markdown :deep(a) {
+    color: var(--ai-primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.message-markdown :deep(table) {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.message-markdown :deep(th),
+.message-markdown :deep(td) {
+    border: 1px solid var(--ai-border);
+    padding: 7px 9px;
+    text-align: left;
 }
 
 .composer {
+    padding: 12px 24px 14px;
     background: var(--ai-bg);
 }
 
 .composer-box {
+    max-width: 920px;
     border: 1px solid var(--ai-border);
+    border-radius: 16px;
     background: var(--ai-panel);
-    box-shadow: 0 4px 16px rgba(15, 23, 42, .055);
+    box-shadow: 0 6px 20px rgba(15, 23, 42, .05);
 }
 
 .composer-box:focus-within {
-    border-color: color-mix(in srgb, var(--ai-primary) 42%, var(--ai-border));
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ai-primary) 8%, transparent),
-        0 4px 16px rgba(15, 23, 42, .055);
+    border-color: color-mix(in srgb, var(--ai-primary) 38%, var(--ai-border));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ai-primary) 7%, transparent),
+        0 6px 20px rgba(15, 23, 42, .05);
 }
 
-.new-chat-btn,
+.composer-box :deep(.el-textarea__inner) {
+    min-height: 48px !important;
+    border-radius: 15px 15px 0 0;
+    background: transparent;
+    padding: 14px 16px 8px;
+    line-height: 24px;
+}
+
+.composer-footer {
+    min-height: 42px;
+    gap: 8px;
+    border-top: 1px solid color-mix(in srgb, var(--ai-border) 72%, transparent);
+    padding: 6px 8px;
+}
+
+.composer-left,
+.composer-right {
+    gap: 4px;
+}
+
+.icon-action {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+}
+
+.composer-settings-trigger {
+    max-width: min(420px, 48vw);
+    height: 34px;
+    gap: 7px;
+    border-radius: 9px;
+    color: var(--ai-text-secondary);
+    padding: 0 10px;
+}
+
+.composer-settings-trigger:hover,
+.composer-settings-trigger:focus-visible {
+    background: var(--ai-surface);
+    color: var(--ai-text);
+}
+
+.composer-settings-trigger small {
+    overflow: hidden;
+    color: var(--ai-text-tertiary);
+    font-size: 11px;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.composer-settings {
+    display: grid;
+    gap: 10px;
+}
+
+.composer-setting-field,
+.composer-setting-status {
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--ai-text-secondary);
+    font-size: 13px;
+}
+
+.composer-settings .semantic-select,
+.composer-settings .reasoning-select,
+.composer-settings .composer-model-select,
+.composer-settings .relay-model-select {
+    width: 226px;
+    flex: 0 0 226px;
+}
+
+.composer-settings :deep(.el-input__wrapper) {
+    min-height: 32px;
+    border-radius: 8px;
+    background: var(--ai-panel);
+    box-shadow: 0 0 0 1px var(--ai-border) inset;
+}
+
+.schema-mode-tag {
+    max-width: 226px;
+}
+
+.ai-generation-disclaimer {
+    min-height: 24px;
+    padding: 0 12px 7px;
+}
+
 .send-btn,
 .store-link-btn {
     border-color: var(--ai-primary);
     background: var(--ai-primary);
-    box-shadow: 0 4px 12px color-mix(in srgb, var(--ai-primary) 16%, transparent);
+    box-shadow: 0 3px 9px color-mix(in srgb, var(--ai-primary) 14%, transparent);
+}
+
+.send-btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+}
+
+@media (max-width: 760px) {
+    .composer-settings-trigger small {
+        display: none;
+    }
+
+    .composer-settings-trigger {
+        max-width: none;
+    }
 }
 </style>
