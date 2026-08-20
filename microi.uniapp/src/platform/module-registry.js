@@ -4,6 +4,7 @@ import { findMenu, loadMenuTree } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition, parseJson } from '@/platform/native-form.js'
 import { normalizeStringList } from '@/platform/view-schema-core.mjs'
 import { appendSystemAuditFields, resolveConfiguredFieldNames, resolveConfiguredFields } from '@/platform/card-field-policy.mjs'
+import { compileModuleFilterFields } from '@/platform/list-filter-fields.mjs'
 
 const DEFAULT_ICON = '/static/microi-blue-256.png'
 const HEAVY_COMPONENTS = new Set([
@@ -189,22 +190,24 @@ function createModuleDefinition(module, definition) {
   const configuredBottomFields = configuredFields(module.menu.CardBottomTagFields, fields)
   const configuredBottom = configuredBottomFields.map((item) => item.field)
   const configuredSearch = configuredFieldNames(module.menu.SearchFieldIds, fields)
+  const filterFields = compileModuleFilterFields(module.menu.SearchFieldIds, appendSystemAuditFields(fields))
   const configuredStatistics = configuredFieldNames(module.menu.StatisticsFields, fields)
   // 后台已配置“移动端/卡片显示列”时必须严格使用该顺序；
   // SelectFields 只在未配置移动端列时作为兼容回退，不能混入卡片造成展示漂移。
   const preferredNames = configuredMobile.length ? configuredMobile : configuredList
-  const preferred = preferredNames.map((name) => fields.find((field) => field.Name === name)).filter(Boolean)
-  const titleField = preferredField(
-    preferred.length ? preferred : fields,
-    [/名称|标题|编号|姓名|name|title|code|no/i]
-  )
+  const preferred = preferredNames.map((name) => fields.find((field) =>
+    String(field.Name || '').toLowerCase() === String(name || '').toLowerCase()
+  )).filter(Boolean)
+  // “移动端/卡片显示列”的第一项固定作为标题，其余项严格按后台顺序进入正文。
+  // 不再按字段名称二次猜测或重排，否则主表与子表会出现配置相同、展示不同。
+  const titleField = configuredMobile.length
+    ? (preferred[0] || null)
+    : preferredField(preferred.length ? preferred : fields, [/名称|标题|编号|姓名|name|title|code|no/i])
   const excluded = new Set([titleField && titleField.Name].filter(Boolean))
-  // 显式卡片标题标签优先占用右上角状态位；只有后台未配置时才按字段名/标签自动推断。
-  const configuredStatus = configuredTagFields[0] || null
-  const statusField = configuredStatus
-    ? fields.find((field) => String(field.Name || '').toLowerCase() === String(configuredStatus.queryField || '').toLowerCase()) || null
-    : preferredField(fields, [/状态|status|stage/i], excluded, false)
-  if (statusField) excluded.add(statusField.Name)
+  // CardTitleTagFields 是旧式顶部标签，不等同于跨端视图的 StatusFields。
+  // 这里仅提供旧模块的状态名称兜底；Card-Mobile 配置会在运行时明确覆盖或清空它。
+  const statusField = preferredField(fields, [/状态|status|stage/i], excluded, false)
+  if (statusField && !configuredMobile.length) excluded.add(statusField.Name)
   let lines = preferred.filter((field) =>
     !excluded.has(field.Name) && !HEAVY_COMPONENTS.has(field.component)
   )
@@ -237,11 +240,14 @@ function createModuleDefinition(module, definition) {
     ...module,
     definition,
     titleField: titleField && titleField.Name || 'Id',
-    statusField: configuredStatus ? configuredStatus.field : (statusField && statusField.Name || ''),
+    statusField: statusField && statusField.Name || '',
     statusOptions: statusField ? (statusField.options || []).map((item) => item.value) : [],
     tagFields: configuredTags.slice(0, 3),
     bottomFields: configuredBottomFields.slice(0, 3),
     hasConfiguredCardFields: Boolean(configuredMobileFields.length || configuredTagFields.length || configuredBottomFields.length),
+    hasConfiguredMobileFields: Boolean(configuredMobileFields.length),
+    hasConfiguredTagFields: Boolean(configuredTagFields.length),
+    hasConfiguredBottomFields: Boolean(configuredBottomFields.length),
     selectFields: queryFields,
     // 弹窗表格等通用卡片必须保留平台配置顺序，不再自行截取前 4 个可见字段。
     cardFields: uniqueFieldNames([
@@ -250,6 +256,7 @@ function createModuleDefinition(module, definition) {
       ...configuredBottomFields.map((item) => item.queryField)
     ]),
     searchFields: configuredSearch,
+    filterFields,
     lines: lines.map((field) => ({
       field: configuredMobileByName.get(field.Name.toLowerCase())?.field || field.Name,
       label: configuredMobileByName.get(field.Name.toLowerCase())?.label || field.Label || field.Name,
@@ -270,11 +277,21 @@ export function createMenuModuleDefinition(menu, definition, table = null) {
   return createModuleDefinition(module, definition)
 }
 
-export async function loadModuleDefinition(menuId, refresh = false) {
+export async function loadModuleDefinition(menuId, refresh = false, options = {}) {
   const modules = await loadAccessibleModules(refresh)
-  const module = modules.find((item) =>
+  let module = modules.find((item) =>
     String(item.menuId) === String(menuId) || String(item.key) === String(menuId)
   )
+  // 隐藏菜单回读只能由关联子表等明确场景开启。普通业务列表仍只认
+  // Display/AppDisplay 可见模块，避免主列表被隐藏子菜单定义替换。
+  if (!module && options.includeHidden === true) {
+    const menu = await findMenu([], '', refresh, menuId)
+    if (menu && menu.DiyTableId) {
+      const tableMap = await loadTableMap([{ menu }])
+      const table = tableMap.get(String(menu.DiyTableId || ''))
+      module = baseModule(menu, null, table)
+    }
+  }
   if (!module) throw new Error('模块不存在或当前账号无权访问')
   const definition = await loadNativeFormDefinition(module.table, refresh, {
     menuId: module.menuId,

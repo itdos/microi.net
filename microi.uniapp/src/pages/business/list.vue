@@ -26,8 +26,9 @@
             <text>×</text>
           </view>
         </view>
-        <view v-if="filterFields.length" class="filter-button" :class="{ active: activeFilterCount > 0 }" @tap="openAdvancedFilters">
-          <text>筛选</text><text v-if="activeFilterCount">{{ activeFilterCount }}</text>
+        <view v-if="filterFields.length" class="filter-button" :class="{ active: activeFilterCount > 0 }" hover-class="filter-button--pressed" @tap="openAdvancedFilters">
+          <view class="filter-button__icon" aria-hidden="true"><view></view><view></view><view></view></view>
+          <text>筛选</text><text v-if="activeFilterCount" class="filter-button__count">{{ activeFilterCount }}</text>
         </view>
         <view class="search-button" @tap="resetSearch">重置</view>
       </view>
@@ -195,11 +196,51 @@
                 <text>至</text>
                 <input :value="rangeFilterValue(field, 'max')" type="digit" :placeholder="field.maxPlaceholder || '最大值'" @input="setRangeFilter(field, 'max', $event.detail.value)" />
               </view>
+              <view v-else-if="field.type === 'date-range'" class="filter-date-range">
+                <picker mode="date" :value="dateFilterValue(field, 'start')" @change="setDateFilter(field, 'start', $event.detail.value)">
+                  <view :class="{ placeholder: !dateFilterValue(field, 'start') }">{{ dateFilterValue(field, 'start') || '开始日期' }}</view>
+                </picker>
+                <text>至</text>
+                <picker mode="date" :value="dateFilterValue(field, 'end')" @change="setDateFilter(field, 'end', $event.detail.value)">
+                  <view :class="{ placeholder: !dateFilterValue(field, 'end') }">{{ dateFilterValue(field, 'end') || '结束日期' }}</view>
+                </picker>
+              </view>
               <view v-else-if="field.type === 'toggle'" class="filter-toggle">
                 <text>{{ field.description || field.label }}</text>
                 <switch :checked="Boolean(filterValues[field.key])" color="#0b86d4" @change="setToggleFilter(field, $event.detail.value)" />
               </view>
-              <view v-else class="filter-options">
+              <view v-else-if="isDropdownFilter(field)" class="filter-select">
+                <view
+                  class="filter-select__trigger"
+                  :class="{ open: expandedFilterKey === field.key }"
+                  hover-class="filter-select__trigger--pressed"
+                  @tap="toggleFilterDropdown(field)"
+                >
+                  <text :class="{ placeholder: !hasFilterValue(filterValues[field.key]) }">{{ filterSelectionLabel(field) }}</text>
+                  <view class="filter-select__arrow"></view>
+                </view>
+                <scroll-view
+                  v-if="expandedFilterKey === field.key"
+                  class="filter-select__menu"
+                  scroll-y
+                  :show-scrollbar="false"
+                  :style="{ height: filterDropdownHeight(field) }"
+                >
+                  <view
+                    v-for="option in filterOptionsFor(field)"
+                    :key="`${field.key}-dropdown-${option.value}`"
+                    class="filter-select__option"
+                    :class="{ active: isFilterOptionSelected(field, option) }"
+                    hover-class="filter-select__option--pressed"
+                    @tap="selectDropdownOption(field, option)"
+                  >
+                    <text>{{ option.label }}</text>
+                    <view class="filter-select__check" :class="{ multiple: field.multiple }"><text>✓</text></view>
+                  </view>
+                  <view v-if="!filterOptionsFor(field).length" class="filter-select__empty"><text>暂无可选项</text></view>
+                </scroll-view>
+              </view>
+              <view v-else class="filter-options" :class="{ 'filter-options--scrollable': filterOptionsFor(field).length > 8 }">
                 <view
                   v-for="option in filterOptionsFor(field)"
                   :key="`${field.key}-${option.value}`"
@@ -271,9 +312,14 @@ import {
 } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { appendStandardDeleteAction } from '@/platform/module-delete.js'
-import { fieldDisplayValue, parseJson } from '@/platform/native-form.js'
+import { fieldDisplayValue, loadNativeFieldOptionPage, parseJson } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
 import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
+import {
+  buildListFilterWhere,
+  hasListFilterValue,
+  mergeModuleFilterFields
+} from '@/platform/list-filter-fields.mjs'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciRestrictedRecordCard from '@/components/mci-restricted-record-card/mci-restricted-record-card.vue'
 import {
@@ -334,6 +380,7 @@ export default {
       approvalOpinions: [],
       actionSubmitting: false,
       filterOpen: false,
+      expandedFilterKey: '',
       filterLoading: false,
       filterValues: {},
       filterOptions: {},
@@ -378,10 +425,7 @@ export default {
     },
     activeFilterCount() {
       return this.filterFields.reduce((count, field) => {
-        const value = this.filterValues[field.key]
-        if (Array.isArray(value)) return count + (value.length ? 1 : 0)
-        if (value && typeof value === 'object') return count + ([value.min, value.max].some((item) => item !== undefined && item !== null && item !== '') ? 1 : 0)
-        return count + (value !== undefined && value !== null && value !== '' && value !== false ? 1 : 0)
+        return count + (hasListFilterValue(this.filterValues[field.key]) ? 1 : 0)
       }, 0)
     },
     statisticsValue() {
@@ -427,6 +471,9 @@ export default {
     this.clearRestrictedLookup()
   },
   methods: {
+    hasFilterValue(value) {
+      return hasListFilterValue(value)
+    },
     openCustomerMap() {
       const sort = this.selectedSort()
       const filters = {
@@ -483,18 +530,28 @@ export default {
       }
     },
     async initializeList(restored = false, refresh = false) {
-      try {
-        const menu = await findMenu(
-          this.baseConfig.menuAliases || [],
-          this.baseConfig.table,
-          refresh
-        )
-        if (menu && menu.Id) this.menuId = menu.Id
-      } catch (error) {}
+      if (!this.baseConfig.skipModuleMetadata) {
+        try {
+          const menu = await findMenu(
+            this.baseConfig.menuAliases || [],
+            this.baseConfig.table,
+            refresh
+          )
+          if (menu && menu.Id) {
+            this.menuId = menu.Id
+            // 移动端页面标题以后台模块名称（sys_menu.Name）为事实源；租户标题仅作无菜单兜底。
+            this.baseConfig = {
+              ...this.baseConfig,
+              menu,
+              title: menu.Name || this.baseConfig.title
+            }
+          }
+        } catch (error) {}
+      }
       this.baseConfig = { ...this.baseConfig, menuId: this.menuId }
       this.config = { ...this.config, menuId: this.menuId }
       await this.loadViewConfig(refresh)
-      if (!restored) await this.loadData(true, refresh)
+      if (!restored || !this.rowsContainConfiguredCardFields()) await this.loadData(true, refresh)
       if (restored && this.keyword.trim()) await this.loadRestrictedRows(refresh)
     },
     getMciListSnapshotKey() {
@@ -527,12 +584,18 @@ export default {
     async loadViewConfig(refresh = false) {
       try {
         let merged = { ...this.baseConfig, menuId: this.menuId }
+        if (this.baseConfig.skipModuleMetadata) {
+          this.config = merged
+          return
+        }
         if (this.menuId) {
           try {
             const menuConfig = await loadModuleDefinition(this.menuId, refresh)
+            const localFilterFields = merged.filterFields || []
             // 旧版菜单“卡片数据”没有摘要字段；移动显示列应完整进入内容行，
             // 不应继续被租户本地的 summaryField 改造成无标签摘要。
             merged = { ...merged, ...menuConfig, summaryField: '' }
+            merged.filterFields = mergeModuleFilterFields(menuConfig.filterFields, localFilterFields)
           } catch (error) {}
         }
         let manifest = await loadModuleViewManifest(this.baseConfig, {
@@ -557,11 +620,9 @@ export default {
         this.viewManifest = manifest
         if (manifest.Module && manifest.Module.Id) this.menuId = manifest.Module.Id
         merged.menuId = this.menuId
-        const arrayFields = ['tagFields', 'lines', 'statusOptions']
-        arrayFields.forEach((name) => {
-          if (merged.hasConfiguredCardFields && ['tagFields', 'lines'].includes(name)) return
-          if (dynamic[name]?.length) merged[name] = dynamic[name]
-        })
+        if (!merged.hasConfiguredMobileFields && dynamic.lines?.length) merged.lines = dynamic.lines
+        if (!merged.hasConfiguredMobileFields && dynamic.bottomFields?.length) merged.bottomFields = dynamic.bottomFields
+        if (dynamic.tagsFromViewSchema) merged.tagFields = dynamic.tagFields || []
         const scalarFields = [
           'titleField',
           'statusField',
@@ -573,18 +634,20 @@ export default {
           'statisticsFormat'
         ]
         scalarFields.forEach((name) => {
-          // ViewSchema 的显式标题/状态是最终展示事实源，不能被旧式卡片字段配置拦截。
+          if (name === 'titleField' && merged.hasConfiguredMobileFields) return
           if (merged.hasConfiguredCardFields && ['summaryField', 'imageField'].includes(name)) return
           if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') {
             merged[name] = dynamic[name]
           }
         })
-        if (dynamic.statusField) {
-          merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.statusField])]
+        if (dynamic.statusFromViewSchema) {
+          merged.statusField = dynamic.statusField || ''
+          merged.statusOptions = dynamic.statusOptions || []
         }
-        if (dynamic.titleField) {
-          merged.selectFields = [...new Set([...(merged.selectFields || []), dynamic.titleField])]
-        }
+        merged.selectFields = [...new Set([
+          ...(merged.selectFields || []),
+          ...(dynamic.requiredFields || [])
+        ].filter(Boolean))]
         if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema
         this.config = merged
       } catch (error) {}
@@ -706,6 +769,7 @@ export default {
       this.keyword = ''
       this.filterValues = {}
       this.filterOpen = false
+      this.expandedFilterKey = ''
       this.period = 'all'
       this.status = ''
       this.customStart = ''
@@ -744,11 +808,10 @@ export default {
     async refresh() {
       this.refreshing = true
       try {
-        await this.loadViewConfig(true)
-        await Promise.all([
-          this.loadData(true, true),
-          this.loadRestrictedRows(true)
-        ])
+        // 平台修改模块名称或卡片字段后，下拉刷新必须重新读取菜单本身，
+        // 不能只刷新 ViewSchema 和数据而继续显示旧标题。
+        await this.initializeList(false, true)
+        await this.loadRestrictedRows(true)
       } finally {
         this.refreshing = false
       }
@@ -757,33 +820,10 @@ export default {
       this.loadData(false)
     },
     buildFilterWhere() {
-      const result = []
-      if (this.whereField && this.whereValue) result.push({ Name: this.whereField, Type: '=', Value: this.whereValue })
-      this.filterFields.forEach((field) => {
-        if (field.type === 'sort') return
-        const value = this.filterValues[field.key]
-        if (field.type === 'range') {
-          if (value && value.min !== undefined && value.min !== '') result.push({ Name: field.field, Type: '>=', Value: Number(value.min) })
-          if (value && value.max !== undefined && value.max !== '') result.push({ Name: field.field, Type: '<=', Value: Number(value.max) })
-          return
-        }
-        if (field.type === 'toggle') {
-          if (!value) return
-          const resolved = field.currentUserField ? this.currentUser[field.currentUserField] : field.value
-          if (resolved !== undefined && resolved !== null && resolved !== '') {
-            result.push({ Name: field.field, Type: field.operation || '=', Value: resolved })
-          }
-          return
-        }
-        if (Array.isArray(value)) {
-          if (value.length) result.push({ Name: field.field, Type: field.operation || 'In', Value: value })
-          return
-        }
-        if (value !== undefined && value !== null && String(value).trim() !== '') {
-          result.push({ Name: field.field, Type: field.operation || (field.type === 'text' ? 'Like' : '='), Value: typeof value === 'string' ? value.trim() : value })
-        }
-      })
-      return result
+      const initial = this.whereField && this.whereValue
+        ? [{ Name: this.whereField, Type: '=', Value: this.whereValue }]
+        : []
+      return buildListFilterWhere(this.filterFields, this.filterValues, this.currentUser, initial)
     },
     selectedSort() {
       const field = this.filterFields.find((item) => item.type === 'sort')
@@ -793,13 +833,26 @@ export default {
     },
     async openAdvancedFilters() {
       this.filterOpen = true
+      this.expandedFilterKey = ''
       const pending = this.filterFields.filter((field) => field.source && !this.filterOptions[field.key])
       if (!pending.length) return
       this.filterLoading = true
       try {
         await Promise.all(pending.map(async (field) => {
           let rows = []
-          if (field.source === 'baseData') {
+          if (field.source === 'native-field') {
+            const nativeField = this.field(field.field)
+            if (!nativeField) return
+            const page = await loadNativeFieldOptionPage(nativeField, {}, {
+              menuId: this.menuId,
+              moduleEngineKey: this.config.key || this.config.moduleEngineKey || this.config.table,
+              pageIndex: 1,
+              pageSize: field.pageSize || 200,
+              timeoutMs: 15000
+            })
+            this.filterOptions[field.key] = page.options || []
+            return
+          } else if (field.source === 'baseData') {
             const result = await post('/api/SysBaseData/getSysBaseData', { ParentKey: field.parentKey }, true)
             if (result && Number(result.Code) === 1) rows = result.Data || []
           } else if (field.source === 'table') {
@@ -810,6 +863,12 @@ export default {
               _OrderByType: field.orderType || 'DESC',
               _SelectFields: ['Id', field.valueField || 'Id', field.labelField || 'Name']
             })
+            if (result && Number(result.Code) === 1) rows = result.Data || []
+          } else if (field.source === 'api-engine' && field.apiEngineKey) {
+            const result = await V8.ApiEngine.Run(field.apiEngineKey, {
+              _PageIndex: 1,
+              _PageSize: field.pageSize || 500
+            }, { checkCode: false })
             if (result && Number(result.Code) === 1) rows = result.Data || []
           }
           this.filterOptions[field.key] = rows.map((row) => ({
@@ -823,8 +882,33 @@ export default {
         this.filterLoading = false
       }
     },
-    closeAdvancedFilters() { this.filterOpen = false },
-    filterOptionsFor(field) { return field.options || this.filterOptions[field.key] || [] },
+    closeAdvancedFilters() {
+      this.filterOpen = false
+      this.expandedFilterKey = ''
+    },
+    filterOptionsFor(field) {
+      const loaded = this.filterOptions[field.key]
+      return Array.isArray(loaded) ? loaded : (field.options || [])
+    },
+    isDropdownFilter(field) {
+      if (!field || field.type !== 'options') return false
+      if (field.presentation === 'dropdown' || field.displaySelect === true) return true
+      return ['Select', 'MultipleSelect', 'Autocomplete', 'Cascader', 'SelectTree', 'TreeCheckbox', 'Department', 'Transfer'].includes(field.component)
+    },
+    toggleFilterDropdown(field) {
+      this.expandedFilterKey = this.expandedFilterKey === field.key ? '' : field.key
+    },
+    filterDropdownHeight(field) {
+      return `${Math.min(Math.max(this.filterOptionsFor(field).length, 1), 6) * 64 + 12}rpx`
+    },
+    filterSelectionLabel(field) {
+      const selected = this.filterOptionsFor(field)
+        .filter((option) => this.isFilterOptionSelected(field, option))
+        .map((option) => option.label)
+      if (!selected.length) return `请选择${field.label}`
+      if (!field.multiple || selected.length <= 2) return selected.join('、')
+      return `已选择 ${selected.length} 项`
+    },
     isFilterOptionSelected(field, option) {
       const value = this.filterValues[field.key]
       if (field.multiple) return Array.isArray(value) && value.some((item) => String(item) === String(option.value))
@@ -841,6 +925,10 @@ export default {
         this.filterValues[field.key] = this.isFilterOptionSelected(field, option) ? '' : option.value
       }
     },
+    selectDropdownOption(field, option) {
+      this.selectFilterOption(field, option)
+      if (!field.multiple) this.expandedFilterKey = ''
+    },
     setToggleFilter(field, value) { this.filterValues[field.key] = value },
     rangeFilterValue(field, side) {
       const value = this.filterValues[field.key]
@@ -849,9 +937,29 @@ export default {
     setRangeFilter(field, side, value) {
       this.filterValues[field.key] = { ...(this.filterValues[field.key] || { min: '', max: '' }), [side]: value }
     },
-    resetAdvancedFilters() { this.filterValues = {} },
+    dateFilterValue(field, side) {
+      const value = this.filterValues[field.key]
+      return value && typeof value === 'object' ? value[side] || '' : ''
+    },
+    setDateFilter(field, side, value) {
+      this.filterValues[field.key] = { ...(this.filterValues[field.key] || { start: '', end: '' }), [side]: value }
+    },
+    resetAdvancedFilters() {
+      this.filterValues = {}
+      this.expandedFilterKey = ''
+    },
     applyAdvancedFilters() {
+      const invalidDate = this.filterFields.find((field) => {
+        if (field.type !== 'date-range') return false
+        const value = this.filterValues[field.key]
+        return value && value.start && value.end && value.start > value.end
+      })
+      if (invalidDate) {
+        uni.showToast({ title: `${invalidDate.label}开始日期不能晚于结束日期`, icon: 'none' })
+        return
+      }
       this.filterOpen = false
+      this.expandedFilterKey = ''
       this.loadData(true, true)
     },
     getTitle(row) {
@@ -862,7 +970,10 @@ export default {
       return key ? formatFieldValue(row[key], '', { empty: '' }) : `记录 ${String(row.Id || '').slice(-6)}`
     },
     getStatus(row) {
-      return formatFieldValue(row[this.config.statusField], '', { empty: '' })
+      const value = this.config.statusField
+        ? this.configuredFieldValue(row, this.config.statusField)
+        : ''
+      return value === '-' ? '' : value
     },
     getStatusClass(row) {
       const statusText = String(this.getStatus(row))
@@ -899,6 +1010,17 @@ export default {
         this.config.summaryField,
         ...(this.config.tagFields || [])
       ])
+    },
+    rowsContainConfiguredCardFields() {
+      if (!this.rows.length) return true
+      const fields = [
+        this.config.titleField,
+        ...(this.config.lines || []).map((line) => line.field),
+        ...(this.config.bottomFields || []).map((item) => typeof item === 'string' ? item : item?.field),
+        ...(this.config.tagFields || []).map((item) => typeof item === 'string' ? item : item?.field),
+        this.config.statusField
+      ].filter(Boolean)
+      return this.rows.every((row) => fields.every((field) => Object.prototype.hasOwnProperty.call(row, field)))
     },
     displayValue(row, line) {
       return this.configuredFieldValue(row, line.field, line.format)
@@ -938,7 +1060,7 @@ export default {
         .filter((value) => value && value !== '-')
       return values.length
         ? values.join(' · ')
-        : this.formatCreateTime(row.CreateTime || row.UpdateTime)
+        : (this.config.hasConfiguredMobileFields ? '' : this.formatCreateTime(row.CreateTime || row.UpdateTime))
     },
     formatCreateTime(value) {
       return formatDateTime(value)
@@ -1296,10 +1418,17 @@ export default {
   height: 72rpx;
   color: #607a85;
   font-size: 24rpx;
+  transition: color 140ms ease, background-color 140ms ease, transform 140ms ease;
 }
 
 .filter-button.active { color: #0b86d4; font-weight: 650; }
-.filter-button > text:last-child:not(:first-child) { min-width: 28rpx; height: 28rpx; margin-left: 5rpx; padding: 0 4rpx; border-radius: 14rpx; color: #fff; background: #e94b2c; font-size: 18rpx; line-height: 28rpx; text-align: center; }
+.filter-button--pressed { border-radius: 10rpx; background: #edf6fa; transform: scale(.96); }
+.filter-button__icon { display: flex; flex-direction: column; align-items: flex-start; gap: 4rpx; width: 24rpx; margin-right: 7rpx; }
+.filter-button__icon view { height: 3rpx; border-radius: 2rpx; background: currentColor; }
+.filter-button__icon view:nth-child(1) { width: 24rpx; }
+.filter-button__icon view:nth-child(2) { width: 16rpx; }
+.filter-button__icon view:nth-child(3) { width: 8rpx; }
+.filter-button__count { min-width: 28rpx; height: 28rpx; margin-left: 5rpx; padding: 0 4rpx; border-radius: 14rpx; color: #fff; background: #e94b2c; font-size: 18rpx; line-height: 28rpx; text-align: center; }
 
 .search-input {
   box-sizing: border-box;
@@ -1850,7 +1979,30 @@ export default {
 .filter-range { display: grid; grid-template-columns: minmax(0, 1fr) 38rpx minmax(0, 1fr); gap: 8rpx; align-items: center; margin-top: 14rpx; }
 .filter-range input { box-sizing: border-box; width: 100%; height: 68rpx; padding: 0 16rpx; border: 1rpx solid #dce8ed; border-radius: 8rpx; color: #294b57; background: #f7fafb; font-size: 23rpx; text-align: center; }
 .filter-range text { color: #8b9da4; font-size: 21rpx; text-align: center; }
+.filter-date-range { display: grid; grid-template-columns: minmax(0, 1fr) 38rpx minmax(0, 1fr); gap: 8rpx; align-items: center; margin-top: 14rpx; }
+.filter-date-range picker > view { box-sizing: border-box; width: 100%; height: 68rpx; padding: 0 12rpx; overflow: hidden; border: 1rpx solid #dce8ed; border-radius: 8rpx; color: #294b57; background: #f7fafb; font-size: 21rpx; line-height: 68rpx; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.filter-date-range picker > view.placeholder { color: #9aaab0; }
+.filter-date-range > text { color: #8b9da4; font-size: 21rpx; text-align: center; }
+.filter-select { margin-top: 14rpx; }
+.filter-select__trigger { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; width: 100%; height: 68rpx; padding: 0 18rpx; border: 1rpx solid #dce8ed; border-radius: 8rpx; background: #f7fafb; transition: border-color 140ms ease, background-color 140ms ease; }
+.filter-select__trigger.open { border-color: rgba(11, 134, 212, 0.55); border-radius: 8rpx 8rpx 0 0; background: #fff; }
+.filter-select__trigger--pressed { background: #eef6f8; }
+.filter-select__trigger > text { min-width: 0; flex: 1; overflow: hidden; color: #294b57; font-size: 23rpx; text-overflow: ellipsis; white-space: nowrap; }
+.filter-select__trigger > text.placeholder { color: #9aaab0; }
+.filter-select__arrow { flex: 0 0 auto; width: 13rpx; height: 13rpx; margin: -7rpx 4rpx 0 0; border-right: 2rpx solid #77909a; border-bottom: 2rpx solid #77909a; transform: rotate(45deg); transition: transform 140ms ease, margin 140ms ease; }
+.filter-select__trigger.open .filter-select__arrow { margin-top: 7rpx; transform: rotate(225deg); }
+.filter-select__menu { box-sizing: border-box; width: 100%; border: 1rpx solid rgba(11, 134, 212, 0.35); border-top: 0; border-radius: 0 0 8rpx 8rpx; background: #fff; box-shadow: 0 12rpx 28rpx rgba(34, 74, 92, 0.12); }
+.filter-select__option { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 14rpx; height: 64rpx; padding: 0 18rpx; border-bottom: 1rpx solid #edf2f4; color: #526f7a; font-size: 22rpx; }
+.filter-select__option:last-child { border-bottom: 0; }
+.filter-select__option > text { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-select__option.active { color: #087dad; background: #edf8fb; font-weight: 650; }
+.filter-select__option--pressed { background: #e7f4f8; }
+.filter-select__check { display: flex; align-items: center; justify-content: center; width: 30rpx; height: 30rpx; border: 1rpx solid #cad9df; border-radius: 50%; color: transparent; background: #fff; font-size: 20rpx; line-height: 1; }
+.filter-select__check.multiple { border-radius: 6rpx; }
+.filter-select__option.active .filter-select__check { border-color: #0b86d4; color: #fff; background: #0b86d4; }
+.filter-select__empty { height: 76rpx; color: #94a5ab; font-size: 21rpx; line-height: 76rpx; text-align: center; }
 .filter-options { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 14rpx; }
+.filter-options--scrollable { max-height: 330rpx; padding-right: 8rpx; overflow-y: auto; overscroll-behavior: contain; }
 .filter-option { min-width: 132rpx; height: 58rpx; padding: 0 16rpx; border: 1rpx solid #dce8ed; border-radius: 8rpx; color: #607a85; background: #f8fbfc; font-size: 21rpx; line-height: 58rpx; text-align: center; transition: transform 140ms ease, background 140ms ease; }
 .filter-option.active { border-color: rgba(11, 134, 212, 0.38); color: #087dad; background: #e9f6fa; font-weight: 650; }
 .filter-option--pressed { transform: scale(0.96); }

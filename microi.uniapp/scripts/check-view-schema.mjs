@@ -96,13 +96,16 @@ const menu = {
           Layout: {
             Card: {
               TitleField: 'KehuMC',
-              StatusField: 'Zhuangtai',
-              TagFields: ['KehuLX'],
+              StatusFields: [{ Name: 'Zhuangtai', DisplayStyle: 'Tag' }],
+              TopFields: ['KehuLX'],
+              SubtitleFields: [
+                { Name: 'FuzeR', ShowLabel: true }
+              ],
               Fields: [
-                { Name: 'FuzeR', ShowLabel: true },
                 { Name: 'InternalCode', Label: '内部编号', ShowLabel: false },
                 { Name: 'KehuLX', Label: '客户类型' }
-              ]
+              ],
+              BottomFields: ['CreateTime']
             },
             Statistics: { Field: 'YuqiJYJE', Label: '预期交易额', Format: 'money' }
           }
@@ -177,17 +180,58 @@ const cardManifest = buildRenderManifest(menu, {
   user: { RoleIds: ['sales'] }
 })
 const cardConfig = compileListConfig(cardManifest, [
+  { Name: 'Zhuangtai', Label: '状态', options: [{ value: 'Active', label: '合作中' }] },
   { Name: 'FuzeR', Label: '负责人' },
   { Name: 'InternalCode', Label: '内部编号' },
   { Name: 'KehuLX', Label: '客户类型' }
 ])
 assert.equal(cardConfig.titleField, 'KehuMC')
+assert.equal(cardConfig.statusField, 'Zhuangtai')
+assert.equal(cardConfig.statusFromViewSchema, true)
+assert.deepEqual(cardConfig.statusOptions, ['Active'], '状态筛选值应跟随跨端状态字段的数据源')
 assert.equal(cardConfig.statisticsField, 'YuqiJYJE')
 assert.equal(cardConfig.lines[0].label, '负责人', 'ShowLabel=true 应从 diy_field 元数据补充中文标签')
 assert.equal(cardConfig.lines[0].showLabel, true)
 assert.equal(cardConfig.lines[1].label, undefined, 'ShowLabel=false 应隐藏显式 Label')
 assert.equal(cardConfig.lines[1].showLabel, false)
 assert.equal(cardConfig.lines[2].label, '客户类型', '未配置 ShowLabel 时应继续兼容显式 Label')
+assert.deepEqual(cardConfig.bottomFields.map((item) => item.field), ['CreateTime'])
+assert.deepEqual(
+  cardConfig.requiredFields,
+  ['KehuMC', 'Zhuangtai', 'KehuLX', 'FuzeR', 'InternalCode', 'CreateTime'],
+  '跨端卡片引用的全部字段都必须进入列表查询'
+)
+
+const disabledFormMenu = { ...menu, EnableViewSchema: 0 }
+assert.equal(
+  selectViewDefinition(disabledFormMenu, { scene: 'Detail', device: 'Mobile' }),
+  null,
+  'EnableViewSchema=0 只应关闭 Detail/Edit 自定义表单'
+)
+assert.equal(
+  selectViewDefinition(disabledFormMenu, { scene: 'Card', device: 'Mobile' })?.Key,
+  'customer-card',
+  'EnableViewSchema=0 时 Card-Mobile 展示配置仍必须生效'
+)
+
+const emptyStatusMenu = {
+  ...disabledFormMenu,
+  ViewSchema: JSON.stringify({
+    Views: [{
+      Key: 'card-without-status',
+      Scene: 'Card',
+      Device: 'Mobile',
+      Layout: { Card: { TitleField: 'KehuMC', StatusFields: [] } }
+    }]
+  })
+}
+const emptyStatusConfig = compileListConfig(buildRenderManifest(emptyStatusMenu, {
+  scene: 'Card',
+  device: 'Mobile'
+}))
+assert.equal(emptyStatusConfig.statusFromViewSchema, true)
+assert.equal(emptyStatusConfig.statusField, '', '跨端卡片未配置状态字段时不得回退旧式标题标签')
+assert.deepEqual(emptyStatusConfig.statusOptions, [], '未配置状态字段时不得保留旧状态筛选项')
 
 const validation = validateViewSchema(menu)
 assert.equal(validation.valid, true)

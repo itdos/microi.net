@@ -21,6 +21,7 @@ async function verifySdk(name, createMicroiV8) {
   })
 
   await V8.FormEngine.AddFormData('Diy_Dingdan', {
+    Id: 'order-add-1',
     DingdanMC: 'new-order',
     _SysMenuId: 'menu-order',
     _InvokeType: 'Client'
@@ -48,6 +49,8 @@ async function verifySdk(name, createMicroiV8) {
   const add = requests[0]
   assert.match(add.url, /\/api\/FormEngine\/addFormData(?:\?|$)/)
   assert.equal(add.data.FormEngineKey, 'Diy_Dingdan')
+  assert.equal(add.data.Id, 'order-add-1')
+  assert.equal(add.data._RowModel.Id, 'order-add-1')
   assert.equal(add.data._RowModel.DingdanMC, 'new-order')
   assert.equal(add.data._RowModel._SysMenuId, 'menu-order')
   assert.equal(add.data._RowModel._InvokeType, 'Client')

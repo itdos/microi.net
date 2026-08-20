@@ -43,8 +43,47 @@ assert.deepEqual(emptyOrderAmountValues(), {
 const formSource = fs.readFileSync(new URL('../src/tenants/xjy/form.js', import.meta.url), 'utf8')
 const nativeFormSource = fs.readFileSync(new URL('../src/pages/native-form/index.vue', import.meta.url), 'utf8')
 const detailSource = fs.readFileSync(new URL('../src/pages/business/detail.vue', import.meta.url), 'utf8')
+const orderBeforeServerSource = fs.readFileSync(new URL(
+  '../../Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/表单引擎/订单（Diy_Dingdan）/表单V8事件/后端表单提交前V8事件（SubmitBeforeServerV8）.js',
+  import.meta.url
+), 'utf8')
 assert.equal(formSource.includes('UptFormData(ORDER_TABLE'), false)
 assert.equal(nativeFormSource.includes('refreshTenantFormDerivedValues(this.tenantFormContext())'), true)
 assert.equal(detailSource.includes('refreshTenantFormDerivedValues(this.tenantDetailFormContext())'), true)
+
+function runOrderBeforeServer(form, param, getTableData) {
+  const V8 = {
+    Form: form,
+    Param: param,
+    FormSubmitAction: 'Insert',
+    CurrentUser: { TenantId: 'tenant-1', TenantName: '租户一' },
+    Action: { GetSysBaseDataKey: () => '' },
+    FormEngine: { GetTableData: getTableData },
+    DbTrans: {}
+  }
+  const result = new Function('V8', orderBeforeServerSource)(V8)
+  return { result, V8 }
+}
+
+const missingOrderId = runOrderBeforeServer({}, {}, () => {
+  throw new Error('订单 Id 为空时不得查询订单商品')
+})
+assert.equal(missingOrderId.result.Code, 0)
+
+let queriedOrderId = ''
+const recoveredOrderId = runOrderBeforeServer({}, { Id: 'order-add-1' }, (request) => {
+  queriedOrderId = request._Where[0].Value
+  return { Code: 1, Data: [] }
+})
+assert.equal(recoveredOrderId.result, undefined)
+assert.equal(recoveredOrderId.V8.Form.Id, 'order-add-1')
+assert.equal(queriedOrderId, 'order-add-1')
+assert.deepEqual(emptyOrderAmountValues(), {
+  DingdanJE: recoveredOrderId.V8.Form.DingdanJE,
+  DingdanXJ: recoveredOrderId.V8.Form.DingdanXJ,
+  YouhuiHHTZJ: recoveredOrderId.V8.Form.YouhuiHHTZJ,
+  YouhuiFD: recoveredOrderId.V8.Form.YouhuiFD,
+  HuanxinJE: recoveredOrderId.V8.Form.HuanxinJE
+})
 
 console.log('xjy order summary checks passed')

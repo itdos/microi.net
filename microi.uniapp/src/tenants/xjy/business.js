@@ -83,6 +83,21 @@ export const businessGroups = [
 const native = (config) => ({ target: 'native-list', pageSize: 15, ...config })
 
 const yesNoOptions = [{ label: '是', value: 1 }, { label: '否', value: 0 }]
+const directoryFilterFields = [
+  { key: 'Account', label: '帐号', field: 'Account', type: 'text' },
+  { key: 'Name', label: '姓名', field: 'Name', type: 'text' },
+  { key: 'Phone', label: '手机号', field: 'Phone', type: 'text' },
+  { key: 'Email', label: '邮箱', field: 'Email', type: 'text' },
+  { key: 'DeptName', label: '组织机构', field: 'DeptName', type: 'text' },
+  {
+    key: 'RoleIds', label: '角色', field: 'RoleIds', type: 'options', component: 'MultipleSelect', presentation: 'dropdown', multiple: true, multiValueLike: true,
+    source: 'api-engine', apiEngineKey: 'get-sys-user-roles', valueField: 'Id', labelField: 'Name', pageSize: 500
+  },
+  { key: 'Level', label: '角色级别', field: 'Level', type: 'range' },
+  { key: 'No', label: '员工编号', field: 'No', type: 'text' },
+  { key: 'Remark', label: '备注', field: 'Remark', type: 'text' },
+  { key: 'CreateTime', label: '创建时间', field: 'CreateTime', type: 'date-range' }
+]
 const customerSortOptions = [
   { label: '预期金额从高到低', value: 'amount-desc', field: 'YuqiJYJE', order: 'DESC' },
   { label: '预期金额从低到高', value: 'amount-asc', field: 'YuqiJYJE', order: 'ASC' },
@@ -435,7 +450,7 @@ export const businessModules = {
     ]
   }),
   proposals: native({
-    title: '客户方案', table: 'Diy_kehufaxx', menuAliases: ['客户方案', '方案管理'],
+    title: '需求方案', table: 'Diy_kehufaxx', menuAliases: ['需求方案', '客户方案', '方案管理'],
     titleField: 'FanganMC', tagFields: ['YujiHZSJ'],
     relatedMetrics: [
       { key: 'positions', label: '场所点位数量合计', aggregateField: 'ChangsuoDWSL', tone: 'primary' },
@@ -521,9 +536,11 @@ export const businessModules = {
     lines: [{ label: '创建人', field: 'UserName' }, { label: '所属商家', field: 'TenantName' }, { label: '修改时间', field: 'UpdateTime', format: 'datetime' }]
   }),
   directory: native({
-    title: '通讯录', table: 'Sys_User', menuAliases: ['通讯录', '组织通讯录', '系统用户'],
+    title: '通讯录', table: 'Sys_User', menuAliases: ['通讯录', '组织通讯录', '系统账号', '系统用户'],
+    listApiEngineKey: 'get-sysUser-list', skipModuleMetadata: true,
     titleField: 'Name', statusField: 'State', tagFields: ['RoleName', 'DeptName'], phoneField: 'Phone',
-    lines: [{ label: '帐号', field: 'Account' }, { label: '部门', field: 'DeptName' }, { label: '联系电话', field: 'Phone', format: 'phone' }]
+    lines: [{ label: '帐号', field: 'Account' }, { label: '部门', field: 'DeptName' }, { label: '联系电话', field: 'Phone', format: 'phone' }],
+    filterFields: directoryFilterFields
   }),
   recruitment: native({
     title: '应聘', table: 'diy_zhaopin', menuAliases: ['应聘', '招聘管理'],
