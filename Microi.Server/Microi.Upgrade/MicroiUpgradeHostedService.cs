@@ -195,10 +195,10 @@ namespace Microi.net
                     }
                     // 表单事件运行时已经直接读取 diy_table.V8Limit。不能仅依赖
                     // 可能漂移的 ServerVersion：在共享升级租约内幂等补齐元数据，
-                    // 并只为 V8Limit IS NULL 的旧行反转 V8Unlimited，保留用户显式值。
+                    // 并只初始化 V8Limit IS NULL 的旧行，保留用户之后的显式值。
                     upgradeLease.ThrowIfLost();
                     var formV8LimitMessages = await new Upgrade33()
-                        .Run(runtimeClient.OsClient)
+                        .Run(runtimeClient.OsClient, resetExistingValues: false)
                         .ConfigureAwait(false);
                     if (formV8LimitMessages.Count > 0)
                     {

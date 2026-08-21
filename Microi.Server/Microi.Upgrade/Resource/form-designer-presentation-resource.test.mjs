@@ -23,6 +23,16 @@ const expectedFieldsByTab = {
         "FormNavigationFooterHtml",
         "FormRecordSelectorPlaceholder",
         "FormRecordSelectorLabelFields"
+    ],
+    "表单 Banner": [
+        "FormBannerEnabled",
+        "FormBannerTitleField",
+        "FormBannerSubtitleField",
+        "FormBannerImageField",
+        "FormBannerIcon",
+        "FormBannerBackgroundField",
+        "FormBannerTagFields",
+        "FormBannerMetrics"
     ]
 };
 
@@ -35,7 +45,7 @@ function assertPresentationResource(resource) {
 
     const tabs = typeof table.Tabs === "string" ? JSON.parse(table.Tabs) : table.Tabs;
     const tabsByName = new Map(tabs.map((item) => [item.Name, item]));
-    for (const name of ["表单信息", "工作台与分组", "标题、说明与记录切换", "事件"]) {
+    for (const name of ["表单信息", "工作台与分组", "标题、说明与记录切换", "表单 Banner", "事件"]) {
         assert.ok(tabsByName.has(name), `missing diy_table property tab: ${name}`);
     }
 
@@ -67,7 +77,7 @@ function assertPresentationResource(resource) {
     }
 }
 
-test("form designer presentation is stored in semantic diy_table fields and two peer property tabs", () => {
+test("form designer presentation is stored in semantic diy_table fields and peer property tabs", () => {
     assertPresentationResource(parseResource(resourceUrl));
 });
 
@@ -75,7 +85,8 @@ test("DiyTable model projects every semantic presentation field", () => {
     const model = fs.readFileSync(modelUrl, "utf8");
     for (const names of Object.values(expectedFieldsByTab)) {
         for (const name of names.filter((item) => item !== "TabsPosition")) {
-            assert.match(model, new RegExp(`\\[Field\\("${name}"\\)\\][\\s\\S]{0,120}public string ${name}\\b`));
+            const type = name === "FormBannerEnabled" ? "int\\?" : "string";
+            assert.match(model, new RegExp(`\\[Field\\("${name}"\\)\\][\\s\\S]{0,160}public ${type} ${name}\\b`));
         }
     }
 });

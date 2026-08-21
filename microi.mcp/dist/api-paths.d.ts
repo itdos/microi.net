@@ -42,6 +42,8 @@ export declare const API: {
     readonly CREATE_ENGINE: "/api/V8Engine/CreateApiEngine";
     readonly EXECUTE_ENGINE: "/api/V8Engine/ExecuteApiEngine";
     readonly RUN_BACKGROUND_API_ENGINE: "/api/BackgroundTask/RunApiEngine";
+    readonly LIST_BACKGROUND_TASKS: "/api/BackgroundTask/List";
+    readonly CANCEL_BACKGROUND_TASK: "/api/BackgroundTask/Cancel";
     readonly UPLOAD_FILE_BASE64: "/api/V8Engine/UploadFileBase64";
     readonly UPLOAD_APPLICATION_ASSET_STREAM: "/api/V8Engine/UploadApplicationAssetStream";
     readonly INITIATE_APPLICATION_ASSET_MULTIPART: "/api/V8Engine/InitiateApplicationAssetMultipart";

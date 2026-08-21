@@ -99,8 +99,13 @@ test("configured list presentation overrides the default title and mobile receiv
 
 test("menu badge configuration is disabled unless both switch and ApiEngine are configured", () => {
     assert.equal(normalizeMenuBadgeConfig({ Enabled: 1 }).Enabled, false);
-    const config = normalizeMenuBadgeConfig({ Enabled: 1, ApiEngineKey: "inventory_badge" });
+    const config = normalizeMenuBadgeConfig({
+        Enabled: 1,
+        ApiEngineKey: "inventory_badge",
+        Tooltip: "  当前低库存商品数  "
+    });
     assert.equal(config.Enabled, true);
+    assert.equal(config.Tooltip, "当前低库存商品数");
     assert.equal(config.ValuePath, "Data.Value");
     assert.equal(formatBadgeValue(210, config), "99+");
     assert.equal(formatBadgeValue(0, config), null);

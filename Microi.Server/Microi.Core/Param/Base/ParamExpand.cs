@@ -956,6 +956,8 @@ namespace Microi.net
         public int? MenuBadgeEnabled { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string MenuBadgeApiEngineKey { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string MenuBadgeTooltip { get; set; }
         public int? EnableViewSchema { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string ViewSchemaVersion { get; set; }

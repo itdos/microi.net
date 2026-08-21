@@ -11,10 +11,6 @@
                 </div>
             </div>
             <div class="head-actions">
-                <div class="enable-control">
-                    <span>启用自定义表单视图</span>
-                    <el-switch v-model="enabled" :disabled="readonly" />
-                </div>
                 <el-tag :type="syncStateType" effect="plain">{{ syncStateText }}</el-tag>
             </div>
         </header>
@@ -128,6 +124,8 @@
                         title="跨端视图负责字段编排，字段模板负责复杂渲染，两者可以叠加使用"
                         description="字段已经配置表格模板时，主字段、次要行和右侧附加字段会直接复用其安全渲染结果；简单多行布局优先在这里配置，复杂条件、组合标签或自定义 HTML 再使用字段模板。"
                     />
+                    <div class="pc-composite-scroll" role="region" aria-label="PC 复合列配置，可左右滚动">
+                    <div class="pc-composite-canvas">
                     <el-empty v-if="listView.Layout.List.Columns.length === 0" description="尚未配置 PC 复合列" :image-size="52" />
                     <article v-for="(column, columnIndex) in listView.Layout.List.Columns" :key="`column_${columnIndex}`" class="config-block">
                         <div class="block-head">
@@ -176,6 +174,8 @@
                             </div>
                         </div>
                     </article>
+                    </div>
+                    </div>
                 </section>
             </el-tab-pane>
 
@@ -226,36 +226,12 @@
                 </div>
             </el-tab-pane>
 
-            <el-tab-pane label="自定义表单" name="form-json" lazy>
-                <section class="designer-card json-card">
-                    <div class="card-head">
-                        <div>
-                            <div class="card-title">Detail / Edit 自定义表单视图</div>
-                            <div class="form-tip">此处只编辑 Detail/Edit 场景，并合并回完整 ViewSchema；“启用自定义表单视图”仅控制这部分。标题与统计、PC 复合列和移动端卡片只要配置就始终生效。</div>
-                        </div>
-                        <div class="inline-actions">
-                            <el-button size="small" :disabled="readonly" @click="refreshCustomFormJson">从完整配置刷新</el-button>
-                            <el-button size="small" type="primary" :disabled="readonly" @click="applyCustomFormJson">校验并应用</el-button>
-                        </div>
-                    </div>
-                    <el-alert
-                        class="designer-alert"
-                        type="info"
-                        show-icon
-                        :closable="false"
-                        title="JSON 根节点使用 Views 数组，只允许 Scene=Detail 或 Scene=Edit；为空表示继续使用标准表单。"
-                    />
-                    <el-input v-model="customFormJson" type="textarea" :rows="22" resize="vertical" :disabled="readonly" spellcheck="false" @input="onCustomFormJsonInput" />
-                    <el-alert v-if="customFormJsonError" class="json-error" type="error" :closable="false" show-icon :title="customFormJsonError" />
-                </section>
-            </el-tab-pane>
-
             <el-tab-pane label="高级 JSON" name="json" lazy>
                 <section class="designer-card json-card">
                     <div class="card-head">
                         <div>
                             <div class="card-title">完整 ViewSchema</div>
-                            <div class="form-tip">保留全部 List/Card/Detail/Edit、角色专属视图及未知扩展字段。List/Card 不受启用开关影响，Detail/Edit 由“启用自定义表单视图”控制；这里只解析 JSON，不会执行 eval 或任意脚本。</div>
+                            <div class="form-tip">保留全部 List/Card、角色专属视图及未知扩展字段。历史 Detail/Edit 配置仅用于兼容迁移，其中的 Banner 会由标准表单复用；这里只解析 JSON，不会执行 eval 或任意脚本。</div>
                         </div>
                         <div class="inline-actions">
                             <el-button size="small" :disabled="readonly" @click="refreshAdvancedJson">从设计器刷新</el-button>
@@ -1187,6 +1163,16 @@ defineExpose({ flushPendingSync });
 .metric-row:first-of-type { border-top: 0; }
 .metric-row :deep(.el-input-number) { width: 100%; }
 .inline-actions { gap: 8px; flex-wrap: wrap; }
+.pc-composite-scroll {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 7px;
+    scrollbar-gutter: stable;
+    overscroll-behavior-x: contain;
+}
+.pc-composite-canvas { min-width: 720px; }
 .config-block {
     margin-top: 10px;
     padding: 10px;

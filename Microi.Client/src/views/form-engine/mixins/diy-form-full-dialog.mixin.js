@@ -1,5 +1,6 @@
 
 import { formTrace } from "@/utils/form-engine-trace.js";
+import { getFormRecordDisplayTitle } from "../field-display-value.js";
 
 export default {
     methods: {
@@ -446,33 +447,42 @@ export default {
             }
             return self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id) ? "fas fa-plus" : "far fa-edit";
         },
+        GetOpenRecordTitleFields() {
+            var self = this;
+            var candidates = [
+                self.SysMenuModel && self.SysMenuModel.SelectFields,
+                self.FieldFormSelectFields,
+                self.ShowDiyFieldList
+            ];
+            for (var index = 0; index < candidates.length; index++) {
+                if (Array.isArray(candidates[index]) && candidates[index].length > 0) {
+                    return candidates[index];
+                }
+            }
+            return Array.isArray(self.DiyFieldList) ? self.DiyFieldList : [];
+        },
+        GetOpenRecordTitleValue() {
+            return getFormRecordDisplayTitle(
+                this.CurrentRowModel || {},
+                this.GetOpenRecordTitleFields(),
+                this.DiyFieldList || []
+            );
+        },
         GetOpenTitle() {
             var self = this;
-            var title1 = "";
-            if (self.UseViewSchemaDetail) {
-                title1 = self.$t("Msg.View");
-            } else if (self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id)) {
-                title1 = self.$t("Msg.Add");
-            } else {
-                var fieldModel = self.ShowDiyFieldList && self.ShowDiyFieldList[0];
-                var firstValue = "";
-                if (fieldModel && !self.DiyCommon.IsNull(fieldModel.Config) && !self.DiyCommon.IsNull(fieldModel.Config.SelectLabel)) {
-                    try {
-                        firstValue = JSON.parse(self.CurrentRowModel[fieldModel.Name])[fieldModel.Config.SelectLabel];
-                    } catch (error) {
-                        firstValue = self.CurrentRowModel[fieldModel.Name];
-                    }
-                } else {
-                    if (fieldModel) {
-                        firstValue = self.CurrentRowModel[fieldModel.Name];
-                    }
-                }
-                title1 = self.$t("Msg." + self.FormMode) + (firstValue ? " [" + firstValue.toString().substring(0, 10) + "]" : "");
-            }
-            var title2 = "";
-            var title3 = self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description) ? "" : self.CurrentDiyTableModel.Description;
-
-            return title1 + (!self.DiyCommon.IsNull(title3) && title3 != title2 ? " - " + title3 : "");
+            var hasRecord = !self.DiyCommon.IsNull(self.CurrentRowModel)
+                && !self.DiyCommon.IsNull(self.CurrentRowModel.Id);
+            var effectiveMode = self.UseViewSchemaDetail
+                ? "View"
+                : (["Add", "Insert"].includes(self.FormMode) ? "Add" : self.FormMode);
+            var modeTitle = self.$t("Msg." + effectiveMode);
+            var recordTitle = hasRecord ? self.GetOpenRecordTitleValue() : "";
+            var tableTitle = self.DiyCommon.IsNull(self.CurrentDiyTableModel)
+                || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description)
+                ? ""
+                : String(self.CurrentDiyTableModel.Description);
+            var suffix = recordTitle || tableTitle;
+            return modeTitle + (suffix ? " - " + suffix : "");
         },
         // ========== 判断右侧面板是否显示 ==========
         ShowFormRight() {
@@ -679,19 +689,9 @@ export default {
         // ========== 页面模式专用：获取标题（带标签页标题更新） ==========
         GetOpenTitlePage() {
             var self = this;
-            var result = "";
             var effectiveFormMode = self.UseViewSchemaDetail ? "View" : self.FormMode;
+            var result = effectiveFormMode ? self.GetOpenTitle() : "";
             if (effectiveFormMode) {
-                var formMode = self.$t("Msg." + effectiveFormMode);
-                var firstValue = "";
-                if (!self.UseViewSchemaDetail && (effectiveFormMode == "Edit" || effectiveFormMode == "View")) {
-                    var fieldModel = self.DiyFieldList[0];
-                    if (fieldModel && self.CurrentRowModel[fieldModel.Name]) {
-                        firstValue = "[" + self.CurrentRowModel[fieldModel.Name] + "]";
-                    }
-                }
-                var tableName = self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description) ? "" : " - " + self.CurrentDiyTableModel.Description;
-                result = formMode + firstValue + tableName;
                 if ((self.CallbackSetFormDataFinish && self.CallbackSetDiyTableModelFinish) || (effectiveFormMode == "Add" && self.CallbackSetDiyTableModelFinish)) {
                     var item = self.tagsViewStore.visitedViews.filter((item) => item.fullPath == self.$route.fullPath);
                     if (item.length > 0) {

@@ -3,8 +3,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const packagePath = path.join(here, 'app.microi.form-engine.json');
-const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+const packagePaths = [path.join(here, 'app.microi.form-engine.json')];
+if (process.argv.includes('--sync-base')) {
+  packagePaths.push(path.join(here, '.resource-sync-base', 'app.microi.form-engine.json'));
+}
 
 function maxVersion(current, target) {
   const parse = (value) => String(value || '').replace(/^v/i, '').split('.').map((part) => Number(part) || 0);
@@ -17,11 +19,15 @@ function maxVersion(current, target) {
   }
   return current || target;
 }
+
+function configurePackage(packagePath) {
+const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 const table = pkg.DiyTables.find((item) => String(item.Name).toLowerCase() === 'diy_table');
 if (!table) throw new Error('app.microi.form-engine.json 缺少 diy_table');
 
 const WORKBENCH_TAB_ID = 'a1b2c3d4-1111-4a11-8111-000000000001';
 const TITLE_TAB_ID = 'a1b2c3d4-1111-4a11-8111-000000000002';
+const BANNER_TAB_ID = 'a1b2c3d4-1111-4a11-8111-000000000003';
 const EVENT_TAB_ID = '84fb2e1e-111a-4e44-b76b-65a2adf8a0d5';
 
 const parsedTabs = JSON.parse(table.Tabs || '[]');
@@ -43,6 +49,15 @@ tabsById.set(TITLE_TAB_ID, {
   Id: TITLE_TAB_ID,
   Icon: 'fas fa-heading',
   _RawName: '标题、说明与记录切换',
+});
+tabsById.set(BANNER_TAB_ID, {
+  Name: '表单 Banner',
+  EnName: 'FormBanner',
+  Display: true,
+  Sort: 5,
+  Id: BANNER_TAB_ID,
+  Icon: 'fas fa-panorama',
+  _RawName: '表单 Banner',
 });
 table.Tabs = JSON.stringify([...tabsById.values()].sort((a, b) => Number(a.Sort || 0) - Number(b.Sort || 0)));
 table.TabsPosition = 'top';
@@ -68,6 +83,14 @@ const definitions = [
   ['FormNavigationFooterHtml', '导航底部说明（HTML）', 'mediumtext', 'Textarea', '[]', undefined, TITLE_TAB_ID, 1560, textareaConfig, 24],
   ['FormRecordSelectorPlaceholder', '记录选择器占位文字', 'varchar(255)', 'Text', '[]', '搜索并切换记录', TITLE_TAB_ID, 1570, textConfig, undefined],
   ['FormRecordSelectorLabelFields', '记录选择器显示字段', 'mediumtext', 'Textarea', '[]', undefined, TITLE_TAB_ID, 1580, textareaConfig, 24],
+  ['FormBannerEnabled', '显示表单 Banner', 'int', 'Switch', '[]', '1', BANNER_TAB_ID, 1590, switchConfig, undefined],
+  ['FormBannerTitleField', 'Banner 标题字段', 'varchar(100)', 'Text', '[]', undefined, BANNER_TAB_ID, 1600, textConfig, undefined],
+  ['FormBannerSubtitleField', 'Banner 副标题字段', 'varchar(100)', 'Text', '[]', undefined, BANNER_TAB_ID, 1610, textConfig, undefined],
+  ['FormBannerImageField', 'Banner 左侧图片字段', 'varchar(100)', 'Text', '[]', undefined, BANNER_TAB_ID, 1620, textConfig, undefined],
+  ['FormBannerIcon', 'Banner 默认图标', 'varchar(100)', 'Text', '[]', 'far fa-file-alt', BANNER_TAB_ID, 1630, textConfig, undefined],
+  ['FormBannerBackgroundField', 'Banner 背景字段', 'varchar(100)', 'Text', '[]', undefined, BANNER_TAB_ID, 1640, textConfig, undefined],
+  ['FormBannerTagFields', 'Banner 右侧标签字段', 'mediumtext', 'Textarea', '[]', undefined, BANNER_TAB_ID, 1650, textareaConfig, 24],
+  ['FormBannerMetrics', 'Banner 统计项（JSON）', 'mediumtext', 'Textarea', '[]', undefined, BANNER_TAB_ID, 1660, textareaConfig, 24],
   ['V8Limit', 'V8运行限制', 'int', 'Switch', '[]', '0', EVENT_TAB_ID, 2490, switchConfig, undefined],
 ];
 
@@ -79,6 +102,10 @@ const ids = [
   'a1b2c3d4-2111-4a11-8111-000000000009', 'a1b2c3d4-2111-4a11-8111-000000000010',
   'a1b2c3d4-2111-4a11-8111-000000000011', 'a1b2c3d4-2111-4a11-8111-000000000012',
   'a1b2c3d4-2111-4a11-8111-000000000013', 'a1b2c3d4-2111-4a11-8111-000000000014',
+  'a1b2c3d4-2111-4a11-8111-000000000015', 'a1b2c3d4-2111-4a11-8111-000000000016',
+  'a1b2c3d4-2111-4a11-8111-000000000017', 'a1b2c3d4-2111-4a11-8111-000000000018',
+  'a1b2c3d4-2111-4a11-8111-000000000019', 'a1b2c3d4-2111-4a11-8111-000000000020',
+  'a1b2c3d4-2111-4a11-8111-000000000021', 'a1b2c3d4-2111-4a11-8111-000000000022',
 ];
 
 definitions.forEach((definition, index) => {
@@ -117,6 +144,17 @@ definitions.forEach((definition, index) => {
   if (name === 'V8Limit') {
     next.Description = '默认关闭，后端表单 V8 事件不设置 Jint 单次执行超时、最大语句数、函数递归和累计分配预算；只有打开后才启用这些限制。进程/容器常驻内存保护、取消、并发、嵌套深度、权限沙箱和数据库保护始终生效。';
   }
+  const bannerDescriptions = {
+    FormBannerEnabled: '默认显示。旧表该字段为空时同样显示，并按字段类型智能推断标题、图片、标签和数值指标；显式关闭后才隐藏。',
+    FormBannerTitleField: '填写当前业务表字段名，如 OrderNo、Name。为空时优先从名称、标题、编号、单号类字段智能推断。',
+    FormBannerSubtitleField: '填写当前业务表字段名，如 CustomerName、ProjectName。为空时从客户、项目、公司、分类、日期等可读字段智能推断。',
+    FormBannerImageField: '填写 ImgUpload 图片字段名。支持单图、多图（取首图）、公开文件路径和私有文件临时授权地址。',
+    FormBannerIcon: '图片字段没有值时使用的 Font Awesome 图标，例如 far fa-file-alt。',
+    FormBannerBackgroundField: '填写图片、颜色或渐变字段名。图片字段遵循单图/多图和公私有文件路径规则；不配置时使用跟随主题的浅色/深色背景。',
+    FormBannerTagFields: '右侧标签字段。可填 Status,Type，也可填 JSON 数组，例如 [{"Field":"Status","Label":"状态","Tone":"success"}]；显式填写 [] 表示不显示标签。',
+    FormBannerMetrics: '统计项 JSON 数组。本地字段例：[{"Field":"Amount","Label":"订单金额","Prefix":"¥"}]；接口引擎例：[{"Key":"Pending","Label":"待处理","ApiEngineKey":"order-banner-metrics","ValuePath":"Data.Pending","RefreshSeconds":30,"ParamMap":{"CustomerId":"Form.CustomerId"}}]。同一 ApiEngineKey 只调用一次；显式填写 [] 表示不显示统计项。',
+  };
+  if (bannerDescriptions[name]) next.Description = bannerDescriptions[name];
   if (current.Name) Object.assign(current, next);
   else pkg.DiyFields.push(next);
 });
@@ -155,6 +193,14 @@ const physicalDefinitions = [
   ['FormNavigationFooterHtml', 'mediumtext', 'mediumtext', '导航底部说明'],
   ['FormRecordSelectorPlaceholder', 'varchar(255)', 'varchar', '记录选择器占位文字'],
   ['FormRecordSelectorLabelFields', 'mediumtext', 'mediumtext', '记录选择器显示字段'],
+  ['FormBannerEnabled', 'int(11)', 'int', '显示表单Banner'],
+  ['FormBannerTitleField', 'varchar(100)', 'varchar', 'Banner标题字段'],
+  ['FormBannerSubtitleField', 'varchar(100)', 'varchar', 'Banner副标题字段'],
+  ['FormBannerImageField', 'varchar(100)', 'varchar', 'Banner图片字段'],
+  ['FormBannerIcon', 'varchar(100)', 'varchar', 'Banner图标'],
+  ['FormBannerBackgroundField', 'varchar(100)', 'varchar', 'Banner背景字段'],
+  ['FormBannerTagFields', 'mediumtext', 'mediumtext', 'Banner标签字段'],
+  ['FormBannerMetrics', 'mediumtext', 'mediumtext', 'Banner统计项'],
 ];
 
 let nextOrdinal = Math.max(...pkg.PhysicalColumns.filter((item) => item.TABLE_NAME === 'diy_table').map((item) => Number(item.ORDINAL_POSITION || 0))) + 1;
@@ -187,16 +233,21 @@ for (const [name, columnType, , comment] of physicalDefinitions) {
   ddl.DDL = `${before},\n  \`${name}\` ${ddlType} NULL COMMENT '${comment.replaceAll("'", "''")}'${after}`;
 }
 
-pkg.PackageInfo.Version = maxVersion(pkg.PackageInfo.Version, 'v7.5.1');
-pkg.PackageInfo.Description = '表单引擎基础资源。工作台与分组、标题说明和记录切换均使用 diy_table 物理属性；表后端 V8 事件统一使用正向 V8Limit。';
+pkg.PackageInfo.Version = maxVersion(pkg.PackageInfo.Version, 'v7.5.5');
+pkg.PackageInfo.Description = '表单引擎基础资源。工作台、分组与紧凑主题化 Banner 均使用 diy_table 物理属性；Banner 支持字段图片、动态标签、接口引擎统计及旧表智能默认。';
 const historyLine = '2026-08-21 v7.5.1 将表单工作台配置迁移为 diy_table 物理属性并新增两个属性 Tab；TabsPosition 默认 top；新增正向 V8Limit，隐藏旧 FormPresentation/V8Unlimited 兼容字段。';
 if (!String(pkg.PackageInfo.ChangeHistory || '').includes(historyLine)) {
   pkg.PackageInfo.ChangeHistory = `${historyLine}\n${pkg.PackageInfo.ChangeHistory || ''}`.trim();
+}
+const bannerHistoryLine = '2026-08-22 v7.5.5 新增表单 Banner 属性 Tab 与 8 个 diy_table 物理字段，支持标题/副标题/图片/背景/标签/接口统计配置；旧表无配置时按字段类型智能显示。';
+if (!String(pkg.PackageInfo.ChangeHistory || '').includes(bannerHistoryLine)) {
+  pkg.PackageInfo.ChangeHistory = `${bannerHistoryLine}\n${pkg.PackageInfo.ChangeHistory || ''}`.trim();
 }
 pkg.PackageInfo.RequiredPlatformCapabilities = [...new Set([
   ...(pkg.PackageInfo.RequiredPlatformCapabilities || []),
   'ServerField:DiyTable.V8Limit',
   'ServerFeature:DiyTablePresentationPhysicalFields',
+  'ServerFeature:DiyTableFormBanner',
 ])];
 pkg.PackageInfo.FieldCount = pkg.DiyFields.length;
 pkg.PackageInfo.DDLCount = pkg.DDLStatements.length;
@@ -210,3 +261,6 @@ console.log(JSON.stringify({
   physicalColumnCount: pkg.PackageInfo.PhysicalColumnCount,
   tabs: JSON.parse(table.Tabs).map((item) => item.Name),
 }, null, 2));
+}
+
+packagePaths.forEach(configurePackage);

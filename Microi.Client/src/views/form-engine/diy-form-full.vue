@@ -1346,7 +1346,6 @@ import _ from "underscore";
 import { isFormMaskBlurEnabled } from "@/utils/form-mask-blur.js";
 import { sanitizeHtml } from "@/utils/safe-html.js";
 import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode, runV8ButtonVisibilityCodeAsync } from "@/utils/v8-button-visibility";
-import { hasModuleDetailView } from "./form-view-blocks/view-schema-runtime";
 import { resolveFormPresentationConfig } from "./form-presentation-runtime.js";
 import {
     diyFormFullCleanupMixin,
@@ -1380,10 +1379,9 @@ export default {
             return String(this.TableName || "").toLowerCase() === "sys_menu";
         },
         UseViewSchemaDetail() {
-            return this.FormMode === "View" &&
-                !this.diyStore.IsPhoneView &&
-                Boolean(this.CurrentRowModel && Object.keys(this.CurrentRowModel).length) &&
-                hasModuleDetailView(this.SysMenuModel, this.GetCurrentUser);
+            // 统一由 DiyForm 承载 Detail/Edit/View。历史 ViewSchema 继续保留在
+            // 数据库中作为迁移源，但不再分叉字段事件、权限和表单呈现链。
+            return false;
         },
         ShowDesktopFormRight() {
             if (this.diyStore.IsPhoneView || !this.ShowFormRight()) return false;

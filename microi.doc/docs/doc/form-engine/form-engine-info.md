@@ -34,6 +34,88 @@
 > 重头戏来了：表单引擎也由表单引擎驱动！即表单引擎列表、表单属性、字段属性也是由表单引擎驱动
 <img src="https://static.itdos.com/upload/img/csdn/f4ead7346e69b9d362e50d3aafb9dcfe.png" alt="表单引擎自驱配置">
 
+## 默认表单 Banner
+
+新增、编辑和查看表单默认共用一套紧凑 Banner。默认视觉以当前租户主题色约 50% 的混合强度
+叠加深蓝灰渐变：比普通浅色卡片更有层次，但不会变成纯黑重色；文字、标签和统计卡片会自动
+保持安全对比度，并适配浅色、深色和移动端。Banner 属于表单本身，因此全部配置都保存在 `diy_table`，不要写入
+`sys_menu`。在表单设计器右侧【表单属性 → 表单 Banner】中可以配置：
+
+| 表单属性 | 物理字段 | 说明 |
+|---|---|---|
+| 显示表单 Banner | `FormBannerEnabled` | 默认显示；只有显式关闭才隐藏。旧数据库没有该字段值时仍安全显示。 |
+| Banner 标题字段 | `FormBannerTitleField` | 业务编号、名称或标题字段名。 |
+| Banner 副标题字段 | `FormBannerSubtitleField` | 客户、项目、公司、分类、日期等辅助字段名。 |
+| Banner 左侧图片字段 | `FormBannerImageField` | `ImgUpload` 字段名；支持单图、多图取首图。 |
+| Banner 默认图标 | `FormBannerIcon` | 图片为空时使用的 Font Awesome 图标。 |
+| Banner 背景字段 | `FormBannerBackgroundField` | 图片字段，或保存主题安全颜色/渐变的文本字段。 |
+| Banner 右侧标签字段 | `FormBannerTagFields` | 逗号分隔字段名，或标签描述 JSON 数组。 |
+| Banner 统计项 | `FormBannerMetrics` | 本地数值字段或接口引擎动态统计描述 JSON 数组。 |
+
+### 存量表的智能默认
+
+上述字段全部为空不是“空白 Banner”。运行时会按真实 `diy_field` 智能选择：自动编号、
+标题、名称、单号作为标题；客户、项目、公司等作为副标题；第一个图片上传字段作为左侧
+图片；下拉、单选、开关、树和部门等选项字段作为标签；仅把金额、合计、数量、成本、余额、
+评分、比率、进度等具有明确业务口径的数值字段作为统计项。`Id`、排序、启用、状态、版本、
+分页和本页加载量等技术数字不会进入 Banner。因此升级前创建的表不需要逐表补配置。显式保存 `[]` 可关闭自动标签或自动
+统计，显式关闭 `FormBannerEnabled` 才隐藏整块 Banner。
+
+使用 MCP/AI 创建新系统时，Manifest 的 `tables[].formBanner` 会写入同一组物理字段；
+未显式指定时，生成器仍会基于新字段写入可用默认值，不会生成一块空 Banner。逐步建模
+完成字段后可调用 `microi_configure_form_banner`，它会读取真实字段、写入并回读校验。
+
+### 标签和统计 JSON
+
+标签既可简单填写 `Status,OrderType`，也可精细配置：
+
+```json
+[
+  { "Field": "Status", "Label": "状态", "Tone": "success", "Icon": "fas fa-circle", "ShowLabel": true },
+  { "Field": "OrderType", "Label": "订单类型" }
+]
+```
+
+统计项可以直接读取当前表单，也可以调用接口引擎：
+
+```json
+[
+  { "Field": "Amount", "Label": "订单金额", "Prefix": "¥", "Icon": "fas fa-coins" },
+  {
+    "Key": "Pending",
+    "Label": "待处理",
+    "ApiEngineKey": "order-banner-metrics",
+    "ValuePath": "Data.Pending",
+    "DefaultValue": 0,
+    "RefreshSeconds": 30,
+    "ParamMap": { "CustomerId": "Form.CustomerId" }
+  }
+]
+```
+
+同一个 `ApiEngineKey` 的多个统计项会合并为一次请求，避免 N+1。接口会同时收到
+`TableId`、`TableName`、`RecordId`、`SysMenuId`、`Form`、`MetricKeys` 和 `Metrics`；
+推荐返回 `{ "Code": 1, "Data": { "Pending": 3 } }`，再用 `ValuePath` 取值。
+统计必须来自真实字段或真实接口口径，禁止使用随机数和固定演示数字。未显式配置统计时，
+运行时最多展示 3 个高价值指标；如果表单存在 `TableChild`，会在当前菜单、父表、父字段、
+父记录的授权上下文中，对完整关联子表数据计算行数及有业务语义的数值字段合计，而不是只统计
+当前分页。没有可靠指标时会直接隐藏统计区，不用 `0` 填充没有意义的卡片。显式配置的
+`FormBannerMetrics` 或接口引擎统计始终优先。
+
+旧版模块视图的 Hero 仍可兼容迁移标题、图片和背景，但模块列表总数、分类数量等全局统计不会
+再带入单条记录 Banner。只有 `Source=Field`、明确标记记录作用域，或接口参数引用当前
+`Form/RecordId` 的指标才会迁移；其余情况自动回到上述当前记录/授权子表规则。
+
+### 图片与背景文件
+
+- 图片字段继续保存吾码上传控件原始值，不能把临时授权 URL 写回业务表。
+- 单图可为路径字符串或文件对象；多图数组取第一张有效图片。
+- 公开文件通过平台文件服务器路径解析；私有图片必须携带当前表、记录、字段和菜单上下文，
+  由平台获取短期授权地址，不能在前端拼接私有 URL。
+- 未配置背景或字段为空时使用当前主题色约 50% 混合强度的深色渐变；背景图片加载失败也会安全回退。
+- 自定义背景图片上自动叠加深色安全遮罩，避免浅色图片导致标题和统计不可读。
+- 统计卡片使用轻量半透明背景和柔和阴影分层，不依赖密集边框；窄屏自动从横向排列降为两列或单列。
+
 ### 固定审计字段不是异常字段
 
 平台表固定包含 `Id`、`CreateTime`、`UpdateTime`、`UserId`、`UserName`、`IsDeleted`。这些字段必须同时存在物理列和 `diy_field` 元数据；它们属于正常表单字段，不应出现在设计器【异常字段修复】列表。

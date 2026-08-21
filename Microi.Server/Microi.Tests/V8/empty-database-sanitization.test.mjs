@@ -88,9 +88,30 @@ function run(storeRows, options = {}) {
             'mci_background_task',
             'mci_database_backup',
             'mci_gitee_star_audit',
+            'mci_system_setting',
+            'mci_user_external_identity',
+            'mci_user_access_key',
+            'diy_sso',
+            'mci_identity_connector',
             'mci_identity_credential',
             'mci_identity_device',
+            'mci_identity_face',
+            'mci_identity_group',
+            'mci_identity_group_member',
+            'mci_identity_sync_conflict',
+            'mci_identity_sync_run',
+            'mci_identity_tag',
+            'mci_identity_tag_assignment',
             'mci_identity_totp',
+            'mci_ai_token_account',
+            'mci_file_remote_connection',
+            'mci_spider_account',
+            'mci_redis_connection',
+            'sys_servernode',
+            'sys_sourcedatatable',
+            'microi_database',
+            'wx_mp',
+            'wx_menu',
             'mci_marketplace_install_event',
             'mci_tenant_quota_log',
             'mic_msg_event_log',
@@ -267,6 +288,8 @@ test('empty database SQL clears credentials and operational residue but keeps co
   assert.match(result.Data.Sql, /DELETE from mci_spider_account;/)
   assert.match(result.Data.Sql, /DELETE from mci_security_attack_event;/)
   assert.match(result.Data.Sql, /DELETE from mci_user_access_key;/)
+  assert.match(result.Data.Sql, /UPDATE sys_user SET[\s\S]*PwdEncode='DES'/i)
+  assert.match(result.Data.Sql, /GiteeUserId='', GiteeLogin=''/i)
   assert.match(result.Data.Sql, /DELETE from sys_business_blueprint;/)
   assert.match(result.Data.Sql, /DELETE l FROM diy_lang l/)
   assert.match(result.Data.Sql, /SUBSTRING_INDEX\(COALESCE\(l\.\`Key\`, ''\), ':', 2\)/)
@@ -275,7 +298,12 @@ test('empty database SQL clears credentials and operational residue but keeps co
   assert.doesNotMatch(result.Data.Sql, /LIKE CONCAT\('diy_field:', LOWER\(x\.Name\)/)
   for (const table of [
     'mci_background_task', 'mci_database_backup', 'mci_gitee_star_audit',
-    'mci_identity_credential', 'mci_identity_device', 'mci_identity_totp',
+    'mci_system_setting', 'mci_user_external_identity', 'mci_user_access_key', 'diy_sso',
+    'mci_identity_connector', 'mci_identity_credential', 'mci_identity_device', 'mci_identity_face',
+    'mci_identity_group', 'mci_identity_group_member', 'mci_identity_sync_conflict', 'mci_identity_sync_run',
+    'mci_identity_tag', 'mci_identity_tag_assignment', 'mci_identity_totp',
+    'mci_ai_token_account', 'mci_file_remote_connection', 'mci_spider_account', 'mci_redis_connection',
+    'sys_servernode', 'sys_sourcedatatable', 'microi_database', 'wx_mp', 'wx_menu',
     'mci_marketplace_install_event', 'mci_tenant_quota_log', 'mic_msg_event_log',
     'microi_job_locks', 'wx_mini_program', 'wx_tpl_msg', 'mic_msgset'
   ]) {

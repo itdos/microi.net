@@ -155,7 +155,13 @@ async function collectFiles(root, excludedDirectories = new Set()) {
   const output = [];
   async function visit(directory) {
     const entries = await readdir(directory, { withFileTypes: true });
-    entries.sort((left, right) => left.name.localeCompare(right.name));
+    // Keep directory traversal byte-for-byte aligned with the MCP v3 manifest.
+    // localeCompare is locale-sensitive (and orders upper/lower case differently
+    // from .NET StringComparer.Ordinal), so compare normalized relative paths by
+    // their raw UTF-16 ordering instead.
+    entries.sort((left, right) => (
+      left.name < right.name ? -1 : left.name > right.name ? 1 : 0
+    ));
     for (const entry of entries) {
       if (entry.isDirectory() && excludedDirectories.has(entry.name)) continue;
       const fullPath = resolve(directory, entry.name);
@@ -245,7 +251,7 @@ const sourceFiles = await collectFiles(applicationRoot, new Set(['dist', 'node_m
 const sourceFingerprint = [];
 for (const fullPath of sourceFiles) {
   const bytes = await readFile(fullPath);
-  sourceFingerprint.push(`${normalizePath(relative(applicationRoot, fullPath))}:${sha256(bytes)}:${bytes.length}`);
+  sourceFingerprint.push(`${normalizePath(relative(applicationRoot, fullPath))}\t${sha256(bytes)}\t${bytes.length}`);
 }
 const localSourceManifestHash = sha256(sourceFingerprint.join('\n'));
 // Keep this byte-for-byte identical to the MCP v3 directory publisher.
