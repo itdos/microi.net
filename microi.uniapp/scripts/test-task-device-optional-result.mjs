@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import test from 'node:test'
 
 const detailSource = fs.readFileSync(new URL('../src/pages/task/device.vue', import.meta.url), 'utf8')
+const feedbackSource = fs.readFileSync(new URL('../src/pages/native/task-feedback.vue', import.meta.url), 'utf8')
 const listSource = fs.readFileSync(new URL('../src/pages/task/devices.vue', import.meta.url), 'utf8')
 const mapSource = fs.readFileSync(new URL('../src/pages/task/map.vue', import.meta.url), 'utf8')
 const taskSource = fs.readFileSync(new URL('../src/utils/xjy-task.js', import.meta.url), 'utf8')
@@ -22,6 +23,14 @@ test('任务设备处理结果允许为空提交', () => {
   assert.doesNotMatch(detailSource, /请填写处理结果/)
   assert.doesNotMatch(detailSource, /!this\.form\.ChuliJG\.trim\(\)/)
   assert.match(detailSource, /await saveTaskDevice\(this\.id, this\.taskType, \{[\s\S]*\.\.\.this\.form,[\s\S]*_LocationUpdated: this\.locationUpdated[\s\S]*\}, this\.device\)/)
+})
+
+test('完成任务页服务汇总允许为空提交', () => {
+  assert.match(feedbackSource, /<text>服务汇总<\/text><text class="section-heading__hint">选填<\/text>/)
+  assert.doesNotMatch(feedbackSource, /section-heading__required[^>]*>必填/)
+  assert.doesNotMatch(feedbackSource, /请填写处理结果/)
+  assert.doesNotMatch(feedbackSource, /!this\.form\.result\.trim\(\)/)
+  assert.ok(feedbackSource.includes("Jieguo:String(this.form.result||'').trim()"))
 })
 
 test('任务设备列表可按名称型号编号和安装位置检索', () => {

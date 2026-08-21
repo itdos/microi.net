@@ -970,7 +970,9 @@ export function createMicroiV8(options = {}) {
       return '';
     }
 
-    return (await requestPrivate('GetPrivateFileUrl')) || (await requestPrivate('MallFileUrl')) || assetUrl(path);
+    // 普通表单上传默认位于私有桶。签发失败时必须保持失败关闭，不能把同一路径
+    // 改拼到公有 FileServer；否则既会产生无效图片请求，也可能绕过记录级授权边界。
+    return (await requestPrivate('GetPrivateFileUrl')) || (await requestPrivate('MallFileUrl')) || '';
   }
 
   function isWeChatMiniProgramRuntime() {

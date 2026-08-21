@@ -74,9 +74,10 @@ return {
 
 - 列表页固定顺序为“模块 Hero（标题/副标题/动态指标）→ PageTabs → 查询与表格”；PageTabs 不能渲染到 Hero 上方，也不能重复承担模块标题。
 - `TargetSysMenuId` 为空时，页签仍在当前模块执行 `V8Code` 和重新查询。
-- `TargetSysMenuId` 指向其它模块时，点击会替换当前路由，并使用目标模块自己的表单引擎、字段、查询接口替换、按钮和分页配置完整初始化。
+- `TargetSysMenuId` 指向其它模块时，点击会在当前 `diy-table` 实例内加载目标模块自己的表单引擎、字段、查询接口替换、按钮和分页配置；入口路由、面包屑、顶部访问标签和宿主 Hero 不变，URL 只更新 `Tab` 查询参数。
 - 目标模块可以设置 `Display=0、AppDisplay=0` 隐藏左侧菜单，但必须给使用角色分配菜单权限，否则动态路由中找不到目标模块。
-- 组成一组的所有模块应保存同一套 PageTabs；跨模块页签负责导航，目标模块加载后再根据路由 `Tab` 执行对应页签 V8。
+- 一组 PageTabs 只保存在入口模块；隐藏目标模块设置 `ParentId=入口菜单Id、HasChild=0、PageTabs=[]`，不得复制同一套 PageTabs。入口菜单保持 `HasChild=0`，仍然直接打开业务页面。
+- 模块设计器的 PageTabs 必须显示【关联模块】可搜索菜单树，展示模块名称并保存 `TargetSysMenuId`，不能让该协议只能手工改 JSON。
 - 禁止在 `diy-table` 或 mixin 中按模块名、Url、表名写死页签数据源。
 
 ### V8CodeShow（显隐控制）—— 支持 `return` 和 `V8.Result`
