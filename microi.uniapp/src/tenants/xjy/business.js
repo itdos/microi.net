@@ -17,9 +17,9 @@ export const businessGroups = [
       { key: 'casebooks', title: '案例册', icon: asset('business/anlice.png') },
       { key: 'proposals', title: '需求方案', icon: asset('business/shenqing.png') },
       { key: 'customerCare', title: '客户关怀', icon: asset('business/tixing.png') },
-      { key: 'customerMap', title: '客户地图', icon: asset('business/customerMap.png') },
-      { key: 'contactMap', title: '联系人地图', icon: asset('business/dw.png') },
-      { key: 'visitMap', title: '跟进地图', icon: asset('business/baifang.png') }
+      { key: 'customerMap', title: '客户地图', icon: asset('business/customerMap.png') }
+      // ,{ key: 'contactMap', title: '联系人地图', icon: asset('business/dw.png') },
+      // { key: 'visitMap', title: '跟进地图', icon: asset('business/baifang.png') }
     ]
   },
   {
@@ -40,9 +40,9 @@ export const businessGroups = [
       { key: 'taskScan', title: '扫码做任务', icon: appConfig.cdnAssets.scan },
       { key: 'deviceMap', title: '设备地图', icon: asset('business/eqpMap.png') },
       { key: 'orderGoods', title: '订单商品', icon: asset('business/goods.png') },
-      { key: 'installationPositions', title: '安装位置', icon: asset('business/dw.png') },
+      // { key: 'installationPositions', title: '安装位置', icon: asset('business/dw.png') },
       { key: 'orderCommissions', title: '订单分佣', icon: asset('business/shouyi.png') },
-      { key: 'consumableArchives', title: '订单耗材', icon: asset('business/lvxin.png') }
+      // { key: 'consumableArchives', title: '订单耗材', icon: asset('business/lvxin.png') }
     ]
   },
   {

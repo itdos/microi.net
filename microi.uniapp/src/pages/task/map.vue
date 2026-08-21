@@ -114,6 +114,23 @@ function mapDistanceKm(sourceLatitude, sourceLongitude, targetLatitude, targetLo
   return 6371 * 2 * Math.atan2(Math.sqrt(clamped), Math.sqrt(1 - clamped))
 }
 
+function validMapCoordinate(latitude, longitude) {
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+  return Number.isFinite(lat) && lat >= -90 && lat <= 90 && lat !== 0 &&
+    Number.isFinite(lng) && lng >= -180 && lng <= 180 && lng !== 0
+}
+
+// 仅补查没有任务坐标的历史记录，避免把全部售后任务加载到地图页。
+const TASK_COORDINATE_MISSING_WHERE = [
+  { GroupStart: true, Name: 'KehuDT_Lat', Type: '=', Value: null },
+  { AndOr: 'OR', Name: 'KehuDT_Lat', Type: '=', Value: '' },
+  { AndOr: 'OR', Name: 'KehuDT_Lat', Type: '=', Value: '0' },
+  { AndOr: 'OR', Name: 'KehuDT_Lng', Type: '=', Value: null },
+  { AndOr: 'OR', Name: 'KehuDT_Lng', Type: '=', Value: '' },
+  { AndOr: 'OR', Name: 'KehuDT_Lng', Type: '=', Value: '0', GroupEnd: true }
+]
+
 function parseTaskFilters(value) {
   if (!value) return {}
   const candidates = [String(value)]
@@ -298,6 +315,46 @@ export default {
         }
       })
     },
+    async withAuthorizedTaskCoordinateDefaults(rows) {
+      const tasks = Array.isArray(rows) ? rows : []
+      const missingTaskIds = [...new Set(tasks
+        .filter((task) => !validMapCoordinate(task.KehuDT_Lat, task.KehuDT_Lng))
+        .map((task) => String(task.Id || task.id || '').trim())
+        .filter(Boolean))]
+      if (!missingTaskIds.length) return { rows: tasks, fallbackFailed: false }
+
+      const defaults = []
+      let fallbackFailed = false
+      for (let index = 0; index < missingTaskIds.length; index += 200) {
+        try {
+          const result = await callApiEngine('get_location_shouhou-v2', {
+            TaskIds: missingTaskIds.slice(index, index + 200)
+          })
+          if (!result || Number(result.Code) !== 1) {
+            throw new Error((result && result.Msg) || '历史任务坐标加载失败')
+          }
+          if (Array.isArray(result.Data)) defaults.push(...result.Data)
+        } catch (error) {
+          // 坐标兜底不是任务列表的访问前提；接口异常时仍展示自带坐标的任务。
+          fallbackFailed = true
+        }
+      }
+      const defaultByTaskId = new Map(defaults.map((item) => [String(item.Id || ''), item]))
+      return {
+        fallbackFailed,
+        rows: tasks.map((task) => {
+          if (validMapCoordinate(task.KehuDT_Lat, task.KehuDT_Lng)) return task
+          const coordinate = defaultByTaskId.get(String(task.Id || task.id || ''))
+          if (!coordinate || !validMapCoordinate(coordinate.KehuDT_Lat, coordinate.KehuDT_Lng)) return task
+          return {
+            ...task,
+            KehuDT_Lat: coordinate.KehuDT_Lat,
+            KehuDT_Lng: coordinate.KehuDT_Lng,
+            CoordinateSource: 'customer-default'
+          }
+        })
+      }
+    },
     async loadCustomerDevices() {
       this.loading = true
       try {
@@ -311,9 +368,16 @@ export default {
       this.loading = true
       try {
         const taskDevices = await loadAllTaskDevices(this.taskId, { refresh: true, keyword: this.deviceFilters.keyword || '' })
-        const result = await callApiEngine('get_location_shebei-v2', { TaskId: this.taskId })
-        if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '设备位置加载失败')
-        const equipmentWithDefaults = Array.isArray(result.Data) ? result.Data : []
+        let equipmentWithDefaults = []
+        let fallbackFailed = false
+        try {
+          const result = await callApiEngine('get_location_shebei-v2', { TaskId: this.taskId })
+          if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '设备位置加载失败')
+          equipmentWithDefaults = Array.isArray(result.Data) ? result.Data : []
+        } catch (error) {
+          // 坐标增强失败不能阻断已经通过任务设备权限查询的数据。
+          fallbackFailed = true
+        }
         const equipmentById = new Map(equipmentWithDefaults.map((item) => [String(item.Id), item]))
         const equipmentByCode = new Map(equipmentWithDefaults.filter((item) => item.ShebeiBH).map((item) => [String(item.ShebeiBH), item]))
         const equipmentByTaskDeviceId = new Map(equipmentWithDefaults.filter((item) => item.TaskDeviceId).map((item) => [String(item.TaskDeviceId), item]))
@@ -322,6 +386,7 @@ export default {
             equipmentById.get(String(taskDevice.KehuSBID)) ||
             equipmentByCode.get(String(taskDevice.code)) || {}
           return {
+            ...taskDevice,
             ...source,
             TaskDeviceId: taskDevice.Id,
             TaskDeviceStatus: taskDevice.status,
@@ -333,6 +398,7 @@ export default {
             AnzhuangWZ: taskDevice.position || source.AnzhuangWZ
           }
         }))
+        if (fallbackFailed) uni.showToast({ title: '部分设备暂时无定位', icon: 'none' })
       } catch (error) { uni.showToast({ title: error.message || '任务设备地图加载失败', icon: 'none' }) }
       finally { this.loading = false }
     },
@@ -376,60 +442,21 @@ export default {
           tasks.forEach((task) => tasksById.set(String(task.Id || task.id), task))
         }
 
-        // Newer tasks already carry coordinates; keep this query limited by the selected range.
+        // 新任务直接使用任务坐标；历史无坐标任务仍由任务模块先做菜单与行权限过滤。
         await loadScopedTasks([...baseExtraWhere, ...rangeWhere])
+        await loadScopedTasks([...baseExtraWhere, ...TASK_COORDINATE_MISSING_WHERE])
 
-        // Historical tasks may have no task coordinate. Read nearby customers through the
-        // customer module so its SqlWhere/data scope is applied, then query linked tasks
-        // again through the task module so task permissions remain authoritative.
-        const customerConfig = await this.authorizedCustomerModule()
-        const customerExtraWhere = [...rangeWhere]
-        if (this.customerId) customerExtraWhere.push({ Name: 'Id', Type: '=', Value: this.customerId })
-        const customers = (await this.loadAuthorizedCustomerRows(customerConfig, {
-          extraWhere: customerExtraWhere,
-          pageSize: 500,
-          refresh: true
-        })).filter((customer) => {
-          const latitude = Number(customer.KehuDT_Lat)
-          const longitude = Number(customer.KehuDT_Lng)
-          return Number.isFinite(latitude) && latitude !== 0 &&
-            Number.isFinite(longitude) && longitude !== 0 &&
-            mapDistanceKm(this.latitude, this.longitude, latitude, longitude) <= radius
-        })
-        const customerById = new Map(customers.map((customer) => [String(customer.Id), customer]))
-        const customerIds = [...customerById.keys()]
-        for (let index = 0; index < customerIds.length; index += 200) {
-          await loadScopedTasks([
-            ...baseExtraWhere,
-            { Name: 'KehuID', Type: 'In', Value: customerIds.slice(index, index + 200) }
-          ])
-        }
-
-        const tasks = [...tasksById.values()].map((task) => {
-          const taskLatitude = Number(task.KehuDT_Lat)
-          const taskLongitude = Number(task.KehuDT_Lng)
-          const taskHasCoordinate = Number.isFinite(taskLatitude) && taskLatitude !== 0 &&
-            Number.isFinite(taskLongitude) && taskLongitude !== 0
-          if (taskHasCoordinate) return task
-          const customer = customerById.get(String(task.KehuID || ''))
-          if (!customer) return task
-          return {
-            ...task,
-            customer: task.customer || customer.KehuMC || '',
-            address: task.address || customer.XiangxiDZ || '',
-            KehuDT_Lat: customer.KehuDT_Lat,
-            KehuDT_Lng: customer.KehuDT_Lng,
-            CoordinateSource: 'customer-default'
-          }
-        })
-
-        this.applyRows(tasks.filter((task) => {
+        const coordinateResult = await this.withAuthorizedTaskCoordinateDefaults([...tasksById.values()])
+        const visibleTasks = coordinateResult.rows.filter((task) => {
           const latitude = Number(task.KehuDT_Lat)
           const longitude = Number(task.KehuDT_Lng)
-          return Number.isFinite(latitude) && latitude !== 0 &&
-            Number.isFinite(longitude) && longitude !== 0 &&
+          return validMapCoordinate(latitude, longitude) &&
             mapDistanceKm(this.latitude, this.longitude, latitude, longitude) <= radius
-        }))
+        })
+        this.applyRows(visibleTasks)
+        if (coordinateResult.fallbackFailed) {
+          uni.showToast({ title: '部分历史任务暂时无定位', icon: 'none' })
+        }
       } catch (error) {
         const message = String(error && (error.errMsg || error.message) || '')
         const locationDenied = /getLocation:fail auth deny|location permission|定位权限/i.test(message)

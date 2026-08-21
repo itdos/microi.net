@@ -45,6 +45,14 @@ function joinUrl(base, path) {
   return `${normalizeBase(base)}/${trimLeftSlash(value)}`;
 }
 
+export function isApiEngineRequestUrl(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  const withoutOrigin = text.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+/i, '');
+  const path = withoutOrigin.split(/[?#]/, 1)[0];
+  return /^\/?apiengine(?:\/|$)/i.test(path);
+}
+
 function appendQuery(url, key, value) {
   if (!value || new RegExp(`[?&]${key}=`, 'i').test(url)) return url;
   const sep = url.indexOf('?') >= 0 ? '&' : '?';
@@ -740,7 +748,9 @@ export function createMicroiV8(options = {}) {
       setSingletonHeader(headers, 'Token', token);
       setSingletonHeader(headers, 'Authorization', `Bearer ${token}`);
     }
-    if (options.apiEngine) headers.apiengine = '1';
+    if (options.apiEngine || isApiEngineRequestUrl(options.url || options.path)) {
+      headers.apiengine = '1';
+    }
     return headers;
   }
 
@@ -960,7 +970,9 @@ export function createMicroiV8(options = {}) {
       return '';
     }
 
-    return (await requestPrivate('GetPrivateFileUrl')) || (await requestPrivate('MallFileUrl')) || assetUrl(path);
+    // 普通表单上传默认位于私有桶。签发失败时必须保持失败关闭，不能把同一路径
+    // 改拼到公有 FileServer；否则既会产生无效图片请求，也可能绕过记录级授权边界。
+    return (await requestPrivate('GetPrivateFileUrl')) || (await requestPrivate('MallFileUrl')) || '';
   }
 
   function isWeChatMiniProgramRuntime() {

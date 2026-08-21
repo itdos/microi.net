@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyzeBackgroundWorkload, analyzeClientChunking } from './advanced-tools.js';
+import { analyzeBackgroundWorkload, analyzeClientChunking, normalizeAllMenuJson } from './advanced-tools.js';
 test('classifies estimated long-running work as a background task', () => {
     const result = analyzeBackgroundWorkload({
         Name: '生成测试任务',
@@ -30,6 +30,41 @@ test('does not misclassify a long-task management dialog as the task itself', ()
     });`,
     });
     assert.deepEqual(result, { required: false, reasons: [] });
+});
+test('still classifies install action buttons from their action semantics', () => {
+    const result = analyzeBackgroundWorkload({
+        Name: '安装应用',
+        V8Code: "V8.ApiEngine.Run('install_application', {});",
+    });
+    assert.equal(result.required, true);
+    assert.match(result.reasons.join('\n'), /动作语义/);
+});
+test('does not infer background work from PageTab filter literals', () => {
+    const result = normalizeAllMenuJson({
+        PageTabs: [{
+                Id: 'running',
+                Name: '运行中',
+                V8Code: `V8.SearchSet([
+        { Name: 'ShebeiZT', Type: 'In', Value: ['待安装', '使用中', '库存中'] }
+      ]);`,
+            }],
+    });
+    assert.deepEqual(result.errors, []);
+    const [tab] = JSON.parse(String(result.data.PageTabs));
+    assert.match(tab.V8Code, /待安装/);
+    assert.equal(tab.RunBackground, undefined);
+});
+test('still enforces explicit long-running Workload thresholds on PageTabs', () => {
+    const result = normalizeAllMenuJson({
+        PageTabs: [{
+                Id: 'long-running-tab',
+                Name: '运行中',
+                V8Code: "V8.SearchSet({ Status: 'Running' });",
+                Workload: { ExpectedSeconds: 120 },
+            }],
+    });
+    assert.equal(result.errors.length, 1);
+    assert.match(result.errors[0], /缺少 ApiEngineKey/);
 });
 test('accepts an explicit resumable client chunking contract', () => {
     const result = analyzeClientChunking({

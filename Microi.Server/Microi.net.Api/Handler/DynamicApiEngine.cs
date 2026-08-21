@@ -136,6 +136,19 @@ namespace Microi.net.Api
             return $"{CacheKeyPrefix}:{osClient}:{ApiEngineCacheKey}:{key}";
         }
 
+        // zhy 2026-08-21：数据库回源结果必须先落成 object 和强类型字符串，
+        // zhy 2026-08-21：避免 dynamic 调用链把字符串扩展方法推迟到运行时绑定。
+        private static (string ApiEngineKey, string ApiAddress) GetRouteCacheAliases(object apiModel)
+        {
+            string apiEngineKey = DynamicHelper
+                .GetDynamicStringValue(apiModel, "ApiEngineKey", string.Empty)
+                .ToLowerInvariant();
+            string apiAddress = DynamicHelper
+                .GetDynamicStringValue(apiModel, "ApiAddress", string.Empty)
+                .ToLowerInvariant();
+            return (apiEngineKey, apiAddress);
+        }
+
         /// <summary>
         /// 检查是否为 FormEngine 特殊路由
         /// </summary>
@@ -294,14 +307,14 @@ namespace Microi.net.Api
                     {
                         apiModel = JObject.FromObject((object)fallbackResult.Data);
                         var cacheJson = JsonConvert.SerializeObject((object)fallbackResult.Data);
-                        var apiEngineKey = DynamicHelper.GetDynamicStringValue(apiModel, "ApiEngineKey", "").ToLowerInvariant();
-                        var apiAddress = DynamicHelper.GetDynamicStringValue(apiModel, "ApiAddress", "").ToLowerInvariant();
+                        // zhy 2026-08-21：统一提取并重建 ApiEngineKey、ApiAddress 两个路由缓存别名。
+                        var (apiEngineKey, apiAddress) = GetRouteCacheAliases((object)apiModel);
                         var cacheTasks = new List<Task>();
-                        if (!apiEngineKey.DosIsNullOrWhiteSpace())
+                        if (!string.IsNullOrWhiteSpace(apiEngineKey))
                         {
                             cacheTasks.Add(cacheClient.SetAsync(BuildCacheKey(osClient, apiEngineKey), cacheJson));
                         }
-                        if (!apiAddress.DosIsNullOrWhiteSpace())
+                        if (!string.IsNullOrWhiteSpace(apiAddress))
                         {
                             cacheTasks.Add(cacheClient.SetAsync(BuildCacheKey(osClient, apiAddress), cacheJson));
                         }

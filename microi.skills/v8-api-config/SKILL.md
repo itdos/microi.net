@@ -222,6 +222,19 @@ Body: {"ApiEngineKey":"your_key","Action":"Bootstrap"}
 - 需要 C# 验签/AES 解密或隐藏 SaaS 密钥的回调，使用“最小协议网关 + `Managed` 核心接口 + `CreateIfMissing` 租户 Hook”。网关不得承载日志、写表、通知等业务逻辑；传给 V8 的事件必须脱敏，并包含稳定 `EventId` 供 Hook 幂等。
 - 更新接口代码时保留 HTTP 元数据，避免只覆盖 JS 代码却把匿名、启用、自定义地址等配置冲掉。
 
+### 路由冷缓存与客户端直达头（强制）
+
+- `/apiengine/{ApiEngineKey}` 客户端请求必须携带 `apiengine: 1`；标准前端 SDK 应从稳定路径自动识别并补齐，不能要求每个业务页面手写 Header。自定义 `ApiAddress` 无法从路径识别时，调用方显式设置 `apiEngine: true`。
+- 动态路由缓存未命中后允许从 `sys_apiengine` 权威回源并重建 `ApiEngineKey`、`ApiAddress` 两个别名。回源对象如果来自 `dynamic`，先转换为 `JObject`/`object`，并把字段显式赋给 `string`、`bool` 等强类型局部变量，再调用普通方法或扩展方法；禁止让 `dynamic` 调用链延续到 `DosIsNullOrWhiteSpace`、LINQ 或 JToken 扩展。
+- 自动化必须覆盖“缓存预热命中”和“缓存为空首次请求”两条路径；首次请求不得 404，且回源后两个缓存别名均可再次命中。滚动发布、节点重启或缓存清理后要重复执行无 Header 与带 `apiengine: 1` 的真实 HTTP smoke test。
+
+### 复盘：接口引擎冷缓存回源异常被吞成空 404
+
+- 触发场景：接口配置、启用和匿名设置都正确，接口昨天可用；节点重启或缓存缺失后，小程序首次请求 `/apiengine/{key}` 返回空 body 404。
+- 根因：动态路由从数据库回源成功后，局部变量仍沿着 `dynamic` 调用链传播；运行时对实际 `string` 绑定扩展方法失败，外层异常处理返回原路由值，最终由 ASP.NET Core 表现为无正文 404。
+- 通用规则：数据库/缓存的动态对象在进入路由、鉴权、缓存键和 LINQ 逻辑前必须强类型落地；稳定接口引擎路径由 SDK 自动携带 `apiengine: 1` 作为直达兜底。
+- 自动化检查：单元测试直接传入 `JObject` 验证回源别名强类型归一化；前端传输测试断言 `/apiengine/*` 自动携带 `apiengine: 1`，普通 `/api/*` 不误带；本地启动后清空专用测试别名并验证首次 HTTP 请求成功及缓存重建。
+
 ## 请求内异步与可靠后台任务
 
 接口默认同步返回。对本次请求必须完成的异步 I/O，调用真实的 `*Async` 方法并 `await`。常用入口包括 `V8.Http.*Async`、`V8.FormEngine.GetTableDataAsync` 和 `V8.ApiEngine.RunAsync`：
