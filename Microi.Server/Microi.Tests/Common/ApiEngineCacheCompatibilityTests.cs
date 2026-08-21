@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microi.net;
+using Microi.net.Api;
 using Newtonsoft.Json.Linq;
 
 namespace Dos.Common.Tests;
@@ -22,6 +23,12 @@ public class ApiEngineCacheCompatibilityTests
             "RequireAuthoritativeApiEngineModel",
             BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("后台接口引擎权威读取策略不存在。");
+
+    private static readonly MethodInfo RouteCacheAliasMethod =
+        typeof(DynamicRoute).GetMethod(
+            "GetRouteCacheAliases",
+            BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("接口引擎动态路由缓存别名方法不存在。");
 
     private static readonly MethodInfo UpgradeEventMethod =
         UpgradeCacheCompatibilityType.GetMethod(
@@ -76,6 +83,20 @@ public class ApiEngineCacheCompatibilityTests
 
         Assert.True(success);
         Assert.Same(cachedValue, arguments[1]);
+    }
+
+    // zhy 2026-08-21：回归数据库冷缓存回源时的强类型别名提取，防止再次出现空响应 404。
+    [Fact]
+    public void DatabaseFallbackRouteAliasesAreStrongTypedAndNormalized()
+    {
+        var fallbackModel = JObject.Parse(
+            "{\"ApiEngineKey\":\"Wx-Login\",\"ApiAddress\":\"/ApiEngine/Wx-Login\"}");
+
+        var aliases = Assert.IsType<(string ApiEngineKey, string ApiAddress)>(
+            RouteCacheAliasMethod.Invoke(null, new object?[] { fallbackModel }));
+
+        Assert.Equal("wx-login", aliases.ApiEngineKey);
+        Assert.Equal("/apiengine/wx-login", aliases.ApiAddress);
     }
 
     [Theory]

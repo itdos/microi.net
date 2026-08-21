@@ -2,7 +2,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { MicroiClient } from './microi-client.js';
 import type { McpServerContext } from './server.js';
 type JsonRecord = Record<string, unknown>;
-export declare function analyzeBackgroundWorkload(buttonInput: unknown): {
+export declare function analyzeBackgroundWorkload(buttonInput: unknown, options?: {
+    inferActionSemantics?: boolean;
+}): {
     required: boolean;
     reasons: string[];
 };
