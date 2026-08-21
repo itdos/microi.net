@@ -195,26 +195,54 @@ public class V8MemoryConstraintTests
     }
 
     [Fact]
-    public void TrustedTableMetadata_ControlsUnlimitedRuntimeWithoutReadingSysConfigOrRequestFields()
+    public void TrustedTableMetadata_UsesPositiveV8LimitWithoutReadingSysConfigOrRequestFields()
     {
         var ordinary = CreateV8EngineParam.FromSysConfig(new JObject
         {
-            ["V8Unlimited"] = 1
+            ["V8Limit"] = 1
         });
-        var enabled = CreateV8EngineParam.FromTrustedDiyTable(
-            new JObject { ["V8Unlimited"] = 0 },
-            new JObject { ["V8Unlimited"] = 1 });
-        var disabled = CreateV8EngineParam.FromTrustedDiyTable(
+        var unrestricted = CreateV8EngineParam.FromTrustedDiyTable(
+            new JObject { ["V8Limit"] = 1 },
+            new JObject { ["V8Limit"] = 0 });
+        var limited = CreateV8EngineParam.FromTrustedDiyTable(
             null,
-            new JObject { ["V8Unlimited"] = 0 });
+            new JObject { ["V8Limit"] = 1 });
+        var missing = CreateV8EngineParam.FromTrustedDiyTable(null, new JObject());
+        var nullValue = CreateV8EngineParam.FromTrustedDiyTable(
+            null,
+            new JObject { ["V8Limit"] = null });
 
         Assert.False(ordinary.UnlimitedRuntime);
-        Assert.True(enabled.UnlimitedRuntime);
-        Assert.False(disabled.UnlimitedRuntime);
-        Assert.True(enabled.ToExecutionLimitInfo().UnlimitedRuntime);
+        Assert.True(unrestricted.UnlimitedRuntime);
+        Assert.False(limited.UnlimitedRuntime);
+        Assert.True(missing.UnlimitedRuntime);
+        Assert.True(nullValue.UnlimitedRuntime);
+        Assert.True(unrestricted.ToExecutionLimitInfo().UnlimitedRuntime);
         Assert.Equal(
             "ProcessResidentMemoryGuardOnly",
-            enabled.ToExecutionLimitInfo().MemoryAccounting);
+            unrestricted.ToExecutionLimitInfo().MemoryAccounting);
+    }
+
+    [Fact]
+    public void TrustedTableMetadata_UsesLegacyV8UnlimitedOnlyWhenPositiveFieldIsAbsent()
+    {
+        Assert.True(CreateV8EngineParam.ResolveTrustedDiyTableUnlimitedRuntime(
+            new JObject { ["V8Unlimited"] = 1 }));
+        Assert.False(CreateV8EngineParam.ResolveTrustedDiyTableUnlimitedRuntime(
+            new JObject { ["V8Unlimited"] = 0 }));
+
+        Assert.True(CreateV8EngineParam.ResolveTrustedDiyTableUnlimitedRuntime(
+            new JObject
+            {
+                ["V8Limit"] = 0,
+                ["V8Unlimited"] = 0
+            }));
+        Assert.False(CreateV8EngineParam.ResolveTrustedDiyTableUnlimitedRuntime(
+            new JObject
+            {
+                ["V8Limit"] = 1,
+                ["V8Unlimited"] = 1
+            }));
     }
 
     [Fact]

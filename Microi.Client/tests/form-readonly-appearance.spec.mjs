@@ -16,7 +16,7 @@ test("runtime form items expose a dedicated readonly state", () => {
 });
 
 test("readonly fields keep readable text and a distinct disabled surface", () => {
-    const styles = read("src/styles/diy-form.scss");
+    const styles = read("src/styles/diy-form-base.scss");
 
     assert.match(styles, /\.el-form-item\.is-field-readonly/);
     assert.match(styles, /background-color: var\(--el-disabled-bg-color/);

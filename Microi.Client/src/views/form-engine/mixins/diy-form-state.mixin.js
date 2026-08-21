@@ -1,4 +1,13 @@
 import { formTrace, isAdvancedFieldLayoutRuntimeEnabled } from "@/utils/form-engine-trace.js";
+import { sanitizeHtml } from "@/utils/safe-html.js";
+import {
+    buildFormPresentationSections,
+    collectFormSectionBadgeApiGroups,
+    formatPresentationText,
+    getFormSectionBadgeRefreshSeconds,
+    resolveFormPresentationConfig,
+    resolveFormSectionBadgeValue
+} from "../form-presentation-runtime.js";
 
 export default {
     watch: {
@@ -18,6 +27,12 @@ export default {
         },
         HideFieldsSignature() {
             this.ScheduleRefreshDiyFieldRuntimeState();
+        },
+        PresentationSectionStatsSignature: {
+            immediate: true,
+            handler() {
+                this.QueueRefreshPresentationSectionStats();
+            }
         }
     },
     computed: {
@@ -41,10 +56,11 @@ export default {
             if (!self.DiyCommon.IsNull(self.TableName)) {
                 classes.push('itdos-diy-form-' + self.TableName);
             }
-            if (!self.DiyCommon.IsNull(self.PresentationMode)) {
-                classes.push('diy-form--' + String(self.PresentationMode).replace(/[^A-Za-z0-9_-]/g, '').toLowerCase());
+            if (!self.DiyCommon.IsNull(self.EffectivePresentationMode)) {
+                classes.push('diy-form--' + String(self.EffectivePresentationMode).replace(/[^A-Za-z0-9_-]/g, '').toLowerCase());
             }
-            var presentation = String(self.PresentationMode || '').trim().toLowerCase();
+            if (self.PrintAllSections) classes.push('diy-form--print-all-sections');
+            var presentation = String(self.EffectivePresentationMode || '').trim().toLowerCase();
             classes.push(presentation === 'classic' || presentation === 'legacy' ? 'diy-form--classic' : 'diy-form--modern');
             if (self.LoadMode === 'Design') classes.push('diy-form--design-mode');
             classes.push(self.DiyCommon.IsNull(self.DiyTableModel.InputBorderStyle) ? 'Border' : self.DiyTableModel.InputBorderStyle);
@@ -54,8 +70,14 @@ export default {
         tabsClass() {
             var self = this;
             var classes = ['field-form-tabs'];
-            if (self.FormTabs.length == 1 &&
-                (self.FormTabs[0].Name == 'none' || self.FormTabs[0].Name == 'info' || !self.FormTabs[0].Name)) {
+            var visibleTabs = self.FormTabs.filter(function (tab) { return tab && tab.Display !== false; });
+            var hideSingleTab = visibleTabs.length === 1 && (
+                self.IsControlCenterPresentation ||
+                visibleTabs[0].Name == 'none' ||
+                visibleTabs[0].Name == 'info' ||
+                !visibleTabs[0].Name
+            );
+            if (hideSingleTab) {
                 classes.push('tab-pane-hide');
             } else {
                 classes.push('tab-pane-show');
@@ -72,7 +94,7 @@ export default {
                 classes.push('field-border');
             }
             if (self.IsControlCenterPresentation) {
-                classes.push('presentation-density-' + String(self.PresentationConfig.Density || 'Compact').toLowerCase());
+                classes.push('presentation-density-' + String(self.EffectivePresentationConfig.Density || 'Compact').toLowerCase());
             }
             return classes.join(' ');
         },
@@ -169,51 +191,92 @@ export default {
             });
             return grouped;
         },
+        EffectivePresentationConfig() {
+            return resolveFormPresentationConfig(this.DiyTableModel, this.PresentationConfig, this.PresentationMode);
+        },
+        EffectivePresentationMode() {
+            return String(this.EffectivePresentationConfig.Presentation || 'ControlCenter');
+        },
         IsControlCenterPresentation() {
-            var presentation = String(this.PresentationMode || '').trim().toLowerCase();
+            var presentation = String(this.EffectivePresentationMode || '').trim().toLowerCase();
             return presentation === 'controlcenter' || presentation === 'settingscenter';
         },
         PresentationSections() {
-            var self = this;
-            var configured = Array.isArray(self.PresentationConfig.Sections) ? self.PresentationConfig.Sections : [];
-            return (self.FormTabs || []).filter((tab) => tab && tab.Display !== false).map((tab, index) => {
-                var key = tab.Id || tab.Name || 'section-' + index;
-                var meta = configured.find((item) => {
-                    if (!item || typeof item !== 'object') return false;
-                    var declaredKey = item.Key || item.Id || item.Name;
-                    return String(declaredKey || '').toLowerCase() === String(key).toLowerCase()
-                        || String(declaredKey || '').toLowerCase() === String(tab.Name || '').toLowerCase();
-                }) || {};
-                var fields = self.DiyFieldListGrouped[key] || [];
-                return {
-                    Key: key,
-                    Index: index,
-                    Title: String(meta.Title || meta.Label || tab.Name || '基础信息'),
-                    Description: String(meta.Description || tab.Description || ''),
-                    Icon: String(meta.Icon || tab.Icon || ''),
-                    FieldCount: fields.filter((field) => field && field._isShow !== false).length
-                };
-            });
+            return buildFormPresentationSections({
+                tabs: this.FormTabs,
+                groupedFields: this.DiyFieldListGrouped,
+                table: this.DiyTableModel,
+                config: this.EffectivePresentationConfig,
+                statValues: this.PresentationSectionStatValues
+            }).map((section) => ({
+                ...section,
+                NavigationSubtitleHtml: sanitizeHtml(section.NavigationSubtitleHtml),
+                SectionSubtitleHtml: sanitizeHtml(section.SectionSubtitleHtml),
+                FooterDescriptionHtml: sanitizeHtml(section.FooterDescriptionHtml)
+            }));
         },
         ActivePresentationSection() {
             return this.PresentationSections.find((section) => section.Key === this.FieldActiveTab)
                 || this.PresentationSections[0]
-                || { Key: '', Title: '基础信息', Description: '', Icon: '', FieldCount: 0, Index: 0 };
+                || {
+                    Key: '', Title: '表单信息', SectionTitle: '表单信息', SectionEyebrow: 'FORM SECTION',
+                    SectionSubtitleHtml: '', FooterTitle: '', FooterDescriptionHtml: '', Icon: '',
+                    FieldCount: 0, RequiredCount: 0, DisplayValue: 0, CountLabel: '0 项', RequiredLabel: '', Index: 0
+                };
+        },
+        PresentationNavigationTitle() {
+            return String(this.EffectivePresentationConfig.Navigation?.Title || '表单分组');
+        },
+        PresentationNavigationCountText() {
+            return formatPresentationText(
+                this.EffectivePresentationConfig.Navigation?.CountText || '{count} 项',
+                { count: this.PresentationSections.length, value: this.PresentationSections.length }
+            );
+        },
+        PresentationNavigationFooter() {
+            var navigation = this.EffectivePresentationConfig.Navigation || {};
+            var active = this.ActivePresentationSection || {};
+            var title = String(active.FooterTitle || navigation.FooterTitle || '');
+            var html = sanitizeHtml(active.FooterDescriptionHtml || navigation.FooterHtml || '');
+            return { Visible: Boolean(title || html), Title: title, Html: html };
         },
         ShowPresentationSectionNavigation() {
             if (!this.IsControlCenterPresentation || this.PresentationSections.length <= 1) return false;
-            return String(this.PresentationConfig.SectionNavigation || 'Auto').toLowerCase() !== 'tabs';
+            var navigation = this.EffectivePresentationConfig.Navigation || {};
+            return String(navigation.Mode || this.EffectivePresentationConfig.SectionNavigation || 'Auto').toLowerCase() !== 'tabs';
         },
         PresentationSectionNavigationPosition() {
-            var configured = String(this.PresentationConfig.SectionNavigationPosition || '').trim().toLowerCase();
-            if (['left', 'right', 'top', 'bottom'].indexOf(configured) > -1) return configured;
-            var tablePosition = typeof this.GetTabsPosition === 'function'
-                ? String(this.GetTabsPosition() || '').trim().toLowerCase()
-                : '';
-            return ['left', 'right', 'top', 'bottom'].indexOf(tablePosition) > -1 ? tablePosition : 'left';
+            if (this.diyStore && this.diyStore.IsPhoneView) return 'top';
+            var tablePosition = String(this.DiyTableModel && this.DiyTableModel.TabsPosition || '').trim().toLowerCase();
+            if (['left', 'right', 'top', 'bottom'].indexOf(tablePosition) > -1) return tablePosition;
+            var navigation = this.EffectivePresentationConfig.Navigation || {};
+            var configured = String(navigation.Position || this.EffectivePresentationConfig.SectionNavigationPosition || '').trim().toLowerCase();
+            // 与经典 el-tabs 的 GetTabsPosition() 保持同一默认值。旧表没有保存
+            // TabsPosition 时必须落在 top，不能因为启用了现代工作台就暗中改成 left。
+            return ['left', 'right', 'top', 'bottom'].indexOf(configured) > -1 ? configured : 'top';
         },
         PresentationFieldSearchKeyword() {
-            return String(this.FieldSearchKeyword || this.PresentationConfig.FieldSearchKeyword || '').trim().toLowerCase();
+            return String(this.FieldSearchKeyword || this.EffectivePresentationConfig.FieldSearchKeyword || '').trim().toLowerCase();
+        },
+        PresentationSectionStatsSignature() {
+            var descriptors = this.PresentationSections
+                .filter((section) => section.Badge && section.Badge.Enabled)
+                .map((section) => ({ Key: section.Key, Badge: section.Badge }));
+            var context = {
+                TableId: this.TableId || this.DiyTableModel?.Id || '',
+                TableName: this.TableName || this.DiyTableModel?.Name || '',
+                SysMenuId: this.SysMenuId || '',
+                RecordId: this.FormDiyTableModel?.Id || this.TableRowId || '',
+                Ready: Boolean(this.GetDiyTableRowModelFinish),
+                Descriptors: descriptors
+            };
+            try {
+                return JSON.stringify(context);
+            } catch (error) {
+                return [context.TableId, context.TableName, context.SysMenuId, context.RecordId]
+                    .concat(descriptors.map((item) => item.Key + ':' + item.Badge.ApiEngineKey))
+                    .join('|');
+            }
         },
         presentationLayoutClass() {
             return [
@@ -225,20 +288,159 @@ export default {
         },
     },
     methods: {
+        GetPrintPresentationSection(tab) {
+            var key = tab && (tab.Id || tab.Name);
+            return this.PresentationSections.find(function (section) { return section.Key === key; }) || {
+                SectionEyebrow: 'FORM SECTION',
+                SectionTitle: (tab && tab.Name) || '',
+                SectionSubtitleHtml: '',
+                CountLabel: '',
+                RequiredCount: 0,
+                RequiredLabel: ''
+            };
+        },
+        BeginPrintLayout() {
+            var snapshot = {
+                PrintAllSections: this.PrintAllSections,
+                FieldActiveTab: this.FieldActiveTab,
+                renderedTabs: new Set(this.renderedTabs || []),
+                renderedFieldCounts: Object.assign({}, this.renderedFieldCounts || {})
+            };
+            var nextCounts = Object.assign({}, this.renderedFieldCounts || {});
+            (this.FormTabs || []).forEach((tab) => {
+                if (!tab || tab.Display === false) return;
+                var key = tab.Id || tab.Name;
+                if (!key) return;
+                this.renderedTabs.add(key);
+                nextCounts[key] = (this.DiyFieldListGrouped[key] || []).length;
+            });
+            this.renderedFieldCounts = nextCounts;
+            this.PrintAllSections = true;
+            return snapshot;
+        },
+        EndPrintLayout(snapshot) {
+            var state = snapshot || {};
+            this.PrintAllSections = Boolean(state.PrintAllSections);
+            if (state.FieldActiveTab) this.FieldActiveTab = state.FieldActiveTab;
+            if (state.renderedTabs instanceof Set) this.renderedTabs = new Set(state.renderedTabs);
+            if (state.renderedFieldCounts) this.renderedFieldCounts = Object.assign({}, state.renderedFieldCounts);
+        },
         ActivatePresentationSection(section) {
             if (!section || !section.Key || section.Key === this.FieldActiveTab) return;
             this.tabClickField({ name: section.Key, index: section.Index });
         },
         GetPresentationSectionSubtitle(section) {
             if (!section) return '0 项';
-            var countText = String(section.FieldCount || 0) + ' 项';
-            return section.Description ? String(section.Description) + ' · ' + countText : countText;
+            return section.NavigationSubtitleHtml || section.CountLabel || '0 项';
         },
         GetPresentationSectionFieldCount(tab) {
             if (!tab) return 0;
             var key = tab.Id || tab.Name;
             var section = this.PresentationSections.find(function (item) { return item.Key === key; });
-            return section ? section.FieldCount : 0;
+            return section ? section.DisplayValue : 0;
+        },
+        BuildPresentationSectionBadgeParams(descriptors) {
+            var sharedParams = Object.create(null);
+            var sectionParams = Object.create(null);
+            (descriptors || []).forEach((descriptor) => {
+                var section = descriptor.section || {};
+                var badge = descriptor.badge || {};
+                var params = badge.ParamMap && typeof badge.ParamMap === 'object' ? badge.ParamMap : {};
+                var safeParams = {};
+                Object.keys(params).forEach((key) => {
+                    if (['__proto__', 'prototype', 'constructor'].indexOf(key) > -1) return;
+                    safeParams[key] = params[key];
+                    if (!Object.prototype.hasOwnProperty.call(sharedParams, key)) sharedParams[key] = params[key];
+                });
+                if (['__proto__', 'prototype', 'constructor'].indexOf(section.Key) === -1) {
+                    sectionParams[section.Key] = safeParams;
+                }
+            });
+            var recordId = this.FormDiyTableModel?.Id || this.TableRowId || '';
+            var tableId = this.TableId || this.DiyTableModel?.Id || '';
+            var sysMenuId = this.SysMenuId || '';
+            return Object.assign(sharedParams, {
+                _SysMenuId: sysMenuId,
+                SysMenuId: sysMenuId,
+                TableId: tableId,
+                DiyTableId: tableId,
+                TableName: this.TableName || this.DiyTableModel?.Name || '',
+                RecordId: recordId,
+                Id: recordId,
+                SectionKeys: (descriptors || []).map((descriptor) => descriptor.section.Key),
+                SectionParams: sectionParams
+            });
+        },
+        QueueRefreshPresentationSectionStats() {
+            var self = this;
+            if (self._presentationSectionStatsQueued || self._isDestroyed) return;
+            self._presentationSectionStatsQueued = true;
+            self.$nextTick(function () {
+                self._presentationSectionStatsQueued = false;
+                if (!self._isDestroyed) self.RefreshPresentationSectionStats();
+            });
+        },
+        async RefreshPresentationSectionStats() {
+            var self = this;
+            if (self._presentationSectionStatsRefreshTimer) {
+                clearTimeout(self._presentationSectionStatsRefreshTimer);
+                self._presentationSectionStatsRefreshTimer = null;
+            }
+            var groups = collectFormSectionBadgeApiGroups(self.PresentationSections);
+            var generation = ++self._presentationSectionStatsRequestGeneration;
+            if (!groups.size) {
+                self.PresentationSectionStatValues = {};
+                self.PresentationSectionStatsLoading = false;
+                return;
+            }
+            self.PresentationSectionStatsLoading = true;
+            var nextValues = Object.create(null);
+            await Promise.all([...groups.entries()].map(async ([apiEngineKey, descriptors]) => {
+                try {
+                    var response = await self.DiyCommon.ApiEngine.Run(
+                        apiEngineKey,
+                        self.BuildPresentationSectionBadgeParams(descriptors)
+                    );
+                    if (response && typeof response === 'object'
+                        && Object.prototype.hasOwnProperty.call(response, 'Code')
+                        && Number(response.Code) !== 1) {
+                        throw new Error(response.Msg || '表单分组统计接口返回失败');
+                    }
+                    descriptors.forEach((descriptor) => {
+                        var value = resolveFormSectionBadgeValue(response, descriptor);
+                        if (value !== undefined && ['__proto__', 'prototype', 'constructor'].indexOf(descriptor.section.Key) === -1) {
+                            nextValues[descriptor.section.Key] = value;
+                        }
+                    });
+                } catch (error) {
+                    // 展示统计失败不得阻断表单加载、权限校验或字段事件。
+                    descriptors.forEach((descriptor) => {
+                        var fallback = descriptor.badge.DefaultValue;
+                        if (fallback !== undefined && fallback !== null && fallback !== '') {
+                            if (['__proto__', 'prototype', 'constructor'].indexOf(descriptor.section.Key) === -1) {
+                                nextValues[descriptor.section.Key] = fallback;
+                            }
+                        }
+                    });
+                }
+            }));
+            if (generation !== self._presentationSectionStatsRequestGeneration || self._isDestroyed) return;
+            self.PresentationSectionStatValues = nextValues;
+            self.PresentationSectionStatsLoading = false;
+            self.SchedulePresentationSectionStatsRefresh();
+        },
+        SchedulePresentationSectionStatsRefresh() {
+            var self = this;
+            if (self._presentationSectionStatsRefreshTimer) {
+                clearTimeout(self._presentationSectionStatsRefreshTimer);
+                self._presentationSectionStatsRefreshTimer = null;
+            }
+            var seconds = getFormSectionBadgeRefreshSeconds(self.PresentationSections);
+            if (!seconds || self._isDestroyed) return;
+            self._presentationSectionStatsRefreshTimer = setTimeout(function () {
+                self._presentationSectionStatsRefreshTimer = null;
+                self.RefreshPresentationSectionStats();
+            }, seconds * 1000);
         },
         MatchesPresentationFieldSearch(field) {
             var keyword = this.PresentationFieldSearchKeyword;
@@ -264,7 +466,7 @@ export default {
                 'Textarea', 'RichText', 'CodeEditor', 'Upload', 'FileUpload',
                 'ImageUpload', 'TableChild', 'DiyTable', 'Map', 'MapArea',
                 'JsonTable', 'Html', 'HTML', 'Tabs', 'CollapseGroup',
-                'Radio', 'Checkbox', 'TreeCheckbox'
+                'TreeCheckbox'
             ];
             var classes = [];
             if (this.IsControlCenterPresentation) classes.push('diy-presentation-field-card');
@@ -983,6 +1185,7 @@ export default {
             currentTabIndex: 0,
             PageType: "", //可以是Report
             FormTabs: [],
+            PrintAllSections: false,
             CollapseGroupState: {},
             FieldTabsState: {},
             // 性能优化：跟踪已渲染的标签页，实现懒加载
@@ -1054,6 +1257,12 @@ export default {
             OldFormData: {},
             BusinessDataTranslateLoading: false,
             BusinessDataTranslateRaw: {},
+            // 表单分组徽标仅属于呈现层；失败时回退字段数，不影响表单数据和提交链。
+            PresentationSectionStatValues: {},
+            PresentationSectionStatsLoading: false,
+            _presentationSectionStatsQueued: false,
+            _presentationSectionStatsRequestGeneration: 0,
+            _presentationSectionStatsRefreshTimer: null,
             DiyTableModel: {
                 Tabs: []
             },
@@ -1090,6 +1299,14 @@ export default {
     },
     beforeUpdate() {},
     beforeEnter: (to, from, next) => {},
+    beforeUnmount() {
+        this._presentationSectionStatsRequestGeneration += 1;
+        this._presentationSectionStatsQueued = false;
+        if (this._presentationSectionStatsRefreshTimer) {
+            clearTimeout(this._presentationSectionStatsRefreshTimer);
+            this._presentationSectionStatsRefreshTimer = null;
+        }
+    },
     unmounted() {},
         beforeRouteLeave(to, from, next) {
         // ...

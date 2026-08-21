@@ -12,7 +12,26 @@ import Cookies from "js-cookie";
 import { normalizeAccessRoute } from "@/views/system/components/user-access-key-utils";
 import { cancelRouteLoading, finishRouteLoading, startRouteLoading } from "@/utils/mci-loading";
 import { createDynamicRouteRematch, shouldStartInitialRouteLoading } from "@/router/navigation-state";
+import { getLegacySsoCapabilities, readLegacySsoCredential } from "@/utils/sso-federation.js";
 const whiteList = ["/login", "/auth-redirect", "/access-login", "/mci-redis-manager"]; // no redirect whitelist
+
+let legacySsoCapabilityCache = { osClient: "", expiresAt: 0, data: [] };
+
+async function loadLegacySsoCapabilities() {
+    const osClient = String(DiyCommon.GetOsClient() || "");
+    const now = Date.now();
+    if (legacySsoCapabilityCache.osClient === osClient
+        && legacySsoCapabilityCache.expiresAt > now) {
+        return legacySsoCapabilityCache.data;
+    }
+    const data = await getLegacySsoCapabilities(DiyCommon, osClient);
+    legacySsoCapabilityCache = {
+        osClient,
+        expiresAt: now + 15000,
+        data: Array.isArray(data) ? data : []
+    };
+    return legacySsoCapabilityCache.data;
+}
 
 function removeCredentialParameter(paramName) {
     if (!paramName) return;
@@ -138,125 +157,52 @@ router.beforeEach(async (to, from, next) => {
         return;
     }
     //   document.title = getPageTitle(to.meta.title)
-    //2022-09-14 所有页面均需要token自动登录
-    var diySsoArray = sessionStorage.getItem("Diy_Sso");
-    // Never persist an incoming credential in sessionStorage. Existing deployments
-    // may still contain the legacy value, so remove it during the compatibility pass.
-    try { sessionStorage.removeItem("LastSsoToken"); } catch (_) { }
+    // Legacy URL-token compatibility may only use the narrow SSO projection.
+    // Remove historical browser caches that contained whole diy_sso rows.
+    try {
+        sessionStorage.removeItem("Diy_Sso");
+        sessionStorage.removeItem("LastSsoToken");
+    } catch (_) { }
     var lastSsoToken = DiyCommon.getToken();
-    if (!diySsoArray) {
-        var diySsoResult = await DiyCommon.PostAsync("/api/FormEngine/GetTableDataAnonymous", {
-            FormEngineKey: "Diy_Sso",
-            _Where: [["IsEnable", "=", 1]],
-            OsClient: DiyCommon.GetOsClient()
-        });
-        if (diySsoResult.Code == 1 && Array.isArray(diySsoResult.Data) && diySsoResult.Data.length > 0) {
-            diySsoArray = diySsoResult.Data;
-        } else {
-            diySsoArray = [];
-        }
-        sessionStorage.setItem("Diy_Sso", JSON.stringify(diySsoArray));
-    } else {
-        // 安全/稳定性修复：sessionStorage 数据可能损坏，避免 JSON.parse 抛错导致守卫卡死
-        try {
-            diySsoArray = JSON.parse(diySsoArray);
-            if (!Array.isArray(diySsoArray)) diySsoArray = [];
-        } catch (e) {
-            console.warn("[permission] Diy_Sso JSON 解析失败，已重置：", e && e.message);
-            diySsoArray = [];
-            try { sessionStorage.removeItem("Diy_Sso"); } catch (_) { }
-        }
+    var diySsoArray = [];
+    try {
+        diySsoArray = await loadLegacySsoCapabilities();
+    } catch (_) {
+        diySsoArray = [];
     }
-    if (diySsoArray.length > 0) {
-    }
-    // 直接检测URL中的token参数，无需Diy_Sso配置即可自动登录
-    var directTokenMatch = /[?&]token=([^&;#]+)/i.exec(location.href);
-    if (!directTokenMatch) {
-        directTokenMatch = /[?&]token%3D([^&;#]+)/i.exec(location.href);
-    }
-    var directToken = directTokenMatch ? decodeURIComponent(directTokenMatch[1].replace(/\+/g, "%20")) : null;
-    if (directToken) removeCredentialParameter("token");
-    if (directToken && ((directToken !== lastSsoToken) || !DiyCommon.getToken()) && directToken != "$V8.CurrentToken$") {
-        var newtoken = directToken.replace("Bearer%20", "").replace("Bearer ", "");
-        DiyCommon.setToken(newtoken);
-        var directLoginResult = await DiyCommon.PostAsync(DiyApi.TokenLogin(), {
-            _token: directToken,
-            Token: directToken,
-            OsClient: DiyCommon.GetOsClient()
-        });
-        if (directLoginResult.Code == 1) {
-            const diyStore = useDiyStore(pinia);
-            diyStore.setState("SystemStyle", "Classic");
-            diyStore.setCurrentUser(directLoginResult.Data);
-            // 优先级：当前目标 > redirect > 用户个人首页 > 系统默认首页 > /
-            // 1. 当前目标路径不是/login，说明用户要直接访问该页面
-            if (to.path && to.path !== '/login' && to.path !== '/') {
-                next(createDynamicRouteRematch(to));
-                return;
-            }
-            // 2. 检查路由redirect参数
-            var redirectPath = to.query && to.query.redirect;
-            if (redirectPath) {
-                redirectPath = redirectPath.split('?')[0];
-                if (redirectPath && redirectPath !== '/login' && redirectPath !== '/') {
-                    next({ path: normalizeMenuRoutePath(redirectPath), replace: true });
-                    return;
-                }
-            }
-            // 3. 检查用户个人首页配置
-            var userDefaultIndexUrl = await getAuthorizedUserDefaultIndexUrl(directLoginResult.Data);
-            if (userDefaultIndexUrl) {
-                next({ path: userDefaultIndexUrl, replace: true });
-                return;
-            }
-            // 4. 检查系统默认首页配置
-            var sysConfigResult = await DiyCommon.FormEngine.GetFormDataAnonymous({
-                FormEngineKey: "Sys_Config",
-                _Where: [["IsEnable", "=", 1]],
-                OsClient: DiyCommon.GetOsClient()
-            });
-            if (sysConfigResult.Code == 1) {
-                var sysConfig = sysConfigResult.Data;
-                if (sysConfig && sysConfig.DefaultIndexUrl) {
-                    var url = String(sysConfig.DefaultIndexUrl || "");
-                    url = url.replace("$V8.CurrentToken$", DiyCommon.getToken());
-                    if (url.startsWith("/iframe/")) {
-                        url = normalizeIframeRouteUrl(url);
-                    } else if (url.startsWith("http")) {
-                        window.location.href = url;
-                        return;
-                    }
-                    next({ path: normalizeMenuRoutePath(url) });
-                    return;
-                }
-            }
-            next({ path: "/" });
-            return;
-        }
-    }
+    var matchedLegacyCredential = false;
     for (let index = 0; index < diySsoArray.length; index++) {
         const diySso = diySsoArray[index];
-        var token = decodeURIComponent((new RegExp("[?|&|%3F]" + diySso.TokenName + "%3D" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
-        if (!token) {
-            token = decodeURIComponent((new RegExp("[?|&|%3F]" + diySso.TokenName + "=" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
-        }
-        // console.log('-------> SsoAutoLogin token：' + token);
-        if (((token && token !== lastSsoToken) || (token && !DiyCommon.getToken())) && token != "$V8.CurrentToken$") {
-            // && token != DiyCommon.getToken()
+        const token = readLegacySsoCredential(location.href, diySso.TokenName);
+        if (token) {
+            matchedLegacyCredential = true;
             removeCredentialParameter(diySso.TokenName);
-            //登录
-            if (diySso.ClientSsoApi.toLowerCase() == DiyApi.TokenLogin().toLowerCase()) {
-                var newtoken = token.replace("Bearer%20", "").replace("Bearer ", "");
-                // 使用统一的 Token 存储方法
-                DiyCommon.setToken(newtoken);
+        }
+        if (token && (token !== lastSsoToken || !DiyCommon.getToken())) {
+            const usesDiyToken = String(diySso.ClientSsoApi).toLowerCase()
+                === DiyApi.TokenLogin().toLowerCase();
+            if (usesDiyToken) {
+                DiyCommon.setToken(token.replace(/^Bearer(?:%20|\s)+/i, ""));
             }
-            var ssoApiResult = await DiyCommon.PostAsync(diySso.ClientSsoApi, {
-                //'/api/SysUser/SsoPengrui'
-                _token: token,
-                Token: token,
-                TokenName: diySso.TokenName,
-                OsClient: DiyCommon.GetOsClient()
-            });
+            let ssoApiResult;
+            try {
+                ssoApiResult = await DiyCommon.PostAsync(diySso.ClientSsoApi, {
+                    _token: token,
+                    Token: token,
+                    TokenName: diySso.TokenName,
+                    OsClient: DiyCommon.GetOsClient()
+                });
+            } catch (error) {
+                if (usesDiyToken) {
+                    if (lastSsoToken) DiyCommon.setToken(lastSsoToken);
+                    else DiyCommon.removeToken();
+                }
+                throw error;
+            }
+            if (ssoApiResult.Code != 1 && usesDiyToken) {
+                if (lastSsoToken) DiyCommon.setToken(lastSsoToken);
+                else DiyCommon.removeToken();
+            }
             // console.log('-------> SsoAutoLogin ssoApiResult：', ssoApiResult);
             if (ssoApiResult.Code == 1) {
                 const diyStore = useDiyStore(pinia);
@@ -299,6 +245,9 @@ router.beforeEach(async (to, from, next) => {
                 break;
             }
         }
+    }
+    if (!matchedLegacyCredential && readLegacySsoCredential(location.href, "token")) {
+        removeCredentialParameter("token");
     }
 
     const hasToken = DiyCommon.getToken();

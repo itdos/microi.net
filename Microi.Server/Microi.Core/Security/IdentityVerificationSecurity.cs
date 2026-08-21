@@ -214,7 +214,7 @@ namespace Microi.net
                 throw new ArgumentException(
                     $"Passkey RP ID 与当前站点域名不匹配。当前站点：{currentOrigin}；"
                     + $"当前域名：{originHost}；已配置 RP ID：{rpId}。"
-                    + "请由租户管理员进入“系统设置 → 登录与身份”，将 Passkey RP ID 设置为当前域名，"
+                    + "请由租户管理员进入“系统设置 → 安全与服务接入”，将 Passkey RP ID 设置为当前域名，"
                     + "或设置为当前域名的可注册父域；同时把当前站点完整 Origin 加入 PasskeyOrigins，"
                     + "保存后重新登记通行密钥。",
                     nameof(configuredRpId));

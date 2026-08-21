@@ -20,7 +20,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.4.4.0";
+        public static string Version = "6.4.5.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -136,7 +136,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("API_ENGINE_RESOURCE_BASELINE_V1") ||
                     !code.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !code.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
-                    !code.Contains("PLATFORM_API_ENGINE_PRESERVE_NEWER_V1") ||
+                    !code.Contains("OFFICIAL_MANAGED_OVERWRITE_V1") ||
                     !code.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
                     !code.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
                     !code.Contains("BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1") ||
@@ -739,7 +739,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("API_ENGINE_RESOURCE_BASELINE_V1") ||
                     !content.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !content.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
-                    !content.Contains("PLATFORM_API_ENGINE_PRESERVE_NEWER_V1") ||
+                    !content.Contains("OFFICIAL_MANAGED_OVERWRITE_V1") ||
                     !content.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
                     !content.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
                     !content.Contains("BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1") ||
@@ -881,7 +881,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !importerEngineCode.Contains("API_ENGINE_RESOURCE_BASELINE_V1") ||
                     !importerEngineCode.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !importerEngineCode.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
-                    !importerEngineCode.Contains("PLATFORM_API_ENGINE_PRESERVE_NEWER_V1") ||
+                    !importerEngineCode.Contains("OFFICIAL_MANAGED_OVERWRITE_V1") ||
                     !importerEngineCode.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
                     !importerEngineCode.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
                     !importerEngineCode.Contains("BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1") ||

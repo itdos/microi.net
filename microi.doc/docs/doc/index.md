@@ -178,6 +178,7 @@
 <tr><td>📂 <strong><a href="/doc/more/hdfs">分布式存储</a></strong></td><td>阿里云 OSS / MinIO / 亚马逊 S3，可扩展更多存储介质</td></tr>
 <tr><td>🔐 <strong><a href="/doc/more/security">平台安全与兼容基线</a></strong></td><td>FormEngine 混合授权、保护表、TableChild、上传与私有文件、CORS/SSRF、RSA、Token 和多节点缓存</td></tr>
 <tr><td>🛡️ <strong><a href="/doc/more/identity-verification">登录方式与强身份验证</a></strong></td><td>DiyToken、Passkey、Authenticator、Gitee/微信/GitHub 登录、改密步进票据与可选严格人脸网关</td></tr>
+<tr><td>🔑 <strong><a href="/doc/more/sso">SSO 身份联邦</a></strong></td><td>OIDC、SAML2、CAS 双向单点登录、账号映射、协议端点、安全基线与官方商城应用</td></tr>
 <tr><td>📨 <strong><a href="/doc/system-engine/mq">消息队列</a></strong></td><td>RabbitMQ 集成</td></tr>
 <tr><td>🔔 <strong><a href="/doc/system-engine/message-notification">消息通知</a></strong></td><td>公众号/服务号、短信、邮件与平台内部实时通知，持久日志和多节点幂等</td></tr>
 <tr><td>📡 <strong><a href="/doc/system-engine/mqtt-engine">IoT 物联网 MQTT</a></strong></td><td>集成 MQTT 服务器，支持 485 / ZigBee / 蓝牙 / Modbus 网关</td></tr>
@@ -195,7 +196,7 @@
 <tr><td>📂 <strong><a href="/doc/system-engine/databases">数据库管理</a></strong></td><td>一键加载第三方数据库，接口引擎中访问任意数据库</td></tr>
 <tr><td>📑 <strong><a href="/doc/more/office">Office 引擎</a></strong></td><td>集成 OnlyOffice，本地设计模板，导出/打印</td></tr>
 <tr><td>🔐 <strong>细粒度权限</strong></td><td>精确到每张表、每个字段、每个菜单、每个按钮、每个接口</td></tr>
-<tr><td>🔑 <strong>单点登录</strong></td><td>支持第三方系统 ↔ 低代码平台双向单点登录</td></tr>
+<tr><td>🔑 <strong><a href="/doc/more/sso">SSO 身份联邦</a></strong></td><td>支持第三方系统 ↔ 吾码双向 OIDC、SAML2、CAS 单点登录</td></tr>
 <tr><td>💬 <strong>微信公众平台</strong></td><td>多公众号 / 多小程序配置、模板消息</td></tr>
 <tr><td>🎨 <strong><a href="/doc/system-engine/microi-ui">Microi.UI</a></strong></td><td>Web / UniApp 统一设计系统、主题变量、响应式组件和 AI 可检索组件文档</td></tr>
 <tr><td>📱 <strong><a href="/doc/system-engine/multi-end-client">PC / WebOS / UniApp / App</a></strong></td><td>经典管理端、桌面式门户、移动 Web、原生动态小程序和 HBuilderX App 壳</td></tr>

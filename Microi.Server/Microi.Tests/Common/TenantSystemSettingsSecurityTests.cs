@@ -126,6 +126,35 @@ public class TenantSystemSettingsSecurityTests
             official, "Login.Passkey.Enabled", fallback: false, preferLegacyForOfficialDefault: true));
     }
 
+    [Fact]
+    public void DisabledManagementTemplate_RemainsRuntimePrivateAndFallsBack()
+    {
+        var disabled = new TenantSystemSettingValue
+        {
+            Key = "Sms.Aliyun.AccessKeySecret",
+            Value = "must-not-be-used",
+            SecretCipher = "must-not-be-projected",
+            ValueType = "String",
+            IsPublic = true,
+            IsSecret = true,
+            IsEnabled = false,
+            TenantOsClient = "iTdos"
+        };
+        var settings = new Dictionary<string, TenantSystemSettingValue>(StringComparer.OrdinalIgnoreCase)
+        {
+            [disabled.Key] = disabled
+        };
+
+        Assert.Equal("legacy-secret", TenantSystemSettingsSecurity.GetText(
+            settings, disabled.Key, "legacy-secret", decryptSecret: true));
+        Assert.False(TenantSystemSettingsSecurity.GetBool(
+            settings, disabled.Key, fallback: false));
+        Assert.Null(TenantSystemSettingsSecurity.CreateV8Projection(new[] { disabled })[disabled.Key]);
+        var disabledPublicRow = Row(disabled.Key, "must-not-reach-browser", "String", isPublic: true);
+        disabledPublicRow["IsEnabled"] = 0;
+        Assert.Empty(TenantSystemSettingsSecurity.CreatePublicProjection(new[] { disabledPublicRow }).Properties());
+    }
+
     private static JObject Row(string key, string value, string type, bool isPublic)
     {
         return new JObject

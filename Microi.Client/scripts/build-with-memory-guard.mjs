@@ -13,6 +13,10 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { calculateBuildMemoryPlan } from './build-memory-plan.mjs';
+import {
+    resolveBuildOutputMode,
+    validateBuildOutputMode
+} from './build-output-mode.mjs';
 
 const GB = 1024 ** 3;
 const MB = 1024 ** 2;
@@ -34,7 +38,7 @@ const resumeStableSampleCount = 5;
 // 当前 14802 模块的现代浏览器完整依赖图（含 go-view）实测在 Rollup
 // 输出 757 个 chunk 时，5 GB 堆会 OOM，进程树峰值约 5.4 GB。
 // Vite 只生成未压缩现代 ESM；它退出后由独立 1.5 GB 子进程逐文件压缩，
-// Chrome 49 再由独立 2 GB 子进程逐 chunk 串行转换，三个阶段的峰值不会叠加。
+// 显式启用 Chrome 49 时，再由独立 2 GB 子进程逐 chunk 串行转换，三个阶段的峰值不会叠加。
 const defaultHeapMb = 6144;
 const measuredModernProcessTreePeakMb = 6144;
 const modernMinifyHeapMb = 1536;
@@ -75,14 +79,15 @@ const esbuildParallelism = Math.max(
 );
 const buildMemoryNoticeThreshold = totalMemory * 0.25;
 const rawArgs = process.argv.slice(2);
-const dryRun = rawArgs.includes('--dry-run');
-const legacyOnly = rawArgs.includes('--legacy-only');
-const preflightOnly = rawArgs.includes('--preflight-only');
-const viteArgs = ['build', ...rawArgs.filter((arg) => ![
-    '--dry-run',
-    '--legacy-only',
-    '--preflight-only'
-].includes(arg))];
+const {
+    dryRun,
+    includeLegacy,
+    legacyOnly,
+    modeLabel,
+    preflightOnly,
+    runModern,
+    viteArgs
+} = resolveBuildOutputMode(rawArgs);
 const interactiveInput = process.stdin.isTTY || process.env.MICROI_BUILD_INTERACTIVE === '1';
 const skipMemoryWaitFromEnv = /^(?:1|true|yes|on)$/i.test(
     String(process.env.MICROI_BUILD_SKIP_MEMORY_WAIT || '').trim()
@@ -311,14 +316,19 @@ async function waitForStartMemory(context, requiredStartMemory) {
 console.log(
     `[Microi build guard] 物理内存 ${formatGb(totalMemory)} GB，可用 ${formatGb(freeMemory)} GB，` +
     `现代 Vite 堆上限 ${heapMb} MB，esbuild 并行 ${esbuildParallelism}，` +
-    `现代串行压缩 ${modernMinifyHeapMb} MB，legacy ${legacyHeapMb} MB。`
+    `现代串行压缩 ${modernMinifyHeapMb} MB` +
+    `${includeLegacy ? `，legacy ${legacyHeapMb} MB。` : '；Chrome 49 legacy 未启用。'}`
 );
+console.log(`[Microi build guard] 本次构建模式：${modeLabel}。`);
+const selectedPhaseTargets = legacyOnly
+    ? `legacy ${formatGb(requiredLegacyStartMemory)} GB`
+    : `现代 Vite ${formatGb(requiredModernStartMemory)} GB，` +
+        `现代串行压缩 ${formatGb(requiredModernMinifyStartMemory)} GB` +
+        `${includeLegacy ? `，legacy ${formatGb(requiredLegacyStartMemory)} GB` : ''}`;
 console.log(
     `[Microi build guard] 系统安全余量 ${formatGb(systemSafetyMemory)} GB，` +
     `现代 Vite 实测峰值预算 ${formatGb(modernMemoryPlan.phaseBudgetMemory)} GB；` +
-    `各顺序阶段启动目标：现代 Vite ${formatGb(requiredModernStartMemory)} GB，` +
-    `现代串行压缩 ${formatGb(requiredModernMinifyStartMemory)} GB，` +
-    `legacy ${formatGb(requiredLegacyStartMemory)} GB（阶段峰值不叠加）；` +
+    `本次顺序阶段启动目标：${selectedPhaseTargets}（阶段峰值不叠加）；` +
     '全机占用达到 95% 时自动暂停整个构建进程树，降至 90% 并稳定 5 秒后继续。'
 );
 if (skipMemoryWaitFromEnv) {
@@ -327,42 +337,47 @@ if (skipMemoryWaitFromEnv) {
     );
 }
 
-if (!existsSync(viteBin)) {
+if (runModern && !existsSync(viteBin)) {
     console.error('[Microi build guard] 未找到本地 Vite，请先执行 npm install。');
     process.exit(1);
 }
-if (!existsSync(modernMinifier)) {
+if (runModern && !existsSync(modernMinifier)) {
     console.error(`[Microi build guard] 未找到现代产物压缩器：${modernMinifier}`);
     process.exit(1);
 }
-if (!existsSync(legacyBuilder)) {
+if (includeLegacy && !existsSync(legacyBuilder)) {
     console.error(`[Microi build guard] 未找到 Chrome 49 转换器：${legacyBuilder}`);
     process.exit(1);
 }
 
+const initialPhaseName = legacyOnly ? 'Chrome 49 legacy 阶段' : '现代 Vite 阶段';
+const requiredInitialStartMemory = legacyOnly
+    ? requiredLegacyStartMemory
+    : requiredModernStartMemory;
+
 if (preflightOnly) {
-    if (!memoryWaitBypassed && freeMemory < requiredModernStartMemory) {
+    if (!memoryWaitBypassed && freeMemory < requiredInitialStartMemory) {
         console.error(
             `[Microi build guard] 发布前资源预检未通过：当前可用 ${formatGb(freeMemory)} GB，` +
-            `现代阶段需要至少 ${formatGb(requiredModernStartMemory)} GB。` +
+            `${initialPhaseName}需要至少 ${formatGb(requiredInitialStartMemory)} GB。` +
             '请先关闭不需要的 WSL、后端、浏览器或其它重任务后重试。'
         );
         process.exit(2);
     }
-    console.log('[Microi build guard] 发布前资源预检通过，未启动 Vite。');
+    console.log(`[Microi build guard] 发布前资源预检通过（${modeLabel}），未启动构建。`);
     process.exit(0);
 }
 
 if (dryRun) {
     if (memoryWaitBypassed) {
         console.log('[Microi build guard] dry-run：实际构建将按配置跳过内存等待和自动暂停。');
-    } else if (freeMemory < requiredModernStartMemory) {
+    } else if (freeMemory < requiredInitialStartMemory) {
         console.log(
             `[Microi build guard] dry-run：当前可用 ${formatGb(freeMemory)} GB；` +
-            `实际构建会等待到 ${formatGb(requiredModernStartMemory)} GB 后再启动现代阶段。`
+            `实际构建会等待到 ${formatGb(requiredInitialStartMemory)} GB 后再启动${initialPhaseName}。`
         );
     } else {
-        console.log('[Microi build guard] 资源检查通过（dry-run，未启动 Vite）。');
+        console.log(`[Microi build guard] 资源检查通过（dry-run，${modeLabel}，未启动构建）。`);
     }
     process.exit(0);
 }
@@ -645,15 +660,23 @@ try {
     assertSafeBuildPath(legacyOutDir);
     rmSync(legacyOutDir, { recursive: true, force: true });
 
-    if (!legacyOnly) {
+    if (runModern) {
         await runVitePhase('现代浏览器', 'modern', modernOutDir);
         await runModernMinificationPhase();
     } else if (!existsSync(path.join(modernOutDir, 'index.html'))) {
         throw new Error('--legacy-only 需要已有的现代浏览器 index.html。');
     }
-    await runLegacyConversionPhase();
-    rmSync(legacyOutDir, { recursive: true, force: true });
-    console.log('\n[Microi build guard] 现代与 Chrome 49 legacy 产物已合并完成。');
+
+    if (includeLegacy) {
+        await runLegacyConversionPhase();
+        rmSync(legacyOutDir, { recursive: true, force: true });
+    }
+
+    validateBuildOutputMode({
+        distDir: modernOutDir,
+        includeLegacy
+    });
+    console.log(`\n[Microi build guard] 构建完成：${modeLabel}。`);
 } catch (error) {
     console.error(`[Microi build guard] ${error.message}`);
     process.exitCode = stoppedForMemory ? 137 : 1;

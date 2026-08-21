@@ -16,7 +16,7 @@
 | `PageTabs` | 列表页 Tab |
 | `ExportMoreBtns` | 导出下拉扩展 |
 
-`PageTabs.TargetSysMenuId` 是通用的跨模块页签协议。未配置时继续执行当前模块的页签 V8；配置其它 `sys_menu.Id` 时，`diy-table.vue` 使用动态路由替换当前地址，让目标模块按自身 `sys_menu / diy_table / diy_field` 完整重建，并移除旧的顶部访问标签。不得为应用商城或其它单一模块在 schema/data mixin 中增加专用数据源分支。
+`PageTabs.TargetSysMenuId` 是通用的跨模块页签协议。未配置时继续执行当前模块的页签 V8；配置其它 `sys_menu.Id` 时，`diy-table.vue` 在同一个组件实例内切换模块上下文，按目标 `sys_menu / diy_table / diy_field` 重载数据，同时保留入口路由、面包屑、顶部访问标签、宿主 Hero 和入口 PageTabs，URL 只更新 `Tab` 查询参数。入口模块是唯一 PageTabs 配置源，隐藏目标模块不得复制 PageTabs。不得为应用商城或其它单一模块在 schema/data mixin 中增加专用数据源分支。
 
 按钮显隐链路：
 

@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.1.8
+ * Version: v2.2.1
  * Function:
  * - Unified marketplace importer with resumable slices, strict SharedPublicRuntime support, and verified current/history baselines for legacy managed API engines.
  */
@@ -1085,6 +1085,8 @@ try {
         ApiEngineInserted: 0,
         ApiEngineUpdated: 0,
         ApiEngineSkipped: 0,
+        ApiEngineHistoryMigrated: 0,
+        ApiEngineHistorySkipped: 0,
         VersionRecordUpdated: 0,
         ApplicationInstalled: 0,
         ApplicationSourceFiles: 0,
@@ -1135,6 +1137,7 @@ try {
         'ReferenceRowsUpdated', 'FlowInserted', 'FlowUpdated',
         'NodeInserted', 'NodeUpdated', 'LineInserted', 'LineUpdated',
         'ApiEngineInserted', 'ApiEngineUpdated', 'ApiEngineSkipped',
+        'ApiEngineHistoryMigrated', 'ApiEngineHistorySkipped',
         'DataSetCount', 'DataInserted', 'DataUpdated', 'DataSkipped',
         'ScheduleJobSaved', 'VersionRecordUpdated'
     ];
@@ -2140,6 +2143,8 @@ try {
                     ApiEngineInserted: stats.ApiEngineInserted,
                     ApiEngineUpdated: stats.ApiEngineUpdated,
                     ApiEngineSkipped: stats.ApiEngineSkipped,
+                    ApiEngineHistoryMigrated: stats.ApiEngineHistoryMigrated,
+                    ApiEngineHistorySkipped: stats.ApiEngineHistorySkipped,
                     ApplicationSourceFiles: stats.ApplicationSourceFiles,
                     ApplicationBuildAssets: stats.ApplicationBuildAssets,
                     ApplicationInlineBuildAssets: stats.ApplicationInlineBuildAssets,
@@ -5451,6 +5456,148 @@ try {
             }
         }
     };
+    // API_ENGINE_CHANGE_HISTORY_TABLECHILD_MIGRATION_V1
+    // 只有携带新子表的表单引擎包才执行。物理表与字段已经在前面的 schema
+    // 阶段落库；后台分片安装则固定在 PostSchema 执行，避免旧文本先被迁移、
+    // 后续建表失败后又留下不可重试的半成品。旧 ChangeHistory 永不清空，
+    // 因此旧前端/旧后端与迁移重试都能继续工作。
+    var packageContainsApiEngineHistoryTable = function () {
+        var targetName = 'mci_apiengine_change_history';
+        var packageTables = Package.DiyTables || [];
+        for (var historyTableIndex = 0; historyTableIndex < packageTables.length; historyTableIndex++) {
+            if (String(packageTables[historyTableIndex] && packageTables[historyTableIndex].Name || '').toLowerCase() == targetName) {
+                return true;
+            }
+        }
+        var packageDdls = Package.DDLStatements || [];
+        for (var historyDdlIndex = 0; historyDdlIndex < packageDdls.length; historyDdlIndex++) {
+            if (String(packageDdls[historyDdlIndex] && packageDdls[historyDdlIndex].TableName || '').toLowerCase() == targetName) {
+                return true;
+            }
+        }
+        return false;
+    };
+    var migrateLegacyApiEngineChangeHistory = function () {
+        if (!packageContainsApiEngineHistoryTable()) return;
+        if (backgroundChunkingEnabled && backgroundCheckpointPhase != 'PostSchema') return;
+
+        var targetTable = 'mci_apiengine_change_history';
+        var legacyApiEngineColumns = getTargetPhysicalColumns('sys_apiengine');
+        if (!legacyApiEngineColumns.changehistory) {
+            // 极老数据库可能从未有 ChangeHistory；新资源仍可正常安装，后续
+            // MCP / VS Code 会直接写子表。只有“物理列确实不存在”才允许跳过；
+            // 列存在但读取失败必须失败关闭，避免把暂时性数据库异常误报为迁移成功。
+            debugLog.api_engine_history_migration_skipped =
+                '旧 sys_apiengine.ChangeHistory 物理列不存在，已跳过历史迁移';
+            return;
+        }
+        var pageIndex = 1;
+        var pageSize = 200;
+        var reachedLastPage = false;
+        while (!reachedLastPage && pageIndex <= 10000) {
+            var legacyResult = V8.FormEngine.GetTableData('sys_apiengine', {
+                // 老租户的 IsDeleted 可能为 NULL。SQL 中 NULL <> 1 不成立，
+                // 若在查询条件里直接使用该表达式会漏迁历史接口；先稳定分页
+                // 读取，再只跳过明确等于 1 的软删除行。
+                _SelectFields: ['Id', 'Version', 'ChangeHistory', 'CreateTime', 'UpdateTime', 'IsDeleted'],
+                _OrderBy: 'Id',
+                _OrderByType: 'ASC',
+                _PageIndex: pageIndex,
+                _PageSize: pageSize
+            });
+            if (!legacyResult || legacyResult.Code != 1) {
+                throw new Error('接口引擎修改历史迁移失败：旧 ChangeHistory 不可读取，'
+                    + ((legacyResult && legacyResult.Msg) || '接口无返回'));
+            }
+
+            var legacyRows = legacyResult.Data || [];
+            reachedLastPage = legacyRows.length < pageSize;
+            if (legacyRows.length == 0) break;
+
+            var engineIds = [];
+            for (var historyEngineIndex = 0; historyEngineIndex < legacyRows.length; historyEngineIndex++) {
+                var historyEngineId = String(legacyRows[historyEngineIndex] && legacyRows[historyEngineIndex].Id || '').trim();
+                if (historyEngineId) engineIds.push(historyEngineId);
+            }
+            var existingKeys = {};
+            if (engineIds.length > 0) {
+                var existingHistoryResult = V8.FormEngine.GetTableData(targetTable, {
+                    _SelectFields: ['EntryKey'],
+                    _Where: [['ApiEngineId', 'In', engineIds]],
+                    _PageIndex: 1,
+                    _PageSize: 100000
+                });
+                if (!existingHistoryResult || existingHistoryResult.Code != 1) {
+                    throw new Error('接口引擎修改历史迁移失败：新子表不可读取，'
+                        + ((existingHistoryResult && existingHistoryResult.Msg) || '接口无返回'));
+                }
+                var existingHistoryRows = existingHistoryResult.Data || [];
+                for (var existingHistoryIndex = 0; existingHistoryIndex < existingHistoryRows.length; existingHistoryIndex++) {
+                    var existingKey = String(existingHistoryRows[existingHistoryIndex] && existingHistoryRows[existingHistoryIndex].EntryKey || '').trim();
+                    if (existingKey) existingKeys[existingKey] = true;
+                }
+            }
+
+            for (var legacyEngineIndex = 0; legacyEngineIndex < legacyRows.length; legacyEngineIndex++) {
+                var legacyEngine = legacyRows[legacyEngineIndex] || {};
+                if (Number(legacyEngine.IsDeleted || 0) === 1) continue;
+                var apiEngineId = String(legacyEngine.Id || '').trim();
+                if (!apiEngineId) continue;
+                var legacyLines = String(legacyEngine.ChangeHistory || '').split(/\r?\n/);
+                for (var legacyLineIndex = 0; legacyLineIndex < legacyLines.length; legacyLineIndex++) {
+                    var legacyLine = String(legacyLines[legacyLineIndex] || '').trim();
+                    if (!legacyLine) continue;
+                    var entryKey = V8.EncryptHelper.Sha256Hex(apiEngineId + '\n' + legacyLine);
+                    if (existingKeys[entryKey]) {
+                        stats.ApiEngineHistorySkipped++;
+                        continue;
+                    }
+
+                    var versionMatch = legacyLine.match(/\b(v\d+\.\d+(?:\.\d+){0,2})\b/i);
+                    var dateMatch = legacyLine.match(/^(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}:\d{2})?)/);
+                    var historyTime = dateMatch && dateMatch[1]
+                        ? (dateMatch[1].length == 10 ? dateMatch[1] + ' 00:00:00' : dateMatch[1])
+                        : String(legacyEngine.UpdateTime || legacyEngine.CreateTime || nowText('yyyy-MM-dd HH:mm:ss'));
+                    var addHistoryResult = V8.FormEngine.AddFormData(targetTable, {
+                        Id: V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid(),
+                        ApiEngineId: apiEngineId,
+                        Version: versionMatch && versionMatch[1] ? versionMatch[1] : String(legacyEngine.Version || ''),
+                        Description: legacyLine,
+                        EntryKey: entryKey,
+                        Source: '旧 ChangeHistory 逐行迁移',
+                        CreateTime: historyTime,
+                        UpdateTime: historyTime,
+                        IsDeleted: 0
+                    });
+                    if (!addHistoryResult || addHistoryResult.Code != 1) {
+                        // 唯一键并发只算幂等跳过；其它错误回滚本次应用安装，
+                        // 保留旧文本后可安全修复并重试。
+                        var duplicateHistoryResult = V8.FormEngine.GetFormData(targetTable, {
+                            _Where: [['EntryKey', '=', entryKey]],
+                            _SelectFields: ['Id', 'EntryKey']
+                        });
+                        if (duplicateHistoryResult && duplicateHistoryResult.Code == 1 && duplicateHistoryResult.Data) {
+                            existingKeys[entryKey] = true;
+                            stats.ApiEngineHistorySkipped++;
+                            continue;
+                        }
+                        throw new Error('接口引擎修改历史迁移失败：ApiEngineId=' + apiEngineId
+                            + '，' + ((addHistoryResult && addHistoryResult.Msg) || '接口无返回'));
+                    }
+                    existingKeys[entryKey] = true;
+                    stats.ApiEngineHistoryMigrated++;
+                }
+            }
+            pageIndex++;
+        }
+        if (!reachedLastPage && pageIndex > 10000) {
+            throw new Error('接口引擎修改历史迁移超过 2000000 条引擎分页安全上限');
+        }
+        debugLog.api_engine_history_migration = '逐行迁移' + stats.ApiEngineHistoryMigrated
+            + '条，幂等跳过' + stats.ApiEngineHistorySkipped + '条；旧文本保留';
+    };
+    migrateLegacyApiEngineChangeHistory();
+
     restoreApplicationMenuBindingsFromPackage();
     for (var bindingIndex = 0; bindingIndex < applicationMenuBindings.length; bindingIndex++) {
         var binding = applicationMenuBindings[bindingIndex];
@@ -5696,9 +5843,10 @@ try {
         return 0;
     }
 
-    // PLATFORM_API_ENGINE_PRESERVE_NEWER_V1：官方平台应用可能携带发布时的旧版
-    // 共享接口引擎。若当前租户已经运行更高语义版本，保留该版本并继续安装；
-    // 同版本异哈希、无版本、普通应用及低版本本地修改仍按三方基线冲突回滚。
+    // OFFICIAL_MANAGED_OVERWRITE_V1：可信 iTdos 官方 Platform 包中的
+    // Application-owned Managed 接口是平台发行物，安装/升级必须以包内版本覆盖，
+    // 不因 Local!=Base 报租户冲突。离线/社区包仍走三方基线；CreateIfMissing
+    // 与历史 Tenant 所有权在到达本决策前已被永久保护，绝不覆盖。
     function normalizeApiEngineBaseHashes(value) {
         var source = value;
         if (typeof source == 'string') {
@@ -5717,7 +5865,11 @@ try {
         return result;
     }
 
-    function decideManagedApiEngineUpdate(ownership, baseHash, localHash, incomingHash, localVersion, incomingVersion, compatibleBaseHashes) {
+    function decideManagedApiEngineUpdate(ownership, baseHash, localHash, incomingHash, localVersion, incomingVersion, compatibleBaseHashes, trustedOfficialManagedOverwrite) {
+        if (trustedOfficialManagedOverwrite
+            && String(ownership || '').toLowerCase() == 'platform') {
+            return localHash == incomingHash ? 'Apply' : 'ApplyOfficialManagedOverwrite';
+        }
         if (localHash == incomingHash || (baseHash && localHash == baseHash)) return 'Apply';
         var compatibleHashes = normalizeApiEngineBaseHashes(compatibleBaseHashes);
         for (var compatibleIndex = 0; compatibleIndex < compatibleHashes.length; compatibleIndex++) {
@@ -6090,8 +6242,15 @@ try {
                     incomingHash,
                     localVersion,
                     incomingVersion,
-                    apiEnginePolicy.CompatibleBaseHashes
+                    apiEnginePolicy.CompatibleBaseHashes,
+                    trustedOfficialPlatformPackage
+                        && String(apiEnginePolicy.Ownership || '').toLowerCase() == 'platform'
                 );
+                if (managedDecision == 'ApplyOfficialManagedOverwrite') {
+                    debugLog['apiengine_official_managed_overwrite_' + i] =
+                        '可信官方平台 Managed 资源覆盖升级：' + apiEngine.ApiEngineKey
+                        + '，local=' + localHash + '，incoming=' + incomingHash;
+                }
                 if (managedDecision == 'Conflict'
                     && apiEngineExecutableHash(existingApiEngine && existingApiEngine.ApiV8Code)
                         == apiEngineExecutableHash(apiEngine.ApiV8Code)) {
@@ -6264,6 +6423,39 @@ try {
         }
         return fields;
     };
+    // DATASET_METADATA_UPDATE_V1：InsertIfMissing 仍然保护租户配置值；官方包只可显式
+    // 更新分类、说明、排序三项展示元数据。ConfigValue / SecretCipher 等运行值永不参与。
+    var normalizeDataMetadataFields = function (dataSet, sourceRow, dataTableName, conflictPolicy) {
+        if (conflictPolicy != 'InsertIfMissing') return [];
+        var rawFields = dataSet.MetadataFieldsIfExists || [];
+        if (typeof rawFields == 'string') {
+            try { rawFields = JSON.parse(rawFields || '[]'); }
+            catch (metadataFieldsError) {
+                throw new Error('应用数据导入失败：表 ' + dataTableName + ' 的 MetadataFieldsIfExists 不是有效JSON');
+            }
+        }
+        var allowedFields = { category: 'Category', description: 'Description', sort: 'Sort' };
+        var fields = [];
+        var fieldMap = {};
+        if (rawFields && rawFields.length != null) {
+            for (var metadataFieldIndex = 0; metadataFieldIndex < rawFields.length; metadataFieldIndex++) {
+                var requestedField = String(rawFields[metadataFieldIndex] || '');
+                var canonicalField = allowedFields[requestedField.toLowerCase()];
+                if (!canonicalField) {
+                    throw new Error('应用数据导入失败：表 ' + dataTableName
+                        + ' 的 MetadataFieldsIfExists 仅允许 Category、Description、Sort');
+                }
+                if (!Object.prototype.hasOwnProperty.call(sourceRow, canonicalField)) {
+                    throw new Error('应用数据导入失败：表 ' + dataTableName + ' 的元数据字段缺少值：' + canonicalField);
+                }
+                if (!fieldMap[canonicalField]) {
+                    fields.push(canonicalField);
+                    fieldMap[canonicalField] = true;
+                }
+            }
+        }
+        return fields;
+    };
     var findExistingPackageData = function (dataTableName, sourceRow, conflictPolicy, conflictFields) {
         var existingById = V8.FormEngine.GetFormData(dataTableName, { Id: String(sourceRow.Id) });
         if (existingById && existingById.Code == 1 && existingById.Data) {
@@ -6351,9 +6543,30 @@ try {
             var conflictFields = normalizeDataConflictFields(dataSet, sourceRow, dataTableName, conflictPolicy);
             var existingData = findExistingPackageData(dataTableName, sourceRow, conflictPolicy, conflictFields);
             if (conflictPolicy == 'InsertIfMissing' && existingData.Exists) {
-                stats.DataSkipped++;
-                debugLog['data_insert_if_missing_skip_' + dataTableName + '_' + dataRowIndex]
-                    = '已存在，匹配字段：' + existingData.Match;
+                var metadataFields = normalizeDataMetadataFields(dataSet, sourceRow, dataTableName, conflictPolicy);
+                if (metadataFields.length > 0) {
+                    var existingRow = existingData.Result && existingData.Result.Data;
+                    var metadataTargetRow = {
+                        Id: String((existingRow && existingRow.Id) || sourceRow.Id),
+                        OsClient: V8.OsClient
+                    };
+                    for (var metadataCopyIndex = 0; metadataCopyIndex < metadataFields.length; metadataCopyIndex++) {
+                        var metadataFieldName = metadataFields[metadataCopyIndex];
+                        metadataTargetRow[metadataFieldName] = sourceRow[metadataFieldName];
+                    }
+                    var metadataUpdateResult = V8.FormEngine.UptFormData(dataTableName, metadataTargetRow);
+                    if (!metadataUpdateResult || metadataUpdateResult.Code != 1) {
+                        throw new Error('应用数据元数据更新失败：表 ' + dataTableName + '，Id=' + metadataTargetRow.Id
+                            + '，' + ((metadataUpdateResult && metadataUpdateResult.Msg) || '未知错误'));
+                    }
+                    stats.DataUpdated++;
+                    debugLog['data_insert_if_missing_metadata_' + dataTableName + '_' + dataRowIndex]
+                        = '仅更新元数据：' + metadataFields.join(',') + '，匹配字段：' + existingData.Match;
+                } else {
+                    stats.DataSkipped++;
+                    debugLog['data_insert_if_missing_skip_' + dataTableName + '_' + dataRowIndex]
+                        = '已存在，匹配字段：' + existingData.Match;
+                }
                 continue;
             }
             var targetRow = {};
@@ -6463,6 +6676,8 @@ try {
             工作流连线: '新增' + stats.LineInserted + '条，修改' + stats.LineUpdated + '条',
             接口引擎: '新增' + stats.ApiEngineInserted + '条，修改' + stats.ApiEngineUpdated
                 + '条，保留租户扩展' + stats.ApiEngineSkipped + '条',
+            接口引擎修改历史: '迁移' + stats.ApiEngineHistoryMigrated
+                + '条，幂等跳过' + stats.ApiEngineHistorySkipped + '条，旧文本保留',
             选择数据: '数据集' + stats.DataSetCount + '个，新增' + stats.DataInserted + '条，修改' + stats.DataUpdated + '条，跳过' + stats.DataSkipped + '条',
             定时任务: '保存' + stats.ScheduleJobSaved + '个',
             在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码新增' + stats.ApplicationSourceFiles + '个/复用' + stats.ApplicationSourceFilesReused + '个，公有编译文件新增' + stats.ApplicationBuildAssets + '个/复用' + stats.ApplicationBuildAssetsReused + '个，数据库内联运行文件' + stats.ApplicationInlineBuildAssets + '个，共享公共运行时' + stats.ApplicationSharedRuntimes + '个，清理旧文件元数据' + stats.AssetRowsPruned + '个，微服务页面' + stats.MicroServicePages + '个，迁移旧菜单' + stats.MicroServiceMenus + '个，保留原生菜单' + stats.MicroServiceMenusPreserved + '个',

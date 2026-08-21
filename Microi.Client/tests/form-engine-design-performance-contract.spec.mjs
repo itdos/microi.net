@@ -8,7 +8,9 @@ const formCleanupFilename = new URL("../src/views/form-engine/mixins/diy-form-cl
 const formFullFilename = new URL("../src/views/form-engine/diy-form-full.vue", import.meta.url);
 const formDialogFilename = new URL("../src/views/form-engine/mixins/diy-form-full-dialog.mixin.js", import.meta.url);
 const formUtilsFilename = new URL("../src/views/form-engine/mixins/form-utils.mixin.js", import.meta.url);
-const formStyleFilename = new URL("../src/styles/diy-form.scss", import.meta.url);
+const formStyleFilename = new URL("../src/styles/diy-form-base.scss", import.meta.url);
+const formStyleEntryFilename = new URL("../src/views/form-engine/styles/diy-form.scss", import.meta.url);
+const viteConfigFilename = new URL("../vite.config.js", import.meta.url);
 const formSchemaFilename = new URL("../src/views/form-engine/mixins/diy-form-schema.mixin.js", import.meta.url);
 const jsonTableFilename = new URL("../src/views/form-engine/diy-field-component/diy-jsontable.vue", import.meta.url);
 const tableFilename = new URL("../src/views/form-engine/diy-table.vue", import.meta.url);
@@ -49,6 +51,16 @@ function extractBalancedBlock(source, marker) {
     }
     assert.fail(`unterminated block after source marker: ${marker}`);
 }
+
+test("form styles use one semantic base partial and one engine entrypoint", function () {
+    const styleEntrySource = read(formStyleEntryFilename);
+    const viteConfigSource = read(viteConfigFilename);
+
+    assert.match(styleEntrySource, /^@use\s+["']@\/styles\/diy-form-base\.scss["'];/);
+    assert.doesNotMatch(styleEntrySource, /@import\s+["']@\/styles\/diy-form\.scss["']/);
+    assert.equal(fs.existsSync(new URL("../src/styles/diy-form.scss", import.meta.url)), false);
+    assert.match(viteConfigSource, /if\s*\(\/\^\\s\*\@use\\s\+\/m\.test\(source\)\)/);
+});
 
 test("diy form keeps one V8 context per field until the form context changes", function () {
     const formSource = read(formFilename);

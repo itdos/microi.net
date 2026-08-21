@@ -501,7 +501,7 @@ redisConn = RedisConnBuilder.Build(clientModel);
 
 // Generated entities select their complete physical field list. A source
 // checkout can therefore fail before the hosted upgrade starts when its
-// database predates a newly generated column (for example diy_table.V8Unlimited).
+// database predates a newly generated column (for example diy_table.V8Limit).
 // Run the shared-lease, expand-only prerequisite gate before License or login
 // can query FormEngine, and fail closed if the invariant cannot be established.
 var runtimePrerequisiteResult = await app.Services

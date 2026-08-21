@@ -681,6 +681,9 @@ export default {
                 self.$refs.fieldFormPage.FormSubmit(param, async function (success, formData, outFormV8Result) {
                     if (success == true) {
                         await self.DeleteCurrentDraftAfterSave();
+                        if (self.IsEmbeddedMode) {
+                            self.$emit("CallbackGetDiyTableRow", formData || self.CurrentRowModel || {});
+                        }
                         if (isBack === true && (!outFormV8Result || outFormV8Result.Result !== false)) {
                             self.Go_1();
                         } else {

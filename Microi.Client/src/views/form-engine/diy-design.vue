@@ -1887,6 +1887,12 @@ export default {
                 data.Tabs = JSON.stringify(data.Tabs);
             }
 
+            // v7.5.0 曾短暂使用 FormPresentation JSON；新配置已迁移到语义化
+            // 物理字段，这里只保证旧值保存时不被破坏，不再主动生成默认 JSON。
+            if (!self.DiyCommon.IsNull(data.FormPresentation) && typeof data.FormPresentation === "object") {
+                data.FormPresentation = JSON.stringify(data.FormPresentation);
+            }
+
             if (self.DiyCommon.IsNull(data.BindRole)) {
                 data.BindRole = "[]";
             } else if(typeof data.BindRole === "object") {

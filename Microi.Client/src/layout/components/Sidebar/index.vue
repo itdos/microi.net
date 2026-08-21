@@ -1,8 +1,14 @@
 <template>
     <div
-        :class="{ 'has-logo': showLogo, 'sidebar-js-bg': ShowStar() }"
+        :class="{
+            'has-logo': showLogo,
+            'sidebar-js-bg': ShowStar(),
+            'sidebar-child-expand-right': isRightChildExpandMode
+        }"
+        :data-menu-child-expand-mode="menuChildExpandMode"
         @mouseover="handleCompactMenuMouseOver"
         @focusin="handleCompactMenuMouseOver"
+        @click="handleFlyoutMenuClick"
         @mouseleave="scheduleCompactClose"
     >
         <logo v-if="showLogo" :collapse="isCollapse" />
@@ -20,7 +26,10 @@
                 mode="vertical"
                 :show-timeout="100"
                 :hide-timeout="100"
-                :class="{ 'sidebar-main-menu--compact': isCollapse }"
+                :class="{
+                    'sidebar-main-menu--compact': isCollapse,
+                    'sidebar-main-menu--flyout': isRightChildExpandMode
+                }"
             >
                 <template v-for="(route, routeIndex) in permission_routes" :key="route.path + '-' + (route.meta && route.meta.title || route.Name || '')">
                     <sidebar-item
@@ -29,6 +38,7 @@
                         :item="route"
                         :base-path="route.path"
                         :compact-index="routeIndex"
+                        :flyout-mode="isRightChildExpandMode"
                     />
                 </template>
             </el-menu>
@@ -39,7 +49,7 @@
         <teleport to="body">
             <div
                 v-for="(panel, panelIndex) in compactPanels"
-                v-show="isCollapse"
+                v-show="useFlyoutMenu"
                 :key="panel.key"
                 class="mci-sidebar-menu-popper mci-sidebar-compact-flyout"
                 :data-panel-index="panelIndex"
@@ -89,6 +99,10 @@ import { isExternal } from "@/utils/validate";
 import { ArrowRight } from "@element-plus/icons-vue";
 import { useDiyStore, usePermissionStore, useAppStore, useSettingsStore } from "@/pinia";
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import {
+    MENU_CHILD_EXPAND_MODE,
+    normalizeMenuChildExpandMode
+} from "./menu-child-expand-mode.mjs";
 
 export default {
     components: { SidebarItem, Logo, MenuBottom, MenuItem, ArrowRight },
@@ -128,6 +142,15 @@ export default {
         };
     },
     computed: {
+        menuChildExpandMode() {
+            return normalizeMenuChildExpandMode(this.SysConfig?.MenuChildExpandMode);
+        },
+        isRightChildExpandMode() {
+            return !this.isCollapse && this.menuChildExpandMode === MENU_CHILD_EXPAND_MODE.RIGHT;
+        },
+        useFlyoutMenu() {
+            return this.isCollapse || this.isRightChildExpandMode;
+        },
         activeMenu() {
             const route = this.$route;
             const { meta, path } = route;
@@ -147,7 +170,7 @@ export default {
         };
     },
     watch: {
-        isCollapse(value) {
+        useFlyoutMenu(value) {
             if (!value) this.closeCompactMenu();
         },
         "$route.fullPath"() {
@@ -261,7 +284,7 @@ export default {
             }
         },
         handleCompactMenuMouseOver(event) {
-            if (!this.isCollapse || !event?.target) return;
+            if (!this.useFlyoutMenu || !event?.target) return;
             const rootElement = event.target.closest?.('.sidebar-menu-node[data-menu-level="0"][data-compact-index]');
             if (!rootElement || !event.currentTarget?.contains(rootElement)) return;
             const routeIndex = Number(rootElement.dataset.compactIndex);
@@ -286,7 +309,7 @@ export default {
             });
         },
         openCompactMenu(payload) {
-            if (!this.isCollapse || !payload?.item || !payload?.rect) return;
+            if (!this.useFlyoutMenu || !payload?.item || !payload?.rect) return;
             this.cancelCompactClose();
             const rootNode = this.buildCompactNode(payload.item, payload.basePath || payload.item.path || "");
             if (!rootNode?.hasChildren) {
@@ -308,7 +331,7 @@ export default {
             this.$nextTick(() => this.fitCompactPanel(0));
         },
         openCompactChild(node, panelIndex, event) {
-            if (!this.isCollapse) return;
+            if (!this.useFlyoutMenu) return;
             this.cancelCompactClose();
             this.compactPanels = this.compactPanels.slice(0, panelIndex + 1);
             if (!node?.hasChildren || !event?.currentTarget) return;
@@ -361,6 +384,10 @@ export default {
         },
         isCompactNodeActive(node) {
             return Boolean(node?.target) && (this.$route?.fullPath === node.target || this.$route?.path === node.target);
+        },
+        handleFlyoutMenuClick(event) {
+            if (!this.useFlyoutMenu) return;
+            this.handleCompactMenuMouseOver(event);
         },
         scheduleCompactClose() {
             this.cancelCompactClose();

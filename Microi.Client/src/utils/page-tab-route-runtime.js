@@ -1,3 +1,5 @@
+import { shouldReuseRecordWorkbenchRoute } from "./record-id.js";
+
 function parseJsonValue(value) {
     if (typeof value !== "string") return value;
     const text = value.trim();
@@ -58,7 +60,7 @@ export function shouldReusePageTabRoute(view) {
 
 export function getPageTabRouteViewKey(route) {
     if (!route) return "";
-    return shouldReusePageTabRoute(route)
+    return shouldReusePageTabRoute(route) || shouldReuseRecordWorkbenchRoute(route)
         ? String(route.path || route.fullPath || "")
         : String(route.fullPath || route.path || "");
 }

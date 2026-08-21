@@ -374,20 +374,27 @@ export default {
     top: 0;
     z-index: 2;
     display: grid;
-    grid-template-columns: minmax(230px, 36%) 1fr;
-    gap: 12px;
-    padding: 9px 12px;
+    grid-template-columns: minmax(190px, 28%) minmax(520px, 1fr);
+    min-width: 760px;
+    gap: 0;
+    padding: 0;
     color: var(--el-text-color-secondary);
     background: var(--el-fill-color-light);
     border-bottom: 1px solid var(--el-border-color-light);
     font-weight: 600;
 }
 
+.mci-role-permission-field__header > div {
+    box-sizing: border-box;
+    padding: 7px 10px;
+    border-right: 1px solid var(--el-border-color-lighter);
+}
+
 .mci-role-permission-field__tree :deep(.role-menu-row) {
     display: grid;
-    grid-template-columns: minmax(230px, 36%) minmax(460px, 1fr);
+    grid-template-columns: minmax(190px, 28%) minmax(520px, 1fr);
     min-width: 760px;
-    min-height: 42px;
+    min-height: 36px;
     border-top: 1px solid var(--el-border-color-lighter);
 }
 
@@ -399,18 +406,21 @@ export default {
     display: flex;
     align-items: center;
     box-sizing: border-box;
-    padding: 7px 12px;
+    padding: 3px 10px;
     border-right: 1px solid var(--el-border-color-lighter);
 }
 
 .mci-role-permission-field__tree :deep(.role-menu-expand),
 .mci-role-permission-field__tree :deep(.role-menu-expand-placeholder) {
-    width: 22px;
-    min-width: 22px;
-    height: 22px;
+    width: 20px;
+    min-width: 20px;
+    height: 20px;
 }
 
 .mci-role-permission-field__tree :deep(.role-menu-expand) {
+    display: inline-grid;
+    place-items: center;
+    align-self: center;
     padding: 0;
     color: var(--el-text-color-secondary);
     background: transparent;
@@ -419,14 +429,18 @@ export default {
 }
 
 .mci-role-permission-field__tree :deep(.role-menu-expand-arrow) {
-    display: inline-block;
-    font-size: 20px;
-    line-height: 20px;
+    display: block;
+    width: 7px;
+    height: 7px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+    transform-origin: center;
     transition: transform 0.12s ease;
 }
 
 .mci-role-permission-field__tree :deep(.role-menu-expand-arrow.expanded) {
-    transform: rotate(90deg);
+    transform: rotate(45deg);
 }
 
 .mci-role-permission-field__tree :deep(.role-menu-check),
@@ -436,22 +450,56 @@ export default {
     cursor: pointer;
 }
 
+.mci-role-permission-field__tree :deep(.role-menu-check) {
+    min-width: 0;
+    min-height: 26px;
+    gap: 6px;
+    line-height: 18px !important;
+}
+
+.mci-role-permission-field__tree :deep(.role-menu-check .icon) {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    line-height: 1;
+}
+
+.mci-role-permission-field__tree :deep(.role-menu-check > span) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .mci-role-permission-field__tree :deep(.permission-checkbox-group) {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 8px;
+    align-content: center;
+    align-items: center;
+    gap: 2px 6px;
 }
 
 .mci-role-permission-field__tree :deep(.perm-cb) {
-    padding: 2px 6px;
+    min-height: 24px;
+    padding: 0 4px;
     font-size: 13px;
+    line-height: 18px !important;
     white-space: nowrap;
     border-radius: 3px;
 }
 
 .mci-role-permission-field__tree :deep(input[type="checkbox"]) {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
     margin-right: 5px;
     accent-color: var(--el-color-primary);
+}
+
+.mci-role-permission-field__tree :deep(.role-menu-check input[type="checkbox"]) {
+    margin-right: 0;
 }
 
 .mci-role-permission-field__direct-table {

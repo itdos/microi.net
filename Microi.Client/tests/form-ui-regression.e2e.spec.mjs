@@ -1,11 +1,15 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
 const LOCAL_PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const JUNCHI_PASSWORD = process.env.PW_JUNCHI_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || "";
+const CLIENT_ROOT = path.basename(process.cwd()).toLowerCase() === "microi.client"
+    ? process.cwd()
+    : path.resolve(process.cwd(), "Microi.Client");
 const SCREENSHOT_DIR = path.resolve(
     process.cwd(),
     process.env.PW_SCREENSHOT_DIR || "../.tmp/form-ui-acceptance"
@@ -164,6 +168,109 @@ async function switchThemeMode(page, mode) {
     await page.waitForTimeout(200);
 }
 
+async function expectRecordSearch(scope, { dialog = false } = {}) {
+    const selector = scope.locator(
+        dialog
+            ? '.diy-form-record-selector--dialog:visible'
+            : '.diy-form-record-selector:visible:not(.diy-form-record-selector--dialog):not(.diy-form-record-selector--mobile)'
+    ).first();
+    await expect(selector).toBeVisible({ timeout: 30_000 });
+    await expect(selector.locator('[aria-label="搜索并切换记录"]').first()).toBeVisible();
+    await expect(selector.locator(".el-select input").first()).toBeVisible();
+    await expect(selector.locator(".diy-form-record-count")).toContainText(/共\s*\d+\s*条/);
+    return selector;
+}
+
+async function readPresentationVisualSignature(scope) {
+    const nav = scope.locator(".diy-form-section-nav:visible").first();
+    await expect(nav).toBeVisible({ timeout: 30_000 });
+    return nav.evaluate((element) => {
+        const root = element.closest(".diy-form--controlcenter, .diy-form--settingscenter");
+        const active = element.querySelector(".diy-form-section-nav__item.active");
+        const main = root?.querySelector(".diy-form-presentation-main");
+        const style = getComputedStyle(element);
+        const activeStyle = active ? getComputedStyle(active) : null;
+        const mainStyle = main ? getComputedStyle(main) : null;
+        return {
+            controlCenter: Boolean(root?.classList.contains("diy-form--controlcenter")),
+            navBackground: style.backgroundColor,
+            navBorderRadius: style.borderRadius,
+            activeBackground: activeStyle?.backgroundColor || "",
+            activeBorderRadius: activeStyle?.borderRadius || "",
+            mainBackground: mainStyle?.backgroundColor || "",
+            mainBorderRadius: mainStyle?.borderRadius || ""
+        };
+    });
+}
+
+async function expectSectionMetadata(scope) {
+    const sections = scope.locator(".diy-form-section-nav__item:visible");
+    const sectionCount = await sections.count();
+    expect(sectionCount).toBeGreaterThan(0);
+    let requiredTagFound = false;
+
+    for (let index = 0; index < sectionCount; index += 1) {
+        const section = sections.nth(index);
+        await section.click();
+        await expect(section).toHaveClass(/active/);
+        const tags = scope.locator(".diy-form-section-head__tags .el-tag:visible");
+        await expect(tags.first()).toContainText(/\d+\s*项/);
+        if (await tags.count() > 1) {
+            await expect(tags.nth(1)).toContainText(/\d+\s*必填项/);
+            requiredTagFound = true;
+        }
+    }
+
+    await sections.first().click();
+    return requiredTagFound;
+}
+
+test("表单呈现契约：HTML 分组说明、页脚与必填统计由同一 DiyForm 安全渲染", async () => {
+    const runtimePath = path.join(CLIENT_ROOT, "src/views/form-engine/form-presentation-runtime.js");
+    const [formSource, runtimeSource] = await Promise.all([
+        fs.readFile(path.join(CLIENT_ROOT, "src/views/form-engine/diy-form.vue"), "utf8"),
+        fs.readFile(runtimePath, "utf8")
+    ]);
+    const { buildFormPresentationSections } = await import(pathToFileURL(runtimePath).href);
+    const sections = buildFormPresentationSections({
+        tabs: [{ Id: "security", Name: "安全设置" }],
+        groupedFields: {
+            security: [
+                { Name: "Account", Component: "Text", NotEmpty: true },
+                { Name: "Remark", Component: "Textarea", NotEmpty: false }
+            ]
+        },
+        table: {
+            Tabs: [{
+                Id: "security",
+                Name: "安全设置",
+                SubtitleHtml: "<strong>{fieldCount}</strong> 项配置",
+                SectionSubtitleHtml: "支持 <em>HTML</em> 说明",
+                FooterTitle: "安全边界",
+                FooterDescriptionHtml: "仅向 <code>admin</code> 展示"
+            }]
+        },
+        config: { RequiredCountText: "{count} 必填项" }
+    });
+
+    expect(formSource).toContain('v-safe-html="section.NavigationSubtitleHtml"');
+    expect(formSource).toContain('v-safe-html="PresentationNavigationFooter.Html"');
+    expect(formSource).toContain('v-safe-html="ActivePresentationSection.SectionSubtitleHtml"');
+    expect(formSource).toContain("ActivePresentationSection.RequiredCount > 0");
+    expect(runtimeSource).toContain('"{count} 必填项"');
+    expect(runtimeSource).toContain("BadgeApiEngineKey");
+    expect(sections).toHaveLength(1);
+    expect(sections[0]).toMatchObject({
+        FieldCount: 2,
+        RequiredCount: 1,
+        RequiredLabel: "1 必填项",
+        NavigationSubtitleHtml: "<strong>2</strong> 项配置",
+        SectionSubtitleHtml: "支持 <em>HTML</em> 说明",
+        FooterTitle: "安全边界",
+        FooterDescriptionHtml: "仅向 <code>admin</code> 展示"
+    });
+});
+
 test("本地接口引擎：通用关键词搜索在亮色与暗色主题下保持清晰等宽", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
@@ -219,14 +326,14 @@ test("本地接口引擎表单：字段说明以紧凑灰字直显，不再使�
             height: box.height,
             overflow: style.overflow,
             whiteSpace: style.whiteSpace,
-            title: element.getAttribute("title") || ""
+            accessibleDescription: element.getAttribute("aria-label") || element.getAttribute("title") || ""
         };
     }));
     for (const metrics of descriptionMetrics) {
         expect(metrics.fontSize, JSON.stringify(metrics)).toBeLessThanOrEqual(11.5);
         expect(metrics.lineHeight, JSON.stringify(metrics)).toBeLessThanOrEqual(15.5);
         expect(metrics.height, JSON.stringify(metrics)).toBeLessThanOrEqual(31);
-        expect(metrics.title.length, JSON.stringify(metrics)).toBeGreaterThan(0);
+        expect(metrics.accessibleDescription.length, JSON.stringify(metrics)).toBeGreaterThan(0);
         if (metrics.className.includes("diy-field-description--inline")) {
             expect(metrics.overflow).toBe("hidden");
             expect(metrics.whiteSpace).toBe("nowrap");
@@ -235,46 +342,138 @@ test("本地接口引擎表单：字段说明以紧凑灰字直显，不再使�
     await form.screenshot({ path: path.join(SCREENSHOT_DIR, "00b-api-engine-field-descriptions.png") });
 });
 
-test("本地系统设置：Logo、直线分组、项数、字段搜索与当前记录刷新", async ({ page }) => {
+test("本地员工表单：日期与普通文本输入等高", async ({ page }) => {
+    test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/diy-employee");
+    const firstRow = page.locator(".el-table__body-wrapper tbody tr").first();
+    await expect(firstRow).toBeVisible({ timeout: 45_000 });
+    await firstRow.dblclick();
+
+    const overlay = page.locator(".diy-form-container.el-dialog, .diy-form-container.el-drawer").last();
+    await expect(overlay).toBeVisible({ timeout: 30_000 });
+    const form = overlay.locator(".itdos-diy-form:visible").first();
+    await expect(form).toBeVisible();
+
+    const dateWrapper = form.locator(".el-date-editor .el-input__wrapper:visible").first();
+    const textWrapper = form.locator(".el-form-item:visible:not(:has(.el-date-editor)) .el-input__wrapper:visible").first();
+    await expect(dateWrapper).toBeVisible();
+    await expect(textWrapper).toBeVisible();
+    const [dateHeight, textHeight] = await Promise.all([
+        dateWrapper.evaluate((element) => element.getBoundingClientRect().height),
+        textWrapper.evaluate((element) => element.getBoundingClientRect().height)
+    ]);
+    expect(Math.abs(dateHeight - textHeight), JSON.stringify({ dateHeight, textHeight })).toBeLessThanOrEqual(1);
+});
+
+test("记录工作台：合并头部、表格弹层同构、跨模块通用、移动适配与页签去重", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/system-config?RecordId=a5fabe90-995f-45a0-adb4-606cdb98cdcd");
+    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/system-config");
 
     await expect(page.locator(".module-form-workbench")).toBeVisible({ timeout: 45_000 });
+    await expect.poll(() => page.url(), { timeout: 30_000 }).toMatch(/#\/system-config\?[^#]*RecordId=[^&#]+/);
     await expectHealthyLogo(page);
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator(".module-form-workbench")).toBeVisible({ timeout: 45_000 });
     await expectHealthyLogo(page);
+
+    const systemTabs = page.locator("#tags-view-container-microi .parent-tabs > .el-tabs__header .el-tabs__item")
+        .filter({ hasText: /系统设置|System Settings/i });
+    await expect(systemTabs).toHaveCount(1);
+    await expect(page.locator(".diy-form-embedded-workbench")).toBeVisible();
+    await expect(page.locator(".module-form-workbench .workbench-toolbar")).toHaveCount(0);
+    await expect(page.locator(".module-form-workbench").getByText(/切换到经典表格|返回表单工作台/)).toHaveCount(0);
+
+    const embeddedHeader = page.locator(".diy-form-page-header--embedded").first();
+    await expect(page.locator(".module-form-workbench .diy-form-page-header--embedded")).toHaveCount(1);
+    await expect(embeddedHeader).toBeVisible();
+    const embeddedRecordSearch = await expectRecordSearch(embeddedHeader);
+    await embeddedRecordSearch.locator(".el-select").click();
+    await expect(page.locator(".el-select-dropdown:visible .el-select-dropdown__item").first()).toBeVisible();
+    await page.keyboard.press("Escape");
+    const headerGeometry = await embeddedHeader.evaluate((root) => {
+        const icon = root.querySelector(".diy-form-workbench-title-icon");
+        const description = root.querySelector(".diy-form-dialog-title__description");
+        const buttons = [...root.querySelectorAll(".form-actions .el-button")]
+            .filter((element) => element.getBoundingClientRect().height > 0);
+        const primary = buttons.find((element) => element.classList.contains("el-button--primary"));
+        const parseRgb = (value) => (String(value || "").match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+        const luminance = (value) => {
+            const channels = parseRgb(value).map((channel) => channel / 255).map((channel) => (
+                channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4)
+            ));
+            return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+        };
+        const contrast = (foreground, background) => {
+            const fg = luminance(foreground);
+            const bg = luminance(background);
+            return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+        };
+        const primaryStyle = primary ? getComputedStyle(primary) : null;
+        return {
+            iconWidth: icon?.getBoundingClientRect().width || 0,
+            iconHeight: icon?.getBoundingClientRect().height || 0,
+            iconClass: icon?.querySelector("svg, i")?.getAttribute("class") || "",
+            description: description?.textContent?.trim() || "",
+            buttonCount: buttons.length,
+            buttonHeights: buttons.map((element) => element.getBoundingClientRect().height),
+            primaryContrast: primaryStyle ? contrast(primaryStyle.color, primaryStyle.backgroundColor) : 0
+        };
+    });
+    expect(headerGeometry.iconWidth, JSON.stringify(headerGeometry)).toBeGreaterThanOrEqual(40);
+    expect(headerGeometry.iconHeight, JSON.stringify(headerGeometry)).toBeGreaterThanOrEqual(40);
+    expect(headerGeometry.iconClass, JSON.stringify(headerGeometry)).not.toBe("");
+    expect(headerGeometry.description).toContain("原有字段事件、表单事件与权限规则保持不变");
+    expect(headerGeometry.buttonCount).toBeGreaterThan(0);
+    expect(Math.min(...headerGeometry.buttonHeights), JSON.stringify(headerGeometry)).toBeGreaterThanOrEqual(39);
+    expect(headerGeometry.primaryContrast, JSON.stringify(headerGeometry)).toBeGreaterThanOrEqual(4.5);
 
     const activeSection = page.locator(".diy-form-section-nav__item.active").first();
     await expect(activeSection).toBeVisible();
     const markerRadius = await activeSection.evaluate((element) => getComputedStyle(element, "::before").borderRadius);
     expect(Number.parseFloat(markerRadius)).toBeGreaterThan(0);
 
-    const subtitles = await page.locator(".diy-form-section-nav__copy small").allTextContents();
+    const directWorkbench = page.locator(".module-form-workbench:visible").last();
+    const subtitles = await directWorkbench.locator(".diy-form-section-nav__copy small").allTextContents();
     expect(subtitles.length).toBeGreaterThan(0);
-    expect(subtitles.every((text) => /\d+\s*项/.test(text))).toBe(true);
+    expect(subtitles.every((text) => text.trim().length > 0)).toBe(true);
     expect(subtitles.some((text) => /个字段/.test(text))).toBe(false);
-    await expect(page.locator(".diy-form-section-nav__count").first()).toBeVisible();
+    await expect(directWorkbench.locator(".diy-form-section-nav__count").first()).toBeVisible();
+    await expect(directWorkbench.locator(".diy-form-section-nav script, .diy-form-section-head script")).toHaveCount(0);
+    await expectSectionMetadata(directWorkbench);
+    const directSignature = await readPresentationVisualSignature(directWorkbench);
+    expect(directSignature.controlCenter, JSON.stringify(directSignature)).toBe(true);
 
-    const search = page.locator('.form-field-toolbar input[aria-label="搜索当前表单字段"]').first();
+    const configuredHtml = await directWorkbench.locator(".diy-form-section-nav").evaluate((nav) => ({
+        subtitleWithMarkup: [...nav.querySelectorAll(".diy-form-section-nav__copy small")]
+            .some((element) => element.children.length > 0),
+        footerVisible: Boolean(nav.querySelector(".diy-form-section-nav__footer"))
+    }));
+    if (configuredHtml.subtitleWithMarkup) {
+        await expect(directWorkbench.locator(".diy-form-section-nav__copy > small > *").first()).toBeVisible();
+    }
+    if (configuredHtml.footerVisible) {
+        const footer = directWorkbench.locator(".diy-form-section-nav__footer").first();
+        await expect(footer).toBeVisible();
+        await expect(footer).not.toBeEmpty();
+        await expect(footer.locator("script")).toHaveCount(0);
+    }
+
+    const search = page.locator('.diy-form-header-search input[aria-label="搜索当前表单字段"]').first();
     await expect(search).toBeVisible();
     await search.fill("Logo");
-    await expect(page.locator(".field-match-count")).toContainText("项匹配");
+    await expect(page.locator(".diy-form-header-search .diy-form-field-search-count")).toContainText("项");
     await search.clear();
-    const refresh = page.getByRole("button", { name: "刷新当前记录", exact: true }).first();
+    await embeddedHeader.getByRole("button", { name: /^(?:More|更多)$/i }).click();
+    const refresh = page.locator(".el-dropdown__popper:visible").last()
+        .getByText("刷新当前记录", { exact: true });
+    await expect(refresh).toBeVisible();
     await refresh.click();
-    const skeleton = page.locator(".workbench-skeleton");
-    const skeletonShown = await skeleton.waitFor({ state: "visible", timeout: 2_000 }).then(() => true).catch(() => false);
-    if (skeletonShown) {
-        await page.screenshot({ path: path.join(SCREENSHOT_DIR, "01a-system-config-skeleton.png"), fullPage: false });
-    }
-    await expect(skeleton).toHaveCount(0, { timeout: 30_000 });
     await expect(activeSection).toBeVisible();
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "01b-system-config-workbench.png"), fullPage: false });
 
-    const identityButton = page.getByRole("button", { name: /登录与身份|Login.*Identity/i }).first();
+    const identityButton = page.getByRole("button", { name: /安全与服务接入|Security.*Service Access/i }).first();
     await expect(identityButton).toBeVisible();
     await identityButton.click();
     const settingsFrame = await waitForSystemSettingsFrame(page);
@@ -300,6 +499,294 @@ test("本地系统设置：Logo、直线分组、项数、字段搜索与当前�
     expect(appGeometry.markerHeight / appGeometry.activeHeight).toBeLessThanOrEqual(0.6);
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "01c-system-private-settings.png"), fullPage: false });
+    const settingsDrawer = page.locator(".el-overlay.is-drawer:visible").last();
+    if (await settingsDrawer.count()) {
+        const closeDrawer = settingsDrawer.getByRole("button", { name: /Close|关闭/i }).first();
+        if (await closeDrawer.isVisible().catch(() => false)) await closeDrawer.click();
+        else await page.keyboard.press("Escape");
+        await expect(settingsDrawer).toBeHidden({ timeout: 15_000 });
+    }
+
+    const systemRecordId = await page.evaluate(() => new URLSearchParams(location.hash.split("?")[1] || "").get("RecordId"));
+    expect(systemRecordId).toBeTruthy();
+    await page.goto(`${tenantUrl("iTdos")}#/system-config?RecordId=${encodeURIComponent(systemRecordId)}&ViewMode=Table`, {
+        waitUntil: "domcontentloaded"
+    });
+    await expect(page.locator(".module-form-workbench")).toHaveCount(0, { timeout: 45_000 });
+    await expect(page.getByText(/返回表单工作台|切换到经典表格/)).toHaveCount(0);
+    const tableRow = page.locator(".el-table__body-wrapper tbody tr").first();
+    await expect(tableRow).toBeVisible({ timeout: 45_000 });
+    await tableRow.dblclick();
+    const modernForm = page.locator(".diy-form-container.diy-form-modern-dialog:visible, .diy-form-container.diy-form-modern-drawer:visible").last();
+    await expect(modernForm).toBeVisible({ timeout: 30_000 });
+    await expect(modernForm.locator(".diy-form-section-nav")).toBeVisible({ timeout: 30_000 });
+    await expect(modernForm.locator(".diy-form--controlcenter")).toBeVisible();
+    await expect(modernForm.locator(".el-dialog__header, .el-drawer__header")).not.toContainText("当前记录");
+    await expectRecordSearch(modernForm, { dialog: true });
+    const tableDialogSignature = await readPresentationVisualSignature(modernForm);
+    expect(tableDialogSignature).toEqual(directSignature);
+    await expect(page.locator(".el-notification:visible, .el-message:visible")
+        .filter({ hasText: /404 Request failed/i })).toHaveCount(0, { timeout: 10_000 });
+    await modernForm.screenshot({ path: path.join(SCREENSHOT_DIR, "01d-system-config-modern-form.png") });
+    await expect(systemTabs).toHaveCount(1);
+    const closeModernForm = modernForm.locator(".el-dialog__headerbtn, .el-drawer__close-btn").first();
+    if (await closeModernForm.isVisible().catch(() => false)) await closeModernForm.click();
+    else await page.keyboard.press("Escape");
+    await expect(modernForm).toBeHidden({ timeout: 15_000 });
+
+    const apiRecordId = "01M0E5HKF6E2XQ32P8X1QMH4X5";
+    await page.goto(`${tenantUrl("iTdos")}#/api-engine?RecordId=${apiRecordId}`, { waitUntil: "domcontentloaded" });
+    const apiWorkbench = page.locator(".module-form-workbench:visible").last();
+    await expect(apiWorkbench).toBeVisible({ timeout: 45_000 });
+    await expect(apiWorkbench.locator(".diy-form-embedded-workbench")).toBeVisible({ timeout: 45_000 });
+    await expect(apiWorkbench.locator(".diy-form-section-nav")).toBeVisible({ timeout: 45_000 });
+    await expect(apiWorkbench.locator(".workbench-toolbar")).toHaveCount(0);
+    const apiHeader = apiWorkbench.locator(".diy-form-page-header--embedded").first();
+    await expect(apiHeader).toBeVisible();
+    await expectRecordSearch(apiHeader);
+    const apiSignature = await readPresentationVisualSignature(apiWorkbench);
+    expect(apiSignature).toEqual(directSignature);
+    await expect(apiWorkbench.locator(".diy-form-dialog-title__heading")).not.toContainText(/^记录\s+01M0E5HK/i, {
+        timeout: 15_000
+    });
+    await expect.poll(() => page.evaluate(() => (
+        new URLSearchParams(location.hash.split("?")[1] || "").get("RecordId")
+    )), { timeout: 15_000 }).toBe(apiRecordId);
+    const apiRecordSelect = apiHeader.locator('.diy-form-record-selector .el-select').first();
+    await apiRecordSelect.click();
+    const nextApiRecord = page.locator('.el-select-dropdown:visible .el-select-dropdown__item:not(.is-selected)').first();
+    await expect(nextApiRecord).toBeVisible({ timeout: 15_000 });
+    await nextApiRecord.click();
+    await expect.poll(() => page.evaluate(() => (
+        new URLSearchParams(location.hash.split("?")[1] || "").get("RecordId")
+    )), { timeout: 30_000 }).not.toBe(apiRecordId);
+    await expect(apiWorkbench.locator(".diy-form-section-nav")).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(1_500);
+    await expect(page.locator(".el-notification:visible, .el-message:visible")
+        .filter({ hasText: /NoExistData|Sys_Config/i })).toHaveCount(0);
+    await expect(page.locator(".el-notification:visible, .el-message:visible")
+        .filter({ hasText: /404 Request failed/i })).toHaveCount(0, { timeout: 10_000 });
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "01e-api-engine-record-workbench.png"), fullPage: false });
+
+    await page.evaluate(() => {
+        window.__microiApiPrintCalls = 0;
+        window.print = () => {
+            window.__microiApiPrintCalls += 1;
+        };
+    });
+    const apiMore = apiHeader.getByRole("button", { name: /^(?:More|更多)$/i }).last();
+    await apiMore.click();
+    const apiPrintItem = page.getByRole("menuitem", { name: /^(?:Print|打印)$/i }).last();
+    await expect(apiPrintItem).toBeVisible();
+    await apiPrintItem.click();
+    await expect.poll(() => page.evaluate(() => window.__microiApiPrintCalls), { timeout: 10_000 }).toBe(1);
+    await expect.poll(() => page.evaluate(() => document.body.classList.contains("diy-form-print-mode"))).toBe(true);
+    await page.emulateMedia({ media: "print" });
+    const apiPrintGeometry = await apiWorkbench.evaluate((element) => {
+        const row = element.querySelector(".page-mode-row");
+        const main = row?.querySelector(":scope > .el-col:not(.page-right-col)");
+        const right = row?.querySelector(":scope > .page-right-col");
+        const printSource = element.querySelector(".diy-code-editor-print-source");
+        const editor = element.querySelector(".diy-code-editor .editor-body");
+        const rowBox = row?.getBoundingClientRect();
+        const mainBox = main?.getBoundingClientRect();
+        return {
+            rowWidth: rowBox?.width || 0,
+            mainWidth: mainBox?.width || 0,
+            rightDisplay: right ? getComputedStyle(right).display : "none",
+            printSourceDisplay: printSource ? getComputedStyle(printSource).display : "missing",
+            printSourceLength: printSource?.textContent?.trim().length || 0,
+            editorDisplay: editor ? getComputedStyle(editor).display : "missing"
+        };
+    });
+    expect(apiPrintGeometry.rightDisplay, JSON.stringify(apiPrintGeometry)).toBe("none");
+    expect(apiPrintGeometry.mainWidth, JSON.stringify(apiPrintGeometry)).toBeGreaterThanOrEqual(apiPrintGeometry.rowWidth - 2);
+    expect(apiPrintGeometry.printSourceDisplay, JSON.stringify(apiPrintGeometry)).toBe("block");
+    expect(apiPrintGeometry.printSourceLength, JSON.stringify(apiPrintGeometry)).toBeGreaterThan(20);
+    expect(["none", "missing"], JSON.stringify(apiPrintGeometry)).toContain(apiPrintGeometry.editorDisplay);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "01g-api-engine-print-preview.png"), fullPage: true });
+    await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+    await page.emulateMedia({ media: "screen" });
+    await expect.poll(() => page.evaluate(() => document.body.classList.contains("diy-form-print-mode"))).toBe(false);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${tenantUrl("iTdos")}#/system-config?RecordId=${encodeURIComponent(systemRecordId)}`, {
+        waitUntil: "domcontentloaded"
+    });
+    const mobileWorkbench = page.locator(".module-form-workbench:visible").last();
+    await expect(mobileWorkbench).toBeVisible({ timeout: 45_000 });
+    const mobileRecordSearch = mobileWorkbench.locator(".diy-form-record-selector--mobile:visible").first();
+    await expect(mobileRecordSearch).toBeVisible();
+    await expect(mobileRecordSearch.locator('[aria-label="搜索并切换记录"]').first()).toBeVisible();
+    await expect(mobileRecordSearch.locator(".el-select input").first()).toBeVisible();
+    const mobileRecordGeometry = await mobileRecordSearch.evaluate((element) => ({
+        width: element.getBoundingClientRect().width,
+        selectWidth: element.querySelector('.el-select')?.getBoundingClientRect().width || 0
+    }));
+    expect(mobileRecordGeometry.width, JSON.stringify(mobileRecordGeometry)).toBeGreaterThanOrEqual(320);
+    expect(mobileRecordGeometry.selectWidth, JSON.stringify(mobileRecordGeometry)).toBeGreaterThanOrEqual(240);
+    await expect.poll(() => page.evaluate(() => (
+        Math.max(document.documentElement.scrollWidth, document.body.scrollWidth)
+        - document.documentElement.clientWidth
+    )), { timeout: 15_000 }).toBeLessThanOrEqual(1);
+    const mobileNav = mobileWorkbench.locator(".diy-form-section-nav:visible").first();
+    await expect(mobileNav).toBeVisible();
+    await expect(mobileWorkbench.locator(".mci-loading-skeleton:visible")).toHaveCount(0, { timeout: 30_000 });
+    await expect(mobileWorkbench.locator(".diy-form-section-head h3:visible").first()).not.toBeEmpty();
+    const mobileGeometry = await mobileNav.evaluate((element) => ({
+        overflowX: getComputedStyle(element).overflowX,
+        right: element.getBoundingClientRect().right,
+        viewport: document.documentElement.clientWidth
+    }));
+    expect(["auto", "scroll"]).toContain(mobileGeometry.overflowX);
+    expect(mobileGeometry.right, JSON.stringify(mobileGeometry)).toBeLessThanOrEqual(mobileGeometry.viewport + 1);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "01f-system-config-mobile-workbench.png"), fullPage: true });
+});
+
+test("联系人弹层：单分组满宽、紧凑记录工具、原地切换与通用打印", async ({ page }) => {
+    test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/contact");
+
+    const table = page.locator(".el-table__body-wrapper").first();
+    const firstRow = table.locator("tbody tr").first();
+    await expect(firstRow).toBeVisible({ timeout: 45_000 });
+    const routeBeforeOpen = new URL(page.url()).hash;
+    await firstRow.dblclick();
+
+    const overlay = page.locator(".diy-form-container.diy-form-modern-dialog:visible, .diy-form-container.diy-form-modern-drawer:visible").last();
+    await expect(overlay).toBeVisible({ timeout: 30_000 });
+    const layout = overlay.locator(".diy-form-presentation-layout.is-control-center:visible").first();
+    await expect(layout).toBeVisible();
+    const layoutGeometry = await layout.evaluate((element) => {
+        const main = element.querySelector(".diy-form-presentation-main");
+        const rootBox = element.getBoundingClientRect();
+        const mainBox = main?.getBoundingClientRect();
+        return {
+            navCount: element.querySelectorAll(".diy-form-section-nav").length,
+            leftGap: mainBox ? mainBox.left - rootBox.left : Number.POSITIVE_INFINITY,
+            mainWidth: mainBox?.width || 0,
+            rootWidth: rootBox.width,
+            gridTemplateAreas: getComputedStyle(element).gridTemplateAreas
+        };
+    });
+    expect(layoutGeometry.navCount, JSON.stringify(layoutGeometry)).toBe(0);
+    expect(Math.abs(layoutGeometry.leftGap), JSON.stringify(layoutGeometry)).toBeLessThanOrEqual(2);
+    expect(Math.abs(layoutGeometry.mainWidth - layoutGeometry.rootWidth), JSON.stringify(layoutGeometry)).toBeLessThanOrEqual(2);
+    expect(layoutGeometry.gridTemplateAreas, JSON.stringify(layoutGeometry)).toContain("section-main");
+
+    const actions = overlay.locator(".diy-form-dialog-actions:visible").first();
+    const more = actions.getByRole("button", { name: /^(?:More|更多)$/i }).first();
+    const selector = actions.locator(".diy-form-record-selector--dialog:visible").first();
+    const search = actions.locator(".diy-form-header-search:visible").first();
+    await expect(more).toBeVisible();
+    await expect(selector).toBeVisible();
+    await expect(search).toBeVisible();
+    const toolGeometry = await actions.evaluate((element) => {
+        const box = (selector) => {
+            const rect = element.querySelector(selector)?.getBoundingClientRect();
+            return rect ? { x: rect.x, width: rect.width, height: rect.height } : null;
+        };
+        return {
+            more: box(".el-dropdown .el-button"),
+            selector: box(".diy-form-record-selector--dialog .el-select__wrapper"),
+            count: box(".diy-form-record-count"),
+            search: box(".diy-form-header-search .el-input__wrapper")
+        };
+    });
+    expect(toolGeometry.more.x, JSON.stringify(toolGeometry)).toBeLessThan(toolGeometry.selector.x);
+    expect(toolGeometry.selector.x, JSON.stringify(toolGeometry)).toBeLessThan(toolGeometry.search.x);
+    expect(toolGeometry.selector.width, JSON.stringify(toolGeometry)).toBeLessThanOrEqual(230);
+    expect(toolGeometry.search.width, JSON.stringify(toolGeometry)).toBeLessThanOrEqual(170);
+    for (const key of ["selector", "count", "search"]) {
+        expect(Math.abs(toolGeometry[key].height - toolGeometry.more.height), JSON.stringify(toolGeometry)).toBeLessThanOrEqual(1);
+    }
+
+    const selectedRecordLabel = async () => (await selector.locator(".el-select__selected-item").allInnerTexts())
+        .map((value) => value.trim())
+        .find(Boolean) || "";
+    const selectedBefore = await selectedRecordLabel();
+    expect(selectedBefore).not.toBe("");
+    await selector.locator(".el-select").click();
+    const nextRecord = page.locator(".el-select-dropdown:visible .el-select-dropdown__item:not(.is-selected)").first();
+    await expect(nextRecord).toBeVisible({ timeout: 15_000 });
+    await nextRecord.click();
+    await expect.poll(selectedRecordLabel, { timeout: 30_000 }).not.toBe(selectedBefore);
+    expect(new URL(page.url()).hash).toBe(routeBeforeOpen);
+    await expect(table).toBeVisible();
+    await expect(overlay).toBeVisible();
+
+    await page.evaluate(() => {
+        window.__microiPrintCalls = 0;
+        window.print = () => {
+            window.__microiPrintCalls += 1;
+        };
+    });
+    await more.click();
+    const printItem = page.getByRole("menuitem", { name: /^(?:Print|打印)$/i }).last();
+    await expect(printItem).toBeVisible();
+    await printItem.click();
+    await expect.poll(() => page.evaluate(() => window.__microiPrintCalls), { timeout: 10_000 }).toBe(1);
+    await expect.poll(() => page.evaluate(() => document.body.classList.contains("diy-form-print-mode"))).toBe(true);
+    await page.emulateMedia({ media: "print" });
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "02b-contact-print-preview.png"), fullPage: true });
+    await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+    await page.emulateMedia({ media: "screen" });
+    await expect.poll(() => page.evaluate(() => document.body.classList.contains("diy-form-print-mode"))).toBe(false);
+    expect(new URL(page.url()).hash).toBe(routeBeforeOpen);
+    await overlay.screenshot({ path: path.join(SCREENSHOT_DIR, "02-contact-dialog-record-print.png") });
+});
+
+test("系统设置：安全与服务接入填满宿主可用高度", async ({ page }) => {
+    test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/system-config");
+    await expect(page.locator(".module-form-workbench")).toBeVisible({ timeout: 45_000 });
+
+    const entry = page.getByRole("button", { name: /安全与服务接入|Security.*Service Access/i }).first();
+    await expect(entry).toBeVisible({ timeout: 30_000 });
+    await entry.click();
+    const settingsFrame = await waitForSystemSettingsFrame(page);
+    const settings = settingsFrame.locator(".system-settings");
+    await expect(settings).toBeVisible({ timeout: 30_000 });
+    await expect(settingsFrame.getByText("安全与服务接入", { exact: true }).first()).toBeVisible();
+
+    const hostBody = page.locator(".diy-custom-dialog__body--micro-app:visible").last();
+    const hostApp = hostBody.locator(".micro-app-dialog:visible").first();
+    await expect(hostBody).toBeVisible();
+    await expect(hostApp).toBeVisible();
+    const hostGeometry = await hostBody.evaluate((body) => {
+        const app = body.querySelector(".micro-app-dialog");
+        const bodyBox = body.getBoundingClientRect();
+        const appBox = app?.getBoundingClientRect();
+        return {
+            bodyHeight: bodyBox.height,
+            appHeight: appBox?.height || 0,
+            viewportHeight: window.innerHeight,
+            blankBelowApp: appBox ? bodyBox.bottom - appBox.bottom : Number.POSITIVE_INFINITY
+        };
+    });
+    expect(hostGeometry.bodyHeight, JSON.stringify(hostGeometry)).toBeGreaterThanOrEqual(hostGeometry.viewportHeight - 162);
+    expect(Math.abs(hostGeometry.appHeight - hostGeometry.bodyHeight), JSON.stringify(hostGeometry)).toBeLessThanOrEqual(2);
+    expect(hostGeometry.blankBelowApp, JSON.stringify(hostGeometry)).toBeLessThanOrEqual(2);
+
+    const geometry = await settings.evaluate((root) => {
+        const workspace = root.querySelector(".workspace");
+        const list = root.querySelector(".settings-list");
+        const rootBox = root.getBoundingClientRect();
+        const workspaceBox = workspace?.getBoundingClientRect();
+        return {
+            rootTop: rootBox.top,
+            rootBottom: rootBox.bottom,
+            viewportHeight: document.documentElement.clientHeight,
+            blankBelow: workspaceBox ? rootBox.bottom - workspaceBox.bottom : Number.POSITIVE_INFINITY,
+            listMinHeight: list ? getComputedStyle(list).minHeight : "missing"
+        };
+    });
+    expect(geometry.rootBottom, JSON.stringify(geometry)).toBeGreaterThanOrEqual(geometry.viewportHeight - 2);
+    expect(geometry.blankBelow, JSON.stringify(geometry)).toBeLessThanOrEqual(80);
+    expect(geometry.listMinHeight).toBe("0px");
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03-system-security-service-access.png"), fullPage: false });
 });
 
 test("本地员工详情：通用搜索工具栏与日期、单选对齐", async ({ page }) => {

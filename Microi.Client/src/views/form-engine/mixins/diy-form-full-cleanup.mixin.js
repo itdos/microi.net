@@ -4,6 +4,7 @@ beforeUnmount() {
         try { self.TrackDetailClose && self.TrackDetailClose(); } catch (e) {}
         self._isDestroyed = true;
         try { self._cancelFieldFormOpen && self._cancelFieldFormOpen(); } catch (e) {}
+        try { self._printCleanup && self._printCleanup(); } catch (e) {}
         try { self.ShowFieldForm = false; self.ShowFieldFormDrawer = false; } catch (e) {}
 
         // 1. 解除全局 popstate 监听（即使关闭逻辑没走到 onDialogClosed/onDrawerClosed 也兜底清理）

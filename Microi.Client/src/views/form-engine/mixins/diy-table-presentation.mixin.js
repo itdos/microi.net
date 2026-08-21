@@ -8,10 +8,13 @@ import {
     formatBadgeValue,
     getButtonKey,
     normalizeButtonBadge,
+    resolveModuleOpenFirstRecord,
     resolveListPresentationHeader,
     resolveButtonBadgeValue,
     resolveMetricValue
 } from "../form-view-blocks/module-presentation-runtime";
+import { resolveFormPresentationConfig } from "../form-presentation-runtime.js";
+import { hasScalarRecordId } from "@/utils/record-id.js";
 
 function uniqueFields(fields) {
     const seen = new Set();
@@ -76,23 +79,35 @@ export default {
                 user: this.GetCurrentUser
             });
         },
+        FormPresentationConfig() {
+            return resolveFormPresentationConfig(
+                this.CurrentDiyTableModel || {},
+                this.ModuleListView?.Layout?.Form || {},
+                ""
+            );
+        },
         ModuleFormWorkbenchConfig() {
-            return this.ModuleListView?.Layout?.Form || {};
+            return this.FormPresentationConfig || {};
+        },
+        ModuleFormWorkbenchRouteActive() {
+            if (this._moduleViewDeactivated === true) return false;
+            const routeMenuId = String(this.$route?.meta?.Id || this.$route?.meta?.SysMenuId || "");
+            const ownerMenuId = String(this.PageTabHostSysMenuId || this.SysMenuId || this.SysMenuModel?.Id || "");
+            return !routeMenuId || !ownerMenuId || routeMenuId === ownerMenuId;
+        },
+        ModuleFormWorkbenchAvailable() {
+            const preset = String(this.ModuleListView?.Layout?.Preset || "").toLowerCase();
+            const moduleForm = this.ModuleListView?.Layout?.Form || {};
+            const openFirstRecord = resolveModuleOpenFirstRecord(this.SysMenuModel, moduleForm);
+            return openFirstRecord
+                || preset === "formworkbench"
+                || hasScalarRecordId(this.$route?.query?.RecordId);
         },
         ModuleFormWorkbenchEnabled() {
-            const preset = String(this.ModuleListView?.Layout?.Preset || "").toLowerCase();
             const requestedMode = String(this.$route?.query?.ViewMode || this.$route?.query?.viewMode || "").toLowerCase();
-            return preset === "formworkbench"
+            return this.ModuleFormWorkbenchRouteActive
+                && this.ModuleFormWorkbenchAvailable
                 && requestedMode !== "table"
-                && !this._IsTableChild
-                && this.PropsEmbedded !== true
-                && this.PropsIsJoinTable !== true;
-        },
-        ModuleFormWorkbenchClassicEnabled() {
-            const preset = String(this.ModuleListView?.Layout?.Preset || "").toLowerCase();
-            const requestedMode = String(this.$route?.query?.ViewMode || this.$route?.query?.viewMode || "").toLowerCase();
-            return preset === "formworkbench"
-                && requestedMode === "table"
                 && !this._IsTableChild
                 && this.PropsEmbedded !== true
                 && this.PropsIsJoinTable !== true;
@@ -306,15 +321,13 @@ export default {
         },
         HandleModuleWorkbenchFormReady(form) {
             this.SyncModuleWorkbenchSelection(form || {});
-            const buttons = this.SysMenuModel?.FormBtns;
-            if (!Array.isArray(buttons) || buttons.length === 0) return;
-            this.HandlerBtns(buttons, form || {});
+            // 内嵌工作台复用 DiyFormFull；表单按钮显隐及 V8 上下文由该完整容器统一处理。
         },
         HandleModuleWorkbenchPage(pageIndex) {
             return this.GetDiyTableRow({ _PageIndex: pageIndex });
         },
         HandleModuleWorkbenchRecordChange(recordId) {
-            if (!recordId) return;
+            if (!recordId || !this.ModuleFormWorkbenchRouteActive) return;
             const current = (this.DiyTableRowList || []).find((item) => item && item.Id === recordId) || {};
             this.SyncModuleWorkbenchSelection(current);
             const batchButtons = this.SysMenuModel?.BatchSelectMoreBtns;
@@ -327,19 +340,16 @@ export default {
             query.RecordId = recordId;
             this.$router.replace({ path: this.$route.path, query }).catch(() => {});
         },
-        SwitchModuleWorkbenchToClassic() {
-            if (!this.$router || !this.$route) return;
-            this.$router.replace({
-                path: this.$route.path,
-                query: { ...(this.$route.query || {}), ViewMode: "Table" }
-            }).catch(() => {});
-        },
-        SwitchClassicToModuleWorkbench() {
-            if (!this.$router || !this.$route) return;
-            const query = { ...(this.$route.query || {}) };
-            delete query.ViewMode;
-            delete query.viewMode;
-            this.$router.replace({ path: this.$route.path, query }).catch(() => {});
+        HandleWorkspaceDialogRecordChange(recordId) {
+            // Dialog/Drawer record navigation only changes the dialog record.
+            // It must never replace the host table URL or hide the underlying list.
+            if (!recordId) return;
+            const current = (this.DiyTableRowList || []).find((item) => item && item.Id === recordId) || {};
+            this.SyncModuleWorkbenchSelection(current);
+            const batchButtons = this.SysMenuModel?.BatchSelectMoreBtns;
+            if (Array.isArray(batchButtons) && batchButtons.length > 0) {
+                this.HandlerBtns(batchButtons, current);
+            }
         },
         ResolvePresentationField(reference) {
             const source = typeof reference === "string" ? { Name: reference } : (reference || {});

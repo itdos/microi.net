@@ -44,3 +44,12 @@ test("表直连编辑器支持只读态并在保存前等待服务端策略", ()
     assert.match(source, /async flushPendingSync\(\)/u);
     assert.match(source, /!this\.policyReady \|\| this\.policyLoadFailed/u);
 });
+
+test("表直连选择器默认加载二十条并保留服务端远程搜索", () => {
+    const source = readFileSync(componentUrls[1], "utf8");
+    assert.match(source, /\bremote\b/u);
+    assert.match(source, /:remote-method="searchTables"/u);
+    assert.match(source, /await this\.searchTables\(""\)/u);
+    assert.match(source, /_PageSize:\s*20/u);
+    assert.match(source, /if \(text\) \{[\s\S]*?params\._Where/u);
+});

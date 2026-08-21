@@ -98,7 +98,8 @@ test("modern form remains the default while classic mode and all label positions
     assert.match(state, /diy-modern-field-card--tall/);
     assert.match(styles, /\.diy-modern-field-card--tall \.el-form-item__label[\s\S]*?align-items:\s*flex-start/);
     assert.match(styles, /\.diy-modern-field-card \.el-input__prefix[\s\S]*?align-items:\s*center/);
-    assert.equal((form.match(/popper-class="diy-field-description-tooltip"/g) || []).length, 4);
+    // 四个字段说明提示与设计器宽度提示共用真正的 CSS 三角箭头。
+    assert.equal((form.match(/popper-class="diy-field-description-tooltip"/g) || []).length, 5);
     assert.equal((form.match(/:teleported="true"/g) || []).length >= 4, true);
     assert.match(form, /class="diy-field-description diy-field-description--inline"[\s\S]*?tabindex="0"[\s\S]*?:aria-label="field\.Description"/);
     assert.match(styles, /\.diy-field-description\s*\{[\s\S]*?pointer-events:\s*auto !important/);
@@ -130,7 +131,10 @@ test("form and designer dialogs share the modern draggable themed treatment", as
     assert.match(full, /@close="HandleModernOverlayClose"/);
     assert.match(fullStyles, /\.diy-form-modern-overlay\.is-closing[\s\S]*?backdrop-filter:\s*none !important/);
     assert.match(fullStyles, /html\.dark|body\.dark/);
-    assert.equal((full.match(/class="diy-form-field-search-toolbar"/g) || []).length, 3);
+    assert.equal((full.match(/class="diy-form-header-search"/g) || []).length, 3);
+    assert.equal((full.match(/class="diy-form-field-search-toolbar diy-form-field-search-toolbar--mobile"/g) || []).length, 3);
+    assert.equal((full.match(/placeholder="搜索字段"/g) || []).length, 6);
+    assert.equal((full.match(/<el-icon><Refresh \/><\/el-icon>[\s\S]*?刷新当前记录/g) || []).length >= 3, true);
     assert.equal((full.match(/:FieldSearchKeyword="FormFieldSearchKeyword"/g) || []).length, 3);
     assert.match(full, /FormFieldSearchMatchCount/);
     assert.match(full, /async RefreshCurrentForm\(\)[\s\S]*?await formRef\.Init\(\)/);

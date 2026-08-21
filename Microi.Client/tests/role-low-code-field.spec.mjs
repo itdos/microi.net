@@ -15,7 +15,7 @@ test("low-code role permission field uses FormEngine data and emits a virtual JS
 
     assert.match(source, /FormEngine\.GetTableData\("sys_rolelimit"/);
     assert.match(source, /TableName:\s*"Sys_Menu"/);
-    assert.match(source, /JSON\.stringify\(\{ Menu:/);
+    assert.match(source, /JSON\.stringify\(\{\s*Menu:/);
     assert.match(source, /flushPendingSync/);
     assert.match(source, /parent\.Permission\.includes\("Read"\)/);
     assert.doesNotMatch(source, /NoDetail|NoSearch/);
@@ -39,6 +39,7 @@ test("field label alignment and left tree leaf semantics respect positive config
     const leftTree = read("src/views/form-engine/left-right/LeftView.vue");
     const leftRight = read("src/views/form-engine/left-right/LeftTreeJoinRightForm.vue");
     const styles = read("src/views/form-engine/styles/diy-form.scss");
+    const rolePermission = read("src/views/system/components/sysrole-permission-field.vue");
 
     assert.match(common, /field\.FormLabelPosition/);
     assert.match(common, /\["left", "right", "top"\]\.includes/);
@@ -57,6 +58,7 @@ test("field label alignment and left tree leaf semantics respect positive config
     assert.doesNotMatch(allCategoryBranch, /ref_RightDiyTable\.DiyTableRowList\s*=\s*\[\]/);
     assert.match(styles, /diy-field-label__text[\s\S]*?flex:\s*0 0 auto/);
     assert.match(styles, /diy-field-description--inline[\s\S]*?text-overflow:\s*ellipsis/);
+    assert.match(rolePermission, /grid-template-columns:\s*minmax\(190px, 28%\) minmax\(520px, 1fr\)/);
 });
 
 test("the legacy custom role manager remains in the source tree", () => {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-20T15:12:13.816Z",
+  "generatedAt": "2026-08-21T06:26:54.984Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -833,18 +833,18 @@
       ]
     },
     "microi-ui": {
-      "originalSha256": "20079680908e7a22e13e0ea5736d866b81f9fb56fb0ebdb453ac9b33436e761a",
-      "originalLines": 333,
-      "prefixSha256": "0e9f51341f11df22736a2eb4e70b3e2e74a796d5786ee3d79641f716ad1f031b",
-      "prefixBytes": 1486,
-      "entryLines": 183,
+      "originalSha256": "ca465631dae6a04d31790b07c0099c02eb0a9094122ef7bda0fe69356ceedf0b",
+      "originalLines": 337,
+      "prefixSha256": "612e566beaf54af5c250762e7d7540b6da8288d8c16fada43f48439facb0bb66",
+      "prefixBytes": 1484,
+      "entryLines": 187,
       "chunks": [
         {
           "id": "microi-ui-000",
           "ordinal": 0,
           "destination": "microi-ui/SKILL.md",
-          "sha256": "5952d38dd1ffabb11b55b833bc26c432b723159c4ad688897e3bdbbb20a03b52",
-          "lines": 11,
+          "sha256": "1fdfec21b03bf209a64b65bc4c1d22cf443b065125d3fb7700d8e1751694394b",
+          "lines": 15,
           "heading": "核心承诺"
         },
         {
@@ -1610,18 +1610,18 @@
       ]
     },
     "ui-design": {
-      "originalSha256": "3d4dc66359626b24983aa01de74064151425f5119091b228e3a913f5f5b7666d",
-      "originalLines": 1632,
-      "prefixSha256": "d557bbba4ba5ade3f10f5d8cc672d038f5136ce2eda7eaefbcfe2dd2eb65812a",
-      "prefixBytes": 1106,
-      "entryLines": 206,
+      "originalSha256": "cf2d6bef2450c4ee6227d960fcdfcb1c38f5eddab58a764af89918338a23acf5",
+      "originalLines": 1636,
+      "prefixSha256": "d537abb190e152d01a556e7fb730fc15304e14a28ba6853e76056e883c79097f",
+      "prefixBytes": 1101,
+      "entryLines": 210,
       "chunks": [
         {
           "id": "ui-design-000",
           "ordinal": 0,
           "destination": "ui-design/SKILL.md",
-          "sha256": "4b6409ab265eb741b2f4b28b51b7de12cde79ff4a19c8a6e8acf80ac867444be",
-          "lines": 29,
+          "sha256": "205676798890adacffba77fa7ffb48f044b5d4443f11620831f361d2edf97a81",
+          "lines": 33,
           "heading": "整体风格定义"
         },
         {
@@ -1924,7 +1924,7 @@
       ]
     },
     "v8-crud-api": {
-      "originalSha256": "97eb5908c4f897157909b86016348507c70d66d1276284ff1651a4e9b0494893",
+      "originalSha256": "4e7d07a502616d8af206cd60a9d8acd80a6bab7ab071d32394a559f69869a506",
       "originalLines": 401,
       "prefixSha256": "6d062f6eb2f3cab61d7eb1dc2f7de7c273ef254ae291bdb13bd9fdcc65b8d940",
       "prefixBytes": 776,
@@ -1934,7 +1934,7 @@
           "id": "v8-crud-api-000",
           "ordinal": 0,
           "destination": "v8-crud-api/SKILL.md",
-          "sha256": "bfeaae480ebf6028fe98904cc6f8feb630b140b99551fefcc551c8038a2ca078",
+          "sha256": "6b43119f4eae78fb6b185d48c5c289878ba86093ae62ce44ad0bdaa48093f605",
           "lines": 27,
           "heading": "本地优先与版本头（必做）"
         },

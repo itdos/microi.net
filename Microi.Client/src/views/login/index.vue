@@ -626,6 +626,12 @@ import {
     verifyWithPasskey,
     verifyWithTotp
 } from "@/utils/identity-verification.js";
+import {
+    getLegacySsoCapabilities,
+    getSsoCapabilities,
+    readLegacySsoCredential,
+    runFederatedLogin
+} from "@/utils/sso-federation.js";
 import ThemeSelect from "@/layout/components/ThemeSelect.vue";
 import config from "@/config.json";
 import {
@@ -839,6 +845,20 @@ export default {
                         : (providerAvailable ? (provider?.Kind === "qr" ? "扫码登录" : "授权登录") : (provider?.Enabled ? "待配置" : "未开启"))
                 });
             });
+            (capabilities.FederatedProviders || []).forEach((provider) => {
+                const protocol = String(provider.Protocol || "SSO").toUpperCase();
+                methods.push({
+                    key: `Federated:${provider.ConnectionKey}`,
+                    connectionKey: provider.ConnectionKey,
+                    federated: true,
+                    name: provider.Name || provider.ConnectionKey,
+                    description: provider.Description || `使用企业 ${protocol} 身份源登录`,
+                    glyph: protocol === "OIDC" ? "ID" : (protocol === "SAML2" ? "S" : (protocol === "CAS" ? "C" : "↗")),
+                    tone: "federated",
+                    available: provider.Enabled !== false,
+                    status: !this.IdentityCapabilitiesLoaded ? "读取中" : protocol
+                });
+            });
             return methods;
         }
     },
@@ -1036,11 +1056,19 @@ export default {
 
     methods: {
         async LoadIdentityCapabilities() {
+            const capabilities = {};
             try {
-                this.IdentityCapabilities = await getIdentityCapabilities(this.DiyCommon, this.OsClient);
+                Object.assign(capabilities, await getIdentityCapabilities(this.DiyCommon, this.OsClient));
+            } catch (_) {}
+            try {
+                const sso = await getSsoCapabilities(this.DiyCommon, this.OsClient);
+                capabilities.FederatedProviders = Array.isArray(sso.Providers) ? sso.Providers : [];
+                capabilities.SsoProtocols = Array.isArray(sso.Protocols) ? sso.Protocols : [];
+                capabilities.LegacySsoCompatibilityCount = Number(sso.LegacyCompatibilityCount || 0);
             } catch (_) {
-                this.IdentityCapabilities = {};
+                capabilities.FederatedProviders = [];
             } finally {
+                this.IdentityCapabilities = capabilities;
                 this.IdentityCapabilitiesLoaded = true;
             }
         },
@@ -1062,6 +1090,7 @@ export default {
             if (method.key === "Passkey") return this.LoginWithPasskey();
             if (method.key === "Totp") return this.OpenTotpLogin();
             if (method.key === "Face") return this.LoginWithFace();
+            if (method.federated) return this.LoginWithFederated(method.connectionKey);
             if (method.provider) return this.LoginWithExternal(method.provider);
         },
         ValidateIdentityLoginPolicy() {
@@ -1187,6 +1216,36 @@ export default {
             } finally {
                 this.IdentityLoginWaiting = "";
             }
+        },
+        async LoginWithFederated(connectionKey) {
+            if (this.IdentityLoginWaiting || !this.ValidateIdentityLoginPolicy()) return;
+            this.IdentityLoginWaiting = connectionKey || "SSO";
+            try {
+                const result = await runFederatedLogin({
+                    diyCommon: this.DiyCommon,
+                    osClient: this.OsClient,
+                    connectionKey,
+                    clientType: this.diyStore.IsPhoneView ? "Mobile" : "PC"
+                });
+                await this.CompleteIdentityLogin(result);
+            } catch (error) {
+                this.DiyCommon.Tips(error?.message || "企业单点登录失败。", false);
+            } finally {
+                this.IdentityLoginWaiting = "";
+            }
+        },
+        RemoveSsoCredentialFromUrl(parameterNames) {
+            if (typeof window === "undefined" || !window.history?.replaceState) return;
+            let safeUrl = window.location.href;
+            (parameterNames || []).forEach((parameterName) => {
+                const escaped = String(parameterName || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                if (!escaped) return;
+                safeUrl = safeUrl
+                    .replace(new RegExp(`([?&])${escaped}=[^&#;]*`, "gi"), "$1")
+                    .replace(new RegExp(`(%3F|%26)${escaped}%3D.*?(?=%26|%23|&|#|$)`, "gi"), "$1");
+            });
+            safeUrl = safeUrl.replace(/\?&/g, "?").replace(/&&+/g, "&").replace(/[?&](?=#|$)/g, "");
+            if (safeUrl !== window.location.href) window.history.replaceState(window.history.state, "", safeUrl);
         },
         isEnabledFlag(value) {
             if (value === true || value === 1) return true;
@@ -1712,90 +1771,54 @@ export default {
         HiddenLogin() {
             // this.diyStore.setLoginCover(true);
         },
-        TokenLogin() {
+        async TokenLogin() {
             var self = this;
-            //token自动登录
-            // 直接检测URL中的token参数，无需Diy_Sso配置即可自动登录
-            var directTokenMatch = /[?&]token=([^&;#]+)/i.exec(location.href);
-            if (!directTokenMatch) {
-                directTokenMatch = /[?&]token%3D([^&;#]+)/i.exec(location.href);
-            }
-            var directToken = directTokenMatch ? decodeURIComponent(directTokenMatch[1].replace(/\+/g, "%20")) : null;
-            if (!self.DiyCommon.IsNull(directToken) && directToken != "$V8.CurrentToken$") {
-                console.log("-------> SsoLogin direct token login：" + directToken);
-                var newtoken = directToken.replace("Bearer%20", "").replace("Bearer ", "");
-                self.DiyCommon.setToken(newtoken);
-                self.DiyCommon.Post(
-                    self.DiyApi.TokenLogin(),
-                    {
-                        _token: directToken,
-                        Token: directToken,
-                        OsClient: self.OsClient
-                    },
-                    function (result) {
-                        console.log("-------> SsoLogin direct tokenLogin result：", result);
-                        if (result.Code == 1) {
-                            self.LoginResult = result;
-                            self.diyStore.setCurrentUser(result.Data);
-                            self.diyStore.setState("SystemStyle", "Classic");
-                            self.GotoSystem();
-                        }
+            try {
+                const legacyConnections = await getLegacySsoCapabilities(self.DiyCommon, self.OsClient);
+                for (const diySso of legacyConnections) {
+                    const token = readLegacySsoCredential(location.href, diySso.TokenName);
+                    if (!token) continue;
+                    self.RemoveSsoCredentialFromUrl([diySso.TokenName]);
+                    const usesDiyToken = String(diySso.ClientSsoApi).toLowerCase()
+                        === self.DiyApi.TokenLogin().toLowerCase();
+                    const previousToken = self.DiyCommon.getToken();
+                    if (usesDiyToken) {
+                        self.DiyCommon.setToken(token.replace(/^Bearer(?:%20|\s)+/i, ""));
                     }
-                );
-                return;
-            }
-            // 无直接token参数，回退到Diy_Sso配置方式
-            var diySsoList = self.DiyCommon.Post(
-                "/api/FormEngine/GetTableDataAnonymous",
-                {
-                    FormEngineKey: "Diy_Sso",
-                    // _SearchEqual: { IsEnable: true },
-                    _Where: [["IsEnable", "=", 1]],
-                    OsClient: self.OsClient
-                },
-                function (result) {
-                    self.LoginResult = result;
-                    if (result.Code == 1 && Array.isArray(result.Data) && result.Data.length > 0) {
-                        // console.log("-------> SsoLogin href：" + location.href);
-                        for (let index = 0; index < result.Data.length; index++) {
-                            const diySso = result.Data[index];
-                            var token = decodeURIComponent((new RegExp("[?|&|%3F]" + diySso.TokenName + "%3D" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
-                            if (!token) {
-                                token = decodeURIComponent((new RegExp("[?|&|%3F]" + diySso.TokenName + "=" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
-                            }
-                            if (!self.DiyCommon.IsNull(token) && token != "$V8.CurrentToken$") {
-                                console.log("-------> SsoLogin token：" + token);
-                                //登录
-                                if (diySso.ClientSsoApi.toLowerCase() == self.DiyApi.TokenLogin().toLowerCase()) {
-                                    var newtoken = token.replace("Bearer%20", "").replace("Bearer ", "");
-                                    // 使用统一的 Token 存储方法
-                                    self.DiyCommon.setToken(newtoken);
-                                }
-                                self.DiyCommon.Post(
-                                    diySso.ClientSsoApi,
-                                    {
-                                        //'/api/SysUser/SsoPengrui'
-                                        _token: token,
-                                        Token: token,
-                                        TokenName: diySso.TokenName,
-                                        OsClient: self.OsClient
-                                    },
-                                    function (ssoResult) {
-                                        console.log("-------> SsoLogin ssoApiResult：", ssoResult);
-                                        if (ssoResult.Code == 1) {
-                                            self.LoginResult = ssoResult;
-                                            self.diyStore.setCurrentUser(ssoResult.Data);
-                                            self.diyStore.setState("SystemStyle", "Classic");
-                                            self.GotoSystem();
-                                        }
-                                    }
-                                );
-                                break;
-                            }
+                    let ssoResult;
+                    try {
+                        ssoResult = await self.DiyCommon.PostAsync(diySso.ClientSsoApi, {
+                            _token: token,
+                            Token: token,
+                            TokenName: diySso.TokenName,
+                            OsClient: self.OsClient
+                        });
+                    } catch (error) {
+                        if (usesDiyToken) {
+                            if (previousToken) self.DiyCommon.setToken(previousToken);
+                            else self.DiyCommon.removeToken();
                         }
+                        throw error;
                     }
+                    if (ssoResult.Code == 1) {
+                        self.LoginResult = ssoResult;
+                        self.diyStore.setCurrentUser(ssoResult.Data);
+                        self.diyStore.setState("SystemStyle", "Classic");
+                        self.GotoSystem();
+                    } else if (usesDiyToken) {
+                        if (previousToken) self.DiyCommon.setToken(previousToken);
+                        else self.DiyCommon.removeToken();
+                    }
+                    return;
                 }
-            );
+            } catch (_) {
+                // Standard account/password and federated login remain available.
+            }
+            // An unconfigured generic token must never activate a session, and
+            // must not remain in browser history or referrer-bearing URLs.
+            if (readLegacySsoCredential(location.href, "token")) {
+                self.RemoveSsoCredentialFromUrl(["token"]);
+            }
         },
         async Login() {
             var self = this;

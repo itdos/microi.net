@@ -85,6 +85,30 @@ export default {
                 display
             };
         },
+
+        /**
+         * left 标签时，字段说明从整行 Label 起点开始并横跨 Label + 控件；
+         * right 标签时仍从控件列开始。top 标签的说明由 Label 插槽内联展示。
+         * 说明节点位于 el-form-item 外，因此 right 需要显式复用表单的 label-width。
+         */
+        getFieldDescriptionStyle(field) {
+            if (!field || !this.shouldShowLabel(field)) {
+                return {};
+            }
+            var labelPosition = String(this.GetLabelPosition(field) || '').toLowerCase();
+            if (labelPosition !== 'right') {
+                return {};
+            }
+            var labelWidth = this.GetFormLabelWidth();
+            if (labelWidth === undefined || labelWidth === null || String(labelWidth).trim() === '' || labelWidth === 'auto') {
+                return {};
+            }
+            var normalizedWidth = typeof labelWidth === 'number' ? labelWidth + 'px' : String(labelWidth);
+            return {
+                marginInlineStart: normalizedWidth,
+                maxWidth: 'calc(100% - ' + normalizedWidth + ')'
+            };
+        },
         
         /**
          * 获取表单字段宽度（span）

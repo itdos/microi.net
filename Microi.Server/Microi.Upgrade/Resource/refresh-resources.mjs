@@ -36,6 +36,7 @@ const resourceNames = [
   'app.microi.form-engine.json',
   'app.microi.module-engine.json',
   'app.microi.saas-engine.json',
+  'app.microi.sso.json',
   'app.microi.store.json',
 ];
 const endpoint = process.env.MICROI_UPGRADE_RESOURCE_API
@@ -120,12 +121,12 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
       || !content.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
       || !content.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
-      || !content.includes('PLATFORM_API_ENGINE_PRESERVE_NEWER_V1')
+      || !content.includes('OFFICIAL_MANAGED_OVERWRITE_V1')
       || !content.includes('DATABASE_ONLY_BUILD_ASSETS_V1')
       || !content.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')
       || !content.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
       || !content.includes('OBJECT_STORAGE_FORBIDDEN')) {
-      throw new Error(`${name} 低于 v1.10.11 或缺少跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、可信官方平台资源较新版本保护及统一应用商城能力，拒绝降级本地基线`);
+      throw new Error(`${name} 低于 v1.10.11 或缺少跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、可信官方平台 Managed 覆盖升级及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -167,6 +168,7 @@ function validateReleaseCandidate(name, content) {
       'app.microi.form-engine.json': '表单引擎',
       'app.microi.module-engine.json': '模块引擎',
       'app.microi.saas-engine.json': 'SaaS引擎',
+      'app.microi.sso.json': 'SSO 身份联邦',
       'app.microi.store.json': '应用商城',
     };
     if (packageModel?.PackageInfo?.Name !== expectedNames[name]) {
@@ -326,7 +328,7 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
         || !importerCode.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
         || !importerCode.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
-        || !importerCode.includes('PLATFORM_API_ENGINE_PRESERVE_NEWER_V1')
+        || !importerCode.includes('OFFICIAL_MANAGED_OVERWRITE_V1')
         || !importerCode.includes('DATABASE_ONLY_BUILD_ASSETS_V1')
         || !importerCode.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')
         || !importerCode.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
@@ -696,7 +698,7 @@ if (process.argv.includes('--synchronize-local')) {
       localStandaloneContents,
     );
     process.stderr.write(
-      '\n⚠ 官网升级资源接口在重试后仍暂时不可用；7 项本地资源与上次官网成功回读的共同基线完全一致。\n'
+      `\n⚠ 官网升级资源接口在重试后仍暂时不可用；${resourceNames.length} 项本地资源与上次官网成功回读的共同基线完全一致。\n`
       + '  本次仅允许继续后端编译发布：未写入官网、未修改本地资源、未推进共同基线。\n'
       + `  故障原因：${error.message}\n\n`,
     );

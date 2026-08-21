@@ -50,6 +50,32 @@ async function login(page) {
         .toBeVisible({ timeout: 30_000 });
 }
 
+test("聊天联系人和历史对象始终显示 Name 或 Account", async ({ page }) => {
+    test.skip(!password, "PW_LOCAL_PASSWORD is required");
+    await fs.mkdir(screenshotDir, { recursive: true });
+    await login(page);
+
+    const realtime = page.locator(".chat-realtime-indicator");
+    await expect(realtime).toHaveClass(/is-connected/, { timeout: 45_000 });
+    await realtime.click();
+    const panel = page.locator(".vChat-wrapper:visible");
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+
+    const recentNames = panel.locator(".J__recordList .title");
+    await expect(recentNames.first()).toBeVisible({ timeout: 20_000 });
+    const recentText = (await recentNames.allTextContents()).map(value => value.trim());
+    expect(recentText.length).toBeGreaterThan(0);
+    expect(recentText.every(Boolean), JSON.stringify(recentText)).toBe(true);
+
+    await panel.locator(".vChat-sidebar > .list.flex1 li").nth(1).click();
+    const directoryNames = panel.locator(".J__addrFriendList .name");
+    await expect(directoryNames.first()).toBeVisible({ timeout: 20_000 });
+    const directoryText = (await directoryNames.allTextContents()).map(value => value.trim());
+    expect(directoryText.length).toBeGreaterThan(0);
+    expect(directoryText.every(Boolean), JSON.stringify(directoryText)).toBe(true);
+    await panel.screenshot({ path: path.join(screenshotDir, "chat-name-account-fallback.png") });
+});
+
 test("SignalR状态、admin平台会话、AI闭环和后台任务事件驱动", async ({ page }, testInfo) => {
     test.skip(!password, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(screenshotDir, { recursive: true });
