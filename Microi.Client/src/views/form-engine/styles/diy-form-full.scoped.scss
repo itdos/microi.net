@@ -262,6 +262,9 @@
     &.draft-list {
         background: linear-gradient(135deg, #e6a23c, #c07a12);
     }
+    &.refresh {
+        background: linear-gradient(135deg, #409eff, #246fcb);
+    }
     &.delete {
         background: linear-gradient(135deg, #f56c6c, #c62828);
     }

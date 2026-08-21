@@ -69,7 +69,7 @@ public class IdentityVerificationSecurityTests
             IdentityVerificationSecurity.NormalizePasskeyRelyingPartyId(configuredRpId, origin));
 
         Assert.Contains("当前站点域名不匹配", error.Message, StringComparison.Ordinal);
-        Assert.Contains("系统设置 → 登录与身份", error.Message, StringComparison.Ordinal);
+        Assert.Contains("系统设置 → 安全与服务接入", error.Message, StringComparison.Ordinal);
         Assert.Contains("PasskeyOrigins", error.Message, StringComparison.Ordinal);
         Assert.Contains("os.jifulii.com", error.Message, StringComparison.Ordinal);
     }

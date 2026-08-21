@@ -100,9 +100,9 @@
             :rows="DiyTableRowList"
             :fields="DiyFieldList"
             :config="ModuleFormWorkbenchConfig"
+            :title-icon="SysMenuModel.Icon || ''"
             :page-buttons="SysMenuModel.PageBtns || []"
             :batch-buttons="SysMenuModel.BatchSelectMoreBtns || []"
-            :form-buttons="SysMenuModel.FormBtns || []"
             :row-count="Number(DiyTableRowCount || 0)"
             :page-index="DiyTableRowPageIndex"
             :page-size="DiyTableRowPageSize"
@@ -115,7 +115,6 @@
             @load-page="HandleModuleWorkbenchPage"
             @record-change="HandleModuleWorkbenchRecordChange"
             @form-ready="HandleModuleWorkbenchFormReady"
-            @switch-classic="SwitchModuleWorkbenchToClassic"
             @open-form="HandleModuleWorkbenchOpenForm"
             @run-action="HandleModuleWorkbenchAction"
         />
@@ -419,7 +418,7 @@
                             >
                         </el-popover>
                     </div>
-                    <el-dropdown v-if="(!PropsHideMoreFunctions || ModuleFormWorkbenchClassicEnabled) && !diyStore.IsPhoneView" trigger="click">
+                    <el-dropdown v-if="!PropsHideMoreFunctions && !diyStore.IsPhoneView" trigger="click">
                         <el-button type="primary" :loading="BusinessDataTranslateLoading">
                             <el-icon style="margin-right: 4px"><MoreFilled /></el-icon>{{ $t('Msg.MoreFunctions') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
                         </el-button>
@@ -430,9 +429,6 @@
                                 </el-dropdown-item>
                                 <el-dropdown-item v-if="!PropsHideMoreFunctions" @click="TranslateBusinessData()">
                                     <fa-icon icon="fas fa-language" class="mr-1" />{{ $t('Msg.TranslateBusinessData') }}
-                                </el-dropdown-item>
-                                <el-dropdown-item v-if="ModuleFormWorkbenchClassicEnabled" divided @click="SwitchClassicToModuleWorkbench">
-                                    <fa-icon icon="fas fa-table-columns" class="mr-1" />返回表单工作台（当前为经典表格视图）
                                 </el-dropdown-item>
                             </el-dropdown-menu>
                         </template>
@@ -500,7 +496,7 @@
                 </div>
 
                 <!--DIY移动端浮动操作按钮（FAB）-->
-                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !PropsEmbedded && (ShowAddByRoute || ModuleFormWorkbenchClassicEnabled) && !IsTrashMode && cardSelection.length === 0" :style="GetFabContainerStyle()">
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !PropsEmbedded && ShowAddByRoute && !IsTrashMode && cardSelection.length === 0" :style="GetFabContainerStyle()">
                     <!--遮罩层-->
                     <transition name="fab-overlay">
                         <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
@@ -508,10 +504,6 @@
                     <!--弹出菜单-->
                     <transition name="fab-menu">
                         <div class="mobile-fab-menu" v-if="showMobileFabMenu">
-                            <div class="mobile-fab-menu-item" v-if="ModuleFormWorkbenchClassicEnabled" @click="showMobileFabMenu = false; SwitchClassicToModuleWorkbench()">
-                                <div class="mobile-fab-menu-icon v8"><fa-icon icon="fas fa-table-columns" /></div>
-                                <span class="mobile-fab-menu-label">返回表单工作台</span>
-                            </div>
                             <!--工作流-发起申请按钮-->
                             <div class="mobile-fab-menu-item" v-if="IsWorkFlowMenu() && _LimitAdd && !TableChildField.Readonly && PropsIsJoinTable !== true && IsVisibleAdd == true" @click="showMobileFabMenu = false; StartWorkFlow()">
                                 <div class="mobile-fab-menu-icon add"><fa-icon icon="far fa-paper-plane" /></div>
@@ -1877,6 +1869,7 @@
 
         <DiyFormDialog v-if="_shouldRenderDiyFormDialog"
             @CallbackGetDiyTableRow="GetDiyTableRow"
+            @WorkspaceRecordChange="HandleWorkspaceDialogRecordChange"
             @ParentFormSet="ParentFormSet"
             :FatherFormModel="FatherFormModel"
             :ParentV8="ParentV8_Data ? ParentV8_Data : ParentV8"
@@ -3065,9 +3058,10 @@ export default {
             var self = this;
             var routes = self.$router.getRoutes ? self.$router.getRoutes() : [];
             var targetRoute = findPageTabTargetRoute(routes, targetSysMenuId);
-            if (!targetRoute || !targetRoute.name) return null;
-
-            var targetMeta = targetRoute.meta || {};
+            // 隐藏的跨表目标模块可以挂在入口菜单下面且不生成独立路由。
+            // 路由只作为快速缓存；缺失时必须通过受权限保护的菜单接口解析，
+            // 否则合法的 TargetSysMenuId 会被误判为“未分配权限”。
+            var targetMeta = targetRoute && targetRoute.meta ? targetRoute.meta : {};
             var tableId = String(targetMeta.DiyTableId || targetMeta.TableId || "").trim();
             if (!tableId) {
                 var menuResult = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuModel, {
@@ -3077,7 +3071,7 @@ export default {
                 tableId = String(menuResult.Data && menuResult.Data.DiyTableId || "").trim();
             }
             if (!tableId) return null;
-            return { Route: targetRoute, TableId: tableId };
+            return { Route: targetRoute || null, TableId: tableId };
         },
         PreparePageTabModuleContext(tabModel, targetSysMenuId, targetTableId) {
             var self = this;
@@ -3388,7 +3382,28 @@ export default {
                             IsDefaultOpen: isDefaultOpen,
                             IsOpenWorkFlowForm: isOpenWorkFlowForm,
                             WFParam: wfParam,
-                            TableChildAuth: self.TableChildAuth
+                            TableChildAuth: self.TableChildAuth,
+                            // 记录上下文只复用当前列表已经按菜单权限和筛选条件返回的数据。
+                            RecordNavigator: {
+                                // 嵌套子表、内嵌表和联表没有独立模块 URL；若在这些场景
+                                // 同步 RecordId，会错误覆盖宿主记录的路由参数。
+                                Enabled: self.FormMode !== "Add"
+                                    && self.FormMode !== "Insert"
+                                    && !self._IsTableChild
+                                    && self.PropsEmbedded !== true
+                                    && self.PropsIsJoinTable !== true,
+                                Rows: self.DiyTableRowList || [],
+                                RowCount: Number(self.DiyTableRowCount || 0),
+                                LabelFields: self.ModuleFormWorkbenchConfig?.RecordSelector?.LabelFields || [],
+                                Placeholder: "搜索并切换记录"
+                            },
+                            // 旧模块 FormWorkbench 仅作没有表级 FormPresentation 时的兼容回退。
+                            PresentationMode: self.ModuleFormWorkbenchAvailable
+                                ? String(self.ModuleFormWorkbenchConfig?.Presentation || "ControlCenter")
+                                : "",
+                            PresentationConfig: self.ModuleFormWorkbenchAvailable
+                                ? (self.ModuleFormWorkbenchConfig || {})
+                                : {}
                         });
                         self.BtnLoading = false;
                         self._openFormDialogTimer = null;

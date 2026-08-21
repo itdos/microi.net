@@ -68,6 +68,42 @@ namespace Microi.net
         DosResult ConsumeIdentityVerificationTicket(dynamic dynamicParam);
 
         /// <summary>
+        /// 仅供 app.microi.sso 的 Managed 身份解析引擎创建最小权限 JIT 用户。
+        /// 密码哈希、角色存在性与禁止创建平台管理员均由可信宿主强制执行。
+        /// </summary>
+        DosResult CreateFederatedUser(dynamic dynamicParam);
+
+        /// <summary>
+        /// 仅供 SSO 兼容引擎在外部身份验证完成后签发短期一次性登录票据。
+        /// </summary>
+        DosResult CreateSsoLoginTicket(dynamic dynamicParam);
+
+        /// <summary>
+        /// 原子消费 SSO 一次性票据并签发平台唯一会话 DiyToken。
+        /// </summary>
+        DosResult CompleteSsoLogin(dynamic dynamicParam);
+
+        /// <summary>
+        /// 平台管理员轮换 OIDC 客户端密钥；明文只在本次结果中返回一次。
+        /// </summary>
+        DosResult RotateSsoClientSecret(dynamic dynamicParam);
+
+        /// <summary>
+        /// 仅供 SaaS 身份应用原子校验并消费短信验证码，返回短期、一次性登录证明。
+        /// </summary>
+        DosResult CreatePlatformSmsProof(dynamic dynamicParam);
+
+        /// <summary>
+        /// 仅供持有有效短信证明的 Managed 身份引擎创建 PBKDF2 用户。
+        /// </summary>
+        DosResult CreatePlatformSmsUser(dynamic dynamicParam);
+
+        /// <summary>
+        /// 原子消费短信证明并为证明绑定的已启用用户签发 DiyToken。
+        /// </summary>
+        DosResult CompletePlatformSmsLogin(dynamic dynamicParam);
+
+        /// <summary>
         /// 获取当前token
         /// </summary>
         CurrentToken GetCurrentToken(string token = null, string osClient = null);

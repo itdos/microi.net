@@ -36,25 +36,23 @@ test('官方平台应用包的 PC 复合列默认保持紧凑双行', async () =
   }
 });
 
-test('系统设置通过 ViewSchema 使用通用表单工作台并保留经典列表', async () => {
+test('系统设置的模块 ViewSchema 不再保存表单工作台配置', async () => {
   const packageModel = await readPackage('app.microi.saas-engine.json');
   const menu = packageModel.SysMenus.find(item => item.Id === 'ea6b79e8-2c6b-4d0f-9b6a-44d01a3479bf');
   const schema = JSON.parse(menu.ViewSchema);
   const view = schema.Views.find(item => item.Scene === 'List' && item.Device === 'PC');
 
-  assert.equal(view.Layout.Preset, 'FormWorkbench');
-  assert.deepEqual(view.Layout.Form, {
-    Presentation: 'SettingsCenter',
-    Mode: 'Edit',
-    ShowClassicList: true,
-    RecordSelector: {
-      Display: 'Both',
-      LabelFields: ['PeizhiMC', 'SysTitle', 'ApiBase'],
-      Placeholder: '选择要维护的系统配置'
-    }
-  });
+  assert.notEqual(String(view.Layout.Preset || '').toLowerCase(), 'formworkbench');
+  assert.equal(view.Layout.Form, undefined);
+  const table = packageModel.DiyTables.find(item => item.Id === 'c8570fa6-c10f-4014-8cb4-4b046e7ba69c');
+  const presentation = JSON.parse(table.FormPresentation);
+  assert.equal(presentation.Presentation, 'ControlCenter');
+  assert.equal(Object.hasOwn(presentation, 'OpenFirstRecord'), false);
+  assert.equal(menu.OpenFirstRecord, 1);
+  assert.equal(presentation.NavigationTitle, '配置分组');
+  assert.deepEqual(presentation.RecordSelector.LabelFields, ['PeizhiMC', 'SysTitle', 'ApiBase']);
   assert.equal(menu.OpenType, 'Diy');
-  assert.match(menu.PageBtns, /登录与身份/);
+  assert.match(menu.PageBtns, /安全与服务接入/);
 });
 
 test('应用商城统一入口由内置微服务承载', async () => {

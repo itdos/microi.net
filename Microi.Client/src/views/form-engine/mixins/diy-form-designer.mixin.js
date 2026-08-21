@@ -314,11 +314,16 @@ deleteField(field) {
             self.$emit('CallbackDeleteField', field);
         },
 adjustFieldWidth(field, delta) {
-            var self = this;
             var newWidth = field.FormWidth || field._span;
-            newWidth = Math.max(1, Math.min(24, newWidth + delta));
+            this.setFieldWidth(field, Number(newWidth) + delta);
+        },
+setFieldWidth(field, value) {
+            var self = this;
+            if (!field) return;
+            var parsed = Number.parseInt(value, 10);
+            if (!Number.isFinite(parsed)) return;
+            var newWidth = Math.max(1, Math.min(24, parsed));
 
-            // 更新字段宽度
             field.FormWidth = newWidth;
             field._span = newWidth;
             if (typeof self.RefreshDiyFieldRuntimeState === 'function') {

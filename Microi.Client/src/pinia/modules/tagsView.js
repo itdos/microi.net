@@ -2,6 +2,7 @@
 import { defineStore } from "pinia";
 import { releaseMicroAppRuntimeCacheForView } from "@/utils/microAppRuntimeCache.js";
 import { shouldReusePageTabRoute } from "@/utils/page-tab-route-runtime.js";
+import { shouldReuseRecordWorkbenchRoute } from "@/utils/record-id.js";
 
 // 最大缓存页面数量，防止 keep-alive 缓存过多导致内存泄漏
 const MAX_CACHED_VIEWS = 15;
@@ -16,9 +17,9 @@ export const useTagsViewStore = defineStore("tagsView", {
 
     actions: {
         addVisitedView(view) {
-            // 页面多 Tab 的跨模块模式复用当前列表实例，Tab 只属于同一个业务入口。
-            // query 变化时更新现有访问标签，不能额外创建一排隐藏模块标签。
-            if (shouldReusePageTabRoute(view)) {
+            // 页面多 Tab 与记录工作台都属于同一个业务入口。RecordId/ViewMode 只切换
+            // 当前模块的记录或展示方式，query 变化时更新现有标签而不是创建重复标签。
+            if (shouldReusePageTabRoute(view) || shouldReuseRecordWorkbenchRoute(view)) {
                 const reusableIndex = this.visitedViews.findIndex((item) => (
                     item.path === view.path && item.name === view.name
                 ));

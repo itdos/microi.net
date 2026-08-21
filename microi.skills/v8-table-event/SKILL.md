@@ -58,7 +58,7 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 - 传入 `_InvokeType: 'Client'` → **触发**表单 V8 事件
 - Postman 等直接调用接口 → 前端事件**不执行**，后端事件**仍执行**
 - 服务器端提交前/后 V8 事件在**同一事务**中执行
-- `diy_table.V8Unlimited` 只控制该表的后端提交前、提交后和数据处理 V8；仅当事件链必须保持一个事务且无法安全分片时开启。它解除当前 Jint Engine 的超时、语句、函数递归和累计分配限制，但不解除进程常驻内存、取消、并发、接口嵌套深度、权限和数据库保护。
+- `diy_table.V8Limit` 是表后端提交前、提交后和数据处理 V8 的正向开关：缺失、`null`、`0/false` 均不设置 Jint 单次超时、语句、函数递归和累计分配预算，只有 `1/true` 才启用这些限制。旧 `V8Unlimited` 仅在新字段不存在时反向推断，新的 MCP、Manifest 和应用资源只写 `V8Limit`。进程常驻内存、取消、并发、接口嵌套深度、权限和数据库保护始终生效。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=v8-table-event-003 sha256=65a1e728982d4e534d06dc2440eac111fe53a08f0a3012c6a9f8b1de45b4b81f -->

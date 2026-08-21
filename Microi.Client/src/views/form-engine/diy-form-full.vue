@@ -2,12 +2,17 @@
     <div>
         <!--以全新页面形式打开Form（路由页面模式）-->
         <div v-if="IsPageMode" class="pluginPage"
-            :class="{ 'mobile-form-page': diyStore.IsPhoneView, 'mini-program' : diyStore.IsMiniProgram }"
-            style="margin-top: 10px;">
+            :class="{
+                'mobile-form-page': diyStore.IsPhoneView,
+                'mini-program' : diyStore.IsMiniProgram,
+                'diy-form-embedded-workbench': IsEmbeddedMode,
+                'diy-form-print-target': IsPrinting
+            }"
+            :style="IsEmbeddedMode ? undefined : { marginTop: '10px' }">
             <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
             <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram" class="mobile-form-header-bar">
                 <div class="mobile-header-left">
-                    <el-icon class="back-icon" @click="Go_1()">
+                    <el-icon v-if="!IsEmbeddedMode" class="back-icon" @click="Go_1()">
                         <ArrowLeft />
                     </el-icon>
                 </div>
@@ -45,45 +50,122 @@
                 </div> -->
             </div>
 
+            <div
+                v-if="diyStore.IsPhoneView && ShowWorkspaceRecordSelector"
+                class="diy-form-record-selector diy-form-record-selector--mobile"
+            >
+                <el-select
+                    :model-value="TableRowId"
+                    filterable
+                    :loading="WorkspaceRecordSwitching"
+                    :placeholder="WorkspaceRecordSelectorPlaceholder"
+                    aria-label="搜索并切换记录"
+                    @change="SwitchWorkspaceRecord"
+                >
+                    <el-option
+                        v-for="record in WorkspaceRecordOptions"
+                        :key="GetWorkspaceRecordId(record)"
+                        :label="GetWorkspaceRecordLabel(record)"
+                        :value="GetWorkspaceRecordId(record)"
+                    />
+                </el-select>
+                <span v-if="WorkspaceRecordCount !== null" class="diy-form-record-count">共 {{ WorkspaceRecordCount }} 条</span>
+            </div>
+
             <div>
                 <!--PC端表单头部操作栏（移动端改用FAB浮动按钮）-->
-                <div v-if="!diyStore.IsPhoneView" class="form-header diy-form-page-header">
-                    <div class="diy-form-dialog-title">
-                        <span class="diy-form-dialog-title__eyebrow">FORM WORKSPACE</span>
-                        <div class="diy-form-dialog-title__heading">
-                            <i :class="GetOpenTitleIcon()" />
-                            <span>{{ GetOpenTitlePage() }}</span>
+                <div
+                    v-if="!diyStore.IsPhoneView"
+                    class="form-header diy-form-page-header"
+                    :class="{ 'diy-form-page-header--embedded': IsEmbeddedMode }"
+                >
+                    <div class="diy-form-dialog-title" :class="{ 'is-embedded': IsEmbeddedMode }">
+                        <span v-if="IsEmbeddedMode" class="diy-form-workbench-title-icon" aria-hidden="true">
+                            <fa-icon :icon="GetWorkspaceTitleIcon()" />
+                        </span>
+                        <div class="diy-form-dialog-title__copy">
+                            <span class="diy-form-dialog-title__eyebrow">{{ GetWorkspaceEyebrow() }}</span>
+                            <div class="diy-form-dialog-title__heading">
+                                <i v-if="!IsEmbeddedMode" :class="GetOpenTitleIcon()" />
+                                <span>{{ GetWorkspaceTitle() }}</span>
+                            </div>
+                            <div
+                                v-if="IsEmbeddedMode && GetWorkspaceDescription()"
+                                class="diy-form-dialog-title__description diy-form-rich-copy"
+                                v-html="GetWorkspaceDescriptionHtml()"
+                            ></div>
                         </div>
                     </div>
-                    <div class="form-actions">
+                    <div class="form-actions diy-form-dialog-actions diy-form-toolbar">
+                        <div v-if="$slots['workspace-actions']" class="diy-form-toolbar__extensions">
+                            <slot name="workspace-actions" :row="CurrentRowModel" :record-id="TableRowId" />
+                        </div>
                         <!-- 工作流：醒目的【发起流程/处理工作】按钮（PageMode 顶部） -->
                         <el-button v-if="ShowWfTopSubmitBtn" size="small" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
                             {{ WfTopSubmitBtnText }}
                         </el-button>
-                        <el-button v-if="FormMode != 'View' && !ShowWfTopSubmitBtn" size="small" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
+                        <el-button v-if="FormMode != 'View' && !ShowWfTopSubmitBtn" size="small" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(!IsEmbeddedMode)">
                             {{ $t("Msg.Save") }}
                         </el-button>
-                        <el-dropdown v-if="!IsWorkflowReviewContext" trigger="click" size="small">
+                        <el-dropdown trigger="click" size="small">
                             <el-button size="small">
                                 {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                             </el-button>
                             <template #dropdown>
                                 <el-dropdown-menu class="form-submit-btns">
-                                    <el-dropdown-item v-if="FormMode != 'View'" :disabled="SaveDiyTableCommonLoding || BtnLoading" @click="SaveToDraftBox">
+                                    <el-dropdown-item v-if="!UseViewSchemaDetail" :disabled="FormRefreshing" @click="RefreshCurrentForm">
+                                        <el-icon><Refresh /></el-icon>
+                                        刷新当前记录
+                                    </el-dropdown-item>
+                                    <el-dropdown-item :disabled="IsPrinting" @click="PrintCurrentForm">
+                                        <fa-icon icon="fas fa-print" class="mr-1" />
+                                        {{ $t('Msg.PrintEngine.print') }}
+                                    </el-dropdown-item>
+                                    <el-dropdown-item v-if="!IsWorkflowReviewContext && FormMode != 'View'" :disabled="SaveDiyTableCommonLoding || BtnLoading" @click="SaveToDraftBox">
                                         <fa-icon icon="far fa-save" class="mr-1" />
                                         {{ $t('Msg.SaveToDraftBox') }}
                                     </el-dropdown-item>
-                                    <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
+                                    <el-dropdown-item v-if="!IsWorkflowReviewContext" :disabled="DraftListLoading" @click="OpenDraftDialog">
                                         <fa-icon icon="far fa-folder-open" class="mr-1" />
                                         {{ $t('Msg.LoadFromDraftBox') }}
                                     </el-dropdown-item>
-                                    <el-dropdown-item :disabled="BtnLoading" @click="TranslateBusinessData">
+                                    <el-dropdown-item v-if="!IsWorkflowReviewContext" :disabled="BtnLoading" @click="TranslateBusinessData">
                                         <fa-icon icon="fas fa-language" class="mr-1" />
                                         {{ $t('Msg.TranslateBusinessData') }}
                                     </el-dropdown-item>
                                 </el-dropdown-menu>
                             </template>
                         </el-dropdown>
+                        <div v-if="ShowWorkspaceRecordSelector" class="diy-form-record-selector">
+                            <el-select
+                                :model-value="TableRowId"
+                                filterable
+                                :loading="WorkspaceRecordSwitching"
+                                :placeholder="WorkspaceRecordSelectorPlaceholder"
+                                aria-label="搜索并切换记录"
+                                size="small"
+                                @change="SwitchWorkspaceRecord"
+                            >
+                                <el-option
+                                    v-for="record in WorkspaceRecordOptions"
+                                    :key="GetWorkspaceRecordId(record)"
+                                    :label="GetWorkspaceRecordLabel(record)"
+                                    :value="GetWorkspaceRecordId(record)"
+                                />
+                            </el-select>
+                            <span v-if="WorkspaceRecordCount !== null" class="diy-form-record-count">共 {{ WorkspaceRecordCount }} 条</span>
+                        </div>
+                        <div v-if="!UseViewSchemaDetail" class="diy-form-header-search">
+                            <el-input
+                                v-model.trim="FormFieldSearchKeyword"
+                                clearable
+                                :prefix-icon="Search"
+                                placeholder="搜索字段"
+                                aria-label="搜索当前表单字段"
+                                size="small"
+                            />
+                            <span v-if="FormFieldSearchKeyword" class="diy-form-field-search-count">{{ FormFieldSearchMatchCount }} 项</span>
+                        </div>
                         <el-button v-if="FormMode == 'View' && ShowUpdateBtn && !IsWorkflowReviewContext" size="small" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" @click="GotoEdit()">
                             {{ $t("Msg.Edit") }}
                         </el-button>
@@ -118,7 +200,7 @@
                                 </el-button>
                             </template>
                         </template>
-                        <el-button size="small" type="default" :icon="Back" @click="Go_1()">
+                        <el-button v-if="!IsEmbeddedMode" size="small" type="default" :icon="Back" @click="Go_1()">
                             {{ $t("Msg.Back") }}
                         </el-button>
                     </div>
@@ -135,28 +217,30 @@
                             :get-server-path="DiyCommon.GetServerPath"
                             @action="HandleViewAction"
                         />
-                        <div v-if="!UseViewSchemaDetail && !diyStore.IsPhoneView" class="diy-form-field-search-toolbar">
+                        <div v-if="!UseViewSchemaDetail && diyStore.IsPhoneView" class="diy-form-field-search-toolbar diy-form-field-search-toolbar--mobile">
                             <el-input
                                 v-model.trim="FormFieldSearchKeyword"
                                 clearable
                                 :prefix-icon="Search"
-                                placeholder="搜索字段名称、字段名或说明"
+                                placeholder="搜索字段"
                                 aria-label="搜索当前表单字段"
                             />
                             <span v-if="FormFieldSearchKeyword" class="diy-form-field-search-count">{{ FormFieldSearchMatchCount }} 项匹配</span>
-                            <el-button :icon="Refresh" :loading="FormRefreshing" @click="RefreshCurrentForm">刷新当前记录</el-button>
                         </div>
                         <DiyForm
                             v-if="TableId && TableRowId"
                             v-show="!UseViewSchemaDetail"
                             ref="fieldFormPage"
+                            :AutoInit="!IsEmbeddedMode"
                             :CodeEditorMini="UseMiniCodeEditor"
                             :FormMode="FormMode"
-                            :LoadMode="'Page'"
+                            :LoadMode="IsEmbeddedMode ? 'Workbench' : 'Page'"
                             :TableId="TableId"
                             :SysMenuId="SysMenuId"
                             :TableRowId="TableRowId"
                             :FieldSearchKeyword="FormFieldSearchKeyword"
+                            :PresentationMode="PresentationMode"
+                            :PresentationConfig="PresentationConfig"
                             @CallbackFormSubmit="CallbackFormSubmitPage"
                             @CallbackSetFormData="CallbackSetFormData"
                             @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
@@ -234,7 +318,7 @@
                         @click="TriggerWfSubmit()">
                         {{ WfTopSubmitBtnText }}
                     </el-button>
-                    <el-button v-else-if="FormMode != 'View' && !IsWorkflowReviewContext" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn" @click="SaveDiyTableCommonPage(true)">
+                    <el-button v-else-if="FormMode != 'View' && !IsWorkflowReviewContext" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn" @click="SaveDiyTableCommonPage(!IsEmbeddedMode)">
                         {{ $t('Msg.Save') }}
                     </el-button>
                     <el-button v-else-if="FormMode == 'View' && ShowUpdateBtn && !IsWorkflowReviewContext" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" class="mobile-form-bottom-btn" @click="GotoEdit()">
@@ -253,6 +337,14 @@
                             <div class="mobile-fab-menu-item" v-if="ShowFormRight()" @click="showMobileFabMenu = false; showMobileRightDrawer = true">
                                 <div class="mobile-fab-menu-icon info"><fa-icon icon="far fa-list-alt" /></div>
                                 <span class="mobile-fab-menu-label">{{ $t('Msg.WorkflowInfo') }}</span>
+                            </div>
+                            <div class="mobile-fab-menu-item" v-if="!UseViewSchemaDetail" @click="showMobileFabMenu = false; RefreshCurrentForm()">
+                                <div class="mobile-fab-menu-icon refresh"><el-icon><Refresh /></el-icon></div>
+                                <span class="mobile-fab-menu-label">刷新当前记录</span>
+                            </div>
+                            <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; PrintCurrentForm()">
+                                <div class="mobile-fab-menu-icon print"><fa-icon icon="fas fa-print" /></div>
+                                <span class="mobile-fab-menu-label">{{ $t('Msg.PrintEngine.print') }}</span>
                             </div>
                             <!--取消编辑-->
                             <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && !IsWorkflowReviewContext" @click="showMobileFabMenu = false; FormMode = 'View'">
@@ -290,7 +382,10 @@
         <el-dialog
             v-if="ShowFieldForm"
             class="diy-form-container diy-form-modern-dialog"
-            :class="{ 'diy-form-fixed-height': !!Height }"
+            :class="{
+                'diy-form-fixed-height': !!Height,
+                'diy-form-print-target': IsPrinting
+            }"
             draggable
             align-center
             :width="GetOpenFormWidth()"
@@ -311,15 +406,17 @@
         >
             <template #header>
                 <div class="diy-form-dialog-title">
-                    <span class="diy-form-dialog-title__eyebrow">
-                        {{ FormMode == 'View' ? 'VIEW RECORD' : (FormMode == 'Add' || FormMode == 'Insert' ? 'CREATE RECORD' : 'EDIT RECORD') }}
-                    </span>
-                    <div class="diy-form-dialog-title__heading">
-                        <fa-icon :class="GetOpenTitleIcon()" />
-                        <span>{{ GetOpenTitle() }}</span>
+                    <div class="diy-form-dialog-title__copy">
+                        <span class="diy-form-dialog-title__eyebrow">
+                            {{ FormMode == 'View' ? 'VIEW RECORD' : (FormMode == 'Add' || FormMode == 'Insert' ? 'CREATE RECORD' : 'EDIT RECORD') }}
+                        </span>
+                        <div class="diy-form-dialog-title__heading">
+                            <fa-icon :class="GetOpenTitleIcon()" />
+                            <span>{{ GetOpenTitle() }}</span>
+                        </div>
                     </div>
                 </div>
-                <div v-if="!diyStore.IsPhoneView" class="diy-form-dialog-actions">
+                <div v-if="!diyStore.IsPhoneView" class="diy-form-dialog-actions diy-form-toolbar">
                     <!-- 工作流：醒目的【发起流程/处理工作】按钮（Dialog模式顶部） -->
                     <el-button v-if="ShowWfTopSubmitBtn" size="small" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
                         {{ WfTopSubmitBtnText }}
@@ -392,26 +489,35 @@
                             </el-button>
                         </template>
                     </template>
-                    <el-dropdown v-if="!IsWorkflowReviewContext" trigger="click" size="small">
+                    <el-dropdown trigger="click" size="small">
                         <el-button size="small">
                             {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                         </el-button>
                         <template #dropdown>
                             <el-dropdown-menu class="form-submit-btns">
-                                <el-dropdown-item v-if="FormMode != 'View'" :disabled="BtnLoading" @click="SaveToDraftBox">
+                                <el-dropdown-item v-if="!UseViewSchemaDetail" :disabled="FormRefreshing" @click="RefreshCurrentForm">
+                                    <el-icon><Refresh /></el-icon>
+                                    刷新当前记录
+                                </el-dropdown-item>
+                                <el-dropdown-item :disabled="IsPrinting" @click="PrintCurrentForm">
+                                    <fa-icon icon="fas fa-print" class="mr-1" />
+                                    {{ $t('Msg.PrintEngine.print') }}
+                                </el-dropdown-item>
+                                <el-dropdown-item v-if="!IsWorkflowReviewContext && FormMode != 'View'" :disabled="BtnLoading" @click="SaveToDraftBox">
                                     <fa-icon icon="far fa-save" class="mr-1" />
                                     {{ $t('Msg.SaveToDraftBox') }}
                                 </el-dropdown-item>
-                                <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
+                                <el-dropdown-item v-if="!IsWorkflowReviewContext" :disabled="DraftListLoading" @click="OpenDraftDialog">
                                     <fa-icon icon="far fa-folder-open" class="mr-1" />
                                     {{ $t('Msg.LoadFromDraftBox') }}
                                 </el-dropdown-item>
-                                <el-dropdown-item :disabled="BtnLoading" @click="TranslateBusinessData">
+                                <el-dropdown-item v-if="!IsWorkflowReviewContext" :disabled="BtnLoading" @click="TranslateBusinessData">
                                     <fa-icon icon="fas fa-language" class="mr-1" />
                                     {{ $t('Msg.TranslateBusinessData') }}
                                 </el-dropdown-item>
                                 <el-dropdown-item
                                     v-if="
+                                        !IsWorkflowReviewContext &&
                                         LimitDel() &&
                                         TableChildFormMode !== 'View' &&
                                         FormMode != 'Add' &&
@@ -427,7 +533,7 @@
                                     >{{ $t("Msg.Delete") }}</el-dropdown-item
                                 >
                                 <el-dropdown-item
-                                    v-if="GetCurrentUser._IsAdmin"
+                                    v-if="!IsWorkflowReviewContext && GetCurrentUser._IsAdmin"
                                     :icon="View"
                                     @click="ShowHideField = !ShowHideField">
                                     {{ $t("Msg.ShowHideField") }}
@@ -435,6 +541,36 @@
                             </el-dropdown-menu>
                         </template>
                     </el-dropdown>
+                    <div v-if="ShowWorkspaceRecordSelector" class="diy-form-record-selector diy-form-record-selector--dialog">
+                        <el-select
+                            :model-value="TableRowId"
+                            filterable
+                            :loading="WorkspaceRecordSwitching"
+                            :placeholder="WorkspaceRecordSelectorPlaceholder"
+                            aria-label="搜索并切换记录"
+                            size="small"
+                            @change="SwitchWorkspaceRecord"
+                        >
+                            <el-option
+                                v-for="record in WorkspaceRecordOptions"
+                                :key="GetWorkspaceRecordId(record)"
+                                :label="GetWorkspaceRecordLabel(record)"
+                                :value="GetWorkspaceRecordId(record)"
+                            />
+                        </el-select>
+                        <span v-if="WorkspaceRecordCount !== null" class="diy-form-record-count">共 {{ WorkspaceRecordCount }} 条</span>
+                    </div>
+                    <div v-if="!UseViewSchemaDetail" class="diy-form-header-search">
+                        <el-input
+                            v-model.trim="FormFieldSearchKeyword"
+                            clearable
+                            :prefix-icon="Search"
+                            placeholder="搜索字段"
+                            aria-label="搜索当前表单字段"
+                            size="small"
+                        />
+                        <span v-if="FormFieldSearchKeyword" class="diy-form-field-search-count">{{ FormFieldSearchMatchCount }} 项</span>
+                    </div>
                     <el-button
                         v-if="UseViewSchemaDetail && ShowFormRight() && !diyStore.IsPhoneView"
                         size="small"
@@ -462,16 +598,15 @@
                         :get-server-path="DiyCommon.GetServerPath"
                         @action="HandleViewAction"
                     />
-                    <div v-if="!UseViewSchemaDetail && !diyStore.IsPhoneView" class="diy-form-field-search-toolbar">
+                    <div v-if="!UseViewSchemaDetail && diyStore.IsPhoneView" class="diy-form-field-search-toolbar diy-form-field-search-toolbar--mobile">
                         <el-input
                             v-model.trim="FormFieldSearchKeyword"
                             clearable
                             :prefix-icon="Search"
-                            placeholder="搜索字段名称、字段名或说明"
+                            placeholder="搜索字段"
                             aria-label="搜索当前表单字段"
                         />
                         <span v-if="FormFieldSearchKeyword" class="diy-form-field-search-count">{{ FormFieldSearchMatchCount }} 项匹配</span>
-                        <el-button :icon="Refresh" :loading="FormRefreshing" @click="RefreshCurrentForm">刷新当前记录</el-button>
                     </div>
                     <DiyForm
                         v-show="!UseViewSchemaDetail"
@@ -487,6 +622,8 @@
                         :TableName="TableName"
                         :TableRowId="TableRowId"
                         :FieldSearchKeyword="FormFieldSearchKeyword"
+                        :PresentationMode="PresentationMode"
+                        :PresentationConfig="PresentationConfig"
                         :DefaultValues="FieldFormDefaultValues"
                         :SelectFields="FieldFormSelectFields"
                         :FixedTabs="FieldFormFixedTabs"
@@ -513,7 +650,7 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowDesktopFormRight" :span="5" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 10px; padding-right: 10px">
+                <el-col v-if="ShowDesktopFormRight" :span="5" class="page-right-col diy-form-right-panel-col" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 10px; padding-right: 10px">
                     <FormRightPanel
                         ref="formRightPanel"
                         v-model="FormRightType"
@@ -588,8 +725,16 @@
                             <div class="mobile-fab-menu-icon info"><fa-icon icon="far fa-list-alt" /></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.WorkflowInfo') }}</span>
                         </div>
+                        <div class="mobile-fab-menu-item" v-if="!UseViewSchemaDetail" @click="showMobileFabMenu = false; RefreshCurrentForm()">
+                            <div class="mobile-fab-menu-icon refresh"><el-icon><Refresh /></el-icon></div>
+                            <span class="mobile-fab-menu-label">刷新当前记录</span>
+                        </div>
+                        <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; PrintCurrentForm()">
+                            <div class="mobile-fab-menu-icon print"><fa-icon icon="fas fa-print" /></div>
+                            <span class="mobile-fab-menu-label">{{ $t('Msg.PrintEngine.print') }}</span>
+                        </div>
                         <!--取消编辑-->
-                        <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; FormMode = 'View'">
+                        <div class="mobile-fab-menu-item" v-if="!IsWorkflowReviewContext && FormMode == 'Edit' && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; FormMode = 'View'">
                             <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
                         </div>
@@ -611,7 +756,7 @@
                             </template>
                         </template>
                         <!--删除-->
-                        <div class="mobile-fab-menu-item" v-if="LimitDel() && FormMode != 'Add' && ShowDeleteBtn && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')">
+                        <div class="mobile-fab-menu-item" v-if="!IsWorkflowReviewContext && LimitDel() && FormMode != 'Add' && ShowDeleteBtn && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; DelDiyTableRow(CurrentRowModel, 'ShowFieldForm')">
                             <div class="mobile-fab-menu-icon delete"><el-icon><Delete /></el-icon></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Delete') }}</span>
                         </div>
@@ -628,6 +773,7 @@
         <el-drawer
             v-if="ShowFieldFormDrawer"
             class="diy-form-container diy-form-modern-drawer"
+            :class="{ 'diy-form-print-target': IsPrinting }"
             :modal-class="GetModernOverlayClass()"
             :modal="true"
             :size="GetOpenFormWidth()"
@@ -646,15 +792,17 @@
         >
             <template #header>
                 <div class="diy-form-dialog-title">
-                    <span class="diy-form-dialog-title__eyebrow">
-                        {{ FormMode == 'View' ? 'VIEW RECORD' : (FormMode == 'Add' || FormMode == 'Insert' ? 'CREATE RECORD' : 'EDIT RECORD') }}
-                    </span>
-                    <div class="diy-form-dialog-title__heading">
-                        <fa-icon :class="GetOpenTitleIcon()" />
-                        <span>{{ GetOpenTitle() }}</span>
+                    <div class="diy-form-dialog-title__copy">
+                        <span class="diy-form-dialog-title__eyebrow">
+                            {{ FormMode == 'View' ? 'VIEW RECORD' : (FormMode == 'Add' || FormMode == 'Insert' ? 'CREATE RECORD' : 'EDIT RECORD') }}
+                        </span>
+                        <div class="diy-form-dialog-title__heading">
+                            <fa-icon :class="GetOpenTitleIcon()" />
+                            <span>{{ GetOpenTitle() }}</span>
+                        </div>
                     </div>
                 </div>
-                <div v-if="!diyStore.IsPhoneView" class="diy-form-dialog-actions diy-form-drawer-actions">
+                <div v-if="!diyStore.IsPhoneView" class="diy-form-dialog-actions diy-form-drawer-actions diy-form-toolbar">
                     <!-- 工作流：醒目的【发起流程/处理工作】按钮（Drawer模式顶部） -->
                     <el-button v-if="ShowWfTopSubmitBtn" size="small" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
                         {{ WfTopSubmitBtnText }}
@@ -738,26 +886,35 @@
                             </el-button>
                         </template>
                     </template>
-                    <el-dropdown v-if="!IsWorkflowReviewContext" trigger="click" size="small">
+                    <el-dropdown trigger="click" size="small">
                         <el-button size="small">
                             {{ $t("Msg.More") }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                         </el-button>
                         <template #dropdown>
                             <el-dropdown-menu class="form-submit-btns">
-                                <el-dropdown-item v-if="FormMode != 'View'" :disabled="BtnLoading" @click="SaveToDraftBox">
+                                <el-dropdown-item v-if="!UseViewSchemaDetail" :disabled="FormRefreshing" @click="RefreshCurrentForm">
+                                    <el-icon><Refresh /></el-icon>
+                                    刷新当前记录
+                                </el-dropdown-item>
+                                <el-dropdown-item :disabled="IsPrinting" @click="PrintCurrentForm">
+                                    <fa-icon icon="fas fa-print" class="mr-1" />
+                                    {{ $t('Msg.PrintEngine.print') }}
+                                </el-dropdown-item>
+                                <el-dropdown-item v-if="!IsWorkflowReviewContext && FormMode != 'View'" :disabled="BtnLoading" @click="SaveToDraftBox">
                                     <fa-icon icon="far fa-save" class="mr-1" />
                                     {{ $t('Msg.SaveToDraftBox') }}
                                 </el-dropdown-item>
-                                <el-dropdown-item :disabled="DraftListLoading" @click="OpenDraftDialog">
+                                <el-dropdown-item v-if="!IsWorkflowReviewContext" :disabled="DraftListLoading" @click="OpenDraftDialog">
                                     <fa-icon icon="far fa-folder-open" class="mr-1" />
                                     {{ $t('Msg.LoadFromDraftBox') }}
                                 </el-dropdown-item>
-                                <el-dropdown-item :disabled="BtnLoading" @click="TranslateBusinessData">
+                                <el-dropdown-item v-if="!IsWorkflowReviewContext" :disabled="BtnLoading" @click="TranslateBusinessData">
                                     <fa-icon icon="fas fa-language" class="mr-1" />
                                     {{ $t('Msg.TranslateBusinessData') }}
                                 </el-dropdown-item>
                                 <el-dropdown-item
                                     v-if="
+                                        !IsWorkflowReviewContext &&
                                         LimitDel() &&
                                         TableChildFormMode !== 'View' &&
                                         FormMode != 'Add' &&
@@ -773,7 +930,7 @@
                                     >{{ $t("Msg.Delete") }}</el-dropdown-item
                                 >
                                 <el-dropdown-item
-                                    v-if="GetCurrentUser._IsAdmin"
+                                    v-if="!IsWorkflowReviewContext && GetCurrentUser._IsAdmin"
                                     :icon="View"
                                     @click="ShowHideField = !ShowHideField">
                                     {{ $t("Msg.ShowHideField") }}
@@ -781,6 +938,36 @@
                             </el-dropdown-menu>
                         </template>
                     </el-dropdown>
+                    <div v-if="ShowWorkspaceRecordSelector" class="diy-form-record-selector diy-form-record-selector--dialog">
+                        <el-select
+                            :model-value="TableRowId"
+                            filterable
+                            :loading="WorkspaceRecordSwitching"
+                            :placeholder="WorkspaceRecordSelectorPlaceholder"
+                            aria-label="搜索并切换记录"
+                            size="small"
+                            @change="SwitchWorkspaceRecord"
+                        >
+                            <el-option
+                                v-for="record in WorkspaceRecordOptions"
+                                :key="GetWorkspaceRecordId(record)"
+                                :label="GetWorkspaceRecordLabel(record)"
+                                :value="GetWorkspaceRecordId(record)"
+                            />
+                        </el-select>
+                        <span v-if="WorkspaceRecordCount !== null" class="diy-form-record-count">共 {{ WorkspaceRecordCount }} 条</span>
+                    </div>
+                    <div v-if="!UseViewSchemaDetail" class="diy-form-header-search">
+                        <el-input
+                            v-model.trim="FormFieldSearchKeyword"
+                            clearable
+                            :prefix-icon="Search"
+                            placeholder="搜索字段"
+                            aria-label="搜索当前表单字段"
+                            size="small"
+                        />
+                        <span v-if="FormFieldSearchKeyword" class="diy-form-field-search-count">{{ FormFieldSearchMatchCount }} 项</span>
+                    </div>
                     <el-button
                         v-if="UseViewSchemaDetail && ShowFormRight() && !diyStore.IsPhoneView"
                         size="small"
@@ -809,16 +996,15 @@
                         :get-server-path="DiyCommon.GetServerPath"
                         @action="HandleViewAction"
                     />
-                    <div v-if="!UseViewSchemaDetail && !diyStore.IsPhoneView" class="diy-form-field-search-toolbar">
+                    <div v-if="!UseViewSchemaDetail && diyStore.IsPhoneView" class="diy-form-field-search-toolbar diy-form-field-search-toolbar--mobile">
                         <el-input
                             v-model.trim="FormFieldSearchKeyword"
                             clearable
                             :prefix-icon="Search"
-                            placeholder="搜索字段名称、字段名或说明"
+                            placeholder="搜索字段"
                             aria-label="搜索当前表单字段"
                         />
                         <span v-if="FormFieldSearchKeyword" class="diy-form-field-search-count">{{ FormFieldSearchMatchCount }} 项匹配</span>
-                        <el-button :icon="Refresh" :loading="FormRefreshing" @click="RefreshCurrentForm">刷新当前记录</el-button>
                     </div>
                     <DiyForm
                         v-show="!UseViewSchemaDetail"
@@ -834,6 +1020,8 @@
                         :TableName="TableName"
                         :TableRowId="TableRowId"
                         :FieldSearchKeyword="FormFieldSearchKeyword"
+                        :PresentationMode="PresentationMode"
+                        :PresentationConfig="PresentationConfig"
                         :DefaultValues="FieldFormDefaultValues"
                         :SelectFields="FieldFormSelectFields"
                         :FixedTabs="FieldFormFixedTabs"
@@ -860,7 +1048,7 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowDesktopFormRight" :span="5" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 10px; padding-right: 10px">
+                <el-col v-if="ShowDesktopFormRight" :span="5" class="page-right-col diy-form-right-panel-col" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 10px; padding-right: 10px">
                     <FormRightPanel
                         ref="formRightPanel"
                         v-model="FormRightType"
@@ -935,8 +1123,16 @@
                             <div class="mobile-fab-menu-icon info"><fa-icon icon="far fa-list-alt" /></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.WorkflowInfo') }}</span>
                         </div>
+                        <div class="mobile-fab-menu-item" v-if="!UseViewSchemaDetail" @click="showMobileFabMenu = false; RefreshCurrentForm()">
+                            <div class="mobile-fab-menu-icon refresh"><el-icon><Refresh /></el-icon></div>
+                            <span class="mobile-fab-menu-label">刷新当前记录</span>
+                        </div>
+                        <div class="mobile-fab-menu-item" @click="showMobileFabMenu = false; PrintCurrentForm()">
+                            <div class="mobile-fab-menu-icon print"><fa-icon icon="fas fa-print" /></div>
+                            <span class="mobile-fab-menu-label">{{ $t('Msg.PrintEngine.print') }}</span>
+                        </div>
                         <!--取消编辑-->
-                        <div class="mobile-fab-menu-item" v-if="FormMode == 'Edit' && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; FormMode = 'View'">
+                        <div class="mobile-fab-menu-item" v-if="!IsWorkflowReviewContext && FormMode == 'Edit' && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; FormMode = 'View'">
                             <div class="mobile-fab-menu-icon cancel"><el-icon><ArrowLeft /></el-icon></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Cancel') + $t('Msg.Edit') }}</span>
                         </div>
@@ -958,7 +1154,7 @@
                             </template>
                         </template>
                         <!--删除-->
-                        <div class="mobile-fab-menu-item" v-if="LimitDel() && FormMode != 'Add' && ShowDeleteBtn && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; DelDiyTableRow(CurrentRowModel, 'ShowFieldFormDrawer')">
+                        <div class="mobile-fab-menu-item" v-if="!IsWorkflowReviewContext && LimitDel() && FormMode != 'Add' && ShowDeleteBtn && !IsWorkflowSubmitMode" @click="showMobileFabMenu = false; DelDiyTableRow(CurrentRowModel, 'ShowFieldFormDrawer')">
                             <div class="mobile-fab-menu-icon delete"><el-icon><Delete /></el-icon></div>
                             <span class="mobile-fab-menu-label">{{ $t('Msg.Delete') }}</span>
                         </div>
@@ -1148,8 +1344,10 @@ import { Refresh, Search } from "@element-plus/icons-vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
 import _ from "underscore";
 import { isFormMaskBlurEnabled } from "@/utils/form-mask-blur.js";
+import { sanitizeHtml } from "@/utils/safe-html.js";
 import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode, runV8ButtonVisibilityCodeAsync } from "@/utils/v8-button-visibility";
 import { hasModuleDetailView } from "./form-view-blocks/view-schema-runtime";
+import { resolveFormPresentationConfig } from "./form-presentation-runtime.js";
 import {
     diyFormFullCleanupMixin,
     diyFormFullMobileMixin,
@@ -1200,6 +1398,46 @@ export default {
                 return [field.Label, field.Name, field.AsName, field.Description, field.Component]
                     .some((value) => String(value || "").toLowerCase().includes(keyword));
             }).length;
+        },
+        EffectiveRecordNavigator() {
+            const source = this.IsEmbeddedMode
+                ? (this.EmbeddedRecordNavigator || {})
+                : (this.RecordNavigatorContext || {});
+            return source && typeof source === "object" && !Array.isArray(source) ? source : {};
+        },
+        WorkspaceRecordOptions() {
+            const rows = Array.isArray(this.EffectiveRecordNavigator.Rows)
+                ? this.EffectiveRecordNavigator.Rows
+                : [];
+            const current = this.CurrentRowModel && this.CurrentRowModel.Id ? this.CurrentRowModel : null;
+            const seen = new Set();
+            return [current, ...rows].filter((record) => {
+                const id = this.GetWorkspaceRecordId(record);
+                if (!id || seen.has(id)) return false;
+                seen.add(id);
+                return true;
+            });
+        },
+        WorkspaceRecordCount() {
+            const value = this.EffectiveRecordNavigator.RowCount;
+            if (value === null || value === undefined || value === "") {
+                return this.WorkspaceRecordOptions.length ? this.WorkspaceRecordOptions.length : null;
+            }
+            const count = Number(value);
+            return Number.isFinite(count) ? count : null;
+        },
+        WorkspaceRecordSelectorPlaceholder() {
+            const presentation = this.GetFormPresentation();
+            return String(
+                this.EffectiveRecordNavigator.Placeholder
+                || presentation?.RecordSelector?.Placeholder
+                || "搜索并切换记录"
+            );
+        },
+        ShowWorkspaceRecordSelector() {
+            if (this.FormMode === "Add" || this.FormMode === "Insert" || this.IsWorkflowReviewContext) return false;
+            if (this.EffectiveRecordNavigator.Enabled === false) return false;
+            return this.WorkspaceRecordOptions.length > 0;
         }
     },
     setup() {
@@ -1217,6 +1455,20 @@ export default {
         };
     },
     props: {
+        // 模块记录工作台以内嵌形态复用完整表单容器时，标题文案与图标由宿主提供。
+        EmbeddedHeader: {
+            type: Object,
+            default() {
+                return {};
+            }
+        },
+        // 记录列表只由模块宿主按当前权限、筛选和分页结果传入；完整表单不另行绕过菜单权限查询。
+        EmbeddedRecordNavigator: {
+            type: Object,
+            default() {
+                return {};
+            }
+        },
         //子表的DiyTableId
         TableChildTableId: {
             type: String,
@@ -1282,6 +1534,168 @@ export default {
     //  3) ParentV8_Data 闭包持有
     //  4) Element Plus 子组件 ref（fieldForm、refWFHistory 等）
     methods: {
+        GetFormPresentation() {
+            return resolveFormPresentationConfig(this.CurrentDiyTableModel || {}, {}, "");
+        },
+        GetWorkspaceRecordId(record) {
+            return String(record?.Id || "").trim();
+        },
+        GetWorkspaceRecordLabel(record) {
+            if (!record) return "";
+            const presentation = this.GetFormPresentation();
+            const configured = this.EffectiveRecordNavigator.LabelFields
+                || presentation?.RecordSelector?.LabelFields;
+            const names = Array.isArray(configured) && configured.length
+                ? configured
+                : ["Name", "ApiName", "Title", "Label", "PeizhiMC", "SysTitle", "Key", "Account"];
+            for (const name of names) {
+                const field = (this.DiyFieldList || []).find((item) => item && (item.Name === name || item.AsName === name));
+                const candidates = [name, field?.AsName, field?.Name].filter(Boolean);
+                for (const candidate of candidates) {
+                    const value = record[candidate];
+                    if (value !== undefined && value !== null && String(value).trim()) return String(value);
+                }
+            }
+            const id = this.GetWorkspaceRecordId(record);
+            return id ? "记录 " + id.slice(0, 8) : "";
+        },
+        async SwitchWorkspaceRecord(recordId) {
+            const nextId = String(recordId || "").trim();
+            if (!nextId || nextId === String(this.TableRowId || "") || this.WorkspaceRecordSwitching) return;
+            const switchRecord = () => this.ApplyWorkspaceRecordSwitch(nextId);
+            if (this.FormMode !== "View" && this.CloseFormNeedConfirm) {
+                this.DiyCommon.OsConfirm("当前表单有未保存的修改，确认放弃修改并切换记录？", switchRecord);
+                return;
+            }
+            await switchRecord();
+        },
+        async ApplyWorkspaceRecordSwitch(recordId) {
+            this.WorkspaceRecordSwitching = true;
+            try {
+                this.CloseFormNeedConfirm = false;
+                this.FormFieldSearchKeyword = "";
+                this.TableRowId = recordId;
+                this.CurrentRowModel = {};
+                this.FormRelatedCounts = { DataLog: 0, DataComment: 0, DataVersion: 0 };
+
+                // 只有页面工作台让宿主同步 URL；Dialog/Drawer 必须保留底层表格和当前路由。
+                if (this.IsEmbeddedMode) {
+                    this.$emit("WorkspaceRecordChange", recordId);
+                    return;
+                }
+                const token = this._beginFieldFormOpen();
+                await this.$nextTick();
+                this._initFieldFormWhenReady({
+                    token,
+                    formMode: this.FormMode,
+                    dialogId: this.DialogType === "Drawer" ? "ShowFieldFormDrawer" : "ShowFieldForm",
+                    source: "WorkspaceRecordSwitch"
+                });
+                if (this.FormMode === "View") this.LoadFormRelatedCounts();
+            } finally {
+                this.WorkspaceRecordSwitching = false;
+            }
+        },
+        async PrintCurrentForm() {
+            if (this.IsPrinting) return;
+            if (typeof window === "undefined" || typeof document === "undefined" || typeof window.print !== "function") {
+                this.DiyCommon.Tips("当前浏览器不支持打印。", false);
+                return;
+            }
+
+            const activeForm = typeof this.GetActiveFieldForm === "function" ? this.GetActiveFieldForm() : null;
+            const previousSearchKeyword = this.FormFieldSearchKeyword;
+            const previousDocumentTitle = document.title;
+            const printSnapshot = activeForm && typeof activeForm.BeginPrintLayout === "function"
+                ? activeForm.BeginPrintLayout()
+                : null;
+            let printMedia = null;
+            let printMediaHandler = null;
+            const printAncestors = [];
+            let cleaned = false;
+
+            const cleanup = () => {
+                if (cleaned) return;
+                cleaned = true;
+                if (this._printFallbackTimer) {
+                    clearTimeout(this._printFallbackTimer);
+                    this._printFallbackTimer = null;
+                }
+                window.removeEventListener("afterprint", cleanup);
+                if (printMedia && printMediaHandler) {
+                    if (typeof printMedia.removeEventListener === "function") printMedia.removeEventListener("change", printMediaHandler);
+                    else if (typeof printMedia.removeListener === "function") printMedia.removeListener(printMediaHandler);
+                }
+                document.body.classList.remove("diy-form-print-mode");
+                printAncestors.forEach((element) => element.classList.remove("diy-form-print-ancestor"));
+                document.title = previousDocumentTitle;
+                this.FormFieldSearchKeyword = previousSearchKeyword;
+                this.IsPrinting = false;
+                if (activeForm && typeof activeForm.EndPrintLayout === "function") activeForm.EndPrintLayout(printSnapshot);
+                if (this._printCleanup === cleanup) this._printCleanup = null;
+            };
+
+            this._printCleanup = cleanup;
+            this.IsPrinting = true;
+            this.FormFieldSearchKeyword = "";
+            document.body.classList.add("diy-form-print-mode");
+            document.title = String((this.IsPageMode ? this.GetOpenTitlePage() : this.GetOpenTitle()) || previousDocumentTitle || "Microi");
+
+            try {
+                await this.$nextTick();
+                const printTarget = document.querySelector(".diy-form-print-target");
+                if (!printTarget) throw new Error("未找到当前表单的打印区域");
+                let printAncestor = printTarget.parentElement;
+                while (printAncestor && printAncestor !== document.body) {
+                    printAncestor.classList.add("diy-form-print-ancestor");
+                    printAncestors.push(printAncestor);
+                    printAncestor = printAncestor.parentElement;
+                }
+                await new Promise((resolve) => {
+                    const schedule = typeof window.requestAnimationFrame === "function"
+                        ? window.requestAnimationFrame.bind(window)
+                        : (callback) => window.setTimeout(callback, 16);
+                    schedule(() => schedule(resolve));
+                });
+                window.addEventListener("afterprint", cleanup, { once: true });
+                if (typeof window.matchMedia === "function") {
+                    printMedia = window.matchMedia("print");
+                    printMediaHandler = (event) => {
+                        if (!event.matches) cleanup();
+                    };
+                    if (typeof printMedia.addEventListener === "function") printMedia.addEventListener("change", printMediaHandler);
+                    else if (typeof printMedia.addListener === "function") printMedia.addListener(printMediaHandler);
+                }
+                // afterprint 是主清理信号；超时仅兜底极少数不派发该事件的内嵌浏览器。
+                this._printFallbackTimer = window.setTimeout(cleanup, 120000);
+                window.print();
+            } catch (error) {
+                cleanup();
+                this.DiyCommon.Tips("无法打开打印预览：" + (error && error.message ? error.message : error), false);
+            }
+        },
+        GetWorkspaceEyebrow() {
+            if (!this.IsEmbeddedMode) return "FORM WORKSPACE";
+            const presentation = this.GetFormPresentation();
+            return String(presentation.WorkbenchEyebrow || this.EmbeddedHeader?.Eyebrow || "FORM WORKBENCH");
+        },
+        GetWorkspaceTitle() {
+            if (!this.IsEmbeddedMode) return this.GetOpenTitlePage();
+            const rowTitle = this.GetWorkspaceRecordLabel(this.CurrentRowModel || {});
+            return String(rowTitle || this.EmbeddedHeader?.Title || this.GetOpenTitlePage() || "当前记录");
+        },
+        GetWorkspaceDescription() {
+            if (!this.IsEmbeddedMode) return "";
+            const presentation = this.GetFormPresentation();
+            return String(presentation.WorkbenchDescription || this.EmbeddedHeader?.Description || "");
+        },
+        GetWorkspaceDescriptionHtml() {
+            return sanitizeHtml(this.GetWorkspaceDescription());
+        },
+        GetWorkspaceTitleIcon() {
+            if (!this.IsEmbeddedMode) return this.GetOpenTitleIcon();
+            return String(this.EmbeddedHeader?.Icon || this.SysMenuModel?.Icon || "fas fa-sliders-h");
+        },
         async RefreshCurrentForm() {
             const formRef = this.$refs.fieldFormPage || this.$refs.fieldForm;
             if (!formRef || typeof formRef.Init !== "function" || this.FormRefreshing) return;
@@ -1465,6 +1879,8 @@ export default {
          */
         Init(param) {
             var self = this;
+            self._formFullInitRequestToken = (self._formFullInitRequestToken || 0) + 1;
+            var initRequestToken = self._formFullInitRequestToken;
 
             // 每次打开一条新记录都从完整字段视图开始，避免沿用上一条记录的筛选状态。
             self.FormFieldSearchKeyword = "";
@@ -1478,6 +1894,19 @@ export default {
             self.DialogType = param.DialogType;
             self.SysMenuId = param.SysMenuId;
             self.TableChildAuth = param.TableChildAuth || null;
+            self.PresentationMode = param.PresentationMode || "";
+            self.PresentationConfig = param.PresentationConfig || {};
+            self.RecordNavigatorContext = param.RecordNavigator
+                || (self.DialogType === "Embedded" ? self.EmbeddedRecordNavigator : {})
+                || {};
+            self.DiyTableRowList = Array.isArray(self.RecordNavigatorContext.Rows)
+                ? self.RecordNavigatorContext.Rows
+                : [];
+            if (self.DialogType === "Embedded") {
+                self.CurrentRowModel = {};
+                self.CallbackSetFormDataFinish = false;
+                self.CallbackSetDiyTableModelFinish = false;
+            }
 
             // 工作流上下文必须在抽屉/弹窗首次渲染前就可用，否则普通保存、
             // 取消编辑和更多按钮会在 InitWorkFlow 异步完成前短暂闪现。
@@ -1522,9 +1951,9 @@ export default {
             var wfParam = param.WFParam;
 
             self.$nextTick(async function () {
-                if (self._isDestroyed) { return; }
+                if (self._isDestroyed || initRequestToken !== self._formFullInitRequestToken) { return; }
                 await self.EnsureSysMenuModel();
-                if (self._isDestroyed) { return; }
+                if (self._isDestroyed || initRequestToken !== self._formFullInitRequestToken) { return; }
                 self.OpenDetail(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
             });
         },
@@ -1571,6 +2000,22 @@ export default {
             // 工作流模式不支持Page路由跳转（路由无法传递工作流参数），强制使用Drawer
             if (dialogType == "Page" && isOpenWorkFlowForm) {
                 dialogType = "Drawer";
+            }
+
+            // 记录工作台直接复用本组件的 Page 表单与完整按钮/权限/事件链，
+            // 但不进行路由跳转，也不创建 Dialog/Drawer 外壳。
+            if (dialogType == "Embedded") {
+                self.ShowFieldForm = false;
+                self.ShowFieldFormDrawer = false;
+                var embeddedOpenToken = self._beginFieldFormOpen();
+                self._initFieldFormWhenReady({
+                    token: embeddedOpenToken,
+                    formMode: formMode,
+                    isOpenWorkFlowForm: isOpenWorkFlowForm,
+                    wfParam: wfParam,
+                    source: "Embedded"
+                });
+                return;
             }
 
             // 全新页面模式：通过路由跳转
@@ -2027,6 +2472,7 @@ export default {
             var self = this;
             self.CurrentRowModel = formData;
             self.CallbackSetFormDataFinish = true;
+            self.$emit("CallbackSetFormData", formData || {});
 
             self.EnsureSysMenuModel().then(async function () {
                 await self.HandlerBtnsAsync(self.SysMenuModel.FormBtns, self.CurrentRowModel, {});

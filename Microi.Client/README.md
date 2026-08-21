@@ -80,6 +80,21 @@ Microi.Client/
 http://localhost:1988/?OsClient=iTdos
 ```
 
+## 生产构建与浏览器范围
+
+```shell
+# 默认：仅生成现代浏览器产物
+npm run build
+
+# 仅在明确需要兼容 Chrome 49 的客户环境中使用
+npm run build:legacy
+```
+
+- 现代版目标为 Chrome / Edge 107+、Firefox 104+、Safari 16+，产物输出到 `bin/Release/dist/`。
+- `build:legacy` 会在现代版之后额外执行独立的 Chrome 49 转换、polyfill 与校验阶段，明显增加构建时间和产物体积；默认构建不会再生成 `static/js-legacy/`。
+- Chrome 49 包属于存量客户的尽力兼容层。Vue 3、Element Plus 等当前依赖已不再官方支持 Chrome 49，交付前仍须在客户真实旧浏览器上验证其实际使用功能。
+- 一键发布脚本同样默认仅构建现代版。无人值守任务只有显式设置 `MICROI_BUILD_CHROME49_LEGACY=true` 才会附带 legacy 产物。
+
 ## 定制组件目录
 >* [/src/views/custom/]为所有客户的定制组件，理论上不用上传到仓库，用户可主动删除里面的所有文件。
 

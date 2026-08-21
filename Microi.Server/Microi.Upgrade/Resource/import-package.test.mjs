@@ -78,7 +78,7 @@ function extractNamedFunction(sourceText, name) {
   assert.fail(`unterminated function ${name}`);
 }
 
-test("managed API-engine conflict decisions preserve only newer trusted platform resources", () => {
+test("trusted official Platform Managed resources overwrite while ordinary packages keep three-way protection", () => {
   const fixture = { String };
   vm.runInNewContext(`
     ${extractNamedFunction(source, "compareApiEngineVersion")}
@@ -88,6 +88,9 @@ test("managed API-engine conflict decisions preserve only newer trusted platform
   `, fixture);
 
   const decide = fixture.result;
+  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 6], [1, 7, 4], [], true), "ApplyOfficialManagedOverwrite");
+  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 4], [1, 7, 4], [], true), "ApplyOfficialManagedOverwrite");
+  assert.equal(decide("Application", "base", "local", "incoming", [1, 7, 6], [1, 7, 4], [], true), "Conflict");
   assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 6], [1, 7, 4]), "PreserveNewer");
   assert.equal(decide("Application", "base", "local", "incoming", [1, 7, 6], [1, 7, 4]), "Conflict");
   assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 4], [1, 7, 4]), "Conflict");
@@ -454,6 +457,9 @@ function runDataSetImportFixture(options = {}) {
     TableName: "diy_schedule_job",
     ConflictPolicy: options.conflictPolicy || "InsertIfMissing",
     ConflictFields: options.conflictFields || ["JobName"],
+    ...(options.metadataFieldsIfExists
+      ? { MetadataFieldsIfExists: options.metadataFieldsIfExists }
+      : {}),
     Rows: [row],
   };
   const fixtureContext = {
@@ -799,6 +805,34 @@ test("InsertIfMissing treats a concurrent deterministic-Id insert as idempotent 
   assert.equal(result.stats.DataSkipped, 1);
 });
 
+test("InsertIfMissing may refresh only explicit display metadata without overwriting tenant values", () => {
+  const result = runDataSetImportFixture({
+    row: {
+      Category: "安全与服务接入",
+      Description: "租户自有安全配置",
+      JobParam: "tenant-value-must-not-change",
+    },
+    metadataFieldsIfExists: ["Category", "Description"],
+    idResults: [{ Code: 1, Data: { Id: "existing-id" } }],
+  });
+  assert.equal(result.calls.add.length, 0);
+  assert.deepEqual(result.calls.update, [{
+    Id: "existing-id",
+    OsClient: "target-tenant",
+    Category: "安全与服务接入",
+    Description: "租户自有安全配置",
+  }]);
+  assert.equal(result.stats.DataUpdated, 1);
+  assert.equal(result.stats.DataSkipped, 0);
+});
+
+test("metadata-only dataset updates reject value and secret fields", () => {
+  assert.throws(() => runDataSetImportFixture({
+    metadataFieldsIfExists: ["ConfigValue"],
+    idResults: [{ Code: 1, Data: { Id: "existing-id" } }],
+  }), /仅允许 Category、Description、Sort/);
+});
+
 test("self-contained offline applications prefer embedded files over public ZIP URLs", () => {
   assert.match(source, /embeddedSourceFiles[\s\S]*?embeddedSourceFiles\.length[\s\S]*?downloadApplicationZip\(packageAssets\.SourceZip/);
   assert.match(source, /embeddedBuildAssets[\s\S]*?embeddedBuildAssets\.length[\s\S]*?downloadApplicationZip\(packageAssets\.BuildZip/);
@@ -1094,7 +1128,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(source, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(source, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
   assert.match(source, /TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1/);
-  assert.match(source, /PLATFORM_API_ENGINE_PRESERVE_NEWER_V1/);
+  assert.match(source, /OFFICIAL_MANAGED_OVERWRITE_V1/);
+  assert.match(source, /ApplyOfficialManagedOverwrite/);
+  assert.match(source, /trustedOfficialPlatformPackage[\s\S]*?apiEnginePolicy\.Ownership/);
   assert.match(source, /ADMIN_MENU_PERMISSION_V1/);
   assert.match(source, /ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/);
   assert.match(source, /ADMIN_MENU_PERMISSION_DB_TIME_V1/);
@@ -1205,7 +1241,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);
   assert.match(refreshSource, /OBJECT_STORAGE_FORBIDDEN/);
-  assert.match(refreshSource, /PLATFORM_API_ENGINE_PRESERVE_NEWER_V1/);
+  assert.match(refreshSource, /OFFICIAL_MANAGED_OVERWRITE_V1/);
   assert.match(refreshSource, /OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1/);
   assert.match(refreshSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(refreshSource, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);

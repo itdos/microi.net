@@ -187,6 +187,11 @@ test("menu, dialog and component hosts pass authenticated permission context wit
         assert.match(source, /OpenAppDialog\(param\)[\s\S]*?PermissionContext:\s*\{/);
         assert.match(source, /PermissionContext:[\s\S]*?sysMenuId:[\s\S]*?moduleEngineKey:[\s\S]*?diyTableId:/);
     }
+
+    const host = read("src/views/micro-app/host.vue");
+    const dialog = read("src/views/micro-app/dialog.vue");
+    assert.match(host, /config\.version\s*&&\s*runtime\.VersionedEntryUrl/);
+    assert.match(dialog, /requestedVersion\s*&&\s*runtime\.VersionedEntryUrl/);
 });
 
 test("managed menu routes can use the stable entry only for safe compatibility failures", async () => {

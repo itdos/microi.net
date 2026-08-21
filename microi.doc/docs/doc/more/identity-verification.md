@@ -56,6 +56,8 @@ Passkey、TOTP 和严格人脸只回答“当前用户是否完成了足够强�
 
 未绑定的外部身份不会自动创建吾码用户，也不会按邮箱或昵称猜测账号归属。Provider 的授权、换 Token 和用户信息端点固定在后端白名单中，租户只能配置开关、名称、说明、Scope、ClientId 与 ClientSecret，不能把 OAuth code 或 Secret 改送到任意地址。
 
+本节的 Gitee、微信和 GitHub 是平台内置、端点固定的个人外部身份登录。企业自建身份中心、Keycloak/ADFS/Entra ID、双向 OIDC、SAML2 或 CAS 不在这里配置，请使用 [SSO 身份联邦](./sso)。
+
 ### 4. 修改密码
 
 个人中心先按 `用户Id + 编码后的新密码` 计算操作摘要，再按用户选择完成 Passkey、Authenticator 或严格人脸验证。后端重新计算同一摘要并原子消费票据；票据与当前租户、用户、用途和摘要任一项不符都会拒绝。

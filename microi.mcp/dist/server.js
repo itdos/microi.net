@@ -2278,7 +2278,7 @@ BOUNDARY RULES:
 - **microi_get_table_data / microi_add_form_data / microi_update_form_data** — 维护租户业务表数据（如商品、示例数据、配置项）时使用，写入后必须回读验证关键字段
 - **sys_user.DefaultIndexUrl** — 当前用户登录后的首选站内路由，支持 /route、#/route、/#/route；留空时回退系统默认首页。客户端只采用存在且当前用户有权限的内部路由
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
-- **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；如 sys_apiengine 存在 Version/ChangeHistory 字段则同步写入；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
+- **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；同步写入 Version，并将本次说明追加到接口引擎修改历史子表（旧库由后端兼容旧 ChangeHistory 字段）；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
@@ -3742,9 +3742,11 @@ export function createMcpServer(client, context) {
                 '|---|-----------|------|----------|--------------|-------------|',
             ];
             engines.forEach((e, i) => {
-                const v8Limit = e.V8Limit !== undefined
+                const v8Limit = e.V8Limit !== undefined && e.V8Limit !== null
                     ? Number(e.V8Limit || 0)
-                    : (Number(e.V8Unlimited || 0) === 1 ? 0 : 1);
+                    : e.V8Unlimited !== undefined && e.V8Unlimited !== null
+                        ? (Number(e.V8Unlimited || 0) === 1 ? 0 : 1)
+                        : 0;
                 lines.push(`| ${i + 1} | ${e.ApiEngineKey || ''} | ${e.ApiName || ''} | ${e.Category || ''} | ${v8Limit === 1 ? 'ON' : 'OFF'} | ${e.ApiRemark || e.Description || ''} |`);
             });
             return { content: [{ type: 'text', text: lines.join('\n') }] };
@@ -3780,7 +3782,11 @@ export function createMcpServer(client, context) {
                 engine?.Category ? `- **Category**: ${engine.Category}` : '',
                 engine?.ApiAddress ? `- **Address**: ${engine.ApiAddress}` : '',
                 engine?.ApiRemark ? `- **Remark**: ${engine.ApiRemark}` : '',
-                `- **V8Limit**: ${engine?.V8Limit !== undefined ? Number(engine.V8Limit || 0) === 1 : Number(engine?.V8Unlimited || 0) !== 1}`,
+                `- **V8Limit**: ${engine?.V8Limit !== undefined && engine?.V8Limit !== null
+                    ? Number(engine.V8Limit || 0) === 1
+                    : engine?.V8Unlimited !== undefined && engine?.V8Unlimited !== null
+                        ? Number(engine.V8Unlimited || 0) !== 1
+                        : false}`,
                 `- **Source completeness**: ${hasMore || start > 0 ? 'PARTIAL CHUNK — do not save this chunk alone' : 'COMPLETE'}`,
                 `- **Character range**: [${start}, ${end}) of ${code.length}`,
                 `- **Full source SHA-256**: ${sha256}`,
@@ -3951,11 +3957,11 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 保存接口引擎代码
     // ========================
-    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Optional v8Limit uses positive semantics: false/default means no Jint per-execution budget, true enables the configured timeout/statement/recursion/allocation limits. The value is verified by remote readback. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`, {
+    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, appends the change summary to the API-engine history TableChild (the server falls back to legacy ChangeHistory on old databases), and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Optional v8Limit uses positive semantics: false/default means no Jint per-execution budget, true enables the configured timeout/statement/recursion/allocation limits. The value is verified by remote readback. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`, {
         apiEngineKey: z.string().describe('The unique key of the API engine'),
         code: z.string().describe('The complete JavaScript source code to save'),
         functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
-        changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
+        changeSummary: z.string().optional().describe('One-line change summary appended to the API-engine history TableChild; old databases use the server-side legacy fallback.'),
         v8Limit: z.boolean().optional().describe('Positive switch. false/default means unrestricted Jint execution budgets; true applies this engine\'s configured timeout/statement/recursion/allocation limits. Omit to preserve the current value.'),
         v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
         confirmLargeReduction: z.string().optional().describe('Required only when replacing source >=8000 chars with code shorter by more than 15%. Use apiEngineKey or EXECUTE.'),
@@ -3990,7 +3996,7 @@ export function createMcpServer(client, context) {
         category: z.string().optional().describe('Category to organize engines'),
         code: z.string().optional().describe('Initial JavaScript code for the engine'),
         functionDescription: z.string().optional().describe('Complete function description to keep in the initial code header. No change history here.'),
-        changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
+        changeSummary: z.string().optional().describe('One-line change summary appended to the API-engine history TableChild; old databases use the server-side legacy fallback.'),
         apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
         v8Limit: z.boolean().optional().describe('Default false. false means no Jint per-execution budget; true applies the configured runtime limits. Process resident-memory guard always remains active.'),
         v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
@@ -4238,7 +4244,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 创建自定义表（低代码系统设计）
     // ========================
-    server.tool('microi_create_table', `Create or reconcile a custom table for OsClient "${osClient}". Inserts a record into diy_table. IDEMPOTENT — calling again with the same name reuses the existing TableId; an explicitly supplied v8Unlimited value is reconciled and read back by system validation. This is step 2 of system design.`, {
+    server.tool('microi_create_table', `Create or reconcile a custom table for OsClient "${osClient}". Inserts a record into diy_table. IDEMPOTENT — calling again with the same name reuses the existing TableId; an explicitly supplied v8Limit value is reconciled and read back by system validation. This is step 2 of system design.`, {
         name: z.string().describe('Table name in English (e.g. "Crm_Customer", "Order_Main"). Convention: Module_Entity format. Will be a real MySQL table.'),
         description: z.string().optional().describe('Chinese description of the table (e.g. "客户信息", "订单主表")'),
         tabs: z.string().optional().describe('Form tab layout JSON (e.g. \'[{"Id":"basic","Name":"基本信息","Sort":10},{"Id":"business","Name":"业务信息","Sort":20}]\'). Groups fields into diy_table.Tabs. When using microi_generate_system, many-field tables can be auto-tabbed.'),
@@ -4246,13 +4252,15 @@ export function createMcpServer(client, context) {
         column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 2 (双列，更紧凑现代)'),
         formOpenType: z.string().optional().describe('How to open form: "Dialog" (弹窗), "Drawer" (抽屉), "Page" (新页面). Default: Dialog'),
         formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "80%"). Default: 80%'),
-        v8Unlimited: z.boolean().optional().describe('Default false for new tables; omit to preserve an existing table. true removes Jint per-execution budgets only for this table\'s backend V8 events while retaining the process resident-memory guard.'),
-    }, async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth, v8Unlimited }) => {
+        v8Limit: z.boolean().optional().describe('Default false for new tables; omit to preserve an existing table. true enables Jint per-execution timeout, statement, recursion and allocation budgets for this table\'s backend V8 events.'),
+        v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
+    }, async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth, v8Limit, v8Unlimited }) => {
         try {
+            const requestedV8Limit = v8Limit ?? (v8Unlimited === undefined ? undefined : !v8Unlimited);
             const result = await client.createTable(name, description, {
                 Tabs: tabs, IsTree: isTree, Column: column ?? 2,
                 FormOpenType: formOpenType || 'Dialog', FormOpenWidth: formOpenWidth || '80%',
-                V8Unlimited: v8Unlimited === undefined ? undefined : (v8Unlimited ? 1 : 0),
+                V8Limit: requestedV8Limit === undefined ? undefined : (requestedV8Limit ? 1 : 0),
             });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -5091,7 +5099,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 修改 diy_table 属性（如表单列数 Column）
     // ========================
-    server.tool('microi_update_table', `Update a diy_table record for OsClient "${osClient}" (for example form layout, V8Unlimited, data log/comment/version switches, Description or IsTree). Only provided fields are patched. Automatically clears diy_table + diy_table_field_list Redis caches.`, {
+    server.tool('microi_update_table', `Update a diy_table record for OsClient "${osClient}" (for example form layout, V8Limit, data log/comment/version switches, Description or IsTree). Only provided fields are patched. Automatically clears diy_table + diy_table_field_list Redis caches.`, {
         id: z.string().optional().describe('TableId (preferred locator)'),
         name: z.string().optional().describe('Table Name (alternative locator)'),
         column: z.number().optional().describe('Form columns: 1, 2 or 3'),
@@ -5103,7 +5111,8 @@ export function createMcpServer(client, context) {
         enableDataLog: z.number().optional().describe('1 enables per-row data change logs; 0 disables.'),
         enableDataComment: z.number().optional().describe('1 enables per-row comments; 0 disables.'),
         enableDataVersion: z.number().optional().describe('1 enables data versions; 0 disables.'),
-        v8Unlimited: z.boolean().optional().describe('Explicit high-risk switch for this table\'s backend V8 events. Omit to preserve; false writes 0 and true writes 1.'),
+        v8Limit: z.boolean().optional().describe('Positive runtime switch for this table\'s backend V8 events. Omit to preserve; false writes 0 (no Jint per-execution budgets) and true writes 1 (enable limits).'),
+        v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
     }, async (args) => {
         try {
             const patch = {};
@@ -5129,8 +5138,9 @@ export function createMcpServer(client, context) {
                 patch.EnableDataComment = args.enableDataComment === 1 ? 1 : 0;
             if (args.enableDataVersion !== undefined)
                 patch.EnableDataVersion = args.enableDataVersion === 1 ? 1 : 0;
-            if (args.v8Unlimited !== undefined)
-                patch.V8Unlimited = args.v8Unlimited ? 1 : 0;
+            const requestedV8Limit = args.v8Limit ?? (args.v8Unlimited === undefined ? undefined : !args.v8Unlimited);
+            if (requestedV8Limit !== undefined)
+                patch.V8Limit = requestedV8Limit ? 1 : 0;
             const result = await client.updateTable(patch);
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -5528,7 +5538,7 @@ export function createMcpServer(client, context) {
         moreBtns: z.string().optional().describe('Row action buttons JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,BtnStyle,IsVisible,ShowRow:true,V8CodeShow,V8Code,RunBackground,BackgroundTask,IsBackgroundTask,ApiEngineKey}. V8Code typically calls V8.ApiEngine.Run(...). Long tasks such as install/import/init should set RunBackground=true and ApiEngineKey so the frontend starts a background task. Example: \'[{"Id":"01K...","Name":"指派","BtnStyle":"primary","IsVisible":true,"ShowRow":true,"V8CodeShow":"V8.Result=V8.Form.Status==\\"待指派\\";","V8Code":"V8.OpenAnyForm({TableName:\\"Diy_X\\",Id:V8.Form.Id,FormMode:\\"Edit\\",SelectFields:[\\"AssigneeId\\"],EventReplace:{Submit:async function(v8,p,cb){var r=await V8.ApiEngine.Run({ApiEngineKey:\\"x_assign\\",Id:v8.Form.Id,AssigneeId:v8.Form.AssigneeId});cb(r);V8.RefreshTable({_PageIndex:1});}}});"}]\''),
         formBtns: z.string().optional().describe('Form bottom buttons JSON ARRAY (string). Same item shape as moreBtns but ShowRow not required. Buttons may configure BadgeEnabled, BadgeApiEngineKey, BadgeValuePath, BadgeTone, BadgeMax, BadgeShowZero and BadgeRefreshSeconds.'),
         batchSelectMoreBtns: z.string().optional().describe('Batch action buttons JSON ARRAY (string). Same item and optional Badge* fields as moreBtns. Use V8.TableRowSelected to access selected rows; badge APIs must batch current-page Ids instead of calling once per row.'),
-        pageTabs: z.string().optional().describe('Page top tabs JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,V8Code,V8CodeShow,TargetSysMenuId}. TargetSysMenuId associates another module; clicking it replaces the current route and reloads that module. V8Code typically calls V8.SearchSet({field:value}) for tabs within the current module.'),
+        pageTabs: z.string().optional().describe('Page top tabs JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,V8Code,V8CodeShow,TargetSysMenuId}. TargetSysMenuId loads another module inside the stable entry diy-table host; the route, breadcrumb, access tab, host Hero and entry PageTabs stay unchanged while only the Tab query changes. Keep PageTabs only on the entry module; hidden targets use ParentId=entry module and PageTabs=[]. V8Code typically calls V8.SearchSet({field:value}) for tabs within the current module.'),
         exportMoreBtns: z.string().optional().describe('Export menu extra buttons JSON ARRAY (string). Supports the same optional Badge* fields as formBtns.'),
         pageBtns: z.string().optional().describe('Page-level top buttons JSON ARRAY (string). Supports the same optional Badge* fields; page counts normally come from Data.Buttons.'),
         sortFieldIds: z.string().optional().describe('Comma-separated field Ids that user can sort by. JSON array string also accepted.'),

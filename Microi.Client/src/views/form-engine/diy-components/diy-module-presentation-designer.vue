@@ -179,102 +179,6 @@
                 </section>
             </el-tab-pane>
 
-            <el-tab-pane label="表单工作台" name="form-workbench" lazy>
-                <section class="designer-card">
-                    <div class="card-head">
-                        <div>
-                            <div class="card-title">通用控制中心式表单工作台</div>
-                            <div class="form-tip">启用后，模块列表显示记录选择器和真实 DiyForm；控制中心会直接复用表单 Tabs 作为分组导航，经典表单、字段权限、校验、表单事件及各作用域 V8 按钮均保留。</div>
-                        </div>
-                        <div class="toggle-field"><span>启用工作台</span><el-switch v-model="formWorkbenchEnabled" :disabled="readonly" /></div>
-                    </div>
-                    <el-alert
-                        class="designer-alert"
-                        type="info"
-                        show-icon
-                        :closable="false"
-                        title="适合系统参数、租户配置、主数据档案等少量记录的集中维护"
-                        description="大量交易数据仍建议使用经典表格或移动端卡片；工作台记录选择器只加载当前分页，可通过上一页/下一页切换。"
-                    />
-                    <div class="workbench-config-grid" :class="{ disabled: !formWorkbenchEnabled }">
-                        <label class="compact-field">
-                            <span>表单视觉</span>
-                            <el-select v-model="listView.Layout.Form.Presentation" :disabled="readonly || !formWorkbenchEnabled">
-                                <el-option label="控制中心（推荐）" value="ControlCenter" />
-                                <el-option label="控制中心（兼容旧配置）" value="SettingsCenter" />
-                                <el-option label="经典表单" value="Standard" />
-                            </el-select>
-                        </label>
-                        <label class="compact-field">
-                            <span>内容密度</span>
-                            <el-select v-model="listView.Layout.Form.Density" :disabled="readonly || !formWorkbenchEnabled">
-                                <el-option label="紧凑" value="Compact" />
-                                <el-option label="舒适" value="Comfortable" />
-                            </el-select>
-                        </label>
-                        <label class="compact-field">
-                            <span>分组导航</span>
-                            <el-select v-model="listView.Layout.Form.SectionNavigation" :disabled="readonly || !formWorkbenchEnabled">
-                                <el-option label="自动（桌面侧栏、移动横排）" value="Auto" />
-                                <el-option label="侧栏 / 移动横排" value="Sidebar" />
-                                <el-option label="顶部 Tabs" value="Tabs" />
-                            </el-select>
-                        </label>
-                        <label class="compact-field">
-                            <span>导航方向</span>
-                            <el-select v-model="listView.Layout.Form.SectionNavigationPosition" :disabled="readonly || !formWorkbenchEnabled || listView.Layout.Form.SectionNavigation === 'Tabs'">
-                                <el-option label="左侧" value="Left" />
-                                <el-option label="顶部" value="Top" />
-                                <el-option label="右侧" value="Right" />
-                                <el-option label="底部" value="Bottom" />
-                            </el-select>
-                        </label>
-                        <label class="compact-field">
-                            <span>默认模式</span>
-                            <el-select v-model="listView.Layout.Form.Mode" :disabled="readonly || !formWorkbenchEnabled">
-                                <el-option label="可编辑" value="Edit" />
-                                <el-option label="只读查看" value="View" />
-                            </el-select>
-                        </label>
-                        <label class="compact-field">
-                            <span>记录选择器</span>
-                            <el-select v-model="listView.Layout.Form.RecordSelector.Display" :disabled="readonly || !formWorkbenchEnabled">
-                                <el-option label="下拉框 + 左侧列表" value="Both" />
-                                <el-option label="仅下拉框" value="Dropdown" />
-                                <el-option label="仅左侧列表" value="List" />
-                            </el-select>
-                        </label>
-                        <label class="compact-field">
-                            <span>记录标题字段</span>
-                            <el-select v-model="listView.Layout.Form.RecordSelector.LabelFields" multiple filterable allow-create :disabled="readonly || !formWorkbenchEnabled" placeholder="按优先级选择名称、标题、编号字段">
-                                <el-option v-for="item in fieldOptions" :key="item.value" :label="item.label" :value="item.value" />
-                            </el-select>
-                        </label>
-                        <label class="compact-field workbench-placeholder">
-                            <span>选择器提示</span>
-                            <el-input v-model="listView.Layout.Form.RecordSelector.Placeholder" :disabled="readonly || !formWorkbenchEnabled" placeholder="请选择要维护的数据" />
-                        </label>
-                        <label class="compact-field">
-                            <span>工作台眉题</span>
-                            <el-input v-model="listView.Layout.Form.Eyebrow" :disabled="readonly || !formWorkbenchEnabled" placeholder="FORM WORKBENCH" />
-                        </label>
-                        <label class="compact-field workbench-placeholder">
-                            <span>工作台说明</span>
-                            <el-input v-model="listView.Layout.Form.Description" :disabled="readonly || !formWorkbenchEnabled" placeholder="集中维护当前记录的业务信息" />
-                        </label>
-                        <label class="compact-field">
-                            <span>分组导航标题</span>
-                            <el-input v-model="listView.Layout.Form.NavigationTitle" :disabled="readonly || !formWorkbenchEnabled" placeholder="配置分组" />
-                        </label>
-                        <label class="compact-field">
-                            <span>保存按钮文字</span>
-                            <el-input v-model="listView.Layout.Form.SaveText" :disabled="readonly || !formWorkbenchEnabled" placeholder="保存当前记录" />
-                        </label>
-                        <div class="toggle-field"><span>显示“经典表格”入口</span><el-switch v-model="listView.Layout.Form.ShowClassicList" :disabled="readonly || !formWorkbenchEnabled" /></div>
-                    </div>
-                </section>
-            </el-tab-pane>
-
             <el-tab-pane label="移动端卡片" name="card" lazy>
                 <section class="designer-card">
                     <div class="card-head">
@@ -533,15 +437,6 @@ const formModel = computed(() => formModelCandidates.value.find((item) => ["View
     || formModelCandidates.value[0]
     || {});
 const readonly = computed(() => props.FieldReadonly || String(props.FormMode || "").toLowerCase() === "view");
-const formWorkbenchEnabled = computed({
-    get() {
-        return canonical(listView.value?.Layout?.Preset) === "formworkbench";
-    },
-    set(value) {
-        if (!listView.value?.Layout) return;
-        listView.value.Layout.Preset = value ? "FormWorkbench" : "";
-    }
-});
 const diyTableId = computed(() => normalizeEntityId(readFormField("DiyTableId")) || normalizeEntityId(moduleContext.value.DiyTableId));
 const fieldOptions = computed(() => fields.value
     .filter((item) => item && item.Name)
@@ -676,8 +571,7 @@ function ensureEditorViews(root) {
     const listLayout = ensureObject(listResult.view, "Layout", "layout");
     const hero = ensureObject(listLayout.value, "Hero", "hero");
     const list = ensureObject(listLayout.value, "List", "list");
-    const form = ensureObject(listLayout.value, "Form", "form");
-    changed = changed || listLayout.changed || hero.changed || list.changed || form.changed;
+    changed = changed || listLayout.changed || hero.changed || list.changed;
     changed = ensureString(hero.value, "Title") || changed;
     changed = ensureString(hero.value, "Eyebrow") || changed;
     changed = ensureString(hero.value, "Description") || changed;
@@ -685,22 +579,6 @@ function ensureEditorViews(root) {
     if (!list.value.Density) { list.value.Density = "Compact"; changed = true; }
     changed = ensureObjectArray(list.value, "Columns", normalizeColumnDraft) || changed;
     if (listLayout.value.Preset === undefined) { listLayout.value.Preset = ""; changed = true; }
-    if (!form.value.Presentation) { form.value.Presentation = "ControlCenter"; changed = true; }
-    if (!form.value.Mode) { form.value.Mode = "Edit"; changed = true; }
-    if (!form.value.Density) { form.value.Density = "Compact"; changed = true; }
-    if (!form.value.SectionNavigation) { form.value.SectionNavigation = "Auto"; changed = true; }
-    if (!form.value.SectionNavigationPosition) { form.value.SectionNavigationPosition = "Left"; changed = true; }
-    ["Eyebrow", "Description", "NavigationTitle", "SectionEyebrow", "SaveText"].forEach((key) => {
-        if (form.value[key] === undefined) { form.value[key] = ""; changed = true; }
-    });
-    if (!Array.isArray(form.value.Sections)) { form.value.Sections = []; changed = true; }
-    if (form.value.ShowClassicList === undefined) { form.value.ShowClassicList = true; changed = true; }
-    const recordSelector = ensureObject(form.value, "RecordSelector", "recordSelector");
-    changed = changed || recordSelector.changed;
-    if (!recordSelector.value.Display) { recordSelector.value.Display = "Both"; changed = true; }
-    if (!Array.isArray(recordSelector.value.LabelFields)) { recordSelector.value.LabelFields = []; changed = true; }
-    if (recordSelector.value.Placeholder === undefined) { recordSelector.value.Placeholder = ""; changed = true; }
-
     const cardLayout = ensureObject(cardResult.view, "Layout", "layout");
     const card = ensureObject(cardLayout.value, "Card", "card");
     changed = changed || cardLayout.changed || card.changed;

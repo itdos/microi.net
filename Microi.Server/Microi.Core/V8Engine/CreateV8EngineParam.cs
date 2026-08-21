@@ -1,5 +1,6 @@
 using System;
 using Dos.Common;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -100,11 +101,52 @@ namespace Microi.net
             object diyTableModel)
         {
             var param = FromSysConfig(sysConfig);
-            param.UnlimitedRuntime = DynamicHelper.GetDynamicBoolValue(
-                diyTableModel,
-                "V8Unlimited",
-                false);
+            param.UnlimitedRuntime = ResolveTrustedDiyTableUnlimitedRuntime(diyTableModel);
             return param;
+        }
+
+        /// <summary>
+        /// Resolves table-event runtime limits from trusted metadata. V8Limit is
+        /// the positive source of truth: only true/1 enables Jint's per-execution
+        /// budgets. V8Unlimited is read only when V8Limit is genuinely absent so
+        /// an old database can keep its historical meaning during rolling upgrade.
+        /// </summary>
+        public static bool ResolveTrustedDiyTableUnlimitedRuntime(object diyTableModel)
+        {
+            if (diyTableModel == null) return true;
+
+            var model = diyTableModel as JObject ?? JObject.FromObject(diyTableModel);
+            if (model.TryGetValue("V8Limit", StringComparison.OrdinalIgnoreCase, out var v8Limit))
+            {
+                return !IsExplicitlyEnabled(v8Limit);
+            }
+
+            if (model.TryGetValue("V8Unlimited", StringComparison.OrdinalIgnoreCase, out var legacyUnlimited))
+            {
+                return IsExplicitlyEnabled(legacyUnlimited);
+            }
+
+            return true;
+        }
+
+        private static bool IsExplicitlyEnabled(JToken value)
+        {
+            if (value == null
+                || value.Type == JTokenType.Null
+                || value.Type == JTokenType.Undefined)
+            {
+                return false;
+            }
+
+            if (value.Type == JTokenType.Boolean) return value.Value<bool>();
+            if (value.Type == JTokenType.Integer || value.Type == JTokenType.Float)
+            {
+                return value.Value<decimal>() == 1M;
+            }
+
+            var text = value.ToString().Trim();
+            return string.Equals(text, "1", StringComparison.Ordinal)
+                || string.Equals(text, "true", StringComparison.OrdinalIgnoreCase);
         }
 
         public V8ExecutionLimitInfo ToExecutionLimitInfo(

@@ -8,6 +8,7 @@ const packageModel = JSON.parse(await readFile(new URL("app.microi.store.json", 
 const bulkSource = await readFile(new URL("bulk-import-packages.js", resourceUrl), "utf8");
 const importerSource = await readFile(new URL("import-package.js", resourceUrl), "utf8");
 const statSource = await readFile(new URL("official-marketplace-install-stat.js", resourceUrl), "utf8");
+const apiEngineSource = await readFile(new URL("../../Microi.net/ApiEngine/ApiEngine.cs", resourceUrl), "utf8");
 
 function normalizeSource(value) {
   return `${String(value || "").replace(/\r\n?/g, "\n").replace(/\n*$/g, "")}\n`;
@@ -77,6 +78,17 @@ test("application-store package hides every install mutation on the official pla
   assert.match(bulk.V8Code, /平台已保留普通任务执行槽/);
   assert.equal(bulk.Workload.ExpectedItems, 29);
   assert.equal(bulk.Workload.ExecutionMode, undefined);
+});
+
+test("official publishing database blocks every marketplace installer before V8 execution", () => {
+  assert.match(apiEngineSource, /OfficialPlatformBlockedMarketplaceEngineKeys/);
+  assert.match(apiEngineSource, /"import-microi-store-package"/);
+  assert.match(apiEngineSource, /"bulk-import-microi-store-packages"/);
+  const guardIndex = apiEngineSource.indexOf("OfficialPlatformBlockedMarketplaceEngineKeys.Contains(param.ApiEngineKey)");
+  const executionIndex = apiEngineSource.indexOf("new V8Engine().Run", guardIndex);
+  assert.ok(guardIndex >= 0, "official source guard is missing");
+  assert.ok(executionIndex === -1 || executionIndex > guardIndex, "official source guard must execute before importer V8");
+  assert.match(apiEngineSource, /不允许安装、更新、重新安装或批量安装商城应用/);
 });
 
 test("bulk install persists its plan in the shared background-task checkpoint", () => {
@@ -159,7 +171,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.1\.8/);
+  assert.match(importerSource, /Version: v2\.2\.1/);
   assert.match(importerSource, /MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1/);
   assert.match(importerSource, /\/api\/ApiEngine\/Run\?OsClient=/);
   assert.match(importerSource, /marketplaceEngineParam\('get-microi-store-model'/);
@@ -193,7 +205,8 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(importerSource, /UpgradePolicy == 'CreateIfMissing'/);
   assert.match(importerSource, /TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1/);
-  assert.match(importerSource, /PLATFORM_API_ENGINE_PRESERVE_NEWER_V1/);
+  assert.match(importerSource, /OFFICIAL_MANAGED_OVERWRITE_V1/);
+  assert.match(importerSource, /ApplyOfficialManagedOverwrite/);
   assert.match(importerSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(importerSource, /OBJECT_STORAGE_FORBIDDEN/);
   assert.match(importerSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
@@ -213,6 +226,6 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.1.8");
+  assert.equal(embeddedImporter.Version, "v2.2.1");
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
 });

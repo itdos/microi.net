@@ -326,6 +326,7 @@ test('MCP escalates to VS Code recovery when a refresh-issued token is immediate
 test('saveEngineCode confirms an uncertain write by readback', async () => {
     const originalFetch = globalThis.fetch;
     let storedCode = '';
+    let updatePayload;
     try {
         globalThis.fetch = async (input, init) => {
             const url = String(input);
@@ -342,7 +343,8 @@ test('saveEngineCode confirms an uncertain write by readback', async () => {
             }
             if (url.endsWith('/api/V8Engine/UpdateApiEngineCode')) {
                 const payload = JSON.parse(String(init?.body || '{}'));
-                storedCode = Buffer.from(payload.ApiV8CodeBase64 || '', 'base64').toString('utf8');
+                updatePayload = payload;
+                storedCode = Buffer.from(String(payload.ApiV8CodeBase64 || ''), 'base64').toString('utf8');
                 throw new TypeError('socket closed after request body was sent');
             }
             throw new Error(`Unexpected URL: ${url}`);
@@ -351,6 +353,8 @@ test('saveEngineCode confirms an uncertain write by readback', async () => {
         assert.equal(result.Code, 1);
         assert.equal(result.Data.RecoveredAfterTransportError, true);
         assert.match(storedCode, /return \{ Code: 1, Data: "ok" \};/);
+        assert.match(String(updatePayload?.ChangeSummary || ''), /^v\d+\.\d+\.\d+ /);
+        assert.equal(updatePayload?.ChangeHistory, undefined);
     }
     finally {
         globalThis.fetch = originalFetch;
@@ -425,11 +429,13 @@ test('saveEventCode confirms an uncertain write by readback', async () => {
 test('createEngine confirms an uncertain write by readback', async () => {
     const originalFetch = globalThis.fetch;
     let storedEngine;
+    let createPayload;
     try {
         globalThis.fetch = async (input, init) => {
             const url = String(input);
             if (url.endsWith('/api/V8Engine/CreateApiEngine')) {
                 const payload = JSON.parse(String(init?.body || '{}'));
+                createPayload = payload;
                 storedEngine = {
                     ApiEngineKey: payload.ApiEngineKey,
                     ApiName: payload.ApiName,
@@ -459,6 +465,8 @@ test('createEngine confirms an uncertain write by readback', async () => {
         assert.equal(result.Data.Verified, true);
         assert.equal(storedEngine?.V8Limit, 0);
         assert.match(String(storedEngine?.ApiV8Code || ''), /return \{ Code: 1, Data: "ok" \};/);
+        assert.match(String(createPayload?.ChangeSummary || ''), /^v\d+\.\d+\.\d+ /);
+        assert.equal(createPayload?.ChangeHistory, undefined);
     }
     finally {
         globalThis.fetch = originalFetch;

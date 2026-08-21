@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { MicroiClient } from './microi-client.js';
+import type { MicroiClient, ApiResponse } from './microi-client.js';
 import type { McpServerContext } from './server.js';
 type JsonRecord = Record<string, unknown>;
 export declare function analyzeBackgroundWorkload(buttonInput: unknown, options?: {
@@ -38,6 +38,7 @@ export declare function normalizeAllMenuJson(data: JsonRecord): {
     errors: string[];
     warnings: string[];
 };
+export declare function buildGenerateSystemValidationPayload(results: JsonRecord[], validation: ApiResponse): JsonRecord;
 export declare function normalizeViewSchemaJson(raw: unknown): {
     ok: boolean;
     value?: string;
