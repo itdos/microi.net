@@ -14,6 +14,7 @@ import {
     resolveMetricValue
 } from "../form-view-blocks/module-presentation-runtime";
 import { resolveFormPresentationConfig } from "../form-presentation-runtime.js";
+import { migrateLegacyModuleHeroBanner } from "../form-banner-runtime.js";
 import { hasScalarRecordId } from "@/utils/record-id.js";
 
 function uniqueFields(fields) {
@@ -80,9 +81,31 @@ export default {
             });
         },
         FormPresentationConfig() {
+            const device = this.diyStore.IsPhoneView ? "Mobile" : "PC";
+            const legacyFormView = selectModuleView(this.SysMenuModel, {
+                scene: "Detail",
+                device,
+                user: this.GetCurrentUser,
+                allowLegacyFormConfig: true
+            }) || selectModuleView(this.SysMenuModel, {
+                scene: "Edit",
+                device,
+                user: this.GetCurrentUser,
+                allowLegacyFormConfig: true
+            });
+            const legacyConfig = {
+                ...(this.ModuleListView?.Layout?.Form || {})
+            };
+            const sharedBanner = legacyFormView?.Layout?.Hero || this.ModuleListView?.Layout?.Hero;
+            if (sharedBanner) {
+                // Detail/Edit 自定义视图不再接管表单运行时；其历史 Hero 会迁移到
+                // 标准 DiyForm。这里只复用标题、图片、背景及明确绑定当前记录的
+                // 统计，列表总数/分类统计不得混入单条记录 Banner。
+                legacyConfig.Banner = migrateLegacyModuleHeroBanner(sharedBanner);
+            }
             return resolveFormPresentationConfig(
                 this.CurrentDiyTableModel || {},
-                this.ModuleListView?.Layout?.Form || {},
+                legacyConfig,
                 ""
             );
         },

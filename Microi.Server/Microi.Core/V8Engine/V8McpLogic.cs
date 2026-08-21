@@ -1308,9 +1308,15 @@ namespace Microi.net
                                     },
                                     _SelectFields = new[] { "Id", "ApiEngineKey" }
                                 });
-                            var createdEngineId = createdEngine.Code == 1
-                                ? SafeString(createdEngine.Data?.Id)
-                                : "";
+                            // createdEngine.Data is dynamic.  Without an explicit object/string
+                            // boundary the conditional result also becomes dynamic, so the next
+                            // DosIsNullOrWhiteSpace extension call is dispatched as an instance
+                            // member on System.String and fails at runtime.  Normalize the dynamic
+                            // value before any string extensions are used.
+                            object createdEngineIdValue = createdEngine.Code == 1
+                                ? createdEngine.Data?.Id
+                                : null;
+                            string createdEngineId = SafeString(createdEngineIdValue);
                             var historyResult = !createdEngineId.DosIsNullOrWhiteSpace()
                                 ? await AddApiEngineChangeHistoryRow(
                                     osClient, createdEngineId, resolvedVersion, changeHistory, apiV8Code)
@@ -3605,6 +3611,7 @@ namespace Microi.net
             string mobileListFields = null,
             string cardTitleTagFields = null, string cardBottomTagFields = null,
             int menuBadgeEnabled = 0, string menuBadgeApiEngineKey = null,
+            string menuBadgeTooltip = null,
             int enableViewSchema = 0, string viewSchemaVersion = "1.0",
             int viewConfigVersion = 1, string viewSchema = null,
             int isMicroiService = 0, string microServiceId = null,
@@ -3832,6 +3839,7 @@ namespace Microi.net
                 };
                 if (!string.IsNullOrWhiteSpace(icon)) menuData["Icon"] = icon;
                 if (!string.IsNullOrWhiteSpace(menuBadgeApiEngineKey)) menuData["MenuBadgeApiEngineKey"] = menuBadgeApiEngineKey.Trim();
+                if (!string.IsNullOrWhiteSpace(menuBadgeTooltip)) menuData["MenuBadgeTooltip"] = menuBadgeTooltip.Trim();
                 if (!string.IsNullOrWhiteSpace(searchFieldIds)) menuData["SearchFieldIds"] = searchFieldIds;
                 if (!string.IsNullOrWhiteSpace(tableDiyFieldIds)) menuData["TableDiyFieldIds"] = tableDiyFieldIds;
                 if (!string.IsNullOrWhiteSpace(defaultOrderBy)) menuData["DefaultOrderBy"] = defaultOrderBy;
@@ -4677,7 +4685,7 @@ namespace Microi.net
                         "Id", "Name", "ParentId", "DiyTableId", "DiyTableName", "Url", "ComponentName", "ComponentPath",
                         "OpenType", "Display", "AppDisplay", "Sort", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds",
                         "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns",
-                        "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema", "UpdateTime"
+                        "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema", "UpdateTime"
                     },
                     _Where = BuildKeywordWhere(keyword, "Name", "Url", "DiyTableName"),
                     _OrderBy = "Sort",
@@ -4723,7 +4731,7 @@ namespace Microi.net
                 var allowed = new[] {
                     "Name", "Description", "DiyTableId", "DiyTableName", "ParentId", "Sort", "ComponentName", "ComponentPath", "Display", "AppDisplay",
                     "OpenType", "FlowDesignId", "Url", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds", "DefaultOrderBy", "SqlWhere",
-                    "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema",
+                    "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema",
                     "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns", "SortFieldIds", "NotShowFields",
                     "SqlJoin", "JoinTables", "SelectFields", "StatisticsFields", "InTableEdit", "InTableEditFields", "MobileListFields",
                     "CardTitleTagFields", "CardBottomTagFields", "SelectApi", "ImportApi", "ExportApi", "AddBtnText", "SaveBtnText",
@@ -4758,7 +4766,8 @@ namespace Microi.net
                 // node reloads the current metadata. Do this only for badge patches to avoid adding a
                 // schema-cache round trip to ordinary module updates.
                 var hasMenuBadgePatch = data["MenuBadgeEnabled"] != null
-                    || data["MenuBadgeApiEngineKey"] != null;
+                    || data["MenuBadgeApiEngineKey"] != null
+                    || data["MenuBadgeTooltip"] != null;
                 if (hasMenuBadgePatch)
                 {
                     var schemaKeys = new List<string> { "sys_menu" };
@@ -4806,7 +4815,12 @@ namespace Microi.net
                             readback["MenuBadgeApiEngineKey"]?.ToObject<string>() ?? "",
                             data["MenuBadgeApiEngineKey"]?.ToObject<string>() ?? "",
                             StringComparison.Ordinal);
-                    if (enabledMismatch || apiKeyMismatch)
+                    var tooltipMismatch = data["MenuBadgeTooltip"] != null
+                        && !string.Equals(
+                            readback["MenuBadgeTooltip"]?.ToObject<string>() ?? "",
+                            data["MenuBadgeTooltip"]?.ToObject<string>() ?? "",
+                            StringComparison.Ordinal);
+                    if (enabledMismatch || apiKeyMismatch || tooltipMismatch)
                     {
                         return new DosResult<object>(
                             0,
@@ -4814,7 +4828,8 @@ namespace Microi.net
                             {
                                 ModuleId = moduleId,
                                 MenuBadgeEnabled = NormalizeMenuBadgeEnabledToken(readback["MenuBadgeEnabled"]),
-                                MenuBadgeApiEngineKey = readback["MenuBadgeApiEngineKey"]?.ToObject<string>()
+                                MenuBadgeApiEngineKey = readback["MenuBadgeApiEngineKey"]?.ToObject<string>(),
+                                MenuBadgeTooltip = readback["MenuBadgeTooltip"]?.ToObject<string>()
                             },
                             "菜单模块更新接口执行成功，但菜单角标字段回读不一致；请确认模块引擎资源已安装并重试");
                     }

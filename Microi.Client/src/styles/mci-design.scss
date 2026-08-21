@@ -1317,6 +1317,161 @@ html.dark {
     > .el-dialog__title::before { content: "MESSAGE DETAILS"; }
 }
 
+/* Element Plus MessageBox（确认、警告、输入提示）的统一大圆角契约。运行时会
+   自动覆盖直接 ElMessageBox/$confirm 调用，DiyCommon.OsConfirm 则首帧即带此类。 */
+.el-message-box.mci-unified-message-box {
+    --mci-message-accent: var(--el-color-primary, #3478f6);
+    --mci-message-surface: var(--mci-bg-card, var(--el-bg-color-overlay, #fff));
+    --mci-message-line: var(--mci-border-color, var(--el-border-color-lighter, #e1e8f0));
+    width: min(540px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    overflow: hidden;
+    padding: 0 !important;
+    border: 1px solid var(--mci-message-line) !important;
+    border-radius: 24px !important;
+    background: var(--mci-message-surface) !important;
+    box-shadow: 0 28px 74px rgba(9, 24, 48, .26), 0 8px 22px rgba(9, 24, 48, .1) !important;
+
+    &[data-mci-message-type="warning"] { --mci-message-accent: var(--el-color-warning, #e6a23c); }
+    &[data-mci-message-type="error"] { --mci-message-accent: var(--el-color-danger, #f56c6c); }
+    &[data-mci-message-type="success"] { --mci-message-accent: var(--el-color-success, #67c23a); }
+
+    .el-message-box__header {
+        position: relative;
+        display: flex;
+        min-height: 86px;
+        align-items: center;
+        gap: 14px;
+        box-sizing: border-box;
+        padding: 16px 72px 16px 24px;
+        border-bottom: 1px solid var(--mci-message-line);
+        background:
+            linear-gradient(115deg, color-mix(in srgb, var(--mci-message-accent) 10%, transparent), transparent 48%),
+            var(--mci-message-surface);
+
+        &::before {
+            display: inline-flex;
+            width: 42px;
+            height: 42px;
+            flex: 0 0 42px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid color-mix(in srgb, var(--mci-message-accent) 30%, transparent);
+            border-radius: 14px;
+            background: color-mix(in srgb, var(--mci-message-accent) 13%, var(--mci-message-surface));
+            color: var(--mci-message-accent);
+            content: "!";
+            font-size: 20px;
+            font-weight: 850;
+            box-shadow: 0 8px 20px color-mix(in srgb, var(--mci-message-accent) 14%, transparent);
+        }
+    }
+
+    &[data-mci-message-type="info"] .el-message-box__header::before { content: "i"; }
+    &[data-mci-message-type="success"] .el-message-box__header::before { content: "✓"; }
+    &[data-mci-message-type="error"] .el-message-box__header::before { content: "×"; }
+
+    .el-message-box__title {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        color: var(--el-text-color-primary, #152238) !important;
+        font-size: 20px;
+        font-weight: 760;
+        line-height: 1.25;
+
+        &::before {
+            margin-bottom: 5px;
+            color: var(--mci-message-accent);
+            content: "MICROI CONFIRM";
+            font-size: 10px;
+            font-weight: 850;
+            letter-spacing: .17em;
+            line-height: 1;
+        }
+    }
+
+    .el-message-box__headerbtn {
+        top: 50%;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        border: 1px solid var(--mci-message-line);
+        border-radius: 12px;
+        background: var(--el-fill-color-light, #eef2f6);
+        color: var(--el-text-color-secondary, #66758a);
+        transform: translateY(-50%);
+
+        &:hover,
+        &:focus-visible {
+            border-color: color-mix(in srgb, var(--mci-message-accent) 34%, var(--mci-message-line));
+            color: var(--mci-message-accent);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--mci-message-accent) 12%, transparent);
+        }
+    }
+
+    .el-message-box__content {
+        min-height: 76px;
+        box-sizing: border-box;
+        padding: 24px 28px 22px;
+        color: var(--el-text-color-regular, #34435a);
+        background: color-mix(in srgb, var(--el-fill-color-extra-light, #f6f8fb) 56%, var(--mci-message-surface));
+    }
+
+    .el-message-box__status { display: none; }
+    .el-message-box__message {
+        margin: 0;
+        padding: 0;
+        font-size: 16px;
+        line-height: 1.75;
+        overflow-wrap: anywhere;
+    }
+
+    .el-message-box__btns {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+        box-sizing: border-box;
+        padding: 17px 24px 21px;
+        border-top: 1px solid var(--mci-message-line);
+        background: var(--mci-message-surface);
+
+        .el-button {
+            min-width: 100px;
+            height: 44px;
+            margin-left: 0;
+            padding: 0 24px;
+            border-radius: 13px;
+            font-size: 14px;
+            font-weight: 720;
+        }
+
+        .el-button--primary {
+            border-color: transparent;
+            background: var(--mci-message-accent) !important;
+            box-shadow: 0 10px 24px color-mix(in srgb, var(--mci-message-accent) 28%, transparent);
+        }
+    }
+}
+
+.mci-unified-message-overlay {
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+@media (max-width: 560px) {
+    .el-message-box.mci-unified-message-box {
+        .el-message-box__header { min-height: 78px; padding: 13px 62px 13px 16px; }
+        .el-message-box__header::before { width: 38px; height: 38px; flex-basis: 38px; border-radius: 12px; }
+        .el-message-box__title { font-size: 18px; }
+        .el-message-box__content { padding: 20px 18px; }
+        .el-message-box__btns { padding: 14px 16px 17px; }
+        .el-message-box__btns .el-button { min-width: 92px; }
+    }
+}
+
 .el-dialog.mci-import-dialog {
     width: min(760px, calc(100vw - 32px)) !important;
     margin: auto !important;
@@ -1777,9 +1932,9 @@ html.dark {
     .el-tabs__item.is-active {
         z-index: 1;
         color: var(--mci-tabs-accent) !important;
-        background: color-mix(in srgb, var(--mci-tabs-accent) 24%, var(--mci-tabs-surface));
-        box-shadow: 0 3px 10px color-mix(in srgb, var(--mci-tabs-accent) 9%, transparent),
-            0 1px 2px rgba(15, 23, 42, .04);
+        // background: color-mix(in srgb, var(--mci-tabs-accent) 24%, var(--mci-tabs-surface));
+        // box-shadow: 0 3px 10px color-mix(in srgb, var(--mci-tabs-accent) 9%, transparent),
+        //     0 1px 2px rgba(15, 23, 42, .04);
     }
 }
 

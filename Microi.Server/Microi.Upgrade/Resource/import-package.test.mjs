@@ -166,10 +166,43 @@ test("marketplace package reads retry empty transient responses without acceptin
   assert.equal(result.Data.Id, "store-1");
   assert.equal(calls.post, 2);
   assert.equal(calls.sleep, 1);
-  assert.match(source, /MARKETPLACE_SOURCE_READ_RETRY_V1/);
+  assert.match(source, /MARKETPLACE_SOURCE_READ_RETRY_V2/);
+  assert.match(source, /V8\.Http\.PostResponse/);
+  assert.match(source, /responseEnvelope\.RawBytes/);
   assert.match(source, /MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1/);
   assert.match(source, /marketplaceEngineRunUrl/);
   assert.match(source, /marketplaceEngineParam\('get-microi-store-model'/);
+});
+
+test("background-task unique-index recovery preserves the authoritative row and rejects two active tasks", () => {
+  const fixture = {};
+  vm.runInNewContext(`
+    ${extractNamedFunction(source, "isTerminalBackgroundTaskStatus")}
+    ${extractNamedFunction(source, "selectBackgroundTaskDuplicateCanonical")}
+    result = selectBackgroundTaskDuplicateCanonical;
+  `, fixture);
+
+  const selectCanonical = fixture.result;
+  const active = { Id: "active", Status: "Running", UpdateTime: "2026-08-20 10:00:00" };
+  const succeeded = { Id: "success", Status: "Succeeded", UpdateTime: "2026-08-22 10:00:00" };
+  assert.equal(selectCanonical([succeeded, active]).Id, "active");
+  assert.equal(selectCanonical([
+    { Id: "failed-new", Status: "Failed", UpdateTime: "2026-08-22 10:00:00" },
+    { Id: "success-old", Status: "Succeeded", UpdateTime: "2026-08-20 10:00:00" },
+  ]).Id, "success-old");
+  assert.throws(
+    () => selectCanonical([
+      { Id: "pending", Status: "Pending" },
+      { Id: "retrying", Status: "Retrying" },
+    ]),
+    /多条活动记录/,
+  );
+
+  assert.match(source, /BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1/);
+  assert.match(source, /archived-duplicate:/);
+  assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
+  assert.match(source, /recoveredFromIdempotencyDuplicate/);
+  assert.match(source, /Version: v2\.2\.9/);
 });
 
 function runAdminMenuPermissionFixture(options = {}) {
@@ -805,6 +838,43 @@ test("InsertIfMissing treats a concurrent deterministic-Id insert as idempotent 
   assert.equal(result.stats.DataSkipped, 1);
 });
 
+test("marketplace package reads recover response text from raw bytes", () => {
+  const calls = { postResponse: 0 };
+  const fixture = {
+    storeRequestHeaders: {},
+    V8: {
+      Http: {
+        PostResponse() {
+          calls.postResponse += 1;
+          return {
+            Content: "",
+            RawBytes: { Length: 16 },
+            StatusCode: 200,
+            ErrorMessage: "",
+          };
+        },
+      },
+      Action: { Sleep() {} },
+    },
+    System: {
+      Text: {
+        Encoding: {
+          UTF8: {
+            GetString() { return '{"Code":1,"Data":{"Id":"raw-store"}}'; },
+          },
+        },
+      },
+      Threading: { Thread: { Sleep() {} } },
+    },
+  };
+  vm.runInNewContext(`${marketplaceReadRetrySource[0]}\nresult = postMarketplaceReadWithRetry;`, fixture);
+
+  const result = fixture.result("读取测试包", "https://api.itdos.com/test", { Id: "raw-store" }, 120);
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.Id, "raw-store");
+  assert.equal(calls.postResponse, 1);
+});
+
 test("InsertIfMissing may refresh only explicit display metadata without overwriting tenant values", () => {
   const result = runDataSetImportFixture({
     row: {
@@ -1122,7 +1192,10 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
   assert.equal(packageImporter.LimitMemory, 8192, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.10.11") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v2.2.2") >= 0);
+  assert.match(source, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1/);
+  assert.match(source, /ensureGeneratedEntityPhysicalPrerequisites/);
+  assert.match(source, /diy_table[\s\S]*?FormPresentationMode/);
   assert.match(source, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(source, /\^\(bit\|tinyint\|smallint/);
   assert.match(source, /API_ENGINE_RESOURCE_BASELINE_V1/);
@@ -1180,9 +1253,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 10, 11\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.10.11 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 10, 11\)/);
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(2, 2, 2\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v2.2.2 floor");
+  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(2, 2, 2\)/);
   assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 3, 6\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
@@ -1224,7 +1297,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_010_011/);
+  assert.match(refreshSource, /versionNumber\s*<\s*2_002_002/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -1236,7 +1309,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_007_008/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_004_002/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_010_011/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_002_002/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);

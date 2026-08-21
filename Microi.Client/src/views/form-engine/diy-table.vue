@@ -3401,9 +3401,7 @@ export default {
                             PresentationMode: self.ModuleFormWorkbenchAvailable
                                 ? String(self.ModuleFormWorkbenchConfig?.Presentation || "ControlCenter")
                                 : "",
-                            PresentationConfig: self.ModuleFormWorkbenchAvailable
-                                ? (self.ModuleFormWorkbenchConfig || {})
-                                : {}
+                            PresentationConfig: self.ModuleFormWorkbenchConfig || {}
                         });
                         self.BtnLoading = false;
                         self._openFormDialogTimer = null;

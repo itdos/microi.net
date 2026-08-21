@@ -1,5 +1,18 @@
 <template>
     <div :class="rootClass" v-mci-loading:form="!GetDiyTableRowModelFinish">
+        <StandardFormBanner
+            v-if="ShowStandardFormBanner"
+            :config="EffectivePresentationConfig.Banner"
+            :form="FormDiyTableModel"
+            :fields="DiyFieldList"
+            :table="DiyTableModel"
+            :table-row-id="TableRowId"
+            :sys-menu-id="SysMenuId"
+            :get-server-path="DiyCommon.GetServerPath"
+            :get-private-file-url="ResolveFormBannerPrivateFileUrl"
+            :run-api-engine="RunFormBannerApiEngine"
+            :load-related-metrics="LoadFormBannerRelatedMetrics"
+        />
         <div :class="presentationLayoutClass">
             <aside v-if="ShowPresentationSectionNavigation" class="diy-form-section-nav" aria-label="表单分组导航">
                 <div class="diy-form-section-nav__head">
@@ -33,14 +46,19 @@
             </aside>
             <section class="diy-form-presentation-main">
                 <header v-if="IsControlCenterPresentation" class="diy-form-section-head">
-                    <div>
-                        <span>{{ ActivePresentationSection.SectionEyebrow }}</span>
-                        <h3>{{ ActivePresentationSection.SectionTitle }}</h3>
-                        <div
-                            v-if="ActivePresentationSection.SectionSubtitleHtml"
-                            class="diy-form-section-head__description"
-                            v-safe-html="ActivePresentationSection.SectionSubtitleHtml"
-                        ></div>
+                    <div class="diy-form-section-head__identity">
+                        <span class="diy-form-section-head__icon" aria-hidden="true">
+                            <fa-icon :icon="ResolveTabIcon(ActivePresentationSection.Icon, ActivePresentationSection.Index)" />
+                        </span>
+                        <div class="diy-form-section-head__copy">
+                            <span class="diy-form-section-head__eyebrow">{{ ActivePresentationSection.SectionEyebrow }}</span>
+                            <h3>{{ ActivePresentationSection.SectionTitle }}</h3>
+                            <div
+                                v-if="ActivePresentationSection.SectionSubtitleHtml"
+                                class="diy-form-section-head__description"
+                                v-safe-html="ActivePresentationSection.SectionSubtitleHtml"
+                            ></div>
+                        </div>
                     </div>
                     <div class="diy-form-section-head__tags">
                         <el-tag effect="plain">{{ ActivePresentationSection.CountLabel }}</el-tag>
@@ -54,7 +72,7 @@
         <el-tabs
             id="field-form-tabs"
             v-model="FieldActiveTab"
-            :tab-position="GetTabsPosition()"
+            :tab-position="GetEffectiveTabsPosition()"
             :class="[tabsClass, 'mci-tabs', 'mci-tabs--form']"
             @tab-click="tabClickField"
         >
@@ -316,7 +334,13 @@
                                             </template>
                                             <!--通用组件渲染-->
                                            <!-- {{field.Component}} -->
+                                            <DiyReadonlyValue
+                                                v-if="ShouldRenderReadonlyValue(field)"
+                                                :value="GetReadonlyFieldDisplayValue(field)"
+                                                :field="field"
+                                            />
                                             <component
+                                                v-else
                                                 :is="GetFieldComponent(field)"
                                                 :ref="'ref_' + field.Name"
                                                 v-model="FormDiyTableModel[field.Name]"
@@ -418,6 +442,11 @@ import { initV8IdentityVerification } from "@/utils/v8-identity-verification.js"
 import { initV8Print } from "@/utils/v8-print.js";
 import { formTrace } from "@/utils/form-engine-trace.js";
 import { resolveTabIcon } from "@/utils/tab-icon.js";
+import DiyReadonlyValue from "./diy-field-component/diy-readonly-value.vue";
+import StandardFormBanner from "./form-view-blocks/standard-form-banner.vue";
+import { buildFormBannerRelatedMetrics } from "./form-banner-runtime.js";
+
+const formBannerChildMetadataCache = new Map();
 
 // Mixins
 import {
@@ -448,6 +477,8 @@ export default {
     ],
     components: {
         draggable,
+        DiyReadonlyValue,
+        StandardFormBanner
     },
     setup() {
         const diyStore = useDiyStore();
@@ -675,6 +706,127 @@ export default {
         window.addEventListener("microi:lang-change", self._handleLangChange);
     },
     methods: {
+        ResolveFormBannerPrivateFileUrl(filePathName, options) {
+            return this.DiyCommon.GetPrivateFileUrl(filePathName, options);
+        },
+        RunFormBannerApiEngine(apiEngineKey, params) {
+            return this.DiyCommon.ApiEngine.Run(apiEngineKey, params);
+        },
+        GetFormBannerTableChildConfig(field) {
+            const value = field && field.Config;
+            if (value && typeof value === "object" && !Array.isArray(value)) return value;
+            try {
+                const parsed = JSON.parse(value || "{}");
+                return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+            } catch (_error) {
+                return {};
+            }
+        },
+        async GetFormBannerChildMetadata(childTableId, childSysMenuId, authorizationContext) {
+            const userId = this.GetCurrentUser && this.GetCurrentUser.Id || "anonymous";
+            const cacheKey = [
+                this.DiyCommon.GetOsClient(),
+                userId,
+                childTableId,
+                childSysMenuId,
+                authorizationContext.ParentFieldId,
+                authorizationContext.ParentRowId
+            ].join(":");
+            if (!formBannerChildMetadataCache.has(cacheKey)) {
+                const request = Promise.all([
+                    this.DiyCommon.PostAsync({
+                        url: this.DiyApi.GetDiyTableModel,
+                        data: {
+                            Id: childTableId,
+                            FormEngineKey: "Diy_Table",
+                            _SysMenuId: childSysMenuId,
+                            _TableChildAuth: authorizationContext
+                        },
+                        suppressErrorNotification: true
+                    }),
+                    this.DiyCommon.PostAsync({
+                        url: this.DiyApi.GetDiyFieldByDiyTables,
+                        data: {
+                            TableIds: [childTableId],
+                            SysMenuId: childSysMenuId,
+                            _TableChildAuth: authorizationContext
+                        },
+                        suppressErrorNotification: true
+                    })
+                ]).then(([tableResult, fieldResult]) => {
+                    if (Number(tableResult?.Code) !== 1 || Number(fieldResult?.Code) !== 1) {
+                        throw new Error(tableResult?.Msg || fieldResult?.Msg || "读取子表元数据失败");
+                    }
+                    return {
+                        Table: tableResult.Data || {},
+                        Fields: Array.isArray(fieldResult.Data) ? fieldResult.Data : []
+                    };
+                }).catch((error) => {
+                    formBannerChildMetadataCache.delete(cacheKey);
+                    throw error;
+                });
+                formBannerChildMetadataCache.set(cacheKey, request);
+            }
+            return formBannerChildMetadataCache.get(cacheKey);
+        },
+        async LoadSingleFormBannerRelatedMetric(field, context) {
+            const config = this.GetFormBannerTableChildConfig(field);
+            const tableChild = config.TableChild && typeof config.TableChild === "object" ? config.TableChild : {};
+            const childTableId = config.TableChildTableId || tableChild.TableChildTableId;
+            const childSysMenuId = config.TableChildSysMenuId || tableChild.TableChildSysMenuId;
+            const childFkFieldName = config.TableChildFkFieldName || tableChild.TableChildFkFieldName;
+            const primaryFieldName = tableChild.PrimaryTableFieldName || "";
+            const recordId = context.RecordId || this.FormDiyTableModel?.Id || this.TableRowId;
+            const parentValue = primaryFieldName
+                ? context.Form?.[primaryFieldName]
+                : recordId;
+            if (!childTableId || !childSysMenuId || !childFkFieldName
+                || parentValue === undefined || parentValue === null || parentValue === "") return [];
+
+            const authorizationContext = {
+                ParentSysMenuId: context.SysMenuId || this.SysMenuId || "",
+                ParentTableId: context.Table?.Id || this.DiyTableModel?.Id || this.TableId || "",
+                ParentFieldId: field.Id || "",
+                ParentRowId: recordId || "",
+                ParentValue: parentValue,
+                ParentFormMode: this.FormMode || "",
+                Parent: this.TableChildAuth || null
+            };
+            const metadata = await this.GetFormBannerChildMetadata(
+                childTableId,
+                childSysMenuId,
+                authorizationContext
+            );
+            const tableName = metadata.Table && metadata.Table.Name;
+            if (!tableName) return [];
+            const endpoint = "/api/FormEngine/GetTableData-" + String(tableName).replace(/_/g, "-").toLowerCase();
+            const result = await this.DiyCommon.PostAsync({
+                url: endpoint,
+                data: {
+                    FormEngineKey: tableName,
+                    _PageIndex: 1,
+                    _PageSize: 1,
+                    _SelectFields: ["Id"],
+                    _Where: [[childFkFieldName, "=", parentValue]],
+                    _TableChildAuth: authorizationContext
+                },
+                dataType: "json",
+                suppressErrorNotification: true
+            });
+            return buildFormBannerRelatedMetrics(field, metadata.Fields, result, 3);
+        },
+        async LoadFormBannerRelatedMetrics(relationFields, context = {}) {
+            const fields = Array.isArray(relationFields) ? relationFields.slice(0, 3) : [];
+            if (!fields.length || !(context.RecordId || this.FormDiyTableModel?.Id || this.TableRowId)) return [];
+            const results = await Promise.all(fields.map(async (field) => {
+                try {
+                    return await this.LoadSingleFormBannerRelatedMetric(field, context);
+                } catch (_error) {
+                    return [];
+                }
+            }));
+            return results.flat().slice(0, 3);
+        },
         ResolveTabIcon(icon, index) {
             return resolveTabIcon(icon, index);
         },

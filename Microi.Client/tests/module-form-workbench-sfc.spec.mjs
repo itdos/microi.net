@@ -90,9 +90,11 @@ test("ViewMode=Table remains a route state without classic/workbench switch UI",
     assert.match(mixinSource, /requestedMode !== "table"/);
     assert.match(mixinSource, /hasScalarRecordId\(this\.\$route\?\.query\?\.RecordId\)/);
     assert.match(mixinSource, /FormPresentationConfig/);
+    assert.match(mixinSource, /legacyFormView\?\.Layout\?\.Hero\s*\|\|\s*this\.ModuleListView\?\.Layout\?\.Hero/);
+    assert.match(mixinSource, /migrateLegacyModuleHeroBanner\(sharedBanner\)/);
     assert.match(mixinSource, /resolveModuleOpenFirstRecord\(this\.SysMenuModel, moduleForm\)/);
     assert.match(tableSource, /PresentationMode:\s*self\.ModuleFormWorkbenchAvailable/);
-    assert.match(tableSource, /PresentationConfig:\s*self\.ModuleFormWorkbenchAvailable/);
+    assert.match(tableSource, /PresentationConfig:\s*self\.ModuleFormWorkbenchConfig\s*\|\|\s*\{\}/);
     assert.match(tableSource, /RecordNavigator:/);
     assert.match(tableSource, /Enabled:\s*self\.FormMode !== "Add"[\s\S]{0,240}!self\._IsTableChild[\s\S]{0,160}self\.PropsEmbedded !== true[\s\S]{0,160}self\.PropsIsJoinTable !== true/);
     assert.doesNotMatch(mixinSource, /delete query\.ViewMode|delete query\.viewMode/);
@@ -137,6 +139,9 @@ test("DiyForm exposes the generic control-center presentation without replacing 
     assert.match(source, /PresentationSections/);
     assert.match(source, /ActivatePresentationSection/);
     assert.match(source, /GetPresentationFieldClass\(field\)/);
+    assert.match(source, /StandardFormBanner/);
+    assert.match(source, /DiyReadonlyValue/);
+    assert.match(source, /GetEffectiveTabsPosition/);
     assert.match(source, /:is="GetFieldComponent\(field\)"/);
     assert.match(source, /@CallbackRunV8Code="RunV8Code"/);
 });

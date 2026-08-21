@@ -20,6 +20,11 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 才评估 Drawer；不能用 Drawer 代替 Tabs/CollapseGroup 的信息架构。Dialog 统一使用居中、可拖动、
 大圆角弹层；Drawer 贴边且不使用大圆角。
 
+`CollapseGroup` 的运行态视觉统一使用清爽的白色/主题表面卡片：短主题色指示条、紧凑
+标题、可选图标、单行副标题、标题旁轻量 `x 项` 文案，以及最右侧无底色的折叠箭头。
+不得使用整块主题色填充、蓝色大描边或醒目的实心数量胶囊；分组内容与标题属于同一张
+卡片，展开后不再嵌套第二套外框。深色模式使用 Element 主题变量，不能写死白色/蓝色。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=microi-form-layout-000 sha256=cade6a415454aa04f5fcf840e6d9df1323ac9751c0e3c8e1b07b360007413819 -->
 ## 1. 三种分组能力速查

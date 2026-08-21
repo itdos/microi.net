@@ -136,7 +136,7 @@ PageTabs 通过 `TargetSysMenuId` 切换不同模块/表时，入口模块必须
 ### 重要模块的统计与信息层级
 
 - 待办、库存预警、未读、逾期、待收/待付等有行动含义的菜单，主动询问并配置
-  `MenuBadgeEnabled=1` 与 `MenuBadgeApiEngineKey`。接口统一返回
+  `MenuBadgeEnabled=1`、`MenuBadgeApiEngineKey` 与说明统计口径的 `MenuBadgeTooltip`。接口统一返回
   `{ Code:1, Data:{ Value: number } }`，并按当前用户权限统计。
 - `Scene=List` 的 `Layout.Hero` 用 `Eyebrow/Title/Description/Metrics` 建立模块标题与
   指标条。相同 `ApiEngineKey` 的指标必须由一个聚合接口批量返回，使用 `ValuePath`

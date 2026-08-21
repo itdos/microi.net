@@ -114,6 +114,28 @@ test("section counts exclude layout controls and expose field and required tags"
     assert.equal(section.RequiredLabel, "1 必填项");
 });
 
+test("legacy none placeholders fall back to the table description", () => {
+    const [section] = buildFormPresentationSections({
+        tabs: [{ Id: "none", Name: "no, none", Title: "no, none" }],
+        groupedFields: { none: [] },
+        table: { Description: "订单信息" },
+        config: {}
+    });
+    assert.equal(section.Title, "订单信息");
+    assert.equal(section.SectionTitle, "订单信息");
+});
+
+test("single default section inherits the configured form subtitle", () => {
+    const [section] = buildFormPresentationSections({
+        tabs: [{ Id: "none", Name: "none", Icon: "far fa-file-alt" }],
+        groupedFields: { none: [] },
+        table: { Description: "接口引擎" },
+        config: { WorkbenchDescription: "<b>维护接口业务配置</b>" }
+    });
+    assert.equal(section.Icon, "far fa-file-alt");
+    assert.equal(section.SectionSubtitleHtml, "<b>维护接口业务配置</b>");
+});
+
 test("badge requests are grouped by ApiEngineKey and values resolve per section", () => {
     const config = resolveFormPresentationConfig({}, {});
     const sections = buildFormPresentationSections({
@@ -166,4 +188,6 @@ test("form presentation HTML is sanitized before the safe HTML directive renders
     assert.match(state, /NavigationSubtitleHtml:\s*sanitizeHtml/);
     assert.match(state, /SectionSubtitleHtml:\s*sanitizeHtml/);
     assert.match(state, /FooterDescriptionHtml:\s*sanitizeHtml/);
+    assert.match(form, /diy-form-section-head__icon/u);
+    assert.match(form, /ResolveTabIcon\(ActivePresentationSection\.Icon,\s*ActivePresentationSection\.Index\)/u);
 });

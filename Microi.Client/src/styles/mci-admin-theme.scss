@@ -529,6 +529,23 @@ html[data-theme="dark"] .sidebar-container-microi .el-menu-item.is-active {
     transform: none !important;
 }
 
+/* 菜单数字角标提示位于右侧：用向左的三角形替代 Element 默认旋转方块。 */
+.mci-menu-badge-tooltip.el-popper[data-popper-placement^="right"] > .el-popper__arrow {
+    left: -7px !important;
+    width: 7px;
+    height: 12px;
+}
+
+.mci-menu-badge-tooltip.el-popper[data-popper-placement^="right"] > .el-popper__arrow::before {
+    width: 7px !important;
+    height: 12px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--mci-tooltip-bg, #273449) !important;
+    clip-path: polygon(0 50%, 100% 0, 100% 100%);
+    transform: none !important;
+}
+
 .diy-field-description-tooltip.el-popper[data-popper-placement^="top"] > .el-popper__arrow,
 .diy-field-description-tooltip.el-popper[data-popper-placement^="bottom"] > .el-popper__arrow {
     width: 12px;

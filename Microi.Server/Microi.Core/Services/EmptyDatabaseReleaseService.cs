@@ -49,7 +49,12 @@ namespace Microi.net
                 "mci_ai_app", "mci_ai_project", "mci_ai_app_file", "mci_ai_app_version",
                 "microi_job_triggers", "microi_job_cron_triggers", "microi_job_job_details", "microi_job_calendars",
                 "mci_background_task", "mci_database_backup", "mci_gitee_star_audit",
-                "mci_identity_credential", "mci_identity_device", "mci_identity_totp",
+                "mci_system_setting", "mci_user_external_identity", "mci_user_access_key", "diy_sso",
+                "mci_identity_connector", "mci_identity_credential", "mci_identity_device", "mci_identity_face",
+                "mci_identity_group", "mci_identity_group_member", "mci_identity_sync_conflict", "mci_identity_sync_run",
+                "mci_identity_tag", "mci_identity_tag_assignment", "mci_identity_totp",
+                "mci_ai_token_account", "mci_file_remote_connection", "mci_spider_account", "mci_redis_connection",
+                "sys_servernode", "sys_sourcedatatable", "microi_database", "wx_mp", "wx_menu",
                 "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
                 "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
             },
@@ -57,7 +62,12 @@ namespace Microi.net
         private static readonly string[] EmptyDatabaseOperationalTables =
         {
             "mci_background_task", "mci_database_backup", "mci_gitee_star_audit",
-            "mci_identity_credential", "mci_identity_device", "mci_identity_totp",
+            "mci_system_setting", "mci_user_external_identity", "mci_user_access_key", "diy_sso",
+            "mci_identity_connector", "mci_identity_credential", "mci_identity_device", "mci_identity_face",
+            "mci_identity_group", "mci_identity_group_member", "mci_identity_sync_conflict", "mci_identity_sync_run",
+            "mci_identity_tag", "mci_identity_tag_assignment", "mci_identity_totp",
+            "mci_ai_token_account", "mci_file_remote_connection", "mci_spider_account", "mci_redis_connection",
+            "sys_servernode", "sys_sourcedatatable", "microi_database", "wx_mp", "wx_menu",
             "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
             "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
         };
@@ -943,7 +953,8 @@ DROP TEMPORARY TABLE IF EXISTS temp_backend_app_owned_tables;");
 
         /// <summary>
         /// 空数据库只保留平台运行所需结构，不携带主库的任务、备份、审计、身份凭据、
-        /// 安装事件、配额流水、消息配置或第三方小程序账号数据。该后端门禁独立于 V8
+        /// 租户私有设置、外部身份、身份治理、安装事件、配额流水、消息配置或第三方账号数据。
+        /// 该后端门禁独立于 V8
         /// 脱敏脚本执行，防止线上脚本被旧版本覆盖或遗漏后再次发布隐私数据。
         /// </summary>
         private static void ClearOperationalResidue(MySqlConnectionStringBuilder sourceBuilder)

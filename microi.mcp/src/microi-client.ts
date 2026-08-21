@@ -3458,6 +3458,25 @@ export class MicroiClient {
     });
   }
 
+  async listBackgroundTasks(): Promise<ApiResponse> {
+    return this.post(API.LIST_BACKGROUND_TASKS, {
+      OsClient: this.config.osClient,
+    }, {
+      timeoutMs: this.requestTimeoutMs,
+      operationName: 'list background tasks',
+    });
+  }
+
+  async cancelBackgroundTask(taskId: string): Promise<ApiResponse> {
+    return this.post(API.CANCEL_BACKGROUND_TASK, {
+      OsClient: this.config.osClient,
+      Id: taskId,
+    }, {
+      timeoutMs: this.writeRequestTimeoutMs,
+      operationName: 'cancel background task',
+    });
+  }
+
   async listPageEngineHistory(pageId: string, pageIndex = 1, pageSize = 50): Promise<ApiResponse> {
     return this.post(API.LIST_PAGE_ENGINE_HISTORY, {
       OsClient: this.config.osClient,
