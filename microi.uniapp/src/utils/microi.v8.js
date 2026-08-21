@@ -45,6 +45,14 @@ function joinUrl(base, path) {
   return `${normalizeBase(base)}/${trimLeftSlash(value)}`;
 }
 
+export function isApiEngineRequestUrl(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  const withoutOrigin = text.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+/i, '');
+  const path = withoutOrigin.split(/[?#]/, 1)[0];
+  return /^\/?apiengine(?:\/|$)/i.test(path);
+}
+
 function appendQuery(url, key, value) {
   if (!value || new RegExp(`[?&]${key}=`, 'i').test(url)) return url;
   const sep = url.indexOf('?') >= 0 ? '&' : '?';
@@ -740,7 +748,9 @@ export function createMicroiV8(options = {}) {
       setSingletonHeader(headers, 'Token', token);
       setSingletonHeader(headers, 'Authorization', `Bearer ${token}`);
     }
-    if (options.apiEngine) headers.apiengine = '1';
+    if (options.apiEngine || isApiEngineRequestUrl(options.url || options.path)) {
+      headers.apiengine = '1';
+    }
     return headers;
   }
 
