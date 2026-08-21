@@ -33,10 +33,10 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 ## 接口引擎资源所有权（强制）
 
 - 新发布包必须声明 `ResourcePolicies.ApiEngines`，不得再依赖“同 Key 直接覆盖”。官方不可随租户修改的核心使用 `{ Ownership:'Application', UpgradePolicy:'Managed' }`；提供给租户改业务的 Hook 使用 `{ Ownership:'Tenant', UpgradePolicy:'CreateIfMissing' }`。
-- 发布器从上一版 `AppPakcet.SysApiEngines` 计算 `BaseHash`；导入成功后把本版摘要写入 `sys_microistoreversion.InstallResult.ResourceState.ApiEngines`。更新判定固定为 Base/Local/Incoming：`Local == Base` 才允许更新；`Local != Base && Local != Incoming` 必须回滚并报告冲突，禁止静默覆盖。
+- 发布器从上一版 `AppPakcet.SysApiEngines` 计算 `BaseHash`；导入成功后把本版摘要写入 `sys_microistoreversion.InstallResult.ResourceState.ApiEngines`。普通/社区应用仍按 Base/Local/Incoming 三方保护：`Local == Base` 才更新，`Local != Base && Local != Incoming` 必须冲突回滚。唯一覆盖例外是从固定 `https://api.itdos.com + iTdos` 实时回读并校验为官方 `ApplicationType=Platform` 的应用：其中 `Ownership=Application + UpgradePolicy=Managed` 属于平台发行物，安装/更新按包覆盖本地差异；离线包、自报官方、非 Platform 来源都不能获得该权限。
 - `CreateIfMissing` 只在目标 Key 不存在时创建，存在时不得对齐 Id、源码、启用状态或其它字段。扩展模板发布后即归租户维护；后续版本禁止把同一 Key 改回 `Managed` 接管，确需新的官方核心时发布新 Key 并显式迁移。
-- 官方功能采用“Managed 核心 + CreateIfMissing Hook”。核心只提供稳定协议和默认行为；客户日志、写表、通知和业务动作放 Hook，并以稳定 `EventId`、唯一约束或 outbox 幂等。安全核心冲突不自动三方合并代码。
-- 历史包未声明策略时只能按旧兼容流程安装；重新发布时发布器必须生成策略。验收至少覆盖首次安装、未修改核心升级、核心被改后冲突回滚、Hook 被改后保持原样、重复安装和两节点竞态。
+- 官方功能采用“Managed 核心 + CreateIfMissing Hook”。核心只提供稳定协议和默认行为，并在可信官方 Platform 包更新时覆盖升级；客户日志、写表、通知和业务动作放 Hook，并以稳定 `EventId`、唯一约束或 outbox 幂等。`CreateIfMissing` 一旦交给租户维护，即使后续官方包误改为 Managed 也必须冲突回滚。
+- 历史包未声明策略时只能按旧兼容流程安装；重新发布时发布器必须生成策略。验收至少覆盖首次安装、可信官方 Managed 本地有差异仍覆盖、普通应用核心差异冲突回滚、Hook 被改后保持原样、重复安装、两节点竞态，以及官方发布数据库连 `ValidateOnly` 也禁止执行安装器。
 
 ## 安装流程
 
