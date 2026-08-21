@@ -1729,7 +1729,7 @@ var DiyCommon = {
             closeOnPressEscape: false,
             closeOnHashChange: false,
 
-            customClass: option.CustomClass || "",
+            customClass: [option.CustomClass, "mci-unified-message-box"].filter(Boolean).join(" "),
             beforeClose: typeof option.BeforeClose === "function" ? option.BeforeClose : undefined,
 
             showClose: option.ShowClose,

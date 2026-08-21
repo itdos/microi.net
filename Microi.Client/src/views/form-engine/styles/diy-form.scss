@@ -156,7 +156,33 @@
         padding: 2px 3px 6px;
         border-bottom: 0;
     }
-    .diy-form-section-head span { color: var(--form-center-accent); font-size: 9px; font-weight: 800; letter-spacing: 1.25px; }
+    .diy-form-section-head__identity {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+    }
+    .diy-form-section-head__icon {
+        display: inline-flex;
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 11px;
+        color: var(--form-center-accent);
+        background: color-mix(in srgb, var(--form-center-accent) 10%, var(--form-center-soft) 90%);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--form-center-accent) 8%, transparent);
+        font-size: 15px;
+    }
+    .diy-form-section-head__copy { min-width: 0; }
+    .diy-form-section-head__eyebrow {
+        display: block;
+        color: var(--form-center-accent);
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 1.25px;
+    }
     .diy-form-section-head h3 { margin: 3px 0 0; color: var(--el-text-color-primary); font-size: 17px; line-height: 24px; }
     .diy-form-section-head__description { margin: 3px 0 0; color: var(--el-text-color-secondary); font-size: 11px; line-height: 17px; }
     .diy-form-section-head__description :deep(:first-child) { margin-top: 0; }
@@ -207,6 +233,11 @@
         border-radius: 5px;
         background: var(--form-center-card);
         transition: border-color 160ms ease, box-shadow 160ms ease;
+	box-shadow: 0 3px 12px #1f2d3d09;
+    }
+    :deep(.collapse-group-item.diy-presentation-field-card > .container-form-item) {
+        margin: 3px 5px;
+        border-radius: 9px;
     }
     :deep(.diy-presentation-field-card > .container-form-item:hover) {
         border-color: color-mix(in srgb, var(--form-center-accent) 58%, var(--form-center-line));
@@ -276,7 +307,7 @@
     .section-nav-top .diy-form-section-nav__head,
     .section-nav-bottom .diy-form-section-nav__head { min-width: 126px; }
     .section-nav-top .diy-form-section-nav__item,
-    .section-nav-bottom .diy-form-section-nav__item { min-width: 170px; width: auto; }
+    .section-nav-bottom .diy-form-section-nav__item { min-width: 120px; width: auto; }
     .section-nav-top .diy-form-section-nav__footer,
     .section-nav-bottom .diy-form-section-nav__footer { min-width: 210px; margin: 0; }
     .section-nav-top .diy-form-section-nav__item.active::before,
@@ -299,9 +330,35 @@
     --diy-modern-text: var(--mci-text-primary, var(--el-text-color-primary, #172033));
     --diy-modern-muted: var(--mci-text-secondary, var(--el-text-color-secondary, #66758a));
     box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    // overflow-x: clip;
     // padding: 4px;
 
-    .diy-form-presentation-main { min-width: 0; }
+    .diy-form-presentation-layout,
+    .diy-form-presentation-main,
+    .field-form-tabs,
+    .field-form {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    /* 独立分组导航显示时，原生 Tab 头已隐藏，固定为 block 可进一步隔离
+     * 历史 left/right class 带来的横向 flex 尺寸反馈。 */
+    :deep(.field-form-tabs.presentation-tabs-nav-hidden) { display: block !important; }
+    :deep(.field-form-tabs.presentation-tabs-nav-hidden > .el-tabs__content),
+    :deep(.field-form-tabs.presentation-tabs-nav-hidden > .el-tabs__content > .el-tab-pane),
+    :deep(.field-form-tabs.presentation-tabs-nav-hidden .field-form),
+    :deep(.field-form-tabs.presentation-tabs-nav-hidden .field-form > .el-form),
+    :deep(.field-form-tabs.presentation-tabs-nav-hidden .field-form > .el-form > .el-row) {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
 
     :deep(.field-form-tabs:not(.mci-tabs) > .el-tabs__header) {
         margin: 0 0 10px;
@@ -593,6 +650,8 @@
     .diy-form--controlcenter {
         .diy-form-presentation-main { padding: 8px; border-radius: 12px; }
         .diy-form-section-head { align-items: flex-start; margin-bottom: 7px; }
+        .diy-form-section-head__identity { gap: 8px; }
+        .diy-form-section-head__icon { width: 32px; height: 32px; flex-basis: 32px; border-radius: 10px; font-size: 13px; }
         .diy-form-section-head__description { display: none; }
         .diy-form-section-head__tags { flex-wrap: wrap; gap: 4px; }
         .diy-form-section-head__tags :deep(.el-tag) { height: 22px; padding: 0 6px; font-size: 10px; }

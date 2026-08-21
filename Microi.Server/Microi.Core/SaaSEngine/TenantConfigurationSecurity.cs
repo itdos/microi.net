@@ -464,7 +464,22 @@ namespace Microi.net
                     property.Remove();
                 }
             }
+            // This public boolean contains no tenant secret. It lets low-code page
+            // buttons hide host-level control-plane actions in child tenants while
+            // the corresponding server action still performs authoritative checks.
+            projection["IsMainTenant"] = IsRuntimeMainTenant(osClient);
             return projection;
+        }
+
+        internal static bool IsRuntimeMainTenant(string osClient)
+        {
+            var configured = OsClientExtend.GetConfigOsClient();
+            if (string.IsNullOrWhiteSpace(configured)) configured = OsClientDefault.OsClient;
+            return !string.IsNullOrWhiteSpace(osClient)
+                   && string.Equals(
+                       osClient.Trim(),
+                       (configured ?? string.Empty).Trim(),
+                       StringComparison.OrdinalIgnoreCase);
         }
 
         private static void RemovePropertyIgnoreCase(JObject target, string propertyName)

@@ -1,6 +1,6 @@
 {
   "name": "microi.net",
-  "version": "7.5.1",
+  "version": "7.5.2",
   "description": "开源低代码平台 - Microi吾码",
   "author": "iTdos",
   "type": "module",
@@ -32,6 +32,7 @@
     "test:build-output-mode": "node --test tests/build-output-mode.spec.mjs",
     "test:background-task": "node --test tests/background-task-display.spec.mjs",
     "test:view-schema": "node --test tests/view-schema-runtime.spec.mjs tests/module-presentation-runtime.spec.mjs tests/module-presentation-designer-sfc.spec.mjs tests/module-form-workbench-sfc.spec.mjs",
+    "test:form-banner": "node --test tests/form-banner-runtime.spec.mjs tests/form-banner-sfc.spec.mjs tests/form-presentation-runtime.spec.mjs",
     "test:e2e": "playwright test --config=.microi-e2e/playwright.config.js",
     "test:e2e:headed": "playwright test --config=.microi-e2e/playwright.config.js --headed",
     "test:e2e:ui": "playwright test --config=.microi-e2e/playwright.config.js --ui",

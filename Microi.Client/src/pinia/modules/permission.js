@@ -350,7 +350,8 @@ function buildMeta(item, extra = {}) {
         AppDisplay : item.AppDisplay,
         MenuBadgeConfig: Object.assign({}, menuBadgeOptions, {
             Enabled: item.MenuBadgeEnabled,
-            ApiEngineKey: item.MenuBadgeApiEngineKey || menuBadgeOptions.ApiEngineKey
+            ApiEngineKey: item.MenuBadgeApiEngineKey || menuBadgeOptions.ApiEngineKey,
+            Tooltip: item.MenuBadgeTooltip || menuBadgeOptions.Tooltip
         }),
         UrlParam: item.UrlParam,
         title: item.Name,
@@ -661,7 +662,7 @@ export const usePermissionStore = defineStore("permission", {
                 DiyCommon.Post(
                     DiyApi.GetSysMenuStep(),
                     {
-                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "ModuleEngineKey", "MicroServiceId", "MicroServiceKey", "MsKey", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
+                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "ModuleEngineKey", "MicroServiceId", "MicroServiceKey", "MsKey", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
                         OsClient: osClient,
                         TableName: "Sys_Menu",
                         _OrderBy: "Sort",

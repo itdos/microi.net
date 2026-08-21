@@ -44,6 +44,8 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("ReservedNonDiyLangSlotCount", runtime);
         Assert.Contains("ShouldReserveNonMaintenanceSlot", runtime);
         Assert.Contains("DiyLangBackgroundTaskService.ClusterConcurrencyKey", runtime);
+        Assert.Contains("ChildTenantPlatformAppControlService.ClusterConcurrencyKey", runtime);
+        Assert.Contains("ChildTenantPlatformAppControlService.ChildWorkerApiEngineKey", runtime);
         Assert.Contains("concurrencyLeaseOsClient = OsClientExtend.GetConfigOsClient()", runtime);
         Assert.Contains("ActiveTasks", runtime);
         Assert.Contains("CommandFlags.FireAndForget", runtime);
@@ -56,6 +58,13 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("AttemptCount>=MaxAttempts", store);
         Assert.Contains("任务已耗尽重试次数，系统已自动终结", store);
         Assert.Contains("ApiEngineKey<>@excludedApiEngineKey", store);
+        Assert.Contains("BACKGROUND_TASK_READY_TIME_FAIR_ORDER_V1", store);
+        Assert.Contains(
+            "ORDER BY COALESCE(NextRunTime, CreateTime) ASC, CreateTime ASC",
+            store);
+        Assert.Contains("BACKGROUND_TASK_CONSECUTIVE_RETRY_BUDGET_V1", store);
+        Assert.Contains("AttemptCount=0,LastError=''", store);
+        Assert.Contains("LastError=@p9", store);
         Assert.Contains("Interlocked.Increment(ref _tenantScanCursor)", store);
         Assert.Contains("item.LeaseExpiresAt = leaseExpiresAt", store);
         Assert.Contains("Math.Max(1, Math.Min(3600, delaySeconds))", store);

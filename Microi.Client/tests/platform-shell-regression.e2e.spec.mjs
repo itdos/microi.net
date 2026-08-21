@@ -5,6 +5,7 @@ import path from "node:path";
 const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
 const LOCAL_PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || "";
+const API_BASE = process.env.PW_API_BASE || "";
 const SCREENSHOT_DIR = path.resolve(
     process.cwd(),
     process.env.PW_SCREENSHOT_DIR || "../.tmp/platform-shell-acceptance"
@@ -19,7 +20,8 @@ test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
 function tenantUrl(hash = "") {
-    return `${FRONTEND}/?OsClient=iTdos${hash}`;
+    const apiBase = API_BASE ? `&ApiBase=${encodeURIComponent(API_BASE)}` : "";
+    return `${FRONTEND}/?OsClient=iTdos${apiBase}${hash}`;
 }
 
 async function login(page) {
@@ -348,9 +350,13 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     await openRoute(page, "#/microi-store");
     const store = await waitForFrame(page, ".marketplace");
 
-    await expect(store.getByText("平台官方应用源", { exact: true }).first()).toBeVisible({ timeout: 45_000 });
+    const sourcePicker = store.locator(".source-picker");
+    await expect(sourcePicker.getByLabel("商城来源")).toHaveValue("official", { timeout: 45_000 });
+    await expect(store.locator(".market-toolbar__source-context")).toContainText("平台官方应用源");
     await expect(store.getByText("吾码官方源", { exact: true })).toHaveCount(0);
-    const category = store.locator('select[aria-label="应用分类"]');
+    const filterMenu = store.locator(".filter-menu");
+    await filterMenu.locator("summary").click();
+    const category = filterMenu.locator('select[aria-label="应用分类"]');
     await expect(category).toBeVisible();
     const categoryText = await category.locator("option").allTextContents();
     expect(categoryText).toEqual(expect.arrayContaining(["游戏", "企业应用", "办公协同"]));
@@ -364,6 +370,25 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     await expect(pager).toBeVisible();
     await expect(pager.locator('select')).toBeVisible();
     await expect(pager.locator('input[type="number"]')).toBeVisible();
+    const compactGeometry = await store.evaluate(() => {
+        const hero = document.querySelector(".market-hero")?.getBoundingClientRect();
+        const preview = document.querySelector(".app-card .preview-wrap")?.getBoundingClientRect();
+        const visibleToolbarButtons = [...document.querySelectorAll(".market-toolbar button")]
+            .filter((element) => {
+                const style = getComputedStyle(element);
+                const box = element.getBoundingClientRect();
+                return style.visibility !== "hidden" && style.display !== "none" && box.width > 0 && box.height > 0;
+            });
+        return {
+            heroHeight: hero?.height || 0,
+            previewHeight: preview?.height || 0,
+            visibleToolbarButtonCount: visibleToolbarButtons.length
+        };
+    });
+    expect(compactGeometry.heroHeight, JSON.stringify(compactGeometry)).toBeLessThanOrEqual(125);
+    expect(compactGeometry.previewHeight, JSON.stringify(compactGeometry)).toBeLessThanOrEqual(120);
+    expect(compactGeometry.visibleToolbarButtonCount, JSON.stringify(compactGeometry)).toBeLessThanOrEqual(4);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "09-marketplace-clean-overview.png"), fullPage: false });
 
     const routeBeforeModes = page.url();
     await store.getByRole("button", { name: /已经安装应用/ }).click();
@@ -386,7 +411,7 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     }));
     expect(beforeDetailScrollState.htmlComputed, JSON.stringify(beforeDetailScrollState)).not.toBe("hidden");
 
-    await store.getByRole("button", { name: "查看完整详情", exact: true }).first().click();
+    await store.getByRole("button", { name: "详情", exact: true }).first().click();
     const detail = store.locator(".modal-shell.app-detail");
     const detailBackdrop = store.locator(".modal-backdrop").filter({ has: detail });
     await expect(detail).toBeVisible({ timeout: 30_000 });
@@ -553,7 +578,7 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     }));
     expect(unlockedState.htmlComputed, JSON.stringify(unlockedState)).not.toBe("hidden");
 
-    await store.getByRole("button", { name: "管理商城源", exact: true }).click();
+    await store.getByRole("button", { name: "来源设置", exact: true }).click();
     const sourceDialog = store.locator(".modal-shell.source-editor");
     const sourceBackdrop = store.locator(".modal-backdrop").filter({ has: sourceDialog });
     await expect(sourceDialog).toBeVisible();

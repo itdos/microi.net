@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +34,19 @@ function parseArguments(rawArguments) {
     throw new Error('Tool arguments must be a JSON object.');
   }
   return parsed;
+}
+
+async function hydrateFileParameters(argumentsObject, rawMapping) {
+  if (!rawMapping) return argumentsObject;
+  const mapping = parseArguments(rawMapping);
+  const result = { ...argumentsObject };
+  for (const [parameterName, filePath] of Object.entries(mapping)) {
+    if (!parameterName || typeof filePath !== 'string' || !filePath.trim()) {
+      throw new Error('MICROI_MCP_FILE_PARAMS_JSON must map parameter names to file paths.');
+    }
+    result[parameterName] = await readFile(path.resolve(filePath), 'utf8');
+  }
+  return result;
 }
 
 function buildServerEnvironment(sourceEnvironment) {
@@ -107,8 +121,9 @@ async function main() {
 
   const serverEnvironment = buildServerEnvironment(process.env);
   validateConfiguration(serverEnvironment);
-  const toolArguments = parseArguments(
-    process.env.MICROI_MCP_TOOL_ARGS_JSON || process.argv[3] || '{}',
+  const toolArguments = await hydrateFileParameters(
+    parseArguments(process.env.MICROI_MCP_TOOL_ARGS_JSON || process.argv[3] || '{}'),
+    process.env.MICROI_MCP_FILE_PARAMS_JSON,
   );
   const serverEntry = process.env.MICROI_MCP_SERVER_ENTRY
     ? path.resolve(process.env.MICROI_MCP_SERVER_ENTRY)

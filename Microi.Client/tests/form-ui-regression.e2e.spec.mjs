@@ -1327,6 +1327,39 @@ test("君驰项目表单：必填内联提示、数字步进无断层、紧凑�
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03b-junchi-collapse-group.png"), fullPage: false });
 });
 
+test("君驰托码表单：折叠分组头部与内容左右边界完整拼接", async ({ page }) => {
+    test.skip(!JUNCHI_PASSWORD, "PW_JUNCHI_PASSWORD is required");
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    const tenant = { osClient: "junchi", apiBase: "https://api.chongstech.com", password: JUNCHI_PASSWORD };
+    await openTenantRoute(page, tenant, "#/diy-tuoma");
+    const firstRow = page.locator(".el-table__body-wrapper tbody tr").first();
+    await expect(firstRow).toBeVisible({ timeout: 60_000 });
+    await firstRow.dblclick();
+
+    const overlay = page.locator(".diy-form-container.el-dialog, .diy-form-container.el-drawer").last();
+    await expect(overlay).toBeVisible({ timeout: 45_000 });
+    const collapse = overlay.locator(".diy-collapse-group").first();
+    await expect(collapse).toBeVisible({ timeout: 45_000 });
+    await collapse.scrollIntoViewIfNeeded();
+
+    const seam = await overlay.evaluate((root) => {
+        const header = root.querySelector(".diy-collapse-group");
+        const first = root.querySelector(".collapse-group-item.collapse-group-row-start");
+        const row = first?.closest(".el-row");
+        if (!header || !row) return null;
+        const headerBox = header.getBoundingClientRect();
+        const rowBox = row.getBoundingClientRect();
+        return {
+            left: Math.abs(headerBox.left - rowBox.left),
+            right: Math.abs(headerBox.right - rowBox.right)
+        };
+    });
+    expect(seam).not.toBeNull();
+    expect(seam.left, JSON.stringify(seam)).toBeLessThanOrEqual(1);
+    expect(seam.right, JSON.stringify(seam)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03c-junchi-tuoma-collapse-seam.png"), fullPage: false });
+});
+
 test("君驰设计器：双击折叠分组保留图标与视觉风格专项配置", async ({ page }) => {
     test.skip(!JUNCHI_PASSWORD, "PW_JUNCHI_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });

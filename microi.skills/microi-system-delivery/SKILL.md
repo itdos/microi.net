@@ -9,6 +9,12 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 
 本 Skill 来自一次完整业务系统交付复盘。目标是让下一套 OA、ERP、MES、CRM、商城、预约、互联网项目等 Microi 系统少走返工路：先固定事实源，再用 MCP 正确建模，最后用可视化和业务闭环测试证明可交付。
 
+每张由 AI/MCP 创建的业务表都必须同时设计默认表单 Banner，不能只建字段和菜单。完整
+Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选择业务编号/名称标题、
+客户/项目副标题、首个 `ImgUpload`、状态/类型标签和真实数值指标，并写入 `diy_table`
+语义字段。跨表统计由接口引擎批量返回，禁止随机数、固定演示值和 N+1；Banner 不属于
+模块引擎或 `sys_menu`。逐步建模在字段完成后调用 `microi_configure_form_banner` 回读验收。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=b09c3f2d05e2927322de0c42913f85813296e9001bccf31b6dc85779cbe3099f -->
 ## 交付总原则

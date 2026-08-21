@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.2.3
+ * Version: v1.2.4
  * Function:
  * - 只规划并安装“未安装/可更新”应用，绝不重新安装已是最新版的应用。
  * - 计划和子检查点写入后台任务 CheckpointJson，支持多节点租约转移、进程重启和幂等重试。
@@ -102,6 +102,11 @@ function childFailureDetail(result) {
         }
         var direct = value.详情 || value.Detail || value.Msg || value.Message
             || value.错误信息 || value.Error || value.error;
+        var identifier = value.标识 || value.Identifier || value.Key || value.key;
+        if (direct !== null && direct !== undefined && identifier) {
+            addDetail(trim(identifier) + '：' + trim(direct));
+            return;
+        }
         if (direct !== null && direct !== undefined) scan(direct, depth + 1, true);
         for (var key in value) {
             if (!Object.prototype.hasOwnProperty.call(value, key) || details.length >= 3) continue;

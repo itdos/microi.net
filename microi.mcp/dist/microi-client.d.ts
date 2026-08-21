@@ -780,6 +780,8 @@ export declare class MicroiClient {
         ExpectedCurrentHash?: string;
         ChangeSummary?: string;
     }): Promise<ApiResponse>;
+    listBackgroundTasks(): Promise<ApiResponse>;
+    cancelBackgroundTask(taskId: string): Promise<ApiResponse>;
     listPageEngineHistory(pageId: string, pageIndex?: number, pageSize?: number): Promise<ApiResponse>;
     getPageEngineHistory(pageId: string, historyId: string): Promise<ApiResponse>;
     comparePageEngineVersions(pageId: string, leftHistoryId?: string, rightHistoryId?: string): Promise<ApiResponse>;

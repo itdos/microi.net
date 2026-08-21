@@ -1398,6 +1398,7 @@ export function buildPlan(manifest) {
     const jobs = getArray(manifest, 'jobs', 'Jobs');
     const permissions = getArray(manifest, 'permissions', 'Permissions');
     const manifestFieldsByTable = new Map();
+    const manifestEngineKeys = new Set(engines.map((engine) => getString(engine, 'apiEngineKey', 'ApiEngineKey').toLowerCase()).filter(Boolean));
     if (!tables.length && !engines.length && !modules.length && !pages.length) {
         warnings.push('Manifest 未声明 tables/engines/modules/pages，可能不是完整系统计划');
     }
@@ -1429,6 +1430,33 @@ export function buildPlan(manifest) {
             if (name && label)
                 manifestFieldsByTable.get(name.toLowerCase())?.add(label.toLowerCase());
             plan.push(`add_field ${name}.${fieldName}`);
+        });
+        const bannerPatch = buildDefaultFormBanner(table);
+        plan.push(`configure_form_banner ${name || `(index ${tableIndex})`}`);
+        const knownBannerFields = manifestFieldsByTable.get(name.toLowerCase()) || new Set();
+        const validateBannerField = (fieldName, path) => {
+            if (fieldName && !knownBannerFields.has(fieldName.toLowerCase()) && !isSystemFieldName(fieldName)) {
+                errors.push(`${path} references unknown field "${fieldName}" on table "${name}"`);
+            }
+        };
+        validateBannerField(getString(bannerPatch, 'FormBannerTitleField'), `tables[${tableIndex}].formBanner.titleField`);
+        validateBannerField(getString(bannerPatch, 'FormBannerSubtitleField'), `tables[${tableIndex}].formBanner.subtitleField`);
+        validateBannerField(getString(bannerPatch, 'FormBannerImageField'), `tables[${tableIndex}].formBanner.imageField`);
+        validateBannerField(getString(bannerPatch, 'FormBannerBackgroundField'), `tables[${tableIndex}].formBanner.backgroundField`);
+        const bannerTags = bannerDescriptorArray(JSON.parse(getString(bannerPatch, 'FormBannerTagFields') || '[]'));
+        bannerTags.forEach((item, position) => {
+            const fieldName = typeof item === 'string' ? item : getString(asRecord(item), 'Field', 'field', 'Name', 'name');
+            validateBannerField(fieldName, `tables[${tableIndex}].formBanner.tagFields[${position}]`);
+        });
+        const bannerMetrics = bannerDescriptorArray(JSON.parse(getString(bannerPatch, 'FormBannerMetrics') || '[]'));
+        bannerMetrics.forEach((item, position) => {
+            const metric = asRecord(item);
+            const fieldName = typeof item === 'string' ? item : getString(metric, 'Field', 'field', 'Name', 'name');
+            validateBannerField(fieldName, `tables[${tableIndex}].formBanner.metrics[${position}]`);
+            const apiEngineKey = getString(metric, 'ApiEngineKey', 'apiEngineKey');
+            if (apiEngineKey && !manifestEngineKeys.has(apiEngineKey.toLowerCase())) {
+                warnings.push(`tables[${tableIndex}].formBanner.metrics[${position}] references ApiEngineKey "${apiEngineKey}" not declared in this manifest; it must already exist in the target tenant`);
+            }
         });
         const indexableFields = new Set(getArray(table, 'fields', 'Fields')
             .map((field) => getString(field, 'name', 'Name').toLowerCase())
@@ -1925,6 +1953,140 @@ function getManifestRelationContract(field) {
         primaryTableFieldName: getString(relation, 'primaryTableFieldName', 'PrimaryTableFieldName') || 'Id',
     };
 }
+const FORM_BANNER_LAYOUT_COMPONENTS = new Set([
+    'collapsegroup', 'tabs', 'divider', 'empty', 'alert', 'statictext', 'html', 'button',
+]);
+const FORM_BANNER_TAG_COMPONENTS = new Set([
+    'select', 'multipleselect', 'radio', 'checkbox', 'switch', 'cascader', 'selecttree', 'department',
+]);
+const FORM_BANNER_NUMBER_COMPONENTS = new Set(['numbertext', 'slider', 'rate', 'progress']);
+function bannerFieldText(field) {
+    return `${getString(field, 'name', 'Name')} ${getString(field, 'label', 'Label')} ${getString(field, 'description', 'Description')}`.toLowerCase();
+}
+function bannerFieldScore(field, keywords, fallback) {
+    const text = bannerFieldText(field);
+    const matched = keywords.findIndex((keyword) => text.includes(keyword));
+    return matched >= 0 ? 100 - matched : fallback;
+}
+function isBannerNumericField(field) {
+    if (FORM_BANNER_TAG_COMPONENTS.has(tableFieldComponent(field)))
+        return false;
+    if (FORM_BANNER_NUMBER_COMPONENTS.has(tableFieldComponent(field)))
+        return true;
+    return /^(tinyint|smallint|mediumint|int|bigint|decimal|numeric|float|double|real)(\b|\()/iu
+        .test(getString(field, 'type', 'Type'));
+}
+function isMeaningfulBannerMetricField(field) {
+    if (!isBannerNumericField(field))
+        return false;
+    const text = bannerFieldText(field);
+    if (/(^|\s|_)(id|ids)(\s|_|$)|sort|order|latitude|longitude|phone|mobile|enabled?|disabled?|visible|deleted|status|state|type|category|version|timeout|retry|limit|pagesize|page size|offset|loaded|load count|record count|data count|排序|经度|纬度|电话|手机|启用|禁用|显示|删除|状态|类型|分类|版本|超时|重试|限制|分页|本页|加载|记录数/iu.test(text))
+        return false;
+    return hasKeyword(text, [
+        'amount', 'money', 'price', 'total', 'count', 'quantity', 'number', 'score', 'rate', 'progress',
+        'budget', 'cost', 'fee', 'tax', 'discount', 'income', 'expense', 'balance', 'point', 'weight',
+        'volume', 'area', 'duration', 'hour', 'day',
+        '金额', '总额', '价格', '数量', '个数', '积分', '比例', '进度', '余额', '预算', '成本', '费用',
+        '税额', '折扣', '收入', '支出', '重量', '体积', '面积', '时长', '工时', '天数', '评分', '完成度',
+    ]);
+}
+function bannerDescriptorArray(value) {
+    if (Array.isArray(value))
+        return value;
+    if (typeof value !== 'string' || !value.trim())
+        return [];
+    return jsonArrayOrSplit(value);
+}
+/**
+ * Build the semantic diy_table Banner patch used by Manifest generation.
+ * Explicit arrays win (including []); otherwise business field types supply a
+ * stable, useful first rendering for new modules and old databases alike.
+ */
+export function buildDefaultFormBanner(table) {
+    const fields = getArray(table, 'fields', 'Fields').filter((field) => {
+        const name = getString(field, 'name', 'Name');
+        const visible = getNumber(field, 'visible', 'Visible');
+        return Boolean(name)
+            && visible !== 0
+            && !isSystemFieldName(name)
+            && !FORM_BANNER_LAYOUT_COMPONENTS.has(tableFieldComponent(field));
+    });
+    const explicitValue = getValue(table, 'formBanner', 'FormBanner');
+    const explicit = asRecord(explicitValue);
+    const ranked = (score) => fields
+        .map((field, index) => ({ field, index, score: score(field, index) }))
+        .filter((item) => item.score > 0)
+        .sort((left, right) => right.score - left.score || left.index - right.index)
+        .map((item) => item.field);
+    const titleField = getString(explicit, 'titleField', 'TitleField') || getString(ranked((field, index) => {
+        let score = bannerFieldScore(field, ['title', 'name', 'subject', 'code', 'no', 'number', '标题', '名称', '主题', '编号', '单号', '编码'], 20 - index);
+        if (tableFieldComponent(field) === 'autonumber')
+            score += 50;
+        else if (tableFieldComponent(field) === 'text')
+            score += 20;
+        if (FORM_BANNER_TAG_COMPONENTS.has(tableFieldComponent(field)) || isBannerNumericField(field))
+            score -= 80;
+        return score;
+    })[0] || {}, 'name', 'Name');
+    const subtitleField = getString(explicit, 'subtitleField', 'SubtitleField') || getString(ranked((field, index) => {
+        const name = getString(field, 'name', 'Name');
+        if (name === titleField || isBannerNumericField(field) || tableFieldComponent(field) === 'imgupload')
+            return 0;
+        return bannerFieldScore(field, [
+            'subtitle', 'customer', 'client', 'project', 'company', 'category', 'type', 'date', 'contact',
+            '副标题', '客户', '项目', '公司', '单位', '分类', '类型', '日期', '联系人', '说明',
+        ], 12 - index) + (['text', 'select', 'radio', 'datetime', 'department', 'selecttree'].includes(tableFieldComponent(field)) ? 18 : 0);
+    })[0] || {}, 'name', 'Name');
+    const imageField = getString(explicit, 'imageField', 'ImageField')
+        || getString(fields.find((field) => ['imgupload', 'imageupload'].includes(tableFieldComponent(field))) || {}, 'name', 'Name');
+    const tagValue = getValue(explicit, 'tagFields', 'TagFields', 'tags', 'Tags');
+    const tags = tagValue !== undefined
+        ? bannerDescriptorArray(tagValue)
+        : ranked((field, index) => FORM_BANNER_TAG_COMPONENTS.has(tableFieldComponent(field))
+            ? bannerFieldScore(field, ['status', 'state', 'stage', 'type', 'category', 'level', '状态', '阶段', '类型', '分类', '级别'], 30 - index)
+            : 0)
+            .slice(0, 3)
+            .map((field) => ({
+            Key: getString(field, 'name', 'Name'),
+            Field: getString(field, 'name', 'Name'),
+            Label: getString(field, 'label', 'Label') || getString(field, 'name', 'Name'),
+        }));
+    const metricValue = getValue(explicit, 'metrics', 'Metrics');
+    const metrics = metricValue !== undefined
+        ? bannerDescriptorArray(metricValue)
+        : ranked((field) => {
+            if (!isMeaningfulBannerMetricField(field))
+                return 0;
+            return bannerFieldScore(field, [
+                'amount', 'money', 'price', 'total', 'count', 'quantity', 'number', 'score', 'rate', 'progress',
+                'budget', 'cost', 'fee', 'tax', 'discount', 'income', 'expense', 'balance', 'point', 'weight',
+                '金额', '总额', '价格', '数量', '个数', '积分', '比例', '进度', '余额', '预算', '成本', '费用',
+            ], 0);
+        }).slice(0, 3).map((field) => ({
+            Key: getString(field, 'name', 'Name'),
+            Field: getString(field, 'name', 'Name'),
+            Label: getString(field, 'label', 'Label') || getString(field, 'name', 'Name'),
+            Auto: true,
+        }));
+    const enabled = getBoolean(explicit, 'enabled', 'Enabled');
+    const result = {
+        FormBannerEnabled: enabled === false ? 0 : 1,
+        FormBannerTitleField: titleField,
+        FormBannerSubtitleField: subtitleField,
+        FormBannerImageField: imageField,
+        FormBannerIcon: getString(explicit, 'icon', 'Icon') || 'far fa-file-alt',
+        FormBannerBackgroundField: getString(explicit, 'backgroundField', 'BackgroundField'),
+        FormBannerTagFields: JSON.stringify(tags),
+    };
+    const hasChildRelation = fields.some((field) => tableFieldComponent(field) === 'tablechild'
+        || getManifestRelationContract(field)?.cardinality === '1:N');
+    // A child-only table intentionally leaves the column null so the runtime can
+    // discover authorized child counts/SUM values. Explicit [] still disables it.
+    if (metricValue !== undefined || metrics.length > 0 || !hasChildRelation) {
+        result.FormBannerMetrics = JSON.stringify(metrics);
+    }
+    return result;
+}
 function parseConfigRecord(value) {
     if (typeof value === 'string') {
         if (!value.trim())
@@ -2287,6 +2449,19 @@ export function manifestGuide(osClient) {
                     description: 'Order main table',
                     v8Limit: false,
                     tabs: [{ Id: 'basic', Name: 'Basic Info', Sort: 10 }, { Id: 'business', Name: 'Business Info', Sort: 20 }],
+                    formBanner: {
+                        enabled: true,
+                        titleField: 'OrderNo',
+                        subtitleField: 'CustomerName',
+                        imageField: '',
+                        icon: 'far fa-file-alt',
+                        backgroundField: '',
+                        tagFields: [{ Field: 'Status', Label: 'Status' }],
+                        metrics: [
+                            { Field: 'Amount', Label: 'Order Amount', Prefix: '¥', Icon: 'fas fa-coins' },
+                            { Key: 'Pending', Label: 'Pending', ApiEngineKey: 'biz_order_metrics', ValuePath: 'Data.Pending', RefreshSeconds: 30 },
+                        ],
+                    },
                     fields: [
                         { name: 'OrderNo', label: 'Order No', type: 'varchar(50)', component: 'AutoNumber', tab: 'basic', configSource: { sourceType: 'AutoNumber', prefix: 'ORD', length: 6 }, notEmpty: 1, unique: 1, tableWidth: 160, sort: 10 },
                         { name: 'CustomerName', label: 'Customer', type: 'varchar(100)', component: 'Text', tab: 'basic', notEmpty: 1, tableWidth: 160, sort: 20 },
@@ -2449,6 +2624,7 @@ export function manifestGuide(osClient) {
         naturalFieldKeys: {
             tables: {
                 tabs: 'diy_table.Tabs form groups. When omitted and the table has more than 12 business fields, generator creates Basic/Contact/Business/Attachment/Extra tabs and assigns empty field tab values.',
+                formBanner: 'Semantic diy_table Banner configuration. Configure enabled/titleField/subtitleField/imageField/icon/backgroundField/tagFields/metrics here, never in sys_menu. The default Banner uses a compact theme-colored dark gradient. When omitted, generator writes useful type-aware defaults: title/name/code, customer/project subtitle, first ImgUpload, up to 3 option tags and up to 3 business-semantic metrics. Id/sort/enabled/status/version/page-load numbers are never metrics. A TableChild form may leave metrics unset so runtime performs authorized full-child count/SUM inference. Metrics may also use ApiEngineKey + ValuePath + ParamMap + RefreshSeconds.',
                 column: 'Form column count. Omit to use 2 columns for generated systems unless the user asks for a single-column form.',
                 formOpenType: 'Default Dialog. Use Drawer only for extremely large forms (roughly 36+ business fields, 2+ child tables, or similarly heavy content).',
                 formOpenWidth: 'Default 80% for generated Dialog forms. Preserve an explicit business-specific width.',
@@ -2487,6 +2663,7 @@ export function manifestGuide(osClient) {
         },
         rules: [
             'Use table and field names in manifests; do not ask the user for diy_field ids.',
+            'Every generated business table must have a useful compact theme-colored dark-gradient form Banner. Put its configuration in tables[].formBanner/diy_table, not in modules/sys_menu. Prefer a business number/name title, a customer/project subtitle, real option tags and at most 3 business-semantic current-record or authorized full-child metrics; exclude technical numbers and never fabricate statistics.',
             'JoinForm is only for 1:1/N:1 and must target a different table through a real parent Id field. Use TableChild for every 1:N collection; declare its child table, child foreign key, hidden child module and (OsClient, foreignKey) index. The generator rejects raw or unresolved relation Config.',
             'Put business logic in API engines and call them from menu button V8Code.',
             'For workflow manifests, include exactly one start node, at least one end node, valid FromNodeId/ToNodeId lines, and stable LineName values in the form "{from node} 到 {to node}".',
@@ -2694,6 +2871,19 @@ export function registerAdvancedTools(server, client, context) {
                             results,
                         }, null, 2), true);
                     }
+                }
+                const bannerPatch = buildDefaultFormBanner(table);
+                const bannerResponse = await client.updateTable({ Id: tableId, ...bannerPatch });
+                results.push({ step: 'configureFormBanner', tableName, banner: bannerPatch, response: bannerResponse });
+                if (bannerResponse.Code !== 1) {
+                    return textResult(JSON.stringify({
+                        ok: false,
+                        failedAt: 'configureFormBanner',
+                        tableName,
+                        banner: bannerPatch,
+                        response: bannerResponse,
+                        results,
+                    }, null, 2), true);
                 }
             }
             const schemaResponse = await client.getDbSchema();

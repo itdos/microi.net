@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.8.3
+ * Version: v1.8.4
  * Function:
- * - 统一应用商城发布器：V3 committed proof、精确版本、共享公共运行时，以及受管接口历史兼容基线的连续发布。
+ * - 统一应用商城发布器：V3 committed proof、精确版本、资源快照 CAS、共享公共运行时，以及受管接口历史兼容基线的连续发布。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -370,6 +370,146 @@ function canonicalJson(value) {
 function sha256Hex(value) {
   if (!V8.EncryptHelper || !V8.EncryptHelper.Sha256Hex) throw new Error('V8.EncryptHelper.Sha256Hex 不可用');
   return text(V8.EncryptHelper.Sha256Hex(text(value))).toLowerCase();
+}
+var RESOURCE_SNAPSHOT_SCHEMA = 'Microi.ApplicationResourceSnapshot';
+var RESOURCE_SNAPSHOT_SCHEMA_VERSION = 1;
+
+/*
+ * 资源快照允许业务数据中的有限小数，但仍拒绝非 JSON 数值和超出
+ * JavaScript safe integer 边界的数值。对象键在所有层级按字典序输出。
+ */
+function canonicalResourceJson(value) {
+  if (value === null) return 'null';
+  if (value && typeof value.length === 'number' && typeof value !== 'string') {
+    var arrayParts = [];
+    for (var arrayIndex = 0; arrayIndex < value.length; arrayIndex++) {
+      arrayParts.push(canonicalResourceJson(value[arrayIndex]));
+    }
+    return '[' + arrayParts.join(',') + ']';
+  }
+  if (typeof value === 'object') {
+    var objectKeys = Object.keys(value).sort();
+    var objectParts = [];
+    for (var objectIndex = 0; objectIndex < objectKeys.length; objectIndex++) {
+      var objectKey = objectKeys[objectIndex];
+      if (value[objectKey] === undefined || typeof value[objectKey] === 'function') {
+        throw new Error('资源快照不能包含 undefined/function：' + objectKey);
+      }
+      objectParts.push(JSON.stringify(objectKey) + ':' + canonicalResourceJson(value[objectKey]));
+    }
+    return '{' + objectParts.join(',') + '}';
+  }
+  if (typeof value === 'number'
+      && (!isFinite(value) || Math.abs(value) > 9007199254740991)) {
+    throw new Error('资源快照 number 只允许有限 safe number');
+  }
+  var primitive = JSON.stringify(value);
+  if (primitive === undefined) throw new Error('资源快照包含非 JSON 值');
+  return primitive;
+}
+
+/* 每个资源行先做对象键规范化，再按整行 canonical JSON 稳定排序。 */
+function sortCanonicalResourceArray(value) {
+  var rows = toArray(value);
+  var entries = [];
+  for (var i = 0; i < rows.length; i++) {
+    var rowJson = canonicalResourceJson(rows[i]);
+    entries.push({ Json: rowJson, Value: JSON.parse(rowJson) });
+  }
+  entries.sort(function (left, right) {
+    if (left.Json < right.Json) return -1;
+    if (left.Json > right.Json) return 1;
+    return 0;
+  });
+  var result = [];
+  for (var entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+    result.push(entries[entryIndex].Value);
+  }
+  return result;
+}
+
+/* DataSets 是二层资源：数据集与其 Rows 都必须消除数据库返回顺序差异。 */
+function normalizeSnapshotDataSets(value) {
+  var rows = toArray(value);
+  var normalized = [];
+  for (var i = 0; i < rows.length; i++) {
+    var dataSetJson = canonicalResourceJson(rows[i] || {});
+    var dataSet = JSON.parse(dataSetJson);
+    if (dataSet.Rows !== undefined && dataSet.Rows !== null) {
+      dataSet.Rows = sortCanonicalResourceArray(dataSet.Rows);
+    }
+    normalized.push(dataSet);
+  }
+  return sortCanonicalResourceArray(normalized);
+}
+
+/* MenuContract 保留全部字段，仅对其集合型菜单数组做稳定排序。 */
+function normalizeSnapshotMenuContract(value) {
+  if (!value) return null;
+  var normalized = JSON.parse(canonicalResourceJson(value));
+  if (normalized.MenuIds !== undefined && normalized.MenuIds !== null) {
+    normalized.MenuIds = sortCanonicalResourceArray(normalized.MenuIds);
+  }
+  if (normalized.Menus !== undefined && normalized.Menus !== null) {
+    normalized.Menus = sortCanonicalResourceArray(normalized.Menus);
+  }
+  return normalized;
+}
+
+/*
+ * RESOURCE_SNAPSHOT_SCHEMA_V1
+ * 快照只包含会影响应用安装资源的稳定事实；不包含时间、用户或资产地址。
+ * SysApiEngines 保留导出行全部字段，包括完整 ApiV8Code。
+ */
+function buildResourceSnapshot(appKey, appVersion, menuContract, resources, resourcePolicies) {
+  var normalizedAppKey = text(appKey).replace(/^\s+|\s+$/g, '');
+  var normalizedAppVersion = normalizeExactVersion(appVersion);
+  if (isBlank(normalizedAppKey)) throw new Error('资源快照 AppKey 不能为空');
+  if (isBlank(normalizedAppVersion)) throw new Error('资源快照 AppVersion 必须是精确语义版本');
+  var source = resources || {};
+  return {
+    Schema: RESOURCE_SNAPSHOT_SCHEMA,
+    SchemaVersion: RESOURCE_SNAPSHOT_SCHEMA_VERSION,
+    AppKey: normalizedAppKey,
+    AppVersion: normalizedAppVersion,
+    MenuContract: normalizeSnapshotMenuContract(menuContract),
+    Resources: {
+      DDLStatements: sortCanonicalResourceArray(source.DDLStatements),
+      PhysicalColumns: sortCanonicalResourceArray(source.PhysicalColumns),
+      DiyTables: sortCanonicalResourceArray(source.DiyTables),
+      DiyFields: sortCanonicalResourceArray(source.DiyFields),
+      DataSets: normalizeSnapshotDataSets(source.DataSets),
+      SysMenus: sortCanonicalResourceArray(source.SysMenus),
+      WfFlowDesigns: sortCanonicalResourceArray(source.WfFlowDesigns),
+      WfNodes: sortCanonicalResourceArray(source.WfNodes),
+      WfLines: sortCanonicalResourceArray(source.WfLines),
+      SysApiEngines: sortCanonicalResourceArray(source.SysApiEngines),
+      ScheduleJobs: sortCanonicalResourceArray(source.ScheduleJobs)
+    },
+    ResourcePolicies: resourcePolicies
+      ? JSON.parse(canonicalResourceJson(resourcePolicies))
+      : null
+  };
+}
+
+function createResourceSnapshotReceipt(appKey, appVersion, menuContract, resources, resourcePolicies) {
+  var snapshot = buildResourceSnapshot(appKey, appVersion, menuContract, resources, resourcePolicies);
+  var canonical = canonicalResourceJson(snapshot);
+  return {
+    ResourceSnapshotSchema: RESOURCE_SNAPSHOT_SCHEMA,
+    ResourceSnapshotSchemaVersion: RESOURCE_SNAPSHOT_SCHEMA_VERSION,
+    ResourceSnapshot: JSON.parse(canonical),
+    ResourceSnapshotCanonicalJson: canonical,
+    ResourceSnapshotHash: sha256Hex(canonical)
+  };
+}
+
+function readExpectedResourceSnapshotHash(value) {
+  var hash = text(value).replace(/^\s+|\s+$/g, '').toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(hash)) {
+    throw new Error('ProtocolVersion=3 Publish 必须提供有效 ExpectedResourceSnapshotHash');
+  }
+  return hash;
 }
 function apiEngineMap(engines) {
   var result = {};

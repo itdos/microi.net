@@ -44,6 +44,38 @@ Drawer 只服务超长复杂表单，不能作为所有 CRUD 模块的模板默�
    若设计器显示而运行态不显示，先检查 `InFormV8`/字段 V8 是否调用
    `V8.FieldSet(..., 'Visible', false)`、`hideField` 或传入 `HideFields`，再判断前端源码。
 
+## 表单 Banner（所有新业务表必做）
+
+标准表单 Banner 默认显示，以当前主题色约 50% 混合强度叠加深蓝灰渐变，并适配浅色、
+深色与移动端。视觉应有层次但保持清爽，标题始终维持安全对比度；统计卡片使用半透明背景
+和柔和阴影分层，避免堆叠边框。它属于表单语义，配置
+必须写入 `diy_table` 的 `FormBannerEnabled`、`FormBannerTitleField`、
+`FormBannerSubtitleField`、`FormBannerImageField`、`FormBannerIcon`、
+`FormBannerBackgroundField`、`FormBannerTagFields`、`FormBannerMetrics`，禁止写进
+`sys_menu`、`DiyConfig` 或项目定制组件。
+
+- 标题优先业务自动编号/单号/编码，再选名称或标题；副标题优先客户、项目、公司、分类、
+  日期等可读字段。
+- 左侧图片使用 `ImgUpload`。单图、多图取首图，继续遵循吾码公有/私有文件路径与授权
+  规则；图片为空时必须有语义合适的 Font Awesome 图标回退。
+- 右侧标签优先 `Select/Radio/Switch/Checkbox/SelectTree/Department` 等选项字段，最多
+  选择 3 个有业务意义的状态、类型或等级。显式 `[]` 表示不要自动标签。
+- 自动统计最多 3 项，只选择真实金额、合计、数量、成本、余额、评分、比率、进度等具有
+  明确业务口径的数值字段；必须排除 Id、排序、启用、状态、版本、分页和本页加载量。
+  存在 `TableChild` 时，默认统计必须携带完整父表/父字段/父记录授权上下文，在服务端对全部
+  关联子表数据计算行数或业务数值合计，不能只统计当前页。跨表自定义口径使用 `ApiEngineKey +
+  ValuePath + ParamMap + RefreshSeconds`，相同接口批量返回，禁止 N+1、随机数和固定演示数；
+  没有可靠指标时隐藏统计区。显式 `[]` 表示不要自动统计。
+- 兼容旧模块 Hero 时仅迁移视觉、`Source=Field` 或显式记录作用域指标；列表总数、分类数量和
+  未引用当前 `Form/RecordId` 的全局接口统计不得进入单记录 Banner，缺省时回到当前记录和
+  授权 `TableChild` 的语义统计。
+- 未配置的存量表由运行时按字段类型智能推断，不能因为物理字段为空而隐藏或展示空壳。
+  只有 `FormBannerEnabled=0` 才隐藏。
+- 完整系统 Manifest 使用 `tables[].formBanner`；未提供时 `microi_generate_system` 仍须写入
+  类型感知的默认值。逐步创建字段后调用 `microi_configure_form_banner` 并回读验证。
+- 表单设计器验收必须覆盖有/无图片、有/无统计、子表完整聚合、接口失败回退、浅色、深色、
+  PC 和窄屏，并检查文字对比度以及不存在技术字段伪统计。
+
 ## 物理类型底线
 
 MCP 建模只使用：

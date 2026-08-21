@@ -148,6 +148,39 @@ namespace Microi.net
             }
         }
 
+        /// <summary>
+        /// 读取当前主租户后台编排任务可维护的子租户目录。
+        /// 调用方传入的用户、租户和目标均不受信任，权限来自持久任务租约。
+        /// </summary>
+        public DosResult GetChildTenantPlatformAppMaintenanceTargets(dynamic dynamicParam)
+        {
+            try
+            {
+                return ChildTenantPlatformAppControlService.GetTargets(
+                    JsonHelper.ToJObject(dynamicParam) ?? new JObject());
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "读取子租户平台应用维护目录失败：" + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 为一个经过 SaaS 主库目录复核的子租户创建目标作用域后台任务。
+        /// </summary>
+        public DosResult QueueChildTenantPlatformAppMaintenance(dynamic dynamicParam)
+        {
+            try
+            {
+                return ChildTenantPlatformAppControlService.QueueTarget(
+                    JsonHelper.ToJObject(dynamicParam) ?? new JObject());
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "投递子租户平台应用维护任务失败：" + ex.Message);
+            }
+        }
+
         private static EmptyDatabaseReleaseRequest ParseEmptyDatabaseReleaseRequest(object dynamicParam)
         {
             var param = JsonHelper.ToJObject(dynamicParam) ?? new JObject();

@@ -125,10 +125,30 @@ export function enhanceMciDialog(dialog, context = null) {
     return dialog;
 }
 
+/**
+ * MessageBox is used by both DiyCommon.OsConfirm and direct Element Plus calls.
+ * Enhancing it at the DOM boundary keeps logout, unsaved-close and feature-local
+ * confirmations on the same visual contract without forcing every caller to
+ * remember a customClass.
+ */
+export function enhanceMciMessageBox(messageBox) {
+    if (!(messageBox instanceof HTMLElement)) return null;
+    messageBox.classList.add("mci-unified-message-box");
+    const status = messageBox.querySelector(".el-message-box__status");
+    const type = ["success", "warning", "error", "info"]
+        .find((item) => status?.classList.contains(`el-message-box-icon--${item}`)) || "info";
+    messageBox.dataset.mciMessageType = type;
+    const wrapper = messageBox.closest(".el-overlay-message-box, .el-message-box__wrapper, .el-overlay");
+    if (wrapper) wrapper.classList.add("mci-unified-message-overlay");
+    return messageBox;
+}
+
 function enhanceTree(node) {
     if (!(node instanceof Element)) return;
     if (node.matches(".el-dialog")) enhanceMciDialog(node);
     else node.querySelectorAll?.(".el-dialog").forEach((dialog) => enhanceMciDialog(dialog));
+    if (node.matches(".el-message-box")) enhanceMciMessageBox(node);
+    else node.querySelectorAll?.(".el-message-box").forEach((messageBox) => enhanceMciMessageBox(messageBox));
 }
 
 function completePendingDialogStructure(target) {
@@ -165,8 +185,8 @@ function flushPendingDialogs() {
 
 function queueDialogNode(node) {
     if (!(node instanceof Element)) return;
-    if (!node.matches(".el-dialog, .el-overlay, .el-dialog__header")
-        && !node.querySelector?.(".el-dialog")) return;
+    if (!node.matches(".el-dialog, .el-overlay, .el-dialog__header, .el-message-box, .el-message-box__wrapper, .el-overlay-message-box")
+        && !node.querySelector?.(".el-dialog, .el-message-box")) return;
     pendingNodes.add(node);
     if (!pendingFrame) pendingFrame = window.requestAnimationFrame(flushPendingDialogs);
 }
@@ -175,10 +195,14 @@ export function installMciDialogRuntime() {
     if (runtimeObserver || typeof MutationObserver === "undefined") return;
     const start = () => {
         document.querySelectorAll(".el-dialog").forEach((dialog) => enhanceMciDialog(dialog));
+        document.querySelectorAll(".el-message-box").forEach((messageBox) => enhanceMciMessageBox(messageBox));
         runtimeObserver = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 mutation.addedNodes.forEach(queueDialogNode);
                 if (mutation.target instanceof Element && mutation.target.closest(".el-dialog")) {
+                    queueDialogNode(mutation.target);
+                }
+                if (mutation.target instanceof Element && mutation.target.closest(".el-message-box")) {
                     queueDialogNode(mutation.target);
                 }
             });

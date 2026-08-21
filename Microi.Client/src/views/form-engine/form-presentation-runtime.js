@@ -91,6 +91,20 @@ function parseStringList(value) {
     return text.split(/[,，\r\n]+/).map((item) => item.trim()).filter(Boolean);
 }
 
+function parseDescriptorList(value) {
+    if (value === undefined || value === null) return undefined;
+    if (Array.isArray(value)) return value;
+    const text = String(value).trim();
+    if (!text) return [];
+    try {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) return parsed;
+    } catch (_error) {
+        // Tag fields also accept the designer-friendly Name,Status syntax.
+    }
+    return text.split(/[,，\r\n]+/).map((item) => item.trim()).filter(Boolean);
+}
+
 function normalizeTablePresentation(table) {
     const source = isRecord(table) ? table : {};
     const configured = mergeRecords(
@@ -117,6 +131,24 @@ function normalizeTablePresentation(table) {
     const labelFields = parseStringList(source.FormRecordSelectorLabelFields);
     if (labelFields !== undefined) recordSelector.LabelFields = labelFields;
     if (Object.keys(recordSelector).length) flattened.RecordSelector = recordSelector;
+
+    const banner = {};
+    const setBannerValue = (key, value) => {
+        // New columns are nullable. Null means an upgraded legacy table has not
+        // made an explicit choice and should still receive smart defaults.
+        if (value !== undefined && value !== null) banner[key] = value;
+    };
+    setBannerValue("Enabled", source.FormBannerEnabled);
+    setBannerValue("TitleField", source.FormBannerTitleField);
+    setBannerValue("SubtitleField", source.FormBannerSubtitleField);
+    setBannerValue("ImageField", source.FormBannerImageField);
+    setBannerValue("Icon", source.FormBannerIcon);
+    setBannerValue("BackgroundField", source.FormBannerBackgroundField);
+    const tagFields = parseDescriptorList(source.FormBannerTagFields);
+    const metrics = parseDescriptorList(source.FormBannerMetrics);
+    if (tagFields !== undefined) banner.Tags = tagFields;
+    if (metrics !== undefined) banner.Metrics = metrics;
+    if (Object.keys(banner).length) flattened.Banner = banner;
 
     // FormPresentation 是 v7.5.0 的兼容迁移源；语义清晰的 diy_table
     // 物理字段是新事实源，只有对应物理字段为空时才回退旧 JSON。
@@ -207,6 +239,15 @@ function countSectionFields(fields) {
 function normalizeCountSuffix(value) {
     if (value === undefined || value === null) return "项";
     return String(value);
+}
+
+function normalizeSectionTitle(value, table) {
+    const text = String(value === undefined || value === null ? "" : value).trim();
+    const placeholder = text.toLowerCase().replace(/，/g, ",").replace(/\s+/g, " ");
+    if (["", "none", "info", "no, none", "no,none", "无", "无分组"].includes(placeholder)) {
+        return String((table && table.Description) || "表单信息");
+    }
+    return text;
 }
 
 function getOwnValue(source, key) {
@@ -328,11 +369,12 @@ export function buildFormPresentationSections(options) {
             fieldCount: counts.FieldCount,
             requiredCount: counts.RequiredCount
         });
-        const fallbackTitle = ["none", "info", ""].includes(String(tab.Name || "").toLowerCase())
-            ? String(table.Description || "表单信息")
-            : String(tab.Name || "表单信息");
-        const title = String(firstDefined(meta.Title, meta.Label, fallbackTitle) || fallbackTitle);
+        const fallbackTitle = normalizeSectionTitle(tab.Name, table);
+        const title = normalizeSectionTitle(firstDefined(meta.Title, meta.Label, fallbackTitle), table);
         const descriptionHtml = String(firstDefined(meta.DescriptionHtml, meta.Description, "") || "");
+        const formSubtitleHtml = tabs.length <= 1
+            ? String(firstDefined(config.SectionSubtitleHtml, config.WorkbenchDescription, "") || "")
+            : "";
         const subtitleTemplate = firstDefined(meta.SubtitleHtml, meta.NavigationSubtitleHtml);
         const navigationSubtitleHtml = subtitleTemplate !== undefined && subtitleTemplate !== null && subtitleTemplate !== ""
             ? formatPresentationText(subtitleTemplate, countContext)
@@ -347,9 +389,10 @@ export function buildFormPresentationSections(options) {
             SectionEyebrow: String(firstDefined(meta.SectionEyebrow, config.SectionEyebrow, "FORM SECTION") || ""),
             SectionTitle: String(firstDefined(meta.SectionTitle, meta.ContentTitle, title) || title),
             SectionSubtitleHtml: String(firstDefined(
-                meta.SectionSubtitleHtml,
-                meta.ContentDescriptionHtml,
-                descriptionHtml,
+                meta.SectionSubtitleHtml || undefined,
+                meta.ContentDescriptionHtml || undefined,
+                descriptionHtml || undefined,
+                formSubtitleHtml || undefined,
                 ""
             ) || ""),
             FooterTitle: String(firstDefined(meta.FooterTitle, meta.Footer && meta.Footer.Title, "") || ""),

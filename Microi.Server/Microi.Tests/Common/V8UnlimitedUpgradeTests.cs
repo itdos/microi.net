@@ -27,10 +27,33 @@ public class V8UnlimitedUpgradeTests
         Assert.Contains("UpgradeDistributedLease.TryAcquire", upgrade, StringComparison.Ordinal);
         Assert.Contains("RuntimePhysicalPrerequisitesReady", upgrade, StringComparison.Ordinal);
         Assert.Contains("[\"V8Limit\"] = \"int\"", upgrade, StringComparison.Ordinal);
+        Assert.Contains("[\"OsClient\"] = \"varchar(255)\"", upgrade, StringComparison.Ordinal);
+        Assert.Contains("[\"TableInEdit\"] = \"int\"", upgrade, StringComparison.Ordinal);
+        Assert.Contains("[\"AddCallbakApi\"] = \"varchar(500)\"", upgrade, StringComparison.Ordinal);
         Assert.Contains("EnsureRuntimePhysicalPrerequisitesAsync(runtimeClient, stoppingToken)", hostedService, StringComparison.Ordinal);
         Assert.True(
             hostedService.IndexOf("EnsureRuntimePhysicalPrerequisitesAsync", StringComparison.Ordinal)
             < hostedService.IndexOf("new Upgrade21()", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AddFormData_ReusesResolvedDiyTableModel_AndPreservesMetadataRootCause()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net", "FormEngine", "FormEngineAdd.cs"));
+
+        Assert.Contains("_DiyTableModel = diyTableModel", source, StringComparison.Ordinal);
+        Assert.Contains("fieldListResult.Code != 1 || fieldListResult.Data == null", source, StringComparison.Ordinal);
+        Assert.Contains("[GetDiyField][AddFormData]", source, StringComparison.Ordinal);
+        var checkIndex = source.IndexOf(
+            "if (fieldListResult.Code != 1 || fieldListResult.Data == null)",
+            StringComparison.Ordinal);
+        var dereferenceIndex = source.IndexOf(
+            "var fieldList = fieldListResult.Data;",
+            checkIndex,
+            StringComparison.Ordinal);
+        Assert.True(checkIndex >= 0 && dereferenceIndex > checkIndex);
     }
 
     [Fact]
@@ -108,7 +131,7 @@ public class V8UnlimitedUpgradeTests
     }
 
     [Fact]
-    public void Upgrade33_IdempotentlyInitializesOnlyNullPositiveSwitchAndRunsBeforeVersionGate()
+    public void Upgrade33_ResetsExistingTablesOnce_AndStartupOnlyInitializesNullValues()
     {
         var root = FindRepositoryRoot();
         var migration = File.ReadAllText(Path.Combine(
@@ -118,22 +141,24 @@ public class V8UnlimitedUpgradeTests
         var hostedService = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "MicroiUpgradeHostedService.cs"));
 
-        Assert.Equal("6.9.8.8", Upgrade33.Version);
+        Assert.Equal("6.9.8.9", Upgrade33.Version);
         Assert.Contains("UPDATE diy_table", migration, StringComparison.Ordinal);
-        Assert.Contains("WHEN V8Unlimited = @p0 THEN @p1", migration, StringComparison.Ordinal);
-        Assert.Contains("WHEN V8Unlimited = @p1 THEN @p0", migration, StringComparison.Ordinal);
-        Assert.Contains("ELSE @p1", migration, StringComparison.Ordinal);
+        Assert.Contains("if (resetExistingValues)", migration, StringComparison.Ordinal);
+        Assert.Contains("SET V8Limit = @p0", migration, StringComparison.Ordinal);
+        Assert.Contains("V8Unlimited = @p1", migration, StringComparison.Ordinal);
         Assert.Contains("WHERE V8Limit IS NULL", migration, StringComparison.Ordinal);
-        Assert.Contains(".AddInParameter(\"p0\", 1)", migration, StringComparison.Ordinal);
-        Assert.Contains(".AddInParameter(\"p1\", 0)", migration, StringComparison.Ordinal);
+        Assert.Contains(".AddInParameter(\"p0\", 0)", migration, StringComparison.Ordinal);
+        Assert.Contains(".AddInParameter(\"p1\", 1)", migration, StringComparison.Ordinal);
         Assert.Contains("Name = FieldName", migration, StringComparison.Ordinal);
         Assert.Contains("DefaultValue = \"0\"", migration, StringComparison.Ordinal);
         Assert.Contains("[\"Visible\"] = 0", migration, StringComparison.Ordinal);
+        Assert.DoesNotContain("[\"IsDeleted\"] = 1", migration, StringComparison.Ordinal);
         Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade33.Version)", upgrade, StringComparison.Ordinal);
         var leaseContextIndex = hostedService.IndexOf(
             "using (UpgradeExecutionLeaseContext.Enter(upgradeLease))",
             StringComparison.Ordinal);
         var invariantIndex = hostedService.IndexOf("var formV8LimitMessages = await new Upgrade33()", StringComparison.Ordinal);
+        Assert.Contains(".Run(runtimeClient.OsClient, resetExistingValues: false)", hostedService, StringComparison.Ordinal);
         var versionReadIndex = hostedService.IndexOf("SELECT ServerVersion FROM sys_config", StringComparison.Ordinal);
         var versionGateIndex = hostedService.IndexOf("_upgrade.Upgrade(currentVersion", StringComparison.Ordinal);
         Assert.True(leaseContextIndex >= 0);

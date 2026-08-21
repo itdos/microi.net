@@ -1913,6 +1913,7 @@ if (_microiLegacyMenuConfigChanged) {
 
             EnsureColumn(osClientSecret, "sys_menu", "MenuBadgeEnabled", "int");
             EnsureColumn(osClientSecret, "sys_menu", "MenuBadgeApiEngineKey", "varchar(100)");
+            EnsureColumn(osClientSecret, "sys_menu", "MenuBadgeTooltip", "varchar(500)");
 
             osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}sys_menu{quoteClose}
                     SET {quoteOpen}MenuBadgeEnabled{quoteClose}=0
@@ -1956,6 +1957,13 @@ if (_microiLegacyMenuConfigChanged) {
             {
                 var diyTableColumns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
+                    // DiyTable.GetFields() 会一次性投影这些历史运行列。部分空库应用包
+                    // 曾漏建它们，导致任何 GetDiyField 都先在读取 diy_table 时失败。
+                    ["OsClient"] = "varchar(255)",
+                    ["TableInEdit"] = "int",
+                    ["AddCallbakApi"] = "varchar(500)",
+                    ["UptCallbakApi"] = "varchar(500)",
+                    ["DelCallbakApi"] = "varchar(500)",
                     ["V8Limit"] = "int",
                     ["V8Unlimited"] = "int",
                     ["FormPresentation"] = "mediumtext",
@@ -1971,7 +1979,15 @@ if (_microiLegacyMenuConfigChanged) {
                     ["FormNavigationFooterTitle"] = "varchar(255)",
                     ["FormNavigationFooterHtml"] = "mediumtext",
                     ["FormRecordSelectorPlaceholder"] = "varchar(255)",
-                    ["FormRecordSelectorLabelFields"] = "mediumtext"
+                    ["FormRecordSelectorLabelFields"] = "mediumtext",
+                    ["FormBannerEnabled"] = "int",
+                    ["FormBannerTitleField"] = "varchar(100)",
+                    ["FormBannerSubtitleField"] = "varchar(100)",
+                    ["FormBannerImageField"] = "varchar(100)",
+                    ["FormBannerIcon"] = "varchar(100)",
+                    ["FormBannerBackgroundField"] = "varchar(100)",
+                    ["FormBannerTagFields"] = "mediumtext",
+                    ["FormBannerMetrics"] = "mediumtext"
                 };
                 foreach (var column in diyTableColumns)
                 {
@@ -1988,6 +2004,7 @@ if (_microiLegacyMenuConfigChanged) {
             if (TableExists(osClientSecret, "diy_table")
                 && !new[]
                 {
+                    "OsClient", "TableInEdit", "AddCallbakApi", "UptCallbakApi", "DelCallbakApi",
                     "V8Limit", "V8Unlimited", "FormPresentation",
                     "FormPresentationMode", "FormPresentationDensity",
                     "FormNavigationTitle", "FormNavigationCountText",
@@ -1995,7 +2012,10 @@ if (_microiLegacyMenuConfigChanged) {
                     "FormRequiredCountText", "FormWorkbenchEyebrow",
                     "FormWorkbenchDescription", "FormNavigationFooterTitle",
                     "FormNavigationFooterHtml", "FormRecordSelectorPlaceholder",
-                    "FormRecordSelectorLabelFields"
+                    "FormRecordSelectorLabelFields", "FormBannerEnabled",
+                    "FormBannerTitleField", "FormBannerSubtitleField",
+                    "FormBannerImageField", "FormBannerIcon", "FormBannerBackgroundField",
+                    "FormBannerTagFields", "FormBannerMetrics"
                 }.All(column => ColumnExists(osClientSecret, "diy_table", column)))
             {
                 return false;

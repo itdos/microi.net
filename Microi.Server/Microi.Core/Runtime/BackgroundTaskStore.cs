@@ -383,7 +383,11 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND CancelRequested=0
   AND AttemptCount < MaxAttempts
   AND (NextRunTime IS NULL OR NextRunTime<=@p1)
   AND (Status IN ('Pending','Retrying') OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p1)))
-ORDER BY CreateTime ASC");
+-- BACKGROUND_TASK_READY_TIME_FAIR_ORDER_V1: a chunked task receives a fresh
+-- NextRunTime whenever it is requeued. Ordering only by CreateTime lets the
+-- oldest task reclaim every slice and can starve later tasks indefinitely.
+-- Never-run tasks use CreateTime; resumed tasks rotate by their ready time.
+ORDER BY COALESCE(NextRunTime, CreateTime) ASC, CreateTime ASC");
             var candidateCommand = client.Db.FromSql(candidateSql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", DbTime(now))
@@ -538,6 +542,7 @@ WHERE Id=@p14 AND OsClient=@p15 AND Status='Running' AND LeaseOwner=@p16 AND Fen
             item.Msg = message ?? "";
             item.Result = result ?? new JObject();
             item.ResultJson = item.Result.ToString(Newtonsoft.Json.Formatting.None);
+            item.LastError = succeeded ? "" : message ?? "";
             item.EndTime = now;
             item.EstimatedEndTime = null;
             item.RemainingSeconds = null;
@@ -549,8 +554,9 @@ WHERE Id=@p14 AND OsClient=@p15 AND Status='Running' AND LeaseOwner=@p16 AND Fen
                 if (item.Total > 0) item.Current = item.Total;
             }
             return OwnedUpdate(item, @"Status=@p0,StatusText=@p1,Progress=@p2,ProgressMode=@p3,
-WorkCurrent=@p4,WorkTotal=@p5,Msg=@p6,ResultJson=@p7,EndTime=@p8,EstimatedEndTime=NULL,
-RemainingSeconds=NULL,EstimateConfidence='None',LeaseOwner='',LeaseExpiresAt=NULL,HeartbeatTime=@p8,UpdateTime=@p8",
+ WorkCurrent=@p4,WorkTotal=@p5,Msg=@p6,ResultJson=@p7,EndTime=@p8,EstimatedEndTime=NULL,
+ RemainingSeconds=NULL,EstimateConfidence='None',LastError=@p9,
+ LeaseOwner='',LeaseExpiresAt=NULL,HeartbeatTime=@p8,UpdateTime=@p8",
                 command => command
                     .AddInParameter("p0", status)
                     .AddInParameter("p1", statusText)
@@ -560,7 +566,8 @@ RemainingSeconds=NULL,EstimateConfidence='None',LeaseOwner='',LeaseExpiresAt=NUL
                     .AddInParameter("p5", item.Total)
                     .AddInParameter("p6", item.Msg)
                     .AddInParameter("p7", item.ResultJson)
-                    .AddInParameter("p8", DbTime(now)));
+                    .AddInParameter("p8", DbTime(now))
+                    .AddInParameter("p9", item.LastError));
         }
 
         public static bool RequeueChunk(
@@ -581,16 +588,23 @@ RemainingSeconds=NULL,EstimateConfidence='None',LeaseOwner='',LeaseExpiresAt=NUL
             item.Status = item.CancelRequested ? "Canceled" : "Pending";
             item.StatusText = item.CancelRequested ? "已停止" : "等待下一批";
             item.NextRunTime = item.CancelRequested ? (DateTime?)null : nextRun;
+            // BACKGROUND_TASK_CONSECUTIVE_RETRY_BUDGET_V1: MaxAttempts protects
+            // against consecutive failures, not the lifetime count of transient
+            // failures across a resumable task that can contain hundreds of
+            // successful chunks. A committed continuation is a recovery point.
+            item.AttemptCount = 0;
+            item.LastError = "";
             return OwnedUpdate(item, @"Status=CASE WHEN CancelRequested=1 THEN 'Canceled' ELSE 'Pending' END,
 StatusText=CASE WHEN CancelRequested=1 THEN '已停止' ELSE '等待下一批' END,
 Msg=CASE WHEN CancelRequested=1 THEN '任务已停止；失败或取消不会伪装成 100%。' ELSE @p0 END,
 ParamJson=@p1,CheckpointJson=@p2,
 NextRunTime=CASE WHEN CancelRequested=1 THEN NULL ELSE @p3 END,
 EndTime=CASE WHEN CancelRequested=1 THEN @p4 ELSE EndTime END,
-EstimatedEndTime=CASE WHEN CancelRequested=1 THEN NULL ELSE EstimatedEndTime END,
-RemainingSeconds=CASE WHEN CancelRequested=1 THEN NULL ELSE RemainingSeconds END,
-EstimateConfidence=CASE WHEN CancelRequested=1 THEN 'None' ELSE EstimateConfidence END,
-LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
+ EstimatedEndTime=CASE WHEN CancelRequested=1 THEN NULL ELSE EstimatedEndTime END,
+ RemainingSeconds=CASE WHEN CancelRequested=1 THEN NULL ELSE RemainingSeconds END,
+ EstimateConfidence=CASE WHEN CancelRequested=1 THEN 'None' ELSE EstimateConfidence END,
+ AttemptCount=0,LastError='',
+ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
                 command => command
                     .AddInParameter("p0", item.Msg)
                     .AddInParameter("p1", item.ParamJson)

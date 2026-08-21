@@ -171,38 +171,44 @@
 
     .collapse-group-theme-default {
         --collapse-group-color: var(--el-color-primary);
-        --collapse-group-bg: color-mix(in srgb, var(--el-color-primary) 5%, var(--el-bg-color) 95%);
-        --collapse-group-border: color-mix(in srgb, var(--el-color-primary) 34%, var(--el-border-color-light) 66%);
     }
 
     .collapse-group-theme-primary {
         --collapse-group-color: var(--el-color-primary);
-        --collapse-group-bg: color-mix(in srgb, var(--el-color-primary) 6%, var(--el-bg-color) 94%);
-        --collapse-group-border: color-mix(in srgb, var(--el-color-primary) 28%, var(--el-border-color-light) 72%);
     }
 
     .collapse-group-theme-success {
         --collapse-group-color: var(--el-color-success);
-        --collapse-group-bg: color-mix(in srgb, var(--el-color-success) 6%, var(--el-bg-color) 94%);
-        --collapse-group-border: color-mix(in srgb, var(--el-color-success) 28%, var(--el-border-color-light) 72%);
     }
 
     .collapse-group-theme-warning {
         --collapse-group-color: var(--el-color-warning);
-        --collapse-group-bg: color-mix(in srgb, var(--el-color-warning) 7%, var(--el-bg-color) 93%);
-        --collapse-group-border: color-mix(in srgb, var(--el-color-warning) 30%, var(--el-border-color-light) 70%);
     }
 
     .collapse-group-theme-danger {
         --collapse-group-color: var(--el-color-danger);
-        --collapse-group-bg: color-mix(in srgb, var(--el-color-danger) 6%, var(--el-bg-color) 94%);
-        --collapse-group-border: color-mix(in srgb, var(--el-color-danger) 28%, var(--el-border-color-light) 72%);
+    }
+
+    .collapse-group-theme-default,
+    .collapse-group-theme-primary,
+    .collapse-group-theme-success,
+    .collapse-group-theme-warning,
+    .collapse-group-theme-danger {
+        --collapse-group-bg: color-mix(in srgb, var(--collapse-group-color) 4%, var(--el-bg-color) 96%);
+        --collapse-group-surface: color-mix(in srgb, var(--collapse-group-color) 2.5%, var(--el-bg-color) 97.5%);
+        --collapse-group-border: color-mix(in srgb, var(--collapse-group-color) 24%, var(--el-border-color-light) 76%);
     }
 
     .collapse-group-header {
-        margin-top: 5px;
+        margin-top: 7px;
 
         .container-form-item {
+            // CollapseGroup 的内容边框以整行网格为基准绘制；头部不能继续
+            // 继承普通字段卡片的 5px 横向留白，否则展开后两侧会各错开 5px。
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
             margin-bottom: 0;
         }
 
@@ -230,9 +236,10 @@
         .container-form-item {
             position: relative;
             z-index: 1;
+            margin: 3px 5px;
             padding: 6px 16px 1px;
-            border-radius: 0;
-            background: transparent;
+            border-radius: 9px;
+            background: var(--el-bg-color);
         }
 
         .el-form-item {
@@ -269,6 +276,7 @@
         width: 100%;
         border-left: 1px solid var(--collapse-group-border);
         border-right: 1px solid var(--collapse-group-border);
+        background: var(--collapse-group-surface);
         pointer-events: none;
     }
 
@@ -277,13 +285,14 @@
     }
 
     .collapse-group-row-first.collapse-group-row-start::before {
-        top: -5px;
+        top: -6px;
     }
 
     .collapse-group-row-last.collapse-group-row-start::before {
         border-bottom: 1px solid var(--collapse-group-border);
-        border-bottom-left-radius: 8px;
-        border-bottom-right-radius: 8px;
+        border-bottom-left-radius: 12px;
+        border-bottom-right-radius: 12px;
+        box-shadow: 0 10px 24px rgba(25, 48, 82, .07);
     }
 
     @for $span from 1 through 24 {
@@ -300,9 +309,10 @@
         .collapse-group-item {
             border-left-width: 1px;
             border-right-width: 1px;
-            background: transparent;
+            background: var(--collapse-group-surface);
 
             .container-form-item {
+                margin: 3px 7px;
                 padding-left: 14px;
                 padding-right: 14px;
             }
@@ -329,10 +339,11 @@
 
         .collapse-group-visible-last {
             border-bottom-width: 1px;
-            border-bottom-left-radius: 8px;
-            border-bottom-right-radius: 8px;
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
             padding-bottom: 10px;
             margin-bottom: 10px;
+            box-shadow: 0 10px 24px rgba(25, 48, 82, .07);
         }
     }
 

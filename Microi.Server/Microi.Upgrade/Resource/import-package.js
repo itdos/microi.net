@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.2.1
+ * Version: v2.2.9
  * Function:
- * - Unified marketplace importer with resumable slices, strict SharedPublicRuntime support, and verified current/history baselines for legacy managed API engines.
+ * - 统一应用商城导入器；安装前幂等补齐物理前置列，支持后台分片、资源基线、官方平台受管升级、商城源只读重试，并在后台任务唯一索引创建冲突时仅归档重复终态幂等键。
  */
 
 // ==================== 参数接收与校验 ====================
@@ -32,6 +32,118 @@ if (invokeType == 'client') {
             Msg: '权限不足：只有超级管理员才能安装应用。'
         };
     }
+}
+
+// GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1：部分历史空库包遗漏了 DiyTable
+// 生成实体已经投影的物理列。FormEngine 在读取任意字段元数据前会先物化整条
+// diy_table，旧库因此把真实 Unknown column 包装成 Enumerable.Where 的 source
+// 为空。导入器在第一次 FormEngine 调用前只补固定平台列；新版后端启动升级仍是
+// 主路径，这里为尚未正确跑过物理前置迁移的客户节点提供幂等自愈。
+function ensureGeneratedEntityPhysicalPrerequisites() {
+    var dbType = String(
+        V8.OsClientModel && (V8.OsClientModel.DbType || V8.OsClientModel.OsClientDbType) || 'MySql'
+    ).toLowerCase();
+    var isSqlServer = dbType.indexOf('sqlserver') >= 0 || dbType.indexOf('mssql') >= 0;
+    var isOracle = dbType.indexOf('oracle') >= 0;
+    var quoteOpen = isSqlServer ? '[' : (isOracle ? '"' : '`');
+    var quoteClose = isSqlServer ? ']' : (isOracle ? '"' : '`');
+    var added = [];
+
+    function textType(length) {
+        if (isOracle) return 'VARCHAR2(' + length + ')';
+        return 'varchar(' + length + ')';
+    }
+    function intType() {
+        return isOracle ? 'NUMBER(10)' : 'int';
+    }
+    function largeTextType() {
+        if (isOracle) return 'CLOB';
+        if (isSqlServer) return 'nvarchar(max)';
+        return 'mediumtext';
+    }
+    function readColumns(tableName) {
+        var sql;
+        if (isOracle) {
+            sql = 'SELECT COLUMN_NAME AS "ColumnName" FROM USER_TAB_COLUMNS WHERE TABLE_NAME=UPPER(@p0)';
+        } else if (isSqlServer) {
+            sql = 'SELECT COLUMN_NAME AS ColumnName FROM INFORMATION_SCHEMA.COLUMNS '
+                + 'WHERE TABLE_CATALOG=DB_NAME() AND LOWER(TABLE_NAME)=LOWER(@p0)';
+        } else {
+            sql = 'SELECT COLUMN_NAME AS ColumnName FROM INFORMATION_SCHEMA.COLUMNS '
+                + 'WHERE TABLE_SCHEMA=DATABASE() AND LOWER(TABLE_NAME)=LOWER(@p0)';
+        }
+        var rows = V8.Db.FromSql(sql).AddInParameter('@p0', tableName).ToArray();
+        var map = {};
+        if (!rows || rows.length === undefined) return map;
+        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            var row = rows[rowIndex] || {};
+            var name = String(row.ColumnName || row.COLUMN_NAME || row.column_name || '').toLowerCase();
+            if (name) map[name] = true;
+        }
+        return map;
+    }
+    function ensureTableColumns(tableName, definitions) {
+        var existing = readColumns(tableName);
+        for (var definitionIndex = 0; definitionIndex < definitions.length; definitionIndex++) {
+            var definition = definitions[definitionIndex];
+            var columnName = String(definition[0]);
+            if (existing[columnName.toLowerCase()]) continue;
+            var alterSql = 'ALTER TABLE ' + quoteOpen + tableName + quoteClose
+                + ' ADD ' + quoteOpen + columnName + quoteClose + ' ' + definition[1] + ' NULL';
+            try {
+                V8.Db.FromSql(alterSql).ExecuteNonQuery();
+            } catch (addColumnError) {
+                // 多节点可能同时首次自愈。仅当并发节点已经把同一列补齐时吞掉重复列；
+                // 权限、连接或其它 DDL 异常继续带真实表/列原因失败关闭。
+                if (!readColumns(tableName)[columnName.toLowerCase()]) {
+                    throw new Error(
+                        '补齐平台运行时物理列失败：' + tableName + '.' + columnName + '；'
+                        + (addColumnError && addColumnError.message ? addColumnError.message : String(addColumnError))
+                    );
+                }
+            }
+            existing[columnName.toLowerCase()] = true;
+            added.push(tableName + '.' + columnName);
+        }
+    }
+
+    ensureTableColumns('sys_apiengine', [
+        ['StopHttp', intType()], ['Timeout', intType()], ['MaxStatements', intType()],
+        ['LimitMemory', intType()], ['LimitRecursion', intType()], ['V8Limit', intType()],
+        ['V8Unlimited', intType()], ['Lock', intType()]
+    ]);
+    ensureTableColumns('diy_table', [
+        ['OsClient', textType(255)], ['TableInEdit', intType()],
+        ['AddCallbakApi', textType(500)], ['UptCallbakApi', textType(500)],
+        ['DelCallbakApi', textType(500)], ['V8Limit', intType()], ['V8Unlimited', intType()],
+        ['FormPresentation', largeTextType()], ['FormPresentationMode', textType(50)],
+        ['FormPresentationDensity', textType(50)], ['FormNavigationTitle', textType(255)],
+        ['FormNavigationCountText', textType(255)], ['FormSectionNavigation', textType(50)],
+        ['FormSectionEyebrow', textType(255)], ['FormRequiredCountText', textType(255)],
+        ['FormWorkbenchEyebrow', textType(255)], ['FormWorkbenchDescription', largeTextType()],
+        ['FormNavigationFooterTitle', textType(255)], ['FormNavigationFooterHtml', largeTextType()],
+        ['FormRecordSelectorPlaceholder', textType(255)], ['FormRecordSelectorLabelFields', largeTextType()],
+        ['FormBannerEnabled', intType()], ['FormBannerTitleField', textType(100)],
+        ['FormBannerSubtitleField', textType(100)], ['FormBannerImageField', textType(100)],
+        ['FormBannerIcon', textType(100)], ['FormBannerBackgroundField', textType(100)],
+        ['FormBannerTagFields', largeTextType()], ['FormBannerMetrics', largeTextType()]
+    ]);
+    return added;
+}
+
+try {
+    var generatedEntityPhysicalColumnsAdded = ensureGeneratedEntityPhysicalPrerequisites();
+    if (generatedEntityPhysicalColumnsAdded.length > 0) {
+        debugLog.generated_entity_physical_bootstrap = generatedEntityPhysicalColumnsAdded;
+    }
+} catch (physicalBootstrapError) {
+    return {
+        Code: 0,
+        Msg: '应用安装前置物理结构自检失败：'
+            + (physicalBootstrapError && physicalBootstrapError.message
+                ? physicalBootstrapError.message
+                : String(physicalBootstrapError))
+    };
 }
 
 var backgroundTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
@@ -449,22 +561,44 @@ try {
     return { Code: 0, Msg: credentialError.message || String(credentialError) };
 }
 
-// MARKETPLACE_SOURCE_READ_RETRY_V1：后台分片每次都要从商城源重新读取权威包。
+// MARKETPLACE_SOURCE_READ_RETRY_V2：后台分片每次都要从商城源重新读取权威包。
 // 代理切换、连接复用或上游瞬时超时时，V8.Http 可能短暂返回空字符串；直接
 // JSON.parse 会让整个大型应用从外层任务重试。这里只对固定的只读商城请求做
 // 有界重试，绝不重试安装写入，也不接受空响应或非成功业务结果。
 var postMarketplaceReadWithRetry = function (label, url, postParam, timeoutSeconds) {
     var lastError = '';
-    var maxAttempts = 3;
+    var maxAttempts = 8;
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            var response = V8.Http.Post({
+            var request = {
                 Url: url,
                 PostParam: postParam || {},
                 ParamType: 'json',
                 Headers: storeRequestHeaders,
                 Timeout: timeoutSeconds || 120
-            });
+            };
+            var response = null;
+            if (V8.Http.PostResponse) {
+                var responseEnvelope = V8.Http.PostResponse(request);
+                var responseText = responseEnvelope && responseEnvelope.Content;
+                if ((!responseText || !String(responseText).replace(/^\s+|\s+$/g, ''))
+                    && responseEnvelope && responseEnvelope.RawBytes
+                    && responseEnvelope.RawBytes.Length > 0) {
+                    responseText = System.Text.Encoding.UTF8.GetString(responseEnvelope.RawBytes);
+                }
+                if (!responseText || !String(responseText).replace(/^\s+|\s+$/g, '')) {
+                    var statusCode = responseEnvelope ? Number(responseEnvelope.StatusCode || 0) : 0;
+                    var transportError = responseEnvelope
+                        ? String(responseEnvelope.ErrorMessage || '').replace(/^\s+|\s+$/g, '')
+                        : '';
+                    throw new Error('商城源返回空响应（HTTP ' + statusCode
+                        + (transportError ? '，' + transportError : '') + '）');
+                }
+                response = responseText;
+            } else {
+                // 兼容尚未提供完整响应方法的旧节点。
+                response = V8.Http.Post(request);
+            }
             if (typeof response == 'string') {
                 var responseText = String(response || '').replace(/^\s+|\s+$/g, '');
                 if (!responseText) throw new Error('商城源返回空响应');
@@ -477,8 +611,8 @@ var postMarketplaceReadWithRetry = function (label, url, postParam, timeoutSecon
         }
         if (attempt < maxAttempts) {
             try {
-                if (V8.Action && V8.Action.Sleep) V8.Action.Sleep(250 * attempt);
-                else System.Threading.Thread.Sleep(250 * attempt);
+                if (V8.Action && V8.Action.Sleep) V8.Action.Sleep(500 * attempt);
+                else System.Threading.Thread.Sleep(500 * attempt);
             } catch (sleepError) { }
         }
     }
@@ -2197,20 +2331,34 @@ try {
                         Timeout: 30
                     });
                     // MARKETPLACE_INSTALL_STAT_STRING_RESPONSE_V1：V8.Http.Post 在不同
-                    // 运行版本中可能直接返回对象，也可能返回 JSON 字符串。官方接口已
-                    // 成功执行但未解析字符串时，不能把本地安装误判失败并反复回滚。
+                    // 运行版本中可能直接返回对象，也可能返回 JSON 字符串。
+                    // MARKETPLACE_INSTALL_STAT_NON_BLOCKING_V2：安装次数属于幂等遥测，
+                    // 旧节点可能返回 True/False 或代理诊断文本。非标准回执必须保留告警，
+                    // 但不能把已经成功的应用导入误判失败并回滚；OperationId/InstallationKey
+                    // 继续保证远端实际成功但响应丢失时不会重复计数。
                     if (typeof remoteStat == 'string') {
-                        remoteStat = JSON.parse(remoteStat);
+                        var remoteStatText = String(remoteStat || '').replace(/^\s+|\s+$/g, '');
+                        if (/^true$/i.test(remoteStatText)) {
+                            remoteStat = { Code: 1, Msg: '兼容旧节点布尔成功回执' };
+                        } else {
+                            try {
+                                remoteStat = JSON.parse(remoteStatText);
+                            } catch (remoteStatParseError) {
+                                debugLog.install_count_warning_remote = '官方商城安装次数回执不是标准JSON：'
+                                    + remoteStatText.substring(0, 300) + '，操作Id=' + installOperationId;
+                                remoteStat = null;
+                            }
+                        }
                     }
-                    if (remoteStat && remoteStat.Code == 1) {
+                    if (remoteStat === true || (remoteStat && remoteStat.Code == 1)) {
                         debugLog.install_count_result = '官方商城安装次数已累计，操作Id=' + installOperationId;
-                    } else {
-                        debugLog.install_count_error_remote = '官方商城安装次数累计失败：'
+                    } else if (!debugLog.install_count_warning_remote) {
+                        debugLog.install_count_warning_remote = '官方商城安装次数累计未确认：'
                             + ((remoteStat && remoteStat.Msg) || '接口无返回') + '，操作Id=' + installOperationId;
                     }
                 } catch (statError) {
-                    debugLog.install_count_error_remote = (statError.message || String(statError))
-                        + '，操作Id=' + installOperationId;
+                    debugLog.install_count_warning_remote = '官方商城安装次数累计请求异常：'
+                        + (statError.message || String(statError)) + '，操作Id=' + installOperationId;
                 }
             } else {
                 debugLog.version_record_error = saveResult ? saveResult.Msg : '未知错误';
@@ -3248,6 +3396,141 @@ try {
         return appKey.toLowerCase() == 'app.microi.background-task';
     };
 
+    // BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1：极少数旧库在唯一索引
+    // 建立前已经因历史竞态留下相同幂等键。只归档明确终态的重复行；活动状态或
+    // 未知状态一律视为仍有执行语义，同一键出现两条时失败关闭，绝不删除任务。
+    function isTerminalBackgroundTaskStatus(status) {
+        var normalized = String(status || '').toLowerCase();
+        return normalized == 'succeeded' || normalized == 'failed' || normalized == 'canceled';
+    }
+
+    function selectBackgroundTaskDuplicateCanonical(rows) {
+        rows = rows || [];
+        var activeRows = [];
+        var terminalRows = [];
+        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            var row = rows[rowIndex] || {};
+            if (isTerminalBackgroundTaskStatus(row.Status)) terminalRows.push(row);
+            else activeRows.push(row);
+        }
+        if (activeRows.length > 1) {
+            var activeIds = [];
+            for (var activeIndex = 0; activeIndex < activeRows.length; activeIndex++) {
+                activeIds.push(String(activeRows[activeIndex].Id || ''));
+            }
+            throw new Error(
+                '后台任务幂等键存在多条活动记录，拒绝自动归档：' + activeIds.join(',')
+                + '；请先确认权威执行记录后再重试'
+            );
+        }
+        if (activeRows.length == 1) return activeRows[0];
+        terminalRows.sort(function (left, right) {
+            var leftSucceeded = String(left.Status || '').toLowerCase() == 'succeeded' ? 1 : 0;
+            var rightSucceeded = String(right.Status || '').toLowerCase() == 'succeeded' ? 1 : 0;
+            if (leftSucceeded != rightSucceeded) return rightSucceeded - leftSucceeded;
+            var leftTime = String(left.UpdateTime || left.CreateTime || '');
+            var rightTime = String(right.UpdateTime || right.CreateTime || '');
+            if (leftTime != rightTime) return leftTime > rightTime ? -1 : 1;
+            var leftId = String(left.Id || '');
+            var rightId = String(right.Id || '');
+            return leftId == rightId ? 0 : (leftId > rightId ? -1 : 1);
+        });
+        return terminalRows.length > 0 ? terminalRows[0] : null;
+    }
+
+    var repairBackgroundTaskIdempotencyDuplicates = function (ddlInfo, ddlText, ddlError) {
+        if (!isBackgroundTaskBootstrapPackage()
+            || !ddlInfo
+            || String(ddlInfo.Kind || '').toLowerCase() != 'index'
+            || String(ddlInfo.TableName || '').toLowerCase() != 'mci_background_task') return -1;
+        var indexName = String(ddlInfo.IndexName || '').toLowerCase();
+        if (indexName != 'ux_mci_background_task_idempotency'
+            && indexName != 'ux_mci_bg_task_runtime_idem') return -1;
+        var errorText = String(ddlError && ddlError.message ? ddlError.message : ddlError || '');
+        if (!/duplicate entry|duplicate key|unique constraint|ora-00001/i.test(errorText)) return -1;
+
+        var ddlLower = String(ddlText || '').toLowerCase();
+        var scopeColumns = ['OsClient'];
+        if (ddlLower.indexOf('runtimeosclienttype') >= 0) scopeColumns.push('RuntimeOsClientType');
+        if (ddlLower.indexOf('runtimeosclientnetwork') >= 0) scopeColumns.push('RuntimeOsClientNetwork');
+        scopeColumns.push('IdempotencyKey');
+        var selectColumns = ['Id', 'Status', 'CreateTime', 'UpdateTime'];
+        for (var scopeIndex = 0; scopeIndex < scopeColumns.length; scopeIndex++) {
+            if (selectColumns.indexOf(scopeColumns[scopeIndex]) < 0) selectColumns.push(scopeColumns[scopeIndex]);
+        }
+
+        var readRows = function () {
+            return V8.Db.FromSql(
+                'SELECT ' + selectColumns.join(',')
+                + ' FROM mci_background_task WHERE IdempotencyKey IS NOT NULL AND IdempotencyKey <> \'\''
+            ).ToArray() || [];
+        };
+        var groupDuplicates = function (rows) {
+            var groups = {};
+            for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+                var row = rows[rowIndex] || {};
+                var values = [];
+                var completeScope = true;
+                for (var columnIndex = 0; columnIndex < scopeColumns.length; columnIndex++) {
+                    var value = getPhysicalValue(row, [scopeColumns[columnIndex]]);
+                    // 当前物理导入器以 MySQL 为目标；复合唯一索引任一列为 NULL 时
+                    // 不会形成冲突，不能把这类记录误判为重复历史。
+                    if (value === null || value === undefined) {
+                        completeScope = false;
+                        break;
+                    }
+                    values.push(String(value));
+                }
+                if (!completeScope) continue;
+                var groupKey = JSON.stringify(values);
+                if (!groups[groupKey]) groups[groupKey] = [];
+                groups[groupKey].push(row);
+            }
+            var duplicates = [];
+            for (var groupKey in groups) {
+                if (Object.prototype.hasOwnProperty.call(groups, groupKey) && groups[groupKey].length > 1) {
+                    duplicates.push(groups[groupKey]);
+                }
+            }
+            return duplicates;
+        };
+
+        var duplicateGroups = groupDuplicates(readRows());
+        var archivedCount = 0;
+        for (var groupIndex = 0; groupIndex < duplicateGroups.length; groupIndex++) {
+            var groupRows = duplicateGroups[groupIndex];
+            var canonical = selectBackgroundTaskDuplicateCanonical(groupRows);
+            if (!canonical || !canonical.Id) {
+                throw new Error('后台任务历史重复幂等键缺少可保留的权威记录，拒绝自动归档');
+            }
+            for (var duplicateIndex = 0; duplicateIndex < groupRows.length; duplicateIndex++) {
+                var duplicateRow = groupRows[duplicateIndex] || {};
+                if (String(duplicateRow.Id || '') == String(canonical.Id)) continue;
+                if (!isTerminalBackgroundTaskStatus(duplicateRow.Status)) {
+                    throw new Error(
+                        '后台任务历史重复幂等键包含非终态记录 ' + String(duplicateRow.Id || '')
+                        + '，拒绝自动归档'
+                    );
+                }
+                var originalKey = String(duplicateRow.IdempotencyKey || '');
+                var archivedKey = 'archived-duplicate:' + String(duplicateRow.Id || '');
+                var updated = V8.Db.FromSql(
+                    'UPDATE mci_background_task SET IdempotencyKey=@p0 '
+                    + 'WHERE Id=@p1 AND IdempotencyKey=@p2'
+                )
+                    .AddInParameter('@p0', archivedKey)
+                    .AddInParameter('@p1', String(duplicateRow.Id || ''))
+                    .AddInParameter('@p2', originalKey)
+                    .ExecuteNonQuery();
+                if (parseInt(updated || 0, 10) > 0) archivedCount++;
+            }
+        }
+        if (groupDuplicates(readRows()).length > 0) {
+            throw new Error('后台任务历史重复幂等键归档后回读仍有冲突，拒绝创建唯一索引');
+        }
+        return archivedCount;
+    };
+
     // The bootstrap package is installed in the foreground because it cannot
     // enqueue itself. Do not report success until the complete worker schema and
     // all distributed-runtime indexes can be read back from the physical database.
@@ -3357,6 +3640,7 @@ try {
             } catch (ddlError) {
                 var finalDdlError = ddlError;
                 var recoveredFromRowSize = false;
+                var recoveredFromIdempotencyDuplicate = false;
                 if (ddlInfo.Kind == 'table' && isMysqlRowSizeTooLargeError(ddlError)) {
                     var promotedWideColumns = promoteWidePackageColumnsForTable(
                         ddlInfo.TableName,
@@ -3378,6 +3662,25 @@ try {
                 }
 
                 if (!recoveredFromRowSize) {
+                    try {
+                        var archivedDuplicateTasks = repairBackgroundTaskIdempotencyDuplicates(
+                            ddlInfo,
+                            ddlItem.DDL,
+                            finalDdlError
+                        );
+                        if (archivedDuplicateTasks >= 0) {
+                            V8.Db.FromSql(ddlItem.DDL).ExecuteNonQuery();
+                            recoveredFromIdempotencyDuplicate = true;
+                            ddlExecuted++;
+                            debugLog['ddl_duplicate_idempotency_recovered_' + ddlLogKey] =
+                                '已保留权威任务并归档' + archivedDuplicateTasks + '条终态历史重复幂等键，唯一索引创建成功';
+                        }
+                    } catch (idempotencyRepairError) {
+                        finalDdlError = idempotencyRepairError;
+                    }
+                }
+
+                if (!recoveredFromRowSize && !recoveredFromIdempotencyDuplicate) {
                     // 多节点或重复请求可能在存在性检查之后抢先创建对象。
                     // 失败后再次回读；对象已存在即按幂等成功处理。
                     var existsAfterError = ddlInfo.Kind == 'table'

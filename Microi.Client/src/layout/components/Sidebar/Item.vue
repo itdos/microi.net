@@ -7,8 +7,21 @@
             <List />
         </el-icon>
         <span v-if="title" class="menu-title" :title="title" :aria-label="title">{{ title }}</span>
+        <el-tooltip
+            v-if="badgeText !== null && badgeConfigModel.Tooltip"
+            :content="badgeConfigModel.Tooltip"
+            placement="right"
+            popper-class="mci-menu-badge-tooltip"
+        >
+            <span
+                class="menu-stat-badge"
+                :class="'is-' + badgeConfigModel.Tone"
+                :style="badgeConfigModel.Color ? { backgroundColor: badgeConfigModel.Color } : undefined"
+                :aria-label="`${title}统计 ${badgeRawValue}，${badgeConfigModel.Tooltip}`"
+            >{{ badgeText }}</span>
+        </el-tooltip>
         <span
-            v-if="badgeText !== null"
+            v-else-if="badgeText !== null"
             class="menu-stat-badge"
             :class="'is-' + badgeConfigModel.Tone"
             :style="badgeConfigModel.Color ? { backgroundColor: badgeConfigModel.Color } : undefined"
