@@ -593,9 +593,11 @@ V8.ConfirmTips(`确认批量删除选中的[${selectData.length}]条数据？`, 
 - 不配置【关联模块】：在当前模块执行 `V8Code`，通常使用 `V8.SearchSet(...)` 切换筛选条件。
 - 配置【关联模块】：保存目标 `sys_menu.Id` 到 `TargetSysMenuId`。点击后在当前 `diy-table` 实例内重新加载目标模块的 `sys_menu / diy_table / diy_field`，入口路由、面包屑、顶部访问标签和模块 Hero 保持不变，URL 只替换 `Tab` 查询参数。目标菜单可以设置 `Display=0、AppDisplay=0` 隐藏导航入口，但仍需给当前角色分配菜单权限；未授权目标不会因页签关联而绕过菜单和表权限。
 
+在【模块设计 → 按钮 → 页面多Tab】中，【关联模块】列使用可搜索的菜单树展示模块名称并保存目标 Id。跨表页签的隐藏目标菜单应统一挂在入口菜单下面，设置 `ParentId=入口菜单Id、Display=0、AppDisplay=0、HasChild=0、PageTabs=[]`；入口菜单保持 `HasChild=0`，因此仍可直接点击打开，不会被隐藏子项变成只能展开的目录。
+
 每个 PageTab 还可配置 `BadgeEnabled` 和 `BadgeApiEngineKey` 显示数字角标；`BadgeValuePath` 可直接指定返回路径，例如 `Data.Buttons.pending-tab`。同一接口引擎会按页签合并调用，并收到 `ButtonKeys`、当前筛选条件和模块上下文，适合“待办 12 / 已完成 86 / 异常 3”这类可行动统计。若使用 `BadgeField`，它读取模块“统计列”的页面汇总值；不要在 Tab 的 `V8Code` 中再次单独请求数量。
 
-关联模块适合一个业务入口下不同页签分别使用不同 `diy_table`、字段、列表模板、查询接口替换或按钮配置的场景。PageTabs 只需由入口模块维护一组；目标模块负责各自的表、字段、查询和按钮配置，不必重复复制同一组 PageTabs。运行时会保留入口 PageTabs 的显隐、角标与 Hero，并用请求版本号丢弃快速切换产生的旧响应；不要在前端 mixin 中按菜单名或表名写死数据源。
+关联模块适合一个业务入口下不同页签分别使用不同 `diy_table`、字段、列表模板、查询接口替换或按钮配置的场景。PageTabs 只需由入口模块维护一组；目标模块负责各自的表、字段、查询和按钮配置，不得重复复制同一组 PageTabs。运行时会保留入口 PageTabs 的显隐、角标与 Hero，并用请求版本号丢弃快速切换产生的旧响应；不要在前端 mixin 中按菜单名或表名写死数据源。
 
 顶层列表首次读取模块配置、以及跨模块 PageTabs 切换期间，会显示与最终几何尺寸一致的骨架：模块标题/副标题与指标使用 `44px / 62px` 两档，已配置 PageTabs 时同时保留页签、工具栏和列表区域。骨架使用当前主题变量并遵守 `prefers-reduced-motion`；不能先渲染空白标题或空 Tab，再靠整页路由重建造成纵向跳动。
 

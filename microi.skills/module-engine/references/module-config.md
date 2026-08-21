@@ -191,7 +191,7 @@ PageTabs 可以通过 `BadgeApiEngineKey` 显示数字角标。接口按 `Button
 
 PageTabs 只表达当前模块的数据类别/状态，不能取代模块 Hero，也不能渲染到 Hero 上方。
 
-跨表 Tab 由入口模块统一配置一组 PageTabs，目标菜单只保留各自的模块设计、表绑定和角色权限，不复制 PageTabs。切换只更新当前 URL 的 `Tab` 查询参数；路由、面包屑、顶部访问标签和入口模块 Hero 保持稳定，表格上下文在原实例中切换。实现时必须取消旧请求、丢弃迟到响应并在失败时回滚，禁止按菜单名或业务表名写死。
+跨表 Tab 由入口模块统一配置一组 PageTabs，目标菜单只保留各自的模块设计、表绑定和角色权限，不复制 PageTabs。隐藏目标菜单统一设置 `ParentId=入口菜单Id、Display=0、AppDisplay=0、HasChild=0、PageTabs=[]`，入口菜单继续保持 `HasChild=0` 作为可直接点击的业务入口。模块设计器用【关联模块】可搜索菜单树展示名称、保存 `TargetSysMenuId`。切换只更新当前 URL 的 `Tab` 查询参数；路由、面包屑、顶部访问标签和入口模块 Hero 保持稳定，表格上下文在原实例中切换。实现时必须取消旧请求、丢弃迟到响应并在失败时回滚，禁止按菜单名或业务表名写死。
 
 首屏和跨模块切换应为 Hero 标题/统计、PageTabs、工具栏和列表提供与最终几何尺寸一致的主题化骨架屏；根据模块元数据判断是否预留指标区和 PageTabs，并支持 `prefers-reduced-motion: reduce`。
 

@@ -1,6 +1,6 @@
 {
   "name": "microi.net",
-  "version": "7.5.0",
+  "version": "7.5.1",
   "description": "开源低代码平台 - Microi吾码",
   "author": "iTdos",
   "type": "module",
@@ -10,6 +10,8 @@
     "dev": "vite",
     "build": "node scripts/build-with-memory-guard.mjs",
     "build:clean": "node scripts/build-with-memory-guard.mjs --force",
+    "build:legacy": "node scripts/build-with-memory-guard.mjs --with-legacy",
+    "build:legacy:clean": "node scripts/build-with-memory-guard.mjs --with-legacy --force",
     "build:analyze": "cross-env MICROI_BUILD_ANALYZE=true npm run build:clean && node analyze-build.js && open dist/stats.html",
     "analyze:deps": "./analyze-deps.sh",
     "analyze:build": "node analyze-build.js",
@@ -27,6 +29,7 @@
     "test:v8-ai": "node --test tests/v8-ai.spec.mjs",
     "test:api-service-status": "node --test tests/api-service-status.spec.mjs",
     "test:upload-error": "node --test tests/upload-error.spec.mjs",
+    "test:build-output-mode": "node --test tests/build-output-mode.spec.mjs",
     "test:background-task": "node --test tests/background-task-display.spec.mjs",
     "test:view-schema": "node --test tests/view-schema-runtime.spec.mjs tests/module-presentation-runtime.spec.mjs tests/module-presentation-designer-sfc.spec.mjs tests/module-form-workbench-sfc.spec.mjs",
     "test:e2e": "playwright test --config=.microi-e2e/playwright.config.js",
@@ -162,9 +165,10 @@
     "vite-plugin-svg-icons": "^2.0.1"
   },
   "browserslist": [
-    "> 1%",
-    "last 2 versions",
-    "Chrome >= 49"
+    "Chrome >= 107",
+    "Edge >= 107",
+    "Firefox >= 104",
+    "Safari >= 16"
   ],
   "bugs": {
     "url": "https://www.microi.net"

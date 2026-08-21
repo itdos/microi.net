@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-upgrade-resource
- * Version: v1.2.1
+ * Version: v1.2.2
  * Function:
- * - 匿名读取固定白名单中的 7 个吾码升级资源；超级管理员可通过 SHA 乐观锁原子发布升级资源。
+ * - 匿名读取固定白名单中的 8 个吾码升级资源；超级管理员可通过 SHA 乐观锁原子发布升级资源。
  */
 
 var PARAM = V8.Param || {};
@@ -37,6 +37,7 @@ function getStoreAppId(name) {
   if (name === "app.microi.form-engine.json") return "app.microi.form-engine";
   if (name === "app.microi.module-engine.json") return "app.microi.module-engine";
   if (name === "app.microi.saas-engine.json") return "app.microi.saas-engine";
+  if (name === "app.microi.sso.json") return "app.microi.sso";
   return "";
 }
 
@@ -133,7 +134,8 @@ function validatePublishResource(name, content) {
     "app.microi.store.json": "应用商城",
     "app.microi.form-engine.json": "表单引擎",
     "app.microi.module-engine.json": "模块引擎",
-    "app.microi.saas-engine.json": "SaaS引擎"
+    "app.microi.saas-engine.json": "SaaS引擎",
+    "app.microi.sso.json": "SSO 身份联邦"
   };
   if (!packageModel.PackageInfo
       || text(packageModel.PackageInfo.Name) !== expectedNames[name]
@@ -207,7 +209,7 @@ function parsePublishItems() {
 }
 
 function lockPublishRows() {
-  // 多节点可能同时发布。固定顺序锁住全部 7 个白名单资源行，使
+  // 多节点可能同时发布。固定顺序锁住全部 8 个白名单资源行，使
   // “校验 ExpectedRemoteSha256 + 写入”在同一数据库事务内保持原子。
   V8.Db.FromSql(
     "SELECT Id FROM sys_apiengine "
@@ -216,7 +218,7 @@ function lockPublishRows() {
   ).ToArray();
   V8.Db.FromSql(
     "SELECT Id FROM sys_microistore "
-    + "WHERE AppId IN ('app.microi.form-engine','app.microi.module-engine','app.microi.saas-engine','app.microi.store') "
+    + "WHERE AppId IN ('app.microi.form-engine','app.microi.module-engine','app.microi.saas-engine','app.microi.sso','app.microi.store') "
     + "ORDER BY Id FOR UPDATE"
   ).ToArray();
 }

@@ -47,6 +47,21 @@ test("a table route carrying Tab reuses its Vue instance and access tab", () => 
     assert.equal(shouldReusePageTabRoute({ ...route, meta: { microAppHost: true } }), false);
 });
 
+test("record workbench query changes reuse the current Vue instance", () => {
+    const route = {
+        path: "/system-config",
+        fullPath: "/system-config?RecordId=row-1",
+        query: { RecordId: "row-1" },
+        meta: { DiyTableId: "table-config" }
+    };
+    assert.equal(getPageTabRouteViewKey(route), "/system-config");
+    assert.equal(getPageTabRouteViewKey({
+        ...route,
+        fullPath: "/system-config?RecordId=row-1&ViewMode=Table",
+        query: { RecordId: "row-1", ViewMode: "Table" }
+    }), "/system-config");
+});
+
 test("diy-table keeps one shell while loading a target module context", async () => {
     const [tableSource, dataSource, schemaSource, styleSource, tagsStoreSource] = await Promise.all([
         readFile(new URL("../src/views/form-engine/diy-table.vue", import.meta.url), "utf8"),

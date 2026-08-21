@@ -203,26 +203,134 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
     );
     await addRole.click();
 
-    const roleDialog = page.locator(".diy-form-container.el-dialog:visible, .diy-form-container.el-drawer:visible").last();
-    await expect(roleDialog).toBeVisible({ timeout: 30_000 });
-    const permissionField = roleDialog.locator(".mci-role-permission-field");
-    await expect(permissionField).toBeVisible({ timeout: 30_000 });
+    const permissionTree = page.locator(".mci-role-permission-field__tree:visible").last();
+    await expect(permissionTree).toBeVisible({ timeout: 60_000 });
+    const permissionField = permissionTree.locator(
+        "xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' mci-role-permission-field ')][1]"
+    );
+    await expect(permissionField).toBeVisible();
+    const roleDialogCandidate = permissionField.locator(
+        "xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' diy-form-container ')][1]"
+    );
+    await expect(roleDialogCandidate).toBeVisible({ timeout: 30_000 });
+    await roleDialogCandidate.evaluate((element) => element.setAttribute("data-role-acceptance-dialog", "true"));
+    const roleDialog = page.locator('[data-role-acceptance-dialog="true"]');
     await expect(permissionField.locator(".el-form-item")).toHaveCount(0);
     const permissionFormItem = permissionField.locator(
         "xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' el-form-item ')][1]"
     );
     await expect(permissionFormItem.locator(":scope > .el-form-item__label")).toHaveCount(1);
     await expect(roleDialog).toContainText("接口引擎等平台控制面仍要求 9999 级管理员");
-    await expect(roleDialog.locator(".mci-role-permission-field__tree")).toBeVisible({ timeout: 30_000 });
     await expect(permissionField.getByText(/无详情|无搜索/)).toHaveCount(0);
+
+    const compactTreeGeometry = await permissionTree.locator(".role-menu-row").first().evaluate((row) => {
+        const rowRect = row.getBoundingClientRect();
+        const name = row.querySelector(".role-menu-name");
+        const permissions = row.querySelector(".permission-checkbox-group");
+        const expand = row.querySelector(".role-menu-expand, .role-menu-expand-placeholder");
+        const menuCheck = row.querySelector(".role-menu-check");
+        const centerY = (element) => {
+            const rect = element?.getBoundingClientRect();
+            return rect ? rect.top + rect.height / 2 : 0;
+        };
+        return {
+            rowHeight: rowRect.height,
+            nameRatio: (name?.getBoundingClientRect().width || 0) / rowRect.width,
+            permissionWidth: permissions?.getBoundingClientRect().width || 0,
+            expandCenterDelta: Math.abs(centerY(expand) - centerY(menuCheck))
+        };
+    });
+    expect(compactTreeGeometry.rowHeight, JSON.stringify(compactTreeGeometry)).toBeLessThanOrEqual(42);
+    expect(compactTreeGeometry.nameRatio, JSON.stringify(compactTreeGeometry)).toBeLessThan(0.34);
+    expect(compactTreeGeometry.nameRatio, JSON.stringify(compactTreeGeometry)).toBeGreaterThan(0.2);
+    expect(compactTreeGeometry.permissionWidth, JSON.stringify(compactTreeGeometry)).toBeGreaterThan(500);
+    expect(compactTreeGeometry.expandCenterDelta, JSON.stringify(compactTreeGeometry)).toBeLessThanOrEqual(2);
+
+    const fieldSearch = roleDialog.locator('.diy-form-header-search input[aria-label="搜索当前表单字段"]').first();
+    const moreButton = roleDialog.getByRole("button", { name: /^(?:More|更多)$/i }).first();
+    await expect(fieldSearch).toBeVisible();
+    await expect(fieldSearch).toHaveAttribute("placeholder", "搜索字段");
+    await expect(moreButton).toBeVisible();
+    const toolbarGeometry = await fieldSearch.evaluate((input) => {
+        const search = input.closest(".diy-form-header-search")?.getBoundingClientRect();
+        const actions = input.closest(".diy-form-dialog-actions, .form-actions");
+        const more = [...(actions?.querySelectorAll("button") || [])]
+            .find((button) => /^(More|更多)$/i.test(button.textContent?.trim() || ""))
+            ?.getBoundingClientRect();
+        return {
+            searchWidth: search?.width || 0,
+            gap: search && more ? more.left - search.right : -1,
+            centerDelta: search && more
+                ? Math.abs((search.top + search.height / 2) - (more.top + more.height / 2))
+                : 999
+        };
+    });
+    expect(toolbarGeometry.searchWidth, JSON.stringify(toolbarGeometry)).toBeLessThanOrEqual(230);
+    expect(toolbarGeometry.gap, JSON.stringify(toolbarGeometry)).toBeGreaterThanOrEqual(0);
+    expect(toolbarGeometry.gap, JSON.stringify(toolbarGeometry)).toBeLessThanOrEqual(14);
+    expect(toolbarGeometry.centerDelta, JSON.stringify(toolbarGeometry)).toBeLessThanOrEqual(3);
+    await fieldSearch.fill("BaseLimit");
+    await expect(roleDialog.locator(".diy-form-header-search .diy-form-field-search-count")).toContainText(/\d+\s*项/);
+    const clearSearch = roleDialog.locator(".diy-form-header-search .el-input__suffix .el-icon").first();
+    await expect(clearSearch).toBeVisible();
+    await clearSearch.click();
+    await expect(fieldSearch).toHaveValue("");
+    await moreButton.click();
+    const formMoreMenu = page.locator(".el-dropdown__popper:visible").last();
+    const refreshItem = formMoreMenu.getByText("刷新当前记录", { exact: true });
+    await expect(refreshItem).toBeVisible();
+    const refreshIconCount = await refreshItem.evaluate((element) => {
+        const item = element.matches(".el-dropdown-menu__item")
+            ? element
+            : element.closest(".el-dropdown-menu__item");
+        return item?.querySelectorAll("svg").length || 0;
+    });
+    expect(refreshIconCount).toBeGreaterThan(0);
+    await page.keyboard.press("Escape");
+
+    const basePermissionItem = formItem(roleDialog, /基础权限|Basic Permissions/i);
+    await expect(basePermissionItem).toBeVisible();
+    const basePermissionGeometry = await basePermissionItem.evaluate((item) => {
+        const label = item.querySelector(":scope > .el-form-item__label")?.getBoundingClientRect();
+        const control = item.querySelector(":scope > .el-form-item__content .el-checkbox-group")?.getBoundingClientRect();
+        const description = item.parentElement?.querySelector(":scope > .diy-field-description--below")?.getBoundingClientRect();
+        return {
+            centerDelta: label && control
+                ? Math.abs((label.top + label.height / 2) - (control.top + control.height / 2))
+                : 999,
+            descriptionStartDelta: description && control ? Math.abs(description.left - control.left) : 999
+        };
+    });
+    expect(basePermissionGeometry.centerDelta, JSON.stringify(basePermissionGeometry)).toBeLessThanOrEqual(3);
+    expect(basePermissionGeometry.descriptionStartDelta, JSON.stringify(basePermissionGeometry)).toBeLessThanOrEqual(3);
+    const baseDescription = basePermissionItem.locator("xpath=..").locator(":scope > .diy-field-description--below");
+    await expect(baseDescription).toBeVisible();
+    await baseDescription.hover();
+    const descriptionTooltip = page.locator(".diy-field-description-tooltip:visible").last();
+    await expect(descriptionTooltip).toBeVisible();
+    const tooltipArrow = await descriptionTooltip.locator(".el-popper__arrow").evaluate((arrow) => {
+        const pseudo = getComputedStyle(arrow, "::before");
+        return { clipPath: pseudo.clipPath, borderRadius: pseudo.borderRadius };
+    });
+    expect(tooltipArrow.clipPath, JSON.stringify(tooltipArrow)).toContain("polygon");
+    expect(tooltipArrow.borderRadius, JSON.stringify(tooltipArrow)).toBe("0px");
+
     const directTablePolicyResult = await (await directTablePolicyResponse).json();
     expect(Number(directTablePolicyResult.Code), directTablePolicyResult.Msg || "direct-table policy failed").toBe(1);
     expect(Array.isArray(directTablePolicyResult.Data)).toBe(true);
     const directTableSection = permissionField.locator(".mci-role-permission-field__direct-table");
     await expect(directTableSection).toBeVisible({ timeout: 30_000 });
     await expect(directTableSection.getByRole("heading", { name: "表直连权限", exact: true })).toBeVisible();
-    await expect(directTableSection.getByRole("combobox").first()).toBeEnabled();
+    const directTablePicker = directTableSection.getByRole("combobox").first();
+    await expect(directTablePicker).toBeEnabled();
     await expect(directTableSection).toContainText("平台保护");
+    await directTableSection.locator(".mci-table-permission__picker .el-select__wrapper").click();
+    const defaultTableOptions = page.locator(".el-select__popper:visible .el-select-dropdown__item");
+    await expect(defaultTableOptions.first()).toBeVisible({ timeout: 15_000 });
+    const defaultTableOptionCount = await defaultTableOptions.count();
+    expect(defaultTableOptionCount).toBeGreaterThan(0);
+    expect(defaultTableOptionCount).toBeLessThanOrEqual(20);
+    await page.keyboard.press("Escape");
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "01-role-low-code-permissions.png"), fullPage: false });
     await directTableSection.scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03-role-direct-table-permission.png"), fullPage: false });
@@ -249,6 +357,56 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
     await expect(page.getByText(/url不能为空/)).toHaveCount(0);
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "02-dept-low-code-form.png"), fullPage: false });
     expect(legacyCalls, `legacy custom CRUD endpoints were called: ${legacyCalls.join(", ")}`).toEqual([]);
+});
+
+test("移动端表单保留即时字段搜索，并在浮动更多中提供刷新", async ({ page }) => {
+    test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page, { osClient: "iTdos", password: LOCAL_PASSWORD });
+    await page.goto(tenantUrl("iTdos", "", "#/system/role"), { waitUntil: "domcontentloaded" });
+
+    const rolePage = page.locator(".left-right-page").first();
+    await expect(rolePage).toBeVisible({ timeout: 45_000 });
+    const tableMore = rolePage.locator(".mobile-fab-container:visible .mobile-fab-btn").last();
+    await expect(tableMore).toBeVisible({ timeout: 45_000 });
+    await tableMore.click();
+    const addRole = page.locator(".mobile-fab-menu:visible .mobile-fab-menu-item")
+        .filter({ hasText: /新增|Add/i }).first();
+    await expect(addRole).toBeVisible();
+    await addRole.click();
+
+    const mobileSearchToolbar = page.locator(".diy-form-field-search-toolbar--mobile:visible").last();
+    const mobileSearch = mobileSearchToolbar.getByRole("textbox", { name: "搜索当前表单字段" });
+    await expect(mobileSearchToolbar).toBeVisible({ timeout: 30_000 });
+    await expect(mobileSearch).toHaveAttribute("placeholder", "搜索字段");
+    const mobileSearchGeometry = await mobileSearchToolbar.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const input = element.querySelector(".el-input")?.getBoundingClientRect();
+        return { width: rect.width, inputWidth: input?.width || 0, viewportWidth: window.innerWidth };
+    });
+    expect(mobileSearchGeometry.width, JSON.stringify(mobileSearchGeometry)).toBeLessThanOrEqual(390);
+    expect(mobileSearchGeometry.inputWidth, JSON.stringify(mobileSearchGeometry)).toBeGreaterThan(250);
+    await mobileSearch.fill("BaseLimit");
+    await expect(mobileSearchToolbar.locator(".diy-form-field-search-count")).toContainText(/\d+\s*项/);
+    const mobileClear = mobileSearchToolbar.locator(".el-input__suffix .el-icon").first();
+    await expect(mobileClear).toBeVisible();
+    await mobileClear.click();
+    await expect(mobileSearch).toHaveValue("");
+
+    const mobileMore = page.locator(".mobile-fab-btn:visible").last();
+    await expect(mobileMore).toBeVisible();
+    await mobileMore.click();
+    const mobileMenu = page.locator(".mobile-fab-menu:visible").last();
+    const mobileRefresh = mobileMenu.locator(".mobile-fab-menu-item")
+        .filter({ hasText: "刷新当前记录" }).first();
+    await expect(mobileRefresh).toBeVisible();
+    await expect(mobileRefresh.locator("svg").first()).toBeVisible();
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "04-mobile-form-search-more.png"), fullPage: false });
+
+    await mobileMore.click();
+    const mobileClose = page.locator(".diy-form-dialog-actions.is-mobile:visible button").last();
+    if (await mobileClose.isVisible().catch(() => false)) await mobileClose.click();
 });
 
 test("角色和部门低代码表单完成事务新增、修改、删除", async ({ page }) => {

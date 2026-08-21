@@ -273,5 +273,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ### 🐳 本地编译发布到 Docker 镜像
 
 1. 安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-2. 执行 `npm run build` 命令打包
+2. 执行 `npm run build` 打包现代版（Chrome / Edge 107+、Firefox 104+、Safari 16+，默认推荐）
 3. 进入 `bin/Release/` 目录，执行 `publish-demo.sh` 脚本（记得先修改里面的配置）
+
+只有已明确约定继续支持 Chrome 49 的存量客户，才使用 `npm run build:legacy` 同时生成 legacy 包。该命令会额外执行旧语法转换、polyfill 和完整校验，明显增加构建时间与产物体积。由于 Vue 3、Element Plus 等当前依赖已不再官方支持 Chrome 49，这一产物属于尽力兼容层，正式交付前仍需在客户真实旧浏览器上验证实际使用功能。

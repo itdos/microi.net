@@ -17,8 +17,9 @@
                 :remote-method="searchTables"
                 :loading="searchLoading"
                 :disabled="readonly || !policyReady"
-                placeholder="输入表名或说明，添加直连授权"
+                placeholder="选择或输入表名、说明，添加直连授权"
                 style="width: 100%"
+                @visible-change="handlePickerVisible"
                 @change="addTable"
             >
                 <el-option
@@ -99,6 +100,7 @@ export default {
             tableOptions: [],
             pendingTableId: "",
             searchLoading: false,
+            searchVersion: 0,
             loadingVersion: 0,
             policyByTableName: Object.create(null),
             policyReady: false,
@@ -175,6 +177,7 @@ export default {
                 this.policyByTableName = policyByTableName;
                 this.policyReady = true;
                 this.rows = this.rows.map((row) => this.applyPolicyToRow(row));
+                await this.searchTables("");
             } catch (error) {
                 this.policyByTableName = Object.create(null);
                 this.policyLoadFailed = true;
@@ -260,26 +263,40 @@ export default {
         },
         async searchTables(keyword) {
             const text = String(keyword || "").trim();
-            if (!this.policyReady || !text) {
+            if (!this.policyReady) {
                 this.tableOptions = [];
                 return;
             }
+            const version = ++this.searchVersion;
             this.searchLoading = true;
             try {
-                const result = await this.DiyCommon.FormEngine.GetTableData("diy_table", {
-                    _Where: [
-                        ["(", "Name", "Like", text],
-                        ["OR", "Description", "Like", text, ")"]
-                    ],
+                const params = {
                     _PageIndex: 1,
-                    _PageSize: 30,
+                    _PageSize: 20,
                     _SelectFields: ["Id", "Name", "Description"],
                     _OrderBy: "Description",
                     _OrderByType: "ASC"
-                });
-                this.tableOptions = result && result.Code === 1 ? result.Data || [] : [];
+                };
+                if (text) {
+                    params._Where = [
+                        ["(", "Name", "Like", text],
+                        ["OR", "Description", "Like", text, ")"]
+                    ];
+                }
+                const result = await this.DiyCommon.FormEngine.GetTableData("diy_table", params);
+                if (version === this.searchVersion) {
+                    this.tableOptions = result && result.Code === 1 ? result.Data || [] : [];
+                }
+            } catch (error) {
+                if (version === this.searchVersion) this.tableOptions = [];
+                console.warn("Microi：搜索可授权数据表失败", error);
             } finally {
-                this.searchLoading = false;
+                if (version === this.searchVersion) this.searchLoading = false;
+            }
+        },
+        handlePickerVisible(visible) {
+            if (visible && this.policyReady && this.tableOptions.length === 0) {
+                this.searchTables("");
             }
         },
         addTable(tableId) {

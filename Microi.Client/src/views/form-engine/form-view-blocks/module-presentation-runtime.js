@@ -7,6 +7,26 @@ function asBoolean(value, fallback = false) {
     );
 }
 
+/**
+ * Resolve the module-level "open first record" switch.
+ *
+ * OpenFirstRecord is owned by sys_menu.  Older ViewSchema payloads stored the
+ * same switch under Layout.Form, so that value remains a read-only fallback
+ * only when the physical menu field is genuinely absent/empty.  In
+ * particular, an explicit 0/false on sys_menu must be able to turn off an old
+ * Layout.Form value of true.
+ */
+export function resolveModuleOpenFirstRecord(menu = {}, legacyForm = {}) {
+    const physicalValue = menu?.OpenFirstRecord;
+    if (physicalValue !== undefined && physicalValue !== null && String(physicalValue).trim() !== "") {
+        return asBoolean(physicalValue);
+    }
+    const legacyValue = legacyForm?.OpenFirstRecord;
+    return legacyValue === undefined || legacyValue === null || String(legacyValue).trim() === ""
+        ? false
+        : asBoolean(legacyValue);
+}
+
 export function parseJsonObject(value) {
     if (value && typeof value === "object" && !Array.isArray(value)) return value;
     if (typeof value !== "string" || !value.trim()) return {};

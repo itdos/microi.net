@@ -4,6 +4,7 @@
         <el-button type="primary" :icon="Edit" @click="openMiniEditor">
             编辑代码{{ miniCodeLength }}
         </el-button>
+        <pre class="diy-code-editor-print-source" aria-label="代码内容">{{ ModelValue || '（无代码）' }}</pre>
 
         <el-dialog
             v-if="miniEditorVisible"
@@ -102,6 +103,7 @@
 
     <!-- 正常模式：完整编辑器 -->
     <div v-else class="monaco-container" :class="{ 'ai-panel-open': aiPanelVisible }" :id="'monaco-container-' + (field && field.Id) + '-' + RandomValue" :style="{ height: EditorHeight }">
+        <pre class="diy-code-editor-print-source" aria-label="代码内容">{{ ModelValue || '（无代码）' }}</pre>
         <div class="monaco-toolbar">
             <div class="toolbar-left">
                 <button class="toolbar-btn" @click.prevent="undoCode" title="撤销 (Ctrl+Z)">
@@ -2530,6 +2532,55 @@ defineExpose({
                 font-size: 13px;
             }
         }
+    }
+}
+
+.diy-code-editor-print-source {
+    display: none;
+}
+
+@media print {
+    .code-editor-mini,
+    .monaco-container {
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .code-editor-mini > .el-button,
+    .code-editor-mini > .el-dialog,
+    .monaco-container > .monaco-toolbar,
+    .monaco-container > .editor-body,
+    .monaco-container > .resize-handle,
+    .monaco-container > .ai-panel-wrapper {
+        display: none !important;
+    }
+
+    .diy-code-editor-print-source {
+        display: block !important;
+        width: 100% !important;
+        min-height: 12mm;
+        box-sizing: border-box;
+        margin: 0 !important;
+        padding: 3mm 3.5mm;
+        overflow: visible !important;
+        border: 1px solid #d7e0eb;
+        border-radius: 2mm;
+        color: #172033 !important;
+        background: #f7f9fc !important;
+        font: 8.5pt/1.48 Consolas, "SFMono-Regular", "Microsoft YaHei", monospace;
+        overflow-wrap: anywhere;
+        tab-size: 2;
+        white-space: pre-wrap;
+        break-inside: auto;
+        page-break-inside: auto;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
     }
 }
 

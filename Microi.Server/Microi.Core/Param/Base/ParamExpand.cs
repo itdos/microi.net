@@ -244,8 +244,12 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string ServerDataV8 { get; set; }
         /// <summary>
-        /// Whether backend table V8 events use process-resident-memory protection
-        /// instead of configurable per-execution Jint limits.
+        /// Only true/1 enables configurable per-execution Jint limits for backend
+        /// table V8 events. Missing/null/0 keeps those budgets disabled.
+        /// </summary>
+        public int? V8Limit { get; set; }
+        /// <summary>
+        /// Legacy compatibility alias. New writes must use V8Limit.
         /// </summary>
         public int? V8Unlimited { get; set; }
 
@@ -335,6 +339,34 @@ namespace Microi.net
         public string TableTabs { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string TabsPosition { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormPresentation { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormPresentationMode { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormPresentationDensity { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormNavigationTitle { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormNavigationCountText { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormSectionNavigation { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormSectionEyebrow { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormRequiredCountText { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormWorkbenchEyebrow { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormWorkbenchDescription { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormNavigationFooterTitle { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormNavigationFooterHtml { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormRecordSelectorPlaceholder { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string FormRecordSelectorLabelFields { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Tabs { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -586,6 +618,34 @@ namespace Microi.net
         public string _TableTabs { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _TabsPosition { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormPresentation { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormPresentationMode { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormPresentationDensity { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormNavigationTitle { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormNavigationCountText { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormSectionNavigation { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormSectionEyebrow { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormRequiredCountText { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormWorkbenchEyebrow { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormWorkbenchDescription { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormNavigationFooterTitle { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormNavigationFooterHtml { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormRecordSelectorPlaceholder { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _FormRecordSelectorLabelFields { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _Tabs { get; set; }
 

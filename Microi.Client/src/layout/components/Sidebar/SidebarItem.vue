@@ -2,6 +2,7 @@
     <div
         v-if="item.Display !== 0 && !item.hidden"
         class="sidebar-menu-node"
+        :class="{ 'sidebar-menu-node--flyout-root': flyoutMode && normalizedLevel === 0 }"
         :data-menu-level="normalizedLevel"
         :data-compact-index="normalizedLevel === 0 && compactIndex >= 0 ? compactIndex : undefined"
         :style="menuLevelStyle"
@@ -23,6 +24,21 @@
                 </app-link>
             </span>
         </template>
+        <el-menu-item
+            v-else-if="flyoutMode && normalizedLevel === 0"
+            :index="`__mci_flyout_${compactIndex}`"
+            class="sidebar-flyout-root-item"
+            aria-haspopup="menu"
+        >
+            <item
+                v-if="item.meta"
+                :icon="item.meta.icon"
+                :title="generateTitle(item.meta.title)"
+                :menu-id="item.meta.Id"
+                :badge-config="item.meta.MenuBadgeConfig"
+            />
+            <el-icon class="mci-sidebar-root-flyout-arrow"><ArrowRight /></el-icon>
+        </el-menu-item>
         <el-sub-menu v-else ref="subMenu" :index="getItemPath(item)" popper-append-to-body>
             <template #title>
                 <span class="submenu-title-link" @click="handleSubMenuTitleClick(item)">
@@ -42,6 +58,7 @@
                 :level="normalizedLevel + 1"
                 :item="child"
                 :base-path="resolvePath(child)"
+                :flyout-mode="flyoutMode"
                 class="nest-menu"
             />
         </el-sub-menu>
@@ -59,10 +76,11 @@ import { isExternal } from "@/utils/validate";
 import Item from "./Item";
 import AppLink from "./Link";
 import FixiOSBug from "./FixiOSBug";
+import { ArrowRight } from "@element-plus/icons-vue";
 
 export default {
     name: "SidebarItem",
-    components: { Item, AppLink },
+    components: { Item, AppLink, ArrowRight },
     mixins: [FixiOSBug],
     props: {
         // route object
@@ -85,6 +103,10 @@ export default {
         compactIndex: {
             type: Number,
             default: -1
+        },
+        flyoutMode: {
+            type: Boolean,
+            default: false
         }
     },
     setup() {
@@ -229,5 +251,23 @@ export default {
     align-items: center;
     width: auto;
     height: 100%;
+}
+
+.sidebar-flyout-root-item {
+    display: flex;
+    align-items: center;
+}
+
+.sidebar-flyout-root-item :deep(.menu-item-wrapper) {
+    flex: 1;
+    min-width: 0;
+}
+
+.mci-sidebar-root-flyout-arrow {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
+    margin-left: 8px;
+    color: currentColor;
 }
 </style>

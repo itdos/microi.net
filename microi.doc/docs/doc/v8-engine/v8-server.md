@@ -294,7 +294,7 @@ console.log(JSON.stringify(V8.Limits));
 
 无论开关状态如何，进程/容器常驻内存保护、HTTP 断开与后台任务取消、节点停机取消、执行并发、接口嵌套深度、CLR 类型沙箱、租户权限、SQL/ORM/HTTP/文件限制都始终生效。接口调用的下游接口分别读取自己的 `V8Limit`，不会继承上游设置。
 
-若复杂逻辑位于表的 `SubmitBeforeServerV8`、`SubmitAfterServerV8` 或 `ServerDataV8`，仍使用 `diy_table.V8Unlimited`：只有事件链必须保持一个事务且无法安全分片时才开启。建议同时满足以下条件：
+表后端事件同样使用正向开关 `diy_table.V8Limit`：字段缺失、`null`、`0/false` 都不设置 Jint 单次预算，只有 `1/true` 才启用限制。旧 `diy_table.V8Unlimited` 仅在新字段不存在时按反向语义兼容，新版表单、MCP、Manifest 与应用资源统一写 `V8Limit/v8Limit`。复杂逻辑位于 `SubmitBeforeServerV8`、`SubmitAfterServerV8` 或 `ServerDataV8` 时，仍建议满足以下条件：
 
 - 由后台任务承载，避免依赖长时间浏览器连接；
 - 已评估数据库长事务的锁等待、事务日志/Undo、回滚耗时和连接超时；
@@ -427,6 +427,24 @@ var directTablePolicies = V8.Method.GetDirectTableGrantPolicies();
 `RefreshExtensionDatabases(osClient?)` 绑定当前 V8 租户。存在 `V8.DbTrans` 时只注册提交后回调：真实事务提交成功才递增共享 Redis 版本，回滚不刷新；没有事务时立即刷新。它适合“数据库扩展”应用的 `microi_database.SubmitAfterServerV8`，不应暴露成匿名或普通业务接口。
 
 `GetDirectTableGrantPolicies()` 返回平台统一维护的表直连授权模式和允许操作。它只供角色管理等可信后端表单事件校验，不能替代当前用户、菜单、表和行级权限判断，也不能直接作为匿名业务接口返回。
+
+### 身份应用可信原子
+
+SSO 与平台短信登录遵循“接口引擎编排，C# 只补不可伪造的底层原子”。下列方法不是普通业务 API，只允许对应官方 Managed 接口引擎在精确 `OsClient + ApiEngineKey` 上调用；其它接口引擎、表单事件、匿名请求或直接 HTTP 调用都会失败关闭：
+
+| 方法 | 唯一用途 | 允许的接口引擎 |
+|---|---|---|
+| `CreateFederatedUser` | 校验非管理员角色并以专用带盐哈希创建 SSO JIT 用户 | `sso_resolve_federated_identity` |
+| `CreateSsoLoginTicket` | 为已解析用户创建短时一次性 SSO 登录票据 | `sso_legacy_token_login` |
+| `CompleteSsoLogin` | 原子消费 SSO 票据、重读启用用户并签发 DiyToken | `sso_complete_login` |
+| `RotateSsoClientSecret` | 生成只显示一次的客户端 Secret 并持久化验证哈希 | `sso_rotate_client_secret` |
+| `CreatePlatformSmsProof` | 限频并原子消费短信验证码，签发短时证明 | `platform_auth_sms_login` |
+| `CreatePlatformSmsUser` | 在短信证明约束下创建带盐哈希用户 | `platform_auth_sms_login` |
+| `CompletePlatformSmsLogin` | 原子消费短信证明并签发 DiyToken | `platform_auth_sms_login` |
+
+接口引擎不得把这些方法包装成“通用用户创建/Token 生成”接口，也不得让客户端传入目标 `OsClient`、任意用户对象、Role Level、Secret 保存位置或回调地址。官方应用分别通过 `app.microi.sso` 与自动安装的 `app.microi.saas-engine` 交付编排代码和 ResourcePolicies；应用尚未安装时，普通账号密码登录仍由最小启动内核保证可用。
+
+SSO 的完整应用合同、协议端点和 11 个接口引擎见 [SSO 身份联邦](../more/sso)。
 
 ### V8.Method.Upload
 
@@ -1916,7 +1934,7 @@ WFNodeStart：流程节点开始V8事件
 
 常见上下文包括 `V8.Param`、`V8.Header`、`V8.CurrentUser`、`V8.OsClient`、`V8.Form`、`V8.OldForm`、`V8.TableModel`、`V8.TableData`、`V8.FormSubmitAction`、`V8.EventName`、`V8.InvokeType`、`V8.RowIndex`、`V8.CacheData`、`V8.NotSaveField`、`V8.LineValue`、`V8.NextNodeId`、`V8.FilesByteBase64` 和 `V8.WF`。`Engine`、`HttpContext`、执行租约等宿主对象属于内部实现，不要保存到静态变量、缓存或延迟回调。
 
-平台的 `SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 以及 V8 并发门共同保护单次脚本和单节点资源。V8 的默认/最大超时、语句数、单层累计分配、调用树累计分配、JavaScript 递归、接口嵌套深度和并发等待可在 `sys_config` 的开发配置中查看；接口引擎默认 `sys_apiengine.V8Limit=0`，不设置 Jint 单次预算，只有打开 `V8运行限制` 后才应用 `Timeout/MaxStatements/LimitMemory/LimitRecursion`。表后端事件继续使用 `diy_table.V8Unlimited` 作为受控例外。进程内并发门不是集群级配额或分布式锁；多节点副作用仍必须依赖 Redis/数据库租约、幂等键、唯一约束、状态机或 outbox/inbox。
+平台的 `SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 以及 V8 并发门共同保护单次脚本和单节点资源。V8 的默认/最大超时、语句数、单层累计分配、调用树累计分配、JavaScript 递归、接口嵌套深度和并发等待可在 `sys_config` 的开发配置中查看；接口引擎与表后端事件分别默认 `sys_apiengine.V8Limit=0`、`diy_table.V8Limit=0`，不设置 Jint 单次预算，只有打开 `V8运行限制` 后才应用 `Timeout/MaxStatements/LimitMemory/LimitRecursion`。进程内并发门不是集群级配额或分布式锁；多节点副作用仍必须依赖 Redis/数据库租约、幂等键、唯一约束、状态机或 outbox/inbox。
 
 脚本应主动控制：
 

@@ -15,9 +15,11 @@ namespace Microi.net
     {
         public string FromUserId { get; set; }
         public string FromUserName { get; set; }
+        public string FromUserAccount { get; set; }
         public string FromUserAvatar { get; set; }
         public string ToUserId { get; set; }
         public string ToUserName { get; set; }
+        public string ToUserAccount { get; set; }
         public string ToUserAvatar { get; set; }
         public string Content { get; set; }
         public DateTime CreateTime { get; set; }
@@ -32,9 +34,11 @@ namespace Microi.net
     {
         public string UserId { get; set; }
         public string UserName { get; set; }
+        public string UserAccount { get; set; }
         public string UserAvatar { get; set; }
         public string ContactUserId { get; set; }
         public string ContactUserName { get; set; }
+        public string ContactUserAccount { get; set; }
         public string ContactUserAvatar { get; set; }
         public string ContactUserDeviceClientId { get; set; }
         public string LastMessage { get; set; }
@@ -42,6 +46,87 @@ namespace Microi.net
         public string OtherInfo { get; set; }
         public int UnRead { get; set; }
         public DateTime UpdateTime { get; set; }
+    }
+
+    /// <summary>
+    /// 聊天联系人最小公开投影。只补充现有登录账号，不扩展手机号、邮箱等用户资料。
+    /// </summary>
+    public static class ChatContactProjection
+    {
+        private static string FirstNotBlank(params string[] values)
+        {
+            return values?
+                .Select(value => value?.Trim())
+                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+        }
+
+        public static string ResolveDisplayName(
+            string currentName,
+            string storedName,
+            string currentAccount,
+            string storedAccount,
+            string fallback = "未命名用户")
+        {
+            return FirstNotBlank(
+                currentName,
+                storedName,
+                currentAccount,
+                storedAccount,
+                fallback,
+                "未命名用户");
+        }
+
+        /// <summary>
+        /// 已鉴权公共用户目录仍只返回 Id/Name/Avatar；Account 仅在服务端参与 Name 回退计算。
+        /// </summary>
+        public static string ResolvePublicDirectoryName(string name, string account)
+        {
+            return ResolveDisplayName(name, null, account, null);
+        }
+
+        public static string ResolveAccount(string currentAccount, string storedAccount)
+        {
+            return FirstNotBlank(currentAccount, storedAccount);
+        }
+
+        public static string ResolveAvatar(string currentAvatar, string storedAvatar)
+        {
+            return FirstNotBlank(currentAvatar, storedAvatar);
+        }
+
+        public static MessageChatContactListDto Create(
+            MessageChatContactList source,
+            string currentContactName = null,
+            string currentContactAccount = null,
+            string currentContactAvatar = null)
+        {
+            source ??= new MessageChatContactList();
+            return new MessageChatContactListDto
+            {
+                UserId = source.UserId,
+                UserName = source.UserName,
+                UserAccount = source.UserAccount,
+                UserAvatar = source.UserAvatar,
+                ContactUserId = source.ContactUserId,
+                ContactUserName = ResolveDisplayName(
+                    currentContactName,
+                    source.ContactUserName,
+                    currentContactAccount,
+                    source.ContactUserAccount),
+                ContactUserAccount = ResolveAccount(
+                    currentContactAccount,
+                    source.ContactUserAccount),
+                ContactUserAvatar = ResolveAvatar(
+                    currentContactAvatar,
+                    source.ContactUserAvatar),
+                ContactUserDeviceClientId = source.ContactUserDeviceClientId,
+                LastMessage = source.LastMessage,
+                LastMessageType = source.LastMessageType,
+                OtherInfo = source.OtherInfo,
+                UnRead = source.UnRead,
+                UpdateTime = source.UpdateTime
+            };
+        }
     }
 
     /// <summary>
@@ -63,6 +148,10 @@ namespace Microi.net
         /// </summary>
         public string UserName { get; set; }
         /// <summary>
+        /// 当前用户登录账号，仅用于聊天联系人显示名回退。
+        /// </summary>
+        public string UserAccount { get; set; }
+        /// <summary>
         /// 
         /// </summary>
         public string UserAvatar { get; set; }
@@ -74,6 +163,10 @@ namespace Microi.net
         /// 
         /// </summary>
         public string ContactUserName { get; set; }
+        /// <summary>
+        /// 聊天对象登录账号，仅用于聊天联系人显示名回退。
+        /// </summary>
+        public string ContactUserAccount { get; set; }
         /// <summary>
         /// 
         /// </summary>
@@ -187,6 +280,10 @@ namespace Microi.net
         /// </summary>
         public virtual string FromUserName { get; set; }
         /// <summary>
+        /// 发送者登录账号，仅用于聊天显示名回退。
+        /// </summary>
+        public virtual string FromUserAccount { get; set; }
+        /// <summary>
         /// 
         /// </summary>
         public virtual string FromUserId { get; set; }
@@ -198,6 +295,10 @@ namespace Microi.net
         /// 
         /// </summary>
         public virtual string ToUserName { get; set; }
+        /// <summary>
+        /// 接收者登录账号，仅用于聊天显示名回退。
+        /// </summary>
+        public virtual string ToUserAccount { get; set; }
         /// <summary>
         /// 
         /// </summary>

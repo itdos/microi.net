@@ -1651,7 +1651,8 @@ docker push registry.cn-地域.aliyuncs.com/命名空间/microi-api:$version
 
 ### 3️⃣ 本地打包并上传 Docker 镜像 - 前端
 
-- 使用 `npm run build` 打包前端
+- 默认使用 `npm run build` 打包现代版前端（Chrome / Edge 107+、Firefox 104+、Safari 16+）
+- 只有明确需要兼容 Chrome 49 的存量客户才使用 `npm run build:legacy`；它会额外生成 legacy 包，显著增加构建时间和产物体积，且交付前必须在客户真实旧浏览器上验证
 - 在打包输出目录创建 `Dockerfile`：
 ```powershell
 #Vue2

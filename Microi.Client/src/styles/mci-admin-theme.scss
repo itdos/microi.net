@@ -521,6 +521,70 @@ html[data-theme="dark"] .sidebar-container-microi .el-menu-item.is-active {
     word-break: break-word;
 }
 
+/* Element Plus 默认用旋转方块模拟箭头；字段说明改为真正的三角形。 */
+.diy-field-description-tooltip.el-popper > .el-popper__arrow::before {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--mci-tooltip-bg, #273449) !important;
+    transform: none !important;
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="top"] > .el-popper__arrow,
+.diy-field-description-tooltip.el-popper[data-popper-placement^="bottom"] > .el-popper__arrow {
+    width: 12px;
+    height: 7px;
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="top"] > .el-popper__arrow {
+    bottom: -7px !important;
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="bottom"] > .el-popper__arrow {
+    top: -7px !important;
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="top"] > .el-popper__arrow::before,
+.diy-field-description-tooltip.el-popper[data-popper-placement^="bottom"] > .el-popper__arrow::before {
+    width: 12px !important;
+    height: 7px !important;
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="top"] > .el-popper__arrow::before {
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="bottom"] > .el-popper__arrow::before {
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="left"] > .el-popper__arrow,
+.diy-field-description-tooltip.el-popper[data-popper-placement^="right"] > .el-popper__arrow {
+    width: 7px;
+    height: 12px;
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="left"] > .el-popper__arrow {
+    right: -7px !important;
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="right"] > .el-popper__arrow {
+    left: -7px !important;
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="left"] > .el-popper__arrow::before,
+.diy-field-description-tooltip.el-popper[data-popper-placement^="right"] > .el-popper__arrow::before {
+    width: 7px !important;
+    height: 12px !important;
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="left"] > .el-popper__arrow::before {
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.diy-field-description-tooltip.el-popper[data-popper-placement^="right"] > .el-popper__arrow::before {
+    clip-path: polygon(100% 0, 0 50%, 100% 100%);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .app-wrapper-microi,
     .main-container-microi,

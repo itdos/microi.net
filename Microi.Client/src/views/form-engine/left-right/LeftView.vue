@@ -220,6 +220,7 @@
 <script>
 import { computed, defineAsyncComponent } from "vue";
 import { useDiyStore } from "@/pinia";
+import { collectDefaultExpandedKeys } from "./left-tree-default-expand.js";
 
 // 🔥 改为异步导入，避免循环依赖和初始化顺序问题
 const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"));
@@ -337,7 +338,9 @@ export default {
             return String(label).indexOf(value) !== -1;
         },
         ApplyTreeData(data) {
-            this.TreeData.categories = this.NormalizeTreeData(Array.isArray(data) ? data : []);
+            var categories = this.NormalizeTreeData(Array.isArray(data) ? data : []);
+            this.TreeData.categories = categories;
+            this.TreeData.ExpandedKeys = collectDefaultExpandedKeys(categories, this.LeftTreeData.DefaultExpandLevel);
             this.TreeData.treeRenderKey++;
         },
         NormalizeTreeData(data) {

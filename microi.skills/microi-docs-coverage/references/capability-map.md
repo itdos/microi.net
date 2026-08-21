@@ -31,6 +31,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `more/identity-verification.md` | v8-security, v8-utilities, microi-microservice, app-store, v8-saas-multi-tenant | DiyToken、登录方式气泡、Passkey、Authenticator TOTP、Gitee/微信/GitHub、动态租户设置、严格人脸、一次性步进票据、个人中心和自动升级包 |
 | `more/office.md` | v8-export-import, microi-microservice | Office 导入导出与在线编辑集成 |
 | `more/security.md` | v8-security | 平台安全和兼容基线 |
+| `more/sso.md` | microi-sso, v8-security, app-store | 双向 OIDC/SAML2/CAS、账号映射、协议端点、安全基线、商城发布与验收 |
 | `more/sys-config.md` | v8-utilities, microi-deployment | 系统/租户配置和敏感边界 |
 | `system-engine/ai-engine.md` | ai-engine, v8-http-integration, microi-ai-application | 模型代理、License、V8.AI、MCP 对话、跨端调用和安全 |
 | `system-engine/ai-platform-governance.md` | ai-platform-governance, app-store, business-blueprint, page-engine | 门户、身份、配置、发布、服务韧性、Trace/日志、资产协作与可恢复导入 |

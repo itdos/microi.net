@@ -128,7 +128,7 @@ test("WebAuthn RP ID 不匹配时返回详细中文配置方案", () => {
         assert.match(translated.message, /Passkey 域名配置与当前站点不匹配/);
         assert.match(translated.message, /os\.jifulii\.com/);
         assert.match(translated.message, /api\.itdos\.com/);
-        assert.match(translated.message, /系统设置 → 登录与身份/);
+        assert.match(translated.message, /系统设置 → 安全与服务接入/);
         assert.match(translated.message, /PasskeyOrigins/);
         assert.match(translated.message, /\.well-known\/webauthn/);
         assert.doesNotMatch(translated.message, /registrable domain suffix/);

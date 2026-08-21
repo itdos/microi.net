@@ -1,32 +1,44 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 import { buildPlan, manifestGuide } from './advanced-tools.js';
 
-test('manifest planning keeps table V8Unlimited and accepts positive engine V8Limit', () => {
+test('manifest planning uses positive V8Limit for tables and engines', () => {
   const plan = buildPlan({
-    name: 'V8 unlimited contract probe',
-    tables: [{ name: 'Biz_Atomic', fields: [], v8Unlimited: true }],
+    name: 'V8 limit contract probe',
+    tables: [{ name: 'Biz_Atomic', fields: [], v8Limit: true }],
     engines: [{ apiEngineKey: 'biz_atomic_run', code: 'return { Code: 1 };', v8Limit: true }],
   });
 
   assert.deepEqual(plan.errors, []);
-  assert.equal(plan.warnings.filter((warning) => warning.includes('v8Unlimited=true')).length, 1);
-  assert.match(plan.warnings.join('\n'), /进程常驻内存保护仍生效/u);
+  assert.equal(plan.warnings.filter((warning) => warning.includes('v8Unlimited')).length, 0);
 });
 
-test('manifest planning rejects ambiguous table V8Unlimited and engine V8Limit values', () => {
+test('manifest planning rejects invalid and conflicting table V8Limit values', () => {
   const invalid = buildPlan({
-    tables: [{ name: 'Biz_Invalid', fields: [], v8Unlimited: 'automatic' }],
+    tables: [{ name: 'Biz_Invalid', fields: [], v8Limit: 'automatic' }],
     engines: [{ apiEngineKey: 'biz_invalid', v8Limit: 'automatic' }],
   });
-  assert.equal(invalid.errors.filter((error) => error.includes('v8Unlimited 必须是 boolean 或 0/1')).length, 1);
-  assert.equal(invalid.errors.filter((error) => error.includes('v8Limit 必须是 boolean 或 0/1')).length, 1);
+  assert.equal(invalid.errors.filter((error) => error.includes('v8Limit 必须是 boolean 或 0/1')).length, 2);
 
   const safeDefault = buildPlan({
-    tables: [{ name: 'Biz_Default', fields: [], v8Unlimited: false }],
+    tables: [{ name: 'Biz_Default', fields: [], v8Limit: false }],
     engines: [{ apiEngineKey: 'biz_default', v8Limit: false }],
   });
-  assert.equal(safeDefault.warnings.some((warning) => warning.includes('v8Unlimited=true')), false);
+  assert.equal(safeDefault.warnings.some((warning) => warning.includes('v8Unlimited')), false);
+
+  const conflict = buildPlan({
+    tables: [{ name: 'Biz_Conflict', fields: [], v8Limit: true, v8Unlimited: true }],
+  });
+  assert.equal(conflict.errors.some((error) => error.includes('v8Limit 与兼容字段 v8Unlimited 的语义冲突')), true);
+});
+
+test('manifest planning accepts legacy table V8Unlimited only as inverted compatibility input', () => {
+  const legacy = buildPlan({
+    tables: [{ name: 'Biz_Legacy', fields: [], v8Unlimited: true }],
+  });
+  assert.deepEqual(legacy.errors, []);
+  assert.equal(legacy.warnings.some((warning) => warning.includes('v8Unlimited 已弃用')), true);
 });
 
 test('manifest schema documents safe defaults for tables and engines', () => {
@@ -36,8 +48,14 @@ test('manifest schema documents safe defaults for tables and engines', () => {
   const engines = shape.engines as Array<Record<string, unknown>>;
   const natural = guide.naturalFieldKeys as Record<string, Record<string, string>>;
 
-  assert.equal(tables[0].v8Unlimited, false);
+  assert.equal(tables[0].v8Limit, false);
   assert.equal(engines[0].v8Limit, false);
-  assert.match(natural.tables.v8Unlimited, /Default false/u);
+  assert.match(natural.tables.v8Limit, /Default false/u);
   assert.match(natural.engines.v8Limit, /false means no Jint/u);
+});
+
+test('engine list and detail default missing runtime fields to V8Limit=false', () => {
+  const source = fs.readFileSync(new URL('./server.ts', import.meta.url), 'utf8');
+  assert.match(source, /e\.V8Unlimited !== undefined && e\.V8Unlimited !== null[\s\S]{0,120}: 0;/u);
+  assert.match(source, /engine\?\.V8Unlimited !== undefined && engine\?\.V8Unlimited !== null[\s\S]{0,140}: false/u);
 });
