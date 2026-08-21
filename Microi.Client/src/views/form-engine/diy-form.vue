@@ -3,36 +3,53 @@
         <div :class="presentationLayoutClass">
             <aside v-if="ShowPresentationSectionNavigation" class="diy-form-section-nav" aria-label="表单分组导航">
                 <div class="diy-form-section-nav__head">
-                    <span>{{ PresentationConfig.NavigationTitle || '配置分组' }}</span>
-                    <small>{{ PresentationSections.length }} 项</small>
+                    <span>{{ PresentationNavigationTitle }}</span>
+                    <small>{{ PresentationNavigationCountText }}</small>
                 </div>
-                <button
-                    v-for="section in PresentationSections"
-                    :key="section.Key"
-                    type="button"
-                    class="diy-form-section-nav__item"
-                    :class="{ active: section.Key === FieldActiveTab }"
-                    :aria-current="section.Key === FieldActiveTab ? 'page' : undefined"
-                    @click="ActivatePresentationSection(section)"
-                >
-                    <span class="diy-form-section-nav__icon">
-                        <fa-icon :icon="section.Icon || 'far fa-folder-open'" />
-                    </span>
-                    <span class="diy-form-section-nav__copy">
-                        <b>{{ section.Title }}</b>
-                        <small>{{ GetPresentationSectionSubtitle(section) }}</small>
-                    </span>
-                    <span class="diy-form-section-nav__count">{{ section.FieldCount }}</span>
-                </button>
+                <div class="diy-form-section-nav__items">
+                    <button
+                        v-for="section in PresentationSections"
+                        :key="section.Key"
+                        type="button"
+                        class="diy-form-section-nav__item"
+                        :class="{ active: section.Key === FieldActiveTab }"
+                        :aria-current="section.Key === FieldActiveTab ? 'page' : undefined"
+                        @click="ActivatePresentationSection(section)"
+                    >
+                        <span class="diy-form-section-nav__icon">
+                            <fa-icon :icon="section.Icon || 'far fa-folder-open'" />
+                        </span>
+                        <span class="diy-form-section-nav__copy">
+                            <b>{{ section.Title }}</b>
+                            <small v-safe-html="section.NavigationSubtitleHtml"></small>
+                        </span>
+                        <span class="diy-form-section-nav__count">{{ section.DisplayValue }}</span>
+                    </button>
+                </div>
+                <div v-if="PresentationNavigationFooter.Visible" class="diy-form-section-nav__footer">
+                    <strong v-if="PresentationNavigationFooter.Title">{{ PresentationNavigationFooter.Title }}</strong>
+                    <div v-if="PresentationNavigationFooter.Html" v-safe-html="PresentationNavigationFooter.Html"></div>
+                </div>
             </aside>
             <section class="diy-form-presentation-main">
                 <header v-if="IsControlCenterPresentation" class="diy-form-section-head">
                     <div>
-                        <span>{{ PresentationConfig.SectionEyebrow || 'FORM SECTION' }}</span>
-                        <h3>{{ ActivePresentationSection.Title }}</h3>
-                        <p v-if="ActivePresentationSection.Description">{{ ActivePresentationSection.Description }}</p>
+                        <span>{{ ActivePresentationSection.SectionEyebrow }}</span>
+                        <h3>{{ ActivePresentationSection.SectionTitle }}</h3>
+                        <div
+                            v-if="ActivePresentationSection.SectionSubtitleHtml"
+                            class="diy-form-section-head__description"
+                            v-safe-html="ActivePresentationSection.SectionSubtitleHtml"
+                        ></div>
                     </div>
-                    <el-tag effect="plain">{{ ActivePresentationSection.FieldCount }} 项</el-tag>
+                    <div class="diy-form-section-head__tags">
+                        <el-tag effect="plain">{{ ActivePresentationSection.CountLabel }}</el-tag>
+                        <el-tag
+                            v-if="ActivePresentationSection.RequiredCount > 0"
+                            type="danger"
+                            effect="plain"
+                        >{{ ActivePresentationSection.RequiredLabel }}</el-tag>
+                    </div>
                 </header>
         <el-tabs
             id="field-form-tabs"
@@ -55,6 +72,25 @@
                         :id="'field-form-' + tabIndex"
                         :data-tab="tab.Id || tab.Name"
                         :class="formContainerClass">
+                        <header v-if="PrintAllSections" class="diy-form-print-section-head">
+                            <div class="diy-form-print-section-head__copy">
+                                <span>{{ GetPrintPresentationSection(tab).SectionEyebrow }}</span>
+                                <h2>{{ GetPrintPresentationSection(tab).SectionTitle }}</h2>
+                                <div
+                                    v-if="GetPrintPresentationSection(tab).SectionSubtitleHtml"
+                                    class="diy-form-print-section-head__description"
+                                    v-safe-html="GetPrintPresentationSection(tab).SectionSubtitleHtml"
+                                ></div>
+                            </div>
+                            <div class="diy-form-print-section-head__tags">
+                                <small v-if="GetPrintPresentationSection(tab).CountLabel">
+                                    {{ GetPrintPresentationSection(tab).CountLabel }}
+                                </small>
+                                <small v-if="GetPrintPresentationSection(tab).RequiredCount > 0">
+                                    {{ GetPrintPresentationSection(tab).RequiredLabel }}
+                                </small>
+                            </div>
+                        </header>
                         <el-form
                             :rules="FormRules"
                             :class="DiyTableModel.Name"
@@ -109,10 +145,26 @@
                                             <el-tooltip :content="$t('Msg.DeleteField')" placement="top">
                                                 <el-button size="small" :icon="Delete" type="danger" circle @click.stop="deleteField(field)" />
                                             </el-tooltip>
-                                            <el-tooltip :content="$t('Msg.FieldWidth') + ': ' + field._span + '/24'" placement="top">
+                                            <el-tooltip
+                                                :content="$t('Msg.FieldWidth') + ': ' + field._span + '/24'"
+                                                placement="top"
+                                                popper-class="diy-field-description-tooltip"
+                                            >
                                                 <div class="width-control">
                                                     <el-button size="small" :icon="Minus" circle @click.stop="adjustFieldWidth(field, -1)" :disabled="field._span <= 1" />
-                                                    <span class="width-display">{{ field._span }}</span>
+                                                    <el-input-number
+                                                        class="width-input"
+                                                        :model-value="field._span"
+                                                        :min="1"
+                                                        :max="24"
+                                                        :step="1"
+                                                        :controls="false"
+                                                        size="small"
+                                                        aria-label="字段表单占宽"
+                                                        @update:model-value="setFieldWidth(field, $event)"
+                                                        @click.stop
+                                                        @keydown.stop
+                                                    />
                                                     <el-button size="small" :icon="Plus" circle @click.stop="adjustFieldWidth(field, 1)" :disabled="field._span >= 24" />
                                                 </div>
                                             </el-tooltip>
@@ -210,6 +262,7 @@
                                                 class="diy-field-description diy-field-description--below"
                                                 tabindex="0"
                                                 :aria-label="field.Description"
+                                                :style="getFieldDescriptionStyle(field)"
                                             >{{ field.Description }}</small>
                                         </el-tooltip>
                                     </div>
@@ -220,7 +273,7 @@
                             <!-- 普通模式：使用原生 el-row 以获得最佳性能。 
                                     如果这里设置:gutter="10"会导致折叠组件标题和内容对不齐，
                                     但如果不设置又会导致表单字段与字段直接挨在一起了-->
-                            <el-row v-else :gutter="10" @click="handleFieldClick">
+                            <el-row v-else @click="handleFieldClick">
                                 <el-col
                                     v-for="field in GetRenderedTabFields(tab.Id || tab.Name)"
                                     v-show="field._isShow && MatchesPresentationFieldSearch(field)"
@@ -315,6 +368,7 @@
                                                 class="diy-field-description diy-field-description--below"
                                                 tabindex="0"
                                                 :aria-label="field.Description"
+                                                :style="getFieldDescriptionStyle(field)"
                                             >{{ field.Description }}</small>
                                         </el-tooltip>
                                     </div>
@@ -458,13 +512,13 @@ export default {
             type: Boolean,
             default: false
         },
-        // ViewSchema 表单工作台的纯展示模式；不改变字段、权限、校验或 V8 提交行为。
+        // 显式兼容出口（Classic/Legacy）或旧模块工作台模式；未传时默认使用现代工作台。
         PresentationMode: {
             type: String,
             default: ""
         },
-        // ViewSchema FormWorkbench 的展示配置。仅控制分组导航、密度和文案，
-        // 字段组件、权限、校验、V8 事件与提交仍由当前 DiyForm 负责。
+        // 旧 ViewSchema FormWorkbench 的兼容配置。diy_table.FormPresentation 与 Tabs
+        // 元数据优先；所有配置仅改变呈现，不改变字段、权限、校验或 V8 提交行为。
         PresentationConfig: {
             type: Object,
             default: () => ({})

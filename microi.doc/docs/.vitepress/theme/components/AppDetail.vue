@@ -27,7 +27,7 @@
               </div>
             </div>
             <div class="app-detail-actions">
-              <button v-if="app.PreviewUrl" type="button" class="primary" @click="openPreview">
+              <button v-if="app.ExperienceUrl" type="button" class="primary" @click="openPreview">
                 立即体验
                 <span aria-hidden="true">↗</span>
               </button>
@@ -137,8 +137,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vitepress'
-import { withPreviewVersion } from '../utils/app-preview-url.js'
-import { buildApplicationLaunchUrl } from '../utils/uniapp-preview-mode.js'
+import { resolveApplicationExperienceUrl } from '../utils/app-preview-url.js'
 import { OFFICIAL_MICROI_API_BASE } from '../utils/site-api-base.js'
 import {
   buildSiteSessionHeaders,
@@ -174,13 +173,6 @@ const updatedDate = computed(() => {
   const value = app.value?.AppUpdateTime || app.value?.UpdateTime
   return value ? String(value).slice(0, 10) : '持续更新'
 })
-const versionedPreviewUrl = computed(() => withPreviewVersion(
-  app.value?.PreviewUrl,
-  app.value || {},
-  typeof window === 'undefined' ? 'https://microi.net' : window.location.origin,
-  { apiBase: APP_API_BASE, osClient: OS_CLIENT }
-))
-
 function queryAppKey() {
   if (typeof window === 'undefined') return ''
   return new URLSearchParams(window.location.search).get('app') || ''
@@ -292,6 +284,10 @@ function normalizeApp(item) {
     AppPreviewUrl: resolveAssetUrl(item.AppPreview),
     AppKey: item.AppKey || item.AppId,
     ApplicationType: applicationType,
+    ExperienceUrl: resolveApplicationExperienceUrl(item, typeof window === 'undefined' ? undefined : window, {
+      baseUrl: typeof window === 'undefined' ? 'https://microi.net' : window.location.origin,
+      fileServer: fileServer.value
+    }),
     Category: category,
     icon: iconMap[category] || 'AI',
     tone: toneMap[category] || 'blue',
@@ -430,7 +426,8 @@ async function recordView() {
     if (result.Code === 1 && result.Data) {
       app.value.ViewCount = Number(result.Data.ViewCount || app.value.ViewCount)
       app.value.InstallCount = Number(result.Data.InstallCount || app.value.InstallCount)
-      app.value.PreviewUrl = result.Data.PreviewUrl || app.value.PreviewUrl
+      // 浏览统计只更新计数；立即体验地址始终以 official_ai_apps 的公开记录
+      // 为单一事实源，避免详情页被统计接口中的历史版本地址覆盖。
     }
   } catch (_) {
     // 浏览统计失败不阻断详情页。
@@ -438,9 +435,8 @@ async function recordView() {
 }
 
 function openPreview() {
-  if (!versionedPreviewUrl.value) return
-  const launchUrl = buildApplicationLaunchUrl(app.value, versionedPreviewUrl.value, window)
-  window.open(launchUrl, '_blank', 'noopener,noreferrer')
+  if (!app.value?.ExperienceUrl) return
+  window.open(app.value.ExperienceUrl, '_blank', 'noopener,noreferrer')
 }
 
 function typeLabel(value) {

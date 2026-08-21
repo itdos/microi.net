@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { withPreviewVersion } from './app-preview-url.js'
+import {
+  resolveApplicationExperienceUrl,
+  resolveStableApplicationEntry,
+  withPreviewVersion
+} from './app-preview-url.js'
+
+const desktopWindow = {
+  location: { origin: 'https://microi.net' },
+  matchMedia: () => ({ matches: false })
+}
 
 test('uses the stable latest entry and removes runtime/cache query parameters', () => {
   const actual = withPreviewVersion(
@@ -31,6 +40,54 @@ test('Unity Taoyuan always launches from its public stable entry without a versi
     'https://microi.net'
   )
 
-  assert.equal(actual, 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html')
+  assert.equal(actual, 'https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html?stable-entry=current')
   assert.doesNotMatch(actual, /\/v\d+(?:\.\d+)+\//)
+})
+
+test('uses one stable legacy fallback after rejecting release and request artifacts', () => {
+  const app = {
+    AppKey: 'legacy-office',
+    AppName: '旧版办公应用',
+    AppType: 'Web',
+    PreviewUrl: 'https://static.itdos.com/requests/build-42/index.html',
+    ReleaseUrl: 'https://static.itdos.com/apps/legacy-office/releases/v4/assets/index.html',
+    VersionPreviewUrl: 'https://static.itdos.com/apps/legacy-office/versions/v4/index.html',
+    AppUrl: 'https://static.itdos.com/apps/legacy-office/index.html?v=4&OsClient=iTdos'
+  }
+
+  assert.equal(
+    resolveApplicationExperienceUrl(app, desktopWindow),
+    'https://static.itdos.com/apps/legacy-office/index.html'
+  )
+})
+
+test('prefers the public current publish path over a stale preview fallback', () => {
+  assert.equal(
+    resolveApplicationExperienceUrl({
+      AppKey: 'current-office',
+      ApplicationType: 'Web',
+      PublicPublishPath: 'itdos/ai-app-publish/current-office/index.html',
+      PreviewUrl: 'https://legacy.example.test/current-office/index.html'
+    }, desktopWindow, { fileServer: 'https://static.itdos.com' }),
+    'https://static.itdos.com/itdos/ai-app-publish/current-office/index.html'
+  )
+})
+
+test('supports case-insensitive JSON legacy fields and normalizes old versions roots', () => {
+  assert.equal(
+    resolveStableApplicationEntry({
+      AppKey: 'legacy-json',
+      appurl: JSON.stringify({ Url: 'https://static.itdos.com/itdos/ai-app-publish/legacy-json/versions/v2.3.1/index.html?mode=share' })
+    }),
+    'https://static.itdos.com/itdos/ai-app-publish/legacy-json/index.html?mode=share'
+  )
+})
+
+test('never promotes explicit version or release fields into the public experience link', () => {
+  assert.equal(resolveStableApplicationEntry({
+    AppKey: 'immutable-only',
+    VersionPreviewUrl: 'https://static.itdos.com/apps/immutable-only/versions/v1/index.html',
+    VersionUrl: 'https://static.itdos.com/apps/immutable-only/v1/index.html',
+    ReleaseUrl: 'https://static.itdos.com/apps/immutable-only/releases/v1/index.html'
+  }), '')
 })

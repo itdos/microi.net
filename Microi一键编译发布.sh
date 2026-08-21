@@ -336,6 +336,7 @@ print_divider() {
 # 在异常关闭时留下多层 bash/npm 残留进程。
 run_client_build() {
     local _node_cmd="node"
+    local _build_args=()
     if is_windows_shell && command -v node.exe >/dev/null 2>&1; then
         _node_cmd="node.exe"
     fi
@@ -348,14 +349,18 @@ run_client_build() {
         return 1
     fi
 
+    if [ "${BUILD_CLIENT_LEGACY:-false}" = true ]; then
+        _build_args+=(--with-legacy)
+    fi
+
     MICROI_ACTIVE_GUARD_PID_FILE="$PWD/.tmp/build-logs/guard.pid"
     rm -f "$MICROI_ACTIVE_GUARD_PID_FILE"
     # Bash 非交互脚本会默认把后台命令的 stdin 指向 /dev/null；显式继承当前 stdin，
     # 让构建守护器在内存等待期间可以读取 s/skip 指令。CI 等非终端场景仍保持自动等待。
     if [ -t 0 ]; then
-        MICROI_BUILD_INTERACTIVE=1 "$_node_cmd" scripts/build-with-memory-guard.mjs <&0 &
+        MICROI_BUILD_INTERACTIVE=1 "$_node_cmd" scripts/build-with-memory-guard.mjs "${_build_args[@]}" <&0 &
     else
-        "$_node_cmd" scripts/build-with-memory-guard.mjs &
+        "$_node_cmd" scripts/build-with-memory-guard.mjs "${_build_args[@]}" &
     fi
     MICROI_ACTIVE_BUILD_PID=$!
 
@@ -370,6 +375,7 @@ run_client_build() {
 # 避免后端已编译/发布后才长时间等待内存恢复。
 run_client_preflight() {
     local _node_cmd="node"
+    local _preflight_args=(--preflight-only)
     if is_windows_shell && command -v node.exe >/dev/null 2>&1; then
         _node_cmd="node.exe"
     fi
@@ -377,9 +383,12 @@ run_client_preflight() {
         echo "未找到 Node.js：$_node_cmd" >&2
         return 127
     fi
+    if [ "${BUILD_CLIENT_LEGACY:-false}" = true ]; then
+        _preflight_args+=(--with-legacy)
+    fi
     (
         cd Microi.Client
-        "$_node_cmd" scripts/build-with-memory-guard.mjs --preflight-only
+        "$_node_cmd" scripts/build-with-memory-guard.mjs "${_preflight_args[@]}"
     )
 }
 
@@ -630,6 +639,8 @@ fi
 BUMP_VERSION=false      # 是否更新版本号
 BUILD_BACKEND=false     # 是否编译后端（dotnet build）
 BUILD_CLIENT=false      # 是否编译前端（npm run build）
+BUILD_CLIENT_LEGACY=false # 是否额外生成 Chrome 49 legacy 产物
+CLIENT_BUILD_OUTPUT_LABEL="现代版"
 PUBLISH_BACKEND=false   # 是否发布后端（dotnet publish + 冒烟 + 加密）
 PUSH_NUGET=false        # 是否推送 NuGet
 PUSH_DOCKER=false       # 是否推送 Docker
@@ -763,6 +774,40 @@ elif [ -d "microi.doc" ]; then
     esac
 fi
 
+# --- Chrome 49 兼容产物（仅前端构建时询问；默认不生成）---
+if [ "$BUILD_CLIENT" = true ]; then
+    case "${MICROI_BUILD_CHROME49_LEGACY:-}" in
+        1|true|TRUE|True|yes|YES|Yes|on|ON|On)
+            BUILD_CLIENT_LEGACY=true
+            print_info "已通过 MICROI_BUILD_CHROME49_LEGACY 启用 Chrome 49 legacy 产物"
+            ;;
+        0|false|FALSE|False|no|NO|No|off|OFF|Off)
+            BUILD_CLIENT_LEGACY=false
+            print_info "已通过 MICROI_BUILD_CHROME49_LEGACY 使用仅现代版产物"
+            ;;
+        "")
+            echo ""
+            echo -e "  ${BOLD}【旧浏览器兼容】${NC}"
+            echo "    默认仅生成现代版；只有明确仍需 Chrome 49 的客户环境才启用 legacy。"
+            echo "    0) 仅现代版（默认，推荐）"
+            echo "    1) 现代版 + Chrome 49 legacy（显著延长构建）"
+            read -r -p "  请输入选项 [0/1，直接回车=0]: " _legacy_choice || _legacy_choice=""
+            case "$_legacy_choice" in
+                0|"") BUILD_CLIENT_LEGACY=false ;;
+                1) BUILD_CLIENT_LEGACY=true ;;
+                *) print_fail "无效选项: $_legacy_choice（仅支持 0/1）" ;;
+            esac
+            ;;
+        *)
+            print_fail "MICROI_BUILD_CHROME49_LEGACY 仅支持 true/false 或 1/0"
+            ;;
+    esac
+
+    if [ "$BUILD_CLIENT_LEGACY" = true ]; then
+        CLIENT_BUILD_OUTPUT_LABEL="现代版 + Chrome 49 legacy"
+    fi
+fi
+
 # ──────────────────────────────────────────────────────────────
 # 打印执行摘要
 # ──────────────────────────────────────────────────────────────
@@ -789,7 +834,7 @@ if [ "$BUILD_BACKEND" = true ]; then
     fi
 fi
 if [ "$BUILD_CLIENT" = true ]; then
-    echo -e "  前端编译: ${GREEN}✔${NC}"
+    echo -e "  前端编译: ${GREEN}✔${NC}（${CLIENT_BUILD_OUTPUT_LABEL}）"
 fi
 for _p in "${SELECTED_API_PLANS[@]}"; do
     echo -e "  后端Docker: ${GREEN}✔${NC} $(echo "$_p" | cut -d'|' -f1)"
@@ -834,7 +879,7 @@ fi
 # 前端资源预检必须发生在版本号、升级资源和其它源码变更之前。
 if [ "$BUILD_CLIENT" = true ]; then
     print_phase "发布前资源预检"
-    print_step "检查前端完整构建所需内存..."
+    print_step "检查前端构建所需内存（${CLIENT_BUILD_OUTPUT_LABEL}）..."
     if ! run_client_preflight; then
         print_fail "前端构建资源不足，尚未修改版本号或启动其它重任务。请释放内存后重新执行。"
     fi
@@ -897,11 +942,15 @@ if [ "$PUBLISH_BACKEND" = true ]; then
 fi
 
 # 前端优先于 .NET 全量编译执行，避免后端编译产生的文件缓存和短期内存占用
-# 挤压 Vite 启动空间；现代浏览器和 Chrome 49 两套产物及完整校验保持不变。
+# 挤压 Vite 启动空间；Chrome 49 兼容包只在显式选择后生成。
 if [ "$BUILD_CLIENT" = true ]; then
     print_phase "编译前端 Microi.Client"
 
-    print_step "前端受保护构建（现代 Vite 6GB、现代 JS 独立串行压缩 1.5GB、legacy 2GB；按实测峰值分阶段预检，全机 95% 自动暂停）..."
+    if [ "$BUILD_CLIENT_LEGACY" = true ]; then
+        print_step "前端受保护构建（现代 Vite 6GB、现代 JS 串行压缩 1.5GB、Chrome 49 legacy 2GB；各阶段峰值不叠加）..."
+    else
+        print_step "前端受保护构建（仅现代版：Vite 6GB、JS 串行压缩 1.5GB；已跳过 Chrome 49 legacy）..."
+    fi
     echo ""
     cd Microi.Client
     if ! run_client_build; then
@@ -1581,7 +1630,7 @@ if [ "$PUBLISH_BACKEND" != true ] && [ "$BUILD_BACKEND" = true ]; then
 fi
 if [ "$BUILD_CLIENT" = true ] && [ ${#SELECTED_CLIENT_PLANS[@]} -eq 0 ]; then
     echo ""
-    echo -e "  ${BOLD}📁 前端产物:${NC} Microi.Client/bin/Release/dist/"
+    echo -e "  ${BOLD}📁 前端产物:${NC} Microi.Client/bin/Release/dist/（${CLIENT_BUILD_OUTPUT_LABEL}）"
 fi
 if [ "$PUBLISH_BACKEND" = true ] && [ ${#SELECTED_API_PLANS[@]} -eq 0 ]; then
     echo ""
@@ -1631,7 +1680,7 @@ for _p in "${SELECTED_API_PLANS[@]}"; do
     echo -e "  后端Docker: ${GREEN}✅${NC} $(echo "$_p" | cut -d'|' -f1)"
 done
 if [ "$BUILD_CLIENT" = true ]; then
-    echo -e "  前端编译: ${GREEN}✅${NC}"
+    echo -e "  前端编译: ${GREEN}✅${NC}（${CLIENT_BUILD_OUTPUT_LABEL}）"
 fi
 for _p in "${SELECTED_CLIENT_PLANS[@]}"; do
     echo -e "  前端Docker: ${GREEN}✅${NC} $(echo "$_p" | cut -d'|' -f1)"

@@ -110,10 +110,10 @@ export default defineConfig({
         preprocessorOptions: {
             scss: {
                 // 全局注入变量文件，让所有 scss 文件都能访问变量
-                // 使用函数形式，避免在包含 @use 内置模块的文件中注入
+                // 使用 Sass 模块的文件必须自行声明依赖；在任何 @use 前注入旧式
+                // @import 会触发“@use rules must be written before any other rules”。
                 additionalData: (source, filename) => {
-                    // 如果文件包含 @use "sass: 内置模块，将 @import 放到 @use 之后
-                    if (source.includes('@use "sass:')) {
+                    if (/^\s*@use\s+/m.test(source)) {
                         return source;
                     }
                     const normalizedFilename = filename.replace(/\\/g, '/');
@@ -170,7 +170,7 @@ export default defineConfig({
         // 确保 CSS 导入顺序一致
         assetsInlineLimit: 4096,
         // JS 会由 build-with-memory-guard 在 Vite 退出后逐文件串行压缩；
-        // Chrome 49 产物随后在另一个独立子进程中逐文件转换。
+        // 仅显式启用 legacy 模式时，才会在另一个独立子进程中转换 Chrome 49 产物。
         minify: false,
         rollupOptions: {
             // 🔥 确保依赖加载顺序：Vue -> Element Plus -> 其他

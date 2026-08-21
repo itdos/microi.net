@@ -302,7 +302,7 @@ export default {
                 Title: param.Title || "应用",
                 TitleIcon: param.TitleIcon || "fas fa-window-maximize",
                 Width: param.Width || "80%",
-                BodyHeight: param.BodyHeight || "min(780px, calc(100vh - 160px))",
+                BodyHeight: param.BodyHeight || "calc(100vh - 160px)",
                 OpenType: param.OpenType || "Dialog",
                 DataAppend: {
                     AppKey: param.AppKey,

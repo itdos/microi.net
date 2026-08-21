@@ -14,6 +14,7 @@ const officialResourceNames = new Set([
   'app.microi.form-engine.json',
   'app.microi.module-engine.json',
   'app.microi.saas-engine.json',
+  'app.microi.sso.json',
   'app.microi.store.json',
 ]);
 

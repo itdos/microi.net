@@ -4,10 +4,11 @@
   <section class="mci-ui-hero">
     <div class="mci-ui-hero__copy">
       <span class="mci-ui-kicker">Microi Design System</span>
-      <h2>让每一个吾码前端项目，都有统一、先进、可持续的视觉底座。</h2>
+      <h2>让每一个吾码前端项目，都有清爽、清新、统一且可持续的视觉底座。</h2>
       <p>
         吾码UI（Microi.UI / MCI-UI）面向 Vue 3 PC 网站、响应式网站、移动端 H5、uni-app 项目，
-        提供品牌 token、主题运行时、跨端基础组件、骨架屏、安全区、动效和 AI 生成规范。
+        提供品牌 token、主题运行时、跨端基础组件、骨架屏、安全区、动效和 AI 生成规范；
+        所有界面默认适配租户主题色以及亮色、暗色模式。
       </p>
       <div class="mci-ui-hero__actions">
         <a href="#快速接入">快速接入</a>
@@ -66,6 +67,8 @@
 
 ## 设计系统定位
 
+吾码UI首先追求页面清爽、清新和易读：压缩重复标题、说明与统计卡，减少不服务于信息层级的装饰，把空间留给真实内容和核心操作。清爽不等于空白或纯白，而是用明确层级、稳定间距和克制的色彩，让用户快速看懂并完成任务。
+
 <section class="mci-ui-showcase mci-ui-showcase--why">
   <div class="mci-ui-showcase__copy">
     <span class="mci-ui-kicker">Why Microi.UI</span>
@@ -88,7 +91,7 @@
   <div class="mci-ui-theme-lab__intro">
     <span class="mci-ui-kicker">Theme Runtime</span>
     <h3>主题切换是内建能力，不是项目后期补丁。</h3>
-    <p>所有移动端和 PC 网站项目默认支持明暗模式、九套主色、圆角/扁平形态和动效偏好。白色与黄色主色必须使用 <code>--mci-text-on-primary</code>，避免文字对比度不足。</p>
+    <p>所有移动端和 PC 网站项目默认支持租户运行时主题色、亮色/暗色模式、九套预设主色、圆角/扁平形态和动效偏好。组件只消费语义 token，不把某一种品牌色、白底或深色背景硬编码为唯一外观；白色与黄色主色必须使用 <code>--mci-text-on-primary</code>，避免文字对比度不足。</p>
   </div>
   <div class="mci-ui-theme-grid">
     <article><b>light / dark</b><span>明暗模式</span></article>

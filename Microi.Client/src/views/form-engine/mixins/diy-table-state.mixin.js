@@ -499,6 +499,7 @@ export default {
             PageTabHostTableId: "",
             _moduleShellHadMetrics: null,
             _moduleContextVersion: 0,
+            _moduleViewDeactivated: false,
             // ========== 定时器ID存储（用于防止内存泄漏） ==========
             _importStepTimer: null,
             _debounceTimer: null,
@@ -771,6 +772,7 @@ export default {
     },
     activated() {
         var self = this;
+        self._moduleViewDeactivated = false;
         // console.log('%c[DiyTableRowlist] ========== activated 被触发 ==========', 'color: green; font-size: 16px; font-weight: bold');
         // console.log('[DiyTableRowlist] 当前路由:', self.$route.fullPath);
         // console.log('[DiyTableRowlist] 上次加载的路由:', self._lastLoadedRoute);
@@ -833,6 +835,7 @@ export default {
     },
     deactivated() {
         var self = this;
+        self._moduleViewDeactivated = true;
         console.log('%c[DiyTableRowlist] ========== deactivated 被触发 ==========', 'color: orange; font-size: 13px; font-weight: bold');
 
         // 保存当前滚动位置（移动端）

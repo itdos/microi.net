@@ -8,12 +8,13 @@ const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const resource = JSON.parse(fs.readFileSync(path.join(resourceDir, "app.microi.module-engine.json"), "utf8"));
 
 test("module engine package version and physical menu badge columns are current", () => {
-    assert.equal(resource.PackageInfo.Version, "v7.4.8");
+    assert.equal(resource.PackageInfo.Version, "v7.5.0");
     const physicalNames = new Set((resource.PhysicalColumns || []).map((item) => item.COLUMN_NAME));
     for (const name of ["MenuBadgeEnabled", "MenuBadgeApiEngineKey", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema"]) {
         assert.ok(physicalNames.has(name), `missing physical sys_menu column ${name}`);
         assert.match(resource.DDLStatements[0].DDL, new RegExp(`\\b${name}\\b`));
     }
+    assert.ok(physicalNames.has("FormPresentation"), "missing shared diy_table.FormPresentation snapshot");
 });
 
 function field(name) {
@@ -113,6 +114,29 @@ test("all button collections and PageTabs expose the complete badge contract", (
         assert.equal(badgeApiEngineColumn.Config.SelectLabel, menuBadgeApiEngineConfig.SelectLabel);
         assert.equal(badgeApiEngineColumn.Config.Sql, menuBadgeApiEngineConfig.Sql, `${name}.BadgeApiEngineKey SQL contract`);
     }
+});
+
+test("PageTabs designer exposes a readable module-tree association", () => {
+    const columns = configOf(field("PageTabs")).JsonTable.Columns;
+    const targetModule = columns.find((item) => item.Key === "TargetSysMenuId");
+    assert.ok(targetModule, "PageTabs must expose TargetSysMenuId in the module designer");
+    assert.equal(targetModule.Label, "关联模块");
+    assert.equal(targetModule.Component, "SelectTree");
+    assert.equal(targetModule.Visible, true);
+    assert.ok(Number(targetModule.MinWidth) >= 240);
+    assert.equal(targetModule.Config.DataSource, "Sql");
+    assert.equal(targetModule.Config.SelectSaveField, "Id");
+    assert.equal(targetModule.Config.SelectLabel, "Name");
+    assert.equal(targetModule.Config.SelectSaveFormat, "Text");
+    assert.equal(targetModule.Config.SelectTree?.Filterable, true);
+    assert.match(targetModule.Config.Sql, /from\s+sys_menu/i);
+    assert.match(targetModule.Config.Sql, /ParentId/i);
+
+    const visibleSorts = columns
+        .filter((item) => item.Visible !== false)
+        .map((item) => Number(item.Sort));
+    assert.equal(new Set(visibleSorts).size, visibleSorts.length, "PageTabs visible column sorts must be unique");
+    assert.deepEqual(visibleSorts, [...visibleSorts].sort((left, right) => left - right));
 });
 
 test("sys_menu form tabs have deterministic unique ordering", () => {

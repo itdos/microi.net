@@ -138,6 +138,7 @@ public class FormEngineTenantBoundaryTests
     [InlineData("mci_ai_app_version")]
     [InlineData("mci_ai_data_domain")]
     [InlineData("mci_ai_role_policy")]
+    [InlineData("diy_sso")]
     public void ClientFormEngine_ProtectsHighRiskPlatformTables(string tableName)
     {
         Assert.True(PlatformResourceSecurity.IsProtectedTable(tableName));
@@ -250,7 +251,7 @@ public class FormEngineTenantBoundaryTests
     [Fact]
     public void ClientFormEngine_PlatformPolicyContainsExactDistinctTableSet()
     {
-        Assert.Equal(55, PlatformResourceSecurity.PlatformTableNames.Count);
+        Assert.Equal(56, PlatformResourceSecurity.PlatformTableNames.Count);
         Assert.Equal(
             PlatformResourceSecurity.PlatformTableNames.Count,
             PlatformResourceSecurity.PlatformTableNames

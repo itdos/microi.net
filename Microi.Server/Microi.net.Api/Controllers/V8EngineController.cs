@@ -169,7 +169,7 @@ namespace Microi.net.Api
             var result = await V8McpLogic.UpdateApiEngineCode(
                 osClient, apiEngineKey, code,
                 param.Value<string>("Version"),
-                param.Value<string>("ChangeHistory") ?? param.Value<string>("ChangeSummary"),
+                param.Value<string>("ChangeSummary") ?? param.Value<string>("ChangeHistory"),
                 ResolveRequestedV8Limit(param),
                 hasCodePayload);
             return Ok(result);
@@ -204,7 +204,7 @@ namespace Microi.net.Api
                 param["Lock"].Val<int>(), param["AllowAnonymous"].Val<int>(),
                 param["IsEnable"]?.Val<int>() ?? 1, param["Category"].Val<string>(), code,
                 param.Value<string>("Version"),
-                param.Value<string>("ChangeHistory") ?? param.Value<string>("ChangeSummary"),
+                param.Value<string>("ChangeSummary") ?? param.Value<string>("ChangeHistory"),
                 ResolveRequestedV8Limit(param));
             return Ok(result);
         }
@@ -1148,7 +1148,7 @@ namespace Microi.net.Api
             var result = await V8McpLogic.CreateTable(osClient, name, param["Description"].Val<string>(),
                 param["Tabs"].Val<string>(), param["IsTree"]?.Val<int>() ?? 0,
                 param["Column"]?.Val<int>() ?? 1, param["FormOpenType"].Val<string>(),
-                param["FormOpenWidth"].Val<string>(), param["V8Unlimited"]?.Val<int?>());
+                param["FormOpenWidth"].Val<string>(), ResolveRequestedV8Limit(param));
             return Ok(result);
         }
 

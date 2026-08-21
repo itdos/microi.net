@@ -56,11 +56,15 @@ export default {
         }
     },
     computed: {
+        IsEmbeddedMode() {
+            return this.DialogType === "Embedded";
+        },
         // 判断是否为页面模式（通过路由参数判断 + 必须是直接访问，非嵌套子表 + 未被 keep-alive 停用）
         IsPageMode() {
             var self = this;
             // 被 keep-alive 停用的实例不应该渲染页面模式内容，防止缓存实例因路由变化重新挂载 DiyForm 导致重复请求
             if (self._isDeactivated) return false;
+            if (self.IsEmbeddedMode) return true;
             // 必须同时满足：1. 路由是 form-page 路径  2. 是直接页面访问（非弹窗内的子表）
             var isFormPageRoute = self.$route && self.$route.params && self.$route.params.TableId && self.$route.path.indexOf('/diy/form-page') > -1;
             return isFormPageRoute && self._isDirectPageMode;
@@ -108,7 +112,8 @@ export default {
         // Page模式：FAB菜单是否有内容（取消编辑 / 表单更多按钮）
         HasFabMenuItemsPage() {
             var self = this;
-            if (self.IsWorkflowReviewContext) return self.ShowFormRight && self.ShowFormRight();
+            // 通用打印在任何表单上下文都可用，包括流程只读查看。
+            if (self.IsWorkflowReviewContext) return true;
             if (self.FormMode == 'Edit') return true;
             if (self.FormMode != 'View') return true;
             if (self.HasVisibleFormBtns) return true;
@@ -118,7 +123,7 @@ export default {
         // Dialog模式：FAB菜单是否有内容（取消编辑 / FormBtns / 删除）
         HasFabMenuItemsDialog() {
             var self = this;
-            if (self.IsWorkflowReviewContext) return self.ShowFormRight && self.ShowFormRight();
+            if (self.IsWorkflowReviewContext) return true;
             if (self.FormMode == 'Edit' && !self.IsWorkflowSubmitMode) return true;
             if (self.FormMode != 'View') return true;
             if (self.HasVisibleFormBtns) return true;
@@ -161,6 +166,7 @@ export default {
             FormMode: "View",
             FormFieldSearchKeyword: "",
             FormRefreshing: false,
+            IsPrinting: false,
             BtnLoading: false,
             BtnV8Loading: false,
             ShowFormBottomBtns: {
@@ -179,10 +185,14 @@ export default {
             ParentV8_Data: null,
             CurrentTableRowListActiveTab: {},
             DiyTableRowList: [],
+            RecordNavigatorContext: {},
+            WorkspaceRecordSwitching: false,
             CloseFormNeedConfirm: false,
             ApiReplace: {},
             EventReplace: {},
             DataAppend: {},
+            PresentationMode: "",
+            PresentationConfig: {},
 
             // ========== 工作流相关 ==========
             OpenDiyFormWorkFlow: false,

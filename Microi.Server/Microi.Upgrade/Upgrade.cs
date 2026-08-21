@@ -1157,6 +1157,37 @@ namespace Microi.net
             }
             #endregion
 
+            #region 升级33 --2026-08-21【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade33.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade33().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级33 - 2026-08-21】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级33 - 2026-08-21】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade33.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级33失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级33 - 2026-08-21】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
             #region 保持新旧接口引擎字段元数据兼容【必须】
             try
             {
@@ -1918,12 +1949,35 @@ if (_microiLegacyMenuConfigChanged) {
                 }
             }
 
-            // DiyTable is materialized through a generated entity whose selected
-            // field list includes V8Unlimited. Add the physical column before any
-            // version-gated metadata migration can query that entity.
+            // DiyTable is materialized through a generated entity. Add newly
+            // generated physical columns before version-gated metadata or the
+            // official form-engine package can query that entity.
             if (TableExists(osClientSecret, "diy_table"))
             {
-                EnsureColumn(osClientSecret, "diy_table", "V8Unlimited", "int");
+                var diyTableColumns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["V8Limit"] = "int",
+                    ["V8Unlimited"] = "int",
+                    ["FormPresentation"] = "mediumtext",
+                    ["FormPresentationMode"] = "varchar(50)",
+                    ["FormPresentationDensity"] = "varchar(50)",
+                    ["FormNavigationTitle"] = "varchar(255)",
+                    ["FormNavigationCountText"] = "varchar(255)",
+                    ["FormSectionNavigation"] = "varchar(50)",
+                    ["FormSectionEyebrow"] = "varchar(255)",
+                    ["FormRequiredCountText"] = "varchar(255)",
+                    ["FormWorkbenchEyebrow"] = "varchar(255)",
+                    ["FormWorkbenchDescription"] = "mediumtext",
+                    ["FormNavigationFooterTitle"] = "varchar(255)",
+                    ["FormNavigationFooterHtml"] = "mediumtext",
+                    ["FormRecordSelectorPlaceholder"] = "varchar(255)",
+                    ["FormRecordSelectorLabelFields"] = "mediumtext"
+                };
+                foreach (var column in diyTableColumns)
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    EnsureColumn(osClientSecret, "diy_table", column.Key, column.Value);
+                }
             }
         }
 
@@ -1932,7 +1986,17 @@ if (_microiLegacyMenuConfigChanged) {
             if (osClientSecret?.Db == null) return false;
 
             if (TableExists(osClientSecret, "diy_table")
-                && !ColumnExists(osClientSecret, "diy_table", "V8Unlimited"))
+                && !new[]
+                {
+                    "V8Limit", "V8Unlimited", "FormPresentation",
+                    "FormPresentationMode", "FormPresentationDensity",
+                    "FormNavigationTitle", "FormNavigationCountText",
+                    "FormSectionNavigation", "FormSectionEyebrow",
+                    "FormRequiredCountText", "FormWorkbenchEyebrow",
+                    "FormWorkbenchDescription", "FormNavigationFooterTitle",
+                    "FormNavigationFooterHtml", "FormRecordSelectorPlaceholder",
+                    "FormRecordSelectorLabelFields"
+                }.All(column => ColumnExists(osClientSecret, "diy_table", column)))
             {
                 return false;
             }

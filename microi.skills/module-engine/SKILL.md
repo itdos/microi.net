@@ -121,7 +121,7 @@ Iframe 不把长期 Token、密码或连接串放 URL。第三方单点登录使
 
 PC 列表的固定结构顺序是“模块 Hero（标题/副标题/动态指标）→ PageTabs → 查询与表格”，Hero 必须渲染在页面多 Tab 上方。头部只使用一次性入场和一次性轻量光效，禁止持续循环动画；`prefers-reduced-motion: reduce` 必须关闭动画和过渡。
 
-PageTabs 通过 `TargetSysMenuId` 切换不同模块/表时，入口模块必须作为稳定宿主：客户端在同一个 `diy-table` 实例内加载目标模块的菜单、表、字段与列表数据，只更新当前 URL 的 `Tab` 查询参数，不替换路由、面包屑、顶部访问标签或宿主 Hero。入口模块只配置一组 PageTabs；目标菜单可隐藏导航，但只需保留目标表格设计和角色权限，不得复制同一组 PageTabs。切换时必须中止旧请求并以模块上下文版本丢弃迟到响应，失败时回滚原模块。
+PageTabs 通过 `TargetSysMenuId` 切换不同模块/表时，入口模块必须作为稳定宿主：客户端在同一个 `diy-table` 实例内加载目标模块的菜单、表、字段与列表数据，只更新当前 URL 的 `Tab` 查询参数，不替换路由、面包屑、顶部访问标签或宿主 Hero。入口模块只配置一组 PageTabs；目标菜单可隐藏导航，但只需保留目标表格设计和角色权限，不得复制同一组 PageTabs。隐藏目标菜单统一设置 `ParentId=入口菜单Id、Display=0、AppDisplay=0、HasChild=0、PageTabs=[]`，入口菜单保持 `HasChild=0` 以继续作为可点击业务入口。模块设计器必须用可搜索菜单树显示 `TargetSysMenuId` 的模块名称，不能只在运行时 JSON 中保存不可见 Id。切换时必须中止旧请求并以模块上下文版本丢弃迟到响应，失败时回滚原模块。
 
 模块首屏或跨模块切换期间，Hero 标题/指标、PageTabs、工具栏与列表必须显示与最终布局同尺寸的主题化骨架屏；不能先渲染空白旧布局再整体位移。骨架屏同样遵守 `prefers-reduced-motion: reduce`，并在无指标或无 PageTabs 时按元数据提示隐藏对应占位。
 

@@ -642,6 +642,8 @@ export declare class MicroiClient {
         Column?: number;
         FormOpenType?: string;
         FormOpenWidth?: string;
+        V8Limit?: number;
+        /** @deprecated Compatibility alias. Prefer V8Limit; 1 maps to V8Limit=0. */
         V8Unlimited?: number;
     }): Promise<ApiResponse>;
     repairFixedAuditFields(input: {

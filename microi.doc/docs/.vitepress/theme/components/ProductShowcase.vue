@@ -136,7 +136,7 @@
               </button>
             </div>
             <button
-              v-if="app.PreviewUrl"
+              v-if="app.ExperienceUrl"
               type="button"
               class="ai-app-experience"
               :aria-label="`${copy.tryNow}：${app.Name}`"
@@ -183,8 +183,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vitepress'
-import { withPreviewVersion } from '../utils/app-preview-url.js'
-import { buildApplicationLaunchUrl } from '../utils/uniapp-preview-mode.js'
+import { resolveApplicationExperienceUrl } from '../utils/app-preview-url.js'
 import { OFFICIAL_MICROI_API_BASE } from '../utils/site-api-base.js'
 import { buildMarketplaceHref, readMarketplaceState } from '../utils/marketplace-query-state.js'
 import {
@@ -354,6 +353,10 @@ function normalizeApp(app) {
     Id: String(app.Id || ''),
     AppKey: String(app.AppKey || app.Id || ''),
     ApplicationType: String(app.ApplicationType || app.AppType || 'Platform'),
+    ExperienceUrl: resolveApplicationExperienceUrl(app, typeof window === 'undefined' ? undefined : window, {
+      baseUrl: typeof window === 'undefined' ? 'https://microi.net' : window.location.origin,
+      fileServer: fileServer.value
+    }),
     Name: name,
     Description: plainText(app.Description) || '基于 Microi吾码 构建的 AI 应用。',
     AppAuthor: author,
@@ -629,18 +632,13 @@ function openDetail(app) {
 }
 
 function openPreview(app) {
-  if (typeof window === 'undefined' || !app?.PreviewUrl) return
-  const previewUrl = withPreviewVersion(app.PreviewUrl, app, window.location.origin, {
-    apiBase: API_BASE,
-    osClient: OS_CLIENT
-  })
-  if (!previewUrl) return
-  window.open(buildApplicationLaunchUrl(app, previewUrl, window), '_blank', 'noopener,noreferrer')
+  if (typeof window === 'undefined' || !app?.ExperienceUrl) return
+  window.open(app.ExperienceUrl, '_blank', 'noopener,noreferrer')
 }
 
 function openDemandCenter() {
   if (typeof window === 'undefined') return
-  const target = demandCenter.value?.PreviewUrl || '/app-detail.html?app=software-demand-studio'
+  const target = demandCenter.value?.ExperienceUrl || '/app-detail.html?app=software-demand-studio'
   const url = new URL(target, window.location.origin)
   const need = keyword.value.trim().slice(0, 200)
   url.hash = need ? `need=${encodeURIComponent(need)}` : 'start'

@@ -1,0 +1,218 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Dos.ORM;
+using Newtonsoft.Json.Linq;
+
+namespace Microi.net
+{
+    /// <summary>
+    /// Migrates backend form-event runtime control from the negative
+    /// diy_table.V8Unlimited switch to the positive diy_table.V8Limit switch.
+    /// Existing rows whose positive switch is still null are inverted so an old
+    /// database keeps its behaviour; repeated execution preserves every explicit
+    /// V8Limit=0/1 choice. All new records default to V8Limit=0 (unrestricted).
+    /// </summary>
+    public sealed class Upgrade33
+    {
+        public static string Version = "6.9.8.8";
+
+        public const string FieldName = "V8Limit";
+        public const string LegacyFieldName = "V8Unlimited";
+        public const string Description =
+            "默认关闭，后端表单 V8 事件不设置 Jint 单次执行超时、最大语句数、函数递归和累计分配预算；只有打开后才启用这些单次限制。进程/容器常驻内存保护、取消、并发、嵌套深度、权限沙箱和数据库保护始终生效。";
+
+        public async Task<List<string>> Run(string osClient)
+        {
+            var messages = new List<string>();
+            try
+            {
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                var client = OsClientExtend.GetClient(osClient);
+                if (client?.Db == null)
+                {
+                    messages.Add("租户数据库连接不存在，无法升级表单 V8 运行限制开关。");
+                    return messages;
+                }
+
+                var table = await GetTableAsync(osClient).ConfigureAwait(false);
+                if (table == null)
+                {
+                    messages.Add("未找到 diy_table 元数据，无法升级表单 V8 运行限制开关。");
+                    return messages;
+                }
+
+                var tableId = table.Value<string>("Id");
+                var tab = await GetReferenceTabAsync(
+                    osClient,
+                    tableId,
+                    "ServerDataV8",
+                    "事件").ConfigureAwait(false);
+                await EnsureFieldAsync(messages, osClient, tableId, tab).ConfigureAwait(false);
+                if (messages.Count > 0) return messages;
+
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                // This method is also a current-runtime invariant outside the
+                // ServerVersion gate. Only initialize rows that have not acquired
+                // the positive switch yet, so retries and version drift cannot
+                // overwrite a user's later V8Limit=0/1 choice.
+                client.Db.FromSql(@"UPDATE diy_table
+                        SET V8Limit = CASE
+                            WHEN V8Unlimited = @p0 THEN @p1
+                            WHEN V8Unlimited = @p1 THEN @p0
+                            ELSE @p1
+                        END
+                        WHERE V8Limit IS NULL")
+                    .AddInParameter("p0", 1)
+                    .AddInParameter("p1", 0)
+                    .ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                messages.Add("升级表单 V8 运行限制开关失败：" + ex.Message);
+            }
+            return messages;
+        }
+
+        private static async Task EnsureFieldAsync(
+            List<string> messages,
+            string osClient,
+            string tableId,
+            string tab)
+        {
+            var client = OsClientExtend.GetClient(osClient);
+            var existing = await GetFieldAsync(osClient, tableId, FieldName).ConfigureAwait(false);
+            var physicalExists = client.Db.ColumnExists("diy_table", FieldName);
+            if (existing == null)
+            {
+                var add = await UpgradeTrustedFormEngine.AddFieldAsync(
+                    osClient,
+                    new DiyFieldParam
+                    {
+                        TableId = tableId,
+                        TableName = "diy_table",
+                        Name = FieldName,
+                        Label = "V8运行限制",
+                        Type = "int",
+                        Component = "Switch",
+                        DefaultValue = "0",
+                        Sort = 2490,
+                        TableWidth = 130,
+                        Description = Description,
+                        Tab = tab,
+                        Visible = 1,
+                        AppVisible = 1,
+                        Readonly = 0,
+                        NotEmpty = 0,
+                        NameConfirm = 1,
+                        _NotAddDbField = physicalExists
+                    }).ConfigureAwait(false);
+                if (add.Code != 1)
+                {
+                    messages.Add($"新增 diy_table.{FieldName} 失败：{add.Msg}");
+                    return;
+                }
+                existing = await GetFieldAsync(osClient, tableId, FieldName).ConfigureAwait(false);
+            }
+
+            if (existing == null)
+            {
+                messages.Add($"新增 diy_table.{FieldName} 后未能回读字段元数据。");
+                return;
+            }
+
+            var update = await UpgradeTrustedFormEngine.UpdateAsync(
+                "diy_field",
+                osClient,
+                new JObject
+                {
+                    ["Id"] = existing["Id"],
+                    ["OsClient"] = osClient,
+                    ["TableId"] = tableId,
+                    ["Label"] = "V8运行限制",
+                    ["Component"] = "Switch",
+                    ["DefaultValue"] = "0",
+                    ["Description"] = Description,
+                    ["Sort"] = 2490,
+                    ["Tab"] = tab,
+                    ["Visible"] = 1,
+                    ["AppVisible"] = 1,
+                    ["IsDeleted"] = 0
+                }).ConfigureAwait(false);
+            if (update.Code != 1)
+            {
+                messages.Add($"更新 diy_table.{FieldName} 元数据失败：{update.Msg}");
+                return;
+            }
+
+            var legacy = await GetFieldAsync(osClient, tableId, LegacyFieldName).ConfigureAwait(false);
+            if (legacy != null)
+            {
+                var hide = await UpgradeTrustedFormEngine.UpdateAsync(
+                    "diy_field",
+                    osClient,
+                    new JObject
+                    {
+                        ["Id"] = legacy["Id"],
+                        ["OsClient"] = osClient,
+                        ["TableId"] = tableId,
+                        ["Visible"] = 0,
+                        ["AppVisible"] = 0,
+                        ["IsDeleted"] = 1
+                    }).ConfigureAwait(false);
+                if (hide.Code != 1)
+                {
+                    messages.Add("隐藏旧 diy_table.V8Unlimited 字段元数据失败：" + hide.Msg);
+                }
+            }
+        }
+
+        private static async Task<JObject> GetTableAsync(string osClient)
+        {
+            var result = await MicroiEngine.FormEngine.GetFormDataAsync(
+                "diy_table",
+                new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object> { new List<object> { "Name", "=", "diy_table" } },
+                    _SelectFields = new[] { "Id", "Name" }
+                }).ConfigureAwait(false);
+            return result.Code == 1 && result.Data != null
+                ? JObject.FromObject((object)result.Data)
+                : null;
+        }
+
+        private static async Task<JObject> GetFieldAsync(
+            string osClient,
+            string tableId,
+            string fieldName)
+        {
+            var result = await MicroiEngine.FormEngine.GetFormDataAsync(
+                "diy_field",
+                new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>
+                    {
+                        new List<object> { "TableId", "=", tableId },
+                        new List<object> { "Name", "=", fieldName }
+                    },
+                    _SelectFields = new[] { "Id", "Name", "Tab", "IsDeleted" }
+                }).ConfigureAwait(false);
+            return result.Code == 1 && result.Data != null
+                ? JObject.FromObject((object)result.Data)
+                : null;
+        }
+
+        private static async Task<string> GetReferenceTabAsync(
+            string osClient,
+            string tableId,
+            string referenceField,
+            string fallback)
+        {
+            var field = await GetFieldAsync(osClient, tableId, referenceField).ConfigureAwait(false);
+            var tab = field?.Value<string>("Tab");
+            return string.IsNullOrWhiteSpace(tab) ? fallback : tab;
+        }
+    }
+}

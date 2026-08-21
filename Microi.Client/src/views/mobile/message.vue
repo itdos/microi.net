@@ -59,7 +59,7 @@
                             :src="DiyCommon.GetServerPath(msg.ContactUserAvatar)"
                             class="mci-avatar"
                         >
-                            {{ (msg.ContactUserName || '?').charAt(0) }}
+                            {{ displayContactName(msg).charAt(0) }}
                         </el-avatar>
                         <span v-if="msg.UnRead > 0" class="mci-badge unread-badge">
                             {{ msg.UnRead > 99 ? '99+' : msg.UnRead }}
@@ -67,7 +67,7 @@
                     </div>
                     <div class="msg-body">
                         <div class="msg-top">
-                            <span class="msg-name">{{ msg.ContactUserName }}</span>
+                            <span class="msg-name">{{ displayContactName(msg) }}</span>
                             <span class="msg-time">{{ formatTime(msg.UpdateTime) }}</span>
                         </div>
                         <div class="msg-bottom">
@@ -106,10 +106,10 @@
                     @click="startNewChat(contact)"
                 >
                     <el-avatar :size="40" :src="contact.UserImg" class="mci-avatar">
-                        {{ (contact.Name || '?').charAt(0) }}
+                        {{ displayContactName(contact).charAt(0) }}
                     </el-avatar>
                     <div class="contact-info">
-                        <span class="contact-name">{{ contact.Name }}</span>
+                        <span class="contact-name">{{ displayContactName(contact) }}</span>
                         <span class="contact-dept" v-if="contact.DepartmentName">{{ contact.DepartmentName }}</span>
                     </div>
                 </div>
@@ -131,10 +131,10 @@
             <div class="dialog-contact-list">
                 <div v-for="contact in dialogContactList" :key="contact.Id" class="mci-cell" @click="startDialogChat(contact)">
                     <el-avatar :size="36" :src="contact.UserImg" class="mci-avatar">
-                        {{ (contact.Name || '?').charAt(0) }}
+                        {{ displayContactName(contact).charAt(0) }}
                     </el-avatar>
                     <div class="contact-info">
-                        <span class="contact-name">{{ contact.Name }}</span>
+                        <span class="contact-name">{{ displayContactName(contact) }}</span>
                         <span class="contact-dept" v-if="contact.DepartmentName">{{ contact.DepartmentName }}</span>
                     </div>
                 </div>
@@ -149,7 +149,15 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useDiyStore } from '@/pinia';
 import { Search, Plus } from '@element-plus/icons-vue';
-import { getLastContacts, formatTime as chatFormatTime, initWebSocketEvents, cleanupWebSocketEvents } from '@/utils/chat.common';
+import {
+    getLastContacts,
+    formatTime as chatFormatTime,
+    initWebSocketEvents,
+    cleanupWebSocketEvents,
+    normalizeChatContact,
+    normalizeChatDirectoryUser,
+    resolveChatDisplayName
+} from '@/utils/chat.common';
 import { DiyCommon } from '@/utils/diy.common';
 
 defineOptions({ name: 'mobile_message' });
@@ -179,10 +187,16 @@ let wsEventsRegistered = false;
 const filteredMessageList = computed(() => {
     if (!searchKeyword.value) return messageList.value;
     return messageList.value.filter(msg =>
-        msg.ContactUserName?.includes(searchKeyword.value) ||
+        displayContactName(msg).includes(searchKeyword.value) ||
         msg.LastMessage?.includes(searchKeyword.value)
     );
 });
+
+const displayContactName = contact => resolveChatDisplayName(
+    contact,
+    null,
+    t('Msg.Mobile.common.unknown')
+);
 
 let contactSearchTimer = null;
 const onContactSearchInput = () => {
@@ -199,7 +213,10 @@ const searchContacts = () => {
     DiyCommon.Post('/api/SysUser/GetSysUserPublicInfo', {
         State: 1, _PageIndex: 1, _PageSize: 15, _Keyword: contactKeyword.value
     }, function(result) {
-        if (DiyCommon.Result(result)) dialogContactList.value = result.Data || [];
+        if (DiyCommon.Result(result)) {
+            dialogContactList.value = (result.Data || [])
+                .map(item => normalizeChatDirectoryUser(item, t('Msg.Mobile.common.unknown')));
+        }
     });
 };
 
@@ -215,11 +232,11 @@ const switchToContacts = () => {
     }
 };
 
-const openChat = (msg) => router.push({ path: '/mobile/chat', query: { id: msg.ContactUserId, name: msg.ContactUserName } });
-const startNewChat = (contact) => router.push({ path: '/mobile/chat', query: { id: contact.Id, name: contact.Name } });
+const openChat = (msg) => router.push({ path: '/mobile/chat', query: { id: msg.ContactUserId, name: displayContactName(msg) } });
+const startNewChat = (contact) => router.push({ path: '/mobile/chat', query: { id: contact.Id, name: displayContactName(contact) } });
 const startDialogChat = (contact) => {
     showNewChat.value = false;
-    router.push({ path: '/mobile/chat', query: { id: contact.Id, name: contact.Name } });
+    router.push({ path: '/mobile/chat', query: { id: contact.Id, name: displayContactName(contact) } });
 };
 
 const loadLastContacts = async () => {
@@ -258,7 +275,8 @@ const loadContacts = (isLoadMore = false) => {
         State: 1, _PageIndex: contactPageIndex.value, _PageSize: contactPageSize.value, _Keyword: searchKeyword.value || ''
     }, function(result) {
         if (DiyCommon.Result(result)) {
-            const data = result.Data || [];
+            const data = (result.Data || [])
+                .map(item => normalizeChatDirectoryUser(item, t('Msg.Mobile.common.unknown')));
             if (isLoadMore) contactList.value = contactList.value.concat(data);
             else {
                 if (!searchKeyword.value) {
@@ -314,7 +332,11 @@ const registerWebSocketEvents = () => {
             } else {
                 messageList.value.unshift({
                     ContactUserId: message.FromUserId,
-                    ContactUserName: message.FromUserName || t('Msg.Mobile.common.unknown'),
+                    ContactUserName: resolveChatDisplayName({
+                        ContactUserName: message.FromUserName,
+                        ContactUserAccount: message.FromUserAccount || message.FromAccount
+                    }, null, t('Msg.Mobile.common.unknown')),
+                    ContactUserAccount: message.FromUserAccount || message.FromAccount || '',
                     ContactUserAvatar: message.FromUserAvatar || '',
                     LastMessage: message.Content,
                     UpdateTime: new Date().toISOString(),
@@ -324,7 +346,11 @@ const registerWebSocketEvents = () => {
         },
         onReceiveLastContacts: (contacts) => {
             if (contacts && contacts.length > 0) {
-                messageList.value = contacts;
+                messageList.value = contacts.map(item => normalizeChatContact(
+                    item,
+                    null,
+                    t('Msg.Mobile.common.unknown')
+                ));
                 const aiIndex = messageList.value.findIndex(m => m.ContactUserId === 'AI');
                 if (aiIndex === -1) {
                     messageList.value.unshift({

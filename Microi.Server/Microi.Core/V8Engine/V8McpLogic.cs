@@ -58,6 +58,34 @@ namespace Microi.net
             return int.TryParse(text, out var value) ? value : fallback;
         }
 
+        private static bool SafeJBool(JToken token, bool fallback = false)
+        {
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined) return fallback;
+            var text = token.ToString();
+            if (bool.TryParse(text, out var boolValue)) return boolValue;
+            if (int.TryParse(text, out var intValue)) return intValue != 0;
+            return fallback;
+        }
+
+        /// <summary>
+        /// FormEngine 的泛型参数为 dynamic 时，Data 中每一行仍会沿 LINQ 链传播 dynamic。
+        /// 验收逻辑先统一投影为 JObject，避免 JValue 上的扩展方法进入运行时动态绑定。
+        /// </summary>
+        internal static List<JObject> NormalizeLowCodeValidationRows(object rows)
+        {
+            if (rows == null) return new List<JObject>();
+            if (rows is string || !(rows is System.Collections.IEnumerable sequence))
+                throw new ArgumentException("低代码验收数据必须是行集合", nameof(rows));
+
+            var result = new List<JObject>();
+            foreach (object row in sequence)
+            {
+                if (row == null) continue;
+                result.Add(row as JObject ?? JObject.FromObject(row));
+            }
+            return result;
+        }
+
         private static string SafeJDateTime(JObject row, string fieldName)
         {
             var token = row?[fieldName];
@@ -169,6 +197,173 @@ namespace Microi.net
         private static bool DiyTableHasColumn(string osClient, string columnName)
         {
             return HasPhysicalColumn(osClient, "diy_table", columnName);
+        }
+
+        private const string ApiEngineChangeHistoryTable = "mci_apiengine_change_history";
+
+        private static bool SupportsApiEngineChangeHistoryRows(string osClient)
+        {
+            return HasPhysicalColumn(osClient, ApiEngineChangeHistoryTable, "ApiEngineId")
+                && HasPhysicalColumn(osClient, ApiEngineChangeHistoryTable, "Description")
+                && HasPhysicalColumn(osClient, ApiEngineChangeHistoryTable, "EntryKey");
+        }
+
+        internal static string BuildApiEngineChangeHistoryEntryKey(
+            string apiEngineId,
+            string version,
+            string summary,
+            string code)
+        {
+            var source = string.Join("\n", new[]
+            {
+                SafeString(apiEngineId).Trim(),
+                SafeString(version).Trim(),
+                SafeString(summary).Trim(),
+                SafeString(code)
+            });
+            using (var sha256 = SHA256.Create())
+            {
+                var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(source));
+                return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
+            }
+        }
+
+        private static async Task<DosResult<object>> AddApiEngineChangeHistoryRow(
+            string osClient,
+            string apiEngineId,
+            string version,
+            string summary,
+            string code)
+        {
+            var normalizedSummary = SafeString(summary).Trim();
+            var normalizedVersion = SafeString(version).Trim();
+            if (!normalizedVersion.DosIsNullOrWhiteSpace())
+            {
+                normalizedSummary = Regex.Replace(
+                    normalizedSummary,
+                    $@"^{Regex.Escape(normalizedVersion)}\s+",
+                    "",
+                    RegexOptions.IgnoreCase).Trim();
+            }
+            if (normalizedSummary.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult<object>(1, new { Storage = "None" }, "没有修改说明需要写入");
+            }
+            if (!SupportsApiEngineChangeHistoryRows(osClient))
+            {
+                return new DosResult<object>(2, null, "接口引擎修改历史子表尚未安装");
+            }
+
+            var entryKey = BuildApiEngineChangeHistoryEntryKey(
+                apiEngineId, normalizedVersion, normalizedSummary, code);
+            var existing = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(
+                ApiEngineChangeHistoryTable,
+                new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>
+                    {
+                        new List<object> { "EntryKey", "=", entryKey }
+                    },
+                    _SelectFields = new[] { "Id", "EntryKey" }
+                });
+            if (existing.Code == 1 && existing.Data != null)
+            {
+                return new DosResult<object>(1, new
+                {
+                    Storage = "TableChild",
+                    EntryKey = entryKey,
+                    Existing = true
+                }, "修改历史记录已存在，按幂等写入跳过");
+            }
+
+            var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(
+                ApiEngineChangeHistoryTable,
+                new JObject
+                {
+                    ["Id"] = Ulid.NewUlid().ToString(),
+                    ["OsClient"] = osClient,
+                    ["ApiEngineId"] = apiEngineId,
+                    ["Version"] = normalizedVersion,
+                    ["Description"] = normalizedSummary,
+                    ["EntryKey"] = entryKey,
+                    ["Source"] = "MCP / VS Code",
+                    ["CreateTime"] = now,
+                    ["UpdateTime"] = now,
+                    ["IsDeleted"] = 0,
+                    ["_InvokeType"] = "Server"
+                });
+            if (addResult.Code == 1)
+            {
+                return new DosResult<object>(1, new
+                {
+                    Storage = "TableChild",
+                    EntryKey = entryKey,
+                    Existing = false
+                }, "修改历史已写入子表");
+            }
+
+            // 并发重试可能在“查询不存在”后由另一请求先写入；再次回读后按成功处理。
+            var readback = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(
+                ApiEngineChangeHistoryTable,
+                new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>
+                    {
+                        new List<object> { "EntryKey", "=", entryKey }
+                    },
+                    _SelectFields = new[] { "Id", "EntryKey" }
+                });
+            if (readback.Code == 1 && readback.Data != null)
+            {
+                return new DosResult<object>(1, new
+                {
+                    Storage = "TableChild",
+                    EntryKey = entryKey,
+                    Existing = true
+                }, "修改历史已由并发请求写入");
+            }
+            return new DosResult<object>(addResult.Code, addResult.Data, addResult.Msg);
+        }
+
+        private static async Task<DosResult<object>> AppendLegacyApiEngineChangeHistory(
+            string osClient,
+            string apiEngineId,
+            string changeHistoryEntry)
+        {
+            if (!SysApiEngineHasColumn(osClient, "ChangeHistory")
+                || changeHistoryEntry.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult<object>(2, null, "当前数据库没有旧版修改历史字段");
+            }
+
+            var current = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
+            {
+                OsClient = osClient,
+                Id = apiEngineId,
+                _SelectFields = new[] { "Id", "ChangeHistory" }
+            });
+            if (current.Code != 1 || current.Data == null)
+            {
+                // 兼容字段是整段文本，必须先成功回读旧值才能追加。读取异常时
+                // 继续更新会把存量历史覆盖成当前一行，宁可让上层报告回退不可用。
+                return new DosResult<object>(
+                    current.Code == 1 ? 0 : current.Code,
+                    current.Data,
+                    current.Msg.DosIsNullOrWhiteSpace()
+                        ? "读取旧版接口引擎修改历史失败，已取消兼容字段回退写入"
+                        : current.Msg);
+            }
+            var update = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", new JObject
+            {
+                ["Id"] = apiEngineId,
+                ["OsClient"] = osClient,
+                ["ChangeHistory"] = changeHistoryEntry + SafeString(current.Data?.ChangeHistory),
+                ["_InvokeType"] = "Server"
+            });
+            return new DosResult<object>(update.Code, update.Data, update.Msg);
         }
 
         private static bool IsBlank(object value)
@@ -614,7 +809,9 @@ namespace Microi.net
                         apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
                         var v8Limit = hasV8LimitColumn
                             ? SafeJInt(row, "V8Limit")
-                            : (hasV8UnlimitedColumn && SafeJInt(row, "V8Unlimited") == 1 ? 0 : 1);
+                            : hasV8UnlimitedColumn
+                                ? (SafeJInt(row, "V8Unlimited") == 1 ? 0 : 1)
+                                : 0;
 
                         list.Add(new
                         {
@@ -683,7 +880,9 @@ namespace Microi.net
                     apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
                     var v8Limit = hasV8LimitColumn
                         ? SafeJInt(row, "V8Limit")
-                        : (hasV8UnlimitedColumn && SafeJInt(row, "V8Unlimited") == 1 ? 0 : 1);
+                        : hasV8UnlimitedColumn
+                            ? (SafeJInt(row, "V8Unlimited") == 1 ? 0 : 1)
+                            : 0;
 
                     return new DosResult<object>(1, new
                     {
@@ -749,7 +948,9 @@ namespace Microi.net
                     apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
                     var v8Limit = hasV8LimitColumn
                         ? SafeJInt(row, "V8Limit")
-                        : (hasV8UnlimitedColumn && SafeJInt(row, "V8Unlimited") == 1 ? 0 : 1);
+                        : hasV8UnlimitedColumn
+                            ? (SafeJInt(row, "V8Unlimited") == 1 ? 0 : 1)
+                            : 0;
 
                     return new DosResult<object>(1, new
                     {
@@ -815,7 +1016,9 @@ namespace Microi.net
                         apiV8Code = DecodeLegacyApiV8Code(apiV8Code);
                         var v8Limit = hasV8LimitColumn
                             ? SafeJInt(row, "V8Limit")
-                            : (hasV8UnlimitedColumn && SafeJInt(row, "V8Unlimited") == 1 ? 0 : 1);
+                            : hasV8UnlimitedColumn
+                                ? (SafeJInt(row, "V8Unlimited") == 1 ? 0 : 1)
+                                : 0;
 
                         list.Add(new
                         {
@@ -894,6 +1097,9 @@ namespace Microi.net
                 var changeHistoryEntry = BuildV8ChangeHistoryEntry(resolvedVersion, changeHistory);
                 var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var useChangeHistoryRows = updateCode
+                    && !SafeString(changeHistory).Trim().DosIsNullOrWhiteSpace()
+                    && SupportsApiEngineChangeHistoryRows(osClient);
                 var hasV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
                 if (v8Limit.HasValue && !hasV8LimitColumn)
@@ -915,7 +1121,9 @@ namespace Microi.net
                     {
                         updateParam["Version"] = resolvedVersion;
                     }
-                    if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace())
+                    if (!useChangeHistoryRows
+                        && hasChangeHistoryColumn
+                        && !changeHistoryEntry.DosIsNullOrWhiteSpace())
                     {
                         var historyResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                         {
@@ -945,6 +1153,37 @@ namespace Microi.net
 #endif
                 }
 
+                var historyStorage = "None";
+                if (updateCode && !SafeString(changeHistory).Trim().DosIsNullOrWhiteSpace())
+                {
+                    if (useChangeHistoryRows)
+                    {
+                        var historyResult = await AddApiEngineChangeHistoryRow(
+                            osClient, id, resolvedVersion, changeHistory, plainCode);
+                        if (historyResult.Code == 1)
+                        {
+                            historyStorage = "TableChild";
+                        }
+                        else
+                        {
+                            // 子表异常时继续向旧字段降级，代码更新保持成功且修改说明不丢失。
+                            var legacyFallback = await AppendLegacyApiEngineChangeHistory(
+                                osClient, id, changeHistoryEntry);
+                            historyStorage = legacyFallback.Code == 1
+                                ? "LegacyFallback"
+                                : "Unavailable";
+                        }
+                    }
+                    else if (hasChangeHistoryColumn)
+                    {
+                        historyStorage = "LegacyColumn";
+                    }
+                    else
+                    {
+                        historyStorage = "Unavailable";
+                    }
+                }
+
                 var cacheRefreshStatus = await RefreshApiEngineRouteCacheWithTimeout(osClient, apiEngineKey, id);
 
                 return new DosResult<object>(1, new
@@ -954,6 +1193,7 @@ namespace Microi.net
                         : $"接口引擎 [{apiEngineKey}] 运行配置已同步到数据库",
                     UpdateTime = now,
                     Version = updateCode ? resolvedVersion : null,
+                    ChangeHistoryStorage = historyStorage,
                     V8Limit = v8Limit.HasValue ? (v8Limit.Value == 1 ? 1 : 0) : (int?)null,
                     V8Unlimited = v8Limit.HasValue ? (v8Limit.Value == 1 ? 0 : 1) : (int?)null,
                     CacheRefresh = cacheRefreshStatus
@@ -999,6 +1239,8 @@ namespace Microi.net
                 var changeHistoryEntry = BuildV8ChangeHistoryEntry(resolvedVersion, changeHistory);
                 var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var useChangeHistoryRows = !SafeString(changeHistory).Trim().DosIsNullOrWhiteSpace()
+                    && SupportsApiEngineChangeHistoryRows(osClient);
                 var hasV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
                 if (v8Limit.HasValue && !hasV8LimitColumn)
@@ -1036,7 +1278,12 @@ namespace Microi.net
                     ["_InvokeType"] = "Server"
                 };
                 if (hasVersionColumn) addParam["Version"] = resolvedVersion;
-                if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace()) addParam["ChangeHistory"] = changeHistoryEntry;
+                if (!useChangeHistoryRows
+                    && hasChangeHistoryColumn
+                    && !changeHistoryEntry.DosIsNullOrWhiteSpace())
+                {
+                    addParam["ChangeHistory"] = changeHistoryEntry;
+                }
                 var effectiveV8Limit = v8Limit == 1 ? 1 : 0;
                 if (hasV8LimitColumn) addParam["V8Limit"] = effectiveV8Limit;
                 if (hasV8UnlimitedColumn) addParam["V8Unlimited"] = effectiveV8Limit == 1 ? 0 : 1;
@@ -1045,6 +1292,55 @@ namespace Microi.net
 
                 if (addResult.Code == 1)
                 {
+                    var historyStorage = "None";
+                    if (!SafeString(changeHistory).Trim().DosIsNullOrWhiteSpace())
+                    {
+                        if (useChangeHistoryRows)
+                        {
+                            var createdEngine = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(
+                                "sys_apiengine",
+                                new
+                                {
+                                    OsClient = osClient,
+                                    _Where = new List<object>
+                                    {
+                                        new List<object> { "ApiEngineKey", "=", apiEngineKey }
+                                    },
+                                    _SelectFields = new[] { "Id", "ApiEngineKey" }
+                                });
+                            var createdEngineId = createdEngine.Code == 1
+                                ? SafeString(createdEngine.Data?.Id)
+                                : "";
+                            var historyResult = !createdEngineId.DosIsNullOrWhiteSpace()
+                                ? await AddApiEngineChangeHistoryRow(
+                                    osClient, createdEngineId, resolvedVersion, changeHistory, apiV8Code)
+                                : new DosResult<object>(0, null, "新增接口引擎后未能回读 Id");
+                            if (historyResult.Code == 1)
+                            {
+                                historyStorage = "TableChild";
+                            }
+                            else if (!createdEngineId.DosIsNullOrWhiteSpace())
+                            {
+                                var legacyFallback = await AppendLegacyApiEngineChangeHistory(
+                                    osClient, createdEngineId, changeHistoryEntry);
+                                historyStorage = legacyFallback.Code == 1
+                                    ? "LegacyFallback"
+                                    : "Unavailable";
+                            }
+                            else
+                            {
+                                historyStorage = "Unavailable";
+                            }
+                        }
+                        else if (hasChangeHistoryColumn)
+                        {
+                            historyStorage = "LegacyColumn";
+                        }
+                        else
+                        {
+                            historyStorage = "Unavailable";
+                        }
+                    }
                     var cacheRefreshStatus = await RefreshApiEngineRouteCacheWithTimeout(osClient, apiEngineKey);
 
                     return new DosResult<object>(1, new
@@ -1052,6 +1348,7 @@ namespace Microi.net
                         Message = $"接口引擎 [{apiEngineKey}] 创建成功",
                         ApiEngineKey = apiEngineKey,
                         Version = resolvedVersion,
+                        ChangeHistoryStorage = historyStorage,
                         Category = category ?? "未分类",
                         V8Limit = effectiveV8Limit,
                         V8Unlimited = effectiveV8Limit == 1 ? 0 : 1,
@@ -2104,7 +2401,9 @@ namespace Microi.net
 
                     var v8Limit = hasV8LimitColumn
                         ? SafeJInt(row, "V8Limit")
-                        : (hasV8UnlimitedColumn && SafeJInt(row, "V8Unlimited") == 1 ? 0 : 1);
+                        : hasV8UnlimitedColumn
+                            ? (SafeJInt(row, "V8Unlimited") == 1 ? 0 : 1)
+                            : 0;
                     engines.Add(new
                     {
                         Id = SafeJString(row, "Id"),
@@ -2208,16 +2507,17 @@ namespace Microi.net
         /// </summary>
         public static async Task<DosResult<object>> CreateTable(string osClient, string name, string description,
             string tabs = null, int isTree = 0, int column = 1, string formOpenType = null,
-            string formOpenWidth = null, int? v8Unlimited = null)
+            string formOpenWidth = null, int? v8Limit = null)
         {
             try
             {
-                var hasV8UnlimitedColumn = DiyTableHasColumn(osClient, "V8Unlimited");
-                if (v8Unlimited.HasValue && !hasV8UnlimitedColumn)
+                var hasV8LimitColumn = DiyTableHasColumn(osClient, "V8Limit");
+                if (!hasV8LimitColumn)
                 {
                     return new DosResult<object>(0, null,
-                        "当前平台尚未安装 diy_table.V8Unlimited 字段，请先升级后端与表单引擎资源");
+                        "当前平台尚未安装 diy_table.V8Limit 字段，请先升级后端与表单引擎资源");
                 }
+                var effectiveV8Limit = v8Limit == 1 ? 1 : 0;
 
                 // 检查表名是否已存在（幂等：已存在则直接返回该表）
                 var existResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_table", new
@@ -2271,16 +2571,16 @@ namespace Microi.net
                         return fixedFieldResult;
                     }
 
-                    var v8UnlimitedUpdated = false;
-                    if (v8Unlimited.HasValue)
+                    var v8LimitUpdated = false;
+                    if (v8Limit.HasValue)
                     {
                         var updateResult = await UpdateTable(osClient, new JObject
                         {
                             ["Id"] = existingTableId,
-                            ["V8Unlimited"] = v8Unlimited.Value == 1 ? 1 : 0
+                            ["V8Limit"] = effectiveV8Limit
                         });
                         if (updateResult.Code != 1) return updateResult;
-                        v8UnlimitedUpdated = true;
+                        v8LimitUpdated = true;
                     }
 
                     return new DosResult<object>(1, new
@@ -2292,8 +2592,8 @@ namespace Microi.net
                         Name = name,
                         Skipped = !repairedPhysicalTable,
                         Repaired = repairedPhysicalTable,
-                        V8Unlimited = v8Unlimited.HasValue ? (v8Unlimited.Value == 1 ? 1 : 0) : (int?)null,
-                        V8UnlimitedUpdated = v8UnlimitedUpdated
+                        V8Limit = v8Limit.HasValue ? effectiveV8Limit : (int?)null,
+                        V8LimitUpdated = v8LimitUpdated
                     });
                 }
 
@@ -2319,7 +2619,7 @@ namespace Microi.net
                 if (column > 1) tableData.Column = column;
                 if (!string.IsNullOrWhiteSpace(formOpenType)) tableData.FormOpenType = formOpenType;
                 if (!string.IsNullOrWhiteSpace(formOpenWidth)) tableData.FormOpenWidth = formOpenWidth;
-                if (v8Unlimited.HasValue) tableData.V8Unlimited = v8Unlimited.Value == 1 ? 1 : 0;
+                tableData.V8Limit = effectiveV8Limit;
 
                 var addResult = await MicroiEngine.FormEngine.AddTableAsync(tableData);
 
@@ -2330,7 +2630,7 @@ namespace Microi.net
                         Message = $"自定义表 [{name}] 创建成功",
                         TableId = id,
                         Name = name,
-                        V8Unlimited = v8Unlimited.HasValue ? (v8Unlimited.Value == 1 ? 1 : 0) : 0
+                        V8Limit = effectiveV8Limit
                     });
                 }
 
@@ -4826,10 +5126,12 @@ namespace Microi.net
             {
                 var errors = new List<string>();
                 var warnings = new List<string>();
+                var hasTableV8LimitColumn = DiyTableHasColumn(osClient, "V8Limit");
                 var hasTableV8UnlimitedColumn = DiyTableHasColumn(osClient, "V8Unlimited");
                 var hasEngineV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasEngineV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
                 var tableSelectFields = new List<string> { "Id", "Name", "Description" };
+                if (hasTableV8LimitColumn) tableSelectFields.Add("V8Limit");
                 if (hasTableV8UnlimitedColumn) tableSelectFields.Add("V8Unlimited");
 
                 var tableResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_table", new
@@ -4844,55 +5146,73 @@ namespace Microi.net
                     _SelectFields = new[] { "Id", "TableId", "Name", "Label", "Component", "Config" },
                     _PageSize = 50000
                 });
-                var tables = tableResult.Code == 1 && tableResult.Data != null ? tableResult.Data.ToList() : new List<dynamic>();
-                var fields = fieldResult.Code == 1 && fieldResult.Data != null ? fieldResult.Data.ToList() : new List<dynamic>();
-                var tableByName = tables.ToDictionary(t => ((string)t.Name ?? "").ToLower(), t => t);
-                var fieldsByTable = fields.GroupBy(f => (string)f.TableId ?? "").ToDictionary(g => g.Key, g => g.ToList());
+                List<JObject> tables = tableResult.Code == 1 && tableResult.Data != null
+                    ? NormalizeLowCodeValidationRows((object)tableResult.Data)
+                    : new List<JObject>();
+                List<JObject> fields = fieldResult.Code == 1 && fieldResult.Data != null
+                    ? NormalizeLowCodeValidationRows((object)fieldResult.Data)
+                    : new List<JObject>();
+                var tableByName = tables.ToDictionary(
+                    table => SafeJString(table, "Name").ToLowerInvariant(),
+                    table => table);
+                var fieldsByTable = fields
+                    .GroupBy(field => SafeJString(field, "TableId"))
+                    .ToDictionary(group => group.Key, group => group.ToList());
 
                 var manifestTables = manifest["tables"] as JArray ?? manifest["Tables"] as JArray ?? new JArray();
                 foreach (var token in manifestTables)
                 {
                     if (!(token is JObject table)) continue;
-                    var name = table["name"].Val<string>() ?? table["Name"].Val<string>();
-                    if (name.DosIsNullOrWhiteSpace()) { errors.Add("表定义缺少 name"); continue; }
-                    if (!tableByName.TryGetValue(name.ToLower(), out var tableModel))
+                    string name = SafeJString(table, "name", SafeJString(table, "Name"));
+                    if (string.IsNullOrWhiteSpace(name)) { errors.Add("表定义缺少 name"); continue; }
+                    if (!tableByName.TryGetValue(name.ToLowerInvariant(), out var tableModel))
                     {
                         errors.Add($"缺少表：{name}");
                         continue;
                     }
-                    var expectedTableUnlimited = table["v8Unlimited"] ?? table["V8Unlimited"];
-                    if (expectedTableUnlimited != null && expectedTableUnlimited.Type != JTokenType.Null)
+                    var expectedTableLimit = table["v8Limit"] ?? table["V8Limit"];
+                    var expectedLegacyUnlimited = table["v8Unlimited"] ?? table["V8Unlimited"];
+                    if ((expectedTableLimit != null && expectedTableLimit.Type != JTokenType.Null)
+                        || (expectedLegacyUnlimited != null && expectedLegacyUnlimited.Type != JTokenType.Null))
                     {
-                        if (!hasTableV8UnlimitedColumn)
+                        if (!hasTableV8LimitColumn && !hasTableV8UnlimitedColumn)
                         {
-                            errors.Add($"表 {name} 无法验收 V8Unlimited：当前平台缺少 diy_table.V8Unlimited 字段");
+                            errors.Add($"表 {name} 无法验收 V8Limit：当前平台缺少 diy_table.V8Limit/V8Unlimited 字段");
                         }
                         else
                         {
-                            var expected = expectedTableUnlimited.Val<bool>() ? 1 : 0;
-                            var actual = SafeJInt(JObject.FromObject(tableModel), "V8Unlimited");
-                            if (actual != expected) errors.Add($"表 {name} 的 V8Unlimited 期望 {expected}，实际 {actual}");
-                            if (expected == 1) warnings.Add($"表 {name} 已开启 V8Unlimited；仅该表后端 V8 事件取消 Jint 单次预算，进程常驻内存保护仍生效");
+                            var expected = expectedTableLimit != null && expectedTableLimit.Type != JTokenType.Null
+                                ? (SafeJBool(expectedTableLimit) ? 1 : 0)
+                                : (SafeJBool(expectedLegacyUnlimited) ? 0 : 1);
+                            var actual = hasTableV8LimitColumn
+                                ? SafeJInt(tableModel, "V8Limit")
+                                : (SafeJInt(tableModel, "V8Unlimited") == 1 ? 0 : 1);
+                            if (actual != expected) errors.Add($"表 {name} 的 V8Limit 期望 {expected}，实际 {actual}");
+                            if (expected == 1) warnings.Add($"表 {name} 已开启 V8Limit；该表后端 V8 事件将启用 Jint 单次预算，进程常驻内存保护始终生效");
                         }
                     }
-                    var tableFields = fieldsByTable.ContainsKey((string)tableModel.Id) ? fieldsByTable[(string)tableModel.Id] : new List<dynamic>();
-                    var fieldNames = new HashSet<string>(tableFields.Select(f => ((string)f.Name ?? "").ToLower()));
+                    var tableId = SafeJString(tableModel, "Id");
+                    var tableFields = fieldsByTable.TryGetValue(tableId, out var savedTableFields)
+                        ? savedTableFields
+                        : new List<JObject>();
+                    var fieldNames = new HashSet<string>(
+                        tableFields.Select(field => SafeJString(field, "Name").ToLowerInvariant()));
                     var manifestFields = table["fields"] as JArray ?? table["Fields"] as JArray ?? new JArray();
                     foreach (var fieldToken in manifestFields)
                     {
                         if (!(fieldToken is JObject field)) continue;
-                        var fieldName = field["name"].Val<string>() ?? field["Name"].Val<string>();
-                        if (fieldName.DosIsNullOrWhiteSpace()) { errors.Add($"表 {name} 中存在无 name 字段定义"); continue; }
-                        if (!fieldNames.Contains(fieldName.ToLower()))
+                        string fieldName = SafeJString(field, "name", SafeJString(field, "Name"));
+                        if (string.IsNullOrWhiteSpace(fieldName)) { errors.Add($"表 {name} 中存在无 name 字段定义"); continue; }
+                        if (!fieldNames.Contains(fieldName.ToLowerInvariant()))
                         {
                             errors.Add($"表 {name} 缺少字段：{fieldName}");
                             continue;
                         }
-                        var expectedComponent = field["component"].Val<string>() ?? field["Component"].Val<string>();
+                        string expectedComponent = SafeJString(field, "component", SafeJString(field, "Component"));
                         var savedField = tableFields.FirstOrDefault(item =>
-                            string.Equals((string)item.Name, fieldName, StringComparison.OrdinalIgnoreCase));
-                        var actualComponent = savedField == null ? "" : (string)savedField.Component ?? "";
-                        if (!expectedComponent.DosIsNullOrWhiteSpace()
+                            string.Equals(SafeJString(item, "Name"), fieldName, StringComparison.OrdinalIgnoreCase));
+                        string actualComponent = savedField == null ? "" : SafeJString(savedField, "Component");
+                        if (!string.IsNullOrWhiteSpace(expectedComponent)
                             && !string.Equals(expectedComponent, actualComponent, StringComparison.OrdinalIgnoreCase))
                         {
                             errors.Add($"表 {name} 字段 {fieldName} 的组件期望 {expectedComponent}，实际 {actualComponent}");
@@ -4901,18 +5221,19 @@ namespace Microi.net
 
                     foreach (var relationFieldModel in tableFields)
                     {
-                        var relationField = JObject.FromObject(relationFieldModel);
-                        var component = relationField["Component"].Val<string>();
+                        JObject relationField = relationFieldModel;
+                        string component = SafeJString(relationField, "Component");
                         if (!string.Equals(component, "JoinForm", StringComparison.OrdinalIgnoreCase)
                             && !string.Equals(component, "TableChild", StringComparison.OrdinalIgnoreCase)) continue;
+                        string relationFieldName = SafeJString(relationField, "Name");
                         var relationCheck = await ValidateMcpFieldRelationAsync(
                             osClient,
-                            (string)tableModel.Id,
-                            relationField["Name"].Val<string>(),
+                            tableId,
+                            relationFieldName,
                             component,
-                            relationField["Config"].Val<string>());
+                            SafeJString(relationField, "Config"));
                         if (!relationCheck.Ok)
-                            errors.Add($"表 {name} 字段 {relationField["Name"].Val<string>()}：{relationCheck.Msg}");
+                            errors.Add($"表 {name} 字段 {relationFieldName}：{relationCheck.Msg}");
                     }
 
                     var manifestIndexes = table["indexes"] as JArray ?? table["Indexes"] as JArray ?? new JArray();
@@ -4928,20 +5249,20 @@ namespace Microi.net
                             foreach (var indexToken in manifestIndexes)
                             {
                                 if (!(indexToken is JObject index)) continue;
-                                var indexName = index["name"].Val<string>() ?? index["Name"].Val<string>();
+                                string indexName = SafeJString(index, "name", SafeJString(index, "Name"));
                                 var indexColumnsToken = index["columns"] as JArray ?? index["Columns"] as JArray ?? new JArray();
                                 var indexColumns = indexColumnsToken.Values<string>()
-                                    .Where(value => !value.DosIsNullOrWhiteSpace())
+                                    .Where(value => !string.IsNullOrWhiteSpace(value))
                                     .ToList();
-                                var unique = index["unique"].Val<bool?>() ?? index["Unique"].Val<bool?>() ?? false;
+                                var unique = SafeJBool(index["unique"] ?? index["Unique"]);
                                 var matched = indexResult.Data.Any(existing =>
-                                    (indexName.DosIsNullOrWhiteSpace()
+                                    (string.IsNullOrWhiteSpace(indexName)
                                         || existing.Key_name.Equals(indexName, StringComparison.OrdinalIgnoreCase))
                                     && existing.IsUnique == unique
                                     && existing.Columns.SequenceEqual(indexColumns, StringComparer.OrdinalIgnoreCase));
                                 if (!matched)
                                 {
-                                    errors.Add($"表 {name} 缺少索引：{(indexName.DosIsNullOrWhiteSpace() ? string.Join(",", indexColumns) : indexName)}");
+                                    errors.Add($"表 {name} 缺少索引：{(string.IsNullOrWhiteSpace(indexName) ? string.Join(",", indexColumns) : indexName)}");
                                 }
                             }
                         }
@@ -4953,8 +5274,9 @@ namespace Microi.net
                     foreach (var token in items)
                     {
                         if (!(token is JObject item)) continue;
-                        var key = item[keyField].Val<string>() ?? item[keyField.Substring(0, 1).ToLower() + keyField.Substring(1)].Val<string>();
-                        if (key.DosIsNullOrWhiteSpace()) continue;
+                        string camelKeyField = keyField.Substring(0, 1).ToLowerInvariant() + keyField.Substring(1);
+                        string key = SafeJString(item, keyField, SafeJString(item, camelKeyField));
+                        if (string.IsNullOrWhiteSpace(key)) continue;
                         var exist = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(tableName, new
                         {
                             OsClient = osClient,
@@ -4973,8 +5295,8 @@ namespace Microi.net
                     var expectedEngineUnlimited = engine["v8Unlimited"] ?? engine["V8Unlimited"];
                     if ((expectedEngineLimit == null || expectedEngineLimit.Type == JTokenType.Null)
                         && (expectedEngineUnlimited == null || expectedEngineUnlimited.Type == JTokenType.Null)) continue;
-                    var apiEngineKey = engine["apiEngineKey"].Val<string>() ?? engine["ApiEngineKey"].Val<string>();
-                    if (apiEngineKey.DosIsNullOrWhiteSpace()) continue;
+                    string apiEngineKey = SafeJString(engine, "apiEngineKey", SafeJString(engine, "ApiEngineKey"));
+                    if (string.IsNullOrWhiteSpace(apiEngineKey)) continue;
                     if (!hasEngineV8LimitColumn && !hasEngineV8UnlimitedColumn)
                     {
                         errors.Add($"接口引擎 {apiEngineKey} 无法验收 V8Limit：当前平台缺少 sys_apiengine.V8Limit/V8Unlimited 字段");
@@ -4991,12 +5313,14 @@ namespace Microi.net
                     });
                     if (engineResult.Code != 1 || engineResult.Data == null) continue;
                     var expected = expectedEngineLimit != null && expectedEngineLimit.Type != JTokenType.Null
-                        ? (expectedEngineLimit.Val<bool>() ? 1 : 0)
-                        : (expectedEngineUnlimited.Val<bool>() ? 0 : 1);
-                    var engineRow = JObject.FromObject(engineResult.Data);
+                        ? (SafeJBool(expectedEngineLimit) ? 1 : 0)
+                        : (SafeJBool(expectedEngineUnlimited) ? 0 : 1);
+                    JObject engineRow = JObject.FromObject((object)engineResult.Data);
                     var actual = hasEngineV8LimitColumn
                         ? SafeJInt(engineRow, "V8Limit")
-                        : (SafeJInt(engineRow, "V8Unlimited") == 1 ? 0 : 1);
+                        : hasEngineV8UnlimitedColumn
+                            ? (SafeJInt(engineRow, "V8Unlimited") == 1 ? 0 : 1)
+                            : 0;
                     if (actual != expected) errors.Add($"接口引擎 {apiEngineKey} 的 V8Limit 期望 {expected}，实际 {actual}");
                     if (expected == 1) warnings.Add($"接口引擎 {apiEngineKey} 已开启 V8运行限制；仅该接口启用 Jint 单次执行预算，进程常驻内存保护始终生效");
                 }
@@ -5010,9 +5334,9 @@ namespace Microi.net
                 foreach (var token in manifestJobs)
                 {
                     if (!(token is JObject job)) continue;
-                    var jobName = job["JobName"].Val<string>() ?? job["jobName"].Val<string>()
-                        ?? job["name"].Val<string>() ?? job["Name"].Val<string>();
-                    if (jobName.DosIsNullOrWhiteSpace()) continue;
+                    string jobName = SafeJString(job, "JobName",
+                        SafeJString(job, "jobName", SafeJString(job, "name", SafeJString(job, "Name"))));
+                    if (string.IsNullOrWhiteSpace(jobName)) continue;
                     var runtime = await MicroiEngine.Job.GetJobDetail(
                         new MicroiSearchJobModel
                         {
@@ -5029,8 +5353,8 @@ namespace Microi.net
                 foreach (var token in events)
                 {
                     if (!(token is JObject ev)) continue;
-                    var eventType = ev["eventType"].Val<string>() ?? ev["EventType"].Val<string>();
-                    if (!eventType.DosIsNullOrWhiteSpace() && !ValidEventTypes.Contains(eventType))
+                    string eventType = SafeJString(ev, "eventType", SafeJString(ev, "EventType"));
+                    if (!string.IsNullOrWhiteSpace(eventType) && !ValidEventTypes.Contains(eventType))
                     {
                         errors.Add($"无效 V8 事件类型：{eventType}");
                     }
@@ -7000,6 +7324,25 @@ namespace Microi.net
             try
             {
                 if (patch == null) return new DosResult<object>(0, null, "patch 不能为空");
+                patch = (JObject)patch.DeepClone();
+                var requestedV8Limit = patch["V8Limit"] ?? patch["v8Limit"];
+                var legacyV8Unlimited = patch["V8Unlimited"] ?? patch["v8Unlimited"];
+                if (requestedV8Limit != null || legacyV8Unlimited != null)
+                {
+                    if (!DiyTableHasColumn(osClient, "V8Limit"))
+                    {
+                        return new DosResult<object>(0, null,
+                            "当前平台尚未安装 diy_table.V8Limit 字段，请先升级后端与表单引擎资源");
+                    }
+                    // Positive V8Limit always wins. The legacy alias is accepted
+                    // only at the transport edge and is never written again.
+                    patch["V8Limit"] = requestedV8Limit != null
+                        ? (requestedV8Limit.Val<int>() == 1 ? 1 : 0)
+                        : (legacyV8Unlimited.Val<int>() == 1 ? 0 : 1);
+                    patch.Remove("v8Limit");
+                    patch.Remove("V8Unlimited");
+                    patch.Remove("v8Unlimited");
+                }
                 var id = patch["Id"].Val<string>();
                 var name = patch["Name"].Val<string>();
                 if (id.DosIsNullOrWhiteSpace() && name.DosIsNullOrWhiteSpace())

@@ -200,7 +200,11 @@ export default {
                 this.pageKey = String(runtime.Page?.PageKey || "");
                 this.publishStatus = String(runtime.PublishStatus || (usingFallback ? "CompatibilityFallback" : ""));
                 this.assetSource = String(runtime.AssetSource || runtime.StorageMode || (usingFallback ? "managed-stable-entry" : ""));
-                let url = String(runtime.EntryUrl || "");
+                // An explicit Version is a real immutable-version contract, not
+                // only a compatibility assertion. Prefer the versioned entry
+                // returned by Resolve so a pinned dialog cannot be redirected
+                // through a stale stable pointer during a mixed v2/v3 rollout.
+                let url = String((requestedVersion && runtime.VersionedEntryUrl) || runtime.EntryUrl || "");
                 if (!url) {
                     url = buildMicroAppEntryUrl({
                         apiBase: DiyCommon.GetApiBase(),

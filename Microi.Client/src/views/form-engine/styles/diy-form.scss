@@ -1,4 +1,4 @@
-@import "@/styles/diy-form.scss";
+@use "@/styles/diy-form-base.scss";
 
 /* ViewSchema FormWorkbench 的通用控制中心外观。
  * SettingsCenter 是旧配置别名；两者只改变呈现层，不分叉 DiyForm 数据和 V8 执行链。 */
@@ -19,11 +19,12 @@
     }
     .diy-form-presentation-layout.is-control-center:not(.has-section-nav) {
         grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "section-main";
     }
     .diy-form-section-nav {
         grid-area: section-nav;
         position: sticky;
-        top: 10px;
+        // top: 10px;
         display: flex;
         min-width: 0;
         flex-direction: column;
@@ -43,6 +44,12 @@
         font-weight: 750;
     }
     .diy-form-section-nav__head small { color: var(--el-text-color-secondary); font-size: 10px; font-weight: 500; }
+    .diy-form-section-nav__items {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 5px;
+    }
     .diy-form-section-nav__item {
         position: relative;
         display: flex;
@@ -97,6 +104,7 @@
     .diy-form-section-nav__copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .diy-form-section-nav__copy b { font-size: 12px; }
     .diy-form-section-nav__copy small { margin-top: 3px; color: var(--el-text-color-secondary); font-size: 9px; font-weight: 500; }
+    .diy-form-section-nav__copy small :deep(*) { display: inline; margin: 0; padding: 0; }
     .diy-form-section-nav__count,
     .diy-form-tab-count {
         display: inline-grid;
@@ -111,6 +119,25 @@
         font-weight: 750;
         line-height: 18px;
     }
+    .diy-form-section-nav__footer {
+        margin: 7px 3px 2px;
+        padding: 10px;
+        border: 1px dashed color-mix(in srgb, var(--form-center-line) 86%, transparent);
+        border-radius: 11px;
+        color: var(--el-text-color-secondary);
+        background: color-mix(in srgb, var(--form-center-card) 72%, transparent);
+        font-size: 10px;
+        line-height: 17px;
+        overflow-wrap: anywhere;
+    }
+    .diy-form-section-nav__footer strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--el-text-color-primary);
+        font-size: 11px;
+    }
+    .diy-form-section-nav__footer :deep(:first-child) { margin-top: 0; }
+    .diy-form-section-nav__footer :deep(:last-child) { margin-bottom: 0; }
     .diy-form-tab-label { display: inline-flex; align-items: center; gap: 6px; }
     .diy-form-presentation-main {
         grid-area: section-main;
@@ -131,7 +158,16 @@
     }
     .diy-form-section-head span { color: var(--form-center-accent); font-size: 9px; font-weight: 800; letter-spacing: 1.25px; }
     .diy-form-section-head h3 { margin: 3px 0 0; color: var(--el-text-color-primary); font-size: 17px; line-height: 24px; }
-    .diy-form-section-head p { margin: 3px 0 0; color: var(--el-text-color-secondary); font-size: 11px; line-height: 17px; }
+    .diy-form-section-head__description { margin: 3px 0 0; color: var(--el-text-color-secondary); font-size: 11px; line-height: 17px; }
+    .diy-form-section-head__description :deep(:first-child) { margin-top: 0; }
+    .diy-form-section-head__description :deep(:last-child) { margin-bottom: 0; }
+    .diy-form-section-head__tags {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+    }
 
     :deep(.field-form-tabs.presentation-tabs-nav-hidden > .el-tabs__header) { display: none; }
     :deep(.field-form-tabs.is-control-center-tabs:not(.presentation-tabs-nav-hidden) > .el-tabs__header) {
@@ -165,16 +201,16 @@
     :deep(.diy-presentation-field-card > .container-form-item) {
         box-sizing: border-box;
         height: 100%;
-        min-height: 76px;
+        min-height: 34px;
         padding: 9px 10px;
-        border: 1px solid color-mix(in srgb, var(--form-center-line) 58%, transparent);
-        border-radius: 12px;
+        // border: 1px solid color-mix(in srgb, var(--form-center-line) 58%, transparent);
+        border-radius: 5px;
         background: var(--form-center-card);
         transition: border-color 160ms ease, box-shadow 160ms ease;
     }
     :deep(.diy-presentation-field-card > .container-form-item:hover) {
-        border-color: color-mix(in srgb, var(--form-center-accent) 28%, var(--form-center-line));
-        box-shadow: 0 2px 8px rgba(25, 48, 82, .035);
+        border-color: color-mix(in srgb, var(--form-center-accent) 58%, var(--form-center-line));
+        box-shadow: 0 0px 10px rgba(25, 48, 82, .05);
     }
     :deep(.diy-presentation-field-card .el-form-item) { margin-bottom: 0; }
     :deep(.diy-presentation-field-card .el-form-item__label) {
@@ -201,7 +237,16 @@
         border-radius: 9px;
         box-shadow: 0 0 0 1px var(--form-center-line) inset;
     }
-    :deep(.presentation-density-compact .diy-presentation-field-card > .container-form-item) { min-height: 70px; padding: 8px 9px; }
+    :deep(.diy-presentation-field-card .el-input__wrapper),
+    :deep(.diy-presentation-field-card .el-select__wrapper) {
+        box-sizing: border-box;
+        height: 34px;
+        min-height: 34px;
+    }
+    :deep(.presentation-density-compact .diy-presentation-field-card > .container-form-item) {
+        padding: 3px 3px 0px 3px;
+        margin:2px;
+    }
 
     .diy-form-presentation-layout.section-nav-right {
         grid-template-columns: minmax(0, 1fr) 190px;
@@ -223,10 +268,17 @@
         flex-direction: row;
         overflow-x: auto;
     }
+    .section-nav-top .diy-form-section-nav__items,
+    .section-nav-bottom .diy-form-section-nav__items {
+        flex: 1 0 auto;
+        flex-direction: row;
+    }
     .section-nav-top .diy-form-section-nav__head,
     .section-nav-bottom .diy-form-section-nav__head { min-width: 126px; }
     .section-nav-top .diy-form-section-nav__item,
     .section-nav-bottom .diy-form-section-nav__item { min-width: 170px; width: auto; }
+    .section-nav-top .diy-form-section-nav__footer,
+    .section-nav-bottom .diy-form-section-nav__footer { min-width: 210px; margin: 0; }
     .section-nav-top .diy-form-section-nav__item.active::before,
     .section-nav-bottom .diy-form-section-nav__item.active::before {
         display: none;
@@ -247,7 +299,7 @@
     --diy-modern-text: var(--mci-text-primary, var(--el-text-color-primary, #172033));
     --diy-modern-muted: var(--mci-text-secondary, var(--el-text-color-secondary, #66758a));
     box-sizing: border-box;
-    padding: 4px;
+    // padding: 4px;
 
     .diy-form-presentation-main { min-width: 0; }
 
@@ -347,7 +399,11 @@
             box-shadow: 0 0 0 1px var(--diy-modern-accent) inset, 0 0 0 3px color-mix(in srgb, var(--diy-modern-accent) 10%, transparent);
         }
         :deep(.diy-modern-field-card .el-input__wrapper),
-        :deep(.diy-modern-field-card .el-select__wrapper) { min-height: 34px; }
+        :deep(.diy-modern-field-card .el-select__wrapper) {
+            box-sizing: border-box;
+            height: 34px;
+            min-height: 34px;
+        }
         :deep(.diy-modern-field-card .el-date-editor.el-input),
         :deep(.diy-modern-field-card .el-date-editor.el-input__wrapper),
         :deep(.diy-modern-field-card .el-input-number),
@@ -521,9 +577,12 @@
     .diy-form--controlcenter {
         .diy-form-presentation-layout.is-control-center { grid-template-columns: minmax(0, 1fr); }
         .diy-form-presentation-layout.is-control-center { grid-template-areas: "section-nav" "section-main"; }
+        .diy-form-presentation-layout.is-control-center:not(.has-section-nav) { grid-template-areas: "section-main"; }
         .diy-form-section-nav { position: static; flex-direction: row; overflow-x: auto; }
+        .diy-form-section-nav__items { flex: 1 0 auto; flex-direction: row; }
         .diy-form-section-nav__head { display: none; }
         .diy-form-section-nav__item { min-width: 155px; }
+        .diy-form-section-nav__footer { min-width: 220px; margin: 0; }
         .diy-form-section-nav__item.active { box-shadow: none; }
         .diy-form-section-nav__item.active::before { display: none; }
     }
@@ -533,8 +592,10 @@
     .diy-form--settingscenter,
     .diy-form--controlcenter {
         .diy-form-presentation-main { padding: 8px; border-radius: 12px; }
-        .diy-form-section-head { margin-bottom: 7px; }
-        .diy-form-section-head p,.diy-form-section-head :deep(.el-tag) { display: none; }
+        .diy-form-section-head { align-items: flex-start; margin-bottom: 7px; }
+        .diy-form-section-head__description { display: none; }
+        .diy-form-section-head__tags { flex-wrap: wrap; gap: 4px; }
+        .diy-form-section-head__tags :deep(.el-tag) { height: 22px; padding: 0 6px; font-size: 10px; }
         :deep(.field-form) { padding: 1px; }
         :deep(.diy-presentation-field-card) { padding-top: 4px; padding-bottom: 4px; }
         :deep(.diy-presentation-field-card > .container-form-item) { min-height: 72px; padding: 9px; }
@@ -553,7 +614,7 @@
         display: inline-flex;
         min-width: 0;
         max-width: 100%;
-        align-items: baseline;
+        align-items: center;
         gap: 7px;
     }
 
@@ -592,6 +653,7 @@
 
     .diy-field-description--below {
         display: -webkit-box;
+        box-sizing: border-box;
         max-height: 30px;
         margin: -1px 2px 2px;
         overflow: hidden;
@@ -704,12 +766,22 @@
         background-color: var(--el-fill-color-light, #f5f7fa);
         border-radius: 4px;
 
-        .width-display {
-            font-weight: bold;
-            min-width: 30px;
-            text-align: center;
-            color: var(--el-color-primary, #409EFF);
-            font-size: 13px;
+        .width-input {
+            width: 42px;
+
+            :deep(.el-input__wrapper) {
+                min-height: 28px;
+                padding: 0 4px;
+                background: transparent;
+                box-shadow: none;
+            }
+
+            :deep(.el-input__inner) {
+                color: var(--el-color-primary, #409EFF);
+                font-size: 13px;
+                font-weight: 700;
+                text-align: center;
+            }
         }
 
         :deep(.el-button) {
@@ -805,4 +877,184 @@
   :deep(.el-tabs__nav) {
     flex-wrap: nowrap;
   }
+}
+
+.diy-form-print-section-head {
+    display: none;
+}
+
+@media print {
+    .diy-form--print-all-sections {
+        width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        color: #172033 !important;
+        background: #fff !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+
+        .diy-form-presentation-layout,
+        .diy-form-presentation-main,
+        .field-form-tabs,
+        :deep(.el-tabs__content),
+        .field-form,
+        :deep(.el-form) {
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: #fff !important;
+            box-shadow: none !important;
+        }
+
+        .diy-form-section-nav,
+        .diy-form-section-head,
+        :deep(.field-form-tabs > .el-tabs__header) {
+            display: none !important;
+        }
+
+        :deep(.field-form-tabs > .el-tabs__content > .el-tab-pane) {
+            display: block !important;
+            position: static !important;
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        :deep(.field-form-tabs > .el-tabs__content > .el-tab-pane:not(:first-child)) {
+            break-before: page;
+            page-break-before: always;
+        }
+
+        .diy-form-print-section-head {
+            display: flex;
+            min-height: 19mm;
+            box-sizing: border-box;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 8mm;
+            margin: 0 0 5mm;
+            padding: 0 0 4mm;
+            border-bottom: 1px solid #d7e0eb;
+            break-after: avoid-page;
+            page-break-after: avoid;
+        }
+
+        .diy-form-print-section-head__copy {
+            min-width: 0;
+        }
+
+        .diy-form-print-section-head__copy > span {
+            display: block;
+            color: #526176;
+            font-size: 8pt;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: 1.4px;
+        }
+
+        .diy-form-print-section-head h2 {
+            margin: 1.5mm 0 0;
+            color: #172033;
+            font-size: 17pt;
+            line-height: 1.18;
+        }
+
+        .diy-form-print-section-head__description {
+            margin-top: 1.5mm;
+            color: #617087;
+            font-size: 9pt;
+            line-height: 1.45;
+        }
+
+        .diy-form-print-section-head__description :deep(:first-child) { margin-top: 0; }
+        .diy-form-print-section-head__description :deep(:last-child) { margin-bottom: 0; }
+
+        .diy-form-print-section-head__tags {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 2mm;
+        }
+
+        .diy-form-print-section-head__tags small {
+            display: inline-flex;
+            min-height: 7mm;
+            align-items: center;
+            padding: 0 2.5mm;
+            border: 1px solid #d7e0eb;
+            border-radius: 999px;
+            color: #526176;
+            background: #f6f8fb;
+            font-size: 8pt;
+            white-space: nowrap;
+        }
+
+        :deep([data-field-id]),
+        :deep(.container-form-item),
+        :deep(.el-form-item) {
+            break-inside: avoid-page;
+            page-break-inside: avoid;
+        }
+
+        :deep([data-field-id]:has(.diy-code-editor-print-source)),
+        :deep(.container-form-item:has(.diy-code-editor-print-source)),
+        :deep(.el-form-item:has(.diy-code-editor-print-source)) {
+            break-inside: auto;
+            page-break-inside: auto;
+        }
+
+        :deep(.el-input__wrapper),
+        :deep(.el-select__wrapper),
+        :deep(.el-textarea__inner),
+        :deep(.el-date-editor),
+        :deep(.el-input-number) {
+            border-color: #d7e0eb !important;
+            background: #fff !important;
+            box-shadow: 0 0 0 1px #d7e0eb inset !important;
+        }
+
+        :deep(.el-form-item__label),
+        :deep(.el-input__inner),
+        :deep(.el-textarea__inner),
+        :deep(.el-select__selected-item) {
+            color: #26364b !important;
+        }
+
+        :deep(.el-row) {
+            margin-right: 0 !important;
+            margin-left: 0 !important;
+        }
+
+        :deep(.el-table),
+        :deep(.el-table__inner-wrapper),
+        :deep(.el-table__body-wrapper),
+        :deep(.el-table__header-wrapper) {
+            width: 100% !important;
+            max-width: none !important;
+            overflow: visible !important;
+            color: #26364b !important;
+            background: #fff !important;
+        }
+
+        :deep(.el-table th.el-table__cell) {
+            color: #26364b !important;
+            background: #f3f6fa !important;
+        }
+
+        :deep(.el-button),
+        :deep(.field-toolbar),
+        :deep(.drag-handle),
+        :deep(.width-resize-handle) {
+            display: none !important;
+        }
+    }
 }

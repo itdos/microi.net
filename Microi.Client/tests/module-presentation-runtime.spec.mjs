@@ -10,8 +10,19 @@ import {
     normalizeMenuBadgeConfig,
     resolveButtonBadgeValue,
     resolveListPresentationHeader,
+    resolveModuleOpenFirstRecord,
     resolveMetricValue
 } from "../src/views/form-engine/form-view-blocks/module-presentation-runtime.js";
+
+test("sys_menu OpenFirstRecord overrides the legacy ViewSchema fallback", () => {
+    assert.equal(resolveModuleOpenFirstRecord({ OpenFirstRecord: 1 }, { OpenFirstRecord: false }), true);
+    assert.equal(resolveModuleOpenFirstRecord({ OpenFirstRecord: 0 }, { OpenFirstRecord: true }), false);
+    assert.equal(resolveModuleOpenFirstRecord({ OpenFirstRecord: "false" }, { OpenFirstRecord: 1 }), false);
+    assert.equal(resolveModuleOpenFirstRecord({}, { OpenFirstRecord: "true" }), true);
+    assert.equal(resolveModuleOpenFirstRecord({ OpenFirstRecord: null }, { OpenFirstRecord: 1 }), true);
+    assert.equal(resolveModuleOpenFirstRecord({ OpenFirstRecord: "" }, { OpenFirstRecord: 1 }), true);
+    assert.equal(resolveModuleOpenFirstRecord({}, {}), false);
+});
 
 test("top-level desktop lists receive a compact default header without enabling ViewSchema", () => {
     const header = resolveListPresentationHeader({

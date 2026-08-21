@@ -439,6 +439,12 @@ namespace Microi.net.Api
                 });
                 if (getTokenResult.Code != 1)
                 {
+                    await TryRunPlatformLoginEventAsync(
+                        param,
+                        false,
+                        "PasswordLoginTokenFailed",
+                        sysUser["Id"].Val<string>(),
+                        getTokenResult.Msg);
                     return Json(getTokenResult);
                 }
                 #endregion
@@ -508,12 +514,63 @@ namespace Microi.net.Api
                     LastLoginTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                     OsClient = param.OsClient
                 });
+                await TryRunPlatformLoginEventAsync(
+                    param,
+                    true,
+                    "PasswordLogin",
+                    sysUser["Id"].Val<string>(),
+                    "");
             }
             if (result.Code != 1)
             {
-                QueueLoginFailed(param, result.Msg);
+                if (!await TryRunPlatformLoginEventAsync(
+                        param,
+                        false,
+                        "PasswordLoginFailed",
+                        "",
+                        result.Msg))
+                {
+                    QueueLoginFailed(param, result.Msg);
+                }
             }
             return Json(result);
+        }
+
+        private static async Task<bool> TryRunPlatformLoginEventAsync(
+            SysUserParam param,
+            bool success,
+            string action,
+            string userId,
+            string reason)
+        {
+            if (param?.OsClient.DosIsNullOrWhiteSpace() != false) return false;
+            try
+            {
+                var account = (param.Account ?? "").Trim();
+                object engineResult = await MicroiEngine.ApiEngine.RunAsync(
+                    "platform_auth_login_event",
+                    new JObject
+                    {
+                        ["OsClient"] = param.OsClient,
+                        ["_TrustedPlatformAuthProtocol"] = true,
+                        ["Action"] = action ?? "",
+                        ["UserId"] = userId ?? "",
+                        ["SubjectHash"] = UserBehaviorAudit.HashIdentifier(account),
+                        ["LoginMethod"] = "PASSWORD",
+                        ["Success"] = success,
+                        ["Reason"] = (reason ?? "").Length > 200
+                            ? (reason ?? "").Substring(0, 200)
+                            : reason ?? "",
+                        ["OccurredAt"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                    });
+                return engineResult != null
+                       && JObject.FromObject(engineResult)["Code"].Val<int>() == 1;
+            }
+            catch
+            {
+                // 身份应用尚未安装或租户 Hook 异常时，启动登录仍必须可用。
+                return false;
+            }
         }
 
         private void QueueLoginFailed(SysUserParam param, string reason)
@@ -557,281 +614,28 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> SmsLogin([FromBody] SysUserParam param)
         {
+            param = await EnsureSmsLoginParam(param);
+            if (param == null || param.OsClient.DosIsNullOrWhiteSpace())
+                return Json(new DosResult(1003, null, "OsClient不能为空！"));
+
             try
             {
-                param = await EnsureSmsLoginParam(param);
-                #region 参数校验
-                if (param.OsClient.DosIsNullOrWhiteSpace())
-                {
-                    return Json(new DosResult(1003, null, "OsClient不能为空！"));
-                }
-                if (param.Phone.DosIsNullOrWhiteSpace() || param.Phone.Trim().Length != 11)
-                {
-                    return Json(new DosResult(0, null, "请输入正确的11位手机号！"));
-                }
-                if (param._CaptchaValue.DosIsNullOrWhiteSpace())
-                {
-                    return Json(new DosResult(0, null, "请输入短信验证码！"));
-                }
-                var phone = param.Phone.Trim();
-                #endregion
-
-                #region 验证短信验证码（从Redis缓存中获取）
-                var cacheKey = $"Microi:{param.OsClient}:SmsCaptcha:{phone}";
-                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(param.OsClient);
-                var cachedCode = await DiyCacheBase.GetAsync<string>(cacheKey);
-
-                if (cachedCode.DosIsNullOrWhiteSpace())
-                {
-                    return Json(new DosResult(0, null, "未获取短信验证码或验证码已过期！"));
-                }
-                if (cachedCode != "Allow" && cachedCode != param._CaptchaValue)
-                {
-                    return Json(new DosResult(0, null, "短信验证码错误！"));
-                }
-                #endregion
-
-                #region 查询用户是否已存在
-                var userResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
-                {
-                    _Where = new System.Collections.Generic.List<System.Collections.Generic.List<object>>()
-                    {
-                        new System.Collections.Generic.List<object> { "Phone", "=", phone }
-                    },
-                    OsClient = param.OsClient
-                });
-                #endregion
-
-                bool isNewUser = false;
-                string userId = null;
-                string loginAccount = phone;
-
-                if (userResult.Code == 2 || (userResult.Code == 1 && userResult.Data == null))
-                {
-                    #region 用户不存在，自动注册
-                    isNewUser = true;
-                    // A phone number is public data and must never be used as a
-                    // predictable default password.  Passwordless SMS users get
-                    // a random server-side password and a short-lived grant to
-                    // choose their own password after login.
-                    var registerPwd = param.Pwd.DosIsNullOrWhiteSpace()
-                        ? Convert.ToHexString(RandomNumberGenerator.GetBytes(32))
-                        : param.Pwd.Trim();
-                    if (!param.Pwd.DosIsNullOrWhiteSpace())
-                    {
-                        if (registerPwd.Length < 6)
-                        {
-                            return Json(new DosResult(0, null, "密码长度不能少于6位！"));
-                        }
-                        var checkPwdResult = await _sysUserLogic.CheckPwd(registerPwd, param._Lang);
-                        if (!checkPwdResult.DosIsNullOrWhiteSpace())
-                        {
-                            return Json(new DosResult(0, null, checkPwdResult));
-                        }
-                    }
-                    var encryptedPwd = EncryptHelper.DESEncode(registerPwd);
-
-                    var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_user", new
-                    {
-                        Account = phone,
-                        Phone = phone,
-                        Pwd = encryptedPwd,
-                        Name = phone,
-                        Level = 1,
-                        State = 1,
-                        IsDeleted = 0,
-                        RoleIds = "[]",
-                        OsClient = param.OsClient
-                    });
-
-                    if (addResult.Code != 1)
-                    {
-                        return Json(new DosResult(0, null, $"注册失败：{addResult.Msg}"));
-                    }
-
-                    userId = DynamicHelper.GetDynamicStringValue(addResult.Data, "Id", "");
-                    if (userId.DosIsNullOrWhiteSpace())
-                    {
-                        userId = addResult.Data?.ToString();
-                    }
-                    loginAccount = phone;
-                    #endregion
-                }
-                else if (userResult.Code == 1)
-                {
-                    #region 用户已存在，验证状态
-                    var state = DynamicHelper.GetDynamicIntValue(userResult.Data, "State", 0);
-                    var isDeleted = DynamicHelper.GetDynamicIntValue(userResult.Data, "IsDeleted", 0);
-                    userId = DynamicHelper.GetDynamicStringValue(userResult.Data, "Id", "");
-                    if (userId.DosIsNullOrWhiteSpace())
-                    {
-                        return Json(new DosResult(0, null, "账号数据异常：Id为空！"));
-                    }
-                    var existingAccount = DynamicHelper.GetDynamicStringValue(userResult.Data, "Account", "");
-                    var existingName = DynamicHelper.GetDynamicStringValue(userResult.Data, "Name", "");
-                    var accountToSave = string.IsNullOrWhiteSpace(existingAccount) ? phone : existingAccount;
-                    if (isDeleted == 1 || state != 1)
-                    {
-                        return Json(new DosResult(0, null, "帐号已停用，请联系管理员。"));
-                    }
-                    if (string.IsNullOrWhiteSpace(existingAccount) || string.IsNullOrWhiteSpace(existingName))
-                    {
-                        var restoreResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
-                        {
-                            Id = userId,
-                            Account = accountToSave,
-                            Phone = phone,
-                            Name = string.IsNullOrWhiteSpace(existingName) ? phone : existingName,
-                            OsClient = param.OsClient
-                        });
-                        if (restoreResult.Code != 1)
-                        {
-                            return Json(new DosResult(0, null, $"恢复账号失败：{restoreResult.Msg}"));
-                        }
-                    }
-                    if (!param.Pwd.DosIsNullOrWhiteSpace())
-                    {
-                        var resetPwd = param.Pwd.Trim();
-                        if (resetPwd.Length < 6)
-                        {
-                            return Json(new DosResult(0, null, "密码长度不能少于6位！"));
-                        }
-                        var checkPwdResult = await _sysUserLogic.CheckPwd(resetPwd, param._Lang);
-                        if (!checkPwdResult.DosIsNullOrWhiteSpace())
-                        {
-                            return Json(new DosResult(0, null, checkPwdResult));
-                        }
-                        var resetPwdResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
-                        {
-                            Id = userId,
-                            Pwd = EncryptHelper.DESEncode(resetPwd),
-                            OsClient = param.OsClient
-                        });
-                        if (resetPwdResult.Code != 1)
-                        {
-                            return Json(new DosResult(0, null, $"更新登录密码失败：{resetPwdResult.Msg}"));
-                        }
-                    }
-                    if (string.IsNullOrWhiteSpace(existingAccount))
-                    {
-                        loginAccount = phone;
-                    }
-                    else
-                    {
-                        loginAccount = existingAccount;
-                    }
-                    #endregion
-                }
-                else
-                {
-                    return Json(new DosResult(0, null, $"查询用户失败：{userResult.Msg}"));
-                }
-
-                #region 销毁验证码缓存
-                try { await DiyCacheBase.RemoveAsync(cacheKey); } catch { }
-                #endregion
-
-                #region 获取完整用户信息用于登录
-                var loginResult = await _sysUserLogic.LoginByAccount(new SysUserParam()
-                {
-                    Account = loginAccount,
-                    OsClient = param.OsClient,
-                });
-                if (loginResult.Code != 1 && isNewUser)
-                {
-                    for (var retryIndex = 0; retryIndex < 3 && loginResult.Code != 1; retryIndex++)
-                    {
-                        await Task.Delay(300);
-                        loginResult = await _sysUserLogic.LoginByAccount(new SysUserParam()
-                        {
-                            Account = loginAccount,
-                            OsClient = param.OsClient,
-                        });
-                    }
-                }
-
-                if (loginResult.Code != 1)
-                {
-                    return Json(new DosResult(0, null, $"登录失败：{loginResult.Msg}"));
-                }
-
-                JObject sysUser = JObject.FromObject(loginResult.Data);
-
-                // 获取Token
-                var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
-                {
-                    CurrentUser = sysUser,
-                    OsClient = param.OsClient,
-                    _ClientType = param._ClientType
-                });
-                if (getTokenResult.Code != 1)
-                {
-                    QueueLoginFailed(param, getTokenResult.Msg ?? "登录令牌生成失败");
-                    return Json(getTokenResult);
-                }
-
-                var accessToken = getTokenResult.Data?.Token ?? "";
-                sysUser["Authorization"] = accessToken;
-                sysUser["Pwd"] = "";
-                if (param.Pwd.DosIsNullOrWhiteSpace())
-                {
-                    var passwordGrantKey = $"Microi:{param.OsClient}:SmsPasswordGrant:{userId}";
-                    await DiyCacheBase.SetAsync(
-                        passwordGrantKey,
-                        HashAccessToken(accessToken),
-                        TimeSpan.FromMinutes(10));
-                }
-                #endregion
-
-                var tenantResult = new TenantProvisioningService().GetUserTenant(userId);
-                dynamic tenantData = tenantResult.Code == 1 ? tenantResult.Data : null;
-
-                #region 获取系统配置
-                var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient, param._Lang);
-                dynamic sysConfig = sysConfigResult.Code == 1
-                    ? TenantConfigurationSecurity.CreatePublicSysConfigProjection(sysConfigResult.Data, param.OsClient)
-                    : null;
-
-                dynamic SysMenuHomePage = null;
-                try
-                {
-                    SysMenuHomePage = (await new SysMenuLogic().GetSysMenuHomePage(new SysMenuParam() { OsClient = param.OsClient })).Data;
-                }
-                catch { }
-                #endregion
-
-                // 异步更新最后登录时间
-                _ = MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
-                {
-                    Id = sysUser["Id"].Val<string>(),
-                    LastLoginIP = IPHelper.GetClientIP(HttpContext).Data,
-                    LastLoginTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                    OsClient = param.OsClient
-                });
-
-                var smsLoginResult = new DosResult(1, sysUser, isNewUser ? "注册并登录成功" : "登录成功");
-                smsLoginResult.DataAppend = new
-                {
-                    SysMenuHomePage = SysMenuHomePage,
-                    SysConfig = sysConfig,
-                    IsNewUser = isNewUser,
-                    Token = accessToken,
-                    TenantOsClient = tenantData == null ? null : DynamicHelper.GetDynamicStringValue(tenantData, "OsClient", ""),
-                    TenantName = tenantData == null ? null : DynamicHelper.GetDynamicStringValue(tenantData, "ClientName", "")
-                };
-
-                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
-                {
-                    Type = "短信登录日志",
-                    Title = $"{phone}{(isNewUser ? "注册并登录" : "登录")}了系统",
-                    OsClient = param.OsClient
-                });
-
-                return Json(smsLoginResult);
+                // 兼容旧客户端路由；短信验证码、注册和登录编排由随 SaaS 基础包
+                // 自动安装的 Managed 接口引擎负责。应用尚未安装时普通密码登录仍可用。
+                var request = JObject.FromObject(param);
+                request["OsClient"] = param.OsClient;
+                request["Did"] = Request.Headers["did"].ToString();
+                object result = await MicroiEngine.ApiEngine.RunAsync(
+                    "platform_auth_sms_login",
+                    request);
+                return Json(result ?? new DosResult(0, null,
+                    "短信登录应用未返回结果，请安装或升级官方 SaaS 引擎应用。"));
             }
-            catch
+            catch (Exception ex)
             {
-                return Json(new DosResult(0, null, "登录失败，请稍后重试。"));
+                Console.WriteLine("Microi：短信登录接口引擎调用失败：" + ex.Message);
+                return Json(new DosResult(0, null,
+                    "短信登录应用不可用；请先使用账号密码登录并升级官方 SaaS 引擎应用。"));
             }
         }
 
@@ -935,12 +739,11 @@ namespace Microi.net.Api
                     return Json(new DosResult(0, null, "设置密码授权已失效，请重新通过短信验证码登录。"));
                 }
 
-                var encryptedPwd = EncryptHelper.DESEncode(param.Pwd);
-
                 var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
                 {
                     Id = userId,
-                    Pwd = encryptedPwd,
+                    Pwd = PasswordHashSecurity.HashPassword(param.Pwd),
+                    PwdEncode = PasswordHashSecurity.EncodingName,
                     OsClient = osClient
                 });
 
@@ -1707,7 +1510,12 @@ namespace Microi.net.Api
                 var newResult = new DosResult(1);
                 // Public directory data must not expose phone numbers or other
                 // account-management fields to every authenticated user.
-                newResult.Data = result.Data.Select(d => new { d.Id, d.Name, d.Avatar }).ToList();
+                newResult.Data = result.Data.Select(d => new
+                {
+                    d.Id,
+                    Name = ChatContactProjection.ResolvePublicDirectoryName(d.Name, d.Account),
+                    d.Avatar
+                }).ToList();
                 return Json(newResult);
             }
             return Json(result);
@@ -1805,161 +1613,6 @@ namespace Microi.net.Api
                 Level = 2
             });
             return Json(new DosResult(1, decodeResult.Data));
-        }
-
-        /// <summary>
-        /// 传入headers token、OsClient
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpGet, HttpPost]
-        [AllowAnonymous]
-        public async Task<JsonResult> SsoPengrui(SysUserParam param)
-        {
-            try
-            {
-                if (param == null
-                    || param.OsClient.DosIsNullOrWhiteSpace()
-                    || param.TokenName.DosIsNullOrWhiteSpace())
-                {
-                    return Json(new DosResult(0, null, "OsClient和TokenName不能为空！"));
-                }
-
-                var token = param._token;
-                if (token.DosIsNullOrWhiteSpace())
-                {
-                    token = param.Token;
-                }
-                if (token.DosIsNullOrWhiteSpace())
-                {
-                    return Json(new DosResult(0, null, "Token为空！"));
-                }
-                if (token.Length > 8192 || param.TokenName.Length > 100 || param.OsClient.Length > 100)
-                {
-                    return Json(new DosResult(0, null, "SSO参数长度超出限制！"));
-                }
-
-                // The enabled tenant-side SSO record is the only trusted source
-                // of the upstream URL.  There is no hard-coded fallback and the
-                // caller cannot submit an arbitrary URL.
-                var diySsoResult = await MicroiEngine.FormEngine.GetFormDataAsync<DiySso>(new
-                {
-                    FormEngineKey = "Diy_Sso",
-                    _SearchEqual = new Dictionary<string, string>() {
-                        { "TokenName", param.TokenName },
-                        { "IsEnable", "1" },
-                    },
-                    OsClient = param.OsClient
-                });
-                if (diySsoResult.Code != 1 || diySsoResult.Data == null)
-                {
-                    return Json(new DosResult(0, null, "SSO配置不存在或未启用！"));
-                }
-                if (!Uri.TryCreate(diySsoResult.Data.ServerSsoApi, UriKind.Absolute, out var ssoUri)
-                    || !string.Equals(ssoUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-                    || !string.IsNullOrEmpty(ssoUri.UserInfo))
-                {
-                    return Json(new DosResult(0, null, "SSO服务地址必须使用HTTPS且不能包含用户凭据！"));
-                }
-
-                var httpParam = new DiyHttpParam { Url = ssoUri.AbsoluteUri };
-                httpParam.Headers = new { Authorization = "Bearer " + token };
-                var getResultString = await MicroiEngine.Http.Get(httpParam);
-                var resultModel = JsonHelper.Deserialize<SsoPengruiModel>(getResultString);
-                if (resultModel != null && !resultModel.username.DosIsNullOrWhiteSpace())
-                {
-                    var account = resultModel.username.Trim();
-                    if (account.Length < 2 || account.Length > 20)
-                    {
-                        return Json(new DosResult(0, null, "SSO返回的帐号格式无效！"));
-                    }
-
-                    // Never persist the bearer token or raw upstream response.
-                    MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
-                    {
-                        Type = "SSO登录日志",
-                        Title = "SSO身份验证成功",
-                        Content = "Account=" + account,
-                        IP = IPHelper.GetClientIP(HttpContext).Data,
-                        OsClient = param.OsClient
-                    });
-
-                    //判断是否存在用户，存在则直接登陆，不存在则创建，再登陆
-                    // var userModel = (await _sysUserLogic.GetSysUserModel(new SysUserParam()
-                    // {
-                    //     Account = resultModel.username,
-                    //     OsClient = param.OsClient
-                    // })).Data;
-                    var userModel = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
-                    {
-                        _Where = new List<List<object>>()
-                        {
-                            new List<object> { "Account", "=", resultModel.username },
-                        },
-                        OsClient = param.OsClient
-                    });
-                    if (userModel.Code == 2 || (userModel.Code == 1 && userModel.Data == null))
-                    {
-                        // Create a least-privilege account.  Roles must be
-                        // explicitly assigned by a platform administrator.
-                        var addUSerresult = await _sysUserLogic.AddSysUser(new SysUserParam()
-                        {
-                            Account = account,
-                            Name = account,
-                            Pwd = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
-                            OsClient = param.OsClient
-                        });
-                        if (addUSerresult.Code != 1)
-                        {
-                            return Json(addUSerresult);
-                        }
-                    }
-                    else if (userModel.Code != 1)
-                    {
-                        return Json(new DosResult(0, null, "SSO用户查询失败，请稍后重试。"));
-                    }
-                    //登陆用户
-                    var result = await _sysUserLogic.LoginByAccount(new SysUserParam()
-                    {
-                        Account = account,
-                        OsClient = param.OsClient,
-                    });
-                    var newResult = new DosResult<JObject>();
-                    if (result.Code == 1)
-                    {
-                        var sysUser = JObject.FromObject(result.Data);
-
-                        #region 获取该用户access_token。--2019-07-17 若获取失败则登录失败。
-                        var getTokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam()
-                        {
-                            CurrentUser = sysUser,
-                            OsClient = param.OsClient
-                        });
-                        if (getTokenResult.Code != 1)
-                        {
-                            return Json(getTokenResult);
-                        }
-                        #endregion
-
-                        //屏蔽掉不该返回的字段，也可以map ViewModel
-                        sysUser["Pwd"] = "";
-                        newResult.Code = 1;
-                        newResult.Data = sysUser;
-                        newResult.DataAppend = new
-                        {
-                            SysMenuHomePage = (await new SysMenuLogic().GetSysMenuHomePage(new SysMenuParam() { OsClient = param.OsClient })).Data
-                        };
-                        return Json(newResult);
-                    }
-
-                    return Json(result);
-                }
-                return Json(new DosResult(0, null, "SSO身份验证失败！"));
-            }
-            catch
-            {
-                return Json(new DosResult(0, null, "SSO登录失败，请联系管理员检查服务配置。"));
-            }
         }
 
         /// <summary>

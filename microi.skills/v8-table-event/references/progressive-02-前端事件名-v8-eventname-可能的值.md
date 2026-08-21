@@ -35,7 +35,7 @@
 - `_InvokeType:'Server'` 只表达事件调用语义，不是客户端授权开关；浏览器伪造它不会获得受信任权限
 - `V8.FormSubmitAction` 的值是 `'Insert'`/`'Update'`/`'Delete'`（非 Add/Upt/Del）
 - 在 DataFilterV8 中使用 `V8.CacheData` 缓存查询结果，避免每行执行 N+1 查询
-- 表事件调用下游接口时，`diy_table.V8Unlimited` 不会改变下游接口；下游接口独立读取正向 `sys_apiengine.V8Limit`（默认 0 表示不限 Jint 单次预算，1 表示启用限制）
+- 表事件调用下游接口时，表级正向 `diy_table.V8Limit` 不会改变下游接口；下游接口独立读取正向 `sys_apiengine.V8Limit`（两者均默认 0 表示不限 Jint 单次预算，1 表示启用限制）
 
 ### 复盘：提交后事件误把增量表单当作完整记录
 
