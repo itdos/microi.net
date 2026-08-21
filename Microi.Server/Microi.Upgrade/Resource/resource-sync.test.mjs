@@ -355,6 +355,10 @@ test('官网读取门只校验稳定身份和可解析性，不把旧版本误�
     'app.microi.store.json',
     JSON.stringify({ PackageInfo: { Name: '应用商城', Version: 'v1.0.0' } }),
   ));
+  assert.doesNotThrow(() => validateReadableOfficialResource(
+    'app.microi.sso.json',
+    JSON.stringify({ PackageInfo: { Name: 'SSO 身份联邦', Version: 'v7.5.0' } }),
+  ));
   assert.throws(
     () => validateReadableOfficialResource('import-package.js', '/* missing identity */'),
     /缺少稳定资源标识/,
@@ -675,7 +679,7 @@ test('官网临时故障识别只放行网络、限流和服务端错误', () =>
   assert.equal(isTemporaryOfficialResourceFailure(new Error('资源名不正确')), false);
 });
 
-test('离线发布仅允许七项本地资源与共同基线完全一致', () => {
+test('离线发布仅允许全部本地资源与共同基线完全一致', () => {
   const names = ['a.js', 'b.json'];
   const local = new Map([['a.js', 'a\n'], ['b.json', '{}\n']]);
   const base = new Map(local);

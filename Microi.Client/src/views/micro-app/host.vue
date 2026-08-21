@@ -870,7 +870,9 @@ export default {
             this.pageKey = String(runtime.Page?.PageKey || "");
             this.publishStatus = String(runtime.PublishStatus || "");
             this.assetSource = String(runtime.AssetSource || runtime.StorageMode || "");
-            return String(runtime.EntryUrl || "");
+            // Explicit menu versions must resolve to their immutable entry.
+            // Unpinned routes keep using the stable committed pointer.
+            return String((config.version && runtime.VersionedEntryUrl) || runtime.EntryUrl || "");
         },
         async probeEntry(url) {
             let parsed = null;

@@ -537,26 +537,48 @@ function getBoolean(record: JsonRecord, ...keys: string[]): boolean | undefined 
   return undefined;
 }
 
-function validateV8Unlimited(
+function validateTableV8Limit(
   record: JsonRecord,
   path: string,
   errors: string[],
   warnings: string[],
 ): boolean | undefined {
-  const raw = getValue(record, 'v8Unlimited', 'V8Unlimited');
-  if (raw === undefined || raw === null || raw === '') return undefined;
-  const value = getBoolean(record, 'v8Unlimited', 'V8Unlimited');
+  const rawPositive = getValue(record, 'v8Limit', 'V8Limit');
+  const rawLegacy = getValue(record, 'v8Unlimited', 'V8Unlimited');
+  if ((rawPositive === undefined || rawPositive === null || rawPositive === '')
+    && (rawLegacy === undefined || rawLegacy === null || rawLegacy === '')) return undefined;
+  const hasPositive = rawPositive !== undefined && rawPositive !== null && rawPositive !== '';
+  const value = hasPositive
+    ? getBoolean(record, 'v8Limit', 'V8Limit')
+    : getEngineV8Limit(record);
   if (value === undefined) {
-    errors.push(`${path}.v8Unlimited 必须是 boolean 或 0/1`);
+    errors.push(`${path}.v8Limit 必须是 boolean 或 0/1`);
     return undefined;
   }
-  if (value) {
-    warnings.push(
-      `${path}.v8Unlimited=true 会取消该表后端 V8 事件的单次 Jint 超时、语句、递归和累计分配预算；`
-      + '仅在业务明确要求单事务且已评估数据库锁、回滚、连接超时与进程内存风险时开启。进程常驻内存保护仍生效，且不会向嵌套接口继承。',
-    );
+  if (hasPositive && rawLegacy !== undefined) {
+    const legacyLimit = getBoolean(record, 'v8Unlimited', 'V8Unlimited');
+    if (legacyLimit !== undefined && value !== !legacyLimit) {
+      errors.push(`${path}.v8Limit 与兼容字段 v8Unlimited 的语义冲突`);
+    }
+  } else if (rawLegacy !== undefined) {
+    warnings.push(`${path}.v8Unlimited 已弃用；表单引擎请改用正向字段 v8Limit（false=不限，true=启用限制）`);
   }
   return value;
+}
+
+export function buildGenerateSystemValidationPayload(
+  results: JsonRecord[],
+  validation: ApiResponse,
+): JsonRecord {
+  return {
+    ok: validation.Code === 1,
+    results,
+    validation: {
+      Code: validation.Code,
+      Msg: validation.Msg ?? null,
+      Data: validation.Data ?? null,
+    },
+  };
 }
 
 function getEngineV8Limit(record: JsonRecord): boolean | undefined {
@@ -1470,7 +1492,7 @@ export function buildPlan(manifest: JsonRecord): { plan: string[]; errors: strin
   tables.forEach((table, tableIndex) => {
     const name = getString(table, 'name', 'Name');
     if (!name) errors.push(`tables[${tableIndex}].name 不能为空`);
-    validateV8Unlimited(table, `tables[${tableIndex}]`, errors, warnings);
+    validateTableV8Limit(table, `tables[${tableIndex}]`, errors, warnings);
     plan.push(`create_table ${name || `(index ${tableIndex})`}`);
     const layout = buildDefaultTableLayout(table);
     if (layout.tabs?.length) {
@@ -2336,7 +2358,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
       tables: [{
         name: 'Biz_Order',
         description: 'Order main table',
-        v8Unlimited: false,
+        v8Limit: false,
         tabs: [{ Id: 'basic', Name: 'Basic Info', Sort: 10 }, { Id: 'business', Name: 'Business Info', Sort: 20 }],
         fields: [
           { name: 'OrderNo', label: 'Order No', type: 'varchar(50)', component: 'AutoNumber', tab: 'basic', configSource: { sourceType: 'AutoNumber', prefix: 'ORD', length: 6 }, notEmpty: 1, unique: 1, tableWidth: 160, sort: 10 },
@@ -2504,7 +2526,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
         formOpenType: 'Default Dialog. Use Drawer only for extremely large forms (roughly 36+ business fields, 2+ child tables, or similarly heavy content).',
         formOpenWidth: 'Default 80% for generated Dialog forms. Preserve an explicit business-specific width.',
         indexes: 'Physical database indexes. Declare ordered columns and unique. Required indexes must be created by microi_create_table_index or manifest generation, never by ad-hoc SQL. Tenant tables should usually lead with OsClient.',
-        v8Unlimited: 'Default false. Set true only when this table\'s backend V8 events must keep one database transaction and the user explicitly accepts unbounded Jint per-execution budgets. Process resident-memory protection remains active.',
+        v8Limit: 'Default false. Missing/null/false means no per-execution Jint budgets; true enables timeout, statement, recursion and allocation limits for this table\'s backend V8 events. Legacy v8Unlimited is accepted only as an inverted compatibility alias.',
       },
       engines: {
         v8Limit: 'Default false. false means no Jint per-execution budget; true applies this engine\'s configured timeout, statement, allocation and recursion limits. Omit to preserve an existing engine setting during upsert.',
@@ -2730,9 +2752,9 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
             Column: getNumber(table, 'column', 'Column') ?? tableLayout.column ?? 2,
             FormOpenType: formOpen.type,
             FormOpenWidth: formOpen.width,
-            V8Unlimited: getBoolean(table, 'v8Unlimited', 'V8Unlimited') === undefined
+            V8Limit: getEngineV8Limit(table) === undefined
               ? undefined
-              : (getBoolean(table, 'v8Unlimited', 'V8Unlimited') ? 1 : 0),
+              : (getEngineV8Limit(table) ? 1 : 0),
           });
           results.push({ step: 'createTable', tableName, response });
           if (response.Code !== 1) return textResult(JSON.stringify({ ok: false, failedAt: 'createTable', tableName, response, results }, null, 2), true);
@@ -2993,7 +3015,13 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
 
         const validation = await client.validateLowCodeSystem(manifest);
         await audit(client, 'microi_generate_system:finish', getString(manifest, 'name', 'Name') || 'manifest', { results, validation });
-        return textResult(JSON.stringify({ ok: validation.Code === 1, results, validation: validation.Data }, null, 2), validation.Code !== 1);
+        // Keep the complete validation envelope. Persisted rollout recovery
+        // evidence must retain Code/Msg so a validator-only compatibility path
+        // can distinguish one known server defect from arbitrary failures.
+        return textResult(
+          JSON.stringify(buildGenerateSystemValidationPayload(results, validation), null, 2),
+          validation.Code !== 1,
+        );
       } catch (error) {
         return textResult(`Error: ${error instanceof Error ? error.message : String(error)}\n\n${JSON.stringify({ results }, null, 2)}`, true);
       }

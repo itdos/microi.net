@@ -351,10 +351,11 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, nextTick } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, nextTick } from 'vue';
 import { Search, Rank, Edit, Setting, Download, DocumentCopy } from '@element-plus/icons-vue';
 import Sortable from 'sortablejs';
 import DiyDataSourceConfig from './shared/DiyDataSourceConfig.vue';
+import { createStableJsonTableColumnFieldResolver } from './json-table-column-field-runtime.js';
 
 export default {
     name: 'diy-jsontable',
@@ -427,6 +428,9 @@ export default {
         
         // 表格数据
         const tableData = ref([]);
+        // 动态列组件必须复用稳定字段对象。若每次渲染都临时创建对象，Select/SelectTree
+        // 异步写入的 field.Data 会在下一次渲染时丢失，已保存值也就只能显示占位符。
+        const resolveStableColumnField = createStableJsonTableColumnFieldResolver(reactive);
 
         // 配置弹窗相关
         const configDialogVisible = ref(false);
@@ -653,7 +657,7 @@ export default {
                 }
             }
             
-            return {
+            const fieldModel = {
                 // JSON 表格列可复用一个真实 diy_field 的远程数据源配置。
                 // 默认仍使用列 Key，只有显式配置 DataSourceFieldId 时才代理到该字段，
                 // 避免给某个业务模块写死下拉选项或接口地址。
@@ -666,6 +670,18 @@ export default {
                 Config: config,
                 Data: dataList
             };
+            const cacheKey = String(col.Id || col._configId || col.Key || 'column');
+            const configSignature = JSON.stringify({
+                Id: fieldModel.Id,
+                Name: fieldModel.Name,
+                Label: fieldModel.Label,
+                Component: fieldModel.Component,
+                Readonly: fieldModel.Readonly,
+                Placeholder: fieldModel.Placeholder,
+                Config: fieldModel.Config,
+                Data: dataList
+            });
+            return resolveStableColumnField(cacheKey, fieldModel, configSignature);
         };
 
         // 获取显示值

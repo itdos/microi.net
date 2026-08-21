@@ -643,6 +643,7 @@ console.log('调试信息')                                  // 控制台输出�
 - `microi.skills/v8-export-import/SKILL.md` — Microi V8 Excel 导入导出
 - `microi.skills/v8-debugging/SKILL.md` — Microi V8 调试与日志
 - `microi.skills/v8-security/SKILL.md` — Microi V8 安全最佳实践
+- `microi.skills/microi-sso/SKILL.md` — Microi 双向 OIDC、SAML2、CAS 身份联邦、配置、发布与验收
 - `microi.skills/v8-frontend-events/SKILL.md` — Microi V8 前端事件大全
 - `microi.skills/v8-template-engine/SKILL.md` — Microi V8 模板引擎（表格/表单 V8 模板）
 - `microi.skills/v8-menu-buttons/SKILL.md` — v8-menu-buttons — 菜单按钮 / Tab / 批量操作 V8 写法

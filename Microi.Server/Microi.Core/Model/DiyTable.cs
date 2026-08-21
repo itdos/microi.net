@@ -36,6 +36,20 @@ namespace Microi.net
 		private int _TableInEdit;
 		private string _RowAction;
 		private string _Tabs;
+		private string _FormPresentation;
+		private string _FormPresentationMode;
+		private string _FormPresentationDensity;
+		private string _FormNavigationTitle;
+		private string _FormNavigationCountText;
+		private string _FormSectionNavigation;
+		private string _FormSectionEyebrow;
+		private string _FormRequiredCountText;
+		private string _FormWorkbenchEyebrow;
+		private string _FormWorkbenchDescription;
+		private string _FormNavigationFooterTitle;
+		private string _FormNavigationFooterHtml;
+		private string _FormRecordSelectorPlaceholder;
+		private string _FormRecordSelectorLabelFields;
 		private string _TabsPosition;
 		private string _TableTabs;
 		private string _TableTabsPosition;
@@ -66,6 +80,7 @@ namespace Microi.net
 		private string _UserName;
 		private string _SubmitBeforeServerV8;
 		private string _SubmitAfterServerV8;
+		private int _V8Limit;
 		private int _V8Unlimited;
 
 		/// <summary>
@@ -654,6 +669,149 @@ namespace Microi.net
 			}
 		}
 		/// <summary>
+		/// 表单统一呈现配置
+		/// </summary>
+		[Field("FormPresentation")]
+		public string FormPresentation
+		{
+			get{ return _FormPresentation; }
+			set
+			{
+				this.OnPropertyValueChange("FormPresentation");
+				this._FormPresentation = value;
+			}
+		}
+		/// <summary>
+		/// 表单工作台呈现模式
+		/// </summary>
+		[Field("FormPresentationMode")]
+		public string FormPresentationMode
+		{
+			get{ return _FormPresentationMode; }
+			set { this.OnPropertyValueChange("FormPresentationMode"); this._FormPresentationMode = value; }
+		}
+		/// <summary>
+		/// 表单工作台信息密度
+		/// </summary>
+		[Field("FormPresentationDensity")]
+		public string FormPresentationDensity
+		{
+			get{ return _FormPresentationDensity; }
+			set { this.OnPropertyValueChange("FormPresentationDensity"); this._FormPresentationDensity = value; }
+		}
+		/// <summary>
+		/// 表单分组导航标题
+		/// </summary>
+		[Field("FormNavigationTitle")]
+		public string FormNavigationTitle
+		{
+			get{ return _FormNavigationTitle; }
+			set { this.OnPropertyValueChange("FormNavigationTitle"); this._FormNavigationTitle = value; }
+		}
+		/// <summary>
+		/// 表单分组数量文案
+		/// </summary>
+		[Field("FormNavigationCountText")]
+		public string FormNavigationCountText
+		{
+			get{ return _FormNavigationCountText; }
+			set { this.OnPropertyValueChange("FormNavigationCountText"); this._FormNavigationCountText = value; }
+		}
+		/// <summary>
+		/// 表单分组导航方式
+		/// </summary>
+		[Field("FormSectionNavigation")]
+		public string FormSectionNavigation
+		{
+			get{ return _FormSectionNavigation; }
+			set { this.OnPropertyValueChange("FormSectionNavigation"); this._FormSectionNavigation = value; }
+		}
+		/// <summary>
+		/// 表单分组眉题
+		/// </summary>
+		[Field("FormSectionEyebrow")]
+		public string FormSectionEyebrow
+		{
+			get{ return _FormSectionEyebrow; }
+			set { this.OnPropertyValueChange("FormSectionEyebrow"); this._FormSectionEyebrow = value; }
+		}
+		/// <summary>
+		/// 必填字段数量文案
+		/// </summary>
+		[Field("FormRequiredCountText")]
+		public string FormRequiredCountText
+		{
+			get{ return _FormRequiredCountText; }
+			set { this.OnPropertyValueChange("FormRequiredCountText"); this._FormRequiredCountText = value; }
+		}
+		/// <summary>
+		/// 表单工作台眉题
+		/// </summary>
+		[Field("FormWorkbenchEyebrow")]
+		public string FormWorkbenchEyebrow
+		{
+			get{ return _FormWorkbenchEyebrow; }
+			set { this.OnPropertyValueChange("FormWorkbenchEyebrow"); this._FormWorkbenchEyebrow = value; }
+		}
+		/// <summary>
+		/// 表单工作台说明
+		/// </summary>
+		[Field("FormWorkbenchDescription")]
+		public string FormWorkbenchDescription
+		{
+			get{ return _FormWorkbenchDescription; }
+			set { this.OnPropertyValueChange("FormWorkbenchDescription"); this._FormWorkbenchDescription = value; }
+		}
+		/// <summary>
+		/// 分组导航底部标题
+		/// </summary>
+		[Field("FormNavigationFooterTitle")]
+		public string FormNavigationFooterTitle
+		{
+			get{ return _FormNavigationFooterTitle; }
+			set { this.OnPropertyValueChange("FormNavigationFooterTitle"); this._FormNavigationFooterTitle = value; }
+		}
+		/// <summary>
+		/// 分组导航底部说明
+		/// </summary>
+		[Field("FormNavigationFooterHtml")]
+		public string FormNavigationFooterHtml
+		{
+			get{ return _FormNavigationFooterHtml; }
+			set { this.OnPropertyValueChange("FormNavigationFooterHtml"); this._FormNavigationFooterHtml = value; }
+		}
+		/// <summary>
+		/// 记录选择器占位文字
+		/// </summary>
+		[Field("FormRecordSelectorPlaceholder")]
+		public string FormRecordSelectorPlaceholder
+		{
+			get{ return _FormRecordSelectorPlaceholder; }
+			set { this.OnPropertyValueChange("FormRecordSelectorPlaceholder"); this._FormRecordSelectorPlaceholder = value; }
+		}
+		/// <summary>
+		/// 记录选择器显示字段
+		/// </summary>
+		[Field("FormRecordSelectorLabelFields")]
+		public string FormRecordSelectorLabelFields
+		{
+			get{ return _FormRecordSelectorLabelFields; }
+			set { this.OnPropertyValueChange("FormRecordSelectorLabelFields"); this._FormRecordSelectorLabelFields = value; }
+		}
+		/// <summary>
+		/// 后端表单 V8 事件是否启用单次 Jint 运行限制
+		/// </summary>
+		[Field("V8Limit")]
+		public int V8Limit
+		{
+			get{ return _V8Limit; }
+			set
+			{
+				this.OnPropertyValueChange("V8Limit");
+				this._V8Limit = value;
+			}
+		}
+		/// <summary>
 		/// 后端V8事件是否不启用单次Jint运行限制
 		/// </summary>
 		[Field("V8Unlimited")]
@@ -699,6 +857,20 @@ namespace Microi.net
 				_.TableInEdit,
 				_.RowAction,
 				_.Tabs,
+				_.FormPresentation,
+				_.FormPresentationMode,
+				_.FormPresentationDensity,
+				_.FormNavigationTitle,
+				_.FormNavigationCountText,
+				_.FormSectionNavigation,
+				_.FormSectionEyebrow,
+				_.FormRequiredCountText,
+				_.FormWorkbenchEyebrow,
+				_.FormWorkbenchDescription,
+				_.FormNavigationFooterTitle,
+				_.FormNavigationFooterHtml,
+				_.FormRecordSelectorPlaceholder,
+				_.FormRecordSelectorLabelFields,
 				_.TabsPosition,
 				_.TableTabs,
 				_.TableTabsPosition,
@@ -729,6 +901,7 @@ namespace Microi.net
 				_.UserName,
 				_.SubmitBeforeServerV8,
 				_.SubmitAfterServerV8,
+				_.V8Limit,
 				_.V8Unlimited,
 			};
         }
@@ -753,6 +926,20 @@ namespace Microi.net
 				this._TableInEdit,
 				this._RowAction,
 				this._Tabs,
+				this._FormPresentation,
+				this._FormPresentationMode,
+				this._FormPresentationDensity,
+				this._FormNavigationTitle,
+				this._FormNavigationCountText,
+				this._FormSectionNavigation,
+				this._FormSectionEyebrow,
+				this._FormRequiredCountText,
+				this._FormWorkbenchEyebrow,
+				this._FormWorkbenchDescription,
+				this._FormNavigationFooterTitle,
+				this._FormNavigationFooterHtml,
+				this._FormRecordSelectorPlaceholder,
+				this._FormRecordSelectorLabelFields,
 				this._TabsPosition,
 				this._TableTabs,
 				this._TableTabsPosition,
@@ -783,6 +970,7 @@ namespace Microi.net
 				this._UserName,
 				this._SubmitBeforeServerV8,
 				this._SubmitAfterServerV8,
+				this._V8Limit,
 				this._V8Unlimited,
 			};
         }
@@ -866,6 +1054,23 @@ namespace Microi.net
 			/// 表单Tabs
 			/// </summary>
 			public readonly static Field Tabs = new Field("Tabs", "diy_table", "表单Tabs");
+            /// <summary>
+			/// 表单统一呈现配置
+			/// </summary>
+			public readonly static Field FormPresentation = new Field("FormPresentation", "diy_table", "表单统一呈现配置");
+            public readonly static Field FormPresentationMode = new Field("FormPresentationMode", "diy_table", "表单呈现模式");
+            public readonly static Field FormPresentationDensity = new Field("FormPresentationDensity", "diy_table", "表单信息密度");
+            public readonly static Field FormNavigationTitle = new Field("FormNavigationTitle", "diy_table", "分组导航标题");
+            public readonly static Field FormNavigationCountText = new Field("FormNavigationCountText", "diy_table", "分组数量文案");
+            public readonly static Field FormSectionNavigation = new Field("FormSectionNavigation", "diy_table", "分组导航方式");
+            public readonly static Field FormSectionEyebrow = new Field("FormSectionEyebrow", "diy_table", "分组眉题");
+            public readonly static Field FormRequiredCountText = new Field("FormRequiredCountText", "diy_table", "必填数量文案");
+            public readonly static Field FormWorkbenchEyebrow = new Field("FormWorkbenchEyebrow", "diy_table", "工作台眉题");
+            public readonly static Field FormWorkbenchDescription = new Field("FormWorkbenchDescription", "diy_table", "工作台说明");
+            public readonly static Field FormNavigationFooterTitle = new Field("FormNavigationFooterTitle", "diy_table", "导航底部标题");
+            public readonly static Field FormNavigationFooterHtml = new Field("FormNavigationFooterHtml", "diy_table", "导航底部说明");
+            public readonly static Field FormRecordSelectorPlaceholder = new Field("FormRecordSelectorPlaceholder", "diy_table", "记录选择器占位文字");
+            public readonly static Field FormRecordSelectorLabelFields = new Field("FormRecordSelectorLabelFields", "diy_table", "记录选择器显示字段");
             /// <summary>
 			/// 
 			/// </summary>
@@ -986,6 +1191,10 @@ namespace Microi.net
 			/// 表单提交后事件
 			/// </summary>
 			public readonly static Field SubmitAfterServerV8 = new Field("SubmitAfterServerV8", "diy_table", "表单提交后事件");
+            /// <summary>
+			/// 后端表单 V8 事件是否启用单次 Jint 运行限制
+			/// </summary>
+			public readonly static Field V8Limit = new Field("V8Limit", "diy_table", "V8运行限制");
             /// <summary>
 			/// 后端V8事件是否不启用单次Jint运行限制
 			/// </summary>

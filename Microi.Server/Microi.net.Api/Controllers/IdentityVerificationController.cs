@@ -1030,7 +1030,7 @@ namespace Microi.net.Api
                 && !options.PasskeyOrigins.Any(item => string.Equals(item.TrimEnd('/'), origin, StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidOperationException(
                     $"当前站点 {origin} 不在租户 PasskeyOrigins 白名单中。"
-                    + "请由租户管理员进入“系统设置 → 登录与身份”，添加当前完整 Origin（含 https:// 和端口），保存后重试。 ");
+                    + "请由租户管理员进入“系统设置 → 安全与服务接入”，添加当前完整 Origin（含 https:// 和端口），保存后重试。 ");
             return origin;
         }
 

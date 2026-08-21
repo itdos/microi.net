@@ -92,7 +92,7 @@ export function translateWebAuthnError(error, publicKey = {}) {
     if (relyingPartyMismatch) {
         return new Error(
             `无法使用生物识别：Passkey 域名配置与当前站点不匹配。当前页面域名为“${context.hostname}”，`
-            + `后端下发的 RP ID 为“${context.rpId}”。请由租户管理员进入“系统设置 → 登录与身份”，`
+            + `后端下发的 RP ID 为“${context.rpId}”。请由租户管理员进入“系统设置 → 安全与服务接入”，`
             + `将 Passkey RP ID 设置为当前页面域名（最稳妥），或设置为它的可注册父域；`
             + `同时把完整 Origin“${context.origin}”加入 PasskeyOrigins，并确认页面使用 HTTPS。`
             + `如确实需要跨站点 RP ID，还必须在 RP ID 站点正确发布可访问的 /.well-known/webauthn 关联声明。`
@@ -114,7 +114,7 @@ export function translateWebAuthnError(error, publicKey = {}) {
     if (name === "SecurityError") {
         return new Error(
             `浏览器安全策略阻止了 Passkey。当前站点为“${context.origin}”，RP ID 为“${context.rpId}”。`
-            + "请确认使用 HTTPS，并检查“系统设置 → 登录与身份”中的 Passkey RP ID 与 PasskeyOrigins。"
+            + "请确认使用 HTTPS，并检查“系统设置 → 安全与服务接入”中的 Passkey RP ID 与 PasskeyOrigins。"
         );
     }
     return error instanceof Error ? error : new Error(rawMessage || "设备验证失败，请重试。");

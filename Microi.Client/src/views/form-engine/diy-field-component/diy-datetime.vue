@@ -8,7 +8,7 @@
     <!-- @change="(currentValue, oldValue) => {return InputOnBlur(currentValue, oldValue, field)}" -->
 
     <!--  -->
-    <div>
+    <div class="diy-datetime-control">
         <el-time-picker
             v-if="field.Config && (field.Config.DateTimeType == 'HH:mm' || field.Config.DateTimeType == 'HH:mm:ss')"
             v-model="ModelValue"
@@ -429,4 +429,17 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.diy-datetime-control {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+
+    :deep(.el-date-editor) {
+        width: 100%;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+}
+</style>

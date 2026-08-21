@@ -8,6 +8,7 @@ const directory = dirname(fileURLToPath(import.meta.url));
 const saasPackagePath = resolve(directory, 'app.microi.saas-engine.json');
 const storePackagePath = resolve(directory, 'app.microi.store.json');
 const SYSTEM_SETTINGS_MENU_ID = 'ea6b79e8-2c6b-4d0f-9b6a-44d01a3479bf';
+const SYSTEM_SETTINGS_TABLE_ID = 'c8570fa6-c10f-4014-8cb4-4b046e7ba69c';
 const APP_STORE_MENU_ID = '61b7faee-35b2-4571-add2-5231a355f368';
 
 async function readPackage(path) {
@@ -35,21 +36,33 @@ function configureSystemSettings(packageModel) {
   if (!pcList) throw new Error('系统设置缺少 PC List 视图');
   pcList.Enabled = true;
   pcList.Layout ||= {};
-  pcList.Layout.Preset = 'FormWorkbench';
-  pcList.Layout.Form = {
-    Presentation: 'SettingsCenter',
-    Mode: 'Edit',
-    ShowClassicList: true,
-    RecordSelector: {
-      Display: 'Both',
-      LabelFields: ['PeizhiMC', 'SysTitle', 'ApiBase'],
-      Placeholder: '选择要维护的系统配置'
-    }
-  };
+  // 表单工作台配置已经迁移到 diy_table.FormPresentation；模块 ViewSchema 只负责列表/卡片呈现。
+  if (String(pcList.Layout.Preset || '').toLowerCase() === 'formworkbench') delete pcList.Layout.Preset;
+  delete pcList.Layout.Form;
   menu.ViewSchema = JSON.stringify(schema);
   menu.EnableViewSchema = 1;
   menu.ViewSchemaVersion = '1.0';
-  return menu;
+  const table = (packageModel.DiyTables || []).find(item => item.Id === SYSTEM_SETTINGS_TABLE_ID);
+  if (!table) throw new Error(`应用包缺少系统设置表：${SYSTEM_SETTINGS_TABLE_ID}`);
+  table.FormPresentation = JSON.stringify({
+    Presentation: 'ControlCenter',
+    Density: 'Compact',
+    NavigationTitle: '配置分组',
+    NavigationCountText: '{count} 项',
+    SectionNavigation: 'Auto',
+    SectionEyebrow: 'FORM SECTION',
+    RequiredCountText: '{count} 必填项',
+    OpenFirstRecord: true,
+    WorkbenchEyebrow: 'FORM WORKBENCH',
+    WorkbenchDescription: '集中维护当前记录的业务信息，原有字段事件、表单事件与权限规则保持不变。',
+    NavigationFooterTitle: '',
+    NavigationFooterHtml: '',
+    RecordSelector: {
+      LabelFields: ['PeizhiMC', 'SysTitle', 'ApiBase'],
+      Placeholder: '搜索并切换系统配置'
+    }
+  });
+  return { menu, table };
 }
 
 function configureMarketplace(packageModel) {
@@ -76,9 +89,9 @@ await writeFile(storePackagePath, `${JSON.stringify(storePackage, null, 2)}\n`, 
 
 process.stdout.write(`${JSON.stringify({
   systemSettings: {
-    id: systemSettings.Id,
-    url: systemSettings.Url,
-    preset: JSON.parse(systemSettings.ViewSchema).Views.find(view => view.Scene === 'List' && view.Device === 'PC')?.Layout?.Preset
+    id: systemSettings.menu.Id,
+    url: systemSettings.menu.Url,
+    formPresentationOwner: 'diy_table.FormPresentation'
   },
   marketplace: {
     id: marketplace.Id,

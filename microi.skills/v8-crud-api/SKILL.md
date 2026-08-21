@@ -10,7 +10,7 @@ description: Microi V8 CRUD 接口引擎开发。用于编写服务端 JavaScrip
 你正在开发 Microi 吾码平台的 V8 接口引擎。接口引擎是运行在服务端的 JavaScript 函数，通过 `V8.FormEngine` 操作数据库，通过 `V8.Result` 或 `return` 返回结果。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-crud-api-000 sha256=bfeaae480ebf6028fe98904cc6f8feb630b140b99551fefcc551c8038a2ca078 -->
+<!-- microi-progressive:chunk id=v8-crud-api-000 sha256=6b43119f4eae78fb6b185d48c5c289878ba86093ae62ce44ad0bdaa48093f605 -->
 ## 本地优先与版本头（必做）
 
 AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目>/接口引擎/.../*.js` 本地文件，再通过 MCP 或 VS Code 插件同步到数据库。插件提示“本地和远端不一致”时，必须先读取本地与远端代码并合并有效差异，不能盲目用任一侧覆盖另一侧。
@@ -33,7 +33,7 @@ AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目
 
 Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `DOTNET_ENVIRONMENT`，让 `Program.cs` 读取 `Microi.Server/Microi.net.Api/.microi-local` 并加载对应的 `appsettings.{Env}.json`。
 
-版本与历史同步规则：通过 MCP 或 VS Code 插件保存接口引擎时，必须同步写入 `sys_apiengine.Version`；修改记录只写入 `sys_apiengine.ChangeHistory`，不得写进代码头。`ChangeHistory` 是“修改历史说明”，每次更新都必须把最新说明拼接到最前面，并保留原有全部历史文字，禁止覆盖、清空或只保留最新一条。旧数据库可能没有 `Version`、`ChangeHistory` 字段，工具必须检测字段或失败回退，保证旧库仍可只更新 `ApiV8Code` 与 `UpdateTime`。
+版本与历史同步规则：通过 MCP 或 VS Code 插件保存接口引擎时，必须同步写入 `sys_apiengine.Version`；新版平台把每次修改说明作为独立记录写入 `mci_apiengine_change_history`，表单中的“修改历史”使用 `TableChild` 展示，不再让客户端拼接或覆盖 `sys_apiengine.ChangeHistory` 多行文本。写入必须携带版本号与简明说明，并使用幂等 `EntryKey` 防止网络重试产生重复记录。安装/升级表单引擎官方应用时，旧 `ChangeHistory` 按非空行迁入子表并保留旧物理列作滚动兼容；尚未安装该子表、旧库缺字段或迁移期间，后端应自动回退旧字段或仅更新 `ApiV8Code` 与 `UpdateTime`，不得因此阻断代码同步。
 
 生成接口引擎代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；跨表事务、权限校验、状态机、金额/库存计算、复杂 `_Where` 条件等代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。
 

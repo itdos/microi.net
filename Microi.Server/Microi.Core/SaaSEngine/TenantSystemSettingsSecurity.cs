@@ -99,7 +99,9 @@ namespace Microi.net
                 if (client?.Db == null) return output;
                 var rows = client.Db.FromSql(
                         $"SELECT Id,ConfigKey,ConfigValue,SecretCipher,ValueType,Category,Description,IsPublic,IsSecret,IsEnabled,Sort,ValueSource " +
-                        $"FROM {TableName} WHERE (IsDeleted<>1 OR IsDeleted IS NULL) AND (IsEnabled=1 OR IsEnabled IS NULL) " +
+                        // 管理快照必须保留停用行，管理员才能重新启用；所有运行时读取器
+                        // （GetBool/GetText/CreateV8Projection）仍逐项检查 IsEnabled 并失败关闭。
+                        $"FROM {TableName} WHERE (IsDeleted<>1 OR IsDeleted IS NULL) " +
                         "ORDER BY Sort ASC, ConfigKey ASC")
                     .ToList<dynamic>() ?? new List<dynamic>();
                 var values = new List<TenantSystemSettingValue>();

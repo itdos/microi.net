@@ -92,6 +92,52 @@ namespace Microi.net
             return !IsBlank(value);
         }
 
+        private static async Task<Dictionary<string, SysUser>> GetChatUserProjectionsAsync(
+            string osClient,
+            IEnumerable<string> userIds)
+        {
+            var ids = (userIds ?? Enumerable.Empty<string>())
+                .Select(id => id?.Trim())
+                .Where(id => !string.IsNullOrWhiteSpace(id)
+                             && !string.Equals(id, "AI", StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(100)
+                .ToList();
+            if (ids.Count == 0)
+                return new Dictionary<string, SysUser>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<SysUser>(
+                    "sys_user",
+                    new
+                    {
+                        Ids = ids,
+                        OsClient = osClient,
+                        _PageIndex = 1,
+                        _PageSize = ids.Count,
+                        _SelectFields = new List<string> { "Id", "Name", "Account", "Avatar" }
+                    }).ConfigureAwait(false);
+                if (result?.Code != 1 || result.Data == null)
+                    return new Dictionary<string, SysUser>(StringComparer.OrdinalIgnoreCase);
+
+                return result.Data
+                    .Where(user => !string.IsNullOrWhiteSpace(user?.Id))
+                    .GroupBy(user => user.Id.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                WriteWebSocketLog(
+                    osClient,
+                    "ChatContactProjectionFailed",
+                    "聊天联系人公开投影读取失败",
+                    ex.GetType().Name,
+                    1);
+                return new Dictionary<string, SysUser>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
         private async Task<WebSocketIdentity> ResolveIdentityAsync()
         {
             if (Context?.Items != null
@@ -149,6 +195,7 @@ namespace Microi.net
                 OsClient = currentToken.OsClient,
                 UserId = userId,
                 UserName = string.IsNullOrWhiteSpace(name) ? account : name,
+                UserAccount = account,
                 UserAvatar = currentUser["Avatar"].Val<string>(),
                 CurrentUser = currentUser,
                 Token = token
@@ -188,6 +235,7 @@ namespace Microi.net
             public string OsClient { get; set; }
             public string UserId { get; set; }
             public string UserName { get; set; }
+            public string UserAccount { get; set; }
             public string UserAvatar { get; set; }
             public JObject CurrentUser { get; set; }
             public string Token { get; set; }
@@ -229,6 +277,7 @@ namespace Microi.net
             var osClient = identity.OsClient;
             var userId = identity.UserId;
             var userName = identity.UserName;
+            var userAccount = identity.UserAccount;
             var userAvatar = identity.UserAvatar;
             var diyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
             HttpContext httpContext = base.Context.GetHttpContext();
@@ -313,6 +362,7 @@ namespace Microi.net
                     {
                         UserId = userId,
                         UserName = userName,
+                        UserAccount = userAccount,
                         UserAvatar = userAvatar,
                         OtherInfo = otherInfo,
                         ContactUserId = "",
@@ -473,6 +523,7 @@ namespace Microi.net
                 msg.OsClient = callerIdentity.OsClient;
                 msg.FromUserId = callerIdentity.UserId;
                 msg.FromUserName = callerIdentity.UserName;
+                msg.FromUserAccount = callerIdentity.UserAccount;
                 msg.FromUserAvatar = callerIdentity.UserAvatar;
                 if (IsBlank(msg.ToUserId) || IsBlank(msg.Content))
                     throw new HubException("接收用户和消息内容不能为空。");
@@ -481,6 +532,7 @@ namespace Microi.net
                 {
                     msg.ToUserId = "AI";
                     msg.ToUserName = "AI助手";
+                    msg.ToUserAccount = "AI";
                     msg.ToUserAvatar = "";
                     if (_microiAI == null || _backgroundHubContext == null)
                         throw new HubException("AI聊天服务暂不可用，请稍后重试。");
@@ -492,7 +544,12 @@ namespace Microi.net
                         new { Id = msg.ToUserId, OsClient = callerIdentity.OsClient });
                     if (targetUserResult == null || targetUserResult.Code != 1 || targetUserResult.Data == null)
                         throw new HubException("接收用户不存在或已停用。");
-                    msg.ToUserName = targetUserResult.Data.Name;
+                    msg.ToUserAccount = targetUserResult.Data.Account;
+                    msg.ToUserName = ChatContactProjection.ResolveDisplayName(
+                        targetUserResult.Data.Name,
+                        null,
+                        msg.ToUserAccount,
+                        null);
                     msg.ToUserAvatar = targetUserResult.Data.Avatar;
                 }
             }
@@ -539,10 +596,14 @@ namespace Microi.net
                     var messageDto = new MessageBodyDto
                     {
                         FromUserId = msg.FromUserId,
-                        FromUserName = msg.FromUserName,
+                        FromUserName = ChatContactProjection.ResolveDisplayName(
+                            null, msg.FromUserName, null, msg.FromUserAccount),
+                        FromUserAccount = msg.FromUserAccount,
                         FromUserAvatar = msg.FromUserAvatar,
                         ToUserId = msg.ToUserId,
-                        ToUserName = msg.ToUserName,
+                        ToUserName = ChatContactProjection.ResolveDisplayName(
+                            null, msg.ToUserName, null, msg.ToUserAccount),
+                        ToUserAccount = msg.ToUserAccount,
                         ToUserAvatar = msg.ToUserAvatar,
                         Content = msg.Content,
                         CreateTime = msg.CreateTime,
@@ -574,9 +635,11 @@ namespace Microi.net
                 {
                     UserId = msg.FromUserId,
                     UserName = msg.FromUserName,
+                    UserAccount = msg.FromUserAccount,
                     UserAvatar = msg.FromUserAvatar,
                     ContactUserId = msg.ToUserId,
                     ContactUserName = msg.ToUserName,
+                    ContactUserAccount = msg.ToUserAccount,
                     ContactUserAvatar = msg.ToUserAvatar,
                     LastMessage = msg.Content,
                     LastMessageType = msg.Type,
@@ -590,9 +653,11 @@ namespace Microi.net
                 {
                     UserId = msg.ToUserId,
                     UserName = msg.ToUserName,
+                    UserAccount = msg.ToUserAccount,
                     UserAvatar = msg.ToUserAvatar,
                     ContactUserId = msg.FromUserId,
                     ContactUserName = msg.FromUserName,
+                    ContactUserAccount = msg.FromUserAccount,
                     ContactUserAvatar = msg.FromUserAvatar,
                     LastMessage = msg.Content,
                     LastMessageType = msg.Type,
@@ -964,9 +1029,11 @@ namespace Microi.net
                             {
                                 FromUserId = aiUser.Id,
                                 FromUserName = aiUser.Name,
+                                FromUserAccount = "AI",
                                 FromUserAvatar = aiUser.Avatar,
                                 ToUserId = originalMsg.FromUserId,
                                 ToUserName = originalMsg.FromUserName,
+                                ToUserAccount = originalMsg.FromUserAccount,
                                 ToUserAvatar = originalMsg.FromUserAvatar,
                                 Content = queryDataJson,
                                 CreateTime = DateTime.Now,
@@ -994,9 +1061,11 @@ namespace Microi.net
                     {
                         FromUserId = aiUser.Id,
                         FromUserName = aiUser.Name,
+                        FromUserAccount = "AI",
                         FromUserAvatar = aiUser.Avatar,
                         ToUserId = originalMsg.FromUserId,
                         ToUserName = originalMsg.FromUserName,
+                        ToUserAccount = originalMsg.FromUserAccount,
                         ToUserAvatar = originalMsg.FromUserAvatar,
                         Content = string.IsNullOrWhiteSpace(aiResult.Content)
                             ? fullResponse.ToString()
@@ -1030,6 +1099,7 @@ namespace Microi.net
             msg ??= new MessageBody();
             msg.FromUserId = identity.UserId;
             msg.FromUserName = identity.UserName;
+            msg.FromUserAccount = identity.UserAccount;
             msg.FromUserAvatar = identity.UserAvatar;
             msg.OsClient = identity.OsClient;
             await SendChatRecordToUserCore(msg).ConfigureAwait(false);
@@ -1088,19 +1158,47 @@ namespace Microi.net
                     return;
                 }
                 result2 = result2.OrderBy((MessageBody d) => d.CreateTime).ToList();
-                // 转换为DTO避免ObjectId序列化问题
-                var result2Dto = result2.Select(m => new MessageBodyDto
+                // 旧历史消息可能没有保存姓名或账号；仅按本次会话双方的 Id
+                // 读取当前 Name/Account/Avatar，保持聊天 DTO 的最小身份投影。
+                var chatUsers = await GetChatUserProjectionsAsync(
+                    msg.OsClient,
+                    result2.SelectMany(message => new[] { message.FromUserId, message.ToUserId }))
+                    .ConfigureAwait(false);
+                var result2Dto = result2.Select(m =>
                 {
-                    FromUserId = m.FromUserId,
-                    FromUserName = m.FromUserName,
-                    FromUserAvatar = m.FromUserAvatar,
-                    ToUserId = m.ToUserId,
-                    ToUserName = m.ToUserName,
-                    ToUserAvatar = m.ToUserAvatar,
-                    Content = m.Content,
-                    CreateTime = m.CreateTime,
-                    Type = m.Type,
-                    IsRead = m.IsRead
+                    chatUsers.TryGetValue(m.FromUserId ?? string.Empty, out var currentFromUser);
+                    chatUsers.TryGetValue(m.ToUserId ?? string.Empty, out var currentToUser);
+                    return new MessageBodyDto
+                    {
+                        FromUserId = m.FromUserId,
+                        FromUserName = ChatContactProjection.ResolveDisplayName(
+                            currentFromUser?.Name,
+                            m.FromUserName,
+                            currentFromUser?.Account,
+                            m.FromUserAccount),
+                        FromUserAccount = ChatContactProjection.ResolveAccount(
+                            currentFromUser?.Account,
+                            m.FromUserAccount),
+                        FromUserAvatar = ChatContactProjection.ResolveAvatar(
+                            currentFromUser?.Avatar,
+                            m.FromUserAvatar),
+                        ToUserId = m.ToUserId,
+                        ToUserName = ChatContactProjection.ResolveDisplayName(
+                            currentToUser?.Name,
+                            m.ToUserName,
+                            currentToUser?.Account,
+                            m.ToUserAccount),
+                        ToUserAccount = ChatContactProjection.ResolveAccount(
+                            currentToUser?.Account,
+                            m.ToUserAccount),
+                        ToUserAvatar = ChatContactProjection.ResolveAvatar(
+                            currentToUser?.Avatar,
+                            m.ToUserAvatar),
+                        Content = m.Content,
+                        CreateTime = m.CreateTime,
+                        Type = m.Type,
+                        IsRead = m.IsRead
+                    };
                 }).ToList();
                 await base.Clients.Clients(clientInfoFrom2.ConnectionIds).ReceiveSendChatRecordToUser(result2Dto);
                 await TMongodbHelper<MessageBody>.UpdateManayAsync(hostChat, new Dictionary<string, object> { { "IsRead", true } }, Builders<MessageBody>.Filter.And(Builders<MessageBody>.Filter.Eq("FromUserId", msg.ToUserId) & Builders<MessageBody>.Filter.Eq("ToUserId", msg.FromUserId)));
@@ -1215,6 +1313,7 @@ namespace Microi.net
             msg ??= new MessageBody();
             msg.FromUserId = identity.UserId;
             msg.FromUserName = identity.UserName;
+            msg.FromUserAccount = identity.UserAccount;
             msg.FromUserAvatar = identity.UserAvatar;
             msg.OsClient = identity.OsClient;
             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
@@ -1246,9 +1345,11 @@ namespace Microi.net
                 {
                     UserId = msg.FromUserId,
                     UserName = msg.FromUserName,
+                    UserAccount = msg.FromUserAccount,
                     UserAvatar = msg.FromUserAvatar,
                     ContactUserId = msg.ToUserId,
                     ContactUserName = msg.ToUserName,
+                    ContactUserAccount = msg.ToUserAccount,
                     ContactUserAvatar = msg.ToUserAvatar,
                     OtherInfo = msg.OtherInfo,
                     OsClient = msg.OsClient,
@@ -1267,6 +1368,7 @@ namespace Microi.net
             msg ??= new MessageChatContactListParam();
             msg.UserId = identity.UserId;
             msg.UserName = identity.UserName;
+            msg.UserAccount = identity.UserAccount;
             msg.UserAvatar = identity.UserAvatar;
             msg.OsClient = identity.OsClient;
             msg.ContactUserId = "";
@@ -1353,10 +1455,14 @@ namespace Microi.net
                             tModel.LastMessageType = msg.LastMessageType;
                         if (IsNotBlank(msg.UserName))
                             tModel.UserName = msg.UserName;
+                        if (IsNotBlank(msg.UserAccount))
+                            tModel.UserAccount = msg.UserAccount;
                         if (IsNotBlank(msg.UserAvatar))
                             tModel.UserAvatar = msg.UserAvatar;
                         if (IsNotBlank(msg.ContactUserName))
                             tModel.ContactUserName = msg.ContactUserName;
+                        if (IsNotBlank(msg.ContactUserAccount))
+                            tModel.ContactUserAccount = msg.ContactUserAccount;
                         if (IsNotBlank(msg.ContactUserAvatar))
                             tModel.ContactUserAvatar = msg.ContactUserAvatar;
 
@@ -1405,21 +1511,19 @@ namespace Microi.net
                     lastChatList = new List<MessageChatContactList>();
                 }
                 
-                // 转换为DTO避免ObjectId序列化问题
-                var lastChatListDto = lastChatList.Select(c => new MessageChatContactListDto
+                // 仅按当前用户自己的历史联系人 Id 读取 Name/Account/Avatar，
+                // 不扩大公共用户目录，也不把手机号、邮箱等资料投影到聊天端。
+                var chatUsers = await GetChatUserProjectionsAsync(
+                    msg.OsClient,
+                    lastChatList.Select(contact => contact.ContactUserId)).ConfigureAwait(false);
+                var lastChatListDto = lastChatList.Select(contact =>
                 {
-                    UserId = c.UserId,
-                    UserName = c.UserName,
-                    UserAvatar = c.UserAvatar,
-                    ContactUserId = c.ContactUserId,
-                    ContactUserName = c.ContactUserName,
-                    ContactUserAvatar = c.ContactUserAvatar,
-                    ContactUserDeviceClientId = c.ContactUserDeviceClientId,
-                    LastMessage = c.LastMessage,
-                    LastMessageType = c.LastMessageType,
-                    OtherInfo = c.OtherInfo,
-                    UnRead = c.UnRead,
-                    UpdateTime = c.UpdateTime
+                    chatUsers.TryGetValue(contact.ContactUserId ?? string.Empty, out var currentContact);
+                    return ChatContactProjection.Create(
+                        contact,
+                        currentContact?.Name,
+                        currentContact?.Account,
+                        currentContact?.Avatar);
                 }).ToList();
                 
                 if (msg._iHubContext != null)
