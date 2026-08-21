@@ -110,7 +110,9 @@ test("我的工作跨表 PageTabs 在同一模块实例内切换并显示稳定�
         if (delayModuleRequests
             && request.method() !== "OPTIONS"
             && /\/(?:api|apiengine)\//i.test(request.url())) {
-            await new Promise((resolve) => setTimeout(resolve, 1_100));
+            // 目标菜单不一定生成路由，首次切换会先走一次受权限保护的菜单解析。
+            // 为随后并行的模块上下文请求保留足够的可观测窗口，避免骨架刚出现就消失。
+            await new Promise((resolve) => setTimeout(resolve, 2_500));
         }
         await route.continue();
     });

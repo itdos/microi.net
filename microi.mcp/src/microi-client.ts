@@ -2166,7 +2166,7 @@ export class MicroiClient {
       ApiEngineKey: apiEngineKey,
       ApiV8CodeBase64: Buffer.from(prepared.code, 'utf8').toString('base64'),
       Version: prepared.version,
-      ChangeHistory: prepared.changeHistory,
+      ChangeSummary: prepared.changeHistory,
       ...(requestedV8Limit === undefined ? {} : { V8Limit: requestedV8Limit ? 1 : 0 }),
     };
     const matchesReadback = (data: ApiEngine | undefined) =>
@@ -2310,7 +2310,7 @@ export class MicroiClient {
     });
     payload.ApiV8CodeBase64 = Buffer.from(prepared.code, 'utf8').toString('base64');
     payload.Version = prepared.version;
-    payload.ChangeHistory = prepared.changeHistory;
+    payload.ChangeSummary = prepared.changeHistory;
     delete payload.Code;
     delete payload.ApiV8Code;
     delete payload.functionDescription;
@@ -2925,13 +2925,20 @@ export class MicroiClient {
   async createTable(name: string, description?: string, options?: {
     Tabs?: string; IsTree?: number; Column?: number;
     FormOpenType?: string; FormOpenWidth?: string;
+    V8Limit?: number;
+    /** @deprecated Compatibility alias. Prefer V8Limit; 1 maps to V8Limit=0. */
     V8Unlimited?: number;
   }): Promise<ApiResponse> {
+    const payload: Record<string, unknown> = { ...(options || {}) };
+    if (payload.V8Limit === undefined && payload.V8Unlimited !== undefined) {
+      payload.V8Limit = Number(payload.V8Unlimited) === 1 ? 0 : 1;
+    }
+    delete payload.V8Unlimited;
     return this.post(API.CREATE_TABLE, {
       OsClient: this.config.osClient,
       Name: name,
       Description: description || '',
-      ...options,
+      ...payload,
     });
   }
 

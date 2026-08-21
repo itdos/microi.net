@@ -53,9 +53,11 @@ test("平台内置微服务只从显式发布契约解析正式源码根", async
 });
 
 test("两个官方基线包携带同一份可离线启动的数据库运行产物", async () => {
-  const [saasPackage, storePackage] = await Promise.all([
+  const [saasPackage, storePackage, saasSyncBase, storeSyncBase] = await Promise.all([
     readJson("app.microi.saas-engine.json"),
     readJson("app.microi.store.json"),
+    readJson(".resource-sync-base/app.microi.saas-engine.json"),
+    readJson(".resource-sync-base/app.microi.store.json"),
   ]);
   const saasBundle = platformBundle(saasPackage);
   const storeBundle = platformBundle(storePackage);
@@ -93,4 +95,13 @@ test("两个官方基线包携带同一份可离线启动的数据库运行产�
   assert.equal(saasBundle.MicroService.DistHash, storeBundle.MicroService.DistHash);
   assert.deepEqual(saasBundle.BuildAssets, storeBundle.BuildAssets);
   assert.deepEqual(saasBundle.Routes, storeBundle.Routes);
+  assert.equal(saasPackage.PackageInfo.Version, "v7.5.7");
+  assert.equal(storePackage.PackageInfo.Version, "v7.5.7");
+  assert.match(storePackage.PackageInfo.ChangeHistory, /v7\.5\.7[\s\S]*microi-platform-service[\s\S]*v1\.6\.9/);
+  assert.equal(saasBundle.VersionNo, "v1.6.9");
+  assert.equal(saasBundle.Application.CurrentVersion, 26);
+  assert.equal(saasSyncBase.PackageInfo.Version, "v7.5.6");
+  assert.equal(storeSyncBase.PackageInfo.Version, "v7.5.3");
+  assert.equal(platformBundle(saasSyncBase).VersionNo, "v1.6.8");
+  assert.equal(platformBundle(storeSyncBase).VersionNo, "v1.6.8");
 });

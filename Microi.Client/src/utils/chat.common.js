@@ -77,6 +77,69 @@ export function splitTypewriterUnits(content) {
     return units;
 }
 
+const CHAT_CONTACT_NAME_FIELDS = Object.freeze([
+    'ContactUserName',
+    'Name',
+    'NickName'
+]);
+
+const CHAT_CONTACT_ACCOUNT_FIELDS = Object.freeze([
+    'ContactUserAccount',
+    'Account',
+    'UserAccount',
+    'LoginName'
+]);
+
+function cleanChatIdentityValue(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value !== 'string' && typeof value !== 'number') return '';
+    return String(value).trim();
+}
+
+/**
+ * 统一解析聊天对象显示名：姓名为空或仅含空白时回退到账号。
+ * Id 不属于显示名候选，避免无名称数据把内部标识暴露给用户。
+ */
+export function resolveChatDisplayName(contact, relatedContact = null, fallback = '未命名用户') {
+    const sources = [contact, relatedContact].filter(item => item && typeof item === 'object');
+    for (const field of CHAT_CONTACT_NAME_FIELDS) {
+        for (const source of sources) {
+            const value = cleanChatIdentityValue(source[field]);
+            if (value) return value;
+        }
+    }
+    for (const field of CHAT_CONTACT_ACCOUNT_FIELDS) {
+        for (const source of sources) {
+            const value = cleanChatIdentityValue(source[field]);
+            if (value) return value;
+        }
+    }
+    return cleanChatIdentityValue(fallback) || '未命名用户';
+}
+
+export function normalizeChatDirectoryUser(user, fallback = '未命名用户') {
+    const source = user && typeof user === 'object' ? user : {};
+    return {
+        ...source,
+        Name: resolveChatDisplayName(source, null, fallback)
+    };
+}
+
+export function normalizeChatContact(contact, directoryUser = null, fallback = '未命名用户') {
+    const source = contact && typeof contact === 'object' ? contact : {};
+    let account = '';
+    for (const field of CHAT_CONTACT_ACCOUNT_FIELDS) {
+        account = cleanChatIdentityValue(source[field])
+            || cleanChatIdentityValue(directoryUser?.[field]);
+        if (account) break;
+    }
+    return {
+        ...source,
+        ...(account ? { ContactUserAccount: account } : {}),
+        ContactUserName: resolveChatDisplayName(source, directoryUser, fallback)
+    };
+}
+
 /**
  * 格式化时间
  */

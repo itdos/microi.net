@@ -83,6 +83,7 @@ namespace Microi.net
             "sys_mq",
             "sys_mqtt",
             "microi_database",
+            "diy_sso",
 
             // Logs, node state and credential-bearing platform integrations.
             "sys_log",

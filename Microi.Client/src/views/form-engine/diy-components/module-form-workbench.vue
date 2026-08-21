@@ -3,62 +3,6 @@
         class="module-form-workbench"
         :class="[`is-${presentation.toLowerCase()}`, { 'is-control-center': isControlCenter }]"
     >
-        <header class="workbench-toolbar">
-            <div v-if="selector.Display !== 'List'" class="workbench-record-select">
-                <span class="toolbar-label">当前记录</span>
-                <el-select
-                    v-model="selectedId"
-                    filterable
-                    :disabled="records.length === 0"
-                    :placeholder="selector.Placeholder || '请选择要维护的数据'"
-                >
-                    <el-option
-                        v-for="record in records"
-                        :key="record.Id"
-                        :label="recordLabel(record)"
-                        :value="record.Id"
-                    />
-                </el-select>
-                <span v-if="rowCount !== null && rowCount !== undefined" class="record-count">共 {{ rowCount }} 条</span>
-            </div>
-            <div class="workbench-actions workbench-page-actions">
-                <!-- 页面 V8 按钮保持经典表格的页面作用域，逐个显示，不并入统一业务下拉。 -->
-                <el-button
-                    v-for="action in visiblePageActions"
-                    :key="`page:${actionKey(action)}`"
-                    :type="actionType(action)"
-                    :loading="actionLoading"
-                    :disabled="action.Disabled === true"
-                    @click="runAction(action, 'Page')"
-                >
-                    <fa-icon :icon="actionIcon(action)" class="action-icon" />{{ actionLabel(action) }}
-                </el-button>
-                <!-- 工作台只有一条当前记录；批量按钮默认以该记录作为已选数据执行。 -->
-                <el-button
-                    v-for="action in visibleBatchActions"
-                    :key="`batch:${actionKey(action)}`"
-                    :type="actionType(action)"
-                    :loading="actionLoading"
-                    :disabled="!selectedId || action.Disabled === true"
-                    @click="runAction(action, 'Batch')"
-                >
-                    <fa-icon :icon="actionIcon(action)" class="action-icon" />{{ actionLabel(action) }}
-                </el-button>
-                <el-button :icon="Refresh" :loading="loading" @click="refreshCurrentRecord">刷新</el-button>
-                <el-button v-if="canAdd" :icon="Plus" @click="$emit('open-form', null, 'Add')">新增记录</el-button>
-                <el-dropdown v-if="config.ShowClassicList !== false" trigger="click">
-                    <el-button :icon="MoreFilled">更多功能<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
-                    <template #dropdown>
-                        <el-dropdown-menu>
-                            <el-dropdown-item @click="$emit('switch-classic')">
-                                <el-icon><List /></el-icon>切换到经典表格
-                            </el-dropdown-item>
-                        </el-dropdown-menu>
-                    </template>
-                </el-dropdown>
-            </div>
-        </header>
-
         <div
             v-if="loading && records.length === 0"
             class="workbench-skeleton"
@@ -69,7 +13,7 @@
         </div>
 
         <el-empty
-            v-else-if="records.length === 0"
+            v-else-if="recordOptions.length === 0"
             class="workbench-empty"
             description="当前模块暂无可维护记录"
         >
@@ -84,12 +28,12 @@
                 <div class="record-list" role="listbox" aria-label="记录列表">
                     <button
                         v-for="record in filteredRecords"
-                        :key="record.Id"
+                        :key="recordId(record)"
                         type="button"
                         class="record-item"
-                        :class="{ active: selectedId === record.Id }"
-                        :aria-selected="selectedId === record.Id"
-                        @click="selectRecord(record.Id)"
+                        :class="{ active: selectedId === recordId(record) }"
+                        :aria-selected="selectedId === recordId(record)"
+                        @click="selectRecord(recordId(record))"
                     >
                         <span class="record-mark">{{ recordInitial(record) }}</span>
                         <span class="record-copy">
@@ -107,38 +51,52 @@
             </aside>
 
             <main class="form-workspace">
-                <div class="form-workspace-head">
-                    <div class="workspace-copy">
-                        <span class="workspace-eyebrow">{{ workspaceEyebrow }}</span>
-                        <h2>{{ recordLabel(selectedRecord) }}</h2>
-                        <p>{{ workspaceDescription }}</p>
-                    </div>
-                    <div class="form-scope-actions">
-                        <!-- 表单 V8 按钮显示在表单操作区。 -->
+                <DiyFormFull
+                    v-if="selectedId && tableId"
+                    :key="tableId"
+                    ref="embeddedFormRef"
+                    :EmbeddedHeader="embeddedHeader"
+                    :EmbeddedRecordNavigator="embeddedRecordNavigator"
+                    @CallbackSetFormData="handleFormData"
+                    @CallbackGetDiyTableRow="handleEmbeddedRefresh"
+                    @WorkspaceRecordChange="selectRecord"
+                >
+                    <template #workspace-actions>
                         <el-button
-                            v-for="action in visibleFormActions"
-                            :key="`form:${actionKey(action)}`"
+                            v-for="action in visiblePageActions"
+                            :key="`page:${actionKey(action)}`"
                             :type="actionType(action)"
+                            size="small"
                             :loading="actionLoading"
                             :disabled="action.Disabled === true"
-                            @click="runAction(action, 'Form')"
+                            @click="runAction(action, 'Page')"
                         >
                             <fa-icon :icon="actionIcon(action)" class="action-icon" />{{ actionLabel(action) }}
                         </el-button>
-                        <!-- ShowRow=true 的行按钮继续直接显示。 -->
+                        <el-button
+                            v-for="action in visibleBatchActions"
+                            :key="`batch:${actionKey(action)}`"
+                            :type="actionType(action)"
+                            size="small"
+                            :loading="actionLoading"
+                            :disabled="!selectedId || action.Disabled === true"
+                            @click="runAction(action, 'Batch')"
+                        >
+                            <fa-icon :icon="actionIcon(action)" class="action-icon" />{{ actionLabel(action) }}
+                        </el-button>
                         <el-button
                             v-for="action in visibleRowOutsideActions"
                             :key="`row-out:${actionKey(action)}`"
                             :type="actionType(action)"
+                            size="small"
                             :loading="actionLoading"
-                            :disabled="action.Disabled === true"
+                            :disabled="!selectedId || action.Disabled === true"
                             @click="runAction(action, 'Row')"
                         >
                             <fa-icon :icon="actionIcon(action)" class="action-icon" />{{ actionLabel(action) }}
                         </el-button>
-                        <!-- ShowRow=false 的行按钮只进入当前记录自己的“更多”。 -->
-                        <el-dropdown v-if="visibleRowInsideActions.length" trigger="click">
-                            <el-button>更多<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                        <el-dropdown v-if="visibleRowInsideActions.length" trigger="click" size="small">
+                            <el-button :icon="MoreFilled" size="small">更多业务<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
                             <template #dropdown>
                                 <el-dropdown-menu>
                                     <el-dropdown-item
@@ -152,54 +110,19 @@
                                 </el-dropdown-menu>
                             </template>
                         </el-dropdown>
-                        <el-tag effect="plain" type="success">{{ formMode === 'View' ? '查看模式' : '编辑模式' }}</el-tag>
-                        <el-button
-                            v-if="selectedId && canEdit && formMode !== 'View'"
-                            type="primary"
-                            :icon="Select"
-                            :loading="saving"
-                            @click="saveCurrent"
-                        >{{ config.SaveText || '保存当前记录' }}</el-button>
-                    </div>
-                </div>
-                <div class="form-field-toolbar">
-                    <el-input
-                        v-model="fieldKeyword"
-                        clearable
-                        :prefix-icon="Search"
-                        placeholder="搜索字段名称、字段名或说明"
-                        aria-label="搜索当前表单字段"
-                    />
-                    <span v-if="fieldKeyword" class="field-match-count">{{ matchingFieldCount }} 项匹配</span>
-                    <el-button :icon="Refresh" :loading="loading" @click="refreshCurrentRecord">刷新当前记录</el-button>
-                </div>
-                <DiyForm
-                    v-if="selectedId && tableId"
-                    :key="`${tableId}:${selectedId}:${formMode}:${formRefreshVersion}`"
-                    ref="formRef"
-                    :TableId="tableId"
-                    :TableName="tableName"
-                    :SysMenuId="sysMenuId"
-                    :TableRowId="selectedId"
-                    :FormMode="formMode"
-                    :LoadMode="'Workbench'"
-                    :PresentationMode="presentation"
-                    :PresentationConfig="resolvedPresentationConfig"
-                    :CurrentTableData="records"
-                    @CallbackFormSubmit="handleRequestedSubmit"
-                    @CallbackSetFormData="handleFormData"
-                    @CallbackRefreshTable="$emit('refresh')"
-                />
+                        <el-button v-if="canAdd" :icon="Plus" size="small" @click="$emit('open-form', null, 'Add')">新增记录</el-button>
+                    </template>
+                </DiyFormFull>
             </main>
         </div>
     </section>
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, ref, watch } from "vue";
-import { ArrowDown, ArrowRight, List, MoreFilled, Plus, Refresh, Search, Select } from "@element-plus/icons-vue";
+import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
+import { ArrowDown, ArrowRight, MoreFilled, Plus, Search } from "@element-plus/icons-vue";
 
-const DiyForm = defineAsyncComponent(() => import("@/views/form-engine/diy-form.vue"));
+const DiyFormFull = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"));
 
 const props = defineProps({
     tableId: { type: String, default: "" },
@@ -208,9 +131,9 @@ const props = defineProps({
     rows: { type: Array, default: () => [] },
     fields: { type: Array, default: () => [] },
     config: { type: Object, default: () => ({}) },
+    titleIcon: { type: String, default: "" },
     pageButtons: { type: Array, default: () => [] },
     batchButtons: { type: Array, default: () => [] },
-    formButtons: { type: Array, default: () => [] },
     rowCount: { type: Number, default: 0 },
     pageIndex: { type: Number, default: 1 },
     pageSize: { type: Number, default: 15 },
@@ -221,50 +144,66 @@ const props = defineProps({
     initialRecordId: { type: String, default: "" }
 });
 
-const emit = defineEmits(["refresh", "switch-classic", "open-form", "run-action", "load-page", "record-change", "form-ready", "saved"]);
+const emit = defineEmits(["refresh", "open-form", "run-action", "load-page", "record-change", "form-ready"]);
 const selectedId = ref("");
 const keyword = ref("");
-const fieldKeyword = ref("");
-const saving = ref(false);
-const formRefreshVersion = ref(0);
-const formRef = ref(null);
+const embeddedFormRef = ref(null);
 const currentForm = ref({});
+const lastEmbeddedSignature = ref("");
+let lastEmbeddedFormInstance = null;
+const embeddedCurrentForm = computed(() => {
+    const row = embeddedFormRef.value?.CurrentRowModel;
+    return row && Object.keys(row).length ? row : currentForm.value;
+});
 
 const records = computed(() => (Array.isArray(props.rows) ? props.rows : []).filter((item) => item && item.Id));
+const recordOptions = computed(() => {
+    const result = [...records.value];
+    const currentId = recordId(embeddedCurrentForm.value);
+    if (currentId === selectedId.value && !result.some((item) => recordId(item) === currentId)) {
+        result.unshift(embeddedCurrentForm.value);
+    } else if (selectedId.value && !result.some((item) => recordId(item) === selectedId.value)) {
+        result.unshift({ Id: selectedId.value });
+    }
+    return result;
+});
 const selector = computed(() => ({ Display: "Both", LabelFields: [], ...((props.config && props.config.RecordSelector) || {}) }));
 const presentation = computed(() => String(props.config.Presentation || "ControlCenter"));
 const isControlCenter = computed(() => ["controlcenter", "settingscenter"].includes(presentation.value.toLowerCase()));
 const formMode = computed(() => props.canEdit ? String(props.config.Mode || "Edit") : "View");
-const selectedRecord = computed(() => records.value.find((item) => item.Id === selectedId.value) || records.value[0] || {});
+const selectedRecord = computed(() => {
+    const listRecord = records.value.find((item) => recordId(item) === selectedId.value);
+    if (recordId(embeddedCurrentForm.value) === selectedId.value) {
+        return { ...(listRecord || {}), ...(embeddedCurrentForm.value || {}) };
+    }
+    return listRecord || (selectedId.value ? { Id: selectedId.value } : {});
+});
 const showRecordNavigator = computed(() => selector.value.Display === "List" || (selector.value.Display === "Both" && !isControlCenter.value));
 const pageCount = computed(() => Math.max(1, Math.ceil(Number(props.rowCount || 0) / Math.max(1, Number(props.pageSize || 15)))));
 const filteredRecords = computed(() => {
     const value = keyword.value.trim().toLowerCase();
-    if (!value) return records.value;
-    return records.value.filter((record) => `${recordLabel(record)} ${recordSecondary(record)}`.toLowerCase().includes(value));
+    if (!value) return recordOptions.value;
+    return recordOptions.value.filter((record) => `${recordLabel(record)} ${recordSecondary(record)}`.toLowerCase().includes(value));
 });
 const visiblePageActions = computed(() => visibleActions(props.pageButtons));
 const visibleBatchActions = computed(() => visibleActions(props.batchButtons));
-const visibleFormActions = computed(() => visibleActions(props.formButtons));
 const visibleRowOutsideActions = computed(() => visibleActions(selectedRecord.value?._RowMoreBtnsOut));
 const visibleRowInsideActions = computed(() => visibleActions(selectedRecord.value?._RowMoreBtnsIn));
 const workspaceEyebrow = computed(() => String(props.config.Eyebrow || "FORM WORKBENCH"));
 const workspaceDescription = computed(() => String(props.config.Description || "集中维护当前记录的业务信息，原有字段事件、表单事件与权限规则保持不变。"));
-const resolvedPresentationConfig = computed(() => ({
-    ...(props.config || {}),
-    FieldSearchKeyword: fieldKeyword.value
+const embeddedHeader = computed(() => ({
+    Eyebrow: workspaceEyebrow.value,
+    Title: recordLabel(selectedRecord.value),
+    Description: workspaceDescription.value,
+    Icon: props.titleIcon || props.config.Icon || props.config.TitleIcon || "fas fa-sliders-h"
 }));
-const matchingFieldCount = computed(() => {
-    const value = fieldKeyword.value.trim().toLowerCase();
-    if (!value) return (Array.isArray(props.fields) ? props.fields : []).length;
-    return (Array.isArray(props.fields) ? props.fields : []).filter((field) => [
-        field?.Label,
-        field?.Name,
-        field?.AsName,
-        field?.Description,
-        field?.Component
-    ].some((item) => String(item || "").toLowerCase().includes(value))).length;
-});
+const embeddedRecordNavigator = computed(() => ({
+    Enabled: selector.value.Display !== "List",
+    Rows: recordOptions.value,
+    RowCount: props.rowCount,
+    LabelFields: configuredLabelFields(),
+    Placeholder: selector.value.Placeholder || "搜索并切换记录"
+}));
 
 watch(selectedId, (value, previous) => {
     if (!value || value === previous) return;
@@ -272,13 +211,29 @@ watch(selectedId, (value, previous) => {
     emit("record-change", value);
 }, { flush: "post" });
 watch(records, (value) => {
-    if (value.some((item) => item.Id === selectedId.value)) return;
-    const requested = props.initialRecordId && value.find((item) => item.Id === props.initialRecordId);
-    selectedId.value = (requested || value[0] || {}).Id || "";
+    const requested = String(props.initialRecordId || "").trim();
+    if (requested) {
+        if (selectedId.value !== requested) selectedId.value = requested;
+        return;
+    }
+    if (value.some((item) => recordId(item) === selectedId.value)) return;
+    selectedId.value = value.length ? recordId(value[0]) : "";
 }, { immediate: true });
 watch(() => props.initialRecordId, (value) => {
-    if (value && records.value.some((item) => item.Id === value)) selectedId.value = value;
+    const requested = String(value || "").trim();
+    if (requested) {
+        if (selectedId.value !== requested) selectedId.value = requested;
+        return;
+    }
+    if (!records.value.some((item) => recordId(item) === selectedId.value)) {
+        selectedId.value = records.value.length ? recordId(records.value[0]) : "";
+    }
 });
+watch(
+    [embeddedFormRef, selectedId, () => props.tableId, () => props.tableName, () => props.sysMenuId, formMode, presentation, () => props.config],
+    initializeEmbeddedForm,
+    { immediate: true, flush: "post", deep: true }
+);
 
 function visibleActions(source) {
     return (Array.isArray(source) ? source : []).filter((action) => action && Boolean(action.IsVisible));
@@ -291,9 +246,12 @@ function fieldValue(record, name) {
     const alias = field && (field.AsName || field.Name);
     return alias && record[alias] !== undefined ? String(record[alias] || "") : "";
 }
+function recordId(record) {
+    return String(record?.Id || "").trim();
+}
 function configuredLabelFields() {
     const configured = Array.isArray(selector.value.LabelFields) ? selector.value.LabelFields : [];
-    return configured.length ? configured : ["Name", "Title", "Label", "Key", "SysTitle", "PeizhiMC", "Account"];
+    return configured.length ? configured : ["Name", "ApiName", "Title", "Label", "PeizhiMC", "SysTitle", "Key", "Account"];
 }
 function recordLabel(record) {
     if (!record) return "未选择记录";
@@ -320,44 +278,78 @@ function actionIcon(action) {
 function actionType(action) {
     return action?.BtnStyle || action?.Style || "primary";
 }
-function selectRecord(id) {
-    selectedId.value = id;
-}
-function refreshCurrentRecord() {
-    formRefreshVersion.value += 1;
-    emit("refresh");
+async function selectRecord(id) {
+    const nextId = String(id || "").trim();
+    if (!nextId || nextId === selectedId.value) return;
+
+    // 左侧记录列表与表单头部选择器共用同一条切换链，确保编辑态先经过
+    // DiyFormFull 的未保存确认；WorkspaceRecordChange 回调再次进入时，
+    // TableRowId 已提交为 nextId，此处只同步宿主 selectedId 和 URL。
+    const form = embeddedFormRef.value;
+    const activeFormId = String(form?.TableRowId || "").trim();
+    if (form && typeof form.SwitchWorkspaceRecord === "function" && activeFormId !== nextId) {
+        await form.SwitchWorkspaceRecord(nextId);
+        return;
+    }
+    selectedId.value = nextId;
 }
 function runAction(action, scope) {
     let row = selectedRecord.value || {};
     if (scope === "Page") row = {};
-    if (scope === "Form") row = Object.keys(currentForm.value || {}).length ? currentForm.value : selectedRecord.value;
     emit("run-action", action, row || {}, scope, selectedRecord.value || {});
 }
 function handleFormData(form) {
     currentForm.value = form || {};
     emit("form-ready", currentForm.value);
 }
-function handleRequestedSubmit(param) {
-    saveCurrent(param || {});
+function handleEmbeddedRefresh() {
+    emit("refresh");
 }
-async function saveCurrent(overrides = {}) {
-    if (!formRef.value || saving.value || !selectedId.value || formMode.value === "View") return;
-    saving.value = true;
-    const formParam = {
-        FormMode: formMode.value,
-        TableRowId: selectedId.value,
-        SavedType: "Update",
-        ...overrides
-    };
+function stableConfigKey() {
     try {
-        await formRef.value.FormSubmit(formParam, (success, formData) => {
-            if (!success) return;
-            emit("saved", formData || currentForm.value);
-            emit("refresh");
-        });
-    } finally {
-        saving.value = false;
+        return JSON.stringify(props.config || {});
+    } catch (_error) {
+        return presentation.value;
     }
+}
+async function initializeEmbeddedForm() {
+    await nextTick();
+    const form = embeddedFormRef.value;
+    if (!form || typeof form.Init !== "function" || !selectedId.value || !props.tableId) {
+        if (!form) {
+            lastEmbeddedFormInstance = null;
+            lastEmbeddedSignature.value = "";
+        }
+        return;
+    }
+    // v-if 卸载后可能重新出现相同 tableId/recordId；签名相同不代表还是
+    // 已完成 Init 的那个组件实例，新实例必须重新初始化。
+    if (lastEmbeddedFormInstance !== form) {
+        lastEmbeddedFormInstance = form;
+        lastEmbeddedSignature.value = "";
+    }
+    const signature = [
+        props.tableId,
+        props.tableName,
+        props.sysMenuId,
+        selectedId.value,
+        formMode.value,
+        presentation.value,
+        stableConfigKey()
+    ].join("|");
+    if (lastEmbeddedSignature.value === signature) return;
+    lastEmbeddedSignature.value = signature;
+    form.Init({
+        TableId: props.tableId,
+        TableName: props.tableName,
+        SysMenuId: props.sysMenuId,
+        Id: selectedId.value,
+        FormMode: formMode.value,
+        DialogType: "Embedded",
+        PresentationMode: presentation.value,
+        PresentationConfig: props.config || {},
+        RecordNavigator: embeddedRecordNavigator.value
+    });
 }
 </script>
 
@@ -372,19 +364,7 @@ async function saveCurrent(overrides = {}) {
     background: transparent;
     box-shadow: none;
 }
-.workbench-toolbar,
-.workbench-record-select,
-.workbench-actions,
-.form-workspace-head,
-.form-scope-actions,
 .record-pagination { display: flex; align-items: center; }
-.workbench-toolbar { justify-content: space-between; gap: 10px; padding: 2px 0 8px; border-bottom: 0; }
-.workbench-record-select { min-width: 0; flex: 1; gap: 9px; }
-.workbench-record-select :deep(.el-select) { width: min(460px, 50vw); }
-.toolbar-label { color: var(--el-text-color-secondary); font-size: 12px; white-space: nowrap; }
-.record-count { padding: 3px 8px; border-radius: 999px; color: var(--workbench-accent); background: color-mix(in srgb, var(--workbench-accent) 9%, transparent); font-size: 11px; white-space: nowrap; }
-.workbench-actions,.form-scope-actions { justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
-.workbench-actions :deep(.el-button + .el-button),.form-scope-actions :deep(.el-button + .el-button) { margin-left: 0; }
 .workbench-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 10px; }
 .workbench-layout.has-record-navigator { grid-template-columns: 230px minmax(0, 1fr); }
 .record-navigator { display: flex; min-height: 520px; flex-direction: column; padding: 8px; border: 1px solid color-mix(in srgb, var(--workbench-line) 58%, transparent); border-radius: 13px; background: color-mix(in srgb, var(--workbench-soft) 68%, transparent); }
@@ -399,15 +379,7 @@ async function saveCurrent(overrides = {}) {
 .record-copy b { font-size: 12px; }
 .record-copy small { margin-top: 3px; color: var(--el-text-color-secondary); font-size: 9px; }
 .record-pagination { justify-content: space-between; gap: 4px; padding-top: 8px; color: var(--el-text-color-secondary); font-size: 10px; }
-.form-workspace { min-width: 0; padding: 10px; border: 0; border-radius: 14px; background: transparent; }
-.form-workspace-head { justify-content: space-between; gap: 14px; margin-bottom: 8px; padding: 2px 2px 6px; border-bottom: 0; }
-.form-field-toolbar { display: flex; align-items: center; gap: 8px; margin: 0 2px 10px; padding: 8px; border: 1px solid color-mix(in srgb, var(--workbench-line) 64%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--workbench-soft) 55%, transparent); }
-.form-field-toolbar :deep(.el-input) { min-width: 220px; flex: 1; }
-.field-match-count { color: var(--el-text-color-secondary); font-size: 11px; white-space: nowrap; }
-.workspace-copy { min-width: 240px; flex: 1; }
-.form-workspace-head h2 { margin: 3px 0 0; color: var(--el-text-color-primary); font-size: 18px; line-height: 25px; }
-.form-workspace-head p { margin: 4px 0 0; color: var(--el-text-color-secondary); font-size: 11px; line-height: 17px; }
-.workspace-eyebrow { color: var(--workbench-accent); font-size: 9px; font-weight: 800; letter-spacing: 1.4px; }
+.form-workspace { min-width: 0; padding: 0; border: 0; border-radius: 14px; background: transparent; }
 .workbench-empty { min-height: 420px; }
 .workbench-skeleton { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 10px; }
 .workbench-skeleton.has-record-navigator { grid-template-columns: 230px minmax(0, 1fr); }
@@ -416,12 +388,7 @@ async function saveCurrent(overrides = {}) {
 .workbench-skeleton i { height: 58px; border-radius: 10px; background: color-mix(in srgb, var(--el-bg-color) 58%, transparent); }
 .action-icon { margin-right: 6px; }
 @keyframes workbench-shimmer { to { background-position: -220% 0; } }
-@media (max-width: 1100px) {
-    .workbench-toolbar,.form-workspace-head { align-items: stretch; flex-direction: column; }
-    .workbench-actions,.form-scope-actions { justify-content: flex-start; }
-}
 @media (max-width: 900px) {
-    .workbench-record-select :deep(.el-select) { width: 100%; }
     .workbench-layout,.workbench-layout.has-record-navigator { grid-template-columns: 1fr; }
     .workbench-skeleton,.workbench-skeleton.has-record-navigator { grid-template-columns: 1fr; }
     .workbench-skeleton aside { display: none; }
@@ -430,14 +397,7 @@ async function saveCurrent(overrides = {}) {
 }
 @media (max-width: 620px) {
     .module-form-workbench { padding: 4px; border-radius: 0; }
-    .workbench-record-select { align-items: stretch; flex-direction: column; }
-    .toolbar-label { display: none; }
-    .workbench-actions,.form-scope-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .workbench-actions :deep(.el-button),.workbench-actions :deep(.el-dropdown),.workbench-actions :deep(.el-dropdown .el-button),
-    .form-scope-actions :deep(.el-button),.form-scope-actions :deep(.el-dropdown),.form-scope-actions :deep(.el-dropdown .el-button) { width: 100%; }
     .form-workspace { padding: 6px; }
-    .form-workspace-head p { display: none; }
-    .form-field-toolbar { align-items: stretch; flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>

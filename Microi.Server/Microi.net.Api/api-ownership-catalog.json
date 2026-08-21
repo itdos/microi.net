@@ -1,0 +1,125 @@
+{
+  "SchemaVersion": 1,
+  "UpdatedAt": "2026-08-21",
+  "Principle": "业务编排优先由应用商城 Managed ApiEngine 交付；C# 仅保留启动前置、协议网关、可信鉴权、密钥隔离、存储网络边界和运行时内核。",
+  "Dispositions": {
+    "KernelRuntime": "宿主不可被应用包替代的原子运行时；保持 C#，由接口引擎调用。",
+    "BootstrapIdentity": "应用未安装前也必须可用的登录、验证码和 DiyToken 最小链路；保持可信内核并提供可选应用 Hook。",
+    "ProtocolGateway": "C# 只做验签、解密、原始协议响应和安全归一化；业务进入 Managed ApiEngine。",
+    "ManagedBusinessFacade": "业务逻辑迁入对应应用 ApiEngine；旧 Controller 仅保留有期限的兼容转发或删除。",
+    "OperationsKernel": "诊断、安全防护和宿主运维能力；保持 C#，不得承载租户可变业务。"
+  },
+  "Controllers": {
+    "AiController": { "OwnerType": "Application", "OwnerId": "app.microi.ai-engine", "Disposition": "ManagedBusinessFacade" },
+    "AIWorkFlowController": { "OwnerType": "Application", "OwnerId": "app.microi.ai-engine", "Disposition": "ManagedBusinessFacade" },
+    "ApiEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "BackgroundTaskController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "CacheController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "CaptchaController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
+    "DataSourceEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "DiagnosticsController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
+    "DiyChatController": { "OwnerType": "Application", "OwnerId": "app.microi.ai-engine", "Disposition": "ManagedBusinessFacade" },
+    "ExternalLoginController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
+    "FormEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "HDFSController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "HomeController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
+    "IdentityVerificationController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
+    "ImController": { "OwnerType": "Application", "OwnerId": "app.microi.message-notification", "Disposition": "ManagedBusinessFacade" },
+    "iTdosHeartController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
+    "JobController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "LicenseController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
+    "MarketplaceSourceController": { "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "ProtocolGateway" },
+    "MessageController": { "OwnerType": "Application", "OwnerId": "app.microi.message-notification", "Disposition": "ProtocolGateway" },
+    "MicroAppController": { "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "KernelRuntime" },
+    "ModuleEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "MqController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "MqttController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "OcrController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "OfficeController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "OnlineTerminalController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
+    "OsController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
+    "SearchEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "SecurityGuardController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
+    "SpiderController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "SsoController": { "OwnerType": "Application", "OwnerId": "app.microi.sso", "Disposition": "ProtocolGateway" },
+    "SysBaseDataController": { "OwnerType": "Application", "OwnerId": "app.microi.module-engine", "Disposition": "ManagedBusinessFacade" },
+    "SysDeptController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ManagedBusinessFacade" },
+    "SysLogController": { "OwnerType": "Application", "OwnerId": "app.microi.sys-log", "Disposition": "ManagedBusinessFacade" },
+    "SysMenuController": { "OwnerType": "Application", "OwnerId": "app.microi.module-engine", "Disposition": "ManagedBusinessFacade" },
+    "SysRoleController": { "OwnerType": "Application", "OwnerId": "app.microi.sys-role", "Disposition": "ManagedBusinessFacade" },
+    "SystemMonitorController": { "OwnerType": "Application", "OwnerId": "app.microi.sys-monitor", "Disposition": "OperationsKernel" },
+    "SysUserAccessKeyController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
+    "SysUserController": { "OwnerType": "Application", "OwnerId": "app.microi.sys_user", "Disposition": "BootstrapIdentity" },
+    "TenantSystemSettingsController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ManagedBusinessFacade" },
+    "TranslateController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "UEditorController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "ProtocolGateway" },
+    "UploadController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "ProtocolGateway" },
+    "UserBehaviorController": { "OwnerType": "Application", "OwnerId": "app.microi.sys-log", "Disposition": "ManagedBusinessFacade" },
+    "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
+    "WeChatContentSecurityController": { "OwnerType": "Application", "OwnerId": "microi-wechat-content-security", "Disposition": "ProtocolGateway" },
+    "WeChatController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
+    "WorkFlowController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" }
+  },
+  "ActionOverrides": {
+    "SysUserController.Login": {
+      "Disposition": "BootstrapIdentity",
+      "Target": "native password/captcha/DiyToken bootstrap plus optional platform_auth_login_event",
+      "Reason": "全新数据库尚未安装应用时仍必须能够使用 admin 登录并进入应用商城。"
+    },
+    "SysUserController.SmsLogin": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform_auth_sms_login",
+      "Reason": "短信注册、角色分配、租户信息与登录响应属于可升级业务编排。"
+    },
+    "SysUserController.AddSysUser": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "FormEngine plus app.microi.saas-engine policy engine"
+    },
+    "SysUserController.UptSysUser": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "FormEngine plus app.microi.saas-engine policy engine"
+    },
+    "SysUserController.DelSysUser": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "FormEngine plus app.microi.saas-engine policy engine"
+    },
+    "SsoController": {
+      "Disposition": "ProtocolGateway",
+      "Target": "app.microi.sso Managed ApiEngines",
+      "NativeBoundary": [
+        "OIDC/SAML/CAS message parsing and signature validation",
+        "redirect and raw protocol response",
+        "opaque one-time protocol tickets",
+        "tenant signing keys and DiyToken trusted atoms"
+      ],
+      "ManagedApiEngines": [
+        "sso_capabilities",
+        "sso_legacy_capabilities",
+        "sso_connection_runtime",
+        "sso_resolve_federated_identity",
+        "sso_protocol_event",
+        "sso_event_hook",
+        "sso_outbound_claims",
+        "sso_complete_login",
+        "sso_rotate_client_secret",
+        "sso_legacy_token_login",
+        "sso_user_runtime"
+      ],
+      "RemovedNativeActions": [
+        "Capabilities",
+        "LegacyCapabilities",
+        "CompleteLogin",
+        "RotateClientSecret",
+        "SysUserController.SsoPengrui"
+      ]
+    },
+    "WeChatContentSecurityController.Callback": {
+      "Disposition": "ProtocolGateway",
+      "Target": "C# signature/AES gateway plus Managed callback ApiEngine"
+    },
+    "MarketplaceSourceController": {
+      "Disposition": "ProtocolGateway",
+      "Target": "app.microi.store Managed ApiEngines"
+    }
+  }
+}

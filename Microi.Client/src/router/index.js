@@ -35,6 +35,13 @@ export const constantRoutes = [
         meta: { title: "访问密钥登录", anonymous: true, keepAlive: false }
     },
     {
+        path: "/sso-authorize",
+        name: "sso_authorize",
+        component: () => import("@/views/login/sso-authorize.vue"),
+        hidden: true,
+        meta: { title: "单点登录授权", anonymous: true, keepAlive: false }
+    },
+    {
         path: "/mci-redis-manager",
         name: "mci_redis_manager",
         component: () => import("@/views/system/mci-redis-manager.vue"),

@@ -119,7 +119,12 @@
                                 <li id="A">
                                     <div
                                         @click="
-                                            SelectCurrentLastContact({ ContactUserId: user.Id, ContactUserName: user.Name, ContactUserAvatar: user.Avatar });
+                                            SelectCurrentLastContact({
+                                                ContactUserId: user.Id,
+                                                ContactUserName: user.Name,
+                                                ContactUserAccount: user.Account,
+                                                ContactUserAvatar: user.Avatar
+                                            });
                                         "
                                         v-for="user in AllContactsList"
                                         :key="'contacts_' + user.Id"
@@ -401,6 +406,9 @@ import {
     renderDataTable, 
     escapeHtml,
     splitTypewriterUnits,
+    resolveChatDisplayName,
+    normalizeChatContact,
+    normalizeChatDirectoryUser,
     initWebSocketEvents,
     cleanupWebSocketEvents
 } from "@/utils/chat.common";
@@ -612,7 +620,16 @@ export default {
         GetLastContacts: {
             get() {
                 var self = this;
-                const recent = Array.isArray(self.LastContacts) ? self.LastContacts : [];
+                const directoryByUserId = new Map(
+                    (Array.isArray(self.AllContactsList) ? self.AllContactsList : [])
+                        .map(item => [String(item?.Id || ""), item])
+                );
+                const recent = (Array.isArray(self.LastContacts) ? self.LastContacts : [])
+                    .map(item => normalizeChatContact(
+                        item,
+                        directoryByUserId.get(String(item?.ContactUserId || item?.Id || "")),
+                        "未命名用户"
+                    ));
                 const byUserId = new Map(
                     recent.map(item => [String(item?.ContactUserId || item?.Id || ""), item])
                 );
@@ -625,6 +642,7 @@ export default {
                     UpdateTime: "",
                     UnRead: 0,
                     ...(byUserId.get("AI") || {}),
+                    ContactUserName: "AI助手",
                     ContactUserAvatar: AI_ASSISTANT_AVATAR
                 };
                 const platformContact = createPlatformSystemContact(
@@ -639,7 +657,7 @@ export default {
                 ];
                 const keyword = String(self.kw || "").trim().toLowerCase();
                 if (!keyword) return merged;
-                return merged.filter(item => `${item?.ContactUserName || ""} ${item?.LastMessage || ""}`
+                return merged.filter(item => `${item?.ContactUserName || ""} ${item?.ContactUserAccount || ""} ${item?.LastMessage || ""}`
                     .toLowerCase()
                     .includes(keyword));
                 // self.LastContacts.forEach(element => {
@@ -1343,10 +1361,13 @@ export default {
                         let contactsList = [];
                         if (isLoadMore) {
                             // 加载更多：追加数据（AI助手已在第一页添加，不需要重复）
-                            contactsList = self.AllContactsList.concat(result.Data || []);
+                            contactsList = self.AllContactsList.concat(
+                                (result.Data || []).map(item => normalizeChatDirectoryUser(item, "未命名用户"))
+                            );
                         } else {
                             // 首次加载或搜索：替换数据
-                            contactsList = result.Data || [];
+                            contactsList = (result.Data || [])
+                                .map(item => normalizeChatDirectoryUser(item, "未命名用户"));
                             
                             // 在第一页且无搜索关键字时，添加AI助手到列表开头
                             if (self.contactsPageIndex === 1 && !self.kw) {
@@ -1410,7 +1431,8 @@ export default {
                 ...(knownContact || {}),
                 ...(contact || {}),
                 ContactUserId: contactUserId,
-                ContactUserName: contact?.ContactUserName || contact?.Name || knownContact?.ContactUserName || "",
+                ContactUserName: resolveChatDisplayName(contact, knownContact, "未命名用户"),
+                ContactUserAccount: contact?.ContactUserAccount || contact?.Account || knownContact?.ContactUserAccount || knownContact?.Account || "",
                 ContactUserAvatar: contact?.ContactUserAvatar || contact?.Avatar || knownContact?.ContactUserAvatar || ""
             };
 
@@ -1723,7 +1745,8 @@ export default {
                     // 接收最近联系人列表
                     onReceiveLastContacts: (message) => {
                         self.FirstConnectWebsocket = false;
-                        self.LastContacts = message;
+                        self.LastContacts = (Array.isArray(message) ? message : [])
+                            .map(item => normalizeChatContact(item, null, "未命名用户"));
                     },
                     
                     // 接收未读消息数

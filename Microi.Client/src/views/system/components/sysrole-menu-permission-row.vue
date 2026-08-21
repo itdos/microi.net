@@ -1,7 +1,7 @@
 <template>
     <div class="role-menu-node">
-        <div class="role-menu-row" :style="{ paddingLeft: level * 22 + 'px' }">
-            <div class="role-menu-name">
+        <div class="role-menu-row">
+            <div class="role-menu-name" :style="{ paddingLeft: 10 + level * 18 + 'px' }">
                 <button
                     v-if="hasChildren"
                     type="button"
@@ -9,12 +9,12 @@
                     :aria-label="expanded ? '收起当前行' : '展开当前行'"
                     @click="expanded = !expanded"
                 >
-                    <span :class="['role-menu-expand-arrow', { expanded }]">›</span>
+                    <span :class="['role-menu-expand-arrow', { expanded }]" aria-hidden="true"></span>
                 </button>
                 <span v-else class="role-menu-expand-placeholder"></span>
                 <label class="role-menu-check">
                     <input type="checkbox" :checked="row._Check === true" :disabled="disabled" @change="emitNameChange" />
-                    <i v-if="row.IconClass" :class="['icon', 'mr-2', row.IconClass]"></i>
+                    <i v-if="row.IconClass" :class="['icon', row.IconClass]"></i>
                     <span>{{ row.Name || row.EnName }}</span>
                 </label>
             </div>

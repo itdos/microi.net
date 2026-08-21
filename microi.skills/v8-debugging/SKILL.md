@@ -89,7 +89,9 @@ return {
   `HasMore + Checkpoint` 续跑，不要只提高单次超时或内存。
 - 接口引擎的正向开关是 `sys_apiengine.V8Limit`：默认关闭时
   `V8.Limits.UnlimitedRuntime=true`，打开后才应用超时、语句、函数递归、
-  累计分配和 Promise 等待限制。表后端事件仍用 `diy_table.V8Unlimited`。
+  累计分配和 Promise 等待限制。表后端事件同样使用正向 `diy_table.V8Limit`：
+  缺失、`null`、`0/false` 不设置单次预算，只有 `1/true` 才启用限制；旧
+  `V8Unlimited` 仅在新字段不存在时反向兼容。
   常驻内存保护、外部取消、并发、接口嵌套深度、权限沙箱与数据库限制始终
   生效；两类开关都只能来自持久化可信元数据，不能从请求参数启用。
 - 服务端另有一个内置受信任特例：主租户中由持久队列恢复的
