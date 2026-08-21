@@ -103,7 +103,9 @@ export default {
       return {
         ...raw,
         Path: path,
-        url: url || V8.assetUrl(path),
+        // resolveFileUrl 已区分公有资源与需要鉴权的私有资源；私有签发失败时
+        // 保持空地址并展示受控占位，不能再次把相对路径拼到公有 FileServer。
+        url: url || '',
         localPath,
         resolving: false,
         resolveFailures: 0

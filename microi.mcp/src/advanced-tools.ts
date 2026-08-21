@@ -242,7 +242,10 @@ function stringifyConfig(value: unknown): string | undefined {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
-export function analyzeBackgroundWorkload(buttonInput: unknown): { required: boolean; reasons: string[] } {
+export function analyzeBackgroundWorkload(
+  buttonInput: unknown,
+  options: { inferActionSemantics?: boolean } = {},
+): { required: boolean; reasons: string[] } {
   const button = asRecord(buttonInput);
   const workload = asRecord(button.Workload ?? button.workload ?? button.BackgroundWorkload ?? button.backgroundWorkload);
   const reasons: string[] = [];
@@ -268,7 +271,8 @@ export function analyzeBackgroundWorkload(buttonInput: unknown): { required: boo
   // action both blocks valid menu updates and can accidentally bypass the intended confirmation UI.
   const isNavigationOnly = /\bV8\.OpenAppDialog\s*\(/i.test(v8Code)
     && !/\bV8\.(?:ApiEngine\.RunBackground|Method\.QueueBackgroundTask)\s*\(/i.test(v8Code);
-  if (!isNavigationOnly
+  if (options.inferActionSemantics !== false
+      && !isNavigationOnly
       && /(批量.{0,4}(导入|生成|修复|处理)|安装|初始化|全量同步|数据迁移|数据库备份|批量任务)/i.test(semanticText)) {
     reasons.push('动作语义属于典型长任务');
   }
@@ -396,7 +400,12 @@ function normalizeMenuJsonArray(fieldName: string, raw?: unknown): { ok: boolean
     const button = asRecord(item);
     const name = getString(button, 'Name', 'name');
     if (!name) errors.push(`${fieldName}[${index}].Name 不能为空`);
-    const workloadAnalysis = analyzeBackgroundWorkload(button);
+    // PageTabs describe filters/navigation. Their names and V8 filter literals (for example,
+    // "待安装") are not action semantics and must not be inferred as background work.
+    // Explicit Workload thresholds are still evaluated for every field, including PageTabs.
+    const workloadAnalysis = analyzeBackgroundWorkload(button, {
+      inferActionSemantics: fieldName !== 'PageTabs',
+    });
     const clientChunking = analyzeClientChunking(button);
     let runBackground = button.RunBackground ?? button.runBackground ?? button.BackgroundTask ?? button.backgroundTask ?? button.IsBackgroundTask ?? button.isBackgroundTask;
     const apiEngineKey = getString(button, 'ApiEngineKey', 'apiEngineKey');
