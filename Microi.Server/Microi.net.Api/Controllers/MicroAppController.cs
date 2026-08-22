@@ -532,7 +532,71 @@ namespace Microi.net.Api
             // result.Data is dynamic. Without the explicit object boundary the
             // local page/isEnable variables also become dynamic, so Val<int>()
             // is incorrectly dispatched as a JValue instance method at runtime.
-            return ToEnabledPage((object)result.Data);
+            var page = ToEnabledPage((object)result.Data);
+            return page == null ? null : await EnrichPageSourceInfo(osClient, page);
+        }
+
+        private static async Task<JObject> EnrichPageSourceInfo(string osClient, JObject page)
+        {
+            var pageId = page?["Id"].Val<string>();
+            if (pageId.DosIsNullOrWhiteSpace()) return page;
+            try
+            {
+                // RouteMetaJson was added after the first page schema shipped.
+                // Read it separately so older tenants still resolve and mount the
+                // micro-app through the stable cross-version projection above.
+                var param = new DiyTableRowParam
+                {
+                    FormEngineKey = "sys_microiservice_page",
+                    OsClient = osClient,
+                    _InvokeType = InvokeType.Server.ToString(),
+                    _TrustedServerInvocation = true,
+                    _Where = new List<DiyWhere>
+                    {
+                        new DiyWhere { Name = "Id", Type = "=", Value = pageId }
+                    },
+                    _SelectFields = new List<string> { "Id", "RouteMetaJson" }
+                };
+                dynamic result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
+                return result.Code == 1
+                    ? AttachPageSourceInfo(page, (object)result.Data)
+                    : page;
+            }
+            catch
+            {
+                // Source-file metadata is informational. A legacy schema must
+                // never turn an otherwise healthy micro-app route into an error.
+                return page;
+            }
+        }
+
+        private static JObject AttachPageSourceInfo(JObject page, object data)
+        {
+            if (page == null) return null;
+            var row = ToJObject(data);
+            var routeMetaJson = row?["RouteMetaJson"].Val<string>();
+            if (routeMetaJson.DosIsNullOrWhiteSpace()) return page;
+            try
+            {
+                var routeMeta = JObject.Parse(routeMetaJson);
+                var sourceFile = (routeMeta["SourceFile"] ?? routeMeta["sourceFile"])
+                    ?.Val<string>()
+                    ?.Replace('\\', '/')
+                    ?.Trim()
+                    ?.TrimStart('/');
+                if (sourceFile.DosIsNullOrWhiteSpace()
+                    || sourceFile.Length > 1000
+                    || sourceFile.Split('/').Any(segment => segment == ".."))
+                {
+                    return page;
+                }
+                page["SourceFile"] = sourceFile;
+                return page;
+            }
+            catch
+            {
+                return page;
+            }
         }
 
         private static JObject ToEnabledPage(object data)

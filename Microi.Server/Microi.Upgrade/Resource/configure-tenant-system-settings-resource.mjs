@@ -9,8 +9,24 @@ const packageModel = JSON.parse(await readFile(packageUrl, 'utf8'))
 const storePackageModel = JSON.parse(await readFile(storePackageUrl, 'utf8'))
 const importerSource = (await readFile(importerUrl, 'utf8')).replace(/\r\n/g, '\n')
 const category = '安全与服务接入'
-const platformServiceVersion = 'v1.6.9'
 const createTime = '2026-08-21 00:00:00'
+
+const parseVersion = value => String(value || '')
+  .replace(/^v/i, '')
+  .split('.')
+  .map(part => Number(part) || 0)
+
+const ensureMinimumVersion = (value, minimum) => {
+  const currentParts = parseVersion(value)
+  const minimumParts = parseVersion(minimum)
+  for (let index = 0; index < Math.max(currentParts.length, minimumParts.length); index += 1) {
+    const currentPart = currentParts[index] || 0
+    const minimumPart = minimumParts[index] || 0
+    if (currentPart > minimumPart) return value
+    if (currentPart < minimumPart) return minimum
+  }
+  return value || minimum
+}
 
 const template = (id, key, value, valueType, description, sort, isSecret = false) => ({
   Id: id,
@@ -74,17 +90,9 @@ button.V8Code = String(button.V8Code || '').replace(
   /Title:\s*'租户系统设置 · [^']*'/,
   `Title: '租户系统设置 · ${category}'`,
 )
-if (/\n\s*Version:\s*'[^']*',/.test(button.V8Code)) {
-  button.V8Code = button.V8Code.replace(
-    /\n(\s*)Version:\s*'[^']*',/,
-    `\n$1Version: '${platformServiceVersion}',`,
-  )
-} else {
-  button.V8Code = button.V8Code.replace(
-    /(\n\s*AppKey:\s*'microi-platform-service',)/,
-    `$1\n  Version: '${platformServiceVersion}',`,
-  )
-}
+// 平台内置服务入口必须解析当前 DatabaseOnly 运行包。这里不能固化历史
+// BuildVersion，否则 SaaS 包与内置微服务分开升级后会在读取数据库资产前失败。
+button.V8Code = button.V8Code.replace(/\n\s*Version:\s*'[^']*',/, '')
 menu.PageBtns = typeof menu.PageBtns === 'string' ? JSON.stringify(buttons) : buttons
 
 const dataSet = (packageModel.DataSets || []).find(item => String(item.TableName).toLowerCase() === 'mci_system_setting')
@@ -108,8 +116,9 @@ for (const row of templates) {
 dataSet.Rows = existingRows
 
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {})
-info.Version = 'v7.5.7'
+info.Version = ensureMinimumVersion(info.Version, 'v7.5.16')
 const changeLines = [
+  '2026-08-22 v7.5.16 “安全与服务接入”入口不再锁定历史微服务版本，始终解析当前 DatabaseOnly 内置运行包，HDFS/CDN 不可用时继续使用数据库资产。',
   '2026-08-21 v7.5.7 内嵌 microi-platform-service 升级至 v1.6.9，统一交付满高系统设置、清爽应用商城与主题化明暗模式。',
   '2026-08-21 v7.5.6 内嵌 microi-platform-service 升级至 v1.6.8，并固化“安全与服务接入”满高弹层及租户私有配置交付。',
   '2026-08-21 v7.5.5 将 send_sms_reg 作为 Managed/Platform 资源纳入 SaaS 基础包，保留匿名 HTTP 契约并优先读取租户后端私有短信配置。',
@@ -138,7 +147,7 @@ importer.ApiV8Code = importerSource
 importer.Version = importerVersion.startsWith('v') ? importerVersion : `v${importerVersion}`
 importer.LimitMemory = 8192
 const storeInfo = storePackageModel.PackageInfo || (storePackageModel.PackageInfo = {})
-storeInfo.Version = 'v7.5.7'
+storeInfo.Version = ensureMinimumVersion(storeInfo.Version, 'v7.5.7')
 const storeChangeLines = [
   '2026-08-21 v7.5.7 内嵌 microi-platform-service 升级至 v1.6.9，应用商城压缩首屏层级并完成主题色、亮色与深色适配。',
   '2026-08-21 v7.5.3 内嵌 microi-platform-service 升级至 v1.6.8，正式交付“安全与服务接入”满高弹层与租户私有配置界面。',

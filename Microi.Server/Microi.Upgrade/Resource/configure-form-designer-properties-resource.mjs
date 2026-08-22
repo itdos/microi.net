@@ -170,6 +170,24 @@ legacyPresentation.AppVisible = 0;
 legacyPresentation.Description = '旧版兼容，只读迁移源；新版设计器统一维护 diy_table 物理属性字段。';
 legacyPresentation.Label = '旧版表单工作台配置（兼容）';
 
+const tabsField = byName.get('Tabs');
+if (!tabsField) throw new Error('缺少 diy_table.Tabs 元数据');
+const modulePackagePath = path.join(path.dirname(packagePath), 'app.microi.module-engine.json');
+const modulePackage = JSON.parse(fs.readFileSync(modulePackagePath, 'utf8'));
+const menuBadgeApiEngineField = modulePackage.DiyFields.find((item) => (
+  String(item.TableName).toLowerCase() === 'sys_menu'
+  && item.Name === 'MenuBadgeApiEngineKey'
+));
+if (!menuBadgeApiEngineField) throw new Error('模块引擎包缺少 sys_menu.MenuBadgeApiEngineKey 元数据');
+const tabsConfig = JSON.parse(tabsField.Config || '{}');
+const badgeApiEngineColumn = tabsConfig.JsonTable?.Columns?.find((item) => item.Key === 'BadgeApiEngineKey');
+if (!badgeApiEngineColumn) throw new Error('diy_table.Tabs 缺少 BadgeApiEngineKey 配置列');
+badgeApiEngineColumn.Config = {
+  ...(badgeApiEngineColumn.Config || {}),
+  DataSourceFieldId: menuBadgeApiEngineField.Id,
+};
+tabsField.Config = JSON.stringify(tabsConfig);
+
 const legacyUnlimited = byName.get('V8Unlimited');
 if (!legacyUnlimited) throw new Error('缺少 diy_table.V8Unlimited 元数据');
 legacyUnlimited.Visible = 0;
@@ -233,7 +251,7 @@ for (const [name, columnType, , comment] of physicalDefinitions) {
   ddl.DDL = `${before},\n  \`${name}\` ${ddlType} NULL COMMENT '${comment.replaceAll("'", "''")}'${after}`;
 }
 
-pkg.PackageInfo.Version = maxVersion(pkg.PackageInfo.Version, 'v7.5.5');
+pkg.PackageInfo.Version = maxVersion(pkg.PackageInfo.Version, 'v7.5.6');
 pkg.PackageInfo.Description = '表单引擎基础资源。工作台、分组与紧凑主题化 Banner 均使用 diy_table 物理属性；Banner 支持字段图片、动态标签、接口引擎统计及旧表智能默认。';
 const historyLine = '2026-08-21 v7.5.1 将表单工作台配置迁移为 diy_table 物理属性并新增两个属性 Tab；TabsPosition 默认 top；新增正向 V8Limit，隐藏旧 FormPresentation/V8Unlimited 兼容字段。';
 if (!String(pkg.PackageInfo.ChangeHistory || '').includes(historyLine)) {
@@ -242,6 +260,10 @@ if (!String(pkg.PackageInfo.ChangeHistory || '').includes(historyLine)) {
 const bannerHistoryLine = '2026-08-22 v7.5.5 新增表单 Banner 属性 Tab 与 8 个 diy_table 物理字段，支持标题/副标题/图片/背景/标签/接口统计配置；旧表无配置时按字段类型智能显示。';
 if (!String(pkg.PackageInfo.ChangeHistory || '').includes(bannerHistoryLine)) {
   pkg.PackageInfo.ChangeHistory = `${bannerHistoryLine}\n${pkg.PackageInfo.ChangeHistory || ''}`.trim();
+}
+const badgeProxyHistoryLine = '2026-08-22 v7.5.6 修复表单分组统计接口引擎下拉的数据源字段代理，避免设计器把 BadgeApiEngineKey 当作不存在的 DiyField Id。';
+if (!String(pkg.PackageInfo.ChangeHistory || '').includes(badgeProxyHistoryLine)) {
+  pkg.PackageInfo.ChangeHistory = `${badgeProxyHistoryLine}\n${pkg.PackageInfo.ChangeHistory || ''}`.trim();
 }
 pkg.PackageInfo.RequiredPlatformCapabilities = [...new Set([
   ...(pkg.PackageInfo.RequiredPlatformCapabilities || []),

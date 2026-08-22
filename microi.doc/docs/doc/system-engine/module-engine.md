@@ -13,6 +13,15 @@
 
 管理员也可在【系统账号】表单的“个人设置”页签维护该字段。MCP 维护账号数据时使用同名字段 `DefaultIndexUrl`；留空表示继承系统默认值。
 
+个人设置还支持 `sys_user.ThemeColor`、`ThemeMode` 和 `MenuChildExpandMode`。右上角主题设置与平台个人中心统一调用官方 Managed 接口引擎 `platform-user-update-preferences` 保存：
+
+- `ThemeColor` 留空时继承 `sys_config.ThemeColor`；
+- `ThemeMode` 使用 `light / dark`；
+- `MenuChildExpandMode` 使用 `System / Down / Right`，其中 `System` 继承系统设置；
+- 已安装这些字段时以账号值为准，换设备登录也会恢复；旧租户未安装字段时仅保留浏览器本地兼容行为。
+
+接口引擎只从当前 DiyToken 读取用户 Id 和租户，不接受调用方指定目标用户/租户，也不写账号、手机号、部门、角色、Level、状态、密码、认证因子或登录审计字段。管理员表单中的“个人设置”Tab 应继续用 CollapseGroup 将语言与首页、主题与菜单、桌面外观分组。
+
 ## 左侧菜单统计角标
 
 对库存预警、待审批、未读消息、待回款等需要用户持续关注的菜单，可在模块引擎配置：

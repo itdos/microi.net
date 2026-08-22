@@ -26,7 +26,16 @@ test('system settings drawer fills its viewport and uses the security/service-ac
   const button = JSON.parse(menu.PageBtns).find(item => item.Id === 'mci-system-settings-identity-center')
   assert.equal(button.Name, '安全与服务接入')
   assert.match(button.V8Code, /租户系统设置 · 安全与服务接入/)
-  assert.match(button.V8Code, /Version:\s*'v1\.6\.9'/)
+  assert.match(button.V8Code, /AppKey:\s*'microi-platform-service'/)
+  assert.match(button.V8Code, /RoutePath:\s*'\/system-settings'/)
+  assert.doesNotMatch(button.V8Code, /\bVersion\s*:/)
+
+  const platformBundle = packageModel.ApplicationBundles.find(
+    item => item?.Application?.AppKey === 'microi-platform-service',
+  )
+  assert.equal(platformBundle.AssetStoragePolicy.Build, 'DatabaseOnly')
+  assert.equal(platformBundle.MicroService.StorageMode, 'db')
+  assert.ok(platformBundle.BuildAssets.some(asset => asset.Path === 'index.html'))
 })
 
 test('official package refreshes metadata but never overwrites tenant setting values', () => {

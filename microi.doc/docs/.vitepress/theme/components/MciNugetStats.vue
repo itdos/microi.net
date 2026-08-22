@@ -61,7 +61,10 @@ import {
   NUGET_FALLBACK_STATS,
   formatCompactDownloads,
   loadCachedNugetStats,
-  loadNugetOwnerStats
+  loadLocalNugetStats,
+  loadNugetOwnerStats,
+  persistLocalNugetStats,
+  preferHigherNugetStats
 } from '../utils/nuget-downloads.js'
 
 const props = defineProps({
@@ -105,15 +108,19 @@ const copy = computed(() => isEnglish.value ? {
   ariaLabel: 'Microi NuGet download statistics',
   eyebrow: 'NUGET OFFICIAL LIVE DATA',
   title: 'Ranks first by downloads among publicly searchable .NET AI low-code platforms',
-  description: 'Public packages owned by ITdos, aggregated by the official iTdos API Engine and shared through its Redis last-success cache.',
+  description: 'Public packages owned by ITdos, aggregated by the official iTdos API Engine and retained in Redis plus a daily database snapshot.',
   downloads: 'downloads',
   cacheLoading: 'Reading recent data',
   updating: 'Updating now',
   current: 'Current API live total',
   cached: 'Latest successful total',
+  database: 'Daily database snapshot',
+  browser: 'Browser last-success snapshot',
   fallback: 'Embedded recent snapshot',
   liveSource: `${stats.value.packageCount} packages · current API live total${updateTime.value ? ` · ${updateTime.value}` : ''}`,
   cachedSource: `${stats.value.packageCount} packages · Redis latest successful total${updateTime.value ? ` · ${updateTime.value}` : ''}`,
+  databaseSource: `${stats.value.packageCount} packages · daily database snapshot${updateTime.value ? ` · ${updateTime.value}` : ''}`,
+  browserSource: `${stats.value.packageCount} packages · browser last-success snapshot${updateTime.value ? ` · ${updateTime.value}` : ''}`,
   fallbackSource: 'Built-in recent snapshot · opening the profile shows the current public data',
   methodNote: 'Official indexes update asynchronously; the category statement is based on publicly searchable peers, not an official Microsoft ranking.',
   linkTitle: 'Open the official ITdos profile on NuGet'
@@ -121,15 +128,19 @@ const copy = computed(() => isEnglish.value ? {
   ariaLabel: 'Microi吾码 NuGet 下载量统计',
   eyebrow: 'NUGET 官方实时数据',
   title: 'NuGet 可公开检索的 .NET AI 低代码平台中下载量位居首位',
-  description: '由 iTdos 官方接口引擎汇总 ITdos 名下公开包，并通过 Redis 共享最近一次成功结果。长期、可核验的数据可从侧面反映平台成熟度与开发者采用情况。',
+  description: '由 iTdos 官方接口引擎汇总 ITdos 名下公开包，成功结果先写入 Redis，再按日持久化到数据库。长期、可核验的数据可从侧面反映平台成熟度与开发者采用情况。',
   downloads: '累计下载',
   cacheLoading: '正在读取最近数据',
   updating: '正在更新',
   current: '当前 API 实时汇总',
   cached: '最近一次成功汇总',
+  database: '数据库每日持久快照',
+  browser: '浏览器最近成功快照',
   fallback: '官网内置最近快照',
   liveSource: `${stats.value.packageCount} 个公开包 · 当前 API 实时汇总${updateTime.value ? ` · 更新于 ${updateTime.value}` : ''}`,
   cachedSource: `${stats.value.packageCount} 个公开包 · Redis 最近一次成功汇总${updateTime.value ? ` · 更新于 ${updateTime.value}` : ''}`,
+  databaseSource: `${stats.value.packageCount} 个公开包 · 数据库每日持久快照${updateTime.value ? ` · 更新于 ${updateTime.value}` : ''}`,
+  browserSource: `${stats.value.packageCount} 个公开包 · 浏览器最近成功快照${updateTime.value ? ` · 更新于 ${updateTime.value}` : ''}`,
   fallbackSource: '官网内置最近快照 · 点击前往 NuGet 官方主页查看公开数据',
   methodNote: 'NuGet 各官方索引异步同步，数值可能短时略有差异；“位居首位”按可公开检索的同类平台下载量口径，不代表微软 / NuGet 官方评选。',
   linkTitle: '前往 NuGet 官方 ITdos 主页查看全部包与实时下载量'
@@ -139,14 +150,21 @@ const statusText = computed(() => {
   if (state.value === 'cache-loading') return copy.value.cacheLoading
   if (state.value === 'refreshing') return copy.value.updating
   if (state.value === 'live') return copy.value.current
-  if (state.value === 'cached') return copy.value.cached
+  if (state.value === 'cached') {
+    if (stats.value.stage === 'database') return copy.value.database
+    if (stats.value.stage === 'browser') return copy.value.browser
+    return copy.value.cached
+  }
   return copy.value.fallback
 })
 
 const sourceText = computed(() => {
   if (state.value === 'live') return copy.value.liveSource
-  if (state.value === 'refreshing' && stats.value.stage === 'cache') return copy.value.cachedSource
-  if (state.value === 'cached') return copy.value.cachedSource
+  if (state.value === 'refreshing' || state.value === 'cached') {
+    if (stats.value.stage === 'database') return copy.value.databaseSource
+    if (stats.value.stage === 'browser') return copy.value.browserSource
+    if (stats.value.stage === 'cache') return copy.value.cachedSource
+  }
   return copy.value.fallbackSource
 })
 
@@ -201,16 +219,25 @@ function wait(milliseconds) {
 
 onMounted(async () => {
   mounted = true
-  let serverCacheLoaded = false
+  let successfulSnapshotLoaded = false
+
+  const local = loadLocalNugetStats()
+  if (local) {
+    stats.value = preferHigherNugetStats(stats.value, local)
+    displayDownloads.value = stats.value.totalDownloads
+    state.value = 'cached'
+    successfulSnapshotLoaded = true
+  }
 
   try {
     const cached = await loadCachedNugetStats()
     if (!mounted) return
-    stats.value = cached
-    serverCacheLoaded = true
-    animateDownloads(cached.totalDownloads, 360)
+    stats.value = preferHigherNugetStats(stats.value, cached)
+    persistLocalNugetStats(cached)
+    successfulSnapshotLoaded = true
+    animateDownloads(stats.value.totalDownloads, 360)
   } catch {
-    // 首次缓存尚未建立或网络暂不可用时，继续显示官网内置最近快照。
+    // 服务端不可达时保留浏览器最后成功快照；首次访问再使用官网内置快照。
   }
 
   if (!mounted) return
@@ -222,14 +249,20 @@ onMounted(async () => {
     if (!mounted) return
     await wait(950 - (performance.now() - refreshingSince))
     if (!mounted) return
-    stats.value = refreshed
-    await animateDownloads(refreshed.totalDownloads)
+    const selected = preferHigherNugetStats(stats.value, refreshed)
+    const selectedCurrentRefresh = selected === refreshed && refreshed.isLive
+    stats.value = selected
+    persistLocalNugetStats(refreshed)
+    successfulSnapshotLoaded = true
+    await animateDownloads(stats.value.totalDownloads)
     if (!mounted) return
-    state.value = refreshed.isLive ? 'live' : (serverCacheLoaded ? 'cached' : 'fallback')
+    state.value = selectedCurrentRefresh
+      ? 'live'
+      : (successfulSnapshotLoaded ? 'cached' : 'fallback')
   } catch {
     await wait(950 - (performance.now() - refreshingSince))
     if (!mounted) return
-    state.value = serverCacheLoaded ? 'cached' : 'fallback'
+    state.value = successfulSnapshotLoaded ? 'cached' : 'fallback'
   }
 })
 

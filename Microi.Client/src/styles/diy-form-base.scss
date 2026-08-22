@@ -177,6 +177,12 @@
         --collapse-group-color: var(--el-color-primary);
     }
 
+    // 历史表单曾写入 Theme=info。它在视觉上一直按主色展示，保留同色
+    // 兼容映射，避免该值导致整组内容承载面的背景变量失效。
+    .collapse-group-theme-info {
+        --collapse-group-color: var(--el-color-primary);
+    }
+
     .collapse-group-theme-success {
         --collapse-group-color: var(--el-color-success);
     }
@@ -191,18 +197,21 @@
 
     .collapse-group-theme-default,
     .collapse-group-theme-primary,
+    .collapse-group-theme-info,
     .collapse-group-theme-success,
     .collapse-group-theme-warning,
     .collapse-group-theme-danger {
-        --collapse-group-bg: color-mix(in srgb, var(--collapse-group-color) 4%, var(--el-bg-color) 96%);
-        --collapse-group-surface: color-mix(in srgb, var(--collapse-group-color) 2.5%, var(--el-bg-color) 97.5%);
-        --collapse-group-border: color-mix(in srgb, var(--collapse-group-color) 24%, var(--el-border-color-light) 76%);
+        --collapse-group-bg: color-mix(in srgb, var(--collapse-group-color) 20%, var(--el-bg-color) 96%);
+        // 使用主题卡片底色：浅色主题即纯白，暗色主题继续保持暗色表面。
+        --collapse-group-surface: var(--el-bg-color);
     }
 
     .collapse-group-header {
-        margin-top: 7px;
+        margin-top: 2px;
 
         .container-form-item {
+            background: transparent !important;
+            box-shadow: none !important;
             // CollapseGroup 的内容边框以整行网格为基准绘制；头部不能继续
             // 继承普通字段卡片的 5px 横向留白，否则展开后两侧会各错开 5px。
             margin-left: 0 !important;
@@ -214,7 +223,6 @@
 
         &.collapse-group-expanded {
             .diy-collapse-group {
-                border-bottom-color: var(--collapse-group-border);
                 border-bottom-left-radius: 0;
                 border-bottom-right-radius: 0;
                 box-shadow: none;
@@ -224,14 +232,10 @@
 
     .collapse-group-item {
         position: relative;
-        background: transparent;
-        border-color: var(--collapse-group-border);
-        border-style: solid;
-        border-width: 0;
+        background: var(--collapse-group-surface);
         padding-left: 0 !important;
         padding-right: 0 !important;
         overflow: visible;
-        transition: border-color 0.2s ease;
 
         .container-form-item {
             position: relative;
@@ -239,7 +243,7 @@
             margin: 3px 5px;
             padding: 6px 16px 1px;
             border-radius: 9px;
-            background: var(--el-bg-color);
+            background: var(--collapse-group-surface);
         }
 
         .el-form-item {
@@ -248,22 +252,20 @@
     }
 
     .collapse-group-row-first {
-        border-top-width: 0;
         padding-top: 2px;
     }
 
     .collapse-group-row-last {
-        border-bottom-width: 0;
         padding-bottom: 6px;
         margin-bottom: 6px;
     }
 
-    .collapse-group-row-start {
-        border-left-width: 0;
+    .collapse-group-row-last.collapse-group-row-start {
+        border-bottom-left-radius: 12px;
     }
 
-    .collapse-group-row-end {
-        border-right-width: 0;
+    .collapse-group-row-last.collapse-group-row-end {
+        border-bottom-right-radius: 12px;
     }
 
     .collapse-group-row-start::before {
@@ -274,8 +276,6 @@
         bottom: 0;
         left: 0;
         width: 100%;
-        border-left: 1px solid var(--collapse-group-border);
-        border-right: 1px solid var(--collapse-group-border);
         background: var(--collapse-group-surface);
         pointer-events: none;
     }
@@ -289,7 +289,6 @@
     }
 
     .collapse-group-row-last.collapse-group-row-start::before {
-        border-bottom: 1px solid var(--collapse-group-border);
         border-bottom-left-radius: 12px;
         border-bottom-right-radius: 12px;
         box-shadow: 0 10px 24px rgba(25, 48, 82, .07);
@@ -307,8 +306,6 @@
 
     @media (max-width: 768px) {
         .collapse-group-item {
-            border-left-width: 1px;
-            border-right-width: 1px;
             background: var(--collapse-group-surface);
 
             .container-form-item {
@@ -324,8 +321,6 @@
 
         .collapse-group-row-first,
         .collapse-group-row-last {
-            border-top-width: 0;
-            border-bottom-width: 0;
             padding-top: 0;
             padding-bottom: 0;
             margin-bottom: 0;
@@ -333,12 +328,10 @@
         }
 
         .collapse-group-visible-first {
-            border-top-width: 0;
             padding-top: 8px;
         }
 
         .collapse-group-visible-last {
-            border-bottom-width: 1px;
             border-bottom-left-radius: 12px;
             border-bottom-right-radius: 12px;
             padding-bottom: 10px;

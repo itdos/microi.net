@@ -176,8 +176,34 @@ public class MicroAppStableEntryTests
 
         var fields = Assert.IsAssignableFrom<IEnumerable<string>>(method!.Invoke(null, null));
         Assert.DoesNotContain("PageName", fields);
+        Assert.DoesNotContain("RouteMetaJson", fields);
         Assert.Contains("PageTitle", fields);
         Assert.Contains("RoutePath", fields);
+    }
+
+    [Fact]
+    public void RuntimePageProjection_ExposesOnlyNormalizedSourceFileFromOptionalRouteMetadata()
+    {
+        var method = typeof(MicroAppController).GetMethod(
+            "AttachPageSourceInfo",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var page = JObject.FromObject(new { Id = "page-1", PageKey = "manager-dashboard" });
+        var metadata = JObject.FromObject(new
+        {
+            RouteMetaJson = "{\"SourceFile\":\"/src\\\\pages\\\\ManagerDashboardPage.vue\",\"InternalSecret\":\"not-exposed\"}"
+        });
+
+        var result = Assert.IsType<JObject>(method!.Invoke(null, new object[] { page, metadata }));
+        Assert.Equal("src/pages/ManagerDashboardPage.vue", result["SourceFile"]?.Value<string>());
+        Assert.Null(result["RouteMetaJson"]);
+        Assert.Null(result["InternalSecret"]);
+
+        var unsafePage = JObject.FromObject(new { Id = "page-2" });
+        var unsafeMetadata = JObject.FromObject(new { RouteMetaJson = "{\"SourceFile\":\"../secrets.txt\"}" });
+        var unsafeResult = Assert.IsType<JObject>(method.Invoke(null, new object[] { unsafePage, unsafeMetadata }));
+        Assert.Null(unsafeResult["SourceFile"]);
     }
 
     [Fact]
