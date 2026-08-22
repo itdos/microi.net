@@ -1357,6 +1357,27 @@ export default {
         /**
          * 删除字段
          */
+        RemoveDeletedFieldFromDesigner(field) {
+            var self = this;
+            var fieldForm = self.$refs.fieldForm;
+
+            // 设计画布维护 CollapseGroup / Tabs 派生出来的 _isShow 等运行态。
+            // 必须由画布自己的删除入口完成移除和重算，父组件只 splice 会让
+            // 原分组子字段保持隐藏，直到刷新整页才恢复。
+            if (fieldForm && typeof fieldForm.DelDiyFieldArr === "function") {
+                fieldForm.DelDiyFieldArr(field);
+                self.DiyFieldList = fieldForm.DiyFieldList;
+            } else {
+                var fieldIndex = self.DiyFieldList.findIndex((item) => item && item.Id === field.Id);
+                if (fieldIndex > -1) {
+                    self.DiyFieldList.splice(fieldIndex, 1);
+                }
+            }
+
+            self.DiyFieldListClone = lodash.cloneDeep(self.DiyFieldList);
+            self.CurrentDiyFieldModel = {};
+            self.ShowFieldSettingsDialog = false;
+        },
         CallbackDeleteField(field) {
             var self = this;
             self.DiyCommon.OsConfirm('确定删除字段【' + field.Label + '】？', function() {
@@ -1371,12 +1392,7 @@ export default {
                 function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.DiyCommon.Tips(self.$t("Msg.Success"));
-                        var fieldIndex = self.DiyFieldList.findIndex(f => f.Id === field.Id);
-                        if (fieldIndex > -1) {
-                            self.DiyFieldList.splice(fieldIndex, 1);
-                            // 清空选中
-                            self.CurrentDiyFieldModel = {};
-                        }
+                        self.RemoveDeletedFieldFromDesigner(field);
                     }
                 });
             });

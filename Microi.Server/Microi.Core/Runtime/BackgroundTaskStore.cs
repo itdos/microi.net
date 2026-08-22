@@ -35,6 +35,9 @@ namespace Microi.net
         internal const string TableName = "mci_background_task";
         private const int DefaultLeaseSeconds = 90;
         private const int EmptyDatabaseReleaseLeaseSeconds = 900;
+        private const int InfrastructureContentionRetryLimit = 3;
+        private const string InfrastructureContentionRetryPrefix =
+            "[InfrastructureContentionRetry:";
         private const string EmptyDatabaseReleaseApiEngineKey =
             "admin_build_sanitized_empty_database";
         private static long _tenantScanCursor;
@@ -651,6 +654,17 @@ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p2",
 
         public static bool RetryOrFail(BackgroundTaskRecord item, Exception error, bool hostStopping)
         {
+            // BACKGROUND_TASK_INFRASTRUCTURE_CONTENTION_RETRY_V1: MaxAttempts is
+            // the caller's business retry budget. A database deadlock or lock-wait
+            // timeout can happen while the durable worker is persisting an otherwise
+            // healthy checkpoint, so a MaxAttempts=1 task must not become a false
+            // business failure. Give only low-budget tasks two additional bounded
+            // infrastructure retries; a successful continuation clears LastError.
+            if (!hostStopping && TryRequeueInfrastructureContention(item, error))
+            {
+                return true;
+            }
+
             var now = DateTime.Now;
             var safeError = SafeError(error);
             var nextAttempt = item.AttemptCount + 1;
@@ -688,6 +702,120 @@ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
                     .AddInParameter("p2", nextAttempt)
                     .AddInParameter("p3", DbTime(nextRun))
                     .AddInParameter("p4", DbTime(now)));
+        }
+
+        private static bool TryRequeueInfrastructureContention(
+            BackgroundTaskRecord item,
+            Exception error)
+        {
+            if (!ShouldRequeueInfrastructureContention(item, error, out var nextAttempt))
+            {
+                return false;
+            }
+
+            var now = DateTime.Now;
+            var nextRun = now.AddSeconds(Math.Min(30, 3 * nextAttempt));
+            var safeError = SafeError(error);
+            var persistedError = InfrastructureContentionRetryPrefix
+                                 + nextAttempt.ToString(CultureInfo.InvariantCulture)
+                                 + "] "
+                                 + safeError;
+            if (persistedError.Length > 2000)
+            {
+                persistedError = persistedError.Substring(0, 2000);
+            }
+
+            item.Status = "Retrying";
+            item.StatusText = "数据库争用，等待自动恢复";
+            item.Msg = "遇到瞬时数据库争用，系统正在自动恢复。";
+            item.NextRunTime = nextRun;
+            item.AttemptCount = 0;
+            item.LastError = persistedError;
+            return OwnedUpdate(item, @"Status='Retrying',StatusText=@p0,Msg=@p1,LastError=@p2,
+AttemptCount=0,NextRunTime=@p3,EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
+LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
+                command => command
+                    .AddInParameter("p0", item.StatusText)
+                    .AddInParameter("p1", item.Msg)
+                    .AddInParameter("p2", item.LastError)
+                    .AddInParameter("p3", DbTime(nextRun))
+                    .AddInParameter("p4", DbTime(now)));
+        }
+
+        internal static bool ShouldRequeueInfrastructureContention(
+            BackgroundTaskRecord item,
+            Exception error,
+            out int nextAttempt)
+        {
+            nextAttempt = ReadInfrastructureContentionRetryOrdinal(item?.LastError) + 1;
+            return item != null
+                   && item.MaxAttempts < InfrastructureContentionRetryLimit
+                   && IsTransientInfrastructureDatabaseContention(error)
+                   && nextAttempt < InfrastructureContentionRetryLimit;
+        }
+
+        internal static bool IsTransientInfrastructureDatabaseContention(Exception error)
+        {
+            for (var current = error; current != null; current = current.InnerException)
+            {
+                var type = current.GetType();
+                try
+                {
+                    var numberValue = type.GetProperty("Number")?.GetValue(current);
+                    if (numberValue != null
+                        && int.TryParse(numberValue.ToString(), out var number)
+                        && (number == 1205 || number == 1213))
+                    {
+                        return true;
+                    }
+
+                    var sqlState = type.GetProperty("SqlState")?.GetValue(current)?.ToString()
+                                   ?? type.GetProperty("SQLState")?.GetValue(current)?.ToString();
+                    if (string.Equals(sqlState, "40001", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(sqlState, "40P01", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Provider metadata is optional; the stable message signatures
+                    // below still cover wrapped Jint/Dos.ORM exceptions.
+                }
+
+                var message = current.Message ?? "";
+                if (message.IndexOf("Deadlock found when trying to get lock", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("Lock wait timeout exceeded", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("deadlock victim", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("was deadlocked on lock resources", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("ORA-00060", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("could not serialize access", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static int ReadInfrastructureContentionRetryOrdinal(string lastError)
+        {
+            if (lastError.DosIsNullOrWhiteSpace()
+                || !lastError.StartsWith(InfrastructureContentionRetryPrefix, StringComparison.Ordinal))
+            {
+                return 0;
+            }
+
+            var end = lastError.IndexOf(']', InfrastructureContentionRetryPrefix.Length);
+            if (end <= InfrastructureContentionRetryPrefix.Length)
+            {
+                return 0;
+            }
+            var value = lastError.Substring(
+                InfrastructureContentionRetryPrefix.Length,
+                end - InfrastructureContentionRetryPrefix.Length);
+            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ordinal)
+                ? Math.Max(0, ordinal)
+                : 0;
         }
 
         private static bool OwnedUpdate(

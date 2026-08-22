@@ -41,6 +41,11 @@ namespace Microi.net.Api
             public string Ticket { get; set; }
         }
 
+        public sealed class MapRuntimeRequest
+        {
+            public string Provider { get; set; }
+        }
+
         [HttpPost]
         [AllowAnonymous]
         public JsonResult GetPublic([FromBody] JObject request)
@@ -58,6 +63,79 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "OsClient 无效。"));
             }
+        }
+
+        /// <summary>
+        /// 为已登录表单用户返回当前所选地图 JS SDK 必需的最小运行时配置。
+        /// 浏览器地图 Key 在网络面板中天然可见，因此这里只做供应商级白名单投影，
+        /// 并要求供应商控制台同时配置域名白名单；其它租户 Secret 永不进入响应。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> GetMapRuntime([FromBody] MapRuntimeRequest request)
+        {
+            Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+            Response.Headers.Pragma = "no-cache";
+
+            var tokenResult = await RequireAuthenticatedUserAsync().ConfigureAwait(false);
+            if (tokenResult.Code != 1) return Json(tokenResult);
+            var osClient = tokenResult.Data.OsClient;
+            var requestedProvider = TenantSystemSettingsSecurity.NormalizeMapProvider(request?.Provider);
+
+            JObject legacySysConfig = new JObject();
+            try
+            {
+                var legacyResult = await MicroiEngine.FormEngine.GetSysConfig(osClient).ConfigureAwait(false);
+                if (legacyResult.Code == 1 && legacyResult.Data != null)
+                {
+                    legacySysConfig = legacyResult.Data as JObject
+                                      ?? JObject.FromObject((object)legacyResult.Data);
+                }
+            }
+            catch
+            {
+                // 新租户私密设置仍可独立提供地图配置；旧 sys_config 只作为兼容回退。
+            }
+
+            TenantMapRuntimeConfiguration runtime;
+            try
+            {
+                runtime = TenantSystemSettingsSecurity.ResolveMapRuntimeConfiguration(
+                    TenantSystemSettingsSecurity.LoadSnapshot(osClient),
+                    requestedProvider,
+                    legacySysConfig);
+            }
+            catch
+            {
+                return Json(MapRuntimeFailure(
+                    requestedProvider,
+                    "MAP_RUNTIME_CONFIG_INVALID",
+                    "地图安全配置无法读取，请由超级管理员重新保存当前供应商的设置。"));
+            }
+
+            if (runtime.ClientKey.DosIsNullOrWhiteSpace())
+            {
+                return Json(MapRuntimeFailure(
+                    runtime.Provider,
+                    "MAP_KEY_MISSING",
+                    $"{MapProviderLabel(runtime.Provider)}尚未配置客户端 Key。请在“系统设置 → 安全与服务接入”中填写并启用。"));
+            }
+
+            if (!TenantSystemSettingsSecurity.TryNormalizeMapServiceHost(runtime.ServiceHost, out var serviceHost))
+            {
+                return Json(MapRuntimeFailure(
+                    runtime.Provider,
+                    "MAP_AMAP_SERVICE_HOST_INVALID",
+                    "高德地图安全代理地址无效，必须是无账号、查询参数和片段的 HTTP(S) 绝对地址。"));
+            }
+
+            return Json(new DosResult(1, new
+            {
+                runtime.Provider,
+                runtime.ClientKey,
+                SecurityJsCode = serviceHost.DosIsNullOrWhiteSpace() ? runtime.SecurityJsCode : string.Empty,
+                ServiceHost = serviceHost,
+                runtime.Source
+            }));
         }
 
         [HttpPost]
@@ -230,6 +308,31 @@ namespace Microi.net.Api
             if ((token.CurrentUser["Level"]?.Val<int>() ?? 0) < 999)
                 return new DosResult<CurrentToken>(0, null, "只有超级管理员可以管理租户系统设置。");
             return new DosResult<CurrentToken>(1, token);
+        }
+
+        private static async Task<DosResult<CurrentToken>> RequireAuthenticatedUserAsync()
+        {
+            var token = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
+            if (token?.CurrentUser == null)
+                return new DosResult<CurrentToken>(1001, null, "登录身份已过期。请重新登录。");
+            if (UserAccessKeySecurity.IsSession(token.CurrentUser))
+                return new DosResult<CurrentToken>(0, null, "访问密钥会话不能读取浏览器地图凭据。");
+            return new DosResult<CurrentToken>(1, token);
+        }
+
+        private static DosResult MapRuntimeFailure(string provider, string reasonCode, string message)
+        {
+            return new DosResult(0, new { Provider = provider, ReasonCode = reasonCode }, message)
+            {
+                DataAppend = new { ReasonCode = reasonCode }
+            };
+        }
+
+        private static string MapProviderLabel(string provider)
+        {
+            return provider == "AMap" ? "高德地图"
+                : provider == "Tencent" ? "腾讯地图"
+                : "百度地图";
         }
 
         private static async Task<JObject> FindSettingAsync(string osClient, string id, string key)

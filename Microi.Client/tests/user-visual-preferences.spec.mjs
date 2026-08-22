@@ -17,13 +17,19 @@ test("installed per-user theme values override device-local and system values", 
         resolveUserThemeColor({ Id: "u1", ThemeColor: "" }, "#111111", "#222222"),
         "#222222"
     );
-    assert.equal(resolveUserThemeMode({ Id: "u1", ThemeMode: "dark" }, "light"), "dark");
-    assert.equal(resolveUserThemeMode({ Id: "u1", ThemeMode: "" }, "dark"), "light");
+    assert.equal(
+        resolveUserThemeColor({ Id: "u1", ThemeColor: "" }, "#111111", "", "#333333"),
+        "#333333"
+    );
+    assert.equal(resolveUserThemeMode({ Id: "u1", ThemeMode: "dark" }, "light", "light"), "dark");
+    assert.equal(resolveUserThemeMode({ Id: "u1", ThemeMode: "" }, "light", "dark"), "dark");
+    assert.equal(resolveUserThemeMode({ Id: "u1", ThemeMode: "" }, "dark", "", "light"), "light");
 });
 
 test("old tenants without preference columns retain the local compatibility fallback", () => {
     assert.equal(resolveUserThemeColor({ Id: "u1" }, "#111111", "#222222"), "#111111");
-    assert.equal(resolveUserThemeMode({ Id: "u1" }, "dark"), "dark");
+    assert.equal(resolveUserThemeMode({ Id: "u1" }, "dark", "light"), "dark");
+    assert.equal(resolveUserThemeMode({ Id: "u1" }, "", "dark"), "dark");
 });
 
 test("menu expansion can follow the system or use a personal override", () => {

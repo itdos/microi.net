@@ -1,5 +1,9 @@
 <template>
-  <view class="login-container" :style="mciTokenStyle">
+  <view
+    class="login-container"
+    :class="{ 'login-container--scrollable': isAppRuntime && platformConnectionExpanded }"
+    :style="mciTokenStyle"
+  >
     <image class="login-water" :src="xjyAssets.waterHero" mode="aspectFill" />
     <view class="login-shade"></view>
     <!-- 顶部导航：返回按钮 -->
@@ -18,6 +22,86 @@
         <text class="app-name">{{ appName }}</text>
         <text class="app-subtitle">{{ appSubTitle }}</text>
       </view>
+
+      <!-- #ifdef APP-PLUS -->
+      <view class="app-endpoint-card" v-if="isAppRuntime">
+        <view class="app-endpoint-summary" @tap="togglePlatformConnection">
+          <view class="app-endpoint-summary-copy">
+            <view class="app-endpoint-title-row">
+              <text class="app-endpoint-title">平台连接</text>
+              <text class="app-endpoint-status">已连接</text>
+            </view>
+            <text class="app-endpoint-current">{{ appliedApiBase }} · {{ appliedOsClient }}</text>
+          </view>
+          <view class="app-endpoint-switch">
+            <text class="app-endpoint-switch-icon">⇄</text>
+            <text>{{ platformConnectionExpanded ? '收起' : '切换' }}</text>
+          </view>
+        </view>
+
+        <view class="app-endpoint-editor" v-if="platformConnectionExpanded">
+          <text class="app-endpoint-help">连接任意吾码平台。协议请从下拉框选择，地址框不要输入 http:// 或 https://。</text>
+
+          <view class="app-endpoint-field">
+            <text class="app-endpoint-label">API 地址</text>
+            <view class="app-endpoint-api-row">
+              <picker
+                class="app-endpoint-protocol"
+                mode="selector"
+                :range="apiProtocolOptions"
+                :value="apiProtocolIndex"
+                :disabled="platformConnectionApplying"
+                @change="handleApiProtocolChange"
+              >
+                <view class="app-endpoint-protocol-value">
+                  <text>{{ apiProtocolOptions[apiProtocolIndex] }}</text>
+                  <text class="app-endpoint-caret">⌄</text>
+                </view>
+              </picker>
+              <input
+                class="app-endpoint-input app-endpoint-host-input"
+                type="text"
+                :value="apiHost"
+                :disabled="platformConnectionApplying"
+                placeholder="api.example.com 或 IP:端口"
+                placeholder-style="color:rgba(255,255,255,.48);font-size:24rpx;"
+                maxlength="240"
+                @input="handleApiHostInput"
+              />
+            </view>
+          </view>
+
+          <view class="app-endpoint-field">
+            <text class="app-endpoint-label">租户 OsClient</text>
+            <input
+              class="app-endpoint-input"
+              type="text"
+              :value="runtimeOsClient"
+              :disabled="platformConnectionApplying"
+              placeholder="例如 iTdos"
+              placeholder-style="color:rgba(255,255,255,.48);font-size:24rpx;"
+              maxlength="128"
+              @input="handleRuntimeOsClientInput"
+            />
+          </view>
+
+          <view class="app-endpoint-warning" v-if="apiProtocolOptions[apiProtocolIndex] === 'http://'">
+            <text class="app-endpoint-warning-icon">!</text>
+            <text>HTTP 不加密，只建议用于可信内网；iOS 安装包还需配置对应的 ATS 例外。</text>
+          </view>
+
+          <button
+            class="app-endpoint-apply"
+            :loading="platformConnectionApplying"
+            :disabled="platformConnectionApplying || !endpointDirty"
+            @tap="applyPlatformConnection"
+          >
+            <text class="app-endpoint-apply-icon">✓</text>
+            <text>{{ platformConnectionApplying ? '正在验证平台' : '连接并应用' }}</text>
+          </button>
+        </view>
+      </view>
+      <!-- #endif -->
 
       <!-- 小程序授权登录（默认显示，仅支持授权登录的平台显示） -->
       <view class="auth-section" v-if="!showAccountLogin && hasAuthLogin">
@@ -138,7 +222,7 @@
         <button
           class="account-login-btn"
           :loading="accountLoginLoading"
-          :disabled="accountLoginLoading"
+          :disabled="accountLoginLoading || platformConnectionApplying"
           @tap="handleAccountLogin"
         >
           <text>{{ t('login.loginBtn') }}</text>
@@ -179,11 +263,38 @@
 <script>
 import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
-import { post, setToken, setUser, getToken, removeToken } from '@/utils/request.js'
+import {
+  applyAppRuntimeEndpoint,
+  applyRuntimeSysConfig,
+  getToken,
+  post,
+  probeAppRuntimeEndpoint,
+  removeToken,
+  setToken,
+  setUser
+} from '@/utils/request.js'
 import { encryptPassword } from '@/utils/crypto.js'
 import { captureInvitation, invitationPayload } from '@/platform/invitation.js'
-import { getLoginProvider, getAuthLoginApi, getClientType, supportsAuthLogin, getPlatformName, getPlatformNameEn } from '@/utils/platform.js'
+import {
+  getLoginProvider,
+  getAuthLoginApi,
+  getClientType,
+  getPlatform,
+  getPlatformName,
+  getPlatformNameEn,
+  PLATFORMS,
+  supportsAuthLogin
+} from '@/utils/platform.js'
 import { shouldResumePreviousPage } from '@/platform/login-navigation.mjs'
+import {
+  APP_RUNTIME_ENDPOINT_PROTOCOLS,
+  buildAppRuntimeEndpoint,
+  runtimeEndpointScope,
+  splitRuntimeApiBase
+} from '@/platform/runtime-endpoint.mjs'
+import { resetSysConfigRuntimeCache } from '@/utils/sysconfig.js'
+import { resetBusinessRuntimeCache } from '@/platform/business-runtime.js'
+import { disconnectSignalR } from '@/utils/signalr.js'
 
 function isEnabledFlag(value) {
   if (value === true || value === 1) return true
@@ -194,7 +305,9 @@ function isEnabledFlag(value) {
   return false
 }
 
-const LOGIN_PREFERENCES_KEY = 'mci_login_preferences_v1'
+const LOGIN_PREFERENCES_KEY = 'mci_login_preferences_v2'
+const LEGACY_LOGIN_PREFERENCES_KEY = 'mci_login_preferences_v1'
+const MAX_LOGIN_PREFERENCE_SCOPES = 12
 const REMEMBERED_PASSWORD_MASK = '••••••••'
 
 function normalizeAuthLoginUser(data) {
@@ -216,6 +329,7 @@ function isValidLoginSession(user, token) {
 export default {
   mixins: [themeMixin],
   data() {
+    const runtimeEndpoint = splitRuntimeApiBase(appConfig.apiBase)
     return {
       // 平台信息（从 config 解构，避免整个模块对象被 reactive 化导致小程序报错）
       appName: appConfig.appName,
@@ -251,7 +365,35 @@ export default {
       privacyChecked: false,
       currentYear: new Date().getFullYear(),
       // 登录后重定向地址（从商品详情等页面跳过来时用）
-      redirectUrl: ''
+      redirectUrl: '',
+      // 通用 App 平台连接；小程序和 H5 在条件编译后不会展示入口。
+      isAppRuntime: getPlatform() === PLATFORMS.APP && appConfig.features?.runtimeEndpointSwitch === true,
+      apiProtocolOptions: [...APP_RUNTIME_ENDPOINT_PROTOCOLS],
+      apiProtocolIndex: APP_RUNTIME_ENDPOINT_PROTOCOLS.indexOf(runtimeEndpoint.protocol),
+      apiHost: runtimeEndpoint.apiHost,
+      runtimeOsClient: appConfig.osClient,
+      appliedApiBase: appConfig.apiBase,
+      appliedOsClient: appConfig.osClient,
+      platformConnectionExpanded: false,
+      platformConnectionApplying: false,
+      endpointEditDirty: false,
+      runtimeEndpointChanged: false
+    }
+  },
+
+  computed: {
+    endpointDirty() {
+      if (!this.isAppRuntime) return false
+      try {
+        const endpoint = buildAppRuntimeEndpoint({
+          protocol: this.apiProtocolOptions[this.apiProtocolIndex],
+          apiHost: this.apiHost,
+          osClient: this.runtimeOsClient
+        })
+        return endpoint.apiBase !== this.appliedApiBase || endpoint.osClient !== this.appliedOsClient
+      } catch (error) {
+        return true
+      }
     }
   },
 
@@ -299,11 +441,56 @@ export default {
   },
 
   methods: {
-    restoreLoginPreferences() {
-      let saved = {}
+    currentLoginPreferenceScope() {
+      return runtimeEndpointScope(appConfig.apiBase, appConfig.osClient)
+    },
+    readLoginPreferenceStore() {
       try {
-        saved = uni.getStorageSync(LOGIN_PREFERENCES_KEY) || {}
+        const saved = uni.getStorageSync(LOGIN_PREFERENCES_KEY)
+        if (saved && Number(saved.version) === 2 && saved.records && typeof saved.records === 'object') {
+          return { version: 2, records: { ...saved.records } }
+        }
       } catch (error) {}
+      return { version: 2, records: {} }
+    },
+    writeLoginPreferenceStore(store) {
+      const records = store && store.records && typeof store.records === 'object' ? store.records : {}
+      const retained = {}
+      Object.keys(records)
+        .sort((left, right) => Number(records[right] && records[right].updatedAt || 0) - Number(records[left] && records[left].updatedAt || 0))
+        .slice(0, MAX_LOGIN_PREFERENCE_SCOPES)
+        .forEach((key) => { retained[key] = records[key] })
+      try {
+        if (Object.keys(retained).length) {
+          uni.setStorageSync(LOGIN_PREFERENCES_KEY, { version: 2, records: retained })
+        } else {
+          uni.removeStorageSync(LOGIN_PREFERENCES_KEY)
+        }
+      } catch (error) {}
+    },
+    readLegacyLoginPreference() {
+      try {
+        const currentScope = this.currentLoginPreferenceScope()
+        const defaultScope = runtimeEndpointScope(appConfig.defaultApiBase, appConfig.defaultOsClient)
+        if (currentScope !== defaultScope) return null
+        const saved = uni.getStorageSync(LEGACY_LOGIN_PREFERENCES_KEY)
+        return saved && typeof saved === 'object' ? saved : null
+      } catch (error) {
+        return null
+      }
+    },
+    restoreLoginPreferences() {
+      const store = this.readLoginPreferenceStore()
+      const scope = this.currentLoginPreferenceScope()
+      let saved = store.records[scope]
+      if (!saved) {
+        saved = this.readLegacyLoginPreference()
+        if (saved) {
+          store.records[scope] = { ...saved, version: 2, updatedAt: Date.now() }
+          this.writeLoginPreferenceStore(store)
+        }
+      }
+      saved = saved || {}
       const account = String(saved.account || '').trim()
       const passwordCipher = String(saved.passwordCipher || '')
       this.rememberAccount = saved.rememberAccount === true && !!account
@@ -313,22 +500,28 @@ export default {
       this.account = this.rememberedAccount
       this.password = this.rememberPassword ? REMEMBERED_PASSWORD_MASK : ''
     },
+    removeCurrentLoginPreference() {
+      const store = this.readLoginPreferenceStore()
+      delete store.records[this.currentLoginPreferenceScope()]
+      this.writeLoginPreferenceStore(store)
+    },
     persistLoginPreferences(passwordCipher = '') {
       if (!this.rememberAccount) {
-        try { uni.removeStorageSync(LOGIN_PREFERENCES_KEY) } catch (error) {}
+        this.removeCurrentLoginPreference()
         return
       }
       const account = String(this.account || '').trim()
       const cipher = this.rememberPassword ? String(passwordCipher || this.rememberedPasswordCipher || '') : ''
-      try {
-        uni.setStorageSync(LOGIN_PREFERENCES_KEY, {
-          version: 1,
-          rememberAccount: true,
-          rememberPassword: this.rememberPassword && !!cipher,
-          account,
-          passwordCipher: cipher
-        })
-      } catch (error) {}
+      const store = this.readLoginPreferenceStore()
+      store.records[this.currentLoginPreferenceScope()] = {
+        version: 2,
+        rememberAccount: true,
+        rememberPassword: this.rememberPassword && !!cipher,
+        account,
+        passwordCipher: cipher,
+        updatedAt: Date.now()
+      }
+      this.writeLoginPreferenceStore(store)
       this.rememberedAccount = account
       this.rememberedPasswordCipher = cipher
       if (cipher) this.password = REMEMBERED_PASSWORD_MASK
@@ -362,7 +555,7 @@ export default {
         this.rememberedAccount = ''
         this.rememberedPasswordCipher = ''
         if (this.password === REMEMBERED_PASSWORD_MASK) this.password = ''
-        try { uni.removeStorageSync(LOGIN_PREFERENCES_KEY) } catch (error) {}
+        this.removeCurrentLoginPreference()
       }
     },
     toggleRememberPassword() {
@@ -375,9 +568,130 @@ export default {
         this.persistLoginPreferences()
       }
     },
+    clearLoginIdentityForEndpointEdit() {
+      this.account = ''
+      this.password = ''
+      this.showPassword = false
+      this.rememberAccount = false
+      this.rememberPassword = false
+      this.rememberedAccount = ''
+      this.rememberedPasswordCipher = ''
+      this.privacyChecked = false
+      this.captchaId = ''
+      this.captchaValue = ''
+      this.captchaImgSrc = ''
+    },
+    markEndpointDraftChanged() {
+      const dirty = this.endpointDirty
+      if (dirty && !this.endpointEditDirty) this.clearLoginIdentityForEndpointEdit()
+      if (!dirty && this.endpointEditDirty) this.restoreLoginPreferences()
+      this.endpointEditDirty = dirty
+    },
+    togglePlatformConnection() {
+      this.platformConnectionExpanded = !this.platformConnectionExpanded
+    },
+    handleApiProtocolChange(event) {
+      const nextIndex = Number(event && event.detail && event.detail.value)
+      this.apiProtocolIndex = Number.isInteger(nextIndex) && nextIndex >= 0 && nextIndex < this.apiProtocolOptions.length
+        ? nextIndex
+        : 0
+      this.markEndpointDraftChanged()
+    },
+    handleApiHostInput(event) {
+      this.apiHost = String((event.detail && event.detail.value) || '')
+      this.markEndpointDraftChanged()
+    },
+    handleRuntimeOsClientInput(event) {
+      this.runtimeOsClient = String((event.detail && event.detail.value) || '')
+      this.markEndpointDraftChanged()
+    },
+    confirmInsecureEndpoint(endpoint) {
+      if (!endpoint || endpoint.protocol !== 'http://') return Promise.resolve(true)
+      return new Promise((resolve) => {
+        uni.showModal({
+          title: '确认使用 HTTP？',
+          content: 'HTTP 会以明文传输登录和业务数据，只建议连接可信内网。iOS 安装包还必须为目标地址配置 ATS 例外。',
+          confirmText: '继续连接',
+          cancelText: '改用 HTTPS',
+          success: (result) => resolve(!!result.confirm),
+          fail: () => resolve(false)
+        })
+      })
+    },
+    async applyPlatformConnection(options = {}) {
+      if (!this.isAppRuntime || this.platformConnectionApplying) return !this.endpointDirty
+      const showSuccess = options && options.showSuccess !== false
+      this.platformConnectionApplying = true
+      try {
+        const draftEndpoint = buildAppRuntimeEndpoint({
+          protocol: this.apiProtocolOptions[this.apiProtocolIndex],
+          apiHost: this.apiHost,
+          osClient: this.runtimeOsClient
+        })
+        if (!(await this.confirmInsecureEndpoint(draftEndpoint))) return false
+
+        // 先匿名读取候选租户配置；拼写错误或不可达时不破坏当前会话与缓存。
+        const probed = await probeAppRuntimeEndpoint(draftEndpoint)
+        const hadDraftIdentity = this.endpointEditDirty && !!(String(this.account || '').trim() || this.password)
+        const endpointChanged = draftEndpoint.apiBase !== appConfig.apiBase || draftEndpoint.osClient !== appConfig.osClient
+        if (endpointChanged) disconnectSignalR()
+        const applied = applyAppRuntimeEndpoint(draftEndpoint)
+        if (applied.changed) {
+          resetSysConfigRuntimeCache()
+          resetBusinessRuntimeCache()
+          this.runtimeEndpointChanged = true
+        }
+
+        this.appliedApiBase = applied.apiBase
+        this.appliedOsClient = applied.osClient
+        this.apiProtocolIndex = this.apiProtocolOptions.indexOf(applied.protocol)
+        this.apiHost = applied.apiHost
+        this.runtimeOsClient = applied.osClient
+        this.endpointEditDirty = false
+        if (applied.changed && !hadDraftIdentity) this.restoreLoginPreferences()
+        this.applySysConfig(probed.sysConfig)
+        this.platformConnectionExpanded = false
+
+        if (showSuccess) {
+          uni.showToast({ title: `已连接 ${applied.osClient}`, icon: 'success' })
+        }
+        return true
+      } catch (error) {
+        const message = error && (error.message || error.Msg) ? (error.message || error.Msg) : '平台连接失败，请检查配置'
+        uni.showModal({ title: '无法连接平台', content: String(message), showCancel: false })
+        return false
+      } finally {
+        this.platformConnectionApplying = false
+      }
+    },
     /**
      * 获取系统配置
      */
+    applySysConfig(cfg = {}) {
+      applyRuntimeSysConfig(cfg)
+
+      this.enableCaptcha = isEnabledFlag(cfg.EnableCaptcha)
+      if (this.enableCaptcha) {
+        this.getCaptcha()
+      } else {
+        this.captchaId = ''
+        this.captchaValue = ''
+        this.captchaImgSrc = ''
+      }
+
+      this.appName = cfg.SysTitle || cfg.SysShortTitle || appConfig.appName
+      this.appSubTitle = cfg.SystemSubTitle || appConfig.appSubTitle
+      if (cfg.SysLogo) {
+        this.logoUrl = this.getServerPath(cfg.SysLogo, appConfig.fileServer)
+      } else {
+        this.logoUrl = appConfig.logoUrl
+      }
+
+      this.enablePrivacyPolicy = cfg.EnablePrivacyPolicy === undefined
+        ? isEnabledFlag(appConfig.enablePrivacyPolicy)
+        : isEnabledFlag(cfg.EnablePrivacyPolicy)
+      this.privacyPolicyName = cfg.PrivacyPolicyName || appConfig.privacyPolicyName
+    },
     async getSysConfig() {
       try {
         const result = await post('/api/DiyTable/GetSysConfig', {
@@ -386,45 +700,7 @@ export default {
         }, false)
 
         if (result.Code === 1 && result.Data) {
-          const cfg = result.Data
-
-          // 是否开启验证码
-          this.enableCaptcha = isEnabledFlag(cfg.EnableCaptcha)
-          if (this.enableCaptcha) {
-            this.getCaptcha()
-          } else {
-            this.captchaId = ''
-            this.captchaValue = ''
-            this.captchaImgSrc = ''
-          }
-
-          // 动态设置系统标题
-          if (cfg.SysTitle) {
-            this.appName = cfg.SysTitle
-          } else if (cfg.SysShortTitle) {
-            this.appName = cfg.SysShortTitle
-          }
-
-          // 动态设置副标题
-          if (cfg.SystemSubTitle) {
-            this.appSubTitle = cfg.SystemSubTitle
-          }
-
-          // 动态设置 Logo（参考 microi.web GetServerPath 逻辑）
-          if (cfg.SysLogo) {
-            const fileServer = cfg.FileServer
-              ? cfg.FileServer.replace(/\/+$/, '')
-              : appConfig.apiBase.replace(/\/+$/, '')
-            this.logoUrl = this.getServerPath(cfg.SysLogo, fileServer)
-          }
-
-          // 隐私协议相关
-          if (cfg.EnablePrivacyPolicy !== undefined) {
-            this.enablePrivacyPolicy = !!cfg.EnablePrivacyPolicy
-          }
-          if (cfg.PrivacyPolicyName) {
-            this.privacyPolicyName = cfg.PrivacyPolicyName
-          }
+          this.applySysConfig(result.Data)
         }
       } catch (e) {
         console.error('获取系统配置失败:', e)
@@ -640,6 +916,10 @@ export default {
      * 账号密码登录
      */
     async handleAccountLogin() {
+      if (this.isAppRuntime && this.endpointDirty) {
+        const connected = await this.applyPlatformConnection({ showSuccess: false })
+        if (!connected) return
+      }
       if (!this.checkPrivacy()) return
 
       if (!this.account.trim()) {
@@ -759,6 +1039,11 @@ export default {
      */
     navigateAfterLogin() {
       setTimeout(() => {
+        // 切换平台后必须销毁旧平台页面栈，避免返回旧租户详情或继续使用旧页面内存。
+        if (this.runtimeEndpointChanged) {
+          uni.reLaunch({ url: '/pages/workspace/index' })
+          return
+        }
         const pages = getCurrentPages()
         const previousPage = pages.length > 1 ? pages[pages.length - 2] : null
 
@@ -843,6 +1128,18 @@ export default {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.login-container--scrollable {
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  .login-content {
+    flex: none;
+    justify-content: flex-start;
+    padding-top: 36rpx;
+    padding-bottom: 36rpx;
+  }
 }
 
 .login-water,
@@ -939,6 +1236,194 @@ export default {
   font-size: 26rpx;
   color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0;
+}
+
+/* App 通用平台连接器：仅由 APP-PLUS 条件编译进入安装包。 */
+.app-endpoint-card {
+  width: 100%;
+  box-sizing: border-box;
+  margin: -24rpx 0 32rpx;
+  padding: 24rpx;
+  border: 2rpx solid rgba(255, 255, 255, .22);
+  border-radius: 20rpx;
+  background: rgba(4, 47, 68, .48);
+  box-shadow: 0 10rpx 30rpx rgba(1, 24, 38, .16);
+  backdrop-filter: blur(16rpx);
+}
+
+.app-endpoint-summary,
+.app-endpoint-title-row,
+.app-endpoint-switch,
+.app-endpoint-api-row,
+.app-endpoint-warning,
+.app-endpoint-apply {
+  display: flex;
+  align-items: center;
+}
+
+.app-endpoint-summary {
+  min-height: 64rpx;
+  justify-content: space-between;
+}
+
+.app-endpoint-summary-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-endpoint-title-row {
+  gap: 14rpx;
+  margin-bottom: 8rpx;
+}
+
+.app-endpoint-title {
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 650;
+}
+
+.app-endpoint-status {
+  padding: 3rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(55, 211, 154, .18);
+  color: #8ff0c8;
+  font-size: 20rpx;
+}
+
+.app-endpoint-current {
+  display: block;
+  max-width: 470rpx;
+  overflow: hidden;
+  color: rgba(255, 255, 255, .66);
+  font-size: 22rpx;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-endpoint-switch {
+  flex: none;
+  min-height: 60rpx;
+  margin-left: 18rpx;
+  gap: 8rpx;
+  color: #fff;
+  font-size: 24rpx;
+}
+
+.app-endpoint-switch-icon {
+  color: #7ee2e8;
+  font-size: 30rpx;
+}
+
+.app-endpoint-editor {
+  margin-top: 22rpx;
+  padding-top: 22rpx;
+  border-top: 2rpx solid rgba(255, 255, 255, .14);
+}
+
+.app-endpoint-help {
+  display: block;
+  margin-bottom: 22rpx;
+  color: rgba(255, 255, 255, .7);
+  font-size: 22rpx;
+  line-height: 1.55;
+}
+
+.app-endpoint-field {
+  margin-bottom: 20rpx;
+}
+
+.app-endpoint-label {
+  display: block;
+  margin-bottom: 10rpx;
+  color: rgba(255, 255, 255, .88);
+  font-size: 24rpx;
+}
+
+.app-endpoint-api-row {
+  width: 100%;
+  gap: 12rpx;
+}
+
+.app-endpoint-protocol {
+  flex: none;
+  width: 168rpx;
+}
+
+.app-endpoint-protocol-value,
+.app-endpoint-input {
+  height: 82rpx;
+  box-sizing: border-box;
+  border: 2rpx solid rgba(255, 255, 255, .22);
+  border-radius: 14rpx;
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+  font-size: 26rpx;
+}
+
+.app-endpoint-protocol-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18rpx;
+}
+
+.app-endpoint-caret {
+  color: rgba(255, 255, 255, .7);
+  font-size: 24rpx;
+}
+
+.app-endpoint-input {
+  width: 100%;
+  padding: 0 22rpx;
+}
+
+.app-endpoint-host-input {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-endpoint-warning {
+  align-items: flex-start;
+  gap: 12rpx;
+  margin: 2rpx 0 20rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 12rpx;
+  background: rgba(245, 166, 35, .16);
+  color: #ffe2a6;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.app-endpoint-warning-icon {
+  flex: none;
+  width: 28rpx;
+  height: 28rpx;
+  border: 2rpx solid currentColor;
+  border-radius: 50%;
+  text-align: center;
+  font-size: 20rpx;
+  line-height: 27rpx;
+}
+
+.app-endpoint-apply {
+  width: 100%;
+  height: 82rpx;
+  justify-content: center;
+  gap: 10rpx;
+  border: 0;
+  border-radius: 14rpx;
+  background: #fff;
+  color: #087da8;
+  font-size: 27rpx;
+  font-weight: 650;
+
+  &::after { border: 0; }
+  &[disabled] { opacity: .48; }
+}
+
+.app-endpoint-apply-icon {
+  font-size: 26rpx;
 }
 
 /* 授权登录区域 */

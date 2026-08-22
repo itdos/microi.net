@@ -480,6 +480,21 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
+    public void FormEngine_SingleFieldMetadataUpdateDoesNotRunPhysicalDdl()
+    {
+        var root = Environment.GetEnvironmentVariable("MICROI_TEST_REPOSITORY_ROOT")
+                   ?? FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Core", "FormEngine", "FormEngine.cs"));
+
+        Assert.Contains("var physicalDefinitionChanged = fieldModel.Name != param.Name", source);
+        Assert.Matches(
+            @"physicalDefinitionChanged\s*=\s*fieldModel\.Name\s*!=\s*param\.Name\s*\|\|\s*fieldModel\.Type\s*!=\s*param\.Type\s*;\s*if\s*\(physicalDefinitionChanged\)",
+            source);
+        Assert.Contains("MicroiEngine.ORM(dbInfo.DbType).ChangeColumn", source);
+    }
+
+    [Fact]
     public void BackendRuntimeTab_ReconcileIsIdempotent()
     {
         var first = Upgrade30.ReconcileTabs("[]", out var firstChanged);

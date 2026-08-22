@@ -596,12 +596,14 @@ export function createMicroiV8(options = {}) {
   let tokenMaintenanceTimer = null;
   let stopBrowserResumeListeners = null;
   let contentSecurityBatchAvailable = null;
+  let runtimeEndpointGeneration = 0;
 
   // 更新配置后立即刷新并发队列，保证 maxConcurrent 热更新生效。
   function configure(next = {}) {
     const contentSecurityContextChanged =
       (Object.prototype.hasOwnProperty.call(next, 'osClient') && next.osClient !== config.osClient)
       || (Object.prototype.hasOwnProperty.call(next, 'apiBase') && next.apiBase !== config.apiBase);
+    if (contentSecurityContextChanged) runtimeEndpointGeneration += 1;
     config = { ...config, ...next };
     if (contentSecurityContextChanged) contentSecurityBatchAvailable = null;
     if (Object.prototype.hasOwnProperty.call(next, 'maxConcurrent')) {
@@ -768,6 +770,7 @@ export function createMicroiV8(options = {}) {
     let fullUrl = buildUrl(options.url || options.path || '');
     const authEnabled = options.auth !== false;
     const requestToken = authEnabled ? getToken() : '';
+    const requestEndpointGeneration = runtimeEndpointGeneration;
     const headers = buildHeaders(options);
     const data = options.data === undefined ? {} : options.data;
     const timeout = options.timeout || config.timeout;
@@ -819,6 +822,13 @@ export function createMicroiV8(options = {}) {
       const statusCode = response.statusCode || response.status || 200;
       const body = response.data === undefined ? response.body : response.data;
       const headersReturned = response.header || response.headers || {};
+
+      // 用户切换 ApiBase/OsClient 后，旧平台的迟到响应不能再写入 Token 或业务状态。
+      if (requestEndpointGeneration !== runtimeEndpointGeneration) {
+        const staleEndpointError = new Error('请求所属平台已切换，已忽略旧平台响应。');
+        staleEndpointError.Code = 'RUNTIME_ENDPOINT_CHANGED';
+        throw staleEndpointError;
+      }
 
       if (authEnabled && isAuthExpired(body, statusCode)) {
         const expiredCurrentSession = handleAuthExpired(body, requestToken);

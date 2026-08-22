@@ -50,13 +50,14 @@ async function waitForExit(child, timeoutMs = 10000) {
     ]);
 }
 
-function runProcessManager(action, frontendPort) {
+function runProcessManager(action, frontendPort, backendPort = 61501) {
     return spawnSync('powershell.exe', [
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
         '-File', path.join(repoRoot, 'Microi.Server', 'tools', 'Microi.LocalProcessManager.ps1'),
         '-Action', action,
         '-WorkspaceRoot', repoRoot,
+        '-BackendPort', String(backendPort),
         '-FrontendPort', String(frontendPort)
     ], {
         cwd: repoRoot,
@@ -94,6 +95,7 @@ test('Windows 进程管理器按端口、进程类型和工作区路径校验并
     assert.match(manager, /Test-IsWorkspaceFrontend/);
     assert.match(manager, /NativeProcessInspector/);
     assert.match(manager, /Get-ProcessCurrentDirectory/);
+    assert.match(manager, /return \(Get-ProcessCurrentDirectory \$ProcessInfo\) -eq \$backendRoot/);
     assert.match(manager, /return \(Get-ProcessCurrentDirectory \$ProcessInfo\) -eq \$frontendRoot/);
     assert.match(manager, /processName -ne 'dotnet\.exe'/);
     assert.match(manager, /processName -ne 'node\.exe'/);
@@ -101,6 +103,62 @@ test('Windows 进程管理器按端口、进程类型和工作区路径校验并
     assert.match(manager, /\[System\.IO\.FileShare\]::None/);
     assert.match(manager, /taskkill\.exe \/PID \$processId \/T \/F/);
     assert.doesNotMatch(manager, /\/IM\s+(dotnet|node|chrome|msedge)/i);
+});
+
+test('临时输出的 Microi.net.Api 仅在 CWD 精确属于当前工作区时可结束', {
+    skip: process.platform !== 'win32'
+}, async () => {
+    const backendRoot = path.join(repoRoot, 'Microi.Server', 'Microi.net.Api');
+    const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-backend-ownership-'));
+    const fakeBackend = path.join(testRoot, 'Microi.net.Api.exe');
+    const listener = path.join(testRoot, 'listener.cjs');
+    fs.copyFileSync(process.execPath, fakeBackend);
+    fs.writeFileSync(listener, [
+        "const net = require('node:net');",
+        "net.createServer(() => {}).listen(Number(process.argv[2]), '127.0.0.1');"
+    ].join('\n'));
+
+    let workspaceBackend;
+    let externalBackend;
+    let externalRoot;
+    try {
+        const workspacePort = await reservePort();
+        workspaceBackend = spawn(fakeBackend, [listener, String(workspacePort)], {
+            cwd: backendRoot,
+            windowsHide: true,
+            stdio: 'ignore'
+        });
+        await waitForPort(workspacePort);
+
+        const workspaceResult = runProcessManager('StopBackend', 61500, workspacePort);
+        assert.equal(
+            workspaceResult.status,
+            0,
+            `${workspaceResult.stdout}\n${workspaceResult.stderr}`
+        );
+        assert.equal(await waitForExit(workspaceBackend), true, '当前工作区 CWD 的临时后端应被精确结束');
+
+        externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-external-backend-'));
+        const externalPort = await reservePort();
+        externalBackend = spawn(fakeBackend, [listener, String(externalPort)], {
+            cwd: externalRoot,
+            windowsHide: true,
+            stdio: 'ignore'
+        });
+        await waitForPort(externalPort);
+
+        const externalResult = runProcessManager('StopBackend', 61500, externalPort);
+        assert.notEqual(externalResult.status, 0, '外部 CWD 的同名临时后端必须拒绝结束');
+        assert.equal(externalBackend.exitCode, null, '拒绝后外部临时后端必须继续运行');
+    }
+    finally {
+        stopExactProcessTree(workspaceBackend);
+        stopExactProcessTree(externalBackend);
+        if (workspaceBackend) await waitForExit(workspaceBackend, 5000);
+        if (externalBackend) await waitForExit(externalBackend, 5000);
+        if (externalRoot) fs.rmSync(externalRoot, { recursive: true, force: true });
+        fs.rmSync(testRoot, { recursive: true, force: true });
+    }
 });
 
 test('相对入口 Vite 用进程工作目录识别当前工作区，并对外部工作区失败关闭', {

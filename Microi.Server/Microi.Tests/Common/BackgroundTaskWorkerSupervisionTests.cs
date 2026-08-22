@@ -46,6 +46,8 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("DiyLangBackgroundTaskService.ClusterConcurrencyKey", runtime);
         Assert.Contains("ChildTenantPlatformAppControlService.ClusterConcurrencyKey", runtime);
         Assert.Contains("ChildTenantPlatformAppControlService.ChildWorkerApiEngineKey", runtime);
+        Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_V1", runtime);
+        Assert.Contains("EnsureTargetExecutionBootstrap", runtime);
         Assert.Contains("concurrencyLeaseOsClient = OsClientExtend.GetConfigOsClient()", runtime);
         Assert.Contains("ActiveTasks", runtime);
         Assert.Contains("CommandFlags.FireAndForget", runtime);
@@ -135,6 +137,45 @@ public sealed class BackgroundTaskWorkerSupervisionTests
             Microi.net.BackgroundTaskService.ShouldRetryRenewalFailure(consecutiveFailures));
     }
 
+    [Fact]
+    public void InfrastructureDatabaseContention_GetsABoundedRetryBudgetIndependentOfBusinessAttempts()
+    {
+        var item = new Microi.net.BackgroundTaskRecord
+        {
+            MaxAttempts = 1,
+            LastError = ""
+        };
+        var deadlock = new InvalidOperationException(
+            "V8 wrapper",
+            new Exception("Deadlock found when trying to get lock; try restarting transaction"));
+
+        Assert.True(Microi.net.BackgroundTaskStore.ShouldRequeueInfrastructureContention(
+            item,
+            deadlock,
+            out var firstAttempt));
+        Assert.Equal(1, firstAttempt);
+
+        item.LastError = "[InfrastructureContentionRetry:1] deadlock";
+        Assert.True(Microi.net.BackgroundTaskStore.ShouldRequeueInfrastructureContention(
+            item,
+            deadlock,
+            out var secondAttempt));
+        Assert.Equal(2, secondAttempt);
+
+        item.LastError = "[InfrastructureContentionRetry:2] deadlock";
+        Assert.False(Microi.net.BackgroundTaskStore.ShouldRequeueInfrastructureContention(
+            item,
+            deadlock,
+            out var exhaustedAttempt));
+        Assert.Equal(3, exhaustedAttempt);
+
+        item.LastError = "";
+        Assert.False(Microi.net.BackgroundTaskStore.ShouldRequeueInfrastructureContention(
+            item,
+            new InvalidOperationException("Value cannot be null. (Parameter 'source')"),
+            out _));
+    }
+
     [Theory]
     [InlineData("ordinary_job", 90)]
     [InlineData("admin_build_sanitized_empty_database", 900)]
@@ -150,6 +191,17 @@ public sealed class BackgroundTaskWorkerSupervisionTests
 
     private static string FindServerRoot()
     {
+        var repositoryRoot = Environment.GetEnvironmentVariable("MICROI_TEST_REPOSITORY_ROOT");
+        if (!string.IsNullOrWhiteSpace(repositoryRoot))
+        {
+            var configuredServerRoot = Path.Combine(repositoryRoot, "Microi.Server");
+            if (Directory.Exists(Path.Combine(configuredServerRoot, "Microi.Core"))
+                && Directory.Exists(Path.Combine(configuredServerRoot, "Microi.net.Api")))
+            {
+                return configuredServerRoot;
+            }
+        }
+
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory != null)
         {

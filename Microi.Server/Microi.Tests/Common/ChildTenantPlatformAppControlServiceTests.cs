@@ -103,10 +103,12 @@ public class ChildTenantPlatformAppControlServiceTests
             "import-package.js"));
 
         Assert.Contains("CHILD_TENANT_MONITOR_BOOTSTRAP_RECOVERY_V1", controlSource, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("EnsureMonitorBootstrapRecovery", controlSource, StringComparison.Ordinal);
+        Assert.Contains("EnsureTargetExecutionBootstrap", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", importerSource, StringComparison.Ordinal);
-        Assert.Contains("Version: v2.2.9", importerSource, StringComparison.Ordinal);
+        Assert.Contains("Version: v2.3.3", importerSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -176,6 +178,22 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Equal(string.Empty, error);
     }
 
+    [Fact]
+    public void BootstrapWorkerRefresh_IgnoresBomAndLineEndingDifferencesAtSameVersion()
+    {
+        const string source = "/* Version: v1.2.6 */\nimport-microi-store-package\nApplicationType\n";
+        const string target = "\uFEFF/* Version: v1.2.6 */\r\nimport-microi-store-package\r\nApplicationType\r\n";
+
+        Assert.False(ChildTenantPlatformAppControlService.ShouldRefreshBootstrapEngine(
+            "bulk-import-microi-store-packages",
+            "v1.2.6",
+            target,
+            "v1.2.6",
+            source,
+            out var error));
+        Assert.Equal(string.Empty, error);
+    }
+
     [Theory]
     [InlineData("v2.2.3", "v2.2.3", "同版本但源码不同")]
     [InlineData("invalid", "v2.2.3", "版本无法安全比较")]
@@ -229,10 +247,18 @@ public class ChildTenantPlatformAppControlServiceTests
 
     private static string FindRepositoryRoot()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !Directory.Exists(Path.Combine(directory.FullName, "Microi.Server")))
-            directory = directory.Parent;
-        return directory?.FullName
-               ?? throw new DirectoryNotFoundException("Repository root not found.");
+        foreach (var startPath in new[]
+                 {
+                     Environment.GetEnvironmentVariable("MICROI_TEST_REPOSITORY_ROOT"),
+                     Directory.GetCurrentDirectory(),
+                     AppContext.BaseDirectory
+                 }.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            var directory = new DirectoryInfo(startPath);
+            while (directory != null && !Directory.Exists(Path.Combine(directory.FullName, "Microi.Server")))
+                directory = directory.Parent;
+            if (directory != null) return directory.FullName;
+        }
+        throw new DirectoryNotFoundException("Repository root not found.");
     }
 }

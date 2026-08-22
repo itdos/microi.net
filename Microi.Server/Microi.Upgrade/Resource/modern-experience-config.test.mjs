@@ -122,6 +122,8 @@ test('联邦商城包包含公开范围、私有凭据和历史版本契约', as
   assert.match(engines.get('get-microi-store').ApiV8Code, /ownedOnly/);
   assert.match(engines.get('get-microi-store').ApiV8Code, /V8\.Param\.Visibility/);
   assert.match(engines.get('get-microi-store-model').ApiV8Code, /delete plain\.PrivateSourcePath/);
+  assert.match(engines.get('get-microi-store-model').ApiV8Code, /MARKETPLACE_PINNED_INSTALL_SNAPSHOT_V1/);
+  assert.match(engines.get('get-microi-store').ApiV8Code, /BULK_PLATFORM_BOOTSTRAP_ORDER_V1/);
   const versionsEngine = engines.get('get-microi-store-versions');
   assert.match(versionsEngine.ApiV8Code, /mic_data_version/);
   assert.equal(versionsEngine.Version, 'v1.1.0');
@@ -133,6 +135,8 @@ test('联邦商城包包含公开范围、私有凭据和历史版本契约', as
   assert.doesNotMatch(versionsEngine.ApiV8Code, /_PageSize:\s*500/);
   assert.match(engines.get('import-microi-store-package').ApiV8Code, /MARKETPLACE_PRIVATE_SOURCE_CREDENTIAL_V1/);
   assert.match(engines.get('import-microi-store-package').ApiV8Code, /StoreVersionId/);
+  assert.match(engines.get('import-microi-store-package').ApiV8Code, /PACKAGE_REPLAY_VERSION_GUARD_V2/);
+  assert.match(engines.get('bulk-import-microi-store-packages').ApiV8Code, /prioritizeBootstrapPlan/);
 
   for (const [id, url] of [
     ['01KXFSG8153B3VZPZ45WNCCFHR', '/microi-store-installed'],

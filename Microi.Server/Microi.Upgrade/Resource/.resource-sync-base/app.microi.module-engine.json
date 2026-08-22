@@ -1,17 +1,18 @@
 {
   "PackageInfo": {
     "Name": "模块引擎",
-    "Version": "v7.5.4",
+    "Version": "v7.5.5",
     "CreateTime": "2026-08-08T06:31:30.327Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
-    "Description": "模块引擎基础资源。左侧菜单数字角标支持配置接口引擎统计值和悬停说明；记录直达与表单展示继续使用物理配置。",
-    "ChangeHistory": "2026-08-22 v7.5.2 新增 sys_menu.MenuBadgeTooltip，左侧菜单数字角标可显示自定义悬停说明，旧菜单未配置时保持原有标题提示。\n2026-08-21 v7.5.1 将“进入模块默认打开第一条记录”迁移为 sys_menu.OpenFirstRecord 物理字段；模块设置与表单设置各归其所属引擎，旧 ViewSchema 配置继续兼容读取。\n2026-08-21 v7.5.0 移除模块侧独立表单工作台配置入口，统一使用 diy_table.FormPresentation；记录直达、表格弹层和跨模块记录页复用同一 DiyForm。\n",
+    "Description": "模块引擎基础资源。顶栏标签右键可从当前模块绑定关系直达表单设计，路由元数据缺失时安全回查 sys_menu.DiyTableId；菜单角标、记录直达与表单展示继续使用物理配置。",
+    "ChangeHistory": "2026-08-23 v7.5.5 顶栏标签右键新增表单设计入口，优先读取路由 DiyTableId，缺失时按当前 sys_menu.Id 回查绑定表单并缓存结果。\n2026-08-22 v7.5.2 新增 sys_menu.MenuBadgeTooltip，左侧菜单数字角标可显示自定义悬停说明，旧菜单未配置时保持原有标题提示。\n2026-08-21 v7.5.1 将“进入模块默认打开第一条记录”迁移为 sys_menu.OpenFirstRecord 物理字段；模块设置与表单设置各归其所属引擎，旧 ViewSchema 配置继续兼容读取。\n2026-08-21 v7.5.0 移除模块侧独立表单工作台配置入口，统一使用 diy_table.FormPresentation；记录直达、表格弹层和跨模块记录页复用同一 DiyForm。\n",
     "RequiredPlatformCapabilities": [
       "ClientFeature:FormPresentation",
       "ServerField:DiyTable.FormPresentation",
       "ServerField:SysMenu.OpenFirstRecord",
-      "ServerField:SysMenu.MenuBadgeTooltip"
+      "ServerField:SysMenu.MenuBadgeTooltip",
+      "ClientFeature:TagsViewBoundFormDesign"
     ],
     "MenuCount": 1,
     "TableCount": 1,

@@ -202,7 +202,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.2\.9/);
+  assert.match(source, /Version: v2\.3\.3/);
 });
 
 function runAdminMenuPermissionFixture(options = {}) {
@@ -1058,8 +1058,12 @@ test("schema import uses durable bounded phases before application assets", () =
   assert.match(source, /assertSchemaChunkSucceeded\('字段定义'\)/);
   assert.match(source, /TaskId:\s*String\(backgroundTaskId/);
   assert.match(source, /Checkpoint:\s*buildPersistentCheckpoint\('ApplicationAssets'/);
-  assert.match(source, /PACKAGE_REPLAY_VERSION_GUARD_V1/);
+  assert.match(source, /PACKAGE_REPLAY_VERSION_GUARD_V2/);
   assert.match(source, /checkpoint\.PackageVersion\s*=\s*checkpointPackageVersion/);
+  assert.match(source, /checkpoint\.StoreVersionId\s*=\s*checkpointStoreVersionId/);
+  assert.match(source, /backgroundCheckpoint\.StoreVersionId/);
+  assert.match(source, /ExpectedAppVersion:/);
+  assert.match(source, /PinCurrentVersion:\s*backgroundChunkingEnabled/);
   assert.match(source, /应用包版本在后台分片期间发生变化/);
   assert.match(source, /snapshotPersistentSchemaStats/);
   assert.match(source, /checkpoint\.SchemaStats\s*=\s*schemaStats/);
@@ -1192,9 +1196,18 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
   assert.equal(packageImporter.LimitMemory, 8192, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v2.2.2") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v2.3.3") >= 0);
+  assert.match(source, /PACKAGE_REPLAY_VERSION_GUARD_V2/);
+  assert.match(source, /BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1/);
   assert.match(source, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1/);
+  assert.match(source, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1/);
+  assert.match(source, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1/);
   assert.match(source, /ensureGeneratedEntityPhysicalPrerequisites/);
+  assert.match(source, /batchAlterParts\.join\(', '\)/);
+  assert.match(source, /if \(!isSqlServer && !isOracle\)/);
+  assert.match(source, /physicalBootstrapOwnsSlice \? 1 : 999/);
+  assert.match(source, /Phase: physicalBootstrapNextPhase/);
+  assert.match(source, /physicalBootstrapPhase == 'Prerequisites'/);
   assert.match(source, /diy_table[\s\S]*?FormPresentationMode/);
   assert.match(source, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(source, /\^\(bit\|tinyint\|smallint/);
@@ -1253,10 +1266,19 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(2, 2, 2\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v2.2.2 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(2, 2, 2\)/);
-  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 3, 6\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 3, 3\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 2, 7\)/);
+  assert.equal(
+    (appStoreUpgradeSource.match(/!HasPinnedImporterCapabilities\(/g) || []).length,
+    3,
+    "runtime, downloaded importer, and embedded package validation must share the pinned-snapshot capability gate",
+  );
+  assert.equal(
+    (appStoreUpgradeSource.match(/!HasPinnedBulkCapabilities\(/g) || []).length,
+    2,
+    "runtime and embedded package validation must share the pinned bulk-worker capability gate",
+  );
+  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 5, 23\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
     3,
@@ -1324,6 +1346,82 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /tabbedMenus\.length\s*===\s*tabbedMenuIds\.size/);
   assert.match(refreshSource, /uploadAuditMenuValid/);
   assert.match(refreshSource, /ApplicationAssetMultipartSession/);
+});
+
+test("legacy physical prerequisites commit at most one metadata table per background slice", () => {
+  const schemas = {
+    sys_apiengine: new Set([
+      "stophttp", "timeout", "maxstatements", "limitmemory", "limitrecursion", "v8unlimited", "lock",
+    ]),
+    diy_table: new Set([
+      "osclient", "tableinedit", "addcallbakapi", "uptcallbakapi", "delcallbakapi", "v8unlimited",
+      "formpresentation", "formpresentationmode", "formpresentationdensity", "formnavigationtitle",
+      "formnavigationcounttext", "formsectionnavigation", "formsectioneyebrow", "formrequiredcounttext",
+      "formworkbencheyebrow", "formworkbenchdescription", "formnavigationfootertitle",
+      "formnavigationfooterhtml", "formrecordselectorplaceholder", "formrecordselectorlabelfields",
+      "formbannerenabled", "formbannertitlefield", "formbannersubtitlefield", "formbannerimagefield",
+      "formbannericon", "formbannerbackgroundfield", "formbannertagfields", "formbannermetrics",
+    ]),
+  };
+  const alterSql = [];
+  const fixture = {
+    Error,
+    JSON,
+    String,
+    isNaN,
+    parseInt,
+    V8: {
+      OsClientModel: { DbType: "MySql" },
+      Db: {
+        FromSql(sql) {
+          let selectedTable = "";
+          return {
+            AddInParameter(name, value) {
+              selectedTable = String(value).toLowerCase();
+              return this;
+            },
+            ToArray() {
+              return [...(schemas[selectedTable] || [])].map(ColumnName => ({ ColumnName }));
+            },
+            ExecuteNonQuery() {
+              alterSql.push(sql);
+              const tableMatch = String(sql).match(/^ALTER TABLE `([^`]+)`/i);
+              assert.ok(tableMatch, `unexpected prerequisite SQL: ${sql}`);
+              const tableKey = tableMatch[1].toLowerCase();
+              for (const match of String(sql).matchAll(/ADD `([^`]+)`/gi)) {
+                schemas[tableKey].add(match[1].toLowerCase());
+              }
+              return 1;
+            },
+          };
+        },
+      },
+    },
+  };
+  vm.runInNewContext(
+    `${extractNamedFunction(source, "ensureGeneratedEntityPhysicalPrerequisites")}; result = ensureGeneratedEntityPhysicalPrerequisites;`,
+    fixture,
+  );
+
+  const first = fixture.result(1);
+  assert.equal(first.ChangedTableCount, 1);
+  assert.equal(first.RemainingTableCount, 1);
+  assert.deepEqual([...first.Added], ["sys_apiengine.V8Limit"]);
+  assert.equal(alterSql.length, 1);
+  assert.match(alterSql[0], /^ALTER TABLE `sys_apiengine` ADD `V8Limit` int NULL$/i);
+
+  const second = fixture.result(1);
+  assert.equal(second.ChangedTableCount, 1);
+  assert.equal(second.RemainingTableCount, 0);
+  assert.deepEqual([...second.Added], ["diy_table.V8Limit"]);
+  assert.equal(alterSql.length, 2);
+  assert.match(alterSql[1], /^ALTER TABLE `diy_table` ADD `V8Limit` int NULL$/i);
+
+  const modern = fixture.result(1);
+  assert.equal(modern.ChangedTableCount, 0);
+  assert.equal(modern.RemainingTableCount, 0);
+  assert.deepEqual([...modern.Added], []);
+  assert.equal(alterSql.length, 2, "no-op modern tenants must not receive an empty ALTER slice");
 });
 
 test("reinstall DDL classifies existing indexes for idempotent skipping", () => {

@@ -4,9 +4,19 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
     getUploadPreviewUrl,
+    normalizeUploadResponseItem,
     resolveUploadLimit,
     sanitizeUploadMeta
 } from "../src/utils/upload-response.js";
+
+test("upload response normalizes single and per-file multiple payloads", function () {
+    const single = { Id: "single", Path: "/single.png" };
+    const multiple = [{ Id: "multiple", Path: "/multiple.png" }];
+    assert.equal(normalizeUploadResponseItem(single), single);
+    assert.equal(normalizeUploadResponseItem(multiple), multiple[0]);
+    assert.equal(normalizeUploadResponseItem([]), null);
+    assert.equal(normalizeUploadResponseItem("invalid"), null);
+});
 
 const fileUploadSource = await readFile(
     new URL("../src/views/form-engine/diy-field-component/diy-fileupload.vue", import.meta.url),
