@@ -367,6 +367,12 @@
             <template #header>
                 <div class="wf-drawer-header">
                     <div class="wf-drawer-title">{{ FlowTitle }}</div>
+                    <MciRenderSourceBadge
+                        v-if="OpenFormType === 'Custom'"
+                        type="custom"
+                        placement="inline"
+                        :instance-key="FlowTitle + ':' + ShowFieldFormDrawer"
+                    />
                     <el-button :icon="Close" @click="ShowFieldFormDrawer = false">{{ $t("Msg.Close") }}</el-button>
                 </div>
             </template>
@@ -384,11 +390,13 @@ import { computed, defineAsyncComponent } from "vue";
 import { useDiyStore } from "@/pinia";
 import _ from "underscore";
 import MicroiCalendar from "@/views/fullcalendar/fullcalendar.vue";
+import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
 
 export default {
     name: "diy_my_work",
     components: {
         MicroiCalendar,
+        MciRenderSourceBadge,
         DiyTable: defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"))
     },
     props: {

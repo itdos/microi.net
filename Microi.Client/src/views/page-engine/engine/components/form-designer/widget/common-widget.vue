@@ -68,6 +68,12 @@
       </div>
 
       <!-- #####在这里面添加新组件代码 ,代码开始###### -->
+      <MciRenderSourceBadge
+        v-if="!isDesignMode && Number(widgetObj.category) === 1"
+        type="custom"
+        placement="edge"
+        :instance-key="widgetObj.widgetOption.number"
+      />
       <Suspense>
         <component
           :is="selectedWidgetComponent(widgetObj.type)"
@@ -159,6 +165,7 @@ const { formData, curWidget, curWrapper, components } =
   storeToRefs(pageEngineStore)
 import useResizable from '../../../hooks/useResizable'
 import { peT } from '../../../i18n.js'
+import MciRenderSourceBadge from '@/components/MciRenderSourceBadge/index.vue'
 
 const componentRaw = toRaw(components.value)
 

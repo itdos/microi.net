@@ -1720,6 +1720,7 @@ export default {
                         }
                         self.DevComponents[componentName].Name = componentName;
                         self.DevComponents[componentName].Path = componentPath;
+                        self.DevComponents[componentName].RenderSource = DynamicComponentCache.getSource(componentName, componentPath);
                         // removed debug log
                     } catch (error) {
                         // removed debug log

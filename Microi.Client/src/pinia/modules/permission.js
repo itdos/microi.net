@@ -10,6 +10,7 @@ import {
     hasConfiguredModuleMetrics,
     hasConfiguredPageTabs
 } from "@/utils/page-tab-route-runtime.js";
+import { resolveMenuRenderSource } from "@/utils/framework-presentation.js";
 // Vue Router 4 支持直接使用 () => import() 形式，不需要 defineAsyncComponent
 
 /**
@@ -228,6 +229,8 @@ function appendMicroAppMeta(meta, item) {
         || friendlyConfig.appKey
         || (item.MicroServiceId ? DiyCommon.GuidRemoveSing(item.MicroServiceId) : "");
     meta.OpenType = item.OpenType;
+    meta.ComponentName = item.ComponentName;
+    meta.RenderSourceType = resolveMenuRenderSource(item);
     meta.Url = item.LegacyMenuUrl ? "" : item.Url;
     meta.LegacyMenuUrl = item.LegacyMenuUrl;
     meta.UrlApiEngineId = item.UrlApiEngineId;

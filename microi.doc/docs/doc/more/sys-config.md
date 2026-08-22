@@ -27,6 +27,29 @@ var clientSecret = privateSettings['Login.Gitee.ClientSecret'];
 
 登录页入口统一使用 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub` 五个负向开关，字段标签分别为“关闭生物登录入口”“关闭Authenticator登录入口”“关闭Gitee登录入口”“关闭微信登录入口”“关闭GitHub登录入口”。它们缺失、空值或 `0/false` 时默认显示入口，只有显式 `1/true` 才关闭；旧 `Login*Display` 字段仅作兼容回退并隐藏。`DisableAiAssistant` 同样保持负向开关语义。
 
+## 界面风格：框架来源标识与水印
+
+微服务和定制组件的来源标识由吾码宿主统一渲染，子应用不需要自行实现，也不存在租户级显示开关。`RenderSourceBadgeMode` 已停用并从系统设置移除：来源标识始终可发现，避免用户在不知道内容来源的情况下误改宿主或子应用。
+
+菜单微服务显示在框架内容区右上角并提供独立关闭按钮，用户认为它遮挡子应用控件时可仅关闭当前页面实例的标识；切换到另一个微服务页面后会重新显示，不会记住为全局关闭。`V8.OpenAppDialog` 打开的微服务或定制弹层把标识放在标准标题栏，因为它不会覆盖弹层正文和右上角操作区，所以始终显示且不提供关闭按钮。表单 `DevComponent` 显示在字段宿主，表格中的 `DevComponent` 只在列头显示一次，避免每行重复。
+
+来源标识本身是可点击按钮。点击后由框架打开统一的大圆角详情弹层，展示应用标识、页面标识、应用内路由、框架路由、版本、源码定位、运行入口、发布/挂载状态和租户坐标，并生成一段可复制的 Microi MCP 修改指令。详情中的运行信息只显示公开定位数据，不展示 Token、访问密钥或私有配置值。
+
+框架水印使用以下公开 `sys_config` 字段，覆盖整个 `100vw × 100vh`，包括路由内容和 Element Plus 弹层；水印层固定 `pointer-events:none`，不会阻止点击、滚动、拖拽、触摸或键盘操作，并自动适配亮色/深色主题。
+
+| 字段 | 默认值 | 说明 |
+|---|---|---|
+| `FrameworkWatermarkEnabled` | `0` | 显式设为 `1/true` 才开启，保证旧租户升级后视觉不变 |
+| `FrameworkWatermarkContent` | `$SysTitle$ - $UserName$` | 留空时显示“系统标题 - 用户名”；用户名为空自动回退 `$Account$`，两者均为空时只显示系统标题，不会输出 `undefined/null`。支持 `$SysTitle$`、`$SysShortTitle$`、`$UserName$`、`$Account$`、`$Date$`、`$DateTime$`，也支持 `{{UserName}}` 写法 |
+| `FrameworkWatermarkDirection` | `DiagonalUp` | `DiagonalUp`（斜向上）、`DiagonalDown`（斜向下）、`Horizontal`（水平） |
+| `FrameworkWatermarkOpacity` | `30` | 百分比；未设置、非法或为 `0` 时按 `30` 处理，运行时限制在 `1–100` |
+| `FrameworkWatermarkDensity` | `Comfortable` | `Compact`、`Comfortable`、`Sparse` 三档重复间距 |
+| `FrameworkWatermarkFontSize` | `14` | 像素；未设置、非法或为 `0` 时按 `14` 处理，运行时限制在 `8–72` |
+
+水印内容只应使用系统标题、用户显示名、账号、日期等公开展示信息，不要填写 Token、密码、Secret、手机号等敏感值。保存系统设置后会沿用现有 `sys_config` 缓存失效机制；刷新页面即可按最新配置重建框架水印。
+
+“界面风格”是一级 Tab，内部继续使用“主题与导航 / 登录界面与入口 / AI 与框架水印”等 `CollapseGroup` 归类设置。新增界面配置时应放入相应折叠组，不能继续把大量开关直接平铺在 Tab 中。
+
 ---
 
 ## 🔐 验证码

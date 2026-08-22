@@ -3,6 +3,7 @@
         <div id="app-microi" :class="GetAppClass()">
             <router-view />
         </div>
+        <MciFrameworkWatermark />
         <ApiServiceUnavailable />
     </el-config-provider>
 </template>
@@ -13,6 +14,7 @@ import { ElConfigProvider } from "element-plus";
 import { useDiyStore, useSettingsStore, useAppStore } from "@/pinia";
 import { getElementLocale, normalizeLocale } from "@/lang";
 import { setThemeMode as applyThemeMode } from "@/utils/theme-color.js";
+import { resolveUserThemeMode } from "@/utils/user-visual-preferences.js";
 import { syncApkDesktopStatusbarInset } from "@/utils/apk-statusbar-safe-area.js";
 import { getQueryObject } from "@/utils/index.js";
 import {
@@ -20,12 +22,13 @@ import {
     syncClassicShellVisibilityFromUrl
 } from "@/utils/classic-shell-visibility.js";
 import ApiServiceUnavailable from "@/components/ApiServiceUnavailable/index.vue";
+import MciFrameworkWatermark from "@/components/MciFrameworkWatermark/index.vue";
 import { isEmbeddedWebosWindowRuntime } from "@/utils/webos-embedded-runtime.js";
 // import drag from '@/views/form-engine/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
     name: "App",
-    components: { ElConfigProvider, ApiServiceUnavailable },
+    components: { ElConfigProvider, ApiServiceUnavailable, MciFrameworkWatermark },
     setup() {
         const diyStore = useDiyStore();
         const settingsStore = useSettingsStore();
@@ -91,6 +94,10 @@ export default {
         },
         "diyStore.IsTabFullScreen": function (isFullScreen) {
             if (!isFullScreen) this.syncClassicShellVisibility();
+        },
+        "GetCurrentUser.ThemeMode": function () {
+            if (isEmbeddedWebosWindowRuntime()) return;
+            applyThemeMode(resolveUserThemeMode(this.GetCurrentUser || {}, this.readLocalThemeMode()));
         }
     },
 
@@ -264,13 +271,18 @@ export default {
         // 恢复 MCI 亮/暗模式（localStorage 'mci-theme'）
         restoreMciMode() {
             try {
-                var mode = localStorage.getItem('mci-theme');
-                if (mode !== 'light' && mode !== 'dark') {
-                    mode = 'light';
-                }
+                var mode = resolveUserThemeMode(this.GetCurrentUser || {}, this.readLocalThemeMode());
                 // 通过统一入口恢复浅色/暗色，并同步当前 palette 的全部令牌。
                 applyThemeMode(mode);
             } catch (e) {}
+        },
+        readLocalThemeMode() {
+            try {
+                var mode = localStorage.getItem('mci-theme');
+                return mode === 'dark' ? 'dark' : 'light';
+            } catch (e) {
+                return 'light';
+            }
         },
         GetAppClass: function () {
             var result = "";

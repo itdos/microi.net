@@ -663,6 +663,13 @@
                             <template #header>
                                 <div class="col-header-cell" @click.stop="showColHeaderMenu(field, $event)">
                                     <span class="col-header-label">{{ field.Label }}</span>
+                                    <MciRenderSourceBadge
+                                        v-if="field.Component === 'DevComponent' && GetDevComponentRenderSource(field)"
+                                        :type="GetDevComponentRenderSource(field)"
+                                        placement="inline"
+                                        :instance-key="field.Id"
+                                        @click.stop
+                                    />
                                     <span class="col-header-sort-indicator" v-if="getColSortState(field)">
                                         <el-icon v-if="getColSortState(field) === 'asc'" :size="12"><SortUp /></el-icon>
                                         <el-icon v-else :size="12"><SortDown /></el-icon>
@@ -2117,6 +2124,7 @@ import DiyIndexManager from "@/views/form-engine/diy-components/DiyIndexManager.
 import DiyTableSpecialCell from "@/views/form-engine/diy-components/DiyTableSpecialCell.vue";
 import DiySearch from "@/views/form-engine/diy-search.vue";
 import DiyModleSearch from "@/views/form-engine/diy-mobile-search.vue";
+import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
 import { getFieldConfig, isSpecialTableField } from "@/views/form-engine/utils/table-special-field";
 import { scheduleTableInit } from "@/views/form-engine/utils/diy-table-init.js";
 import { resolveTabIcon } from "@/utils/tab-icon.js";
@@ -2151,6 +2159,7 @@ export default {
         DiyTableSpecialCell,
         DiySearch,
         DiyModleSearch,
+        MciRenderSourceBadge,
         ModuleFormWorkbench: defineAsyncComponent(() => import("@/views/form-engine/diy-components/module-form-workbench.vue")),
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
         DiyTableChild: defineAsyncComponent(() => import("@/views/form-engine/diy-table"))
