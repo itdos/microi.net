@@ -22,6 +22,7 @@ test('system settings drawer fills its viewport and uses the security/service-ac
   assert.match(microserviceSource, /\.workspace\{flex:1 0 auto;align-items:stretch\}/)
   assert.match(microserviceSource, /安全与服务接入/)
   assert.match(microserviceSource, /Sms\\\./)
+  assert.match(microserviceSource, /Map\\\./)
   const menu = packageModel.SysMenus.find(item => item.Id === 'ea6b79e8-2c6b-4d0f-9b6a-44d01a3479bf')
   const button = JSON.parse(menu.PageBtns).find(item => item.Id === 'mci-system-settings-identity-center')
   assert.equal(button.Name, '安全与服务接入')
@@ -54,6 +55,8 @@ test('tenant-owned identity, OAuth and SMS templates are complete and fail close
     'Login.GitHub.ClientId', 'Login.GitHub.ClientSecret', 'Login.GitHub.Scope',
     'Sms.Aliyun.AccessKeyId', 'Sms.Aliyun.AccessKeySecret',
     'Sms.Aliyun.SignName', 'Sms.Aliyun.TemplateCode',
+    'Map.Provider', 'Map.AMap.JsApiKey', 'Map.AMap.SecurityJsCode',
+    'Map.AMap.ServiceHost', 'Map.Baidu.JsApiKey', 'Map.Tencent.JsApiKey',
   ]
   for (const key of requiredKeys) {
     assert.ok(rows.has(key), `missing ${key}`)
@@ -63,6 +66,8 @@ test('tenant-owned identity, OAuth and SMS templates are complete and fail close
   for (const key of [
     'Login.Face.ApiKey', 'Login.Gitee.ClientSecret', 'Login.WeChat.ClientSecret',
     'Login.GitHub.ClientSecret', 'Sms.Aliyun.AccessKeyId', 'Sms.Aliyun.AccessKeySecret',
+    'Map.AMap.JsApiKey', 'Map.AMap.SecurityJsCode',
+    'Map.Baidu.JsApiKey', 'Map.Tencent.JsApiKey',
   ]) {
     const row = rows.get(key)
     assert.equal(row.IsSecret, 1)
@@ -71,6 +76,23 @@ test('tenant-owned identity, OAuth and SMS templates are complete and fail close
   }
   const forbiddenInfrastructure = /(?:Database|DbConn|Redis|Mongo|MinIO|MQHost|Rabbit|ObjectStorage)/i
   assert.equal([...rows.keys()].filter(key => forbiddenInfrastructure.test(key)).length, 0)
+})
+
+test('map runtime endpoint exposes one authenticated provider credential with no-store and legacy fallback', () => {
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    'POST /api/TenantSystemSettings/GetMapRuntime',
+  ))
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    'ClientFeature:MapRuntimeProvidersAMapBaiduTencent',
+  ))
+  assert.match(controllerSource, /GetMapRuntime/)
+  assert.match(controllerSource, /RequireAuthenticatedUserAsync/)
+  assert.match(controllerSource, /UserAccessKeySecurity\.IsSession/)
+  assert.match(controllerSource, /no-store, no-cache, max-age=0/)
+  assert.match(controllerSource, /ResolveMapRuntimeConfiguration/)
+  assert.match(controllerSource, /GetSysConfig\(osClient\)/)
+  assert.match(controllerSource, /runtime\.ClientKey/)
+  assert.doesNotMatch(controllerSource, /new\s*\{[^}]*AMapKey[^}]*BaiduAK[^}]*TencentMapKey/s)
 })
 
 test('disabled templates remain manageable but cannot reach runtime or public projections', () => {

@@ -1,6 +1,6 @@
 /*
  * ApiEngineKey: bulk-update-child-tenant-platform-apps
- * Version: v1.1.2
+ * Version: v1.1.5
  * 主租户编排器：按当前运行环境的 SaaS 目录，为每个启用的子租户创建一个
  * “安装/更新全部平台应用”持久后台任务。租户识别和目标任务投递由可信 C# 原子完成。
  */
@@ -79,22 +79,27 @@ if (!trustedInvocation
     return { Code: 0, Msg: '该操作必须通过主租户持久后台任务执行。' };
 }
 
-var executionParam = {
-    _BackgroundTaskId: taskId,
-    _BackgroundTaskFencingToken: fencingToken
-};
-var targetsResult = V8.Method.GetChildTenantPlatformAppMaintenanceTargets(executionParam);
-if (!targetsResult || targetsResult.Code != 1) {
-    return {
-        Code: 0,
-        Msg: '读取子租户目录失败：' + ((targetsResult && targetsResult.Msg) || '服务无返回')
-    };
-}
-
-var targets = toArray(targetsResult.Data && targetsResult.Data.Targets);
 var checkpoint = parseObject(V8.Param._BackgroundTaskCheckpoint);
 if (checkpoint.TaskId && text(checkpoint.TaskId) != taskId) checkpoint = {};
 var phase = text(checkpoint.Phase || 'Queue');
+var targets = [];
+// CHILD_TASK_MONITOR_CHECKPOINT_ONLY_V1：租户发现与工作器自举只允许发生在 Queue。
+// Monitor 必须只汇总已经持久化的 ChildTasks，避免运行中再次读取目录或修复工作器，
+// 让无关的租户配置/源码格式差异把已经正常执行的整批任务误判成失败。
+if (phase == 'Queue') {
+    var executionParam = {
+        _BackgroundTaskId: taskId,
+        _BackgroundTaskFencingToken: fencingToken
+    };
+    var targetsResult = V8.Method.GetChildTenantPlatformAppMaintenanceTargets(executionParam);
+    if (!targetsResult || targetsResult.Code != 1) {
+        return {
+            Code: 0,
+            Msg: '读取子租户目录失败：' + ((targetsResult && targetsResult.Msg) || '服务无返回')
+        };
+    }
+    targets = toArray(targetsResult.Data && targetsResult.Data.Targets);
+}
 var attemptedTargets = toArray(checkpoint.AttemptedTargets).map(function (item) {
     return text(item).toLowerCase();
 });

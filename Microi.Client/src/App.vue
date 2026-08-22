@@ -97,7 +97,11 @@ export default {
         },
         "GetCurrentUser.ThemeMode": function () {
             if (isEmbeddedWebosWindowRuntime()) return;
-            applyThemeMode(resolveUserThemeMode(this.GetCurrentUser || {}, this.readLocalThemeMode()));
+            this.applyResolvedThemeMode();
+        },
+        "diyStore.SysConfig.ThemeMode": function () {
+            if (isEmbeddedWebosWindowRuntime()) return;
+            this.applyResolvedThemeMode();
         }
     },
 
@@ -271,10 +275,18 @@ export default {
         // 恢复 MCI 亮/暗模式（localStorage 'mci-theme'）
         restoreMciMode() {
             try {
-                var mode = resolveUserThemeMode(this.GetCurrentUser || {}, this.readLocalThemeMode());
-                // 通过统一入口恢复浅色/暗色，并同步当前 palette 的全部令牌。
-                applyThemeMode(mode);
+                this.applyResolvedThemeMode();
             } catch (e) {}
+        },
+        applyResolvedThemeMode() {
+            var mode = resolveUserThemeMode(
+                this.GetCurrentUser || {},
+                this.readLocalThemeMode(),
+                this.diyStore.SysConfig?.ThemeMode,
+                "light"
+            );
+            // 通过统一入口恢复浅色/暗色，并同步当前 palette 的全部令牌。
+            applyThemeMode(mode);
         },
         readLocalThemeMode() {
             try {

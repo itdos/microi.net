@@ -77,6 +77,13 @@ const templates = [
   template('4df93e43-f6bb-4bf0-b3b7-51d724921042', 'Sms.Aliyun.AccessKeySecret', '', 'String', '当前租户阿里云短信 AccessKey Secret', 411, true),
   template('4df93e43-f6bb-4bf0-b3b7-51d724921043', 'Sms.Aliyun.SignName', '', 'String', '当前租户阿里云短信签名', 412),
   template('4df93e43-f6bb-4bf0-b3b7-51d724921044', 'Sms.Aliyun.TemplateCode', '', 'String', '当前租户阿里云验证码模板编码', 413),
+
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921051', 'Map.Provider', 'Baidu', 'String', '表单地图控件默认供应商：AMap、Baidu 或 Tencent', 510),
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921052', 'Map.AMap.JsApiKey', '', 'String', '高德地图 Web 端 JS API Key；必须在高德控制台限制可用域名', 511, true),
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921053', 'Map.AMap.SecurityJsCode', '', 'String', '高德地图 JS API 2.0 安全密钥；生产环境优先配置安全代理地址', 512, true),
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921054', 'Map.AMap.ServiceHost', '', 'String', '高德地图安全代理 serviceHost（HTTP(S) 绝对地址，配置后不向浏览器返回安全密钥）', 513),
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921055', 'Map.Baidu.JsApiKey', '', 'String', '百度地图 Web 端 JavaScript API AK；必须在百度控制台限制 Referer 白名单', 514, true),
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921056', 'Map.Tencent.JsApiKey', '', 'String', '腾讯地图 JavaScript API GL Key；必须在腾讯位置服务控制台限制授权域名', 515, true),
 ]
 
 const menu = (packageModel.SysMenus || []).find(item => item.Id === 'ea6b79e8-2c6b-4d0f-9b6a-44d01a3479bf')
@@ -116,8 +123,14 @@ for (const row of templates) {
 dataSet.Rows = existingRows
 
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {})
-info.Version = ensureMinimumVersion(info.Version, 'v7.5.16')
+info.Version = ensureMinimumVersion(info.Version, 'v7.5.23')
+info.RequiredPlatformCapabilities = [...new Set([
+  ...(info.RequiredPlatformCapabilities || []),
+  'POST /api/TenantSystemSettings/GetMapRuntime',
+  'ClientFeature:MapRuntimeProvidersAMapBaiduTencent',
+])]
 const changeLines = [
+  '2026-08-22 v7.5.23 “安全与服务接入”新增高德、百度、腾讯地图租户私密配置模板，浏览器只按当前供应商读取最小运行时凭据并兼容旧 sys_config 字段。',
   '2026-08-22 v7.5.16 “安全与服务接入”入口不再锁定历史微服务版本，始终解析当前 DatabaseOnly 内置运行包，HDFS/CDN 不可用时继续使用数据库资产。',
   '2026-08-21 v7.5.7 内嵌 microi-platform-service 升级至 v1.6.9，统一交付满高系统设置、清爽应用商城与主题化明暗模式。',
   '2026-08-21 v7.5.6 内嵌 microi-platform-service 升级至 v1.6.8，并固化“安全与服务接入”满高弹层及租户私有配置交付。',

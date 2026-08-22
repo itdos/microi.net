@@ -18,6 +18,7 @@ export type StoreApplicationOperation = 'install' | 'update';
 export interface StoreApplicationTaskInput {
     operation: StoreApplicationOperation;
     storeId: string;
+    storeVersionId?: string;
     requestId: string;
     storeApiBase?: string;
     storeOsClient?: string;

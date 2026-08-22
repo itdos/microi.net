@@ -5,17 +5,19 @@
         <el-upload
             v-if="FormMode != 'View' && field.Visible"
             ref="uploadRef"
+            class="mci-compact-upload"
             drag
             accept="image/*"
-            :multiple="field.Config.ImgUpload.Multiple === true"
+            :multiple="getMultipleFlag"
             :limit="field.Config.ImgUpload.MaxCount"
             :action="GetUploadUrl()"
             :data="{
                 Path: '/img',
                 Limit: field.Config.ImgUpload.Limit,
-                Preview: field.Config.ImgUpload.Preview
+                Preview: isImgCompressionEnabled(field.Config.ImgUpload.Preview)
             }"
             :headers="GetUploadHeaders()"
+            :http-request="performImageUpload"
             :before-upload="(file) => BeforeImgUpload(file)"
             :on-exceed="() => onExceed()"
             :on-success="(result, file, fileList) => ImgUploadSuccess(result, file, fileList)"
@@ -23,13 +25,17 @@
             :on-remove="(file, fileList) => ImgUploadRemove(file, fileList)"
             :show-file-list="false"
         >
-            <el-icon class="el-icon--upload">
-                <upload-filled />
-            </el-icon>
-            <div class="el-upload__text">将图片拖到此处，或<em>点击上传</em></div>
-            <template #tip>
-                <div class="el-upload__tip">{{ field.Config.ImgUpload.Tips }}</div>
-            </template>
+            <DiyUploadCompactSummary
+                kind="image"
+                :private-storage="field.Config.ImgUpload.Limit"
+                :multiple="getMultipleFlag"
+                :max-count="field.Config.ImgUpload.MaxCount"
+                :compressed="isImgCompressionEnabled(field.Config.ImgUpload.Preview)"
+                :max-size="field.Config.ImgUpload.MaxSize"
+                :tips="field.Config.ImgUpload.Tips"
+                show-crop-toggle
+                v-model:crop-enabled="runtimeCropEnabled"
+            />
         </el-upload>
 
         <!-- 单图片显示 - 编辑/新增模式 -->
@@ -99,7 +105,7 @@
             class="multiple-imgs-list"
         >
             <el-card
-                v-for="img in imageListComputed"
+                v-for="(img, index) in imageListComputed"
                 :key="img.Id"
                 class="img-card"
                 :data-id="img.Id"
@@ -171,71 +177,108 @@
         <el-dialog
             v-if="configDialogVisible"
             v-model="configDialogVisible"
+            class="mci-field-config-dialog mci-imgupload-config-dialog"
             title="图片上传配置"
-            width="500px"
+            width="min(780px, calc(100vw - 32px))"
             :close-on-click-modal="false"
             destroy-on-close
             append-to-body
         >
-            <el-form label-width="140px" label-position="left" size="small">
-                <el-form-item label="禁止匿名访问">
-                    <el-switch v-model="configForm.Limit" active-color="#ff6c04" inactive-color="#ccc" />
-                    <div class="form-item-tip">开启后图片将通过私有链接访问</div>
-                </el-form-item>
+            <div class="mci-img-config-banner">
+                <span><el-icon><Crop /></el-icon></span>
+                <div>
+                    <strong>图片上传与智能裁剪</strong>
+                    <small>用统一的安全上传协议保存展示图，原图始终保留在 HDFS 私有桶。</small>
+                </div>
+            </div>
 
-                <el-form-item label="多图片上传">
-                    <el-switch v-model="configForm.Multiple" active-color="#ff6c04" inactive-color="#ccc" />
-                    <div class="form-item-tip">开启后支持上传多张图片</div>
-                </el-form-item>
+            <el-form label-width="150px" label-position="left" size="default">
+                <section class="mci-img-config-section">
+                    <header><span>01</span><strong>上传基础</strong></header>
+                    <el-form-item label="禁止匿名访问">
+                        <el-switch v-model="configForm.Limit" />
+                        <div class="form-item-tip">开启后图片通过带鉴权的短期链接访问</div>
+                    </el-form-item>
+                    <el-form-item label="多图片上传">
+                        <el-switch v-model="configForm.Multiple" />
+                        <div class="form-item-tip">开启后支持一次选择多张图片</div>
+                    </el-form-item>
+                    <el-form-item label="最大允许上传个数">
+                        <el-input-number v-model="configForm.MaxCount" :min="1" :max="100" />
+                    </el-form-item>
+                    <el-form-item label="上传说明">
+                        <el-input v-model="configForm.Tips" placeholder="如：支持 JPG、PNG、WebP 格式" />
+                    </el-form-item>
+                    <el-form-item label="是否压缩">
+                        <el-switch v-model="configForm.Preview" />
+                        <div class="form-item-tip">开启后后端会自动生成约 500KB 的展示图</div>
+                    </el-form-item>
+                    <el-form-item label="最大体积(M)">
+                        <el-input-number v-model="configForm.MaxSize" :min="1" :max="1024" />
+                    </el-form-item>
+                    <el-form-item label="保存为完整路径">
+                        <el-switch v-model="configForm.SaveFullPath" />
+                        <div class="form-item-tip">开启后保存完整 URL，默认保存稳定的相对路径</div>
+                    </el-form-item>
+                </section>
 
-                <el-form-item label="最大允许上传个数">
-                    <el-input-number v-model="configForm.MaxCount" :min="1" :max="100" />
-                    <div class="form-item-tip">多图片上传时的最大数量限制</div>
-                </el-form-item>
+                <section class="mci-img-config-section mci-img-config-section--crop">
+                    <header>
+                        <span>02</span><strong>图片裁剪</strong>
+                        <el-tag type="success" effect="light" round>原图私有保留</el-tag>
+                    </header>
+                    <el-form-item label="默认开启裁剪">
+                        <el-switch v-model="configForm.Crop.Enabled" />
+                        <div class="form-item-tip">仅决定表单用户的初始状态；用户仍可在图片控件中随时开启或关闭裁剪</div>
+                    </el-form-item>
+                    <template>
+                        <el-form-item label="裁剪模式">
+                            <el-radio-group v-model="configForm.Crop.Mode" @change="handleCropModeChange">
+                                <el-radio-button value="free">自由裁剪</el-radio-button>
+                                <el-radio-button value="fixed">固定比例</el-radio-button>
+                                <el-radio-button value="select">用户可选</el-radio-button>
+                            </el-radio-group>
+                            <div class="form-item-tip">“用户可选”会在裁剪时提供自由、1:1、4:3、16:9 等比例</div>
+                        </el-form-item>
+                        <el-form-item v-if="configForm.Crop.Mode !== 'free'" label="默认比例">
+                            <el-select v-model="configForm.Crop.Ratio" style="width: 220px">
+                                <el-option
+                                    v-for="ratio in cropRatioOptions"
+                                    :key="ratio.value"
+                                    :label="ratio.label"
+                                    :value="ratio.value"
+                                />
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item v-if="configForm.Crop.Mode !== 'free' && configForm.Crop.Ratio === 'custom'" label="自定义比例">
+                            <div class="mci-custom-ratio-inputs">
+                                <el-input-number v-model="configForm.Crop.CustomWidth" :min="1" :max="10000" :precision="2" controls-position="right" />
+                                <span>:</span>
+                                <el-input-number v-model="configForm.Crop.CustomHeight" :min="1" :max="10000" :precision="2" controls-position="right" />
+                            </div>
+                        </el-form-item>
+                        <el-form-item label="编辑工具">
+                            <el-checkbox v-model="configForm.Crop.AllowZoom">缩放</el-checkbox>
+                            <el-checkbox v-model="configForm.Crop.AllowRotate">旋转</el-checkbox>
+                            <el-checkbox v-model="configForm.Crop.AllowFlip">镜像翻转</el-checkbox>
+                        </el-form-item>
+                    </template>
+                </section>
 
-                <el-form-item label="上传说明">
-                    <el-input v-model="configForm.Tips" placeholder="如：支持jpg、png、gif格式" />
-                    <div class="form-item-tip">显示在上传区域下方的提示文字</div>
-                </el-form-item>
-
-                <el-form-item label="是否压缩">
-                    <el-switch v-model="configForm.Preview" active-color="#ff6c04" inactive-color="#ccc" />
-                    <div class="form-item-tip">开启后会自动生成压缩预览图</div>
-                </el-form-item>
-
-                <el-form-item label="最大体积(M)">
-                    <el-input-number v-model="configForm.MaxSize" :min="1" :max="1024" />
-                    <div class="form-item-tip">单张图片的最大体积限制，单位MB</div>
-                </el-form-item>
-
-                <el-form-item label="保存为完整路径">
-                    <el-switch v-model="configForm.SaveFullPath" active-color="#ff6c04" inactive-color="#ccc" />
-                    <div class="form-item-tip">开启后保存时Path将存储完整URL（含文件服务器域名），而非相对路径</div>
-                </el-form-item>
-
-                <el-divider content-position="left">V8引擎代码</el-divider>
-
-                <el-form-item label="上传前V8引擎代码">
-                    <el-button
-                        type="primary"
-                        :icon="Edit"
-                        @click="openCodeEditor('BeforeUploadV8', '上传前V8引擎代码')"
-                    >
-                        编辑代码{{ getCodeLength(configForm.BeforeUploadV8) }}
-                    </el-button>
-                    <div class="form-item-tip">上传前执行的V8引擎代码，V8.Result返回false可阻止上传</div>
-                </el-form-item>
-
-                <el-form-item label="上传成功后V8引擎代码">
-                    <el-button
-                        type="primary"
-                        :icon="Edit"
-                        @click="openCodeEditor('UploadSuccessV8', '上传成功后V8引擎代码')"
-                    >
-                        编辑代码{{ getCodeLength(configForm.UploadSuccessV8) }}
-                    </el-button>
-                    <div class="form-item-tip">上传成功后执行的V8引擎JavaScript代码</div>
-                </el-form-item>
+                <section class="mci-img-config-section">
+                    <header><span>03</span><strong>V8 扩展</strong></header>
+                    <el-form-item label="上传前V8引擎代码">
+                        <el-button type="primary" plain :icon="Edit" @click="openCodeEditor('BeforeUploadV8', '上传前V8引擎代码')">
+                            编辑代码{{ getCodeLength(configForm.BeforeUploadV8) }}
+                        </el-button>
+                        <div class="form-item-tip">V8.Result 返回 false 可阻止上传</div>
+                    </el-form-item>
+                    <el-form-item label="上传成功后V8代码">
+                        <el-button type="primary" plain :icon="Edit" @click="openCodeEditor('UploadSuccessV8', '上传成功后V8引擎代码')">
+                            编辑代码{{ getCodeLength(configForm.UploadSuccessV8) }}
+                        </el-button>
+                    </el-form-item>
+                </section>
             </el-form>
             <template #footer>
                 <el-button @click="configDialogVisible = false">取消</el-button>
@@ -275,18 +318,40 @@
                 <el-button type="primary" @click="saveCodeEditor">确定</el-button>
             </template>
         </el-dialog>
+
+        <diy-image-crop-dialog
+            v-model="cropDialogVisible"
+            :file="cropDialogFile"
+            :config="cropDialogConfig"
+            @confirm="handleCropConfirm"
+            @bypass="handleCropBypass"
+            @cancel="handleCropCancel"
+        />
     </div>
 </template>
 
 <script setup>
 import { ref, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { UploadFilled, Delete, Rank, Edit } from '@element-plus/icons-vue';
+import { useI18n } from 'vue-i18n';
+import { Delete, Rank, Edit, Crop } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import Sortable from 'sortablejs';
 import { useDiyStore } from "@/pinia";
 import { getUploadErrorMessage } from "@/utils/upload-error";
 // zhy：统一解析上传接口返回的实际私有策略、短期预览地址和可持久化元数据。
-import { getUploadPreviewUrl, resolveUploadLimit, sanitizeUploadMeta } from "@/utils/upload-response";
+import {
+    getUploadPreviewUrl,
+    normalizeUploadResponseItem,
+    resolveUploadLimit,
+    sanitizeUploadMeta
+} from "@/utils/upload-response";
+import DiyImageCropDialog from './diy-image-crop-dialog.vue';
+import DiyUploadCompactSummary from './diy-upload-compact-summary.vue';
+import {
+    IMAGE_CROP_RATIOS,
+    isCropSupportedImage,
+    normalizeImageCropConfig
+} from './image-crop-config';
 
 // 禁用属性继承
 defineOptions({
@@ -340,6 +405,7 @@ const emit = defineEmits(['update:modelValue', 'CallbackRunV8Code']);
 const instance = getCurrentInstance();
 const DiyCommon = instance.appContext.config.globalProperties.DiyCommon;
 const DiyApi = instance.appContext.config.globalProperties.DiyApi;
+const { t } = useI18n();
 const diyStore = useDiyStore();
 const SysConfig = computed(() => ({
     ...(diyStore.SysConfig || {}),
@@ -356,17 +422,49 @@ const singleImageName = ref('');
 
 // 配置弹窗相关
 const configDialogVisible = ref(false);
+// 未配置时遵循后端安全默认值：图片生成约 500KB 的展示图，原图只保存在私有桶。
+// 仅显式 false/0 才关闭压缩，兼容历史 JSON 中的字符串布尔值。
+const isImgCompressionEnabled = (value) => !(
+    value === false || value === 0 || value === '0' || String(value).toLowerCase() === 'false'
+);
 const configForm = ref({
     Limit: false,
     Multiple: false,
     MaxCount: 10,
     Tips: '',
-    Preview: false,
+    Preview: true,
     MaxSize: 10,
     SaveFullPath: false,
+    Crop: normalizeImageCropConfig(),
     BeforeUploadV8: '',
     UploadSuccessV8: ''
 });
+const cropRatioOptions = IMAGE_CROP_RATIOS.filter(item => item.value !== 'free');
+const handleCropModeChange = () => {
+    // 历史字段从自由裁剪切到固定/可选模式时，Ratio 仍可能是 free。
+    // 立即归一化，避免固定模式出现一个无法选择的“free”原始值。
+    configForm.value.Crop = normalizeImageCropConfig(configForm.value.Crop);
+};
+
+// 裁剪对话框通过队列串行处理多选图片，避免同时选择多图时弹窗互相覆盖。
+const cropDialogVisible = ref(false);
+const cropDialogFile = ref(null);
+const cropDialogConfig = ref(normalizeImageCropConfig());
+const runtimeCropEnabled = ref(normalizeImageCropConfig(props.field.Config?.ImgUpload?.Crop).Enabled);
+const activeCropConfig = computed(() => ({
+    ...normalizeImageCropConfig(props.field.Config?.ImgUpload?.Crop),
+    Enabled: runtimeCropEnabled.value
+}));
+watch(
+    () => normalizeImageCropConfig(props.field.Config?.ImgUpload?.Crop).Enabled,
+    (enabled) => {
+        runtimeCropEnabled.value = enabled;
+    },
+    { immediate: true }
+);
+const pendingCropUploads = new Map();
+let cropQueue = Promise.resolve();
+let cropDialogResolver = null;
 
 // 代码编辑器弹窗相关
 const codeEditorVisible = ref(false);
@@ -388,9 +486,10 @@ const openConfig = () => {
         Multiple: props.field.Config.ImgUpload.Multiple || false,
         MaxCount: props.field.Config.ImgUpload.MaxCount || 10,
         Tips: props.field.Config.ImgUpload.Tips || '',
-        Preview: props.field.Config.ImgUpload.Preview || false,
+        Preview: isImgCompressionEnabled(props.field.Config.ImgUpload.Preview),
         MaxSize: props.field.Config.ImgUpload.MaxSize || 10,
         SaveFullPath: props.field.Config.ImgUpload.SaveFullPath || false,
+        Crop: normalizeImageCropConfig(props.field.Config.ImgUpload.Crop),
         BeforeUploadV8: props.field.Config.Upload?.BeforeUploadV8 || '',
         UploadSuccessV8: props.field.Config.Upload?.UploadSuccessV8 || ''
     };
@@ -410,6 +509,7 @@ const saveConfig = () => {
     props.field.Config.ImgUpload.Preview = configForm.value.Preview;
     props.field.Config.ImgUpload.MaxSize = configForm.value.MaxSize;
     props.field.Config.ImgUpload.SaveFullPath = configForm.value.SaveFullPath;
+    props.field.Config.ImgUpload.Crop = normalizeImageCropConfig(configForm.value.Crop);
 
     // 保存Upload V8配置
     if (!props.field.Config.Upload) {
@@ -615,6 +715,110 @@ const GetUploadHeaders = () => {
     };
 };
 
+const getUploadUid = (file) => String(file?.uid ?? '');
+
+const finishCropDialog = (value) => {
+    const resolver = cropDialogResolver;
+    cropDialogResolver = null;
+    cropDialogVisible.value = false;
+    if (resolver) resolver(value);
+    nextTick(() => {
+        if (!cropDialogVisible.value) cropDialogFile.value = null;
+    });
+};
+
+const handleCropConfirm = (result) => finishCropDialog(result);
+const handleCropBypass = () => finishCropDialog({ bypass: true });
+const handleCropCancel = () => finishCropDialog(null);
+
+const enqueueImageCrop = (file, config) => {
+    const task = cropQueue.then(() => new Promise((resolve) => {
+        cropDialogResolver = resolve;
+        cropDialogFile.value = file;
+        cropDialogConfig.value = normalizeImageCropConfig(config);
+        cropDialogVisible.value = true;
+    }));
+    // 无论用户应用还是取消，后续图片都能继续进入队列。
+    cropQueue = task.then(() => undefined, () => undefined);
+    return task;
+};
+
+const runBeforeUploadV8 = (file) => {
+    const code = props.field.Config?.Upload?.BeforeUploadV8;
+    if (!code) return Promise.resolve(true);
+    return new Promise((resolve) => {
+        emit('CallbackRunV8Code', {
+            field: props.field,
+            thisValue: file,
+            _v8Code: code,
+            callback: (result) => resolve(result !== false)
+        });
+    });
+};
+
+// 自定义上传保证裁剪图与未修改原图在同一 multipart 请求中送达。
+// 后端先把 MicroiOriginalFile 写入私有桶，成功后才会保存裁剪展示图。
+const performImageUpload = (options) => {
+    const rawFile = options.file;
+    const uid = getUploadUid(rawFile);
+    const cropPayload = pendingCropUploads.get(uid);
+    const formData = new FormData();
+    const displayFile = cropPayload
+        ? new File([cropPayload.blob], cropPayload.originalFile.name, {
+            type: cropPayload.blob.type || cropPayload.originalFile.type,
+            lastModified: Date.now()
+        })
+        : rawFile;
+
+    formData.append(options.filename || 'file', displayFile, displayFile.name);
+    if (cropPayload) {
+        formData.append('MicroiOriginalFile', cropPayload.originalFile, cropPayload.originalFile.name);
+        formData.append('CropEnabled', 'true');
+    }
+    formData.append('Path', '/img');
+    const limitValue = props.field.Config.ImgUpload.Limit;
+    const limitEnabled = limitValue === true || limitValue === 1
+        || String(limitValue).trim().toLowerCase() === 'true'
+        || String(limitValue).trim() === '1';
+    formData.append('Limit', String(limitEnabled));
+    formData.append('Multiple', String(getMultipleFlag.value));
+    formData.append('Preview', String(isImgCompressionEnabled(props.field.Config.ImgUpload.Preview)));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open(options.method || 'POST', options.action || GetUploadUrl(), true);
+    xhr.withCredentials = options.withCredentials === true;
+    const headers = { ...GetUploadHeaders(), ...(options.headers || {}) };
+    Object.entries(headers).forEach(([name, value]) => {
+        if (value !== undefined && value !== null) xhr.setRequestHeader(name, String(value));
+    });
+    xhr.upload.addEventListener('progress', (event) => {
+        if (event.total > 0) options.onProgress({ percent: event.loaded / event.total * 100 });
+    });
+
+    const clearPending = () => pendingCropUploads.delete(uid);
+    xhr.addEventListener('load', () => {
+        clearPending();
+        if (xhr.status < 200 || xhr.status >= 300) {
+            const error = new Error(xhr.responseText || `HTTP ${xhr.status}`);
+            error.status = xhr.status;
+            options.onError(error);
+            return;
+        }
+        try {
+            options.onSuccess(JSON.parse(xhr.responseText));
+        } catch {
+            options.onError(new Error('上传服务返回了无法解析的数据！'));
+        }
+    });
+    xhr.addEventListener('error', () => {
+        clearPending();
+        options.onError(new Error('图片上传网络异常，请稍后重试！'));
+    });
+    xhr.addEventListener('abort', () => clearPending());
+    xhr.send(formData);
+    return xhr;
+};
+
 // 上传文件超出限制
 const onExceed = () => {
     DiyCommon.Tips(`最多只能上传${props.field.Config.ImgUpload.MaxCount}张图片`, false);
@@ -642,7 +846,7 @@ const setupBeforeImgUpload = (file) => {
 };
 
 // 上传前的钩子
-const BeforeImgUpload = (file) => {
+const BeforeImgUpload = async (file) => {
     // 验证文件类型
     const isImage = file.type.startsWith('image/');
     if (!isImage) {
@@ -650,23 +854,25 @@ const BeforeImgUpload = (file) => {
         return false;
     }
 
-    // 上传前V8事件
-    if (props.field.Config && props.field.Config.Upload && props.field.Config.Upload.BeforeUploadV8) {
-        return new Promise((resolve, reject) => {
-            emit('CallbackRunV8Code', {
-                field: props.field,
-                thisValue: file,
-                _v8Code: props.field.Config.Upload.BeforeUploadV8,
-                callback: (result) => {
-                    if (result === false) {
-                        reject(); // 阻止上传
-                        return;
-                    }
-                    setupBeforeImgUpload(file);
-                    resolve(true);
-                }
-            });
-        });
+    const maxSizeMegabytes = Number(props.field.Config.ImgUpload.MaxSize || 10);
+    if (Number.isFinite(maxSizeMegabytes) && maxSizeMegabytes > 0
+        && file.size > maxSizeMegabytes * 1024 * 1024) {
+        DiyCommon.Tips(`单张图片不能超过 ${maxSizeMegabytes}MB！`, false);
+        return false;
+    }
+
+    const v8Allowed = await runBeforeUploadV8(file);
+    if (!v8Allowed) return false;
+
+    const cropConfig = activeCropConfig.value;
+    if (cropConfig.Enabled) {
+        if (!isCropSupportedImage(file)) {
+            DiyCommon.Tips('开启裁剪时支持 JPG、PNG 和 WebP 图片；GIF 等动态格式请关闭裁剪后上传。', false, 10);
+            return false;
+        }
+        const cropResult = await enqueueImageCrop(file, cropConfig);
+        if (!cropResult) return false;
+        if (!cropResult.bypass) pendingCropUploads.set(getUploadUid(file), cropResult);
     }
 
     setupBeforeImgUpload(file);
@@ -719,7 +925,12 @@ const ImgUploadSuccess = (result, file, fileList) => {
     console.log('DiyCommon.Result(result) 返回:', isSuccess);
 
     if (isSuccess) {
-        const responseData = file.response?.Data || result.Data;
+        const responseData = normalizeUploadResponseItem(file.response?.Data ?? result.Data);
+        if (!responseData?.Path) {
+            clearFailedImgUpload(file);
+            DiyCommon.Tips('图片上传成功，但服务端未返回可用的图片路径！', false, 10);
+            return;
+        }
         const uploadedImgId = responseData.Id || file.uid;
         const uploadedImgPath = responseData.Path;
         // zhy：以服务端实际 Limit 为准，并复用本次上传返回的短期地址，避免未保存记录二次鉴权失败。
@@ -1132,6 +1343,8 @@ onBeforeUnmount(() => {
     if (sortableInstance) {
         sortableInstance.destroy();
     }
+    if (cropDialogResolver) finishCropDialog(null);
+    pendingCropUploads.clear();
     uploadRef.value = null;
 });
 </script>
@@ -1304,4 +1517,68 @@ onBeforeUnmount(() => {
     }
 }
 
+</style>
+
+<style lang="scss">
+.mci-imgupload-config-dialog {
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 28px 80px rgba(15, 23, 42, .22);
+
+    .el-dialog__header {
+        margin: 0;
+        padding: 20px 24px 15px;
+        border-bottom: 1px solid var(--el-border-color-lighter);
+    }
+    .el-dialog__title { font-size: 18px; font-weight: 700; color: var(--el-text-color-primary); }
+    .el-dialog__body { max-height: min(72vh, 760px); padding: 18px 22px; overflow-y: auto; background: var(--el-fill-color-extra-light); }
+    .el-dialog__footer { padding: 15px 22px; border-top: 1px solid var(--el-border-color-lighter); background: var(--el-bg-color); }
+
+    .mci-img-config-banner {
+        display: flex; align-items: center; gap: 13px; margin-bottom: 15px; padding: 15px 17px;
+        border: 1px solid color-mix(in srgb, var(--el-color-primary) 18%, var(--el-border-color-lighter));
+        border-radius: 14px;
+        background: linear-gradient(115deg, color-mix(in srgb, var(--el-color-primary) 9%, #fff), #fff 68%);
+    }
+    .mci-img-config-banner > span {
+        width: 40px; height: 40px; display: grid; place-items: center; flex: 0 0 auto;
+        border-radius: 12px; color: #fff; font-size: 20px;
+        background: linear-gradient(145deg, var(--el-color-primary), #7c3aed);
+        box-shadow: 0 8px 18px color-mix(in srgb, var(--el-color-primary) 22%, transparent);
+    }
+    .mci-img-config-banner > div { display: flex; flex-direction: column; min-width: 0; }
+    .mci-img-config-banner strong { color: var(--el-text-color-primary); font-size: 14px; }
+    .mci-img-config-banner small { margin-top: 4px; color: var(--el-text-color-secondary); font-size: 11px; line-height: 1.5; }
+
+    .mci-img-config-section {
+        margin-top: 12px; padding: 17px 18px 4px; border: 1px solid var(--el-border-color-lighter);
+        border-radius: 14px; background: var(--el-bg-color);
+    }
+    .mci-img-config-section > header { margin-bottom: 14px; display: flex; align-items: center; gap: 9px; }
+    .mci-img-config-section > header > span { color: var(--el-color-primary); font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+    .mci-img-config-section > header > strong { color: var(--el-text-color-primary); font-size: 14px; }
+    .mci-img-config-section > header .el-tag { margin-left: auto; }
+    .mci-img-config-section--crop {
+        border-color: color-mix(in srgb, var(--el-color-primary) 22%, var(--el-border-color-lighter));
+        background: linear-gradient(145deg, var(--el-bg-color), color-mix(in srgb, var(--el-color-primary) 3%, var(--el-bg-color)));
+    }
+    .el-form-item { margin-bottom: 15px; }
+    .el-form-item__content { min-width: 0; }
+    .form-item-tip { flex-basis: 100%; margin-top: 5px; color: var(--el-text-color-secondary); font-size: 11px; line-height: 1.5; }
+    .mci-custom-ratio-inputs { display: flex; align-items: center; gap: 10px; }
+    .mci-custom-ratio-inputs .el-input-number { width: 145px; }
+}
+
+@media (max-width: 680px) {
+    .mci-imgupload-config-dialog {
+        width: calc(100vw - 20px) !important;
+        .el-dialog__body { padding: 14px; }
+        .mci-img-config-section { padding: 15px 13px 3px; }
+        .el-form-item { display: block; }
+        .el-form-item__label { width: auto !important; height: auto; margin-bottom: 7px; }
+        .el-form-item__content { margin-left: 0 !important; }
+        .el-radio-group { display: grid; grid-template-columns: 1fr; width: 100%; }
+        .el-radio-button__inner { width: 100%; }
+    }
+}
 </style>

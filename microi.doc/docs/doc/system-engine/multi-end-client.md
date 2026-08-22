@@ -45,6 +45,20 @@ PC 与移动入口应共享服务端权限和会话事实。仅把菜单在 CSS 
 
 新增租户应创建独立 Profile 与 `src/tenants/<tenant>/`，不能在平台层散落 `if (OsClient === ...)`。默认构建指向哪个 Profile 以当前仓库说明为准，发布前必须明确目标租户，避免把客户 A 的品牌、API 或路由打进客户 B 的包。
 
+### 通用 App 登录平台切换
+
+`microi.uniapp` 的 `standard` Profile 可构建一个通用原生 App。该能力只在 `APP-PLUS` 登录页出现，H5 和小程序仍使用构建时固定配置：
+
+1. 协议只能从 `https://`、`http://` 下拉框选择，API 输入框不接收重复协议；`OsClient` 单独填写。
+2. 客户端先匿名读取候选租户的 `GetSysConfig`，连接和租户有效后才保存设置。
+3. 平台切换会断开旧消息连接，清除旧 DiyToken、用户、菜单、表元数据、页面会话和业务缓存；切换前发出的迟到响应不能写回新会话。
+4. 系统标题、Logo、FileServer、验证码、隐私协议及登录 RSA 公钥从目标平台重新加载。记住的账号和 RSA 密文以 `ApiBase + OsClient` 为隔离边界，不能跨平台复用。
+5. 通用 App 使用 `npm run build:app:standard` 构建；默认客户交付命令仍保持原 Profile，不会因通用模式改变客户品牌与路由。
+
+HTTPS 是默认值。`http://` 只建议连接确实无法升级的可信内网或旧设备。iOS 的 App Transport Security 与 Android 9+ 默认策略都会拒绝不安全连接；允许用户填写任意 HTTP 地址需要分别声明全局 ATS 与 Android cleartext 例外。Apple 要求 ATS 例外在审核中提供理由，并明确建议优先修复服务端或使用更窄的域名例外。`standard` Profile 为这项明确需求声明例外，客户专属 Profile 不默认继承；发布前必须从最终 IPA/APK 回读原生清单并做真机验证。参见 [Apple：防止不安全的网络连接](https://developer.apple.com/documentation/security/preventing-insecure-network-connections)、[Android：Network Security Configuration](https://developer.android.com/privacy-and-security/security-config)、[DCloud：iOS 原生配置文件](https://uniapp.dcloud.net.cn/tutorial/app-nativeresource-ios.html) 与 [DCloud：Android 原生清单](https://uniapp.dcloud.net.cn/tutorial/app-nativeresource-android.html)。
+
+`build:app:standard` 的输出是 App 编译资源，不是已签名安装包。DCloud 云打包前执行 `npm run profile:sync -- standard`，让 `src/manifest.json`、`src/Info.plist`、`src/AndroidManifest.xml` 和运行配置处于同一 Profile；云打包及安装包回读结束后执行 `npm run profile:sync -- xjy && npm run check:profiles` 恢复仓库默认交付态。不要使用默认 `xjy` 源码配置打通用包。
+
 ## `microi.app` HBuilderX 壳
 
 `microi.app` 使用 5+App/Wap2App，把远程 `Microi.Client` 运行在 launcher WebView 中。它不是把 Vue 项目转换成 uni-app，因此适合需要完整后台能力又希望使用原生蓝牙、扫码、相机、文件与状态栏 API 的场景。
@@ -66,8 +80,22 @@ PC 与移动入口应共享服务端权限和会话事实。仅把菜单在 CSS 
 | 桌面化门户或触控桌面 | WebOS |
 | 浏览器内快速适配手机 | `Microi.Client` 移动 Web |
 | 微信小程序和原生业务体验 | `microi.uniapp` |
+| 面向多个吾码平台/租户的通用原生 App | `microi.uniapp` 的 `standard` App 构建 |
 | 完整 Web 后台 + 原生蓝牙/扫码 | `microi.app` |
 | 单个复杂定制页面独立发布 | [前端微服务](/doc/system-engine/micro-app) |
+
+## App Store 选型与审核边界
+
+若目标是上架面向手机用户的正式 App，`microi.uniapp` 通常比 `microi.app` 更合适：前者有原生页面、动态表单、消息、AI、个人中心和设备能力；后者的核心仍是把远程管理后台放进 WebView。Apple 4.2 要求 App 的功能、内容和界面不能只是重新包装网站，所以纯套壳的 4.2 风险更高。不过，使用 uni-app 不等于自动过审，最终仍取决于安装包实际体验、业务完整性、隐私和审核材料。参见 [Apple App Review Guidelines 4.2](https://developer.apple.com/app-store/review/guidelines/#minimum-functionality)。
+
+通用单一安装包并非天然违规。Apple 4.2.6 明确把承载多个客户内容的聚合/选择器模型列为模板服务的一种可接受方案；吾码通用 App 应由平台方直接提交，登录后提供真实原生业务价值，而不是帮助各客户批量提交大量近似 App。审核至少还需满足：
+
+- 提供长期有效的审核账号或完整演示模式，并确保审核期间后端可访问；在 App Review Notes 写明平台地址、`OsClient` 和非显而易见的切换方式。
+- 完成真机稳定性、IPv6 网络、弱网、上传、隐私协议、权限说明和所有外链检查。
+- 若 App 内支持创建账号，必须提供可在 App 内发起的账号删除流程。
+- 任意 HTTP 会降低传输安全并触发额外 ATS 说明；以“更容易过审”为目标的正式公共环境应优先全部升级 HTTPS。
+
+审核要求以提交时的 [Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/) 和 [App 内账号删除要求](https://developer.apple.com/support/offering-account-deletion-in-your-app/) 为准。
 
 ## 跨端一致性原则
 
@@ -82,6 +110,7 @@ PC 与移动入口应共享服务端权限和会话事实。仅把菜单在 CSS 
 - PC：经典界面登录、菜单、表格、表单、设计器和退出。
 - WebOS：macOS / Windows 桌面、Dock、应用打开、主题、语言、桌面切换。
 - 移动 Web：底部导航、消息/聊天、返回栈、横竖屏与软键盘。
-- UniApp：微信开发者工具、真机登录、动态表单、上传、定位、分享和消息。
+- UniApp 小程序：微信开发者工具、真机登录、动态表单、上传、定位、分享和消息。
+- UniApp App：候选平台探测、HTTPS/HTTP、跨平台会话清理、冷启动恢复、Android/iOS 真机与最终安装包配置回读。
 - App 壳：Android 手机、平板横竖屏、旋转、状态栏、返回键、扫码与蓝牙。
 - 服务端：普通角色直接访问路由/API 时仍被权限策略正确限制。

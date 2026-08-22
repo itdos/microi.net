@@ -40,6 +40,26 @@ export function canonicalizeResource(name, content) {
   return `${JSON.stringify(JSON.parse(normalized), null, 2)}\n`;
 }
 
+export function normalizeOfficialPackageExecutionLimits(name, content, recursionCeiling = 5000) {
+  const canonical = canonicalizeResource(name, content);
+  if (!name.endsWith('.json')) return canonical;
+
+  const ceiling = Number(recursionCeiling);
+  if (!Number.isFinite(ceiling) || ceiling <= 0) {
+    throw new Error('官方应用包递归上限必须是正整数');
+  }
+
+  const packageModel = JSON.parse(canonical);
+  let changed = false;
+  for (const engine of Array.isArray(packageModel?.SysApiEngines) ? packageModel.SysApiEngines : []) {
+    const persisted = Number(engine?.LimitRecursion);
+    if (!Number.isFinite(persisted) || persisted <= ceiling) continue;
+    engine.LimitRecursion = Math.trunc(ceiling);
+    changed = true;
+  }
+  return changed ? canonicalizeResource(name, JSON.stringify(packageModel)) : canonical;
+}
+
 // Remote resources are one side of a three-way merge and are allowed to lag
 // behind the local release candidate. This gate only proves that the response
 // has the expected stable identity and can be parsed safely. The strict feature

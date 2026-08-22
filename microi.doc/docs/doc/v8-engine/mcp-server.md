@@ -21,7 +21,7 @@ Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Claude Code、Trae 等 A
 | 工作流与任务 | `microi_check_workflow_package`、`microi_test_workflow_condition`、`microi_save_workflow_package`、`microi_save_job` | 流程拓扑、条件测试与调度 |
 | 蓝图 | `microi_list_blueprints`、`microi_get_blueprint`、`microi_save_blueprint`、`microi_validate_blueprint` | 读取、维护和验证业务架构 |
 | 前端微服务 | `microi_list_applications`、`microi_create_microservice`、`microi_sync_microservice_source`、`microi_publish_microservice` | 创建、同步源码、构建与发布 |
-| 应用商城 | `microi_install_store_application`、`microi_update_store_application` | 提交可恢复安装/更新任务 |
+| 应用商城 | `microi_install_store_application`、`microi_update_store_application` | 提交可恢复安装/更新任务；发布升版恢复可固定 `storeVersionId` 不可变快照 |
 | 外部数据库 | `microi_list_database_types`、`microi_inspect_external_database`、`microi_query_external_database`、`microi_execute_external_database` | 结构探测、只读采样与受控高权限执行 |
 | 文件迁移 | `microi_import_external_attachment`、`microi_upload_file_base64` | 从 URL、本机/UNC 或 Base64 写入 HDFS |
 | Redis / MongoDB 日志 | `microi_redis_*`、`microi_query_mongodb_logs`、`microi_write_mongodb_log` | 诊断和显式确认后的维护 |

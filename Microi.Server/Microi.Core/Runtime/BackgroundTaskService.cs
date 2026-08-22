@@ -776,6 +776,24 @@ namespace Microi.net
                 {
                     var param = ParseObject(item.ParamJson);
                     var trustedUser = ParseObject(item.TrustedUserJson);
+                    if (string.Equals(
+                            item.ApiEngineKey,
+                            ChildTenantPlatformAppControlService.ChildWorkerApiEngineKey,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        // CHILD_TENANT_EXECUTION_BOOTSTRAP_V1：旧批次可能已经在父任务
+                        // Monitor 前排队。领取任务后、运行目标租户 V8 前刷新官方安装器，
+                        // 使平台修复能够从原检查点接管，而不要求用户删除并重建任务。
+                        var bootstrap = ChildTenantPlatformAppControlService.EnsureTargetExecutionBootstrap(
+                            item.OsClient,
+                            executionOsClient,
+                            trustedUser);
+                        if (bootstrap?.Code != 1)
+                        {
+                            throw new InvalidOperationException(
+                                "子租户商城工作器执行前自愈失败：" + (bootstrap?.Msg ?? "无返回"));
+                        }
+                    }
                     param["ApiEngineKey"] = item.ApiEngineKey;
                     param["_BackgroundTaskId"] = item.Id;
                     param["_BackgroundTaskTitle"] = item.Title ?? "";

@@ -43,6 +43,7 @@ module.exports = {
     },
     features: {
       ai: true,
+      runtimeEndpointSwitch: true,
       business: false,
       businessCatalog: true,
       dynamicModules: true,

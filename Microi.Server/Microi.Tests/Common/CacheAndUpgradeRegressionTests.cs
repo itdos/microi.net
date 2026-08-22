@@ -266,6 +266,52 @@ public class CacheAndUpgradeRegressionTests
     }
 
     [Fact]
+    public async Task TwoLevelCache_BoundsAStalledPublishWithoutLeakingItsLateFault()
+    {
+        var stalled = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var awaitPublish = typeof(MicroiTwoLevelCache).GetMethod(
+            "AwaitPublishWithinAsync",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(awaitPublish);
+
+        await Assert.ThrowsAsync<TimeoutException>(async () =>
+            await Assert.IsAssignableFrom<Task>(awaitPublish!.Invoke(
+                null,
+                new object[] { stalled.Task, TimeSpan.FromMilliseconds(25) })));
+
+        stalled.TrySetException(new InvalidOperationException("late publish failure"));
+        await Task.Delay(10, TestContext.Current.CancellationToken);
+        Assert.True(stalled.Task.IsFaulted);
+        Assert.True(stalled.Task.Exception?.InnerException is InvalidOperationException);
+    }
+
+    [Fact]
+    public void TwoLevelCache_PublishTimeoutOpensABoundedCooldown()
+    {
+        var type = typeof(MicroiTwoLevelCache);
+        var timeout = type.GetField(
+            "PublishWaitTimeout",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var cooldown = type.GetField(
+            "PublishFailureCooldown",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var suppressedUntil = type.GetField(
+            "_publishSuppressedUntilTicks",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var openCooldown = type.GetMethod(
+            "OpenPublishFailureCooldown",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(timeout);
+        Assert.NotNull(cooldown);
+        Assert.NotNull(suppressedUntil);
+        Assert.NotNull(openCooldown);
+        Assert.InRange((TimeSpan)timeout!.GetValue(null)!, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
+        Assert.InRange((TimeSpan)cooldown!.GetValue(null)!, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
     public void TwoLevelCache_UsesContainerSafeInstanceIdentityForPubSubInvalidation()
     {
         var type = typeof(MicroiTwoLevelCache);
@@ -357,16 +403,63 @@ public class CacheAndUpgradeRegressionTests
             item => item["ApiEngineKey"]?.ToString() == "bulk-import-microi-store-packages");
         Assert.Equal(1, bulkEngine["IsEnable"]?.Value<int>());
         Assert.Equal(0, bulkEngine["StopHttp"]?.Value<int>());
-        AssertEngineVersionAtLeast(bulkEngine, new System.Version(1, 1, 1));
+        AssertEngineVersionAtLeast(bulkEngine, new System.Version(1, 2, 7));
         Assert.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("BULK_BOUNDED_PACKAGE_SLICES_V1", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("StoreVersionId", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("BulkAdaptiveSingleSlice: false", bulkEngine["ApiV8Code"]?.ToString());
         Assert.DoesNotContain("mci_marketplace_bulk_install_item", bulkEngine["ApiV8Code"]?.ToString());
 
         var importer = Assert.Single(
             package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "import-microi-store-package");
-        AssertEngineVersionAtLeast(importer, new System.Version(1, 8, 6));
+        AssertEngineVersionAtLeast(importer, new System.Version(2, 3, 3));
         Assert.Contains("PACKAGE_API_ENGINE_READBACK_V1", importer["ApiV8Code"]?.ToString());
+        Assert.Contains("PACKAGE_REPLAY_VERSION_GUARD_V2", importer["ApiV8Code"]?.ToString());
+        Assert.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1", importer["ApiV8Code"]?.ToString());
+        Assert.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1", importer["ApiV8Code"]?.ToString());
+        Assert.Contains("BULK_PLATFORM_BOOTSTRAP_ORDER_V1", package.ToString());
+    }
+
+    [Fact]
+    public void AppStoreUpgrade_RejectsWorkersWithoutPinnedSnapshotCapabilities()
+    {
+        var loadResources = typeof(UpgradeAppStore).GetMethod(
+            "LoadBundledResources",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var hasImporter = typeof(UpgradeAppStore).GetMethod(
+            "HasPinnedImporterCapabilities",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var hasBulk = typeof(UpgradeAppStore).GetMethod(
+            "HasPinnedBulkCapabilities",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(loadResources);
+        Assert.NotNull(hasImporter);
+        Assert.NotNull(hasBulk);
+
+        var resources = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
+            loadResources!.Invoke(null, null));
+        var package = JObject.Parse(resources["app.microi.store.json"]);
+        var importer = Assert.Single(package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "import-microi-store-package");
+        var importerCode = importer["ApiV8Code"]?.ToString() ?? string.Empty;
+        Assert.True(Assert.IsType<bool>(hasImporter!.Invoke(null,
+            new object[] { importerCode, new System.Version(2, 3, 3) })));
+        Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
+            new object[] { importerCode, new System.Version(2, 2, 9) })));
+        Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
+            new object[] { importerCode.Replace("PACKAGE_REPLAY_VERSION_GUARD_V2", "LEGACY_REPLAY_GUARD"), new System.Version(2, 3, 3) })));
+
+        var bulk = Assert.Single(package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "bulk-import-microi-store-packages");
+        var bulkCode = bulk["ApiV8Code"]?.ToString() ?? string.Empty;
+        Assert.True(Assert.IsType<bool>(hasBulk!.Invoke(null,
+            new object[] { bulkCode, new System.Version(1, 2, 7) })));
+        Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
+            new object[] { bulkCode, new System.Version(1, 2, 4) })));
+        Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
+            new object[] { bulkCode.Replace("BulkAdaptiveSingleSlice: false", "BulkAdaptiveSingleSlice: true"), new System.Version(1, 2, 7) })));
     }
 
     [Fact]

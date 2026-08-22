@@ -437,16 +437,35 @@ UptDiyFieldDataSource(fieldName, dataSource) {
         },
 DelDiyFieldArr(field) {
             var self = this;
-            var index = 0;
-            self.DiyFieldList.forEach((element) => {
-                if (element.Id == field.Id) {
-                    self.DiyFieldList.splice(index, 1);
-                }
-                index++;
+            if (!field || !field.Id || !Array.isArray(self.DiyFieldList)) return false;
+
+            var fieldIndex = self.DiyFieldList.findIndex((element) => element && element.Id == field.Id);
+            if (fieldIndex < 0) return false;
+
+            self.DiyFieldList.splice(fieldIndex, 1);
+
+            // 删除布局控件时一并清理本地折叠/页签状态，避免同一 Id 被恢复后
+            // 继续继承已经失效的设计态。选中态也不能再指向已删除字段。
+            ["CollapseGroupState", "FieldTabsState"].forEach((stateName) => {
+                var state = self[stateName];
+                if (!state || !Object.prototype.hasOwnProperty.call(state, field.Id)) return;
+                var nextState = Object.assign({}, state);
+                delete nextState[field.Id];
+                self[stateName] = nextState;
             });
+            if (self.CurrentDiyFieldModel && self.CurrentDiyFieldModel.Id == field.Id) {
+                self.CurrentDiyFieldModel = {};
+            }
+            if (self.selectedFieldForToolbar && self.selectedFieldForToolbar.Id == field.Id) {
+                self.selectedFieldForToolbar = null;
+            }
+
+            // CollapseGroup / Tabs 会改写后续字段的 _isShow。删除后必须立即从
+            // 当前字段序列重算，否则原分组的子字段会一直隐藏到整页刷新。
             if (typeof self.RefreshDiyFieldRuntimeState === 'function') {
                 self.RefreshDiyFieldRuntimeState();
             }
+            return true;
         },
     }
 };

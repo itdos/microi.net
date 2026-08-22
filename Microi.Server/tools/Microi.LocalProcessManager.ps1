@@ -237,11 +237,20 @@ function Test-IsWorkspaceBackend($ProcessInfo) {
     $processName = ([string]$ProcessInfo.Name).ToLowerInvariant()
     if ($processName -ne 'dotnet.exe' -and $processName -ne 'microi.net.api.exe') { return $false }
     $text = Get-CommandText $ProcessInfo
-    if (-not $text.Contains($backendRoot)) { return $false }
-    return $text.Contains('microi.net.api.dll') `
+    $isBackendEntry = $text.Contains('microi.net.api.dll') `
         -or $text.Contains('microi.net.api.exe') `
         -or $text.Contains('microi.net.api.csproj') `
         -or $text.Contains('dotnet run')
+    if (-not $isBackendEntry) { return $false }
+    if ($text.Contains($backendRoot)) { return $true }
+
+    # Isolated integration tests can publish Microi.net.Api.exe to a temporary
+    # output directory while deliberately keeping the real API project as CWD.
+    # Accept only that exact executable + exact project-directory combination;
+    # dotnet, another process name, an unreadable CWD, or any other directory
+    # continues to fail closed.
+    if ($processName -ne 'microi.net.api.exe' -or -not $text.Contains('microi.net.api.exe')) { return $false }
+    return (Get-ProcessCurrentDirectory $ProcessInfo) -eq $backendRoot
 }
 
 function Test-IsWorkspaceFrontend($ProcessInfo) {

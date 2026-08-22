@@ -15,10 +15,10 @@
 #endregion
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Aliyun.OSS;
 using Dos.Common;
@@ -38,6 +38,10 @@ namespace Microi.net
     /// </summary>
     public class MicroiHDFS
     {
+        // 图片解码属于高内存操作。单进程串行压缩可避免多个超大手机/设计图
+        // 同时解码导致容器 OOM；对象存储上传本身仍保持原有并发能力。
+        private static readonly SemaphoreSlim UploadImageCompressionGate = new SemaphoreSlim(1, 1);
+
         /// <summary>
         /// 每次上传都从 SaaS 引擎共享配置读取当前租户限额，不建立单节点静态缓存。
         /// 因此 sys_osclients 经现有 ReloadOsClient 流程发布到 Redis 后，各节点立即按新值执行。
@@ -93,11 +97,26 @@ namespace Microi.net
 
             var httpContext = DiyHttpContext.Current ?? _httpContext;
             var uploadNetworkPreference = ResolveUploadNetworkPreference(httpContext != null);
-            param.Files ??= new Dictionary<string, Stream>();
+            param.Files ??= new Dictionary<string, Stream>(StringComparer.OrdinalIgnoreCase);
+            param.OriginalFiles ??= new Dictionary<string, Stream>(StringComparer.OrdinalIgnoreCase);
             if (httpContext?.Request?.HasFormContentType == true)
             {
                 foreach (var file in httpContext.Request.Form.Files)
                 {
+                    var isCropOriginal = file != null
+                        && string.Equals(file.Name, "MicroiOriginalFile", StringComparison.OrdinalIgnoreCase);
+                    if (isCropOriginal)
+                    {
+                        if (param.CropEnabled == true
+                            && !param.OriginalFiles.Keys.Any(name => string.Equals(
+                                name,
+                                file.FileName,
+                                StringComparison.OrdinalIgnoreCase)))
+                        {
+                            param.OriginalFiles.Add(file.FileName, file.OpenReadStream());
+                        }
+                        continue;
+                    }
                     //zhy：接口引擎会先把 multipart 文件注入 FilesByteBase64。V8.Method.Upload
                     //zhy：仍处于同一个 HttpContext 时，不能再把原始请求流补成第二份同名载荷。
                     if (file != null
@@ -274,6 +293,25 @@ namespace Microi.net
                 //定义压缩后或不压缩的图片路径
                 var resultPath = fielPah + "/" + realFileName + fileSuffix;
 
+                var originalFileStream = file.Value;
+                var hasSeparateOriginal = false;
+                if (param.CropEnabled == true)
+                {
+                    var originalFile = param.OriginalFiles.FirstOrDefault(item => string.Equals(
+                        item.Key,
+                        file.Key,
+                        StringComparison.OrdinalIgnoreCase));
+                    if (originalFile.Value == null)
+                    {
+                        return new DosResult(0, null, "裁剪图找不到对应的同名原图：" + file.Key);
+                    }
+                    originalFileStream = originalFile.Value;
+                    hasSeparateOriginal = true;
+                }
+
+                var originalFileSize = originalFileStream.CanSeek ? originalFileStream.Length : 0L;
+                var storedFileSize = file.Value.CanSeek ? file.Value.Length : 0L;
+
                 //定义压缩前的图片路径
                 var pathOrigin = fielPah + "/" + realFileName + "_origin" + fileSuffix;
 
@@ -285,12 +323,42 @@ namespace Microi.net
                     || fileSuffix == ".jpeg"
                     || fileSuffix == ".png"
                     || fileSuffix == ".bmp"
+                    || fileSuffix == ".webp"
                     )
                 {
                     isCanPreview = true;
                 }
 
                 #endregion
+
+                // 前端裁剪协议传入的原图必须先写入私有桶。只有这一步成功，
+                // 后续才允许写入裁剪图，避免公开或业务展示图已存在但原图丢失。
+                if (hasSeparateOriginal)
+                {
+                    try
+                    {
+                        if (originalFileStream.CanSeek && originalFileStream.Position != 0)
+                        {
+                            originalFileStream.Position = 0;
+                        }
+                        var putCropOriginalResult = await _iMicroiHDFS.PutObject(new HDFSParam()
+                        {
+                            ClientModel = clientModel,
+                            NetworkIsInternet = uploadNetworkPreference,
+                            Limit = true,
+                            FileFullPath = pathOrigin,
+                            FileStream = originalFileStream
+                        });
+                        if (putCropOriginalResult.Code != 1)
+                        {
+                            return putCropOriginalResult;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        return new DosResult(0, null, $"裁剪原图私有保存失败，已阻止保存裁剪图：{ex.Message}");
+                    }
+                }
 
                 #region 压缩处理
                 if (isCanPreview && (param.Preview == null || param.Preview == true))
@@ -301,113 +369,35 @@ namespace Microi.net
 
                     try
                     {
-                        #region 裁剪压缩之前，先将原图保存。值得注意的是，原图只存私有，不存公有。
-                        // 重置 Stream Position，避免多次读取导致问题
-                        if (file.Value.CanSeek && file.Value.Position != 0)
+                        #region 压缩前先保存原图。裁剪协议已在上方保存真实原图，不可用裁剪图覆盖。
+                        if (!hasSeparateOriginal)
                         {
-                            file.Value.Position = 0;
-                        }
-                        var putResult = await _iMicroiHDFS.PutObject(new HDFSParam()
-                        {
-                            ClientModel = clientModel,
-                            NetworkIsInternet = uploadNetworkPreference,
-                            Limit = true,//param.Limit,
-                            FileFullPath = pathOrigin,
-                            FileStream = file.Value
-                        });
-                        if (putResult.Code != 1)
-                        {
-                            return putResult;
-                        }
-                        #endregion
-
-                    //判断是否裁剪。OSS暂时还没有处理裁剪。
-                    var needCrop = false;
-                    needCrop = DiyHttpContext.Current != null 
-                        && DiyHttpContext.Current.Request.HasFormContentType
-                        && !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["pw"])
-                        && !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["ph"])
-                        && !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["px"])
-                        && !string.IsNullOrWhiteSpace(DiyHttpContext.Current.Request.Form["py"]);
-                    
-                    if (needCrop)
-                    {
-                        #region 裁剪。 裁剪目前在docker环境下有点问题，每次更新后要安装一个包，不安装会报错，所以处理方式为即使裁剪失败也不管。
-                        try
-                        {
-                            float pw = float.Parse(DiyHttpContext.Current.Request.Form["pw"]);
-                            float ph = float.Parse(DiyHttpContext.Current.Request.Form["ph"]);
-                            float px = float.Parse(DiyHttpContext.Current.Request.Form["px"]);
-                            float py = float.Parse(DiyHttpContext.Current.Request.Form["py"]);
-                            // Bitmap b = new Bitmap(file.Value);//.InputStream
-                            //                                   //剪裁图片
-                            // if (px + pw > b.Width)
-                            // {
-                            //     pw = b.Width - px;
-                            // }
-                            // if (py + ph > b.Height)
-                            // {
-                            //     ph = b.Height - py;
-                            // }
-                            // RectangleF rec = new RectangleF(px, py, pw, ph);
-                            // Bitmap nb = b.Clone(rec, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                            // //重新保存图片
-                            // var ms = new MemoryStream();
-                            // nb.Save(ms, b.RawFormat);
-                            // var img = ImageHelper.MakeThumbnail(new ImageParam()
-                            // {
-                            //     Mode = EnumHelper.ImageMode.W,
-                            //     MaxWidth = previewMaxWidth,
-                            //     Image = ms,
-                            //     MaxLength = previewMaxLength
-                            // });
-
-                            // //var img = ImageHelper.MakeThumbnailV2(new ImageParam()
-                            // //{
-                            // //    FileSuffix = fileSuffix,
-                            // //    Image = ms,
-                            // //    MaxLength = previewMaxLength
-                            // //});
-
-                            // var putCaijianResult = await _iMicroiHDFS.PutObject(new HDFSParam()
-                            // {
-                            //     ClientModel = clientModel,
-                            //     Limit = param.Limit,
-                            //     FileFullPath = resultPath,
-                            //     FileStream = img
-                            // });
-                            // if (putCaijianResult.Code != 1)
-                            // {
-                            //     return putCaijianResult;
-                            // }
-                        }
-                        catch (Exception ex)
-                        {
-
-                            var putCaijianResult = await _iMicroiHDFS.PutObject(new HDFSParam()
+                            // 重置 Stream Position，避免多次读取导致问题
+                            if (file.Value.CanSeek && file.Value.Position != 0)
+                            {
+                                file.Value.Position = 0;
+                            }
+                            var putResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                             {
                                 ClientModel = clientModel,
                                 NetworkIsInternet = uploadNetworkPreference,
-                                Limit = param.Limit,
-                                FileFullPath = resultPath,
+                                Limit = true,//param.Limit,
+                                FileFullPath = pathOrigin,
                                 FileStream = file.Value
                             });
-                            if (putCaijianResult.Code != 1)
+                            if (putResult.Code != 1)
                             {
-                                return putCaijianResult;
+                                return putResult;
                             }
                         }
                         #endregion
-                    }
-                    else
-                    {
-                        #region 压缩处理
-                        //是否使用阿里OSS的图片压缩服务。注：oss压缩只能指定最大宽高、按比例压缩质量，并不能像程序那样控制MaxLength最大体积。
-                        // ConfigHelper.GetAppSettings("UseAliOssImgProcess")
-                        if (hdfs == "Aliyun" && clientModel.OsClientModel["UseAliOssImgProcess"].Val<string>() == "1")
+
+                        // 是否使用阿里 OSS 图片处理。其服务只能限制宽高/质量，无法精确保证目标体积。
+                        if (!hasSeparateOriginal
+                            && hdfs == "Aliyun"
+                            && clientModel.OsClientModel["UseAliOssImgProcess"].Val<string>() == "1")
                         {
-                            #region 阿里云压缩
-                            var putCaijianResult = await _iMicroiHDFS.PutObject(new HDFSParam()
+                            var putPreviewResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                             {
                                 ClientModel = clientModel,
                                 NetworkIsInternet = uploadNetworkPreference,
@@ -416,101 +406,60 @@ namespace Microi.net
                                 FileFullPath = resultPath,
                                 Preview = true,
                             });
-                            if (putCaijianResult.Code != 1)
+                            if (putPreviewResult.Code != 1)
                             {
-                                return putCaijianResult;
+                                return putPreviewResult;
                             }
-                            #endregion
                         }
                         else
                         {
-                            #region 服务器压缩
-                            //centos会有错，一直没解决
-                            Stream newImgStream = null;
+                            UploadImageCompressionResult compressedImage;
+                            await UploadImageCompressionGate.WaitAsync();
                             try
                             {
-                                // 重置 Stream Position
                                 if (file.Value.CanSeek && file.Value.Position != 0)
                                 {
                                     file.Value.Position = 0;
                                 }
-                                newImgStream = ImageHelper.MakeThumbnail(new ImageParam()
+                                compressedImage = ImageHelper.CompressUploadImage(
+                                    file.Value,
+                                    fileSuffix,
+                                    previewMaxLength,
+                                    previewMaxWidth);
+                            }
+                            finally
+                            {
+                                UploadImageCompressionGate.Release();
+                            }
+
+                            if (!compressedImage.TargetSizeReached)
+                            {
+                                return new DosResult(0, null,
+                                    $"图片压缩后仍超过 {previewMaxLength}KB，请降低图片尺寸后重试；原图已安全保存到私有存储。");
+                            }
+
+                            storedFileSize = compressedImage.Size;
+                            using (var previewStream = new MemoryStream(compressedImage.Bytes, false))
+                            {
+                                var putPreviewResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                                 {
-                                    Mode = EnumHelper.ImageMode.W,
-                                    MaxWidth = previewMaxWidth,
-                                    Image = file.Value,//file.InputStream,
-                                    MaxLength = previewMaxLength
+                                    ClientModel = clientModel,
+                                    NetworkIsInternet = uploadNetworkPreference,
+                                    Limit = param.Limit,
+                                    FileFullPath = resultPath,
+                                    FileStream = previewStream
                                 });
-                                //newImgStream = ImageHelper.MakeThumbnailV2(new ImageParam()
-                                //{
-                                //    FileSuffix = fileSuffix,
-                                //    Image = file.Value,
-                                //    MaxLength = previewMaxLength
-                                //});
+                                if (putPreviewResult.Code != 1)
+                                {
+                                    return putPreviewResult;
+                                }
                             }
-                            catch (Exception ex)
-                            {
-
-                                newImgStream = file.Value;
-                                newImgStream.Position = 0;
-                            }
-
-                            var putYasuoResult = await _iMicroiHDFS.PutObject(new HDFSParam()
-                            {
-                                ClientModel = clientModel,
-                                NetworkIsInternet = uploadNetworkPreference,
-                                Limit = param.Limit,
-                                FileFullPath = resultPath,
-                                FileStream = newImgStream
-                            });
-                            if (putYasuoResult.Code != 1)
-                            {
-                                return putYasuoResult;
-                            }
-                            #endregion
                         }
-                        #endregion
                     }
-                    }
-                    catch (NotSupportedException notSupportEx)
+                    catch (Exception ex)
                     {
-                        // 降级：直接上传不压缩
-                        if (file.Value.CanSeek)
-                        {
-                            file.Value.Position = 0;
-                        }
-                        var putFallbackResult = await _iMicroiHDFS.PutObject(new HDFSParam()
-                        {
-                            ClientModel = clientModel,
-                            NetworkIsInternet = uploadNetworkPreference,
-                            Limit = param.Limit,
-                            FileFullPath = resultPath,
-                            FileStream = file.Value
-                        });
-                        if (putFallbackResult.Code != 1)
-                        {
-                            return putFallbackResult;
-                        }
-                    }
-                    catch (Exception generalEx)
-                    {
-                        // 降级：直接上传不压缩
-                        if (file.Value.CanSeek)
-                        {
-                            file.Value.Position = 0;
-                        }
-                        var putFallbackResult = await _iMicroiHDFS.PutObject(new HDFSParam()
-                        {
-                            ClientModel = clientModel,
-                            NetworkIsInternet = uploadNetworkPreference,
-                            Limit = param.Limit,
-                            FileFullPath = resultPath,
-                            FileStream = file.Value
-                        });
-                        if (putFallbackResult.Code != 1)
-                        {
-                            return putFallbackResult;
-                        }
+                        // 压缩失败不得把未压缩原图发布到公开桶；私有原图已经在上方先行保存。
+                        return new DosResult(0, null, $"图片压缩失败，已阻止发布未压缩原图：{ex.Message}");
                     }
                 }
                 #endregion
@@ -550,7 +499,10 @@ namespace Microi.net
                     {
                         Path = resultPath,
                         Name = realFileName + fileSuffix,//file.FileName,
-                        Size = file.Value.Length, // file.Length.GetFileSize(),
+                        Size = storedFileSize,
+                        OriginalSize = originalFileSize,
+                        Cropped = hasSeparateOriginal,
+                        OriginalStored = hasSeparateOriginal || (isCanPreview && (param.Preview == null || param.Preview == true)),
                         CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                         Id = param.FileId.DosIsNullOrWhiteSpace() ? Ulid.NewUlid().ToString() : param.FileId
                     });
@@ -562,7 +514,10 @@ namespace Microi.net
                     {
                         Path = resultPath,
                         Name = realFileName + fileSuffix,//file.FileName,
-                        Size = file.Value.Length, //file.Length.GetFileSize(),
+                        Size = storedFileSize,
+                        OriginalSize = originalFileSize,
+                        Cropped = hasSeparateOriginal,
+                        OriginalStored = hasSeparateOriginal || (isCanPreview && (param.Preview == null || param.Preview == true)),
                         CreateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                         Id = param.FileId.DosIsNullOrWhiteSpace() ? Ulid.NewUlid().ToString() : param.FileId
                     };
