@@ -30,7 +30,7 @@ test("module package exposes the menu badge tooltip as a physical field", () => 
 });
 
 test("SaaS package owns the main-tenant fan-out engine and page button", () => {
-  assert.equal(saasPackage.PackageInfo.Version, "v7.5.15");
+  assert.equal(saasPackage.PackageInfo.Version, "v7.5.21");
   const key = "bulk-update-child-tenant-platform-apps";
   const engine = saasPackage.SysApiEngines.find(item => item.ApiEngineKey === key);
   assert.ok(engine);

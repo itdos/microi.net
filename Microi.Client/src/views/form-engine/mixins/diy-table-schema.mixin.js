@@ -3,9 +3,15 @@ import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import { getVisiblePageTabs, resolveInitialPageTab } from "./page-tab-runtime.js";
 import { selectTableDataSourceFields } from "./table-field-data-source.js";
 import { tableAuditPreferenceKey, tableFieldPreferenceKey } from "../utils/user-table-column-preference.js";
+import { resolveDevComponentRenderSource } from "@/utils/framework-presentation.js";
 
 export default {
     methods: {
+        GetDevComponentRenderSource(field) {
+            const componentName = field?.Config?.DevComponentName;
+            if (!componentName) return "";
+            return resolveDevComponentRenderSource(this.DevComponents?.[componentName] || { Path: field?.Config?.DevComponentPath });
+        },
         GetFieldIsReadOnly(field) {
             var self = this;
             if (self.TableChildField.Readonly) {
@@ -259,6 +265,7 @@ export default {
                         }
                         self.DevComponents[componentName].Name = componentName;
                         self.DevComponents[componentName].Path = componentPath;
+                        self.DevComponents[componentName].RenderSource = DynamicComponentCache.getSource(componentName, componentPath);
                         // console.log('渲染定制组件成功');
                     } catch (error) {
                         console.log("渲染定制组件出现错误：" + error.message);

@@ -43,6 +43,7 @@ import { installLegacyQrCodeDownload } from "./utils/legacy-qrcode.js";
 import { installMciDialogRuntime } from "./utils/mci-dialog-runtime.js";
 // 主题色工具 - 360 极速浏览器兼容方案
 import { initThemeColor, setThemeColor } from "./utils/theme-color";
+import { resolveUserThemeColor } from "./utils/user-visual-preferences.js";
 import $ from "jquery";
 window.$ = window.jQuery = window.jquery = $;
 import * as websocket from "@microsoft/signalr";
@@ -240,14 +241,24 @@ async function initApp() {
     }
 
     // 初始化主题色（兼容生产环境 CSS 顺序差异）
-    const themeColor = diyStore.themeColor || diyStore.SysConfig?.ThemeColor || "#409eff";
+    const themeColor = resolveUserThemeColor(
+        diyStore.GetCurrentUser || {},
+        diyStore.themeColor,
+        diyStore.SysConfig?.ThemeColor,
+        "#409eff"
+    );
     setThemeColor(themeColor);
 
     // 监听主题变化并实时应用
     watch(
-        () => [diyStore.themeColor, diyStore.SysConfig?.ThemeColor],
-        ([localColor, sysColor]) => {
-            setThemeColor(localColor || sysColor || "#409eff");
+        () => [diyStore.GetCurrentUser?.ThemeColor, diyStore.themeColor, diyStore.SysConfig?.ThemeColor],
+        () => {
+            setThemeColor(resolveUserThemeColor(
+                diyStore.GetCurrentUser || {},
+                diyStore.themeColor,
+                diyStore.SysConfig?.ThemeColor,
+                "#409eff"
+            ));
         },
         { immediate: false }
     );

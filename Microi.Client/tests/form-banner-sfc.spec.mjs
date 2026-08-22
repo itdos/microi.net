@@ -39,15 +39,21 @@ test("standard Banner stays compact, theme-aware and responsive", () => {
     assert.match(formSource, /:load-related-metrics="LoadFormBannerRelatedMetrics"/u);
 });
 
-test("CollapseGroup uses the clean custom-form card instead of a blue outlined header", () => {
+test("CollapseGroup keeps the theme accent on a borderless continuous surface", () => {
     assert.match(collapseSource, /diy-collapse-group__accent/u);
     assert.match(collapseSource, /diy-collapse-group__icon-shell/u);
     assert.match(collapseSource, /var\(--el-bg-color\)/u);
-    assert.match(collapseSource, /var\(--el-border-color-light\)/u);
+    assert.match(collapseSource, /border:\s*0/u);
     assert.match(collapseSource, /diy-collapse-group__count/u);
+    assert.match(collapseSource, /&__desc[\s\S]*color:\s*var\(--el-text-color-regular\)/u);
     assert.doesNotMatch(collapseSource, /<el-tag[^>]*diy-collapse-group__count/u);
     assert.match(formBaseSource, /--collapse-group-surface/u);
+    assert.match(formBaseSource, /\.collapse-group-theme-info[\s\S]*--collapse-group-color:\s*var\(--el-color-primary\)/u);
+    assert.match(formBaseSource, /--collapse-group-surface:\s*var\(--el-bg-color\)/u);
+    assert.match(formBaseSource, /\.collapse-group-item\s*\{[\s\S]*background:\s*var\(--collapse-group-surface\)/u);
     assert.match(formBaseSource, /background:\s*var\(--collapse-group-surface\)/u);
+    assert.doesNotMatch(formBaseSource, /border-left:\s*1px solid var\(--collapse-group-border\)/u);
+    assert.doesNotMatch(formBaseSource, /border-bottom:\s*1px solid var\(--collapse-group-border\)/u);
     assert.match(formBaseSource, /border-bottom-left-radius:\s*12px/u);
     assert.match(formBaseSource, /box-shadow:\s*0 10px 24px/u);
 });

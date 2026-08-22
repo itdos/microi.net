@@ -132,6 +132,20 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 `V8.SysConfig` 是面向浏览器的脱敏公开配置投影，不得依赖其中出现数据库连接串、对象存储密钥、短信/邮件密码或其它 SaaS 私密字段。
 
+### 框架来源标识与水印（强制）
+
+- 微服务和定制组件的来源标识必须由 Microi.Client 宿主统一渲染，子应用不得各自实现。来源标识是框架内置的常驻可发现能力，不得再创建 `RenderSourceBadgeMode`、自动收起、全局关闭等租户配置。
+- `V8.OpenAppDialog` / Drawer 等标准弹层的来源标识放在标题文字之后，始终显示且不提供关闭按钮；菜单/整页微服务由 `micro-app/host.vue` 在内容区右上角直接渲染，必须提供只作用于当前页面实例的手动关闭按钮，切换实例后恢复显示。不得依赖外围路由组件猜测菜单微服务，避免动态路由元数据不同步导致漏标。
+- 来源标识必须使用可点击的 `button` 语义与 `cursor:pointer`。点击后用可拖动、居中、亮/暗色适配的大圆角 Element Plus 弹层展示 AppKey、PageKey、应用内/框架路由、版本、源码定位、运行入口、发布/挂载状态和租户坐标，并生成可复制的 MCP 修改指令；公开详情不得包含 DiyToken、访问密钥、私有配置或用户敏感字段。
+- 框架水印覆盖 `100vw × 100vh` 且固定 `pointer-events:none`。开启后内容空值默认 `$SysTitle$ - $UserName$`（用户名为空回退账号）、方向默认 `DiagonalUp`、密度默认 `Comfortable`、字号空值/0 默认 14，透明度空值/0 默认 30；亮色、深色、弹层、键盘和减少动态效果模式都要验收。
+
+### 用户级界面偏好（强制）
+
+- 主题色、浅色/深色、菜单子级展开方式等需要“换设备仍生效”的选择必须保存到当前 DiyToken 用户的 `sys_user` 白名单字段；`localStorage` 只作为未安装新字段租户和匿名启动阶段的兼容回退，不能作为跨设备事实源。
+- 已安装用户偏好字段时优先级固定为“当前用户显式值 → 租户 `sys_config` → 平台安全默认”；个人菜单值 `System` 表示继承租户配置。不得让上一位用户的浏览器本地主题覆盖下一位已登录用户。
+- 自助保存优先使用官方 `Managed` 接口引擎，由 `V8.CurrentUser.Id` 与 `V8.OsClient` 推导用户和租户，并在服务端构造固定白名单更新对象；接口参数禁止决定目标 Id/OsClient，也禁止写入 Account、Phone、Tenant、Dept、Role、Level、State、Pwd、认证因子和登录审计字段。只有缺少可复用可信原子能力时才新增 C# DTO/端点。保存成功后调用 `V8.Method.RefreshLoginUser` 刷新登录缓存，并让微服务宿主重新同步 `CurrentUser`。
+- 右上角即时切换可以乐观应用并短防抖保存；远端保存失败时保留当前设备效果并明确提示。个人中心和右上角必须调用同一个应用包交付的白名单接口引擎（当前为 `platform-user-update-preferences`），不能分别形成两套字段、枚举或优先级。
+
 ---
 
 <!-- /microi-progressive:chunk -->

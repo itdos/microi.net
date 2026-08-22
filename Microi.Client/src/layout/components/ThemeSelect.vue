@@ -74,12 +74,18 @@
 import { Brush, Sunny, Moon, Check, MagicStick } from "@element-plus/icons-vue";
 import { computed, watch } from "vue";
 import { useDiyStore, useAppStore, useSettingsStore } from "@/pinia";
+import { DiyCommon } from "@/utils/diy.common.js";
 import {
     getThemePalettes,
     setThemeColor as applyThemeColor,
     setThemeMode,
     getThemeMode
 } from "@/utils/theme-color.js";
+import {
+    hasInstalledUserPreference,
+    resolveUserThemeColor,
+    resolveUserThemeMode
+} from "@/utils/user-visual-preferences.js";
 
 const DEFAULT_THEME_COLOR = "#409eff";
 
@@ -101,22 +107,31 @@ export default {
             set: (v) => diyStore.setThemeColor(v)
         });
         const SysConfig = computed(() => diyStore.SysConfig || {});
+        const CurrentUser = computed(() => diyStore.GetCurrentUser || {});
         const themeColor = computed({
-            get: () => localThemeColor.value || SysConfig.value.ThemeColor || DEFAULT_THEME_COLOR,
+            get: () => resolveUserThemeColor(
+                CurrentUser.value,
+                localThemeColor.value,
+                SysConfig.value.ThemeColor,
+                DEFAULT_THEME_COLOR
+            ),
             set: (v) => diyStore.setThemeColor(v)
         });
         watch(
-            () => SysConfig.value.ThemeColor,
-            (color) => {
-                if (!localThemeColor.value) applyThemeColor(color || DEFAULT_THEME_COLOR);
+            () => [CurrentUser.value.ThemeColor, SysConfig.value.ThemeColor, localThemeColor.value],
+            () => {
+                applyThemeColor(themeColor.value || DEFAULT_THEME_COLOR);
             }
         );
-        return { diyStore, appStore, settingsStore, themeColor, localThemeColor, SysConfig };
+        return { diyStore, appStore, settingsStore, themeColor, localThemeColor, SysConfig, CurrentUser };
     },
     data() {
         return {
             ShowThemes: false,
-            themeMode: 'light'
+            themeMode: 'light',
+            preferenceSaveTimer: null,
+            pendingPreferencePatch: {},
+            preferenceSaveInFlight: false
         };
     },
     computed: {
@@ -126,11 +141,23 @@ export default {
         }
     },
     mounted() {
-        // 初始化模式
-        this.themeMode = getThemeMode();
-        // 初始化主题色：本地手动选择 > SysConfig.ThemeColor > 默认色
+        // 已安装个人偏好字段时以服务端用户值为准；旧租户继续保留本机兼容值。
+        this.themeMode = resolveUserThemeMode(this.CurrentUser, getThemeMode());
+        setThemeMode(this.themeMode);
         const appliedColor = applyThemeColor(this.themeColor || DEFAULT_THEME_COLOR);
         if (appliedColor && !this.isActive(appliedColor)) this.diyStore.setThemeColor(appliedColor);
+    },
+    beforeUnmount() {
+        if (this.preferenceSaveTimer) window.clearTimeout(this.preferenceSaveTimer);
+    },
+    watch: {
+        "CurrentUser.ThemeMode"() {
+            const mode = resolveUserThemeMode(this.CurrentUser, getThemeMode());
+            if (mode !== this.themeMode) {
+                this.themeMode = mode;
+                setThemeMode(mode);
+            }
+        }
     },
     methods: {
         isActive(color) {
@@ -139,13 +166,55 @@ export default {
         changeTheme(color) {
             if (!color) color = (this.SysConfig && this.SysConfig.ThemeColor) || DEFAULT_THEME_COLOR;
             const appliedColor = applyThemeColor(color);
-            this.diyStore.setThemeColor(appliedColor || color);
+            const nextColor = appliedColor || color;
+            this.diyStore.setThemeColor(nextColor);
+            this.saveInstalledVisualPreferences({ ThemeColor: nextColor });
         },
         changeMode(mode) {
             this.themeMode = mode;
             const appliedColor = setThemeMode(mode);
             // 从浅色白色切到暗色时自动回落为蓝色，并同步持久化状态。
-            if (appliedColor && !this.isActive(appliedColor)) this.diyStore.setThemeColor(appliedColor);
+            const patch = { ThemeMode: mode };
+            if (appliedColor && !this.isActive(appliedColor)) {
+                this.diyStore.setThemeColor(appliedColor);
+                patch.ThemeColor = appliedColor;
+            }
+            this.saveInstalledVisualPreferences(patch);
+        },
+        saveInstalledVisualPreferences(patch) {
+            const installedPatch = Object.fromEntries(
+                Object.entries(patch || {}).filter(([key]) => hasInstalledUserPreference(this.CurrentUser, key))
+            );
+            if (!Object.keys(installedPatch).length) return;
+
+            this.diyStore.setCurrentUser({ ...this.CurrentUser, ...installedPatch });
+            Object.assign(this.pendingPreferencePatch, installedPatch);
+            if (this.preferenceSaveTimer) window.clearTimeout(this.preferenceSaveTimer);
+            this.preferenceSaveTimer = window.setTimeout(() => this.flushVisualPreferences(), 320);
+        },
+        async flushVisualPreferences() {
+            this.preferenceSaveTimer = null;
+            if (this.preferenceSaveInFlight || !Object.keys(this.pendingPreferencePatch).length) return;
+            const patch = { ...this.pendingPreferencePatch };
+            this.pendingPreferencePatch = {};
+            this.preferenceSaveInFlight = true;
+            try {
+                const result = await DiyCommon.ApiEngine.Run(
+                    "platform-user-update-preferences",
+                    patch
+                );
+                if (!result || result.Code !== 1) {
+                    throw new Error(result?.Msg || "个人主题偏好保存失败");
+                }
+                if (result.Data) this.diyStore.setCurrentUser(result.Data);
+            } catch (error) {
+                DiyCommon.Tips(`主题已在当前设备生效，但跨设备保存失败：${error?.message || error}`, false);
+            } finally {
+                this.preferenceSaveInFlight = false;
+                if (Object.keys(this.pendingPreferencePatch).length) {
+                    this.preferenceSaveTimer = window.setTimeout(() => this.flushVisualPreferences(), 100);
+                }
+            }
         }
     }
 };

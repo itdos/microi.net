@@ -46,12 +46,20 @@ if (!/^\d+\.\d+\.\d+$/.test(sourcePackageVersion)) {
 }
 const version = argumentValue('--version', `v${sourcePackageVersion}`);
 const applicationVersionArgument = argumentValue('--application-version');
+const saasPackageVersionArgument = argumentValue('--saas-package-version');
+const storePackageVersionArgument = argumentValue('--store-package-version');
 const sourceManifestHashOverride = argumentValue('--source-manifest-hash');
 const runtimeManifestHashOverride = argumentValue('--runtime-manifest-hash');
 const verifyOnly = process.argv.includes('--verify-only');
 const requireCleanSource = process.argv.includes('--require-clean-source');
 const timestamp = new Date(argumentValue('--timestamp', new Date().toISOString()));
 if (!/^v\d+\.\d+\.\d+$/.test(version)) throw new Error(`无效微服务版本：${version}`);
+for (const [label, value] of [
+  ['SaaS 引擎包版本', saasPackageVersionArgument],
+  ['应用商城包版本', storePackageVersionArgument],
+]) {
+  if (value && !/^v\d+\.\d+\.\d+$/.test(value)) throw new Error(`${label}无效：${value}`);
+}
 if (version !== `v${sourcePackageVersion}`) {
   throw new Error(`发布版本必须与唯一源码根 package.json 一致：source=v${sourcePackageVersion}, requested=${version}`);
 }
@@ -86,6 +94,17 @@ if (requireCleanSource) {
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const normalizePath = value => value.replaceAll('\\', '/');
 const deepClone = value => JSON.parse(JSON.stringify(value));
+
+function compareSemanticVersion(left, right) {
+  const parse = value => String(value || '').replace(/^v/i, '').split('.').map(part => Number(part) || 0);
+  const leftParts = parse(left);
+  const rightParts = parse(right);
+  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index++) {
+    const difference = (leftParts[index] || 0) - (rightParts[index] || 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
 
 function replaceByIdentity(target, source, identity) {
   const sourceItems = source.filter(identity);
@@ -221,13 +240,6 @@ if (!Number.isInteger(applicationVersion) || applicationVersion < 1) {
 }
 const embeddedVersion = String(bundle?.VersionNo || '');
 const embeddedApplicationVersion = Number(bundle?.Application?.CurrentVersion || 0);
-if (!verifyOnly && version !== embeddedVersion && !applicationVersionArgument) {
-  throw new Error(`源码版本已从 ${embeddedVersion || '(empty)'} 变为 ${version}；必须显式传 --application-version=<递增整数>`);
-}
-if (!verifyOnly && version !== embeddedVersion && applicationVersion <= embeddedApplicationVersion) {
-  throw new Error(`新源码版本的应用版本号必须大于 ${embeddedApplicationVersion}`);
-}
-
 const distFiles = await collectFiles(distRoot);
 const buildAssets = [];
 for (const fullPath of distFiles) {
@@ -271,6 +283,38 @@ const localTime = new Intl.DateTimeFormat('sv-SE', {
   year: 'numeric', month: '2-digit', day: '2-digit',
   hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
 }).format(timestamp);
+const currentSaasPackageVersion = String(packageModel?.PackageInfo?.Version || '');
+const currentStorePackageVersion = String(storePackageModel?.PackageInfo?.Version || '');
+const runtimeChanged = (
+  version !== embeddedVersion
+  || localRuntimeManifestHash !== String(bundle?.MicroService?.DistHash || '')
+);
+if (!verifyOnly && runtimeChanged) {
+  if (!applicationVersionArgument) {
+    throw new Error(
+      `平台内置微服务运行时已变化（${embeddedVersion || '(empty)'} -> ${version}）；`
+      + '必须显式传 --application-version=<递增整数>',
+    );
+  }
+  if (applicationVersion <= embeddedApplicationVersion) {
+    throw new Error(`新运行时的应用版本号必须大于 ${embeddedApplicationVersion}`);
+  }
+  if (!saasPackageVersionArgument || !storePackageVersionArgument) {
+    throw new Error(
+      '平台内置微服务运行时变化时，必须同时显式传 '
+      + '--saas-package-version=<递增版本> 与 --store-package-version=<递增版本>',
+    );
+  }
+  if (compareSemanticVersion(saasPackageVersionArgument, currentSaasPackageVersion) <= 0) {
+    throw new Error(`SaaS 引擎包版本必须大于 ${currentSaasPackageVersion || '(empty)'}`);
+  }
+  if (compareSemanticVersion(storePackageVersionArgument, currentStorePackageVersion) <= 0) {
+    throw new Error(`应用商城包版本必须大于 ${currentStorePackageVersion || '(empty)'}`);
+  }
+}
+if (!verifyOnly && !runtimeChanged && (saasPackageVersionArgument || storePackageVersionArgument)) {
+  throw new Error('平台内置微服务运行时未变化，不应通过嵌入脚本递增官方应用包版本');
+}
 const manifestAssets = buildAssets.map(asset => ({
   Path: asset.Path,
   FilePathName: `database://microi-platform-service/${version}/${asset.Path}`,
@@ -400,6 +444,8 @@ if (verifyOnly) {
     sourceGitCommit,
     version,
     applicationVersion,
+    saasPackageVersion: currentSaasPackageVersion,
+    storePackageVersion: currentStorePackageVersion,
     files: buildAssets.length,
     totalSize,
     sourceManifestHash: localSourceManifestHash,
@@ -407,6 +453,20 @@ if (verifyOnly) {
     runtimeDelivery: releaseContract.RuntimeDelivery,
   }, null, 2) + '\n');
   process.exit(0);
+}
+
+if (runtimeChanged) {
+  const releaseDate = localTime.slice(0, 10);
+  packageModel.PackageInfo.Version = saasPackageVersionArgument;
+  storePackageModel.PackageInfo.Version = storePackageVersionArgument;
+  const saasHistoryLine = `${releaseDate} ${saasPackageVersionArgument} 重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保官方在线应用与 SaaS 离线兜底产物一致。`;
+  const storeHistoryLine = `${releaseDate} ${storePackageVersionArgument} 重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保应用商城可独立交付当前离线兜底产物。`;
+  if (!String(packageModel.PackageInfo.ChangeHistory || '').includes(saasHistoryLine)) {
+    packageModel.PackageInfo.ChangeHistory = `${saasHistoryLine}\n${packageModel.PackageInfo.ChangeHistory || ''}`;
+  }
+  if (!String(storePackageModel.PackageInfo.ChangeHistory || '').includes(storeHistoryLine)) {
+    storePackageModel.PackageInfo.ChangeHistory = `${storeHistoryLine}\n${storePackageModel.PackageInfo.ChangeHistory || ''}`;
+  }
 }
 
 bundle.VersionNo = version;
@@ -507,6 +567,8 @@ process.stdout.write(JSON.stringify({
   storePackagePath,
   version,
   applicationVersion,
+  saasPackageVersion: packageModel.PackageInfo.Version,
+  storePackageVersion: storePackageModel.PackageInfo.Version,
   files: buildAssets.length,
   totalSize,
   sourceManifestHash,

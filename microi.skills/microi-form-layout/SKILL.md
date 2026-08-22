@@ -25,6 +25,13 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 不得使用整块主题色填充、蓝色大描边或醒目的实心数量胶囊；分组内容与标题属于同一张
 卡片，展开后不再嵌套第二套外框。深色模式使用 Element 主题变量，不能写死白色/蓝色。
 
+## 配置类表单的二级分组硬规则
+
+- `sys_config`、`sys_user`、SaaS 设置、接口参数、打印/工作流设置等“配置类表单”不能因为已经有表级 Tab 就停止信息架构审计。表级 Tab 只负责一级领域；同一 Tab 内存在 **7 个以上可见设置**或 **2 个以上明确语义域**时，必须继续按语义放入 `CollapseGroup`。
+- 水印、主题、菜单、登录入口、安全策略、桌面偏好等一组相互关联的开关/参数必须由一个带图标、说明、计数的 CollapseGroup 包裹；不能把 5~20 个设置直接平铺在 Tab 中，也不能让每个小设置单独占一个 Tab。
+- 新增设置字段时必须同时审计所在 Tab 的现有字段，而不只是包住本次新增字段。若相邻设置已形成稳定语义域，应一次性补齐该域的 CollapseGroup；隐藏兼容字段继续保留但不计入可见项数。
+- 配置表采用“表级 Tab + Tab 内 CollapseGroup”时，CollapseGroup 必须与成员字段写入同一个 `Tab`，并用连续 `Sort` 保证作用范围在下一个布局节点前结束。发布前必须打开真实编辑表单验证，不能只凭元数据字符串判断布局成功。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=microi-form-layout-000 sha256=cade6a415454aa04f5fcf840e6d9df1323ac9751c0e3c8e1b07b360007413819 -->
 ## 1. 三种分组能力速查
@@ -139,7 +146,9 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 - 创建 CollapseGroup 分组时，必须设置 `Icon`（如 `fas fa-calculator` / `fas fa-info-circle`），不要默认空白。
 - 任何 Tab / CollapseGroup 都必须有 `Description` 解释分组用途，不要只放一个标题。
 - 每个 CollapseGroup 必须回读到 `FormWidth=24`；`Config.CollapseGroup.ShowFieldCount` 默认必须为 `true`。
+- 可扩展配置表或设置页的末尾 CollapseGroup 不得无边界使用 `ScopeMode=UntilNextGroup`。已知标准子项数量时必须改用 `ScopeMode=FieldCount` 并显式保存准确 `FieldCount`；否则必须增加后续分组边界，避免未来新增字段或租户扩展字段被末尾分组误吞。
 - 表级 Tab 与 CollapseGroup 的 `Description` 作为副标题显示；开启计数时统一追加 `x 项`，禁止继续显示 `x 个字段`。运行时动态显隐字段后必须重算计数，已有数字角标配置继续生效，不能被静态字段数覆盖。
+- 分组/Tab 的字段计数必须基于字段原始可见性（如 `_baseIsShow`），不能把“当前因折叠而隐藏”误判成不可见，否则收起后的分组会错误显示 `0 项`。
 - 表级分组方向完整支持 `TabsPosition=left/top/right/bottom`；每个方向都要检查标题、副标题、动态角标和选中指示线，纵向指示线端点固定为直角。
 - 修改 `diy_table.Tabs` 或 `diy_field.Tab` / `Config.CollapseGroup` / `Config.FieldTabs` 后，必须调用 `microi_refresh_schema_cache`。
 - Tab 内嵌套 CollapseGroup 时，CollapseGroup 必须设 `DefaultCollapsed=true`（默认收起），避免 Tab 内继续被折叠分组抢首屏空间。

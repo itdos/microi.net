@@ -94,6 +94,9 @@ namespace Microi.net.Api
         public class UpdateCurrentProfileRequest
         {
             public string Name { get; set; }
+            public string Email { get; set; }
+            public string Sex { get; set; }
+            public string Lang { get; set; }
             public string Avatar { get; set; }
             public string PublicAvatar { get; set; }
         }
@@ -142,6 +145,36 @@ namespace Microi.net.Api
                 || routePath.StartsWith("/access-login/", StringComparison.OrdinalIgnoreCase))
             {
                 error = "登录后首页只能使用当前系统内的业务路由。";
+                return false;
+            }
+            return true;
+        }
+
+        private static bool TryNormalizeEmail(string value, out string normalized, out string error)
+        {
+            normalized = (value ?? string.Empty).Trim();
+            error = null;
+            if (normalized.Length == 0)
+            {
+                return true;
+            }
+            if (normalized.Length > 100 || normalized.Any(char.IsControl))
+            {
+                error = "邮箱长度不能超过 100 个字符。";
+                return false;
+            }
+            try
+            {
+                var address = new System.Net.Mail.MailAddress(normalized);
+                if (!string.Equals(address.Address, normalized, StringComparison.OrdinalIgnoreCase))
+                {
+                    error = "邮箱格式不正确。";
+                    return false;
+                }
+            }
+            catch
+            {
+                error = "邮箱格式不正确。";
                 return false;
             }
             return true;
@@ -1657,7 +1690,7 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 账户资料自助修改。字段白名单固定为显示名称、私有头像和公开头像，目标用户、租户
+        /// 账户资料自助修改。字段白名单固定为显示名称、邮箱、性别、语言、私有头像和公开头像，目标用户、租户
         /// 均来自登录 Token。私有头像只能来自 member/avatar，公开头像只能来自
         /// member/public-avatar；未提交的头像字段保持原值，兼容尚未安装公开头像字段的租户。
         /// </summary>
@@ -1686,6 +1719,33 @@ namespace Microi.net.Api
                 ["Name"] = name,
                 ["OsClient"] = osClient
             };
+
+            if (param?.Email != null)
+            {
+                if (!TryNormalizeEmail(param.Email, out var email, out var emailError))
+                {
+                    return Json(new DosResult(0, null, emailError));
+                }
+                updateModel["Email"] = email;
+            }
+            if (param?.Sex != null)
+            {
+                var sex = param.Sex.Trim();
+                if (sex.Length > 0 && sex != "男" && sex != "女" && sex != "保密")
+                {
+                    return Json(new DosResult(0, null, "性别只能选择男、女或保密。"));
+                }
+                updateModel["Sex"] = sex;
+            }
+            if (param?.Lang != null)
+            {
+                var lang = param.Lang.Trim();
+                if (lang != "zh-CN" && lang != "zh-TW" && lang != "en")
+                {
+                    return Json(new DosResult(0, null, "语言只能选择简体中文、繁体中文或 English。"));
+                }
+                updateModel["Lang"] = lang;
+            }
 
             if (param?.Avatar != null)
             {

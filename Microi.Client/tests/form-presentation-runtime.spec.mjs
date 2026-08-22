@@ -92,7 +92,7 @@ test("record selector label fields also accept designer-friendly comma separated
     assert.deepEqual(config.RecordSelector.LabelFields, ["Name", "Code", "Account"]);
 });
 
-test("section counts exclude layout controls and expose field and required tags", () => {
+test("section counts include collapsed fields while excluding layout controls and base-hidden fields", () => {
     const [section] = buildFormPresentationSections({
         table: { Description: "系统设置" },
         config: resolveFormPresentationConfig({}, {}),
@@ -102,15 +102,17 @@ test("section counts exclude layout controls and expose field and required tags"
                 { Name: "Divider1", Component: "Divider", NotEmpty: 1 },
                 { Name: "Name", Component: "Text", NotEmpty: "true" },
                 { Name: "Hidden", Component: "Text", NotEmpty: 1, _isShow: false },
+                { Name: "Collapsed", Component: "Text", NotEmpty: 0, _baseIsShow: true, _isShow: false },
+                { Name: "BaseHidden", Component: "Text", NotEmpty: 1, _baseIsShow: false, _isShow: false },
                 { Name: "Remark", Component: "Textarea", NotEmpty: 0 }
             ]
         }
     });
 
     assert.equal(section.Title, "系统设置");
-    assert.equal(section.FieldCount, 2);
+    assert.equal(section.FieldCount, 3);
     assert.equal(section.RequiredCount, 1);
-    assert.equal(section.CountLabel, "2 项");
+    assert.equal(section.CountLabel, "3 项");
     assert.equal(section.RequiredLabel, "1 必填项");
 });
 

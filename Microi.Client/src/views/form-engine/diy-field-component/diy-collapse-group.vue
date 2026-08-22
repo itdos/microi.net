@@ -211,22 +211,25 @@ defineExpose({
 .diy-collapse-group {
     --group-color: var(--collapse-group-color, var(--el-color-primary));
     --group-bg: var(--collapse-group-bg, var(--mci-bg-card, var(--el-bg-color)));
-    --group-border: var(--collapse-group-border, color-mix(in srgb, var(--group-color) 24%, var(--el-border-color-light) 76%));
     box-sizing: border-box;
     width: 100%;
-    border: 1px solid var(--group-border);
+    border: 0;
     border-radius: 12px;
     background: var(--group-bg);
     cursor: pointer;
     overflow: hidden;
     box-shadow: 0 5px 16px rgba(15, 35, 60, 0.05);
     outline: none;
-    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    transition: background 0.18s ease, box-shadow 0.18s ease;
 
-    &:hover,
+    &:hover {
+        box-shadow: 0 7px 20px rgba(15, 35, 60, 0.07);
+    }
+
     &:focus-visible {
-        border-color: color-mix(in srgb, var(--group-color) 24%, var(--el-border-color-light) 76%);
-        box-shadow: 0 6px 18px rgba(15, 35, 60, 0.05);
+        box-shadow:
+            0 0 0 2px color-mix(in srgb, var(--group-color) 22%, transparent),
+            0 7px 20px rgba(15, 35, 60, 0.07);
     }
 
     &.is-expanded {
@@ -323,7 +326,7 @@ defineExpose({
         margin-top: 1px;
         font-size: 11px;
         line-height: 16px;
-        color: var(--el-text-color-secondary);
+        color: var(--el-text-color-regular);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -331,13 +334,15 @@ defineExpose({
 
     &__count {
         flex: 0 0 auto;
-        color: var(--el-text-color-secondary);
+        color: var(--el-text-color-regular);
         font-size: 11px;
         font-weight: 500;
         line-height: 16px;
     }
 
     &--primary { --group-color: var(--el-color-primary); }
+    // 兼容历史配置值；保持与其既有主色视觉一致。
+    &--info { --group-color: var(--el-color-primary); }
     &--default {
         --group-color: var(--mci-color-primary, var(--el-color-primary));
     }

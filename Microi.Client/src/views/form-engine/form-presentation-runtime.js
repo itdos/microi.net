@@ -227,7 +227,9 @@ function normalizeSectionBadge(meta, key) {
 
 function countSectionFields(fields) {
     return (Array.isArray(fields) ? fields : []).reduce((result, field) => {
-        if (!field || field._isShow === false || LAYOUT_COMPONENTS.has(String(field.Component || ""))) {
+        const hasBaseVisibility = Boolean(field) && Object.prototype.hasOwnProperty.call(field, "_baseIsShow");
+        const isBaseVisible = hasBaseVisibility ? field._baseIsShow !== false : field && field._isShow !== false;
+        if (!field || !isBaseVisible || LAYOUT_COMPONENTS.has(String(field.Component || ""))) {
             return result;
         }
         result.FieldCount += 1;

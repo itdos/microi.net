@@ -20,6 +20,14 @@
                 />
             </div>
         </teleport>
+        <MciRenderSourceBadge
+            v-if="appKey"
+            type="microservice"
+            placement="edge"
+            :instance-key="ownedRouteFullPath + ':' + appKey"
+            dismissible
+            :source-info="renderSourceInfo"
+        />
         <micro-app-runtime-error
             v-if="error"
             :message="error"
@@ -58,11 +66,13 @@
 import { DiyCommon } from "@/utils/diy.common";
 import { defineAsyncComponent } from "vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
+import { resolveUserThemeColor } from "@/utils/user-visual-preferences.js";
 import { buildMicroAppEntryUrl, shouldUseMicroAppResolveFallback } from "@/utils/microAppEntryUrl.js";
 import { resolveMicroAppHostViewport } from "@/utils/microAppViewport.js";
 import { isFormMaskBlurEnabled } from "@/utils/form-mask-blur.js";
 import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
 import MicroAppRuntimeError from "./runtime-error.vue";
+import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
 import { hasRenderableMicroAppContent, shouldAutoRecoverMicroApp } from "./render-health.js";
 import {
     MICRO_APP_HOST_ACTION_RESULT_TYPE,
@@ -177,11 +187,23 @@ function joinUrl(baseUrl, path) {
     return String(baseUrl || "").replace(/\/+$/, "") + "/" + String(path || "").replace(/^\/+/, "");
 }
 
+function parseJsonObject(value) {
+    if (!value) return {};
+    if (typeof value === "object" && !Array.isArray(value)) return value;
+    try {
+        const parsed = JSON.parse(String(value));
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+        return {};
+    }
+}
+
 export default {
     name: "MicroAppHost",
     components: {
         MicroAppLoadingSkeleton,
         MicroAppRuntimeError,
+        MciRenderSourceBadge,
         DiyFormFull: defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"))
     },
     setup() {
@@ -197,6 +219,8 @@ export default {
             appVersion: "",
             microRoutePath: "",
             pageKey: "",
+            sourceFile: "",
+            privateSourcePath: "",
             publishStatus: "",
             assetSource: "",
             httpStatus: "",
@@ -261,7 +285,12 @@ export default {
                 permissionContext,
                 appKey: this.appKey,
                 version: this.appVersion,
-                themeColor: this.runtimeThemeColor || this.diyStore.themeColor || this.diyStore.SysConfig?.ThemeColor || "#409eff",
+                themeColor: this.runtimeThemeColor || resolveUserThemeColor(
+                    this.diyStore.GetCurrentUser || {},
+                    this.diyStore.themeColor,
+                    this.diyStore.SysConfig?.ThemeColor,
+                    "#409eff"
+                ),
                 themeMode: this.runtimeThemeMode,
                 themePalette: this.runtimeThemeTokens.palette || "custom",
                 themeOnPrimary: this.runtimeThemeTokens.onPrimary || "#ffffff",
@@ -318,6 +347,24 @@ export default {
                 cacheInstance: this.microAppName,
                 childReadyRendered: this.childReadyRendered,
                 reasonCode: this.reasonCode
+            };
+        },
+        renderSourceInfo() {
+            return {
+                appName: this.ownedRouteMeta?.title || this.appKey,
+                appKey: this.appKey,
+                pageKey: this.pageKey,
+                routePath: this.microRoutePath,
+                frameworkRoute: this.ownedRouteFullPath,
+                sourceFile: this.sourceFile,
+                privateSourcePath: this.privateSourcePath,
+                version: this.appVersion,
+                entryUrl: this.entryUrl,
+                publishStatus: this.publishStatus,
+                assetSource: this.assetSource,
+                mountState: this.mountState,
+                osClient: DiyCommon.GetOsClient(),
+                apiBase: DiyCommon.GetApiBase()
             };
         },
         globalOverlaySegments() {
@@ -428,6 +475,9 @@ export default {
                     case "showMessage":
                         result = this.showHostMessage(request.data);
                         break;
+                    case "refreshCurrentUser":
+                        result = await this.refreshCurrentUserFromServer();
+                        break;
                     case "setGlobalOverlay":
                         result = this.setGlobalOverlay(request.data);
                         break;
@@ -447,6 +497,20 @@ export default {
                 const silent = request.data?.silent === true || request.data?.Silent === true;
                 if (!silent) this.$message?.error?.(message);
             }
+        },
+        async refreshCurrentUserFromServer() {
+            const result = await DiyCommon.PostAsync(
+                "/api/SysUser/RefreshLoginUser",
+                {},
+                null,
+                null,
+                "json"
+            );
+            if (!result || result.Code !== 1 || !result.Data) {
+                throw new Error(result?.Msg || "当前用户偏好刷新失败");
+            }
+            this.diyStore.setCurrentUser(result.Data);
+            return { accepted: true };
         },
         sendHostActionResult(request, success, data = null, error = null) {
             const app = this.$refs.microApp;
@@ -866,8 +930,36 @@ export default {
                 throw error;
             }
             const runtime = result.Data || {};
+            // 普通菜单路由优先保持宽松运行时解析，避免尚未登记页面元数据的
+            // 子路由影响微服务挂载；运行入口解析成功后，再以只读方式补取页面
+            // 元数据，专供宿主来源标识展示源码文件和 PageKey。补取失败不影响运行。
+            let metadataRuntime = runtime;
+            if (!runtime.Page && !requirePage && config.microRoutePath) {
+                try {
+                    const metadataResult = await DiyCommon.PostAsync("/api/MicroApp/Resolve", {
+                        OsClient: DiyCommon.GetOsClient(),
+                        AppKey: config.appKey,
+                        Version: config.version,
+                        RoutePath: config.microRoutePath,
+                        RequirePage: true
+                    });
+                    if (Number(metadataResult?.Code) === 1 && metadataResult?.Data?.Page) {
+                        metadataRuntime = metadataResult.Data;
+                    }
+                } catch (_) {
+                    // 来源详情属于辅助信息，不能让元数据服务异常阻断微服务本身。
+                }
+            }
+            const page = metadataRuntime.Page || runtime.Page;
+            const routeMeta = parseJsonObject(page?.RouteMetaJson || page?.RouteMeta);
             this.appVersion = String(runtime.Version || config.version || "");
-            this.pageKey = String(runtime.Page?.PageKey || "");
+            this.pageKey = String(page?.PageKey || "");
+            this.sourceFile = String(page?.SourceFile || routeMeta.SourceFile || routeMeta.sourceFile || "");
+            this.privateSourcePath = String(metadataRuntime.PrivateSourcePath
+                || metadataRuntime.Application?.PrivateSourcePath
+                || runtime.PrivateSourcePath
+                || runtime.Application?.PrivateSourcePath
+                || "");
             this.publishStatus = String(runtime.PublishStatus || "");
             this.assetSource = String(runtime.AssetSource || runtime.StorageMode || "");
             // Explicit menu versions must resolve to their immutable entry.
@@ -1105,6 +1197,8 @@ export default {
             this.loading = true;
             this.error = "";
             this.entryUrl = "";
+            this.sourceFile = "";
+            this.privateSourcePath = "";
             this.runtimeInstanceName = "";
             this.cacheState = "cold";
             this.httpStatus = "";

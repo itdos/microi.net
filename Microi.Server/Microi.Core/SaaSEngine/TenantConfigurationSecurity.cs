@@ -135,13 +135,24 @@ namespace Microi.net
         private static readonly HashSet<string> PublicSysConfigAlwaysHiddenFieldSet =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "ClientSecrets", "GlobalServerV8Code"
+                "ClientSecrets", "GlobalServerV8Code",
+                // Retired in v7.5.3: framework source badges are always available and
+                // no longer accept a tenant-wide visibility/collapse switch.
+                "RenderSourceBadgeMode"
             };
 
         private static readonly HashSet<string> PublicSysConfigExplicitlySafeFieldSet =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "FormMaskBlur",
+                // Framework-owned presentation settings are intentionally public. They are
+                // consumed during client bootstrap and never contain infrastructure secrets.
+                "FrameworkWatermarkEnabled",
+                "FrameworkWatermarkContent",
+                "FrameworkWatermarkDirection",
+                "FrameworkWatermarkOpacity",
+                "FrameworkWatermarkDensity",
+                "FrameworkWatermarkFontSize",
                 "DisableLoginPasskey",
                 "DisableLoginAuthenticator",
                 "DisableLoginGitee",
