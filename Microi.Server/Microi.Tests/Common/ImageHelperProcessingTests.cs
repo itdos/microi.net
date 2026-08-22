@@ -1,4 +1,5 @@
 using SkiaSharp;
+using System.Runtime.InteropServices;
 
 namespace Dos.Common.Tests;
 
@@ -416,6 +417,58 @@ public class ImageHelperProcessingTests
         Assert.Equal(96, info.Height);
     }
 
+    [Fact]
+    public void Upload_compression_keeps_a_small_image_byte_for_byte()
+    {
+        var source = Solid(40, 30, "#336699");
+        using var stream = new MemoryStream(source.Bytes);
+
+        var result = ImageHelper.CompressUploadImage(stream, ".png");
+
+        Assert.False(result.WasCompressed);
+        Assert.True(result.TargetSizeReached);
+        Assert.Equal(source.Bytes, result.Bytes);
+        Assert.Equal(source.Size, result.OriginalSize);
+        Assert.Equal(40, result.OriginalWidth);
+        Assert.Equal(30, result.OriginalHeight);
+    }
+
+    [Fact]
+    public void Upload_compression_limits_noisy_png_size_and_longest_edge()
+    {
+        var source = NoisyPng(2500, 1800, includeAlpha: false);
+        Assert.True(source.LongLength > 500L * 1024);
+        using var stream = new MemoryStream(source);
+
+        var result = ImageHelper.CompressUploadImage(stream, "catalog.png", 500, 1920);
+
+        Assert.True(result.WasCompressed);
+        Assert.True(result.TargetSizeReached);
+        Assert.InRange(result.Size, 1, 500L * 1024);
+        Assert.Equal(source.LongLength, result.OriginalSize);
+        Assert.Equal(2500, result.OriginalWidth);
+        Assert.Equal(1800, result.OriginalHeight);
+        Assert.True(Math.Max(result.Width, result.Height) <= 1920);
+        using var decoded = Decode(result.Bytes);
+        Assert.Equal(result.Width, decoded.Width);
+        Assert.Equal(result.Height, decoded.Height);
+    }
+
+    [Fact]
+    public void Upload_compression_preserves_png_transparency()
+    {
+        var source = NoisyPng(1400, 900, includeAlpha: true);
+        using var stream = new MemoryStream(source);
+
+        var result = ImageHelper.CompressUploadImage(stream, ".png", 300, 1000);
+
+        Assert.True(result.TargetSizeReached);
+        Assert.Equal("png", result.Format);
+        using var decoded = Decode(result.Bytes);
+        Assert.Contains(Enumerable.Range(0, decoded.Width * decoded.Height), pixel =>
+            decoded.GetPixel(pixel % decoded.Width, pixel / decoded.Width).Alpha < 250);
+    }
+
     private static ImageProcessResult Solid(int width, int height, string color)
     {
         return ImageHelper.Create(new ImageCreateParam
@@ -425,6 +478,22 @@ public class ImageHelperProcessingTests
             BackgroundColor = color,
             Format = "png"
         });
+    }
+
+    private static byte[] NoisyPng(int width, int height, bool includeAlpha)
+    {
+        using var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
+        var pixels = new byte[bitmap.RowBytes * height];
+        var random = new Random(20260822);
+        random.NextBytes(pixels);
+        for (var offset = 3; offset < pixels.Length; offset += 4)
+        {
+            pixels[offset] = includeAlpha ? (byte)(64 + pixels[offset] % 192) : (byte)255;
+        }
+        Marshal.Copy(pixels, 0, bitmap.GetPixels(), pixels.Length);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
     }
 
     private static ImageProcessResult DrawText(string text, string fontFamily)

@@ -9,6 +9,7 @@ import {
   isTemporaryOfficialResourceFailure,
   mergeJavascriptResource,
   mergeJsonResource,
+  normalizeOfficialPackageExecutionLimits,
   validateReadableOfficialResource,
   verifyOfflineReleaseSafety,
 } from './resource-sync-core.mjs';
@@ -669,6 +670,24 @@ test('商城包写回时优先使用更高正式版本，否则独立递增包�
 test('资源规范化统一换行和 JSON 缩进', () => {
   assert.equal(canonicalizeResource('engine.js', 'var x = 1;\r\n'), 'var x = 1;\n');
   assert.equal(canonicalizeResource('package.json', '{"a":1}'), '{\n  "a": 1\n}\n');
+});
+
+test('官方应用包候选不会持久化超过运行时硬上限的递归深度', () => {
+  const normalized = JSON.parse(normalizeOfficialPackageExecutionLimits(
+    'app.microi.store.json',
+    JSON.stringify({
+      PackageInfo: { Name: '应用商城' },
+      SysApiEngines: [
+        { ApiEngineKey: 'legacy-high', LimitRecursion: 10000 },
+        { ApiEngineKey: 'ordinary', LimitRecursion: 2000 },
+        { ApiEngineKey: 'unlimited', LimitRecursion: 0 },
+      ],
+    }),
+  ));
+
+  assert.equal(normalized.SysApiEngines[0].LimitRecursion, 5000);
+  assert.equal(normalized.SysApiEngines[1].LimitRecursion, 2000);
+  assert.equal(normalized.SysApiEngines[2].LimitRecursion, 0);
 });
 
 test('官网临时故障识别只放行网络、限流和服务端错误', () => {

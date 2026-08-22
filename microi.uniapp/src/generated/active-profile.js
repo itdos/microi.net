@@ -49,6 +49,7 @@ export default {
   },
   "features": {
     "ai": true,
+    "runtimeEndpointSwitch": false,
     "business": true,
     "businessCatalog": true,
     "dynamicForm": true,

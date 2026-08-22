@@ -11,7 +11,7 @@ const fieldByName = new Map((resource.DiyFields || []).map((field) => [field.Nam
 test('SSO official package has stable identity and no tenant data', () => {
   assert.equal(resource.PackageInfo.Name, 'SSO 身份联邦');
   assert.equal(resource.PackageInfo.AppId, 'app.microi.sso');
-  assert.equal(resource.PackageInfo.Version, 'v7.5.2');
+  assert.equal(resource.PackageInfo.Version, 'v7.5.5');
   assert.deepEqual(resource.PackageInfo.RequiredPlatformCapabilities, [
     'POST /api/Sso/Begin',
     'POST /api/Sso/CompleteAuthorization',

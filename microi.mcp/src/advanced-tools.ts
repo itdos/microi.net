@@ -309,6 +309,7 @@ const OFFICIAL_STORE_OSCLIENT = 'iTdos';
 export interface StoreApplicationTaskInput {
   operation: StoreApplicationOperation;
   storeId: string;
+  storeVersionId?: string;
   requestId: string;
   storeApiBase?: string;
   storeOsClient?: string;
@@ -326,12 +327,16 @@ export function buildStoreApplicationBackgroundRequest(input: StoreApplicationTa
   Options: JsonRecord;
 } {
   const storeId = String(input.storeId || '').trim();
+  const storeVersionId = String(input.storeVersionId || '').trim();
   const requestId = String(input.requestId || '').trim();
   if (!/^[A-Za-z0-9:._-]{1,100}$/u.test(storeId)) {
     throw new Error('storeId 只能包含字母、数字、冒号、点、下划线和连字符，长度 1-100。');
   }
   if (!/^[A-Za-z0-9:._-]{8,100}$/u.test(requestId)) {
     throw new Error('requestId 必须是调用方保存并在重试时复用的稳定幂等 Id，长度 8-100。');
+  }
+  if (storeVersionId && !/^[A-Za-z0-9:._-]{1,100}$/u.test(storeVersionId)) {
+    throw new Error('storeVersionId 只能包含字母、数字、冒号、点、下划线和连字符，长度 1-100。');
   }
 
   const rawStoreApiBase = String(input.storeApiBase || OFFICIAL_STORE_API_BASE).trim();
@@ -363,6 +368,7 @@ export function buildStoreApplicationBackgroundRequest(input: StoreApplicationTa
     // STORE_APPLICATION_MCP_IDENTIFIER_ONLY_V1: never carry Package/AppPakcet/Form/Row.
     Param: compactObject({
       StoreId: storeId,
+      StoreVersionId: storeVersionId || undefined,
       AppId: input.appId,
       AppName: input.appName,
       AppVersion: input.appVersion,
@@ -3325,6 +3331,8 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
 
   const storeApplicationSchema = {
     storeId: z.string().regex(/^[A-Za-z0-9:._-]{1,100}$/).describe('商城 sys_microistore 记录 Id'),
+    storeVersionId: z.string().regex(/^[A-Za-z0-9:._-]{1,100}$/).optional()
+      .describe('可选：mic_data_version 不可变完整包快照 Id，用于发布升版后的精确恢复'),
     requestId: z.string().regex(/^[A-Za-z0-9:._-]{8,100}$/).describe('调用方生成并在不确定重试时复用的稳定幂等 Id'),
     appId: z.string().max(100).optional(),
     appName: z.string().max(200).optional(),
@@ -3340,7 +3348,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
     const operationText = operation === 'update' ? '更新' : '安装';
     server.tool(
       toolName,
-      `${operationText}一个应用商城应用到当前 MCP 绑定租户 ${osClient}。任务只传 StoreId 和商城源定位信息，由服务端持久队列调用 import-microi-store-package；首次调用不传 confirmExecution 只返回预检，真实执行后必须轮询后台任务至 Succeeded。`,
+      `${operationText}一个应用商城应用到当前 MCP 绑定租户 ${osClient}。任务只传 StoreId、可选不可变 StoreVersionId 和商城源定位信息，由服务端持久队列调用 import-microi-store-package；首次调用不传 confirmExecution 只返回预检，真实执行后必须轮询后台任务至 Succeeded。`,
       storeApplicationSchema,
       async (input) => {
         let request;
@@ -3348,6 +3356,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
           request = buildStoreApplicationBackgroundRequest({
             operation,
             storeId: input.storeId,
+            storeVersionId: input.storeVersionId,
             requestId: input.requestId,
             appId: input.appId,
             appName: input.appName,
@@ -3371,6 +3380,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
         await audit(client, toolName, input.storeId, {
           Operation: operation,
           StoreId: input.storeId,
+          StoreVersionId: request.Param.StoreVersionId,
           StoreApiBase: request.Param.StoreApiBase,
           StoreOsClient: request.Param.StoreOsClient,
           IdempotencyKey: request.Options.IdempotencyKey,

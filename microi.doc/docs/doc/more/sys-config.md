@@ -13,6 +13,23 @@
 - 后端接口引擎和后端 V8 事件仍可读取 `sys_config` 全部字段；私密值统一从 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 读取。禁止返回、记录或复制整个 `ServerPrivateSettings`。
 - `mci_system_setting` 的 Secret 使用租户绑定认证加密，列表默认掩码；临时显示原文要求 Passkey、Authenticator 或严格人脸的一次性步进验证，并使用 `no-store`。
 
+### 表单地图服务接入
+
+表单 `Map / MapArea` 的高德、百度、腾讯凭据统一放在 `mci_system_setting`，并归类到“系统设置 → 安全与服务接入”：
+
+| Key | 类型 | 默认状态 | 用途 |
+|---|---|---|---|
+| `Map.Provider` | 普通私有 | 停用 | 默认地图供应商：`AMap`、`Baidu` 或 `Tencent` |
+| `Map.AMap.JsApiKey` | Secret | 停用 | 高德 Web JS API Key |
+| `Map.AMap.SecurityJsCode` | Secret | 停用 | 高德 JS API 2.0 安全密钥 |
+| `Map.AMap.ServiceHost` | 普通私有 | 停用 | 高德安全代理地址；优先于直接下发安全密钥 |
+| `Map.Baidu.JsApiKey` | Secret | 停用 | 百度 JavaScript API AK |
+| `Map.Tencent.JsApiKey` | Secret | 停用 | 腾讯 JavaScript API GL Key |
+
+官方模板全部默认停用，升级不会覆盖现有租户选择；旧 `sys_config.AMapKey / AMapSecret / BaiduAK` 在新设置未启用时继续兼容。地图运行时端点只接受当前登录用户，从 DiyToken 确定租户，只返回字段实际选择的一家供应商，并设置 `Cache-Control: no-store`；访问密钥会话被拒绝，响应中不存在其它 Secret。
+
+浏览器地图 SDK 必须拿到客户端 Key，所以 Key 在浏览器开发者工具中仍可见。必须在高德、百度、腾讯控制台配置当前生产域名白名单和所需 JavaScript API 产品；Secret 的作用是防止明文落库、列表泄露和一次性返回全部供应商凭据。高德配置 `Map.AMap.ServiceHost` 后，后端不会再返回 `Map.AMap.SecurityJsCode`。
+
 ```js
 // 前端或后端均可读取公开实体字段
 var title = V8.SysConfig.SysTitle;
@@ -23,7 +40,7 @@ var clientSecret = privateSettings['Login.Gitee.ClientSecret'];
 // clientSecret 只能参与当前后端调用，禁止 return 或 console.log。
 ```
 
-`FormMaskBlur` 是全局正向开关：缺失、空值或 `0/false` 默认关闭遮罩毛玻璃，只有显式 `1/true` 才开启。表级 `diy_table.DisableFormMaskBlur` 仍是负向开关；全局开启后，某张表显式配置 `1/true` 可单独关闭。旧 `sys_config.DisableFormMaskBlur` 只用于未升级租户的前端兼容回退，字段元数据必须在 PC 与移动端隐藏。
+`FormMaskBlur` 是全局正向开关：缺失、空值或 `0/false` 默认关闭遮罩毛玻璃，只有显式 `1/true` 才开启。平台统一 Dialog、图片裁剪、字段配置、业务弹窗和 Element Plus MessageBox 都必须从同一运行时读取该值，页面不得再用静态 CSS 默认开启毛玻璃。表级 `diy_table.DisableFormMaskBlur` 仍是负向开关；全局开启后，某张表显式配置 `1/true` 可单独关闭。旧 `sys_config.DisableFormMaskBlur` 只用于未升级租户的前端兼容回退，字段元数据必须在 PC 与移动端隐藏。
 
 登录页入口统一使用 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub` 五个负向开关，字段标签分别为“关闭生物登录入口”“关闭Authenticator登录入口”“关闭Gitee登录入口”“关闭微信登录入口”“关闭GitHub登录入口”。它们缺失、空值或 `0/false` 时默认显示入口，只有显式 `1/true` 才关闭；旧 `Login*Display` 字段仅作兼容回退并隐藏。`DisableAiAssistant` 同样保持负向开关语义。
 

@@ -44,8 +44,8 @@ function executeEvent({
 }
 
 test('marketplace package carries the explicit-version contract and release metadata', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.5.4');
-  assert.match(packageModel.PackageInfo.ChangeHistory, /^2026-08-21 v7\.5\.4 /u);
+  assert.equal(packageModel.PackageInfo.Version, 'v7.5.24');
+  assert.match(packageModel.PackageInfo.ChangeHistory, /(?:^|\n)2026-08-21 v7\.5\.4 /u);
   assert.match(eventCode, /Version: v1\.1\.3/u);
   assert.match(eventCode, /MARKETPLACE_EXPLICIT_VERSION_V1/u);
 });

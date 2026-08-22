@@ -52,9 +52,13 @@ for (const profileId of profileIds) {
   const artifacts = getProfileArtifacts(profileId)
   const pagesArtifact = findArtifact(artifacts, 'src', 'pages.json')
   const manifestArtifact = findArtifact(artifacts, 'src', 'manifest.json')
+  const iosInfoPlistArtifact = findArtifact(artifacts, 'src', 'Info.plist')
+  const androidManifestArtifact = findArtifact(artifacts, 'src', 'AndroidManifest.xml')
   const activeTabBarArtifact = findArtifact(artifacts, 'src', 'generated', 'active-tabbar.js')
   check(!!pagesArtifact, `${profileId}: getProfileArtifacts 缺少 pages.json`)
   check(!!manifestArtifact, `${profileId}: getProfileArtifacts 缺少 manifest.json`)
+  check(!!iosInfoPlistArtifact, `${profileId}: getProfileArtifacts 缺少 Info.plist`)
+  check(!!androidManifestArtifact, `${profileId}: getProfileArtifacts 缺少 AndroidManifest.xml 描述`)
   check(!!activeTabBarArtifact, `${profileId}: getProfileArtifacts 缺少 active-tabbar.js`)
   if (!pagesArtifact || !manifestArtifact) continue
 
@@ -118,6 +122,14 @@ check(
 check(
   fs.readFileSync(path.join(projectRoot, 'src', 'manifest.json')).equals(fs.readFileSync(path.join(projectRoot, 'profiles', 'xjy', 'manifest.json'))),
   '默认 src/manifest.json 必须与 xjy Profile 完全一致'
+)
+check(
+  fs.readFileSync(path.join(projectRoot, 'src', 'Info.plist')).equals(fs.readFileSync(path.join(projectRoot, 'profiles', 'xjy', 'Info.plist'))),
+  '默认 src/Info.plist 必须与 xjy Profile 完全一致'
+)
+check(
+  !fs.existsSync(path.join(projectRoot, 'src', 'AndroidManifest.xml')),
+  '默认 xjy Profile 不得保留 standard 的 Android 明文 HTTP 例外'
 )
 check(
   fs.readFileSync(path.join(projectRoot, 'src', 'generated', 'active-profile.js'), 'utf8') === generatedProfileSource(xjyProfile),

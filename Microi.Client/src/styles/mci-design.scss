@@ -1461,6 +1461,12 @@ html.dark {
     -webkit-backdrop-filter: blur(3px);
 }
 
+.el-overlay-message-box.mci-global-overlay--plain,
+.mci-unified-message-overlay.mci-global-overlay--plain {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
 @media (max-width: 560px) {
     .el-message-box.mci-unified-message-box {
         .el-message-box__header { min-height: 78px; padding: 13px 62px 13px 16px; }
@@ -1632,6 +1638,13 @@ html.dark {
 }
 
 .mci-unified-overlay.mci-unified-overlay--plain {
+    background: color-mix(in srgb, #111827 52%, transparent) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.el-overlay.mci-global-overlay--plain,
+.mci-unified-overlay.mci-global-overlay--plain {
     background: color-mix(in srgb, #111827 52%, transparent) !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;

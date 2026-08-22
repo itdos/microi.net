@@ -169,3 +169,7 @@ if (ctx.token && ctx.token !== appliedHostToken) {
 
 普通 `request`、浏览器 `fetch(FormData)` 上传和 `uni.uploadFile` 都必须读取响应头的新 Token。验收时必须连续执行至少两个需要登录态的请求（前一个允许发生 Token 轮换），确认后一个仍返回 `Code=1`；不能只看页面首屏渲染成功。
 <!-- /microi-progressive:chunk -->
+
+## 运行时 ApiBase / OsClient 切换
+
+允许用户切换平台的客户端必须把 `ApiBase + OsClient` 视为完整安全边界，而不是只替换请求 URL。候选端点应先匿名探测，成功后再原子更新配置并清除旧 Token、用户和平台派生缓存；账号、RSA 密文、菜单、表元数据和页面状态不得跨边界复用。SDK 每次修改 `apiBase` 或 `osClient` 都必须推进端点代次，请求记录发起时代次，并在处理响应头 Token、鉴权失效或响应体之前拒绝旧代次的迟到响应。验收至少覆盖“旧平台登录请求未返回 -> 切换平台 -> 旧响应携带 Token 返回”，并确认旧 Token 没有写入、新请求只发送一个新 `osclient`。

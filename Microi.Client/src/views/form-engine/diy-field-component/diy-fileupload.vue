@@ -3,6 +3,7 @@
         <el-upload
             v-if="FormMode != 'View' && field.Visible"
             ref="uploadRef"
+            class="mci-compact-upload"
             drag
             :multiple="field.Config.FileUpload.Multiple === true"
             :limit="field.Config.FileUpload.MaxCount"
@@ -20,13 +21,14 @@
             :on-remove="(file, fileList) => FileUploadRemove(file, fileList)"
             :show-file-list="false"
         >
-            <el-icon class="el-icon--upload">
-                <upload-filled />
-            </el-icon>
-            <div class="el-upload__text">拖拽文件到此处，或<em>点击上传</em></div>
-            <template #tip>
-                <div class="el-upload__tip">{{ field.Config.FileUpload.Tips }}</div>
-            </template>
+            <DiyUploadCompactSummary
+                kind="file"
+                :private-storage="field.Config.FileUpload.Limit"
+                :multiple="field.Config.FileUpload.Multiple === true"
+                :max-count="field.Config.FileUpload.MaxCount"
+                :max-size="field.Config.FileUpload.MaxSize"
+                :tips="field.Config.FileUpload.Tips"
+            />
         </el-upload>
 
         <!-- 单文件显示 - 编辑/新增模式 -->
@@ -281,13 +283,14 @@
 
 <script setup>
 import { ref, computed, getCurrentInstance, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { UploadFilled, Document, Delete, Rank, Picture, FolderOpened, Grid, VideoPlay, Tickets, Edit, View } from '@element-plus/icons-vue';
+import { Document, Delete, Rank, Picture, FolderOpened, Grid, VideoPlay, Tickets, Edit, View } from '@element-plus/icons-vue';
 import { ElMessageBox, ElImageViewer } from 'element-plus';
 import Sortable from 'sortablejs';
 import { useDiyStore } from "@/pinia";
 import { getUploadErrorMessage } from "@/utils/upload-error";
 // zhy：统一解析上传接口返回的实际私有策略、短期预览地址和可持久化元数据。
 import { getUploadPreviewUrl, resolveUploadLimit, sanitizeUploadMeta } from "@/utils/upload-response";
+import DiyUploadCompactSummary from './diy-upload-compact-summary.vue';
 
 // 禁用属性继承
 defineOptions({

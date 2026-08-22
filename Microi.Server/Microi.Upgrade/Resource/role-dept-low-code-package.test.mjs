@@ -15,7 +15,7 @@ function sourceHash(value) {
 test("SaaS engine declares every changed legacy managed-engine baseline", () => {
   const fixtures = {
     admin_get_empty_database_sanitization_sql: {
-      current: "4431ff8e4de593cc2a67b2656cfb4455f90e3aa05de6e60492331139b52efa8c",
+      current: "ee435e4cc0a5868ce9199a26c18593447600ba0be09bff3f9d6774d5ef2cd10e",
       base: "3f877b2f71deb2c553ed6d3515839e307a1e82ecbf45d7bbc865ca1380cc4df0",
       compatible: ["db42fca3c905fdd1ecf42586c3cfc40bb3b292a647118ca14c416743f7dbccc6"],
     },

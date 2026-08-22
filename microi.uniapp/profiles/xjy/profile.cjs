@@ -50,6 +50,7 @@ module.exports = {
     },
     features: {
       ai: true,
+      runtimeEndpointSwitch: false,
       business: true,
       businessCatalog: true,
       dynamicForm: true,

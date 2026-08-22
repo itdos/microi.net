@@ -1,7 +1,26 @@
+import { isFormMaskBlurEnabled } from "./form-mask-blur.js";
+
 const dialogState = new WeakMap();
 let runtimeObserver = null;
 let pendingFrame = 0;
 const pendingNodes = new Set();
+let getSysConfig = () => ({});
+
+function applyGlobalMaskBlurClass(overlay) {
+    if (!(overlay instanceof HTMLElement)) return;
+    overlay.classList.toggle(
+        "mci-global-overlay--plain",
+        !isFormMaskBlurEnabled(getSysConfig() || {})
+    );
+}
+
+export function refreshMciDialogMaskBlur() {
+    if (typeof document === "undefined") return;
+    // Element Plus 的 Dialog、Drawer、ImageViewer 与 MessageBox 都建立在
+    // overlay 容器上；从 DOM 边界统一应用系统策略，避免局部弹层各自写死毛玻璃。
+    document.querySelectorAll(".el-overlay, .el-overlay-message-box")
+        .forEach(applyGlobalMaskBlurClass);
+}
 
 function visibleDialog(dialog) {
     if (!(dialog instanceof HTMLElement)) return false;
@@ -120,6 +139,7 @@ export function enhanceMciDialog(dialog, context = null) {
         overlay.classList.add("mci-unified-overlay");
         overlay.dataset.mciDialogContract = state.context?.variant || "dialog";
         if (state.context?.variant === "field") overlay.classList.add("mci-field-config-overlay");
+        applyGlobalMaskBlurClass(overlay);
     }
     installFallbackDrag(dialog, state);
     return dialog;
@@ -139,12 +159,17 @@ export function enhanceMciMessageBox(messageBox) {
         .find((item) => status?.classList.contains(`el-message-box-icon--${item}`)) || "info";
     messageBox.dataset.mciMessageType = type;
     const wrapper = messageBox.closest(".el-overlay-message-box, .el-message-box__wrapper, .el-overlay");
-    if (wrapper) wrapper.classList.add("mci-unified-message-overlay");
+    if (wrapper) {
+        wrapper.classList.add("mci-unified-message-overlay");
+        applyGlobalMaskBlurClass(wrapper);
+    }
     return messageBox;
 }
 
 function enhanceTree(node) {
     if (!(node instanceof Element)) return;
+    if (node.matches(".el-overlay, .el-overlay-message-box")) applyGlobalMaskBlurClass(node);
+    node.querySelectorAll?.(".el-overlay, .el-overlay-message-box").forEach(applyGlobalMaskBlurClass);
     if (node.matches(".el-dialog")) enhanceMciDialog(node);
     else node.querySelectorAll?.(".el-dialog").forEach((dialog) => enhanceMciDialog(dialog));
     if (node.matches(".el-message-box")) enhanceMciMessageBox(node);
@@ -191,8 +216,12 @@ function queueDialogNode(node) {
     if (!pendingFrame) pendingFrame = window.requestAnimationFrame(flushPendingDialogs);
 }
 
-export function installMciDialogRuntime() {
-    if (runtimeObserver || typeof MutationObserver === "undefined") return;
+export function installMciDialogRuntime(options = {}) {
+    if (typeof options.getSysConfig === "function") getSysConfig = options.getSysConfig;
+    if (runtimeObserver || typeof MutationObserver === "undefined") {
+        refreshMciDialogMaskBlur();
+        return;
+    }
     const start = () => {
         document.querySelectorAll(".el-dialog").forEach((dialog) => enhanceMciDialog(dialog));
         document.querySelectorAll(".el-message-box").forEach((messageBox) => enhanceMciMessageBox(messageBox));
@@ -213,6 +242,7 @@ export function installMciDialogRuntime() {
             attributes: true,
             attributeFilter: ["class"]
         });
+        refreshMciDialogMaskBlur();
     };
     if (document.body) start();
     else document.addEventListener("DOMContentLoaded", start, { once: true });

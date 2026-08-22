@@ -1,6 +1,6 @@
 {
   "name": "microi.net",
-  "version": "7.5.4",
+  "version": "7.5.6",
   "description": "开源低代码平台 - Microi吾码",
   "author": "iTdos",
   "type": "module",
@@ -84,6 +84,7 @@
     "clipboard": "^2.0.11",
     "color": "^5.0.3",
     "coordtransform": "^2.1.2",
+    "cropperjs": "1.6.2",
     "crypto-js": "^4.2.0",
     "dayjs": "^1.11.13",
     "deepmerge": "^4.3.1",

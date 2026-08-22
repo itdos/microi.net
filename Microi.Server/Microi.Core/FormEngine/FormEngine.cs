@@ -1242,12 +1242,12 @@ namespace Microi.net
                         var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, diyTableModel.DataBaseId);
 
 
-                        //如果修改了列名，或类型
-                        //修改为强制修改物理表，不再判断列名、类型
-                        //if (fieldModel.Name != param.Name 
-                        //    || fieldModel.Type != param.Type
-                        //    || fieldModel.Label != param.Label
-                        //    )
+                        // 只有列名或物理类型实际变化时才执行 DDL。字段说明、布局、
+                        // V8 事件等元数据更新不应反复 ALTER TABLE；批量保存字段的
+                        // UptDiyFieldList 已遵循同一语义。
+                        var physicalDefinitionChanged = fieldModel.Name != param.Name
+                                                        || fieldModel.Type != param.Type;
+                        if (physicalDefinitionChanged)
                         {
                             //判断字段是否已存在
                             if (
@@ -1289,9 +1289,8 @@ namespace Microi.net
                                 }
 
                             }
-
-                            param.NameConfirm = 1;
                         }
+                        param.NameConfirm = 1;
 
                         //iTdos数据库中修改数据
                         #region  通用修改

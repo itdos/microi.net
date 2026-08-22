@@ -13,6 +13,11 @@ const MENU_CACHE_KEY = 'microi_mobile_menu_tree_v2'
 let tableIdCache = null
 let menuTreeCache = null
 
+export function resetBusinessRuntimeCache() {
+  tableIdCache = null
+  menuTreeCache = null
+}
+
 function currentIdentityKey() {
   const user = getUser() || {}
   return String(user.Id || user.Account || 'guest')

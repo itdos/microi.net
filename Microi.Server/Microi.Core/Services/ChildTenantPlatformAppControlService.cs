@@ -389,6 +389,18 @@ namespace Microi.net
             }
         }
 
+        internal static DosResult EnsureTargetExecutionBootstrap(
+            string ownerOsClient,
+            string targetOsClient,
+            JObject trustedCurrentUser)
+        {
+            // CHILD_TENANT_EXECUTION_BOOTSTRAP_V1：父任务进入 Monitor 后不再重复
+            // 扫描租户目录，但已经排队的子任务仍必须在进程重启/平台热升级后获得
+            // 当前主租户的官方安装器。复用进程内按目标缓存，只在首次执行时自愈，
+            // 避免每个导入分片都重复检查物理结构和复制工作器。
+            return EnsureMonitorBootstrapRecovery(ownerOsClient, targetOsClient, trustedCurrentUser);
+        }
+
         private static DosResult EnsureTargetApiEngine(
             string ownerOsClient,
             string targetOsClient,
@@ -534,7 +546,10 @@ namespace Microi.net
             out string error)
         {
             error = string.Empty;
-            if (string.Equals(targetCode ?? string.Empty, sourceCode ?? string.Empty, StringComparison.Ordinal))
+            if (string.Equals(
+                    NormalizeBootstrapSourceForComparison(targetCode),
+                    NormalizeBootstrapSourceForComparison(sourceCode),
+                    StringComparison.Ordinal))
                 return false;
 
             if (!TryParseBootstrapVersion(targetVersion, out var targetParts)
@@ -561,6 +576,15 @@ namespace Microi.net
                 return false;
             }
             return true;
+        }
+
+        private static string NormalizeBootstrapSourceForComparison(string source)
+        {
+            return (source ?? string.Empty)
+                .TrimStart('\uFEFF')
+                .Replace("\r\n", "\n")
+                .Replace('\r', '\n')
+                .TrimEnd();
         }
 
         private static bool TryParseBootstrapVersion(string value, out int[] parts)

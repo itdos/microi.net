@@ -26,11 +26,24 @@ export function normalizeUserThemeMode(value, fallback = USER_THEME_MODE.LIGHT) 
     return fallback === USER_THEME_MODE.DARK ? USER_THEME_MODE.DARK : USER_THEME_MODE.LIGHT;
 }
 
-export function resolveUserThemeMode(user = {}, localMode = USER_THEME_MODE.LIGHT) {
+export function resolveUserThemeMode(
+    user = {},
+    localMode = USER_THEME_MODE.LIGHT,
+    systemMode = "",
+    fallback = USER_THEME_MODE.LIGHT
+) {
+    const defaultMode = normalizeUserThemeMode(fallback, USER_THEME_MODE.LIGHT);
+    const resolvedSystemMode = text(systemMode)
+        ? normalizeUserThemeMode(systemMode, defaultMode)
+        : defaultMode;
     if (hasInstalledUserPreference(user, "ThemeMode")) {
-        return normalizeUserThemeMode(user.ThemeMode, USER_THEME_MODE.LIGHT);
+        return text(user.ThemeMode)
+            ? normalizeUserThemeMode(user.ThemeMode, resolvedSystemMode)
+            : resolvedSystemMode;
     }
-    return normalizeUserThemeMode(localMode, USER_THEME_MODE.LIGHT);
+    return text(localMode)
+        ? normalizeUserThemeMode(localMode, resolvedSystemMode)
+        : resolvedSystemMode;
 }
 
 export function resolveUserThemeColor(user = {}, localColor = "", systemColor = "", fallback = "#409eff") {

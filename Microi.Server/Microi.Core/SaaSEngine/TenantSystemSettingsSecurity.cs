@@ -22,6 +22,12 @@ namespace Microi.net
     public static class TenantSystemSettingsSecurity
     {
         public const string TableName = "mci_system_setting";
+        public const string MapProviderKey = "Map.Provider";
+        public const string BaiduMapClientKey = "Map.Baidu.JsApiKey";
+        public const string AMapClientKey = "Map.AMap.JsApiKey";
+        public const string AMapSecurityJsCodeKey = "Map.AMap.SecurityJsCode";
+        public const string AMapServiceHostKey = "Map.AMap.ServiceHost";
+        public const string TencentMapClientKey = "Map.Tencent.JsApiKey";
         private const string CipherPurpose = "Microi.TenantSystemSetting:v1:";
 
         private static readonly Regex KeyRegex = new Regex(
@@ -33,7 +39,8 @@ namespace Microi.net
             "password", "passwd", "pwd", "secret", "token", "credential",
             "privatekey", "private_key", "accesskey", "apikey", "api_key",
             "connectionstring", "connection_string", "dbconn", "redis",
-            "minio", "authsecret", "clientsecret", "signingkey", "aeskey"
+            "minio", "authsecret", "clientsecret", "signingkey", "aeskey",
+            "securityjscode"
         };
 
         public static string NormalizeKey(string key)
@@ -235,6 +242,144 @@ namespace Microi.net
             return UnprotectSecret(item.TenantOsClient, item.Key, item.SecretCipher);
         }
 
+        /// <summary>
+        /// 将表单字段或租户默认值规范为地图供应商标识。System 表示继续使用租户默认值；
+        /// 未识别的历史值失败回退到调用方指定的安全默认值。
+        /// </summary>
+        public static string NormalizeMapProvider(string provider, string fallback = "System")
+        {
+            var value = (provider ?? string.Empty).Trim();
+            if (value.Length == 0) return fallback;
+            if (new[] { "System", "Default" }.Any(item => string.Equals(item, value, StringComparison.OrdinalIgnoreCase)))
+                return "System";
+            if (new[] { "AMap", "Gaode", "高德" }.Any(item => string.Equals(item, value, StringComparison.OrdinalIgnoreCase)))
+                return "AMap";
+            if (new[] { "Baidu", "BMap", "百度" }.Any(item => string.Equals(item, value, StringComparison.OrdinalIgnoreCase)))
+                return "Baidu";
+            if (new[] { "Tencent", "QQ", "QQMap", "腾讯" }.Any(item => string.Equals(item, value, StringComparison.OrdinalIgnoreCase)))
+                return "Tencent";
+            return fallback;
+        }
+
+        /// <summary>
+        /// 只解析浏览器地图 SDK 必需的当前供应商配置。租户私密设置优先；尚未启用模板时
+        /// 回退历史 sys_config 字段，保证升级后旧地图立即可用。返回对象不会包含其它供应商
+        /// 的 Key，也不得并入 SysConfig 或任何共享浏览器缓存。
+        /// </summary>
+        public static TenantMapRuntimeConfiguration ResolveMapRuntimeConfiguration(
+            IReadOnlyDictionary<string, TenantSystemSettingValue> settings,
+            string requestedProvider,
+            JObject legacySysConfig)
+        {
+            settings ??= new Dictionary<string, TenantSystemSettingValue>(StringComparer.OrdinalIgnoreCase);
+            legacySysConfig ??= new JObject();
+
+            var provider = NormalizeMapProvider(requestedProvider);
+            if (string.Equals(provider, "System", StringComparison.OrdinalIgnoreCase))
+            {
+                provider = NormalizeMapProvider(GetText(settings, MapProviderKey, "System"));
+            }
+            if (string.Equals(provider, "System", StringComparison.OrdinalIgnoreCase))
+            {
+                // Baidu is checked first to preserve the historical default used by existing fields.
+                if (HasConfiguredMapCredential(settings, BaiduMapClientKey, legacySysConfig, "BaiduAK")) provider = "Baidu";
+                else if (HasConfiguredMapCredential(settings, AMapClientKey, legacySysConfig, "AMapKey")) provider = "AMap";
+                else if (HasConfiguredMapCredential(settings, TencentMapClientKey, legacySysConfig, "TencentMapKey", "TencentMapJsKey", "QQMapKey")) provider = "Tencent";
+                else provider = "Baidu";
+            }
+
+            var result = new TenantMapRuntimeConfiguration { Provider = provider };
+            switch (provider)
+            {
+                case "AMap":
+                    result.ClientKey = ResolveMapValue(settings, AMapClientKey, legacySysConfig, out var amapTenant, "AMapKey");
+                    result.SecurityJsCode = ResolveMapValue(settings, AMapSecurityJsCodeKey, legacySysConfig, out _, "AMapSecurityJsCode", "AMapSecret");
+                    result.ServiceHost = ResolveMapValue(settings, AMapServiceHostKey, legacySysConfig, out _, "AMapServiceHost");
+                    result.Source = amapTenant ? "Tenant" : "Legacy";
+                    break;
+                case "Tencent":
+                    result.ClientKey = ResolveMapValue(settings, TencentMapClientKey, legacySysConfig, out var tencentTenant, "TencentMapKey", "TencentMapJsKey", "QQMapKey");
+                    result.Source = tencentTenant ? "Tenant" : "Legacy";
+                    break;
+                default:
+                    result.Provider = "Baidu";
+                    result.ClientKey = ResolveMapValue(settings, BaiduMapClientKey, legacySysConfig, out var baiduTenant, "BaiduAK");
+                    result.Source = baiduTenant ? "Tenant" : "Legacy";
+                    break;
+            }
+            return result;
+        }
+
+        public static bool TryNormalizeMapServiceHost(string value, out string normalized)
+        {
+            normalized = (value ?? string.Empty).Trim().TrimEnd('/');
+            if (normalized.Length == 0) return true;
+            if (normalized.Length > 2048
+                || !Uri.TryCreate(normalized, UriKind.Absolute, out var uri)
+                || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)
+                || !string.IsNullOrWhiteSpace(uri.UserInfo)
+                || !string.IsNullOrWhiteSpace(uri.Query)
+                || !string.IsNullOrWhiteSpace(uri.Fragment))
+            {
+                normalized = string.Empty;
+                return false;
+            }
+            return true;
+        }
+
+        private static bool HasConfiguredMapCredential(
+            IReadOnlyDictionary<string, TenantSystemSettingValue> settings,
+            string key,
+            JObject legacySysConfig,
+            params string[] legacyKeys)
+        {
+            if (settings.TryGetValue(key, out var item) && item != null && item.IsEnabled)
+            {
+                if (item.IsSecret && !string.IsNullOrWhiteSpace(item.SecretCipher)) return true;
+                if (!item.IsSecret && !string.IsNullOrWhiteSpace(item.Value)) return true;
+            }
+            return !string.IsNullOrWhiteSpace(GetLegacyText(legacySysConfig, legacyKeys));
+        }
+
+        private static string ResolveMapValue(
+            IReadOnlyDictionary<string, TenantSystemSettingValue> settings,
+            string key,
+            JObject legacySysConfig,
+            out bool fromTenant,
+            params string[] legacyKeys)
+        {
+            fromTenant = false;
+            if (settings.TryGetValue(key, out var item) && item != null && item.IsEnabled)
+            {
+                var tenantValue = GetText(settings, key, string.Empty);
+                if (!string.IsNullOrWhiteSpace(tenantValue))
+                {
+                    fromTenant = true;
+                    return NormalizeMapRuntimeText(tenantValue, key);
+                }
+            }
+            return NormalizeMapRuntimeText(GetLegacyText(legacySysConfig, legacyKeys), key);
+        }
+
+        private static string GetLegacyText(JObject legacySysConfig, params string[] keys)
+        {
+            foreach (var key in keys ?? Array.Empty<string>())
+            {
+                var property = legacySysConfig?.Properties().FirstOrDefault(item =>
+                    string.Equals(item.Name, key, StringComparison.OrdinalIgnoreCase));
+                var value = property?.Value?.Type == JTokenType.Null ? string.Empty : property?.Value?.ToString();
+                if (!string.IsNullOrWhiteSpace(value)) return value;
+            }
+            return string.Empty;
+        }
+
+        private static string NormalizeMapRuntimeText(string value, string key)
+        {
+            var text = new string((value ?? string.Empty).Where(ch => !char.IsControl(ch)).ToArray()).Trim();
+            if (text.Length > 4096) throw new ArgumentException($"地图设置 {key} 超出允许长度。");
+            return text;
+        }
+
         public static bool GetBool(
             IReadOnlyDictionary<string, TenantSystemSettingValue> settings,
             string key,
@@ -346,5 +491,14 @@ namespace Microi.net
         public string ValueSource { get; set; }
         [JsonIgnore]
         public string TenantOsClient { get; set; }
+    }
+
+    public sealed class TenantMapRuntimeConfiguration
+    {
+        public string Provider { get; set; }
+        public string ClientKey { get; set; }
+        public string SecurityJsCode { get; set; }
+        public string ServiceHost { get; set; }
+        public string Source { get; set; }
     }
 }

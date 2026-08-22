@@ -1,6 +1,6 @@
-# Microi 原生动态小程序
+# Microi 原生动态移动端
 
-`microi.uniapp` 是 Microi AI 低代码平台的原生动态小程序基线，基于 **uni-app + Vue 3 + Vite**。默认 Profile 是已经完成客户交付验收的 **集福鲤版（xjy）**，因此直接执行原有开发、构建命令时，页面、功能、路由和视觉仍以集福鲤版本为准。
+`microi.uniapp` 是 Microi AI 低代码平台的原生动态小程序与 App 基线，基于 **uni-app + Vue 3 + Vite**。默认 Profile 是已经完成客户交付验收的 **集福鲤版（xjy）**，因此直接执行原有开发、构建命令时，页面、功能、路由和视觉仍以集福鲤版本为准。
 
 > 本项目不再使用 WebView 打开 Microi 后台。通用列表、详情、动态表单、消息、AI 助手和个人中心均原生运行；租户可继续添加商城、资讯、售后任务等独立业务。后台字段、数据源和移动端配置通过动态表单即时生效。
 
@@ -37,7 +37,7 @@ Microi.UI 是产品设计系统和最终交付标准，负责品牌令牌、布�
 - **安全区自适应**：使用实时状态栏、胶囊和底部 safe-area 数据，不依赖固定机型高度。
 - **克制的水主题动效**：首页和“我的”顶部播放 CDN 静音循环水面视频，静态水图负责首帧和失败回退；登录页只使用静态水景与低成本 CSS 位移动效，避免微信原生视频层覆盖登录表单。
 - **高性能交互**：分包加载、按需注入、骨架屏、请求去重、按用户隔离的短期缓存、错峰标签页预热和消息连接复用。AI 主体只在进入独立分包后加载，前台 Token 续签延迟执行并做一分钟节流，水面视频在首帧后启用且低性能设备自动回退静态图。
-- **账号登录记忆**：账号密码登录支持分别记住账号和密码；本地只保存成功登录后的 RSA 密文和掩码，不保存明文密码，账号变更或密文复用失败会自动清除记忆。
+- **账号登录记忆**：账号密码登录支持分别记住账号和密码；本地只保存成功登录后的 RSA 密文和掩码，不保存明文密码，并按 `ApiBase + OsClient` 隔离，账号变更、平台切换或密文复用失败会自动清除当前输入。
 
 ## AI 数据权限
 
@@ -205,15 +205,39 @@ Microi 标准基础版：
 npm run dev:mp-weixin:standard
 npm run build:mp-weixin:standard
 npm run build:h5:standard
+npm run dev:app:standard
+npm run build:app:standard
 ```
 
-标准微信构建输出到 `dist/build/standard-mp-weixin`，不会覆盖集福鲤产物。环境地址、`OsClient`、品牌、功能开关和接口配置在对应 `profiles/<id>/profile.cjs` 中维护；不要在 README、页面或测试产物中写入真实密码。
+标准微信构建输出到 `dist/build/standard-mp-weixin`，通用 App 构建输出到 `dist/build/standard-app`，都不会覆盖集福鲤产物。环境地址、`OsClient`、品牌、功能开关和接口配置在对应 `profiles/<id>/profile.cjs` 中维护；不要在 README、页面或测试产物中写入真实密码。
+
+### 通用 App 平台切换
+
+使用 `npm run build:app:standard` 生成通用 App 编译资源；该目录不是已签名的 IPA/APK。仅在 `standard + APP-PLUS` 登录页会显示“平台连接”：用户从固定下拉框选择 `https://` 或 `http://`，地址框只填写域名、IP、端口和可选路径，再单独填写租户 `OsClient`。H5、各小程序和客户专属 Profile 仍固定使用构建配置，不暴露运行时后端设置。
+
+连接流程先匿名读取候选平台的 `GetSysConfig`，验证地址与租户有效后才落盘。真正切换时会断开旧 SignalR、清除旧 DiyToken、用户、菜单、表元数据、页面会话与业务缓存；平台切换前发出的迟到响应也会被 SDK 拒绝。系统标题、Logo、FileServer、验证码、隐私协议和租户登录 RSA 公钥均以新平台返回值为准。记住的账号及 RSA 密文最多保留 12 个端点范围，且不会跨平台复用。
+
+HTTPS 是默认和正式发布推荐值。为了满足“任意 HTTP 地址”的通用连接需求，`standard` Profile 的 iOS `Info.plist` 声明了 `NSAllowsArbitraryLoads`，Android `AndroidManifest.xml` 声明了 `usesCleartextTraffic=true`；`xjy` 客户专属 Profile 均未放开。Apple 明确要求 ATS 例外在审核时提供理由，并建议尽可能改用 HTTPS 或更窄的域名例外。提交前必须从最终 IPA/APK 回读原生清单、在真机分别验证 HTTPS/HTTP，并在 App Review Notes 说明需要连接客户自管旧设备或内网服务的真实场景；若正式产品不需要任意 HTTP，应删除全局例外并只发布 HTTPS。
+
+DCloud 云打包从 CLI 项目的 `src` 读取 `manifest.json`、`Info.plist` 与 `AndroidManifest.xml`，因此最终打包前必须显式同步 `standard`，打包结束后恢复仓库默认 `xjy`：
+
+```bash
+npm run profile:sync -- standard
+# 在 HBuilderX 中对当前源码执行 Android/iOS 云打包，并回读最终安装包
+npm run profile:sync -- xjy
+npm run check:profiles
+```
+
+不要直接拿默认源码配置打通用包，也不要把 `standard` 生成桥接文件作为仓库默认值提交。
 
 ## 验收命令
 
 ```bash
 # 双 Profile + UI 合规 + 44 类官方控件映射
 npm run check:ui
+
+# App 平台地址、租户隔离、HTTP 风险提示和迟到响应竞态
+npm run check:app-runtime
 
 # 36 个页面分享策略、参数白名单和 6 张品牌封面审计
 npm run check:share

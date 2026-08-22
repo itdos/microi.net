@@ -62,11 +62,22 @@
 | `JoinTable` | 关联集合展示 | 查询与权限在服务端完成 |
 | `JoinForm` | 嵌入一个独立记录的完整表单 | 主表字段保存一个目标 Id；目标表不能与当前表相同 |
 | `TableChild` | 主表内嵌 0..N 条明细列表 | 独立子表、子表真实外键、隐藏子菜单、回查索引 |
-| `Map` | 点位 | `varchar(200)`/`mediumtext`，明确坐标格式 |
-| `MapArea` | 区域 | `mediumtext`，限制点数/体积 |
+| `Map` | 点位 | 高德/百度/腾讯；`Config.MapCompany=System/AMap/Baidu/Tencent`；凭据只进租户“安全与服务接入”，不得写字段配置或公开 SysConfig |
+| `MapArea` | 区域 | 与 `Map` 共用供应商安全配置；`mediumtext` 保存 `Paths`，限制路径、点数和体积 |
 | `Qrcode` | 二维码卡片展示 | 优先 `IsVirtual=1`；扫码原文另存普通 `varchar` 字段 |
 | `FontAwesome` | 图标选择 | `varchar(200)` |
 | `DevComponent` | 主前端定制 Vue 控件 | 仅用于长期复用且标准控件无法满足的场景 |
+
+### `Map / MapArea` 运行时与安全边界
+
+- 渲染事实源是 `Microi.Client/src/views/form-engine/diy-field-component/diy-map.vue`；公共错误分类与安全配置请求在同目录 `map-runtime.js`。
+- 字段只保存 `Config.MapCompany`，值为 `System / AMap / Baidu / Tencent`。禁止把 Key、securityJsCode、Secret 或代理凭据写入 `diy_field.Config`、V8 前端事件、公开 `sys_config` 投影或前端构建变量。
+- 租户凭据使用 `mci_system_setting` 的 `Map.*` 模板，在“系统设置 → 安全与服务接入”由超级管理员维护。运行时由可信后端按 DiyToken 租户和当前供应商做白名单投影，只返回一家的 `ClientKey`，必须 `no-store` 并拒绝访问密钥会话。
+- 旧 `sys_config.AMapKey / AMapSecret / BaiduAK` 仅在对应新设置未启用时兼容回退。不要为迁移直接重新公开这些字段。
+- 旧字段 `Config` 中的 `MapKey / MapSecret / AMapKey / AMapSecret / BaiduAK / TencentMapKey` 等明文属性不属于运行时配置；设计器保存地图配置时必须清除。迁移顺序固定为“先写入并启用租户 `Map.*` Secret，再清理字段元数据”。
+- 浏览器 JS Key 天然可见，必须配置供应商域名/Referer 白名单；高德生产环境优先配置 `Map.AMap.ServiceHost`，存在代理时不得再返回 `SecurityJsCode`。
+- 加载中、缺少 Key、运行时接口不匹配、SDK 网络/超时/鉴权/域名/WebGL/容器尺寸错误必须在控件区域显示明确原因码和重试入口，禁止只 `console.warn/error` 后留下空白地图。
+- `Map` 保持 `{Name}_Lng / {Name}_Lat / {Name}.{Address,Center,Zoom}`；`MapArea` 保持 `{Name}.{Paths,Center,Zoom}`。三家供应商切换不得改变持久化格式。
 
 ### `JoinForm` 不是子表
 
@@ -132,12 +143,72 @@ if (V8.LoadMode !== 'Design') {
 | CodeEditor / JsonTable | `CodeEditor.Height`、`JsonTable.Columns`、`JsonTable.Columns[].Config` |
 | JoinForm | `JoinForm.TableId`、`JoinForm.TableName`、`JoinForm.JoinFieldName`、`JoinForm.FormMode`、`JoinForm.Id`、`JoinForm._SearchEqual` |
 | TableChild | Config 根节点的 `TableChildTableId`、`TableChildSysMenuId`、`TableChildFkFieldName`；`TableChild.PrimaryTableFieldName`（默认 `Id`）及分页/导入选项 |
-| ImgUpload | `ImgUpload.Multiple`；导出时会按最大图片数展开列 |
+| ImgUpload | `ImgUpload.Limit/Multiple/MaxCount/Tips/Preview/MaxSize/SaveFullPath`；`ImgUpload.Crop.Enabled` 仅表示默认开启，另有 `Mode=free/fixed/select`、`Ratio`、`CustomWidth/CustomHeight`、`AllowZoom/AllowRotate/AllowFlip`；运行时在上传面板内提供裁剪开关，裁剪弹层提供“不裁剪直接上传”；导出时会按最大图片数展开列 |
+| FileUpload | `FileUpload.Limit/Multiple/MaxCount/Tips/MaxSize/SaveFullPath`，以及 Office 预览/编辑/版本配置；文件不使用 `ImgUpload.Preview/Crop` |
+| RichText | `RichText.Limit`；`Image.Enabled/MaxSize/MaxCount/Preview/CompressMaxSize/CompressMaxWidth`；`Video.Enabled/MaxSize/MaxCount`；`File.Enabled/MaxSize/MaxCount/Accept`；私有正文存稳定标识而不是临时 URL |
 | Qrcode | `Qrcode.DisplayWidth`、`Qrcode.ShowDownload`、`Qrcode.DownloadText`；扫码内容使用运行态 `DataAppend.Code` |
 
 其余选择、树、上传、关联和布局选项以当前字段设计器和
 `microi-db-schema/references/form-component-options.md` 为事实源；不要凭旧截图
 发明配置键。
+
+### `ImgUpload / FileUpload` 生成与运行时规则
+
+```json
+{
+  "ImgUpload": {
+    "Limit": true,
+    "Multiple": true,
+    "MaxCount": 6,
+    "Tips": "支持 JPG、PNG、WebP",
+    "Preview": true,
+    "MaxSize": 10,
+    "SaveFullPath": false,
+    "Crop": {
+      "Enabled": true,
+      "Mode": "select",
+      "Ratio": "16:9",
+      "CustomWidth": 1,
+      "CustomHeight": 1,
+      "AllowZoom": true,
+      "AllowRotate": true,
+      "AllowFlip": true
+    }
+  }
+}
+```
+
+- `Limit=true` 表示字段配置为私有桶，`false` 表示配置为公有桶；最终访问仍服从后端租户权限和上传安全策略。
+- `Multiple=true` 时 `MaxCount` 必须是正整数；`MaxSize` 单位为 MB。`Preview` 未配置时按 `true` 压缩，普通列表、卡片、商品图不要关闭。
+- `Crop.Enabled` 只决定运行时裁剪开关的初始状态；`false` 或缺失时用户仍可在紧凑上传面板主动开启。裁剪前原图始终进入 HDFS 私有桶，业务字段只保存展示图元数据。
+- 图片和文件都把拖放提示、存储范围、单/多文件、最大数量、处理方式和最大体积合并到同一个紧凑面板；不要在字段外再生成重复说明卡片。
+
+### `RichText` 生成与运行时规则
+
+```json
+{
+  "RichText": {
+    "EditorProduct": "WangEditor",
+    "Limit": true,
+    "Image": {
+      "Enabled": true,
+      "MaxSize": 20,
+      "MaxCount": 10,
+      "Preview": true,
+      "CompressMaxSize": 500,
+      "CompressMaxWidth": 1920
+    },
+    "Video": { "Enabled": true, "MaxSize": 200, "MaxCount": 3 },
+    "File": { "Enabled": true, "MaxSize": 100, "MaxCount": 10, "Accept": "" }
+  }
+}
+```
+
+- 公开公告、商品详情等匿名网页内容显式用 `Limit=false`；内部公告、合同说明等用 `true`。旧字段缺失时默认私有，不能由 AI 猜成公有。
+- `MaxSize` 单位 MB，`CompressMaxSize` 单位 KB。图片压缩开启时原图仍先进入 HDFS 私有桶，正文只引用展示图。
+- 私有正文只保存 `/__microi_richtext_private__/...` 稳定标识；运行时携带当前菜单、表、记录和字段上下文换取短效代理 URL，禁止把临时 Token/Ticket 回写字段。
+- 普通文件通过富文本工具栏附件入口插入 `a.href`；私有授权只接受真实 `img/video/source.src` 与 `a.href` 的精确路径，不接受正文文字、`data-*` 或脚本标签。
+- RichText 通常使用 `FormWidth=24`，配置摘要保持单行紧凑，不要再生成独立的大说明卡。
 
 ## 宽度与重字段
 

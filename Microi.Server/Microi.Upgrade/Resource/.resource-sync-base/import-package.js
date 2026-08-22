@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.2.9
+ * Version: v2.3.3
  * Function:
- * - 统一应用商城导入器；安装前幂等补齐物理前置列，支持后台分片、资源基线、官方平台受管升级、商城源只读重试，并在后台任务唯一索引创建冲突时仅归档重复终态幂等键。
+ * - 统一应用商城导入器；后台安装按期望应用版本锁定不可变商城快照，安装前幂等补齐物理前置列，支持后台分片、资源基线、官方平台受管升级、商城源只读重试，并在后台任务唯一索引创建冲突时仅归档重复终态幂等键。
  */
 
 // ==================== 参数接收与校验 ====================
@@ -35,11 +35,17 @@ if (invokeType == 'client') {
 }
 
 // GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1：部分历史空库包遗漏了 DiyTable
+// GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1：MySQL 同一张表缺少多个固定前置列时，
+// 必须合并为一次 ALTER TABLE，避免旧租户逐列重建元数据表并在首个检查点前耗尽
+// 单片超时。SQL Server / Oracle 保留经过验证的逐列兼容路径。
+// GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1：可信后台任务每个执行片最多
+// 修改一张前置元数据表，提交 Prerequisites 检查点后再继续；没有缺列时直接进入
+// 原 DDL 阶段，不为现代租户制造空分片。
 // 生成实体已经投影的物理列。FormEngine 在读取任意字段元数据前会先物化整条
 // diy_table，旧库因此把真实 Unknown column 包装成 Enumerable.Where 的 source
 // 为空。导入器在第一次 FormEngine 调用前只补固定平台列；新版后端启动升级仍是
 // 主路径，这里为尚未正确跑过物理前置迁移的客户节点提供幂等自愈。
-function ensureGeneratedEntityPhysicalPrerequisites() {
+function ensureGeneratedEntityPhysicalPrerequisites(maxChangedTables) {
     var dbType = String(
         V8.OsClientModel && (V8.OsClientModel.DbType || V8.OsClientModel.OsClientDbType) || 'MySql'
     ).toLowerCase();
@@ -48,6 +54,8 @@ function ensureGeneratedEntityPhysicalPrerequisites() {
     var quoteOpen = isSqlServer ? '[' : (isOracle ? '"' : '`');
     var quoteClose = isSqlServer ? ']' : (isOracle ? '"' : '`');
     var added = [];
+    maxChangedTables = parseInt(maxChangedTables || 999, 10);
+    if (isNaN(maxChangedTables) || maxChangedTables < 1) maxChangedTables = 1;
 
     function textType(length) {
         if (isOracle) return 'VARCHAR2(' + length + ')';
@@ -82,14 +90,60 @@ function ensureGeneratedEntityPhysicalPrerequisites() {
         }
         return map;
     }
-    function ensureTableColumns(tableName, definitions) {
+    function ensureTableColumns(tableName, definitions, allowWrite) {
         var existing = readColumns(tableName);
+        var pendingDefinitions = [];
         for (var definitionIndex = 0; definitionIndex < definitions.length; definitionIndex++) {
             var definition = definitions[definitionIndex];
             var columnName = String(definition[0]);
             if (existing[columnName.toLowerCase()]) continue;
+            pendingDefinitions.push(definition);
+        }
+        if (pendingDefinitions.length == 0) return { Missing: 0, Written: false };
+        if (!allowWrite) return { Missing: pendingDefinitions.length, Written: false };
+
+        if (!isSqlServer && !isOracle) {
+            var batchAlterParts = [];
+            for (var batchIndex = 0; batchIndex < pendingDefinitions.length; batchIndex++) {
+                var batchDefinition = pendingDefinitions[batchIndex];
+                batchAlterParts.push(
+                    'ADD ' + quoteOpen + String(batchDefinition[0]) + quoteClose
+                    + ' ' + batchDefinition[1] + ' NULL'
+                );
+            }
+            var batchAlterSql = 'ALTER TABLE ' + quoteOpen + tableName + quoteClose
+                + ' ' + batchAlterParts.join(', ');
+            try {
+                V8.Db.FromSql(batchAlterSql).ExecuteNonQuery();
+            } catch (batchAddColumnError) {
+                var batchReadback = readColumns(tableName);
+                var unresolvedColumns = [];
+                for (var unresolvedIndex = 0; unresolvedIndex < pendingDefinitions.length; unresolvedIndex++) {
+                    var unresolvedName = String(pendingDefinitions[unresolvedIndex][0]);
+                    if (!batchReadback[unresolvedName.toLowerCase()]) unresolvedColumns.push(unresolvedName);
+                }
+                if (unresolvedColumns.length > 0) {
+                    throw new Error(
+                        '批量补齐平台运行时物理列失败：' + tableName + '.' + unresolvedColumns.join(',') + '；'
+                        + (batchAddColumnError && batchAddColumnError.message
+                            ? batchAddColumnError.message
+                            : String(batchAddColumnError))
+                    );
+                }
+            }
+            for (var committedIndex = 0; committedIndex < pendingDefinitions.length; committedIndex++) {
+                var committedName = String(pendingDefinitions[committedIndex][0]);
+                existing[committedName.toLowerCase()] = true;
+                added.push(tableName + '.' + committedName);
+            }
+            return { Missing: pendingDefinitions.length, Written: true };
+        }
+
+        for (var pendingIndex = 0; pendingIndex < pendingDefinitions.length; pendingIndex++) {
+            var pendingDefinition = pendingDefinitions[pendingIndex];
+            var columnName = String(pendingDefinition[0]);
             var alterSql = 'ALTER TABLE ' + quoteOpen + tableName + quoteClose
-                + ' ADD ' + quoteOpen + columnName + quoteClose + ' ' + definition[1] + ' NULL';
+                + ' ADD ' + quoteOpen + columnName + quoteClose + ' ' + pendingDefinition[1] + ' NULL';
             try {
                 V8.Db.FromSql(alterSql).ExecuteNonQuery();
             } catch (addColumnError) {
@@ -105,36 +159,127 @@ function ensureGeneratedEntityPhysicalPrerequisites() {
             existing[columnName.toLowerCase()] = true;
             added.push(tableName + '.' + columnName);
         }
+        return { Missing: pendingDefinitions.length, Written: true };
     }
 
-    ensureTableColumns('sys_apiengine', [
-        ['StopHttp', intType()], ['Timeout', intType()], ['MaxStatements', intType()],
-        ['LimitMemory', intType()], ['LimitRecursion', intType()], ['V8Limit', intType()],
-        ['V8Unlimited', intType()], ['Lock', intType()]
-    ]);
-    ensureTableColumns('diy_table', [
-        ['OsClient', textType(255)], ['TableInEdit', intType()],
-        ['AddCallbakApi', textType(500)], ['UptCallbakApi', textType(500)],
-        ['DelCallbakApi', textType(500)], ['V8Limit', intType()], ['V8Unlimited', intType()],
-        ['FormPresentation', largeTextType()], ['FormPresentationMode', textType(50)],
-        ['FormPresentationDensity', textType(50)], ['FormNavigationTitle', textType(255)],
-        ['FormNavigationCountText', textType(255)], ['FormSectionNavigation', textType(50)],
-        ['FormSectionEyebrow', textType(255)], ['FormRequiredCountText', textType(255)],
-        ['FormWorkbenchEyebrow', textType(255)], ['FormWorkbenchDescription', largeTextType()],
-        ['FormNavigationFooterTitle', textType(255)], ['FormNavigationFooterHtml', largeTextType()],
-        ['FormRecordSelectorPlaceholder', textType(255)], ['FormRecordSelectorLabelFields', largeTextType()],
-        ['FormBannerEnabled', intType()], ['FormBannerTitleField', textType(100)],
-        ['FormBannerSubtitleField', textType(100)], ['FormBannerImageField', textType(100)],
-        ['FormBannerIcon', textType(100)], ['FormBannerBackgroundField', textType(100)],
-        ['FormBannerTagFields', largeTextType()], ['FormBannerMetrics', largeTextType()]
-    ]);
-    return added;
+    var prerequisiteTables = [
+        {
+            TableName: 'sys_apiengine',
+            Definitions: [
+                ['StopHttp', intType()], ['Timeout', intType()], ['MaxStatements', intType()],
+                ['LimitMemory', intType()], ['LimitRecursion', intType()], ['V8Limit', intType()],
+                ['V8Unlimited', intType()], ['Lock', intType()]
+            ]
+        },
+        {
+            TableName: 'diy_table',
+            Definitions: [
+                ['OsClient', textType(255)], ['TableInEdit', intType()],
+                ['AddCallbakApi', textType(500)], ['UptCallbakApi', textType(500)],
+                ['DelCallbakApi', textType(500)], ['V8Limit', intType()], ['V8Unlimited', intType()],
+                ['FormPresentation', largeTextType()], ['FormPresentationMode', textType(50)],
+                ['FormPresentationDensity', textType(50)], ['FormNavigationTitle', textType(255)],
+                ['FormNavigationCountText', textType(255)], ['FormSectionNavigation', textType(50)],
+                ['FormSectionEyebrow', textType(255)], ['FormRequiredCountText', textType(255)],
+                ['FormWorkbenchEyebrow', textType(255)], ['FormWorkbenchDescription', largeTextType()],
+                ['FormNavigationFooterTitle', textType(255)], ['FormNavigationFooterHtml', largeTextType()],
+                ['FormRecordSelectorPlaceholder', textType(255)], ['FormRecordSelectorLabelFields', largeTextType()],
+                ['FormBannerEnabled', intType()], ['FormBannerTitleField', textType(100)],
+                ['FormBannerSubtitleField', textType(100)], ['FormBannerImageField', textType(100)],
+                ['FormBannerIcon', textType(100)], ['FormBannerBackgroundField', textType(100)],
+                ['FormBannerTagFields', largeTextType()], ['FormBannerMetrics', largeTextType()]
+            ]
+        }
+    ];
+    var changedTableCount = 0;
+    var remainingTableCount = 0;
+    for (var prerequisiteIndex = 0; prerequisiteIndex < prerequisiteTables.length; prerequisiteIndex++) {
+        var prerequisiteTable = prerequisiteTables[prerequisiteIndex];
+        var prerequisiteResult = ensureTableColumns(
+            prerequisiteTable.TableName,
+            prerequisiteTable.Definitions,
+            changedTableCount < maxChangedTables
+        );
+        if (prerequisiteResult.Missing < 1) continue;
+        if (prerequisiteResult.Written) changedTableCount++;
+        else remainingTableCount++;
+    }
+    return {
+        Added: added,
+        ChangedTableCount: changedTableCount,
+        RemainingTableCount: remainingTableCount
+    };
 }
 
+var physicalBootstrapTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
+var physicalBootstrapEnvelope = V8.Param._BackgroundTask || {};
+var physicalBootstrapChunkingEnabled = !!physicalBootstrapTaskId && (
+    V8.Param._TrustedServerInvocation === true
+    || String(V8.Param._TrustedServerInvocation || '').toLowerCase() == 'true'
+    || (String(physicalBootstrapEnvelope.Id || '') == String(physicalBootstrapTaskId)
+        && V8.Param._BackgroundTaskFencingToken !== null
+        && V8.Param._BackgroundTaskFencingToken !== undefined)
+);
+var physicalBootstrapCheckpoint = V8.Param._BackgroundTaskCheckpoint || {};
+if (typeof physicalBootstrapCheckpoint == 'string') {
+    try { physicalBootstrapCheckpoint = JSON.parse(physicalBootstrapCheckpoint); }
+    catch (physicalBootstrapCheckpointError) { physicalBootstrapCheckpoint = {}; }
+}
+if (physicalBootstrapCheckpoint.TaskId
+    && String(physicalBootstrapCheckpoint.TaskId) != String(physicalBootstrapTaskId || '')) {
+    physicalBootstrapCheckpoint = {};
+}
+var physicalBootstrapPhase = String(physicalBootstrapCheckpoint.Phase || '');
+var physicalBootstrapOwnsSlice = physicalBootstrapChunkingEnabled
+    && (!physicalBootstrapPhase || physicalBootstrapPhase == 'Prerequisites');
+
 try {
-    var generatedEntityPhysicalColumnsAdded = ensureGeneratedEntityPhysicalPrerequisites();
-    if (generatedEntityPhysicalColumnsAdded.length > 0) {
-        debugLog.generated_entity_physical_bootstrap = generatedEntityPhysicalColumnsAdded;
+    var generatedEntityPhysicalBootstrap = ensureGeneratedEntityPhysicalPrerequisites(
+        physicalBootstrapOwnsSlice ? 1 : 999
+    );
+    if (generatedEntityPhysicalBootstrap.Added.length > 0) {
+        debugLog.generated_entity_physical_bootstrap = generatedEntityPhysicalBootstrap.Added;
+    }
+    if (physicalBootstrapOwnsSlice && generatedEntityPhysicalBootstrap.ChangedTableCount > 0) {
+        var physicalBootstrapHasMore = generatedEntityPhysicalBootstrap.RemainingTableCount > 0;
+        var physicalBootstrapNextPhase = physicalBootstrapHasMore ? 'Prerequisites' : 'Ddl';
+        var physicalBootstrapProgress = physicalBootstrapHasMore ? 2 : 5;
+        var physicalBootstrapPackageInfo = Package && Package.PackageInfo ? Package.PackageInfo : {};
+        var physicalBootstrapContinuation = {
+            Version: 1,
+            TaskId: String(physicalBootstrapTaskId || ''),
+            Phase: physicalBootstrapNextPhase,
+            Index: 0,
+            Progress: physicalBootstrapProgress
+        };
+        var physicalBootstrapPackageVersion = String(
+            physicalBootstrapPackageInfo.Version || physicalBootstrapPackageInfo.AppVersion
+            || V8.Param.AppVersion || ''
+        );
+        var physicalBootstrapPackageIdentity = String(
+            physicalBootstrapPackageInfo.AppId || physicalBootstrapPackageInfo.AppKey
+            || V8.Param.AppId || V8.Param.AppKey || V8.Param.StoreId
+            || physicalBootstrapPackageInfo.Name || ''
+        );
+        var physicalBootstrapStoreVersionId = String(V8.Param.StoreVersionId || '');
+        if (physicalBootstrapPackageVersion) physicalBootstrapContinuation.PackageVersion = physicalBootstrapPackageVersion;
+        if (physicalBootstrapPackageIdentity) physicalBootstrapContinuation.PackageIdentity = physicalBootstrapPackageIdentity;
+        if (physicalBootstrapStoreVersionId) physicalBootstrapContinuation.StoreVersionId = physicalBootstrapStoreVersionId;
+        var physicalBootstrapMessage = physicalBootstrapHasMore
+            ? '平台运行时前置物理列已提交，将继续补齐下一张元数据表'
+            : '平台运行时前置物理列已提交，将继续导入应用物理结构';
+        return {
+            Code: 1,
+            Data: {
+                BackgroundTask: {
+                    HasMore: true,
+                    Checkpoint: physicalBootstrapContinuation,
+                    Progress: physicalBootstrapProgress,
+                    Msg: physicalBootstrapMessage
+                }
+            },
+            Msg: physicalBootstrapMessage
+        };
     }
 } catch (physicalBootstrapError) {
     return {
@@ -301,8 +446,12 @@ var buildPersistentCheckpoint = function (phase, index, extra) {
         checkpointPackageInfo.AppId || checkpointPackageInfo.AppKey || V8.Param.AppId
         || V8.Param.AppKey || V8.Param.StoreId || checkpointPackageInfo.Name || ''
     );
+    var checkpointStoreVersionId = String(
+        V8.Param.StoreVersionId || backgroundCheckpoint.StoreVersionId || ''
+    );
     if (checkpointPackageVersion) checkpoint.PackageVersion = checkpointPackageVersion;
     if (checkpointPackageIdentity) checkpoint.PackageIdentity = checkpointPackageIdentity;
+    if (checkpointStoreVersionId) checkpoint.StoreVersionId = checkpointStoreVersionId;
     if (backgroundCheckpoint.IdMapsPlanned === true
         || phase == 'Fields'
         || phase == 'Physical'
@@ -546,7 +695,13 @@ var syncStoreMetaFromRow = function () {
     if (!V8.Param.StoreApiBase) V8.Param.StoreApiBase = firstTextParam([row.StoreApiBase, row.AppStoreApiBase]);
     if (!V8.Param.StoreOsClient) V8.Param.StoreOsClient = firstTextParam([row.StoreOsClient, row.AppStoreOsClient, row.SourceOsClient]);
     if (!V8.Param.StoreCredentialKey) V8.Param.StoreCredentialKey = firstTextParam([row.StoreCredentialKey, row.CredentialKey]);
-    if (!V8.Param.StoreVersionId) V8.Param.StoreVersionId = firstTextParam([row.StoreVersionId, row.DataVersionId]);
+    if (!V8.Param.StoreVersionId) {
+        V8.Param.StoreVersionId = firstTextParam([
+            backgroundCheckpoint.StoreVersionId,
+            row.StoreVersionId,
+            row.DataVersionId
+        ]);
+    }
     return row;
 };
 
@@ -643,7 +798,9 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
         marketplaceEngineRunUrl,
         marketplaceEngineParam('get-microi-store-model', {
             Id: storeId,
-            StoreVersionId: firstTextParam([V8.Param.StoreVersionId, storeRow.StoreVersionId, storeRow.DataVersionId])
+            StoreVersionId: firstTextParam([V8.Param.StoreVersionId, storeRow.StoreVersionId, storeRow.DataVersionId]),
+            ExpectedAppVersion: firstTextParam([V8.Param.AppVersion, storeRow.AppVersion, storeRow.Version]),
+            PinCurrentVersion: backgroundChunkingEnabled
         }),
         120
     );
@@ -655,6 +812,23 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
         if (!V8.Param.AppName) V8.Param.AppName = firstTextParam([storeModel.AppName, storeModel.Name]);
         if (!V8.Param.AppVersion) V8.Param.AppVersion = firstTextParam([storeModel.AppVersion, storeModel.Version]);
         if (!V8.Param.AppAuthor) V8.Param.AppAuthor = firstTextParam([storeModel.AppAuthor, storeModel.Author]);
+        if (!V8.Param.StoreVersionId) {
+            V8.Param.StoreVersionId = firstTextParam([storeModel.StoreVersionId, storeModel.DataVersionId]);
+        }
+        if (backgroundChunkingEnabled && !V8.Param.StoreVersionId) {
+            return {
+                Code: 0,
+                Data: {
+                    ErrorType: 'MARKETPLACE_VERSION_SNAPSHOT_MISSING',
+                    StoreId: storeId,
+                    AppVersion: firstTextParam([V8.Param.AppVersion, storeModel.AppVersion, storeModel.Version])
+                },
+                Msg: '商城源未返回不可变安装快照，已停止后台分片安装。'
+            };
+        }
+        if (V8.Param.StoreVersionId) {
+            debugLog.marketplace_version_snapshot = String(V8.Param.StoreVersionId);
+        }
     }
 }
 
@@ -689,100 +863,22 @@ var trustedOfficialPlatformPackage = !!authoritativeStoreModel
     && String(authoritativeStoreModel.ApplicationType || '').toLowerCase() == 'platform'
     && (officialPublisherType == '官方应用' || officialPublisherType == '平台应用');
 
-// BULK_SMALL_PACKAGE_SINGLE_SLICE_V1：批量安装本身已经按“一个应用一个外层
-// checkpoint”持久化。对规模可控的官方平台包，再把同一个应用拆成几十个内部
-// Worker 片段只会反复下载和解析同一包体，调度成本远大于数据库写入。可信批量
-// 任务可让小包在一个事务中完成；大型 Schema、远程 ZIP 或大资产仍保留原有分片。
-var bulkAdaptiveSingleSliceRequested = V8.Param.BulkAdaptiveSingleSlice === true
-    || String(V8.Param.BulkAdaptiveSingleSlice || '').toLowerCase() == 'true';
-var trustedBulkAdaptiveInvocation = bulkAdaptiveSingleSliceRequested
-    && backgroundChunkingEnabled
-    && (V8.Param._TrustedServerInvocation === true
-        || String(V8.Param._TrustedServerInvocation || '').toLowerCase() == 'true')
-    && !!backgroundTaskId
-    && String(backgroundTaskEnvelope.Id || '') == String(backgroundTaskId)
-    && parseInt(V8.Param._BackgroundTaskFencingToken || 0, 10) > 0
-    && parseInt(V8.Param.BulkTotal || 0, 10) > 0;
 var listSize = function (value) {
     return value && value.length !== undefined ? Number(value.length) || 0 : 0;
 };
-var bulkAdaptivePackageEligible = function (packageModel) {
-    packageModel = packageModel || {};
-    var fieldCount = listSize(packageModel.DiyFields);
-    var tableCount = listSize(packageModel.DiyTables);
-    var ddlCount = listSize(packageModel.DDLStatements);
-    var menuCount = listSize(packageModel.SysMenus);
-    var apiEngineCount = listSize(packageModel.SysApiEngines);
-    var scheduleJobCount = listSize(packageModel.ScheduleJobs);
-    var workflowUnitCount = listSize(packageModel.WorkFlows || packageModel.Workflows)
-        + listSize(packageModel.WFNodes || packageModel.WorkFlowNodes)
-        + listSize(packageModel.WFLines || packageModel.WorkFlowLines);
-    var dataRowCount = 0;
-    var dataSets = packageModel.DataSets || [];
-    for (var dataSetIndex = 0; dataSetIndex < listSize(dataSets); dataSetIndex++) {
-        var dataSet = dataSets[dataSetIndex] || {};
-        dataRowCount += listSize(dataSet.Rows || dataSet.Data);
-    }
-
-    var bundles = [];
-    var packageBundles = packageModel.ApplicationBundles || [];
-    for (var bundleIndex = 0; bundleIndex < listSize(packageBundles); bundleIndex++) {
-        if (packageBundles[bundleIndex]) bundles.push(packageBundles[bundleIndex]);
-    }
-    var legacyBundle = packageModel.ApplicationBundle || packageModel.AiApplication || packageModel.FrontendApplication;
-    if (legacyBundle) bundles.push(legacyBundle);
-    var assetFileCount = 0;
-    var assetContentChars = 0;
-    var hasRemoteZipOnlyAssets = false;
-    for (var adaptiveBundleIndex = 0; adaptiveBundleIndex < bundles.length; adaptiveBundleIndex++) {
-        var adaptiveBundle = bundles[adaptiveBundleIndex] || {};
-        var sourceFiles = adaptiveBundle.SourceFiles || adaptiveBundle.Files || [];
-        var buildAssets = adaptiveBundle.BuildAssets || adaptiveBundle.Assets || [];
-        var embeddedCount = listSize(sourceFiles) + listSize(buildAssets);
-        var packageAssets = adaptiveBundle.PackageAssets || adaptiveBundle.ZipAssets || null;
-        if (typeof packageAssets == 'string') {
-            try { packageAssets = JSON.parse(packageAssets); } catch (adaptiveAssetParseError) { return false; }
-        }
-        if (packageAssets && packageAssets.length !== undefined && !packageAssets.BuildZip && !packageAssets.SourceZip) {
-            packageAssets = packageAssets.length ? packageAssets[0] : null;
-        }
-        if (embeddedCount == 0 && packageAssets && (packageAssets.BuildZip || packageAssets.SourceZip)) {
-            hasRemoteZipOnlyAssets = true;
-        }
-        var adaptiveFiles = [];
-        var sourceFileCount = listSize(sourceFiles);
-        var buildAssetCount = listSize(buildAssets);
-        for (var sourceFileIndex = 0; sourceFileIndex < sourceFileCount; sourceFileIndex++) adaptiveFiles.push(sourceFiles[sourceFileIndex]);
-        for (var buildAssetIndex = 0; buildAssetIndex < buildAssetCount; buildAssetIndex++) adaptiveFiles.push(buildAssets[buildAssetIndex]);
-        assetFileCount += adaptiveFiles.length;
-        for (var adaptiveFileIndex = 0; adaptiveFileIndex < adaptiveFiles.length; adaptiveFileIndex++) {
-            assetContentChars += applicationAssetContentLength(adaptiveFiles[adaptiveFileIndex]);
-        }
-    }
-
-    return fieldCount <= 160
-        && tableCount <= 12
-        && ddlCount <= 16
-        && menuCount <= 20
-        && apiEngineCount <= 40
-        && scheduleJobCount == 0
-        && workflowUnitCount <= 200
-        && dataRowCount <= 500
-        && assetFileCount <= 20
-        && assetContentChars <= 8 * 1024 * 1024
-        && !hasRemoteZipOnlyAssets;
-};
-if (trustedBulkAdaptiveInvocation && bulkAdaptivePackageEligible(Package)) {
-    backgroundChunkingEnabled = false;
-    backgroundCheckpoint = {};
-    backgroundCheckpointPhase = 'Ddl';
-    backgroundCheckpointIndex = 0;
-    debugLog.bulk_small_package_single_slice = '可信批量任务使用单应用单事务快速路径';
+// BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1：历史 BulkAdaptiveSingleSlice
+// 只按资源条数估算工作量，会把包含重 DDL、实体生成和权限回填的官方包误判为
+// “小包”，造成单事务长期占用且没有可恢复检查点。为兼容旧批量工作器继续接收
+// 参数，但后台任务一律保留有界分片；直接前台安装的既有语义不受影响。
+var bulkAdaptiveSingleSliceRequested = V8.Param.BulkAdaptiveSingleSlice === true
+    || String(V8.Param.BulkAdaptiveSingleSlice || '').toLowerCase() == 'true';
+if (bulkAdaptiveSingleSliceRequested && backgroundChunkingEnabled) {
+    debugLog.bulk_adaptive_single_slice_ignored = '已保留后台有界分片，忽略旧版单事务请求';
 }
 
-// PACKAGE_REPLAY_VERSION_GUARD_V1：identifier-only 后台任务会在每片从商城源
-// 重新读取包体。发布方若在任务中途切换版本，旧检查点不能与新包混用；宁可让
-// 当前任务明确失败并以新幂等请求重新开始，也不能把两个版本的 DDL/字段拼在一起。
+// PACKAGE_REPLAY_VERSION_GUARD_V2：identifier-only 后台任务首次按期望 AppVersion
+// 解析不可变 StoreVersionId，并把它写入检查点；后续每片只读取该历史快照。
+// 版本和身份校验仍失败关闭，防止快照损坏、错误引用或旧任务把两个包混装。
 if (backgroundChunkingEnabled) {
     var currentPackageVersion = String(
         Package.PackageInfo.Version || Package.PackageInfo.AppVersion || V8.Param.AppVersion || ''
@@ -805,6 +901,13 @@ if (backgroundChunkingEnabled) {
         return {
             Code: 0,
             Msg: '应用包身份与后台检查点不一致，已停止混合安装，请重新提交更新任务。'
+        };
+    }
+    if (backgroundCheckpoint.StoreVersionId
+        && String(backgroundCheckpoint.StoreVersionId) != String(V8.Param.StoreVersionId || '')) {
+        return {
+            Code: 0,
+            Msg: '应用包历史快照与后台检查点不一致，已停止混合安装。'
         };
     }
 }

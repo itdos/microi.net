@@ -9,6 +9,14 @@ description: Microi 吾码 UniApp/H5 前端通用规范。用于构建或修复�
 
 本 Skill 适用于任何 Microi 吾码 UniApp/H5 项目，包括商城、OA、ERP、MES、CRM、互联网项目、预约项目等。不要把规则写成某一个业务应用专属规范。
 
+## 图片上传默认参数（强制）
+
+UniApp/H5/小程序必须通过项目统一 `microi.v8.js` 的 `V8.uploadFile` / `V8.uploadFiles` 上传图片。调用方省略 `options.preview` 时，SDK 必须发送 `Preview=true` 并默认使用 `img` 路径；只有显式 `preview:false` 才允许关闭。服务端仍是最终事实源：即使旧客户端完全不传该字段，也要默认压缩到约 `500 KB`、最长边约 `1920 px`，并在 HDFS 私有桶保留一份 `_origin` 原图。页面不得为了“上传成功”自行改成 `preview:false`，也不得把私有原图或临时签名地址保存进业务字段。
+
+## 平台方通用 App 登录连接器（明确例外）
+
+登录页默认不得展示 ApiBase、OsClient 或调试配置；但用户明确要求、且安装包由 Microi 平台方作为多租户聚合客户端发布时，允许仅在 `APP-PLUS` 登录页提供通用连接器。协议必须使用固定 `https://` / `http://` 下拉框，地址框禁止重复输入协议，HTTPS 默认，HTTP 显示明文风险并二次确认；H5、小程序和客户专属包不得因此自动开放。候选地址先匿名读取 `GetSysConfig`，验证成功后再持久化。真正切换时必须清除旧 DiyToken、用户、SignalR、菜单/元数据/页面缓存，按 `ApiBase + OsClient` 隔离记住的账号及 RSA 密文，并用端点代次拒绝切换前的迟到响应。支持任意 HTTP 时，最终 IPA 必须显式包含 ATS 例外，Android 安装包必须显式包含 cleartext 例外；不需要任意 HTTP 的正式包应保持平台默认安全策略，iOS ATS 例外还必须在 App Store 审核中说明。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=microi-uniapp-frontend-000 sha256=ecb0fc85b5c3b15ac79c9049ca86de8c586d4ce3a6c975255464069d89f87ac4 -->
 ## 移动端质量门禁必须先读

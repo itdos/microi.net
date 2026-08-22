@@ -6,6 +6,18 @@ import { fileURLToPath } from "node:url";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const readJson = name => JSON.parse(fs.readFileSync(path.join(directory, name), "utf8"));
+const versionParts = value => String(value || "").replace(/^v/i, "").split(".")
+  .map(part => Number.parseInt(part, 10) || 0);
+const versionAtLeast = (actual, minimum) => {
+  const left = versionParts(actual);
+  const right = versionParts(minimum);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    if ((left[index] || 0) !== (right[index] || 0)) {
+      return (left[index] || 0) > (right[index] || 0);
+    }
+  }
+  return true;
+};
 const modulePackage = readJson("app.microi.module-engine.json");
 const saasPackage = readJson("app.microi.saas-engine.json");
 const taskServiceSource = fs.readFileSync(
@@ -14,7 +26,7 @@ const taskServiceSource = fs.readFileSync(
 );
 
 test("module package exposes the menu badge tooltip as a physical field", () => {
-  assert.equal(modulePackage.PackageInfo.Version, "v7.5.4");
+  assert.equal(modulePackage.PackageInfo.Version, "v7.5.5");
   assert.ok(modulePackage.PackageInfo.RequiredPlatformCapabilities.includes(
     "ServerField:SysMenu.MenuBadgeTooltip"
   ));
@@ -30,7 +42,10 @@ test("module package exposes the menu badge tooltip as a physical field", () => 
 });
 
 test("SaaS package owns the main-tenant fan-out engine and page button", () => {
-  assert.equal(saasPackage.PackageInfo.Version, "v7.5.21");
+  assert.ok(
+    versionAtLeast(saasPackage.PackageInfo.Version, "v7.5.24"),
+    `SaaS package must retain the child-tenant fan-out baseline, current=${saasPackage.PackageInfo.Version}`,
+  );
   const key = "bulk-update-child-tenant-platform-apps";
   const engine = saasPackage.SysApiEngines.find(item => item.ApiEngineKey === key);
   assert.ok(engine);
@@ -40,6 +55,16 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(engine.ApiV8Code, /CHILD_PLATFORM_APP_BOOTSTRAP_V1/);
   assert.match(engine.ApiV8Code, /CHILD_TASK_TERMINAL_AGGREGATION_V1/);
   assert.match(engine.ApiV8Code, /CHILD_TASK_AGGREGATE_PROGRESS_V1/);
+  assert.match(engine.ApiV8Code, /CHILD_TASK_MONITOR_CHECKPOINT_ONLY_V1/);
+  const queueGuardIndex = engine.ApiV8Code.indexOf("if (phase == 'Queue')");
+  const targetDiscoveryIndex = engine.ApiV8Code.indexOf(
+    "GetChildTenantPlatformAppMaintenanceTargets"
+  );
+  assert.ok(queueGuardIndex >= 0 && targetDiscoveryIndex > queueGuardIndex);
+  assert.equal(
+    engine.ApiV8Code.indexOf("GetChildTenantPlatformAppMaintenanceTargets", targetDiscoveryIndex + 1),
+    -1
+  );
   assert.match(engine.ApiV8Code, /Current: normalizedProgress/);
   assert.match(engine.ApiV8Code, /Total: 100/);
   assert.match(engine.ApiV8Code, /Phase: 'Monitor'/);
@@ -47,7 +72,7 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(engine.ApiV8Code, /MaxItemsPerChunk|batchSize = 20/);
   assert.match(engine.ApiV8Code, /queueFailureDetail/);
   assert.match(engine.ApiV8Code, /item\.Name \|\| item\.OsClient/);
-  assert.equal(engine.Version, "v1.1.2");
+  assert.equal(engine.Version, "v1.1.5");
   assert.equal(
     saasPackage.ResourcePolicies.ApiEngines[key]?.UpgradePolicy,
     "Managed"

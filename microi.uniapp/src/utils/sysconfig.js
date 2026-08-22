@@ -2,7 +2,7 @@
  * 系统配置缓存工具
  * 提供 SysConfig 的获取、缓存和读取
  */
-import { post } from './request.js'
+import { applyRuntimeSysConfig, post } from './request.js'
 import appConfig from '../config.js'
 
 const CACHE_KEY = 'sys_config_cache'
@@ -19,6 +19,15 @@ let aiFlagState = {
 let aiModelFlagState = {
   checkedAt: 0,
   enabled: false
+}
+
+export function resetSysConfigRuntimeCache() {
+  sysConfigRequest = null
+  aiFlagRequest = null
+  aiModelFlagRequest = null
+  aiFlagState = { checkedAt: 0, enabled: false }
+  aiModelFlagState = { checkedAt: 0, enabled: false }
+  try { uni.removeStorageSync(CACHE_KEY) } catch (error) {}
 }
 
 export function isEnabledFlag(value) {
@@ -76,6 +85,7 @@ export async function getSysConfig(options = {}) {
         OsClient: appConfig.osClient
       }, false)
       if (result.Code === 1 && result.Data) {
+        applyRuntimeSysConfig(result.Data)
         setCachedSysConfig(result.Data)
         return result.Data
       }

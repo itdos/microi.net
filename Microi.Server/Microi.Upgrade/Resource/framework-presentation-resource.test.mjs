@@ -15,7 +15,7 @@ const fieldNames = [
 const fields = packageModel.DiyFields.filter(item => item.TableId === sysConfigTable.Id && fieldNames.includes(item.Name));
 
 test('SaaS package delivers all framework watermark fields in interface style', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.5.21');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.5.26');
   assert.equal(fields.length, fieldNames.length);
   assert.deepEqual(new Set(fields.map(item => item.Name)), new Set(fieldNames));
   for (const field of fields) {

@@ -106,7 +106,7 @@ test("bulk install persists its plan in the shared background-task checkpoint", 
   assert.match(bulkSource, /V8\.ApiEngine\.Run\('import-microi-store-package'/);
   assert.match(bulkSource, /BULK_CHILD_FAILURE_DETAIL_V1/);
   assert.match(bulkSource, /BULK_PLATFORM_ONLY_PLAN_V1/);
-  assert.match(bulkSource, /BULK_ADAPTIVE_SINGLE_SLICE_V1/);
+  assert.match(bulkSource, /BULK_BOUNDED_PACKAGE_SLICES_V1/);
   assert.match(bulkSource, /BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1/);
   assert.match(bulkSource, /BULK_STORAGE_FAILURE_RECOVERY_V1/);
   assert.match(bulkSource, /BULK_MONOTONIC_CHILD_PROGRESS_V1/);
@@ -118,7 +118,7 @@ test("bulk install persists its plan in the shared background-task checkpoint", 
   assert.match(bulkSource, /ApplicationType: bulkApplicationType/);
   assert.match(bulkSource, /trim\(row\.ApplicationType \|\| row\.AppType\) != bulkApplicationType/);
   assert.match(bulkSource, /checkpointVersion[\s\S]*checkpointVersion < 3[\s\S]*phase = 'Discover'/);
-  assert.match(bulkSource, /BulkAdaptiveSingleSlice: true/);
+  assert.match(bulkSource, /BulkAdaptiveSingleSlice: false/);
   assert.match(bulkSource, /childFailureDetail\(childResult\)/);
   assert.match(bulkSource, /ChildData:/);
   assert.doesNotMatch(bulkSource, /localStorage|sessionStorage|static\s+/i);
@@ -166,7 +166,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.2.4");
+  assert.equal(engine.Version, "v1.2.7");
   assert.match(bulkSource, /value\.标识 \|\| value\.Identifier/);
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
@@ -175,7 +175,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.2\.7/);
+  assert.match(importerSource, /Version: v2\.3\.3/);
   assert.match(importerSource, /MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1/);
   assert.match(importerSource, /\/api\/ApiEngine\/Run\?OsClient=/);
   assert.match(importerSource, /marketplaceEngineParam\('get-microi-store-model'/);
@@ -189,7 +189,7 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /ADMIN_MENU_PERMISSION_DB_TIME_V1/);
   assert.match(importerSource, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);
   assert.match(importerSource, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
-  assert.match(importerSource, /BULK_SMALL_PACKAGE_SINGLE_SLICE_V1/);
+  assert.match(importerSource, /BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1/);
   assert.match(importerSource, /MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/);
   assert.match(importerSource, /MySqlOffpageTypeOverrides/);
   assert.match(importerSource, /isMysqlRowSizeTooLargeError/);
@@ -197,9 +197,8 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /ADD COLUMN触发MySQL 65535字节行宽上限/);
   assert.match(importerSource, /CREATE TABLE触发MySQL 65535字节行宽上限/);
   assert.match(importerSource, /isPackageColumnIndexed/);
-  assert.match(importerSource, /trustedBulkAdaptiveInvocation/);
-  assert.match(importerSource, /fieldCount <= 160/);
-  assert.match(importerSource, /assetContentChars <= 8 \* 1024 \* 1024/);
+  assert.match(importerSource, /bulk_adaptive_single_slice_ignored/);
+  assert.doesNotMatch(importerSource, /backgroundChunkingEnabled\s*=\s*false/);
   assert.match(importerSource, /PACKAGE_API_ENGINE_READBACK_V1/);
   assert.match(importerSource, /assertPersistedApiEngine\(apiEngine, updatedEngine\)/);
   assert.match(importerSource, /assertPersistedApiEngine\(apiEngine, insertedEngine\)/);
@@ -211,6 +210,8 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1/);
   assert.match(importerSource, /OFFICIAL_MANAGED_OVERWRITE_V1/);
   assert.match(importerSource, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1/);
+  assert.match(importerSource, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1/);
+  assert.match(importerSource, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1/);
   assert.match(importerSource, /ApplyOfficialManagedOverwrite/);
   assert.match(importerSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(importerSource, /OBJECT_STORAGE_FORBIDDEN/);
@@ -231,6 +232,6 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.2.7");
+  assert.equal(embeddedImporter.Version, "v2.3.3");
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
 });

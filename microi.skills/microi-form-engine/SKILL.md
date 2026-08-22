@@ -38,6 +38,28 @@ Config/Data、菜单查询列与缓存保持一致。
 6. 绑定菜单后补齐/允许平台推断列表列、搜索列、隐藏列、排序列、移动端列和默认排序。
 7. 回读 `diy_field`、刷新 schema 缓存，再在真实新增/编辑/查看表单中验收。
 
+## 上传字段配置（AI 生成时强制）
+
+- 图片使用 `Config.ImgUpload`，至少明确 `Limit`、`Multiple`、`MaxCount`、`Preview`、
+  `MaxSize` 和 `Crop`；文件使用 `Config.FileUpload`，至少明确 `Limit`、`Multiple`、
+  `MaxCount`、`MaxSize`。完整键和值域读取 `references/component-catalog.md`。
+- `ImgUpload.Preview` 未配置时默认开启压缩；普通业务图片优先保持开启。裁剪前的原图无论
+  展示图配置为公有或私有、是否压缩，都必须保存在 HDFS 私有桶，业务字段不得保存原图路径。
+- `ImgUpload.Crop.Enabled` 只控制表单打开时是否默认选中裁剪。运行时的裁剪开关、存储范围、
+  单/多图数量、压缩状态和最大体积统一显示在紧凑上传面板中；不得把 `Enabled=false` 误解为
+  禁止用户裁剪。`Mode` 只允许 `free/fixed/select`。
+- 图片和文件的拖放区都使用同一紧凑配置面板。`Multiple=true` 时必须设置业务合理的
+  `MaxCount`；`MaxSize` 单位为 MB，字段限制只能收紧租户/平台上限，不能放大。
+- 富文本使用 `Config.RichText`：必须明确 `Limit`，并按需配置
+  `Image.Enabled/MaxSize/MaxCount/Preview/CompressMaxSize/CompressMaxWidth`、
+  `Video.Enabled/MaxSize/MaxCount`、`File.Enabled/MaxSize/MaxCount/Accept`。公开公告、商品详情
+  等匿名正文显式使用 `Limit=false`；内部正文使用 `true`。旧字段缺失配置时安全默认为私有桶，
+  图片默认压缩到约 500 KB、最长边 1920 px。
+- 私有富文本只能持久化稳定对象标识，禁止把 HDFS 签名 URL、审计代理 Ticket 或 DiyToken 写入
+  HTML。每次查看/编辑按当前菜单、表、记录和字段权限换取新短效地址；外部匿名页面没有此权限
+  上下文，因此不能把私有 RichText 当作公开正文。普通交互式帐号也不能用 `Limit=false` 绕过
+  后端强制私有策略。
+
 新建表/模块时，除非用户显式指定或表单达到极重阈值（约 36+ 业务字段、2+ 子表或同等
 重型控件密度），默认保存 `diy_table.FormOpenType=Dialog` 与 `FormOpenWidth=80%`。
 Drawer 只服务超长复杂表单，不能作为所有 CRUD 模块的模板默认值。

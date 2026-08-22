@@ -1,10 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.2.4
+ * Version: v1.2.7
  * Function:
- * - 只规划并安装“未安装/可更新”应用，绝不重新安装已是最新版的应用。
- * - 计划和子检查点写入后台任务 CheckpointJson，支持多节点租约转移、进程重启和幂等重试。
+ * - 规划并逐个安装或更新全部官方平台应用；持久化计划、不可变商城快照标识与子检查点，并透传结构化失败详情。
  */
 
 // BACKGROUND_TASK_CHECKPOINT_PLAN_V2：应用商城批量计划只依赖平台已有的
@@ -15,8 +14,9 @@
 // BULK_PLATFORM_ONLY_PLAN_V1：页面上的“全部安装/更新”只面向 29 个官方平台
 // 应用。UniApp、Web、MicroService 等社区/AI 应用必须由用户逐个选择，禁止把
 // 整个商城的上千个应用和数千张业务表误装到租户。
-// BULK_ADAPTIVE_SINGLE_SLICE_V1：小型官方包按“一个应用一个事务”执行，外层
-// 任务仍在每个应用后持久化检查点；只有大型包继续使用导入器的内部安全分片。
+// BULK_BOUNDED_PACKAGE_SLICES_V1：所有官方包均保留导入器内部的有界分片与
+// 检查点；不能仅按资源数量把系统设置、系统帐号等 CPU/DDL 重包误判为小包，
+// 否则单次事务可能长期占用工作器且无法从中间进度恢复。
 // BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1：失败终态必须带任务、阶段、应用序号和
 // 可执行恢复建议，后台任务中心不能再只显示“接口无返回”或无法定位的笼统错误。
 function text(value, fallback) {
@@ -128,6 +128,12 @@ function childFailureDetail(result) {
 // 这种无关建议。按子导入器的稳定 ErrorType/HTTP 线索返回可执行恢复步骤。
 function childRecoveryHint(message, completed) {
     var value = text(message).toLowerCase();
+    if (value.indexOf('marketplace_version_snapshot') >= 0
+        || value.indexOf('不可变安装快照') >= 0
+        || value.indexOf('版本快照尚未就绪') >= 0) {
+        return '商城发布版本的不可变快照尚未就绪；请等待发布事务完成后重新发起。'
+            + '系统不会混装两个版本，前 ' + completed + ' 个已完成应用会幂等跳过。';
+    }
     if (value.indexOf('object_storage_forbidden') >= 0
         || value.indexOf('403') >= 0
         || value.indexOf('forbidden') >= 0
@@ -286,6 +292,7 @@ function normalizePlan(value) {
             AppId: trim(item.AppId),
             AppName: trim(item.AppName || item.Name || item.AppId || item.StoreId),
             AppVersion: trim(item.AppVersion || item.Version),
+            StoreVersionId: trim(item.StoreVersionId || item.DataVersionId),
             ApplicationType: bulkApplicationType,
             InstallAction: text(item.InstallAction) == 'Update' ? 'Update' : 'Install'
         });
@@ -310,10 +317,23 @@ function appendPlanRows(plan, rows) {
             AppId: appId,
             AppName: trim(row.AppName || row.Name || appId),
             AppVersion: trim(row.AppVersion || row.Version),
+            StoreVersionId: trim(row.StoreVersionId || row.DataVersionId),
             ApplicationType: bulkApplicationType,
             InstallAction: status == 'Outdated' ? 'Update' : 'Install'
         });
     }
+}
+function prioritizeBootstrapPlan(plan) {
+    // 只在 Discover 完整结束后排序一次；Install 恢复阶段绝不重排已有 CurrentIndex。
+    return plan.map(function (item, index) { return { Item: item, Index: index }; })
+        .sort(function (left, right) {
+            var leftBootstrap = trim(left.Item.AppId).toLowerCase() == 'app.microi.store' ? 0 : 1;
+            var rightBootstrap = trim(right.Item.AppId).toLowerCase() == 'app.microi.store' ? 0 : 1;
+            return leftBootstrap != rightBootstrap
+                ? leftBootstrap - rightBootstrap
+                : left.Index - right.Index;
+        })
+        .map(function (entry) { return entry.Item; });
 }
 
 if (phase == 'Discover') {
@@ -344,6 +364,7 @@ if (phase == 'Discover') {
             _PageIndex: pageIndex,
             _PageSize: pageSize,
             ApplicationType: bulkApplicationType,
+            BulkInstallPlan: true,
             InstalledVersions: installedVersions
         },
         ParamType: 'json',
@@ -381,6 +402,7 @@ if (phase == 'Discover') {
         }, 2, pageIndex * pageSize, dataCount, '商城应用盘点已完成一页，将从后台任务检查点继续');
     }
 
+    plan = prioritizeBootstrapPlan(plan);
     if (plan.length <= 0) {
         report(100, 0, 0, '所有应用均已是最新版，无需安装或更新');
         return {
@@ -435,6 +457,7 @@ var childParam = {
     AppId: item.AppId,
     AppName: item.AppName,
     AppVersion: item.AppVersion,
+    StoreVersionId: item.StoreVersionId,
     StoreApiBase: sourceApiBase,
     StoreOsClient: sourceOsClient,
     StoreCredentialKey: sourceCredentialKey,
@@ -443,7 +466,7 @@ var childParam = {
     InstallOperationId: taskId + ':' + (item.StoreId || item.AppId),
     BulkCurrentIndex: currentIndex,
     BulkTotal: total,
-    BulkAdaptiveSingleSlice: true,
+    BulkAdaptiveSingleSlice: false,
     _BackgroundTaskId: taskId,
     _BackgroundTask: taskEnvelope,
     _BackgroundTaskFencingToken: fencingToken,

@@ -74,4 +74,9 @@ test('fixed action column keeps normal, striped and hover backgrounds aligned', 
   assert.match(popupStyles, /\.user-column-settings-menu/);
   assert.match(popupStyles, /\.user-column-settings-list/);
   assert.match(popupStyles, /\.user-column-settings-foot/);
+  assert.match(
+    popupStyles,
+    /\.user-column-settings-menu\s*>\s*\.user-column-settings-head,\s*\n\.user-column-settings-menu\s*>\s*\.user-column-settings-foot\s*\{[\s\S]*?margin-inline:\s*0;/,
+    'header and footer own full-width background surfaces without inherited side gaps'
+  );
 });

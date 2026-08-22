@@ -1,8 +1,12 @@
 import appConfig from '../config.js';
 import { createMicroiV8 } from './microi.v8.js';
 import { shouldPromptAuthExpired } from '../platform/auth-expired-policy.mjs';
-import { removeCachePrefix } from '../platform/cache.js';
+import { clearPlatformCache, removeCachePrefix } from '../platform/cache.js';
 import { clearRetainedListSessions } from '../platform/list-session.mjs';
+import {
+  APP_RUNTIME_ENDPOINT_STORAGE_KEY,
+  buildAppRuntimeEndpoint
+} from '../platform/runtime-endpoint.mjs';
 
 const TOKEN_KEY = 'microi_token';
 const USER_KEY = 'microi_user';
@@ -164,6 +168,110 @@ export const V8 = createMicroiV8({
     });
   }
 });
+
+function clearRuntimeEndpointStorageCaches() {
+  const runtimeUni = getRuntimeUni();
+  if (!runtimeUni) return;
+  const exactKeys = [
+    'SysConfig',
+    'sys_config_cache',
+    'microi_diy_table_ids_v2',
+    'mci_ai_model_selection',
+    'xjy_ai_model_selection'
+  ];
+  const prefixes = ['microi_mobile_menu_tree_v2:'];
+  try {
+    exactKeys.forEach((key) => runtimeUni.removeStorageSync(key));
+    const storageInfo = runtimeUni.getStorageInfoSync();
+    (storageInfo.keys || []).forEach((key) => {
+      if (prefixes.some((prefix) => String(key).startsWith(prefix))) runtimeUni.removeStorageSync(key);
+    });
+  } catch (error) {}
+}
+
+export function applyRuntimeSysConfig(sysConfig = {}) {
+  const model = sysConfig && typeof sysConfig === 'object' ? sysConfig : {};
+  const fileServer = String(model.FileServer || appConfig.apiBase || '').replace(/\/+$/, '');
+  // 不复用上一平台的租户专属登录公钥；空值由 crypto.js 回退到历史兼容公钥。
+  appConfig.publicKey = String(model.LoginRsaPublicKey || '').replace(/\\n/g, '\n').trim();
+  appConfig.fileServer = fileServer;
+  V8.configure({ fileServer });
+  V8.SetSysConfig(model);
+  return model;
+}
+
+export async function probeAppRuntimeEndpoint(input = {}) {
+  const endpoint = buildAppRuntimeEndpoint(input);
+  const query = `OsClient=${encodeURIComponent(endpoint.osClient)}`;
+  let response;
+  try {
+    response = await uniRequestAdapter({
+      url: `${endpoint.apiBase}/api/DiyTable/GetSysConfig?${query}`,
+      method: 'POST',
+      data: {
+        OsClient: endpoint.osClient,
+        _SearchEqual: { IsEnable: 1 }
+      },
+      headers: {
+        'Content-Type': 'application/json',
+        osclient: endpoint.osClient,
+        did: V8.getDid()
+      },
+      timeout: 15000
+    });
+  } catch (error) {
+    throw new Error(`无法连接该平台：${error && (error.errMsg || error.message) ? (error.errMsg || error.message) : '网络请求失败'}`);
+  }
+
+  const statusCode = Number(response && (response.statusCode || response.status) || 0);
+  const body = response && (response.data === undefined ? response.body : response.data);
+  if (statusCode < 200 || statusCode >= 300) {
+    throw new Error(`无法连接该平台：HTTP ${statusCode || '未知状态'}`);
+  }
+  if (!body || Number(body.Code) !== 1 || !body.Data || typeof body.Data !== 'object') {
+    throw new Error((body && body.Msg) || '平台未返回有效的租户配置，请检查 API 地址和 OsClient');
+  }
+  return { endpoint, sysConfig: body.Data };
+}
+
+export function applyAppRuntimeEndpoint(input = {}, options = {}) {
+  const endpoint = buildAppRuntimeEndpoint(input);
+  const changed = endpoint.apiBase !== appConfig.apiBase || endpoint.osClient !== appConfig.osClient;
+  const runtimeUni = getRuntimeUni();
+
+  if (options.persist !== false && runtimeUni) {
+    runtimeUni.setStorageSync(APP_RUNTIME_ENDPOINT_STORAGE_KEY, {
+      version: 1,
+      apiBase: endpoint.apiBase,
+      osClient: endpoint.osClient,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  if (changed) {
+    removeToken();
+    clearPlatformCache();
+    clearRetainedListSessions();
+    clearRuntimeEndpointStorageCaches();
+  }
+
+  appConfig.apiBase = endpoint.apiBase;
+  appConfig.osClient = endpoint.osClient;
+  if (changed) {
+    appConfig.fileServer = endpoint.apiBase;
+    appConfig.publicKey = '';
+  }
+  V8.configure({
+    apiBase: endpoint.apiBase,
+    osClient: endpoint.osClient,
+    fileServer: appConfig.fileServer || endpoint.apiBase
+  });
+
+  if (runtimeUni && typeof runtimeUni.$emit === 'function') {
+    runtimeUni.$emit('mci:runtime-endpoint-changed', { ...endpoint, changed });
+  }
+  return { ...endpoint, changed };
+}
 
 export function getToken() {
   return V8.getToken();

@@ -52,6 +52,7 @@ Object.assign(profile.config, {
   servicePlatformName: `${label}服务平台`,
   poweredBy: label
 })
+profile.config.features.runtimeEndpointSwitch = false
 fs.writeFileSync(
   path.join(profileRoot, 'profile.cjs'),
   `module.exports = ${JSON.stringify(profile, null, 2)}\n`
@@ -66,6 +67,11 @@ manifest.name = `${label}移动工作台`
 manifest.description = `${label}原生动态小程序`
 manifest.appid = `__UNI__MICROI_${tenantId.replace(/[^a-z0-9]/gi, '_').toUpperCase()}`
 fs.writeFileSync(path.join(profileRoot, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+// 客户专属 Profile 默认保持 ATS 安全策略，不继承 standard 通用 App 的任意 HTTP 例外。
+fs.copyFileSync(
+  path.join(root, 'profiles', 'xjy', 'Info.plist'),
+  path.join(profileRoot, 'Info.plist')
+)
 
 console.log(`租户 ${tenantId} 已创建：`)
 console.log(`- ${path.relative(root, tenantRoot)}`)
