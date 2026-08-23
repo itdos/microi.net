@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.8.4
+ * Version: v1.8.6
  * Function:
- * - 统一应用商城发布器：V3 committed proof、精确版本、资源快照 CAS、共享公共运行时，以及受管接口历史兼容基线的连续发布。
+ * - 统一应用商城发布器：V3 committed proof、精确版本、租户范围更新日志硬门禁、资源快照 CAS、共享公共运行时，以及受管接口历史兼容基线的连续发布。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -233,7 +233,7 @@ function getMicroService(appKey) {
   return { Service: service.Data, Pages: pages && pages.Code === 1 ? toArray(pages.Data) : [] };
 }
 function getApplicationInfrastructure() {
-  var tableNames = ['sys_microistore', 'mci_ai_app_file', 'mci_ai_app_version', 'sys_microiservice', 'sys_microiservice_page'];
+  var tableNames = ['sys_microistore', 'sys_microistore_changelog', 'mci_ai_app_file', 'mci_ai_app_version', 'sys_microiservice', 'sys_microiservice_page'];
   var tablesResult = V8.FormEngine.GetTableData('diy_table', {
     _Where: [['Name', 'In', tableNames]],
     _PageSize: 100
@@ -248,6 +248,7 @@ function getApplicationInfrastructure() {
   });
   if (!fieldsResult || fieldsResult.Code !== 1) throw new Error('读取在线应用基础字段定义失败：' + ((fieldsResult && fieldsResult.Msg) || ''));
   var ddls = [
+    { TableName: 'sys_microistore_changelog', DDL: "CREATE TABLE IF NOT EXISTS `sys_microistore_changelog` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL DEFAULT 0,`OsClient` varchar(50) NOT NULL,`StoreId` varchar(50) NOT NULL,`Version` varchar(50) NOT NULL,`Title` varchar(200) NOT NULL,`ChangeType` varchar(50) NOT NULL DEFAULT 'Feature',`Content` mediumtext NOT NULL,`ReleaseTime` varchar(25) NOT NULL,`Sort` int NULL DEFAULT 100,UNIQUE KEY `ux_microistore_changelog_store_version` (`OsClient`,`StoreId`,`Version`),KEY `ix_microistore_changelog_store_release` (`OsClient`,`StoreId`,`ReleaseTime`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
     { TableName: 'sys_microistore', DDL: "CREATE TABLE IF NOT EXISTS `sys_microistore` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`AppName` varchar(200) NULL,`Name` varchar(200) NULL,`AppId` varchar(100) NULL,`AppKey` varchar(200) NULL,`AppVersion` varchar(50) NULL,`AppPublishTime` varchar(25) NULL,`AppUpdateTime` varchar(25) NULL,`AppAuthor` varchar(100) NULL,`AppAuthorAvatar` mediumtext NULL,`AppDetail` mediumtext NULL,`Description` mediumtext NULL,`AppPrice` int NULL,`AppOriPrice` int NULL,`AppRate` decimal(18,1) NULL,`AppPakcet` mediumtext NULL,`AppPreview` mediumtext NULL,`IsApprove` int NULL,`AppType` varchar(50) NULL,`ApplicationType` varchar(50) NULL,`Category` varchar(50) NULL,`PublisherType` varchar(50) NULL,`Status` varchar(50) NULL,`OwnerUserId` varchar(50) NULL,`OwnerName` varchar(200) NULL,`CurrentVersion` int NULL,`PreviewUrl` varchar(2000) NULL,`PublicPublishPath` varchar(2000) NULL,`PrivateSourcePath` varchar(2000) NULL,`BuildStatus` varchar(50) NULL,`LastBuildTaskId` varchar(50) NULL,`LastBuildMsg` mediumtext NULL,`LastConversationId` varchar(50) NULL,`ViewCount` int NULL,`InstallCount` int NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
     { TableName: 'mci_ai_app_file', DDL: "CREATE TABLE IF NOT EXISTS `mci_ai_app_file` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`AppId` varchar(50) NULL,`AppName` varchar(200) NULL,`VersionId` varchar(50) NULL,`FilePath` varchar(1000) NULL,`FileName` varchar(255) NULL,`FileType` varchar(50) NULL,`HdfsPath` varchar(1000) NULL,`PublishHdfsPath` varchar(1000) NULL,`StorageScope` varchar(50) NULL,`ContentHash` varchar(100) NULL,`Size` bigint NULL,`Version` int NULL,`IsDirectory` int NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
     { TableName: 'mci_ai_app_version', DDL: "CREATE TABLE IF NOT EXISTS `mci_ai_app_version` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`AppId` varchar(50) NULL,`AppName` varchar(200) NULL,`VersionNo` varchar(50) NULL,`VersionName` varchar(200) NULL,`Status` varchar(50) NULL,`SourceSnapshotPath` varchar(1000) NULL,`PublishPath` varchar(1000) NULL,`PreviewUrl` varchar(1000) NULL,`BuildTaskId` varchar(50) NULL,`BuildLog` mediumtext NULL,`ChangeSummary` mediumtext NULL,`FileCount` int NULL,`TotalSize` bigint NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
@@ -329,6 +330,23 @@ function getExistingStore(appKey) {
     _PageSize: 1
   });
   return result && result.Code === 1 && result.Data ? result.Data : null;
+}
+/* MARKETPLACE_CHANGELOG_REQUIRED_V1：制包与发布都必须绑定当前商城版本的一条完整日志。 */
+function requireMarketplaceChangeLog(storeId, versionValue) {
+  var version = normalizeExactVersion(versionValue);
+  if (isBlank(storeId) || isBlank(version)) {
+    return fail('请先保存商城应用，并提供合法的精确 AppVersion（例如 v1.2.3）。');
+  }
+  var result = V8.FormEngine.GetFormData('sys_microistore_changelog', {
+    _Where: [['OsClient', '=', V8.OsClient], ['AND', 'StoreId', '=', storeId], ['AND', 'Version', '=', version]],
+    _SelectFields: ['Id', 'OsClient', 'StoreId', 'Version', 'Title', 'ChangeType', 'Content', 'ReleaseTime', 'Sort', 'IsDeleted']
+  });
+  var row = result && result.Code === 1 ? result.Data : null;
+  if (!row || row.IsDeleted === 1 || row.IsDeleted === true
+      || isBlank(row.Title) || isBlank(row.ChangeType) || isBlank(row.Content) || isBlank(row.ReleaseTime)) {
+    return fail('应用 ' + version + ' 缺少完整更新日志。请先在商城应用的【更新日志】页签补齐标题、类型、内容和发布时间。');
+  }
+  return ok(row, '更新日志校验通过');
 }
 function parseArray(value) {
   if (!value) return [];
@@ -1054,6 +1072,12 @@ var deliveryVersions = resolveDeliveryVersions({
 });
 var runtimeVersionNo = deliveryVersions.RuntimeVersion;
 var versionNo = deliveryVersions.PackageVersion;
+var changeLogValidation = requireMarketplaceChangeLog(
+  text((existingStore && existingStore.Id) || app.Id),
+  versionNo
+);
+if (!changeLogValidation || changeLogValidation.Code !== 1) return changeLogValidation;
+var releaseChangeLog = changeLogValidation.Data;
 var sharedPublicRuntime = requestedSharedPublicRuntime;
 if (sharedPublicRuntime) {
   if (!protocolV3) return fail('SharedPublicRuntime 只允许 ProtocolVersion=3 的已提交不可变运行时。');
@@ -1178,7 +1202,14 @@ var packageModel = {
     DataSetCount: selectedDataSets.length,
     DataRowCount: selectedDataRowCount,
     JobCount: selectedScheduleJobs.length,
-    IncludeSource: includeSource
+    IncludeSource: includeSource,
+    ChangeLog: {
+      Version: text(releaseChangeLog.Version),
+      Title: text(releaseChangeLog.Title),
+      ChangeType: text(releaseChangeLog.ChangeType),
+      Content: text(releaseChangeLog.Content),
+      ReleaseTime: text(releaseChangeLog.ReleaseTime)
+    }
   },
   ApplicationBundle: {
     SchemaVersion: 2,

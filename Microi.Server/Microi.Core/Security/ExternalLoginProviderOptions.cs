@@ -35,18 +35,20 @@ namespace Microi.net
         {
             var model = OsClientExtend.GetClient(osClient)?.OsClientModel ?? new JObject();
             var settings = TenantSystemSettingsSecurity.LoadSnapshot(osClient);
-            if (!TenantSystemSettingsSecurity.GetBool(settings, "Login.External.Enabled", true))
+            var sysConfig = TenantSystemSettingsSecurity.LoadTenantSysConfigSnapshot(osClient);
+            if (!TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+                    sysConfig, "ExternalLoginEnabled", settings, "Login.External.Enabled", true))
                 return Array.Empty<ExternalLoginProviderOptions>();
 
             return new[]
             {
-                Create(settings, model, "Gitee", "Gitee 登录", "使用已绑定的 Gitee 身份安全登录", "oauth", "gitee", 30,
+                Create(sysConfig, settings, model, "Gitee", "Gitee 登录", "使用已绑定的 Gitee 身份安全登录", "oauth", "gitee", 30,
                     "https://gitee.com/oauth/authorize", "https://gitee.com/oauth/token", "https://gitee.com/api/v5/user",
                     "user_info", "GiteeOAuthClientId", "GiteeOAuthClientSecret"),
-                Create(settings, model, "WeChat", "微信扫码登录", "使用微信开放平台扫码并登录已绑定账号", "qr", "wechat", 40,
+                Create(sysConfig, settings, model, "WeChat", "微信扫码登录", "使用微信开放平台扫码并登录已绑定账号", "qr", "wechat", 40,
                     "https://open.weixin.qq.com/connect/qrconnect", "https://api.weixin.qq.com/sns/oauth2/access_token",
                     "https://api.weixin.qq.com/sns/userinfo", "snsapi_login", "WeChatAppId", "WeChatAppSecret"),
-                Create(settings, model, "GitHub", "GitHub 登录", "使用已绑定的 GitHub 身份安全登录", "oauth", "github", 50,
+                Create(sysConfig, settings, model, "GitHub", "GitHub 登录", "使用已绑定的 GitHub 身份安全登录", "oauth", "github", 50,
                     "https://github.com/login/oauth/authorize", "https://github.com/login/oauth/access_token",
                     "https://api.github.com/user", "read:user user:email", null, null)
             };
@@ -59,6 +61,7 @@ namespace Microi.net
         }
 
         private static ExternalLoginProviderOptions Create(
+            JObject sysConfig,
             IReadOnlyDictionary<string, TenantSystemSettingValue> settings,
             JObject legacy,
             string key,
@@ -75,7 +78,8 @@ namespace Microi.net
             string legacyClientSecret)
         {
             var prefix = "Login." + key + ".";
-            var enabled = TenantSystemSettingsSecurity.GetBool(settings, prefix + "Enabled", false);
+            var enabled = TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+                sysConfig, key + "LoginEnabled", settings, prefix + "Enabled", false);
             var clientId = ReadText(settings, prefix + "ClientId", legacyClientId == null ? "" : legacy[legacyClientId]?.ToString());
             var clientSecret = ReadSecret(settings, prefix + "ClientSecret",
                 legacyClientSecret == null ? "" : legacy[legacyClientSecret]?.ToString());

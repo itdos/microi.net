@@ -80,9 +80,10 @@ UniApp 使用 Vue 3 + TypeScript 的官方 Vite 工具链，并同时遵守 `mic
 2. 依次执行类型检查、单元测试、生产构建和产物静态扫描。
 3. 检查 `dist/build` 不含源码、Token、密钥、localhost、source map 或陈旧 chunk。
 4. 同步私有源码，再流式发布公有构建目录；源码同步失败不得继续发布。发布前回读并冻结应用的 `CurrentVersion` 与 `AppVersion`，stage 只上传不可变版本资产，finalize 必须同时提交 `ExpectedCurrentVersion` 与 `ExpectedAppVersion` 做 compare-and-set；缺一项、状态漂移或回读不一致都停止，不能自动覆盖较新发布。
-5. Web/UniApp 使用 `/{OsClient}/ai-app-publish/{AppKey}/index.html`；MicroService 使用 `/micro-app/{OsClient}/{AppKey}/index.html`。不要因技术栈相同而混淆运行类型。
-6. 官网、二维码、分享链接和商城“立即体验”只能使用不含 `/releases/`、`/requests/`、`/versions/` 与语义版本号的稳定当前入口；不得使用 `SharedPublicRuntime.EntryUrl` 或发布结果中的不可变版本 URL。固定入口必须以代理或全屏加载壳保持浏览器地址不变，不能用 30x、`meta refresh` 或 `location.replace` 把地址栏跳到版本产物。
-7. `SharedPublicRuntime.EntryUrl` 和 `/versions/{Version}/index.html` 仅用于历史记录、回滚、摘要校验与审计。回读应用、版本、active 文件清单和 SHA-256；旧清单文件只能可逆归档，不能删除。再分别直接请求稳定当前入口、不可变版本入口及主要 JS/CSS，并断言前者完成加载后地址栏仍不含版本段。
+5. 每次创建、修改、升级或重新发布 AI 应用，必须在任何源码同步、stage、finalize 或商城制包之前，为目标精确 `AppVersion` 写入 `sys_microistore_changelog`。日志的 `StoreId / Version / Title / ChangeType / Content / ReleaseTime` 必须完整；发布工具显式传入含义一致且非空的 `changeSummary`，发布后同时回读商城子表与 `mci_ai_app_version.ChangeSummary`。缺日志或版本不一致必须停止发布。
+6. Web/UniApp 使用 `/{OsClient}/ai-app-publish/{AppKey}/index.html`；MicroService 使用 `/micro-app/{OsClient}/{AppKey}/index.html`。不要因技术栈相同而混淆运行类型。
+7. 官网、二维码、分享链接和商城“立即体验”只能使用不含 `/releases/`、`/requests/`、`/versions/` 与语义版本号的稳定当前入口；不得使用 `SharedPublicRuntime.EntryUrl` 或发布结果中的不可变版本 URL。固定入口必须以代理或全屏加载壳保持浏览器地址不变，不能用 30x、`meta refresh` 或 `location.replace` 把地址栏跳到版本产物。
+8. `SharedPublicRuntime.EntryUrl` 和 `/versions/{Version}/index.html` 仅用于历史记录、回滚、摘要校验与审计。回读应用、版本、active 文件清单和 SHA-256；旧清单文件只能可逆归档，不能删除。再分别直接请求稳定当前入口、不可变版本入口及主要 JS/CSS，并断言前者完成加载后地址栏仍不含版本段。
 
 ## 完成定义
 

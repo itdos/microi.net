@@ -62,7 +62,17 @@ namespace Microi.net
                     return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
                 }
                 var fileByte = Convert.FromBase64String(param.FileByteBase64);
-                var result = new NPOIHelper(fileByte).ExcelToListDynamic(param.SheetIndex ?? 0);
+                var maxDataRows = Math.Min(param.MaxDataRows ?? MaxImportExcelDataRows, MaxImportExcelDataRows);
+                var maxColumns = Math.Min(param.MaxColumns ?? MaxImportExcelColumns, MaxImportExcelColumns);
+                var result = new NPOIHelper(fileByte).ExcelToListDynamic(
+                    param.SheetIndex ?? 0,
+                    maxDataRows,
+                    maxColumns,
+                    param.HeaderStartRow,
+                    param.HeaderEndRow,
+                    param.DataStartRow,
+                    param.DataEndRow,
+                    param.Columns);
                 return new DosResultList<dynamic>(1, result);
             }
             catch (Exception ex)
@@ -1995,10 +2005,29 @@ namespace Microi.net
                 var lastSqlLog = "";
                 try
                 {
+                    var importColumnMappings = new List<ExcelImportColumnParam>();
+                    if (!param._ImportColumnsJson.DosIsNullOrWhiteSpace())
+                    {
+                        importColumnMappings = JsonConvert.DeserializeObject<List<ExcelImportColumnParam>>(
+                            param._ImportColumnsJson) ?? new List<ExcelImportColumnParam>();
+                    }
                     var fileDataList = new NPOIHelper(fileByte).ExcelToListDynamic(
-                        0,
+                        param._ImportSheetIndex ?? 0,
                         MaxImportExcelDataRows,
-                        MaxImportExcelColumns);
+                        MaxImportExcelColumns,
+                        param._ImportHeaderStartRow,
+                        param._ImportHeaderEndRow,
+                        param._ImportDataStartRow,
+                        param._ImportDataEndRow,
+                        importColumnMappings);
+                    if (param._ImportHeaderStartRow.HasValue || importColumnMappings.Any())
+                    {
+                        importStepList.Add(
+                            $"{DateTime.Now.ToString(dateTimeFormat)}：已按确认范围解析：Sheet第【{(param._ImportSheetIndex ?? 0) + 1}】张，"
+                            + $"表头【{param._ImportHeaderStartRow ?? 1}-{param._ImportHeaderEndRow ?? param._ImportHeaderStartRow ?? 1}】行，"
+                            + $"数据从第【{param._ImportDataStartRow ?? (param._ImportHeaderEndRow ?? 1) + 1}】行开始，"
+                            + $"映射【{importColumnMappings.Count}】列。");
+                    }
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已读取【{fileDataList.Count}】条数据！");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：正在开启新线程进行导入...");
                     await diyCacheBase.SetAsync(stepSign, importStepList);

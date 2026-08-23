@@ -78,7 +78,7 @@
 | 组件 | 推荐类型 | 配置项 |
 | --- | --- | --- |
 | `RichText` | `mediumtext` | 富文本内容，图片上传遵循平台上传配置。 |
-| `CodeEditor` | `mediumtext` | `CodeEditor.Height`。 |
+| `CodeEditor` | `mediumtext` | `CodeEditor.Height`；`CodeEditor.DisplayMode=Inline/Dialog`，配置项很多或同页多个代码字段时优先 `Dialog`。 |
 | `JsonTable` | `mediumtext` | JSON 表格展示/编辑，保存结构化 JSON；配置必须写在 `Config.JsonTable`。 |
 | `ImgUpload` | `mediumtext` | `ImgUpload.Limit`、`Multiple`、`Tips`、`MaxCount`、`ShowFileList`、`Preview`、`MaxSize`。 |
 | `FileUpload` | `mediumtext` | `FileUpload.Limit`、`Multiple`、`Tips`、`MaxCount`、`ShowFileList`、`MaxSize`。 |

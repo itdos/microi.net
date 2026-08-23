@@ -776,14 +776,18 @@ namespace Microi.net
                 {
                     var param = ParseObject(item.ParamJson);
                     var trustedUser = ParseObject(item.TrustedUserJson);
-                    if (string.Equals(
+                    if (ChildTenantPlatformAppControlService.RequiresTargetExecutionBootstrap(
                             item.ApiEngineKey,
-                            ChildTenantPlatformAppControlService.ChildWorkerApiEngineKey,
-                            StringComparison.OrdinalIgnoreCase))
+                            item.OsClient,
+                            executionOsClient,
+                            param[TargetExecutionOsClientParam]?.ToString()))
                     {
-                        // CHILD_TENANT_EXECUTION_BOOTSTRAP_V1：旧批次可能已经在父任务
-                        // Monitor 前排队。领取任务后、运行目标租户 V8 前刷新官方安装器，
-                        // 使平台修复能够从原检查点接管，而不要求用户删除并重建任务。
+                        // CHILD_TENANT_EXECUTION_BOOTSTRAP_V1：已排队的主→子任务在
+                        // 运行目标租户 V8 前刷新官方安装器，使平台修复接管原检查点。
+                        // CHILD_TENANT_EXECUTION_BOOTSTRAP_SCOPE_V1：只有服务端控制面
+                        // 持久化了目标租户标记的主→子任务才执行跨租户自愈。普通租户
+                        // 自己发起“全部安装/更新”时 owner==execution 且没有该保留标记，
+                        // 必须让批量计划先安装/更新应用商城，不能从旧租户自己复制旧工作器。
                         var bootstrap = ChildTenantPlatformAppControlService.EnsureTargetExecutionBootstrap(
                             item.OsClient,
                             executionOsClient,

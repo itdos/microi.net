@@ -377,7 +377,8 @@ namespace Microi.net
                             TargetOsClient = targetOsClient,
                             ImporterVersion = ReadText(importer, "Version")
                         },
-                        "目标租户统一应用导入器尚未包含后台任务历史重复幂等键修复能力，请先更新主租户应用商城后重试。");
+                        "跨租户目标的统一应用导入器尚未包含后台任务历史重复幂等键修复能力，"
+                        + "且当前主租户受信工作器未能补齐该能力；请同步与当前后端配套的应用商城自举资源后重试。");
                 }
 
                 MonitorBootstrapRecoveryReady.Add(recoveryKey);
@@ -389,11 +390,38 @@ namespace Microi.net
             }
         }
 
+        // CHILD_TENANT_EXECUTION_BOOTSTRAP_SCOPE_V1：固定工作器 Key 本身不能证明
+        // 这是跨租户任务；还必须核对控制面保留标记以及 owner/target 作用域。
+        internal static bool RequiresTargetExecutionBootstrap(
+            string apiEngineKey,
+            string ownerOsClient,
+            string executionOsClient,
+            string persistedTargetOsClient)
+        {
+            var target = (persistedTargetOsClient ?? string.Empty).Trim();
+            return string.Equals(apiEngineKey, ChildWorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)
+                   && !string.IsNullOrWhiteSpace(ownerOsClient)
+                   && !string.IsNullOrWhiteSpace(executionOsClient)
+                   && !string.IsNullOrWhiteSpace(target)
+                   && !string.Equals(ownerOsClient, executionOsClient, StringComparison.OrdinalIgnoreCase)
+                   && string.Equals(target, executionOsClient, StringComparison.OrdinalIgnoreCase);
+        }
+
         internal static DosResult EnsureTargetExecutionBootstrap(
             string ownerOsClient,
             string targetOsClient,
             JObject trustedCurrentUser)
         {
+            if (string.Equals(ownerOsClient, targetOsClient, StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult(1, new JObject
+                {
+                    ["Recovered"] = false,
+                    ["Skipped"] = true,
+                    ["Scope"] = "SameTenantSelfService"
+                }, "当前租户自助批量安装按计划优先更新应用商城，不执行跨租户工作器自愈。");
+            }
+
             // CHILD_TENANT_EXECUTION_BOOTSTRAP_V1：父任务进入 Monitor 后不再重复
             // 扫描租户目录，但已经排队的子任务仍必须在进程重启/平台热升级后获得
             // 当前主租户的官方安装器。复用进程内按目标缓存，只在首次执行时自愈，

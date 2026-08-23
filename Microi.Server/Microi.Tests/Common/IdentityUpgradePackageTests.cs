@@ -98,7 +98,16 @@ public class IdentityUpgradePackageTests
                      ("LoginAuthenticatorDisplay", "1"),
                      ("LoginGiteeDisplay", "1"),
                      ("LoginWeChatDisplay", "1"),
-                     ("LoginGitHubDisplay", "1")
+                     ("LoginGitHubDisplay", "1"),
+                     ("IdentityVerificationEnabled", "1"),
+                     ("PasskeyEnabled", "1"),
+                     ("AuthenticatorTotpEnabled", "1"),
+                     ("RequirePasswordChangeStepUp", "1"),
+                     ("ExternalLoginEnabled", "1"),
+                     ("FaceVerificationEnabled", "0"),
+                     ("GiteeLoginEnabled", "0"),
+                     ("WeChatLoginEnabled", "0"),
+                     ("GitHubLoginEnabled", "0")
                  })
         {
             var field = Assert.Single(fields, item =>
@@ -131,21 +140,42 @@ public class IdentityUpgradePackageTests
             .Where(item => item["TableName"]?.Value<string>() == "mci_system_setting") ?? []);
         Assert.Equal("InsertIfMissing", settingsDataSet["ConflictPolicy"]?.Value<string>());
         var settingRows = settingsDataSet["Rows"]?.Children<JObject>().ToList() ?? [];
-        Assert.Equal(9, settingRows.Count);
+        Assert.True(settingRows.Count >= 31);
         Assert.All(settingRows, setting => Assert.Equal(0, setting["IsPublic"]?.Value<int>()));
         Assert.DoesNotContain(settingRows,
             row => row["ConfigKey"]?.Value<string>()?.EndsWith(".Display", StringComparison.Ordinal) == true);
+        foreach (var migratedKey in new[]
+                 {
+                     "Login.Identity.Enabled",
+                     "Login.Passkey.Enabled",
+                     "Login.Authenticator.Enabled",
+                     "Security.PasswordChange.RequireStepUp",
+                     "Login.External.Enabled",
+                     "Login.Face.Enabled",
+                     "Login.Gitee.Enabled",
+                     "Login.WeChat.Enabled",
+                     "Login.GitHub.Enabled"
+                 })
+        {
+            Assert.DoesNotContain(settingRows,
+                row => string.Equals(row["ConfigKey"]?.Value<string>(), migratedKey,
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        Assert.Contains(settingRows,
+            row => row["ConfigKey"]?.Value<string>() == "Login.Passkey.RpId");
+        Assert.Contains(settingRows,
+            row => row["ConfigKey"]?.Value<string>() == "Login.Gitee.ClientSecret");
 
         var bundle = Assert.Single(package["ApplicationBundles"]?.Children<JObject>()
             .Where(item => item["Application"]?["AppKey"]?.Value<string>() == "microi-platform-service") ?? []);
-        Assert.Equal("v1.6.0", bundle["VersionNo"]?.Value<string>());
+        Assert.Equal("v1.7.7", bundle["VersionNo"]?.Value<string>());
         Assert.False(bundle["IncludeSource"]?.Value<bool>());
-        Assert.Equal(18, bundle["Application"]?["CurrentVersion"]?.Value<int>());
-        Assert.Equal("v1.6.0", bundle["Application"]?["BuildVersion"]?.Value<string>());
-        Assert.Equal("v1.6.0", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal(34, bundle["Application"]?["CurrentVersion"]?.Value<int>());
+        Assert.Equal("v1.7.7", bundle["Application"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal("v1.7.7", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
         Assert.Equal("db", bundle["MicroService"]?["StorageMode"]?.Value<string>());
         Assert.All(bundle["Routes"]?.Children<JObject>() ?? [], route =>
-            Assert.Equal("v1.6.0", route["BuildVersion"]?.Value<string>()));
+            Assert.Equal("v1.7.7", route["BuildVersion"]?.Value<string>()));
         Assert.False(bundle["PackageAssets"]?["IncludeSource"]?.Value<bool>());
         Assert.Null(bundle["PackageAssets"]?["SourceZip"]);
         Assert.Null(bundle["PackageAssets"]?["BuildZip"]);

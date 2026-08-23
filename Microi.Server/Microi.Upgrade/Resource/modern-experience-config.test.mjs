@@ -154,7 +154,8 @@ test('联邦商城包包含公开范围、私有凭据和历史版本契约', as
     ['get-microi-store-versions.js', 'get-microi-store-versions'],
   ]) {
     const standalone = (await readFile(resolve(directory, file), 'utf8')).trim();
-    assert.equal(engines.get(key).ApiV8Code.trim(), standalone);
+    const normalizeLineEndings = value => String(value || '').replace(/\r\n/g, '\n').trim();
+    assert.equal(normalizeLineEndings(engines.get(key).ApiV8Code), normalizeLineEndings(standalone));
   }
 });
 

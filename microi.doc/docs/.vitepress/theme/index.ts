@@ -23,6 +23,7 @@ import "./styles/nuget-downloads.scss";
 import "./styles/micro-app.scss";
 import "./styles/file-manage.scss";
 import "./styles/unity-integration.scss";
+import "./styles/update-log.scss";
 
 const APPEARANCE_KEY = 'vitepress-theme-appearance'
 

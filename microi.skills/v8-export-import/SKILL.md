@@ -150,7 +150,7 @@ return {
 | `NumberFormat/HeaderStyle/Style` | 数字格式与列级样式 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-003 sha256=8c2868406d663d51bbd479c12b052b70ffa1014cc4ec4186b8dcecd0e5a3105b -->
+<!-- microi-progressive:chunk id=v8-export-import-003 sha256=75977093346f025e91041b36bdb7887e2cacee854800c1f43e407e8fc037a166 -->
 ## 解析上传的 Excel（导入）
 
 ```javascript
@@ -160,7 +160,7 @@ if (!filesByteBase64) return { Code: 0, Msg: '请上传 Excel 文件' };
 
 var base64 = Object.values(filesByteBase64)[0];
 
-// 解析第一张工作表为对象数组
+// 可直接解析旧的首行表头模板
 var parsed = V8.Office.ExcelToList({
   FileByteBase64: base64,
   SheetIndex: 0
@@ -171,12 +171,15 @@ var dataList = parsed.Data;  // [{ 列标题: 值, ... }, ...]
 return { Code: 1, Data: dataList, DataCount: dataList.length };
 ```
 
+`ExcelToList` 的增强参数为 `HeaderStartRow/HeaderEndRow/DataStartRow/DataEndRow/Columns/MaxDataRows/MaxColumns`。除 `SheetIndex` 和 `Columns[].ColumnIndex` 从 `0` 开始外，行号都从 `1` 开始；传增强范围后每行带 `_ExcelRow`。参数全省略时继续兼容“首行表头、第二行开始数据”。
+
 ### 固定版式模板与后台自定义导入
 
-默认导入适合首行即字段标题的标准表格。多行表头、合并单元格、项目名称位于固定单元格、或需按规格/材质查询存货等模板，页面按钮使用 `V8.OpenImportDialog({...})` 声明工作表、单元格和列映射；平台弹层负责浏览器解析、后台任务提交、真实进度轮询与结果呈现。
+通用【导入】和 `V8.OpenImportDialog` 共用智能导入弹层：默认宽度 `80%`，选择文件后自动识别工作表、单行/多级合并表头、首条与末条数据行和字段映射；先按每页 `15` 条预览，用户确认后才写入。低可信度时必须允许用户人工指定表头/数据起止行和逐列映射。模板顶部图片、标题、说明文字以及 A 列为空的数据行都不能破坏识别。
 
-- 页面 V8 只声明 `ApiEngineKey`、`Workbook.Cells/Columns/DataStartRow/DataEndRow/KeyField`，不得拼上传 DOM、传完整工作簿 Base64 或自行轮询。
-- 后台接口引擎从 `V8.Param._ImportRowsJson` 和 `_ImportMetaJson` 取值，必须重做模板、权限、字段、唯一性和状态校验。
+- 页面 V8 可只声明 `ApiEngineKey`；`Workbook.Cells/Columns/HeaderStartRow/HeaderEndRow/DataStartRow/DataEndRow/KeyField` 均为模板提示或固定约束，不传时自动识别。不得拼上传 DOM、传完整工作簿 Base64 或自行轮询。
+- `V8.OpenImportDialog` 后台接口引擎从 `V8.Param._ImportRowsJson` 和 `_ImportMetaJson` 取值；必须重做模板、权限、字段、唯一性和状态校验。
+- 菜单【导入接口替换】仍接收原始文件 `V8.FilesByteBase64`，并新增 `_ImportMetaJson`。接口引擎必须把元数据里的 `SheetIndex/HeaderStartRow/HeaderEndRow/DataStartRow/DataEndRow/Columns` 传给 `V8.Office.ExcelToList`，由服务端按同一范围重读原文件，不能只信任浏览器预览，也不能固定读取第一行。
 - 先校验全部行再写入；接口引擎返回 `Code != 1` 时依靠平台事务整体回滚，禁止手动 Commit/Rollback。
 - 用 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报真实校验/写入工作量；未知总量保持不确定进度，不伪造百分比。
 - 业务幂等键使用后台任务 Id 或明确的导入操作 Id；重试前回读批次，避免重复写入。

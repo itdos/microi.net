@@ -37,6 +37,7 @@
     <ProjectReference Include="..\Microi.Cache\Microi.Cache.csproj" />
     <ProjectReference Include="..\Microi.V8Engine\Microi.V8Engine.csproj" />
     <ProjectReference Include="..\Microi.OCR\Microi.OCR.csproj" />
+    <ProjectReference Include="..\Microi.Office\Microi.Office.csproj" />
     <ProjectReference Include="..\Microi.Upgrade\Microi.Upgrade.csproj" />
     <ProjectReference Include="..\Microi.net.Api\Microi.net.Api.csproj"
                       Condition="Exists('..\Microi.net.Api\Microi.net.Api.csproj')" />
