@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import {
   canonicalizeResource,
+  hasPlatformServiceBundleChanged,
   isTemporaryOfficialResourceFailure,
   mergeResource,
   normalizeOfficialPackageExecutionLimits,
@@ -895,7 +896,23 @@ if (process.argv.includes('--synchronize-local')) {
     }
   }
 
-  if (publish) await verifyPlatformServiceReleaseSource();
+  if (publish) {
+    const changedPlatformServicePackages = [
+      'app.microi.saas-engine.json',
+      'app.microi.store.json',
+    ].filter(name => hasPlatformServiceBundleChanged(
+      name,
+      remoteResources.get(name).content,
+      mergedResources.get(name),
+    ));
+    if (changedPlatformServicePackages.length) {
+      await verifyPlatformServiceReleaseSource();
+    } else {
+      process.stdout.write(
+        'microi-platform-service\t两个内置包与官网内容一致，本次仅发布其它资源，跳过唯一源码干净度校验\n',
+      );
+    }
+  }
 
   if (remoteChanges.length && !publish) {
     throw new Error(

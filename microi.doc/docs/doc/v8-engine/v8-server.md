@@ -428,6 +428,37 @@ var directTablePolicies = V8.Method.GetDirectTableGrantPolicies();
 
 `GetDirectTableGrantPolicies()` 返回平台统一维护的表直连授权模式和允许操作。它只供角色管理等可信后端表单事件校验，不能替代当前用户、菜单、表和行级权限判断，也不能直接作为匿名业务接口返回。
 
+### 系统日志/监控可信原子
+
+系统日志、请求归因和进程/主机观测继续由接口引擎编排；C# 只提供接口引擎无法安全完成的当前节点采样、日志读取和安全封禁原子。官方应用使用 `mci-system-observability-query` 与 `mci-system-observability-action`，两者都必须保持登录校验，不能开放匿名调用。
+
+```javascript
+// 当前节点请求、接口、来源 IP、进程、主机、日志队列和安全访问快照
+var snapshot = V8.Method.GetSystemObservability({
+  Action: 'Snapshot',
+  WindowMinutes: 5, // 1～15 分钟
+  Top: 20,          // 5～50 项
+  IncludeHost: true,
+  IncludeDocker: false
+});
+
+// 只允许平台超级管理员执行；会写安全审计
+var blocked = V8.Method.ManageSystemObservability({
+  Action: 'BlockIp',
+  Ip: '203.0.113.10',
+  BlockMinutes: 30,
+  Reason: '高频异常请求'
+});
+var unblocked = V8.Method.ManageSystemObservability({
+  Action: 'UnblockIp',
+  Ip: '203.0.113.10'
+});
+```
+
+`GetSystemObservability` 支持 `Snapshot`、`Logs`、`LogTypes`、`LogStats`、`Signal`、`Trace`、`ApiRank`、`AppLogs`。服务端会重新验证当前租户平台管理员身份，限制分页、时间窗口、排行与日志长度，并对应用日志中的密码、Token、Cookie、Secret、ApiKey 等内容脱敏。观测中间件不采集请求体、查询字符串、Authorization 或 Cookie。
+
+`Snapshot.Scope.CurrentNodeOnly=true` 表示数据只属于当前 API 节点；多实例部署必须逐节点或在外部指标系统聚合。页面展示的请求耗时、吞吐、并发和错误率用于定位 CPU 相关热点，不等同于逐请求 CPU 采样，不能据此宣称某个请求独占了精确 CPU 百分比。`ManageSystemObservability` 仅接受 `BlockIp/UnblockIp`，拒绝本机、未指定和组播地址，封禁最长 7 天并写入用户行为审计。
+
 ### 身份应用可信原子
 
 SSO 与平台短信登录遵循“接口引擎编排，C# 只补不可伪造的底层原子”。下列方法不是普通业务 API，只允许对应官方 Managed 接口引擎在精确 `OsClient + ApiEngineKey` 上调用；其它接口引擎、表单事件、匿名请求或直接 HTTP 调用都会失败关闭：
@@ -1397,7 +1428,7 @@ Compose 的 CPU/内存限制是安全基线，应按真实图片尺寸、页数�
 | 方法 | 说明 |
 |---|---|
 | `ExportExcel({...})` | 导出 `.xlsx`，支持单/多 Sheet、标准表格、高级自由布局、图片、公式、合并、边框、打印和行分组 |
-| `ExcelToList({...})` | 解析 Excel；`SheetIndex` 从 `0` 开始 |
+| `ExcelToList({...})` | 解析 Excel 或 CSV；CSV 自动识别 UTF-8/GBK 编码与常见分隔符，`SheetIndex` 从 `0` 开始 |
 | `ExportWordText({...})` | 旧版纯文本 Word 导出，继续兼容 |
 | `ExportWord({...})` | 导出 `.docx`，支持段落、章节、表格、图片、页眉页脚、页码 |
 | `ExportPowerPoint({...})` | 导出 `.pptx`，支持多页、文本、项目符号、表格、图片、主题、页码 |
@@ -1818,11 +1849,12 @@ return {
 | `Images[]` | `FileByteBase64/FileName/ContentType/X/Y/Width/Height` |
 | `Tables[]` | `Headers/Rows/ColumnWidths/X/Y/Width/Height/HeaderBackgroundColor/HeaderFontColor/CellBackgroundColor/CellFontColor/FontSize` |
 
-### 解析 Excel
+### 解析 Excel / CSV
 
 ```js
 var rows = V8.Office.ExcelToList({
   FileByteBase64: excelBase64,
+  FileType: 'excel',  // CSV 传 csv，或通过 FileName: 'data.csv' 自动判断
   SheetIndex: 0,       // 从 0 开始
   HeaderStartRow: 5,  // 其余行号均从 1 开始
   HeaderEndRow: 6,
@@ -1838,24 +1870,32 @@ if (rows.Code !== 1) return rows;
 
 | 参数 | 说明 |
 |---|---|
+| `FileType/FileName` | CSV 传 `FileType:'csv'` 或带 `.csv` 后缀的 `FileName`；Excel 省略即可。 |
+| `Encoding/Delimiter` | CSV 可选固定编码/分隔符；通常应省略，由服务端自动识别 UTF-8/GBK 与逗号、制表符、分号、竖线。 |
 | `SheetIndex` | 工作表索引，从 `0` 开始；省略时读取第一张。 |
 | `HeaderStartRow/HeaderEndRow` | 表头一基起止行，支持合并单元格和多级表头；省略时保持旧行为：首行为表头。 |
 | `DataStartRow/DataEndRow` | 数据一基起止行；省略时从表头下一行读到已用区域末尾。 |
 | `Columns` | 确认后的列映射。`ColumnIndex` 从 `0` 开始，也可传 Excel 列字母 `Column`；`Name` 为返回对象字段名。 |
 | `MaxDataRows/MaxColumns` | 解析上限；服务端仍强制不超过平台 50000 行、256 个有效映射列。 |
 
-增强参数全部可省略，旧的首行表头模板继续兼容。传入增强范围后，每行额外返回 `_ExcelRow` 便于精确报错；数据行是否有效按所有已映射列判断，不再因 A 列为空而丢弃；公式单元格读取计算结果。
+增强参数全部可省略，旧的首行表头模板继续兼容。传入增强范围后，每行额外返回 `_ExcelRow` 便于精确报错；数据行是否有效按所有已映射列判断，不再因 A 列为空而丢弃；公式单元格读取计算结果。CSV 解析成功时，`DataAppend.FileType/Encoding/Delimiter` 返回服务端实际识别结果，便于接口引擎与浏览器元数据交叉复核。
 
-菜单配置【导入接口替换】时，统一弹层会在用户确认后上传原始文件，并同时传 `V8.Param._ImportMetaJson`。自定义接口应解析这份元数据，再把相同范围传给 `V8.Office.ExcelToList`，从服务端原文件重新取数；不能直接信任浏览器预览，也不能退回固定首行表头：
+菜单配置【导入接口替换】时，统一弹层会在用户确认后上传原始文件，并同时传 `V8.Param._ImportMetaJson`、`_ImportErrorPolicy` 和 `_ImportUniqueRulesJson`。`_ImportMetaJson` v2.2 内也包含 `ErrorPolicy/UpsertMode/UniqueRules`。自定义接口应解析元数据，把相同范围传给 `V8.Office.ExcelToList`，从服务端原文件重新取数；不能直接信任浏览器预览，也不能退回固定首行表头：
 
 ```js
 var meta = JSON.parse(V8.Param._ImportMetaJson || '{}');
+var errorPolicy = V8.Param._ImportErrorPolicy || meta.ErrorPolicy || 'RollbackAll';
+if (errorPolicy !== 'RollbackAll' && errorPolicy !== 'ContinueOnError') {
+  return { Code: 0, Msg: '不支持的导入错误处理策略' };
+}
 var fileMap = V8.FilesByteBase64 || {};
 var fileBase64 = Object.values(fileMap)[0];
 if (!fileBase64) return { Code: 0, Msg: '请上传 Excel 文件' };
 
 var parsed = V8.Office.ExcelToList({
   FileByteBase64: fileBase64,
+  FileType: meta.FileType || V8.Param._ImportFileType,
+  FileName: V8.Param._ImportFileName,
   SheetIndex: meta.SheetIndex == null ? 0 : meta.SheetIndex,
   HeaderStartRow: meta.HeaderStartRow,
   HeaderEndRow: meta.HeaderEndRow,
@@ -1864,8 +1904,24 @@ var parsed = V8.Office.ExcelToList({
   Columns: meta.Columns || []
 });
 if (parsed.Code !== 1) return parsed;
-// 接下来仍须重做权限、字段、唯一性、状态与整批事务校验。
+if (meta.FileType === 'csv' && parsed.DataAppend) {
+  if (meta.Encoding && meta.Encoding !== parsed.DataAppend.Encoding) {
+    return { Code: 0, Msg: 'CSV 编码复核不一致，请重新上传后确认预览。' };
+  }
+  if (meta.Delimiter && meta.Delimiter.replace('\t', '\\t') !== parsed.DataAppend.Delimiter) {
+    return { Code: 0, Msg: 'CSV 分隔符复核不一致，请重新上传后确认预览。' };
+  }
+}
+// 接下来仍须重做权限、字段、唯一性和状态校验。
+// meta.UniqueRules / _ImportUniqueRulesJson 仅用于向用户说明，不能代替服务端权威字段配置。
 ```
+
+自定义接口的 Upsert 规则必须与通用导入一致：每个“单字段唯一”各自判断，全部“组合唯一”字段共同判断；任一完整规则命中同一 Id 则按 Id 修改，全部未命中则新增；不同规则命中不同 Id，或一条规则命中多条数据，必须把该行记为冲突。禁止把多个独立规则错误拼成同一个 `AND` 条件，也禁止按宽泛唯一条件一次更新多行。
+
+- `RollbackAll`：首个行错误返回 `Code:0`，由接口引擎事务整体回滚，禁止手动 `Commit/Rollback`。
+- `ContinueOnError`：捕获行错误并继续处理下一行，最终返回 `Code:1`，同时返回 `Added/Updated/Failed/Errors`。若数据库异常已使当前事务不可继续，应先做整批预校验或改用平台允许的独立幂等行操作，不能声称已继续。
+
+菜单【导入接口替换】与 `V8.OpenImportDialog` 后台接口引擎都必须遵守以上策略；区别只是前者使用 `V8.FilesByteBase64` 在服务端重读原文件，后者读取 `_ImportRowsJson` 的确认后映射行。
 
 ### 发送邮件 SendEmail
 >* 源码实现在 `Microi.Server/Microi.Office/MicroiOffice.cs`（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Office/MicroiOffice.cs) / [Gitee](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Office/MicroiOffice.cs)）。

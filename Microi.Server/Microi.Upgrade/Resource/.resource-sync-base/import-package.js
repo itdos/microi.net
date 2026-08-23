@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.3.3
+ * Version: v2.3.6
  * Function:
  * - 统一应用商城导入器；后台安装按期望应用版本锁定不可变商城快照，安装前幂等补齐物理前置列，支持后台分片、资源基线、官方平台受管升级、商城源只读重试，并在后台任务唯一索引创建冲突时仅归档重复终态幂等键。
  */
@@ -997,8 +997,20 @@ var validatePackageMenuRuntimeContract = function (packageModel) {
         }
     }
 
+    // LEGACY_MICROSERVICE_MENU_KEY_INFERENCE_V1：历史官方包可能使用单数
+    // ApplicationBundle，且源租户 sys_menu 尚无 MicroServiceKey 物理字段。
+    // 仅从包内不可变事实唯一推导 Key；显式 URL 冲突或多候选仍失败关闭。
     var runtimeBundles = {};
-    var bundles = packageModel.ApplicationBundles || [];
+    var runtimeBundleKeys = [];
+    var bundles = [];
+    var pluralBundles = packageModel.ApplicationBundles || [];
+    for (var pluralBundleIndex = 0; pluralBundleIndex < listSize(pluralBundles); pluralBundleIndex++) {
+        if (pluralBundles[pluralBundleIndex]) bundles.push(pluralBundles[pluralBundleIndex]);
+    }
+    var singularBundle = packageModel.ApplicationBundle
+        || packageModel.AiApplication
+        || packageModel.FrontendApplication;
+    if (singularBundle) bundles.push(singularBundle);
     for (var bundleIndex = 0; bundleIndex < listSize(bundles); bundleIndex++) {
         var bundle = bundles[bundleIndex] || {};
         var application = bundle.Application || {};
@@ -1006,12 +1018,22 @@ var validatePackageMenuRuntimeContract = function (packageModel) {
         var appKey = firstTextParam([application.AppKey, bundle.AppKey, microService.MsKey]).toLowerCase();
         if (!appKey) continue;
         var routeMap = {};
+        var pageIdMap = {};
         var routes = bundle.Routes || [];
         for (var routeIndex = 0; routeIndex < listSize(routes); routeIndex++) {
-            var routePath = String((routes[routeIndex] || {}).RoutePath || '').replace(/^\s+|\s+$/g, '');
+            var route = routes[routeIndex] || {};
+            var routePath = String(route.RoutePath || '').replace(/^\s+|\s+$/g, '');
             if (routePath) routeMap[routePath.toLowerCase()] = true;
+            if (route.Id) pageIdMap[String(route.Id).toLowerCase()] = true;
         }
-        runtimeBundles[appKey] = { Routes: routeMap };
+        var runtimeBundleAlreadyKnown = !!runtimeBundles[appKey];
+        runtimeBundles[appKey] = {
+            Key: appKey,
+            ServiceId: String(microService.Id || '').toLowerCase(),
+            Routes: routeMap,
+            PageIds: pageIdMap
+        };
+        if (!runtimeBundleAlreadyKnown) runtimeBundleKeys.push(appKey);
     }
 
     for (var runtimeMenuIndex = 0; runtimeMenuIndex < listSize(menus); runtimeMenuIndex++) {
@@ -1026,6 +1048,41 @@ var validatePackageMenuRuntimeContract = function (packageModel) {
             runtimeMenu.MicroServiceAppKey
         ]).toLowerCase();
         var menuLabel = String(runtimeMenu.Name || runtimeMenu.Id || ('第' + (runtimeMenuIndex + 1) + '个菜单'));
+        if (!menuKey) {
+            var menuUrl = String(runtimeMenu.Url || '').replace(/^\s+|\s+$/g, '');
+            var urlKeyMatch = /^\/micro-app\/([^\/?#]+)(?:\/|$)/i.exec(menuUrl);
+            if (urlKeyMatch && urlKeyMatch[1]) {
+                // URL 是菜单自身的显式稳定绑定。即使包内没有同 Key 运行包也先保留，
+                // 后续统一校验会给出准确的“未交付 ApplicationBundle”错误。
+                menuKey = String(urlKeyMatch[1]).toLowerCase();
+            } else {
+                var candidateKeys = [];
+                var menuServiceId = String(runtimeMenu.MicroServiceId || '').toLowerCase();
+                var menuPageId = String(runtimeMenu.MicroServicePageId || '').toLowerCase();
+                var inferredRoutePath = firstTextParam([
+                    runtimeMenu.MicroServiceRoutePath,
+                    runtimeMenu.RoutePath
+                ]).toLowerCase();
+                var appendCandidate = function (candidateKey) {
+                    for (var candidateIndex = 0; candidateIndex < candidateKeys.length; candidateIndex++) {
+                        if (candidateKeys[candidateIndex] == candidateKey) return;
+                    }
+                    candidateKeys.push(candidateKey);
+                };
+                for (var runtimeBundleKeyIndex = 0; runtimeBundleKeyIndex < runtimeBundleKeys.length; runtimeBundleKeyIndex++) {
+                    var candidateKey = runtimeBundleKeys[runtimeBundleKeyIndex];
+                    var candidateBundle = runtimeBundles[candidateKey];
+                    if ((menuServiceId && candidateBundle.ServiceId == menuServiceId)
+                        || (menuPageId && candidateBundle.PageIds[menuPageId])
+                        || (inferredRoutePath && candidateBundle.Routes[inferredRoutePath])) {
+                        appendCandidate(candidateKey);
+                    }
+                }
+                if (candidateKeys.length == 1) menuKey = candidateKeys[0];
+                else if (candidateKeys.length == 0 && runtimeBundleKeys.length == 1) menuKey = runtimeBundleKeys[0];
+            }
+            if (menuKey) runtimeMenu.MicroServiceKey = menuKey;
+        }
         if (!menuKey) {
             errors.push('微服务菜单【' + menuLabel + '】缺少 MicroServiceKey');
             continue;
@@ -1612,7 +1669,7 @@ try {
         if (!resumeInstall || !appId) return existingApplicationAssets;
         var result = V8.FormEngine.GetTableData('mci_ai_app_file', {
             _Where: [['AppId', '=', appId]],
-            _SelectFields: ['Id', 'FilePath', 'HdfsPath', 'PublishHdfsPath', 'ContentHash', 'Size'],
+            _SelectFields: ['Id', 'FilePath', 'HdfsPath', 'PublishHdfsPath', 'StorageScope', 'ContentHash', 'Size'],
             _PageIndex: 1,
             _PageSize: 20000
         });
@@ -1641,6 +1698,8 @@ try {
             Path: normalizedPath,
             HdfsPath: existing.HdfsPath,
             FilePathName: existing.HdfsPath,
+            PublishHdfsPath: existing.PublishHdfsPath,
+            StorageScope: existing.StorageScope,
             Size: actualSize,
             Hash: actualHash,
             Reused: true
@@ -1969,6 +2028,16 @@ try {
                 ? null
                 : reuseApplicationAsset(existingApplicationAssets, buildMetadataPath, buildFile);
             var buildWasReused = !!buildUpload;
+            // MOVE_OBJECT_UNAVAILABLE_RESUME_V1：部分历史节点能够上传并读取公有对象，
+            // 但尚未实现 MoveObject，或存储账号只有 Put/Get 而没有 Move/Delete 权限。
+            // 首次稳定路径移动失败后会保留刚上传且摘要已校验的真实对象，并在
+            // StorageScope 中持久化回退标记；后续分片直接复用该对象，禁止每片
+            // 重传同一文件、AssetIndex 永远停在 1。未带标记的历史旧 Key 仍会
+            // 先重传一次并尝试修复，兼顾旧脏路径自愈与旧存储节点兼容。
+            var buildMoveFallbackScope = 'PrivateSource+PublicBuildMoveFallback';
+            var buildUsesPersistedMoveFallback = buildWasReused
+                && String(buildUpload.StorageScope || '').toLowerCase()
+                    == buildMoveFallbackScope.toLowerCase();
             var reusedBuildHdfsPath = buildWasReused ? normalizeApplicationPath(buildUpload.HdfsPath).toLowerCase() : '';
             if (useDatabaseOnlyBuild) {
                 // DATABASE_ONLY_BUILD_ASSETS_V1：仅当包清单显式声明 DatabaseOnly、
@@ -2009,10 +2078,13 @@ try {
             var stableBuildPath = appType == 'MicroService'
                 ? normalizeApplicationPath(String(V8.OsClient || '').toLowerCase() + '/' + buildRoot + '/' + normalizedBuildPath)
                 : normalizeApplicationPath(String(V8.OsClient || '').toLowerCase() + '/ai-app-publish/' + appKey + '/' + normalizedBuildPath);
-            var buildPathRepaired = useDatabaseOnlyBuild ? false : moveBuildToStablePath(buildUpload, stableBuildPath);
+            var buildPathRepaired = useDatabaseOnlyBuild
+                ? false
+                : (buildUsesPersistedMoveFallback ? false : moveBuildToStablePath(buildUpload, stableBuildPath));
             // SKIP_MOVE_FOR_REUSED_BUILD_V1：已处于当前租户稳定 Key 的断点资产不重复移动。
             // 旧版错误 Key 若已被移动或删除，则从本次自包含包重传，再尝试写入正确 Key。
-            if (!useDatabaseOnlyBuild && buildWasReused && !buildPathRepaired) {
+            if (!useDatabaseOnlyBuild && buildWasReused
+                && !buildUsesPersistedMoveFallback && !buildPathRepaired) {
                 if (shouldContinueApplicationAssets(buildFile)) {
                     return buildApplicationAssetContinuation(bundleIndex, 'BuildRepair', b, totalBundleAssets);
                 }
@@ -2023,6 +2095,8 @@ try {
                 buildWasReused = false;
                 moveBuildToStablePath(buildUpload, stableBuildPath);
             }
+            var buildUsesMoveFallback = !useDatabaseOnlyBuild && !buildPathRepaired
+                && normalizeApplicationPath(buildUpload.HdfsPath) != stableBuildPath;
             uploadedBuild.push(buildUpload);
             // DB_RUNTIME_BUILD_ASSETS_V1：目标环境的 FileServer/CDN 可能与开发环境不同。
             // 离线包显式选择 db/database 时，把编译产物同步写入同源运行清单。
@@ -2044,8 +2118,9 @@ try {
                 });
             }
             if (useDatabaseOnlyBuild) continue;
-            if (buildWasReused && buildPathRepaired
-                && reusedBuildHdfsPath == stableBuildPath.toLowerCase()) continue;
+            if (buildWasReused
+                && ((buildPathRepaired && reusedBuildHdfsPath == stableBuildPath.toLowerCase())
+                    || buildUsesPersistedMoveFallback)) continue;
             // 安装后的 Web/UniApp 仍须保留真实 dist 元数据，才能继续编辑源码、
             // 重新构建并打包，而不是退回只生成一张兼容预览页。
             var buildAssetRow = {
@@ -2056,7 +2131,9 @@ try {
                 FileType: applicationFileType(normalizedBuildPath),
                 HdfsPath: buildUpload.HdfsPath,
                 PublishHdfsPath: buildUpload.HdfsPath,
-                StorageScope: 'PrivateSource+PublicBuild',
+                StorageScope: buildUsesMoveFallback
+                    ? buildMoveFallbackScope
+                    : 'PrivateSource+PublicBuild',
                 ContentHash: buildUpload.Hash,
                 Size: buildUpload.Size,
                 IsDirectory: 0,
@@ -5114,6 +5191,30 @@ try {
     var packageName = firstTextParam([V8.Param.AppName, Package.PackageInfo.Name]);
     var preserveInterfaceEnginePageTabs = packageAppIdLower == 'app.microi.api-engine'
         || packageName == '接口引擎';
+    // MENU_URL_UPDATE_COLLISION_RECOVERY_V1：升级既有菜单时，包内 Url 可能已被
+    // 目标租户的其它首页菜单占用。优先保留该菜单当前仍唯一的 Url；否则生成
+    // 有界唯一后缀并重试，禁止因为一个路由冲突回滚整个平台应用。
+    var menuUrlOwnerCount = function (url, excludedMenuId) {
+        var sql = 'SELECT COUNT(Id) FROM sys_menu WHERE Url=@p0';
+        if (excludedMenuId) sql += ' AND Id<>@p1';
+        var query = V8.Db.FromSql(sql).AddInParameter('@p0', url);
+        if (excludedMenuId) query.AddInParameter('@p1', excludedMenuId);
+        return Number(query.ToScalar() || 0);
+    };
+    var chooseMenuUrlCollisionFallback = function (incomingUrl, currentUrl, menuId) {
+        var normalizedCurrent = String(currentUrl || '').trim();
+        if (normalizedCurrent
+            && normalizedCurrent != String(incomingUrl || '')
+            && menuUrlOwnerCount(normalizedCurrent, menuId) == 0) {
+            return normalizedCurrent;
+        }
+        var baseUrl = String(incomingUrl || '').trim();
+        for (var suffix = 2; suffix <= 100; suffix++) {
+            var candidate = baseUrl + '-' + suffix;
+            if (menuUrlOwnerCount(candidate, menuId) == 0) return candidate;
+        }
+        return baseUrl + '-' + String(V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid());
+    };
     var legacyMenuDiyConfigFields = [
         'SelectApi', 'AddBtnText', 'SaveBtnText', 'AddBtnType', 'SaveType',
         'HiddenIndex', 'GeneralSeaarch', 'ImportApi', 'ImportProgressApi', 'ExportApi'
@@ -5620,7 +5721,7 @@ try {
         if (exists) {
             var existingMenuVisibilityResult = V8.FormEngine.GetFormData('sys_menu', {
                 Id: menu.Id,
-                _SelectFields: ['Display', 'AppDisplay', 'DiyConfig']
+                _SelectFields: ['Display', 'AppDisplay', 'DiyConfig', 'Url']
             });
             existingMenuVisibility = existingMenuVisibilityResult
                 && existingMenuVisibilityResult.Code == 1
@@ -5679,6 +5780,24 @@ try {
             if (uptResult.Code == 1) {
                 stats.MenuUpdated++;
                 menuWriteSucceeded = true;
+            } else if (uptResult.Msg
+                && uptResult.Msg.indexOf('[Url]已存在唯一值') > -1
+                && modelCopy.Url) {
+                var updateOriginalUrl = modelCopy.Url;
+                modelCopy.Url = chooseMenuUrlCollisionFallback(
+                    updateOriginalUrl,
+                    existingMenuVisibility && existingMenuVisibility.Url,
+                    menu.Id);
+                debugLog['menu_url_update_retry_' + menu.Id] = updateOriginalUrl + ' → ' + modelCopy.Url;
+                var updateRetryResult = runWriteWithRetry(function () {
+                    return V8.FormEngine.UptFormData('sys_menu', modelCopy);
+                }, 'menu_url_update_retry_' + menu.Id);
+                if (updateRetryResult.Code == 1) {
+                    stats.MenuUpdated++;
+                    menuWriteSucceeded = true;
+                } else {
+                    debugLog['menu_upt_error_' + menu.Id] = updateRetryResult.Msg;
+                }
             } else {
                 debugLog['menu_upt_error_' + menu.Id] = uptResult.Msg;
             }
@@ -5710,8 +5829,7 @@ try {
             } else if (addResult.Msg && addResult.Msg.indexOf('[Url]已存在唯一值') > -1 && modelCopy.Url) {
                 // Url重复，自动追加后缀重试
                 var originalUrl = modelCopy.Url;
-                var urlCount = V8.Db.FromSql("SELECT COUNT(Id) FROM sys_menu WHERE Url='" + originalUrl.replace(/'/g, "''") + "'").ToScalar();
-                var newUrl = originalUrl + '-' + (Number(urlCount) + 1);
+                var newUrl = chooseMenuUrlCollisionFallback(originalUrl, '', menu.Id);
                 modelCopy.Url = newUrl;
                 debugLog['menu_url_retry_' + menu.Id] = originalUrl + ' → ' + newUrl;
                 var retryResult = runWriteWithRetry(function () {
@@ -6167,6 +6285,16 @@ try {
         if (isMissingValue(model.EnableLog)) model.EnableLog = 0;
     }
 
+    function normalizeApiEngineFlag(value) {
+        if (value === true) return 1;
+        if (value === false || isMissingValue(value)) return 0;
+        var normalized = String(value).trim().toLowerCase();
+        if (normalized == 'true' || normalized == 'yes' || normalized == 'on') return 1;
+        if (normalized == 'false' || normalized == 'no' || normalized == 'off') return 0;
+        var numeric = Number(value);
+        return isNaN(numeric) ? 0 : (numeric == 0 ? 0 : 1);
+    }
+
     function removeApiEngineCacheValue(value) {
         if (isMissingValue(value)) return;
         V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(value).toLowerCase()}`);
@@ -6224,6 +6352,35 @@ try {
             V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiAddress).toLowerCase()}`, latestCacheJson);
         }
         return latest;
+    }
+
+    // API_ENGINE_FLAG_PHYSICAL_RECONCILIATION_V1：部分历史库已存在 StopHttp 等
+    // 物理列，但对应 diy_field 元数据缺失，FormEngine 会返回成功却静默忽略开关。
+    // 仅在首次严格回读发现差异时，对已通过资源所有权校验的布尔运行状态做参数化
+    // 物理补正，随后清缓存并再次严格回读；源码和其它安全元数据仍禁止绕过 FormEngine。
+    function reconcilePersistedApiEngineFlags(expected, latest) {
+        if (!latest) return latest;
+        var assignments = [];
+        if (!isMissingValue(expected.IsEnable)
+            && normalizeApiEngineFlag(latest.IsEnable) != normalizeApiEngineFlag(expected.IsEnable)) {
+            assignments.push('IsEnable=' + normalizeApiEngineFlag(expected.IsEnable));
+        }
+        if (!isMissingValue(expected.StopHttp)
+            && normalizeApiEngineFlag(latest.StopHttp) != normalizeApiEngineFlag(expected.StopHttp)) {
+            assignments.push('StopHttp=' + normalizeApiEngineFlag(expected.StopHttp));
+        }
+        if (normalizeApiEngineFlag(latest.IsDeleted) == 1) assignments.push('IsDeleted=0');
+        if (assignments.length == 0) return latest;
+        var stableId = String(latest.Id || expected.Id || '');
+        if (!stableId) throw new Error('接口引擎开关补正缺少稳定Id：' + expected.ApiEngineKey);
+        var affected = V8.Db.FromSql(
+            'UPDATE sys_apiengine SET ' + assignments.join(',') + ' WHERE Id=@p0'
+        ).AddInParameter('@p0', stableId).ExecuteNonQuery();
+        if (Number(affected) != 1) {
+            throw new Error('接口引擎开关物理补正未命中唯一记录：' + expected.ApiEngineKey);
+        }
+        debugLog['apiengine_flag_physical_reconcile_' + expected.ApiEngineKey] = assignments.join(',');
+        return refreshApiEngineCache(expected.ApiEngineKey, stableId, expected.ApiAddress);
     }
 
     function parseApiEngineVersion(model) {
@@ -6489,15 +6646,15 @@ try {
         if (!latest || !expectedKey || actualKey !== expectedKey) {
             throw new Error('接口引擎写入后回读失败：' + (expectedKey || (expected && expected.Id) || '未知接口'));
         }
-        if (Number(latest.IsDeleted || 0) === 1) {
+        if (normalizeApiEngineFlag(latest.IsDeleted) === 1) {
             throw new Error('接口引擎写入后仍处于删除状态：' + expected.ApiEngineKey);
         }
         if (!isMissingValue(expected.IsEnable)
-            && Number(latest.IsEnable || 0) !== Number(expected.IsEnable || 0)) {
+            && normalizeApiEngineFlag(latest.IsEnable) !== normalizeApiEngineFlag(expected.IsEnable)) {
             throw new Error('接口引擎写入后启用状态不一致：' + expected.ApiEngineKey);
         }
         if (!isMissingValue(expected.StopHttp)
-            && Number(latest.StopHttp || 0) !== Number(expected.StopHttp || 0)) {
+            && normalizeApiEngineFlag(latest.StopHttp) !== normalizeApiEngineFlag(expected.StopHttp)) {
             throw new Error('接口引擎写入后HTTP状态不一致：' + expected.ApiEngineKey);
         }
         var expectedCode = String(expected.ApiV8Code || '');
@@ -6733,6 +6890,7 @@ try {
                 if (uptResult.Code == 1) {
                     stats.ApiEngineUpdated++;
                     var updatedEngine = refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
+                    updatedEngine = reconcilePersistedApiEngineFlags(apiEngine, updatedEngine);
                     assertPersistedApiEngine(apiEngine, updatedEngine);
                     recordApiEngineResourceState(apiEngine, apiEnginePolicy);
                 } else {
@@ -6745,6 +6903,7 @@ try {
                 if (addResult.Code == 1) {
                     stats.ApiEngineInserted++;
                     var insertedEngine = refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
+                    insertedEngine = reconcilePersistedApiEngineFlags(apiEngine, insertedEngine);
                     assertPersistedApiEngine(apiEngine, insertedEngine);
                     recordApiEngineResourceState(apiEngine, apiEnginePolicy);
                 } else {

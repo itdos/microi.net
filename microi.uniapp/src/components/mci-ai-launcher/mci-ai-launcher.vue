@@ -56,7 +56,6 @@
 </template>
 
 <script>
-import appConfig from '@/config.js'
 import activeTabBar from '@/generated/active-tabbar.js'
 import { getSafeAreaMetrics } from '@/utils/safe-area.js'
 import { getAiAssistantEnabled } from '@/utils/sysconfig.js'
@@ -82,7 +81,7 @@ export default {
       activeIndex: -1,
       opening: false,
       switching: false,
-      aiAssistantEnabled: false,
+      aiAssistantEnabled: true,
       safeTop: 0,
       safeHeaderHeight: 44,
       safeLeft: 0,
@@ -206,8 +205,7 @@ export default {
       }, 0)
     },
     async resolveAssistantVisibility() {
-      const profileEnabled = appConfig.features && appConfig.features.ai === true
-      const enabled = profileEnabled ? await getAiAssistantEnabled() : false
+      const enabled = await getAiAssistantEnabled()
       this.aiAssistantEnabled = enabled
       this.updateGlobalAiState(enabled)
       this.syncWeixinTabBar()

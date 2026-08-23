@@ -33,6 +33,11 @@ namespace Microi.net
         {
            {"GetPa", "83442E16-917D-43B1-9C79-7F173C74EDC0"},
         };
+
+        private static readonly string[] MenuTreeProjectionFields =
+        {
+            "Id", "ParentId", "Sort"
+        };
         #endregion
 
         /// <summary>
@@ -167,6 +172,10 @@ namespace Microi.net
             {
                 return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
+            if (param._CurrentUser == null)
+            {
+                return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang));
+            }
             var where = new List<List<object>>();
             where.Add(new List<object>(){ "IsDeleted", "<>", 1 });
             if (param.Ids != null)
@@ -181,7 +190,6 @@ namespace Microi.net
             {
                 where.Add(new List<object>(){ "AppDisplay", "=", param.AppDisplay });
             }
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             //判断权限
             //注意：如果有模块配置的菜单权限，那里返回的菜单就应该是所有
             if (param._CurrentUser != null)
@@ -250,35 +258,30 @@ namespace Microi.net
                     where.Add(new List<object>(){ "Id", "In", ids });// || d.UserId == param._CurrentSysUser.Id
                 }
             }
-            var selectFields = new List<string>() {
-                // "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService",
-                // "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url",
-                // "DiyTableId", "ParentId", "Sort",
-            };
-            if(param._SelectFields != null && param._SelectFields.Any())
+            // Do not pass the browser projection into FormEngine. FormEngine validates an
+            // explicit _SelectFields list against diy_field metadata; an old/cold database
+            // can have the physical sys_menu columns while its metadata is incomplete, in
+            // which case the SQL projection collapses to the fixed Id field. Read the
+            // physical row first, then apply the untrusted projection in memory below.
+            var allResult = await MicroiEngine.FormEngine.GetTableDataAsync(
+                "sys_menu",
+                CreateMenuDiscoveryQuery(param, where));
+            if (allResult == null || allResult.Code != 1)
             {
-                selectFields = param._SelectFields;
+                return new DosResultList<dynamic>(
+                    allResult?.Code ?? 0,
+                    null,
+                    allResult?.Msg ?? DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang),
+                    allResult?.DataCount,
+                    allResult?.DataAppend);
             }
-            var allResult = await MicroiEngine.FormEngine.GetTableDataAsync("sys_menu", new
-            {
-                _SelectFields = selectFields,
-                _Where = where,
-                _OrderBy = "Sort",
-                _OrderByType = "ASC",
-                OsClient = param.OsClient,
-                _Lang = param._Lang,
-                _CurrentUser = param._CurrentUser,
-                // Menu discovery already applies sys_rolelimit filtering above. Mark this
-                // internal materialization as Server so the generic FormEngine client
-                // boundary can keep raw sys_menu access admin-only.
-                _InvokeType = "Server",
-            });
-            var allData = allResult.Data as List<dynamic> ?? new List<dynamic>();
+            var allData = allResult.Data ?? new List<dynamic>();
 
             // 兼容旧版 Vue2 定制页面菜单：微服务发布时可在 RouteMetaJson 中声明
             // LegacyMenuUrls / LegacyComponentPaths。这里仅对接口返回值做瞬时映射，
             // 不修改客户库 sys_menu，因而同一套新版服务可以直接承接多个老库。
             await ApplyLegacyMicroServiceAliases(param.OsClient, allData);
+            allData = ProjectMenuRows(allData, param._SelectFields);
 
             // 按ParentId构建字典索引，将递归子节点查找从O(n²)优化为O(n)
             var childrenMap = new Dictionary<string, List<dynamic>>();
@@ -331,6 +334,70 @@ namespace Microi.net
             //递归获取层级（使用字典索引优化）
             BuildChildrenFromMap(childrenMap, firstList);
             return new DosResultList<dynamic>(1, firstList, "", dataCount);
+        }
+
+        internal static DiyTableRowParam CreateMenuDiscoveryQuery(SysMenuParam param, object where)
+        {
+            if (param == null) throw new ArgumentNullException(nameof(param));
+
+            return new DiyTableRowParam
+            {
+                _Where = where,
+                _OrderBy = "Sort",
+                _OrderByType = "ASC",
+                OsClient = param.OsClient,
+                _Lang = param._Lang,
+                _CurrentUser = param._CurrentUser,
+                _InvokeType = "Server",
+                // GetSysMenuStep already authenticates the caller and reduces the row set
+                // to the current role's menu ids. This provenance flag cannot be bound by
+                // browser JSON and prevents a second generic sys_menu authorization pass.
+                _TrustedServerInvocation = true
+            };
+        }
+
+        internal static List<dynamic> ProjectMenuRows(
+            IEnumerable<dynamic> rows,
+            IEnumerable<string> selectFields)
+        {
+            var materializedRows = rows?.ToList() ?? new List<dynamic>();
+            var requestedFields = (selectFields ?? Enumerable.Empty<string>())
+                .Where(field => !string.IsNullOrWhiteSpace(field))
+                .Select(field => field.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (requestedFields.Count == 0)
+            {
+                return materializedRows;
+            }
+
+            foreach (var field in MenuTreeProjectionFields)
+            {
+                if (!requestedFields.Contains(field, StringComparer.OrdinalIgnoreCase))
+                {
+                    requestedFields.Add(field);
+                }
+            }
+
+            var projectedRows = new List<dynamic>(materializedRows.Count);
+            foreach (var rawRow in materializedRows)
+            {
+                var source = ToJObject((object)rawRow);
+                if (source == null) continue;
+
+                var projected = new JObject();
+                foreach (var field in requestedFields)
+                {
+                    var sourceProperty = source.Properties().FirstOrDefault(property =>
+                        string.Equals(property.Name, field, StringComparison.OrdinalIgnoreCase));
+                    if (sourceProperty != null)
+                    {
+                        projected[sourceProperty.Name] = sourceProperty.Value.DeepClone();
+                    }
+                }
+                projectedRows.Add(projected);
+            }
+            return projectedRows;
         }
 
         private async Task ApplyLegacyMicroServiceAliases(string osClient, List<dynamic> menus)

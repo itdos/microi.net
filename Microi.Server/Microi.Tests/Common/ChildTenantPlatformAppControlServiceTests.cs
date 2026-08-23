@@ -120,6 +120,11 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("childStatus == 'Failed' || childStatus == 'Canceled'", orchestrator, StringComparison.Ordinal);
         Assert.Contains("全部子租户任务已结束", orchestrator, StringComparison.Ordinal);
         Assert.Contains("全部 ' + childTasks.length + ' 个子租户平台应用均已安装/更新成功", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TASK_PARTIAL_QUEUE_MONITOR_V1", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TASK_RUNTIME_RELOAD_FALLBACK_V1", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("discoverTargetsWithRuntimeRecovery", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("Failures: failures", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("var queueFailures = failures.filter", orchestrator, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -139,14 +144,22 @@ public class ChildTenantPlatformAppControlServiceTests
             "Resource",
             "import-package.js"));
 
-        Assert.Contains("CHILD_TENANT_MONITOR_BOOTSTRAP_RECOVERY_V1", controlSource, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_DIRECTORY_DISCOVERY_ONLY_V1", controlSource, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_RUNTIME_RELOAD_RECOVERY_V1", controlSource, StringComparison.Ordinal);
+        Assert.Contains("ResolveTargetClientWithReload", controlSource, StringComparison.Ordinal);
+        Assert.Contains("MicroiEngine.V8Method.ReloadOsClient(targetOsClient)", controlSource, StringComparison.Ordinal);
+        var getTargetsStart = controlSource.IndexOf("public static DosResult GetTargets", StringComparison.Ordinal);
+        var queueTargetStart = controlSource.IndexOf("public static DosResult QueueTarget", StringComparison.Ordinal);
+        var getTargetsBlock = controlSource.Substring(getTargetsStart, queueTargetStart - getTargetsStart);
+        Assert.DoesNotContain("EnsureTargetBootstrap", getTargetsBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureMonitorBootstrapRecovery", getTargetsBlock, StringComparison.Ordinal);
         Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("EnsureMonitorBootstrapRecovery", controlSource, StringComparison.Ordinal);
         Assert.Contains("EnsureTargetExecutionBootstrap", controlSource, StringComparison.Ordinal);
         Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_SCOPE_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", importerSource, StringComparison.Ordinal);
-        Assert.Contains("Version: v2.3.3", importerSource, StringComparison.Ordinal);
+        Assert.Contains("Version: v2.3.5", importerSource, StringComparison.Ordinal);
     }
 
     [Fact]

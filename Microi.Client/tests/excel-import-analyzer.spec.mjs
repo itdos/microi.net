@@ -5,6 +5,9 @@ import {
     analyzeExcelWorkbook,
     buildImportMetadata,
     buildImportTargets,
+    decodeCsvArrayBuffer,
+    IMPORT_ERROR_POLICY,
+    normalizeImportErrorPolicy,
     IMPORT_PREVIEW_PAGE_SIZE
 } from "../src/views/form-engine/utils/excel-import-analyzer.js";
 
@@ -101,6 +104,17 @@ test("keeps an unknown workbook available for manual row and column mapping", ()
     assert.equal(automatic.mappedColumnCount, 0);
     assert.equal(automatic.sourceRowCount, 2);
     assert.equal(automatic.rows.length, 0);
+    assert.deepEqual(automatic.sourceRows, [
+        { _ExcelRow: 3, _ImportSourceColumn_0: "甲", _ImportSourceColumn_1: "001" },
+        { _ExcelRow: 4, _ImportSourceColumn_0: "乙", _ImportSourceColumn_1: "002" }
+    ]);
+    assert.deepEqual(
+        automatic.columns.map((column) => [column.header, column.sourceKey, column.targetName]),
+        [
+            ["内部简称", "_ImportSourceColumn_0", ""],
+            ["内部号码", "_ImportSourceColumn_1", ""]
+        ]
+    );
     assert.deepEqual(automatic.columns[0].samples, ["甲", "乙"]);
 
     const corrected = analyzeExcelWorkbook(XLSX, workbook, {
@@ -116,6 +130,26 @@ test("keeps an unknown workbook available for manual row and column mapping", ()
         { _ExcelRow: 3, CustomerName: "甲", CustomerCode: "001" },
         { _ExcelRow: 4, CustomerName: "乙", CustomerCode: "002" }
     ]);
+});
+
+test("does not consume the first data row as a second header when fields are unrelated", () => {
+    const workbook = workbookFromRows([
+        ["资产名称", "资产状态", "资产价格", "购买日期"],
+        ["多功能一体机", "使用中", "2668.00", "2018年05月14日"],
+        ["四门储物柜", "使用中", "715.00", "2016年08月01日"],
+        ["冰箱", "使用中", "860.00", "2020年04月01日"],
+        ["双推门矮柜", "使用中", "815.00", "2016年08月01日"],
+        ["扶手椅", "使用中", "210.00", "2009年10月19日"]
+    ]);
+    const result = analyzeExcelWorkbook(XLSX, workbook, {
+        targets: buildImportTargets(fields)
+    });
+
+    assert.deepEqual([result.headerStartRow, result.headerEndRow], [1, 1]);
+    assert.deepEqual([result.dataStartRow, result.dataEndRow], [2, 6]);
+    assert.equal(result.mappedColumnCount, 0);
+    assert.equal(result.sourceRowCount, 5);
+    assert.equal(result.sourceRows[0]._ImportSourceColumn_0, "多功能一体机");
 });
 
 test("preserves declarative V8 column coordinates and emits server parse metadata", () => {
@@ -140,11 +174,71 @@ test("preserves declarative V8 column coordinates and emits server parse metadat
 
     assert.deepEqual(result.rows, [{ _ExcelRow: 4, Specification: "M8", Quantity: 20 }]);
     assert.deepEqual(result.cells, { ProjectCode: "P-2026" });
-    assert.equal(metadata.Version, "2.0");
+    assert.equal(metadata.Version, "2.2");
+    assert.equal(metadata.ErrorPolicy, "RollbackAll");
+    assert.equal(metadata.UpsertMode, "ByTableUniqueRules");
     assert.deepEqual(metadata.Columns.map((column) => column.Column), ["B", "C"]);
     assert.equal(metadata.DataStartRow, 4);
 });
 
+test("detects UTF-8 and GBK CSV encodings before using the same source-row preview", () => {
+    const utf8Bytes = new Uint8Array([
+        0xef, 0xbb, 0xbf,
+        ...new TextEncoder().encode("资产名称,资产状态\r\n电脑,使用中")
+    ]);
+    const utf8 = decodeCsvArrayBuffer(utf8Bytes);
+    assert.equal(utf8.encoding, "UTF-8");
+    assert.equal(utf8.delimiter, ",");
+
+    const gbkHex = "D7CAB2FAC3FBB3C62CD7CAB2FAD7B4CCAC0D0AB5E7C4D42CCAB9D3C3D6D0";
+    const gbkBytes = Uint8Array.from(gbkHex.match(/../g), (value) => Number.parseInt(value, 16));
+    const gbk = decodeCsvArrayBuffer(gbkBytes);
+    assert.equal(gbk.encoding, "GBK");
+    assert.equal(gbk.delimiter, ",");
+    assert.equal(gbk.text, "资产名称,资产状态\r\n电脑,使用中");
+
+    const workbook = XLSX.read(gbk.text, { type: "string", FS: gbk.delimiter });
+    const result = analyzeExcelWorkbook(XLSX, workbook, {
+        fileType: "csv",
+        encoding: gbk.encoding,
+        delimiter: gbk.delimiter,
+        targets: buildImportTargets(fields)
+    });
+    assert.equal(result.mappedColumnCount, 0);
+    assert.equal(result.sourceRowCount, 1);
+    assert.deepEqual(result.sourceRows[0], {
+        _ExcelRow: 2,
+        _ImportSourceColumn_0: "电脑",
+        _ImportSourceColumn_1: "使用中"
+    });
+    assert.deepEqual(buildImportMetadata(result), {
+        Version: "2.2",
+        ErrorPolicy: "RollbackAll",
+        UpsertMode: "ByTableUniqueRules",
+        UniqueRules: [],
+        FileType: "csv",
+        Encoding: "GBK",
+        Delimiter: ",",
+        SheetIndex: 0,
+        SheetName: "Sheet1",
+        HeaderStartRow: 1,
+        HeaderEndRow: 1,
+        DataStartRow: 2,
+        DataEndRow: 2,
+        Confidence: "low",
+        RowCount: 0,
+        KeyField: "",
+        Cells: {},
+        Columns: []
+    });
+});
+
 test("preview pagination contract remains exactly fifteen rows", () => {
     assert.equal(IMPORT_PREVIEW_PAGE_SIZE, 15);
+});
+
+test("import error policy keeps rollback-all compatibility and accepts continue-on-error", () => {
+    assert.equal(normalizeImportErrorPolicy(), IMPORT_ERROR_POLICY.ROLLBACK_ALL);
+    assert.equal(normalizeImportErrorPolicy("ContinueOnError"), IMPORT_ERROR_POLICY.CONTINUE_ON_ERROR);
+    assert.equal(normalizeImportErrorPolicy("unexpected"), IMPORT_ERROR_POLICY.ROLLBACK_ALL);
 });

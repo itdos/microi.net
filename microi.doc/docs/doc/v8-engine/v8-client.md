@@ -889,7 +889,11 @@ window.microApp.dispatch({
 
 ## V8.OpenImportDialog
 
-> 在数据表格的页面按钮 V8 中打开平台统一 Excel 导入弹层。通用【导入】与本 API 共用同一套智能识别、人工校正和预览界面：弹层默认占页面宽度的 80%，自动识别工作表、单行或多级合并表头、首条数据行及字段映射；上传后先按每页 15 条预览，不会立即写库。识别可信度低时，用户可人工指定表头起止行、数据起止行和逐列映射，确认后才提交。
+> 在数据表格的页面按钮 V8 中打开平台统一导入弹层。通用【导入】与本 API 共用同一套智能识别、人工校正和预览界面：弹层默认占页面宽度的 80%，支持 `.xls`、`.xlsx`、`.csv`（CSV 自动识别 UTF-8/GBK 和常见分隔符），自动识别工作表、单行或多级合并表头、首条数据行及字段映射；上传后先按每页 15 条预览，不会立即写库。识别可信度低时，用户可人工指定表头起止行、数据起止行和逐列映射，确认后才提交。
+
+数据预览与字段映射解耦：即使未匹配到当前表的任何字段，也会显示识别数据范围内的全部源列和源行，未匹配列头以红色显示，悬停可查看原因。【列映射】之后的【原始工作簿】页签始终保留完整源文件视图，可核对所有工作表、复杂/合并表头、图片、说明文字、样式和原始数据；它不受自动识别结果或字段匹配率影响。
+
+为兼容 OpenPyXL 等工具生成的等价 DrawingML 默认命名空间，前端会在内存中为预览副本规范化图片命名空间；正式提交的仍是原始文件，规范化结果不会进入导入数据或替换上传文件。
 
 ```js
 V8.OpenImportDialog({
@@ -897,6 +901,7 @@ V8.OpenImportDialog({
   Description: '读取固定模板并在后台完成校验、匹配和写入。',
   ApiEngineKey: 'project_material_custom_import',
   TaskTitle: '项目材料自定义导入',
+  ErrorPolicy: 'RollbackAll', // 初始值；用户仍可在弹层改为 ContinueOnError
   Param: {
     TemplateVersion: '2026-08'
   },
@@ -928,6 +933,7 @@ V8.OpenImportDialog({
 |------|------|------|------|
 | `ApiEngineKey` | `string` | 是 | 后台执行的接口引擎 Key。 |
 | `Title` / `Description` / `TaskTitle` | `string` | 否 | 弹层标题、说明和后台任务标题。 |
+| `ErrorPolicy` | `string` | 否 | 初始错误策略：`RollbackAll`（默认，任一错误整批回滚）或 `ContinueOnError`（跳过错误行并继续）；用户可在弹层中修改。 |
 | `Param` | `object` | 否 | 追加给接口引擎的固定参数。 |
 | `Workbook.SheetIndex` / `SheetName` | `number/string` | 否 | 工作表索引或名称，默认第一张；用户仍可在预览中切换。 |
 | `Workbook.Cells` | `object` | 否 | 元数据名称到 A1 单元格地址的映射。 |
@@ -938,9 +944,48 @@ V8.OpenImportDialog({
 | `MaxFileSizeMB` / `MaxRows` / `MaxColumns` | `number` | 否 | 客户端文件、有效数据行和列数上限，后台自定义任务默认 20 MB / 5000 行 / 256 列。 |
 | `BackgroundOptions` | `object` | 否 | 传给 `RunBackground` 的并发、重试等选项。 |
 
-接口引擎从 `V8.Param._ImportRowsJson`、`_ImportMetaJson`、`_ImportFileName` 和 `_ImportFileSize` 读取数据。`_ImportMetaJson` 版本为 `2.0`，包含 `SheetIndex/SheetName/HeaderStartRow/HeaderEndRow/DataStartRow/DataEndRow/Columns/Cells/RowCount/Confidence`；`Columns[].ColumnIndex` 从 0 开始，全部行号从 1 开始。业务端必须再次校验模板、字段、权限和数据状态，并通过 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报真实工作量。返回 `Code != 1` 会回滚当前接口引擎事务；应先完整校验再写入，避免部分成功。页面 V8 不应读取 Base64、拼接上传 DOM 或自行实现任务轮询。
+接口引擎从 `V8.Param._ImportRowsJson`、`_ImportMetaJson`、`_ImportErrorPolicy`、`_ImportUniqueRulesJson`、`_ImportFileName` 和 `_ImportFileSize` 读取数据。`_ImportMetaJson` 版本为 `2.2`，除 `SheetIndex/SheetName/HeaderStartRow/HeaderEndRow/DataStartRow/DataEndRow/Columns/Cells/RowCount/Confidence/FileType/Encoding/Delimiter` 外，还包含：
 
-模块自带【导入】按钮现在也支持上述自动识别、人工校正和预览，并在确认后把原始文件及同一份解析范围交给服务端复核。只有需要固定单元格元数据、后台任务、跨表匹配或特殊业务事务时，才使用 `OpenImportDialog`；不要仅为多级表头重复开发自定义上传界面。
+- `ErrorPolicy`：用户最终确认的 `RollbackAll` 或 `ContinueOnError`。
+- `UpsertMode: 'ByTableUniqueRules'`。
+- `UniqueRules`：弹层展示的单字段、组合唯一规则快照。
+
+`UniqueRules` 只能用于界面说明和协议诊断，不能作为权限或数据完整性的事实源。接口引擎必须重新读取当前表的权威字段配置：每个 `Config.Unique.Type='Alone'` 的唯一字段各自是一条规则，所有 `Type='All'` 字段共同组成一条组合规则。导入行只在一条规则的全部字段都有值时使用该规则；任一规则命中同一条已有记录则修改，全部未命中则新增；多条规则命中不同记录或同一规则命中多条脏数据时，该行必须报冲突，不能任意挑选记录。
+
+`_ImportRowsJson` 只包含已映射、准备提交的字段，完整原始内容只用于前端核对，不能直接作为可信写入数据。业务端仍须校验模板、字段、菜单/表权限、数据状态和唯一规则，并通过 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报新增、修改、失败及真实工作量。
+
+错误策略由接口引擎显式执行：`RollbackAll` 遇到首个行错误应返回 `Code:0`，依靠接口引擎事务整体回滚；`ContinueOnError` 应捕获并记录行错误、继续下一行，最后返回 `Code:1` 使成功行提交。两种模式都禁止手动调用 `Commit/Rollback`。如果所用数据库或外部服务在某个异常后无法继续当前事务，自定义接口应先完整预校验，或把每行写入封装为平台允许的独立幂等操作，不能伪报“已跳过并继续”。页面 V8 不应读取 Base64、拼接上传 DOM或自行实现任务轮询。
+
+```js
+var rows = JSON.parse(V8.Param._ImportRowsJson || '[]');
+var meta = JSON.parse(V8.Param._ImportMetaJson || '{}');
+var errorPolicy = V8.Param._ImportErrorPolicy || meta.ErrorPolicy || 'RollbackAll';
+var errors = [];
+var added = 0;
+var updated = 0;
+
+for (var i = 0; i < rows.length; i++) {
+  try {
+    // 这里必须按当前表权威 Unique/Config 重新解析规则并安全定位 existingId。
+    // existingId 存在则 UptFormData，不存在则 AddFormData；不得只信任 meta.UniqueRules。
+    var writeResult = writeOneRowWithAuthoritativeUniqueRules(rows[i]);
+    if (!writeResult || writeResult.Code !== 1) {
+      throw new Error((writeResult && writeResult.Msg) || '导入失败');
+    }
+    if (writeResult.Data && writeResult.Data.Updated) updated++; else added++;
+  } catch (error) {
+    errors.push({ ExcelRow: rows[i]._ExcelRow || i + 1, Msg: error.message || String(error) });
+    if (errorPolicy === 'RollbackAll') {
+      return { Code: 0, Msg: errors[0].Msg, Data: { Added: 0, Updated: 0, Failed: 1, Errors: errors } };
+    }
+  }
+}
+return { Code: 1, Data: { Added: added, Updated: updated, Failed: errors.length, Errors: errors } };
+```
+
+上例的 `writeOneRowWithAuthoritativeUniqueRules` 是业务接口应实现的封装名称，并非平台全局函数。
+
+模块自带【导入】按钮也支持上述 Excel/CSV 自动识别、全源数据预览、原始工作簿、人工校正和列映射，并在确认后把原始文件及同一份解析范围交给服务端复核。只有需要固定单元格元数据、后台任务、跨表匹配或特殊业务事务时，才使用 `OpenImportDialog`；不要仅为复杂表头或 CSV 重复开发自定义上传界面。
 
 ## V8.NewGuid
 >* 生成一个前端Guid值

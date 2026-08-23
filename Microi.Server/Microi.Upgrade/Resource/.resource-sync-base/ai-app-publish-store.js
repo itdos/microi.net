@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.8.6
+ * Version: v1.8.7
  * Function:
  * - 统一应用商城发布器：V3 committed proof、精确版本、租户范围更新日志硬门禁、资源快照 CAS、共享公共运行时，以及受管接口历史兼容基线的连续发布。
  */
@@ -693,6 +693,55 @@ function normalizeMenuContract(value, menuIds, exactMenuIds) {
   }
   return value;
 }
+
+// MICROSERVICE_MENU_KEY_ENRICHMENT_V1：sys_menu 的历史母表可能尚未包含
+// MicroServiceKey 物理字段，但应用商城包必须是跨租户自包含的。发布时以当前
+// committed ApplicationBundle 的 AppKey/MsKey 补齐菜单，并拒绝跨应用或缺路由绑定。
+function enrichMicroServiceMenuBindings(packageModel) {
+  var model = packageModel || {};
+  var bundle = model.ApplicationBundle || {};
+  var application = bundle.Application || {};
+  var microService = bundle.MicroService || {};
+  var applicationType = text(
+    bundle.ApplicationType || application.ApplicationType || application.AppType,
+  ).toLowerCase();
+  if (applicationType !== 'microservice') return ok({ Updated: 0 });
+
+  var appKey = text(application.AppKey || bundle.AppKey || microService.MsKey).trim();
+  if (isBlank(appKey)) return fail('MicroService 应用包缺少稳定 AppKey/MsKey，无法绑定菜单');
+
+  var routeMap = {};
+  var routes = toArray(bundle.Routes);
+  for (var routeIndex = 0; routeIndex < routes.length; routeIndex++) {
+    var routePath = text((routes[routeIndex] || {}).RoutePath).trim().toLowerCase();
+    if (routePath) routeMap[routePath] = true;
+  }
+
+  var menus = toArray(model.SysMenus);
+  var updated = 0;
+  for (var menuIndex = 0; menuIndex < menus.length; menuIndex++) {
+    var menu = menus[menuIndex] || {};
+    var isMicroServiceMenu = text(menu.OpenType).toLowerCase() === 'microservice'
+      || menu.IsMicroiService === true
+      || Number(menu.IsMicroiService || 0) === 1;
+    if (!isMicroServiceMenu) continue;
+
+    var existingKey = text(menu.MicroServiceKey || menu.MsKey || menu.MicroServiceAppKey).trim();
+    if (existingKey && existingKey.toLowerCase() !== appKey.toLowerCase()) {
+      return fail('微服务菜单【' + text(menu.Name || menu.Id, '未命名') + '】绑定 ' + existingKey
+        + '，与当前应用包 ' + appKey + ' 不一致');
+    }
+    var menuRoutePath = text(menu.MicroServiceRoutePath || menu.RoutePath).trim();
+    if (menuRoutePath && !routeMap[menuRoutePath.toLowerCase()]) {
+      return fail('微服务菜单【' + text(menu.Name || menu.Id, '未命名') + '】引用路由 '
+        + menuRoutePath + '，但当前 committed ApplicationBundle 未包含该路由');
+    }
+    menu.MicroServiceKey = appKey;
+    updated += 1;
+  }
+  model.SysMenus = menus;
+  return ok({ Updated: updated, MicroServiceKey: appKey });
+}
 function selectionJson(value) {
   if (value === null || value === undefined) return '';
   return typeof value === 'string' ? value : JSON.stringify(value);
@@ -1248,6 +1297,10 @@ var packageModel = {
   SysApiEngines: toArray(selectedExport.SysApiEngines),
   ScheduleJobs: selectedScheduleJobs
 };
+var microServiceMenuBindingResult = enrichMicroServiceMenuBindings(packageModel);
+if (!microServiceMenuBindingResult || microServiceMenuBindingResult.Code !== 1) {
+  return microServiceMenuBindingResult || fail('微服务菜单绑定补全失败');
+}
 if (sharedPublicRuntime) {
   packageModel.PackageInfo.SharedPublicRuntime = true;
   packageModel.ApplicationBundle.AssetStoragePolicy = {

@@ -43,7 +43,7 @@ test("module package exposes the menu badge tooltip as a physical field", () => 
 
 test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.ok(
-    versionAtLeast(saasPackage.PackageInfo.Version, "v7.5.24"),
+    versionAtLeast(saasPackage.PackageInfo.Version, "v7.5.31"),
     `SaaS package must retain the child-tenant fan-out baseline, current=${saasPackage.PackageInfo.Version}`,
   );
   const key = "bulk-update-child-tenant-platform-apps";
@@ -56,11 +56,24 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(engine.ApiV8Code, /CHILD_TASK_TERMINAL_AGGREGATION_V1/);
   assert.match(engine.ApiV8Code, /CHILD_TASK_AGGREGATE_PROGRESS_V1/);
   assert.match(engine.ApiV8Code, /CHILD_TASK_MONITOR_CHECKPOINT_ONLY_V1/);
+  assert.match(engine.ApiV8Code, /CHILD_TASK_PARTIAL_QUEUE_MONITOR_V1/);
+  assert.match(engine.ApiV8Code, /CHILD_TASK_RUNTIME_RELOAD_FALLBACK_V1/);
+  assert.match(engine.ApiV8Code, /discoverTargetsWithRuntimeRecovery/);
+  assert.match(engine.ApiV8Code, /V8\.Method\.ReloadOsClient/);
+  const recoveryHelperIndex = engine.ApiV8Code.indexOf(
+    "function discoverTargetsWithRuntimeRecovery"
+  );
   const queueGuardIndex = engine.ApiV8Code.indexOf("if (phase == 'Queue')");
   const targetDiscoveryIndex = engine.ApiV8Code.indexOf(
-    "GetChildTenantPlatformAppMaintenanceTargets"
+    "GetChildTenantPlatformAppMaintenanceTargets",
+    recoveryHelperIndex
   );
-  assert.ok(queueGuardIndex >= 0 && targetDiscoveryIndex > queueGuardIndex);
+  const queueRecoveryCallIndex = engine.ApiV8Code.indexOf(
+    "discoverTargetsWithRuntimeRecovery(executionParam)",
+    queueGuardIndex
+  );
+  assert.ok(recoveryHelperIndex >= 0 && targetDiscoveryIndex > recoveryHelperIndex);
+  assert.ok(queueGuardIndex >= 0 && queueRecoveryCallIndex > queueGuardIndex);
   assert.equal(
     engine.ApiV8Code.indexOf("GetChildTenantPlatformAppMaintenanceTargets", targetDiscoveryIndex + 1),
     -1
@@ -72,7 +85,7 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(engine.ApiV8Code, /MaxItemsPerChunk|batchSize = 20/);
   assert.match(engine.ApiV8Code, /queueFailureDetail/);
   assert.match(engine.ApiV8Code, /item\.Name \|\| item\.OsClient/);
-  assert.equal(engine.Version, "v1.1.5");
+  assert.equal(engine.Version, "v1.1.7");
   assert.equal(
     saasPackage.ResourcePolicies.ApiEngines[key]?.UpgradePolicy,
     "Managed"

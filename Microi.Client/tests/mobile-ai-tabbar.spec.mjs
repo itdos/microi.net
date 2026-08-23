@@ -14,6 +14,10 @@ const componentSource = fs.readFileSync(
     path.resolve(testDir, "../src/components/MobileTabBar/index.vue"),
     "utf8"
 );
+const visibilitySource = fs.readFileSync(
+    path.resolve(testDir, "../src/components/MobileTabBar/mobile-ai-entry.js"),
+    "utf8"
+);
 const designSource = fs.readFileSync(
     path.resolve(testDir, "../src/styles/mci-design.scss"),
     "utf8"
@@ -31,12 +35,17 @@ test("AI entry is enabled by default and only an explicit negative switch hides 
     assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: 0 }), true);
     assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: "0" }), true);
     assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: false }), true);
+    assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: "false" }), true);
+    assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: null }), true);
+    assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: "unexpected" }), true);
     assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: 1 }), false);
     assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: "1" }), false);
     assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: true }), false);
     assert.equal(isMobileAiAssistantEnabled({ DisableAiAssistant: "true" }), false);
-    assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: 0 }), false);
+    assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: 0 }), true);
     assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: 1 }), true);
+    assert.equal(isMobileAiAssistantEnabled({ IsShowAiAssistant: 1, DisableAiAssistant: 1 }), false);
+    assert.doesNotMatch(visibilitySource, /IsShowAiAssistant/);
 });
 
 test("AI entry targets the dedicated data assistant page", () => {
