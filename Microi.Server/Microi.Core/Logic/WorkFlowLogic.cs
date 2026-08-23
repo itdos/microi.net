@@ -485,6 +485,8 @@ namespace Microi.net
                 {
                     return new DosResult<dynamic>(0, null, updateResult.Msg);
                 }
+                await MicroiEngine.CacheTenant.Cache(param.OsClient)
+                    .RemoveAsync($"Microi:{param.OsClient}:WorkflowStats:{userId}");
             }
 
             return new DosResult<dynamic>(1, new { IsRead = true, Changed = changed });

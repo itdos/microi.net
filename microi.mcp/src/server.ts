@@ -2,6 +2,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { isIP } from 'node:net';
 import path from 'node:path';
 import { z } from 'zod';
 import type { ApiResponse, MicroiClient, DbTable, DbField, PlaywrightContextData, PlaywrightEngineInfo, PlaywrightModuleInfo, TranslateTextResult } from './microi-client.js';
@@ -4938,6 +4939,147 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }
         return { content: [{ type: 'text', text: `✅ Workflow node V8 "${nodeId}/${eventType}" saved successfully.` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 统一查询系统日志/监控
+  // ========================
+  server.tool(
+    'microi_query_system_observability',
+    `Query the complete Microi 系统日志/监控 surface for OsClient ${osClient}. Start with action=Capabilities. Read actions cover logs/statistics/details, live signals, Trace timeline, hot API rank, runtime/host/Docker/queue snapshot, application logs, security records, platform statistics and network traffic attribution/history. The backend enforces platform-observability administrator permission, tenant isolation, bounded pagination and secret redaction. Runtime metrics are current-node only; HTTP-attributed bytes do not equal total NIC/container traffic.`,
+    {
+      action: z.enum([
+        'Capabilities', 'Snapshot', 'Logs', 'LogTypes', 'LogStats', 'Signal', 'Trace',
+        'ApiRank', 'AppLogs', 'PlatformStats', 'SecurityData', 'TrafficHistory',
+      ]).describe('Read action. Use Capabilities first to discover exact scope and boundaries.'),
+      keyword: z.string().max(100).optional().describe('Log/signal/security keyword. The backend applies its own bounded search rules.'),
+      type: z.string().max(100).optional().describe('System log Type filter.'),
+      category: z.string().max(100).optional().describe('System log Category filter.'),
+      source: z.string().max(100).optional().describe('System log Source filter.'),
+      level: z.number().int().min(0).max(10).optional().describe('Exact log level for Logs.'),
+      levelMin: z.number().int().min(0).max(10).optional().describe('Minimum log level for Signal.'),
+      searchMonth: z.string().regex(/^\d{6}$/u).optional().describe('Log/Trace month in yyyyMM.'),
+      pageIndex: z.number().int().min(1).max(100000).optional().describe('Page index, default 1.'),
+      pageSize: z.number().int().min(1).max(500).optional().describe('Page size. Logs/SecurityData max 200; Trace/TrafficHistory max 500.'),
+      windowMinutes: z.number().int().min(1).max(15).optional().describe('Snapshot request window, 1-15 minutes.'),
+      windowSeconds: z.number().int().min(60).max(86400).optional().describe('Signal window, 60-86400 seconds.'),
+      top: z.number().int().min(1).max(100).optional().describe('Top N for Snapshot or ApiRank. Snapshot backend clamps to 5-50.'),
+      includeHost: z.boolean().optional().describe('Snapshot includes host/runtime overview. Default true.'),
+      includeDocker: z.boolean().optional().describe('Snapshot includes heavier Docker sampling. Default false.'),
+      traceId: z.string().regex(/^[0-9a-fA-F]{32}$/u).optional().describe('W3C 32-hex TraceId for Trace.'),
+      serviceName: z.string().max(100).optional().describe('Signal service-name filter.'),
+      apiEngineKey: z.string().max(100).optional().describe('ApiRank engine-key filter.'),
+      name: z.string().max(100).optional().describe('ApiRank endpoint/name filter.'),
+      lines: z.number().int().min(20).max(1000).optional().describe('AppLogs tail lines, 20-1000.'),
+      kind: z.enum(['Access', 'Attack', 'Block']).optional().describe('SecurityData kind.'),
+      status: z.string().max(50).optional().describe('SecurityData Block status filter.'),
+      dimensionType: z.enum(['Total', 'Endpoint', 'Ip', 'User', 'Tenant', 'ContentType']).optional().describe('TrafficHistory aggregation dimension.'),
+      hours: z.number().int().min(1).max(168).optional().describe('TrafficHistory lookback hours, 1-168.'),
+      observedOsClient: z.string().max(50).optional().describe('TrafficHistory observed tenant filter; caller still remains bound to the authenticated control plane.'),
+    },
+    async ({
+      action, keyword, type, category, source, level, levelMin, searchMonth, pageIndex, pageSize,
+      windowMinutes, windowSeconds, top, includeHost, includeDocker, traceId, serviceName,
+      apiEngineKey, name, lines, kind, status, dimensionType, hours, observedOsClient,
+    }) => {
+      try {
+        if (action === 'Trace' && !traceId) {
+          return { content: [{ type: 'text', text: 'Trace 查询必须传入 32 位十六进制 traceId。' }], isError: true };
+        }
+        const result = await client.querySystemObservability({
+          Action: action,
+          ...(keyword ? { Keyword: keyword, _Keyword: keyword } : {}),
+          ...(type ? { Type: type } : {}),
+          ...(category ? { Category: category } : {}),
+          ...(source ? { Source: source } : {}),
+          ...(level === undefined ? {} : { Level: level }),
+          ...(levelMin === undefined ? {} : { LevelMin: levelMin }),
+          ...(searchMonth ? { SearchMonth: searchMonth, _SearchMonth: searchMonth } : {}),
+          ...(pageIndex === undefined ? {} : { PageIndex: pageIndex, _PageIndex: pageIndex }),
+          ...(pageSize === undefined ? {} : { PageSize: pageSize, _PageSize: pageSize }),
+          ...(windowMinutes === undefined ? {} : { WindowMinutes: windowMinutes }),
+          ...(windowSeconds === undefined ? {} : { WindowSeconds: windowSeconds }),
+          ...(top === undefined ? {} : { Top: top }),
+          ...(includeHost === undefined ? {} : { IncludeHost: includeHost }),
+          ...(includeDocker === undefined ? {} : { IncludeDocker: includeDocker }),
+          ...(traceId ? { TraceId: traceId.toLowerCase() } : {}),
+          ...(serviceName ? { ServiceName: serviceName } : {}),
+          ...(apiEngineKey ? { ApiEngineKey: apiEngineKey } : {}),
+          ...(name ? { Name: name } : {}),
+          ...(lines === undefined ? {} : { Lines: lines }),
+          ...(kind ? { Kind: kind } : {}),
+          ...(status ? { Status: status } : {}),
+          ...(dimensionType ? { DimensionType: dimensionType } : {}),
+          ...(hours === undefined ? {} : { Hours: hours }),
+          ...(observedOsClient ? { ObservedOsClient: observedOsClient } : {}),
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify({
+            Code: result.Code,
+            Msg: result.Msg || '',
+            Data: result.Data,
+            DataCount: result.DataCount,
+            DataAppend: result.DataAppend,
+          }, null, 2) }],
+          ...(result.Code === 1 ? {} : { isError: true }),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 系统日志/监控 IP 治理
+  // ========================
+  server.tool(
+    'microi_manage_system_observability',
+    `Safely manage an IP block through Microi 系统日志/监控 for OsClient ${osClient}. Supported actions are BlockIp and UnblockIp only. The first call without the exact confirmation returns a dry-run preview and performs no write. The backend revalidates platform-admin permission, IP safety, tenant scope and writes an audit record.`,
+    {
+      action: z.enum(['BlockIp', 'UnblockIp']).describe('Security governance action.'),
+      ip: z.string().min(3).max(64).describe('IPv4 or IPv6 address. Host/local/unspecified/multicast targets are rejected again by the backend.'),
+      blockMinutes: z.number().int().min(1).max(10080).optional().describe('Block duration in minutes, 1-10080. Default 30 for BlockIp.'),
+      reason: z.string().max(300).optional().describe('Bounded operator reason. Do not include tokens, passwords or request bodies.'),
+      confirmExecution: z.string().optional().describe('Exact confirmation: BlockIp:<ip> or UnblockIp:<ip>.'),
+    },
+    async ({ action, ip, blockMinutes, reason, confirmExecution }) => {
+      try {
+        const normalizedIp = ip.trim();
+        if (isIP(normalizedIp) === 0) {
+          return { content: [{ type: 'text', text: 'IP 地址格式无效。' }], isError: true };
+        }
+        const expectedConfirmation = `${action}:${normalizedIp}`;
+        if (confirmExecution !== expectedConfirmation) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({
+              dryRun: true,
+              action,
+              ip: normalizedIp,
+              blockMinutes: action === 'BlockIp' ? (blockMinutes || 30) : undefined,
+              reason: action === 'BlockIp' ? (reason || '系统日志/监控中由管理员手动封禁。') : undefined,
+              requiredConfirmation: expectedConfirmation,
+              warning: '确认后会修改当前租户的 IP 封锁状态，并写入平台审计日志。',
+            }, null, 2) }],
+          };
+        }
+        await client.writeAuditLog(
+          'microi_manage_system_observability',
+          normalizedIp,
+          JSON.stringify({ action, blockMinutes: action === 'BlockIp' ? (blockMinutes || 30) : undefined }),
+        );
+        const result = await client.manageSystemObservability({
+          Action: action,
+          Ip: normalizedIp,
+          ...(action === 'BlockIp' ? { BlockMinutes: blockMinutes || 30, Reason: reason || '' } : {}),
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ Code: result.Code, Msg: result.Msg || '', Data: result.Data }, null, 2) }],
+          ...(result.Code === 1 ? {} : { isError: true }),
+        };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }

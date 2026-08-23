@@ -42,6 +42,34 @@ test("frontend V8 notification API maps stable overloads to server engines", asy
     assert.equal(callbackResult.Code, 1);
 });
 
+test("notification list coalesces one render burst and mutations invalidate it", async () => {
+    const calls = [];
+    let resolveFirst;
+    const first = new Promise((resolve) => { resolveFirst = resolve; });
+    const api = createPlatformNotificationApi((engineKey, param) => {
+        calls.push({ engineKey, param });
+        if (engineKey === PLATFORM_NOTIFICATION_ENGINE_KEYS.List && calls.length === 1) return first;
+        return Promise.resolve({ Code: 1, Data: [], DataCount: 0, DataAppend: { UnreadCount: 0 } });
+    });
+
+    const left = api.List({ _PageSize: 20 });
+    const right = api.List({ _PageSize: 20 });
+    assert.equal(calls.length, 1);
+    resolveFirst({ Code: 1, Data: [{ Id: "notice-1" }], DataCount: 1 });
+    assert.deepEqual(await left, await right);
+
+    await api.List({ _PageSize: 20 });
+    assert.equal(calls.length, 1, "the short render-burst cache should reuse the completed snapshot");
+
+    await api.MarkRead("notice-1");
+    await api.List({ _PageSize: 20 });
+    assert.deepEqual(calls.map((item) => item.engineKey), [
+        PLATFORM_NOTIFICATION_ENGINE_KEYS.List,
+        PLATFORM_NOTIFICATION_ENGINE_KEYS.MarkRead,
+        PLATFORM_NOTIFICATION_ENGINE_KEYS.List
+    ]);
+});
+
 test("notification snapshot keeps server unread count and has a safe fallback", () => {
     assert.deepEqual(normalizePlatformNotificationResult({
         Code: 1,

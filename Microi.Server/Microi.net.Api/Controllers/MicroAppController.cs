@@ -425,6 +425,11 @@ namespace Microi.net.Api
             {
                 return Ok(new DosResult(0, null, "OsClient and AppKey are required."));
             }
+            SystemObservabilityService.AnnotateControllerResource(
+                HttpContext,
+                "MicroApp",
+                nameof(Resolve),
+                appKey);
 
             // Resolve only needs lightweight runtime metadata. Loading the
             // compiled asset payload here makes every menu navigation scale
@@ -477,12 +482,12 @@ namespace Microi.net.Api
                     }
                     else
                     {
-                    return Ok(new DosResult(0, new
-                    {
-                        ReasonCode = "MICRO_APP_PAGE_RESOLVE_FAILED",
-                        AppKey = appKey,
-                        RoutePath = NormalizeRoutePath(routePath)
-                    }, "暂时无法读取微服务页面配置，请稍后重试。"));
+                        return Ok(new DosResult(0, new
+                        {
+                            ReasonCode = "MICRO_APP_PAGE_RESOLVE_FAILED",
+                            AppKey = appKey,
+                            RoutePath = NormalizeRoutePath(routePath)
+                        }, "暂时无法读取微服务页面配置，请稍后重试。"));
                     }
                 }
             }

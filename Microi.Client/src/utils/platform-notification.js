@@ -11,6 +11,11 @@ export const LEGACY_PLATFORM_SYSTEM_CONTACT_ID = "MICROI_PLATFORM_ADMIN";
 export const PLATFORM_NOTIFICATION_EVENT = "microi-platform-notification";
 export const PLATFORM_NOTIFICATION_SNAPSHOT_EVENT = "microi-platform-notifications-snapshot";
 
+// Notification center, chat and SignalR reconnect can request the same snapshot
+// during one render burst. Coalesce those reads without turning the durable
+// notification log into a long-lived client cache.
+const LIST_BURST_CACHE_MS = 750;
+
 function callEngine(runEngine, engineKey, param, callback) {
     const promise = Promise.resolve(runEngine(engineKey, param || {}));
     if (typeof callback === "function") {
@@ -23,6 +28,41 @@ export function createPlatformNotificationApi(runEngine) {
     if (typeof runEngine !== "function") {
         throw new TypeError("runEngine must be a function");
     }
+    const pendingLists = new Map();
+    const recentLists = new Map();
+    let listGeneration = 0;
+
+    function invalidateLists() {
+        listGeneration += 1;
+        recentLists.clear();
+    }
+
+    function listRequest(param, callback) {
+        const requestParam = { ...(param || {}) };
+        const generation = listGeneration;
+        const key = `${generation}:${JSON.stringify(requestParam)}`;
+        const now = Date.now();
+        const recent = recentLists.get(key);
+        let promise;
+        if (recent && recent.expiresAt > now) {
+            promise = Promise.resolve(recent.result);
+        } else if (pendingLists.has(key)) {
+            promise = pendingLists.get(key);
+        } else {
+            promise = callEngine(runEngine, PLATFORM_NOTIFICATION_ENGINE_KEYS.List, requestParam)
+                .then((result) => {
+                    if (generation === listGeneration) {
+                        recentLists.set(key, { result, expiresAt: Date.now() + LIST_BURST_CACHE_MS });
+                    }
+                    return result;
+                })
+                .finally(() => pendingLists.delete(key));
+            pendingLists.set(key, promise);
+        }
+        if (typeof callback === "function") promise.then(callback);
+        return promise;
+    }
+
     return Object.freeze({
         Send(msgKeyOrParam, paramOrCallback, callback) {
             let param;
@@ -34,13 +74,15 @@ export function createPlatformNotificationApi(runEngine) {
                 param = { ...(msgKeyOrParam || {}) };
                 callback = typeof paramOrCallback === "function" ? paramOrCallback : callback;
             }
+            invalidateLists();
             return callEngine(runEngine, PLATFORM_NOTIFICATION_ENGINE_KEYS.Send, param, callback);
         },
         List(param, callback) {
-            return callEngine(runEngine, PLATFORM_NOTIFICATION_ENGINE_KEYS.List, param, callback);
+            return listRequest(param, callback);
         },
         MarkRead(idOrParam, callback) {
             const param = typeof idOrParam === "string" ? { Id: idOrParam } : { ...(idOrParam || {}) };
+            invalidateLists();
             return callEngine(runEngine, PLATFORM_NOTIFICATION_ENGINE_KEYS.MarkRead, param, callback);
         }
     });

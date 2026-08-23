@@ -113,7 +113,7 @@
 | 低代码开发者 | [快速开始](/doc/getting-started/start-use) · [表单引擎](/doc/form-engine/form-engine-info) · [模块引擎](/doc/system-engine/module-engine) · [工作流](/doc/system-engine/wf-engine) |
 | AI / V8 开发者 | [AI + V8 编程](/doc/v8-engine/ai-apiengine) · [VS Code 插件](/doc/v8-engine/vs-code-plugin) · [接口引擎](/doc/v8-engine/api-engine) |
 | 前端与多端开发者 | [Microi.UI](/doc/system-engine/microi-ui) · [多端客户端](/doc/system-engine/multi-end-client) · [前端微服务](/doc/system-engine/micro-app) · [Unity / WebGL](/doc/system-engine/unity-integration) |
-| 运维 / 安全负责人 | [Docker 部署](/doc/getting-started/docker-run) · [安全基线](/doc/more/security) · [任务调度](/doc/system-engine/job) · [消息通知](/doc/system-engine/message-notification) |
+| 运维 / 安全负责人 | [系统日志/监控](/doc/system-engine/system-observability) · [Docker 部署](/doc/getting-started/docker-run) · [安全基线](/doc/more/security) · [任务调度](/doc/system-engine/job) · [消息通知](/doc/system-engine/message-notification) |
 | 系统集成开发者 | [接口引擎](/doc/v8-engine/api-engine) · [数据源引擎](/doc/system-engine/datasource-engine) · [MQ](/doc/system-engine/mq) / [MQTT](/doc/system-engine/mqtt-engine) · [应用商城](/doc/system-engine/app-store) |
 
 | 资源 | 地址 |
@@ -180,6 +180,7 @@
 <tr><td>🛡️ <strong><a href="/doc/more/identity-verification">登录方式与强身份验证</a></strong></td><td>DiyToken、Passkey、Authenticator、Gitee/微信/GitHub 登录、改密步进票据与可选严格人脸网关</td></tr>
 <tr><td>🔑 <strong><a href="/doc/more/sso">SSO 身份联邦</a></strong></td><td>OIDC、SAML2、CAS 双向单点登录、账号映射、协议端点、安全基线与官方商城应用</td></tr>
 <tr><td>📨 <strong><a href="/doc/system-engine/mq">消息队列</a></strong></td><td>RabbitMQ 集成</td></tr>
+<tr><td>🛰️ <strong><a href="/doc/system-engine/system-observability">系统日志/监控</a></strong></td><td>日志、Trace、热点接口、CPU/内存、网络流量归因、安全事件与 AI 查询治理</td></tr>
 <tr><td>🔔 <strong><a href="/doc/system-engine/message-notification">消息通知</a></strong></td><td>公众号/服务号、短信、邮件与平台内部实时通知，持久日志和多节点幂等</td></tr>
 <tr><td>📡 <strong><a href="/doc/system-engine/mqtt-engine">IoT 物联网 MQTT</a></strong></td><td>集成 MQTT 服务器，支持 485 / ZigBee / 蓝牙 / Modbus 网关</td></tr>
 <tr><td>🔍 <strong><a href="/doc/system-engine/search-engine">搜索引擎</a></strong></td><td>ElasticSearch 分词搜索</td></tr>

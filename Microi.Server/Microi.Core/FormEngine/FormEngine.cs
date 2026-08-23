@@ -115,6 +115,8 @@ namespace Microi.net
             else if (normalizedTableName == "sys_rolelimit"
                      || normalizedTableName == "sys_role"
                      || normalizedTableName == "sys_user"
+                     || normalizedTableName == "sys_microiservice"
+                     || normalizedTableName == "sys_microiservice_page"
                      || normalizedTableName == "diy_table"
                      || normalizedTableName == "diy_field")
             {

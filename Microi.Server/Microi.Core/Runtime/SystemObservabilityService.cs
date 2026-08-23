@@ -84,6 +84,12 @@ namespace Microi.net
         /// </summary>
         public static void AnnotateApiEngine(HttpContext context, string apiEngineKey, string osClient = "")
         {
+            NetworkTrafficObservabilityService.AnnotateEndpoint(
+                context,
+                "/apiengine/" + (apiEngineKey ?? "").Trim(),
+                "ApiEngine",
+                apiEngineKey,
+                osClient);
             if (context == null
                 || !context.Items.TryGetValue(RequestStateItemKey, out var item)
                 || !(item is ActiveRequestState state))
@@ -96,6 +102,61 @@ namespace Microi.net
             state.IsDiagnostic = IsDiagnosticRoute(state.Route);
             osClient = (osClient ?? "").Trim();
             if (OsClientPattern.IsMatch(osClient)) state.RequestedOsClient = osClient;
+        }
+
+        /// <summary>
+        /// 控制器完成参数绑定后，把通用 FormEngine 路由细分到受限的表单引擎 Key。
+        /// 只记录短标识，不读取 Where、业务数据或请求体，避免诊断页把所有表查询
+        /// 聚合成无法继续定位的 /api/FormEngine/GetTableData。
+        /// </summary>
+        public static void AnnotateFormEngine(HttpContext context, string formEngineKey, string action)
+        {
+            NetworkTrafficObservabilityService.AnnotateEndpoint(
+                context,
+                $"/api/FormEngine/{(action ?? "Request").Trim()}::{(formEngineKey ?? "").Trim()}",
+                "FormEngine",
+                "",
+                "");
+            if (context == null
+                || !context.Items.TryGetValue(RequestStateItemKey, out var item)
+                || !(item is ActiveRequestState state))
+                return;
+            formEngineKey = (formEngineKey ?? "").Trim();
+            action = (action ?? "Request").Trim();
+            if (!ApiEngineKeyPattern.IsMatch(formEngineKey)
+                || !ApiEngineKeyPattern.IsMatch(action))
+                return;
+            state.EndpointKind = "FormEngine";
+            state.ApiEngineKey = "";
+            state.Route = $"/api/FormEngine/{action}::{formEngineKey}";
+        }
+
+        public static void AnnotateControllerResource(
+            HttpContext context,
+            string controller,
+            string action,
+            string resourceKey)
+        {
+            NetworkTrafficObservabilityService.AnnotateEndpoint(
+                context,
+                $"/api/{(controller ?? "").Trim()}/{(action ?? "").Trim()}::{(resourceKey ?? "").Trim()}",
+                "Controller",
+                "",
+                "");
+            if (context == null
+                || !context.Items.TryGetValue(RequestStateItemKey, out var item)
+                || !(item is ActiveRequestState state))
+                return;
+            controller = (controller ?? "").Trim();
+            action = (action ?? "").Trim();
+            resourceKey = (resourceKey ?? "").Trim();
+            if (!ApiEngineKeyPattern.IsMatch(controller)
+                || !ApiEngineKeyPattern.IsMatch(action)
+                || !ApiEngineKeyPattern.IsMatch(resourceKey))
+                return;
+            state.EndpointKind = "Controller";
+            state.ApiEngineKey = "";
+            state.Route = $"/api/{controller}/{action}::{resourceKey}";
         }
 
         public static SystemObservabilitySnapshot GetSnapshot(int windowMinutes = 5, int top = 15)
@@ -178,7 +239,8 @@ namespace Microi.net
                 TopEndpoints = topEndpoints,
                 TopIps = topIps,
                 ActiveRequests = active,
-                RecentRequests = recent
+                RecentRequests = recent,
+                NetworkTraffic = NetworkTrafficObservabilityService.GetSnapshot(windowMinutes, top)
             };
             snapshot.Diagnosis = Diagnose(snapshot);
             return snapshot;
@@ -728,6 +790,7 @@ namespace Microi.net
         public List<TopRequestMetric> TopIps { get; set; } = new List<TopRequestMetric>();
         public List<ActiveRequestSnapshot> ActiveRequests { get; set; } = new List<ActiveRequestSnapshot>();
         public List<CompletedRequestSnapshot> RecentRequests { get; set; } = new List<CompletedRequestSnapshot>();
+        public NetworkTrafficSnapshot NetworkTraffic { get; set; }
         public ObservabilityDiagnosis Diagnosis { get; set; }
     }
 

@@ -55,6 +55,7 @@
   "ai-engine.md":"AI引擎与Microi.AI中转站",
   "ai-workflow-suite.md":"AI工作流、蓝图与状态机",
   "ai-platform-governance.md":"AI平台治理中心",
+  "system-observability.md":"系统日志/监控",
   "app-store.md":"应用商城",
   "mqtt-engine.md":"MQTT引擎（IoT物联网）",
   "wf-engine.md" : "流程引擎",

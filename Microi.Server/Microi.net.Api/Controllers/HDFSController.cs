@@ -297,9 +297,15 @@ namespace Microi.net.Api
             param.OriginalFiles = new Dictionary<string, Stream>(StringComparer.OrdinalIgnoreCase);
             if (HttpContext.Request.HasFormContentType)
             {
+                long declaredBytes = 0;
+                var observedFileNames = new List<string>();
+                var observedExtensions = new List<string>();
                 foreach (var file in HttpContext.Request.Form.Files)
                 {
                     if (file == null) continue;
+                    declaredBytes += Math.Max(0, file.Length);
+                    observedFileNames.Add(file.FileName);
+                    observedExtensions.Add(Path.GetExtension(file.FileName));
                     var isOriginal = string.Equals(
                         file.Name,
                         "MicroiOriginalFile",
@@ -316,6 +322,13 @@ namespace Microi.net.Api
                     }
                     target.Add(file.FileName, file.OpenReadStream());
                 }
+                NetworkTrafficObservabilityService.AnnotateTransfer(
+                    HttpContext,
+                    "Upload",
+                    HttpContext.Request.Form.Files.Count,
+                    declaredBytes,
+                    observedFileNames,
+                    observedExtensions);
             }
             return null;
         }
