@@ -375,6 +375,8 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 
 ## 代码编辑器 CodeEditor
 >* 支持代码联想、代码缩进、语法高亮、代码折叠等等
+>* `Config.CodeEditor.DisplayMode` 支持 `Inline`（表单内直接显示编辑器，默认兼容模式）和 `Dialog`（只显示 `编辑代码（N字）` 按钮，点击后打开平台统一大圆角代码弹层）。配置入口为【表单设计 → 控件配置 → 默认显示方式】。
+>* 配置类长表单或同一 Tab 含多个代码字段时优先使用 `Dialog`，避免 Monaco 编辑器长期占满表单；代码密集型工作台可按字段显式使用 `Inline`。`CodeEditor.Height` 继续控制内联编辑器和弹层编辑区域的建议高度。
 
 ## 下拉树 SelectTree
 >* 这是一个非常强大的组件
@@ -470,7 +472,7 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 | ImgUpload / FileUpload | `Limit`、`Multiple`、`Tips`、`MaxCount`、`ShowFileList`、`Preview`、`MaxSize`、`Upload.*V8`；ImgUpload 另支持 `Crop.Enabled/Mode/Ratio/CustomWidth/CustomHeight/AllowZoom/AllowRotate/AllowFlip` |
 | Cascader / SelectTree / Department / Address / TreeCheckbox | `Lazy`、`Filterable`、`Value`、`Label`、`Children`、`ParentField`、`ParentFields`、`Multiple`、`EmitPath`、`TreeCheckbox.*` |
 | OpenTable / JoinForm / JoinTable | `OpenTable.BtnName`、`OpenTable.MultipleSelect`、`OpenTable.BeforeOpenV8`、`OpenTable.SubmitV8`、`JoinForm.*`、`JoinTable.*` |
-| CodeEditor / JsonTable / Html | `CodeEditor.Height`、`JsonTable.Columns`、`JsonTable.Columns[].Config`、JSON/HTML 内容配置 |
+| CodeEditor / JsonTable / Html | `CodeEditor.Height`、`CodeEditor.DisplayMode=Inline/Dialog`、`JsonTable.Columns`、`JsonTable.Columns[].Config`、JSON/HTML 内容配置 |
 | RichText | `RichText.Limit`；`Image.Enabled/MaxSize/MaxCount/Preview/CompressMaxSize/CompressMaxWidth`；`Video.Enabled/MaxSize/MaxCount`；`File.Enabled/MaxSize/MaxCount/Accept` |
 | Map / MapArea / Qrcode / FontAwesome / DevComponent | `MapCompany=System/AMap/Baidu/Tencent`（凭据只在“安全与服务接入”维护）；`Qrcode.DisplayWidth`、`Qrcode.ShowDownload`、`Qrcode.DownloadText`（二维码内容由 `DataAppend.Code` 提供）；图标类名；`DevComponentName`、`DevComponentPath` |
 

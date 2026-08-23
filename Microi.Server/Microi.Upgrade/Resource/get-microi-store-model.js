@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store-model
- * Version: v1.2.4
+ * Version: v1.2.6
  * Function:
- * - 按公开/私有权限读取当前或历史应用包；后台安装按期望应用版本解析并固定不可变数据版本快照，详情模式不返回大型数据包。
+ * - 按公开/私有权限读取当前或历史应用包；后台安装按期望应用版本解析并固定不可变数据版本快照；详情模式返回租户范围内的更新日志但不返回大型数据包。
  */
 
 function text(value) { return value === null || value === undefined ? "" : String(value); }
@@ -43,6 +43,31 @@ function stripPackage(row) {
   delete plain.SelectAiApp;
   delete plain.PrivateSourcePath;
   return plain;
+}
+function readChangeLogs(storeId) {
+  try {
+    var result = V8.FormEngine.GetTableData("sys_microistore_changelog", {
+      _Where: [["OsClient", "=", V8.OsClient], ["AND", "StoreId", "=", storeId]],
+      _SelectFields: ["Id", "OsClient", "StoreId", "Version", "Title", "ChangeType", "Content", "ReleaseTime", "Sort"],
+      _OrderBy: "ReleaseTime",
+      _OrderByType: "DESC",
+      _PageIndex: 1,
+      _PageSize: 100
+    });
+    if (!result || result.Code !== 1) {
+      return { Available: false, Rows: [], Count: 0 };
+    }
+    return {
+      Available: true,
+      Rows: result.Data || [],
+      Count: result.DataCount === null || result.DataCount === undefined
+        ? (result.Data || []).length
+        : result.DataCount
+    };
+  } catch (error) {
+    // 兼容尚未安装应用商城更新日志资源的历史来源。
+    return { Available: false, Rows: [], Count: 0 };
+  }
 }
 
 var id = trim(V8.Param.Id || V8.Param.StoreId);
@@ -144,4 +169,14 @@ if (versionId) {
 selected.IsPublic = isPublic ? 1 : 0;
 selected.Visibility = isPublic ? "Public" : "Private";
 if (!flag(V8.Param.IncludePackage, true)) selected = stripPackage(selected);
-return { Code: 1, Data: selected, Msg: "成功" };
+var changeLogs = readChangeLogs(id);
+return {
+  Code: 1,
+  Data: selected,
+  DataAppend: {
+    ChangeLogAvailable: changeLogs.Available,
+    ChangeLogCount: changeLogs.Count,
+    ChangeLogs: changeLogs.Rows
+  },
+  Msg: "成功"
+};

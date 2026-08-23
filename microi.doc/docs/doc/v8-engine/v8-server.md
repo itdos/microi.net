@@ -1823,8 +1823,48 @@ return {
 ```js
 var rows = V8.Office.ExcelToList({
   FileByteBase64: excelBase64,
-  SheetIndex: 0
+  SheetIndex: 0,       // 从 0 开始
+  HeaderStartRow: 5,  // 其余行号均从 1 开始
+  HeaderEndRow: 6,
+  DataStartRow: 7,
+  DataEndRow: 1000,
+  Columns: [
+    { ColumnIndex: 0, Name: 'CustomerName', Label: '客户名称' },
+    { Column: 'C', Name: 'Phone', Label: '手机号' }
+  ]
 });
+if (rows.Code !== 1) return rows;
+```
+
+| 参数 | 说明 |
+|---|---|
+| `SheetIndex` | 工作表索引，从 `0` 开始；省略时读取第一张。 |
+| `HeaderStartRow/HeaderEndRow` | 表头一基起止行，支持合并单元格和多级表头；省略时保持旧行为：首行为表头。 |
+| `DataStartRow/DataEndRow` | 数据一基起止行；省略时从表头下一行读到已用区域末尾。 |
+| `Columns` | 确认后的列映射。`ColumnIndex` 从 `0` 开始，也可传 Excel 列字母 `Column`；`Name` 为返回对象字段名。 |
+| `MaxDataRows/MaxColumns` | 解析上限；服务端仍强制不超过平台 50000 行、256 个有效映射列。 |
+
+增强参数全部可省略，旧的首行表头模板继续兼容。传入增强范围后，每行额外返回 `_ExcelRow` 便于精确报错；数据行是否有效按所有已映射列判断，不再因 A 列为空而丢弃；公式单元格读取计算结果。
+
+菜单配置【导入接口替换】时，统一弹层会在用户确认后上传原始文件，并同时传 `V8.Param._ImportMetaJson`。自定义接口应解析这份元数据，再把相同范围传给 `V8.Office.ExcelToList`，从服务端原文件重新取数；不能直接信任浏览器预览，也不能退回固定首行表头：
+
+```js
+var meta = JSON.parse(V8.Param._ImportMetaJson || '{}');
+var fileMap = V8.FilesByteBase64 || {};
+var fileBase64 = Object.values(fileMap)[0];
+if (!fileBase64) return { Code: 0, Msg: '请上传 Excel 文件' };
+
+var parsed = V8.Office.ExcelToList({
+  FileByteBase64: fileBase64,
+  SheetIndex: meta.SheetIndex == null ? 0 : meta.SheetIndex,
+  HeaderStartRow: meta.HeaderStartRow,
+  HeaderEndRow: meta.HeaderEndRow,
+  DataStartRow: meta.DataStartRow,
+  DataEndRow: meta.DataEndRow,
+  Columns: meta.Columns || []
+});
+if (parsed.Code !== 1) return parsed;
+// 接下来仍须重做权限、字段、唯一性、状态与整批事务校验。
 ```
 
 ### 发送邮件 SendEmail

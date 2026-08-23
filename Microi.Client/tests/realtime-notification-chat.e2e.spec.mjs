@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const frontend = process.env.PW_BASE_URL || "http://localhost:61500";
+const apiBase = process.env.PW_API_BASE || "";
 const password = process.env.PW_LOCAL_PASSWORD || "";
 const browserChannel = process.env.PW_BROWSER_CHANNEL || "";
 const screenshotDir = path.resolve(
@@ -18,7 +19,8 @@ test.use({
 test.setTimeout(240_000);
 
 async function login(page) {
-    await page.goto(`${frontend}/?OsClient=iTdos`, { waitUntil: "domcontentloaded" });
+    const apiBaseQuery = apiBase ? `&ApiBase=${encodeURIComponent(apiBase)}` : "";
+    await page.goto(`${frontend}/?OsClient=iTdos${apiBaseQuery}`, { waitUntil: "domcontentloaded" });
     const account = page.locator([
         'input[placeholder*="用户名"]',
         'input[placeholder*="账号"]',
@@ -48,6 +50,12 @@ async function login(page) {
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
     await expect(page.getByRole("button", { name: /管理员|admin/i }).first())
         .toBeVisible({ timeout: 30_000 });
+    if (apiBase) {
+        const runtimeEndpoint = await page.evaluate(() => window.__MICROI_RUNTIME_ENDPOINT__);
+        expect(runtimeEndpoint?.apiBase).toBe(apiBase);
+        expect(runtimeEndpoint?.osClient).toBe("iTdos");
+        expect(runtimeEndpoint?.source?.apiBase).toBe("url-query");
+    }
 }
 
 test("聊天联系人和历史对象始终显示 Name 或 Account", async ({ page }) => {
@@ -76,7 +84,7 @@ test("聊天联系人和历史对象始终显示 Name 或 Account", async ({ pag
     await panel.screenshot({ path: path.join(screenshotDir, "chat-name-account-fallback.png") });
 });
 
-test("SignalR状态、admin平台会话、AI闭环和后台任务事件驱动", async ({ page }, testInfo) => {
+test("SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事件驱动", async ({ page }, testInfo) => {
     test.skip(!password, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(screenshotDir, { recursive: true });
 
@@ -102,22 +110,38 @@ test("SignalR状态、admin平台会话、AI闭环和后台任务事件驱动", 
     await realtime.click();
     await expect(page.locator(".vChat-wrapper")).toBeVisible({ timeout: 15_000 });
     const recentList = page.locator(".vc-recordList");
-    await expect(recentList.getByText("AI助手", { exact: true }).first()).toBeVisible();
-    await expect(recentList.getByText("admin", { exact: true }).first()).toBeVisible();
+    await expect(recentList.getByText("AI助手", { exact: true })).toHaveCount(1);
+    await expect(recentList.getByText("admin", { exact: true })).toHaveCount(0);
     await page.screenshot({
-        path: path.join(screenshotDir, "chat-quick-contacts.png"),
+        path: path.join(screenshotDir, "chat-ai-platform-merged-contact.png"),
         fullPage: true
     });
 
-    await recentList.getByText("admin", { exact: true }).first().click();
-    await expect(page.locator(".vChat__header .barTit")).toHaveText("admin");
-    const editor = page.locator("#J__wcEditor");
-    await expect(editor).toHaveAttribute("contenteditable", "false");
-    await expect(editor).toHaveAttribute("placeholder", /只读/);
+    const systemMessage = `系统消息已统一由AI助手发送 ${Date.now()}`;
+    const systemResult = await page.evaluate(async content => {
+        const app = window.__VUE_APP__;
+        const proxy = app?._instance?.proxy;
+        const common = proxy?.DiyCommon || app?.config?.globalProperties?.DiyCommon;
+        const currentUser = proxy?.diyStore?.GetCurrentUser;
+        if (!common?.Post || !currentUser?.Id) {
+            return { Code: 0, Msg: "DiyCommon or current user is unavailable" };
+        }
+        return await new Promise(resolve => {
+            common.Post(
+                "/api/DiyChat/SendSystemMessage",
+                { Content: content, ToUserId: currentUser.Id },
+                resolve,
+                error => resolve({ Code: 0, Msg: String(error || "request failed") })
+            );
+        });
+    }, systemMessage);
+    expect(Number(systemResult?.Code), systemResult?.Msg || "system message failed").toBe(1);
 
+    const editor = page.locator("#J__wcEditor");
     await recentList.getByText("AI助手", { exact: true }).first().click();
     await expect(page.locator(".vChat__header .barTit")).toHaveText("AI助手");
     await expect(editor).toHaveAttribute("contenteditable", "true");
+    await expect(page.locator("#J__chatMsgList")).toContainText(systemMessage, { timeout: 30_000 });
     await page.waitForTimeout(1500);
     const beforeAiCount = await page.locator("#J__chatMsgList li.others").count();
     const prompt = `请只回复“SignalR正常” ${Date.now()}`;
@@ -128,7 +152,8 @@ test("SignalR状态、admin平台会话、AI闭环和后台任务事件驱动", 
         { timeout: 60_000 }
     ).toBeGreaterThan(beforeAiCount);
     const aiReply = page.locator("#J__chatMsgList li.others").last();
-    await expect(aiReply.locator(".msg")).not.toContainText("正在思考", { timeout: 120_000 });
+    await expect(aiReply.locator(".msg")).toContainText("SignalR正常", { timeout: 120_000 });
+    await expect(aiReply.locator(".typing-cursor")).toHaveCount(0, { timeout: 120_000 });
     const aiReplyText = (await aiReply.locator(".msg").innerText()).trim();
     expect(aiReplyText).toContain("SignalR正常");
     expect(aiReplyText).not.toMatch(/AI回复失败|暂时无法回复|数据查询失败/);

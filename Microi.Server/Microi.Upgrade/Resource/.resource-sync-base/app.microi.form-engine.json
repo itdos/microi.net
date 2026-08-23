@@ -1,12 +1,12 @@
 {
   "PackageInfo": {
     "Name": "表单引擎",
-    "Version": "v7.6.0",
+    "Version": "v7.6.1",
     "CreateTime": "2026-08-08T18:11:58.929Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
-    "Description": "表单引擎基础资源。图片、文件与富文本附件均可配置公有/私有桶和上传限制；RichText 支持图片压缩、视频、普通附件，并以稳定标识安全续签私有资源，避免临时 Token 落库。",
-    "ChangeHistory": "2026-08-23 v7.6.0 RichText 新增公有/私有桶、图片压缩、视频与文件附件配置；私有正文只保存稳定对象标识，每次打开按菜单、记录、字段权限换取短效审计地址，临时 Token 不落库。\n2026-08-23 v7.5.9 图片与文件上传合并拖放区和配置摘要，紧凑显示公有/私有桶、单多文件与最大数量、压缩状态、最大体积；ImgUpload 裁剪开关合并到同一面板。\n2026-08-23 v7.5.8 修复 ImgUpload 多图裁剪上传在接口返回数组时不回显；新增表单用户“上传前裁剪”开关与“不裁剪直接上传”；裁剪弹层及平台弹窗遮罩统一服从 FormMaskBlur，默认关闭毛玻璃。\n2026-08-23 v7.5.7 新增 ImgUpload 专业裁剪配置，支持自由、固定、运行时可选和自定义比例；裁剪图与未改动原图同请求上传，后端强制先将原图写入 HDFS 私有桶。\n2026-08-22 v7.5.6 修复表单分组统计接口引擎下拉的数据源字段代理，避免设计器把 BadgeApiEngineKey 当作不存在的 DiyField Id。\n2026-08-22 v7.5.5 新增表单 Banner 属性 Tab 与 8 个 diy_table 物理字段，支持标题/副标题/图片/背景/标签/接口统计配置；旧表无配置时按字段类型智能显示。\n2026-08-21 v7.5.4 将接口引擎修改历史改为 TableChild 子表；旧 ChangeHistory 按非空行幂等迁移，新版 MCP 与 VS Code 写入独立版本记录。\n2026-08-21 v7.5.1 将表单工作台配置迁移为 diy_table 物理属性并新增两个属性 Tab；TabsPosition 默认 top；新增正向 V8Limit，隐藏旧 FormPresentation/V8Unlimited 兼容字段。\n2026-08-21 v7.5.0 新增 diy_table.FormPresentation 与扩展 Tabs 配置，支持默认现代分组工作台、动态统计、必填计数、HTML 标题/说明、记录切换和移动端适配；弹层与直达页统一复用 DiyForm。\n2026-08-18 v6.9.10 新增 diy_table.DisableFormMaskBlur（关闭表单遮罩毛玻璃），默认 0；安装或升级后继续默认显示毛玻璃，仅显式开启该负向开关时关闭。",
+    "Description": "表单引擎基础资源。通用与接口引擎自定义 Excel 导入支持工作表、多级表头和数据行智能识别、人工校正、15 条分页预览及服务端原文件复核；图片、文件与富文本附件继续支持公有/私有桶和上传限制。",
+    "ChangeHistory": "2026-08-23 v7.6.1 通用与接口引擎自定义 Excel 导入统一升级：80% 宽弹层，自动识别工作表、单行/多级表头及数据起止行，低可信度人工校正、逐列映射、每页 15 条预览，确认后服务端按同一范围复核原文件。\n2026-08-23 v7.6.0 RichText 新增公有/私有桶、图片压缩、视频与文件附件配置；私有正文只保存稳定对象标识，每次打开按菜单、记录、字段权限换取短效审计地址，临时 Token 不落库。\n2026-08-23 v7.5.9 图片与文件上传合并拖放区和配置摘要，紧凑显示公有/私有桶、单多文件与最大数量、压缩状态、最大体积；ImgUpload 裁剪开关合并到同一面板。\n2026-08-23 v7.5.8 修复 ImgUpload 多图裁剪上传在接口返回数组时不回显；新增表单用户“上传前裁剪”开关与“不裁剪直接上传”；裁剪弹层及平台弹窗遮罩统一服从 FormMaskBlur，默认关闭毛玻璃。\n2026-08-23 v7.5.7 新增 ImgUpload 专业裁剪配置，支持自由、固定、运行时可选和自定义比例；裁剪图与未改动原图同请求上传，后端强制先将原图写入 HDFS 私有桶。\n2026-08-22 v7.5.6 修复表单分组统计接口引擎下拉的数据源字段代理，避免设计器把 BadgeApiEngineKey 当作不存在的 DiyField Id。\n2026-08-22 v7.5.5 新增表单 Banner 属性 Tab 与 8 个 diy_table 物理字段，支持标题/副标题/图片/背景/标签/接口统计配置；旧表无配置时按字段类型智能显示。\n2026-08-21 v7.5.4 将接口引擎修改历史改为 TableChild 子表；旧 ChangeHistory 按非空行幂等迁移，新版 MCP 与 VS Code 写入独立版本记录。\n2026-08-21 v7.5.1 将表单工作台配置迁移为 diy_table 物理属性并新增两个属性 Tab；TabsPosition 默认 top；新增正向 V8Limit，隐藏旧 FormPresentation/V8Unlimited 兼容字段。\n2026-08-21 v7.5.0 新增 diy_table.FormPresentation 与扩展 Tabs 配置，支持默认现代分组工作台、动态统计、必填计数、HTML 标题/说明、记录切换和移动端适配；弹层与直达页统一复用 DiyForm。\n2026-08-18 v6.9.10 新增 diy_table.DisableFormMaskBlur（关闭表单遮罩毛玻璃），默认 0；安装或升级后继续默认显示毛玻璃，仅显式开启该负向开关时关闭。",
     "RequiredPlatformCapabilities": [
       "ClientFeature:FormPresentation",
       "ServerField:DiyTable.FormPresentation",
@@ -21,7 +21,9 @@
       "ServerFeature:ImgUploadCropOriginal",
       "ClientFeature:UploadCompactConfigSummary",
       "ClientFeature:RichTextUploadPolicy",
-      "ServerFeature:RichTextPrivateAssetAuthorization"
+      "ServerFeature:RichTextPrivateAssetAuthorization",
+      "ClientFeature:SmartExcelImportPreview",
+      "ServerFeature:ExcelImportConfirmedRange"
     ],
     "MenuCount": 4,
     "TableCount": 8,

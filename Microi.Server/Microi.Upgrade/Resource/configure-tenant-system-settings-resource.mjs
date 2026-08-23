@@ -10,6 +10,22 @@ const storePackageModel = JSON.parse(await readFile(storePackageUrl, 'utf8'))
 const importerSource = (await readFile(importerUrl, 'utf8')).replace(/\r\n/g, '\n')
 const category = '安全与服务接入'
 const createTime = '2026-08-21 00:00:00'
+const migratedPublicSettingKeys = new Set([
+  'login.identity.enabled',
+  'login.passkey.enabled',
+  'login.authenticator.enabled',
+  'security.passwordchange.requirestepup',
+  'login.external.enabled',
+  'login.face.enabled',
+  'login.gitee.enabled',
+  'login.wechat.enabled',
+  'login.github.enabled',
+  'login.passkey.display',
+  'login.authenticator.display',
+  'login.gitee.display',
+  'login.wechat.display',
+  'login.github.display',
+])
 
 const parseVersion = value => String(value || '')
   .replace(/^v/i, '')
@@ -116,11 +132,9 @@ if (dataSet.ConflictPolicy !== 'InsertIfMissing') throw new Error('mci_system_se
 dataSet.ConflictFields = ['ConfigKey']
 dataSet.MetadataFieldsIfExists = ['Category', 'Description']
 
-const existingRows = Array.isArray(dataSet.Rows) ? dataSet.Rows : []
+const existingRows = (Array.isArray(dataSet.Rows) ? dataSet.Rows : [])
+  .filter(row => !migratedPublicSettingKeys.has(String(row.ConfigKey || '').toLowerCase()))
 const rowsByKey = new Map(existingRows.map(row => [String(row.ConfigKey || '').toLowerCase(), row]))
-for (const row of existingRows) {
-  row.Category = category
-}
 for (const row of templates) {
   const key = row.ConfigKey.toLowerCase()
   if (!rowsByKey.has(key)) {
@@ -131,13 +145,14 @@ for (const row of templates) {
 dataSet.Rows = existingRows
 
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {})
-info.Version = ensureMinimumVersion(info.Version, 'v7.5.28')
+info.Version = ensureMinimumVersion(info.Version, 'v7.5.29')
 info.RequiredPlatformCapabilities = [...new Set([
   ...(info.RequiredPlatformCapabilities || []),
   'POST /api/TenantSystemSettings/GetMapRuntime',
   'ClientFeature:MapRuntimeProvidersAMapBaiduTencent',
 ])]
 const changeLines = [
+  '2026-08-23 v7.5.29 从 mci_system_setting 官方种子移除功能启用与入口显示开关；历史租户值仅作只读兼容回退，私有设置继续只交付凭据和后端专用接入参数。',
   '2026-08-23 v7.5.28 系统设置微服务显式继承宿主主题色，修复外置样式下图标与主按钮失色；删除确认层完整展示配置说明主标题。',
   '2026-08-23 v7.5.27 “安全与服务接入”改为 80% 吾码大圆角 Dialog，配置卡片紧凑化并以说明为主标题；Bool 使用开关，编辑、删除、TOTP 与 Secret 显示统一使用品牌弹层且遮罩毛玻璃跟随系统开关。',
   '2026-08-22 v7.5.23 “安全与服务接入”新增高德、百度、腾讯地图租户私密配置模板，浏览器只按当前供应商读取最小运行时凭据并兼容旧 sys_config 字段。',
@@ -160,6 +175,8 @@ info.DataRowCount = (packageModel.DataSets || []).reduce(
 
 await writeFile(packageUrl, `${JSON.stringify(packageModel, null, 2)}\n`, 'utf8')
 
+let storeSummary = ''
+if (!process.argv.includes('--saas-only')) {
 const importer = (storePackageModel.SysApiEngines || []).find(
   item => item.ApiEngineKey === 'import-microi-store-package',
 )
@@ -183,5 +200,7 @@ for (const line of [...storeChangeLines].reverse()) {
 }
 storeInfo.ChangeHistory = `${storeHistoryLines.join('\n')}\n`
 await writeFile(storePackageUrl, `${JSON.stringify(storePackageModel, null, 2)}\n`, 'utf8')
+storeSummary = `; store ${storeInfo.Version}/${importer.Version}`
+}
 
-console.log(`updated ${info.Version}: ${dataSet.Rows.length} tenant system-setting rows; store ${storeInfo.Version}/${importer.Version}`)
+console.log(`updated ${info.Version}: ${dataSet.Rows.length} tenant system-setting rows${storeSummary}`)

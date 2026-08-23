@@ -13,6 +13,34 @@
 - 后端接口引擎和后端 V8 事件仍可读取 `sys_config` 全部字段；私密值统一从 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 读取。禁止返回、记录或复制整个 `ServerPrivateSettings`。
 - `mci_system_setting` 的 Secret 使用租户绑定认证加密，列表默认掩码；临时显示原文要求 Passkey、Authenticator 或严格人脸的一次性步进验证，并使用 `no-store`。
 
+“是否启用、是否显示、采用哪种公开交互方式”这类浏览器和管理员都需要判断的能力开关，必须建成 `sys_config` 实体字段，不能因为它与登录、OAuth 或安全功能有关就塞进“安全与服务接入”。“安全与服务接入”只维护 API Key、ClientSecret、RP ID、Origin、Issuer、供应商地址、Scope 等不能公开或仅供后端执行的参数。两边禁止维护同一个新配置；存量 `mci_system_setting` 开关只作升级兼容回退，保存入口和列表均不再展示。
+
+## 登录与身份能力开关
+
+登录与身份能力的公开正向开关如下：
+
+| `sys_config` 字段 | 默认值 | 说明 |
+|---|---:|---|
+| `IdentityVerificationEnabled` | `1` | 统一强身份验证与多登录方式总开关 |
+| `PasskeyEnabled` | `1` | Passkey / Windows Hello / Face ID / Touch ID 能力 |
+| `AuthenticatorTotpEnabled` | `1` | 标准 TOTP Authenticator 能力 |
+| `RequirePasswordChangeStepUp` | `1` | 已登记强因子的用户修改密码时要求二次验证 |
+| `ExternalLoginEnabled` | `1` | 内置第三方登录总开关 |
+| `FaceVerificationEnabled` | `0` | 独立 Face Gateway 严格人脸与活体能力 |
+| `GiteeLoginEnabled` / `WeChatLoginEnabled` / `GitHubLoginEnabled` | `0` | 对应内置外部登录能力 |
+
+新字段显式值优先；字段尚未安装或值为空时，运行时才读取旧 `mci_system_setting` Key，再回退到存量 `sys_osclients` / 安全默认值。这样旧租户升级后不会被突然改值，但升级完成后的唯一配置入口始终是公开系统设置。
+
+旧数据库启用 Passkey / Authenticator 时，需要同时更新平台前端、后端与官方“系统设置”“SaaS引擎”应用包；仅安装应用包不会替换正在运行的后端 DLL 或已部署的前端静态资源。完成更新后在 `sys_config` 打开公开能力与登录入口开关，存量用户仍须在个人中心分别登记自己的 Passkey 或 TOTP，系统不会替用户自动生成认证因子。Passkey 还要求可信 HTTPS 前端 Origin（`localhost` 仅限开发），HTTP 站点即使开关已打开也不能完成 WebAuthn 登记或登录。
+
+## 开发配置与服务接入
+
+### 开发配置的表单布局
+
+“开发配置”Tab 默认使用四个展开的 `CollapseGroup`：访问与运行地址、V8 执行治理、全局脚本、模板与页面代码。分组作用域使用“直到下一个分组”，避免后续新增字段被错误吞入末尾分组。
+
+该 Tab 的 `CodeEditor` 字段统一设置 `Config.CodeEditor.DisplayMode = "Dialog"`。表单默认只显示 `编辑代码（N字）` 按钮，点击后使用平台统一大圆角弹层编辑；确实需要在表单内常驻编辑器的字段可以在【表单设计 → 控件配置 → 默认显示方式】改回 `Inline`。字符数按 Unicode 字符计算，空值也显示 `0字`。
+
 ### 表单地图服务接入
 
 表单 `Map / MapArea` 的高德、百度、腾讯凭据统一放在 `mci_system_setting`，并归类到“系统设置 → 安全与服务接入”：

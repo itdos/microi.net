@@ -17,7 +17,10 @@ test('form engine package declares image crop and rich text upload contracts', (
     assert.ok(capabilities.includes('ServerFeature:ImgUploadCropOriginal'));
     assert.ok(capabilities.includes('ClientFeature:RichTextUploadPolicy'));
     assert.ok(capabilities.includes('ServerFeature:RichTextPrivateAssetAuthorization'));
-    assert.equal(appPackage.PackageInfo.Version, 'v7.6.0');
+    assert.equal(appPackage.PackageInfo.Version, 'v7.6.1');
+    assert.ok(capabilities.includes('ClientFeature:SmartExcelImportPreview'));
+    assert.ok(capabilities.includes('ServerFeature:ExcelImportConfirmedRange'));
+    assert.match(appPackage.PackageInfo.ChangeHistory, /v7\.6\.1[\s\S]*自动识别[\s\S]*每页 15 条预览/);
     assert.match(appPackage.PackageInfo.ChangeHistory, /v7\.6\.0[\s\S]*RichText[\s\S]*临时 Token 不落库/);
 });
 

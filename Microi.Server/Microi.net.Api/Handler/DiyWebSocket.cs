@@ -99,7 +99,7 @@ namespace Microi.net
             var ids = (userIds ?? Enumerable.Empty<string>())
                 .Select(id => id?.Trim())
                 .Where(id => !string.IsNullOrWhiteSpace(id)
-                             && !string.Equals(id, "AI", StringComparison.OrdinalIgnoreCase))
+                             && !ChatAssistantIdentity.IsAssistant(id))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(100)
                 .ToList();
@@ -528,12 +528,12 @@ namespace Microi.net
                 if (IsBlank(msg.ToUserId) || IsBlank(msg.Content))
                     throw new HubException("接收用户和消息内容不能为空。");
 
-                if (string.Equals(msg.ToUserId, "AI", StringComparison.OrdinalIgnoreCase))
+                if (ChatAssistantIdentity.IsAssistant(msg.ToUserId))
                 {
-                    msg.ToUserId = "AI";
-                    msg.ToUserName = "AI助手";
-                    msg.ToUserAccount = "AI";
-                    msg.ToUserAvatar = "";
+                    msg.ToUserId = ChatAssistantIdentity.UserId;
+                    msg.ToUserName = ChatAssistantIdentity.UserName;
+                    msg.ToUserAccount = ChatAssistantIdentity.UserAccount;
+                    msg.ToUserAvatar = ChatAssistantIdentity.UserAvatar;
                     if (_microiAI == null || _backgroundHubContext == null)
                         throw new HubException("AI聊天服务暂不可用，请稍后重试。");
                 }
@@ -565,13 +565,9 @@ namespace Microi.net
                 {
                     try
                     {
-                        var msg2 = new MessageBody
-                        {
-                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                            FromUserId = "系统消息",
-                            FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now
-                        };
+                        var msg2 = ChatAssistantIdentity.CreateSystemMessage(
+                            DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
+                            msg.FromUserId);
                         if (msg._iHubContext != null)
                         {
                             msg._iHubContext.Clients.Clients(clientInfoFrom.ConnectionIds).SendAsync("ReceiveSendToUser", msg2);
@@ -674,7 +670,7 @@ namespace Microi.net
                 });
 
                 // 如果接收者是AI用户，自动触发AI回复
-                if (msg.ToUserId == "AI")
+                if (ChatAssistantIdentity.IsAssistant(msg.ToUserId))
                 {
                     var trustedAiIdentity = callerIdentity
                         ?? await ResolveIdentityAsync().ConfigureAwait(false);
@@ -837,7 +833,7 @@ namespace Microi.net
                             .Clients(clientInfoTo.ConnectionIds)
                             .ReceiveAIError(
                                 "AI助手暂时无法回复，请检查当前租户的AI模型配置后重试。",
-                                "AI",
+                                ChatAssistantIdentity.UserId,
                                 originalMsg.FromUserId);
                     }
                 }
@@ -859,7 +855,7 @@ namespace Microi.net
                             .Clients(clientInfoTo.ConnectionIds)
                             .ReceiveAIChunk(
                                 "",
-                                "AI",
+                                ChatAssistantIdentity.UserId,
                                 originalMsg.FromUserId,
                                 true);
                     }
@@ -886,9 +882,9 @@ namespace Microi.net
                 var chatHost = GetChatHost(trustedOsClient);
                 var aiUser = new
                 {
-                    Id = "AI",
-                    Name = "AI助手",
-                    Avatar = ""
+                    Id = ChatAssistantIdentity.UserId,
+                    Name = ChatAssistantIdentity.UserName,
+                    Avatar = ChatAssistantIdentity.UserAvatar
                 };
 
                 // 优先使用客户端传递的AI模型（通过OtherInfo字段）
@@ -1029,7 +1025,7 @@ namespace Microi.net
                             {
                                 FromUserId = aiUser.Id,
                                 FromUserName = aiUser.Name,
-                                FromUserAccount = "AI",
+                                FromUserAccount = ChatAssistantIdentity.UserAccount,
                                 FromUserAvatar = aiUser.Avatar,
                                 ToUserId = originalMsg.FromUserId,
                                 ToUserName = originalMsg.FromUserName,
@@ -1061,7 +1057,7 @@ namespace Microi.net
                     {
                         FromUserId = aiUser.Id,
                         FromUserName = aiUser.Name,
-                        FromUserAccount = "AI",
+                        FromUserAccount = ChatAssistantIdentity.UserAccount,
                         FromUserAvatar = aiUser.Avatar,
                         ToUserId = originalMsg.FromUserId,
                         ToUserName = originalMsg.FromUserName,
@@ -1115,15 +1111,10 @@ namespace Microi.net
                 {
                     try
                     {
-                        await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(new MessageBodyDto
-                        {
-                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                            FromUserId = "系统消息",
-                            FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now,
-                            Type = "系统消息",
-                            IsRead = false
-                        });
+                        await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(
+                            ChatAssistantIdentity.CreateSystemMessageDto(
+                                DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
+                                msg.FromUserId));
                     }
                     catch (Exception)
                     {
@@ -1246,15 +1237,9 @@ namespace Microi.net
                 {
                     try
                     {
-                        var msg2 = new MessageBodyDto
-                        {
-                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                            FromUserId = "系统消息",
-                            FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now,
-                            Type = "系统消息",
-                            IsRead = false
-                        };
+                        var msg2 = ChatAssistantIdentity.CreateSystemMessageDto(
+                            DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
+                            msg.FromUserId);
                         if (msg._iHubContext != null)
                         {
                             msg._iHubContext.Clients.Clients(clientInfoFrom.ConnectionIds).SendAsync("ReceiveSendToUser", msg2);
@@ -1324,15 +1309,10 @@ namespace Microi.net
                 {
                     try
                     {
-                        await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(new MessageBodyDto
-                        {
-                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                            FromUserId = "系统消息",
-                            FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now,
-                            Type = "系统消息",
-                            IsRead = false
-                        });
+                        await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(
+                            ChatAssistantIdentity.CreateSystemMessageDto(
+                                DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
+                                msg.FromUserId));
                     }
                     catch (Exception)
                     {
@@ -1393,15 +1373,9 @@ namespace Microi.net
                     try
                     {
                         List<string> connectIds = clientInfo.ConnectionIds;
-                        var msg2 = new MessageBodyDto
-                        {
-                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                            FromUserId = "系统消息",
-                            FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now,
-                            Type = "系统消息",
-                            IsRead = false
-                        };
+                        var msg2 = ChatAssistantIdentity.CreateSystemMessageDto(
+                            DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
+                            msg.UserId);
                         if (msg._iHubContext != null)
                         {
                             msg._iHubContext.Clients.Clients(connectIds).SendAsync("ReceiveSendToUser", msg2);
@@ -1541,15 +1515,9 @@ namespace Microi.net
 
                 try
                 {
-                    var msg2 = new MessageBodyDto
-                    {
-                        Content = ex.Message,
-                        FromUserId = "系统消息",
-                        FromUserName = "系统管理员",
-                        CreateTime = DateTime.Now,
-                        Type = "系统消息",
-                        IsRead = false
-                    };
+                    var msg2 = ChatAssistantIdentity.CreateSystemMessageDto(
+                        ex.Message,
+                        msg.UserId);
                     if (msg._iHubContext != null)
                     {
                         msg._iHubContext.Clients.Clients(clientInfo.ConnectionIds).SendAsync("ReceiveSendToUser", msg2);
@@ -1585,15 +1553,10 @@ namespace Microi.net
                 {
                     try
                     {
-                        await base.Clients.Clients(clientInfo2.ConnectionIds).ReceiveSendToUser(new MessageBodyDto
-                        {
-                            Content = DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                            FromUserId = "系统消息",
-                            FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now,
-                            Type = "系统消息",
-                            IsRead = false
-                        });
+                        await base.Clients.Clients(clientInfo2.ConnectionIds).ReceiveSendToUser(
+                            ChatAssistantIdentity.CreateSystemMessageDto(
+                                DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
+                                msg.UserId));
                     }
                     catch (Exception)
                     {
@@ -1641,15 +1604,10 @@ namespace Microi.net
                 {
                     try
                     {
-                        await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendToUser(new MessageBodyDto
-                        {
-                            Content = ex.Message,
-                            FromUserId = "系统消息",
-                            FromUserName = "系统管理员",
-                            CreateTime = DateTime.Now,
-                            Type = "系统消息",
-                            IsRead = false
-                        });
+                        await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendToUser(
+                            ChatAssistantIdentity.CreateSystemMessageDto(
+                                ex.Message,
+                                msg.UserId));
                     }
                     catch (Exception)
                     {

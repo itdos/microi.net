@@ -254,6 +254,8 @@ test("real Junchi pages render permanent inspectable source badges and a non-blo
     await expect(detailsDialog.getByText("microi-platform-service", { exact: true }).first()).toBeVisible();
     await expect(detailsDialog.getByText("/system-settings", { exact: true }).first()).toBeVisible();
     await expect(detailsDialog.getByText(/microi_list_applications/i).first()).toBeVisible();
+    await expect(detailsDialog).toContainText("当前内容由平台框架统一托管");
+    await expect(detailsDialog).not.toContainText(/吾码|吾碼/);
     await page.screenshot({
         path: testInfo.outputPath("dialog-microservice-source-details.png"),
         fullPage: false

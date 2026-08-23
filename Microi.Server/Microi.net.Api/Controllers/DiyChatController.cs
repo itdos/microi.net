@@ -53,26 +53,6 @@ namespace Microi.net.Api
             var sysUser = await DiyToken.GetCurrentToken();
             msgParam.OsClient = sysUser?.OsClient;
 
-            // var adminSysUserModelResult = await new SysUserLogic().GetSysUserModel(new SysUserParam()
-            // {
-            //     Account = "admin",
-            //     OsClient = msgParam.OsClient
-            // });
-            var adminSysUserModelResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
-            {
-                _Where = new List<List<object>>()
-                {
-                    new List<object> { "Account", "=", "admin" },
-                },
-                OsClient = msgParam.OsClient
-            });
-
-            if (adminSysUserModelResult.Code != 1)
-            {
-                return new DosResult(0, null, adminSysUserModelResult.Msg);
-            }
-            var adminSysUserModel = adminSysUserModelResult.Data;
-
             // var toSysUserModelResult = await new SysUserLogic().GetSysUserModel(new SysUserParam()
             // {
             //     Id = msgParam.ToUserId,
@@ -95,10 +75,13 @@ namespace Microi.net.Api
             var toSysUserModel = toSysUserModelResult.Data;
 
             msgParam.ToUserName = toSysUserModel.Name;
+            msgParam.ToUserAccount = toSysUserModel.Account;
             msgParam.ToUserAvatar = toSysUserModel.Avatar;
-            msgParam.FromUserId = adminSysUserModel.Id;
-            msgParam.FromUserName = adminSysUserModel.Name;
-            msgParam.FromUserAvatar = adminSysUserModel.Avatar;
+            msgParam.FromUserId = ChatAssistantIdentity.UserId;
+            msgParam.FromUserName = ChatAssistantIdentity.UserName;
+            msgParam.FromUserAccount = ChatAssistantIdentity.UserAccount;
+            msgParam.FromUserAvatar = ChatAssistantIdentity.UserAvatar;
+            msgParam.Type = "系统消息";
 
 
             //Microi.net.ClientInfo clientInfo = await DiyCacheBase.NoSql.GetAsync<Microi.net.ClientInfo>("Microi:ChatOnline:" + msg.OsClient + ":" + msg.ToUserId);

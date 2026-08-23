@@ -261,12 +261,12 @@
                                 </ul>
                                 <div v-if="!HasCurrentContact" class="chat-conversation-empty">
                                     <div class="empty-title">开始一段对话</div>
-                                    <div class="empty-desc">左侧已为你固定 AI助手 和 admin 平台消息，选择一个即可开始。</div>
+                                    <div class="empty-desc">左侧已为你固定 AI助手；平台消息也会统一显示在这段会话中。</div>
                                 </div>
                                 <div v-else-if="ChatRecord.length == 0" class="chat-conversation-empty">
                                     <div class="empty-title">还没有消息</div>
                                     <div class="empty-desc">
-                                        {{ IsPlatformSystemContact ? '通知中心的平台消息会同步显示在这里。' : '发送第一条消息，或稍后重试加载历史记录。' }}
+                                        {{ IsAiAssistantContact ? '向 AI 助手提问；平台消息也会同步显示在这里。' : '发送第一条消息，或稍后重试加载历史记录。' }}
                                     </div>
                                 </div>
                             </div>
@@ -418,14 +418,15 @@ import {
     normalizeRealtimeState
 } from "@/utils/realtime-connection";
 import {
+    AI_ASSISTANT_CONTACT_ID,
     PLATFORM_NOTIFICATION_EVENT,
     PLATFORM_NOTIFICATION_SNAPSHOT_EVENT,
-    PLATFORM_SYSTEM_CONTACT_ID,
-    createPlatformSystemContact,
+    LEGACY_PLATFORM_SYSTEM_CONTACT_ID,
+    createAiAssistantContact,
+    mergePlatformChatRecords,
     mergePlatformNotification,
     normalizeNotificationLink,
-    normalizePlatformNotificationResult,
-    toPlatformChatRecord
+    normalizePlatformNotificationResult
 } from "@/utils/platform-notification";
 
 const AI_ASSISTANT_AVATAR = "/static/mci/ai/assistant-robot.png";
@@ -564,17 +565,15 @@ export default {
         HasCurrentContact() {
             return !this.DiyCommon.IsNull(this.GetCurrentLastContact?.ContactUserId);
         },
-        IsPlatformSystemContact() {
-            return this.GetCurrentLastContact?.ContactUserId === PLATFORM_SYSTEM_CONTACT_ID;
+        IsAiAssistantContact() {
+            return this.GetCurrentLastContact?.ContactUserId === AI_ASSISTANT_CONTACT_ID;
         },
         CanSendCurrentMessage() {
             return this.HasCurrentContact
-                && !this.IsPlatformSystemContact
                 && this.RealtimeState === "Connected";
         },
         EditorPlaceholder() {
             if (!this.HasCurrentContact) return "请选择一个聊天对象！";
-            if (this.IsPlatformSystemContact) return "平台消息由 admin 发送，此会话只读";
             if (this.RealtimeState !== "Connected") return "实时通信未连接，请先重试";
             return "输入文字或Ctrl+V粘贴图片...";
         },
@@ -633,26 +632,17 @@ export default {
                 const byUserId = new Map(
                     recent.map(item => [String(item?.ContactUserId || item?.Id || ""), item])
                 );
-                const aiContact = {
-                    ContactId: "AI",
-                    ContactUserId: "AI",
-                    ContactUserName: "AI助手",
-                    ContactUserAvatar: AI_ASSISTANT_AVATAR,
-                    LastMessage: "点击开始与AI助手聊天",
-                    UpdateTime: "",
-                    UnRead: 0,
-                    ...(byUserId.get("AI") || {}),
-                    ContactUserName: "AI助手",
-                    ContactUserAvatar: AI_ASSISTANT_AVATAR
-                };
-                const platformContact = createPlatformSystemContact(
+                const aiContact = createAiAssistantContact(
+                    byUserId.get(AI_ASSISTANT_CONTACT_ID),
                     self.platformNotifications,
                     self.platformUnreadCount
                 );
-                const pinnedIds = new Set(["AI", PLATFORM_SYSTEM_CONTACT_ID]);
+                const pinnedIds = new Set([
+                    AI_ASSISTANT_CONTACT_ID,
+                    LEGACY_PLATFORM_SYSTEM_CONTACT_ID
+                ]);
                 const merged = [
                     aiContact,
-                    platformContact,
                     ...recent.filter(item => !pinnedIds.has(String(item?.ContactUserId || item?.Id || "")))
                 ];
                 const keyword = String(self.kw || "").trim().toLowerCase();
@@ -1256,7 +1246,7 @@ export default {
             this.$websocket = websocket;
             this.boundWebsocket = websocket;
             this.InitSignalROnEvent();
-            if (this.IsPlatformSystemContact) {
+            if (this.IsAiAssistantContact) {
                 this.loadPlatformNotifications();
             }
         },
@@ -1298,11 +1288,13 @@ export default {
             this.syncPlatformChatRecords();
         },
         syncPlatformChatRecords() {
-            if (!this.IsPlatformSystemContact) return;
-            const records = this.platformNotifications.map(item =>
-                toPlatformChatRecord(item, this.GetCurrentUser)
+            if (!this.IsAiAssistantContact) return;
+            const records = mergePlatformChatRecords(
+                this.ChatRecord,
+                this.platformNotifications,
+                this.GetCurrentUser
             );
-            this.ChatRecord.splice(0, this.ChatRecord.length, ...records.reverse());
+            this.ChatRecord.splice(0, this.ChatRecord.length, ...records);
             this.$nextTick(() => this.wchat_ToBottom());
         },
         openPlatformMessageLink(value) {
@@ -1442,20 +1434,15 @@ export default {
             self.cancelAITypewriter();
             
             // 如果选择的是AI助手，加载AI模型列表
-            if (contactUserId === 'AI') {
+            if (contactUserId === AI_ASSISTANT_CONTACT_ID) {
                 self.loadAiModelList();
+                self.loadPlatformNotifications();
             }
             
             //切换当前聊天人
             self.diyStore.setDiyChatCurrentLastContact(selectedContact);
             self.ChatRecord.splice(0, self.ChatRecord.length);
 
-            // 平台消息以数据库为权威历史源，SignalR 只负责新消息即时到达。
-            if (contactUserId === PLATFORM_SYSTEM_CONTACT_ID) {
-                self.loadPlatformNotifications();
-                return;
-            }
-            
             // 直接使用this.$websocket（已在checkConnection中同步）
             // 如果this.$websocket为null，尝试从全局获取
             const ws = self.$websocket || window.__VUE_APP__?.config?.globalProperties?.$websocket;
@@ -1736,7 +1723,14 @@ export default {
                                 merged.push(item);
                             }
                         });
-                        self.ChatRecord.splice(0, self.ChatRecord.length, ...merged);
+                        const visibleRecords = self.IsAiAssistantContact
+                            ? mergePlatformChatRecords(
+                                merged,
+                                self.platformNotifications,
+                                self.GetCurrentUser
+                            )
+                            : merged;
+                        self.ChatRecord.splice(0, self.ChatRecord.length, ...visibleRecords);
                         self.$nextTick(() => {
                             self.wchat_ToBottom();
                         });
@@ -1891,8 +1885,6 @@ export default {
         SendMessage() {
             var self = this;
 
-            if (self.IsPlatformSystemContact) return;
-            
             if (!self.$websocket || !self.$websocket.invoke || self.$websocket.state !== 'Connected') {
                 console.error('[SendMessage] WebSocket 未连接，无法发送消息');
                 window.tryConnectWebSocket?.(false);

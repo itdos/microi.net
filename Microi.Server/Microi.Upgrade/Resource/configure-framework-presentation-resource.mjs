@@ -10,7 +10,7 @@ if (process.argv.includes('--sync-base')) {
 
 const SYS_CONFIG_TABLE_ID = 'c8570fa6-c10f-4014-8cb4-4b046e7ba69c';
 const INTERFACE_STYLE_TAB_ID = 'f7e10da1-0b96-4624-90ea-07c7e6991b74';
-const TARGET_VERSION = 'v7.5.21';
+const TARGET_VERSION = 'v7.5.29';
 const OBSOLETE_FIELD_NAMES = new Set(['RenderSourceBadgeMode']);
 
 const FIELD_IDS = {
@@ -23,6 +23,15 @@ const FIELD_IDS = {
   FrameworkPresentationGroup: '6d872b50-ef21-4cf3-8ec0-000000000008',
   InterfaceThemeNavigationGroup: '6d872b50-ef21-4cf3-8ec0-000000000009',
   InterfaceLoginExperienceGroup: '6d872b50-ef21-4cf3-8ec0-000000000010',
+  IdentityVerificationEnabled: '7a5c11b0-4d9f-4c82-9100-000000000001',
+  PasskeyEnabled: '7a5c11b0-4d9f-4c82-9100-000000000002',
+  AuthenticatorTotpEnabled: '7a5c11b0-4d9f-4c82-9100-000000000003',
+  RequirePasswordChangeStepUp: '7a5c11b0-4d9f-4c82-9100-000000000004',
+  ExternalLoginEnabled: '7a5c11b0-4d9f-4c82-9100-000000000005',
+  FaceVerificationEnabled: '7a5c11b0-4d9f-4c82-9100-000000000006',
+  GiteeLoginEnabled: '7a5c11b0-4d9f-4c82-9100-000000000007',
+  WeChatLoginEnabled: '7a5c11b0-4d9f-4c82-9100-000000000008',
+  GitHubLoginEnabled: '7a5c11b0-4d9f-4c82-9100-000000000009',
 };
 
 function maxVersion(current, target) {
@@ -62,13 +71,58 @@ function configurePackage(packagePath) {
 
   const definitions = [
     {
+      name: 'IdentityVerificationEnabled', label: '启用统一身份验证能力', type: 'int', component: 'Switch',
+      data: [], defaultValue: '1', sort: 1630, config: switchConfig,
+      description: '统一控制 Passkey、Authenticator 与严格人脸等强身份验证能力；关闭后相关登记、登录和二次验证均不可用。',
+    },
+    {
+      name: 'PasskeyEnabled', label: '启用 Passkey 生物登录', type: 'int', component: 'Switch',
+      data: [], defaultValue: '1', sort: 1640, config: switchConfig,
+      description: '启用 Windows Hello、Face ID、Touch ID 或安全密钥登录与二次验证；登录入口是否显示由下方独立开关控制。',
+    },
+    {
+      name: 'AuthenticatorTotpEnabled', label: '启用 Authenticator 动态口令', type: 'int', component: 'Switch',
+      data: [], defaultValue: '1', sort: 1650, config: switchConfig,
+      description: '启用标准 TOTP Authenticator 登记、登录与二次验证；用户仍需先在个人中心完成登记。',
+    },
+    {
+      name: 'RequirePasswordChangeStepUp', label: '修改密码要求二次验证', type: 'int', component: 'Switch',
+      data: [], defaultValue: '1', sort: 1660, config: switchConfig,
+      description: '已登记强身份验证因素的用户修改密码时，必须先完成一次性二次验证。',
+    },
+    {
+      name: 'ExternalLoginEnabled', label: '启用外部平台登录', type: 'int', component: 'Switch',
+      data: [], defaultValue: '1', sort: 1670, config: switchConfig,
+      description: 'Gitee、微信与 GitHub OAuth 登录总开关；各平台还需单独启用并在“安全与服务接入”配置凭据。',
+    },
+    {
+      name: 'FaceVerificationEnabled', label: '启用严格人脸与活体核验', type: 'int', component: 'Switch',
+      data: [], defaultValue: '0', sort: 1680, config: switchConfig,
+      description: '启用独立 Face Gateway 严格人脸与活体核验；必须先在“安全与服务接入”配置网关地址和凭据。',
+    },
+    {
+      name: 'GiteeLoginEnabled', label: '启用 Gitee 登录', type: 'int', component: 'Switch',
+      data: [], defaultValue: '0', sort: 1690, config: switchConfig,
+      description: '允许使用已绑定的 Gitee 身份登录；ClientId、ClientSecret 等接入参数仍保存在服务端私有设置。',
+    },
+    {
+      name: 'WeChatLoginEnabled', label: '启用微信扫码登录', type: 'int', component: 'Switch',
+      data: [], defaultValue: '0', sort: 1700, config: switchConfig,
+      description: '允许使用已绑定的微信开放平台身份扫码登录；接入凭据仍保存在服务端私有设置。',
+    },
+    {
+      name: 'GitHubLoginEnabled', label: '启用 GitHub 登录', type: 'int', component: 'Switch',
+      data: [], defaultValue: '0', sort: 1710, config: switchConfig,
+      description: '允许使用已绑定的 GitHub 身份登录；ClientId、ClientSecret 等接入参数仍保存在服务端私有设置。',
+    },
+    {
       name: 'FrameworkWatermarkEnabled', label: '开启框架水印', type: 'int', component: 'Switch',
-      data: [], defaultValue: '0', sort: 1830, config: switchConfig,
+      data: [], defaultValue: '0', sort: 1930, config: switchConfig,
       description: '默认关闭；开启后由吾码框架覆盖 100vw × 100vh，包含路由页面和弹层，水印不拦截鼠标、触摸或键盘操作。',
     },
     {
       name: 'FrameworkWatermarkContent', label: '框架水印内容', type: 'varchar(255)', component: 'Text',
-      data: [], defaultValue: '$SysTitle$ - $UserName$', sort: 1840, config: textConfig, formWidth: 12,
+      data: [], defaultValue: '$SysTitle$ - $UserName$', sort: 1940, config: textConfig, formWidth: 12,
       placeholder: '默认：$SysTitle$ - $UserName$',
       description: '留空时显示“系统标题 - 用户名”；用户名为空时自动回退为账号，均为空时只显示系统标题，不会输出 undefined/null。支持 $SysTitle$、$SysShortTitle$、$UserName$、$Account$、$Date$、$DateTime$ 及 {{UserName}} 形式。',
     },
@@ -79,12 +133,12 @@ function configurePackage(packagePath) {
         { Key: 'DiagonalDown', Value: '斜向下' },
         { Key: 'Horizontal', Value: '水平' },
       ],
-      defaultValue: 'DiagonalUp', sort: 1850, config: radioConfig, formWidth: 12,
+      defaultValue: 'DiagonalUp', sort: 1950, config: radioConfig, formWidth: 12,
       description: '控制水印文字的旋转方向；默认斜向上，兼顾可辨识性与正文可读性。',
     },
     {
       name: 'FrameworkWatermarkOpacity', label: '水印透明度', type: 'int', component: 'NumberText',
-      data: [], defaultValue: '30', sort: 1860, config: numberConfig, formWidth: 6,
+      data: [], defaultValue: '30', sort: 1960, config: numberConfig, formWidth: 6,
       description: '百分比；未设置、非法或为 0 时按 30 处理，运行时限制在 1–100。',
     },
     {
@@ -94,12 +148,12 @@ function configurePackage(packagePath) {
         { Key: 'Comfortable', Value: '舒适' },
         { Key: 'Sparse', Value: '稀疏' },
       ],
-      defaultValue: 'Comfortable', sort: 1870, config: radioConfig, formWidth: 12,
+      defaultValue: 'Comfortable', sort: 1970, config: radioConfig, formWidth: 12,
       description: '控制重复水印之间的水平和垂直间距；默认舒适密度适合常规后台页面。',
     },
     {
       name: 'FrameworkWatermarkFontSize', label: '水印字号', type: 'int', component: 'NumberText',
-      data: [], defaultValue: '14', sort: 1880, config: numberConfig, formWidth: 6,
+      data: [], defaultValue: '14', sort: 1980, config: numberConfig, formWidth: 6,
       description: '单位 px；未设置、非法或为 0 时按 14 处理，运行时限制在 8–72，并自动适配亮色和深色主题。',
     },
   ];
@@ -158,22 +212,28 @@ function configurePackage(packagePath) {
     },
     {
       name: 'InterfaceLoginExperienceGroup', label: '登录界面与入口', sort: 1600,
-      description: '登录遮罩、背景效果与各类安全登录入口', icon: 'fas fa-right-to-bracket',
+      description: '登录能力启用、入口显示、遮罩与背景体验；凭据仍由服务端私有设置维护', icon: 'fas fa-right-to-bracket',
       fields: [
-        ['DisableFormMaskBlur', 1610], ['FormMaskBlur', 1620], ['LoginPasskeyDisplay', 1630], ['DisableLoginPasskey', 1640],
-        ['LoginAuthenticatorDisplay', 1650], ['DisableLoginAuthenticator', 1660], ['LoginGiteeDisplay', 1670], ['DisableLoginGitee', 1680],
-        ['LoginWeChatDisplay', 1690], ['DisableLoginWeChat', 1700], ['LoginGitHubDisplay', 1710], ['DisableLoginGitHub', 1720],
-        ['IsAeroLogin', 1730], ['EnableSystemStyle', 1740],
+        ['DisableFormMaskBlur', 1610], ['FormMaskBlur', 1620],
+        ['IdentityVerificationEnabled', 1630], ['PasskeyEnabled', 1640], ['AuthenticatorTotpEnabled', 1650],
+        ['RequirePasswordChangeStepUp', 1660], ['ExternalLoginEnabled', 1670], ['FaceVerificationEnabled', 1680],
+        ['GiteeLoginEnabled', 1690], ['WeChatLoginEnabled', 1700], ['GitHubLoginEnabled', 1710],
+        ['LoginPasskeyDisplay', 1720], ['DisableLoginPasskey', 1730],
+        ['LoginAuthenticatorDisplay', 1740], ['DisableLoginAuthenticator', 1750],
+        ['LoginGiteeDisplay', 1760], ['DisableLoginGitee', 1770],
+        ['LoginWeChatDisplay', 1780], ['DisableLoginWeChat', 1790],
+        ['LoginGitHubDisplay', 1800], ['DisableLoginGitHub', 1810],
+        ['IsAeroLogin', 1820], ['EnableSystemStyle', 1830],
       ],
     },
     {
-      name: 'FrameworkPresentationGroup', label: 'AI 与框架水印', sort: 1800,
+      name: 'FrameworkPresentationGroup', label: 'AI 与框架水印', sort: 1900,
       description: 'AI 助手与全屏框架水印', icon: 'fas fa-fingerprint',
       scopeMode: 'FieldCount', fieldCount: 8,
       fields: [
-        ['IsShowAiAssistant', 1810], ['DisableAiAssistant', 1820],
-        ['FrameworkWatermarkEnabled', 1830], ['FrameworkWatermarkContent', 1840], ['FrameworkWatermarkDirection', 1850],
-        ['FrameworkWatermarkOpacity', 1860], ['FrameworkWatermarkDensity', 1870], ['FrameworkWatermarkFontSize', 1880],
+        ['IsShowAiAssistant', 1910], ['DisableAiAssistant', 1920],
+        ['FrameworkWatermarkEnabled', 1930], ['FrameworkWatermarkContent', 1940], ['FrameworkWatermarkDirection', 1950],
+        ['FrameworkWatermarkOpacity', 1960], ['FrameworkWatermarkDensity', 1970], ['FrameworkWatermarkFontSize', 1980],
       ],
     },
   ];
@@ -258,7 +318,7 @@ function configurePackage(packagePath) {
 
   const info = pkg.PackageInfo || (pkg.PackageInfo = {});
   info.Version = maxVersion(info.Version, TARGET_VERSION);
-  const historyLine = '2026-08-22 v7.5.21 将框架来源标识改为框架内置常驻能力并移除“渲染来源标识”配置；菜单微服务标识可手动关闭且可查看源码、路由和运行信息，弹窗标识保持常驻；水印透明度空值或 0 默认回退 30。';
+  const historyLine = '2026-08-23 v7.5.29 登录、强身份验证与外部平台功能开关迁移到 sys_config 公开实体字段；安全与服务接入仅保留凭据和后端专用参数，并兼容旧租户私有 Key 回退。';
   if (!String(info.ChangeHistory || '').includes(historyLine)) {
     info.ChangeHistory = `${historyLine}\n${info.ChangeHistory || ''}`;
   }
@@ -266,6 +326,7 @@ function configurePackage(packagePath) {
     ...(info.RequiredPlatformCapabilities || []),
     'ClientFeature:FrameworkRenderSourceBadge',
     'ClientFeature:FrameworkWatermark',
+    'SystemSettings:PublicLoginBehaviorSwitches',
   ])];
   info.FieldCount = pkg.DiyFields.length;
   info.DDLCount = pkg.DDLStatements.length;

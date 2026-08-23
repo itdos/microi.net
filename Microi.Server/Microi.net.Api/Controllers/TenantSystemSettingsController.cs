@@ -146,6 +146,7 @@ namespace Microi.net.Api
             Response.Headers.CacheControl = "no-store";
             var snapshot = TenantSystemSettingsSecurity.LoadSnapshot(tokenResult.Data.OsClient);
             var rows = snapshot.Values
+                .Where(item => !TenantSystemSettingsSecurity.IsMigratedPublicSettingKey(item.Key))
                 .OrderBy(item => item.Sort)
                 .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(item => new
@@ -178,6 +179,9 @@ namespace Microi.net.Api
             string key;
             try { key = TenantSystemSettingsSecurity.NormalizeKey(request.ConfigKey); }
             catch (Exception ex) { return Json(new DosResult(0, null, ex.Message)); }
+            if (TenantSystemSettingsSecurity.IsMigratedPublicSettingKey(key))
+                return Json(new DosResult(0, null,
+                    "此公开开关已迁移到“系统设置 → 登录界面与入口”，不能再作为服务端私有设置保存。"));
             var value = request.Value ?? string.Empty;
             if (value.Length > 1024 * 1024) return Json(new DosResult(0, null, "设置值不能超过 1MB。"));
             var isSecret = request.IsSecret || TenantSystemSettingsSecurity.IsSensitiveKey(key);
@@ -289,6 +293,9 @@ namespace Microi.net.Api
             if (tokenResult.Code != 1) return Json(tokenResult);
             var item = await FindSettingByIdAsync(tokenResult.Data.OsClient, request?.Id).ConfigureAwait(false);
             if (item == null) return Json(new DosResult(0, null, "设置不存在。"));
+            if (TenantSystemSettingsSecurity.IsMigratedPublicSettingKey(item["ConfigKey"]?.ToString()))
+                return Json(new DosResult(0, null,
+                    "此公开开关已迁移到“系统设置 → 登录界面与入口”，历史兼容值不能在私有设置中删除。"));
             var result = await MicroiEngine.FormEngine.DelFormDataAsync(TenantSystemSettingsSecurity.TableName, new
             {
                 Id = request.Id,

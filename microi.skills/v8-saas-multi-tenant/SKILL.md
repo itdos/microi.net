@@ -32,7 +32,7 @@ V8.ClientModel         // OsClientModel 的兼容别名，同样是脱敏副本
 V8.SysConfig           // 当前租户系统配置根对象；不存在 PublicSettings 属性
 ```
 
-前端 V8 的 `V8.SysConfig` 是匿名 `GetSysConfig` 的独立脱敏副本，`mci_system_setting` 中允许公开的普通值直接平铺到根对象；不会暴露 `ClientSecrets`、`GlobalServerV8Code` 或疑似凭据字段。后端接口引擎与后端 V8 事件的 `V8.SysConfig` 是当前租户完整、独立的 `sys_config`，并把全部启用的租户设置（含后端解密后的 Secret）平铺到根对象。两端都不存在 `PublicSettings` 包装层。后端可使用 Secret，但严禁返回前端、写日志或写审计。子租户显式传其它 `OsClient` 仍会被强制改回当前租户。
+前端 V8 的 `V8.SysConfig` 是匿名 `GetSysConfig` 的独立脱敏 `sys_config` 副本；`mci_system_setting` 的任何记录都不会进入浏览器。后端接口引擎与后端 V8 事件的 `V8.SysConfig` 包含当前租户完整、独立的 `sys_config`，后端私密设置统一位于 `V8.SysConfig.ServerPrivateSettings`，其中 Secret 由可信后端解密。两端都不存在 `PublicSettings` 包装层。后端可使用 Secret，但严禁返回前端、写日志或写审计。子租户显式传其它 `OsClient` 仍会被强制改回当前租户。
 
 ### V8.OsClientModel 常用字段
 
@@ -41,7 +41,7 @@ V8.OsClientModel.SysTitle              // 租户系统标题
 V8.OsClientModel.DbType                // 非敏感数据库类型
 V8.OsClientModel.HDFS                  // 'Aliyun' / 'MinIO' / 'S3'
 V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
-// 当前租户自行扩展的业务字段只作存量兼容；新增配置使用 mci_system_setting
+// 当前租户自行扩展的业务字段只作存量兼容；新增公开配置使用 sys_config，后端私密参数使用 mci_system_setting
 
 // 以下基础设施字段不会注入 V8：
 // DbConn / DbReadConn / AuthSecret
@@ -55,7 +55,7 @@ V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
 
 - 所有可变业务逻辑默认必须由接口引擎编排，包括但不限于租户开通、开库、初始化、归属修复、官网个人中心、付费额度等 SaaS 业务流程。C# 后端只暴露原子 V8 能力，例如建库、导入空库模板、复制 `sys_config`、刷新 SaaS 缓存、补偿回滚、字段兜底等；不要把可变业务分支写死到 Controller 或 `TenantProvisioningService` 这类后端定制代码里。接口引擎缺少能力时，优先扩展 `V8.Method`/V8 引擎原子函数，再由接口引擎调用。
 - 主租户由运行环境决定：优先读取环境变量 `OsClient`，其次读取 `appsettings.json` 的 `AppSettings:OsClient`。只有这条主租户 `sys_osclients` 数据中的平台级字段会作为全局配置生效。
-- API 启动配置只有十项白名单：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。除这十项外，部署/节点级运行参数与基础设施秘密从主控 `sys_osclients` 读取；允许子租户自行维护的业务开关、OAuth/第三方集成和展示设置从该租户 `sys_config` / `mci_system_setting` 读取，未配置时使用代码安全默认值。官方 License 恢复次数/间隔与固定私钥挂载 `/app/microi_private.pem` 是信任链例外。禁止再增加 `MICROI_*`、`DOS_ORM_*`、自定义 `AppSettings` 节点或动态名称的环境变量读取。节点身份由平台自动生成。
+- API 启动配置只有十项白名单：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。除这十项外，部署/节点级运行参数与基础设施秘密从主控 `sys_osclients` 读取；允许子租户自行维护且需要浏览器判断的业务开关、入口显示和公开交互配置使用该租户 `sys_config` 实体字段，OAuth/第三方集成的凭据、RP/Origin/Issuer/Scope 与仅后端参数使用 `mci_system_setting`，未配置时使用代码安全默认值。官方 License 恢复次数/间隔与固定私钥挂载 `/app/microi_private.pem` 是信任链例外。禁止再增加 `MICROI_*`、`DOS_ORM_*`、自定义 `AppSettings` 节点或动态名称的环境变量读取。节点身份由平台自动生成。
 - `ASPNETCORE_*`、`DOTNET_*` 仅用于 .NET 宿主；构建、安装、测试、MCP、发布脚本可使用自身进程变量，但 API 生产代码不得把它们当业务配置。新增 SaaS 运行字段必须配套独立或既有 Tab、幂等升级、缓存刷新、敏感字段脱敏、子租户不继承和源码扫描测试。
 - 文件上传的租户业务开关与额度按“当前租户 `sys_osclients` → 代码默认值”解析；平台固定灾难保护、HTTP/Multipart/Form 和反向代理上限不可由租户覆盖，也不要求安装者维护额外上传环境变量。
 - 类似 MQTT 端口、PressureGuard、V8Limits、OrmLimits、StartupLimits、SecurityGuard 这类影响整进程资源的配置，不能让每个子租户各自抬高全局上限。子租户同名隔离字段只能降低自己的并发、等待时间或资源额度，用于隔离弱租户、试用租户或异常租户。
@@ -147,15 +147,16 @@ var erpUrl = (V8.OsClientNetwork === 'Intranet')
 // ❌ 危险：密钥写在代码里，所有租户共用，无法独立轮换
 var ak = 'AKIDxxxxxxxx';
 
-// ✅ 普通业务值：每个租户在 mci_system_setting 动态维护
-var loginName = V8.SysConfig['Login.Gitee.Name'];
+// ✅ 浏览器需要判断的开关：使用 sys_config 实体字段
+var giteeEnabled = V8.SysConfig.GiteeLoginEnabled === 1;
 
 // ✅ 后端 V8 可读取当前租户 Secret 并直接调用供应商
-var secret = V8.SysConfig['Login.Gitee.ClientSecret'];
+var privateSettings = V8.SysConfig.ServerPrivateSettings || {};
+var secret = privateSettings['Login.Gitee.ClientSecret'];
 // 禁止 return secret、console.log(secret) 或写入前端可读字段。
 ```
 
-> `mci_system_setting` 位于每个租户自己的数据库。普通设置可逐条动态公开并直接平铺到前端 `V8.SysConfig`；Secret 保存认证密文，只在后端 V8 的当前租户 `V8.SysConfig` 中解密使用。前端 V8、普通 FormEngine HTTP、匿名/访问密钥会话不能读取 Secret，后端 V8 也不能获得通用解密器。`sys_osclients` 自定义业务字段只保留存量兼容；共享基础设施字段由服务端强制移除，不能用自定义同义字段绕过安全代理。
+> `mci_system_setting` 位于每个租户自己的数据库，只保存不能公开或仅供后端执行的配置；普通值与 Secret 都不会下发浏览器。Secret 保存认证密文，只在后端 V8 的当前租户 `ServerPrivateSettings` 中解密使用。能力开关和入口显示必须建成 `sys_config` 实体字段，禁止通过 `IsPublic` 或其它运行时勾选把私密记录公开。前端 V8、普通 FormEngine HTTP、匿名/访问密钥会话不能读取私密设置，后端 V8 也不能获得通用解密器。`sys_osclients` 自定义业务字段只保留存量兼容；共享基础设施字段由服务端强制移除，不能用自定义同义字段绕过安全代理。
 
 ## 用户扩展字段访问（同理）
 

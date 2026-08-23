@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
+    AI_ASSISTANT_CONTACT_ID,
+    AI_ASSISTANT_CONTACT_NAME,
+    LEGACY_PLATFORM_SYSTEM_CONTACT_ID,
     PLATFORM_NOTIFICATION_ENGINE_KEYS,
-    PLATFORM_SYSTEM_CONTACT_ID,
-    createPlatformSystemContact,
+    createAiAssistantContact,
     createPlatformNotificationApi,
     getPlatformNotificationSender,
+    mergePlatformChatRecords,
     mergePlatformNotification,
     normalizeNotificationLink,
     normalizePlatformNotificationResult,
@@ -69,7 +72,7 @@ test("realtime hints merge by durable notification identity", () => {
     ]);
 });
 
-test("platform notification is projected as a read-only admin system conversation", () => {
+test("platform notifications are projected into the single AI assistant conversation", () => {
     const notification = {
         Id: "notice-1",
         EventId: "event-1",
@@ -79,18 +82,65 @@ test("platform notification is projected as a read-only admin system conversatio
         Payload: JSON.stringify({ SystemSenderAccount: "admin" }),
         IsRead: 0
     };
-    const contact = createPlatformSystemContact([notification], 3);
+    const contact = createAiAssistantContact({
+        ContactUserId: AI_ASSISTANT_CONTACT_ID,
+        LastMessage: "older AI reply",
+        UpdateTime: "2026-08-20T20:30:00",
+        UnRead: 2
+    }, [notification], 3);
     const record = toPlatformChatRecord(notification, { Id: "user-1", Name: "管理员" });
 
-    assert.equal(getPlatformNotificationSender(notification), "admin");
-    assert.equal(contact.ContactUserId, PLATFORM_SYSTEM_CONTACT_ID);
-    assert.equal(contact.ContactUserName, "admin");
-    assert.equal(contact.UnRead, 3);
-    assert.equal(record.FromUserId, PLATFORM_SYSTEM_CONTACT_ID);
-    assert.equal(record.FromUserName, "admin");
+    assert.equal(getPlatformNotificationSender(notification), AI_ASSISTANT_CONTACT_NAME);
+    assert.equal(contact.ContactUserId, AI_ASSISTANT_CONTACT_ID);
+    assert.equal(contact.ContactUserName, AI_ASSISTANT_CONTACT_NAME);
+    assert.equal(contact.LastMessage, "今晚升级");
+    assert.equal(contact.UnRead, 5);
+    assert.equal(record.FromUserId, AI_ASSISTANT_CONTACT_ID);
+    assert.equal(record.FromUserName, AI_ASSISTANT_CONTACT_NAME);
     assert.equal(record.ToUserId, "user-1");
     assert.equal(record.Type, "platform-system");
     assert.match(record.Content, /平台维护\n今晚升级/);
+    assert.notEqual(record.FromUserId, LEGACY_PLATFORM_SYSTEM_CONTACT_ID);
+});
+
+test("AI chat history and durable platform notifications merge chronologically without duplicates", () => {
+    const records = [
+        {
+            Id: "chat-1",
+            FromUserId: "AI",
+            Content: "普通 AI 回复",
+            CreateTime: "2026-08-20T21:00:00"
+        },
+        {
+            Id: "notice-old-projection",
+            NotificationId: "notice-1",
+            IsPlatformNotification: true,
+            CreateTime: "2026-08-20T21:30:00"
+        }
+    ];
+    const notifications = [
+        {
+            Id: "notice-2",
+            Title: "第二条",
+            CreateTime: "2026-08-20T22:00:00"
+        },
+        {
+            Id: "notice-1",
+            Title: "第一条",
+            CreateTime: "2026-08-20T21:30:00"
+        },
+        {
+            Id: "notice-1",
+            Title: "重复项",
+            CreateTime: "2026-08-20T21:30:00"
+        }
+    ];
+
+    const merged = mergePlatformChatRecords(records, notifications, { Id: "user-1" });
+    assert.deepEqual(merged.map(item => item.Id), ["chat-1", "notice-1", "notice-2"]);
+    assert.equal(merged.filter(item => item.NotificationId === "notice-1").length, 1);
+    assert.ok(merged.filter(item => item.IsPlatformNotification)
+        .every(item => item.FromUserId === AI_ASSISTANT_CONTACT_ID));
 });
 
 test("notification links reject script schemes and keep safe routes", () => {

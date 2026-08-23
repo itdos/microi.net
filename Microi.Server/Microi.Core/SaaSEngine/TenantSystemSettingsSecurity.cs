@@ -43,6 +43,37 @@ namespace Microi.net
             "securityjscode"
         };
 
+        private static readonly HashSet<string> MigratedPublicSettingKeySet =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Login.Identity.Enabled",
+                "Login.Passkey.Enabled",
+                "Login.Authenticator.Enabled",
+                "Security.PasswordChange.RequireStepUp",
+                "Login.External.Enabled",
+                "Login.Face.Enabled",
+                "Login.Gitee.Enabled",
+                "Login.WeChat.Enabled",
+                "Login.GitHub.Enabled",
+                "Login.Passkey.Display",
+                "Login.Authenticator.Display",
+                "Login.Gitee.Display",
+                "Login.WeChat.Display",
+                "Login.GitHub.Display"
+            };
+
+        /// <summary>
+        /// 已迁移到 sys_config 实体字段的公开功能/展示开关。旧行只作为未安装新版
+        /// 系统设置应用时的只读兼容回退，不能继续通过私有设置管理端增删改。
+        /// </summary>
+        public static IReadOnlyCollection<string> MigratedPublicSettingKeys =>
+            MigratedPublicSettingKeySet.ToArray();
+
+        public static bool IsMigratedPublicSettingKey(string key)
+        {
+            return MigratedPublicSettingKeySet.Contains((key ?? string.Empty).Trim());
+        }
+
         public static string NormalizeKey(string key)
         {
             var value = (key ?? string.Empty).Trim();
@@ -183,6 +214,55 @@ namespace Microi.net
         public static JObject LoadPublicProjection(string osClient)
         {
             return new JObject();
+        }
+
+        /// <summary>
+        /// 读取当前租户 sys_config 的服务端快照。这里只用于解析已经声明为公开实体字段的
+        /// 行为开关；旧租户尚未安装新增物理列时查询失败关闭，并继续走兼容回退。
+        /// </summary>
+        public static JObject LoadTenantSysConfigSnapshot(string osClient)
+        {
+            try
+            {
+                osClient = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+                var client = OsClientExtend.GetClient(osClient);
+                if (client?.Db == null) return new JObject();
+                var raw = client.Db.FromSql("SELECT * FROM sys_config").First<dynamic>();
+                return raw as JObject ?? (raw == null ? new JObject() : JObject.FromObject((object)raw));
+            }
+            catch
+            {
+                // 兼容尚未安装新版系统设置应用、尚无 sys_config 或物理列不完整的旧租户。
+                return new JObject();
+            }
+        }
+
+        /// <summary>
+        /// 公开行为开关以 sys_config 显式值为唯一新事实源；字段缺失/空值时才读取历史
+        /// mci_system_setting，再回退 sys_osclients 的存量字段或代码安全默认值。
+        /// </summary>
+        public static bool GetPublicBehaviorBool(
+            JObject sysConfig,
+            string sysConfigField,
+            IReadOnlyDictionary<string, TenantSystemSettingValue> legacySettings,
+            string legacySettingKey,
+            bool fallback)
+        {
+            var property = sysConfig?.Properties().FirstOrDefault(item =>
+                string.Equals(item.Name, sysConfigField, StringComparison.OrdinalIgnoreCase));
+            var value = property?.Value;
+            if (value != null
+                && value.Type != JTokenType.Null
+                && (value.Type != JTokenType.String || !string.IsNullOrWhiteSpace(value.ToString())))
+            {
+                return Flag(value, fallback);
+            }
+
+            return GetBool(
+                legacySettings,
+                legacySettingKey,
+                fallback,
+                preferLegacyForOfficialDefault: true);
         }
 
         /// <summary>

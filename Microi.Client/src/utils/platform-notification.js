@@ -4,7 +4,10 @@ export const PLATFORM_NOTIFICATION_ENGINE_KEYS = Object.freeze({
     MarkRead: "msg_internal_mark_read"
 });
 
-export const PLATFORM_SYSTEM_CONTACT_ID = "MICROI_PLATFORM_ADMIN";
+export const AI_ASSISTANT_CONTACT_ID = "AI";
+export const AI_ASSISTANT_CONTACT_NAME = "AI助手";
+export const AI_ASSISTANT_CONTACT_AVATAR = "/static/mci/ai/assistant-robot.png";
+export const LEGACY_PLATFORM_SYSTEM_CONTACT_ID = "MICROI_PLATFORM_ADMIN";
 export const PLATFORM_NOTIFICATION_EVENT = "microi-platform-notification";
 export const PLATFORM_NOTIFICATION_SNAPSHOT_EVENT = "microi-platform-notifications-snapshot";
 
@@ -64,26 +67,8 @@ export function mergePlatformNotification(rows, incoming, limit = 100) {
         .slice(0, Math.max(1, Number(limit) || 100));
 }
 
-function parseNotificationPayload(value) {
-    if (!value) return {};
-    if (typeof value === "object") return value;
-    try {
-        const parsed = JSON.parse(String(value));
-        return parsed && typeof parsed === "object" ? parsed : {};
-    } catch (_) {
-        return {};
-    }
-}
-
-export function getPlatformNotificationSender(notification) {
-    const payload = parseNotificationPayload(notification?.Payload || notification?.DataAppend);
-    return String(
-        notification?.SenderAccount
-        || notification?.SystemSenderAccount
-        || payload.SenderAccount
-        || payload.SystemSenderAccount
-        || "admin"
-    ).trim() || "admin";
+export function getPlatformNotificationSender() {
+    return AI_ASSISTANT_CONTACT_NAME;
 }
 
 export function toPlatformChatRecord(notification, currentUser = {}) {
@@ -93,9 +78,10 @@ export function toPlatformChatRecord(notification, currentUser = {}) {
         Id: String(notification?.Id || notification?.EventId || ""),
         NotificationId: String(notification?.Id || ""),
         EventId: String(notification?.EventId || ""),
-        FromUserId: PLATFORM_SYSTEM_CONTACT_ID,
-        FromUserName: getPlatformNotificationSender(notification),
-        FromUserAvatar: "./static/img/logo.svg",
+        FromUserId: AI_ASSISTANT_CONTACT_ID,
+        FromUserName: AI_ASSISTANT_CONTACT_NAME,
+        FromUserAccount: AI_ASSISTANT_CONTACT_ID,
+        FromUserAvatar: AI_ASSISTANT_CONTACT_AVATAR,
         ToUserId: String(currentUser?.Id || ""),
         ToUserName: String(currentUser?.Name || currentUser?.Account || ""),
         Content: title && content && title !== content ? `${title}\n${content}` : (content || title),
@@ -107,17 +93,50 @@ export function toPlatformChatRecord(notification, currentUser = {}) {
     };
 }
 
-export function createPlatformSystemContact(rows = [], unreadCount = 0) {
+function toTimestamp(value) {
+    const timestamp = Date.parse(String(value || ""));
+    return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+export function mergePlatformChatRecords(chatRecords = [], rows = [], currentUser = {}) {
+    const ordinaryRecords = (Array.isArray(chatRecords) ? chatRecords : [])
+        .filter(item => !item?.IsPlatformNotification);
+    const notificationRecords = (Array.isArray(rows) ? rows : [])
+        .map(item => toPlatformChatRecord(item, currentUser));
+    const notificationIds = new Set();
+    const merged = ordinaryRecords.concat(notificationRecords.filter(item => {
+        const identity = String(item.NotificationId || item.EventId || item.Id || "");
+        if (!identity || notificationIds.has(identity)) return false;
+        notificationIds.add(identity);
+        return true;
+    }));
+    return merged
+        .map((item, index) => ({ item, index }))
+        .sort((left, right) => {
+            const timeDelta = toTimestamp(left.item?.CreateTime) - toTimestamp(right.item?.CreateTime);
+            return timeDelta || left.index - right.index;
+        })
+        .map(entry => entry.item);
+}
+
+export function createAiAssistantContact(existingContact = {}, rows = [], unreadCount = 0) {
     const latest = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    const chatUpdateTime = existingContact?.UpdateTime || "";
+    const notificationUpdateTime = latest?.CreateTime || "";
+    const notificationIsLatest = toTimestamp(notificationUpdateTime) > toTimestamp(chatUpdateTime);
     return {
-        ContactId: PLATFORM_SYSTEM_CONTACT_ID,
-        ContactUserId: PLATFORM_SYSTEM_CONTACT_ID,
-        ContactUserName: getPlatformNotificationSender(latest),
-        ContactUserAvatar: "./static/img/logo.svg",
-        LastMessage: latest?.MsgContent || latest?.Content || "平台消息将在这里同步显示",
-        UpdateTime: latest?.CreateTime || "",
-        UnRead: Math.max(0, Number(unreadCount || 0)),
-        IsPlatformSystem: true
+        ...(existingContact || {}),
+        ContactId: AI_ASSISTANT_CONTACT_ID,
+        ContactUserId: AI_ASSISTANT_CONTACT_ID,
+        ContactUserName: AI_ASSISTANT_CONTACT_NAME,
+        ContactUserAvatar: AI_ASSISTANT_CONTACT_AVATAR,
+        LastMessage: notificationIsLatest
+            ? (latest?.MsgContent || latest?.Content || latest?.Title || "平台消息")
+            : (existingContact?.LastMessage || "点击开始与AI助手聊天"),
+        UpdateTime: notificationIsLatest ? notificationUpdateTime : chatUpdateTime,
+        UnRead: Math.max(0, Number(existingContact?.UnRead || 0))
+            + Math.max(0, Number(unreadCount || 0)),
+        IncludesPlatformNotifications: true
     };
 }
 

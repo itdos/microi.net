@@ -47,6 +47,8 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("ChildTenantPlatformAppControlService.ClusterConcurrencyKey", runtime);
         Assert.Contains("ChildTenantPlatformAppControlService.ChildWorkerApiEngineKey", runtime);
         Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_V1", runtime);
+        Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_SCOPE_V1", runtime);
+        Assert.Contains("RequiresTargetExecutionBootstrap", runtime);
         Assert.Contains("EnsureTargetExecutionBootstrap", runtime);
         Assert.Contains("concurrencyLeaseOsClient = OsClientExtend.GetConfigOsClient()", runtime);
         Assert.Contains("ActiveTasks", runtime);

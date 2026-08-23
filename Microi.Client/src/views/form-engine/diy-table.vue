@@ -1886,6 +1886,7 @@
         <DiyImportDialog
             ref="refDiyImportDialog"
             :tableId="TableId"
+            :diyFieldList="DiyFieldList"
             :sysMenuModel="SysMenuModel"
             :isAdmin="GetCurrentUser._IsAdmin"
             :tableChildFkFieldName="TableChildFkFieldName"

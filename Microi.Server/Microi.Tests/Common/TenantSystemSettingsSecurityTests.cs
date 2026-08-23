@@ -127,6 +127,49 @@ public class TenantSystemSettingsSecurityTests
     }
 
     [Fact]
+    public void PublicBehaviorSwitch_UsesSysConfigBeforeLegacyPrivateRows()
+    {
+        var legacy = new Dictionary<string, TenantSystemSettingValue>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Login.Passkey.Enabled"] = new()
+            {
+                Key = "Login.Passkey.Enabled",
+                Value = "true",
+                IsEnabled = true,
+                ValueSource = "Tenant"
+            }
+        };
+
+        Assert.False(TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+            new JObject { ["PasskeyEnabled"] = 0 },
+            "PasskeyEnabled",
+            legacy,
+            "Login.Passkey.Enabled",
+            fallback: true));
+
+        Assert.True(TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+            new JObject { ["PasskeyEnabled"] = null },
+            "PasskeyEnabled",
+            legacy,
+            "Login.Passkey.Enabled",
+            fallback: false));
+    }
+
+    [Theory]
+    [InlineData("Login.Identity.Enabled")]
+    [InlineData("Login.Passkey.Enabled")]
+    [InlineData("Login.Authenticator.Enabled")]
+    [InlineData("Security.PasswordChange.RequireStepUp")]
+    [InlineData("Login.External.Enabled")]
+    [InlineData("Login.GitHub.Display")]
+    public void MigratedPublicKeys_AreRecognizedAsReadOnlyCompatibilityRows(string key)
+    {
+        Assert.True(TenantSystemSettingsSecurity.IsMigratedPublicSettingKey(key));
+        Assert.Contains(key, TenantSystemSettingsSecurity.MigratedPublicSettingKeys,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void DisabledManagementTemplate_RemainsRuntimePrivateAndFallsBack()
     {
         var disabled = new TenantSystemSettingValue
