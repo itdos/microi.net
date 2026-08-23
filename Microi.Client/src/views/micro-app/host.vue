@@ -908,7 +908,12 @@ export default {
                     AppKey: config.appKey,
                     Version: config.version,
                     RoutePath: config.microRoutePath,
-                    RequirePage: requirePage
+                    RequirePage: requirePage,
+                    // Current backends return best-effort source metadata with the same
+                    // runtime lookup. Old backends ignore this field and keep the guarded
+                    // compatibility read below, so one menu open no longer needs two
+                    // sequential Resolve calls on upgraded nodes.
+                    IncludePageMetadata: !requirePage && Boolean(config.microRoutePath)
                 });
             } catch (resolveError) {
                 if (!shouldUseMicroAppResolveFallback(null, { requirePage, requestedVersion: config.version })) {

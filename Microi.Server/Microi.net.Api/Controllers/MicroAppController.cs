@@ -393,13 +393,21 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
-        public async Task<IActionResult> Resolve(string osClient, string appKey, string version = null, string routePath = null, bool requirePage = false, [FromBody] JObject param = null)
+        public async Task<IActionResult> Resolve(
+            string osClient,
+            string appKey,
+            string version = null,
+            string routePath = null,
+            bool requirePage = false,
+            bool includePageMetadata = false,
+            [FromBody] JObject param = null)
         {
             osClient = osClient ?? param?["OsClient"].Val<string>();
             appKey = appKey ?? param?["AppKey"].Val<string>();
             version = version ?? param?["Version"].Val<string>();
             routePath = routePath ?? param?["RoutePath"].Val<string>() ?? param?["MicroRoute"].Val<string>();
             requirePage = requirePage || param?["RequirePage"].Val<bool?>() == true;
+            includePageMetadata = includePageMetadata || param?["IncludePageMetadata"].Val<bool?>() == true;
 
             var token = await DiyToken.GetCurrentToken(false);
             var tokenOsClient = Convert.ToString(token?.OsClient);
@@ -446,7 +454,7 @@ namespace Microi.net.Api
             // sys_menu integrations must not touch this optional table at all:
             // customer sub-tenants can legitimately be on an older page schema
             // while their published micro-service runtime is otherwise healthy.
-            if (requirePage)
+            if (requirePage || includePageMetadata)
             {
                 try
                 {
@@ -461,12 +469,21 @@ namespace Microi.net.Api
                         "微服务页面元数据解析失败",
                         $"TraceId={HttpContext?.TraceIdentifier}; AppKey={appKey}; RoutePath={NormalizeRoutePath(routePath)}; ErrorType={ex.GetType().FullName}; Message={ex.Message}",
                         3);
+                    if (!requirePage)
+                    {
+                        // Source metadata is optional for ordinary menu routes. A legacy
+                        // page schema must not block the already-resolved runtime entry.
+                        page = null;
+                    }
+                    else
+                    {
                     return Ok(new DosResult(0, new
                     {
                         ReasonCode = "MICRO_APP_PAGE_RESOLVE_FAILED",
                         AppKey = appKey,
                         RoutePath = NormalizeRoutePath(routePath)
                     }, "暂时无法读取微服务页面配置，请稍后重试。"));
+                    }
                 }
             }
             if (requirePage && !routePath.DosIsNullOrWhiteSpace() && page == null)
