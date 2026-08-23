@@ -93,13 +93,21 @@ const button = (buttons || []).find(item => item.Id === 'mci-system-settings-ide
 if (!button) throw new Error('系统设置菜单缺少租户安全设置按钮')
 button.Name = category
 button._RawName = category
-button.V8Code = String(button.V8Code || '').replace(
-  /Title:\s*'租户系统设置 · [^']*'/,
-  `Title: '租户系统设置 · ${category}'`,
-)
 // 平台内置服务入口必须解析当前 DatabaseOnly 运行包。这里不能固化历史
 // BuildVersion，否则 SaaS 包与内置微服务分开升级后会在读取数据库资产前失败。
-button.V8Code = button.V8Code.replace(/\n\s*Version:\s*'[^']*',/, '')
+button.V8Code = `V8.OpenAppDialog({
+  AppKey: 'microi-platform-service',
+  RoutePath: '/system-settings',
+  Title: '租户系统设置 · ${category}',
+  TitleIcon: 'fas fa-shield-halved',
+  Width: '80%',
+  BodyHeight: 'calc(100vh - 160px)',
+  OpenType: 'Dialog',
+  Data: { Section: 'login' },
+  OnSuccess: function(){ V8.RefreshTable({ _PageIndex: -1 }); },
+  OnCancel: function(){},
+  OnError: function(error){ V8.Tips((error && error.message) || '系统设置页面加载失败', false); }
+});`
 menu.PageBtns = typeof menu.PageBtns === 'string' ? JSON.stringify(buttons) : buttons
 
 const dataSet = (packageModel.DataSets || []).find(item => String(item.TableName).toLowerCase() === 'mci_system_setting')
@@ -123,13 +131,15 @@ for (const row of templates) {
 dataSet.Rows = existingRows
 
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {})
-info.Version = ensureMinimumVersion(info.Version, 'v7.5.23')
+info.Version = ensureMinimumVersion(info.Version, 'v7.5.28')
 info.RequiredPlatformCapabilities = [...new Set([
   ...(info.RequiredPlatformCapabilities || []),
   'POST /api/TenantSystemSettings/GetMapRuntime',
   'ClientFeature:MapRuntimeProvidersAMapBaiduTencent',
 ])]
 const changeLines = [
+  '2026-08-23 v7.5.28 系统设置微服务显式继承宿主主题色，修复外置样式下图标与主按钮失色；删除确认层完整展示配置说明主标题。',
+  '2026-08-23 v7.5.27 “安全与服务接入”改为 80% 吾码大圆角 Dialog，配置卡片紧凑化并以说明为主标题；Bool 使用开关，编辑、删除、TOTP 与 Secret 显示统一使用品牌弹层且遮罩毛玻璃跟随系统开关。',
   '2026-08-22 v7.5.23 “安全与服务接入”新增高德、百度、腾讯地图租户私密配置模板，浏览器只按当前供应商读取最小运行时凭据并兼容旧 sys_config 字段。',
   '2026-08-22 v7.5.16 “安全与服务接入”入口不再锁定历史微服务版本，始终解析当前 DatabaseOnly 内置运行包，HDFS/CDN 不可用时继续使用数据库资产。',
   '2026-08-21 v7.5.7 内嵌 microi-platform-service 升级至 v1.6.9，统一交付满高系统设置、清爽应用商城与主题化明暗模式。',

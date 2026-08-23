@@ -5,6 +5,7 @@ import test from 'node:test'
 const read = url => readFile(url, 'utf8')
 const packageModel = JSON.parse(await read(new URL('./app.microi.saas-engine.json', import.meta.url)))
 const microserviceSource = await read(new URL('../../../AI-Project/microi/AI应用/microi-platform-service/src/SystemSettings.vue', import.meta.url))
+const microserviceStyles = await read(new URL('../../../AI-Project/microi/AI应用/microi-platform-service/src/system-settings.css', import.meta.url))
 const tenantSettingsSource = await read(new URL('../../Microi.Core/SaaSEngine/TenantSystemSettingsSecurity.cs', import.meta.url))
 const controllerSource = await read(new URL('../../Microi.net.Api/Controllers/TenantSystemSettingsController.cs', import.meta.url))
 const identitySource = await read(new URL('../../Microi.Core/Security/IdentityVerificationSecurity.cs', import.meta.url))
@@ -16,10 +17,11 @@ const smsSource = smsEngine?.ApiV8Code || ''
 const dataSet = packageModel.DataSets.find(item => item.TableName === 'mci_system_setting')
 const rows = new Map(dataSet.Rows.map(row => [row.ConfigKey, row]))
 
-test('system settings drawer fills its viewport and uses the security/service-access name', () => {
+test('system settings uses an 80% unified dialog and fills its body without a blank tail', () => {
   assert.match(microserviceSource, /context\.hostViewport\?\.height/)
-  assert.match(microserviceSource, /\.system-settings\{[^}]*display:flex[^}]*min-height:var\(--system-settings-host-height,var\(--micro-app-available-height,100vh\)\)[^}]*flex-direction:column/)
-  assert.match(microserviceSource, /\.workspace\{flex:1 0 auto;align-items:stretch\}/)
+  assert.match(microserviceStyles, /height:\s*var\(--system-settings-host-height,\s*var\(--micro-app-available-height,\s*100vh\)\)/)
+  assert.match(microserviceStyles, /\.workspace\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?overflow:\s*hidden/)
+  assert.match(microserviceStyles, /\.settings-scroll\s*\{[\s\S]*?overflow-y:\s*auto/)
   assert.match(microserviceSource, /安全与服务接入/)
   assert.match(microserviceSource, /Sms\\\./)
   assert.match(microserviceSource, /Map\\\./)
@@ -29,6 +31,10 @@ test('system settings drawer fills its viewport and uses the security/service-ac
   assert.match(button.V8Code, /租户系统设置 · 安全与服务接入/)
   assert.match(button.V8Code, /AppKey:\s*'microi-platform-service'/)
   assert.match(button.V8Code, /RoutePath:\s*'\/system-settings'/)
+  assert.match(button.V8Code, /Width:\s*'80%'/)
+  assert.match(button.V8Code, /BodyHeight:\s*'calc\(100vh - 160px\)'/)
+  assert.match(button.V8Code, /OpenType:\s*'Dialog'/)
+  assert.doesNotMatch(button.V8Code, /OpenType:\s*'Drawer'/)
   assert.doesNotMatch(button.V8Code, /\bVersion\s*:/)
 
   const platformBundle = packageModel.ApplicationBundles.find(
@@ -37,6 +43,18 @@ test('system settings drawer fills its viewport and uses the security/service-ac
   assert.equal(platformBundle.AssetStoragePolicy.Build, 'DatabaseOnly')
   assert.equal(platformBundle.MicroService.StorageMode, 'db')
   assert.ok(platformBundle.BuildAssets.some(asset => asset.Path === 'index.html'))
+})
+
+test('system settings cards and actions follow the unified interaction contract', () => {
+  assert.match(microserviceSource, /<div class="config-copy"><b>\{\{ settingTitle\(item\) \}\}<\/b><p>\{\{ item\.ConfigKey \}\}<\/p><\/div>/)
+  assert.match(microserviceSource, /class="value-switch"[\s\S]*?role="switch"/)
+  assert.match(microserviceSource, /class="bool-editor"[\s\S]*?role="switch"/)
+  assert.match(microserviceSource, /<dialog ref="editorDialog"/)
+  assert.match(microserviceSource, /<dialog ref="deleteDialog"/)
+  assert.match(microserviceSource, /DELETE TENANT SETTING/)
+  assert.doesNotMatch(microserviceSource, /window\.(?:alert|confirm|prompt)\s*\(/)
+  assert.match(microserviceStyles, /dialog\.modal-backdrop\.blurred::backdrop\s*\{[\s\S]*?backdrop-filter:\s*blur\(/)
+  assert.match(microserviceStyles, /dialog\.modal-backdrop\.plain::backdrop\s*\{[\s\S]*?backdrop-filter:\s*none/)
 })
 
 test('official package refreshes metadata but never overwrites tenant setting values', () => {
