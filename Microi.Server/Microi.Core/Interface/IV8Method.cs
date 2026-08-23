@@ -193,6 +193,12 @@ namespace Microi.net
         DosResult ManageSystemObservability(dynamic dynamicParam);
 
         /// <summary>
+        /// 返回当前用户“我的工作”统一统计。宿主并行执行独立计数并复用强类型
+        /// 抄送读取逻辑，接口引擎仅负责缓存与展示编排。
+        /// </summary>
+        DosResult GetCurrentUserWorkflowStats();
+
+        /// <summary>
         /// 当前租户超级管理员幂等保存接口引擎定时任务；Quartz 与元数据均完成回读后才成功。
         /// </summary>
         DosResult SaveScheduleJob(dynamic dynamicParam);

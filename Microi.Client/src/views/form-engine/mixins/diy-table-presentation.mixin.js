@@ -474,81 +474,73 @@ export default {
                 ...extra
             };
         },
-        async RefreshModuleMetrics(queryParam = {}, generation = ++this._presentationRequestGeneration) {
-            const metrics = this.ModuleHero.Metrics || [];
-            const apiMetrics = metrics.filter((metric) => metric.ApiEngineKey);
-            if (!apiMetrics.length) {
+        async RefreshModulePresentationData(rows = [], queryParam = {}, generation = this._presentationRequestGeneration) {
+            const apiMetrics = (this.ModuleHero.Metrics || []).filter((metric) => metric.ApiEngineKey);
+            const menu = this.SysMenuModel || {};
+            const collections = [menu.PageTabs, menu.MoreBtns, menu.PageBtns, menu.BatchSelectMoreBtns, menu.ExportMoreBtns, menu.FormBtns];
+            const badgeGroups = collectBadgeApiGroups(collections);
+            const metricGroups = new Map();
+            apiMetrics.forEach((metric) => {
+                if (!metricGroups.has(metric.ApiEngineKey)) metricGroups.set(metric.ApiEngineKey, []);
+                metricGroups.get(metric.ApiEngineKey).push(metric);
+            });
+            const engineKeys = [...new Set([...metricGroups.keys(), ...badgeGroups.keys()])];
+            if (!engineKeys.length) {
                 this.ModuleMetricValues = {};
+                this.ButtonBadgeValues = {};
                 this.ModuleMetricLoading = false;
                 return;
             }
-            this.ModuleMetricLoading = true;
-            const groups = new Map();
-            apiMetrics.forEach((metric) => {
-                if (!groups.has(metric.ApiEngineKey)) groups.set(metric.ApiEngineKey, []);
-                groups.get(metric.ApiEngineKey).push(metric);
-            });
-            const nextValues = {};
-            await Promise.all([...groups.entries()].map(async ([apiEngineKey, groupMetrics]) => {
+            this.ModuleMetricLoading = apiMetrics.length > 0;
+            const rowIds = (rows || []).map((row) => row?.Id).filter(Boolean);
+            const nextMetricValues = {};
+            const nextBadgeValues = {};
+            await Promise.all(engineKeys.map(async (apiEngineKey) => {
+                const groupMetrics = metricGroups.get(apiEngineKey) || [];
+                const descriptors = badgeGroups.get(apiEngineKey) || [];
+                const uniqueDescriptors = [...new Map(descriptors.map((descriptor) => [descriptor.buttonKey, descriptor])).values()];
                 const params = groupMetrics.reduce((result, metric) => Object.assign(result, metric.ParamMap || {}), {});
                 try {
+                    // One engine may serve both header metrics and button badges. Sending
+                    // their keys together avoids two Jint executions and duplicate count
+                    // queries for the same module refresh.
+                    const extra = {};
+                    if (groupMetrics.length) extra.MetricKeys = groupMetrics.map((metric) => metric.Key);
+                    if (uniqueDescriptors.length) {
+                        extra.Ids = rowIds;
+                        extra.ButtonKeys = uniqueDescriptors.map((descriptor) => descriptor.buttonKey);
+                    }
                     const response = await this.DiyCommon.ApiEngine.Run(apiEngineKey, {
                         ...params,
-                        ...this._presentationContext(queryParam, { MetricKeys: groupMetrics.map((metric) => metric.Key) })
+                        ...this._presentationContext(queryParam, extra)
                     });
                     if (response && typeof response === "object" && Object.prototype.hasOwnProperty.call(response, "Code") && Number(response.Code) !== 1) {
-                        throw new Error(response.Msg || "模块指标接口返回失败");
+                        throw new Error(response.Msg || "模块展示统计接口返回失败");
                     }
                     groupMetrics.forEach((metric) => {
-                        nextValues[metric.Key] = resolveMetricValue(response, metric);
+                        nextMetricValues[metric.Key] = resolveMetricValue(response, metric);
                     });
-                } catch (error) {
-                    groupMetrics.forEach((metric) => { nextValues[metric.Key] = metric.DefaultValue; });
-                }
-            }));
-            if (generation !== this._presentationRequestGeneration || this._isDestroyed) return;
-            this.ModuleMetricValues = nextValues;
-            this.ModuleMetricLoading = false;
-        },
-        async RefreshButtonBadges(rows = [], queryParam = {}, generation = this._presentationRequestGeneration) {
-            const menu = this.SysMenuModel || {};
-            const collections = [menu.PageTabs, menu.MoreBtns, menu.PageBtns, menu.BatchSelectMoreBtns, menu.ExportMoreBtns, menu.FormBtns];
-            const groups = collectBadgeApiGroups(collections);
-            if (!groups.size) {
-                this.ButtonBadgeValues = {};
-                return;
-            }
-            const rowIds = (rows || []).map((row) => row?.Id).filter(Boolean);
-            const nextValues = {};
-            await Promise.all([...groups.entries()].map(async ([apiEngineKey, descriptors]) => {
-                const uniqueDescriptors = [...new Map(descriptors.map((descriptor) => [descriptor.buttonKey, descriptor])).values()];
-                try {
-                    const response = await this.DiyCommon.ApiEngine.Run(apiEngineKey, this._presentationContext(queryParam, {
-                        Ids: rowIds,
-                        ButtonKeys: uniqueDescriptors.map((descriptor) => descriptor.buttonKey)
-                    }));
-                    if (response && typeof response === "object" && Object.prototype.hasOwnProperty.call(response, "Code") && Number(response.Code) !== 1) {
-                        throw new Error(response.Msg || "按钮统计接口返回失败");
-                    }
                     uniqueDescriptors.forEach(({ badge, buttonKey }) => {
-                        nextValues[`page|${buttonKey}`] = resolveButtonBadgeValue(response, badge, buttonKey);
+                        nextBadgeValues[`page|${buttonKey}`] = resolveButtonBadgeValue(response, badge, buttonKey);
                         rowIds.forEach((rowId) => {
-                            nextValues[`${rowId}|${buttonKey}`] = resolveButtonBadgeValue(response, badge, buttonKey, rowId);
+                            nextBadgeValues[`${rowId}|${buttonKey}`] = resolveButtonBadgeValue(response, badge, buttonKey, rowId);
                         });
                     });
                 } catch (error) {
-                    // 统计失败不阻断列表和按钮本身。
+                    groupMetrics.forEach((metric) => { nextMetricValues[metric.Key] = metric.DefaultValue; });
+                    // 统计失败不阻断列表、指标占位或按钮本身。
                 }
             }));
             if (generation !== this._presentationRequestGeneration || this._isDestroyed) return;
-            this.ButtonBadgeValues = nextValues;
+            this.ModuleMetricValues = nextMetricValues;
+            this.ButtonBadgeValues = nextBadgeValues;
+            this.ModuleMetricLoading = false;
         },
         RefreshModulePresentation(queryParam = {}, rows = []) {
             this._modulePresentationLastQuery = queryParam || {};
             this._modulePresentationLastRows = rows || [];
             const generation = ++this._presentationRequestGeneration;
-            this.RefreshModuleMetrics(queryParam, generation);
-            this.RefreshButtonBadges(rows, queryParam, generation);
+            this.RefreshModulePresentationData(rows, queryParam, generation);
             this.ScheduleModulePresentationRefresh();
         },
         ScheduleModulePresentationRefresh() {

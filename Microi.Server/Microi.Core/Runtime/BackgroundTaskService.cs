@@ -669,10 +669,20 @@ namespace Microi.net
                         osClient, userKey, runtimeOsClientType, runtimeOsClientNetwork))
                     .ConfigureAwait(false);
                 if (clientInfo?.ConnectionIds == null || !clientInfo.ConnectionIds.Any()) return;
+                // Every task mutation writes the bounded Redis projection before it queues
+                // a notification. Re-reading the authoritative table for each progress
+                // push turned active jobs into a database polling loop. Transport the
+                // fresh projection and keep the controller List endpoint as the explicit
+                // authoritative reconciliation path.
+                var projected = ListLegacyCache(osClient, userKey)
+                    .OrderByDescending(item => item.CreateTime)
+                    .Take(100)
+                    .Select(ApplyRuntimeFields)
+                    .ToList();
                 await RealtimePushRuntime.SendAsync(
                         clientInfo.ConnectionIds,
                         "ReceiveBackgroundTaskList",
-                        List(osClient, userKey))
+                        projected.Count > 0 ? projected : List(osClient, userKey))
                     .ConfigureAwait(false);
             }
             catch (Exception ex)
