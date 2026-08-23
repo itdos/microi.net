@@ -42,6 +42,7 @@ import {
     getValueByPath,
     normalizeMenuBadgeConfig
 } from "@/views/form-engine/form-view-blocks/module-presentation-runtime";
+import { requestMenuBadge } from "./menu-badge-batch";
 
 const menuBadgeCache = new Map();
 
@@ -119,10 +120,11 @@ export default {
                 return;
             }
             try {
-                const result = await DiyCommon.ApiEngine.Run(config.ApiEngineKey, {
+                const result = await requestMenuBadge(DiyCommon.ApiEngine.Run, config.ApiEngineKey, {
                     ...config.ParamMap,
                     _SysMenuId: props.menuId,
                     SysMenuId: props.menuId,
+                    ValueOnly: config.ValuePath === "Data.Value" || config.ValuePath === "Data.Count",
                     OsClient: DiyCommon.GetOsClient()
                 });
                 if (result && typeof result === "object" && Object.prototype.hasOwnProperty.call(result, "Code") && Number(result.Code) !== 1) {

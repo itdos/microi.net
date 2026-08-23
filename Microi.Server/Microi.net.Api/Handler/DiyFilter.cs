@@ -1084,6 +1084,13 @@ namespace Microi.net.Api
                     try
                     {
                         var sysUserObj = JObject.FromObject(sysUser);
+                        NetworkTrafficObservabilityService.AnnotateIdentity(
+                            context.HttpContext,
+                            sysUserObj["Id"]?.ToString(),
+                            sysUserObj["Account"]?.ToString(),
+                            sysUserObj["Name"]?.ToString(),
+                            tokenOsClient,
+                            clientType);
                         //获取该用户的所有角色的所有基础权限
                         var baseLimit = new List<string>();
                         var roles = sysUserObj["_Roles"].Val<JArray>();

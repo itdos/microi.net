@@ -6,6 +6,40 @@ namespace Microi.Tests.Common;
 public class SysMenuProjectionTests
 {
     [Fact]
+    public void MenuTreeCacheKey_IsVersionedAndNormalizesSetLikeFields()
+    {
+        var user = JObject.FromObject(new
+        {
+            Id = "user-1",
+            Account = "admin",
+            Level = 999,
+            RoleIds = "[\"role-1\"]"
+        });
+        var first = new SysMenuParam
+        {
+            OsClient = "iTdos",
+            _CurrentUser = user,
+            Ids = new List<string> { "menu-b", "menu-a" },
+            _SelectFields = new List<string> { "Name", "Id" },
+            Display = 1
+        };
+        var reordered = new SysMenuParam
+        {
+            OsClient = "iTdos",
+            _CurrentUser = user,
+            Ids = new List<string> { "menu-a", "menu-b" },
+            _SelectFields = new List<string> { "Id", "Name" },
+            Display = 1
+        };
+
+        var key = SysMenuLogic.BuildMenuTreeCacheKey(first, "7");
+        Assert.Equal(key, SysMenuLogic.BuildMenuTreeCacheKey(reordered, "7"));
+        Assert.NotEqual(key, SysMenuLogic.BuildMenuTreeCacheKey(reordered, "8"));
+        reordered._ChildSystemId = "child-system";
+        Assert.NotEqual(key, SysMenuLogic.BuildMenuTreeCacheKey(reordered, "7"));
+    }
+
+    [Fact]
     public void MenuDiscoveryQuery_DoesNotDelegateProjectionToDiyFieldMetadata()
     {
         var currentUser = new JObject

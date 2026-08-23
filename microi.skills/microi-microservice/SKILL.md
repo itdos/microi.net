@@ -160,7 +160,8 @@ window.microApp.dispatch({
 
 AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data)`，先检查
 `hostCapabilities.actions`，再 dispatch。当前标准动作是：`closeTab`、`navigate`、
-`replaceTab`、`back`、`forward`、`reloadTab`、`setTabTitle`、`showMessage`。
+`replaceTab`、`back`、`forward`、`reloadTab`、`setTabTitle`、`showMessage`、`setGlobalOverlay`。
+`setGlobalOverlay` 只负责平台级遮罩、宿主滚动锁和必要时提升微应用层级，不替代子应用自己的 Dialog、焦点管理和权限。平台级详情/确认弹层打开时传 `visible/blur/lockScroll/mask/promote`，关闭、路由离开、错误和 `onBeforeUnmount` 都必须发送 `visible:false, lockScroll:false, promote:false`；多个弹层用本地计数或统一 computed 保证最后一个关闭后才撤销。
 `navigate/replaceTab` 只传以 `/` 开头的站内 path 或 `{name,params,query,hash}`；禁止传
 外部 URL、登录页、访问密钥页或内部 redirect。目标仍要存在于当前用户动态路由并经过路由守卫，
 宿主桥接不授予菜单或数据权限。业务保存成功后才能关闭/跳转，不能把尽力返回的

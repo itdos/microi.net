@@ -673,6 +673,31 @@ export interface MongodbLogWrite {
   appId?: string;
 }
 
+export type SystemObservabilityQueryAction =
+  | 'Capabilities'
+  | 'Snapshot'
+  | 'Logs'
+  | 'LogTypes'
+  | 'LogStats'
+  | 'Signal'
+  | 'Trace'
+  | 'ApiRank'
+  | 'AppLogs'
+  | 'PlatformStats'
+  | 'SecurityData'
+  | 'TrafficHistory';
+
+export type SystemObservabilityManageAction = 'BlockIp' | 'UnblockIp';
+
+export interface SystemObservabilityQuery extends Record<string, unknown> {
+  Action: SystemObservabilityQueryAction;
+}
+
+export interface SystemObservabilityManage extends Record<string, unknown> {
+  Action: SystemObservabilityManageAction;
+  Ip: string;
+}
+
 export interface UserAccessKeyRecord {
   Id: string;
   Name?: string;
@@ -3358,6 +3383,14 @@ export class MicroiClient {
       Result: log.result || '',
       AppId: log.appId || 'microi.mcp',
     });
+  }
+
+  async querySystemObservability(query: SystemObservabilityQuery): Promise<ApiResponse> {
+    return this.executeEngine('mci-system-observability-query', query);
+  }
+
+  async manageSystemObservability(command: SystemObservabilityManage): Promise<ApiResponse> {
+    return this.executeEngine('mci-system-observability-action', command);
   }
 
   async getRedisStatistics(database = 0, connectionId?: string): Promise<ApiResponse> {
