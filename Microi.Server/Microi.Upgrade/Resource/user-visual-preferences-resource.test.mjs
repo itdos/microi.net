@@ -8,7 +8,7 @@ const names = ['ThemeColor', 'ThemeMode', 'MenuChildExpandMode'];
 const fields = names.map(name => packageModel.DiyFields.find(item => item.TableId === table.Id && item.Name === name));
 
 test('SaaS package delivers per-user visual preferences with safe legacy defaults', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.5.26');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.5.28');
   assert.ok(fields.every(Boolean));
   assert.ok(fields.every(field => field.Tab === '01KGFAYTX109WCP98XJZP395VY'));
   assert.equal(fields.find(field => field.Name === 'ThemeColor').DefaultValue, '');

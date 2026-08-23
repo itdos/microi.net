@@ -218,11 +218,12 @@ test("clean shell styling keeps tabs, search controls and metrics theme-aware", 
 });
 
 test("micro-app hosts and platform pages keep the live theme contract", async function () {
-    const [dialogHost, routeHost, runtime, settings, marketplace] = await Promise.all([
+    const [dialogHost, routeHost, runtime, settings, settingsStyles, marketplace] = await Promise.all([
         source("src/views/micro-app/dialog.vue"),
         source("src/views/micro-app/host.vue"),
         readPlatformServiceSource("src/microi.js"),
         readPlatformServiceSource("src/SystemSettings.vue"),
+        readPlatformServiceSource("src/system-settings.css"),
         readPlatformServiceSource("src/Marketplace.vue")
     ]);
 
@@ -238,7 +239,8 @@ test("micro-app hosts and platform pages keep the live theme contract", async fu
     assert.match(runtime, /microApp\?\.addDataListener/);
     assert.match(runtime, /microApp\?\.removeDataListener/);
     assert.match(settings, /subscribeContext\(\(nextContext\) => Object\.assign\(context, nextContext\)\)/);
-    assert.match(settings, /\.system-settings\[data-theme=dark\]/);
+    assert.match(settings, /<style scoped src="\.\/system-settings\.css"><\/style>/);
+    assert.match(settingsStyles, /\.system-settings\[data-theme="dark"\]/);
     assert.match(marketplace, /subscribeContext\(next=>Object\.assign\(context,next\),false\)/);
 });
 

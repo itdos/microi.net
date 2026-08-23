@@ -17,7 +17,7 @@ const expected = [
 ];
 
 test('SaaS bootstrap package carries platform authentication engines', () => {
-  assert.equal(resource.PackageInfo.Version, 'v7.5.26');
+  assert.equal(resource.PackageInfo.Version, 'v7.5.28');
   assert.equal(resource.PackageInfo.ApiEngineCount, resource.SysApiEngines.length);
   const engines = resource.SysApiEngines.filter((item) => expected.includes(item.ApiEngineKey));
   assert.deepEqual(engines.map((item) => item.ApiEngineKey), expected);

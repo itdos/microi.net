@@ -94,14 +94,42 @@ async function expectHealthyLogo(page) {
     expect(state.naturalWidth, `logo failed to load: ${state.src}`).toBeGreaterThan(0);
 }
 
-async function waitForSystemSettingsFrame(page) {
+function collectMicroAppDiagnostics(page) {
+    const entries = [];
+    const remember = (entry) => {
+        entries.push(String(entry || "").slice(0, 1200));
+        if (entries.length > 40) entries.shift();
+    };
+    page.on("console", (message) => {
+        if (["error", "warning"].includes(message.type())) remember(`console.${message.type()}: ${message.text()}`);
+    });
+    page.on("pageerror", (error) => remember(`pageerror: ${error?.stack || error?.message || error}`));
+    page.on("requestfailed", (request) => remember(`requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText || ""}`));
+    page.on("response", (response) => {
+        if (response.status() >= 400) remember(`response: ${response.status()} ${response.request().method()} ${response.url()}`);
+    });
+    return entries;
+}
+
+async function waitForSystemSettingsFrame(page, diagnostics = []) {
     for (let attempt = 0; attempt < 180; attempt += 1) {
         for (const frame of page.frames()) {
             if (await frame.locator(".system-settings").count().catch(() => 0)) return frame;
         }
         await page.waitForTimeout(250);
     }
-    throw new Error(`system-settings application did not mount; frames: ${page.frames().map((frame) => frame.url()).join(", ")}`);
+    const frames = await Promise.all(page.frames().map(async (frame) => ({
+        url: frame.url(),
+        title: await frame.title().catch(() => ""),
+        body: await frame.locator("body").innerText().catch(() => ""),
+        html: await frame.locator("body").innerHTML().catch(() => "")
+    })));
+    throw new Error(`system-settings application did not mount\nframes=${JSON.stringify(frames.map((frame) => ({
+        url: frame.url,
+        title: frame.title,
+        body: frame.body.slice(0, 1000),
+        html: frame.html.slice(0, 2000)
+    })), null, 2)}\ndiagnostics=${JSON.stringify(diagnostics, null, 2)}`);
 }
 
 async function readKeywordSearchMetrics(keywordInput) {
@@ -499,12 +527,12 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
     expect(appGeometry.markerHeight / appGeometry.activeHeight).toBeLessThanOrEqual(0.6);
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "01c-system-private-settings.png"), fullPage: false });
-    const settingsDrawer = page.locator(".el-overlay.is-drawer:visible").last();
-    if (await settingsDrawer.count()) {
-        const closeDrawer = settingsDrawer.getByRole("button", { name: /Close|关闭/i }).first();
-        if (await closeDrawer.isVisible().catch(() => false)) await closeDrawer.click();
+    const settingsOverlay = page.locator(".mci-unified-dialog:visible, .el-overlay.is-drawer:visible").last();
+    if (await settingsOverlay.count()) {
+        const closeOverlay = settingsOverlay.getByRole("button", { name: /Close|关闭/i }).first();
+        if (await closeOverlay.isVisible().catch(() => false)) await closeOverlay.click();
         else await page.keyboard.press("Escape");
-        await expect(settingsDrawer).toBeHidden({ timeout: 15_000 });
+        await expect(settingsOverlay).toBeHidden({ timeout: 15_000 });
     }
 
     const systemRecordId = await page.evaluate(() => new URLSearchParams(location.hash.split("?")[1] || "").get("RecordId"));
@@ -737,8 +765,9 @@ test("联系人弹层：单分组满宽、紧凑记录工具、原地切换与�
     await overlay.screenshot({ path: path.join(SCREENSHOT_DIR, "02-contact-dialog-record-print.png") });
 });
 
-test("系统设置：安全与服务接入填满宿主可用高度", async ({ page }) => {
+test("系统设置：安全与服务接入统一弹层、紧凑卡片与平台确认框", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    const runtimeDiagnostics = collectMicroAppDiagnostics(page);
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/system-config");
     await expect(page.locator(".module-form-workbench")).toBeVisible({ timeout: 45_000 });
@@ -746,7 +775,31 @@ test("系统设置：安全与服务接入填满宿主可用高度", async ({ pa
     const entry = page.getByRole("button", { name: /安全与服务接入|Security.*Service Access/i }).first();
     await expect(entry).toBeVisible({ timeout: 30_000 });
     await entry.click();
-    const settingsFrame = await waitForSystemSettingsFrame(page);
+    const outerDialog = page.locator(".mci-unified-dialog.el-dialog:visible").last();
+    await expect(outerDialog).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator(".el-overlay.is-drawer:visible")).toHaveCount(0);
+    await expect(outerDialog.locator(".diy-custom-dialog__title i.fas.fa-shield-halved")).toHaveCount(1);
+    const outerGeometry = await outerDialog.evaluate((dialog) => {
+        const box = dialog.getBoundingClientRect();
+        return {
+            widthRatio: box.width / window.innerWidth,
+            borderRadius: Number.parseFloat(getComputedStyle(dialog).borderRadius)
+        };
+    });
+    expect(outerGeometry.widthRatio, JSON.stringify(outerGeometry)).toBeGreaterThanOrEqual(0.77);
+    expect(outerGeometry.widthRatio, JSON.stringify(outerGeometry)).toBeLessThanOrEqual(0.82);
+    expect(outerGeometry.borderRadius, JSON.stringify(outerGeometry)).toBeGreaterThanOrEqual(20);
+
+    const outerMask = page.locator(".mci-unified-overlay:visible").last();
+    await expect(outerMask).toBeVisible();
+    const outerMaskStyle = await outerMask.evaluate((mask) => ({
+        plain: mask.classList.contains("mci-unified-overlay--plain"),
+        filter: getComputedStyle(mask).backdropFilter || getComputedStyle(mask).webkitBackdropFilter || ""
+    }));
+    if (outerMaskStyle.plain) expect(outerMaskStyle.filter).not.toMatch(/blur\(/i);
+    else expect(outerMaskStyle.filter, JSON.stringify(outerMaskStyle)).toMatch(/blur\(/i);
+
+    const settingsFrame = await waitForSystemSettingsFrame(page, runtimeDiagnostics);
     const settings = settingsFrame.locator(".system-settings");
     await expect(settings).toBeVisible({ timeout: 30_000 });
     await expect(settingsFrame.getByText("安全与服务接入", { exact: true }).first()).toBeVisible();
@@ -770,6 +823,73 @@ test("系统设置：安全与服务接入填满宿主可用高度", async ({ pa
     expect(Math.abs(hostGeometry.appHeight - hostGeometry.bodyHeight), JSON.stringify(hostGeometry)).toBeLessThanOrEqual(2);
     expect(hostGeometry.blankBelowApp, JSON.stringify(hostGeometry)).toBeLessThanOrEqual(2);
 
+    const firstCard = settingsFrame.locator(".config-card").first();
+    await expect(firstCard).toBeVisible();
+    const cardPresentation = await firstCard.evaluate((card) => {
+        const title = card.querySelector(".config-copy b");
+        const key = card.querySelector(".config-copy p");
+        return {
+            title: title?.textContent?.trim() || "",
+            key: key?.textContent?.trim() || "",
+            titleSize: Number.parseFloat(getComputedStyle(title).fontSize),
+            keySize: Number.parseFloat(getComputedStyle(key).fontSize),
+            height: card.getBoundingClientRect().height
+        };
+    });
+    expect(cardPresentation.title).not.toBe("");
+    expect(cardPresentation.key).toMatch(/[.:]/);
+    expect(cardPresentation.title).not.toBe(cardPresentation.key);
+    expect(cardPresentation.titleSize).toBeGreaterThan(cardPresentation.keySize);
+    expect(cardPresentation.height, JSON.stringify(cardPresentation)).toBeLessThanOrEqual(170);
+    await expect(settingsFrame.locator('.value-switch[role="switch"]')).not.toHaveCount(0);
+
+    await firstCard.getByRole("button", { name: "编辑", exact: true }).click();
+    const editorLayer = settingsFrame.locator("dialog.modal-backdrop[open]:has(.modal-shell.editor)");
+    const editor = editorLayer.locator(".modal-shell.editor");
+    await expect(editor).toBeVisible();
+    await expect(editor.locator(".modal-title-icon")).toBeVisible();
+    await expect(editor.locator(".modal-title-copy h2")).toHaveText(cardPresentation.title);
+    await expect(editor.locator(".modal-title-copy p")).toHaveText(cardPresentation.key);
+    const editorStyle = await editor.evaluate((dialog) => ({
+        borderRadius: Number.parseFloat(getComputedStyle(dialog).borderRadius),
+        iconBackground: getComputedStyle(dialog.querySelector(".modal-title-icon")).backgroundColor,
+        primaryBackground: getComputedStyle(dialog.querySelector(".modal-footer .primary")).backgroundColor
+    }));
+    expect(editorStyle.borderRadius).toBeGreaterThanOrEqual(20);
+    expect(editorStyle.iconBackground).not.toBe("rgba(0, 0, 0, 0)");
+    expect(editorStyle.primaryBackground).not.toBe("rgb(255, 255, 255)");
+    const editorMaskStyle = await editorLayer.evaluate((mask) => ({
+        plain: mask.classList.contains("plain"),
+        filter: getComputedStyle(mask).backdropFilter || getComputedStyle(mask).webkitBackdropFilter || ""
+    }));
+    expect(editorMaskStyle.plain).toBe(outerMaskStyle.plain);
+    if (editorMaskStyle.plain) expect(editorMaskStyle.filter).not.toMatch(/blur\(/i);
+    else expect(editorMaskStyle.filter, JSON.stringify(editorMaskStyle)).toMatch(/blur\(/i);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03b-system-setting-editor-dialog.png"), fullPage: false });
+    await editor.getByRole("button", { name: "关闭", exact: true }).click();
+    await expect(editorLayer).toHaveCount(0);
+
+    let nativeDialogCount = 0;
+    const nativeDialogHandler = async (dialog) => {
+        nativeDialogCount += 1;
+        await dialog.dismiss();
+    };
+    page.on("dialog", nativeDialogHandler);
+    await firstCard.getByRole("button", { name: "删除", exact: true }).click();
+    const deleteLayer = settingsFrame.locator("dialog.modal-backdrop[open]:has(.confirm-dialog)");
+    const deleteDialog = deleteLayer.locator(".confirm-dialog");
+    await expect(deleteDialog).toBeVisible();
+    await expect(deleteDialog.locator(".modal-title-icon.danger-icon")).toBeVisible();
+    await expect(deleteDialog.locator(".modal-title-copy h2")).toHaveText(cardPresentation.title);
+    await expect(deleteDialog.locator(".modal-title-copy p")).toHaveText(cardPresentation.key);
+    await expect(deleteDialog.getByRole("button", { name: "确认删除", exact: true })).toBeVisible();
+    await page.waitForTimeout(300);
+    expect(nativeDialogCount).toBe(0);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03c-system-setting-delete-confirm.png"), fullPage: false });
+    await deleteDialog.getByRole("button", { name: "取消", exact: true }).click();
+    await expect(deleteLayer).toHaveCount(0);
+    page.off("dialog", nativeDialogHandler);
+
     const geometry = await settings.evaluate((root) => {
         const workspace = root.querySelector(".workspace");
         const list = root.querySelector(".settings-list");
@@ -778,13 +898,14 @@ test("系统设置：安全与服务接入填满宿主可用高度", async ({ pa
         return {
             rootTop: rootBox.top,
             rootBottom: rootBox.bottom,
+            rootHeight: rootBox.height,
             viewportHeight: document.documentElement.clientHeight,
             blankBelow: workspaceBox ? rootBox.bottom - workspaceBox.bottom : Number.POSITIVE_INFINITY,
             listMinHeight: list ? getComputedStyle(list).minHeight : "missing"
         };
     });
-    expect(geometry.rootBottom, JSON.stringify(geometry)).toBeGreaterThanOrEqual(geometry.viewportHeight - 2);
-    expect(geometry.blankBelow, JSON.stringify(geometry)).toBeLessThanOrEqual(80);
+    expect(Math.abs(geometry.rootHeight - hostGeometry.appHeight), JSON.stringify({ geometry, hostGeometry })).toBeLessThanOrEqual(2);
+    expect(geometry.blankBelow, JSON.stringify(geometry)).toBeLessThanOrEqual(24);
     expect(geometry.listMinHeight).toBe("0px");
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03-system-security-service-access.png"), fullPage: false });
 });
