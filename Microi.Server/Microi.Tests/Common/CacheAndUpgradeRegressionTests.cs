@@ -12,6 +12,17 @@ namespace Microi.Tests.Common;
 public class CacheAndUpgradeRegressionTests
 {
     [Fact]
+    public void FormEngineContract_ExposesBoundedBatchCountPrimitiveToV8()
+    {
+        var contract = typeof(IFormEngine).GetMethod(nameof(IFormEngine.GetTableDataCountBatch));
+        var implementation = typeof(FormEngine).GetMethod(nameof(IFormEngine.GetTableDataCountBatch));
+
+        Assert.NotNull(contract);
+        Assert.NotNull(implementation);
+        Assert.Equal(typeof(DosResultList<dynamic>), contract!.ReturnType);
+    }
+
+    [Fact]
     public void Upgrade21_CoversEveryBackgroundTaskRuntimeColumn_AndCanAdoptLegacyPhysicalTable()
     {
         var requiredColumnsMethod = typeof(Upgrade21).GetMethod(

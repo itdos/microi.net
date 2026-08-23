@@ -359,6 +359,17 @@ namespace Microi.net
         /// </summary>
         DosResultList<dynamic> GetTableDataCount(string formEngineKey, dynamic dynamicParam, DbTrans _trans = null);
 
+        /// <summary>
+        /// 批量获取多组数据条数。用于接口引擎将彼此独立的只读统计合并执行；
+        /// 每一项仍使用标准 FormEngine 权限、租户和数据范围校验。
+        /// </summary>
+        Task<DosResultList<dynamic>> GetTableDataCountBatchAsync(dynamic dynamicParam, DbTrans _trans = null);
+
+        /// <summary>
+        /// 批量获取多组数据条数（同步版本，供 V8 调用）。
+        /// </summary>
+        DosResultList<dynamic> GetTableDataCountBatch(dynamic dynamicParam, DbTrans _trans = null);
+
         #endregion
 
         #region 树形数据

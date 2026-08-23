@@ -183,6 +183,8 @@ services.AddSingleton(SysLogQueueOptions.CreateDefault());
 services.AddSingleton<SysLogQueueService>();
 services.AddSingleton<ISysLogQueue>(sp => sp.GetRequiredService<SysLogQueueService>());
 services.AddHostedService(sp => sp.GetRequiredService<SysLogQueueService>());
+// 网络流量热路径只做内存聚合；固定 5 分钟桶由后台批量幂等写 MySQL。
+services.AddHostedService<SystemObservabilityTrafficRollupService>();
 // 进程级内存最后防线：软阈值退出流量，硬阈值有界停机，避免单节点拖垮宿主机。
 services.AddSingleton(ProcessMemoryGuardOptions.CreateDefault());
 services.AddSingleton<ProcessMemoryPressureState>();

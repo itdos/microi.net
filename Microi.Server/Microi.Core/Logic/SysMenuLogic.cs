@@ -41,6 +41,7 @@ namespace Microi.net
         };
         private static readonly ConcurrentDictionary<string, LegacyAliasCacheEntry> LegacyAliasCache =
             new ConcurrentDictionary<string, LegacyAliasCacheEntry>(StringComparer.OrdinalIgnoreCase);
+        private static readonly TimeSpan MenuTreeCacheTtl = TimeSpan.FromMinutes(2);
         #endregion
 
         /// <summary>
@@ -178,6 +179,37 @@ namespace Microi.net
             if (param._CurrentUser == null)
             {
                 return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang));
+            }
+            // The menu tree is part of the authenticated platform bootstrap and cannot
+            // be delegated to a tenant ApiEngine. Reuse the same cross-node
+            // authorization version that is incremented by every menu/role/user write;
+            // this makes cached trees unreachable immediately after a permission or
+            // route change instead of accepting a long stale TTL window.
+            var authorizationVersion = await FormEngineAuthorizationCache
+                .GetCurrentVersionAsync(param.OsClient)
+                .ConfigureAwait(false);
+            var menuTreeCacheKey = BuildMenuTreeCacheKey(param, authorizationVersion);
+            if (!menuTreeCacheKey.DosIsNullOrWhiteSpace())
+            {
+                try
+                {
+                    var cachedTree = await MicroiEngine.CacheTenant.Cache(param.OsClient)
+                        .GetAsync<SysMenuTreeCachePayload>(menuTreeCacheKey)
+                        .ConfigureAwait(false);
+                    if (cachedTree?.Data != null)
+                    {
+                        return new DosResultList<dynamic>(
+                            1,
+                            cachedTree.Data.Select(row => (dynamic)row.DeepClone()).ToList(),
+                            "",
+                            cachedTree.DataCount);
+                    }
+                }
+                catch
+                {
+                    // Redis is an optimization here. Authentication and the database
+                    // remain authoritative when cache read/deserialization is unavailable.
+                }
             }
             var where = new List<List<object>>();
             where.Add(new List<object>(){ "IsDeleted", "<>", 1 });
@@ -352,7 +384,65 @@ namespace Microi.net
             }
             //递归获取层级（使用字典索引优化）
             BuildChildrenFromMap(childrenMap, firstList);
+            if (!menuTreeCacheKey.DosIsNullOrWhiteSpace())
+            {
+                try
+                {
+                    var cacheRows = firstList
+                        .Select(row => ToJObject((object)row))
+                        .Where(row => row != null)
+                        .Select(row => (JObject)row.DeepClone())
+                        .ToList();
+                    await MicroiEngine.CacheTenant.Cache(param.OsClient)
+                        .SetAsync(
+                            menuTreeCacheKey,
+                            new SysMenuTreeCachePayload { Data = cacheRows, DataCount = dataCount },
+                            MenuTreeCacheTtl)
+                        .ConfigureAwait(false);
+                }
+                catch
+                {
+                    // A failed cache population must not fail an otherwise valid login.
+                }
+            }
             return new DosResultList<dynamic>(1, firstList, "", dataCount);
+        }
+
+        internal static string BuildMenuTreeCacheKey(SysMenuParam param, string authorizationVersion)
+        {
+            if (param == null
+                || param.OsClient.DosIsNullOrWhiteSpace()
+                || authorizationVersion.DosIsNullOrWhiteSpace()
+                || param._CurrentUser == null)
+            {
+                return null;
+            }
+
+            var currentUser = param._CurrentUser;
+            var signature = JsonConvert.SerializeObject(new
+            {
+                UserId = currentUser["Id"]?.ToString() ?? "",
+                Account = currentUser["Account"]?.ToString() ?? "",
+                Level = currentUser["Level"]?.ToString() ?? "",
+                RoleIds = currentUser["RoleIds"]?.ToString() ?? "",
+                Ids = (param.Ids ?? new List<string>())
+                    .Where(value => !value.DosIsNullOrWhiteSpace())
+                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+                param.Display,
+                param.AppDisplay,
+                param._All,
+                param._ChildSystemId,
+                param._PageIndex,
+                param._PageSize,
+                param._Top,
+                SelectFields = (param._SelectFields ?? new List<string>())
+                    .Where(value => !value.DosIsNullOrWhiteSpace())
+                    .Select(value => value.Trim())
+                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+            });
+            return $"Microi:{param.OsClient}:SysMenuStep:v1:{authorizationVersion}:{DiyCommon.SHA256Encode(signature)}";
         }
 
         internal static DiyTableRowParam CreateMenuDiscoveryQuery(
@@ -654,6 +744,12 @@ namespace Microi.net
         {
             public Dictionary<string, LegacyMicroServicePage> Aliases { get; set; }
             public DateTime ExpiresAtUtc { get; set; }
+        }
+
+        private sealed class SysMenuTreeCachePayload
+        {
+            public List<JObject> Data { get; set; }
+            public int DataCount { get; set; }
         }
         /// <summary>
         /// 递归获取层级（基于字典索引，O(n)复杂度）

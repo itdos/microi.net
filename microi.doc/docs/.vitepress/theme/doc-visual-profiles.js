@@ -43,6 +43,7 @@ export const DOC_VISUAL_PROFILES = Object.freeze({
   'system-engine/ai-engine': 'overview',
   'system-engine/ai-platform-governance': 'overview',
   'system-engine/ai-workflow-suite': 'overview',
+  'system-engine/system-observability': 'overview',
   'system-engine/app-store': 'guide',
   'system-engine/databases': 'guide',
   'system-engine/datasource-engine': 'overview',

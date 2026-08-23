@@ -9,7 +9,7 @@ description: Microi V8 调试与日志指南。用于排查接口引擎、V8 事
 
 你正在为 Microi 吾码平台编写 V8 引擎代码，需要在开发/测试/生产环境进行排错。本指南提供调试模式、异常捕获、系统日志、调试输出的标准做法。
 
-MongoDB 运行日志通过 `microi_query_mongodb_logs` 只读查询；必须限制租户、时间窗、页大小和返回字段，不在结果或回答中输出 Token、连接串、Secret 或完整敏感请求体。
+系统级排查优先读取 `../system-observability/SKILL.md` 并通过 `microi_query_system_observability` 查询统一日志、统计、详情、Trace、热点接口和运行数据；`microi_query_mongodb_logs` 仅保留给只需要旧 Mongo 日志列表的兼容场景。两者都必须限制租户、时间窗、页大小和返回字段，不在结果或回答中输出 Token、连接串、Secret 或完整敏感请求体。
 
 ## 三种输出通道
 
