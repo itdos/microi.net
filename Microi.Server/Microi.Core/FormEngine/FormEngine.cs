@@ -813,6 +813,33 @@ namespace Microi.net
             "_FormData", "_RowModel",
             // "Id", "Ids", "IsDeleted", "CreateTime", "UpdateTime", "UserId", "UserName",
         };
+
+        /// <summary>
+        /// OsClient is normally a reserved request-context name. The low-code system generator
+        /// also requires tenant-scoped child indexes to start with OsClient, so it may create
+        /// this one system-managed metadata field only through the trusted server boundary.
+        /// Keeping the field hidden, readonly, required and varchar(50) prevents an editable
+        /// business field from impersonating the tenant context.
+        /// </summary>
+        public static bool CanAddTrustedOsClientField(
+            string fieldName,
+            string fieldType,
+            string component,
+            bool trustedServerInvocation,
+            int visible,
+            int appVisible,
+            int readonlyValue,
+            int notEmpty)
+        {
+            return trustedServerInvocation
+                   && string.Equals(fieldName, "OsClient", StringComparison.OrdinalIgnoreCase)
+                   && string.Equals(fieldType?.Trim(), "varchar(50)", StringComparison.OrdinalIgnoreCase)
+                   && string.Equals(component?.Trim(), "Text", StringComparison.OrdinalIgnoreCase)
+                   && visible == 0
+                   && appVisible == 0
+                   && readonlyValue == 1
+                   && notEmpty == 1;
+        }
         /// <summary>
         /// 新增一个字段
         /// </summary>
@@ -893,7 +920,17 @@ namespace Microi.net
                 {
                     fieldComponent = "Field";
                 }
-                if (CantAddField.Contains(fieldName))
+                var trustedOsClientField = CanAddTrustedOsClientField(
+                    fieldName,
+                    fieldType,
+                    fieldComponent,
+                    sourceBaseParam?._TrustedServerInvocation == true,
+                    param["Visible"].Val<int>(),
+                    param["AppVisible"].Val<int>(),
+                    param["Readonly"].Val<int>(),
+                    param["NotEmpty"].Val<int>());
+                if (CantAddField.Any(item => item.Equals(fieldName, StringComparison.OrdinalIgnoreCase))
+                    && !trustedOsClientField)
                 {
                     return new DosResult(0, null, "系统内置字段名，请更换：" + fieldName);
                 }

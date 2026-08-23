@@ -1479,7 +1479,8 @@ html.dark {
 }
 
 .el-dialog.mci-import-dialog {
-    width: min(760px, calc(100vw - 32px)) !important;
+    width: 80% !important;
+    max-width: 1480px;
     margin: auto !important;
 
     > .el-dialog__header:has(> .el-dialog__title) {
@@ -1488,14 +1489,28 @@ html.dark {
     }
 
     > .el-dialog__body {
-        max-height: min(68vh, 720px);
+        max-height: min(76vh, 860px);
         overflow: auto;
         padding: 22px 28px;
     }
+
+    > .el-dialog__footer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+}
+
+.mci-import-dialog__intro {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
 }
 
 .mci-import-dialog__description {
-    margin: 0 0 16px;
+    margin: 0;
     color: var(--el-text-color-secondary, #66758a);
     font-size: 14px;
     line-height: 1.65;
@@ -1510,7 +1525,7 @@ html.dark {
     }
 
     .el-upload-dragger {
-        min-height: 154px;
+        min-height: 142px;
         box-sizing: border-box;
         border: 1px dashed color-mix(in srgb, var(--el-color-primary, #3478f6) 34%, var(--el-border-color, #d8e0ea));
         border-radius: 16px;
@@ -1522,6 +1537,24 @@ html.dark {
             border-color: var(--el-color-primary, #3478f6);
             background: color-mix(in srgb, var(--el-color-primary, #3478f6) 8%, var(--mci-dialog-surface, #fff));
             box-shadow: 0 0 0 4px color-mix(in srgb, var(--el-color-primary, #3478f6) 10%, transparent);
+        }
+    }
+
+    &.is-compact {
+        .el-upload-dragger {
+            min-height: 76px;
+            padding: 12px 20px;
+        }
+
+        .mci-import-dialog__upload-icon {
+            margin: 0 8px 0 0;
+            font-size: 24px;
+            vertical-align: middle;
+        }
+
+        .el-upload__text {
+            display: inline-block;
+            vertical-align: middle;
         }
     }
 
@@ -1547,6 +1580,10 @@ html.dark {
     box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
 }
 
+.mci-import-dialog__workspace {
+    margin-top: 16px;
+}
+
 .mci-import-dialog__status-head,
 .mci-import-dialog__file-summary {
     display: flex;
@@ -1565,12 +1602,112 @@ html.dark {
 }
 
 .mci-import-dialog__file-summary {
-    margin-top: 14px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    background: var(--el-fill-color-light, #eef2f6);
+    padding: 12px 14px;
+    border: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter, #e1e8f0));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--el-color-primary, #3478f6) 4%, var(--mci-dialog-surface, #fff));
     color: var(--el-text-color-regular, #3f4d62);
     font-size: 13px;
+
+    > div:first-child {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+
+        strong {
+            overflow: hidden;
+            font-size: 14px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        span { color: var(--el-text-color-secondary, #66758a); }
+    }
+}
+
+.mci-import-dialog__summary-tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.mci-import-dialog__review-alert {
+    margin-top: 14px;
+}
+
+.mci-import-dialog__settings {
+    margin-top: 14px;
+    padding: 14px;
+    border: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter, #e1e8f0));
+    border-radius: 14px;
+    background: var(--el-fill-color-extra-light, #f7f9fc);
+}
+
+.mci-import-dialog__settings-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    color: var(--el-text-color-primary, #1f2a3d);
+    font-size: 14px;
+    font-weight: 700;
+
+    > div { display: flex; gap: 8px; }
+    .el-button + .el-button { margin-left: 0; }
+}
+
+.mci-import-dialog__settings-grid {
+    display: grid;
+    grid-template-columns: minmax(170px, 1.35fr) repeat(4, minmax(130px, 1fr));
+    gap: 12px;
+
+    label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+        color: var(--el-text-color-secondary, #66758a);
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .el-select,
+    .el-input-number { width: 100%; }
+}
+
+.mci-import-dialog__tabs {
+    margin-top: 14px;
+
+    .el-tabs__header { margin-bottom: 12px; }
+}
+
+.mci-import-dialog__table-wrap {
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+.mci-import-dialog__preview-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.25;
+
+    small {
+        overflow: hidden;
+        color: var(--el-text-color-secondary, #66758a);
+        font-size: 11px;
+        font-weight: 400;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.mci-import-dialog__pagination {
+    justify-content: flex-end;
+    margin-top: 14px;
 }
 
 .mci-import-dialog__progress {
@@ -1620,6 +1757,11 @@ html.dark {
     }
 }
 
+.mci-import-dialog__legacy-tools {
+    margin-top: 10px;
+    border-top: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter, #e1e8f0));
+}
+
 .mci-import-dialog__legacy-progress {
     min-height: 44px;
     padding: 12px 14px;
@@ -1629,6 +1771,45 @@ html.dark {
     color: var(--el-text-color-secondary, #66758a);
     font-size: 13px;
     line-height: 1.65;
+}
+
+.mci-import-dialog__footer-hint {
+    flex: 1;
+    padding-right: 12px;
+    color: var(--el-text-color-secondary, #66758a);
+    font-size: 12px;
+    line-height: 1.45;
+    text-align: left;
+}
+
+@media (max-width: 1100px) {
+    .mci-import-dialog__settings-grid {
+        grid-template-columns: repeat(3, minmax(150px, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .el-dialog.mci-import-dialog {
+        width: calc(100% - 24px) !important;
+
+        > .el-dialog__body { padding: 16px; }
+        > .el-dialog__footer { flex-wrap: wrap; }
+    }
+
+    .mci-import-dialog__intro,
+    .mci-import-dialog__file-summary,
+    .mci-import-dialog__settings-title {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .mci-import-dialog__summary-tags { justify-content: flex-start; }
+    .mci-import-dialog__settings-grid { grid-template-columns: 1fr 1fr; }
+    .mci-import-dialog__footer-hint { flex-basis: 100%; }
+}
+
+@media (max-width: 480px) {
+    .mci-import-dialog__settings-grid { grid-template-columns: 1fr; }
 }
 
 .mci-unified-overlay {

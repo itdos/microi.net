@@ -482,6 +482,8 @@ V8.Result = {
 
 >* **导入模板**：提前做好导入模板让用户下载
 
+通用【导入】弹层默认宽度为页面的 80%。选择 Excel 后先自动识别工作表、单行/多级表头、数据起止行和字段映射，再按每页 15 条预览；用户确认后才正式上传导入。若识别可信度低，可人工指定表头/数据行范围并逐列映射。模板顶部的图片、标题和填写说明不会被直接当作数据，但发布模板前仍应使用真实文件验收。
+
 >* **表格分页序号递增**：非第一页序号继承页码
 
 ## 接口替换
@@ -511,13 +513,20 @@ V8.Cache.Set(isImportingKey, '1');//标记正在导入
 importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + '：正在读取文件数据...');
 V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
 
-//获取excel数据
+// 获取弹层确认后的解析范围，并在服务端按原文件重新解析
 var filesByteBase64 = V8.FilesByteBase64;
 var base64String = Object.values(filesByteBase64)[0];
+var importMeta = JSON.parse(V8.Param._ImportMetaJson || '{}');
 var dataList = V8.Office.ExcelToList({
-  FileByteBase64 : base64String,
-  SheetIndex : 0//取第一张表
+  FileByteBase64: base64String,
+  SheetIndex: importMeta.SheetIndex == null ? 0 : importMeta.SheetIndex,
+  HeaderStartRow: importMeta.HeaderStartRow,
+  HeaderEndRow: importMeta.HeaderEndRow,
+  DataStartRow: importMeta.DataStartRow,
+  DataEndRow: importMeta.DataEndRow,
+  Columns: importMeta.Columns || []
 });
+if (dataList.Code !== 1) return dataList;
 dataList.Data.forEach(item => {
   item.AAA = 111;
 });

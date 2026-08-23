@@ -60,6 +60,43 @@ public class ChildTenantPlatformAppControlServiceTests
                 "main"));
     }
 
+    [Theory]
+    [InlineData("bulk-import-microi-store-packages", "iTdos", "lxwb", "lxwb", true)]
+    [InlineData("bulk-import-microi-store-packages", "lxwb", "lxwb", "", false)]
+    [InlineData("bulk-import-microi-store-packages", "lxwb", "lxwb", "lxwb", false)]
+    [InlineData("bulk-import-microi-store-packages", "iTdos", "lxwb", "other", false)]
+    [InlineData("ordinary-engine", "iTdos", "lxwb", "lxwb", false)]
+    public void ExecutionBootstrap_RequiresPersistedCrossTenantTargetMarker(
+        string apiEngineKey,
+        string ownerOsClient,
+        string executionOsClient,
+        string persistedTargetOsClient,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            ChildTenantPlatformAppControlService.RequiresTargetExecutionBootstrap(
+                apiEngineKey,
+                ownerOsClient,
+                executionOsClient,
+                persistedTargetOsClient));
+    }
+
+    [Fact]
+    public void ExecutionBootstrap_SkipsSameTenantMarketplaceSelfServiceBeforeDatabaseAccess()
+    {
+        var result = ChildTenantPlatformAppControlService.EnsureTargetExecutionBootstrap(
+            "lxwb",
+            "lxwb",
+            new JObject());
+
+        Assert.Equal(1, result.Code);
+        var data = Assert.IsType<JObject>(result.Data);
+        Assert.True(data["Skipped"]?.Value<bool>() == true);
+        Assert.Equal("SameTenantSelfService", data["Scope"]?.ToString());
+        Assert.Contains("不执行跨租户工作器自愈", result.Msg, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void ChildMaintenance_BootstrapsInstallerAndWorker_AndParentMonitorsTerminalRows()
     {
@@ -106,6 +143,7 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("EnsureMonitorBootstrapRecovery", controlSource, StringComparison.Ordinal);
         Assert.Contains("EnsureTargetExecutionBootstrap", controlSource, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_SCOPE_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", importerSource, StringComparison.Ordinal);
         Assert.Contains("Version: v2.3.3", importerSource, StringComparison.Ordinal);

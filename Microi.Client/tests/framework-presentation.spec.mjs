@@ -116,3 +116,20 @@ test("framework hosts own permanent, inspectable source badges and the watermark
     assert.match(cache, /renderSource = 'microservice'/u);
     assert.match(cache, /_sourceCache/u);
 });
+
+test("render source descriptions use tenant-neutral platform wording", async () => {
+    const [zh, zhTw, en] = await Promise.all([
+        read("../src/lang/zh.js"),
+        read("../src/lang/zh-tw.js"),
+        read("../src/lang/en.js")
+    ]);
+    for (const source of [zh, zhTw]) {
+        assert.doesNotMatch(source, /FrameworkRendered:\s*"[^"]*吾[码碼]/u);
+        assert.doesNotMatch(source, /RenderSourceDetailsSubtitle:\s*"[^"]*吾[码碼]/u);
+        assert.doesNotMatch(source, /MicroServiceSourceDescription:\s*"[^"]*吾[码碼]/u);
+        assert.doesNotMatch(source, /CustomComponentSourceDescription:\s*"[^"]*吾[码碼]/u);
+    }
+    assert.match(zh, /RenderSourceDetailsSubtitle:\s*"当前内容由平台框架统一托管"/u);
+    assert.match(zhTw, /RenderSourceDetailsSubtitle:\s*"目前內容由平台框架統一託管"/u);
+    assert.doesNotMatch(en, /(?:FrameworkRendered|RenderSourceDetailsSubtitle|MicroServiceSourceDescription|CustomComponentSourceDescription):\s*"[^"]*Microi/u);
+});

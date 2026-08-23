@@ -125,7 +125,10 @@ test('disabled templates remain manageable but cannot reach runtime or public pr
   assert.doesNotMatch(auditBody, /SecretCipher|request\.Value|plainText/)
 })
 
-test('new private settings take priority while legacy SaaS fields remain a safe compatibility fallback', () => {
+test('public behavior switches lead while private parameters and legacy SaaS fields remain safe fallbacks', () => {
+  assert.match(identitySource, /GetPublicBehaviorBool/)
+  assert.match(identitySource, /PasskeyEnabled[\s\S]*?Login\.Passkey\.Enabled/)
+  assert.match(externalLoginSource, /ExternalLoginEnabled[\s\S]*?Login\.External\.Enabled/)
   assert.match(identitySource, /Login\.Passkey\.RpId[\s\S]*?PasskeyRpId/)
   assert.match(identitySource, /Login\.Face\.ApiKey[\s\S]*?legacyFaceApiKey/)
   assert.match(externalLoginSource, /Login\." \+ key \+ "\./)

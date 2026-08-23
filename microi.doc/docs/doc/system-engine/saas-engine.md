@@ -64,9 +64,10 @@
 |---|---|---|
 | 数据库连接、Redis、MongoDB、MinIO、MQ/MQTT、搜索、签名与部署信任链 | 主库 `sys_osclients` | 否，只能由平台控制面维护 |
 | 系统标题、主题、公开地址、登录入口显示等浏览器公开配置 | 子租户库 `sys_config` 实体字段 | 按系统设置权限维护 |
-| OAuth ClientId/ClientSecret、后端业务开关、第三方私密参数 | 子租户库 `mci_system_setting` | 是，仅租户超级管理员维护 |
+| 登录/OAuth 等能力与显示开关 | 子租户库 `sys_config` 实体字段 | 按系统设置权限维护 |
+| OAuth ClientId/ClientSecret、RP/Origin/Issuer、供应商地址与第三方私密参数 | 子租户库 `mci_system_setting` | 是，仅租户超级管理员维护 |
 
-`mci_system_setting` 只属于后端私密执行面，历史 `IsPublic` 字段已停用，普通值与 Secret 都不会下发浏览器。后端接口引擎/后端 V8 事件通过 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 按当前租户读取，Secret 由可信后端解密；该独立节点避免动态 Key 覆盖 `sys_config` 实体字段。后端使用私密值时禁止整体返回节点，Secret 还禁止写入日志、审计或前端可读字段。
+`mci_system_setting` 只属于后端私密执行面，历史 `IsPublic` 字段已停用，普通值与 Secret 都不会下发浏览器。是否启用、是否显示等公开开关不得放入该表；历史开关仅作新版 `sys_config` 字段缺失时的兼容回退。后端接口引擎/后端 V8 事件通过 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 按当前租户读取私密参数，Secret 由可信后端解密；该独立节点避免动态 Key 覆盖 `sys_config` 实体字段。后端使用私密值时禁止整体返回节点，Secret 还禁止写入日志、审计或前端可读字段。
 
 Secret 的列表接口只返回“已配置”状态；显示原文需要租户超级管理员先完成 Passkey、Authenticator 或严格人脸二次验证，原文响应禁止缓存并在前端 30 秒后清除，审计只记录 Key/记录 Id/结果，不记录明文。登录方式的完整配置见 [登录方式、Passkey、Authenticator、第三方登录与严格人脸验证](../more/identity-verification)。
 

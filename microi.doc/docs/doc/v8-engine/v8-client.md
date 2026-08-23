@@ -889,7 +889,7 @@ window.microApp.dispatch({
 
 ## V8.OpenImportDialog
 
-> 在数据表格的页面按钮 V8 中打开平台统一 Excel 导入弹层。适合多行表头、合并单元格、固定单元格元数据等无法由默认首行表头导入器表达的模板。弹层在浏览器内按声明式映射读取工作簿，将精简后的行 JSON 提交给持久化后台接口引擎任务，并实时显示真实进度和返回结果。
+> 在数据表格的页面按钮 V8 中打开平台统一 Excel 导入弹层。通用【导入】与本 API 共用同一套智能识别、人工校正和预览界面：弹层默认占页面宽度的 80%，自动识别工作表、单行或多级合并表头、首条数据行及字段映射；上传后先按每页 15 条预览，不会立即写库。识别可信度低时，用户可人工指定表头起止行、数据起止行和逐列映射，确认后才提交。
 
 ```js
 V8.OpenImportDialog({
@@ -902,6 +902,8 @@ V8.OpenImportDialog({
   },
   Workbook: {
     SheetIndex: 0,
+    HeaderStartRow: 5,
+    HeaderEndRow: 6,
     Cells: {
       ProjectText: 'A4'
     },
@@ -927,17 +929,18 @@ V8.OpenImportDialog({
 | `ApiEngineKey` | `string` | 是 | 后台执行的接口引擎 Key。 |
 | `Title` / `Description` / `TaskTitle` | `string` | 否 | 弹层标题、说明和后台任务标题。 |
 | `Param` | `object` | 否 | 追加给接口引擎的固定参数。 |
-| `Workbook.SheetIndex` / `SheetName` | `number/string` | 否 | 工作表索引或名称，默认第一张。 |
+| `Workbook.SheetIndex` / `SheetName` | `number/string` | 否 | 工作表索引或名称，默认第一张；用户仍可在预览中切换。 |
 | `Workbook.Cells` | `object` | 否 | 元数据名称到 A1 单元格地址的映射。 |
-| `Workbook.Columns` | `array` | 是 | 行字段名到 Excel 列字母或零基列号的映射。 |
-| `DataStartRow` / `DataEndRow` | `number` | 是/否 | 一基数据起止行；结束行省略时读取工作表已用区域。 |
+| `Workbook.Columns` | `array` | 否 | 目标字段名到 Excel 列字母或零基列号的优先映射；省略时自动按字段名/标题识别，也可由用户人工映射。 |
+| `HeaderStartRow` / `HeaderEndRow` | `number` | 否 | 一基表头起止行；可表达多级表头。省略时自动识别。 |
+| `DataStartRow` / `DataEndRow` | `number` | 否 | 一基数据起止行；省略时自动识别首条与末条数据。 |
 | `KeyField` | `string` | 否 | 为空时跳过该行的业务键字段。 |
-| `MaxFileSizeMB` / `MaxRows` | `number` | 否 | 客户端文件和行数上限，默认 20 MB / 5000 行。 |
+| `MaxFileSizeMB` / `MaxRows` / `MaxColumns` | `number` | 否 | 客户端文件、有效数据行和列数上限，后台自定义任务默认 20 MB / 5000 行 / 256 列。 |
 | `BackgroundOptions` | `object` | 否 | 传给 `RunBackground` 的并发、重试等选项。 |
 
-接口引擎从 `V8.Param._ImportRowsJson`、`_ImportMetaJson`、`_ImportFileName` 和 `_ImportFileSize` 读取数据。业务端必须再次校验模板、字段、权限和数据状态，并通过 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报真实工作量。返回 `Code != 1` 会回滚当前接口引擎事务；应先完整校验再写入，避免部分成功。页面 V8 不应读取 Base64、拼接上传 DOM 或自行实现任务轮询。
+接口引擎从 `V8.Param._ImportRowsJson`、`_ImportMetaJson`、`_ImportFileName` 和 `_ImportFileSize` 读取数据。`_ImportMetaJson` 版本为 `2.0`，包含 `SheetIndex/SheetName/HeaderStartRow/HeaderEndRow/DataStartRow/DataEndRow/Columns/Cells/RowCount/Confidence`；`Columns[].ColumnIndex` 从 0 开始，全部行号从 1 开始。业务端必须再次校验模板、字段、权限和数据状态，并通过 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报真实工作量。返回 `Code != 1` 会回滚当前接口引擎事务；应先完整校验再写入，避免部分成功。页面 V8 不应读取 Base64、拼接上传 DOM 或自行实现任务轮询。
 
-默认的单行表头导入仍使用模块自带【导入】按钮；只有模板结构或业务匹配规则超出默认能力时才使用 `OpenImportDialog`。
+模块自带【导入】按钮现在也支持上述自动识别、人工校正和预览，并在确认后把原始文件及同一份解析范围交给服务端复核。只有需要固定单元格元数据、后台任务、跨表匹配或特殊业务事务时，才使用 `OpenImportDialog`；不要仅为多级表头重复开发自定义上传界面。
 
 ## V8.NewGuid
 >* 生成一个前端Guid值

@@ -1,7 +1,27 @@
+using Microi.net;
+
 namespace Microi.Tests.Common;
 
 public class McpTableCreationTrustTests
 {
+    [Fact]
+    public void ReservedOsClientField_RequiresTheCompleteTrustedSystemShape()
+    {
+        Assert.True(FormEngineExtend.CanAddTrustedOsClientField(
+            "OsClient", "varchar(50)", "Text", true, 0, 0, 1, 1));
+
+        Assert.False(FormEngineExtend.CanAddTrustedOsClientField(
+            "OsClient", "varchar(50)", "Text", false, 0, 0, 1, 1));
+        Assert.False(FormEngineExtend.CanAddTrustedOsClientField(
+            "OsClient", "varchar(50)", "Text", true, 1, 0, 1, 1));
+        Assert.False(FormEngineExtend.CanAddTrustedOsClientField(
+            "OsClient", "varchar(50)", "Text", true, 0, 0, 0, 1));
+        Assert.False(FormEngineExtend.CanAddTrustedOsClientField(
+            "OsClient", "mediumtext", "Text", true, 0, 0, 1, 1));
+        Assert.False(FormEngineExtend.CanAddTrustedOsClientField(
+            "TableId", "varchar(50)", "Text", true, 0, 0, 1, 1));
+    }
+
     [Fact]
     public void CreateTable_ForwardsTrustedServerProvenanceWithStrongType()
     {

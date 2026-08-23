@@ -84,9 +84,10 @@ test("chat contact display name falls back from blank Name to Account without ex
 test("PC chat has quick contacts, event-driven connection state and visible AI failure", () => {
     const source = readFileSync(new URL("../src/views/chat/index.vue", import.meta.url), "utf8");
     const layout = readFileSync(new URL("../src/views/chat/css/layout.scss", import.meta.url), "utf8");
-    assert.match(source, /ContactUserName:\s*"AI助手"/);
-    assert.match(source, /createPlatformSystemContact/);
-    assert.match(source, /PLATFORM_SYSTEM_CONTACT_ID/);
+    assert.match(source, /AI_ASSISTANT_CONTACT_ID/);
+    assert.match(source, /createAiAssistantContact/);
+    assert.match(source, /mergePlatformChatRecords/);
+    assert.match(source, /LEGACY_PLATFORM_SYSTEM_CONTACT_ID/);
     assert.match(source, /REALTIME_STATE_EVENT/);
     assert.match(source, /onReceiveAIError/);
     assert.match(source, /AI回复失败/);
@@ -105,4 +106,5 @@ test("PC chat has quick contacts, event-driven connection state and visible AI f
     assert.match(layout, /\.vc-recordList\s*\{[\s\S]*?overflow-x:\s*hidden !important/);
     assert.match(layout, /\.vc-recordList ul li \.info\s*\{[\s\S]*?min-width:\s*0/);
     assert.doesNotMatch(source, /setTimeout\(checkConnection|每200ms|刷新页面重试/);
+    assert.doesNotMatch(source, /AI助手 和 admin|平台消息由 admin|IsPlatformSystemContact/);
 });

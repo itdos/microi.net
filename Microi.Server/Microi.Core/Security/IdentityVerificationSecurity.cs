@@ -34,22 +34,28 @@ namespace Microi.net
             var client = OsClientExtend.GetClient(osClient);
             var model = client?.OsClientModel ?? new JObject();
             var settings = TenantSystemSettingsSecurity.LoadSnapshot(osClient);
+            var sysConfig = TenantSystemSettingsSecurity.LoadTenantSysConfigSnapshot(osClient);
             var legacyFaceApiKey = model["FaceApiKey"]?.ToString() ?? "";
             return new IdentityVerificationOptions
             {
-                Enabled = TenantSystemSettingsSecurity.GetBool(settings, "Login.Identity.Enabled",
-                    ReadBool(model, "IdentityVerificationEnabled", true), true),
-                PasskeyEnabled = TenantSystemSettingsSecurity.GetBool(settings, "Login.Passkey.Enabled",
-                    ReadBool(model, "PasskeyEnabled", true), true),
-                TotpEnabled = TenantSystemSettingsSecurity.GetBool(settings, "Login.Authenticator.Enabled",
-                    ReadBool(model, "AuthenticatorTotpEnabled", true), true),
+                Enabled = TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+                    sysConfig, "IdentityVerificationEnabled", settings, "Login.Identity.Enabled",
+                    ReadBool(model, "IdentityVerificationEnabled", true)),
+                PasskeyEnabled = TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+                    sysConfig, "PasskeyEnabled", settings, "Login.Passkey.Enabled",
+                    ReadBool(model, "PasskeyEnabled", true)),
+                TotpEnabled = TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+                    sysConfig, "AuthenticatorTotpEnabled", settings, "Login.Authenticator.Enabled",
+                    ReadBool(model, "AuthenticatorTotpEnabled", true)),
                 TotpIssuer = NormalizeIssuer(ReadSettingText(settings, "Login.Authenticator.Issuer",
                     model["AuthenticatorIssuer"]?.ToString())),
-                FaceEnabled = TenantSystemSettingsSecurity.GetBool(settings, "Login.Face.Enabled",
-                    ReadBool(model, "FaceVerificationEnabled", false), true),
-                RequirePasswordChangeStepUp = TenantSystemSettingsSecurity.GetBool(settings,
+                FaceEnabled = TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+                    sysConfig, "FaceVerificationEnabled", settings, "Login.Face.Enabled",
+                    ReadBool(model, "FaceVerificationEnabled", false)),
+                RequirePasswordChangeStepUp = TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+                    sysConfig, "RequirePasswordChangeStepUp", settings,
                     "Security.PasswordChange.RequireStepUp",
-                    ReadBool(model, "RequirePasswordChangeStepUp", true), true),
+                    ReadBool(model, "RequirePasswordChangeStepUp", true)),
                 PasskeyRpId = ReadSettingText(settings, "Login.Passkey.RpId",
                     model["PasskeyRpId"]?.ToString()).Trim(),
                 PasskeyOrigins = ParseList(new JValue(ReadSettingText(settings, "Login.Passkey.Origins",
