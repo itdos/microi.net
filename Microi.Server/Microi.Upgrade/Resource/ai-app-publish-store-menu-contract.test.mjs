@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.8.4 V3 source", () => {
+test("publisher package metadata matches the v1.8.7 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.8.4");
+  assert.equal(packagedPublisher.Version, "v1.8.7");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -24,6 +24,43 @@ test("publisher package metadata matches the v1.8.4 V3 source", () => {
 test("microservice packages exclude deleted and disabled historical routes", () => {
   assert.match(publisherSource, /\['AND', 'IsDeleted', '<>', 1\]/);
   assert.match(publisherSource, /\['AND', 'IsEnable', '<>', 0\]/);
+});
+
+test("publisher enriches portable MicroService menu keys and rejects cross-app bindings", () => {
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "ok")}
+    ${extractFunction(publisherSource, "fail")}
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "enrichMicroServiceMenuBindings")}
+    result = enrichMicroServiceMenuBindings;
+  `, context);
+
+  const packageFixture = {
+    ApplicationBundle: {
+      ApplicationType: "MicroService",
+      Application: { AppKey: "microi-platform-service" },
+      MicroService: { MsKey: "microi-platform-service" },
+      Routes: [{ RoutePath: "/system-observability" }],
+    },
+    SysMenus: [{
+      Id: "menu-log",
+      Name: "系统日志/监控",
+      OpenType: "MicroService",
+      MicroServiceRoutePath: "/system-observability",
+    }],
+  };
+  const result = context.result(packageFixture);
+  assert.equal(result.Code, 1);
+  assert.equal(packageFixture.SysMenus[0].MicroServiceKey, "microi-platform-service");
+  assert.equal(result.Data.Updated, 1);
+
+  packageFixture.SysMenus[0].MicroServiceKey = "another-app";
+  assert.match(context.result(packageFixture).Msg, /与当前应用包.*不一致/);
+  assert.match(publisherSource, /MICROSERVICE_MENU_KEY_ENRICHMENT_V1/);
+  assert.match(publisherSource, /microServiceMenuBindingResult = enrichMicroServiceMenuBindings\(packageModel\)/);
 });
 
 test("publisher emits platform-owned managed baselines and tenant-owned hooks for official platform apps", () => {
@@ -459,7 +496,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.8\.4/);
+  assert.match(publisherSource, /Version: v1\.8\.7/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

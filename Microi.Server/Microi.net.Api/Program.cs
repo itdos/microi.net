@@ -391,6 +391,9 @@ app.UseRouting();
 // 安全防护可能在 Controller 前直接返回 DosResult。CORS 必须先执行，
 // 否则独立部署的前端无法读取 SecurityBlocked JSON，会误报成 API 不可用。
 app.UseCors("any");
+// 包住安全守卫与压力守卫，才能看见被拒绝、排队和异常请求；客户端 IP 只取
+// ForwardedHeadersMiddleware 已验证并写入的 Connection.RemoteIpAddress。
+app.UseSystemObservability();
 app.UseSecurityGuard();
 app.UseRequestPressureGuard();
 //-------注意以下两者的顺序-------

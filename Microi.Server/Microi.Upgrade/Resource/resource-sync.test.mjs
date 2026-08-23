@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   canonicalizeResource,
+  hasPlatformServiceBundleChanged,
   isTemporaryOfficialResourceFailure,
   mergeJavascriptResource,
   mergeJsonResource,
@@ -696,6 +697,51 @@ test('官网临时故障识别只放行网络、限流和服务端错误', () =>
   assert.equal(isTemporaryOfficialResourceFailure(new Error('fetch failed', { cause: { code: 'ECONNRESET' } })), true);
   assert.equal(isTemporaryOfficialResourceFailure(new Error('import-package.js HTTP 401')), false);
   assert.equal(isTemporaryOfficialResourceFailure(new Error('资源名不正确')), false);
+});
+
+test('仅当平台内置微服务包内容变化时要求验证唯一源码', () => {
+  const packageContent = bundle => JSON.stringify({
+    PackageInfo: { Name: '应用商城', Version: 'v1.0.0' },
+    ApplicationBundles: [bundle],
+  });
+  const unchanged = {
+    Application: { AppKey: 'microi-platform-service', BuildVersion: 'v1.0.0' },
+    BuildAssets: [{ Path: 'index.html', Sha256: 'same' }],
+  };
+  const reordered = {
+    BuildAssets: [{ Sha256: 'same', Path: 'index.html' }],
+    Application: { BuildVersion: 'v1.0.0', AppKey: 'microi-platform-service' },
+  };
+  const changed = {
+    ...unchanged,
+    BuildAssets: [{ Path: 'index.html', Sha256: 'changed' }],
+  };
+  assert.equal(
+    hasPlatformServiceBundleChanged(
+      'app.microi.store.json',
+      packageContent(unchanged),
+      packageContent(reordered),
+    ),
+    false,
+  );
+  assert.equal(
+    hasPlatformServiceBundleChanged(
+      'app.microi.store.json',
+      packageContent(unchanged),
+      packageContent(changed),
+    ),
+    true,
+  );
+  assert.throws(
+    () => hasPlatformServiceBundleChanged(
+      'app.microi.store.json',
+      packageContent(unchanged),
+      JSON.stringify({ PackageInfo: { Name: '应用商城' }, ApplicationBundles: [] }),
+    ),
+    /必须且只能包含一个 microi-platform-service 应用包/,
+  );
+  assert.match(refreshSource, /changedPlatformServicePackages/);
+  assert.match(refreshSource, /两个内置包与官网内容一致/);
 });
 
 test('离线发布仅允许全部本地资源与共同基线完全一致', () => {

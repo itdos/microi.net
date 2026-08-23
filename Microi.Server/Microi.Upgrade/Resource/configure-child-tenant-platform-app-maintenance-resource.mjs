@@ -31,19 +31,25 @@ const refreshCounts = packageModel => {
   info.ApiEngineCount = (packageModel.SysApiEngines || []).length;
   info.DataSetCount = (packageModel.DataSets || []).length;
   info.DataRowCount = (packageModel.DataSets || []).reduce(
-    (sum, item) => sum + (Array.isArray(item.Data) ? item.Data.length : 0),
+    (sum, item) => sum + (Array.isArray(item.Rows)
+      ? item.Rows.length
+      : (Array.isArray(item.Data) ? item.Data.length : 0)),
     0
   );
 };
 
 const modulePackage = readJson("app.microi.module-engine.json");
-modulePackage.PackageInfo.Version = "v7.5.4";
-modulePackage.PackageInfo.Description =
+modulePackage.PackageInfo.Version ||= "v7.5.5";
+modulePackage.PackageInfo.Description ||=
   "模块引擎基础资源。左侧菜单数字角标支持配置接口引擎统计值和悬停说明；记录直达与表单展示继续使用物理配置。";
-modulePackage.PackageInfo.ChangeHistory = prependHistory(
-  modulePackage.PackageInfo.ChangeHistory,
-  "2026-08-22 v7.5.2 新增 sys_menu.MenuBadgeTooltip，左侧菜单数字角标可显示自定义悬停说明，旧菜单未配置时保持原有标题提示。"
-);
+const badgeTooltipHistory =
+  "2026-08-22 v7.5.2 新增 sys_menu.MenuBadgeTooltip，左侧菜单数字角标可显示自定义悬停说明，旧菜单未配置时保持原有标题提示。";
+if (!String(modulePackage.PackageInfo.ChangeHistory || "").includes(badgeTooltipHistory)) {
+  modulePackage.PackageInfo.ChangeHistory = prependHistory(
+    modulePackage.PackageInfo.ChangeHistory,
+    badgeTooltipHistory
+  );
+}
 addCapability(modulePackage.PackageInfo, "ServerField:SysMenu.MenuBadgeTooltip");
 
 const ddl = modulePackage.DDLStatements[0];
@@ -103,7 +109,7 @@ const orchestratorSource = fs.readFileSync(
   path.join(directory, "bulk-update-child-tenant-platform-apps.js"),
   "utf8"
 ).replace(/\r\n/g, "\n");
-saasPackage.PackageInfo.Version = "v7.5.24";
+saasPackage.PackageInfo.Version = "v7.5.31";
 saasPackage.PackageInfo.Description =
   "SaaS 引擎基础资源。主租户可为全部启用子租户补齐商城工作器并创建独立的平台应用安装/更新后台任务，父任务以全部子任务真实终态为准。";
 saasPackage.PackageInfo.ChangeHistory = prependHistory(
@@ -126,12 +132,20 @@ saasPackage.PackageInfo.ChangeHistory = prependHistory(
   saasPackage.PackageInfo.ChangeHistory,
   "2026-08-23 v7.5.24 父任务进入 Monitor 后只汇总持久化子任务，不再重复执行租户目录发现与商城工作器自举。"
 );
+saasPackage.PackageInfo.ChangeHistory = prependHistory(
+  saasPackage.PackageInfo.ChangeHistory,
+  "2026-08-23 v7.5.31 补齐 diy_LeftJoinRightView 表、字段和物理结构；子租户运行时缺失时按 sys_osclients 自动重载，单租户投递失败不再提前中止其它子任务汇总。"
+);
 for (const capability of [
   "V8.Method.GetChildTenantPlatformAppMaintenanceTargets",
   "V8.Method.QueueChildTenantPlatformAppMaintenance",
   "BackgroundTask:TrustedTargetOsClient",
   "InstallerBootstrap:ChildTenantMarketplaceWorkers",
-  "BackgroundTask:ChildTenantTerminalAggregation"
+  "BackgroundTask:ChildTenantTerminalAggregation",
+  "Installer:PackageDataTableClosure",
+  "BackgroundTask:ChildTenantRuntimeReloadRecovery",
+  "BackgroundTask:PartialQueueTerminalAggregation",
+  "V8.Method.ReloadOsClient"
 ]) addCapability(saasPackage.PackageInfo, capability);
 
 const engine = {
@@ -141,6 +155,8 @@ const engine = {
   CreateTime: "2026-08-22 00:00:00",
   Id: "8b6ee32a-69c5-47cd-95d5-7a1342d64a87",
   ChangeHistory:
+    "2026-08-23 20:20:00 v1.1.7 兼容旧控制面：目录或投递遇到未加载 OsClient 时受控重载并重试\n" +
+    "2026-08-23 20:00:00 v1.1.6 子租户运行时逐个重载；单个投递失败仍持续汇总全部已投递子任务\n" +
     "2026-08-23 00:40:30 v1.1.5 安全保存后的官方实际版本；Monitor 仅汇总持久化 ChildTasks\n" +
     "2026-08-23 00:40:00 v1.1.4 Monitor 阶段只读取持久化 ChildTasks，避免运行中自举重检误中断父任务\n" +
     "2026-08-23 00:30:00 v1.1.3 Monitor 阶段只读取持久化 ChildTasks，避免运行中自举重检误中断父任务\n" +
@@ -148,7 +164,7 @@ const engine = {
     "2026-08-22 13:00:00 v1.1.1 父任务 Current/Total 改用百分比单位，避免排队数量触发 99% 假进度\n" +
     "2026-08-22 12:00:00 v1.1.0 投递前补齐子租户商城工作器，并持续汇总全部子任务真实终态\n" +
     "2026-08-22 00:00:00 v1.0.0 创建主租户批量维护子租户平台应用编排接口\n",
-  Version: "v1.1.5",
+  Version: "v1.1.7",
   LimitRecursion: 1000,
   LimitMemory: 256,
   MaxStatements: 10000000,

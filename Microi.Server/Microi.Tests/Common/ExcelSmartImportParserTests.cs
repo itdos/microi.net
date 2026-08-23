@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using Microi.net;
+using Newtonsoft.Json.Linq;
 using NPOI.SS.Util;
 using NPOI.XSSF.UserModel;
 
@@ -122,6 +125,73 @@ public class ExcelSmartImportParserTests
                     new ExcelImportColumnParam { Column = "B", Name = "Same" }
                 }));
         Assert.Contains("重复", error.Message);
+    }
+
+    [Fact]
+    public void CsvParser_DetectsUtf8AndKeepsQuotedCommaAndNewline()
+    {
+        var preamble = Encoding.UTF8.GetPreamble();
+        var content = Encoding.UTF8.GetBytes(
+            "导入说明\r\n资产名称,资产状态,备注\r\n\"电脑,主机\",使用中,\"第一行\r\n第二行\"\r\n");
+        var bytes = new byte[preamble.Length + content.Length];
+        Buffer.BlockCopy(preamble, 0, bytes, 0, preamble.Length);
+        Buffer.BlockCopy(content, 0, bytes, preamble.Length, content.Length);
+
+        var result = CsvImportHelper.CsvToListDynamic(
+            bytes,
+            maxDataRows: 100,
+            maxColumns: 20,
+            headerStartRow: 2,
+            headerEndRow: 2,
+            dataStartRow: 3,
+            dataEndRow: 3,
+            columnMappings: new[]
+            {
+                new ExcelImportColumnParam { Column = "A", Name = "AssetName" },
+                new ExcelImportColumnParam { Column = "B", Name = "AssetStatus" },
+                new ExcelImportColumnParam { Column = "C", Name = "Remark" }
+            });
+
+        Assert.Equal("UTF-8", result.Encoding);
+        Assert.Equal(",", result.Delimiter);
+        var row = Assert.IsAssignableFrom<IDictionary<string, object>>((object)Assert.Single(result.Rows));
+        Assert.Equal("电脑,主机", row["AssetName"]);
+        Assert.Equal("使用中", row["AssetStatus"]);
+        Assert.Equal("第一行\r\n第二行", row["Remark"]);
+        Assert.Equal(3, row["_ExcelRow"]);
+    }
+
+    [Fact]
+    public void CsvParser_AutomaticallyFallsBackToGbk()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        var bytes = Encoding.GetEncoding(936).GetBytes("资产名称,资产状态\r\n电脑,使用中");
+
+        var result = CsvImportHelper.CsvToListDynamic(bytes);
+
+        Assert.Equal("GBK", result.Encoding);
+        var row = Assert.IsAssignableFrom<IDictionary<string, object>>((object)Assert.Single(result.Rows));
+        Assert.Equal("电脑", row["资产名称"]);
+        Assert.Equal("使用中", row["资产状态"]);
+    }
+
+    [Fact]
+    public void OfficeExcelToList_RoutesCsvAndReturnsDetectedSourceMetadata()
+    {
+        var bytes = Encoding.UTF8.GetBytes("资产名称;资产状态\r\n电脑;使用中");
+        var result = new MicroiOffice(null).ExcelToList(new
+        {
+            FileByteBase64 = Convert.ToBase64String(bytes),
+            FileName = "assets.csv"
+        });
+
+        Assert.Equal(1, result.Code);
+        var row = Assert.IsAssignableFrom<IDictionary<string, object>>((object)Assert.Single(result.Data));
+        Assert.Equal("电脑", row["资产名称"]);
+        var append = JObject.FromObject(result.DataAppend);
+        Assert.Equal("csv", append.Value<string>("FileType"));
+        Assert.Equal("UTF-8", append.Value<string>("Encoding"));
+        Assert.Equal(";", append.Value<string>("Delimiter"));
     }
 
     private static byte[] BuildWorkbook(Action<XSSFWorkbook> configure)

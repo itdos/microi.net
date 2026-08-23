@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-23T00:53:50.403Z",
+  "generatedAt": "2026-08-23T11:33:47.095Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2091,11 +2091,11 @@
       ]
     },
     "v8-export-import": {
-      "originalSha256": "76d9a977e0c510e72a3b3b938631970b5d0ba480b8ced4e3f2622db85c2692a8",
-      "originalLines": 608,
+      "originalSha256": "161e52443dfefde5530e07509429ca19d18ca46a85807455d1b09b60dc72e866",
+      "originalLines": 616,
       "prefixSha256": "db7143225a92851a015cc0d5e5a7dd40db9d16e6fcdffdc1e5116f32f52ebbda",
       "prefixBytes": 1120,
-      "entryLines": 198,
+      "entryLines": 206,
       "chunks": [
         {
           "id": "v8-export-import-000",
@@ -2125,8 +2125,8 @@
           "id": "v8-export-import-003",
           "ordinal": 7,
           "destination": "v8-export-import/SKILL.md",
-          "sha256": "75977093346f025e91041b36bdb7887e2cacee854800c1f43e407e8fc037a166",
-          "lines": 36,
+          "sha256": "51a6c3e7a44ca35dc17b5536545ac7a1d47a8915045283841d304a04c04cd219",
+          "lines": 44,
           "heading": "解析上传的 Excel（导入）"
         },
         {

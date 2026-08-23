@@ -28,6 +28,92 @@ const INSTRUCTION_WORDS = [
 ];
 
 export const IMPORT_PREVIEW_PAGE_SIZE = 15;
+export const IMPORT_ERROR_POLICY = Object.freeze({
+    ROLLBACK_ALL: "RollbackAll",
+    CONTINUE_ON_ERROR: "ContinueOnError"
+});
+
+export function normalizeImportErrorPolicy(value) {
+    return String(value || "").trim().toLowerCase() === "continueonerror"
+        ? IMPORT_ERROR_POLICY.CONTINUE_ON_ERROR
+        : IMPORT_ERROR_POLICY.ROLLBACK_ALL;
+}
+
+const CSV_DELIMITERS = [",", "\t", ";", "|"];
+
+function toByteArray(value) {
+    if (value instanceof Uint8Array) return value;
+    if (value instanceof ArrayBuffer) return new Uint8Array(value);
+    if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    throw new TypeError("CSV content must be an ArrayBuffer or Uint8Array.");
+}
+
+function decodeBytes(bytes, encoding, fatal = false) {
+    return new TextDecoder(encoding, { fatal }).decode(bytes).replace(/^\uFEFF/, "");
+}
+
+export function detectCsvDelimiter(text) {
+    const counts = new Map(CSV_DELIMITERS.map((delimiter) => [delimiter, []]));
+    const current = new Map(CSV_DELIMITERS.map((delimiter) => [delimiter, 0]));
+    let inQuotes = false;
+    let rowCount = 0;
+    const source = String(text || "");
+    for (let index = 0; index < source.length && rowCount < 20; index += 1) {
+        const character = source[index];
+        if (character === '"') {
+            if (inQuotes && source[index + 1] === '"') index += 1;
+            else inQuotes = !inQuotes;
+            continue;
+        }
+        if (inQuotes) continue;
+        if (current.has(character)) current.set(character, current.get(character) + 1);
+        if (character !== "\r" && character !== "\n") continue;
+        if (character === "\r" && source[index + 1] === "\n") index += 1;
+        CSV_DELIMITERS.forEach((delimiter) => counts.get(delimiter).push(current.get(delimiter)));
+        CSV_DELIMITERS.forEach((delimiter) => current.set(delimiter, 0));
+        rowCount += 1;
+    }
+    if (rowCount < 20 && [...current.values()].some((value) => value > 0)) {
+        CSV_DELIMITERS.forEach((delimiter) => counts.get(delimiter).push(current.get(delimiter)));
+    }
+    let best = { delimiter: ",", score: -1 };
+    CSV_DELIMITERS.forEach((delimiter) => {
+        const populated = counts.get(delimiter).filter((value) => value > 0);
+        if (!populated.length) return;
+        const frequencies = new Map();
+        populated.forEach((value) => frequencies.set(value, (frequencies.get(value) || 0) + 1));
+        const [modeCount, modeFrequency] = [...frequencies.entries()]
+            .sort((left, right) => right[1] - left[1] || right[0] - left[0])[0];
+        const score = populated.length * 100 + modeFrequency * 20 + modeCount;
+        if (score > best.score) best = { delimiter, score };
+    });
+    return best.delimiter;
+}
+
+export function decodeCsvArrayBuffer(value) {
+    const bytes = toByteArray(value);
+    let text;
+    let encoding;
+    if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+        text = decodeBytes(bytes.subarray(3), "utf-8");
+        encoding = "UTF-8";
+    } else if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+        text = decodeBytes(bytes.subarray(2), "utf-16le");
+        encoding = "UTF-16LE";
+    } else if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+        text = decodeBytes(bytes.subarray(2), "utf-16be");
+        encoding = "UTF-16BE";
+    } else {
+        try {
+            text = decodeBytes(bytes, "utf-8", true);
+            encoding = "UTF-8";
+        } catch (_) {
+            text = decodeBytes(bytes, "gb18030");
+            encoding = "GBK";
+        }
+    }
+    return { text, encoding, delimiter: detectCsvDelimiter(text) };
+}
 
 function toPositiveInteger(value, fallback) {
     const parsed = Number(value);
@@ -307,16 +393,24 @@ function scoreHeaderCandidate(XLSX, sheet, startRow, endRow, columnIndexes, targ
         && range.e.c > range.s.c
         && columnIndexes.some((columnIndex) => columnIndex >= range.s.c && columnIndex <= range.e.c)
     )).length;
-    const parentLabels = new Set();
+    const parentLabels = new Map();
     if (startRow < endRow) {
         columnIndexes.forEach((columnIndex) => {
             const value = normalizeText(readCell(XLSX, sheet, startRow - 1, columnIndex, true));
-            if (value && value.length <= 50 && !looksLikeInstruction(value)) parentLabels.add(value);
+            if (value && value.length <= 50 && !looksLikeInstruction(value)) {
+                parentLabels.set(value, (parentLabels.get(value) || 0) + 1);
+            }
         });
     }
+    const hasRepeatedParentLabel = [...parentLabels.values()].some((count) => count >= 2);
     const hierarchyBonus = mergedHeaderGroups > 0
         ? Math.min(6, mergedHeaderGroups * 3)
-        : (parentLabels.size >= 2 ? 2 : 0);
+        : (hasRepeatedParentLabel ? 2 : 0);
+    const unsupportedHierarchyPenalty = startRow < endRow
+        && mergedHeaderGroups === 0
+        && !hasRepeatedParentLabel
+        ? Math.min(14, 8 + (endRow - startRow - 1) * 3)
+        : 0;
     const sparseTitlePenalty = columnIndexes.length > 1 && uniqueHeaders.size <= 1 ? 6 : 0;
     const score = exactScore
         + matched * 8
@@ -326,6 +420,7 @@ function scoreHeaderCandidate(XLSX, sheet, startRow, endRow, columnIndexes, targ
         - numericHeaders * 2
         - instructionHeaders * 7
         - sparseTitlePenalty
+        - unsupportedHierarchyPenalty
         - Math.max(0, endRow - startRow - 2);
     return { startRow, endRow, headers, mappings, matched, score };
 }
@@ -569,16 +664,19 @@ export function analyzeExcelWorkbook(XLSX, workbook, options = {}) {
     );
     const maxRows = clamp(toPositiveInteger(options.maxRows, 50000), 1, 50000);
     const rows = [];
+    const sourceRows = [];
     const samples = new Map();
     let sourceRowCount = 0;
     for (let rowNumber = dataStartRow; rowNumber <= dataEndRow; rowNumber += 1) {
         const row = { _ExcelRow: rowNumber };
+        const sourceRow = { _ExcelRow: rowNumber };
         let hasValue = false;
         let sourceHasValue = false;
         const values = new Map();
         columnIndexes.forEach((columnIndex) => {
             const value = readCell(XLSX, sheet, rowNumber - 1, columnIndex);
             values.set(columnIndex, value);
+            sourceRow[`_ImportSourceColumn_${columnIndex}`] = value;
             if (!isBlank(value)) {
                 sourceHasValue = true;
                 const currentSamples = samples.get(columnIndex) || [];
@@ -586,7 +684,10 @@ export function analyzeExcelWorkbook(XLSX, workbook, options = {}) {
                 samples.set(columnIndex, currentSamples);
             }
         });
-        if (sourceHasValue) sourceRowCount += 1;
+        if (sourceHasValue) {
+            sourceRowCount += 1;
+            sourceRows.push(sourceRow);
+        }
         if (sourceRowCount > maxRows) {
             const error = new Error(`Excel data rows exceed the limit ${maxRows}.`);
             error.code = "IMPORT_TOO_MANY_ROWS";
@@ -609,6 +710,7 @@ export function analyzeExcelWorkbook(XLSX, workbook, options = {}) {
         return {
             columnIndex,
             columnLetter: XLSX.utils.encode_col(columnIndex),
+            sourceKey: `_ImportSourceColumn_${columnIndex}`,
             header: detection.headers[columnIndex] || "",
             targetName: target ? target.name : "",
             targetLabel: target ? target.label : "",
@@ -637,16 +739,26 @@ export function analyzeExcelWorkbook(XLSX, workbook, options = {}) {
         mappedColumnCount: mappedColumns.length,
         ignoredColumnCount: Math.max(0, columns.length - mappedColumns.length),
         sourceRowCount,
+        sourceRows,
         keyField: options.keyField || "",
         rows,
-        cells
+        cells,
+        fileType: normalizeText(options.fileType).toLowerCase() || "excel",
+        encoding: normalizeText(options.encoding),
+        delimiter: options.delimiter || ""
     };
 }
 
-export function buildImportMetadata(analysis) {
+export function buildImportMetadata(analysis, options = {}) {
     if (!analysis) return null;
     return {
-        Version: "2.0",
+        Version: "2.2",
+        ErrorPolicy: normalizeImportErrorPolicy(options.errorPolicy),
+        UpsertMode: "ByTableUniqueRules",
+        UniqueRules: Array.isArray(options.uniqueRules) ? options.uniqueRules : [],
+        FileType: analysis.fileType || "excel",
+        Encoding: analysis.encoding || "",
+        Delimiter: analysis.delimiter || "",
         SheetIndex: analysis.sheetIndex,
         SheetName: analysis.sheetName,
         HeaderStartRow: analysis.headerStartRow,

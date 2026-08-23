@@ -4,6 +4,9 @@
  */
 import { applyRuntimeSysConfig, post } from './request.js'
 import appConfig from '../config.js'
+import { isAiAssistantVisible, isEnabledFlag } from './feature-flags.js'
+
+export { isAiAssistantVisible, isEnabledFlag } from './feature-flags.js'
 
 const CACHE_KEY = 'sys_config_cache'
 const CACHE_EXPIRE = 30 * 60 * 1000 // 缓存30分钟
@@ -14,7 +17,7 @@ let aiFlagRequest = null
 let aiModelFlagRequest = null
 let aiFlagState = {
   checkedAt: 0,
-  enabled: false
+  enabled: true
 }
 let aiModelFlagState = {
   checkedAt: 0,
@@ -25,15 +28,9 @@ export function resetSysConfigRuntimeCache() {
   sysConfigRequest = null
   aiFlagRequest = null
   aiModelFlagRequest = null
-  aiFlagState = { checkedAt: 0, enabled: false }
+  aiFlagState = { checkedAt: 0, enabled: true }
   aiModelFlagState = { checkedAt: 0, enabled: false }
   try { uni.removeStorageSync(CACHE_KEY) } catch (error) {}
-}
-
-export function isEnabledFlag(value) {
-  if (value === true || value === 1) return true
-  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
-  return normalized === '1' || normalized === 'true'
 }
 
 /**
@@ -103,7 +100,8 @@ export async function getSysConfig(options = {}) {
 }
 
 /**
- * AI 助手采用失败关闭策略：只有服务端最新配置明确开启时才显示。
+ * AI 助手采用负向开关：只有 DisableAiAssistant 明确开启时才隐藏。
+ * 字段缺失、值未开启或配置请求失败时都默认显示。
  */
 export async function getAiAssistantEnabled(options = {}) {
   const force = options === true || (options && options.refresh === true)
@@ -113,7 +111,7 @@ export async function getAiAssistantEnabled(options = {}) {
 
   aiFlagRequest = (async () => {
     const config = await getSysConfig({ refresh: true })
-    const enabled = isEnabledFlag(config && config.IsShowAiAssistant)
+    const enabled = isAiAssistantVisible(config)
     aiFlagState = { checkedAt: Date.now(), enabled }
     return enabled
   })()
@@ -121,8 +119,8 @@ export async function getAiAssistantEnabled(options = {}) {
   try {
     return await aiFlagRequest
   } catch (error) {
-    aiFlagState = { checkedAt: Date.now(), enabled: false }
-    return false
+    aiFlagState = { checkedAt: Date.now(), enabled: true }
+    return true
   } finally {
     aiFlagRequest = null
   }

@@ -511,6 +511,17 @@ namespace Microi.net
         public string _ImportColumnsJson { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _ImportMetaJson { get; set; }
+        /// <summary>
+        /// 导入错误处理策略：RollbackAll（默认，兼容旧行为）或 ContinueOnError（逐行提交并跳过错误行）。
+        /// </summary>
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportErrorPolicy { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportFileType { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportEncoding { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportDelimiter { get; set; }
         public int? _TreeLazy { get; set; }
         /// <summary>
         /// 动态加载时传入的父级值，用于加载指定父节点的子级数据

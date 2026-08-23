@@ -6,6 +6,30 @@ namespace Microi.Tests.Common;
 public sealed class DiyLangBackgroundTaskTests
 {
     [Fact]
+    public void ClientLangSeeds_UseCompactFormRightPanelLabels()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "Microi.Server",
+            "Microi.Core",
+            "FormEngine",
+            "FormEngineLang.cs"));
+
+        Assert.Contains(
+            "Key = \"Msg.DataLog\", ZhCN = \"日志\"",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Key = \"Msg.DataComment\", ZhCN = \"评论\"",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Key = \"Msg.DataVersion\", ZhCN = \"版本\"",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SourceTag_RemovesCallerControlledLogCharacters()
     {
         var value = DiyLangBackgroundTaskService.SanitizeSource(

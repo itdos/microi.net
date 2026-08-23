@@ -182,6 +182,17 @@ namespace Microi.net
         DosResult QuerySystemLogSignal(dynamic dynamicParam);
 
         /// <summary>
+        /// 平台管理员读取当前节点运行快照、系统日志和安全防护状态。
+        /// 该方法只提供宿主/Mongo/进程等接口引擎无法直接访问的只读原子能力。
+        /// </summary>
+        DosResult GetSystemObservability(dynamic dynamicParam);
+
+        /// <summary>
+        /// 平台管理员执行受限的 IP 封禁/解封；租户、操作者和审计字段均由可信后端决定。
+        /// </summary>
+        DosResult ManageSystemObservability(dynamic dynamicParam);
+
+        /// <summary>
         /// 当前租户超级管理员幂等保存接口引擎定时任务；Quartz 与元数据均完成回读后才成功。
         /// </summary>
         DosResult SaveScheduleJob(dynamic dynamicParam);

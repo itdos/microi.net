@@ -22,6 +22,68 @@
             <el-tag type="info" effect="plain" round>{{ $t("Msg.ImportServerValidation") }}</el-tag>
         </div>
 
+        <section class="mci-import-dialog__execution">
+            <div class="mci-import-dialog__execution-head">
+                <div>
+                    <strong>{{ $t("Msg.ImportExecutionPolicy") }}</strong>
+                    <p>{{ $t("Msg.ImportExecutionPolicyHint") }}</p>
+                </div>
+                <el-tag type="info" effect="plain" round>
+                    {{ $t("Msg.ImportCurrentTable") }}：{{ importTableDisplayName }}
+                </el-tag>
+            </div>
+            <el-radio-group
+                v-model="errorPolicy"
+                class="mci-import-dialog__policy-grid"
+                :disabled="submitting || isTaskActive"
+            >
+                <div
+                    class="mci-import-dialog__policy-card"
+                    :class="{ 'is-active': errorPolicy === IMPORT_ERROR_POLICY.ROLLBACK_ALL }"
+                >
+                    <el-radio :value="IMPORT_ERROR_POLICY.ROLLBACK_ALL">
+                        {{ $t("Msg.ImportRollbackAll") }}
+                    </el-radio>
+                    <p>{{ $t("Msg.ImportRollbackAllDesc") }}</p>
+                </div>
+                <div
+                    class="mci-import-dialog__policy-card"
+                    :class="{ 'is-active': errorPolicy === IMPORT_ERROR_POLICY.CONTINUE_ON_ERROR }"
+                >
+                    <el-radio :value="IMPORT_ERROR_POLICY.CONTINUE_ON_ERROR">
+                        {{ $t("Msg.ImportContinueOnError") }}
+                    </el-radio>
+                    <p>{{ $t("Msg.ImportContinueOnErrorDesc") }}</p>
+                </div>
+            </el-radio-group>
+            <div class="mci-import-dialog__unique-rules">
+                <div class="mci-import-dialog__unique-rules-title">
+                    <strong>{{ $t("Msg.ImportUniqueRules") }}</strong>
+                    <span>{{ $t("Msg.ImportUniqueRulesHint") }}</span>
+                </div>
+                <div v-if="uniqueRules.length" class="mci-import-dialog__unique-rule-list">
+                    <el-tag
+                        v-for="rule in uniqueRules"
+                        :key="rule.Key"
+                        :type="rule.Type === 'All' ? 'warning' : 'success'"
+                        effect="light"
+                        round
+                    >
+                        {{ uniqueRuleText(rule) }}
+                    </el-tag>
+                    <p>{{ $t("Msg.ImportUpsertHint") }}</p>
+                </div>
+                <el-alert
+                    v-else
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                    :title="$t('Msg.ImportNoUniqueRules')"
+                    :description="$t('Msg.ImportNoUniqueRulesHint')"
+                />
+            </div>
+        </section>
+
         <el-upload
             ref="workbookUpload"
             class="upload-drag-style mci-import-dialog__upload"
@@ -61,7 +123,7 @@
                         {{ $t("Msg.ImportConfidence") }}：{{ confidenceText }}
                     </el-tag>
                     <el-tag type="success" effect="plain" round>
-                        {{ parsedImport.rows.length || parsedImport.sourceRowCount }} {{ $t("Msg.ImportRows") }}
+                        {{ parsedImport.sourceRowCount }} {{ $t("Msg.ImportRows") }}
                     </el-tag>
                     <el-tag type="info" effect="plain" round>
                         {{ parsedImport.mappedColumnCount }} {{ $t("Msg.ImportMappedColumns") }}
@@ -71,9 +133,9 @@
 
             <el-skeleton v-if="parsing" :rows="6" animated />
 
-            <template v-else-if="parsedImport">
+            <template v-else-if="parsedImport || workbookPreviewSource">
                 <el-alert
-                    v-if="needsManualReview"
+                    v-if="parsedImport && needsManualReview"
                     class="mci-import-dialog__review-alert"
                     type="warning"
                     :closable="false"
@@ -81,7 +143,7 @@
                     :title="$t('Msg.ImportManualReviewHint')"
                 />
 
-                <div class="mci-import-dialog__settings">
+                <div v-if="parsedImport" class="mci-import-dialog__settings">
                     <div class="mci-import-dialog__settings-title">
                         <span>{{ $t("Msg.ImportWorkbookSettings") }}</span>
                         <div>
@@ -125,7 +187,7 @@
                 </div>
 
                 <el-tabs v-model="activeTab" class="mci-import-dialog__tabs">
-                    <el-tab-pane :label="$t('Msg.ImportPreview')" name="preview">
+                    <el-tab-pane v-if="parsedImport" :label="$t('Msg.ImportPreview')" name="preview">
                         <div class="mci-import-dialog__table-wrap">
                             <el-table
                                 :data="previewRows"
@@ -145,35 +207,48 @@
                                 <el-table-column
                                     v-for="column in previewColumns"
                                     :key="'preview_' + column.columnIndex + '_' + column.targetName"
-                                    :prop="column.targetName"
-                                    :label="column.targetLabel || column.header || column.columnLetter"
+                                    :prop="column.sourceKey"
+                                    :label="column.header || column.columnLetter"
                                     min-width="150"
                                     show-overflow-tooltip
                                 >
                                     <template #header>
-                                        <div class="mci-import-dialog__preview-head">
-                                            <span>{{ column.targetLabel || column.header || column.columnLetter }}</span>
-                                            <small>{{ column.columnLetter }} · {{ column.header || "-" }}</small>
+                                        <div
+                                            class="mci-import-dialog__preview-head"
+                                            :class="{ 'is-unmatched': !column.targetName }"
+                                        >
+                                            <el-tooltip
+                                                v-if="!column.targetName"
+                                                :content="$t('Msg.ImportUnmatchedColumnTip')"
+                                                placement="top"
+                                            >
+                                                <span>{{ column.header || column.columnLetter }}</span>
+                                            </el-tooltip>
+                                            <span v-else>{{ column.header || column.columnLetter }}</span>
+                                            <small v-if="column.targetName">
+                                                {{ column.columnLetter }} · {{ $t("Msg.ImportMappedTo") }} {{ column.targetLabel || column.targetName }}
+                                            </small>
+                                            <small v-else>{{ column.columnLetter }} · {{ $t("Msg.ImportUnmatchedColumn") }}</small>
                                         </div>
                                     </template>
                                     <template #default="scope">
-                                        {{ formatPreviewValue(scope.row[column.targetName]) }}
+                                        {{ formatPreviewValue(scope.row[column.sourceKey]) }}
                                     </template>
                                 </el-table-column>
                             </el-table>
                         </div>
                         <el-pagination
-                            v-if="parsedImport.rows.length > previewPageSize"
+                            v-if="parsedImport.sourceRows.length > previewPageSize"
                             v-model:current-page="previewPage"
                             class="mci-import-dialog__pagination"
                             background
                             layout="total, prev, pager, next"
                             :page-size="previewPageSize"
-                            :total="parsedImport.rows.length"
+                            :total="parsedImport.sourceRows.length"
                         />
                     </el-tab-pane>
 
-                    <el-tab-pane :label="$t('Msg.ImportColumnMapping')" name="mapping">
+                    <el-tab-pane v-if="parsedImport" :label="$t('Msg.ImportColumnMapping')" name="mapping">
                         <el-table :data="parsedImport.columns" border stripe height="360" table-layout="fixed">
                             <el-table-column :label="$t('Msg.ImportExcelColumn')" width="105" align="center">
                                 <template #default="scope"><strong>{{ scope.row.columnLetter }}</strong></template>
@@ -203,6 +278,28 @@
                                 </template>
                             </el-table-column>
                         </el-table>
+                    </el-tab-pane>
+
+                    <el-tab-pane :label="$t('Msg.ImportOriginalWorkbook')" name="workbook" lazy>
+                        <div class="mci-import-dialog__raw-head">
+                            <span>{{ $t("Msg.ImportOriginalWorkbookHint") }}</span>
+                            <el-tag v-if="sourceFileInfo" type="info" effect="plain" round>{{ sourceFileInfo }}</el-tag>
+                        </div>
+                        <div
+                            v-loading="workbookPreviewLoading"
+                            class="mci-import-dialog__raw-workbook"
+                            :element-loading-text="$t('Msg.ImportRenderingWorkbook')"
+                        >
+                            <vue-office-excel
+                                v-if="workbookPreviewSource"
+                                :key="workbookPreviewKey"
+                                :src="workbookPreviewSource"
+                                @rendered="handleWorkbookPreviewRendered"
+                                @error="handleWorkbookPreviewError"
+                            />
+                            <el-empty v-else :description="$t('Msg.ImportOriginalWorkbookUnavailable')" />
+                        </div>
+                        <p v-if="workbookPreviewError" class="mci-import-dialog__error">{{ workbookPreviewError }}</p>
                     </el-tab-pane>
                 </el-tabs>
             </template>
@@ -274,12 +371,19 @@
 <script>
 import { markRaw } from "vue";
 import { CircleCheckFilled, Close, MagicStick, RefreshRight, Upload, Warning } from "@element-plus/icons-vue";
+import VueOfficeExcel from "@vue-office/excel";
+import "@vue-office/excel/lib/index.css";
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
+import { buildDiyFieldUniqueRules } from "@/utils/diy-field-unique";
+import { normalizeXlsxPreviewArrayBuffer } from "../utils/excel-preview-normalizer";
 import {
     analyzeExcelWorkbook,
     buildImportMetadata,
     buildImportTargets,
+    decodeCsvArrayBuffer,
+    IMPORT_ERROR_POLICY,
+    normalizeImportErrorPolicy,
     IMPORT_PREVIEW_PAGE_SIZE
 } from "@/views/form-engine/utils/excel-import-analyzer";
 
@@ -288,10 +392,11 @@ const TERMINAL_TASK_STATUSES = ["Succeeded", "Failed", "Canceled"];
 
 export default {
     name: "DiyImportDialog",
-    components: { Upload },
+    components: { Upload, VueOfficeExcel },
     props: {
         tableId: { type: String, required: true },
         diyFieldList: { type: Array, default: () => [] },
+        diyTableModel: { type: Object, default: () => ({}) },
         sysMenuModel: { type: Object, default: () => ({}) },
         isAdmin: { type: Boolean, default: false },
         tableChildFkFieldName: { type: String, default: "" },
@@ -305,8 +410,10 @@ export default {
         return {
             DiyCommon,
             DiyApi,
+            IMPORT_ERROR_POLICY,
             visible: false,
             dialogOptions: {},
+            errorPolicy: IMPORT_ERROR_POLICY.ROLLBACK_ALL,
             importStepList: [],
             selectedFile: null,
             parsedImport: null,
@@ -323,6 +430,13 @@ export default {
             previewPageSize: IMPORT_PREVIEW_PAGE_SIZE,
             analysisSettings: { sheetIndex: 0, headerStartRow: 1, headerEndRow: 1, dataStartRow: 2, dataEndRow: 2 },
             manualMappings: {},
+            workbookPreviewSource: null,
+            workbookPreviewLoading: false,
+            workbookPreviewError: "",
+            workbookPreviewKey: 0,
+            sourceFileType: "",
+            sourceEncoding: "",
+            sourceDelimiter: "",
             _xlsx: null,
             _workbook: null,
             _importStepTimer: null,
@@ -352,7 +466,7 @@ export default {
             return (this.dialogOptions && this.dialogOptions.Width) || "80%";
         },
         customAccept() {
-            return (this.dialogOptions && this.dialogOptions.Accept) || ".xls,.xlsx";
+            return (this.dialogOptions && this.dialogOptions.Accept) || ".xls,.xlsx,.csv";
         },
         importApi() {
             if (this.sysMenuModel && this.sysMenuModel.ImportApi) return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportApi);
@@ -365,8 +479,19 @@ export default {
         authHeader() {
             return "Bearer " + this.DiyCommon.Authorization();
         },
+        importTableDisplayName() {
+            const table = this.diyTableModel || {};
+            const menu = this.sysMenuModel || {};
+            return table.Description || table.Label || menu.Name || table.Name || this.tableId;
+        },
+        uniqueRules() {
+            return buildDiyFieldUniqueRules(this.diyFieldList);
+        },
         importMetadata() {
-            return buildImportMetadata(this.parsedImport);
+            return buildImportMetadata(this.parsedImport, {
+                errorPolicy: this.errorPolicy,
+                uniqueRules: this.uniqueRules
+            });
         },
         uploadData() {
             const result = {
@@ -391,16 +516,27 @@ export default {
                 result._ImportDataEndRow = this.importMetadata.DataEndRow;
                 result._ImportColumnsJson = JSON.stringify(this.importMetadata.Columns);
                 result._ImportMetaJson = JSON.stringify(this.importMetadata);
+                result._ImportErrorPolicy = this.errorPolicy;
+                result._ImportFileType = this.importMetadata.FileType;
+                result._ImportEncoding = this.importMetadata.Encoding;
+                result._ImportDelimiter = this.importMetadata.Delimiter;
             }
             return result;
         },
         previewColumns() {
-            return this.parsedImport ? this.parsedImport.columns.filter((column) => column.targetName) : [];
+            return this.parsedImport ? this.parsedImport.columns : [];
         },
         previewRows() {
             if (!this.parsedImport) return [];
             const start = (this.previewPage - 1) * this.previewPageSize;
-            return this.parsedImport.rows.slice(start, start + this.previewPageSize);
+            return this.parsedImport.sourceRows.slice(start, start + this.previewPageSize);
+        },
+        sourceFileInfo() {
+            if (!this.sourceFileType) return "";
+            if (this.sourceFileType === "csv") {
+                return ["CSV", this.sourceEncoding].filter(Boolean).join(" · ");
+            }
+            return this.sourceFileType.toUpperCase();
         },
         needsManualReview() {
             return Boolean(this.parsedImport && (this.parsedImport.confidence === "low" || !this.parsedImport.mappedColumnCount));
@@ -565,6 +701,12 @@ export default {
             this.activeTab = "preview";
             this.previewPage = 1;
             this.manualMappings = {};
+            this.workbookPreviewSource = null;
+            this.workbookPreviewLoading = false;
+            this.workbookPreviewError = "";
+            this.sourceFileType = "";
+            this.sourceEncoding = "";
+            this.sourceDelimiter = "";
             this._xlsx = null;
             this._workbook = null;
             if (clearSelectedFile && this.$refs.workbookUpload?.clearFiles) this.$refs.workbookUpload.clearFiles();
@@ -572,6 +714,7 @@ export default {
         show(options) {
             this.dialogOptions = options && typeof options === "object" ? { ...options } : {};
             this.clearImportState(true);
+            this.errorPolicy = normalizeImportErrorPolicy(this.dialogOptions.ErrorPolicy);
             this.visible = true;
         },
         hide() {
@@ -580,7 +723,7 @@ export default {
         validateExcelFile(file) {
             const name = String(file && file.name || "");
             const maxSizeMb = Number(this.dialogOptions.MaxFileSizeMB || 20);
-            if (!/\.xlsx?$/i.test(name)) throw new Error(this.$t("Msg.OnlyXlsFile"));
+            if (!/\.(xlsx?|csv)$/i.test(name)) throw new Error(this.$t("Msg.OnlyXlsFile"));
             if (Number(file.size || 0) > maxSizeMb * 1024 * 1024) throw new Error(this.$t("Msg.ImportFileTooLarge", { size: maxSizeMb }));
         },
         async handleFileChange(uploadFile) {
@@ -593,12 +736,44 @@ export default {
                 this.validateExcelFile(file);
                 const module = await import("xlsx");
                 this._xlsx = module.default || module;
-                this._workbook = markRaw(this._xlsx.read(await file.arrayBuffer(), { type: "array", cellDates: true }));
+                const fileBuffer = await file.arrayBuffer();
+                const extension = String(file.name || "").split(".").pop().toLowerCase();
+                this.sourceFileType = extension;
+                if (extension === "csv") {
+                    const csv = decodeCsvArrayBuffer(fileBuffer);
+                    this.sourceEncoding = csv.encoding;
+                    this.sourceDelimiter = csv.delimiter;
+                    this._workbook = markRaw(this._xlsx.read(csv.text, {
+                        type: "string",
+                        FS: csv.delimiter,
+                        cellDates: true,
+                        cellStyles: true,
+                        raw: false
+                    }));
+                    this.workbookPreviewSource = markRaw(this._xlsx.write(this._workbook, {
+                        type: "array",
+                        bookType: "xlsx",
+                        cellStyles: true
+                    }));
+                } else {
+                    this._workbook = markRaw(this._xlsx.read(fileBuffer, {
+                        type: "array",
+                        cellDates: true,
+                        cellStyles: true
+                    }));
+                    const previewBuffer = extension === "xlsx"
+                        ? await normalizeXlsxPreviewArrayBuffer(fileBuffer)
+                        : fileBuffer;
+                    this.workbookPreviewSource = markRaw(previewBuffer);
+                }
+                this.workbookPreviewKey += 1;
+                this.workbookPreviewLoading = true;
                 this.runWorkbookAnalysis("initial");
-                if (!this.parsedImport.sourceRowCount) throw new Error(this.$t("Msg.ImportNoRows"));
+                if (!this.parsedImport.sourceRowCount) this.customError = this.$t("Msg.ImportNoRows");
             } catch (error) {
                 this.customError = this.formatAnalysisError(error);
-                this.parsedImport = null;
+                if (!this._workbook) this.workbookPreviewSource = null;
+                if (!this.parsedImport && this.workbookPreviewSource) this.activeTab = "workbook";
             } finally {
                 this.parsing = false;
             }
@@ -635,6 +810,9 @@ export default {
                 manualMappings: manual ? this.manualMappings : {},
                 cells: workbookConfig.Cells || {},
                 keyField: workbookConfig.KeyField || "",
+                fileType: this.sourceFileType === "csv" ? "csv" : "excel",
+                encoding: this.sourceEncoding,
+                delimiter: this.sourceDelimiter,
                 targets: buildImportTargets(this.diyFieldList, configuredColumns)
             };
         },
@@ -715,6 +893,21 @@ export default {
             if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
             return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
         },
+        uniqueRuleText(rule) {
+            const labels = (rule?.Fields || []).map((field) => field.Label || field.Name).join(" + ");
+            const mode = rule?.Type === "All"
+                ? this.$t("Msg.ImportUniqueRuleAll")
+                : this.$t("Msg.ImportUniqueRuleAlone");
+            return `${mode}：${labels}`;
+        },
+        handleWorkbookPreviewRendered() {
+            this.workbookPreviewLoading = false;
+            this.workbookPreviewError = "";
+        },
+        handleWorkbookPreviewError(error) {
+            this.workbookPreviewLoading = false;
+            this.workbookPreviewError = (error && (error.message || error.msg)) || this.$t("Msg.ImportOriginalWorkbookUnavailable");
+        },
         async startImport() {
             if (!this.canStartImport) return;
             if (this.isCustomImport) {
@@ -740,6 +933,8 @@ export default {
                 const params = Object.assign({}, options.Param || {}, {
                     _ImportRowsJson: JSON.stringify(this.parsedImport.rows),
                     _ImportMetaJson: JSON.stringify(this.importMetadata),
+                    _ImportErrorPolicy: this.errorPolicy,
+                    _ImportUniqueRulesJson: JSON.stringify(this.uniqueRules),
                     _ImportFileName: this.selectedFile.name,
                     _ImportFileSize: this.selectedFile.size
                 });

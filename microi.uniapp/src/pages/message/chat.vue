@@ -188,7 +188,7 @@ export default {
   data() {
     return {
       statusBarHeight: 0,
-      aiAssistantEnabled: false,
+      aiAssistantEnabled: true,
       chatId: '',
       chatName: '聊天',
       chatType: 'private',
