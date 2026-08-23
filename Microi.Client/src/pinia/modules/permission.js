@@ -36,8 +36,6 @@ const pathMappings = {
     "/diy/diy-components/iframe": "/form-engine/diy-components/iframe",
     "/micro-app/host": "/micro-app/host",
     // system 相关映射
-    "/itdos/system/sys-log": "/system/sys-log",
-    "/itdos/system/sys-monitor": "/system/sys-monitor",
     "/itdos/system/sysrole-manage": "/system/sysrole-manage",
     "/itdos/system/sysdept-manage": "/system/sysdept-manage",
     "/itdos/system/sysuser-manage": "/system/sysuser-manage",

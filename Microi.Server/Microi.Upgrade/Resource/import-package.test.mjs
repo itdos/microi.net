@@ -78,6 +78,34 @@ function extractNamedFunction(sourceText, name) {
   assert.fail(`unterminated function ${name}`);
 }
 
+function extractAssignedFunction(sourceText, name) {
+  const start = sourceText.indexOf(`var ${name} = function (`);
+  assert.notEqual(start, -1, `missing assigned function ${name}`);
+  const brace = sourceText.indexOf("{", start);
+  let depth = 0;
+  let quote = "";
+  let escaped = false;
+  for (let index = brace; index < sourceText.length; index += 1) {
+    const char = sourceText[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === quote) quote = "";
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") {
+      quote = char;
+      continue;
+    }
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return sourceText.slice(start, index + 2);
+    }
+  }
+  assert.fail(`unterminated assigned function ${name}`);
+}
+
 test("trusted official Platform Managed resources overwrite while ordinary packages keep three-way protection", () => {
   const fixture = { String };
   vm.runInNewContext(`
@@ -202,7 +230,84 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.3\.3/);
+  assert.match(source, /Version: v2\.3\.6/);
+});
+
+test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {
+  const fixture = {};
+  vm.runInNewContext(`
+    ${extractAssignedFunction(source, "firstTextParam")}
+    ${extractAssignedFunction(source, "listSize")}
+    ${extractAssignedFunction(source, "validatePackageMenuRuntimeContract")}
+    result = validatePackageMenuRuntimeContract;
+  `, fixture);
+
+  const fromStableUrl = {
+    SysMenus: [{
+      Id: "menu-log",
+      Name: "系统日志/监控",
+      OpenType: "MicroService",
+      Url: "/micro-app/microi-platform-service/system-observability",
+      MicroServiceRoutePath: "/system-observability",
+    }],
+    ApplicationBundle: {
+      Application: { AppKey: "microi-platform-service" },
+      MicroService: { Id: "service-source", MsKey: "microi-platform-service" },
+      Routes: [{ Id: "page-log", RoutePath: "/system-observability" }],
+    },
+  };
+  assert.deepEqual(Array.from(fixture.result(fromStableUrl).Errors), []);
+  assert.equal(fromStableUrl.SysMenus[0].MicroServiceKey, "microi-platform-service");
+
+  const fromUniqueRoute = {
+    SysMenus: [{
+      Id: "menu-route",
+      OpenType: "MicroService",
+      MicroServiceRoutePath: "/only-route",
+    }],
+    ApplicationBundles: [{
+      Application: { AppKey: "only-app" },
+      MicroService: { Id: "only-service" },
+      Routes: [{ Id: "only-page", RoutePath: "/only-route" }],
+    }],
+  };
+  assert.deepEqual(Array.from(fixture.result(fromUniqueRoute).Errors), []);
+  assert.equal(fromUniqueRoute.SysMenus[0].MicroServiceKey, "only-app");
+
+  assert.match(source, /LEGACY_MICROSERVICE_MENU_KEY_INFERENCE_V1/);
+});
+
+test("legacy MicroService menu recovery fails closed for ambiguous or conflicting bundles", () => {
+  const fixture = {};
+  vm.runInNewContext(`
+    ${extractAssignedFunction(source, "firstTextParam")}
+    ${extractAssignedFunction(source, "listSize")}
+    ${extractAssignedFunction(source, "validatePackageMenuRuntimeContract")}
+    result = validatePackageMenuRuntimeContract;
+  `, fixture);
+
+  const ambiguous = {
+    SysMenus: [{ OpenType: "MicroService", MicroServiceRoutePath: "/shared" }],
+    ApplicationBundles: [
+      { Application: { AppKey: "app-a" }, Routes: [{ RoutePath: "/shared" }] },
+      { Application: { AppKey: "app-b" }, Routes: [{ RoutePath: "/shared" }] },
+    ],
+  };
+  assert.match(fixture.result(ambiguous).Errors[0], /缺少 MicroServiceKey/);
+
+  const conflictingUrl = {
+    SysMenus: [{
+      Name: "冲突菜单",
+      OpenType: "MicroService",
+      Url: "/micro-app/not-delivered/home",
+      MicroServiceRoutePath: "/home",
+    }],
+    ApplicationBundle: {
+      Application: { AppKey: "delivered-app" },
+      Routes: [{ RoutePath: "/home" }],
+    },
+  };
+  assert.match(fixture.result(conflictingUrl).Errors[0], /not-delivered.*未交付对应 ApplicationBundle/);
 });
 
 function runAdminMenuPermissionFixture(options = {}) {
@@ -1255,7 +1360,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(source, /BACKGROUND_TASK_BOOTSTRAP_READINESS_V1/);
   assert.match(source, /var legacyMenuDiyConfigFields = \[/);
   assert.match(source, /syncLegacyMenuDiyConfig\([\s\S]*?existingMenuVisibility \? existingMenuVisibility\.DiyConfig/);
-  assert.match(source, /_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig'\]/);
+  assert.match(source, /_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig', 'Url'\]/);
 
   const appStoreMenu = packageModel.SysMenus.find(
     menu => menu.Id === "61b7faee-35b2-4571-add2-5231a355f368"
@@ -1346,6 +1451,36 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /tabbedMenus\.length\s*===\s*tabbedMenuIds\.size/);
   assert.match(refreshSource, /uploadAuditMenuValid/);
   assert.match(refreshSource, /ApplicationAssetMultipartSession/);
+});
+
+test("API-engine readback normalizes legacy flag shapes and physically reconciles ignored switches", () => {
+  const fixture = { String, Number, isNaN };
+  vm.runInNewContext(`
+    ${extractNamedFunction(source, "isMissingValue")}
+    ${extractNamedFunction(source, "normalizeApiEngineFlag")}
+    result = normalizeApiEngineFlag;
+  `, fixture);
+  const normalize = fixture.result;
+  assert.equal(normalize(true), 1);
+  assert.equal(normalize(false), 0);
+  assert.equal(normalize("True"), 1);
+  assert.equal(normalize("False"), 0);
+  assert.equal(normalize("1"), 1);
+  assert.equal(normalize("0"), 0);
+  assert.match(source, /API_ENGINE_FLAG_PHYSICAL_RECONCILIATION_V1/);
+  assert.match(source, /UPDATE sys_apiengine SET ' \+ assignments\.join\(','\) \+ ' WHERE Id=@p0/);
+  assert.ok(
+    source.indexOf("reconcilePersistedApiEngineFlags(apiEngine, updatedEngine)")
+      < source.indexOf("assertPersistedApiEngine(apiEngine, updatedEngine)"),
+  );
+});
+
+test("existing menu URL collisions retry without overwriting an unrelated tenant route", () => {
+  assert.match(source, /MENU_URL_UPDATE_COLLISION_RECOVERY_V1/);
+  assert.match(source, /menuUrlOwnerCount/);
+  assert.match(source, /menu_url_update_retry_/);
+  assert.match(source, /existingMenuVisibility && existingMenuVisibility\.Url/);
+  assert.doesNotMatch(source, /SELECT COUNT\(Id\) FROM sys_menu WHERE Url='" \+ originalUrl/);
 });
 
 test("legacy physical prerequisites commit at most one metadata table per background slice", () => {
@@ -2075,6 +2210,106 @@ test("legacy reused microservice build with a broken key is reuploaded and repai
   assert.equal(buildContext.stats.ApplicationBuildAssets, 1);
 });
 
+test("MoveObject-unavailable nodes persist a verified upload fallback and resume without a loop", () => {
+  const buildStageSource = source.match(
+    /var uploadedBuild = \[\];[\s\S]*?pruneApplicationAssets\(appId, expectedApplicationPaths\);/
+  );
+  assert.ok(buildStageSource, "build asset stage should be extractable");
+
+  const stablePath = "legacy/micro-app/demo-service/v1.0.0/index.html";
+  const temporaryPath = "legacy/temp/index-789.html";
+  const calls = { move: 0, upload: 0, rows: [], prune: 0 };
+  const createContext = existingAsset => ({
+    appId: "app-legacy",
+    appKey: "demo-service",
+    appName: "Demo Service",
+    appType: "MicroService",
+    inlineRuntimeBuild: false,
+    buildRoot: "micro-app/demo-service/v1.0.0",
+    buildAssets: [{ Path: "index.html", Size: 128, Sha256: "hash-index" }],
+    existingApplicationAssets: existingAsset ? { "dist/index.html": existingAsset } : {},
+    expectedApplicationPaths: {},
+    stats: { ApplicationBuildAssets: 0, ApplicationBuildAssetsReused: 0 },
+    V8: {
+      OsClient: "legacy",
+      Method: {
+        MoveObject() {
+          calls.move++;
+          return { Code: 0, Msg: "MoveObject unavailable" };
+        }
+      }
+    },
+    normalizeApplicationPath(value) {
+      return String(value || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    },
+    reuseApplicationAsset(_existing, metadataPath, file) {
+      if (!existingAsset) return null;
+      return {
+        Path: metadataPath,
+        HdfsPath: existingAsset.HdfsPath,
+        FilePathName: existingAsset.HdfsPath,
+        PublishHdfsPath: existingAsset.PublishHdfsPath,
+        StorageScope: existingAsset.StorageScope,
+        Size: file.Size,
+        Hash: file.Sha256,
+        Reused: true
+      };
+    },
+    uploadApplicationAsset() {
+      calls.upload++;
+      return {
+        Path: "index.html",
+        HdfsPath: temporaryPath,
+        FilePathName: temporaryPath,
+        Size: 128,
+        Hash: "hash-index"
+      };
+    },
+    upsertApplicationRow(_table, _where, row) {
+      calls.rows.push({ ...row });
+      return { Code: 1 };
+    },
+    applicationFileName(value) { return String(value || "").split("/").pop(); },
+    applicationFileType() { return "html"; },
+    shouldContinueApplicationAssets() { return false; },
+    markApplicationAssetUploaded() {},
+    reportProgress() {},
+    pruneApplicationAssets() { calls.prune++; }
+  });
+
+  const firstContext = createContext(null);
+  vm.runInNewContext(
+    `(function () { ${buildStageSource[0]}; this.uploadedBuild = uploadedBuild; }).call(this);`,
+    firstContext
+  );
+  assert.equal(calls.upload, 1);
+  assert.equal(calls.move, 1);
+  assert.equal(calls.rows.length, 1);
+  assert.equal(calls.rows[0].HdfsPath, temporaryPath);
+  assert.equal(calls.rows[0].StorageScope, "PrivateSource+PublicBuildMoveFallback");
+  assert.notEqual(calls.rows[0].HdfsPath, stablePath);
+
+  const persisted = {
+    Id: "asset-1",
+    HdfsPath: temporaryPath,
+    PublishHdfsPath: temporaryPath,
+    StorageScope: "PrivateSource+PublicBuildMoveFallback",
+    ContentHash: "hash-index",
+    Size: 128
+  };
+  const resumeContext = createContext(persisted);
+  vm.runInNewContext(
+    `(function () { ${buildStageSource[0]}; this.uploadedBuild = uploadedBuild; }).call(this);`,
+    resumeContext
+  );
+  assert.equal(calls.upload, 1, "resume must not upload the same verified fallback again");
+  assert.equal(calls.move, 1, "resume must not retry unsupported MoveObject forever");
+  assert.equal(calls.rows.length, 1, "resume must not rewrite identical fallback metadata");
+  assert.equal(resumeContext.stats.ApplicationBuildAssetsReused, 1);
+  assert.equal(calls.prune, 2);
+  assert.match(source, /MOVE_OBJECT_UNAVAILABLE_RESUME_V1/);
+});
+
 test("managed micro-app assets proxy stable HDFS paths instead of cross-origin redirects", () => {
   assert.match(microAppControllerSource, /GetText\(asset, "hdfsPath", "HdfsPath"\)/);
   assert.match(microAppControllerSource, /GetText\(asset, "publishHdfsPath", "PublishHdfsPath"\)/);
@@ -2089,7 +2324,7 @@ test("managed micro-app assets proxy stable HDFS paths instead of cross-origin r
 });
 
 test("updating an existing menu preserves customer desktop and mobile visibility", () => {
-    assert.match(source, /GetFormData\('sys_menu',[\s\S]*?_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig'\]/);
+    assert.match(source, /GetFormData\('sys_menu',[\s\S]*?_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig', 'Url'\]/);
   assert.match(source, /existingMenuVisibility\.Display[\s\S]*?modelCopy\.Display/);
   assert.match(source, /existingMenuVisibility\.AppDisplay[\s\S]*?modelCopy\.AppDisplay/);
   assert.match(source, /preserve_existing_menu_visibility_/);

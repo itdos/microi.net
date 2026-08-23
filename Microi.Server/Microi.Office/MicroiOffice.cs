@@ -34,6 +34,9 @@ namespace Microi.net
         private const long MaxImportExcelFileBytes = 20L * 1024L * 1024L;
         private const int MaxImportExcelDataRows = 50000;
         private const int MaxImportExcelColumns = 256;
+        private const int MaxImportErrorDetails = 100;
+        private const string ImportErrorPolicyRollbackAll = "RollbackAll";
+        private const string ImportErrorPolicyContinueOnError = "ContinueOnError";
 
         /// <summary>
         /// 通用的 dynamic 参数转换方法
@@ -64,16 +67,46 @@ namespace Microi.net
                 var fileByte = Convert.FromBase64String(param.FileByteBase64);
                 var maxDataRows = Math.Min(param.MaxDataRows ?? MaxImportExcelDataRows, MaxImportExcelDataRows);
                 var maxColumns = Math.Min(param.MaxColumns ?? MaxImportExcelColumns, MaxImportExcelColumns);
-                var result = new NPOIHelper(fileByte).ExcelToListDynamic(
-                    param.SheetIndex ?? 0,
-                    maxDataRows,
-                    maxColumns,
-                    param.HeaderStartRow,
-                    param.HeaderEndRow,
-                    param.DataStartRow,
-                    param.DataEndRow,
-                    param.Columns);
-                return new DosResultList<dynamic>(1, result);
+                string fileType = param.FileType ?? "";
+                string fileName = param.FileName ?? "";
+                var isCsv = fileType.Trim().TrimStart('.').Equals("csv", StringComparison.OrdinalIgnoreCase)
+                    || Path.GetExtension(fileName).Equals(".csv", StringComparison.OrdinalIgnoreCase);
+                List<dynamic> result;
+                object dataAppend = null;
+                if (isCsv)
+                {
+                    var csvResult = CsvImportHelper.CsvToListDynamic(
+                        fileByte,
+                        maxDataRows,
+                        maxColumns,
+                        param.HeaderStartRow,
+                        param.HeaderEndRow,
+                        param.DataStartRow,
+                        param.DataEndRow,
+                        param.Columns,
+                        param.Encoding,
+                        param.Delimiter);
+                    result = csvResult.Rows;
+                    dataAppend = new
+                    {
+                        FileType = "csv",
+                        csvResult.Encoding,
+                        csvResult.Delimiter
+                    };
+                }
+                else
+                {
+                    result = new NPOIHelper(fileByte).ExcelToListDynamic(
+                        param.SheetIndex ?? 0,
+                        maxDataRows,
+                        maxColumns,
+                        param.HeaderStartRow,
+                        param.HeaderEndRow,
+                        param.DataStartRow,
+                        param.DataEndRow,
+                        param.Columns);
+                }
+                return new DosResultList<dynamic>(1, result, null, result.Count, dataAppend);
             }
             catch (Exception ex)
             {
@@ -1440,6 +1473,252 @@ namespace Microi.net
             return fieldConfig.Unique?.Type.DosIsNullOrWhiteSpace("Alone") ?? "Alone";
         }
 
+        private static string ImportNormalizeErrorPolicy(string value)
+        {
+            if (value.DosIsNullOrWhiteSpace()) return ImportErrorPolicyRollbackAll;
+            var normalized = value.Trim();
+            if (normalized.Equals(ImportErrorPolicyRollbackAll, StringComparison.OrdinalIgnoreCase))
+            {
+                return ImportErrorPolicyRollbackAll;
+            }
+            if (normalized.Equals(ImportErrorPolicyContinueOnError, StringComparison.OrdinalIgnoreCase))
+            {
+                return ImportErrorPolicyContinueOnError;
+            }
+            throw new ArgumentException($"不支持的导入错误处理策略【{value}】，仅支持 {ImportErrorPolicyRollbackAll} 或 {ImportErrorPolicyContinueOnError}。");
+        }
+
+        private class ImportUniqueRule
+        {
+            public string Type { get; set; }
+            public List<JObject> Fields { get; set; } = new List<JObject>();
+        }
+
+        private class ImportRowWriteResult
+        {
+            public bool Updated { get; set; }
+            public int Affected { get; set; }
+            public string LastSql { get; set; }
+        }
+
+        private static List<ImportUniqueRule> ImportBuildUniqueRules(IEnumerable<JObject> fields)
+        {
+            var uniqueFields = (fields ?? Enumerable.Empty<JObject>())
+                .Where(d => d != null
+                    && d["Unique"].Val<int>() == 1
+                    && !d["Name"].Val<string>().DosIsNullOrWhiteSpace())
+                .OrderBy(d => d["Sort"].Val<int>())
+                .ToList();
+            var rules = uniqueFields
+                .Where(d => !string.Equals(ImportGetUniqueType(d), "All", StringComparison.OrdinalIgnoreCase))
+                .Select(d => new ImportUniqueRule
+                {
+                    Type = "Alone",
+                    Fields = new List<JObject> { d }
+                })
+                .ToList();
+            var allFields = uniqueFields
+                .Where(d => string.Equals(ImportGetUniqueType(d), "All", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (allFields.Any())
+            {
+                rules.Add(new ImportUniqueRule { Type = "All", Fields = allFields });
+            }
+            return rules;
+        }
+
+        private static string ImportDescribeUniqueRule(ImportUniqueRule rule)
+        {
+            var fieldText = string.Join(" + ", (rule?.Fields ?? new List<JObject>())
+                .Select(d => $"{d["Label"].Val<string>().DosIsNullOrWhiteSpace(d["Name"].Val<string>())}({d["Name"].Val<string>()})"));
+            return string.Equals(rule?.Type, "All", StringComparison.OrdinalIgnoreCase)
+                ? $"组合唯一【{fieldText}】"
+                : $"单字段唯一【{fieldText}】";
+        }
+
+        private static string ImportDescribeUniqueRules(IEnumerable<ImportUniqueRule> rules)
+        {
+            var descriptions = (rules ?? Enumerable.Empty<ImportUniqueRule>())
+                .Select(ImportDescribeUniqueRule)
+                .Where(d => !d.DosIsNullOrWhiteSpace())
+                .ToList();
+            return descriptions.Any()
+                ? string.Join("；", descriptions)
+                : "未配置唯一字段（只能新增，重复导入可能产生重复数据）";
+        }
+
+        private static bool ImportTryBuildUniqueRuleValues(
+            IDictionary<string, object> row,
+            JObject fixedField,
+            ImportUniqueRule rule,
+            out List<KeyValuePair<JObject, object>> values)
+        {
+            values = new List<KeyValuePair<JObject, object>>();
+            foreach (var field in rule?.Fields ?? new List<JObject>())
+            {
+                if (!ImportTryGetFieldValue(row, fixedField, field, out var value)
+                    || ImportNormalizeValue(value, field).DosIsNullOrWhiteSpace())
+                {
+                    values.Clear();
+                    return false;
+                }
+                values.Add(new KeyValuePair<JObject, object>(field, value));
+            }
+            return values.Any();
+        }
+
+        private static string ImportResolveExistingRowId(
+            IDictionary<string, object> row,
+            JObject fixedField,
+            IEnumerable<ImportUniqueRule> rules,
+            string sqlTableName,
+            DbTrans trans,
+            DbInfo dbInfo,
+            List<string> sqlLog,
+            out string lastSql)
+        {
+            lastSql = "";
+            var matchedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var rule in rules ?? Enumerable.Empty<ImportUniqueRule>())
+            {
+                if (!ImportTryBuildUniqueRuleValues(row, fixedField, rule, out var values)) continue;
+                var whereSql = " WHERE IsDeleted = 0 ";
+                foreach (var item in values)
+                {
+                    var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(item.Key["Name"].Val<string>());
+                    whereSql += $" AND {sqlFieldName}={ImportBuildSqlValue(item.Value, item.Key)} ";
+                }
+
+                var countSql = $"SELECT COUNT(Id) FROM {sqlTableName}{whereSql}";
+                sqlLog?.Add(countSql);
+                lastSql = countSql;
+                var count = trans.FromSql(countSql).ToScalar<int>();
+                if (count > 1)
+                {
+                    throw new Exception($"{ImportDescribeUniqueRule(rule)}在当前表中命中【{count}】条数据，无法确定要修改的记录，请先清理重复数据。");
+                }
+                if (count != 1) continue;
+
+                var idSql = $"SELECT Id FROM {sqlTableName}{whereSql}";
+                sqlLog?.Add(idSql);
+                lastSql = idSql;
+                var id = trans.FromSql(idSql).ToScalar<string>();
+                if (id.DosIsNullOrWhiteSpace())
+                {
+                    throw new Exception($"{ImportDescribeUniqueRule(rule)}已命中数据但未读取到记录 Id。");
+                }
+                matchedIds.Add(id);
+                if (matchedIds.Count > 1)
+                {
+                    throw new Exception("同一导入行的不同唯一规则命中了不同记录，无法安全判断修改目标。请检查唯一字段值或清理冲突数据。");
+                }
+            }
+            return matchedIds.FirstOrDefault();
+        }
+
+        private static ImportRowWriteResult ImportWriteRow(
+            IDictionary<string, object> row,
+            int excelRow,
+            JObject fixedField,
+            List<JObject> importFieldList,
+            List<ImportUniqueRule> uniqueRules,
+            string sqlTableName,
+            DbTrans trans,
+            DbInfo dbInfo,
+            DiyTableRowParam param,
+            List<string> sqlLog)
+        {
+            var existingId = ImportResolveExistingRowId(
+                row, fixedField, uniqueRules, sqlTableName, trans, dbInfo, sqlLog, out var lastSql);
+            if (!existingId.DosIsNullOrWhiteSpace())
+            {
+                var colsSetBuilder = new System.Text.StringBuilder();
+                foreach (var colModel in importFieldList)
+                {
+                    var fieldName = colModel["Name"].Val<string>();
+                    if (string.Equals(fieldName, "Id", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!ImportTryGetFieldValue(row, fixedField, colModel, out var valueObj)) continue;
+                    if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true
+                        && string.Equals(fieldName, "TenantId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(fieldName);
+                    colsSetBuilder.Append($"{sqlFieldName}={ImportBuildSqlValue(valueObj, colModel)},");
+                }
+                var colsSet = colsSetBuilder.ToString().TrimEnd(',');
+                if (colsSet.DosIsNullOrWhiteSpace())
+                {
+                    return new ImportRowWriteResult { Updated = true, Affected = 0, LastSql = lastSql };
+                }
+                var idField = MicroiEngine.ORM(dbInfo.DbType).GetFieldName("Id");
+                var updateSql = $"UPDATE {sqlTableName} SET {colsSet} WHERE IsDeleted = 0 AND {idField}='{ImportEscapeSql(existingId)}'";
+                sqlLog?.Add(updateSql);
+                var affected = trans.FromSql(updateSql).ExecuteNonQuery();
+                if (affected > 1)
+                {
+                    throw new Exception($"Excel 第【{excelRow}】行按唯一规则修改了【{affected}】条记录，已终止以避免批量误改。");
+                }
+                return new ImportRowWriteResult { Updated = true, Affected = affected, LastSql = updateSql };
+            }
+
+            var importedFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var colNamesBuilder = new System.Text.StringBuilder();
+            var colValuesBuilder = new System.Text.StringBuilder();
+            foreach (var colModel in importFieldList)
+            {
+                var fieldName = colModel["Name"].Val<string>();
+                if (string.Equals(fieldName, "Id", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!ImportTryGetFieldValue(row, fixedField, colModel, out var value)) continue;
+                if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true
+                    && string.Equals(fieldName, "TenantId", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName(fieldName)).Append(',');
+                colValuesBuilder.Append(ImportBuildSqlValue(value, colModel)).Append(',');
+                importedFieldNames.Add(fieldName);
+            }
+            if (param._CurrentUser != null
+                && !importedFieldNames.Contains("TenantId")
+                && !param._CurrentUser["TenantId"].Val<string>().DosIsNullOrWhiteSpace())
+            {
+                colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName("TenantId")).Append(',');
+                colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName("TenantName")).Append(',');
+                colValuesBuilder.Append($"'{ImportEscapeSql(param._CurrentUser?["TenantId"].Val<string>())}','{ImportEscapeSql(param._CurrentUser?["TenantName"].Val<string>())}',");
+            }
+            var colNames = colNamesBuilder.ToString().TrimEnd(',');
+            var colValues = colValuesBuilder.ToString().TrimEnd(',');
+            if (colNames.DosIsNullOrWhiteSpace())
+            {
+                var headers = string.Join(",", row.Keys.Where(d => !string.Equals(d, "_ExcelRow", StringComparison.OrdinalIgnoreCase)));
+                throw new Exception($"Excel 第【{excelRow}】行未匹配到可导入字段，请检查表头和列映射。表头：{headers}");
+            }
+            var insertSql = $@"INSERT INTO {sqlTableName} (Id,CreateTime,UpdateTime,UserId,IsDeleted,{colNames})
+                                VALUES ('{Ulid.NewUlid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{ImportEscapeSql(param._CurrentUser?["Id"].Val<string>())}',0,{colValues})";
+            sqlLog?.Add(insertSql);
+            var insertAffected = trans.FromSql(insertSql).ExecuteNonQuery();
+            if (insertAffected != 1)
+            {
+                throw new Exception($"Excel 第【{excelRow}】行新增结果异常，数据库影响行数为【{insertAffected}】。");
+            }
+            return new ImportRowWriteResult { Updated = false, Affected = insertAffected, LastSql = insertSql };
+        }
+
+        private static int ImportGetExcelRowNumber(IDictionary<string, object> row, int sourceIndex, DiyTableRowParam param)
+        {
+            if (row != null
+                && row.TryGetValue("_ExcelRow", out var value)
+                && int.TryParse(value?.ToString(), out var excelRow)
+                && excelRow > 0)
+            {
+                return excelRow;
+            }
+            var firstDataRow = param?._ImportDataStartRow
+                ?? ((param?._ImportHeaderEndRow ?? param?._ImportHeaderStartRow ?? 1) + 1);
+            return firstDataRow + sourceIndex;
+        }
+
         private static JObject ImportFindField(IEnumerable<JObject> fields, IEnumerable<string> names, IEnumerable<string> labels)
         {
             var nameSet = new HashSet<string>(names ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
@@ -1925,9 +2204,9 @@ namespace Microi.net
             if (files.Count != 1)
             {
                 await diyCacheBase.SetAsync(startSign, "0");
-                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！必须且只能上传一个Excel文件！");
+                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！必须且只能上传一个 Excel 或 CSV 文件！");
                 await diyCacheBase.SetAsync(stepSign, importStepList);
-                result = new DosResult(0, null, "必须且只能上传一个Excel文件！");
+                result = new DosResult(0, null, "必须且只能上传一个 Excel 或 CSV 文件！");
                 return;
             }
 
@@ -1936,16 +2215,29 @@ namespace Microi.net
             if (file.Length <= 0 || file.Length > MaxImportExcelFileBytes)
             {
                 await diyCacheBase.SetAsync(startSign, "0");
-                result = new DosResult(0, null, $"Excel文件必须大于0且不超过{MaxImportExcelFileBytes / 1024 / 1024}MB！");
+                result = new DosResult(0, null, $"Excel/CSV 文件必须大于0且不超过{MaxImportExcelFileBytes / 1024 / 1024}MB！");
                 importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{result.Msg}");
                 await diyCacheBase.SetAsync(stepSign, importStepList);
                 return;
             }
-            if (fileSuffix != ".xls" && fileSuffix != ".xlsx")
+            if (fileSuffix != ".xls" && fileSuffix != ".xlsx" && fileSuffix != ".csv")
             {
                 await diyCacheBase.SetAsync(startSign, "0");
-                result = new DosResult(0, null, "只允许导入真实的.xls或.xlsx文件！");
+                result = new DosResult(0, null, "只允许导入真实的 .xls、.xlsx 或 .csv 文件！");
                 importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{result.Msg}");
+                await diyCacheBase.SetAsync(stepSign, importStepList);
+                return;
+            }
+            string importErrorPolicy;
+            try
+            {
+                importErrorPolicy = ImportNormalizeErrorPolicy(param._ImportErrorPolicy);
+            }
+            catch (Exception ex)
+            {
+                await diyCacheBase.SetAsync(startSign, "0");
+                result = new DosResult(0, null, ex.Message);
+                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
                 await diyCacheBase.SetAsync(stepSign, importStepList);
                 return;
             }
@@ -2003,27 +2295,69 @@ namespace Microi.net
             {
                 var sqlLog = new List<string>();
                 var lastSqlLog = "";
+                var successCount = 0;
+                var updatedCount = 0;
+                var failedCount = 0;
                 try
                 {
+                    if (!OfficeDocumentSecurity.HasExpectedFileSignature(fileSuffix, fileByte))
+                    {
+                        throw new ArgumentException($"上传内容与文件类型{fileSuffix}不一致或文件已损坏。");
+                    }
                     var importColumnMappings = new List<ExcelImportColumnParam>();
                     if (!param._ImportColumnsJson.DosIsNullOrWhiteSpace())
                     {
                         importColumnMappings = JsonConvert.DeserializeObject<List<ExcelImportColumnParam>>(
                             param._ImportColumnsJson) ?? new List<ExcelImportColumnParam>();
                     }
-                    var fileDataList = new NPOIHelper(fileByte).ExcelToListDynamic(
-                        param._ImportSheetIndex ?? 0,
-                        MaxImportExcelDataRows,
-                        MaxImportExcelColumns,
-                        param._ImportHeaderStartRow,
-                        param._ImportHeaderEndRow,
-                        param._ImportDataStartRow,
-                        param._ImportDataEndRow,
-                        importColumnMappings);
+                    List<dynamic> fileDataList;
+                    CsvImportHelper.CsvImportResult csvImportResult = null;
+                    if (fileSuffix == ".csv")
+                    {
+                        csvImportResult = CsvImportHelper.CsvToListDynamic(
+                            fileByte,
+                            MaxImportExcelDataRows,
+                            MaxImportExcelColumns,
+                            param._ImportHeaderStartRow,
+                            param._ImportHeaderEndRow,
+                            param._ImportDataStartRow,
+                            param._ImportDataEndRow,
+                            importColumnMappings,
+                            null,
+                            null);
+                        string expectedEncoding = (param._ImportEncoding ?? "").Trim();
+                        if (expectedEncoding.Equals("GB18030", StringComparison.OrdinalIgnoreCase)) expectedEncoding = "GBK";
+                        if (!expectedEncoding.DosIsNullOrWhiteSpace()
+                            && !expectedEncoding.Equals(csvImportResult.Encoding, StringComparison.OrdinalIgnoreCase))
+                        {
+                            throw new ArgumentException($"CSV 编码复核不一致：前端识别为{expectedEncoding}，服务端识别为{csvImportResult.Encoding}。");
+                        }
+                        string expectedDelimiter = param._ImportDelimiter == "\t" ? "\\t" : (param._ImportDelimiter ?? "");
+                        if (!expectedDelimiter.DosIsNullOrWhiteSpace()
+                            && !expectedDelimiter.Equals(csvImportResult.Delimiter, StringComparison.Ordinal))
+                        {
+                            throw new ArgumentException("CSV 分隔符复核不一致，请重新上传后确认预览。");
+                        }
+                        fileDataList = csvImportResult.Rows;
+                    }
+                    else
+                    {
+                        fileDataList = new NPOIHelper(fileByte).ExcelToListDynamic(
+                            param._ImportSheetIndex ?? 0,
+                            MaxImportExcelDataRows,
+                            MaxImportExcelColumns,
+                            param._ImportHeaderStartRow,
+                            param._ImportHeaderEndRow,
+                            param._ImportDataStartRow,
+                            param._ImportDataEndRow,
+                            importColumnMappings);
+                    }
                     if (param._ImportHeaderStartRow.HasValue || importColumnMappings.Any())
                     {
-                        importStepList.Add(
-                            $"{DateTime.Now.ToString(dateTimeFormat)}：已按确认范围解析：Sheet第【{(param._ImportSheetIndex ?? 0) + 1}】张，"
+                        var sourceDescription = csvImportResult == null
+                            ? $"Sheet第【{(param._ImportSheetIndex ?? 0) + 1}】张"
+                            : $"CSV 编码【{csvImportResult.Encoding}】、分隔符【{csvImportResult.Delimiter}】";
+                        importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已按确认范围解析：{sourceDescription}，"
                             + $"表头【{param._ImportHeaderStartRow ?? 1}-{param._ImportHeaderEndRow ?? param._ImportHeaderStartRow ?? 1}】行，"
                             + $"数据从第【{param._ImportDataStartRow ?? (param._ImportHeaderEndRow ?? 1) + 1}】行开始，"
                             + $"映射【{importColumnMappings.Count}】列。");
@@ -2060,233 +2394,150 @@ namespace Microi.net
                     ImportAutoFillChildFkByParentCode(fileDataList, importFieldList, guanlianField, diyTableModel, dbSession, dbInfo, osClientModel, importStepList, dateTimeFormat);
                     await diyCacheBase.SetAsync(stepSign, importStepList);
 
-                    //取唯一字段
-                    var uniqueFieldList = importFieldList.Where(d => d["Unique"].Val<int>() == 1).ToList();
-
-                    var tIndex1 = 0;
-                    var tUptIndex1 = 0;
-                    var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(diyTableModel.Name, osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
-                    using (var trans = dbSession.BeginTransaction())
-                    {
-                        var count2 = 0;
-
-                        importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已导入【0】条数据...");
-                        await diyCacheBase.SetAsync(stepSign, importStepList);
-
-                        foreach (var item in fileDataList)
-                        {
-                            IDictionary<string, object> itemEObj = ImportGetRowDictionary((object)item);
-                            if (itemEObj == null)
-                            {
-                                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：第【{tIndex1 + 1}】行不是可识别的Excel数据，已跳过。");
-                                continue;
-                            }
-
-                            var itemEObjKeys = itemEObj.Select(d => d.Key).ToList();
-                            bool? isHaveUnique = false;
-                            var uniqueField = "";
-                            var uniqueFieldLabel = "";
-                            var uniqueFieldValue = "";
-                            var uniqueFieldLabelAll = new List<UniqueFieldModel>();
-
-                            foreach (var field in uniqueFieldList)
-                            {
-                                object valueObj;
-                                if (ImportTryGetFieldValue(itemEObj, null, field, out valueObj))
-                                {
-                                    isHaveUnique = true;
-                                    var value = ImportNormalizeValue(valueObj, field);
-                                    var uniqueType = ImportGetUniqueType(field);
-                                    if (string.Equals(uniqueType, "All", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        uniqueFieldLabelAll.Add(new UniqueFieldModel()
-                                        {
-                                            Name = field["Name"].Val<string>(),
-                                            Label = field["Label"].Val<string>(),
-                                            Value = value
-                                        });
-                                    }
-                                    else
-                                    {
-                                        uniqueField = field["Name"].Val<string>();
-                                        uniqueFieldLabel = field["Label"].Val<string>();
-                                        uniqueFieldValue = value;
-                                    }
-                                }
-                            }
-                            if (isHaveUnique != true)
-                            {
-                                isHaveUnique = false;
-                            }
-
-                            if (!uniqueField.DosIsNullOrWhiteSpace() && uniqueFieldValue.DosIsNullOrWhiteSpace())
-                            {
-                                isHaveUnique = false;
-                            }
-                            if (uniqueFieldLabelAll.Any(d => d.Value.DosIsNullOrWhiteSpace()))
-                            {
-                                uniqueFieldLabelAll.Clear();
-                                if (uniqueField.DosIsNullOrWhiteSpace())
-                                {
-                                    isHaveUnique = false;
-                                }
-                            }
-
-
-                            //判断是否存在，如果存在才执行下面的这些，不存在的话还是走新增
-                            var isHaveTheData = 0;
-                            if (
-                                (isHaveUnique.Value && !uniqueField.DosIsNullOrWhiteSpace())
-                                || (uniqueFieldLabelAll.Any())
-                            )
-                            {
-                                var haveDataSql = $@"SELECT COUNT(Id) FROM {sqlTableName}
-                                                            WHERE IsDeleted = 0 ";
-
-                                if (isHaveUnique.Value && !uniqueField.DosIsNullOrWhiteSpace())
-                                {
-                                    //{(dbInfo.DbType == "SqlServer" ? "TOP 1" : "")} 
-                                    var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueField);
-                                    var uniqueFieldModel = uniqueFieldList.FirstOrDefault(d => d["Name"].Val<string>() == uniqueField);
-                                    haveDataSql += $" AND {sqlFieldName}={ImportBuildSqlValue(uniqueFieldValue, uniqueFieldModel)} ";
-                                }
-
-                                if (uniqueFieldLabelAll.Any())
-                                {
-                                    foreach (var uniqueFieldItem in uniqueFieldLabelAll)
-                                    {
-                                        var uniqueFieldModel = uniqueFieldList.FirstOrDefault(d => d["Name"].Val<string>() == uniqueFieldItem.Name);
-                                        var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueFieldItem.Name);
-                                        haveDataSql += $" AND {sqlFieldName}={ImportBuildSqlValue(uniqueFieldItem.Value, uniqueFieldModel)} ";
-                                    }
-                                }
-
-                                //if (dbInfo.DbType == "MySql")
-                                //{
-                                //    haveDataSql += " LIMIT 1";
-                                //}
-                                sqlLog.Add(haveDataSql);
-                                lastSqlLog = haveDataSql;
-                                isHaveTheData = dbSession.FromSql(haveDataSql).ToScalar<int>();
-                            }
-
-                            //如果存在唯一字段，并且要导入的数据中确实有唯一字段， 并且已经存在这条数据了
-                            if (uniqueFieldList.Any()
-                                && isHaveUnique != null
-                                && isHaveUnique.Value
-                                && isHaveTheData > 0
-                                )
-                            {
-                                var colsSetBuilder = new System.Text.StringBuilder();
-
-                                foreach (var colModel in importFieldList)
-                                {
-                                    object valueObj;
-                                    if (ImportTryGetFieldValue(itemEObj, guanlianField, colModel, out valueObj) && colModel["Name"].Val<string>() != uniqueField)
-                                    {
-                                        //只有超级管理员才有权限导入Tenant数据
-                                        if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true && colModel["Name"].Val<string>() == "TenantId")
-                                        {
-                                            continue;
-                                        }
-                                        var joinVal = ImportBuildSqlValue(valueObj, colModel);
-                                        var sqlFieldName2 = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(colModel["Name"].Val<string>());
-                                        colsSetBuilder.Append($"{sqlFieldName2}={joinVal},");
-                                    }
-                                }
-
-                                var colsSet = colsSetBuilder.ToString().TrimEnd(',');
-                                if (colsSet.DosIsNullOrWhiteSpace())
-                                {
-                                    tIndex1++;
-                                    importStepList[importStepList.Count - 1] = $"{DateTime.Now.ToString(dateTimeFormat)}：已导入【{tIndex1}】条数据！";
-                                    await diyCacheBase.SetAsync(stepSign, importStepList);
-                                    continue;
-                                }
-
-                                //在客户数据库修改数据
-                                var uptSql = $@"UPDATE {sqlTableName} SET {colsSet} WHERE IsDeleted = 0   ";
-
-                                if (!uniqueField.DosIsNullOrWhiteSpace())
-                                {
-                                    var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueField);
-                                    var uniqueFieldModel = uniqueFieldList.FirstOrDefault(d => d["Name"].Val<string>() == uniqueField);
-                                    uptSql += $" AND {sqlFieldName} = {ImportBuildSqlValue(uniqueFieldValue, uniqueFieldModel)} ";
-                                }
-                                if (uniqueFieldLabelAll.Any())
-                                {
-                                    foreach (var uniqueFieldItem in uniqueFieldLabelAll)
-                                    {
-                                        var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(uniqueFieldItem.Name);
-
-                                        var uniqueFieldModel = uniqueFieldList.FirstOrDefault(d => d["Name"].Val<string>() == uniqueFieldItem.Name);
-                                        uptSql += $" AND {sqlFieldName} = {ImportBuildSqlValue(uniqueFieldItem.Value, uniqueFieldModel)} ";
-                                    }
-                                }
-                                sqlLog.Add(uptSql);
-                                lastSqlLog = uptSql;
-                                count2 += trans.FromSql(uptSql).ExecuteNonQuery();
-                                tUptIndex1++;
-                            }
-                            else
-                            {
-                                var keyValues = new Dictionary<string, object>();
-                                var colNamesBuilder = new System.Text.StringBuilder();
-                                var colValuesBuilder = new System.Text.StringBuilder();
-
-                                foreach (var colModel in importFieldList)
-                                {
-                                    object value;
-                                    if (ImportTryGetFieldValue(itemEObj, guanlianField, colModel, out value))
-                                    {
-                                        //只有超级管理员才有权限导入Tenant数据
-                                        if (param._CurrentUser?["_IsAdmin"].Val<bool>() != true && colModel["Name"].Val<string>() == "TenantId")
-                                        {
-                                            continue;
-                                        }
-                                        colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName(colModel["Name"].Val<string>())).Append(',');
-                                        colValuesBuilder.Append(ImportBuildSqlValue(value, colModel)).Append(',');
-
-                                        keyValues.Add(colModel["Name"].Val<string>(), value);
-                                    }
-                                }
-                                if (param._CurrentUser != null
-                                    && !keyValues.Any(d => d.Key == "TenantId") 
-                                    && !param._CurrentUser["TenantId"].Val<string>().DosIsNullOrWhiteSpace())
-                                {
-                                    colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName("TenantId")).Append(',');
-                                    colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName("TenantName")).Append(',');
-                                    colValuesBuilder.Append($"'{ImportEscapeSql(param._CurrentUser?["TenantId"].Val<string>())}','{ImportEscapeSql(param._CurrentUser?["TenantName"].Val<string>())}',");
-                                }
-                                var colNames = colNamesBuilder.ToString();
-                                var colValues = colValuesBuilder.ToString();
-                                if (colNames.TrimEnd(',').DosIsNullOrWhiteSpace())
-                                {
-                                    throw new Exception($"第【{tIndex1 + 1}】行未匹配到可导入字段，请检查Excel表头。表头：{string.Join(",", itemEObjKeys)}");
-                                }
-
-
-                                //在客户数据库中插入数据
-                                var insertSql = $@"INSERT INTO {sqlTableName} (Id,CreateTime,UpdateTime,UserId,IsDeleted,{colNames.TrimEnd(',')}) 
-                                                    VALUES ('{Ulid.NewUlid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{ImportEscapeSql(param._CurrentUser?["Id"].Val<string>())}',0,{colValues.TrimEnd(',')})";
-                                sqlLog.Add(insertSql);
-                                lastSqlLog = insertSql;
-                                count2 += trans.FromSql(insertSql).ExecuteNonQuery();
-                            }
-                            tIndex1++;
-                            importStepList[importStepList.Count - 1] = $"{DateTime.Now.ToString(dateTimeFormat)}：已导入【{tIndex1}】条数据！";
-                            await diyCacheBase.SetAsync(stepSign, importStepList);
-                        }
-                        trans.Commit();
-                    }
-                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：成功导入【{tIndex1}】条数据！");
-                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：其中【{tUptIndex1}】条数据为修改！");
-                    UserBehaviorAudit.Track(param, "Data", "DataImport", "导入数据", "Table", param.TableId,
-                        $"向表[{diyTableModel?.Name}/{param.TableId}]导入了[{tIndex1}]条数据，其中修改[{tUptIndex1}]条、新增[{tIndex1 - tUptIndex1}]条",
-                        new { TableId = param.TableId, Table = diyTableModel?.Name, Count = tIndex1, Updated = tUptIndex1, Added = tIndex1 - tUptIndex1 });
+                    // 唯一规则只能由服务端字段元数据计算，前端 _ImportMetaJson 中的规则仅用于提示。
+                    var uniqueRules = ImportBuildUniqueRules(fieldList);
+                    var uniqueRuleDescription = ImportDescribeUniqueRules(uniqueRules);
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：错误处理策略：【{importErrorPolicy}】。");
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：重复数据判断：【{uniqueRuleDescription}】。任一规则命中同一记录则修改，均未命中则新增。");
                     await diyCacheBase.SetAsync(stepSign, importStepList);
 
-                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已全部成功结束！线程关闭。");
+                    var sqlTableName = MicroiEngine.ORM(dbInfo.DbType).GetTableName(
+                        diyTableModel.Name,
+                        osClientModel.OsClientModel["DbOracleTableSpace"].Val<string>());
+                    var progressIndex = importStepList.Count;
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已处理【0/{fileDataList.Count}】条，成功【0】条，失败【0】条...");
+                    await diyCacheBase.SetAsync(stepSign, importStepList);
+
+                    if (importErrorPolicy == ImportErrorPolicyRollbackAll)
+                    {
+                        using (var trans = dbSession.BeginTransaction())
+                        {
+                            try
+                            {
+                                for (var sourceIndex = 0; sourceIndex < fileDataList.Count; sourceIndex++)
+                                {
+                                    var itemEObj = ImportGetRowDictionary((object)fileDataList[sourceIndex]);
+                                    var excelRow = ImportGetExcelRowNumber(itemEObj, sourceIndex, param);
+                                    if (itemEObj == null)
+                                    {
+                                        throw new Exception($"Excel 第【{excelRow}】行不是可识别的数据对象。");
+                                    }
+                                    ImportRowWriteResult rowResult;
+                                    try
+                                    {
+                                        rowResult = ImportWriteRow(
+                                            itemEObj, excelRow, guanlianField, importFieldList, uniqueRules,
+                                            sqlTableName, trans, dbInfo, param, sqlLog);
+                                    }
+                                    catch (Exception rowEx)
+                                    {
+                                        throw new Exception($"Excel 第【{excelRow}】行导入失败：{rowEx.Message}", rowEx);
+                                    }
+                                    lastSqlLog = rowResult.LastSql ?? lastSqlLog;
+                                    successCount++;
+                                    if (rowResult.Updated) updatedCount++;
+                                    importStepList[progressIndex] = $"{DateTime.Now.ToString(dateTimeFormat)}：已处理【{sourceIndex + 1}/{fileDataList.Count}】条，成功【{successCount}】条，失败【0】条...";
+                                    await diyCacheBase.SetAsync(stepSign, importStepList);
+                                }
+                                trans.Commit();
+                            }
+                            catch (Exception ex)
+                            {
+                                if (!trans.IsCommitOrRollback)
+                                {
+                                    try { trans.Rollback(); }
+                                    catch (Exception rollbackEx)
+                                    {
+                                        throw new AggregateException("导入失败且数据库回滚也发生异常。", ex, rollbackEx);
+                                    }
+                                }
+                                var rolledBackCount = successCount;
+                                successCount = 0;
+                                updatedCount = 0;
+                                failedCount = 1;
+                                throw new Exception($"本次选择了“任一行失败则全部回滚”；已回滚此前处理的【{rolledBackCount}】条数据。{ex.Message}", ex);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (var sourceIndex = 0; sourceIndex < fileDataList.Count; sourceIndex++)
+                        {
+                            var itemEObj = ImportGetRowDictionary((object)fileDataList[sourceIndex]);
+                            var excelRow = ImportGetExcelRowNumber(itemEObj, sourceIndex, param);
+                            using (var trans = dbSession.BeginTransaction())
+                            {
+                                try
+                                {
+                                    if (itemEObj == null)
+                                    {
+                                        throw new Exception("该行不是可识别的数据对象。");
+                                    }
+                                    var rowResult = ImportWriteRow(
+                                        itemEObj, excelRow, guanlianField, importFieldList, uniqueRules,
+                                        sqlTableName, trans, dbInfo, param, sqlLog);
+                                    lastSqlLog = rowResult.LastSql ?? lastSqlLog;
+                                    trans.Commit();
+                                    successCount++;
+                                    if (rowResult.Updated) updatedCount++;
+                                }
+                                catch (Exception rowEx)
+                                {
+                                    var rollbackError = "";
+                                    if (!trans.IsCommitOrRollback)
+                                    {
+                                        try { trans.Rollback(); }
+                                        catch (Exception rollbackEx)
+                                        {
+                                            throw new AggregateException(
+                                                $"Excel 第【{excelRow}】行失败且该行事务回滚异常，无法安全继续。",
+                                                rowEx,
+                                                rollbackEx);
+                                        }
+                                    }
+                                    failedCount++;
+                                    if (failedCount <= MaxImportErrorDetails)
+                                    {
+                                        importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：Excel 第【{excelRow}】行失败，已跳过：{rowEx.Message}{rollbackError}");
+                                        MicroiEngine.QueueSystemLog(
+                                            param.OsClient,
+                                            "Office",
+                                            "DataImportRowFailed",
+                                            "Excel 数据导入行失败并跳过",
+                                            $"ExcelRow={excelRow}; Error={rowEx}",
+                                            2,
+                                            false,
+                                            param.TableId);
+                                    }
+                                }
+                            }
+                            importStepList[progressIndex] = $"{DateTime.Now.ToString(dateTimeFormat)}：已处理【{sourceIndex + 1}/{fileDataList.Count}】条，成功【{successCount}】条，失败【{failedCount}】条...";
+                            await diyCacheBase.SetAsync(stepSign, importStepList);
+                        }
+                        if (failedCount > MaxImportErrorDetails)
+                        {
+                            importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：另有【{failedCount - MaxImportErrorDetails}】条错误未逐条展示，完整数量已计入失败统计。");
+                        }
+                    }
+
+                    var addedCount = successCount - updatedCount;
+                    importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：导入完成：成功【{successCount}】条（新增【{addedCount}】、修改【{updatedCount}】），失败【{failedCount}】条。");
+                    importStepList.Add(importErrorPolicy == ImportErrorPolicyContinueOnError && failedCount > 0
+                        ? $"{DateTime.Now.ToString(dateTimeFormat)}：已按用户选择跳过错误行，其余成功行均已提交。"
+                        : $"{DateTime.Now.ToString(dateTimeFormat)}：已全部成功结束！线程关闭。");
+                    UserBehaviorAudit.Track(param, "Data", "DataImport", "导入数据", "Table", param.TableId,
+                        $"向表[{diyTableModel?.Name}/{param.TableId}]导入完成，策略[{importErrorPolicy}]，成功[{successCount}]、新增[{addedCount}]、修改[{updatedCount}]、失败[{failedCount}]",
+                        new
+                        {
+                            TableId = param.TableId,
+                            Table = diyTableModel?.Name,
+                            ErrorPolicy = importErrorPolicy,
+                            Count = successCount,
+                            Updated = updatedCount,
+                            Added = addedCount,
+                            Failed = failedCount,
+                            UniqueRules = uniqueRuleDescription
+                        });
                     await diyCacheBase.SetAsync(stepSign, importStepList);
                     await diyCacheBase.SetAsync(startSign, "0");
                 }
@@ -2294,7 +2545,16 @@ namespace Microi.net
                 {
                     UserBehaviorAudit.Track(param, "Data", "DataImport", "导入数据", "Table", param.TableId,
                         $"向表[{diyTableModel?.Name}/{param.TableId}]导入数据失败",
-                        new { TableId = param.TableId, Table = diyTableModel?.Name, Error = ex.Message }, false);
+                        new
+                        {
+                            TableId = param.TableId,
+                            Table = diyTableModel?.Name,
+                            ErrorPolicy = importErrorPolicy,
+                            Success = successCount,
+                            Updated = updatedCount,
+                            Failed = failedCount,
+                            Error = ex.Message
+                        }, false);
                     await diyCacheBase.SetAsync(startSign, "0");
                     MicroiEngine.QueueSystemLog(param.OsClient, "Office", "DataImportFailed", "Excel 数据导入失败", ex.ToString(), 2, false, param.TableId);
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");

@@ -30,6 +30,11 @@ const readablePackageNames = {
   'app.microi.store.json': '应用商城',
 };
 
+const platformServicePackageNames = new Set([
+  'app.microi.saas-engine.json',
+  'app.microi.store.json',
+]);
+
 export function normalizeText(content) {
   return `${String(content ?? '').replace(/\r\n?/g, '\n').replace(/\n*$/g, '')}\n`;
 }
@@ -38,6 +43,45 @@ export function canonicalizeResource(name, content) {
   const normalized = normalizeText(content);
   if (!name.endsWith('.json')) return normalized;
   return `${JSON.stringify(JSON.parse(normalized), null, 2)}\n`;
+}
+
+function stableJsonValue(value) {
+  if (Array.isArray(value)) return value.map(stableJsonValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map(key => [key, stableJsonValue(value[key])]),
+  );
+}
+
+function getRequiredPlatformServiceBundle(name, content) {
+  if (!platformServicePackageNames.has(name)) {
+    throw new Error(`不允许检查非平台内置微服务应用包：${name}`);
+  }
+  let packageModel;
+  try {
+    packageModel = JSON.parse(canonicalizeResource(name, content));
+  } catch (error) {
+    throw new Error(`${name} 不是有效 JSON，无法判断平台内置微服务是否变化`, { cause: error });
+  }
+  const bundles = Array.isArray(packageModel?.ApplicationBundles)
+    ? packageModel.ApplicationBundles
+    : [];
+  const matches = bundles.filter(bundle => {
+    const application = bundle?.Application || {};
+    return String(application.AppKey || application.AppId || '').trim() === 'microi-platform-service';
+  });
+  if (matches.length !== 1) {
+    throw new Error(`${name} 必须且只能包含一个 microi-platform-service 应用包，当前 ${matches.length} 个`);
+  }
+  return matches[0];
+}
+
+export function hasPlatformServiceBundleChanged(name, remoteContent, candidateContent) {
+  const remoteBundle = getRequiredPlatformServiceBundle(name, remoteContent);
+  const candidateBundle = getRequiredPlatformServiceBundle(name, candidateContent);
+  return JSON.stringify(stableJsonValue(remoteBundle)) !== JSON.stringify(stableJsonValue(candidateBundle));
 }
 
 export function normalizeOfficialPackageExecutionLimits(name, content, recursionCeiling = 5000) {

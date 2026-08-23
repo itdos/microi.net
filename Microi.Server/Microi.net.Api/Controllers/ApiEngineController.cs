@@ -653,6 +653,7 @@ namespace Microi.net.Api
             ApplyRouteOsClient(param, osClient);
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
             param["ApiAddress"] = apiPath;
+            SystemObservabilityService.AnnotateApiEngine(HttpContext, param["ApiEngineKey"].Val<string>(), param["OsClient"].Val<string>());
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             dynamic? result = await MicroiEngine.ApiEngine.RunAsync(param);
@@ -712,6 +713,7 @@ namespace Microi.net.Api
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
 
             param["ApiAddress"] = apiPath;
+            SystemObservabilityService.AnnotateApiEngine(HttpContext, param["ApiEngineKey"].Val<string>(), param["OsClient"].Val<string>());
             //param.ApiAddress = HttpContext.Request.Path.Value;
 
             #region 接口引擎接收文件，将文件流转为byte[]，再转为string
@@ -771,6 +773,7 @@ namespace Microi.net.Api
 
             param["ApiAddress"] = apiPath;
 
+            SystemObservabilityService.AnnotateApiEngine(HttpContext, param["ApiEngineKey"].Val<string>(), param["OsClient"].Val<string>());
             #region 接口引擎接收文件，将文件流转为byte[]，再转为string
 
             //get请求无法访问到 HttpContext.Request.Form
@@ -846,6 +849,7 @@ namespace Microi.net.Api
 
             param["ApiAddress"] = apiPath;
 
+            SystemObservabilityService.AnnotateApiEngine(HttpContext, param["ApiEngineKey"].Val<string>(), param["OsClient"].Val<string>());
             #region 接口引擎接收文件，将文件流转为byte[]，再转为string
 
             //get请求无法访问到 HttpContext.Request.Form
@@ -963,6 +967,7 @@ namespace Microi.net.Api
 
             param["ApiAddress"] = apiPath;
 
+            SystemObservabilityService.AnnotateApiEngine(HttpContext, param["ApiEngineKey"].Val<string>(), param["OsClient"].Val<string>());
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);

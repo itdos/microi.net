@@ -52,39 +52,16 @@ namespace Microi.net
             if (permission.Code != 1) return permission;
             try
             {
+                // CHILD_TENANT_DIRECTORY_DISCOVERY_ONLY_V1：目录发现只读取主租户的
+                // 权威 sys_osclients 快照。运行时挂载和商城工作器自愈必须在逐租户
+                // QueueTarget 中独立执行，禁止一个陈旧租户缓存拖垮整批目录读取。
                 var targets = SnapshotEligibleChildTenants();
-                var recoveredTargets = new List<string>();
-                foreach (var target in targets)
-                {
-                    // CHILD_TENANT_MONITOR_BOOTSTRAP_RECOVERY_V1：已投递的父任务在平台
-                    // 升级后仍会继续调用 GetTargets。每个进程/运行域只为每个目标做一次
-                    // 前置能力和官方工作器刷新，让旧批次也能获得最新的可恢复导入器。
-                    var recovery = EnsureMonitorBootstrapRecovery(
-                        context.OwnerOsClient,
-                        target.OsClient,
-                        context.TrustedCurrentUser);
-                    if (recovery.Code != 1)
-                    {
-                        return new DosResult(0, new
-                        {
-                            TargetOsClient = target.OsClient,
-                            TargetName = target.Name,
-                            Recovery = recovery.Data
-                        }, $"子租户【{target.Name}（{target.OsClient}）】后台任务维护能力恢复失败：{recovery.Msg}");
-                    }
-                    if (recovery.Data is JObject recoveryData
-                        && recoveryData["Recovered"]?.Value<bool>() == true)
-                    {
-                        recoveredTargets.Add(target.OsClient);
-                    }
-                }
                 return new DosResult(1, new
                 {
                     RuntimeMainOsClient = context.OwnerOsClient,
                     RuntimeOsClientType = OsClientDefault.OsClientType ?? string.Empty,
                     RuntimeOsClientNetwork = OsClientDefault.OsClientNetwork ?? string.Empty,
                     Count = targets.Count,
-                    RecoveredTargets = recoveredTargets,
                     Targets = targets.Select(item => new
                     {
                         item.OsClient,
@@ -113,10 +90,12 @@ namespace Microi.net
                 if (target == null)
                     return new DosResult(0, null, "目标租户不属于当前运行环境、未启用或已经不是子租户。");
 
-                // Resolve the runtime object now so a catalog row that cannot be
-                // mounted on this node fails before a misleading task is queued.
-                if (OsClientExtend.GetClient(target.OsClient) == null)
-                    return new DosResult(0, null, "目标租户运行配置尚未加载。");
+                // CHILD_TENANT_RUNTIME_RELOAD_RECOVERY_V1：sys_osclients 是目录事实源；
+                // 节点运行时缓存缺失时先从已提交配置重载一次，再决定该租户是否失败。
+                // 失败只归属于当前目标，不能让其它已启用子租户无法投递。
+                var targetClient = ResolveTargetClientWithReload(target.OsClient, out var runtimeReloaded);
+                if (targetClient?.Db == null)
+                    return new DosResult(0, null, "目标租户数据库连接不可用。");
 
                 // 平台应用维护本身依赖生成实体物理列和两个商城工作接口。老空库
                 // 可能恰好缺少这些资源，不能要求它先成功安装商城来获得安装器。
@@ -149,6 +128,8 @@ namespace Microi.net
                     {
                         ["IdempotencyKey"] =
                             $"child-platform-apps:{context.TaskId}:{target.OsClient}".ToLowerInvariant(),
+                        // 子租户可能共享同一物理数据库；商城安装包含 DDL，必须继续使用
+                        // 固定工作器键在整个运行环境内串行，避免跨租户结构更新死锁。
                         ["ConcurrencyKey"] = ChildWorkerApiEngineKey,
                         // The installer advances through durable, idempotent shards. A
                         // bounded retry budget must cover both transient database
@@ -183,7 +164,8 @@ namespace Microi.net
                     task.StatusText,
                     TargetOsClient = target.OsClient,
                     TargetName = target.Name,
-                    Bootstrap = bootstrap.Data
+                    Bootstrap = bootstrap.Data,
+                    RuntimeReloaded = runtimeReloaded
                 }, $"子租户【{target.Name}】的平台应用维护任务已进入主租户后台任务中心。");
             }
             catch (Exception ex)
@@ -277,12 +259,53 @@ namespace Microi.net
             return result.OrderBy(item => item.OsClient, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
+        private static OsClientSecret ResolveTargetClientWithReload(
+            string targetOsClient,
+            out bool runtimeReloaded)
+        {
+            runtimeReloaded = false;
+            Exception initialLookupError = null;
+            try
+            {
+                var existing = OsClientExtend.GetClient(targetOsClient);
+                if (existing != null) return existing;
+            }
+            catch (Exception ex)
+            {
+                initialLookupError = ex;
+            }
+
+            var reload = MicroiEngine.V8Method.ReloadOsClient(targetOsClient);
+            if (reload == null || reload.Code != 1)
+            {
+                throw new InvalidOperationException(
+                    $"租户 {targetOsClient} 未加载，且从 sys_osclients 重新加载失败："
+                    + (reload?.Msg ?? initialLookupError?.Message ?? "服务无返回"),
+                    initialLookupError);
+            }
+
+            try
+            {
+                var refreshed = OsClientExtend.GetClient(targetOsClient);
+                if (refreshed == null)
+                    throw new InvalidOperationException("重载返回成功但运行时仍未注册该租户。");
+                runtimeReloaded = true;
+                return refreshed;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    $"租户 {targetOsClient} 从 sys_osclients 重新加载后仍不可用：{ex.Message}",
+                    ex);
+            }
+        }
+
         private static DosResult EnsureTargetBootstrap(
             string ownerOsClient,
             string targetOsClient,
             JObject trustedCurrentUser)
         {
-            var targetClient = OsClientExtend.GetClient(targetOsClient);
+            var targetClient = ResolveTargetClientWithReload(targetOsClient, out _);
             if (targetClient?.Db == null)
                 return new DosResult(0, null, "目标租户数据库连接不可用。");
 
@@ -355,7 +378,7 @@ namespace Microi.net
                 var bootstrap = EnsureTargetBootstrap(ownerOsClient, targetOsClient, trustedCurrentUser);
                 if (bootstrap.Code != 1) return bootstrap;
 
-                var targetClient = OsClientExtend.GetClient(targetOsClient);
+                var targetClient = ResolveTargetClientWithReload(targetOsClient, out _);
                 if (targetClient?.Db == null)
                     return new DosResult(0, null, "目标租户数据库连接不可用。");
                 var targetColumns = GetPhysicalColumns(targetClient, "sys_apiengine");
@@ -436,7 +459,7 @@ namespace Microi.net
             JObject trustedCurrentUser)
         {
             var ownerClient = OsClientExtend.GetClient(ownerOsClient);
-            var targetClient = OsClientExtend.GetClient(targetOsClient);
+            var targetClient = ResolveTargetClientWithReload(targetOsClient, out _);
             if (ownerClient?.Db == null || targetClient?.Db == null)
                 return new DosResult(0, null, "商城工作接口来源或目标数据库连接不可用。");
 

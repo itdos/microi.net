@@ -69,6 +69,7 @@ const aiClient = read('src/pages/ai/utils/mci-ai.js');
 const messageChat = read('src/pages/message/chat.vue');
 const loginPage = read('src/pages/login/index.vue');
 const sysConfig = read('src/utils/sysconfig.js');
+const featureFlags = read('src/utils/feature-flags.js');
 
 assert(request.includes('function uniRequestAdapter'), 'request.js must define an explicit uni.request adapter.');
 assert(request.includes('requestAdapter: uniRequestAdapter'), 'Configured Microi V8 instance must use the uni.request adapter.');
@@ -88,7 +89,10 @@ assert(visualAuthPrompt.includes('message-login.png'), 'Visual screenshot check 
 assert(aiClient.includes("MCI_AI_ENGINE_KEY = 'mci_ai_data_assistant'"), 'AI client must use the canonical mci_ai_data_assistant engine key.');
 assert(!aiLauncher.includes('getToken') && aiLauncher.includes("url: '/pages/ai/index'"), 'The enabled AI launcher must open the dedicated route without an auth request.');
 assert(aiLauncher.includes('isFallbackLauncher') && aiLauncher.includes('getAiAssistantEnabled'), 'The fixed AI launcher visibility must be controlled by the server-side system setting.');
-assert(sysConfig.includes('IsShowAiAssistant') && sysConfig.includes('enabled: false') && sysConfig.includes('getSysConfig({ refresh: true })'), 'AI feature flag must default closed and refresh from Sys_Config.');
+assert(featureFlags.includes('DisableAiAssistant') && !featureFlags.includes('IsShowAiAssistant') && sysConfig.includes('enabled: true') && sysConfig.includes('getSysConfig({ refresh: true })'), 'AI assistant visibility must use only the negative DisableAiAssistant switch and default open.');
+assert(app.includes('mciAiAssistantEnabled: true') && aiLauncher.includes('aiAssistantEnabled: true') && customTabBarJs.includes('aiAssistantEnabled: true'), 'App, H5, and WeChat tab bars must render the assistant by default until an explicit DisableAiAssistant value hides it.');
+assert(!aiLauncher.includes('appConfig.features') && messagePage.includes('aiAssistantEnabled: true') && messageChat.includes('aiAssistantEnabled: true'), 'Runtime AI visibility must not be overridden by a second profile switch or fail-closed page defaults.');
+assert(pkg.scripts && pkg.scripts['check:ai-assistant-visibility'], 'package.json must expose the AI assistant visibility contract test.');
 assert(sysConfig.includes('IsShowAiModel') && sysConfig.includes('getAiModelEnabled') && sysConfig.includes('aiModelFlagState'), 'AI model selectors must use the fail-closed IsShowAiModel platform flag.');
 assert(pagesConfig.tabBar && pagesConfig.tabBar.custom === true, 'The active profile must use a custom tabBar for the navigation capsule.');
 assert(xjyPagesConfig.tabBar && xjyPagesConfig.tabBar.custom === true, 'The xjy profile must enable the custom tabBar.');

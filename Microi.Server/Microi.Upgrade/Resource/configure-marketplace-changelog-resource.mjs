@@ -491,7 +491,7 @@ function configureSchema(packageModel) {
 
 function updatePackageInfo(packageModel) {
   const info = packageModel.PackageInfo || (packageModel.PackageInfo = {});
-  info.Version = 'v7.5.31';
+  info.Version = 'v7.5.32';
   info.CreateTime = '2026-08-23T12:00:00.000Z';
   info.RequiredPlatformCapabilities = Array.from(new Set([
     ...(info.RequiredPlatformCapabilities || []).filter((capability) => (
@@ -501,19 +501,22 @@ function updatePackageInfo(packageModel) {
     'Schema:MarketplaceChangeLogV1',
     'ApiEngine:get-microi-store-model@v1.2.6',
     'ApiEngine:ai_app_publish_store@v1.8.6',
+    'Importer:ManagedApiEngineFlagPhysicalReconciliation',
+    'Importer:ExistingMenuUrlCollisionRecovery',
   ]));
-  const historyLine = '2026-08-23 v7.5.31 新增应用更新日志子表、商城详情时间线与精确版本发布门禁；所有应用类型发布前必须填写完整更新日志。';
-  const isSupersededChangeLogLine = (line) => (
-    /新增应用更新日志子表、商城详情时间线与精确版本发布门禁/.test(String(line || ''))
-  );
+  const historyLine = '2026-08-23 v7.5.32 导入器在低代码字段元数据落后时参数化补正受管接口开关并二次严格回读；既有菜单 Url 冲突时保留租户当前唯一路由或生成安全后缀。';
+  const previousChangeLogLine =
+    '2026-08-23 v7.5.31 新增应用更新日志子表、商城详情时间线与精确版本发布门禁；所有应用类型发布前必须填写完整更新日志。';
+  const isCurrentHistoryLine = (line) => String(line || '') === historyLine
+    || String(line || '') === previousChangeLogLine;
   const oldHistory = typeof info.ChangeHistory === 'string'
-    ? info.ChangeHistory.split(/\r?\n/).filter((line) => line && !isSupersededChangeLogLine(line))
+    ? info.ChangeHistory.split(/\r?\n/).filter((line) => line && !isCurrentHistoryLine(line))
     : (Array.isArray(info.ChangeHistory)
         ? info.ChangeHistory
-          .filter((item) => !isSupersededChangeLogLine(item?.Description))
+          .filter((item) => !isCurrentHistoryLine(item?.Description))
           .map((item) => [item.Date, item.Version, item.Description].filter(Boolean).join(' '))
         : []);
-  info.ChangeHistory = [historyLine, ...oldHistory].join('\n') + '\n';
+  info.ChangeHistory = [historyLine, previousChangeLogLine, ...oldHistory].join('\n') + '\n';
   info.MenuCount = packageModel.SysMenus.length;
   info.TableCount = packageModel.DiyTables.length;
   info.FieldCount = packageModel.DiyFields.length;
@@ -539,6 +542,17 @@ async function main() {
   configureMenu(packageModel);
   configureParentForm(packageModel);
   configureSchema(packageModel);
+  const importer = (packageModel.SysApiEngines || []).find(
+    (item) => item.ApiEngineKey === 'import-microi-store-package',
+  );
+  assert(importer, '应用商城包缺少统一应用导入器');
+  const importerHistoryLine =
+    '2026-08-23 20:10:00 v2.3.4 受管接口开关物理补正后二次严格回读；既有菜单 Url 冲突安全重试';
+  importer.ChangeHistory = [
+    importerHistoryLine,
+    ...String(importer.ChangeHistory || '').split(/\r?\n/)
+      .filter((line) => line && line !== importerHistoryLine),
+  ].join('\n') + '\n';
   packageModel.ResourcePolicies ||= {};
   packageModel.ResourcePolicies.ApiEngines ||= {};
   packageModel.ResourcePolicies.ApiEngines['get-microi-store-model'] = {

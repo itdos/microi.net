@@ -1480,7 +1480,6 @@ html.dark {
 
 .el-dialog.mci-import-dialog {
     width: 80% !important;
-    max-width: 1480px;
     margin: auto !important;
 
     > .el-dialog__header:has(> .el-dialog__title) {
@@ -1578,6 +1577,108 @@ html.dark {
     border-radius: 16px;
     background: var(--mci-dialog-surface, var(--el-bg-color, #fff));
     box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+}
+
+.mci-import-dialog__execution {
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter, #e1e8f0));
+    border-radius: 16px;
+    background: var(--mci-dialog-surface, var(--el-bg-color, #fff));
+}
+
+.mci-import-dialog__execution-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+
+    strong {
+        color: var(--el-text-color-primary, #1f2a3d);
+        font-size: 14px;
+    }
+
+    p {
+        margin: 5px 0 0;
+        color: var(--el-text-color-secondary, #66758a);
+        font-size: 12px;
+        line-height: 1.55;
+    }
+}
+
+.mci-import-dialog__policy-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 12px;
+}
+
+.mci-import-dialog__policy-card {
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--el-border-color, #d8e0ea);
+    border-radius: 12px;
+    background: var(--el-fill-color-extra-light, #f7f9fc);
+    transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
+
+    &.is-active {
+        border-color: var(--el-color-primary, #3478f6);
+        background: color-mix(in srgb, var(--el-color-primary, #3478f6) 7%, var(--mci-dialog-surface, #fff));
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--el-color-primary, #3478f6) 9%, transparent);
+    }
+
+    .el-radio {
+        height: auto;
+        margin-right: 0;
+        font-weight: 700;
+    }
+
+    p {
+        margin: 6px 0 0 24px;
+        color: var(--el-text-color-secondary, #66758a);
+        font-size: 12px;
+        line-height: 1.55;
+    }
+}
+
+.mci-import-dialog__unique-rules {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter, #e1e8f0));
+}
+
+.mci-import-dialog__unique-rules-title {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+
+    strong {
+        color: var(--el-text-color-primary, #1f2a3d);
+        font-size: 13px;
+    }
+
+    span {
+        color: var(--el-text-color-secondary, #66758a);
+        font-size: 12px;
+    }
+}
+
+.mci-import-dialog__unique-rule-list {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    p {
+        flex-basis: 100%;
+        margin: 2px 0 0;
+        color: var(--el-text-color-secondary, #66758a);
+        font-size: 12px;
+        line-height: 1.55;
+    }
 }
 
 .mci-import-dialog__workspace {
@@ -1703,6 +1804,45 @@ html.dark {
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
+    &.is-unmatched {
+        > span,
+        small {
+            color: var(--el-color-danger-dark-2, var(--el-color-danger));
+            color: color-mix(in srgb, var(--el-color-danger) 65%, var(--el-text-color-primary));
+        }
+
+        > span {
+            cursor: help;
+            font-weight: 700;
+            text-decoration: underline dotted;
+            text-underline-offset: 3px;
+        }
+    }
+}
+
+.mci-import-dialog__raw-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.mci-import-dialog__raw-workbook {
+    height: min(52vh, 560px);
+    min-height: 360px;
+    overflow: hidden;
+    border: 1px solid var(--mci-dialog-line, var(--el-border-color-lighter));
+    border-radius: 12px;
+    background: var(--mci-dialog-surface, var(--el-bg-color));
+
+    .vue-office-excel {
+        height: 100%;
+    }
 }
 
 .mci-import-dialog__pagination {
@@ -1798,14 +1938,18 @@ html.dark {
 
     .mci-import-dialog__intro,
     .mci-import-dialog__file-summary,
-    .mci-import-dialog__settings-title {
+    .mci-import-dialog__settings-title,
+    .mci-import-dialog__execution-head {
         align-items: stretch;
         flex-direction: column;
     }
 
     .mci-import-dialog__summary-tags { justify-content: flex-start; }
     .mci-import-dialog__settings-grid { grid-template-columns: 1fr 1fr; }
+    .mci-import-dialog__policy-grid { grid-template-columns: 1fr; }
     .mci-import-dialog__footer-hint { flex-basis: 100%; }
+    .mci-import-dialog__raw-head { align-items: flex-start; flex-direction: column; }
+    .mci-import-dialog__raw-workbook { min-height: 320px; }
 }
 
 @media (max-width: 480px) {

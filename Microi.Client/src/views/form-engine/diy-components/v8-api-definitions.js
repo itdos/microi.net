@@ -628,9 +628,9 @@ export const V8ApiDefinitions = {
                 label: "OpenImportDialog",
                 kind: "Method",
                 documentation:
-                    "打开平台统一 Excel 导入弹层。页面按钮只声明 ApiEngineKey、工作表单元格和列映射；浏览器读取工作簿后把行 JSON 提交为持久化后台接口引擎任务，并在弹层中实时显示进度与结果。后台接口引擎从 V8.Param._ImportRowsJson / _ImportMetaJson 读取数据，并用 V8.Method.UpdateBackgroundTask 上报真实进度。\n\n参数：\n  - ApiEngineKey: 后台接口引擎 Key（必传）\n  - Title/Description/TaskTitle: 弹层和任务文案\n  - Param: 追加给接口引擎的固定参数\n  - Workbook: SheetIndex/SheetName、Cells、Columns、DataStartRow、DataEndRow、KeyField\n  - BackgroundOptions: ConcurrencyKey、MaxAttempts 等后台任务选项\n\n不要在页面 V8 中读取文件 Base64、拼 DOM 或自行轮询。",
+                    "打开平台统一 Excel/CSV 导入弹层。浏览器先自动识别并预览完整工作簿，再由用户选择“任一错误全部回滚”或“跳过错误行继续”。当前表单的单字段唯一、组合唯一规则会明确展示，并随 v2.2 元数据传给后台接口引擎；后台仍必须从权威字段配置重算规则。接口引擎从 V8.Param._ImportRowsJson / _ImportMetaJson / _ImportErrorPolicy / _ImportUniqueRulesJson 读取数据，并用 V8.Method.UpdateBackgroundTask 上报真实进度与新增、修改、失败统计。\n\n参数：\n  - ApiEngineKey: 后台接口引擎 Key（必传）\n  - Title/Description/TaskTitle: 弹层和任务文案\n  - ErrorPolicy: 初始策略 RollbackAll（默认）或 ContinueOnError；用户可在弹层修改\n  - Param: 追加给接口引擎的固定参数\n  - Workbook: SheetIndex/SheetName、Cells、Columns、DataStartRow、DataEndRow、KeyField\n  - BackgroundOptions: ConcurrencyKey、MaxAttempts 等后台任务选项\n\n不要在页面 V8 中读取文件 Base64、拼 DOM 或自行轮询。",
                 insertText: "OpenImportDialog",
-                snippet: 'OpenImportDialog({\n\tTitle: "${1:自定义导入}",\n\tApiEngineKey: "${2:import_api_key}",\n\tWorkbook: {\n\t\tSheetIndex: 0,\n\t\tCells: { ProjectText: "A4" },\n\t\tColumns: [\n\t\t\t{ Name: "LineNo", Column: "A" },\n\t\t\t{ Name: "Specification", Column: "C" }\n\t\t],\n\t\tDataStartRow: ${3:7},\n\t\tDataEndRow: ${4:1000},\n\t\tKeyField: "LineNo"\n\t}\n})'
+                snippet: 'OpenImportDialog({\n\tTitle: "${1:自定义导入}",\n\tApiEngineKey: "${2:import_api_key}",\n\tErrorPolicy: "RollbackAll",\n\tWorkbook: {\n\t\tSheetIndex: 0,\n\t\tCells: { ProjectText: "A4" },\n\t\tColumns: [\n\t\t\t{ Name: "LineNo", Column: "A" },\n\t\t\t{ Name: "Specification", Column: "C" }\n\t\t],\n\t\tDataStartRow: ${3:7},\n\t\tDataEndRow: ${4:1000},\n\t\tKeyField: "LineNo"\n\t}\n})'
             },
 
             // ========== 工具方法 ==========

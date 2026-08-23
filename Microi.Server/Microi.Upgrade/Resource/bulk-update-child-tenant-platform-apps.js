@@ -1,12 +1,14 @@
 /*
  * ApiEngineKey: bulk-update-child-tenant-platform-apps
- * Version: v1.1.5
+ * Version: v1.1.7
  * 主租户编排器：按当前运行环境的 SaaS 目录，为每个启用的子租户创建一个
  * “安装/更新全部平台应用”持久后台任务。租户识别和目标任务投递由可信 C# 原子完成。
  */
 // CHILD_PLATFORM_APP_BOOTSTRAP_V1：投递原子会先补齐目标租户运行时物理前置列及固定商城工作器。
 // CHILD_TASK_TERMINAL_AGGREGATION_V1：父任务持续汇总全部子任务终态，只有全部成功才成功。
 // CHILD_TASK_AGGREGATE_PROGRESS_V1：后台任务 Current/Total 固定为百分比单位，避免排队数量把父任务提前推到 99%。
+// CHILD_TASK_PARTIAL_QUEUE_MONITOR_V1：单个租户投递失败不提前终止，继续监控全部已投递子任务并合并终态。
+// CHILD_TASK_RUNTIME_RELOAD_FALLBACK_V1：兼容尚未升级控制面 C# 的节点，遇到未加载 OsClient 时受控重载后重试。
 function text(value) {
     return value === null || value === undefined ? '' : String(value).trim();
 }
@@ -61,6 +63,30 @@ function continuation(checkpoint, progress, current, total, message, nextDelaySe
     }
     return result;
 }
+function missingRuntimeOsClient(message) {
+    var match = /未找到OsClient[：:]\s*([A-Za-z0-9._-]{1,100})/.exec(text(message));
+    return match ? text(match[1]) : '';
+}
+function discoverTargetsWithRuntimeRecovery(executionParam) {
+    var recovered = {};
+    for (var attempt = 0; attempt < 500; attempt++) {
+        var result = V8.Method.GetChildTenantPlatformAppMaintenanceTargets(executionParam);
+        if (result && result.Code == 1) return result;
+        var missingOsClient = missingRuntimeOsClient(result && result.Msg);
+        var missingKey = missingOsClient.toLowerCase();
+        if (!missingKey || recovered[missingKey] || !V8.Method.ReloadOsClient) return result;
+        recovered[missingKey] = true;
+        var reload = V8.Method.ReloadOsClient(missingOsClient);
+        if (!reload || reload.Code != 1) {
+            return {
+                Code: 0,
+                Msg: '自动重载子租户 ' + missingOsClient + ' 失败：'
+                    + ((reload && reload.Msg) || '服务无返回')
+            };
+        }
+    }
+    return { Code: 0, Msg: '子租户运行时自动重载超过500个安全上限。' };
+}
 
 var currentUser = V8.CurrentUser || {};
 if (!currentUser.Id || toInt(currentUser.Level, 0) < 9999) {
@@ -91,7 +117,7 @@ if (phase == 'Queue') {
         _BackgroundTaskId: taskId,
         _BackgroundTaskFencingToken: fencingToken
     };
-    var targetsResult = V8.Method.GetChildTenantPlatformAppMaintenanceTargets(executionParam);
+    var targetsResult = discoverTargetsWithRuntimeRecovery(executionParam);
     if (!targetsResult || targetsResult.Code != 1) {
         return {
             Code: 0,
@@ -125,6 +151,23 @@ if (phase == 'Queue') {
             _BackgroundTaskFencingToken: fencingToken,
             TargetOsClient: targetOsClient
         });
+        if ((!queued || queued.Code != 1)
+            && missingRuntimeOsClient(queued && queued.Msg)
+            && V8.Method.ReloadOsClient) {
+            var targetReload = V8.Method.ReloadOsClient(targetOsClient);
+            if (targetReload && targetReload.Code == 1) {
+                queued = V8.Method.QueueChildTenantPlatformAppMaintenance({
+                    _BackgroundTaskId: taskId,
+                    _BackgroundTaskFencingToken: fencingToken,
+                    TargetOsClient: targetOsClient
+                });
+            } else {
+                queued = {
+                    Code: 0,
+                    Msg: '自动重载目标租户失败：' + ((targetReload && targetReload.Msg) || '服务无返回')
+                };
+            }
+        }
         attemptedMap[targetKey] = true;
         attemptedTargets.push(targetKey);
         processedThisSlice++;
@@ -132,6 +175,7 @@ if (phase == 'Queue') {
             failures.push({
                 OsClient: targetOsClient,
                 Name: targetName,
+                Stage: 'Queue',
                 Msg: (queued && queued.Msg) || '任务投递无返回'
             });
         } else {
@@ -170,7 +214,7 @@ if (phase == 'Queue') {
         '已创建 ' + childTasks.length + ' 个子租户任务，继续处理剩余 ' + remaining + ' 个租户');
     }
 
-    if (failures.length > 0) {
+    if (failures.length > 0 && childTasks.length <= 0) {
         var queueFailureDetail = failures.slice(0, 5).map(function (item) {
             return text(item.Name || item.OsClient) + '：' + text(item.Msg || '未知错误');
         }).join('；');
@@ -205,9 +249,11 @@ if (phase == 'Queue') {
         Phase: 'Monitor',
         AttemptedTargets: attemptedTargets,
         ChildTasks: childTasks,
-        Failures: []
+        Failures: failures
     }, 5, 0, childTasks.length,
-    '已创建全部 ' + childTasks.length + ' 个子租户任务，开始汇总实际安装进度', 2);
+    '已创建 ' + childTasks.length + ' 个子租户任务'
+        + (failures.length > 0 ? '，另有 ' + failures.length + ' 个租户投递失败' : '')
+        + '，开始汇总实际安装进度', 2);
 }
 
 if (phase != 'Monitor') {
@@ -237,8 +283,11 @@ for (var childRowIndex = 0; childRowIndex < childRows.length; childRowIndex++) {
     childRowMap[text(childRow.Id)] = childRow;
 }
 
+var queueFailures = failures.filter(function (item) {
+    return !text(item && item.TaskId);
+});
 var succeeded = [];
-var terminalFailures = [];
+var terminalFailures = queueFailures.slice();
 var runningCount = 0;
 var progressTotal = 0;
 for (var childIndex = 0; childIndex < childTasks.length; childIndex++) {
@@ -281,14 +330,16 @@ for (var childIndex = 0; childIndex < childTasks.length; childIndex++) {
     }
 }
 
+var totalTargetCount = childTasks.length + queueFailures.length;
 var terminalCount = succeeded.length + terminalFailures.length;
-var aggregateProgress = childTasks.length > 0
-    ? Math.max(5, Math.min(99, 5 + Math.floor(94 * progressTotal / (100 * childTasks.length))))
+var aggregateProgress = totalTargetCount > 0
+    ? Math.max(5, Math.min(99, 5 + Math.floor(94 * (progressTotal + queueFailures.length * 100)
+        / (100 * totalTargetCount))))
     : 100;
 var monitorMessage = '子租户安装进度：成功 ' + succeeded.length
     + '，失败 ' + terminalFailures.length + '，进行中 ' + runningCount
-    + '（' + terminalCount + '/' + childTasks.length + '）';
-report(aggregateProgress, terminalCount, childTasks.length, monitorMessage);
+    + '（' + terminalCount + '/' + totalTargetCount + '）';
+report(aggregateProgress, terminalCount, totalTargetCount, monitorMessage);
 
 if (runningCount > 0) {
     return continuation({
@@ -297,8 +348,8 @@ if (runningCount > 0) {
         Phase: 'Monitor',
         AttemptedTargets: attemptedTargets,
         ChildTasks: childTasks,
-        Failures: terminalFailures
-    }, aggregateProgress, terminalCount, childTasks.length, monitorMessage, 3);
+        Failures: queueFailures
+    }, aggregateProgress, terminalCount, totalTargetCount, monitorMessage, 3);
 }
 
 if (terminalFailures.length > 0) {
@@ -306,7 +357,7 @@ if (terminalFailures.length > 0) {
         Code: 0,
         Data: {
             FailureStage: 'ChildTerminal',
-            TargetCount: childTasks.length,
+            TargetCount: totalTargetCount,
             SucceededCount: succeeded.length,
             FailedCount: terminalFailures.length,
             Results: succeeded,
@@ -322,7 +373,7 @@ report(100, childTasks.length, childTasks.length,
 return {
     Code: 1,
     Data: {
-        TargetCount: childTasks.length,
+        TargetCount: totalTargetCount,
         SucceededCount: succeeded.length,
         FailedCount: 0,
         Results: succeeded
