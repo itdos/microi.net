@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <OutputType>Library</OutputType>
+    <Authors>Microi</Authors>
+    <Company>www.microi.net</Company>
+    <Description>开源低代码平台 - Microi吾码：多租户翻译引擎，支持阿里云与 LibreTranslate。官网：https://microi.net</Description>
+    <Copyright>Copyright 2009-2026 microi.net</Copyright>
+    <PackageProjectUrl>https://microi.net</PackageProjectUrl>
+    <PackageIcon>microi-blue-256.png</PackageIcon>
+    <PackageTags>低代码,LowCode,AI,Translate,LibreTranslate,Microi吾码,Microi</PackageTags>
+    <PackageReleaseNotes>Microi 吾码开源翻译引擎，支持文本、批量、语种检测、文件翻译、建议与健康检查。</PackageReleaseNotes>
+    <Version>7.5.10</Version>
+    <AssemblyVersion>7.5.10</AssemblyVersion>
+    <FileVersion>7.5.10</FileVersion>
+    <RestorePackages>true</RestorePackages>
+    <IsPackable>true</IsPackable>
+    <Configurations>Release;Debug</Configurations>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../Microi.Core/Resource/microi-blue-256.png" Link="Resource/microi-blue-256.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+</Project>

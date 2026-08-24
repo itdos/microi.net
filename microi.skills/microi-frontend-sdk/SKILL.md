@@ -10,7 +10,7 @@ description: Microi 前端 SDK 使用规范，适用于 Vue 3、uni-app、H5、P
 所有 Vue 3 前端项目都应使用 `microi.skills/microi.v8.js` 作为统一的 Microi 前端 SDK。新项目不要复制旧版 Vue2/Vuex 请求封装，也不要重新手写 token、上传、文件 URL、ApiEngine 或 FormEngine 层。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-000 sha256=06f944bc009a4e773ae6d5496d435d3e4a4fdb23d59107dac9cedffcfdf18f86 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-000 sha256=4b1d4f626b1c4de344339a2fba6b2eaf48e9e5a018c2faa1f7480b90254a4cfb -->
 ## 必须采用的模式
 
 将 SDK 复制到项目源码目录，通常是：
@@ -56,7 +56,7 @@ export function createApp() {
 页面和业务接口模块应从项目请求模块导入已配置实例或薄封装函数，不要直接从标准 skill 文件导入。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-001 sha256=f1c2ab1fadc01dbe8ea4b9de98f7c02192c3f2cfed8b792fe62f8ef516b67d83 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-001 sha256=c418c6c9e6846d2ce4db04501520036e2c6b0f162c282d6e099e802c9b83f72d -->
 ## 必须委托 SDK 的能力
 
 - `ApiEngine.Run`：直接调用 `/apiengine/{key}` 时使用 `V8.ApiEngine.Run(key, data)`。
@@ -71,7 +71,7 @@ export function createApp() {
 `Microi.Client` 主后台运行时已内置前后端同构的 `V8.Http.Get/Post/Patch` 及对应 Response 方法；表单事件、按钮 V8 等宿主前端新代码必须优先使用 `V8.Http`，旧 `V8.Post/Get` 仅作兼容保留，其参数和兼容规则以 `v8-http-integration/SKILL.md` 为准。独立项目使用本 SDK、且不在主后台 V8 宿主中时，才使用 SDK 自身的小写 `V8.get/post`、`ApiEngine`、`FormEngine`；不要把它们与宿主旧版大写 `V8.Post/Get` 混为一谈，也不要假设浏览器可以绕过第三方接口的 CORS。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-002 sha256=5842c30af751f60041e4435efe5c993144a874cb2e9d97c41fb37d1f06d6474e -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-002 sha256=54b302bfe2a8830a3043ae7804ca775d6159453bea0cfdeac61c3b97d36466ed -->
 ## 登录与验证码封装
 
 SDK 或项目请求模块必须提供登录所需的系统配置和验证码薄封装，不要让页面散落手写。
@@ -120,7 +120,7 @@ AI 生成的前端微服务不能假定永远在主平台 iframe/micro-app 宿�
 - 宿主额外传入 `permissionContext={sysMenuId,moduleEngineKey,diyTableId}`。SDK/服务层需要访问 FormEngine 时使用真实授权 `moduleEngineKey`；该对象不能代替后端权限，也不能成为放宽匿名接口的理由。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-003 sha256=d5d1984e6cd4efbb2340f984473146c66bb342d60bb571454c457f5673b1c68f -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-003 sha256=fd0dbc19f767d1b69c41582a99d2c578c2e4ee8c871df89fd67ed054641d1931 -->
 ## 请求头规则
 
 SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业务 wrapper 或上传逻辑各自拼接租户和鉴权头。
@@ -132,7 +132,7 @@ SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业
 - 验收时检查真实网络请求：不得出现 `osclient: demo, demo`、`Authorization: Bearer xxx, Bearer xxx` 这类逗号合并值。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-004 sha256=c5f546fd4ef770459d42239b40af81d52399a3623340472b703cffe09a7b5d1e -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-004 sha256=f5644fc45280e53988d1eed432e57afc2c56fc58b1232505950359219b5220d2 -->
 ## 上传规则
 
 `V8.uploadFile` 是 Microi 前端唯一允许的上传入口。SDK 实现必须：
@@ -150,7 +150,7 @@ SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业
 当上传突然报 `移动端文件上传路径不合法！` 时，先检查实际 multipart 表单字段和请求头。在 Microi 移动端/会员 Token 流程中，后端会在 HDFS 上传前校验 `Path`；错误的 `Content-Type` 会导致后端读不到表单字段，并表现为路径错误。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-005 sha256=1a9d0a33adbff849decf01d114e72cad96f80a6122f0b281cecf9092bbcd0c42 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-005 sha256=ea5ffc6757b73bb3251b34d26b2902674c3a0c7f5277dcf8745e39ff11fe6b56 -->
 ## 项目封装规则
 
 面向业务页面的函数名要保持稳定。如果已有项目导出 `callEngine`、`formEngineGet`、`getImageUrl`、`parseImages` 或 `uploadFile`，保留这些导出，内部委托给 `V8`。这样既能统一 SDK，又能避免大面积改页面。

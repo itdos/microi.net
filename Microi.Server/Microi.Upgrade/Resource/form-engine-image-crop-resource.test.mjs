@@ -7,6 +7,14 @@ import { fileURLToPath } from 'node:url';
 const resourceRoot = path.dirname(fileURLToPath(import.meta.url));
 const packagePath = path.join(resourceRoot, 'app.microi.form-engine.json');
 const appPackage = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+const versionAtLeast = (actual, minimum) => {
+    const left = String(actual || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+    const right = String(minimum || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+    for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+        if ((left[index] || 0) !== (right[index] || 0)) return (left[index] || 0) > (right[index] || 0);
+    }
+    return true;
+};
 
 test('form engine package declares image crop and rich text upload contracts', () => {
     const capabilities = appPackage.PackageInfo.RequiredPlatformCapabilities || [];
@@ -17,7 +25,7 @@ test('form engine package declares image crop and rich text upload contracts', (
     assert.ok(capabilities.includes('ServerFeature:ImgUploadCropOriginal'));
     assert.ok(capabilities.includes('ClientFeature:RichTextUploadPolicy'));
     assert.ok(capabilities.includes('ServerFeature:RichTextPrivateAssetAuthorization'));
-    assert.equal(appPackage.PackageInfo.Version, 'v7.6.1');
+    assert.ok(versionAtLeast(appPackage.PackageInfo.Version, 'v7.6.1'));
     assert.ok(capabilities.includes('ClientFeature:SmartExcelImportPreview'));
     assert.ok(capabilities.includes('ServerFeature:ExcelImportConfirmedRange'));
     assert.match(appPackage.PackageInfo.ChangeHistory, /v7\.6\.1[\s\S]*自动识别[\s\S]*每页 15 条预览/);

@@ -55,6 +55,8 @@ namespace Microi.net
         Task<DosResultList<SysLog>> GetSysLog(SysLogParam param);
         Task<DosResultList<SysLog>> GetTraceTimeline(SysLogTraceQueryParam param);
         Task<DosResult<SysLogSignalResult>> QuerySystemLogSignal(SysLogSignalQueryParam param);
+        /// <summary>按时间范围跨月分页读取受限系统日志明细。</summary>
+        Task<DosResultList<SysLog>> QuerySystemLogRange(SysLogRangeQueryParam param);
         Task<DosResult<SysLogLifecyclePlan>> PlanSystemLogLifecycle(SysLogLifecycleParam param);
         Task<DosResult<SysLogLifecycleBatch>> ReadSystemLogLifecycleBatch(SysLogLifecycleParam param);
         Task<DosResult<SysLogLifecycleRunState>> CommitSystemLogLifecycleBatch(SysLogLifecycleCommitParam param);

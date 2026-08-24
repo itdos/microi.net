@@ -39,21 +39,31 @@ AI 第一次使用时先查询 `action=Capabilities`，再按返回的动作、�
 | `AppLogs` | 当前 API 进程日志尾部 | `lines=20..1000` |
 | `PlatformStats` | 表、菜单、接口引擎、租户、用户和排行 | 无 |
 | `SecurityData` | 访问、攻击或封锁记录 | `kind=Access|Attack|Block`、分页 |
-| `TrafficHistory` | MySQL 固定时间桶流量历史 | `dimensionType`、`hours=1..168`、分页 |
+| `TrafficHistory` | MySQL 固定时间桶流量趋势 | `rangeKey`；可选 `dimensionType` |
+| `HistoricalDashboard` | 同一时间范围内的热点接口、IP、帐号、租户、内容类型与请求/流量总览 | `rangeKey=live5|today|yesterday|3d|7d|15d|30d|3m|6m|1y`、`top` |
+| `TrafficDetails` | 跨月大文件、上传下载和可疑传输 MongoDB 明细 | `rangeKey`、`pageIndex/pageSize`；可选 `keyword/transferAction/ip/userId/endpoint` |
 
 示例：
 
 ```json
 {
-  "action": "TrafficHistory",
-  "dimensionType": "Endpoint",
-  "hours": 24,
+  "action": "HistoricalDashboard",
+  "rangeKey": "30d",
+  "top": 15
+}
+```
+
+```json
+{
+  "action": "TrafficDetails",
+  "rangeKey": "7d",
+  "transferAction": "Upload",
   "pageIndex": 1,
   "pageSize": 15
 }
 ```
 
-所有列表默认按 15 条开始；扩大分页前先增加过滤条件。日志和安全数据每页最多 200 条，Trace 与流量历史最多 500 条。不得循环拉取无时间边界的全量日志。
+所有列表默认按 15 条开始；扩大分页前先增加过滤条件。日志和安全数据每页最多 200 条，Trace 最多 500 条。历史总览由固定聚合桶一次返回有界 TOP，不得循环拉取无时间边界的全量日志。
 
 ## 安全治理动作
 
@@ -73,6 +83,7 @@ UnblockIp:<ip>
 3. HTTP 可归因流量只统计经过 API 中间件的请求体和响应体。网卡、容器 NetIO 还包含 TLS/HTTP 头、重传、数据库、Redis、MongoDB、MQ、对象存储、外部 HTTP、健康检查和同机其它进程。
 4. “未归因流量”只能作为排查线索，不能强行归属给某个帐号、IP 或接口。
 5. IP 必须注明是可信代理解析后的客户端地址还是直接连接地址；代理链未配置正确前不要据此处罚用户。
+6. 进程 CPU“多核原始值”可超过 100%；247.7% 表示约占用 2.48 个逻辑核心。判断整机压力应使用主机归一值并结合持续时间、请求率与热点排行。
 
 ## 隐私与权限
 
@@ -86,9 +97,16 @@ UnblockIp:<ip>
 
 - 请求热路径只做原子计数和有硬上限的分钟桶聚合；端点、IP、帐号、租户、内容类型限制基数并保留 TOP N。
 - 普通高频明细只保留短窗口内存；错误、慢请求、大文件和可疑传输进入有界队列，异步批量写 MongoDB。
-- 长期趋势使用 MySQL 固定时间桶和确定性幂等键批量 upsert；页面不能每次扫描 Mongo 明细重新聚合总览。
+- 长期趋势使用 MySQL 固定时间桶和确定性幂等键批量 upsert；5 分钟桶保留 48 小时、小时桶保留 45 天、天桶保留 400 天。页面不能每次扫描 Mongo 明细重新聚合总览。
 - 队列必须有硬容量、故障 spool/WAL、停机排空和幂等重放；禁止无界 `ConcurrentQueue` 或逐请求同步写 Mongo/MySQL。
 - Redis 适合短时热点结果、租约和限流；缓存 Key 包含租户、动作和过滤摘要，写入或治理后主动失效，并保留短 TTL 防止永久陈旧。
+
+## 接口引擎归因规范
+
+- PC、UniApp、内置微服务、MCP 和应用包中的固定接口必须调用 `/apiengine/{ApiEngineKey}` 或该引擎唯一 `ApiAddress`；新增代码禁止调用 `/api/ApiEngine/Run`。
+- SDK 的普通 `ApiEngine.Run` 必须自动生成真实引擎路径；旧通用入口只能封装在显式 `RunLegacy` 中，供不能立即升级的历史客户端使用。
+- 监控中保留通用入口的兼容识别，但不能依赖读取请求正文才能知道 Key；真实路由、访问日志、限流和流量排行应直接显示接口引擎 Key。
+- 代码审计要区分运行调用与文档/兼容测试；发布门至少扫描 Microi.Client、UniApp、微服务源码、MCP 与应用包，确保没有新增固定业务依赖。
 
 需要压测或修改热路径时同时读取 `../performance-testing/SKILL.md`；排查 V8/日志写法时读取 `../v8-debugging/SKILL.md`。
 
@@ -96,7 +114,7 @@ UnblockIp:<ip>
 
 1. 先查 `Capabilities`，确认当前版本和边界。
 2. 查 `Snapshot`，记录节点、窗口、请求率、活动请求、CPU/内存、队列、HTTP 流量与未归因残差。
-3. 查 `ApiRank` 和 `TrafficHistory` 的 Endpoint/IP/User/Tenant/ContentType 维度，区分“计算慢”与“传输大”。
+3. 查 `ApiRank` 和 `TrafficHistory` 的 Endpoint/IP/User/Tenant/ContentType 维度，区分“计算慢”与“传输大”；再用 `TrafficDetails` 定位具体帐号/匿名、IP、接口、文件元数据和 TraceId。
 4. 按异常接口或 TraceId 查 `Logs`、`Signal`、`Trace`；先处理时间线中的首个根因。
 5. 对慢 SQL 核对执行计划、索引、返回字段、分页、排序/Join 和锁等待；不要先盲目加 Redis。
 6. 对高频只读结果评估短 TTL Redis，并明确更新/删除时的失效路径；对写接口先批量化 I/O、缩小事务和消除逐行远程调用。

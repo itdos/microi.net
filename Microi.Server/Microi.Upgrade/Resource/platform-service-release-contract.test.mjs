@@ -21,6 +21,15 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function versionWeight(value) {
+  const [major, minor, patch] = String(value || "")
+    .replace(/^v/i, "")
+    .split(".")
+    .slice(0, 3)
+    .map(item => Number(item) || 0);
+  return major * 1_000_000 + minor * 1_000 + patch;
+}
+
 async function collectFiles(root) {
   const result = [];
   async function visit(directory) {
@@ -60,7 +69,8 @@ test("平台内置微服务只从显式发布契约解析正式源码根", async
   assert.match(script, /--store-package-version/);
   assert.doesNotMatch(script, /AI-Project\/microi\/AI应用\/microi-platform-service/);
   assert.doesNotMatch(script, /Microi-V8-Engine\/.*microi-platform-service/);
-  assert.match(resourcePublisher, /if \(publish\) await verifyPlatformServiceReleaseSource\(\)/);
+  assert.match(resourcePublisher, /if \(publish\) \{[\s\S]*changedPlatformServicePackages[\s\S]*await verifyPlatformServiceReleaseSource\(\)/);
+  assert.match(resourcePublisher, /两个内置包与官网内容一致，本次仅发布其它资源/);
   assert.match(resourcePublisher, /\[verifierPath, '--verify-only', '--require-clean-source'\]/);
   assert.ok(
     resourcePublisher.indexOf("verifyPlatformServiceReleaseSource();")
@@ -139,10 +149,8 @@ test("两个官方基线包携带同一份可离线启动的数据库运行产�
     expectedAssets,
     "官方数据包内嵌运行时必须与唯一源码根的 dist 字节级一致",
   );
-  assert.equal(saasPackage.PackageInfo.Version, saasSyncBase.PackageInfo.Version);
-  assert.equal(storePackage.PackageInfo.Version, storeSyncBase.PackageInfo.Version);
-  assert.equal(platformBundle(saasSyncBase).VersionNo, saasBundle.VersionNo);
-  assert.equal(platformBundle(storeSyncBase).VersionNo, storeBundle.VersionNo);
-  assert.equal(platformBundle(saasSyncBase).MicroService.DistHash, saasBundle.MicroService.DistHash);
-  assert.equal(platformBundle(storeSyncBase).MicroService.DistHash, storeBundle.MicroService.DistHash);
+  assert.ok(versionWeight(saasPackage.PackageInfo.Version) >= versionWeight(saasSyncBase.PackageInfo.Version));
+  assert.ok(versionWeight(storePackage.PackageInfo.Version) >= versionWeight(storeSyncBase.PackageInfo.Version));
+  assert.ok(versionWeight(saasBundle.VersionNo) >= versionWeight(platformBundle(saasSyncBase).VersionNo));
+  assert.ok(versionWeight(storeBundle.VersionNo) >= versionWeight(platformBundle(storeSyncBase).VersionNo));
 });

@@ -75,14 +75,16 @@ function generatedStarters() {
     "vueStarterFiles",
     "microServiceStarterFiles",
     "webStarterFiles",
+    "beautyUniAppFiles",
   ];
-  const context = { JSON, Object, String };
+  const context = { JSON, Object, String, Error, encodeURIComponent, V8: { OsClient: "iTdos" } };
   vm.runInNewContext(`
     function text(value, fallback) { return value === null || value === undefined ? (fallback || "") : String(value); }
     ${functionNames.map(extractFunction).join("\n")}
     result = {
       web: webStarterFiles("合同测试 Web", "Web 描述</script><script>alert(1)</script>"),
-      microService: microServiceStarterFiles("合同测试微服务", "微服务描述")
+      microService: microServiceStarterFiles("合同测试微服务", "微服务描述"),
+      uniApp: beautyUniAppFiles("合同测试 UniApp", "UniApp 描述")
     };
   `, context);
   return JSON.parse(JSON.stringify(context.result));
@@ -143,11 +145,20 @@ function assertStableVueBaseline(files, applicationType) {
 }
 
 test("ai_app_create keeps one versioned and syntactically valid engine", () => {
-  assert.ok(compareSemver(engine.Version, "v1.1.5") >= 0);
+  assert.ok(compareSemver(engine.Version, "v1.1.8") >= 0);
   assert.match(engine.ChangeHistory, new RegExp(`^\\d{4}-\\d{2}-\\d{2}(?: \\d{2}:\\d{2}:\\d{2})? ${escapeRegExp(engine.Version)} `));
   assert.match(source, /ApiEngineKey: ai_app_create/);
   assert.match(source, new RegExp(`Version: ${escapeRegExp(engine.Version)}`));
   assert.doesNotThrow(() => new Function(source));
+});
+
+test("UniApp starter calls the custom ApiEngine route for truthful attribution", () => {
+  const { uniApp } = generatedStarters();
+  const apiSource = fileMap(uniApp).get("common/microi-api.js");
+  assert.match(apiSource, /\/apiengine\/"\+encodeURIComponent\(key\)/);
+  assert.match(apiSource, /apiengine:"1"/);
+  assert.doesNotMatch(apiSource, /\/api\/ApiEngine\/Run/i);
+  assert.doesNotMatch(apiSource, /ApiEngineKey:apiEngineKey/);
 });
 
 test("Web starter is a Vue 3, Vite, and strict TypeScript application", () => {

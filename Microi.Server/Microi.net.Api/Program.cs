@@ -4,6 +4,7 @@
 using System.Net;
 using System.Text;
 using System.Diagnostics;
+using System.IO.Compression;
 using Dos.Common;
 using Microi.License;
 using Microi.net;
@@ -19,6 +20,7 @@ using Senparc.Weixin.RegisterServices;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
@@ -234,6 +236,28 @@ services.Configure<ApiBehaviorOptions>(opt =>
 });
 services.AddHttpContextAccessor();
 services.AddAuthorization();
+// JSON、HTML、JS、CSS 等文本响应默认启用低 CPU 的 Gzip Fastest。
+// 文件下载、图片、视频和 SSE 流式响应不在 MIME 白名单中，避免重复压缩或破坏流式刷新。
+// 这能显著降低大菜单/表格响应在 Docker 网桥与公网链路上的实际传输量。
+services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes
+        .Concat(new[]
+        {
+            "application/json",
+            "application/problem+json",
+            "application/vnd.api+json",
+            "application/javascript",
+            "image/svg+xml"
+        })
+        .Distinct(StringComparer.OrdinalIgnoreCase);
+});
+services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest;
+});
 services.AddSession(opt =>
 {
     opt.IdleTimeout = TimeSpan.FromMinutes(20);
@@ -396,6 +420,9 @@ app.UseCors("any");
 // 包住安全守卫与压力守卫，才能看见被拒绝、排队和异常请求；客户端 IP 只取
 // ForwardedHeadersMiddleware 已验证并写入的 Connection.RemoteIpAddress。
 app.UseSystemObservability();
+// 放在流量观测内层：观测写流包住 Kestrel 原始响应，压缩器再包住观测写流，
+// 因而 SentBytes 记录的是实际线上压缩后字节，而不是序列化前的逻辑正文大小。
+app.UseResponseCompression();
 app.UseSecurityGuard();
 app.UseRequestPressureGuard();
 //-------注意以下两者的顺序-------

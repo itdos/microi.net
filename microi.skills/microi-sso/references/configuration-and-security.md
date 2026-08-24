@@ -12,7 +12,7 @@
 
 `diy_sso` 是管理员专用平台表。匿名能力接口只投影 ConnectionKey、名称、协议、图标、说明和发起地址；旧兼容投影只允许同源 `/api/` 路径与安全 Token 参数名。
 
-匿名投影由 `sso_capabilities` / `sso_legacy_capabilities` 接口引擎提供；Controller 不得直接查询并返回 `diy_sso`。内部协议网关通过 StopHttp 的 `sso_connection_runtime` 取得最小运行投影。客户端统一调用 `/api/ApiEngine/Run?OsClient=`，避免应用尚未安装或网关未注册动态路由时出现 404。
+匿名投影由 `sso_capabilities` / `sso_legacy_capabilities` 接口引擎提供；Controller 不得直接查询并返回 `diy_sso`。内部协议网关通过 StopHttp 的 `sso_connection_runtime` 取得最小运行投影。客户端统一调用 `/apiengine/{ApiEngineKey}?OsClient=`，让观测数据保留真实 Key；新版宿主对未安装引擎返回结构化缺失错误，不再因动态路由尚未注册而直接 404。
 
 ## Secret 与证书
 

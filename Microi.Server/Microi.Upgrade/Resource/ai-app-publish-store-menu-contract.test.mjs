@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.8.7 V3 source", () => {
+test("publisher package metadata matches the v1.9.7 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.8.7");
+  assert.equal(packagedPublisher.Version, "v1.9.7");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -24,6 +24,25 @@ test("publisher package metadata matches the v1.8.7 V3 source", () => {
 test("microservice packages exclude deleted and disabled historical routes", () => {
   assert.match(publisherSource, /\['AND', 'IsDeleted', '<>', 1\]/);
   assert.match(publisherSource, /\['AND', 'IsEnable', '<>', 0\]/);
+});
+
+test("small MicroServices can publish a verified database-only runtime without losing source delivery", () => {
+  assert.match(publisherSource, /requestedDatabaseOnlyBuild/);
+  assert.match(publisherSource, /DatabaseOnlyBuild 最多允许 256 个编译文件/);
+  assert.match(publisherSource, /DatabaseOnlyBuild 总大小不能超过 5MB/);
+  assert.match(publisherSource, /DatabaseOnlyBuild 入口未返回完整 HTML 文档/);
+  assert.match(publisherSource, /function readRuntimeAssetBase64\(runtimeAsset, path\)/);
+  assert.match(publisherSource, /runtimeAsset\.StableFilePathName/);
+  assert.match(publisherSource, /\/micro-app\\\/v3\\\/tenants/);
+  assert.match(publisherSource, /readRuntimeAssetBase64\(runtimeAsset, path\)/);
+  assert.match(publisherSource, /stableResponse\.Content/);
+  assert.match(publisherSource, /System\.Convert\.ToBase64String\(stableResponse\.RawBytes\)/);
+  assert.match(publisherSource, /if \(isTextFile\(path\) && stableResponse/);
+  assert.match(publisherSource, /Source:\s*includeSource \? 'PrivateHdfs' : 'NotIncluded'/);
+  assert.match(publisherSource, /Build:\s*'DatabaseOnly'/);
+  assert.match(publisherSource, /databaseOnlyService\.StorageMode = 'db'/);
+  assert.match(publisherSource, /databaseOnlyService\.MsUrl = 'db'/);
+  assert.match(publisherSource, /inlineBase64 \|\| readRuntimeAssetBase64/);
 });
 
 test("publisher enriches portable MicroService menu keys and rejects cross-app bindings", () => {
@@ -80,6 +99,7 @@ test("publisher emits platform-owned managed baselines and tenant-owned hooks fo
     ${extractFunction(publisherSource, "text")}
     ${extractFunction(publisherSource, "toArray")}
     ${extractFunction(publisherSource, "parseObject")}
+    function readStoredPackage(row) { return parseObject(row && row.AppPakcet, {}); }
     ${extractFunction(publisherSource, "sha256Hex")}
     ${extractFunction(publisherSource, "apiEngineMap")}
     ${extractFunction(publisherSource, "normalizeSha256Hashes")}
@@ -496,7 +516,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.8\.7/);
+  assert.match(publisherSource, /Version: v1\.9\.7/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

@@ -134,7 +134,7 @@ public sealed class TranslateGatewayTests
         Assert.Contains("50", tooMany.Msg);
 
         var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(), "Microi.Server", "Microi.net", "TranslateEngine", "TranslateEngine.cs"));
+            FindRepositoryRoot(), "Microi.Server", "Microi.Translate", "TranslateEngine.cs"));
         Assert.DoesNotContain("GetConfigOsClient()", source, StringComparison.Ordinal);
         Assert.Contains("HashSensitive(config?.ApiKey)", source, StringComparison.Ordinal);
     }

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createMenuBadgeRequester } from "../src/layout/components/Sidebar/menu-badge-batch.js";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const nextTask = (callback) => queueMicrotask(callback);
 
@@ -77,4 +82,17 @@ test("batch failures reject every waiting sidebar item", async () => {
     assert.deepEqual(settled.map(item => item.status), ["rejected", "rejected"]);
     assert.equal(settled[0].reason, failure);
     assert.equal(settled[1].reason, failure);
+});
+
+test("all standard module-presentation surfaces share the official batch requester", () => {
+    const surfaces = [
+        "src/views/form-engine/mixins/diy-table-presentation.mixin.js",
+        "src/views/form-engine/mixins/diy-form-state.mixin.js",
+        "src/views/form-engine/form-view-blocks/standard-form-banner.vue"
+    ];
+    for (const relative of surfaces) {
+        const source = fs.readFileSync(path.join(root, relative), "utf8");
+        assert.match(source, /import\s*\{\s*requestMenuBadge\s*\}/u, `${relative} must use the shared coalescer`);
+        assert.match(source, /await\s+requestMenuBadge\s*\(/u, `${relative} must not bypass the shared coalescer`);
+    }
 });

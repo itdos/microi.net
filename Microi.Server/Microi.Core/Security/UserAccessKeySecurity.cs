@@ -411,6 +411,12 @@ namespace Microi.net
             {
                 return true;
             }
+            if (path.StartsWith("/apiengine/", StringComparison.Ordinal))
+            {
+                // 动态自定义地址只在这里校验能力域；进入 ApiEngineController 后还会
+                // 以服务端解析出的真实 ApiEngineKey 再校验 AllowedApiEngineKeys。
+                return HasScope(currentUser, "api-engine:run");
+            }
             if (path == "/api/sysmenu/getsysmenustep")
             {
                 // Only wildcard page keys need the complete dynamic route tree.

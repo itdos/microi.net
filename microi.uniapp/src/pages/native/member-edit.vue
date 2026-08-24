@@ -46,7 +46,7 @@ export default {
     async loadRoles() {
       this.loading = true
       try {
-        const result = await post('/api/SysRole/GetSysRole', {})
+        const result = await post('/apiengine/platform-sys-role?Action=GetSysRole', {})
         if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '角色加载失败')
         this.roles = Array.isArray(result.Data) ? result.Data : []
       } catch (error) {

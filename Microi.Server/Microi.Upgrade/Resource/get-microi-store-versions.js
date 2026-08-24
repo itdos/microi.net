@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store-versions
- * Version: v1.1.0
+ * Version: v1.1.2
  * Function:
  * - 当前版本固定返回在 DataAppend，历史版本由服务端分页与搜索。
  * - 单次只解析当前页快照，避免应用详情一次加载全部历史包。
@@ -27,6 +27,13 @@ function parseData(value) {
   try { return JSON.parse(String(value)); } catch (error) { return null; }
 }
 function versionText(row) { return trim(row && (row.AppVersion || row.Version || row.PackageVersion)); }
+function installable(row) {
+  return !!(row && trim(row.Id)
+    && (trim(row.AppPakcet)
+      || (trim(row.PackageHdfsPath)
+        && /^[a-f0-9]{64}$/i.test(trim(row.PackageSha256))
+        && Number(row.PackageSize || 0) > 0)));
+}
 
 var id = trim(V8.Param.Id || V8.Param.StoreId);
 if (!id) return { Code: 0, Msg: "应用商城记录 Id 不能为空。" };
@@ -83,7 +90,7 @@ for (var i = 0; i < rows.length; i++) {
     Remark: rows[i].Remark,
     Action: rows[i].Action,
     IsCurrent: false,
-    Installable: !!(snapshot && trim(snapshot.Id) === id && snapshot.AppPakcet),
+    Installable: installable(snapshot) && trim(snapshot.Id) === id,
     Visibility: isPublic ? "Public" : "Private"
   });
 }

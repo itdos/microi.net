@@ -7,6 +7,8 @@ description: Microi 翻译引擎与多语言词条规范。用于 V8.TranslateEn
 
 # Microi TranslateEngine
 
+翻译运行时源码位于开源类库 `Microi.Server/Microi.Translate`，NuGet 包名为 `Microi.Translate`。可复用的供应商、租户隔离、缓存和模型契约必须维护在该类库；闭源 `Microi.net` 只允许保留 License 授权或平台私有装配边界，不能重新复制翻译业务实现。
+
 ## API
 
 ```js
@@ -111,6 +113,7 @@ MCP 固定工具：`microi_translate`、`microi_detect_language`、`microi_list_
 
 ## 验收清单
 
+- [ ] `Microi.Translate` 能独立编译、打包并由发布脚本推送 NuGet，`Microi.net/TranslateEngine` 不再残留重复源码
 - [ ] `Translate` 的 `DosResult` 契约处理正确
 - [ ] 词条优先，动态翻译只用于动态内容
 - [ ] 普通租户无法伪造 `OsClient`

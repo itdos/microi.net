@@ -367,7 +367,7 @@ export async function loadMenuTree(refresh = false) {
       return menuTreeCache.data
     }
   }
-  const result = await post('/api/SysMenu/GetSysMenuStep', {
+  const result = await post('/apiengine/platform-sys-menu?Action=GetSysMenuStep', {
     OsClient: appConfig.osClient,
     TableName: 'Sys_Menu',
     _OrderBy: 'Sort',

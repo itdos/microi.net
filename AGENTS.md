@@ -298,6 +298,8 @@ var guid = V8.Method.NewGuid();
 var ulid = V8.Method.NewUlid();
 var ts = V8.Method.GetTimestamp();             // Unix秒级时间戳
 var oldWhere = V8.Method.ParseWhere(V8.Param._Where);     // 新版→旧版Where转换
+var cipher = V8.Method.ProtectApiEngineSecret(secretText); // 绑定当前租户+接口引擎，密钥不进入V8
+var plain = V8.Method.UnprotectApiEngineSecret(cipher);    // 仅同租户、同ApiEngineKey可解密
 // 文件上传
 var upResult = V8.Method.Upload({
   FilesByteBase64: V8.FilesByteBase64,

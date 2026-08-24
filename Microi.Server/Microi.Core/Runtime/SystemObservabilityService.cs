@@ -84,9 +84,11 @@ namespace Microi.net
         /// </summary>
         public static void AnnotateApiEngine(HttpContext context, string apiEngineKey, string osClient = "")
         {
+            apiEngineKey = (apiEngineKey ?? "").Trim();
+            if (!ApiEngineKeyPattern.IsMatch(apiEngineKey)) return;
             NetworkTrafficObservabilityService.AnnotateEndpoint(
                 context,
-                "/apiengine/" + (apiEngineKey ?? "").Trim(),
+                "/apiengine/" + apiEngineKey,
                 "ApiEngine",
                 apiEngineKey,
                 osClient);
@@ -94,8 +96,6 @@ namespace Microi.net
                 || !context.Items.TryGetValue(RequestStateItemKey, out var item)
                 || !(item is ActiveRequestState state))
                 return;
-            apiEngineKey = (apiEngineKey ?? "").Trim();
-            if (!ApiEngineKeyPattern.IsMatch(apiEngineKey)) return;
             state.ApiEngineKey = apiEngineKey;
             state.EndpointKind = "ApiEngine";
             state.Route = "/apiengine/" + apiEngineKey;
@@ -439,7 +439,7 @@ namespace Microi.net
             var cpu = snapshot.Process.ProcessCpuPercentNormalized;
             var rawCpu = snapshot.Process.ProcessCpuPercentRaw;
             var top = snapshot.TopEndpoints.FirstOrDefault();
-            if (cpu >= 70 || rawCpu >= 100)
+            if (IsProcessCpuHigh(cpu))
             {
                 result.Severity = cpu >= 90 ? "Critical" : "Warning";
                 result.Confidence = top != null && top.RequestCount >= 5 ? "Medium" : "Low";
@@ -468,13 +468,23 @@ namespace Microi.net
             }
             if (top != null && top.CostSharePercent >= 50 && top.RequestCount >= 5)
             {
-                result.Confidence = cpu >= 70 || rawCpu >= 100 ? "High" : "Medium";
+                result.Confidence = IsProcessCpuHigh(cpu) ? "High" : "Medium";
                 result.Signals.Add(new DiagnosisSignal
                 {
                     Code = "HOT_ENDPOINT_CONCENTRATED",
                     Severity = top.AverageDurationMs >= 1000 ? "Warning" : "Info",
                     Title = "热点接口集中",
                     Detail = $"{top.Key} 请求 {top.RequestCount} 次，平均 {top.AverageDurationMs:0.##}ms，P95 {top.P95DurationMs:0.##}ms。"
+                });
+            }
+            if (rawCpu >= 100 && !IsProcessCpuHigh(cpu))
+            {
+                result.Signals.Add(new DiagnosisSignal
+                {
+                    Code = "MULTICORE_CPU_CONTEXT",
+                    Severity = "Info",
+                    Title = "多核原始 CPU 超过 100% 不等于整机过载",
+                    Detail = $"当前约使用 {rawCpu / 100d:0.##} 个逻辑核；按 {Math.Max(1, Environment.ProcessorCount)} 核归一化后为 {cpu:0.##}%，未达到 70% 高负载阈值。"
                 });
             }
             if (snapshot.Requests.ErrorRate >= 10 && snapshot.Requests.RequestCount >= 20)
@@ -513,6 +523,11 @@ namespace Microi.net
             result.Recommendations.Add("高频来源先确认是否可信代理、轮询或爬虫，再决定限流/封禁；不要直接封禁容器网桥网关。"
             );
             return result;
+        }
+
+        internal static bool IsProcessCpuHigh(double normalizedCpuPercent)
+        {
+            return normalizedCpuPercent >= 70;
         }
 
         private static ActiveRequestSnapshot ToActiveSnapshot(ActiveRequestState item, DateTime nowUtc)

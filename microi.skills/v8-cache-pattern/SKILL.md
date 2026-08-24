@@ -15,12 +15,17 @@ description: Microi V8 Redis 缓存与管理模式。用于读写 V8.Cache、租
 |------|------|--------|
 | `V8.Cache.Set(key, value, expire)` | 设置缓存 | `boolean` |
 | `V8.Cache.Get(key)` | 获取缓存 | `string \| null` |
-| `V8.Cache.Remove(key)` | 删除缓存 | `boolean` |
+| `V8.Cache.Remove/Delete/Del(key)` | 删除缓存（兼容别名） | `boolean` |
 | `V8.Cache.KeyExist(key)` | 是否存在（兼容旧版运行时的真实方法名） | `boolean` |
+| `V8.Cache.Exists(key)` | 是否存在（新版别名） | `boolean` |
+| `V8.Cache.SetIfNotExists(key, value, seconds)` | Redis `SET NX`，只在不存在时写入 | `boolean` |
+| `V8.Cache.Expire(key, seconds)` | 为整个 Redis Key 设置正数秒 TTL | `boolean` |
 | `V8.Cache.HashSet(key, field, value)` | 写入 Hash 字段 | `boolean` |
 | `V8.Cache.HashGet(key, field)` | 读取 Hash 字段 | `string \| null` |
 | `V8.Cache.HashGetAll(key)` | 读取全部 Hash 字段 | Hash 条目数组 |
-| `V8.Cache.HashDelete(key, field)` | 删除 Hash 字段 | `boolean` |
+| `V8.Cache.HashGetAllKeys/HashGetAllValues(key)` | 读取全部字段名或反序列化值 | 数组 |
+| `V8.Cache.HashDelete/HashRemove(key, field)` | 删除 Hash 字段（兼容别名） | `boolean` |
+| `V8.Cache.HashExists/HashLength(key, field?)` | 字段存在判断或 Hash 长度 | `boolean / number` |
 | `V8.Cache.HashIncrement(key, field, amount)` | 原子增减数值字段 | `number` |
 
 > 需要把接口引擎复制到不同版本的 Microi 环境时，统一使用 `V8.Cache.KeyExist(key)`。部分新版本可能提供 `Exists` 别名，但旧版运行时没有该方法。
@@ -41,17 +46,23 @@ var reserved = V8.Cache.HashIncrement(hashKey, 'Reserved', 1);
 V8.Cache.HashDelete(hashKey, 'Reserved');
 ```
 
-`HashIncrement` 的 `amount` 可以为负数。当前 V8 Hash API 不提供独立 TTL 设置；需要自动过期时，优先把对象序列化为 String 后用 `Set(key, value, expire)`，或由受控 Redis 管理流程设置整 Key 的 TTL。
+`HashIncrement` 的 `amount` 可以为负数。Hash 字段没有独立 TTL；可用
+`V8.Cache.Expire(hashKey, seconds)` 为整个 Hash Key 设置 TTL。Hash 不进入 L1，
+因此这里没有 String L1 副本晚于 Redis TTL 的问题。
 
 ## Redis 管理器与 MCP
 
 平台 Redis 管理器固定路由为 `#/mci-redis-manager`：
 
-- 已登录平台管理员可使用当前租户默认 Redis，并可管理保存于主租户 `mci_redis_connection` 表的额外连接；记录必须按 `TenantOsClient` 隔离，密码只在后端加密保存且永不回传前端。
-- 未登录时只允许创建当前页面内存中的临时连接；不得加载当前租户 Redis、已保存连接或缓存中的旧用户信息，刷新页面后必须清空临时凭据。
+- Redis 管理器接口要求已登录且当前用户 `Level >= 9999`。它只接受 `tenant`（当前租户默认 Redis）和 `saved`（主租户 `mci_redis_connection` 中保存的额外连接）两种模式；当前源码明确拒绝 `temporary`，也没有匿名临时连接模式。
+- 保存连接记录必须按 `TenantOsClient` 隔离，密码只在后端保护并且不回传前端；调用方只传保存后的 `connectionId`。
 - Key 列表必须使用 `SCAN` 游标分页，禁止在生产 Redis 上使用阻塞式 `KEYS *`。内容查看支持 String、Hash、List、Set、Sorted Set、Stream；集合内容要分页并限制单次条数。
 - 写入 Hash/List/Set/Sorted Set 时先完整解析 JSON，再覆盖旧 Key；删除、覆盖、重命名和 TTL 变更属于破坏性操作，必须先展示目标连接、数据库与 Key 并要求明确确认。
-- 临时匿名接口只开放白名单操作，不开放任意 Redis 命令、Lua、`FLUSHALL` 或 `FLUSHDB`；设置短连接超时、访问频率限制、单次 Key 数量和内容大小上限。
+- 管理接口不开放任意 Redis 命令、Lua、`FLUSHALL` 或 `FLUSHDB`；批量删除最多 500 个 Key，重命名不覆盖既有目标。
+
+对应后端管理入口包括只读统计 `/api/cache/statistics`、节点 L1 精确失效
+`/api/cache/invalidate`、模式失效 `/api/cache/invalidate-pattern`，以及 Redis 管理器
+路由前缀 `/api/cache/redis/`。它们都属于受权管理能力，不是匿名业务 API。
 
 MCP 默认操作当前 MCP `OsClient` 的租户 Redis；额外连接只传管理页保存后的 `connectionId`，禁止在 MCP 参数、日志或回答中传递 Redis 密码。
 
@@ -73,7 +84,7 @@ MCP 默认操作当前 MCP `OsClient` 的租户 Redis；额外连接只传管理
   - `'0.12:00:00'` = 12 小时
   - `'1.00:00:00'` = 1 天
   - `'7.00:00:00'` = 7 天
-- 不传则**永久缓存**（直到手动 Remove 或 Redis 重启）
+- 不传则不设置业务 TTL；实际存续还受显式删除、Redis 淘汰策略和持久化配置影响
 
 ## 🔑 Key 命名规范（必须遵守）
 
@@ -105,11 +116,14 @@ var foreignKey = 'Microi:other-tenant:User:' + userId;
 
 平台内部对系统配置等场景实现了 **L1 进程内缓存 + L2 Redis 缓存**：
 
-- L1：.NET 进程内 `IMemoryCache`（每个容器独立）
-- L2：Redis（全集群共享）
+- L1：进程内静态 `ConcurrentDictionary<string, CacheEntry>`（每个 API 进程独立）
+- L2：当前租户的 Redis（同一租户各 API 节点共享）
 
-读取顺序：L1 命中 → L2 命中 → 数据库
-写入顺序：DB → L2 → L1
+缓存组件读取顺序：L1 命中 → L2 命中并回填 L1 → 返回未命中。它本身不查询
+业务数据库；数据库查询与回填属于调用方的 Cache-Aside 流程。
+
+缓存组件写入顺序：L2 Redis 成功 → 更新本节点 L1 → 等待 Pub/Sub 失效广播。
+Redis 写入是权威结果；广播短暂失败时其它节点的旧 L1 最迟由本地 TTL 兜底淘汰。
 
 > ⚠️ 直接修改数据库未走平台保存流程时，可能绕过缓存失效。优先调用受支持的保存/刷新接口并回读验证；不要把重启容器或清空整个 Redis 当作日常缓存刷新方案。
 
@@ -147,7 +161,7 @@ V8.Cache.Remove('user:' + userId);
 先查缓存，缓存不存在时查数据库并回填缓存。
 
 ```javascript
-var cacheKey = 'Microi:' + V8.OsClient + ':product:detail:' + V8.Param.id;
+var cacheKey = 'Product:Detail:' + V8.Param.id;
 
 // 1. 先查缓存
 var cached = V8.Cache.Get(cacheKey);
@@ -174,9 +188,9 @@ return { Code: 1, Data: result.Data };
 
 ```javascript
 // 在 SubmitAfterServerV8.js（数据写入后）清除缓存
-if (V8.FormSubmitAction === 'Update' || V8.FormSubmitAction === 'Delete') {
-  V8.Cache.Remove('Microi:' + V8.OsClient + ':product:detail:' + V8.Form.Id);
-  V8.Cache.Remove('Microi:' + V8.OsClient + ':product:list');
+if (V8.FormSubmitAction === 'Upt' || V8.FormSubmitAction === 'Del') {
+  V8.Cache.Remove('Product:Detail:' + V8.Form.Id);
+  V8.Cache.Remove('Product:List');
 }
 ```
 
@@ -185,7 +199,7 @@ if (V8.FormSubmitAction === 'Update' || V8.FormSubmitAction === 'Delete') {
 ```javascript
 var pageIndex = parseInt(V8.Param.pageIndex) || 1;
 var pageSize = parseInt(V8.Param.pageSize) || 20;
-var cacheKey = 'Microi:' + V8.OsClient + ':product:list:' + pageIndex + ':' + pageSize;
+var cacheKey = 'Product:List:' + pageIndex + ':' + pageSize;
 
 var cached = V8.Cache.Get(cacheKey);
 if (cached) {
@@ -210,7 +224,7 @@ return response;
 ## 防缓存穿透（查询不存在的数据）
 
 ```javascript
-var cacheKey = 'Microi:' + V8.OsClient + ':user:' + V8.Param.id;
+var cacheKey = 'User:Detail:' + V8.Param.id;
 var cached = V8.Cache.Get(cacheKey);
 
 // 注意：缓存值可能是 "null" 字符串（空对象占位）
@@ -246,7 +260,8 @@ V8 业务脚本需要互斥时：
 3. Key 至少包含 `OsClient + 任务/业务唯一标识`；
 4. 分布式锁只能减少并发，业务副作用仍必须用幂等键、唯一约束/条件更新、状态机或 outbox/inbox 保证只执行一次。
 
-`V8.Cache` 没有公开安全的 compare-and-set/带令牌释放原语时，禁止自行实现锁。
+`SetIfNotExists` 只提供原子的“首次写入 + TTL”，没有唯一持有者令牌、续租和
+仅持有者释放语义。禁止把它或其它普通 Cache 调用拼成分布式锁。
 
 ## 原子计数与限流
 
@@ -269,7 +284,7 @@ Microi:myapp:api:count:userId:date     API 调用计数
 
 - `V8.Cache.Get()` 返回 `null` 表示 key 不存在，返回空字符串 `''` 是合法值
 - `V8.Cache.Set()` 的 value 必须是字符串，对象需要 `JSON.stringify()`
-- **过期时间格式为 `d.HH:mm:ss` 字符串**（非秒数），不传则永久缓存
+- 过期时间支持正数秒或 `d.HH:mm:ss` 字符串；不传则不设置业务 TTL
 - Key 命名建议：`Microi:{V8.OsClient}:{分类}:{Key}`，避免跨应用冲突
 - 写操作后即时清除相关缓存，避免脏数据
 - 不要缓存频繁变化的数据（如实时库存），不如每次查库
