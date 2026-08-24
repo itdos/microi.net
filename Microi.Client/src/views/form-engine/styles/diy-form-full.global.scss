@@ -313,6 +313,7 @@
 
     > .el-dialog__header {
         display: flex;
+        min-width: 0;
         min-height: 66px;
         align-items: center;
         justify-content: space-between;
@@ -337,6 +338,18 @@
     .diy-form-dialog-scroll-content {
         margin-right: 0 !important;
         margin-left: 0 !important;
+    }
+
+    // 表单弹层只保留最外层滚动容器，避免 Tab 内容区与 overlay 同时出现纵向滚动条。
+    .diy-form-dialog-scroll-content,
+    .diy-form-dialog-scroll-content > .el-col,
+    .diy-form-dialog-scroll-content > .el-col > .itdos-diy-form,
+    .diy-form-dialog-scroll-content > .el-col > .itdos-diy-form > .diy-form-presentation-layout,
+    .diy-form-dialog-scroll-content .field-form-tabs,
+    .diy-form-dialog-scroll-content .field-form-tabs > .el-tabs__content {
+        height: auto !important;
+        max-height: none !important;
+        overflow-y: visible !important;
     }
 
     .diy-form-dialog-actions {
@@ -382,6 +395,7 @@
 
     > .el-drawer__header {
         display: flex;
+        min-width: 0;
         min-height: 66px;
         flex-shrink: 0;
         align-items: center;
@@ -400,7 +414,21 @@
     > .el-drawer__body {
         box-sizing: border-box;
         padding: 12px 14px 14px;
+        overflow-x: hidden;
+        overflow-y: auto;
         background: color-mix(in srgb, var(--diy-dialog-soft) 84%, var(--diy-dialog-surface));
+    }
+
+    // Drawer body 位于最右侧并作为唯一纵向滚动容器，内部表单完整参与文档流。
+    > .el-drawer__body > .el-row,
+    > .el-drawer__body > .el-row > .el-col,
+    > .el-drawer__body .itdos-diy-form,
+    > .el-drawer__body .diy-form-presentation-layout,
+    > .el-drawer__body .field-form-tabs,
+    > .el-drawer__body .field-form-tabs > .el-tabs__content {
+        height: auto !important;
+        max-height: none !important;
+        overflow-y: visible !important;
     }
 
     .diy-form-dialog-actions {
@@ -467,31 +495,53 @@
 
 .diy-form-dialog-title {
     display: flex;
-    min-width: 180px;
+    min-width: 0;
     min-height: 36px;
+    flex: 1 1 180px;
     align-items: center;
     gap: 12px;
+    overflow: hidden;
     color: var(--mci-text-primary, var(--el-text-color-primary));
 }
 
 .diy-form-dialog-title__eyebrow {
     display: block;
+    overflow: hidden;
     margin-bottom: 3px;
     color: var(--mci-color-primary, var(--el-color-primary));
     font-size: 9px;
     font-weight: 850;
     line-height: 13px;
     letter-spacing: 1.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .diy-form-dialog-title__heading {
     display: flex;
+    width: 100%;
+    min-width: 0;
     align-items: center;
     gap: 8px;
     color: var(--mci-text-primary, var(--el-text-color-primary));
     font-size: 17px;
     font-weight: 760;
     line-height: 24px;
+    white-space: nowrap;
+}
+
+.diy-form-dialog-title__heading > svg,
+.diy-form-dialog-title__heading > i,
+.diy-form-dialog-title__heading > .el-icon {
+    flex: 0 0 auto;
+}
+
+.diy-form-dialog-title__heading > span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .diy-form-page-header {
@@ -553,6 +603,7 @@
 .diy-form-dialog-title__copy {
     min-width: 0;
     flex: 1 1 auto;
+    overflow: hidden;
 }
 
 .diy-form-record-selector {

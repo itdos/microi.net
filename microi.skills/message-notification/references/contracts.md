@@ -73,6 +73,8 @@
 - 仅返回 `V8.CurrentUser.Id` 的 `ChannelType=平台内部` 记录。
 - 支持 `PageIndex/PageSize`，`PageSize` 最大 100。
 - `DataAppend.UnreadCount` 返回同一用户权威未读数。
+- 每条记录统一投影 `SenderUserId/Account=AI`、`SenderName=AI助手`、`ReadOnly=false`；聊天侧只能固定一个 AI 助手联系人，并将通知权威历史与 AI 聊天历史按时间合并。
+- 兼容旧 `MICROI_PLATFORM_ADMIN/admin` 元数据时只改显示投影，不批量删除或改写 `mic_msg_event_log` 历史事实。
 
 ### `msg_internal_mark_read`
 

@@ -10,6 +10,7 @@ import {
     hasConfiguredModuleMetrics,
     hasConfiguredPageTabs
 } from "@/utils/page-tab-route-runtime.js";
+import { resolveMenuRenderSource } from "@/utils/framework-presentation.js";
 // Vue Router 4 支持直接使用 () => import() 形式，不需要 defineAsyncComponent
 
 /**
@@ -35,8 +36,6 @@ const pathMappings = {
     "/diy/diy-components/iframe": "/form-engine/diy-components/iframe",
     "/micro-app/host": "/micro-app/host",
     // system 相关映射
-    "/itdos/system/sys-log": "/system/sys-log",
-    "/itdos/system/sys-monitor": "/system/sys-monitor",
     "/itdos/system/sysrole-manage": "/system/sysrole-manage",
     "/itdos/system/sysdept-manage": "/system/sysdept-manage",
     "/itdos/system/sysuser-manage": "/system/sysuser-manage",
@@ -228,6 +227,8 @@ function appendMicroAppMeta(meta, item) {
         || friendlyConfig.appKey
         || (item.MicroServiceId ? DiyCommon.GuidRemoveSing(item.MicroServiceId) : "");
     meta.OpenType = item.OpenType;
+    meta.ComponentName = item.ComponentName;
+    meta.RenderSourceType = resolveMenuRenderSource(item);
     meta.Url = item.LegacyMenuUrl ? "" : item.Url;
     meta.LegacyMenuUrl = item.LegacyMenuUrl;
     meta.UrlApiEngineId = item.UrlApiEngineId;
@@ -350,7 +351,8 @@ function buildMeta(item, extra = {}) {
         AppDisplay : item.AppDisplay,
         MenuBadgeConfig: Object.assign({}, menuBadgeOptions, {
             Enabled: item.MenuBadgeEnabled,
-            ApiEngineKey: item.MenuBadgeApiEngineKey || menuBadgeOptions.ApiEngineKey
+            ApiEngineKey: item.MenuBadgeApiEngineKey || menuBadgeOptions.ApiEngineKey,
+            Tooltip: item.MenuBadgeTooltip || menuBadgeOptions.Tooltip
         }),
         UrlParam: item.UrlParam,
         title: item.Name,
@@ -661,7 +663,7 @@ export const usePermissionStore = defineStore("permission", {
                 DiyCommon.Post(
                     DiyApi.GetSysMenuStep(),
                     {
-                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "ModuleEngineKey", "MicroServiceId", "MicroServiceKey", "MsKey", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
+                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "ModuleEngineKey", "MicroServiceId", "MicroServiceKey", "MsKey", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
                         OsClient: osClient,
                         TableName: "Sys_Menu",
                         _OrderBy: "Sort",

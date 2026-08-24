@@ -127,6 +127,49 @@ public class TenantSystemSettingsSecurityTests
     }
 
     [Fact]
+    public void PublicBehaviorSwitch_UsesSysConfigBeforeLegacyPrivateRows()
+    {
+        var legacy = new Dictionary<string, TenantSystemSettingValue>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Login.Passkey.Enabled"] = new()
+            {
+                Key = "Login.Passkey.Enabled",
+                Value = "true",
+                IsEnabled = true,
+                ValueSource = "Tenant"
+            }
+        };
+
+        Assert.False(TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+            new JObject { ["PasskeyEnabled"] = 0 },
+            "PasskeyEnabled",
+            legacy,
+            "Login.Passkey.Enabled",
+            fallback: true));
+
+        Assert.True(TenantSystemSettingsSecurity.GetPublicBehaviorBool(
+            new JObject { ["PasskeyEnabled"] = null },
+            "PasskeyEnabled",
+            legacy,
+            "Login.Passkey.Enabled",
+            fallback: false));
+    }
+
+    [Theory]
+    [InlineData("Login.Identity.Enabled")]
+    [InlineData("Login.Passkey.Enabled")]
+    [InlineData("Login.Authenticator.Enabled")]
+    [InlineData("Security.PasswordChange.RequireStepUp")]
+    [InlineData("Login.External.Enabled")]
+    [InlineData("Login.GitHub.Display")]
+    public void MigratedPublicKeys_AreRecognizedAsReadOnlyCompatibilityRows(string key)
+    {
+        Assert.True(TenantSystemSettingsSecurity.IsMigratedPublicSettingKey(key));
+        Assert.Contains(key, TenantSystemSettingsSecurity.MigratedPublicSettingKeys,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void DisabledManagementTemplate_RemainsRuntimePrivateAndFallsBack()
     {
         var disabled = new TenantSystemSettingValue
@@ -153,6 +196,90 @@ public class TenantSystemSettingsSecurityTests
         var disabledPublicRow = Row(disabled.Key, "must-not-reach-browser", "String", isPublic: true);
         disabledPublicRow["IsEnabled"] = 0;
         Assert.Empty(TenantSystemSettingsSecurity.CreatePublicProjection(new[] { disabledPublicRow }).Properties());
+    }
+
+    [Fact]
+    public void MapRuntime_OnlyReturnsTheExplicitlySelectedProviderCredential()
+    {
+        var settings = new Dictionary<string, TenantSystemSettingValue>(StringComparer.OrdinalIgnoreCase)
+        {
+            [TenantSystemSettingsSecurity.AMapClientKey] = EnabledText(
+                TenantSystemSettingsSecurity.AMapClientKey, "tenant-amap-key"),
+            [TenantSystemSettingsSecurity.BaiduMapClientKey] = EnabledText(
+                TenantSystemSettingsSecurity.BaiduMapClientKey, "tenant-baidu-key"),
+            [TenantSystemSettingsSecurity.TencentMapClientKey] = EnabledText(
+                TenantSystemSettingsSecurity.TencentMapClientKey, "tenant-tencent-key")
+        };
+
+        var runtime = TenantSystemSettingsSecurity.ResolveMapRuntimeConfiguration(
+            settings,
+            "AMap",
+            new JObject { ["BaiduAK"] = "legacy-baidu-key" });
+
+        Assert.Equal("AMap", runtime.Provider);
+        Assert.Equal("tenant-amap-key", runtime.ClientKey);
+        Assert.Equal("Tenant", runtime.Source);
+        Assert.Null(runtime.GetType().GetProperty("BaiduKey"));
+        Assert.Null(runtime.GetType().GetProperty("TencentKey"));
+    }
+
+    [Fact]
+    public void MapRuntime_SystemModePreservesLegacyBaiduDefault()
+    {
+        var runtime = TenantSystemSettingsSecurity.ResolveMapRuntimeConfiguration(
+            new Dictionary<string, TenantSystemSettingValue>(StringComparer.OrdinalIgnoreCase),
+            "System",
+            new JObject
+            {
+                ["BaiduAK"] = "legacy-baidu-key",
+                ["AMapKey"] = "legacy-amap-key"
+            });
+
+        Assert.Equal("Baidu", runtime.Provider);
+        Assert.Equal("legacy-baidu-key", runtime.ClientKey);
+        Assert.Equal("Legacy", runtime.Source);
+    }
+
+    [Fact]
+    public void MapRuntime_TenantDefaultCanSelectTencentAndSecurityCodeIsAlwaysSensitive()
+    {
+        var settings = new Dictionary<string, TenantSystemSettingValue>(StringComparer.OrdinalIgnoreCase)
+        {
+            [TenantSystemSettingsSecurity.MapProviderKey] = EnabledText(
+                TenantSystemSettingsSecurity.MapProviderKey, "Tencent"),
+            [TenantSystemSettingsSecurity.TencentMapClientKey] = EnabledText(
+                TenantSystemSettingsSecurity.TencentMapClientKey, "tenant-tencent-key")
+        };
+
+        var runtime = TenantSystemSettingsSecurity.ResolveMapRuntimeConfiguration(settings, "System", new JObject());
+
+        Assert.Equal("Tencent", runtime.Provider);
+        Assert.Equal("tenant-tencent-key", runtime.ClientKey);
+        Assert.True(TenantSystemSettingsSecurity.IsSensitiveKey(
+            TenantSystemSettingsSecurity.AMapSecurityJsCodeKey));
+    }
+
+    [Theory]
+    [InlineData("https://maps.example.com/_AMapService", true)]
+    [InlineData("http://localhost:8080/_AMapService", true)]
+    [InlineData("javascript:alert(1)", false)]
+    [InlineData("https://user:pwd@maps.example.com/proxy", false)]
+    [InlineData("https://maps.example.com/proxy?token=value", false)]
+    public void MapRuntime_ServiceHostAcceptsOnlyPlainHttpEndpoints(string value, bool expected)
+    {
+        Assert.Equal(expected, TenantSystemSettingsSecurity.TryNormalizeMapServiceHost(value, out _));
+    }
+
+    private static TenantSystemSettingValue EnabledText(string key, string value)
+    {
+        return new TenantSystemSettingValue
+        {
+            Key = key,
+            Value = value,
+            ValueType = "String",
+            IsEnabled = true,
+            IsSecret = false
+        };
     }
 
     private static JObject Row(string key, string value, string type, bool isPublic)

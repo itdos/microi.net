@@ -143,6 +143,93 @@ public class FileUploadSecurityTests
     }
 
     [Fact]
+    public void ValidatePayload_CropCountsOriginalBytesWithoutCountingASecondBusinessFile()
+    {
+        var options = new FileUploadSecurityOptions
+        {
+            MaxFileBytes = 8,
+            MaxTotalBytes = 12,
+            MaxFileCount = 1
+        };
+        var param = new DiyUploadParam
+        {
+            CropEnabled = true,
+            Files = new Dictionary<string, Stream>
+            {
+                ["portrait.jpg"] = new MemoryStream(new byte[3])
+            },
+            OriginalFiles = new Dictionary<string, Stream>
+            {
+                ["PORTRAIT.JPG"] = new MemoryStream(new byte[7])
+            }
+        };
+
+        var result = FileUploadSecurity.ValidatePayload(param, out var totalBytes, options);
+
+        Assert.Null(result);
+        Assert.Equal(10, totalBytes);
+    }
+
+    [Fact]
+    public void ValidatePayload_CropRequiresExactlyOneMatchingOriginalForEveryDisplayImage()
+    {
+        var missing = new DiyUploadParam
+        {
+            CropEnabled = true,
+            Files = new Dictionary<string, Stream>
+            {
+                ["portrait.jpg"] = new MemoryStream(new byte[3])
+            }
+        };
+        var mismatched = new DiyUploadParam
+        {
+            CropEnabled = true,
+            Files = new Dictionary<string, Stream>
+            {
+                ["portrait.jpg"] = new MemoryStream(new byte[3])
+            },
+            OriginalFiles = new Dictionary<string, Stream>
+            {
+                ["other.jpg"] = new MemoryStream(new byte[3])
+            }
+        };
+        var undeclared = new DiyUploadParam
+        {
+            Files = new Dictionary<string, Stream>
+            {
+                ["portrait.jpg"] = new MemoryStream(new byte[3])
+            },
+            OriginalFiles = new Dictionary<string, Stream>
+            {
+                ["portrait.jpg"] = new MemoryStream(new byte[3])
+            }
+        };
+
+        Assert.Equal(0, FileUploadSecurity.ValidatePayload(missing, SmallLimits).Code);
+        Assert.Equal(0, FileUploadSecurity.ValidatePayload(mismatched, SmallLimits).Code);
+        Assert.Equal(0, FileUploadSecurity.ValidatePayload(undeclared, SmallLimits).Code);
+    }
+
+    [Fact]
+    public void ValidatePayload_CropOriginalCannotBypassCombinedRequestLimit()
+    {
+        var param = new DiyUploadParam
+        {
+            CropEnabled = true,
+            Files = new Dictionary<string, Stream>
+            {
+                ["portrait.jpg"] = new MemoryStream(new byte[7])
+            },
+            OriginalFiles = new Dictionary<string, Stream>
+            {
+                ["portrait.jpg"] = new MemoryStream(new byte[6])
+            }
+        };
+
+        Assert.Equal(0, FileUploadSecurity.ValidatePayload(param, SmallLimits).Code);
+    }
+
+    [Fact]
     public void DailyQuotaKeys_AreTenantAndUserScopedAndShareRedisClusterSlot()
     {
         var day = new DateTime(2026, 7, 23, 12, 0, 0, DateTimeKind.Utc);

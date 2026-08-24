@@ -15,6 +15,7 @@
 *******************************************************/
 #endregion
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -33,6 +34,14 @@ namespace Microi.net
         {
            {"GetPa", "83442E16-917D-43B1-9C79-7F173C74EDC0"},
         };
+
+        private static readonly string[] MenuTreeProjectionFields =
+        {
+            "Id", "ParentId", "Sort"
+        };
+        private static readonly ConcurrentDictionary<string, LegacyAliasCacheEntry> LegacyAliasCache =
+            new ConcurrentDictionary<string, LegacyAliasCacheEntry>(StringComparer.OrdinalIgnoreCase);
+        private static readonly TimeSpan MenuTreeCacheTtl = TimeSpan.FromMinutes(2);
         #endregion
 
         /// <summary>
@@ -167,6 +176,41 @@ namespace Microi.net
             {
                 return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
+            if (param._CurrentUser == null)
+            {
+                return new DosResultList<dynamic>(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang));
+            }
+            // The menu tree is part of the authenticated platform bootstrap and cannot
+            // be delegated to a tenant ApiEngine. Reuse the same cross-node
+            // authorization version that is incremented by every menu/role/user write;
+            // this makes cached trees unreachable immediately after a permission or
+            // route change instead of accepting a long stale TTL window.
+            var authorizationVersion = await FormEngineAuthorizationCache
+                .GetCurrentVersionAsync(param.OsClient)
+                .ConfigureAwait(false);
+            var menuTreeCacheKey = BuildMenuTreeCacheKey(param, authorizationVersion);
+            if (!menuTreeCacheKey.DosIsNullOrWhiteSpace())
+            {
+                try
+                {
+                    var cachedTree = await MicroiEngine.CacheTenant.Cache(param.OsClient)
+                        .GetAsync<SysMenuTreeCachePayload>(menuTreeCacheKey)
+                        .ConfigureAwait(false);
+                    if (cachedTree?.Data != null)
+                    {
+                        return new DosResultList<dynamic>(
+                            1,
+                            cachedTree.Data.Select(row => (dynamic)row.DeepClone()).ToList(),
+                            "",
+                            cachedTree.DataCount);
+                    }
+                }
+                catch
+                {
+                    // Redis is an optimization here. Authentication and the database
+                    // remain authoritative when cache read/deserialization is unavailable.
+                }
+            }
             var where = new List<List<object>>();
             where.Add(new List<object>(){ "IsDeleted", "<>", 1 });
             if (param.Ids != null)
@@ -181,7 +225,6 @@ namespace Microi.net
             {
                 where.Add(new List<object>(){ "AppDisplay", "=", param.AppDisplay });
             }
-            DbSession dbSession = OsClientExtend.GetClient(param.OsClient).DbRead;
             //判断权限
             //注意：如果有模块配置的菜单权限，那里返回的菜单就应该是所有
             if (param._CurrentUser != null)
@@ -250,35 +293,46 @@ namespace Microi.net
                     where.Add(new List<object>(){ "Id", "In", ids });// || d.UserId == param._CurrentSysUser.Id
                 }
             }
-            var selectFields = new List<string>() {
-                // "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService",
-                // "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url",
-                // "DiyTableId", "ParentId", "Sort",
-            };
-            if(param._SelectFields != null && param._SelectFields.Any())
+            // The main shell asks for a narrow menu projection. Reading every mediumtext
+            // configuration column for every menu made login/menu refresh scale with the
+            // whole sys_menu payload. Use the requested projection first; only an old/cold
+            // database whose diy_field metadata collapses the projection to Id falls back
+            // to the physical row compatibility path.
+            var menuProjection = BuildMenuProjectionFields(param._SelectFields);
+            var allResult = await MicroiEngine.FormEngine.GetTableDataAsync(
+                "sys_menu",
+                CreateMenuDiscoveryQuery(param, where, menuProjection));
+            if (allResult == null || allResult.Code != 1)
             {
-                selectFields = param._SelectFields;
+                return new DosResultList<dynamic>(
+                    allResult?.Code ?? 0,
+                    null,
+                    allResult?.Msg ?? DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang),
+                    allResult?.DataCount,
+                    allResult?.DataAppend);
             }
-            var allResult = await MicroiEngine.FormEngine.GetTableDataAsync("sys_menu", new
+            if (ShouldFallbackMenuProjection(allResult.Data, menuProjection))
             {
-                _SelectFields = selectFields,
-                _Where = where,
-                _OrderBy = "Sort",
-                _OrderByType = "ASC",
-                OsClient = param.OsClient,
-                _Lang = param._Lang,
-                _CurrentUser = param._CurrentUser,
-                // Menu discovery already applies sys_rolelimit filtering above. Mark this
-                // internal materialization as Server so the generic FormEngine client
-                // boundary can keep raw sys_menu access admin-only.
-                _InvokeType = "Server",
-            });
-            var allData = allResult.Data as List<dynamic> ?? new List<dynamic>();
+                allResult = await MicroiEngine.FormEngine.GetTableDataAsync(
+                    "sys_menu",
+                    CreateMenuDiscoveryQuery(param, where, null));
+                if (allResult == null || allResult.Code != 1)
+                {
+                    return new DosResultList<dynamic>(
+                        allResult?.Code ?? 0,
+                        null,
+                        allResult?.Msg ?? DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang),
+                        allResult?.DataCount,
+                        allResult?.DataAppend);
+                }
+            }
+            var allData = allResult.Data ?? new List<dynamic>();
 
             // 兼容旧版 Vue2 定制页面菜单：微服务发布时可在 RouteMetaJson 中声明
             // LegacyMenuUrls / LegacyComponentPaths。这里仅对接口返回值做瞬时映射，
             // 不修改客户库 sys_menu，因而同一套新版服务可以直接承接多个老库。
             await ApplyLegacyMicroServiceAliases(param.OsClient, allData);
+            allData = ProjectMenuRows(allData, param._SelectFields);
 
             // 按ParentId构建字典索引，将递归子节点查找从O(n²)优化为O(n)
             var childrenMap = new Dictionary<string, List<dynamic>>();
@@ -330,7 +384,166 @@ namespace Microi.net
             }
             //递归获取层级（使用字典索引优化）
             BuildChildrenFromMap(childrenMap, firstList);
+            if (!menuTreeCacheKey.DosIsNullOrWhiteSpace())
+            {
+                try
+                {
+                    var cacheRows = firstList
+                        .Select(row => ToJObject((object)row))
+                        .Where(row => row != null)
+                        .Select(row => (JObject)row.DeepClone())
+                        .ToList();
+                    await MicroiEngine.CacheTenant.Cache(param.OsClient)
+                        .SetAsync(
+                            menuTreeCacheKey,
+                            new SysMenuTreeCachePayload { Data = cacheRows, DataCount = dataCount },
+                            MenuTreeCacheTtl)
+                        .ConfigureAwait(false);
+                }
+                catch
+                {
+                    // A failed cache population must not fail an otherwise valid login.
+                }
+            }
             return new DosResultList<dynamic>(1, firstList, "", dataCount);
+        }
+
+        internal static string BuildMenuTreeCacheKey(SysMenuParam param, string authorizationVersion)
+        {
+            if (param == null
+                || param.OsClient.DosIsNullOrWhiteSpace()
+                || authorizationVersion.DosIsNullOrWhiteSpace()
+                || param._CurrentUser == null)
+            {
+                return null;
+            }
+
+            var currentUser = param._CurrentUser;
+            var signature = JsonConvert.SerializeObject(new
+            {
+                UserId = currentUser["Id"]?.ToString() ?? "",
+                Account = currentUser["Account"]?.ToString() ?? "",
+                Level = currentUser["Level"]?.ToString() ?? "",
+                RoleIds = currentUser["RoleIds"]?.ToString() ?? "",
+                Ids = (param.Ids ?? new List<string>())
+                    .Where(value => !value.DosIsNullOrWhiteSpace())
+                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+                param.Display,
+                param.AppDisplay,
+                param._All,
+                param._ChildSystemId,
+                param._PageIndex,
+                param._PageSize,
+                param._Top,
+                SelectFields = (param._SelectFields ?? new List<string>())
+                    .Where(value => !value.DosIsNullOrWhiteSpace())
+                    .Select(value => value.Trim())
+                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+            });
+            return $"Microi:{param.OsClient}:SysMenuStep:v1:{authorizationVersion}:{DiyCommon.SHA256Encode(signature)}";
+        }
+
+        internal static DiyTableRowParam CreateMenuDiscoveryQuery(
+            SysMenuParam param,
+            object where,
+            List<string> selectFields = null)
+        {
+            if (param == null) throw new ArgumentNullException(nameof(param));
+
+            return new DiyTableRowParam
+            {
+                _Where = where,
+                _OrderBy = "Sort",
+                _OrderByType = "ASC",
+                _SelectFields = selectFields,
+                OsClient = param.OsClient,
+                _Lang = param._Lang,
+                _CurrentUser = param._CurrentUser,
+                _InvokeType = "Server",
+                // GetSysMenuStep already authenticates the caller and reduces the row set
+                // to the current role's menu ids. This provenance flag cannot be bound by
+                // browser JSON and prevents a second generic sys_menu authorization pass.
+                _TrustedServerInvocation = true
+            };
+        }
+
+        internal static List<string> BuildMenuProjectionFields(IEnumerable<string> selectFields)
+        {
+            var projection = (selectFields ?? Enumerable.Empty<string>())
+                .Where(field => !string.IsNullOrWhiteSpace(field))
+                .Select(field => field.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (projection.Count == 0) return null;
+            foreach (var field in MenuTreeProjectionFields)
+            {
+                if (!projection.Contains(field, StringComparer.OrdinalIgnoreCase)) projection.Add(field);
+            }
+            return projection;
+        }
+
+        internal static bool ShouldFallbackMenuProjection(
+            IEnumerable<dynamic> rows,
+            IEnumerable<string> selectFields)
+        {
+            var expected = (selectFields ?? Enumerable.Empty<string>())
+                .Where(field => !string.Equals(field, "Id", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (expected.Count == 0) return false;
+            var materialized = rows?.ToList() ?? new List<dynamic>();
+            if (materialized.Count == 0) return false;
+            return materialized.All(row =>
+            {
+                var source = ToJObject((object)row);
+                return source == null || !source.Properties().Any(property =>
+                    expected.Contains(property.Name, StringComparer.OrdinalIgnoreCase));
+            });
+        }
+
+        internal static List<dynamic> ProjectMenuRows(
+            IEnumerable<dynamic> rows,
+            IEnumerable<string> selectFields)
+        {
+            var materializedRows = rows?.ToList() ?? new List<dynamic>();
+            var requestedFields = (selectFields ?? Enumerable.Empty<string>())
+                .Where(field => !string.IsNullOrWhiteSpace(field))
+                .Select(field => field.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (requestedFields.Count == 0)
+            {
+                return materializedRows;
+            }
+
+            foreach (var field in MenuTreeProjectionFields)
+            {
+                if (!requestedFields.Contains(field, StringComparer.OrdinalIgnoreCase))
+                {
+                    requestedFields.Add(field);
+                }
+            }
+
+            var projectedRows = new List<dynamic>(materializedRows.Count);
+            foreach (var rawRow in materializedRows)
+            {
+                var source = ToJObject((object)rawRow);
+                if (source == null) continue;
+
+                var projected = new JObject();
+                foreach (var field in requestedFields)
+                {
+                    var sourceProperty = source.Properties().FirstOrDefault(property =>
+                        string.Equals(property.Name, field, StringComparison.OrdinalIgnoreCase));
+                    if (sourceProperty != null)
+                    {
+                        projected[sourceProperty.Name] = sourceProperty.Value.DeepClone();
+                    }
+                }
+                projectedRows.Add(projected);
+            }
+            return projectedRows;
         }
 
         private async Task ApplyLegacyMicroServiceAliases(string osClient, List<dynamic> menus)
@@ -339,14 +552,25 @@ namespace Microi.net
 
             try
             {
+                var cacheKey = (osClient ?? "").Trim();
+                Dictionary<string, LegacyMicroServicePage> aliases;
+                if (LegacyAliasCache.TryGetValue(cacheKey, out var cached)
+                    && cached.ExpiresAtUtc > DateTime.UtcNow)
+                {
+                    aliases = cached.Aliases;
+                }
+                else
+                {
                 var serviceResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_microiservice", new
                 {
                     OsClient = osClient,
+                    _SelectFields = new[] { "Id", "MsKey", "IsEnable" },
                     _PageSize = 1000
                 });
                 var pageResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_microiservice_page", new
                 {
                     OsClient = osClient,
+                    _SelectFields = new[] { "Id", "MicroServiceId", "MicroServiceKey", "RoutePath", "IsEnable", "RouteMetaJson" },
                     _PageSize = 5000
                 });
                 if (serviceResult.Code != 1 || pageResult.Code != 1) return;
@@ -363,7 +587,7 @@ namespace Microi.net
                 }
                 if (services.Count == 0) return;
 
-                var aliases = new Dictionary<string, LegacyMicroServicePage>(StringComparer.OrdinalIgnoreCase);
+                aliases = new Dictionary<string, LegacyMicroServicePage>(StringComparer.OrdinalIgnoreCase);
                 foreach (var rawPage in pageResult.Data as List<dynamic> ?? new List<dynamic>())
                 {
                     JObject page = ToJObject((object)rawPage);
@@ -386,6 +610,15 @@ namespace Microi.net
                     AddLegacyAliases(aliases, target, "url", meta?["LegacyMenuUrl"]);
                     AddLegacyAliases(aliases, target, "component", meta?["LegacyComponentPaths"]);
                     AddLegacyAliases(aliases, target, "component", meta?["LegacyComponentPath"]);
+                }
+                    LegacyAliasCache[cacheKey] = new LegacyAliasCacheEntry
+                    {
+                        Aliases = aliases,
+                        // Publishing/menu migration is infrequent. A short bounded cache
+                        // removes two control-plane scans from repeated shell refreshes
+                        // while making new page aliases visible without a service restart.
+                        ExpiresAtUtc = DateTime.UtcNow.AddSeconds(30)
+                    };
                 }
                 if (aliases.Count == 0) return;
 
@@ -505,6 +738,18 @@ namespace Microi.net
             public string ServiceKey { get; set; }
             public string PageId { get; set; }
             public string RoutePath { get; set; }
+        }
+
+        private sealed class LegacyAliasCacheEntry
+        {
+            public Dictionary<string, LegacyMicroServicePage> Aliases { get; set; }
+            public DateTime ExpiresAtUtc { get; set; }
+        }
+
+        private sealed class SysMenuTreeCachePayload
+        {
+            public List<JObject> Data { get; set; }
+            public int DataCount { get; set; }
         }
         /// <summary>
         /// 递归获取层级（基于字典索引，O(n)复杂度）

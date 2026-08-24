@@ -415,6 +415,13 @@ public class TenantConfigurationSecurityTests
             ["AccessToken"] = "token",
             ["ThirdPartyKey"] = "key",
             ["DisableLoginPasskey"] = 0,
+            ["RenderSourceBadgeMode"] = "Off",
+            ["FrameworkWatermarkEnabled"] = 1,
+            ["FrameworkWatermarkContent"] = "$SysTitle$ · $UserName$",
+            ["FrameworkWatermarkDirection"] = "DiagonalUp",
+            ["FrameworkWatermarkOpacity"] = 8,
+            ["FrameworkWatermarkDensity"] = "Comfortable",
+            ["FrameworkWatermarkFontSize"] = 16,
             ["PasskeyPrivateKey"] = "must-not-leak",
             ["PwdV8"] = "backend-password-v8",
             ["GlobalV8Code"] = "frontend-global-v8",
@@ -430,6 +437,13 @@ public class TenantConfigurationSecurityTests
         Assert.Null(projection["AccessToken"]);
         Assert.Null(projection["ThirdPartyKey"]);
         Assert.Equal(0, projection["DisableLoginPasskey"]?.Value<int>());
+        Assert.Null(projection["RenderSourceBadgeMode"]);
+        Assert.Equal(1, projection["FrameworkWatermarkEnabled"]?.Value<int>());
+        Assert.Equal("$SysTitle$ · $UserName$", projection["FrameworkWatermarkContent"]?.ToString());
+        Assert.Equal("DiagonalUp", projection["FrameworkWatermarkDirection"]?.ToString());
+        Assert.Equal(8, projection["FrameworkWatermarkOpacity"]?.Value<int>());
+        Assert.Equal("Comfortable", projection["FrameworkWatermarkDensity"]?.ToString());
+        Assert.Equal(16, projection["FrameworkWatermarkFontSize"]?.Value<int>());
         Assert.Null(projection["PasskeyPrivateKey"]);
         Assert.Null(projection["PwdV8"]);
         Assert.Equal("frontend-global-v8", projection["GlobalV8Code"]?.ToString());
@@ -437,6 +451,7 @@ public class TenantConfigurationSecurityTests
         Assert.Null(projection["PublicSettings"]);
         Assert.Null(projection["ServerPrivateSettings"]);
         Assert.True(TenantConfigurationSecurity.ShouldCopySysConfigFromMain("DisableLoginPasskey"));
+        Assert.True(TenantConfigurationSecurity.ShouldCopySysConfigFromMain("FrameworkWatermarkContent"));
         Assert.False(TenantConfigurationSecurity.ShouldCopySysConfigFromMain("PasskeyPrivateKey"));
     }
 

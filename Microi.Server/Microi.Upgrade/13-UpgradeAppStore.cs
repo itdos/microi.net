@@ -20,7 +20,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.4.5.0";
+        public static string Version = "6.4.6.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -45,6 +45,30 @@ namespace Microi.net
         // 受信任核心导入器提升到平台既有 8GB 累计分配硬上限；进程常驻内存保护仍生效，
         // 普通接口引擎不受影响，5GB 运行资产继续走 HDFS multipart 而不进入 Jint。
         private const int ImporterLimitMemoryMb = 8192;
+        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 3, 3);
+        private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 2, 7);
+
+        private static bool HasPinnedImporterCapabilities(string code, System.Version version)
+        {
+            return version != null
+                && version >= MinimumPinnedImporterVersion
+                && !code.DosIsNullOrWhiteSpace()
+                && code.Contains("PACKAGE_REPLAY_VERSION_GUARD_V2")
+                && code.Contains("PinCurrentVersion")
+                && code.Contains("BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1")
+                && code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1")
+                && code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1");
+        }
+
+        private static bool HasPinnedBulkCapabilities(string code, System.Version version)
+        {
+            return version != null
+                && version >= MinimumPinnedBulkVersion
+                && !code.DosIsNullOrWhiteSpace()
+                && code.Contains("BULK_BOUNDED_PACKAGE_SLICES_V1")
+                && code.Contains("StoreVersionId")
+                && code.Contains("BulkAdaptiveSingleSlice: false");
+        }
 
         private static readonly string[] RequiredResourceNames =
         {
@@ -101,7 +125,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 10, 11) ||
+                    !HasPinnedImporterCapabilities(code, importerVersion) ||
                     !long.TryParse(importerLimitMemoryText, out var importerLimitMemory) ||
                     importerLimitMemory < ImporterLimitMemoryMb ||
                     !long.TryParse(importerLimitRecursionText, out var importerLimitRecursion) ||
@@ -137,6 +161,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !code.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
                     !code.Contains("OFFICIAL_MANAGED_OVERWRITE_V1") ||
+                    !code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1") ||
                     !code.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
                     !code.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
                     !code.Contains("BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1") ||
@@ -165,7 +190,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 if (bulkEngine == null
                     || !bulkVersionMatch.Success
                     || !System.Version.TryParse(bulkVersionMatch.Groups[1].Value, out bulkVersion)
-                    || bulkVersion < new System.Version(1, 1, 6)
+                    || !HasPinnedBulkCapabilities(bulkCode, bulkVersion)
                     || bulkEngine.Value<int?>("IsEnable") != 1
                     || bulkEngine.Value<int?>("StopHttp") != 0
                     || !bulkCode.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2")
@@ -174,6 +199,15 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     || !bulkCode.Contains("BULK_MONOTONIC_CHILD_PROGRESS_V1"))
                 {
                     return RefreshRequired(osClient, "应用商城全部安装/更新接口缺失或版本过低");
+                }
+
+                var storeListCode = client.Db.FromSql(@"SELECT ApiV8Code FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "get-microi-store")
+                    .ToScalar()?.ToString() ?? string.Empty;
+                if (!storeListCode.Contains("BULK_PLATFORM_BOOTSTRAP_ORDER_V1"))
+                {
+                    return RefreshRequired(osClient, "应用商城平台批量计划缺少自举优先级");
                 }
 
                 var publisherCode = client.Db.FromSql(@"SELECT ApiV8Code FROM sys_apiengine
@@ -712,7 +746,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 10, 11) ||
+                    !HasPinnedImporterCapabilities(content, importerVersion) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -740,6 +774,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !content.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
                     !content.Contains("OFFICIAL_MANAGED_OVERWRITE_V1") ||
+                    !content.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1") ||
                     !content.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
                     !content.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
                     !content.Contains("BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1") ||
@@ -852,11 +887,11 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var bulkEngineCode = bulkEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
                 var bulkEngineVersionText = bulkEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
-                    packageVersion < new System.Version(7, 3, 6) ||
+                    packageVersion < new System.Version(7, 5, 23) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
-                    embeddedImporterVersion < new System.Version(1, 10, 11) ||
+                    !HasPinnedImporterCapabilities(importerEngineCode, embeddedImporterVersion) ||
                     !System.Version.TryParse(bulkEngineVersionText, out var embeddedBulkVersion) ||
-                    embeddedBulkVersion < new System.Version(1, 1, 6) ||
+                    !HasPinnedBulkCapabilities(bulkEngineCode, embeddedBulkVersion) ||
                     bulkEngine?["IsEnable"]?.Value<int>() != 1 ||
                     bulkEngine?["StopHttp"]?.Value<int>() != 0 ||
                     !content.Contains("TargetSysMenuId") ||
@@ -866,6 +901,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("ApplicationAssetMultipartSession") ||
                     !content.Contains("UploadRecoveryHint") ||
                     !content.Contains("RunBackground('bulk-import-microi-store-packages'") ||
+                    !content.Contains("BULK_PLATFORM_BOOTSTRAP_ORDER_V1") ||
                     !buildZipEngineCode.Contains("REAL_BUILD_ZIP_ASSETS_V1") ||
                     !sourceZipEngineCode.Contains("SOURCE_ONLY_ZIP_ROOT_V1") ||
                     !importerEngineCode.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
@@ -882,6 +918,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !importerEngineCode.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !importerEngineCode.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
                     !importerEngineCode.Contains("OFFICIAL_MANAGED_OVERWRITE_V1") ||
+                    !importerEngineCode.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1") ||
                     !importerEngineCode.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
                     !importerEngineCode.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
                     !importerEngineCode.Contains("BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1") ||

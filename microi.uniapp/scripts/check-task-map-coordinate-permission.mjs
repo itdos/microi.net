@@ -6,8 +6,9 @@ import { fileURLToPath } from 'node:url'
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
 const source = fs.readFileSync(path.join(projectRoot, 'src/pages/task/map.vue'), 'utf8')
-const taskMapMethod = source.match(/async loadTaskMap\(\) \{[\s\S]*?\n    \},\n    async loadFilteredCustomers/)
-const taskDeviceMapMethod = source.match(/async loadTaskDevices\(\) \{[\s\S]*?\n    \},\n    async loadTaskMap/)
+// Git 在 Windows 工作区可能检出 CRLF；静态契约不能把换行风格误判成业务缺失。
+const taskMapMethod = source.match(/async loadTaskMap\(\) \{[\s\S]*?\r?\n    \},\r?\n    async loadFilteredCustomers/)
+const taskDeviceMapMethod = source.match(/async loadTaskDevices\(\) \{[\s\S]*?\r?\n    \},\r?\n    async loadTaskMap/)
 
 assert.ok(taskMapMethod, '必须能定位售后任务地图加载方法')
 assert.doesNotMatch(taskMapMethod[0], /authorizedCustomerModule|loadAuthorizedCustomerRows/,

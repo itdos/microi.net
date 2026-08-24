@@ -293,18 +293,42 @@ namespace Microi.net.Api
 
         private DosResult LoadFormFiles(DiyUploadParam param)
         {
-            param.Files = new Dictionary<string, Stream>();
+            param.Files = new Dictionary<string, Stream>(StringComparer.OrdinalIgnoreCase);
+            param.OriginalFiles = new Dictionary<string, Stream>(StringComparer.OrdinalIgnoreCase);
             if (HttpContext.Request.HasFormContentType)
             {
+                long declaredBytes = 0;
+                var observedFileNames = new List<string>();
+                var observedExtensions = new List<string>();
                 foreach (var file in HttpContext.Request.Form.Files)
                 {
                     if (file == null) continue;
-                    if (param.Files.ContainsKey(file.FileName))
+                    declaredBytes += Math.Max(0, file.Length);
+                    observedFileNames.Add(file.FileName);
+                    observedExtensions.Add(Path.GetExtension(file.FileName));
+                    var isOriginal = string.Equals(
+                        file.Name,
+                        "MicroiOriginalFile",
+                        StringComparison.OrdinalIgnoreCase);
+                    if (isOriginal && param.CropEnabled != true)
+                    {
+                        return new DosResult(0, null, "未开启裁剪协议时不允许提交裁剪原图！");
+                    }
+
+                    var target = isOriginal ? param.OriginalFiles : param.Files;
+                    if (target.ContainsKey(file.FileName))
                     {
                         return new DosResult(0, null, "同一次上传中存在重复文件名：" + file.FileName);
                     }
-                    param.Files.Add(file.FileName, file.OpenReadStream());
+                    target.Add(file.FileName, file.OpenReadStream());
                 }
+                NetworkTrafficObservabilityService.AnnotateTransfer(
+                    HttpContext,
+                    "Upload",
+                    HttpContext.Request.Form.Files.Count,
+                    declaredBytes,
+                    observedFileNames,
+                    observedExtensions);
             }
             return null;
         }
@@ -493,7 +517,8 @@ namespace Microi.net.Api
                 if (fieldName.DosIsNullOrWhiteSpace()
                     || !string.Equals(fieldTableId, tableId, StringComparison.OrdinalIgnoreCase)
                     || (!string.Equals(component, "FileUpload", StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(component, "ImgUpload", StringComparison.OrdinalIgnoreCase)))
+                        && !string.Equals(component, "ImgUpload", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(component, "RichText", StringComparison.OrdinalIgnoreCase)))
                 {
                     return new DosResult(0, null, "文件字段与当前表单不匹配！");
                 }
@@ -530,8 +555,11 @@ namespace Microi.net.Api
                 var requestedPaths = new List<string>();
                 if (!param.FilePathName.DosIsNullOrWhiteSpace()) requestedPaths.Add(param.FilePathName);
                 if (param.FilePathNames != null) requestedPaths.AddRange(param.FilePathNames);
+                var isRichText = string.Equals(component, "RichText", StringComparison.OrdinalIgnoreCase);
                 if (requestedPaths.Count == 0
-                    || requestedPaths.Any(path => !FieldValueReferencesPath(fieldValue, path)))
+                    || requestedPaths.Any(path => isRichText
+                        ? !RichTextPrivateAssetReference.ReferencesPath(TokenString(fieldValue), path)
+                        : !FieldValueReferencesPath(fieldValue, path)))
                 {
                     return new DosResult(0, null, "业务记录的文件字段未引用所请求的私有文件！");
                 }

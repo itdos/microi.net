@@ -41,3 +41,13 @@ test("login page keeps the entry button and renders an explicit all-hidden state
     assert.match(login, /请使用账号密码登录，或联系系统管理员开启至少一种登录方式/);
     assert.match(login, /externalDefaults\s*=\s*\[[\s\S]*?Gitee[\s\S]*?WeChat[\s\S]*?GitHub/);
 });
+
+test("successful password login keeps a truthful loading label until navigation completes", function () {
+    const login = readFileSync(new URL("../src/views/login/index.vue", import.meta.url), "utf8");
+    assert.match(login, /<span>\{\{ LoginButtonText \}\}<\/span>/);
+    assert.match(login, /LoginStage:\s*"idle"/);
+    assert.match(login, /LoginStage === "routes"[\s\S]*?正在加载工作台/);
+    assert.match(login, /LoginStage === "entering"[\s\S]*?正在进入系统/);
+    assert.match(login, /self\.LoginStage = "routes"[\s\S]*?await self\.GotoSystem\(\)/);
+    assert.match(login, /self\.LoginStage = "entering"[\s\S]*?await self\.\$router\.push/);
+});

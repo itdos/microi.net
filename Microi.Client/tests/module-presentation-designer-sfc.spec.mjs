@@ -84,12 +84,12 @@ test("module presentation designer compiles and exposes every standard list/card
     assert.match(source, /fieldRequestId/);
     assert.match(source, /cloneJson\(shared\)/);
     assert.match(source, /跨端视图负责字段编排，字段模板负责复杂渲染，两者可以叠加使用/);
-    assert.match(source, /label="自定义表单" name="form-json"/);
-    assert.match(source, /function applyCustomFormJson\s*\(/);
-    assert.match(source, /currentViews\.filter\(\(view\) => !isCustomFormView\(view\)\)/);
+    assert.doesNotMatch(source, /label="自定义表单" name="form-json"/);
+    assert.doesNotMatch(parsed.descriptor.template.content, /启用自定义表单视图/);
+    assert.match(source, /历史 Detail\/Edit 配置仅用于兼容迁移，其中的 Banner 会由标准表单复用/);
+    assert.match(source, /pc-composite-scroll/);
     assert.match(source, /DEFAULT_VIEW_SCHEMA_VERSION\s*=\s*"1\.0"/);
     assert.match(source, /DEFAULT_VIEW_CONFIG_VERSION\s*=\s*1/);
-    assert.match(source, /只要配置就始终生效/);
     assert.doesNotMatch(source, /\beval\s*\(|new Function\s*\(/);
 });
 
@@ -99,9 +99,10 @@ test("module presentation designer defers every internal pane and remote-pages a
     assert.deepEqual(parsed.errors, []);
     const template = parsed.descriptor.template.content;
 
-    for (const paneName of ["hero", "list", "card", "form-json", "json"]) {
+    for (const paneName of ["hero", "list", "card", "json"]) {
         assert.match(openingTagForNamedPane(template, paneName), /\blazy\b/i);
     }
+    assert.doesNotMatch(template, /name=["']form-json["']/);
     assert.doesNotMatch(template, /name=["']form-workbench["']|表单工作台/);
 
     const apiEngineSelect = template.match(/<el-select\b(?=[^>]*v-model=["']metric\.ApiEngineKey["'])[^>]*>/i)?.[0];

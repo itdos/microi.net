@@ -6,6 +6,7 @@ test('store application MCP request persists only identifiers and a stable backg
   const request = buildStoreApplicationBackgroundRequest({
     operation: 'install',
     storeId: '01KSTOREAPP000000000000001',
+    storeVersionId: '01M0NPJEGVS6F38SFJKQE0AMGV',
     requestId: 'saas-v6.9.4-20260801',
     appId: 'app.microi.saas',
     appName: 'SaaS引擎',
@@ -15,6 +16,7 @@ test('store application MCP request persists only identifiers and a stable backg
 
   assert.equal(request.ApiEngineKey, 'import-microi-store-package');
   assert.equal(request.Param.StoreId, '01KSTOREAPP000000000000001');
+  assert.equal(request.Param.StoreVersionId, '01M0NPJEGVS6F38SFJKQE0AMGV');
   assert.equal(request.Param.StoreApiBase, 'https://api.itdos.com');
   assert.equal(request.Param.ResumeInstall, true);
   assert.equal(
@@ -59,4 +61,13 @@ test('store application MCP request requires a caller-stable idempotency request
     storeId: 'store-1',
     requestId: 'short',
   }), /requestId/);
+});
+
+test('store application MCP request rejects an invalid immutable snapshot Id', () => {
+  assert.throws(() => buildStoreApplicationBackgroundRequest({
+    operation: 'update',
+    storeId: 'store-1',
+    storeVersionId: 'snapshot/with/path',
+    requestId: 'update-20260823',
+  }), /storeVersionId/);
 });

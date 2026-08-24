@@ -49,6 +49,9 @@
             <li @click="toggleFullScreen(selectedTag)">
                 <el-icon><FullScreen /></el-icon> {{ $t("tagsView.fullScreen") }}
             </li>
+            <li v-if="canShowFormDesign(selectedTag)" @click="openFormDesign(selectedTag)">
+                <el-icon><EditPen /></el-icon> {{ $t("Msg.FormDesign") }}
+            </li>
             <li v-if="canShowModuleDesign(selectedTag)" @click="openModuleDesign(selectedTag)">
                 <el-icon><QuestionFilled /></el-icon> {{ $t("Msg.ModuleDesign") }}
             </li>
@@ -157,6 +160,11 @@ import { computed, defineAsyncComponent } from "vue";
 import { routeLoading } from "@/utils/mci-loading";
 import { resolveTabIcon } from "@/utils/tab-icon.js";
 import { getPageTabRouteViewKey } from "@/utils/page-tab-route-runtime.js";
+import {
+    getTabDiyTableId,
+    getTabSysMenuId,
+    hydrateTabFormDesignContext
+} from "@/utils/tab-design-context.js";
 
 import { AppMain } from "../../components";
 
@@ -202,6 +210,7 @@ export default {
             fullscreenTipVisible: false,
             fullscreenTipTimer: null,
             showModuleDesignDialog: false,
+            formDesignMap: {},
             pageEngineDesignMap: {}
         };
     },
@@ -271,6 +280,7 @@ export default {
             };
         };
         window.addEventListener("microi:page-engine-design-context", this._pageEngineDesignHandler);
+        this._formDesignLookups = new Map();
     },
     beforeUnmount() {
         if (this._keyHandler) {
@@ -285,6 +295,7 @@ export default {
         if (this.fullscreenTipTimer) {
             clearTimeout(this.fullscreenTipTimer);
         }
+        if (this._formDesignLookups) this._formDesignLookups.clear();
     },
     methods: {
         GetRouteViewKey(route) {
@@ -500,7 +511,9 @@ export default {
             if (!tag) return;
 
             const menuMinWidth = 105;
-            const extraMenuItems = Number(this.canShowModuleDesign(tag)) + Number(this.canShowPageEngineDesign(tag));
+            const extraMenuItems = Number(this.canShowFormDesign(tag))
+                + Number(this.canShowModuleDesign(tag))
+                + Number(this.canShowPageEngineDesign(tag));
             const menuHeight = 155 + extraMenuItems * 40; // 预估菜单高度
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
@@ -521,6 +534,9 @@ export default {
             this.top = top;
             this.visible = true;
             this.selectedTag = tag;
+            this.warmupFormDesignContext(tag).catch((error) => {
+                console.warn("[TagsView] form design context warmup failed:", error);
+            });
         },
         isAdminUser() {
             const user = this.diyStore && this.diyStore.GetCurrentUser;
@@ -530,13 +546,49 @@ export default {
             return isAdmin || Number(user.Level || 0) >= 9999;
         },
         getSysMenuIdFromTag(tag = {}) {
-            const meta = tag.meta || {};
-            const query = tag.query || {};
-            const params = tag.params || {};
-            return meta.Id || meta.id || meta.SysMenuId || meta.sysMenuId || query.SysMenuId || query.Id || params.SysMenuId || params.Id || "";
+            return getTabSysMenuId(tag);
         },
         canShowModuleDesign(tag) {
             return this.isAdminUser() && !!this.getSysMenuIdFromTag(tag);
+        },
+        getDiyTableIdFromTag(tag = {}) {
+            return getTabDiyTableId(tag, this.formDesignMap);
+        },
+        canShowFormDesign(tag) {
+            return this.isAdminUser() && !!this.getDiyTableIdFromTag(tag);
+        },
+        warmupFormDesignContext(tag = {}) {
+            if (!this.isAdminUser()) return Promise.resolve("");
+            const direct = this.getDiyTableIdFromTag(tag);
+            if (direct) return Promise.resolve(direct);
+
+            const sysMenuId = this.getSysMenuIdFromTag(tag);
+            if (!sysMenuId) return Promise.resolve("");
+            if (!this._formDesignLookups) this._formDesignLookups = new Map();
+            if (this._formDesignLookups.has(sysMenuId)) return this._formDesignLookups.get(sysMenuId);
+
+            const lookup = hydrateTabFormDesignContext(tag, this.formDesignMap, (menuId) => (
+                this.DiyCommon.FormEngine.GetFormData("sys_menu", {
+                    Id: menuId,
+                    _SelectFields: ["Id", "DiyTableId", "DiyTableName"]
+                })
+            )).finally(() => {
+                this._formDesignLookups.delete(sysMenuId);
+            });
+            this._formDesignLookups.set(sysMenuId, lookup);
+            return lookup;
+        },
+        async openFormDesign(tag) {
+            this.closeMenu();
+            const diyTableId = this.getDiyTableIdFromTag(tag) || await this.warmupFormDesignContext(tag);
+            if (!diyTableId) {
+                this.DiyCommon.Tips("当前标签未绑定表单，无法打开表单设计！", false);
+                return;
+            }
+            this.$router.push({
+                path: `/diy/diy-design/${diyTableId}`,
+                query: { PageType: "" }
+            });
         },
         getPageEngineIdFromTag(tag = {}) {
             const meta = tag.meta || {};

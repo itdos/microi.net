@@ -409,12 +409,16 @@ namespace Microi.net
             if (!param._Keyword.DosIsNullOrWhiteSpace())
             {
                 hasKeyword = true;
-                // Regex 搜索 Title + Content（中文无法用 $text 分词，Regex 正确匹配子串）
-                // 仅搜 2 个关键字段，比原先 11 字段 OR 快很多
+                // 保留旧日志页最常用的“标题、内容、用户、IP”搜索，并补充 TraceId。
+                // Regex 无法使用 B-Tree；下方固定 Hint CreateTime 索引并采用“多取一条”，
+                // 避免再为关键字搜索执行一次完整 Count。
                 var rx = new BsonRegularExpression(System.Text.RegularExpressions.Regex.Escape(param._Keyword), "i");
                 list.Add(Builders<SysLog>.Filter.Or(
                     Builders<SysLog>.Filter.Regex(d => d.Title, rx),
-                    Builders<SysLog>.Filter.Regex(d => d.Content, rx)
+                    Builders<SysLog>.Filter.Regex(d => d.Content, rx),
+                    Builders<SysLog>.Filter.Regex(d => d.UserName, rx),
+                    Builders<SysLog>.Filter.Regex(d => d.IP, rx),
+                    Builders<SysLog>.Filter.Regex(d => d.TraceId, rx)
                 ));
                 //where.And(d => d.Title.Like(param._Keyword)
                 //                || d.Content.Like(param._Keyword)
@@ -1231,14 +1235,17 @@ namespace Microi.net
                     ? DateTime.Now.ToString("yyyyMM") : param._SearchMonth);
                 var host = CreateTenantMongoHost(param.OsClient, tableName);
 
-                // 关键字过滤（同 GetSysLog 逻辑，Regex 搜 Title + Content）
+                // 关键字过滤与 GetSysLog 保持一致，避免统计卡和列表口径不同。
                 FilterDefinition<SysLog> kwFilter = null;
                 if (!param._Keyword.DosIsNullOrWhiteSpace())
                 {
                     var rx = new BsonRegularExpression(System.Text.RegularExpressions.Regex.Escape(param._Keyword), "i");
                     kwFilter = Builders<SysLog>.Filter.Or(
                         Builders<SysLog>.Filter.Regex(d => d.Title, rx),
-                        Builders<SysLog>.Filter.Regex(d => d.Content, rx)
+                        Builders<SysLog>.Filter.Regex(d => d.Content, rx),
+                        Builders<SysLog>.Filter.Regex(d => d.UserName, rx),
+                        Builders<SysLog>.Filter.Regex(d => d.IP, rx),
+                        Builders<SysLog>.Filter.Regex(d => d.TraceId, rx)
                     );
                 }
 
@@ -1255,6 +1262,7 @@ namespace Microi.net
                         .Group(new BsonDocument
                         {
                             { "_id", BsonNull.Value },
+                            { "Total", new BsonDocument("$sum", 1) },
                             { "Error", new BsonDocument("$sum", new BsonDocument("$cond",
                                 new BsonArray { new BsonDocument("$eq", new BsonArray { "$Level", 3 }), 1, 0 })) },
                             { "Warn", new BsonDocument("$sum", new BsonDocument("$cond",
@@ -1273,6 +1281,7 @@ namespace Microi.net
                         Code = 1,
                         Data = new
                         {
+                            Total = aggResult?["Total"].ToInt64() ?? 0,
                             Error = aggResult?["Error"].ToInt64() ?? 0,
                             Warn = aggResult?["Warn"].ToInt64() ?? 0,
                             SlowSQL = aggResult?["SlowSQL"].ToInt64() ?? 0,
@@ -1288,19 +1297,21 @@ namespace Microi.net
                 Func<FilterDefinition<SysLog>, Task<long>> countFn;
                 countFn = f => TMongodbHelper<SysLog>.CountAsync(host, f);
 
-                // 5 个 Count 并行执行
+                // 分类 Count 并行执行；总量走集合估算，不再增加一次精确全表 Count。
+                var totalTask = TMongodbHelper<SysLog>.CountEstimatedAsync(host);
                 var t1 = countFn(Combine(Builders<SysLog>.Filter.Where(d => d.Level == 3)));
                 var t2 = countFn(Combine(Builders<SysLog>.Filter.Where(d => d.Level == 2)));
                 var t3 = countFn(Combine(Builders<SysLog>.Filter.Where(d => d.Type == "数据库慢SQL")));
                 var t4 = countFn(Combine(Builders<SysLog>.Filter.Where(d => d.Type == "表单V8慢日志")));
                 var t5 = countFn(Combine(Builders<SysLog>.Filter.Where(d => d.Type == "Exception")));
-                await Task.WhenAll(t1, t2, t3, t4, t5);
+                await Task.WhenAll(totalTask, t1, t2, t3, t4, t5);
 
                 return new DosResult
                 {
                     Code = 1,
                     Data = new
                     {
+                        Total = totalTask.Result,
                         Error = t1.Result,
                         Warn = t2.Result,
                         SlowSQL = t3.Result,

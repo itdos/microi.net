@@ -7,6 +7,8 @@ using System.Data;
 using System;
 using System.Dynamic;
 using Dos.Common;
+using System.Globalization;
+using System.Linq;
 
 namespace Microi.net
 {
@@ -296,7 +298,12 @@ namespace Microi.net
         public List<dynamic> ExcelToListDynamic(
             int sheetIndex = 0,
             int? maxDataRows = null,
-            int? maxColumns = null)
+            int? maxColumns = null,
+            int? headerStartRow = null,
+            int? headerEndRow = null,
+            int? dataStartRow = null,
+            int? dataEndRow = null,
+            IEnumerable<ExcelImportColumnParam> columnMappings = null)
         {
             if (_IWorkbook == null)
             {
@@ -315,184 +322,246 @@ namespace Microi.net
             {
                 throw new ArgumentException($"未读取到第{sheetIndex + 1}个Sheet，请检查Excel文件内容。");
             }
-            return ExcelToListDynamic(sheet, maxDataRows, maxColumns);
+            return ExcelToListDynamic(
+                sheet,
+                maxDataRows,
+                maxColumns,
+                headerStartRow,
+                headerEndRow,
+                dataStartRow,
+                dataEndRow,
+                columnMappings);
         }
+
+        private sealed class ExcelDynamicColumnDefinition
+        {
+            public int ColumnIndex { get; set; }
+            public string FieldName { get; set; }
+        }
+
+        private static int ExcelColumnNameToIndex(string column)
+        {
+            if (column.DosIsNullOrWhiteSpace()) return -1;
+            var value = 0;
+            foreach (var character in column.Trim().ToUpperInvariant())
+            {
+                if (character < 'A' || character > 'Z') return -1;
+                value = value * 26 + character - 'A' + 1;
+            }
+            return value - 1;
+        }
+
+        private static ICell GetMergedAnchorCell(ISheet sheet, int rowIndex, int columnIndex)
+        {
+            for (var mergeIndex = 0; mergeIndex < sheet.NumMergedRegions; mergeIndex++)
+            {
+                var range = sheet.GetMergedRegion(mergeIndex);
+                if (range != null && range.IsInRange(rowIndex, columnIndex))
+                {
+                    return sheet.GetRow(range.FirstRow)?.GetCell(range.FirstColumn);
+                }
+            }
+            return sheet.GetRow(rowIndex)?.GetCell(columnIndex);
+        }
+
+        private static object GetExcelCellValue(ICell cell, IFormulaEvaluator evaluator, DataFormatter formatter)
+        {
+            if (cell == null) return null;
+            try
+            {
+                if (cell.CellType == CellType.Formula)
+                {
+                    var formulaValue = formatter.FormatCellValue(cell, evaluator)?.Trim();
+                    return formulaValue.DosIsNullOrWhiteSpace() ? null : formulaValue;
+                }
+                switch (cell.CellType)
+                {
+                    case CellType.String:
+                        var text = cell.StringCellValue?.Trim();
+                        return text.DosIsNullOrWhiteSpace() ? null : text;
+                    case CellType.Numeric:
+                        if (DateUtil.IsValidExcelDate(cell.NumericCellValue) && DateUtil.IsCellDateFormatted(cell))
+                        {
+                            return cell.DateCellValue?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                        }
+                        return cell.NumericCellValue.ToString(CultureInfo.InvariantCulture);
+                    case CellType.Boolean:
+                        return cell.BooleanCellValue;
+                    default:
+                        return null;
+                }
+            }
+            catch
+            {
+                var fallback = formatter.FormatCellValue(cell, evaluator)?.Trim();
+                return fallback.DosIsNullOrWhiteSpace() ? null : fallback;
+            }
+        }
+
+        private static string BuildExcelHeader(
+            ISheet sheet,
+            int headerStartIndex,
+            int headerEndIndex,
+            int columnIndex,
+            IFormulaEvaluator evaluator,
+            DataFormatter formatter)
+        {
+            var values = new List<string>();
+            for (var rowIndex = headerStartIndex; rowIndex <= headerEndIndex; rowIndex++)
+            {
+                var value = GetExcelCellValue(
+                    GetMergedAnchorCell(sheet, rowIndex, columnIndex),
+                    evaluator,
+                    formatter)?.ToString()?.Trim();
+                if (!value.DosIsNullOrWhiteSpace() && (values.Count == 0 || values.Last() != value))
+                {
+                    values.Add(value);
+                }
+            }
+            return string.Join(" / ", values);
+        }
+
         private List<dynamic> ExcelToListDynamic(
             ISheet sheet,
             int? maxDataRows,
-            int? maxColumns)
+            int? maxColumns,
+            int? headerStartRow,
+            int? headerEndRow,
+            int? dataStartRow,
+            int? dataEndRow,
+            IEnumerable<ExcelImportColumnParam> columnMappings)
         {
+            if (sheet == null) throw new ArgumentException("Excel Sheet为空。");
+
+            var firstRowNumber = sheet.FirstRowNum + 1;
+            var lastRowNumber = sheet.LastRowNum + 1;
+            var normalizedHeaderStartRow = headerStartRow ?? firstRowNumber;
+            var normalizedHeaderEndRow = headerEndRow ?? normalizedHeaderStartRow;
+            var normalizedDataStartRow = dataStartRow ?? normalizedHeaderEndRow + 1;
+            var normalizedDataEndRow = Math.Min(dataEndRow ?? lastRowNumber, lastRowNumber);
+            if (normalizedHeaderStartRow < firstRowNumber || normalizedHeaderStartRow > lastRowNumber)
+            {
+                throw new ArgumentException($"表头起始行{normalizedHeaderStartRow}超出Sheet有效范围{firstRowNumber}-{lastRowNumber}。");
+            }
+            if (normalizedHeaderEndRow < normalizedHeaderStartRow || normalizedHeaderEndRow >= normalizedDataStartRow)
+            {
+                throw new ArgumentException("表头行范围无效，表头结束行必须不小于起始行且位于数据起始行之前。");
+            }
+            if (normalizedDataStartRow < firstRowNumber || normalizedDataEndRow < normalizedDataStartRow)
+            {
+                throw new ArgumentException("数据行范围无效，请确认数据起始行和结束行。");
+            }
+
+            var configuredColumns = (columnMappings ?? Enumerable.Empty<ExcelImportColumnParam>())
+                .Where(item => item != null)
+                .ToList();
+            if (maxColumns.HasValue && configuredColumns.Count > maxColumns.Value)
+            {
+                throw new ArgumentException($"Excel有效列数{configuredColumns.Count}超过上限{maxColumns.Value}，请精简后导入。");
+            }
+
+            var evaluator = _IWorkbook.GetCreationHelper().CreateFormulaEvaluator();
+            var formatter = new DataFormatter();
+            var columnDefinitions = new List<ExcelDynamicColumnDefinition>();
+            if (configuredColumns.Any())
+            {
+                var fieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var mapping in configuredColumns)
+                {
+                    var columnIndex = mapping.ColumnIndex ?? ExcelColumnNameToIndex(mapping.Column);
+                    var fieldName = !mapping.Name.DosIsNullOrWhiteSpace()
+                        ? mapping.Name.Trim()
+                        : (!mapping.Label.DosIsNullOrWhiteSpace() ? mapping.Label.Trim() : mapping.Header?.Trim());
+                    if (columnIndex < 0 || fieldName.DosIsNullOrWhiteSpace())
+                    {
+                        throw new ArgumentException("Excel列映射包含无效的列索引或目标字段。");
+                    }
+                    if (!fieldNames.Add(fieldName))
+                    {
+                        throw new ArgumentException($"Excel列映射中的目标字段[{fieldName}]重复。");
+                    }
+                    columnDefinitions.Add(new ExcelDynamicColumnDefinition
+                    {
+                        ColumnIndex = columnIndex,
+                        FieldName = fieldName
+                    });
+                }
+            }
+            else
+            {
+                var lastCellIndex = -1;
+                for (var rowIndex = normalizedHeaderStartRow - 1; rowIndex <= normalizedHeaderEndRow - 1; rowIndex++)
+                {
+                    var row = sheet.GetRow(rowIndex);
+                    if (row != null) lastCellIndex = Math.Max(lastCellIndex, row.LastCellNum - 1);
+                }
+                if (lastCellIndex < 0)
+                {
+                    throw new ArgumentException($"Excel Sheet[{sheet.SheetName}]表头为空，请确认指定行包含字段标题。");
+                }
+                var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (var columnIndex = 0; columnIndex <= lastCellIndex; columnIndex++)
+                {
+                    var fieldName = BuildExcelHeader(
+                        sheet,
+                        normalizedHeaderStartRow - 1,
+                        normalizedHeaderEndRow - 1,
+                        columnIndex,
+                        evaluator,
+                        formatter);
+                    if (fieldName.DosIsNullOrWhiteSpace()) continue;
+                    var uniqueName = fieldName;
+                    var suffix = 2;
+                    while (!usedNames.Add(uniqueName)) uniqueName = $"{fieldName}_{suffix++}";
+                    columnDefinitions.Add(new ExcelDynamicColumnDefinition
+                    {
+                        ColumnIndex = columnIndex,
+                        FieldName = uniqueName
+                    });
+                }
+            }
+
+            if (!columnDefinitions.Any())
+            {
+                throw new ArgumentException($"Excel Sheet[{sheet.SheetName}]未读取到有效表头或列映射。");
+            }
+            if (maxColumns.HasValue && columnDefinitions.Count > maxColumns.Value)
+            {
+                throw new ArgumentException($"Excel有效列数{columnDefinitions.Count}超过上限{maxColumns.Value}，请精简后导入。");
+            }
+            if (maxDataRows.HasValue
+                && normalizedDataEndRow - normalizedDataStartRow + 1 > maxDataRows.Value * 5L)
+            {
+                throw new ArgumentException("Excel数据范围包含过多空行，请重新指定紧凑的数据起止行。");
+            }
+
             var list = new List<dynamic>();
-            if (sheet == null)
+            var enhancedMode = headerStartRow.HasValue
+                || headerEndRow.HasValue
+                || dataStartRow.HasValue
+                || dataEndRow.HasValue
+                || configuredColumns.Any();
+            for (var rowNumber = normalizedDataStartRow; rowNumber <= normalizedDataEndRow; rowNumber++)
             {
-                throw new ArgumentException("Excel Sheet为空。");
-            }
-            var headRow = sheet.GetRow(sheet.FirstRowNum);
-            if (headRow == null)
-            {
-                throw new ArgumentException($"Excel Sheet[{sheet.SheetName}]未读取到表头行，请确认第一行是字段标题。");
-            }
-            var cells = headRow.Cells;
-            if (cells == null || cells.Count == 0)
-            {
-                throw new ArgumentException($"Excel Sheet[{sheet.SheetName}]表头为空，请确认第一行是字段标题。");
-            }
-            var dataRowCount = Math.Max(0, sheet.LastRowNum - sheet.FirstRowNum);
-            if (maxDataRows.HasValue && dataRowCount > maxDataRows.Value)
-            {
-                throw new ArgumentException(
-                    $"Excel数据行数{dataRowCount}超过上限{maxDataRows.Value}，请拆分后导入。");
-            }
-            var fields = new List<string>();
-            foreach (var cell in cells)
-            {
-                var fieldName = cell?.ToString();
-                if (!fieldName.DosIsNullOrWhiteSpace())
-                {
-                    fields.Add(fieldName.Trim());
-                }
-            }
-            if (fields.Count == 0)
-            {
-                throw new ArgumentException($"Excel Sheet[{sheet.SheetName}]未读取到有效表头，请确认第一行是字段标题。");
-            }
-            if (maxColumns.HasValue && fields.Count > maxColumns.Value)
-            {
-                throw new ArgumentException(
-                    $"Excel有效列数{fields.Count}超过上限{maxColumns.Value}，请精简后导入。");
-            }
-
-            //遍历每一行数据
-            for (int i = sheet.FirstRowNum + 1, len = sheet.LastRowNum + 1; i < len; i++)
-            {
+                var row = sheet.GetRow(rowNumber - 1);
+                if (row == null) continue;
                 dynamic expandoObject = new ExpandoObject();
-                IDictionary<string, object> dictionary = (IDictionary<string, object>)expandoObject;
-                IRow row = sheet.GetRow(i);
-                if (row != null)
+                var dictionary = (IDictionary<string, object>)expandoObject;
+                var hasValue = false;
+                foreach (var column in columnDefinitions)
                 {
-                    #region 如果第一列的值就为空了，整行不要
-                    ICell cell1 = row.GetCell(0);
-                    if (cell1 == null)
-                    {
-                        continue;
-                    }
-                    object cellValue1 = null;
-                    switch (cell1.CellType)
-                    {
-                        case CellType.String: //文本
-                            cellValue1 = cell1.StringCellValue;
-                            break;
-                        case CellType.Numeric: //数值
-                            cellValue1 = cell1.NumericCellValue;//Double转换为int.。//2020-06-17是哪个SB说要转成int的？不要5.20这种小数点？
-                            break;
-                        case CellType.Boolean: //bool
-                            cellValue1 = cell1.BooleanCellValue;
-                            break;
-                        case CellType.Blank: //空白
-                            cellValue1 = "";
-                            break;
-                        default:
-                            cellValue1 = "";
-                            break;
-                    }
-                    if (cellValue1 == null || cellValue1.ToString().DosIsNullOrWhiteSpace())
-                    {
-                        continue;
-                    }
-                    #endregion
-
-
-                    for (int j = 0, len2 = fields.Count; j < len2; j++)
-                    {
-                        try
-                        {
-                            ICell cell = row.GetCell(j);
-                            object cellValue = null;
-                            if (cell == null)
-                            {
-                                continue;
-                            }
-                            switch (cell.CellType)
-                            {
-                                case CellType.String: //文本
-                                    cellValue = cell.StringCellValue;
-                                    break;
-                                case CellType.Numeric: //数值。注意：日期也是数值，所以这里要判断
-                                    if (DateUtil.IsValidExcelDate(cell.NumericCellValue) && DateUtil.IsCellDateFormatted(cell))
-                                    {
-                                        DateTime D = row.GetCell(j).DateCellValue.Value;
-                                        cellValue = (D.ToString().Length == 0 || D.ToString().Contains("#")) ? "" : D.ToString();
-                                    }
-                                    else
-                                    {
-                                        double strValue = cell.NumericCellValue;
-                                        cellValue = (strValue.ToString().Length == 0 || strValue.ToString().Contains("#")) ? "" : strValue.ToString();
-                                    }
-                                    //cellValue = cell.NumericCellValue;//Double转换为int.。//2020-06-17是哪个SB说要转成int的？不要5.20这种小数点？
-                                    break;
-                                case CellType.Boolean: //bool
-                                    cellValue = cell.BooleanCellValue;
-                                    break;
-                                case CellType.Blank: //空白
-                                    cellValue = "";
-                                    break;
-                                case CellType.Formula: //公式：也可能是图片
-                                    //if (cell.CellType == CellType.String)
-                                    //{
-                                    //    // 获取富文本字符串
-                                    //    IRichTextString richText = cell.RichStringCellValue;
-
-                                    //    // 循环获取图片
-                                    //    for (int k = 0; k < richText.NumFormattingRuns; k++)
-                                    //    {
-                                    //        if (richText.GetFontAtIndex(k).IsBold) // 通常图片会被设置为粗体
-                                    //        {
-                                    //            // 获取图片
-                                    //            byte[] bytes = richText.GetFontAtIndex(i).GetImage();
-
-                                    //            // 将字节流保存为文件或进行其他处理
-                                    //            using (FileStream fs = new FileStream("output.png", FileMode.Create, FileAccess.Write))
-                                    //            {
-                                    //                fs.Write(bytes, 0, bytes.Length);
-                                    //            }
-
-                                    //            break; // 通常只有一个图片，所以我们只需要第一个图片即可
-                                    //        }
-                                    //    }
-                                    //}
-                                    cellValue = "";
-                                    break;
-                                default:
-                                    cellValue = "";
-                                    break;
-                            }
-
-                            //typeof(T).GetProperty(fields[j]).SetValue(t, cellValue, null);
-                            // #if !NET461 && !NETSTANDARD2_0
-                            // expandoObject.TryAdd(fields[j], cellValue);
-                            // expandoObject[fields[j]] = cellValue;
-                            if (!dictionary.ContainsKey(fields[j]))
-                            {
-                                dictionary.Add(fields[j], cellValue);
-                            }
-                            else
-                            {
-                                dictionary[fields[j]] = cellValue; // 更新值
-                            }
-                            // #endif
-                        }
-                        catch (Exception ex)
-                        {
-                            //LogHelper.Error(ex.Message, "ExcelToListDynamic_");
-                        }
-
-
-                    }
-                    list.Add(expandoObject);
+                    var value = GetExcelCellValue(row.GetCell(column.ColumnIndex), evaluator, formatter);
+                    dictionary[column.FieldName] = value;
+                    if (value != null && !value.ToString().DosIsNullOrWhiteSpace()) hasValue = true;
                 }
-
+                if (!hasValue) continue;
+                if (maxDataRows.HasValue && list.Count >= maxDataRows.Value)
+                {
+                    throw new ArgumentException($"Excel数据行数超过上限{maxDataRows.Value}，请拆分后导入。");
+                }
+                if (enhancedMode) dictionary["_ExcelRow"] = rowNumber;
+                list.Add(expandoObject);
             }
-
             return list;
         }
     }

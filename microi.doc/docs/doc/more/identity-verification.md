@@ -127,7 +127,7 @@ return V8.FormEngine.UptFormData('payment_order', {
 
 ## 四、租户系统设置与安全边界
 
-数据库、Redis、MongoDB、MinIO、MQ 等部署级连接仍放在主控数据库的 `sys_osclients`，子租户不能修改。需要浏览器读取的登录入口显示、品牌文字等公开配置在当前租户 `sys_config` 创建实体字段；OAuth 开关、ClientId/ClientSecret 等后端私密配置放在当前租户的 `mci_system_setting`，由【系统设置 → 登录与身份】关联维护，不新增 API 环境变量或 `appsettings` 节点。
+数据库、Redis、MongoDB、MinIO、MQ 等部署级连接仍放在主控数据库的 `sys_osclients`，子租户不能修改。登录能力、入口显示、品牌文字等公开配置在当前租户 `sys_config` 创建实体字段；OAuth ClientId/ClientSecret、Passkey RP/Origin、Authenticator Issuer、Face Gateway 和其它仅供后端执行的参数放在当前租户的 `mci_system_setting`，由【系统设置 → 安全与服务接入】维护，不新增 API 环境变量或 `appsettings` 节点。
 
 两张表的边界固定，不允许用运行时勾选把私密记录临时公开：
 
@@ -140,13 +140,13 @@ return V8.FormEngine.UptFormData('payment_order', {
 
 | Key | 类型/可见性 | 说明 | 默认值 |
 |---|---|---|---|
-| `Login.Identity.Enabled` | Bool / 服务端私有 | 登录方式总开关 | `true` |
-| `Login.Passkey.Enabled` | Bool / 服务端私有 | Passkey/WebAuthn | `true` |
-| `Login.Authenticator.Enabled` | Bool / 服务端私有 | TOTP Authenticator | `true` |
-| `Security.PasswordChange.RequireStepUp` | Bool / 服务端私有 | 已有强因子时改密需二次验证 | `true` |
-| `Login.External.Enabled` | Bool / 服务端私有 | 第三方登录总开关 | `true` |
-| `Login.Face.Enabled` | Bool / 服务端私有 | 严格人脸入口 | `false` |
-| `Login.Gitee.Enabled` / `Login.WeChat.Enabled` / `Login.GitHub.Enabled` | Bool / 服务端私有 | 对应外部登录能力 | `false` |
+| `sys_config.IdentityVerificationEnabled` | Bool / 浏览器公开 | 登录方式总开关 | `1` |
+| `sys_config.PasskeyEnabled` | Bool / 浏览器公开 | Passkey/WebAuthn | `1` |
+| `sys_config.AuthenticatorTotpEnabled` | Bool / 浏览器公开 | TOTP Authenticator | `1` |
+| `sys_config.RequirePasswordChangeStepUp` | Bool / 浏览器公开 | 已有强因子时改密需二次验证 | `1` |
+| `sys_config.ExternalLoginEnabled` | Bool / 浏览器公开 | 第三方登录总开关 | `1` |
+| `sys_config.FaceVerificationEnabled` | Bool / 浏览器公开 | 严格人脸入口 | `0` |
+| `sys_config.GiteeLoginEnabled` / `WeChatLoginEnabled` / `GitHubLoginEnabled` | Bool / 浏览器公开 | 对应外部登录能力 | `0` |
 | `sys_config.DisableLoginPasskey` 等五个实体字段 | Bool / 浏览器公开 | 关闭对应登录入口；缺失、空值或 `0` 默认显示，显式 `1` 才关闭 | `0` |
 | `Login.{Provider}.ClientId` | String / 服务端私有 | OAuth 应用 ClientId | 无 |
 | `Login.{Provider}.ClientSecret` | String / Secret | OAuth 应用 ClientSecret | 无 |
@@ -154,9 +154,9 @@ return V8.FormEngine.UptFormData('payment_order', {
 
 `{Provider}` 目前支持 `Gitee`、`WeChat`、`GitHub`。回调地址由后端按当前 API 域名固定生成：`/api/ExternalLogin/Callback?OsClient={租户}&Provider={Provider}`，应把【开始授权】接口返回的 `CallbackUrl` 原样登记到第三方平台。生产环境必须使用 HTTPS；`localhost` 仅用于受控开发。RP ID、Origin 或第三方回调域名配错时，浏览器/供应商会正确拒绝验证。
 
-五个浏览器公开字段完整名称为 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub`。旧 `LoginPasskeyDisplay`、`LoginAuthenticatorDisplay`、`LoginGiteeDisplay`、`LoginWeChatDisplay`、`LoginGitHubDisplay` 只用于兼容尚未升级的租户，不再作为新配置入口。
+五个浏览器公开字段完整名称为 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub`。旧 `LoginPasskeyDisplay`、`LoginAuthenticatorDisplay`、`LoginGiteeDisplay`、`LoginWeChatDisplay`、`LoginGitHubDisplay` 只用于兼容尚未升级的租户，不再作为新配置入口。旧 `mci_system_setting` 的 `Login.*.Enabled` / `Security.PasswordChange.RequireStepUp` 同样只在对应新实体字段缺失或为空时回退读取；新版“安全与服务接入”不再显示、保存或删除这些迁移项。
 
-官方应用商城 `app.microi.saas-engine` 会幂等安装身份表、动态设置表、外部身份表、默认设置、个人中心和租户系统设置微服务。默认行使用 `InsertIfMissing + ConfigKey`：老租户升级后自动看见功能，租户后来明确保存的值不会被下一次升级覆盖。为了兼容旧配置，默认行仍允许历史 `sys_osclients` 身份开关在租户首次保存新设置前生效；一旦保存，`ValueSource=Tenant` 的租户值成为事实源。
+官方应用商城 `app.microi.saas-engine` 会幂等安装身份表、动态私密设置表、外部身份表、公开系统设置字段、个人中心和租户系统设置微服务。老租户升级后会得到新的公开字段，安装器不会覆盖租户已有明确选择。运行时只在新字段缺失或为空时读取历史 `mci_system_setting` / `sys_osclients` 值；管理员一旦保存新字段，`sys_config` 就成为能力开关的唯一事实源。
 
 ## 五、平台数据
 
@@ -214,8 +214,8 @@ Authorization: Bearer {FaceApiKey}
 
 ## 八、启用顺序与验收
 
-1. 更新后端并确认自动升级已成功导入 `app.microi.saas-engine`；或在应用商城手动更新“SaaS引擎”，回读六张表、默认设置、索引和 `microi-platform-service` 版本。
-2. Passkey 与 TOTP 默认开启；登录页【登录方式】应能展示已启用方式。生产环境建议显式配置 Passkey RP ID/Origins；需要严格人脸时再配置网关。
+1. 更新平台前端与后端，并确认自动升级已成功导入最新版“系统设置”和 `app.microi.saas-engine`；仅更新应用包不会替换旧后端 DLL 或旧登录页静态资源。回读六张表、公开开关、索引和 `microi-platform-service` 版本。
+2. 在【系统设置】打开统一身份、Passkey / TOTP 能力及对应登录入口；登录页【登录方式】应能展示已启用方式。Passkey 的生产前端必须使用可信 HTTPS，并建议显式配置 RP ID/Origins；需要严格人脸时再配置网关。
 3. 在【个人中心 → 身份验证器】登记 Passkey/TOTP，并逐个决定是否允许免密码登录、二次授权；至少保留两个恢复因子或管理员重置路径。
 4. 如需外部登录，在【系统设置 → 登录与身份】配置 Provider 开关、ClientId、ClientSecret 和可选 Scope，先在个人中心绑定，再从退出后的登录页完成真实授权。
 5. 验证 PC 和手机登录、本人改密、用途策略切换、凭据/外部绑定撤销、TOTP 重放、OAuth state 重放、重复票据、过期票据、跨用户/跨租户票据。

@@ -9,20 +9,20 @@ namespace Microi.net
     /// <summary>
     /// Migrates backend form-event runtime control from the negative
     /// diy_table.V8Unlimited switch to the positive diy_table.V8Limit switch.
-    /// Existing rows whose positive switch is still null are inverted so an old
-    /// database keeps its behaviour; repeated execution preserves every explicit
-    /// V8Limit=0/1 choice. All new records default to V8Limit=0 (unrestricted).
+    /// The version-gated migration resets every existing table to unrestricted
+    /// exactly once. Startup invariant calls only initialize missing/null values,
+    /// so a user's later explicit V8Limit=0/1 choice is never overwritten.
     /// </summary>
     public sealed class Upgrade33
     {
-        public static string Version = "6.9.8.8";
+        public static string Version = "6.9.8.9";
 
         public const string FieldName = "V8Limit";
         public const string LegacyFieldName = "V8Unlimited";
         public const string Description =
             "默认关闭，后端表单 V8 事件不设置 Jint 单次执行超时、最大语句数、函数递归和累计分配预算；只有打开后才启用这些单次限制。进程/容器常驻内存保护、取消、并发、嵌套深度、权限沙箱和数据库保护始终生效。";
 
-        public async Task<List<string>> Run(string osClient)
+        public async Task<List<string>> Run(string osClient, bool resetExistingValues = true)
         {
             var messages = new List<string>();
             try
@@ -52,20 +52,31 @@ namespace Microi.net
                 if (messages.Count > 0) return messages;
 
                 UpgradeExecutionLeaseContext.ThrowIfLost();
-                // This method is also a current-runtime invariant outside the
-                // ServerVersion gate. Only initialize rows that have not acquired
-                // the positive switch yet, so retries and version drift cannot
-                // overwrite a user's later V8Limit=0/1 choice.
-                client.Db.FromSql(@"UPDATE diy_table
-                        SET V8Limit = CASE
-                            WHEN V8Unlimited = @p0 THEN @p1
-                            WHEN V8Unlimited = @p1 THEN @p0
-                            ELSE @p1
-                        END
-                        WHERE V8Limit IS NULL")
-                    .AddInParameter("p0", 1)
-                    .AddInParameter("p1", 0)
-                    .ExecuteNonQuery();
+                if (resetExistingValues)
+                {
+                    // Upgrade.cs advances ServerVersion only after Run succeeds.
+                    // This historical correction therefore runs once and makes
+                    // every pre-existing form-event runtime unrestricted.
+                    client.Db.FromSql(@"UPDATE diy_table
+                            SET V8Limit = @p0,
+                                V8Unlimited = @p1")
+                        .AddInParameter("p0", 0)
+                        .AddInParameter("p1", 1)
+                        .ExecuteNonQuery();
+                }
+                else
+                {
+                    // Hosted startup uses this metadata invariant before reading
+                    // ServerVersion. It may fill only uninitialized rows and must
+                    // never undo a tenant's later explicit V8Limit choice.
+                    client.Db.FromSql(@"UPDATE diy_table
+                            SET V8Limit = @p0,
+                                V8Unlimited = @p1
+                            WHERE V8Limit IS NULL")
+                        .AddInParameter("p0", 0)
+                        .AddInParameter("p1", 1)
+                        .ExecuteNonQuery();
+                }
             }
             catch (Exception ex)
             {
@@ -157,8 +168,7 @@ namespace Microi.net
                         ["OsClient"] = osClient,
                         ["TableId"] = tableId,
                         ["Visible"] = 0,
-                        ["AppVisible"] = 0,
-                        ["IsDeleted"] = 1
+                        ["AppVisible"] = 0
                     }).ConfigureAwait(false);
                 if (hide.Code != 1)
                 {

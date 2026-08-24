@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.8.3
+ * Version: v1.8.7
  * Function:
- * - 统一应用商城发布器：V3 committed proof、精确版本、共享公共运行时，以及受管接口历史兼容基线的连续发布。
+ * - 统一应用商城发布器：V3 committed proof、精确版本、租户范围更新日志硬门禁、资源快照 CAS、共享公共运行时，以及受管接口历史兼容基线的连续发布。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -233,7 +233,7 @@ function getMicroService(appKey) {
   return { Service: service.Data, Pages: pages && pages.Code === 1 ? toArray(pages.Data) : [] };
 }
 function getApplicationInfrastructure() {
-  var tableNames = ['sys_microistore', 'mci_ai_app_file', 'mci_ai_app_version', 'sys_microiservice', 'sys_microiservice_page'];
+  var tableNames = ['sys_microistore', 'sys_microistore_changelog', 'mci_ai_app_file', 'mci_ai_app_version', 'sys_microiservice', 'sys_microiservice_page'];
   var tablesResult = V8.FormEngine.GetTableData('diy_table', {
     _Where: [['Name', 'In', tableNames]],
     _PageSize: 100
@@ -248,6 +248,7 @@ function getApplicationInfrastructure() {
   });
   if (!fieldsResult || fieldsResult.Code !== 1) throw new Error('读取在线应用基础字段定义失败：' + ((fieldsResult && fieldsResult.Msg) || ''));
   var ddls = [
+    { TableName: 'sys_microistore_changelog', DDL: "CREATE TABLE IF NOT EXISTS `sys_microistore_changelog` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL DEFAULT 0,`OsClient` varchar(50) NOT NULL,`StoreId` varchar(50) NOT NULL,`Version` varchar(50) NOT NULL,`Title` varchar(200) NOT NULL,`ChangeType` varchar(50) NOT NULL DEFAULT 'Feature',`Content` mediumtext NOT NULL,`ReleaseTime` varchar(25) NOT NULL,`Sort` int NULL DEFAULT 100,UNIQUE KEY `ux_microistore_changelog_store_version` (`OsClient`,`StoreId`,`Version`),KEY `ix_microistore_changelog_store_release` (`OsClient`,`StoreId`,`ReleaseTime`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
     { TableName: 'sys_microistore', DDL: "CREATE TABLE IF NOT EXISTS `sys_microistore` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`AppName` varchar(200) NULL,`Name` varchar(200) NULL,`AppId` varchar(100) NULL,`AppKey` varchar(200) NULL,`AppVersion` varchar(50) NULL,`AppPublishTime` varchar(25) NULL,`AppUpdateTime` varchar(25) NULL,`AppAuthor` varchar(100) NULL,`AppAuthorAvatar` mediumtext NULL,`AppDetail` mediumtext NULL,`Description` mediumtext NULL,`AppPrice` int NULL,`AppOriPrice` int NULL,`AppRate` decimal(18,1) NULL,`AppPakcet` mediumtext NULL,`AppPreview` mediumtext NULL,`IsApprove` int NULL,`AppType` varchar(50) NULL,`ApplicationType` varchar(50) NULL,`Category` varchar(50) NULL,`PublisherType` varchar(50) NULL,`Status` varchar(50) NULL,`OwnerUserId` varchar(50) NULL,`OwnerName` varchar(200) NULL,`CurrentVersion` int NULL,`PreviewUrl` varchar(2000) NULL,`PublicPublishPath` varchar(2000) NULL,`PrivateSourcePath` varchar(2000) NULL,`BuildStatus` varchar(50) NULL,`LastBuildTaskId` varchar(50) NULL,`LastBuildMsg` mediumtext NULL,`LastConversationId` varchar(50) NULL,`ViewCount` int NULL,`InstallCount` int NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
     { TableName: 'mci_ai_app_file', DDL: "CREATE TABLE IF NOT EXISTS `mci_ai_app_file` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`AppId` varchar(50) NULL,`AppName` varchar(200) NULL,`VersionId` varchar(50) NULL,`FilePath` varchar(1000) NULL,`FileName` varchar(255) NULL,`FileType` varchar(50) NULL,`HdfsPath` varchar(1000) NULL,`PublishHdfsPath` varchar(1000) NULL,`StorageScope` varchar(50) NULL,`ContentHash` varchar(100) NULL,`Size` bigint NULL,`Version` int NULL,`IsDirectory` int NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
     { TableName: 'mci_ai_app_version', DDL: "CREATE TABLE IF NOT EXISTS `mci_ai_app_version` (`Id` varchar(36) NOT NULL PRIMARY KEY,`CreateTime` datetime NULL,`UpdateTime` datetime NULL,`UserId` varchar(36) NULL,`UserName` varchar(255) NULL,`IsDeleted` int NULL,`AppId` varchar(50) NULL,`AppName` varchar(200) NULL,`VersionNo` varchar(50) NULL,`VersionName` varchar(200) NULL,`Status` varchar(50) NULL,`SourceSnapshotPath` varchar(1000) NULL,`PublishPath` varchar(1000) NULL,`PreviewUrl` varchar(1000) NULL,`BuildTaskId` varchar(50) NULL,`BuildLog` mediumtext NULL,`ChangeSummary` mediumtext NULL,`FileCount` int NULL,`TotalSize` bigint NULL,`Remark` mediumtext NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" },
@@ -330,6 +331,23 @@ function getExistingStore(appKey) {
   });
   return result && result.Code === 1 && result.Data ? result.Data : null;
 }
+/* MARKETPLACE_CHANGELOG_REQUIRED_V1：制包与发布都必须绑定当前商城版本的一条完整日志。 */
+function requireMarketplaceChangeLog(storeId, versionValue) {
+  var version = normalizeExactVersion(versionValue);
+  if (isBlank(storeId) || isBlank(version)) {
+    return fail('请先保存商城应用，并提供合法的精确 AppVersion（例如 v1.2.3）。');
+  }
+  var result = V8.FormEngine.GetFormData('sys_microistore_changelog', {
+    _Where: [['OsClient', '=', V8.OsClient], ['AND', 'StoreId', '=', storeId], ['AND', 'Version', '=', version]],
+    _SelectFields: ['Id', 'OsClient', 'StoreId', 'Version', 'Title', 'ChangeType', 'Content', 'ReleaseTime', 'Sort', 'IsDeleted']
+  });
+  var row = result && result.Code === 1 ? result.Data : null;
+  if (!row || row.IsDeleted === 1 || row.IsDeleted === true
+      || isBlank(row.Title) || isBlank(row.ChangeType) || isBlank(row.Content) || isBlank(row.ReleaseTime)) {
+    return fail('应用 ' + version + ' 缺少完整更新日志。请先在商城应用的【更新日志】页签补齐标题、类型、内容和发布时间。');
+  }
+  return ok(row, '更新日志校验通过');
+}
 function parseArray(value) {
   if (!value) return [];
   if (typeof value === 'string') {
@@ -370,6 +388,146 @@ function canonicalJson(value) {
 function sha256Hex(value) {
   if (!V8.EncryptHelper || !V8.EncryptHelper.Sha256Hex) throw new Error('V8.EncryptHelper.Sha256Hex 不可用');
   return text(V8.EncryptHelper.Sha256Hex(text(value))).toLowerCase();
+}
+var RESOURCE_SNAPSHOT_SCHEMA = 'Microi.ApplicationResourceSnapshot';
+var RESOURCE_SNAPSHOT_SCHEMA_VERSION = 1;
+
+/*
+ * 资源快照允许业务数据中的有限小数，但仍拒绝非 JSON 数值和超出
+ * JavaScript safe integer 边界的数值。对象键在所有层级按字典序输出。
+ */
+function canonicalResourceJson(value) {
+  if (value === null) return 'null';
+  if (value && typeof value.length === 'number' && typeof value !== 'string') {
+    var arrayParts = [];
+    for (var arrayIndex = 0; arrayIndex < value.length; arrayIndex++) {
+      arrayParts.push(canonicalResourceJson(value[arrayIndex]));
+    }
+    return '[' + arrayParts.join(',') + ']';
+  }
+  if (typeof value === 'object') {
+    var objectKeys = Object.keys(value).sort();
+    var objectParts = [];
+    for (var objectIndex = 0; objectIndex < objectKeys.length; objectIndex++) {
+      var objectKey = objectKeys[objectIndex];
+      if (value[objectKey] === undefined || typeof value[objectKey] === 'function') {
+        throw new Error('资源快照不能包含 undefined/function：' + objectKey);
+      }
+      objectParts.push(JSON.stringify(objectKey) + ':' + canonicalResourceJson(value[objectKey]));
+    }
+    return '{' + objectParts.join(',') + '}';
+  }
+  if (typeof value === 'number'
+      && (!isFinite(value) || Math.abs(value) > 9007199254740991)) {
+    throw new Error('资源快照 number 只允许有限 safe number');
+  }
+  var primitive = JSON.stringify(value);
+  if (primitive === undefined) throw new Error('资源快照包含非 JSON 值');
+  return primitive;
+}
+
+/* 每个资源行先做对象键规范化，再按整行 canonical JSON 稳定排序。 */
+function sortCanonicalResourceArray(value) {
+  var rows = toArray(value);
+  var entries = [];
+  for (var i = 0; i < rows.length; i++) {
+    var rowJson = canonicalResourceJson(rows[i]);
+    entries.push({ Json: rowJson, Value: JSON.parse(rowJson) });
+  }
+  entries.sort(function (left, right) {
+    if (left.Json < right.Json) return -1;
+    if (left.Json > right.Json) return 1;
+    return 0;
+  });
+  var result = [];
+  for (var entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+    result.push(entries[entryIndex].Value);
+  }
+  return result;
+}
+
+/* DataSets 是二层资源：数据集与其 Rows 都必须消除数据库返回顺序差异。 */
+function normalizeSnapshotDataSets(value) {
+  var rows = toArray(value);
+  var normalized = [];
+  for (var i = 0; i < rows.length; i++) {
+    var dataSetJson = canonicalResourceJson(rows[i] || {});
+    var dataSet = JSON.parse(dataSetJson);
+    if (dataSet.Rows !== undefined && dataSet.Rows !== null) {
+      dataSet.Rows = sortCanonicalResourceArray(dataSet.Rows);
+    }
+    normalized.push(dataSet);
+  }
+  return sortCanonicalResourceArray(normalized);
+}
+
+/* MenuContract 保留全部字段，仅对其集合型菜单数组做稳定排序。 */
+function normalizeSnapshotMenuContract(value) {
+  if (!value) return null;
+  var normalized = JSON.parse(canonicalResourceJson(value));
+  if (normalized.MenuIds !== undefined && normalized.MenuIds !== null) {
+    normalized.MenuIds = sortCanonicalResourceArray(normalized.MenuIds);
+  }
+  if (normalized.Menus !== undefined && normalized.Menus !== null) {
+    normalized.Menus = sortCanonicalResourceArray(normalized.Menus);
+  }
+  return normalized;
+}
+
+/*
+ * RESOURCE_SNAPSHOT_SCHEMA_V1
+ * 快照只包含会影响应用安装资源的稳定事实；不包含时间、用户或资产地址。
+ * SysApiEngines 保留导出行全部字段，包括完整 ApiV8Code。
+ */
+function buildResourceSnapshot(appKey, appVersion, menuContract, resources, resourcePolicies) {
+  var normalizedAppKey = text(appKey).replace(/^\s+|\s+$/g, '');
+  var normalizedAppVersion = normalizeExactVersion(appVersion);
+  if (isBlank(normalizedAppKey)) throw new Error('资源快照 AppKey 不能为空');
+  if (isBlank(normalizedAppVersion)) throw new Error('资源快照 AppVersion 必须是精确语义版本');
+  var source = resources || {};
+  return {
+    Schema: RESOURCE_SNAPSHOT_SCHEMA,
+    SchemaVersion: RESOURCE_SNAPSHOT_SCHEMA_VERSION,
+    AppKey: normalizedAppKey,
+    AppVersion: normalizedAppVersion,
+    MenuContract: normalizeSnapshotMenuContract(menuContract),
+    Resources: {
+      DDLStatements: sortCanonicalResourceArray(source.DDLStatements),
+      PhysicalColumns: sortCanonicalResourceArray(source.PhysicalColumns),
+      DiyTables: sortCanonicalResourceArray(source.DiyTables),
+      DiyFields: sortCanonicalResourceArray(source.DiyFields),
+      DataSets: normalizeSnapshotDataSets(source.DataSets),
+      SysMenus: sortCanonicalResourceArray(source.SysMenus),
+      WfFlowDesigns: sortCanonicalResourceArray(source.WfFlowDesigns),
+      WfNodes: sortCanonicalResourceArray(source.WfNodes),
+      WfLines: sortCanonicalResourceArray(source.WfLines),
+      SysApiEngines: sortCanonicalResourceArray(source.SysApiEngines),
+      ScheduleJobs: sortCanonicalResourceArray(source.ScheduleJobs)
+    },
+    ResourcePolicies: resourcePolicies
+      ? JSON.parse(canonicalResourceJson(resourcePolicies))
+      : null
+  };
+}
+
+function createResourceSnapshotReceipt(appKey, appVersion, menuContract, resources, resourcePolicies) {
+  var snapshot = buildResourceSnapshot(appKey, appVersion, menuContract, resources, resourcePolicies);
+  var canonical = canonicalResourceJson(snapshot);
+  return {
+    ResourceSnapshotSchema: RESOURCE_SNAPSHOT_SCHEMA,
+    ResourceSnapshotSchemaVersion: RESOURCE_SNAPSHOT_SCHEMA_VERSION,
+    ResourceSnapshot: JSON.parse(canonical),
+    ResourceSnapshotCanonicalJson: canonical,
+    ResourceSnapshotHash: sha256Hex(canonical)
+  };
+}
+
+function readExpectedResourceSnapshotHash(value) {
+  var hash = text(value).replace(/^\s+|\s+$/g, '').toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(hash)) {
+    throw new Error('ProtocolVersion=3 Publish 必须提供有效 ExpectedResourceSnapshotHash');
+  }
+  return hash;
 }
 function apiEngineMap(engines) {
   var result = {};
@@ -534,6 +692,55 @@ function normalizeMenuContract(value, menuIds, exactMenuIds) {
     }
   }
   return value;
+}
+
+// MICROSERVICE_MENU_KEY_ENRICHMENT_V1：sys_menu 的历史母表可能尚未包含
+// MicroServiceKey 物理字段，但应用商城包必须是跨租户自包含的。发布时以当前
+// committed ApplicationBundle 的 AppKey/MsKey 补齐菜单，并拒绝跨应用或缺路由绑定。
+function enrichMicroServiceMenuBindings(packageModel) {
+  var model = packageModel || {};
+  var bundle = model.ApplicationBundle || {};
+  var application = bundle.Application || {};
+  var microService = bundle.MicroService || {};
+  var applicationType = text(
+    bundle.ApplicationType || application.ApplicationType || application.AppType,
+  ).toLowerCase();
+  if (applicationType !== 'microservice') return ok({ Updated: 0 });
+
+  var appKey = text(application.AppKey || bundle.AppKey || microService.MsKey).trim();
+  if (isBlank(appKey)) return fail('MicroService 应用包缺少稳定 AppKey/MsKey，无法绑定菜单');
+
+  var routeMap = {};
+  var routes = toArray(bundle.Routes);
+  for (var routeIndex = 0; routeIndex < routes.length; routeIndex++) {
+    var routePath = text((routes[routeIndex] || {}).RoutePath).trim().toLowerCase();
+    if (routePath) routeMap[routePath] = true;
+  }
+
+  var menus = toArray(model.SysMenus);
+  var updated = 0;
+  for (var menuIndex = 0; menuIndex < menus.length; menuIndex++) {
+    var menu = menus[menuIndex] || {};
+    var isMicroServiceMenu = text(menu.OpenType).toLowerCase() === 'microservice'
+      || menu.IsMicroiService === true
+      || Number(menu.IsMicroiService || 0) === 1;
+    if (!isMicroServiceMenu) continue;
+
+    var existingKey = text(menu.MicroServiceKey || menu.MsKey || menu.MicroServiceAppKey).trim();
+    if (existingKey && existingKey.toLowerCase() !== appKey.toLowerCase()) {
+      return fail('微服务菜单【' + text(menu.Name || menu.Id, '未命名') + '】绑定 ' + existingKey
+        + '，与当前应用包 ' + appKey + ' 不一致');
+    }
+    var menuRoutePath = text(menu.MicroServiceRoutePath || menu.RoutePath).trim();
+    if (menuRoutePath && !routeMap[menuRoutePath.toLowerCase()]) {
+      return fail('微服务菜单【' + text(menu.Name || menu.Id, '未命名') + '】引用路由 '
+        + menuRoutePath + '，但当前 committed ApplicationBundle 未包含该路由');
+    }
+    menu.MicroServiceKey = appKey;
+    updated += 1;
+  }
+  model.SysMenus = menus;
+  return ok({ Updated: updated, MicroServiceKey: appKey });
 }
 function selectionJson(value) {
   if (value === null || value === undefined) return '';
@@ -914,6 +1121,12 @@ var deliveryVersions = resolveDeliveryVersions({
 });
 var runtimeVersionNo = deliveryVersions.RuntimeVersion;
 var versionNo = deliveryVersions.PackageVersion;
+var changeLogValidation = requireMarketplaceChangeLog(
+  text((existingStore && existingStore.Id) || app.Id),
+  versionNo
+);
+if (!changeLogValidation || changeLogValidation.Code !== 1) return changeLogValidation;
+var releaseChangeLog = changeLogValidation.Data;
 var sharedPublicRuntime = requestedSharedPublicRuntime;
 if (sharedPublicRuntime) {
   if (!protocolV3) return fail('SharedPublicRuntime 只允许 ProtocolVersion=3 的已提交不可变运行时。');
@@ -1038,7 +1251,14 @@ var packageModel = {
     DataSetCount: selectedDataSets.length,
     DataRowCount: selectedDataRowCount,
     JobCount: selectedScheduleJobs.length,
-    IncludeSource: includeSource
+    IncludeSource: includeSource,
+    ChangeLog: {
+      Version: text(releaseChangeLog.Version),
+      Title: text(releaseChangeLog.Title),
+      ChangeType: text(releaseChangeLog.ChangeType),
+      Content: text(releaseChangeLog.Content),
+      ReleaseTime: text(releaseChangeLog.ReleaseTime)
+    }
   },
   ApplicationBundle: {
     SchemaVersion: 2,
@@ -1077,6 +1297,10 @@ var packageModel = {
   SysApiEngines: toArray(selectedExport.SysApiEngines),
   ScheduleJobs: selectedScheduleJobs
 };
+var microServiceMenuBindingResult = enrichMicroServiceMenuBindings(packageModel);
+if (!microServiceMenuBindingResult || microServiceMenuBindingResult.Code !== 1) {
+  return microServiceMenuBindingResult || fail('微服务菜单绑定补全失败');
+}
 if (sharedPublicRuntime) {
   packageModel.PackageInfo.SharedPublicRuntime = true;
   packageModel.ApplicationBundle.AssetStoragePolicy = {

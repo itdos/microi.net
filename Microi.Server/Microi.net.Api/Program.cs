@@ -183,6 +183,8 @@ services.AddSingleton(SysLogQueueOptions.CreateDefault());
 services.AddSingleton<SysLogQueueService>();
 services.AddSingleton<ISysLogQueue>(sp => sp.GetRequiredService<SysLogQueueService>());
 services.AddHostedService(sp => sp.GetRequiredService<SysLogQueueService>());
+// 网络流量热路径只做内存聚合；固定 5 分钟桶由后台批量幂等写 MySQL。
+services.AddHostedService<SystemObservabilityTrafficRollupService>();
 // 进程级内存最后防线：软阈值退出流量，硬阈值有界停机，避免单节点拖垮宿主机。
 services.AddSingleton(ProcessMemoryGuardOptions.CreateDefault());
 services.AddSingleton<ProcessMemoryPressureState>();
@@ -391,6 +393,9 @@ app.UseRouting();
 // 安全防护可能在 Controller 前直接返回 DosResult。CORS 必须先执行，
 // 否则独立部署的前端无法读取 SecurityBlocked JSON，会误报成 API 不可用。
 app.UseCors("any");
+// 包住安全守卫与压力守卫，才能看见被拒绝、排队和异常请求；客户端 IP 只取
+// ForwardedHeadersMiddleware 已验证并写入的 Connection.RemoteIpAddress。
+app.UseSystemObservability();
 app.UseSecurityGuard();
 app.UseRequestPressureGuard();
 //-------注意以下两者的顺序-------

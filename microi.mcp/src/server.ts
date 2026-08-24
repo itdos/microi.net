@@ -2,6 +2,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { isIP } from 'node:net';
 import path from 'node:path';
 import { z } from 'zod';
 import type { ApiResponse, MicroiClient, DbTable, DbField, PlaywrightContextData, PlaywrightEngineInfo, PlaywrightModuleInfo, TranslateTextResult } from './microi-client.js';
@@ -23,6 +24,7 @@ export {
 } from './document-inputs.js';
 export type { PreparedMcpOcrInput, PreparedMcpTranslateFileInput } from './document-inputs.js';
 import {
+  buildDefaultFormBanner,
   buildDefaultModulePresentation,
   inferTableColumnWidth,
   normalizeAllMenuJson,
@@ -2257,6 +2259,7 @@ const CORE_TOOL_REGISTRATION_ORDER = [
   'microi_bulk_apply_module_presentation',
   'microi_list_modules',
   'microi_update_table',
+  'microi_configure_form_banner',
   'microi_bulk_update_table_features',
   'microi_set_role_permission',
   'microi_set_engine_anonymous',
@@ -2702,7 +2705,8 @@ BOUNDARY RULES:
 ## 更高一层编排与验收工具
 - **microi_get_manifest_schema** — Return the full-system Manifest contract and example. In modules, use field names such as listFields/searchFields/sortFields; MCP resolves them to diy_field Id, SelectFields and SearchFieldIds before writing sys_menu.
 - **microi_plan_system** — 从完整 Manifest 生成干跑计划，不写入
-- **microi_generate_system** — 按 Manifest 一次性编排表、字段、数据源、接口引擎、事件、菜单、权限、页面、打印、工作流、任务，并自动验收；真实写入必须传 confirmExecution
+- **microi_generate_system** — 按 Manifest 一次性编排表、字段、表单 Banner、数据源、接口引擎、事件、菜单、权限、页面、打印、工作流、任务，并自动验收；真实写入必须传 confirmExecution
+- **microi_configure_form_banner** — 读取真实字段后智能配置 diy_table 表单 Banner，支持标题、副标题、单/多图、标签以及本地或接口引擎统计
 - **microi_validate_system** — 对生成结果做后置验收，检查表/字段/引擎/菜单/数据源/打印/工作流是否存在
 - **microi_validate_menu_buttons** — 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON，自动补 Id/Sort/默认显隐
 - **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
@@ -2752,6 +2756,7 @@ BOUNDARY RULES:
 - 绑定 diyTableId 创建菜单时，不要只写 Name/DiyTableId。应配置或允许 MCP/后端自动推断：TableDiyFieldIds、SelectFields、SearchFieldIds、SortFieldIds、NotShowFields、StatisticsFields、MobileListFields、CardTitleTagFields、CardBottomTagFields、DefaultOrderBy。
 - NotShowFields 默认隐藏 Id/外键/系统字段/布局控件/上传富文本地图子表等重字段；SearchFieldIds 默认选择标题、名称、编号、状态、类型、分类、负责人、时间等常用筛选；StatisticsFields 默认选择金额、价格、数量、积分、余额等数值字段；MobileListFields 默认选择 3-4 个卡片可读字段。
 - 每个可见且绑定表的 Diy 模块必须有：紧凑 Hero 标题、业务副标题、2-4 个真实动态指标、合理列宽、至少一个有合理 MinWidth 的 PC 复合列，以及不重复字段的移动端标题/副标题/顶部标签/状态/右侧金额/正文/Meta/底部区域。用户未配置 ViewSchema 时，microi_generate_system、microi_create_module 和后端 CreateModule 会按真实 diy_field 元数据补齐 List/Card 最低默认值。
+- 每张新业务表还必须在 diy_table 上配置默认显示的表单 Banner：业务编号/名称作为标题，客户/项目等作为副标题，首个 ImgUpload 作为图片，选项字段作为右侧标签，数值字段或 ApiEngineKey + ValuePath 作为真实统计。禁止把表单 Banner 写入 sys_menu，禁止虚构统计；完整 Manifest 由 microi_generate_system 自动推断并保存，逐步建模则在字段完成后调用 microi_configure_form_banner。
 - PC 复合列一般最多显示两行，即一个主字段加一个 Lines 次要字段。可以按业务拆成多个各自两行的复合列；不要把两个 Lines 堆在同一列形成三行高表格。只有确有层级价值并完成桌面视觉验收的特殊场景才允许三行。
 - 自动默认值不是 AI 省略设计的理由。应按当前表和状态流把指标改为待处理、逾期、金额、容量、风险等有业务含义的真实聚合；DataCount/PageCount 只是无可推断指标时的真实兜底。禁止随机数、伪统计和无来源数字。
 - 复合列 Lines/TrailingFields 使用的字段不再作为普通列重复展示；复合列必须给足 MinWidth。每个 diy_field 未显式设置 TableWidth 时按标题/地址、日期/编码、数值、状态等语义自动推断。
@@ -4941,6 +4946,147 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   );
 
   // ========================
+  // Tool: 统一查询系统日志/监控
+  // ========================
+  server.tool(
+    'microi_query_system_observability',
+    `Query the complete Microi 系统日志/监控 surface for OsClient ${osClient}. Start with action=Capabilities. Read actions cover logs/statistics/details, live signals, Trace timeline, hot API rank, runtime/host/Docker/queue snapshot, application logs, security records, platform statistics and network traffic attribution/history. The backend enforces platform-observability administrator permission, tenant isolation, bounded pagination and secret redaction. Runtime metrics are current-node only; HTTP-attributed bytes do not equal total NIC/container traffic.`,
+    {
+      action: z.enum([
+        'Capabilities', 'Snapshot', 'Logs', 'LogTypes', 'LogStats', 'Signal', 'Trace',
+        'ApiRank', 'AppLogs', 'PlatformStats', 'SecurityData', 'TrafficHistory',
+      ]).describe('Read action. Use Capabilities first to discover exact scope and boundaries.'),
+      keyword: z.string().max(100).optional().describe('Log/signal/security keyword. The backend applies its own bounded search rules.'),
+      type: z.string().max(100).optional().describe('System log Type filter.'),
+      category: z.string().max(100).optional().describe('System log Category filter.'),
+      source: z.string().max(100).optional().describe('System log Source filter.'),
+      level: z.number().int().min(0).max(10).optional().describe('Exact log level for Logs.'),
+      levelMin: z.number().int().min(0).max(10).optional().describe('Minimum log level for Signal.'),
+      searchMonth: z.string().regex(/^\d{6}$/u).optional().describe('Log/Trace month in yyyyMM.'),
+      pageIndex: z.number().int().min(1).max(100000).optional().describe('Page index, default 1.'),
+      pageSize: z.number().int().min(1).max(500).optional().describe('Page size. Logs/SecurityData max 200; Trace/TrafficHistory max 500.'),
+      windowMinutes: z.number().int().min(1).max(15).optional().describe('Snapshot request window, 1-15 minutes.'),
+      windowSeconds: z.number().int().min(60).max(86400).optional().describe('Signal window, 60-86400 seconds.'),
+      top: z.number().int().min(1).max(100).optional().describe('Top N for Snapshot or ApiRank. Snapshot backend clamps to 5-50.'),
+      includeHost: z.boolean().optional().describe('Snapshot includes host/runtime overview. Default true.'),
+      includeDocker: z.boolean().optional().describe('Snapshot includes heavier Docker sampling. Default false.'),
+      traceId: z.string().regex(/^[0-9a-fA-F]{32}$/u).optional().describe('W3C 32-hex TraceId for Trace.'),
+      serviceName: z.string().max(100).optional().describe('Signal service-name filter.'),
+      apiEngineKey: z.string().max(100).optional().describe('ApiRank engine-key filter.'),
+      name: z.string().max(100).optional().describe('ApiRank endpoint/name filter.'),
+      lines: z.number().int().min(20).max(1000).optional().describe('AppLogs tail lines, 20-1000.'),
+      kind: z.enum(['Access', 'Attack', 'Block']).optional().describe('SecurityData kind.'),
+      status: z.string().max(50).optional().describe('SecurityData Block status filter.'),
+      dimensionType: z.enum(['Total', 'Endpoint', 'Ip', 'User', 'Tenant', 'ContentType']).optional().describe('TrafficHistory aggregation dimension.'),
+      hours: z.number().int().min(1).max(168).optional().describe('TrafficHistory lookback hours, 1-168.'),
+      observedOsClient: z.string().max(50).optional().describe('TrafficHistory observed tenant filter; caller still remains bound to the authenticated control plane.'),
+    },
+    async ({
+      action, keyword, type, category, source, level, levelMin, searchMonth, pageIndex, pageSize,
+      windowMinutes, windowSeconds, top, includeHost, includeDocker, traceId, serviceName,
+      apiEngineKey, name, lines, kind, status, dimensionType, hours, observedOsClient,
+    }) => {
+      try {
+        if (action === 'Trace' && !traceId) {
+          return { content: [{ type: 'text', text: 'Trace 查询必须传入 32 位十六进制 traceId。' }], isError: true };
+        }
+        const result = await client.querySystemObservability({
+          Action: action,
+          ...(keyword ? { Keyword: keyword, _Keyword: keyword } : {}),
+          ...(type ? { Type: type } : {}),
+          ...(category ? { Category: category } : {}),
+          ...(source ? { Source: source } : {}),
+          ...(level === undefined ? {} : { Level: level }),
+          ...(levelMin === undefined ? {} : { LevelMin: levelMin }),
+          ...(searchMonth ? { SearchMonth: searchMonth, _SearchMonth: searchMonth } : {}),
+          ...(pageIndex === undefined ? {} : { PageIndex: pageIndex, _PageIndex: pageIndex }),
+          ...(pageSize === undefined ? {} : { PageSize: pageSize, _PageSize: pageSize }),
+          ...(windowMinutes === undefined ? {} : { WindowMinutes: windowMinutes }),
+          ...(windowSeconds === undefined ? {} : { WindowSeconds: windowSeconds }),
+          ...(top === undefined ? {} : { Top: top }),
+          ...(includeHost === undefined ? {} : { IncludeHost: includeHost }),
+          ...(includeDocker === undefined ? {} : { IncludeDocker: includeDocker }),
+          ...(traceId ? { TraceId: traceId.toLowerCase() } : {}),
+          ...(serviceName ? { ServiceName: serviceName } : {}),
+          ...(apiEngineKey ? { ApiEngineKey: apiEngineKey } : {}),
+          ...(name ? { Name: name } : {}),
+          ...(lines === undefined ? {} : { Lines: lines }),
+          ...(kind ? { Kind: kind } : {}),
+          ...(status ? { Status: status } : {}),
+          ...(dimensionType ? { DimensionType: dimensionType } : {}),
+          ...(hours === undefined ? {} : { Hours: hours }),
+          ...(observedOsClient ? { ObservedOsClient: observedOsClient } : {}),
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify({
+            Code: result.Code,
+            Msg: result.Msg || '',
+            Data: result.Data,
+            DataCount: result.DataCount,
+            DataAppend: result.DataAppend,
+          }, null, 2) }],
+          ...(result.Code === 1 ? {} : { isError: true }),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 系统日志/监控 IP 治理
+  // ========================
+  server.tool(
+    'microi_manage_system_observability',
+    `Safely manage an IP block through Microi 系统日志/监控 for OsClient ${osClient}. Supported actions are BlockIp and UnblockIp only. The first call without the exact confirmation returns a dry-run preview and performs no write. The backend revalidates platform-admin permission, IP safety, tenant scope and writes an audit record.`,
+    {
+      action: z.enum(['BlockIp', 'UnblockIp']).describe('Security governance action.'),
+      ip: z.string().min(3).max(64).describe('IPv4 or IPv6 address. Host/local/unspecified/multicast targets are rejected again by the backend.'),
+      blockMinutes: z.number().int().min(1).max(10080).optional().describe('Block duration in minutes, 1-10080. Default 30 for BlockIp.'),
+      reason: z.string().max(300).optional().describe('Bounded operator reason. Do not include tokens, passwords or request bodies.'),
+      confirmExecution: z.string().optional().describe('Exact confirmation: BlockIp:<ip> or UnblockIp:<ip>.'),
+    },
+    async ({ action, ip, blockMinutes, reason, confirmExecution }) => {
+      try {
+        const normalizedIp = ip.trim();
+        if (isIP(normalizedIp) === 0) {
+          return { content: [{ type: 'text', text: 'IP 地址格式无效。' }], isError: true };
+        }
+        const expectedConfirmation = `${action}:${normalizedIp}`;
+        if (confirmExecution !== expectedConfirmation) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({
+              dryRun: true,
+              action,
+              ip: normalizedIp,
+              blockMinutes: action === 'BlockIp' ? (blockMinutes || 30) : undefined,
+              reason: action === 'BlockIp' ? (reason || '系统日志/监控中由管理员手动封禁。') : undefined,
+              requiredConfirmation: expectedConfirmation,
+              warning: '确认后会修改当前租户的 IP 封锁状态，并写入平台审计日志。',
+            }, null, 2) }],
+          };
+        }
+        await client.writeAuditLog(
+          'microi_manage_system_observability',
+          normalizedIp,
+          JSON.stringify({ action, blockMinutes: action === 'BlockIp' ? (blockMinutes || 30) : undefined }),
+        );
+        const result = await client.manageSystemObservability({
+          Action: action,
+          Ip: normalizedIp,
+          ...(action === 'BlockIp' ? { BlockMinutes: blockMinutes || 30, Reason: reason || '' } : {}),
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ Code: result.Code, Msg: result.Msg || '', Data: result.Data }, null, 2) }],
+          ...(result.Code === 1 ? {} : { isError: true }),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
   // Tool: 查询 MongoDB 系统日志
   // ========================
   server.tool(
@@ -5004,7 +5150,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_create_table',
-    `Create or reconcile a custom table for OsClient "${osClient}". Inserts a record into diy_table. IDEMPOTENT — calling again with the same name reuses the existing TableId; an explicitly supplied v8Limit value is reconciled and read back by system validation. This is step 2 of system design.`,
+    `Create or reconcile a custom table for OsClient "${osClient}". Inserts a record into diy_table. IDEMPOTENT — calling again with the same name reuses the existing TableId; an explicitly supplied v8Limit value is reconciled and read back by system validation. This is step 2 of system design. After adding fields, call microi_configure_form_banner so the default-visible Banner receives useful field-aware configuration.`,
     {
       name: z.string().describe('Table name in English (e.g. "Crm_Customer", "Order_Main"). Convention: Module_Entity format. Will be a real MySQL table.'),
       description: z.string().optional().describe('Chinese description of the table (e.g. "客户信息", "订单主表")'),
@@ -5888,6 +6034,16 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       enableDataVersion: z.number().optional().describe('1 enables data versions; 0 disables.'),
       v8Limit: z.boolean().optional().describe('Positive runtime switch for this table\'s backend V8 events. Omit to preserve; false writes 0 (no Jint per-execution budgets) and true writes 1 (enable limits).'),
       v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
+      formBanner: z.object({
+        enabled: z.boolean().optional().describe('Banner is enabled by default; false explicitly hides it.'),
+        titleField: z.string().optional(),
+        subtitleField: z.string().optional(),
+        imageField: z.string().optional().describe('ImgUpload field; single/multiple and public/private paths are supported.'),
+        icon: z.string().optional().describe('Font Awesome fallback icon.'),
+        backgroundField: z.string().optional().describe('Image/color/gradient field used as the Banner background.'),
+        tagFields: z.union([z.string(), z.array(z.union([z.string(), jsonRecordSchema]))]).optional(),
+        metrics: z.union([z.string(), z.array(z.union([z.string(), jsonRecordSchema]))]).optional().describe('Local Field metrics or ApiEngineKey + ValuePath descriptors.'),
+      }).optional().describe('Semantic form Banner configuration stored on diy_table, never sys_menu.'),
     },
     async (args) => {
       try {
@@ -5905,9 +6061,227 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         if (args.enableDataVersion !== undefined) patch.EnableDataVersion = args.enableDataVersion === 1 ? 1 : 0;
         const requestedV8Limit = args.v8Limit ?? (args.v8Unlimited === undefined ? undefined : !args.v8Unlimited);
         if (requestedV8Limit !== undefined) patch.V8Limit = requestedV8Limit ? 1 : 0;
+        if (args.formBanner) {
+          patch.FormBannerEnabled = args.formBanner.enabled === false ? 0 : 1;
+          if (args.formBanner.titleField !== undefined) patch.FormBannerTitleField = args.formBanner.titleField;
+          if (args.formBanner.subtitleField !== undefined) patch.FormBannerSubtitleField = args.formBanner.subtitleField;
+          if (args.formBanner.imageField !== undefined) patch.FormBannerImageField = args.formBanner.imageField;
+          if (args.formBanner.icon !== undefined) patch.FormBannerIcon = args.formBanner.icon;
+          if (args.formBanner.backgroundField !== undefined) patch.FormBannerBackgroundField = args.formBanner.backgroundField;
+          if (args.formBanner.tagFields !== undefined) patch.FormBannerTagFields = typeof args.formBanner.tagFields === 'string'
+            ? args.formBanner.tagFields
+            : JSON.stringify(args.formBanner.tagFields);
+          if (args.formBanner.metrics !== undefined) patch.FormBannerMetrics = typeof args.formBanner.metrics === 'string'
+            ? args.formBanner.metrics
+            : JSON.stringify(args.formBanner.metrics);
+        }
         const result = await client.updateTable(patch);
         if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         return { content: [{ type: 'text', text: `✅ Table updated. ${JSON.stringify(result.Data)}` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 持久后台执行接口引擎 / 查询通知中心任务
+  // ========================
+  server.tool(
+    'microi_run_engine_background',
+    `Queue an API engine as a durable background task on Microi server (OsClient: ${osClient}). The task is visible in the notification center and survives process restarts. Reuse the same idempotencyKey after any timeout or uncertain response.`,
+    {
+      apiEngineKey: z.string().min(1).describe('The unique key of the API engine to execute'),
+      title: z.string().min(1).optional().describe('User-facing task title shown in the notification center'),
+      params: z.record(z.unknown()).optional().describe('Optional parameters passed to the engine through V8.Param'),
+      idempotencyKey: z.string().min(12).max(200).describe('Caller-stable key. Reuse it after timeouts so the server returns the same task instead of creating a duplicate.'),
+      concurrencyKey: z.string().min(1).max(200).optional().describe('Optional cluster-wide serialization key for tasks that must not overlap'),
+      maxAttempts: z.number().int().min(1).max(10).optional().describe('Maximum worker attempts, default 3'),
+      retryOnFailure: z.boolean().optional().describe('Whether a terminal engine failure may be retried by the worker'),
+      confirmExecution: z.string().optional().describe('Required because the task may write data or call external services. Use apiEngineKey or EXECUTE.'),
+    },
+    async ({ apiEngineKey, title, params, idempotencyKey, concurrencyKey, maxAttempts, retryOnFailure, confirmExecution }) => {
+      try {
+        if (confirmExecution !== apiEngineKey && confirmExecution !== 'EXECUTE') {
+          return {
+            content: [{
+              type: 'text',
+              text: `执行已拦截：microi_run_engine_background 会创建持久后台任务，请重新调用并传 confirmExecution="${apiEngineKey}" 或 "EXECUTE"。`,
+            }],
+            isError: true,
+          };
+        }
+        const options: Record<string, unknown> = {
+          IdempotencyKey: idempotencyKey,
+        };
+        if (concurrencyKey) options.ConcurrencyKey = concurrencyKey;
+        if (maxAttempts !== undefined) options.MaxAttempts = maxAttempts;
+        if (retryOnFailure !== undefined) options.RetryOnFailure = retryOnFailure;
+        await client.writeAuditLog('microi_run_engine_background', apiEngineKey, JSON.stringify({
+          title: title || apiEngineKey,
+          idempotencyKey,
+          concurrencyKey: concurrencyKey || '',
+          maxAttempts: maxAttempts ?? 3,
+          retryOnFailure: retryOnFailure ?? false,
+        }));
+        const result = await client.runBackgroundApiEngine({
+          apiEngineKey,
+          title: title || apiEngineKey,
+          param: params || {},
+          options,
+        });
+        return {
+          content: [{
+            type: 'text',
+            text: `## Background task: ${apiEngineKey}\n- **Code**: ${result.Code}\n- **Message**: ${result.Msg || ''}\n\n\`\`\`json\n${JSON.stringify(result.Data, null, 2)}\n\`\`\``,
+          }],
+          isError: result.Code !== 1,
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_list_background_tasks',
+    `List durable background tasks visible to the current authenticated Microi user (OsClient: ${osClient}), including progress, terminal status and failure details from the notification center.`,
+    {},
+    async () => {
+      try {
+        const result = await client.listBackgroundTasks();
+        return {
+          content: [{
+            type: 'text',
+            text: `## Background tasks\n- **Code**: ${result.Code}\n- **Message**: ${result.Msg || ''}\n\n\`\`\`json\n${JSON.stringify(result.Data, null, 2)}\n\`\`\``,
+          }],
+          isError: result.Code !== 1,
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_cancel_background_tasks',
+    `Request cancellation for one or more durable background tasks owned by the current authenticated Microi user (OsClient: ${osClient}). Running tasks stop cooperatively; pending tasks become canceled immediately.`,
+    {
+      taskIds: z.array(z.string().min(1)).min(1).max(100).describe('Exact notification-center task IDs to cancel'),
+      reason: z.string().min(1).max(500).describe('Audited reason for canceling these tasks'),
+      confirmExecution: z.literal('CANCEL').optional().describe('Required because cancellation changes durable task state. Use CANCEL.'),
+    },
+    async ({ taskIds, reason, confirmExecution }) => {
+      try {
+        if (confirmExecution !== 'CANCEL') {
+          return {
+            content: [{
+              type: 'text',
+              text: '执行已拦截：microi_cancel_background_tasks 会改变持久任务状态，请重新调用并传 confirmExecution="CANCEL"。',
+            }],
+            isError: true,
+          };
+        }
+        const uniqueTaskIds = Array.from(new Set(taskIds.map(value => value.trim()).filter(Boolean)));
+        await client.writeAuditLog('microi_cancel_background_tasks', uniqueTaskIds.join(','), JSON.stringify({
+          taskIds: uniqueTaskIds,
+          reason,
+        }));
+        const results: Array<Record<string, unknown>> = [];
+        for (const taskId of uniqueTaskIds) {
+          const result = await client.cancelBackgroundTask(taskId);
+          results.push({ TaskId: taskId, Code: result.Code, Msg: result.Msg || '' });
+        }
+        const failed = results.filter(item => Number(item.Code) !== 1);
+        return {
+          content: [{
+            type: 'text',
+            text: `## Background task cancellation\n- **Requested**: ${results.length}\n- **Succeeded**: ${results.length - failed.length}\n- **Failed**: ${failed.length}\n\n\`\`\`json\n${JSON.stringify(results, null, 2)}\n\`\`\``,
+          }],
+          isError: failed.length > 0,
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 按字段元数据智能配置表单 Banner
+  // ========================
+  server.tool(
+    'microi_configure_form_banner',
+    `Configure the default-visible form Banner on diy_table for OsClient "${osClient}". Reads the real diy_field list, infers useful title/subtitle/image/tag/number fields when values are omitted, writes semantic diy_table fields, and verifies the saved configuration. Use after adding fields. Banner configuration never belongs to sys_menu.`,
+    {
+      tableId: z.string().optional().describe('Exact diy_table.Id. Provide tableId or tableName.'),
+      tableName: z.string().optional().describe('Exact diy_table.Name. Provide tableName or tableId.'),
+      banner: z.object({
+        enabled: z.boolean().optional(),
+        titleField: z.string().optional(),
+        subtitleField: z.string().optional(),
+        imageField: z.string().optional(),
+        icon: z.string().optional(),
+        backgroundField: z.string().optional(),
+        tagFields: z.union([z.string(), z.array(z.union([z.string(), jsonRecordSchema]))]).optional(),
+        metrics: z.union([z.string(), z.array(z.union([z.string(), jsonRecordSchema]))]).optional(),
+      }).optional().describe('Optional explicit overrides. Omit the object or individual values to use field-type inference.'),
+    },
+    async ({ tableId, tableName, banner }) => {
+      if (!tableId && !tableName) {
+        return { content: [{ type: 'text', text: 'Error: tableId or tableName is required.' }], isError: true };
+      }
+      try {
+        const fieldResponse = await client.getFieldList(tableName, tableId);
+        if (fieldResponse.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${fieldResponse.Msg}` }], isError: true };
+        }
+        const fields = unwrapList<Record<string, unknown>>(fieldResponse.Data);
+        let resolvedTableId = tableId || String(fields[0]?.TableId || '');
+        let resolvedTableName = tableName || String(fields[0]?.TableName || '');
+        if (!resolvedTableId || !resolvedTableName) {
+          const locateResponse = await client.getTableData('diy_table', {
+            _Where: tableId ? [['Id', '=', tableId]] : [['Name', '=', tableName]],
+            _SelectFields: ['Id', 'Name', 'Description'],
+            _PageIndex: 1,
+            _PageSize: 2,
+          });
+          if (locateResponse.Code !== 1) {
+            return { content: [{ type: 'text', text: `Error: ${locateResponse.Msg}` }], isError: true };
+          }
+          const tables = unwrapList<Record<string, unknown>>(locateResponse.Data);
+          if (tables.length !== 1) {
+            return { content: [{ type: 'text', text: `Error: expected one diy_table record, found ${tables.length}.` }], isError: true };
+          }
+          resolvedTableId = resolvedTableId || String(tables[0].Id || '');
+          resolvedTableName = resolvedTableName || String(tables[0].Name || '');
+        }
+
+        const patch = buildDefaultFormBanner({
+          name: resolvedTableName,
+          fields,
+          ...(banner ? { formBanner: banner } : {}),
+        });
+        const updateResponse = await client.updateTable({ Id: resolvedTableId, ...patch });
+        if (updateResponse.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${updateResponse.Msg}` }], isError: true };
+        }
+        const readbackResponse = await client.getTableData('diy_table', {
+          _Where: [['Id', '=', resolvedTableId]],
+          _SelectFields: ['Id', 'Name', ...Object.keys(patch)],
+          _PageIndex: 1,
+          _PageSize: 1,
+        });
+        if (readbackResponse.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: Banner write succeeded but readback failed: ${readbackResponse.Msg}` }], isError: true };
+        }
+        const saved = unwrapList<Record<string, unknown>>(readbackResponse.Data)[0];
+        const mismatches = Object.entries(patch).filter(([key, value]) => String(saved?.[key] ?? '') !== String(value ?? ''));
+        if (mismatches.length) {
+          return { content: [{ type: 'text', text: `Error: Banner readback mismatch: ${mismatches.map(([key]) => key).join(', ')}` }], isError: true };
+        }
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ ok: true, tableId: resolvedTableId, tableName: resolvedTableName, banner: patch }, null, 2) }],
+        };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }

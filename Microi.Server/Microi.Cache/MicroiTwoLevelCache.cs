@@ -61,6 +61,9 @@ namespace Microi.net
         // StackExchange.Redis 本身支持并发，但批量表单导入会在短时间产生数千次
         // 缓存失效。将同一租户的 PUBLISH 串行化，避免命令在连接写队列中无界积压。
         private readonly SemaphoreSlim _publishGate = new SemaphoreSlim(1, 1);
+        private static readonly TimeSpan PublishWaitTimeout = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan PublishFailureCooldown = TimeSpan.FromSeconds(15);
+        private long _publishSuppressedUntilTicks = 0;
         private long _lastPublishWarningTicks = 0;
         private long _suppressedPublishWarnings = 0;
 
@@ -665,7 +668,29 @@ namespace Microi.net
         /// </summary>
         private async Task PublishWithRetryAsync(RedisChannel channel, RedisValue message, string description)
         {
-            await _publishGate.WaitAsync().ConfigureAwait(false);
+            // CACHE_INVALIDATION_BOUNDED_BEST_EFFORT_V1: Pub/Sub only invalidates
+            // other nodes' L1 copies; the authoritative Redis write has already
+            // succeeded. A stalled PUBLISH must therefore never pin FormEngine or
+            // an application-install checkpoint indefinitely. During a failure
+            // window, coalesce notifications and probe again after a short cooldown.
+            var nowTicks = DateTime.UtcNow.Ticks;
+            if (nowTicks < Interlocked.Read(ref _publishSuppressedUntilTicks))
+            {
+                Interlocked.Increment(ref _suppressedPublishWarnings);
+                return;
+            }
+
+            var gateEntered = await _publishGate
+                .WaitAsync(PublishWaitTimeout)
+                .ConfigureAwait(false);
+            if (!gateEntered)
+            {
+                OpenPublishFailureCooldown();
+                LogPublishFailure(
+                    description,
+                    new TimeoutException($"等待缓存失效广播队列超过 {PublishWaitTimeout.TotalSeconds:0} 秒。"));
+                return;
+            }
             try
             {
                 Exception lastException = null;
@@ -674,12 +699,19 @@ namespace Microi.net
                     try
                     {
                         var subscriber = _redis.GetSubscriber();
-                        await subscriber.PublishAsync(channel, message).ConfigureAwait(false);
+                        var publishTask = subscriber.PublishAsync(channel, message);
+                        await AwaitPublishWithinAsync(publishTask, PublishWaitTimeout)
+                            .ConfigureAwait(false);
                         return;
                     }
                     catch (Exception ex)
                     {
                         lastException = ex;
+                        if (ex is TimeoutException)
+                        {
+                            OpenPublishFailureCooldown();
+                            break;
+                        }
                         if (attempt < 2 && IsTransientRedisPublishFailure(ex))
                         {
                             await Task.Delay(100).ConfigureAwait(false);
@@ -695,6 +727,41 @@ namespace Microi.net
             {
                 _publishGate.Release();
             }
+        }
+
+        internal static async Task AwaitPublishWithinAsync(Task publishTask, TimeSpan timeout)
+        {
+            if (publishTask == null) throw new ArgumentNullException(nameof(publishTask));
+            try
+            {
+                var completed = await Task.WhenAny(publishTask, Task.Delay(timeout))
+                    .ConfigureAwait(false);
+                if (!ReferenceEquals(completed, publishTask))
+                {
+                    throw new TimeoutException(
+                        $"缓存失效广播超过 {timeout.TotalSeconds:0.###} 秒仍未完成。");
+                }
+                await publishTask.ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                // WaitAsync cannot cancel StackExchange.Redis' pending command.
+                // Observe a late fault while allowing the business operation to
+                // continue; the cooldown prevents an unbounded pile-up of probes.
+                _ = publishTask.ContinueWith(
+                    completed => { _ = completed.Exception; },
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+                throw;
+            }
+        }
+
+        private void OpenPublishFailureCooldown()
+        {
+            Interlocked.Exchange(
+                ref _publishSuppressedUntilTicks,
+                DateTime.UtcNow.Add(PublishFailureCooldown).Ticks);
         }
 
         private static bool IsTransientRedisPublishFailure(Exception ex)

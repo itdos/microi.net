@@ -9,7 +9,9 @@ import * as sass from 'sass';
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(projectRoot, '..');
 const read = relativePath => fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
-const sha256 = relativePath => crypto.createHash('sha256').update(fs.readFileSync(path.join(repositoryRoot, relativePath))).digest('hex');
+const sha256 = relativePath => crypto.createHash('sha256')
+  .update(fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8').replace(/\r\n?/gu, '\n'))
+  .digest('hex');
 const readSkill = skillName => {
   const skillDirectory = path.join(repositoryRoot, 'microi.skills', skillName);
   const referencesDirectory = path.join(skillDirectory, 'references');

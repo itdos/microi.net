@@ -13,6 +13,51 @@
 - 后端接口引擎和后端 V8 事件仍可读取 `sys_config` 全部字段；私密值统一从 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 读取。禁止返回、记录或复制整个 `ServerPrivateSettings`。
 - `mci_system_setting` 的 Secret 使用租户绑定认证加密，列表默认掩码；临时显示原文要求 Passkey、Authenticator 或严格人脸的一次性步进验证，并使用 `no-store`。
 
+“是否启用、是否显示、采用哪种公开交互方式”这类浏览器和管理员都需要判断的能力开关，必须建成 `sys_config` 实体字段，不能因为它与登录、OAuth 或安全功能有关就塞进“安全与服务接入”。“安全与服务接入”只维护 API Key、ClientSecret、RP ID、Origin、Issuer、供应商地址、Scope 等不能公开或仅供后端执行的参数。两边禁止维护同一个新配置；存量 `mci_system_setting` 开关只作升级兼容回退，保存入口和列表均不再展示。
+
+## 登录与身份能力开关
+
+登录与身份能力的公开正向开关如下：
+
+| `sys_config` 字段 | 默认值 | 说明 |
+|---|---:|---|
+| `IdentityVerificationEnabled` | `1` | 统一强身份验证与多登录方式总开关 |
+| `PasskeyEnabled` | `1` | Passkey / Windows Hello / Face ID / Touch ID 能力 |
+| `AuthenticatorTotpEnabled` | `1` | 标准 TOTP Authenticator 能力 |
+| `RequirePasswordChangeStepUp` | `1` | 已登记强因子的用户修改密码时要求二次验证 |
+| `ExternalLoginEnabled` | `1` | 内置第三方登录总开关 |
+| `FaceVerificationEnabled` | `0` | 独立 Face Gateway 严格人脸与活体能力 |
+| `GiteeLoginEnabled` / `WeChatLoginEnabled` / `GitHubLoginEnabled` | `0` | 对应内置外部登录能力 |
+
+新字段显式值优先；字段尚未安装或值为空时，运行时才读取旧 `mci_system_setting` Key，再回退到存量 `sys_osclients` / 安全默认值。这样旧租户升级后不会被突然改值，但升级完成后的唯一配置入口始终是公开系统设置。
+
+旧数据库启用 Passkey / Authenticator 时，需要同时更新平台前端、后端与官方“系统设置”“SaaS引擎”应用包；仅安装应用包不会替换正在运行的后端 DLL 或已部署的前端静态资源。完成更新后在 `sys_config` 打开公开能力与登录入口开关，存量用户仍须在个人中心分别登记自己的 Passkey 或 TOTP，系统不会替用户自动生成认证因子。Passkey 还要求可信 HTTPS 前端 Origin（`localhost` 仅限开发），HTTP 站点即使开关已打开也不能完成 WebAuthn 登记或登录。
+
+## 开发配置与服务接入
+
+### 开发配置的表单布局
+
+“开发配置”Tab 默认使用四个展开的 `CollapseGroup`：访问与运行地址、V8 执行治理、全局脚本、模板与页面代码。分组作用域使用“直到下一个分组”，避免后续新增字段被错误吞入末尾分组。
+
+该 Tab 的 `CodeEditor` 字段统一设置 `Config.CodeEditor.DisplayMode = "Dialog"`。表单默认只显示 `编辑代码（N字）` 按钮，点击后使用平台统一大圆角弹层编辑；确实需要在表单内常驻编辑器的字段可以在【表单设计 → 控件配置 → 默认显示方式】改回 `Inline`。字符数按 Unicode 字符计算，空值也显示 `0字`。
+
+### 表单地图服务接入
+
+表单 `Map / MapArea` 的高德、百度、腾讯凭据统一放在 `mci_system_setting`，并归类到“系统设置 → 安全与服务接入”：
+
+| Key | 类型 | 默认状态 | 用途 |
+|---|---|---|---|
+| `Map.Provider` | 普通私有 | 停用 | 默认地图供应商：`AMap`、`Baidu` 或 `Tencent` |
+| `Map.AMap.JsApiKey` | Secret | 停用 | 高德 Web JS API Key |
+| `Map.AMap.SecurityJsCode` | Secret | 停用 | 高德 JS API 2.0 安全密钥 |
+| `Map.AMap.ServiceHost` | 普通私有 | 停用 | 高德安全代理地址；优先于直接下发安全密钥 |
+| `Map.Baidu.JsApiKey` | Secret | 停用 | 百度 JavaScript API AK |
+| `Map.Tencent.JsApiKey` | Secret | 停用 | 腾讯 JavaScript API GL Key |
+
+官方模板全部默认停用，升级不会覆盖现有租户选择；旧 `sys_config.AMapKey / AMapSecret / BaiduAK` 在新设置未启用时继续兼容。地图运行时端点只接受当前登录用户，从 DiyToken 确定租户，只返回字段实际选择的一家供应商，并设置 `Cache-Control: no-store`；访问密钥会话被拒绝，响应中不存在其它 Secret。
+
+浏览器地图 SDK 必须拿到客户端 Key，所以 Key 在浏览器开发者工具中仍可见。必须在高德、百度、腾讯控制台配置当前生产域名白名单和所需 JavaScript API 产品；Secret 的作用是防止明文落库、列表泄露和一次性返回全部供应商凭据。高德配置 `Map.AMap.ServiceHost` 后，后端不会再返回 `Map.AMap.SecurityJsCode`。
+
 ```js
 // 前端或后端均可读取公开实体字段
 var title = V8.SysConfig.SysTitle;
@@ -23,9 +68,32 @@ var clientSecret = privateSettings['Login.Gitee.ClientSecret'];
 // clientSecret 只能参与当前后端调用，禁止 return 或 console.log。
 ```
 
-`FormMaskBlur` 是全局正向开关：缺失、空值或 `0/false` 默认关闭遮罩毛玻璃，只有显式 `1/true` 才开启。表级 `diy_table.DisableFormMaskBlur` 仍是负向开关；全局开启后，某张表显式配置 `1/true` 可单独关闭。旧 `sys_config.DisableFormMaskBlur` 只用于未升级租户的前端兼容回退，字段元数据必须在 PC 与移动端隐藏。
+`FormMaskBlur` 是全局正向开关：缺失、空值或 `0/false` 默认关闭遮罩毛玻璃，只有显式 `1/true` 才开启。平台统一 Dialog、图片裁剪、字段配置、业务弹窗和 Element Plus MessageBox 都必须从同一运行时读取该值，页面不得再用静态 CSS 默认开启毛玻璃。表级 `diy_table.DisableFormMaskBlur` 仍是负向开关；全局开启后，某张表显式配置 `1/true` 可单独关闭。旧 `sys_config.DisableFormMaskBlur` 只用于未升级租户的前端兼容回退，字段元数据必须在 PC 与移动端隐藏。
 
 登录页入口统一使用 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub` 五个负向开关，字段标签分别为“关闭生物登录入口”“关闭Authenticator登录入口”“关闭Gitee登录入口”“关闭微信登录入口”“关闭GitHub登录入口”。它们缺失、空值或 `0/false` 时默认显示入口，只有显式 `1/true` 才关闭；旧 `Login*Display` 字段仅作兼容回退并隐藏。`DisableAiAssistant` 同样保持负向开关语义。
+
+## 界面风格：框架来源标识与水印
+
+微服务和定制组件的来源标识由吾码宿主统一渲染，子应用不需要自行实现，也不存在租户级显示开关。`RenderSourceBadgeMode` 已停用并从系统设置移除：来源标识始终可发现，避免用户在不知道内容来源的情况下误改宿主或子应用。
+
+菜单微服务显示在框架内容区右上角并提供独立关闭按钮，用户认为它遮挡子应用控件时可仅关闭当前页面实例的标识；切换到另一个微服务页面后会重新显示，不会记住为全局关闭。`V8.OpenAppDialog` 打开的微服务或定制弹层把标识放在标准标题栏，因为它不会覆盖弹层正文和右上角操作区，所以始终显示且不提供关闭按钮。表单 `DevComponent` 显示在字段宿主，表格中的 `DevComponent` 只在列头显示一次，避免每行重复。
+
+来源标识本身是可点击按钮。点击后由框架打开统一的大圆角详情弹层，展示应用标识、页面标识、应用内路由、框架路由、版本、源码定位、运行入口、发布/挂载状态和租户坐标，并生成一段可复制的 Microi MCP 修改指令。详情中的运行信息只显示公开定位数据，不展示 Token、访问密钥或私有配置值。
+
+框架水印使用以下公开 `sys_config` 字段，覆盖整个 `100vw × 100vh`，包括路由内容和 Element Plus 弹层；水印层固定 `pointer-events:none`，不会阻止点击、滚动、拖拽、触摸或键盘操作，并自动适配亮色/深色主题。
+
+| 字段 | 默认值 | 说明 |
+|---|---|---|
+| `FrameworkWatermarkEnabled` | `0` | 显式设为 `1/true` 才开启，保证旧租户升级后视觉不变 |
+| `FrameworkWatermarkContent` | `$SysTitle$ - $UserName$` | 留空时显示“系统标题 - 用户名”；用户名为空自动回退 `$Account$`，两者均为空时只显示系统标题，不会输出 `undefined/null`。支持 `$SysTitle$`、`$SysShortTitle$`、`$UserName$`、`$Account$`、`$Date$`、`$DateTime$`，也支持 `{{UserName}}` 写法 |
+| `FrameworkWatermarkDirection` | `DiagonalUp` | `DiagonalUp`（斜向上）、`DiagonalDown`（斜向下）、`Horizontal`（水平） |
+| `FrameworkWatermarkOpacity` | `30` | 百分比；未设置、非法或为 `0` 时按 `30` 处理，运行时限制在 `1–100` |
+| `FrameworkWatermarkDensity` | `Comfortable` | `Compact`、`Comfortable`、`Sparse` 三档重复间距 |
+| `FrameworkWatermarkFontSize` | `14` | 像素；未设置、非法或为 `0` 时按 `14` 处理，运行时限制在 `8–72` |
+
+水印内容只应使用系统标题、用户显示名、账号、日期等公开展示信息，不要填写 Token、密码、Secret、手机号等敏感值。保存系统设置后会沿用现有 `sys_config` 缓存失效机制；刷新页面即可按最新配置重建框架水印。
+
+“界面风格”是一级 Tab，内部继续使用“主题与导航 / 登录界面与入口 / AI 与框架水印”等 `CollapseGroup` 归类设置。新增界面配置时应放入相应折叠组，不能继续把大量开关直接平铺在 Tab 中。
 
 ---
 

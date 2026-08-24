@@ -535,6 +535,7 @@ export default {
                         }
                         self.DevComponents[field.Config.DevComponentName].Name = field.Config.DevComponentName;
                         self.DevComponents[field.Config.DevComponentName].Path = field.Config.DevComponentPath;
+                        self.DevComponents[field.Config.DevComponentName].RenderSource = DynamicComponentCache.getSource(field.Config.DevComponentName, componentPath);
                         // console.log('渲染定制组件成功');
                     } catch (error) {
                         console.log("渲染定制组件出现错误：" + error.message);

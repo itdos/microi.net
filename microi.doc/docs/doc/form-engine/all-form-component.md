@@ -61,7 +61,33 @@ if(V8.Form.Phone.length != 11){
 >* 多行文本，不限制字数
 
 ## 富文本 RichText
->* 富文本编辑器，支持图片上传
+>* 富文本编辑器支持图片、视频和普通文件附件，并在编辑器上方用一行紧凑摘要显示当前存储与大小策略。
+>* 控件配置可以统一选择公有桶或私有桶，并分别开关图片、视频、文件上传及设置单个大小、单次数量；图片还支持服务端压缩目标体积和最大宽度。旧字段没有这些配置时安全默认为私有桶，图片默认压缩到约 `500 KB`、最长边 `1920 px`。
+>* 官网公告、商品详情等需要被匿名网页直接读取的正文应由平台超级管理员显式配置 `Limit=false`；内部通知、合同说明等使用 `Limit=true`。普通交互式帐号不能用前端配置绕过后端强制私有策略。
+>* 私有正文不会把 30 分钟短效 URL 或 Token 保存进数据库，而是保存稳定对象标识；每次重新打开记录时，组件按当前菜单、表、记录和字段权限换取新的审计代理地址，所以旧临时地址过期不影响再次预览。外部网站不会获得这段权限上下文，因此要公开展示的正文必须使用公有桶。
+
+推荐配置示例：
+
+```json
+{
+  "RichText": {
+    "EditorProduct": "WangEditor",
+    "Limit": false,
+    "Image": {
+      "Enabled": true,
+      "MaxSize": 20,
+      "MaxCount": 10,
+      "Preview": true,
+      "CompressMaxSize": 500,
+      "CompressMaxWidth": 1920
+    },
+    "Video": { "Enabled": true, "MaxSize": 200, "MaxCount": 3 },
+    "File": { "Enabled": true, "MaxSize": 100, "MaxCount": 10, "Accept": ".pdf,.docx,.xlsx" }
+  }
+}
+```
+
+`MaxSize` 单位为 MB，`CompressMaxSize` 单位为 KB。图片压缩开启时，展示图遵循这里的目标值，压缩前原图仍先保存到 HDFS 私有桶；正文只保存展示图引用，不暴露原图路径。普通附件通过编辑器工具栏的“上传附件”插入安全链接。
 
 ## 文本联想 Autocomplete
 >* 输入联想查询下拉选择，也可自定义输入
@@ -93,6 +119,10 @@ if(V8.Form.Phone.length != 11){
 
 ## 图片上传 ImgUpload
 >* 默认不允许匿名访问
+>* 新增/编辑表单把拖放上传区和当前配置合并成一个紧凑面板，直接显示公有/私有桶、单图/多图与最大数量、压缩状态、最大体积；裁剪开关也位于同一面板内，位置不受字段 Label 的 `left/top/right` 布局影响。
+>* 控件配置中的“默认开启裁剪”只决定表单用户进入当前表单时裁剪开关的初始状态，用户仍可按本次上传自行开启或关闭。
+>* 裁剪工作台支持自由裁剪、固定比例、用户可选比例和自定义宽高比，并可单独开关缩放、旋转、镜像工具；用户也可点击“不裁剪直接上传”，该动作会继续上传而不是取消选图。
+>* 实际应用裁剪时，裁剪图用于业务展示；裁剪前的未改动原图会先写入当前租户 HDFS 私有桶。原图真实路径不会写入业务字段或返回给普通前端。
 >* 上传前V8事件可通过`V8.ThisValue`访问到属性
 ```js
 {
@@ -103,9 +133,40 @@ if(V8.Form.Phone.length != 11){
 ```
 >* 上传后可通过`V8.Form.字段名`访问到图片URL地址、Name等
 
+AI/MCP 创建图片字段时应写入 `diy_field.Config.ImgUpload`，推荐完整配置如下：
+
+```json
+{
+  "ImgUpload": {
+    "Limit": true,
+    "Multiple": true,
+    "MaxCount": 6,
+    "Tips": "支持 JPG、PNG、WebP",
+    "Preview": true,
+    "MaxSize": 10,
+    "SaveFullPath": false,
+    "Crop": {
+      "Enabled": true,
+      "Mode": "select",
+      "Ratio": "16:9",
+      "CustomWidth": 7,
+      "CustomHeight": 5,
+      "AllowZoom": true,
+      "AllowRotate": true,
+      "AllowFlip": true
+    }
+  }
+}
+```
+
+`Limit=true` 表示配置为私有桶，`false` 表示配置为公有桶；`Multiple=true` 时必须同时给出合理的 `MaxCount`；`Preview` 表示图片压缩，未配置时也默认开启；`MaxSize` 单位为 MB。`Crop.Enabled` 表示“默认开启裁剪”，不是裁剪能力总开关。`Mode=free` 表示自由构图；`fixed` 将 `Ratio` 锁定为设计器指定比例；`select` 允许用户在裁剪时切换自由、1:1、4:3、3:4、16:9、9:16、3:2、2:3 与自定义比例。旧字段没有 `Crop` 时运行时开关默认关闭，但用户仍可主动开启裁剪。
+
+多图模式下，Element Plus 会逐张发起上传，而 HDFS 接口在 `Multiple=true` 时仍可能为每次请求返回 `Data: [{...}]`。客户端必须同时兼容 `Data` 对象与单元素数组，逐张替换对应 `uid` 占位项，不能因读取不到数组中的 `Path` 而出现“接口成功但图片不回显”。
+
 ## 文件上传 FileUpload
 >* 默认不允许匿名访问
 >* V8事件同`图片上传 ImgUpload`
+>* 与图片上传共用紧凑的拖放/配置二合一面板，显示公有/私有桶、单文件/多文件与最大数量、保留原文件、最大体积。常用配置为 `FileUpload.Limit/Multiple/MaxCount/Tips/MaxSize/SaveFullPath`；文件上传不使用图片压缩或裁剪配置。
 
 ## 评分 Rate
 >* 评分组件，默认int类型，数据库存储为int类型
@@ -155,10 +216,36 @@ if(V8.Form.Phone.length != 11){
 >* 在主表详情子表区域、左右树形页面或通过 `V8.OpenAnyTable` 带主表条件打开子表后导入时，即使 Excel 没有主表关联列，也应由前端把固定主表关系传给 `/api/FormEngine/ImportDiyTableRow`，后端再补齐外键和 `FieldRelations` 回填列。
 
 ## 地图(点) Map
->* 地图画点
+
+`Map` 用于搜索、点击或拖动标注点，保存经纬度和地址；支持高德、百度、腾讯三种浏览器地图。字段双击配置中的 `Config.MapCompany` 可选：
+
+- `System`：跟随租户“系统设置 → 安全与服务接入”的 `Map.Provider`，推荐使用。
+- `AMap`：高德地图。
+- `Baidu`：百度地图。
+- `Tencent`：腾讯地图。
+
+地图凭据不能写在字段 `Config`、前端源码或公开 `V8.SysConfig` 中。由超级管理员在“安全与服务接入”填写并启用：
+
+| 设置 Key | Secret | 说明 |
+|---|:---:|---|
+| `Map.Provider` | 否 | 系统默认供应商：`AMap`、`Baidu`、`Tencent` |
+| `Map.AMap.JsApiKey` | 是 | 高德 Web JS API Key |
+| `Map.AMap.SecurityJsCode` | 是 | 高德 JS API 2.0 安全密钥；未使用安全代理时填写 |
+| `Map.AMap.ServiceHost` | 否 | 高德安全代理 `serviceHost`；配置后后端不会把 `SecurityJsCode` 返回浏览器 |
+| `Map.Baidu.JsApiKey` | 是 | 百度 JavaScript API AK |
+| `Map.Tencent.JsApiKey` | 是 | 腾讯 JavaScript API GL Key |
+
+升级前已经配置的 `sys_config.AMapKey`、`AMapSecret`、`BaiduAK` 会继续作为兼容回退；租户启用新的私密设置后，以新设置为准。地图 JS SDK 的客户端 Key 在浏览器网络面板中天然可见，因此 Secret 表示“数据库密文保存、管理列表掩码”，不能代替供应商的域名/Referer 白名单。高德生产环境优先使用 `serviceHost` 安全代理。
+
+旧设计器曾把 `MapKey / MapSecret` 等凭据写进字段 `Config`。新版运行时不会读取这些字段；管理员在设计器中重新保存地图配置时会自动移除已知的历史凭据属性，只保留供应商选择。正式迁移凭据时应先在“安全与服务接入”保存并启用对应 `Map.*` 设置，再清理旧字段元数据，避免在迁移窗口内中断地图。
+
+控件先显示加载状态；缺少 Key、后端版本不匹配、SDK 网络失败、超时、Key/安全密钥无效、域名未授权、WebGL 不可用或容器没有尺寸时，不会再留下空白区域，而会在地图区域直接显示原因码、处理建议和“重新加载”按钮。接口只按当前供应商返回一份最小配置，响应为 `no-store`，访问密钥会话不能读取。
+
+点位数据继续兼容原格式：经度保存到 `{字段名}_Lng`，纬度保存到 `{字段名}_Lat`，地址、视野中心和缩放级别保存在 `{字段名}` 对象的 `Address`、`Center`、`Zoom` 中。
 
 ## 地图(区域) MapArea
->* 地图画区域
+
+`MapArea` 与 `Map` 使用同一供应商和安全配置。编辑模式可开始/停止绘制、右键结束当前折线并清除重画；查看模式只展示结果。路径保存在 `{字段名}.Paths`，格式为二维点集 `[[{ lng, lat }, ...], ...]`，同时保存 `Center` 与 `Zoom`。应按业务限制路径数量和点数，避免把超大轨迹直接放入表单字段。
 
 ## 级联选择器 Cascader
 >* 自定义级联选择器
@@ -288,6 +375,8 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 
 ## 代码编辑器 CodeEditor
 >* 支持代码联想、代码缩进、语法高亮、代码折叠等等
+>* `Config.CodeEditor.DisplayMode` 支持 `Inline`（表单内直接显示编辑器，默认兼容模式）和 `Dialog`（只显示 `编辑代码（N字）` 按钮，点击后打开平台统一大圆角代码弹层）。配置入口为【表单设计 → 控件配置 → 默认显示方式】。
+>* 配置类长表单或同一 Tab 含多个代码字段时优先使用 `Dialog`，避免 Monaco 编辑器长期占满表单；代码密集型工作台可按字段显式使用 `Inline`。`CodeEditor.Height` 继续控制内联编辑器和弹层编辑区域的建议高度。
 
 ## 下拉树 SelectTree
 >* 这是一个非常强大的组件
@@ -380,8 +469,11 @@ return { Code : 1 };//会自动提交事务，因为Code == 1
 | AutoNumber | `AutoNumberFixed`、`AutoNumberLength`、`AutoNumberFields`、`AutoNumber.DataRule`、`AutoNumber.CreateRule` |
 | Button | `Button.Type`、`Button.Icon`、`Button.Size`、`Button.PreviewCanClick`、`Button.RefreshTableAfterClick` |
 | Divider / CollapseGroup / Tabs / Alert / StaticText | `DividerPosition`、`Divider.Icon`、`CollapseGroup.*`、`FieldTabs.*`、`Alert.*`、`StaticText.Content` |
-| ImgUpload / FileUpload | `Limit`、`Multiple`、`Tips`、`MaxCount`、`ShowFileList`、`Preview`、`MaxSize`、`Upload.*V8` |
+| ImgUpload / FileUpload | `Limit`、`Multiple`、`Tips`、`MaxCount`、`ShowFileList`、`Preview`、`MaxSize`、`Upload.*V8`；ImgUpload 另支持 `Crop.Enabled/Mode/Ratio/CustomWidth/CustomHeight/AllowZoom/AllowRotate/AllowFlip` |
 | Cascader / SelectTree / Department / Address / TreeCheckbox | `Lazy`、`Filterable`、`Value`、`Label`、`Children`、`ParentField`、`ParentFields`、`Multiple`、`EmitPath`、`TreeCheckbox.*` |
 | OpenTable / JoinForm / JoinTable | `OpenTable.BtnName`、`OpenTable.MultipleSelect`、`OpenTable.BeforeOpenV8`、`OpenTable.SubmitV8`、`JoinForm.*`、`JoinTable.*` |
-| CodeEditor / JsonTable / Html / RichText | `CodeEditor.Height`、`JsonTable.Columns`、`JsonTable.Columns[].Config`、JSON/HTML/富文本内容配置 |
-| Map / MapArea / Qrcode / FontAwesome / DevComponent | `MapCompany`；`Qrcode.DisplayWidth`、`Qrcode.ShowDownload`、`Qrcode.DownloadText`（二维码内容由 `DataAppend.Code` 提供）；图标类名；`DevComponentName`、`DevComponentPath` |
+| CodeEditor / JsonTable / Html | `CodeEditor.Height`、`CodeEditor.DisplayMode=Inline/Dialog`、`JsonTable.Columns`、`JsonTable.Columns[].Config`、JSON/HTML 内容配置 |
+| RichText | `RichText.Limit`；`Image.Enabled/MaxSize/MaxCount/Preview/CompressMaxSize/CompressMaxWidth`；`Video.Enabled/MaxSize/MaxCount`；`File.Enabled/MaxSize/MaxCount/Accept` |
+| Map / MapArea / Qrcode / FontAwesome / DevComponent | `MapCompany=System/AMap/Baidu/Tencent`（凭据只在“安全与服务接入”维护）；`Qrcode.DisplayWidth`、`Qrcode.ShowDownload`、`Qrcode.DownloadText`（二维码内容由 `DataAppend.Code` 提供）；图标类名；`DevComponentName`、`DevComponentPath` |
+
+`ImgUpload.Preview` 新配置默认开启；未配置时后端也按开启处理。展示图默认约 `500 KB`、最长边 `1920 px`，原图会先保存到 HDFS 私有桶。只有明确需要原始画质且已评估页面性能时才应关闭，列表、卡片和商品图不应关闭。

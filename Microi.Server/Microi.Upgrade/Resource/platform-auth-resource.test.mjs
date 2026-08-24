@@ -17,7 +17,7 @@ const expected = [
 ];
 
 test('SaaS bootstrap package carries platform authentication engines', () => {
-  assert.equal(resource.PackageInfo.Version, 'v7.5.7');
+  assert.equal(resource.PackageInfo.Version, 'v7.5.28');
   assert.equal(resource.PackageInfo.ApiEngineCount, resource.SysApiEngines.length);
   const engines = resource.SysApiEngines.filter((item) => expected.includes(item.ApiEngineKey));
   assert.deepEqual(engines.map((item) => item.ApiEngineKey), expected);
@@ -96,7 +96,7 @@ test('backend upgrade auto-installs the identity package while password login st
     path.join(directory, '..', '..', 'Microi.net.Api', 'Controllers', 'SysUserController.cs'),
     'utf8'
   );
-  assert.match(upgrade, /Version = "6\.4\.5\.0"/);
+  assert.match(upgrade, /Version = "6\.4\.6\.0"/);
   assert.match(upgrade, /SaaSEnginePackageResourceName/);
   assert.match(upgrade, /InstallUpgradePackage\(osClient, msgs, SaaSEnginePackageResourceName/);
   assert.match(controller, /var result = await _sysUserLogic\.Login\(param\)/);

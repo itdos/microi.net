@@ -199,7 +199,7 @@ public sealed class EmptyDatabaseReleaseServiceTests
             item => item["ApiEngineKey"]?.Value<string>() == "admin_get_empty_database_sanitization_sql");
         var code = engine["ApiV8Code"]?.Value<string>() ?? "";
 
-        Assert.Equal("v1.2.8", engine["Version"]?.Value<string>());
+        Assert.Equal("v1.3.0", engine["Version"]?.Value<string>());
         Assert.Contains("protectedPlatformTableNames", code, StringComparison.Ordinal);
         Assert.Contains("operationalResidueTableNames", code, StringComparison.Ordinal);
         Assert.Contains("cleanupOperationalResidueSql", code, StringComparison.Ordinal);
@@ -265,7 +265,12 @@ public sealed class EmptyDatabaseReleaseServiceTests
         foreach (var table in new[]
                  {
                      "mci_background_task", "mci_database_backup", "mci_gitee_star_audit",
-                     "mci_identity_credential", "mci_identity_device", "mci_identity_totp",
+                     "mci_system_setting", "mci_user_external_identity", "mci_user_access_key", "diy_sso",
+                     "mci_identity_connector", "mci_identity_credential", "mci_identity_device", "mci_identity_face",
+                     "mci_identity_group", "mci_identity_group_member", "mci_identity_sync_conflict", "mci_identity_sync_run",
+                     "mci_identity_tag", "mci_identity_tag_assignment", "mci_identity_totp",
+                     "mci_ai_token_account", "mci_file_remote_connection", "mci_spider_account", "mci_redis_connection",
+                     "sys_servernode", "sys_sourcedatatable", "microi_database", "wx_mp", "wx_menu",
                      "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
                      "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
                  })

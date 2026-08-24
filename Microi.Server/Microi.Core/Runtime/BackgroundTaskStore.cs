@@ -35,6 +35,9 @@ namespace Microi.net
         internal const string TableName = "mci_background_task";
         private const int DefaultLeaseSeconds = 90;
         private const int EmptyDatabaseReleaseLeaseSeconds = 900;
+        private const int InfrastructureContentionRetryLimit = 3;
+        private const string InfrastructureContentionRetryPrefix =
+            "[InfrastructureContentionRetry:";
         private const string EmptyDatabaseReleaseApiEngineKey =
             "admin_build_sanitized_empty_database";
         private static long _tenantScanCursor;
@@ -383,7 +386,11 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND CancelRequested=0
   AND AttemptCount < MaxAttempts
   AND (NextRunTime IS NULL OR NextRunTime<=@p1)
   AND (Status IN ('Pending','Retrying') OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p1)))
-ORDER BY CreateTime ASC");
+-- BACKGROUND_TASK_READY_TIME_FAIR_ORDER_V1: a chunked task receives a fresh
+-- NextRunTime whenever it is requeued. Ordering only by CreateTime lets the
+-- oldest task reclaim every slice and can starve later tasks indefinitely.
+-- Never-run tasks use CreateTime; resumed tasks rotate by their ready time.
+ORDER BY COALESCE(NextRunTime, CreateTime) ASC, CreateTime ASC");
             var candidateCommand = client.Db.FromSql(candidateSql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", DbTime(now))
@@ -538,6 +545,7 @@ WHERE Id=@p14 AND OsClient=@p15 AND Status='Running' AND LeaseOwner=@p16 AND Fen
             item.Msg = message ?? "";
             item.Result = result ?? new JObject();
             item.ResultJson = item.Result.ToString(Newtonsoft.Json.Formatting.None);
+            item.LastError = succeeded ? "" : message ?? "";
             item.EndTime = now;
             item.EstimatedEndTime = null;
             item.RemainingSeconds = null;
@@ -549,8 +557,9 @@ WHERE Id=@p14 AND OsClient=@p15 AND Status='Running' AND LeaseOwner=@p16 AND Fen
                 if (item.Total > 0) item.Current = item.Total;
             }
             return OwnedUpdate(item, @"Status=@p0,StatusText=@p1,Progress=@p2,ProgressMode=@p3,
-WorkCurrent=@p4,WorkTotal=@p5,Msg=@p6,ResultJson=@p7,EndTime=@p8,EstimatedEndTime=NULL,
-RemainingSeconds=NULL,EstimateConfidence='None',LeaseOwner='',LeaseExpiresAt=NULL,HeartbeatTime=@p8,UpdateTime=@p8",
+ WorkCurrent=@p4,WorkTotal=@p5,Msg=@p6,ResultJson=@p7,EndTime=@p8,EstimatedEndTime=NULL,
+ RemainingSeconds=NULL,EstimateConfidence='None',LastError=@p9,
+ LeaseOwner='',LeaseExpiresAt=NULL,HeartbeatTime=@p8,UpdateTime=@p8",
                 command => command
                     .AddInParameter("p0", status)
                     .AddInParameter("p1", statusText)
@@ -560,7 +569,8 @@ RemainingSeconds=NULL,EstimateConfidence='None',LeaseOwner='',LeaseExpiresAt=NUL
                     .AddInParameter("p5", item.Total)
                     .AddInParameter("p6", item.Msg)
                     .AddInParameter("p7", item.ResultJson)
-                    .AddInParameter("p8", DbTime(now)));
+                    .AddInParameter("p8", DbTime(now))
+                    .AddInParameter("p9", item.LastError));
         }
 
         public static bool RequeueChunk(
@@ -581,16 +591,23 @@ RemainingSeconds=NULL,EstimateConfidence='None',LeaseOwner='',LeaseExpiresAt=NUL
             item.Status = item.CancelRequested ? "Canceled" : "Pending";
             item.StatusText = item.CancelRequested ? "已停止" : "等待下一批";
             item.NextRunTime = item.CancelRequested ? (DateTime?)null : nextRun;
+            // BACKGROUND_TASK_CONSECUTIVE_RETRY_BUDGET_V1: MaxAttempts protects
+            // against consecutive failures, not the lifetime count of transient
+            // failures across a resumable task that can contain hundreds of
+            // successful chunks. A committed continuation is a recovery point.
+            item.AttemptCount = 0;
+            item.LastError = "";
             return OwnedUpdate(item, @"Status=CASE WHEN CancelRequested=1 THEN 'Canceled' ELSE 'Pending' END,
 StatusText=CASE WHEN CancelRequested=1 THEN '已停止' ELSE '等待下一批' END,
 Msg=CASE WHEN CancelRequested=1 THEN '任务已停止；失败或取消不会伪装成 100%。' ELSE @p0 END,
 ParamJson=@p1,CheckpointJson=@p2,
 NextRunTime=CASE WHEN CancelRequested=1 THEN NULL ELSE @p3 END,
 EndTime=CASE WHEN CancelRequested=1 THEN @p4 ELSE EndTime END,
-EstimatedEndTime=CASE WHEN CancelRequested=1 THEN NULL ELSE EstimatedEndTime END,
-RemainingSeconds=CASE WHEN CancelRequested=1 THEN NULL ELSE RemainingSeconds END,
-EstimateConfidence=CASE WHEN CancelRequested=1 THEN 'None' ELSE EstimateConfidence END,
-LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
+ EstimatedEndTime=CASE WHEN CancelRequested=1 THEN NULL ELSE EstimatedEndTime END,
+ RemainingSeconds=CASE WHEN CancelRequested=1 THEN NULL ELSE RemainingSeconds END,
+ EstimateConfidence=CASE WHEN CancelRequested=1 THEN 'None' ELSE EstimateConfidence END,
+ AttemptCount=0,LastError='',
+ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
                 command => command
                     .AddInParameter("p0", item.Msg)
                     .AddInParameter("p1", item.ParamJson)
@@ -637,6 +654,17 @@ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p2",
 
         public static bool RetryOrFail(BackgroundTaskRecord item, Exception error, bool hostStopping)
         {
+            // BACKGROUND_TASK_INFRASTRUCTURE_CONTENTION_RETRY_V1: MaxAttempts is
+            // the caller's business retry budget. A database deadlock or lock-wait
+            // timeout can happen while the durable worker is persisting an otherwise
+            // healthy checkpoint, so a MaxAttempts=1 task must not become a false
+            // business failure. Give only low-budget tasks two additional bounded
+            // infrastructure retries; a successful continuation clears LastError.
+            if (!hostStopping && TryRequeueInfrastructureContention(item, error))
+            {
+                return true;
+            }
+
             var now = DateTime.Now;
             var safeError = SafeError(error);
             var nextAttempt = item.AttemptCount + 1;
@@ -674,6 +702,120 @@ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
                     .AddInParameter("p2", nextAttempt)
                     .AddInParameter("p3", DbTime(nextRun))
                     .AddInParameter("p4", DbTime(now)));
+        }
+
+        private static bool TryRequeueInfrastructureContention(
+            BackgroundTaskRecord item,
+            Exception error)
+        {
+            if (!ShouldRequeueInfrastructureContention(item, error, out var nextAttempt))
+            {
+                return false;
+            }
+
+            var now = DateTime.Now;
+            var nextRun = now.AddSeconds(Math.Min(30, 3 * nextAttempt));
+            var safeError = SafeError(error);
+            var persistedError = InfrastructureContentionRetryPrefix
+                                 + nextAttempt.ToString(CultureInfo.InvariantCulture)
+                                 + "] "
+                                 + safeError;
+            if (persistedError.Length > 2000)
+            {
+                persistedError = persistedError.Substring(0, 2000);
+            }
+
+            item.Status = "Retrying";
+            item.StatusText = "数据库争用，等待自动恢复";
+            item.Msg = "遇到瞬时数据库争用，系统正在自动恢复。";
+            item.NextRunTime = nextRun;
+            item.AttemptCount = 0;
+            item.LastError = persistedError;
+            return OwnedUpdate(item, @"Status='Retrying',StatusText=@p0,Msg=@p1,LastError=@p2,
+AttemptCount=0,NextRunTime=@p3,EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
+LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
+                command => command
+                    .AddInParameter("p0", item.StatusText)
+                    .AddInParameter("p1", item.Msg)
+                    .AddInParameter("p2", item.LastError)
+                    .AddInParameter("p3", DbTime(nextRun))
+                    .AddInParameter("p4", DbTime(now)));
+        }
+
+        internal static bool ShouldRequeueInfrastructureContention(
+            BackgroundTaskRecord item,
+            Exception error,
+            out int nextAttempt)
+        {
+            nextAttempt = ReadInfrastructureContentionRetryOrdinal(item?.LastError) + 1;
+            return item != null
+                   && item.MaxAttempts < InfrastructureContentionRetryLimit
+                   && IsTransientInfrastructureDatabaseContention(error)
+                   && nextAttempt < InfrastructureContentionRetryLimit;
+        }
+
+        internal static bool IsTransientInfrastructureDatabaseContention(Exception error)
+        {
+            for (var current = error; current != null; current = current.InnerException)
+            {
+                var type = current.GetType();
+                try
+                {
+                    var numberValue = type.GetProperty("Number")?.GetValue(current);
+                    if (numberValue != null
+                        && int.TryParse(numberValue.ToString(), out var number)
+                        && (number == 1205 || number == 1213))
+                    {
+                        return true;
+                    }
+
+                    var sqlState = type.GetProperty("SqlState")?.GetValue(current)?.ToString()
+                                   ?? type.GetProperty("SQLState")?.GetValue(current)?.ToString();
+                    if (string.Equals(sqlState, "40001", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(sqlState, "40P01", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Provider metadata is optional; the stable message signatures
+                    // below still cover wrapped Jint/Dos.ORM exceptions.
+                }
+
+                var message = current.Message ?? "";
+                if (message.IndexOf("Deadlock found when trying to get lock", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("Lock wait timeout exceeded", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("deadlock victim", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("was deadlocked on lock resources", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("ORA-00060", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("could not serialize access", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static int ReadInfrastructureContentionRetryOrdinal(string lastError)
+        {
+            if (lastError.DosIsNullOrWhiteSpace()
+                || !lastError.StartsWith(InfrastructureContentionRetryPrefix, StringComparison.Ordinal))
+            {
+                return 0;
+            }
+
+            var end = lastError.IndexOf(']', InfrastructureContentionRetryPrefix.Length);
+            if (end <= InfrastructureContentionRetryPrefix.Length)
+            {
+                return 0;
+            }
+            var value = lastError.Substring(
+                InfrastructureContentionRetryPrefix.Length,
+                end - InfrastructureContentionRetryPrefix.Length);
+            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ordinal)
+                ? Math.Max(0, ordinal)
+                : 0;
         }
 
         private static bool OwnedUpdate(

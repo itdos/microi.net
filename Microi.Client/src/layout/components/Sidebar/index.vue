@@ -103,6 +103,7 @@ import {
     MENU_CHILD_EXPAND_MODE,
     normalizeMenuChildExpandMode
 } from "./menu-child-expand-mode.mjs";
+import { resolveUserMenuChildExpandMode } from "@/utils/user-visual-preferences.js";
 
 export default {
     components: { SidebarItem, Logo, MenuBottom, MenuItem, ArrowRight },
@@ -116,6 +117,7 @@ export default {
         const sidebar = computed(() => appStore.sidebar);
         const OsClient = computed(() => diyStore.OsClient);
         const SysConfig = computed(() => diyStore.SysConfig);
+        const CurrentUser = computed(() => diyStore.GetCurrentUser || {});
         const showLogo = computed(() => settingsStore.sidebarLogo);
         const isCollapse = computed(() => !sidebar.value.opened);
         const sidebarRenderKey = ref(0);
@@ -135,6 +137,7 @@ export default {
             sidebar,
             OsClient,
             SysConfig,
+            CurrentUser,
             showLogo,
             isCollapse,
             sidebarRenderKey,
@@ -143,7 +146,10 @@ export default {
     },
     computed: {
         menuChildExpandMode() {
-            return normalizeMenuChildExpandMode(this.SysConfig?.MenuChildExpandMode);
+            return normalizeMenuChildExpandMode(resolveUserMenuChildExpandMode(
+                this.CurrentUser?.MenuChildExpandMode,
+                this.SysConfig?.MenuChildExpandMode
+            ));
         },
         isRightChildExpandMode() {
             return !this.isCollapse && this.menuChildExpandMode === MENU_CHILD_EXPAND_MODE.RIGHT;

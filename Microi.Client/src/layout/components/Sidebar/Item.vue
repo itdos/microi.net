@@ -7,8 +7,21 @@
             <List />
         </el-icon>
         <span v-if="title" class="menu-title" :title="title" :aria-label="title">{{ title }}</span>
+        <el-tooltip
+            v-if="badgeText !== null && badgeConfigModel.Tooltip"
+            :content="badgeConfigModel.Tooltip"
+            placement="right"
+            popper-class="mci-menu-badge-tooltip"
+        >
+            <span
+                class="menu-stat-badge"
+                :class="'is-' + badgeConfigModel.Tone"
+                :style="badgeConfigModel.Color ? { backgroundColor: badgeConfigModel.Color } : undefined"
+                :aria-label="`${title}统计 ${badgeRawValue}，${badgeConfigModel.Tooltip}`"
+            >{{ badgeText }}</span>
+        </el-tooltip>
         <span
-            v-if="badgeText !== null"
+            v-else-if="badgeText !== null"
             class="menu-stat-badge"
             :class="'is-' + badgeConfigModel.Tone"
             :style="badgeConfigModel.Color ? { backgroundColor: badgeConfigModel.Color } : undefined"
@@ -29,6 +42,7 @@ import {
     getValueByPath,
     normalizeMenuBadgeConfig
 } from "@/views/form-engine/form-view-blocks/module-presentation-runtime";
+import { requestMenuBadge } from "./menu-badge-batch";
 
 const menuBadgeCache = new Map();
 
@@ -106,10 +120,11 @@ export default {
                 return;
             }
             try {
-                const result = await DiyCommon.ApiEngine.Run(config.ApiEngineKey, {
+                const result = await requestMenuBadge(DiyCommon.ApiEngine.Run, config.ApiEngineKey, {
                     ...config.ParamMap,
                     _SysMenuId: props.menuId,
                     SysMenuId: props.menuId,
+                    ValueOnly: config.ValuePath === "Data.Value" || config.ValuePath === "Data.Count",
                     OsClient: DiyCommon.GetOsClient()
                 });
                 if (result && typeof result === "object" && Object.prototype.hasOwnProperty.call(result, "Code") && Number(result.Code) !== 1) {

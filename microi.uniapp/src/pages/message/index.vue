@@ -237,7 +237,7 @@
 		data() {
 			return {
 				statusBarHeight: 0,
-				aiAssistantEnabled: false,
+				aiAssistantEnabled: true,
 				isLoggedIn: false,
 				activeTab: 'messages',
 				searchKeyword: '',

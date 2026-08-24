@@ -436,6 +436,22 @@ namespace Microi.net
         public bool? IndexUnique { get; set; }
     }
     /// <summary>
+    /// Excel 智能导入确认后的列映射。ColumnIndex 从 0 开始，行号参数从 1 开始。
+    /// </summary>
+    public class ExcelImportColumnParam
+    {
+        public int? ColumnIndex { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string Column { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string Header { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string Name { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string Label { get; set; }
+    }
+
+    /// <summary>
     /// 2021-11-01新增：Id的类型从string修改为String，为了兼容非string的老数据库
     /// </summary>
     public partial class DiyTableRowParam : BaseParam
@@ -480,6 +496,32 @@ namespace Microi.net
         public List<ExcelSheetParam> Sheets { get; set; }
         public OfficeExcelExportOptionsParam ExcelOptions { get; set; }
         public OfficeExcelLayoutParam ExcelLayout { get; set; }
+        /// <summary>
+        /// 智能导入工作表索引（从 0 开始）。未传时保持旧行为：读取第一个工作表。
+        /// </summary>
+        public int? _ImportSheetIndex { get; set; }
+        /// <summary>
+        /// 智能导入行号均从 1 开始；未传时保持旧行为：首行为表头、第二行为数据。
+        /// </summary>
+        public int? _ImportHeaderStartRow { get; set; }
+        public int? _ImportHeaderEndRow { get; set; }
+        public int? _ImportDataStartRow { get; set; }
+        public int? _ImportDataEndRow { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportColumnsJson { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportMetaJson { get; set; }
+        /// <summary>
+        /// 导入错误处理策略：RollbackAll（默认，兼容旧行为）或 ContinueOnError（逐行提交并跳过错误行）。
+        /// </summary>
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportErrorPolicy { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportFileType { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportEncoding { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportDelimiter { get; set; }
         public int? _TreeLazy { get; set; }
         /// <summary>
         /// 动态加载时传入的父级值，用于加载指定父节点的子级数据
@@ -956,6 +998,8 @@ namespace Microi.net
         public int? MenuBadgeEnabled { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string MenuBadgeApiEngineKey { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string MenuBadgeTooltip { get; set; }
         public int? EnableViewSchema { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string ViewSchemaVersion { get; set; }

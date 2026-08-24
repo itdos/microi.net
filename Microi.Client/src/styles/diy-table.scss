@@ -1002,6 +1002,11 @@
     border-radius: 12px;
     box-shadow: 0 16px 48px rgba(15, 23, 42, .18), 0 2px 8px rgba(15, 23, 42, .08);
 }
+.user-column-settings-menu > .user-column-settings-head,
+.user-column-settings-menu > .user-column-settings-foot {
+    box-sizing: border-box;
+    margin-inline: 0;
+}
 .user-column-settings-head {
     display: flex;
     align-items: flex-start;

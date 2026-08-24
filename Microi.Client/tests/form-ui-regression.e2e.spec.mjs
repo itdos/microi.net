@@ -94,14 +94,42 @@ async function expectHealthyLogo(page) {
     expect(state.naturalWidth, `logo failed to load: ${state.src}`).toBeGreaterThan(0);
 }
 
-async function waitForSystemSettingsFrame(page) {
+function collectMicroAppDiagnostics(page) {
+    const entries = [];
+    const remember = (entry) => {
+        entries.push(String(entry || "").slice(0, 1200));
+        if (entries.length > 40) entries.shift();
+    };
+    page.on("console", (message) => {
+        if (["error", "warning"].includes(message.type())) remember(`console.${message.type()}: ${message.text()}`);
+    });
+    page.on("pageerror", (error) => remember(`pageerror: ${error?.stack || error?.message || error}`));
+    page.on("requestfailed", (request) => remember(`requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText || ""}`));
+    page.on("response", (response) => {
+        if (response.status() >= 400) remember(`response: ${response.status()} ${response.request().method()} ${response.url()}`);
+    });
+    return entries;
+}
+
+async function waitForSystemSettingsFrame(page, diagnostics = []) {
     for (let attempt = 0; attempt < 180; attempt += 1) {
         for (const frame of page.frames()) {
             if (await frame.locator(".system-settings").count().catch(() => 0)) return frame;
         }
         await page.waitForTimeout(250);
     }
-    throw new Error(`system-settings application did not mount; frames: ${page.frames().map((frame) => frame.url()).join(", ")}`);
+    const frames = await Promise.all(page.frames().map(async (frame) => ({
+        url: frame.url(),
+        title: await frame.title().catch(() => ""),
+        body: await frame.locator("body").innerText().catch(() => ""),
+        html: await frame.locator("body").innerHTML().catch(() => "")
+    })));
+    throw new Error(`system-settings application did not mount\nframes=${JSON.stringify(frames.map((frame) => ({
+        url: frame.url,
+        title: frame.title,
+        body: frame.body.slice(0, 1000),
+        html: frame.html.slice(0, 2000)
+    })), null, 2)}\ndiagnostics=${JSON.stringify(diagnostics, null, 2)}`);
 }
 
 async function readKeywordSearchMetrics(keywordInput) {
@@ -499,12 +527,12 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
     expect(appGeometry.markerHeight / appGeometry.activeHeight).toBeLessThanOrEqual(0.6);
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "01c-system-private-settings.png"), fullPage: false });
-    const settingsDrawer = page.locator(".el-overlay.is-drawer:visible").last();
-    if (await settingsDrawer.count()) {
-        const closeDrawer = settingsDrawer.getByRole("button", { name: /Close|关闭/i }).first();
-        if (await closeDrawer.isVisible().catch(() => false)) await closeDrawer.click();
+    const settingsOverlay = page.locator(".mci-unified-dialog:visible, .el-overlay.is-drawer:visible").last();
+    if (await settingsOverlay.count()) {
+        const closeOverlay = settingsOverlay.getByRole("button", { name: /Close|关闭/i }).first();
+        if (await closeOverlay.isVisible().catch(() => false)) await closeOverlay.click();
         else await page.keyboard.press("Escape");
-        await expect(settingsDrawer).toBeHidden({ timeout: 15_000 });
+        await expect(settingsOverlay).toBeHidden({ timeout: 15_000 });
     }
 
     const systemRecordId = await page.evaluate(() => new URLSearchParams(location.hash.split("?")[1] || "").get("RecordId"));
@@ -737,8 +765,9 @@ test("联系人弹层：单分组满宽、紧凑记录工具、原地切换与�
     await overlay.screenshot({ path: path.join(SCREENSHOT_DIR, "02-contact-dialog-record-print.png") });
 });
 
-test("系统设置：安全与服务接入填满宿主可用高度", async ({ page }) => {
+test("系统设置：安全与服务接入统一弹层、紧凑卡片与平台确认框", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    const runtimeDiagnostics = collectMicroAppDiagnostics(page);
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/system-config");
     await expect(page.locator(".module-form-workbench")).toBeVisible({ timeout: 45_000 });
@@ -746,7 +775,31 @@ test("系统设置：安全与服务接入填满宿主可用高度", async ({ pa
     const entry = page.getByRole("button", { name: /安全与服务接入|Security.*Service Access/i }).first();
     await expect(entry).toBeVisible({ timeout: 30_000 });
     await entry.click();
-    const settingsFrame = await waitForSystemSettingsFrame(page);
+    const outerDialog = page.locator(".mci-unified-dialog.el-dialog:visible").last();
+    await expect(outerDialog).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator(".el-overlay.is-drawer:visible")).toHaveCount(0);
+    await expect(outerDialog.locator(".diy-custom-dialog__title i.fas.fa-shield-halved")).toHaveCount(1);
+    const outerGeometry = await outerDialog.evaluate((dialog) => {
+        const box = dialog.getBoundingClientRect();
+        return {
+            widthRatio: box.width / window.innerWidth,
+            borderRadius: Number.parseFloat(getComputedStyle(dialog).borderRadius)
+        };
+    });
+    expect(outerGeometry.widthRatio, JSON.stringify(outerGeometry)).toBeGreaterThanOrEqual(0.77);
+    expect(outerGeometry.widthRatio, JSON.stringify(outerGeometry)).toBeLessThanOrEqual(0.82);
+    expect(outerGeometry.borderRadius, JSON.stringify(outerGeometry)).toBeGreaterThanOrEqual(20);
+
+    const outerMask = page.locator(".mci-unified-overlay:visible").last();
+    await expect(outerMask).toBeVisible();
+    const outerMaskStyle = await outerMask.evaluate((mask) => ({
+        plain: mask.classList.contains("mci-unified-overlay--plain"),
+        filter: getComputedStyle(mask).backdropFilter || getComputedStyle(mask).webkitBackdropFilter || ""
+    }));
+    if (outerMaskStyle.plain) expect(outerMaskStyle.filter).not.toMatch(/blur\(/i);
+    else expect(outerMaskStyle.filter, JSON.stringify(outerMaskStyle)).toMatch(/blur\(/i);
+
+    const settingsFrame = await waitForSystemSettingsFrame(page, runtimeDiagnostics);
     const settings = settingsFrame.locator(".system-settings");
     await expect(settings).toBeVisible({ timeout: 30_000 });
     await expect(settingsFrame.getByText("安全与服务接入", { exact: true }).first()).toBeVisible();
@@ -770,6 +823,73 @@ test("系统设置：安全与服务接入填满宿主可用高度", async ({ pa
     expect(Math.abs(hostGeometry.appHeight - hostGeometry.bodyHeight), JSON.stringify(hostGeometry)).toBeLessThanOrEqual(2);
     expect(hostGeometry.blankBelowApp, JSON.stringify(hostGeometry)).toBeLessThanOrEqual(2);
 
+    const firstCard = settingsFrame.locator(".config-card").first();
+    await expect(firstCard).toBeVisible();
+    const cardPresentation = await firstCard.evaluate((card) => {
+        const title = card.querySelector(".config-copy b");
+        const key = card.querySelector(".config-copy p");
+        return {
+            title: title?.textContent?.trim() || "",
+            key: key?.textContent?.trim() || "",
+            titleSize: Number.parseFloat(getComputedStyle(title).fontSize),
+            keySize: Number.parseFloat(getComputedStyle(key).fontSize),
+            height: card.getBoundingClientRect().height
+        };
+    });
+    expect(cardPresentation.title).not.toBe("");
+    expect(cardPresentation.key).toMatch(/[.:]/);
+    expect(cardPresentation.title).not.toBe(cardPresentation.key);
+    expect(cardPresentation.titleSize).toBeGreaterThan(cardPresentation.keySize);
+    expect(cardPresentation.height, JSON.stringify(cardPresentation)).toBeLessThanOrEqual(170);
+    await expect(settingsFrame.locator('.value-switch[role="switch"]')).not.toHaveCount(0);
+
+    await firstCard.getByRole("button", { name: "编辑", exact: true }).click();
+    const editorLayer = settingsFrame.locator("dialog.modal-backdrop[open]:has(.modal-shell.editor)");
+    const editor = editorLayer.locator(".modal-shell.editor");
+    await expect(editor).toBeVisible();
+    await expect(editor.locator(".modal-title-icon")).toBeVisible();
+    await expect(editor.locator(".modal-title-copy h2")).toHaveText(cardPresentation.title);
+    await expect(editor.locator(".modal-title-copy p")).toHaveText(cardPresentation.key);
+    const editorStyle = await editor.evaluate((dialog) => ({
+        borderRadius: Number.parseFloat(getComputedStyle(dialog).borderRadius),
+        iconBackground: getComputedStyle(dialog.querySelector(".modal-title-icon")).backgroundColor,
+        primaryBackground: getComputedStyle(dialog.querySelector(".modal-footer .primary")).backgroundColor
+    }));
+    expect(editorStyle.borderRadius).toBeGreaterThanOrEqual(20);
+    expect(editorStyle.iconBackground).not.toBe("rgba(0, 0, 0, 0)");
+    expect(editorStyle.primaryBackground).not.toBe("rgb(255, 255, 255)");
+    const editorMaskStyle = await editorLayer.evaluate((mask) => ({
+        plain: mask.classList.contains("plain"),
+        filter: getComputedStyle(mask).backdropFilter || getComputedStyle(mask).webkitBackdropFilter || ""
+    }));
+    expect(editorMaskStyle.plain).toBe(outerMaskStyle.plain);
+    if (editorMaskStyle.plain) expect(editorMaskStyle.filter).not.toMatch(/blur\(/i);
+    else expect(editorMaskStyle.filter, JSON.stringify(editorMaskStyle)).toMatch(/blur\(/i);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03b-system-setting-editor-dialog.png"), fullPage: false });
+    await editor.getByRole("button", { name: "关闭", exact: true }).click();
+    await expect(editorLayer).toHaveCount(0);
+
+    let nativeDialogCount = 0;
+    const nativeDialogHandler = async (dialog) => {
+        nativeDialogCount += 1;
+        await dialog.dismiss();
+    };
+    page.on("dialog", nativeDialogHandler);
+    await firstCard.getByRole("button", { name: "删除", exact: true }).click();
+    const deleteLayer = settingsFrame.locator("dialog.modal-backdrop[open]:has(.confirm-dialog)");
+    const deleteDialog = deleteLayer.locator(".confirm-dialog");
+    await expect(deleteDialog).toBeVisible();
+    await expect(deleteDialog.locator(".modal-title-icon.danger-icon")).toBeVisible();
+    await expect(deleteDialog.locator(".modal-title-copy h2")).toHaveText(cardPresentation.title);
+    await expect(deleteDialog.locator(".modal-title-copy p")).toHaveText(cardPresentation.key);
+    await expect(deleteDialog.getByRole("button", { name: "确认删除", exact: true })).toBeVisible();
+    await page.waitForTimeout(300);
+    expect(nativeDialogCount).toBe(0);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03c-system-setting-delete-confirm.png"), fullPage: false });
+    await deleteDialog.getByRole("button", { name: "取消", exact: true }).click();
+    await expect(deleteLayer).toHaveCount(0);
+    page.off("dialog", nativeDialogHandler);
+
     const geometry = await settings.evaluate((root) => {
         const workspace = root.querySelector(".workspace");
         const list = root.querySelector(".settings-list");
@@ -778,13 +898,14 @@ test("系统设置：安全与服务接入填满宿主可用高度", async ({ pa
         return {
             rootTop: rootBox.top,
             rootBottom: rootBox.bottom,
+            rootHeight: rootBox.height,
             viewportHeight: document.documentElement.clientHeight,
             blankBelow: workspaceBox ? rootBox.bottom - workspaceBox.bottom : Number.POSITIVE_INFINITY,
             listMinHeight: list ? getComputedStyle(list).minHeight : "missing"
         };
     });
-    expect(geometry.rootBottom, JSON.stringify(geometry)).toBeGreaterThanOrEqual(geometry.viewportHeight - 2);
-    expect(geometry.blankBelow, JSON.stringify(geometry)).toBeLessThanOrEqual(80);
+    expect(Math.abs(geometry.rootHeight - hostGeometry.appHeight), JSON.stringify({ geometry, hostGeometry })).toBeLessThanOrEqual(2);
+    expect(geometry.blankBelow, JSON.stringify(geometry)).toBeLessThanOrEqual(24);
     expect(geometry.listMinHeight).toBe("0px");
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03-system-security-service-access.png"), fullPage: false });
 });
@@ -1299,12 +1420,20 @@ test("君驰项目表单：必填内联提示、数字步进无断层、紧凑�
 
     const collapse = overlay.locator(".diy-collapse-group").first();
     await expect(collapse).toBeVisible();
-    const collapseStyle = await collapse.locator(".diy-collapse-group__header").evaluate((element) => ({
-        backgroundColor: getComputedStyle(element).backgroundColor,
-        borderColor: getComputedStyle(element).borderColor
+    const collapseStyle = await collapse.evaluate((element) => ({
+        backgroundColor: getComputedStyle(element.querySelector(".diy-collapse-group__header")).backgroundColor,
+        borderTopWidth: getComputedStyle(element).borderTopWidth,
+        borderRightWidth: getComputedStyle(element).borderRightWidth,
+        borderBottomWidth: getComputedStyle(element).borderBottomWidth,
+        borderLeftWidth: getComputedStyle(element).borderLeftWidth,
+        accentCount: element.querySelectorAll(".diy-collapse-group__accent").length
     }));
     expect(collapseStyle.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
-    expect(collapseStyle.borderColor).not.toBe("rgba(0, 0, 0, 0)");
+    expect(collapseStyle.borderTopWidth).toBe("0px");
+    expect(collapseStyle.borderRightWidth).toBe("0px");
+    expect(collapseStyle.borderBottomWidth).toBe("0px");
+    expect(collapseStyle.borderLeftWidth).toBe("0px");
+    expect(collapseStyle.accentCount).toBe(1);
 
     const firstCollapseChild = overlay.locator(".collapse-group-item:visible").first();
     await expect(firstCollapseChild).toBeVisible();
@@ -1319,12 +1448,166 @@ test("君驰项目表单：必填内联提示、数字步进无断层、紧凑�
             inset: item.getBoundingClientRect().left - row.getBoundingClientRect().left
         };
     });
-    expect(childGeometry, "折叠分组内首个字段与左侧分组线的间距").not.toBeNull();
+    expect(childGeometry, "折叠分组内首个字段与分组左侧的间距").not.toBeNull();
     expect(childGeometry.inset, JSON.stringify(childGeometry)).toBeGreaterThanOrEqual(12);
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03-junchi-project-validation.png"), fullPage: false });
     await collapse.scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03b-junchi-collapse-group.png"), fullPage: false });
+});
+
+test("君驰托码表单：折叠分组保留装饰短线、无外框且字段间隙为纯白", async ({ page }) => {
+    test.skip(!JUNCHI_PASSWORD, "PW_JUNCHI_PASSWORD is required");
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    const tenant = { osClient: "junchi", apiBase: "https://api.chongstech.com", password: JUNCHI_PASSWORD };
+    await openTenantRoute(page, tenant, "#/diy-tuoma");
+    const firstRow = page.locator(".el-table__body-wrapper tbody tr").first();
+    await expect(firstRow).toBeVisible({ timeout: 60_000 });
+    await firstRow.dblclick();
+
+    const overlay = page.locator(".diy-form-container.el-dialog, .diy-form-container.el-drawer").last();
+    await expect(overlay).toBeVisible({ timeout: 45_000 });
+    const collapse = overlay.locator(".diy-collapse-group").first();
+    await expect(collapse).toBeVisible({ timeout: 45_000 });
+    await collapse.scrollIntoViewIfNeeded();
+
+    const groups = await overlay.evaluate((root) => {
+        const px = (value) => Number.parseFloat(value || "0") || 0;
+        const canvas = document.createElement("canvas");
+        canvas.width = 1;
+        canvas.height = 1;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        const rgb = (value) => {
+            context.clearRect(0, 0, 1, 1);
+            context.fillStyle = value;
+            context.fillRect(0, 0, 1, 1);
+            return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3);
+        };
+        const luminance = (value) => {
+            const channels = rgb(value).map((channel) => channel / 255).map((channel) => (
+                channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4)
+            ));
+            return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+        };
+        const contrast = (foreground, background) => {
+            const fg = luminance(foreground);
+            const bg = luminance(background);
+            return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+        };
+        return Array.from(root.querySelectorAll(".collapse-group-header")).map((headerColumn) => {
+            const header = headerColumn.querySelector(".diy-collapse-group");
+            const children = [];
+            let sibling = headerColumn.nextElementSibling;
+            while (sibling && !sibling.classList.contains("collapse-group-header") && !sibling.classList.contains("field-tabs-header")) {
+                if (sibling.classList.contains("collapse-group-item")) children.push(sibling);
+                sibling = sibling.nextElementSibling;
+            }
+            const first = children.find((item) => item.classList.contains("collapse-group-row-first") && item.classList.contains("collapse-group-row-start"));
+            const last = children.find((item) => item.classList.contains("collapse-group-row-last") && item.classList.contains("collapse-group-row-start"));
+            if (!header || !first || !last) {
+                return {
+                    title: header?.querySelector(".diy-collapse-group__title")?.textContent?.trim() || "",
+                    childCount: children.length,
+                    firstClass: first?.className || "",
+                    lastClass: last?.className || ""
+                };
+            }
+            const headerBox = header.getBoundingClientRect();
+            const firstBox = first.getBoundingClientRect();
+            const firstBefore = getComputedStyle(first, "::before");
+            const lastBefore = getComputedStyle(last, "::before");
+            const wrapperLeft = firstBox.left + px(firstBefore.left);
+            const wrapperRight = wrapperLeft + px(firstBefore.width);
+            const fieldSurface = first.querySelector(".container-form-item");
+            const fieldSurfaceBox = fieldSurface?.getBoundingClientRect();
+            const horizontalGapElement = fieldSurfaceBox
+                ? document.elementFromPoint(firstBox.left + 2, Math.min(firstBox.bottom - 2, fieldSurfaceBox.top + 2))
+                : null;
+            const verticalGapElement = fieldSurfaceBox
+                ? document.elementFromPoint(
+                    fieldSurfaceBox.left + Math.min(12, fieldSurfaceBox.width / 2),
+                    Math.min(firstBox.bottom - 1, fieldSurfaceBox.bottom + 1)
+                )
+                : null;
+            const headerSurface = header.querySelector(".diy-collapse-group__header");
+            const headerTitle = header.querySelector(".diy-collapse-group__title");
+            const headerDescription = header.querySelector(".diy-collapse-group__desc");
+            const headerBackground = getComputedStyle(headerSurface).backgroundColor;
+            const headerStyle = getComputedStyle(header);
+            return {
+                title: header.querySelector(".diy-collapse-group__title")?.textContent?.trim() || "",
+                childCount: children.length,
+                firstClass: first.className,
+                lastClass: last.className,
+                left: Math.abs(headerBox.left - wrapperLeft),
+                right: Math.abs(headerBox.right - wrapperRight),
+                wrapperBackground: firstBefore.backgroundColor,
+                fieldBackground: fieldSurface ? getComputedStyle(fieldSurface).backgroundColor : "",
+                itemBackgrounds: Array.from(new Set(children.map((item) => getComputedStyle(item).backgroundColor))),
+                fieldBackgrounds: Array.from(new Set(children.map((item) => {
+                    const surface = item.querySelector(".container-form-item");
+                    return surface ? getComputedStyle(surface).backgroundColor : "";
+                }))),
+                horizontalGapBackground: horizontalGapElement ? getComputedStyle(horizontalGapElement).backgroundColor : "",
+                verticalGapBackground: verticalGapElement ? getComputedStyle(verticalGapElement).backgroundColor : "",
+                accentCount: header.querySelectorAll(".diy-collapse-group__accent").length,
+                headerBorderTop: headerStyle.borderTopWidth,
+                headerBorderRight: headerStyle.borderRightWidth,
+                headerBorderBottom: headerStyle.borderBottomWidth,
+                headerBorderLeft: headerStyle.borderLeftWidth,
+                firstBorderLeft: firstBefore.borderLeftWidth,
+                firstBorderRight: firstBefore.borderRightWidth,
+                lastBorderBottom: lastBefore.borderBottomWidth,
+                lastRadiusLeft: lastBefore.borderBottomLeftRadius,
+                lastRadiusRight: lastBefore.borderBottomRightRadius,
+                titleContrast: contrast(getComputedStyle(headerTitle).color, headerBackground),
+                descriptionContrast: headerDescription ? contrast(getComputedStyle(headerDescription).color, headerBackground) : null
+            };
+        });
+    });
+    expect(groups.length, JSON.stringify(groups)).toBeGreaterThanOrEqual(3);
+    for (const group of groups) {
+        expect(group.childCount, JSON.stringify(groups)).toBeGreaterThan(0);
+        expect(group.firstClass, JSON.stringify(groups)).toContain("collapse-group-row-first");
+        expect(group.lastClass, JSON.stringify(groups)).toContain("collapse-group-row-last");
+        expect(group.left, JSON.stringify(groups)).toBeLessThanOrEqual(1);
+        expect(group.right, JSON.stringify(groups)).toBeLessThanOrEqual(1);
+        expect(group.wrapperBackground, JSON.stringify(groups)).toBe("rgb(255, 255, 255)");
+        expect(group.fieldBackground, JSON.stringify(groups)).toBe("rgb(255, 255, 255)");
+        expect(group.itemBackgrounds, JSON.stringify(groups)).toEqual(["rgb(255, 255, 255)"]);
+        expect(group.fieldBackgrounds, JSON.stringify(groups)).toEqual(["rgb(255, 255, 255)"]);
+        // elementFromPoint only returns a node for groups currently inside the viewport.
+        // Off-screen and single-field groups are still covered by the wrapper/item/surface
+        // background assertions above; validate actual gap pixels whenever a sample exists.
+        if (group.horizontalGapBackground) {
+            expect(group.horizontalGapBackground, JSON.stringify(groups)).toBe("rgb(255, 255, 255)");
+        }
+        if (group.verticalGapBackground) {
+            expect(group.verticalGapBackground, JSON.stringify(groups)).toBe("rgb(255, 255, 255)");
+        }
+        expect(group.accentCount, JSON.stringify(groups)).toBe(1);
+        expect(group.headerBorderTop, JSON.stringify(groups)).toBe("0px");
+        expect(group.headerBorderRight, JSON.stringify(groups)).toBe("0px");
+        expect(group.headerBorderBottom, JSON.stringify(groups)).toBe("0px");
+        expect(group.headerBorderLeft, JSON.stringify(groups)).toBe("0px");
+        expect(group.firstBorderLeft, JSON.stringify(groups)).toBe("0px");
+        expect(group.firstBorderRight, JSON.stringify(groups)).toBe("0px");
+        expect(group.lastBorderBottom, JSON.stringify(groups)).toBe("0px");
+        expect(group.lastRadiusLeft, JSON.stringify(groups)).not.toBe("0px");
+        expect(group.lastRadiusRight, JSON.stringify(groups)).not.toBe("0px");
+        expect(group.titleContrast, JSON.stringify(groups)).toBeGreaterThanOrEqual(4.5);
+        if (group.descriptionContrast !== null) {
+            expect(group.descriptionContrast, JSON.stringify(groups)).toBeGreaterThanOrEqual(4.5);
+        }
+    }
+    expect(
+        groups.filter((group) => (
+            group.horizontalGapBackground === "rgb(255, 255, 255)"
+            && group.verticalGapBackground === "rgb(255, 255, 255)"
+        )).length,
+        JSON.stringify(groups)
+    ).toBeGreaterThanOrEqual(3);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03c-junchi-tuoma-collapse-white.png"), fullPage: false });
 });
 
 test("君驰设计器：双击折叠分组保留图标与视觉风格专项配置", async ({ page }) => {

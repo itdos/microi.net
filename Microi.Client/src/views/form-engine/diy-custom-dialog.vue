@@ -23,7 +23,14 @@
                 <div class="diy-custom-dialog__header">
                     <div class="diy-custom-dialog__title">
                         <i :class="TitleIcon" />
-                        {{ title }}
+                        <span class="diy-custom-dialog__title-text">{{ title }}</span>
+                        <MciRenderSourceBadge
+                            v-if="renderSourceType"
+                            :type="renderSourceType"
+                            placement="inline"
+                            :instance-key="ComponentName + ':' + ShowDialog"
+                            :source-info="renderSourceInfo"
+                        />
                     </div>
                     <div class="diy-custom-dialog__actions">
                         <el-button :icon="Close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
@@ -57,7 +64,14 @@
                 <div class="diy-custom-dialog__header">
                     <div class="diy-custom-dialog__title">
                         <i :class="TitleIcon" />
-                        {{ title }}
+                        <span class="diy-custom-dialog__title-text">{{ title }}</span>
+                        <MciRenderSourceBadge
+                            v-if="renderSourceType"
+                            :type="renderSourceType"
+                            placement="inline"
+                            :instance-key="ComponentName + ':' + ShowDialog"
+                            :source-info="renderSourceInfo"
+                        />
                     </div>
                     <div class="diy-custom-dialog__actions">
                         <el-button :icon="Close" @click="ShowDialog = false">{{ $t("Msg.Close") }}</el-button>
@@ -84,10 +98,11 @@ import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
 import { isFormMaskBlurDisabled } from "@/utils/form-mask-blur.js";
 import MicroAppLoadingSkeleton from "@/views/micro-app/loading-skeleton.vue";
+import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
 export default {
     name: "DiyCustomDialog",
     directives: {},
-    components: { MicroAppLoadingSkeleton },
+    components: { MicroAppLoadingSkeleton, MciRenderSourceBadge },
     setup() {
         const diyStore = useDiyStore();
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
@@ -95,6 +110,29 @@ export default {
         return { diyStore, GetCurrentUser, OsClient };
     },
     computed: {
+        renderSourceType() {
+            if (!this.ComponentName) return "";
+            return this.isMicroAppDialog ? "microservice" : "custom";
+        },
+        renderSourceInfo() {
+            const data = this.DataAppend || {};
+            return {
+                title: this.title,
+                appName: data.AppName || data.Name || this.title,
+                appKey: data.AppKey || data.MicroServiceKey || "",
+                pageKey: data.PageKey || "",
+                routePath: data.RoutePath || data.MicroRoute || "",
+                frameworkRoute: this.$route?.fullPath || "",
+                sourceFile: data.SourceFile || "",
+                sourcePath: data.SourcePath || "",
+                privateSourcePath: data.PrivateSourcePath || "",
+                version: data.Version || data.BuildVersion || "",
+                componentName: this.ComponentName,
+                componentPath: this.ComponentPath,
+                osClient: this.OsClient || "",
+                apiBase: this.DiyCommon?.GetApiBase?.() || ""
+            };
+        },
         isMicroAppDialog() {
             return String(this.ComponentName || "").toLowerCase() === "microappdialog";
         },
@@ -203,9 +241,17 @@ export default {
 }
 
 .diy-custom-dialog__title {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 8px;
     min-width: 0;
     color: var(--el-text-color-primary);
     font-size: 15px;
+}
+
+.diy-custom-dialog__title-text {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

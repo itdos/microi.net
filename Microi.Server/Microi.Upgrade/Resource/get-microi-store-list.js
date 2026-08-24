@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store
- * Version: v1.4.1
+ * Version: v1.4.3
  * Function:
- * - 联邦应用商城列表：公开/私有可见性、分类筛选、安装版本和来源统计。
+ * - 读取统一应用商城列表并计算租户安装状态；批量平台安装时优先返回应用商城自举包。
  */
 
 function text(value, fallback) { return value === null || value === undefined ? (fallback || "") : String(value); }
@@ -218,6 +218,21 @@ if (action === "CheckPlatformApps" || action === "CheckOfficialUpdates" || actio
     OfficialCount: platformCount, InstalledCount: installedCount,
     CheckedAt: typeof DateNow === "function" ? DateNow("yyyy-MM-dd HH:mm:ss") : System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
   }};
+}
+
+// BULK_PLATFORM_BOOTSTRAP_ORDER_V1：旧租户先安装/更新应用商城自身，才能让
+// 后续 SaaS、表单等长包使用最新版导入器。批量协调器会显式传 BulkInstallPlan；
+// 兼容旧协调器时，以外部 InstalledVersions + 仅筛选 Platform 识别批量盘点。
+var platformOnly = types.length === 1 && lower(types[0]) === "platform";
+var externalInstalledVersions = V8.Param.InstalledVersions || V8.Param.InstalledApps;
+var bulkInstallPlan = flag(V8.Param.BulkInstallPlan, false)
+  || (!!externalInstalledVersions && platformOnly);
+if (bulkInstallPlan) {
+  all.sort(function (left, right) {
+    var leftBootstrap = lower(left && (left.AppId || left.AppKey)) === "app.microi.store" ? 0 : 1;
+    var rightBootstrap = lower(right && (right.AppId || right.AppKey)) === "app.microi.store" ? 0 : 1;
+    return leftBootstrap - rightBootstrap;
+  });
 }
 
 var start = (pageIndex - 1) * pageSize;

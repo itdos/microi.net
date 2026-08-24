@@ -154,8 +154,14 @@
             <template #header
                 ><div>
                     <div class="pull-left" style="color: var(--el-text-color-primary); font-size: 15px">
-                        <i :class="''" />
-                        {{ "发起新流程 - " + CurrentFlowDesign.FlowName }}
+                         <i :class="''" />
+                         {{ "发起新流程 - " + CurrentFlowDesign.FlowName }}
+                        <MciRenderSourceBadge
+                            v-if="OpenFormType === 'Custom'"
+                            type="custom"
+                            placement="inline"
+                            :instance-key="CurrentFlowDesign.Id + ':' + ShowStartFlowForm"
+                        />
                     </div>
                     <div class="pull-right">
                         <el-button :icon="Close" @click="ShowStartFlowForm = false">{{ $t("Msg.Close") }}</el-button>
@@ -177,10 +183,11 @@ import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
 // Vite: 使用 ES Module import 导入静态资源
 import bodyBgSvg from "@/assets/img/body-bg.svg";
+import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
 export default {
     name: "DiyFlowIndex",
     directives: {},
-    components: {},
+    components: { MciRenderSourceBadge },
     setup() {
         const diyStore = useDiyStore();
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);

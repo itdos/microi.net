@@ -9,8 +9,40 @@ const packageModel = JSON.parse(await readFile(packageUrl, 'utf8'))
 const storePackageModel = JSON.parse(await readFile(storePackageUrl, 'utf8'))
 const importerSource = (await readFile(importerUrl, 'utf8')).replace(/\r\n/g, '\n')
 const category = '安全与服务接入'
-const platformServiceVersion = 'v1.6.9'
 const createTime = '2026-08-21 00:00:00'
+const migratedPublicSettingKeys = new Set([
+  'login.identity.enabled',
+  'login.passkey.enabled',
+  'login.authenticator.enabled',
+  'security.passwordchange.requirestepup',
+  'login.external.enabled',
+  'login.face.enabled',
+  'login.gitee.enabled',
+  'login.wechat.enabled',
+  'login.github.enabled',
+  'login.passkey.display',
+  'login.authenticator.display',
+  'login.gitee.display',
+  'login.wechat.display',
+  'login.github.display',
+])
+
+const parseVersion = value => String(value || '')
+  .replace(/^v/i, '')
+  .split('.')
+  .map(part => Number(part) || 0)
+
+const ensureMinimumVersion = (value, minimum) => {
+  const currentParts = parseVersion(value)
+  const minimumParts = parseVersion(minimum)
+  for (let index = 0; index < Math.max(currentParts.length, minimumParts.length); index += 1) {
+    const currentPart = currentParts[index] || 0
+    const minimumPart = minimumParts[index] || 0
+    if (currentPart > minimumPart) return value
+    if (currentPart < minimumPart) return minimum
+  }
+  return value || minimum
+}
 
 const template = (id, key, value, valueType, description, sort, isSecret = false) => ({
   Id: id,
@@ -61,6 +93,13 @@ const templates = [
   template('4df93e43-f6bb-4bf0-b3b7-51d724921042', 'Sms.Aliyun.AccessKeySecret', '', 'String', '当前租户阿里云短信 AccessKey Secret', 411, true),
   template('4df93e43-f6bb-4bf0-b3b7-51d724921043', 'Sms.Aliyun.SignName', '', 'String', '当前租户阿里云短信签名', 412),
   template('4df93e43-f6bb-4bf0-b3b7-51d724921044', 'Sms.Aliyun.TemplateCode', '', 'String', '当前租户阿里云验证码模板编码', 413),
+
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921051', 'Map.Provider', 'Baidu', 'String', '表单地图控件默认供应商：AMap、Baidu 或 Tencent', 510),
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921052', 'Map.AMap.JsApiKey', '', 'String', '高德地图 Web 端 JS API Key；必须在高德控制台限制可用域名', 511, true),
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921053', 'Map.AMap.SecurityJsCode', '', 'String', '高德地图 JS API 2.0 安全密钥；生产环境优先配置安全代理地址', 512, true),
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921054', 'Map.AMap.ServiceHost', '', 'String', '高德地图安全代理 serviceHost（HTTP(S) 绝对地址，配置后不向浏览器返回安全密钥）', 513),
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921055', 'Map.Baidu.JsApiKey', '', 'String', '百度地图 Web 端 JavaScript API AK；必须在百度控制台限制 Referer 白名单', 514, true),
+  template('4df93e43-f6bb-4bf0-b3b7-51d724921056', 'Map.Tencent.JsApiKey', '', 'String', '腾讯地图 JavaScript API GL Key；必须在腾讯位置服务控制台限制授权域名', 515, true),
 ]
 
 const menu = (packageModel.SysMenus || []).find(item => item.Id === 'ea6b79e8-2c6b-4d0f-9b6a-44d01a3479bf')
@@ -70,21 +109,21 @@ const button = (buttons || []).find(item => item.Id === 'mci-system-settings-ide
 if (!button) throw new Error('系统设置菜单缺少租户安全设置按钮')
 button.Name = category
 button._RawName = category
-button.V8Code = String(button.V8Code || '').replace(
-  /Title:\s*'租户系统设置 · [^']*'/,
-  `Title: '租户系统设置 · ${category}'`,
-)
-if (/\n\s*Version:\s*'[^']*',/.test(button.V8Code)) {
-  button.V8Code = button.V8Code.replace(
-    /\n(\s*)Version:\s*'[^']*',/,
-    `\n$1Version: '${platformServiceVersion}',`,
-  )
-} else {
-  button.V8Code = button.V8Code.replace(
-    /(\n\s*AppKey:\s*'microi-platform-service',)/,
-    `$1\n  Version: '${platformServiceVersion}',`,
-  )
-}
+// 平台内置服务入口必须解析当前 DatabaseOnly 运行包。这里不能固化历史
+// BuildVersion，否则 SaaS 包与内置微服务分开升级后会在读取数据库资产前失败。
+button.V8Code = `V8.OpenAppDialog({
+  AppKey: 'microi-platform-service',
+  RoutePath: '/system-settings',
+  Title: '租户系统设置 · ${category}',
+  TitleIcon: 'fas fa-shield-halved',
+  Width: '80%',
+  BodyHeight: 'calc(100vh - 160px)',
+  OpenType: 'Dialog',
+  Data: { Section: 'login' },
+  OnSuccess: function(){ V8.RefreshTable({ _PageIndex: -1 }); },
+  OnCancel: function(){},
+  OnError: function(error){ V8.Tips((error && error.message) || '系统设置页面加载失败', false); }
+});`
 menu.PageBtns = typeof menu.PageBtns === 'string' ? JSON.stringify(buttons) : buttons
 
 const dataSet = (packageModel.DataSets || []).find(item => String(item.TableName).toLowerCase() === 'mci_system_setting')
@@ -93,11 +132,9 @@ if (dataSet.ConflictPolicy !== 'InsertIfMissing') throw new Error('mci_system_se
 dataSet.ConflictFields = ['ConfigKey']
 dataSet.MetadataFieldsIfExists = ['Category', 'Description']
 
-const existingRows = Array.isArray(dataSet.Rows) ? dataSet.Rows : []
+const existingRows = (Array.isArray(dataSet.Rows) ? dataSet.Rows : [])
+  .filter(row => !migratedPublicSettingKeys.has(String(row.ConfigKey || '').toLowerCase()))
 const rowsByKey = new Map(existingRows.map(row => [String(row.ConfigKey || '').toLowerCase(), row]))
-for (const row of existingRows) {
-  row.Category = category
-}
 for (const row of templates) {
   const key = row.ConfigKey.toLowerCase()
   if (!rowsByKey.has(key)) {
@@ -108,8 +145,18 @@ for (const row of templates) {
 dataSet.Rows = existingRows
 
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {})
-info.Version = 'v7.5.7'
+info.Version = ensureMinimumVersion(info.Version, 'v7.5.29')
+info.RequiredPlatformCapabilities = [...new Set([
+  ...(info.RequiredPlatformCapabilities || []),
+  'POST /api/TenantSystemSettings/GetMapRuntime',
+  'ClientFeature:MapRuntimeProvidersAMapBaiduTencent',
+])]
 const changeLines = [
+  '2026-08-23 v7.5.29 从 mci_system_setting 官方种子移除功能启用与入口显示开关；历史租户值仅作只读兼容回退，私有设置继续只交付凭据和后端专用接入参数。',
+  '2026-08-23 v7.5.28 系统设置微服务显式继承宿主主题色，修复外置样式下图标与主按钮失色；删除确认层完整展示配置说明主标题。',
+  '2026-08-23 v7.5.27 “安全与服务接入”改为 80% 吾码大圆角 Dialog，配置卡片紧凑化并以说明为主标题；Bool 使用开关，编辑、删除、TOTP 与 Secret 显示统一使用品牌弹层且遮罩毛玻璃跟随系统开关。',
+  '2026-08-22 v7.5.23 “安全与服务接入”新增高德、百度、腾讯地图租户私密配置模板，浏览器只按当前供应商读取最小运行时凭据并兼容旧 sys_config 字段。',
+  '2026-08-22 v7.5.16 “安全与服务接入”入口不再锁定历史微服务版本，始终解析当前 DatabaseOnly 内置运行包，HDFS/CDN 不可用时继续使用数据库资产。',
   '2026-08-21 v7.5.7 内嵌 microi-platform-service 升级至 v1.6.9，统一交付满高系统设置、清爽应用商城与主题化明暗模式。',
   '2026-08-21 v7.5.6 内嵌 microi-platform-service 升级至 v1.6.8，并固化“安全与服务接入”满高弹层及租户私有配置交付。',
   '2026-08-21 v7.5.5 将 send_sms_reg 作为 Managed/Platform 资源纳入 SaaS 基础包，保留匿名 HTTP 契约并优先读取租户后端私有短信配置。',
@@ -128,6 +175,8 @@ info.DataRowCount = (packageModel.DataSets || []).reduce(
 
 await writeFile(packageUrl, `${JSON.stringify(packageModel, null, 2)}\n`, 'utf8')
 
+let storeSummary = ''
+if (!process.argv.includes('--saas-only')) {
 const importer = (storePackageModel.SysApiEngines || []).find(
   item => item.ApiEngineKey === 'import-microi-store-package',
 )
@@ -138,7 +187,7 @@ importer.ApiV8Code = importerSource
 importer.Version = importerVersion.startsWith('v') ? importerVersion : `v${importerVersion}`
 importer.LimitMemory = 8192
 const storeInfo = storePackageModel.PackageInfo || (storePackageModel.PackageInfo = {})
-storeInfo.Version = 'v7.5.7'
+storeInfo.Version = ensureMinimumVersion(storeInfo.Version, 'v7.5.7')
 const storeChangeLines = [
   '2026-08-21 v7.5.7 内嵌 microi-platform-service 升级至 v1.6.9，应用商城压缩首屏层级并完成主题色、亮色与深色适配。',
   '2026-08-21 v7.5.3 内嵌 microi-platform-service 升级至 v1.6.8，正式交付“安全与服务接入”满高弹层与租户私有配置界面。',
@@ -151,5 +200,7 @@ for (const line of [...storeChangeLines].reverse()) {
 }
 storeInfo.ChangeHistory = `${storeHistoryLines.join('\n')}\n`
 await writeFile(storePackageUrl, `${JSON.stringify(storePackageModel, null, 2)}\n`, 'utf8')
+storeSummary = `; store ${storeInfo.Version}/${importer.Version}`
+}
 
-console.log(`updated ${info.Version}: ${dataSet.Rows.length} tenant system-setting rows; store ${storeInfo.Version}/${importer.Version}`)
+console.log(`updated ${info.Version}: ${dataSet.Rows.length} tenant system-setting rows${storeSummary}`)

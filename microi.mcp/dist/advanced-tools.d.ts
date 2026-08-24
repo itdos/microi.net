@@ -18,6 +18,7 @@ export type StoreApplicationOperation = 'install' | 'update';
 export interface StoreApplicationTaskInput {
     operation: StoreApplicationOperation;
     storeId: string;
+    storeVersionId?: string;
     requestId: string;
     storeApiBase?: string;
     storeOsClient?: string;
@@ -58,6 +59,12 @@ export declare function buildPlan(manifest: JsonRecord): {
     errors: string[];
     warnings: string[];
 };
+/**
+ * Build the semantic diy_table Banner patch used by Manifest generation.
+ * Explicit arrays win (including []); otherwise business field types supply a
+ * stable, useful first rendering for new modules and old databases alike.
+ */
+export declare function buildDefaultFormBanner(table: JsonRecord): JsonRecord;
 /**
  * Validate the portable relation contract before any Manifest write occurs.
  * Runtime ids in raw Config are deliberately not trusted: they are resolved

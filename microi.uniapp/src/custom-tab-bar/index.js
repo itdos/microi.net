@@ -30,7 +30,7 @@ Component({
     color: '#80909A',
     selectedColor: '#E54625',
     backgroundColor: '#FFFFFF',
-    aiAssistantEnabled: false,
+    aiAssistantEnabled: true,
     safeTop: 0,
     safeRight: 0,
     safeBottom: 0,

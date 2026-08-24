@@ -223,6 +223,19 @@ namespace Dos.Common
         public long Size { get; set; }
     }
 
+    /// <summary>
+    /// 交互式上传图片的跨平台压缩结果。OriginalSize/OriginalWidth/OriginalHeight
+    /// 只用于审计和返回元数据；原始字节仍由 HDFS 上传流程单独写入私有桶。
+    /// </summary>
+    public class UploadImageCompressionResult : ImageProcessResult
+    {
+        public long OriginalSize { get; set; }
+        public int OriginalWidth { get; set; }
+        public int OriginalHeight { get; set; }
+        public bool WasCompressed { get; set; }
+        public bool TargetSizeReached { get; set; }
+    }
+
     public class ImageInfoResult
     {
         public int Width { get; set; }
@@ -250,10 +263,102 @@ namespace Dos.Common
         public const int ImageProcessingMaxInputBytesPerImage = 25 * 1024 * 1024;
         public const long ImageProcessingMaxTotalInputBytes = 100L * 1024 * 1024;
         public const int ImageProcessingMaxOutputBytes = 50 * 1024 * 1024;
+        public const int UploadImageDefaultMaxSizeKb = 500;
+        public const int UploadImageDefaultMaxEdge = 1920;
+        public const int UploadImageMaxInputBytes = 256 * 1024 * 1024;
+        public const long UploadImageMaxSourcePixels = 250_000_000L;
+        private const long UploadImageMaxFullDecodePixels = 50_000_000L;
+        private const int UploadImageMinEdge = 64;
         private const string EmbeddedFallbackFontResource =
             "Dos.Common.Resource.NotoSansCJKsc-Regular.otf";
         private static readonly Lazy<byte[]> EmbeddedFallbackFontBytes =
             new Lazy<byte[]>(LoadEmbeddedFallbackFontBytes);
+
+        /// <summary>
+        /// 为普通上传生成展示图。默认把最长边限制到 1920px，并把体积控制在
+        /// 500KB 左右；实现只依赖 SkiaSharp，可在 Windows、Linux 和容器中一致运行。
+        /// 超大 PNG 优先使用编解码器缩放，必要时使用逐行降采样，避免为原始像素
+        /// 一次性分配数百 MB 内存。
+        /// </summary>
+        public static UploadImageCompressionResult CompressUploadImage(
+            Stream image,
+            string fileSuffix,
+            int maxSizeKb = UploadImageDefaultMaxSizeKb,
+            int maxEdge = UploadImageDefaultMaxEdge)
+        {
+            if (image == null) throw new ArgumentNullException(nameof(image));
+            maxSizeKb = Math.Max(64, Math.Min(maxSizeKb, 2048));
+            maxEdge = Math.Max(320, Math.Min(maxEdge, 4096));
+
+            var originalBytes = ReadUploadImageBytes(image);
+            using (var encoded = SKData.CreateCopy(originalBytes))
+            using (var codec = SKCodec.Create(encoded))
+            {
+                if (codec == null) throw new ArgumentException("无法识别上传图片格式或图片已损坏。", nameof(image));
+                var originalWidth = codec.Info.Width;
+                var originalHeight = codec.Info.Height;
+                if (originalWidth <= 0 || originalHeight <= 0
+                    || originalWidth > 65535 || originalHeight > 65535
+                    || (long)originalWidth * originalHeight > UploadImageMaxSourcePixels)
+                    throw new ArgumentException($"上传图片像素尺寸过大，最多允许 {UploadImageMaxSourcePixels:N0} 像素。", nameof(image));
+
+                var format = ResolveUploadImageFormat(fileSuffix, codec.EncodedFormat);
+                var targetBytes = checked(maxSizeKb * 1024L);
+                var sourceMaxEdge = Math.Max(originalWidth, originalHeight);
+                if (originalBytes.LongLength <= targetBytes && sourceMaxEdge <= maxEdge)
+                {
+                    return BuildUploadCompressionResult(originalBytes, format, originalWidth, originalHeight,
+                        originalBytes.LongLength, originalWidth, originalHeight, false, true);
+                }
+
+                var initialScale = Math.Min(1D, maxEdge / (double)sourceMaxEdge);
+                var targetWidth = Math.Max(1, (int)Math.Round(originalWidth * initialScale));
+                var targetHeight = Math.Max(1, (int)Math.Round(originalHeight * initialScale));
+                SKBitmap bitmap = null;
+                byte[] smallest = null;
+                var smallestWidth = targetWidth;
+                var smallestHeight = targetHeight;
+                try
+                {
+                    bitmap = DecodeUploadBitmap(originalBytes, originalWidth, originalHeight,
+                        targetWidth, targetHeight);
+                    for (var attempt = 0; attempt < 14; attempt++)
+                    {
+                        var output = EncodeUploadBitmap(bitmap, format, targetBytes);
+                        if (smallest == null || output.Length < smallest.Length)
+                        {
+                            smallest = output;
+                            smallestWidth = bitmap.Width;
+                            smallestHeight = bitmap.Height;
+                        }
+                        if (output.LongLength <= targetBytes)
+                        {
+                            return BuildUploadCompressionResult(output, format, bitmap.Width, bitmap.Height,
+                                originalBytes.LongLength, originalWidth, originalHeight, true, true);
+                        }
+
+                        if (bitmap.Width <= UploadImageMinEdge && bitmap.Height <= UploadImageMinEdge) break;
+                        var ratio = Math.Sqrt(targetBytes / (double)output.LongLength) * 0.94D;
+                        ratio = Math.Max(0.50D, Math.Min(0.88D, ratio));
+                        var nextWidth = Math.Max(UploadImageMinEdge, (int)Math.Floor(bitmap.Width * ratio));
+                        var nextHeight = Math.Max(UploadImageMinEdge, (int)Math.Floor(bitmap.Height * ratio));
+                        if (nextWidth == bitmap.Width && nextHeight == bitmap.Height) break;
+                        var next = ResizeUploadBitmap(bitmap, nextWidth, nextHeight);
+                        bitmap.Dispose();
+                        bitmap = next;
+                    }
+
+                    if (smallest == null) throw new InvalidOperationException("图片压缩未生成有效输出。");
+                    return BuildUploadCompressionResult(smallest, format, smallestWidth, smallestHeight,
+                        originalBytes.LongLength, originalWidth, originalHeight, true,
+                        smallest.LongLength <= targetBytes);
+                }
+                finally
+                {
+                    bitmap?.Dispose();
+                }
+            }
+        }
 
         public static ImageProcessResult Create(ImageCreateParam param)
         {
@@ -571,6 +676,301 @@ namespace Dos.Common
                     Origin = codec.EncodedOrigin.ToString(),
                     HasAlpha = codec.Info.AlphaType != SKAlphaType.Opaque
                 };
+            }
+        }
+
+        private static UploadImageCompressionResult BuildUploadCompressionResult(
+            byte[] bytes,
+            string format,
+            int width,
+            int height,
+            long originalSize,
+            int originalWidth,
+            int originalHeight,
+            bool wasCompressed,
+            bool targetSizeReached)
+        {
+            return new UploadImageCompressionResult
+            {
+                Bytes = bytes,
+                Width = width,
+                Height = height,
+                Format = format,
+                ContentType = ContentTypeFor(format),
+                FileName = $"preview.{ExtensionFor(format)}",
+                Size = bytes.LongLength,
+                OriginalSize = originalSize,
+                OriginalWidth = originalWidth,
+                OriginalHeight = originalHeight,
+                WasCompressed = wasCompressed,
+                TargetSizeReached = targetSizeReached
+            };
+        }
+
+        private static byte[] ReadUploadImageBytes(Stream image)
+        {
+            var originalPosition = 0L;
+            var restorePosition = image.CanSeek;
+            if (restorePosition)
+            {
+                originalPosition = image.Position;
+                var remaining = image.Length - image.Position;
+                if (remaining <= 0) throw new ArgumentException("上传图片内容为空。", nameof(image));
+                if (remaining > UploadImageMaxInputBytes)
+                    throw new ArgumentException($"上传图片不能超过 {UploadImageMaxInputBytes / 1024 / 1024} MB。", nameof(image));
+            }
+
+            try
+            {
+                using (var output = new MemoryStream())
+                {
+                    var buffer = new byte[81920];
+                    int read;
+                    while ((read = image.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        if (output.Length > UploadImageMaxInputBytes - read)
+                            throw new ArgumentException($"上传图片不能超过 {UploadImageMaxInputBytes / 1024 / 1024} MB。", nameof(image));
+                        output.Write(buffer, 0, read);
+                    }
+                    if (output.Length == 0) throw new ArgumentException("上传图片内容为空。", nameof(image));
+                    return output.ToArray();
+                }
+            }
+            finally
+            {
+                if (restorePosition) image.Position = originalPosition;
+            }
+        }
+
+        private static string ResolveUploadImageFormat(string fileSuffix, SKEncodedImageFormat encodedFormat)
+        {
+            var extension = (Path.GetExtension(fileSuffix) ?? fileSuffix ?? string.Empty)
+                .Trim().TrimStart('.').ToLowerInvariant();
+            switch (extension)
+            {
+                case "jpg":
+                case "jpeg": return "jpeg";
+                case "png": return "png";
+                case "webp": return "webp";
+                case "bmp": return "bmp";
+            }
+
+            var detected = EncodedFormatName(encodedFormat);
+            if (detected == "jpeg" || detected == "png" || detected == "webp" || detected == "bmp")
+                return detected;
+            throw new NotSupportedException($"当前上传压缩不支持 {detected} 图片格式。");
+        }
+
+        private static SKBitmap DecodeUploadBitmap(
+            byte[] encodedBytes,
+            int originalWidth,
+            int originalHeight,
+            int targetWidth,
+            int targetHeight)
+        {
+            var direct = TryDecodeUploadBitmap(encodedBytes, targetWidth, targetHeight, out var directResult);
+            if (direct != null) return direct;
+
+            var desiredScale = (float)Math.Min(targetWidth / (double)originalWidth,
+                targetHeight / (double)originalHeight);
+            using (var data = SKData.CreateCopy(encodedBytes))
+            using (var codec = SKCodec.Create(data))
+            {
+                if (codec == null) throw new ArgumentException("无法识别上传图片格式或图片已损坏。");
+                var supported = codec.GetScaledDimensions(desiredScale);
+                if (supported.Width > 0 && supported.Height > 0
+                    && (supported.Width < originalWidth || supported.Height < originalHeight))
+                {
+                    var scaled = TryDecodeUploadBitmap(encodedBytes, supported.Width, supported.Height, out _);
+                    if (scaled != null)
+                    {
+                        if (scaled.Width == targetWidth && scaled.Height == targetHeight) return scaled;
+                        try
+                        {
+                            return ResizeUploadBitmap(scaled, targetWidth, targetHeight);
+                        }
+                        finally
+                        {
+                            scaled.Dispose();
+                        }
+                    }
+                }
+            }
+
+            if ((long)originalWidth * originalHeight <= UploadImageMaxFullDecodePixels)
+            {
+                var full = TryDecodeUploadBitmap(encodedBytes, originalWidth, originalHeight, out var fullResult);
+                if (full == null)
+                    throw new ArgumentException($"图片解码失败：{fullResult}（缩放解码：{directResult}）。");
+                try
+                {
+                    return ResizeUploadBitmap(full, targetWidth, targetHeight);
+                }
+                finally
+                {
+                    full.Dispose();
+                }
+            }
+
+            return DecodeUploadBitmapByScanlines(encodedBytes, originalWidth, originalHeight,
+                targetWidth, targetHeight, directResult);
+        }
+
+        private static SKBitmap TryDecodeUploadBitmap(
+            byte[] encodedBytes,
+            int width,
+            int height,
+            out SKCodecResult result)
+        {
+            using (var data = SKData.CreateCopy(encodedBytes))
+            using (var codec = SKCodec.Create(data))
+            {
+                if (codec == null)
+                {
+                    result = SKCodecResult.InvalidInput;
+                    return null;
+                }
+                var info = new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+                var bitmap = new SKBitmap(info);
+                result = codec.GetPixels(info, bitmap.GetPixels());
+                if (result == SKCodecResult.Success || result == SKCodecResult.IncompleteInput) return bitmap;
+                bitmap.Dispose();
+                return null;
+            }
+        }
+
+        private static SKBitmap DecodeUploadBitmapByScanlines(
+            byte[] encodedBytes,
+            int originalWidth,
+            int originalHeight,
+            int targetWidth,
+            int targetHeight,
+            SKCodecResult directResult)
+        {
+            using (var data = SKData.CreateCopy(encodedBytes))
+            using (var codec = SKCodec.Create(data))
+            {
+                if (codec == null) throw new ArgumentException("无法识别上传图片格式或图片已损坏。");
+                var sourceInfo = new SKImageInfo(originalWidth, originalHeight,
+                    SKColorType.Rgba8888, SKAlphaType.Premul);
+                var start = codec.StartScanlineDecode(sourceInfo);
+                if (start != SKCodecResult.Success)
+                    throw new NotSupportedException($"超大图片不支持安全逐行压缩：{start}（缩放解码：{directResult}）。");
+
+                var outputInfo = new SKImageInfo(targetWidth, targetHeight,
+                    SKColorType.Rgba8888, SKAlphaType.Premul);
+                var output = new SKBitmap(outputInfo);
+                var sourceRow = new byte[sourceInfo.RowBytes];
+                var targetRow = new byte[outputInfo.RowBytes];
+                var rowPointer = Marshal.AllocHGlobal(sourceInfo.RowBytes);
+                try
+                {
+                    var nextTargetY = 0;
+                    for (var sourceY = 0; sourceY < originalHeight && nextTargetY < targetHeight; sourceY++)
+                    {
+                        if (codec.GetScanlines(rowPointer, 1, sourceInfo.RowBytes) != 1)
+                            throw new ArgumentException($"图片逐行解码在第 {sourceY + 1} 行失败。");
+                        Marshal.Copy(rowPointer, sourceRow, 0, sourceRow.Length);
+                        while (nextTargetY < targetHeight
+                               && (long)nextTargetY * originalHeight / targetHeight <= sourceY)
+                        {
+                            for (var targetX = 0; targetX < targetWidth; targetX++)
+                            {
+                                var sourceX = (int)((long)targetX * originalWidth / targetWidth);
+                                var sourceOffset = sourceX * 4;
+                                var targetOffset = targetX * 4;
+                                targetRow[targetOffset] = sourceRow[sourceOffset];
+                                targetRow[targetOffset + 1] = sourceRow[sourceOffset + 1];
+                                targetRow[targetOffset + 2] = sourceRow[sourceOffset + 2];
+                                targetRow[targetOffset + 3] = sourceRow[sourceOffset + 3];
+                            }
+                            Marshal.Copy(targetRow, 0,
+                                IntPtr.Add(output.GetPixels(), nextTargetY * output.RowBytes), targetRow.Length);
+                            nextTargetY++;
+                        }
+                    }
+
+                    if (nextTargetY != targetHeight)
+                    {
+                        output.Dispose();
+                        throw new ArgumentException("图片逐行解码未返回完整像素数据。");
+                    }
+                    return output;
+                }
+                catch
+                {
+                    output.Dispose();
+                    throw;
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(rowPointer);
+                }
+            }
+        }
+
+        private static SKBitmap ResizeUploadBitmap(SKBitmap source, int width, int height)
+        {
+            var info = new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+            var resized = new SKBitmap(info);
+            using (var canvas = new SKCanvas(resized))
+            using (var paint = new SKPaint { IsAntialias = true })
+            {
+                canvas.Clear(SKColors.Transparent);
+                canvas.DrawBitmap(source,
+                    new SKRect(0, 0, source.Width, source.Height),
+                    new SKRect(0, 0, width, height),
+                    new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear),
+                    paint);
+                canvas.Flush();
+            }
+            return resized;
+        }
+
+        private static byte[] EncodeUploadBitmap(SKBitmap bitmap, string format, long targetBytes)
+        {
+            if (format != "jpeg" && format != "webp")
+                return EncodeUploadBitmap(bitmap, format, 100);
+
+            byte[] bestWithinTarget = null;
+            byte[] smallest = null;
+            var low = 35;
+            var high = 90;
+            while (low <= high)
+            {
+                var quality = (low + high) / 2;
+                var current = EncodeUploadBitmap(bitmap, format, quality);
+                if (smallest == null || current.Length < smallest.Length) smallest = current;
+                if (current.LongLength <= targetBytes)
+                {
+                    bestWithinTarget = current;
+                    low = quality + 1;
+                }
+                else
+                {
+                    high = quality - 1;
+                }
+            }
+            return bestWithinTarget ?? smallest
+                   ?? throw new InvalidOperationException("图片编码未生成有效输出。");
+        }
+
+        private static byte[] EncodeUploadBitmap(SKBitmap bitmap, string format, int quality)
+        {
+            if (format == "bmp")
+            {
+                using (var pixmap = bitmap.PeekPixels())
+                {
+                    if (pixmap == null) throw new InvalidOperationException("无法读取 BMP 图片像素。");
+                    return EncodeBmp(pixmap, bitmap.Width, bitmap.Height);
+                }
+            }
+
+            using (var image = SKImage.FromBitmap(bitmap))
+            using (var data = image.Encode(ToEncodedFormat(format), quality))
+            {
+                if (data == null) throw new InvalidOperationException($"当前运行环境不支持编码为 {format}。");
+                return data.ToArray();
             }
         }
 

@@ -1729,7 +1729,7 @@ var DiyCommon = {
             closeOnPressEscape: false,
             closeOnHashChange: false,
 
-            customClass: option.CustomClass || "",
+            customClass: [option.CustomClass, "mci-unified-message-box"].filter(Boolean).join(" "),
             beforeClose: typeof option.BeforeClose === "function" ? option.BeforeClose : undefined,
 
             showClose: option.ShowClose,
@@ -2890,7 +2890,17 @@ var DiyCommon = {
                 MaxCount: 10,
                 ShowFileList: false,
                 Preview: true,
-                MaxSize: 10 //单位M
+                MaxSize: 10, //单位M
+                Crop: {
+                    Enabled: false,
+                    Mode: "free", // free自由、fixed固定比例、select用户可选
+                    Ratio: "1:1",
+                    CustomWidth: 1,
+                    CustomHeight: 1,
+                    AllowRotate: true,
+                    AllowFlip: true,
+                    AllowZoom: true
+                }
             },
             // ImgUploadLimit: false, // 文件/图片 上传   限制匿名访问
             // ImgUploadMultiple: false, // 多文件上传
@@ -3010,7 +3020,27 @@ var DiyCommon = {
                 Height: ""
             },
             RichText: {
-                EditorProduct: ""
+                EditorProduct: "WangEditor",
+                Limit: true,
+                Image: {
+                    Enabled: true,
+                    MaxSize: 20,
+                    MaxCount: 10,
+                    Preview: true,
+                    CompressMaxSize: 500,
+                    CompressMaxWidth: 1920
+                },
+                Video: {
+                    Enabled: true,
+                    MaxSize: 200,
+                    MaxCount: 3
+                },
+                File: {
+                    Enabled: true,
+                    MaxSize: 100,
+                    MaxCount: 10,
+                    Accept: ""
+                }
             }
         };
         if (DiyCommon.IsNull(field.Config)) {

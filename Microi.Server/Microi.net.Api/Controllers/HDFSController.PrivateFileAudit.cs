@@ -64,6 +64,19 @@ public partial class HDFSController
             Response.StatusCode = (int)upstream.StatusCode;
             if (upstream.Content.Headers.ContentType != null) Response.ContentType = upstream.Content.Headers.ContentType.ToString();
             if (upstream.Content.Headers.ContentLength.HasValue) Response.ContentLength = upstream.Content.Headers.ContentLength.Value;
+            NetworkTrafficObservabilityService.AnnotateIdentity(
+                HttpContext,
+                currentUser?["Id"]?.ToString(),
+                currentUser?["Account"]?.ToString(),
+                currentUser?["Name"]?.ToString(),
+                o);
+            NetworkTrafficObservabilityService.AnnotateTransfer(
+                HttpContext,
+                "Download",
+                1,
+                upstream.Content.Headers.ContentLength ?? 0,
+                new[] { ticket.FileName },
+                new[] { Path.GetExtension(ticket.FileName ?? "") });
             CopyHeader(upstream, "Accept-Ranges");
             CopyHeader(upstream, "Content-Range");
             CopyHeader(upstream, "Content-Disposition");

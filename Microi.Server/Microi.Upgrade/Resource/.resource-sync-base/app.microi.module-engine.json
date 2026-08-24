@@ -1,25 +1,27 @@
 {
   "PackageInfo": {
     "Name": "模块引擎",
-    "Version": "v7.5.1",
+    "Version": "v7.5.5",
     "CreateTime": "2026-08-08T06:31:30.327Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
-    "Description": "模块引擎基础资源。记录直达由 sys_menu.OpenFirstRecord 控制，表单分组与工作台外观统一读取 diy_table 物理属性。",
-    "ChangeHistory": "2026-08-21 v7.5.1 将“进入模块默认打开第一条记录”迁移为 sys_menu.OpenFirstRecord 物理字段；模块设置与表单设置各归其所属引擎，旧 ViewSchema 配置继续兼容读取。\n2026-08-21 v7.5.0 移除模块侧独立表单工作台配置入口，统一使用 diy_table.FormPresentation；记录直达、表格弹层和跨模块记录页复用同一 DiyForm。",
+    "Description": "模块引擎基础资源。顶栏标签右键可从当前模块绑定关系直达表单设计，路由元数据缺失时安全回查 sys_menu.DiyTableId；菜单角标、记录直达与表单展示继续使用物理配置。",
+    "ChangeHistory": "2026-08-23 v7.5.5 顶栏标签右键新增表单设计入口，优先读取路由 DiyTableId，缺失时按当前 sys_menu.Id 回查绑定表单并缓存结果。\n2026-08-22 v7.5.2 新增 sys_menu.MenuBadgeTooltip，左侧菜单数字角标可显示自定义悬停说明，旧菜单未配置时保持原有标题提示。\n2026-08-21 v7.5.1 将“进入模块默认打开第一条记录”迁移为 sys_menu.OpenFirstRecord 物理字段；模块设置与表单设置各归其所属引擎，旧 ViewSchema 配置继续兼容读取。\n2026-08-21 v7.5.0 移除模块侧独立表单工作台配置入口，统一使用 diy_table.FormPresentation；记录直达、表格弹层和跨模块记录页复用同一 DiyForm。\n",
     "RequiredPlatformCapabilities": [
       "ClientFeature:FormPresentation",
       "ServerField:DiyTable.FormPresentation",
-      "ServerField:SysMenu.OpenFirstRecord"
+      "ServerField:SysMenu.OpenFirstRecord",
+      "ServerField:SysMenu.MenuBadgeTooltip",
+      "ClientFeature:TagsViewBoundFormDesign"
     ],
     "MenuCount": 1,
     "TableCount": 1,
-    "FieldCount": 110,
+    "FieldCount": 111,
     "FlowCount": 0,
     "NodeCount": 0,
     "LineCount": 0,
     "DDLCount": 1,
-    "PhysicalColumnCount": 316,
+    "PhysicalColumnCount": 317,
     "ApiEngineCount": 0,
     "DataSetCount": 0,
     "DataRowCount": 0,
@@ -29,7 +31,7 @@
     {
       "TableName": "sys_menu",
       "TableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",
-      "DDL": "CREATE TABLE IF NOT EXISTS `sys_menu` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `MenuBadgeApiEngineKey` varchar(100) NULL COMMENT '菜单统计接口引擎',\n  `MenuBadgeEnabled` int NULL COMMENT '显示菜单统计',\n  `DataSourceFieldTabs` varchar(50) NULL COMMENT '数据源配置',\n  `ViewSchema` mediumtext NULL COMMENT '模块展示设计器',\n  `ViewSchemaVersion` varchar(25) NULL COMMENT '视图协议版本',\n  `EnableViewSchema` int NULL COMMENT '启用跨端视图',\n  `ViewConfigVersion` int NULL COMMENT '视图配置版本',\n  `MicroServiceRoutePath` varchar(200) NULL COMMENT '微服务路由',\n  `MicroServicePageId` varchar(50) NULL COMMENT '选择微服务页面',\n  `MicroServiceId` varchar(50) NULL COMMENT '选择微服务',\n  `EnableDrafts` int NULL COMMENT '启用草稿箱',\n  `TableCellWrap` int NULL COMMENT '表格单元格自动换行',\n  `FlowDesignId` varchar(100) NULL COMMENT '关联流程引擎',\n  `CardBottomTagFields` mediumtext NULL COMMENT '卡片底部标签字段',\n  `CardTitleTagFields` mediumtext NULL COMMENT '卡片标题标签字段',\n  `DiyTableName` varchar(50) NULL COMMENT '关联表单的表名',\n  `TableCardImgPosition` varchar(50) NULL COMMENT '卡片预览图位置',\n  `ExportApi` varchar(255) NULL COMMENT '导出接口替换',\n  `ImportProgressApi` varchar(255) NULL COMMENT '导入进度接口替换',\n  `ImportApi` varchar(255) NULL COMMENT '导入接口替换',\n  `SaveType` varchar(50) NULL COMMENT '[表内编辑]保存方式',\n  `HiddenIndex` int NULL COMMENT '隐藏通用搜索',\n  `GeneralSeaarch` int NULL COMMENT '隐藏列表序号',\n  `AddBtnType` varchar(50) NULL COMMENT '[新增]模式',\n  `SaveBtnText` varchar(25) NULL COMMENT '[保存]文字替换',\n  `AddBtnText` varchar(25) NULL COMMENT '[新增]文字替换',\n  `SelectApi` varchar(255) NULL COMMENT '查询接口替换',\n  `FixedFields` mediumtext NULL COMMENT '固定列',\n  `MobileListFields` mediumtext NULL COMMENT '移动端/卡片显示列',\n  `UrlApiEngineId` varchar(50) NULL COMMENT 'Url地址接口引擎',\n  `DelCodeShowV8` mediumtext NULL COMMENT '[删除]按钮显示条件',\n  `EditCodeShowV8` mediumtext NULL COMMENT '[编辑]按钮显示条件',\n  `AddCodeShowV8` mediumtext NULL COMMENT '[新增]按钮显示条件',\n  `IsChildSystem` int NULL COMMENT '是否子系统',\n  `ModuleEngineKey` varchar(50) NULL COMMENT '模块引擎Key',\n  `TableCardImgStyle` varchar(500) NULL COMMENT '卡片图片样式',\n  `TableCardImgField` varchar(50) NULL COMMENT '卡片图片字段',\n  `TableCardCol` int NULL COMMENT '卡片每行几列',\n  `SecondMenuRow` int NULL COMMENT '二级目录缩略行',\n  `SecondMenuColumn` int NULL COMMENT '二级目录缩略列',\n  `IconComponent` varchar(50) NULL COMMENT '图标组件',\n  `DefaultPageSize` int NULL COMMENT '默认每页数量',\n  `SecondMenuLineCount` int NULL COMMENT '二级目录每行几个',\n  `SecondMenuHeight` varchar(50) NULL COMMENT '二级目录高度',\n  `SecondMenuWidth` varchar(50) NULL COMMENT '二级目录宽度',\n  `MacScreenIndex` int NULL COMMENT '所属mac第几屏幕',\n  `HasChild` int NULL COMMENT '是否有子集',\n  `SizeHeightMac` varchar(50) NULL COMMENT '图标高（mac）',\n  `SizeWidthMac` varchar(50) NULL COMMENT '图标宽（mac）',\n  `DisplayMac` int NULL COMMENT '显示[mac]',\n  `AppDisplay` int NULL COMMENT '移动端是否显示',\n  `ReportId` varchar(36) NULL,\n  `ReportName` varchar(100) NULL COMMENT '选择报表',\n  `OpenType` varchar(500) NULL COMMENT '打开方式',\n  `ImportV8` mediumtext NULL,\n  `Icon` varchar(500) NULL COMMENT '菜单图片',\n  `TableDiyFieldIds` mediumtext NULL COMMENT '查询列[废弃]',\n  `PageTemplate` varchar(255) NULL COMMENT '界面模板',\n  `PageBtns` mediumtext NULL COMMENT '[页面]更多按钮',\n  `DiyTableId` varchar(36) NULL COMMENT '选择表单',\n  `NotShowFields` mediumtext NULL COMMENT '不显示列',\n  `SqlWhere` mediumtext NULL COMMENT '数据权限',\n  `StatisticsFields` mediumtext NULL COMMENT '统计列',\n  `IsMicroiService` int NULL COMMENT '微服务',\n  `ImportTemplateName` varchar(255) NULL COMMENT '导入模板名称',\n  `EnName` varchar(500) NULL,\n  `MultRun` int NULL,\n  `Code` varchar(500) NULL,\n  `TableHeaders` mediumtext NULL COMMENT '多级表头数据',\n  `JquerySelector` varchar(500) NULL,\n  `ExportV8` mediumtext NULL,\n  `DefaultOrderBy` varchar(255) NULL COMMENT '默认排序字段',\n  `Sort` int(11) NULL COMMENT '排序',\n  `InTableEdit` int NULL COMMENT '开启表内编辑',\n  `Class` varchar(500) NULL COMMENT '就是Customer',\n  `SearchFieldIds` mediumtext NULL COMMENT '可搜索的字段',\n  `ComponentPath` varchar(500) NULL COMMENT '组件路径',\n  `Description` varchar(500) NULL COMMENT '菜单描述',\n  `ExportMoreBtns` mediumtext NULL COMMENT '[导出]更多按钮',\n  `IconClass` varchar(500) NULL COMMENT '图标',\n  `Url` varchar(500) NULL COMMENT 'Url地址',\n  `DiyConfig` mediumtext NULL COMMENT '模块配置（已废弃）',\n  `SortFieldIds` mediumtext NULL COMMENT '可排序字段',\n  `Link` varchar(500) NULL,\n  `SqlJoin` mediumtext NULL COMMENT 'Join关联',\n  `BatchSelectMoreBtns` mediumtext NULL COMMENT '[批量选择]更多按钮',\n  `StoreId` varchar(36) NULL,\n  `ImportTemplate` varchar(255) NULL COMMENT '导入模板',\n  `Name` varchar(500) NULL COMMENT '名称',\n  `EnDescription` varchar(500) NULL,\n  `MoreBtns` mediumtext NULL COMMENT '[行]更多按钮',\n  `ComponentName` varchar(500) NULL COMMENT '界面模板',\n  `PageTabs` mediumtext NULL COMMENT '页面多Tab',\n  `InTableEditFields` mediumtext NULL COMMENT '表内可编辑字段',\n  `Display` int NULL COMMENT '是否显示',\n  `DetailPageV8` mediumtext NULL COMMENT '详情按钮V8',\n  `RoleGroup` mediumtext NULL,\n  `SelectFields` mediumtext NULL COMMENT '查询列',\n  `FormBtns` mediumtext NULL COMMENT '[表单]更多按钮',\n  `JoinTables` mediumtext NULL COMMENT '关联表',\n  `DisplayWin` int NULL COMMENT '显示[win]',\n  `ParentId` varchar(50) NULL COMMENT '上级',\n  `ParentIds` mediumtext NULL,\n  `OpenFirstRecord` int NULL DEFAULT 0 COMMENT '进入模块默认打开第一条记录'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+      "DDL": "CREATE TABLE IF NOT EXISTS `sys_menu` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `MenuBadgeApiEngineKey` varchar(100) NULL COMMENT '菜单统计接口引擎',\n  `MenuBadgeTooltip` varchar(500) NULL COMMENT '菜单角标悬停说明',\n  `MenuBadgeEnabled` int NULL COMMENT '显示菜单统计',\n  `DataSourceFieldTabs` varchar(50) NULL COMMENT '数据源配置',\n  `ViewSchema` mediumtext NULL COMMENT '模块展示设计器',\n  `ViewSchemaVersion` varchar(25) NULL COMMENT '视图协议版本',\n  `EnableViewSchema` int NULL COMMENT '启用跨端视图',\n  `ViewConfigVersion` int NULL COMMENT '视图配置版本',\n  `MicroServiceRoutePath` varchar(200) NULL COMMENT '微服务路由',\n  `MicroServicePageId` varchar(50) NULL COMMENT '选择微服务页面',\n  `MicroServiceId` varchar(50) NULL COMMENT '选择微服务',\n  `EnableDrafts` int NULL COMMENT '启用草稿箱',\n  `TableCellWrap` int NULL COMMENT '表格单元格自动换行',\n  `FlowDesignId` varchar(100) NULL COMMENT '关联流程引擎',\n  `CardBottomTagFields` mediumtext NULL COMMENT '卡片底部标签字段',\n  `CardTitleTagFields` mediumtext NULL COMMENT '卡片标题标签字段',\n  `DiyTableName` varchar(50) NULL COMMENT '关联表单的表名',\n  `TableCardImgPosition` varchar(50) NULL COMMENT '卡片预览图位置',\n  `ExportApi` varchar(255) NULL COMMENT '导出接口替换',\n  `ImportProgressApi` varchar(255) NULL COMMENT '导入进度接口替换',\n  `ImportApi` varchar(255) NULL COMMENT '导入接口替换',\n  `SaveType` varchar(50) NULL COMMENT '[表内编辑]保存方式',\n  `HiddenIndex` int NULL COMMENT '隐藏通用搜索',\n  `GeneralSeaarch` int NULL COMMENT '隐藏列表序号',\n  `AddBtnType` varchar(50) NULL COMMENT '[新增]模式',\n  `SaveBtnText` varchar(25) NULL COMMENT '[保存]文字替换',\n  `AddBtnText` varchar(25) NULL COMMENT '[新增]文字替换',\n  `SelectApi` varchar(255) NULL COMMENT '查询接口替换',\n  `FixedFields` mediumtext NULL COMMENT '固定列',\n  `MobileListFields` mediumtext NULL COMMENT '移动端/卡片显示列',\n  `UrlApiEngineId` varchar(50) NULL COMMENT 'Url地址接口引擎',\n  `DelCodeShowV8` mediumtext NULL COMMENT '[删除]按钮显示条件',\n  `EditCodeShowV8` mediumtext NULL COMMENT '[编辑]按钮显示条件',\n  `AddCodeShowV8` mediumtext NULL COMMENT '[新增]按钮显示条件',\n  `IsChildSystem` int NULL COMMENT '是否子系统',\n  `ModuleEngineKey` varchar(50) NULL COMMENT '模块引擎Key',\n  `TableCardImgStyle` varchar(500) NULL COMMENT '卡片图片样式',\n  `TableCardImgField` varchar(50) NULL COMMENT '卡片图片字段',\n  `TableCardCol` int NULL COMMENT '卡片每行几列',\n  `SecondMenuRow` int NULL COMMENT '二级目录缩略行',\n  `SecondMenuColumn` int NULL COMMENT '二级目录缩略列',\n  `IconComponent` varchar(50) NULL COMMENT '图标组件',\n  `DefaultPageSize` int NULL COMMENT '默认每页数量',\n  `SecondMenuLineCount` int NULL COMMENT '二级目录每行几个',\n  `SecondMenuHeight` varchar(50) NULL COMMENT '二级目录高度',\n  `SecondMenuWidth` varchar(50) NULL COMMENT '二级目录宽度',\n  `MacScreenIndex` int NULL COMMENT '所属mac第几屏幕',\n  `HasChild` int NULL COMMENT '是否有子集',\n  `SizeHeightMac` varchar(50) NULL COMMENT '图标高（mac）',\n  `SizeWidthMac` varchar(50) NULL COMMENT '图标宽（mac）',\n  `DisplayMac` int NULL COMMENT '显示[mac]',\n  `AppDisplay` int NULL COMMENT '移动端是否显示',\n  `ReportId` varchar(36) NULL,\n  `ReportName` varchar(100) NULL COMMENT '选择报表',\n  `OpenType` varchar(500) NULL COMMENT '打开方式',\n  `ImportV8` mediumtext NULL,\n  `Icon` varchar(500) NULL COMMENT '菜单图片',\n  `TableDiyFieldIds` mediumtext NULL COMMENT '查询列[废弃]',\n  `PageTemplate` varchar(255) NULL COMMENT '界面模板',\n  `PageBtns` mediumtext NULL COMMENT '[页面]更多按钮',\n  `DiyTableId` varchar(36) NULL COMMENT '选择表单',\n  `NotShowFields` mediumtext NULL COMMENT '不显示列',\n  `SqlWhere` mediumtext NULL COMMENT '数据权限',\n  `StatisticsFields` mediumtext NULL COMMENT '统计列',\n  `IsMicroiService` int NULL COMMENT '微服务',\n  `ImportTemplateName` varchar(255) NULL COMMENT '导入模板名称',\n  `EnName` varchar(500) NULL,\n  `MultRun` int NULL,\n  `Code` varchar(500) NULL,\n  `TableHeaders` mediumtext NULL COMMENT '多级表头数据',\n  `JquerySelector` varchar(500) NULL,\n  `ExportV8` mediumtext NULL,\n  `DefaultOrderBy` varchar(255) NULL COMMENT '默认排序字段',\n  `Sort` int(11) NULL COMMENT '排序',\n  `InTableEdit` int NULL COMMENT '开启表内编辑',\n  `Class` varchar(500) NULL COMMENT '就是Customer',\n  `SearchFieldIds` mediumtext NULL COMMENT '可搜索的字段',\n  `ComponentPath` varchar(500) NULL COMMENT '组件路径',\n  `Description` varchar(500) NULL COMMENT '菜单描述',\n  `ExportMoreBtns` mediumtext NULL COMMENT '[导出]更多按钮',\n  `IconClass` varchar(500) NULL COMMENT '图标',\n  `Url` varchar(500) NULL COMMENT 'Url地址',\n  `DiyConfig` mediumtext NULL COMMENT '模块配置（已废弃）',\n  `SortFieldIds` mediumtext NULL COMMENT '可排序字段',\n  `Link` varchar(500) NULL,\n  `SqlJoin` mediumtext NULL COMMENT 'Join关联',\n  `BatchSelectMoreBtns` mediumtext NULL COMMENT '[批量选择]更多按钮',\n  `StoreId` varchar(36) NULL,\n  `ImportTemplate` varchar(255) NULL COMMENT '导入模板',\n  `Name` varchar(500) NULL COMMENT '名称',\n  `EnDescription` varchar(500) NULL,\n  `MoreBtns` mediumtext NULL COMMENT '[行]更多按钮',\n  `ComponentName` varchar(500) NULL COMMENT '界面模板',\n  `PageTabs` mediumtext NULL COMMENT '页面多Tab',\n  `InTableEditFields` mediumtext NULL COMMENT '表内可编辑字段',\n  `Display` int NULL COMMENT '是否显示',\n  `DetailPageV8` mediumtext NULL COMMENT '详情按钮V8',\n  `RoleGroup` mediumtext NULL,\n  `SelectFields` mediumtext NULL COMMENT '查询列',\n  `FormBtns` mediumtext NULL COMMENT '[表单]更多按钮',\n  `JoinTables` mediumtext NULL COMMENT '关联表',\n  `DisplayWin` int NULL COMMENT '显示[win]',\n  `ParentId` varchar(50) NULL COMMENT '上级',\n  `ParentIds` mediumtext NULL,\n  `OpenFirstRecord` int NULL DEFAULT 0 COMMENT '进入模块默认打开第一条记录'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     }
   ],
   "PhysicalColumns": [
@@ -3824,6 +3826,18 @@
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 112
+    },
+    {
+      "TABLE_NAME": "sys_menu",
+      "COLUMN_NAME": "MenuBadgeTooltip",
+      "COLUMN_TYPE": "varchar(500)",
+      "DATA_TYPE": "varchar",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "菜单角标悬停说明",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 113
     }
   ],
   "SysMenus": [
@@ -4062,6 +4076,33 @@
       "Label": "菜单统计接口引擎",
       "Id": "25ad2446-53d5-4fdb-a38a-d3981c5bb32c",
       "CreateTime": "2026-07-31 05:59:59"
+    },
+    {
+      "TableName": "sys_menu",
+      "AppVisible": 1,
+      "Tab": "01KGA478B0NB99YQN5ZMY6S85W",
+      "Type": "varchar(500)",
+      "Name": "MenuBadgeTooltip",
+      "InTableEdit": 0,
+      "Unique": 0,
+      "NameConfirm": 1,
+      "TableWidth": 260,
+      "Config": "{}",
+      "TableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",
+      "Readonly": 0,
+      "Encrypt": 0,
+      "BindRole": "[]",
+      "Placeholder": "例如：当前登录用户的待办与未读抄送数量之和",
+      "Component": "Text",
+      "Description": "鼠标移入左侧菜单右侧的数字角标时显示；用于解释数字的业务含义。留空时沿用历史标题提示。",
+      "Visible": 1,
+      "IsLockField": 1,
+      "Data": "[]",
+      "Sort": 3230,
+      "NotEmpty": 0,
+      "Label": "菜单角标悬停说明",
+      "Id": "e20ca27c-f0cf-4d2a-9b80-c9e8fffb3d2d",
+      "CreateTime": "2026-08-22 00:00:00"
     },
     {
       "TableName": "sys_menu",

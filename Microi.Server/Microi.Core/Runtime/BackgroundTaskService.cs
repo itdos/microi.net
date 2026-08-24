@@ -51,12 +51,22 @@ namespace Microi.net
         public string BusinessEtaField { get; set; }
     }
 
+    internal sealed class TrustedBackgroundTaskExecutionContext
+    {
+        public string TaskId { get; set; }
+        public string OwnerOsClient { get; set; }
+        public string ApiEngineKey { get; set; }
+        public long FencingToken { get; set; }
+        public JObject TrustedCurrentUser { get; set; }
+    }
+
     /// <summary>
     /// Durable background task façade. The tenant database is the source of truth;
     /// Redis only caches user projections and SignalR only transports notifications.
     /// </summary>
     public static class BackgroundTaskService
     {
+        internal const string TargetExecutionOsClientParam = "_BackgroundTaskTargetOsClient";
         private const int MaxLogChars = 120000;
         private const int LeaseRenewalTransientFailureLimit = 3;
         private static readonly TimeSpan RenewalShutdownTimeout = TimeSpan.FromSeconds(5);
@@ -111,6 +121,51 @@ namespace Microi.net
             JObject trustedCurrentUser,
             JObject options)
         {
+            return StartApiEngineCore(
+                osClient,
+                userKey,
+                title,
+                apiParam,
+                trustedCurrentUser,
+                options,
+                null);
+        }
+
+        internal static BackgroundTaskItem StartApiEngineForTargetTenant(
+            string ownerOsClient,
+            string targetOsClient,
+            string userKey,
+            string title,
+            JObject apiParam,
+            JObject trustedCurrentUser,
+            JObject options)
+        {
+            targetOsClient = (targetOsClient ?? string.Empty).Trim();
+            if (targetOsClient.DosIsNullOrWhiteSpace())
+                throw new InvalidOperationException("目标子租户不能为空。");
+            ChildTenantPlatformAppControlService.EnsureTargetExecutionAllowed(
+                apiParam?["ApiEngineKey"]?.ToString(),
+                ownerOsClient,
+                targetOsClient);
+            return StartApiEngineCore(
+                ownerOsClient,
+                userKey,
+                title,
+                apiParam,
+                trustedCurrentUser,
+                options,
+                targetOsClient);
+        }
+
+        private static BackgroundTaskItem StartApiEngineCore(
+            string osClient,
+            string userKey,
+            string title,
+            JObject apiParam,
+            JObject trustedCurrentUser,
+            JObject options,
+            string targetOsClient)
+        {
             osClient = osClient ?? "";
             userKey = userKey ?? "";
             if (!BackgroundTaskStore.TryGetAvailability(osClient, out var unavailableReason))
@@ -123,6 +178,12 @@ namespace Microi.net
             }
 
             var param = apiParam == null ? new JObject() : (JObject)apiParam.DeepClone();
+            // External callers can never select another tenant by smuggling the
+            // reserved execution marker into RunBackground params. Only the
+            // trusted control-plane overload above may add it after sanitization.
+            param.Remove(TargetExecutionOsClientParam);
+            if (!targetOsClient.DosIsNullOrWhiteSpace())
+                param[TargetExecutionOsClientParam] = targetOsClient;
             if (param["_TraceParent"] == null && !MicroiTraceContext.CurrentTraceParent.DosIsNullOrWhiteSpace())
             {
                 param["_TraceParent"] = MicroiTraceContext.CurrentTraceParent;
@@ -372,6 +433,45 @@ namespace Microi.net
                 fencingToken);
         }
 
+        internal static bool TryGetCurrentExecutionContext(
+            string taskId,
+            long fencingToken,
+            string expectedApiEngineKey,
+            out TrustedBackgroundTaskExecutionContext context)
+        {
+            context = null;
+            if (taskId.DosIsNullOrWhiteSpace()
+                || expectedApiEngineKey.DosIsNullOrWhiteSpace()
+                || !ActiveExecutions.TryGetValue(taskId, out var active)
+                || active.Cancellation.IsCancellationRequested
+                || active.LeaseLost
+                || active.Record.FencingToken != fencingToken
+                || !string.Equals(
+                    active.Record.ApiEngineKey,
+                    expectedApiEngineKey,
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+            if (!BackgroundTaskStore.IsLeaseCurrent(
+                    active.Record.OsClient,
+                    taskId,
+                    active.Record.LeaseOwner,
+                    fencingToken))
+            {
+                return false;
+            }
+            context = new TrustedBackgroundTaskExecutionContext
+            {
+                TaskId = active.Record.Id,
+                OwnerOsClient = active.Record.OsClient,
+                ApiEngineKey = active.Record.ApiEngineKey,
+                FencingToken = active.Record.FencingToken,
+                TrustedCurrentUser = ParseObject(active.Record.TrustedUserJson)
+            };
+            return true;
+        }
+
         public static async Task RunWorkerLoopAsync(
             CancellationToken stoppingToken,
             Action heartbeat = null)
@@ -569,10 +669,20 @@ namespace Microi.net
                         osClient, userKey, runtimeOsClientType, runtimeOsClientNetwork))
                     .ConfigureAwait(false);
                 if (clientInfo?.ConnectionIds == null || !clientInfo.ConnectionIds.Any()) return;
+                // Every task mutation writes the bounded Redis projection before it queues
+                // a notification. Re-reading the authoritative table for each progress
+                // push turned active jobs into a database polling loop. Transport the
+                // fresh projection and keep the controller List endpoint as the explicit
+                // authoritative reconciliation path.
+                var projected = ListLegacyCache(osClient, userKey)
+                    .OrderByDescending(item => item.CreateTime)
+                    .Take(100)
+                    .Select(ApplyRuntimeFields)
+                    .ToList();
                 await RealtimePushRuntime.SendAsync(
                         clientInfo.ConnectionIds,
                         "ReceiveBackgroundTaskList",
-                        List(osClient, userKey))
+                        projected.Count > 0 ? projected : List(osClient, userKey))
                     .ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -583,12 +693,22 @@ namespace Microi.net
 
         private static async Task ProcessClaimedAsync(BackgroundTaskRecord item, CancellationToken stoppingToken)
         {
+            string executionOsClient;
+            try
+            {
+                executionOsClient = ResolveExecutionOsClient(item);
+            }
+            catch (Exception ex)
+            {
+                BackgroundTaskStore.RetryOrFail(item, ex, false);
+                return;
+            }
             BackgroundTaskConcurrencyLease concurrencyLease = null;
             if (!item.ConcurrencyKey.DosIsNullOrWhiteSpace())
             {
                 try
                 {
-                    var concurrencyLeaseOsClient = item.OsClient;
+                    var concurrencyLeaseOsClient = executionOsClient;
                     var concurrencyLeaseKey = item.ConcurrencyKey;
                     if (string.Equals(
                             item.ApiEngineKey,
@@ -603,6 +723,22 @@ namespace Microi.net
                         if (concurrencyLeaseOsClient.DosIsNullOrWhiteSpace())
                             concurrencyLeaseOsClient = OsClientDefault.OsClient;
                         concurrencyLeaseKey = DiyLangBackgroundTaskService.ClusterConcurrencyKey;
+                    }
+                    else if (string.Equals(
+                                 item.ApiEngineKey,
+                                 ChildTenantPlatformAppControlService.ChildWorkerApiEngineKey,
+                                 StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Child tenants can share one physical schema. Tenant-scoped
+                        // leases would still allow concurrent DDL and metadata writes
+                        // against that shared database, causing avoidable deadlocks.
+                        // Queue every tenant task up-front for observability, but
+                        // serialize the installer through the configured tenant Redis.
+                        concurrencyLeaseOsClient = OsClientExtend.GetConfigOsClient();
+                        if (concurrencyLeaseOsClient.DosIsNullOrWhiteSpace())
+                            concurrencyLeaseOsClient = OsClientDefault.OsClient;
+                        concurrencyLeaseKey =
+                            ChildTenantPlatformAppControlService.ClusterConcurrencyKey;
                     }
                     concurrencyLease = BackgroundTaskConcurrencyLease.TryAcquire(
                         concurrencyLeaseOsClient,
@@ -636,7 +772,8 @@ namespace Microi.net
                     traceParam["_TraceState"]?.ToString(),
                     new Dictionary<string, object>
                     {
-                        ["microi.os_client"] = item.OsClient ?? "",
+                        ["microi.os_client"] = executionOsClient ?? "",
+                        ["microi.background_task_owner_os_client"] = item.OsClient ?? "",
                         ["microi.background_task_id"] = item.Id ?? "",
                         ["microi.api_engine_key"] = item.ApiEngineKey ?? "",
                         ["microi.fencing_token"] = item.FencingToken
@@ -649,13 +786,35 @@ namespace Microi.net
                 {
                     var param = ParseObject(item.ParamJson);
                     var trustedUser = ParseObject(item.TrustedUserJson);
+                    if (ChildTenantPlatformAppControlService.RequiresTargetExecutionBootstrap(
+                            item.ApiEngineKey,
+                            item.OsClient,
+                            executionOsClient,
+                            param[TargetExecutionOsClientParam]?.ToString()))
+                    {
+                        // CHILD_TENANT_EXECUTION_BOOTSTRAP_V1：已排队的主→子任务在
+                        // 运行目标租户 V8 前刷新官方安装器，使平台修复接管原检查点。
+                        // CHILD_TENANT_EXECUTION_BOOTSTRAP_SCOPE_V1：只有服务端控制面
+                        // 持久化了目标租户标记的主→子任务才执行跨租户自愈。普通租户
+                        // 自己发起“全部安装/更新”时 owner==execution 且没有该保留标记，
+                        // 必须让批量计划先安装/更新应用商城，不能从旧租户自己复制旧工作器。
+                        var bootstrap = ChildTenantPlatformAppControlService.EnsureTargetExecutionBootstrap(
+                            item.OsClient,
+                            executionOsClient,
+                            trustedUser);
+                        if (bootstrap?.Code != 1)
+                        {
+                            throw new InvalidOperationException(
+                                "子租户商城工作器执行前自愈失败：" + (bootstrap?.Msg ?? "无返回"));
+                        }
+                    }
                     param["ApiEngineKey"] = item.ApiEngineKey;
                     param["_BackgroundTaskId"] = item.Id;
                     param["_BackgroundTaskTitle"] = item.Title ?? "";
                     param["_BackgroundTaskIdempotencyKey"] = item.IdempotencyKey ?? item.Id;
                     param["_BackgroundTaskFencingToken"] = item.FencingToken;
                     param["_BackgroundTaskAttempt"] = item.AttemptCount + 1;
-                    param["OsClient"] = item.OsClient;
+                    param["OsClient"] = executionOsClient;
                     param["_InvokeType"] = "Client";
                     // 后台任务由服务端持久队列恢复可信用户快照后执行，不是外部 HTTP
                     // 调用。保留 Client 业务语义，同时用独立 provenance 标记允许调用
@@ -736,6 +895,17 @@ namespace Microi.net
                         if (continuation["ParamPatch"] is JObject patch)
                         {
                             foreach (var property in patch.Properties()) nextParam[property.Name] = property.Value.DeepClone();
+                        }
+                        // A tenant ApiEngine continuation must never redirect a
+                        // trusted cross-tenant task. Restore the server-selected
+                        // target after applying its untrusted ParamPatch.
+                        nextParam.Remove(TargetExecutionOsClientParam);
+                        if (!string.Equals(
+                                executionOsClient,
+                                item.OsClient,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            nextParam[TargetExecutionOsClientParam] = executionOsClient;
                         }
                         BackgroundTaskStore.RequeueChunk(
                             item,
@@ -915,6 +1085,20 @@ namespace Microi.net
             if (result["Data"] is JObject data && data["BackgroundTask"] is JObject fromData) return fromData;
             if (result["DataAppend"] is JObject append && append["BackgroundTask"] is JObject fromAppend) return fromAppend;
             return null;
+        }
+
+        private static string ResolveExecutionOsClient(BackgroundTaskRecord item)
+        {
+            var ownerOsClient = item?.OsClient ?? string.Empty;
+            var targetOsClient = ParseObject(item?.ParamJson)[TargetExecutionOsClientParam]
+                ?.ToString()
+                ?.Trim();
+            if (targetOsClient.DosIsNullOrWhiteSpace()) return ownerOsClient;
+            ChildTenantPlatformAppControlService.EnsureTargetExecutionAllowed(
+                item?.ApiEngineKey,
+                ownerOsClient,
+                targetOsClient);
+            return targetOsClient;
         }
 
         private static bool IsPersistedCancellationRequested(BackgroundTaskRecord item)

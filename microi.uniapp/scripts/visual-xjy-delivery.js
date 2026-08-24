@@ -601,7 +601,7 @@ function buildMockResponse(request) {
 
   if (request.method === 'OPTIONS') return { status: 204, body: '' };
   if (lowerUrl.includes('getsysconfig') || lowerUrl.includes('microi-init')) {
-    return { Code: 1, Data: { SysTitle: '集福鲤', SysShortTitle: '集福鲤', CompanyName: '新纪源水科技', IsShowAiAssistant: 1 } };
+    return { Code: 1, Data: { SysTitle: '集福鲤', SysShortTitle: '集福鲤', CompanyName: '新纪源水科技', DisableAiAssistant: 0 } };
   }
   if (lowerUrl.includes('formengine/getdiytablemodel')) {
     return { Code: 1, Data: sysUserTable };

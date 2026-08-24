@@ -2,6 +2,12 @@
     <!-- diy-form 已统一负责字段 Label 与说明；这里不能再嵌套 el-form-item，
          否则所有 DevComponent 都会出现双 Label 和多余的左侧缩进。 -->
     <div v-show="GetFieldIsShow(field)" class="diy-devcomponent-form-item">
+        <MciRenderSourceBadge
+            v-if="renderSourceType"
+            :type="renderSourceType"
+            placement="edge"
+            :instance-key="field.Id || field.Name"
+        />
         <component
             v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
             ref="devComponentRef"
@@ -59,7 +65,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, getCurrentInstance } from "vue";
+import { computed, ref, reactive, getCurrentInstance } from "vue";
+import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
+import { resolveDevComponentRenderSource } from "@/utils/framework-presentation.js";
 
 // 禁用属性继承
 defineOptions({
@@ -139,6 +147,13 @@ const devComponentRef = ref(null);
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
+const renderSourceType = computed(() => {
+    const componentName = props.field?.Config?.DevComponentName;
+    if (!componentName) return "";
+    return resolveDevComponentRenderSource(props.DevComponents?.[componentName] || {
+        Path: props.field?.Config?.DevComponentPath
+    });
+});
 
 // 配置弹窗相关
 const configDialogVisible = ref(false);
@@ -221,8 +236,14 @@ defineExpose({
 
 <style lang="scss" scoped>
 .diy-devcomponent-form-item {
+    position: relative;
     width: 100%;
     min-width: 0;
+}
+
+.diy-devcomponent-form-item > :deep(.mci-render-source-badge--edge) {
+    top: -27px;
+    right: 2px;
 }
 
 .form-item-tip {

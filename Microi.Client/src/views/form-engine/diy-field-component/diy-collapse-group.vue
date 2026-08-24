@@ -2,21 +2,29 @@
     <div
         class="diy-collapse-group"
         :class="['diy-collapse-group--' + theme, isCollapsed ? 'is-collapsed' : 'is-expanded']"
+        role="button"
+        tabindex="0"
+        :aria-expanded="String(!isCollapsed)"
         @click="toggleCollapse"
+        @keydown.enter.prevent="toggleCollapse"
+        @keydown.space.prevent="toggleCollapse"
     >
         <div class="diy-collapse-group__header">
+            <span class="diy-collapse-group__accent" aria-hidden="true"></span>
+            <span class="diy-collapse-group__icon-shell">
+                <fa-icon v-if="currentIcon" :icon="currentIcon" class="diy-collapse-group__icon" />
+            </span>
+            <div class="diy-collapse-group__main">
+                <div class="diy-collapse-group__title-row">
+                    <div class="diy-collapse-group__title" v-safe-html="title"></div>
+                    <span v-if="showFieldCount" class="diy-collapse-group__count">{{ childCount }} 项</span>
+                </div>
+                <div v-if="description" class="diy-collapse-group__desc" v-safe-html="description"></div>
+            </div>
             <el-icon class="diy-collapse-group__arrow">
                 <ArrowRight v-if="isCollapsed" />
                 <ArrowDown v-else />
             </el-icon>
-            <fa-icon v-if="currentIcon" :icon="currentIcon" class="diy-collapse-group__icon" />
-            <div class="diy-collapse-group__main">
-                <div class="diy-collapse-group__title" v-safe-html="title"></div>
-                <div v-if="description" class="diy-collapse-group__desc" v-safe-html="description"></div>
-            </div>
-            <el-tag v-if="showFieldCount" size="small" effect="plain" class="diy-collapse-group__count">
-                {{ childCount }} 项
-            </el-tag>
         </div>
     </div>
 
@@ -202,24 +210,26 @@ defineExpose({
 <style lang="scss" scoped>
 .diy-collapse-group {
     --group-color: var(--collapse-group-color, var(--el-color-primary));
-    --group-bg: var(--collapse-group-bg, color-mix(in srgb, var(--group-color) 8%, var(--el-bg-color) 92%));
-    --group-border: var(--collapse-group-border, var(--el-border-color-light));
+    --group-bg: var(--collapse-group-bg, var(--mci-bg-card, var(--el-bg-color)));
+    box-sizing: border-box;
     width: 100%;
-    border: 1px solid var(--group-border);
-    border-radius: 8px;
+    border: 0;
+    border-radius: 12px;
     background: var(--group-bg);
     cursor: pointer;
     overflow: hidden;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.035);
-    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 5px 16px rgba(15, 35, 60, 0.05);
+    outline: none;
+    transition: background 0.18s ease, box-shadow 0.18s ease;
 
     &:hover {
-        border-color: var(--group-color);
-        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.055);
+        box-shadow: 0 7px 20px rgba(15, 35, 60, 0.07);
     }
 
-    &:active {
-        transform: translateY(1px);
+    &:focus-visible {
+        box-shadow:
+            0 0 0 2px color-mix(in srgb, var(--group-color) 22%, transparent),
+            0 7px 20px rgba(15, 35, 60, 0.07);
     }
 
     &.is-expanded {
@@ -229,16 +239,36 @@ defineExpose({
     }
 
     &__header {
-        min-height: 26px;
+        position: relative;
+        min-height: 56px;
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 9px 12px 9px 13px;
+        gap: 10px;
+        box-sizing: border-box;
+        padding: 9px 14px 9px 17px;
         background: var(--group-bg);
+        transition: background-color .18s ease;
+    }
+
+    &:hover &__header,
+    &:focus-visible &__header {
+        background: color-mix(in srgb, var(--group-color) 2.5%, var(--group-bg) 97.5%);
+    }
+
+    &__accent {
+        position: absolute;
+        top: 50%;
+        left: 5px;
+        width: 3px;
+        height: 23px;
+        border-radius: 999px;
+        background: var(--group-color);
+        transform: translateY(-50%);
     }
 
     &__arrow,
-    &__icon {
+    &__icon,
+    &__icon-shell {
         flex: 0 0 auto;
         color: var(--group-color);
     }
@@ -246,19 +276,28 @@ defineExpose({
     &__arrow {
         width: 22px;
         height: 22px;
-        border-radius: 50%;
-        background: color-mix(in srgb, var(--group-color) 12%, var(--el-bg-color) 88%);
+        margin-left: 2px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        color: var(--el-text-color-secondary);
+        font-size: 14px;
+        transition: color .18s ease, transform .18s ease;
+    }
+
+    &__icon-shell {
+        width: 34px;
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--group-color) 7%, var(--el-bg-color) 93%);
     }
 
     &__icon {
-        width: 20px;
-        height: 20px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        width: 16px;
+        height: 16px;
     }
 
     &__main {
@@ -266,38 +305,60 @@ defineExpose({
         flex: 1;
     }
 
+    &__title-row {
+        min-width: 0;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+
     &__title {
-        font-weight: 600;
+        font-weight: 720;
         font-size: 14px;
         line-height: 20px;
         color: var(--el-text-color-primary);
-        word-break: break-word;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     &__desc {
-        margin-top: 2px;
-        font-size: 12px;
-        line-height: 18px;
-        color: var(--el-text-color-secondary);
-        word-break: break-word;
+        margin-top: 1px;
+        font-size: 11px;
+        line-height: 16px;
+        color: var(--el-text-color-regular);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     &__count {
         flex: 0 0 auto;
-        border-color: color-mix(in srgb, var(--group-color) 32%, var(--el-border-color-light) 68%);
-        color: var(--group-color);
-        background: color-mix(in srgb, var(--group-color) 4%, var(--el-bg-color) 96%);
+        color: var(--el-text-color-regular);
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 16px;
     }
 
     &--primary { --group-color: var(--el-color-primary); }
+    // 兼容历史配置值；保持与其既有主色视觉一致。
+    &--info { --group-color: var(--el-color-primary); }
     &--default {
         --group-color: var(--mci-color-primary, var(--el-color-primary));
-        --group-bg: color-mix(in srgb, var(--group-color) 7%, var(--el-bg-color) 93%);
-        --group-border: color-mix(in srgb, var(--group-color) 28%, var(--el-border-color-light) 72%);
     }
     &--success { --group-color: var(--el-color-success); }
     &--warning { --group-color: var(--el-color-warning); }
     &--danger { --group-color: var(--el-color-danger); }
+}
+
+@media (max-width: 720px) {
+    .diy-collapse-group {
+        border-radius: 11px;
+
+        &__header { min-height: 52px; gap: 8px; padding: 8px 10px 8px 15px; }
+        &__icon-shell { width: 31px; height: 31px; border-radius: 9px; }
+        &__arrow { width: 20px; height: 20px; }
+    }
 }
 
 .collapse-icon-picker {

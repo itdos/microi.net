@@ -15,7 +15,7 @@ function sourceHash(value) {
 test("SaaS engine declares every changed legacy managed-engine baseline", () => {
   const fixtures = {
     admin_get_empty_database_sanitization_sql: {
-      current: "4431ff8e4de593cc2a67b2656cfb4455f90e3aa05de6e60492331139b52efa8c",
+      current: "ee435e4cc0a5868ce9199a26c18593447600ba0be09bff3f9d6774d5ef2cd10e",
       base: "3f877b2f71deb2c553ed6d3515839e307a1e82ecbf45d7bbc865ca1380cc4df0",
       compatible: ["db42fca3c905fdd1ecf42586c3cfc40bb3b292a647118ca14c416743f7dbccc6"],
     },
@@ -95,6 +95,22 @@ test("SaaS engine delivers role and department management as low-code tree-table
     (item) => item.TableName === "diy_LeftJoinRightView",
   );
   assert.equal(dataSet.ConflictPolicy, "UpsertById");
+  const leftRightTable = packageModel.DiyTables.find(
+    (item) => item.Name === "diy_LeftJoinRightView",
+  );
+  assert.ok(leftRightTable, "SaaS package data must not reference a table it does not create");
+  assert.equal(leftRightTable.Id, dataSet.TableId);
+  assert.ok(packageModel.DDLStatements.some(
+    (item) => item.TableName === "diy_LeftJoinRightView" && /CREATE TABLE IF NOT EXISTS/u.test(item.DDL),
+  ));
+  assert.equal(
+    packageModel.DiyFields.filter((item) => item.TableId === leftRightTable.Id).length,
+    38,
+  );
+  assert.equal(
+    packageModel.PhysicalColumns.filter((item) => item.TABLE_NAME === "diy_LeftJoinRightView").length,
+    38,
+  );
   assert.deepEqual(new Set(dataSet.RowIds), new Set([
     "01M0CZAY7TSGSTC2RK6CVQTM17",
     "01M0CZAYK3JW93QY0ZY3WD860G",
@@ -109,4 +125,8 @@ test("SaaS engine delivers role and department management as low-code tree-table
       && item.ZibiaoGLZD === "ParentId"
       && item.GuanlianPPLJ === "=",
   ));
+  assert.equal(packageModel.PackageInfo.TableCount, packageModel.DiyTables.length);
+  assert.equal(packageModel.PackageInfo.FieldCount, packageModel.DiyFields.length);
+  assert.equal(packageModel.PackageInfo.DDLCount, packageModel.DDLStatements.length);
+  assert.equal(packageModel.PackageInfo.PhysicalColumnCount, packageModel.PhysicalColumns.length);
 });

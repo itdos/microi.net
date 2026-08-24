@@ -66,6 +66,7 @@ namespace Microi.net
         /// </summary>
         public IDatabase Database => _redisDb;
         private readonly IDatabase _redisDb = default;
+        private readonly string _osClient;
         private const string SENTINEL_TYPE = "2";
         /// <summary>
         /// 线程安全的连接字典，使用Lazy保证连接创建的线程安全
@@ -77,6 +78,10 @@ namespace Microi.net
         /// </summary>
         public MicroiCacheRedis(string osClient)
         {
+            osClient = string.IsNullOrWhiteSpace(osClient)
+                ? OsClient.GetConfigOsClient()
+                : osClient;
+            _osClient = osClient;
             if (!_lazyConnections.ContainsKey(osClient))
             {
                 var clientModel = OsClient.GetClient(osClient);
@@ -95,6 +100,7 @@ namespace Microi.net
         public MicroiCacheRedis()
         {
             var osClient = OsClient.GetConfigOsClient();
+            _osClient = osClient;
             if (!_lazyConnections.ContainsKey(osClient))
             {
                 var clientModel = OsClient.GetClient(osClient);
@@ -449,34 +455,28 @@ namespace Microi.net
                 return 0;
 
             long deletedCount = 0;
-            var endpoints = GetConnection(GetCurrentOsClient()).GetEndPoints();
+            // CACHE_PATTERN_EXACT_TENANT_CONNECTION_V1: different tenants may use
+            // the same Redis database number on different servers. Inferring the
+            // connection from IDatabase.Database can therefore scan and delete on
+            // another tenant's Redis. Always use the OsClient captured by this
+            // cache instance.
+            var connection = GetConnection(_osClient);
+            var endpoints = connection.GetEndPoints();
 
             // 对每个端点执行SCAN删除
             foreach (var endpoint in endpoints)
             {
-                var server = GetConnection(GetCurrentOsClient()).GetServer(endpoint);
+                var server = connection.GetServer(endpoint);
                 var keys = server.Keys(_redisDb.Database, parentKey, pageSize: 1000);
 
                 foreach (var key in keys)
                 {
-                    if (await _redisDb.KeyDeleteAsync(key))
+                    if (await _redisDb.KeyDeleteAsync(key).ConfigureAwait(false))
                         deletedCount++;
                 }
             }
 
             return deletedCount;
-        }
-
-        // 获取当前OsClient(从连接字典推断)
-        private string GetCurrentOsClient()
-        {
-            // 从_redisDb反向查找对应的osClient
-            foreach (var kvp in _lazyConnections)
-            {
-                if (GetDatabase(kvp.Key).Database == _redisDb.Database)
-                    return kvp.Key;
-            }
-            return OsClient.GetConfigOsClient();
         }
 
         #endregion

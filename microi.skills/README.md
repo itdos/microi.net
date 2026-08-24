@@ -8,7 +8,7 @@
 
 ## 包含的 Skills
 
-当前仓库包含 64 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
+当前仓库包含 65 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
 
 ### V8 引擎核心（后端）
 
@@ -65,6 +65,7 @@
 | **translate-engine** | 多语言词条、翻译供应商、租户隔离、缓存和批量翻译 | `translate-engine/SKILL.md` |
 | **ai-engine** | 模型代理、NL2SQL/NL2V8、Schema/Skill 关键词检索与可选向量融合 | `ai-engine/SKILL.md` |
 | **ai-platform-governance** | 门户/身份/配置/发布、服务韧性、Trace/日志、资产协作与可恢复导入 | `ai-platform-governance/SKILL.md` |
+| **system-observability** | 系统日志、Trace、热点接口、资源监控、网络流量归因、安全事件与 AI 查询/治理 | `system-observability/SKILL.md` |
 | **app-store** | 应用包、Manifest、后台安装、差异升级、回滚和验收 | `app-store/SKILL.md` |
 | **microi-sso** | 双向 OIDC/SAML2/CAS、账号映射、Secret/证书、官方商城发布与伙伴联调 | `microi-sso/SKILL.md` |
 

@@ -19,6 +19,14 @@ function parseBoolean(value) {
     return undefined;
 }
 
+// HDFS.Upload 在 Multiple=true 时即使每个 Element Plus 请求只携带一张图片，
+// 也会按多文件协议返回 Data 数组；单图协议则直接返回对象。调用端必须先归一化，
+// 否则多图上传会把 Path/Id 读取成 undefined，最终表现为上传成功但表单不回显。
+export function normalizeUploadResponseItem(responseData) {
+    const value = Array.isArray(responseData) ? responseData[0] : responseData;
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
 // zhy：服务端可能因安全策略强制私有，必须优先采用响应中的实际 Limit。
 export function resolveUploadLimit(responseData, configuredLimit) {
     const responseLimit = parseBoolean(responseData && responseData.Limit);
