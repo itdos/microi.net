@@ -26,11 +26,11 @@ for (const filePath of paths) {
   if (!String(importer.ApiV8Code || '').includes('API_ENGINE_CHANGE_HISTORY_TABLECHILD_MIGRATION_V1')) {
     throw new Error(`${filePath}: embedded importer does not contain history migration`);
   }
-  if (!String(importer.ApiV8Code || '').includes('Version: v2.2.1')) {
-    throw new Error(`${filePath}: embedded importer version is not v2.2.1`);
+  if (!String(importer.ApiV8Code || '').includes('Version: v2.2.2')) {
+    throw new Error(`${filePath}: embedded importer version is not v2.2.2`);
   }
 
-  importer.Version = 'v2.2.1';
+  importer.Version = 'v2.2.2';
   const info = packageData.PackageInfo || (packageData.PackageInfo = {});
   if (compareVersion(info.Version, 'v7.5.6') < 0) info.Version = 'v7.5.6';
   const releaseLine = '2026-08-21 v7.5.6 安装表单引擎包后将接口引擎旧 ChangeHistory 按非空行幂等迁移到 TableChild 子表，保留旧文本并在安装结果中返回迁移统计。';

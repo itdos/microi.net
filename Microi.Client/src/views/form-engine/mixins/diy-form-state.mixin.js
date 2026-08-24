@@ -1,5 +1,6 @@
 import { formTrace, isAdvancedFieldLayoutRuntimeEnabled } from "@/utils/form-engine-trace.js";
 import { sanitizeHtml } from "@/utils/safe-html.js";
+import { hasFormBannerConfig } from "../field-display-value.js";
 import {
     buildFormPresentationSections,
     collectFormSectionBadgeApiGroups,
@@ -197,6 +198,12 @@ export default {
         EffectivePresentationMode() {
             return String(this.EffectivePresentationConfig.Presentation || 'ControlCenter');
         },
+        ShowStandardFormBanner() {
+            // Mobile keeps the record header and form content compact. Do not
+            // mount the Banner at all, which also prevents its metric requests.
+            if (this.diyStore && this.diyStore.IsPhoneView) return false;
+            return hasFormBannerConfig(this.EffectivePresentationConfig && this.EffectivePresentationConfig.Banner);
+        },
         IsControlCenterPresentation() {
             var presentation = String(this.EffectivePresentationMode || '').trim().toLowerCase();
             return presentation === 'controlcenter' || presentation === 'settingscenter';
@@ -288,6 +295,12 @@ export default {
         },
     },
     methods: {
+        GetEffectiveTabsPosition() {
+            // 工作台已有独立分组导航时，Element Plus 自带 Tab 头会被隐藏。
+            // 此时仍给 el-tabs 传 left/right 会让不可见的 header 参与横向 flex
+            // 尺寸计算，设计器响应式更新时可能形成宽度正反馈并持续撑大首列。
+            return this.ShowPresentationSectionNavigation ? 'top' : this.GetTabsPosition();
+        },
         GetPrintPresentationSection(tab) {
             var key = tab && (tab.Id || tab.Name);
             return this.PresentationSections.find(function (section) { return section.Key === key; }) || {

@@ -383,6 +383,33 @@ return {1, userNext, tenantNext}";
                 return null;
             }
 
+            DosResult AddOriginalFile(string name, long size, HashSet<string> originalNames)
+            {
+                if (param.CropEnabled != true)
+                    return new DosResult(0, null, "未开启裁剪协议时不允许提交裁剪原图！");
+                if (string.IsNullOrWhiteSpace(name))
+                    return new DosResult(0, null, "裁剪原图文件名不能为空！");
+                if (Path.GetFileName(name).Length > 255)
+                    return new DosResult(0, null, "裁剪原图文件名不能超过255个字符！");
+                if (!names.Contains(name))
+                    return new DosResult(0, null, "裁剪原图找不到同名的展示图：" + name);
+                if (!originalNames.Add(name))
+                    return new DosResult(0, null, "同一次上传中存在重复裁剪原图：" + name);
+                if (size < 0)
+                    return new DosResult(0, null, "无法确定裁剪原图大小：" + name);
+                if (size == 0)
+                    return new DosResult(0, null, "裁剪原图体积为0：" + name);
+                if (size > options.MaxFileBytes)
+                    return new DosResult(0, null,
+                        $"单个裁剪原图不能超过{FormatMegabytes(options.MaxFileBytes)}MB：" + name);
+                // 原图不是第二个业务文件，不增加文件数；但必须计入请求大小和每日配额。
+                if (validatedTotalBytes > options.MaxTotalBytes - size)
+                    return new DosResult(0, null,
+                        $"单次上传总大小不能超过{FormatMegabytes(options.MaxTotalBytes)}MB！");
+                validatedTotalBytes += size;
+                return null;
+            }
+
             foreach (var file in param.Files ?? new Dictionary<string, Stream>())
             {
                 if (file.Value == null)
@@ -417,6 +444,37 @@ return {1, userNext, tenantNext}";
                 var error = AddFile(file.Key, decodedLength);
                 if (error != null) return error;
             }
+
+            var originalFiles = param.OriginalFiles ?? new Dictionary<string, Stream>();
+            if (param.CropEnabled == true && originalFiles.Count == 0)
+                return new DosResult(0, null, "开启裁剪后必须同时提交裁剪前的原图！");
+            if (param.CropEnabled != true && originalFiles.Count > 0)
+                return new DosResult(0, null, "未开启裁剪协议时不允许提交裁剪原图！");
+
+            var originalNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in originalFiles)
+            {
+                if (file.Value == null)
+                    return new DosResult(0, null, "裁剪原图文件流不能为空：" + file.Key);
+                if (!file.Value.CanSeek)
+                    return new DosResult(0, null, "当前裁剪原图流无法安全确定大小：" + file.Key);
+
+                long remaining;
+                try
+                {
+                    remaining = file.Value.Length - file.Value.Position;
+                }
+                catch
+                {
+                    return new DosResult(0, null, "无法读取裁剪原图大小：" + file.Key);
+                }
+
+                var error = AddOriginalFile(file.Key, remaining, originalNames);
+                if (error != null) return error;
+            }
+
+            if (param.CropEnabled == true && originalNames.Count != count)
+                return new DosResult(0, null, "每张裁剪图都必须对应一张同名原图！");
 
             if (count == 0)
                 return new DosResult(0, null, "未检测到上传文件！");

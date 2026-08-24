@@ -115,6 +115,8 @@ namespace Microi.net
             else if (normalizedTableName == "sys_rolelimit"
                      || normalizedTableName == "sys_role"
                      || normalizedTableName == "sys_user"
+                     || normalizedTableName == "sys_microiservice"
+                     || normalizedTableName == "sys_microiservice_page"
                      || normalizedTableName == "diy_table"
                      || normalizedTableName == "diy_field")
             {
@@ -813,6 +815,33 @@ namespace Microi.net
             "_FormData", "_RowModel",
             // "Id", "Ids", "IsDeleted", "CreateTime", "UpdateTime", "UserId", "UserName",
         };
+
+        /// <summary>
+        /// OsClient is normally a reserved request-context name. The low-code system generator
+        /// also requires tenant-scoped child indexes to start with OsClient, so it may create
+        /// this one system-managed metadata field only through the trusted server boundary.
+        /// Keeping the field hidden, readonly, required and varchar(50) prevents an editable
+        /// business field from impersonating the tenant context.
+        /// </summary>
+        public static bool CanAddTrustedOsClientField(
+            string fieldName,
+            string fieldType,
+            string component,
+            bool trustedServerInvocation,
+            int visible,
+            int appVisible,
+            int readonlyValue,
+            int notEmpty)
+        {
+            return trustedServerInvocation
+                   && string.Equals(fieldName, "OsClient", StringComparison.OrdinalIgnoreCase)
+                   && string.Equals(fieldType?.Trim(), "varchar(50)", StringComparison.OrdinalIgnoreCase)
+                   && string.Equals(component?.Trim(), "Text", StringComparison.OrdinalIgnoreCase)
+                   && visible == 0
+                   && appVisible == 0
+                   && readonlyValue == 1
+                   && notEmpty == 1;
+        }
         /// <summary>
         /// 新增一个字段
         /// </summary>
@@ -893,7 +922,17 @@ namespace Microi.net
                 {
                     fieldComponent = "Field";
                 }
-                if (CantAddField.Contains(fieldName))
+                var trustedOsClientField = CanAddTrustedOsClientField(
+                    fieldName,
+                    fieldType,
+                    fieldComponent,
+                    sourceBaseParam?._TrustedServerInvocation == true,
+                    param["Visible"].Val<int>(),
+                    param["AppVisible"].Val<int>(),
+                    param["Readonly"].Val<int>(),
+                    param["NotEmpty"].Val<int>());
+                if (CantAddField.Any(item => item.Equals(fieldName, StringComparison.OrdinalIgnoreCase))
+                    && !trustedOsClientField)
                 {
                     return new DosResult(0, null, "系统内置字段名，请更换：" + fieldName);
                 }
@@ -1242,12 +1281,12 @@ namespace Microi.net
                         var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, diyTableModel.DataBaseId);
 
 
-                        //如果修改了列名，或类型
-                        //修改为强制修改物理表，不再判断列名、类型
-                        //if (fieldModel.Name != param.Name 
-                        //    || fieldModel.Type != param.Type
-                        //    || fieldModel.Label != param.Label
-                        //    )
+                        // 只有列名或物理类型实际变化时才执行 DDL。字段说明、布局、
+                        // V8 事件等元数据更新不应反复 ALTER TABLE；批量保存字段的
+                        // UptDiyFieldList 已遵循同一语义。
+                        var physicalDefinitionChanged = fieldModel.Name != param.Name
+                                                        || fieldModel.Type != param.Type;
+                        if (physicalDefinitionChanged)
                         {
                             //判断字段是否已存在
                             if (
@@ -1289,9 +1328,8 @@ namespace Microi.net
                                 }
 
                             }
-
-                            param.NameConfirm = 1;
                         }
+                        param.NameConfirm = 1;
 
                         //iTdos数据库中修改数据
                         #region  通用修改

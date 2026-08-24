@@ -27,7 +27,7 @@
                 <template #label>
                     <span class="tab-label">
                         <el-icon><Document /></el-icon>
-                        <span>{{ $t ? $t('Msg.DataLog') || '数据日志' : '数据日志' }}</span>
+                        <span>{{ $t ? $t('Msg.DataLog') || '日志' : '日志' }}</span>
                         <span class="mci-tab-badge">{{ GetRelatedCount('DataLog') }}</span>
                     </span>
                 </template>
@@ -35,7 +35,7 @@
                     <div class="panel-toolbar">
                         <div class="panel-toolbar-title">
                             <el-icon><Document /></el-icon>
-                            <span>{{ $t ? $t('Msg.DataLog') || '数据日志' : '数据日志' }}</span>
+                            <span>{{ $t ? $t('Msg.DataLog') || '日志' : '日志' }}</span>
                         </div>
                         <el-tooltip :content="$t ? $t('Msg.Refresh') || '刷新' : '刷新'" placement="top">
                             <el-button
@@ -105,7 +105,7 @@
                 <template #label>
                     <span class="tab-label">
                         <el-icon><ChatDotRound /></el-icon>
-                        <span>{{ $t ? $t('Msg.DataComment') || '数据评论' : '数据评论' }}</span>
+                        <span>{{ $t ? $t('Msg.DataComment') || '评论' : '评论' }}</span>
                         <span class="mci-tab-badge">{{ GetRelatedCount('DataComment') }}</span>
                     </span>
                 </template>
@@ -113,7 +113,7 @@
                     <div class="panel-toolbar">
                         <div class="panel-toolbar-title">
                             <el-icon><ChatDotRound /></el-icon>
-                            <span>{{ $t ? $t('Msg.DataComment') || '数据评论' : '数据评论' }}</span>
+                            <span>{{ $t ? $t('Msg.DataComment') || '评论' : '评论' }}</span>
                         </div>
                         <el-tooltip :content="$t ? $t('Msg.Refresh') || '刷新' : '刷新'" placement="top">
                             <el-button
@@ -220,7 +220,7 @@
                 <template #label>
                     <span class="tab-label">
                         <el-icon><Clock /></el-icon>
-                        <span>{{ $t ? $t('Msg.DataVersion') : '数据版本' }}</span>
+                        <span>{{ $t ? $t('Msg.DataVersion') : '版本' }}</span>
                         <span class="mci-tab-badge">{{ GetRelatedCount('DataVersion') }}</span>
                     </span>
                 </template>
@@ -228,7 +228,7 @@
                     <div class="panel-toolbar">
                         <div class="panel-toolbar-title">
                             <el-icon><Clock /></el-icon>
-                            <span>{{ $t ? $t('Msg.DataVersion') : '数据版本' }}</span>
+                            <span>{{ $t ? $t('Msg.DataVersion') : '版本' }}</span>
                         </div>
                         <el-tooltip :content="$t ? $t('Msg.Refresh') || '刷新' : '刷新'" placement="top">
                             <el-button
@@ -586,16 +586,23 @@ export default {
             margin: 0 0 10px 0;
         }
         .el-tabs__item {
-            padding: 0 10px;
+            padding: 0 2px;
             font-size: 13px;
             font-weight: 500;
 
             .tab-label {
                 display: inline-flex;
                 align-items: center;
-                gap: 4px;
+                gap: 2px;
                 .el-icon {
                     font-size: 14px;
+                }
+                .mci-tab-badge {
+                    min-width: 16px;
+                    height: 16px;
+                    margin-left: 1px;
+                    padding: 0 3px;
+                    font-size: 10px;
                 }
             }
         }

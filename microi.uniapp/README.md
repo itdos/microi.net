@@ -1,6 +1,6 @@
-# Microi 原生动态小程序
+# Microi 原生动态移动端
 
-`microi.uniapp` 是 Microi AI 低代码平台的原生动态小程序基线，基于 **uni-app + Vue 3 + Vite**。默认 Profile 是已经完成客户交付验收的 **集福鲤版（xjy）**，因此直接执行原有开发、构建命令时，页面、功能、路由和视觉仍以集福鲤版本为准。
+`microi.uniapp` 是 Microi AI 低代码平台的原生动态小程序与 App 基线，基于 **uni-app + Vue 3 + Vite**。默认 Profile 是已经完成客户交付验收的 **集福鲤版（xjy）**，因此直接执行原有开发、构建命令时，页面、功能、路由和视觉仍以集福鲤版本为准。
 
 > 本项目不再使用 WebView 打开 Microi 后台。通用列表、详情、动态表单、消息、AI 助手和个人中心均原生运行；租户可继续添加商城、资讯、售后任务等独立业务。后台字段、数据源和移动端配置通过动态表单即时生效。
 
@@ -33,17 +33,17 @@ Microi.UI 是产品设计系统和最终交付标准，负责品牌令牌、布�
 - **动态表单**：运行时读取 Microi 表和字段元数据，在小程序内渲染原生控件并调用 FormEngine API 保存。
 - **历史存值兼容**：地区数组、关联对象数组、富文本 HTML、旧字符串图片路径及新旧上传 JSON 都由统一显示层解析。
 - **单一完整详情**：客户、订单等业务只保留一个详情入口；核心信息默认展开，次要字段与关联业务按真实表意分组折叠并延迟加载。
-- **集福鲤 · AI助手**：由系统设置 `IsShowAiAssistant` 控制是否开放；开启后，Tab 页底部采用“左侧胶囊导航 + 右侧独立固定 AI 槽”，点击 AI 槽打开独立的全屏 AI 路由。模型通道、中转站运行模型和推理强度与 PC 端 AI 引擎保持一致；未登录用户只能看到登录提示，不请求任何业务数据。
+- **集福鲤 · AI助手**：由系统设置负向开关 `DisableAiAssistant` 控制是否关闭；字段缺失或未设为开启值时默认显示。显示后，Tab 页底部采用“左侧胶囊导航 + 右侧独立固定 AI 槽”，点击 AI 槽打开独立的全屏 AI 路由。模型通道、中转站运行模型和推理强度与 PC 端 AI 引擎保持一致；未登录用户只能看到登录提示，不请求任何业务数据。
 - **安全区自适应**：使用实时状态栏、胶囊和底部 safe-area 数据，不依赖固定机型高度。
 - **克制的水主题动效**：首页和“我的”顶部播放 CDN 静音循环水面视频，静态水图负责首帧和失败回退；登录页只使用静态水景与低成本 CSS 位移动效，避免微信原生视频层覆盖登录表单。
 - **高性能交互**：分包加载、按需注入、骨架屏、请求去重、按用户隔离的短期缓存、错峰标签页预热和消息连接复用。AI 主体只在进入独立分包后加载，前台 Token 续签延迟执行并做一分钟节流，水面视频在首帧后启用且低性能设备自动回退静态图。
-- **账号登录记忆**：账号密码登录支持分别记住账号和密码；本地只保存成功登录后的 RSA 密文和掩码，不保存明文密码，账号变更或密文复用失败会自动清除记忆。
+- **账号登录记忆**：账号密码登录支持分别记住账号和密码；本地只保存成功登录后的 RSA 密文和掩码，不保存明文密码，并按 `ApiBase + OsClient` 隔离，账号变更、平台切换或密文复用失败会自动清除当前输入。
 
 ## AI 数据权限
 
 小程序 AI 统一调用 Microi 官方接口引擎 `mci_ai_data_assistant`。它不接受客户端自行声明角色、数据范围或可访问表，也不执行模型生成的 SQL；服务端先按当前 Token、角色策略和业务域查询数据，再将限量、脱敏后的结果交给获准模型分析。该能力采用 `mci_` 官方命名，可由不同项目按配置复用，不绑定集福鲤业务表。
 
-AI 总开关位于“系统设置”的 `是否显示AI助手（IsShowAiAssistant）`，默认关闭且仅接受 `1` 为开启值。关闭时不显示右侧 AI 槽，左侧导航胶囊自动占用完整可用宽度；消息列表、通讯录、新建会话弹窗和历史缓存都会过滤旧 AI 会话。直接访问独立助手路由只呈现完整的普通消息中心空状态，访问旧 `id=AI` 会话会返回消息中心，且不会请求模型、会话记录或业务数据。开启时所有生成页面固定显示“内容由人工智能生成，请注意甄别”。只有完成对应小程序服务类目和生成内容标识等合规要求后才能开启。
+AI 总开关位于“系统设置”的 `关闭AI助手图标（DisableAiAssistant）`。只有该负向开关明确为 `1/true` 时才关闭；字段不存在、为空、为 `0/false` 或其它值时都默认显示，并且废弃字段 `IsShowAiAssistant` 不再参与判断。关闭时不显示右侧 AI 槽，左侧导航胶囊自动占用完整可用宽度；消息列表、通讯录、新建会话弹窗和历史缓存都会过滤旧 AI 会话。直接访问独立助手路由只呈现完整的普通消息中心空状态，访问旧 `id=AI` 会话会返回消息中心，且不会请求模型、会话记录或业务数据。显示时所有生成页面固定显示“内容由人工智能生成，请注意甄别”。只有完成对应小程序服务类目和生成内容标识等合规要求后才能开放使用。
 
 - 后台动态策略表：`mci_ai_role_policy`，入口为系统管理下的“AI数据权限”。
 - 后台动态业务域表：`mci_ai_data_domain`，配置域名称、来源表、日期/状态/指标字段、可读字段、敏感字段、范围规则和推荐问题；集福鲤与 Microi 官网租户使用各自的数据域配置。
@@ -205,15 +205,39 @@ Microi 标准基础版：
 npm run dev:mp-weixin:standard
 npm run build:mp-weixin:standard
 npm run build:h5:standard
+npm run dev:app:standard
+npm run build:app:standard
 ```
 
-标准微信构建输出到 `dist/build/standard-mp-weixin`，不会覆盖集福鲤产物。环境地址、`OsClient`、品牌、功能开关和接口配置在对应 `profiles/<id>/profile.cjs` 中维护；不要在 README、页面或测试产物中写入真实密码。
+标准微信构建输出到 `dist/build/standard-mp-weixin`，通用 App 构建输出到 `dist/build/standard-app`，都不会覆盖集福鲤产物。环境地址、`OsClient`、品牌、功能开关和接口配置在对应 `profiles/<id>/profile.cjs` 中维护；不要在 README、页面或测试产物中写入真实密码。
+
+### 通用 App 平台切换
+
+使用 `npm run build:app:standard` 生成通用 App 编译资源；该目录不是已签名的 IPA/APK。仅在 `standard + APP-PLUS` 登录页会显示“平台连接”：用户从固定下拉框选择 `https://` 或 `http://`，地址框只填写域名、IP、端口和可选路径，再单独填写租户 `OsClient`。H5、各小程序和客户专属 Profile 仍固定使用构建配置，不暴露运行时后端设置。
+
+连接流程先匿名读取候选平台的 `GetSysConfig`，验证地址与租户有效后才落盘。真正切换时会断开旧 SignalR、清除旧 DiyToken、用户、菜单、表元数据、页面会话与业务缓存；平台切换前发出的迟到响应也会被 SDK 拒绝。系统标题、Logo、FileServer、验证码、隐私协议和租户登录 RSA 公钥均以新平台返回值为准。记住的账号及 RSA 密文最多保留 12 个端点范围，且不会跨平台复用。
+
+HTTPS 是默认和正式发布推荐值。为了满足“任意 HTTP 地址”的通用连接需求，`standard` Profile 的 iOS `Info.plist` 声明了 `NSAllowsArbitraryLoads`，Android `AndroidManifest.xml` 声明了 `usesCleartextTraffic=true`；`xjy` 客户专属 Profile 均未放开。Apple 明确要求 ATS 例外在审核时提供理由，并建议尽可能改用 HTTPS 或更窄的域名例外。提交前必须从最终 IPA/APK 回读原生清单、在真机分别验证 HTTPS/HTTP，并在 App Review Notes 说明需要连接客户自管旧设备或内网服务的真实场景；若正式产品不需要任意 HTTP，应删除全局例外并只发布 HTTPS。
+
+DCloud 云打包从 CLI 项目的 `src` 读取 `manifest.json`、`Info.plist` 与 `AndroidManifest.xml`，因此最终打包前必须显式同步 `standard`，打包结束后恢复仓库默认 `xjy`：
+
+```bash
+npm run profile:sync -- standard
+# 在 HBuilderX 中对当前源码执行 Android/iOS 云打包，并回读最终安装包
+npm run profile:sync -- xjy
+npm run check:profiles
+```
+
+不要直接拿默认源码配置打通用包，也不要把 `standard` 生成桥接文件作为仓库默认值提交。
 
 ## 验收命令
 
 ```bash
 # 双 Profile + UI 合规 + 44 类官方控件映射
 npm run check:ui
+
+# App 平台地址、租户隔离、HTTP 风险提示和迟到响应竞态
+npm run check:app-runtime
 
 # 36 个页面分享策略、参数白名单和 6 张品牌封面审计
 npm run check:share
@@ -250,7 +274,7 @@ D:/Work/microi.net.all/.tmp/xjy-uniapp-visual/
 
 - 登录主体首帧直接渲染，不再等待 `GetSysConfig` 返回；配置请求失败时仍可使用授权登录和账号密码登录。
 - 登录页移除原生视频层，生产 WXML 不含 `<video>`；静态水景保留品牌视觉，同时避免原生层覆盖造成白屏假象。
-- `Sys_Config.IsShowAiAssistant` 为 AI 总开关，集福鲤租户当前值为 `0`；关闭时首页无 AI 入口，消息列表与联系人不显示 AI 会话，直接路由显示正常的“消息中心”空状态且不初始化 AI 组件，旧 AI 会话深链自动返回消息中心。
+- `Sys_Config.DisableAiAssistant` 为 AI 负向总开关；仅 `1/true` 表示关闭，字段缺失或其它值均默认显示。关闭时首页无 AI 入口，消息列表与联系人不显示 AI 会话，直接路由显示正常的“消息中心”空状态且不初始化 AI 组件，旧 AI 会话深链自动返回消息中心。
 - 微信开发者工具自动化验证登录完整展示、账号表单可切换、AI 入口关闭、普通消息关闭态和旧会话深链保护，并输出 `review-login-ready.png`、`review-ai-disabled.png`。
 - 生产构建未包含 `vConsole`、`setEnableDebug` 等调试钩子；提审前仍应使用正式构建重新上传，并录制从打开小程序到登录页完整可用的操作视频。
 

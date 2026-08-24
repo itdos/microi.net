@@ -1,6 +1,6 @@
 <template>
     <!-- Mini模式：只显示一个按钮，点击弹出编辑器 -->
-    <div v-if="CodeEditorMini" class="code-editor-mini">
+    <div v-if="UseMiniMode" class="code-editor-mini">
         <el-button type="primary" :icon="Edit" @click="openMiniEditor">
             编辑代码{{ miniCodeLength }}
         </el-button>
@@ -9,6 +9,7 @@
         <el-dialog
             v-if="miniEditorVisible"
             v-model="miniEditorVisible"
+            class="mci-unified-dialog code-editor-runtime-dialog"
             title="编辑代码"
             width="80%"
             :close-on-click-modal="false"
@@ -213,6 +214,7 @@
         <el-dialog
             v-if="configDialogVisible"
             v-model="configDialogVisible"
+            class="mci-unified-dialog mci-field-config-dialog"
             title="代码编辑器配置"
             draggable
             align-center
@@ -229,6 +231,13 @@
                 </el-form-item>
             </el-form>
             <el-form label-width="100px" label-position="top" size="small">
+                <el-form-item label="默认显示方式">
+                    <el-radio-group v-model="configForm.DisplayMode">
+                        <el-radio value="Inline">直接显示代码编辑器</el-radio>
+                        <el-radio value="Dialog">显示“编辑代码（xx字）”按钮</el-radio>
+                    </el-radio-group>
+                    <small class="code-editor-config-tip">按钮模式只在点击后加载 Monaco，适合系统设置等代码字段较多的表单。</small>
+                </el-form-item>
                 <el-form-item label="默认语言">
                     <el-select v-model="configForm.Language" placeholder="javascript">
                         <el-option label="JavaScript" value="javascript"></el-option>
@@ -452,6 +461,12 @@ const props = defineProps({
         type: String,
         default: "client"
     }
+});
+
+const UseMiniMode = computed(() => {
+    if (props.CodeEditorMini) return true;
+    const configured = String(props.field?.Config?.CodeEditor?.DisplayMode || '').trim().toLowerCase();
+    return configured === 'dialog' || configured === 'button' || configured === 'mini';
 });
 
 // 监听表单模式变化
@@ -683,7 +698,7 @@ let resizeObserver = null;
 
 onMounted(() => {
     // Mini模式下不自动初始化编辑器，等用户点击按钮后再初始化
-    if (!props.CodeEditorMini) {
+    if (!UseMiniMode.value) {
         Init();
     }
 });
@@ -1072,7 +1087,8 @@ const configDialogVisible = ref(false);
 const configForm = ref({
     Height: '500',
     Language: 'javascript',
-    V8CodeType: 'client'
+    V8CodeType: 'client',
+    DisplayMode: 'Inline'
 });
 
 const openConfig = () => {
@@ -1085,7 +1101,8 @@ const openConfig = () => {
     configForm.value = {
         Height: props.field.Config.CodeEditor.Height || '500',
         Language: props.field.Config.CodeEditor.Language || 'javascript',
-        V8CodeType: props.field.Config.CodeEditor.V8CodeType || props.v8CodeType || 'client'
+        V8CodeType: props.field.Config.CodeEditor.V8CodeType || props.v8CodeType || 'client',
+        DisplayMode: props.field.Config.CodeEditor.DisplayMode || 'Inline'
     };
     configDialogVisible.value = true;
 };
@@ -1317,6 +1334,7 @@ const saveConfig = () => {
     props.field.Config.CodeEditor.Height = configForm.value.Height;
     props.field.Config.CodeEditor.Language = configForm.value.Language;
     props.field.Config.CodeEditor.V8CodeType = configForm.value.V8CodeType;
+    props.field.Config.CodeEditor.DisplayMode = configForm.value.DisplayMode || 'Inline';
     configDialogVisible.value = false;
     // 更新编辑器高度
     EditorHeight.value = configForm.value.Height + 'px';
@@ -1329,6 +1347,13 @@ const saveConfig = () => {
         }
         monacoEditor.layout();
     }
+    nextTick(() => {
+        if (UseMiniMode.value) {
+            disposeEditor();
+        } else if (!monacoEditor) {
+            Init();
+        }
+    });
     // 提示保存成功
     const instance = getCurrentInstance();
     DiyCommon.Tips('配置已保存', true);
@@ -1850,10 +1875,8 @@ const miniEditorVisible = ref(false);
 let miniEditorBackup = ''; // 打开弹窗时备份的值，用于取消恢复
 
 const miniCodeLength = computed(() => {
-    const val = ModelValue.value;
-    if (!val) return '';
-    const len = String(val).length;
-    return len > 0 ? `（${len}字）` : '';
+    const len = Array.from(String(ModelValue.value || '')).length;
+    return `（${len}字）`;
 });
 
 // 销毁当前编辑器实例（Mini模式弹窗关闭时调用）
@@ -2533,6 +2556,13 @@ defineExpose({
             }
         }
     }
+}
+
+.code-editor-config-tip {
+    display: block;
+    margin-top: 6px;
+    color: var(--el-text-color-secondary, #909399);
+    line-height: 1.5;
 }
 
 .diy-code-editor-print-source {

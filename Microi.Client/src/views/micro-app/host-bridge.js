@@ -16,6 +16,7 @@ const TAB_ACTIONS = Object.freeze([
     "reloadTab",
     "setTabTitle",
     "showMessage",
+    "refreshCurrentUser",
     "setGlobalOverlay",
     "openForm"
 ]);
@@ -44,6 +45,9 @@ const ACTION_ALIASES = Object.freeze({
     message: "showMessage",
     tips: "showMessage",
     toast: "showMessage",
+    refreshcurrentuser: "refreshCurrentUser",
+    refreshuserpreferences: "refreshCurrentUser",
+    syncuserpreferences: "refreshCurrentUser",
     setglobaloverlay: "setGlobalOverlay",
     globaloverlay: "setGlobalOverlay",
     overlay: "setGlobalOverlay",

@@ -397,7 +397,9 @@ export function selectModuleView(menu, options = {}) {
     const scene = canonical(options.scene, VIEW_SCENES, "Detail");
     // EnableViewSchema 只启用自定义表单（Detail/Edit）。列表标题、复合列和卡片
     // 属于模块展示配置，只要存在有效 ViewSchema 就应直接生效。
-    if (["Detail", "Edit"].includes(scene) && Number(menu.EnableViewSchema || 0) !== 1) return null;
+    if (["Detail", "Edit"].includes(scene)
+        && Number(menu.EnableViewSchema || 0) !== 1
+        && options.allowLegacyFormConfig !== true) return null;
     const schema = parseObject(menu.ViewSchema);
     const views = Array.isArray(schema.Views || schema.views) ? (schema.Views || schema.views) : [];
     const device = canonical(options.device, VIEW_DEVICES, "PC");

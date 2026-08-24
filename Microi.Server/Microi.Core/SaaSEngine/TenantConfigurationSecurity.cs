@@ -135,13 +135,33 @@ namespace Microi.net
         private static readonly HashSet<string> PublicSysConfigAlwaysHiddenFieldSet =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "ClientSecrets", "GlobalServerV8Code"
+                "ClientSecrets", "GlobalServerV8Code",
+                // Retired in v7.5.3: framework source badges are always available and
+                // no longer accept a tenant-wide visibility/collapse switch.
+                "RenderSourceBadgeMode"
             };
 
         private static readonly HashSet<string> PublicSysConfigExplicitlySafeFieldSet =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "FormMaskBlur",
+                // Framework-owned presentation settings are intentionally public. They are
+                // consumed during client bootstrap and never contain infrastructure secrets.
+                "FrameworkWatermarkEnabled",
+                "FrameworkWatermarkContent",
+                "FrameworkWatermarkDirection",
+                "FrameworkWatermarkOpacity",
+                "FrameworkWatermarkDensity",
+                "FrameworkWatermarkFontSize",
+                "IdentityVerificationEnabled",
+                "PasskeyEnabled",
+                "AuthenticatorTotpEnabled",
+                "RequirePasswordChangeStepUp",
+                "ExternalLoginEnabled",
+                "FaceVerificationEnabled",
+                "GiteeLoginEnabled",
+                "WeChatLoginEnabled",
+                "GitHubLoginEnabled",
                 "DisableLoginPasskey",
                 "DisableLoginAuthenticator",
                 "DisableLoginGitee",
@@ -464,7 +484,22 @@ namespace Microi.net
                     property.Remove();
                 }
             }
+            // This public boolean contains no tenant secret. It lets low-code page
+            // buttons hide host-level control-plane actions in child tenants while
+            // the corresponding server action still performs authoritative checks.
+            projection["IsMainTenant"] = IsRuntimeMainTenant(osClient);
             return projection;
+        }
+
+        internal static bool IsRuntimeMainTenant(string osClient)
+        {
+            var configured = OsClientExtend.GetConfigOsClient();
+            if (string.IsNullOrWhiteSpace(configured)) configured = OsClientDefault.OsClient;
+            return !string.IsNullOrWhiteSpace(osClient)
+                   && string.Equals(
+                       osClient.Trim(),
+                       (configured ?? string.Empty).Trim(),
+                       StringComparison.OrdinalIgnoreCase);
         }
 
         private static void RemovePropertyIgnoreCase(JObject target, string propertyName)

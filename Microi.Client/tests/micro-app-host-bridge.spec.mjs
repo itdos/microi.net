@@ -24,6 +24,7 @@ test("menu micro-apps receive a versioned host capability contract", () => {
             "reloadTab",
             "setTabTitle",
             "showMessage",
+            "refreshCurrentUser",
             "setGlobalOverlay",
             "openForm"
         ],
@@ -55,6 +56,10 @@ test("host actions use one explicit dispatch envelope and normalize documented a
     assert.equal(
         bridge.parseMicroAppHostAction({ type: "micro-app:host-action", data: { action: "refreshTab" } }).action,
         "reloadTab"
+    );
+    assert.equal(
+        bridge.parseMicroAppHostAction({ type: "micro-app:host-action", data: { action: "syncUserPreferences" } }).action,
+        "refreshCurrentUser"
     );
 });
 
@@ -95,6 +100,7 @@ test("the page host connects dispatch actions to router and TagsView behavior", 
     assert.match(host, /this\.\$router\.replace\(target\)/);
     assert.match(host, /window\.addEventListener\("page-refresh"/);
     assert.match(host, /MICRO_APP_HOST_ACTION_RESULT_TYPE/);
+    assert.match(host, /case "refreshCurrentUser"[\s\S]*RefreshLoginUser/);
     assert.match(host, /childPrelockedHtmlOnly/);
     assert.match(host, /htmlOverflow:\s*childPrelockedHtmlOnly\s*\?\s*""\s*:\s*html\.style\.overflow/);
     assert.match(host, /html\.style\.overflow\s*=\s*state\.htmlOverflow/);

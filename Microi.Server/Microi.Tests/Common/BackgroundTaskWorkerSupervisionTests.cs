@@ -44,6 +44,12 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("ReservedNonDiyLangSlotCount", runtime);
         Assert.Contains("ShouldReserveNonMaintenanceSlot", runtime);
         Assert.Contains("DiyLangBackgroundTaskService.ClusterConcurrencyKey", runtime);
+        Assert.Contains("ChildTenantPlatformAppControlService.ClusterConcurrencyKey", runtime);
+        Assert.Contains("ChildTenantPlatformAppControlService.ChildWorkerApiEngineKey", runtime);
+        Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_V1", runtime);
+        Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_SCOPE_V1", runtime);
+        Assert.Contains("RequiresTargetExecutionBootstrap", runtime);
+        Assert.Contains("EnsureTargetExecutionBootstrap", runtime);
         Assert.Contains("concurrencyLeaseOsClient = OsClientExtend.GetConfigOsClient()", runtime);
         Assert.Contains("ActiveTasks", runtime);
         Assert.Contains("CommandFlags.FireAndForget", runtime);
@@ -56,6 +62,13 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("AttemptCount>=MaxAttempts", store);
         Assert.Contains("任务已耗尽重试次数，系统已自动终结", store);
         Assert.Contains("ApiEngineKey<>@excludedApiEngineKey", store);
+        Assert.Contains("BACKGROUND_TASK_READY_TIME_FAIR_ORDER_V1", store);
+        Assert.Contains(
+            "ORDER BY COALESCE(NextRunTime, CreateTime) ASC, CreateTime ASC",
+            store);
+        Assert.Contains("BACKGROUND_TASK_CONSECUTIVE_RETRY_BUDGET_V1", store);
+        Assert.Contains("AttemptCount=0,LastError=''", store);
+        Assert.Contains("LastError=@p9", store);
         Assert.Contains("Interlocked.Increment(ref _tenantScanCursor)", store);
         Assert.Contains("item.LeaseExpiresAt = leaseExpiresAt", store);
         Assert.Contains("Math.Max(1, Math.Min(3600, delaySeconds))", store);
@@ -126,6 +139,45 @@ public sealed class BackgroundTaskWorkerSupervisionTests
             Microi.net.BackgroundTaskService.ShouldRetryRenewalFailure(consecutiveFailures));
     }
 
+    [Fact]
+    public void InfrastructureDatabaseContention_GetsABoundedRetryBudgetIndependentOfBusinessAttempts()
+    {
+        var item = new Microi.net.BackgroundTaskRecord
+        {
+            MaxAttempts = 1,
+            LastError = ""
+        };
+        var deadlock = new InvalidOperationException(
+            "V8 wrapper",
+            new Exception("Deadlock found when trying to get lock; try restarting transaction"));
+
+        Assert.True(Microi.net.BackgroundTaskStore.ShouldRequeueInfrastructureContention(
+            item,
+            deadlock,
+            out var firstAttempt));
+        Assert.Equal(1, firstAttempt);
+
+        item.LastError = "[InfrastructureContentionRetry:1] deadlock";
+        Assert.True(Microi.net.BackgroundTaskStore.ShouldRequeueInfrastructureContention(
+            item,
+            deadlock,
+            out var secondAttempt));
+        Assert.Equal(2, secondAttempt);
+
+        item.LastError = "[InfrastructureContentionRetry:2] deadlock";
+        Assert.False(Microi.net.BackgroundTaskStore.ShouldRequeueInfrastructureContention(
+            item,
+            deadlock,
+            out var exhaustedAttempt));
+        Assert.Equal(3, exhaustedAttempt);
+
+        item.LastError = "";
+        Assert.False(Microi.net.BackgroundTaskStore.ShouldRequeueInfrastructureContention(
+            item,
+            new InvalidOperationException("Value cannot be null. (Parameter 'source')"),
+            out _));
+    }
+
     [Theory]
     [InlineData("ordinary_job", 90)]
     [InlineData("admin_build_sanitized_empty_database", 900)]
@@ -141,6 +193,17 @@ public sealed class BackgroundTaskWorkerSupervisionTests
 
     private static string FindServerRoot()
     {
+        var repositoryRoot = Environment.GetEnvironmentVariable("MICROI_TEST_REPOSITORY_ROOT");
+        if (!string.IsNullOrWhiteSpace(repositoryRoot))
+        {
+            var configuredServerRoot = Path.Combine(repositoryRoot, "Microi.Server");
+            if (Directory.Exists(Path.Combine(configuredServerRoot, "Microi.Core"))
+                && Directory.Exists(Path.Combine(configuredServerRoot, "Microi.net.Api")))
+            {
+                return configuredServerRoot;
+            }
+        }
+
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory != null)
         {

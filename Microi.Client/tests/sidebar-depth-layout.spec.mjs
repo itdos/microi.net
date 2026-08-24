@@ -18,6 +18,10 @@ const item = fs.readFileSync(
     path.join(clientRoot, "src/layout/components/Sidebar/Item.vue"),
     "utf8"
 );
+const adminTheme = fs.readFileSync(
+    path.join(clientRoot, "src/styles/mci-admin-theme.scss"),
+    "utf8"
+);
 
 test("recursive sidebar items carry an explicit depth and cap deep indentation", () => {
     assert.match(sidebarItem, /:level="normalizedLevel \+ 1"/);
@@ -35,4 +39,18 @@ test("expanded sidebar keeps nested menus full width and reserves text space", (
 
 test("truncated menu labels expose the complete accessible title", () => {
     assert.match(item, /class="menu-title" :title="title" :aria-label="title"/);
+});
+
+test("configured menu badges expose their business meaning in a hover tooltip", () => {
+    assert.match(item, /badgeConfigModel\.Tooltip/);
+    assert.match(item, /<el-tooltip[\s\S]*:content="badgeConfigModel\.Tooltip"/);
+    assert.match(item, /popper-class="mci-menu-badge-tooltip"/);
+    assert.match(item, /统计 \$\{badgeRawValue\}，\$\{badgeConfigModel\.Tooltip\}/);
+});
+
+test("menu badge tooltip uses a real left-pointing triangle instead of a rotated square", () => {
+    assert.match(adminTheme, /\.mci-menu-badge-tooltip\.el-popper\[data-popper-placement\^="right"\]/);
+    assert.match(adminTheme, /clip-path:\s*polygon\(0 50%, 100% 0, 100% 100%\)/);
+    assert.match(adminTheme, /border:\s*0 !important/);
+    assert.match(adminTheme, /transform:\s*none !important/);
 });

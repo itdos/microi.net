@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-17 06:47:47
+# 版本：v2026-08-23 19:18:00
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -30,7 +30,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-17 06:47:47"
+SCRIPT_VERSION="v2026-08-23 19:18:00"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -989,6 +989,19 @@ print_generated_install_configuration() {
     [ -n "${QDRANT_GRPC_PORT:-}" ] && printf '  %-18s %s\n' "Qdrant gRPC:" "${QDRANT_GRPC_PORT}"
   fi
   echo ''
+  if [ -n "${HOST_MEMORY_MB:-}" ] && [ -n "${MICROI_DOCKER_MEMORY_BUDGET_MB:-}" ]; then
+    echo '------------------------------------------------------------------'
+    echo 'Docker 资源保护：'
+    echo '------------------------------------------------------------------'
+    echo "宿主机:      ${HOST_LOGICAL_CPUS} 逻辑 CPU / ${HOST_MEMORY_MB}MB 内存"
+    echo "系统保留:    CPU 至少 5% / 内存至少 ${HOST_MEMORY_RESERVE_MB}MB（系统、SSH、宝塔）"
+    echo "共享硬上限:  CPU 合计 ${MICROI_DOCKER_CPU_QUOTA_PERCENT}% / 内存合计 ${MICROI_DOCKER_MEMORY_BUDGET_MB}MB"
+    echo "共享父级:    ${MICROI_DOCKER_CGROUP_PARENT:-尚未配置}"
+    echo 'API、数据库等容器不再固定切分额度；任一服务可使用共享池中的全部空闲资源'
+    echo 'cgroup v2 同时禁止共享池使用 swap；cgroup v1 在内核支持 swap accounting 时同样限制'
+    echo ''
+  fi
+  echo ''
   echo '------------------------------------------------------------------'
   echo '本次服务配置、凭据与数据目录：'
   echo '------------------------------------------------------------------'
@@ -1931,6 +1944,340 @@ detect_storage_type() {
   echo 'unknown'
 }
 
+detect_host_memory_mb() {
+  local memory_mb="${MICROI_HOST_MEMORY_MB_OVERRIDE:-}"
+  if [[ ! "${memory_mb}" =~ ^[1-9][0-9]*$ ]]; then
+    memory_mb=$(awk '/MemTotal/ {print int($2 / 1024); exit}' /proc/meminfo 2>/dev/null || echo 0)
+  fi
+  if [[ ! "${memory_mb}" =~ ^[1-9][0-9]*$ ]]; then
+    echo 'Microi：错误：无法读取宿主机物理内存，不能安全计算 Docker 资源上限。' >&2
+    return 1
+  fi
+  echo "${memory_mb}"
+}
+
+detect_host_logical_cpus() {
+  local logical_cpus="${MICROI_HOST_LOGICAL_CPUS_OVERRIDE:-}"
+  if [[ ! "${logical_cpus}" =~ ^[1-9][0-9]*$ ]]; then
+    logical_cpus=$(nproc 2>/dev/null || echo 0)
+  fi
+  if [[ ! "${logical_cpus}" =~ ^[1-9][0-9]*$ ]]; then
+    echo 'Microi：错误：无法读取宿主机逻辑 CPU 数，不能安全计算 Docker 资源上限。' >&2
+    return 1
+  fi
+  echo "${logical_cpus}"
+}
+
+format_cpu_milli() {
+  local milli_cpus="$1"
+  printf '%d.%03d' "$((milli_cpus / 1000))" "$((milli_cpus % 1000))"
+}
+
+# 全部一键安装容器进入同一个父 cgroup。只限制父级合计，不再把预算按固定权重
+# 切给 API、数据库或 OCR；任一服务都能在其它服务空闲时使用整个共享池。
+calculate_microi_resource_plan() {
+  local memory_reserve_five_percent
+
+  HOST_MEMORY_MB=$(detect_host_memory_mb) || return 1
+  HOST_LOGICAL_CPUS=$(detect_host_logical_cpus) || return 1
+  memory_reserve_five_percent=$(((HOST_MEMORY_MB + 19) / 20))
+  HOST_MEMORY_RESERVE_MB="${memory_reserve_five_percent}"
+  [ "${HOST_MEMORY_RESERVE_MB}" -lt 1536 ] && HOST_MEMORY_RESERVE_MB=1536
+  if [ "${HOST_MEMORY_MB}" -le "${HOST_MEMORY_RESERVE_MB}" ]; then
+    echo "Microi：错误：宿主机仅 ${HOST_MEMORY_MB}MB 内存，无法在保留 ${HOST_MEMORY_RESERVE_MB}MB 给系统/宝塔后启动吾码容器。" >&2
+    return 1
+  fi
+
+  MICROI_DOCKER_MEMORY_BUDGET_MB=$((HOST_MEMORY_MB - HOST_MEMORY_RESERVE_MB))
+  if [ "${MICROI_DOCKER_MEMORY_BUDGET_MB}" -lt 1024 ]; then
+    echo "Microi：错误：给系统保留 ${HOST_MEMORY_RESERVE_MB}MB 后，吾码容器总预算不足 1024MB，已停止安装以避免宿主机 OOM。" >&2
+    return 1
+  fi
+  MICROI_DOCKER_CPU_BUDGET_MILLI=$((HOST_LOGICAL_CPUS * 950))
+  MICROI_DOCKER_CPU_QUOTA_PERCENT=$((HOST_LOGICAL_CPUS * 95))
+  MICROI_DOCKER_MEMORY_LIMIT_BYTES=$((MICROI_DOCKER_MEMORY_BUDGET_MB * 1024 * 1024))
+}
+
+print_microi_resource_plan() {
+  echo 'Microi：Docker 共享资源池保护方案：'
+  echo "Microi：  宿主机 ${HOST_LOGICAL_CPUS} 逻辑 CPU / ${HOST_MEMORY_MB}MB 内存；至少保留 CPU 5% 和内存 ${HOST_MEMORY_RESERVE_MB}MB 给系统、SSH 与宝塔。"
+  echo "Microi：  全部受管容器共享同一父级硬上限：CPU ${MICROI_DOCKER_CPU_QUOTA_PERCENT}%（$(format_cpu_milli "${MICROI_DOCKER_CPU_BUDGET_MILLI}") 核），内存 ${MICROI_DOCKER_MEMORY_BUDGET_MB}MB。"
+  echo 'Microi：  API、数据库、OCR 等不再固定切分额度；任一服务可使用共享池中的全部空闲资源。'
+  echo "Microi：  Docker cgroup 驱动 ${MICROI_DOCKER_CGROUP_DRIVER} / cgroup v${MICROI_CGROUP_VERSION}，Compose 父级 ${MICROI_DOCKER_CGROUP_PARENT}。"
+  if [ "${HOST_LOGICAL_CPUS}" -lt 4 ] || [ "${HOST_MEMORY_MB}" -lt 16384 ]; then
+    echo 'Microi：警告：当前低于 OCR 推荐的 4 核 16GB；共享硬限制会优先保护宿主机，但池内服务在合计高负载下仍可能被限流或 OOM 重启。'
+  fi
+}
+
+verify_docker_resource_limit_capabilities() {
+  local docker_info_output
+  docker_info_output=$(docker info 2>&1) || return 1
+  if docker info --format '{{json .SecurityOptions}}' 2>/dev/null | grep -qi 'rootless'; then
+    echo 'Microi：错误：当前为 rootless Docker，无法可靠加入宿主机 systemd 管理的 microi.slice；已停止安装。'
+    return 1
+  fi
+  if printf '%s\n' "${docker_info_output}" | grep -Eqi 'No memory limit support|No cpu cfs quota support'; then
+    echo 'Microi：错误：当前 Docker/内核不支持内存硬限制或 CPU CFS quota，不能保证为宿主机保留资源，已停止安装。'
+    return 1
+  fi
+  if printf '%s\n' "${docker_info_output}" | grep -Eqi 'No swap limit support'; then
+    echo 'Microi：警告：当前内核未启用 swap limit；物理内存硬限制仍会设置，但建议启用 swap accounting 或关闭宿主机 swap，避免高负载换页拖慢宝塔。'
+  fi
+}
+
+render_microi_slice_unit() {
+  local cgroup_version="$1"
+  cat <<EOF
+# Managed by Microi install-microi.sh - shared container resource pool
+[Unit]
+Description=Microi managed containers shared resource pool
+
+[Slice]
+CPUAccounting=yes
+MemoryAccounting=yes
+CPUQuota=${MICROI_DOCKER_CPU_QUOTA_PERCENT}%
+EOF
+  if [ "${cgroup_version}" = '2' ]; then
+    cat <<EOF
+MemoryMax=${MICROI_DOCKER_MEMORY_BUDGET_MB}M
+MemorySwapMax=0
+EOF
+  else
+    cat <<EOF
+MemoryLimit=${MICROI_DOCKER_MEMORY_BUDGET_MB}M
+EOF
+  fi
+  cat <<'EOF'
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+render_microi_cgroup_v1_swap_service() {
+  cat <<EOF
+# Managed by Microi install-microi.sh - cgroup v1 swap protection
+[Unit]
+Description=Apply Microi shared cgroup v1 memory+swap limit
+Requires=microi.slice
+After=microi.slice
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -ec 'for f in \$\$(find /sys/fs/cgroup -path "*""/microi.slice/memory.memsw.limit_in_bytes" -print); do printf "${MICROI_DOCKER_MEMORY_LIMIT_BYTES}\\n" > "\$\$f"; done'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+detect_microi_cgroup_runtime() {
+  local systemd_version
+
+  if ! command -v systemctl > /dev/null 2>&1 \
+    || [ "$(ps -p 1 -o comm= 2>/dev/null | tr -d '[:space:]')" != 'systemd' ]; then
+    echo 'Microi：错误：共享资源池需要 systemd 管理 microi.slice；当前环境不是受支持的 systemd Linux 主机。'
+    return 1
+  fi
+  systemd_version=$(systemctl --version | awk 'NR == 1 {print $2}')
+  if [[ ! "${systemd_version}" =~ ^[0-9]+$ ]] || [ "${systemd_version}" -lt 219 ]; then
+    echo "Microi：错误：systemd 版本 ${systemd_version:-未知} 不支持吾码共享资源池。"
+    return 1
+  fi
+
+  if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+    MICROI_CGROUP_VERSION=2
+    if [ "${systemd_version}" -lt 232 ]; then
+      echo "Microi：错误：cgroup v2 需要 systemd 232+ 才能同时设置内存与 swap 父级上限；当前为 ${systemd_version}。"
+      return 1
+    fi
+  else
+    MICROI_CGROUP_VERSION=1
+  fi
+
+  MICROI_DOCKER_CGROUP_DRIVER=$(docker info --format '{{.CgroupDriver}}' 2>/dev/null || true)
+  case "${MICROI_DOCKER_CGROUP_DRIVER}" in
+    systemd) MICROI_DOCKER_CGROUP_PARENT='microi.slice' ;;
+    cgroupfs) MICROI_DOCKER_CGROUP_PARENT='/microi.slice' ;;
+    *)
+      echo "Microi：错误：不支持 Docker cgroup 驱动 ${MICROI_DOCKER_CGROUP_DRIVER:-未知}；未启动任何新容器。"
+      return 1
+      ;;
+  esac
+}
+
+install_microi_shared_resource_pool() {
+  local resource_tmp_dir
+  local slice_tmp
+  local swap_service_tmp=''
+  local slice_unit='/etc/systemd/system/microi.slice'
+  local swap_service_unit='/etc/systemd/system/microi-cgroup-v1-swap-limit.service'
+  local managed_marker='# Managed by Microi install-microi.sh'
+
+  if [ -e "${slice_unit}" ] && ! grep -Fq "${managed_marker}" "${slice_unit}"; then
+    echo "Microi：错误：${slice_unit} 已存在且不属于吾码，脚本不会覆盖。"
+    return 1
+  fi
+  if [ "${MICROI_CGROUP_VERSION}" = '1' ] \
+    && [ -e "${swap_service_unit}" ] \
+    && ! grep -Fq "${managed_marker}" "${swap_service_unit}"; then
+    echo "Microi：错误：${swap_service_unit} 已存在且不属于吾码，脚本不会覆盖。"
+    return 1
+  fi
+
+  resource_tmp_dir=$(mktemp -d /tmp/microi_resource_pool_XXXXXX)
+  slice_tmp="${resource_tmp_dir}/microi.slice"
+  render_microi_slice_unit "${MICROI_CGROUP_VERSION}" > "${slice_tmp}"
+  if command -v systemd-analyze > /dev/null 2>&1 \
+    && ! systemd-analyze verify "${slice_tmp}" > /dev/null 2>&1; then
+    echo 'Microi：错误：microi.slice 配置校验失败，未写入 systemd。'
+    rm -f -- "${slice_tmp}"
+    rmdir -- "${resource_tmp_dir}"
+    return 1
+  fi
+
+  if [ "${MICROI_CGROUP_VERSION}" = '1' ]; then
+    swap_service_tmp="${resource_tmp_dir}/microi-cgroup-v1-swap-limit.service"
+    render_microi_cgroup_v1_swap_service > "${swap_service_tmp}"
+    if command -v systemd-analyze > /dev/null 2>&1 \
+      && ! systemd-analyze verify "${slice_tmp}" "${swap_service_tmp}" > /dev/null 2>&1; then
+      echo 'Microi：错误：cgroup v1 swap 保护配置校验失败，未写入 systemd。'
+      rm -f -- "${slice_tmp}" "${swap_service_tmp}"
+      rmdir -- "${resource_tmp_dir}"
+      return 1
+    fi
+  fi
+
+  sudo install -m 0644 "${slice_tmp}" "${slice_unit}"
+  if [ "${MICROI_CGROUP_VERSION}" = '1' ]; then
+    sudo install -m 0644 "${swap_service_tmp}" "${swap_service_unit}"
+  fi
+  rm -f -- "${slice_tmp}"
+  [ -z "${swap_service_tmp}" ] || rm -f -- "${swap_service_tmp}"
+  rmdir -- "${resource_tmp_dir}"
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable microi.slice > /dev/null
+  sudo systemctl start microi.slice
+  if [ "${MICROI_CGROUP_VERSION}" = '2' ]; then
+    sudo systemctl set-property --runtime microi.slice \
+      "CPUQuota=${MICROI_DOCKER_CPU_QUOTA_PERCENT}%" \
+      "MemoryMax=${MICROI_DOCKER_MEMORY_BUDGET_MB}M" \
+      'MemorySwapMax=0'
+  else
+    sudo systemctl set-property --runtime microi.slice \
+      "CPUQuota=${MICROI_DOCKER_CPU_QUOTA_PERCENT}%" \
+      "MemoryLimit=${MICROI_DOCKER_MEMORY_BUDGET_MB}M"
+    sudo systemctl enable microi-cgroup-v1-swap-limit.service > /dev/null
+    sudo systemctl restart microi-cgroup-v1-swap-limit.service
+  fi
+}
+
+find_cgroup_v1_mount() {
+  local controller="$1"
+  awk -v controller="${controller}" '
+    $3 == "cgroup" && ("," $4 ",") ~ ("," controller ",") { print $2; exit }
+  ' /proc/mounts
+}
+
+verify_microi_shared_resource_pool() {
+  local control_group
+  local cpu_file
+  local memory_file
+  local swap_file
+  local cpu_mount
+  local memory_mount
+  local actual_memory
+  local actual_swap=''
+  local quota
+  local period
+  local actual_cpu_milli
+
+  control_group=$(systemctl show microi.slice --property ControlGroup 2>/dev/null \
+    | sed -n 's/^ControlGroup=//p')
+  if [ -z "${control_group}" ] || [ "${control_group}" = '/' ]; then
+    echo 'Microi：错误：无法回读 microi.slice 的父 cgroup 路径。'
+    return 1
+  fi
+
+  if [ "${MICROI_CGROUP_VERSION}" = '2' ]; then
+    cpu_file="/sys/fs/cgroup${control_group}/cpu.max"
+    memory_file="/sys/fs/cgroup${control_group}/memory.max"
+    swap_file="/sys/fs/cgroup${control_group}/memory.swap.max"
+  else
+    cpu_mount=$(find_cgroup_v1_mount cpu)
+    memory_mount=$(find_cgroup_v1_mount memory)
+    if [ -z "${cpu_mount}" ] || [ -z "${memory_mount}" ]; then
+      echo 'Microi：错误：无法定位 cgroup v1 的 CPU/内存控制器。'
+      return 1
+    fi
+    cpu_file="${cpu_mount}${control_group}/cpu.cfs_quota_us"
+    memory_file="${memory_mount}${control_group}/memory.limit_in_bytes"
+    swap_file="${memory_mount}${control_group}/memory.memsw.limit_in_bytes"
+  fi
+
+  if [ ! -r "${cpu_file}" ] || [ ! -r "${memory_file}" ]; then
+    echo 'Microi：错误：microi.slice 的 CPU/内存控制文件不存在，未能建立共享硬上限。'
+    return 1
+  fi
+  actual_memory=$(cat "${memory_file}")
+  if [ "${actual_memory}" -ne "${MICROI_DOCKER_MEMORY_LIMIT_BYTES}" ]; then
+    echo "Microi：错误：共享内存硬上限回读不一致，期望 ${MICROI_DOCKER_MEMORY_LIMIT_BYTES}，实际 ${actual_memory}。"
+    return 1
+  fi
+
+  if [ "${MICROI_CGROUP_VERSION}" = '2' ]; then
+    read -r quota period < "${cpu_file}"
+  else
+    quota=$(cat "${cpu_file}")
+    period=$(cat "${cpu_mount}${control_group}/cpu.cfs_period_us")
+  fi
+  if [ "${quota}" = 'max' ] || [ "${quota}" -le 0 ] || [ "${period}" -le 0 ]; then
+    echo 'Microi：错误：共享 CPU quota 未生效。'
+    return 1
+  fi
+  actual_cpu_milli=$((quota * 1000 / period))
+  if [ "${actual_cpu_milli}" -ne "${MICROI_DOCKER_CPU_BUDGET_MILLI}" ]; then
+    echo "Microi：错误：共享 CPU 硬上限回读不一致，期望 ${MICROI_DOCKER_CPU_BUDGET_MILLI}m，实际 ${actual_cpu_milli}m。"
+    return 1
+  fi
+
+  if [ -r "${swap_file}" ]; then
+    actual_swap=$(cat "${swap_file}")
+    if [ "${MICROI_CGROUP_VERSION}" = '2' ]; then
+      [ "${actual_swap}" = '0' ] || {
+        echo "Microi：错误：共享池 swap 上限回读不一致，实际 ${actual_swap}。"
+        return 1
+      }
+    elif [ "${actual_swap}" -ne "${MICROI_DOCKER_MEMORY_LIMIT_BYTES}" ]; then
+      echo "Microi：错误：cgroup v1 内存+swap 上限回读不一致，实际 ${actual_swap}。"
+      return 1
+    fi
+  elif [ "${MICROI_CGROUP_VERSION}" = '1' ]; then
+    echo 'Microi：警告：当前 cgroup v1 内核未启用 swap accounting；物理内存父级硬上限已生效，但不能单独限制池内 swap。'
+  fi
+
+  echo "Microi：共享父级回读通过：${control_group}，CPU $(format_cpu_milli "${actual_cpu_milli}") 核 / 内存 ${MICROI_DOCKER_MEMORY_BUDGET_MB}MB ✓"
+}
+
+verify_container_shared_resource_pool() {
+  local container_name="$1"
+  local actual_parent
+
+  if ! actual_parent=$(docker inspect "${container_name}" \
+    --format '{{.HostConfig.CgroupParent}}' 2>/dev/null); then
+    echo "Microi：错误：无法回读 ${container_name} 的共享 cgroup 父级。"
+    return 1
+  fi
+  if [ "${actual_parent}" != "${MICROI_DOCKER_CGROUP_PARENT}" ]; then
+    echo "Microi：错误：${container_name} 未进入共享资源池；期望 ${MICROI_DOCKER_CGROUP_PARENT}，实际 ${actual_parent:-空}。"
+    return 1
+  fi
+  echo "Microi：${container_name} 已进入共享资源池 ${actual_parent} ✓"
+}
+
 # MySQL 与整套 Microi 服务共机部署，缓冲池保留 Redis/Mongo/API/系统空间；
 # CPU 决定连接及 I/O 线程，真实块设备 ROTA 决定 SSD/HDD I/O 参数。
 generate_mysql_config() {
@@ -2097,6 +2444,37 @@ default_authentication_plugin = mysql_native_password
 MYSQL8ONLY
   fi
 }
+
+# 自动化验收入口：只计算宿主机/容器资源预算，不读取交互、不访问网络或 Docker。
+if [ "${MICROI_INSTALL_RESOURCE_PLAN_ONLY:-0}" = "1" ]; then
+  calculate_microi_resource_plan
+  echo "HOST_MEMORY_MB=${HOST_MEMORY_MB}"
+  echo "HOST_LOGICAL_CPUS=${HOST_LOGICAL_CPUS}"
+  echo "HOST_MEMORY_RESERVE_MB=${HOST_MEMORY_RESERVE_MB}"
+  echo "MICROI_DOCKER_MEMORY_BUDGET_MB=${MICROI_DOCKER_MEMORY_BUDGET_MB}"
+  echo "MICROI_DOCKER_MEMORY_LIMIT_BYTES=${MICROI_DOCKER_MEMORY_LIMIT_BYTES}"
+  echo "MICROI_DOCKER_CPU_BUDGET_MILLI=${MICROI_DOCKER_CPU_BUDGET_MILLI}"
+  echo "MICROI_DOCKER_CPU_QUOTA_PERCENT=${MICROI_DOCKER_CPU_QUOTA_PERCENT}"
+  echo 'API_RESOURCE_POLICY=shared'
+  echo 'DATABASE_RESOURCE_POLICY=shared'
+  exit 0
+fi
+
+# 自动化验收入口：渲染 systemd 共享资源池单元，不访问 Docker、不写入宿主机。
+if [ "${MICROI_INSTALL_RESOURCE_UNIT_ONLY:-0}" = "1" ]; then
+  MICROI_CGROUP_VERSION="${MICROI_CGROUP_VERSION_OVERRIDE:?MICROI_CGROUP_VERSION_OVERRIDE must be 1 or 2}"
+  case "${MICROI_CGROUP_VERSION}" in
+    1|2) ;;
+    *) echo 'MICROI_CGROUP_VERSION_OVERRIDE must be 1 or 2' >&2; exit 1 ;;
+  esac
+  calculate_microi_resource_plan
+  render_microi_slice_unit "${MICROI_CGROUP_VERSION}"
+  if [ "${MICROI_CGROUP_VERSION}" = '1' ]; then
+    echo '---MICROI-UNIT-SEPARATOR---'
+    render_microi_cgroup_v1_swap_service
+  fi
+  exit 0
+fi
 
 # 自动化验收入口：不读取交互、不访问网络、不修改 Docker。
 if [ "${MICROI_INSTALL_VALIDATE_SQL_ZIP_ONLY:-0}" = "1" ]; then
@@ -2829,6 +3207,13 @@ if [ -n "${EXISTING_MICROI_CONTAINERS}" ]; then
   exit 1
 fi
 
+calculate_microi_resource_plan
+verify_docker_resource_limit_capabilities
+detect_microi_cgroup_runtime
+install_microi_shared_resource_pool
+verify_microi_shared_resource_pool
+print_microi_resource_plan
+
 ensure_microi_network
 ensure_ocr_runtime_network
 
@@ -3268,6 +3653,10 @@ compose_up() {
   project_name=$(basename "${project_dir}")
   echo ""
   echo "Microi：正在部署编排 [${project_name}]..."
+  if ! (cd "${project_dir}" && docker compose config > /dev/null); then
+    echo "Microi：错误：编排 [${project_name}] 静态校验失败，未启动容器 ✗"
+    exit 1
+  fi
   # 使用 if 包裹避免 set -e 在子shell失败时直接退出脚本
   if (cd "${project_dir}" && docker compose up -d); then
     echo "Microi：编排 [${project_name}] 部署成功 ✓"
@@ -3370,7 +3759,10 @@ run_mysql_client() {
     database_args+=("${DATABASE_NAME}")
   fi
   if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
-    docker_args=(run --rm -i --network microi --user '0:0')
+    docker_args=(
+      run --rm -i --network microi --user '0:0'
+      --cgroup-parent "${MICROI_DOCKER_CGROUP_PARENT}"
+    )
     if [ "${MYSQL_EXTERNAL_USE_HOST_GATEWAY}" = '1' ]; then
       docker_args+=(--add-host 'host.docker.internal:host-gateway')
     fi
@@ -3488,6 +3880,7 @@ services:
       com.microi.database.name: ${DATABASE_NAME}
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     tty: true
     stdin_open: true
     privileged: true
@@ -3519,6 +3912,7 @@ services:
       com.microi.database.name: ${DATABASE_NAME}
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     ports:
       - "${DATABASE_PORT}:${DATABASE_INTERNAL_PORT}"
     environment:
@@ -3547,7 +3941,7 @@ services:
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
     privileged: true
-    mem_limit: 3g
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     shm_size: 1g
     ports:
       - "${DATABASE_PORT}:${DATABASE_INTERNAL_PORT}"
@@ -3583,6 +3977,7 @@ services:
       com.microi.database.name: ${DATABASE_NAME}
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     ports:
       - "${DATABASE_PORT}:${DATABASE_INTERNAL_PORT}"
     environment:
@@ -3609,6 +4004,7 @@ chmod 600 "${DATABASE_DIR}/docker-compose.yml"
 echo "Microi：数据库编排文件已生成: ${DATABASE_DIR}/docker-compose.yml ✓"
 
 compose_up "${DATABASE_DIR}"
+verify_container_shared_resource_pool "${DATABASE_CONTAINER_NAME}"
 
 echo "Microi：等待 ${DATABASE_DISPLAY_NAME} 容器启动..."
 sleep 5
@@ -4050,6 +4446,7 @@ services:
     container_name: microi-install-redis
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     tty: true
     stdin_open: true
     privileged: true
@@ -4100,6 +4497,7 @@ EOF
 echo "Microi：Redis 编排文件已生成 ✓"
 
 compose_up "${REDIS_DIR}"
+verify_container_shared_resource_pool microi-install-redis
 
 echo ''
 echo '[步骤7/11] Redis 部署完成 ✓'
@@ -4124,6 +4522,7 @@ services:
     container_name: microi-install-mongodb
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     tty: true
     stdin_open: true
     privileged: true
@@ -4145,6 +4544,7 @@ EOF
 echo "Microi：MongoDB 编排文件已生成 ✓"
 
 compose_up "${MONGO_DIR}"
+verify_container_shared_resource_pool microi-install-mongodb
 
 echo ''
 echo '[步骤8/11] MongoDB 部署完成 ✓'
@@ -4205,6 +4605,7 @@ services:
     container_name: microi-install-minio
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     tty: true
     stdin_open: true
     privileged: true
@@ -4229,6 +4630,7 @@ EOF
   echo "Microi：MinIO 编排文件已生成 ✓"
 
   compose_up "${MINIO_DIR}"
+  verify_container_shared_resource_pool microi-install-minio
 
   echo 'Microi：等待 MinIO API 就绪...'
   MINIO_READY=false
@@ -4265,7 +4667,10 @@ else
 fi
 
 run_minio_mc() {
-  local -a docker_args=(run --rm --network microi --user '0:0')
+  local -a docker_args=(
+    run --rm --network microi --user '0:0'
+    --cgroup-parent "${MICROI_DOCKER_CGROUP_PARENT}"
+  )
   if [ "${MINIO_EXTERNAL_USE_HOST_GATEWAY:-0}" = '1' ]; then
     docker_args+=(--add-host 'host.docker.internal:host-gateway')
   fi
@@ -4419,8 +4824,7 @@ ${OCR_COMPOSE_SERVICE_NETWORK}
     ports:
       - "127.0.0.1:${OCR_PORT}:${OCR_INTERNAL_PORT}"
     shm_size: "4gb"
-    cpus: "4.0"
-    mem_limit: "8g"
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     stop_grace_period: 90s
     security_opt:
       - no-new-privileges:true
@@ -4447,6 +4851,7 @@ EOF
 echo 'Microi：OCR 编排文件已生成 ✓'
 
 compose_up "${OCR_DIR}"
+verify_container_shared_resource_pool "${OCR_CONTAINER_NAME}"
 echo 'Microi：等待 OCR 服务完成模型加载并进入 healthy（最长 20 分钟）...'
 OCR_READY=0
 for _ocr_wait in $(seq 1 120); do
@@ -4493,6 +4898,7 @@ services:
     container_name: microi-install-ollama
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     ports:
       - "${OLLAMA_PORT}:11434"
     volumes:
@@ -4557,6 +4963,7 @@ services:
     container_name: microi-install-qdrant
 ${COMPOSE_SERVICE_NETWORK}
     restart: unless-stopped
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     ports:
       - "${QDRANT_HTTP_PORT}:6333"
       - "${QDRANT_GRPC_PORT}:6334"
@@ -4628,6 +5035,7 @@ services:
     image: ${LIBRETRANSLATE_IMAGE}
     container_name: ${LIBRETRANSLATE_CONTAINER_NAME}
 ${OCR_COMPOSE_SERVICE_NETWORK}
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     user: "0:0"
     security_opt:
       - apparmor=unconfined
@@ -4660,6 +5068,7 @@ EOF
   echo 'Microi：初始化 LibreTranslate 随机 API Key...'
   if ! printf '%s' "${LIBRETRANSLATE_API_KEY}" | docker run --rm -i \
     --user '0:0' \
+    --cgroup-parent "${MICROI_DOCKER_CGROUP_PARENT}" \
     -v /microi/libretranslate/api-keys:/app/db \
     --entrypoint ./venv/bin/python \
     "${LIBRETRANSLATE_IMAGE}" -c \
@@ -4675,6 +5084,7 @@ EOF
   echo 'Microi：LibreTranslate 随机 API Key 初始化完成 ✓'
 
   compose_up "${LIBRETRANSLATE_DIR}"
+  verify_container_shared_resource_pool "${LIBRETRANSLATE_CONTAINER_NAME}"
   if [ "$(docker inspect "${LIBRETRANSLATE_CONTAINER_NAME}" --format '{{.State.Running}}' 2>/dev/null)" != "true" ]; then
     echo 'Microi：错误：LibreTranslate 容器启动失败。'
     docker logs "${LIBRETRANSLATE_CONTAINER_NAME}" 2>&1 | tail -100 || true
@@ -4752,6 +5162,7 @@ services:
 ${APP_API_SERVICE_NETWORK}
 ${APP_API_EXTRA_HOSTS}
     restart: always
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     tty: true
     stdin_open: true
     privileged: true
@@ -4783,6 +5194,7 @@ ${APP_API_EXTRA_HOSTS}
     container_name: microi-install-client
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     tty: true
     stdin_open: true
     ports:
@@ -4804,6 +5216,8 @@ chmod 600 "${APP_DIR}/docker-compose.yml"
 echo "Microi：平台应用编排文件已生成 ✓"
 
 compose_up "${APP_DIR}"
+verify_container_shared_resource_pool microi-install-api
+verify_container_shared_resource_pool microi-install-client
 
 wait_for_microi_api() {
   local probe_path="$1"
@@ -5048,6 +5462,7 @@ services:
     container_name: microi-install-watchtower
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
+    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     privileged: true
     tty: true
     stdin_open: true
@@ -5069,6 +5484,7 @@ EOF
 echo "Microi：Watchtower 编排文件已生成 ✓"
 
 compose_up "${WATCHTOWER_DIR}"
+verify_container_shared_resource_pool microi-install-watchtower
 
 echo ''
 echo '[步骤11/11] Watchtower 部署完成 ✓'

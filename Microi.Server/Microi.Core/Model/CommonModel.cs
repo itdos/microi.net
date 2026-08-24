@@ -218,6 +218,12 @@ namespace Microi.net
         /// 是否是预览图，如果是预览图则压缩
         /// </summary>
         public bool? Preview { get; set; }
+        /// <summary>
+        /// 是否由表单引擎图片控件生成了裁剪图。开启后必须同时提交
+        /// 同名的 OriginalFiles，后端先将未改动原图写入 HDFS 私有桶，
+        /// 再保存裁剪后的展示图。不接受单独的客户端布尔声明。
+        /// </summary>
+        public bool? CropEnabled { get; set; }
         // 标识微信小程序用户图片上传，并传递微信内容安全检测场景。
         /// <summary>
         /// 客户端声明当前上传来自微信小程序内容发布场景。
@@ -236,6 +242,11 @@ namespace Microi.net
         /// 
         /// </summary>
         public Dictionary<string, Stream> Files { get; set; } = new Dictionary<string, Stream>();
+        /// <summary>
+        /// 图片裁剪前的原始文件流。仅用于服务端私有留存，不作为第二个业务文件返回。
+        /// multipart 字段名固定为 MicroiOriginalFile，文件名必须与 Files 中的裁剪图一致。
+        /// </summary>
+        public Dictionary<string, Stream> OriginalFiles { get; set; } = new Dictionary<string, Stream>();
         public Dictionary<string, byte[]> FilesByte { get; set; } = new Dictionary<string, byte[]>();
         public Dictionary<string, string> FilesByteBase64 { get; set; } = new Dictionary<string, string>();
         /// <summary>

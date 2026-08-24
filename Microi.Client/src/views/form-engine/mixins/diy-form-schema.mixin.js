@@ -1,54 +1,28 @@
 import _ from "underscore";
+import { getFormFieldDisplayValue } from "../field-display-value.js";
+
+const VIEW_COMPONENTS_REQUIRING_RUNTIME = new Set([
+    "Button", "Divider", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html",
+    "RichText", "CodeEditor", "JsonTable", "ImgUpload", "FileUpload", "TableChild",
+    "Map", "MapArea", "Qrcode", "FontAwesome", "DevComponent", "Rate", "Progress",
+    "Slider", "ColorPicker"
+]);
 
 export default {
     methods: {
         GetColValue(row, field) {
-            var self = this;
-            var fuheWZ = "";
-            var result = "";
-            if (!self.DiyCommon.IsNull(field.Config)) {
-                if (typeof field.Config === "string") {
-                    field.Config = JSON.parse(field.Config);
-                }
-                if (!self.DiyCommon.IsNull(field.Config.TextApend)) {
-                    fuheWZ = " " + field.Config.TextApend;
-                }
-
-                if (!self.DiyCommon.IsNull(field.Config.SelectLabel)) {
-                    try {
-                        //2021-01-02发现问题，这里如果存的是一串数字 ，JSON.parse()不会报错
-                        var tObj = JSON.parse(row[field.Name]);
-                        if (Array.isArray(tObj)) {
-                            //if (field.Component == 'MultipleSelect')
-                            tObj.forEach((element, index) => {
-                                result += self.DiyCommon.IsNull(element[field.Config.SelectLabel]) ? "" : element[field.Config.SelectLabel];
-                                if (index !== tObj.length - 1) {
-                                    result += ",";
-                                }
-                            });
-                            return result + fuheWZ;
-                        }
-                        //2021-01-02发现问题，这里如果存的是一串数字 ，JSON.parse()不会报错
-                        else if (typeof tObj == "number") {
-                            result = self.DiyCommon.IsNull(row[field.Name]) ? "" : row[field.Name];
-                            return result + fuheWZ;
-                        } else {
-                            result = self.DiyCommon.IsNull(tObj[field.Config.SelectLabel]) ? "" : tObj[field.Config.SelectLabel];
-                            return result + fuheWZ;
-                        }
-                    } catch (error) {
-                        // removed debug logs
-                    }
-                }
-            }
-
-            var displayValue = self.DiyCommon.IsNull(row[field.Name]) ? "" : row[field.Name];
-            //如果是富文本，需要去掉html标签
-            if (field.Component == "RichText") {
-                displayValue = self.DiyCommon.RemoveHtml(displayValue);
-            }
-            result = displayValue; //self.DiyCommon.IsNull(scope.row[field.Name]) ? '' : scope.row[field.Name];
-            return result + fuheWZ;
+            var source = row && row.row && typeof row.row === "object" ? row.row : row;
+            return getFormFieldDisplayValue(source, field, { emptyText: "" });
+        },
+        GetReadonlyFieldDisplayValue(field) {
+            return getFormFieldDisplayValue(this.FormDiyTableModel, field);
+        },
+        ShouldRenderReadonlyValue(field) {
+            if (this.FormMode !== "View" || this.LoadMode === "Design" || !field) return false;
+            if (!this.DiyCommon.IsNull(field.V8TmpEngineForm)) return false;
+            var config = field.Config && typeof field.Config === "object" ? field.Config : {};
+            if (!this.DiyCommon.IsNull(config.DevComponentName)) return false;
+            return !VIEW_COMPONENTS_REQUIRING_RUNTIME.has(field.Component);
         },
         async GetDiyFieldListObjectFunc(field) {
             var self = this;

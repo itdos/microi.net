@@ -98,11 +98,13 @@ function getProfileArtifacts(profileId) {
   const profile = loadProfile(profileId)
   const pagesSource = profilePath(profileId, 'pages.json')
   const manifestSource = profilePath(profileId, 'manifest.json')
+  const iosInfoPlistSource = profilePath(profileId, 'Info.plist')
+  const androidManifestSource = profilePath(profileId, 'AndroidManifest.xml')
   const tenantSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'business.js')
   const tenantNativeTableSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'native-table.js')
   const tenantFormSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'form.js')
   const tenantRuntimeSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'runtime.js')
-  for (const required of [pagesSource, manifestSource, tenantSource, tenantNativeTableSource, tenantFormSource, tenantRuntimeSource]) {
+  for (const required of [pagesSource, manifestSource, iosInfoPlistSource, tenantSource, tenantNativeTableSource, tenantFormSource, tenantRuntimeSource]) {
     if (!fs.existsSync(required)) throw new Error(`Profile 缺少文件: ${required}`)
   }
   const pagesContent = fs.readFileSync(pagesSource)
@@ -115,6 +117,15 @@ function getProfileArtifacts(profileId) {
     {
       target: path.join(projectRoot, 'src', 'manifest.json'),
       content: fs.readFileSync(manifestSource)
+    },
+    {
+      target: path.join(projectRoot, 'src', 'Info.plist'),
+      content: fs.readFileSync(iosInfoPlistSource)
+    },
+    {
+      // 仅通用 App Profile 需要任意 HTTP；客户 Profile 用 null 明确移除该原生覆盖文件。
+      target: path.join(projectRoot, 'src', 'AndroidManifest.xml'),
+      content: fs.existsSync(androidManifestSource) ? fs.readFileSync(androidManifestSource) : null
     },
     {
       target: path.join(projectRoot, 'src', 'generated', 'active-profile.js'),
@@ -151,6 +162,10 @@ function activateProfile(profileId) {
     content: fs.existsSync(target) ? fs.readFileSync(target) : null
   }))
   artifacts.forEach(({ target, content }) => {
+    if (content === null) {
+      if (fs.existsSync(target)) fs.rmSync(target)
+      return
+    }
     fs.mkdirSync(path.dirname(target), { recursive: true })
     fs.writeFileSync(target, content)
   })

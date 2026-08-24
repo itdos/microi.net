@@ -13,6 +13,15 @@
 
 管理员也可在【系统账号】表单的“个人设置”页签维护该字段。MCP 维护账号数据时使用同名字段 `DefaultIndexUrl`；留空表示继承系统默认值。
 
+个人设置还支持 `sys_user.ThemeColor`、`ThemeMode` 和 `MenuChildExpandMode`。右上角主题设置与平台个人中心统一调用官方 Managed 接口引擎 `platform-user-update-preferences` 保存：
+
+- `ThemeColor` 留空时继承 `sys_config.ThemeColor`；
+- `ThemeMode` 使用 `light / dark`；
+- `MenuChildExpandMode` 使用 `System / Down / Right`，其中 `System` 继承系统设置；
+- 已安装这些字段时以账号值为准，换设备登录也会恢复；旧租户未安装字段时仅保留浏览器本地兼容行为。
+
+接口引擎只从当前 DiyToken 读取用户 Id 和租户，不接受调用方指定目标用户/租户，也不写账号、手机号、部门、角色、Level、状态、密码、认证因子或登录审计字段。管理员表单中的“个人设置”Tab 应继续用 CollapseGroup 将语言与首页、主题与菜单、桌面外观分组。
+
 ## 左侧菜单统计角标
 
 对库存预警、待审批、未读消息、待回款等需要用户持续关注的菜单，可在模块引擎配置：
@@ -21,6 +30,7 @@
 | --- | --- |
 | `MenuBadgeEnabled` | 是否在左侧菜单右侧显示统计角标；默认关闭。 |
 | `MenuBadgeApiEngineKey` | 统计接口引擎 Key；开启角标时必填。 |
+| `MenuBadgeTooltip` | 鼠标移入数字角标时显示的业务说明；建议明确统计对象、用户范围以及“待办/未读/总数”等口径。 |
 
 前端按菜单调用一次接口引擎，并携带 `_SysMenuId`、`SysMenuId`、`OsClient`。接口使用统一返回协议：
 
@@ -36,6 +46,8 @@ return {
 ```
 
 `Data.Value=0` 时默认不显示，超过 99 显示 `99+`；统计失败只隐藏角标，不阻断菜单导航。客户端对同一用户、菜单和接口结果做短缓存并定时刷新。接口引擎必须继续执行当前租户和当前用户的数据权限，不能为了统计总数改成匿名接口或绕开模块权限。
+
+官方基础菜单的说明口径如下：接口引擎为“当前租户接口引擎总数”，我的工作为“当前登录用户的待办任务数与未读抄送数之和”，系统账号为“当前租户系统账号总数”。自定义角标也应使用同样具体的说明，不能只写“数量”或“统计值”。未配置 `MenuBadgeTooltip` 的历史菜单继续显示原有的“菜单名：原始数字”标题，不影响兼容。
 
 以下菜单通常应主动考虑角标：待办/待审批、库存或余额预警、未读消息、逾期合同、待付款/待回款、失败任务。普通资料维护、低频设置、无明确行动含义的总数不建议配置，以免侧栏充满噪声。
 
@@ -470,6 +482,12 @@ V8.Result = {
 
 >* **导入模板**：提前做好导入模板让用户下载
 
+通用【导入】弹层默认宽度为页面的 80%，支持 `.xls`、`.xlsx` 和 `.csv`；CSV 会自动识别 UTF-8/GBK 编码及常见分隔符。选择文件后先自动识别工作表、单行/多级表头、数据起止行和字段映射，再按每页 15 条预览；用户确认后才正式上传导入。即使一个字段也未匹配，数据预览仍展示识别范围内的全部源列、源行，未匹配列头以红色提示；若识别可信度低，可人工指定表头/数据行范围并逐列映射。
+
+【列映射】之后的【原始工作簿】页签直接渲染完整源文件，用于核对所有工作表、复杂/合并表头、图片、说明文字、样式及原始数据，不受当前表字段是否匹配影响。CSV 会以识别后的编码和分隔符转换为只读表格后完整预览。模板发布前仍应使用真实文件验收。
+
+部分 OpenPyXL 或第三方工具生成的 `.xlsx` 会用等价的 DrawingML 默认命名空间保存图片。前端只对预览副本做命名空间兼容规范化，以保证锚定图片可渲染；用户确认后上传和服务端复核的始终是未经改写的原始文件。
+
 >* **表格分页序号递增**：非第一页序号继承页码
 
 ## 接口替换
@@ -499,13 +517,36 @@ V8.Cache.Set(isImportingKey, '1');//标记正在导入
 importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + '：正在读取文件数据...');
 V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
 
-//获取excel数据
+// 获取弹层确认后的解析范围，并在服务端按原文件重新解析
 var filesByteBase64 = V8.FilesByteBase64;
 var base64String = Object.values(filesByteBase64)[0];
+var importMeta = JSON.parse(V8.Param._ImportMetaJson || '{}');
+var errorPolicy = V8.Param._ImportErrorPolicy || importMeta.ErrorPolicy || 'RollbackAll';
+if (errorPolicy !== 'RollbackAll' && errorPolicy !== 'ContinueOnError') {
+  V8.Cache.Set(isImportingKey, '0');
+  return { Code: 0, Msg: '不支持的导入错误处理策略' };
+}
 var dataList = V8.Office.ExcelToList({
-  FileByteBase64 : base64String,
-  SheetIndex : 0//取第一张表
+  FileByteBase64: base64String,
+  FileType: importMeta.FileType || V8.Param._ImportFileType,
+  FileName: V8.Param._ImportFileName,
+  SheetIndex: importMeta.SheetIndex == null ? 0 : importMeta.SheetIndex,
+  HeaderStartRow: importMeta.HeaderStartRow,
+  HeaderEndRow: importMeta.HeaderEndRow,
+  DataStartRow: importMeta.DataStartRow,
+  DataEndRow: importMeta.DataEndRow,
+  Columns: importMeta.Columns || []
 });
+if (dataList.Code !== 1) return dataList;
+// CSV 由服务端独立识别编码和分隔符；可与浏览器元数据交叉复核
+if (importMeta.FileType === 'csv' && dataList.DataAppend) {
+  if (importMeta.Encoding && importMeta.Encoding !== dataList.DataAppend.Encoding) {
+    return { Code: 0, Msg: 'CSV 编码复核不一致，请重新上传后确认预览。' };
+  }
+  if (importMeta.Delimiter && importMeta.Delimiter.replace('\t', '\\t') !== dataList.DataAppend.Delimiter) {
+    return { Code: 0, Msg: 'CSV 分隔符复核不一致，请重新上传后确认预览。' };
+  }
+}
 dataList.Data.forEach(item => {
   item.AAA = 111;
 });
@@ -515,28 +556,43 @@ importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + "：已读取【" + dataLis
 importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：已导入【0】条数据...`);
 V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
 
-dataList.Data.forEach((item, index) => {
-  //循环导入数据
-  var addResult = V8.FormEngine.AddFormData('tableName', item, V8.DbTrans);
-  if(addResult.Code != 1){
-    //返回错误结果，平台会自动回滚事务（禁止手动调用V8.DbTrans.Rollback()）
-    V8.Cache.Set(isImportingKey, '0');//取消标记正在导入
-    //写进度
-    importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：导入出现错误：${addResult.Msg}。已回滚！`);
-    V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
-    return { Code : 0, Msg : addResult.Msg };//平台识别到Code!=1，自动回滚事务
+var errorList = [];
+var successCount = 0;
+for (var index = 0; index < dataList.Data.length; index++) {
+  var item = dataList.Data[index];
+  try {
+    // 示例只演示策略控制。正式接口必须先从 diy_field 权威配置重算唯一规则：
+    // 每个 Alone 字段各自判断，全部 All 字段共同判断；命中同一 Id 修改，否则新增。
+    var writeResult = V8.FormEngine.AddFormData('tableName', item, V8.DbTrans);
+    if (!writeResult || writeResult.Code != 1) {
+      throw new Error((writeResult && writeResult.Msg) || '导入失败');
+    }
+    successCount++;
+  } catch (error) {
+    var rowError = { ExcelRow: item._ExcelRow || index + 1, Msg: error.message || String(error) };
+    errorList.push(rowError);
+    importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：第【${rowError.ExcelRow}】行失败：${rowError.Msg}`);
+    if (errorPolicy === 'RollbackAll') {
+      V8.Cache.Set(isImportingKey, '0');
+      V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
+      return { Code: 0, Msg: rowError.Msg, Data: { Added: 0, Updated: 0, Failed: 1, Errors: errorList } };
+    }
   }
-  //写进度（覆盖上一条）
-  importStepList[importStepList.length - 1] = DateNow('yyyy-MM-dd HH:mm:ss') + `：已导入【${index+1}】条数据...`;
+  //写进度（覆盖进度行）
+  importStepList[2] = DateNow('yyyy-MM-dd HH:mm:ss') + `：已处理【${index + 1}】条，成功【${successCount}】条，失败【${errorList.length}】条...`;
   V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
-});
+}
 //写进度
-importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：导入成功，已结束！`);
+importStepList.push(DateNow('yyyy-MM-dd HH:mm:ss') + `：导入结束，成功【${successCount}】条，失败【${errorList.length}】条。`);
 V8.Cache.Set(importStepKey, JSON.stringify(importStepList));
 V8.Cache.Set(isImportingKey, '0');//取消标记正在导入
-return { Code : 1 };
+return { Code: 1, Data: { Added: successCount, Updated: 0, Failed: errorList.length, Errors: errorList } };
 ```
 :::
+
+上例中的 `AddFormData` 仅用于展示错误策略，不是完整 Upsert。正式自定义导入必须读取当前 `diy_table/diy_field` 权威配置：每个 `Unique=1 + Config.Unique.Type=Alone` 字段是一条独立规则，全部 `Type=All` 字段组成一条组合规则；任一完整规则命中同一 Id 后按 Id 调用 `UptFormData`，均未命中才 `AddFormData`。不同规则命中不同 Id、或一条规则命中多条数据时必须按行报错。弹层传入的 `_ImportUniqueRulesJson` 只用于用户提示和诊断，不能替代服务端重算。
+
+`RollbackAll` 返回 `Code:0` 由平台整体回滚；`ContinueOnError` 捕获行错误后最终返回 `Code:1` 让成功行提交。接口引擎中禁止手动 `Commit/Rollback`。如果底层数据库异常已使事务失效，必须先做整批预校验或使用独立幂等行操作，不能伪报继续成功。
 
 >* **导入进度接口替换**
 ```js

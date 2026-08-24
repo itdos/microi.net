@@ -150,8 +150,8 @@ return {
 | `NumberFormat/HeaderStyle/Style` | 数字格式与列级样式 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-export-import-003 sha256=8c2868406d663d51bbd479c12b052b70ffa1014cc4ec4186b8dcecd0e5a3105b -->
-## 解析上传的 Excel（导入）
+<!-- microi-progressive:chunk id=v8-export-import-003 sha256=51a6c3e7a44ca35dc17b5536545ac7a1d47a8915045283841d304a04c04cd219 -->
+## 解析上传的 Excel / CSV（导入）
 
 ```javascript
 // 接口引擎接收 V8.FilesByteBase64
@@ -160,7 +160,7 @@ if (!filesByteBase64) return { Code: 0, Msg: '请上传 Excel 文件' };
 
 var base64 = Object.values(filesByteBase64)[0];
 
-// 解析第一张工作表为对象数组
+// 可直接解析旧的首行表头模板
 var parsed = V8.Office.ExcelToList({
   FileByteBase64: base64,
   SheetIndex: 0
@@ -171,13 +171,24 @@ var dataList = parsed.Data;  // [{ 列标题: 值, ... }, ...]
 return { Code: 1, Data: dataList, DataCount: dataList.length };
 ```
 
+`ExcelToList` 的增强参数为 `FileType/FileName/Encoding/Delimiter/HeaderStartRow/HeaderEndRow/DataStartRow/DataEndRow/Columns/MaxDataRows/MaxColumns`。CSV 传 `FileType:'csv'` 或 `.csv` 文件名，编码和分隔符通常省略，由服务端自动识别 UTF-8/GBK 与逗号、制表符、分号、竖线；结果通过 `DataAppend.Encoding/Delimiter` 回传实际识别值。除 `SheetIndex` 和 `Columns[].ColumnIndex` 从 `0` 开始外，行号都从 `1` 开始；传增强范围后每行带 `_ExcelRow`。参数全省略时继续兼容“首行表头、第二行开始数据”。
+
 ### 固定版式模板与后台自定义导入
 
-默认导入适合首行即字段标题的标准表格。多行表头、合并单元格、项目名称位于固定单元格、或需按规格/材质查询存货等模板，页面按钮使用 `V8.OpenImportDialog({...})` 声明工作表、单元格和列映射；平台弹层负责浏览器解析、后台任务提交、真实进度轮询与结果呈现。
+通用【导入】和 `V8.OpenImportDialog` 共用智能导入弹层：默认宽度 `80%`，支持 `.xls/.xlsx/.csv`，选择文件后自动识别工作表、单行/多级合并表头、首条与末条数据行和字段映射；先按每页 `15` 条预览，用户确认后才写入。数据预览必须独立保留全部源列、源行，不能因为零字段匹配而显示空白；未匹配列头以红色和悬停原因标记。低可信度时必须允许用户人工指定表头/数据起止行和逐列映射。模板顶部图片、标题、说明文字以及 A 列为空的数据行都不能破坏识别。
 
-- 页面 V8 只声明 `ApiEngineKey`、`Workbook.Cells/Columns/DataStartRow/DataEndRow/KeyField`，不得拼上传 DOM、传完整工作簿 Base64 或自行轮询。
-- 后台接口引擎从 `V8.Param._ImportRowsJson` 和 `_ImportMetaJson` 取值，必须重做模板、权限、字段、唯一性和状态校验。
-- 先校验全部行再写入；接口引擎返回 `Code != 1` 时依靠平台事务整体回滚，禁止手动 Commit/Rollback。
+【列映射】后的【原始工作簿】页签必须不依赖解析可信度，直接显示完整工作簿/CSV，包括所有工作表、合并表头、图片、说明、样式和原始数据；该视图只用于核对，不能绕过目标字段映射和服务端校验。
+
+`.xlsx` 原始预览必须兼容 OpenPyXL 等生成器使用等价 DrawingML 默认命名空间的锚定图片。只允许在内存中的预览副本规范化 `xdr` 命名空间和关系目标；正式上传、接口引擎和服务端复核始终使用未经改写的原始文件。
+
+- 页面 V8 可只声明 `ApiEngineKey`；`Workbook.Cells/Columns/HeaderStartRow/HeaderEndRow/DataStartRow/DataEndRow/KeyField` 均为模板提示或固定约束，不传时自动识别。不得拼上传 DOM、传完整工作簿 Base64 或自行轮询。
+- 弹层必须让用户在 `RollbackAll`（默认，任一错误整批回滚）和 `ContinueOnError`（逐行提交/跳过错误行）之间明确选择；未传时保持旧版 `RollbackAll`。最终值同时写入 `_ImportErrorPolicy` 与 `_ImportMetaJson.ErrorPolicy`，不能由服务端静默改成另一策略。
+- 当前表的唯一配置必须在上传前可读展示：每个 `Unique=1 + Config.Unique.Type=Alone` 字段各自是一条规则，全部 `Type=All` 字段共同组成一条组合规则；无唯一规则时明确警告“只能新增，重复导入可能产生重复数据”。
+- 标准导入的服务端必须从权威 `diy_field` 重新计算唯一规则，不能信任前端快照。任一完整规则命中同一 Id 则按 Id 修改，均未命中则新增；不同规则命中不同 Id、或一条规则命中多条脏数据时按行报冲突，禁止任意选记录或按宽泛条件更新多行。
+- `V8.OpenImportDialog` 后台接口引擎从 `V8.Param._ImportRowsJson`、`_ImportMetaJson`、`_ImportErrorPolicy` 和 `_ImportUniqueRulesJson` 取值；必须重做模板、权限、字段、唯一性和状态校验。v2.2 元数据中的 `UniqueRules` 只用于说明和诊断。
+- 菜单【导入接口替换】仍接收原始文件 `V8.FilesByteBase64`，并接收上述策略/规则元数据。接口引擎必须把元数据里的 `FileType/SheetIndex/HeaderStartRow/HeaderEndRow/DataStartRow/DataEndRow/Columns` 传给 `V8.Office.ExcelToList`，由服务端按同一范围重读原文件；CSV 应省略固定 `Encoding/Delimiter` 让服务端独立识别，再用 `DataAppend` 与元数据交叉复核。不能只信任浏览器预览，也不能固定读取第一行。
+- `RollbackAll` 在首个行错误时返回 `Code != 1`，依靠平台事务整体回滚；`ContinueOnError` 捕获并记录行错误、继续下一行，最后返回 `Code=1` 提交成功行。两种模式都禁止手动 Commit/Rollback；若底层异常使事务不可继续，必须先做整批预校验或使用平台允许的独立幂等行操作。
+- 结果与进度必须分别统计 `Added/Updated/Failed/Errors`；整批回滚后成功、新增、修改数必须归零，不能把已回滚行计作成功。
 - 用 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报真实校验/写入工作量；未知总量保持不确定进度，不伪造百分比。
 - 业务幂等键使用后台任务 Id 或明确的导入操作 Id；重试前回读批次，避免重复写入。
 

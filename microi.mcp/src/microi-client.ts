@@ -673,6 +673,31 @@ export interface MongodbLogWrite {
   appId?: string;
 }
 
+export type SystemObservabilityQueryAction =
+  | 'Capabilities'
+  | 'Snapshot'
+  | 'Logs'
+  | 'LogTypes'
+  | 'LogStats'
+  | 'Signal'
+  | 'Trace'
+  | 'ApiRank'
+  | 'AppLogs'
+  | 'PlatformStats'
+  | 'SecurityData'
+  | 'TrafficHistory';
+
+export type SystemObservabilityManageAction = 'BlockIp' | 'UnblockIp';
+
+export interface SystemObservabilityQuery extends Record<string, unknown> {
+  Action: SystemObservabilityQueryAction;
+}
+
+export interface SystemObservabilityManage extends Record<string, unknown> {
+  Action: SystemObservabilityManageAction;
+  Ip: string;
+}
+
 export interface UserAccessKeyRecord {
   Id: string;
   Name?: string;
@@ -3360,6 +3385,14 @@ export class MicroiClient {
     });
   }
 
+  async querySystemObservability(query: SystemObservabilityQuery): Promise<ApiResponse> {
+    return this.executeEngine('mci-system-observability-query', query);
+  }
+
+  async manageSystemObservability(command: SystemObservabilityManage): Promise<ApiResponse> {
+    return this.executeEngine('mci-system-observability-action', command);
+  }
+
   async getRedisStatistics(database = 0, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_STATISTICS, {
       Mode: connectionId ? 'saved' : 'tenant',
@@ -3455,6 +3488,25 @@ export class MicroiClient {
     return this.post(API.SAVE_PAGE_ENGINE, {
       OsClient: this.config.osClient,
       ...data,
+    });
+  }
+
+  async listBackgroundTasks(): Promise<ApiResponse> {
+    return this.post(API.LIST_BACKGROUND_TASKS, {
+      OsClient: this.config.osClient,
+    }, {
+      timeoutMs: this.requestTimeoutMs,
+      operationName: 'list background tasks',
+    });
+  }
+
+  async cancelBackgroundTask(taskId: string): Promise<ApiResponse> {
+    return this.post(API.CANCEL_BACKGROUND_TASK, {
+      OsClient: this.config.osClient,
+      Id: taskId,
+    }, {
+      timeoutMs: this.writeRequestTimeoutMs,
+      operationName: 'cancel background task',
     });
   }
 

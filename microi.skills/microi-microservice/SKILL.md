@@ -104,6 +104,7 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 创建/更新元数据：`microi_create_microservice`。
 - 同步私有源码：`microi_sync_microservice_source`；本地工程必须优先传 `directory`，不构造 Base64 文件数组。
 - 真实编译目录优先 `microi_publish_application_directory_stream` 流式发布。
+- 每次创建、修改、升级或重新发布微服务，必须先为目标精确 `AppVersion` 在 `sys_microistore_changelog` 写入完整日志，再同步源码、stage、finalize 或制作商城包。日志必须关联真实 `StoreId`，包含 `Title / ChangeType / Content / ReleaseTime`；流式发布显式传入与日志含义一致的非空 `changeSummary`。发布后同时回读商城日志、`mci_ai_app_version.ChangeSummary` 与包内 `PackageInfo.ChangeLog`；缺失或版本不一致必须失败关闭。
 - 发布动作必须明确区分两种模式：默认“源码+编译产物”先把完整工程同步到私有桶并逐文件回读 SHA-256，再把 `dist` 流式发布到公有桶；显式“仅编译产物”只更新公有桶，必须在界面中告知其他用户仍会拉取上一次私有源码，禁止暗示源码已同步。
 - 私有源码同步使用 `ReplacePrivateSourceOnly` 精确清理过期源码；兼容调用可以继续接受 `replace`，但实现不得用旧式全表 `Replace=true` 删除同一应用的公有运行产物元数据。
 - `mci_ai_app_file` 同时存在私有源码和公有编译产物。源码拉取/差异比较必须优先按 `StorageScope=PublicBuildStream|PublicBuildStreamArchived|PublicBuildOnly` 排除公有产物，并保留旧数据中 `HdfsPath == PublishHdfsPath` 的兼容判断；不能仅靠两个路径相等识别，否则版本路径与稳定别名不同的流式产物会被误读成私有源码。
@@ -159,7 +160,8 @@ window.microApp.dispatch({
 
 AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data)`，先检查
 `hostCapabilities.actions`，再 dispatch。当前标准动作是：`closeTab`、`navigate`、
-`replaceTab`、`back`、`forward`、`reloadTab`、`setTabTitle`、`showMessage`。
+`replaceTab`、`back`、`forward`、`reloadTab`、`setTabTitle`、`showMessage`、`setGlobalOverlay`。
+`setGlobalOverlay` 只负责平台级遮罩、宿主滚动锁和必要时提升微应用层级，不替代子应用自己的 Dialog、焦点管理和权限。平台级详情/确认弹层打开时传 `visible/blur/lockScroll/mask/promote`，关闭、路由离开、错误和 `onBeforeUnmount` 都必须发送 `visible:false, lockScroll:false, promote:false`；多个弹层用本地计数或统一 computed 保证最后一个关闭后才撤销。
 `navigate/replaceTab` 只传以 `/` 开头的站内 path 或 `{name,params,query,hash}`；禁止传
 外部 URL、登录页、访问密钥页或内部 redirect。目标仍要存在于当前用户动态路由并经过路由守卫，
 宿主桥接不授予菜单或数据权限。业务保存成功后才能关闭/跳转，不能把尽力返回的

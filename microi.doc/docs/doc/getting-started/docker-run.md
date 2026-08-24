@@ -8,6 +8,87 @@
 
 默认安装 **主数据库 + Redis + MinIO + MongoDB + PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）+ Watchtower + 低代码平台程序（API + Web）**。已有 MySQL 或 MinIO 的客户也可在交互中选择复用，安装器会跳过对应容器、数据目录、编排和宿主机端口。其余独立编排统一接入 `microi` Docker bridge 网络；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
 
+### 🛡️ 宿主机 CPU / 内存保护
+
+Docker 的 `cpus`、`mem_limit` 是**单容器**上限。如果给 API 和数据库各写“整机 95%”，两个容器并发时仍可能把宿主机耗尽；如果按固定比例拆分，又会出现 16 GiB 服务器上的 API 只能使用 2 GiB 之类的不合理限制。
+
+当前一键安装改为 **共享父 cgroup**：全部吾码受管容器进入同一个 `microi.slice`，CPU、内存只在父级限制合计，API、数据库、OCR 等不再固定切分份额。其它服务空闲时，API 或数据库任意一个都可以使用共享池内的全部空闲资源；多服务同时繁忙时，合计仍不能突破父级硬上限。
+
+- CPU 总预算：`宿主机逻辑 CPU 数 × 95%`，至少留出 5% 给宿主机和宝塔等进程。
+- 内存总预算：`宿主机总内存 - max(1536 MiB, 向上取整(总内存 × 5%))`。也就是说至少保留 5%，并且小内存服务器至少保留 1.5 GiB；计算后不足 1 GiB 可用预算时，安装器会停止，不冒险启动整套服务。
+- 安装器创建持久化的 `/etc/systemd/system/microi.slice`。Docker 使用 `systemd` cgroup 驱动时，Compose 写入 `cgroup_parent: microi.slice`；使用 `cgroupfs` 时写入 `cgroup_parent: /microi.slice`。
+- 当前一键安装只支持由宿主机 systemd 管理的 rootful Docker；检测到 rootless Docker 或不具备 CPU/内存 cgroup 控制器时，会在写入 Slice 和启动新容器前停止。
+- cgroup v2 会设置父级 `MemoryMax`、`CPUQuota` 和 `MemorySwapMax=0`；cgroup v1 会设置 `MemoryLimit`、`CPUQuota`，内核启用 swap accounting 时再把父级内存与 Swap 合计限制为同一数值。
+- 复用已有 MySQL / MinIO 时，安装器启动的临时客户端容器仍进入共享池；外部服务本身不在本机父 cgroup 内，必须在它自己的宿主机单独保护。
+- 安装器在启动容器前回读父级 CPU、内存和 Swap 控制文件，启动每个编排前执行 `docker compose config`，启动后再用 `docker inspect` 确认每个容器的 `CgroupParent`。
+
+例如 4 核、16 GiB 服务器会保留 1.5 GiB 内存，共享池硬上限为 **3.8 CPU / 14848 MiB**：
+
+- API 单独繁忙、其它容器空闲时，可使用最多约 **3.8 CPU / 14848 MiB**，不再是 0.760 CPU / 2227 MiB。
+- 数据库单独繁忙时同样可以使用共享池的全部空闲额度。
+- API、数据库、OCR 等同时繁忙时，它们的**合计**最多为 3.8 CPU / 14848 MiB，从而给宿主机、SSH、宝塔和 Docker 守护进程留出资源。
+
+:::: warning 资源限制的真实边界
+共享限制能把吾码受管容器的合计失控影响收敛在 `microi.slice` 内，但不能证明历史故障一定由吾码引起，也不能保证宝塔绝不会受影响：宿主机 nginx、宝塔、其它未加入该父级的容器和非 Docker 进程仍会竞争预留资源。共享池达到内存硬上限时，池内某个进程可能被 OOM Kill，达到 CPU 上限时池内服务会被整体节流。生产环境仍需结合 `docker stats`、容器日志和宿主机监控定位真实原因。
+::::
+
+#### 已有安装或手工 Compose 如何补上限制
+
+此次修改不会自动重写已经生成的旧 Compose。已有环境应先备份数据库和编排文件，再创建共享 Slice，并把**每个吾码容器**加入同一个父级。下面以 4 核、16 GiB、cgroup v2 为例：
+
+```ini
+# /etc/systemd/system/microi.slice
+[Unit]
+Description=Microi managed containers shared resource pool
+
+[Slice]
+CPUAccounting=yes
+MemoryAccounting=yes
+CPUQuota=380%
+MemoryMax=14848M
+MemorySwapMax=0
+
+[Install]
+WantedBy=multi-user.target
+```
+
+cgroup v1 主机把 `MemoryMax`、`MemorySwapMax` 替换为 `MemoryLimit=14848M`；旧内核还需按实际是否启用 swap accounting 设置父级 `memory.memsw.limit_in_bytes`。不要为了补这个配置直接重跑已有安装；应先备份，再按本节手工升级并重建原编排。然后确认 Docker 驱动，并在 Compose 中持久化对应的父级名称：
+
+```bash
+docker info --format 'CgroupDriver={{.CgroupDriver}} CgroupVersion={{.CgroupVersion}}'
+
+# Docker CgroupDriver=systemd：每个服务写 cgroup_parent: microi.slice
+# Docker CgroupDriver=cgroupfs：每个服务写 cgroup_parent: /microi.slice
+```
+
+```yaml
+services:
+  microi-api:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest
+    cgroup_parent: microi.slice # cgroupfs 驱动必须改为 /microi.slice
+```
+
+数据库、Redis、MongoDB、MinIO、OCR、LibreTranslate、Web、Watchtower 以及可选 Ollama/Qdrant 都使用同一 `cgroup_parent`，不要再按服务写固定 `cpus` / `mem_limit`。修改后按顺序验收：
+
+```bash
+# 1. 装载并启动共享父级
+sudo systemctl daemon-reload
+sudo systemctl enable --now microi.slice
+
+# 2. 只解析、规范化并校验 Compose，不启动容器
+docker compose config
+
+# 3. 确认数据库已备份后重建当前编排；不要附加 -v
+docker compose up -d --force-recreate
+
+# 4. 回读容器父级和 Slice 的合计硬限制，并观察一次资源占用
+docker inspect microi-api --format 'CgroupParent={{.HostConfig.CgroupParent}} OOMKilled={{.State.OOMKilled}}'
+systemctl show microi.slice -p ControlGroup -p CPUQuotaPerSecUSec -p MemoryMax -p MemoryLimit -p MemorySwapMax
+docker stats --no-stream
+```
+
+Docker Compose 官方文档说明 `cgroup_parent` 用于指定容器父 cgroup；Docker 对 `systemd` 与 `cgroupfs` 驱动的父级命名规则不同。Linux cgroup 的资源限制按层级向所有后代生效，子组不能逃逸父级约束。参见 [Compose 服务属性](https://docs.docker.com/reference/compose-file/services/#cgroup_parent)、[Docker 默认 cgroup 父级](https://docs.docker.com/reference/cli/dockerd/#default-cgroup-parent) 和 [Linux cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html)。
+
 :::: warning 不再推荐安装 Ollama、nomic-embed-text 和 Qdrant
 对于 Microi吾码默认的 **NL2SQL、NL2V8、在线 AI 数据分析与 AI 编程** 场景，平台内置的“**大模型关键词扩展 + 当前用户权限范围内的 Schema/Skill 搜索 + 精确表/字段回读**”已经完整替代原来的 **Ollama + `nomic-embed-text` + Qdrant** 方案。一键安装脚本已固定跳过这三项：安装更快、资源占用更低，也不会连接或同步向量数据库。
 
@@ -40,7 +121,7 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 | :--: | ---- |
 | 1 | 执行脚本时会提示选择【公网 IP `g` / 内网 IP `n`】、主租户 `OsClient`（直接 Enter 默认为 `iTdos`）、主数据库类型/版本，以及是否复用已有 MySQL / MinIO |
 | 2 | Docker 环境不存在时脚本会**自动安装** Docker 及 Docker Compose V2 插件 |
-| 3 | 新装 MySQL 的性能配置会**自动根据服务器内存**生成（支持 1G ~ 32G+ 多档位）；复用已有 MySQL 时不修改其全局配置 |
+| 3 | 新装 MySQL 的性能配置会根据宿主机内存与 CPU 自适应生成；Docker 层由全部吾码容器共享的 `microi.slice` 合计硬上限保护，复用已有 MySQL 时不修改其全局配置 |
 | 4 | 数据库还原后会自动同步 `sys_osclients.OsClient/ClientName` 和 API、Web 编排中的 `OsClient` |
 | 5 | 新装或复用 MinIO 都会创建/复用私有桶和公有桶（默认 `mci-private` / `mci-public`，已有服务可改名），清理私有桶匿名权限、为公有桶开放匿名下载，并把端点、密钥、桶名、SSL 等配置写回 `sys_osclients` |
 | 6 | 根据安装模式选择的访问 IP 和实际端点，自动把 `sys_config.ApiBase` 写为 API 地址，把 `sys_config.FileServer` 写为最终公有桶 HTTP(S) 地址 |
@@ -51,6 +132,7 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 | 11 | 密码与端口准备后若任一后段门禁失败，脚本仍保持非零退出码，同时打印“安装未完成”恢复汇总；新装凭据按既有规则展示，客户已有 MySQL/MinIO 的密码和密钥只标记为已读取，绝不回显 |
 | 12 | 检测到已有安装或中断编排时不要直接重跑、删卷、删除数据目录或清空外部服务；先按失败汇总和 API 日志排查，确需停编排时使用对应目录的 `docker compose down`，禁止附加 `-v` |
 | 13 | 若脚本中文显示为乱码/问号，请先执行 `export LANG=en_US.UTF-8` 或 `export LANG=C.UTF-8` 后重新运行 |
+| 14 | 当前一键安装会把全部受管容器加入同一个 `microi.slice`，并回读父级 CPU、内存和 Swap 合计硬上限；旧安装不会自动补写，请按“宿主机 CPU / 内存保护”一节升级 |
 
 ### 📋 端口分配表（默认从 61600 开始）
 
@@ -156,6 +238,8 @@ bash install-microi-offline.sh
 - 通过服务器面板**原生安装 MySQL**（低配服务器建议 v5.7.x，高配服务器建议 v8.0.x）
 - Redis、MongoDB 根据实际情况自由决定编排部署还是服务器面板部署
 :::
+
+> 本节主要服务的 Compose 示例都使用同一个 `cgroup_parent`，不再按服务写固定 CPU / 内存份额。共享父级的总上限按前文公式计算；最省心且不易配置错的方式仍是使用一键安装脚本动态生成。
 
 ::: danger Ubuntu 24 注意
 使用宝塔面板在 Ubuntu 24 上原生安装的 Redis、MongoDB，可能会遇到安装失败或修改端口/密码后无法启动服务，建议直接卸载改用 Docker 编排部署。
@@ -754,7 +838,7 @@ update microi_job_triggers set TRIGGER_STATE='PAUSED';
 ::: tip 配置建议
 低配服务器建议 v5.7.x（如 4核8G/16G），高配服务器建议 v8.0.x（如 8核8G/16G）
 :::
-::: details 展开查看 Shell 命令（20 行）
+::: details 展开查看 Shell 命令（21 行）
 ```shell
 version: '3.8'
 services:
@@ -762,6 +846,7 @@ services:
     image: registry.cn-hangzhou.aliyuncs.com/microios/mysql:5.7
     container_name: microi-mysql5.7
     restart: always
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     tty: true
     stdin_open: true
     ports:
@@ -779,59 +864,56 @@ services:
 ```
 :::
 MySQL 5.7 数据库配置文件 `microi_mysql.cnf`：
-::: details 展开查看 Shell 命令（51 行）
+::: details 展开查看 Shell 命令（48 行）
 ```shell
 [mysqld]
-# 基础配置
+# Microi 自适应配置：RAM=16384MB, physical=4, logical=4, disk=ssd
 lower_case_table_names = 1
 character_set_server = utf8mb4
 collation_server = utf8mb4_unicode_ci
 max_allowed_packet = 512M
-net_buffer_length = 16384
-skip_name_resolve = ON  # 避免DNS解析延迟
-sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION # 允许非常规的0000-00-00 00:00:00时间值
+skip_name_resolve = ON
+sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 
-# 连接配置
-max_connections = 1000
-max_connect_errors = 100000  # 防止因错误连接被阻塞
-thread_cache_size = 100
-table_open_cache = 2000
-table_open_cache_instances = 16  # 提升SSD并发访问能力
+# 连接与表缓存（连接数同时受 CPU、共享父级内存上限约束）
+max_connections = 100
+max_connect_errors = 100000
+thread_cache_size = 32
+table_open_cache = 1024
 
-# 内存配置（8GB优化）
-innodb_buffer_pool_size = 5G     # 保留足够内存给OS和其他缓存
-innodb_log_buffer_size = 256M
-key_buffer_size = 128M           # MyISAM使用少时降低
-query_cache_type = 0             # 禁用查询缓存（高并发下易竞争）
-query_cache_size = 0
-tmp_table_size = 256M
-max_heap_table_size = 256M
-
-# InnoDB I/O优化（SSD关键配置）
-innodb_io_capacity = 4000        # SSD的IOPS能力（根据SSD性能调整）
-innodb_io_capacity_max = 8000    # 突发负载上限
-innodb_flush_method = O_DIRECT   # 避免双缓冲，直接访问SSD
-innodb_flush_neighbors = 0       # 关闭刷新邻近页（SSD无需寻道优化）
-innodb_log_file_size = 2G        # 大日志减少checkpoint
-innodb_log_files_in_group = 2    # 总日志大小4G（恢复与性能平衡）
-innodb_buffer_pool_instances = 8 # 提升并发访问能力
-innodb_read_io_threads = 8       # 增加I/O线程
-innodb_write_io_threads = 8
-innodb_purge_threads = 4         # 提升清理效率
-innodb_adaptive_flushing = ON    # 自适应刷新
-
-# 缓冲配置（每个连接独立，谨慎设置）
-sort_buffer_size = 2M
-read_buffer_size = 1M
-read_rnd_buffer_size = 1M
-join_buffer_size = 2M
+# 全局内存；每连接缓冲保持保守值，避免高并发 OOM
+innodb_buffer_pool_size = 5120M
+innodb_log_buffer_size = 64M
+key_buffer_size = 64M
+tmp_table_size = 64M
+max_heap_table_size = 64M
+sort_buffer_size = 512K
+read_buffer_size = 512K
+read_rnd_buffer_size = 512K
+join_buffer_size = 512K
 thread_stack = 512K
-binlog_cache_size = 2M
 
-# SSD持久化优化
-innodb_flush_log_at_trx_commit = 2  # 事务提交时延后刷盘（SSD安全）
-sync_binlog = 1000                  # 批量同步binlog（降低SSD磨损）
-innodb_doublewrite = 1              # 保持双写确保崩溃安全（SSD仍需）
+# 按物理核心与 SSD/HDD 自动调节的 InnoDB I/O
+innodb_buffer_pool_instances = 5
+innodb_log_file_size = 320M
+innodb_log_files_in_group = 2
+innodb_io_capacity = 2000
+innodb_io_capacity_max = 4000
+innodb_flush_method = O_DIRECT
+innodb_flush_neighbors = 0
+innodb_read_io_threads = 4
+innodb_write_io_threads = 4
+innodb_purge_threads = 2
+innodb_adaptive_flushing = ON
+
+# 默认采用安全持久化；不要为降低资源占用而牺牲事务一致性
+innodb_flush_log_at_trx_commit = 1
+sync_binlog = 1
+innodb_doublewrite = 1
+log_bin_trust_function_creators = ON
+performance_schema = ON
+query_cache_type = 0
+query_cache_size = 0
 ```
 :::
 
@@ -842,7 +924,7 @@ innodb_doublewrite = 1              # 保持双写确保崩溃安全（SSD仍需
 ::: tip 配置建议
 低配服务器建议 v5.7.x，高配服务器建议 v8.0.x
 :::
-::: details 展开查看 Shell 命令（20 行）
+::: details 展开查看 Shell 命令（21 行）
 ```shell
 version: '3.8'
 services:
@@ -850,6 +932,7 @@ services:
     image: registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0
     container_name: microi-mysql8.0
     restart: always
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     tty: true
     stdin_open: true
     ports:
@@ -867,69 +950,55 @@ services:
 ```
 :::
 MySQL 8.0 数据库配置文件 `microi_mysql8.0.cnf`：
-::: details 展开查看 Shell 命令（61 行）
+::: details 展开查看 Shell 命令（47 行）
 ```shell
 [mysqld]
-# 基础配置
+# Microi 自适应配置：RAM=16384MB, physical=4, logical=4, disk=ssd
 lower_case_table_names = 1
 character_set_server = utf8mb4
 collation_server = utf8mb4_unicode_ci
 max_allowed_packet = 512M
-net_buffer_length = 16384
 skip_name_resolve = ON
-# MySQL 8.0 SQL模式调整（移除已废弃的NO_AUTO_CREATE_USER）
 sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
 
-# 连接配置
-max_connections = 1000
+# 连接与表缓存（连接数同时受 CPU、共享父级内存上限约束）
+max_connections = 100
 max_connect_errors = 100000
-thread_cache_size = 100
-table_open_cache = 2000
-table_open_cache_instances = 16
+thread_cache_size = 32
+table_open_cache = 1024
 
-# 内存配置（8GB优化）
-innodb_buffer_pool_size = 5G
-innodb_log_buffer_size = 256M
-key_buffer_size = 128M
-# MySQL 8.0 已移除查询缓存
-# query_cache_type = 0
-# query_cache_size = 0
-tmp_table_size = 256M
-max_heap_table_size = 256M
+# 全局内存；每连接缓冲保持保守值，避免高并发 OOM
+innodb_buffer_pool_size = 5120M
+innodb_log_buffer_size = 64M
+key_buffer_size = 64M
+tmp_table_size = 64M
+max_heap_table_size = 64M
+sort_buffer_size = 512K
+read_buffer_size = 512K
+read_rnd_buffer_size = 512K
+join_buffer_size = 512K
+thread_stack = 512K
 
-# InnoDB I/O优化（SSD关键配置）
-innodb_io_capacity = 4000
-innodb_io_capacity_max = 8000
+# 按物理核心与 SSD/HDD 自动调节的 InnoDB I/O
+innodb_buffer_pool_instances = 5
+innodb_log_file_size = 320M
+innodb_log_files_in_group = 2
+innodb_io_capacity = 2000
+innodb_io_capacity_max = 4000
 innodb_flush_method = O_DIRECT
 innodb_flush_neighbors = 0
-innodb_log_file_size = 2G
-innodb_log_files_in_group = 2
-innodb_buffer_pool_instances = 8
-# MySQL 8.0 默认使用原生AI/O，以下线程参数可保留但实际可能被自动管理
-innodb_read_io_threads = 8
-innodb_write_io_threads = 8
-innodb_purge_threads = 4
+innodb_read_io_threads = 4
+innodb_write_io_threads = 4
+innodb_purge_threads = 2
 innodb_adaptive_flushing = ON
 
-# 缓冲配置（保持与5.7一致）
-sort_buffer_size = 2M
-read_buffer_size = 1M
-read_rnd_buffer_size = 1M
-join_buffer_size = 2M
-thread_stack = 512K
-binlog_cache_size = 2M
-
-# SSD持久化优化
-innodb_flush_log_at_trx_commit = 2
-sync_binlog = 1000
+# 默认采用安全持久化；不要为降低资源占用而牺牲事务一致性
+innodb_flush_log_at_trx_commit = 1
+sync_binlog = 1
 innodb_doublewrite = 1
-
-# MySQL 8.0 新增推荐配置
-default_authentication_plugin = mysql_native_password  # 兼容旧客户端
-innodb_dedicated_server = ON  # 自动调整InnoDB内存参数（推荐8G服务器）
-log_bin_trust_function_creators = ON  # 允许二进制日志记录存储函数
-# 性能Schema优化（根据监控需求调整）
+log_bin_trust_function_creators = ON
 performance_schema = ON
+default_authentication_plugin = mysql_native_password
 ```
 :::
 
@@ -940,13 +1009,14 @@ performance_schema = ON
 ::: warning 注意
 编排中有两个地方包含 `password123456`，请修改为您的自定义密码。
 :::
-::: details 展开查看 Shell 命令（93 行）
+::: details 展开查看 Shell 命令（94 行）
 ```shell
 version: '3.8'
 services:
   microi-redis:
     image: registry.cn-hangzhou.aliyuncs.com/microios/redis:7.4.2
     container_name: microi-redis
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
@@ -960,7 +1030,7 @@ services:
       - "--requirepass"
       - "password123456"
       - "--maxmemory"
-      - "8gb"
+      - "2gb"            # 16GiB宿主机的一键脚本默认值；Redis缓存仍受共享父级总上限保护
       - "--maxmemory-policy"
       - "allkeys-lru"
       - "--timeout"
@@ -1046,7 +1116,7 @@ services:
 ::: warning 注意
 请修改默认密码 `password123456`。
 :::
-::: details 展开查看 Shell 命令（21 行）
+::: details 展开查看 Shell 命令（22 行）
 ```shell
 version: '3.8'
 services:
@@ -1054,6 +1124,7 @@ services:
     image: registry.cn-hangzhou.aliyuncs.com/microios/mongo:latest
     container_name: microi-mongodb
     restart: always
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     tty: true
     stdin_open: true
     ports:
@@ -1087,13 +1158,14 @@ services:
 ::: danger MinIO 反向代理注意
 必须设置 `proxy_set_header Host $http_host`，否则导致私有桶只能上传无法下载。阿里云 OSS、CDN、负载均衡默认配置不会有此问题。
 :::
-::: details 展开查看 Shell 命令（25 行）
+::: details 展开查看 Shell 命令（26 行）
 ```shell
 version: '3.8'
 services:
   microi-minio:
     image:  registry.cn-hangzhou.aliyuncs.com/microios/minio:2023-06-09
     container_name: microi-minio
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
@@ -1127,13 +1199,14 @@ services:
 - API 容器只允许下面十个启动引导配置：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。其它后端运行参数统一在主租户 SaaS 引擎中动态维护，不要再增加 `MICROI_*` 或自定义 `AppSettings` 环境变量。`ASPNETCORE_*` / `DOTNET_*` 仅属于 .NET 宿主配置。
 - 下方旧式手工示例中的 `172.27.221.211` 表示 API 容器确实可达的外部数据库/缓存宿主机，并不表示推荐让同机 Docker 依赖绕宿主机端口；同机容器部署应建立共享 bridge 网络，改用对应容器 DNS 与内部端口。无论哪种方式，都不要把 API 容器中的 `127.0.0.1` / `localhost` 当成其它容器。
 :::
-::: details 展开查看 Shell 命令（70 行）
+::: details 展开查看 Shell 命令（66 行）
 ```shell
 version: '3.8'
 services:
   microi-api:
     image: registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest
     container_name: microi-api
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
@@ -1163,6 +1236,7 @@ services:
   microi-client:
     image: registry.cn-hangzhou.aliyuncs.com/microios/microi-client:latest
     container_name: microi-client
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
@@ -1183,6 +1257,7 @@ services:
   watchtower:
     image: registry.cn-hangzhou.aliyuncs.com/microios/watchtower:latest
     container_name: watchtower
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     restart: always  
     privileged: true
     tty: true
@@ -1261,8 +1336,7 @@ services:
       # 仅允许宿主机访问；不要直接暴露到公网。
       - "127.0.0.1:18080:8080"
     shm_size: "4gb"
-    cpus: "4.0"
-    mem_limit: "8g"
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     stop_grace_period: 90s
     security_opt:
       - no-new-privileges:true
@@ -1308,6 +1382,8 @@ docker inspect microi-ocr --format '{{.State.Health.Status}}'
 ```yaml
 services:
   microi-api:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     networks:
       - microi-ocr
 
@@ -1381,6 +1457,7 @@ services:
   microi-translate:
     image: registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6-microi1
     container_name: microi-translate
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     user: "0:0"
     security_opt:
       - apparmor=unconfined
@@ -1432,11 +1509,13 @@ Microi API 不需要增加翻译环境变量。请在 SaaS 引擎主租户记录
 
 :::: warning 新装环境请跳过本节
 Microi 默认 NL2SQL/NL2V8/在线 AI 数据分析已经由内置的关键词扩展、权限感知 Schema/Skill 搜索和精确字段回读完整承接，不再推荐部署 Ollama、`nomic-embed-text` 与 Qdrant。仅当已有系统必须兼容旧向量链路，或独立召回评测证明内置能力无法满足特殊语义检索时，才同时部署本节和下一节。
+
+如确需在同一宿主机部署 Ollama 与 Qdrant，也必须使用前文同一个 `cgroup_parent`。它们会自动加入吾码共享总预算，不需要再配置固定的单服务 CPU / 内存份额；但模型加载可能挤压 API、数据库等服务，生产环境更建议使用独立服务器。
 ::::
 
 >* Docker会自动创建所需的数据目录，无需手动创建
 >* 通过docker编排部署
-::: details 展开查看 Shell 命令（50 行）
+::: details 展开查看 Shell 命令（51 行）
 ```shell
 version: '3.8'
 services:
@@ -1444,6 +1523,7 @@ services:
   microi-ollama:
     image: registry.cn-hangzhou.aliyuncs.com/microios/ollama:latest  # 使用阿里云镜像，也可使用日期版本如 :20260129
     container_name: microi-ollama
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     ports:
       - "1434:11434"  # 如需修改端口，直接改这里，如 "8080:11434"
     volumes:
@@ -1504,7 +1584,7 @@ curl http://localhost:1434/v1/embeddings \
 ```
 
 ### 🔟 Qdrant 向量数据库编排（不推荐，仅兼容特殊场景）
-::: details 展开查看 Shell 命令（93 行）
+::: details 展开查看 Shell 命令（87 行）
 ```shell
 version: '3.8'
 services:
@@ -1512,6 +1592,7 @@ services:
   microi-qdrant:
     image: registry.cn-hangzhou.aliyuncs.com/microios/qdrant:latest
     container_name: microi-qdrant
+    cgroup_parent: "${MICROI_CGROUP_PARENT:-microi.slice}"
     restart: unless-stopped
     
     # 端口映射
@@ -1563,13 +1644,6 @@ services:
       - QDRANT__STORAGE__OPTIMIZERS__MEMMAP_THRESHOLD_KB=102400     # mmap阈值
       - QDRANT__STORAGE__OPTIMIZERS__INDEXING_THRESHOLD_KB=20480    # 索引阈值（20MB）
         
-    # 资源限制（根据服务器实际情况调整）
-    #deploy:
-    #  resources:
-    #    limits:
-    #      cpus: '4.0'              # 最大CPU核心数
-    #      memory: 8G               # 最大内存
-    
     # 健康检查（可选，如不需要可删除）
     # 作用：监控服务状态，自动重启失败的容器
     healthcheck:

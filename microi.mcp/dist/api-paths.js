@@ -48,6 +48,8 @@ export const API = {
     CREATE_ENGINE: '/api/V8Engine/CreateApiEngine',
     EXECUTE_ENGINE: '/api/V8Engine/ExecuteApiEngine',
     RUN_BACKGROUND_API_ENGINE: '/api/BackgroundTask/RunApiEngine',
+    LIST_BACKGROUND_TASKS: '/api/BackgroundTask/List',
+    CANCEL_BACKGROUND_TASK: '/api/BackgroundTask/Cancel',
     UPLOAD_FILE_BASE64: '/api/V8Engine/UploadFileBase64',
     UPLOAD_APPLICATION_ASSET_STREAM: '/api/V8Engine/UploadApplicationAssetStream',
     INITIATE_APPLICATION_ASSET_MULTIPART: '/api/V8Engine/InitiateApplicationAssetMultipart',

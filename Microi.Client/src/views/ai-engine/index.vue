@@ -1347,7 +1347,13 @@ function isSecureRelayStation(model) {
 async function loadPlatformStats() {
     statsLoading.value = true;
     try {
-        const result = await DiyCommon.PostAsync("/api/systemmonitor/GetPlatformStats", {}, null, null, "json");
+        const result = await DiyCommon.PostAsync(
+            "/apiengine/mci-system-observability-query",
+            { Action: "PlatformStats" },
+            null,
+            null,
+            "json"
+        );
         if (!isOk(result)) return;
         const data = getData(result) || {};
         platformStats.DiyTableCount = data.DiyTableCount || 0;

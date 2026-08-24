@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { analyzeBackgroundWorkload, analyzeClientChunking, normalizeAllMenuJson } from './advanced-tools.js';
+import { MicroiClient } from './microi-client.js';
+function createClient() {
+    return new MicroiClient({
+        apiBaseUrl: 'https://microi.test',
+        username: '',
+        password: '',
+        osClient: 'iTdos',
+        token: 'test-token',
+        requestTimeoutMs: 1_000,
+        writeRequestTimeoutMs: 1_000,
+    });
+}
 test('classifies estimated long-running work as a background task', () => {
     const result = analyzeBackgroundWorkload({
         Name: '生成测试任务',
@@ -92,5 +104,83 @@ test('rejects incomplete client chunking declarations', () => {
     });
     assert.equal(result.declared, true);
     assert.equal(result.valid, false);
+});
+test('queues a durable API-engine task with explicit idempotency and retry options', async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+        globalThis.fetch = (async (input, init) => {
+            assert.equal(String(input), 'https://microi.test/api/BackgroundTask/RunApiEngine');
+            const body = JSON.parse(String(init?.body || '{}'));
+            assert.equal(body.OsClient, 'iTdos');
+            assert.equal(body.ApiEngineKey, 'bulk-import-microi-store-packages');
+            assert.equal(body.Title, '安装/更新全部平台应用');
+            assert.deepEqual(body.Param, { ResumeInstall: true });
+            assert.deepEqual(body.Options, {
+                IdempotencyKey: 'mcp:bulk-store:20260822-0300',
+                ConcurrencyKey: 'bulk-import-microi-store-packages',
+                MaxAttempts: 5,
+                RetryOnFailure: true,
+            });
+            return new Response(JSON.stringify({ Code: 1, Data: { Id: 'task-1' }, Msg: 'queued' }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        const result = await createClient().runBackgroundApiEngine({
+            apiEngineKey: 'bulk-import-microi-store-packages',
+            title: '安装/更新全部平台应用',
+            param: { ResumeInstall: true },
+            options: {
+                IdempotencyKey: 'mcp:bulk-store:20260822-0300',
+                ConcurrencyKey: 'bulk-import-microi-store-packages',
+                MaxAttempts: 5,
+                RetryOnFailure: true,
+            },
+        });
+        assert.equal(result.Code, 1);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+test('reads the authenticated users notification-center background tasks', async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+        globalThis.fetch = (async (input, init) => {
+            assert.equal(String(input), 'https://microi.test/api/BackgroundTask/List');
+            const body = JSON.parse(String(init?.body || '{}'));
+            assert.equal(body.OsClient, 'iTdos');
+            return new Response(JSON.stringify({ Code: 1, Data: [{ Id: 'task-1', Status: 'Succeeded' }] }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        const result = await createClient().listBackgroundTasks();
+        assert.equal(result.Code, 1);
+        assert.equal(result.Data[0].Status, 'Succeeded');
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+test('requests authenticated cooperative cancellation for an exact background task', async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+        globalThis.fetch = (async (input, init) => {
+            assert.equal(String(input), 'https://microi.test/api/BackgroundTask/Cancel');
+            const body = JSON.parse(String(init?.body || '{}'));
+            assert.equal(body.OsClient, 'iTdos');
+            assert.equal(body.Id, 'task-old-1');
+            return new Response(JSON.stringify({ Code: 1, Msg: '已请求停止后台任务' }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        const result = await createClient().cancelBackgroundTask('task-old-1');
+        assert.equal(result.Code, 1);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
 });
 //# sourceMappingURL=background-task.test.js.map

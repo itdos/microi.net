@@ -9,6 +9,14 @@
                 <component :is="Component" :key="key" />
             </keep-alive>
         </router-view>
+        <MciRenderSourceBadge
+            v-if="routeRenderSource === 'custom'"
+            :type="routeRenderSource"
+            placement="edge"
+            :instance-key="$route.fullPath"
+            dismissible
+            :source-info="routeSourceInfo"
+        />
         <section id="MicroiService"></section>
     </section>
 </template>
@@ -17,9 +25,12 @@
 import { useTagsViewStore, useDiyStore } from "@/pinia";
 import { computed, watch } from "vue";
 import { routeLoading } from "@/utils/mci-loading";
+import MciRenderSourceBadge from "@/components/MciRenderSourceBadge/index.vue";
+import { resolveRouteRenderSource } from "@/utils/framework-presentation.js";
 
 export default {
     name: "AppMain",
+    components: { MciRenderSourceBadge },
     setup() {
         const tagsViewStore = useTagsViewStore();
         const diyStore = useDiyStore();
@@ -34,6 +45,18 @@ export default {
         };
     },
     computed: {
+        routeRenderSource() {
+            return resolveRouteRenderSource(this.$route.meta || {});
+        },
+        routeSourceInfo() {
+            const meta = this.$route.meta || {};
+            return {
+                title: meta.title || "",
+                componentName: meta.ComponentName || "",
+                componentPath: meta.ComponentPath || "",
+                frameworkRoute: this.$route.fullPath || this.$route.path || ""
+            };
+        },
         key() {
             // A micro-app host snapshots one exact top-level tab route. Query
             // changes therefore create a new host and cannot mutate a host that

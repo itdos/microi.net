@@ -33,6 +33,9 @@ public class ApiEngineChangeHistoryTests
         Assert.Contains("ChangeHistoryStorage", mcpSource, StringComparison.Ordinal);
         Assert.Contains("AppendLegacyApiEngineChangeHistory", mcpSource, StringComparison.Ordinal);
         Assert.Contains("已取消兼容字段回退写入", mcpSource, StringComparison.Ordinal);
+        Assert.Contains("object createdEngineIdValue", mcpSource, StringComparison.Ordinal);
+        Assert.Contains("string createdEngineId = SafeString(createdEngineIdValue)", mcpSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("var createdEngineId = createdEngine.Code", mcpSource, StringComparison.Ordinal);
         Assert.Contains("ChangeSummary", controllerSource, StringComparison.Ordinal);
         Assert.Contains("ChangeHistory", controllerSource, StringComparison.Ordinal);
     }
@@ -42,10 +45,19 @@ public class ApiEngineChangeHistoryTests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current != null)
         {
-            if (Directory.Exists(Path.Combine(current.FullName, "Microi.Core"))
-                && Directory.Exists(Path.Combine(current.FullName, "Microi.net.Api")))
+            foreach (var candidate in new[]
+                     {
+                         current.FullName,
+                         Path.Combine(current.FullName, "Microi.Server")
+                     })
             {
-                return current.FullName;
+                if (File.Exists(Path.Combine(
+                        candidate, "Microi.Core", "V8Engine", "V8McpLogic.cs"))
+                    && File.Exists(Path.Combine(
+                        candidate, "Microi.net.Api", "Controllers", "V8EngineController.cs")))
+                {
+                    return candidate;
+                }
             }
 
             current = current.Parent;

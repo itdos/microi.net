@@ -9,6 +9,7 @@ const NUGET_STATS_ENGINE_KEY = 'official_nuget_stats'
 const OS_CLIENT = 'iTdos'
 const CACHE_REQUEST_TIMEOUT_MS = 4500
 const REFRESH_REQUEST_TIMEOUT_MS = 16000
+export const NUGET_LOCAL_STORAGE_KEY = 'microi:public-stats:nuget-itdos:v1'
 
 export const NUGET_STATS_ENDPOINT = `${buildSiteApiEngineUrl(
   OFFICIAL_MICROI_API_BASE,
@@ -18,13 +19,14 @@ export const NUGET_STATS_ENDPOINT = `${buildSiteApiEngineUrl(
 export const NUGET_FALLBACK_STATS = Object.freeze({
   owner: NUGET_OWNER,
   packageCount: 38,
-  totalDownloads: 8942864,
+  totalDownloads: 9741567,
   profileUrl: NUGET_PROFILE_URL,
-  queriedAt: '',
-  cachedAt: '',
-  successfulEndpoints: 0,
+  queriedAt: '2026-08-22T00:46:00.065Z',
+  cachedAt: '2026-08-22T00:46:00.065Z',
+  successfulEndpoints: 2,
   stage: 'fallback',
   cacheState: 'embedded',
+  databaseState: '',
   ageSeconds: null,
   didRefresh: false,
   refreshFailed: false,
@@ -60,12 +62,78 @@ export function normalizeNugetStatsPayload(value, expectedStage = '') {
     successfulEndpoints: asNonNegativeInteger(value.successfulEndpoints),
     stage,
     cacheState: String(value.cacheState || ''),
+    databaseState: String(value.databaseState || ''),
     ageSeconds: value.ageSeconds === null || value.ageSeconds === undefined
       ? null
       : asNonNegativeInteger(value.ageSeconds),
     didRefresh: value.didRefresh === true,
     refreshFailed,
     isLive: stage === 'current' && !refreshFailed
+  }
+}
+
+function defaultStorage() {
+  try {
+    return globalThis.localStorage || null
+  } catch {
+    return null
+  }
+}
+
+function snapshotTime(value) {
+  const timestamp = new Date(String(value?.queriedAt || '')).getTime()
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+export function preferHigherNugetStats(current, candidate) {
+  if (!current) return candidate || null
+  if (!candidate) return current
+  if (candidate.totalDownloads !== current.totalDownloads) {
+    return candidate.totalDownloads > current.totalDownloads ? candidate : current
+  }
+  if (candidate.stage === 'current' && current.stage !== 'current') return candidate
+  return snapshotTime(candidate) > snapshotTime(current) ? candidate : current
+}
+
+export function loadLocalNugetStats({ storage } = {}) {
+  const target = storage || defaultStorage()
+  if (!target || typeof target.getItem !== 'function') return null
+  try {
+    const raw = target.getItem(NUGET_LOCAL_STORAGE_KEY)
+    if (!raw) return null
+    const normalized = normalizeNugetStatsPayload(JSON.parse(raw), 'browser')
+    return {
+      ...normalized,
+      stage: 'browser',
+      cacheState: 'browser-last-success',
+      didRefresh: false,
+      refreshFailed: false,
+      isLive: false
+    }
+  } catch {
+    return null
+  }
+}
+
+export function persistLocalNugetStats(value, { storage } = {}) {
+  const target = storage || defaultStorage()
+  if (!target || typeof target.setItem !== 'function') return null
+  try {
+    const normalized = normalizeNugetStatsPayload(value)
+    const previous = loadLocalNugetStats({ storage: target })
+    const selected = preferHigherNugetStats(previous, normalized)
+    const stored = {
+      ...selected,
+      stage: 'browser',
+      cacheState: 'browser-last-success',
+      didRefresh: false,
+      refreshFailed: false,
+      isLive: false
+    }
+    target.setItem(NUGET_LOCAL_STORAGE_KEY, JSON.stringify(stored))
+    return stored
+  } catch {
+    return null
   }
 }
 
