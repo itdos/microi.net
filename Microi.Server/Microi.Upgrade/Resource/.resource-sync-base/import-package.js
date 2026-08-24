@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.3.6
+ * Version: v2.4.2
  * Function:
- * - 统一应用商城导入器；后台安装按期望应用版本锁定不可变商城快照，安装前幂等补齐物理前置列，支持后台分片、资源基线、官方平台受管升级、商城源只读重试，并在后台任务唯一索引创建冲突时仅归档重复终态幂等键。
+ * - 统一应用商城导入器；支持 HDFS 公私有包指针、大小与 SHA-256 校验、后台分片和官方受管升级。
  */
 
 // ==================== 参数接收与校验 ====================
@@ -188,6 +188,18 @@ function ensureGeneratedEntityPhysicalPrerequisites(maxChangedTables) {
                 ['FormBannerSubtitleField', textType(100)], ['FormBannerImageField', textType(100)],
                 ['FormBannerIcon', textType(100)], ['FormBannerBackgroundField', textType(100)],
                 ['FormBannerTagFields', largeTextType()], ['FormBannerMetrics', largeTextType()]
+            ]
+        },
+        {
+            // MARKETPLACE_HDFS_PACKAGE_POINTER_SCHEMA_V1：商城包安装前一次性补齐
+            // 内容指针列；MySQL 会合并为单条 ALTER，避免大表逐列重建八次。
+            TableName: 'sys_microistore',
+            Definitions: [
+                ['PackageId', textType(50)], ['PackageStorageMode', textType(50)],
+                ['PackageHdfsPath', textType(2000)], ['PackageSha256', textType(100)],
+                ['PackageSize', isOracle ? 'NUMBER(19)' : 'bigint'],
+                ['PackageContentType', textType(100)], ['PackageFormatVersion', intType()],
+                ['PackageUploadedAt', textType(25)]
             ]
         }
     ];
@@ -773,18 +785,57 @@ var postMarketplaceReadWithRetry = function (label, url, postParam, timeoutSecon
     }
     throw new Error(label + '失败（已重试' + maxAttempts + '次）：' + (lastError || '商城源无返回'));
 };
-// MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1：自定义 /apiengine/* 地址依赖网关
-// 动态路由，在部分部署拓扑中可能直接返回 404。商城跨租户调用统一走稳定的
-// ApiEngine 控制器入口，并把引擎 Key 放入 JSON 参数；私有商城凭据仍由上面的
-// storeRequestHeaders 原样传递。
-var marketplaceEngineRunUrl = storeApiBase + '/api/ApiEngine/Run?OsClient=' + encodeURIComponent(storeOsClient);
+// MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2：固定商城能力使用引擎自定义地址，
+// 使耗时、流量与异常能够精确归因到 ApiEngineKey。宿主对缺失引擎
+// 也会返回结构化 DosResult，不再依赖通用 Run 入口避免 404。
+var marketplaceEngineUrl = function (apiEngineKey) {
+    return storeApiBase + '/apiengine/' + encodeURIComponent(apiEngineKey)
+        + '?OsClient=' + encodeURIComponent(storeOsClient);
+};
 var marketplaceEngineParam = function (apiEngineKey, postParam) {
-    var result = { ApiEngineKey: apiEngineKey };
+    var result = {};
     postParam = postParam || {};
     for (var key in postParam) {
         if (Object.prototype.hasOwnProperty.call(postParam, key)) result[key] = postParam[key];
     }
     return result;
+};
+// MARKETPLACE_HDFS_PACKAGE_POINTER_V1：新版商城响应只返回不可变 HDFS 指针和
+// 短期下载地址。安装端完整下载一次后必须核对 UTF-8 字节数和 SHA-256；旧
+// AppPakcet 继续兼容，但后台任务与数据库版本快照不再复制大包正文。
+var loadMarketplacePackage = function (storeModel, label) {
+    storeModel = storeModel || {};
+    if (storeModel.AppPakcet) return storeModel.AppPakcet;
+    var downloadUrl = firstTextParam([storeModel.PackageDownloadUrl]);
+    var expectedSha = firstTextParam([storeModel.PackageSha256]).toLowerCase();
+    var expectedSize = parseInt(storeModel.PackageSize || 0, 10) || 0;
+    if (!downloadUrl || !/^https?:\/\//i.test(downloadUrl)
+        || !/^[a-f0-9]{64}$/.test(expectedSha)
+        || expectedSize < 1 || expectedSize > 256 * 1024 * 1024) {
+        throw new Error((label || '应用包') + '的 HDFS 指针缺少安全下载地址、SHA-256 或合法字节数');
+    }
+    var response = V8.Http.GetResponse({
+        Url: downloadUrl,
+        GetParam: {},
+        Timeout: 600,
+        Headers: { 'Accept': 'application/json' }
+    });
+    if (!response || Number(response.StatusCode || 0) < 200 || Number(response.StatusCode || 0) >= 300) {
+        throw new Error((label || '应用包') + '下载失败（HTTP '
+            + Number(response && response.StatusCode || 0) + '）');
+    }
+    var content = response.Content;
+    if ((!content || !String(content).length) && response.RawBytes && response.RawBytes.Length > 0) {
+        content = System.Text.Encoding.UTF8.GetString(response.RawBytes);
+    }
+    content = String(content || '');
+    var actualSize = Number(System.Text.Encoding.UTF8.GetByteCount(content));
+    var actualSha = String(V8.EncryptHelper.Sha256Hex(content) || '').toLowerCase();
+    if (actualSize != expectedSize || actualSha != expectedSha) {
+        throw new Error((label || '应用包') + '下载校验失败：size=' + actualSize + '/' + expectedSize
+            + '，sha256=' + actualSha + '/' + expectedSha);
+    }
+    return content;
 };
 var authoritativeStoreModel = null;
 if (!Package && storeRow && storeRow.AppPakcet) {
@@ -795,7 +846,7 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
     var storeId = firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id]);
     var storeModelResult = postMarketplaceReadWithRetry(
         '读取商城应用包',
-        marketplaceEngineRunUrl,
+        marketplaceEngineUrl('get-microi-store-model'),
         marketplaceEngineParam('get-microi-store-model', {
             Id: storeId,
             StoreVersionId: firstTextParam([V8.Param.StoreVersionId, storeRow.StoreVersionId, storeRow.DataVersionId]),
@@ -807,7 +858,7 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
     if (storeModelResult && storeModelResult.Code == 1 && storeModelResult.Data) {
         var storeModel = storeModelResult.Data;
         authoritativeStoreModel = storeModel;
-        Package = storeModel.AppPakcet;
+        Package = loadMarketplacePackage(storeModel, '商城应用包');
         if (!V8.Param.AppId) V8.Param.AppId = firstTextParam([storeModel.AppId, storeModel.AppKey, storeModel.Id]);
         if (!V8.Param.AppName) V8.Param.AppName = firstTextParam([storeModel.AppName, storeModel.Name]);
         if (!V8.Param.AppVersion) V8.Param.AppVersion = firstTextParam([storeModel.AppVersion, storeModel.Version]);
@@ -1388,11 +1439,13 @@ try {
         ApplicationBuildAssets: 0,
         ApplicationBuildAssetsReused: 0,
         ApplicationInlineBuildAssets: 0,
+        ApplicationRuntimeVerified: 0,
         ApplicationSharedRuntimes: 0,
         AssetRowsPruned: 0,
         MicroServicePages: 0,
         MicroServiceMenus: 0,
         MicroServiceMenusPreserved: 0,
+        MicroServiceMenusRetired: 0,
         DataSetCount: 0,
         DataInserted: 0,
         DataUpdated: 0,
@@ -1424,8 +1477,9 @@ try {
         'PhysicalFieldsSkipped', 'PhysicalFieldsErrors',
         'ApplicationInstalled', 'ApplicationSourceFiles', 'ApplicationSourceFilesReused',
         'ApplicationBuildAssets', 'ApplicationBuildAssetsReused',
-        'ApplicationInlineBuildAssets', 'ApplicationSharedRuntimes', 'AssetRowsPruned',
-        'MicroServicePages', 'MicroServiceMenus', 'MicroServiceMenusPreserved',
+        'ApplicationInlineBuildAssets', 'ApplicationRuntimeVerified',
+        'ApplicationSharedRuntimes', 'AssetRowsPruned',
+        'MicroServicePages', 'MicroServiceMenus', 'MicroServiceMenusPreserved', 'MicroServiceMenusRetired',
         'MenuInserted', 'MenuUpdated', 'MenuIdRemapped',
         'AdminRoleLimitInserted', 'AdminRoleLimitUpdated', 'AdminRoleLimitSkipped',
         'ReferenceRowsUpdated', 'FlowInserted', 'FlowUpdated',
@@ -1480,7 +1534,7 @@ try {
         var metaFields = [
             'PageKey', 'PageName', 'PageTitle', 'RoutePath', 'EntryPath',
             'Sort', 'IsHome', 'IsEnable', 'LegacyMenuUrls', 'LegacyMenuUrl',
-            'LegacyComponentPaths', 'LegacyComponentPath'
+            'LegacyComponentPaths', 'LegacyComponentPath', 'RetireLegacyMenus'
         ];
         for (var metaFieldIndex = 0; metaFieldIndex < metaFields.length; metaFieldIndex++) {
             var metaField = metaFields[metaFieldIndex];
@@ -1710,8 +1764,20 @@ try {
         if (!resumeInstall || !appId) return;
         var existingApplicationAssets = loadExistingApplicationAssets(appId);
         var staleIds = [];
+        var preserveExistingPrivateSource = expectedPaths
+            && expectedPaths.__PreserveExistingPrivateSource === true;
         for (var existingPath in existingApplicationAssets) {
-            if (!expectedPaths[existingPath]) staleIds.push(String(existingApplicationAssets[existingPath].Id));
+            if (expectedPaths[existingPath]) continue;
+            var existingAsset = existingApplicationAssets[existingPath] || {};
+            var storageScope = String(existingAsset.StorageScope || '').toLowerCase();
+            var normalizedExistingPath = normalizeApplicationPath(existingAsset.FilePath || existingPath).toLowerCase();
+            var isPrivateSource = storageScope == 'private'
+                || (normalizedExistingPath.indexOf('dist/') !== 0 && storageScope.indexOf('public') < 0);
+            // RUNTIME_ONLY_PACKAGE_PRESERVES_SOURCE_V1：同一个平台微服务可能同时由多个
+            // 官方应用包承载运行时基线。Source=NotIncluded 只表示本包不交付源码，绝不能
+            // 删除目标租户已经由其它源码包安装的私有文件；显式包含源码的包仍按完整清单裁剪。
+            if (preserveExistingPrivateSource && isPrivateSource) continue;
+            staleIds.push(String(existingAsset.Id));
         }
         if (!staleIds.length) return;
         // PRUNE_ASSET_IDS_WITH_DELFORM_V1：Jint 数组无法稳定匹配 DelTableData 的
@@ -1843,7 +1909,9 @@ try {
         }
         var sourceRoot = 'ai-app-source/' + appId;
         var existingApplicationAssets = loadExistingApplicationAssets(appId);
-        var expectedApplicationPaths = {};
+        var expectedApplicationPaths = {
+            __PreserveExistingPrivateSource: sourceNotIncluded
+        };
         var packageAssets = parsePackageAssets(bundle.PackageAssets || bundle.ZipAssets || null);
         // 真离线包优先使用 JSON 内嵌文件；没有内嵌文件时才兼容商城公网 ZIP。
         var embeddedSourceFiles = bundle.SourceFiles || bundle.Files || [];
@@ -2237,6 +2305,15 @@ try {
             if (!existingService && previousAppKey && previousAppKey != appKey) {
                 existingService = getApplicationRow('sys_microiservice', '', [['MsKey', '=', previousAppKey]]);
             }
+            // VERIFIED_RUNTIME_NO_SILENT_DOWNGRADE_V1：多个官方应用可以共享同一个
+            // 平台微服务。旧应用包不得把已经完整内联到数据库的运行时静默覆盖回
+            // file/HDFS，否则一次无关应用升级就会让所有共享页面重新变成 404。
+            if (existingService
+                && /^(db|database)$/i.test(String(existingService.StorageMode || ''))
+                && !inlineRuntimeBuild) {
+                throw new Error('拒绝将已验证的数据库内置微服务降级为文件运行时：' + appKey
+                    + '；请重新发布当前应用，并使用 AssetStoragePolicy.Build=DatabaseOnly。');
+            }
             var serviceRow = {
                 MsKey: appKey,
                 MsName: appName,
@@ -2266,7 +2343,95 @@ try {
             }
             var serviceResult = upsertApplicationRow('sys_microiservice', [['MsKey', '=', appKey]], serviceRow);
             if (!serviceResult || serviceResult.Code != 1) throw new Error('写入微服务运行元数据失败：' + ((serviceResult && serviceResult.Msg) || ''));
-            var serviceData = V8.FormEngine.GetFormData('sys_microiservice', { _Where: [['MsKey', '=', appKey]] });
+            var serviceData = V8.FormEngine.GetFormData('sys_microiservice', {
+                _Where: [['MsKey', '=', appKey]],
+                _SelectFields: ['Id', 'MsKey', 'StorageMode', 'MsUrl', 'EntryPath', 'BuildVersion', 'AssetCount', 'AssetsJson']
+            });
+            if (!serviceData || serviceData.Code != 1 || !serviceData.Data || !serviceData.Data.Id) {
+                throw new Error('微服务运行元数据写后回读失败：' + appKey);
+            }
+            var installedService = serviceData.Data;
+            if (String(installedService.MsKey || '').toLowerCase() != String(appKey || '').toLowerCase()
+                || String(installedService.EntryPath || '').toLowerCase() != String(entryPath || '').toLowerCase()
+                || String(installedService.BuildVersion || '') != String(versionNo || '')) {
+                throw new Error('微服务运行元数据写后回读不一致：' + appKey);
+            }
+            if (inlineRuntimeBuild) {
+                if (!/^(db|database)$/i.test(String(installedService.StorageMode || ''))
+                    || !/^(db|database)$/i.test(String(installedService.MsUrl || ''))) {
+                    throw new Error('数据库内置微服务写后回读未保持 StorageMode=db、MsUrl=db：' + appKey);
+                }
+                var installedRuntimeAssets = [];
+                try { installedRuntimeAssets = JSON.parse(String(installedService.AssetsJson || '[]')); }
+                catch (runtimeReadbackParseError) {
+                    throw new Error('数据库内置微服务 AssetsJson 写后回读不是有效 JSON：' + appKey);
+                }
+                if (!installedRuntimeAssets || installedRuntimeAssets.length != runtimeDbAssets.length
+                    || Number(installedService.AssetCount || 0) != runtimeDbAssets.length) {
+                    throw new Error('数据库内置微服务资产数量写后回读不一致：' + appKey
+                        + '，期望' + runtimeDbAssets.length + '个，实际'
+                        + (installedRuntimeAssets ? installedRuntimeAssets.length : 0) + '个');
+                }
+                var installedEntryVerified = false;
+                for (var runtimeReadbackIndex = 0; runtimeReadbackIndex < runtimeDbAssets.length; runtimeReadbackIndex++) {
+                    var expectedRuntimeAsset = runtimeDbAssets[runtimeReadbackIndex] || {};
+                    var expectedRuntimePath = normalizeApplicationPath(expectedRuntimeAsset.Path).toLowerCase();
+                    var installedRuntimeAsset = null;
+                    for (var installedAssetIndex = 0; installedAssetIndex < installedRuntimeAssets.length; installedAssetIndex++) {
+                        var candidateRuntimeAsset = installedRuntimeAssets[installedAssetIndex] || {};
+                        if (normalizeApplicationPath(candidateRuntimeAsset.Path).toLowerCase() == expectedRuntimePath) {
+                            installedRuntimeAsset = candidateRuntimeAsset;
+                            break;
+                        }
+                    }
+                    if (!installedRuntimeAsset) throw new Error('数据库内置微服务写后回读缺少资产：' + expectedRuntimePath);
+                    var installedRuntimeBase64 = firstTextParam([
+                        installedRuntimeAsset.ContentBase64,
+                        installedRuntimeAsset.FileByteBase64,
+                        installedRuntimeAsset.Base64
+                    ]);
+                    if (!installedRuntimeBase64) throw new Error('数据库内置微服务写后回读缺少完整字节：' + expectedRuntimePath);
+                    var installedRuntimeSize = base64DecodedSize(installedRuntimeBase64);
+                    if (installedRuntimeSize <= 0 || installedRuntimeSize != Number(expectedRuntimeAsset.Size || 0)) {
+                        throw new Error('数据库内置微服务写后回读大小不一致：' + expectedRuntimePath);
+                    }
+                    var expectedRuntimeHash = firstTextParam([
+                        expectedRuntimeAsset.Hash,
+                        expectedRuntimeAsset.Sha256,
+                        expectedRuntimeAsset.ContentHash
+                    ]).toLowerCase();
+                    var installedRuntimeHash = firstTextParam([
+                        installedRuntimeAsset.Hash,
+                        installedRuntimeAsset.Sha256,
+                        installedRuntimeAsset.ContentHash
+                    ]).toLowerCase();
+                    if (expectedRuntimeHash && installedRuntimeHash != expectedRuntimeHash) {
+                        throw new Error('数据库内置微服务写后回读摘要不一致：' + expectedRuntimePath);
+                    }
+                    if (expectedRuntimePath == normalizeApplicationPath(entryPath).toLowerCase()) {
+                        var installedEntryHtml = '';
+                        try {
+                            installedEntryHtml = System.Text.Encoding.UTF8.GetString(
+                                System.Convert.FromBase64String(String(installedRuntimeBase64))
+                            );
+                        } catch (entryDecodeError) {
+                            throw new Error('数据库内置微服务入口不是有效 Base64/UTF-8 HTML：' + appKey);
+                        }
+                        if (!/<!doctype\s+html/i.test(installedEntryHtml)
+                            || !/<html\b/i.test(installedEntryHtml)
+                            || !/<head\b/i.test(installedEntryHtml)
+                            || !/<body\b/i.test(installedEntryHtml)
+                            || !/<\/html\s*>/i.test(installedEntryHtml)) {
+                            throw new Error('数据库内置微服务入口不是完整 HTML 文档：' + appKey);
+                        }
+                        installedEntryVerified = true;
+                    }
+                }
+                if (!installedEntryVerified) throw new Error('数据库内置微服务缺少可验证入口：' + entryPath);
+                stats.ApplicationRuntimeVerified++;
+                debugLog['microservice_runtime_verified_' + appKey] = 'StorageMode=db，资产'
+                    + runtimeDbAssets.length + '个，入口HTML完整';
+            }
             var serviceId = serviceData && serviceData.Code == 1 && serviceData.Data ? serviceData.Data.Id : '';
             var routes = bundle.Routes || bundle.Pages || [];
             if (!routes.length) routes = [{ PageKey: 'home', PageName: '首页', PageTitle: '首页', RoutePath: '/', EntryPath: entryPath, Sort: 0, IsHome: 1 }];
@@ -2298,6 +2463,9 @@ try {
                     PageId: installedPage && installedPage.Id ? installedPage.Id : '',
                     RoutePath: routePath,
                     PreserveExistingNativeMenus: preserveExistingNativeMenus,
+                    RetireLegacyMenus: routeMeta.RetireLegacyMenus === true
+                        || Number(routeMeta.RetireLegacyMenus || 0) === 1
+                        || String(routeMeta.RetireLegacyMenus || '').toLowerCase() == 'true',
                     LegacyMenuUrls: legacyRouteValues(routeMeta, 'LegacyMenuUrls', 'LegacyMenuUrl'),
                     LegacyComponentPaths: legacyRouteValues(routeMeta, 'LegacyComponentPaths', 'LegacyComponentPath')
                 });
@@ -2462,6 +2630,7 @@ try {
                     ApplicationSourceFiles: stats.ApplicationSourceFiles,
                     ApplicationBuildAssets: stats.ApplicationBuildAssets,
                     ApplicationInlineBuildAssets: stats.ApplicationInlineBuildAssets,
+                    ApplicationRuntimeVerified: stats.ApplicationRuntimeVerified,
                     ApplicationSharedRuntimes: stats.ApplicationSharedRuntimes,
                     ResourceState: {
                         SchemaVersion: 1,
@@ -2496,7 +2665,7 @@ try {
                         marketplaceInstallIdentity + '|' + V8.OsClient + '|' + installOperationId
                     );
                     var remoteStat = V8.Http.Post({
-                        Url: marketplaceEngineRunUrl,
+                        Url: marketplaceEngineUrl('official_marketplace_install_stat'),
                         PostParam: marketplaceEngineParam('official_marketplace_install_stat', {
                             StoreId: model.StoreId,
                             AppId: model.AppId,
@@ -5151,6 +5320,9 @@ try {
                     PageId: restoredPage.Id,
                     RoutePath: restoreRoutePath,
                     PreserveExistingNativeMenus: !!(restoredApplication && restoredApplication.Id),
+                    RetireLegacyMenus: restoreRouteMeta.RetireLegacyMenus === true
+                        || Number(restoreRouteMeta.RetireLegacyMenus || 0) === 1
+                        || String(restoreRouteMeta.RetireLegacyMenus || '').toLowerCase() == 'true',
                     LegacyMenuUrls: legacyRouteValues(restoreRouteMeta, 'LegacyMenuUrls', 'LegacyMenuUrl'),
                     LegacyComponentPaths: legacyRouteValues(restoreRouteMeta, 'LegacyComponentPaths', 'LegacyComponentPath')
                 });
@@ -5649,7 +5821,10 @@ try {
                     && String(rawMenuById.ModuleEngineKey || '').toLowerCase() == String(menu.ModuleEngineKey).toLowerCase();
                 var sameMenuByUrl = menu.Url
                     && String(rawMenuById.Url || '').toLowerCase() == String(menu.Url).toLowerCase();
-                if (sameMenuByKey || sameMenuByUrl) {
+                // MENU_URL_IS_PRIMARY_IDENTITY_V1：Url 存在时必须以 Url 为主身份；
+                // ModuleEngineKey 只允许补充识别无 Url 的旧菜单，不能把两个不同路由
+                // 的菜单合并成同一行。
+                if ((menu.Url && sameMenuByUrl) || (!menu.Url && sameMenuByKey)) {
                     execNonQuery(
                         'UPDATE sys_menu SET OsClient = @p0, IsDeleted = 0 WHERE Id = @p1',
                         [V8.OsClient, menu.Id]
@@ -5661,17 +5836,7 @@ try {
         }
         if (!exists) {
             var matchedMenu = null;
-            if (menu.ModuleEngineKey) {
-                var menuByKeyResult = V8.FormEngine.GetFormData('sys_menu', {
-                    OsClient: V8.OsClient,
-                    _Where: [['ModuleEngineKey', '=', menu.ModuleEngineKey]],
-                    _PageSize: 1
-                });
-                if (menuByKeyResult.Code == 1 && menuByKeyResult.Data) {
-                    matchedMenu = menuByKeyResult.Data;
-                }
-            }
-            if (!matchedMenu && menu.Url) {
+            if (menu.Url) {
                 var menuByUrlResult = V8.FormEngine.GetFormData('sys_menu', {
                     OsClient: V8.OsClient,
                     _Where: [['Url', '=', menu.Url]],
@@ -5679,6 +5844,23 @@ try {
                 });
                 if (menuByUrlResult.Code == 1 && menuByUrlResult.Data) {
                     matchedMenu = menuByUrlResult.Data;
+                }
+            }
+            if (!matchedMenu && menu.ModuleEngineKey) {
+                var menuByKeyResult = V8.FormEngine.GetFormData('sys_menu', {
+                    OsClient: V8.OsClient,
+                    _Where: [['ModuleEngineKey', '=', menu.ModuleEngineKey]],
+                    _PageSize: 1
+                });
+                if (menuByKeyResult.Code == 1 && menuByKeyResult.Data) {
+                    var keyMatchedUrl = String(menuByKeyResult.Data.Url || '').toLowerCase();
+                    var incomingMenuUrl = String(menu.Url || '').toLowerCase();
+                    if (!incomingMenuUrl || !keyMatchedUrl || keyMatchedUrl == incomingMenuUrl) {
+                        matchedMenu = menuByKeyResult.Data;
+                    } else {
+                        debugLog['menu_key_collision_' + packageMenuId] = '忽略路由不一致的 ModuleEngineKey 匹配：'
+                            + menu.ModuleEngineKey + '，目标Url=' + keyMatchedUrl + '，包Url=' + incomingMenuUrl;
+                    }
                 }
             }
             if (!matchedMenu && rawMenuById && rawMenuById.Id) {
@@ -5849,6 +6031,32 @@ try {
         if (menuWriteSucceeded && menuNeedsAdministratorPermission) {
             grantAdministratorPermissionsForNewMenu(modelCopy);
         }
+        if (!menuWriteSucceeded) {
+            throw new Error('菜单写入失败：' + (modelCopy.Name || modelCopy.Id)
+                + '，Url=' + String(modelCopy.Url || '') + '；应用安装已回滚。');
+        }
+
+        var menuReadbackResult = V8.FormEngine.GetFormData('sys_menu', {
+            Id: modelCopy.Id,
+            _SelectFields: ['Id', 'Name', 'Url', 'ModuleEngineKey', 'DiyTableId', 'DiyTableName', 'ComponentPath', 'OpenType']
+        });
+        var menuReadback = menuReadbackResult && menuReadbackResult.Code == 1
+            ? menuReadbackResult.Data
+            : null;
+        if (!menuReadback || String(menuReadback.Id || '') != String(modelCopy.Id || '')) {
+            throw new Error('菜单写后回读失败：' + (modelCopy.Name || modelCopy.Id));
+        }
+        if (modelCopy.Url && String(menuReadback.Url || '').toLowerCase() != String(modelCopy.Url).toLowerCase()) {
+            throw new Error('菜单写后回读路由不一致：' + (modelCopy.Name || modelCopy.Id)
+                + '，期望' + modelCopy.Url + '，实际' + String(menuReadback.Url || ''));
+        }
+        if (modelCopy.DiyTableId && String(menuReadback.DiyTableId || '') != String(modelCopy.DiyTableId)) {
+            throw new Error('菜单写后回读 DiyTableId 不一致：' + (modelCopy.Name || modelCopy.Id));
+        }
+        if (modelCopy.DiyTableName
+            && String(menuReadback.DiyTableName || '').toLowerCase() != String(modelCopy.DiyTableName).toLowerCase()) {
+            throw new Error('菜单写后回读 DiyTableName 不一致：' + (modelCopy.Name || modelCopy.Id));
+        }
 
         //清除缓存
         V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_menu:${menu.Id.toLowerCase()}`);
@@ -5874,6 +6082,11 @@ try {
                 _PageSize: 1000
             });
             menus = menuResult && menuResult.Code == 1 && menuResult.Data ? menuResult.Data : [];
+        }
+        var declaredLegacyMenuIds = {};
+        for (var declaredLegacyMenuIndex = 0; declaredLegacyMenuIndex < menus.length; declaredLegacyMenuIndex++) {
+            var declaredLegacyMenu = menus[declaredLegacyMenuIndex] || {};
+            if (declaredLegacyMenu.Id) declaredLegacyMenuIds[String(declaredLegacyMenu.Id)] = true;
         }
         var packageBoundMenuIds = [];
         for (var packageBoundMenuIndex = 0; packageBoundMenuIndex < sysMenus.length; packageBoundMenuIndex++) {
@@ -5941,6 +6154,23 @@ try {
                 && Number(legacyMenu.IsMicroiService || 0) !== 1
                 && componentPath
                 && componentPath != '/micro-app/host';
+            if (binding.RetireLegacyMenus && declaredLegacyMenuIds[String(legacyMenu.Id)]) {
+                var retireResult = runWriteWithRetry(function () {
+                    return V8.FormEngine.DelFormData('sys_menu', { Id: legacyMenu.Id });
+                }, 'retire_microservice_legacy_menu_' + legacyMenu.Id);
+                if (retireResult && retireResult.Code == 1) {
+                    migratedMenuIds[legacyMenu.Id] = true;
+                    stats.MicroServiceMenusRetired++;
+                    V8.Cache.Remove('Microi:' + V8.OsClient + ':FormData:sys_menu:' + String(legacyMenu.Id).toLowerCase());
+                    if (legacyMenu.ModuleEngineKey) {
+                        V8.Cache.Remove('Microi:' + V8.OsClient + ':FormData:sys_menu:' + String(legacyMenu.ModuleEngineKey).toLowerCase());
+                    }
+                    continue;
+                }
+                debugLog['retire_microservice_legacy_menu_error_' + legacyMenu.Id]
+                    = (retireResult && retireResult.Msg) || '接口无返回';
+                continue;
+            }
             if (binding.PreserveExistingNativeMenus && isExistingNativeComponent) {
                 migratedMenuIds[legacyMenu.Id] = true;
                 stats.MicroServiceMenusPreserved++;
@@ -6136,7 +6366,8 @@ try {
 
     debugLog.step3Result = '菜单数据处理完成：新增' + stats.MenuInserted + '，修改' + stats.MenuUpdated
         + '，系统管理员权限新增' + stats.AdminRoleLimitInserted + '、补齐' + stats.AdminRoleLimitUpdated + '、已完整' + stats.AdminRoleLimitSkipped
-        + '，迁移微服务旧菜单' + stats.MicroServiceMenus + '，保留现有原生菜单' + stats.MicroServiceMenusPreserved;
+        + '，迁移微服务旧菜单' + stats.MicroServiceMenus + '，退役旧菜单' + stats.MicroServiceMenusRetired
+        + '，保留现有原生菜单' + stats.MicroServiceMenusPreserved;
 
     // ==================== 步骤4：处理wf_flowdesign数据（可选） ====================
 
@@ -6501,7 +6732,7 @@ try {
             for (var historyPage = 1; historyPage <= 50; historyPage++) {
                 var versionsResult = postMarketplaceReadWithRetry(
                     '读取商城历史版本列表',
-                    marketplaceEngineRunUrl,
+                    marketplaceEngineUrl('get-microi-store-versions'),
                     marketplaceEngineParam('get-microi-store-versions', {
                         Id: historicalStoreId,
                         _PageIndex: historyPage,
@@ -6525,7 +6756,7 @@ try {
             for (var historicalVersionIndex = 0; historicalVersionIndex < versionIds.length; historicalVersionIndex++) {
                 var historicalModelResult = postMarketplaceReadWithRetry(
                     '读取商城历史版本快照',
-                    marketplaceEngineRunUrl,
+                    marketplaceEngineUrl('get-microi-store-model'),
                     marketplaceEngineParam('get-microi-store-model', {
                         Id: historicalStoreId,
                         StoreVersionId: versionIds[historicalVersionIndex]
@@ -6545,7 +6776,7 @@ try {
                     || Number(historicalModel.IsApprove || 0) !== 1) {
                     continue;
                 }
-                var historicalPackage = historicalModel.AppPakcet;
+                var historicalPackage = loadMarketplacePackage(historicalModel, '商城历史版本包');
                 if (typeof historicalPackage == 'string') historicalPackage = JSON.parse(historicalPackage);
                 if (!historicalPackage || !historicalPackage.PackageInfo
                     || normalizeMarketplaceVersion(
@@ -7245,7 +7476,7 @@ try {
                 + '条，幂等跳过' + stats.ApiEngineHistorySkipped + '条，旧文本保留',
             选择数据: '数据集' + stats.DataSetCount + '个，新增' + stats.DataInserted + '条，修改' + stats.DataUpdated + '条，跳过' + stats.DataSkipped + '条',
             定时任务: '保存' + stats.ScheduleJobSaved + '个',
-            在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码新增' + stats.ApplicationSourceFiles + '个/复用' + stats.ApplicationSourceFilesReused + '个，公有编译文件新增' + stats.ApplicationBuildAssets + '个/复用' + stats.ApplicationBuildAssetsReused + '个，数据库内联运行文件' + stats.ApplicationInlineBuildAssets + '个，共享公共运行时' + stats.ApplicationSharedRuntimes + '个，清理旧文件元数据' + stats.AssetRowsPruned + '个，微服务页面' + stats.MicroServicePages + '个，迁移旧菜单' + stats.MicroServiceMenus + '个，保留原生菜单' + stats.MicroServiceMenusPreserved + '个',
+            在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码新增' + stats.ApplicationSourceFiles + '个/复用' + stats.ApplicationSourceFilesReused + '个，公有编译文件新增' + stats.ApplicationBuildAssets + '个/复用' + stats.ApplicationBuildAssetsReused + '个，数据库内联运行文件' + stats.ApplicationInlineBuildAssets + '个，共享公共运行时' + stats.ApplicationSharedRuntimes + '个，清理旧文件元数据' + stats.AssetRowsPruned + '个，微服务页面' + stats.MicroServicePages + '个，迁移旧菜单' + stats.MicroServiceMenus + '个，退役旧菜单' + stats.MicroServiceMenusRetired + '个，保留原生菜单' + stats.MicroServiceMenusPreserved + '个',
             应用安装版本: '写入' + (stats.VersionRecordUpdated || 0) + '条'
         }
     };

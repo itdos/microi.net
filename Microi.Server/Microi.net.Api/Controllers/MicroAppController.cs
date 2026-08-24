@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -189,10 +190,18 @@ namespace Microi.net.Api
                 {
                     contentType = GuessContentType(assetPath);
                 }
-                Response.ContentType = contentType;
-                if (upstreamResponse.Content.Headers.ContentLength.HasValue)
+                if (!IsContentTypeCompatible(assetPath, contentType))
                 {
-                    Response.ContentLength = upstreamResponse.Content.Headers.ContentLength.Value;
+                    return StatusCode(502,
+                        $"Application v3 immutable asset returned an incompatible content type: {contentType}");
+                }
+                var expectedSize = GetExpectedAssetSize(asset);
+                if (expectedSize > 0
+                    && upstreamResponse.Content.Headers.ContentLength.HasValue
+                    && upstreamResponse.Content.Headers.ContentLength.Value != expectedSize)
+                {
+                    return StatusCode(502,
+                        $"Application v3 immutable asset size mismatch: expected={expectedSize}, actual={upstreamResponse.Content.Headers.ContentLength.Value}");
                 }
                 var sha256 = GetText(asset, "Sha256", "sha256");
                 if (!sha256.DosIsNullOrWhiteSpace())
@@ -203,9 +212,34 @@ namespace Microi.net.Api
 
                 if (isHead)
                 {
+                    Response.ContentType = contentType;
+                    if (upstreamResponse.Content.Headers.ContentLength.HasValue)
+                    {
+                        Response.ContentLength = upstreamResponse.Content.Headers.ContentLength.Value;
+                    }
                     return new EmptyResult();
                 }
 
+                if (IsHtmlAsset(assetPath, contentType))
+                {
+                    var htmlBytes = await upstreamResponse.Content.ReadAsByteArrayAsync(
+                        HttpContext.RequestAborted);
+                    if (!TryValidateManagedAssetBytes(htmlBytes, assetPath, contentType, asset, out var htmlValidationError))
+                    {
+                        return StatusCode(502,
+                            $"Application v3 immutable entry validation failed: {htmlValidationError}");
+                    }
+                    Response.ContentType = contentType;
+                    Response.ContentLength = htmlBytes.LongLength;
+                    Response.Headers["X-Microi-Asset-Validation"] = "html-size-sha256";
+                    return File(htmlBytes, contentType);
+                }
+
+                Response.ContentType = contentType;
+                if (upstreamResponse.Content.Headers.ContentLength.HasValue)
+                {
+                    Response.ContentLength = upstreamResponse.Content.Headers.ContentLength.Value;
+                }
                 await using var upstreamStream = await upstreamResponse.Content.ReadAsStreamAsync(
                     HttpContext.RequestAborted);
                 await upstreamStream.CopyToAsync(Response.Body, HttpContext.RequestAborted);
@@ -324,6 +358,16 @@ namespace Microi.net.Api
                         appKey,
                         currentVersion,
                         rewriteStableEntry);
+                    if (!TryValidateManagedAssetBytes(
+                            inlineBytes,
+                            assetPath,
+                            inlineContentType,
+                            asset,
+                            out var inlineValidationError,
+                            validateHash: !rewriteStableEntry))
+                    {
+                        return StatusCode(500, $"MicroApp inline asset validation failed: {inlineValidationError}");
+                    }
                     SetAssetHeaders(appKey, currentVersion, assetPath, asset, rewriteStableEntry);
                     return File(inlineBytes, inlineContentType);
                 }
@@ -349,6 +393,16 @@ namespace Microi.net.Api
                         appKey,
                         currentVersion,
                         rewriteStableEntry);
+                    if (!TryValidateManagedAssetBytes(
+                            proxyBytes,
+                            assetPath,
+                            proxyContentType,
+                            asset,
+                            out var proxyValidationError,
+                            validateHash: !rewriteStableEntry))
+                    {
+                        return StatusCode(502, $"MicroApp managed file asset validation failed: {proxyValidationError}");
+                    }
                     SetAssetHeaders(appKey, currentVersion, assetPath, asset, rewriteStableEntry);
                     return File(proxyBytes, proxyContentType);
                 }
@@ -386,6 +440,17 @@ namespace Microi.net.Api
                 appKey,
                 currentVersion,
                 rewriteStableEntry);
+
+            if (!TryValidateManagedAssetBytes(
+                    bytes,
+                    assetPath,
+                    contentType,
+                    asset,
+                    out var databaseValidationError,
+                    validateHash: !rewriteStableEntry))
+            {
+                return StatusCode(500, $"MicroApp database asset validation failed: {databaseValidationError}");
+            }
 
             SetAssetHeaders(appKey, currentVersion, assetPath, asset, rewriteStableEntry);
 
@@ -1363,6 +1428,108 @@ namespace Microi.net.Api
                 if (!value.DosIsNullOrWhiteSpace()) return value;
             }
             return "";
+        }
+
+        private static long GetExpectedAssetSize(JObject asset)
+        {
+            var value = GetText(asset, "size", "Size", "contentLength", "ContentLength");
+            return long.TryParse(value, out var size) && size > 0 ? size : 0;
+        }
+
+        private static bool IsHtmlAsset(string assetPath, string contentType)
+        {
+            return Path.GetExtension(assetPath ?? "").Equals(".html", StringComparison.OrdinalIgnoreCase)
+                || (!contentType.DosIsNullOrWhiteSpace()
+                    && contentType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsContentTypeCompatible(string assetPath, string contentType)
+        {
+            if (contentType.DosIsNullOrWhiteSpace()) return false;
+            var mediaType = contentType.Split(';')[0].Trim().ToLowerInvariant();
+            if (mediaType is "application/xml" or "text/xml") return false;
+            return Path.GetExtension(assetPath ?? "").ToLowerInvariant() switch
+            {
+                ".html" or ".htm" => mediaType == "text/html" || mediaType == "application/xhtml+xml",
+                ".js" or ".mjs" => mediaType.Contains("javascript") || mediaType == "application/octet-stream",
+                ".css" => mediaType == "text/css" || mediaType == "application/octet-stream",
+                ".json" or ".map" => mediaType == "application/json" || mediaType == "application/octet-stream",
+                ".svg" => mediaType == "image/svg+xml" || mediaType == "application/octet-stream",
+                ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".ico" =>
+                    mediaType.StartsWith("image/", StringComparison.Ordinal) || mediaType == "application/octet-stream",
+                ".woff" or ".woff2" or ".ttf" =>
+                    mediaType.StartsWith("font/", StringComparison.Ordinal) || mediaType == "application/octet-stream",
+                _ => mediaType != "text/html"
+            };
+        }
+
+        private static bool TryValidateManagedAssetBytes(
+            byte[] bytes,
+            string assetPath,
+            string contentType,
+            JObject asset,
+            out string error,
+            bool validateHash = true)
+        {
+            error = "";
+            if (bytes == null || bytes.Length == 0)
+            {
+                error = "asset body is empty";
+                return false;
+            }
+            if (!IsContentTypeCompatible(assetPath, contentType))
+            {
+                error = $"content type is incompatible: {contentType}";
+                return false;
+            }
+            var expectedSize = GetExpectedAssetSize(asset);
+            if (validateHash && expectedSize > 0 && bytes.LongLength != expectedSize)
+            {
+                error = $"size mismatch: expected={expectedSize}, actual={bytes.LongLength}";
+                return false;
+            }
+
+            var prefixLength = Math.Min(bytes.Length, 4096);
+            var prefix = Encoding.UTF8.GetString(bytes, 0, prefixLength);
+            if (Regex.IsMatch(prefix, @"<\s*(?:Error|ErrorResponse)\b", RegexOptions.IgnoreCase)
+                || prefix.IndexOf("<Code>NoSuchKey</Code>", StringComparison.OrdinalIgnoreCase) >= 0
+                || prefix.IndexOf("NoSuchBucket", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                error = "object storage returned an XML error document";
+                return false;
+            }
+
+            if (IsHtmlAsset(assetPath, contentType))
+            {
+                var html = Encoding.UTF8.GetString(bytes);
+                if (!Regex.IsMatch(html, @"<!doctype\s+html", RegexOptions.IgnoreCase)
+                    || !Regex.IsMatch(html, @"<html\b", RegexOptions.IgnoreCase)
+                    || !Regex.IsMatch(html, @"<head\b", RegexOptions.IgnoreCase)
+                    || !Regex.IsMatch(html, @"<body\b", RegexOptions.IgnoreCase)
+                    || !Regex.IsMatch(html, @"</html\s*>", RegexOptions.IgnoreCase))
+                {
+                    error = "entry is not a complete HTML document";
+                    return false;
+                }
+            }
+
+            var expectedHash = GetText(asset, "sha256", "Sha256", "hash", "Hash", "contentHash", "ContentHash")
+                .Trim()
+                .ToLowerInvariant();
+            if (validateHash && expectedHash.Length == 64)
+            {
+                var rawHash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+                var base64Hash = Convert.ToHexString(
+                    SHA256.HashData(Encoding.UTF8.GetBytes(Convert.ToBase64String(bytes))))
+                    .ToLowerInvariant();
+                if (!string.Equals(expectedHash, rawHash, StringComparison.Ordinal)
+                    && !string.Equals(expectedHash, base64Hash, StringComparison.Ordinal))
+                {
+                    error = "sha256 mismatch";
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static string GuessContentType(string assetPath)

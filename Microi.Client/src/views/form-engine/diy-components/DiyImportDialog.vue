@@ -969,10 +969,15 @@ export default {
         async pollBackgroundTask() {
             if (!this.backgroundTaskId) return;
             try {
-                const result = await this.DiyCommon.PostAsync("/api/BackgroundTask/List", {}, null, null, "json");
-                if (result && Number(result.Code) === 1 && Array.isArray(result.Data)) {
-                    const task = result.Data.find((item) => String(item.Id || item.TaskId) === String(this.backgroundTaskId));
-                    if (task) this.backgroundTask = task;
+                const result = await this.DiyCommon.PostAsync(
+                    "/apiengine/platform-background-task",
+                    { Action: "Status", Id: this.backgroundTaskId },
+                    null,
+                    null,
+                    "json"
+                );
+                if (result && Number(result.Code) === 1 && result.Data) {
+                    this.backgroundTask = Object.assign({}, this.backgroundTask || {}, result.Data);
                 }
                 if (this.backgroundTask && TERMINAL_TASK_STATUSES.includes(this.backgroundTask.Status)) {
                     if (this.backgroundTask.Status === "Succeeded" && !this.customSuccessEmitted) {

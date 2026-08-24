@@ -43,7 +43,7 @@
 
 ## 404 与应用缺失回归
 
-- 客户端能力发现和登录完成只允许调用 `/api/ApiEngine/Run?OsClient=`，请求体携带精确 `ApiEngineKey`。
+- 客户端能力发现和登录完成只允许调用 `/apiengine/{ApiEngineKey}?OsClient=`；固定业务不得新增 `/api/ApiEngine/Run` 依赖。
 - 在未安装 `app.microi.sso` 的租户调用通用入口，应返回结构化“接口引擎不存在”；不能返回 `/api/Sso/Capabilities` 路由 404。
 - 安装后回读 11 个 `sys_apiengine` 行并刷新缓存，再验证 `sso_capabilities` 为 `Code=1`。
 - `/api/Sso/Capabilities`、`LegacyCapabilities`、`CompleteLogin`、`RotateClientSecret` 与 `/api/SysUser/SsoPengrui` 必须保持删除，防止业务逻辑重新漂回 Controller。

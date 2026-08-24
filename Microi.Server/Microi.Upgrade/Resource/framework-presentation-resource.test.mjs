@@ -3,6 +3,14 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const packageModel = JSON.parse(await readFile(new URL('./app.microi.saas-engine.json', import.meta.url), 'utf8'));
+const versionAtLeast = (actual, minimum) => {
+  const left = String(actual || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+  const right = String(minimum || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    if ((left[index] || 0) !== (right[index] || 0)) return (left[index] || 0) > (right[index] || 0);
+  }
+  return true;
+};
 const sysConfigTable = packageModel.DiyTables.find(item => String(item.Name).toLowerCase() === 'sys_config');
 const fieldNames = [
   'FrameworkWatermarkEnabled',
@@ -15,7 +23,7 @@ const fieldNames = [
 const fields = packageModel.DiyFields.filter(item => item.TableId === sysConfigTable.Id && fieldNames.includes(item.Name));
 
 test('SaaS package delivers all framework watermark fields in interface style', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.5.30');
+  assert.ok(versionAtLeast(packageModel.PackageInfo.Version, 'v7.5.30'));
   assert.equal(fields.length, fieldNames.length);
   assert.deepEqual(new Set(fields.map(item => item.Name)), new Set(fieldNames));
   for (const field of fields) {

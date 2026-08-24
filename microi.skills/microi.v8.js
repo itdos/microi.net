@@ -1510,7 +1510,7 @@ export function createMicroiV8(options = {}) {
     UniappUploadAnonymous: '/api/HDFS/uniappUploadAnonymous',
     GetCurrentUser: '/api/SysUser/getCurrentUser',
     GetDateTimeNow: '/api/os/getDateTimeNow',
-    AddSysLog: '/api/SysLog/addSysLog',
+    AddSysLog: '/apiengine/platform-client-log',
     GetOsClientByDomain: '/api/Os/getOsClientByDomain',
     ApiEngine: {}
   };

@@ -20,7 +20,10 @@ AI 工作流会读取当前租户的表、菜单、接口引擎、V8 调用与�
 - 如何从一段业务描述生成初始系统关系图？
 - 如何保存一份可继续审阅的系统级 AI 工作流？
 
-前端入口为 `/ai-workflow`，服务端接口位于 `/api/AIWorkFlow/*`，包含概览、节点详情、自然语言生成、列表、读取、保存和删除。所有请求都先绑定当前登录身份与 OsClient；它不是允许匿名读取整个租户结构的拓扑接口。
+前端入口为 `/ai-workflow`，服务端统一调用 Managed 接口引擎
+`/apiengine/platform-ai-workflow`，用 `Action=Overview/NodeDetail/GenerateFromPrompt/List/Get/Save/Delete`
+区分动作。接口由应用商城升级，C# 仅保留图谱计算原子能力；所有请求都重新绑定当前登录身份与
+OsClient，并要求当前租户超级管理员，它不是允许匿名读取整个租户结构的拓扑接口。
 
 ## 业务架构蓝图
 

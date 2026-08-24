@@ -906,9 +906,9 @@ export default {
             param.SysRoleLimits = self.ForGetSysMenuListCheck(self.SysMenuList);
 
             var paramType = "json";
-            var url = "/api/SysRole/UptSysRole"; //UptSysRole
+            var url = "/apiengine/platform-sys-role?Action=UptSysRole";
             if (self.DiyCommon.IsNull(self.CurrentSysRoleModel.Id)) {
-                url = "/api/SysRole/AddSysRole"; //AddSysRole
+                url = "/apiengine/platform-sys-role?Action=AddSysRole";
             }
             param._Test = { Key: "aaa", Value: "bbb" };
             self.DiyCommon.Post(

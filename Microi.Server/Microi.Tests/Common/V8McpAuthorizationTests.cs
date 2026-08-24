@@ -19,7 +19,7 @@ public sealed class V8McpAuthorizationTests
             .Where(method => method.GetCustomAttributes<HttpMethodAttribute>(true).Any())
             .ToArray();
 
-        Assert.Equal(104, actions.Length);
+        Assert.Equal(109, actions.Length);
         foreach (var action in actions)
         {
             var declarations = action.GetCustomAttributes<V8McpCapabilityAttribute>(true).ToArray();
@@ -83,4 +83,3 @@ public sealed class V8McpAuthorizationTests
         return (bool)(method.Invoke(null, new object[] { user, scope }) ?? false);
     }
 }
-

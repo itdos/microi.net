@@ -30,6 +30,8 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
     const presentationRequestEvidence = new Map();
     const menuRequestStartedAt = new Map();
     const menuRequestDurations = [];
+    const menuRequestTransports = [];
+    const isMenuRequest = url => /(?:\/api\/SysMenu\/GetSysMenuStep|\/apiengine\/platform-sys-menu\?[^#]*\bAction=GetSysMenuStep)(?:&|$|#)/i.test(url);
     page.on('pageerror', error => pageErrors.push(String(error?.stack || error)));
     page.on('console', message => {
         if (message.type() === 'error') consoleErrors.push(message.text());
@@ -42,7 +44,7 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
             presentationEvidence.status = response.status();
             delete presentationEvidence.startedAt;
         }
-        if (/\/api\/SysMenu\/GetSysMenuStep(?:\?|$)/i.test(response.url())) {
+        if (isMenuRequest(response.url())) {
             const startedAt = menuRequestStartedAt.get(request);
             if (startedAt) menuRequestDurations.push(Date.now() - startedAt);
         }
@@ -57,14 +59,18 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
         }
     });
     page.on('request', request => {
-        if (/\/api\/SysMenu\/GetSysMenuStep(?:\?|$)/i.test(request.url())) {
+        if (isMenuRequest(request.url())) {
             menuRequestStartedAt.set(request, Date.now());
+            menuRequestTransports.push(/\/apiengine\/platform-sys-menu/i.test(request.url()) ? 'custom-address' : 'legacy-controller');
         }
-        if (!/\/api\/ApiEngine\/Run(?:\?|$)/i.test(request.url())) return;
+        const isLegacyRun = /\/api\/ApiEngine\/Run(?:\?|$)/i.test(request.url());
+        const isPresentationAddress = /\/apiengine\/mci-module-presentation-stats(?:\?|$)/i.test(request.url());
+        if (!isLegacyRun && !isPresentationAddress) return;
         try {
             const body = request.postDataJSON();
-            if (String(body?.ApiEngineKey || '').toLowerCase() !== 'mci-module-presentation-stats') return;
+            if (isLegacyRun && String(body?.ApiEngineKey || '').toLowerCase() !== 'mci-module-presentation-stats') return;
             const evidence = {
+                transport: isPresentationAddress ? 'custom-address' : 'legacy-run',
                 menuId: body.SysMenuId || body._SysMenuId || '',
                 batchSize: Array.isArray(body.MenuRequests) ? body.MenuRequests.length : 0,
                 startedAt: Date.now()
@@ -184,7 +190,7 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
     await expect(page.getByText('网卡累计接收', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: '流量热点接口', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: '帐号 / 匿名', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '近期大文件 / 可疑传输', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /大文件 \/ 可疑传输明细$/ })).toBeVisible();
     await expect(page.locator('.obs-traffic-cockpit .obs-data-table__size select').first()).toHaveValue('15');
     const criticalRisk = page.locator('.obs-traffic-cockpit .obs-risk.is-critical').first();
     await expect(criticalRisk, '匿名 10MB 上传探针应被识别为严重异常').toBeVisible({ timeout: 30_000 });
@@ -234,6 +240,8 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
         message: '侧栏菜单统计应使用批量接口协议'
     }).toBeGreaterThan(0);
     const badgeBatches = presentationStatsRequests.filter(item => item.batchSize > 0);
+    expect(badgeBatches.some(item => item.transport === 'custom-address'), '侧栏统计必须调用接口引擎自定义地址').toBe(true);
+    expect(presentationStatsRequests.some(item => item.transport === 'legacy-run'), '侧栏统计不应回退到 /api/ApiEngine/Run').toBe(false);
     expect(presentationStatsRequests.length, '侧栏统计不得退化为按菜单逐项调用').toBeLessThanOrEqual(6);
     expect(Math.max(...badgeBatches.map(item => item.batchSize)), '一次批量请求应承载多个菜单').toBeGreaterThan(10);
 
@@ -265,13 +273,15 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
         menuRequestDurations.at(-1),
         `菜单缓存命中应快于首次查询：${JSON.stringify(menuRequestDurations)}`
     ).toBeLessThan(menuRequestDurations[0]);
+    expect(menuRequestTransports.every(item => item === 'custom-address'), '菜单加载必须使用接口引擎自定义地址').toBe(true);
 
     fs.writeFileSync(
         path.join(ARTIFACT_DIR, 'system-observability-performance.json'),
         JSON.stringify({
             presentationStatsRequestCount: presentationStatsRequests.length,
             presentationStatsRequests,
-            getSysMenuStepDurationsMs: menuRequestDurations
+            getSysMenuStepDurationsMs: menuRequestDurations,
+            getSysMenuStepTransports: menuRequestTransports
         }, null, 2),
         'utf8'
     );

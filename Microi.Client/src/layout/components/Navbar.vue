@@ -299,32 +299,28 @@ export default {
                 }
             }
         },
-        async loadUserSig(sdkAppid, secretKey, expire) {
+        async loadUserSig(expire) {
             let self = this;
-            // let result = await request({
-            //     url: `${self.DiyCommon.GetApiBase()}/api/Im/GetUserSig`,
-            //     method: "get",
-            //     params: {
-            //         userId: self.GetCurrentUser?.Account,
-            //         sdkAppid: sdkAppid,
-            //         secretKey: secretKey,
-            //         expire: expire
-            //     }
-            // });
-            // if (result.status == 200) {
-            //     return result.data;
-            // }
-            // return null;
+            return await new Promise(resolve => {
+                self.DiyCommon.Post('/apiengine/platform-tencent-im', {
+                    Action: 'GetUserSig',
+                    UserId: self.GetCurrentUser?.Account,
+                    Expire: expire
+                }, function(result) {
+                    resolve(result?.Code === 1 ? result.Data?.UserSig : null);
+                }, function() {
+                    resolve(null);
+                });
+            });
         },
         async onIframeLoad() {
             let self = this;
             console.log("腾讯即时通信IM Iframe 已加载完成", self.SysConfig);
 
             let sdkAppid = self.SysConfig?.IMSdkAppid; //应用id
-            let secretKey = self.SysConfig?.IMSecretKey; //应用密钥
             let expire = 604800; //过期时间
-            if (!sdkAppid || !secretKey) return;
-            let userSig = await self.loadUserSig(sdkAppid, secretKey, expire);
+            if (!sdkAppid) return;
+            let userSig = await self.loadUserSig(expire);
 
             //模拟数据库数据
             let demoObj = {

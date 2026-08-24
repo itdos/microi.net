@@ -51,7 +51,7 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 | `DataFilterV8.js` | **后端** | `DataFilter` | 获取列表/表单数据后 | 每行数据加工、脱敏、补充字段 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-002 sha256=1956a46955c57434582c8dd5a41ffe9d445a74f42b26706c7d2033dfb822ffc0 -->
+<!-- microi-progressive:chunk id=v8-table-event-002 sha256=86c13bfd4dbc035e5498fe072ed176780ed31975b64eda09c1a378de986ab73d -->
 ## 事件触发规则
 
 - 后端 V8 事件 / 接口引擎中调用 `V8.FormEngine` 增删改 → **不触发**表单 V8 事件

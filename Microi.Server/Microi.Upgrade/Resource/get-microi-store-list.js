@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store
- * Version: v1.4.3
+ * Version: v1.4.6
  * Function:
  * - 读取统一应用商城列表并计算租户安装状态；批量平台安装时优先返回应用商城自举包。
  */
@@ -72,15 +72,29 @@ function first(row, names) {
   return "";
 }
 function addMap(map, key, row) { key = lower(key); if (key && !map[key]) map[key] = row; }
-function installedMap() {
+function installedMap(apps) {
   var external = V8.Param.InstalledVersions || V8.Param.InstalledApps;
   var rows = external ? toArray(external) : [];
   if (!external) {
+    var storeIds = [], appIds = [];
+    for (var appIndex = 0; appIndex < apps.length; appIndex++) {
+      var app = apps[appIndex] || {};
+      if (trim(app.Id)) storeIds.push(trim(app.Id));
+      if (trim(app.AppId || app.AppKey)) appIds.push(trim(app.AppId || app.AppKey));
+    }
+    if (!storeIds.length && !appIds.length) return {};
     try {
+      var installedWhere = [];
+      if (storeIds.length && appIds.length) {
+        installedWhere.push(["AND", "(", "StoreId", "In", storeIds]);
+        installedWhere.push(["OR", "AppId", "In", appIds, ")"]);
+      } else if (storeIds.length) installedWhere.push(["StoreId", "In", storeIds]);
+      else installedWhere.push(["AppId", "In", appIds]);
       var result = V8.FormEngine.GetTableData("sys_microistoreversion", {
+        _Where: installedWhere,
         _SelectFields: ["Id", "StoreId", "AppId", "AppName", "AppVersion", "AppVersionInstall", "InstallStatus", "InstallTime"],
         _PageIndex: 1,
-        _PageSize: 5000
+        _PageSize: Math.max(15, Math.min(1000, (storeIds.length + appIds.length) * 3))
       });
       rows = result && result.Code === 1 ? toArray(result.Data) : [];
     } catch (error) { rows = []; }
@@ -134,9 +148,91 @@ function collectWhereFilter(fieldNames) {
   return result;
 }
 
+function appendPublishedWhere(where) {
+  // SQL AND has higher precedence than OR, so this single bounded group means:
+  // (Platform AND approved) OR (non-Platform AND published AND built).
+  where.push(["AND", "(", "ApplicationType", "=", "Platform"]);
+  where.push(["AND", "IsApprove", "=", 1]);
+  where.push(["OR", "ApplicationType", "<>", "Platform"]);
+  where.push(["AND", "Status", "=", "Published"]);
+  where.push(["AND", "BuildStatus", "=", "Success", ")"]);
+}
+function appendPublicWhere(where, expectedPublic) {
+  if (expectedPublic === false) {
+    where.push(["AND", "IsPublic", "=", 0]);
+    return;
+  }
+  where.push(["AND", "(", "IsPublic", "=", 1]);
+  where.push(["OR", "IsPublic", "=", null, ")"]);
+}
+function appendKeywordWhere(where, keyword) {
+  if (!keyword) return;
+  where.push(["AND", "(", "AppName", "Like", keyword]);
+  where.push(["OR", "AppKey", "Like", keyword]);
+  where.push(["OR", "AppId", "Like", keyword]);
+  where.push(["OR", "AppDetail", "Like", keyword, ")"]);
+}
+function readCatalogFacets(authenticated, ownedOnly, ownerUserId) {
+  var cacheKey = "Microi:" + V8.OsClient + ":StoreCatalogFacets:" + (authenticated ? "auth" : "anon");
+  if (!ownedOnly) {
+    var cached = V8.Cache.Get(cacheKey);
+    if (cached) {
+      try { return JSON.parse(String(cached)); } catch (ignoreCache) { }
+    }
+  }
+  var facetWhere = [];
+  if (ownedOnly) {
+    facetWhere.push(["AND", "(", "OwnerUserId", "=", ownerUserId]);
+    facetWhere.push(["OR", "UserId", "=", ownerUserId, ")"]);
+  } else {
+    appendPublishedWhere(facetWhere);
+    if (!authenticated) appendPublicWhere(facetWhere, true);
+  }
+  var categorySet = {}, typeSet = {}, publisherSet = {};
+  var publicCount = 0, privateCount = 0, pageIndex = 1, dataCount = 0;
+  while (pageIndex <= 10) {
+    var facetResult = V8.FormEngine.GetTableData("sys_microistore", {
+      _Where: facetWhere,
+      _SelectFields: ["ApplicationType", "AppType", "Category", "PublisherType", "IsPublic"],
+      _OrderBy: "Id",
+      _OrderByType: "ASC",
+      _PageIndex: pageIndex,
+      _PageSize: 1000
+    });
+    if (!facetResult || facetResult.Code !== 1) break;
+    var facetRows = facetResult.Data || [];
+    dataCount = Number(facetResult.DataCount || facetRows.length);
+    for (var facetIndex = 0; facetIndex < facetRows.length; facetIndex++) {
+      var row = facetRows[facetIndex] || {};
+      var runtimeType = trim(row.ApplicationType || row.AppType || "Platform");
+      var category = trim(row.Category || (runtimeType === "Platform" ? "platform" : "other"));
+      var publisher = trim(row.PublisherType || "租户应用");
+      var isPublic = flag(row.IsPublic, true);
+      categorySet[category] = true;
+      typeSet[runtimeType] = true;
+      publisherSet[publisher] = true;
+      if (isPublic) publicCount++; else privateCount++;
+    }
+    if (facetRows.length < 1000 || pageIndex * 1000 >= dataCount) break;
+    pageIndex++;
+  }
+  var facets = {
+    PublicApplicationCount: publicCount,
+    PrivateApplicationCount: authenticated ? privateCount : 0,
+    Categories: Object.keys(categorySet).sort(),
+    ApplicationTypes: Object.keys(typeSet).sort(),
+    PublisherTypes: Object.keys(publisherSet).sort(),
+    IsTruncated: dataCount > 10000
+  };
+  if (!ownedOnly) V8.Cache.Set(cacheKey, JSON.stringify(facets), 300);
+  return facets;
+}
+
 var authenticated = hasAuthenticatedUser();
 var ownerUserId = currentUserId();
-var ownedOnly = lower(V8.Param.Scope) === "owned";
+var scope = lower(V8.Param.Scope);
+var ownedOnly = scope === "owned";
+var installedOnly = scope === "installed";
 if (ownedOnly && (!authenticated || !ownerUserId)) return { Code: 0, Data: [], Msg: "登录后才能读取自己发布的应用。" };
 var pageIndex = Math.max(1, parseInt(V8.Param._PageIndex || V8.Param.PageIndex || 1, 10) || 1);
 var pageSize = Math.max(1, Math.min(500, parseInt(V8.Param._PageSize || V8.Param.PageSize || 15, 10) || 15));
@@ -145,42 +241,89 @@ var types = values(V8.Param.ApplicationTypes || V8.Param.ApplicationType);
 var categories = values(V8.Param.Categories || V8.Param.Category);
 var publishers = values(V8.Param.PublisherTypes || V8.Param.PublisherType);
 var visibility = lower(V8.Param.Visibility);
+var action = text(V8.Param.Action || V8.Param.action);
 appendUnique(types, collectWhereFilter(["ApplicationType", "AppType"]));
 appendUnique(categories, collectWhereFilter(["Category"]));
 appendUnique(publishers, collectWhereFilter(["PublisherType"]));
+var checkPlatformApps = action === "CheckPlatformApps" || action === "CheckOfficialUpdates" || action === "CheckUpdates" || action === "OfficialNotice";
+var platformOnly = types.length === 1 && lower(types[0]) === "platform";
+var externalInstalledVersions = V8.Param.InstalledVersions || V8.Param.InstalledApps;
+var bulkInstallPlan = flag(V8.Param.BulkInstallPlan, false) || (!!externalInstalledVersions && platformOnly);
+var queryWhere = [];
+if (ownedOnly) {
+  queryWhere.push(["AND", "(", "OwnerUserId", "=", ownerUserId]);
+  queryWhere.push(["OR", "UserId", "=", ownerUserId, ")"]);
+} else {
+  appendPublishedWhere(queryWhere);
+  if (!authenticated) appendPublicWhere(queryWhere, true);
+}
+if (visibility === "public") appendPublicWhere(queryWhere, true);
+if (visibility === "private") appendPublicWhere(queryWhere, false);
+if (checkPlatformApps) queryWhere.push(["AND", "ApplicationType", "=", "Platform"]);
+else if (types.length) queryWhere.push(["AND", "ApplicationType", "In", types]);
+if (categories.length) queryWhere.push(["AND", "Category", "In", categories]);
+if (publishers.length) queryWhere.push(["AND", "PublisherType", "In", publishers]);
+appendKeywordWhere(queryWhere, keyword);
 
+// “已安装”视图必须仍由商城源做服务端分页。旧前端为了筛选安装状态会
+// 拉取最多 10000 个完整应用再在浏览器切片，既放大接口耗时，也产生无谓流量。
+// 这里只接收当前租户已安装记录的最小投影，并把商城 Id/AppId 条件下推到数据库。
+if (installedOnly) {
+  var installedRows = toArray(externalInstalledVersions);
+  var installedStoreIds = [], installedAppIds = [];
+  for (var installedIndex = 0; installedIndex < installedRows.length; installedIndex++) {
+    var installedRow = installedRows[installedIndex] || {};
+    var installedStoreId = trim(installedRow.StoreId);
+    var installedAppId = trim(installedRow.AppId || installedRow.AppKey);
+    if (installedStoreId && installedStoreIds.indexOf(installedStoreId) < 0) installedStoreIds.push(installedStoreId);
+    if (installedAppId && installedAppIds.indexOf(installedAppId) < 0) installedAppIds.push(installedAppId);
+  }
+  if (!installedStoreIds.length && !installedAppIds.length) {
+    return {
+      Code: 1,
+      Data: [],
+      DataCount: 0,
+      Msg: "成功",
+      DataAppend: { PageIndex: pageIndex, PageSize: pageSize, Scope: "Installed" }
+    };
+  }
+  if (installedStoreIds.length && installedAppIds.length) {
+    queryWhere.push(["AND", "(", "Id", "In", installedStoreIds]);
+    queryWhere.push(["OR", "AppId", "In", installedAppIds]);
+    queryWhere.push(["OR", "AppKey", "In", installedAppIds, ")"]);
+  } else if (installedStoreIds.length) {
+    queryWhere.push(["AND", "Id", "In", installedStoreIds]);
+  } else {
+    queryWhere.push(["AND", "(", "AppId", "In", installedAppIds]);
+    queryWhere.push(["OR", "AppKey", "In", installedAppIds, ")"]);
+  }
+}
+
+var queryPageIndex = checkPlatformApps || bulkInstallPlan ? 1 : pageIndex;
+var queryPageSize = checkPlatformApps || bulkInstallPlan ? 500 : pageSize;
 var sourceResult = V8.FormEngine.GetTableData("sys_microistore", {
-  _SelectNotFields: ["AppPakcet", "AiAppZipFiles", "AiAppPackageManifest", "SelectData", "SelectAiApp"],
+  _Where: queryWhere,
+  _SelectFields: [
+    "Id", "AppId", "AppKey", "AppName", "AppVersion", "CurrentVersion", "AppAuthor",
+    "AppUpdateTime", "AppPreview", "AppDetail", "ApplicationType", "AppType", "Category",
+    "PublisherType", "IsPublic", "IsApprove", "Status", "BuildStatus", "OwnerUserId", "UserId",
+    "PublicPublishPath", "PreviewUrl", "ViewCount", "InstallCount"
+  ],
   _OrderBy: "AppUpdateTime",
   _OrderByType: "DESC",
-  _PageIndex: 1,
-  _PageSize: 5000
+  _PageIndex: queryPageIndex,
+  _PageSize: queryPageSize
 });
 if (!sourceResult || sourceResult.Code !== 1) return sourceResult || { Code: 0, Data: [], Msg: "应用商城读取失败" };
 
-var map = installedMap(), all = [], categorySet = {}, typeSet = {}, publisherSet = {};
-var source = sourceResult.Data || [], publicCount = 0, privateCount = 0;
+var source = sourceResult.Data || [];
+var map = installedMap(source), all = [];
 for (var i = 0; i < source.length; i++) {
   var app = source[i] || {};
   var isPublic = flag(app.IsPublic, true);
-  if (!isPublic && !authenticated) continue;
   var runtimeType = trim(app.ApplicationType || app.AppType || "Platform");
   var category = trim(app.Category || (runtimeType === "Platform" ? "platform" : "other"));
   var publisher = trim(app.PublisherType || "租户应用");
-  var published = runtimeType === "Platform"
-    ? Number(app.IsApprove || 0) === 1
-    : trim(app.Status) === "Published" && trim(app.BuildStatus) === "Success";
-  var isOwner = trim(app.OwnerUserId || app.UserId) === ownerUserId;
-  if (ownedOnly ? !isOwner : !published) continue;
-  if (visibility === "public" && !isPublic) continue;
-  if (visibility === "private" && isPublic) continue;
-  if (!ownedOnly) {
-    if (isPublic) publicCount++; else privateCount++;
-  }
-  categorySet[category] = true; typeSet[runtimeType] = true; publisherSet[publisher] = true;
-  if (!contains(types, runtimeType) || !contains(categories, category) || !contains(publishers, publisher)) continue;
-  var haystack = lower(text(app.AppName || app.Name) + " " + text(app.AppDetail || app.Description) + " " + runtimeType + " " + category + " " + publisher);
-  if (keyword && haystack.indexOf(keyword) < 0) continue;
   app.Name = text(app.AppName || app.Name);
   app.AppName = app.Name;
   app.Description = text(app.AppDetail || app.Description);
@@ -198,8 +341,7 @@ for (var i = 0; i < source.length; i++) {
   all.push(app);
 }
 
-var action = text(V8.Param.Action || V8.Param.action);
-if (action === "CheckPlatformApps" || action === "CheckOfficialUpdates" || action === "CheckUpdates" || action === "OfficialNotice") {
+if (checkPlatformApps) {
   var notices = [], installedCount = 0, platformCount = 0;
   for (var n = 0; n < all.length; n++) {
     var item = all[n];
@@ -223,10 +365,6 @@ if (action === "CheckPlatformApps" || action === "CheckOfficialUpdates" || actio
 // BULK_PLATFORM_BOOTSTRAP_ORDER_V1：旧租户先安装/更新应用商城自身，才能让
 // 后续 SaaS、表单等长包使用最新版导入器。批量协调器会显式传 BulkInstallPlan；
 // 兼容旧协调器时，以外部 InstalledVersions + 仅筛选 Platform 识别批量盘点。
-var platformOnly = types.length === 1 && lower(types[0]) === "platform";
-var externalInstalledVersions = V8.Param.InstalledVersions || V8.Param.InstalledApps;
-var bulkInstallPlan = flag(V8.Param.BulkInstallPlan, false)
-  || (!!externalInstalledVersions && platformOnly);
 if (bulkInstallPlan) {
   all.sort(function (left, right) {
     var leftBootstrap = lower(left && (left.AppId || left.AppKey)) === "app.microi.store" ? 0 : 1;
@@ -235,22 +373,24 @@ if (bulkInstallPlan) {
   });
 }
 
-var start = (pageIndex - 1) * pageSize;
+var facets = readCatalogFacets(authenticated, ownedOnly, ownerUserId);
+var start = checkPlatformApps || bulkInstallPlan ? (pageIndex - 1) * pageSize : 0;
 return {
   Code: 1,
   Data: all.slice(start, start + pageSize),
-  DataCount: all.length,
+  DataCount: Number(sourceResult.DataCount || all.length),
   Msg: "成功",
   DataAppend: {
     FileServer: trim(V8.SysConfig && V8.SysConfig.FileServer),
     PageIndex: pageIndex,
     PageSize: pageSize,
     Authenticated: authenticated,
-    Scope: ownedOnly ? "Owned" : "Published",
-    PublicApplicationCount: publicCount,
-    PrivateApplicationCount: authenticated ? privateCount : 0,
-    Categories: Object.keys(categorySet).sort(),
-    ApplicationTypes: Object.keys(typeSet).sort(),
-    PublisherTypes: Object.keys(publisherSet).sort()
+    Scope: ownedOnly ? "Owned" : (installedOnly ? "Installed" : "Published"),
+    PublicApplicationCount: facets.PublicApplicationCount,
+    PrivateApplicationCount: facets.PrivateApplicationCount,
+    Categories: facets.Categories,
+    ApplicationTypes: facets.ApplicationTypes,
+    PublisherTypes: facets.PublisherTypes,
+    FacetsTruncated: facets.IsTruncated
   }
 };

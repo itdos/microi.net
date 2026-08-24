@@ -44,7 +44,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=113995bb5eb3f6d9dfdf0b8d8cb45c415dc931c244beb80dd976f56ce782fb13 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=ca442fa8a4990040aa7172dd37b49437bc6de0c9b1f88d889a30f5e936321aa1 -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图

@@ -44,10 +44,10 @@ var DiyApi = {
     },
 
     GetSysRole: function () {
-        return "/api/sysrole/getSysRole"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-role?Action=GetSysRole";
     },
     GetSysRoleModel: function () {
-        return "/api/sysrole/getSysRoleModel"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-role?Action=GetSysRoleModel";
     },
 
     /**
@@ -82,7 +82,7 @@ var DiyApi = {
      */
     // GetSysBaseData: '/api/' + joinUrl + 'SysBaseData/GetSysBaseData',
     GetSysBaseData: function () {
-        return "/api/SysBaseData/getSysBaseData"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-base-data?Action=GetSysBaseData";
     },
 
     GetBizWechat: "/api/BizWechat/GetBizWechat",
@@ -134,32 +134,28 @@ var DiyApi = {
      */
     // AddSysMenu: '/api/' + joinUrl + 'SysMenu/AddSysMenu',
     AddSysMenu: function () {
-        return "/api/SysMenu/addSysMenu";
-        return "/api/" + DiyCommon.GetApiClientUrl() + "SysMenu/AddSysMenu";
+        return "/apiengine/platform-sys-menu?Action=AddSysMenu";
     },
     /**
      * 删除菜单
      */
     // DelSysMenu: '/api/' + joinUrl + 'SysMenu/DelSysMenu',
     DelSysMenu: function () {
-        return "/api/SysMenu/delSysMenu";
-        return "/api/" + DiyCommon.GetApiClientUrl() + "SysMenu/DelSysMenu";
+        return "/apiengine/platform-sys-menu?Action=DelSysMenu";
     },
     /**
      * 修改菜单
      */
     // UptSysMenu: '/api/' + joinUrl + 'SysMenu/UptSysMenu',
     UptSysMenu: function () {
-        return "/api/SysMenu/uptSysMenu";
-        return "/api/" + DiyCommon.GetApiClientUrl() + "SysMenu/UptSysMenu";
+        return "/apiengine/platform-sys-menu?Action=UptSysMenu";
     },
     /**
      * 获取菜单tree
      */
     // GetSysMenuStep: '/api/' + joinUrl + 'SysMenu/GetSysMenuStep',
     GetSysMenuStep: function () {
-        return "/api/SysMenu/GetSysMenuStep";
-        return "/api/" + DiyCommon.GetApiClientUrl() + "SysMenu/GetSysMenuStep";
+        return "/apiengine/platform-sys-menu?Action=GetSysMenuStep";
     },
     GetSysMenuModel: "/api/FormEngine/GetSysMenuModel",
     GetLeftRightPageConfig: "/api/FormEngine/GetLeftRightPageConfig",
@@ -177,7 +173,7 @@ var DiyApi = {
      */
     // DelSysRole: '/api/' + joinUrl + 'SysRole/DelSysRole',
     DelSysRole: function () {
-        return "/api/SysRole/delSysRole"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-role?Action=DelSysRole";
     },
 
     /**
@@ -187,7 +183,7 @@ var DiyApi = {
      */
     // UptSysRole: '/api/' + joinUrl + 'SysRole/UptSysRole',
     UptSysRole: function () {
-        return "/api/SysRole/UptSysRole"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-role?Action=UptSysRole";
     },
 
     /**
@@ -196,7 +192,7 @@ var DiyApi = {
      */
     // AddSysRole: '/api/' + joinUrl + 'SysRole/AddSysRole',
     AddSysRole: function () {
-        return "/api/SysRole/AddSysRole"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-role?Action=AddSysRole";
     },
 
     /**
@@ -204,21 +200,21 @@ var DiyApi = {
      */
     // AddSysBaseData: '/api/' + joinUrl + 'SysBaseData/AddSysBaseData',
     AddSysBaseData: function () {
-        return "/api/SysBaseData/addSysBaseData"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-base-data?Action=AddSysBaseData";
     },
     /**
      * 基础数据
      */
     // DelSysBaseData: '/api/' + joinUrl + 'SysBaseData/DelSysBaseData',
     DelSysBaseData: function () {
-        return "/api/SysBaseData/delSysBaseData"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-base-data?Action=DelSysBaseData";
     },
     /**
      * 基础数据
      */
     // UptSysBaseData: '/api/' + joinUrl + 'SysBaseData/UptSysBaseData',
     UptSysBaseData: function () {
-        return "/api/SysBaseData/uptSysBaseData"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-base-data?Action=UptSysBaseData";
     },
     // /**
     //  * 基础数据
@@ -229,7 +225,7 @@ var DiyApi = {
      */
     // GetSysBaseDataStep: '/api/' + joinUrl + 'SysBaseData/GetSysBaseDataStep',
     GetSysBaseDataStep: function () {
-        return "/api/SysBaseData/getSysBaseDataStep"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-base-data?Action=GetSysBaseDataStep";
     },
 
     /**
@@ -268,11 +264,11 @@ var DiyApi = {
         return "/api/SysRichText/GetSysRichTextStep"; //' + DiyCommon.GetApiClientUrl() + '
     },
 
-    GetSysDept: "/api/SysDept/getSysDept",
-    GetSysDeptStep: "/api/SysDept/getSysDeptStep",
-    AddSysDept: "/api/SysDept/addSysDept",
-    UptSysDept: "/api/SysDept/uptSysDept",
-    DelSysDept: "/api/SysDept/delSysDept",
+    GetSysDept: "/apiengine/platform-sys-dept?Action=GetSysDept",
+    GetSysDeptStep: "/apiengine/platform-sys-dept?Action=GetSysDeptStep",
+    AddSysDept: "/apiengine/platform-sys-dept?Action=AddSysDept",
+    UptSysDept: "/apiengine/platform-sys-dept?Action=UptSysDept",
+    DelSysDept: "/apiengine/platform-sys-dept?Action=DelSysDept",
 
     LoadNotDiyTable: "/api/FormEngine/LoadNotDiyTable",
     GetNotDiyTable: "/api/FormEngine/GetNotDiyTable",
@@ -300,7 +296,10 @@ var DiyApi = {
     UptDiyDataListByWhere: "/api/FormEngine/UptDiyDataListByWhere",
     GetDiyFieldSqlData: "/api/FormEngine/GetDiyFieldSqlData", // sql数据源来源
     GetDataSourceEngine: "/api/DataSourceEngine/Run", // 数据源引擎来源
-    ApiEngineRun: "/api/ApiEngine/Run", // 数据源引擎来源
+    GetApiEngineUrl: function (apiEngineKey) {
+        var key = String(apiEngineKey || "").trim();
+        return key ? "/apiengine/" + encodeURIComponent(key) : "";
+    },
     GetFieldsData: "/api/FormEngine/GetFieldsData",
     GetImportDiyTableRowStep: "/api/FormEngine/GetImportDiyTableRowStep",
 
@@ -313,7 +312,7 @@ var DiyApi = {
     GetDiyFieldModel: "/api/FormEngine/GetDiyFieldModel",
     UptDiyFieldList: "/api/FormEngine/UptDiyFieldList",
 
-    GetSysRoleLimitByMenuId: "/api/SysMenu/GetSysRoleLimitByMenuId" //获取角色菜单权限（李赛赛）
+    GetSysRoleLimitByMenuId: "/apiengine/platform-sys-menu?Action=GetSysRoleLimitByMenuId" //获取角色菜单权限（李赛赛）
 };
 
 export { DiyApi };

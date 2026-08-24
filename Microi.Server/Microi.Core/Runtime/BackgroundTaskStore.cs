@@ -48,6 +48,12 @@ TrustedUserJson,IdempotencyKey,ConcurrencyKey,LeaseOwner,LeaseExpiresAt,FencingT
 ExecutionCount,RetryOnFailure,NextRunTime,ProgressSampleTime,ProgressSampleCurrent,ThroughputPerSecond,
 ProgressSampleCount,CheckpointJson,LastError,BusinessTable,BusinessId,BusinessStatusField,BusinessTaskIdField,
 BusinessProgressField,BusinessEtaField,RuntimeOsClientType,RuntimeOsClientNetwork";
+        private const string SummaryProjection = @"Id,Title,Type,ApiEngineKey,Status,StatusText,
+Progress,ProgressMode,WorkCurrent AS Current,WorkTotal AS Total,Msg,CreateTime,StartTime,EndTime,
+HeartbeatTime,EstimatedEndTime,RemainingSeconds,EstimateConfidence,CancelRequested,AttemptCount,MaxAttempts,
+ExecutionCount,BusinessTable,BusinessId,
+CASE WHEN Log IS NULL OR Log='' THEN 0 ELSE 1 END AS HasLog,
+CASE WHEN ResultJson IS NULL OR ResultJson='' THEN 0 ELSE 1 END AS HasResult";
         internal const string RuntimeScopePredicate = @"(RuntimeOsClientType IS NULL OR RuntimeOsClientType='' OR RuntimeOsClientType=@runtimeType)
   AND (RuntimeOsClientNetwork IS NULL OR RuntimeOsClientNetwork='' OR RuntimeOsClientNetwork=@runtimeNetwork)";
 
@@ -171,6 +177,54 @@ ORDER BY CreateTime DESC", take);
                 .ToList();
         }
 
+        public static List<BackgroundTaskSummary> ListSummaries(
+            string osClient,
+            string userKey,
+            int pageIndex,
+            int pageSize,
+            out int dataCount)
+        {
+            var client = GetRequiredClient(osClient);
+            pageIndex = Math.Max(1, pageIndex);
+            pageSize = Math.Max(1, Math.Min(100, pageSize));
+            var predicate = $@"(IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1
+  AND {RuntimeScopePredicate}";
+            var countValue = client.Db.FromSql($"SELECT COUNT(1) FROM {TableName} WHERE {predicate}")
+                .AddInParameter("p0", osClient)
+                .AddInParameter("p1", userKey)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
+                .ToScalar();
+            dataCount = Math.Max(0, Convert.ToInt32(countValue ?? 0, CultureInfo.InvariantCulture));
+            var sql = PageSql(client, $@"SELECT {SummaryProjection} FROM {TableName}
+WHERE {predicate}
+ORDER BY CreateTime DESC", pageIndex, pageSize);
+            var rows = client.Db.FromSql(sql)
+                .AddInParameter("p0", osClient)
+                .AddInParameter("p1", userKey)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
+                .ToList<BackgroundTaskSummary>();
+            foreach (var item in rows) HydrateSummary(item);
+            return rows;
+        }
+
+        public static BackgroundTaskSummary GetSummaryForUser(string osClient, string userKey, string taskId)
+        {
+            var client = GetRequiredClient(osClient);
+            var sql = FirstSql(client, $@"SELECT {SummaryProjection} FROM {TableName}
+WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1 AND Id=@p2
+  AND {RuntimeScopePredicate}");
+            var item = client.Db.FromSql(sql)
+                .AddInParameter("p0", osClient)
+                .AddInParameter("p1", userKey)
+                .AddInParameter("p2", taskId)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
+                .ToFirst<BackgroundTaskSummary>();
+            return HydrateSummary(item);
+        }
+
         public static BackgroundTaskRecord Get(string osClient, string taskId)
         {
             var client = GetRequiredClient(osClient);
@@ -180,6 +234,21 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND Id=@p1
             return Hydrate(client.Db.FromSql(sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", taskId)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
+                .ToFirst<BackgroundTaskRecord>());
+        }
+
+        public static BackgroundTaskRecord GetForUser(string osClient, string userKey, string taskId)
+        {
+            var client = GetRequiredClient(osClient);
+            var sql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
+WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1 AND Id=@p2
+  AND {RuntimeScopePredicate}");
+            return Hydrate(client.Db.FromSql(sql)
+                .AddInParameter("p0", osClient)
+                .AddInParameter("p1", userKey)
+                .AddInParameter("p2", taskId)
                 .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
                 .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
                 .ToFirst<BackgroundTaskRecord>());
@@ -923,6 +992,42 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
                 return sql + $" FETCH FIRST {take} ROWS ONLY";
             }
             return sql + $" LIMIT {take}";
+        }
+
+        private static string PageSql(OsClientSecret client, string sql, int pageIndex, int pageSize)
+        {
+            var offset = Math.Max(0, pageIndex - 1) * pageSize;
+            var dbType = client.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            if (string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(dbType, "Oracle", StringComparison.OrdinalIgnoreCase))
+            {
+                return sql + $" OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY";
+            }
+            return sql + $" LIMIT {offset},{pageSize}";
+        }
+
+        private static string FormatDuration(int seconds)
+        {
+            seconds = Math.Max(0, seconds);
+            if (seconds < 60) return $"{seconds}s";
+            if (seconds < 3600) return $"{seconds / 60}m {seconds % 60}s";
+            if (seconds < 86400) return $"{seconds / 3600}h {(seconds % 3600) / 60}m";
+            return $"{seconds / 86400}d {(seconds % 86400) / 3600}h {(seconds % 3600) / 60}m";
+        }
+
+        private static BackgroundTaskSummary HydrateSummary(BackgroundTaskSummary item)
+        {
+            if (item == null) return null;
+            var from = item.StartTime ?? item.CreateTime;
+            var to = item.EndTime ?? DateTime.Now;
+            item.ElapsedSeconds = Math.Max(0, Convert.ToInt32((to - from).TotalSeconds));
+            item.ElapsedText = FormatDuration(item.ElapsedSeconds);
+            item.RemainingText = item.RemainingSeconds.HasValue
+                ? FormatDuration(item.RemainingSeconds.Value)
+                : "";
+            item.ProgressMode = item.ProgressMode.DosIsNullOrWhiteSpace() ? "Indeterminate" : item.ProgressMode;
+            item.EstimateConfidence = item.EstimateConfidence.DosIsNullOrWhiteSpace() ? "None" : item.EstimateConfidence;
+            return item;
         }
 
         private static string SafeError(Exception error)

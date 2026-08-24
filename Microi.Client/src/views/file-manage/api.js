@@ -3,7 +3,6 @@ import JSEncrypt from 'jsencrypt'
 import config from '@/config.json'
 
 const API_BASE = '/api/HDFS'
-const API_ENGINE_RUN = '/api/ApiEngine/Run'
 const DEFAULT_LOGIN_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
 XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
@@ -143,10 +142,11 @@ export const fileSyncApi = {
       OsClient: platform.osClient || '',
       authorization: token && !token.startsWith('Bearer ') ? `Bearer ${token}` : token
     }
-    const resp = await fetch(`${apiBase}${API_ENGINE_RUN}`, {
+    const engineUrl = `/apiengine/${encodeURIComponent(apiEngineKey)}`
+    const resp = await fetch(`${apiBase}${engineUrl}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ ApiEngineKey: apiEngineKey, ...param })
+      body: JSON.stringify({ ...param })
     })
     return responseJson(resp, `远程接口 ${apiEngineKey} 调用失败`)
   },

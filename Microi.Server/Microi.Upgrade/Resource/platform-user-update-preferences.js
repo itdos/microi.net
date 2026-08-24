@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-user-update-preferences
- * Version: v1.0.0
+ * Version: v1.0.2
  * Function:
  * - 仅允许登录用户保存自己的界面偏好；目标用户和租户始终取当前 DiyToken 上下文。
  * - 固定白名单覆盖首页、主题、菜单展开和桌面外观，不接受账号、角色、组织或认证字段。
@@ -167,6 +167,43 @@ if (updateCount === 0) {
   return { Code: 1, Data: currentUser, Msg: '没有需要保存的个人偏好。' };
 }
 
+function comparablePreference(name, value) {
+  if (name === 'RandomDesktopBg' || name === 'OpenTreeMenu') {
+    var normalized = normalizeFlag(value);
+    return normalized.ok ? String(normalized.value) : text(value);
+  }
+  if (name === 'DesktopDockMenu') {
+    var parsed = value;
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch (ignore) { return text(value); }
+    }
+    if (!parsed || typeof parsed.length === 'undefined') return '[]';
+    var items = [];
+    for (var itemIndex = 0; itemIndex < parsed.length; itemIndex++) items.push(text(parsed[itemIndex]));
+    return JSON.stringify(items);
+  }
+  var result = text(value);
+  if (name === 'ThemeColor') return result.toUpperCase();
+  if (name === 'ThemeMode' || name === 'DesktopType') return result.toLowerCase();
+  return result;
+}
+
+// Theme pickers can emit the current value repeatedly. Do not perform a DB
+// UPDATE or rebuild the login projection unless at least one normalized value
+// actually changed.
+var changedModel = { Id: userId };
+var changedCount = 0;
+for (var fieldName in updateModel) {
+  if (!Object.prototype.hasOwnProperty.call(updateModel, fieldName) || fieldName === 'Id') continue;
+  if (comparablePreference(fieldName, updateModel[fieldName]) === comparablePreference(fieldName, currentUser[fieldName])) continue;
+  changedModel[fieldName] = updateModel[fieldName];
+  changedCount++;
+}
+if (changedCount === 0) {
+  return { Code: 1, Data: currentUser, Changed: false, Msg: '个人偏好未变化，无需重复保存。' };
+}
+updateModel = changedModel;
+
 var updateResult = V8.FormEngine.UptFormData('sys_user', updateModel);
 if (!updateResult || updateResult.Code != 1) {
   return updateResult || fail('个人偏好保存失败。');
@@ -180,5 +217,6 @@ if (!refreshResult || refreshResult.Code != 1) {
 return {
   Code: 1,
   Data: refreshResult.Data,
+  Changed: true,
   Msg: '个人偏好已保存并同步到当前账号。'
 };

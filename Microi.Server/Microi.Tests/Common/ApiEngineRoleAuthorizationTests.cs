@@ -99,6 +99,7 @@ public class ApiEngineRoleAuthorizationTests
     [InlineData("ApiEngine", "Run_Request_Get", true)]
     [InlineData("ApiEngine", "Run_Response_File", true)]
     [InlineData("ApiEngine", "Run_Response_Html", true)]
+    [InlineData("ApiEngine", "Run_Response_Stream", true)]
     [InlineData("BackgroundTask", "RunApiEngine", true)]
     [InlineData("BackgroundTask", "Cancel", false)]
     [InlineData("FormEngine", "UptFormData", false)]

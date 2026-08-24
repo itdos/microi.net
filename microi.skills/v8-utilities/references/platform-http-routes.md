@@ -9,10 +9,12 @@
 | 路由 | 用途 |
 |---|---|
 | `POST /apiengine/{ApiEngineKey}` | 推荐的稳定接口引擎入口 |
-| `POST /api/ApiEngine/Run` | 兼容入口，Body 传 `ApiEngineKey` |
+| `POST /api/ApiEngine/Run` | 仅旧客户端兼容，Body 传 `ApiEngineKey`；新增固定业务禁止使用 |
 | `/apiengine/{ApiEngineKey}--OsClient--{OsClient}--` | 仅用于确实无法设置 Header/Form/Query 的 GET/HEAD 场景 |
 
 普通请求优先在唯一 `osclient` Header 传租户，也可在 Query/Form/JSON 中冗余；
+固定业务必须使用真实引擎动态地址或唯一 `ApiAddress`，使日志、流量、审计和限流
+直接按引擎归因；旧通用入口只能由显式 `RunLegacy` 调用。
 不要无脑把特殊租户后缀加到每条 URL。官网中的
 `/apiengine/test1`、`/apiengine/get-product-list`、打印、支付和 Excel demo
 都是业务 `ApiEngineKey` 示例，不是固定平台接口。
@@ -49,7 +51,7 @@
 | `POST /api/HDFS/GetPrivateFileUrl` | 获取当前租户短期私有文件地址 |
 | `GET /api/HDFS/OpenPrivateFile` | 受权打开私有文件/Office 代理 |
 | `POST /api/DiyChat/SendSystemMessage` | 发送站内消息；前端优先 `V8.SendSystemMessage` |
-| `POST /api/mq/sendmsg` | MQ HTTP 兼容入口；业务端优先受控 V8/MQ |
+| `POST /apiengine/platform-mq` | MQ 管理入口；Body 使用 `Action=Send`，仅当前租户超级管理员 |
 | `GET /api/Diagnostics/health` | 聚合健康状态 |
 | `GET /api/Diagnostics/liveness` | 进程存活检查，不代表已就绪接流量 |
 

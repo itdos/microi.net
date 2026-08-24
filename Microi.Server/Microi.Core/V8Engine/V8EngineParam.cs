@@ -163,6 +163,14 @@ namespace Microi.net
         public IV8Method Method { get; set; }
 
         /// <summary>
+        /// HTTP streaming capability for ApiEngine ResponseType=Stream.  The sink,
+        /// cancellation token and byte budgets are bound by the host and are never
+        /// accepted from V8.Param.
+        /// </summary>
+        [JsonIgnore]
+        public V8ApiEngineStream Stream { get; set; } = V8ApiEngineStream.Disabled;
+
+        /// <summary>
         /// 平台内部通知。固定使用当前 V8 租户并在事务提交后发送 SignalR 提示；
         /// 通知列表与未读状态仍以 mic_msg_event_log 为权威事实源。
         /// </summary>

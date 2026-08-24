@@ -70,6 +70,7 @@ import {
     normalizeFormBannerConfig,
     resolveFormBannerMetricValue
 } from "../form-banner-runtime.js";
+import { requestMenuBadge } from "@/layout/components/Sidebar/menu-badge-batch.js";
 
 const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
@@ -366,7 +367,11 @@ export default {
             const values = Object.create(null);
             const requests = canLoadApiMetrics ? [...groups.entries()].map(async ([apiEngineKey, descriptors]) => {
                 try {
-                    const response = await this.runApiEngine(apiEngineKey, this.buildMetricParams(descriptors));
+                    const response = await requestMenuBadge(
+                        this.runApiEngine,
+                        apiEngineKey,
+                        this.buildMetricParams(descriptors)
+                    );
                     if (response && typeof response === "object"
                         && Object.prototype.hasOwnProperty.call(response, "Code")
                         && Number(response.Code) !== 1) {

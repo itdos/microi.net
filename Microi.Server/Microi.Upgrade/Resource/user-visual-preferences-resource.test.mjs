@@ -3,12 +3,20 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const packageModel = JSON.parse(await readFile(new URL('./app.microi.saas-engine.json', import.meta.url), 'utf8'));
+const versionAtLeast = (actual, minimum) => {
+  const left = String(actual || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+  const right = String(minimum || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    if ((left[index] || 0) !== (right[index] || 0)) return (left[index] || 0) > (right[index] || 0);
+  }
+  return true;
+};
 const table = packageModel.DiyTables.find(item => String(item.Name || '').toLowerCase() === 'sys_user');
 const names = ['ThemeColor', 'ThemeMode', 'MenuChildExpandMode'];
 const fields = names.map(name => packageModel.DiyFields.find(item => item.TableId === table.Id && item.Name === name));
 
 test('SaaS package delivers per-user visual preferences with safe legacy defaults', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.5.28');
+  assert.ok(versionAtLeast(packageModel.PackageInfo.Version, 'v7.5.28'));
   assert.ok(fields.every(Boolean));
   assert.ok(fields.every(field => field.Tab === '01KGFAYTX109WCP98XJZP395VY'));
   assert.equal(fields.find(field => field.Name === 'ThemeColor').DefaultValue, '');

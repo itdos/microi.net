@@ -83,7 +83,8 @@
   letter-spacing: .15em;
 }
 
-.mci-release-scope-banner h2#mci-release-scope-title {
+.mci-release-scope-banner h2#mci-release-scope-title,
+.mci-release-scope-banner h2#mci-release-era-title {
   margin: 0;
   border: 0;
   font-size: clamp(21px, 3vw, 29px);
@@ -91,7 +92,8 @@
   letter-spacing: -.025em;
 }
 
-.mci-release-scope-banner h2#mci-release-scope-title::before {
+.mci-release-scope-banner h2#mci-release-scope-title::before,
+.mci-release-scope-banner h2#mci-release-era-title::before {
   display: none;
 }
 
@@ -159,10 +161,26 @@
   color: var(--mci-release-blue);
 }
 
+.mci-release-era-banner {
+  --mci-release-blue: #7c3aed;
+  --mci-release-cyan: #2563eb;
+  margin-top: 46px;
+}
+
+.mci-release-era-banner .mci-release-scope-banner__mark span {
+  font-size: 23px;
+  letter-spacing: -.06em;
+}
+
 .dark .mci-release-scope-banner {
   --mci-release-blue: #60a5fa;
   --mci-release-cyan: #22d3ee;
   box-shadow: 0 20px 60px rgba(2, 8, 23, .32);
+}
+
+.dark .mci-release-era-banner {
+  --mci-release-blue: #a78bfa;
+  --mci-release-cyan: #60a5fa;
 }
 
 @media (max-width: 700px) {
@@ -181,6 +199,7 @@
   }
 
   .mci-release-scope-banner__mark span { font-size: 27px; }
+  .mci-release-era-banner .mci-release-scope-banner__mark span { font-size: 21px; }
   .mci-release-scope-banner__paths { grid-template-columns: 1fr; }
 }
 

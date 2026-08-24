@@ -296,6 +296,7 @@ export interface ApiEngine {
     V8Limit?: number;
     /** @deprecated Compatibility alias returned by older servers. Prefer V8Limit. */
     V8Unlimited?: number;
+    ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | string;
     Version?: string;
     ChangeHistory?: string;
     UpdateTime?: string;
@@ -354,6 +355,15 @@ export interface MongodbLogWrite {
     timer?: number;
     result?: string;
     appId?: string;
+}
+export type SystemObservabilityQueryAction = 'Capabilities' | 'Snapshot' | 'Logs' | 'LogTypes' | 'LogStats' | 'Signal' | 'Trace' | 'ApiRank' | 'AppLogs' | 'PlatformStats' | 'SecurityData' | 'TrafficHistory' | 'TrafficDetails' | 'HistoricalDashboard';
+export type SystemObservabilityManageAction = 'BlockIp' | 'UnblockIp';
+export interface SystemObservabilityQuery extends Record<string, unknown> {
+    Action: SystemObservabilityQueryAction;
+}
+export interface SystemObservabilityManage extends Record<string, unknown> {
+    Action: SystemObservabilityManageAction;
+    Ip: string;
 }
 export interface UserAccessKeyRecord {
     Id: string;
@@ -570,6 +580,7 @@ export declare class MicroiClient {
         changeSummary?: string;
         confirmLargeReduction?: boolean;
         v8Limit?: boolean;
+        responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream';
         /** @deprecated Compatibility alias. true maps to v8Limit=false. */
         v8Unlimited?: boolean;
     }): Promise<ApiResponse>;
@@ -582,6 +593,7 @@ export declare class MicroiClient {
         Category?: string;
         Code?: string;
         ApiAddress?: string;
+        ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream';
         V8Limit?: number;
         /** @deprecated Compatibility alias. true maps to V8Limit=0. */
         V8Unlimited?: number;
@@ -760,6 +772,8 @@ export declare class MicroiClient {
     writeAuditLog(action: string, target: string, content: string): Promise<ApiResponse>;
     queryMongodbLogs(query?: MongodbLogQuery): Promise<ApiResponse>;
     writeMongodbLog(log: MongodbLogWrite): Promise<ApiResponse>;
+    querySystemObservability(query: SystemObservabilityQuery): Promise<ApiResponse>;
+    manageSystemObservability(command: SystemObservabilityManage): Promise<ApiResponse>;
     getRedisStatistics(database?: number, connectionId?: string): Promise<ApiResponse>;
     getRedisKeys(pattern?: string, database?: number, pageSize?: number, cursor?: string, connectionId?: string): Promise<ApiResponse>;
     getRedisKey(key: string, database?: number, pageIndex?: number, pageSize?: number, connectionId?: string): Promise<ApiResponse>;

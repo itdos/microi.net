@@ -1,9 +1,11 @@
 import { DiyCommon } from "@/utils/diy.common";
 
-function call(url, params) {
+const API_URL = "/apiengine/platform-ai-workflow";
+
+function call(action, params) {
     return new Promise((resolve, reject) => {
         try {
-            DiyCommon.Post(url, params || {}, function (result) {
+            DiyCommon.Post(API_URL, { ...(params || {}), Action: action }, function (result) {
                 resolve(result);
             });
         } catch (e) {
@@ -14,25 +16,25 @@ function call(url, params) {
 
 export const AiWorkFlowApi = {
     overview(params) {
-        return call("/api/AIWorkFlow/GetOverview", params || {});
+        return call("Overview", params || {});
     },
     nodeDetail(params) {
-        return call("/api/AIWorkFlow/GetNodeDetail", params || {});
+        return call("NodeDetail", params || {});
     },
     generateFromPrompt(params) {
-        return call("/api/AIWorkFlow/GenerateFromPrompt", params || {});
+        return call("GenerateFromPrompt", params || {});
     },
     list(keyword) {
-        return call("/api/AIWorkFlow/ListAIWorkFlows", { Keyword: keyword || "" });
+        return call("List", { Keyword: keyword || "" });
     },
     get(id) {
-        return call("/api/AIWorkFlow/GetAIWorkFlow", { Id: id });
+        return call("Get", { Id: id });
     },
     save(params) {
-        return call("/api/AIWorkFlow/SaveAIWorkFlow", params || {});
+        return call("Save", params || {});
     },
     delete(id) {
-        return call("/api/AIWorkFlow/DeleteAIWorkFlow", { Id: id });
+        return call("Delete", { Id: id });
     }
 };
 

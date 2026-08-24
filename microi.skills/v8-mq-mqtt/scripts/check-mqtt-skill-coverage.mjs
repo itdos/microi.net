@@ -14,7 +14,8 @@ const files = {
   model: 'Microi.Server/Microi.Core/Model/MqttParam.cs',
   mqttInterface: 'Microi.Server/Microi.Core/Interface/IMicroiMQTT.cs',
   tenantSecurity: 'Microi.Server/Microi.Core/SaaSEngine/TenantConfigurationSecurity.cs',
-  controller: 'Microi.Server/Microi.net.Api/Controllers/MqttController.cs'
+  platformRuntime: 'Microi.Server/Microi.Core/V8Engine/Runtime/V8Method.PlatformPluginRuntimes.cs',
+  platformApiEngine: 'Microi.Server/Microi.Upgrade/Resource/platform-mqtt.js'
 };
 
 const content = {};
@@ -98,7 +99,7 @@ for (const propertyName of expectedProperties) {
 
 const sourceEvents = [...runtimeEvents].sort();
 const sourceProperties = [...mqttProperties].sort();
-for (const targetName of ['skill', 'reference', 'mqttDoc', 'v8Doc']) {
+for (const targetName of ['reference', 'mqttDoc', 'v8Doc']) {
   requireTokens(targetName, sourceEvents);
   requireTokens(targetName, sourceProperties);
 }
@@ -139,22 +140,20 @@ const operationsTokens = [
   '独立 MQTT 节点'
 ];
 
-requireTokens('skill', [
-  'MqttEnable',
-  'MqttPort',
-  'MqttWsPort',
-  'MqttAccount',
-  'MqttPwd',
-  'MqttApiEngine',
-  'MqttAllowAnonymous',
-  'MqttTopicIsolation'
+requireTokens('platformRuntime', [
+  'ManageMqtt',
+  'RequireCurrentTenantSuperAdmin',
+  'IMicroiMQTT',
+  'GetConnectedClients',
+  'PublishAsync'
 ]);
+requireTokens('platformApiEngine', ['V8.Method.ManageMqtt']);
+
+requireTokens('skill', ['references/mqtt-production.md', 'platform-mqtt']);
 requireTokens('reference', configurationTokens);
 
-for (const targetName of ['skill', 'reference']) {
-  requireTokens(targetName, securityTokens);
-  requireTokens(targetName, operationsTokens);
-}
+requireTokens('reference', securityTokens);
+requireTokens('reference', operationsTokens);
 
 requireTokens(
   'mqttDoc',
@@ -190,7 +189,6 @@ requireTokens('runtime', [
 ]);
 requireTokens('mqttInterface', ['PublishAsync(string osClient', 'GetConnectedClients(string osClient)']);
 requireTokens('tenantSecurity', ['NormalizeMqttTopic', 'HasTenantServiceCredentialCollision']);
-requireTokens('controller', ['[PlatformAdminOnly]', 'StatusScope = "CurrentNode"']);
 
 if (failures.length > 0) {
   console.error('MQTT Skill 覆盖检查失败：');

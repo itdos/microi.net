@@ -15,9 +15,17 @@ const expected = [
   'platform_auth_login_hook',
   'send_sms_reg'
 ];
+const versionAtLeast = (actual, minimum) => {
+  const left = String(actual || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+  const right = String(minimum || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    if ((left[index] || 0) !== (right[index] || 0)) return (left[index] || 0) > (right[index] || 0);
+  }
+  return true;
+};
 
 test('SaaS bootstrap package carries platform authentication engines', () => {
-  assert.equal(resource.PackageInfo.Version, 'v7.5.28');
+  assert.ok(versionAtLeast(resource.PackageInfo.Version, 'v7.5.28'));
   assert.equal(resource.PackageInfo.ApiEngineCount, resource.SysApiEngines.length);
   const engines = resource.SysApiEngines.filter((item) => expected.includes(item.ApiEngineKey));
   assert.deepEqual(engines.map((item) => item.ApiEngineKey), expected);

@@ -159,6 +159,7 @@ export default {
             ShowThemes: false,
             themeMode: 'light',
             pendingPreferencePatch: {},
+            preferenceSaveTimer: null,
             preferenceSaveInFlight: false,
             preferenceSaveState: "saved",
             preferenceSaveError: ""
@@ -194,6 +195,9 @@ export default {
         setThemeMode(this.themeMode);
         const appliedColor = applyThemeColor(this.themeColor || DEFAULT_THEME_COLOR);
         if (appliedColor && !this.isActive(appliedColor)) this.diyStore.setThemeColor(appliedColor);
+    },
+    beforeUnmount() {
+        if (this.preferenceSaveTimer) clearTimeout(this.preferenceSaveTimer);
     },
     watch: {
         "CurrentUser.ThemeMode"() {
@@ -247,11 +251,20 @@ export default {
             Object.assign(this.pendingPreferencePatch, installedPatch);
             this.preferenceSaveState = "pending";
             this.preferenceSaveError = "";
-            void this.flushVisualPreferences();
+            this.scheduleVisualPreferenceFlush();
+        },
+        scheduleVisualPreferenceFlush(delay = 250) {
+            if (this.preferenceSaveTimer) clearTimeout(this.preferenceSaveTimer);
+            this.preferenceSaveTimer = setTimeout(() => {
+                this.preferenceSaveTimer = null;
+                void this.flushVisualPreferences();
+            }, delay);
         },
         retryVisualPreferences() {
             if (this.preferenceSaveState !== "error" || !Object.keys(this.pendingPreferencePatch).length) return;
             this.preferenceSaveError = "";
+            if (this.preferenceSaveTimer) clearTimeout(this.preferenceSaveTimer);
+            this.preferenceSaveTimer = null;
             void this.flushVisualPreferences();
         },
         async flushVisualPreferences() {
@@ -282,7 +295,7 @@ export default {
                 DiyCommon.Tips(`主题已在当前设备生效，但跨设备保存失败：${error?.message || error}`, false);
             } finally {
                 this.preferenceSaveInFlight = false;
-                if (succeeded && Object.keys(this.pendingPreferencePatch).length) void this.flushVisualPreferences();
+                if (succeeded && Object.keys(this.pendingPreferencePatch).length) this.scheduleVisualPreferenceFlush();
             }
         }
     }

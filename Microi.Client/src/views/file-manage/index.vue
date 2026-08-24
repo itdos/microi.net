@@ -1,53 +1,51 @@
 <template>
   <div class="file-manage-container" v-mci-loading:page="initializing">
-    <template>
-      <!-- 左侧文件夹树 -->
-      <div class="sidebar" :style="{ width: sidebarWidth + 'px' }">
-        <div class="bucket-switcher">
-          <el-radio-group v-model="isPrivateBucket" size="small" @change="handleBucketSwitch">
-            <el-radio-button :value="true">私有桶</el-radio-button>
-            <el-radio-button :value="false">公有桶</el-radio-button>
-          </el-radio-group>
-        </div>
-        <FolderTree
-          :folders="folders"
-          :current-folder-id="currentFolderId"
-          @select="handleFolderSelect"
-          @expand="handleFolderExpand"
-          @create-folder="handleCreateFolder"
-          @context-action="handleFolderContextAction"
-        />
+    <!-- 左侧文件夹树 -->
+    <div class="sidebar" :style="{ width: sidebarWidth + 'px' }">
+      <div class="bucket-switcher">
+        <el-radio-group v-model="isPrivateBucket" size="small" @change="handleBucketSwitch">
+          <el-radio-button :value="true">私有桶</el-radio-button>
+          <el-radio-button :value="false">公有桶</el-radio-button>
+        </el-radio-group>
       </div>
+      <FolderTree
+        :folders="folders"
+        :current-folder-id="currentFolderId"
+        @select="handleFolderSelect"
+        @expand="handleFolderExpand"
+        @create-folder="handleCreateFolder"
+        @context-action="handleFolderContextAction"
+      />
+    </div>
 
-      <!-- 可拖拽分隔线 -->
-      <div class="resize-handle" @mousedown="startResize"></div>
+    <!-- 可拖拽分隔线 -->
+    <div class="resize-handle" @mousedown="startResize"></div>
 
-      <!-- 右侧文件列表 -->
-      <div class="main-content">
-        <FileList
-          :files="currentItems"
-          :breadcrumb="breadcrumb"
-          :loading="fileLoading"
-          :preview-enabled="previewEnabled"
-          :thumbnail-urls="thumbnailUrls"
-          :recycle-mode="recycleMode"
-          @open="handleFileOpen"
-          @contextmenu="handleContextMenuAction"
-          @navigate="handleBreadcrumbNavigate"
-          @select="handleFileSelect"
-          @upload="openUploadPicker"
-          @create-folder="handleCreateFolder"
-          @refresh="refreshCurrentFolder"
-          @sync="syncDialogVisible = true"
-          @toggle-trash="toggleTrashMode"
-          @preview-toggle="handlePreviewToggle"
-          @batch-delete="handleBatchDelete"
-          @batch-move="handleBatchMove"
-          @batch-restore="handleBatchRestore"
-          @area-action="handleFileAreaAction"
-        />
-      </div>
-    </template>
+    <!-- 右侧文件列表 -->
+    <div class="main-content">
+      <FileList
+        :files="currentItems"
+        :breadcrumb="breadcrumb"
+        :loading="fileLoading"
+        :preview-enabled="previewEnabled"
+        :thumbnail-urls="thumbnailUrls"
+        :recycle-mode="recycleMode"
+        @open="handleFileOpen"
+        @contextmenu="handleContextMenuAction"
+        @navigate="handleBreadcrumbNavigate"
+        @select="handleFileSelect"
+        @upload="openUploadPicker"
+        @create-folder="handleCreateFolder"
+        @refresh="refreshCurrentFolder"
+        @sync="syncDialogVisible = true"
+        @toggle-trash="toggleTrashMode"
+        @preview-toggle="handlePreviewToggle"
+        @batch-delete="handleBatchDelete"
+        @batch-move="handleBatchMove"
+        @batch-restore="handleBatchRestore"
+        @area-action="handleFileAreaAction"
+      />
+    </div>
 
     <input
       ref="fileInputRef"

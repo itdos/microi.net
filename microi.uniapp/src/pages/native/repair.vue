@@ -111,7 +111,7 @@ export default {
         const [deviceResult, customerResult, typeResult] = await Promise.allSettled([
           V8.FormEngine.GetFormData('Diy_KehuSB', { Id: this.deviceId }),
           callApiEngine('repair_customer', { Id: this.deviceId }),
-          post('/api/SysBaseData/getSysBaseData', { ParentKey: 'BaoxiuLX' }, true)
+          post('/apiengine/platform-sys-base-data?Action=GetSysBaseData', { ParentKey: 'BaoxiuLX' }, true)
         ])
         if (deviceResult.status !== 'fulfilled' || !deviceResult.value || Number(deviceResult.value.Code) !== 1) {
           throw new Error('设备信息加载失败')

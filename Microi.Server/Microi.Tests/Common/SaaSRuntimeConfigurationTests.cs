@@ -641,8 +641,9 @@ public class SaaSRuntimeConfigurationTests
         var source = File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
-            "Microi.net",
+            "Microi.Core",
             "V8Engine",
+            "Runtime",
             "V8Method.cs"));
         var start = source.IndexOf("public DosResult ReloadOsClient", StringComparison.Ordinal);
         var end = source.IndexOf("public DosResult RefreshExtensionDatabases", start, StringComparison.Ordinal);
@@ -693,9 +694,9 @@ public class SaaSRuntimeConfigurationTests
         var cache = Read(
             "Microi.Server", "Microi.Cache", "MicroiTwoLevelCache.cs");
         var translateEngine = Read(
-            "Microi.Server", "Microi.net", "TranslateEngine", "TranslateEngine.cs");
+            "Microi.Server", "Microi.Translate", "TranslateEngine.cs");
         var v8Engine = Read(
-            "Microi.Server", "Microi.net", "V8Engine", "V8Engine.cs");
+            "Microi.Server", "Microi.Core", "V8Engine", "Runtime", "V8Engine.cs");
         var runtimeConfigurationMap = Read(
             "Microi.Server", "Microi.net", "Common", "OsClient.cs");
 

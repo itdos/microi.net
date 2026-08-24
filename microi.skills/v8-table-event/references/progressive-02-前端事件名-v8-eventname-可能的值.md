@@ -25,7 +25,7 @@
 | `WFNodeEnd` | 流程节点结束 V8 事件 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-table-event-012 sha256=380fc790dcf02a27f8b47d9a894b98cb90ebc7ea6b57a5b30075d3d9d32a0262 -->
+<!-- microi-progressive:chunk id=v8-table-event-012 sha256=db5bf410bc6babf14d3d91cc61b9875c81bc1be24b2c1b7c62334bc6819e4e55 -->
 ## 注意事项
 
 - 前端事件可使用 `window` 对象和 `async/await`，后端事件不可以

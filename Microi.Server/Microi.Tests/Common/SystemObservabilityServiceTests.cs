@@ -1,11 +1,49 @@
 using System.Net;
 using Microi.net;
 using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.Common;
 
 public sealed class SystemObservabilityServiceTests
 {
+    [Fact]
+    public void LogQuery_DoesNotConfuseControlActionWithBusinessLogAction()
+    {
+        var query = V8Method.BuildObservabilityLogQuery(new JObject
+        {
+            ["Action"] = "Logs",
+            ["LogAction"] = "MenuVisit",
+            ["_PageIndex"] = 0,
+            ["_PageSize"] = 500,
+            ["Level"] = 2,
+            ["Keyword"] = "failure"
+        }, "tenant-a");
+
+        Assert.Equal("tenant-a", query.OsClient);
+        Assert.Equal("MenuVisit", query.Action);
+        Assert.Equal(1, query._PageIndex);
+        Assert.Equal(200, query._PageSize);
+        Assert.Equal(2, query.Level);
+        Assert.Equal("failure", query._Keyword);
+
+        var unfiltered = V8Method.BuildObservabilityLogQuery(
+            new JObject { ["Action"] = "Logs" },
+            "tenant-a");
+        Assert.True(string.IsNullOrWhiteSpace(unfiltered.Action));
+        Assert.Equal(15, unfiltered._PageSize);
+    }
+
+    [Theory]
+    [InlineData(15.5, false)]
+    [InlineData(69.99, false)]
+    [InlineData(70, true)]
+    [InlineData(95, true)]
+    public void ProcessCpuDiagnosis_UsesHostNormalizedPercent(double normalized, bool expected)
+    {
+        Assert.Equal(expected, SystemObservabilityService.IsProcessCpuHigh(normalized));
+    }
+
     [Fact]
     public void NormalizeRoute_BoundsHighCardinalitySegmentsAndTenantSuffix()
     {
@@ -199,6 +237,37 @@ public sealed class SystemObservabilityServiceTests
         Assert.Equal(first.Count, first.Select(item => item.Id).Distinct().Count());
         Assert.Contains(first, item => item.DimensionType == "Total" && item.RequestCount == 30);
         Assert.Equal(10, first.Count(item => item.DimensionType == "Endpoint"));
+    }
+
+    [Fact]
+    public void NetworkTraffic_PersistedRollupsAggregateCountsAndKeepEndpointBounded()
+    {
+        var start = new DateTime(2026, 8, 24, 1, 0, 0, DateTimeKind.Utc);
+        var source = Enumerable.Range(0, 30).Select(index => new NetworkTrafficRollupRow
+        {
+            BucketStartUtc = start.AddMinutes(index % 12 * 5),
+            BucketMinutes = 5,
+            NodeId = "node-a",
+            DimensionType = index == 0 ? "Total" : "Endpoint",
+            DimensionKey = index == 0 ? "*" : $"/api/test/{index}",
+            RequestCount = index + 1,
+            ErrorCount = index % 3 == 0 ? 1 : 0,
+            ReceivedBytes = 100 + index,
+            SentBytes = 200 + index,
+            DurationMs = 20 + index,
+            MaxDurationMs = 20 + index
+        }).ToArray();
+
+        var result = NetworkTrafficObservabilityService.AggregatePersistedRollupRows(
+            source,
+            start,
+            60,
+            10,
+            12);
+
+        Assert.Single(result, item => item.DimensionType == "Total");
+        Assert.Equal(12, result.Count(item => item.DimensionType == "Endpoint"));
+        Assert.All(result, item => Assert.Equal(60, item.BucketMinutes));
     }
 
     [Fact]

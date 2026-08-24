@@ -32,13 +32,107 @@ namespace Microi.Cache
     /// <summary>
     /// Redis 管理器核心实现。这里只开放明确的 Redis 白名单操作，不接受任意命令字符串。
     /// </summary>
-    public class MicroiRedisManager : IMicroiRedisManager
+    public class MicroiRedisManager : IMicroiRedisManager, IMicroiCacheManagementRuntime
     {
         private const string ConnectionTable = "mci_redis_connection";
         private const int MaxCachedConnections = 64;
         private static readonly TimeSpan CachedConnectionIdleTime = TimeSpan.FromMinutes(15);
         private static readonly ConcurrentDictionary<string, CachedConnection> CachedConnections =
             new ConcurrentDictionary<string, CachedConnection>(StringComparer.Ordinal);
+
+        public async Task<object> ExecuteAsync(string tenantOsClient, string action, JObject request)
+        {
+            request = request ?? new JObject();
+            switch ((action ?? "").Trim().ToLowerInvariant())
+            {
+                case "statistics":
+                {
+                    var stats = MicroiTwoLevelCache.GetStatistics();
+                    return new
+                    {
+                        stats.LocalHits,
+                        stats.RedisHits,
+                        stats.Misses,
+                        stats.LocalCacheSize,
+                        LocalHitRate = $"{stats.LocalHitRate:F2}%",
+                        TotalHitRate = $"{stats.TotalHitRate:F2}%",
+                        Message = stats.ToString()
+                    };
+                }
+                case "invalidate":
+                {
+                    var key = request["Key"]?.ToString();
+                    if (key.DosIsNullOrWhiteSpace()) throw new ArgumentException("Key参数不能为空。");
+                    await MicroiEngine.CacheTenant.Cache(tenantOsClient).RemoveAsync(key).ConfigureAwait(false);
+                    return new { Key = key };
+                }
+                case "invalidatepattern":
+                {
+                    var pattern = request["Pattern"]?.ToString();
+                    if (pattern.DosIsNullOrWhiteSpace()) throw new ArgumentException("Pattern参数不能为空。");
+                    await MicroiEngine.CacheTenant.Cache(tenantOsClient).RemoveParentAsync(pattern).ConfigureAwait(false);
+                    return new { Pattern = pattern };
+                }
+                case "connections":
+                    return await GetConnectionsAsync(tenantOsClient).ConfigureAwait(false);
+                case "saveconnection":
+                    return await SaveConnectionAsync(
+                            tenantOsClient,
+                            request.ToObject<RedisManagerSavedConnectionInput>() ?? new RedisManagerSavedConnectionInput())
+                        .ConfigureAwait(false);
+                case "deleteconnection":
+                    await DeleteConnectionAsync(tenantOsClient, request["Id"]?.ToString()).ConfigureAwait(false);
+                    return null;
+                case "testconnection":
+                    return await TestConnectionAsync(
+                            tenantOsClient,
+                            request.ToObject<RedisManagerContextRequest>() ?? new RedisManagerContextRequest())
+                        .ConfigureAwait(false);
+                case "redisstatistics":
+                    return await GetStatisticsAsync(
+                            tenantOsClient,
+                            request.ToObject<RedisManagerContextRequest>() ?? new RedisManagerContextRequest())
+                        .ConfigureAwait(false);
+                case "keys":
+                    return await GetKeysAsync(
+                            tenantOsClient,
+                            request.ToObject<RedisManagerKeyListRequest>() ?? new RedisManagerKeyListRequest())
+                        .ConfigureAwait(false);
+                case "key":
+                    return await GetKeyAsync(
+                            tenantOsClient,
+                            request.ToObject<RedisManagerKeyRequest>() ?? new RedisManagerKeyRequest())
+                        .ConfigureAwait(false);
+                case "deletekeys":
+                    return new
+                    {
+                        Deleted = await DeleteKeysAsync(
+                                tenantOsClient,
+                                request.ToObject<RedisManagerDeleteRequest>() ?? new RedisManagerDeleteRequest())
+                            .ConfigureAwait(false)
+                    };
+                case "replacevalue":
+                    await ReplaceValueAsync(
+                            tenantOsClient,
+                            request.ToObject<RedisManagerReplaceRequest>() ?? new RedisManagerReplaceRequest())
+                        .ConfigureAwait(false);
+                    return null;
+                case "renamekey":
+                    await RenameKeyAsync(
+                            tenantOsClient,
+                            request.ToObject<RedisManagerRenameRequest>() ?? new RedisManagerRenameRequest())
+                        .ConfigureAwait(false);
+                    return null;
+                case "setttl":
+                    await SetTtlAsync(
+                            tenantOsClient,
+                            request.ToObject<RedisManagerTtlRequest>() ?? new RedisManagerTtlRequest())
+                        .ConfigureAwait(false);
+                    return null;
+                default:
+                    throw new ArgumentException("不支持的缓存管理动作。");
+            }
+        }
 
         private sealed class CachedConnection
         {

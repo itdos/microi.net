@@ -528,6 +528,22 @@ if (!legacyMarketplaceUrls.includes('/microi-store')) legacyMarketplaceUrls.push
 marketplaceRouteMeta.LegacyMenuUrls = legacyMarketplaceUrls;
 marketplaceRoute.LegacyMenuUrls = legacyMarketplaceUrls;
 marketplaceRoute.RouteMetaJson = JSON.stringify(marketplaceRouteMeta);
+const observabilityRoute = bundle.Routes.find(route => route.RoutePath === '/system-observability');
+if (!observabilityRoute) throw new Error('平台微服务缺少 /system-observability 路由');
+let observabilityRouteMeta = {};
+try { observabilityRouteMeta = JSON.parse(observabilityRoute.RouteMetaJson || '{}') || {}; }
+catch { observabilityRouteMeta = {}; }
+const legacyObservabilityUrls = Array.isArray(observabilityRouteMeta.LegacyMenuUrls)
+  ? observabilityRouteMeta.LegacyMenuUrls
+  : [];
+for (const legacyUrl of ['/syslog', '/mic-system-monitor']) {
+  if (!legacyObservabilityUrls.includes(legacyUrl)) legacyObservabilityUrls.push(legacyUrl);
+}
+observabilityRouteMeta.LegacyMenuUrls = legacyObservabilityUrls;
+observabilityRouteMeta.RetireLegacyMenus = true;
+observabilityRoute.LegacyMenuUrls = legacyObservabilityUrls;
+observabilityRoute.RetireLegacyMenus = true;
+observabilityRoute.RouteMetaJson = JSON.stringify(observabilityRouteMeta);
 for (const route of bundle.Routes) {
   route.UpdateTime = localTime;
   route.BuildVersion = version;

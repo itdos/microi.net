@@ -12,7 +12,11 @@ namespace Microi.net
             {
                 services.AddSingleton<IMicroiCache, MicroiCacheRedis>();
                 services.AddSingleton<IMicroiCacheTenant, MicroiCacheTenant>();// 工厂
-                services.AddSingleton<Microi.Cache.IMicroiRedisManager, Microi.Cache.MicroiRedisManager>();
+                services.AddSingleton<Microi.Cache.MicroiRedisManager>();
+                services.AddSingleton<Microi.Cache.IMicroiRedisManager>(provider =>
+                    provider.GetRequiredService<Microi.Cache.MicroiRedisManager>());
+                services.AddSingleton<IMicroiCacheManagementRuntime>(provider =>
+                    provider.GetRequiredService<Microi.Cache.MicroiRedisManager>());
                 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入【分布式缓存】插件成功！");
                 return services;
             }

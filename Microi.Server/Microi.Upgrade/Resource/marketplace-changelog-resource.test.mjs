@@ -8,6 +8,14 @@ const publisherSourceUrl = new URL('./ai-app-publish-store.js', import.meta.url)
 const packageModel = JSON.parse(await readFile(resourceUrl, 'utf8'));
 const modelSource = await readFile(modelSourceUrl, 'utf8');
 const publisherSource = await readFile(publisherSourceUrl, 'utf8');
+const versionAtLeast = (actual, minimum) => {
+  const left = String(actual || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+  const right = String(minimum || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    if ((left[index] || 0) !== (right[index] || 0)) return (left[index] || 0) > (right[index] || 0);
+  }
+  return true;
+};
 
 const tableName = 'sys_microistore_changelog';
 const table = packageModel.DiyTables.find((item) => item.Name === tableName);
@@ -76,7 +84,7 @@ test('making or publishing an app requires the exact version changelog', () => {
 });
 
 test('package metadata and engine ownership describe the changelog capability', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.5.31');
+  assert.ok(versionAtLeast(packageModel.PackageInfo.Version, 'v7.5.31'));
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes('Schema:MarketplaceChangeLogV1'));
   assert.equal(
     packageModel.ResourcePolicies.ApiEngines['get-microi-store-model'].UpgradePolicy,

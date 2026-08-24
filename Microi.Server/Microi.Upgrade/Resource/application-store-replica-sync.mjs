@@ -40,6 +40,11 @@ export const applicationStoreReplicaMappings = Object.freeze([
     publishedStandalone: true,
   }),
   Object.freeze({
+    resourceName: 'ai-app-create.js',
+    apiEngineKey: 'ai_app_create',
+    publishedStandalone: false,
+  }),
+  Object.freeze({
     resourceName: 'ai-app-prepare-store-assets.js',
     apiEngineKey: 'ai_app_prepare_store_assets',
     publishedStandalone: false,
@@ -313,7 +318,7 @@ function synchronizeBulkInstallButton(packageModel) {
     var workerStatus = null;
     try {
       if (V8.PostAsync) {
-        workerStatus = await V8.PostAsync('/api/BackgroundTask/WorkerStatus', {}, null, null, 'json');
+        workerStatus = await V8.PostAsync('/apiengine/platform-background-task', { Action: 'WorkerStatus' }, null, null, 'json');
       }
     } catch (workerStatusError) {
       workerStatus = null;

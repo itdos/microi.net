@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-23 19:18:00
+# 版本：v2026-08-24 09:25:54
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -30,7 +30,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-23 19:18:00"
+SCRIPT_VERSION="v2026-08-24 09:25:54"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -994,10 +994,15 @@ print_generated_install_configuration() {
     echo 'Docker 资源保护：'
     echo '------------------------------------------------------------------'
     echo "宿主机:      ${HOST_LOGICAL_CPUS} 逻辑 CPU / ${HOST_MEMORY_MB}MB 内存"
-    echo "系统保留:    CPU 至少 5% / 内存至少 ${HOST_MEMORY_RESERVE_MB}MB（系统、SSH、宝塔）"
-    echo "共享硬上限:  CPU 合计 ${MICROI_DOCKER_CPU_QUOTA_PERCENT}% / 内存合计 ${MICROI_DOCKER_MEMORY_BUDGET_MB}MB"
+    echo "系统保留:    CPU 5% / 内存 ${HOST_MEMORY_RESERVE_MB}MB（系统、SSH、宝塔）"
+    echo "API+主数据库共享硬上限: CPU 合计 ${MICROI_DOCKER_CPU_QUOTA_PERCENT}% / 内存合计 ${MICROI_DOCKER_MEMORY_BUDGET_MB}MB"
     echo "共享父级:    ${MICROI_DOCKER_CGROUP_PARENT:-尚未配置}"
-    echo 'API、数据库等容器不再固定切分额度；任一服务可使用共享池中的全部空闲资源'
+    if [ "${DATABASE_SERVICE_MODE:-managed}" = 'external' ]; then
+      echo '当前复用外部 MySQL：仅吾码 API 进入共享池；外部数据库不受本机 cgroup 管理'
+    else
+      echo '吾码 API 与主数据库不固定切分额度；任一方可使用共享池中的全部空闲资源'
+    fi
+    echo 'Redis、MongoDB、Web、MinIO、OCR 等其它服务不加入该资源池，也不新增 Docker 硬限制'
     echo 'cgroup v2 同时禁止共享池使用 swap；cgroup v1 在内核支持 swap accounting 时同样限制'
     echo ''
   fi
@@ -1973,24 +1978,15 @@ format_cpu_milli() {
   printf '%d.%03d' "$((milli_cpus / 1000))" "$((milli_cpus % 1000))"
 }
 
-# 全部一键安装容器进入同一个父 cgroup。只限制父级合计，不再把预算按固定权重
-# 切给 API、数据库或 OCR；任一服务都能在其它服务空闲时使用整个共享池。
+# 仅吾码 API 与本脚本创建的主数据库进入同一个父 cgroup。只限制二者合计，
+# 不按固定权重切分；任一方都能在另一方空闲时使用整个共享池。
 calculate_microi_resource_plan() {
-  local memory_reserve_five_percent
-
   HOST_MEMORY_MB=$(detect_host_memory_mb) || return 1
   HOST_LOGICAL_CPUS=$(detect_host_logical_cpus) || return 1
-  memory_reserve_five_percent=$(((HOST_MEMORY_MB + 19) / 20))
-  HOST_MEMORY_RESERVE_MB="${memory_reserve_five_percent}"
-  [ "${HOST_MEMORY_RESERVE_MB}" -lt 1536 ] && HOST_MEMORY_RESERVE_MB=1536
-  if [ "${HOST_MEMORY_MB}" -le "${HOST_MEMORY_RESERVE_MB}" ]; then
-    echo "Microi：错误：宿主机仅 ${HOST_MEMORY_MB}MB 内存，无法在保留 ${HOST_MEMORY_RESERVE_MB}MB 给系统/宝塔后启动吾码容器。" >&2
-    return 1
-  fi
-
-  MICROI_DOCKER_MEMORY_BUDGET_MB=$((HOST_MEMORY_MB - HOST_MEMORY_RESERVE_MB))
+  MICROI_DOCKER_MEMORY_BUDGET_MB=$((HOST_MEMORY_MB * 95 / 100))
+  HOST_MEMORY_RESERVE_MB=$((HOST_MEMORY_MB - MICROI_DOCKER_MEMORY_BUDGET_MB))
   if [ "${MICROI_DOCKER_MEMORY_BUDGET_MB}" -lt 1024 ]; then
-    echo "Microi：错误：给系统保留 ${HOST_MEMORY_RESERVE_MB}MB 后，吾码容器总预算不足 1024MB，已停止安装以避免宿主机 OOM。" >&2
+    echo "Microi：错误：宿主机 95% 内存仅 ${MICROI_DOCKER_MEMORY_BUDGET_MB}MB，不足以安全启动吾码 API 与主数据库。" >&2
     return 1
   fi
   MICROI_DOCKER_CPU_BUDGET_MILLI=$((HOST_LOGICAL_CPUS * 950))
@@ -1999,13 +1995,19 @@ calculate_microi_resource_plan() {
 }
 
 print_microi_resource_plan() {
-  echo 'Microi：Docker 共享资源池保护方案：'
-  echo "Microi：  宿主机 ${HOST_LOGICAL_CPUS} 逻辑 CPU / ${HOST_MEMORY_MB}MB 内存；至少保留 CPU 5% 和内存 ${HOST_MEMORY_RESERVE_MB}MB 给系统、SSH 与宝塔。"
-  echo "Microi：  全部受管容器共享同一父级硬上限：CPU ${MICROI_DOCKER_CPU_QUOTA_PERCENT}%（$(format_cpu_milli "${MICROI_DOCKER_CPU_BUDGET_MILLI}") 核），内存 ${MICROI_DOCKER_MEMORY_BUDGET_MB}MB。"
-  echo 'Microi：  API、数据库、OCR 等不再固定切分额度；任一服务可使用共享池中的全部空闲资源。'
+  echo 'Microi：API + 主数据库 Docker 共享资源池保护方案：'
+  echo "Microi：  宿主机 ${HOST_LOGICAL_CPUS} 逻辑 CPU / ${HOST_MEMORY_MB}MB 内存；保留 CPU 5% 和内存 ${HOST_MEMORY_RESERVE_MB}MB 给系统、SSH 与宝塔。"
+  if [ "${DATABASE_SERVICE_MODE:-managed}" = 'external' ]; then
+    echo "Microi：  当前复用外部 MySQL，仅吾码 API 进入本机父级硬上限：CPU ${MICROI_DOCKER_CPU_QUOTA_PERCENT}%（$(format_cpu_milli "${MICROI_DOCKER_CPU_BUDGET_MILLI}") 核），内存 ${MICROI_DOCKER_MEMORY_BUDGET_MB}MB。"
+    echo 'Microi：  外部 MySQL 不受本机 cgroup 管理，必须在它自己的宿主机或服务平台单独保护。'
+  else
+    echo "Microi：  吾码 API 与本脚本创建的主数据库共享同一父级硬上限：CPU ${MICROI_DOCKER_CPU_QUOTA_PERCENT}%（$(format_cpu_milli "${MICROI_DOCKER_CPU_BUDGET_MILLI}") 核），内存 ${MICROI_DOCKER_MEMORY_BUDGET_MB}MB。"
+    echo 'Microi：  API 与主数据库不固定切分额度；任一方可使用共享池中的全部空闲资源。'
+  fi
+  echo 'Microi：  Redis、MongoDB、Web、MinIO、OCR 等其它服务不加入该资源池，也不新增 Docker 硬限制。'
   echo "Microi：  Docker cgroup 驱动 ${MICROI_DOCKER_CGROUP_DRIVER} / cgroup v${MICROI_CGROUP_VERSION}，Compose 父级 ${MICROI_DOCKER_CGROUP_PARENT}。"
   if [ "${HOST_LOGICAL_CPUS}" -lt 4 ] || [ "${HOST_MEMORY_MB}" -lt 16384 ]; then
-    echo 'Microi：警告：当前低于 OCR 推荐的 4 核 16GB；共享硬限制会优先保护宿主机，但池内服务在合计高负载下仍可能被限流或 OOM 重启。'
+    echo 'Microi：警告：当前服务器资源较小；共享硬限制会优先保护宿主机，但 API 或主数据库在合计高负载下仍可能被限流或 OOM 重启。'
   fi
 }
 
@@ -2028,9 +2030,9 @@ verify_docker_resource_limit_capabilities() {
 render_microi_slice_unit() {
   local cgroup_version="$1"
   cat <<EOF
-# Managed by Microi install-microi.sh - shared container resource pool
+# Managed by Microi install-microi.sh - API and primary database resource pool
 [Unit]
-Description=Microi managed containers shared resource pool
+Description=Microi API and primary database shared resource pool
 
 [Slice]
 CPUAccounting=yes
@@ -2058,7 +2060,7 @@ render_microi_cgroup_v1_swap_service() {
   cat <<EOF
 # Managed by Microi install-microi.sh - cgroup v1 swap protection
 [Unit]
-Description=Apply Microi shared cgroup v1 memory+swap limit
+Description=Apply Microi API and primary database cgroup v1 memory+swap limit
 Requires=microi.slice
 After=microi.slice
 Before=docker.service
@@ -2445,7 +2447,7 @@ MYSQL8ONLY
   fi
 }
 
-# 自动化验收入口：只计算宿主机/容器资源预算，不读取交互、不访问网络或 Docker。
+# 自动化验收入口：只计算 API + 主数据库资源预算，不读取交互、不访问网络或 Docker。
 if [ "${MICROI_INSTALL_RESOURCE_PLAN_ONLY:-0}" = "1" ]; then
   calculate_microi_resource_plan
   echo "HOST_MEMORY_MB=${HOST_MEMORY_MB}"
@@ -2457,6 +2459,8 @@ if [ "${MICROI_INSTALL_RESOURCE_PLAN_ONLY:-0}" = "1" ]; then
   echo "MICROI_DOCKER_CPU_QUOTA_PERCENT=${MICROI_DOCKER_CPU_QUOTA_PERCENT}"
   echo 'API_RESOURCE_POLICY=shared'
   echo 'DATABASE_RESOURCE_POLICY=shared'
+  echo 'EXTERNAL_DATABASE_RESOURCE_POLICY=outside'
+  echo 'OTHER_RESOURCE_POLICY=unrestricted'
   exit 0
 fi
 
@@ -3761,7 +3765,6 @@ run_mysql_client() {
   if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
     docker_args=(
       run --rm -i --network microi --user '0:0'
-      --cgroup-parent "${MICROI_DOCKER_CGROUP_PARENT}"
     )
     if [ "${MYSQL_EXTERNAL_USE_HOST_GATEWAY}" = '1' ]; then
       docker_args+=(--add-host 'host.docker.internal:host-gateway')
@@ -4446,7 +4449,6 @@ services:
     container_name: microi-install-redis
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
-    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     tty: true
     stdin_open: true
     privileged: true
@@ -4497,7 +4499,6 @@ EOF
 echo "Microi：Redis 编排文件已生成 ✓"
 
 compose_up "${REDIS_DIR}"
-verify_container_shared_resource_pool microi-install-redis
 
 echo ''
 echo '[步骤7/11] Redis 部署完成 ✓'
@@ -4522,7 +4523,6 @@ services:
     container_name: microi-install-mongodb
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
-    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     tty: true
     stdin_open: true
     privileged: true
@@ -4544,7 +4544,6 @@ EOF
 echo "Microi：MongoDB 编排文件已生成 ✓"
 
 compose_up "${MONGO_DIR}"
-verify_container_shared_resource_pool microi-install-mongodb
 
 echo ''
 echo '[步骤8/11] MongoDB 部署完成 ✓'
@@ -4605,7 +4604,6 @@ services:
     container_name: microi-install-minio
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
-    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     tty: true
     stdin_open: true
     privileged: true
@@ -4630,7 +4628,6 @@ EOF
   echo "Microi：MinIO 编排文件已生成 ✓"
 
   compose_up "${MINIO_DIR}"
-  verify_container_shared_resource_pool microi-install-minio
 
   echo 'Microi：等待 MinIO API 就绪...'
   MINIO_READY=false
@@ -4669,7 +4666,6 @@ fi
 run_minio_mc() {
   local -a docker_args=(
     run --rm --network microi --user '0:0'
-    --cgroup-parent "${MICROI_DOCKER_CGROUP_PARENT}"
   )
   if [ "${MINIO_EXTERNAL_USE_HOST_GATEWAY:-0}" = '1' ]; then
     docker_args+=(--add-host 'host.docker.internal:host-gateway')
@@ -4824,7 +4820,6 @@ ${OCR_COMPOSE_SERVICE_NETWORK}
     ports:
       - "127.0.0.1:${OCR_PORT}:${OCR_INTERNAL_PORT}"
     shm_size: "4gb"
-    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     stop_grace_period: 90s
     security_opt:
       - no-new-privileges:true
@@ -4851,7 +4846,6 @@ EOF
 echo 'Microi：OCR 编排文件已生成 ✓'
 
 compose_up "${OCR_DIR}"
-verify_container_shared_resource_pool "${OCR_CONTAINER_NAME}"
 echo 'Microi：等待 OCR 服务完成模型加载并进入 healthy（最长 20 分钟）...'
 OCR_READY=0
 for _ocr_wait in $(seq 1 120); do
@@ -4898,7 +4892,6 @@ services:
     container_name: microi-install-ollama
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
-    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     ports:
       - "${OLLAMA_PORT}:11434"
     volumes:
@@ -4963,7 +4956,6 @@ services:
     container_name: microi-install-qdrant
 ${COMPOSE_SERVICE_NETWORK}
     restart: unless-stopped
-    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     ports:
       - "${QDRANT_HTTP_PORT}:6333"
       - "${QDRANT_GRPC_PORT}:6334"
@@ -5035,7 +5027,6 @@ services:
     image: ${LIBRETRANSLATE_IMAGE}
     container_name: ${LIBRETRANSLATE_CONTAINER_NAME}
 ${OCR_COMPOSE_SERVICE_NETWORK}
-    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     user: "0:0"
     security_opt:
       - apparmor=unconfined
@@ -5068,7 +5059,6 @@ EOF
   echo 'Microi：初始化 LibreTranslate 随机 API Key...'
   if ! printf '%s' "${LIBRETRANSLATE_API_KEY}" | docker run --rm -i \
     --user '0:0' \
-    --cgroup-parent "${MICROI_DOCKER_CGROUP_PARENT}" \
     -v /microi/libretranslate/api-keys:/app/db \
     --entrypoint ./venv/bin/python \
     "${LIBRETRANSLATE_IMAGE}" -c \
@@ -5084,7 +5074,6 @@ EOF
   echo 'Microi：LibreTranslate 随机 API Key 初始化完成 ✓'
 
   compose_up "${LIBRETRANSLATE_DIR}"
-  verify_container_shared_resource_pool "${LIBRETRANSLATE_CONTAINER_NAME}"
   if [ "$(docker inspect "${LIBRETRANSLATE_CONTAINER_NAME}" --format '{{.State.Running}}' 2>/dev/null)" != "true" ]; then
     echo 'Microi：错误：LibreTranslate 容器启动失败。'
     docker logs "${LIBRETRANSLATE_CONTAINER_NAME}" 2>&1 | tail -100 || true
@@ -5194,7 +5183,6 @@ ${APP_API_EXTRA_HOSTS}
     container_name: microi-install-client
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
-    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     tty: true
     stdin_open: true
     ports:
@@ -5217,7 +5205,6 @@ echo "Microi：平台应用编排文件已生成 ✓"
 
 compose_up "${APP_DIR}"
 verify_container_shared_resource_pool microi-install-api
-verify_container_shared_resource_pool microi-install-client
 
 wait_for_microi_api() {
   local probe_path="$1"
@@ -5462,7 +5449,6 @@ services:
     container_name: microi-install-watchtower
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
-    cgroup_parent: "${MICROI_DOCKER_CGROUP_PARENT}"
     privileged: true
     tty: true
     stdin_open: true
@@ -5484,7 +5470,6 @@ EOF
 echo "Microi：Watchtower 编排文件已生成 ✓"
 
 compose_up "${WATCHTOWER_DIR}"
-verify_container_shared_resource_pool microi-install-watchtower
 
 echo ''
 echo '[步骤11/11] Watchtower 部署完成 ✓'

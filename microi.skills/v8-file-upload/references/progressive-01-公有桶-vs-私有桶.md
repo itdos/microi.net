@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-file-upload-005 sha256=431aed9f824e7a604e8e1e02e03404cc4940814f352e6afd3f7639a106d1f332 -->
+<!-- microi-progressive:chunk id=v8-file-upload-005 sha256=6136a38af209aad174ca1cacd61fcfc66e3428e1e8bf75be8a2490bcb094b71e -->
 ## 公有桶 vs 私有桶
 
 ### 应用商城 ZIP

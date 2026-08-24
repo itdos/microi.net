@@ -442,7 +442,7 @@ namespace Microi.net
                     .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                     .ToArray()
             });
-            return $"Microi:{param.OsClient}:SysMenuStep:v1:{authorizationVersion}:{DiyCommon.SHA256Encode(signature)}";
+            return $"Microi:{param.OsClient}:SysMenuStep:v2:{authorizationVersion}:{DiyCommon.SHA256Encode(signature)}";
         }
 
         internal static DiyTableRowParam CreateMenuDiscoveryQuery(
@@ -538,7 +538,20 @@ namespace Microi.net
                         string.Equals(property.Name, field, StringComparison.OrdinalIgnoreCase));
                     if (sourceProperty != null)
                     {
-                        projected[sourceProperty.Name] = sourceProperty.Value.DeepClone();
+                        // 浏览器把缺失的可选属性与 null/空字符串按同一方式处理；
+                        // 大型主租户常有上千个菜单，逐行重复输出几十个空属性会制造
+                        // 数百 KB 无业务价值的响应与 Redis 缓存。显式 0/false 必须保留，
+                        // 以免改变 Display、AppDisplay、MenuBadgeEnabled 等语义。
+                        var value = sourceProperty.Value;
+                        if (value == null || value.Type == JTokenType.Null || value.Type == JTokenType.Undefined)
+                        {
+                            continue;
+                        }
+                        if (value.Type == JTokenType.String && string.IsNullOrEmpty(value.Value<string>()))
+                        {
+                            continue;
+                        }
+                        projected[sourceProperty.Name] = value.DeepClone();
                     }
                 }
                 projectedRows.Add(projected);
