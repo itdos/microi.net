@@ -77,6 +77,8 @@ C# 只保留：
 - 高熵一次性 code/ticket、重放保护和 DiyToken 签发；
 - 仅允许精确 Managed Key 调用的 `CreateFederatedUser`、`CreateSsoLoginTicket`、`CompleteSsoLogin`、`RotateSsoClientSecret` 原子。
 
+协议网关的标准路由是 `/api/Sso/Begin`、`/api/Sso/CompleteAuthorization`、`/api/Sso/CompleteLogin`、`/api/Sso/LegacyCapabilities` 和 `/api/Sso/RotateClientSecret`（统一前缀 `/api/Sso/`）。这些路由只处理重定向、协议报文、签名/票据和可信原子；连接投影、身份解析、登录完成与密钥轮换的业务编排仍由上面的 Managed 接口引擎承担。
+
 新增 SSO 需求先判断是否只需修改上述接口引擎。只有缺少不可伪造、不可泄露的底层原子时才增加 V8 方法；增加后同时更新应用 `RequiredPlatformCapabilities`、后端文档、测试与最低版本。
 
 详细用户文档：`microi.doc/docs/doc/more/sso.md`。

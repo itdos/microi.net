@@ -576,8 +576,8 @@ export const businessModules = {
   taskScan: { target: 'native-page', title: '扫码做任务', path: '/pages/task/scan' },
   deviceMap: { target: 'native-page', title: '设备地图', path: '/pages/task/map?mode=device' },
   customerMap: { target: 'native-page', title: '客户地图', path: '/pages/task/map?mode=customer' },
-  contactMap: { target: 'native-page', title: '联系人地图', path: '/pages/task/map?mode=contacts' },
-  visitMap: { target: 'native-page', title: '跟进地图', path: '/pages/task/map?mode=visit' },
+  // contactMap: { target: 'native-page', title: '联系人地图', path: '/pages/task/map?mode=contacts' },
+  // visitMap: { target: 'native-page', title: '跟进地图', path: '/pages/task/map?mode=visit' },
   afterSalesAdd: { target: 'form-add', title: '我要售后', table: 'Diy_ShouhouDD', menuAliases: ['售后订单', '售后任务'] }
 }
 
