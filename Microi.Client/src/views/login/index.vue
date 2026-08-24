@@ -278,7 +278,7 @@
                         <span class="login-button-content">
                             <el-icon v-if="LoginWaiting" class="is-loading"><Loading /></el-icon>
                             <el-icon v-else><Unlock /></el-icon>
-                            <span>{{ LoginWaiting ? '正在安全接入...' : '登录' }}</span>
+                            <span>{{ LoginButtonText }}</span>
                         </span>
                     </button>
                     <div class="identity-login-entry">
@@ -724,6 +724,12 @@ export default {
         };
     },
     computed: {
+        LoginButtonText() {
+            if (!this.LoginWaiting) return "登录";
+            if (this.LoginStage === "routes") return "正在加载工作台...";
+            if (this.LoginStage === "entering") return "正在进入系统...";
+            return "正在安全接入...";
+        },
         OsVersionString() {
             // 从全局属性获取版本号
             return this.$root?.OsVersion || this.OsVersion || "";
@@ -903,6 +909,7 @@ export default {
             otherQuery: {},
             LoginResult: {},
             LoginWaiting: false,
+            LoginStage: "idle",
             IdentityLoginWaiting: "",
             IdentityCapabilities: {},
             IdentityCapabilitiesLoaded: false,
@@ -1849,6 +1856,7 @@ export default {
             }
 
             self.LoginWaiting = true;
+            self.LoginStage = "auth";
 
             var loginApi = self.DiyApi.Login();
             if (self.SysConfig.DiySystem) {
@@ -1876,22 +1884,36 @@ export default {
                     self.LoginResult = result;
                     self.PersistRememberedLogin(result.Data || {});
                     self.diyStore.setState("SystemStyle", "Classic");
-                    self.GotoSystem();
+                    self.LoginStage = "routes";
+                    try {
+                        const navigated = await self.GotoSystem();
+                        if (!navigated && !self.LoginComponentUnmounted) {
+                            self.LoginWaiting = false;
+                            self.LoginStage = "idle";
+                        }
+                    } catch (error) {
+                        console.error("GotoSystem error:", error);
+                        if (!self.LoginComponentUnmounted) {
+                            self.LoginWaiting = false;
+                            self.LoginStage = "idle";
+                            self.DiyCommon.Tips("登录成功，但进入系统失败，请重试。", false);
+                        }
+                    }
                 } else {
                     if (self.EnableCaptcha) {
                         self.GetCaptcha();
                         self.CaptchaValue = "";
                     }
-                    // 使用 Vue 响应式状态控制
+                    self.LoginWaiting = false;
+                    self.LoginStage = "idle";
                 }
-                self.LoginWaiting = false;
             });
         },
         async GotoSystem() {
             var self = this;
             if (self.DiyCommon.IsNull(self.SystemStyle)) {
                 self.DiyCommon.Tips(self.$t("Msg.ChooseOSType"));
-                return;
+                return false;
             }
             self.diyStore.setState("SystemStyle", self.SystemStyle);
 
@@ -1952,12 +1974,14 @@ export default {
             await self.$nextTick();
             // 短暂等待确保路由完全注册（50ms足够，因为已经在登录时加载）
             await new Promise(resolve => setTimeout(resolve, 50));
+            self.LoginStage = "entering";
 
             if (self.SystemStyle == "WebOS" || self.SystemStyle == "macOS" || self.SystemStyle == "Windows") {
-                self.$router.push({
+                const navigationFailure = await self.$router.push({
                     path: "/os",
                     replace: true
                 });
+                if (navigationFailure) throw navigationFailure;
             } else {
                 var url = "/";
                 var fallbackUrl = getFirstValidRoutePath(accessRoutes.length > 0 ? accessRoutes : self.permissionStore.addRoutes);
@@ -1975,14 +1999,14 @@ export default {
                         url = self.normalizeIframeRouteUrl(url);
                     } else if (url.startsWith("http") && !self.diyStore.IsPhoneView) {
                         window.location.href = url;
-                        return;
+                        return true;
                     }
                 } else if (self.LoginResult.DataAppend && self.LoginResult.DataAppend.SysMenuHomePage && self.LoginResult.DataAppend.SysMenuHomePage.Url) {
                     url = String(self.LoginResult.DataAppend.SysMenuHomePage.Url || "");
                 }
                 if (url && url.startsWith("http") && !self.diyStore.IsPhoneView) {
                     window.location.href = url;
-                    return;
+                    return true;
                 }
                 url = normalizeMenuRoutePath(url || fallbackUrl || "/");
                 var isRegisteredRoute = function (targetPath) {
@@ -2008,11 +2032,12 @@ export default {
                 if (!isRegisteredRoute(targetPath) && fallbackUrl) {
                     targetPath = fallbackUrl;
                 }
-                self.$router.push({
+                const navigationFailure = await self.$router.push({
                     path: targetPath,
                     query: self.otherQuery,
                     replace: true
                 });
+                if (navigationFailure) throw navigationFailure;
                 
                 // 登录成功后尝试连接WebSocket
                 self.$nextTick(() => {
@@ -2056,6 +2081,7 @@ export default {
                     }
                 }
             });
+            return true;
         }
     }
 };

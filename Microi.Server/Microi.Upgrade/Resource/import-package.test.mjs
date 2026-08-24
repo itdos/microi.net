@@ -78,6 +78,34 @@ function extractNamedFunction(sourceText, name) {
   assert.fail(`unterminated function ${name}`);
 }
 
+function extractAssignedFunction(sourceText, name) {
+  const start = sourceText.indexOf(`var ${name} = function (`);
+  assert.notEqual(start, -1, `missing assigned function ${name}`);
+  const brace = sourceText.indexOf("{", start);
+  let depth = 0;
+  let quote = "";
+  let escaped = false;
+  for (let index = brace; index < sourceText.length; index += 1) {
+    const char = sourceText[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === quote) quote = "";
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") {
+      quote = char;
+      continue;
+    }
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return sourceText.slice(start, index + 2);
+    }
+  }
+  assert.fail(`unterminated assigned function ${name}`);
+}
+
 test("trusted official Platform Managed resources overwrite while ordinary packages keep three-way protection", () => {
   const fixture = { String };
   vm.runInNewContext(`
@@ -166,10 +194,120 @@ test("marketplace package reads retry empty transient responses without acceptin
   assert.equal(result.Data.Id, "store-1");
   assert.equal(calls.post, 2);
   assert.equal(calls.sleep, 1);
-  assert.match(source, /MARKETPLACE_SOURCE_READ_RETRY_V1/);
+  assert.match(source, /MARKETPLACE_SOURCE_READ_RETRY_V2/);
+  assert.match(source, /V8\.Http\.PostResponse/);
+  assert.match(source, /responseEnvelope\.RawBytes/);
   assert.match(source, /MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1/);
   assert.match(source, /marketplaceEngineRunUrl/);
   assert.match(source, /marketplaceEngineParam\('get-microi-store-model'/);
+});
+
+test("background-task unique-index recovery preserves the authoritative row and rejects two active tasks", () => {
+  const fixture = {};
+  vm.runInNewContext(`
+    ${extractNamedFunction(source, "isTerminalBackgroundTaskStatus")}
+    ${extractNamedFunction(source, "selectBackgroundTaskDuplicateCanonical")}
+    result = selectBackgroundTaskDuplicateCanonical;
+  `, fixture);
+
+  const selectCanonical = fixture.result;
+  const active = { Id: "active", Status: "Running", UpdateTime: "2026-08-20 10:00:00" };
+  const succeeded = { Id: "success", Status: "Succeeded", UpdateTime: "2026-08-22 10:00:00" };
+  assert.equal(selectCanonical([succeeded, active]).Id, "active");
+  assert.equal(selectCanonical([
+    { Id: "failed-new", Status: "Failed", UpdateTime: "2026-08-22 10:00:00" },
+    { Id: "success-old", Status: "Succeeded", UpdateTime: "2026-08-20 10:00:00" },
+  ]).Id, "success-old");
+  assert.throws(
+    () => selectCanonical([
+      { Id: "pending", Status: "Pending" },
+      { Id: "retrying", Status: "Retrying" },
+    ]),
+    /多条活动记录/,
+  );
+
+  assert.match(source, /BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1/);
+  assert.match(source, /archived-duplicate:/);
+  assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
+  assert.match(source, /recoveredFromIdempotencyDuplicate/);
+  assert.match(source, /Version: v2\.3\.6/);
+});
+
+test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {
+  const fixture = {};
+  vm.runInNewContext(`
+    ${extractAssignedFunction(source, "firstTextParam")}
+    ${extractAssignedFunction(source, "listSize")}
+    ${extractAssignedFunction(source, "validatePackageMenuRuntimeContract")}
+    result = validatePackageMenuRuntimeContract;
+  `, fixture);
+
+  const fromStableUrl = {
+    SysMenus: [{
+      Id: "menu-log",
+      Name: "系统日志/监控",
+      OpenType: "MicroService",
+      Url: "/micro-app/microi-platform-service/system-observability",
+      MicroServiceRoutePath: "/system-observability",
+    }],
+    ApplicationBundle: {
+      Application: { AppKey: "microi-platform-service" },
+      MicroService: { Id: "service-source", MsKey: "microi-platform-service" },
+      Routes: [{ Id: "page-log", RoutePath: "/system-observability" }],
+    },
+  };
+  assert.deepEqual(Array.from(fixture.result(fromStableUrl).Errors), []);
+  assert.equal(fromStableUrl.SysMenus[0].MicroServiceKey, "microi-platform-service");
+
+  const fromUniqueRoute = {
+    SysMenus: [{
+      Id: "menu-route",
+      OpenType: "MicroService",
+      MicroServiceRoutePath: "/only-route",
+    }],
+    ApplicationBundles: [{
+      Application: { AppKey: "only-app" },
+      MicroService: { Id: "only-service" },
+      Routes: [{ Id: "only-page", RoutePath: "/only-route" }],
+    }],
+  };
+  assert.deepEqual(Array.from(fixture.result(fromUniqueRoute).Errors), []);
+  assert.equal(fromUniqueRoute.SysMenus[0].MicroServiceKey, "only-app");
+
+  assert.match(source, /LEGACY_MICROSERVICE_MENU_KEY_INFERENCE_V1/);
+});
+
+test("legacy MicroService menu recovery fails closed for ambiguous or conflicting bundles", () => {
+  const fixture = {};
+  vm.runInNewContext(`
+    ${extractAssignedFunction(source, "firstTextParam")}
+    ${extractAssignedFunction(source, "listSize")}
+    ${extractAssignedFunction(source, "validatePackageMenuRuntimeContract")}
+    result = validatePackageMenuRuntimeContract;
+  `, fixture);
+
+  const ambiguous = {
+    SysMenus: [{ OpenType: "MicroService", MicroServiceRoutePath: "/shared" }],
+    ApplicationBundles: [
+      { Application: { AppKey: "app-a" }, Routes: [{ RoutePath: "/shared" }] },
+      { Application: { AppKey: "app-b" }, Routes: [{ RoutePath: "/shared" }] },
+    ],
+  };
+  assert.match(fixture.result(ambiguous).Errors[0], /缺少 MicroServiceKey/);
+
+  const conflictingUrl = {
+    SysMenus: [{
+      Name: "冲突菜单",
+      OpenType: "MicroService",
+      Url: "/micro-app/not-delivered/home",
+      MicroServiceRoutePath: "/home",
+    }],
+    ApplicationBundle: {
+      Application: { AppKey: "delivered-app" },
+      Routes: [{ RoutePath: "/home" }],
+    },
+  };
+  assert.match(fixture.result(conflictingUrl).Errors[0], /not-delivered.*未交付对应 ApplicationBundle/);
 });
 
 function runAdminMenuPermissionFixture(options = {}) {
@@ -805,6 +943,43 @@ test("InsertIfMissing treats a concurrent deterministic-Id insert as idempotent 
   assert.equal(result.stats.DataSkipped, 1);
 });
 
+test("marketplace package reads recover response text from raw bytes", () => {
+  const calls = { postResponse: 0 };
+  const fixture = {
+    storeRequestHeaders: {},
+    V8: {
+      Http: {
+        PostResponse() {
+          calls.postResponse += 1;
+          return {
+            Content: "",
+            RawBytes: { Length: 16 },
+            StatusCode: 200,
+            ErrorMessage: "",
+          };
+        },
+      },
+      Action: { Sleep() {} },
+    },
+    System: {
+      Text: {
+        Encoding: {
+          UTF8: {
+            GetString() { return '{"Code":1,"Data":{"Id":"raw-store"}}'; },
+          },
+        },
+      },
+      Threading: { Thread: { Sleep() {} } },
+    },
+  };
+  vm.runInNewContext(`${marketplaceReadRetrySource[0]}\nresult = postMarketplaceReadWithRetry;`, fixture);
+
+  const result = fixture.result("读取测试包", "https://api.itdos.com/test", { Id: "raw-store" }, 120);
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.Id, "raw-store");
+  assert.equal(calls.postResponse, 1);
+});
+
 test("InsertIfMissing may refresh only explicit display metadata without overwriting tenant values", () => {
   const result = runDataSetImportFixture({
     row: {
@@ -988,8 +1163,12 @@ test("schema import uses durable bounded phases before application assets", () =
   assert.match(source, /assertSchemaChunkSucceeded\('字段定义'\)/);
   assert.match(source, /TaskId:\s*String\(backgroundTaskId/);
   assert.match(source, /Checkpoint:\s*buildPersistentCheckpoint\('ApplicationAssets'/);
-  assert.match(source, /PACKAGE_REPLAY_VERSION_GUARD_V1/);
+  assert.match(source, /PACKAGE_REPLAY_VERSION_GUARD_V2/);
   assert.match(source, /checkpoint\.PackageVersion\s*=\s*checkpointPackageVersion/);
+  assert.match(source, /checkpoint\.StoreVersionId\s*=\s*checkpointStoreVersionId/);
+  assert.match(source, /backgroundCheckpoint\.StoreVersionId/);
+  assert.match(source, /ExpectedAppVersion:/);
+  assert.match(source, /PinCurrentVersion:\s*backgroundChunkingEnabled/);
   assert.match(source, /应用包版本在后台分片期间发生变化/);
   assert.match(source, /snapshotPersistentSchemaStats/);
   assert.match(source, /checkpoint\.SchemaStats\s*=\s*schemaStats/);
@@ -1122,7 +1301,19 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
   assert.equal(packageImporter.LimitMemory, 8192, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.10.11") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v2.3.3") >= 0);
+  assert.match(source, /PACKAGE_REPLAY_VERSION_GUARD_V2/);
+  assert.match(source, /BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1/);
+  assert.match(source, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1/);
+  assert.match(source, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1/);
+  assert.match(source, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1/);
+  assert.match(source, /ensureGeneratedEntityPhysicalPrerequisites/);
+  assert.match(source, /batchAlterParts\.join\(', '\)/);
+  assert.match(source, /if \(!isSqlServer && !isOracle\)/);
+  assert.match(source, /physicalBootstrapOwnsSlice \? 1 : 999/);
+  assert.match(source, /Phase: physicalBootstrapNextPhase/);
+  assert.match(source, /physicalBootstrapPhase == 'Prerequisites'/);
+  assert.match(source, /diy_table[\s\S]*?FormPresentationMode/);
   assert.match(source, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(source, /\^\(bit\|tinyint\|smallint/);
   assert.match(source, /API_ENGINE_RESOURCE_BASELINE_V1/);
@@ -1169,7 +1360,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(source, /BACKGROUND_TASK_BOOTSTRAP_READINESS_V1/);
   assert.match(source, /var legacyMenuDiyConfigFields = \[/);
   assert.match(source, /syncLegacyMenuDiyConfig\([\s\S]*?existingMenuVisibility \? existingMenuVisibility\.DiyConfig/);
-  assert.match(source, /_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig'\]/);
+  assert.match(source, /_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig', 'Url'\]/);
 
   const appStoreMenu = packageModel.SysMenus.find(
     menu => menu.Id === "61b7faee-35b2-4571-add2-5231a355f368"
@@ -1180,10 +1371,19 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 10, 11\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.10.11 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 10, 11\)/);
-  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 3, 6\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 3, 3\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 2, 7\)/);
+  assert.equal(
+    (appStoreUpgradeSource.match(/!HasPinnedImporterCapabilities\(/g) || []).length,
+    3,
+    "runtime, downloaded importer, and embedded package validation must share the pinned-snapshot capability gate",
+  );
+  assert.equal(
+    (appStoreUpgradeSource.match(/!HasPinnedBulkCapabilities\(/g) || []).length,
+    2,
+    "runtime and embedded package validation must share the pinned bulk-worker capability gate",
+  );
+  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 5, 23\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
     3,
@@ -1224,7 +1424,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_010_011/);
+  assert.match(refreshSource, /versionNumber\s*<\s*2_002_002/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -1236,7 +1436,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_007_008/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_004_002/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_010_011/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_002_002/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);
@@ -1251,6 +1451,112 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /tabbedMenus\.length\s*===\s*tabbedMenuIds\.size/);
   assert.match(refreshSource, /uploadAuditMenuValid/);
   assert.match(refreshSource, /ApplicationAssetMultipartSession/);
+});
+
+test("API-engine readback normalizes legacy flag shapes and physically reconciles ignored switches", () => {
+  const fixture = { String, Number, isNaN };
+  vm.runInNewContext(`
+    ${extractNamedFunction(source, "isMissingValue")}
+    ${extractNamedFunction(source, "normalizeApiEngineFlag")}
+    result = normalizeApiEngineFlag;
+  `, fixture);
+  const normalize = fixture.result;
+  assert.equal(normalize(true), 1);
+  assert.equal(normalize(false), 0);
+  assert.equal(normalize("True"), 1);
+  assert.equal(normalize("False"), 0);
+  assert.equal(normalize("1"), 1);
+  assert.equal(normalize("0"), 0);
+  assert.match(source, /API_ENGINE_FLAG_PHYSICAL_RECONCILIATION_V1/);
+  assert.match(source, /UPDATE sys_apiengine SET ' \+ assignments\.join\(','\) \+ ' WHERE Id=@p0/);
+  assert.ok(
+    source.indexOf("reconcilePersistedApiEngineFlags(apiEngine, updatedEngine)")
+      < source.indexOf("assertPersistedApiEngine(apiEngine, updatedEngine)"),
+  );
+});
+
+test("existing menu URL collisions retry without overwriting an unrelated tenant route", () => {
+  assert.match(source, /MENU_URL_UPDATE_COLLISION_RECOVERY_V1/);
+  assert.match(source, /menuUrlOwnerCount/);
+  assert.match(source, /menu_url_update_retry_/);
+  assert.match(source, /existingMenuVisibility && existingMenuVisibility\.Url/);
+  assert.doesNotMatch(source, /SELECT COUNT\(Id\) FROM sys_menu WHERE Url='" \+ originalUrl/);
+});
+
+test("legacy physical prerequisites commit at most one metadata table per background slice", () => {
+  const schemas = {
+    sys_apiengine: new Set([
+      "stophttp", "timeout", "maxstatements", "limitmemory", "limitrecursion", "v8unlimited", "lock",
+    ]),
+    diy_table: new Set([
+      "osclient", "tableinedit", "addcallbakapi", "uptcallbakapi", "delcallbakapi", "v8unlimited",
+      "formpresentation", "formpresentationmode", "formpresentationdensity", "formnavigationtitle",
+      "formnavigationcounttext", "formsectionnavigation", "formsectioneyebrow", "formrequiredcounttext",
+      "formworkbencheyebrow", "formworkbenchdescription", "formnavigationfootertitle",
+      "formnavigationfooterhtml", "formrecordselectorplaceholder", "formrecordselectorlabelfields",
+      "formbannerenabled", "formbannertitlefield", "formbannersubtitlefield", "formbannerimagefield",
+      "formbannericon", "formbannerbackgroundfield", "formbannertagfields", "formbannermetrics",
+    ]),
+  };
+  const alterSql = [];
+  const fixture = {
+    Error,
+    JSON,
+    String,
+    isNaN,
+    parseInt,
+    V8: {
+      OsClientModel: { DbType: "MySql" },
+      Db: {
+        FromSql(sql) {
+          let selectedTable = "";
+          return {
+            AddInParameter(name, value) {
+              selectedTable = String(value).toLowerCase();
+              return this;
+            },
+            ToArray() {
+              return [...(schemas[selectedTable] || [])].map(ColumnName => ({ ColumnName }));
+            },
+            ExecuteNonQuery() {
+              alterSql.push(sql);
+              const tableMatch = String(sql).match(/^ALTER TABLE `([^`]+)`/i);
+              assert.ok(tableMatch, `unexpected prerequisite SQL: ${sql}`);
+              const tableKey = tableMatch[1].toLowerCase();
+              for (const match of String(sql).matchAll(/ADD `([^`]+)`/gi)) {
+                schemas[tableKey].add(match[1].toLowerCase());
+              }
+              return 1;
+            },
+          };
+        },
+      },
+    },
+  };
+  vm.runInNewContext(
+    `${extractNamedFunction(source, "ensureGeneratedEntityPhysicalPrerequisites")}; result = ensureGeneratedEntityPhysicalPrerequisites;`,
+    fixture,
+  );
+
+  const first = fixture.result(1);
+  assert.equal(first.ChangedTableCount, 1);
+  assert.equal(first.RemainingTableCount, 1);
+  assert.deepEqual([...first.Added], ["sys_apiengine.V8Limit"]);
+  assert.equal(alterSql.length, 1);
+  assert.match(alterSql[0], /^ALTER TABLE `sys_apiengine` ADD `V8Limit` int NULL$/i);
+
+  const second = fixture.result(1);
+  assert.equal(second.ChangedTableCount, 1);
+  assert.equal(second.RemainingTableCount, 0);
+  assert.deepEqual([...second.Added], ["diy_table.V8Limit"]);
+  assert.equal(alterSql.length, 2);
+  assert.match(alterSql[1], /^ALTER TABLE `diy_table` ADD `V8Limit` int NULL$/i);
+
+  const modern = fixture.result(1);
+  assert.equal(modern.ChangedTableCount, 0);
+  assert.equal(modern.RemainingTableCount, 0);
+  assert.deepEqual([...modern.Added], []);
+  assert.equal(alterSql.length, 2, "no-op modern tenants must not receive an empty ALTER slice");
 });
 
 test("reinstall DDL classifies existing indexes for idempotent skipping", () => {
@@ -1904,6 +2210,106 @@ test("legacy reused microservice build with a broken key is reuploaded and repai
   assert.equal(buildContext.stats.ApplicationBuildAssets, 1);
 });
 
+test("MoveObject-unavailable nodes persist a verified upload fallback and resume without a loop", () => {
+  const buildStageSource = source.match(
+    /var uploadedBuild = \[\];[\s\S]*?pruneApplicationAssets\(appId, expectedApplicationPaths\);/
+  );
+  assert.ok(buildStageSource, "build asset stage should be extractable");
+
+  const stablePath = "legacy/micro-app/demo-service/v1.0.0/index.html";
+  const temporaryPath = "legacy/temp/index-789.html";
+  const calls = { move: 0, upload: 0, rows: [], prune: 0 };
+  const createContext = existingAsset => ({
+    appId: "app-legacy",
+    appKey: "demo-service",
+    appName: "Demo Service",
+    appType: "MicroService",
+    inlineRuntimeBuild: false,
+    buildRoot: "micro-app/demo-service/v1.0.0",
+    buildAssets: [{ Path: "index.html", Size: 128, Sha256: "hash-index" }],
+    existingApplicationAssets: existingAsset ? { "dist/index.html": existingAsset } : {},
+    expectedApplicationPaths: {},
+    stats: { ApplicationBuildAssets: 0, ApplicationBuildAssetsReused: 0 },
+    V8: {
+      OsClient: "legacy",
+      Method: {
+        MoveObject() {
+          calls.move++;
+          return { Code: 0, Msg: "MoveObject unavailable" };
+        }
+      }
+    },
+    normalizeApplicationPath(value) {
+      return String(value || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    },
+    reuseApplicationAsset(_existing, metadataPath, file) {
+      if (!existingAsset) return null;
+      return {
+        Path: metadataPath,
+        HdfsPath: existingAsset.HdfsPath,
+        FilePathName: existingAsset.HdfsPath,
+        PublishHdfsPath: existingAsset.PublishHdfsPath,
+        StorageScope: existingAsset.StorageScope,
+        Size: file.Size,
+        Hash: file.Sha256,
+        Reused: true
+      };
+    },
+    uploadApplicationAsset() {
+      calls.upload++;
+      return {
+        Path: "index.html",
+        HdfsPath: temporaryPath,
+        FilePathName: temporaryPath,
+        Size: 128,
+        Hash: "hash-index"
+      };
+    },
+    upsertApplicationRow(_table, _where, row) {
+      calls.rows.push({ ...row });
+      return { Code: 1 };
+    },
+    applicationFileName(value) { return String(value || "").split("/").pop(); },
+    applicationFileType() { return "html"; },
+    shouldContinueApplicationAssets() { return false; },
+    markApplicationAssetUploaded() {},
+    reportProgress() {},
+    pruneApplicationAssets() { calls.prune++; }
+  });
+
+  const firstContext = createContext(null);
+  vm.runInNewContext(
+    `(function () { ${buildStageSource[0]}; this.uploadedBuild = uploadedBuild; }).call(this);`,
+    firstContext
+  );
+  assert.equal(calls.upload, 1);
+  assert.equal(calls.move, 1);
+  assert.equal(calls.rows.length, 1);
+  assert.equal(calls.rows[0].HdfsPath, temporaryPath);
+  assert.equal(calls.rows[0].StorageScope, "PrivateSource+PublicBuildMoveFallback");
+  assert.notEqual(calls.rows[0].HdfsPath, stablePath);
+
+  const persisted = {
+    Id: "asset-1",
+    HdfsPath: temporaryPath,
+    PublishHdfsPath: temporaryPath,
+    StorageScope: "PrivateSource+PublicBuildMoveFallback",
+    ContentHash: "hash-index",
+    Size: 128
+  };
+  const resumeContext = createContext(persisted);
+  vm.runInNewContext(
+    `(function () { ${buildStageSource[0]}; this.uploadedBuild = uploadedBuild; }).call(this);`,
+    resumeContext
+  );
+  assert.equal(calls.upload, 1, "resume must not upload the same verified fallback again");
+  assert.equal(calls.move, 1, "resume must not retry unsupported MoveObject forever");
+  assert.equal(calls.rows.length, 1, "resume must not rewrite identical fallback metadata");
+  assert.equal(resumeContext.stats.ApplicationBuildAssetsReused, 1);
+  assert.equal(calls.prune, 2);
+  assert.match(source, /MOVE_OBJECT_UNAVAILABLE_RESUME_V1/);
+});
+
 test("managed micro-app assets proxy stable HDFS paths instead of cross-origin redirects", () => {
   assert.match(microAppControllerSource, /GetText\(asset, "hdfsPath", "HdfsPath"\)/);
   assert.match(microAppControllerSource, /GetText\(asset, "publishHdfsPath", "PublishHdfsPath"\)/);
@@ -1918,7 +2324,7 @@ test("managed micro-app assets proxy stable HDFS paths instead of cross-origin r
 });
 
 test("updating an existing menu preserves customer desktop and mobile visibility", () => {
-    assert.match(source, /GetFormData\('sys_menu',[\s\S]*?_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig'\]/);
+    assert.match(source, /GetFormData\('sys_menu',[\s\S]*?_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig', 'Url'\]/);
   assert.match(source, /existingMenuVisibility\.Display[\s\S]*?modelCopy\.Display/);
   assert.match(source, /existingMenuVisibility\.AppDisplay[\s\S]*?modelCopy\.AppDisplay/);
   assert.match(source, /preserve_existing_menu_visibility_/);

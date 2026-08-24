@@ -46,7 +46,7 @@ export default {
   data() {
     return {
       featureLoading: true,
-      featureEnabled: false
+      featureEnabled: true
     }
   },
   onLoad() {

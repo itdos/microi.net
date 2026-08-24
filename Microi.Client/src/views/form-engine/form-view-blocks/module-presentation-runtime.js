@@ -283,6 +283,7 @@ export function normalizeMenuBadgeConfig(value) {
     return {
         Enabled: asBoolean(source.Enabled ?? source.enabled, false) && Boolean(apiEngineKey),
         ApiEngineKey: apiEngineKey,
+        Tooltip: String(source.Tooltip || source.tooltip || "").trim(),
         ValuePath: String(source.ValuePath || source.valuePath || "Data.Value"),
         Tone: String(source.Tone || source.tone || "danger").toLowerCase(),
         Color: String(source.Color || source.color || ""),

@@ -36,6 +36,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/ai-engine.md` | ai-engine, v8-http-integration, microi-ai-application | 模型代理、License、V8.AI、MCP 对话、跨端调用和安全 |
 | `system-engine/ai-platform-governance.md` | ai-platform-governance, app-store, business-blueprint, page-engine | 门户、身份、配置、发布、服务韧性、Trace/日志、资产协作与可恢复导入 |
 | `system-engine/ai-workflow-suite.md` | business-blueprint, v8-workflow, microi-system-delivery | AI 工作流、蓝图、状态机、自动化流和流程挖掘 |
+| `system-engine/system-observability.md` | system-observability, performance-testing, v8-debugging, microi-microservice | 系统日志、Trace、热点接口、资源监控、网络流量归因、安全治理、AI/MCP 与商城交付 |
 | `system-engine/app-store.md` | app-store | 应用包、安装、升级和回滚 |
 | `system-engine/databases.md` | dos-orm, v8-sql-query, microi-deployment | 扩展数据库与迁移 |
 | `system-engine/datasource-engine.md` | datasource-engine | 数据源定义、执行和供数 |

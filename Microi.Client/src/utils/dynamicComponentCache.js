@@ -20,6 +20,7 @@ const viewModules = import.meta.glob('/src/views/**/*.vue');
 
 const DynamicComponentCache = {
     _cache: new Map(),
+    _sourceCache: new Map(),
     _modules: viewModules,
     
     /**
@@ -98,6 +99,7 @@ const DynamicComponentCache = {
         }
         
         let component;
+        let renderSource = 'custom';
         if (customComponent) {
             // 使用传入的自定义组件
             component = markRaw(customComponent);
@@ -118,6 +120,7 @@ const DynamicComponentCache = {
                     }
                 });
             } else {
+                renderSource = 'microservice';
                 console.warn(`[DynamicComponentCache] 未找到组件: ${path}`);
                 // 本地源码不存在时，尝试通过已安装微服务页面的 LegacyComponentPaths
                 // 解析并承载旧开发组件。离线应用包安装后即可生效，无需逐租户改字段。
@@ -136,9 +139,20 @@ const DynamicComponentCache = {
         
         // 缓存组件
         this._cache.set(cacheKey, component);
+        this._sourceCache.set(cacheKey, renderSource);
         console.log(`[DynamicComponentCache] 缓存组件: ${name}, 路径: ${path}, 缓存大小: ${this._cache.size}`);
         
         return component;
+    },
+
+    /**
+     * 返回框架实际采用的渲染来源。本地源码/显式组件为 custom，
+     * LegacyComponentPaths 微服务兜底为 microservice。
+     */
+    getSource(name, path) {
+        const cacheKey = `${name}:${path}`;
+        if (this._sourceCache.has(cacheKey)) return this._sourceCache.get(cacheKey);
+        return this._findModuleLoader(path) ? 'custom' : 'microservice';
     },
     
     /**
@@ -163,6 +177,7 @@ const DynamicComponentCache = {
      */
     clear() {
         this._cache.clear();
+        this._sourceCache.clear();
     },
     
     /**

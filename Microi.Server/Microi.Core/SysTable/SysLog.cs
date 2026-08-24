@@ -58,5 +58,10 @@ namespace Microi.net
 		public string Remark { get; set; }
 		public int? Level { get; set; }
 		public int? Timer { get; set; }
+		// 兼容历史 MongoDB 日志文档中的客户端诊断字段。旧版系统日志详情页
+		// 已展示这些信息；显式建模后新版受限观测接口才能按需、安全地返回。
+		public string Browser { get; set; }
+		public string OS { get; set; }
+		public string RequestMethod { get; set; }
 	}
 }

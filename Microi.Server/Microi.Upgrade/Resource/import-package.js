@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.2.1
+ * Version: v2.3.6
  * Function:
- * - Unified marketplace importer with resumable slices, strict SharedPublicRuntime support, and verified current/history baselines for legacy managed API engines.
+ * - 统一应用商城导入器；后台安装按期望应用版本锁定不可变商城快照，安装前幂等补齐物理前置列，支持后台分片、资源基线、官方平台受管升级、商城源只读重试，并在后台任务唯一索引创建冲突时仅归档重复终态幂等键。
  */
 
 // ==================== 参数接收与校验 ====================
@@ -32,6 +32,263 @@ if (invokeType == 'client') {
             Msg: '权限不足：只有超级管理员才能安装应用。'
         };
     }
+}
+
+// GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1：部分历史空库包遗漏了 DiyTable
+// GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1：MySQL 同一张表缺少多个固定前置列时，
+// 必须合并为一次 ALTER TABLE，避免旧租户逐列重建元数据表并在首个检查点前耗尽
+// 单片超时。SQL Server / Oracle 保留经过验证的逐列兼容路径。
+// GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1：可信后台任务每个执行片最多
+// 修改一张前置元数据表，提交 Prerequisites 检查点后再继续；没有缺列时直接进入
+// 原 DDL 阶段，不为现代租户制造空分片。
+// 生成实体已经投影的物理列。FormEngine 在读取任意字段元数据前会先物化整条
+// diy_table，旧库因此把真实 Unknown column 包装成 Enumerable.Where 的 source
+// 为空。导入器在第一次 FormEngine 调用前只补固定平台列；新版后端启动升级仍是
+// 主路径，这里为尚未正确跑过物理前置迁移的客户节点提供幂等自愈。
+function ensureGeneratedEntityPhysicalPrerequisites(maxChangedTables) {
+    var dbType = String(
+        V8.OsClientModel && (V8.OsClientModel.DbType || V8.OsClientModel.OsClientDbType) || 'MySql'
+    ).toLowerCase();
+    var isSqlServer = dbType.indexOf('sqlserver') >= 0 || dbType.indexOf('mssql') >= 0;
+    var isOracle = dbType.indexOf('oracle') >= 0;
+    var quoteOpen = isSqlServer ? '[' : (isOracle ? '"' : '`');
+    var quoteClose = isSqlServer ? ']' : (isOracle ? '"' : '`');
+    var added = [];
+    maxChangedTables = parseInt(maxChangedTables || 999, 10);
+    if (isNaN(maxChangedTables) || maxChangedTables < 1) maxChangedTables = 1;
+
+    function textType(length) {
+        if (isOracle) return 'VARCHAR2(' + length + ')';
+        return 'varchar(' + length + ')';
+    }
+    function intType() {
+        return isOracle ? 'NUMBER(10)' : 'int';
+    }
+    function largeTextType() {
+        if (isOracle) return 'CLOB';
+        if (isSqlServer) return 'nvarchar(max)';
+        return 'mediumtext';
+    }
+    function readColumns(tableName) {
+        var sql;
+        if (isOracle) {
+            sql = 'SELECT COLUMN_NAME AS "ColumnName" FROM USER_TAB_COLUMNS WHERE TABLE_NAME=UPPER(@p0)';
+        } else if (isSqlServer) {
+            sql = 'SELECT COLUMN_NAME AS ColumnName FROM INFORMATION_SCHEMA.COLUMNS '
+                + 'WHERE TABLE_CATALOG=DB_NAME() AND LOWER(TABLE_NAME)=LOWER(@p0)';
+        } else {
+            sql = 'SELECT COLUMN_NAME AS ColumnName FROM INFORMATION_SCHEMA.COLUMNS '
+                + 'WHERE TABLE_SCHEMA=DATABASE() AND LOWER(TABLE_NAME)=LOWER(@p0)';
+        }
+        var rows = V8.Db.FromSql(sql).AddInParameter('@p0', tableName).ToArray();
+        var map = {};
+        if (!rows || rows.length === undefined) return map;
+        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            var row = rows[rowIndex] || {};
+            var name = String(row.ColumnName || row.COLUMN_NAME || row.column_name || '').toLowerCase();
+            if (name) map[name] = true;
+        }
+        return map;
+    }
+    function ensureTableColumns(tableName, definitions, allowWrite) {
+        var existing = readColumns(tableName);
+        var pendingDefinitions = [];
+        for (var definitionIndex = 0; definitionIndex < definitions.length; definitionIndex++) {
+            var definition = definitions[definitionIndex];
+            var columnName = String(definition[0]);
+            if (existing[columnName.toLowerCase()]) continue;
+            pendingDefinitions.push(definition);
+        }
+        if (pendingDefinitions.length == 0) return { Missing: 0, Written: false };
+        if (!allowWrite) return { Missing: pendingDefinitions.length, Written: false };
+
+        if (!isSqlServer && !isOracle) {
+            var batchAlterParts = [];
+            for (var batchIndex = 0; batchIndex < pendingDefinitions.length; batchIndex++) {
+                var batchDefinition = pendingDefinitions[batchIndex];
+                batchAlterParts.push(
+                    'ADD ' + quoteOpen + String(batchDefinition[0]) + quoteClose
+                    + ' ' + batchDefinition[1] + ' NULL'
+                );
+            }
+            var batchAlterSql = 'ALTER TABLE ' + quoteOpen + tableName + quoteClose
+                + ' ' + batchAlterParts.join(', ');
+            try {
+                V8.Db.FromSql(batchAlterSql).ExecuteNonQuery();
+            } catch (batchAddColumnError) {
+                var batchReadback = readColumns(tableName);
+                var unresolvedColumns = [];
+                for (var unresolvedIndex = 0; unresolvedIndex < pendingDefinitions.length; unresolvedIndex++) {
+                    var unresolvedName = String(pendingDefinitions[unresolvedIndex][0]);
+                    if (!batchReadback[unresolvedName.toLowerCase()]) unresolvedColumns.push(unresolvedName);
+                }
+                if (unresolvedColumns.length > 0) {
+                    throw new Error(
+                        '批量补齐平台运行时物理列失败：' + tableName + '.' + unresolvedColumns.join(',') + '；'
+                        + (batchAddColumnError && batchAddColumnError.message
+                            ? batchAddColumnError.message
+                            : String(batchAddColumnError))
+                    );
+                }
+            }
+            for (var committedIndex = 0; committedIndex < pendingDefinitions.length; committedIndex++) {
+                var committedName = String(pendingDefinitions[committedIndex][0]);
+                existing[committedName.toLowerCase()] = true;
+                added.push(tableName + '.' + committedName);
+            }
+            return { Missing: pendingDefinitions.length, Written: true };
+        }
+
+        for (var pendingIndex = 0; pendingIndex < pendingDefinitions.length; pendingIndex++) {
+            var pendingDefinition = pendingDefinitions[pendingIndex];
+            var columnName = String(pendingDefinition[0]);
+            var alterSql = 'ALTER TABLE ' + quoteOpen + tableName + quoteClose
+                + ' ADD ' + quoteOpen + columnName + quoteClose + ' ' + pendingDefinition[1] + ' NULL';
+            try {
+                V8.Db.FromSql(alterSql).ExecuteNonQuery();
+            } catch (addColumnError) {
+                // 多节点可能同时首次自愈。仅当并发节点已经把同一列补齐时吞掉重复列；
+                // 权限、连接或其它 DDL 异常继续带真实表/列原因失败关闭。
+                if (!readColumns(tableName)[columnName.toLowerCase()]) {
+                    throw new Error(
+                        '补齐平台运行时物理列失败：' + tableName + '.' + columnName + '；'
+                        + (addColumnError && addColumnError.message ? addColumnError.message : String(addColumnError))
+                    );
+                }
+            }
+            existing[columnName.toLowerCase()] = true;
+            added.push(tableName + '.' + columnName);
+        }
+        return { Missing: pendingDefinitions.length, Written: true };
+    }
+
+    var prerequisiteTables = [
+        {
+            TableName: 'sys_apiengine',
+            Definitions: [
+                ['StopHttp', intType()], ['Timeout', intType()], ['MaxStatements', intType()],
+                ['LimitMemory', intType()], ['LimitRecursion', intType()], ['V8Limit', intType()],
+                ['V8Unlimited', intType()], ['Lock', intType()]
+            ]
+        },
+        {
+            TableName: 'diy_table',
+            Definitions: [
+                ['OsClient', textType(255)], ['TableInEdit', intType()],
+                ['AddCallbakApi', textType(500)], ['UptCallbakApi', textType(500)],
+                ['DelCallbakApi', textType(500)], ['V8Limit', intType()], ['V8Unlimited', intType()],
+                ['FormPresentation', largeTextType()], ['FormPresentationMode', textType(50)],
+                ['FormPresentationDensity', textType(50)], ['FormNavigationTitle', textType(255)],
+                ['FormNavigationCountText', textType(255)], ['FormSectionNavigation', textType(50)],
+                ['FormSectionEyebrow', textType(255)], ['FormRequiredCountText', textType(255)],
+                ['FormWorkbenchEyebrow', textType(255)], ['FormWorkbenchDescription', largeTextType()],
+                ['FormNavigationFooterTitle', textType(255)], ['FormNavigationFooterHtml', largeTextType()],
+                ['FormRecordSelectorPlaceholder', textType(255)], ['FormRecordSelectorLabelFields', largeTextType()],
+                ['FormBannerEnabled', intType()], ['FormBannerTitleField', textType(100)],
+                ['FormBannerSubtitleField', textType(100)], ['FormBannerImageField', textType(100)],
+                ['FormBannerIcon', textType(100)], ['FormBannerBackgroundField', textType(100)],
+                ['FormBannerTagFields', largeTextType()], ['FormBannerMetrics', largeTextType()]
+            ]
+        }
+    ];
+    var changedTableCount = 0;
+    var remainingTableCount = 0;
+    for (var prerequisiteIndex = 0; prerequisiteIndex < prerequisiteTables.length; prerequisiteIndex++) {
+        var prerequisiteTable = prerequisiteTables[prerequisiteIndex];
+        var prerequisiteResult = ensureTableColumns(
+            prerequisiteTable.TableName,
+            prerequisiteTable.Definitions,
+            changedTableCount < maxChangedTables
+        );
+        if (prerequisiteResult.Missing < 1) continue;
+        if (prerequisiteResult.Written) changedTableCount++;
+        else remainingTableCount++;
+    }
+    return {
+        Added: added,
+        ChangedTableCount: changedTableCount,
+        RemainingTableCount: remainingTableCount
+    };
+}
+
+var physicalBootstrapTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
+var physicalBootstrapEnvelope = V8.Param._BackgroundTask || {};
+var physicalBootstrapChunkingEnabled = !!physicalBootstrapTaskId && (
+    V8.Param._TrustedServerInvocation === true
+    || String(V8.Param._TrustedServerInvocation || '').toLowerCase() == 'true'
+    || (String(physicalBootstrapEnvelope.Id || '') == String(physicalBootstrapTaskId)
+        && V8.Param._BackgroundTaskFencingToken !== null
+        && V8.Param._BackgroundTaskFencingToken !== undefined)
+);
+var physicalBootstrapCheckpoint = V8.Param._BackgroundTaskCheckpoint || {};
+if (typeof physicalBootstrapCheckpoint == 'string') {
+    try { physicalBootstrapCheckpoint = JSON.parse(physicalBootstrapCheckpoint); }
+    catch (physicalBootstrapCheckpointError) { physicalBootstrapCheckpoint = {}; }
+}
+if (physicalBootstrapCheckpoint.TaskId
+    && String(physicalBootstrapCheckpoint.TaskId) != String(physicalBootstrapTaskId || '')) {
+    physicalBootstrapCheckpoint = {};
+}
+var physicalBootstrapPhase = String(physicalBootstrapCheckpoint.Phase || '');
+var physicalBootstrapOwnsSlice = physicalBootstrapChunkingEnabled
+    && (!physicalBootstrapPhase || physicalBootstrapPhase == 'Prerequisites');
+
+try {
+    var generatedEntityPhysicalBootstrap = ensureGeneratedEntityPhysicalPrerequisites(
+        physicalBootstrapOwnsSlice ? 1 : 999
+    );
+    if (generatedEntityPhysicalBootstrap.Added.length > 0) {
+        debugLog.generated_entity_physical_bootstrap = generatedEntityPhysicalBootstrap.Added;
+    }
+    if (physicalBootstrapOwnsSlice && generatedEntityPhysicalBootstrap.ChangedTableCount > 0) {
+        var physicalBootstrapHasMore = generatedEntityPhysicalBootstrap.RemainingTableCount > 0;
+        var physicalBootstrapNextPhase = physicalBootstrapHasMore ? 'Prerequisites' : 'Ddl';
+        var physicalBootstrapProgress = physicalBootstrapHasMore ? 2 : 5;
+        var physicalBootstrapPackageInfo = Package && Package.PackageInfo ? Package.PackageInfo : {};
+        var physicalBootstrapContinuation = {
+            Version: 1,
+            TaskId: String(physicalBootstrapTaskId || ''),
+            Phase: physicalBootstrapNextPhase,
+            Index: 0,
+            Progress: physicalBootstrapProgress
+        };
+        var physicalBootstrapPackageVersion = String(
+            physicalBootstrapPackageInfo.Version || physicalBootstrapPackageInfo.AppVersion
+            || V8.Param.AppVersion || ''
+        );
+        var physicalBootstrapPackageIdentity = String(
+            physicalBootstrapPackageInfo.AppId || physicalBootstrapPackageInfo.AppKey
+            || V8.Param.AppId || V8.Param.AppKey || V8.Param.StoreId
+            || physicalBootstrapPackageInfo.Name || ''
+        );
+        var physicalBootstrapStoreVersionId = String(V8.Param.StoreVersionId || '');
+        if (physicalBootstrapPackageVersion) physicalBootstrapContinuation.PackageVersion = physicalBootstrapPackageVersion;
+        if (physicalBootstrapPackageIdentity) physicalBootstrapContinuation.PackageIdentity = physicalBootstrapPackageIdentity;
+        if (physicalBootstrapStoreVersionId) physicalBootstrapContinuation.StoreVersionId = physicalBootstrapStoreVersionId;
+        var physicalBootstrapMessage = physicalBootstrapHasMore
+            ? '平台运行时前置物理列已提交，将继续补齐下一张元数据表'
+            : '平台运行时前置物理列已提交，将继续导入应用物理结构';
+        return {
+            Code: 1,
+            Data: {
+                BackgroundTask: {
+                    HasMore: true,
+                    Checkpoint: physicalBootstrapContinuation,
+                    Progress: physicalBootstrapProgress,
+                    Msg: physicalBootstrapMessage
+                }
+            },
+            Msg: physicalBootstrapMessage
+        };
+    }
+} catch (physicalBootstrapError) {
+    return {
+        Code: 0,
+        Msg: '应用安装前置物理结构自检失败：'
+            + (physicalBootstrapError && physicalBootstrapError.message
+                ? physicalBootstrapError.message
+                : String(physicalBootstrapError))
+    };
 }
 
 var backgroundTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
@@ -189,8 +446,12 @@ var buildPersistentCheckpoint = function (phase, index, extra) {
         checkpointPackageInfo.AppId || checkpointPackageInfo.AppKey || V8.Param.AppId
         || V8.Param.AppKey || V8.Param.StoreId || checkpointPackageInfo.Name || ''
     );
+    var checkpointStoreVersionId = String(
+        V8.Param.StoreVersionId || backgroundCheckpoint.StoreVersionId || ''
+    );
     if (checkpointPackageVersion) checkpoint.PackageVersion = checkpointPackageVersion;
     if (checkpointPackageIdentity) checkpoint.PackageIdentity = checkpointPackageIdentity;
+    if (checkpointStoreVersionId) checkpoint.StoreVersionId = checkpointStoreVersionId;
     if (backgroundCheckpoint.IdMapsPlanned === true
         || phase == 'Fields'
         || phase == 'Physical'
@@ -434,7 +695,13 @@ var syncStoreMetaFromRow = function () {
     if (!V8.Param.StoreApiBase) V8.Param.StoreApiBase = firstTextParam([row.StoreApiBase, row.AppStoreApiBase]);
     if (!V8.Param.StoreOsClient) V8.Param.StoreOsClient = firstTextParam([row.StoreOsClient, row.AppStoreOsClient, row.SourceOsClient]);
     if (!V8.Param.StoreCredentialKey) V8.Param.StoreCredentialKey = firstTextParam([row.StoreCredentialKey, row.CredentialKey]);
-    if (!V8.Param.StoreVersionId) V8.Param.StoreVersionId = firstTextParam([row.StoreVersionId, row.DataVersionId]);
+    if (!V8.Param.StoreVersionId) {
+        V8.Param.StoreVersionId = firstTextParam([
+            backgroundCheckpoint.StoreVersionId,
+            row.StoreVersionId,
+            row.DataVersionId
+        ]);
+    }
     return row;
 };
 
@@ -449,22 +716,44 @@ try {
     return { Code: 0, Msg: credentialError.message || String(credentialError) };
 }
 
-// MARKETPLACE_SOURCE_READ_RETRY_V1：后台分片每次都要从商城源重新读取权威包。
+// MARKETPLACE_SOURCE_READ_RETRY_V2：后台分片每次都要从商城源重新读取权威包。
 // 代理切换、连接复用或上游瞬时超时时，V8.Http 可能短暂返回空字符串；直接
 // JSON.parse 会让整个大型应用从外层任务重试。这里只对固定的只读商城请求做
 // 有界重试，绝不重试安装写入，也不接受空响应或非成功业务结果。
 var postMarketplaceReadWithRetry = function (label, url, postParam, timeoutSeconds) {
     var lastError = '';
-    var maxAttempts = 3;
+    var maxAttempts = 8;
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            var response = V8.Http.Post({
+            var request = {
                 Url: url,
                 PostParam: postParam || {},
                 ParamType: 'json',
                 Headers: storeRequestHeaders,
                 Timeout: timeoutSeconds || 120
-            });
+            };
+            var response = null;
+            if (V8.Http.PostResponse) {
+                var responseEnvelope = V8.Http.PostResponse(request);
+                var responseText = responseEnvelope && responseEnvelope.Content;
+                if ((!responseText || !String(responseText).replace(/^\s+|\s+$/g, ''))
+                    && responseEnvelope && responseEnvelope.RawBytes
+                    && responseEnvelope.RawBytes.Length > 0) {
+                    responseText = System.Text.Encoding.UTF8.GetString(responseEnvelope.RawBytes);
+                }
+                if (!responseText || !String(responseText).replace(/^\s+|\s+$/g, '')) {
+                    var statusCode = responseEnvelope ? Number(responseEnvelope.StatusCode || 0) : 0;
+                    var transportError = responseEnvelope
+                        ? String(responseEnvelope.ErrorMessage || '').replace(/^\s+|\s+$/g, '')
+                        : '';
+                    throw new Error('商城源返回空响应（HTTP ' + statusCode
+                        + (transportError ? '，' + transportError : '') + '）');
+                }
+                response = responseText;
+            } else {
+                // 兼容尚未提供完整响应方法的旧节点。
+                response = V8.Http.Post(request);
+            }
             if (typeof response == 'string') {
                 var responseText = String(response || '').replace(/^\s+|\s+$/g, '');
                 if (!responseText) throw new Error('商城源返回空响应');
@@ -477,8 +766,8 @@ var postMarketplaceReadWithRetry = function (label, url, postParam, timeoutSecon
         }
         if (attempt < maxAttempts) {
             try {
-                if (V8.Action && V8.Action.Sleep) V8.Action.Sleep(250 * attempt);
-                else System.Threading.Thread.Sleep(250 * attempt);
+                if (V8.Action && V8.Action.Sleep) V8.Action.Sleep(500 * attempt);
+                else System.Threading.Thread.Sleep(500 * attempt);
             } catch (sleepError) { }
         }
     }
@@ -509,7 +798,9 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
         marketplaceEngineRunUrl,
         marketplaceEngineParam('get-microi-store-model', {
             Id: storeId,
-            StoreVersionId: firstTextParam([V8.Param.StoreVersionId, storeRow.StoreVersionId, storeRow.DataVersionId])
+            StoreVersionId: firstTextParam([V8.Param.StoreVersionId, storeRow.StoreVersionId, storeRow.DataVersionId]),
+            ExpectedAppVersion: firstTextParam([V8.Param.AppVersion, storeRow.AppVersion, storeRow.Version]),
+            PinCurrentVersion: backgroundChunkingEnabled
         }),
         120
     );
@@ -521,6 +812,23 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
         if (!V8.Param.AppName) V8.Param.AppName = firstTextParam([storeModel.AppName, storeModel.Name]);
         if (!V8.Param.AppVersion) V8.Param.AppVersion = firstTextParam([storeModel.AppVersion, storeModel.Version]);
         if (!V8.Param.AppAuthor) V8.Param.AppAuthor = firstTextParam([storeModel.AppAuthor, storeModel.Author]);
+        if (!V8.Param.StoreVersionId) {
+            V8.Param.StoreVersionId = firstTextParam([storeModel.StoreVersionId, storeModel.DataVersionId]);
+        }
+        if (backgroundChunkingEnabled && !V8.Param.StoreVersionId) {
+            return {
+                Code: 0,
+                Data: {
+                    ErrorType: 'MARKETPLACE_VERSION_SNAPSHOT_MISSING',
+                    StoreId: storeId,
+                    AppVersion: firstTextParam([V8.Param.AppVersion, storeModel.AppVersion, storeModel.Version])
+                },
+                Msg: '商城源未返回不可变安装快照，已停止后台分片安装。'
+            };
+        }
+        if (V8.Param.StoreVersionId) {
+            debugLog.marketplace_version_snapshot = String(V8.Param.StoreVersionId);
+        }
     }
 }
 
@@ -555,100 +863,22 @@ var trustedOfficialPlatformPackage = !!authoritativeStoreModel
     && String(authoritativeStoreModel.ApplicationType || '').toLowerCase() == 'platform'
     && (officialPublisherType == '官方应用' || officialPublisherType == '平台应用');
 
-// BULK_SMALL_PACKAGE_SINGLE_SLICE_V1：批量安装本身已经按“一个应用一个外层
-// checkpoint”持久化。对规模可控的官方平台包，再把同一个应用拆成几十个内部
-// Worker 片段只会反复下载和解析同一包体，调度成本远大于数据库写入。可信批量
-// 任务可让小包在一个事务中完成；大型 Schema、远程 ZIP 或大资产仍保留原有分片。
-var bulkAdaptiveSingleSliceRequested = V8.Param.BulkAdaptiveSingleSlice === true
-    || String(V8.Param.BulkAdaptiveSingleSlice || '').toLowerCase() == 'true';
-var trustedBulkAdaptiveInvocation = bulkAdaptiveSingleSliceRequested
-    && backgroundChunkingEnabled
-    && (V8.Param._TrustedServerInvocation === true
-        || String(V8.Param._TrustedServerInvocation || '').toLowerCase() == 'true')
-    && !!backgroundTaskId
-    && String(backgroundTaskEnvelope.Id || '') == String(backgroundTaskId)
-    && parseInt(V8.Param._BackgroundTaskFencingToken || 0, 10) > 0
-    && parseInt(V8.Param.BulkTotal || 0, 10) > 0;
 var listSize = function (value) {
     return value && value.length !== undefined ? Number(value.length) || 0 : 0;
 };
-var bulkAdaptivePackageEligible = function (packageModel) {
-    packageModel = packageModel || {};
-    var fieldCount = listSize(packageModel.DiyFields);
-    var tableCount = listSize(packageModel.DiyTables);
-    var ddlCount = listSize(packageModel.DDLStatements);
-    var menuCount = listSize(packageModel.SysMenus);
-    var apiEngineCount = listSize(packageModel.SysApiEngines);
-    var scheduleJobCount = listSize(packageModel.ScheduleJobs);
-    var workflowUnitCount = listSize(packageModel.WorkFlows || packageModel.Workflows)
-        + listSize(packageModel.WFNodes || packageModel.WorkFlowNodes)
-        + listSize(packageModel.WFLines || packageModel.WorkFlowLines);
-    var dataRowCount = 0;
-    var dataSets = packageModel.DataSets || [];
-    for (var dataSetIndex = 0; dataSetIndex < listSize(dataSets); dataSetIndex++) {
-        var dataSet = dataSets[dataSetIndex] || {};
-        dataRowCount += listSize(dataSet.Rows || dataSet.Data);
-    }
-
-    var bundles = [];
-    var packageBundles = packageModel.ApplicationBundles || [];
-    for (var bundleIndex = 0; bundleIndex < listSize(packageBundles); bundleIndex++) {
-        if (packageBundles[bundleIndex]) bundles.push(packageBundles[bundleIndex]);
-    }
-    var legacyBundle = packageModel.ApplicationBundle || packageModel.AiApplication || packageModel.FrontendApplication;
-    if (legacyBundle) bundles.push(legacyBundle);
-    var assetFileCount = 0;
-    var assetContentChars = 0;
-    var hasRemoteZipOnlyAssets = false;
-    for (var adaptiveBundleIndex = 0; adaptiveBundleIndex < bundles.length; adaptiveBundleIndex++) {
-        var adaptiveBundle = bundles[adaptiveBundleIndex] || {};
-        var sourceFiles = adaptiveBundle.SourceFiles || adaptiveBundle.Files || [];
-        var buildAssets = adaptiveBundle.BuildAssets || adaptiveBundle.Assets || [];
-        var embeddedCount = listSize(sourceFiles) + listSize(buildAssets);
-        var packageAssets = adaptiveBundle.PackageAssets || adaptiveBundle.ZipAssets || null;
-        if (typeof packageAssets == 'string') {
-            try { packageAssets = JSON.parse(packageAssets); } catch (adaptiveAssetParseError) { return false; }
-        }
-        if (packageAssets && packageAssets.length !== undefined && !packageAssets.BuildZip && !packageAssets.SourceZip) {
-            packageAssets = packageAssets.length ? packageAssets[0] : null;
-        }
-        if (embeddedCount == 0 && packageAssets && (packageAssets.BuildZip || packageAssets.SourceZip)) {
-            hasRemoteZipOnlyAssets = true;
-        }
-        var adaptiveFiles = [];
-        var sourceFileCount = listSize(sourceFiles);
-        var buildAssetCount = listSize(buildAssets);
-        for (var sourceFileIndex = 0; sourceFileIndex < sourceFileCount; sourceFileIndex++) adaptiveFiles.push(sourceFiles[sourceFileIndex]);
-        for (var buildAssetIndex = 0; buildAssetIndex < buildAssetCount; buildAssetIndex++) adaptiveFiles.push(buildAssets[buildAssetIndex]);
-        assetFileCount += adaptiveFiles.length;
-        for (var adaptiveFileIndex = 0; adaptiveFileIndex < adaptiveFiles.length; adaptiveFileIndex++) {
-            assetContentChars += applicationAssetContentLength(adaptiveFiles[adaptiveFileIndex]);
-        }
-    }
-
-    return fieldCount <= 160
-        && tableCount <= 12
-        && ddlCount <= 16
-        && menuCount <= 20
-        && apiEngineCount <= 40
-        && scheduleJobCount == 0
-        && workflowUnitCount <= 200
-        && dataRowCount <= 500
-        && assetFileCount <= 20
-        && assetContentChars <= 8 * 1024 * 1024
-        && !hasRemoteZipOnlyAssets;
-};
-if (trustedBulkAdaptiveInvocation && bulkAdaptivePackageEligible(Package)) {
-    backgroundChunkingEnabled = false;
-    backgroundCheckpoint = {};
-    backgroundCheckpointPhase = 'Ddl';
-    backgroundCheckpointIndex = 0;
-    debugLog.bulk_small_package_single_slice = '可信批量任务使用单应用单事务快速路径';
+// BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1：历史 BulkAdaptiveSingleSlice
+// 只按资源条数估算工作量，会把包含重 DDL、实体生成和权限回填的官方包误判为
+// “小包”，造成单事务长期占用且没有可恢复检查点。为兼容旧批量工作器继续接收
+// 参数，但后台任务一律保留有界分片；直接前台安装的既有语义不受影响。
+var bulkAdaptiveSingleSliceRequested = V8.Param.BulkAdaptiveSingleSlice === true
+    || String(V8.Param.BulkAdaptiveSingleSlice || '').toLowerCase() == 'true';
+if (bulkAdaptiveSingleSliceRequested && backgroundChunkingEnabled) {
+    debugLog.bulk_adaptive_single_slice_ignored = '已保留后台有界分片，忽略旧版单事务请求';
 }
 
-// PACKAGE_REPLAY_VERSION_GUARD_V1：identifier-only 后台任务会在每片从商城源
-// 重新读取包体。发布方若在任务中途切换版本，旧检查点不能与新包混用；宁可让
-// 当前任务明确失败并以新幂等请求重新开始，也不能把两个版本的 DDL/字段拼在一起。
+// PACKAGE_REPLAY_VERSION_GUARD_V2：identifier-only 后台任务首次按期望 AppVersion
+// 解析不可变 StoreVersionId，并把它写入检查点；后续每片只读取该历史快照。
+// 版本和身份校验仍失败关闭，防止快照损坏、错误引用或旧任务把两个包混装。
 if (backgroundChunkingEnabled) {
     var currentPackageVersion = String(
         Package.PackageInfo.Version || Package.PackageInfo.AppVersion || V8.Param.AppVersion || ''
@@ -671,6 +901,13 @@ if (backgroundChunkingEnabled) {
         return {
             Code: 0,
             Msg: '应用包身份与后台检查点不一致，已停止混合安装，请重新提交更新任务。'
+        };
+    }
+    if (backgroundCheckpoint.StoreVersionId
+        && String(backgroundCheckpoint.StoreVersionId) != String(V8.Param.StoreVersionId || '')) {
+        return {
+            Code: 0,
+            Msg: '应用包历史快照与后台检查点不一致，已停止混合安装。'
         };
     }
 }
@@ -760,8 +997,20 @@ var validatePackageMenuRuntimeContract = function (packageModel) {
         }
     }
 
+    // LEGACY_MICROSERVICE_MENU_KEY_INFERENCE_V1：历史官方包可能使用单数
+    // ApplicationBundle，且源租户 sys_menu 尚无 MicroServiceKey 物理字段。
+    // 仅从包内不可变事实唯一推导 Key；显式 URL 冲突或多候选仍失败关闭。
     var runtimeBundles = {};
-    var bundles = packageModel.ApplicationBundles || [];
+    var runtimeBundleKeys = [];
+    var bundles = [];
+    var pluralBundles = packageModel.ApplicationBundles || [];
+    for (var pluralBundleIndex = 0; pluralBundleIndex < listSize(pluralBundles); pluralBundleIndex++) {
+        if (pluralBundles[pluralBundleIndex]) bundles.push(pluralBundles[pluralBundleIndex]);
+    }
+    var singularBundle = packageModel.ApplicationBundle
+        || packageModel.AiApplication
+        || packageModel.FrontendApplication;
+    if (singularBundle) bundles.push(singularBundle);
     for (var bundleIndex = 0; bundleIndex < listSize(bundles); bundleIndex++) {
         var bundle = bundles[bundleIndex] || {};
         var application = bundle.Application || {};
@@ -769,12 +1018,22 @@ var validatePackageMenuRuntimeContract = function (packageModel) {
         var appKey = firstTextParam([application.AppKey, bundle.AppKey, microService.MsKey]).toLowerCase();
         if (!appKey) continue;
         var routeMap = {};
+        var pageIdMap = {};
         var routes = bundle.Routes || [];
         for (var routeIndex = 0; routeIndex < listSize(routes); routeIndex++) {
-            var routePath = String((routes[routeIndex] || {}).RoutePath || '').replace(/^\s+|\s+$/g, '');
+            var route = routes[routeIndex] || {};
+            var routePath = String(route.RoutePath || '').replace(/^\s+|\s+$/g, '');
             if (routePath) routeMap[routePath.toLowerCase()] = true;
+            if (route.Id) pageIdMap[String(route.Id).toLowerCase()] = true;
         }
-        runtimeBundles[appKey] = { Routes: routeMap };
+        var runtimeBundleAlreadyKnown = !!runtimeBundles[appKey];
+        runtimeBundles[appKey] = {
+            Key: appKey,
+            ServiceId: String(microService.Id || '').toLowerCase(),
+            Routes: routeMap,
+            PageIds: pageIdMap
+        };
+        if (!runtimeBundleAlreadyKnown) runtimeBundleKeys.push(appKey);
     }
 
     for (var runtimeMenuIndex = 0; runtimeMenuIndex < listSize(menus); runtimeMenuIndex++) {
@@ -789,6 +1048,41 @@ var validatePackageMenuRuntimeContract = function (packageModel) {
             runtimeMenu.MicroServiceAppKey
         ]).toLowerCase();
         var menuLabel = String(runtimeMenu.Name || runtimeMenu.Id || ('第' + (runtimeMenuIndex + 1) + '个菜单'));
+        if (!menuKey) {
+            var menuUrl = String(runtimeMenu.Url || '').replace(/^\s+|\s+$/g, '');
+            var urlKeyMatch = /^\/micro-app\/([^\/?#]+)(?:\/|$)/i.exec(menuUrl);
+            if (urlKeyMatch && urlKeyMatch[1]) {
+                // URL 是菜单自身的显式稳定绑定。即使包内没有同 Key 运行包也先保留，
+                // 后续统一校验会给出准确的“未交付 ApplicationBundle”错误。
+                menuKey = String(urlKeyMatch[1]).toLowerCase();
+            } else {
+                var candidateKeys = [];
+                var menuServiceId = String(runtimeMenu.MicroServiceId || '').toLowerCase();
+                var menuPageId = String(runtimeMenu.MicroServicePageId || '').toLowerCase();
+                var inferredRoutePath = firstTextParam([
+                    runtimeMenu.MicroServiceRoutePath,
+                    runtimeMenu.RoutePath
+                ]).toLowerCase();
+                var appendCandidate = function (candidateKey) {
+                    for (var candidateIndex = 0; candidateIndex < candidateKeys.length; candidateIndex++) {
+                        if (candidateKeys[candidateIndex] == candidateKey) return;
+                    }
+                    candidateKeys.push(candidateKey);
+                };
+                for (var runtimeBundleKeyIndex = 0; runtimeBundleKeyIndex < runtimeBundleKeys.length; runtimeBundleKeyIndex++) {
+                    var candidateKey = runtimeBundleKeys[runtimeBundleKeyIndex];
+                    var candidateBundle = runtimeBundles[candidateKey];
+                    if ((menuServiceId && candidateBundle.ServiceId == menuServiceId)
+                        || (menuPageId && candidateBundle.PageIds[menuPageId])
+                        || (inferredRoutePath && candidateBundle.Routes[inferredRoutePath])) {
+                        appendCandidate(candidateKey);
+                    }
+                }
+                if (candidateKeys.length == 1) menuKey = candidateKeys[0];
+                else if (candidateKeys.length == 0 && runtimeBundleKeys.length == 1) menuKey = runtimeBundleKeys[0];
+            }
+            if (menuKey) runtimeMenu.MicroServiceKey = menuKey;
+        }
         if (!menuKey) {
             errors.push('微服务菜单【' + menuLabel + '】缺少 MicroServiceKey');
             continue;
@@ -1375,7 +1669,7 @@ try {
         if (!resumeInstall || !appId) return existingApplicationAssets;
         var result = V8.FormEngine.GetTableData('mci_ai_app_file', {
             _Where: [['AppId', '=', appId]],
-            _SelectFields: ['Id', 'FilePath', 'HdfsPath', 'PublishHdfsPath', 'ContentHash', 'Size'],
+            _SelectFields: ['Id', 'FilePath', 'HdfsPath', 'PublishHdfsPath', 'StorageScope', 'ContentHash', 'Size'],
             _PageIndex: 1,
             _PageSize: 20000
         });
@@ -1404,6 +1698,8 @@ try {
             Path: normalizedPath,
             HdfsPath: existing.HdfsPath,
             FilePathName: existing.HdfsPath,
+            PublishHdfsPath: existing.PublishHdfsPath,
+            StorageScope: existing.StorageScope,
             Size: actualSize,
             Hash: actualHash,
             Reused: true
@@ -1732,6 +2028,16 @@ try {
                 ? null
                 : reuseApplicationAsset(existingApplicationAssets, buildMetadataPath, buildFile);
             var buildWasReused = !!buildUpload;
+            // MOVE_OBJECT_UNAVAILABLE_RESUME_V1：部分历史节点能够上传并读取公有对象，
+            // 但尚未实现 MoveObject，或存储账号只有 Put/Get 而没有 Move/Delete 权限。
+            // 首次稳定路径移动失败后会保留刚上传且摘要已校验的真实对象，并在
+            // StorageScope 中持久化回退标记；后续分片直接复用该对象，禁止每片
+            // 重传同一文件、AssetIndex 永远停在 1。未带标记的历史旧 Key 仍会
+            // 先重传一次并尝试修复，兼顾旧脏路径自愈与旧存储节点兼容。
+            var buildMoveFallbackScope = 'PrivateSource+PublicBuildMoveFallback';
+            var buildUsesPersistedMoveFallback = buildWasReused
+                && String(buildUpload.StorageScope || '').toLowerCase()
+                    == buildMoveFallbackScope.toLowerCase();
             var reusedBuildHdfsPath = buildWasReused ? normalizeApplicationPath(buildUpload.HdfsPath).toLowerCase() : '';
             if (useDatabaseOnlyBuild) {
                 // DATABASE_ONLY_BUILD_ASSETS_V1：仅当包清单显式声明 DatabaseOnly、
@@ -1772,10 +2078,13 @@ try {
             var stableBuildPath = appType == 'MicroService'
                 ? normalizeApplicationPath(String(V8.OsClient || '').toLowerCase() + '/' + buildRoot + '/' + normalizedBuildPath)
                 : normalizeApplicationPath(String(V8.OsClient || '').toLowerCase() + '/ai-app-publish/' + appKey + '/' + normalizedBuildPath);
-            var buildPathRepaired = useDatabaseOnlyBuild ? false : moveBuildToStablePath(buildUpload, stableBuildPath);
+            var buildPathRepaired = useDatabaseOnlyBuild
+                ? false
+                : (buildUsesPersistedMoveFallback ? false : moveBuildToStablePath(buildUpload, stableBuildPath));
             // SKIP_MOVE_FOR_REUSED_BUILD_V1：已处于当前租户稳定 Key 的断点资产不重复移动。
             // 旧版错误 Key 若已被移动或删除，则从本次自包含包重传，再尝试写入正确 Key。
-            if (!useDatabaseOnlyBuild && buildWasReused && !buildPathRepaired) {
+            if (!useDatabaseOnlyBuild && buildWasReused
+                && !buildUsesPersistedMoveFallback && !buildPathRepaired) {
                 if (shouldContinueApplicationAssets(buildFile)) {
                     return buildApplicationAssetContinuation(bundleIndex, 'BuildRepair', b, totalBundleAssets);
                 }
@@ -1786,6 +2095,8 @@ try {
                 buildWasReused = false;
                 moveBuildToStablePath(buildUpload, stableBuildPath);
             }
+            var buildUsesMoveFallback = !useDatabaseOnlyBuild && !buildPathRepaired
+                && normalizeApplicationPath(buildUpload.HdfsPath) != stableBuildPath;
             uploadedBuild.push(buildUpload);
             // DB_RUNTIME_BUILD_ASSETS_V1：目标环境的 FileServer/CDN 可能与开发环境不同。
             // 离线包显式选择 db/database 时，把编译产物同步写入同源运行清单。
@@ -1807,8 +2118,9 @@ try {
                 });
             }
             if (useDatabaseOnlyBuild) continue;
-            if (buildWasReused && buildPathRepaired
-                && reusedBuildHdfsPath == stableBuildPath.toLowerCase()) continue;
+            if (buildWasReused
+                && ((buildPathRepaired && reusedBuildHdfsPath == stableBuildPath.toLowerCase())
+                    || buildUsesPersistedMoveFallback)) continue;
             // 安装后的 Web/UniApp 仍须保留真实 dist 元数据，才能继续编辑源码、
             // 重新构建并打包，而不是退回只生成一张兼容预览页。
             var buildAssetRow = {
@@ -1819,7 +2131,9 @@ try {
                 FileType: applicationFileType(normalizedBuildPath),
                 HdfsPath: buildUpload.HdfsPath,
                 PublishHdfsPath: buildUpload.HdfsPath,
-                StorageScope: 'PrivateSource+PublicBuild',
+                StorageScope: buildUsesMoveFallback
+                    ? buildMoveFallbackScope
+                    : 'PrivateSource+PublicBuild',
                 ContentHash: buildUpload.Hash,
                 Size: buildUpload.Size,
                 IsDirectory: 0,
@@ -2197,20 +2511,34 @@ try {
                         Timeout: 30
                     });
                     // MARKETPLACE_INSTALL_STAT_STRING_RESPONSE_V1：V8.Http.Post 在不同
-                    // 运行版本中可能直接返回对象，也可能返回 JSON 字符串。官方接口已
-                    // 成功执行但未解析字符串时，不能把本地安装误判失败并反复回滚。
+                    // 运行版本中可能直接返回对象，也可能返回 JSON 字符串。
+                    // MARKETPLACE_INSTALL_STAT_NON_BLOCKING_V2：安装次数属于幂等遥测，
+                    // 旧节点可能返回 True/False 或代理诊断文本。非标准回执必须保留告警，
+                    // 但不能把已经成功的应用导入误判失败并回滚；OperationId/InstallationKey
+                    // 继续保证远端实际成功但响应丢失时不会重复计数。
                     if (typeof remoteStat == 'string') {
-                        remoteStat = JSON.parse(remoteStat);
+                        var remoteStatText = String(remoteStat || '').replace(/^\s+|\s+$/g, '');
+                        if (/^true$/i.test(remoteStatText)) {
+                            remoteStat = { Code: 1, Msg: '兼容旧节点布尔成功回执' };
+                        } else {
+                            try {
+                                remoteStat = JSON.parse(remoteStatText);
+                            } catch (remoteStatParseError) {
+                                debugLog.install_count_warning_remote = '官方商城安装次数回执不是标准JSON：'
+                                    + remoteStatText.substring(0, 300) + '，操作Id=' + installOperationId;
+                                remoteStat = null;
+                            }
+                        }
                     }
-                    if (remoteStat && remoteStat.Code == 1) {
+                    if (remoteStat === true || (remoteStat && remoteStat.Code == 1)) {
                         debugLog.install_count_result = '官方商城安装次数已累计，操作Id=' + installOperationId;
-                    } else {
-                        debugLog.install_count_error_remote = '官方商城安装次数累计失败：'
+                    } else if (!debugLog.install_count_warning_remote) {
+                        debugLog.install_count_warning_remote = '官方商城安装次数累计未确认：'
                             + ((remoteStat && remoteStat.Msg) || '接口无返回') + '，操作Id=' + installOperationId;
                     }
                 } catch (statError) {
-                    debugLog.install_count_error_remote = (statError.message || String(statError))
-                        + '，操作Id=' + installOperationId;
+                    debugLog.install_count_warning_remote = '官方商城安装次数累计请求异常：'
+                        + (statError.message || String(statError)) + '，操作Id=' + installOperationId;
                 }
             } else {
                 debugLog.version_record_error = saveResult ? saveResult.Msg : '未知错误';
@@ -3248,6 +3576,141 @@ try {
         return appKey.toLowerCase() == 'app.microi.background-task';
     };
 
+    // BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1：极少数旧库在唯一索引
+    // 建立前已经因历史竞态留下相同幂等键。只归档明确终态的重复行；活动状态或
+    // 未知状态一律视为仍有执行语义，同一键出现两条时失败关闭，绝不删除任务。
+    function isTerminalBackgroundTaskStatus(status) {
+        var normalized = String(status || '').toLowerCase();
+        return normalized == 'succeeded' || normalized == 'failed' || normalized == 'canceled';
+    }
+
+    function selectBackgroundTaskDuplicateCanonical(rows) {
+        rows = rows || [];
+        var activeRows = [];
+        var terminalRows = [];
+        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            var row = rows[rowIndex] || {};
+            if (isTerminalBackgroundTaskStatus(row.Status)) terminalRows.push(row);
+            else activeRows.push(row);
+        }
+        if (activeRows.length > 1) {
+            var activeIds = [];
+            for (var activeIndex = 0; activeIndex < activeRows.length; activeIndex++) {
+                activeIds.push(String(activeRows[activeIndex].Id || ''));
+            }
+            throw new Error(
+                '后台任务幂等键存在多条活动记录，拒绝自动归档：' + activeIds.join(',')
+                + '；请先确认权威执行记录后再重试'
+            );
+        }
+        if (activeRows.length == 1) return activeRows[0];
+        terminalRows.sort(function (left, right) {
+            var leftSucceeded = String(left.Status || '').toLowerCase() == 'succeeded' ? 1 : 0;
+            var rightSucceeded = String(right.Status || '').toLowerCase() == 'succeeded' ? 1 : 0;
+            if (leftSucceeded != rightSucceeded) return rightSucceeded - leftSucceeded;
+            var leftTime = String(left.UpdateTime || left.CreateTime || '');
+            var rightTime = String(right.UpdateTime || right.CreateTime || '');
+            if (leftTime != rightTime) return leftTime > rightTime ? -1 : 1;
+            var leftId = String(left.Id || '');
+            var rightId = String(right.Id || '');
+            return leftId == rightId ? 0 : (leftId > rightId ? -1 : 1);
+        });
+        return terminalRows.length > 0 ? terminalRows[0] : null;
+    }
+
+    var repairBackgroundTaskIdempotencyDuplicates = function (ddlInfo, ddlText, ddlError) {
+        if (!isBackgroundTaskBootstrapPackage()
+            || !ddlInfo
+            || String(ddlInfo.Kind || '').toLowerCase() != 'index'
+            || String(ddlInfo.TableName || '').toLowerCase() != 'mci_background_task') return -1;
+        var indexName = String(ddlInfo.IndexName || '').toLowerCase();
+        if (indexName != 'ux_mci_background_task_idempotency'
+            && indexName != 'ux_mci_bg_task_runtime_idem') return -1;
+        var errorText = String(ddlError && ddlError.message ? ddlError.message : ddlError || '');
+        if (!/duplicate entry|duplicate key|unique constraint|ora-00001/i.test(errorText)) return -1;
+
+        var ddlLower = String(ddlText || '').toLowerCase();
+        var scopeColumns = ['OsClient'];
+        if (ddlLower.indexOf('runtimeosclienttype') >= 0) scopeColumns.push('RuntimeOsClientType');
+        if (ddlLower.indexOf('runtimeosclientnetwork') >= 0) scopeColumns.push('RuntimeOsClientNetwork');
+        scopeColumns.push('IdempotencyKey');
+        var selectColumns = ['Id', 'Status', 'CreateTime', 'UpdateTime'];
+        for (var scopeIndex = 0; scopeIndex < scopeColumns.length; scopeIndex++) {
+            if (selectColumns.indexOf(scopeColumns[scopeIndex]) < 0) selectColumns.push(scopeColumns[scopeIndex]);
+        }
+
+        var readRows = function () {
+            return V8.Db.FromSql(
+                'SELECT ' + selectColumns.join(',')
+                + ' FROM mci_background_task WHERE IdempotencyKey IS NOT NULL AND IdempotencyKey <> \'\''
+            ).ToArray() || [];
+        };
+        var groupDuplicates = function (rows) {
+            var groups = {};
+            for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+                var row = rows[rowIndex] || {};
+                var values = [];
+                var completeScope = true;
+                for (var columnIndex = 0; columnIndex < scopeColumns.length; columnIndex++) {
+                    var value = getPhysicalValue(row, [scopeColumns[columnIndex]]);
+                    // 当前物理导入器以 MySQL 为目标；复合唯一索引任一列为 NULL 时
+                    // 不会形成冲突，不能把这类记录误判为重复历史。
+                    if (value === null || value === undefined) {
+                        completeScope = false;
+                        break;
+                    }
+                    values.push(String(value));
+                }
+                if (!completeScope) continue;
+                var groupKey = JSON.stringify(values);
+                if (!groups[groupKey]) groups[groupKey] = [];
+                groups[groupKey].push(row);
+            }
+            var duplicates = [];
+            for (var groupKey in groups) {
+                if (Object.prototype.hasOwnProperty.call(groups, groupKey) && groups[groupKey].length > 1) {
+                    duplicates.push(groups[groupKey]);
+                }
+            }
+            return duplicates;
+        };
+
+        var duplicateGroups = groupDuplicates(readRows());
+        var archivedCount = 0;
+        for (var groupIndex = 0; groupIndex < duplicateGroups.length; groupIndex++) {
+            var groupRows = duplicateGroups[groupIndex];
+            var canonical = selectBackgroundTaskDuplicateCanonical(groupRows);
+            if (!canonical || !canonical.Id) {
+                throw new Error('后台任务历史重复幂等键缺少可保留的权威记录，拒绝自动归档');
+            }
+            for (var duplicateIndex = 0; duplicateIndex < groupRows.length; duplicateIndex++) {
+                var duplicateRow = groupRows[duplicateIndex] || {};
+                if (String(duplicateRow.Id || '') == String(canonical.Id)) continue;
+                if (!isTerminalBackgroundTaskStatus(duplicateRow.Status)) {
+                    throw new Error(
+                        '后台任务历史重复幂等键包含非终态记录 ' + String(duplicateRow.Id || '')
+                        + '，拒绝自动归档'
+                    );
+                }
+                var originalKey = String(duplicateRow.IdempotencyKey || '');
+                var archivedKey = 'archived-duplicate:' + String(duplicateRow.Id || '');
+                var updated = V8.Db.FromSql(
+                    'UPDATE mci_background_task SET IdempotencyKey=@p0 '
+                    + 'WHERE Id=@p1 AND IdempotencyKey=@p2'
+                )
+                    .AddInParameter('@p0', archivedKey)
+                    .AddInParameter('@p1', String(duplicateRow.Id || ''))
+                    .AddInParameter('@p2', originalKey)
+                    .ExecuteNonQuery();
+                if (parseInt(updated || 0, 10) > 0) archivedCount++;
+            }
+        }
+        if (groupDuplicates(readRows()).length > 0) {
+            throw new Error('后台任务历史重复幂等键归档后回读仍有冲突，拒绝创建唯一索引');
+        }
+        return archivedCount;
+    };
+
     // The bootstrap package is installed in the foreground because it cannot
     // enqueue itself. Do not report success until the complete worker schema and
     // all distributed-runtime indexes can be read back from the physical database.
@@ -3357,6 +3820,7 @@ try {
             } catch (ddlError) {
                 var finalDdlError = ddlError;
                 var recoveredFromRowSize = false;
+                var recoveredFromIdempotencyDuplicate = false;
                 if (ddlInfo.Kind == 'table' && isMysqlRowSizeTooLargeError(ddlError)) {
                     var promotedWideColumns = promoteWidePackageColumnsForTable(
                         ddlInfo.TableName,
@@ -3378,6 +3842,25 @@ try {
                 }
 
                 if (!recoveredFromRowSize) {
+                    try {
+                        var archivedDuplicateTasks = repairBackgroundTaskIdempotencyDuplicates(
+                            ddlInfo,
+                            ddlItem.DDL,
+                            finalDdlError
+                        );
+                        if (archivedDuplicateTasks >= 0) {
+                            V8.Db.FromSql(ddlItem.DDL).ExecuteNonQuery();
+                            recoveredFromIdempotencyDuplicate = true;
+                            ddlExecuted++;
+                            debugLog['ddl_duplicate_idempotency_recovered_' + ddlLogKey] =
+                                '已保留权威任务并归档' + archivedDuplicateTasks + '条终态历史重复幂等键，唯一索引创建成功';
+                        }
+                    } catch (idempotencyRepairError) {
+                        finalDdlError = idempotencyRepairError;
+                    }
+                }
+
+                if (!recoveredFromRowSize && !recoveredFromIdempotencyDuplicate) {
                     // 多节点或重复请求可能在存在性检查之后抢先创建对象。
                     // 失败后再次回读；对象已存在即按幂等成功处理。
                     var existsAfterError = ddlInfo.Kind == 'table'
@@ -4708,6 +5191,30 @@ try {
     var packageName = firstTextParam([V8.Param.AppName, Package.PackageInfo.Name]);
     var preserveInterfaceEnginePageTabs = packageAppIdLower == 'app.microi.api-engine'
         || packageName == '接口引擎';
+    // MENU_URL_UPDATE_COLLISION_RECOVERY_V1：升级既有菜单时，包内 Url 可能已被
+    // 目标租户的其它首页菜单占用。优先保留该菜单当前仍唯一的 Url；否则生成
+    // 有界唯一后缀并重试，禁止因为一个路由冲突回滚整个平台应用。
+    var menuUrlOwnerCount = function (url, excludedMenuId) {
+        var sql = 'SELECT COUNT(Id) FROM sys_menu WHERE Url=@p0';
+        if (excludedMenuId) sql += ' AND Id<>@p1';
+        var query = V8.Db.FromSql(sql).AddInParameter('@p0', url);
+        if (excludedMenuId) query.AddInParameter('@p1', excludedMenuId);
+        return Number(query.ToScalar() || 0);
+    };
+    var chooseMenuUrlCollisionFallback = function (incomingUrl, currentUrl, menuId) {
+        var normalizedCurrent = String(currentUrl || '').trim();
+        if (normalizedCurrent
+            && normalizedCurrent != String(incomingUrl || '')
+            && menuUrlOwnerCount(normalizedCurrent, menuId) == 0) {
+            return normalizedCurrent;
+        }
+        var baseUrl = String(incomingUrl || '').trim();
+        for (var suffix = 2; suffix <= 100; suffix++) {
+            var candidate = baseUrl + '-' + suffix;
+            if (menuUrlOwnerCount(candidate, menuId) == 0) return candidate;
+        }
+        return baseUrl + '-' + String(V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid());
+    };
     var legacyMenuDiyConfigFields = [
         'SelectApi', 'AddBtnText', 'SaveBtnText', 'AddBtnType', 'SaveType',
         'HiddenIndex', 'GeneralSeaarch', 'ImportApi', 'ImportProgressApi', 'ExportApi'
@@ -5214,7 +5721,7 @@ try {
         if (exists) {
             var existingMenuVisibilityResult = V8.FormEngine.GetFormData('sys_menu', {
                 Id: menu.Id,
-                _SelectFields: ['Display', 'AppDisplay', 'DiyConfig']
+                _SelectFields: ['Display', 'AppDisplay', 'DiyConfig', 'Url']
             });
             existingMenuVisibility = existingMenuVisibilityResult
                 && existingMenuVisibilityResult.Code == 1
@@ -5273,6 +5780,24 @@ try {
             if (uptResult.Code == 1) {
                 stats.MenuUpdated++;
                 menuWriteSucceeded = true;
+            } else if (uptResult.Msg
+                && uptResult.Msg.indexOf('[Url]已存在唯一值') > -1
+                && modelCopy.Url) {
+                var updateOriginalUrl = modelCopy.Url;
+                modelCopy.Url = chooseMenuUrlCollisionFallback(
+                    updateOriginalUrl,
+                    existingMenuVisibility && existingMenuVisibility.Url,
+                    menu.Id);
+                debugLog['menu_url_update_retry_' + menu.Id] = updateOriginalUrl + ' → ' + modelCopy.Url;
+                var updateRetryResult = runWriteWithRetry(function () {
+                    return V8.FormEngine.UptFormData('sys_menu', modelCopy);
+                }, 'menu_url_update_retry_' + menu.Id);
+                if (updateRetryResult.Code == 1) {
+                    stats.MenuUpdated++;
+                    menuWriteSucceeded = true;
+                } else {
+                    debugLog['menu_upt_error_' + menu.Id] = updateRetryResult.Msg;
+                }
             } else {
                 debugLog['menu_upt_error_' + menu.Id] = uptResult.Msg;
             }
@@ -5304,8 +5829,7 @@ try {
             } else if (addResult.Msg && addResult.Msg.indexOf('[Url]已存在唯一值') > -1 && modelCopy.Url) {
                 // Url重复，自动追加后缀重试
                 var originalUrl = modelCopy.Url;
-                var urlCount = V8.Db.FromSql("SELECT COUNT(Id) FROM sys_menu WHERE Url='" + originalUrl.replace(/'/g, "''") + "'").ToScalar();
-                var newUrl = originalUrl + '-' + (Number(urlCount) + 1);
+                var newUrl = chooseMenuUrlCollisionFallback(originalUrl, '', menu.Id);
                 modelCopy.Url = newUrl;
                 debugLog['menu_url_retry_' + menu.Id] = originalUrl + ' → ' + newUrl;
                 var retryResult = runWriteWithRetry(function () {
@@ -5761,6 +6285,16 @@ try {
         if (isMissingValue(model.EnableLog)) model.EnableLog = 0;
     }
 
+    function normalizeApiEngineFlag(value) {
+        if (value === true) return 1;
+        if (value === false || isMissingValue(value)) return 0;
+        var normalized = String(value).trim().toLowerCase();
+        if (normalized == 'true' || normalized == 'yes' || normalized == 'on') return 1;
+        if (normalized == 'false' || normalized == 'no' || normalized == 'off') return 0;
+        var numeric = Number(value);
+        return isNaN(numeric) ? 0 : (numeric == 0 ? 0 : 1);
+    }
+
     function removeApiEngineCacheValue(value) {
         if (isMissingValue(value)) return;
         V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(value).toLowerCase()}`);
@@ -5818,6 +6352,35 @@ try {
             V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiAddress).toLowerCase()}`, latestCacheJson);
         }
         return latest;
+    }
+
+    // API_ENGINE_FLAG_PHYSICAL_RECONCILIATION_V1：部分历史库已存在 StopHttp 等
+    // 物理列，但对应 diy_field 元数据缺失，FormEngine 会返回成功却静默忽略开关。
+    // 仅在首次严格回读发现差异时，对已通过资源所有权校验的布尔运行状态做参数化
+    // 物理补正，随后清缓存并再次严格回读；源码和其它安全元数据仍禁止绕过 FormEngine。
+    function reconcilePersistedApiEngineFlags(expected, latest) {
+        if (!latest) return latest;
+        var assignments = [];
+        if (!isMissingValue(expected.IsEnable)
+            && normalizeApiEngineFlag(latest.IsEnable) != normalizeApiEngineFlag(expected.IsEnable)) {
+            assignments.push('IsEnable=' + normalizeApiEngineFlag(expected.IsEnable));
+        }
+        if (!isMissingValue(expected.StopHttp)
+            && normalizeApiEngineFlag(latest.StopHttp) != normalizeApiEngineFlag(expected.StopHttp)) {
+            assignments.push('StopHttp=' + normalizeApiEngineFlag(expected.StopHttp));
+        }
+        if (normalizeApiEngineFlag(latest.IsDeleted) == 1) assignments.push('IsDeleted=0');
+        if (assignments.length == 0) return latest;
+        var stableId = String(latest.Id || expected.Id || '');
+        if (!stableId) throw new Error('接口引擎开关补正缺少稳定Id：' + expected.ApiEngineKey);
+        var affected = V8.Db.FromSql(
+            'UPDATE sys_apiengine SET ' + assignments.join(',') + ' WHERE Id=@p0'
+        ).AddInParameter('@p0', stableId).ExecuteNonQuery();
+        if (Number(affected) != 1) {
+            throw new Error('接口引擎开关物理补正未命中唯一记录：' + expected.ApiEngineKey);
+        }
+        debugLog['apiengine_flag_physical_reconcile_' + expected.ApiEngineKey] = assignments.join(',');
+        return refreshApiEngineCache(expected.ApiEngineKey, stableId, expected.ApiAddress);
     }
 
     function parseApiEngineVersion(model) {
@@ -6083,15 +6646,15 @@ try {
         if (!latest || !expectedKey || actualKey !== expectedKey) {
             throw new Error('接口引擎写入后回读失败：' + (expectedKey || (expected && expected.Id) || '未知接口'));
         }
-        if (Number(latest.IsDeleted || 0) === 1) {
+        if (normalizeApiEngineFlag(latest.IsDeleted) === 1) {
             throw new Error('接口引擎写入后仍处于删除状态：' + expected.ApiEngineKey);
         }
         if (!isMissingValue(expected.IsEnable)
-            && Number(latest.IsEnable || 0) !== Number(expected.IsEnable || 0)) {
+            && normalizeApiEngineFlag(latest.IsEnable) !== normalizeApiEngineFlag(expected.IsEnable)) {
             throw new Error('接口引擎写入后启用状态不一致：' + expected.ApiEngineKey);
         }
         if (!isMissingValue(expected.StopHttp)
-            && Number(latest.StopHttp || 0) !== Number(expected.StopHttp || 0)) {
+            && normalizeApiEngineFlag(latest.StopHttp) !== normalizeApiEngineFlag(expected.StopHttp)) {
             throw new Error('接口引擎写入后HTTP状态不一致：' + expected.ApiEngineKey);
         }
         var expectedCode = String(expected.ApiV8Code || '');
@@ -6327,6 +6890,7 @@ try {
                 if (uptResult.Code == 1) {
                     stats.ApiEngineUpdated++;
                     var updatedEngine = refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
+                    updatedEngine = reconcilePersistedApiEngineFlags(apiEngine, updatedEngine);
                     assertPersistedApiEngine(apiEngine, updatedEngine);
                     recordApiEngineResourceState(apiEngine, apiEnginePolicy);
                 } else {
@@ -6339,6 +6903,7 @@ try {
                 if (addResult.Code == 1) {
                     stats.ApiEngineInserted++;
                     var insertedEngine = refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
+                    insertedEngine = reconcilePersistedApiEngineFlags(apiEngine, insertedEngine);
                     assertPersistedApiEngine(apiEngine, insertedEngine);
                     recordApiEngineResourceState(apiEngine, apiEnginePolicy);
                 } else {

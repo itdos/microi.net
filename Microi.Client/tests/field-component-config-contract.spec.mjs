@@ -131,7 +131,7 @@ test("native and generic field settings share the platform rounded overlay contr
     assert.match(runtime, /new MutationObserver/);
     assert.match(runtime, /attributes:\s*true/);
     assert.match(runtime, /attributeFilter:\s*\["class"\]/);
-    assert.match(main, /installMciDialogRuntime\(\)/);
+    assert.match(main, /installMciDialogRuntime\(\{\s*getSysConfig:\s*\(\)\s*=>\s*dialogDiyStore\.SysConfig\s*\}\)/);
     assert.match(mixin, /requestAnimationFrame\(function\s*\(\)\s*\{[\s\S]*enhanceMciDialog\(dialog,\s*buildDialogContext\(\)\)/);
     assert.match(styles, /\.el-dialog\.mci-field-config-dialog/);
     assert.match(styles, /\.mci-field-config-heading/);
@@ -142,4 +142,30 @@ test("native and generic field settings share the platform rounded overlay contr
     assert.match(styles, /align-items:\s*center[\s\S]*?justify-content:\s*center/);
     assert.match(styles, /min-width:\s*96px[\s\S]*?height:\s*42px/);
     assert.match(styles, /\.mci-component-config-form[\s\S]*?border:\s*0[\s\S]*?background:\s*transparent/);
+});
+
+test("image uploads default to compressed previews and preserve an explicit opt-out", () => {
+    const source = fs.readFileSync(path.join(componentRoot, "diy-imgupload.vue"), "utf8");
+    assert.match(source, /const isImgCompressionEnabled = \(value\) => !\(/);
+    assert.match(source, /Preview:\s*isImgCompressionEnabled\(field\.Config\.ImgUpload\.Preview\)/);
+    assert.match(source, /Preview:\s*true,/);
+    assert.match(source, /Preview:\s*isImgCompressionEnabled\(props\.field\.Config\.ImgUpload\.Preview\)/);
+    assert.doesNotMatch(source, /Preview:\s*props\.field\.Config\.ImgUpload\.Preview\s*\|\|\s*false/);
+});
+
+test("image crop uploads preserve the untouched original through the protected multipart protocol", () => {
+    const source = fs.readFileSync(path.join(componentRoot, "diy-imgupload.vue"), "utf8");
+    const cropDialog = fs.readFileSync(path.join(componentRoot, "diy-image-crop-dialog.vue"), "utf8");
+    const cropConfig = fs.readFileSync(path.join(componentRoot, "image-crop-config.js"), "utf8");
+    assert.match(source, /:http-request="performImageUpload"/);
+    assert.match(source, /formData\.append\('MicroiOriginalFile',\s*cropPayload\.originalFile/);
+    assert.match(source, /formData\.append\('CropEnabled',\s*'true'\)/);
+    assert.match(source, /Crop:\s*normalizeImageCropConfig/);
+    assert.match(source, /@change="handleCropModeChange"/);
+    assert.match(source, /configForm\.value\.Crop\s*=\s*normalizeImageCropConfig\(configForm\.value\.Crop\)/);
+    assert.match(cropConfig, /Mode:\s*'free'/);
+    assert.match(cropDialog, /MICROI IMAGE STUDIO/);
+    assert.match(cropDialog, /getCroppedCanvas/);
+    assert.match(cropDialog, /IMAGE_CROP_RATIOS/);
+    assert.match(cropDialog, /prefers-reduced-motion/);
 });

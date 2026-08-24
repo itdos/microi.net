@@ -21,25 +21,27 @@ test.use({
 
 test.setTimeout(90_000);
 
-function enableAiAssistant(json) {
+function useDefaultAiAssistantVisibility(json) {
     if (!json || typeof json !== "object") return json;
 
     if (json.Data && typeof json.Data === "object" && !Array.isArray(json.Data)) {
-        json.Data.DisableAiAssistant = 0;
+        delete json.Data.DisableAiAssistant;
+        json.Data.IsShowAiAssistant = 0;
     }
 
     if (json.DataAppend?.SysConfig && typeof json.DataAppend.SysConfig === "object") {
-        json.DataAppend.SysConfig.DisableAiAssistant = 0;
+        delete json.DataAppend.SysConfig.DisableAiAssistant;
+        json.DataAppend.SysConfig.IsShowAiAssistant = 0;
     }
 
     return json;
 }
 
-async function fulfillWithEnabledAi(route) {
+async function fulfillWithDefaultVisibleAi(route) {
     const response = await route.fetch();
     let json;
     try {
-        json = enableAiAssistant(await response.json());
+        json = useDefaultAiAssistantVisibility(await response.json());
     } catch {
         await route.fulfill({ response });
         return;
@@ -109,10 +111,10 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
         responseAudits.push(audit);
     });
 
-    // iTdos 当前配置可保持默认关闭；本用例只在浏览器响应副本中开启，
-    // 既验证 feature-on 分支，也不改写远端 Sys_Config。
-    await page.route(/\/api\/FormEngine\/GetSysConfig(?:\?|$)/i, fulfillWithEnabledAi);
-    await page.route(/\/api\/SysUser\/Login(?:\?|$)/i, fulfillWithEnabledAi);
+    // 响应副本删除新字段并故意保留旧字段 0，证明缺失 DisableAiAssistant 时仍默认显示，
+    // 且废弃的 IsShowAiAssistant 不再影响运行时，不改写远端 Sys_Config。
+    await page.route(/\/api\/FormEngine\/GetSysConfig(?:\?|$)/i, fulfillWithDefaultVisibleAi);
+    await page.route(/\/api\/SysUser\/Login(?:\?|$)/i, fulfillWithDefaultVisibleAi);
 
     await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`, {
         waitUntil: "domcontentloaded"
@@ -262,8 +264,8 @@ test("PC 顶栏机器人打开并拖动完整 AI 助手弹窗", async ({ page },
         }
     });
 
-    await page.route(/\/api\/FormEngine\/GetSysConfig(?:\?|$)/i, fulfillWithEnabledAi);
-    await page.route(/\/api\/SysUser\/Login(?:\?|$)/i, fulfillWithEnabledAi);
+    await page.route(/\/api\/FormEngine\/GetSysConfig(?:\?|$)/i, fulfillWithDefaultVisibleAi);
+    await page.route(/\/api\/SysUser\/Login(?:\?|$)/i, fulfillWithDefaultVisibleAi);
     await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`, {
         waitUntil: "domcontentloaded"
     });
@@ -332,8 +334,9 @@ test("PC 顶栏机器人打开并拖动完整 AI 助手弹窗", async ({ page },
     await expect(unifiedAssistant.getByTestId("unified-ai-history-active")).toBeVisible();
     await expect(unifiedAssistant.getByTestId("unified-ai-history-archived")).toBeVisible();
     await unifiedAssistant.getByTestId("unified-ai-settings").click();
-    await expect(page.getByTestId("unified-ai-model")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("unified-ai-mode")).toBeVisible();
+    const visibleSettings = page.locator(".ai-composer-settings-popper:visible");
+    await expect(visibleSettings.getByTestId("unified-ai-model")).toBeVisible({ timeout: 30_000 });
+    await expect(visibleSettings.getByTestId("unified-ai-mode")).toBeVisible();
     await expect(unifiedAssistant.getByTestId("unified-ai-input")).toBeVisible();
     await expect(unifiedAssistant.getByTestId("unified-ai-send")).toBeVisible();
     await expect(unifiedAssistant.locator(".secure-scope-tag")).toBeVisible();

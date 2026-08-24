@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 1,
-  "UpdatedAt": "2026-08-21",
+  "UpdatedAt": "2026-08-23",
   "Principle": "业务编排优先由应用商城 Managed ApiEngine 交付；C# 仅保留启动前置、协议网关、可信鉴权、密钥隔离、存储网络边界和运行时内核。",
   "Dispositions": {
     "KernelRuntime": "宿主不可被应用包替代的原子运行时；保持 C#，由接口引擎调用。",
@@ -47,7 +47,6 @@
     "SysLogController": { "OwnerType": "Application", "OwnerId": "app.microi.sys-log", "Disposition": "ManagedBusinessFacade" },
     "SysMenuController": { "OwnerType": "Application", "OwnerId": "app.microi.module-engine", "Disposition": "ManagedBusinessFacade" },
     "SysRoleController": { "OwnerType": "Application", "OwnerId": "app.microi.sys-role", "Disposition": "ManagedBusinessFacade" },
-    "SystemMonitorController": { "OwnerType": "Application", "OwnerId": "app.microi.sys-monitor", "Disposition": "OperationsKernel" },
     "SysUserAccessKeyController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
     "SysUserController": { "OwnerType": "Application", "OwnerId": "app.microi.sys_user", "Disposition": "BootstrapIdentity" },
     "TenantSystemSettingsController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ManagedBusinessFacade" },

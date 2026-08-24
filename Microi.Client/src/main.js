@@ -40,9 +40,10 @@ import { reportApiServiceFailure } from "./utils/api-service-status.js";
 import { syncClassicShellVisibilityFromUrl } from "./utils/classic-shell-visibility.js";
 import { isEmbeddedWebosWindowRuntime } from "./utils/webos-embedded-runtime.js";
 import { installLegacyQrCodeDownload } from "./utils/legacy-qrcode.js";
-import { installMciDialogRuntime } from "./utils/mci-dialog-runtime.js";
+import { installMciDialogRuntime, refreshMciDialogMaskBlur } from "./utils/mci-dialog-runtime.js";
 // 主题色工具 - 360 极速浏览器兼容方案
 import { initThemeColor, setThemeColor } from "./utils/theme-color";
+import { resolveUserThemeColor } from "./utils/user-visual-preferences.js";
 import $ from "jquery";
 window.$ = window.jQuery = window.jquery = $;
 import * as websocket from "@microsoft/signalr";
@@ -58,10 +59,6 @@ window.__MICROI_WEBOS_EMBEDDED_RUNTIME__ = isWebosEmbeddedRuntime;
 
 // 初始化主题色系统（必须在样式加载后执行）
 initThemeColor();
-// 统一 Element Plus Dialog：大圆角、主题标题及拖动兜底。运行时观察器会
-// 在 Vue 内部拖动重渲染后恢复契约，避免 class 被组件补丁覆盖。
-installMciDialogRuntime();
-
 // 前端微服务运行时。MicroApp 用于承载按租户从数据库/独立地址发布的 Vue3 定制页面。
 microApp.start();
 window.microApp = microApp;
@@ -96,6 +93,18 @@ app.use(chatComponents);
 if (!isWebosEmbeddedRuntime) LocalStorageManager.init();
 // 使用 Pinia
 app.use(pinia);
+// 统一 Element Plus Dialog：大圆角、主题标题、拖动兜底及全局遮罩策略。
+// SysConfig 缺失时毛玻璃默认关闭；只有 FormMaskBlur=1/true 才显式开启。
+const dialogDiyStore = useDiyStore(pinia);
+installMciDialogRuntime({ getSysConfig: () => dialogDiyStore.SysConfig });
+watch(
+    [
+        () => dialogDiyStore.SysConfig?.FormMaskBlur,
+        () => dialogDiyStore.SysConfig?.DisableFormMaskBlur
+    ],
+    refreshMciDialogMaskBlur,
+    { immediate: true }
+);
 if (isWebosEmbeddedRuntime) {
     // Router 首次导航前从父页共享存储做一次只读白名单引导；之后只接受父页
     // postMessage 更新内存态，嵌入 Pinia 不安装持久化插件。
@@ -240,14 +249,24 @@ async function initApp() {
     }
 
     // 初始化主题色（兼容生产环境 CSS 顺序差异）
-    const themeColor = diyStore.themeColor || diyStore.SysConfig?.ThemeColor || "#409eff";
+    const themeColor = resolveUserThemeColor(
+        diyStore.GetCurrentUser || {},
+        diyStore.themeColor,
+        diyStore.SysConfig?.ThemeColor,
+        "#409eff"
+    );
     setThemeColor(themeColor);
 
     // 监听主题变化并实时应用
     watch(
-        () => [diyStore.themeColor, diyStore.SysConfig?.ThemeColor],
-        ([localColor, sysColor]) => {
-            setThemeColor(localColor || sysColor || "#409eff");
+        () => [diyStore.GetCurrentUser?.ThemeColor, diyStore.themeColor, diyStore.SysConfig?.ThemeColor],
+        () => {
+            setThemeColor(resolveUserThemeColor(
+                diyStore.GetCurrentUser || {},
+                diyStore.themeColor,
+                diyStore.SysConfig?.ThemeColor,
+                "#409eff"
+            ));
         },
         { immediate: false }
     );

@@ -28,6 +28,55 @@ namespace Microi.net
     }
 
     /// <summary>
+    /// 聊天内唯一的内置发送人。AI 回复、平台通知与系统提示统一使用该身份，
+    /// 避免再为系统消息创建独立的 admin 联系人。
+    /// </summary>
+    public static class ChatAssistantIdentity
+    {
+        public const string UserId = "AI";
+        public const string UserName = "AI助手";
+        public const string UserAccount = "AI";
+        public const string UserAvatar = "";
+
+        public static bool IsAssistant(string userId)
+        {
+            return string.Equals(userId?.Trim(), UserId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static MessageBody CreateSystemMessage(string content, string toUserId = null)
+        {
+            return new MessageBody
+            {
+                Content = content,
+                FromUserId = UserId,
+                FromUserName = UserName,
+                FromUserAccount = UserAccount,
+                FromUserAvatar = UserAvatar,
+                ToUserId = toUserId,
+                CreateTime = DateTime.Now,
+                Type = "系统消息",
+                IsRead = false
+            };
+        }
+
+        public static MessageBodyDto CreateSystemMessageDto(string content, string toUserId = null)
+        {
+            return new MessageBodyDto
+            {
+                Content = content,
+                FromUserId = UserId,
+                FromUserName = UserName,
+                FromUserAccount = UserAccount,
+                FromUserAvatar = UserAvatar,
+                ToUserId = toUserId,
+                CreateTime = DateTime.Now,
+                Type = "系统消息",
+                IsRead = false
+            };
+        }
+    }
+
+    /// <summary>
     /// 聊天联系人列表DTO - 纯POCO，避免ObjectId序列化问题
     /// </summary>
     public class MessageChatContactListDto

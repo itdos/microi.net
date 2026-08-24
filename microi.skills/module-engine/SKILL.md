@@ -115,6 +115,18 @@ Iframe 不把长期 Token、密码或连接串放 URL。第三方单点登录使
 - 不复制官网旧“Redis 文本进度 + 长事务循环”导入示例作为新实现；必须有稳定
   幂等键、业务任务状态、真实 Current/Total、失败恢复和必要的 checkpoint 分片。
 
+### 菜单启动查询与字段元数据兼容
+
+- 菜单树是登录后的启动控制面。读取 `sys_menu` 时，不能把浏览器传入的
+  `_SelectFields` 直接交给依赖 `diy_field` 的通用查询投影：旧库、空库或升级后缓存
+  未同步时，物理列仍存在但元数据可能不完整，查询结果会退化成只含固定字段 `Id`。
+- 服务端应先在已完成登录、租户与角色菜单范围校验的可信边界读取物理菜单行，再在内存中
+  按请求字段投影；构建树所需的 `Id/ParentId/Sort` 必须保留。可信标记不得由浏览器 JSON
+  绑定，不能借此绕过菜单、角色或数据权限。
+- 底层菜单查询失败必须原样返回失败，禁止把失败结果转换成 `Code=1` 的空菜单。回归测试至少
+  覆盖“不向表单引擎下传显式投影”“字段名大小写兼容”“投影仍保留树字段”“未指定字段时
+  保留物理行”。
+
 ## 跨端 ViewSchema
 
 顶层 PC 数据列表默认使用紧凑的新模块标题样式；即使未启用自定义表单视图，也不能退回无标题的旧外观。无指标头部固定 `44px`、含指标头部固定 `62px`，连同间距总纵向占用约 `50px / 68px`。子表、关联表、嵌入表不重复显示，移动端由固定导航栏承载标题。`Scene=List/Card` 的个性化标题、指标、复合列和卡片配置存在时必须直接生效；`EnableViewSchema` 只控制 Detail/Edit 自定义表单视图。
@@ -136,7 +148,7 @@ PageTabs 通过 `TargetSysMenuId` 切换不同模块/表时，入口模块必须
 ### 重要模块的统计与信息层级
 
 - 待办、库存预警、未读、逾期、待收/待付等有行动含义的菜单，主动询问并配置
-  `MenuBadgeEnabled=1` 与 `MenuBadgeApiEngineKey`。接口统一返回
+  `MenuBadgeEnabled=1`、`MenuBadgeApiEngineKey` 与说明统计口径的 `MenuBadgeTooltip`。接口统一返回
   `{ Code:1, Data:{ Value: number } }`，并按当前用户权限统计。
 - `Scene=List` 的 `Layout.Hero` 用 `Eyebrow/Title/Description/Metrics` 建立模块标题与
   指标条。相同 `ApiEngineKey` 的指标必须由一个聚合接口批量返回，使用 `ValuePath`

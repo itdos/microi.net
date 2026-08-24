@@ -44,6 +44,15 @@ namespace Microi.net.Api
             }
         }
 
+        private void AnnotateObservability(JObject param, string action)
+        {
+            var formEngineKey = param?["FormEngineKey"].Val<string>()
+                .DosIsNullOrWhiteSpace(param?["_FormEngineKey"].Val<string>())
+                .DosIsNullOrWhiteSpace(param?["TableName"].Val<string>())
+                .DosIsNullOrWhiteSpace(param?["_TableName"].Val<string>());
+            SystemObservabilityService.AnnotateFormEngine(HttpContext, formEngineKey, action);
+        }
+
         private void SetCurrentUserParam(JObject param, object currentUser)
         {
             if (param == null || currentUser == null)
@@ -484,6 +493,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetFormData([FromBody] JObject param)
         {
             param = await DefaultParam(param);
+            AnnotateObservability(param, nameof(GetFormData));
             if (TryGetInvalidRecordIdField(param, out var invalidField))
             {
                 return InvalidRecordIdResult(invalidField);
@@ -781,6 +791,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableData([FromBody] JObject param)
         {
             param = await DefaultParam(param);
+            AnnotateObservability(param, nameof(GetTableData));
             var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             return Json(result);
         }
@@ -978,6 +989,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableDataCount([FromBody] JObject param)
         {
             param = await DefaultParam(param);
+            AnnotateObservability(param, nameof(GetTableDataCount));
             var result = await MicroiEngine.FormEngine.GetTableDataCountAsync(param);
             return Json(result);
         }
@@ -1003,6 +1015,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetTableDataTree([FromBody] JObject param)
         {
             param = await DefaultParam(param);
+            AnnotateObservability(param, nameof(GetTableDataTree));
             var result = await MicroiEngine.FormEngine.GetTableDataTreeAsync(param);
             return Json(result);
         }

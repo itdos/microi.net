@@ -1216,6 +1216,7 @@ namespace Microi.net.Api
                 param["CardTitleTagFields"].Val<string>(), param["CardBottomTagFields"].Val<string>(),
                 param["MenuBadgeEnabled"]?.Val<int>() ?? 0,
                 param["MenuBadgeApiEngineKey"].Val<string>(),
+                param["MenuBadgeTooltip"].Val<string>(),
                 param["EnableViewSchema"]?.Val<int>() ?? 0,
                 param["ViewSchemaVersion"].Val<string>() ?? "1.0",
                 param["ViewConfigVersion"]?.Val<int>() ?? 1,

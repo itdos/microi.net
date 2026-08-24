@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -19,6 +19,21 @@ function platformBundle(packageModel) {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+async function collectFiles(root) {
+  const result = [];
+  async function visit(directory) {
+    const entries = await readdir(directory, { withFileTypes: true });
+    entries.sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
+    for (const entry of entries) {
+      const fullPath = path.resolve(directory, entry.name);
+      if (entry.isDirectory()) await visit(fullPath);
+      else if (entry.isFile()) result.push(fullPath);
+    }
+  }
+  await visit(root);
+  return result;
 }
 
 test("平台内置微服务只从显式发布契约解析正式源码根", async () => {
@@ -41,6 +56,8 @@ test("平台内置微服务只从显式发布契约解析正式源码根", async
   assert.match(script, /platform-service-release\.json/);
   assert.match(script, /--verify-only/);
   assert.match(script, /--require-clean-source/);
+  assert.match(script, /--saas-package-version/);
+  assert.match(script, /--store-package-version/);
   assert.doesNotMatch(script, /AI-Project\/microi\/AI应用\/microi-platform-service/);
   assert.doesNotMatch(script, /Microi-V8-Engine\/.*microi-platform-service/);
   assert.match(resourcePublisher, /if \(publish\) await verifyPlatformServiceReleaseSource\(\)/);
@@ -53,11 +70,13 @@ test("平台内置微服务只从显式发布契约解析正式源码根", async
 });
 
 test("两个官方基线包携带同一份可离线启动的数据库运行产物", async () => {
-  const [saasPackage, storePackage, saasSyncBase, storeSyncBase] = await Promise.all([
+  const contract = await readJson("platform-service-release.json");
+  const [saasPackage, storePackage, saasSyncBase, storeSyncBase, sourcePackage] = await Promise.all([
     readJson("app.microi.saas-engine.json"),
     readJson("app.microi.store.json"),
     readJson(".resource-sync-base/app.microi.saas-engine.json"),
     readJson(".resource-sync-base/app.microi.store.json"),
+    JSON.parse(await readFile(path.resolve(repositoryRoot, contract.SourceRoot, "package.json"), "utf8")),
   ]);
   const saasBundle = platformBundle(saasPackage);
   const storeBundle = platformBundle(storePackage);
@@ -92,16 +111,38 @@ test("两个官方基线包携带同一份可离线启动的数据库运行产�
   }
 
   assert.equal(saasBundle.VersionNo, storeBundle.VersionNo);
+  assert.equal(saasBundle.VersionNo, `v${sourcePackage.version}`);
+  assert.equal(saasBundle.Application.CurrentVersion, storeBundle.Application.CurrentVersion);
   assert.equal(saasBundle.MicroService.DistHash, storeBundle.MicroService.DistHash);
   assert.deepEqual(saasBundle.BuildAssets, storeBundle.BuildAssets);
   assert.deepEqual(saasBundle.Routes, storeBundle.Routes);
-  assert.equal(saasPackage.PackageInfo.Version, "v7.5.7");
-  assert.equal(storePackage.PackageInfo.Version, "v7.5.7");
-  assert.match(storePackage.PackageInfo.ChangeHistory, /v7\.5\.7[\s\S]*microi-platform-service[\s\S]*v1\.6\.9/);
-  assert.equal(saasBundle.VersionNo, "v1.6.9");
-  assert.equal(saasBundle.Application.CurrentVersion, 26);
-  assert.equal(saasSyncBase.PackageInfo.Version, "v7.5.6");
-  assert.equal(storeSyncBase.PackageInfo.Version, "v7.5.3");
-  assert.equal(platformBundle(saasSyncBase).VersionNo, "v1.6.8");
-  assert.equal(platformBundle(storeSyncBase).VersionNo, "v1.6.8");
+
+  const distRoot = path.resolve(repositoryRoot, contract.SourceRoot, "dist");
+  const distFiles = await collectFiles(distRoot);
+  const expectedAssets = [];
+  for (const filePath of distFiles) {
+    const bytes = await readFile(filePath);
+    expectedAssets.push({
+      Path: path.relative(distRoot, filePath).replaceAll("\\", "/"),
+      Size: bytes.length,
+      Sha256: sha256(bytes),
+      FileByteBase64: bytes.toString("base64"),
+    });
+  }
+  assert.deepEqual(
+    saasBundle.BuildAssets.map(asset => ({
+      Path: asset.Path,
+      Size: Number(asset.Size),
+      Sha256: asset.Sha256,
+      FileByteBase64: asset.FileByteBase64,
+    })),
+    expectedAssets,
+    "官方数据包内嵌运行时必须与唯一源码根的 dist 字节级一致",
+  );
+  assert.equal(saasPackage.PackageInfo.Version, saasSyncBase.PackageInfo.Version);
+  assert.equal(storePackage.PackageInfo.Version, storeSyncBase.PackageInfo.Version);
+  assert.equal(platformBundle(saasSyncBase).VersionNo, saasBundle.VersionNo);
+  assert.equal(platformBundle(storeSyncBase).VersionNo, storeBundle.VersionNo);
+  assert.equal(platformBundle(saasSyncBase).MicroService.DistHash, saasBundle.MicroService.DistHash);
+  assert.equal(platformBundle(storeSyncBase).MicroService.DistHash, storeBundle.MicroService.DistHash);
 });

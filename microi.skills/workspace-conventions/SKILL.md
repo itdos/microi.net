@@ -119,6 +119,10 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 吾码后台系统前端移动端自适应源码 | `Microi.Client/src/views/mobile/` |
 | 吾码低代码后端源码 | `Microi.Server/` |
 | 吾码表单引擎源码 | `Microi.Client/src/views/form-engine/` |
+| 吾码表单设计器源码 | `Microi.Client/src/views/form-engine/diy-design.vue` |
+| 吾码数据表格渲染源码 | `Microi.Client/src/views/form-engine/diy-table.vue` |
+| 吾码表单渲染源码 | `Microi.Client/src/views/form-engine/diy-form.vue` |
+| 吾码地图控件源码 | `Microi.Client/src/views/form-engine/diy-field-component/diy-map.vue` |
 | 吾码界面引擎源码 | `Microi.Client/src/views/page-engine/` |
 | 吾码打印引擎源码 | `Microi.Client/src/views/print-engine/` |
 | 吾码 App 源码 | `microi.app/` |
@@ -127,6 +131,13 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 吾码 AI 应用及应用商城发行源码 | 默认位于 `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}/`；受审计的独立源码仓库必须由发布契约显式指定 |
 
 以上路径只作为通用工作区相对路径规范，不写入具体本机盘符。跨仓库、空工作区或普通用户项目中，如果路径不存在，以插件生成的 `AGENTS.md`、MCP 配置和实际文件树为准。
+
+### 吾码创建人身份识别（强制）
+
+- 每次开始处理吾码任务时，都先检查工作区根的 `Microi.Server/Microi.net/`：目录必须存在，并且 `rg --files Microi.Server/Microi.net` 至少返回一个真实源码文件，空目录不成立。满足条件即确认当前是“吾码创建人在官方完整源码工作区开发”；这是工作区级开发者身份标记，不要求本次代码恰好修改在该目录内。目录缺失或为空时按普通吾码用户工作区处理，不得假设拥有官方主库权限。
+- 确认创建人身份后，处理平台基础能力的修改、构建或交付任务时，必须同时读取 `app-store` Skill，并把官方母版资源、对应平台应用数据包、应用商城发布及发布后回读纳入完成边界；不得只改源码、本地租户或本地 JSON 后结束。
+- 触发表现包括但不限于：新增或修改系统设置、表、字段、Tab、菜单、权限、接口引擎、表单事件、数据源、页面、打印、工作流、任务、平台内置微服务及可幂等种子数据。先判断资源归属的一个或多个官方平台应用，基础空库包与存量租户增量应用都涉及时必须同时更新。
+- 纯审查、解释和诊断任务保持只读；目录识别只决定交付链路和事实源，不授权与当前任务无关的线上写入。当前任务属于平台功能修改/交付且官方 `microi_itdos` 权限可用时，官方应用包发布与版本、状态、内容哈希回读属于正常收尾步骤，不得再次降级成可选建议。
 
 每个 `AI应用/{appKey}` 必须只有一个可编辑事实源，统一承载界面、微服务、Manifest、接口引擎、资源策略、测试、构建脚本与商城上传素材。普通应用默认使用当前连接下的 `Microi-V8-Engine` 目录；受审计的官方内置应用若由独立 Git 仓库维护，必须由版本管理的发布契约唯一指向该源码根，并让构建、跨工程测试和发行包共同读取契约。此时同名 `Microi-V8-Engine` 目录只是远端同步镜像，不得回退为构建源。禁止靠目录探测在多份副本之间自动择新，也禁止另建无契约的 `microi.apps/` 平行发行根。
 

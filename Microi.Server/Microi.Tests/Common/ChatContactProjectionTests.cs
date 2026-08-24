@@ -80,4 +80,24 @@ public sealed class ChatContactProjectionTests
         Assert.DoesNotContain("Email", fields);
         Assert.DoesNotContain("Pwd", fields);
     }
+
+    [Fact]
+    public void System_messages_share_the_single_AI_assistant_identity()
+    {
+        Assert.True(ChatAssistantIdentity.IsAssistant(" ai "));
+        Assert.False(ChatAssistantIdentity.IsAssistant("admin"));
+
+        var message = ChatAssistantIdentity.CreateSystemMessage("平台维护", "user-1");
+        var dto = ChatAssistantIdentity.CreateSystemMessageDto("参数错误", "user-2");
+
+        Assert.Equal("AI", message.FromUserId);
+        Assert.Equal("AI助手", message.FromUserName);
+        Assert.Equal("AI", message.FromUserAccount);
+        Assert.Equal("系统消息", message.Type);
+        Assert.Equal("user-1", message.ToUserId);
+        Assert.Equal("AI", dto.FromUserId);
+        Assert.Equal("AI助手", dto.FromUserName);
+        Assert.Equal("user-2", dto.ToUserId);
+        Assert.DoesNotContain("admin", new[] { message.FromUserId, message.FromUserName, dto.FromUserId, dto.FromUserName });
+    }
 }

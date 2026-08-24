@@ -7,7 +7,7 @@
         :width="dialogWidth"
         :modal-append-to-body="true"
         :close-on-click-modal="false"
-        :close-on-press-escape="!submitting"
+        :close-on-press-escape="!submitting && !isTaskActive"
         :modal="true"
         :destroy-on-close="false"
         append-to-body
@@ -15,64 +15,306 @@
         draggable
         @closed="handleDialogClosed"
     >
-        <div v-if="dialogDescription" class="mci-import-dialog__description">
-            {{ dialogDescription }}
+        <div class="mci-import-dialog__intro">
+            <div class="mci-import-dialog__description">
+                {{ dialogDescription || $t("Msg.ImportSmartHint") }}
+            </div>
+            <el-tag type="info" effect="plain" round>{{ $t("Msg.ImportServerValidation") }}</el-tag>
         </div>
 
+        <section class="mci-import-dialog__execution">
+            <div class="mci-import-dialog__execution-head">
+                <div>
+                    <strong>{{ $t("Msg.ImportExecutionPolicy") }}</strong>
+                    <p>{{ $t("Msg.ImportExecutionPolicyHint") }}</p>
+                </div>
+                <el-tag type="info" effect="plain" round>
+                    {{ $t("Msg.ImportCurrentTable") }}：{{ importTableDisplayName }}
+                </el-tag>
+            </div>
+            <el-radio-group
+                v-model="errorPolicy"
+                class="mci-import-dialog__policy-grid"
+                :disabled="submitting || isTaskActive"
+            >
+                <div
+                    class="mci-import-dialog__policy-card"
+                    :class="{ 'is-active': errorPolicy === IMPORT_ERROR_POLICY.ROLLBACK_ALL }"
+                >
+                    <el-radio :value="IMPORT_ERROR_POLICY.ROLLBACK_ALL">
+                        {{ $t("Msg.ImportRollbackAll") }}
+                    </el-radio>
+                    <p>{{ $t("Msg.ImportRollbackAllDesc") }}</p>
+                </div>
+                <div
+                    class="mci-import-dialog__policy-card"
+                    :class="{ 'is-active': errorPolicy === IMPORT_ERROR_POLICY.CONTINUE_ON_ERROR }"
+                >
+                    <el-radio :value="IMPORT_ERROR_POLICY.CONTINUE_ON_ERROR">
+                        {{ $t("Msg.ImportContinueOnError") }}
+                    </el-radio>
+                    <p>{{ $t("Msg.ImportContinueOnErrorDesc") }}</p>
+                </div>
+            </el-radio-group>
+            <div class="mci-import-dialog__unique-rules">
+                <div class="mci-import-dialog__unique-rules-title">
+                    <strong>{{ $t("Msg.ImportUniqueRules") }}</strong>
+                    <span>{{ $t("Msg.ImportUniqueRulesHint") }}</span>
+                </div>
+                <div v-if="uniqueRules.length" class="mci-import-dialog__unique-rule-list">
+                    <el-tag
+                        v-for="rule in uniqueRules"
+                        :key="rule.Key"
+                        :type="rule.Type === 'All' ? 'warning' : 'success'"
+                        effect="light"
+                        round
+                    >
+                        {{ uniqueRuleText(rule) }}
+                    </el-tag>
+                    <p>{{ $t("Msg.ImportUpsertHint") }}</p>
+                </div>
+                <el-alert
+                    v-else
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                    :title="$t('Msg.ImportNoUniqueRules')"
+                    :description="$t('Msg.ImportNoUniqueRulesHint')"
+                />
+            </div>
+        </section>
+
         <el-upload
-            v-if="isCustomImport"
-            ref="customUpload"
+            ref="workbookUpload"
             class="upload-drag-style mci-import-dialog__upload"
+            :class="{ 'is-compact': Boolean(selectedFile) }"
+            :action="importApi"
             :accept="customAccept"
             :auto-upload="false"
+            :data="uploadData"
+            :headers="{ authorization: authHeader }"
             :disabled="parsing || submitting || isTaskActive"
             :limit="1"
             :show-file-list="false"
-            :on-change="handleCustomFileChange"
-            drag
-        >
-            <el-icon class="mci-import-dialog__upload-icon"><Upload /></el-icon>
-            <div class="el-upload__text">{{ $t("Msg.UploadDesc") }}</div>
-            <template #tip>
-                <div class="el-upload__tip">{{ $t("Msg.OnlyXlsFile") }}</div>
-            </template>
-        </el-upload>
-
-        <el-upload
-            v-else
-            class="upload-drag-style mci-import-dialog__upload"
-            :action="importApi"
-            :accept="customAccept"
-            :data="uploadData"
-            :headers="{ authorization: authHeader }"
-            :show-file-list="false"
+            :on-change="handleFileChange"
+            :on-exceed="handleFileExceed"
             :on-success="handleUploadSuccess"
+            :on-error="handleUploadError"
             :before-upload="handleBeforeUpload"
             drag
         >
             <el-icon class="mci-import-dialog__upload-icon"><Upload /></el-icon>
-            <div class="el-upload__text">{{ $t("Msg.UploadDesc") }}</div>
+            <div class="el-upload__text">
+                {{ selectedFile ? $t("Msg.ImportChangeFile") : $t("Msg.UploadDesc") }}
+            </div>
             <template #tip>
                 <div class="el-upload__tip">{{ $t("Msg.OnlyXlsFile") }}</div>
             </template>
         </el-upload>
 
-        <section v-if="isCustomImport" class="mci-import-dialog__status" aria-live="polite">
+        <section v-if="selectedFile" class="mci-import-dialog__workspace" aria-live="polite">
+            <div class="mci-import-dialog__file-summary">
+                <div>
+                    <strong>{{ selectedFile.name }}</strong>
+                    <span>{{ formatFileSize(selectedFile.size) }}</span>
+                </div>
+                <div v-if="parsedImport" class="mci-import-dialog__summary-tags">
+                    <el-tag :type="confidenceTagType" effect="light" round>
+                        {{ $t("Msg.ImportConfidence") }}：{{ confidenceText }}
+                    </el-tag>
+                    <el-tag type="success" effect="plain" round>
+                        {{ parsedImport.sourceRowCount }} {{ $t("Msg.ImportRows") }}
+                    </el-tag>
+                    <el-tag type="info" effect="plain" round>
+                        {{ parsedImport.mappedColumnCount }} {{ $t("Msg.ImportMappedColumns") }}
+                    </el-tag>
+                </div>
+            </div>
+
+            <el-skeleton v-if="parsing" :rows="6" animated />
+
+            <template v-else-if="parsedImport || workbookPreviewSource">
+                <el-alert
+                    v-if="parsedImport && needsManualReview"
+                    class="mci-import-dialog__review-alert"
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                    :title="$t('Msg.ImportManualReviewHint')"
+                />
+
+                <div v-if="parsedImport" class="mci-import-dialog__settings">
+                    <div class="mci-import-dialog__settings-title">
+                        <span>{{ $t("Msg.ImportWorkbookSettings") }}</span>
+                        <div>
+                            <el-button :icon="MagicStick" @click="autoDetectWorkbook">
+                                {{ $t("Msg.ImportAutoDetect") }}
+                            </el-button>
+                            <el-button type="primary" plain :icon="RefreshRight" @click="applyManualSettings">
+                                {{ $t("Msg.ImportApplySettings") }}
+                            </el-button>
+                        </div>
+                    </div>
+                    <div class="mci-import-dialog__settings-grid">
+                        <label>
+                            <span>{{ $t("Msg.ImportSheet") }}</span>
+                            <el-select v-model="analysisSettings.sheetIndex" @change="handleSheetChange">
+                                <el-option
+                                    v-for="(sheetName, index) in parsedImport.sheetNames"
+                                    :key="sheetName"
+                                    :label="sheetName"
+                                    :value="index"
+                                />
+                            </el-select>
+                        </label>
+                        <label>
+                            <span>{{ $t("Msg.ImportHeaderStartRow") }}</span>
+                            <el-input-number v-model="analysisSettings.headerStartRow" :min="1" controls-position="right" />
+                        </label>
+                        <label>
+                            <span>{{ $t("Msg.ImportHeaderEndRow") }}</span>
+                            <el-input-number v-model="analysisSettings.headerEndRow" :min="1" controls-position="right" />
+                        </label>
+                        <label>
+                            <span>{{ $t("Msg.ImportDataStartRow") }}</span>
+                            <el-input-number v-model="analysisSettings.dataStartRow" :min="1" controls-position="right" />
+                        </label>
+                        <label>
+                            <span>{{ $t("Msg.ImportDataEndRow") }}</span>
+                            <el-input-number v-model="analysisSettings.dataEndRow" :min="1" controls-position="right" />
+                        </label>
+                    </div>
+                </div>
+
+                <el-tabs v-model="activeTab" class="mci-import-dialog__tabs">
+                    <el-tab-pane v-if="parsedImport" :label="$t('Msg.ImportPreview')" name="preview">
+                        <div class="mci-import-dialog__table-wrap">
+                            <el-table
+                                :data="previewRows"
+                                border
+                                stripe
+                                height="330"
+                                table-layout="fixed"
+                                empty-text="-"
+                            >
+                                <el-table-column
+                                    prop="_ExcelRow"
+                                    :label="$t('Msg.ImportExcelRow')"
+                                    width="82"
+                                    fixed="left"
+                                    align="center"
+                                />
+                                <el-table-column
+                                    v-for="column in previewColumns"
+                                    :key="'preview_' + column.columnIndex + '_' + column.targetName"
+                                    :prop="column.sourceKey"
+                                    :label="column.header || column.columnLetter"
+                                    min-width="150"
+                                    show-overflow-tooltip
+                                >
+                                    <template #header>
+                                        <div
+                                            class="mci-import-dialog__preview-head"
+                                            :class="{ 'is-unmatched': !column.targetName }"
+                                        >
+                                            <el-tooltip
+                                                v-if="!column.targetName"
+                                                :content="$t('Msg.ImportUnmatchedColumnTip')"
+                                                placement="top"
+                                            >
+                                                <span>{{ column.header || column.columnLetter }}</span>
+                                            </el-tooltip>
+                                            <span v-else>{{ column.header || column.columnLetter }}</span>
+                                            <small v-if="column.targetName">
+                                                {{ column.columnLetter }} · {{ $t("Msg.ImportMappedTo") }} {{ column.targetLabel || column.targetName }}
+                                            </small>
+                                            <small v-else>{{ column.columnLetter }} · {{ $t("Msg.ImportUnmatchedColumn") }}</small>
+                                        </div>
+                                    </template>
+                                    <template #default="scope">
+                                        {{ formatPreviewValue(scope.row[column.sourceKey]) }}
+                                    </template>
+                                </el-table-column>
+                            </el-table>
+                        </div>
+                        <el-pagination
+                            v-if="parsedImport.sourceRows.length > previewPageSize"
+                            v-model:current-page="previewPage"
+                            class="mci-import-dialog__pagination"
+                            background
+                            layout="total, prev, pager, next"
+                            :page-size="previewPageSize"
+                            :total="parsedImport.sourceRows.length"
+                        />
+                    </el-tab-pane>
+
+                    <el-tab-pane v-if="parsedImport" :label="$t('Msg.ImportColumnMapping')" name="mapping">
+                        <el-table :data="parsedImport.columns" border stripe height="360" table-layout="fixed">
+                            <el-table-column :label="$t('Msg.ImportExcelColumn')" width="105" align="center">
+                                <template #default="scope"><strong>{{ scope.row.columnLetter }}</strong></template>
+                            </el-table-column>
+                            <el-table-column prop="header" :label="$t('Msg.ImportDetectedHeader')" min-width="210" show-overflow-tooltip />
+                            <el-table-column :label="$t('Msg.ImportTargetField')" min-width="230">
+                                <template #default="scope">
+                                    <el-select
+                                        :model-value="scope.row.targetName"
+                                        clearable
+                                        filterable
+                                        :placeholder="$t('Msg.ImportIgnoreColumn')"
+                                        @change="updateColumnMapping(scope.row.columnIndex, $event)"
+                                    >
+                                        <el-option
+                                            v-for="target in availableTargets(scope.row)"
+                                            :key="target.name"
+                                            :label="target.label + ' (' + target.name + ')'"
+                                            :value="target.name"
+                                        />
+                                    </el-select>
+                                </template>
+                            </el-table-column>
+                            <el-table-column :label="$t('Msg.ImportSampleValue')" min-width="240" show-overflow-tooltip>
+                                <template #default="scope">
+                                    {{ scope.row.samples.map(formatPreviewValue).join(" / ") || "-" }}
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </el-tab-pane>
+
+                    <el-tab-pane :label="$t('Msg.ImportOriginalWorkbook')" name="workbook" lazy>
+                        <div class="mci-import-dialog__raw-head">
+                            <span>{{ $t("Msg.ImportOriginalWorkbookHint") }}</span>
+                            <el-tag v-if="sourceFileInfo" type="info" effect="plain" round>{{ sourceFileInfo }}</el-tag>
+                        </div>
+                        <div
+                            v-loading="workbookPreviewLoading"
+                            class="mci-import-dialog__raw-workbook"
+                            :element-loading-text="$t('Msg.ImportRenderingWorkbook')"
+                        >
+                            <vue-office-excel
+                                v-if="workbookPreviewSource"
+                                :key="workbookPreviewKey"
+                                :src="workbookPreviewSource"
+                                @rendered="handleWorkbookPreviewRendered"
+                                @error="handleWorkbookPreviewError"
+                            />
+                            <el-empty v-else :description="$t('Msg.ImportOriginalWorkbookUnavailable')" />
+                        </div>
+                        <p v-if="workbookPreviewError" class="mci-import-dialog__error">{{ workbookPreviewError }}</p>
+                    </el-tab-pane>
+                </el-tabs>
+            </template>
+
+            <p v-if="customError" class="mci-import-dialog__error">{{ customError }}</p>
+        </section>
+
+        <section v-if="backgroundTask || uploadSucceeded" class="mci-import-dialog__status" aria-live="polite">
             <div class="mci-import-dialog__status-head">
                 <div>
                     <div class="mci-import-dialog__status-label">{{ $t("Msg.ImportStatus") }}</div>
                     <strong>{{ customStatusTitle }}</strong>
                 </div>
-                <el-tag v-if="backgroundTask || customError" :type="customStatusType" round>
-                    {{ customStatusText }}
-                </el-tag>
+                <el-tag :type="customStatusType" round>{{ customStatusText }}</el-tag>
             </div>
-
-            <div v-if="selectedFile" class="mci-import-dialog__file-summary">
-                <span>{{ selectedFile.name }}</span>
-                <span v-if="parsedImport">{{ parsedImport.rows.length }} {{ $t("Msg.ImportRows") }}</span>
-            </div>
-
             <el-progress
                 v-if="backgroundTask"
                 class="mci-import-dialog__progress"
@@ -81,57 +323,45 @@
                 :status="customProgressStatus"
                 :stroke-width="10"
             />
-
-            <p v-if="customProgressMessage" class="mci-import-dialog__message">
-                {{ customProgressMessage }}
-            </p>
-            <p v-if="customError" class="mci-import-dialog__error">{{ customError }}</p>
-
+            <p v-if="customProgressMessage" class="mci-import-dialog__message">{{ customProgressMessage }}</p>
             <div v-if="customResultItems.length" class="mci-import-dialog__results">
                 <div class="mci-import-dialog__results-title">{{ $t("Msg.ImportResult") }}</div>
-                <div
-                    v-for="(item, index) in customResultItems"
-                    :key="'customResult_' + index"
-                    class="mci-import-dialog__result-row"
-                >
+                <div v-for="(item, index) in customResultItems" :key="'customResult_' + index" class="mci-import-dialog__result-row">
                     {{ item }}
                 </div>
             </div>
         </section>
 
-        <template v-else>
+        <div v-if="!isCustomImport" class="mci-import-dialog__legacy-tools">
             <div class="mci-import-dialog__legacy-actions">
                 <el-button :icon="RefreshRight" @click="getImportProgress">{{ $t("Msg.ViewProgress") }}</el-button>
                 <el-tooltip v-if="isAdmin" effect="dark" :content="$t('Msg.Tips')" placement="top">
                     <el-button :icon="Warning" @click="delImportProgress">{{ $t("Msg.ClearImportCache") }}</el-button>
                 </el-tooltip>
             </div>
-            <div class="mci-import-dialog__legacy-progress" aria-live="polite">
-                <div v-for="(message, index) in importStepList" :key="'importStep_' + index">
-                    {{ message }}
-                </div>
-                <div v-if="importStepList.length === 0">{{ $t("Msg.NoProgress") }}</div>
+            <div v-if="importStepList.length" class="mci-import-dialog__legacy-progress" aria-live="polite">
+                <div v-for="(message, index) in importStepList" :key="'importStep_' + index">{{ message }}</div>
             </div>
-        </template>
+        </div>
 
         <template #footer>
-            <el-button :icon="Close" @click="visible = false">{{ $t("Msg.Close") }}</el-button>
+            <div class="mci-import-dialog__footer-hint">
+                {{ parsedImport && !uploadSucceeded && !isTaskSucceeded ? $t("Msg.ImportConfirmHint") : "" }}
+            </div>
+            <el-button :icon="Close" :disabled="submitting || isTaskActive" @click="visible = false">
+                {{ $t("Msg.Close") }}
+            </el-button>
             <el-button
-                v-if="isCustomImport && !isTaskSucceeded"
+                v-if="!isImportSucceeded"
                 type="primary"
                 :icon="Upload"
-                :loading="parsing || submitting"
-                :disabled="!canStartCustomImport"
-                @click="startCustomImport"
+                :loading="parsing || submitting || isTaskActive"
+                :disabled="!canStartImport"
+                @click="startImport"
             >
                 {{ submitting || isTaskActive ? $t("Msg.ImportRunning") : $t("Msg.StartImport") }}
             </el-button>
-            <el-button
-                v-if="isCustomImport && isTaskSucceeded"
-                type="primary"
-                :icon="CircleCheckFilled"
-                @click="finishCustomImport"
-            >
+            <el-button v-else type="primary" :icon="CircleCheckFilled" @click="finishImport">
                 {{ $t("Msg.ImportDone") }}
             </el-button>
         </template>
@@ -139,18 +369,34 @@
 </template>
 
 <script>
-import { CircleCheckFilled, Close, RefreshRight, Upload, Warning } from "@element-plus/icons-vue";
+import { markRaw } from "vue";
+import { CircleCheckFilled, Close, MagicStick, RefreshRight, Upload, Warning } from "@element-plus/icons-vue";
+import VueOfficeExcel from "@vue-office/excel";
+import "@vue-office/excel/lib/index.css";
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
+import { buildDiyFieldUniqueRules } from "@/utils/diy-field-unique";
+import { normalizeXlsxPreviewArrayBuffer } from "../utils/excel-preview-normalizer";
+import {
+    analyzeExcelWorkbook,
+    buildImportMetadata,
+    buildImportTargets,
+    decodeCsvArrayBuffer,
+    IMPORT_ERROR_POLICY,
+    normalizeImportErrorPolicy,
+    IMPORT_PREVIEW_PAGE_SIZE
+} from "@/views/form-engine/utils/excel-import-analyzer";
 
 const ACTIVE_TASK_STATUSES = ["Pending", "Running", "Retrying"];
 const TERMINAL_TASK_STATUSES = ["Succeeded", "Failed", "Canceled"];
 
 export default {
     name: "DiyImportDialog",
-    components: { Upload },
+    components: { Upload, VueOfficeExcel },
     props: {
         tableId: { type: String, required: true },
+        diyFieldList: { type: Array, default: () => [] },
+        diyTableModel: { type: Object, default: () => ({}) },
         sysMenuModel: { type: Object, default: () => ({}) },
         isAdmin: { type: Boolean, default: false },
         tableChildFkFieldName: { type: String, default: "" },
@@ -164,8 +410,10 @@ export default {
         return {
             DiyCommon,
             DiyApi,
+            IMPORT_ERROR_POLICY,
             visible: false,
             dialogOptions: {},
+            errorPolicy: IMPORT_ERROR_POLICY.ROLLBACK_ALL,
             importStepList: [],
             selectedFile: null,
             parsedImport: null,
@@ -175,18 +423,38 @@ export default {
             backgroundTaskId: "",
             backgroundTask: null,
             customSuccessEmitted: false,
+            uploadSucceeded: false,
+            uploadResult: null,
+            activeTab: "preview",
+            previewPage: 1,
+            previewPageSize: IMPORT_PREVIEW_PAGE_SIZE,
+            analysisSettings: { sheetIndex: 0, headerStartRow: 1, headerEndRow: 1, dataStartRow: 2, dataEndRow: 2 },
+            manualMappings: {},
+            workbookPreviewSource: null,
+            workbookPreviewLoading: false,
+            workbookPreviewError: "",
+            workbookPreviewKey: 0,
+            sourceFileType: "",
+            sourceEncoding: "",
+            sourceDelimiter: "",
+            _xlsx: null,
+            _workbook: null,
             _importStepTimer: null,
             _backgroundTaskTimer: null,
             RefreshRight,
             Warning,
             Close,
             Upload,
+            MagicStick,
             CircleCheckFilled
         };
     },
     computed: {
         isCustomImport() {
             return Boolean(this.dialogOptions && this.dialogOptions.ApiEngineKey);
+        },
+        isImportSucceeded() {
+            return this.isTaskSucceeded || this.uploadSucceeded;
         },
         dialogTitle() {
             return (this.dialogOptions && this.dialogOptions.Title) || this.$t("Msg.Import");
@@ -195,34 +463,44 @@ export default {
             return (this.dialogOptions && this.dialogOptions.Description) || "";
         },
         dialogWidth() {
-            return (this.dialogOptions && this.dialogOptions.Width) || "min(760px, calc(100vw - 32px))";
+            return (this.dialogOptions && this.dialogOptions.Width) || "80%";
         },
         customAccept() {
-            return (this.dialogOptions && this.dialogOptions.Accept) || ".xls,.xlsx";
+            return (this.dialogOptions && this.dialogOptions.Accept) || ".xls,.xlsx,.csv";
         },
         importApi() {
-            if (this.sysMenuModel && this.sysMenuModel.ImportApi) {
-                return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportApi);
-            }
+            if (this.sysMenuModel && this.sysMenuModel.ImportApi) return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportApi);
             return this.DiyCommon.GetApiBase() + "/api/FormEngine/ImportDiyTableRow";
         },
         importProgressApi() {
-            if (this.sysMenuModel && this.sysMenuModel.ImportProgressApi) {
-                return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportProgressApi);
-            }
+            if (this.sysMenuModel && this.sysMenuModel.ImportProgressApi) return this.DiyCommon.RepalceUrlKey(this.sysMenuModel.ImportProgressApi);
             return this.DiyApi.GetImportDiyTableRowStep;
         },
         authHeader() {
             return "Bearer " + this.DiyCommon.Authorization();
         },
+        importTableDisplayName() {
+            const table = this.diyTableModel || {};
+            const menu = this.sysMenuModel || {};
+            return table.Description || table.Label || menu.Name || table.Name || this.tableId;
+        },
+        uniqueRules() {
+            return buildDiyFieldUniqueRules(this.diyFieldList);
+        },
+        importMetadata() {
+            return buildImportMetadata(this.parsedImport, {
+                errorPolicy: this.errorPolicy,
+                uniqueRules: this.uniqueRules
+            });
+        },
         uploadData() {
-            var result = {
+            const result = {
                 Limit: true,
                 TableId: this.tableId,
                 UserId: this.$store?.getters?.GetCurrentUser?.Id || ""
             };
             this.appendMenuContext(result);
-            var fixedFormData = this.buildChildImportFixedData();
+            const fixedFormData = this.buildChildImportFixedData();
             if (Object.keys(fixedFormData).length > 0) result._FieldId = JSON.stringify(fixedFormData);
             if (this.tableChildFkFieldName) result.TableChildFkFieldName = this.tableChildFkFieldName;
             if (this.primaryTableFieldName) result.PrimaryTableFieldName = this.primaryTableFieldName;
@@ -230,7 +508,54 @@ export default {
             if (this.tableChildImportContext && Object.keys(this.tableChildImportContext).length > 0) {
                 result._ChildImportContext = JSON.stringify(this.tableChildImportContext);
             }
+            if (this.importMetadata) {
+                result._ImportSheetIndex = this.importMetadata.SheetIndex;
+                result._ImportHeaderStartRow = this.importMetadata.HeaderStartRow;
+                result._ImportHeaderEndRow = this.importMetadata.HeaderEndRow;
+                result._ImportDataStartRow = this.importMetadata.DataStartRow;
+                result._ImportDataEndRow = this.importMetadata.DataEndRow;
+                result._ImportColumnsJson = JSON.stringify(this.importMetadata.Columns);
+                result._ImportMetaJson = JSON.stringify(this.importMetadata);
+                result._ImportErrorPolicy = this.errorPolicy;
+                result._ImportFileType = this.importMetadata.FileType;
+                result._ImportEncoding = this.importMetadata.Encoding;
+                result._ImportDelimiter = this.importMetadata.Delimiter;
+            }
             return result;
+        },
+        previewColumns() {
+            return this.parsedImport ? this.parsedImport.columns : [];
+        },
+        previewRows() {
+            if (!this.parsedImport) return [];
+            const start = (this.previewPage - 1) * this.previewPageSize;
+            return this.parsedImport.sourceRows.slice(start, start + this.previewPageSize);
+        },
+        sourceFileInfo() {
+            if (!this.sourceFileType) return "";
+            if (this.sourceFileType === "csv") {
+                return ["CSV", this.sourceEncoding].filter(Boolean).join(" · ");
+            }
+            return this.sourceFileType.toUpperCase();
+        },
+        needsManualReview() {
+            return Boolean(this.parsedImport && (this.parsedImport.confidence === "low" || !this.parsedImport.mappedColumnCount));
+        },
+        confidenceText() {
+            if (!this.parsedImport) return "";
+            const labels = {
+                high: this.$t("Msg.ImportConfidenceHigh"),
+                medium: this.$t("Msg.ImportConfidenceMedium"),
+                low: this.$t("Msg.ImportConfidenceLow"),
+                manual: this.$t("Msg.ImportConfidenceManual")
+            };
+            return labels[this.parsedImport.confidence] || labels.low;
+        },
+        confidenceTagType() {
+            if (!this.parsedImport) return "info";
+            if (this.parsedImport.confidence === "high") return "success";
+            if (this.parsedImport.confidence === "low") return "warning";
+            return "info";
         },
         isTaskActive() {
             return Boolean(this.backgroundTask && ACTIVE_TASK_STATUSES.includes(this.backgroundTask.Status));
@@ -238,18 +563,20 @@ export default {
         isTaskSucceeded() {
             return Boolean(this.backgroundTask && this.backgroundTask.Status === "Succeeded");
         },
-        canStartCustomImport() {
+        canStartImport() {
             return Boolean(
                 this.parsedImport
                 && this.parsedImport.rows.length
+                && this.parsedImport.mappedColumnCount
                 && !this.parsing
                 && !this.submitting
                 && !this.isTaskActive
                 && !this.backgroundTaskId
+                && !this.uploadSucceeded
             );
         },
         customProgressPercentage() {
-            if (!this.backgroundTask) return 0;
+            if (!this.backgroundTask) return this.uploadSucceeded ? 100 : 0;
             if (this.backgroundTask.Status === "Succeeded") return 100;
             return Math.max(0, Math.min(100, Number(this.backgroundTask.Progress || 0)));
         },
@@ -257,13 +584,13 @@ export default {
             return this.isTaskActive && Number(this.backgroundTask?.Total || 0) <= 0;
         },
         customProgressStatus() {
-            if (!this.backgroundTask) return undefined;
-            if (this.backgroundTask.Status === "Succeeded") return "success";
-            if (["Failed", "Canceled"].includes(this.backgroundTask.Status)) return "exception";
+            if (this.uploadSucceeded || this.backgroundTask?.Status === "Succeeded") return "success";
+            if (["Failed", "Canceled"].includes(this.backgroundTask?.Status)) return "exception";
             return undefined;
         },
         customStatusTitle() {
             if (this.customError) return this.$t("Msg.ImportFailed");
+            if (this.uploadSucceeded) return this.$t("Msg.ImportSucceeded");
             if (this.backgroundTask) return this.backgroundTask.Title || this.dialogTitle;
             if (this.parsing) return this.$t("Msg.ParsingWorkbook");
             if (this.parsedImport) return this.$t("Msg.ReadyToImport");
@@ -271,8 +598,9 @@ export default {
         },
         customStatusText() {
             if (this.customError) return this.$t("Msg.ImportFailed");
-            var status = this.backgroundTask && this.backgroundTask.Status;
-            var labels = {
+            if (this.uploadSucceeded) return this.$t("Msg.ImportSucceeded");
+            const status = this.backgroundTask && this.backgroundTask.Status;
+            const labels = {
                 Pending: this.$t("Msg.ImportPending"),
                 Running: this.$t("Msg.ImportRunning"),
                 Retrying: this.$t("Msg.ImportRetrying"),
@@ -283,23 +611,22 @@ export default {
             return labels[status] || "";
         },
         customStatusType() {
-            var status = this.backgroundTask && this.backgroundTask.Status;
-            if (status === "Succeeded") return "success";
+            const status = this.backgroundTask && this.backgroundTask.Status;
+            if (this.uploadSucceeded || status === "Succeeded") return "success";
             if (["Failed", "Canceled"].includes(status) || this.customError) return "danger";
             if (status === "Pending") return "info";
             return "warning";
         },
         customProgressMessage() {
-            if (!this.backgroundTask) return this.parsedImport ? this.$t("Msg.ImportReadyHint") : "";
-            var task = this.backgroundTask;
-            var unitText = Number(task.Total || 0) > 0
-                ? ` ${Number(task.Current || 0)}/${Number(task.Total || 0)}`
-                : "";
+            if (this.uploadSucceeded) return (this.uploadResult && this.uploadResult.Msg) || this.$t("Msg.ImportSucceeded");
+            if (!this.backgroundTask) return "";
+            const task = this.backgroundTask;
+            const unitText = Number(task.Total || 0) > 0 ? ` ${Number(task.Current || 0)}/${Number(task.Total || 0)}` : "";
             return (task.Msg || task.Message || this.customStatusText) + unitText;
         },
         customResultItems() {
             if (!this.backgroundTask) return [];
-            var result = this.backgroundTask.Result;
+            let result = this.backgroundTask.Result;
             if (typeof result === "string") {
                 try {
                     result = JSON.parse(result);
@@ -307,15 +634,15 @@ export default {
                     return result ? [result] : [];
                 }
             }
-            var data = result && result.Data !== undefined ? result.Data : result;
+            const data = result && result.Data !== undefined ? result.Data : result;
             if (!data) return [];
-            var items = [];
+            const items = [];
             if (data.ProjectName) items.push(`${this.$t("Msg.ImportProject")}: ${data.ProjectName}`);
             if (data.ImportedCount !== undefined) items.push(`${this.$t("Msg.ImportedRows")}: ${data.ImportedCount}`);
             if (data.BatchNo) items.push(`${this.$t("Msg.ImportBatch")}: ${data.BatchNo}`);
             if (Array.isArray(data.Results)) {
-                data.Results.slice(0, 30).forEach(function(row) {
-                    var line = row.ExcelRow || row.LineNo || "-";
+                data.Results.slice(0, 30).forEach((row) => {
+                    const line = row.ExcelRow || row.LineNo || "-";
                     items.push(`${line}: ${row.SourceSpecification || ""} → ${row.Specification || row.Msg || ""}`);
                 });
             }
@@ -324,7 +651,7 @@ export default {
     },
     methods: {
         appendMenuContext(target) {
-            var menu = this.sysMenuModel || {};
+            const menu = this.sysMenuModel || {};
             if (menu.Id) target._SysMenuId = menu.Id;
             if (menu.ModuleEngineKey) target.ModuleEngineKey = menu.ModuleEngineKey;
             return target;
@@ -333,9 +660,8 @@ export default {
             if (key && value !== undefined && value !== null && value !== "") target[key] = value;
         },
         mergeFixedImportObject(target, source) {
-            var self = this;
             if (!source) return;
-            var sourceObj = source;
+            let sourceObj = source;
             if (typeof source === "string") {
                 try {
                     sourceObj = JSON.parse(source);
@@ -344,29 +670,25 @@ export default {
                 }
             }
             if (!sourceObj || typeof sourceObj !== "object") return;
-            Object.keys(sourceObj).forEach(function(key) {
-                self.mergeFixedImportValue(target, key, sourceObj[key]);
-            });
+            Object.keys(sourceObj).forEach((key) => this.mergeFixedImportValue(target, key, sourceObj[key]));
         },
         buildChildImportFixedData() {
-            var fixedFormData = {};
-            var context = this.tableChildImportContext || {};
+            const fixedFormData = {};
+            const context = this.tableChildImportContext || {};
             this.mergeFixedImportObject(fixedFormData, context.FixedValues);
             this.mergeFixedImportObject(fixedFormData, context.FieldValues);
             this.mergeFixedImportObject(fixedFormData, context._FieldId);
             if (this.tableChildFkFieldName) {
-                var fkValue = this.fatherFormModelData
-                    ? (this.primaryTableFieldName
-                        ? this.fatherFormModelData[this.primaryTableFieldName]
-                        : this.fatherFormModelData.Id)
+                const fkValue = this.fatherFormModelData
+                    ? (this.primaryTableFieldName ? this.fatherFormModelData[this.primaryTableFieldName] : this.fatherFormModelData.Id)
                     : this.tableChildTableRowId;
                 this.mergeFixedImportValue(fixedFormData, this.tableChildFkFieldName, fkValue);
             }
             return fixedFormData;
         },
-        resetCustomState() {
+        clearImportState(clearSelectedFile = true) {
             this.stopBackgroundTaskPolling();
-            this.selectedFile = null;
+            if (clearSelectedFile) this.selectedFile = null;
             this.parsedImport = null;
             this.parsing = false;
             this.submitting = false;
@@ -374,132 +696,272 @@ export default {
             this.backgroundTaskId = "";
             this.backgroundTask = null;
             this.customSuccessEmitted = false;
-            if (this.$refs.customUpload && this.$refs.customUpload.clearFiles) {
-                this.$refs.customUpload.clearFiles();
-            }
+            this.uploadSucceeded = false;
+            this.uploadResult = null;
+            this.activeTab = "preview";
+            this.previewPage = 1;
+            this.manualMappings = {};
+            this.workbookPreviewSource = null;
+            this.workbookPreviewLoading = false;
+            this.workbookPreviewError = "";
+            this.sourceFileType = "";
+            this.sourceEncoding = "";
+            this.sourceDelimiter = "";
+            this._xlsx = null;
+            this._workbook = null;
+            if (clearSelectedFile && this.$refs.workbookUpload?.clearFiles) this.$refs.workbookUpload.clearFiles();
         },
         show(options) {
             this.dialogOptions = options && typeof options === "object" ? { ...options } : {};
-            this.resetCustomState();
+            this.clearImportState(true);
+            this.errorPolicy = normalizeImportErrorPolicy(this.dialogOptions.ErrorPolicy);
             this.visible = true;
         },
         hide() {
             this.visible = false;
         },
         validateExcelFile(file) {
-            var name = String(file && file.name || "");
-            var maxSizeMb = Number(this.dialogOptions.MaxFileSizeMB || 20);
-            if (!/\.xlsx?$/i.test(name)) throw new Error(this.$t("Msg.OnlyXlsFile"));
-            if (Number(file.size || 0) > maxSizeMb * 1024 * 1024) {
-                throw new Error(this.$t("Msg.ImportFileTooLarge", { size: maxSizeMb }));
-            }
+            const name = String(file && file.name || "");
+            const maxSizeMb = Number(this.dialogOptions.MaxFileSizeMB || 20);
+            if (!/\.(xlsx?|csv)$/i.test(name)) throw new Error(this.$t("Msg.OnlyXlsFile"));
+            if (Number(file.size || 0) > maxSizeMb * 1024 * 1024) throw new Error(this.$t("Msg.ImportFileTooLarge", { size: maxSizeMb }));
         },
-        async handleCustomFileChange(uploadFile) {
-            var file = uploadFile && uploadFile.raw;
+        async handleFileChange(uploadFile) {
+            const file = uploadFile && uploadFile.raw;
             if (!file) return;
-            this.resetCustomState();
+            this.clearImportState(false);
             this.selectedFile = file;
             this.parsing = true;
             try {
                 this.validateExcelFile(file);
-                this.parsedImport = await this.parseWorkbook(file, this.dialogOptions.Workbook || {});
-                if (!this.parsedImport.rows.length) throw new Error(this.$t("Msg.ImportNoRows"));
+                const module = await import("xlsx");
+                this._xlsx = module.default || module;
+                const fileBuffer = await file.arrayBuffer();
+                const extension = String(file.name || "").split(".").pop().toLowerCase();
+                this.sourceFileType = extension;
+                if (extension === "csv") {
+                    const csv = decodeCsvArrayBuffer(fileBuffer);
+                    this.sourceEncoding = csv.encoding;
+                    this.sourceDelimiter = csv.delimiter;
+                    this._workbook = markRaw(this._xlsx.read(csv.text, {
+                        type: "string",
+                        FS: csv.delimiter,
+                        cellDates: true,
+                        cellStyles: true,
+                        raw: false
+                    }));
+                    this.workbookPreviewSource = markRaw(this._xlsx.write(this._workbook, {
+                        type: "array",
+                        bookType: "xlsx",
+                        cellStyles: true
+                    }));
+                } else {
+                    this._workbook = markRaw(this._xlsx.read(fileBuffer, {
+                        type: "array",
+                        cellDates: true,
+                        cellStyles: true
+                    }));
+                    const previewBuffer = extension === "xlsx"
+                        ? await normalizeXlsxPreviewArrayBuffer(fileBuffer)
+                        : fileBuffer;
+                    this.workbookPreviewSource = markRaw(previewBuffer);
+                }
+                this.workbookPreviewKey += 1;
+                this.workbookPreviewLoading = true;
+                this.runWorkbookAnalysis("initial");
+                if (!this.parsedImport.sourceRowCount) this.customError = this.$t("Msg.ImportNoRows");
             } catch (error) {
-                this.customError = error && error.message ? error.message : String(error);
-                this.parsedImport = null;
+                this.customError = this.formatAnalysisError(error);
+                if (!this._workbook) this.workbookPreviewSource = null;
+                if (!this.parsedImport && this.workbookPreviewSource) this.activeTab = "workbook";
             } finally {
                 this.parsing = false;
             }
         },
-        normalizeCellValue(cell) {
-            if (!cell || cell.v === undefined || cell.v === null) return null;
-            if (cell.v instanceof Date) return cell.v.toISOString();
-            return typeof cell.v === "string" ? cell.v.trim() : cell.v;
+        handleFileExceed(files) {
+            const file = Array.isArray(files) ? files[0] : null;
+            const uploader = this.$refs.workbookUpload;
+            if (!file || !uploader) return;
+            if (typeof uploader.clearFiles === "function") uploader.clearFiles();
+            file.uid = file.uid || Date.now();
+            if (typeof uploader.handleStart === "function") uploader.handleStart(file);
         },
-        async parseWorkbook(file, config) {
-            var module = await import("xlsx");
-            var XLSX = module.default || module;
-            var workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
-            var sheetName = config.SheetName || workbook.SheetNames[Number(config.SheetIndex || 0)];
-            var sheet = workbook.Sheets[sheetName];
-            if (!sheet) throw new Error(this.$t("Msg.ImportSheetNotFound"));
-            var range = XLSX.utils.decode_range(sheet["!ref"] || "A1:A1");
-            var startRow = Math.max(1, Number(config.DataStartRow || 2));
-            var endRow = Math.min(Number(config.DataEndRow || range.e.r + 1), range.e.r + 1);
-            var columns = Array.isArray(config.Columns) ? config.Columns : [];
-            if (!columns.length) throw new Error(this.$t("Msg.ImportMappingMissing"));
-            var cells = {};
-            Object.keys(config.Cells || {}).forEach((key) => {
-                cells[key] = this.normalizeCellValue(sheet[String(config.Cells[key]).toUpperCase()]);
+        analysisOptions(mode) {
+            const workbookConfig = this.dialogOptions.Workbook || {};
+            const configuredColumns = Array.isArray(workbookConfig.Columns) ? workbookConfig.Columns : [];
+            const initial = mode === "initial";
+            const manual = mode === "manual";
+            const configuredSheetIndex = workbookConfig.SheetIndex;
+            const hasConfiguredSheet = Boolean(String(workbookConfig.SheetName || "").trim())
+                || (configuredSheetIndex !== undefined && configuredSheetIndex !== null && configuredSheetIndex !== "");
+            return {
+                sheetName: initial ? workbookConfig.SheetName : undefined,
+                sheetIndex: initial
+                    ? (hasConfiguredSheet ? Number(configuredSheetIndex || 0) : undefined)
+                    : Number(this.analysisSettings.sheetIndex || 0),
+                autoDetectSheet: initial && !hasConfiguredSheet,
+                headerStartRow: initial ? workbookConfig.HeaderStartRow : (manual ? this.analysisSettings.headerStartRow : null),
+                headerEndRow: initial ? workbookConfig.HeaderEndRow : (manual ? this.analysisSettings.headerEndRow : null),
+                dataStartRow: initial ? workbookConfig.DataStartRow : (manual ? this.analysisSettings.dataStartRow : null),
+                dataEndRow: initial ? workbookConfig.DataEndRow : (manual ? this.analysisSettings.dataEndRow : null),
+                maxHeaderRows: workbookConfig.MaxHeaderRows || 4,
+                maxRows: this.dialogOptions.MaxRows || (this.isCustomImport ? 5000 : 50000),
+                maxColumns: this.dialogOptions.MaxColumns || 256,
+                manualMappings: manual ? this.manualMappings : {},
+                cells: workbookConfig.Cells || {},
+                keyField: workbookConfig.KeyField || "",
+                fileType: this.sourceFileType === "csv" ? "csv" : "excel",
+                encoding: this.sourceEncoding,
+                delimiter: this.sourceDelimiter,
+                targets: buildImportTargets(this.diyFieldList, configuredColumns)
+            };
+        },
+        runWorkbookAnalysis(mode) {
+            if (!this._xlsx || !this._workbook) return;
+            const analysis = analyzeExcelWorkbook(this._xlsx, this._workbook, this.analysisOptions(mode));
+            this.parsedImport = analysis;
+            this.analysisSettings = {
+                sheetIndex: analysis.sheetIndex,
+                headerStartRow: analysis.headerStartRow,
+                headerEndRow: analysis.headerEndRow,
+                dataStartRow: analysis.dataStartRow,
+                dataEndRow: analysis.dataEndRow
+            };
+            this.previewPage = 1;
+            this.customError = "";
+        },
+        autoDetectWorkbook() {
+            this.manualMappings = {};
+            try {
+                this.runWorkbookAnalysis("auto");
+            } catch (error) {
+                this.customError = this.formatAnalysisError(error);
+            }
+        },
+        handleSheetChange() {
+            this.manualMappings = {};
+            this.autoDetectWorkbook();
+        },
+        applyManualSettings() {
+            if (Number(this.analysisSettings.headerStartRow) > Number(this.analysisSettings.headerEndRow)) {
+                this.customError = this.$t("Msg.ImportHeaderRangeInvalid");
+                return;
+            }
+            if (
+                Number(this.analysisSettings.dataStartRow) <= Number(this.analysisSettings.headerEndRow)
+                || Number(this.analysisSettings.dataStartRow) > Number(this.analysisSettings.dataEndRow)
+            ) {
+                this.customError = this.$t("Msg.ImportDataRangeInvalid");
+                return;
+            }
+            try {
+                this.runWorkbookAnalysis("manual");
+            } catch (error) {
+                this.customError = this.formatAnalysisError(error);
+            }
+        },
+        updateColumnMapping(columnIndex, targetName) {
+            const mappings = {};
+            (this.parsedImport?.columns || []).forEach((column) => {
+                mappings[column.columnIndex] = column.targetName || "";
             });
-            var rows = [];
-            for (var rowNumber = startRow; rowNumber <= endRow; rowNumber += 1) {
-                var row = { _ExcelRow: rowNumber };
-                columns.forEach((column) => {
-                    var columnIndex = typeof column.Column === "number"
-                        ? column.Column
-                        : XLSX.utils.decode_col(String(column.Column || "A").toUpperCase());
-                    var address = XLSX.utils.encode_cell({ r: rowNumber - 1, c: columnIndex });
-                    row[column.Name] = this.normalizeCellValue(sheet[address]);
-                });
-                var keyValue = config.KeyField ? row[config.KeyField] : undefined;
-                var hasValue = columns.some(
-                    (column) => row[column.Name] !== null && row[column.Name] !== ""
-                );
-                if (!hasValue || (config.KeyField && (keyValue === null || keyValue === ""))) continue;
-                rows.push(row);
+            mappings[columnIndex] = targetName || "";
+            this.manualMappings = mappings;
+            this.applyManualSettings();
+        },
+        availableTargets(currentColumn) {
+            const used = new Set(
+                (this.parsedImport?.columns || [])
+                    .filter((column) => column.columnIndex !== currentColumn.columnIndex && column.targetName)
+                    .map((column) => column.targetName)
+            );
+            return (this.parsedImport?.targets || []).filter((target) => target.name === currentColumn.targetName || !used.has(target.name));
+        },
+        formatAnalysisError(error) {
+            if (error && error.code === "IMPORT_TOO_MANY_ROWS") return this.$t("Msg.ImportTooManyRows", { count: error.limit });
+            return error && error.message ? error.message : String(error);
+        },
+        formatPreviewValue(value) {
+            if (value === null || value === undefined || value === "") return "-";
+            if (value instanceof Date) return value.toISOString();
+            if (typeof value === "object") return JSON.stringify(value);
+            return String(value);
+        },
+        formatFileSize(value) {
+            const bytes = Number(value || 0);
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+            return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+        },
+        uniqueRuleText(rule) {
+            const labels = (rule?.Fields || []).map((field) => field.Label || field.Name).join(" + ");
+            const mode = rule?.Type === "All"
+                ? this.$t("Msg.ImportUniqueRuleAll")
+                : this.$t("Msg.ImportUniqueRuleAlone");
+            return `${mode}：${labels}`;
+        },
+        handleWorkbookPreviewRendered() {
+            this.workbookPreviewLoading = false;
+            this.workbookPreviewError = "";
+        },
+        handleWorkbookPreviewError(error) {
+            this.workbookPreviewLoading = false;
+            this.workbookPreviewError = (error && (error.message || error.msg)) || this.$t("Msg.ImportOriginalWorkbookUnavailable");
+        },
+        async startImport() {
+            if (!this.canStartImport) return;
+            if (this.isCustomImport) {
+                await this.startCustomImport();
+                return;
             }
-            var maxRows = Math.max(1, Number(this.dialogOptions.MaxRows || 5000));
-            if (rows.length > maxRows) {
-                throw new Error(this.$t("Msg.ImportTooManyRows", { count: maxRows }));
+            this.customError = "";
+            this.submitting = true;
+            const uploader = this.$refs.workbookUpload;
+            if (!uploader || typeof uploader.submit !== "function") {
+                this.submitting = false;
+                this.customError = this.$t("Msg.ImportSubmitFailed");
+                return;
             }
-            return { sheetName, rows, cells };
+            uploader.submit();
         },
         async startCustomImport() {
-            if (!this.canStartCustomImport) return;
             this.submitting = true;
             this.customError = "";
             try {
-                var options = this.dialogOptions || {};
-                var operationId = this.DiyCommon.NewGuid();
-                var params = Object.assign({}, options.Param || {}, {
+                const options = this.dialogOptions || {};
+                const operationId = this.DiyCommon.NewGuid();
+                const params = Object.assign({}, options.Param || {}, {
                     _ImportRowsJson: JSON.stringify(this.parsedImport.rows),
-                    _ImportMetaJson: JSON.stringify({
-                        SheetName: this.parsedImport.sheetName,
-                        Cells: this.parsedImport.cells,
-                        RowCount: this.parsedImport.rows.length
-                    }),
+                    _ImportMetaJson: JSON.stringify(this.importMetadata),
+                    _ImportErrorPolicy: this.errorPolicy,
+                    _ImportUniqueRulesJson: JSON.stringify(this.uniqueRules),
                     _ImportFileName: this.selectedFile.name,
                     _ImportFileSize: this.selectedFile.size
                 });
-                var backgroundOptions = Object.assign({
+                const backgroundOptions = Object.assign({
                     IdempotencyKey: `${options.ApiEngineKey}:${operationId}`,
                     ConcurrencyKey: options.ApiEngineKey,
                     MaxAttempts: 1
                 }, options.BackgroundOptions || {});
-                var result = await this.DiyCommon.ApiEngine.RunBackground(
+                const result = await this.DiyCommon.ApiEngine.RunBackground(
                     options.ApiEngineKey,
                     params,
                     options.TaskTitle || this.dialogTitle,
                     backgroundOptions
                 );
                 if (!result || Number(result.Code) !== 1) {
-                    throw new Error(
-                        (result && (result.Msg || result.Message)) || this.$t("Msg.ImportSubmitFailed")
-                    );
+                    throw new Error((result && (result.Msg || result.Message)) || this.$t("Msg.ImportSubmitFailed"));
                 }
-                var taskData = result.Data || {};
+                const taskData = result.Data || {};
                 this.backgroundTaskId = taskData.Id || taskData.TaskId || taskData.BackgroundTaskId || "";
                 this.backgroundTask = Object.assign({ Status: "Pending", Progress: 0 }, taskData);
                 if (!this.backgroundTaskId) throw new Error(this.$t("Msg.ImportTaskIdMissing"));
                 try {
-                    window.dispatchEvent(
-                        new CustomEvent("microi-background-task-started", { detail: result })
-                    );
+                    window.dispatchEvent(new CustomEvent("microi-background-task-started", { detail: result }));
                 } catch (_) { }
                 await this.pollBackgroundTask();
             } catch (error) {
-                this.customError = error && error.message ? error.message : String(error);
+                this.customError = this.formatAnalysisError(error);
             } finally {
                 this.submitting = false;
             }
@@ -507,34 +969,20 @@ export default {
         async pollBackgroundTask() {
             if (!this.backgroundTaskId) return;
             try {
-                var result = await this.DiyCommon.PostAsync(
-                    "/api/BackgroundTask/List",
-                    {},
-                    null,
-                    null,
-                    "json"
-                );
+                const result = await this.DiyCommon.PostAsync("/api/BackgroundTask/List", {}, null, null, "json");
                 if (result && Number(result.Code) === 1 && Array.isArray(result.Data)) {
-                    var task = result.Data.find(
-                        (item) => String(item.Id || item.TaskId) === String(this.backgroundTaskId)
-                    );
+                    const task = result.Data.find((item) => String(item.Id || item.TaskId) === String(this.backgroundTaskId));
                     if (task) this.backgroundTask = task;
                 }
-                if (
-                    this.backgroundTask
-                    && TERMINAL_TASK_STATUSES.includes(this.backgroundTask.Status)
-                ) {
-                    if (
-                        this.backgroundTask.Status === "Succeeded"
-                        && !this.customSuccessEmitted
-                    ) {
+                if (this.backgroundTask && TERMINAL_TASK_STATUSES.includes(this.backgroundTask.Status)) {
+                    if (this.backgroundTask.Status === "Succeeded" && !this.customSuccessEmitted) {
                         this.customSuccessEmitted = true;
                         this.$emit("import-success", this.backgroundTask);
                     }
                     return;
                 }
             } catch (error) {
-                this.customError = error && error.message ? error.message : String(error);
+                this.customError = this.formatAnalysisError(error);
             }
             this._backgroundTaskTimer = window.setTimeout(() => this.pollBackgroundTask(), 1500);
         },
@@ -544,57 +992,56 @@ export default {
                 this._backgroundTaskTimer = null;
             }
         },
-        finishCustomImport() {
-            if (!this.customSuccessEmitted) this.$emit("import-success", this.backgroundTask);
+        finishImport() {
+            if (this.isTaskSucceeded && !this.customSuccessEmitted) this.$emit("import-success", this.backgroundTask);
             this.visible = false;
         },
         handleDialogClosed() {
             this.stopBackgroundTaskPolling();
         },
         getImportProgress() {
-            var self = this;
-            var requestParam = self.appendMenuContext({ TableId: self.tableId });
-            self.DiyCommon.Post(self.importProgressApi, requestParam, function(result) {
-                if (
-                    self.DiyCommon.Result(result)
-                    && !self.DiyCommon.IsNull(result.Data)
-                    && Array.isArray(result.Data)
-                ) {
-                    self.importStepList = result.Data;
+            const requestParam = this.appendMenuContext({ TableId: this.tableId });
+            this.DiyCommon.Post(this.importProgressApi, requestParam, (result) => {
+                if (this.DiyCommon.Result(result) && !this.DiyCommon.IsNull(result.Data) && Array.isArray(result.Data)) {
+                    this.importStepList = result.Data;
                 }
             });
         },
         delImportProgress() {
-            var self = this;
-            var requestParam = self.appendMenuContext({ TableId: self.tableId });
-            self.DiyCommon.Post(
-                "/api/FormEngine/DelImportDiyTableRowStep",
-                requestParam,
-                function(result) {
-                    if (self.DiyCommon.Result(result)) {
-                        self.DiyCommon.Tips("操作成功！");
-                        self.getImportProgress();
-                    }
+            const requestParam = this.appendMenuContext({ TableId: this.tableId });
+            this.DiyCommon.Post("/api/FormEngine/DelImportDiyTableRowStep", requestParam, (result) => {
+                if (this.DiyCommon.Result(result)) {
+                    this.DiyCommon.Tips(this.$t("Msg.Success"));
+                    this.getImportProgress();
                 }
-            );
+            });
         },
         handleUploadSuccess(result) {
-            var self = this;
-            self.getImportProgress();
-            self._importStepTimer = setTimeout(function() {
-                if (self && self.getImportProgress) self.getImportProgress();
-            }, 800);
-            if (result && Number(result.Code) === 1) self.$emit("import-success");
-            else if (result) self.DiyCommon.Result(result);
+            this.submitting = false;
+            this.uploadResult = result;
+            this.getImportProgress();
+            if (this._importStepTimer) clearTimeout(this._importStepTimer);
+            this._importStepTimer = setTimeout(() => this.getImportProgress(), 800);
+            if (result && Number(result.Code) === 1) {
+                this.uploadSucceeded = true;
+                this.$emit("import-success", result);
+            } else if (result) {
+                this.customError = result.Msg || result.Message || this.$t("Msg.ImportFailed");
+                this.DiyCommon.Result(result);
+            }
+        },
+        handleUploadError(error) {
+            this.submitting = false;
+            this.customError = (error && (error.message || error.msg)) || this.$t("Msg.ImportUploadFailed");
         },
         handleBeforeUpload(file) {
             try {
                 this.validateExcelFile(file);
             } catch (error) {
+                this.submitting = false;
                 this.DiyCommon.Tips(error.message, false);
                 return false;
             }
-            this.DiyCommon.Tips("正在导入！请点击查看进度按钮！");
             if (this._importStepTimer) clearTimeout(this._importStepTimer);
             this._importStepTimer = setTimeout(() => this.getImportProgress(), 1000);
             return true;

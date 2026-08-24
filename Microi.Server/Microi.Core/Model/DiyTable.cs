@@ -50,6 +50,14 @@ namespace Microi.net
 		private string _FormNavigationFooterHtml;
 		private string _FormRecordSelectorPlaceholder;
 		private string _FormRecordSelectorLabelFields;
+		private int? _FormBannerEnabled;
+		private string _FormBannerTitleField;
+		private string _FormBannerSubtitleField;
+		private string _FormBannerImageField;
+		private string _FormBannerIcon;
+		private string _FormBannerBackgroundField;
+		private string _FormBannerTagFields;
+		private string _FormBannerMetrics;
 		private string _TabsPosition;
 		private string _TableTabs;
 		private string _TableTabsPosition;
@@ -799,6 +807,64 @@ namespace Microi.net
 			set { this.OnPropertyValueChange("FormRecordSelectorLabelFields"); this._FormRecordSelectorLabelFields = value; }
 		}
 		/// <summary>
+		/// 是否显示表单 Banner；null 表示旧表使用智能默认
+		/// </summary>
+		[Field("FormBannerEnabled")]
+		public int? FormBannerEnabled
+		{
+			get{ return _FormBannerEnabled; }
+			set { this.OnPropertyValueChange("FormBannerEnabled"); this._FormBannerEnabled = value; }
+		}
+		/// <summary>Banner 标题字段</summary>
+		[Field("FormBannerTitleField")]
+		public string FormBannerTitleField
+		{
+			get{ return _FormBannerTitleField; }
+			set { this.OnPropertyValueChange("FormBannerTitleField"); this._FormBannerTitleField = value; }
+		}
+		/// <summary>Banner 副标题字段</summary>
+		[Field("FormBannerSubtitleField")]
+		public string FormBannerSubtitleField
+		{
+			get{ return _FormBannerSubtitleField; }
+			set { this.OnPropertyValueChange("FormBannerSubtitleField"); this._FormBannerSubtitleField = value; }
+		}
+		/// <summary>Banner 左侧图片字段</summary>
+		[Field("FormBannerImageField")]
+		public string FormBannerImageField
+		{
+			get{ return _FormBannerImageField; }
+			set { this.OnPropertyValueChange("FormBannerImageField"); this._FormBannerImageField = value; }
+		}
+		/// <summary>Banner 无图片时显示的图标</summary>
+		[Field("FormBannerIcon")]
+		public string FormBannerIcon
+		{
+			get{ return _FormBannerIcon; }
+			set { this.OnPropertyValueChange("FormBannerIcon"); this._FormBannerIcon = value; }
+		}
+		/// <summary>Banner 背景图片或颜色字段</summary>
+		[Field("FormBannerBackgroundField")]
+		public string FormBannerBackgroundField
+		{
+			get{ return _FormBannerBackgroundField; }
+			set { this.OnPropertyValueChange("FormBannerBackgroundField"); this._FormBannerBackgroundField = value; }
+		}
+		/// <summary>Banner 右侧标签字段 JSON</summary>
+		[Field("FormBannerTagFields")]
+		public string FormBannerTagFields
+		{
+			get{ return _FormBannerTagFields; }
+			set { this.OnPropertyValueChange("FormBannerTagFields"); this._FormBannerTagFields = value; }
+		}
+		/// <summary>Banner 统计项与接口引擎配置 JSON</summary>
+		[Field("FormBannerMetrics")]
+		public string FormBannerMetrics
+		{
+			get{ return _FormBannerMetrics; }
+			set { this.OnPropertyValueChange("FormBannerMetrics"); this._FormBannerMetrics = value; }
+		}
+		/// <summary>
 		/// 后端表单 V8 事件是否启用单次 Jint 运行限制
 		/// </summary>
 		[Field("V8Limit")]
@@ -871,6 +937,14 @@ namespace Microi.net
 				_.FormNavigationFooterHtml,
 				_.FormRecordSelectorPlaceholder,
 				_.FormRecordSelectorLabelFields,
+				_.FormBannerEnabled,
+				_.FormBannerTitleField,
+				_.FormBannerSubtitleField,
+				_.FormBannerImageField,
+				_.FormBannerIcon,
+				_.FormBannerBackgroundField,
+				_.FormBannerTagFields,
+				_.FormBannerMetrics,
 				_.TabsPosition,
 				_.TableTabs,
 				_.TableTabsPosition,
@@ -940,6 +1014,14 @@ namespace Microi.net
 				this._FormNavigationFooterHtml,
 				this._FormRecordSelectorPlaceholder,
 				this._FormRecordSelectorLabelFields,
+				this._FormBannerEnabled,
+				this._FormBannerTitleField,
+				this._FormBannerSubtitleField,
+				this._FormBannerImageField,
+				this._FormBannerIcon,
+				this._FormBannerBackgroundField,
+				this._FormBannerTagFields,
+				this._FormBannerMetrics,
 				this._TabsPosition,
 				this._TableTabs,
 				this._TableTabsPosition,
@@ -1071,6 +1153,14 @@ namespace Microi.net
             public readonly static Field FormNavigationFooterHtml = new Field("FormNavigationFooterHtml", "diy_table", "导航底部说明");
             public readonly static Field FormRecordSelectorPlaceholder = new Field("FormRecordSelectorPlaceholder", "diy_table", "记录选择器占位文字");
             public readonly static Field FormRecordSelectorLabelFields = new Field("FormRecordSelectorLabelFields", "diy_table", "记录选择器显示字段");
+            public readonly static Field FormBannerEnabled = new Field("FormBannerEnabled", "diy_table", "显示表单Banner");
+            public readonly static Field FormBannerTitleField = new Field("FormBannerTitleField", "diy_table", "Banner标题字段");
+            public readonly static Field FormBannerSubtitleField = new Field("FormBannerSubtitleField", "diy_table", "Banner副标题字段");
+            public readonly static Field FormBannerImageField = new Field("FormBannerImageField", "diy_table", "Banner图片字段");
+            public readonly static Field FormBannerIcon = new Field("FormBannerIcon", "diy_table", "Banner图标");
+            public readonly static Field FormBannerBackgroundField = new Field("FormBannerBackgroundField", "diy_table", "Banner背景字段");
+            public readonly static Field FormBannerTagFields = new Field("FormBannerTagFields", "diy_table", "Banner标签字段");
+            public readonly static Field FormBannerMetrics = new Field("FormBannerMetrics", "diy_table", "Banner统计项");
             /// <summary>
 			/// 
 			/// </summary>
