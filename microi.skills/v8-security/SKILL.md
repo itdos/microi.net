@@ -17,6 +17,8 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 
 第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。公开的租户配置必须建成当前租户 `sys_config` 的实体字段；敏感或仅供后端使用的租户业务配置保存到 `mci_system_setting`。数据库、Redis、MongoDB、MinIO、MQ 等部署控制面仍由主库 `sys_osclients` 托管，子租户不能修改。
 
+能力是否启用、入口是否显示、公开交互模式等 Bool/Enum 配置即使属于登录或第三方集成，也必须放在 `sys_config`；API Key、ClientSecret、RP ID、Origin、Issuer、Scope、供应商地址等后端参数才放在 `mci_system_setting`。禁止给同一个新配置双写两张表。迁移旧开关时采用“新 `sys_config` 显式值 → 旧私密 Key → 存量安全默认”的只读回退，并从私密设置的列表、保存和删除入口移除旧 Key。
+
 ```javascript
 // ✅ 浏览器/前端 V8 只读取 sys_config 的浏览器安全投影
 var sysTitle = V8.SysConfig.SysTitle;
