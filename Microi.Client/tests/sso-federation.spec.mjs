@@ -20,13 +20,10 @@ test("SSO discovery is delivered by marketplace ApiEngines", async () => {
     await getLegacySsoCapabilities(diyCommon, "iTdos");
 
     assert.deepEqual(calls.map((item) => item.url), [
-        "/api/ApiEngine/Run",
-        "/api/ApiEngine/Run"
+        "/apiengine/sso_capabilities",
+        "/apiengine/sso_legacy_capabilities"
     ]);
-    assert.deepEqual(calls.map((item) => item.payload.ApiEngineKey), [
-        "sso_capabilities",
-        "sso_legacy_capabilities"
-    ]);
+    assert.ok(calls.every((item) => item.payload.ApiEngineKey === undefined));
     assert.ok(calls.every((item) => item.payload.OsClient === "iTdos"));
 });
 

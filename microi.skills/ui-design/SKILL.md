@@ -63,7 +63,7 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=ui-design-002 sha256=4339d981ddbc6340663729c1bd89f6be9f9215fa1c6768260377b6feaf202505 -->
+<!-- microi-progressive:chunk id=ui-design-002 sha256=0d1bac0d19d61d288a6eb25f18fc15a045bca3df9a01399d5ce5224c8accffd3 -->
 ## 高端视觉标准
 
 - 每个新页面必须有首屏视觉重心：核心数据、主任务、产品/品牌对象或可操作内容应在第一屏明确出现，不能只有说明文字或空白装饰。

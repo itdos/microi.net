@@ -2,6 +2,8 @@
 
 > 翻译引擎提供动态翻译和 `diy_lang` 多语言词条读取。固定界面文案优先使用词条，动态内容才调用翻译供应商。
 
+核心实现已经拆分为开源类库 `Microi.Server/Microi.Translate`，并随平台版本发布同名 NuGet 包 `Microi.Translate`；闭源 `Microi.net` 仅引用该公共能力，不再维护翻译业务源码副本。
+
 ---
 
 ## V8 API

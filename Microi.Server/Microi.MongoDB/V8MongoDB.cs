@@ -438,6 +438,26 @@ namespace Microi.net
             {
                 list.Add(Builders<SysLog>.Filter.Where(d => d.Type == param.Type));
             }
+            if (!param.Category.DosIsNullOrWhiteSpace())
+            {
+                list.Add(Builders<SysLog>.Filter.Eq(d => d.Category, param.Category.Trim()));
+            }
+            if (!param.Action.DosIsNullOrWhiteSpace())
+            {
+                list.Add(Builders<SysLog>.Filter.Eq(d => d.Action, param.Action.Trim()));
+            }
+            if (!param.Source.DosIsNullOrWhiteSpace())
+            {
+                list.Add(Builders<SysLog>.Filter.Eq(d => d.Source, param.Source.Trim()));
+            }
+            if (!param.IP.DosIsNullOrWhiteSpace())
+            {
+                list.Add(Builders<SysLog>.Filter.Eq(d => d.IP, param.IP.Trim()));
+            }
+            if (!param.UserId.DosIsNullOrWhiteSpace())
+            {
+                list.Add(Builders<SysLog>.Filter.Eq(d => d.UserId, param.UserId.Trim()));
+            }
             if (!param.TraceId.DosIsNullOrWhiteSpace())
             {
                 list.Add(Builders<SysLog>.Filter.Eq(d => d.TraceId, param.TraceId.Trim().ToLowerInvariant()));
@@ -704,6 +724,115 @@ namespace Microi.net
             catch (Exception ex)
             {
                 return new DosResult<SysLogSignalResult>(0, null, ex.Message);
+            }
+        }
+
+        public async Task<DosResultList<SysLog>> QuerySystemLogRange(SysLogRangeQueryParam param)
+        {
+            try
+            {
+                if (param == null || param.OsClient.DosIsNullOrWhiteSpace())
+                    return new DosResultList<SysLog>(0, null, "OsClient不能为空。");
+
+                // SysLog.CreateTime 沿用服务端本地时间契约；接口可统一传 UTC。
+                var start = param.WindowStart.Kind == DateTimeKind.Utc
+                    ? param.WindowStart.ToLocalTime()
+                    : param.WindowStart;
+                var end = param.WindowEnd.Kind == DateTimeKind.Utc
+                    ? param.WindowEnd.ToLocalTime()
+                    : param.WindowEnd;
+                if (start == default(DateTime) || end == default(DateTime) || end <= start)
+                    return new DosResultList<SysLog>(0, null, "日志明细时间范围无效。");
+                if (end - start > TimeSpan.FromDays(400))
+                    return new DosResultList<SysLog>(0, null, "日志明细时间范围不能超过400天。");
+                if ((param.Keyword ?? string.Empty).Length > 100)
+                    return new DosResultList<SysLog>(0, null, "日志关键字最长100个字符。");
+
+                var pageIndex = Math.Max(1, Math.Min(1000000, param.PageIndex));
+                var pageSize = Math.Max(1, Math.Min(100, param.PageSize));
+                var maxMonths = Math.Max(1, Math.Min(14, param.MaxMonths));
+                var host = CreateSystemLogHost(param.OsClient, null);
+                if (host.Connection.DosIsNullOrWhiteSpace())
+                    return new DosResultList<SysLog>(0, null, "当前租户MongoDB配置不可用。");
+
+                var database = MongodbClient<SysLog>.MongodbDatabase(host);
+                var existingMonths = await GetSystemLogMonthsAsync(database).ConfigureAwait(false);
+                var startMonth = start.ToString("yyyyMM", CultureInfo.InvariantCulture);
+                var endMonth = end.ToString("yyyyMM", CultureInfo.InvariantCulture);
+                var months = existingMonths
+                    .Where(month => string.CompareOrdinal(month, startMonth) >= 0
+                                    && string.CompareOrdinal(month, endMonth) <= 0)
+                    .OrderByDescending(month => month, StringComparer.Ordinal)
+                    .Take(maxMonths)
+                    .ToList();
+                if (months.Count == 0)
+                    return new DosResultList<SysLog>(1, new List<SysLog>(), "", 0);
+
+                var monthQueries = new List<(string Month, MongodbHost Host, IMongoCollection<SysLog> Collection, FilterDefinition<SysLog> Filter)>();
+                foreach (var month in months)
+                {
+                    var monthHost = CreateSystemLogHost(param.OsClient, month);
+                    await EnsureSysLogIndexesAsync(monthHost).ConfigureAwait(false);
+                    var collection = MongodbClient<SysLog>.MongodbInfoClient(monthHost);
+                    var filters = new List<FilterDefinition<SysLog>>
+                    {
+                        Builders<SysLog>.Filter.Gte(row => row.CreateTime, start),
+                        Builders<SysLog>.Filter.Lt(row => row.CreateTime, end)
+                    };
+                    if (!param.Category.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(row => row.Category, param.Category.Trim()));
+                    if (!param.Action.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(row => row.Action, param.Action.Trim()));
+                    if (!param.Source.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(row => row.Source, param.Source.Trim()));
+                    if (!param.IP.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(row => row.IP, param.IP.Trim()));
+                    if (!param.UserId.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(row => row.UserId, param.UserId.Trim()));
+                    if (!param.Api.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(row => row.Api, param.Api.Trim()));
+                    if (!param.Keyword.DosIsNullOrWhiteSpace())
+                    {
+                        var expression = new BsonRegularExpression(Regex.Escape(param.Keyword.Trim()), "i");
+                        filters.Add(Builders<SysLog>.Filter.Or(
+                            Builders<SysLog>.Filter.Regex(row => row.Title, expression),
+                            Builders<SysLog>.Filter.Regex(row => row.Content, expression),
+                            Builders<SysLog>.Filter.Regex(row => row.UserName, expression),
+                            Builders<SysLog>.Filter.Regex(row => row.IP, expression),
+                            Builders<SysLog>.Filter.Regex(row => row.Api, expression),
+                            Builders<SysLog>.Filter.Regex(row => row.TargetId, expression),
+                            Builders<SysLog>.Filter.Regex(row => row.OtherInfo, expression)));
+                    }
+                    monthQueries.Add((month, monthHost, collection, Builders<SysLog>.Filter.And(filters)));
+                }
+
+                var countTasks = monthQueries
+                    .Select(query => query.Collection.CountDocumentsAsync(query.Filter))
+                    .ToArray();
+                await Task.WhenAll(countTasks).ConfigureAwait(false);
+                var counts = countTasks.Select(task => task.Result).ToArray();
+                var total = counts.Sum();
+                var skip = (long)(pageIndex - 1) * pageSize;
+                var rows = new List<SysLog>(pageSize);
+                for (var index = 0; index < monthQueries.Count && rows.Count < pageSize; index++)
+                {
+                    if (skip >= counts[index])
+                    {
+                        skip -= counts[index];
+                        continue;
+                    }
+
+                    var query = monthQueries[index];
+                    var remaining = pageSize - rows.Count;
+                    var page = await query.Collection.Find(query.Filter)
+                        .Sort(Builders<SysLog>.Sort.Descending(row => row.CreateTime).Descending(row => row.Id))
+                        .Skip((int)skip)
+                        .Limit(remaining)
+                        .ToListAsync()
+                        .ConfigureAwait(false);
+                    rows.AddRange(page);
+                    skip = 0;
+                }
+
+                return new DosResultList<SysLog>(1, rows, "", total > int.MaxValue ? int.MaxValue : (int)total);
+            }
+            catch (Exception ex)
+            {
+                return new DosResultList<SysLog>(0, null, ex.Message);
             }
         }
 
@@ -1199,6 +1328,14 @@ namespace Microi.net
                     toCreate.Add(new CreateIndexModel<SysLog>(
                         Builders<SysLog>.IndexKeys.Ascending(d => d.Category).Ascending(d => d.Action).Descending(d => d.CreateTime),
                         new CreateIndexOptions { Name = "idx_Category_Action_CreateTime" }));
+                if (!existingIndexNames.Contains("idx_Category_Source_CreateTime"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Ascending(d => d.Category).Ascending(d => d.Source).Descending(d => d.CreateTime),
+                        new CreateIndexOptions { Name = "idx_Category_Source_CreateTime" }));
+                if (!existingIndexNames.Contains("idx_Category_IP_CreateTime"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Ascending(d => d.Category).Ascending(d => d.IP).Descending(d => d.CreateTime),
+                        new CreateIndexOptions { Name = "idx_Category_IP_CreateTime" }));
                 if (!existingIndexNames.Contains("idx_UserId_CreateTime"))
                     toCreate.Add(new CreateIndexModel<SysLog>(
                         Builders<SysLog>.IndexKeys.Ascending(d => d.UserId).Descending(d => d.CreateTime),

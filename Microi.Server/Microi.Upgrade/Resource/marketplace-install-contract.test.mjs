@@ -73,7 +73,8 @@ test("application-store package hides every install mutation on the official pla
   assert.match(bulk.V8Code, /ApplicationType: 'Platform'/);
   assert.match(bulk.V8Code, /官方平台应用/);
   assert.match(bulk.V8Code, /BULK_QUEUE_PREFLIGHT_DIAGNOSTICS_V1/);
-  assert.match(bulk.V8Code, /BackgroundTask\/WorkerStatus/);
+  assert.match(bulk.V8Code, /\/apiengine\/platform-background-task/);
+  assert.doesNotMatch(bulk.V8Code, /\/api\/BackgroundTask\/WorkerStatus/);
   assert.match(bulk.V8Code, /mci_background_task 表已升级/);
   assert.match(bulk.V8Code, /平台已保留普通任务执行槽/);
   assert.equal(bulk.Workload.ExpectedItems, 29);
@@ -175,13 +176,13 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.3\.6/);
-  assert.match(importerSource, /MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1/);
-  assert.match(importerSource, /\/api\/ApiEngine\/Run\?OsClient=/);
+  assert.match(importerSource, /Version: v2\.4\.2/);
+  assert.match(importerSource, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
+  assert.match(importerSource, /storeApiBase \+ '\/apiengine\/'/);
+  assert.doesNotMatch(importerSource, /\/api\/ApiEngine\/Run/);
   assert.match(importerSource, /marketplaceEngineParam\('get-microi-store-model'/);
-  assert.doesNotMatch(importerSource, /storeApiBase \+ '\/apiengine\/get-microi-store-model/);
-  assert.match(bulkSource, /MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1/);
-  assert.match(bulkSource, /ApiEngineKey: 'get-microi-store'/);
+  assert.match(bulkSource, /sourceApiBase \+ '\/apiengine\/get-microi-store/);
+  assert.doesNotMatch(bulkSource, /\/api\/ApiEngine\/Run/);
   assert.match(importerSource, /PACKAGE_MENU_RUNTIME_PREFLIGHT_V1/);
   assert.match(importerSource, /REMOTE_ZIP_SINGLE_ASSET_SLICE_V1/);
   assert.match(importerSource, /ADMIN_MENU_PERMISSION_V1/);
@@ -232,7 +233,7 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.3.6");
+  assert.equal(embeddedImporter.Version, "v2.4.2");
   assert.match(importerSource, /MOVE_OBJECT_UNAVAILABLE_RESUME_V1/);
   assert.match(importerSource, /PrivateSource\+PublicBuildMoveFallback/);
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));

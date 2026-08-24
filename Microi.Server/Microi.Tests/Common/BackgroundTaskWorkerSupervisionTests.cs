@@ -12,11 +12,22 @@ public sealed class BackgroundTaskWorkerSupervisionTests
             "Microi.net.Api",
             "Services",
             "BackgroundTaskWorkerService.cs"));
-        var controller = File.ReadAllText(Path.Combine(
+        var atom = File.ReadAllText(Path.Combine(
             serverRoot,
-            "Microi.net.Api",
-            "Controllers",
-            "BackgroundTaskController.cs"));
+            "Microi.Core",
+            "V8Engine",
+            "Runtime",
+            "V8Method.cs"));
+        var workerRuntime = File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.Core",
+            "Runtime",
+            "BackgroundTaskWorkerRuntime.cs"));
+        var engine = File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.Upgrade",
+            "Resource",
+            "platform-background-task.js"));
         var runtime = File.ReadAllText(Path.Combine(
             serverRoot,
             "Microi.Core",
@@ -32,9 +43,11 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("while (!stoppingToken.IsCancellationRequested)", worker);
         Assert.Contains("BackgroundTaskWorkerRuntime.MarkFault(ex)", worker);
         Assert.Contains("BackgroundTaskWorkerRuntime.MarkHeartbeat", worker);
-        Assert.Contains("LoopHealthy", worker);
-        Assert.Contains("WorkerStatus", controller);
-        Assert.Contains("BackgroundTaskService.GetWorkerReadiness()", controller);
+        Assert.Contains("LoopHealthy", workerRuntime);
+        Assert.Contains("WorkerStatus", engine);
+        Assert.Contains("BackgroundTaskService.GetWorkerReadiness()", atom);
+        Assert.False(File.Exists(Path.Combine(
+            serverRoot, "Microi.net.Api", "Controllers", "BackgroundTaskController.cs")));
         Assert.Contains("BackgroundTaskStore.TryGetAvailability", runtime);
         Assert.Contains("heartbeat?.Invoke()", runtime);
         Assert.Contains("RunningSlotCount", runtime);

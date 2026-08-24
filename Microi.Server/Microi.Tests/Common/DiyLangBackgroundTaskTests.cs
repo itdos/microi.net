@@ -255,12 +255,13 @@ public sealed class DiyLangBackgroundTaskTests
             DiyLangBackgroundTaskService.WorkerApiEngineKey));
 
         var root = FindRepositoryRoot();
-        var controller = File.ReadAllText(Path.Combine(
+        var atom = File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
-            "Microi.net.Api",
-            "Controllers",
-            "BackgroundTaskController.cs"));
+            "Microi.Core",
+            "V8Engine",
+            "Runtime",
+            "V8Method.cs"));
         var worker = File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
@@ -282,8 +283,14 @@ public sealed class DiyLangBackgroundTaskTests
 
         Assert.Contains(
             "BackgroundTaskService.IsReservedNativeWorkerKey(apiEngineKey)",
-            controller,
+            atom,
             StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.net.Api",
+            "Controllers",
+            "BackgroundTaskController.cs")));
         Assert.Contains(
             "PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(osClient, trustedUser)",
             worker,

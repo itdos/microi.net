@@ -20,6 +20,7 @@ description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、Ap
 | `IsAnonymous` | 允许匿名调用（无 Token） | `false` |
 | `StopHttp` | 禁止外部 HTTP 调用（仅允许 V8.ApiEngine.Run 内部调用） | `false` |
 | `IsResponseFile` | 是否响应文件（开启后 Data 必须是文件结构） | `false` |
+| `ResponseType` | `JSON/String/File/HTML/Stream`；`Stream` 开启 SSE/NDJSON | 自动识别 |
 | `LockKey` | 分布式锁 Key（同一时刻全集群只能执行一次） | 空 |
 | `LockTimeout` | 锁超时秒数 | `30` |
 | `LockMsg` | 加锁失败时返回提示 | `操作过于频繁` |
@@ -36,6 +37,22 @@ description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、Ap
 - `V8.Limits` 可读取本片有效预算和当前深度。异常优先检查 `DataAppend.V8Limit.Code`，不要看到“2GB”就判断服务器真实吃满 2GB。
 - 后台任务使用同一执行引擎。总任务可以运行数小时，但单片仍受 `Timeout/MaxStatements/LimitMemory` 约束；超过 10 分钟必须返回 `HasMore + Checkpoint` 分片续跑，不能只把 `Timeout` 调到 1800/3600。
 - 接口引擎使用正向 `V8Limit`：默认 `0/false`，不设置当前 Jint Engine 的单次超时、语句、函数递归、累计分配和 Promise 固定等待预算；只有 `1/true` 才应用 `Timeout/MaxStatements/LimitMemory/LimitRecursion`。常驻内存保护、取消令牌、并发、接口嵌套深度、权限沙箱及数据库限制在两种状态下都保留。老 `V8Unlimited` 只作协议兼容；MCP/Manifest 新配置统一写 `v8Limit`。
+
+### 流式响应（ResponseType=Stream）
+
+```javascript
+for (var i = 0; i < rows.length; i++) {
+  var pushed = await V8.Stream.WriteAsync(rows[i], 'chunk', String(i));
+  if (pushed.Code !== 1) return pushed;
+}
+return { Code: 1, Data: { Count: rows.length } };
+```
+
+- 默认协议为 SSE；客户端请求 `Accept: application/x-ndjson` 或 `streamFormat=ndjson` 可使用 NDJSON。
+- `V8.Stream.Write/WriteAsync` 输出的分片统一标记 `Provisional:true`。宿主保留 `open/done/error/heartbeat`，并且只有事务提交后才发送 `done + Committed:true`；收到 `error` 时客户端不得把暂态分片当成已提交数据。
+- 每次写入都要检查 `Code`，客户端断开或超过大小上限后立即停止循环。请求取消会传入当前 Jint 执行链，但不能替代业务幂等和事务。
+- 当前租户在 `sys_osclients` 配置单分片、累计响应和心跳：`ApiEngineStreamMaxChunkKB` 默认 256（4–1024）、`ApiEngineStreamMaxTotalMB` 默认 16（1–256）、`ApiEngineStreamHeartbeatSeconds` 默认 15（5–60）。
+- 流式传输用于在线增量反馈；大型文件走 HDFS/文件响应，可靠长任务走后台任务 + Checkpoint，广播状态走提交后 SignalR。禁止用流式响应绕过这些边界。
 
 ### 通用实时事件（SignalR）
 
@@ -205,11 +222,16 @@ POST /apiengine/{ApiEngineKey}
 Headers: Content-Type=application/json, osclient={OsClient}, apiengine=1
 Body: {"Action":"Bootstrap","OsClient":"{OsClient}"}
 
-# 兼容旧入口
+# 仅用于不能立即升级的旧客户端；新增或可修改代码禁止使用
 POST /api/ApiEngine/Run
 Headers: Content-Type=application/json, OsClient={OsClient}
 Body: {"ApiEngineKey":"your_key","Action":"Bootstrap"}
 ```
+
+固定业务接口必须调用 `/apiengine/{ApiEngineKey}` 或该引擎配置的唯一
+`ApiAddress`。禁止新增 `/api/ApiEngine/Run` 依赖，否则反向代理、限流、审计和
+系统日志/监控只能看到同一个通用入口，难以按真实接口引擎准确归因。SDK 只可在
+显式命名的 `RunLegacy` 兼容方法中保留旧地址，普通 `Run` 必须生成动态地址。
 
 复测重点：
 

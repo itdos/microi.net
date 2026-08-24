@@ -33,6 +33,12 @@ namespace Microi.net.Api.Controllers
             param._InvokeType = InvokeType.Client.ToString();
         }
 
+        private static async Task InvalidateStatsAfterSuccess(WFParam param, DosResult result)
+        {
+            if (result?.Code == 1)
+                await WorkflowStatsCache.InvalidateTenantAsync(param?.OsClient);
+        }
+
         [HttpPost]
         [PlatformAdminOnly]
         public async Task<JsonResult> SaveWFFlowDesign(WFParam param)
@@ -65,6 +71,7 @@ namespace Microi.net.Api.Controllers
         {
             await DefaultParam(param);
             var result = await MicroiEngine.WFEngine.RecallWork(param);
+            await InvalidateStatsAfterSuccess(param, result);
             return Json(result);
         }
 
@@ -78,6 +85,7 @@ namespace Microi.net.Api.Controllers
         {
             await DefaultParam(param);
             var result = await MicroiEngine.WFEngine.CancelFlow(param);
+            await InvalidateStatsAfterSuccess(param, result);
             return Json(result);
         }
 
@@ -91,6 +99,7 @@ namespace Microi.net.Api.Controllers
         {
             await DefaultParam(param);
             var result = await MicroiEngine.WFEngine.HandOverWork(param);
+            await InvalidateStatsAfterSuccess(param, result);
             return Json(result);
         }
 
@@ -133,6 +142,7 @@ namespace Microi.net.Api.Controllers
             //LineValue必须由条件判断V8执行获得、或者由后端传入 --by Anderson 2023-06-25
             param.LineValue = "";
             var result = await MicroiEngine.WFEngine.StartWork(param);
+            await InvalidateStatsAfterSuccess(param, result);
             return Json(result);
         }
         /// <summary>
@@ -145,6 +155,7 @@ namespace Microi.net.Api.Controllers
         {
             await DefaultParam(param);
             var result = await MicroiEngine.WFEngine.SendWork(param);
+            await InvalidateStatsAfterSuccess(param, result);
             return Json(result);
         }
 
@@ -360,6 +371,7 @@ namespace Microi.net.Api.Controllers
 
                 trans.Commit();
                 MarkStage("commit");
+                await WorkflowStatsCache.InvalidateTenantAsync(osClient);
 
                 // 把表单结果一起返回，前端可继续后续处理
                 var dataAppendDict = wfResult.DataAppend as IDictionary<string, object>;

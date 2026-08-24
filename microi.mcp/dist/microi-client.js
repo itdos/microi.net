@@ -1423,24 +1423,28 @@ export class MicroiClient {
             Version: prepared.version,
             ChangeSummary: prepared.changeHistory,
             ...(requestedV8Limit === undefined ? {} : { V8Limit: requestedV8Limit ? 1 : 0 }),
+            ...(options?.responseType === undefined ? {} : { ResponseType: options.responseType }),
         };
         const matchesReadback = (data) => normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
             === normalizeCodeForComparison(prepared.code)
             && (requestedV8Limit === undefined
-                || apiEngineV8LimitValue(data) === (requestedV8Limit ? 1 : 0));
+                || apiEngineV8LimitValue(data) === (requestedV8Limit ? 1 : 0))
+            && (options?.responseType === undefined
+                || String(data?.ResponseType || 'JSON').toLowerCase() === options.responseType.toLowerCase());
         try {
             const result = await this.post(API.UPDATE_ENGINE_CODE, payload, {
                 timeoutMs: this.writeRequestTimeoutMs,
                 operationName: `保存接口引擎 ${apiEngineKey}`,
             });
-            if (result.Code !== 1 || requestedV8Limit === undefined)
+            if (result.Code !== 1
+                || (requestedV8Limit === undefined && options?.responseType === undefined))
                 return result;
             const verification = await this.pollReadback(() => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Limit`)), matchesReadback);
             if (!verification.matched) {
                 return {
                     Code: 0,
                     Data: { ApiEngineKey: apiEngineKey, UpdateResponse: result.Data },
-                    Msg: `保存接口引擎 ${apiEngineKey} 返回成功，但 V8Limit 写后回读不一致：${verification.lastError || '代码或配置不一致'}`,
+                    Msg: `保存接口引擎 ${apiEngineKey} 返回成功，但运行配置写后回读不一致：${verification.lastError || '代码或配置不一致'}`,
                 };
             }
             return {
@@ -1448,7 +1452,8 @@ export class MicroiClient {
                 Data: {
                     ...(result.Data && typeof result.Data === 'object' ? result.Data : {}),
                     ApiEngineKey: apiEngineKey,
-                    V8Limit: requestedV8Limit ? 1 : 0,
+                    ...(requestedV8Limit === undefined ? {} : { V8Limit: requestedV8Limit ? 1 : 0 }),
+                    ...(options?.responseType === undefined ? {} : { ResponseType: options.responseType }),
                     Verified: true,
                     Verification: 'readback',
                 },
@@ -1557,7 +1562,10 @@ export class MicroiClient {
             && normalizeCodeForComparison(remote?.ApiV8Code || remote?.Code)
                 === normalizeCodeForComparison(prepared.code)
             && (payload.V8Limit === undefined
-                || apiEngineV8LimitValue(remote) === (Number(payload.V8Limit) === 1 ? 1 : 0)));
+                || apiEngineV8LimitValue(remote) === (Number(payload.V8Limit) === 1 ? 1 : 0))
+            && (payload.ResponseType === undefined
+                || String(remote?.ResponseType || 'JSON').toLowerCase()
+                    === String(payload.ResponseType).toLowerCase()));
         try {
             const result = await this.post(API.CREATE_ENGINE, payload, {
                 timeoutMs: this.writeRequestTimeoutMs,
@@ -2363,7 +2371,8 @@ export class MicroiClient {
     async runBackgroundApiEngine(data) {
         return this.post(API.RUN_BACKGROUND_API_ENGINE, {
             OsClient: this.config.osClient,
-            ApiEngineKey: data.apiEngineKey,
+            Action: 'RunApiEngine',
+            TargetApiEngineKey: data.apiEngineKey,
             Title: data.title,
             Param: data.param,
             Options: data.options || {},
@@ -2413,8 +2422,15 @@ export class MicroiClient {
             AppId: log.appId || 'microi.mcp',
         });
     }
+    async querySystemObservability(query) {
+        return this.executeEngine('mci-system-observability-query', query);
+    }
+    async manageSystemObservability(command) {
+        return this.executeEngine('mci-system-observability-action', command);
+    }
     async getRedisStatistics(database = 0, connectionId) {
         return this.post(API.REDIS_STATISTICS, {
+            Action: 'RedisStatistics',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
             Database: database,
@@ -2422,6 +2438,7 @@ export class MicroiClient {
     }
     async getRedisKeys(pattern = '*', database = 0, pageSize = 100, cursor, connectionId) {
         return this.post(API.REDIS_KEYS, {
+            Action: 'Keys',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
             Database: database,
@@ -2432,6 +2449,7 @@ export class MicroiClient {
     }
     async getRedisKey(key, database = 0, pageIndex = 1, pageSize = 500, connectionId) {
         return this.post(API.REDIS_KEY, {
+            Action: 'Key',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
             Database: database,
@@ -2442,6 +2460,7 @@ export class MicroiClient {
     }
     async deleteRedisKeys(keys, database = 0, connectionId) {
         return this.post(API.REDIS_DELETE_KEYS, {
+            Action: 'DeleteKeys',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
             Database: database,
@@ -2450,6 +2469,7 @@ export class MicroiClient {
     }
     async replaceRedisValue(key, dataType, value, database = 0, ttlSeconds, connectionId) {
         return this.post(API.REDIS_REPLACE_VALUE, {
+            Action: 'ReplaceValue',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
             Database: database,
@@ -2461,6 +2481,7 @@ export class MicroiClient {
     }
     async renameRedisKey(key, newKey, database = 0, connectionId) {
         return this.post(API.REDIS_RENAME_KEY, {
+            Action: 'RenameKey',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
             Database: database,
@@ -2470,6 +2491,7 @@ export class MicroiClient {
     }
     async setRedisTtl(key, ttlSeconds, database = 0, connectionId) {
         return this.post(API.REDIS_SET_TTL, {
+            Action: 'SetTtl',
             Mode: connectionId ? 'saved' : 'tenant',
             ConnectionId: connectionId || '',
             Database: database,
@@ -2499,6 +2521,7 @@ export class MicroiClient {
     async listBackgroundTasks() {
         return this.post(API.LIST_BACKGROUND_TASKS, {
             OsClient: this.config.osClient,
+            Action: 'List',
         }, {
             timeoutMs: this.requestTimeoutMs,
             operationName: 'list background tasks',
@@ -2507,6 +2530,7 @@ export class MicroiClient {
     async cancelBackgroundTask(taskId) {
         return this.post(API.CANCEL_BACKGROUND_TASK, {
             OsClient: this.config.osClient,
+            Action: 'Cancel',
             Id: taskId,
         }, {
             timeoutMs: this.writeRequestTimeoutMs,

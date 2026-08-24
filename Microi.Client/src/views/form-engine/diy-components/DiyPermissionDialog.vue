@@ -92,7 +92,7 @@ export default {
             self.btnList = self.getAllFormBtns(self.sysMenuModel);
 
             // 获取所有角色权限（按 FkId 查询）
-            var result = await self.DiyCommon.PostAsync("/api/SysMenu/GetSysRoleLimitByMenuId", {
+            var result = await self.DiyCommon.PostAsync("/apiengine/platform-sys-menu?Action=GetSysRoleLimitByMenuId", {
                 OsClient: self.DiyCommon.GetOsClient(),
                 FkId: self.sysMenuModel.Id
             });
@@ -214,7 +214,7 @@ export default {
                 return Object.assign({}, item, { FkId: item.FkId || self.sysMenuModel.Id });
             });
 
-            var result = await self.DiyCommon.PostAsync("/api/SysMenu/UpdateSysRoleLimitByMenuId", {
+            var result = await self.DiyCommon.PostAsync("/apiengine/platform-sys-menu?Action=UpdateSysRoleLimitByMenuId", {
                 OsClient: self.DiyCommon.GetOsClient(),
                 FkId: self.sysMenuModel.Id,
                 Type: JSON.stringify(newAllLimits)

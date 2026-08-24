@@ -194,6 +194,55 @@ namespace Microi.net
             return HasPhysicalColumn(osClient, "sys_apiengine", columnName);
         }
 
+        private static bool TryNormalizeApiEngineResponseType(
+            string responseType,
+            out string normalized,
+            out string error)
+        {
+            normalized = null;
+            error = "";
+            if (responseType == null) return true;
+
+            var value = SafeString(responseType).Trim();
+            if (value.DosIsNullOrWhiteSpace())
+            {
+                error = "ResponseType 不能为空；可选值：JSON、String、File、HTML、Stream";
+                return false;
+            }
+
+            if (string.Equals(value, "0", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "JSON", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = "JSON";
+                return true;
+            }
+            if (string.Equals(value, "String", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = "String";
+                return true;
+            }
+            if (string.Equals(value, "File", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = "File";
+                return true;
+            }
+            if (string.Equals(value, "HTML", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = "HTML";
+                return true;
+            }
+            if (string.Equals(value, "2", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "SSE", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "Stream", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = "Stream";
+                return true;
+            }
+
+            error = $"不支持的 ResponseType：{value}；可选值：JSON、String、File、HTML、Stream";
+            return false;
+        }
+
         private static bool DiyTableHasColumn(string osClient, string columnName)
         {
             return HasPhysicalColumn(osClient, "diy_table", columnName);
@@ -925,11 +974,13 @@ namespace Microi.net
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
                 var hasV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
+                var hasResponseTypeColumn = SysApiEngineHasColumn(osClient, "ResponseType");
                 var selectFields = new List<string> { "ApiEngineKey", "ApiV8Code", "UpdateTime" };
                 if (hasVersionColumn) selectFields.Add("Version");
                 if (hasChangeHistoryColumn) selectFields.Add("ChangeHistory");
                 if (hasV8LimitColumn) selectFields.Add("V8Limit");
                 if (hasV8UnlimitedColumn) selectFields.Add("V8Unlimited");
+                if (hasResponseTypeColumn) selectFields.Add("ResponseType");
                 var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
@@ -957,6 +1008,7 @@ namespace Microi.net
                         ApiEngineKey = apiEngineKey,
                         V8Limit = v8Limit,
                         V8Unlimited = v8Limit == 0 ? 1 : 0,
+                        ResponseType = hasResponseTypeColumn ? SafeJString(row, "ResponseType") : "JSON",
                         ApiV8Code = apiV8Code,
                         Version = hasVersionColumn ? SafeJString(row, "Version") : "",
                         ChangeHistory = hasChangeHistoryColumn ? SafeJString(row, "ChangeHistory") : "",
@@ -1067,13 +1119,18 @@ namespace Microi.net
             string version = null,
             string changeHistory = null,
             int? v8Limit = null,
+            string responseType = null,
             bool updateCode = true)
         {
             try
             {
-                if (!updateCode && !v8Limit.HasValue)
+                if (!updateCode && !v8Limit.HasValue && responseType == null)
                 {
                     return new DosResult<object>(0, null, "没有需要更新的接口引擎代码或运行配置");
+                }
+                if (!TryNormalizeApiEngineResponseType(responseType, out var normalizedResponseType, out var responseTypeError))
+                {
+                    return new DosResult<object>(0, null, responseTypeError);
                 }
                 var client = OsClientExtend.GetClient(osClient);
                 if (client?.Db == null)
@@ -1102,10 +1159,16 @@ namespace Microi.net
                     && SupportsApiEngineChangeHistoryRows(osClient);
                 var hasV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
+                var hasResponseTypeColumn = SysApiEngineHasColumn(osClient, "ResponseType");
                 if (v8Limit.HasValue && !hasV8LimitColumn)
                 {
                     return new DosResult<object>(0, null,
                         "当前平台尚未安装 sys_apiengine.V8Limit 字段，请先升级后端与接口引擎资源");
+                }
+                if (responseType != null && !hasResponseTypeColumn)
+                {
+                    return new DosResult<object>(0, null,
+                        "当前平台尚未安装 sys_apiengine.ResponseType 字段，请先升级接口引擎资源");
                 }
                 var updateParam = new JObject
                 {
@@ -1141,6 +1204,10 @@ namespace Microi.net
                     {
                         updateParam["V8Unlimited"] = v8Limit.Value == 1 ? 0 : 1;
                     }
+                }
+                if (responseType != null)
+                {
+                    updateParam["ResponseType"] = normalizedResponseType;
                 }
 
                 var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", updateParam);
@@ -1196,6 +1263,7 @@ namespace Microi.net
                     ChangeHistoryStorage = historyStorage,
                     V8Limit = v8Limit.HasValue ? (v8Limit.Value == 1 ? 1 : 0) : (int?)null,
                     V8Unlimited = v8Limit.HasValue ? (v8Limit.Value == 1 ? 0 : 1) : (int?)null,
+                    ResponseType = responseType != null ? normalizedResponseType : null,
                     CacheRefresh = cacheRefreshStatus
                 });
             }
@@ -1216,10 +1284,18 @@ namespace Microi.net
             string osClient, string apiName, string apiEngineKey,
             string apiAddress, string apiRemark, int lockVal, int allowAnonymous,
             int isEnable, string category, string apiV8Code = null,
-            string version = null, string changeHistory = null, int? v8Limit = null)
+            string version = null, string changeHistory = null, int? v8Limit = null,
+            string responseType = null)
         {
             try
             {
+                if (!TryNormalizeApiEngineResponseType(
+                    responseType ?? "JSON",
+                    out var normalizedResponseType,
+                    out var responseTypeError))
+                {
+                    return new DosResult<object>(0, null, responseTypeError);
+                }
                 // 检查 ApiEngineKey 是否已存在
                 var existResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                 {
@@ -1243,6 +1319,7 @@ namespace Microi.net
                     && SupportsApiEngineChangeHistoryRows(osClient);
                 var hasV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
+                var hasResponseTypeColumn = SysApiEngineHasColumn(osClient, "ResponseType");
                 if (v8Limit.HasValue && !hasV8LimitColumn)
                 {
                     return new DosResult<object>(0, null,
@@ -1287,6 +1364,7 @@ namespace Microi.net
                 var effectiveV8Limit = v8Limit == 1 ? 1 : 0;
                 if (hasV8LimitColumn) addParam["V8Limit"] = effectiveV8Limit;
                 if (hasV8UnlimitedColumn) addParam["V8Unlimited"] = effectiveV8Limit == 1 ? 0 : 1;
+                if (hasResponseTypeColumn) addParam["ResponseType"] = normalizedResponseType;
 
                 var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", addParam);
 
@@ -1358,6 +1436,7 @@ namespace Microi.net
                         Category = category ?? "未分类",
                         V8Limit = effectiveV8Limit,
                         V8Unlimited = effectiveV8Limit == 1 ? 0 : 1,
+                        ResponseType = hasResponseTypeColumn ? normalizedResponseType : null,
                         CacheRefresh = cacheRefreshStatus
                     });
                 }

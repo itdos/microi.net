@@ -442,8 +442,6 @@ public class UserAccessKeySecurityTests
             "/api/SysUserFk/GetSysUserFk",
             "/api/ApiEngine/Run",
             "/api/DataSourceEngine/Run",
-            "/api/BackgroundTask/List",
-            "/api/BackgroundTask/RunApiEngine",
             "/api/OnlineTerminal/Mine",
             "/api/Os/GetDateTimeNow",
             "/api/UserBehavior/Signal",

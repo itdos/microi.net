@@ -23,13 +23,13 @@
 外部客户端推荐直接向动态路由发送 JSON：
 
 ```http
-POST /apiengine/{ApiEngineKey}--OsClient--{OsClient}--
+POST /apiengine/{ApiEngineKey}?OsClient={OsClient}
 Content-Type: application/json
 
 {"Action":"Bootstrap","Keyword":"客户"}
 ```
 
-兼容旧入口时，请把接口 Key 放在 JSON Body 中：
+只有不能立即升级的旧客户端才使用兼容入口，并把接口 Key 放在 JSON Body 中：
 
 ```http
 POST /api/ApiEngine/Run
@@ -39,6 +39,8 @@ Content-Type: application/json
 ```
 
 两种入口都会把 JSON Body 恢复到 `V8.Param`；同名 Query/Form 参数保持既有优先级。接口层只负责 HTTP 路由、参数绑定和可信上下文恢复，不承载 AI、模型路由等业务逻辑。客户端提交的 `_CurrentUser`、`_InvokeType:'Server'` 或 `_TrustedServerInvocation` 不能建立服务端信任，身份和调用类型始终由认证中间件及接口层决定。
+
+新增或可修改的前端、微服务、UniApp、MCP 与外部集成必须使用动态路径或引擎配置的唯一 `ApiAddress`，不得新增 `/api/ApiEngine/Run` 依赖。这样系统日志/监控、网关限流、访问审计和流量排行才能直接显示真实接口引擎；旧地址只保留在显式 `RunLegacy` 兼容方法中。
 
 ```javascript
 // 同步调用
@@ -59,6 +61,36 @@ var result2 = V8.ApiEngine.Run('ApiEngineKey', {
 - 返回字符串、数字、数组、布尔值或 `null`，且脚本未抛异常：默认提交。
 - 嵌套调用传入外层事务时，最终提交或回滚由外层调用者决定。
 - `V8.DbTrans.Commit()`、`Rollback()`、`Close()` 会被安全代理忽略，不要在脚本中手动管理平台事务。
+
+### 接口引擎流式响应（SSE / NDJSON）
+
+将接口引擎“响应类型”设为 `Stream` 后，脚本可通过 `V8.Stream` 逐段输出。浏览器默认收到
+`text/event-stream`；请求头 `Accept: application/x-ndjson`（或 Query `streamFormat=ndjson`）时返回
+NDJSON。身份、匿名开关、角色、压力保护、Jint 预算、分布式锁和事务规则与普通接口完全一致。
+
+```javascript
+for (var i = 0; i < 5; i++) {
+  var write = await V8.Stream.WriteAsync(
+    { Index: i, Text: '第 ' + (i + 1) + ' 段' },
+    'chunk',
+    'row-' + i
+  );
+  if (write.Code !== 1) return write; // 客户端断开或超过配额时停止业务
+}
+return { Code: 1, Data: { Count: 5 } };
+```
+
+`V8.Stream.Write(data, eventName?, id?)` 是同步写法，`WriteAsync` 会等待网络背压，更适合循环输出。
+事件名只能使用字母开头的 1–64 位字母、数字、点、下划线或连字符；`open/done/error/heartbeat`
+由宿主保留。所有脚本分片都带 `Provisional:true`，只是暂态进度，不代表数据库已经提交；只有脚本
+返回且事务真正提交后，宿主才发送 `done` 与 `Committed:true`。失败或回滚发送 `error`，客户端必须
+丢弃依赖未提交事务的暂态结果。
+
+连接断开会触发请求取消；脚本应检查每次写入结果并尽快退出。默认单分片 256 KB、单请求累计
+16 MB、心跳 15 秒，可在当前租户 `sys_osclients` 的
+`ApiEngineStreamMaxChunkKB / ApiEngineStreamMaxTotalMB / ApiEngineStreamHeartbeatSeconds` 调整；宿主仍分别
+限制为 4–1024 KB、1–256 MB、5–60 秒。流式接口不能用来绕过文件响应、HDFS、大文件上传、后台任务
+或 MQ；需要可靠断点续跑的长任务仍使用后台任务并持久化 Checkpoint。
 
 ### 接口引擎通用实时事件（SignalR）
 
@@ -344,7 +376,7 @@ var result = V8.Notification.Send({
 
 `V8.Cache` 是当前租户命名空间内的 Redis 能力。传逻辑 Key 时服务端自动生成 `Microi:${V8.OsClient}:{逻辑Key}`；传完整的当前租户 Key 继续兼容，传入其它租户的 `Microi:` 前缀会被拒绝。它不暴露 Redis `IDatabase`、连接管理、服务器扫描或任意连接能力。
 
-过期时间可传秒数，也可传 `d.HH:mm:ss` 字符串，例如 `59` 或 `0.00:00:59`；省略时为永久。常用方法包括 `Set/Get/Delete/Del/Remove`，以及 `HashSet/HashGet/HashGetAll/HashGetAllKeys/HashDelete/HashExists/HashLength/HashIncrement`。
+过期时间可传秒数，也可传 `d.HH:mm:ss` 字符串，例如 `59` 或 `0.00:00:59`；省略时为永久。常用方法包括 `Set/Get/Delete/Del/Remove`、`KeyExist/Exists`、`SetIfNotExists`、`Expire`，以及 `HashSet/HashGet/HashGetAll/HashGetAllKeys/HashGetAllValues/HashDelete/HashRemove/HashExists/HashLength/HashIncrement`。
 
 ```javascript
 // 推荐只传逻辑 Key，租户前缀由服务端添加
@@ -356,9 +388,15 @@ var result3 = V8.Cache.Remove(cacheKey);
 
 V8.Cache.HashSet('Customer:Stats', 'Count', '1');
 var count = V8.Cache.HashGet('Customer:Stats', 'Count');
+V8.Cache.Expire('Customer:Stats', 3600); // 为整个 Hash Key 设置 TTL
+
+// 只在 Key 不存在时写入，并强制使用正数秒 TTL。
+var first = V8.Cache.SetIfNotExists('Idempotency:Order:123', 'processing', 60);
 ```
 
-不要用“先 `KeyExist`、再 `Set`、最后 `Remove`”实现分布式锁：这不是原子加锁，没有持有者令牌，且可能删除其它节点的锁。接口引擎应使用平台的分布式锁配置，Job/Worker 使用带租约和持有者令牌的锁；锁之外还必须使用稳定幂等键、唯一约束或状态机保证副作用只执行一次。
+`SetIfNotExists` 适合短期去重窗口，但仍没有唯一持有者令牌、续租和仅持有者释放语义。不要用它或“先 `KeyExist`、再 `Set`、最后 `Remove`”实现分布式锁。接口引擎应使用平台的分布式锁配置，Job/Worker 使用带租约和持有者令牌的锁；锁之外还必须使用稳定幂等键、唯一约束或状态机保证副作用只执行一次。
+
+`Expire` 直接调整 Redis TTL，不会缩短当前源码中已经存在的 String L1 副本。可能进入 L1 的 String/对象应优先用带 TTL 的 `Set` 重写，或先删除再写入；Hash 不进入 L1，可以直接为整个 Hash Key 设置 TTL。L1/L2 数据流、Pub/Sub 失效、管理接口和源码配置详见[分布式缓存（L1/L2）](../system-engine/cache)。
 
 菜单、角色和表权限保存会递增 Redis 授权版本并使各节点的短期快照失效。不要把“重启容器”或“清空整个 Redis”当作权限刷新方案。
 
@@ -422,11 +460,18 @@ var refreshResult = V8.Method.RefreshExtensionDatabases();
 
 // sys_role 后端提交前事件专用：读取服务端唯一的表直连授权策略
 var directTablePolicies = V8.Method.GetDirectTableGrantPolicies();
+
+// 接口引擎保存需要再次读取的密码或 Token：密钥永不进入 V8，
+// 密文只允许同一 OsClient、同一 ApiEngineKey 解密。
+var cipher = V8.Method.ProtectApiEngineSecret(secretText);
+var plainText = V8.Method.UnprotectApiEngineSecret(cipher);
 ```
 
 `RefreshExtensionDatabases(osClient?)` 绑定当前 V8 租户。存在 `V8.DbTrans` 时只注册提交后回调：真实事务提交成功才递增共享 Redis 版本，回滚不刷新；没有事务时立即刷新。它适合“数据库扩展”应用的 `microi_database.SubmitAfterServerV8`，不应暴露成匿名或普通业务接口。
 
 `GetDirectTableGrantPolicies()` 返回平台统一维护的表直连授权模式和允许操作。它只供角色管理等可信后端表单事件校验，不能替代当前用户、菜单、表和行级权限判断，也不能直接作为匿名业务接口返回。
+
+`ProtectApiEngineSecret(plainText)` / `UnprotectApiEngineSecret(cipherText)` 只允许在后端接口引擎上下文调用。宿主把密文同时绑定当前租户与当前 `ApiEngineKey`，调用方不能传入 OsClient、密钥或 Purpose，也不会获得派生密钥。适用于远程连接密码、短期刷新 Token 等“业务明确需要再次读取”的接口私有凭据；列表必须继续脱敏，读取动作仍要执行当前用户、行归属和权限校验，禁止把解密结果写日志、审计或返回无权前端。接口引擎改 Key 后旧密文不可解，因此升级已有 Managed 引擎时应保持 Key 稳定。
 
 ### 系统日志/监控可信原子
 
@@ -489,7 +534,20 @@ var uploadResult = V8.Method.Upload({
   Path: '/file',
   OsClient: V8.OsClient
 });
+
+// 接口引擎生成 JSON、源码或模板时直接上传 UTF-8 文本，避免 Base64 4/3 膨胀。
+// 仍受当前租户 HDFS、公有/私有桶、扩展名、配额和 256 MB 文本上限约束。
+var textUploadResult = V8.Method.UploadText({
+  Content: JSON.stringify(packageModel),
+  FileName: 'application-v1_2_3.json',
+  Path: '/microi-store/packages/application/202608',
+  Limit: false,
+  Preview: false,
+  OsClient: V8.OsClient
+});
 ```
+
+`UploadText` 只接受 `Content` 和一个安全的 `FileName`，禁止同时传 `FilesByteBase64/FilesByte/Files`。它避免字符串先转 Base64 再还原字节产生的额外内存和错误文本编码，但不会替调用方完成内容哈希：商城等可信发布流程仍须对上传结果回读，并核对 UTF-8 字节数与 SHA-256 后才能提交数据库指针。
 
 #### 私有文件访问与审计
 
@@ -1311,6 +1369,8 @@ MD5、SHA1、SHA256 等摘要不能用于新密码存储；登录密码必须使
 
 `DESEncode/DESDecode` 可用于业务明确要求“加密保存且授权后显示明文”的兼容字段，但只能在后端接口引擎/表单事件中处理：列表默认掩码，显示明文使用独立受权动作并审计，响应禁止缓存，不向匿名、访问密钥会话或普通 FormEngine 暴露批量解密。DES 是现有兼容格式；新高价值秘密优先使用带版本的现代认证加密和集中密钥管理。完整分级见[平台安全与兼容基线](../more/security)。
 
+接口引擎自身需要持久保存可逆凭据时，不要从已脱敏的 `V8.OsClientModel` 读取 `AuthSecret`、`DbConn`，也不要自行拼接 AES 密钥；使用上文的 `V8.Method.ProtectApiEngineSecret/UnprotectApiEngineSecret`，由可信宿主完成租户与接口引擎作用域绑定。
+
 ## 强身份验证票据 V8.Method.ConsumeIdentityVerificationTicket
 
 登录后的前端 V8 可通过 `V8.Identity.Verify` 完成 Passkey、Authenticator TOTP 或严格人脸验证，取得两分钟有效的一次性票据。后端接口引擎必须从数据库重读业务事实、重新计算 `ActionHash`，再原子消费：
@@ -1330,6 +1390,8 @@ if (verified.Code !== 1) return verified;
 ## V8.TranslateEngine
 
 `V8.TranslateEngine` 绑定当前 V8 执行租户的 SaaS 翻译配置。兼容入口 `Translate(text, to, from?)` 的 `Data` 是单个译文字符串；新代码需要批量、HTML、自动检测、候选译文或完整返回信息时使用 `TranslateText`：
+
+底层实现来自开源 NuGet/类库 `Microi.Translate`；平台插件只负责把当前租户上下文安全注入 V8，不在闭源 `Microi.net` 内复制翻译业务逻辑。
 
 ```javascript
 var result = V8.TranslateEngine.TranslateText({

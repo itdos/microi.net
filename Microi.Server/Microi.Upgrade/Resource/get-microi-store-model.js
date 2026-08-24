@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store-model
- * Version: v1.2.6
+ * Version: v1.2.8
  * Function:
  * - 按公开/私有权限读取当前或历史应用包；后台安装按期望应用版本解析并固定不可变数据版本快照；详情模式返回租户范围内的更新日志但不返回大型数据包。
  */
@@ -28,6 +28,33 @@ function parseData(value) {
 function versionText(row) {
   return trim(row && (row.AppVersion || row.Version || row.PackageVersion));
 }
+function hasInstallPackage(row) {
+  return !!(row && (trim(row.AppPakcet)
+    || (trim(row.PackageHdfsPath)
+      && /^[a-f0-9]{64}$/i.test(trim(row.PackageSha256))
+      && Number(row.PackageSize || 0) > 0)));
+}
+function packageDownloadUrl(row, isPublic) {
+  var path = trim(row && row.PackageHdfsPath);
+  if (!path) return '';
+  if (isPublic) {
+    var fileServer = trim(V8.SysConfig && V8.SysConfig.FileServer).replace(/\/+$/, '');
+    if (!fileServer) throw new Error('商城源未配置 FileServer，无法下载公有应用包。');
+    return fileServer + '/' + path.replace(/^\/+/, '');
+  }
+  var urlResult = V8.Method.GetPrivateFileUrl({
+    OsClient: V8.OsClient,
+    FilePathName: path,
+    Limit: true
+  });
+  if (!urlResult || urlResult.Code !== 1) {
+    throw new Error('生成私有应用包临时下载地址失败：' + ((urlResult && urlResult.Msg) || path));
+  }
+  var data = urlResult.Data || {};
+  return typeof data === 'string'
+    ? trim(data)
+    : trim(data.Url || data.url || data.FileUrl || data.FullPath || data.Path);
+}
 function stripPackage(row) {
   if (!row) return row;
   // MARKETPLACE_PLAIN_OBJECT_STRIP_V1
@@ -42,6 +69,7 @@ function stripPackage(row) {
   delete plain.SelectData;
   delete plain.SelectAiApp;
   delete plain.PrivateSourcePath;
+  if (trim(plain.PackageStorageMode).toLowerCase() === 'hdfsprivate') delete plain.PackageHdfsPath;
   return plain;
 }
 function readChangeLogs(storeId) {
@@ -116,7 +144,7 @@ if (!versionId && pinCurrentVersion) {
     if (!snapshot
       || trim(snapshot.Id) !== id
       || versionText(snapshot) !== targetAppVersion
-      || !snapshot.AppPakcet) continue;
+      || !hasInstallPackage(snapshot)) continue;
     versionId = trim(historyRows[historyIndex].Id);
     selected = snapshot;
     selected.StoreVersionId = versionId;
@@ -146,7 +174,7 @@ if (versionId) {
     });
     if (!versionResult || versionResult.Code !== 1 || !versionResult.Data) return { Code: 2, Msg: "指定的应用历史版本不存在。" };
     selected = parseData(versionResult.Data.Data);
-    if (!selected || trim(selected.Id) !== id || !selected.AppPakcet) return { Code: 0, Msg: "应用历史版本数据无效或不包含完整安装包。" };
+    if (!selected || trim(selected.Id) !== id || !hasInstallPackage(selected)) return { Code: 0, Msg: "应用历史版本数据无效或不包含可校验安装包。" };
     selected.StoreVersionId = versionId;
     selected.DataVersion = versionResult.Data.Version;
     selected.DataVersionTime = versionResult.Data.CreateTime || versionResult.Data.UpdateTime;
@@ -168,7 +196,17 @@ if (versionId) {
 }
 selected.IsPublic = isPublic ? 1 : 0;
 selected.Visibility = isPublic ? "Public" : "Private";
-if (!flag(V8.Param.IncludePackage, true)) selected = stripPackage(selected);
+if (!flag(V8.Param.IncludePackage, true)) {
+  selected = stripPackage(selected);
+} else if (!trim(selected.AppPakcet)) {
+  if (!hasInstallPackage(selected)) return { Code: 0, Msg: '应用包指针缺少 HDFS 路径、SHA-256 或字节数。' };
+  try {
+    selected.PackageDownloadUrl = packageDownloadUrl(selected, isPublic);
+  } catch (downloadError) {
+    return { Code: 0, Msg: downloadError.message };
+  }
+  if (!selected.PackageDownloadUrl) return { Code: 0, Msg: '应用包下载地址为空。' };
+}
 var changeLogs = readChangeLogs(id);
 return {
   Code: 1,

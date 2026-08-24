@@ -885,7 +885,7 @@ export default {
                     apiUrl = DiyApi.GetDataSourceEngine;
                     postData.DataSourceKey = jsonTableConfig.DataSourceId;
                 } else if (jsonTableConfig.DataSource === 'ApiEngine' && jsonTableConfig.ApiEngineKey) {
-                    apiUrl = DiyApi.ApiEngineRun;
+                    apiUrl = DiyApi.GetApiEngineUrl(jsonTableConfig.ApiEngineKey);
                     postData.ApiEngineKey = jsonTableConfig.ApiEngineKey;
                 } else {
                     dataSourceLoading.value = false;

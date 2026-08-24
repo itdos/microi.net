@@ -9,7 +9,10 @@ using Newtonsoft.Json;
 using Dos.ORM;
 using System.Text.RegularExpressions;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Linq;
+using System.Linq;
 
 namespace Microi.net.Api
 {
@@ -151,6 +154,32 @@ namespace Microi.net.Api
             // target differs from the token tenant, so only AllowAnonymous engines
             // can be called across tenants.
             param["OsClient"] = routeOsClient;
+        }
+
+        private void AttachFormFilesAndAnnotateTransfer(JObject param)
+        {
+            if (!HttpContext.Request.HasFormContentType
+                || HttpContext.Request.Form?.Files == null
+                || HttpContext.Request.Form.Files.Count == 0) return;
+
+            var formFiles = HttpContext.Request.Form.Files.Where(file => file != null).ToList();
+            NetworkTrafficObservabilityService.AnnotateTransfer(
+                HttpContext,
+                "Upload",
+                formFiles.Count,
+                formFiles.Sum(file => Math.Max(0L, file.Length)),
+                formFiles.Select(file => file.FileName),
+                formFiles.Select(file => System.IO.Path.GetExtension(file.FileName)));
+
+            // V8.FilesByteBase64 是历史兼容契约。这里只在接口确实上传文件时转换；
+            // 流量观测仅记录净化元数据，不复制正文或文件内容到日志。
+            var files = new Dictionary<string, string>();
+            foreach (var file in formFiles)
+            {
+                files[file.FileName] = Convert.ToBase64String(
+                    StreamHelper.StreamToBytes(file.OpenReadStream()));
+            }
+            param["_FilesByteBase64"] = JsonHelper.Serialize(files);
         }
 
         /// <summary>
@@ -400,6 +429,59 @@ namespace Microi.net.Api
                 Content = JsonHelper.Serialize(new { Code = 0, Msg = msg, Data = data }),
                 ContentType = "application/json; charset=utf-8"
             };
+        }
+
+        private static ApiEngineHttpStreamFormat ResolveStreamFormat(HttpRequest request)
+        {
+            var requested = request?.Query["streamFormat"].FirstOrDefault()
+                            ?? request?.Headers.Accept.FirstOrDefault()
+                            ?? string.Empty;
+            return requested.Contains("ndjson", StringComparison.OrdinalIgnoreCase)
+                ? ApiEngineHttpStreamFormat.Ndjson
+                : ApiEngineHttpStreamFormat.ServerSentEvents;
+        }
+
+        private static bool IsCommittedApiEngineResult(object result)
+        {
+            try
+            {
+                if (result == null) return true;
+                if (result is DosResult dosResult) return dosResult.Code == 1;
+                var token = result as JToken ?? JToken.FromObject(result);
+                if (token is JObject obj && obj.Property("Code") != null)
+                {
+                    return obj["Code"].Val<int>() == 1;
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static async Task RunStreamHeartbeatAsync(
+            ApiEngineHttpStreamSink sink,
+            int heartbeatSeconds,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested && sink.IsConnected)
+                {
+                    await Task.Delay(
+                            TimeSpan.FromSeconds(heartbeatSeconds),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        await sink.WriteHeartbeatAsync().ConfigureAwait(false);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
         }
 
         private static bool StartsWithBytes(byte[] bytes, params byte[] prefix)
@@ -654,32 +736,12 @@ namespace Microi.net.Api
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
             param["ApiAddress"] = apiPath;
             SystemObservabilityService.AnnotateApiEngine(HttpContext, param["ApiEngineKey"].Val<string>(), param["OsClient"].Val<string>());
+            try { AttachFormFilesAndAnnotateTransfer(param); } catch { }
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             dynamic? result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
-            try
-            {
-                //#region 接口引擎接收文件，将文件流转为byte[]，再转为string
-                if (HttpContext.Request.HasFormContentType && HttpContext.Request.Form != null && HttpContext.Request.Form.Files != null && HttpContext.Request.Form.Files.Count > 0)
-                {
-                    var files = new Dictionary<string, string>();
-                    foreach (var file in HttpContext.Request.Form.Files)
-                    {
-                        if (file != null)
-                        {
-                            files.Add(file.FileName, Convert.ToBase64String(StreamHelper.StreamToBytes(file.OpenReadStream())));
-                        }
-                    }
-                    param["_FilesByteBase64"] = JsonHelper.Serialize(files);
-                }
-                //#endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
-            }
-            catch
-            {
-            }
-
             if (result != null && result?.GetType() == typeof(string))
             {
                 return Content(result, "text/plain; charset=utf-8");
@@ -716,23 +778,7 @@ namespace Microi.net.Api
             SystemObservabilityService.AnnotateApiEngine(HttpContext, param["ApiEngineKey"].Val<string>(), param["OsClient"].Val<string>());
             //param.ApiAddress = HttpContext.Request.Path.Value;
 
-            #region 接口引擎接收文件，将文件流转为byte[]，再转为string
-
-            if (HttpContext.Request.HasFormContentType && HttpContext.Request.Form != null && HttpContext.Request.Form.Files != null && HttpContext.Request.Form.Files.Count > 0)
-            {
-                var files = new Dictionary<string, string>();
-                foreach (var file in HttpContext.Request.Form.Files)
-                {
-                    if (file != null)
-                    {
-                        files.Add(file.FileName, Convert.ToBase64String(StreamHelper.StreamToBytes(file.OpenReadStream())));
-                    }
-                }
-                param["_FilesByteBase64"] = JsonHelper.Serialize(files);
-                //param._FilesByteBase64 = files;
-            }
-
-            #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
+            AttachFormFilesAndAnnotateTransfer(param);
 
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
@@ -996,6 +1042,117 @@ namespace Microi.net.Api
                 return Content((string)result, "text/html; charset=utf-8");
             }
             return Json(result);
+        }
+
+        /// <summary>
+        /// ApiEngine streaming response.  V8 writes provisional frames through
+        /// V8.Stream.Write/WriteAsync; done is emitted only after transaction commit.
+        /// Supports SSE by default and NDJSON when Accept/query requests ndjson.
+        /// </summary>
+        [HttpPost, HttpGet, HttpDelete, HttpPut, HttpPatch]
+        [AllowAnonymous]
+        public async Task<IActionResult> Run_Response_Stream()
+        {
+            var param = await DefaultParam(new JObject());
+            var apiPath = HttpContext.Request.Path.Value ?? string.Empty;
+            const string osClientPattern = @"--OsClient--(.*?)--$";
+            var osClientMatch = Regex.Match(apiPath, osClientPattern);
+            ApplyRouteOsClient(
+                param,
+                osClientMatch.Success ? osClientMatch.Groups[1].Value : string.Empty);
+            apiPath = Regex.Replace(apiPath, osClientPattern, string.Empty);
+            param["ApiAddress"] = apiPath;
+
+            try
+            {
+                AttachFormFilesAndAnnotateTransfer(param);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new DosResult(0, null, "读取流式接口上传文件失败：" + ex.Message));
+            }
+
+            SystemObservabilityService.AnnotateApiEngine(
+                HttpContext,
+                param["ApiEngineKey"].Val<string>(),
+                param["OsClient"].Val<string>());
+            var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
+            if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
+
+            var osClient = param["OsClient"].Val<string>();
+            if (osClient.DosIsNullOrWhiteSpace()) osClient = DiyToken.GetCurrentOsClient();
+            var options = ApiEngineHttpStreamOptions.FromTenant(osClient);
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                HttpContext.RequestAborted);
+            using var sink = new ApiEngineHttpStreamSink(
+                HttpContext.Response,
+                ResolveStreamFormat(HttpContext.Request),
+                linkedCancellation.Token,
+                options.MaxChunkBytes);
+            V8ApiEngineStream writer = null;
+            Task heartbeatTask = Task.CompletedTask;
+
+            try
+            {
+                await sink.StartAsync(HttpContext.TraceIdentifier).ConfigureAwait(false);
+                heartbeatTask = RunStreamHeartbeatAsync(
+                    sink,
+                    options.HeartbeatSeconds,
+                    linkedCancellation.Token);
+                using (ApiEngineStreamContext.Enter(
+                           sink,
+                           options.MaxChunkBytes,
+                           options.MaxTotalBytes))
+                {
+                    writer = ApiEngineStreamContext.Current;
+                    var result = await MicroiEngine.ApiEngine.RunAsync(param).ConfigureAwait(false);
+                    await PublishRealtimeInvalidationAfterCommitAsync(result, param).ConfigureAwait(false);
+                    await PublishApiEngineRealtimeAfterCommitAsync(result, param).ConfigureAwait(false);
+                    await sink.CompleteAsync(
+                            IsCommittedApiEngineResult(result),
+                            result,
+                            writer.WrittenChunks,
+                            HttpContext.TraceIdentifier)
+                        .ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                // Client disconnect is expected; V8 observes RequestAborted and stops.
+            }
+            catch (Exception ex)
+            {
+                MicroiEngine.QueueSystemLog(
+                    osClient,
+                    "ApiEngineStream",
+                    "ExecutionFailed",
+                    "接口引擎流式执行失败",
+                    ex.ToString(),
+                    3,
+                    false,
+                    HttpContext.TraceIdentifier);
+                if (!HttpContext.RequestAborted.IsCancellationRequested)
+                {
+                    await sink.FailAsync(
+                            "接口引擎流式执行失败，请使用 TraceId 查询系统日志。",
+                            HttpContext.TraceIdentifier,
+                            writer?.WrittenChunks ?? 0)
+                        .ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                linkedCancellation.Cancel();
+                try
+                {
+                    await heartbeatTask.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            }
+
+            return new EmptyResult();
         }
     }
 }

@@ -1155,7 +1155,7 @@ export default {
                         DataSourceKey: field.Config.DataSourceId
                     };
                 } else if (field.Config.DataSource == "ApiEngine") {
-                    apiGetDiyFieldSqlData = self.DiyApi.ApiEngineRun;
+                    apiGetDiyFieldSqlData = self.DiyApi.GetApiEngineUrl(field.Config.DataSourceApiEngineKey);
                     postData = {
                         ...postData,
                         ApiEngineKey: field.Config.DataSourceApiEngineKey

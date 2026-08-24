@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-upgrade-resource
- * Version: v1.2.2
+ * Version: v1.2.4
  * Function:
- * - 匿名读取固定白名单中的 8 个吾码升级资源；超级管理员可通过 SHA 乐观锁原子发布升级资源。
+ * - 匿名读取固定白名单中的吾码升级资源；超级管理员可通过 SHA 乐观锁原子发布升级资源，新版应用包写入 HDFS 并仅持久化可校验指针。
  */
 
 var PARAM = V8.Param || {};
@@ -72,13 +72,31 @@ function readRawResource(name) {
   }
   var storeResult = V8.FormEngine.GetFormData("sys_microistore", {
     _Where: [["AppId", "=", appId]],
-    _SelectFields: ["Id", "AppId", "AppName", "AppVersion", "AppType", "AppDetail", "AppPakcet", "UpdateTime"]
+    _SelectFields: ["Id", "AppId", "AppName", "AppVersion", "AppType", "AppDetail", "IsPublic", "AppPakcet",
+      "PackageId", "PackageStorageMode", "PackageHdfsPath", "PackageSha256", "PackageSize",
+      "PackageContentType", "PackageFormatVersion", "PackageUploadedAt", "UpdateTime"]
   });
   if (!storeResult || storeResult.Code !== 1 || !storeResult.Data) {
     return result(0, null, "读取应用商城数据失败：" + (storeResult && storeResult.Msg ? storeResult.Msg : ""));
   }
   var row = storeResult.Data;
   var packet = text(row.AppPakcet);
+  if (!packet && row.PackageHdfsPath && row.PackageSha256 && Number(row.PackageSize || 0) > 0) {
+    var stored = V8.Method.GetPrivateFileText({
+      OsClient: V8.OsClient,
+      FilePathName: row.PackageHdfsPath,
+      Limit: text(row.PackageStorageMode).toLowerCase() === "hdfsprivate",
+      MaxBytes: Math.min(Math.max(Number(row.PackageSize) + 1024, 1024 * 1024), 256 * 1024 * 1024)
+    });
+    if (!stored || stored.Code !== 1) {
+      return result(0, null, "应用商城资源[" + text(row.AppName || row.AppId) + "]的 HDFS 包回读失败");
+    }
+    packet = text(stored.Data);
+    var storedBytes = Number(System.Text.Encoding.UTF8.GetByteCount(packet));
+    if (storedBytes !== Number(row.PackageSize) || sha256(packet) !== text(row.PackageSha256).toLowerCase()) {
+      return result(0, null, "应用商城资源[" + text(row.AppName || row.AppId) + "]的 HDFS 包大小或哈希不一致");
+    }
+  }
   if (!packet) {
     return result(0, null, "应用商城资源[" + text(row.AppName || row.AppId) + "]的数据包为空");
   }
@@ -86,7 +104,7 @@ function readRawResource(name) {
     ResourceName: name,
     Content: packet,
     Sha256: sha256(packet),
-    Source: "sys_microistore.AppPakcet",
+    Source: row.PackageHdfsPath ? "sys_microistore.PackageHdfsPath" : "sys_microistore.AppPakcet",
     StoreId: row.Id,
     AppId: row.AppId || "",
     AppName: row.AppName || "",
@@ -158,10 +176,29 @@ function applyPublishResource(item, current) {
       Version: validated.Version
     });
   } else {
+    var storageResult = V8.ApiEngine.Run("microi-store-package-storage", {
+      Action: "Store",
+      StoreId: current.Data.RowId,
+      AppVersion: validated.Version,
+      Package: content
+    });
+    if (!storageResult || storageResult.Code !== 1 || !storageResult.Data) {
+      throw new Error("发布升级资源[" + name + "]的 HDFS 包失败："
+        + (storageResult && storageResult.Msg ? storageResult.Msg : "接口无返回"));
+    }
+    var pointer = storageResult.Data;
     saveResult = V8.FormEngine.UptFormData("sys_microistore", {
       Id: current.Data.RowId,
-      AppPakcet: content,
+      AppPakcet: "",
       AppVersion: validated.Version,
+      PackageId: pointer.PackageId,
+      PackageStorageMode: pointer.PackageStorageMode,
+      PackageHdfsPath: pointer.PackageHdfsPath,
+      PackageSha256: pointer.PackageSha256,
+      PackageSize: pointer.PackageSize,
+      PackageContentType: pointer.PackageContentType,
+      PackageFormatVersion: pointer.PackageFormatVersion,
+      PackageUploadedAt: pointer.PackageUploadedAt,
       AppUpdateTime: DateNow("yyyy-MM-dd HH:mm:ss")
     });
   }

@@ -19,8 +19,7 @@ export function getProductCategories() {
 }
 
 export function getProductTypes() {
-  return post('/api/ApiEngine/Run', {
-    ApiEngineKey: 'getGoodsType',
+  return post('/apiengine/getGoodsType', {
     OsClient: appConfig.osClient
   }, false);
 }
@@ -110,8 +109,7 @@ export function getProductDetail(id) {
 }
 
 export function getProductDynamicInfo(id) {
-  return post('/api/ApiEngine/Run', {
-    ApiEngineKey: 'goods_detail',
+  return post('/apiengine/goods_detail', {
     ShangpinID: id,
     OsClient: appConfig.osClient
   }, false);
@@ -145,16 +143,14 @@ export function getBannerList() {
 
 // Favorite and appointment APIs
 export function checkFavorite(id) {
-  return post('/api/ApiEngine/Run', {
-    ApiEngineKey: 'shangpin_issc',
+  return post('/apiengine/shangpin_issc', {
     ShangpinID: id,
     OsClient: appConfig.osClient
   }, true);
 }
 
 export function toggleFavorite(id, type) {
-  return post('/api/ApiEngine/Run', {
-    ApiEngineKey: 'shangpin_sc',
+  return post('/apiengine/shangpin_sc', {
     ShangpinID: id,
     Type: type,
     OsClient: appConfig.osClient
@@ -162,8 +158,7 @@ export function toggleFavorite(id, type) {
 }
 
 export function reserveProduct(params) {
-  return post('/api/ApiEngine/Run', {
-    ApiEngineKey: 'yuyue_shangpin',
+  return post('/apiengine/yuyue_shangpin', {
     ...params,
     OsClient: appConfig.osClient
   }, true);
