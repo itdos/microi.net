@@ -2,6 +2,11 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
+新建业务表的字段落地后必须配置默认表单 Banner：完整 Manifest 使用
+`tables[].formBanner`，逐步建模调用 `microi_configure_form_banner`。标题、图片、标签和
+统计都应来自真实字段或真实接口引擎；配置写 `diy_table`，禁止写入 `sys_menu`。即使用户
+没有逐项指定，也必须写入类型感知的合理默认值，不能交付空 Banner。
+
 <!-- microi-progressive:chunk id=microi-system-delivery-005 sha256=e27ee98421974395b858927ab7b7fbebe27f314e54a8f616064b9c77c01ba808 -->
 ## 标准工作流
 

@@ -248,10 +248,12 @@ export default {
     async authorizedCustomerModule(selectFields = CUSTOMER_MAP_SELECT_FIELDS, preferredMenuId = '') {
       const customerModule = getBusinessModule('customers')
       const table = customerModule.table || 'Diy_Kehu'
-      const menu = await findMenu(customerModule.menuAliases || [], table, false, preferredMenuId)
+      // preferredMenuId 为空时，自动查找当前用户有权限的客户菜单
+      const menu = await findMenu(customerModule.menuAliases || [], table, false, preferredMenuId || '')
       const menuId = String(menu && menu.Id || '').trim()
-      if (!menuId || (preferredMenuId && menuId !== String(preferredMenuId))) {
-        throw new Error('当前账号无权查看客户坐标')
+      // 找不到菜单 → 返回 null，由调用方决定如何处理（有权限的用户才能查到菜单）
+      if (!menuId) {
+        return null
       }
       return {
         ...customerModule,
@@ -473,8 +475,6 @@ export default {
         this.latitude = Number(position.latitude)
         this.longitude = Number(position.longitude)
         const filters = this.customerFilters || {}
-        const menuId = String(filters.menuId || '').trim()
-        if (!menuId) throw new Error('当前账号无权查看客户地图')
         const radius = Number(this.radius)
         const bounds = buildMapRangeBounds(this.latitude, this.longitude, radius)
         const rangeWhere = [
@@ -483,7 +483,11 @@ export default {
           { Name: 'KehuDT_Lng', Type: '>=', Value: bounds.minLongitude },
           { Name: 'KehuDT_Lng', Type: '<=', Value: bounds.maxLongitude }
         ]
-        const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS, menuId)
+        const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS)
+        if (!config) {
+          uni.showToast({ title: '当前账号无权查看客户地图', icon: 'none' })
+          return
+        }
         const pageSize = 500
         const customers = []
         let pageIndex = 1
@@ -530,7 +534,7 @@ export default {
       if (this.customerId && this.mode === 'device') { this.loadCustomerDevices(); return }
       this.loadNearby()
     },
-    loadNearby() {
+    async loadNearby() {
       if (this.taskId && this.mode === 'device') { this.loadTaskDevices(); return }
       if (this.customerId && this.mode === 'device') { this.loadCustomerDevices(); return }
       this.loading = true
@@ -539,10 +543,45 @@ export default {
         success: async (position) => {
           this.latitude = Number(position.latitude); this.longitude = Number(position.longitude)
           try {
-            const engine = this.mode === 'device' ? 'get_location_shebei-v2' : 'get_location_kehu-v2'
-            const result = await callApiEngine(engine, { Km: Number(this.radius), Latitude: this.latitude, Longitude: this.longitude })
-            if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || `${this.entityLabel}加载失败`)
-            this.applyRows(result.Data || [])
+            if (this.mode === 'customer') {
+              // 客户地图：必须走菜单鉴权，后端根据 _SysMenuId 自动过滤数据范围
+              const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS)
+              if (!config) {
+                uni.showToast({ title: '当前账号无权查看客户地图', icon: 'none' })
+                return
+              }
+              const radius = Number(this.radius)
+              const bounds = buildMapRangeBounds(this.latitude, this.longitude, radius)
+              const rangeWhere = [
+                { Name: 'KehuDT_Lat', Type: '>=', Value: bounds.minLatitude },
+                { Name: 'KehuDT_Lat', Type: '<=', Value: bounds.maxLatitude },
+                { Name: 'KehuDT_Lng', Type: '>=', Value: bounds.minLongitude },
+                { Name: 'KehuDT_Lng', Type: '<=', Value: bounds.maxLongitude }
+              ]
+              const customers = []
+              let pageIndex = 1, count = 0
+              do {
+                const result = await loadModuleRows(config, {
+                  pageIndex, pageSize: 500, extraWhere: rangeWhere, refresh: true
+                })
+                if (!result.rows.length) break
+                customers.push(...result.rows)
+                count = result.count
+                pageIndex++
+              } while (customers.length < count)
+              this.applyRows(customers.filter(c => {
+                const lat = Number(c.KehuDT_Lat), lng = Number(c.KehuDT_Lng)
+                return Number.isFinite(lat) && lat !== 0 &&
+                  Number.isFinite(lng) && lng !== 0 &&
+                  mapDistanceKm(this.latitude, this.longitude, lat, lng) <= radius
+              }))
+            } else {
+              // 设备地图：仍走原有接口引擎
+              const engine = 'get_location_shebei-v2'
+              const result = await callApiEngine(engine, { Km: Number(this.radius), Latitude: this.latitude, Longitude: this.longitude })
+              if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || `${this.entityLabel}加载失败`)
+              this.applyRows(result.Data || [])
+            }
           } catch (error) { uni.showToast({ title: error.message || `${this.entityLabel}加载失败`, icon: 'none' }) }
         },
         fail: () => uni.showToast({ title: '请授权定位后重试', icon: 'none' }),
