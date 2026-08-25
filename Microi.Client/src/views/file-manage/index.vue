@@ -73,6 +73,7 @@
       v-model="syncDialogVisible"
       :current-folder-id="currentFolderId"
       :current-limit="isPrivateBucket"
+      :sys-menu-id="fileManagerSysMenuId"
       @finished="refreshCurrentFolder"
     />
 
@@ -231,6 +232,7 @@
 
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import FolderTree from './components/FolderTree.vue'
@@ -240,6 +242,10 @@ import CadViewer from './components/CadViewer.vue'
 import FileSyncDialog from './components/FileSyncDialog.vue'
 import { fileManageApi } from './api'
 import { DiyCommon } from '@/utils/microi.net.import'
+
+const route = useRoute()
+// 只接受路由匹配后由权限菜单写入的 meta，绝不信任 query/params 中可手工修改的菜单 Id。
+const fileManagerSysMenuId = computed(() => String(route.meta?.Id || route.meta?.SysMenuId || ''))
 
 // 侧边栏宽度
 const sidebarWidth = ref(280)
@@ -382,7 +388,7 @@ watch(previewVisible, async (visible) => {
     // 获取临时访问URL（私有桶和公有桶均通过后端获取）
     if (file.filePath && (isImageType(fileType) || isVideoType(fileType) || isAudioType(fileType) || fileType === 'pdf')) {
       try {
-        const result = await fileManageApi.getPrivateFileUrl(file.filePath, isPrivateBucket.value)
+        const result = await fileManageApi.getPrivateFileUrl(file.filePath, isPrivateBucket.value, fileManagerSysMenuId.value)
         if (result.Code === 1 && result.Data) {
           previewFileUrl.value = result.Data
         }
@@ -391,7 +397,7 @@ watch(previewVisible, async (visible) => {
       }
     } else if (file.filePath && isTextType(fileType)) {
       try {
-        const result = await fileManageApi.getPrivateFileUrl(file.filePath, isPrivateBucket.value)
+        const result = await fileManageApi.getPrivateFileUrl(file.filePath, isPrivateBucket.value, fileManagerSysMenuId.value)
         if (result.Code === 1 && result.Data) {
           const resp = await fetch(result.Data)
           previewTextContent.value = await resp.text()
@@ -611,7 +617,7 @@ const ensureThumbnails = (items = []) => {
       if (!path || thumbnailUrls.value[file.id] || thumbnailUrls.value[path] || thumbnailLoading.has(path)) return
 
       thumbnailLoading.add(path)
-      fileManageApi.getPrivateFileUrl(path, isPrivateBucket.value)
+      fileManageApi.getPrivateFileUrl(path, isPrivateBucket.value, fileManagerSysMenuId.value)
         .then(result => {
           if (result.Code === 1 && result.Data) {
             thumbnailUrls.value = {
@@ -1176,7 +1182,7 @@ const handleBatchRestore = (ids) => {
 const handleDownload = async (file) => {
   if (file.filePath) {
     try {
-      const result = await fileManageApi.getPrivateFileUrl(file.filePath, isPrivateBucket.value)
+      const result = await fileManageApi.getPrivateFileUrl(file.filePath, isPrivateBucket.value, fileManagerSysMenuId.value)
       if (result.Code === 1 && result.Data) {
         const link = document.createElement('a')
         link.href = result.Data

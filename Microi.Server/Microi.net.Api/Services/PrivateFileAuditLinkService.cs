@@ -16,6 +16,8 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
         if (result?.Code != 1 || result.Data == null || param == null || param.OsClient.DosIsNullOrWhiteSpace()) return result;
         try
         {
+            var osClient = TenantConfigurationSecurity.NormalizeTenantId(param.OsClient);
+            param.OsClient = osClient;
             var urls = result.Data is IEnumerable<string> many && result.Data is not string
                 ? many.ToList()
                 : new List<string> { result.Data.ToString() };
@@ -32,7 +34,7 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
                 var path = i < paths.Count ? paths[i] : paths.FirstOrDefault();
                 var ticket = new PrivateFileAuditTicket
                 {
-                    OsClient = param.OsClient,
+                    OsClient = osClient,
                     UpstreamUrl = upstream,
                     FilePath = path,
                     FileName = Path.GetFileName(path ?? upstreamUri.AbsolutePath),
@@ -41,13 +43,13 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
                     IssuerUserId = param._CurrentUser?["Id"]?.ToString(),
                     IssuerUserName = UserBehaviorAudit.FormatUser(param._CurrentUser)
                 };
-                var key = PrivateFileAuditTicket.CacheKey(param.OsClient, ticketId);
-                await MicroiEngine.CacheTenant.Cache(param.OsClient).SetAsync(key, ticket, TicketLifetime).ConfigureAwait(false);
-                wrapped.Add(await BuildProxyUrlAsync(param.OsClient, ticketId).ConfigureAwait(false));
+                var key = PrivateFileAuditTicket.CacheKey(osClient, ticketId);
+                await MicroiEngine.CacheTenant.Cache(osClient).SetAsync(key, ticket, TicketLifetime).ConfigureAwait(false);
+                wrapped.Add(await BuildProxyUrlAsync(osClient, ticketId).ConfigureAwait(false));
                 UserBehaviorAudit.Track(param, "File", "PrivateFileUrlIssued", "私有附件", "PrivateFile", path,
                     $"获取了私有附件[{ticket.FileName}]的临时访问地址", new { FilePath = path, TicketExpiresAt = ticket.ExpiresAt },
                     true, null, "ServerFileGateway", eventId:
-                    UserBehaviorAudit.DeterministicEventId($"private-file-issued|{param.OsClient}|{ticketId}"));
+                    UserBehaviorAudit.DeterministicEventId($"private-file-issued|{osClient}|{ticketId}"));
             }
             if (wrapped.Count != urls.Count)
                 return new DosResult(0, null, "私有文件审计代理未能生成完整访问地址，请稍后重试。");
@@ -91,8 +93,8 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
         {
             apiBase = $"{request.Scheme}://{request.Host}{request.PathBase}";
         }
-        if (apiBase.DosIsNullOrWhiteSpace()) return $"/api/HDFS/OpenPrivateFile?o={Uri.EscapeDataString(osClient)}&t={ticketId}";
-        return apiBase.TrimEnd('/') + $"/api/HDFS/OpenPrivateFile?o={Uri.EscapeDataString(osClient)}&t={ticketId}";
+        if (apiBase.DosIsNullOrWhiteSpace()) return $"/api/HDFS/OpenPrivateFile?OsClient={Uri.EscapeDataString(osClient)}&t={ticketId}";
+        return apiBase.TrimEnd('/') + $"/api/HDFS/OpenPrivateFile?OsClient={Uri.EscapeDataString(osClient)}&t={ticketId}";
     }
 
     private static bool IsHttpBaseUrl(string value)

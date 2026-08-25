@@ -48,7 +48,7 @@
 | `GET /api/Captcha/getCaptcha` | 获取验证码图片；同时保存响应 `captchaid` |
 | `POST /api/Captcha/Recognize` | 受控验证码识别，主要供采集引擎 |
 | `POST /api/HDFS/Upload` | 受限文件上传；优先用平台 SDK/V8 Upload |
-| `POST /api/HDFS/GetPrivateFileUrl` | 获取当前租户短期私有文件地址 |
+| `POST /apiengine/platform-private-file-url` | 获取当前租户短期私有文件地址；必须携带权威资源上下文 |
 | `GET /api/HDFS/OpenPrivateFile` | 受权打开私有文件/Office 代理 |
 | `POST /api/DiyChat/SendSystemMessage` | 发送站内消息；前端优先 `V8.SendSystemMessage` |
 | `POST /apiengine/platform-mq` | MQ 管理入口；Body 使用 `Action=Send`，仅当前租户超级管理员 |

@@ -16,7 +16,7 @@ test("AI 视频工作区按画质优先规格创建 VideoClip，并要求合成�
     assert.doesNotMatch(source, /preset: "duration"/);
 });
 
-test("V8.AI.Chat 固定走平台接口并清除伪造身份与密钥", async () => {
+test("V8.AI.Chat 固定走 Managed AI 运行时并清除伪造身份与密钥", async () => {
     let captured;
     const ai = createV8AI({
         http: {
@@ -41,11 +41,12 @@ test("V8.AI.Chat 固定走平台接口并清除伪造身份与密钥", async () 
     });
 
     assert.equal(result.Code, 1);
-    assert.equal(captured.Url, "/api/Ai/Chat");
+    assert.equal(captured.Url, "/apiengine/platform-ai-runtime");
     assert.equal(captured.ParamType, "json");
     assert.deepEqual(captured.PostParam, {
         UserChatMsg: "你好",
-        AiModel: "model-a"
+        AiModel: "model-a",
+        Action: "Chat"
     });
 });
 
@@ -63,8 +64,47 @@ test("V8.AI.ChatGet 支持 GET 且仍由宿主注入鉴权", async () => {
     const result = await ai.ChatGet({ UserChatMsg: "你好", AiModel: "model-a" });
 
     assert.equal(result.Code, 1);
-    assert.equal(captured.Url, "/api/Ai/Chat");
+    assert.equal(captured.Url, "/apiengine/platform-ai-runtime");
     assert.equal(captured.GetParam.UserChatMsg, "你好");
+    assert.equal(captured.GetParam.Action, "Chat");
+});
+
+test("V8.AI 非流式兼容动作使用同一 Managed 路由与固定 Action", async () => {
+    const calls = [];
+    const ai = createV8AI({
+        http: {
+            Post: async (param) => {
+                calls.push(param);
+                return JSON.stringify({ Code: 1, Data: {}, Msg: "" });
+            }
+        }
+    });
+
+    await ai.RecognizeIntent({ UserChatMsg: "识别" });
+    await ai.NL2SQL({ Question: "今天订单数" });
+    await ai.NL2V8({ Question: "生成接口" });
+
+    assert.deepEqual(calls.map((item) => item.Url), [
+        "/apiengine/platform-ai-runtime",
+        "/apiengine/platform-ai-runtime",
+        "/apiengine/platform-ai-runtime"
+    ]);
+    assert.deepEqual(calls.map((item) => item.PostParam.Action), [
+        "RecognizeIntent",
+        "NL2SQL",
+        "NL2V8EngineSync"
+    ]);
+});
+
+test("AI 工作台非流式调用直达 Managed 运行时，流式路径保持原生", () => {
+    const source = fs.readFileSync(new URL("../src/views/ai-engine/index.vue", import.meta.url), "utf8");
+    assert.match(source, /\/apiengine\/platform-ai-runtime/);
+    for (const action of ["UpdateConversationTitle", "RecognizeIntent", "NL2SQL"]) {
+        assert.match(source, new RegExp(`Action: "${action}"`));
+    }
+    assert.doesNotMatch(source, /\/api\/Ai\/(?:UpdateConversationTitle|RecognizeIntent|NL2SQL)/);
+    assert.match(source, /\/api\/Ai\/ChatStream/);
+    assert.match(source, /\/api\/Ai\/NL2V8Engine/);
 });
 
 test("V8.AI MiniMax 视频方法固定走平台接口并清除伪造密钥", async () => {

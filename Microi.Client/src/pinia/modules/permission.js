@@ -11,6 +11,11 @@ import {
     hasConfiguredPageTabs
 } from "@/utils/page-tab-route-runtime.js";
 import { resolveMenuRenderSource } from "@/utils/framework-presentation.js";
+import {
+    PLATFORM_SYS_MENU_BOOTSTRAP_RETRY_DELAYS_MS,
+    createPlatformSysMenuBootstrapError,
+    isPlatformSysMenuBootstrapPending
+} from "@/utils/platform-runtime-readiness.js";
 // Vue Router 4 支持直接使用 () => import() 形式，不需要 defineAsyncComponent
 
 /**
@@ -660,17 +665,31 @@ export const usePermissionStore = defineStore("permission", {
                 var r190317 = window.location.search.substr(1).match(reg190317);
                 var childSystemId = r190317 != null ? r190317[2] : null;
 
-                DiyCommon.Post(
-                    DiyApi.GetSysMenuStep(),
-                    {
+                const menuRequestParam = {
                         _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "ModuleEngineKey", "MicroServiceId", "MicroServiceKey", "MsKey", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
                         OsClient: osClient,
                         TableName: "Sys_Menu",
                         _OrderBy: "Sort",
                         _OrderByType: "ASC",
                         _ChildSystemId: childSystemId
-                    },
+                };
+
+                const requestSysMenu = (attempt = 0) => DiyCommon.Post(
+                    DiyApi.GetSysMenuStep(),
+                    menuRequestParam,
                     (result) => {
+                        if (isPlatformSysMenuBootstrapPending(result)) {
+                            const retryDelay = PLATFORM_SYS_MENU_BOOTSTRAP_RETRY_DELAYS_MS[attempt];
+                            if (retryDelay !== undefined) {
+                                console.warn(
+                                    `平台菜单启动依赖尚未就绪，${retryDelay}ms 后执行第 ${attempt + 2} 次读取。`
+                                );
+                                window.setTimeout(() => requestSysMenu(attempt + 1), retryDelay);
+                                return;
+                            }
+                            reject(createPlatformSysMenuBootstrapError(result));
+                            return;
+                        }
                         if (DiyCommon.Result(result)) {
                             var menuArr = [];
                             MenuBuild(menuArr, result.Data, true);
@@ -709,11 +728,24 @@ export const usePermissionStore = defineStore("permission", {
                         }
                     },
                     (error) => {
+                        if (isPlatformSysMenuBootstrapPending(error)) {
+                            const retryDelay = PLATFORM_SYS_MENU_BOOTSTRAP_RETRY_DELAYS_MS[attempt];
+                            if (retryDelay !== undefined) {
+                                console.warn(
+                                    `平台菜单启动请求尚未就绪，${retryDelay}ms 后执行第 ${attempt + 2} 次读取。`
+                                );
+                                window.setTimeout(() => requestSysMenu(attempt + 1), retryDelay);
+                                return;
+                            }
+                            reject(createPlatformSysMenuBootstrapError(error));
+                            return;
+                        }
                         // 请求异常时，拒绝 Promise
                         console.error("获取菜单异常:", error);
                         reject(error);
                     }
                 );
+                requestSysMenu();
             });
         }
     }

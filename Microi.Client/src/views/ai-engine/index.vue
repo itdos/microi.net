@@ -1544,7 +1544,8 @@ async function editConversationTitle(item) {
         if (item.source === SECURE_DATA_SOURCE) {
             await renameMobileAiConversation(DiyCommon, item.id, title);
         } else {
-            const result = await DiyCommon.PostAsync("/api/Ai/UpdateConversationTitle", {
+            const result = await DiyCommon.PostAsync("/apiengine/platform-ai-runtime", {
+                Action: "UpdateConversationTitle",
                 ConversationId: item.id,
                 Title: title,
                 Source: SOURCE
@@ -2227,7 +2228,8 @@ async function resolveSemanticMode(text, attachments = []) {
         return manualMode;
     }
     try {
-        const result = await DiyCommon.PostAsync("/api/Ai/RecognizeIntent", {
+        const result = await DiyCommon.PostAsync("/apiengine/platform-ai-runtime", {
+            Action: "RecognizeIntent",
             UserChatMsg: text || "请分析我上传的附件。",
             AiModel: selectedRuntimeModelId.value,
             AiModelId: selectedAiModel.value?.Id || "",
@@ -2696,7 +2698,8 @@ async function sendSecureDataQuestion(text, assistantMessage) {
 }
 
 async function sendDataQuestion(text, assistantMessage) {
-    const result = await DiyCommon.PostAsync("/api/Ai/NL2SQL", {
+    const result = await DiyCommon.PostAsync("/apiengine/platform-ai-runtime", {
+        Action: "NL2SQL",
         Question: text,
         AiModel: selectedRuntimeModelId.value,
         AiModelId: selectedAiModel.value.Id || "",

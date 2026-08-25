@@ -60,7 +60,7 @@
                   />
                 </div>
                 <div v-if="form.source.isLoggedIn" class="login-identity">
-                  <el-avatar :size="36" :src="form.source.remoteUser.Avatar || ''" :icon="UserFilled" />
+                  <el-avatar :size="36" :src="form.source.remoteUserAvatarUrl || ''" :icon="UserFilled" />
                   <div class="identity-copy">
                     <strong>{{ remoteUserLabel(form.source) }}</strong>
                     <span>{{ form.source.apiBase }} · {{ form.source.osClient }}</span>
@@ -197,7 +197,7 @@
                   />
                 </div>
                 <div v-if="form.target.isLoggedIn" class="login-identity">
-                  <el-avatar :size="36" :src="form.target.remoteUser.Avatar || ''" :icon="UserFilled" />
+                  <el-avatar :size="36" :src="form.target.remoteUserAvatarUrl || ''" :icon="UserFilled" />
                   <div class="identity-copy">
                     <strong>{{ remoteUserLabel(form.target) }}</strong>
                     <span>{{ form.target.apiBase }} · {{ form.target.osClient }}</span>
@@ -518,6 +518,10 @@ const props = defineProps({
   currentLimit: {
     type: Boolean,
     default: true
+  },
+  sysMenuId: {
+    type: String,
+    default: ''
   }
 })
 
@@ -566,6 +570,7 @@ const form = reactive({
     isLoggedIn: false,
     loggingIn: false,
     remoteUser: {},
+    remoteUserAvatarUrl: '',
     capability: {},
     capabilityError: '',
     suspendEndpointReset: false,
@@ -600,6 +605,7 @@ const form = reactive({
     isLoggedIn: false,
     loggingIn: false,
     remoteUser: {},
+    remoteUserAvatarUrl: '',
     capability: {},
     capabilityError: '',
     suspendEndpointReset: false,
@@ -674,6 +680,7 @@ const resetRemoteLoginState = (platformConfig) => {
   platformConfig.connectionId = ''
   platformConfig.isLoggedIn = false
   platformConfig.remoteUser = {}
+  platformConfig.remoteUserAvatarUrl = ''
   platformConfig.capability = {}
   platformConfig.capabilityError = ''
   platformConfig.loginConfigLoaded = false
@@ -868,6 +875,29 @@ const toRemotePlatform = (platformConfig) => ({
   authorization: platformConfig.authorization
 })
 
+const resolveRemoteUserAvatar = async (platformConfig) => {
+  platformConfig.remoteUserAvatarUrl = ''
+  const rawAvatar = String(platformConfig.remoteUser?.Avatar || '').trim()
+  const userId = String(platformConfig.remoteUser?.Id || '').trim()
+  if (!rawAvatar || !userId || !platformConfig.isLoggedIn || !platformConfig.authorization) return
+  try {
+    const result = await fileSyncApi.runApiEngine('platform-private-file-url', {
+      FilePathName: rawAvatar,
+      FormEngineKey: 'sys_user',
+      FormDataId: userId,
+      FieldId: 'Avatar',
+      ResourceKind: 'UserAvatar',
+      ResourceId: userId
+    }, toRemotePlatform(platformConfig))
+    const data = result?.Data
+    const signedUrl = typeof data === 'string' ? data : (data?.Url || '')
+    // 远端头像没有通过目标租户 Token 签发时保持失败关闭，绝不拼接远端 FileServer。
+    if (/^https?:\/\//i.test(String(signedUrl || ''))) {
+      platformConfig.remoteUserAvatarUrl = String(signedUrl)
+    }
+  } catch (error) {}
+}
+
 const targetUpgradeMessage = () => '目标平台未安装文件同步接口或文件柜版本过低，请让目标平台更新【文件柜】应用后重试（缺少接口：mci_file_sync_capability）。'
 
 const loadRemoteConnections = async (showError = true) => {
@@ -954,6 +984,7 @@ const loginRemotePlatform = async (platformConfig, role, force = false) => {
     }
     platformConfig.remoteUser = login.result?.Data || { Account: platformConfig.account }
     platformConfig.isLoggedIn = true
+    await resolveRemoteUserAvatar(platformConfig)
 
     try {
       await validateRemoteCapability(platformConfig, role)
@@ -978,6 +1009,7 @@ const loginRemotePlatform = async (platformConfig, role, force = false) => {
     platformConfig.authorization = ''
     platformConfig.isLoggedIn = false
     platformConfig.remoteUser = {}
+    platformConfig.remoteUserAvatarUrl = ''
     ElMessage.error(error.message || '远程平台登录失败')
     return false
   } finally {
@@ -994,6 +1026,7 @@ const invalidateRemoteLogin = async (platformConfig, message) => {
   platformConfig.authorization = ''
   platformConfig.isLoggedIn = false
   platformConfig.remoteUser = {}
+  platformConfig.remoteUserAvatarUrl = ''
   platformConfig.capability = {}
   await loadRemoteConnections(false)
 }
@@ -1009,6 +1042,7 @@ const logoutRemotePlatform = async (platformConfig) => {
     platformConfig.connectionId = ''
     platformConfig.isLoggedIn = false
     platformConfig.remoteUser = {}
+    platformConfig.remoteUserAvatarUrl = ''
     platformConfig.capability = {}
     platformConfig.capabilityError = ''
     platformConfig.loginConfigLoaded = false
@@ -1047,6 +1081,7 @@ const handleSavedConnectionChange = async (platformConfig, connectionId, role) =
         Name: connection.RemoteUserName || '',
         Avatar: connection.RemoteUserAvatar || ''
       },
+      remoteUserAvatarUrl: '',
       capability: {},
       capabilityError: '',
       loginConfigLoaded: false,
@@ -1074,6 +1109,7 @@ const handleSavedConnectionChange = async (platformConfig, connectionId, role) =
     }
 
     if (platformConfig.isLoggedIn) {
+      await resolveRemoteUserAvatar(platformConfig)
       ElMessage.success(`已恢复登录：${remoteUserLabel(platformConfig)}`)
       return
     }
@@ -1220,7 +1256,8 @@ const preparePlatform = async (platformConfig, role = 'source') => {
       platformType: 'current',
       apiBase: currentPlatform.apiBase,
       osClient: currentPlatform.osClient,
-      authorization: ''
+      authorization: '',
+      sysMenuId: props.sysMenuId
     }
   }
 
@@ -1247,7 +1284,7 @@ const preparePlatform = async (platformConfig, role = 'source') => {
   if (!platformConfig.isLoggedIn || !platformConfig.authorization) {
     throw new Error('请先登录远程平台')
   }
-  if (role === 'target' && !platformConfig.capability?.ProtocolVersion) {
+  if (!platformConfig.capability?.ProtocolVersion || !platformConfig.capability?.FileManagerSysMenuId) {
     try {
       await validateRemoteCapability(platformConfig, role)
     } catch (error) {
@@ -1255,12 +1292,17 @@ const preparePlatform = async (platformConfig, role = 'source') => {
       throw error
     }
   }
+  const remoteFileManagerSysMenuId = String(platformConfig.capability?.FileManagerSysMenuId || '')
+  if (!remoteFileManagerSysMenuId) {
+    throw new Error('远程平台文件柜能力未返回受信任菜单标识，请更新【文件柜】应用后重试')
+  }
 
   return {
     platformType: 'remote',
     apiBase: platformConfig.apiBase,
     osClient: platformConfig.osClient,
-    authorization: platformConfig.authorization
+    authorization: platformConfig.authorization,
+    sysMenuId: remoteFileManagerSysMenuId
   }
 }
 
@@ -1707,7 +1749,12 @@ const syncFile = async (row, sourcePlatform, targetPlatform, targetFolder) => {
     return
   }
 
-  const urlResult = await fileSyncApi.getPrivateFileUrl(sourcePlatform, row.filePath, form.source.limit)
+  const urlResult = await fileSyncApi.getPrivateFileUrl(
+    sourcePlatform,
+    row.filePath,
+    form.source.limit,
+    sourcePlatform.sysMenuId
+  )
   if (urlResult.Code !== 1 || !urlResult.Data) {
     throw new Error(urlResult.Msg || '获取源文件下载地址失败')
   }

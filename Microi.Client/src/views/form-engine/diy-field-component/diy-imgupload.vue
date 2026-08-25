@@ -1039,7 +1039,7 @@ const setRealPath = (imgId, imgPath, isLimit, uploadedPreviewUrl = '') => {
         console.log('【私有图片】设置loading状态');
 
         DiyCommon.Post(
-            '/api/HDFS/GetPrivateFileUrl',
+            '/apiengine/platform-private-file-url',
             {
                 FilePathName: imgPath,
                 HDFS: SysConfig.value.HDFS || 'Aliyun',
@@ -1245,7 +1245,7 @@ const GetUploadPath = (img) => {
             props.FormDiyTableModel[props.field.Name + '_' + imgId + '_RealPath'] = './static/img/loading.gif';
             if (imgPathName != './static/img/loading.gif' && imgPathName != '正在上传中...') {
                 DiyCommon.Post(
-                    '/api/HDFS/GetPrivateFileUrl',
+                    '/apiengine/platform-private-file-url',
                     {
                         FilePathName: imgPathName,
                         HDFS: SysConfig.value.HDFS || 'Aliyun',

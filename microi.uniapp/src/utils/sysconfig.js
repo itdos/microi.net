@@ -77,7 +77,7 @@ export async function getSysConfig(options = {}) {
   // 请求接口
   sysConfigRequest = (async () => {
     try {
-      const result = await post('/api/DiyTable/GetSysConfig', {
+      const result = await post('/apiengine/platform-sys-config', {
         _SearchEqual: { IsEnable: 1 },
         OsClient: appConfig.osClient
       }, false)

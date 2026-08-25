@@ -27,6 +27,7 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     public sealed class MarketplaceSourceController : Controller
     {
+        private const string MarketplaceSourceApiEngineKey = "platform-marketplace-source";
         private const string CredentialPrefix = "Marketplace.SourceToken.";
         private const int MaxRemoteResponseBytes = 12 * 1024 * 1024;
         private static readonly Regex SourceIdRegex = new Regex(
@@ -87,7 +88,7 @@ namespace Microi.net.Api
                 var credential = LoadCredential(tokenResult.Data.OsClient, sourceId, apiBase, remoteOsClient);
                 var configResult = await SendJsonAsync(
                     apiBase,
-                    "/api/FormEngine/GetSysConfig",
+                    $"/apiengine/platform-sys-config?OsClient={Uri.EscapeDataString(remoteOsClient)}",
                     remoteOsClient,
                     new JObject { ["OsClient"] = remoteOsClient },
                     null).ConfigureAwait(false);
@@ -171,11 +172,17 @@ namespace Microi.net.Api
                 && !sourceUri.IsLoopback)
                 return Json(new DosResult(0, null, "私有商城源登录必须使用 HTTPS；仅本机调试地址允许 HTTP。"));
 
+            var authorizeResult = await AuthorizeOperationAsync(
+                tokenResult.Data,
+                "MarketplaceSourceLogin",
+                sourceId).ConfigureAwait(false);
+            if (authorizeResult?["Code"].Val<int>() != 1) return Json(authorizeResult);
+
             try
             {
                 var configResult = await SendJsonAsync(
                     apiBase,
-                    "/api/FormEngine/GetSysConfig",
+                    $"/apiengine/platform-sys-config?OsClient={Uri.EscapeDataString(remoteOsClient)}",
                     remoteOsClient,
                     new JObject { ["OsClient"] = remoteOsClient },
                     null).ConfigureAwait(false);
@@ -210,7 +217,14 @@ namespace Microi.net.Api
                     loginForm).ConfigureAwait(false);
                 if (loginResult.Body?["Code"]?.Val<int>() != 1 || loginResult.Authorization.DosIsNullOrWhiteSpace())
                 {
-                    QueueAudit(tokenResult.Data, "MarketplaceSourceLogin", false, sourceId, apiBase, remoteOsClient);
+                    var auditResult = await RecordAuditAsync(
+                        tokenResult.Data,
+                        "MarketplaceSourceLogin",
+                        false,
+                        sourceId,
+                        apiBase,
+                        remoteOsClient).ConfigureAwait(false);
+                    if (auditResult?["Code"].Val<int>() != 1) return Json(auditResult);
                     return Json(new DosResult(loginResult.Body?["Code"]?.Val<int>() ?? 0, null,
                         loginResult.Body?["Msg"]?.ToString() ?? "商城源登录失败。"));
                 }
@@ -226,7 +240,14 @@ namespace Microi.net.Api
                     SavedAtUtc = DateTime.UtcNow
                 };
                 var saveResult = await SaveCredentialAsync(tokenResult.Data.OsClient, sourceId, credential).ConfigureAwait(false);
-                QueueAudit(tokenResult.Data, "MarketplaceSourceLogin", saveResult.Code == 1, sourceId, apiBase, remoteOsClient);
+                var saveAuditResult = await RecordAuditAsync(
+                    tokenResult.Data,
+                    "MarketplaceSourceLogin",
+                    saveResult.Code == 1,
+                    sourceId,
+                    apiBase,
+                    remoteOsClient).ConfigureAwait(false);
+                if (saveAuditResult?["Code"].Val<int>() != 1) return Json(saveAuditResult);
                 if (saveResult.Code != 1) return Json(saveResult);
                 var accessibleCount = await ReadApplicationCountAsync(apiBase, remoteOsClient, credential).ConfigureAwait(false);
                 Response.Headers.CacheControl = "no-store";
@@ -242,7 +263,14 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                QueueAudit(tokenResult.Data, "MarketplaceSourceLogin", false, sourceId, apiBase, remoteOsClient);
+                var auditResult = await RecordAuditAsync(
+                    tokenResult.Data,
+                    "MarketplaceSourceLogin",
+                    false,
+                    sourceId,
+                    apiBase,
+                    remoteOsClient).ConfigureAwait(false);
+                if (auditResult?["Code"].Val<int>() != 1) return Json(auditResult);
                 return Json(new DosResult(0, null, SafeRemoteError(ex)));
             }
         }
@@ -346,12 +374,24 @@ namespace Microi.net.Api
             var settings = TenantSystemSettingsSecurity.LoadSnapshot(tokenResult.Data.OsClient);
             if (!settings.TryGetValue(CredentialKey(sourceId), out var item))
                 return Json(new DosResult(1, null, "该商城源当前没有保存登录凭据。"));
+            var authorizeResult = await AuthorizeOperationAsync(
+                tokenResult.Data,
+                "MarketplaceSourceDisconnect",
+                sourceId).ConfigureAwait(false);
+            if (authorizeResult?["Code"].Val<int>() != 1) return Json(authorizeResult);
             var result = await MicroiEngine.FormEngine.DelFormDataAsync(TenantSystemSettingsSecurity.TableName, new
             {
                 Id = item.Id,
                 OsClient = tokenResult.Data.OsClient
             }).ConfigureAwait(false);
-            QueueAudit(tokenResult.Data, "MarketplaceSourceDisconnect", result.Code == 1, sourceId, null, null);
+            var auditResult = await RecordAuditAsync(
+                tokenResult.Data,
+                "MarketplaceSourceDisconnect",
+                result.Code == 1,
+                sourceId,
+                null,
+                null).ConfigureAwait(false);
+            if (auditResult?["Code"].Val<int>() != 1) return Json(auditResult);
             return Json(result.Code == 1
                 ? new DosResult(1, null, "商城源登录凭据已移除。")
                 : result);
@@ -625,7 +665,23 @@ namespace Microi.net.Api
             return new DosResult<CurrentToken>(1, token);
         }
 
-        private static void QueueAudit(
+        private static async Task<JObject> AuthorizeOperationAsync(
+            CurrentToken token,
+            string action,
+            string sourceId)
+        {
+            return await RunMarketplaceEngineAsync(
+                token,
+                new JObject
+                {
+                    ["Action"] = "AuthorizeOperation",
+                    ["OsClient"] = token?.OsClient,
+                    ["AuditAction"] = action,
+                    ["SourceId"] = sourceId
+                }).ConfigureAwait(false);
+        }
+
+        private static async Task<JObject> RecordAuditAsync(
             CurrentToken token,
             string action,
             bool success,
@@ -633,29 +689,38 @@ namespace Microi.net.Api
             string apiBase,
             string remoteOsClient)
         {
-            MicroiEngine.QueueSysLog(new SysLogParam
-            {
-                OsClient = token?.OsClient,
-                UserId = token?.CurrentUser?["Id"]?.ToString(),
-                UserName = token?.CurrentUser?["Name"]?.ToString(),
-                Category = "Security",
-                Action = action,
-                Source = "MarketplaceSourceGateway",
-                TargetType = "MarketplaceSource",
-                TargetId = sourceId,
-                Success = success,
-                OccurredAt = DateTime.Now,
-                Type = "安全审计",
-                Title = action,
-                Content = JsonConvert.SerializeObject(new
+            return await RunMarketplaceEngineAsync(
+                token,
+                new JObject
                 {
-                    Success = success,
-                    SourceId = sourceId,
-                    ApiBase = apiBase,
-                    RemoteOsClient = remoteOsClient
-                }),
-                Level = success ? 1 : 2
-            });
+                    ["Action"] = "RecordAudit",
+                    ["OsClient"] = token?.OsClient,
+                    ["AuditAction"] = action,
+                    ["Success"] = success,
+                    ["SourceId"] = sourceId,
+                    ["ApiBase"] = apiBase,
+                    ["RemoteOsClient"] = remoteOsClient
+                }).ConfigureAwait(false);
+        }
+
+        private static async Task<JObject> RunMarketplaceEngineAsync(
+            CurrentToken token,
+            JObject request)
+        {
+            var rawResult = await ManagedApiEngineCompatibility.RunAsync(
+                MarketplaceSourceApiEngineKey,
+                request,
+                token?.CurrentUser).ConfigureAwait(false);
+            if (rawResult is JObject jobject) return jobject;
+            if (rawResult is string json)
+            {
+                try { return JObject.Parse(json); }
+                catch { return new JObject { ["Code"] = 0, ["Msg"] = "商城源官方接口返回格式无效。" }; }
+            }
+            if (rawResult == null)
+                return new JObject { ["Code"] = 0, ["Msg"] = "商城源官方接口未返回结果。" };
+            try { return JObject.FromObject(rawResult); }
+            catch { return new JObject { ["Code"] = 0, ["Msg"] = "商城源官方接口返回格式无效。" }; }
         }
     }
 }

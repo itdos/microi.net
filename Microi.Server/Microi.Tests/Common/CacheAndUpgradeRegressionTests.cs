@@ -390,7 +390,7 @@ public class CacheAndUpgradeRegressionTests
     }
 
     [Fact]
-    public void AppStoreBundle_DeliversBulkButtonRuntimeDependencyAsOneVerifiedCapability()
+    public void AppStoreBundle_DeliversStartupRuntimeDependenciesAsOneVerifiedCapability()
     {
         var loadResources = typeof(UpgradeAppStore).GetMethod(
             "LoadBundledResources",
@@ -406,8 +406,8 @@ public class CacheAndUpgradeRegressionTests
             System.Version.TryParse(packageVersionText!.TrimStart('v', 'V'), out var packageVersion),
             $"应用商城包版本格式无效：{packageVersionText}");
         Assert.True(
-            packageVersion!.CompareTo(new System.Version(7, 0, 5)) >= 0,
-            $"批量安装能力要求应用商城包版本不低于 v7.0.5，当前为 {packageVersionText}");
+            packageVersion!.CompareTo(new System.Version(7, 5, 50)) >= 0,
+            $"完整启动依赖与旧导入器兼容桥要求应用商城包版本不低于 v7.5.50，当前为 {packageVersionText}");
 
         var bulkEngine = Assert.Single(
             package["SysApiEngines"]!.Children<JObject>(),
@@ -425,12 +425,64 @@ public class CacheAndUpgradeRegressionTests
         var importer = Assert.Single(
             package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "import-microi-store-package");
-        AssertEngineVersionAtLeast(importer, new System.Version(2, 3, 3));
+        AssertEngineVersionAtLeast(importer, new System.Version(2, 4, 3));
         Assert.Contains("PACKAGE_API_ENGINE_READBACK_V1", importer["ApiV8Code"]?.ToString());
         Assert.Contains("PACKAGE_REPLAY_VERSION_GUARD_V2", importer["ApiV8Code"]?.ToString());
+        Assert.Contains("PackagePointerMode: 'HdfsV1'", importer["ApiV8Code"]?.ToString());
         Assert.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1", importer["ApiV8Code"]?.ToString());
         Assert.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1", importer["ApiV8Code"]?.ToString());
         Assert.Contains("BULK_PLATFORM_BOOTSTRAP_ORDER_V1", package.ToString());
+
+        var storeModelEngine = Assert.Single(
+            package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "get-microi-store-model");
+        AssertEngineVersionAtLeast(storeModelEngine, new System.Version(1, 2, 9));
+        Assert.Contains(
+            "MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1",
+            storeModelEngine["ApiV8Code"]?.ToString());
+
+        var backgroundTaskEngine = Assert.Single(
+            package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "platform-background-task");
+        Assert.Equal("/apiengine/platform-background-task", backgroundTaskEngine["ApiAddress"]?.ToString());
+        Assert.Equal(1, backgroundTaskEngine["IsEnable"]?.Value<int>());
+        Assert.Equal(0, backgroundTaskEngine["StopHttp"]?.Value<int>());
+        Assert.Equal(0, backgroundTaskEngine["AllowAnonymous"]?.Value<int>());
+        AssertEngineVersionAtLeast(backgroundTaskEngine, new System.Version(1, 1, 0));
+        Assert.Contains(
+            "V8.Method.ManageBackgroundTask(V8.Param)",
+            backgroundTaskEngine["ApiV8Code"]?.ToString());
+        Assert.Equal(
+            "Managed",
+            package["ResourcePolicies"]?["ApiEngines"]?["platform-background-task"]?["UpgradePolicy"]?.ToString());
+        Assert.Contains(
+            package["PackageInfo"]?["RequiredPlatformCapabilities"]!.Values<string>(),
+            item => item == "ServerFeature:V8.ManageBackgroundTask");
+        Assert.Contains(
+            package["PackageInfo"]?["RequiredPlatformCapabilities"]!.Values<string>(),
+            item => item == "ApiEngine:platform-background-task@v1.1.0");
+
+        var sysMenuEngine = Assert.Single(
+            package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "platform-sys-menu");
+        Assert.Equal("/apiengine/platform-sys-menu", sysMenuEngine["ApiAddress"]?.ToString());
+        Assert.Equal(1, sysMenuEngine["IsEnable"]?.Value<int>());
+        Assert.Equal(0, sysMenuEngine["StopHttp"]?.Value<int>());
+        Assert.Equal(0, sysMenuEngine["AllowAnonymous"]?.Value<int>());
+        AssertEngineVersionAtLeast(sysMenuEngine, new System.Version(1, 0, 0));
+        Assert.Contains(
+            "V8.Method.ManageSystemDirectory",
+            sysMenuEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("Domain: 'SysMenu'", sysMenuEngine["ApiV8Code"]?.ToString());
+        Assert.Equal(
+            "Managed",
+            package["ResourcePolicies"]?["ApiEngines"]?["platform-sys-menu"]?["UpgradePolicy"]?.ToString());
+        Assert.Contains(
+            package["PackageInfo"]?["RequiredPlatformCapabilities"]!.Values<string>(),
+            item => item == "V8.Method.ManageSystemDirectory");
+        Assert.Contains(
+            package["PackageInfo"]?["RequiredPlatformCapabilities"]!.Values<string>(),
+            item => item == "ApiEngine:platform-sys-menu@v1.0.0");
     }
 
     [Fact]
@@ -445,9 +497,13 @@ public class CacheAndUpgradeRegressionTests
         var hasBulk = typeof(UpgradeAppStore).GetMethod(
             "HasPinnedBulkCapabilities",
             BindingFlags.Static | BindingFlags.NonPublic);
+        var hasSysMenu = typeof(UpgradeAppStore).GetMethod(
+            "HasPlatformSysMenuCapabilities",
+            BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(loadResources);
         Assert.NotNull(hasImporter);
         Assert.NotNull(hasBulk);
+        Assert.NotNull(hasSysMenu);
 
         var resources = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
             loadResources!.Invoke(null, null));
@@ -456,11 +512,13 @@ public class CacheAndUpgradeRegressionTests
             item => item["ApiEngineKey"]?.ToString() == "import-microi-store-package");
         var importerCode = importer["ApiV8Code"]?.ToString() ?? string.Empty;
         Assert.True(Assert.IsType<bool>(hasImporter!.Invoke(null,
-            new object[] { importerCode, new System.Version(2, 3, 3) })));
+            new object[] { importerCode, new System.Version(2, 4, 4) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode, new System.Version(2, 2, 9) })));
+            new object[] { importerCode, new System.Version(2, 4, 3) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode.Replace("PACKAGE_REPLAY_VERSION_GUARD_V2", "LEGACY_REPLAY_GUARD"), new System.Version(2, 3, 3) })));
+            new object[] { importerCode.Replace("PACKAGE_REPLAY_VERSION_GUARD_V2", "LEGACY_REPLAY_GUARD"), new System.Version(2, 4, 4) })));
+        Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
+            new object[] { importerCode.Replace("PackagePointerMode: 'HdfsV1'", "PackagePointerMode: 'Legacy'"), new System.Version(2, 4, 4) })));
 
         var bulk = Assert.Single(package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "bulk-import-microi-store-packages");
@@ -471,6 +529,16 @@ public class CacheAndUpgradeRegressionTests
             new object[] { bulkCode, new System.Version(1, 2, 4) })));
         Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
             new object[] { bulkCode.Replace("BulkAdaptiveSingleSlice: false", "BulkAdaptiveSingleSlice: true"), new System.Version(1, 2, 7) })));
+
+        var sysMenu = Assert.Single(package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "platform-sys-menu");
+        var sysMenuCode = sysMenu["ApiV8Code"]?.ToString() ?? string.Empty;
+        Assert.True(Assert.IsType<bool>(hasSysMenu!.Invoke(null,
+            new object[] { sysMenuCode, new System.Version(1, 0, 0) })));
+        Assert.False(Assert.IsType<bool>(hasSysMenu.Invoke(null,
+            new object[] { sysMenuCode, new System.Version(0, 9, 9) })));
+        Assert.False(Assert.IsType<bool>(hasSysMenu.Invoke(null,
+            new object[] { sysMenuCode.Replace("V8.Method.ManageSystemDirectory", "V8.Method.LegacySysMenu"), new System.Version(1, 0, 0) })));
     }
 
     [Fact]
@@ -548,6 +616,45 @@ public class CacheAndUpgradeRegressionTests
         menu["MicroServicePageId"] = null;
         var reason = Assert.IsType<string>(getRepairReason.Invoke(null, new object[] { menu, service, page }));
         Assert.Contains("页面绑定", reason);
+    }
+
+    [Fact]
+    public void OfficialSsoBundle_IsEmbeddedAndCarriesManagedHookRuntimeContract()
+    {
+        var loadResources = typeof(UpgradeAppStore).GetMethod(
+            "LoadBundledResources",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var hasPackagedSsoRuntime = typeof(UpgradeAppStore).GetMethod(
+            "HasPackagedSsoRuntime",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(loadResources);
+        Assert.NotNull(hasPackagedSsoRuntime);
+
+        var resources = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
+            loadResources!.Invoke(null, null));
+        Assert.Contains("app.microi.sso.json", resources.Keys);
+        var package = JObject.Parse(resources["app.microi.sso.json"]);
+        Assert.True(Assert.IsType<bool>(hasPackagedSsoRuntime!.Invoke(null, new object[] { package })));
+        Assert.Equal("v7.5.7", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.Equal("Platform", package["PackageInfo"]?["ApplicationType"]?.ToString());
+
+        var hook = Assert.Single(
+            package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "sso_event_hook");
+        Assert.Equal(
+            "CreateIfMissing",
+            package["ResourcePolicies"]?["ApiEngines"]?["sso_event_hook"]?["UpgradePolicy"]?.ToString());
+        Assert.StartsWith(
+            "/* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1",
+            hook["ApiV8Code"]?.ToString()?.TrimStart());
+
+        var brokenPackage = (JObject)package.DeepClone();
+        var protocolEvent = Assert.Single(
+            brokenPackage["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "sso_protocol_event");
+        protocolEvent["ApiV8Code"] = protocolEvent["ApiV8Code"]?.ToString()
+            .Replace("SSO_TENANT_HOOK_SAFE_PAYLOAD_V1", "UNSAFE_PAYLOAD");
+        Assert.False(Assert.IsType<bool>(hasPackagedSsoRuntime.Invoke(null, new object[] { brokenPackage })));
     }
 
     [Fact]

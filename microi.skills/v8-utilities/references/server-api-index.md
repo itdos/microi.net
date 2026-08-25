@@ -35,7 +35,7 @@
 | `V8.Db`、`V8.DbRead`、`V8.DbTrans` | 主库、只读库、共享事务 |
 | `V8.DbTrans.FromSql(sql)` | 在平台提供的共享事务内执行参数化 SQL |
 | `V8.Dbs`、`V8.Dbs.Open(...)` | 已配置的扩展数据库 |
-| `V8.MongoDb.*` | MongoDB CRUD |
+| `V8.MongoDb.*` | MongoDB CRUD；`UptFormDataByWhere` / `DelFormDataByWhere` 强制参数化非空 `_Where`，禁止更新 `_id`，绑定当前 V8 租户，且不参与 `V8.DbTrans` |
 | `V8.DataSourceEngine` | 当前租户数据源引擎对象 |
 | `V8.DataSourceEngine.Run(...)`、`V8.DataSourceEngine.RunAsync(...)` | 同步/请求内异步运行数据源 |
 | `V8.ModuleEngine` | 后端模块模型能力；不能绕过用户模块权限 |
@@ -51,12 +51,26 @@
 | `V8.Method.NewGuid()`、`V8.Method.NewUlid()` | 生成标识 |
 | `V8.Method.GetTimestamp()` | Unix 秒时间戳 |
 | `V8.Method.GetCurrentToken(token,osClient)` | 读取当前 Token 对象；不透传前端 |
-| `V8.Method.RefreshLoginUser(userId,osClient)` | 刷新用户登录缓存 |
+| `V8.Method.RefreshLoginUser(userId,osClient?,token?)` | 刷新登录投影；租户取当前 V8/已认证 DiyToken（可信宿主须建立用户+租户作用域），显式 OsClient 仅作一致性断言；普通用户仅本人，同租户超级管理员主库复核后可跨用户。第三参仅兼容历史 `microi-init` 的原始 Token，宿主重新验证且只允许 Token 本人；返回对象、访问密钥、空身份和跨租户均拒绝 |
 | `V8.Method.ClearUserLoginInfo(userId,osClient)` | 管理员吊销用户全部终端 Token |
 | `V8.Method.GetDirectTableGrantPolicies()` | 读取平台表直连授权策略；仅供可信角色表单事件做最终校验 |
 | `V8.Method.ConsumeIdentityVerificationTicket({Ticket,Purpose,ActionHash})` | 按当前 DiyToken 用户、租户、用途和操作摘要原子消费一次性 Passkey/TOTP/人脸票据 |
 | `V8.Method.GetPrivateFileUrl({FilePathName})` | 签发当前租户短期私有文件代理地址 |
+| `V8.Method.ResolveOsClientByDomain(domain)` | 仅允许官方 `platform-os-client-by-domain` 调用；返回最小 OsClient 投影 |
+| `V8.Method.GetPublicSysConfig(lang?)` | 仅允许官方 `platform-sys-config` 调用；返回浏览器安全系统设置投影 |
+| `V8.Method.GetLangBundle(lang?,prefix?)` | 仅允许官方 `platform-lang-bundle` 调用；读取当前租户词条包 |
+| `V8.Method.GetLoginWallpapers()` | 仅允许官方 `platform-login-wallpapers` 调用；固定读取当前租户最多 200 条启用壁纸的 `Id/Name/Category/ImgUrl`，不开放通用匿名表权限 |
+| `V8.Method.GetLegacyInitMenuTree(rawToken, osClient?)` | 仅允许官方 `microi-init` 调用；重新验证请求体原始 DiyToken、拒绝访问密钥与跨租户请求，并按当前角色返回权威菜单树 |
+| `V8.Method.GetAuthorizedPrivateFileUrl(options)` | 仅允许官方 `platform-private-file-url` 调用；重算菜单、行、字段与文件引用授权 |
+| `V8.Method.AuthorizeCurrentUserTenantProvisioning()` | 仅允许官方 `platform-create-tenant` 在 Before Hook 前校验主租户普通登录会话 |
+| `V8.Method.ProvisionCurrentUserTenant(options)` | 仅允许官方 `platform-create-tenant` 调用；所有者、手机号、姓名和密码材料从可信当前用户派生 |
+| `V8.Method.PrepareCurrentUserProfileUpdate(options)` | 仅允许官方 `platform-user-update-profile` 调用；固定当前用户并规范当前租户头像路径 |
+| `V8.Method.ManageSysUserAdmin(options)` | 仅允许官方 `platform-sys-user-admin` 调用；固定身份与租户并执行表权限、角色层级、改密 step-up、内容安全及会话安全边界；授权预检返回规范化 `DataAppend.ChangesPassword` |
+| `V8.Method.AuthorizeOfficialResourcePublish()` | 仅允许官方 `get-microi-upgrade-resource` 的发布分支调用；固定 `iTdos`、拒绝访问密钥并从主库复核平台管理员；不是通用授权 API |
+| `V8.Method.ValidateTenantSystemSettingsOperation(options)` | 仅允许官方 `platform-tenant-system-settings` 调用；拒绝访问密钥、非管理员、Secret/Sensitive Key 和已迁移公开 Key |
+| `V8.Method.GetTenantSystemSettingsSecurityProjection()` | 仅允许官方 `platform-tenant-system-settings` 调用；只返回 Secret 是否已配置与迁移 Key，不返回值或密文 |
 | `V8.Method.Upload(options)` | 受配额限制的上传 |
+| `V8.Method.UploadText(options)` | 直接上传当前租户 UTF-8 文本，避免 Base64 膨胀；仍执行安全文件名、扩展名、HDFS、配额与 256 MB 文本上限 |
 | `V8.Method.AddSysLog(options)` | 结构化系统日志 |
 | `V8.Method.ParseWhere(where)` | 兼容旧 Where 转换 |
 | `V8.Method.UpdateBackgroundTask(options)` | 上报已提交单位的后台任务进度 |
@@ -64,6 +78,10 @@
 
 管理员维护、备份、清库、缓存连接管理等低层方法即使可见，也不能暴露为普通
 或匿名业务 API。
+
+以上启动、文件、系统账号和租户设置 `platform-*` 原子都是固定 Managed 接口的可信宿主边界，不是普通业务脚本可复用的快捷方法。官网客户端调用对应 `/apiengine/platform-*` 路由；旧 Controller 只保留旧版本兼容。登录壁纸原子不要求 `diy_wallpaper.IsAnonymousRead=1`，也不允许租户 Hook 参与匿名请求。租户个性化逻辑写入应用声明的 `CreateIfMissing` Hook，禁止直接修改会被官方安装或更新恢复的 Managed 接口。密码、DiyToken、Secret 保存和 Reveal 仍属于 C# 可信边界。
+
+旧客户端兼容路由 `/api/SysUser/UpdateMyDefaultIndexUrl`、`/api/SysUser/UpdateCurrentProfile` 和 `/api/TenantSystemSettings/List` 只固定转发上述 Managed 接口；新客户端不得继续以 Controller 作为业务事实源。
 
 ## Base64 与加密
 

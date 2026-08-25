@@ -76,7 +76,7 @@ Page 模式要特别注意：
 - 匿名公有存储场景只允许当前 `OsClient` 目录下的 `filePathName`；接口响应文件场景用 `fileUrl` 接收当前平台正式 `ApiBase`，或由同端口本地后端读取的 loopback `/apiengine/...`，并要求 URL 显式携带当前 `OsClient`。两种场景都拒绝私有文件、跨租户路径、路径穿越和任意第三方域名。
 - `fileUrl` 路径没有文件扩展名时必须同时传 `fileName` 或 `fileType`。组件先调用 `/api/HDFS/PrepareOfficePreviewFromUrl`，由后端严格校验当前平台、当前 `OsClient` 和单层 `/apiengine/{key}`，再把响应文件透明缓存到当前租户公有对象存储；OnlyOffice 使用返回的公网静态地址。开发环境 loopback 只允许同端口本地后端读取，不能简单替换 origin，也不能把该接口扩展成通用 URL 代理。
 - `canEdit` 不能直接作为授权结果。最终允许编辑必须同时满足有效登录态；匿名即使传 `canEdit=1` 也强制使用 OnlyOffice `mode:'view'` 和 `permissions.edit=false`。
-- 私有文件调用 `/api/HDFS/GetPrivateFileUrl` 时传 `ForOfficePreview:true`，让远程 OnlyOffice 使用租户公网 `ApiBase` 的审计代理地址，避免 `localhost` 导致“下载失败”。
+- 私有文件调用 `/apiengine/platform-private-file-url` 时传 `ForOfficePreview:true` 和权威资源上下文，让远程 OnlyOffice 使用租户公网 `ApiBase` 的审计代理地址，避免 `localhost` 导致“下载失败”。
 - `layout/index.vue` 仅在“路由要求隐藏外壳且当前无有效登录用户”时隐藏 Sidebar/Navbar/TagsView；登录用户打开同一路由仍保留正常系统布局。
 - 不要把匿名路由简单加入全局白名单后跳过组件鉴权；过期 Token 要清理，公有文件校验失败必须停止创建 OnlyOffice 配置。
 

@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Dos.Common;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net.Api
 {
@@ -19,11 +20,8 @@ namespace Microi.net.Api
         /// <param name="context"></param>
         /// <param name="Path"></param>
         /// <returns></returns>
-        public Handler GetHandler(string action, HttpContext context, string Path)
+        public Handler GetHandler(string action, HttpContext context, JObject config)
         {
-            //说明：【customerPath】是后来加上去的，用于区分不同的客户，保存到不同的文件夹。
-            var customerPath = (Path.DosIsNullOrWhiteSpace() ? "" : Path + "/") + "upload/";
-
             //临时解决
             if (action.DosIsNullOrWhiteSpace())
             {
@@ -35,42 +33,39 @@ namespace Microi.net.Api
                 case AppConsts.Action.UploadImage:
                     return new UploadHandler(context, new UploadConfig
                     {
-                        AllowExtensions = UeditorConfig.GetStringList("imageAllowFiles"),
-                        PathFormat = customerPath + UeditorConfig.GetString("imagePathFormat"),
-                        SizeLimit = UeditorConfig.GetInt("imageMaxSize"),
-                        UploadFieldName = UeditorConfig.GetString("imageFieldName")
+                        AllowExtensions = UeditorConfig.GetStringList(config, "imageAllowFiles"),
+                        SizeLimit = UeditorConfig.GetInt(config, "imageMaxSize"),
+                        UploadFieldName = UeditorConfig.GetString(config, "imageFieldName")
                     });
                 case AppConsts.Action.UploadScrawl:
                     return new UploadHandler(context, new UploadConfig()
                     {
                         AllowExtensions = new string[] { ".png" },
-                        PathFormat = customerPath + UeditorConfig.GetString("scrawlPathFormat"),
-                        SizeLimit = UeditorConfig.GetInt("scrawlMaxSize"),
-                        UploadFieldName = UeditorConfig.GetString("scrawlFieldName"),
+                        SizeLimit = UeditorConfig.GetInt(config, "scrawlMaxSize"),
+                        UploadFieldName = UeditorConfig.GetString(config, "scrawlFieldName"),
                         Base64 = true,
                         Base64Filename = "scrawl.png"
                     });
                 case AppConsts.Action.UploadVideo:
                     return new UploadHandler(context, new UploadConfig()
                     {
-                        AllowExtensions = UeditorConfig.GetStringList("videoAllowFiles"),
-                        PathFormat = customerPath + UeditorConfig.GetString("videoPathFormat"),
-                        SizeLimit = UeditorConfig.GetInt("videoMaxSize"),
-                        UploadFieldName = UeditorConfig.GetString("videoFieldName")
+                        AllowExtensions = UeditorConfig.GetStringList(config, "videoAllowFiles"),
+                        SizeLimit = UeditorConfig.GetInt(config, "videoMaxSize"),
+                        UploadFieldName = UeditorConfig.GetString(config, "videoFieldName")
                     });
                 case AppConsts.Action.UploadFile:
                     return new UploadHandler(context, new UploadConfig()
                     {
-                        AllowExtensions = UeditorConfig.GetStringList("fileAllowFiles"),
-                        PathFormat = customerPath + UeditorConfig.GetString("filePathFormat"),
-                        SizeLimit = UeditorConfig.GetInt("fileMaxSize"),
-                        UploadFieldName = UeditorConfig.GetString("fileFieldName")
+                        AllowExtensions = UeditorConfig.GetStringList(config, "fileAllowFiles"),
+                        SizeLimit = UeditorConfig.GetInt(config, "fileMaxSize"),
+                        UploadFieldName = UeditorConfig.GetString(config, "fileFieldName")
                     });
 
                 case AppConsts.Action.ListImage:
-                    return new ListFileManager(context, UeditorConfig.GetString("imageManagerListPath"), UeditorConfig.GetStringList("imageManagerAllowFiles"));
                 case AppConsts.Action.ListFile:
-                    return new ListFileManager(context, UeditorConfig.GetString("fileManagerListPath"), UeditorConfig.GetStringList("fileManagerAllowFiles"));
+                    // 历史实现递归枚举宿主本地目录，无法映射当前租户私有 HDFS 权限，
+                    // 且会造成跨租户文件名泄漏。上传继续兼容，旧本地文件管理动作关闭。
+                    return new NotSupportedHandler(context);
                 case AppConsts.Action.CatchImage:
                     // Remote image crawling is intentionally disabled. The legacy
                     // implementation followed redirects and fetched user-controlled

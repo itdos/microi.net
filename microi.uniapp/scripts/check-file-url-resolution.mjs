@@ -36,7 +36,22 @@ assert.equal(
   'upload values must prefer the durable Path over a temporary Url'
 )
 
-const resolvedUrl = await V8.resolveFileUrl(uploadValue)
+const privateFileContext = {
+  resourceKind: 'FormField',
+  formEngineKey: 'diy_follow',
+  formDataId: 'follow-record-1',
+  fieldId: 'follow-photo-field-1',
+  sysMenuId: 'follow-menu-1'
+}
+
+assert.equal(
+  await V8.resolveFileUrl(uploadValue),
+  '',
+  'private files without authoritative record context must fail closed'
+)
+assert.equal(requests.length, 0, 'a bare private path must not reach the signing engine')
+
+const resolvedUrl = await V8.resolveFileUrl(uploadValue, privateFileContext)
 assert.equal(
   resolvedUrl,
   'https://files.example.test/photo.jpg?expires=9999999999&signature=fresh',
@@ -45,11 +60,17 @@ assert.equal(
 assert.equal(requests.length, 1, 'a private file with a durable Path should be re-signed')
 assert.equal(
   requests[0].url,
-  'https://api.example.test/api/HDFS/GetPrivateFileUrl',
-  'the signing request must use the private-file endpoint'
+  'https://api.example.test/apiengine/platform-private-file-url',
+  'the signing request must use the managed private-file ApiEngine'
 )
 assert.equal(requests[0].method, 'POST', 'private-file context must not be exposed in the query string')
+assert.equal(requests[0].headers.apiengine, '1', 'private-file signing must use direct ApiEngine routing')
 assert.equal(requests[0].data.FilePathName, durablePath, 'the signing request must use the durable Path')
+assert.equal(requests[0].data.FormEngineKey, privateFileContext.formEngineKey)
+assert.equal(requests[0].data.FormDataId, privateFileContext.formDataId)
+assert.equal(requests[0].data.FieldId, privateFileContext.fieldId)
+assert.equal(requests[0].data.SysMenuId, privateFileContext.sysMenuId)
+assert.equal(requests[0].data.ResourceKind, privateFileContext.resourceKind)
 
 assert.equal(
   V8.extractUploadPath({ Url: expiredUrl }),

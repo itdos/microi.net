@@ -84,7 +84,7 @@ description: Microi 移动端质量门禁，适用于 UniApp/H5/微信小程序�
 PC 端、H5、App、微信小程序或任何自定义前端只要调用 `/api/SysUser/login`、`/api/SysUser/Login` 或 `V8.Login(param)`，都必须先读取 `Sys_Config` 的 `EnableCaptcha` 配置，并按配置决定是否展示和提交图形验证码。
 
 要求：
-- 启动登录页时调用 `/api/DiyTable/GetSysConfig` 或项目 SDK 的 `V8.GetSysConfig(true)`，读取当前租户启用状态。
+- 启动登录页时调用 `/apiengine/platform-sys-config` 或项目 SDK 的 `V8.GetSysConfig(true)`，读取当前租户启用状态；旧 Controller 路由只作兼容转发。
 - `EnableCaptcha` 可能是 `1`、`true`、`'1'`、`'true'`，也可能是大小写不同的字符串。必须使用统一的 `isEnabledFlag(value)` 或等价函数判断，不能直接 `!!value`，否则字符串 `'0'` 会被误判为开启。
 - 开启验证码时，登录表单必须显示验证码输入框和验证码图片；验证码图片通过 `GET /api/Captcha/GetCaptcha` 获取，读取响应头 `captchaid`，提交登录时附加 `_CaptchaId` 和 `_CaptchaValue`。
 - 登录失败、验证码错误、网络错误后必须刷新验证码并清空验证码输入；验证码未填写时前端直接阻止提交并提示用户。

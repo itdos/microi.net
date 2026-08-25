@@ -58,7 +58,7 @@ test("real Junchi pages render permanent inspectable source badges and a non-blo
     let patchedSysConfigResponses = 0;
     await page.route(`${API_BASE}/**`, async route => {
         const requestUrl = route.request().url();
-        const isGetSysConfig = /\/api\/FormEngine\/GetSysConfig/i.test(requestUrl);
+        const isGetSysConfig = /\/apiengine\/platform-sys-config/i.test(requestUrl);
         const isLogin = /\/api\/SysUser\/Login/i.test(requestUrl);
         if (!isGetSysConfig && !isLogin) {
             await route.continue();

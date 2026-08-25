@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -193,6 +194,38 @@ namespace Microi.net
             if (currentToken?.CurrentUser == null
                 || currentToken.OsClient.DosIsNullOrWhiteSpace()
                 || userId.DosIsNullOrWhiteSpace())
+            {
+                return null;
+            }
+
+            // AccessKey scopes are enforced by the HTTP authorization path and do not
+            // currently define a realtime subscription capability. Reject them here so
+            // the trusted runner cannot bypass AllowedApiEngineKeys with GatewayKey.
+            if (UserAccessKeySecurity.IsSession(currentToken.CurrentUser)) return null;
+
+            JwtSecurityToken jwtToken;
+            try
+            {
+                jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(
+                    token.Replace("Bearer ", string.Empty));
+            }
+            catch
+            {
+                return null;
+            }
+            if (jwtToken.ValidTo != DateTime.MinValue && jwtToken.ValidTo < DateTime.UtcNow)
+                return null;
+            var clientType = jwtToken.Claims
+                .FirstOrDefault(claim => claim.Type == "ClientType")?.Value;
+            var activeTokenEntry = DiyToken.GetActiveCachedTokenEntry(currentToken, token);
+            if (activeTokenEntry == null) return null;
+            var clientModel = OsClient.GetClient(currentToken.OsClient);
+            var activeTokenUpdateTime = activeTokenEntry.UpdateTime == default
+                ? currentToken.UpdateTime
+                : activeTokenEntry.UpdateTime;
+            if (activeTokenUpdateTime != default
+                && DateTime.Now - activeTokenUpdateTime
+                > DiyToken.ResolveClientTokenLifetime(clientModel, clientType))
             {
                 return null;
             }

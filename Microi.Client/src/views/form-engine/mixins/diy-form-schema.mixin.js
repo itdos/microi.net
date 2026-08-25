@@ -313,7 +313,7 @@ export default {
                         self.FormDiyTableModel[realKey] = "./static/img/loading.gif";
                         // 异步获取私有文件临时 URL
                         self.DiyCommon.Post(
-                            "/api/HDFS/GetPrivateFileUrl",
+                            "/apiengine/platform-private-file-url",
                             {
                                 FilePathName: filePath,
                                 HDFS: self.SysConfig.HDFS || "Aliyun",

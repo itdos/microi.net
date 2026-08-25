@@ -48,6 +48,12 @@ namespace Microi.net
         string UnprotectApiEngineSecret(string cipherText);
 
         /// <summary>
+        /// 原子消费宿主为当前租户、当前 Managed ApiEngineKey 建立的一次性协议作用域。
+        /// 不接受任何 V8 参数，租户脚本不能自行签发或重放。
+        /// </summary>
+        DosResult RequireManagedProtocolContext();
+
+        /// <summary>
         /// 解析查询条件
         /// </summary>
         List<DiyWhere> ParseWhere(object whereParam);
@@ -63,9 +69,14 @@ namespace Microi.net
         JObject SetSysUserRoleInfo(dynamic userModel, string osClient);
 
         /// <summary>
-        /// 刷新登录用户身份信息，token以旧换新
+        /// 刷新当前租户的登录用户身份投影。显式 OsClient 仅作一致性断言；
+        /// 普通用户只允许本人，同租户平台管理员经权威复核后才可跨用户。第三参
+        /// 仅接受原始 Token，并由宿主重新权威验证其用户和租户。
         /// </summary>
-        DosResult<dynamic> RefreshLoginUser(string userId, string osClient = null);
+        DosResult<dynamic> RefreshLoginUser(
+            string userId,
+            string osClient = null,
+            string token = null);
 
         /// <summary>
         /// 清除指定用户全部终端的登录信息，立即吊销所有 Token。仅系统管理员可调用。
@@ -128,6 +139,51 @@ namespace Microi.net
         /// 获取私有文件地址
         /// </summary>
         DosResult GetPrivateFileUrl(dynamic dynamicParam);
+
+        /// <summary>仅供官方启动接口按域名解析最小租户标识。</summary>
+        DosResult ResolveOsClientByDomain(string domain);
+
+        /// <summary>仅供官方启动接口读取浏览器安全的系统设置投影。</summary>
+        DosResult GetPublicSysConfig(string lang = null);
+
+        /// <summary>读取当前租户的语言词条包。</summary>
+        DosResult GetLangBundle(string lang = null, string prefix = "Msg.");
+
+        /// <summary>仅供官方登录壁纸接口读取固定、启用且有界的公开投影。</summary>
+        DosResult GetLoginWallpapers();
+
+        /// <summary>
+        /// 仅供官方 microi-init 兼容门面：重验请求体原始 DiyToken，并按该用户
+        /// 当前角色生成租户内菜单树。不能作为普通接口引擎的通用菜单查询能力。
+        /// </summary>
+        DosResult GetLegacyInitMenuTree(string token, string osClient = null);
+
+        /// <summary>按当前用户完整业务上下文签发私有文件审计代理地址。</summary>
+        DosResult GetAuthorizedPrivateFileUrl(dynamic dynamicParam);
+
+        /// <summary>在租户开通 Before Hook 前校验可信主租户登录身份。</summary>
+        DosResult AuthorizeCurrentUserTenantProvisioning();
+
+        /// <summary>仅供官方租户开通接口按可信当前用户创建其 SaaS 租户。</summary>
+        DosResult ProvisionCurrentUserTenant(dynamic dynamicParam);
+
+        /// <summary>仅供官方个人资料接口校验可信目标用户和租户头像路径。</summary>
+        DosResult PrepareCurrentUserProfileUpdate(dynamic dynamicParam);
+
+        /// <summary>仅供官方系统账号 Managed 接口执行可信账号管理原子。</summary>
+        dynamic ManageSysUserAdmin(dynamic dynamicParam);
+
+        /// <summary>
+        /// 仅供官方升级资源接口执行发布控制面授权：固定接口、固定官方租户、
+        /// 拒绝访问密钥，并从主库复核当前平台管理员身份。
+        /// </summary>
+        DosResult AuthorizeOfficialResourcePublish();
+
+        /// <summary>校验官方租户私有设置接口的管理员身份、Key 和非 Secret 边界。</summary>
+        DosResult ValidateTenantSystemSettingsOperation(dynamic dynamicParam);
+
+        /// <summary>返回租户私有设置的最小 Secret 状态与迁移 Key 投影，不含任何值或密文。</summary>
+        DosResult GetTenantSystemSettingsSecurityProjection();
 
         /// <summary>
         /// 读取当前租户公有或私有桶中的受控 UTF-8 文本文件。
@@ -262,6 +318,12 @@ namespace Microi.net
 
         /// <summary>调用 AI 插件的工作流图谱原子能力；动作编排由官方接口引擎完成。</summary>
         DosResult ManageAiWorkflow(dynamic dynamicParam);
+
+        /// <summary>
+        /// 调用 AI 平台的密钥、额度、供应商协议、任务句柄与媒体落盘受信原子；
+        /// 套餐、订阅和订单等普通业务编排由官方 Managed 接口引擎完成。
+        /// </summary>
+        DosResult ManageAiPlatform(dynamic dynamicParam);
 
         /// <summary>
         /// 使用当前租户后端私有配置生成腾讯 IM UserSig；Secret 不接受前端或 V8 参数。

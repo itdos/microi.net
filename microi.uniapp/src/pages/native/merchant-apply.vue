@@ -29,7 +29,7 @@
 
         <view class="section-title"><text>资质材料</text></view>
         <view class="upload-panel">
-          <view v-for="field in uploadFields" :key="field.key" class="upload-row"><text class="field-label">{{ field.label }}</text><mci-media-uploader v-model="form[field.key]" :max-count="field.max" :upload-path="`xjy/merchant/${field.key}`" /></view>
+          <view v-for="field in uploadFields" :key="field.key" class="upload-row"><text class="field-label">{{ field.label }}</text><mci-media-uploader v-model="form[field.key]" :max-count="field.max" :upload-path="`xjy/merchant/${field.key}`" :file-context="uncommittedFileContext" /></view>
         </view>
         <view class="bottom-space"></view>
       </view>
@@ -43,13 +43,18 @@ import { themeMixin } from '@/utils/theme.js'
 import { getToken, getUser, V8 } from '@/utils/request.js'
 import { captureInvitation, getInvitation, clearInvitation } from '@/platform/invitation.js'
 
+// 商家资质随 Diy_Tenant 新记录一次提交；保存前不存在可验证的 FormDataId。
+// 新上传使用本地临时地址预览，意外回填的私有路径必须保持失败关闭。
+const UNCOMMITTED_PRIVATE_FILE_CONTEXT = Object.freeze({ private: true, failClosed: true })
+
 export default {
   mixins: [themeMixin],
   data() {
     return {
       loading: true, submitting: false, initialized: false, currentUser: {}, industries: [], industry: null, region: [],
       form: { TenantName: '', Dizhi: '', LianxiR: '', LianxiRDH: '', ZhuyingCP: '', YingyeKSSJ: '', YingyeJSSJ: '', ShangjiaJS: '', ShangjiaZZ: '', ErweiMJT: '', GaoxinQY: '', ISO: '', ThreeA: '' },
-      uploadFields: [{ key: 'ShangjiaZZ', label: '商家资质', max: 6 }, { key: 'ErweiMJT', label: '二维码截图', max: 1 }, { key: 'GaoxinQY', label: '高新企业资质', max: 3 }, { key: 'ISO', label: 'ISO 资质', max: 3 }, { key: 'ThreeA', label: '3A 资质', max: 3 }]
+      uploadFields: [{ key: 'ShangjiaZZ', label: '商家资质', max: 6 }, { key: 'ErweiMJT', label: '二维码截图', max: 1 }, { key: 'GaoxinQY', label: '高新企业资质', max: 3 }, { key: 'ISO', label: 'ISO 资质', max: 3 }, { key: 'ThreeA', label: '3A 资质', max: 3 }],
+      uncommittedFileContext: UNCOMMITTED_PRIVATE_FILE_CONTEXT
     }
   },
   computed: { alreadyJoined() { return Boolean(this.currentUser.TenantId) } },

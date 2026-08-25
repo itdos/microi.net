@@ -28,19 +28,19 @@ var DiyApi = {
         DelFormDataByWhere: "/api/FormEngine/DelFormDataByWhere"
     },
     GetSysUser: function () {
-        return "/api/SysUser/GetSysUser"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-user-admin?Action=GetSysUser";
     },
     // GetSysUserFk: function() {
     //   return '/api/sysuserfk/getSysUserfk' //' + DiyCommon.GetApiClientUrl() + '
     // },
     UptSysUser: function () {
-        return "/api/SysUser/uptSysUser"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-user-admin?Action=UptSysUser";
     },
     AddSysUser: function () {
-        return "/api/SysUser/addSysUser"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-user-admin?Action=AddSysUser";
     },
     DelSysUser: function () {
-        return "/api/SysUser/delSysUser"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-sys-user-admin?Action=DelSysUser";
     },
 
     GetSysRole: function () {
@@ -74,7 +74,7 @@ var DiyApi = {
     // },
     // GetCurrentUser: '/api/' + joinUrl + 'SysUser/GetCurrentUser',
     GetCurrentUser: function () {
-        return "/api/SysUser/GetCurrentUser"; //' + DiyCommon.GetApiClientUrl() + '
+        return "/apiengine/platform-current-user";
     },
 
     /**

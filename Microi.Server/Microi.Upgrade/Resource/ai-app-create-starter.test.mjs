@@ -5,6 +5,7 @@ import vm from "node:vm";
 
 const packageModel = JSON.parse(await readFile(new URL("./app.microi.store.json", import.meta.url), "utf8"));
 const standardSdk = (await readFile(new URL("../../../microi.skills/microi.v8.js", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
+const standardAuthBridge = (await readFile(new URL("../../../microi.skills/microi-ai-app-auth.js", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
 const createEngines = packageModel.SysApiEngines.filter(item => item.ApiEngineKey === "ai_app_create");
 
 assert.equal(createEngines.length, 1, "ai_app_create must exist exactly once");
@@ -133,6 +134,13 @@ function assertStableVueBaseline(files, applicationType) {
   assert.match(map.get("src/platform/microi.ts"), /window\.__MICROI_APP_CONTEXT__/);
   assert.match(map.get("src/platform/microi.ts"), /window\.microApp\?\.getData/);
   assert.equal(map.get("src/utils/microi.v8.js"), standardSdk, "starter must embed the maintained Microi SDK");
+  assert.doesNotMatch(standardSdk, /\/api\/(?:DiyTable\/getSysConfig|FormEngine\/GetSysConfig|SysUser\/getCurrentUser|Os\/getOsClientByDomain)/i);
+  assert.match(standardSdk, /\/apiengine\/platform-sys-config/);
+  assert.match(standardSdk, /\/apiengine\/platform-current-user/);
+  assert.match(standardSdk, /\/apiengine\/platform-os-client-by-domain/);
+  assert.doesNotMatch(standardSdk, /requestPrivate\(['"]GetPrivateFileUrl['"]\)/);
+  assert.doesNotMatch(standardSdk, /requestPrivate\(['"]MallFileUrl['"]\)/);
+  assert.match(standardSdk, /platform-private-file-url/);
 
   const businessSource = files
     .filter(file => file.FilePath !== "src/utils/microi.v8.js")
@@ -143,6 +151,13 @@ function assertStableVueBaseline(files, applicationType) {
   assert.doesNotMatch(businessSource, /assets\/app\.js/);
   assert.doesNotMatch(businessSource, /src\/main\.js/);
 }
+
+test("canonical AI app auth bridge uses V8-first platform routes", () => {
+  assert.doesNotMatch(standardAuthBridge, /\/api\/(?:FormEngine\/GetSysConfig|SysUser\/GetCurrentUser)/i);
+  assert.match(standardAuthBridge, /\/apiengine\/platform-sys-config\?OsClient=/);
+  assert.match(standardAuthBridge, /\/apiengine\/platform-current-user\?OsClient=/);
+  assert.match(standardAuthBridge, /apiengine:\s*['"]1['"]/);
+});
 
 test("ai_app_create keeps one versioned and syntactically valid engine", () => {
   assert.ok(compareSemver(engine.Version, "v1.1.8") >= 0);

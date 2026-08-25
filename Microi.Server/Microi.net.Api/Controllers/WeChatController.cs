@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Google.Protobuf.WellKnownTypes;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using Senparc.Weixin;
@@ -12,10 +10,7 @@ using Senparc.Weixin.MP;
 using Senparc.Weixin.MP.AdvancedAPIs;
 using Senparc.Weixin.MP.AdvancedAPIs.OAuth;
 using Dos.Common;
-using System.Net;
-using Senparc.CO2NET.Extensions;
 using Microsoft.AspNetCore.Cors;
-using Senparc.Weixin.MP.AdvancedAPIs.TemplateMessage;
 using Senparc.Weixin.MP.Containers;
 using StackExchange.Redis;
 
@@ -31,49 +26,7 @@ namespace Microi.net.Api.Controllers
     public class WeChatController : Controller
     {
         private const int OAuthStateLifetimeMinutes = 10;
-        private const int MaxOAuthReturnUrlLength = 2048;
-
-        private static bool IsAllowedOAuthReturnUrl(string returnUrl)
-        {
-            if (returnUrl.DosIsNullOrWhiteSpace()) return true;
-            returnUrl = returnUrl.Trim();
-            if (returnUrl.Length > MaxOAuthReturnUrlLength
-                || returnUrl.IndexOfAny(new[] { '\r', '\n', '\\' }) >= 0)
-            {
-                return false;
-            }
-
-            // Same-site SPA routes remain compatible without creating an open redirect.
-            if (returnUrl.StartsWith("/", StringComparison.Ordinal)
-                && !returnUrl.StartsWith("//", StringComparison.Ordinal))
-            {
-                return Uri.TryCreate(returnUrl, UriKind.Relative, out _);
-            }
-
-            if (!Uri.TryCreate(returnUrl, UriKind.Absolute, out var returnUri)
-                || !string.Equals(returnUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-                || !returnUri.UserInfo.DosIsNullOrWhiteSpace())
-            {
-                return false;
-            }
-
-            var configuredOrigins = ConfigHelper.GetRuntimeConfigurationValue(
-                "Security:OAuthReturnUrlOrigins");
-            if (configuredOrigins.DosIsNullOrWhiteSpace()) return false;
-
-            var returnOrigin = returnUri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
-            return configuredOrigins
-                .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(item => item.Trim().TrimEnd('/'))
-                .Any(item =>
-                    Uri.TryCreate(item, UriKind.Absolute, out var allowedUri)
-                    && string.Equals(allowedUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-                    && allowedUri.UserInfo.DosIsNullOrWhiteSpace()
-                    && string.Equals(
-                        allowedUri.GetLeftPart(UriPartial.Authority).TrimEnd('/'),
-                        returnOrigin,
-                        StringComparison.OrdinalIgnoreCase));
-        }
+        private const string UserBindingApiEngineKey = "platform-wechat-user-binding";
 
         private static string OAuthStateCacheKey(string osClient, string state)
         {
@@ -158,117 +111,6 @@ return ''";
         }
 
         /// <summary>
-        /// 根据公众号用户openid推送模板消息给特定用户
-        /// </summary>
-        private bool SendTemplateMessage(string openId)
-        {
-            try
-            {
-                var appId = ConfigHelper.GetRuntimeConfigurationValue(
-                    "Integrations:WeChat:TemplateAppId");
-                var appSecret = ConfigHelper.GetRuntimeConfigurationValue(
-                    "Integrations:WeChat:TemplateAppSecret");
-                var templateId = ConfigHelper.GetRuntimeConfigurationValue(
-                    "Integrations:WeChat:TemplateId");
-                var miniProgramAppId = ConfigHelper.GetRuntimeConfigurationValue(
-                    "Integrations:WeChat:MiniProgramAppId");
-                if (openId.DosIsNullOrWhiteSpace()
-                    || appId.DosIsNullOrWhiteSpace()
-                    || appSecret.DosIsNullOrWhiteSpace()
-                    || templateId.DosIsNullOrWhiteSpace())
-                {
-                    return false;
-                }
-
-                string linkUrl = "";    //点击详情后跳转后的链接地址，为空则不跳转  
-                                        //根据appId判断获取    
-                if (!AccessTokenContainer.CheckRegistered(appId))    //检查是否已经注册
-                {
-                    AccessTokenContainer.RegisterAsync(appId, appSecret).GetAwaiter().GetResult();
-                }
-                string accessToken = Senparc.Weixin.MP.CommonAPIs.CommonApi.GetToken(appId, appSecret).access_token;
-
-                //传入UserId、模板Key、Dictionary<string,string>
-                var data = new Dictionary<string, string>() {
-                        { "first", "这是first" },
-                        { "keyword1", "这是keyword1" },
-                        { "keyword2", "这是keyword2" },
-                        { "keyword3", "这是keyword3" },
-                        { "keyword4", "这是keyword3" },
-                        { "keyword5", "这是keyword3" },
-                        { "remark", "这是remark" },
-                    };
-                var templateData = new ProductTemplateData();
-                var type = templateData.GetType();
-                foreach (var item in data)
-                {
-                    var pi = type.GetProperty(item.Key);
-                    pi?.SetValue(templateData, new TemplateDataItem(item.Value));
-                }
-
-                SendTemplateMessageResult sendResult = null;
-                sendResult = TemplateApi.SendTemplateMessage(accessToken, openId, templateId, linkUrl, templateData, new TemplateModel_MiniProgram()
-                {
-                    appid = miniProgramAppId ?? "",
-                    pagepath = ""
-                });
-
-                //发送成功  
-                if (sendResult.errcode.ToString() == "请求成功")
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-            catch
-            {
-                return false;
-            }
-
-        }
-        /// <summary>  
-        /// 定义模版中的字段属性（需与微信模版中的一致）  
-        /// </summary>  
-        public class ProductTemplateData
-        {
-            /// <summary>
-            /// 
-            /// </summary>
-            public TemplateDataItem first { get; set; }
-            /// <summary>
-            /// 
-            /// </summary>
-            public TemplateDataItem keyword1 { get; set; }
-            /// <summary>
-            /// 
-            /// </summary>
-            public TemplateDataItem keyword2 { get; set; }
-            /// <summary>
-            /// 
-            /// </summary>
-            public TemplateDataItem keyword3 { get; set; }
-            /// <summary>
-            /// 
-            /// </summary>
-            public TemplateDataItem keyword4 { get; set; }
-            /// <summary>
-            /// 
-            /// </summary>
-            public TemplateDataItem keyword5 { get; set; }
-            /// <summary>
-            /// 
-            /// </summary>
-            public TemplateDataItem keyword6 { get; set; }
-            /// <summary>
-            /// 
-            /// </summary>
-            public TemplateDataItem remark { get; set; }
-        }
-
-        /// <summary>
         /// 必传 Authorization 请求头（兼容 POST 表单 authorization）、OsClient，可选 ReturnUrl。
         /// 禁止通过 GET/query 传 Token，避免访问日志、浏览器历史和 Referer 泄露。
         /// </summary>
@@ -293,15 +135,35 @@ return ''";
             {
                 ReturnUrl = "";
             }
-            if (!IsAllowedOAuthReturnUrl(ReturnUrl))
-            {
-                return Content("返回URL验证失败：仅允许站内路径或已配置的可信HTTPS Origin");
-            }
             //解析authorization
             var tokenModelJobj = await DiyToken.GetCurrentToken(authorization, OsClient);
             if (tokenModelJobj == null)
             {
                 return Content("无效的token！");
+            }
+            string trustedOsClient;
+            try
+            {
+                trustedOsClient = TenantConfigurationSecurity.NormalizeTenantId(tokenModelJobj.OsClient);
+                if (!OsClient.DosIsNullOrWhiteSpace()
+                    && !string.Equals(
+                        TenantConfigurationSecurity.NormalizeTenantId(OsClient),
+                        trustedOsClient,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return Content("Token 与 OsClient 不一致！");
+                }
+            }
+            catch
+            {
+                return Content("OsClient 无效！");
+            }
+            if (!TenantProtocolGatewaySettings.TryLoadOAuthReturnUrlPolicy(
+                    trustedOsClient,
+                    out var returnUrlPolicy)
+                || !returnUrlPolicy.IsAllowed(ReturnUrl))
+            {
+                return Content("返回URL验证失败：仅允许站内路径或当前租户配置的可信HTTPS Origin");
             }
             var sysUserDynamic = tokenModelJobj.CurrentUser;
             if (sysUserDynamic["WxMpId"] == null || sysUserDynamic["WxMpId"].Val<string>().DosIsNullOrWhiteSpace())
@@ -312,7 +174,7 @@ return ''";
             {
                 FormEngineKey = "wx_mp",
                 Id = sysUserDynamic["WxMpId"].Val<string>(),
-                OsClient = OsClient
+                OsClient = trustedOsClient
             });
             if (wxmpModelResult.Code != 1)
             {
@@ -338,7 +200,7 @@ return ''";
                         Type = "="
                     }
                 },
-                OsClient = OsClient
+                OsClient = trustedOsClient
             });
             if (sysConfigResult.Code != 1)
             {
@@ -352,7 +214,7 @@ return ''";
             }
 
             var oauthState = await CreateOAuthStateAsync(
-                OsClient,
+                trustedOsClient,
                 sysUserDynamic["Id"].Val<string>(),
                 sysUserDynamic["WxMpId"].Val<string>(),
                 ReturnUrl);
@@ -363,7 +225,7 @@ return ''";
 
             var urlBase = OAuthApi.GetAuthorizeUrl(
                                 appId,
-                                $"{apiBase}/WeChat/UserInfoCallback?o={Uri.EscapeDataString(OsClient)}",
+                                $"{apiBase}/WeChat/UserInfoCallback?OsClient={Uri.EscapeDataString(trustedOsClient)}",
                                 oauthState, OAuthScope.snsapi_userinfo);
             return Redirect(urlBase);
         }
@@ -374,14 +236,23 @@ return ''";
         /// <param name="returnUrl">用户最初尝试进入的页面</param>
         /// <returns></returns>
         [HttpPost, HttpGet]
-        public async Task<ActionResult> UserInfoCallback(string code, string state, string o)
+        public async Task<ActionResult> UserInfoCallback(string code, string state, string OsClient, string o)
         {
             if (string.IsNullOrEmpty(code))
             {
                 return Content("您拒绝了授权！");
             }
 
-            var oauthTicket = await ConsumeOAuthStateAsync(o, state);
+            // 新生成的第三方回调固定使用 ?OsClient=。短期兼容旧版已发出的 ?o= 链接，
+            // 但两者同时出现时必须一致，避免租户选择歧义。
+            if (!OsClient.DosIsNullOrWhiteSpace()
+                && !o.DosIsNullOrWhiteSpace()
+                && !string.Equals(OsClient.Trim(), o.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return Content("授权票据租户参数不一致！");
+            }
+            var callbackOsClient = OsClient.DosIsNullOrWhiteSpace() ? o : OsClient;
+            var oauthTicket = await ConsumeOAuthStateAsync(callbackOsClient, state);
             if (oauthTicket == null)
             {
                 return Content("授权票据无效或已过期！");
@@ -396,18 +267,12 @@ return ''";
             {
                 return Content("授权票据内容无效！");
             }
-
-            var sysUserResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+            if (!TenantProtocolGatewaySettings.TryLoadOAuthReturnUrlPolicy(
+                    osClient,
+                    out var returnUrlPolicy))
             {
-                FormEngineKey = "sys_user",
-                Id = userId,
-                OsClient = osClient
-            });
-            if (sysUserResult.Code != 1)
-            {
-                return Content("用户不存在或已被停用！");
+                return Content("租户配置无效或已停用！");
             }
-            var sysUserDynamic = JObject.FromObject(sysUserResult.Data);
 
             var wxmpModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
@@ -450,51 +315,54 @@ return ''";
             //因为第一步选择的是OAuthScope.snsapi_userinfo，这里可以进一步获取用户详细信息
             try
             {
-                var _formData = new Dictionary<string, string>() {
-                    { "WxOpenId", result.openid},
-                };
                 OAuthUserInfo userInfo = OAuthApi.GetUserInfo(result.access_token, result.openid);
-                if (userInfo != null)
+                var bindingRequest = new JObject
                 {
-                    _formData.Add("WxAvatar", userInfo.headimgurl);
-                    try
-                    {
-                        _formData.Add("WxNickName", userInfo.nickname);
-                    }
-                    catch (Exception ex)
-                    {
-
-                    }
+                    ["Action"] = "Bind",
+                    ["TrustedUserId"] = userId,
+                    ["WxMpId"] = wxMpId,
+                    ["WxOpenId"] = result.openid,
+                    ["WxAvatar"] = userInfo?.headimgurl ?? string.Empty,
+                    ["WxNickName"] = userInfo?.nickname ?? string.Empty
+                };
+                var rawBindingResult = await ManagedApiEngineCompatibility.RunTrustedProtocolAsync(
+                    UserBindingApiEngineKey,
+                    osClient,
+                    bindingRequest).ConfigureAwait(false);
+                var bindingResult = ToResultObject(rawBindingResult);
+                if (bindingResult?["Code"].Val<int>() != 1)
+                {
+                    return Content("绑定失败：" + (bindingResult?["Msg"]?.ToString() ?? "官方微信绑定接口不可用。"));
                 }
-
-                var uptSysUserResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
-                {
-                    FormEngineKey = "sys_user",
-                    Id = userId,
-                    _RowModel = _formData,
-                    CurrentUser = sysUserDynamic,
-                    OsClient = osClient
-                });
 
                 if (!string.IsNullOrEmpty(returnUrl))
                 {
-                    if (!IsAllowedOAuthReturnUrl(returnUrl))
+                    if (!returnUrlPolicy.IsAllowed(returnUrl))
                     {
-                        return Content("返回URL验证失败：仅允许站内路径或已配置的可信HTTPS Origin");
+                        return Content("返回URL验证失败：仅允许站内路径或当前租户配置的可信HTTPS Origin");
                     }
                     return Redirect(returnUrl);
                 }
-                if (uptSysUserResult.Code == 1)
-                {
-                    return Content("绑定成功！");
-                }
-                return Content("绑定失败：" + uptSysUserResult.Msg);
+                return Content("绑定成功！");
                 //return View(userInfo);
             }
             catch (ErrorJsonResultException ex)
             {
                 return Content(ex.Message);
             }
+        }
+
+        private static JObject ToResultObject(object result)
+        {
+            if (result == null) return null;
+            if (result is JObject jobject) return jobject;
+            if (result is string json)
+            {
+                try { return JObject.Parse(json); }
+                catch { return null; }
+            }
+            try { return JObject.FromObject(result); }
+            catch { return null; }
         }
         ///// <summary>
         ///// OAuthScope.snsapi_base方式回调

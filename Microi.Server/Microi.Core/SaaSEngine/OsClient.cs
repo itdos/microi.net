@@ -22,22 +22,6 @@ namespace Microi.net
                 ["DiyLang:RuntimeCacheMaxRows"] = new[] { "DiyLangRuntimeCacheMaxRows" },
                 ["DiyLang:RuntimeCacheMaxCharacters"] = new[] { "DiyLangCacheMaxChars", "DiyLangRuntimeCacheMaxCharacters" },
                 ["DiyLang:RuntimeCacheCommandTimeoutSeconds"] = new[] { "DiyLangCacheSqlTimeoutSec", "DiyLangRuntimeCacheCommandTimeoutSeconds" },
-                ["Security:OAuthReturnUrlOrigins"] = new[] { "OAuthReturnUrlOrigins" },
-                ["Integrations:Chanjet:OAuthState"] = new[] { "ChanjetOAuthState" },
-                ["Integrations:Chanjet:AesKey"] = new[] { "ChanjetAesKey" },
-                ["Integrations:Chanjet:AppKey"] = new[] { "ChanjetAppKey" },
-                ["Integrations:WeChat:TemplateAppId"] = new[] { "WeChatTemplateAppId" },
-                ["Integrations:WeChat:TemplateAppSecret"] = new[] { "WeChatTemplateAppSecret" },
-                ["Integrations:WeChat:TemplateId"] = new[] { "WeChatTemplateId" },
-                ["Integrations:WeChat:MiniProgramAppId"] = new[] { "WeChatMiniProgramAppId" },
-                // 将当前租户的小程序内容安全凭据映射到统一运行配置键。
-                ["Integrations:WeChat:MiniProgramAppSecret"] = new[] { "WeChatMiniProgramAppSecret" },
-                ["Integrations:WeChat:MiniProgramMessageToken"] = new[] { "WeChatMiniProgramMessageToken" },
-                ["Integrations:WeChat:MiniProgramEncodingAESKey"] = new[]
-                {
-                    "WeChatMiniProgramAESKey",
-                    "WeChatMiniProgramEncodingAESKey"
-                },
                 ["Cors:AllowOrigins"] = new[] { "CorsAllowOrigins" },
                 ["Cors:AllowAnyWhenUnconfigured"] = new[] { "CorsAllowAnyWhenUnconfigured" },
                 ["SsrfProtection:Enabled"] = new[] { "SsrfProtectionEnabled" },

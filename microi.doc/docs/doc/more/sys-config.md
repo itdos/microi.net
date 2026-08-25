@@ -15,6 +15,18 @@
 
 “是否启用、是否显示、采用哪种公开交互方式”这类浏览器和管理员都需要判断的能力开关，必须建成 `sys_config` 实体字段，不能因为它与登录、OAuth 或安全功能有关就塞进“安全与服务接入”。“安全与服务接入”只维护 API Key、ClientSecret、RP ID、Origin、Issuer、供应商地址、Scope 等不能公开或仅供后端执行的参数。两边禁止维护同一个新配置；存量 `mci_system_setting` 开关只作升级兼容回退，保存入口和列表均不再展示。
 
+## 系统设置官方应用与 Secret 边界
+
+独立官方应用 `app.microi.sys-config` 唯一交付以下接口引擎：
+
+- `platform-tenant-system-settings` 是 Managed 核心，只编排管理员列表、删除和非 Secret 保存；
+- `platform-system-settings-custom-hook` 是 CreateIfMissing 租户扩展，默认直接返回 `{ Code: 1 }`，官方升级不覆盖；
+- Hook 只接收阶段、设置 Id、ConfigKey 和结果数量，不接收 `ConfigValue`、`SecretCipher` 或 Secret 原文。
+
+安装、更新或重新安装“系统设置”会恢复 Managed 核心源码，因此租户逻辑必须写入 Hook。旧 `/api/TenantSystemSettings/List`、`Delete` 与非 Secret `Save` 只保留兼容转发。Secret/Sensitive Key 保存仍由可信 C# 立即转换为租户绑定认证密文；`GetRevealChallenge + Reveal` 仍要求超级管理员的普通 DiyToken 会话和一次性 Passkey/TOTP/严格人脸票据。访问密钥、匿名 V8、普通 FormEngine HTTP 和租户 Hook 都不能获得通用加解密或 Reveal 能力。
+
+基础 SaaS 空库包仍可携带新租户初始化所需的表、字段和默认模板，但上述两个接口引擎只允许“系统设置”包拥有；SaaS 与应用商城包不得复制同 Key Managed 资源，避免多个官方包相互覆盖。
+
 ## 登录与身份能力开关
 
 登录与身份能力的公开正向开关如下：

@@ -1021,15 +1021,18 @@ export default {
         });
 
         try {
-            self.DiyCommon.PostAsync(
-                "/api/FormEngine/GetSysConfig",
-                {
+            self.DiyCommon.PostAsync({
+                url: "/apiengine/platform-sys-config",
+                data: {
                     _SearchEqual: {
                         IsEnable: 1
                     },
                     OsClient: self.OsClient
                 },
-                async function (sysConfigResult) {
+                skipAuthorization: true,
+                suppressAuthFailure: true,
+                suppressErrorNotification: true,
+                success: async function (sysConfigResult) {
                     if (sysConfigResult.Code == 1) {
                         var sysConfig = sysConfigResult.Data;
                         // 服务端可以公开与部署私钥配对的公钥；本地显式配置仍优先。
@@ -1042,7 +1045,7 @@ export default {
                         await self.LoadLoginWallpapers(sysConfig);
                     }
                 }
-            );
+            }).catch(function () {});
         } catch (error) {}
         var pageTypeReg = new RegExp("(^|&)" + "PageType" + "=([^&]*)(&|$)");
         var pageTypeRegResult = window.location.search.substr(1).match(pageTypeReg);
@@ -1269,15 +1272,15 @@ export default {
             var loadVersion = ++this.WallpaperLoadVersion;
             this.WallpaperLoading = true;
             try {
-                var response = await this.$axios.get(
-                    this.DiyCommon.GetApiBase() + "/api/FormEngine/GetLoginWallpapers",
-                    {
-                        params: {
-                            OsClient: this.OsClient
-                        }
-                    }
-                );
-                var result = response && response.data;
+                var result = await this.DiyCommon.PostAsync({
+                    url: "/apiengine/platform-login-wallpapers",
+                    data: {
+                        OsClient: this.OsClient
+                    },
+                    skipAuthorization: true,
+                    suppressAuthFailure: true,
+                    suppressErrorNotification: true
+                });
                 if (loadVersion !== this.WallpaperLoadVersion || this.LoginComponentUnmounted) return;
                 this.LoginWallpapers = normalizeLoginWallpapers(
                     result && result.Code === 1 ? result.Data : [],
@@ -1668,42 +1671,44 @@ export default {
                 }
             );
         },
-        SendSms() {
+        async SendSms() {
             var self = this;
             // 保存当前的验证码ID和图片，防止被刷新
             var currentCaptchaId = self.RegCaptchaId;
             var currentCaptchaImgSrc = $("#CaptchaImgReg").attr("src");
 
-            self.DiyCommon.Post({
-                url: "/api/sms/send",
-                data: {
-                    Phone: self.RegModel.Phone,
-                    _CaptchaId: self.RegCaptchaId,
-                    _CaptchaValue: self.RegCaptchaValue,
-                    OsClient: self.OsClient
-                },
-                dataType: "json",
-                success: function (result) {
-                    if (self.DiyCommon.Result(result)) {
-                        self.DiyCommon.Tips("发送成功！");
-                        // 确保图形验证码不被刷新，恢复之前的验证码ID和图片
-                        // 使用 $nextTick 确保在 DOM 更新后再恢复验证码
-                        self.$nextTick(function () {
-                            if (currentCaptchaId && currentCaptchaImgSrc) {
-                                self.RegCaptchaId = currentCaptchaId;
-                                $("#CaptchaImgReg").attr("src", currentCaptchaImgSrc);
-                            }
-                        });
-                    }
+            try {
+                var result = await self.DiyCommon.PostAsync({
+                    url: "/apiengine/send_sms_reg",
+                    data: {
+                        Phone: self.RegModel.Phone,
+                        _CaptchaId: self.RegCaptchaId,
+                        _CaptchaValue: self.RegCaptchaValue,
+                        OsClient: self.OsClient
+                    },
+                    dataType: "json",
+                    skipAuthorization: true,
+                    suppressAuthFailure: true
+                });
+                if (self.DiyCommon.Result(result)) {
+                    self.DiyCommon.Tips("发送成功！");
+                    // 确保图形验证码不被刷新，恢复之前的验证码ID和图片
+                    // 使用 $nextTick 确保在 DOM 更新后再恢复验证码
+                    self.$nextTick(function () {
+                        if (currentCaptchaId && currentCaptchaImgSrc) {
+                            self.RegCaptchaId = currentCaptchaId;
+                            $("#CaptchaImgReg").attr("src", currentCaptchaImgSrc);
+                        }
+                    });
                 }
-            });
+            } catch (error) {}
         },
         OpenReg() {
             var self = this;
             self.GetCaptcha(null, "#CaptchaImgReg", "RegCaptchaId");
             self.ShowRegSysUser = true;
         },
-        Reg() {
+        async Reg() {
             var self = this;
             if (!self.RegModel.Pwd || !self.RegModel.Phone) {
                 self.DiyCommon.Tips("帐号密码不能为空！", false);
@@ -1714,28 +1719,51 @@ export default {
                 return;
             }
 
-            // 加密密码
-            var encryptedPwd = self.encryptPassword(self.RegModel.Pwd);
-            if (!encryptedPwd) {
-                return;
-            }
+            var registeredPhone = self.RegModel.Phone;
+            var registeredPassword = self.RegModel.Pwd;
+            try {
+                var result = await self.DiyCommon.PostAsync({
+                    url: "/apiengine/platform_auth_sms_login",
+                    data: {
+                        Phone: registeredPhone,
+                        SmsCode: self.RegModel.SmsCaptchaValue,
+                        // 此 Managed 接口接收 HTTPS 明文密码，并由可信 Core 原子做现代密码哈希；
+                        // 旧 RSA 密文不能复用，否则会被当作真实密码保存。
+                        Password: registeredPassword,
+                        OsClient: self.OsClient,
+                        _ClientType: self.diyStore.IsPhoneView ? "Mobile" : "PC",
+                        Did: self.DiyCommon.GetDid()
+                    },
+                    dataType: "json",
+                    skipAuthorization: true,
+                    suppressAuthFailure: true
+                });
+                if (!self.DiyCommon.Result(result)) return;
 
-            self.DiyCommon.Post({
-                url: "/api/SysUser/reg",
-                data: {
-                    Account: self.RegModel.Phone,
-                    Pwd: encryptedPwd, // 使用加密后的密码
-                    _SmsCaptchaValue: self.RegModel.SmsCaptchaValue,
-                    OsClient: self.OsClient
-                },
-                dataType: "json",
-                success: function (result) {
-                    if (self.DiyCommon.Result(result)) {
-                        self.DiyCommon.Tips("注册成功！");
-                        self.ShowRegSysUser = false;
+                // HTTP 响应头是首选；兼容未暴露 authorization 响应头的跨域部署，
+                // 再从接口引擎固定返回投影恢复同一 DiyToken。
+                var token = result.DataAppend?.Token || result.Data?.Authorization || "";
+                if (self.DiyCommon.IsNull(token)) {
+                    self.DiyCommon.Tips("注册成功，但未收到登录凭据，请重新登录。", false);
+                    return;
+                }
+                self.DiyCommon.ApplyAuthorizationToken(token, "");
+
+                self.Account = registeredPhone;
+                self.Pwd = registeredPassword;
+                self.ShowRegSysUser = false;
+                self.RegModel.Pwd = "";
+                self.RegModel.Pwd2 = "";
+                self.RegModel.SmsCaptchaValue = "";
+                self.RegCaptchaValue = "";
+                try {
+                    await self.CompleteIdentityLogin(result);
+                } catch (error) {
+                    if (!self.LoginComponentUnmounted) {
+                        self.DiyCommon.Tips("注册并登录成功，但进入系统失败，请重试。", false);
                     }
                 }
-            });
+            } catch (error) {}
         },
         GetCaptcha(sysConfig, imgId, captchaId) {
             var self = this;

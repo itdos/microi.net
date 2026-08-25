@@ -1,17 +1,21 @@
+using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using Microi.net;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace Microi.net.Api;
-
+namespace Microi.net
+{
 /// <summary>跨请求跟踪详情停留时间；Redis为主，本机内存为故障兜底。</summary>
 public sealed class UserBehaviorSessionTracker
 {
-    private readonly ConcurrentDictionary<string, DetailVisitState> _local = new();
-    private readonly ConcurrentDictionary<string, long> _dedup = new();
+    private readonly ConcurrentDictionary<string, DetailVisitState> _local =
+        new ConcurrentDictionary<string, DetailVisitState>();
+    private readonly ConcurrentDictionary<string, long> _dedup =
+        new ConcurrentDictionary<string, long>();
 
     public bool ShouldLogOnce(string key, TimeSpan window)
     {
@@ -28,7 +32,7 @@ public sealed class UserBehaviorSessionTracker
     }
 
     public async Task OpenDetailAsync(string osClient, JObject user, string table, string rowId, object row,
-        string? clientType, string? did)
+        string clientType, string did)
     {
         if (string.IsNullOrWhiteSpace(osClient) || string.IsNullOrWhiteSpace(table) || string.IsNullOrWhiteSpace(rowId)) return;
         var state = new DetailVisitState
@@ -49,11 +53,11 @@ public sealed class UserBehaviorSessionTracker
     }
 
     public async Task<long?> CloseDetailAsync(string osClient, JObject user, string table, string rowId,
-        string? clientType, string? did, string source)
+        string clientType, string did, string source)
     {
         if (string.IsNullOrWhiteSpace(osClient) || string.IsNullOrWhiteSpace(table) || string.IsNullOrWhiteSpace(rowId)) return null;
         var key = BuildKey(osClient, user?["Id"]?.ToString(), did, table, rowId);
-        DetailVisitState? state = null;
+        DetailVisitState state = null;
         try
         {
             var json = await MicroiEngine.CacheTenant.Cache(osClient).GetAsync<string>(key).ConfigureAwait(false);
@@ -64,7 +68,9 @@ public sealed class UserBehaviorSessionTracker
         if (state == null) _local.TryGetValue(key, out state);
         _local.TryRemove(key, out _);
 
-        long? seconds = state == null ? null : Math.Max(0, (long)(DateTime.Now - state.OpenedAt).TotalSeconds);
+        long? seconds = state == null
+            ? (long?)null
+            : Math.Max(0, (long)(DateTime.Now - state.OpenedAt).TotalSeconds);
         var context = new DiyTableRowParam
         {
             OsClient = osClient,
@@ -80,18 +86,25 @@ public sealed class UserBehaviorSessionTracker
         return seconds;
     }
 
-    public static string SessionIdFromToken(string? token)
+    public static string SessionIdFromToken(string token)
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-        return Convert.ToHexString(hash).Substring(0, 24).ToLowerInvariant();
+        return Sha256Hex(token).Substring(0, 24);
     }
 
-    private static string BuildKey(string osClient, string? userId, string? did, string table, string rowId)
+    private static string BuildKey(string osClient, string userId, string did, string table, string rowId)
     {
         var raw = $"{osClient}|{userId}|{did}|{table}|{rowId}";
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
+        var hash = Sha256Hex(raw);
         return $"Microi:{osClient}:Audit:Detail:{hash}";
+    }
+
+    private static string Sha256Hex(string value)
+    {
+        using var sha = SHA256.Create();
+        return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value ?? string.Empty)))
+            .Replace("-", string.Empty)
+            .ToLowerInvariant();
     }
 
     private sealed class DetailVisitState
@@ -101,4 +114,5 @@ public sealed class UserBehaviorSessionTracker
         public string RowId { get; set; }
         public JObject Preview { get; set; }
     }
+}
 }

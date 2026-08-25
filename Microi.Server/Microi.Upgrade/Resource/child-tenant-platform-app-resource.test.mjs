@@ -24,9 +24,13 @@ const taskServiceSource = fs.readFileSync(
   path.join(directory, "../../Microi.Core/Runtime/BackgroundTaskService.cs"),
   "utf8"
 );
+const maintenanceGeneratorSource = fs.readFileSync(
+  path.join(directory, "configure-child-tenant-platform-app-maintenance-resource.mjs"),
+  "utf8"
+);
 
 test("module package exposes the menu badge tooltip as a physical field", () => {
-  assert.equal(modulePackage.PackageInfo.Version, "v7.5.5");
+  assert.equal(modulePackage.PackageInfo.Version, "v7.6.1");
   assert.ok(modulePackage.PackageInfo.RequiredPlatformCapabilities.includes(
     "ServerField:SysMenu.MenuBadgeTooltip"
   ));
@@ -100,6 +104,18 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(button?.V8Code || "", /RunBackground/);
   assert.match(button?.V8Code || "", /microi-background-task-started/);
   assert.equal(saasPackage.PackageInfo.ApiEngineCount, saasPackage.SysApiEngines.length);
+});
+
+test("child-tenant maintenance generator preserves newer package metadata", () => {
+  assert.match(
+    maintenanceGeneratorSource,
+    /ensureMinimumPackageVersion\(saasPackage\.PackageInfo, "v7\.5\.31"\)/,
+  );
+  assert.doesNotMatch(
+    maintenanceGeneratorSource,
+    /saasPackage\.PackageInfo\.Version\s*=\s*"v7\.5\.31"/,
+  );
+  assert.doesNotMatch(maintenanceGeneratorSource, /PackageInfo\.ChangeLog\s*=/);
 });
 
 test("target tenant marker is stripped from public submissions and restored after continuations", () => {

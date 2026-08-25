@@ -475,10 +475,12 @@ export default {
                 //取临时链接 _ImportTemplateUrl
                 // self.DiyCommon.Post('/api/Aliyun/GetOssDownloadUrl',{
                 self.DiyCommon.Post(
-                    "/api/HDFS/GetPrivateFileUrl",
+                    "/apiengine/platform-private-file-url",
                     {
                         FilePathName: self.CurrentSysDeptModel.ImportTemplate,
-                        HDFS: self.SysConfig.HDFS || "Aliyun"
+                        HDFS: self.SysConfig.HDFS || "Aliyun",
+                        ResourceKind: "DeptImportTemplate",
+                        ResourceId: self.CurrentSysDeptModel.Id
                     },
                     function (result) {
                         if (self.DiyCommon.Result(result)) {

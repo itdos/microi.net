@@ -50,14 +50,14 @@ test('remote login session persists, reconnects and reports missing target capab
     const corsHeaders = {
       'access-control-allow-origin': '*',
       'access-control-allow-methods': 'GET,POST,OPTIONS',
-      'access-control-allow-headers': 'content-type,osclient,authorization',
+      'access-control-allow-headers': 'content-type,osclient,authorization,apiengine',
       'access-control-expose-headers': 'authorization,captchaid'
     }
     if (route.request().method() === 'OPTIONS') {
       await route.fulfill({ status: 204, headers: corsHeaders, body: '' })
       return
     }
-    if (url.pathname === '/api/FormEngine/GetSysConfig') {
+    if (url.pathname === '/apiengine/platform-sys-config') {
       await route.fulfill({ headers: corsHeaders, json: { Code: 1, Data: { EnableCaptcha: 0 } } })
       return
     }

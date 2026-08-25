@@ -436,7 +436,7 @@ namespace Microi.net.Api.Controllers
             {
                 try
                 {
-                    _ = MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                    MicroiEngine.QueueSysLog(new SysLogParam()
                     {
                         Type = "工作流合并提交慢日志",
                         Title = timingData["Action"] + " 执行时间：" + totalSw.ElapsedMilliseconds + "ms",

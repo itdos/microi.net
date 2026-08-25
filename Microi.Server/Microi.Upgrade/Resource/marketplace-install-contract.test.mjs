@@ -176,7 +176,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.4\.2/);
+  assert.match(importerSource, /Version: v2\.4\.4/);
   assert.match(importerSource, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
   assert.match(importerSource, /storeApiBase \+ '\/apiengine\/'/);
   assert.doesNotMatch(importerSource, /\/api\/ApiEngine\/Run/);
@@ -208,6 +208,12 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /actualCode !== expectedCode/);
   assert.match(importerSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(importerSource, /UpgradePolicy == 'CreateIfMissing'/);
+  assert.match(importerSource, /TENANT_CREATE_IF_MISSING_TOMBSTONE_V1/);
+  assert.match(
+    importerSource,
+    /SELECT \* FROM sys_apiengine WHERE LOWER\(ApiEngineKey\)=LOWER\(@p0\)/,
+  );
+  assert.match(importerSource, /含软删除状态/);
   assert.match(importerSource, /TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1/);
   assert.match(importerSource, /OFFICIAL_MANAGED_OVERWRITE_V1/);
   assert.match(importerSource, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1/);
@@ -233,7 +239,7 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.4.2");
+  assert.equal(embeddedImporter.Version, "v2.4.4");
   assert.match(importerSource, /MOVE_OBJECT_UNAVAILABLE_RESUME_V1/);
   assert.match(importerSource, /PrivateSource\+PublicBuildMoveFallback/);
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));

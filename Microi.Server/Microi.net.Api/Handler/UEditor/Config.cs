@@ -1,161 +1,76 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-#if NETSTANDARD || NETCOREAPP
-using Aliyun.OSS;
-#endif
+using System.Threading.Tasks;
 using Dos.Common;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Microi.net;
 
 namespace Microi.net.Api
 {
     /// <summary>
-    /// Config 的摘要说明
+    /// UEditor 请求级配置。租户配置通过 FormEngine 获取，不使用跨租户静态缓存；
+    /// 本地 JSON 只作为缺少历史字段时的兼容默认值。
     /// </summary>
     public static class UeditorConfig
     {
-        public static bool NoCache = true;
+        public static string ConfigFilePath { get; set; } =
+            Path.Combine(AppContext.BaseDirectory, "wwwroot", "ueditor.json");
 
-        private static JObject BuildItems()
+        public static async Task<JObject> LoadForTenantAsync(string osClient)
         {
-            //var osClient = DiyToken.GetCurrentOsClient();
-            var osClientModel = OsClient.GetClient();
-            //2o023-08-18重新实现
-            try
+            var tenant = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            var configResult = await MicroiEngine.FormEngine.GetSysConfig(tenant)
+                .ConfigureAwait(false);
+            if (configResult?.Code == 1 && configResult.Data != null)
             {
-                var sysConfig = osClientModel.Db.FromSql("select * from sys_sonfig where IsEnable = 1 AND IsDeleted <> 1").First<dynamic>();
-                return JObject.Parse((string)sysConfig.UEditorConfig);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("获取富文本配置失败，请在系统设置中添加[UEditorConfig]字段（代码编辑器）！");
-            }
-
-
-            var configExtension = Path.GetExtension(ConfigFile);
-            var configFileName = ConfigFile.Substring(0, ConfigFile.Length - configExtension.Length);
-            var evnConfig = $"{configFileName}.{UeditorConfig.EnvName}{configExtension}";
-#if NETSTANDARD || NETCOREAPP
-            #region 初始化OSS参数
-            //var useAliOss = ConfigHelper.GetAppSettings("UseAliOssPublic") == "1";
-            var useAliOss = osClientModel.OsClientModel["UseAliOssPublic"].Val<string>() == "1";
-            var endpoint = "";
-            var accessKeyId = "";
-            var accessKeySecret = "";
-            var bucketName = "";
-            OssClient ossClient = null;
-            #endregion
-            if (useAliOss)
-            {
-
-                #region OSS 参数初始化
-                var limit = "Public";
-                //endpoint = ConfigHelper.GetAppSettings("AliOss" + limit + "Endpoint");
-                //accessKeyId = ConfigHelper.GetAppSettings("AliOss" + limit + "AccessKeyId");
-                //accessKeySecret = ConfigHelper.GetAppSettings("AliOss" + limit + "AccessKeySecret");
-                //bucketName = ConfigHelper.GetAppSettings("AliOss" + limit + "BucketName");
-                endpoint = osClientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>();
-                accessKeyId = osClientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>();
-                accessKeySecret = osClientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>();
-                bucketName = osClientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
-                // 创建OssClient实例。
-                ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret);
-                #endregion
-                var ossObject = ossClient.GetObject(new GetObjectRequest(bucketName, "config/ueditor.json"));
-                var jsonStr = new StreamReader(ossObject.Content).ReadToEnd();
-                return JObject.Parse(jsonStr);
-                //using (var http = new HttpClient())
-                //{
-                //    //var jsonStrAsync = http.GetStringAsync(ConfigHelper.GetAppSettings("AliOss" + limit + "Domain") + "/config/ueditor.json");
-                //    var jsonStrAsync = http.GetStringAsync(osClientModel.AliOssPublicDomain + "/config/ueditor.json");
-                //    //jsonStrAsync.Start();
-                //    jsonStrAsync.Wait();
-                //    var jsonStr = jsonStrAsync.Result;
-                //    return JObject.Parse(jsonStr);
-                //}
-
-            }
-            else
-            {
-                if (File.Exists(Path.Combine(WebRootPath, evnConfig)))
+                var data = JsonHelper.ToJObject((object)configResult.Data);
+                var value = data?.Properties().FirstOrDefault(property =>
+                    string.Equals(
+                        property.Name,
+                        "UEditorConfig",
+                        StringComparison.OrdinalIgnoreCase))?.Value;
+                var raw = value?.Type == JTokenType.Object
+                    ? value.ToString(Formatting.None)
+                    : value?.ToString();
+                if (!raw.DosIsNullOrWhiteSpace())
                 {
-                    var json = File.ReadAllText(Path.Combine(WebRootPath, evnConfig));
-                    return JObject.Parse(json);
-                }
-                else
-                {
-                    var configFilePath = Path.Combine(WebRootPath, ConfigFile);
-                    if (!File.Exists(configFilePath))
+                    try
                     {
-                        throw new Exception("未找到UEditor配置文件，请检查！");//若有问题，请参阅文档：https://github.com/baiyunchen/UEditor.Core
+                        return JObject.Parse(raw);
                     }
-                    var json = File.ReadAllText(configFilePath);
-                    return JObject.Parse(json);
+                    catch (JsonException)
+                    {
+                        throw new InvalidOperationException(
+                            "当前租户系统设置中的 UEditorConfig 不是合法 JSON。");
+                    }
                 }
             }
-#else
 
-            if (File.Exists(Path.Combine(WebRootPath, evnConfig)))
+            if (File.Exists(ConfigFilePath))
             {
-                var json = File.ReadAllText(Path.Combine(WebRootPath, evnConfig));
-                return JObject.Parse(json);
+                return JObject.Parse(await File.ReadAllTextAsync(ConfigFilePath)
+                    .ConfigureAwait(false));
             }
-            else
-            {
-                var configFilePath = Path.Combine(WebRootPath, ConfigFile);
-                if (!File.Exists(configFilePath))
-                {
-                    throw new Exception("未找到UEditor配置文件，请检查！");//若有问题，请参阅文档：https://github.com/baiyunchen/UEditor.Core
-                }
-                var json = File.ReadAllText(configFilePath);
-                return JObject.Parse(json);
-            }
-#endif
+            throw new InvalidOperationException(
+                "未找到 UEditor 配置；请在系统设置中维护 UEditorConfig，或部署兼容 ueditor.json。");
         }
 
-        public static JObject Items
+        public static string[] GetStringList(JObject items, string key)
         {
-            get
-            {
-                if (NoCache || _Items == null)
-                {
-                    _Items = BuildItems();
-                }
-                return _Items;
-            }
+            return (items?[key] as JArray)?.Values<string>()
+                .Where(value => !value.DosIsNullOrWhiteSpace())
+                .ToArray() ?? Array.Empty<string>();
         }
 
-        public static string EnvName { get; set; }
-
-        public static string WebRootPath { get; set; }
-
-        // public static string WwwRootPath { get; set; }
-
-        public static string ConfigFile { set; get; } = "ueditor.json";
-
-        private static JObject _Items;
-
-
-        public static T GetValue<T>(string key)
+        public static string GetString(JObject items, string key)
         {
-            return Items[key].Val<T>();
+            return items?[key].Val<string>() ?? string.Empty;
         }
 
-        public static String[] GetStringList(string key)
+        public static int GetInt(JObject items, string key)
         {
-            return Items[key].Select(x => x.Value<String>()).ToArray();
-        }
-
-        public static String GetString(string key)
-        {
-            return GetValue<String>(key);
-        }
-
-        public static int GetInt(string key)
-        {
-            return GetValue<int>(key);
+            return items?[key].Val<int>() ?? 0;
         }
     }
 }

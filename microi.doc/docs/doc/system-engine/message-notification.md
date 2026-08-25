@@ -193,7 +193,7 @@ await V8.Notification.MarkRead({ All: true });
 
 同一条平台内部通知还会投影到右上角唯一固定的“AI助手”会话，不再创建独立的系统联系人。通知中心和聊天会话共用 `mic_msg_event_log` 这一份权威历史与已读状态：聊天侧不另存一份通知，也不把 SignalR 事件当作历史记录；AI 点对点历史仍由聊天存储负责，前端按时间把两类权威记录合并展示，用户可以在同一会话继续向 AI 助手提问。新通知统一返回 `SenderUserId/Account=AI`、`SenderName=AI助手`；旧记录中保存的历史系统发送人元数据也由客户端兼容投影为 AI 助手，不需要破坏性迁移或删除历史日志。
 
-SignalR 连接必须同时携带当前最新 DiyToken 和显式 `OsClient`，服务端以 Token 解析出的用户与租户覆盖客户端提交的发送人字段。聊天图标显示“已连接、连接中、重连中、已断开、重连暂停”等状态；自动重连采用 `0/2/5/10/30` 秒有限退避，达到上限后暂停，只有用户手动重试或登录身份/租户变化才开启新一轮，禁止无限高频重连。重连成功后再回读通知与聊天快照。
+SignalR 连接必须同时携带当前最新 DiyToken 和显式 `OsClient`，服务端以 Token 解析出的用户与租户覆盖客户端提交的发送人字段；访问密钥会话不允许建立实时聊天连接或发送消息。聊天图标显示“已连接、连接中、重连中、已断开、重连暂停”等状态；自动重连采用 `0/2/5/10/30` 秒有限退避，达到上限后暂停，只有用户手动重试或登录身份/租户变化才开启新一轮，禁止无限高频重连。重连成功后再回读通知与聊天快照。
 
 旧的 `V8.SendSystemMessage` 仍用于聊天系统兼容消息。新业务通知使用 `V8.Notification`，才能获得策略、多渠道、事件日志、幂等和通知中心已读状态。
 
@@ -222,13 +222,26 @@ SignalR 连接必须同时携带当前最新 DiyToken 和显式 `OsClient`，服
 - 接收人扇出、正文和 Payload 都要设上限，避免单次 V8 调用拖垮节点。
 - 应用商城包必须随 `mic_msgset`、`mic_msg_event_log`、`wx_tpl_msg` 一并发布 `wx_mp`、`wx_mini_program` 的结构与表单元数据；后两者不附带数据集。这样既满足 `sys_user.WxMpId` 等跨模块 Select 数据源依赖，也不会发布真实渠道密钥、用户配置和历史事件。
 
+### 官方聊天运行时与租户扩展
+
+“消息通知” v1.0.9 单一拥有两个 `Managed` 核心：`platform-chat-system-message` 是旧系统消息 Controller 的最小门面，完成超级管理员校验后只转调 `platform-chat-runtime`；`platform-chat-runtime` 统一编排普通消息持久化、联系人、未读数、历史和已读、删除。两者均 `StopHttp=1`，源码顶部明确提示官方应用安装/更新/重装会恢复官方版，不应直接写入租户定制逻辑。v1.0.8 为聊天运行时分配了跨官方应用全局唯一的稳定 Id，避免与 AI 运行时在同一租户安装时发生主键冲突。
+
+SignalR Hub 调用聊天运行时仍保留 `Client` 权限语义，但不能因此把 `StopHttp` 改为 `0`。v1.0.9 由宿主在 DiyToken 和租户核验后，建立绑定固定 `platform-chat-runtime` Key、权威 `OsClient` 与当前用户快照的一次性可信协议上下文；V8 运行时先调用 `V8.Method.RequireManagedProtocolContext()` 原子消费，再执行聊天动作。普通 HTTP、伪造 `_CurrentUser` / `_InvokeType`、错误租户、错误 Key 和重放调用仍在进入业务代码前失败关闭；`platform-chat-system-message` 的内部 `Server` 嵌套调用不消费该 SignalR 上下文。
+
+运行时支持 `PersistMessage` / `PersistSystemMessage` / `PersistAssistantMessage` / `GetHistoryAndMarkRead` / `GetUnreadCount` / `TouchContact` / `ListContacts` / `DeleteContact`。用户和租户只取 `V8.CurrentUser` 与 `V8.OsClient`，忽略客户端伪造的发送人、用户 Id 和 `OsClient`。发送端应提供稳定 `RequestId`；运行时把“租户 + RequestId”哈希成确定性 Mongo `_id`，相同请求仅复用完全一致的已持久事实，载荷不一致则失败关闭。旧客户端未传 `RequestId` 时，兼容 Hub/Controller 会生成 ULID；这只保证单次调用，不能跨 HTTP/SignalR 重试去重。
+
+租户定制统一写入 `platform-message-notification-custom-hook`。该接口使用 `CreateIfMissing`，首次安装后的源码、启用状态和软删除状态都归租户维护；默认正文精确为 `return { Code : 1 };`。运行时在 `BeforeChatRuntime` 与 `AfterChatRuntime` 阶段调用 Hook。Before 失败会在 MongoDB 写入前阻断；MongoDB 不参与 `V8.DbTrans`，所以已持久之后的 After/联系人投影失败不会把主结果反转为失败，而是以 `Code=1` 并在 `DataAppend.HookWarning` / `ProjectionWarnings` 返回告警。
+
+Hook 只接收 `Stage`、`SourceApiEngineKey`、`Action`、`ActorUserId`、`PeerUserId`、`MessageId` 和 `MessageType`，不接收消息正文、头像、OpenId、Token 或其它秘密。C# `DiyWebSocket` 只保留 DiyToken 连接认证、在线连接缓存、SignalR 尽力投递和 AI 流式协议；消息先持久、再投递，投递丢失不会丢历史，重连后从 Managed 运行时回读。旧 Hub 方法与 `/api/DiyChat/SendSystemMessage` 仍保留，但都转发同一份 Managed 逻辑，不再直连 MongoDB/FormEngine 重复业务。
+
 ## 验收清单
 
-- 两个租户的三张表字段、通知方式数据源和物理索引已回读一致。
+- 两个租户的三张表字段、通知方式数据源、Mongo 聊天读写和物理索引已回读一致。
 - 同一个 `EventId` 重复调用和两个 API 节点并发调用，只产生一次接收人/渠道副作用。
 - 在线用户即时收到；离线用户、断网重连和 SignalR 故障后仍能从列表恢复。
 - 事务回滚不推送；提交后节点退出，持久日志仍可审计。
 - 用户不能读取或标记他人的通知；危险链接和超限参数被拒绝。
+- 无 Token、访问密钥、伪造租户/发送人被拒绝；相同 `RequestId` 并发只生成一条消息，不同载荷不得复用。
 - 公众号/服务号发送主体与小程序跳转分别验证。
 - 源码测试、后端编译、远端回读、真实浏览器和商城安装/校验分别记录，不用本地成功冒充生产部署。
 

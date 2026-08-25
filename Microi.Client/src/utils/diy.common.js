@@ -327,6 +327,8 @@ var DiyCommon = {
             options.FormDataId || "",
             options.FieldId || "",
             options.SysMenuId || options.MenuId || "",
+            options.ResourceKind || "FormField",
+            options.ResourceId || "",
             options.ForOfficePreview === true ? "office" : "browser",
             path
         ];
@@ -338,13 +340,15 @@ var DiyCommon = {
         var request = (async function () {
             try {
                 var sysConfig = store.state.DiyStore.SysConfig || {};
-                var result = await DiyCommon.PostAsync("/api/HDFS/GetPrivateFileUrl", {
+                var result = await DiyCommon.PostAsync("/apiengine/platform-private-file-url", {
                     FilePathName: path,
                     HDFS: options.HDFS || sysConfig.HDFS || "Aliyun",
                     FormEngineKey: options.FormEngineKey || undefined,
                     FormDataId: options.FormDataId || undefined,
                     FieldId: options.FieldId || undefined,
                     SysMenuId: options.SysMenuId || options.MenuId || undefined,
+                    ResourceKind: options.ResourceKind || undefined,
+                    ResourceId: options.ResourceId || undefined,
                     ForOfficePreview: options.ForOfficePreview === true
                 });
                 if (result && result.Code === 1 && result.Data) {
@@ -374,7 +378,9 @@ var DiyCommon = {
             FormEngineKey: "sys_user",
             FormDataId: userId || "",
             FieldId: options.FieldId || "Avatar",
-            SysMenuId: options.SysMenuId || options.MenuId || ""
+            SysMenuId: options.SysMenuId || options.MenuId || "",
+            ResourceKind: "UserAvatar",
+            ResourceId: userId || ""
         });
     },
     pathBase: "./",
@@ -1126,10 +1132,16 @@ var DiyCommon = {
                 return DiyCommon._LangBundlePromises[cacheKey];
             }
             DiyCommon._LangBundleStatus[cacheKey] = "loading";
-            var promise = DiyCommon.PostAsync("/api/FormEngine/GetLangBundle", {
-                OsClient: osClient,
-                _Lang: n,
-                Prefix: "Msg."
+            var promise = DiyCommon.PostAsync({
+                url: "/apiengine/platform-lang-bundle",
+                data: {
+                    OsClient: osClient,
+                    _Lang: n,
+                    Prefix: "Msg."
+                },
+                skipAuthorization: true,
+                suppressAuthFailure: true,
+                suppressErrorNotification: true
             }).then(function (result) {
                 if (result && result.Code == 1 && result.Data) {
                     DiyCommon.ApplyLangBundle(n, result.Data);

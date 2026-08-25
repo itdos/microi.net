@@ -232,7 +232,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.4\.2/);
+  assert.match(source, /Version: v2\.4\.4/);
 });
 
 test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {
@@ -1380,7 +1380,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 3, 3\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 4, 4\)/);
   assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 2, 7\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/!HasPinnedImporterCapabilities\(/g) || []).length,
@@ -1392,7 +1392,8 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
     "runtime and embedded package validation must share the pinned bulk-worker capability gate",
   );
-  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 5, 23\)/);
+  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 5, 55\)/);
+  assert.match(appStoreUpgradeSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
     3,
@@ -1444,7 +1445,8 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_007_008/);
-  assert.match(refreshSource, /versionNumber\s*<\s*7_004_002/);
+  assert.match(refreshSource, /versionNumber\s*<\s*7_005_053/);
+  assert.match(refreshSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
   assert.match(refreshSource, /importerVersionNumber\s*<\s*2_002_002/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);

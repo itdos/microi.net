@@ -26,7 +26,7 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     public sealed class ExternalLoginController : Controller
     {
-        private const string BindingTable = "mci_user_external_identity";
+        private const string BindingApiEngineKey = "platform-external-login-binding";
         private static readonly TimeSpan StateLifetime = TimeSpan.FromMinutes(5);
         private static readonly TimeSpan LoginTicketLifetime = TimeSpan.FromSeconds(90);
         private readonly IHttpClientFactory _httpClientFactory;
@@ -172,23 +172,77 @@ namespace Microi.net.Api
                     return PopupResult(stateModel.ReturnOrigin, Provider, false, "外部平台未返回可绑定的用户身份。", null);
                 if (stateModel.Mode == "Bind")
                 {
-                    var save = await UpsertBindingAsync(OsClient, stateModel.UserId, provider, profile).ConfigureAwait(false);
-                    QueueAudit(OsClient, stateModel.UserId, "BindExternalIdentity", save.Code == 1, provider.Key, null);
-                    return PopupResult(stateModel.ReturnOrigin, provider.Key, save.Code == 1,
-                        save.Code == 1 ? $"{provider.Name}绑定成功。" : save.Msg, null);
+                    var save = await RunBindingProtocolActionAsync(OsClient, new JObject
+                    {
+                        ["Action"] = "Bind",
+                        ["TrustedUserId"] = stateModel.UserId,
+                        ["ProviderKey"] = provider.Key,
+                        ["ProviderSubject"] = profile.Subject,
+                        ["AccountName"] = profile.AccountName,
+                        ["DisplayName"] = profile.DisplayName,
+                        ["Email"] = profile.Email,
+                        ["Avatar"] = profile.Avatar
+                    }).ConfigureAwait(false);
+                    var saveCode = ResultCode(save);
+                    QueueAudit(OsClient, stateModel.UserId, "BindExternalIdentity", saveCode == 1, provider.Key, null);
+                    return PopupResult(stateModel.ReturnOrigin, provider.Key, saveCode == 1,
+                        saveCode == 1 ? $"{provider.Name}绑定成功。" : ResultMessage(save, "外部身份绑定失败。"), null);
                 }
 
-                var binding = await FindBindingAsync(OsClient, provider.Key, profile.Subject).ConfigureAwait(false);
-                if (binding == null)
+                var resolveResult = await RunBindingProtocolActionAsync(OsClient, new JObject
+                {
+                    ["Action"] = "Resolve",
+                    ["ProviderKey"] = provider.Key,
+                    ["ProviderSubject"] = profile.Subject
+                }).ConfigureAwait(false);
+                var resolveCode = ResultCode(resolveResult);
+                if (resolveCode == 2)
                 {
                     QueueAudit(OsClient, null, "ExternalLoginRejected", false, provider.Key, "NotBound");
                     return PopupResult(stateModel.ReturnOrigin, provider.Key, false,
                         $"该{provider.Name}身份尚未绑定吾码账号，请先登录后到个人中心完成绑定。", null);
                 }
+                if (resolveCode != 1)
+                {
+                    QueueAudit(OsClient, null, "ExternalLoginFailed", false, provider.Key, "BindingLookupFailed");
+                    return PopupResult(
+                        stateModel.ReturnOrigin,
+                        provider.Key,
+                        false,
+                        ResultMessage(resolveResult, "外部身份绑定读取失败，请稍后重试。"),
+                        null);
+                }
+                var binding = resolveResult?["Data"] as JObject;
+                if (binding == null)
+                {
+                    QueueAudit(OsClient, null, "ExternalLoginFailed", false, provider.Key, "BindingPayloadInvalid");
+                    return PopupResult(stateModel.ReturnOrigin, provider.Key, false,
+                        "外部身份绑定返回数据无效，请稍后重试。", null);
+                }
                 var userId = binding["BoundUserId"]?.ToString();
                 var user = await GetEnabledUserForTokenAsync(OsClient, userId).ConfigureAwait(false);
                 if (user == null)
                     return PopupResult(stateModel.ReturnOrigin, provider.Key, false, "绑定的吾码账号不存在或已停用。", null);
+
+                var touchResult = await RunBindingProtocolActionAsync(OsClient, new JObject
+                {
+                    ["Action"] = "Touch",
+                    ["Id"] = binding["Id"]?.ToString(),
+                    ["ProviderKey"] = provider.Key,
+                    ["ProviderSubject"] = profile.Subject,
+                    ["AccountName"] = profile.AccountName,
+                    ["DisplayName"] = profile.DisplayName,
+                    ["Avatar"] = profile.Avatar
+                }).ConfigureAwait(false);
+                if (ResultCode(touchResult) != 1)
+                {
+                    return PopupResult(
+                        stateModel.ReturnOrigin,
+                        provider.Key,
+                        false,
+                        ResultMessage(touchResult, "外部身份登录信息更新失败。"),
+                        null);
+                }
 
                 var loginTicket = IdentityVerificationSecurity.NewOpaqueValue();
                 var ticketPayload = new JObject
@@ -202,15 +256,6 @@ namespace Microi.net.Api
                     .StringSetAsync(LoginTicketKey(OsClient, loginTicket), ticketPayload.ToString(Formatting.None),
                         LoginTicketLifetime, When.NotExists).ConfigureAwait(false);
                 if (!saved) return PopupResult(stateModel.ReturnOrigin, provider.Key, false, "登录票据创建失败，请重试。", null);
-                _ = MicroiEngine.FormEngine.UptFormDataAsync(BindingTable, new
-                {
-                    Id = binding["Id"]?.ToString(),
-                    LastLoginTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                    AccountName = NormalizeText(profile.AccountName, 200),
-                    DisplayName = NormalizeText(profile.DisplayName, 200),
-                    Avatar = NormalizeText(profile.Avatar, 1000),
-                    OsClient
-                });
                 return PopupResult(stateModel.ReturnOrigin, provider.Key, true, "身份验证成功，正在进入系统。", loginTicket);
             }
             catch
@@ -267,22 +312,16 @@ namespace Microi.net.Api
                     item.Enabled,
                     Configured = item.Configured
                 }).ToList();
-            var bindings = await ListBindingsByUserAsync(token.Data.OsClient,
-                token.Data.CurrentUser["Id"]?.ToString()).ConfigureAwait(false);
-            return Json(new DosResult(1, new
-            {
-                Providers = providers,
-                Bindings = bindings.Select(item => new
+            var result = await ManagedApiEngineCompatibility.RunAsync(
+                BindingApiEngineKey,
+                new JObject
                 {
-                    Id = item["Id"]?.ToString(),
-                    Provider = item["ProviderKey"]?.ToString(),
-                    AccountName = item["AccountName"]?.ToString(),
-                    DisplayName = item["DisplayName"]?.ToString(),
-                    Avatar = item["Avatar"]?.ToString(),
-                    BindTime = item["BindTime"]?.ToString(),
-                    LastLoginTime = item["LastLoginTime"]?.ToString()
-                }).ToList()
-            }));
+                    ["Action"] = "List",
+                    ["OsClient"] = token.Data.OsClient,
+                    ["Providers"] = JArray.FromObject(providers)
+                },
+                JObject.FromObject(token.Data.CurrentUser)).ConfigureAwait(false);
+            return Json(result);
         }
 
         [HttpPost]
@@ -290,19 +329,19 @@ namespace Microi.net.Api
         {
             var token = await RequireUserTokenAsync().ConfigureAwait(false);
             if (token.Code != 1) return Json(token);
-            var item = await FindOwnedBindingAsync(token.Data.OsClient,
-                token.Data.CurrentUser["Id"]?.ToString(), request?.Id).ConfigureAwait(false);
-            if (item == null) return Json(new DosResult(0, null, "外部身份绑定不存在。"));
-            var result = await MicroiEngine.FormEngine.UptFormDataAsync(BindingTable, new
-            {
-                Id = request.Id,
-                State = 0,
-                IsDeleted = 1,
-                OsClient = token.Data.OsClient
-            }).ConfigureAwait(false);
+            var rawResult = await ManagedApiEngineCompatibility.RunAsync(
+                BindingApiEngineKey,
+                new JObject
+                {
+                    ["Action"] = "Revoke",
+                    ["Id"] = request?.Id,
+                    ["OsClient"] = token.Data.OsClient
+                },
+                JObject.FromObject(token.Data.CurrentUser)).ConfigureAwait(false);
+            var result = ToResultObject(rawResult);
             QueueAudit(token.Data.OsClient, token.Data.CurrentUser["Id"]?.ToString(), "RevokeExternalIdentity",
-                result.Code == 1, item["ProviderKey"]?.ToString(), null);
-            return Json(result);
+                ResultCode(result) == 1, result?["Data"]?["Provider"]?.ToString(), null);
+            return Json(rawResult);
         }
 
         private async Task<ExternalProfile> ExchangeProfileAsync(
@@ -444,143 +483,35 @@ namespace Microi.net.Api
                 .Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
         }
 
-        private static async Task<DosResult> UpsertBindingAsync(
-            string osClient,
-            string userId,
-            ExternalLoginProviderOptions provider,
-            ExternalProfile profile)
+        private static async Task<JObject> RunBindingProtocolActionAsync(string osClient, JObject request)
         {
-            if (userId.DosIsNullOrWhiteSpace()) return new DosResult(0, null, "当前用户身份无效。");
-            var bySubject = await FindBindingAsync(osClient, provider.Key, profile.Subject, includeDisabled: true).ConfigureAwait(false);
-            if (bySubject != null && !string.Equals(bySubject["BoundUserId"]?.ToString(), userId, StringComparison.OrdinalIgnoreCase))
-                return new DosResult(0, null, "该外部身份已绑定其它吾码账号。");
-            var byUserProvider = bySubject ?? await FindBindingByUserProviderAsync(
-                osClient, userId, provider.Key, includeDisabled: true).ConfigureAwait(false);
-            var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            var form = new JObject
-            {
-                ["Id"] = byUserProvider?["Id"]?.ToString() ?? Guid.NewGuid().ToString(),
-                ["BoundUserId"] = userId,
-                ["ProviderKey"] = provider.Key,
-                ["ProviderSubject"] = profile.Subject,
-                ["AccountName"] = NormalizeText(profile.AccountName, 200),
-                ["DisplayName"] = NormalizeText(profile.DisplayName, 200),
-                ["Email"] = NormalizeText(profile.Email, 300),
-                ["Avatar"] = NormalizeText(profile.Avatar, 1000),
-                ["State"] = 1,
-                ["IsDeleted"] = 0,
-                ["BindTime"] = byUserProvider?["BindTime"]?.ToString() ?? now,
-                ["LastVerifiedTime"] = now,
-                ["OsClient"] = osClient
-            };
-            return byUserProvider == null
-                ? await MicroiEngine.FormEngine.AddFormDataAsync(BindingTable, form).ConfigureAwait(false)
-                : await MicroiEngine.FormEngine.UptFormDataAsync(BindingTable, form).ConfigureAwait(false);
+            request ??= new JObject();
+            return ToResultObject(await ManagedApiEngineCompatibility.RunTrustedProtocolAsync(
+                    BindingApiEngineKey,
+                    osClient,
+                    request)
+                .ConfigureAwait(false));
         }
 
-        private static async Task<JObject> FindBindingByUserProviderAsync(
-            string osClient,
-            string userId,
-            string provider,
-            bool includeDisabled = false)
+        private static JObject ToResultObject(object result)
         {
-            if (userId.DosIsNullOrWhiteSpace() || provider.DosIsNullOrWhiteSpace()) return null;
-            try
+            if (result == null) return null;
+            if (result is JObject jobject) return jobject;
+            if (result is string json)
             {
-                var where = new List<DiyWhere>
-                {
-                    new DiyWhere { Name = "BoundUserId", Type = "=", Value = userId },
-                    new DiyWhere { Name = "ProviderKey", Type = "=", Value = provider }
-                };
-                if (!includeDisabled)
-                {
-                    where.Add(new DiyWhere { Name = "State", Type = "=", Value = 1 });
-                    where.Add(new DiyWhere { Name = "IsDeleted", Type = "=", Value = 0 });
-                }
-                var result = await MicroiEngine.FormEngine.GetFormDataAsync(BindingTable, new
-                {
-                    OsClient = osClient,
-                    _Where = where,
-                    _OrderBy = "UpdateTime",
-                    _OrderByType = "DESC"
-                }).ConfigureAwait(false);
-                return result.Code == 1 && result.Data != null ? JObject.FromObject(result.Data) : null;
+                try { return JObject.Parse(json); }
+                catch { return null; }
             }
+            try { return JObject.FromObject(result); }
             catch { return null; }
         }
 
-        private static async Task<JObject> FindBindingAsync(
-            string osClient,
-            string provider,
-            string subject,
-            bool includeDisabled = false)
-        {
-            if (provider.DosIsNullOrWhiteSpace() || subject.DosIsNullOrWhiteSpace()) return null;
-            try
-            {
-                var where = new List<DiyWhere>
-                {
-                    new DiyWhere { Name = "ProviderKey", Type = "=", Value = provider },
-                    new DiyWhere { Name = "ProviderSubject", Type = "=", Value = subject }
-                };
-                if (!includeDisabled)
-                {
-                    where.Add(new DiyWhere { Name = "State", Type = "=", Value = 1 });
-                    where.Add(new DiyWhere { Name = "IsDeleted", Type = "=", Value = 0 });
-                }
-                var result = await MicroiEngine.FormEngine.GetFormDataAsync(BindingTable, new
-                {
-                    OsClient = osClient,
-                    _Where = where
-                }).ConfigureAwait(false);
-                return result.Code == 1 && result.Data != null ? JObject.FromObject(result.Data) : null;
-            }
-            catch { return null; }
-        }
+        private static int ResultCode(JObject result) => result?["Code"].Val<int>() ?? 0;
 
-        private static async Task<List<JObject>> ListBindingsByUserAsync(string osClient, string userId)
+        private static string ResultMessage(JObject result, string fallback)
         {
-            if (userId.DosIsNullOrWhiteSpace()) return new List<JObject>();
-            try
-            {
-                var result = await MicroiEngine.FormEngine.GetTableDataAsync(BindingTable, new
-                {
-                    OsClient = osClient,
-                    _Where = new List<DiyWhere>
-                    {
-                        new DiyWhere { Name = "BoundUserId", Type = "=", Value = userId },
-                        new DiyWhere { Name = "State", Type = "=", Value = 1 },
-                        new DiyWhere { Name = "IsDeleted", Type = "=", Value = 0 }
-                    },
-                    _PageIndex = 1,
-                    _PageSize = 100
-                }).ConfigureAwait(false);
-                return result.Code == 1 && result.Data != null
-                    ? JArray.FromObject(result.Data).OfType<JObject>().ToList()
-                    : new List<JObject>();
-            }
-            catch { return new List<JObject>(); }
-        }
-
-        private static async Task<JObject> FindOwnedBindingAsync(string osClient, string userId, string id)
-        {
-            if (id.DosIsNullOrWhiteSpace()) return null;
-            try
-            {
-                var result = await MicroiEngine.FormEngine.GetFormDataAsync(BindingTable, new
-                {
-                    Id = id,
-                    OsClient = osClient,
-                    _Where = new List<DiyWhere>
-                    {
-                        new DiyWhere { Name = "BoundUserId", Type = "=", Value = userId },
-                        new DiyWhere { Name = "State", Type = "=", Value = 1 },
-                        new DiyWhere { Name = "IsDeleted", Type = "=", Value = 0 }
-                    }
-                }).ConfigureAwait(false);
-                return result.Code == 1 && result.Data != null ? JObject.FromObject(result.Data) : null;
-            }
-            catch { return null; }
+            var message = result?["Msg"]?.ToString();
+            return message.DosIsNullOrWhiteSpace() ? fallback : message;
         }
 
         private static async Task<JObject> GetEnabledUserForTokenAsync(string osClient, string userId)
@@ -613,6 +544,20 @@ namespace Microi.net.Api
             string did,
             string loginMethod)
         {
+            var loginUpdateResult = await RunBindingProtocolActionAsync(osClient, new JObject
+            {
+                ["Action"] = "RecordUserLogin",
+                ["TrustedUserId"] = user["Id"]?.ToString(),
+                ["LastLoginIP"] = IPHelper.GetClientIP(HttpContext).Data
+            }).ConfigureAwait(false);
+            if (ResultCode(loginUpdateResult) != 1)
+            {
+                return Json(new DosResult(
+                    ResultCode(loginUpdateResult),
+                    null,
+                    ResultMessage(loginUpdateResult, "外部登录信息保存失败。")));
+            }
+
             var token = await new DiyToken().GetAccessToken(new DiyTokenParam
             {
                 CurrentUser = user,
@@ -636,13 +581,6 @@ namespace Microi.net.Api
                     LoginMethod = loginMethod
                 }
             };
-            _ = MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
-            {
-                Id = user["Id"]?.ToString(),
-                LastLoginIP = IPHelper.GetClientIP(HttpContext).Data,
-                LastLoginTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                OsClient = osClient
-            });
             return Json(result);
         }
 

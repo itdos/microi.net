@@ -14,6 +14,40 @@ namespace Microi.net
     /// <typeparam name="T"></typeparam>
     public static partial class TMongodbHelper<T> where T : class, new()
     {
+        /// <summary>
+        /// V8.MongoDb 使用 dynamic（运行时为 System.Object）读取无模式文档。旧的强类型
+        /// Mongo 写入可能留下内部 _t discriminator；它不是业务字段，若交给 ObjectSerializer
+        /// 会尝试加载已经移除或位于宿主层的 CLR 类型，并报 Unknown discriminator。
+        /// 所有 dynamic 读取统一在服务端投影掉 _t，强类型读取保持原有多态语义。
+        /// </summary>
+        private static ProjectionDefinition<T> BuildReadProjection(string[] field)
+        {
+            var fieldList = new List<ProjectionDefinition<T>>();
+            if (field != null)
+            {
+                for (var index = 0; index < field.Length; index++)
+                {
+                    var fieldName = field[index];
+                    if (string.IsNullOrWhiteSpace(fieldName)) continue;
+                    if (typeof(T) == typeof(object)
+                        && string.Equals(fieldName.Trim(), "_t", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    fieldList.Add(Builders<T>.Projection.Include(fieldName));
+                }
+            }
+
+            if (fieldList.Count > 0)
+            {
+                return Builders<T>.Projection.Combine(fieldList);
+            }
+
+            return typeof(T) == typeof(object)
+                ? Builders<T>.Projection.Exclude("_t")
+                : null;
+        }
+
         #region +Add 添加一条数据
         /// <summary>
         /// 添加一条数据
@@ -463,22 +497,10 @@ namespace Microi.net
             {
                 var client = MongodbClient<T>.MongodbInfoClient(host);
                 FilterDefinition<T> filter = Builders<T>.Filter.Eq("_id", new ObjectId(id));
-                //不指定查询字段
-                if (field == null || field.Length == 0)
-                {
-                    var result1 = client.Find(filter).FirstOrDefault<T>();
-                    return new DosResult<T>(1, result1);
-                }
-
-                //制定查询字段
-                var fieldList = new List<ProjectionDefinition<T>>();
-                for (int i = 0; i < field.Length; i++)
-                {
-                    fieldList.Add(Builders<T>.Projection.Include(field[i].ToString()));
-                }
-                var projection = Builders<T>.Projection.Combine(fieldList);
-                fieldList?.Clear();
-                var result = client.Find(filter).Project<T>(projection).FirstOrDefault<T>();
+                var query = client.Find(filter);
+                var projection = BuildReadProjection(field);
+                if (projection != null) query = query.Project<T>(projection);
+                var result = query.FirstOrDefault<T>();
                 return new DosResult<T>(1, result);
             }
             catch (Exception ex)
@@ -501,22 +523,10 @@ namespace Microi.net
             {
                 var client = MongodbClient<T>.MongodbInfoClient(host);
                 FilterDefinition<T> filter = Builders<T>.Filter.Eq("_id", new ObjectId(id));
-                //不指定查询字段
-                if (field == null || field.Length == 0)
-                {
-                    var result1 = await client.Find(filter).FirstOrDefaultAsync();
-                    return new DosResult<T>(1, result1);
-                }
-
-                //制定查询字段
-                var fieldList = new List<ProjectionDefinition<T>>();
-                for (int i = 0; i < field.Length; i++)
-                {
-                    fieldList.Add(Builders<T>.Projection.Include(field[i].ToString()));
-                }
-                var projection = Builders<T>.Projection.Combine(fieldList);
-                fieldList?.Clear();
-                var result = await client.Find(filter).Project<T>(projection).FirstOrDefaultAsync();
+                var query = client.Find(filter);
+                var projection = BuildReadProjection(field);
+                if (projection != null) query = query.Project<T>(projection);
+                var result = await query.FirstOrDefaultAsync();
                 return new DosResult<T>(1, result);
             }
             catch (Exception ex)
@@ -544,39 +554,11 @@ namespace Microi.net
                     filter = Builders<T>.Filter.Empty;
                 }
                 var client = MongodbClient<T>.MongodbInfoClient(host);
-                //不指定查询字段
-                if (field == null || field.Length == 0)
-                {
-                    if (sort == null)
-                    {
-                        var result1 = client.Find(filter).ToList();
-                        // return new DosResultList<T>(1, result1);
-                        return result1;
-                    }
-                    //进行排序
-                    var result2 = client.Find(filter).Sort(sort).ToList();
-                    // return new DosResultList<T>(1, result2);
-                    return result2;
-                }
-
-                //制定查询字段
-                var fieldList = new List<ProjectionDefinition<T>>();
-                for (int i = 0; i < field.Length; i++)
-                {
-                    fieldList.Add(Builders<T>.Projection.Include(field[i].ToString()));
-                }
-                var projection = Builders<T>.Projection.Combine(fieldList);
-                fieldList?.Clear();
-                if (sort == null)
-                {
-                    var result3 = client.Find(filter).Project<T>(projection).ToList();
-                    // return new DosResultList<T>(1, result3);
-                    return result3;
-                }
-                //排序查询
-                var result = client.Find(filter).Sort(sort).Project<T>(projection).ToList();
-                // return new DosResultList<T>(1, result);
-                return result;
+                var query = client.Find(filter);
+                if (sort != null) query = query.Sort(sort);
+                var projection = BuildReadProjection(field);
+                if (projection != null) query = query.Project<T>(projection);
+                return query.ToList();
             }
             catch (Exception ex)
             {
@@ -600,33 +582,11 @@ namespace Microi.net
             try
             {
                 var client = MongodbClient<T>.MongodbInfoClient(host);
-                //不指定查询字段
-                if (field == null || field.Length == 0)
-                {
-                    if (sort == null)
-                    {
-                        var result1 = await client.Find(filter).ToListAsync();
-                        return new DosResultList<T>(1, result1);
-                    }
-                    var result2 = await client.Find(filter).Sort(sort).ToListAsync();
-                    return new DosResultList<T>(1, result2);
-                }
-
-                //制定查询字段
-                var fieldList = new List<ProjectionDefinition<T>>();
-                for (int i = 0; i < field.Length; i++)
-                {
-                    fieldList.Add(Builders<T>.Projection.Include(field[i].ToString()));
-                }
-                var projection = Builders<T>.Projection.Combine(fieldList);
-                fieldList?.Clear();
-                if (sort == null)
-                {
-                    var result3 = await client.Find(filter).Project<T>(projection).ToListAsync();
-                    return new DosResultList<T>(1, result3);
-                }
-                //排序查询
-                var result = await client.Find(filter).Sort(sort).Project<T>(projection).ToListAsync();
+                var query = client.Find(filter);
+                if (sort != null) query = query.Sort(sort);
+                var projection = BuildReadProjection(field);
+                if (projection != null) query = query.Project<T>(projection);
+                var result = await query.ToListAsync();
                 return new DosResultList<T>(1, result);
             }
             catch (Exception ex)
@@ -653,29 +613,11 @@ namespace Microi.net
             try
             {
                 var client = MongodbClient<T>.MongodbInfoClient(host);
-                // count = client.Count(filter);
-                //不指定查询字段
-                if (field == null || field.Length == 0)
-                {
-                    if (sort == null) return client.Find(filter).Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToList();
-                    //进行排序
-                    return client.Find(filter).Sort(sort).Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToList();
-                }
-
-                //制定查询字段
-                var fieldList = new List<ProjectionDefinition<T>>();
-                for (int i = 0; i < field.Length; i++)
-                {
-                    fieldList.Add(Builders<T>.Projection.Include(field[i].ToString()));
-                }
-                var projection = Builders<T>.Projection.Combine(fieldList);
-                fieldList?.Clear();
-
-                //不排序
-                if (sort == null) return client.Find(filter).Project<T>(projection).Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToList();
-
-                //排序查询
-                return client.Find(filter).Sort(sort).Project<T>(projection).Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToList();
+                var query = client.Find(filter);
+                if (sort != null) query = query.Sort(sort);
+                var projection = BuildReadProjection(field);
+                if (projection != null) query = query.Project<T>(projection);
+                return query.Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToList();
 
             }
             catch (Exception ex)
@@ -701,28 +643,11 @@ namespace Microi.net
             try
             {
                 var client = MongodbClient<T>.MongodbInfoClient(host);
-                //不指定查询字段
-                if (field == null || field.Length == 0)
-                {
-                    if (sort == null) return await client.Find(filter).Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToListAsync();
-                    //进行排序
-                    return await client.Find(filter).Sort(sort).Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToListAsync();
-                }
-
-                //制定查询字段
-                var fieldList = new List<ProjectionDefinition<T>>();
-                for (int i = 0; i < field.Length; i++)
-                {
-                    fieldList.Add(Builders<T>.Projection.Include(field[i].ToString()));
-                }
-                var projection = Builders<T>.Projection.Combine(fieldList);
-                fieldList?.Clear();
-
-                //不排序
-                if (sort == null) return await client.Find(filter).Project<T>(projection).Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToListAsync();
-
-                //排序查询
-                return await client.Find(filter).Sort(sort).Project<T>(projection).Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToListAsync();
+                var query = client.Find(filter);
+                if (sort != null) query = query.Sort(sort);
+                var projection = BuildReadProjection(field);
+                if (projection != null) query = query.Project<T>(projection);
+                return await query.Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToListAsync();
 
             }
             catch (Exception ex)

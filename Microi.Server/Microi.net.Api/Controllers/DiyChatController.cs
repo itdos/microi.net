@@ -29,6 +29,7 @@ namespace Microi.net.Api
     [PlatformAdminOnly]
     public class DiyChatController : Controller
     {
+        private const string SystemMessageApiEngineKey = "platform-chat-system-message";
         private IHubContext<DiyWebSocket> _context;
         
         /// <summary>
@@ -45,62 +46,66 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<DosResult> SendSystemMessage(MessageBodyParam msgParam)
         {
-            if (msgParam.Content.DosIsNullOrWhiteSpace() || msgParam.ToUserId.DosIsNullOrWhiteSpace())
+            if (msgParam == null || msgParam.Content.DosIsNullOrWhiteSpace() || msgParam.ToUserId.DosIsNullOrWhiteSpace())
             {
-                return new DosResult(0, null, DiyMessage.GetLang(msgParam.OsClient, "ParamError", msgParam._Lang));
+                return new DosResult(0, null, DiyMessage.GetLang(msgParam?.OsClient, "ParamError", msgParam?._Lang));
             }
 
-            var sysUser = await DiyToken.GetCurrentToken();
-            msgParam.OsClient = sysUser?.OsClient;
+            var currentToken = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
+            if (currentToken?.CurrentUser == null)
+                return new DosResult(1001, null, "登录身份已过期，请重新登录。");
+            if (UserAccessKeySecurity.IsSession(currentToken.CurrentUser))
+                return new DosResult(1002, null, "访问密钥会话不允许发送实时聊天消息。");
+            msgParam.OsClient = currentToken.OsClient;
 
-            // var toSysUserModelResult = await new SysUserLogic().GetSysUserModel(new SysUserParam()
-            // {
-            //     Id = msgParam.ToUserId,
-            //     OsClient = msgParam.OsClient
-            // });
-            var toSysUserModelResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
-            {
-                _Where = new List<List<object>>()
+            var rawPrepareResult = await ManagedApiEngineCompatibility.RunAsync(
+                SystemMessageApiEngineKey,
+                new JObject
                 {
-                    new List<object> { "Id", "=", msgParam.ToUserId },
+                    ["Action"] = "PersistSystemMessage",
+                    ["RequestId"] = msgParam.RequestId.DosIsNullOrWhiteSpace()
+                        ? Ulid.NewUlid().ToString()
+                        : msgParam.RequestId.Trim(),
+                    ["OsClient"] = currentToken.OsClient,
+                    ["ToUserId"] = msgParam.ToUserId,
+                    ["Content"] = msgParam.Content,
+                    ["OtherInfo"] = msgParam.OtherInfo,
+                    ["IsRead"] = msgParam.IsRead
                 },
-                OsClient = msgParam.OsClient
-            });
-
-            if (toSysUserModelResult.Code != 1)
+                JObject.FromObject(currentToken.CurrentUser)).ConfigureAwait(false);
+            var prepareResult = ToResultObject(rawPrepareResult);
+            if (prepareResult?["Code"].Val<int>() != 1
+                || prepareResult["Data"] is not JObject data
+                || data["Message"] is not JObject)
             {
-                return new DosResult(0, null, toSysUserModelResult.Msg);
+                return new DosResult(
+                    prepareResult?["Code"].Val<int>() ?? 0,
+                    null,
+                    prepareResult?["Msg"]?.ToString() ?? "官方系统消息接口不可用。");
             }
 
-            var toSysUserModel = toSysUserModelResult.Data;
+            // 固定 Managed runtime 已完成持久化和读模型更新；旧 Controller
+            // 只保留尽力 SignalR 投递，不再重复执行聊天业务。
+            var diyWebSocket = new DiyWebSocket(null);
+            await diyWebSocket.DeliverPreparedMessageAsync(
+                prepareResult,
+                currentToken.OsClient,
+                _context).ConfigureAwait(false);
 
-            msgParam.ToUserName = toSysUserModel.Name;
-            msgParam.ToUserAccount = toSysUserModel.Account;
-            msgParam.ToUserAvatar = toSysUserModel.Avatar;
-            msgParam.FromUserId = ChatAssistantIdentity.UserId;
-            msgParam.FromUserName = ChatAssistantIdentity.UserName;
-            msgParam.FromUserAccount = ChatAssistantIdentity.UserAccount;
-            msgParam.FromUserAvatar = ChatAssistantIdentity.UserAvatar;
-            msgParam.Type = "系统消息";
+            return new DosResult(1, data["Message"]);
+        }
 
-
-            //Microi.net.ClientInfo clientInfo = await DiyCacheBase.NoSql.GetAsync<Microi.net.ClientInfo>("Microi:ChatOnline:" + msg.OsClient + ":" + msg.ToUserId);
-
-            //var clients = _context.Clients.Clients(clientInfo.ConnectionIds);
-
-            msgParam._iHubContext = _context;
-
-            //await _context.Clients.Clients<IClient>("").SendToUser(msg);
-
-            //await _context.Clients.   //.Clients<IClient>("").SendToUser(msg);
-
-            //await clients.SendAsync("ReceiveSendToUser", msg);
-
-            msgParam._iHubContext = _context;
-
-            var diyWebSocket = new DiyWebSocket(null); // 临时实例用于调用SendToUser
-            await diyWebSocket.SendToUser(msgParam);
-
-            return new DosResult(1);        }
+        private static JObject ToResultObject(object result)
+        {
+            if (result == null) return null;
+            if (result is JObject jobject) return jobject;
+            if (result is string json)
+            {
+                try { return JObject.Parse(json); }
+                catch { return null; }
+            }
+            try { return JObject.FromObject(result); }
+            catch { return null; }
+        }
     }
 }

@@ -624,10 +624,12 @@ export default {
             //window.open(self.DiyCommon.GetServerPath(self.SysMenuModel.ImportTemplate));
             // self.DiyCommon.Post('/api/Aliyun/GetOssDownloadUrl',{
             self.DiyCommon.Post(
-                "/api/HDFS/GetPrivateFileUrl",
+                "/apiengine/platform-private-file-url",
                 {
                     FilePathName: self.SysMenuModel.ImportTemplate, //self.FormDiyTableModel[field.Name]
-                    HDFS: self.SysConfig.HDFS || "Aliyun"
+                    HDFS: self.SysConfig.HDFS || "Aliyun",
+                    ResourceKind: "MenuImportTemplate",
+                    ResourceId: self.SysMenuModel.Id
                 },
                 function (result) {
                     if (self.DiyCommon.Result(result)) {
