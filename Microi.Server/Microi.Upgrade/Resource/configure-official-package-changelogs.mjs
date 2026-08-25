@@ -27,11 +27,11 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
     releaseTime: '2026-08-25 15:20:00',
   }),
   'app.microi.saas-engine.json': Object.freeze({
-    version: 'v7.6.11',
-    title: '触发完整一致的启动接口刷新轮次',
+    version: 'v7.6.13',
+    title: '在途启动维护禁止重复投递',
     changeType: 'Fix',
-    content: '将编排刷新修订提升至 runtime-flags-v4，触发已被旧逻辑误标为 v3 完成的在途父任务；刷新检查点绑定当前修订号，并从首租户重启同一原父/子幂等轮次。',
-    releaseTime: '2026-08-25 15:35:00',
+    content: '后台任务每个分片均按 ApiEngineKey 读取最新工作器，旧 RefreshBootstrap 检查点只迁移回 Monitor 并继续权威汇总原 ChildTasks；禁止通过重新排队刷新工作器，避免历史幂等键格式变化后产生第二批安装任务。',
+    releaseTime: '2026-08-25 16:05:00',
   }),
   'app.microi.sso.json': Object.freeze({
     version: 'v7.5.7',

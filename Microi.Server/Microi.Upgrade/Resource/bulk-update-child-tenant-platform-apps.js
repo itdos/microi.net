@@ -9,7 +9,7 @@
 
 /*
  * ApiEngineKey: bulk-update-child-tenant-platform-apps
- * Version: v1.2.5
+ * Version: v1.2.7
  * 主租户编排器：按当前运行环境的 SaaS 目录，为每个启用的子租户创建一个
  * “安装/更新全部平台应用”持久后台任务。租户识别和目标任务投递由可信 C# 原子完成。
  */
@@ -20,12 +20,10 @@
 // CHILD_TASK_RUNTIME_RELOAD_FALLBACK_V1：兼容尚未升级控制面 C# 的节点，遇到未加载 OsClient 时受控重载后重试。
 // CHILD_STARTUP_SCOPE_CHILD_PARAM_PATCH_V1：兼容滚动发布中的旧控制面节点；事故恢复任务入队后，
 // 在父任务事务提交前强制写入并回读子任务范围，写入失败时先请求取消，绝不退化为全量安装。
-// CHILD_STARTUP_BOOTSTRAP_REFRESH_V1：运行中的事故恢复父任务可用原父任务 Id 再次调用投递原子，
-// 只刷新目标租户的官方商城工作器并命中原幂等子任务，不创建重复任务；Jhyxdkj/lsg 优先刷新。
-// CHILD_STARTUP_BOOTSTRAP_REVISION_RESTART_V1：热修若发生在刷新分片中途，检查点必须绑定
-// 当前修订；修订变化时从第 0 个租户重新刷新，禁止把“前半旧版、后半新版”的混合轮次
-// 错误标记为新修订已完成。仍复用原父/子任务 Id，不创建重复任务。
-var startupBootstrapRevision = 'startup-api-runtime-flags-v4';
+// CHILD_STARTUP_NO_REQUEUE_REFRESH_V1：后台任务每个分片都会按 ApiEngineKey 读取当前最新工作器源码，
+// 因此在途父任务升级后只迁移检查点并继续监控原 ChildTasks；严禁再次调用投递原子“刷新”工作器，
+// 避免历史任务幂等键格式变化时创建第二批安装任务。旧 RefreshBootstrap 检查点也只归一化回 Monitor。
+var startupBootstrapRevision = 'startup-api-live-worker-v6-no-requeue';
 function text(value) {
     return value === null || value === undefined ? '' : String(value).trim();
 }
@@ -235,92 +233,16 @@ for (var attemptedIndex = 0; attemptedIndex < attemptedTargets.length; attempted
 }
 var failures = toArray(checkpoint.Failures);
 var childTasks = toArray(checkpoint.ChildTasks);
-var bootstrapRefreshFailures = toArray(checkpoint.BootstrapRefreshFailures);
+var bootstrapRefreshFailures = [];
 
-// 兼容已经进入 Monitor 的在途父任务：官网 Managed 编排器热更新后，先用同一个
-// parent TaskId + target OsClient 再次调用 QueueTarget。控制面会在幂等命中原子任务
-// 之前刷新 import/bulk 两个官方工作器，因此不会产生重复安装任务。
+// 兼容 v1.2.1-v1.2.6 留下的 RefreshBootstrap 检查点。任务运行时会按
+// ApiEngineKey 获取最新源码，所以这里只迁移状态，绝不再次投递子任务。
 if (maintenanceScope == 'StartupDependencies'
-    && phase == 'Monitor'
-    && text(checkpoint.BootstrapRevision) != startupBootstrapRevision) {
-    phase = 'RefreshBootstrap';
-}
-
-if (maintenanceScope == 'StartupDependencies'
-    && phase == 'RefreshBootstrap'
-    && text(checkpoint.BootstrapRefreshRevision) != startupBootstrapRevision) {
-    checkpoint.BootstrapRefreshIndex = 0;
-    bootstrapRefreshFailures = [];
-}
-
-if (phase == 'RefreshBootstrap') {
-    var refreshTasks = childTasks.slice().sort(function (left, right) {
-        function priority(item) {
-            var key = text(item && item.OsClient).toLowerCase();
-            if (key == 'jhyxdkj') return 0;
-            if (key == 'lsg') return 1;
-            return 2;
-        }
-        return priority(left) - priority(right);
-    });
-    var refreshIndex = Math.max(0, toInt(checkpoint.BootstrapRefreshIndex, 0));
-    var refreshEnd = Math.min(refreshTasks.length, refreshIndex + 20);
-    for (var refreshTaskIndex = refreshIndex; refreshTaskIndex < refreshEnd; refreshTaskIndex++) {
-        var refreshTask = refreshTasks[refreshTaskIndex] || {};
-        var refreshResult = V8.Method.QueueChildTenantPlatformAppMaintenance({
-            _BackgroundTaskId: taskId,
-            _BackgroundTaskFencingToken: fencingToken,
-            TargetOsClient: text(refreshTask.OsClient),
-            MaintenanceScope: maintenanceScope
-        });
-        var refreshedTaskId = text(refreshResult && refreshResult.Data && refreshResult.Data.TaskId);
-        if (!refreshResult || refreshResult.Code != 1 || refreshedTaskId != text(refreshTask.TaskId)) {
-            if (refreshedTaskId && refreshedTaskId != text(refreshTask.TaskId)) {
-                cancelUnsafeChildTask(refreshedTaskId,
-                    '启动工作器刷新返回了非原幂等子任务，已拒绝重复任务。');
-            }
-            bootstrapRefreshFailures.push({
-                OsClient: text(refreshTask.OsClient),
-                Name: text(refreshTask.Name || refreshTask.OsClient),
-                TaskId: text(refreshTask.TaskId),
-                Stage: 'BootstrapRefresh',
-                Msg: (refreshResult && refreshResult.Msg) || '工作器刷新无返回或未命中原幂等任务'
-            });
-        }
-    }
-    var refreshMessage = '正在刷新子租户启动接口快速自愈工作器：'
-        + refreshEnd + '/' + refreshTasks.length;
-    report(5, refreshEnd, refreshTasks.length, refreshMessage);
-    if (refreshEnd < refreshTasks.length) {
-        return continuation({
-            Version: 3,
-            TaskId: taskId,
-            Phase: 'RefreshBootstrap',
-            MaintenanceScope: maintenanceScope,
-            BootstrapRefreshRevision: startupBootstrapRevision,
-            BootstrapRefreshIndex: refreshEnd,
-            AttemptedTargets: attemptedTargets,
-            ChildTasks: childTasks,
-            Failures: failures,
-            BootstrapRefreshFailures: bootstrapRefreshFailures
-        }, 5, refreshEnd, refreshTasks.length, refreshMessage, 1);
-    }
-    return continuation({
-        Version: 3,
-        TaskId: taskId,
-        Phase: 'Monitor',
-        MaintenanceScope: maintenanceScope,
-        BootstrapRevision: startupBootstrapRevision,
-        AttemptedTargets: attemptedTargets,
-        ChildTasks: childTasks,
-        Failures: failures,
-        BootstrapRefreshFailures: bootstrapRefreshFailures
-    }, 5, 0, childTasks.length,
-    '启动接口快速自愈工作器刷新完成'
-        + (bootstrapRefreshFailures.length > 0
-            ? '，' + bootstrapRefreshFailures.length + ' 个租户保留原安全安装路径'
-            : '')
-        + '，继续汇总安装进度', 1);
+    && (phase == 'RefreshBootstrap'
+        || (phase == 'Monitor'
+            && text(checkpoint.BootstrapRevision) != startupBootstrapRevision))) {
+    phase = 'Monitor';
+    checkpoint.BootstrapRevision = startupBootstrapRevision;
 }
 
 if (phase == 'Queue') {
