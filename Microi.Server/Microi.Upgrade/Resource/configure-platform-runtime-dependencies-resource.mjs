@@ -198,8 +198,9 @@ for (const dependency of dependencies) {
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {});
 const protocolCapabilities = [
   'ApiEngine:get-microi-store-model@v1.2.9',
-  'ApiEngine:import-microi-store-package@v2.4.7',
+  'ApiEngine:import-microi-store-package@v2.4.8',
   'Installer:StartupDependencyApiFastBootstrap',
+  'Installer:StartupDependencyPreinstallBootstrapV1',
   'Installer:StartupApiRuntimeFlagReconciliation',
   'Marketplace:HdfsLegacyImporterBridgeV1',
 ];
@@ -209,6 +210,7 @@ for (const fieldName of ['RequiredPlatformCapabilities', 'Capabilities']) {
       !String(capability).startsWith('ApiEngine:get-microi-store-model@')
       && !String(capability).startsWith('ApiEngine:import-microi-store-package@')
       && String(capability) !== 'Installer:StartupDependencyApiFastBootstrap'
+      && String(capability) !== 'Installer:StartupDependencyPreinstallBootstrapV1'
       && String(capability) !== 'Installer:StartupApiRuntimeFlagReconciliation'
       && String(capability) !== 'Marketplace:HdfsLegacyImporterBridgeV1'
       && String(capability) !== 'ApiEngine:platform-user-update-preferences'

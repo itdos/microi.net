@@ -50,6 +50,7 @@
 |---|---|
 | `V8.Method.NewGuid()`、`V8.Method.NewUlid()` | 生成标识 |
 | `V8.Method.GetTimestamp()` | Unix 秒时间戳 |
+| `V8.Method.GetBackendVersion()` | 当前 Microi.Core 运行程序集的公开发行版本，格式 `vX.Y.Z`；固定匿名健康接口使用，不返回路径或主机信息 |
 | `V8.Method.GetCurrentToken(token,osClient)` | 读取当前 Token 对象；不透传前端 |
 | `V8.Method.RefreshLoginUser(userId,osClient?,token?)` | 刷新登录投影；租户取当前 V8/已认证 DiyToken（可信宿主须建立用户+租户作用域），显式 OsClient 仅作一致性断言；普通用户仅本人，同租户超级管理员主库复核后可跨用户。第三参仅兼容历史 `microi-init` 的原始 Token，宿主重新验证且只允许 Token 本人；返回对象、访问密钥、空身份和跨租户均拒绝 |
 | `V8.Method.ClearUserLoginInfo(userId,osClient)` | 管理员吊销用户全部终端 Token |

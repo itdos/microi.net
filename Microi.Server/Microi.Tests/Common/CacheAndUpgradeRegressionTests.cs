@@ -414,12 +414,23 @@ public class CacheAndUpgradeRegressionTests
             item => item["ApiEngineKey"]?.ToString() == "bulk-import-microi-store-packages");
         Assert.Equal(1, bulkEngine["IsEnable"]?.Value<int>());
         Assert.Equal(0, bulkEngine["StopHttp"]?.Value<int>());
-        AssertEngineVersionAtLeast(bulkEngine, new System.Version(1, 2, 7));
+        AssertEngineVersionAtLeast(bulkEngine, new System.Version(1, 3, 7));
         Assert.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("BULK_BOUNDED_PACKAGE_SLICES_V1", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("StoreVersionId", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("BulkAdaptiveSingleSlice: false", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("platform-sys-menu", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("platform-sys-config", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains(
+            "BackgroundTask:StartupDependencyResourceClosureV2",
+            package["PackageInfo"]?["RequiredPlatformCapabilities"]?.Values<string>() ?? Array.Empty<string>());
+        Assert.Contains(
+            "BackgroundTask:StartupDependencyBootstrapOnlyV1",
+            package["PackageInfo"]?["RequiredPlatformCapabilities"]?.Values<string>() ?? Array.Empty<string>());
         Assert.DoesNotContain("mci_marketplace_bulk_install_item", bulkEngine["ApiV8Code"]?.ToString());
 
         var importer = Assert.Single(
@@ -512,23 +523,27 @@ public class CacheAndUpgradeRegressionTests
             item => item["ApiEngineKey"]?.ToString() == "import-microi-store-package");
         var importerCode = importer["ApiV8Code"]?.ToString() ?? string.Empty;
         Assert.True(Assert.IsType<bool>(hasImporter!.Invoke(null,
-            new object[] { importerCode, new System.Version(2, 4, 4) })));
+            new object[] { importerCode, new System.Version(2, 4, 8) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode, new System.Version(2, 4, 3) })));
+            new object[] { importerCode, new System.Version(2, 4, 7) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode.Replace("PACKAGE_REPLAY_VERSION_GUARD_V2", "LEGACY_REPLAY_GUARD"), new System.Version(2, 4, 4) })));
+            new object[] { importerCode.Replace("PACKAGE_REPLAY_VERSION_GUARD_V2", "LEGACY_REPLAY_GUARD"), new System.Version(2, 4, 8) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode.Replace("PackagePointerMode: 'HdfsV1'", "PackagePointerMode: 'Legacy'"), new System.Version(2, 4, 4) })));
+            new object[] { importerCode.Replace("PackagePointerMode: 'HdfsV1'", "PackagePointerMode: 'Legacy'"), new System.Version(2, 4, 8) })));
 
         var bulk = Assert.Single(package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "bulk-import-microi-store-packages");
         var bulkCode = bulk["ApiV8Code"]?.ToString() ?? string.Empty;
         Assert.True(Assert.IsType<bool>(hasBulk!.Invoke(null,
-            new object[] { bulkCode, new System.Version(1, 2, 7) })));
+            new object[] { bulkCode, new System.Version(1, 3, 7) })));
         Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
-            new object[] { bulkCode, new System.Version(1, 2, 4) })));
+            new object[] { bulkCode, new System.Version(1, 3, 6) })));
         Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
-            new object[] { bulkCode.Replace("BulkAdaptiveSingleSlice: false", "BulkAdaptiveSingleSlice: true"), new System.Version(1, 2, 7) })));
+            new object[] { bulkCode.Replace("BulkAdaptiveSingleSlice: false", "BulkAdaptiveSingleSlice: true"), new System.Version(1, 3, 7) })));
+        Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
+            new object[] { bulkCode.Replace("STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2", "STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V1"), new System.Version(1, 3, 7) })));
+        Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
+            new object[] { bulkCode.Replace("STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1", "LEGACY_STARTUP_BOOTSTRAP"), new System.Version(1, 3, 7) })));
 
         var sysMenu = Assert.Single(package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "platform-sys-menu");
