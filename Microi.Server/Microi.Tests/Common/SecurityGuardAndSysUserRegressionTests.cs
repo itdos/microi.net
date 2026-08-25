@@ -340,13 +340,17 @@ public class SecurityGuardAndSysUserRegressionTests
     public void DefaultIndexUrlValidation_IsOwnedByTheManagedPreferenceEngine()
     {
         var root = FindRepositoryRoot();
-        var controller = File.ReadAllText(Path.Combine(
+        var sysUserController = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers", "SysUserController.cs"));
+        var compatibilityController = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "LegacyMobileCompatibilityController.cs"));
         var engine = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Resource", "platform-user-update-preferences.js"));
 
-        Assert.Contains("UpdateUserPreferencesApiEngineKey = \"platform-user-update-preferences\"", controller);
-        Assert.DoesNotContain("TryNormalizeDefaultIndexUrl", controller);
+        Assert.Contains("UpdateUserPreferencesApiEngineKey = \"platform-user-update-preferences\"", compatibilityController);
+        Assert.Contains("~/api/SysUser/UpdateMyDefaultIndexUrl", compatibilityController);
+        Assert.DoesNotContain("UpdateMyDefaultIndexUrl", sysUserController);
+        Assert.DoesNotContain("TryNormalizeDefaultIndexUrl", compatibilityController);
         Assert.Contains("defaultIndexUrl.indexOf('/#/') === 0", engine);
         Assert.Contains("defaultIndexUrl.indexOf('#/') === 0", engine);
         Assert.Contains("defaultIndexUrl.indexOf('//') === 0", engine);

@@ -10,6 +10,19 @@ const DEFAULT_AUTH_CODES = [401, -1, 1001, 1002];
 // 禁用常见占位图和外部二维码资源，避免前端误把临时素材带到正式项目。
 const DEFAULT_BLOCKED_ASSET = /(qrserver\.com|create-qr-code|picsum\.photos|placehold\.co|placeholder\.com|dummyimage\.com)/i;
 
+const PLATFORM_SYS_CONFIG_FALLBACK_STATUSES = new Set([404, 405, 501]);
+
+export function shouldFallbackPlatformSysConfig(value) {
+  const status = Number(value?.response?.status ?? value?.statusCode ?? value?.status ?? 0);
+  if (PLATFORM_SYS_CONFIG_FALLBACK_STATUSES.has(status)) return true;
+  const payload = value?.response?.data !== undefined ? value.response.data : value;
+  if (!payload || Number(payload.Code) === 1) return false;
+  const message = String(payload.Msg || payload.Message || '').toLowerCase();
+  return message.includes('sys_apiengine')
+    && message.includes('platform-sys-config')
+    && (message.includes('noexistdata') || message.includes('不存在的数据') || message.includes('不存在'));
+}
+
 // 兼容浏览器、uni-app、小程序运行时以及测试环境中的全局对象读取。
 function getGlobalValue(key) {
   try {
@@ -1939,6 +1952,7 @@ export function createMicroiV8(options = {}) {
   const legacyApi = {
     MicroiInit: '/apiengine/microi-init',
     GetSysConfig: '/apiengine/platform-sys-config',
+    GetSysConfigFallback: '/api/FormEngine/GetSysConfig',
     Login: '/api/SysUser/login',
     AddFormData: '/api/FormEngine/addFormData',
     AddFormDataBatch: '/api/FormEngine/addFormDataBatch',
@@ -2033,14 +2047,30 @@ export function createMicroiV8(options = {}) {
         const cached = storage.get('SysConfig');
         if (cached) return parseMaybeJson(cached, {});
       }
-      const result = await legacyPost(legacyApi.GetSysConfig, {
+      const sysConfigParam = {
         OsClient: config.osClient,
         _SearchEqual: { IsEnable: 1 }
-      }, null, {
-        Auth: false,
-        IsApiEngine: true,
-        SilentError: true
-      });
+      };
+      let result;
+      try {
+        result = await legacyPost(legacyApi.GetSysConfig, sysConfigParam, null, {
+          Auth: false,
+          IsApiEngine: true,
+          SilentError: true
+        });
+      } catch (error) {
+        if (!shouldFallbackPlatformSysConfig(error)) throw error;
+        result = await legacyPost(legacyApi.GetSysConfigFallback, sysConfigParam, null, {
+          Auth: false,
+          SilentError: true
+        });
+      }
+      if (shouldFallbackPlatformSysConfig(result)) {
+        result = await legacyPost(legacyApi.GetSysConfigFallback, sysConfigParam, null, {
+          Auth: false,
+          SilentError: true
+        });
+      }
       if (result && result.Code === 1) {
         const model = result.Data || {};
         client.SysConfig = model;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -110,113 +111,77 @@ namespace Microi.net
                 using (UpgradeExecutionLeaseContext.Enter(upgradeLease))
                 {
                     upgradeLease.ThrowIfLost();
+                    Console.WriteLine(
+                        $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【页面启动接口闭包】后台复检开始。");
+                    var startupDependencyResult = await UpgradeAppStore
+                        .EnsureStartupDependenciesUnderLeaseAsync(runtimeClient)
+                        .ConfigureAwait(false);
+                    if (startupDependencyResult.Code != 1)
+                    {
+                        Console.WriteLine(
+                            $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【页面启动接口闭包】后台复检失败：{startupDependencyResult.Msg}");
+                        throw new InvalidOperationException(startupDependencyResult.Msg);
+                    }
+                    Console.WriteLine(
+                        $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【页面启动接口闭包】后台复检成功：{startupDependencyResult.Msg}");
+
                     // The durable task worker is a runtime prerequisite, so its
                     // idempotent expand-only schema cannot be blocked by an older,
                     // unrelated migration in the tenant's historical chain.
-                    var backgroundTaskMessages = await new Upgrade21()
-                        .Run(runtimeClient.OsClient)
-                        .ConfigureAwait(false);
-                    if (backgroundTaskMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("；", backgroundTaskMessages));
-                    }
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade21-持久后台任务", () => new Upgrade21().Run(runtimeClient.OsClient));
                     // 用户个人首页、商城安装计数事件与批量任务明细都是当前
                     // 运行时直接依赖的扩展型结构。历史租户可能因更早的无关迁移
                     // 失败而停在旧 ServerVersion，因此像后台任务基础表一样在共享
                     // 升级租约内独立、幂等地维持这一不变量。
-                    upgradeLease.ThrowIfLost();
-                    var saasRuntimeMessages = await new Upgrade23()
-                        .Run(runtimeClient.OsClient)
-                        .ConfigureAwait(false);
-                    if (saasRuntimeMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("；", saasRuntimeMessages));
-                    }
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade23-SaaS运行时结构", () => new Upgrade23().Run(runtimeClient.OsClient));
                     // 当前流式应用发布接口会直接读取 V3 发布闸门与协议字段。历史租户
                     // 可能因更早的无关迁移失败或版本号漂移而跳过 Upgrade25，因此把
                     // 这组扩展型物理结构作为运行时前置条件，在同一分布式租约内幂等维护。
-                    upgradeLease.ThrowIfLost();
-                    var applicationGateMessages = await new Upgrade25()
-                        .EnsureTenantGateInvariant(runtimeClient.OsClient)
-                        .ConfigureAwait(false);
-                    if (applicationGateMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("；", applicationGateMessages));
-                    }
-                    upgradeLease.ThrowIfLost();
-                    var applicationStreamSchemaMessages = await new Upgrade25()
-                        .EnsureApplicationStreamV3SchemaInvariant(runtimeClient.OsClient)
-                        .ConfigureAwait(false);
-                    if (applicationStreamSchemaMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("；", applicationStreamSchemaMessages));
-                    }
-                    upgradeLease.ThrowIfLost();
-                    var userAccessKeyMenuMessages = await new Upgrade26()
-                        .Run(runtimeClient.OsClient)
-                        .ConfigureAwait(false);
-                    if (userAccessKeyMenuMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("；", userAccessKeyMenuMessages));
-                    }
-                    upgradeLease.ThrowIfLost();
-                    var userAndMarketplaceMessages = await new Upgrade28()
-                        .Run(runtimeClient.OsClient)
-                        .ConfigureAwait(false);
-                    if (userAndMarketplaceMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("；", userAndMarketplaceMessages));
-                    }
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade25-应用发布租户门禁",
+                        () => new Upgrade25().EnsureTenantGateInvariant(runtimeClient.OsClient));
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade25-应用发布V3结构",
+                        () => new Upgrade25().EnsureApplicationStreamV3SchemaInvariant(runtimeClient.OsClient));
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade26-访问密钥菜单", () => new Upgrade26().Run(runtimeClient.OsClient));
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade28-用户首页与商城事件", () => new Upgrade28().Run(runtimeClient.OsClient));
                     // SaaS 运行配置属于当前 API 的控制面。即使历史 ServerVersion 被错误
                     // 推进，也要在共享升级租约内幂等补齐 OCR 与后端运行配置元数据。
-                    upgradeLease.ThrowIfLost();
-                    var ocrConfigurationMessages = await new Upgrade29()
-                        .Run(runtimeClient.OsClient)
-                        .ConfigureAwait(false);
-                    if (ocrConfigurationMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("；", ocrConfigurationMessages));
-                    }
-                    upgradeLease.ThrowIfLost();
-                    var backendConfigurationMessages = await new Upgrade30()
-                        .Run(runtimeClient.OsClient)
-                        .ConfigureAwait(false);
-                    if (backendConfigurationMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("；", backendConfigurationMessages));
-                    }
-                    upgradeLease.ThrowIfLost();
-                    var translateConfigurationMessages = await new Upgrade31()
-                        .Run(runtimeClient.OsClient)
-                        .ConfigureAwait(false);
-                    if (translateConfigurationMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("；", translateConfigurationMessages));
-                    }
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade29-OCR租户配置", () => new Upgrade29().Run(runtimeClient.OsClient));
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade30-后端运行配置", () => new Upgrade30().Run(runtimeClient.OsClient));
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade31-翻译引擎配置", () => new Upgrade31().Run(runtimeClient.OsClient));
                     // 表单事件运行时已经直接读取 diy_table.V8Limit。不能仅依赖
                     // 可能漂移的 ServerVersion：在共享升级租约内幂等补齐元数据，
                     // 并只初始化 V8Limit IS NULL 的旧行，保留用户之后的显式值。
-                    upgradeLease.ThrowIfLost();
-                    var formV8LimitMessages = await new Upgrade33()
-                        .Run(runtimeClient.OsClient, resetExistingValues: false)
-                        .ConfigureAwait(false);
-                    if (formV8LimitMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("；", formV8LimitMessages));
-                    }
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade33-表单V8限额",
+                        () => new Upgrade33().Run(runtimeClient.OsClient, resetExistingValues: false));
                     upgradeLease.ThrowIfLost();
                     var currentVersion = runtimeClient.Db
                         .FromSql("SELECT ServerVersion FROM sys_config WHERE IsEnable = @p0")
                         .AddInParameter("p0", 1)
                         .ToScalar<string>() ?? "";
+                    Console.WriteLine(
+                        $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【版本迁移链】开始：当前版本={currentVersion.DosIsNullOrWhiteSpace() switch { true => "空", false => currentVersion }}。");
                     var result = await _upgrade.Upgrade(currentVersion, runtimeClient).ConfigureAwait(false);
                     upgradeLease.ThrowIfLost();
                     if (result.Code != 1)
                     {
+                        Console.WriteLine(
+                            $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【版本迁移链】失败：{result.Msg}");
                         Console.WriteLine($"Microi：【Error异常】【{runtimeClient.OsClient}】平台自动升级失败：{result.Msg}");
                     }
                     else
                     {
+                        Console.WriteLine(
+                            $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【版本迁移链】成功。");
                         Console.WriteLine($"Microi：【成功】【{runtimeClient.OsClient}】平台自动升级检查完成。");
                     }
                 }
@@ -243,6 +208,34 @@ namespace Microi.net
             catch (Exception ex)
             {
                 Console.WriteLine($"Microi：【Error异常】【{tenantName}】加载多语言出现异常：{ex.Message}");
+            }
+        }
+
+        private static async Task RunRuntimeInvariantAsync(
+            OsClientSecret runtimeClient,
+            UpgradeDistributedLease upgradeLease,
+            string step,
+            Func<Task<List<string>>> action)
+        {
+            upgradeLease.ThrowIfLost();
+            Console.WriteLine(
+                $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【{step}】开始。");
+            try
+            {
+                var messages = await action().ConfigureAwait(false);
+                upgradeLease.ThrowIfLost();
+                if (messages?.Count > 0)
+                {
+                    throw new InvalidOperationException(string.Join("；", messages));
+                }
+                Console.WriteLine(
+                    $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【{step}】成功。");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【{step}】失败：{ex.Message}");
+                throw;
             }
         }
     }

@@ -92,6 +92,86 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// Repairs the managed ApiEngine closure that the anonymous login shell
+        /// and first authenticated WebOS request depend on. This deliberately
+        /// runs independently from ServerVersion: an old release may have
+        /// advanced the version while the application-package import failed.
+        /// </summary>
+        public async Task<DosResult> EnsureStartupDependenciesAsync(
+            OsClientSecret osClientSecret,
+            CancellationToken cancellationToken = default)
+        {
+            if (osClientSecret?.Db == null)
+            {
+                return new DosResult(0, null, "租户数据库连接不存在，无法检查页面启动接口。");
+            }
+
+            const int maxLeaseAttempts = 30;
+            string leaseReason = null;
+            for (var attempt = 1; attempt <= maxLeaseAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (UpgradeAppStore.StartupDependenciesReady(osClientSecret, out var readyReason))
+                {
+                    return new DosResult(1, new
+                    {
+                        Verified = UpgradeAppStore.RequiredStartupDependencyEngineKeys.Length,
+                        Source = "EmbeddedOfficialApplicationPackages"
+                    }, "七项页面启动接口已就绪。");
+                }
+
+                if (attempt == 1)
+                {
+                    Console.WriteLine(
+                        $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【页面启动接口闭包】待修复：{readyReason}");
+                }
+
+                var upgradeLease = UpgradeDistributedLease.TryAcquire(
+                    osClientSecret.OsClient,
+                    out leaseReason);
+                if (upgradeLease != null)
+                {
+                    using (upgradeLease)
+                    using (UpgradeExecutionLeaseContext.Enter(upgradeLease))
+                    {
+                        upgradeLease.ThrowIfLost();
+                        var repair = await UpgradeAppStore
+                            .EnsureStartupDependenciesUnderLeaseAsync(osClientSecret)
+                            .ConfigureAwait(false);
+                        upgradeLease.ThrowIfLost();
+                        if (repair.Code != 1)
+                        {
+                            return repair;
+                        }
+                        if (!UpgradeAppStore.StartupDependenciesReady(
+                                osClientSecret,
+                                out var finalReason))
+                        {
+                            return new DosResult(0, repair.Data,
+                                "页面启动接口自愈后强回读失败：" + finalReason);
+                        }
+                        return repair;
+                    }
+                }
+
+                // Another node can be importing the same managed resources. Poll
+                // the invariant itself and proceed as soon as the strong readback
+                // succeeds instead of waiting for the complete migration chain.
+                if (attempt < maxLeaseAttempts)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken)
+                        .ConfigureAwait(false);
+                }
+            }
+
+            UpgradeAppStore.StartupDependenciesReady(osClientSecret, out var unresolvedReason);
+            return new DosResult(
+                0,
+                null,
+                $"页面启动接口尚未就绪，且未能取得共享升级租约：{leaseReason ?? "未知原因"}；当前状态：{unresolvedReason}");
+        }
+
+        /// <summary>
         /// 
         /// </summary>
         /// <returns></returns>
@@ -105,6 +185,7 @@ namespace Microi.net
                 Console.WriteLine($"Microi：【Error异常】租户[{osClientSecret?.OsClient}] sys_config.ServerVersion格式错误：{CurrentVersion}");
                 return new DosResultList<MicroiUpgradeResult>(0, null, "sys_config.ServerVersion格式错误，应为四段数字版本号。");
             }
+            WriteVersionedUpgradePlan(osClientSecret?.OsClient, CurrentVersion);
             var result = new List<MicroiUpgradeResult>();
             var needUptServerVersion = false;
             var uptVersion = "";
@@ -118,6 +199,17 @@ namespace Microi.net
             try
             {
                 // 运行时不变量不能只依赖可能被错误推进的历史版本号。
+                Console.WriteLine(
+                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【页面启动接口闭包】版本迁移链内复检开始。");
+                var startupDependencyResult = await UpgradeAppStore
+                    .EnsureStartupDependenciesUnderLeaseAsync(osClientSecret)
+                    .ConfigureAwait(false);
+                if (startupDependencyResult.Code != 1)
+                {
+                    throw new InvalidOperationException(startupDependencyResult.Msg);
+                }
+                Console.WriteLine(
+                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【页面启动接口闭包】版本迁移链内复检成功：{startupDependencyResult.Msg}");
                 EnsureAuthSecretColumns(osClientSecret);
                 EnsureMicroServiceColumns(osClientSecret);
                 EnsureSecurityLevels(osClientSecret);
@@ -1264,9 +1356,13 @@ namespace Microi.net
             if (migrationFailed)
             {
                 var message = string.Join("；", migrationErrors);
+                Console.WriteLine(
+                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【版本迁移最终汇总】失败：当前版本={FormatVersionForLog(CurrentVersion)}，最后成功版本={FormatVersionForLog(uptVersion)}，错误={message}");
                 Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】已停止，未推进ServerVersion：{message}");
                 return new DosResultList<MicroiUpgradeResult>(0, result, message);
             }
+            Console.WriteLine(
+                $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【版本迁移最终汇总】成功：起始版本={FormatVersionForLog(CurrentVersion)}，最终版本={(needUptServerVersion ? FormatVersionForLog(uptVersion) : FormatVersionForLog(CurrentVersion))}，历史步骤均已执行成功或因版本已覆盖而跳过。");
             return new DosResultList<MicroiUpgradeResult>(1, result);
         }
 
@@ -2967,6 +3063,63 @@ if (_microiLegacyMenuConfigChanged) {
                 throw new FormatException($"{fieldName}格式错误，应为四段数字版本号：{versionText}");
             }
             return version;
+        }
+
+        private void WriteVersionedUpgradePlan(string osClient, string currentVersion)
+        {
+            foreach (var program in GetVersionedUpgradePrograms())
+            {
+                var status = NeedUpgrade(currentVersion, program.Value)
+                    ? "待执行"
+                    : string.Equals(program.Key, "Upgrade13-官方基础应用包", StringComparison.Ordinal)
+                        ? "版本已覆盖，仍检查应用资源一致性"
+                        : "版本已覆盖，跳过";
+                Console.WriteLine(
+                    $"Microi：【自动升级状态】【{osClient}】【{program.Key}】{status}；门禁版本={program.Value}。");
+            }
+        }
+
+        private static IReadOnlyList<KeyValuePair<string, string>> GetVersionedUpgradePrograms()
+        {
+            return new[]
+            {
+                new KeyValuePair<string, string>("Upgrade01-AppDisplay与AppVisible", UpgradeAppDisplay.Version),
+                new KeyValuePair<string, string>("Upgrade02-sys_config", UpgradeSysConfig.Version),
+                new KeyValuePair<string, string>("Upgrade03-多语言", UpgradeLang.Version),
+                new KeyValuePair<string, string>("Upgrade05-ApiEngine", UpgradeApiEngine.Version),
+                new KeyValuePair<string, string>("Upgrade07-DiyTable与SysMenu", Upgrade7.Version),
+                new KeyValuePair<string, string>("Upgrade08-定时任务", Upgrade8.Version),
+                new KeyValuePair<string, string>("Upgrade09-历史结构", Upgrade9.Version),
+                new KeyValuePair<string, string>("Upgrade10-历史结构", Upgrade10.Version),
+                new KeyValuePair<string, string>("Upgrade11-历史结构", Upgrade11.Version),
+                new KeyValuePair<string, string>("Upgrade12-ApiEngine字段", Upgrade12.Version),
+                new KeyValuePair<string, string>("Upgrade13-官方基础应用包", UpgradeAppStore.Version),
+                new KeyValuePair<string, string>("Upgrade14-AI引擎", Upgrade14.Version),
+                new KeyValuePair<string, string>("Upgrade15-安全权限", Upgrade15.Version),
+                new KeyValuePair<string, string>("Upgrade16-文件上传租户配置", Upgrade16.Version),
+                new KeyValuePair<string, string>("Upgrade17-AI角色策略", Upgrade17.Version),
+                new KeyValuePair<string, string>("Upgrade18-AI向量模式", Upgrade18.Version),
+                new KeyValuePair<string, string>("Upgrade19-接口引擎内存限制", Upgrade19.Version),
+                new KeyValuePair<string, string>("Upgrade20-用户访问密钥", Upgrade20.Version),
+                new KeyValuePair<string, string>("Upgrade21-持久后台任务", Upgrade21.Version),
+                new KeyValuePair<string, string>("Upgrade22-V8执行限制", Upgrade22.Version),
+                new KeyValuePair<string, string>("Upgrade23-SaaS运行时设置", Upgrade23.Version),
+                new KeyValuePair<string, string>("Upgrade24-数据库备份", Upgrade24.Version),
+                new KeyValuePair<string, string>("Upgrade25-应用发布V3", Upgrade25.Version),
+                new KeyValuePair<string, string>("Upgrade26-用户访问密钥菜单", Upgrade26.Version),
+                new KeyValuePair<string, string>("Upgrade27-V8无限制兼容", Upgrade27.Version),
+                new KeyValuePair<string, string>("Upgrade28-用户首页与商城事件", Upgrade28.Version),
+                new KeyValuePair<string, string>("Upgrade29-OCR租户设置", Upgrade29.Version),
+                new KeyValuePair<string, string>("Upgrade30-后端运行配置", Upgrade30.Version),
+                new KeyValuePair<string, string>("Upgrade31-翻译租户设置", Upgrade31.Version),
+                new KeyValuePair<string, string>("Upgrade32-V8运行限制", Upgrade32.Version),
+                new KeyValuePair<string, string>("Upgrade33-表单V8运行限制", Upgrade33.Version)
+            };
+        }
+
+        private static string FormatVersionForLog(string version)
+        {
+            return version.DosIsNullOrWhiteSpace() ? "空" : version;
         }
 
         public sealed class ServerVersionRow

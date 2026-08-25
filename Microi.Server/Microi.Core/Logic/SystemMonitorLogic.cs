@@ -1024,6 +1024,11 @@ namespace Microi.net
             if (value.Contains("】开始初始化！")
                 || value.Contains("】Microi所有初始化成功！")
                 || value.Contains("】Microi全部启动成功！")
+                // Upgrade diagnostics are an operational recovery boundary.
+                // Keep every step and final summary visible in docker logs even
+                // when ordinary Console noise is routed into MongoDB.
+                || value.Contains("【自动升级状态】")
+                || value.Contains("平台自动升级")
                 || value.Contains("平台服务器端版本号")
                 || value.Contains("数据库连接保护")
                 || value.Contains("SaaS引擎初始化异常")

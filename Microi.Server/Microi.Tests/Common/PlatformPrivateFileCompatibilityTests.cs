@@ -83,23 +83,25 @@ public sealed class PlatformPrivateFileCompatibilityTests
     {
         var root = FindRepositoryRoot();
         var hdfsSource = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.net.Api", "Controllers", "HDFSController.cs"));
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "LegacyMobileCompatibilityController.cs"));
         var method = ExtractMethod(
             hdfsSource,
-            "private async Task<JsonResult> GetPrivateFileUrlCompatibility");
+            "public async Task<JsonResult> GetPrivateFileUrl");
 
         Assert.Contains(
             "PlatformPrivateFileUrlEngineKey = \"platform-private-file-url\"",
             hdfsSource,
             StringComparison.Ordinal);
         Assert.Contains("DiyToken.GetCurrentToken", method, StringComparison.Ordinal);
-        Assert.Contains("GetClientUserFromToken", method, StringComparison.Ordinal);
+        Assert.Contains("GetLegacyClientUserFromToken", method, StringComparison.Ordinal);
         Assert.Contains("ManagedApiEngineCompatibility.RunAsync", method, StringComparison.Ordinal);
         Assert.Contains("PlatformPrivateFileUrlEngineKey", method, StringComparison.Ordinal);
         Assert.Contains("JObject.FromObject(param)", method, StringComparison.Ordinal);
         Assert.DoesNotContain("AuthorizePrivateFileRead", method, StringComparison.Ordinal);
         Assert.DoesNotContain("MicroiEngine.HDFS.GetPrivateFileUrl", method, StringComparison.Ordinal);
         Assert.DoesNotContain("NormalizeFilePaths", method, StringComparison.Ordinal);
+        Assert.Contains("仅用于兼容旧版吾码 PC / UniApp / 定制移动端", hdfsSource, StringComparison.Ordinal);
+        Assert.Contains("本 Controller 及全部历史地址可能整体删除", hdfsSource, StringComparison.Ordinal);
 
         var facadeSource = File.ReadAllText(Path.Combine(
             root,

@@ -19,8 +19,6 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     public class OsController : Controller
     {
-        private const string OsClientByDomainApiEngineKey = "platform-os-client-by-domain";
-
         /// <summary>
         /// 
         /// </summary>
@@ -108,23 +106,6 @@ namespace Microi.net.Api
         {
             var fv = FileVersionInfo.GetVersionInfo("Microi.net.dll");
             return Json(new DosResult(1, fv.FileVersion));
-        }
-
-        [HttpPost, HttpGet]
-        [AllowAnonymous]
-        public async Task<JsonResult> GetOsClientByDomain(string Domain, string Lang = "")
-        {
-            var request = new JObject
-            {
-                ["Domain"] = Domain ?? "",
-                ["_Lang"] = Lang.DosIsNullOrWhiteSpace() ? DiyMessage.Lang : Lang,
-                // 域名解析发生在尚未知晓目标租户的启动阶段，因此固定由配置租户
-                // 加载官方 Managed 引擎；可信原子只返回匹配租户的 OsClient。
-                ["OsClient"] = OsClient.GetConfigOsClient()
-            };
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                OsClientByDomainApiEngineKey,
-                request));
         }
 
         /// <summary>

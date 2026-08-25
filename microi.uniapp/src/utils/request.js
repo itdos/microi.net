@@ -1,5 +1,5 @@
 import appConfig from '../config.js';
-import { createMicroiV8 } from './microi.v8.js';
+import { createMicroiV8, shouldFallbackPlatformSysConfig } from './microi.v8.js';
 import { shouldPromptAuthExpired } from '../platform/auth-expired-policy.mjs';
 import { clearPlatformCache, removeCachePrefix } from '../platform/cache.js';
 import { clearRetainedListSessions } from '../platform/list-session.mjs';
@@ -204,18 +204,22 @@ export async function probeAppRuntimeEndpoint(input = {}) {
   const endpoint = buildAppRuntimeEndpoint(input);
   const query = `OsClient=${encodeURIComponent(endpoint.osClient)}`;
   let response;
+  const requestData = {
+    OsClient: endpoint.osClient,
+    _SearchEqual: { IsEnable: 1 }
+  };
+  const baseHeaders = {
+    'Content-Type': 'application/json',
+    osclient: endpoint.osClient,
+    did: V8.getDid()
+  };
   try {
     response = await uniRequestAdapter({
       url: `${endpoint.apiBase}/apiengine/platform-sys-config?${query}`,
       method: 'POST',
-      data: {
-        OsClient: endpoint.osClient,
-        _SearchEqual: { IsEnable: 1 }
-      },
+      data: requestData,
       headers: {
-        'Content-Type': 'application/json',
-        osclient: endpoint.osClient,
-        did: V8.getDid(),
+        ...baseHeaders,
         apiengine: '1'
       },
       timeout: 15000
@@ -224,8 +228,23 @@ export async function probeAppRuntimeEndpoint(input = {}) {
     throw new Error(`无法连接该平台：${error && (error.errMsg || error.message) ? (error.errMsg || error.message) : '网络请求失败'}`);
   }
 
-  const statusCode = Number(response && (response.statusCode || response.status) || 0);
-  const body = response && (response.data === undefined ? response.body : response.data);
+  let statusCode = Number(response && (response.statusCode || response.status) || 0);
+  let body = response && (response.data === undefined ? response.body : response.data);
+  if (shouldFallbackPlatformSysConfig({ ...((body && typeof body === 'object') ? body : {}), statusCode })) {
+    try {
+      response = await uniRequestAdapter({
+        url: `${endpoint.apiBase}/api/FormEngine/GetSysConfig?${query}`,
+        method: 'POST',
+        data: requestData,
+        headers: baseHeaders,
+        timeout: 15000
+      });
+      statusCode = Number(response && (response.statusCode || response.status) || 0);
+      body = response && (response.data === undefined ? response.body : response.data);
+    } catch (error) {
+      throw new Error(`无法连接该平台：${error && (error.errMsg || error.message) ? (error.errMsg || error.message) : '兼容接口请求失败'}`);
+    }
+  }
   if (statusCode < 200 || statusCode >= 300) {
     throw new Error(`无法连接该平台：HTTP ${statusCode || '未知状态'}`);
   }
@@ -363,4 +382,17 @@ export function get(url, data = {}, auth = true) {
 
 export function post(url, data = {}, auth = true) {
   return request({ url, method: 'POST', data, auth });
+}
+
+export async function getPlatformSysConfigResult(data = {}) {
+  let result;
+  try {
+    result = await post('/apiengine/platform-sys-config', data, false);
+  } catch (error) {
+    if (!shouldFallbackPlatformSysConfig(error)) throw error;
+    return post('/api/FormEngine/GetSysConfig', data, false);
+  }
+  return shouldFallbackPlatformSysConfig(result)
+    ? post('/api/FormEngine/GetSysConfig', data, false)
+    : result;
 }
