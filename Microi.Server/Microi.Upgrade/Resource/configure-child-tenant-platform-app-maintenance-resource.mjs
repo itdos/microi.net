@@ -117,14 +117,16 @@ storePackage.PackageInfo.ChangeHistory = prependHistory(
   storePackage.PackageInfo.ChangeHistory,
   storeClosureChange
 );
-storePackage.PackageInfo.ChangeLog = {
-  Version: "v7.6.12",
-  Title: "大范围事故恢复支持只自举启动接口",
-  ChangeType: "Fix",
-  Content:
-    "受信 StartupDependencies 任务可选择只自举：从应用商城与 SaaS 官方不可变包补齐 platform-sys-menu 和六个运行门面，物理强回读七项契约后立即成功；普通安装和既有在途任务保持完整包流程。",
-  ReleaseTime: "2026-08-25 22:00:00"
-};
+if (storePackage.PackageInfo.Version === "v7.6.12") {
+  storePackage.PackageInfo.ChangeLog = {
+    Version: "v7.6.12",
+    Title: "大范围事故恢复支持只自举启动接口",
+    ChangeType: "Fix",
+    Content:
+      "受信 StartupDependencies 任务可选择只自举：从应用商城与 SaaS 官方不可变包补齐 platform-sys-menu 和六个运行门面，物理强回读七项契约后立即成功；普通安装和既有在途任务保持完整包流程。",
+    ReleaseTime: "2026-08-25 22:00:00"
+  };
+}
 storePackage.PackageInfo.RequiredPlatformCapabilities =
   (storePackage.PackageInfo.RequiredPlatformCapabilities || []).filter(
     capability => !String(capability).startsWith("ApiEngine:bulk-import-microi-store-packages@")
@@ -156,9 +158,9 @@ const orchestratorSource = fs.readFileSync(
   path.join(directory, "bulk-update-child-tenant-platform-apps.js"),
   "utf8"
 ).replace(/\r\n/g, "\n");
-ensureMinimumPackageVersion(saasPackage.PackageInfo, "v7.6.19");
+ensureMinimumPackageVersion(saasPackage.PackageInfo, "v7.6.20");
 saasPackage.PackageInfo.Description =
-  "SaaS 引擎基础资源。提供固定平台启动接口、匿名服务健康契约与真实后端版本，并支持主租户为全部启用子租户执行可回读的平台应用维护。";
+  "SaaS 引擎基础资源。提供由官方应用包声明驱动的完整平台运行时接口闭包、匿名服务健康契约与真实后端版本，并支持主租户为全部启用子租户执行可回读的平台应用维护。";
 saasPackage.PackageInfo.ChangeHistory = prependHistory(
   saasPackage.PackageInfo.ChangeHistory,
   "2026-08-22 v7.5.9 子租户任务投递前幂等补齐运行时物理前置列和固定商城工作器；父任务持续汇总每个子任务真实进度与终态，仅当全部成功时成功。"
@@ -205,14 +207,18 @@ saasPackage.PackageInfo.ChangeHistory = prependHistory(
   saasPackage.PackageInfo.ChangeHistory,
   "2026-08-25 v7.6.19 受信超级管理员后台任务支持按权威目录定向完整维护单个历史租户；启动依赖只自举仍严格限制为两应用闭包，避免为修复极老空库重跑全部子租户。"
 );
-if (saasPackage.PackageInfo.Version === "v7.6.19") {
+saasPackage.PackageInfo.ChangeHistory = prependHistory(
+  saasPackage.PackageInfo.ChangeHistory,
+  "2026-08-26 v7.6.20 后端启动从官方 SaaS 应用包自动计算并强回读完整接口引擎闭包，补齐当前用户 Hook、服务健康、组织机构、菜单角标、私有文件等登录后运行时能力，同时继续保护租户 CreateIfMissing 源码。"
+);
+if (saasPackage.PackageInfo.Version === "v7.6.20") {
   saasPackage.PackageInfo.ChangeLog = {
-    Version: "v7.6.19",
-    Title: "历史子租户支持定向完整平台维护",
+    Version: "v7.6.20",
+    Title: "官方包声明驱动的平台运行时接口闭包",
     ChangeType: "Fix",
     Content:
-      "受信超级管理员后台任务支持按权威目录定向完整维护单个历史租户；启动依赖只自举仍严格限制为两应用闭包，避免为修复极老空库重跑全部子租户。",
-    ReleaseTime: "2026-08-25 23:00:00"
+      "后端启动从官方 SaaS 应用包自动计算并强回读完整接口引擎闭包，补齐当前用户 Hook、服务健康、组织机构、菜单角标、私有文件等登录后运行时能力，同时继续保护租户 CreateIfMissing 源码。",
+    ReleaseTime: "2026-08-26 12:00:00"
   };
 }
 for (const capability of [
@@ -229,6 +235,7 @@ for (const capability of [
   "BackgroundTask:StartupTargetFilter",
   "BackgroundTask:TargetedFullMaintenance",
   "BackgroundTask:StartupDependencyClosureV2",
+  "Installer:DeclaredSaaSRuntimeApiClosureV1",
   "BackgroundTask:StartupDependencyBootstrapOnlyV1",
   "V8.Method.ReloadOsClient"
 ]) addCapability(saasPackage.PackageInfo, capability);

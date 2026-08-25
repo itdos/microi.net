@@ -523,13 +523,15 @@ public class CacheAndUpgradeRegressionTests
             item => item["ApiEngineKey"]?.ToString() == "import-microi-store-package");
         var importerCode = importer["ApiV8Code"]?.ToString() ?? string.Empty;
         Assert.True(Assert.IsType<bool>(hasImporter!.Invoke(null,
-            new object[] { importerCode, new System.Version(2, 4, 8) })));
+            new object[] { importerCode, new System.Version(2, 4, 9) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
             new object[] { importerCode, new System.Version(2, 4, 7) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode.Replace("PACKAGE_REPLAY_VERSION_GUARD_V2", "LEGACY_REPLAY_GUARD"), new System.Version(2, 4, 8) })));
+            new object[] { importerCode.Replace("PACKAGE_REPLAY_VERSION_GUARD_V2", "LEGACY_REPLAY_GUARD"), new System.Version(2, 4, 9) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode.Replace("PackagePointerMode: 'HdfsV1'", "PackagePointerMode: 'Legacy'"), new System.Version(2, 4, 8) })));
+            new object[] { importerCode.Replace("PackagePointerMode: 'HdfsV1'", "PackagePointerMode: 'Legacy'"), new System.Version(2, 4, 9) })));
+        Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
+            new object[] { importerCode.Replace("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1", "LEGACY_EMBEDDED_PACKAGE_TRUST"), new System.Version(2, 4, 9) })));
 
         var bulk = Assert.Single(package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "bulk-import-microi-store-packages");
@@ -650,7 +652,7 @@ public class CacheAndUpgradeRegressionTests
         Assert.Contains("app.microi.sso.json", resources.Keys);
         var package = JObject.Parse(resources["app.microi.sso.json"]);
         Assert.True(Assert.IsType<bool>(hasPackagedSsoRuntime!.Invoke(null, new object[] { package })));
-        Assert.Equal("v7.5.7", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.Equal("v7.5.8", package["PackageInfo"]?["Version"]?.ToString());
         Assert.Equal("Platform", package["PackageInfo"]?["ApplicationType"]?.ToString());
 
         var hook = Assert.Single(

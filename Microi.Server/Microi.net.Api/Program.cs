@@ -607,22 +607,22 @@ foreach (var tenantName in startupTenantNames)
         $"Microi：【自动升级状态】【{tenantName}】【启动前物理字段】成功：{tenantPhysicalResult.Msg}");
 
     Console.WriteLine(
-        $"Microi：【自动升级状态】【{tenantName}】【页面启动接口闭包】开始检查。");
+        $"Microi：【自动升级状态】【{tenantName}】【平台运行时接口闭包】开始检查。");
     var dependencyResult = await upgradeService
         .EnsureStartupDependenciesAsync(startupTenantClient);
     if (dependencyResult.Code != 1)
     {
-        var dependencyError = $"租户[{tenantName}]页面启动接口闭包失败：{dependencyResult.Msg}";
+        var dependencyError = $"租户[{tenantName}]平台运行时接口闭包失败：{dependencyResult.Msg}";
         Console.WriteLine(
-            $"Microi：【自动升级状态】【{tenantName}】【页面启动接口闭包】失败：{dependencyResult.Msg}");
+            $"Microi：【自动升级状态】【{tenantName}】【平台运行时接口闭包】失败：{dependencyResult.Msg}");
         if (string.Equals(tenantName, clientModel.OsClient, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(dependencyError);
-        startupGateFailed.Add(tenantName + "：页面启动接口闭包失败");
+        startupGateFailed.Add(tenantName + "：平台运行时接口闭包失败");
         continue;
     }
     startupGateSucceeded++;
     Console.WriteLine(
-        $"Microi：【自动升级状态】【{tenantName}】【页面启动接口闭包】成功：{dependencyResult.Msg}");
+        $"Microi：【自动升级状态】【{tenantName}】【平台运行时接口闭包】成功：{dependencyResult.Msg}");
 }
 Console.WriteLine(
     $"Microi：【自动升级状态】【启动前门禁汇总】完成：租户数={startupTenantNames.Count}，成功={startupGateSucceeded}，失败={startupGateFailed.Count}，主租户={clientModel.OsClient}，失败明细={(startupGateFailed.Count == 0 ? "无" : string.Join("；", startupGateFailed))}。");

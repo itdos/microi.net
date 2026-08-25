@@ -166,11 +166,11 @@ test("child-tenant maintenance generator preserves newer package metadata", () =
   );
   assert.match(
     maintenanceGeneratorSource,
-    /ensureMinimumPackageVersion\(saasPackage\.PackageInfo, "v7\.6\.19"\)/,
+    /ensureMinimumPackageVersion\(saasPackage\.PackageInfo, "v7\.6\.20"\)/,
   );
   assert.doesNotMatch(
     maintenanceGeneratorSource,
-    /saasPackage\.PackageInfo\.Version\s*=\s*"v7\.6\.19"/,
+    /saasPackage\.PackageInfo\.Version\s*=\s*"v7\.6\.20"/,
   );
   assert.match(maintenanceGeneratorSource, /storePackage\.PackageInfo\.ChangeLog\s*=/);
   assert.match(maintenanceGeneratorSource, /saasPackage\.PackageInfo\.ChangeLog\s*=/);

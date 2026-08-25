@@ -112,18 +112,18 @@ namespace Microi.net
                 {
                     upgradeLease.ThrowIfLost();
                     Console.WriteLine(
-                        $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【页面启动接口闭包】后台复检开始。");
+                        $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【平台运行时接口闭包】后台复检开始。");
                     var startupDependencyResult = await UpgradeAppStore
                         .EnsureStartupDependenciesUnderLeaseAsync(runtimeClient)
                         .ConfigureAwait(false);
                     if (startupDependencyResult.Code != 1)
                     {
                         Console.WriteLine(
-                            $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【页面启动接口闭包】后台复检失败：{startupDependencyResult.Msg}");
+                            $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【平台运行时接口闭包】后台复检失败：{startupDependencyResult.Msg}");
                         throw new InvalidOperationException(startupDependencyResult.Msg);
                     }
                     Console.WriteLine(
-                        $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【页面启动接口闭包】后台复检成功：{startupDependencyResult.Msg}");
+                        $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【平台运行时接口闭包】后台复检成功：{startupDependencyResult.Msg}");
 
                     // The durable task worker is a runtime prerequisite, so its
                     // idempotent expand-only schema cannot be blocked by an older,

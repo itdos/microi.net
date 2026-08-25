@@ -280,7 +280,9 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("GetBootstrapSourceFingerprint", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", importerSource, StringComparison.Ordinal);
-        Assert.Contains("Version: v2.4.8", importerSource, StringComparison.Ordinal);
+        Assert.Contains("Version: v2.4.9", importerSource, StringComparison.Ordinal);
+        Assert.Contains("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1", importerSource, StringComparison.Ordinal);
+        Assert.Contains("V8.Method.RequireManagedProtocolContext", importerSource, StringComparison.Ordinal);
         Assert.Contains("STARTUP_API_RUNTIME_FLAG_PHYSICAL_RECONCILIATION_V1", importerSource, StringComparison.Ordinal);
         Assert.Contains("StartupApiBootstrapRevision", importerSource, StringComparison.Ordinal);
         Assert.Contains("STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1", importerSource, StringComparison.Ordinal);
