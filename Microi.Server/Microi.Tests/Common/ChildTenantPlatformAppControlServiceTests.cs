@@ -127,19 +127,19 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("var immediateFailures = failures.slice()", orchestrator, StringComparison.Ordinal);
         Assert.Contains("CHILD_STARTUP_DEPENDENCY_INCIDENT_SCOPE_V1", orchestrator, StringComparison.Ordinal);
         Assert.Contains("CHILD_STARTUP_SCOPE_CHILD_PARAM_PATCH_V1", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("CHILD_STARTUP_BOOTSTRAP_REFRESH_V1", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("phase = 'RefreshBootstrap'", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("CHILD_STARTUP_BOOTSTRAP_REVISION_RESTART_V1", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("startup-api-runtime-flags-v5", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("CHILD_STARTUP_BOOTSTRAP_TASK_READBACK_V1", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("verifyRefreshedChildTask", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("_BackgroundTaskTargetOsClient", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("checkpoint.BootstrapRefreshRevision", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("checkpoint.BootstrapRefreshIndex = 0", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("BootstrapRefreshRevision: startupBootstrapRevision", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("refreshedTaskId != text(refreshTask.TaskId)", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("if (key == 'jhyxdkj') return 0", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("if (key == 'lsg') return 1", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_STARTUP_NO_REQUEUE_REFRESH_V1", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("phase == 'RefreshBootstrap'", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("startup-api-live-worker-v6-no-requeue", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("checkpoint.BootstrapRevision = startupBootstrapRevision", orchestrator, StringComparison.Ordinal);
+        Assert.DoesNotContain("CHILD_STARTUP_BOOTSTRAP_TASK_READBACK_V1", orchestrator, StringComparison.Ordinal);
+        Assert.DoesNotContain("verifyRefreshedChildTask", orchestrator, StringComparison.Ordinal);
+        var migrationStart = orchestrator.IndexOf("CHILD_STARTUP_NO_REQUEUE_REFRESH_V1", StringComparison.Ordinal);
+        var queueStart = orchestrator.IndexOf("if (phase == 'Queue')", migrationStart, StringComparison.Ordinal);
+        Assert.True(migrationStart >= 0 && queueStart > migrationStart);
+        Assert.DoesNotContain(
+            "QueueChildTenantPlatformAppMaintenance",
+            orchestrator[migrationStart..queueStart],
+            StringComparison.Ordinal);
         Assert.Contains("enforceStartupDependencyScope", orchestrator, StringComparison.Ordinal);
         Assert.Contains("childParam.RequiredAppIds = ['app.microi.saas-engine']", orchestrator, StringComparison.Ordinal);
         Assert.Contains("Status='Pending' AND CancelRequested=0", orchestrator, StringComparison.Ordinal);
