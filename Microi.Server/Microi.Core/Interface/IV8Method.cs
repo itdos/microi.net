@@ -226,6 +226,11 @@ namespace Microi.net
         long GetTimestamp();
 
         /// <summary>
+        /// 获取当前后端运行程序集的发行版本号。
+        /// </summary>
+        string GetBackendVersion();
+
+        /// <summary>
         /// 动态参数转换为系统日志参数
         /// </summary>
         SysLogParam DynamicToSysLogParam(dynamic dynamicParam);

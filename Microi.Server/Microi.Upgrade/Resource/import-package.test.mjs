@@ -232,7 +232,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.4\.7/);
+  assert.match(source, /Version: v2\.4\.8/);
 });
 
 test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {
@@ -1380,8 +1380,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 4, 4\)/);
-  assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 2, 7\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 3, 7\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 4, 8\)/);
+  assert.match(appStoreUpgradeSource, /STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1/);
   assert.equal(
     (appStoreUpgradeSource.match(/!HasPinnedImporterCapabilities\(/g) || []).length,
     3,

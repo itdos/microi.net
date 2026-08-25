@@ -54,6 +54,7 @@ test('platform runtime facades are Managed and only authenticated facades call t
   const managedKeys = [
     'platform-os-client-by-domain',
     'platform-sys-config',
+    'platform-service-health',
     'platform-lang-bundle',
     'platform-current-user',
     'platform-private-file-url',
@@ -67,6 +68,7 @@ test('platform runtime facades are Managed and only authenticated facades call t
   const anonymousKeys = new Set([
     'platform-os-client-by-domain',
     'platform-sys-config',
+    'platform-service-health',
     'platform-lang-bundle',
     'platform-login-wallpapers',
     'microi-init',
@@ -100,6 +102,7 @@ test('anonymous platform bootstrap facades remain minimal and public', () => {
   for (const key of [
     'platform-os-client-by-domain',
     'platform-sys-config',
+    'platform-service-health',
     'platform-lang-bundle',
     'microi-init',
   ]) {

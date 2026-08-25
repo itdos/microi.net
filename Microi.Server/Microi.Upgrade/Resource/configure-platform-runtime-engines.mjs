@@ -40,6 +40,17 @@ function prependOnce(existing, line) {
   return tail ? `${block}\n${tail}` : block;
 }
 
+function removeHistoryVersion(existing, version) {
+  const normalizedVersion = String(version || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`^\\d{4}-\\d{2}-\\d{2}\\s+${normalizedVersion}(?:\\s|$)`);
+  return String(existing || '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .filter(line => !pattern.test(line.trim()))
+    .join('\n')
+    .trim();
+}
+
 function compareSemver(left, right) {
   const parse = value => {
     const match = /^v?(\d+)\.(\d+)\.(\d+)$/i.exec(String(value || '').trim());
@@ -129,6 +140,12 @@ const engines = [
     key: 'platform-sys-config', name: '平台公开系统设置', file: 'platform-sys-config.js',
     id: '019d2a01-9d63-7f91-8c01-000000000003', enableLog: 0, allowAnonymous: 1,
     history: '2026-08-25 v1.0.0 将浏览器公开系统设置迁移为匿名 Managed 接口引擎，强制服务端安全投影。'
+  },
+  {
+    key: 'platform-service-health', name: '平台固定服务健康检查', file: 'platform-service-health.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000012', enableLog: 0, allowAnonymous: 1,
+    version: 'v1.0.1',
+    history: '2026-08-25 v1.0.1 版本原子在后端滚动升级期间允许暂不可用，健康接口仍稳定返回 Healthy；新二进制上线后自动补齐真实版本。\n2026-08-25 v1.0.0 新增固定匿名健康契约并返回真实后端程序集版本；业务接口失败不再代表整个 API 服务不可用。'
   },
   {
     key: 'platform-lang-bundle', name: '平台语言词条包', file: 'platform-lang-bundle.js',
@@ -421,12 +438,14 @@ for (const capability of [
   'ApiEngine:platform-sys-role',
   'V8.Method.ResolveOsClientByDomain',
   'V8.Method.GetPublicSysConfig',
+  'V8.Method.GetBackendVersion',
   'V8.Method.GetLangBundle',
   'V8.Method.GetLoginWallpapers',
   'V8.Method.GetAuthorizedPrivateFileUrl',
   'ApiEngine:platform-runtime-custom-hook',
   'ApiEngine:platform-os-client-by-domain',
   'ApiEngine:platform-sys-config',
+  'ApiEngine:platform-service-health',
   'ApiEngine:platform-lang-bundle',
   'ApiEngine:platform-current-user',
   'ApiEngine:platform-private-file-url',
@@ -448,12 +467,32 @@ const packageHistory = '2026-08-25 v7.6.0 SaaS 官方接口递归深度统一收
 if (compareSemver(packageData.PackageInfo.Version, 'v7.6.0') < 0) {
   packageData.PackageInfo.Version = 'v7.6.0';
 }
+const serviceHealthPackageVersion = 'v7.6.18';
+const serviceHealthHistory = '2026-08-25 v7.6.18 固定健康接口兼容应用包先于后端二进制的滚动升级顺序；版本原子暂不可用时仍返回 Healthy，新二进制上线后自动补齐真实版本。';
+if (compareSemver(packageData.PackageInfo.Version, serviceHealthPackageVersion) < 0) {
+  packageData.PackageInfo.Version = serviceHealthPackageVersion;
+}
+if (packageData.PackageInfo.Version === serviceHealthPackageVersion) {
+  packageData.PackageInfo.Description = 'SaaS 引擎基础资源。提供固定平台启动接口、匿名服务健康契约与真实后端版本，并支持主租户为全部启用子租户执行可回读的平台应用维护。';
+  packageData.PackageInfo.ChangeLog = {
+    Version: serviceHealthPackageVersion,
+    Title: '固定健康契约兼容滚动升级',
+    ChangeType: 'Fix',
+    Content: '固定健康接口兼容应用包先于后端二进制的滚动升级顺序；版本原子暂不可用时仍返回 Healthy，新二进制上线后自动补齐真实版本。',
+    ReleaseTime: '2026-08-25 22:10:00'
+  };
+}
 packageData.PackageInfo.ApiEngineCount = packageData.SysApiEngines.length;
 packageData.PackageInfo.FieldCount = packageData.DiyFields.length;
 packageData.PackageInfo.PhysicalColumnCount = packageData.PhysicalColumns.length;
 packageData.PackageInfo.DataRowCount = (packageData.DataSets || [])
   .reduce((total, dataSet) => total + (dataSet.Rows || []).length, 0);
+packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
+  packageData.PackageInfo.ChangeHistory,
+  serviceHealthPackageVersion,
+);
 packageData.PackageInfo.ChangeHistory = prependOnce(packageData.PackageInfo.ChangeHistory, packageHistory);
+packageData.PackageInfo.ChangeHistory = prependOnce(packageData.PackageInfo.ChangeHistory, serviceHealthHistory);
 
 normalizeOfficialApiEnginePolicies(packageData, path.basename(packagePath));
 const normalizedPackageData = JSON.parse(normalizeOfficialPackageExecutionLimits(

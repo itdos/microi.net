@@ -665,6 +665,13 @@ export const V8ServerApiDefinitions = {
                         insertText: "GetCurrentToken",
                         snippet: "GetCurrentToken(${1:token}${2:, osClient})"
                     },
+                    GetBackendVersion: {
+                        label: "GetBackendVersion",
+                        kind: "Method",
+                        documentation: "读取当前后端 Microi.Core 运行程序集的真实发行版本，返回 vX.Y.Z。只包含公开版本信息，不返回主机路径或其它运行环境详情；固定匿名健康接口 platform-service-health 使用此方法。",
+                        insertText: "GetBackendVersion",
+                        snippet: "GetBackendVersion()"
+                    },
                     RefreshLoginUser: {
                         label: "RefreshLoginUser",
                         kind: "Method",

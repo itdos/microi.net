@@ -315,14 +315,32 @@ function validateReleaseCandidate(name, content) {
       }
     }
     if (name === 'app.microi.saas-engine.json') {
-      for (const key of ['platform-create-tenant', 'platform-external-login-binding', 'platform-wechat-user-binding', 'microi-init']) {
+      for (const key of ['platform-create-tenant', 'platform-external-login-binding', 'platform-wechat-user-binding', 'platform-service-health', 'microi-init']) {
         if (!packageEngineMap.has(key)) throw new Error(`${name} 缺少 ${key}。`);
       }
       for (const duplicateKey of ['platform-user-update-preferences', 'platform-sys-user-admin', 'platform-sys-menu']) {
         if (packageEngineMap.has(duplicateKey)) throw new Error(`${name} 仍包含应由其他官方应用唯一交付的 ${duplicateKey}。`);
       }
-      if (semanticNumber(packageModel?.PackageInfo?.Version) < 7_005_046) {
-        throw new Error(`${name} 低于 v7.5.46。`);
+      if (semanticNumber(packageModel?.PackageInfo?.Version) < 7_006_018) {
+        throw new Error(`${name} 低于 v7.6.18。`);
+      }
+      const serviceHealth = packageEngineMap.get('platform-service-health');
+      const serviceHealthCode = String(serviceHealth?.ApiV8Code || '');
+      const requiredCapabilities = packageModel?.PackageInfo?.RequiredPlatformCapabilities || [];
+      if (semanticNumber(serviceHealth?.Version) < 1_000_001
+        || String(serviceHealth?.ApiAddress || '') !== '/apiengine/platform-service-health'
+        || Number(serviceHealth?.IsEnable) !== 1
+        || Number(serviceHealth?.StopHttp) !== 0
+        || Number(serviceHealth?.AllowAnonymous) !== 1
+        || !serviceHealthCode.includes("Status: 'Healthy'")
+        || !serviceHealthCode.includes('V8.Method.GetBackendVersion()')
+        || !serviceHealthCode.includes('catch (versionError)')
+        || /V8\.(?:Db|FormEngine)/.test(serviceHealthCode)
+        || serviceHealthCode.includes('platform-runtime-custom-hook')
+        || packageModel?.ResourcePolicies?.ApiEngines?.['platform-service-health']?.UpgradePolicy !== 'Managed'
+        || !requiredCapabilities.includes('V8.Method.GetBackendVersion')
+        || !requiredCapabilities.includes('ApiEngine:platform-service-health')) {
+        throw new Error(`${name} 缺少固定匿名服务健康与后端版本契约。`);
       }
       const legacyInit = packageEngineMap.get('microi-init');
       const legacyInitCode = String(legacyInit?.ApiV8Code || '');
@@ -516,7 +534,7 @@ function validateReleaseCandidate(name, content) {
         || !String(publisherEngine?.ApiV8Code || '').includes('buildApiEngineResourcePolicies')
         || !String(publisherEngine?.ApiV8Code || '').includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')
         || !String(publisherEngine?.ApiV8Code || '').includes('SharedPublicRuntime')
-        || engineVersionNumber(bulkEngine) < 1_001_006
+        || engineVersionNumber(bulkEngine) < 1_003_005
         || Number(bulkEngine?.IsEnable) !== 1
         || Number(bulkEngine?.StopHttp) !== 0
         || !String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_CHECKPOINT_PLAN_V2')
@@ -528,6 +546,14 @@ function validateReleaseCandidate(name, content) {
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STORAGE_FAILURE_RECOVERY_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_MONOTONIC_CHILD_PROGRESS_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STRUCTURED_CHILD_ERRORS_V1')
+        || !String(bulkEngine?.ApiV8Code || '').includes('STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2')
+        || !String(bulkEngine?.ApiV8Code || '').includes('STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('BackgroundTask:StartupDependencyResourceClosureV2')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ApiEngine:bulk-import-microi-store-packages@v1.3.7')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('BackgroundTask:StartupDependencyPreinstallBootstrapV1')
         || !String(bulkEngine?.ApiV8Code || '').includes('prioritizeBootstrapPlan')
         || engineVersionNumber(backgroundTaskEngine) < 1_001_000
         || String(backgroundTaskEngine?.ApiAddress || '') !== '/apiengine/platform-background-task'

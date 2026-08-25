@@ -55,12 +55,13 @@ namespace Microi.net
         // 受信任核心导入器提升到平台既有 8GB 累计分配硬上限；进程常驻内存保护仍生效，
         // 普通接口引擎不受影响，5GB 运行资产继续走 HDFS multipart 而不进入 Jint。
         private const int ImporterLimitMemoryMb = 8192;
-        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 4, 4);
-        private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 2, 7);
+        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 4, 8);
+        private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 3, 7);
         private static readonly System.Version MinimumPlatformBackgroundTaskVersion = new System.Version(1, 1, 0);
         private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 0);
         private static readonly System.Version MinimumPlatformRuntimePackageVersion = new System.Version(7, 5, 46);
         private static readonly System.Version MinimumPlatformRuntimeEngineVersion = new System.Version(1, 0, 0);
+        private static readonly System.Version MinimumPlatformServiceHealthEngineVersion = new System.Version(1, 0, 1);
         private static readonly System.Version MinimumPlatformLoginWallpapersEngineVersion = new System.Version(1, 1, 0);
         private static readonly System.Version MinimumPlatformMicroiInitEngineVersion = new System.Version(2, 0, 2);
         private const string PlatformRuntimeCustomHookEngineKey = "platform-runtime-custom-hook";
@@ -71,6 +72,7 @@ namespace Microi.net
         {
             "platform-os-client-by-domain",
             "platform-sys-config",
+            "platform-service-health",
             "platform-lang-bundle",
             "platform-current-user",
             "platform-private-file-url",
@@ -84,6 +86,7 @@ namespace Microi.net
         {
             "platform-os-client-by-domain",
             "platform-sys-config",
+            "platform-service-health",
             "platform-lang-bundle",
             "platform-login-wallpapers",
             "microi-init"
@@ -146,7 +149,12 @@ namespace Microi.net
                 && !code.DosIsNullOrWhiteSpace()
                 && code.Contains("BULK_BOUNDED_PACKAGE_SLICES_V1")
                 && code.Contains("StoreVersionId")
-                && code.Contains("BulkAdaptiveSingleSlice: false");
+                && code.Contains("BulkAdaptiveSingleSlice: false")
+                && code.Contains("STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2")
+                && code.Contains("STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1")
+                && code.Contains("STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1")
+                && code.Contains("platform-sys-menu")
+                && code.Contains("platform-sys-config");
         }
 
         private static bool HasPlatformBackgroundTaskCapabilities(string code, System.Version version)
@@ -203,12 +211,14 @@ namespace Microi.net
             var codeVersionMatch = Regex.Match(code, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
             var minimumEngineVersion = string.Equals(
                     key,
-                    "platform-login-wallpapers",
+                    "platform-service-health",
                     StringComparison.Ordinal)
-                ? MinimumPlatformLoginWallpapersEngineVersion
-                : string.Equals(key, "microi-init", StringComparison.Ordinal)
-                    ? MinimumPlatformMicroiInitEngineVersion
-                    : MinimumPlatformRuntimeEngineVersion;
+                ? MinimumPlatformServiceHealthEngineVersion
+                : string.Equals(key, "platform-login-wallpapers", StringComparison.Ordinal)
+                    ? MinimumPlatformLoginWallpapersEngineVersion
+                    : string.Equals(key, "microi-init", StringComparison.Ordinal)
+                        ? MinimumPlatformMicroiInitEngineVersion
+                        : MinimumPlatformRuntimeEngineVersion;
             return System.Version.TryParse(metadataVersionText, out var metadataVersion)
                 && metadataVersion >= minimumEngineVersion
                 && codeVersionMatch.Success
@@ -222,6 +232,11 @@ namespace Microi.net
                     "/apiengine/" + key,
                     StringComparison.OrdinalIgnoreCase)
                 && code.TrimStart().StartsWith(ManagedPlatformRuntimeNoticeMarker, StringComparison.Ordinal)
+                && (!string.Equals(key, "platform-service-health", StringComparison.Ordinal)
+                    || (code.Contains("V8.Method.GetBackendVersion()")
+                        && code.Contains("Status: 'Healthy'")
+                        && code.Contains("catch (versionError)")
+                        && !code.Contains("V8.Db")))
                 && (!string.Equals(key, "microi-init", StringComparison.Ordinal)
                     || (code.Contains("GetCurrentToken(rawToken, osClient)")
                         && code.Contains("RefreshLoginUser(")
@@ -975,9 +990,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     return RefreshRequired(osClient, "平台后台任务接口缺失或版本过低");
                 }
 
-                // platform-sys-menu 是前端登录后构建路由的启动前置依赖。它不能继续仅由
-                // 安装顺序靠后的 SaaS 包“顺带”交付，否则旧租户先升级二进制时会在进入
-                // 应用商城之前就因接口不存在而全站不可用。
+                // platform-sys-menu 是前端登录后构建路由的启动前置依赖，由安装顺序
+                // 最前的应用商城包单一交付。不能只验证 SaaS 包中的匿名系统设置接口，
+                // 否则旧租户会在进入应用商城之前就因菜单接口不存在而全站不可用。
                 var sysMenuEngineRow = client.Db.FromSql(@"SELECT ApiV8Code, ApiAddress, IsEnable, StopHttp, AllowAnonymous FROM sys_apiengine
 WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     .AddInParameter("p0", PlatformSysMenuEngineKey)
