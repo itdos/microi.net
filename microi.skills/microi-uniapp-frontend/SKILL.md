@@ -63,7 +63,7 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 - 登录、接口引擎、FormEngine、上传等所有请求头必须做大小写不敏感去重；`osclient` 只能发送一个运行期值，例如 `demo`，禁止同时传 `OsClient` 与 `osclient` 导致网络面板出现 `demo, demo`。
 - 账号密码登录只有在同时拿到成功码、有效 token 和有效用户 `Id` 时才算成功。Microi 登录 token 可能在响应头 `authorization`，用户信息可能在响应体 `Data`；两者任一缺失都要清理 SDK token、本地用户缓存和 session。
 - 恢复本地会话时必须重新校验 token 和用户 `Id`，禁止出现页面显示 `admin` 但状态仍是“未登录”的半登录状态。
-- 账号密码登录调用 `/api/SysUser/login`、`/api/SysUser/Login` 或 `V8.Login(param)` 前，必须读取 `/api/DiyTable/GetSysConfig` 或 `V8.GetSysConfig(true)`，并根据 `Sys_Config.EnableCaptcha` 决定是否显示图形验证码。判断函数必须兼容 `1`、`true`、`'1'`、`'true'`，不要直接 `!!cfg.EnableCaptcha`。
+- 账号密码登录调用 `/api/SysUser/login`、`/api/SysUser/Login` 或 `V8.Login(param)` 前，必须读取 `/apiengine/platform-sys-config` 或 `V8.GetSysConfig(true)`，并根据 `Sys_Config.EnableCaptcha` 决定是否显示图形验证码。判断函数必须兼容 `1`、`true`、`'1'`、`'true'`，不要直接 `!!cfg.EnableCaptcha`。
 - 开启验证码时，页面必须通过 `GET /api/Captcha/GetCaptcha` 获取验证码图片，读取响应头 `captchaid`，提交账号登录时传 `_CaptchaId` 和 `_CaptchaValue`；登录失败后清空输入并刷新验证码。未开启验证码时不显示验证码，不传空验证码字段。
 - 微信小程序手机号快捷登录必须使用 `<button open-type="getPhoneNumber">`，通过 `@getphonenumber` 获取 `detail.code`，并重新调用 `uni.login({ provider:'weixin' })` 获取新的 `LoginCode`。前端不能假设能直接拿到手机号明文。
 - H5/App 可提供手机号输入兜底，但必须确认后端接口支持 `Phone` 登录；微信小程序优先走 `Code + LoginCode`。

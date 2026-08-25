@@ -224,7 +224,12 @@ export default {
     async resolveAvatar() {
       const source = this.currentUser.Avatar || this.currentUser.HeadImg || ''
       if (!source) { this.avatarUrl = ''; return }
-      try { this.avatarUrl = await V8.resolveAvatarUrl(source) } catch (e) { this.avatarUrl = '' }
+      try {
+        this.avatarUrl = await V8.resolveAvatarUrl(source, {
+          resourceKind: 'UserAvatar',
+          resourceId: this.currentUser.Id
+        })
+      } catch (e) { this.avatarUrl = '' }
     },
     async loadSummary() {
       this.summaryLoading = true

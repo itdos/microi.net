@@ -22,9 +22,9 @@ namespace Microi.net.Api
             string basePath = "")
         {
 
-            UeditorConfig.ConfigFile = configFileRelativePath;
-            UeditorConfig.NoCache = isCacheConfig;
-            UeditorConfig.WebRootPath = basePath;
+            UeditorConfig.ConfigFilePath = System.IO.Path.Combine(
+                string.IsNullOrWhiteSpace(basePath) ? System.AppContext.BaseDirectory : basePath,
+                configFileRelativePath);
 
             services.TryAddSingleton<UEditorService>();
         }

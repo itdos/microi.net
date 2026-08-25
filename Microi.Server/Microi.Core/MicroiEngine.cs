@@ -37,6 +37,8 @@ namespace Microi.net
         }
         // public static IMicroiPlugins Plugins => GetService<IMicroiPlugins>();
         public static IApiEngine ApiEngine => GetService<IApiEngine>();
+        internal static IManagedApiEngineCompatibilityRunner ManagedCompatibilityApiEngine =>
+            GetService<IManagedApiEngineCompatibilityRunner>();
         internal static IBackgroundTaskApiEngineRunner BackgroundTaskApiEngine => GetService<IBackgroundTaskApiEngineRunner>();
         public static IFormEngine FormEngine => GetService<IFormEngine>();
         public static IV8Engine V8Engine => GetService<IV8Engine>();

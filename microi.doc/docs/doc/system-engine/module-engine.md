@@ -22,6 +22,20 @@
 
 接口引擎只从当前 DiyToken 读取用户 Id 和租户，不接受调用方指定目标用户/租户，也不写账号、手机号、部门、角色、Level、状态、密码、认证因子或登录审计字段。管理员表单中的“个人设置”Tab 应继续用 CollapseGroup 将语言与首页、主题与菜单、桌面外观分组。
 
+### 系统账号官方应用与个性化 Hook
+
+系统账号相关的可变业务编排由独立官方应用 `app.microi.sys_user` 交付：
+
+| 接口引擎 | 职责 |
+| --- | --- |
+| `platform-user-update-preferences` | 保存当前用户首页、主题、菜单和桌面白名单偏好 |
+| `platform-user-update-profile` | 保存当前用户昵称、邮箱、语言和经可信原子校验的头像路径 |
+| `platform-user-custom-hook` | 租户自行维护的 CreateIfMissing 个性化扩展 |
+
+前两个接口是 Managed 官方代码，安装、更新或重新安装“系统账号”会恢复官方源码，不能直接追加租户逻辑。个性化逻辑只写入 `platform-user-custom-hook`；它首次安装时默认直接返回 `{ Code: 1 }`，之后官方升级不覆盖。Hook 只接收阶段、当前用户 Id 和变更字段名等安全最小投影，不接收密码、Token、角色、组织或 Secret。
+
+旧 `/api/SysUser/UpdateMyDefaultIndexUrl` 与 `/api/SysUser/UpdateCurrentProfile` 仅作为旧客户端兼容桥，固定转发上述 Managed 接口。密码哈希/重置、DiyToken、管理员查看历史密码、访问密钥和认证因子仍是可信 C# 边界，不能为了“全 V8”把密钥或通用改密能力暴露给接口引擎。
+
 ## 左侧菜单统计角标
 
 对库存预警、待审批、未读消息、待回款等需要用户持续关注的菜单，可在模块引擎配置：

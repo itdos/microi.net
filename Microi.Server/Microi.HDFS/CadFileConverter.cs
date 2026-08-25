@@ -9,7 +9,7 @@ namespace Microi.net
 {
     /// <summary>
     /// CAD文件格式转换工具。
-    /// 支持：DWG→DXF、STEP/STP→GLB(glTF二进制)。
+    /// 支持：DWG→DXF、STEP/STP→STL。
     /// DWG转换依赖 ACadSharp（已在 Microi.V8Engine 中引用），
     /// STEP/STP转换依赖外部工具（如FreeCAD命令行）。
     /// </summary>
@@ -42,30 +42,20 @@ namespace Microi.net
         /// <summary>
         /// 获取转换后的目标文件扩展名
         /// </summary>
-        public static string GetTargetExtension(string fileSuffix)
-        {
-            var ext = fileSuffix?.ToLower().Trim();
-            switch (ext)
-            {
-                case ".dwg": return ".dxf";
-                case ".step":
-                case ".stp": return ".glb";
-                default: return null;
-            }
-        }
+        public static string GetTargetExtension(string fileSuffix) =>
+            CadDerivedPreviewPath.GetTargetExtension(fileSuffix);
 
         /// <summary>
         /// 获取转换后的文件路径（同目录，文件名加_preview后缀）
         /// </summary>
         public static string GetConvertedPath(string originalPath, string fileSuffix)
         {
-            var targetExt = GetTargetExtension(fileSuffix);
-            if (targetExt == null) return null;
-
-            var dir = Path.GetDirectoryName(originalPath)?.Replace('\\', '/') ?? "";
-            var nameWithoutExt = Path.GetFileNameWithoutExtension(originalPath);
-            var result = (string.IsNullOrEmpty(dir) ? "" : dir + "/") + nameWithoutExt + "_preview" + targetExt;
-            return result;
+            return CadDerivedPreviewPath.TryGetConvertedPath(
+                originalPath,
+                fileSuffix,
+                out var result)
+                ? result
+                : null;
         }
 
         /// <summary>
@@ -113,7 +103,7 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 将STEP/STP流转换为GLB字节数组。
+        /// 将STEP/STP流转换为STL字节数组（保留历史方法名兼容）。
         /// 使用FreeCAD命令行进行转换，如未安装FreeCAD则返回null。
         /// 部署时请确保服务器上安装了FreeCAD（apt install freecad 或 brew install freecad）。
         /// 自定义路径在 SaaS 引擎“后端运行配置”中维护。
@@ -458,8 +448,6 @@ except ImportError:
                     WriteCadLog(clientModel?.OsClient, "ConversionStarted", "CAD 文件异步转换已开始", $"扩展名：{ext}", 1, originalPath, true);
 
                     byte[] convertedBytes = null;
-                    string actualTargetExt = GetTargetExtension(ext);
-
                     switch (ext)
                     {
                         case ".dwg":
@@ -474,13 +462,6 @@ except ImportError:
                             using (var stepStream = new MemoryStream(fileBytes))
                             {
                                 convertedBytes = ConvertStepToGlbBytes(stepStream);
-                                // STEP转换实际输出的是STL格式
-                                if (convertedBytes != null)
-                                {
-                                    actualTargetExt = ".stl";
-                                    convertedPath = GetConvertedPath(originalPath, ext)
-                                        .Replace(".glb", ".stl");
-                                }
                             }
                             break;
                     }

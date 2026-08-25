@@ -192,7 +192,8 @@ test("login SFC wires branding, remembered accounts, classic default, and AI mot
     assert.match(component, /--mci-login-control-radius:\s*12px/);
     assert.match(component, /class="login-appearance-button login-theme-trigger"/);
     assert.match(component, /class="login-appearance-button login-wallpaper-trigger"/);
-    assert.match(component, /\/api\/FormEngine\/GetLoginWallpapers/);
+    assert.match(component, /\/apiengine\/platform-login-wallpapers/);
+    assert.doesNotMatch(component, /\/api\/FormEngine\/GetLoginWallpapers/);
     assert.match(component, /LoginBgImgRandom/);
     assert.match(component, /class="login-wallpaper-stage"/);
     assert.match(component, /class="login-wallpaper-layer login-wallpaper-layer--previous"/);
@@ -232,10 +233,11 @@ test("sidebar logo keeps one stable image node with local fallback", () => {
     const component = readFileSync(new URL("../src/layout/components/Sidebar/Logo.vue", import.meta.url), "utf8");
 
     assert.equal((component.match(/class="sidebar-logo-microi"/g) || []).length, 1);
-    assert.match(component, /resolveLoginSystemLogoUrl/);
-    assert.match(component, /LOCAL_LOGO_FALLBACK\s*=\s*"\.\/static\/img\/logo\/itdos\.svg"/);
+    assert.match(component, /resolveSidebarSystemLogoUrl/);
+    assert.match(component, /LOCAL_LOGO_FALLBACK\s*=\s*typeof window === "undefined"/);
+    assert.match(component, /resolveTenantBrandFallbackText/);
     assert.match(component, /@load="HandleSysLogoLoad"/);
     assert.match(component, /@error="HandleSysLogoError"/);
-    assert.match(component, /this\.logoSource\s*=\s*LOCAL_LOGO_FALLBACK/);
+    assert.match(component, /this\.logoLoadFailed\s*=\s*true/);
     assert.doesNotMatch(component, /<transition[\s>]/);
 });

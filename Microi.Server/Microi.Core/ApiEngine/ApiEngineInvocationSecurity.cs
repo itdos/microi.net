@@ -20,6 +20,14 @@ namespace Microi.net
                 return false;
             }
 
+            if (param != null
+                && V8TrustedExecutionContext.IsManagedProtocolAuthorized(
+                    param["ApiEngineKey"]?.ToString(),
+                    param["OsClient"]?.ToString()))
+            {
+                return false;
+            }
+
             return !IsTrustedBackgroundWorkerInvocation(param, preserveTrustedCurrentUser);
         }
 

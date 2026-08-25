@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.9.7 V3 source", () => {
+test("publisher package metadata matches the v1.9.8 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.9.7");
+  assert.equal(packagedPublisher.Version, "v1.9.8");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -145,6 +145,56 @@ test("publisher emits platform-owned managed baselines and tenant-owned hooks fo
     { ApplicationType: "Platform", PublisherType: "官方应用" },
   );
   assert.equal(explicitlyApplicationOwned.ApiEngines.core.Ownership, "Application");
+});
+
+test("official Platform republish rejects incomplete persisted engine selections and requires explicit removals", () => {
+  const context = { JSON, Object, String };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "ok")}
+    ${extractFunction(publisherSource, "fail")}
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "parseArray")}
+    function readStoredPackage(row) { return JSON.parse((row && row.AppPakcet) || '{}'); }
+    ${extractFunction(publisherSource, "normalizeApiEngineKeys")}
+    ${extractFunction(publisherSource, "validateOfficialPlatformApiEngineSelection")}
+    result = validateOfficialPlatformApiEngineSelection;
+  `, context);
+  const store = {
+    AppPakcet: JSON.stringify({
+      SysApiEngines: [
+        { ApiEngineKey: "engine-a" },
+        { ApiEngineKey: "engine-b" },
+        { ApiEngineKey: "engine-c" },
+      ],
+    }),
+  };
+  const official = { ApplicationType: "Platform", PublisherType: "官方应用" };
+
+  assert.equal(context.result(["engine-a", "engine-b", "engine-c"], false, store, official, []).Code, 1);
+  const fallbackFailure = context.result(["engine-a", "engine-b"], false, store, official, []);
+  assert.equal(fallbackFailure.Code, 0);
+  assert.match(fallbackFailure.Msg, /SelectApiEngine 不完整/);
+
+  const unconfirmedRemoval = context.result(["engine-a", "engine-b"], true, store, official, []);
+  assert.equal(unconfirmedRemoval.Code, 0);
+  assert.match(unconfirmedRemoval.Msg, /ApiEngineRemovalKeys/);
+  const confirmedRemoval = context.result(
+    ["engine-a", "engine-b", "engine-d"],
+    true,
+    store,
+    official,
+    ["engine-c"],
+  );
+  assert.equal(confirmedRemoval.Code, 1);
+  assert.deepEqual(Array.from(confirmedRemoval.Data.RemovedApiEngineKeys), ["engine-c"]);
+
+  assert.equal(
+    context.result(["engine-a"], false, store, { ApplicationType: "Web", PublisherType: "官方应用" }, []).Code,
+    1,
+  );
+  assert.match(publisherSource, /禁止从退化持久选择重发/);
 });
 
 function extractFunction(source, name) {
@@ -516,7 +566,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.9\.7/);
+  assert.match(publisherSource, /Version: v1\.9\.8/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

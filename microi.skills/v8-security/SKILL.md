@@ -11,6 +11,8 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 
 访问密钥由 `microi_list_my_access_keys`、`microi_create_my_access_key`、`microi_revoke_my_access_key` 管理，只允许当前用户、限期、最小 scope，明文仅创建时返回一次。外部身份回调固定为 `/api/ExternalLogin/Callback`，服务端校验租户、Provider、state、redirect 和回调域名，验证成功后仍签发 DiyToken。
 
+官方升级资源属于独立控制面。`get-microi-upgrade-resource` 可以匿名读取固定白名单，但 `Publish/PublishBatch` 必须调用仅绑定该 Managed ApiEngineKey 的 `V8.Method.AuthorizeOfficialResourcePublish()`：固定 `iTdos` 官方租户、拒绝访问密钥会话，并从主库复核当前用户、状态和平台管理员角色。禁止只相信 `V8.CurrentUser.Level`，也禁止把这个可信原子复用于普通接口、租户 Hook 或表单事件；资源校验、SHA 乐观锁、事务行锁、写入及回读仍由 Managed V8 编排。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=v8-security-000 sha256=d03ee34e72925db55f9022de26dfc251c0d3d69fac52ae6a910d42ddfc142ae7 -->
 ## 0. 租户动态系统设置与密钥边界

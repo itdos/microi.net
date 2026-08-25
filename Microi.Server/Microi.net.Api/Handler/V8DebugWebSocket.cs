@@ -61,12 +61,24 @@ namespace Microi.net.Api
                     return;
                 }
 
-                var level = ((JToken)currentToken.CurrentUser["Level"]).Val<int>();
-                if (level < 9999)
+                var osClient = Convert.ToString(currentToken.OsClient);
+                var currentUser = currentToken.CurrentUser as JObject
+                    ?? JsonHelper.ToJObject((object)currentToken.CurrentUser);
+                if (currentUser == null || UserAccessKeySecurity.IsSession(currentUser))
                 {
-                    MicroiEngine.QueueSystemLog(Convert.ToString(currentToken.OsClient), "V8Debug", "InsufficientLevelRejected", "V8 调试 WebSocket 权限不足，已拒绝", $"Level={level}，要求 Level >= 9999。", 3);
+                    MicroiEngine.QueueSystemLog(osClient, "V8Debug", "AccessKeyRejected", "V8 调试 WebSocket 访问密钥连接已拒绝", "逐行调试只允许真实 DiyToken 管理员会话。", 3);
                     context.Response.StatusCode = 403;
-                    await context.Response.WriteAsync("Forbidden: Level >= 9999 required");
+                    await context.Response.WriteAsync("Forbidden: interactive administrator session required");
+                    return;
+                }
+
+                // 调试器能够读取/执行租户脚本，不能只相信可能陈旧的 Token Level。
+                // 同时要求签入投影与当前租户主库中的用户、状态和管理员角色仍然有效。
+                if (!PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(osClient, currentUser))
+                {
+                    MicroiEngine.QueueSystemLog(osClient, "V8Debug", "AdministratorRevalidationRejected", "V8 调试 WebSocket 管理员主库复核失败，已拒绝", "当前用户已失效、降权或不再具备平台管理员角色。", 3);
+                    context.Response.StatusCode = 403;
+                    await context.Response.WriteAsync("Forbidden: current platform administrator required");
                     return;
                 }
 

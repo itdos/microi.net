@@ -417,7 +417,7 @@ export default {
             if (!token) return false;
             const osClient = this.OsClient || this.DiyCommon?.GetOsClient?.() || "";
             const apiBase = this.DiyCommon?.GetApiBase?.() || "";
-            const url = apiBase ? apiBase.replace(/\/+$/, "") + "/api/SysUser/GetCurrentUser" : "/api/SysUser/GetCurrentUser";
+            const url = apiBase ? apiBase.replace(/\/+$/, "") + "/apiengine/platform-current-user" : "/apiengine/platform-current-user";
             try {
                 const response = await fetch(url, {
                     method: "POST",
@@ -622,7 +622,7 @@ export default {
                 });
         },
         getFreshPrivateFileUrl(filePathName) {
-            return this.postJson("/api/HDFS/GetPrivateFileUrl", {
+            return this.postJson("/apiengine/platform-private-file-url", {
                 FilePathName: filePathName,
                 HDFS: this.hdfs || (this.SysConfig && this.SysConfig.HDFS) || "Aliyun",
                 FormEngineKey: this.formEngineKey,

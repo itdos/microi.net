@@ -1931,6 +1931,10 @@ if (_microiLegacyMenuConfigChanged) {
             // 应用商城菜单落库前直接报 Unknown column。
             var columns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
+                // 少数早期 SaaS 子库存在 sys_apiengine 但没有平台稳定 Id。
+                // 跨租户 Managed 自举必须先补齐并逐行回填唯一值，之后才可按
+                // 官方资源模型创建、刷新与清理接口缓存。
+                ["Id"] = "varchar(36)",
                 ["StopHttp"] = "int",
                 ["Timeout"] = "int",
                 ["MaxStatements"] = "int",
@@ -1948,6 +1952,7 @@ if (_microiLegacyMenuConfigChanged) {
                     UpgradeExecutionLeaseContext.ThrowIfLost();
                     EnsureColumn(osClientSecret, "sys_apiengine", column.Key, column.Value);
                 }
+                BackfillApiEngineIds(osClientSecret);
             }
 
             // DiyTable is materialized through a generated entity. Add newly
@@ -2026,11 +2031,42 @@ if (_microiLegacyMenuConfigChanged) {
                 return true;
             }
 
-            return new[]
+            if (!new[]
             {
-                "StopHttp", "Timeout", "MaxStatements", "LimitMemory",
+                "Id", "StopHttp", "Timeout", "MaxStatements", "LimitMemory",
                 "LimitRecursion", "V8Limit", "V8Unlimited", "Lock"
-            }.All(column => ColumnExists(osClientSecret, "sys_apiengine", column));
+            }.All(column => ColumnExists(osClientSecret, "sys_apiengine", column)))
+            {
+                return false;
+            }
+
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            var quoteOpen = dbType == "SqlServer" ? "[" : "`";
+            var quoteClose = dbType == "SqlServer" ? "]" : "`";
+            return osClientSecret.Db.FromSql($@"SELECT COUNT(*)
+                    FROM {quoteOpen}sys_apiengine{quoteClose}
+                    WHERE {quoteOpen}Id{quoteClose} IS NULL
+                       OR LTRIM(RTRIM({quoteOpen}Id{quoteClose}))='' ")
+                .ToScalar<int>() == 0;
+        }
+
+        private void BackfillApiEngineIds(OsClientSecret osClientSecret)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            var sql = dbType == "SqlServer"
+                ? @"UPDATE [sys_apiengine]
+                    SET [Id]=CONVERT(varchar(36), NEWID())
+                    WHERE [Id] IS NULL OR LTRIM(RTRIM([Id]))=''"
+                : @"UPDATE `sys_apiengine`
+                    SET `Id`=UUID()
+                    WHERE `Id` IS NULL OR TRIM(`Id`)=''";
+            var affected = osClientSecret.Db.FromSql(sql).ExecuteNonQuery();
+            if (affected > 0)
+            {
+                Console.WriteLine(
+                    $"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【补齐接口引擎稳定Id】{affected}条");
+            }
         }
 
         private void EnsureLegacyFieldMetadataColumns(OsClientSecret osClientSecret)

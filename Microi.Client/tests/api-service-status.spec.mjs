@@ -42,7 +42,7 @@ function wait(milliseconds) {
 function recover() {
     reportApiServiceRecovered({
         apiBase: context.apiBase,
-        url: "/api/FormEngine/GetSysConfig"
+        url: "/apiengine/platform-sys-config"
     });
 }
 

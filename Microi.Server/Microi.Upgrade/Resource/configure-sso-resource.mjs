@@ -1,10 +1,45 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizeOfficialApiEnginePolicies } from './official-api-engine-notice.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const resourcePath = path.join(directory, 'app.microi.sso.json');
 const pkg = JSON.parse(fs.readFileSync(resourcePath, 'utf8'));
+const minimumPackageVersion = 'v7.5.6';
+
+function semanticVersionParts(value) {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)$/i.exec(String(value || '').trim());
+  return match ? match.slice(1).map(Number) : [0, 0, 0];
+}
+
+function compareSemanticVersions(left, right) {
+  const leftParts = semanticVersionParts(left);
+  const rightParts = semanticVersionParts(right);
+  for (let index = 0; index < 3; index += 1) {
+    if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
+  }
+  return 0;
+}
+
+const packageVersion = compareSemanticVersions(pkg.PackageInfo?.Version, minimumPackageVersion) >= 0
+  ? String(pkg.PackageInfo.Version)
+  : minimumPackageVersion;
+
+function mergeChangeHistory(existingHistory) {
+  const history = new Map();
+  for (const item of Array.isArray(existingHistory) ? existingHistory : []) {
+    if (item?.Version) history.set(String(item.Version), item);
+  }
+  const requiredHistory = [
+    { Version: 'v7.5.6', Date: '2026-08-25', Description: '统一官方 Managed 接口醒目恢复提示；SSO 安全事件经脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 仅返回成功。' },
+    { Version: 'v7.5.2', Date: '2026-08-21', Description: '把连接投影、身份解析、绑定/JIT、角色映射、Claim 投影、审计和存量 Token 登录迁入 Managed 接口引擎；新增 CreateIfMissing 租户 Hook，C# 仅保留可信协议原子。' },
+    { Version: 'v7.5.1', Date: '2026-08-21', Description: '补充宿主 SSO API、协议端点和客户端能力要求，防止旧宿主静默安装不可运行的配置包。' },
+    { Version: 'v7.5.0', Date: '2026-08-21', Description: '建立双向 OIDC、SAML2、CAS 身份联邦配置模型、分组表单和双端模块视图。' }
+  ];
+  for (const item of requiredHistory) history.set(item.Version, item);
+  return [...history.values()].sort((left, right) => compareSemanticVersions(right.Version, left.Version));
+}
 const tableId = 'a148a8e0-0a84-406c-b4e1-fdcc01273436';
 const menuId = '48a11346-3b52-467a-9a41-86ec3dc6c975';
 const engineSourceDirectory = path.resolve(
@@ -245,7 +280,8 @@ menu.ViewSchema = JSON.stringify({ Views: [
 ] });
 
 Object.assign(pkg.PackageInfo, {
-  AppId: 'app.microi.sso', Name: 'SSO 身份联邦', Version: 'v7.5.2', CreateTime: '2026-08-21T12:00:00.000Z',
+  AppId: 'app.microi.sso', Name: 'SSO 身份联邦', Version: packageVersion,
+  ApplicationType: 'Platform', CreateTime: '2026-08-21T12:00:00.000Z',
   Description: 'Microi 吾码官方双向 SSO 应用：OIDC、SAML2、CAS 与存量 Token 兼容。连接投影、JIT/绑定、角色映射、审计与租户 Hook 均由应用接口引擎交付；C# 只保留签名验签、协议响应、一次性票据和 DiyToken 等可信原子。',
   RequiredPlatformCapabilities: [
     'POST /api/Sso/Begin',
@@ -261,11 +297,7 @@ Object.assign(pkg.PackageInfo, {
     'V8.Method.RotateSsoClientSecret',
     'ClientFeature:SsoFederationV1'
   ],
-  ChangeHistory: [
-    { Version: 'v7.5.2', Date: '2026-08-21', Description: '把连接投影、身份解析、绑定/JIT、角色映射、Claim 投影、审计和存量 Token 登录迁入 Managed 接口引擎；新增 CreateIfMissing 租户 Hook，C# 仅保留可信协议原子。' },
-    { Version: 'v7.5.1', Date: '2026-08-21', Description: '补充宿主 SSO API、协议端点和客户端能力要求，防止旧宿主静默安装不可运行的配置包。' },
-    { Version: 'v7.5.0', Date: '2026-08-21', Description: '建立双向 OIDC、SAML2、CAS 身份联邦配置模型、分组表单和双端模块视图。' }
-  ],
+  ChangeHistory: mergeChangeHistory(pkg.PackageInfo.ChangeHistory),
   FieldCount: pkg.DiyFields.length, PhysicalColumnCount: pkg.PhysicalColumns.length,
   ApiEngineCount: (pkg.SysApiEngines || []).length, DataSetCount: (pkg.DataSets || []).length,
   DataRowCount: 0
@@ -289,9 +321,9 @@ pkg.SysApiEngines = engineSpecs.map(([id, key, name, fileName, allowAnonymous, s
   UserId: 'c74d669c-a3d4-11e5-b60d-b870f43edd03',
   CreateTime: '2026-08-21 12:00:00',
   Id: id,
-  ChangeHistory: `2026-08-21 12:00:00 v1.0.1 创建接口引擎 ${key}\n`,
-  Version: 'v1.0.1',
-  LimitRecursion: 10000,
+  ChangeHistory: `2026-08-25 00:00:00 v1.0.2 增加官方资源策略提示与 SSO 租户 Hook 安全合同\n2026-08-21 12:00:00 v1.0.1 创建接口引擎 ${key}\n`,
+  Version: 'v1.0.2',
+  LimitRecursion: 5000,
   LimitMemory: 2048,
   MaxStatements: 100000000,
   Timeout: 120,
@@ -302,7 +334,7 @@ pkg.SysApiEngines = engineSpecs.map(([id, key, name, fileName, allowAnonymous, s
   AllowAnonymous: allowAnonymous,
   ApiAddress: `/apiengine/${key}`,
   Lock: 0,
-  ApiV8Code: fs.readFileSync(path.join(engineSourceDirectory, fileName), 'utf8').replace(/\r\n?/g, '\n').replace(/\n*$/g, '\n'),
+  ApiV8Code: fs.readFileSync(path.join(engineSourceDirectory, fileName), 'utf8').replace(/\r\n?/g, '\n').replace(/\n*$/, '\n'),
   ApiRole: '[]',
   IsEnable: 1,
   ApiEngineKey: key,
@@ -311,11 +343,18 @@ pkg.SysApiEngines = engineSpecs.map(([id, key, name, fileName, allowAnonymous, s
 pkg.DataSets ||= [];
 pkg.PackageInfo.ApiEngineCount = pkg.SysApiEngines.length;
 pkg.ResourcePolicies = {
+  SchemaVersion: 1,
   ApiEngines: Object.fromEntries(engineSpecs.map(([, key]) => [key, {
     Ownership: key === 'sso_event_hook' ? 'Tenant' : 'Application',
     UpgradePolicy: key === 'sso_event_hook' ? 'CreateIfMissing' : 'Managed'
   }]))
 };
+normalizeOfficialApiEnginePolicies(pkg, 'app.microi.sso.json');
+for (const engine of pkg.SysApiEngines) {
+  engine.ApiV8Code = String(engine.ApiV8Code || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\n*$/, '\n');
+}
 
 fs.writeFileSync(resourcePath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify({ fields: pkg.DiyFields.length, physicalColumns: pkg.PhysicalColumns.length, menus: pkg.SysMenus.length }));

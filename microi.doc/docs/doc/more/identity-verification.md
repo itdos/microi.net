@@ -156,7 +156,7 @@ return V8.FormEngine.UptFormData('payment_order', {
 
 五个浏览器公开字段完整名称为 `DisableLoginPasskey`、`DisableLoginAuthenticator`、`DisableLoginGitee`、`DisableLoginWeChat`、`DisableLoginGitHub`。旧 `LoginPasskeyDisplay`、`LoginAuthenticatorDisplay`、`LoginGiteeDisplay`、`LoginWeChatDisplay`、`LoginGitHubDisplay` 只用于兼容尚未升级的租户，不再作为新配置入口。旧 `mci_system_setting` 的 `Login.*.Enabled` / `Security.PasswordChange.RequireStepUp` 同样只在对应新实体字段缺失或为空时回退读取；新版“安全与服务接入”不再显示、保存或删除这些迁移项。
 
-官方应用商城 `app.microi.saas-engine` 会幂等安装身份表、动态私密设置表、外部身份表、公开系统设置字段、个人中心和租户系统设置微服务。老租户升级后会得到新的公开字段，安装器不会覆盖租户已有明确选择。运行时只在新字段缺失或为空时读取历史 `mci_system_setting` / `sys_osclients` 值；管理员一旦保存新字段，`sys_config` 就成为能力开关的唯一事实源。
+基础空库应用 `app.microi.saas-engine` 会幂等安装身份表、动态私密设置表、外部身份表、公开系统设置字段和平台内置微服务。存量租户的增量能力由独立“系统账号” `app.microi.sys_user` 与“系统设置” `app.microi.sys-config` 安装：前者唯一拥有用户偏好/资料 Managed 接口与用户 Hook，后者唯一拥有租户私密设置 Managed 接口与设置 Hook；这些接口不再复制到 SaaS 或应用商城包。安装器不会覆盖租户已有明确选择。运行时只在新字段缺失或为空时读取历史 `mci_system_setting` / `sys_osclients` 值；管理员一旦保存新字段，`sys_config` 就成为能力开关的唯一事实源。
 
 ## 五、平台数据
 
@@ -214,7 +214,7 @@ Authorization: Bearer {FaceApiKey}
 
 ## 八、启用顺序与验收
 
-1. 更新平台前端与后端，并确认自动升级已成功导入最新版“系统设置”和 `app.microi.saas-engine`；仅更新应用包不会替换旧后端 DLL 或旧登录页静态资源。回读六张表、公开开关、索引和 `microi-platform-service` 版本。
+1. 更新平台前端与后端，并确认自动升级已成功导入最新版 `app.microi.saas-engine`、“系统账号” `app.microi.sys_user` 和“系统设置” `app.microi.sys-config`；仅更新应用包不会替换旧后端 DLL 或旧登录页静态资源。回读六张表、公开开关、索引、三个包的 ApiEngine 单一归属和 `microi-platform-service` 版本。
 2. 在【系统设置】打开统一身份、Passkey / TOTP 能力及对应登录入口；登录页【登录方式】应能展示已启用方式。Passkey 的生产前端必须使用可信 HTTPS，并建议显式配置 RP ID/Origins；需要严格人脸时再配置网关。
 3. 在【个人中心 → 身份验证器】登记 Passkey/TOTP，并逐个决定是否允许免密码登录、二次授权；至少保留两个恢复因子或管理员重置路径。
 4. 如需外部登录，在【系统设置 → 登录与身份】配置 Provider 开关、ClientId、ClientSecret 和可选 Scope，先在个人中心绑定，再从退出后的登录页完成真实授权。

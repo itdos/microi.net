@@ -16,20 +16,25 @@ public partial class HDFSController
     /// </summary>
     [HttpGet, HttpHead]
     [AllowAnonymous]
-    public async Task<IActionResult> OpenPrivateFile(string o, string t)
+    public async Task<IActionResult> OpenPrivateFile(
+        [FromQuery(Name = "OsClient")] string osClient,
+        [FromQuery(Name = "o")] string legacyOsClient,
+        string t)
     {
-        if (o.DosIsNullOrWhiteSpace() || t.DosIsNullOrWhiteSpace() || t.Length > 128)
+        if (!TryResolvePrivateFileAuditTenant(osClient, legacyOsClient, out var tenant)
+            || t.DosIsNullOrWhiteSpace()
+            || t.Length > 128)
             return NotFound();
         PrivateFileAuditTicket ticket;
         try
         {
-            ticket = await MicroiEngine.CacheTenant.Cache(o)
-                .GetAsync<PrivateFileAuditTicket>(PrivateFileAuditTicket.CacheKey(o, t)).ConfigureAwait(false);
+            ticket = await MicroiEngine.CacheTenant.Cache(tenant)
+                .GetAsync<PrivateFileAuditTicket>(PrivateFileAuditTicket.CacheKey(tenant, t)).ConfigureAwait(false);
         }
         catch { return StatusCode(StatusCodes.Status503ServiceUnavailable); }
-        if (ticket == null || ticket.ExpiresAt <= DateTime.Now || !string.Equals(ticket.OsClient, o, StringComparison.OrdinalIgnoreCase))
+        if (ticket == null || ticket.ExpiresAt <= DateTime.Now || !string.Equals(ticket.OsClient, tenant, StringComparison.OrdinalIgnoreCase))
         {
-            QueuePrivateFileOpen(ticket, o, t, false, "临时链接不存在或已过期", null, null);
+            QueuePrivateFileOpen(ticket, tenant, t, false, "临时链接不存在或已过期", null, null);
             return NotFound();
         }
 
@@ -37,7 +42,7 @@ public partial class HDFSController
         try
         {
             var currentToken = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
-            if (currentToken?.CurrentUser != null && string.Equals(currentToken.OsClient, o, StringComparison.OrdinalIgnoreCase))
+            if (currentToken?.CurrentUser != null && string.Equals(currentToken.OsClient, tenant, StringComparison.OrdinalIgnoreCase))
                 currentUser = currentToken.CurrentUser;
         }
         catch { }
@@ -52,7 +57,7 @@ public partial class HDFSController
                 HttpCompletionOption.ResponseHeadersRead, HttpContext.RequestAborted).ConfigureAwait(false);
             if (!upstream.IsSuccessStatusCode && upstream.StatusCode != HttpStatusCode.PartialContent)
             {
-                QueuePrivateFileOpen(ticket, o, t, false, $"上游返回{(int)upstream.StatusCode}", currentUser, null);
+                QueuePrivateFileOpen(ticket, tenant, t, false, $"上游返回{(int)upstream.StatusCode}", currentUser, null);
                 if (upstream.StatusCode == HttpStatusCode.NotFound)
                 {
                     return NotFound(new DosResult(0, null,
@@ -69,7 +74,7 @@ public partial class HDFSController
                 currentUser?["Id"]?.ToString(),
                 currentUser?["Account"]?.ToString(),
                 currentUser?["Name"]?.ToString(),
-                o);
+                tenant);
             NetworkTrafficObservabilityService.AnnotateTransfer(
                 HttpContext,
                 "Download",
@@ -83,7 +88,7 @@ public partial class HDFSController
             Response.Headers["X-Content-Type-Options"] = "nosniff";
             if (!HttpMethods.IsHead(Request.Method))
             {
-                QueuePrivateFileOpen(ticket, o, t, true, null, currentUser, upstream.Content.Headers.ContentLength);
+                QueuePrivateFileOpen(ticket, tenant, t, true, null, currentUser, upstream.Content.Headers.ContentLength);
                 await using var stream = await upstream.Content.ReadAsStreamAsync(HttpContext.RequestAborted).ConfigureAwait(false);
                 await stream.CopyToAsync(Response.Body, HttpContext.RequestAborted).ConfigureAwait(false);
             }
@@ -91,13 +96,42 @@ public partial class HDFSController
         }
         catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
         {
-            QueuePrivateFileOpen(ticket, o, t, false, "访问者取消了下载", currentUser, null);
+            QueuePrivateFileOpen(ticket, tenant, t, false, "访问者取消了下载", currentUser, null);
             return new EmptyResult();
         }
         catch (Exception ex)
         {
-            QueuePrivateFileOpen(ticket, o, t, false, ex.Message, currentUser, null);
+            QueuePrivateFileOpen(ticket, tenant, t, false, ex.Message, currentUser, null);
             return StatusCode(StatusCodes.Status502BadGateway);
+        }
+    }
+
+    private static bool TryResolvePrivateFileAuditTenant(
+        string osClient,
+        string legacyOsClient,
+        out string tenant)
+    {
+        tenant = null;
+        try
+        {
+            var canonical = osClient.DosIsNullOrWhiteSpace()
+                ? null
+                : TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            var legacy = legacyOsClient.DosIsNullOrWhiteSpace()
+                ? null
+                : TenantConfigurationSecurity.NormalizeTenantId(legacyOsClient);
+            if (!canonical.DosIsNullOrWhiteSpace()
+                && !legacy.DosIsNullOrWhiteSpace()
+                && !string.Equals(canonical, legacy, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            tenant = canonical ?? legacy;
+            return !tenant.DosIsNullOrWhiteSpace();
+        }
+        catch
+        {
+            return false;
         }
     }
 

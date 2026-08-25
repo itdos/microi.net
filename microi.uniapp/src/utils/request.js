@@ -206,7 +206,7 @@ export async function probeAppRuntimeEndpoint(input = {}) {
   let response;
   try {
     response = await uniRequestAdapter({
-      url: `${endpoint.apiBase}/api/DiyTable/GetSysConfig?${query}`,
+      url: `${endpoint.apiBase}/apiengine/platform-sys-config?${query}`,
       method: 'POST',
       data: {
         OsClient: endpoint.osClient,
@@ -215,7 +215,8 @@ export async function probeAppRuntimeEndpoint(input = {}) {
       headers: {
         'Content-Type': 'application/json',
         osclient: endpoint.osClient,
-        did: V8.getDid()
+        did: V8.getDid(),
+        apiengine: '1'
       },
       timeout: 15000
     });
@@ -330,7 +331,7 @@ export function getUser() {
 export async function getVerifiedCurrentUser() {
   const cached = getUser() || {};
   if (cached.Id && (cached.Name || cached.Account)) return cached;
-  const result = await post('/api/SysUser/GetCurrentUser', {});
+  const result = await post('/apiengine/platform-current-user', {});
   const refreshed = normalizeCurrentUser(result && result.Data);
   if (!result || Number(result.Code) !== 1 || !refreshed || !refreshed.Id || !(refreshed.Name || refreshed.Account)) {
     throw new Error((result && result.Msg) || '当前登录账号信息获取失败，请重新登录后再试');

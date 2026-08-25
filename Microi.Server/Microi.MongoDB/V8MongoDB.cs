@@ -149,6 +149,54 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 按非空 _Where 批量更新。MongoDB 不参与 V8.DbTrans；调用方必须将返回成功
+        /// 视为已提交事实，并以稳定业务事件 Id 实现幂等。
+        /// </summary>
+        public DosResult UptFormDataByWhere(dynamic dynamicParam)
+        {
+            try
+            {
+                V8MongoDBParam param = DynamicToV8MongoDBParam(dynamicParam);
+                param.OsClient = ResolveV8MongoTenant(param.OsClient);
+                if (param.OsClient.DosIsNullOrWhiteSpace())
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
+                if (param._FormData == null || param._FormData.Count == 0 || param._Where == null)
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+
+                string whereError;
+                if (!IsSafeMutationWhere(param._Where, out whereError))
+                    return new DosResult(0, null, whereError);
+
+                var filters = new List<FilterDefinition<dynamic>>();
+                GetWhereSql(param._Where, filters);
+                if (filters.Count == 0)
+                    return new DosResult(0, null, "MongoDB 批量更新必须提供有效且非空的 _Where。");
+
+                var updates = new List<UpdateDefinition<dynamic>>();
+                foreach (var item in param._FormData)
+                {
+                    if (!IsSafeMongoFieldName(item.Key)
+                        || string.Equals(item.Key, "_id", StringComparison.OrdinalIgnoreCase)
+                        || item.Key.StartsWith("_id.", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new DosResult(0, null, $"MongoDB 批量更新字段[{item.Key}]无效或不可修改。");
+                    }
+                    updates.Add(Builders<dynamic>.Update.Set(item.Key, ConvertJTokenToNative(item.Value)));
+                }
+
+                var result = MongodbClient<dynamic>.MongodbInfoClient(CreateV8MongoHost(param))
+                    .UpdateMany(
+                        Builders<dynamic>.Filter.And(filters),
+                        Builders<dynamic>.Update.Combine(updates));
+                return new DosResult(1, new { result.MatchedCount, result.ModifiedCount });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, ex.Message);
+            }
+        }
+
+        /// <summary>
         /// 传入osClient
         /// </summary>
         public DosResult DelFormData(dynamic dynamicParam)
@@ -252,7 +300,14 @@ namespace Microi.net
                 };
 
                 string[] field = null;
-                var sort = Builders<dynamic>.Sort.Descending("CreateTime");
+                var sortField = param._OrderBy.DosIsNullOrWhiteSpace()
+                    ? "CreateTime"
+                    : param._OrderBy.Trim();
+                if (!IsSafeMongoFieldName(sortField))
+                    return new DosResultList<dynamic>(0, null, "MongoDB 排序字段无效。");
+                var sort = string.Equals(param._OrderByType?.Trim(), "ASC", StringComparison.OrdinalIgnoreCase)
+                    ? Builders<dynamic>.Sort.Ascending(sortField)
+                    : Builders<dynamic>.Sort.Descending(sortField);
                 var list = new List<FilterDefinition<dynamic>>();
 
                 if (param._Where != null)
@@ -286,6 +341,81 @@ namespace Microi.net
             {
                 return new DosResultList<dynamic>(0, null, ex.Message);
             }
+        }
+
+        private static bool IsSafeMongoFieldName(string value)
+        {
+            return !value.DosIsNullOrWhiteSpace()
+                && Regex.IsMatch(value, "^[A-Za-z_][A-Za-z0-9_.]{0,127}$", RegexOptions.CultureInvariant);
+        }
+
+        private static string ResolveV8MongoTenant(string osClient)
+        {
+            if (osClient.DosIsNullOrWhiteSpace())
+            {
+                osClient = V8TenantContext.Current?.OsClient;
+                if (osClient.DosIsNullOrWhiteSpace()) osClient = DiyToken.GetCurrentOsClient();
+            }
+            return V8TenantContext.EnforceOsClient(osClient);
+        }
+
+        private static bool IsSafeMutationWhere(object whereObject, out string error)
+        {
+            error = "MongoDB 批量写入必须提供有效、非空且参数化的 _Where。";
+            JArray conditions;
+            try
+            {
+                conditions = whereObject as JArray ?? JArray.FromObject(whereObject);
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (conditions.Count == 0) return false;
+            foreach (var token in conditions)
+            {
+                var condition = token as JArray;
+                if (condition == null) return false;
+                var parts = condition
+                    .Where(item => item.Type != JTokenType.String
+                                   || (item.Val<string>() != "(" && item.Val<string>() != ")"))
+                    .ToList();
+                var offset = parts.Count >= 4 && IsMutationLogicOperator(parts[0].Val<string>()) ? 1 : 0;
+                if (parts.Count - offset < 3) return false;
+
+                var field = parts[offset].Val<string>()?.Trim();
+                var operatorText = parts[offset + 1].Val<string>()?.Trim();
+                if (!IsSafeMongoFieldName(field)
+                    || operatorText.DosIsNullOrWhiteSpace()
+                    || !DiyCommon.FieldWhereTypes.ContainsKey(operatorText)
+                    || parts[offset + 2].Type == JTokenType.Null
+                    || parts[offset + 2].Type == JTokenType.Undefined)
+                {
+                    return false;
+                }
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static bool IsMutationLogicOperator(string value)
+        {
+            return string.Equals(value, "AND", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "OR", StringComparison.OrdinalIgnoreCase)
+                || value == "&&"
+                || value == "||";
+        }
+
+        private static MongodbHost CreateV8MongoHost(V8MongoDBParam param)
+        {
+            return new MongodbHost
+            {
+                Connection = OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
+                DataBase = param.DbName,
+                Table = param.TableName
+            };
         }
         public async Task<DosResult> AddSysLog(SysLogParam param)
         {
@@ -366,6 +496,39 @@ namespace Microi.net
                 }
 
                 return new DosResult(1, persisted);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 按非空 _Where 批量删除。拒绝空条件，避免脚本误删整个集合。
+        /// </summary>
+        public DosResult DelFormDataByWhere(dynamic dynamicParam)
+        {
+            try
+            {
+                V8MongoDBParam param = DynamicToV8MongoDBParam(dynamicParam);
+                param.OsClient = ResolveV8MongoTenant(param.OsClient);
+                if (param.OsClient.DosIsNullOrWhiteSpace())
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "OsClientNotNull", param._Lang));
+                if (param._Where == null)
+                    return new DosResult(0, null, "MongoDB 批量删除必须提供有效且非空的 _Where。");
+
+                string whereError;
+                if (!IsSafeMutationWhere(param._Where, out whereError))
+                    return new DosResult(0, null, whereError);
+
+                var filters = new List<FilterDefinition<dynamic>>();
+                GetWhereSql(param._Where, filters);
+                if (filters.Count == 0)
+                    return new DosResult(0, null, "MongoDB 批量删除必须提供有效且非空的 _Where。");
+
+                var result = MongodbClient<dynamic>.MongodbInfoClient(CreateV8MongoHost(param))
+                    .DeleteMany(Builders<dynamic>.Filter.And(filters));
+                return new DosResult(1, new { result.DeletedCount });
             }
             catch (Exception ex)
             {

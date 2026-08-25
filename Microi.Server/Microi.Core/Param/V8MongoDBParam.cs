@@ -17,6 +17,8 @@ namespace Microi.net
         public int? _PageIndex { get; set; }
         public int? _Top { get; set; }
         public object _Where { get; set; }
+        public string _OrderBy { get; set; }
+        public string _OrderByType { get; set; }
 
     }
 }

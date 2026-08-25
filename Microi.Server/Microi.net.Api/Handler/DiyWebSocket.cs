@@ -24,8 +24,8 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Primitives;
+using Microi.net.Api;
 using MongoDB.Bson.Serialization.Attributes;
-using MongoDB.Driver;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.net
@@ -58,14 +58,12 @@ namespace Microi.net
     /// </summary>
     [EnableCors]
     //internal
-    public class DiyWebSocket : Hub<IClient>, IConnectionHub, ISuppertToClientInvoke
+    public class DiyWebSocket : Hub<IClient>
     {
         private const string IdentityItemKey = "Microi.DiyWebSocket.Identity";
+        private const string ChatRuntimeApiEngineKey = "platform-chat-runtime";
         private readonly IMicroiAI _microiAI;
         private readonly IHubContext<DiyWebSocket, IClient> _backgroundHubContext;
-        
-        // MongoDB连接配置缓存，避免频繁调用OsClient.GetClient
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _mongoConnectionCache = new();
 
         private static void WriteWebSocketLog(string osClient, string action, string title, string content, int level = 2, string targetId = null)
         {
@@ -92,52 +90,6 @@ namespace Microi.net
             return !IsBlank(value);
         }
 
-        private static async Task<Dictionary<string, SysUser>> GetChatUserProjectionsAsync(
-            string osClient,
-            IEnumerable<string> userIds)
-        {
-            var ids = (userIds ?? Enumerable.Empty<string>())
-                .Select(id => id?.Trim())
-                .Where(id => !string.IsNullOrWhiteSpace(id)
-                             && !ChatAssistantIdentity.IsAssistant(id))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Take(100)
-                .ToList();
-            if (ids.Count == 0)
-                return new Dictionary<string, SysUser>(StringComparer.OrdinalIgnoreCase);
-
-            try
-            {
-                var result = await MicroiEngine.FormEngine.GetTableDataAsync<SysUser>(
-                    "sys_user",
-                    new
-                    {
-                        Ids = ids,
-                        OsClient = osClient,
-                        _PageIndex = 1,
-                        _PageSize = ids.Count,
-                        _SelectFields = new List<string> { "Id", "Name", "Account", "Avatar" }
-                    }).ConfigureAwait(false);
-                if (result?.Code != 1 || result.Data == null)
-                    return new Dictionary<string, SysUser>(StringComparer.OrdinalIgnoreCase);
-
-                return result.Data
-                    .Where(user => !string.IsNullOrWhiteSpace(user?.Id))
-                    .GroupBy(user => user.Id.Trim(), StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-            }
-            catch (Exception ex)
-            {
-                WriteWebSocketLog(
-                    osClient,
-                    "ChatContactProjectionFailed",
-                    "聊天联系人公开投影读取失败",
-                    ex.GetType().Name,
-                    1);
-                return new Dictionary<string, SysUser>(StringComparer.OrdinalIgnoreCase);
-            }
-        }
-
         private async Task<WebSocketIdentity> ResolveIdentityAsync()
         {
             if (Context?.Items != null
@@ -161,6 +113,7 @@ namespace Microi.net
             {
                 return null;
             }
+            if (UserAccessKeySecurity.IsSession(currentUser)) return null;
 
             JwtSecurityToken jwtToken;
             try
@@ -247,6 +200,197 @@ namespace Microi.net
         {
             _microiAI = microiAI;
             _backgroundHubContext = backgroundHubContext;
+        }
+
+        private static JObject ToResultObject(object result)
+        {
+            if (result == null) return null;
+            if (result is JObject jobject) return jobject;
+            if (result is string json)
+            {
+                try { return JObject.Parse(json); }
+                catch { return null; }
+            }
+            try { return JObject.FromObject(result); }
+            catch { return null; }
+        }
+
+        private static async Task<JObject> RunChatRuntimeAsync(
+            string action,
+            JObject payload,
+            JObject trustedCurrentUser,
+            string trustedOsClient)
+        {
+            if (trustedCurrentUser == null || trustedOsClient.DosIsNullOrWhiteSpace())
+                throw new HubException("登录身份已失效，请重新登录。");
+            var request = payload?.DeepClone() as JObject ?? new JObject();
+            request["Action"] = action;
+            request["OsClient"] = trustedOsClient;
+            var rawResult = await ManagedApiEngineCompatibility.RunTrustedProtocolAsync(
+                    ChatRuntimeApiEngineKey,
+                    trustedOsClient,
+                    request,
+                    trustedCurrentUser)
+                .ConfigureAwait(false);
+            var result = ToResultObject(rawResult);
+            if (result?["Code"].Val<int>() != 1)
+            {
+                throw new HubException(
+                    result?["Msg"]?.ToString()
+                    ?? "官方聊天运行时不可用，请安装或升级消息通知应用。");
+            }
+            return result;
+        }
+
+        private static MessageBodyDto ReadMessage(JObject result)
+        {
+            return (result?["Data"] as JObject)?["Message"]?.ToObject<MessageBodyDto>();
+        }
+
+        private static List<MessageChatContactListDto> ReadContacts(JObject data, string propertyName)
+        {
+            return data?[propertyName]?.ToObject<List<MessageChatContactListDto>>()
+                ?? new List<MessageChatContactListDto>();
+        }
+
+        private async Task PushMessageAsync(
+            string osClient,
+            MessageBodyDto message,
+            IHubContext<DiyWebSocket> externalContext = null)
+        {
+            if (message == null || message.ToUserId.DosIsNullOrWhiteSpace()) return;
+            var client = await GetOnlineUserInfo(osClient, message.ToUserId).ConfigureAwait(false);
+            if (client?.ConnectionIds?.Any() != true) return;
+            try
+            {
+                if (externalContext != null)
+                    await externalContext.Clients.Clients(client.ConnectionIds)
+                        .SendAsync("ReceiveSendToUser", message).ConfigureAwait(false);
+                else
+                    await base.Clients.Clients(client.ConnectionIds)
+                        .ReceiveSendToUser(message).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                WriteWebSocketLog(osClient, "ChatDeliveryFailed", "聊天消息实时投递失败",
+                    ex.GetType().Name, 2, message.ToUserId);
+            }
+        }
+
+        private async Task PushContactsAsync(
+            string osClient,
+            string userId,
+            List<MessageChatContactListDto> contacts,
+            IHubContext<DiyWebSocket> externalContext = null)
+        {
+            if (userId.DosIsNullOrWhiteSpace()) return;
+            var client = await GetOnlineUserInfo(osClient, userId).ConfigureAwait(false);
+            if (client?.ConnectionIds?.Any() != true) return;
+            try
+            {
+                if (externalContext != null)
+                    await externalContext.Clients.Clients(client.ConnectionIds)
+                        .SendAsync("ReceiveSendLastContacts", contacts).ConfigureAwait(false);
+                else
+                    await base.Clients.Clients(client.ConnectionIds)
+                        .ReceiveSendLastContacts(contacts).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                WriteWebSocketLog(osClient, "ChatContactsDeliveryFailed", "聊天联系人实时投递失败",
+                    ex.GetType().Name, 2, userId);
+            }
+        }
+
+        private async Task PushUnreadAsync(
+            string osClient,
+            string userId,
+            long unreadCount,
+            IHubContext<DiyWebSocket> externalContext = null)
+        {
+            if (userId.DosIsNullOrWhiteSpace()) return;
+            var client = await GetOnlineUserInfo(osClient, userId).ConfigureAwait(false);
+            if (client?.ConnectionIds?.Any() != true) return;
+            try
+            {
+                if (externalContext != null)
+                    await externalContext.Clients.Clients(client.ConnectionIds)
+                        .SendAsync("ReceiveSendUnreadCountToUser", unreadCount).ConfigureAwait(false);
+                else
+                    await base.Clients.Clients(client.ConnectionIds)
+                        .ReceiveSendUnreadCountToUser(unreadCount).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                WriteWebSocketLog(osClient, "ChatUnreadDeliveryFailed", "聊天未读数实时投递失败",
+                    ex.GetType().Name, 2, userId);
+            }
+        }
+
+        private async Task PushHistoryAsync(
+            string osClient,
+            string userId,
+            List<MessageBodyDto> messages)
+        {
+            var client = await GetOnlineUserInfo(osClient, userId).ConfigureAwait(false);
+            if (client?.ConnectionIds?.Any() != true) return;
+            try
+            {
+                await base.Clients.Clients(client.ConnectionIds)
+                    .ReceiveSendChatRecordToUser(messages ?? new List<MessageBodyDto>())
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                WriteWebSocketLog(osClient, "ChatHistoryDeliveryFailed", "聊天记录实时投递失败",
+                    ex.GetType().Name, 2, userId);
+            }
+        }
+
+        private async Task DeliverRuntimeResultAsync(
+            JObject result,
+            string osClient,
+            bool includeMessage,
+            IHubContext<DiyWebSocket> externalContext = null)
+        {
+            if (result?["Data"] is not JObject data) return;
+            if (includeMessage)
+                await PushMessageAsync(osClient, data["Message"]?.ToObject<MessageBodyDto>(), externalContext)
+                    .ConfigureAwait(false);
+
+            var actorUserId = data["ActorUserId"].Val<string>();
+            var targetUserId = data["TargetUserId"].Val<string>();
+            if (data["ActorContacts"] != null)
+                await PushContactsAsync(osClient, actorUserId, ReadContacts(data, "ActorContacts"), externalContext)
+                    .ConfigureAwait(false);
+            if (data["TargetContacts"] != null)
+                await PushContactsAsync(osClient, targetUserId, ReadContacts(data, "TargetContacts"), externalContext)
+                    .ConfigureAwait(false);
+            if (data["Contacts"] != null)
+                await PushContactsAsync(osClient, actorUserId, ReadContacts(data, "Contacts"), externalContext)
+                    .ConfigureAwait(false);
+            if (data["ActorUnreadCount"] != null)
+                await PushUnreadAsync(osClient, actorUserId, data["ActorUnreadCount"].Val<long>(), externalContext)
+                    .ConfigureAwait(false);
+            if (data["TargetUnreadCount"] != null)
+                await PushUnreadAsync(osClient, targetUserId, data["TargetUnreadCount"].Val<long>(), externalContext)
+                    .ConfigureAwait(false);
+            if (data["UnreadCount"] != null)
+                await PushUnreadAsync(osClient, actorUserId, data["UnreadCount"].Val<long>(), externalContext)
+                    .ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 仅用于已由固定 Managed 接口持久化成功的旧 Controller 兼容投递。
+        /// 此方法不接受路由、租户或业务写入，也不会再次持久化。
+        /// </summary>
+        internal async Task DeliverPreparedMessageAsync(
+            JObject managedResult,
+            string osClient,
+            IHubContext<DiyWebSocket> externalContext)
+        {
+            await DeliverRuntimeResultAsync(managedResult, osClient, true, externalContext)
+                .ConfigureAwait(false);
         }
 
         //private static IDictionary<string, ClientInfo> _clients;
@@ -358,20 +502,18 @@ namespace Microi.net
                     requestToken).ConfigureAwait(false);
                 try
                 {
-                    await SendLastContactsCore(new MessageChatContactListParam
-                    {
-                        UserId = userId,
-                        UserName = userName,
-                        UserAccount = userAccount,
-                        UserAvatar = userAvatar,
-                        OtherInfo = otherInfo,
-                        ContactUserId = "",
-                        OsClient = osClient,
-                        _IsUpdateTime = false
-                    });
+                    var contactsResult = await RunChatRuntimeAsync(
+                        "ListContacts",
+                        new JObject { ["PageIndex"] = 1, ["PageSize"] = 20 },
+                        identity.CurrentUser,
+                        identity.OsClient).ConfigureAwait(false);
+                    await DeliverRuntimeResultAsync(contactsResult, identity.OsClient, false)
+                        .ConfigureAwait(false);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    WriteWebSocketLog(identity.OsClient, "ChatContactsBootstrapFailed",
+                        "聊天联系人初始化失败", ex.GetType().Name, 1, identity.UserId);
                 }
             }
             await base.OnConnectedAsync().ConfigureAwait(false);
@@ -456,311 +598,66 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="from"></param>
-        /// <param name="groupName"></param>
-        /// <param name="msg"></param>
-        /// <returns></returns>
-        public async Task SendMessage(string from, string groupName, string msg)
-        {
-            await base.Clients.Group(groupName).ReceiveMessage(new UserMessageContent
-            {
-                Content = msg,
-                FromUserId = from
-            });
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="groupName"></param>
-        /// <param name="msg"></param>
-        /// <returns></returns>
-        public async Task SendConnection(string groupName, ConnectionMessageContent msg)
-        {
-            await base.Clients.Group(groupName).ReceiveConnection(msg);
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="groupName"></param>
-        /// <param name="msg"></param>
-        /// <returns></returns>
-        public async Task SendDisConnection(string groupName, DisConnectionMessageContent msg)
-        {
-            await base.Clients.Group(groupName).ReceiveDisConnection(msg);
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="msg"></param>
-        /// <param name="groupName"></param>
-        /// <returns></returns>
-        public async Task SendToGroup(UserMessageContent msg, string groupName)
-        {
-            await base.Clients.Group(groupName).ReceiveSendToGroup(msg);
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="msg"></param>
-        /// <param name="groups"></param>
-        /// <returns></returns>
-        public async Task SendToGroups(UserMessageContent msg, params string[] groups)
-        {
-            await base.Clients.Groups(groups.ToList().AsReadOnly()).ReceiveSendToGroups(msg);
-        }
-        /// <summary>
-        /// 
-        /// </summary>
         /// <param name="msg"></param>
         /// <returns></returns>
         public async Task SendToUser(MessageBodyParam msg)
         {
-            WebSocketIdentity callerIdentity = null;
-            if (Context?.GetHttpContext() != null)
-            {
-                callerIdentity = await RequireIdentityAsync().ConfigureAwait(false);
-                msg ??= new MessageBodyParam();
-                msg.OsClient = callerIdentity.OsClient;
-                msg.FromUserId = callerIdentity.UserId;
-                msg.FromUserName = callerIdentity.UserName;
-                msg.FromUserAccount = callerIdentity.UserAccount;
-                msg.FromUserAvatar = callerIdentity.UserAvatar;
-                if (IsBlank(msg.ToUserId) || IsBlank(msg.Content))
-                    throw new HubException("接收用户和消息内容不能为空。");
+            var identity = await RequireIdentityAsync().ConfigureAwait(false);
+            msg ??= new MessageBodyParam();
+            if (IsBlank(msg.ToUserId) || IsBlank(msg.Content))
+                throw new HubException("接收用户和消息内容不能为空。");
+            if (ChatAssistantIdentity.IsAssistant(msg.ToUserId)
+                && (_microiAI == null || _backgroundHubContext == null))
+                throw new HubException("AI聊天服务暂不可用，请稍后重试。");
 
-                if (ChatAssistantIdentity.IsAssistant(msg.ToUserId))
+            var requestId = IsNotBlank(msg.RequestId)
+                ? msg.RequestId.Trim()
+                : (IsNotBlank(msg.MessageId) ? msg.MessageId.Trim() : Ulid.NewUlid().ToString());
+            var result = await RunChatRuntimeAsync(
+                "PersistMessage",
+                new JObject
                 {
-                    msg.ToUserId = ChatAssistantIdentity.UserId;
-                    msg.ToUserName = ChatAssistantIdentity.UserName;
-                    msg.ToUserAccount = ChatAssistantIdentity.UserAccount;
-                    msg.ToUserAvatar = ChatAssistantIdentity.UserAvatar;
-                    if (_microiAI == null || _backgroundHubContext == null)
-                        throw new HubException("AI聊天服务暂不可用，请稍后重试。");
-                }
-                else
+                    ["RequestId"] = requestId,
+                    ["ToUserId"] = msg.ToUserId,
+                    ["Content"] = msg.Content,
+                    ["OtherInfo"] = msg.OtherInfo,
+                    ["Type"] = msg.Type,
+                    ["IsRead"] = msg.IsRead
+                },
+                identity.CurrentUser,
+                identity.OsClient).ConfigureAwait(false);
+            await DeliverRuntimeResultAsync(result, identity.OsClient, true).ConfigureAwait(false);
+
+            var stored = ReadMessage(result);
+            if (stored != null && ChatAssistantIdentity.IsAssistant(stored.ToUserId))
+            {
+                var originalMessage = new MessageBodyParam
                 {
-                    var targetUserResult = await MicroiEngine.FormEngine.GetFormDataAsync(
-                        "sys_user",
-                        new { Id = msg.ToUserId, OsClient = callerIdentity.OsClient });
-                    if (targetUserResult == null || targetUserResult.Code != 1 || targetUserResult.Data == null)
-                        throw new HubException("接收用户不存在或已停用。");
-                    msg.ToUserAccount = targetUserResult.Data.Account;
-                    msg.ToUserName = ChatContactProjection.ResolveDisplayName(
-                        targetUserResult.Data.Name,
-                        null,
-                        msg.ToUserAccount,
-                        null);
-                    msg.ToUserAvatar = targetUserResult.Data.Avatar;
-                }
+                    MessageId = stored.MessageId,
+                    RequestId = stored.RequestId,
+                    FromUserId = stored.FromUserId,
+                    FromUserName = stored.FromUserName,
+                    FromUserAccount = stored.FromUserAccount,
+                    FromUserAvatar = stored.FromUserAvatar,
+                    ToUserId = stored.ToUserId,
+                    ToUserName = stored.ToUserName,
+                    ToUserAccount = stored.ToUserAccount,
+                    ToUserAvatar = stored.ToUserAvatar,
+                    Content = stored.Content,
+                    OtherInfo = stored.OtherInfo,
+                    Type = stored.Type,
+                    IsRead = stored.IsRead,
+                    CreateTime = stored.CreateTime,
+                    OsClient = identity.OsClient
+                };
+                _ = RunAiResponseInBackgroundAsync(
+                    _microiAI,
+                    _backgroundHubContext,
+                    originalMessage,
+                    identity.CurrentUser,
+                    identity.OsClient);
             }
-
-            msg.CreateTime = DateTime.Now;
-            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
-
-            if (IsBlank(msg.FromUserId) || IsBlank(msg.ToUserId) || IsBlank(msg.Content) || IsBlank(msg.OsClient))
-            {
-
-                ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
-                if (clientInfoFrom != null)
-                {
-                    try
-                    {
-                        var msg2 = ChatAssistantIdentity.CreateSystemMessage(
-                            DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                            msg.FromUserId);
-                        if (msg._iHubContext != null)
-                        {
-                            msg._iHubContext.Clients.Clients(clientInfoFrom.ConnectionIds).SendAsync("ReceiveSendToUser", msg2);
-                        }
-                        else
-                        {
-                            await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(msg2);
-                        }
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-                return;
-            }
-            ClientInfo clientInfoTo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.ToUserId}");
-            if (clientInfoTo != null)
-            {
-                try
-                {
-                    // 使用DTO避免ObjectId序列化问题
-                    var messageDto = new MessageBodyDto
-                    {
-                        FromUserId = msg.FromUserId,
-                        FromUserName = ChatContactProjection.ResolveDisplayName(
-                            null, msg.FromUserName, null, msg.FromUserAccount),
-                        FromUserAccount = msg.FromUserAccount,
-                        FromUserAvatar = msg.FromUserAvatar,
-                        ToUserId = msg.ToUserId,
-                        ToUserName = ChatContactProjection.ResolveDisplayName(
-                            null, msg.ToUserName, null, msg.ToUserAccount),
-                        ToUserAccount = msg.ToUserAccount,
-                        ToUserAvatar = msg.ToUserAvatar,
-                        Content = msg.Content,
-                        CreateTime = msg.CreateTime,
-                        Type = msg.Type,
-                        IsRead = msg.IsRead
-                    };
-                    
-                    if (msg._iHubContext != null)
-                    {
-                        msg._iHubContext.Clients.Clients(clientInfoTo.ConnectionIds).SendAsync("ReceiveSendToUser", messageDto);
-                    }
-                    else
-                    {
-                        await base.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveSendToUser(messageDto);
-                    }
-                }
-                catch (Exception)
-                {
-                }
-            }
-            try
-            {
-                var chatHost = GetChatHost(msg.OsClient);
-                await TMongodbHelper<MessageBody>.InsertAsync(chatHost, msg);
-
-                await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
-                //更新发送者最近联系人列表
-                await SendLastContactsCore(new MessageChatContactListParam
-                {
-                    UserId = msg.FromUserId,
-                    UserName = msg.FromUserName,
-                    UserAccount = msg.FromUserAccount,
-                    UserAvatar = msg.FromUserAvatar,
-                    ContactUserId = msg.ToUserId,
-                    ContactUserName = msg.ToUserName,
-                    ContactUserAccount = msg.ToUserAccount,
-                    ContactUserAvatar = msg.ToUserAvatar,
-                    LastMessage = msg.Content,
-                    LastMessageType = msg.Type,
-                    OsClient = msg.OsClient,
-                    OtherInfo = msg.OtherInfo,
-                    _IsUpdateTime = true,
-                    _iHubContext = msg._iHubContext
-                });
-                //更新接收者最近联系人列表
-                await SendLastContactsCore(new MessageChatContactListParam
-                {
-                    UserId = msg.ToUserId,
-                    UserName = msg.ToUserName,
-                    UserAccount = msg.ToUserAccount,
-                    UserAvatar = msg.ToUserAvatar,
-                    ContactUserId = msg.FromUserId,
-                    ContactUserName = msg.FromUserName,
-                    ContactUserAccount = msg.FromUserAccount,
-                    ContactUserAvatar = msg.FromUserAvatar,
-                    LastMessage = msg.Content,
-                    LastMessageType = msg.Type,
-                    OsClient = msg.OsClient,
-                    OtherInfo = msg.OtherInfo,
-                    _IsUpdateTime = true,//2021-05-08修改为true，why before is false？
-                    _iHubContext = msg._iHubContext
-                });
-                await SendUnreadCountToUserCore(new MessageBodyParam
-                {
-                    ToUserId = msg.ToUserId,
-                    OsClient = msg.OsClient,
-                    _iHubContext = msg._iHubContext
-                });
-
-                // 如果接收者是AI用户，自动触发AI回复
-                if (ChatAssistantIdentity.IsAssistant(msg.ToUserId))
-                {
-                    var trustedAiIdentity = callerIdentity
-                        ?? await ResolveIdentityAsync().ConfigureAwait(false);
-                    var trustedAiUser = trustedAiIdentity?.CurrentUser;
-                    var trustedAiOsClient = trustedAiIdentity?.OsClient?.Trim();
-                    var trustedAiUserId = trustedAiIdentity?.UserId?.Trim();
-                    if (trustedAiUser == null
-                        || string.IsNullOrWhiteSpace(trustedAiOsClient)
-                        || string.IsNullOrWhiteSpace(trustedAiUserId)
-                        || !string.Equals(
-                            trustedAiOsClient,
-                            msg.OsClient?.Trim(),
-                            StringComparison.OrdinalIgnoreCase)
-                        || !string.Equals(
-                            trustedAiUserId,
-                            msg.FromUserId?.Trim(),
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        WriteWebSocketLog(msg.OsClient, "AiIdentityRejected", "AI 聊天身份或租户不一致，已拒绝调用", "消息身份与当前登录 Token 不一致。", 3, msg.FromUserId);
-                        return;
-                    }
-
-                    if (_microiAI == null || _backgroundHubContext == null)
-                    {
-                        WriteWebSocketLog(msg.OsClient, "AiServiceUnavailable", "AI 自动回复服务不可用", "IMicroiAI 或 HubContext 未注入，已拒绝后台调用。", 3, msg.FromUserId);
-                        throw new HubException("AI聊天服务暂不可用，请稍后重试。");
-                    }
-
-                    // 不把瞬态 Hub 实例传入后台状态机。AI 服务、可信身份和
-                    // 强类型 HubContext 都是独立参数，Hub 方法返回后仍可安全推送。
-                    _ = RunAiResponseInBackgroundAsync(
-                        _microiAI,
-                        _backgroundHubContext,
-                        msg,
-                        trustedAiUser,
-                        trustedAiOsClient);
-                }
-                else
-                {
-                    // Console.WriteLine($"[WebSocket] 普通消息: {msg.FromUserName} -> {msg.ToUserName}");
-                }
-            }
-            catch (Exception ex)
-            {
-                WriteWebSocketLog(msg?.OsClient, "ChatMessageFailed", "聊天消息处理失败", ex.ToString(), 2, msg?.FromUserId);
-                if (Context?.GetHttpContext() != null)
-                {
-                    if (ex is HubException) throw;
-                    throw new HubException("消息处理失败，请稍后重试。");
-                }
-            }
-        }
-
-        /// <summary>
-        /// 获取MongoDB连接配置（带缓存）
-        /// </summary>
-        private static string GetMongoConnection(string osClient)
-        {
-            return _mongoConnectionCache.GetOrAdd(osClient, key =>
-            {
-                var connection = Microi.net.OsClient.GetClient(key).OsClientModel["DbMongoConnection"].Val<string>();
-                // Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[MongoDB] 缓存连接配置: {key}");
-                return connection;
-            });
-        }
-
-        /// <summary>
-        /// 创建MongoDB聊天记录Host
-        /// </summary>
-        private static MongodbHost GetChatHost(string osClient)
-        {
-            return new MongodbHost
-            {
-                Connection = GetMongoConnection(osClient),
-                DataBase = $"diy_chat_{osClient.ToLower()}",
-                Table = $"chat_{DateTime.Now:yyyy}"
-            };
-        }
-
-        /// <summary>
-        /// 创建MongoDB最近联系人Host
-        /// </summary>
-        private MongodbHost GetContactHost(string osClient)
-        {
-            return new MongodbHost
-            {
-                Connection = GetMongoConnection(osClient),
-                DataBase = $"diy_chat_{osClient.ToLower()}",
-                Table = "chat_last_contact"
-            };
+            return;
         }
 
         /// <summary>
@@ -807,7 +704,7 @@ namespace Microi.net
             IMicroiAI microiAI,
             IHubContext<DiyWebSocket, IClient> hubContext,
             MessageBodyParam originalMsg,
-            object trustedCurrentUser,
+            JObject trustedCurrentUser,
             string trustedOsClient)
         {
             try
@@ -867,6 +764,34 @@ namespace Microi.net
             }
         }
 
+        private static async Task DeliverBackgroundRuntimeProjectionAsync(
+            JObject result,
+            string osClient,
+            IHubContext<DiyWebSocket, IClient> hubContext)
+        {
+            if (result?["Data"] is not JObject data || hubContext == null) return;
+            var targetUserId = data["TargetUserId"].Val<string>();
+            if (targetUserId.DosIsNullOrWhiteSpace()) return;
+            var client = await GetOnlineUserInfo(osClient, targetUserId).ConfigureAwait(false);
+            if (client?.ConnectionIds?.Any() != true) return;
+            try
+            {
+                if (data["TargetContacts"] != null)
+                    await hubContext.Clients.Clients(client.ConnectionIds)
+                        .ReceiveSendLastContacts(ReadContacts(data, "TargetContacts"))
+                        .ConfigureAwait(false);
+                if (data["TargetUnreadCount"] != null)
+                    await hubContext.Clients.Clients(client.ConnectionIds)
+                        .ReceiveSendUnreadCountToUser(data["TargetUnreadCount"].Val<long>())
+                        .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                WriteWebSocketLog(osClient, "AiProjectionDeliveryFailed",
+                    "AI聊天投影实时投递失败", ex.GetType().Name, 2, targetUserId);
+            }
+        }
+
         /// <summary>
         /// 处理AI自动回复
         /// </summary>
@@ -874,12 +799,11 @@ namespace Microi.net
             IMicroiAI microiAI,
             IHubContext<DiyWebSocket, IClient> hubContext,
             MessageBodyParam originalMsg,
-            object trustedCurrentUser,
+            JObject trustedCurrentUser,
             string trustedOsClient)
         {
             try
             {
-                var chatHost = GetChatHost(trustedOsClient);
                 var aiUser = new
                 {
                     Id = ChatAssistantIdentity.UserId,
@@ -1020,28 +944,27 @@ namespace Microi.net
                                 Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
                             });
                             
-                            // 发送包含详细数据的消息
-                            var dataMessageDto = new MessageBodyDto
-                            {
-                                FromUserId = aiUser.Id,
-                                FromUserName = aiUser.Name,
-                                FromUserAccount = ChatAssistantIdentity.UserAccount,
-                                FromUserAvatar = aiUser.Avatar,
-                                ToUserId = originalMsg.FromUserId,
-                                ToUserName = originalMsg.FromUserName,
-                                ToUserAccount = originalMsg.FromUserAccount,
-                                ToUserAvatar = originalMsg.FromUserAvatar,
-                                Content = queryDataJson,
-                                CreateTime = DateTime.Now,
-                                Type = "data",  // 标记为数据类型消息
-                                IsRead = false
-                            };
-                            
+                            var dataPersisted = await RunChatRuntimeAsync(
+                                "PersistAssistantMessage",
+                                new JObject
+                                {
+                                    ["RequestId"] = $"{originalMsg.MessageId ?? originalMsg.RequestId}:ai-data",
+                                    ["ToUserId"] = originalMsg.FromUserId,
+                                    ["Content"] = queryDataJson,
+                                    ["Type"] = "data",
+                                    ["IsRead"] = false
+                                },
+                                trustedCurrentUser,
+                                trustedOsClient).ConfigureAwait(false);
+                            var dataMessageDto = ReadMessage(dataPersisted);
                             await SendMessageToClient(
                                 clientInfoTo,
                                 dataMessageDto,
-                                hubContext);
-                            await TMongodbHelper<MessageBodyDto>.InsertAsync(chatHost, dataMessageDto);
+                                hubContext).ConfigureAwait(false);
+                            await DeliverBackgroundRuntimeProjectionAsync(
+                                dataPersisted,
+                                trustedOsClient,
+                                hubContext).ConfigureAwait(false);
                         }
                     }
                     catch (Exception dataEx)
@@ -1050,32 +973,32 @@ namespace Microi.net
                     }
                 }
 
-                // 保存AI回复到MongoDB
+                // AI流式协议仍由宿主负责；最终消息事实统一交由固定 Managed runtime 持久化。
                 try
                 {
-                    var aiReplyMsg = new MessageBody
-                    {
-                        FromUserId = aiUser.Id,
-                        FromUserName = aiUser.Name,
-                        FromUserAccount = ChatAssistantIdentity.UserAccount,
-                        FromUserAvatar = aiUser.Avatar,
-                        ToUserId = originalMsg.FromUserId,
-                        ToUserName = originalMsg.FromUserName,
-                        ToUserAccount = originalMsg.FromUserAccount,
-                        ToUserAvatar = originalMsg.FromUserAvatar,
-                        Content = string.IsNullOrWhiteSpace(aiResult.Content)
-                            ? fullResponse.ToString()
-                            : aiResult.Content,
-                        CreateTime = DateTime.Now,
-                        Type = "text",
-                        IsRead = false
-                    };
-                    
-                    await TMongodbHelper<MessageBody>.InsertAsync(chatHost, aiReplyMsg);
+                    var finalPersisted = await RunChatRuntimeAsync(
+                        "PersistAssistantMessage",
+                        new JObject
+                        {
+                            ["RequestId"] = $"{originalMsg.MessageId ?? originalMsg.RequestId}:ai-final",
+                            ["ToUserId"] = originalMsg.FromUserId,
+                            ["Content"] = string.IsNullOrWhiteSpace(aiResult.Content)
+                                ? fullResponse.ToString()
+                                : aiResult.Content,
+                            ["Type"] = "text",
+                            ["IsRead"] = false
+                        },
+                        trustedCurrentUser,
+                        trustedOsClient).ConfigureAwait(false);
+                    await DeliverBackgroundRuntimeProjectionAsync(
+                        finalPersisted,
+                        trustedOsClient,
+                        hubContext).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     WriteWebSocketLog(trustedOsClient, "AiChatPersistenceFailed", "AI 聊天记录保存失败", ex.ToString(), 2, originalMsg.FromUserId);
+                    throw;
                 }
             }
             catch (Exception ex)
@@ -1093,125 +1016,26 @@ namespace Microi.net
         {
             var identity = await RequireIdentityAsync().ConfigureAwait(false);
             msg ??= new MessageBody();
-            msg.FromUserId = identity.UserId;
-            msg.FromUserName = identity.UserName;
-            msg.FromUserAccount = identity.UserAccount;
-            msg.FromUserAvatar = identity.UserAvatar;
-            msg.OsClient = identity.OsClient;
-            await SendChatRecordToUserCore(msg).ConfigureAwait(false);
+            if (IsBlank(msg.ToUserId)) throw new HubException("聊天对象不能为空。");
+            var result = await RunChatRuntimeAsync(
+                "GetHistoryAndMarkRead",
+                new JObject
+                {
+                    ["PeerUserId"] = msg.ToUserId,
+                    ["PageIndex"] = msg._PageIndex ?? 1,
+                    ["PageSize"] = msg._PageSize ?? 20
+                },
+                identity.CurrentUser,
+                identity.OsClient).ConfigureAwait(false);
+            var data = result["Data"] as JObject;
+            await PushHistoryAsync(
+                identity.OsClient,
+                identity.UserId,
+                data?["Messages"]?.ToObject<List<MessageBodyDto>>() ?? new List<MessageBodyDto>())
+                .ConfigureAwait(false);
+            await DeliverRuntimeResultAsync(result, identity.OsClient, false).ConfigureAwait(false);
         }
 
-        private async Task SendChatRecordToUserCore(MessageBody msg)
-        {
-            if (IsBlank(msg.FromUserId) || IsBlank(msg.ToUserId) || IsBlank(msg.OsClient))
-            {
-                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
-                ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
-                if (clientInfoFrom != null)
-                {
-                    try
-                    {
-                        await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(
-                            ChatAssistantIdentity.CreateSystemMessageDto(
-                                DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                                msg.FromUserId));
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-                return;
-            }
-            try
-            {
-                var hostChat = GetChatHost(msg.OsClient);
-                var hostChatLastContact = GetContactHost(msg.OsClient);
-
-                List<FilterDefinition<MessageBody>> list = new List<FilterDefinition<MessageBody>>
-                        {
-                                (Builders<MessageBody>.Filter.Eq("FromUserId", msg.FromUserId)
-                                & Builders<MessageBody>.Filter.Eq("ToUserId", msg.ToUserId))
-                            |
-                                (Builders<MessageBody>.Filter.Eq("FromUserId", msg.ToUserId)
-                                & Builders<MessageBody>.Filter.Eq("ToUserId", msg.FromUserId))
-                        };
-                FilterDefinition<MessageBody> filter = Builders<MessageBody>.Filter.And(list);
-                string[] field = null;
-                SortDefinition<MessageBody> sort = Builders<MessageBody>.Sort.Descending("CreateTime");
-                List<MessageBody> result2 = await TMongodbHelper<MessageBody>.FindListByPageAsync(hostChat, filter, msg._PageIndex ?? 1, msg._PageSize ?? 20, field, sort);
-
-                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
-
-                ClientInfo clientInfoFrom2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
-                if (clientInfoFrom2 == null)
-                {
-                    WriteWebSocketLog(msg.OsClient, "ChatRecipientOffline", "聊天记录接收用户不在线", "本次实时推送已跳过。", 1, msg.FromUserId);
-                    return;
-                }
-                result2 = result2.OrderBy((MessageBody d) => d.CreateTime).ToList();
-                // 旧历史消息可能没有保存姓名或账号；仅按本次会话双方的 Id
-                // 读取当前 Name/Account/Avatar，保持聊天 DTO 的最小身份投影。
-                var chatUsers = await GetChatUserProjectionsAsync(
-                    msg.OsClient,
-                    result2.SelectMany(message => new[] { message.FromUserId, message.ToUserId }))
-                    .ConfigureAwait(false);
-                var result2Dto = result2.Select(m =>
-                {
-                    chatUsers.TryGetValue(m.FromUserId ?? string.Empty, out var currentFromUser);
-                    chatUsers.TryGetValue(m.ToUserId ?? string.Empty, out var currentToUser);
-                    return new MessageBodyDto
-                    {
-                        FromUserId = m.FromUserId,
-                        FromUserName = ChatContactProjection.ResolveDisplayName(
-                            currentFromUser?.Name,
-                            m.FromUserName,
-                            currentFromUser?.Account,
-                            m.FromUserAccount),
-                        FromUserAccount = ChatContactProjection.ResolveAccount(
-                            currentFromUser?.Account,
-                            m.FromUserAccount),
-                        FromUserAvatar = ChatContactProjection.ResolveAvatar(
-                            currentFromUser?.Avatar,
-                            m.FromUserAvatar),
-                        ToUserId = m.ToUserId,
-                        ToUserName = ChatContactProjection.ResolveDisplayName(
-                            currentToUser?.Name,
-                            m.ToUserName,
-                            currentToUser?.Account,
-                            m.ToUserAccount),
-                        ToUserAccount = ChatContactProjection.ResolveAccount(
-                            currentToUser?.Account,
-                            m.ToUserAccount),
-                        ToUserAvatar = ChatContactProjection.ResolveAvatar(
-                            currentToUser?.Avatar,
-                            m.ToUserAvatar),
-                        Content = m.Content,
-                        CreateTime = m.CreateTime,
-                        Type = m.Type,
-                        IsRead = m.IsRead
-                    };
-                }).ToList();
-                await base.Clients.Clients(clientInfoFrom2.ConnectionIds).ReceiveSendChatRecordToUser(result2Dto);
-                await TMongodbHelper<MessageBody>.UpdateManayAsync(hostChat, new Dictionary<string, object> { { "IsRead", true } }, Builders<MessageBody>.Filter.And(Builders<MessageBody>.Filter.Eq("FromUserId", msg.ToUserId) & Builders<MessageBody>.Filter.Eq("ToUserId", msg.FromUserId)));
-                await SendLastContactsCore(new MessageChatContactListParam
-                {
-                    OsClient = msg.OsClient,
-                    UserId = msg.FromUserId,
-                    ContactUserId = msg.ToUserId,
-                    _IsUpdateTime = false
-                });
-                await SendUnreadCountToUserCore(new MessageBodyParam
-                {
-                    ToUserId = msg.FromUserId,
-                    OsClient = msg.OsClient
-                });
-            }
-            catch (Exception ex)
-            {
-                WriteWebSocketLog(msg.OsClient, "ChatHistoryFailed", "读取聊天记录失败", ex.ToString(), 2, msg.FromUserId);
-                throw new HubException("读取聊天记录失败，请稍后重试。");
-            }
-        }
         /// <summary>
         /// 
         /// </summary>
@@ -1220,73 +1044,14 @@ namespace Microi.net
         public async Task SendUnreadCountToUser(MessageBodyParam msg)
         {
             var identity = await RequireIdentityAsync().ConfigureAwait(false);
-            msg ??= new MessageBodyParam();
-            msg.FromUserId = identity.UserId;
-            msg.ToUserId = identity.UserId;
-            msg.OsClient = identity.OsClient;
-            await SendUnreadCountToUserCore(msg).ConfigureAwait(false);
+            var result = await RunChatRuntimeAsync(
+                "GetUnreadCount",
+                new JObject(),
+                identity.CurrentUser,
+                identity.OsClient).ConfigureAwait(false);
+            await DeliverRuntimeResultAsync(result, identity.OsClient, false).ConfigureAwait(false);
         }
 
-        private async Task SendUnreadCountToUserCore(MessageBodyParam msg)
-        {
-            if (IsBlank(msg.ToUserId) || IsBlank(msg.OsClient))
-            {
-                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
-                ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
-                if (clientInfoFrom != null)
-                {
-                    try
-                    {
-                        var msg2 = ChatAssistantIdentity.CreateSystemMessageDto(
-                            DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                            msg.FromUserId);
-                        if (msg._iHubContext != null)
-                        {
-                            msg._iHubContext.Clients.Clients(clientInfoFrom.ConnectionIds).SendAsync("ReceiveSendToUser", msg2);
-                        }
-                        else
-                        {
-                            await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(msg2);
-                        }
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-                return;
-            }
-            try
-            {
-                var hostChat = GetChatHost(msg.OsClient);
-                List<FilterDefinition<MessageBody>> list = new List<FilterDefinition<MessageBody>> { Builders<MessageBody>.Filter.Eq("ToUserId", msg.ToUserId) & Builders<MessageBody>.Filter.Eq("IsRead", false) };//value: 
-                FilterDefinition<MessageBody> filter = Builders<MessageBody>.Filter.And(list);
-                long result = await TMongodbHelper<MessageBody>.CountAsync(hostChat, filter);
-
-                //List<FilterDefinition<MessageBody>> list2 = new List<FilterDefinition<MessageBody>> { Builders<MessageBody>.Filter.Eq("ToUserId", msg.ToUserId)};
-                //FilterDefinition<MessageBody> filter2 = Builders<MessageBody>.Filter.And(list2);
-                //var result2 = await TMongodbHelper<MessageBody>.FindListAsync(hostChat, filter2);
-
-                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
-
-                ClientInfo clientInfoTo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.ToUserId}");
-                if (clientInfoTo != null)
-                {
-                    if (msg._iHubContext != null)
-                    {
-                        msg._iHubContext.Clients.Clients(clientInfoTo.ConnectionIds).SendAsync("ReceiveSendUnreadCountToUser", result);
-                    }
-                    else
-                    {
-                        await base.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveSendUnreadCountToUser(result);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                WriteWebSocketLog(msg.OsClient, "UnreadCountFailed", "读取聊天未读数失败", ex.ToString(), 2, msg.ToUserId);
-                throw new HubException("读取聊天未读数失败，请稍后重试。");
-            }
-        }
         /// <summary>
         /// 
         /// </summary>
@@ -1296,46 +1061,13 @@ namespace Microi.net
         {
             var identity = await RequireIdentityAsync().ConfigureAwait(false);
             msg ??= new MessageBody();
-            msg.FromUserId = identity.UserId;
-            msg.FromUserName = identity.UserName;
-            msg.FromUserAccount = identity.UserAccount;
-            msg.FromUserAvatar = identity.UserAvatar;
-            msg.OsClient = identity.OsClient;
-            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
-            ClientInfo clientInfoFrom = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
-            if (IsBlank(msg.FromUserId) || IsBlank(msg.ToUserId) || IsBlank(msg.OsClient))
-            {
-                if (clientInfoFrom != null)
-                {
-                    try
-                    {
-                        await base.Clients.Clients(clientInfoFrom.ConnectionIds).ReceiveSendToUser(
-                            ChatAssistantIdentity.CreateSystemMessageDto(
-                                DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                                msg.FromUserId));
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-            }
-            else
-            {
-                await SendLastContactsCore(new MessageChatContactListParam
-                {
-                    UserId = msg.FromUserId,
-                    UserName = msg.FromUserName,
-                    UserAccount = msg.FromUserAccount,
-                    UserAvatar = msg.FromUserAvatar,
-                    ContactUserId = msg.ToUserId,
-                    ContactUserName = msg.ToUserName,
-                    ContactUserAccount = msg.ToUserAccount,
-                    ContactUserAvatar = msg.ToUserAvatar,
-                    OtherInfo = msg.OtherInfo,
-                    OsClient = msg.OsClient,
-                    _IsUpdateTime = false
-                });
-            }
+            if (IsBlank(msg.ToUserId)) throw new HubException("聊天对象不能为空。");
+            var result = await RunChatRuntimeAsync(
+                "TouchContact",
+                new JObject { ["PeerUserId"] = msg.ToUserId },
+                identity.CurrentUser,
+                identity.OsClient).ConfigureAwait(false);
+            await DeliverRuntimeResultAsync(result, identity.OsClient, false).ConfigureAwait(false);
         }
         /// <summary>
         /// 
@@ -1346,192 +1078,18 @@ namespace Microi.net
         {
             var identity = await RequireIdentityAsync().ConfigureAwait(false);
             msg ??= new MessageChatContactListParam();
-            msg.UserId = identity.UserId;
-            msg.UserName = identity.UserName;
-            msg.UserAccount = identity.UserAccount;
-            msg.UserAvatar = identity.UserAvatar;
-            msg.OsClient = identity.OsClient;
-            msg.ContactUserId = "";
-            msg.LastMessage = "";
-            msg.LastMessageType = "";
-            msg._IsUpdateTime = false;
-            await SendLastContactsCore(msg).ConfigureAwait(false);
+            var result = await RunChatRuntimeAsync(
+                "ListContacts",
+                new JObject
+                {
+                    ["PageIndex"] = msg._PageIndex ?? 1,
+                    ["PageSize"] = msg._PageSize ?? 20
+                },
+                identity.CurrentUser,
+                identity.OsClient).ConfigureAwait(false);
+            await DeliverRuntimeResultAsync(result, identity.OsClient, false).ConfigureAwait(false);
         }
 
-        private async Task SendLastContactsCore(MessageChatContactListParam msg)
-        {
-            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
-            ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
-            if (clientInfo == null)
-            {
-                return;
-            }
-            if (IsBlank(msg.UserId) || IsBlank(msg.OsClient))
-            {
-                if (clientInfo != null)
-                {
-                    try
-                    {
-                        List<string> connectIds = clientInfo.ConnectionIds;
-                        var msg2 = ChatAssistantIdentity.CreateSystemMessageDto(
-                            DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                            msg.UserId);
-                        if (msg._iHubContext != null)
-                        {
-                            msg._iHubContext.Clients.Clients(connectIds).SendAsync("ReceiveSendToUser", msg2);
-                        }
-                        else
-                        {
-                            await base.Clients.Clients(connectIds).ReceiveSendToUser(msg2);
-                        }
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-                return;
-            }
-            try
-            {
-                var hostChatLastContact = GetContactHost(msg.OsClient);
-                var hostChat = GetChatHost(msg.OsClient);
-                string[] field = null;
-                SortDefinition<MessageChatContactList> sort = Builders<MessageChatContactList>.Sort.Descending("UpdateTime");
-                List<FilterDefinition<MessageChatContactList>> list2 = new List<FilterDefinition<MessageChatContactList>>();
-                if (IsNotBlank(msg.ContactUserId))
-                {
-                    var contactUserClientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.ContactUserId}");
-
-                    list2.Add(Builders<MessageChatContactList>.Filter.Eq("UserId", msg.UserId));
-                    list2.Add(Builders<MessageChatContactList>.Filter.Eq("ContactUserId", msg.ContactUserId));
-                    List<MessageChatContactList> contactList = (await TMongodbHelper<MessageChatContactList>.FindListAsync(hostChatLastContact, Builders<MessageChatContactList>.Filter.And(list2), field, sort)).Data;
-                    //如果已经存在这个联系人了
-                    if (contactList.Any())
-                    {
-                        if (contactList.Count > 1)
-                        {
-                            int tIndex = 0;
-                            foreach (MessageChatContactList item in contactList)
-                            {
-                                if (tIndex != 0)
-                                {
-                                    await TMongodbHelper<MessageChatContactList>.DeleteAsync(hostChatLastContact, item._id.ToString());
-                                }
-                                tIndex++;
-                            }
-                        }
-                        MessageChatContactList tModel = contactList.First();
-                        if (msg._IsUpdateTime)
-                            tModel.UpdateTime = DateTime.Now;
-                        if (IsNotBlank(msg.LastMessage))
-                            tModel.LastMessage = msg.LastMessage;
-                        if (IsNotBlank(msg.LastMessageType))
-                            tModel.LastMessageType = msg.LastMessageType;
-                        if (IsNotBlank(msg.UserName))
-                            tModel.UserName = msg.UserName;
-                        if (IsNotBlank(msg.UserAccount))
-                            tModel.UserAccount = msg.UserAccount;
-                        if (IsNotBlank(msg.UserAvatar))
-                            tModel.UserAvatar = msg.UserAvatar;
-                        if (IsNotBlank(msg.ContactUserName))
-                            tModel.ContactUserName = msg.ContactUserName;
-                        if (IsNotBlank(msg.ContactUserAccount))
-                            tModel.ContactUserAccount = msg.ContactUserAccount;
-                        if (IsNotBlank(msg.ContactUserAvatar))
-                            tModel.ContactUserAvatar = msg.ContactUserAvatar;
-
-                        if (contactUserClientInfo != null)
-                        {
-                            if (IsNotBlank(contactUserClientInfo.DeviceClientId))
-                            {
-                                tModel.ContactUserDeviceClientId = contactUserClientInfo.DeviceClientId;
-                            }
-                            if (IsNotBlank(contactUserClientInfo.OtherInfo))
-                            {
-                                tModel.OtherInfo = contactUserClientInfo.OtherInfo;
-                            }
-                        }
-
-                        if (IsNotBlank(msg.OtherInfo))
-                            tModel.OtherInfo = msg.OtherInfo;
-
-                        MessageChatContactList messageChatContactList = tModel;
-                        messageChatContactList.UnRead = (int)(await TMongodbHelper<MessageBody>.CountAsync(hostChat, Builders<MessageBody>.Filter.And(Builders<MessageBody>.Filter.Eq("FromUserId", msg.ContactUserId), Builders<MessageBody>.Filter.Eq("ToUserId", msg.UserId), Builders<MessageBody>.Filter.Eq("IsRead", value: false))));
-                        await TMongodbHelper<MessageChatContactList>.UpdateAsync(hostChatLastContact, tModel, tModel._id.ToString());
-                    }
-                    else
-                    {
-                        if (contactUserClientInfo != null)
-                        {
-                            if (IsNotBlank(contactUserClientInfo.DeviceClientId))
-                            {
-                                msg.ContactUserDeviceClientId = contactUserClientInfo.DeviceClientId;
-                            }
-                            if (IsBlank(msg.OtherInfo) && IsNotBlank(contactUserClientInfo.OtherInfo))
-                            {
-                                msg.OtherInfo = contactUserClientInfo.OtherInfo;
-                            }
-                        }
-                        msg.UpdateTime = DateTime.Now;
-                        msg.UnRead = (int)(await TMongodbHelper<MessageBody>.CountAsync(hostChat, Builders<MessageBody>.Filter.And(Builders<MessageBody>.Filter.Eq("FromUserId", msg.ContactUserId), Builders<MessageBody>.Filter.Eq("ToUserId", msg.UserId), Builders<MessageBody>.Filter.Eq("IsRead", value: false))));
-                        await TMongodbHelper<MessageChatContactList>.InsertAsync(hostChatLastContact, msg);
-                    }
-                }
-                list2 = new List<FilterDefinition<MessageChatContactList>> { Builders<MessageChatContactList>.Filter.Eq("UserId", msg.UserId) };
-                FilterDefinition<MessageChatContactList> filter = Builders<MessageChatContactList>.Filter.And(list2);
-                List<MessageChatContactList> lastChatList = await TMongodbHelper<MessageChatContactList>.FindListByPageAsync(hostChatLastContact, filter, msg._PageIndex ?? 1, msg._PageSize ?? 20, field, sort);
-                if (lastChatList == null)
-                {
-                    lastChatList = new List<MessageChatContactList>();
-                }
-                
-                // 仅按当前用户自己的历史联系人 Id 读取 Name/Account/Avatar，
-                // 不扩大公共用户目录，也不把手机号、邮箱等资料投影到聊天端。
-                var chatUsers = await GetChatUserProjectionsAsync(
-                    msg.OsClient,
-                    lastChatList.Select(contact => contact.ContactUserId)).ConfigureAwait(false);
-                var lastChatListDto = lastChatList.Select(contact =>
-                {
-                    chatUsers.TryGetValue(contact.ContactUserId ?? string.Empty, out var currentContact);
-                    return ChatContactProjection.Create(
-                        contact,
-                        currentContact?.Name,
-                        currentContact?.Account,
-                        currentContact?.Avatar);
-                }).ToList();
-                
-                if (msg._iHubContext != null)
-                {
-                    msg._iHubContext.Clients.Clients(clientInfo.ConnectionIds).SendAsync("ReceiveSendLastContacts", lastChatListDto);
-                }
-                else
-                {
-                    await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendLastContacts(lastChatListDto);
-                }
-            }
-            catch (Exception ex)
-            {
-
-
-                try
-                {
-                    var msg2 = ChatAssistantIdentity.CreateSystemMessageDto(
-                        ex.Message,
-                        msg.UserId);
-                    if (msg._iHubContext != null)
-                    {
-                        msg._iHubContext.Clients.Clients(clientInfo.ConnectionIds).SendAsync("ReceiveSendToUser", msg2);
-                    }
-                    else
-                    {
-                        await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendToUser(msg2);
-                    }
-                }
-                catch (Exception)
-                {
-                }
-            }
-        }
         /// <summary>
         /// 
         /// </summary>
@@ -1541,89 +1099,13 @@ namespace Microi.net
         {
             var identity = await RequireIdentityAsync().ConfigureAwait(false);
             msg ??= new MessageChatContactList();
-            msg.UserId = identity.UserId;
-            msg.UserName = identity.UserName;
-            msg.UserAvatar = identity.UserAvatar;
-            msg.OsClient = identity.OsClient;
-            if (IsBlank(msg.UserId) || IsBlank(msg.OsClient) || IsBlank(msg.ContactUserId))
-            {
-                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
-                ClientInfo clientInfo2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
-                if (clientInfo2 != null)
-                {
-                    try
-                    {
-                        await base.Clients.Clients(clientInfo2.ConnectionIds).ReceiveSendToUser(
-                            ChatAssistantIdentity.CreateSystemMessageDto(
-                                DiyMessage.GetLang(msg.OsClient, "ParamError", msg._Lang),
-                                msg.UserId));
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-                return;
-            }
-            try
-            {
-                var hostChatLastContact = GetContactHost(msg.OsClient);
-                string[] field = null;
-                SortDefinition<MessageChatContactList> sort = Builders<MessageChatContactList>.Sort.Descending("UpdateTime");
-                List<FilterDefinition<MessageChatContactList>> list = new List<FilterDefinition<MessageChatContactList>>
-                {
-                    Builders<MessageChatContactList>.Filter.Eq("UserId", msg.UserId),
-                    Builders<MessageChatContactList>.Filter.Eq("ContactUserId", msg.ContactUserId)
-                };
-                List<MessageChatContactList> contactList = (await TMongodbHelper<MessageChatContactList>.FindListAsync(hostChatLastContact, Builders<MessageChatContactList>.Filter.And(list), field, sort)).Data;
-                if (!contactList.Any())
-                {
-                    return;
-                }
-                if (contactList.Count > 1)
-                {
-                    int tIndex = 0;
-                    foreach (MessageChatContactList item in contactList)
-                    {
-                        if (tIndex != 0)
-                        {
-                            await TMongodbHelper<MessageChatContactList>.DeleteAsync(hostChatLastContact, item._id.ToString());
-                        }
-                        tIndex++;
-                    }
-                }
-                MessageChatContactList tModel = contactList.First();
-                await TMongodbHelper<MessageChatContactList>.DeleteAsync(hostChatLastContact, tModel._id.ToString());
-            }
-            catch (Exception ex)
-            {
-
-
-                var DiyCacheBase = MicroiEngine.CacheTenant.Cache(msg.OsClient);
-                ClientInfo clientInfo = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.UserId}");
-                if (clientInfo != null)
-                {
-                    try
-                    {
-                        await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendToUser(
-                            ChatAssistantIdentity.CreateSystemMessageDto(
-                                ex.Message,
-                                msg.UserId));
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-            }
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="msg"></param>
-        /// <param name="users"></param>
-        /// <returns></returns>
-        public async Task SendToUsers(UserMessageContent msg, params string[] users)
-        {
-            await base.Clients.Users(users.ToList().AsReadOnly()).ReceiveSendToUsers(msg);
+            if (IsBlank(msg.ContactUserId)) throw new HubException("聊天对象不能为空。");
+            var result = await RunChatRuntimeAsync(
+                "DeleteContact",
+                new JObject { ["PeerUserId"] = msg.ContactUserId },
+                identity.CurrentUser,
+                identity.OsClient).ConfigureAwait(false);
+            await DeliverRuntimeResultAsync(result, identity.OsClient, false).ConfigureAwait(false);
         }
     }
 }

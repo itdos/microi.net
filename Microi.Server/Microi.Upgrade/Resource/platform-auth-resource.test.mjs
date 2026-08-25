@@ -66,10 +66,22 @@ test('platform authentication package code matches canonical V8 sources', () => 
     const sourceFile = fs.readdirSync(engineSourceDirectory)
       .find((file) => file.endsWith(`(${key}).js`));
     assert.ok(sourceFile, `canonical source is missing for ${key}`);
-    const source = fs.readFileSync(path.join(engineSourceDirectory, sourceFile), 'utf8')
-      .replace(/\r\n?/g, '\n').replace(/\n*$/g, '\n');
-    assert.equal(engine.ApiV8Code, source, `${key} package code drifted`);
+    const normalizeSource = value => String(value || '')
+      .replace(/\r\n?/g, '\n')
+      .trimEnd();
+    const source = fs.readFileSync(path.join(engineSourceDirectory, sourceFile), 'utf8');
+    assert.equal(normalizeSource(engine.ApiV8Code), normalizeSource(source), `${key} package code drifted`);
   }
+});
+
+test('platform authentication generator updates engines in place with canonical limits and newlines', () => {
+  const generator = fs.readFileSync(path.join(directory, 'configure-platform-auth-resource.mjs'), 'utf8');
+  assert.match(generator, /findIndex\(item => item\.ApiEngineKey === spec\.key\)/);
+  assert.doesNotMatch(generator, /filter\(\(engine\) => !managedKeys\.has/);
+  assert.match(generator, /LimitRecursion:\s*5000/);
+  assert.match(generator, /ensureMinimumPackageVersion\(pkg\.PackageInfo, 'v7\.5\.7'\)/);
+  assert.doesNotMatch(generator, /Version:\s*'v7\.5\.7'/);
+  assert.ok(!generator.includes(".replace(/\\n*$/g, '\\n')"));
 });
 
 test('Managed core and CreateIfMissing tenant hook policies are explicit', () => {
@@ -104,7 +116,7 @@ test('backend upgrade auto-installs the identity package while password login st
     path.join(directory, '..', '..', 'Microi.net.Api', 'Controllers', 'SysUserController.cs'),
     'utf8'
   );
-  assert.match(upgrade, /Version = "6\.4\.6\.0"/);
+  assert.match(upgrade, /Version = "6\.4\.11\.0"/);
   assert.match(upgrade, /SaaSEnginePackageResourceName/);
   assert.match(upgrade, /InstallUpgradePackage\(osClient, msgs, SaaSEnginePackageResourceName/);
   assert.match(controller, /var result = await _sysUserLogic\.Login\(param\)/);

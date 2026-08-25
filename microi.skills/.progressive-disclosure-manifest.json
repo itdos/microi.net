@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-24T10:21:26.245Z",
+  "generatedAt": "2026-08-24T23:28:15.830Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2221,18 +2221,18 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "5378f79b6d46af00107a26d466badc5074027bef383084a298c768e93f74803d",
-      "originalLines": 554,
-      "prefixSha256": "ebc8749554b5ded9e5e7508e017d09cd8eefddfc58e13c87dce1234491eb90bb",
-      "prefixBytes": 5841,
-      "entryLines": 216,
+      "originalSha256": "c6a1d4ed64cc2abbd9c3bc42c4d9473535564b45277f4a563e1452006325eaeb",
+      "originalLines": 557,
+      "prefixSha256": "dd9e661499692931e0da053fdb6060a3ff2827eb5862d1a820f05159038ead5d",
+      "prefixBytes": 7475,
+      "entryLines": 219,
       "chunks": [
         {
           "id": "v8-file-upload-000",
           "ordinal": 0,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "b48ce09f93a43efd30e700af637db3881355e8d2baaf45165ea2bd0bdfda25cf",
-          "lines": 11,
+          "sha256": "841bb634227ea21cf97abcbee5dc6220042e73139170e6a6c304bfce83274e7a",
+          "lines": 12,
           "heading": "核心 API"
         },
         {
@@ -2247,7 +2247,7 @@
           "id": "v8-file-upload-002",
           "ordinal": 2,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "dc69d3bcadb1b40d98e1346a8d9d0a3599cae7f7dd6b850dd95ad054c747b2dd",
+          "sha256": "c20863b68d13b3bd41caee90a5e12878501a35b3d9f8d40a80efe3f6b46125a9",
           "lines": 101,
           "heading": "接收前端上传的文件"
         },
@@ -2255,7 +2255,7 @@
           "id": "v8-file-upload-003",
           "ordinal": 5,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "a31f0170454bb9e44007e24ed280873e99ae4ca4f4ecc7307ecc3e738eb51df9",
+          "sha256": "d02dfde4abd2349cd92de1daee129bc08ba42142b5f6229736588cb3e0dbf43c",
           "lines": 13,
           "heading": "跨平台文件同步登录会话"
         },
@@ -2786,11 +2786,11 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "ddf2ac0fceae3cf50c240b0740be07ae2ba59520950e039fd10413c247390813",
-      "originalLines": 495,
-      "prefixSha256": "e94c6e73f300d807957d87a76f4db2fc7c377855be352ce8c1e7cac9c17d703c",
-      "prefixBytes": 1077,
-      "entryLines": 182,
+      "originalSha256": "47f1d4392b637af2b25a658e475bdcf8ee888b6e51098b888e477ce1aa1c9985",
+      "originalLines": 497,
+      "prefixSha256": "c3b2ae10a39461ee69fda3c7e994d072ca6d8c9dc6f2338742bc8f07e0dcffd0",
+      "prefixBytes": 1648,
+      "entryLines": 184,
       "chunks": [
         {
           "id": "v8-security-000",

@@ -13,9 +13,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,AI,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，服务器端自动升级程序。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>7.5.10</Version>
-    <AssemblyVersion>7.5.10</AssemblyVersion>
-    <FileVersion>7.5.10</FileVersion>
+    <Version>7.6.5</Version>
+    <AssemblyVersion>7.6.5</AssemblyVersion>
+    <FileVersion>7.6.5</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -52,7 +52,12 @@
     <EmbeddedResource Include="Resource\app.microi.form-engine.json" LogicalName="Microi.Upgrade.Resource.app.microi.form-engine.json" />
     <EmbeddedResource Include="Resource\app.microi.module-engine.json" LogicalName="Microi.Upgrade.Resource.app.microi.module-engine.json" />
     <EmbeddedResource Include="Resource\app.microi.saas-engine.json" LogicalName="Microi.Upgrade.Resource.app.microi.saas-engine.json" />
+    <EmbeddedResource Include="Resource\app.microi.sso.json" LogicalName="Microi.Upgrade.Resource.app.microi.sso.json" />
     <EmbeddedResource Include="Resource\app.microi.store.json" LogicalName="Microi.Upgrade.Resource.app.microi.store.json" />
+    <EmbeddedResource Include="Resource\app.microi.sys_user.json" LogicalName="Microi.Upgrade.Resource.app.microi.sys_user.json" />
+    <EmbeddedResource Include="Resource\app.microi.sys-config.json" LogicalName="Microi.Upgrade.Resource.app.microi.sys-config.json" />
+    <EmbeddedResource Include="Resource\app.microi.message-notification.json" LogicalName="Microi.Upgrade.Resource.app.microi.message-notification.json" />
+    <EmbeddedResource Include="Resource\app.microi.ai-engine.json" LogicalName="Microi.Upgrade.Resource.app.microi.ai-engine.json" />
   </ItemGroup>
 
 </Project>

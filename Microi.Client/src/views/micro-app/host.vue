@@ -500,7 +500,7 @@ export default {
         },
         async refreshCurrentUserFromServer() {
             const result = await DiyCommon.PostAsync(
-                "/api/SysUser/RefreshLoginUser",
+                "/apiengine/platform-sys-user-admin?Action=RefreshLoginUser",
                 {},
                 null,
                 null,
