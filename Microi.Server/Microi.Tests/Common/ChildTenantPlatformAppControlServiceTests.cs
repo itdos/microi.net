@@ -159,7 +159,7 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_SCOPE_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", importerSource, StringComparison.Ordinal);
-        Assert.Contains("Version: v2.3.5", importerSource, StringComparison.Ordinal);
+        Assert.Contains("Version: v2.4.2", importerSource, StringComparison.Ordinal);
     }
 
     [Fact]

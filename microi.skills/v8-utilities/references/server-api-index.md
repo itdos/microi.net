@@ -19,6 +19,7 @@
 | `V8.LineValue`、`V8.NextNodeId`、`V8.WF` | 工作流路线与节点上下文 |
 | `V8.FilesByteBase64` | 上传文件 Base64 字典 |
 | `V8.Limits` | 当前 Jint 资源预算与调用深度 |
+| `V8.Stream` | 仅 `ResponseType=Stream` 的接口引擎可用；SSE/NDJSON 暂态分片写入器 |
 | `V8.Action` | 服务器全局 V8 自定义方法 |
 
 ## 调用、数据与异步
@@ -27,6 +28,8 @@
 |---|---|
 | `V8.ApiEngine.Run(...)` | 同步调用接口引擎 |
 | `await V8.ApiEngine.RunAsync(...)` | 请求内异步调用接口引擎 |
+| `V8.Stream.Write(data,eventName?,id?)` | 同步写一个受大小限制的暂态流式分片 |
+| `await V8.Stream.WriteAsync(data,eventName?,id?)` | 等待网络背压后写暂态分片；每次检查返回 `Code` |
 | `V8.FormEngine.*` | 表单 CRUD，见 `v8-crud-api` |
 | `await V8.FormEngine.GetTableDataAsync(...)` | 请求内异步查列表 |
 | `V8.Db`、`V8.DbRead`、`V8.DbTrans` | 主库、只读库、共享事务 |

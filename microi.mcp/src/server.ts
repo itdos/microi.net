@@ -4668,22 +4668,24 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_save_engine_code',
-    `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, appends the change summary to the API-engine history TableChild (the server falls back to legacy ChangeHistory on old databases), and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Optional v8Limit uses positive semantics: false/default means no Jint per-execution budget, true enables the configured timeout/statement/recursion/allocation limits. The value is verified by remote readback. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`,
+    `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, appends the change summary to the API-engine history TableChild (the server falls back to legacy ChangeHistory on old databases), and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Optional responseType=Stream enables SSE/NDJSON streaming through V8.Stream.Write/WriteAsync. Optional v8Limit uses positive semantics: false/default means no Jint per-execution budget, true enables the configured timeout/statement/recursion/allocation limits. Runtime values are verified by remote readback. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`,
     {
       apiEngineKey: z.string().describe('The unique key of the API engine'),
       code: z.string().describe('The complete JavaScript source code to save'),
       functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
       changeSummary: z.string().optional().describe('One-line change summary appended to the API-engine history TableChild; old databases use the server-side legacy fallback.'),
       v8Limit: z.boolean().optional().describe('Positive switch. false/default means unrestricted Jint execution budgets; true applies this engine\'s configured timeout/statement/recursion/allocation limits. Omit to preserve the current value.'),
+      responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream']).optional().describe('HTTP response mode. Use Stream for SSE/NDJSON and emit chunks with V8.Stream.Write or WriteAsync. Omit to preserve the current value.'),
       v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
       confirmLargeReduction: z.string().optional().describe('Required only when replacing source >=8000 chars with code shorter by more than 15%. Use apiEngineKey or EXECUTE.'),
     },
-    async ({ apiEngineKey, code, functionDescription, changeSummary, v8Limit, v8Unlimited, confirmLargeReduction }) => {
+    async ({ apiEngineKey, code, functionDescription, changeSummary, v8Limit, responseType, v8Unlimited, confirmLargeReduction }) => {
       try {
         const result = await client.saveEngineCode(apiEngineKey, code, {
           functionDescription,
           changeSummary,
           v8Limit: v8Limit ?? (v8Unlimited === undefined ? undefined : !v8Unlimited),
+          responseType,
           confirmLargeReduction: confirmLargeReduction === apiEngineKey || confirmLargeReduction === 'EXECUTE',
         });
         if (result.Code !== 1) {
@@ -4706,7 +4708,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_create_engine',
-    `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table. WARNING: Do NOT create API engines for basic CRUD operations — the low-code platform handles CRUD automatically when a menu module is bound to a diy_table. Only create engines for complex business logic, third-party integrations, scheduled tasks, or custom calculations. v8Limit defaults to false: limits are applied only when explicitly enabled.`,
+    `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table. WARNING: Do NOT create API engines for basic CRUD operations — the low-code platform handles CRUD automatically when a menu module is bound to a diy_table. Only create engines for complex business logic, third-party integrations, scheduled tasks, or custom calculations. responseType=Stream enables SSE/NDJSON output through V8.Stream.Write/WriteAsync. v8Limit defaults to false: limits are applied only when explicitly enabled.`,
     {
       apiEngineKey: z.string().describe('Unique key for the new engine (lowercase, hyphens allowed, e.g. "my-new-api")'),
       apiName: z.string().describe('Display name of the engine'),
@@ -4715,10 +4717,11 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       functionDescription: z.string().optional().describe('Complete function description to keep in the initial code header. No change history here.'),
       changeSummary: z.string().optional().describe('One-line change summary appended to the API-engine history TableChild; old databases use the server-side legacy fallback.'),
       apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
+      responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream']).optional().describe('HTTP response mode. Default JSON; choose Stream for SSE/NDJSON incremental output.'),
       v8Limit: z.boolean().optional().describe('Default false. false means no Jint per-execution budget; true applies the configured runtime limits. Process resident-memory guard always remains active.'),
       v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
     },
-    async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress, v8Limit, v8Unlimited }) => {
+    async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress, responseType, v8Limit, v8Unlimited }) => {
       try {
         const result = await client.createEngine({
           ApiEngineKey: apiEngineKey,
@@ -4728,6 +4731,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           functionDescription,
           changeSummary,
           ApiAddress: apiAddress,
+          ResponseType: responseType,
           V8Limit: (v8Limit ?? (v8Unlimited === undefined ? undefined : !v8Unlimited)) === undefined
             ? undefined
             : ((v8Limit ?? !v8Unlimited) ? 1 : 0),
@@ -4954,7 +4958,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     {
       action: z.enum([
         'Capabilities', 'Snapshot', 'Logs', 'LogTypes', 'LogStats', 'Signal', 'Trace',
-        'ApiRank', 'AppLogs', 'PlatformStats', 'SecurityData', 'TrafficHistory',
+        'ApiRank', 'AppLogs', 'PlatformStats', 'SecurityData', 'TrafficHistory', 'TrafficDetails', 'HistoricalDashboard',
       ]).describe('Read action. Use Capabilities first to discover exact scope and boundaries.'),
       keyword: z.string().max(100).optional().describe('Log/signal/security keyword. The backend applies its own bounded search rules.'),
       type: z.string().max(100).optional().describe('System log Type filter.'),
@@ -4978,13 +4982,19 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       kind: z.enum(['Access', 'Attack', 'Block']).optional().describe('SecurityData kind.'),
       status: z.string().max(50).optional().describe('SecurityData Block status filter.'),
       dimensionType: z.enum(['Total', 'Endpoint', 'Ip', 'User', 'Tenant', 'ContentType']).optional().describe('TrafficHistory aggregation dimension.'),
-      hours: z.number().int().min(1).max(168).optional().describe('TrafficHistory lookback hours, 1-168.'),
+      rangeKey: z.enum(['live5', 'today', 'yesterday', '3d', '7d', '15d', '30d', '3m', '6m', '1y']).optional().describe('Unified history range for TrafficHistory/HistoricalDashboard. Default today.'),
+      hours: z.number().int().min(1).max(168).optional().describe('Legacy TrafficHistory lookback hours. Prefer rangeKey.'),
       observedOsClient: z.string().max(50).optional().describe('TrafficHistory observed tenant filter; caller still remains bound to the authenticated control plane.'),
+      transferAction: z.string().max(50).optional().describe('TrafficDetails direction/action filter, for example 上传、下载 or SuspiciousTransfer.'),
+      ip: z.string().max(100).optional().describe('TrafficDetails client IP filter.'),
+      userId: z.string().max(100).optional().describe('TrafficDetails authenticated user-id filter.'),
+      endpoint: z.string().max(500).optional().describe('TrafficDetails normalized endpoint or /apiengine/{key} filter.'),
     },
     async ({
       action, keyword, type, category, source, level, levelMin, searchMonth, pageIndex, pageSize,
       windowMinutes, windowSeconds, top, includeHost, includeDocker, traceId, serviceName,
-      apiEngineKey, name, lines, kind, status, dimensionType, hours, observedOsClient,
+      apiEngineKey, name, lines, kind, status, dimensionType, rangeKey, hours, observedOsClient,
+      transferAction, ip, userId, endpoint,
     }) => {
       try {
         if (action === 'Trace' && !traceId) {
@@ -5014,8 +5024,13 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           ...(kind ? { Kind: kind } : {}),
           ...(status ? { Status: status } : {}),
           ...(dimensionType ? { DimensionType: dimensionType } : {}),
+          ...(rangeKey ? { RangeKey: rangeKey } : {}),
           ...(hours === undefined ? {} : { Hours: hours }),
           ...(observedOsClient ? { ObservedOsClient: observedOsClient } : {}),
+          ...(transferAction ? { TransferAction: transferAction } : {}),
+          ...(ip ? { Ip: ip } : {}),
+          ...(userId ? { UserId: userId } : {}),
+          ...(endpoint ? { Endpoint: endpoint } : {}),
         });
         return {
           content: [{ type: 'text', text: JSON.stringify({

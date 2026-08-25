@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const packagePath = resolve(directory, 'app.microi.store.json');
+const enginePath = resolve(directory, 'ai-app-create.js');
 const sdkPath = resolve(directory, '../../../microi.skills/microi.v8.js');
 
 function normalizeText(value) {
@@ -42,38 +43,39 @@ function replaceSdkFunction(source, sdkSource) {
   return `${source.slice(0, start)}${replacement}${source.slice(end + 1)}`;
 }
 
-const packageModel = JSON.parse(await readFile(packagePath, 'utf8'));
 const sdkSource = normalizeText(await readFile(sdkPath, 'utf8'));
-const engines = Array.isArray(packageModel.SysApiEngines) ? packageModel.SysApiEngines : [];
-const engine = engines.find(item => item.ApiEngineKey === 'ai_app_create');
-if (!engine) throw new Error('app.microi.store.json 缺少 ai_app_create');
-
-const currentSource = normalizeText(engine.ApiV8Code);
+const currentSource = normalizeText(await readFile(enginePath, 'utf8'));
 const updatedSource = replaceSdkFunction(currentSource, sdkSource);
 if (updatedSource === currentSource) {
-  console.log(JSON.stringify({ changed: false, version: engine.Version }, null, 2));
+  const version = currentSource.match(/Version:\s*(v?\d+\.\d+\.\d+)/i)?.[1] || '';
+  console.log(JSON.stringify({ changed: false, version }, null, 2));
   process.exit(0);
 }
 
-const oldVersion = String(engine.Version || '');
+const oldVersion = currentSource.match(/Version:\s*(v?\d+\.\d+\.\d+)/i)?.[1] || '';
 const newVersion = nextPatchVersion(oldVersion);
 const timestamp = chinaTimestamp();
-const summary = '同步维护版 Microi 前端 SDK，确保新建 Web 与 MicroService 使用完整当前能力。';
+const summary = '同步维护版 Microi 前端 SDK；UniApp 脚手架改用接口引擎自定义地址，保证热点归因到真实 ApiEngineKey。';
 const headerPattern = new RegExp(`Version:\\s*${oldVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
 const versionedSource = updatedSource.replace(headerPattern, `Version: ${newVersion}`);
 if (versionedSource === updatedSource) throw new Error('ai_app_create 源码头未找到旧版本');
 new Function(versionedSource);
 
+await writeFile(enginePath, versionedSource, 'utf8');
+const packageModel = JSON.parse(await readFile(packagePath, 'utf8'));
+const engines = Array.isArray(packageModel.SysApiEngines) ? packageModel.SysApiEngines : [];
+const engine = engines.find(item => item.ApiEngineKey === 'ai_app_create');
+if (!engine) throw new Error('app.microi.store.json 缺少 ai_app_create');
 engine.ApiV8Code = versionedSource;
 engine.Version = newVersion;
 engine.UpdateTime = timestamp;
 engine.ChangeHistory = `${timestamp} ${newVersion} ${summary}\n${String(engine.ChangeHistory || '')}`;
-
 await writeFile(packagePath, `${JSON.stringify(packageModel, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify({
   changed: true,
   oldVersion,
   newVersion,
   sdkBytes: Buffer.byteLength(sdkSource, 'utf8'),
+  enginePath,
   packagePath,
 }, null, 2));

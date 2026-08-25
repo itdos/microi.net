@@ -16,6 +16,7 @@ import {
 import { resolveFormPresentationConfig } from "../form-presentation-runtime.js";
 import { migrateLegacyModuleHeroBanner } from "../form-banner-runtime.js";
 import { hasScalarRecordId } from "@/utils/record-id.js";
+import { requestMenuBadge } from "@/layout/components/Sidebar/menu-badge-batch.js";
 
 function uniqueFields(fields) {
     const seen = new Set();
@@ -510,7 +511,7 @@ export default {
                         extra.Ids = rowIds;
                         extra.ButtonKeys = uniqueDescriptors.map((descriptor) => descriptor.buttonKey);
                     }
-                    const response = await this.DiyCommon.ApiEngine.Run(apiEngineKey, {
+                    const response = await requestMenuBadge(this.DiyCommon.ApiEngine.Run, apiEngineKey, {
                         ...params,
                         ...this._presentationContext(queryParam, extra)
                     });

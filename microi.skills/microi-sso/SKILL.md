@@ -40,7 +40,7 @@ description: 设计、实现、配置、迁移、发布和验收 Microi 吾码�
 7. 外部角色、邮箱或昵称不能直接获得管理员权限。默认 `BoundOnly`，JIT 必须显式默认角色、唯一性、回收和审计。
 8. HTTP 200、构建成功、商城任务入队或包可下载都不是完整 SSO 验收。
 9. SSO 业务逻辑必须接口引擎优先：连接投影、绑定/JIT、角色与 Claim 映射、审计、登录完成和租户扩展不得重新写进 Controller。只有协议报文、签名验签、Secret/私钥隔离、一次性票据与 DiyToken 等可信原子可以保留 C#。
-10. 客户端调用应用接口使用稳定 `/api/ApiEngine/Run?OsClient=`；应用未安装时必须得到结构化错误，禁止重新依赖可能由网关缺失而 404 的动态 `/apiengine/*` 或已删除的 `/api/Sso/Capabilities` 等定制路由。
+10. 客户端调用固定应用接口必须优先使用 `/apiengine/{ApiEngineKey}?OsClient=`，让系统日志/监控按真实接口引擎归因；新版宿主即使接口尚未安装也会返回结构化缺失错误。`/api/ApiEngine/Run` 只保留给无法预知 Key 的旧版兼容调用，禁止新增固定业务依赖；同样禁止调用已删除的 `/api/Sso/Capabilities` 等定制路由。
 
 ## 标准工作流
 

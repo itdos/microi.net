@@ -355,12 +355,10 @@ if (phase == 'Discover') {
             '在应用商城的来源管理中重新登录该私有来源，然后重新发起全部安装/更新。'
         );
     }
-    // MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1：跨租户商城读取不依赖网关动态
-    // /apiengine/* 路由，统一使用稳定的 ApiEngine 控制器入口。
+    // 固定商城能力走自定义地址，便于按 ApiEngineKey 归因流量与耗时。
     var listResult = V8.Http.Post({
-        Url: sourceApiBase + '/api/ApiEngine/Run?OsClient=' + encodeURIComponent(sourceOsClient),
+        Url: sourceApiBase + '/apiengine/get-microi-store?OsClient=' + encodeURIComponent(sourceOsClient),
         PostParam: {
-            ApiEngineKey: 'get-microi-store',
             _PageIndex: pageIndex,
             _PageSize: pageSize,
             ApplicationType: bulkApplicationType,

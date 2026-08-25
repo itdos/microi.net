@@ -9,7 +9,7 @@ const normalizeMenuId = (payload) => String(payload?.SysMenuId || payload?._SysM
  * contract, while older official engines transparently fall back to the same
  * contract during a rolling platform/application upgrade.
  */
-export function createMenuBadgeRequester(schedule = (callback) => setTimeout(callback, 0)) {
+export function createMenuBadgeRequester(schedule = (callback) => setTimeout(callback, 40)) {
     const groups = new Map();
     let flushScheduled = false;
 

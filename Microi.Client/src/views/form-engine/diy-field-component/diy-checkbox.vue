@@ -453,7 +453,7 @@ export default {
                 apiUrl = self.DiyApi.GetDataSourceEngine;
                 param.DataSourceKey = field.Config.DataSourceId;
             } else if (field.Config.DataSource === "ApiEngine") {
-                apiUrl = self.DiyApi.ApiEngineRun;
+                apiUrl = self.DiyApi.GetApiEngineUrl(field.Config.DataSourceApiEngineKey);
                 param.ApiEngineKey = field.Config.DataSourceApiEngineKey;
             }
             

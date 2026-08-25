@@ -8,8 +8,8 @@
  * - /Users/Work/Microi.net/microi.doc/docs/doc/v8-engine/form-engine.md
  * - /Users/Work/Microi.net/microi.doc/docs/doc/v8-engine/where.md
  *
- * @version 2.2.0
- * @date 2026-08-04
+ * @version 2.3.0
+ * @date 2026-08-24
  */
 
 // V8引擎后端完整API定义
@@ -78,6 +78,50 @@ export const V8ServerApiDefinitions = {
                             '执行接口引擎\n\n参数:\n  - ApiEngineKey: 接口引擎Key\n  - params: 参数对象\n  - V8.DbTrans: 事务对象(可选，传入后由外层事务决定提交/回滚)\n\n事务: 返回带Code对象时仅Code=1提交；无Code对象回滚；字符串/数字/数组/布尔/null且无异常时提交。\n\n示例:\nvar result = V8.ApiEngine.Run("ApiEngineKey", {\n  Param1: "1"\n});\n\n同一事务:\nvar result = V8.ApiEngine.Run("ApiEngineKey", {\n  Param2: "1"\n}, V8.DbTrans);',
                         insertText: "Run",
                         snippet: 'Run("${1:ApiEngineKey}", {\n\t${2:Param1}: ${3:value}\n}${4:, V8.DbTrans})'
+                    }
+                }
+            },
+
+            // ========== 接口引擎流式响应 ==========
+            Stream: {
+                label: "Stream",
+                kind: "Module",
+                documentation: "接口引擎流式响应（仅 ResponseType=Stream 时可用）。宿主负责 SSE/NDJSON 协议、背压、心跳、断连取消和最终 done/error 帧；业务分片在事务提交前均为 provisional，不能当作提交成功凭据。",
+                insertText: "Stream",
+                properties: {
+                    IsAvailable: {
+                        label: "IsAvailable",
+                        kind: "Property",
+                        documentation: "当前 HTTP 调用是否启用了流式响应。",
+                        insertText: "IsAvailable"
+                    },
+                    WrittenBytes: {
+                        label: "WrittenBytes",
+                        kind: "Property",
+                        documentation: "当前请求已经发送的业务分片 UTF-8 字节数。",
+                        insertText: "WrittenBytes"
+                    },
+                    WrittenChunks: {
+                        label: "WrittenChunks",
+                        kind: "Property",
+                        documentation: "当前请求已经发送的业务分片数量。",
+                        insertText: "WrittenChunks"
+                    }
+                },
+                methods: {
+                    Write: {
+                        label: "Write",
+                        kind: "Method",
+                        documentation: "同步写入一个流式业务分片。eventName 默认 chunk；open/done/error/heartbeat 为宿主保留事件。返回 DosResult。",
+                        insertText: "Write",
+                        snippet: 'Write(${1:data}, "${2:chunk}"${3:, "${4:id}"})'
+                    },
+                    WriteAsync: {
+                        label: "WriteAsync",
+                        kind: "Method",
+                        documentation: "异步写入并等待客户端背压释放。推荐在长循环中 await 调用，并在 Code!=1 时停止后续工作。",
+                        insertText: "WriteAsync",
+                        snippet: 'WriteAsync(${1:data}, "${2:chunk}"${3:, "${4:id}"})'
                     }
                 }
             },

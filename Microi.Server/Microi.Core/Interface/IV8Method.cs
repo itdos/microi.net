@@ -37,6 +37,17 @@ namespace Microi.net
         DosResult GetDirectTableGrantPolicies();
 
         /// <summary>
+        /// 使用当前租户和当前接口引擎 Key 派生的服务端密钥加密敏感数据。
+        /// 密钥永不进入 V8；密文只能由同租户、同接口引擎解密。
+        /// </summary>
+        string ProtectApiEngineSecret(string plainText);
+
+        /// <summary>
+        /// 解密由当前租户、当前接口引擎通过 ProtectApiEngineSecret 生成的密文。
+        /// </summary>
+        string UnprotectApiEngineSecret(string cipherText);
+
+        /// <summary>
         /// 解析查询条件
         /// </summary>
         List<DiyWhere> ParseWhere(object whereParam);
@@ -119,9 +130,19 @@ namespace Microi.net
         DosResult GetPrivateFileUrl(dynamic dynamicParam);
 
         /// <summary>
+        /// 读取当前租户公有或私有桶中的受控 UTF-8 文本文件。
+        /// </summary>
+        DosResult GetPrivateFileText(dynamic dynamicParam);
+
+        /// <summary>
         /// 上传文件
         /// </summary>
         DosResult Upload(dynamic dynamicParam);
+
+        /// <summary>
+        /// 将 UTF-8 文本直接上传到当前租户 HDFS，避免 V8 先转换为 Base64。
+        /// </summary>
+        DosResult UploadText(dynamic dynamicParam);
 
         /// <summary>
         /// 创建受限的内存 ZIP，供 V8 脚本安全打包应用资产。
@@ -204,9 +225,49 @@ namespace Microi.net
         DosResult SaveScheduleJob(dynamic dynamicParam);
 
         /// <summary>
+        /// 查询或控制当前租户 Quartz 运行态。接口引擎负责表数据与状态编排；
+        /// 原子能力固定租户并拒绝自定义 DLL/类型加载。
+        /// </summary>
+        DosResult ManageScheduleJob(dynamic dynamicParam);
+
+        /// <summary>
         /// 更新当前后台任务的进度。接口引擎可选调用，不影响普通同步执行。
         /// </summary>
         DosResult UpdateBackgroundTask(dynamic dynamicParam);
+
+        /// <summary>
+        /// 对当前登录用户的持久后台任务执行受限原子操作。动作编排由官方接口引擎完成；
+        /// 该方法只暴露 V8 无法直接访问的任务运行时，并始终从可信上下文解析租户和身份。
+        /// </summary>
+        DosResult ManageBackgroundTask(dynamic dynamicParam);
+
+        /// <summary>
+        /// 当前租户超级管理员执行受限缓存/Redis 管理原子操作；
+        /// 连接密钥、租户身份和任意命令边界不暴露给接口引擎。
+        /// </summary>
+        DosResult ManageCache(dynamic dynamicParam);
+
+        /// <summary>
+        /// 查询当前用户可信终端快照，或由超级管理员踢出指定实时连接。
+        /// SignalR/令牌运行时不直接暴露给接口引擎。
+        /// </summary>
+        DosResult ManageOnlineTerminal(dynamic dynamicParam);
+
+        /// <summary>当前租户超级管理员查询或发布 MQTT；Broker 实例不直接暴露给 V8。</summary>
+        DosResult ManageMq(dynamic dynamicParam);
+        DosResult ManageMqtt(dynamic dynamicParam);
+
+        /// <summary>当前租户超级管理员调用搜索插件的受限索引与查询原子能力。</summary>
+        DosResult ManageSearchEngine(dynamic dynamicParam);
+
+        /// <summary>调用 AI 插件的工作流图谱原子能力；动作编排由官方接口引擎完成。</summary>
+        DosResult ManageAiWorkflow(dynamic dynamicParam);
+
+        /// <summary>
+        /// 使用当前租户后端私有配置生成腾讯 IM UserSig；Secret 不接受前端或 V8 参数。
+        /// </summary>
+        DosResult GenerateTencentImUserSig(dynamic dynamicParam);
+        dynamic ManageSystemDirectory(dynamic dynamicParam);
 
         /// <summary>
         /// 仅供主租户超级管理员重建并复制 microi_empty_temp。

@@ -57,13 +57,31 @@ test('system observability MCP exposes bounded read catalog and confirmed IP gov
       name: 'microi_codex',
       arguments: {
         action: 'microi_query_system_observability',
-        params: { action: 'TrafficHistory', dimensionType: 'Endpoint', hours: 24, pageSize: 15 },
+        params: { action: 'HistoricalDashboard', rangeKey: '30d', top: 15 },
       },
     }) as CallToolResult;
     assert.equal(traffic.isError, undefined);
     assert.deepEqual(queries[1], {
-      Action: 'TrafficHistory', PageSize: 15, _PageSize: 15,
-      DimensionType: 'Endpoint', Hours: 24,
+      Action: 'HistoricalDashboard', RangeKey: '30d', Top: 15,
+    });
+
+    const trafficDetails = await client.callTool({
+      name: 'microi_codex',
+      arguments: {
+        action: 'microi_query_system_observability',
+        params: {
+          action: 'TrafficDetails', rangeKey: '7d', pageIndex: 2, pageSize: 15,
+          transferAction: '上传', ip: '203.0.113.20', userId: 'user-1',
+          endpoint: '/apiengine/upload-file', keyword: '.zip',
+        },
+      },
+    }) as CallToolResult;
+    assert.equal(trafficDetails.isError, undefined);
+    assert.deepEqual(queries[2], {
+      Action: 'TrafficDetails', Keyword: '.zip', _Keyword: '.zip',
+      PageIndex: 2, _PageIndex: 2, PageSize: 15, _PageSize: 15,
+      RangeKey: '7d', TransferAction: '上传', Ip: '203.0.113.20',
+      UserId: 'user-1', Endpoint: '/apiengine/upload-file',
     });
 
     const missingTrace = await client.callTool({
@@ -71,7 +89,7 @@ test('system observability MCP exposes bounded read catalog and confirmed IP gov
       arguments: { action: 'microi_query_system_observability', params: { action: 'Trace' } },
     }) as CallToolResult;
     assert.equal(missingTrace.isError, true);
-    assert.equal(queries.length, 2);
+    assert.equal(queries.length, 3);
 
     const dryRun = await client.callTool({
       name: 'microi_codex',

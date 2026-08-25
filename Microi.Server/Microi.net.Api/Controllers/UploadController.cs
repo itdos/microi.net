@@ -39,6 +39,14 @@ namespace Microi.net.Api
                 if (file != null)
                     param.Files.Add(file.FileName, file.OpenReadStream());
             }
+            var uploadFiles = HttpContext.Request.Form.Files.Where(file => file != null).ToList();
+            NetworkTrafficObservabilityService.AnnotateTransfer(
+                HttpContext,
+                "Upload",
+                uploadFiles.Count,
+                uploadFiles.Sum(file => Math.Max(0L, file.Length)),
+                uploadFiles.Select(file => file.FileName),
+                uploadFiles.Select(file => System.IO.Path.GetExtension(file.FileName)));
             #endregion
 
             //HttpContext为可选参数，在Controller层调用DiyCommon.Upload可以不用传入HttpContext，内部可以自动获取，也可以直接传入文件流。

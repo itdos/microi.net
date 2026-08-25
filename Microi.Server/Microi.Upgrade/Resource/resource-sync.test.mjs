@@ -63,6 +63,12 @@ const defaultAssetPreparer = engineSource(
   'return { Code: 1 };',
 );
 
+const defaultAppCreate = engineSource(
+  'ai_app_create',
+  'v1.2.0',
+  'return { Code: 1 };',
+);
+
 const defaultStoreList = engineSource(
   'get-microi-store',
   'v1.4.0',
@@ -86,6 +92,7 @@ function applicationStorePackage({
   publisher,
   builder,
   bulk = defaultBulkImporter,
+  appCreate = defaultAppCreate,
   preparer = defaultAssetPreparer,
   storeList = defaultStoreList,
   storeModel = defaultStoreModel,
@@ -107,6 +114,13 @@ function applicationStorePackage({
         ApiEngineKey: 'ai_app_publish_store',
         Version: engineVersion(publisher),
         ApiV8Code: publisher,
+        StopHttp: 0,
+      },
+      {
+        Id: 'engine-app-create',
+        ApiEngineKey: 'ai_app_create',
+        Version: engineVersion(appCreate),
+        ApiV8Code: appCreate,
         StopHttp: 0,
       },
       {
@@ -160,6 +174,7 @@ function replicaMaps({
   publisher,
   builder,
   bulk = defaultBulkImporter,
+  appCreate = defaultAppCreate,
   preparer = defaultAssetPreparer,
   storeList = defaultStoreList,
   storeModel = defaultStoreModel,
@@ -172,6 +187,7 @@ function replicaMaps({
     ['get-microi-store-model.js', storeModel],
     ['get-microi-store-versions.js', storeVersions],
     ['ai-app-publish-store.js', publisher],
+    ['ai-app-create.js', appCreate],
     ['ai-app-prepare-store-assets.js', preparer],
     ['ai-app-build.js', builder],
   ]);

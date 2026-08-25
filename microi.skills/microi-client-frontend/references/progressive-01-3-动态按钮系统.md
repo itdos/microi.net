@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-client-frontend-005 sha256=c4aeb714b7eaa724eb7ac8667d474e0707e76c79dcf02c106e8c5b25a1e0ef17 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-005 sha256=0ffafbd99fc0ee478db91200bfc3645c288f20d45120cd7413fb00ac3fbd8952 -->
 ## 3. 动态按钮系统
 
 按钮配置来自 `sys_menu`：

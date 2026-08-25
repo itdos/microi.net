@@ -76,7 +76,7 @@ V8.ConfirmTips('确认领取该任务？', function () {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-003 sha256=ae7e519897a8c331be2f657549997a91cd24a053fe00558e2b51d5c2477fc290 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-003 sha256=d04e7a71ffe8baa47c2430077d0fd0bb44dffc62c7e7ce2bca9d02b220ae24f5 -->
 ## 4.1 模式 B2：在线微服务定制页（OpenAppDialog）
 
 当弹窗包含复杂布局、多步骤交互、实时校验或后续需要 AI 在线维护时，优先把页面实现为在线微服务，按钮 V8 代码只负责打开页面、传入上下文和接收结果。不要把长篇 HTML/CSS 写进 `V8Code`。
