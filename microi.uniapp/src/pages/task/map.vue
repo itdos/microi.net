@@ -22,6 +22,7 @@
             <text>{{ item.TaskDeviceStatus || '未完成' }}</text>
           </view>
         </scroll-view>
+        <view class="entity-sheet__row"><text>客户名称</text><text>{{ selected.KehuMC || '-' }}</text></view>
         <view class="entity-sheet__row"><text>安装位置</text><text>{{ selected.AnzhuangWZ || '-' }}</text></view>
         <view v-if="taskId" class="entity-sheet__row"><text>任务状态</text><text :class="selectedTaskComplete ? 'status-complete' : 'status-unfinished'">{{ selected.TaskDeviceStatus || '未完成' }}</text></view>
         <view class="entity-sheet__row"><text>设备状态</text><text>{{ selected.ShebeiZT || '-' }}</text></view>
