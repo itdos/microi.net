@@ -89,7 +89,7 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(engine.ApiV8Code, /MaxItemsPerChunk|batchSize = 20/);
   assert.match(engine.ApiV8Code, /queueFailureDetail/);
   assert.match(engine.ApiV8Code, /item\.Name \|\| item\.OsClient/);
-  assert.equal(engine.Version, "v1.2.7");
+  assert.equal(engine.Version, "v1.2.8");
   assert.match(engine.ApiV8Code, /CHILD_STARTUP_DEPENDENCY_INCIDENT_SCOPE_V1/);
   assert.match(engine.ApiV8Code, /CHILD_STARTUP_SCOPE_CHILD_PARAM_PATCH_V1/);
   assert.match(engine.ApiV8Code, /enforceStartupDependencyScope/);
@@ -100,6 +100,9 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(engine.ApiV8Code, /startup-api-live-worker-v6-no-requeue/);
   assert.match(engine.ApiV8Code, /phase == 'RefreshBootstrap'/);
   assert.match(engine.ApiV8Code, /checkpoint\.BootstrapRevision = startupBootstrapRevision/);
+  assert.match(engine.ApiV8Code, /CHILD_STARTUP_TARGET_FILTER_V1/);
+  assert.match(engine.ApiV8Code, /TargetOsClients 仅允许用于 StartupDependencies/);
+  assert.match(engine.ApiV8Code, /missingRequestedTargets/);
   assert.doesNotMatch(engine.ApiV8Code, /CHILD_STARTUP_BOOTSTRAP_TASK_READBACK_V1/);
   assert.doesNotMatch(engine.ApiV8Code, /verifyRefreshedChildTask/);
   const legacyMigrationStart = engine.ApiV8Code.indexOf("CHILD_STARTUP_NO_REQUEUE_REFRESH_V1");
@@ -118,6 +121,11 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.ok(
     saasPackage.PackageInfo.RequiredPlatformCapabilities.includes(
       "BackgroundTask:StartupNoRequeueRefresh",
+    ),
+  );
+  assert.ok(
+    saasPackage.PackageInfo.RequiredPlatformCapabilities.includes(
+      "BackgroundTask:StartupTargetFilter",
     ),
   );
   for (const removedCapability of [
@@ -221,6 +229,49 @@ test("legacy startup refresh checkpoint resumes monitor without requeueing child
   assert.equal(result.Data.BackgroundTask.Checkpoint.Phase, "Monitor");
   assert.deepEqual(result.Data.BackgroundTask.Checkpoint.BootstrapRefreshFailures, []);
   assert.equal(queueCalls, 0);
+});
+
+test("startup dependency target filter queues only the authoritative requested tenant", () => {
+  const engine = saasPackage.SysApiEngines.find(
+    item => item.ApiEngineKey === "bulk-update-child-tenant-platform-apps",
+  );
+  const queued = [];
+  const taskId = "targeted-parent";
+  const V8 = {
+    CurrentUser: { Id: "admin", Level: 9999 },
+    Param: {
+      _BackgroundTaskId: taskId,
+      _BackgroundTask: { Id: taskId },
+      _BackgroundTaskFencingToken: 7,
+      _TrustedServerInvocation: true,
+      MaintenanceScope: "StartupDependencies",
+      TargetOsClients: ["lxl"],
+    },
+    Method: {
+      UpdateBackgroundTask() {},
+      GetChildTenantPlatformAppMaintenanceTargets() {
+        return {
+          Code: 1,
+          Data: {
+            Targets: [
+              { OsClient: "Jhyxdkj", Name: "test" },
+              { OsClient: "lxl", Name: "来贤聊" },
+            ],
+          },
+        };
+      },
+      QueueChildTenantPlatformAppMaintenance(param) {
+        queued.push(param.TargetOsClient);
+        return { Code: 0, Msg: "targeted bootstrap probe" };
+      },
+    },
+  };
+
+  const result = new Function("V8", engine.ApiV8Code)(V8);
+  assert.equal(result.Code, 0);
+  assert.deepEqual(queued, ["lxl"]);
+  assert.equal(result.Data.TargetCount, 1);
+  assert.equal(result.Data.FailedCount, 1);
 });
 
 test("target tenant marker is stripped from public submissions and restored after continuations", () => {
