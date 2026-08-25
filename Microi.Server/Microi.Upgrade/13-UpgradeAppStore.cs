@@ -58,8 +58,8 @@ namespace Microi.net
         private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 4, 9);
         private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 3, 7);
         private static readonly System.Version MinimumPlatformBackgroundTaskVersion = new System.Version(1, 1, 0);
-        private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 0);
-        private static readonly System.Version MinimumPlatformRuntimePackageVersion = new System.Version(7, 6, 20);
+        private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 1);
+        private static readonly System.Version MinimumPlatformRuntimePackageVersion = new System.Version(7, 6, 21);
         private static readonly System.Version MinimumPlatformRuntimeEngineVersion = new System.Version(1, 0, 0);
         private static readonly System.Version MinimumPlatformServiceHealthEngineVersion = new System.Version(1, 0, 1);
         private static readonly System.Version MinimumPlatformLoginWallpapersEngineVersion = new System.Version(1, 1, 0);
@@ -206,6 +206,7 @@ namespace Microi.net
                 && code.Contains("V8.Method.ManageSystemDirectory")
                 && code.Contains("Domain: 'SysMenu'")
                 && code.Contains("GetSysMenuStep")
+                && code.Contains("platform-marketplace-source-hook")
                 && !code.Contains("V8.Db.FromSql");
         }
 
@@ -445,10 +446,10 @@ namespace Microi.net
             {
                 { SysUserPackageResourceName, new System.Version(6, 3, 2) },
                 { SysConfigPackageResourceName, new System.Version(6, 3, 8) },
-                { MessageNotificationPackageResourceName, new System.Version(1, 0, 10) },
+                { MessageNotificationPackageResourceName, new System.Version(1, 0, 11) },
                 { AiEnginePackageResourceName, new System.Version(6, 3, 6) },
-                { SaaSEnginePackageResourceName, new System.Version(7, 6, 20) },
-                { AppStorePackageResourceName, new System.Version(7, 6, 15) }
+                { SaaSEnginePackageResourceName, new System.Version(7, 6, 21) },
+                { AppStorePackageResourceName, new System.Version(7, 6, 16) }
             };
 
         private static readonly Dictionary<string, string[]> V8FirstPackageExactEngineKeys =
@@ -483,7 +484,8 @@ namespace Microi.net
                         "msg_internal_mark_read",
                         "platform-chat-system-message",
                         "platform-chat-runtime",
-                        "platform-message-notification-custom-hook"
+                        "platform-message-notification-custom-hook",
+                        "wechat_send_tpl_msg"
                     }
                 },
                 {
@@ -764,6 +766,7 @@ namespace Microi.net
             {
                 var systemCode = byKey["platform-chat-system-message"].Value<string>("ApiV8Code") ?? string.Empty;
                 var runtimeCode = byKey["platform-chat-runtime"].Value<string>("ApiV8Code") ?? string.Empty;
+                var wechatCode = byKey["wechat_send_tpl_msg"].Value<string>("ApiV8Code") ?? string.Empty;
                 var runtimeVersionText = (byKey["platform-chat-runtime"].Value<string>("Version") ?? string.Empty)
                     .TrimStart('v', 'V');
                 var capabilities = package["PackageInfo"]?["RequiredPlatformCapabilities"] as JArray
@@ -783,7 +786,17 @@ namespace Microi.net
                     && runtimeCode.Contains("RequireManagedProtocolContext")
                     && runtimeCode.Contains("platform-message-notification-custom-hook")
                     && runtimeCode.Contains("V8.MongoDb.UptFormDataByWhere")
-                    && runtimeCode.Contains("V8.MongoDb.DelFormDataByWhere");
+                    && runtimeCode.Contains("V8.MongoDb.DelFormDataByWhere")
+                    && wechatCode.Contains("platform-message-notification-custom-hook")
+                    && wechatCode.Contains("V8.Method.SendWeChatTemplateMessage")
+                    && capabilities.Any(item => string.Equals(
+                        item?.ToString(),
+                        "ApiEngine:wechat_send_tpl_msg@v1.0.0",
+                        StringComparison.Ordinal))
+                    && capabilities.Any(item => string.Equals(
+                        item?.ToString(),
+                        "V8.Method.SendWeChatTemplateMessage",
+                        StringComparison.Ordinal));
             }
             if (string.Equals(resourceName, AiEnginePackageResourceName, StringComparison.Ordinal))
             {
@@ -1445,6 +1458,7 @@ WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR Is
             "platform-tenant-system-settings",
             "platform-chat-system-message",
             "platform-chat-runtime",
+            "wechat_send_tpl_msg",
             "platform-marketplace-source",
             "mci_ai_data_assistant",
             "platform-ai-account",
@@ -1458,6 +1472,7 @@ WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR Is
                 "platform-wechat-user-binding",
                 "platform-chat-system-message",
                 "platform-chat-runtime",
+                "wechat_send_tpl_msg",
                 "platform-marketplace-source"
             };
 
@@ -1496,6 +1511,10 @@ WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR Is
                 return "platform-system-settings-custom-hook";
             }
             if (string.Equals(key, "platform-chat-runtime", StringComparison.Ordinal))
+            {
+                return "platform-message-notification-custom-hook";
+            }
+            if (string.Equals(key, "wechat_send_tpl_msg", StringComparison.Ordinal))
             {
                 return "platform-message-notification-custom-hook";
             }
@@ -2491,7 +2510,7 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 if (!HasPackagedPlatformRuntime(package))
                 {
                     throw new InvalidOperationException(
-                        $"升级资源[{resourceName}]缺少 v7.6.20 平台运行时 Managed 基线、完整声明闭包、CreateIfMissing Hook、安全 microi-init、登录壁纸可信原子契约或完整资源策略。"
+                        $"升级资源[{resourceName}]缺少 v7.6.21 平台运行时 Managed 基线、完整声明闭包、CreateIfMissing Hook、安全 microi-init、登录壁纸可信原子契约或完整资源策略。"
                     );
                 }
 
@@ -2607,7 +2626,7 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                         StringComparison.Ordinal)) != true ||
                     requiredCapabilities?.Any(item => string.Equals(
                         item?.ToString(),
-                        "ApiEngine:platform-sys-menu@v1.0.0",
+                        "ApiEngine:platform-sys-menu@v1.0.1",
                         StringComparison.Ordinal)) != true ||
                     !System.Version.TryParse(officialResourceEngineVersionText, out var embeddedOfficialResourceVersion) ||
                     embeddedOfficialResourceVersion < new System.Version(1, 2, 8) ||
