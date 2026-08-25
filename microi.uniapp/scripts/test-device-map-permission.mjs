@@ -26,6 +26,8 @@ assert.match(mapSource, /canOpenBusinessEntry\('deviceMap'\)/,
   '直达设备地图页面必须校验地图入口权限')
 assert.match(mapSource, /DeviceAccessScope !== 'staff'/,
   '客户地图定位摘要不得跳转到通用设备表单详情')
+assert.match(mapSource, /<template v-if="mode === 'device'">[\s\S]*?<view class="entity-sheet__row"><text>客户名称<\/text><text>\{\{ selected\.KehuMC \|\| '-' \}\}<\/text><\/view>\s*<view class="entity-sheet__row"><text>安装位置<\/text>/,
+  '设备地图坐标信息必须在安装位置上方展示客户名称')
 
 assert.match(businessSource, /deviceMap:\s*\{[\s\S]*?menuPermission:\s*\{\s*table:\s*'Diy_KehuSB'/,
   '设备地图必须绑定设备菜单权限')
