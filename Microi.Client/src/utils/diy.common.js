@@ -3811,7 +3811,7 @@ var DiyCommon = {
                     } else if (field.Config.DataSource == "DataSource") {
                         apiGetDiyFieldSqlData = DiyApi.GetDataSourceEngine;
                     } else if (field.Config.DataSource == "ApiEngine") {
-                        apiGetDiyFieldSqlData = DiyApi.ApiEngineRun;
+                        apiGetDiyFieldSqlData = DiyApi.GetApiEngineUrl(field.Config.DataSourceApiEngineKey);
                     }
                     // 查询数据库
                     DiyCommon.Post(apiGetDiyFieldSqlData, param, function (result) {
@@ -4136,7 +4136,7 @@ var DiyCommon = {
                             apiGetFieldsData = DiyApi.GetDataSourceEngine;
                             param.DataSourceKey = field.Config.DataSourceId;
                         } else if (field.Config.DataSource == "ApiEngine") {
-                            apiGetFieldsData = DiyApi.ApiEngineRun;
+                            apiGetFieldsData = DiyApi.GetApiEngineUrl(field.Config.DataSourceApiEngineKey);
                             param.ApiEngineKey = field.Config.DataSourceApiEngineKey;
                         }
                         // 查询数据库
@@ -4940,27 +4940,38 @@ var DiyCommon = {
                 for (let key in param2) {
                     param[key] = param2[key];
                 }
-                var result = await DiyCommon.PostAsync("/api/ApiEngine/Run", param, null, null, "json");
+                var result = await DiyCommon.PostAsync(DiyApi.GetApiEngineUrl(apiKey), param, null, null, "json");
                 if (param3) {
                     param3(result);
                 }
                 return result;
             } else {
                 //如果是这种模式：.Run({}, function(){})
-                var result = await DiyCommon.PostAsync("/api/ApiEngine/Run", param, null, null, "json");
+                var apiKey = param && param.ApiEngineKey;
+                if (DiyCommon.IsNull(apiKey)) {
+                    return { Code: 0, Msg: "ApiEngineKey不能为空。" };
+                }
+                var result = await DiyCommon.PostAsync(DiyApi.GetApiEngineUrl(apiKey), param, null, null, "json");
                 if (param2) {
                     param2(result);
                 }
                 return result;
             }
         },
+        async RunLegacy(apiEngineKey, param, callback) {
+            var request = { ApiEngineKey: apiEngineKey, ...(param || {}) };
+            var result = await DiyCommon.PostAsync("/api/ApiEngine/Run", request, null, null, "json");
+            if (callback) callback(result);
+            return result;
+        },
         async RunBackground(apiEngineKey, param, title, options, callback) {
             if (typeof options === "function") {
                 callback = options;
                 options = {};
             }
-            var result = await DiyCommon.PostAsync("/api/BackgroundTask/RunApiEngine", {
-                ApiEngineKey: apiEngineKey,
+            var result = await DiyCommon.PostAsync("/apiengine/platform-background-task", {
+                Action: "RunApiEngine",
+                TargetApiEngineKey: apiEngineKey,
                 Param: param || {},
                 Title: title || apiEngineKey,
                 Options: options || {}
@@ -5697,7 +5708,7 @@ var DiyCommon = {
         });
     },
     AddSysLog(param, callback) {
-        DiyCommon.Post("/api/SysLog/AddSysLog", param, function (result) {
+        DiyCommon.Post("/apiengine/platform-client-log", param, function (result) {
             // if (DiyCommon.Result(result)) {
             if (result.Code == 1) {
                 if (callback) {

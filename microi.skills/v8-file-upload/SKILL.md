@@ -63,7 +63,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 可信后端 V8 可用 `V8.Http.GetResponse({ Url: url }).RawBytes` 下载，再用 `System.Convert.ToBase64String` 和 `V8.Method.Upload` 上传。该路径同样必须校验域名、大小、Content-Type、后缀和最终重定向目标。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=01111b2fe994a2a5e424f45d405821f0b4f5c29235bc93757352d4c7e10d8d84 -->
+<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=dc69d3bcadb1b40d98e1346a8d9d0a3599cae7f7dd6b850dd95ad054c747b2dd -->
 ## 接收前端上传的文件
 
 前端发起文件上传时，平台自动把文件以 base64 形式注入到 `V8.FilesByteBase64`：
@@ -165,7 +165,7 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 生产 H5 不能只依赖 `uni.uploadFile`。页面从 `uni.chooseImage` 得到的 `tempFiles[0].file`、`tempFiles[0]`、`blob:` / `data:` 临时路径都要传给 `V8.uploadFile`，并设置 `preferFetch:true`；SDK 必须能用 `fetch + FormData` 兜底，否则线上可能报 `未找到 MicroiV8 上传适配器。`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=5765949bee76ce3ccd05503174ff7601135f1d330f8c11a2bf5f268cdeb74133 -->
+<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=a31f0170454bb9e44007e24ed280873e99ae4ca4f4ecc7307ecc3e738eb51df9 -->
 ## 跨平台文件同步登录会话
 
 文件柜、文件同步等需要连接另一套 Microi API 的工具，必须把远程平台视为独立登录会话：
@@ -173,7 +173,7 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 用户必须先完成远程登录，登录成功后显示远程用户名称、帐号、ApiBase、OsClient 和登录状态，并提供明确的退出登录操作。
 - 历史远程连接通过 `mci_` 前缀表保存，并按 `V8.CurrentUser.Id` 做行级隔离；不得把帐号、密码或 Token 放入 `localStorage`。
 - 密码和 Token 只能由受保护的接口引擎写入、读取和清理。数据库必须保存可校验的加密密文，普通 FormEngine 列表不得返回密文字段。
-- 加密密钥优先使用租户专用 `FileCabinetSecret`，可使用仅后端可见的持久化租户密钥兜底；禁止使用进程级临时密钥，否则服务重启后无法解密历史连接。
+- 密码和 Token 使用 `V8.Method.ProtectApiEngineSecret/UnprotectApiEngineSecret`，由宿主把密文绑定当前 `OsClient + ApiEngineKey`；不得从已脱敏的 `V8.OsClientModel` 读取 `AuthSecret/DbConn`，也不得使用进程级临时密钥。接口引擎 Key 必须稳定，确保服务重启和应用升级后仍能解密历史连接。
 - 历史连接列表只返回脱敏元数据；一键重连时再按记录 Id 和当前用户读取凭据。删除连接必须同时清除保存的密码和 Token。
 - 远程目标登录后必须调用文件柜能力探针（如 `mci_file_sync_capability`）检查同步协议版本。接口不存在、返回 404/非标准结果或协议版本过低时，提示目标平台更新【文件柜】应用，不得继续同步。
 - 验收至少覆盖：登录成功显示身份、退出后 Token 清空、历史连接一键重连、删除连接、密文落库、服务重启后仍可解密、目标平台缺少能力接口时的升级提示。

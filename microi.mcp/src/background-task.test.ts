@@ -121,10 +121,11 @@ test('queues a durable API-engine task with explicit idempotency and retry optio
   const originalFetch = globalThis.fetch;
   try {
     globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
-      assert.equal(String(input), 'https://microi.test/api/BackgroundTask/RunApiEngine');
+      assert.equal(String(input), 'https://microi.test/apiengine/platform-background-task');
       const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
       assert.equal(body.OsClient, 'iTdos');
-      assert.equal(body.ApiEngineKey, 'bulk-import-microi-store-packages');
+      assert.equal(body.Action, 'RunApiEngine');
+      assert.equal(body.TargetApiEngineKey, 'bulk-import-microi-store-packages');
       assert.equal(body.Title, '安装/更新全部平台应用');
       assert.deepEqual(body.Param, { ResumeInstall: true });
       assert.deepEqual(body.Options, {
@@ -159,9 +160,10 @@ test('reads the authenticated users notification-center background tasks', async
   const originalFetch = globalThis.fetch;
   try {
     globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
-      assert.equal(String(input), 'https://microi.test/api/BackgroundTask/List');
+      assert.equal(String(input), 'https://microi.test/apiengine/platform-background-task');
       const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
       assert.equal(body.OsClient, 'iTdos');
+      assert.equal(body.Action, 'List');
       return new Response(JSON.stringify({ Code: 1, Data: [{ Id: 'task-1', Status: 'Succeeded' }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -179,9 +181,10 @@ test('requests authenticated cooperative cancellation for an exact background ta
   const originalFetch = globalThis.fetch;
   try {
     globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
-      assert.equal(String(input), 'https://microi.test/api/BackgroundTask/Cancel');
+      assert.equal(String(input), 'https://microi.test/apiengine/platform-background-task');
       const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
       assert.equal(body.OsClient, 'iTdos');
+      assert.equal(body.Action, 'Cancel');
       assert.equal(body.Id, 'task-old-1');
       return new Response(JSON.stringify({ Code: 1, Msg: '已请求停止后台任务' }), {
         status: 200,

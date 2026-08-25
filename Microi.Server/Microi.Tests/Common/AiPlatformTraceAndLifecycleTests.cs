@@ -97,7 +97,7 @@ public sealed class AiPlatformTraceAndLifecycleTests
     public void LifecycleSource_ArchivesVerifiesReceiptsThenConditionallyDeletes()
     {
         var serverRoot = FindServerRoot();
-        var methodSource = File.ReadAllText(Path.Combine(serverRoot, "Microi.net", "V8Engine", "V8Method.cs"));
+        var methodSource = File.ReadAllText(Path.Combine(serverRoot, "Microi.Core", "V8Engine", "Runtime", "V8Method.cs"));
         var mongoSource = File.ReadAllText(Path.Combine(serverRoot, "Microi.MongoDB", "V8MongoDB.cs"));
 
         Assert.True(methodSource.IndexOf("PutObject", StringComparison.Ordinal)
@@ -133,7 +133,7 @@ public sealed class AiPlatformTraceAndLifecycleTests
     public void LogSignalSource_IsTenantBoundBoundedEscapedAndReturnsSanitizedSamples()
     {
         var serverRoot = FindServerRoot();
-        var host = File.ReadAllText(Path.Combine(serverRoot, "Microi.net", "V8Engine", "V8Method.LogSignal.cs"));
+        var host = File.ReadAllText(Path.Combine(serverRoot, "Microi.Core", "V8Engine", "Runtime", "V8Method.LogSignal.cs"));
         var mongo = File.ReadAllText(Path.Combine(serverRoot, "Microi.MongoDB", "V8MongoDB.cs"));
         var start = mongo.IndexOf("QuerySystemLogSignal", StringComparison.Ordinal);
         var end = mongo.IndexOf("PlanSystemLogLifecycle", start, StringComparison.Ordinal);
@@ -160,8 +160,10 @@ public sealed class AiPlatformTraceAndLifecycleTests
         var serverRoot = FindServerRoot();
         var scheduler = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.Job", "MicroiQuartzScheduledTask.cs"));
-        var controller = File.ReadAllText(Path.Combine(
-            serverRoot, "Microi.net.Api", "Controllers", "JobController.cs"));
+        var atom = File.ReadAllText(Path.Combine(
+            serverRoot, "Microi.Core", "V8Engine", "Runtime", "V8Method.ScheduleJob.cs"));
+        var engine = File.ReadAllText(Path.Combine(
+            serverRoot, "Microi.Upgrade", "Resource", "platform-schedule-job.js"));
 
         Assert.Contains("GetTenantGroup", scheduler);
         Assert.Contains("JobBelongsToTenant", scheduler);
@@ -170,7 +172,10 @@ public sealed class AiPlatformTraceAndLifecycleTests
         Assert.DoesNotContain("await _scheduler.AddJob(job, true);\n\n                #endregion 新增job", scheduler);
         Assert.Contains("if (existingTrigger == null)", scheduler);
         Assert.Contains("await _scheduler.ScheduleJob(trigger)", scheduler);
-        Assert.Contains("GetJobByName(jobNameList, osClient)", controller);
+        Assert.Contains("GetJobByName(names, osClient)", atom);
+        Assert.Contains("V8.Method.ManageScheduleJob", engine);
+        Assert.False(File.Exists(Path.Combine(
+            serverRoot, "Microi.net.Api", "Controllers", "JobController.cs")));
     }
 
     [Fact]
@@ -178,7 +183,7 @@ public sealed class AiPlatformTraceAndLifecycleTests
     {
         var serverRoot = FindServerRoot();
         var host = File.ReadAllText(Path.Combine(
-            serverRoot, "Microi.net", "V8Engine", "V8Method.ScheduleJob.cs"));
+            serverRoot, "Microi.Core", "V8Engine", "Runtime", "V8Method.ScheduleJob.cs"));
         var mcp = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.Core", "V8Engine", "V8McpLogic.cs"));
         var publisher = File.ReadAllText(Path.Combine(
@@ -188,7 +193,7 @@ public sealed class AiPlatformTraceAndLifecycleTests
 
         Assert.Contains("RequireCurrentTenantSuperAdmin", host);
         Assert.Contains("UserAccessKeySecurity.IsSession", File.ReadAllText(Path.Combine(
-            serverRoot, "Microi.net", "V8Engine", "V8Method.cs")));
+            serverRoot, "Microi.Core", "V8Engine", "Runtime", "V8Method.cs")));
         Assert.Contains("request[\"OsClient\"] = osClient", host);
         Assert.Contains("request[\"JobType\"] = \"1\"", host);
         Assert.Contains("request.Remove(\"DllName\")", host);

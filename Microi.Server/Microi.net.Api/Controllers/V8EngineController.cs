@@ -171,6 +171,7 @@ namespace Microi.net.Api
                 param.Value<string>("Version"),
                 param.Value<string>("ChangeSummary") ?? param.Value<string>("ChangeHistory"),
                 ResolveRequestedV8Limit(param),
+                param["ResponseType"] == null ? null : param.Value<string>("ResponseType"),
                 hasCodePayload);
             return Ok(result);
         }
@@ -205,7 +206,8 @@ namespace Microi.net.Api
                 param["IsEnable"]?.Val<int>() ?? 1, param["Category"].Val<string>(), code,
                 param.Value<string>("Version"),
                 param.Value<string>("ChangeSummary") ?? param.Value<string>("ChangeHistory"),
-                ResolveRequestedV8Limit(param));
+                ResolveRequestedV8Limit(param),
+                param["ResponseType"] == null ? null : param.Value<string>("ResponseType"));
             return Ok(result);
         }
 

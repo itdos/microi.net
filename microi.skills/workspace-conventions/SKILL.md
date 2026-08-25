@@ -104,7 +104,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 **2026-06 强制补充**：AI 不得在任何子项目目录下放置一次性日志、自动化截图、接口回收文件或调试脚本。像 `Microi.Server/Microi.net.Api/.tmp-*.log`、`Microi.Client/*.png` 这类文件一律视为规范失败，必须移到 `<workspace-root>/.tmp/` 或 `<workspace-root>/.tmp/screenshots/`。正式 Playwright 工程由 Microi.VSCode 插件生成时可以继续使用 `.microi-e2e/`，但 AI 为某个任务手写的一次性 Playwright 脚本、报告和截图仍然必须放在 `.tmp/`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=fff5f355bea04077c15039b668f0a02b1ed018f5e76aaee47113b6be777fef4a -->
+<!-- microi-progressive:chunk id=workspace-conventions-005 sha256=52273704562fac1245fa364ca811949ccb2685dce8375f99bdc4029a314dd758 -->
 ## Microi 源码路径速查（工作区根相对路径）
 
 当用户提到“吾码后端源码”“吾码前端源码”“表单引擎源码”“官网源码”等简称时，默认按下列路径定位；如果当前工作区缺少对应目录，再用 `rg --files` 或目录搜索确认实际位置。

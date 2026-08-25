@@ -366,6 +366,7 @@ test('MCP escalates to VS Code recovery when a refresh-issued token is immediate
 test('saveEngineCode confirms an uncertain write by readback', async () => {
   const originalFetch = globalThis.fetch;
   let storedCode = '';
+  let storedResponseType = 'JSON';
   let updatePayload: Record<string, unknown> | undefined;
   try {
     globalThis.fetch = async (input, init) => {
@@ -377,6 +378,7 @@ test('saveEngineCode confirms an uncertain write by readback', async () => {
             ApiEngineKey: 'transport-probe',
             ApiV8Code: storedCode || 'return { Code: 1 };',
             Version: 'v1.0.0',
+            ResponseType: storedResponseType,
           },
           Msg: '',
         });
@@ -385,6 +387,7 @@ test('saveEngineCode confirms an uncertain write by readback', async () => {
         const payload = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
         updatePayload = payload;
         storedCode = Buffer.from(String(payload.ApiV8CodeBase64 || ''), 'base64').toString('utf8');
+        storedResponseType = String(payload.ResponseType || storedResponseType);
         throw new TypeError('socket closed after request body was sent');
       }
       throw new Error(`Unexpected URL: ${url}`);
@@ -393,13 +396,15 @@ test('saveEngineCode confirms an uncertain write by readback', async () => {
     const result = await createClient().saveEngineCode(
       'transport-probe',
       'return { Code: 1, Data: "ok" };',
-      { functionDescription: '传输恢复测试' },
+      { functionDescription: '传输恢复测试', responseType: 'Stream' },
     );
 
     assert.equal(result.Code, 1);
     assert.equal((result.Data as Record<string, unknown>).RecoveredAfterTransportError, true);
     assert.match(storedCode, /return \{ Code: 1, Data: "ok" \};/);
     assert.match(String(updatePayload?.ChangeSummary || ''), /^v\d+\.\d+\.\d+ /);
+    assert.equal(updatePayload?.ResponseType, 'Stream');
+    assert.equal(storedResponseType, 'Stream');
     assert.equal(updatePayload?.ChangeHistory, undefined);
   } finally {
     globalThis.fetch = originalFetch;
@@ -503,6 +508,7 @@ test('createEngine confirms an uncertain write by readback', async () => {
           ApiName: payload.ApiName,
           ApiAddress: payload.ApiAddress,
           V8Limit: payload.V8Limit,
+          ResponseType: payload.ResponseType,
           ApiV8Code: Buffer.from(String(payload.ApiV8CodeBase64 || ''), 'base64').toString('utf8'),
           Version: payload.Version,
         };
@@ -521,6 +527,7 @@ test('createEngine confirms an uncertain write by readback', async () => {
       ApiName: 'Create transport probe',
       Code: 'return { Code: 1, Data: "ok" };',
       V8Limit: 0,
+      ResponseType: 'Stream',
       functionDescription: '创建接口引擎传输恢复测试',
     });
 
@@ -528,6 +535,7 @@ test('createEngine confirms an uncertain write by readback', async () => {
     assert.equal((result.Data as Record<string, unknown>).RecoveredAfterTransportError, true);
     assert.equal((result.Data as Record<string, unknown>).Verified, true);
     assert.equal(storedEngine?.V8Limit, 0);
+    assert.equal(storedEngine?.ResponseType, 'Stream');
     assert.match(String(storedEngine?.ApiV8Code || ''), /return \{ Code: 1, Data: "ok" \};/);
     assert.match(String(createPayload?.ChangeSummary || ''), /^v\d+\.\d+\.\d+ /);
     assert.equal(createPayload?.ChangeHistory, undefined);

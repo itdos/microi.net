@@ -485,8 +485,7 @@ namespace Microi.net
                 {
                     return new DosResult<dynamic>(0, null, updateResult.Msg);
                 }
-                await MicroiEngine.CacheTenant.Cache(param.OsClient)
-                    .RemoveAsync($"Microi:{param.OsClient}:WorkflowStats:{userId}");
+                await WorkflowStatsCache.InvalidateTenantAsync(param.OsClient);
             }
 
             return new DosResult<dynamic>(1, new { IsRead = true, Changed = changed });
@@ -506,6 +505,10 @@ namespace Microi.net
                     {
                         new DiyWhere { Name = "CopyUsers", Value = userId, Type = "Like" }
                     },
+                    // The unread-copy calculation only parses these two columns.
+                    // Avoid materializing the complete WF_Flow payload for every
+                    // candidate row on the home-page badge hot path.
+                    _SelectFields = new[] { "Id", "CopyUsers" },
                     _PageIndex = pageIndex,
                     _PageSize = pageSize,
                     IsDeleted = 0,

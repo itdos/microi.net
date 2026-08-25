@@ -117,7 +117,7 @@
                 <el-tab-pane name="tasks" lazy>
                     <template #label>
                         <span>{{ $t("Msg.BackgroundTasks") }}</span>
-                        <span v-if="tasks.length > 0" class="tab-count">{{ tasks.length }}</span>
+                        <span v-if="taskCount > 0" class="tab-count">{{ taskCount }}</span>
                     </template>
 
                     <div class="task-sub-actions">
@@ -132,6 +132,7 @@
                         row-key="Id"
                         class="online-table notification-compact-table task-table"
                         max-height="420"
+                        @expand-change="handleTaskExpand"
                     >
                         <el-table-column type="expand" width="36">
                             <template #default="{ row }">
@@ -150,11 +151,11 @@
                                     </div>
                                     <div class="task-detail__row task-detail__row--result">
                                         <span class="task-detail__label">{{ $t("Msg.BackgroundTaskLog") }}</span>
-                                        <pre>{{ row.Log || "-" }}</pre>
+                                        <pre>{{ row.DetailLoading ? $t("Msg.DataLoading") : (row.Log || (row.HasLog ? $t("Msg.DataLoading") : "-")) }}</pre>
                                     </div>
                                     <div class="task-detail__row task-detail__row--result">
                                         <span class="task-detail__label">{{ $t("Msg.BackgroundTaskResult") }}</span>
-                                        <pre>{{ formatTaskResult(row) }}</pre>
+                                        <pre>{{ row.DetailLoading ? $t("Msg.DataLoading") : formatTaskResult(row) }}</pre>
                                     </div>
                                 </div>
                             </template>
@@ -195,7 +196,7 @@
                         </el-table-column>
                         <el-table-column :label="$t('Msg.Operation')" width="178" fixed="right">
                             <template #default="{ row }">
-                                <el-button v-if="getTaskDownloadUrl(row)" link size="small" type="primary" :icon="Download" @click.stop="downloadTaskResult(row)">
+                                <el-button v-if="row.HasResult || getTaskDownloadUrl(row)" link size="small" type="primary" :icon="Download" @click.stop="downloadTaskResult(row)">
                                     {{ $t("Msg.DownloadArtifact") }}
                                 </el-button>
                                 <el-button v-if="canCancel(row)" link size="small" type="danger" :icon="CircleClose" @click.stop="cancelTask(row)">
@@ -207,6 +208,19 @@
                             </template>
                         </el-table-column>
                     </el-table>
+                    <el-pagination
+                        v-if="taskCount > 0"
+                        class="task-pagination"
+                        small
+                        background
+                        layout="total, sizes, prev, pager, next"
+                        :current-page="taskPage"
+                        :page-size="taskPageSize"
+                        :page-sizes="[15, 30, 50, 100]"
+                        :total="taskCount"
+                        @update:current-page="changeTaskPage"
+                        @update:page-size="changeTaskPageSize"
+                    />
                 </el-tab-pane>
 
                 <el-tab-pane v-if="isAdmin" name="apps" lazy>
@@ -395,6 +409,9 @@ export default {
             messageDetailVisible: false,
             activeMessage: {},
             tasks: [],
+            taskPage: 1,
+            taskPageSize: 15,
+            taskCount: 0,
             platformNotifications: [],
             notificationUnreadCount: 0,
             storeNotices: [],
@@ -561,7 +578,10 @@ export default {
             }
         },
         handleTaskList(data) {
-            this.tasks = Array.isArray(data) ? data : [];
+            const rows = Array.isArray(data) ? data : (Array.isArray(data?.Data) ? data.Data : []);
+            if (this.taskPage !== 1) return;
+            this.tasks = this.mergeTaskSummaries(rows);
+            this.taskCount = Math.max(Number(data?.DataCount || 0), this.taskCount, rows.length);
         },
         handlePlatformNotification(data) {
             const existed = this.platformNotifications.some((item) =>
@@ -633,13 +653,19 @@ export default {
             this.bindWebsocket();
             await this.loadTasks();
         },
-        async loadTasks() {
+        async loadTasks(page = this.taskPage) {
             if (this.loading) return;
             this.loading = true;
             try {
-                const result = await DiyCommon.PostAsync("/api/BackgroundTask/List", {}, null, null, "json");
+                const result = await DiyCommon.PostAsync("/apiengine/platform-background-task", {
+                    Action: "List",
+                    _PageIndex: Math.max(1, Number(page) || 1),
+                    _PageSize: this.taskPageSize
+                }, null, null, "json");
                 if (result && result.Code === 1) {
-                    this.tasks = Array.isArray(result.Data) ? result.Data : [];
+                    this.taskPage = Math.max(1, Number(page) || 1);
+                    this.tasks = this.mergeTaskSummaries(Array.isArray(result.Data) ? result.Data : []);
+                    this.taskCount = Number(result.DataCount || this.tasks.length || 0);
                 }
             } finally {
                 this.loading = false;
@@ -649,7 +675,7 @@ export default {
             if (this.notificationLoading || !DiyCommon.Notification) return;
             this.notificationLoading = true;
             try {
-                const result = await DiyCommon.Notification.List({ _PageIndex: 1, _PageSize: 100 });
+                const result = await DiyCommon.Notification.List({ _PageIndex: 1, _PageSize: 15 });
                 if (result && result.Code === 1) {
                     const normalized = normalizePlatformNotificationResult(result);
                     this.platformNotifications = normalized.rows;
@@ -707,9 +733,13 @@ export default {
             if (this.terminalLoading) return;
             this.terminalLoading = true;
             try {
-                const mineTask = DiyCommon.PostAsync("/api/OnlineTerminal/Mine", {}, null, null, "json");
+                const mineTask = DiyCommon.PostAsync("/apiengine/platform-online-terminal", {
+                    Action: "Mine"
+                }, null, null, "json");
                 const listTask = this.isSuperAdmin
-                    ? DiyCommon.PostAsync("/api/OnlineTerminal/List", {}, null, null, "json")
+                    ? DiyCommon.PostAsync("/apiengine/platform-online-terminal", {
+                        Action: "List"
+                    }, null, null, "json")
                     : Promise.resolve(null);
                 const [mine, list] = await Promise.all([mineTask, listTask]);
                 if (mine && mine.Code === 1) {
@@ -739,7 +769,8 @@ export default {
             } catch (_) {
                 return;
             }
-            const result = await DiyCommon.PostAsync("/api/OnlineTerminal/Kick", {
+            const result = await DiyCommon.PostAsync("/apiengine/platform-online-terminal", {
+                Action: "Kick",
                 UserId: userId,
                 ConnectionId: row.ConnectionId
             }, null, null, "json");
@@ -839,8 +870,8 @@ export default {
                 let workerStatus = null;
                 try {
                     workerStatus = await DiyCommon.PostAsync({
-                        url: "/api/BackgroundTask/WorkerStatus",
-                        data: {},
+                        url: "/apiengine/platform-background-task",
+                        data: { Action: "WorkerStatus" },
                         dataType: "json",
                         suppressErrorNotification: true
                     });
@@ -897,14 +928,55 @@ export default {
             this.$router.push({ path: "/microi-store" });
         },
         async clearCompleted() {
-            const result = await DiyCommon.PostAsync("/api/BackgroundTask/ClearCompleted", {}, null, null, "json");
+            const result = await DiyCommon.PostAsync("/apiengine/platform-background-task", {
+                Action: "ClearCompleted"
+            }, null, null, "json");
             if (result && result.Code === 1) {
                 this.refreshTasks();
             }
         },
+        mergeTaskSummaries(rows) {
+            const existing = new Map(this.tasks.map((item) => [String(item?.Id || ""), item]));
+            return (rows || []).map((row) => {
+                const previous = existing.get(String(row?.Id || ""));
+                return previous?.DetailLoaded
+                    ? { ...row, Log: previous.Log, Result: previous.Result, Error: previous.Error, DetailLoaded: true }
+                    : row;
+            });
+        },
+        async loadTaskDetail(item) {
+            if (!item?.Id || item.DetailLoaded || item.DetailLoading) return item;
+            item.DetailLoading = true;
+            try {
+                const result = await DiyCommon.PostAsync("/apiengine/platform-background-task", {
+                    Action: "Detail",
+                    Id: item.Id
+                }, null, null, "json");
+                if (!result || result.Code !== 1) throw new Error(result?.Msg || "后台任务详情读取失败");
+                Object.assign(item, result.Data || {}, { DetailLoaded: true });
+                return item;
+            } finally {
+                item.DetailLoading = false;
+            }
+        },
+        handleTaskExpand(item, expandedRows) {
+            if ((expandedRows || []).some((row) => String(row?.Id) === String(item?.Id))) {
+                void this.loadTaskDetail(item).catch((error) => ElMessage.error(error?.message || String(error)));
+            }
+        },
+        changeTaskPage(page) {
+            void this.loadTasks(page);
+        },
+        changeTaskPageSize(size) {
+            this.taskPageSize = Math.max(1, Number(size) || 15);
+            void this.loadTasks(1);
+        },
         async cancelTask(item) {
             if (!item || !item.Id) return;
-            const result = await DiyCommon.PostAsync("/api/BackgroundTask/Cancel", { Id: item.Id }, null, null, "json");
+            const result = await DiyCommon.PostAsync("/apiengine/platform-background-task", {
+                Action: "Cancel",
+                Id: item.Id
+            }, null, null, "json");
             if (result && result.Code === 1) {
                 this.refreshTasks();
             }
@@ -920,7 +992,10 @@ export default {
             } catch (_) {
                 return;
             }
-            const result = await DiyCommon.PostAsync("/api/BackgroundTask/Remove", { Id: item.Id }, null, null, "json");
+            const result = await DiyCommon.PostAsync("/apiengine/platform-background-task", {
+                Action: "Remove",
+                Id: item.Id
+            }, null, null, "json");
             if (result && result.Code === 1) {
                 this.refreshTasks();
             }
@@ -951,9 +1026,18 @@ export default {
             const data = result.Data || result.data || {};
             return data.DownloadUrl || data.downloadUrl || result.DownloadUrl || result.downloadUrl || "";
         },
-        downloadTaskResult(item) {
+        async downloadTaskResult(item) {
+            try {
+                await this.loadTaskDetail(item);
+            } catch (error) {
+                ElMessage.error(error?.message || String(error));
+                return;
+            }
             const url = this.getTaskDownloadUrl(item);
-            if (!url) return;
+            if (!url) {
+                ElMessage.warning(this.$t("Msg.NoData"));
+                return;
+            }
             const link = document.createElement("a");
             link.href = url;
             link.target = "_blank";

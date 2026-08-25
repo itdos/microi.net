@@ -1,5 +1,4 @@
 const SSO_API_ROOT = "/api/Sso";
-const API_ENGINE_RUN = "/api/ApiEngine/Run";
 
 async function postUrl(diyCommon, url, payload) {
     if (!diyCommon?.PostAsync) throw new Error("DiyCommon.PostAsync 不可用。");
@@ -11,12 +10,9 @@ async function postGateway(diyCommon, action, payload) {
 }
 
 async function postEngine(diyCommon, key, payload) {
-    // 登录页必须在全新数据库、应用包尚未安装时仍可工作。统一入口在
-    // 引擎缺失时返回标准 Code=0，而动态 /apiengine/{key} 会产生 HTTP 404。
-    return postUrl(diyCommon, API_ENGINE_RUN, {
-        ...(payload || {}),
-        ApiEngineKey: key
-    });
+    // 固定业务引擎统一使用自定义地址，便于日志、流量和耗时按引擎归因。
+    // 宿主对未安装引擎也会返回结构化 DosResult，不再产生 404。
+    return postUrl(diyCommon, `/apiengine/${encodeURIComponent(key)}`, payload || {});
 }
 
 function resultData(result) {

@@ -66,6 +66,7 @@ test("publisher classifies stored source and compiled roots without leaking wrap
   assert.equal(sourceArchivePath("build/index.html"), "");
   assert.equal(sourceArchivePath("dist/static/app.js"), "");
   assert.equal(sourceArchivePath("unpackage/dist/build/h5/index.html"), "");
+  assert.equal(sourceArchivePath("upload/v1.8.8/index.html"), "");
 
   assert.equal(buildArchivePath("build/index.html"), "index.html");
   assert.equal(buildArchivePath("dist/static/app.js"), "static/app.js");

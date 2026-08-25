@@ -32,8 +32,9 @@
    配置、租户凭据、Topic 规范化和敏感字段边界。
 4. `Microi.Server/Microi.Core/Interface/IMicroiMQTT.cs`：
    `IMicroiMQTT.PublishAsync(osClient, ...)` 可信后端发布和节点状态接口。
-5. `Microi.Server/Microi.net.Api/Controllers/MqttController.cs`：平台管理员、当前节点
-   状态与示例下行入口的权限边界。
+5. `Microi.Server/Microi.Core/V8Engine/Runtime/V8Method.PlatformPluginRuntimes.cs`
+   与 `Microi.Server/Microi.Upgrade/Resource/platform-mqtt.js`：平台管理员、当前节点
+   状态、租户 Topic 边界与接口引擎交付入口。
 6. `microi.doc/docs/doc/system-engine/mqtt-engine.md`：面向用户的完整能力说明。
 
 目标服务器可能落后于当前源码。编写事件代码前回读其 `sys_osclients` 字段和运行

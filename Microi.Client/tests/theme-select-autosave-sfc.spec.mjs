@@ -18,10 +18,11 @@ test('theme settings expose truthful account autosave feedback and a persistent 
   assert.match(locale, /themeSaveHint:\s*"修改后立即生效，并自动同步到当前账号的个人设置中。"/);
 });
 
-test('theme changes start account persistence immediately and keep retry data on failure', async () => {
+test('theme changes debounce account persistence and keep retry data on failure', async () => {
   const source = await read('src/layout/components/ThemeSelect.vue');
 
-  assert.match(source, /this\.preferenceSaveState = "pending";[\s\S]*?void this\.flushVisualPreferences\(\);/);
+  assert.match(source, /this\.preferenceSaveState = "pending";[\s\S]*?this\.scheduleVisualPreferenceFlush\(\);/);
+  assert.match(source, /scheduleVisualPreferenceFlush\(delay = 250\)/);
   assert.match(source, /this\.preferenceSaveState = "saving";/);
   assert.match(source, /ApiEngine\.Run\(\s*"platform-user-update-preferences"/);
   assert.match(source, /this\.pendingPreferencePatch = \{ \.\.\.patch, \.\.\.this\.pendingPreferencePatch \};/);

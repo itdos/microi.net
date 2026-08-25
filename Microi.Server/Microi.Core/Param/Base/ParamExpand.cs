@@ -49,6 +49,7 @@ namespace Microi.net
         /// <summary>可信事件来源，例如 Server/ClientSignal/TokenLifecycle。</summary>
         public string Source { get; set; }
         public string ClientType { get; set; }
+        public string RequestMethod { get; set; }
         public string Did { get; set; }
         public string TargetType { get; set; }
         public string TargetId { get; set; }
@@ -150,6 +151,27 @@ namespace Microi.net
         public DateTime? LastSeenTime { get; set; }
         public List<string> MonthsScanned { get; set; } = new List<string>();
         public List<SysLogSignalSample> Samples { get; set; } = new List<SysLogSignalSample>();
+    }
+
+    /// <summary>
+    /// 跨月、受限、可分页的系统日志明细查询。
+    /// 主要用于系统可观测性中的高价值网络传输样本；不会返回请求体、文件内容或凭据。
+    /// </summary>
+    public sealed class SysLogRangeQueryParam
+    {
+        public string OsClient { get; set; }
+        public DateTime WindowStart { get; set; }
+        public DateTime WindowEnd { get; set; }
+        public string Category { get; set; }
+        public string Action { get; set; }
+        public string Source { get; set; }
+        public string IP { get; set; }
+        public string UserId { get; set; }
+        public string Api { get; set; }
+        public string Keyword { get; set; }
+        public int PageIndex { get; set; } = 1;
+        public int PageSize { get; set; } = 15;
+        public int MaxMonths { get; set; } = 14;
     }
 
     /// <summary>系统日志生命周期的可信物理执行参数。</summary>

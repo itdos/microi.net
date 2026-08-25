@@ -10,15 +10,15 @@ description: Microi V8 消息队列与 MQTT 生产指南。用于 V8.MQ.SendMsg�
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要使用 RabbitMQ 消息队列或 MQTT 物联网协议。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-mq-mqtt-000 sha256=a883bb502b306ada654b8f45bd6f955c84049f3a032568e5ef8e25e24aa1c2c6 -->
+<!-- microi-progressive:chunk id=v8-mq-mqtt-000 sha256=4a6559aed1af036591a04002c6e3311d9f0957fbbabbcafdc4a6bad95dabd843 -->
 ## V8.MQ — RabbitMQ 消息队列
 
 ### 生产消息（后端）
 
 ```javascript
-// 在 async 接口引擎或 V8 事件中发送消息。
+// 当前 V8EngineMQ 是同步包装，调用完成后直接返回 DosResult。
 // 业务重试必须复用同一个 EventId，供消费者幂等去重。
-var result = await V8.MQ.SendMsg({
+var result = V8.MQ.SendMsg({
   QueueName: 'order_process',
   EventId: V8.Param.eventId || V8.Method.NewUlid(),
   Message: {
@@ -35,14 +35,19 @@ if (result.Code !== 1) return result;
 ### 生产消息（前端）
 
 ```javascript
-V8.Post('/api/mq/sendmsg', {
+V8.ApiEngine.Run('platform-mq', {
+  Action: 'Send',
   QueueName: 'queue_name',
   EventId: stableEventId,
   Message: { ProductId: '123', Count: 2 }
-}, function(result) {
+}).then(function(result) {
   if (result.Code === 1) V8.Tips('消息已发送', true);
-}, null, {}, 'json');
+});
 ```
+
+`platform-mq` 是应用商城交付的 Managed 管理接口，只允许当前租户超级管理员，
+并在可信 V8 原子层固定租户、队列名和 1 MB 消息上限。普通业务前端应调用
+自己的受权接口引擎，再由业务接口引擎执行 `V8.MQ.SendMsg`。
 
 ### 消费消息
 
@@ -63,13 +68,15 @@ V8.FormEngine.UptFormData('Product', {
   Id: data.ProductId,
   Stock: data.Count
 });
+
+return { Code: 1, Data: { EventId: message.EventId } };
 ```
 
 ### 实战模式：异步处理耗时操作
 
 ```javascript
 // 接口引擎：接收请求后发送到队列，快速返回
-await V8.MQ.SendMsg({
+var sendResult = V8.MQ.SendMsg({
   QueueName: 'order_process',
   EventId: V8.Param.eventId,
   Message: {
@@ -78,6 +85,8 @@ await V8.MQ.SendMsg({
     userId: V8.CurrentUser.Id
   }
 });
+
+if (!sendResult || sendResult.Code !== 1) return sendResult;
 
 return { Code: 1, Msg: '订单处理中，请稍候查看结果' };
 ```
@@ -101,6 +110,7 @@ try {
     SyncStatus: 'success',
     SyncTime: DateNow('yyyy-MM-dd HH:mm:ss')
   });
+  return { Code: 1, Data: { EventId: msg.EventId } };
 } catch (ex) {
   V8.FormEngine.UptFormData('Order', {
     Id: data.orderId,
@@ -108,31 +118,40 @@ try {
     SyncError: ex.message
   });
   console.error('订单同步失败: ' + ex.message);
+  return { Code: 0, Msg: '订单同步失败' };
 }
 ```
 
 ### MQ 配置
 
-主租户提供共享 Broker 地址 `MQHost/MQPort`。每个子租户必须在 RabbitMQ 中真实创建独立的 `MQUserName/MQPassword/MQVitrualHost`，并把权限限制在自己的 vhost 与 `microi.{osClient}.*` 队列；缺少凭据或与其它租户共用 user/password/vhost 时失败关闭，不回退主租户管理员账号。
+每个租户都必须配置 `MQHost/MQPort/MQUserName/MQPassword/MQVitrualHost`，并在 RabbitMQ 中真实创建独立 user/vhost，把权限限制在自己的 vhost 与 `microi.{lowerOsClient}.*` 队列。缺少配置或与其它已加载租户共用 user/password/vhost 时失败关闭，不回退主租户管理员账号。可选 `MQUseTls/MQTlsServerName`；`MQHost` 可用逗号分隔多个端点。当前 `AddMicroiMQ()` 默认注册 `MicroiRabbitMQSingleConnection`，不会按 `MQType` 自动切换实现。
 
-在 `diy_queue_receive` 表新增记录后，平台启动时自动订阅：
+在 `diy_queue_receive` 表新增记录后，后台同步会创建或更新消费者：
 
 | 字段 | 含义 |
 |------|------|
-| `Type` | `接口引擎`（固定） |
+| `Type` | `1`=接口引擎；`2`=仅默认主租户受控 DLL |
 | `QueueName` | 逻辑队列名（与生产端 `SendMsg({ QueueName, ... })` 一致） |
 | `ApiEngineKey` | 消费者接口引擎 Key |
-| `IsEnable` | 是否启用 |
-| `OsClient` | 所属租户（多租户隔离） |
+| `FailToReject` | 值为“是”时失败后允许有限重入队 |
+| `Count` | 最大重入队次数；`0` 表示首次失败后直接删除 |
 
-> ⚠️ 修改 `diy_queue_receive` 后需重启平台才会生效订阅。
+新增、修改或删除队列处理配置会在下一同步周期生效。同步间隔默认最多 180 秒，
+正数 `MQListenerTime` 可缩短但最低 15 秒；Host、端口、凭据、vhost 或 TLS 变更
+不会重建已缓存连接，需要滚动重启对应节点。
 
 多节点会对同一租户队列使用 RabbitMQ competing consumer，但“只有一个节点收到”不等于业务只执行一次。消息 envelope 的 `EventId` 是稳定幂等键，消费者必须配合数据库唯一约束、inbox/条件更新保证副作用仅一次；连接凭据轮换后当前版本需要重启节点重建连接。
+
+消费者使用 `prefetch=1`、手动 Ack。接口引擎返回可解析的 `DosResult Code=1` 才
+明确成功；为兼容旧处理器，`null` 或非 `DosResult` 返回也会 Ack，因此新代码必须
+显式返回 `{Code:1}` 或 `{Code:0}`。失败且 `FailToReject=是` 时，Redis 以 EventId
+记录 7 天重试次数并在未达到 `Count` 前立即 requeue；当前源码没有退避和自动 DLQ，
+达到上限或未启用重入队时会 Reject 且不 requeue。
 
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-mq-mqtt-001 sha256=1f51deb2673c77cdd3a096ca658dfe0f025531760f1aee04987f3bb2723131cf -->
+<!-- microi-progressive:chunk id=v8-mq-mqtt-001 sha256=f65fe365f1adca83c0eabe95f73a658d6d79f33b3d9a8d34c5b35ede841e7d73 -->
 ## 注意事项
 
 - MQ 消费者接口引擎通过 `V8.Param.Message` 获取消息，包含 `EventId`、兼容 `Id`、`OsClient`、`Message`、`CurrentUserId`
@@ -151,3 +170,5 @@ try {
 
 - [references/progressive-01-v8-mqtt-iot-物联网.md](references/progressive-01-v8-mqtt-iot-物联网.md)：V8.MQTT — IoT 物联网
 <!-- microi-progressive:end -->
+
+平台级 MQTT 状态与下行发布统一调用 Managed 接口引擎 `platform-mqtt`；该入口只允许当前租户超级管理员，并由 `V8.Method.ManageMqtt` 固定租户边界。普通设备业务仍应创建自己的授权接口引擎。

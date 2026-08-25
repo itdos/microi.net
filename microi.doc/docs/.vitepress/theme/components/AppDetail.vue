@@ -1,16 +1,43 @@
 <template>
   <ClientOnly>
-    <main v-if="isDetailPage" class="app-detail-page">
+    <main v-if="isDetailPage" class="app-detail-page" data-mci-ui-root>
       <div class="app-detail-shell">
         <a class="app-detail-back" href="/apps.html">
           <span aria-hidden="true">←</span>
           返回 AI 应用
         </a>
 
-        <div v-if="loading" class="app-detail-state">正在读取应用详情...</div>
+        <div v-if="loading" class="app-detail-skeleton" aria-busy="true" aria-label="正在读取应用详情">
+          <span class="app-detail-visually-hidden">正在读取应用详情</span>
+          <section class="app-detail-skeleton-hero" aria-hidden="true">
+            <i class="app-detail-skeleton-block app-detail-skeleton-icon"></i>
+            <div>
+              <i class="app-detail-skeleton-block short"></i>
+              <i class="app-detail-skeleton-block title"></i>
+              <i class="app-detail-skeleton-block text"></i>
+              <i class="app-detail-skeleton-block text compact"></i>
+            </div>
+            <div class="app-detail-skeleton-actions">
+              <i class="app-detail-skeleton-block"></i>
+              <i class="app-detail-skeleton-block"></i>
+            </div>
+          </section>
+          <section class="app-detail-skeleton-facts" aria-hidden="true">
+            <i v-for="index in 5" :key="index" class="app-detail-skeleton-block"></i>
+          </section>
+          <section class="app-detail-skeleton-panel" aria-hidden="true">
+            <i class="app-detail-skeleton-block media"></i>
+            <div>
+              <i class="app-detail-skeleton-block title"></i>
+              <i class="app-detail-skeleton-block text"></i>
+              <i class="app-detail-skeleton-block text compact"></i>
+            </div>
+          </section>
+        </div>
         <div v-else-if="errorMessage" class="app-detail-state app-detail-error">
           <strong>暂时无法打开应用详情</strong>
           <span>{{ errorMessage }}</span>
+          <button type="button" @click="loadApp">重新读取</button>
         </div>
 
         <template v-else-if="app">
@@ -85,6 +112,83 @@
             </div>
           </section>
 
+          <section class="app-detail-changelog" aria-labelledby="app-detail-changelog-title">
+            <header class="app-detail-changelog-header">
+              <div class="app-detail-changelog-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 8v4l2.7 1.6M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" />
+                </svg>
+              </div>
+              <div class="app-detail-changelog-title">
+                <span>VERSION HISTORY</span>
+                <h2 id="app-detail-changelog-title">更新日志</h2>
+                <p>从当前版本到历史演进，清晰了解每一次新增、优化、修复与兼容变化。</p>
+              </div>
+              <div class="app-detail-changelog-count" :class="{ muted: !changeLogs.length }">
+                <strong>{{ changeLogTotal }}</strong>
+                <span>条版本记录</span>
+              </div>
+            </header>
+
+            <div v-if="changeLogLoading" class="app-detail-changelog-loading" aria-busy="true">
+              <article v-for="index in 2" :key="index">
+                <i class="app-detail-skeleton-block badge"></i>
+                <i class="app-detail-skeleton-block heading"></i>
+                <i class="app-detail-skeleton-block paragraph"></i>
+              </article>
+            </div>
+
+            <div v-else-if="visibleChangeLogs.length" id="app-detail-changelog-list" class="app-detail-changelog-timeline">
+              <article
+                v-for="(log, index) in visibleChangeLogs"
+                :key="log.Id || `${log.Version}-${log.ReleaseTime}`"
+                class="app-detail-changelog-item"
+                :class="{ current: isCurrentChangeLog(log) }"
+                :data-tone="getChangeTypeMeta(log.ChangeType).tone"
+                :style="{ '--change-index': index }"
+              >
+                <i class="app-detail-changelog-dot" aria-hidden="true"></i>
+                <div class="app-detail-changelog-card">
+                  <header>
+                    <div class="app-detail-changelog-badges">
+                      <span class="type">{{ getChangeTypeMeta(log.ChangeType).label }}</span>
+                      <span class="version">{{ log.Version || '未标注版本' }}</span>
+                      <span v-if="isCurrentChangeLog(log)" class="current-version">当前版本</span>
+                    </div>
+                    <time :datetime="log.ReleaseTime || undefined">{{ formatChangeLogDate(log.ReleaseTime) }}</time>
+                  </header>
+                  <h3>{{ log.Title || `${log.Version || '当前版本'} 更新` }}</h3>
+                  <p>{{ log.Content || '该版本暂未填写详细说明。' }}</p>
+                </div>
+              </article>
+            </div>
+
+            <div v-else class="app-detail-changelog-empty" :class="{ error: changeLogError }">
+              <span class="app-detail-changelog-empty-icon" aria-hidden="true">{{ changeLogError ? '!' : '↻' }}</span>
+              <div>
+                <strong v-if="changeLogError">更新日志暂时未能读取</strong>
+                <strong v-else-if="changeLogAvailable">当前应用尚未补录独立更新日志</strong>
+                <strong v-else>当前商城源尚未提供更新日志能力</strong>
+                <p v-if="changeLogError">{{ changeLogError }}</p>
+                <p v-else-if="changeLogAvailable">发布者补录后，这里会自动呈现对应版本的完整变化。</p>
+                <p v-else>请先更新该来源的应用商城应用，再重新打开详情。</p>
+              </div>
+              <button v-if="changeLogError" type="button" @click="loadChangeLogs(app.Id)">重新读取</button>
+            </div>
+
+            <button
+              v-if="changeLogs.length > CHANGE_LOG_COLLAPSED_COUNT"
+              type="button"
+              class="app-detail-changelog-toggle"
+              :aria-expanded="changeLogExpanded"
+              aria-controls="app-detail-changelog-list"
+              @click="changeLogExpanded = !changeLogExpanded"
+            >
+              {{ changeLogExpanded ? '收起历史版本' : `展开全部 ${changeLogs.length} 条记录` }}
+              <span aria-hidden="true">{{ changeLogExpanded ? '↑' : '↓' }}</span>
+            </button>
+          </section>
+
           <section class="app-detail-content">
             <article class="app-detail-description-card">
               <header>
@@ -137,6 +241,12 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vitepress'
+import {
+  formatChangeLogDate,
+  getChangeTypeMeta,
+  isSameAppVersion,
+  normalizeChangeLogResponse
+} from '../utils/app-changelog.js'
 import { resolveApplicationExperienceUrl } from '../utils/app-preview-url.js'
 import { OFFICIAL_MICROI_API_BASE } from '../utils/site-api-base.js'
 import {
@@ -162,6 +272,13 @@ const favoriteBusy = ref(false)
 const favoriteMessage = ref('')
 const fileServer = ref('')
 const previewImageBroken = ref(false)
+const changeLogs = ref([])
+const changeLogTotal = ref(0)
+const changeLogAvailable = ref(null)
+const changeLogLoading = ref(false)
+const changeLogError = ref('')
+const changeLogExpanded = ref(false)
+const CHANGE_LOG_COLLAPSED_COUNT = 5
 
 // VitePress 的 route.path 在不同导航方式/版本中可能包含查询串；应用详情页
 // 必须只按 pathname 判断，否则 /app-detail.html?app=xxx 会整页被 v-if 隐藏。
@@ -173,6 +290,9 @@ const updatedDate = computed(() => {
   const value = app.value?.AppUpdateTime || app.value?.UpdateTime
   return value ? String(value).slice(0, 10) : '持续更新'
 })
+const visibleChangeLogs = computed(() => changeLogExpanded.value
+  ? changeLogs.value
+  : changeLogs.value.slice(0, CHANGE_LOG_COLLAPSED_COUNT))
 function queryAppKey() {
   if (typeof window === 'undefined') return ''
   return new URLSearchParams(window.location.search).get('app') || ''
@@ -297,6 +417,50 @@ function normalizeApp(item) {
   }
 }
 
+function resetChangeLogState() {
+  changeLogs.value = []
+  changeLogTotal.value = 0
+  changeLogAvailable.value = null
+  changeLogError.value = ''
+  changeLogExpanded.value = false
+}
+
+function applyChangeLogResponse(result) {
+  const normalized = normalizeChangeLogResponse(result)
+  changeLogs.value = normalized.logs
+  changeLogTotal.value = normalized.total
+  changeLogAvailable.value = normalized.available
+}
+
+async function loadChangeLogs(storeId) {
+  if (!storeId || changeLogLoading.value) return null
+  changeLogLoading.value = true
+  changeLogError.value = ''
+  try {
+    const response = await fetch(`${APP_API_BASE}/apiengine/get-microi-store-model?OsClient=${OS_CLIENT}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ Id: storeId, IncludePackage: false })
+    })
+    const result = await response.json()
+    if (result.Code !== 1) throw new Error(result.Msg || '更新日志读取失败')
+    applyChangeLogResponse(result)
+    return result.Data || null
+  } catch (error) {
+    changeLogs.value = []
+    changeLogTotal.value = 0
+    changeLogAvailable.value = null
+    changeLogError.value = error?.message || '网络异常，请稍后重试。'
+    return null
+  } finally {
+    changeLogLoading.value = false
+  }
+}
+
+function isCurrentChangeLog(log) {
+  return isSameAppVersion(log?.Version, app.value?.AppVersion)
+}
+
 function syncAuth() {
   if (typeof window === 'undefined') return
   let hasUser = false
@@ -393,6 +557,8 @@ async function loadApp() {
   }
   loading.value = true
   errorMessage.value = ''
+  app.value = null
+  resetChangeLogState()
   try {
     const response = await fetch(`${APP_API_BASE}/apiengine/official_ai_apps?OsClient=${OS_CLIENT}`, {
       method: 'POST',
@@ -405,7 +571,8 @@ async function loadApp() {
     const matched = result.Data.find(item => String(item.AppKey || item.AppId) === appKey)
     if (!matched) throw new Error('应用不存在或尚未发布')
     previewImageBroken.value = false
-    app.value = normalizeApp(matched)
+    const detailModel = await loadChangeLogs(matched.Id)
+    app.value = normalizeApp({ ...matched, ...(detailModel || {}) })
     await Promise.all([recordView(), loadFavoriteStatus()])
   } catch (error) {
     errorMessage.value = error?.message || '网络异常'
@@ -499,6 +666,24 @@ onBeforeUnmount(() => {
 }
 
 .app-detail-page {
+  --mci-app-detail-surface: #fff;
+  --mci-app-detail-surface-soft: #f7f9fc;
+  --mci-app-detail-surface-raised: #eef3fa;
+  --mci-app-detail-text: #172033;
+  --mci-app-detail-text-soft: #536078;
+  --mci-app-detail-text-muted: #778398;
+  --mci-app-detail-line: #e2e7ef;
+  --mci-app-detail-line-strong: #ccd6e5;
+  --mci-app-detail-primary: #1769e0;
+  --mci-app-detail-primary-soft: rgba(23, 105, 224, .09);
+  --mci-app-detail-cool: #0891b2;
+  --mci-app-detail-shadow: 0 20px 54px rgba(32, 51, 84, .09);
+  --mci-app-change-feature: #1769e0;
+  --mci-app-change-improvement: #7c3aed;
+  --mci-app-change-fix: #d97706;
+  --mci-app-change-security: #059669;
+  --mci-app-change-breaking: #dc2626;
+  --mci-app-change-compatibility: #0891b2;
   min-height: calc(100vh - 64px);
   padding: 46px 24px 88px;
   background:
@@ -508,6 +693,24 @@ onBeforeUnmount(() => {
 }
 
 :global(html.dark .app-detail-page) {
+  --mci-app-detail-surface: #111a2a;
+  --mci-app-detail-surface-soft: #0e1726;
+  --mci-app-detail-surface-raised: #162134;
+  --mci-app-detail-text: #f4f7fb;
+  --mci-app-detail-text-soft: #cbd5e1;
+  --mci-app-detail-text-muted: #9eacc0;
+  --mci-app-detail-line: rgba(148, 163, 184, .18);
+  --mci-app-detail-line-strong: rgba(148, 163, 184, .3);
+  --mci-app-detail-primary: #60a5fa;
+  --mci-app-detail-primary-soft: rgba(96, 165, 250, .12);
+  --mci-app-detail-cool: #35b8d5;
+  --mci-app-detail-shadow: 0 22px 62px rgba(0, 0, 0, .28);
+  --mci-app-change-feature: #60a5fa;
+  --mci-app-change-improvement: #a78bfa;
+  --mci-app-change-fix: #fbbf24;
+  --mci-app-change-security: #34d399;
+  --mci-app-change-breaking: #fb7185;
+  --mci-app-change-compatibility: #22d3ee;
   background:
     radial-gradient(circle at 16% 0, rgba(47, 114, 246, .16), transparent 28rem),
     #0b1220;
@@ -517,6 +720,7 @@ onBeforeUnmount(() => {
 .app-detail-shell {
   width: min(1320px, 100%);
   margin: 0 auto;
+  animation: app-detail-enter .42s cubic-bezier(.25, .46, .45, .94) both;
 }
 
 .app-detail-back {
@@ -528,6 +732,21 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.app-detail-back:hover {
+  color: var(--mci-app-detail-primary);
+  transform: translateX(-2px);
+}
+
+.app-detail-back:focus-visible,
+.app-detail-actions button:focus-visible,
+.app-detail-actions a:focus-visible,
+.app-detail-state button:focus-visible,
+.app-detail-changelog button:focus-visible {
+  outline: 3px solid var(--mci-app-detail-primary-soft);
+  outline-offset: 3px;
 }
 
 :global(html.dark .app-detail-back) {
@@ -546,8 +765,104 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
+.app-detail-state button {
+  display: inline-flex;
+  min-width: 112px;
+  min-height: 44px;
+  margin: 10px auto 0;
+  padding: 0 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mci-app-detail-primary);
+  border-radius: 12px;
+  background: var(--mci-app-detail-primary);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  transition: transform 160ms ease;
+}
+
+.app-detail-state button:active { transform: scale(.97); }
+
+.app-detail-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app-detail-skeleton {
+  display: grid;
+  gap: 20px;
+}
+
+.app-detail-skeleton-hero,
+.app-detail-skeleton-facts,
+.app-detail-skeleton-panel {
+  border: 1px solid var(--mci-app-detail-line);
+  border-radius: 24px;
+  background: var(--mci-app-detail-surface);
+  box-shadow: var(--mci-app-detail-shadow);
+}
+
+.app-detail-skeleton-hero {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 176px;
+  align-items: center;
+  gap: 28px;
+  padding: 34px;
+}
+
+.app-detail-skeleton-hero > div:nth-child(2),
+.app-detail-skeleton-panel > div,
+.app-detail-skeleton-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.app-detail-skeleton-actions .app-detail-skeleton-block { height: 44px; }
+.app-detail-skeleton-icon { width: 132px; height: 132px; border-radius: 30px !important; }
+.app-detail-skeleton-block.short { width: 92px; height: 12px; }
+.app-detail-skeleton-block.title { width: min(420px, 78%); height: 38px; }
+.app-detail-skeleton-block.text { width: min(680px, 94%); height: 15px; }
+.app-detail-skeleton-block.text.compact { width: min(520px, 72%); }
+
+.app-detail-skeleton-facts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 25px;
+  gap: 24px;
+}
+
+.app-detail-skeleton-facts .app-detail-skeleton-block { height: 48px; }
+
+.app-detail-skeleton-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, .7fr);
+  gap: 24px;
+  padding: 24px;
+}
+
+.app-detail-skeleton-panel .media { height: 320px; }
+
+.app-detail-skeleton-block {
+  display: block;
+  width: 100%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--mci-app-detail-surface-raised), var(--mci-app-detail-line), var(--mci-app-detail-surface-raised));
+  background-size: 240% 100%;
+  animation: app-detail-skeleton 1.15s ease-in-out infinite;
+}
+
 .app-detail-error strong {
-  color: #172033;
+  color: var(--mci-app-detail-text);
   font-size: 20px;
 }
 
@@ -662,6 +977,15 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 800;
   text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.app-detail-actions button:active,
+.app-detail-actions a:active { transform: scale(.97); }
+
+@media (hover: hover) {
+  .app-detail-actions button:hover:not(:disabled),
+  .app-detail-actions a:hover { transform: translateY(-2px); }
 }
 
 .app-detail-actions svg {
@@ -820,6 +1144,367 @@ onBeforeUnmount(() => {
 :global(html.dark .app-detail-cover-card > img) { background: #07101e; }
 :global(html.dark .app-detail-cover-empty) { color: #94a3b8; }
 :global(html.dark .app-detail-cover-empty strong) { color: #f8fafc; }
+
+.app-detail-changelog {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-bottom: 20px;
+  padding: clamp(24px, 3vw, 38px);
+  border: 1px solid var(--mci-app-detail-line);
+  border-radius: 26px;
+  background:
+    linear-gradient(var(--mci-app-detail-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mci-app-detail-line) 1px, transparent 1px),
+    linear-gradient(135deg, var(--mci-app-detail-primary-soft), transparent 42%),
+    var(--mci-app-detail-surface);
+  background-size: 54px 54px, 54px 54px, auto, auto;
+  box-shadow: var(--mci-app-detail-shadow);
+}
+
+.app-detail-changelog::after {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: -36%;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .22), transparent);
+  content: "";
+  pointer-events: none;
+  transform: translateX(0) skewX(-18deg);
+  animation: app-detail-changelog-sweep 8s ease-in-out infinite;
+}
+
+.app-detail-changelog > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-detail-changelog-header {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 17px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--mci-app-detail-line);
+}
+
+.app-detail-changelog-icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border: 1px solid rgba(23, 105, 224, .22);
+  border-radius: 16px;
+  background: var(--mci-app-detail-primary-soft);
+  color: var(--mci-app-detail-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4);
+}
+
+.app-detail-changelog-icon svg {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.app-detail-changelog-title > span {
+  color: var(--mci-app-detail-primary);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .15em;
+}
+
+.app-detail-changelog-title h2 {
+  margin: 4px 0 5px;
+  color: var(--mci-app-detail-text);
+  font-size: clamp(25px, 3vw, 34px);
+  letter-spacing: -.03em;
+  line-height: 1.2;
+}
+
+.app-detail-changelog-title p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--mci-app-detail-text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.app-detail-changelog-count {
+  display: grid;
+  min-width: 104px;
+  min-height: 70px;
+  padding: 10px 15px;
+  place-content: center;
+  gap: 2px;
+  border: 1px solid var(--mci-app-detail-line);
+  border-radius: 16px;
+  background: var(--mci-app-detail-surface-soft);
+  text-align: center;
+}
+
+.app-detail-changelog-count strong {
+  color: var(--mci-app-detail-primary);
+  font-size: 25px;
+  line-height: 1;
+}
+
+.app-detail-changelog-count span {
+  color: var(--mci-app-detail-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.app-detail-changelog-count.muted strong { color: var(--mci-app-detail-text-muted); }
+
+.app-detail-changelog-timeline {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+  padding-left: 34px;
+}
+
+.app-detail-changelog-timeline::before {
+  position: absolute;
+  top: 11px;
+  bottom: 11px;
+  left: 9px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--mci-app-detail-primary), var(--mci-app-detail-line-strong) 72%, transparent);
+  content: "";
+}
+
+.app-detail-changelog-item {
+  --change-tone: var(--mci-app-detail-primary);
+  position: relative;
+  min-width: 0;
+  opacity: 0;
+  transform: translateY(14px);
+  animation: app-detail-change-enter .38s cubic-bezier(.25, .46, .45, .94) forwards;
+  animation-delay: calc(var(--change-index, 0) * 45ms);
+}
+
+.app-detail-changelog-item[data-tone="feature"] { --change-tone: var(--mci-app-change-feature); }
+.app-detail-changelog-item[data-tone="improvement"] { --change-tone: var(--mci-app-change-improvement); }
+.app-detail-changelog-item[data-tone="fix"] { --change-tone: var(--mci-app-change-fix); }
+.app-detail-changelog-item[data-tone="security"] { --change-tone: var(--mci-app-change-security); }
+.app-detail-changelog-item[data-tone="breaking"] { --change-tone: var(--mci-app-change-breaking); }
+.app-detail-changelog-item[data-tone="compatibility"] { --change-tone: var(--mci-app-change-compatibility); }
+
+.app-detail-changelog-dot {
+  position: absolute;
+  z-index: 2;
+  top: 22px;
+  left: -31px;
+  width: 14px;
+  height: 14px;
+  border: 4px solid var(--mci-app-detail-surface);
+  border-radius: 50%;
+  background: var(--change-tone);
+  box-shadow: 0 0 0 2px var(--mci-app-detail-line-strong);
+}
+
+.app-detail-changelog-item.current .app-detail-changelog-dot {
+  box-shadow: 0 0 0 3px var(--mci-app-detail-primary-soft), 0 0 0 5px var(--mci-app-detail-primary);
+}
+
+.app-detail-changelog-card {
+  position: relative;
+  min-width: 0;
+  padding: 20px 22px;
+  border: 1px solid var(--mci-app-detail-line);
+  border-radius: 17px;
+  background: var(--mci-app-detail-surface-soft);
+  box-shadow: 0 8px 24px rgba(32, 51, 84, .055);
+  transition: transform 180ms ease, border-color 180ms ease;
+}
+
+.app-detail-changelog-item.current .app-detail-changelog-card {
+  border-color: var(--mci-app-detail-primary);
+  background: linear-gradient(135deg, var(--mci-app-detail-primary-soft), var(--mci-app-detail-surface-soft) 58%);
+  box-shadow: inset 3px 0 0 var(--mci-app-detail-primary), 0 12px 30px rgba(23, 105, 224, .1);
+}
+
+@media (hover: hover) {
+  .app-detail-changelog-card:hover {
+    border-color: var(--mci-app-detail-line-strong);
+    transform: translateY(-2px);
+  }
+}
+
+.app-detail-changelog-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.app-detail-changelog-badges {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.app-detail-changelog-badges span {
+  display: inline-flex;
+  min-height: 26px;
+  padding: 0 9px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.app-detail-changelog-badges .type {
+  border: 1px solid var(--change-tone);
+  background: var(--mci-app-detail-surface);
+  color: var(--change-tone);
+}
+
+.app-detail-changelog-badges .version {
+  border: 1px solid var(--mci-app-detail-line);
+  background: var(--mci-app-detail-surface-raised);
+  color: var(--mci-app-detail-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-detail-changelog-badges .current-version {
+  background: var(--mci-app-detail-primary);
+  color: #fff;
+}
+
+.app-detail-changelog-card time {
+  flex: 0 0 auto;
+  color: var(--mci-app-detail-text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-detail-changelog-card h3 {
+  margin: 13px 0 7px;
+  color: var(--mci-app-detail-text);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.app-detail-changelog-card p {
+  margin: 0;
+  color: var(--mci-app-detail-text-soft);
+  font-size: 13px;
+  line-height: 1.82;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.app-detail-changelog-loading {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+  padding-left: 34px;
+}
+
+.app-detail-changelog-loading article {
+  display: grid;
+  gap: 13px;
+  padding: 20px 22px;
+  border: 1px solid var(--mci-app-detail-line);
+  border-radius: 17px;
+  background: var(--mci-app-detail-surface-soft);
+}
+
+.app-detail-changelog-loading .badge { width: 140px; height: 26px; }
+.app-detail-changelog-loading .heading { width: min(420px, 76%); height: 21px; }
+.app-detail-changelog-loading .paragraph { height: 54px; }
+
+.app-detail-changelog-empty {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px dashed var(--mci-app-detail-line-strong);
+  border-radius: 17px;
+  background: var(--mci-app-detail-surface-soft);
+}
+
+.app-detail-changelog-empty.error { border-color: var(--mci-app-change-breaking); }
+
+.app-detail-changelog-empty-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--mci-app-detail-primary-soft);
+  color: var(--mci-app-detail-primary);
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.app-detail-changelog-empty.error .app-detail-changelog-empty-icon {
+  background: rgba(220, 38, 38, .09);
+  color: var(--mci-app-change-breaking);
+}
+
+.app-detail-changelog-empty strong {
+  display: block;
+  color: var(--mci-app-detail-text);
+  font-size: 14px;
+}
+
+.app-detail-changelog-empty p {
+  margin: 5px 0 0;
+  color: var(--mci-app-detail-text-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.app-detail-changelog-empty button,
+.app-detail-changelog-toggle {
+  display: inline-flex;
+  min-height: 44px;
+  padding: 0 17px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--mci-app-detail-line-strong);
+  border-radius: 12px;
+  background: var(--mci-app-detail-surface);
+  color: var(--mci-app-detail-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  transition: transform 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.app-detail-changelog-toggle {
+  margin: 18px auto 0;
+}
+
+@media (hover: hover) {
+  .app-detail-changelog-empty button:hover,
+  .app-detail-changelog-toggle:hover {
+    border-color: var(--mci-app-detail-primary);
+    color: var(--mci-app-detail-primary);
+    transform: translateY(-1px);
+  }
+}
+
+.app-detail-changelog-empty button:active,
+.app-detail-changelog-toggle:active { transform: scale(.97); }
 
 .app-detail-description-card {
   padding: 24px;
@@ -1024,6 +1709,26 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
+@keyframes app-detail-enter {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes app-detail-change-enter {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes app-detail-skeleton {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+
+@keyframes app-detail-changelog-sweep {
+  0%, 18% { opacity: 0; transform: translateX(0) skewX(-18deg); }
+  30% { opacity: .68; }
+  54%, 100% { opacity: 0; transform: translateX(460%) skewX(-18deg); }
+}
+
 @media (max-width: 900px) {
   .app-detail-hero {
     grid-template-columns: 100px minmax(0, 1fr);
@@ -1043,6 +1748,14 @@ onBeforeUnmount(() => {
   .app-detail-content {
     grid-template-columns: 1fr;
   }
+
+  .app-detail-skeleton-hero {
+    grid-template-columns: 100px minmax(0, 1fr);
+  }
+
+  .app-detail-skeleton-icon { width: 100px; height: 100px; border-radius: 24px !important; }
+  .app-detail-skeleton-actions { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-detail-skeleton-panel { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
@@ -1088,5 +1801,81 @@ onBeforeUnmount(() => {
   .app-detail-cover-card { min-height: 240px; }
   .app-detail-cover-card > img { height: 62vw; min-height: 240px; }
   .app-detail-description-card { padding: 20px; }
+
+  .app-detail-skeleton-hero {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 16px;
+    padding: 22px;
+    border-radius: 22px;
+  }
+
+  .app-detail-skeleton-icon { width: 72px; height: 72px; border-radius: 18px !important; }
+  .app-detail-skeleton-actions { grid-template-columns: 1fr; }
+  .app-detail-skeleton-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 20px; }
+  .app-detail-skeleton-panel { padding: 18px; }
+  .app-detail-skeleton-panel .media { height: 230px; }
+
+  .app-detail-changelog {
+    padding: 20px 16px;
+    border-radius: 22px;
+    background-size: 42px 42px, 42px 42px, auto, auto;
+  }
+
+  .app-detail-changelog-header {
+    grid-template-columns: 46px minmax(0, 1fr);
+    align-items: start;
+    gap: 13px;
+    padding-bottom: 20px;
+  }
+
+  .app-detail-changelog-icon { width: 46px; height: 46px; border-radius: 14px; }
+  .app-detail-changelog-icon svg { width: 22px; height: 22px; }
+  .app-detail-changelog-title h2 { font-size: 25px; }
+  .app-detail-changelog-title p { font-size: 12px; }
+
+  .app-detail-changelog-count {
+    grid-column: 1 / -1;
+    grid-template-columns: auto auto;
+    min-height: 48px;
+    padding: 9px 14px;
+    align-items: center;
+    justify-content: start;
+    gap: 8px;
+    text-align: left;
+  }
+
+  .app-detail-changelog-count strong { font-size: 20px; }
+
+  .app-detail-changelog-timeline,
+  .app-detail-changelog-loading { margin-top: 20px; padding-left: 26px; }
+  .app-detail-changelog-timeline::before { left: 7px; }
+  .app-detail-changelog-dot { left: -25px; width: 12px; height: 12px; border-width: 3px; }
+  .app-detail-changelog-card { padding: 17px 16px; border-radius: 15px; }
+  .app-detail-changelog-card > header { align-items: flex-start; flex-direction: column; gap: 9px; }
+  .app-detail-changelog-card h3 { font-size: 16px; }
+  .app-detail-changelog-card p { font-size: 13px; line-height: 1.78; }
+  .app-detail-changelog-empty { grid-template-columns: 42px minmax(0, 1fr); padding: 17px; }
+  .app-detail-changelog-empty-icon { width: 42px; height: 42px; border-radius: 12px; }
+  .app-detail-changelog-empty button { grid-column: 1 / -1; width: 100%; }
+  .app-detail-changelog-toggle { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-detail-shell,
+  .app-detail-changelog-item,
+  .app-detail-changelog::after,
+  .app-detail-skeleton-block {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  .app-detail-back,
+  .app-detail-actions button,
+  .app-detail-actions a,
+  .app-detail-changelog-card,
+  .app-detail-changelog button {
+    transition: none !important;
+  }
 }
 </style>

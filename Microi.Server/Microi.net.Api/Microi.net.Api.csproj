@@ -126,6 +126,7 @@
     <ProjectReference Include="../Microi.Upgrade/Microi.Upgrade.csproj" />
     <ProjectReference Include="../Microi.MQTT/Microi.MQTT.csproj" />
     <ProjectReference Include="../Microi.V8Engine/Microi.V8Engine.csproj" />
+    <ProjectReference Include="../Microi.Translate/Microi.Translate.csproj" />
     <ProjectReference Include="..\Microi.Office\Microi.Office.csproj">
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>

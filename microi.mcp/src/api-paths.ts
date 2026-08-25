@@ -25,13 +25,13 @@ export const API = {
   TRANSITION_APPLICATION_STREAM_GATE: '/api/V8Engine/TransitionApplicationStreamGate',
 
   // Redis 管理器（默认当前租户连接，可指定已保存连接）
-  REDIS_STATISTICS: '/api/Cache/redis/statistics',
-  REDIS_KEYS: '/api/Cache/redis/keys',
-  REDIS_KEY: '/api/Cache/redis/key',
-  REDIS_DELETE_KEYS: '/api/Cache/redis/keys/delete',
-  REDIS_REPLACE_VALUE: '/api/Cache/redis/key/replace',
-  REDIS_RENAME_KEY: '/api/Cache/redis/key/rename',
-  REDIS_SET_TTL: '/api/Cache/redis/key/ttl',
+  REDIS_STATISTICS: '/apiengine/platform-cache-manager',
+  REDIS_KEYS: '/apiengine/platform-cache-manager',
+  REDIS_KEY: '/apiengine/platform-cache-manager',
+  REDIS_DELETE_KEYS: '/apiengine/platform-cache-manager',
+  REDIS_REPLACE_VALUE: '/apiengine/platform-cache-manager',
+  REDIS_RENAME_KEY: '/apiengine/platform-cache-manager',
+  REDIS_SET_TTL: '/apiengine/platform-cache-manager',
 
   // 数据库结构
   GET_DB_SCHEMA: '/api/V8Engine/GetDbSchema',
@@ -52,9 +52,9 @@ export const API = {
   UPDATE_ENGINE_CODE: '/api/V8Engine/UpdateApiEngineCode',
   CREATE_ENGINE: '/api/V8Engine/CreateApiEngine',
   EXECUTE_ENGINE: '/api/V8Engine/ExecuteApiEngine',
-  RUN_BACKGROUND_API_ENGINE: '/api/BackgroundTask/RunApiEngine',
-  LIST_BACKGROUND_TASKS: '/api/BackgroundTask/List',
-  CANCEL_BACKGROUND_TASK: '/api/BackgroundTask/Cancel',
+  RUN_BACKGROUND_API_ENGINE: '/apiengine/platform-background-task',
+  LIST_BACKGROUND_TASKS: '/apiengine/platform-background-task',
+  CANCEL_BACKGROUND_TASK: '/apiengine/platform-background-task',
   UPLOAD_FILE_BASE64: '/api/V8Engine/UploadFileBase64',
   UPLOAD_APPLICATION_ASSET_STREAM: '/api/V8Engine/UploadApplicationAssetStream',
   INITIATE_APPLICATION_ASSET_MULTIPART: '/api/V8Engine/InitiateApplicationAssetMultipart',

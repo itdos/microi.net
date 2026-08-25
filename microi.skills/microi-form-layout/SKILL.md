@@ -33,7 +33,7 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 - 配置表采用“表级 Tab + Tab 内 CollapseGroup”时，CollapseGroup 必须与成员字段写入同一个 `Tab`，并用连续 `Sort` 保证作用范围在下一个布局节点前结束。发布前必须打开真实编辑表单验证，不能只凭元数据字符串判断布局成功。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-form-layout-000 sha256=cade6a415454aa04f5fcf840e6d9df1323ac9751c0e3c8e1b07b360007413819 -->
+<!-- microi-progressive:chunk id=microi-form-layout-000 sha256=79fcf1787c0fbdbe51363f25fcf72b060b714eed9cbc5593760f9080cff48e31 -->
 ## 1. 三种分组能力速查
 
 | 能力 | 存储位置 | 控件 | 核心作用 | 适用场景 |
@@ -44,7 +44,7 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 | **D. 不分组（默认平铺）** | 无 | — | 全部字段在第一屏 | 总有效表单行 ≤ 6、没有复杂控件，且没有必须强调的业务分组 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-form-layout-001 sha256=f43f8c6f1c156ef3669f0c1f9a9d9d2cb7baf630d0b0cb2f48307a31f3f82ae2 -->
+<!-- microi-progressive:chunk id=microi-form-layout-001 sha256=eb8f9a306f46484217f8fc6094a7dc8ea1f5315187430329d79fa71134c3b2da -->
 ## 2. 黄金决策流程（AI 必须按此顺序判断）
 
 ### 2.1 先算“有效表单行”，禁止只数字段
@@ -95,7 +95,7 @@ Q1: 核心可见字段数、子表和强任务域？
 | 工作流审批表（≤10 字段） | D. 不分组 | 禁止使用 Tab |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-form-layout-002 sha256=9165f561ba90696ce130d24f71a0e56c521b5f8935eac2ddcffb852f3af5d9b2 -->
+<!-- microi-progressive:chunk id=microi-form-layout-002 sha256=119311f1ec30de83c323a0604c0aefb12676da7c421fc459d1555b0a1a7858d0 -->
 ## 4. AI 生成表单布局的标准动作
 
 ### 4.1 必做顺序
@@ -137,7 +137,7 @@ Q1: 核心可见字段数、子表和强任务域？
 V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.ClickFormTab('tabId')` 动态控制 Tab 显隐和默认选中。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-form-layout-003 sha256=c737fc8b0d488548e5a3de616ff172b8b645553c818fb09e70a196f4e9c0e2ae -->
+<!-- microi-progressive:chunk id=microi-form-layout-003 sha256=02934831afff7bd9065406b074f5780cb5686ccdb63fcb350b8c409dad315c74 -->
 ## 5. 必填与禁止
 
 ### 5.1 必填
@@ -167,7 +167,7 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 - ❌ **禁止**用普通新增字段或通用表单数据写入创建布局节点；这类路径可能对目标业务表执行物理 DDL。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-form-layout-004 sha256=539ae919554ca9eda5b5a26ac405181f601f4195f6a59baf1fd368d315987e6c -->
+<!-- microi-progressive:chunk id=microi-form-layout-004 sha256=5de749261dec123edd0fc9186188cb90887892490298dad9d6944670457177df -->
 ## 6. 验收清单
 
 修改或新建表单布局后，AI 必须按以下顺序验收：
@@ -188,7 +188,7 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 通常跳过这些运行态事件；未完成这一步不得直接判定为 Microi.Client 渲染缺陷。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-form-layout-005 sha256=db6759bef83e520e5f137347070f85df1275e14dcbc742bebfdaac4da14be375 -->
+<!-- microi-progressive:chunk id=microi-form-layout-005 sha256=941d45f4389751946df34ec388e28adbbe9965d6ad9f637f48fd35cc6aca5065 -->
 ## 9. 与其他 Skill 的关系
 
 - 字段创建流程：`v8-table-event/SKILL.md` 写 InFormV8 / SubmitFormV8 等。

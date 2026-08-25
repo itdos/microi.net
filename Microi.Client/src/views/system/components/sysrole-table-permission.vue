@@ -158,7 +158,7 @@ export default {
             this.policyLoadFailed = false;
             try {
                 const result = await this.DiyCommon.PostAsync(
-                    "/api/SysRole/GetDirectTableGrantPolicies",
+                    "/apiengine/platform-sys-role?Action=GetDirectTableGrantPolicies",
                     {},
                     null,
                     null,

@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.8.7
+ * Version: v1.9.7
  * Function:
- * - 统一应用商城发布器：V3 committed proof、精确版本、租户范围更新日志硬门禁、资源快照 CAS、共享公共运行时，以及受管接口历史兼容基线的连续发布。
+ * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -31,6 +31,30 @@ function parseObject(value, fallback) {
   try { return JSON.parse(text(value)); }
   catch (error) { return fallback || {}; }
 }
+function boolValue(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback;
+  var normalized = text(value).replace(/^\s+|\s+$/g, '').toLowerCase();
+  return value === true || value === 1 || ['1', 'true', 'yes', 'on', 'enabled'].indexOf(normalized) >= 0;
+}
+function readStoredPackage(row) {
+  if (!row) return {};
+  if (row.AppPakcet) return parseObject(row.AppPakcet, {});
+  if (!row.PackageHdfsPath || !row.PackageSha256 || Number(row.PackageSize || 0) < 1) return {};
+  var stored = V8.Method.GetPrivateFileText({
+    OsClient: V8.OsClient,
+    FilePathName: row.PackageHdfsPath,
+    Limit: text(row.PackageStorageMode).toLowerCase() === 'hdfsprivate',
+    MaxBytes: Math.min(Math.max(Number(row.PackageSize) + 1024, 1024 * 1024), 256 * 1024 * 1024)
+  });
+  if (!stored || stored.Code !== 1) throw new Error('读取上一版 HDFS 应用包失败：' + ((stored && stored.Msg) || '接口无返回'));
+  var packageText = text(stored.Data);
+  var actualSize = Number(System.Text.Encoding.UTF8.GetByteCount(packageText));
+  var actualSha = text(V8.EncryptHelper.Sha256Hex(packageText)).toLowerCase();
+  if (actualSize !== Number(row.PackageSize) || actualSha !== text(row.PackageSha256).toLowerCase()) {
+    throw new Error('上一版 HDFS 应用包大小或 SHA-256 回读不一致');
+  }
+  return parseObject(packageText, {});
+}
 function normalizePath(value) {
   var path = text(value).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
   var parts = path.split('/');
@@ -54,7 +78,12 @@ function buildArchivePath(value) {
 function sourceArchivePath(value) {
   var path = normalizePath(value);
   if (isBlank(path) || !isBlank(buildArchivePath(path))) return '';
-  if (path.toLowerCase().indexOf('source/') === 0) return path.substring(7);
+  var lower = path.toLowerCase();
+  // mci_ai_app_file 会保留每次发布形成的 upload/v* 历史上传副本。
+  // 它们既不是可编辑源码，也不是当前版本构建资产；打包时必须排除，
+  // 否则应用商城包会随历史版本线性膨胀，并在安装端重复还原陈旧文件。
+  if (lower.indexOf('upload/') === 0) return '';
+  if (lower.indexOf('source/') === 0) return path.substring(7);
   return path;
 }
 function safeFileName(value) {
@@ -206,6 +235,36 @@ function readFileBase64(filePathName, isText, limit) {
   if (!response || !response.RawBytes) throw new Error('下载 HDFS 文件失败：' + filePathName);
   return System.Convert.ToBase64String(response.RawBytes);
 }
+function readRuntimeAssetBase64(runtimeAsset, path) {
+  var stablePath = text(runtimeAsset && runtimeAsset.StableFilePathName);
+  var normalizedStablePath = stablePath.replace(/\\/g, '/');
+  var safeStablePath = /^\/micro-app\/v3\/tenants\/[a-z0-9_-]+\/kinds\/runtime\/apps\/[a-z0-9_-]+\/assets\//i.test(normalizedStablePath)
+    && normalizedStablePath.indexOf('..') < 0
+    && normalizedStablePath.indexOf('?') < 0
+    && normalizedStablePath.indexOf('#') < 0;
+  var apiBase = text(V8.SysConfig && V8.SysConfig.ApiBase).replace(/\/+$/, '');
+  if (safeStablePath && /^https?:\/\//i.test(apiBase)) {
+    try {
+      var stableResponse = V8.Http.GetResponse({
+        Url: apiBase + normalizedStablePath,
+        Timeout: 120
+      });
+      if (stableResponse && stableResponse.RawBytes) {
+        try {
+          var stableRawBase64 = System.Convert.ToBase64String(stableResponse.RawBytes);
+          if (!isBlank(stableRawBase64)) return stableRawBase64;
+        } catch (stableRawError) {}
+      }
+      if (isTextFile(path) && stableResponse && !isBlank(stableResponse.Content)) {
+        return V8.Base64.StringToBase64(text(stableResponse.Content));
+      }
+    } catch (stableReadError) {
+      // 稳定地址暂不可用时继续走租户 HDFS 原子能力，不能因一次网络抖动中断制包。
+    }
+  }
+  var hdfsPath = text(runtimeAsset && (runtimeAsset.FilePathName || runtimeAsset.HdfsPath || runtimeAsset.PathName));
+  return readFileBase64(hdfsPath, isTextFile(path), false);
+}
 function isTextFile(path) {
   var lower = text(path).toLowerCase();
   var extensions = ['.vue','.js','.jsx','.ts','.tsx','.json','.html','.htm','.css','.scss','.sass','.less','.md','.txt','.xml','.yaml','.yml','.toml','.ini','.env','.cs','.csproj','.sln','.java','.kt','.go','.py','.php','.rb','.rs','.sql','.sh','.ps1','.bat','.cmd'];
@@ -270,12 +329,12 @@ function getBuildAssets(app, latestVersion, runtime) {
     for (var i = 0; i < runtimeAssets.length; i++) {
       var runtimeAsset = runtimeAssets[i] || {};
       var path = normalizePath(runtimeAsset.Path || runtimeAsset.FileName || 'asset-' + i);
-      var hdfsPath = runtimeAsset.FilePathName || runtimeAsset.HdfsPath || runtimeAsset.PathName || '';
+      var inlineBase64 = text(runtimeAsset.ContentBase64 || runtimeAsset.FileByteBase64 || runtimeAsset.Base64);
       assets.push({
         Path: path,
         FileName: runtimeAsset.FileName || path.substring(path.lastIndexOf('/') + 1),
         ContentType: runtimeAsset.ContentType || '',
-        FileByteBase64: readFileBase64(hdfsPath, isTextFile(path), false),
+        FileByteBase64: inlineBase64 || readRuntimeAssetBase64(runtimeAsset, path),
         Size: runtimeAsset.Size || 0,
         Sha256: runtimeAsset.Sha256 || runtimeAsset.Hash || '',
         IsEntry: runtimeAsset.IsEntry === true || path === text(runtime.Service.EntryPath || 'index.html')
@@ -561,7 +620,7 @@ function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStor
   if (rows.length === 0) return null;
   var requestedRoot = parseObject(requestedPolicies, {});
   var requested = parseObject(requestedRoot.ApiEngines || requestedRoot, {});
-  var previousPackage = parseObject(existingStore && existingStore.AppPakcet, {});
+  var previousPackage = readStoredPackage(existingStore);
   var previousEngines = apiEngineMap(previousPackage.SysApiEngines);
   var previousRoot = parseObject(previousPackage.ResourcePolicies, {});
   var previousPolicies = parseObject(previousRoot.ApiEngines, {});
@@ -994,7 +1053,15 @@ if (!protocolV3 && appType === 'MicroService' && (!runtime || !runtime.Service) 
   };
 }
 var includeSource = V8.Param.IncludeSource === true || V8.Param.IncludeSource === 1 || text(V8.Param.IncludeSource).toLowerCase() === 'true';
+var requestedDatabaseOnlyBuild = V8.Param.DatabaseOnlyBuild === true
+  || V8.Param.DatabaseOnlyBuild === 1
+  || text(V8.Param.DatabaseOnlyBuild).toLowerCase() === 'true';
 var returnPackageModel = V8.Param.ReturnPackageModel === true || V8.Param.ReturnPackageModel === 1 || text(V8.Param.ReturnPackageModel).toLowerCase() === 'true';
+// 组合型应用商城导出器只需要 Package 对象继续合并资源。此模式禁止再生成
+// 内容完全重复的 FileByteBase64，避免大型源码包在 Jint/JSON 中占用双份内存。
+var packageModelOnly = V8.Param.PackageModelOnly === true
+  || V8.Param.PackageModelOnly === 1
+  || text(V8.Param.PackageModelOnly).toLowerCase() === 'true';
 var committedProof = null;
 var committedVersion = null;
 var v3RouteSnapshot = null;
@@ -1128,6 +1195,12 @@ var changeLogValidation = requireMarketplaceChangeLog(
 if (!changeLogValidation || changeLogValidation.Code !== 1) return changeLogValidation;
 var releaseChangeLog = changeLogValidation.Data;
 var sharedPublicRuntime = requestedSharedPublicRuntime;
+if (requestedDatabaseOnlyBuild && appType !== 'MicroService') {
+  return fail('DatabaseOnlyBuild 仅支持文件数和体积受限的 MicroService。');
+}
+if (requestedDatabaseOnlyBuild && sharedPublicRuntime) {
+  return fail('DatabaseOnlyBuild 与 SharedPublicRuntime 不能同时启用。');
+}
 if (sharedPublicRuntime) {
   if (!protocolV3) return fail('SharedPublicRuntime 只允许 ProtocolVersion=3 的已提交不可变运行时。');
   if (includeSource) return fail('SharedPublicRuntime 必须使用 IncludeSource=false；源码交付请使用普通 HDFS 或离线包。');
@@ -1185,8 +1258,8 @@ if (tableIds.length === 0 && existingStore && existingStore.SelectTable) {
 if (apiEngineKeys.length === 0 && existingStore && existingStore.SelectApiEngine) {
   apiEngineKeys = selectionValues(existingStore.SelectApiEngine, ['ApiEngineKey', 'Key', 'Value']);
 }
-if (scheduleJobNames.length === 0 && existingStore && existingStore.AppPakcet) {
-  var previousPackageWithJobs = parseObject(existingStore.AppPakcet, {});
+if (scheduleJobNames.length === 0 && existingStore) {
+  var previousPackageWithJobs = readStoredPackage(existingStore);
   var previousJobs = toArray(previousPackageWithJobs.ScheduleJobs);
   for (var previousJobIndex = 0; previousJobIndex < previousJobs.length; previousJobIndex++) {
     if (previousJobs[previousJobIndex] && previousJobs[previousJobIndex].JobName) {
@@ -1309,6 +1382,65 @@ if (sharedPublicRuntime) {
   };
   packageModel.ApplicationBundle.SharedPublicRuntime = sharedPublicRuntime;
 }
+if (requestedDatabaseOnlyBuild) {
+  buildAssets = getBuildAssets(app, latestVersion, runtime);
+  if (!buildAssets.length) return fail('当前微服务没有可内联的编译文件，无法发布 DatabaseOnlyBuild。');
+  if (buildAssets.length > 256) return fail('DatabaseOnlyBuild 最多允许 256 个编译文件。');
+  var databaseOnlyTotalBytes = 0;
+  var databaseOnlyEntryVerified = false;
+  for (var databaseOnlyIndex = 0; databaseOnlyIndex < buildAssets.length; databaseOnlyIndex++) {
+    var databaseOnlyAsset = buildAssets[databaseOnlyIndex] || {};
+    var databaseOnlyPath = normalizePath(databaseOnlyAsset.Path || databaseOnlyAsset.FileName);
+    var databaseOnlyBase64 = text(databaseOnlyAsset.FileByteBase64 || databaseOnlyAsset.ContentBase64 || databaseOnlyAsset.Base64);
+    if (!databaseOnlyPath || !databaseOnlyBase64) {
+      return fail('DatabaseOnlyBuild 缺少完整编译文件内容：' + (databaseOnlyPath || ('asset-' + databaseOnlyIndex)));
+    }
+    var databaseOnlyBytes = 0;
+    try { databaseOnlyBytes = System.Convert.FromBase64String(databaseOnlyBase64).Length; }
+    catch (databaseOnlyDecodeError) { return fail('DatabaseOnlyBuild 包含无效 Base64：' + databaseOnlyPath); }
+    if (databaseOnlyBytes <= 0) return fail('DatabaseOnlyBuild 包含空文件：' + databaseOnlyPath);
+    databaseOnlyTotalBytes += databaseOnlyBytes;
+    databaseOnlyAsset.Size = databaseOnlyBytes;
+    if (databaseOnlyPath.toLowerCase() === normalizePath(entryPath).toLowerCase()) {
+      var databaseOnlyHtml = '';
+      try {
+        databaseOnlyHtml = System.Text.Encoding.UTF8.GetString(
+          System.Convert.FromBase64String(databaseOnlyBase64)
+        );
+      } catch (databaseOnlyHtmlError) { return fail('DatabaseOnlyBuild 入口不是有效 UTF-8 HTML。'); }
+      if (!/<!doctype\s+html/i.test(databaseOnlyHtml)
+          || !/<html\b/i.test(databaseOnlyHtml)
+          || !/<head\b/i.test(databaseOnlyHtml)
+          || !/<body\b/i.test(databaseOnlyHtml)
+          || !/<\/html\s*>/i.test(databaseOnlyHtml)) {
+        return fail('DatabaseOnlyBuild 入口未返回完整 HTML 文档。');
+      }
+      databaseOnlyAsset.IsEntry = true;
+      databaseOnlyEntryVerified = true;
+    }
+  }
+  if (databaseOnlyTotalBytes > 5 * 1024 * 1024) {
+    return fail('DatabaseOnlyBuild 总大小不能超过 5MB，当前为 ' + databaseOnlyTotalBytes + ' bytes。');
+  }
+  if (!databaseOnlyEntryVerified) return fail('DatabaseOnlyBuild 缺少入口文件：' + entryPath);
+  var databaseOnlyService = {};
+  var sourceMicroService = runtime.Service || {};
+  for (var databaseOnlyServiceKey in sourceMicroService) {
+    databaseOnlyService[databaseOnlyServiceKey] = sourceMicroService[databaseOnlyServiceKey];
+  }
+  databaseOnlyService.StorageMode = 'db';
+  databaseOnlyService.MsUrl = 'db';
+  databaseOnlyService.EntryPath = entryPath;
+  databaseOnlyService.AssetCount = buildAssets.length;
+  packageModel.PackageInfo.DatabaseOnlyBuild = true;
+  packageModel.ApplicationBundle.BuildAssets = buildAssets;
+  packageModel.ApplicationBundle.MicroService = databaseOnlyService;
+  packageModel.ApplicationBundle.AssetStoragePolicy = {
+    Source: includeSource ? 'PrivateHdfs' : 'NotIncluded',
+    Build: 'DatabaseOnly',
+    Reason: '小型平台微服务使用可验证数据库内联运行时，避免目标租户对象存储差异导致 404。'
+  };
+}
 var generatedResourcePolicies = buildApiEngineResourcePolicies(
   packageModel.SysApiEngines,
   requestedResourcePolicies,
@@ -1347,6 +1479,20 @@ if (isOfflineAction) {
     packageModel.ApplicationBundle.SourceFiles = sourceFiles;
   }
   packageModel.PackageInfo.OfflineSelfContained = true;
+  if (packageModelOnly) {
+    return ok({
+      Package: packageModel,
+      PackageSummary: {
+        Name: packageModel.PackageInfo.Name,
+        Version: packageModel.PackageInfo.Version,
+        OfflineSelfContained: true,
+        BuildAssetCount: buildAssets.length,
+        SourceFileCount: sourceFiles.length,
+        RouteCount: packageModel.ApplicationBundle.Routes.length,
+        JobCount: selectedScheduleJobs.length
+      }
+    }, '应用离线包模型已生成');
+  }
   var jsonText = JSON.stringify(packageModel, null, 2);
   var offlineResult = {
     FileName: safeFileName(packageModel.PackageInfo.Name) + '-' + versionNo + '.microi-app.json',
@@ -1380,6 +1526,22 @@ if (action === 'Publish') {
   var packageZipFiles = [];
   if (packageAssets.BuildZip) packageZipFiles.push(packageAssets.BuildZip);
   if (packageAssets.SourceZip) packageZipFiles.push(packageAssets.SourceZip);
+  var packageJson = JSON.stringify(packageModel);
+  var storeVisibility = boolValue(
+    V8.Param.IsPublic,
+    boolValue(preservedStore.IsPublic, true)
+  );
+  var storageResult = V8.ApiEngine.Run('microi-store-package-storage', {
+    Action: 'Store',
+    StoreId: app.Id,
+    AppVersion: versionNo,
+    IsPublic: storeVisibility,
+    Package: packageJson
+  });
+  if (!storageResult || storageResult.Code !== 1 || !storageResult.Data) {
+    return fail('应用包写入 HDFS 失败：' + ((storageResult && storageResult.Msg) || '接口无返回'));
+  }
+  var packagePointer = storageResult.Data;
   var storeRow = {
     AppName: packageModel.PackageInfo.Name,
     Name: packageModel.PackageInfo.Name,
@@ -1408,7 +1570,15 @@ if (action === 'Publish') {
     PrivateSourcePath: preservedStore.PrivateSourcePath || app.PrivateSourcePath || '',
     AppPublishTime: nowText('yyyy-MM-dd HH:mm:ss'),
     AppUpdateTime: nowText('yyyy-MM-dd HH:mm:ss'),
-    AppPakcet: JSON.stringify(packageModel),
+    AppPakcet: '',
+    PackageId: packagePointer.PackageId,
+    PackageStorageMode: packagePointer.PackageStorageMode,
+    PackageHdfsPath: packagePointer.PackageHdfsPath,
+    PackageSha256: packagePointer.PackageSha256,
+    PackageSize: packagePointer.PackageSize,
+    PackageContentType: packagePointer.PackageContentType,
+    PackageFormatVersion: packagePointer.PackageFormatVersion,
+    PackageUploadedAt: packagePointer.PackageUploadedAt,
     SelectMenu: V8.Param.SelectMenu !== undefined && V8.Param.SelectMenu !== null
       ? selectionJson(V8.Param.SelectMenu)
       : (V8.Param.MenuIds !== undefined && V8.Param.MenuIds !== null
@@ -1455,6 +1625,14 @@ if (action === 'Publish') {
       IsApprove: storeRow.IsApprove,
       AppUpdateTime: storeRow.AppUpdateTime,
       AppPakcet: storeRow.AppPakcet,
+      PackageId: storeRow.PackageId,
+      PackageStorageMode: storeRow.PackageStorageMode,
+      PackageHdfsPath: storeRow.PackageHdfsPath,
+      PackageSha256: storeRow.PackageSha256,
+      PackageSize: storeRow.PackageSize,
+      PackageContentType: storeRow.PackageContentType,
+      PackageFormatVersion: storeRow.PackageFormatVersion,
+      PackageUploadedAt: storeRow.PackageUploadedAt,
       SelectMenu: storeRow.SelectMenu,
       SelectTable: storeRow.SelectTable,
       SelectApiEngine: storeRow.SelectApiEngine,
@@ -1487,7 +1665,10 @@ if (action === 'Publish') {
       }
     } catch (postVersionProofError) { return fail(postVersionProofError.message); }
     if (!postPublishStore
-        || text(postPublishStore.AppPakcet) !== text(packageFields.AppPakcet)
+        || text(postPublishStore.AppPakcet) !== ''
+        || text(postPublishStore.PackageHdfsPath) !== text(packageFields.PackageHdfsPath)
+        || text(postPublishStore.PackageSha256).toLowerCase() !== text(packageFields.PackageSha256).toLowerCase()
+        || Number(postPublishStore.PackageSize || 0) !== Number(packageFields.PackageSize || 0)
         || text(postPublishStore.AiAppPackageManifest) !== text(packageFields.AiAppPackageManifest)
         || text(postPublishStore.AiAppZipFiles) !== text(packageFields.AiAppZipFiles)) {
       return fail('v3 committed-proof CAS 写包回读不一致');

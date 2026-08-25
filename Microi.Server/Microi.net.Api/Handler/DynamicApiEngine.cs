@@ -18,42 +18,43 @@ namespace Microi.net.Api
         private const string CacheKeyPrefix = "Microi";
         private const string ApiEngineCacheKey = "FormData:sys_apiengine";
 
-        // 标准 Controller 路由前缀（提前返回，避免缓存查询 - 性能优化）
-        // 包含所有已注册的 Controller 路由（共 34 个）
+        // 标准 Controller 路由前缀（提前返回，避免缓存查询 - 性能优化）。
+        // 此清单只包含当前实际保留的宿主协议/内核 Controller；迁入 Managed
+        // ApiEngine 的旧入口必须从这里移除，避免不存在的 /api/* 路由吞掉动态地址。
         private static readonly HashSet<string> StandardControllerPrefixes = new(StringComparer.OrdinalIgnoreCase)
         {
             "/api/ai/",
-            "/api/alipay/",
             "/api/apiengine/",
-            "/api/cache/",
             "/api/captcha/",
             "/api/datasourceengine/",
+            "/api/diagnostics/",
             "/api/diychat/",
-            "/api/diyfield/",
-            "/api/diytable/",
+            "/api/externallogin/",
             "/api/formengine/",
             "/api/hdfs/",
             "/api/home/",
-            "/api/im/",
-            "/api/job/",
+            "/api/identityverification/",
+            "/api/license/",
+            "/api/marketplacesource/",
             "/api/message/",
+            "/api/microapp/",
             "/api/moduleengine/",
-            "/api/mq/",
-            "/api/mqtt/",
+            "/api/ocr/",
             "/api/office/",
             "/api/os/",
-            "/api/searchengine/",
-            "/api/spider/",
-            "/api/sysbasedata/",
-            "/api/sysdept/",
-            "/api/syslog/",
-            "/api/sysmenu/",
-            "/api/sysrole/",
+            "/api/securityguard/",
+            "/api/sso/",
             "/api/sysuser/",
-            "/api/test/",
+            "/api/sysuseraccesskey/",
+            "/api/tenantsystemsettings/",
+            "/api/translate/",
             "/api/ueditor/",
             "/api/upload/",
+            "/api/userbehavior/",
+            "/api/v8debug/",
+            "/api/v8engine/",
             "/api/wechat/",
+            "/api/wechatcontentsecurity/",
             "/api/workflow/",
             "/itdos-heart"  // 特殊路由：心跳检测
         };
@@ -175,17 +176,24 @@ namespace Microi.net.Api
             var requestMethod = httpContext.Request.Method?.ToUpperInvariant();
             var contentType = httpContext.Request.ContentType?.ToLowerInvariant();
 
+            bool responseFile = DynamicHelper.GetDynamicBoolValue(apiModel, "ResponseFile");
+            string responseType = DynamicHelper.GetDynamicStringValue(apiModel, "ResponseType", "0");
+            var normalizedResponseType = responseType?.Trim() ?? "0";
+
+            if (responseFile || string.Equals(normalizedResponseType, "File", StringComparison.OrdinalIgnoreCase))
+                return "Run_Response_File";
+
+            if (string.Equals(normalizedResponseType, "Stream", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedResponseType, "SSE", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedResponseType, "2", StringComparison.OrdinalIgnoreCase))
+                return "Run_Response_Stream";
+
+            if (string.Equals(normalizedResponseType, "HTML", StringComparison.OrdinalIgnoreCase))
+                return "Run_Response_Html";
+
             // 非 JSON 请求的特殊处理
             if (string.IsNullOrEmpty(contentType) || !contentType.Contains("json"))
             {
-                bool responseFile = DynamicHelper.GetDynamicBoolValue(apiModel, "ResponseFile");
-                string responseType = DynamicHelper.GetDynamicStringValue(apiModel, "ResponseType", "0");
-
-                if (responseFile || responseType == "File")
-                    return "Run_Response_File";
-
-                if (responseType == "HTML")
-                    return "Run_Response_Html";
 
                 if (requestMethod == "GET")
                     return "Run_Request_Get";
@@ -327,6 +335,15 @@ namespace Microi.net.Api
 
                 if (apiModel != null)
                 {
+                    // 在路由解析阶段即把真实接口引擎 Key 写入轻量观测上下文。
+                    // 控制器无需读取请求体，固定自定义地址与通用兼容入口都能按
+                    // ApiEngineKey 分开统计，避免聚合成无法定位的 /api/ApiEngine/Run。
+                    var (resolvedApiEngineKey, _) = GetRouteCacheAliases((object)apiModel);
+                    SystemObservabilityService.AnnotateApiEngine(
+                        httpContext,
+                        resolvedApiEngineKey,
+                        osClient);
+
                     // 设置 OsClient 到 Header（供后续使用）
                     try
                     {
@@ -350,6 +367,16 @@ namespace Microi.net.Api
                     // 决定执行的 Action
                     values["controller"] = "ApiEngine";
                     values["action"] = DetermineApiAction(httpContext, apiModel);
+                    return values;
+                }
+
+                if (apiPathLower.StartsWith("/apiengine/", StringComparison.OrdinalIgnoreCase))
+                {
+                    // 即使应用尚未安装或路由缓存暂时缺失，也把明确的接口引擎地址
+                    // 交给核心入口按 ApiAddress 解析并返回结构化 DosResult，避免 404。
+                    // 存在的 File/HTML/Stream 类型仍会在上方读取模型后选择专用 Action。
+                    values["controller"] = "ApiEngine";
+                    values["action"] = requestMethod == "GET" ? "Run_Request_Get" : "Run";
                     return values;
                 }
             }

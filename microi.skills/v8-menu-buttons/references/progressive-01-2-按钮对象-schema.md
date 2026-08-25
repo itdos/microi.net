@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-menu-buttons-004 sha256=f18f04c54a81c7aaf5c79867eda0f7ec716a5e9b05c723dae9b77cde127326f3 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-004 sha256=9550f2e3a75583bb6f2ab940d423931511f39b6ad8a11fc982c6b24bca6416d1 -->
 ## 2. 按钮对象 Schema
 
 ```jsonc

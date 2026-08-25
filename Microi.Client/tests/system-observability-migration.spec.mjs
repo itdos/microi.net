@@ -20,16 +20,14 @@ test('legacy custom log and monitor pages are removed in favor of the built-in m
   assert.doesNotMatch(aiEngine, /\/api\/systemmonitor\//i)
 })
 
-test('legacy monitor controller is deleted and SysLog only keeps the compatibility writer', () => {
+test('legacy monitor and SysLog controllers are deleted in favor of Managed ApiEngines', () => {
   const apiRoot = path.join(workspaceRoot, 'Microi.Server/Microi.net.Api')
   assert.equal(fs.existsSync(path.join(apiRoot, 'Controllers/SystemMonitorController.cs')), false)
-
-  const sysLog = read(path.join(apiRoot, 'Controllers/SysLogController.cs'))
-  assert.match(sysLog, /AddSysLog\s*\(/)
-  for (const removed of ['GetSysLog', 'GetLogTypes', 'GetSysLogStats', 'GetQueueHealth', 'GetDockerLogs']) {
-    assert.doesNotMatch(sysLog, new RegExp(`${removed}\\s*\\(`))
-  }
+  assert.equal(fs.existsSync(path.join(apiRoot, 'Controllers/SysLogController.cs')), false)
 
   const catalog = read(path.join(apiRoot, 'api-ownership-catalog.json'))
   assert.doesNotMatch(catalog, /SystemMonitorController/)
+
+  const packageText = read(path.join(workspaceRoot, 'Microi.Server/Microi.Upgrade/Resource/app.microi.saas-engine.json'))
+  assert.match(packageText, /platform-client-log/)
 })

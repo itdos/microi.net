@@ -169,7 +169,7 @@ export default {
       }
     },
     async loadServiceTypes() {
-      const result = await post('/api/SysBaseData/getSysBaseData', { ParentKey: 'ShouhouDDLX' }, true)
+      const result = await post('/apiengine/platform-sys-base-data?Action=GetSysBaseData', { ParentKey: 'ShouhouDDLX' }, true)
       const rows = result && Number(result.Code) === 1 && Array.isArray(result.Data) ? result.Data : []
       this.serviceTypes = rows.map((item) => ({ label: item.Value || item.Name || item.Key, value: item.Value || item.Key })).filter((item) => item.value)
     },

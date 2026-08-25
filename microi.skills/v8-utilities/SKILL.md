@@ -71,7 +71,7 @@ var clientDecoded = V8.Base64.decode(clientEncoded);
 | Excel/Word/PPT/邮件 | `v8-export-import` |
 | 前端事件/打印/扫码 | `v8-frontend-events` |
 | 后端表单事件 | `v8-table-event` |
-| 接口配置/异步/后台任务 | `v8-api-config` |
+| 接口配置/流式响应/异步/后台任务 | `v8-api-config` |
 
 ## 不可越过的边界
 

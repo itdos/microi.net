@@ -90,7 +90,7 @@ Microi 吾码从 `v7.5.0` 起提供双向 SSO 身份联邦：既可以让企业�
 
 `{OsClient}` 必须与当前租户一致，`{ConnectionKey}` 使用连接的 `SsoKey`。
 
-登录页能力发现与登录完成使用稳定通用入口 `POST /api/ApiEngine/Run?OsClient={OsClient}`，请求体携带 `ApiEngineKey=sso_capabilities` 或 `sso_complete_login`。不要再调用已移除的 `/api/Sso/Capabilities`、`/api/Sso/LegacyCapabilities`、`/api/Sso/CompleteLogin`、`/api/Sso/RotateClientSecret` 或 `/api/SysUser/SsoPengrui`；这也是应用尚未安装时返回结构化“接口引擎不存在”而不是路由 404 的关键。
+登录页能力发现与登录完成使用可观测的自定义入口 `POST /apiengine/sso_capabilities?OsClient={OsClient}`、`POST /apiengine/sso_complete_login?OsClient={OsClient}`。不要再调用已移除的 `/api/Sso/Capabilities`、`/api/Sso/LegacyCapabilities`、`/api/Sso/CompleteLogin`、`/api/Sso/RotateClientSecret` 或 `/api/SysUser/SsoPengrui`；新版宿主即使应用尚未安装，也会返回结构化“接口引擎不存在”，而不是路由 404。
 
 `POST /api/Sso/Begin`、`POST /api/Sso/CompleteAuthorization` 以及下列标准协议 URL 是最小协议网关，不是业务编排接口。它们验证原始协议后调用上述接口引擎；不能为了追求“零 C# 路由”把私钥、外部 Client Secret、任意重定向或 DiyToken 签发暴露给可编辑脚本。
 
@@ -162,7 +162,7 @@ Service Ticket 为一次性票据，必须与原始 service 精确绑定；校�
 
 ## 八、常见问题
 
-**登录页请求 `/api/Sso/Capabilities` 等旧路径 404**：先升级 `Microi.Client`；新版统一调用 `/api/ApiEngine/Run`。再升级 `Microi.Server` 和 `app.microi.sso`，并回读 11 个接口引擎。应用尚未安装时通用入口应返回结构化缺失提示，不应再出现动态路由 404。
+**登录页请求 `/api/Sso/Capabilities` 等旧路径 404**：先升级 `Microi.Client`；新版统一调用 `/apiengine/{ApiEngineKey}`。再升级 `Microi.Server` 和 `app.microi.sso`，并回读 11 个接口引擎。应用尚未安装时自定义入口应返回结构化缺失提示，不应直接出现路由 404。
 
 **商城更新后仍执行旧接口代码**：回读 `sys_apiengine.Version/ApiV8Code`，确认 Managed 基线没有租户修改冲突，刷新租户接口引擎缓存；不要用 SQL 强行覆盖或手工修改 `.resource-sync-base`。
 

@@ -12,8 +12,53 @@ using System.Threading.Tasks;
 
 namespace Microi.net
 {
-    public class MicroiElasticSearchHelper : IMicroiSearchEngineHelper
+    public class MicroiElasticSearchHelper : IMicroiSearchEngineHelper, IMicroiSearchManagementRuntime
     {
+        public async Task<DosResult> ExecuteAsync(string osClient, string action, Newtonsoft.Json.Linq.JObject request)
+        {
+            MicroiSearchEngineResult result;
+            switch ((action ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "asyncindex":
+                    result = await AsyncIndex(request?["TableId"]?.ToString(), osClient).ConfigureAwait(false);
+                    break;
+                case "adddocument":
+                    result = await AddDocument(request?["TableName"]?.ToString(), request?["Id"]?.ToString(), osClient).ConfigureAwait(false);
+                    break;
+                case "updatedocument":
+                    result = await UpdateDocument(request?["TableName"]?.ToString(), request?["Id"]?.ToString(), osClient).ConfigureAwait(false);
+                    break;
+                case "deletedocument":
+                    result = await DeleteDocument(request?["TableName"]?.ToString(), request?["Id"]?.ToString(), osClient).ConfigureAwait(false);
+                    break;
+                case "addfield":
+                    result = await AddField(request?.ToObject<MicroiSearchEngineFieldModel>(), osClient).ConfigureAwait(false);
+                    break;
+                case "searchbypage":
+                case "searchbysearchafter":
+                {
+                    var search = request?.ToObject<MicroiSearchEngineParam>() ?? new MicroiSearchEngineParam();
+                    search.OsClient = osClient;
+                    search.PageType = string.Equals(action, "searchbysearchafter", StringComparison.OrdinalIgnoreCase)
+                        ? MicroiSearchEngineConst.page_searchafter
+                        : MicroiSearchEngineConst.page_from_size;
+                    result = await GetSearchResponse(search).ConfigureAwait(false);
+                    break;
+                }
+                case "asynctabledatatoindex":
+                    result = await AsyncTableDataToIndex(request?["TableId"]?.ToString(), osClient).ConfigureAwait(false);
+                    break;
+                default:
+                    return new DosResult(0, null, "不支持的搜索引擎动作。");
+            }
+            if (result == null) return new DosResult(0, null, "搜索引擎没有返回结果。");
+            return new DosResult(result.Code, result.Data, result.Msg)
+            {
+                DataCount = result.DataCount > int.MaxValue ? int.MaxValue : (int)result.DataCount,
+                DataAppend = result.SearchAfter == null ? null : new { result.SearchAfter }
+            };
+        }
+
         /// <summary>
         /// 获取当前租户的 OsClient 标识。
         /// HTTP/JWT 与 V8 执行上下文中的租户永远是权威值；只有确实不存在请求/V8

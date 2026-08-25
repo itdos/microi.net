@@ -10,6 +10,7 @@ const BROWSER_EXECUTABLE = process.env.PW_BROWSER_EXECUTABLE || ''
 
 test.use({
   ignoreHTTPSErrors: true,
+  channel: BROWSER_EXECUTABLE ? undefined : 'msedge',
   launchOptions: BROWSER_EXECUTABLE ? { executablePath: BROWSER_EXECUTABLE } : undefined
 })
 test.setTimeout(120_000)
@@ -30,12 +31,13 @@ async function loginCurrent(page) {
 }
 
 async function runConnectionEngine(page, token, param) {
-  const response = await page.request.post(`${BACKEND}/api/ApiEngine/Run`, {
+  const response = await page.request.post(`${BACKEND}/apiengine/mci_file_remote_connection`, {
     headers: { OsClient: OS_CLIENT, authorization: token },
-    data: { ApiEngineKey: 'mci_file_remote_connection', ...param },
+    data: { ...param },
     timeout: 10_000
   })
-  return response.json()
+  const result = await response.json()
+  return result?.Data?.Result || result
 }
 
 test('remote login session persists, reconnects and reports missing target capability', async ({ page }) => {
@@ -66,7 +68,7 @@ test('remote login session persists, reconnects and reports missing target capab
       })
       return
     }
-    if (url.pathname === '/api/ApiEngine/Run') {
+    if (url.pathname === '/apiengine/mci_file_sync_capability') {
       await route.fulfill({ headers: corsHeaders, json: { Code: 0, Msg: '未找到接口引擎：mci_file_sync_capability' } })
       return
     }
@@ -79,7 +81,7 @@ test('remote login session persists, reconnects and reports missing target capab
   if (loginVisible) {
     await usernameInput.fill(ACCOUNT)
     await page.locator('input[placeholder="请输入密码"], input[placeholder="Please enter user password."]').first().fill(PASSWORD)
-    await page.getByRole('button', { name: /登\s*录|log\s*in/i }).click()
+    await page.locator('button.login-button').click()
   }
   await expect(page.getByText('文件同步', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
 
@@ -103,10 +105,17 @@ test('remote login session persists, reconnects and reports missing target capab
     expect(savedConnection?.Id).toBeTruthy()
     await targetPanel.getByRole('button', { name: '退出', exact: true }).click()
     await expect(targetPanel.getByRole('button', { name: '登录', exact: true })).toBeVisible()
-    const loggedOutConnections = await runConnectionEngine(page, token, { Action: 'list' })
-    const loggedOutConnection = (loggedOutConnections.Data || []).find(item => item.Id === savedConnection.Id)
-    expect(loggedOutConnection?.IsLoggedIn).toBe(0)
-    expect(loggedOutConnection?.HasToken).toBe(false)
+    await expect.poll(async () => {
+      const loggedOutConnections = await runConnectionEngine(page, token, { Action: 'list' })
+      const loggedOutConnection = (loggedOutConnections.Data || []).find(item => item.Id === savedConnection.Id)
+      return {
+        IsLoggedIn: loggedOutConnection?.IsLoggedIn,
+        HasToken: loggedOutConnection?.HasToken
+      }
+    }, { timeout: 10_000, message: 'logout must durably clear the saved remote token' }).toEqual({
+      IsLoggedIn: 0,
+      HasToken: false
+    })
 
     await targetPanel.locator('.connection-toolbar .el-select').click()
     await page.locator('.el-select-dropdown__item:visible').filter({ hasText: 'fake_remote / codex_remote' }).click()

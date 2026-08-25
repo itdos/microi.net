@@ -87,7 +87,7 @@ namespace Microi.net
             osClient = Limit((osClient ?? "").Trim(), 50);
             if (route.Length > 0 && SafeKeyPattern.IsMatch(route)) state.Route = route;
             if (endpointKind.Length > 0 && SafeKeyPattern.IsMatch(endpointKind)) state.EndpointKind = endpointKind;
-            if (apiEngineKey.Length == 0 || SafeKeyPattern.IsMatch(apiEngineKey)) state.ApiEngineKey = apiEngineKey;
+            if (apiEngineKey.Length > 0 && SafeKeyPattern.IsMatch(apiEngineKey)) state.ApiEngineKey = apiEngineKey;
             if (osClient.Length > 0 && SafeKeyPattern.IsMatch(osClient)) state.RequestedOsClient = osClient;
             state.IsDiagnostic = IsDiagnosticRoute(state.Route);
         }
@@ -223,11 +223,13 @@ namespace Microi.net
         public static IReadOnlyList<NetworkTrafficRollupRow> BuildRollupRows(
             DateTime bucketStartUtc,
             int bucketMinutes = 5,
-            int top = 10)
+            int top = 10,
+            int endpointTop = 0)
         {
             bucketStartUtc = bucketStartUtc.ToUniversalTime();
             bucketMinutes = Math.Max(1, Math.Min(15, bucketMinutes));
             top = Math.Max(1, Math.Min(25, top));
+            endpointTop = endpointTop <= 0 ? top : Math.Max(1, Math.Min(50, endpointTop));
             var endUtc = bucketStartUtc.AddMinutes(bucketMinutes);
             var firstMinute = MinuteKey(bucketStartUtc);
             var endMinute = MinuteKey(endUtc);
@@ -239,11 +241,70 @@ namespace Microi.net
             var aggregate = AggregateBuckets(buckets);
             var rows = new List<NetworkTrafficRollupRow>();
             rows.Add(ToRollupRow(bucketStartUtc, bucketMinutes, "Total", "*", aggregate.Total));
-            AddRollupRows(rows, bucketStartUtc, bucketMinutes, "Endpoint", aggregate.Routes, top);
+            AddRollupRows(rows, bucketStartUtc, bucketMinutes, "Endpoint", aggregate.Routes, endpointTop);
             AddRollupRows(rows, bucketStartUtc, bucketMinutes, "Ip", aggregate.Ips, top);
             AddRollupRows(rows, bucketStartUtc, bucketMinutes, "User", aggregate.Users, top);
             AddRollupRows(rows, bucketStartUtc, bucketMinutes, "Tenant", aggregate.Tenants, top);
             AddRollupRows(rows, bucketStartUtc, bucketMinutes, "ContentType", aggregate.ContentTypes, top);
+            return rows;
+        }
+
+        /// <summary>
+        /// Re-aggregates persisted child buckets into bounded hourly/daily rows. This
+        /// keeps one-year dashboard queries on fixed rollups instead of scanning raw
+        /// MongoDB samples or hundreds of thousands of five-minute rows.
+        /// </summary>
+        public static IReadOnlyList<NetworkTrafficRollupRow> AggregatePersistedRollupRows(
+            IEnumerable<NetworkTrafficRollupRow> source,
+            DateTime bucketStartUtc,
+            int bucketMinutes,
+            int top = 10,
+            int endpointTop = 25)
+        {
+            bucketStartUtc = bucketStartUtc.ToUniversalTime();
+            bucketMinutes = Math.Max(5, Math.Min(1440, bucketMinutes));
+            top = Math.Max(1, Math.Min(25, top));
+            endpointTop = Math.Max(1, Math.Min(50, endpointTop));
+            var grouped = new Dictionary<string, Dictionary<string, TrafficAggregate>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in source ?? Array.Empty<NetworkTrafficRollupRow>())
+            {
+                if (row == null || row.RequestCount < 0 || string.IsNullOrWhiteSpace(row.DimensionType)) continue;
+                if (!grouped.TryGetValue(row.DimensionType, out var dimensions))
+                {
+                    dimensions = new Dictionary<string, TrafficAggregate>(StringComparer.OrdinalIgnoreCase);
+                    grouped[row.DimensionType] = dimensions;
+                }
+                var key = row.DimensionKey ?? "unknown";
+                if (!dimensions.TryGetValue(key, out var aggregate))
+                {
+                    aggregate = new TrafficAggregate();
+                    dimensions[key] = aggregate;
+                }
+                aggregate.Merge(new TrafficAggregate
+                {
+                    Count = row.RequestCount,
+                    ErrorCount = row.ErrorCount,
+                    SlowCount = row.SlowCount,
+                    ReceivedBytes = row.ReceivedBytes,
+                    SentBytes = row.SentBytes,
+                    DurationMs = row.DurationMs,
+                    MaxDurationMs = row.MaxDurationMs,
+                    AnonymousCount = row.AnonymousCount,
+                    UploadCount = row.UploadCount,
+                    DownloadCount = row.DownloadCount,
+                    SuspiciousCount = row.SuspiciousCount
+                });
+            }
+
+            var rows = new List<NetworkTrafficRollupRow>();
+            foreach (var type in new[] { "Total", "Endpoint", "Ip", "User", "Tenant", "ContentType" })
+            {
+                if (!grouped.TryGetValue(type, out var dimensions) || dimensions.Count == 0) continue;
+                var limit = string.Equals(type, "Total", StringComparison.OrdinalIgnoreCase)
+                    ? 1
+                    : string.Equals(type, "Endpoint", StringComparison.OrdinalIgnoreCase) ? endpointTop : top;
+                AddRollupRows(rows, bucketStartUtc, bucketMinutes, type, dimensions, limit);
+            }
             return rows;
         }
 
@@ -353,6 +414,8 @@ namespace Microi.net
                     OsClient = string.IsNullOrWhiteSpace(item.OsClient) ? OsClientDefault.OsClient : item.OsClient,
                     UserId = item.UserId,
                     UserName = item.Actor,
+                    ClientType = item.ClientType,
+                    RequestMethod = item.Method,
                     Category = "Network",
                     Action = item.IsSuspicious ? "SuspiciousTransfer" : direction,
                     Source = "SystemObservability",

@@ -7,7 +7,7 @@
 统计都应来自真实字段或真实接口引擎；配置写 `diy_table`，禁止写入 `sys_menu`。即使用户
 没有逐项指定，也必须写入类型感知的合理默认值，不能交付空 Banner。
 
-<!-- microi-progressive:chunk id=microi-system-delivery-005 sha256=e27ee98421974395b858927ab7b7fbebe27f314e54a8f616064b9c77c01ba808 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-005 sha256=8e90f8c4618b882000935a83b8ed581ff20c32d9b888f74eb0ace8c39439a46e -->
 ## 标准工作流
 
 ### 1. 需求蓝图阶段

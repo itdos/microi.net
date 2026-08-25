@@ -45,7 +45,8 @@ namespace Microi.net.Api
                 "Run_FormData",
                 "Run_Request_Get",
                 "Run_Response_File",
-                "Run_Response_Html"
+                "Run_Response_Html",
+                "Run_Response_Stream"
             };
         private static readonly HashSet<string> OnlyGetSafeActions =
             new HashSet<string>(StringComparer.Ordinal)

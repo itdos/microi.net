@@ -8,26 +8,41 @@ namespace Dos.Common.Tests;
 public class PlatformRoleMutationSecurityTests
 {
     [Fact]
-    public void SysRoleMutationEndpoints_AreProtectedByPlatformAdministratorFilter()
+    public void SysRoleMutation_IsOwnedByManagedApiEngineAndMinimalV8Primitive()
     {
-        Assert.Null(typeof(SysRoleController).GetCustomAttribute<PlatformAdminOnlyAttribute>(true));
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.Upgrade",
+            "Resource",
+            "platform-sys-role.js"));
+
         foreach (var actionName in new[]
                  {
-                     nameof(SysRoleController.AddSysRole),
-                     nameof(SysRoleController.AddSysRoleFromBody),
-                     nameof(SysRoleController.UptSysRole),
-                     nameof(SysRoleController.UptSysRoleFromBody),
-                     nameof(SysRoleController.DelSysRole)
+                     "AddSysRole",
+                     "DelSysRole",
+                     "UptSysRole",
+                     "GetSysRole",
+                     "GetSysRoleModel",
+                     "GetSysRoleStep",
+                     "GetDirectTableGrantPolicies"
                  })
         {
-            var action = typeof(SysRoleController).GetMethod(actionName);
-            Assert.NotNull(action);
-            Assert.NotNull(action!.GetCustomAttribute<PlatformAdminOnlyAttribute>(true));
+            Assert.Contains(actionName, source, StringComparison.Ordinal);
         }
 
-        var catalogAction = typeof(SysRoleController).GetMethod(nameof(SysRoleController.GetSysRole));
-        Assert.NotNull(catalogAction);
-        Assert.Null(catalogAction!.GetCustomAttribute<PlatformAdminOnlyAttribute>(true));
+        Assert.Contains("Domain: 'SysRole'", source, StringComparison.Ordinal);
+        Assert.Contains("V8.Method.ManageSystemDirectory", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("V8.Db", source, StringComparison.Ordinal);
+        Assert.NotNull(typeof(IV8Method).GetMethod(nameof(IV8Method.ManageSystemDirectory)));
+        Assert.Null(typeof(ApiEngineController).Assembly.GetType("Microi.net.Api.SysRoleController"));
+        Assert.False(File.Exists(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.net.Api",
+            "Controllers",
+            "SysRoleController.cs")));
     }
 
     [Fact]
@@ -376,5 +391,16 @@ public class PlatformRoleMutationSecurityTests
             requestedRoleIds,
             requestedRoleLevels,
             roleIdsSupplied);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current != null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, "Microi.Server"))) return current.FullName;
+            current = current.Parent;
+        }
+        throw new DirectoryNotFoundException("Repository root was not found.");
     }
 }

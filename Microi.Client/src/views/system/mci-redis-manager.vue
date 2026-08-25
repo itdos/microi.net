@@ -431,8 +431,11 @@ function currentUserLooksValid() {
     return !!(getToken() && user && user.Id);
 }
 
-async function apiPost(url, data) {
-    const result = await DiyCommon.PostAsync(url, data, null, null, 'json');
+async function apiPost(action, data) {
+    const result = await DiyCommon.PostAsync('/apiengine/platform-cache-manager', {
+        Action: action,
+        ...(data || {})
+    }, null, null, 'json');
     if (!result || result.Code !== 1) throw new Error(result?.Msg || result?.Message || '请求失败');
     return result.Data;
 }
@@ -452,7 +455,7 @@ async function loadConnections() {
     if (!isLoggedIn.value) return;
     connectionLoading.value = true;
     try {
-        const data = await apiPost('/api/cache/redis/connections', {});
+        const data = await apiPost('Connections', {});
         connections.value = Array.isArray(data) ? data : [];
         const first = connections.value.find(item => item.Mode === 'tenant') || connections.value.find(item => item.Mode === 'saved');
         if (first) await selectConnection(first, Number(first.Database || 0));
@@ -505,7 +508,7 @@ async function loadKeys(append) {
     if (!activeConnection.value || keyLoading.value) return;
     keyLoading.value = true;
     try {
-        const data = await apiPost('/api/cache/redis/keys', contextPayload({
+        const data = await apiPost('Keys', contextPayload({
             Pattern: keyPattern.value || '*',
             Cursor: append ? keyCursor.value : '',
             PageSize: 100
@@ -528,7 +531,7 @@ async function loadKeyDetail(row) {
     if (!row || detailLoading.value) return;
     detailLoading.value = true;
     try {
-        const data = await apiPost('/api/cache/redis/key', contextPayload({ Key: row.Key, PageIndex: 1, PageSize: 500 }));
+        const data = await apiPost('Key', contextPayload({ Key: row.Key, PageIndex: 1, PageSize: 500 }));
         selectedDetail.value = data;
         editorValue.value = data?.RawValue ?? '';
         const language = data?.Type === 'string' && !looksLikeJson(editorValue.value) ? 'plaintext' : 'json';
@@ -549,7 +552,7 @@ async function saveCurrentValue() {
     if (!selectedDetail.value) return;
     detailSaving.value = true;
     try {
-        await apiPost('/api/cache/redis/key/replace', contextPayload({
+        await apiPost('ReplaceValue', contextPayload({
             Key: selectedDetail.value.Key,
             DataType: selectedDetail.value.Type,
             Value: editorValue.value
@@ -569,7 +572,7 @@ async function confirmDelete(keys) {
     await ElMessageBox.confirm(`确认删除 ${keys.length} 个 Redis Key？该操作不可恢复。`, '删除确认', {
         type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消', draggable: true
     });
-    const data = await apiPost('/api/cache/redis/keys/delete', contextPayload({ Keys: keys }));
+    const data = await apiPost('DeleteKeys', contextPayload({ Keys: keys }));
     ElMessage.success(`已删除 ${data?.Deleted ?? keys.length} 个 Key`);
     selectedDetail.value = null;
     editorValue.value = '';
@@ -623,7 +626,7 @@ async function testDialogConnection() {
         const payload = connectionForm.Id && connectionKind.value === 'saved'
             ? { Mode: 'saved', ConnectionId: connectionForm.Id, Database: connectionForm.Database }
             : dialogContextPayload();
-        const data = await apiPost('/api/cache/redis/test', payload);
+        const data = await apiPost('TestConnection', payload);
         ElMessage.success(`连接成功，Ping ${data?.PingMilliseconds ?? '-'} ms`);
     } catch (error) {
         ElMessage.error(error.message);
@@ -637,8 +640,8 @@ async function saveAndConnect() {
     try {
         validateConnectionForm();
         if (connectionKind.value === 'saved') {
-            const saved = await apiPost('/api/cache/redis/connections/save', { ...connectionForm });
-            await apiPost('/api/cache/redis/test', { Mode: 'saved', ConnectionId: saved.Id, Database: saved.Database });
+            const saved = await apiPost('SaveConnection', { ...connectionForm });
+            await apiPost('TestConnection', { Mode: 'saved', ConnectionId: saved.Id, Database: saved.Database });
             await loadConnectionsOnly();
             const item = connections.value.find(connection => connection.Id === saved.Id) || saved;
             connectionDialogVisible.value = false;
@@ -646,7 +649,7 @@ async function saveAndConnect() {
             ElMessage.success('连接已保存');
         } else {
             const payload = dialogContextPayload();
-            await apiPost('/api/cache/redis/test', payload);
+            await apiPost('TestConnection', payload);
             const id = `temporary-${Date.now()}`;
             temporaryConnections[id] = { ...payload.Connection };
             const summary = {
@@ -668,14 +671,14 @@ async function saveAndConnect() {
 
 async function loadConnectionsOnly() {
     const temp = connections.value.filter(item => item.Mode === 'temporary');
-    const data = await apiPost('/api/cache/redis/connections', {});
+    const data = await apiPost('Connections', {});
     connections.value = [...(Array.isArray(data) ? data : []), ...temp];
 }
 
 async function deleteSavedConnection(connection) {
     try {
         await ElMessageBox.confirm(`确认删除连接“${connection.Name}”？不会删除 Redis 中的数据。`, '删除连接', { type: 'warning', draggable: true });
-        await apiPost('/api/cache/redis/connections/delete', { Id: connection.Id });
+        await apiPost('DeleteConnection', { Id: connection.Id });
         if (activeConnection.value?.Id === connection.Id) {
             activeConnection.value = null;
             keyList.value = [];
@@ -707,7 +710,7 @@ async function createKey() {
     createSaving.value = true;
     try {
         if (!String(createForm.Key || '').trim()) throw new Error('请输入 Redis Key');
-        await apiPost('/api/cache/redis/key/replace', contextPayload({ ...createForm }));
+        await apiPost('ReplaceValue', contextPayload({ ...createForm }));
         createDialogVisible.value = false;
         ElMessage.success('Redis Key 已创建');
         await refreshKeys();
@@ -728,7 +731,7 @@ function openRename() {
 async function renameCurrentKey() {
     try {
         const oldKey = selectedDetail.value?.Key;
-        await apiPost('/api/cache/redis/key/rename', contextPayload({ Key: oldKey, NewKey: renameValue.value }));
+        await apiPost('RenameKey', contextPayload({ Key: oldKey, NewKey: renameValue.value }));
         renameDialogVisible.value = false;
         ElMessage.success('Key 已重命名');
         await refreshKeys();
@@ -745,7 +748,7 @@ function openTtl() {
 async function saveTtl() {
     try {
         const key = selectedDetail.value?.Key;
-        await apiPost('/api/cache/redis/key/ttl', contextPayload({ Key: key, TtlSeconds: ttlValue.value }));
+        await apiPost('SetTtl', contextPayload({ Key: key, TtlSeconds: ttlValue.value }));
         ttlDialogVisible.value = false;
         ElMessage.success('TTL 已更新');
         if (ttlValue.value === 0) {
@@ -760,7 +763,7 @@ async function saveTtl() {
 async function openStatistics() {
     statisticsVisible.value = true;
     statisticsLoading.value = true;
-    try { statistics.value = await apiPost('/api/cache/redis/statistics', contextPayload()); }
+    try { statistics.value = await apiPost('RedisStatistics', contextPayload()); }
     catch (error) { ElMessage.error(error.message); }
     finally { statisticsLoading.value = false; }
 }

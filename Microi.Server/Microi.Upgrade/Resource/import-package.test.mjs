@@ -197,8 +197,10 @@ test("marketplace package reads retry empty transient responses without acceptin
   assert.match(source, /MARKETPLACE_SOURCE_READ_RETRY_V2/);
   assert.match(source, /V8\.Http\.PostResponse/);
   assert.match(source, /responseEnvelope\.RawBytes/);
-  assert.match(source, /MARKETPLACE_CANONICAL_ENGINE_ROUTE_V1/);
-  assert.match(source, /marketplaceEngineRunUrl/);
+  assert.match(source, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
+  assert.match(source, /marketplaceEngineUrl/);
+  assert.match(source, /storeApiBase \+ '\/apiengine\/'/);
+  assert.doesNotMatch(source, /\/api\/ApiEngine\/Run/);
   assert.match(source, /marketplaceEngineParam\('get-microi-store-model'/);
 });
 
@@ -230,7 +232,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.3\.6/);
+  assert.match(source, /Version: v2\.4\.2/);
 });
 
 test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {
@@ -1028,7 +1030,11 @@ test("application-store PackageOnly output is a self-contained offline package",
   assert.match(publishSource, /ApplicationBundle\.SourceFiles\s*=\s*sourceFiles/);
   assert.match(publishSource, /ReturnPackageModel/);
   assert.match(publishSource, /if\s*\(returnPackageModel\)\s*offlineResult\.Package\s*=\s*packageModel/);
-  assert.doesNotMatch(publishSource, /return ok\(\{\s*Package:\s*packageModel,[\s\S]*?FileByteBase64/);
+  assert.match(
+    publishSource,
+    /if\s*\(packageModelOnly\)[\s\S]*?return ok\(\{[\s\S]*?Package:\s*packageModel[\s\S]*?应用离线包模型已生成[\s\S]*?var jsonText/,
+  );
+  assert.match(publishSource, /var offlineResult\s*=\s*\{[\s\S]*?FileByteBase64:[\s\S]*?if\s*\(returnPackageModel\)\s*offlineResult\.Package\s*=\s*packageModel/);
 });
 
 test("microservice installation preserves source-server native menus and migrates target placeholders", () => {
@@ -1042,6 +1048,9 @@ test("microservice installation preserves source-server native menus and migrate
   assert.match(source, /ComponentPath:\s*'\/micro-app\/host'/);
   assert.match(source, /MicroServicePageId:\s*binding\.PageId/);
   assert.match(source, /MicroServiceRoutePath:\s*binding\.RoutePath/);
+  assert.match(source, /RetireLegacyMenus[\s\S]*?declaredLegacyMenuIds/);
+  assert.match(source, /DelFormData\('sys_menu'[\s\S]*?retire_microservice_legacy_menu_/);
+  assert.match(source, /MicroServiceMenusRetired\+\+/);
 });
 
 test("source-inclusive packages fail closed and verify imported private source", () => {
@@ -1497,6 +1506,7 @@ test("legacy physical prerequisites commit at most one metadata table per backgr
       "formbannerenabled", "formbannertitlefield", "formbannersubtitlefield", "formbannerimagefield",
       "formbannericon", "formbannerbackgroundfield", "formbannertagfields", "formbannermetrics",
     ]),
+    sys_microistore: new Set(),
   };
   const alterSql = [];
   const fixture = {
@@ -1540,23 +1550,31 @@ test("legacy physical prerequisites commit at most one metadata table per backgr
 
   const first = fixture.result(1);
   assert.equal(first.ChangedTableCount, 1);
-  assert.equal(first.RemainingTableCount, 1);
+  assert.equal(first.RemainingTableCount, 2);
   assert.deepEqual([...first.Added], ["sys_apiengine.V8Limit"]);
   assert.equal(alterSql.length, 1);
   assert.match(alterSql[0], /^ALTER TABLE `sys_apiengine` ADD `V8Limit` int NULL$/i);
 
   const second = fixture.result(1);
   assert.equal(second.ChangedTableCount, 1);
-  assert.equal(second.RemainingTableCount, 0);
+  assert.equal(second.RemainingTableCount, 1);
   assert.deepEqual([...second.Added], ["diy_table.V8Limit"]);
   assert.equal(alterSql.length, 2);
   assert.match(alterSql[1], /^ALTER TABLE `diy_table` ADD `V8Limit` int NULL$/i);
+
+  const third = fixture.result(1);
+  assert.equal(third.ChangedTableCount, 1);
+  assert.equal(third.RemainingTableCount, 0);
+  assert.equal(third.Added.length, 8);
+  assert.equal(alterSql.length, 3);
+  assert.match(alterSql[2], /^ALTER TABLE `sys_microistore` ADD `PackageId` varchar\(50\) NULL,/i);
+  assert.match(alterSql[2], /ADD `PackageUploadedAt` varchar\(25\) NULL$/i);
 
   const modern = fixture.result(1);
   assert.equal(modern.ChangedTableCount, 0);
   assert.equal(modern.RemainingTableCount, 0);
   assert.deepEqual([...modern.Added], []);
-  assert.equal(alterSql.length, 2, "no-op modern tenants must not receive an empty ALTER slice");
+  assert.equal(alterSql.length, 3, "no-op modern tenants must not receive an empty ALTER slice");
 });
 
 test("reinstall DDL classifies existing indexes for idempotent skipping", () => {
@@ -1773,6 +1791,9 @@ test("stale application files use the Jint-safe DelFormData Ids contract", () =>
   const context = {
     resumeInstall: true,
     stats: { AssetRowsPruned: 0 },
+    normalizeApplicationPath(path) {
+      return String(path || "").replace(/\\\\/g, "/").replace(/^\/+/, "");
+    },
     loadExistingApplicationAssets() {
       return {
         "app.vue": { Id: "keep" },
@@ -1798,6 +1819,42 @@ test("stale application files use the Jint-safe DelFormData Ids contract", () =>
     param: { Ids: ["old-source", "old-build"] }
   }]);
   assert.equal(context.stats.AssetRowsPruned, 2);
+});
+
+test("runtime-only application bundles preserve already installed private source files", () => {
+  const functionSource = source.match(
+    /var pruneApplicationAssets = function \(appId, expectedPaths\) \{[\s\S]*?\n    \};/
+  );
+  assert.ok(functionSource, "prune function should be extractable");
+  const calls = [];
+  const context = {
+    resumeInstall: true,
+    stats: { AssetRowsPruned: 0 },
+    normalizeApplicationPath(value) { return String(value || "").replace(/^\/+/, ""); },
+    loadExistingApplicationAssets() {
+      return {
+        "src/app.vue": { Id: "source", FilePath: "src/App.vue", StorageScope: "Private" },
+        "dist/old.js": { Id: "old-build", FilePath: "dist/old.js", StorageScope: "PrivateSource+PublicBuild" }
+      };
+    },
+    V8: {
+      FormEngine: {
+        DelFormData(tableName, param) {
+          calls.push({ tableName, param });
+          return { Code: 1 };
+        }
+      }
+    }
+  };
+  vm.runInNewContext(
+    `${functionSource[0]}; pruneApplicationAssets("app-1", { __PreserveExistingPrivateSource: true });`,
+    context
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{
+    tableName: "mci_ai_app_file",
+    param: { Ids: ["old-build"] }
+  }]);
+  assert.equal(context.stats.AssetRowsPruned, 1);
 });
 
 test("fully reused build assets skip object moves and reach stale-row pruning", () => {
@@ -2323,11 +2380,59 @@ test("managed micro-app assets proxy stable HDFS paths instead of cross-origin r
   assert.doesNotMatch(microAppControllerSource, /CurrentV3[\s\S]{0,5000}?return Redirect\(immutableUrl\);/);
 });
 
+test("micro-app asset gateway rejects object-storage error bodies and incomplete HTML", () => {
+  assert.match(microAppControllerSource, /TryValidateManagedAssetBytes/);
+  assert.match(microAppControllerSource, /IsContentTypeCompatible/);
+  assert.match(microAppControllerSource, /NoSuchKey/);
+  assert.match(microAppControllerSource, /object storage returned an XML error document/);
+  assert.match(microAppControllerSource, /entry is not a complete HTML document/);
+  assert.match(microAppControllerSource, /Application v3 immutable asset size mismatch/);
+  assert.match(microAppControllerSource, /SHA256\.HashData/);
+});
+
 test("updating an existing menu preserves customer desktop and mobile visibility", () => {
     assert.match(source, /GetFormData\('sys_menu',[\s\S]*?_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig', 'Url'\]/);
   assert.match(source, /existingMenuVisibility\.Display[\s\S]*?modelCopy\.Display/);
   assert.match(source, /existingMenuVisibility\.AppDisplay[\s\S]*?modelCopy\.AppDisplay/);
   assert.match(source, /preserve_existing_menu_visibility_/);
+});
+
+test("menu identity is URL-first and every write is verified fail-closed", () => {
+  const urlLookupIndex = source.indexOf("_Where: [['Url', '=', menu.Url]]");
+  const keyLookupIndex = source.indexOf("_Where: [['ModuleEngineKey', '=', menu.ModuleEngineKey]]");
+  assert.ok(urlLookupIndex > -1, "missing URL identity lookup");
+  assert.ok(keyLookupIndex > urlLookupIndex, "ModuleEngineKey must only be a fallback after URL");
+  assert.match(source, /MENU_URL_IS_PRIMARY_IDENTITY_V1/);
+  assert.match(source, /忽略路由不一致的 ModuleEngineKey 匹配/);
+  assert.match(source, /if \(!menuWriteSucceeded\) \{[\s\S]*?应用安装已回滚/);
+  assert.match(source, /菜单写后回读路由不一致/);
+  assert.match(source, /菜单写后回读 DiyTableName 不一致/);
+});
+
+test("application-store and changelog menus remain distinct resources", () => {
+  const storeMenu = packageModel.SysMenus.find(menu => menu.Url === "/microi-store");
+  const changelogMenu = packageModel.SysMenus.find(menu => menu.Url === "/microi-store-changelog");
+  assert.ok(storeMenu);
+  assert.ok(changelogMenu);
+  assert.equal(storeMenu.ModuleEngineKey, "sys_microistore");
+  assert.equal(storeMenu.DiyTableName, "sys_microistore");
+  assert.equal(storeMenu.OpenType, "MicroService");
+  assert.equal(changelogMenu.ModuleEngineKey, null);
+  assert.equal(changelogMenu.DiyTableName, "sys_microistore_changelog");
+  assert.equal(changelogMenu.ComponentPath, "/diy/diy-table-rowlist");
+  assert.equal(changelogMenu.OpenType, "Diy");
+  assert.equal(changelogMenu.IsMicroiService, 0);
+  assert.equal(changelogMenu.MicroServiceKey, null);
+});
+
+test("database-only microservice runtime cannot be silently downgraded and is read back completely", () => {
+  assert.match(source, /VERIFIED_RUNTIME_NO_SILENT_DOWNGRADE_V1/);
+  assert.match(source, /拒绝将已验证的数据库内置微服务降级为文件运行时/);
+  assert.match(source, /ApplicationRuntimeVerified/);
+  assert.match(source, /数据库内置微服务资产数量写后回读不一致/);
+  assert.match(source, /数据库内置微服务写后回读缺少完整字节/);
+  assert.match(source, /<!doctype\\s\+html/);
+  assert.match(source, /数据库内置微服务入口不是完整 HTML 文档/);
 });
 
 test("server upgrade snapshots and restores existing AppDisplay values", () => {

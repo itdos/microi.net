@@ -40,6 +40,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/app-store.md` | app-store | 应用包、安装、升级和回滚 |
 | `system-engine/databases.md` | dos-orm, v8-sql-query, microi-deployment | 扩展数据库与迁移 |
 | `system-engine/datasource-engine.md` | datasource-engine | 数据源定义、执行和供数 |
+| `system-engine/cache.md` | v8-cache-pattern, v8-saas-multi-tenant | L1/L2 架构、租户 Redis、Pub/Sub 失效、V8 安全代理与 Redis 管理器 |
 | `system-engine/file-manage.md` | v8-file-upload, microi-client-frontend | 文件柜、公私桶管理、在线预览、回收站、跨平台与 MinIO 同步 |
 | `system-engine/job.md` | job-engine | 调度、后台任务和分布式恢复 |
 | `system-engine/micro-app.md` | microi-microservice, microi-ai-application | 微服务/AI 前端应用的工程架构与交付 |
@@ -47,7 +48,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/microi-ui.md` | microi-ui | Microi.UI 组件和主题 |
 | `system-engine/message-notification.md` | message-notification | 平台内部消息、SignalR 与多通道通知 |
 | `system-engine/module-engine.md` | module-engine, v8-menu-buttons, v8-template-engine, microi-mobile-app-quality | 菜单统计、模块指标、复合列、移动卡片、按钮角标和页面入口 |
-| `system-engine/mq.md` | v8-mq-mqtt | RabbitMQ 生产与消费 |
+| `system-engine/mq.md` | v8-mq-mqtt | RabbitMQ 租户连接、队列规范化、事务发布、消费确认、有限重试、幂等与多节点运行 |
 | `system-engine/mqtt-engine.md` | v8-mq-mqtt | MQTT Broker、SaaS 认证、Topic ACL、V8 事件、设备路由、下行与生产部署 |
 | `system-engine/page-engine.md` | page-engine | 界面引擎 JSON |
 | `system-engine/print-engine.md` | print-engine, v8-frontend-events | 服务端模板打印与蓝牙直连边界 |
