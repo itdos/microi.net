@@ -28,7 +28,7 @@ function stripGeneratedNotice(value) {
 }
 
 test('SaaS package carries the client runtime facades and one tenant hook', () => {
-  assert.equal(resource.PackageInfo.Version, 'v7.6.13');
+  assert.equal(resource.PackageInfo.Version, 'v7.6.14');
   for (const [key, fileName, allowAnonymous, atom] of facadeDefinitions) {
     const engine = resource.SysApiEngines.find(item => item.ApiEngineKey === key);
     assert.ok(engine, `missing ${key}`);

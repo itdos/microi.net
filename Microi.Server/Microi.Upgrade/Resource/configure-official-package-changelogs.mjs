@@ -27,11 +27,11 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
     releaseTime: '2026-08-25 15:20:00',
   }),
   'app.microi.saas-engine.json': Object.freeze({
-    version: 'v7.6.13',
-    title: '在途启动维护禁止重复投递',
+    version: 'v7.6.14',
+    title: '历史子租户支持精确定向自愈',
     changeType: 'Fix',
-    content: '后台任务每个分片均按 ApiEngineKey 读取最新工作器，旧 RefreshBootstrap 检查点只迁移回 Monitor 并继续权威汇总原 ChildTasks；禁止通过重新排队刷新工作器，避免历史幂等键格式变化后产生第二批安装任务。',
-    releaseTime: '2026-08-25 16:05:00',
+    content: 'StartupDependencies 受信后台任务新增 TargetOsClients 精确目标集；每个目标必须来自当前运行环境的权威启用子租户目录，未知、越界或非事故恢复调用均失败关闭，用于单独修复历史库而不重跑全部租户。',
+    releaseTime: '2026-08-25 16:15:00',
   }),
   'app.microi.sso.json': Object.freeze({
     version: 'v7.5.7',
