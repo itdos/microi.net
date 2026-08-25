@@ -75,6 +75,10 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 
 更新后端源码并重启 API 时，基础应用完整性检查不仅核对应用商城菜单和导入接口，还会核对 `microi-platform-service` 是否启用、`/marketplace` 页面是否启用、菜单是否绑定到对应服务/页面，以及数据库内联 `index.html` 是否存在。任一项缺失、停用或绑定错误都会触发应用商城包的幂等重导入；在线官方资源必须通过相同运行时契约校验，否则整组回退程序集内置资源，不能把不完整资源写入客户库。
 
+登录页和 WebOS 首屏依赖的 `platform-sys-menu`、`platform-os-client-by-domain`、`platform-sys-config`、`platform-lang-bundle`、`platform-current-user`、`platform-private-file-url`、`platform-sys-user-public-info` 共七个 Managed 接口，会在 API 接收流量前按租户逐一强回读。缺失项只从程序集内置的官方应用包创建；已有租户 V8 源码不会被这道紧急门禁覆盖，只校正启用状态、公开路由和匿名契约，完整源码升级仍遵守 Managed 的 Base/Local 冲突规则。`/api/FormEngine/GetSysConfig` 仅作为旧 PC/UniApp 的启动兼容回退，并直接调用固定公开投影原子，不再反向依赖 `platform-sys-config`。
+
+容器日志中所有升级步骤使用 `【自动升级状态】` 标记并固定保留在 stdout，可直接执行 `docker logs microi-api` 查看每个租户的启动门禁、运行时不变量、历史版本步骤（待执行/版本已覆盖）、成功或失败原因，以及最终汇总。若某个子租户失败，汇总会列出该租户和失败阶段；不得只根据 `ServerVersion` 或“进程已启动”判断应用升级成功。
+
 这里的数据库内联不是把所有微服务长期塞进数据库，而是平台启动面专用的受信任例外。`microi-platform-service` 的已校验编译产物同时内置在 SaaS 引擎包和应用商城包中，固定声明 `Source=NotIncluded`、`Build=DatabaseOnly`、`StorageMode=db`，最多 256 个文件、5MB。新环境即使尚未安装 MinIO、OSS 或 S3，仍应能打开应用商城、个人中心和系统设置；前端通过通用微服务宿主先调用 `Resolve`，旧后端才回退稳定 `/micro-app/.../index.html` 入口，不携带第二份平台业务源码。
 
 HDFS 故障时按能力降级，不能把“应用商城页面可打开”和“任意应用都可安装”混为一件事：

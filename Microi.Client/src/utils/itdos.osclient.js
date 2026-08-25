@@ -10,6 +10,7 @@ import {
     getRuntimeWindowValue,
     publishRuntimeEndpointContext
 } from "@/utils/runtime-endpoint-query.js";
+import { getPlatformSysConfig } from "@/utils/platform-sys-config.js";
 
 // 辅助函数：获取 DiyStore
 const getDiyStore = () => useDiyStore(pinia);
@@ -107,17 +108,11 @@ var DiyOsClient = {
         var href = window.location.href.toLowerCase();
         //同步从服务器中获取配置信息，一种是使用await，一种是使用 Promise、Then里面获取
         var sysConfig = null;
-        var sysConfigResult = await DiyCommon.PostAsync({
-            url: "/apiengine/platform-sys-config",
-            data: {
-                _SearchEqual: {
-                    IsEnable: 1
-                },
-                OsClient: osClient
+        var sysConfigResult = await getPlatformSysConfig(DiyCommon, {
+            _SearchEqual: {
+                IsEnable: 1
             },
-            skipAuthorization: true,
-            suppressAuthFailure: true,
-            suppressErrorNotification: true
+            OsClient: osClient
         });
         if (sysConfigResult.Code == 1) {
             sysConfig = sysConfigResult.Data;

@@ -614,6 +614,7 @@ import { getFirstValidRoutePath, hasAccessibleRoutePath, normalizeMenuRoutePath 
 import { getStoredLanguage, resolveSysLocale } from "@/lang";
 import { resolveLoginResourceUrl, resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
 import { normalizeLoginWallpapers, pickNextLoginWallpaper } from "@/utils/login-wallpaper.js";
+import { getPlatformSysConfig } from "@/utils/platform-sys-config.js";
 import {
     DEFAULT_LOGIN_METHOD_KEYS,
     isLoginMethodDisplayEnabled
@@ -1021,29 +1022,22 @@ export default {
         });
 
         try {
-            self.DiyCommon.PostAsync({
-                url: "/apiengine/platform-sys-config",
-                data: {
-                    _SearchEqual: {
-                        IsEnable: 1
-                    },
-                    OsClient: self.OsClient
+            getPlatformSysConfig(self.DiyCommon, {
+                _SearchEqual: {
+                    IsEnable: 1
                 },
-                skipAuthorization: true,
-                suppressAuthFailure: true,
-                suppressErrorNotification: true,
-                success: async function (sysConfigResult) {
-                    if (sysConfigResult.Code == 1) {
-                        var sysConfig = sysConfigResult.Data;
-                        // 服务端可以公开与部署私钥配对的公钥；本地显式配置仍优先。
-                        self.publicKey = resolveLoginRsaPublicKey(
-                            sysConfig && sysConfig.LoginRsaPublicKey
-                                ? String(sysConfig.LoginRsaPublicKey).replace(/\\n/g, "\n").trim()
-                                : ""
-                        );
-                        self.GetCaptcha(sysConfig);
-                        await self.LoadLoginWallpapers(sysConfig);
-                    }
+                OsClient: self.OsClient
+            }).then(async function (sysConfigResult) {
+                if (sysConfigResult.Code == 1) {
+                    var sysConfig = sysConfigResult.Data;
+                    // 服务端可以公开与部署私钥配对的公钥；本地显式配置仍优先。
+                    self.publicKey = resolveLoginRsaPublicKey(
+                        sysConfig && sysConfig.LoginRsaPublicKey
+                            ? String(sysConfig.LoginRsaPublicKey).replace(/\\n/g, "\n").trim()
+                            : ""
+                    );
+                    self.GetCaptcha(sysConfig);
+                    await self.LoadLoginWallpapers(sysConfig);
                 }
             }).catch(function () {});
         } catch (error) {}

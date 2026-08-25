@@ -156,26 +156,10 @@ namespace Microi.net
         {
             var denied = RequireTrustedApiEngine(PlatformSysConfigEngineKey);
             if (denied != null) return denied;
-            try
-            {
-                var osClient = V8TenantContext.Current.OsClient;
-                var source = MicroiEngine.FormEngine.GetSysConfig(osClient, lang)
-                    .GetAwaiter().GetResult();
-                if (source == null) return new DosResult(0, null, "系统设置读取失败。");
-
-                var projection = source.Data == null
-                    ? null
-                    : TenantConfigurationSecurity.CreatePublicSysConfigProjection(source.Data, osClient);
-                var loginPublicKey = ConfigHelper.GetRuntimeConfigurationValue("Security:LoginRsaPublicKey");
-                if (projection != null && !loginPublicKey.DosIsNullOrWhiteSpace())
-                    projection["LoginRsaPublicKey"] = loginPublicKey.Replace("\\n", "\n").Trim();
-
-                return new DosResult(source.Code, projection, source.Msg, null, source.DataAppend);
-            }
-            catch (Exception)
-            {
-                return new DosResult(0, null, "系统设置读取失败，请稍后重试。");
-            }
+            return PlatformBootstrapCompatibilityService
+                .GetPublicSysConfigAsync(V8TenantContext.Current.OsClient, lang)
+                .GetAwaiter()
+                .GetResult();
         }
 
         /// <summary>读取当前租户指定语言前缀的词条包。</summary>

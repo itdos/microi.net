@@ -23,10 +23,6 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class FormEngineController : Controller
     {
-        private const string SysConfigApiEngineKey = "platform-sys-config";
-        private const string LangBundleApiEngineKey = "platform-lang-bundle";
-        private const string LoginWallpapersApiEngineKey = "platform-login-wallpapers";
-
         private string GetRequestLang()
         {
             try
@@ -277,48 +273,6 @@ namespace Microi.net.Api
                 EnsureLang(param);
             }
         }
-        /// <summary>
-        /// 获取系统设置，必传OsClient
-        /// </summary>
-        [HttpPost, HttpGet]
-        [AllowAnonymous]
-        public async Task<JsonResult> GetSysConfig(
-            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] DiyTableRowParam param = null)
-        {
-            var request = await MergeRequestParam(
-                param == null ? new JObject() : JObject.FromObject(param));
-            EnsureLang(request);
-            var osClient = request["OsClient"].Val<string>();
-            if (osClient.DosIsNullOrWhiteSpace())
-            {
-                return Json(new DosResult(0, null,
-                    DiyMessage.GetLang(osClient, "ParamError", request["_Lang"].Val<string>())));
-            }
-            return Json(await ManagedApiEngineCompatibility.RunAsync(SysConfigApiEngineKey, request));
-        }
-
-        /// <summary>
-        /// 兼容旧客户端的登录页壁纸地址。展示字段、启用状态和个性化 Hook
-        /// 统一由 SaaS 引擎应用中的 Managed 接口引擎维护。
-        /// </summary>
-        [HttpPost, HttpGet]
-        [AllowAnonymous]
-        public async Task<JsonResult> GetLoginWallpapers(
-            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] JObject param = null)
-        {
-            param = await MergeRequestParam(param);
-            EnsureLang(param);
-            var osClient = param["OsClient"].Val<string>();
-            var lang = param["_Lang"].Val<string>();
-            if (osClient.DosIsNullOrWhiteSpace())
-            {
-                return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "ParamError", lang)));
-            }
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                LoginWallpapersApiEngineKey,
-                param));
-        }
-
         [HttpPost, HttpGet]
         [PlatformAdminOnly]
         public async Task<JsonResult> SyncLangMetadata([FromBody] JObject param = null)
@@ -401,19 +355,6 @@ namespace Microi.net.Api
                 queuedData["TaskId"]?.ToString(),
                 TimeSpan.FromSeconds(30),
                 HttpContext.RequestAborted));
-        }
-
-        [HttpPost, HttpGet]
-        [AllowAnonymous]
-        public async Task<JsonResult> GetLangBundle([FromBody] JObject param = null)
-        {
-            param = await MergeRequestParam(param);
-            if (param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
-            {
-                param["OsClient"] = OsClient.GetConfigOsClient();
-            }
-            EnsureLang(param);
-            return Json(await ManagedApiEngineCompatibility.RunAsync(LangBundleApiEngineKey, param));
         }
 
         /// <summary>
@@ -1596,23 +1537,6 @@ namespace Microi.net.Api
         #endregion
 
         #region DiyTable methods (merged from DiyTableController, backward compat: /api/DiyTable/*)
-
-        /// <summary>
-        /// [Compat] 获取系统设置 - backward compat for /api/DiyTable/GetSysConfig
-        /// </summary>
-        [HttpPost("~/api/DiyTable/GetSysConfig"), HttpGet("~/api/DiyTable/GetSysConfig")]
-        [AllowAnonymous]
-        public async Task<JsonResult> GetSysConfig_Compat(DiyTableRowParam param)
-        {
-            var request = await MergeRequestParam(
-                param == null ? new JObject() : JObject.FromObject(param));
-            EnsureLang(request);
-            var osClient = request["OsClient"].Val<string>();
-            if (osClient.DosIsNullOrWhiteSpace())
-                return Json(new DosResult(0, null,
-                    DiyMessage.GetLang(osClient, "ParamError", request["_Lang"].Val<string>())));
-            return Json(await ManagedApiEngineCompatibility.RunAsync(SysConfigApiEngineKey, request));
-        }
 
         /// <summary>
         /// [Compat] 将非diy表加载为diy表 - backward compat for /api/DiyTable/LoadNotDiyTable

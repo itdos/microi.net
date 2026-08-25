@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createMemoryHistory, createRouter } from "vue-router";
 
 const clientRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -23,10 +23,16 @@ async function readSourceFiles(directory) {
     return files;
 }
 
-test("platform bootstrap and directory reads use managed ApiEngine routes only", async function () {
+test("platform bootstrap uses Managed routes with one isolated SysConfig compatibility fallback", async function () {
     const files = await readSourceFiles(sourceRoot);
     const legacyRoutes = /\/api\/(?:Os\/GetOsClientByDomain|(?:FormEngine|DiyTable)\/GetSysConfig|FormEngine\/GetLangBundle|FormEngine\/GetLoginWallpapers|SysUser\/(?:GetCurrentUser|GetSysUserPublicInfo|AddSysUser|UptSysUser|DelSysUser|GetSysUser|RefreshLoginUser)(?![A-Za-z0-9_])|HDFS\/GetPrivateFileUrl|sms\/send|SysUser\/reg)/i;
     for (const file of files) {
+        if (file.path.endsWith(path.join("utils", "platform-sys-config.js"))) {
+            assert.match(file.source, /const LEGACY_SYS_CONFIG_URL = "\/api\/FormEngine\/GetSysConfig"/);
+            const withoutApprovedFallback = file.source.replace("/api/FormEngine/GetSysConfig", "");
+            assert.doesNotMatch(withoutApprovedFallback, legacyRoutes, file.path);
+            continue;
+        }
         assert.doesNotMatch(file.source, legacyRoutes, file.path);
     }
     const source = files.map(file => file.source).join("\n");
@@ -63,18 +69,59 @@ test("system-account management uses action-scoped Managed ApiEngine without gen
 
 test("anonymous bootstrap and language requests explicitly omit Authorization", async function () {
     const osClientSource = await readFile(path.join(sourceRoot, "utils", "itdos.osclient.js"), "utf8");
+    const sysConfigSource = await readFile(path.join(sourceRoot, "utils", "platform-sys-config.js"), "utf8");
     const commonSource = await readFile(path.join(sourceRoot, "utils", "diy.common.js"), "utf8");
     const loginSource = await readFile(path.join(sourceRoot, "views", "login", "index.vue"), "utf8");
     const remoteSource = await readFile(path.join(sourceRoot, "views", "file-manage", "api.js"), "utf8");
 
     assert.match(osClientSource, /platform-os-client-by-domain[\s\S]{0,400}skipAuthorization:\s*true/);
-    assert.match(osClientSource, /platform-sys-config[\s\S]{0,500}skipAuthorization:\s*true/);
+    assert.match(osClientSource, /getPlatformSysConfig\(DiyCommon/);
+    assert.match(sysConfigSource, /PLATFORM_SYS_CONFIG_URL\s*=\s*["']\/apiengine\/platform-sys-config/);
+    assert.match(sysConfigSource, /LEGACY_SYS_CONFIG_URL\s*=\s*["']\/api\/FormEngine\/GetSysConfig/);
+    assert.match(sysConfigSource, /function anonymousRequest[\s\S]{0,300}skipAuthorization:\s*true/);
     assert.match(commonSource, /platform-lang-bundle[\s\S]{0,500}skipAuthorization:\s*true/);
-    assert.match(loginSource, /platform-sys-config[\s\S]{0,500}skipAuthorization:\s*true/);
+    assert.match(loginSource, /getPlatformSysConfig\(self\.DiyCommon/);
     assert.match(loginSource, /platform-login-wallpapers[\s\S]{0,500}skipAuthorization:\s*true/);
     assert.match(loginSource, /send_sms_reg[\s\S]{0,500}skipAuthorization:\s*true/);
     assert.match(loginSource, /platform_auth_sms_login[\s\S]{0,900}skipAuthorization:\s*true/);
     assert.match(remoteSource, /platform-sys-config[\s\S]{0,300}apiengine:\s*['"]1['"]/);
+});
+
+test("SysConfig fallback is narrow and retries only missing-engine or unsupported-route failures", async function () {
+    const modulePath = pathToFileURL(path.join(sourceRoot, "utils", "platform-sys-config.js")).href;
+    const {
+        getPlatformSysConfig,
+        shouldFallbackPlatformSysConfig
+    } = await import(modulePath);
+
+    assert.equal(shouldFallbackPlatformSysConfig({ response: { status: 404 } }), true);
+    assert.equal(shouldFallbackPlatformSysConfig({ response: { status: 401 } }), false);
+    assert.equal(shouldFallbackPlatformSysConfig({ Code: 0, Msg: "密码错误" }), false);
+    assert.equal(shouldFallbackPlatformSysConfig({
+        Code: 0,
+        Msg: "NoExistData 表名：sys_apiengine 条件：ApiEngineKey='platform-sys-config'"
+    }), true);
+
+    const calls = [];
+    const diyCommon = {
+        async PostAsync(options) {
+            calls.push(options);
+            if (calls.length === 1) {
+                return {
+                    Code: 0,
+                    Msg: "不存在的数据！表名：sys_apiengine，ApiAddress='/apiengine/platform-sys-config'"
+                };
+            }
+            return { Code: 1, Data: { SysTitle: "兼容成功" } };
+        }
+    };
+    const result = await getPlatformSysConfig(diyCommon, { OsClient: "tenant-a" });
+    assert.equal(result.Code, 1);
+    assert.deepEqual(calls.map(item => item.url), [
+        "/apiengine/platform-sys-config",
+        "/api/FormEngine/GetSysConfig"
+    ]);
+    assert.ok(calls.every(item => item.skipAuthorization === true));
 });
 
 test("SMS registration uses the managed login token contract without changing password login", async function () {

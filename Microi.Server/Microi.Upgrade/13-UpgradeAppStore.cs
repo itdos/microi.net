@@ -82,6 +82,29 @@ namespace Microi.net
         };
         private static readonly string[] RequiredPlatformRuntimeEngineKeys =
             ManagedPlatformRuntimeEngineKeys.Concat(new[] { PlatformRuntimeCustomHookEngineKey }).ToArray();
+        internal static readonly string[] RequiredStartupDependencyEngineKeys =
+        {
+            PlatformSysMenuEngineKey,
+            "platform-os-client-by-domain",
+            "platform-sys-config",
+            "platform-lang-bundle",
+            "platform-current-user",
+            "platform-private-file-url",
+            "platform-sys-user-public-info"
+        };
+        private static readonly IReadOnlyDictionary<string, string[]> StartupDependencyPackageKeys =
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                { AppStorePackageResourceName, new[] { PlatformSysMenuEngineKey } },
+                {
+                    SaaSEnginePackageResourceName,
+                    RequiredStartupDependencyEngineKeys
+                        .Where(key => !string.Equals(key, PlatformSysMenuEngineKey, StringComparison.Ordinal))
+                        .ToArray()
+                }
+            };
+        private static readonly Lazy<IReadOnlyList<JObject>> BundledStartupDependencyEngines =
+            new Lazy<IReadOnlyList<JObject>>(BuildBundledStartupDependencyEngines);
         private static readonly HashSet<string> AnonymousPlatformRuntimeEngineKeys = new HashSet<string>(StringComparer.Ordinal)
         {
             "platform-os-client-by-domain",
@@ -1719,6 +1742,381 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 }
             }
             return resources;
+        }
+
+        /// <summary>
+        /// Reads only the seven interfaces required to render the login/bootstrap
+        /// shell.  Their executable source remains owned by the two embedded
+        /// official application packages; this gate never carries a second copy
+        /// of V8 business code in C#.
+        /// </summary>
+        internal static IReadOnlyList<JObject> LoadBundledStartupDependencyEngines()
+        {
+            return BundledStartupDependencyEngines.Value
+                .Select(item => (JObject)item.DeepClone())
+                .ToList();
+        }
+
+        private static IReadOnlyList<JObject> BuildBundledStartupDependencyEngines()
+        {
+            var resources = LoadBundledResources();
+            var result = new List<JObject>();
+            foreach (var packageEntry in StartupDependencyPackageKeys)
+            {
+                var package = JObject.Parse(resources[packageEntry.Key]);
+                var policyMap = package["ResourcePolicies"]?["ApiEngines"] as JObject;
+                var engines = package["SysApiEngines"]?.Children<JObject>().ToList()
+                              ?? new List<JObject>();
+                foreach (var key in packageEntry.Value)
+                {
+                    var matches = engines.Where(engine => string.Equals(
+                        engine["ApiEngineKey"]?.ToString(),
+                        key,
+                        StringComparison.Ordinal)).ToList();
+                    if (matches.Count != 1)
+                    {
+                        throw new InvalidOperationException(
+                            $"内置官方应用包[{packageEntry.Key}]的启动接口[{key}]定义数量不是1。" );
+                    }
+
+                    var policy = policyMap?[key] as JObject;
+                    if (!string.Equals(policy?["Ownership"]?.ToString(), "Platform", StringComparison.Ordinal)
+                        || !string.Equals(policy?["UpgradePolicy"]?.ToString(), "Managed", StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException(
+                            $"内置官方应用包[{packageEntry.Key}]的启动接口[{key}]未声明 Platform/Managed 所有权。" );
+                    }
+
+                    var engine = (JObject)matches[0].DeepClone();
+                    var source = engine["ApiV8Code"]?.ToString() ?? string.Empty;
+                    if (!source.TrimStart().StartsWith(
+                            ManagedPlatformRuntimeNoticeMarker,
+                            StringComparison.Ordinal)
+                        || !string.Equals(
+                            engine["ApiAddress"]?.ToString(),
+                            "/apiengine/" + key,
+                            StringComparison.Ordinal)
+                        || engine["Id"].Val<string>().DosIsNullOrWhiteSpace())
+                    {
+                        throw new InvalidOperationException(
+                            $"内置官方应用包[{packageEntry.Key}]的启动接口[{key}]运行契约不完整。" );
+                    }
+                    engine["_OfficialPackageResource"] = packageEntry.Key;
+                    result.Add(engine);
+                }
+            }
+
+            var actualKeys = result.Select(item => item["ApiEngineKey"]?.ToString()).ToArray();
+            if (actualKeys.Length != RequiredStartupDependencyEngineKeys.Length
+                || RequiredStartupDependencyEngineKeys.Any(key => !actualKeys.Contains(key, StringComparer.Ordinal)))
+            {
+                throw new InvalidOperationException("内置官方应用包未形成完整的七接口启动依赖闭包。");
+            }
+            return result;
+        }
+
+        internal static bool StartupDependenciesReady(OsClientSecret client, out string reason)
+        {
+            reason = string.Empty;
+            if (client?.Db == null)
+            {
+                reason = "租户数据库连接不可用。";
+                return false;
+            }
+            try
+            {
+                foreach (var source in LoadBundledStartupDependencyEngines())
+                {
+                    var key = source["ApiEngineKey"]?.ToString();
+                    var row = ReadStartupDependencyEngine(client.Db, key);
+                    var contractError = GetStartupDependencyContractError(row, source);
+                    if (!contractError.DosIsNullOrWhiteSpace())
+                    {
+                        reason = key + "：" + contractError;
+                        return false;
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                reason = ex.Message;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Must run under UpgradeDistributedLease. Missing startup interfaces are
+        /// created from embedded official packages. Existing executable source
+        /// is never overwritten by this emergency gate: only its route/runtime
+        /// flags are reconciled, leaving Managed source reconciliation to the
+        /// complete application-package upgrade and its base/local comparison.
+        /// </summary>
+        internal static async Task<DosResult> EnsureStartupDependenciesUnderLeaseAsync(
+            OsClientSecret client)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            if (client?.Db == null)
+                return new DosResult(0, null, "租户数据库连接不可用，无法检查页面启动接口。");
+            if (IsOfficialSourceTenant(client.OsClient))
+            {
+                return StartupDependenciesReady(client, out var officialSourceReason)
+                    ? new DosResult(1, new { Skipped = true, OfficialSource = true },
+                        "官方应用源页面启动接口已就绪；未使用程序集内置包反向写入。")
+                    : new DosResult(0, new
+                    {
+                        Skipped = true,
+                        OfficialSource = true,
+                        Reason = officialSourceReason
+                    }, "官方应用源页面启动接口不完整，必须通过官方应用源同步修复：" + officialSourceReason);
+            }
+
+            var added = new List<string>();
+            var reconciled = new List<string>();
+            var reused = new List<string>();
+            var preservedLocalSource = new List<string>();
+            var conflicts = new List<string>();
+            try
+            {
+                foreach (var packaged in LoadBundledStartupDependencyEngines())
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    var source = (JObject)packaged.DeepClone();
+                    source.Remove("_OfficialPackageResource");
+                    var key = source["ApiEngineKey"]?.ToString();
+                    var existing = ReadStartupDependencyEngine(client.Db, key);
+                    if (existing != null)
+                    {
+                        if (ReadStartupSwitch(existing["IsDeleted"]) == 1
+                            || string.IsNullOrWhiteSpace(existing["ApiV8Code"]?.ToString()))
+                        {
+                            conflicts.Add(key + "：已有记录处于软删除状态或缺少可执行源码");
+                            continue;
+                        }
+
+                        // The availability contract is already satisfied. The
+                        // full Managed package upgrade remains responsible for
+                        // source/version reconciliation, so a routine startup
+                        // must not write all seven rows twice on every node.
+                        if (string.IsNullOrWhiteSpace(
+                                GetStartupDependencyContractError(existing, source)))
+                        {
+                            reused.Add(key);
+                            continue;
+                        }
+
+                        var addressCollision = client.Db.FromSql(@"SELECT Id, ApiEngineKey, ApiAddress
+FROM sys_apiengine
+WHERE LOWER(ApiAddress)=LOWER(@p0) AND Id<>@p1")
+                            .AddInParameter("p0", source["ApiAddress"]?.ToString())
+                            .AddInParameter("p1", existing["Id"]?.ToString())
+                            .First<dynamic>();
+                        if (addressCollision != null)
+                        {
+                            conflicts.Add(key + "：官方 ApiAddress 已被其它接口占用");
+                            continue;
+                        }
+
+                        var sameOfficialSource = string.Equals(
+                            NormalizeStartupDependencySource(existing["ApiV8Code"]?.ToString()),
+                            NormalizeStartupDependencySource(source["ApiV8Code"]?.ToString()),
+                            StringComparison.Ordinal);
+                        var patch = sameOfficialSource
+                            ? source
+                            : new JObject
+                            {
+                                ["Id"] = existing["Id"]?.ToString(),
+                                ["ApiEngineKey"] = key,
+                                ["ApiAddress"] = source["ApiAddress"]?.ToString(),
+                                ["IsEnable"] = 1,
+                                ["StopHttp"] = 0,
+                                ["AllowAnonymous"] = ReadStartupSwitch(source["AllowAnonymous"]),
+                                ["IsDeleted"] = 0
+                            };
+                        patch["Id"] = existing["Id"]?.ToString();
+                        patch["OsClient"] = client.OsClient;
+                        patch["IsDeleted"] = 0;
+                        patch["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                        var update = await UpgradeTrustedFormEngine
+                            .UpdateAsync("sys_apiengine", client.OsClient, patch)
+                            .ConfigureAwait(false);
+                        if (update?.Code != 1)
+                        {
+                            return new DosResult(0, new { ApiEngineKey = key },
+                                $"页面启动接口[{key}]补正失败：{update?.Msg ?? "无返回"}");
+                        }
+                        reconciled.Add(key);
+                        if (!sameOfficialSource) preservedLocalSource.Add(key);
+                    }
+                    else
+                    {
+                        var collision = client.Db.FromSql(@"SELECT Id, ApiEngineKey, ApiAddress
+FROM sys_apiengine
+WHERE Id=@p0 OR LOWER(ApiAddress)=LOWER(@p1)")
+                            .AddInParameter("p0", source["Id"]?.ToString())
+                            .AddInParameter("p1", source["ApiAddress"]?.ToString())
+                            .First<dynamic>();
+                        if (collision != null)
+                        {
+                            conflicts.Add(key + "：稳定 Id 或 ApiAddress 已被其它接口占用");
+                            continue;
+                        }
+
+                        source["OsClient"] = client.OsClient;
+                        source["IsDeleted"] = 0;
+                        source["CreateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                        source["UpdateTime"] = source["CreateTime"];
+                        var add = await UpgradeTrustedFormEngine
+                            .AddAsync("sys_apiengine", client.OsClient, source)
+                            .ConfigureAwait(false);
+                        if (add?.Code != 1)
+                        {
+                            return new DosResult(0, new { ApiEngineKey = key },
+                                $"页面启动接口[{key}]创建失败：{add?.Msg ?? "无返回"}");
+                        }
+                        added.Add(key);
+                    }
+
+                    // Some old databases have physical BIT columns without
+                    // matching diy_field metadata.  FormEngine can then report
+                    // success while silently ignoring these flags, so reconcile
+                    // internal 0/1 constants physically and read them back.
+                    var allowAnonymous = ReadStartupSwitch(source["AllowAnonymous"]);
+                    client.Db.FromSql(@"UPDATE sys_apiengine
+SET IsEnable=1, StopHttp=0, AllowAnonymous=" + allowAnonymous + @", ApiAddress=@p0
+WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                        .AddInParameter("p0", source["ApiAddress"]?.ToString())
+                        .AddInParameter("p1", key)
+                        .ExecuteNonQuery();
+
+                    var readback = ReadStartupDependencyEngine(client.Db, key);
+                    var contractError = GetStartupDependencyContractError(readback, source);
+                    if (!contractError.DosIsNullOrWhiteSpace())
+                    {
+                        return new DosResult(0, new
+                        {
+                            ApiEngineKey = key,
+                            ContractError = contractError
+                        }, $"页面启动接口[{key}]写入后强回读不一致：{contractError}");
+                    }
+                    await InvalidateStartupDependencyCacheAsync(client.OsClient, readback)
+                        .ConfigureAwait(false);
+                }
+
+                if (conflicts.Count > 0)
+                {
+                    return new DosResult(0, new
+                    {
+                        Added = added,
+                        Reconciled = reconciled,
+                        PreservedLocalSource = preservedLocalSource,
+                        Conflicts = conflicts
+                    }, "页面启动接口自举存在客户源码或稳定身份冲突，拒绝把局部成功冒充完整恢复。");
+                }
+
+                foreach (var key in RequiredStartupDependencyEngineKeys)
+                {
+                    if (!added.Contains(key, StringComparer.Ordinal)
+                        && !reconciled.Contains(key, StringComparer.Ordinal)
+                        && !reused.Contains(key, StringComparer.Ordinal))
+                        reused.Add(key);
+                }
+                if (!StartupDependenciesReady(client, out var finalReason))
+                    return new DosResult(0, null, "页面启动接口闭包最终回读失败：" + finalReason);
+
+                return new DosResult(1, new
+                {
+                    Verified = RequiredStartupDependencyEngineKeys.Length,
+                    Added = added,
+                    Reconciled = reconciled,
+                    Reused = reused,
+                    PreservedLocalSource = preservedLocalSource,
+                    Source = "EmbeddedOfficialApplicationPackages"
+                }, added.Count > 0 || reconciled.Count > 0
+                    ? "已从内置官方应用包补齐页面启动接口闭包。"
+                    : "页面启动接口闭包已就绪。");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, new
+                {
+                    Added = added,
+                    Reconciled = reconciled,
+                    PreservedLocalSource = preservedLocalSource,
+                    Conflicts = conflicts
+                }, "页面启动接口闭包检查异常：" + ex.Message);
+            }
+        }
+
+        private static JObject ReadStartupDependencyEngine(DbSession database, string key)
+        {
+            var row = database.FromSql(@"SELECT * FROM sys_apiengine WHERE ApiEngineKey=@p0")
+                .AddInParameter("p0", key)
+                .First<dynamic>();
+            return row == null ? null : JObject.FromObject(row);
+        }
+
+        private static string GetStartupDependencyContractError(JObject row, JObject source)
+        {
+            if (row == null) return "不存在";
+            if (ReadStartupSwitch(row["IsDeleted"]) == 1) return "处于软删除状态";
+            if (ReadStartupSwitch(row["IsEnable"]) != 1) return "IsEnable不是1";
+            if (ReadStartupSwitch(row["StopHttp"]) != 0) return "StopHttp不是0";
+            if (ReadStartupSwitch(row["AllowAnonymous"])
+                != ReadStartupSwitch(source["AllowAnonymous"])) return "AllowAnonymous不一致";
+            if (!string.Equals(row["ApiAddress"]?.ToString(), source["ApiAddress"]?.ToString(), StringComparison.Ordinal))
+                return "ApiAddress不一致";
+            if (string.IsNullOrWhiteSpace(row["ApiV8Code"]?.ToString()))
+                return "ApiV8Code为空";
+            return string.Empty;
+        }
+
+        private static string NormalizeStartupDependencySource(string source)
+        {
+            return (source ?? string.Empty).Replace("\r\n", "\n").Trim();
+        }
+
+        private static int ReadStartupSwitch(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null) return 0;
+            if (token.Type == JTokenType.Boolean) return token.Value<bool>() ? 1 : 0;
+            if (token.Type == JTokenType.Integer || token.Type == JTokenType.Float)
+                return token.Value<double>() == 0 ? 0 : 1;
+            if (token.Type == JTokenType.Bytes)
+                return token.Value<byte[]>()?.Any(value => value != 0) == true ? 1 : 0;
+            var text = token.ToString().Trim();
+            if (bool.TryParse(text, out var boolean)) return boolean ? 1 : 0;
+            if (long.TryParse(text, out var number)) return number == 0 ? 0 : 1;
+            try
+            {
+                var bytes = Convert.FromBase64String(text);
+                return bytes.Any(value => value != 0) ? 1 : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private static async Task InvalidateStartupDependencyCacheAsync(
+            string osClient,
+            JObject row)
+        {
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            foreach (var value in new[]
+            {
+                row?["ApiEngineKey"]?.ToString(),
+                row?["Id"]?.ToString(),
+                row?["ApiAddress"]?.ToString()
+            }.Where(value => !value.DosIsNullOrWhiteSpace()).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{value}")
+                    .ConfigureAwait(false);
+                var lower = value.ToLowerInvariant();
+                if (!string.Equals(value, lower, StringComparison.Ordinal))
+                    await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{lower}")
+                        .ConfigureAwait(false);
+            }
         }
 
         private static async Task<Dictionary<string, string>> LoadUpgradeResourcesAsync()

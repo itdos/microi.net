@@ -20,12 +20,6 @@ namespace Microi.net.Api
     //[IS4Authorize("Auth_SysUserController")]
     public class SysUserController : Controller
     {
-        private const string CurrentUserApiEngineKey = "platform-current-user";
-        private const string SysUserPublicInfoApiEngineKey = "platform-sys-user-public-info";
-        private const string CreateTenantApiEngineKey = "platform-create-tenant";
-        private const string UpdateCurrentProfileApiEngineKey = "platform-user-update-profile";
-        private const string UpdateUserPreferencesApiEngineKey = "platform-user-update-preferences";
-        private const string SysUserAdminApiEngineKey = "platform-sys-user-admin";
         private static SysUserLogic _sysUserLogic = new SysUserLogic();
         private readonly ICaptcha _captcha;
 
@@ -85,31 +79,10 @@ namespace Microi.net.Api
                 && CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
         }
 
-        public class CreateTenantRequest
-        {
-            public string TenantKey { get; set; }
-            public string SystemName { get; set; }
-        }
-
         public class OwnedTenantAdminCredentialRequest
         {
             public string TenantKey { get; set; }
             public bool ConfirmReset { get; set; }
-        }
-
-        public class UpdateCurrentProfileRequest
-        {
-            public string Name { get; set; }
-            public string Email { get; set; }
-            public string Sex { get; set; }
-            public string Lang { get; set; }
-            public string Avatar { get; set; }
-            public string PublicAvatar { get; set; }
-        }
-
-        public class UpdateMyDefaultIndexUrlRequest
-        {
-            public string DefaultIndexUrl { get; set; }
         }
 
         private static async Task DefaultParam(SysUserParam param)
@@ -117,26 +90,6 @@ namespace Microi.net.Api
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             param._CurrentUser = currentTokenDynamic?.CurrentUser;
             param.OsClient = currentTokenDynamic?.OsClient;
-        }
-
-        private async Task<JsonResult> RunSysUserAdminCompatibilityAsync(
-            string action,
-            JObject request)
-        {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            if (currentToken?.CurrentUser == null)
-            {
-                Response.StatusCode = 401;
-                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-            }
-
-            request ??= new JObject();
-            request["Action"] = action;
-            request["OsClient"] = currentToken.OsClient;
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                SysUserAdminApiEngineKey,
-                request,
-                currentToken.CurrentUser));
         }
 
         private void SetSensitiveCredentialResponseHeaders()
@@ -620,24 +573,6 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// Create one SaaS tenant for the current website user.
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> CreateTenant(CreateTenantRequest param)
-        {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            if (currentToken?.CurrentUser == null)
-                return Json(new DosResult(1001, null, "请先登录！"));
-
-            var request = param == null ? new JObject() : JObject.FromObject(param);
-            request["OsClient"] = currentToken.OsClient;
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                CreateTenantApiEngineKey,
-                request,
-                currentToken.CurrentUser));
-        }
-
-        /// <summary>
         /// 查看当前官网账号名下 SaaS 租户的默认 admin 密码。
         /// 密码不会进入接口引擎、FormEngine、URL、缓存或审计日志。
         /// </summary>
@@ -938,113 +873,6 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost, HttpGet]
-        //注意：core2.2->3.1后，继续使用IS4Authorize会导致接口直接报401
-        //[IS4Authorize("Auth_GetCurrentUser")]
-        public async Task<JsonResult> GetCurrentUser(SysUserParam param)
-        {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            if (currentToken?.CurrentUser == null)
-                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-
-            var request = param == null ? new JObject() : JObject.FromObject(param);
-            request["OsClient"] = currentToken.OsClient;
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                CurrentUserApiEngineKey,
-                request,
-                currentToken.CurrentUser));
-        }
-
-        /// <summary>
-        /// 刷新登陆用户redis缓存信息
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost]
-        public async Task<JsonResult> RefreshLoginUser(string userId = null, string osClient = null)
-        {
-            return await RunSysUserAdminCompatibilityAsync(
-                "RefreshLoginUser",
-                new JObject { ["UserId"] = userId });
-        }
-
-        /// <summary>
-        /// 修改用户。必传：Id
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost]
-        public async Task<JsonResult> UptSysUser(SysUserParam param)
-        {
-            return await RunSysUserAdminCompatibilityAsync(
-                "UptSysUser",
-                param == null ? new JObject() : JObject.FromObject(param));
-        }
-
-        /// <summary>
-        /// 新增登陆账号。必传：Account、Pwd
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost]
-        public async Task<JsonResult> AddSysUser(SysUserParam param)
-        {
-            return await RunSysUserAdminCompatibilityAsync(
-                "AddSysUser",
-                param == null ? new JObject() : JObject.FromObject(param));
-        }
-
-        /// <summary>
-        /// 删除用户。必传：Id
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost]
-        public async Task<JsonResult> DelSysUser(SysUserParam param)
-        {
-            return await RunSysUserAdminCompatibilityAsync(
-                "DelSysUser",
-                param == null ? new JObject() : JObject.FromObject(param));
-        }
-
-        /// <summary>
-        /// 获取用户。
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost, HttpGet]
-        public async Task<JsonResult> GetSysUser(SysUserParam param)
-        {
-            return await RunSysUserAdminCompatibilityAsync(
-                "GetSysUser",
-                param == null ? new JObject() : JObject.FromObject(param));
-        }
-        /// <summary>
-        /// 获取所有系统用户公开信息。可传入Ids。
-        /// 建议使用接口引擎重新实现。
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpPost, HttpGet]
-        public async Task<JsonResult> GetSysUserPublicInfo(SysUserParam param)
-        {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            if (currentToken?.CurrentUser == null)
-                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-
-            var request = param == null ? new JObject() : JObject.FromObject(param);
-            request["OsClient"] = currentToken.OsClient;
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                SysUserPublicInfoApiEngineKey,
-                request,
-                currentToken.CurrentUser));
-        }
-
-        /// <summary>
         /// 获取用户。
         /// </summary>
         /// <param name="param"></param>
@@ -1136,53 +964,6 @@ namespace Microi.net.Api
                 Level = 2
             });
             return Json(new DosResult(1, decodeResult.Data));
-        }
-
-        /// <summary>
-        /// 当前用户自助设置登录后首页。目标用户和租户只取登录 Token，且只允许
-        /// 保存站内路由；真正导航时客户端还会按当前动态菜单权限再次校验。
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> UpdateMyDefaultIndexUrl([FromBody] UpdateMyDefaultIndexUrlRequest param)
-        {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            var currentUser = currentToken?.CurrentUser;
-            if (currentUser == null)
-            {
-                Response.StatusCode = 401;
-                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-            }
-
-            var request = param == null ? new JObject() : JObject.FromObject(param);
-            request["OsClient"] = currentToken.OsClient;
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                UpdateUserPreferencesApiEngineKey,
-                request,
-                currentUser));
-        }
-
-        /// <summary>
-        /// 账户资料自助修改。字段白名单固定为显示名称、邮箱、性别、语言、私有头像和公开头像，目标用户、租户
-        /// 均来自登录 Token。私有头像只能来自 member/avatar，公开头像只能来自
-        /// member/public-avatar；未提交的头像字段保持原值，兼容尚未安装公开头像字段的租户。
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> UpdateCurrentProfile([FromBody] UpdateCurrentProfileRequest param)
-        {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            var currentUser = currentToken?.CurrentUser;
-            if (currentUser == null)
-            {
-                Response.StatusCode = 401;
-                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-            }
-
-            var request = param == null ? new JObject() : JObject.FromObject(param);
-            request["OsClient"] = currentToken.OsClient;
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                UpdateCurrentProfileApiEngineKey,
-                request,
-                currentUser));
         }
 
     }
