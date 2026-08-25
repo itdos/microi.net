@@ -16,7 +16,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 模块引擎或 `sys_menu`。逐步建模在字段完成后调用 `microi_configure_form_banner` 回读验收。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=b09c3f2d05e2927322de0c42913f85813296e9001bccf31b6dc85779cbe3099f -->
+<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=088aaa73360be7d63b64ca476e884371140c7807d118c05f04d87a12de0c7701 -->
 ## 交付总原则
 
 1. **先事实源，后建模**：先读需求文档、截图、现有蓝图、数据库结构和菜单结构，形成业务蓝图；不要边猜边建表、边猜边写接口。
@@ -45,7 +45,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 最终回复必须按原始编号逐项汇总：哪些已实现、哪些未实现、是否通过全自动化测试、是否通过截图验证。不能只给总括性“都完成了”。如果某项没有测试或没有截图，必须明说“未覆盖/未截图”，并说明原因。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=aa3d244481565608bc92f7c389f8647e8cd551d241aabad9a9d876f1d15aab52 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=5b929c8ab1cf588601fb0e27149ef05893bc5000eecf05e58961c4f785251e31 -->
 ## 平台安全与存量兼容验收（强制）
 
 AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉及 FormEngine、菜单、角色、子表、文件、SaaS 或登录协议的交付，都必须按以下服务端边界设计和验收：

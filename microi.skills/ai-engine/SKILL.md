@@ -7,7 +7,7 @@ description: Microi AI 引擎、MiniMax 图片/音乐/视频生成与预览、�
 
 # Microi AI Engine
 
-平台媒体生成的受控 HTTP 入口包括 `/api/Ai/GenerateMiniMaxImage`、`/api/Ai/GenerateMiniMaxMusic`、`/api/Ai/CreateMiniMaxVideo`、`/api/Ai/GetMiniMaxVideoTask`、`/api/Ai/GetMiniMaxVideoFile`、`/api/Ai/PersistMiniMaxVideoFile`；AI 工作流入口统一位于 `/api/AIWorkFlow/*`。调用方只提交业务参数和模型选择，供应商密钥、租户配额、任务归属和文件读取权限由服务端判定。生成结果必须先进入当前租户 HDFS 或受控临时句柄，浏览器不接触供应商密钥、图片 Base64、音频十六进制或原始视频任务 Id。`PersistMiniMaxVideoFile` 只能转存当前登录用户所属且已完成的任务，禁止作为任意 URL 搬运器。
+平台媒体生成的受控 HTTP 入口包括 `/api/Ai/GenerateMiniMaxImage`、`/api/Ai/GenerateMiniMaxMusic`、`/api/Ai/CreateMiniMaxVideo`、`/api/Ai/GetMiniMaxVideoTask`、`/api/Ai/GetMiniMaxVideoFile`、`/api/Ai/PersistMiniMaxVideoFile`；AI 工作流统一调用 Managed 接口引擎 `/apiengine/platform-ai-workflow`，通过 `Action` 选择概览、节点详情、生成、列表、读取、保存或删除。调用方只提交业务参数和模型选择，供应商密钥、租户配额、任务归属和文件读取权限由服务端判定。生成结果必须先进入当前租户 HDFS 或受控临时句柄，浏览器不接触供应商密钥、图片 Base64、音频十六进制或原始视频任务 Id。`PersistMiniMaxVideoFile` 只能转存当前登录用户所属且已完成的任务，禁止作为任意 URL 搬运器。
 
 ## 能力
 

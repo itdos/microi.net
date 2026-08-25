@@ -1,5 +1,6 @@
 import { formTrace, isAdvancedFieldLayoutRuntimeEnabled } from "@/utils/form-engine-trace.js";
 import { sanitizeHtml } from "@/utils/safe-html.js";
+import { requestMenuBadge } from "@/layout/components/Sidebar/menu-badge-batch.js";
 import { hasFormBannerConfig } from "../field-display-value.js";
 import {
     buildFormPresentationSections,
@@ -410,7 +411,8 @@ export default {
             var nextValues = Object.create(null);
             await Promise.all([...groups.entries()].map(async ([apiEngineKey, descriptors]) => {
                 try {
-                    var response = await self.DiyCommon.ApiEngine.Run(
+                    var response = await requestMenuBadge(
+                        self.DiyCommon.ApiEngine.Run,
                         apiEngineKey,
                         self.BuildPresentationSectionBadgeParams(descriptors)
                     );

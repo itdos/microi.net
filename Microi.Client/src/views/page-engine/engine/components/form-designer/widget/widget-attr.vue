@@ -726,7 +726,7 @@ const loadSysMenuList = () => {
     return
   }
   DiyCommon.Post(
-    '/api/SysMenu/GetSysMenuStep',
+    '/apiengine/platform-sys-menu?Action=GetSysMenuStep',
     {
       _SelectFields: ['Id', 'Name', 'Icon', 'IconClass', 'Display', 'OpenType', 'DiyTableId', 'ParentId', 'Sort'],
       TableName: 'Sys_Menu',

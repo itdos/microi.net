@@ -12,7 +12,7 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 访问密钥由 `microi_list_my_access_keys`、`microi_create_my_access_key`、`microi_revoke_my_access_key` 管理，只允许当前用户、限期、最小 scope，明文仅创建时返回一次。外部身份回调固定为 `/api/ExternalLogin/Callback`，服务端校验租户、Provider、state、redirect 和回调域名，验证成功后仍签发 DiyToken。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-security-000 sha256=0346bd9ca3fe98dd2b589d1777aa1e55cd24cf7dedc69ee65d4ca91461db7dee -->
+<!-- microi-progressive:chunk id=v8-security-000 sha256=d03ee34e72925db55f9022de26dfc251c0d3d69fac52ae6a910d42ddfc142ae7 -->
 ## 0. 租户动态系统设置与密钥边界
 
 第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。公开的租户配置必须建成当前租户 `sys_config` 的实体字段；敏感或仅供后端使用的租户业务配置保存到 `mci_system_setting`。数据库、Redis、MongoDB、MinIO、MQ 等部署控制面仍由主库 `sys_osclients` 托管，子租户不能修改。
@@ -34,6 +34,8 @@ var openaiKey = 'sk-xxxxxxxxxx';
 ```
 
 `V8.OsClientModel` 与兼容别名 `V8.ClientModel` 均为独立脱敏副本：数据库连接、AuthSecret、Redis、对象存储、MQ、MQTT、Search 的地址与凭据不会注入脚本。存量租户业务字段只作兼容，新增 Secret 不得继续依赖 `V8.OsClientModel`。
+
+接口引擎需要保存可逆的接口私有密码或 Token 时，使用 `V8.Method.ProtectApiEngineSecret(value)` 写入密文，读取时使用 `V8.Method.UnprotectApiEngineSecret(cipher)`。宿主固定绑定当前 `OsClient + ApiEngineKey`，V8 不能指定租户、Purpose 或密钥；同租户其它接口引擎也不能解密。禁止继续用 `V8.OsClientModel.AuthSecret/DbConn` 自行派生 AES 密钥。列表仍只返回脱敏元数据，解密前仍要校验当前用户、行归属和业务权限，原文不得进入日志、审计或匿名响应。
 
 `V8.SysConfig` 按运行端采用不同权限投影，且任何运行端都不存在 `PublicSettings` 属性。浏览器/前端 V8 只得到匿名 `GetSysConfig` 的独立脱敏 `sys_config` 投影；`mci_system_setting` 的任何记录都不会进入浏览器。后端接口引擎和后端 V8 事件得到当前租户完整、独立的 `sys_config`，全部启用的 `mci_system_setting` 则放在 `V8.SysConfig.ServerPrivateSettings`，Secret 由可信后端按租户解密。独立节点避免动态 Key 覆盖 `sys_config` 实体字段，也让前后端边界可审计。子租户调用 `V8.FormEngine.GetSysConfig(...)` 时仍强制使用当前 `OsClient`，不能借缓存命中读取其它租户配置。
 
@@ -61,7 +63,7 @@ Secret 只通过租户管理员专用端点写入租户绑定的认证密文。�
 - 多节点保存连接使用按 `OsClient + DbKey` 隔离的分布式锁，并由数据库唯一索引兜底；同步数据和附件仍必须使用业务幂等键，锁不能替代唯一约束、状态机或 inbox/outbox。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-001 sha256=c5868fd8a159b72f1038658873dfee83a9eca68661eebd837ecadab13dea5c22 -->
+<!-- microi-progressive:chunk id=v8-security-001 sha256=9e477268919238bb6a2525116de3c8386aa439d8e93c5d66f3893cb07740b374 -->
 ## 0.5 接口引擎配置安全
 
 代码以外，接口本身的配置项也是安全防线（详见 `v8-api-config/SKILL.md`）：
@@ -75,7 +77,7 @@ Secret 只通过租户管理员专用端点写入租户绑定的认证密文。�
 | `LogParam = true` | 支付/审计类接口记录请求 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-002 sha256=ed6c3fabf36da5a359778a0e7d085aa9b0d8a2f55337c0c9a1d39da4d72bac95 -->
+<!-- microi-progressive:chunk id=v8-security-002 sha256=7229e5f8d200c0dfbab08752405f5e88d7edc80e9e92b6802880c022b09ca893 -->
 ## 1. 防 SQL 注入
 
 ### 必须：参数化查询
@@ -147,7 +149,7 @@ if (isNaN(amount) || amount <= 0 || amount > 999999.99) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-004 sha256=e811dff8614c24c751291dda271b1574debccf741c0e166790f5324a3d3594ad -->
+<!-- microi-progressive:chunk id=v8-security-004 sha256=1703ea824e4807b24d30225d41e16fb36b0fecc21c63a4ab0296106185460a27 -->
 ## 4. 防 XSS
 
 四个字符替换不是通用 XSS 防护。必须按输出上下文处理：

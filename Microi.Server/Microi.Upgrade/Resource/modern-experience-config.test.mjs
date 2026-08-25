@@ -126,7 +126,7 @@ test('联邦商城包包含公开范围、私有凭据和历史版本契约', as
   assert.match(engines.get('get-microi-store').ApiV8Code, /BULK_PLATFORM_BOOTSTRAP_ORDER_V1/);
   const versionsEngine = engines.get('get-microi-store-versions');
   assert.match(versionsEngine.ApiV8Code, /mic_data_version/);
-  assert.equal(versionsEngine.Version, 'v1.1.0');
+  assert.equal(versionsEngine.Version, 'v1.1.2');
   assert.match(versionsEngine.ApiV8Code, /PaginationVersion:\s*1/);
   assert.match(versionsEngine.ApiV8Code, /V8\.Param\._PageIndex/);
   assert.match(versionsEngine.ApiV8Code, /V8\.Param\._PageSize/);

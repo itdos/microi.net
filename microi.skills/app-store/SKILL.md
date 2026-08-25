@@ -21,14 +21,14 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - 有官方 MCP 权限时，固定使用 `microi_itdos`（`https://api.itdos.com`、`OsClient=iTdos`）更新官方母版、制作并发布对应应用，按内容哈希/包版本回读后，再由目标租户 MCP 安装或更新。无官方权限时只通过当前用户自己的 MCP/Manifest 更新其数据库并回读，不得假借通用升级器越权发布官方应用。
 - `Microi.Upgrade` 只保留应用商城/安装器启动前必需的核心物理兼容或协议迁移，并要求持久化版本门、共享租约、幂等、失败不推进版本。禁止每次启动对每个租户重跑不断增长的历史迁移清单。
 - 平台通用缺陷的交付证据必须分开记录：源码修复、官方母版资源、商城包发布后回读、目标租户后台安装任务、目标租户资源回读和真实 UI/接口验收；其中任一步未完成都不能笼统称为“已发布并安装”。
-- 任何计划让全部吾码租户通过“安装/更新官方应用”获得的标准字段、布局、菜单、页面或种子数据，必须先在官方 `microi_itdos` 主租户创建并回读，再从该主租户按精确菜单/表资源导出新版 `AppPakcet`、单调递增应用版本并发布。禁止先只在客户/子租户补字段，再用本地手工 JSON 冒充官方母版；客户验证应发生在官方包发布之后。
-- 同一标准能力若同时属于基础 SaaS 空库包和独立官方应用（例如系统设置、系统账号），两条交付链都要更新：基础包保证新租户初始化完整，独立应用保证存量租户可增量安装。发布后分别核对 `PackageInfo.Version`、物理列、`diy_field` 布局节点和商城行 `AppVersion/AppPakcet`，不能用其中一条替代另一条。
+- 任何计划让全部吾码租户通过“安装/更新官方应用”获得的标准字段、布局、菜单、页面或种子数据，必须先在官方 `microi_itdos` 主租户创建并回读，再从该主租户按精确菜单/表资源导出新版包、单调递增应用版本并发布。包正文以 `PackageHdfsPath + PackageSha256 + PackageSize` 为事实源；`AppPakcet` 只作旧版读取兼容，验证完成后应为空。禁止先只在客户/子租户补字段，再用本地手工 JSON 冒充官方母版；客户验证应发生在官方包发布之后。
+- 同一标准能力若同时属于基础 SaaS 空库包和独立官方应用（例如系统设置、系统账号），两条交付链都要更新：基础包保证新租户初始化完整，独立应用保证存量租户可增量安装。发布后分别核对 `PackageInfo.Version`、物理列、`diy_field` 布局节点、商城行 `AppVersion` 和 HDFS 包指针/下载哈希，不能用其中一条替代另一条。
 
 ## 吾码创建人开发时的强制发布闭环
 
 - 每次任务先检查工作区根的 `Microi.Server/Microi.net/`。只有目录存在且 `rg --files Microi.Server/Microi.net` 能找到至少一个真实源码文件时，才确认当前是吾码创建人在官方完整源码工作区开发；空目录不算，且不要求本次修改位于该目录。确认后，对任意目录中的平台基础能力执行修改、构建或交付时，官方应用数据包都不是“以后再补”的附加产物，而是本次实现的组成部分。目录缺失或为空时按普通用户工作区处理；纯审查、解释或诊断仍保持只读。
 - 触发资源包括系统设置、表、字段、Tab、菜单、权限、接口引擎、事件、数据源、页面、打印、工作流、任务、平台内置微服务和可幂等种子数据。开始修改时就确定资源归属：系统设置、登录身份、个人中心等通常归 `app.microi.saas-engine`；表单引擎归 `app.microi.form-engine`；模块引擎归 `app.microi.module-engine`；应用商城归 `app.microi.store`。同一能力跨多个包时逐包更新，禁止只挑一个包。
-- 强制闭环依次包含：①源码和定向测试；②通过绑定 `https://api.itdos.com + OsClient=iTdos` 的 `microi_itdos` 更新并回读官方母版资源；③从母版导出或按受审计发布契约生成本地应用包，单调提升包版本并核对资源数量、版本和 SHA-256；④发布对应官方 Platform 应用；⑤重新读取商城行和完整 `AppPakcet`，核对 `Published/IsApprove`、`AppVersion`、`PackageInfo.Version`、资源正文和内容哈希；⑥立即做一次同输入幂等重跑，确认无重复升版或漂移。任务还指定目标租户时，再安装/更新并等待后台任务 `Succeeded` 后回读真实资源。
+- 强制闭环依次包含：①源码和定向测试；②通过绑定 `https://api.itdos.com + OsClient=iTdos` 的 `microi_itdos` 更新并回读官方母版资源；③从母版导出或按受审计发布契约生成本地应用包，单调提升包版本并核对资源数量、版本和 SHA-256；④发布对应官方 Platform 应用；⑤重新读取商城行的小型 HDFS 指针，用公有下载或受权私有下载取得原始 JSON，核对 `Published/IsApprove`、`AppVersion`、`PackageInfo.Version`、UTF-8 字节数、SHA-256 和资源正文；⑥立即做一次同输入幂等重跑，确认无重复升版或漂移。任务还指定目标租户时，再安装/更新并等待后台任务 `Succeeded` 后回读真实资源。
 - 本地包文件、生成器成功、单元测试通过、返回 TaskId 或 HTTP 200 都不能代替官方主数据库与商城回读。`.resource-sync-base` 只能在官网发布后逐项哈希一致时由同步器推进，不得与本地候选一起手工修改。若官方身份、MCP 登录或发布门禁失效，必须保留准确的未发布边界并修复链路；不得把本地 JSON 宣称为“其它吾码用户已经可以安装”。
 - 应用包不得携带真实地图 Key、Token、连接串或其它租户秘密。浏览器供应商 Key 等配置只交付字段/设置模板和安全读取能力，实际值由每个目标租户在安装后自行填写。
 
@@ -43,7 +43,7 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 ## 接口引擎资源所有权（强制）
 
 - 新发布包必须声明 `ResourcePolicies.ApiEngines`，不得再依赖“同 Key 直接覆盖”。官方不可随租户修改的核心使用 `{ Ownership:'Application', UpgradePolicy:'Managed' }`；提供给租户改业务的 Hook 使用 `{ Ownership:'Tenant', UpgradePolicy:'CreateIfMissing' }`。
-- 发布器从上一版 `AppPakcet.SysApiEngines` 计算 `BaseHash`；导入成功后把本版摘要写入 `sys_microistoreversion.InstallResult.ResourceState.ApiEngines`。普通/社区应用仍按 Base/Local/Incoming 三方保护：`Local == Base` 才更新，`Local != Base && Local != Incoming` 必须冲突回滚。唯一覆盖例外是从固定 `https://api.itdos.com + iTdos` 实时回读并校验为官方 `ApplicationType=Platform` 的应用：其中 `Ownership=Application + UpgradePolicy=Managed` 属于平台发行物，安装/更新按包覆盖本地差异；离线包、自报官方、非 Platform 来源都不能获得该权限。
+- 发布器从上一版安装包正文的 `SysApiEngines` 计算 `BaseHash`；正文可能来自已验证的 HDFS 指针或旧版 `AppPakcet`。导入成功后把本版摘要写入 `sys_microistoreversion.InstallResult.ResourceState.ApiEngines`。普通/社区应用仍按 Base/Local/Incoming 三方保护：`Local == Base` 才更新，`Local != Base && Local != Incoming` 必须冲突回滚。唯一覆盖例外是从固定 `https://api.itdos.com + iTdos` 实时回读并校验为官方 `ApplicationType=Platform` 的应用：其中 `Ownership=Application + UpgradePolicy=Managed` 属于平台发行物，安装/更新按包覆盖本地差异；离线包、自报官方、非 Platform 来源都不能获得该权限。
 - `CreateIfMissing` 只在目标 Key 不存在时创建，存在时不得对齐 Id、源码、启用状态或其它字段。扩展模板发布后即归租户维护；后续版本禁止把同一 Key 改回 `Managed` 接管，确需新的官方核心时发布新 Key 并显式迁移。
 - 官方功能采用“Managed 核心 + CreateIfMissing Hook”。核心只提供稳定协议和默认行为，并在可信官方 Platform 包更新时覆盖升级；客户日志、写表、通知和业务动作放 Hook，并以稳定 `EventId`、唯一约束或 outbox 幂等。`CreateIfMissing` 一旦交给租户维护，即使后续官方包误改为 Managed 也必须冲突回滚。
 - 历史包未声明策略时只能按旧兼容流程安装；重新发布时发布器必须生成策略。验收至少覆盖首次安装、可信官方 Managed 本地有差异仍覆盖、普通应用核心差异冲突回滚、Hook 被改后保持原样、重复安装、两节点竞态，以及官方发布数据库连 `ValidateOnly` 也禁止执行安装器。
@@ -80,12 +80,16 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 ## 联邦商城源、公开范围与历史版本（强制）
 
 - 每个主租户和子租户都可以发布自己的应用；应用行用 `IsPublic` 表达公开范围，缺省/历史空值按公开兼容。公开应用允许未登录来源读取和安装，私有应用只允许来源登录成功后的授权身份读取，列表、详情、版本接口都必须重复执行这一权限判断。
+- 新版安装包正文不得长期内联在 `sys_microistore.AppPakcet`，也不得随 `mic_data_version.Data` 重复复制。公开应用写入 HDFS 公有桶并记录 `HdfsPublic`，私有应用写入私有桶并记录 `HdfsPrivate`；数据库只保存 `PackageId/PackageHdfsPath/PackageSha256/PackageSize/PackageContentType/PackageFormatVersion/PackageUploadedAt`。`IsPublic` 历史空值按公开兼容，但所有新建应用必须显式落为 `1/0`。
+- 发布顺序必须是“UTF-8 JSON 上传 → HDFS 回读 → 字节数和 SHA-256 一致 → 写入不可变包索引及商城指针 → 以原值 CAS 清空 `AppPakcet`”。普通发布不得仅凭 Redis 命中跳过 HDFS 回读；只有受控历史压缩可复用内容寻址缓存，安装端仍必须独立下载并校验。公开包可通过 FileServer/CDN 公有地址读取；私有包只能由来源后端在当前授权身份下签发短期下载地址，Token、签名 URL 和包正文不得进入浏览器配置、日志或后台任务参数。
+- `mic_data_version` 历史快照保留不可变 `StoreVersionId` 和同一组包指针，因此旧版本仍可精确安装，不再要求 `Data` 内含完整 JSON。导入器先校验快照版本/应用身份，再按指针下载并在解析前核对大小与哈希；指针缺失时才回退旧版内联字段，禁止快照不匹配时退回当前版本。
+- 旧库容量治理使用 `compact-microi-store-packages` 超级管理员持久后台任务：先幂等补齐物理列，再用有界 `Id` 游标逐批处理；每个包都先上传回读，随后 CAS 清理当前行或历史快照。禁止对数 GB `mic_data_version.Data` 执行全表 `LIKE`/包正文计数。逻辑大字段清空后，MySQL 表空间文件是否立即缩小取决于存储引擎；`OPTIMIZE TABLE` 只能在备份完成的维护窗口由管理员另行执行，不能由应用安装或压缩任务自动触发。
 - 商城来源以 `ApiBase + OsClient` 唯一定位。添加来源先只读发现系统标题、验证码策略和公开应用数；需要私有应用时再登录。帐号、密码、Token 不能写浏览器配置或商城来源 JSON；密码只用于本次登录，长会话 Token 以 `MCP/Mobile` 非 PC 客户端签发，并由当前租户后端加密保存到 `mci_system_setting`，浏览器只持有不具备取密能力的凭据 Key。
 - 后端来源代理必须固定已保存的 `ApiBase + OsClient`，拒绝过期 Token、访问密钥会话、非超级管理员、非 HTTPS 外网地址、重定向漂移和超限响应；Token 不得返回浏览器、日志、审计或应用包。退出登录同步删除服务端密文。
 - 商城主页面统一承载应用市场、已安装、我发布的应用、安装离线包和来源管理，不能再通过独立菜单或路由割裂上下文。来源增删改启停逐项自动保存；来源管理、详情和复杂配置使用平台统一 `80%` 可拖动大圆角 Dialog，遮罩服从正向开关 `sys_config.FormMaskBlur`，缺失或 `0/false` 默认关闭毛玻璃。
 - 每张应用卡必须显示预览图、公开范围、分类、最新版本、当前租户已安装版本及状态色。来源卡必须显示其公开数和当前授权可访问总数；平台官方发布节点只显示“平台官方应用源”身份标记，不显示安装、更新或重新安装操作。
-- 安装可明确选择 `sys_microistore` 当前版本或 `mic_data_version` 中仍含完整包正文的历史快照；后台任务在首次取包时必须把计划中的 `AppVersion` 解析为匹配且包含完整包正文的不可变 `StoreVersionId`，写入 checkpoint，并在全部后续分片一直传到详情取包。发布方中途升版时继续完成已锁定快照，新版留给下一轮盘点；快照缺失、版本不匹配、身份变化或快照 Id 漂移必须失败关闭，禁止退回易变当前行。实际安装版本写回 `sys_microistoreversion`。回退旧版属于重新安装，不得静默换成最新版。
-- 应用详情的版本选择必须服务端分页和搜索，默认每页不超过 20 条；当前版本固定置顶，历史版本只返回仍包含完整包正文的可安装状态。禁止用 `_PageSize:500` 或一次加载全部版本后在浏览器过滤。翻页、搜索与页大小切换都必须保持已选版本语义并显示总数。
+- 安装可明确选择 `sys_microistore` 当前版本或 `mic_data_version` 中仍含完整包正文或已验证包指针的历史快照；后台任务在首次取包时必须把计划中的 `AppVersion` 解析为匹配且可安装的不可变 `StoreVersionId`，写入 checkpoint，并在全部后续分片一直传到详情取包。发布方中途升版时继续完成已锁定快照，新版留给下一轮盘点；快照缺失、版本不匹配、身份变化或快照 Id 漂移必须失败关闭，禁止退回易变当前行。实际安装版本写回 `sys_microistoreversion`。回退旧版属于重新安装，不得静默换成最新版。
+- 应用详情的版本选择必须服务端分页和搜索，默认每页不超过 20 条；当前版本固定置顶，历史版本只返回含完整旧包或有效 HDFS 指针的可安装状态。禁止用 `_PageSize:500` 或一次加载全部版本后在浏览器过滤。翻页、搜索与页大小切换都必须保持已选版本语义并显示总数。
 - 商城详情、来源管理等 Teleport 弹层必须使用宿主级固定遮罩，毛玻璃覆盖完整可视区域；标题栏拖动按弹层真实尺寸限制四边，窗口缩放后重新限制，不能依赖固定像素最大位移或允许内容越出视口。
 - “我发布的应用”只读取当前登录用户拥有的记录，可以包含草稿和构建失败项；普通商城列表只读取已发布项。两者必须在服务端按 Owner 和发布状态过滤，不能依赖浏览器过滤后再分页。
 

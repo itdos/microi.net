@@ -152,7 +152,7 @@ if (V8.Form.Money <= 100) {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-workflow-006 sha256=e67b72bf060a38ed5f94a57f3978026d151bb971fcf47a0b30a434dba819c264 -->
+<!-- microi-progressive:chunk id=v8-workflow-006 sha256=8e2a82330c7f49c3a03920123531d310ea329fd310179918d835e3c05d49771a -->
 ## 前端发起流程
 
 ```javascript

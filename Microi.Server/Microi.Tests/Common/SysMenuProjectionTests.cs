@@ -79,17 +79,25 @@ public class SysMenuProjectionTests
                 ["Name"] = "系统管理",
                 ["ParentId"] = "root",
                 ["Sort"] = 10,
+                ["IconClass"] = "",
+                ["MenuBadgeTooltip"] = null,
+                ["Display"] = 0,
                 ["MoreBtns"] = "sensitive-large-script"
             }
         };
 
-        var result = SysMenuLogic.ProjectMenuRows(rows, new[] { "id", "name" });
+        var result = SysMenuLogic.ProjectMenuRows(
+            rows,
+            new[] { "id", "name", "IconClass", "MenuBadgeTooltip", "Display" });
 
         var menu = Assert.IsType<JObject>(Assert.Single(result));
         Assert.Equal("menu-1", menu["Id"]?.ToString());
         Assert.Equal("系统管理", menu["Name"]?.ToString());
         Assert.Equal("root", menu["ParentId"]?.ToString());
         Assert.Equal("10", menu["Sort"]?.ToString());
+        Assert.Equal("0", menu["Display"]?.ToString());
+        Assert.Null(menu["IconClass"]);
+        Assert.Null(menu["MenuBadgeTooltip"]);
         Assert.Null(menu["MoreBtns"]);
     }
 

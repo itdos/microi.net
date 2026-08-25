@@ -853,7 +853,7 @@ export default {
             this.filterOptions[field.key] = page.options || []
             return
           } else if (field.source === 'baseData') {
-            const result = await post('/api/SysBaseData/getSysBaseData', { ParentKey: field.parentKey }, true)
+            const result = await post('/apiengine/platform-sys-base-data?Action=GetSysBaseData', { ParentKey: field.parentKey }, true)
             if (result && Number(result.Code) === 1) rows = result.Data || []
           } else if (field.source === 'table') {
             const result = await V8.FormEngine.GetTableData(field.table, {

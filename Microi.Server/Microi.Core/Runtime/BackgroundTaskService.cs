@@ -51,6 +51,52 @@ namespace Microi.net
         public string BusinessEtaField { get; set; }
     }
 
+    /// <summary>
+    /// Notification-center list projection. Large execution payloads are deliberately
+    /// excluded so a single completed task cannot turn the list API or SignalR push
+    /// into a multi-megabyte response.
+    /// </summary>
+    public class BackgroundTaskSummary
+    {
+        public string Id { get; set; }
+        public string Title { get; set; }
+        public string Type { get; set; }
+        public string ApiEngineKey { get; set; }
+        public string Status { get; set; }
+        public string StatusText { get; set; }
+        public int Progress { get; set; }
+        public string ProgressMode { get; set; }
+        public int Current { get; set; }
+        public int Total { get; set; }
+        public string Msg { get; set; }
+        public DateTime CreateTime { get; set; }
+        public DateTime? StartTime { get; set; }
+        public DateTime? EndTime { get; set; }
+        public DateTime? HeartbeatTime { get; set; }
+        public DateTime? EstimatedEndTime { get; set; }
+        public int? RemainingSeconds { get; set; }
+        public string RemainingText { get; set; }
+        public string EstimateConfidence { get; set; }
+        public int ElapsedSeconds { get; set; }
+        public string ElapsedText { get; set; }
+        public bool CancelRequested { get; set; }
+        public int AttemptCount { get; set; }
+        public int MaxAttempts { get; set; }
+        public int ExecutionCount { get; set; }
+        public string BusinessTable { get; set; }
+        public string BusinessId { get; set; }
+        public bool HasLog { get; set; }
+        public bool HasResult { get; set; }
+    }
+
+    /// <summary>Owner-scoped detail loaded only when a row is expanded or downloaded.</summary>
+    public sealed class BackgroundTaskDetail : BackgroundTaskSummary
+    {
+        public string Log { get; set; }
+        public JObject Result { get; set; }
+        public string Error { get; set; }
+    }
+
     internal sealed class TrustedBackgroundTaskExecutionContext
     {
         public string TaskId { get; set; }
@@ -302,6 +348,85 @@ namespace Microi.net
                 .Take(100)
                 .Select(ApplyRuntimeFields)
                 .ToList();
+        }
+
+        public static List<BackgroundTaskSummary> ListSummaries(
+            string osClient,
+            string userKey,
+            int pageIndex,
+            int pageSize,
+            out int dataCount)
+        {
+            pageIndex = Math.Max(1, pageIndex);
+            pageSize = Math.Max(1, Math.Min(100, pageSize));
+            try
+            {
+                if (BackgroundTaskStore.IsAvailable(osClient))
+                {
+                    return BackgroundTaskStore.ListSummaries(
+                        osClient,
+                        userKey,
+                        pageIndex,
+                        pageSize,
+                        out dataCount);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogFailure(osClient, "DatabaseTaskSummaryListFailed", "读取数据库后台任务摘要失败", ex, userKey);
+            }
+
+            var all = ListLegacyCache(osClient, userKey)
+                .OrderByDescending(item => item.CreateTime)
+                .ToList();
+            dataCount = all.Count;
+            return all.Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .Select(ToSummary)
+                .ToList();
+        }
+
+        public static BackgroundTaskDetail GetDetail(string osClient, string userKey, string taskId)
+        {
+            if (taskId.DosIsNullOrWhiteSpace()) return null;
+            BackgroundTaskItem item = null;
+            try
+            {
+                if (BackgroundTaskStore.IsAvailable(osClient))
+                {
+                    item = BackgroundTaskStore.GetForUser(osClient, userKey, taskId);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogFailure(osClient, "DatabaseTaskDetailFailed", "读取数据库后台任务详情失败", ex, userKey);
+            }
+            item ??= ListLegacyCache(osClient, userKey)
+                .FirstOrDefault(value => string.Equals(value.Id, taskId, StringComparison.OrdinalIgnoreCase));
+            if (item == null) return null;
+            var detail = JObject.FromObject(ToSummary(item)).ToObject<BackgroundTaskDetail>()
+                         ?? new BackgroundTaskDetail { Id = item.Id };
+            detail.Log = item.Log ?? "";
+            detail.Result = item.Result ?? new JObject();
+            detail.Error = item is BackgroundTaskRecord record ? record.LastError ?? "" : "";
+            return detail;
+        }
+
+        public static BackgroundTaskSummary GetSummary(string osClient, string userKey, string taskId)
+        {
+            if (taskId.DosIsNullOrWhiteSpace()) return null;
+            try
+            {
+                if (BackgroundTaskStore.IsAvailable(osClient))
+                    return BackgroundTaskStore.GetSummaryForUser(osClient, userKey, taskId);
+            }
+            catch (Exception ex)
+            {
+                LogFailure(osClient, "DatabaseTaskStatusFailed", "读取数据库后台任务状态失败", ex, userKey);
+            }
+            var item = ListLegacyCache(osClient, userKey)
+                .FirstOrDefault(value => string.Equals(value.Id, taskId, StringComparison.OrdinalIgnoreCase));
+            return item == null ? null : ToSummary(item);
         }
 
         public static int ClearCompleted(string osClient, string userKey)
@@ -676,13 +801,15 @@ namespace Microi.net
                 // authoritative reconciliation path.
                 var projected = ListLegacyCache(osClient, userKey)
                     .OrderByDescending(item => item.CreateTime)
-                    .Take(100)
-                    .Select(ApplyRuntimeFields)
+                    .Take(15)
+                    .Select(ToSummary)
                     .ToList();
                 await RealtimePushRuntime.SendAsync(
                         clientInfo.ConnectionIds,
                         "ReceiveBackgroundTaskList",
-                        projected.Count > 0 ? projected : List(osClient, userKey))
+                        projected.Count > 0
+                            ? projected
+                            : ListSummaries(osClient, userKey, 1, 15, out _))
                     .ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -1308,6 +1435,44 @@ namespace Microi.net
             item.ProgressMode = item.ProgressMode.DosIsNullOrWhiteSpace() ? "Indeterminate" : item.ProgressMode;
             item.EstimateConfidence = item.EstimateConfidence.DosIsNullOrWhiteSpace() ? "None" : item.EstimateConfidence;
             return item;
+        }
+
+        private static BackgroundTaskSummary ToSummary(BackgroundTaskItem item)
+        {
+            item = ApplyRuntimeFields(item);
+            if (item == null) return null;
+            return new BackgroundTaskSummary
+            {
+                Id = item.Id,
+                Title = item.Title,
+                Type = item.Type,
+                ApiEngineKey = item is BackgroundTaskRecord record ? record.ApiEngineKey : "",
+                Status = item.Status,
+                StatusText = item.StatusText,
+                Progress = item.Progress,
+                ProgressMode = item.ProgressMode,
+                Current = item.Current,
+                Total = item.Total,
+                Msg = item.Msg,
+                CreateTime = item.CreateTime,
+                StartTime = item.StartTime,
+                EndTime = item.EndTime,
+                HeartbeatTime = item.HeartbeatTime,
+                EstimatedEndTime = item.EstimatedEndTime,
+                RemainingSeconds = item.RemainingSeconds,
+                RemainingText = item.RemainingText,
+                EstimateConfidence = item.EstimateConfidence,
+                ElapsedSeconds = item.ElapsedSeconds,
+                ElapsedText = item.ElapsedText,
+                CancelRequested = item.CancelRequested,
+                AttemptCount = item.AttemptCount,
+                MaxAttempts = item.MaxAttempts,
+                ExecutionCount = item.ExecutionCount,
+                BusinessTable = item.BusinessTable,
+                BusinessId = item.BusinessId,
+                HasLog = !item.Log.DosIsNullOrWhiteSpace(),
+                HasResult = item.Result != null && item.Result.HasValues
+            };
         }
 
         private static string FormatDuration(int seconds)

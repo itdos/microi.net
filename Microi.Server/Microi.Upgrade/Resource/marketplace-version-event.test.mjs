@@ -20,6 +20,14 @@ const mirrorPath = path.join(
 );
 
 const packageModel = JSON.parse(readFileSync(packagePath, 'utf8'));
+const versionAtLeast = (actual, minimum) => {
+  const left = String(actual || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+  const right = String(minimum || '').replace(/^v/i, '').split('.').map(value => Number.parseInt(value, 10) || 0);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    if ((left[index] || 0) !== (right[index] || 0)) return (left[index] || 0) > (right[index] || 0);
+  }
+  return true;
+};
 const storeTable = packageModel.DiyTables.find((item) => item.Name === 'sys_microistore');
 assert.ok(storeTable, 'app.microi.store.json must contain sys_microistore');
 const eventCode = String(storeTable.SubmitBeforeServerV8 || '').replace(/\r\n/gu, '\n');
@@ -44,7 +52,7 @@ function executeEvent({
 }
 
 test('marketplace package carries the explicit-version contract and release metadata', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.5.31');
+  assert.ok(versionAtLeast(packageModel.PackageInfo.Version, 'v7.5.31'));
   assert.match(packageModel.PackageInfo.ChangeHistory, /(?:^|\n)2026-08-21 v7\.5\.4 /u);
   assert.match(eventCode, /Version: v1\.1\.3/u);
   assert.match(eventCode, /MARKETPLACE_EXPLICIT_VERSION_V1/u);

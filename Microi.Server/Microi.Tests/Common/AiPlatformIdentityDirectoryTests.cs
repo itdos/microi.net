@@ -97,8 +97,9 @@ public class AiPlatformIdentityDirectoryTests
         var serverRoot = FindServerRoot();
         var host = File.ReadAllText(Path.Combine(
             serverRoot,
-            "Microi.net",
+            "Microi.Core",
             "V8Engine",
+            "Runtime",
             "V8Method.AuthorizationExplain.cs"));
         var engine = File.ReadAllText(Path.Combine(
             serverRoot,
