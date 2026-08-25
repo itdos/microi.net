@@ -401,6 +401,19 @@ export async function findPreferredMenu(aliases = [], tableName = '', refresh = 
   })
 }
 
+// 仅用于入口显隐和前端体验；真正的数据范围仍由 ModuleEngine / ApiEngine 在服务端校验。
+export async function canOpenBusinessEntry(key, refresh = false) {
+  if (!requireLogin()) return false
+  const entry = getBusinessEntry(key) || {}
+  const moduleConfig = getBusinessModule(key) || {}
+  const permission = entry.menuPermission || moduleConfig.menuPermission
+  if (!permission) return true
+  const aliases = permission.menuAliases || moduleConfig.menuAliases || []
+  const table = permission.table || moduleConfig.table || ''
+  const menu = await findMenu(aliases, table, refresh)
+  return Boolean(menu && menu.Id)
+}
+
 export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], fileMenuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null }) {
   if (!requireLogin()) return
   if (!table) {
@@ -455,6 +468,10 @@ export async function openBusiness(key) {
     uni.showToast({ title: '当前应用未配置此业务入口', icon: 'none' })
     return null
   }
+  if (!await canOpenBusinessEntry(key)) {
+    uni.showToast({ title: '当前账号无权使用该功能', icon: 'none' })
+    return null
+  }
   return tenantRuntime.openBusiness({
     getBusinessEntry,
     getBusinessModule,
@@ -493,6 +510,7 @@ export default {
   resolveDiyTableId,
   loadMenuTree,
   findMenu,
+  canOpenBusinessEntry,
   openForm,
   openLowCodeMenu,
   openBusiness,

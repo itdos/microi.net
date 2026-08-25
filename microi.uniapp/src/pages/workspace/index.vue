@@ -125,7 +125,7 @@ import {
   getBusinessEntry,
   getRoleProfile
 } from '@/platform/business.js'
-import { openBusiness, scanDevice } from '@/platform/business-runtime.js'
+import { canOpenBusinessEntry, openBusiness, scanDevice } from '@/platform/business-runtime.js'
 import { loadAccessibleModuleGroups } from '@/platform/module-registry.js'
 import { loadSummarySnapshot, readSummarySnapshot, warmPrimaryTabs } from '@/platform/preload.js'
 import { hasFeature, getProfileRoute } from '@/platform/profile/index.js'
@@ -142,6 +142,8 @@ export default {
       currentUser: {},
       businessGroups,
       runtimeBusinessGroups: [],
+      mapEntryVisibility: { deviceMap: false, customerMap: false },
+      mapPermissionRequestId: 0,
       summary: { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 },
       summaryLoading: false,
       refreshing: false,
@@ -205,7 +207,13 @@ export default {
       const configured = allowed.size
         ? this.businessGroups.filter((group) => allowed.has(group.key))
         : this.businessGroups
-      return configured.concat(this.runtimeBusinessGroups)
+      return configured
+        .map((group) => ({
+          ...group,
+          items: (group.items || []).filter((item) => this.isHomeEntryVisible(item.key))
+        }))
+        .filter((group) => group.items.length)
+        .concat(this.runtimeBusinessGroups)
     },
     quickEntries() {
       const keys = [...this.roleProfile.primaryActions, ...quickActions]
@@ -240,14 +248,33 @@ export default {
       this.summaryLoading = false
       this.summary = { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 }
       this.runtimeBusinessGroups = []
+      this.mapPermissionRequestId += 1
+      this.mapEntryVisibility = { deviceMap: false, customerMap: false }
       return
     }
     if (this.featureEnabled('business')) this.loadSummary()
     if (this.featureEnabled('dynamicModules')) this.loadRuntimeModules()
+    this.loadMapEntryVisibility()
   },
   methods: {
     featureEnabled(name) {
       return hasFeature(name)
+    },
+    isHomeEntryVisible(key) {
+      if (key !== 'deviceMap' && key !== 'customerMap') return true
+      return this.isLoggedIn && this.mapEntryVisibility[key] === true
+    },
+    async loadMapEntryVisibility(refresh = false) {
+      const requestId = ++this.mapPermissionRequestId
+      const entries = ['deviceMap', 'customerMap']
+      const checks = await Promise.all(entries.map(async (key) => {
+        try { return [key, await canOpenBusinessEntry(key, refresh)] } catch (error) { return [key, false] }
+      }))
+      if (requestId !== this.mapPermissionRequestId) return
+      this.mapEntryVisibility = checks.reduce((result, item) => {
+        result[item[0]] = item[1] === true
+        return result
+      }, { deviceMap: false, customerMap: false })
     },
     async loadBrand() {
       try {
@@ -314,7 +341,8 @@ export default {
         await Promise.all([
           this.featureEnabled('business') ? this.loadSummary(true) : Promise.resolve(),
           this.loadBrand(),
-          this.featureEnabled('dynamicModules') ? this.loadRuntimeModules(true) : Promise.resolve()
+          this.featureEnabled('dynamicModules') ? this.loadRuntimeModules(true) : Promise.resolve(),
+          this.loadMapEntryVisibility(true)
         ])
       } finally {
         this.refreshing = false
