@@ -103,7 +103,17 @@ await V8.Notification.MarkRead({ All: true });
 
 ## 应用商城交付
 
-“消息通知”应用包必须包含 `mic_msgset`、`mic_msg_event_log`、`wx_tpl_msg`、`wx_mp`、`wx_mini_program` 五张结构资源，以及相关菜单、`msg_event`、`msg_internal_list`、`msg_internal_mark_read` 和必要索引。`wx_mp`、`wx_mini_program` 只交付物理表结构与表单字段元数据，不得携带数据集；否则既可能泄露真实公众号/小程序密钥，也会覆盖目标租户配置。`sys_user.WxMpId` 和 `wx_tpl_msg` 会读取 `wx_mp`，漏包会使 `/system/diy-user` 等无关页面在加载 Select 数据源时触发 `GetDiyFieldSqlData` 缺表错误。包内不得包含真实公众号 Token/AppSecret、用户接收人、OpenId、历史发送记录或租户专属 URL。先 `ValidateOnly`，再在全新或缺表目标租户真实安装，回读五张表、应用版本和依赖页面；结构校验不能替代真实安装验收。
+“消息通知”应用包必须包含 `mic_msgset`、`mic_msg_event_log`、`wx_tpl_msg`、`wx_mp`、`wx_mini_program` 五张结构资源，以及相关菜单、`msg_event`、`msg_internal_list`、`msg_internal_mark_read`、`platform-chat-system-message`、`platform-chat-runtime`、`platform-message-notification-custom-hook` 和必要索引。`wx_mp`、`wx_mini_program` 只交付物理表结构与表单字段元数据，不得携带数据集；否则既可能泄露真实公众号/小程序密钥，也会覆盖目标租户配置。`sys_user.WxMpId` 和 `wx_tpl_msg` 会读取 `wx_mp`，漏包会使 `/system/diy-user` 等无关页面在加载 Select 数据源时触发 `GetDiyFieldSqlData` 缺表错误。包内不得包含真实公众号 Token/AppSecret、用户接收人、OpenId、历史发送记录或租户专属 URL。先 `ValidateOnly`，再在全新或缺表目标租户真实安装，回读五张表、应用版本和依赖页面；结构校验不能替代真实安装验收。
+
+应用包中的 `sys_apiengine.Id` 是跨应用共享物理表的稳定主键，必须在全部官方应用范围内全局唯一；不能只检查单包内 Key/Id。发布前必须同时扫描全部官方包的 `Id` 与 `ApiEngineKey`，任一跨包重复都应阻断发布和离线包生成。
+
+系统聊天门面 `platform-chat-system-message`（`Managed`）完成平台超级管理员校验后，只转调本应用单一拥有的 `platform-chat-runtime`（`Managed`）。运行时统一编排 `PersistMessage / PersistSystemMessage / PersistAssistantMessage / GetHistoryAndMarkRead / GetUnreadCount / TouchContact / ListContacts / DeleteContact`；Hub/Controller 旧入口只保留 DiyToken 认证、SignalR 投递和 AI 流式协议，不得直连 MongoDB/FormEngine 复制业务。访问密钥会话、空 Token、伪造租户/发送人必须失败关闭。
+
+`platform-chat-runtime` 以 `V8.CurrentUser` / `V8.OsClient` 为唯一身份与租户事实源，对“租户 + 稳定 RequestId”生成确定性 Mongo `_id`；只有全部载荷哈希一致才复用旧记录。MongoDB 不参与 `V8.DbTrans`，因此消息/已读/联系人成功后即是已提交事实；SignalR、投影或 After Hook 失败必须保持 `Code=1` 并通过 `DataAppend.HookWarning` / `ProjectionWarnings` 告警，不得伪装未发生而引导盲目重试。调用 `V8.MongoDb.UptFormDataByWhere` / `DelFormDataByWhere` 时必须使用包含当前用户/权威资源边界的非空参数化 `_Where`，规则详见 `../v8-mongodb/SKILL.md`。
+
+`platform-chat-runtime` 必须保持 `StopHttp=1`、`AllowAnonymous=0`。SignalR Hub 在 DiyToken 与租户核验后，通过宿主一次性可信协议作用域调用，并携带宿主生成的权威当前用户快照；V8 对 `_InvokeType=Client` 的调用必须先执行 `V8.Method.RequireManagedProtocolContext()` 原子消费。不得为修复 Hub 误报“禁止 HTTP 调用”而开放 `StopHttp`，也不得接受 Param 中的信任布尔值、用户或租户覆盖；接口引擎内部 `Server` 嵌套调用保持原有语义。
+
+租户个性化仅写入 `platform-message-notification-custom-hook`（`CreateIfMissing`），默认正文必须精确为 `return { Code : 1 };`。运行时在 `BeforeChatRuntime / AfterChatRuntime` 调用 Hook：Before 失败在 Mongo 写前阻断，After 失败只告警。Hook 只接收 `Stage`、`SourceApiEngineKey`、`Action`、`ActorUserId`、`PeerUserId`、`MessageId`、`MessageType`；正文、头像、OpenId、Token 与其它秘密不得进入租户扩展。三项接口的源码顶部都要保留官方恢复/租户不覆盖提示，并在包合同测试中逐字核对独立源码、包内副本、所有权策略和 HTTP/匿名开关。
 
 ## 最低验收
 
@@ -113,3 +123,4 @@ await V8.Notification.MarkRead({ All: true });
 4. 用户只能查询和标记自己的通知；危险链接、超长正文、跨租户接收人和匿名调用被拒绝。
 5. 公众号/服务号发送主体与小程序跳转目标分别验证，不把 `MiniProgramAppId` 当作模板发送主体。
 6. 源码定向测试、后端编译、远端 MCP 回读、真实浏览器点击和商城安装/校验分别报告；未执行的生产发布不得写成已上线。
+7. 聊天空 Token/访问密钥/伪造租户失败关闭；相同 `RequestId` 并发只有一份 Mongo 事实，不同载荷冲突拒绝；已持久后 SignalR/After Hook 失败仍返回成功并可回读。

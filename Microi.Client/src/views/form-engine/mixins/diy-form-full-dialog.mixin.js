@@ -82,23 +82,24 @@ export default {
             self.DataLogListLoading = true;
             self.GetFormRelatedData(
                 "DataLog",
-                function (result) {
+                async function (result) {
                     // 旧请求被新请求覆盖，丢弃
                     if (token !== self._DataLogLoadToken) return;
                     try {
                         if (result && result.Code == 1 && Array.isArray(result.Data)) {
-                            result.Data.forEach((item) => {
+                            await Promise.all(result.Data.map(async (item) => {
                                 if (item.Content) {
                                     try { item.Content = JSON.parse(item.Content); } catch (e) { item.Content = []; }
                                 } else {
                                     item.Content = [];
                                 }
-                                if (item.Avatar) {
-                                    item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
-                                } else {
-                                    item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
-                                }
-                            });
+                                var rawAvatar = item.Avatar;
+                                var userId = item.AccountUserId || item.UserId;
+                                item.Avatar = rawAvatar && userId
+                                    ? (await self.DiyCommon.GetUserAvatarUrl(rawAvatar, userId))
+                                        || self.DiyCommon.GetServerPath("./static/img/icon/personal.png")
+                                    : self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
+                            }));
                             self.DataLogList = result.Data;
                             self.FormRelatedCounts.DataLog = Number(result.DataCount ?? result.Data.length) || 0;
                         } else {

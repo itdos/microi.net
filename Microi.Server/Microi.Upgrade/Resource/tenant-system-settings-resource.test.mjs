@@ -7,7 +7,9 @@ const packageModel = JSON.parse(await read(new URL('./app.microi.saas-engine.jso
 const microserviceSource = await read(new URL('../../../AI-Project/microi/AI应用/microi-platform-service/src/SystemSettings.vue', import.meta.url))
 const microserviceStyles = await read(new URL('../../../AI-Project/microi/AI应用/microi-platform-service/src/system-settings.css', import.meta.url))
 const tenantSettingsSource = await read(new URL('../../Microi.Core/SaaSEngine/TenantSystemSettingsSecurity.cs', import.meta.url))
+const tenantSettingsFacadeSource = await read(new URL('../../Microi.Core/V8Engine/Runtime/V8Method.SysUserSettingsFacade.cs', import.meta.url))
 const controllerSource = await read(new URL('../../Microi.net.Api/Controllers/TenantSystemSettingsController.cs', import.meta.url))
+const managedTenantSettingsSource = await read(new URL('./platform-tenant-system-settings.js', import.meta.url))
 const identitySource = await read(new URL('../../Microi.Core/Security/IdentityVerificationSecurity.cs', import.meta.url))
 const externalLoginSource = await read(new URL('../../Microi.Core/Security/ExternalLoginProviderOptions.cs', import.meta.url))
 const smsCanonicalSource = await read(new URL('../../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/接口引擎/未分类/[系统]发送阿里云短信(send_sms_reg).js', import.meta.url))
@@ -113,14 +115,45 @@ test('map runtime endpoint exposes one authenticated provider credential with no
   assert.doesNotMatch(controllerSource, /new\s*\{[^}]*AMapKey[^}]*BaiduAK[^}]*TencentMapKey/s)
 })
 
-test('disabled templates remain manageable but cannot reach runtime or public projections', () => {
+test('disabled templates remain manageable while Managed V8 receives only a bounded non-secret projection', () => {
   const query = tenantSettingsSource.match(/SELECT Id,ConfigKey[\s\S]*?ORDER BY Sort ASC, ConfigKey ASC/)?.[0] || ''
   assert.ok(query)
   assert.doesNotMatch(query, /IsEnabled\s*=\s*1/)
   assert.match(tenantSettingsSource, /if \(item == null \|\| !item\.IsEnabled\) continue/)
   assert.match(tenantSettingsSource, /if \(settings == null \|\| !settings\.TryGetValue\(key, out var item\) \|\| !item\.IsEnabled\)/)
   assert.match(tenantSettingsSource, /CreatePublicProjection[\s\S]*?return new JObject\(\)/)
-  assert.match(controllerSource, /ConfigValue = item\.IsSecret \? "" : item\.Value/)
+
+  const listBranch = managedTenantSettingsSource.match(
+    /if \(action\.toLowerCase\(\) === 'list'\) \{[\s\S]*?\n\}\n\nif \(action\.toLowerCase\(\) === 'savenonsecret'\)/,
+  )?.[0] || ''
+  assert.ok(listBranch)
+  assert.match(listBranch, /_SelectFields:\s*\[[\s\S]*?'ConfigValue'[\s\S]*?'IsSecret'/)
+  assert.doesNotMatch(listBranch, /SecretCipher/)
+  assert.match(listBranch, /ConfigValue:\s*isSecret\s*\?\s*''\s*:/)
+  assert.match(listBranch, /HasSecret:\s*isSecret\s*&&\s*flag\(secretState\[text\(item\.Id\)\],\s*false\)/)
+
+  const securityProjection = tenantSettingsFacadeSource.match(
+    /public DosResult GetTenantSystemSettingsSecurityProjection\(\)[\s\S]*?\n        \}\n\n        private static DosResult ResolveTrustedManagedCurrentUser/,
+  )?.[0] || ''
+  assert.ok(securityProjection)
+  assert.match(securityProjection, /\["SecretStateById"\]\s*=\s*secretStateById/)
+  assert.match(securityProjection, /\["MigratedKeys"\]\s*=\s*new JArray/)
+  assert.doesNotMatch(securityProjection, /\["SecretCipher"\]|\["ConfigValue"\]|\["Value"\]/)
+
+  const secretSaveBranch = controllerSource.match(
+    /\/\/ Secret\/Sensitive Key[\s\S]*?\[HttpPost\]\s*public async Task<JsonResult> GetRevealChallenge/,
+  )?.[0] || ''
+  assert.ok(secretSaveBranch)
+  assert.match(secretSaveBranch, /TenantSystemSettingsSecurity\.ProtectSecret/)
+  assert.match(secretSaveBranch, /\["SecretCipher"\]\s*=\s*secretCipher/)
+  assert.doesNotMatch(secretSaveBranch, /ManagedApiEngineCompatibility\.RunAsync/)
+
+  const revealBranch = controllerSource.match(
+    /public async Task<JsonResult> Reveal[\s\S]*?\n        \}\n\n        \[HttpPost\]\s*public async Task<JsonResult> Delete/,
+  )?.[0] || ''
+  assert.ok(revealBranch)
+  assert.match(revealBranch, /IdentityVerificationSecurity\.ConsumeTicketAsync/)
+  assert.match(revealBranch, /TenantSystemSettingsSecurity\.UnprotectSecret/)
   const auditBody = controllerSource.match(/private static void QueueAudit[\s\S]*?\n        }/)?.[0] || ''
   assert.doesNotMatch(auditBody, /SecretCipher|request\.Value|plainText/)
 })
@@ -151,6 +184,6 @@ test('tenant-safe SMS compatibility is delivered by the managed SaaS package', (
     Ownership: 'Platform',
     UpgradePolicy: 'Managed',
   })
-  const normalizedCanonical = smsCanonicalSource.replace(/\r\n?/g, '\n').replace(/\n*$/g, '\n')
+  const normalizedCanonical = smsCanonicalSource.replace(/\r\n?/g, '\n').replace(/\n*$/, '\n')
   assert.equal(smsSource, normalizedCanonical)
 })

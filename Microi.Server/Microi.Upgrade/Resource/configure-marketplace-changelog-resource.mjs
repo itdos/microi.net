@@ -499,7 +499,7 @@ function updatePackageInfo(packageModel) {
       && !String(capability).startsWith('ApiEngine:ai_app_publish_store@')
     )),
     'Schema:MarketplaceChangeLogV1',
-    'ApiEngine:get-microi-store-model@v1.2.8',
+    'ApiEngine:get-microi-store-model@v1.2.9',
     'ApiEngine:ai_app_publish_store@v1.8.6',
     'Importer:ManagedApiEngineFlagPhysicalReconciliation',
     'Importer:ExistingMenuUrlCollisionRecovery',

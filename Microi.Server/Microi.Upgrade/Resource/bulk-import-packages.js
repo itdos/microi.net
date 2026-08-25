@@ -1,7 +1,16 @@
+/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1
+ * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】
+ * 所属官方应用：应用商城
+ * ApiEngineKey：bulk-import-microi-store-packages
+ * 从可信吾码官方应用源安装、更新或重新安装“应用商城”，都会以官方源码恢复此 Managed 接口。
+ * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，
+ * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
+ */
+
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.2.7
+ * Version: v1.3.4
  * Function:
  * - 规划并逐个安装或更新全部官方平台应用；持久化计划、不可变商城快照标识与子检查点，并透传结构化失败详情。
  */
@@ -221,6 +230,31 @@ var sourceCredentialKey = trim(
     || V8.Param.StoreCredentialKey
     || V8.Param.SourceCredentialKey
 );
+function normalizeRequiredAppIds(value) {
+    var values = toArray(value);
+    var result = [];
+    var seen = {};
+    for (var index = 0; index < values.length; index++) {
+        var appId = trim(values[index]).toLowerCase();
+        if (!appId || seen[appId]) continue;
+        seen[appId] = true;
+        result.push(appId);
+    }
+    return result;
+}
+// BULK_REQUIRED_APP_SCOPE_V1：控制面事故修复可把同一受信工作器收窄到
+// 明确的官方 AppId；普通“全部安装/更新”不传此参数，行为保持不变。
+var requiredAppIds = normalizeRequiredAppIds(
+    checkpoint.RequiredAppIds || V8.Param.RequiredAppIds
+);
+var requiredAppIdMap = {};
+for (var requiredIndex = 0; requiredIndex < requiredAppIds.length; requiredIndex++) {
+    requiredAppIdMap[requiredAppIds[requiredIndex]] = true;
+}
+function planItemAllowed(item) {
+    if (requiredAppIds.length <= 0) return true;
+    return requiredAppIdMap[trim(item && (item.AppId || item.AppKey)).toLowerCase()] === true;
+}
 var pageSize = 100;
 
 function report(progress, current, total, message) {
@@ -284,6 +318,7 @@ function normalizePlan(value) {
     for (var i = 0; i < source.length; i++) {
         var item = source[i] || {};
         if (trim(item.ApplicationType || item.AppType) != bulkApplicationType) continue;
+        if (!planItemAllowed(item)) continue;
         var key = planItemKey(item);
         if (!key || seen[key]) continue;
         seen[key] = true;
@@ -305,6 +340,7 @@ function appendPlanRows(plan, rows) {
     for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
         var row = rows[rowIndex] || {};
         if (trim(row.ApplicationType || row.AppType) != bulkApplicationType) continue;
+        if (!planItemAllowed(row)) continue;
         var status = text(row.StoreInstallStatus);
         if (status != 'Uninstalled' && status != 'Outdated') continue;
         var storeId = trim(row.StoreId || row.Id);
@@ -325,10 +361,19 @@ function appendPlanRows(plan, rows) {
 }
 function prioritizeBootstrapPlan(plan) {
     // 只在 Discover 完整结束后排序一次；Install 恢复阶段绝不重排已有 CurrentIndex。
+    // PLATFORM_STARTUP_PACKAGE_PRIORITY_V1：应用商城自身先获得最新导入器，
+    // SaaS 引擎紧随其后补齐 platform-sys-config 等匿名启动接口；其余平台
+    // 应用继续保持商城原始顺序。这样新前端不会等待全部平台包安装完才可启动。
+    function priority(item) {
+        var appId = trim(item && item.AppId).toLowerCase();
+        if (appId == 'app.microi.store') return 0;
+        if (appId == 'app.microi.saas-engine') return 1;
+        return 2;
+    }
     return plan.map(function (item, index) { return { Item: item, Index: index }; })
         .sort(function (left, right) {
-            var leftBootstrap = trim(left.Item.AppId).toLowerCase() == 'app.microi.store' ? 0 : 1;
-            var rightBootstrap = trim(right.Item.AppId).toLowerCase() == 'app.microi.store' ? 0 : 1;
+            var leftBootstrap = priority(left.Item);
+            var rightBootstrap = priority(right.Item);
             return leftBootstrap != rightBootstrap
                 ? leftBootstrap - rightBootstrap
                 : left.Index - right.Index;
@@ -355,9 +400,12 @@ if (phase == 'Discover') {
             '在应用商城的来源管理中重新登录该私有来源，然后重新发起全部安装/更新。'
         );
     }
-    // 固定商城能力走自定义地址，便于按 ApiEngineKey 归因流量与耗时。
+    // MARKETPLACE_LIST_CUSTOM_ADDRESS_V1：接口引擎的 ApiEngineKey 是
+    // get-microi-store，但对外自定义地址固定为 get-microi-store-list。
+    // 远程商城调用必须使用 ApiAddress；把 Key 当作路径会在官方源返回
+    // sys_apiengine NoExistData，并让所有子租户的批量升级反复重试。
     var listResult = V8.Http.Post({
-        Url: sourceApiBase + '/apiengine/get-microi-store?OsClient=' + encodeURIComponent(sourceOsClient),
+        Url: sourceApiBase + '/apiengine/get-microi-store-list?OsClient=' + encodeURIComponent(sourceOsClient),
         PostParam: {
             _PageIndex: pageIndex,
             _PageSize: pageSize,
@@ -396,7 +444,8 @@ if (phase == 'Discover') {
             ApplicationType: bulkApplicationType,
             SourceApiBase: sourceApiBase,
             SourceOsClient: sourceOsClient,
-            SourceCredentialKey: sourceCredentialKey
+            SourceCredentialKey: sourceCredentialKey,
+            RequiredAppIds: requiredAppIds
         }, 2, pageIndex * pageSize, dataCount, '商城应用盘点已完成一页，将从后台任务检查点继续');
     }
 
@@ -421,7 +470,8 @@ if (phase == 'Discover') {
         ApplicationType: bulkApplicationType,
         SourceApiBase: sourceApiBase,
         SourceOsClient: sourceOsClient,
-        SourceCredentialKey: sourceCredentialKey
+        SourceCredentialKey: sourceCredentialKey,
+        RequiredAppIds: requiredAppIds
     }, 3, 0, plan.length, '批量安装计划已写入后台任务检查点，开始逐个安装/更新');
 }
 
@@ -465,6 +515,11 @@ var childParam = {
     BulkCurrentIndex: currentIndex,
     BulkTotal: total,
     BulkAdaptiveSingleSlice: false,
+    // STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1：RequiredAppIds 被可信父任务
+    // 精确收窄为 SaaS 引擎时，允许官方导入器先补齐缺失的六个启动接口；
+    // 普通“全部安装/更新”与其它应用包永远不会进入该快速路径。
+    StartupDependencyRecovery: requiredAppIds.length == 1
+        && requiredAppIds[0] == 'app.microi.saas-engine',
     _BackgroundTaskId: taskId,
     _BackgroundTask: taskEnvelope,
     _BackgroundTaskFencingToken: fencingToken,
@@ -512,7 +567,8 @@ if (childBackground && childBackground.HasMore === true) {
         ApplicationType: bulkApplicationType,
         SourceApiBase: sourceApiBase,
         SourceOsClient: sourceOsClient,
-        SourceCredentialKey: sourceCredentialKey
+        SourceCredentialKey: sourceCredentialKey,
+        RequiredAppIds: requiredAppIds
     }, overallProgress, currentIndex + childProgress / 100, total,
     '[' + (currentIndex + 1) + '/' + total + '] ' + (childBackground.Msg || '应用安装分片已提交'));
 }
@@ -532,6 +588,7 @@ return continuation({
     ApplicationType: bulkApplicationType,
     SourceApiBase: sourceApiBase,
     SourceOsClient: sourceOsClient,
-    SourceCredentialKey: sourceCredentialKey
+    SourceCredentialKey: sourceCredentialKey,
+    RequiredAppIds: requiredAppIds
 }, Math.min(99, Math.floor((currentIndex / total) * 100)), currentIndex, total,
 '已完成【' + item.AppName + '】，继续处理剩余应用');

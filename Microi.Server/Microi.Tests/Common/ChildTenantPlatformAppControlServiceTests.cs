@@ -124,7 +124,59 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("CHILD_TASK_RUNTIME_RELOAD_FALLBACK_V1", orchestrator, StringComparison.Ordinal);
         Assert.Contains("discoverTargetsWithRuntimeRecovery", orchestrator, StringComparison.Ordinal);
         Assert.Contains("Failures: failures", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("var queueFailures = failures.filter", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("var immediateFailures = failures.slice()", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_STARTUP_DEPENDENCY_INCIDENT_SCOPE_V1", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_STARTUP_SCOPE_CHILD_PARAM_PATCH_V1", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_STARTUP_NO_REQUEUE_REFRESH_V1", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("phase == 'RefreshBootstrap'", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("startup-api-live-worker-v6-no-requeue", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("checkpoint.BootstrapRevision = startupBootstrapRevision", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_STARTUP_TARGET_FILTER_V1", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("TargetOsClients 仅允许用于 StartupDependencies", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("missingRequestedTargets", orchestrator, StringComparison.Ordinal);
+        Assert.DoesNotContain("CHILD_STARTUP_BOOTSTRAP_TASK_READBACK_V1", orchestrator, StringComparison.Ordinal);
+        Assert.DoesNotContain("verifyRefreshedChildTask", orchestrator, StringComparison.Ordinal);
+        var migrationStart = orchestrator.IndexOf("CHILD_STARTUP_NO_REQUEUE_REFRESH_V1", StringComparison.Ordinal);
+        var queueStart = orchestrator.IndexOf("if (phase == 'Queue')", migrationStart, StringComparison.Ordinal);
+        Assert.True(migrationStart >= 0 && queueStart > migrationStart);
+        Assert.DoesNotContain(
+            "QueueChildTenantPlatformAppMaintenance",
+            orchestrator[migrationStart..queueStart],
+            StringComparison.Ordinal);
+        Assert.Contains("enforceStartupDependencyScope", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("childParam.RequiredAppIds = ['app.microi.saas-engine']", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("Status='Pending' AND CancelRequested=0", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("cancelUnsafeChildTask", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("MaintenanceScope: maintenanceScope", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("StartupDependencies", orchestrator, StringComparison.Ordinal);
+        Assert.Equal(
+            "StartupDependencies",
+            ChildTenantPlatformAppControlService.StartupDependenciesMaintenanceScope);
+        Assert.Equal(
+            "app.microi.saas-engine",
+            ChildTenantPlatformAppControlService.SaasEngineApplicationId);
+    }
+
+    [Fact]
+    public void BulkPlatformInstaller_UsesMarketplaceCustomAddress_AndPrioritizesStartupPackage()
+    {
+        var root = FindRepositoryRoot();
+        var worker = File.ReadAllText(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.Upgrade",
+            "Resource",
+            "bulk-import-packages.js"));
+
+        Assert.Contains("Version: v1.3.4", worker, StringComparison.Ordinal);
+        Assert.Contains("MARKETPLACE_LIST_CUSTOM_ADDRESS_V1", worker, StringComparison.Ordinal);
+        Assert.Contains("/apiengine/get-microi-store-list?OsClient=", worker, StringComparison.Ordinal);
+        Assert.DoesNotContain("/apiengine/get-microi-store?OsClient=", worker, StringComparison.Ordinal);
+        Assert.Contains("PLATFORM_STARTUP_PACKAGE_PRIORITY_V1", worker, StringComparison.Ordinal);
+        Assert.Contains("app.microi.saas-engine", worker, StringComparison.Ordinal);
+        Assert.Contains("BULK_REQUIRED_APP_SCOPE_V1", worker, StringComparison.Ordinal);
+        Assert.Contains("RequiredAppIds: requiredAppIds", worker, StringComparison.Ordinal);
+        Assert.Contains("StartupDependencyRecovery: requiredAppIds.length == 1", worker, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -157,9 +209,15 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("EnsureMonitorBootstrapRecovery", controlSource, StringComparison.Ordinal);
         Assert.Contains("EnsureTargetExecutionBootstrap", controlSource, StringComparison.Ordinal);
         Assert.Contains("CHILD_TENANT_EXECUTION_BOOTSTRAP_SCOPE_V1", controlSource, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_BOOTSTRAP_SOURCE_FINGERPRINT_V1", controlSource, StringComparison.Ordinal);
+        Assert.Contains("GetBootstrapSourceFingerprint", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", importerSource, StringComparison.Ordinal);
-        Assert.Contains("Version: v2.4.2", importerSource, StringComparison.Ordinal);
+        Assert.Contains("Version: v2.4.7", importerSource, StringComparison.Ordinal);
+        Assert.Contains("STARTUP_API_RUNTIME_FLAG_PHYSICAL_RECONCILIATION_V1", importerSource, StringComparison.Ordinal);
+        Assert.Contains("StartupApiBootstrapRevision", importerSource, StringComparison.Ordinal);
+        Assert.Contains("STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1", importerSource, StringComparison.Ordinal);
+        Assert.Contains("StartupApiBootstrapDone", importerSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -241,6 +299,30 @@ public class ChildTenantPlatformAppControlServiceTests
             target,
             "v1.2.6",
             source,
+            out var error));
+        Assert.Equal(string.Empty, error);
+    }
+
+    [Fact]
+    public void BootstrapWorkerRefresh_IgnoresGeneratedMcpDescriptionHeader()
+    {
+        const string body = "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1 */\n"
+                            + "/* Version: v1.3.2 */\n"
+                            + "import-microi-store-package\nApplicationType\n";
+        const string generatedHeader = "/*\n"
+                                       + " * V8 ApiEngine\n"
+                                       + " * ApiEngineKey: bulk-import-microi-store-packages\n"
+                                       + " * Version: v1.3.3\n"
+                                       + " * Function:\n"
+                                       + " * - 官方工作器\n"
+                                       + " */\n\n";
+
+        Assert.False(ChildTenantPlatformAppControlService.ShouldRefreshBootstrapEngine(
+            "bulk-import-microi-store-packages",
+            "v1.3.3",
+            generatedHeader + body,
+            "v1.3.2",
+            body,
             out var error));
         Assert.Equal(string.Empty, error);
     }

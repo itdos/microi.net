@@ -203,6 +203,8 @@ namespace Microi.net
                 validation.RemainingApplicationScheduleJobs,
                 validation.RemainingApplicationMicroservices,
                 validation.RemainingApplicationMicroservicePages,
+                validation.RemainingApplicationMenus,
+                validation.RemainingApplicationMenuNames,
                 validation.RemainingMciDemoMenus,
                 validation.RemainingAppApiEngines,
                 validation.RemainingAppTableDefinitions,
@@ -850,9 +852,20 @@ WHERE TABLE_SCHEMA=@database ORDER BY TABLE_TYPE DESC, TABLE_NAME;";
                 .Where(name => !ProtectedPlatformTableNames.Contains(name))
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            if (applicationTableNames.Count == 0) return;
 
             using var connection = OpenConnection(WithDatabase(sourceBuilder, TargetDatabase));
+            var applicationMenus = GetRemovableApplicationMenus(connection, resources);
+            var applicationMenuIds = applicationMenus
+                .Select(item => item.Id)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var applicationMenuSeedSql = applicationMenuIds.Count == 0
+                ? string.Empty
+                : "INSERT IGNORE INTO temp_backend_app_menu_ids (Id) VALUES "
+                  + string.Join(",", applicationMenuIds.Select(id => "(" + FormatSqlValue(id) + ")"))
+                  + ";";
             var physicalTables = GetBaseTables(connection, TargetDatabase)
                 .Where(applicationTableNameSet.Contains)
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
@@ -904,6 +917,7 @@ CREATE TEMPORARY TABLE IF NOT EXISTS temp_backend_app_menu_ids (
   Id VARCHAR(64) PRIMARY KEY
 );
 TRUNCATE TABLE temp_backend_app_menu_ids;
+" + applicationMenuSeedSql + @"
 INSERT IGNORE INTO temp_backend_app_menu_ids (Id)
 SELECT DISTINCT m.Id
 FROM sys_menu m
@@ -1021,6 +1035,15 @@ DROP TEMPORARY TABLE IF EXISTS temp_backend_app_owned_tables;");
                 tables,
                 removableApplicationTables);
             var remainingOperationalResidue = GetOperationalResidueRowCounts(connection, tables);
+            var remainingApplicationMenus = GetRemovableApplicationMenus(
+                connection,
+                removableApplicationResources);
+            var remainingApplicationMenuNames = remainingApplicationMenus
+                .Select(item => item.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             var validation = new SanitizationValidation
             {
@@ -1061,6 +1084,8 @@ WHERE TABLE_SCHEMA = DATABASE()
                         "SELECT `MicroServiceKey` FROM `sys_microiservice_page` WHERE COALESCE(`MicroServiceKey`, '') <> '';",
                         removableApplicationResources.AppKeys)
                     : 0,
+                RemainingApplicationMenus = remainingApplicationMenus.Count,
+                RemainingApplicationMenuNames = remainingApplicationMenuNames,
                 RemainingMciDemoMenus = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_menu`
 WHERE LOWER(COALESCE(`ModuleEngineKey`, '')) = 'mci_demo'
@@ -1185,6 +1210,12 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             if (validation.RemainingApplicationMicroservicePages > 0)
             {
                 violations.Add($"应用微服务页面={validation.RemainingApplicationMicroservicePages}");
+            }
+            if (validation.RemainingApplicationMenus > 0)
+            {
+                violations.Add(
+                    $"应用菜单树={validation.RemainingApplicationMenus}"
+                    + FormatNameSample(validation.RemainingApplicationMenuNames));
             }
             if (validation.RemainingMciDemoMenus > 0)
             {
@@ -1358,6 +1389,109 @@ WHERE LOWER(COALESCE(`Key`, '')) LIKE 'diy_field:%'
             return "[" + sample + (names.Count > limit ? ",..." : "") + "]";
         }
 
+        private static List<ApplicationMenuResource> GetRemovableApplicationMenus(
+            MySqlConnection connection,
+            RemovableApplicationResources resources)
+        {
+            var rows = new List<JObject>();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT m.`Id`,m.`ParentId`,m.`Name`,m.`StoreId`,
+       COALESCE(NULLIF(m.`DiyTableName`, ''), t.`Name`) AS `TableName`,
+       m.`ModuleEngineKey`,m.`Url`
+FROM `sys_menu` m
+LEFT JOIN `diy_table` t ON t.`Id` = m.`DiyTableId`;";
+                command.CommandTimeout = 0;
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    string Value(int index) => reader.IsDBNull(index)
+                        ? string.Empty
+                        : Convert.ToString(reader.GetValue(index), CultureInfo.InvariantCulture) ?? string.Empty;
+                    rows.Add(new JObject
+                    {
+                        ["Id"] = Value(0),
+                        ["ParentId"] = Value(1),
+                        ["Name"] = Value(2),
+                        ["StoreId"] = Value(3),
+                        ["TableName"] = Value(4),
+                        ["ModuleEngineKey"] = Value(5),
+                        ["Url"] = Value(6)
+                    });
+                }
+            }
+
+            var ids = BuildRemovableApplicationMenuIds(
+                rows,
+                resources?.StoreIds,
+                resources?.TableNames);
+            return rows
+                .Where(row => ids.Contains(row["Id"]?.ToString() ?? string.Empty))
+                .Select(row => new ApplicationMenuResource
+                {
+                    Id = row["Id"]?.ToString() ?? string.Empty,
+                    Name = row["Name"]?.ToString() ?? string.Empty
+                })
+                .ToList();
+        }
+
+        internal static HashSet<string> BuildRemovableApplicationMenuIds(
+            IEnumerable<JObject> menuRows,
+            ISet<string> removableStoreIds,
+            ISet<string> removableTableNames)
+        {
+            var rows = (menuRows ?? Enumerable.Empty<JObject>())
+                .Where(row => row != null && !string.IsNullOrWhiteSpace(row["Id"]?.ToString()))
+                .ToList();
+            var storeIds = new HashSet<string>(
+                removableStoreIds ?? new HashSet<string>(),
+                StringComparer.OrdinalIgnoreCase);
+            var tableNames = new HashSet<string>(
+                removableTableNames ?? new HashSet<string>(),
+                StringComparer.OrdinalIgnoreCase);
+            tableNames.ExceptWith(ProtectedPlatformTableNames);
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in rows)
+            {
+                var id = row["Id"]?.ToString() ?? string.Empty;
+                var parentId = row["ParentId"]?.ToString() ?? string.Empty;
+                var name = row["Name"]?.ToString() ?? string.Empty;
+                var normalizedName = string.Concat(name.Where(character => !char.IsWhiteSpace(character)));
+                var storeId = row["StoreId"]?.ToString() ?? string.Empty;
+                var tableName = row["TableName"]?.ToString() ?? string.Empty;
+                var moduleEngineKey = row["ModuleEngineKey"]?.ToString() ?? string.Empty;
+                var url = row["Url"]?.ToString() ?? string.Empty;
+                if ((string.IsNullOrWhiteSpace(parentId)
+                     && string.Equals(normalizedName, "AI应用", StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrWhiteSpace(storeId) && storeIds.Contains(storeId))
+                    || (!string.IsNullOrWhiteSpace(tableName) && tableNames.Contains(tableName))
+                    || moduleEngineKey.StartsWith("app_", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(moduleEngineKey, "mci_demo", StringComparison.OrdinalIgnoreCase)
+                    || url.IndexOf("/mci_demo/", StringComparison.OrdinalIgnoreCase) >= 0
+                    || string.Equals(name, "文章关联微服务", StringComparison.Ordinal))
+                {
+                    result.Add(id);
+                }
+            }
+
+            var changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var row in rows)
+                {
+                    var id = row["Id"]?.ToString() ?? string.Empty;
+                    var parentId = row["ParentId"]?.ToString() ?? string.Empty;
+                    if (result.Contains(id) || !result.Contains(parentId)) continue;
+                    result.Add(id);
+                    changed = true;
+                }
+            }
+            return result;
+        }
+
         private static RemovableApplicationResources GetRemovableApplicationResources(
             MySqlConnectionStringBuilder sourceBuilder)
         {
@@ -1369,6 +1503,7 @@ WHERE LOWER(COALESCE(`Key`, '')) LIKE 'diy_field:%'
             var platformEngines = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var applicationEngines = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var applicationKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var applicationStoreIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             using (var command = connection.CreateCommand())
             {
@@ -1414,7 +1549,16 @@ FROM `sys_microistore`;";
                     var isPlatform = IsCorePlatformApplication(appKey, applicationType, appType);
                     (isPlatform ? platformTables : applicationTables).UnionWith(tables);
                     (isPlatform ? platformEngines : applicationEngines).UnionWith(engines);
-                    if (!isPlatform && !string.IsNullOrWhiteSpace(appKey)) applicationKeys.Add(appKey);
+                    if (!isPlatform)
+                    {
+                        if (!string.IsNullOrWhiteSpace(storeId)) applicationStoreIds.Add(storeId);
+                        if (!string.IsNullOrWhiteSpace(appKey))
+                        {
+                            applicationKeys.Add(appKey);
+                            // 历史菜单可能把 AppKey 写入 StoreId，而不是商城记录 Id。
+                            applicationStoreIds.Add(appKey);
+                        }
+                    }
                 }
             }
 
@@ -1481,7 +1625,8 @@ WHERE LEFT(LOWER(COALESCE(`ApiEngineKey`, '')), 9) = 'mci_demo_';";
             {
                 TableNames = applicationTables,
                 ApiEngineKeys = applicationEngines,
-                AppKeys = applicationKeys
+                AppKeys = applicationKeys,
+                StoreIds = applicationStoreIds
             };
         }
 
@@ -2374,6 +2519,8 @@ return 0";
             public long RemainingApplicationScheduleJobs { get; set; }
             public long RemainingApplicationMicroservices { get; set; }
             public long RemainingApplicationMicroservicePages { get; set; }
+            public long RemainingApplicationMenus { get; set; }
+            public List<string> RemainingApplicationMenuNames { get; set; } = new List<string>();
             public long RemainingMciDemoMenus { get; set; }
             public long RemainingAppApiEngines { get; set; }
             public long RemainingAppTableDefinitions { get; set; }
@@ -2396,6 +2543,7 @@ return 0";
                 + RemainingApplicationScheduleJobs
                 + RemainingApplicationMicroservices
                 + RemainingApplicationMicroservicePages
+                + RemainingApplicationMenus
                 + RemainingMciDemoMenus
                 + RemainingAppApiEngines
                 + RemainingAiStoreApps
@@ -2407,6 +2555,13 @@ return 0";
             public HashSet<string> TableNames { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             public HashSet<string> ApiEngineKeys { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             public HashSet<string> AppKeys { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            public HashSet<string> StoreIds { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private sealed class ApplicationMenuResource
+        {
+            public string Id { get; set; }
+            public string Name { get; set; }
         }
     }
 }

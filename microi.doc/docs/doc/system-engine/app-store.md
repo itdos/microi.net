@@ -64,6 +64,8 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 - 发布器必须把请求发布的版本精确传给资产准备器，并回读 `RequestedVersion == PackageVersion == PackageInfo.Version`；禁止资产准备器静默改用“最新版本”。菜单、表和接口引擎的发布选择必须从本次包正文持久化，不能沿用上一版选择状态。
 - 接口引擎资源必须在包内声明 `ResourcePolicies.ApiEngines`。只有从固定 `https://api.itdos.com + iTdos` 实时回读、通过权威商城模型确认的官方 `Platform` 包，才允许把 `Ownership=Application` 的 `Managed` 核心直接覆盖升级到 `Incoming`；这一规则用于保证安装最新版官方平台应用不会被租户旧副本阻断。离线包、自定义商城源、社区/普通应用和无法建立官方信任链的包继续按安装记录中的上一版 SHA-256 执行 `Base / Local / Incoming` 三方保护，`Local != Base` 时整包回滚并报告冲突，不能自报“官方”取得覆盖权限。
 - `CreateIfMissing` 表示租户拥有的扩展 Hook：首次安装创建，后续更新永远跳过；同一 Key 一旦交给租户，后续版本也禁止改回 `Managed`，确需新官方核心时必须发布新 Key。官方应用必须采用“受管核心接口 + 租户扩展 Hook”，客户定制只写 Hook，扩展 Hook 按稳定 `EventId` 幂等。可信官方核心会在升级时被覆盖，因此不能把租户业务修改直接写进核心。
+- 商城源业务固定由 `platform-marketplace-source`（`Managed`）编排，个性化逻辑只写 `platform-marketplace-source-hook`（`CreateIfMissing`，默认正文精确为 `return { Code : 1 };`）。登录在任何远端配置读取、密码发送和凭据保存之前调用 `BeforeMarketplaceSourceLogin`；断开在删除服务端凭据之前调用 `BeforeMarketplaceSourceDisconnect`。Hook 失败会直接阻断操作，不能静默跳过。
+- 商城源 Before Hook 的安全载荷只包含 `Stage / SourceApiEngineKey / Action / SourceId`。`ApiBase`、远端 `OsClient`、账号、密码、Token、签名地址和凭据密文不得进入租户 Hook。登录协议、HTTPS/重定向限制、密码加密、Token 保护与密钥隔离继续保留在可信 C# 网关中；成功或失败后的脱敏审计再由 Managed V8 执行。
 - 其它已有资源使用存在性检查与差异合并；客户自定义 V8、全局配置和非包拥有字段不得被整表覆盖。
 - 更新遵守“先扩展、后迁移、再收缩”，新旧节点滚动期间 API、数据库和缓存合约兼容。
 - 定时任务是应用包的一等资源。导入器完成表、字段、数据与其它 `PostSchema` 资源后，必须在独立 `ScheduleJobs` checkpoint 中幂等创建/更新 Quartz 任务并回读运行元数据；任务阶段失败时不能提前写入已安装版本。

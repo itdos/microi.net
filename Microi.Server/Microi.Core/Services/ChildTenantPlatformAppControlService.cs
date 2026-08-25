@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using Dos.Common;
 using Dos.ORM;
@@ -18,6 +20,8 @@ namespace Microi.net
     {
         public const string OrchestratorApiEngineKey = "bulk-update-child-tenant-platform-apps";
         public const string ChildWorkerApiEngineKey = "bulk-import-microi-store-packages";
+        public const string StartupDependenciesMaintenanceScope = "StartupDependencies";
+        public const string SaasEngineApplicationId = "app.microi.saas-engine";
         public const string ClusterConcurrencyKey = "__microi_child_platform_app_install_cluster__";
         public const int ChildWorkerMaxAttempts = 8;
         internal static readonly string[] RequiredBootstrapApiEngineKeys =
@@ -43,8 +47,8 @@ namespace Microi.net
         private static readonly Regex OsClientKeyRegex =
             new Regex(@"^[A-Za-z0-9._-]{1,100}$", RegexOptions.Compiled);
         private static readonly object MonitorBootstrapRecoverySync = new object();
-        private static readonly HashSet<string> MonitorBootstrapRecoveryReady = new HashSet<string>(
-            StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> MonitorBootstrapRecoveryReady =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public static DosResult GetTargets(JObject input)
         {
@@ -82,6 +86,19 @@ namespace Microi.net
             var targetOsClient = input?["TargetOsClient"]?.ToString()?.Trim() ?? string.Empty;
             if (!OsClientKeyRegex.IsMatch(targetOsClient))
                 return new DosResult(0, null, "TargetOsClient 格式不正确。");
+            var maintenanceScope = input?["MaintenanceScope"]?.ToString()?.Trim() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(maintenanceScope)
+                && !string.Equals(
+                    maintenanceScope,
+                    StartupDependenciesMaintenanceScope,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult(0, null, "MaintenanceScope 仅支持 StartupDependencies。");
+            }
+            var startupDependenciesOnly = string.Equals(
+                maintenanceScope,
+                StartupDependenciesMaintenanceScope,
+                StringComparison.OrdinalIgnoreCase);
 
             try
             {
@@ -111,23 +128,36 @@ namespace Microi.net
                         $"子租户【{target.Name}】平台应用维护前置自愈失败：{bootstrap.Msg}");
                 }
 
+                var childParam = new JObject
+                {
+                    ["ApiEngineKey"] = ChildWorkerApiEngineKey,
+                    ["StoreApiBase"] = "https://api.itdos.com",
+                    ["StoreOsClient"] = "iTdos",
+                    ["ApplicationType"] = "Platform"
+                };
+                if (startupDependenciesOnly)
+                {
+                    // CHILD_TENANT_STARTUP_DEPENDENCY_SCOPE_V1：事故恢复只安装
+                    // platform-sys-config 的唯一官方归属包。商城工作器本身已经由
+                    // 上面的可信 C# 自举原子直接刷新，无需再串行安装其完整应用包。
+                    childParam["RequiredAppIds"] = new JArray(SaasEngineApplicationId);
+                }
+
                 var task = BackgroundTaskService.StartApiEngineForTargetTenant(
                     context.OwnerOsClient,
                     target.OsClient,
                     context.TrustedCurrentUser["Id"]?.ToString() ?? string.Empty,
-                    $"子租户【{target.Name}（{target.OsClient}）】安装/更新全部平台应用",
-                    new JObject
-                    {
-                        ["ApiEngineKey"] = ChildWorkerApiEngineKey,
-                        ["StoreApiBase"] = "https://api.itdos.com",
-                        ["StoreOsClient"] = "iTdos",
-                        ["ApplicationType"] = "Platform"
-                    },
+                    startupDependenciesOnly
+                        ? $"子租户【{target.Name}（{target.OsClient}）】恢复平台启动接口"
+                        : $"子租户【{target.Name}（{target.OsClient}）】安装/更新全部平台应用",
+                    childParam,
                     context.TrustedCurrentUser,
                     new JObject
                     {
                         ["IdempotencyKey"] =
-                            $"child-platform-apps:{context.TaskId}:{target.OsClient}".ToLowerInvariant(),
+                            ($"child-platform-apps:{context.TaskId}:{target.OsClient}"
+                             + (startupDependenciesOnly ? ":startup" : string.Empty))
+                            .ToLowerInvariant(),
                         // 子租户可能共享同一物理数据库；商城安装包含 DDL，必须继续使用
                         // 固定工作器键在整个运行环境内串行，避免跨租户结构更新死锁。
                         ["ConcurrencyKey"] = ChildWorkerApiEngineKey,
@@ -165,7 +195,10 @@ namespace Microi.net
                     TargetOsClient = target.OsClient,
                     TargetName = target.Name,
                     Bootstrap = bootstrap.Data,
-                    RuntimeReloaded = runtimeReloaded
+                    RuntimeReloaded = runtimeReloaded,
+                    MaintenanceScope = startupDependenciesOnly
+                        ? StartupDependenciesMaintenanceScope
+                        : "AllPlatformApplications"
                 }, $"子租户【{target.Name}】的平台应用维护任务已进入主租户后台任务中心。");
             }
             catch (Exception ex)
@@ -363,6 +396,10 @@ namespace Microi.net
             string targetOsClient,
             JObject trustedCurrentUser)
         {
+            // CHILD_TENANT_BOOTSTRAP_SOURCE_FINGERPRINT_V1：缓存必须绑定当前主租户
+            // 官方工作器源码。只按目标租户缓存会让在线修复后的新版本在同一 API
+            // 进程中永远无法刷新到已经重试的子任务。
+            var sourceFingerprint = GetBootstrapSourceFingerprint(ownerOsClient);
             var recoveryKey = string.Join("|", new[]
             {
                 ownerOsClient ?? string.Empty,
@@ -372,7 +409,8 @@ namespace Microi.net
             });
             lock (MonitorBootstrapRecoverySync)
             {
-                if (MonitorBootstrapRecoveryReady.Contains(recoveryKey))
+                if (MonitorBootstrapRecoveryReady.TryGetValue(recoveryKey, out var cachedFingerprint)
+                    && string.Equals(cachedFingerprint, sourceFingerprint, StringComparison.Ordinal))
                     return new DosResult(1, new JObject { ["Recovered"] = false });
 
                 var bootstrap = EnsureTargetBootstrap(ownerOsClient, targetOsClient, trustedCurrentUser);
@@ -404,13 +442,35 @@ namespace Microi.net
                         + "且当前主租户受信工作器未能补齐该能力；请同步与当前后端配套的应用商城自举资源后重试。");
                 }
 
-                MonitorBootstrapRecoveryReady.Add(recoveryKey);
+                MonitorBootstrapRecoveryReady[recoveryKey] = sourceFingerprint;
                 return new DosResult(1, new JObject
                 {
                     ["Recovered"] = true,
                     ["ImporterVersion"] = ReadText(importer, "Version")
                 });
             }
+        }
+
+        private static string GetBootstrapSourceFingerprint(string ownerOsClient)
+        {
+            var ownerClient = OsClientExtend.GetClient(ownerOsClient);
+            if (ownerClient?.Db == null)
+                throw new InvalidOperationException("商城工作接口来源数据库连接不可用。");
+            var ownerColumns = GetPhysicalColumns(ownerClient, "sys_apiengine");
+            var source = new StringBuilder();
+            foreach (var apiEngineKey in RequiredBootstrapApiEngineKeys)
+            {
+                var row = ReadApiEngineRow(ownerClient, ownerColumns, ownerOsClient, apiEngineKey);
+                if (row == null)
+                    throw new InvalidOperationException($"主租户缺少商城自举接口 {apiEngineKey}。");
+                source.Append(apiEngineKey).Append('\n')
+                    .Append(ReadText(row, "Version")).Append('\n')
+                    .Append(NormalizeBootstrapSourceForComparison(ReadText(row, "ApiV8Code")))
+                    .Append('\n');
+            }
+            using var sha256 = SHA256.Create();
+            return BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(source.ToString())))
+                .Replace("-", string.Empty);
         }
 
         // CHILD_TENANT_EXECUTION_BOOTSTRAP_SCOPE_V1：固定工作器 Key 本身不能证明
@@ -631,11 +691,30 @@ namespace Microi.net
 
         private static string NormalizeBootstrapSourceForComparison(string source)
         {
-            return (source ?? string.Empty)
+            var normalized = (source ?? string.Empty)
                 .TrimStart('\uFEFF')
                 .Replace("\r\n", "\n")
                 .Replace('\r', '\n')
                 .TrimEnd();
+
+            // MCP/VS Code 保存接口引擎时会在完整官方源码外再生成一层描述头。
+            // 应用包内嵌的是同一份正文，没有这层传输元数据；若把二者按原文
+            // 比较，会把未改动的 Managed 官方源码误判为租户定制。只剥离开头
+            // 且同时具备完整稳定标识的生成头，OFFICIAL_MANAGED_NOTICE 及正文
+            // 内部注释均保留参与比较，不能因此放宽真实定制代码保护。
+            while (normalized.StartsWith("/*", StringComparison.Ordinal))
+            {
+                var commentEnd = normalized.IndexOf("*/", StringComparison.Ordinal);
+                if (commentEnd < 0) break;
+                var header = normalized.Substring(0, commentEnd + 2);
+                if (header.IndexOf("V8 ApiEngine", StringComparison.Ordinal) < 0
+                    || header.IndexOf("ApiEngineKey:", StringComparison.Ordinal) < 0
+                    || header.IndexOf("Version:", StringComparison.Ordinal) < 0
+                    || header.IndexOf("Function:", StringComparison.Ordinal) < 0)
+                    break;
+                normalized = normalized.Substring(commentEnd + 2).TrimStart();
+            }
+            return normalized.TrimEnd();
         }
 
         private static bool TryParseBootstrapVersion(string value, out int[] parts)

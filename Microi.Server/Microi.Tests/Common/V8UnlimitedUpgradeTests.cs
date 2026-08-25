@@ -27,6 +27,10 @@ public class V8UnlimitedUpgradeTests
         Assert.Contains("UpgradeDistributedLease.TryAcquire", upgrade, StringComparison.Ordinal);
         Assert.Contains("RuntimePhysicalPrerequisitesReady", upgrade, StringComparison.Ordinal);
         Assert.Contains("[\"V8Limit\"] = \"int\"", upgrade, StringComparison.Ordinal);
+        Assert.Contains("[\"Id\"] = \"varchar(36)\"", upgrade, StringComparison.Ordinal);
+        Assert.Contains("BackfillApiEngineIds(osClientSecret)", upgrade, StringComparison.Ordinal);
+        Assert.Contains("SET `Id`=UUID()", upgrade, StringComparison.Ordinal);
+        Assert.Contains("SET [Id]=CONVERT(varchar(36), NEWID())", upgrade, StringComparison.Ordinal);
         Assert.Contains("[\"OsClient\"] = \"varchar(255)\"", upgrade, StringComparison.Ordinal);
         Assert.Contains("[\"TableInEdit\"] = \"int\"", upgrade, StringComparison.Ordinal);
         Assert.Contains("[\"AddCallbakApi\"] = \"varchar(500)\"", upgrade, StringComparison.Ordinal);

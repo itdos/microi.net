@@ -1,19 +1,56 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizeOfficialApiEnginePolicies } from './official-api-engine-notice.mjs';
+import { normalizeOfficialPackageExecutionLimits } from './resource-sync-core.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const packagePath = path.join(root, 'app.microi.saas-engine.json');
 const packageData = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-const now = '2026-08-24 00:00:00';
+const now = '2026-08-25 12:00:00';
 
 function readSource(fileName) {
   return fs.readFileSync(path.join(root, fileName), 'utf8').replace(/\r\n/g, '\n').trimEnd();
 }
 
 function prependOnce(existing, line) {
-  const value = existing || '';
-  return value.split(/\r?\n/).includes(line) ? value : `${line}\n${value}`;
+  const value = String(existing || '').replace(/\r\n/g, '\n').trim();
+  const block = String(line || '').replace(/\r\n/g, '\n').trim();
+  if (!block) return value;
+
+  // 部分接口的单个版本记录本身包含多行。旧实现按“单行相等”判断，
+  // 每次生成都会再次前置整个多行记录。这里按完整行块去重后只保留一份，
+  // 既修复已有重复，也保证同一输入连续生成得到逐字节一致的候选包。
+  const sourceLines = value ? value.split('\n') : [];
+  const blockLines = block.split('\n');
+  const remaining = [];
+  for (let index = 0; index < sourceLines.length;) {
+    let matches = index + blockLines.length <= sourceLines.length;
+    for (let offset = 0; matches && offset < blockLines.length; offset++) {
+      matches = sourceLines[index + offset] === blockLines[offset];
+    }
+    if (matches) {
+      index += blockLines.length;
+      continue;
+    }
+    remaining.push(sourceLines[index]);
+    index++;
+  }
+  const tail = remaining.join('\n').trim();
+  return tail ? `${block}\n${tail}` : block;
+}
+
+function compareSemver(left, right) {
+  const parse = value => {
+    const match = /^v?(\d+)\.(\d+)\.(\d+)$/i.exec(String(value || '').trim());
+    return match ? match.slice(1).map(Number) : [0, 0, 0];
+  };
+  const leftParts = parse(left);
+  const rightParts = parse(right);
+  for (let index = 0; index < 3; index += 1) {
+    if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
+  }
+  return 0;
 }
 
 const engines = [
@@ -73,14 +110,72 @@ const engines = [
     history: '2026-08-24 v1.0.0 组织机构兼容接口迁移至接口引擎，写操作固定为当前租户超级管理员。'
   },
   {
-    key: 'platform-sys-menu', name: '平台菜单与角色菜单权限', file: 'platform-sys-menu.js',
-    id: '9434a0ec-f360-4cb1-8adb-00f5fb879f53', enableLog: 1,
-    history: '2026-08-24 v1.0.0 菜单与角色菜单授权兼容接口迁移至接口引擎。'
-  },
-  {
     key: 'platform-sys-role', name: '平台角色目录', file: 'platform-sys-role.js',
     id: '74d79358-ee99-41ca-b86e-d0c060114fb0', enableLog: 1,
     history: '2026-08-24 v1.0.0 角色目录兼容接口迁移至接口引擎，保留权威表权限与可分配角色过滤。'
+  },
+  {
+    key: 'platform-runtime-custom-hook', name: '平台运行时个性化扩展', file: 'platform-runtime-custom-hook.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000001', enableLog: 1, stopHttp: 1,
+    upgradePolicy: 'CreateIfMissing', ownership: 'Tenant',
+    history: '2026-08-25 v1.0.0 新增租户个性化 Hook；首次安装后由租户维护，官方升级永不覆盖。'
+  },
+  {
+    key: 'platform-os-client-by-domain', name: '平台按域名解析租户', file: 'platform-os-client-by-domain.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000002', enableLog: 0, allowAnonymous: 1,
+    history: '2026-08-25 v1.0.0 将域名租户发现迁移为匿名 Managed 接口引擎，只返回 OsClient 最小投影。'
+  },
+  {
+    key: 'platform-sys-config', name: '平台公开系统设置', file: 'platform-sys-config.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000003', enableLog: 0, allowAnonymous: 1,
+    history: '2026-08-25 v1.0.0 将浏览器公开系统设置迁移为匿名 Managed 接口引擎，强制服务端安全投影。'
+  },
+  {
+    key: 'platform-lang-bundle', name: '平台语言词条包', file: 'platform-lang-bundle.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000004', enableLog: 0, allowAnonymous: 1,
+    history: '2026-08-25 v1.0.0 将语言词条包迁移为匿名 Managed 接口引擎。'
+  },
+  {
+    key: 'platform-current-user', name: '平台当前用户', file: 'platform-current-user.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000005', enableLog: 0,
+    history: '2026-08-25 v1.0.0 将当前用户自省迁移为鉴权 Managed 接口引擎，直接返回可信 V8.CurrentUser。'
+  },
+  {
+    key: 'platform-private-file-url', name: '平台私有文件授权地址', file: 'platform-private-file-url.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000006', enableLog: 1,
+    history: '2026-08-25 v1.0.0 将私有文件短链迁移为鉴权 Managed 接口引擎，复用 Core 菜单、行、字段与引用授权。'
+  },
+  {
+    key: 'platform-sys-user-public-info', name: '平台公共用户目录', file: 'platform-sys-user-public-info.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000007', enableLog: 0,
+    history: '2026-08-25 v1.0.0 将公共用户目录迁移为鉴权 Managed 接口引擎，只返回 Id、Name、Avatar。'
+  },
+  {
+    key: 'platform-login-wallpapers', name: '平台登录壁纸', file: 'platform-login-wallpapers.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000008', enableLog: 0, allowAnonymous: 1,
+    version: 'v1.1.0',
+    history: '2026-08-25 v1.1.0 改用 ApiEngineKey 绑定的可信宿主原子读取登录壁纸，不开放 diy_wallpaper 通用匿名权限。\n2026-08-25 v1.0.0 将登录壁纸最小公开投影迁移为匿名 Managed 接口引擎。'
+  },
+  {
+    key: 'microi-init', name: '平台初始化兼容门面', file: 'platform-microi-init.js',
+    id: '2a78d645-18c2-46f4-979a-b909399f3730', enableLog: 0, allowAnonymous: 1,
+    version: 'v2.0.2',
+    history: '2026-08-25 v2.0.2 登录初始化只返回递归脱敏的会话投影，密码材料、AI Key 与一次性票据绝不进入响应。\n2026-08-25 v2.0.1 纳入 SaaS 官方 Managed 升级链；匿名阶段仅返回公开设置，原始 DiyToken 经后端重验且租户一致后才返回用户与权限菜单。'
+  },
+  {
+    key: 'platform-create-tenant', name: '平台创建租户', file: 'platform-create-tenant.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000009', enableLog: 1,
+    history: '2026-08-25 v1.0.0 将当前用户创建租户的业务编排迁入 Managed 接口引擎，底层只保留可信开通原子。'
+  },
+  {
+    key: 'platform-external-login-binding', name: '平台外部身份绑定', file: 'platform-external-login-binding.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000010', enableLog: 1, stopHttp: 1, lock: 1,
+    history: '2026-08-25 v1.0.0 外部登录协议验签后由一次性可信上下文进入 Managed 接口引擎完成身份绑定。'
+  },
+  {
+    key: 'platform-wechat-user-binding', name: '平台微信用户绑定', file: 'platform-wechat-user-binding.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000011', enableLog: 1, stopHttp: 1, lock: 1,
+    history: '2026-08-25 v1.0.0 微信 OAuth 协议归一化后由一次性可信上下文进入 Managed 接口引擎完成用户绑定。'
   }
 ];
 
@@ -94,6 +189,12 @@ packageData.SysApiEngines ||= [];
 packageData.ResourcePolicies ||= { SchemaVersion: 1, ApiEngines: {} };
 packageData.ResourcePolicies.SchemaVersion ||= 1;
 packageData.ResourcePolicies.ApiEngines ||= {};
+// 单一官方应用所有权：菜单启动接口由应用商城自举包交付，个人偏好由系统账号包交付。
+// SaaS 包必须显式移除历史副本，避免多个 Managed 应用在安装顺序不同时互相覆盖。
+for (const exclusiveKey of ['platform-sys-menu', 'platform-user-update-preferences']) {
+  packageData.SysApiEngines = packageData.SysApiEngines.filter(item => item.ApiEngineKey !== exclusiveKey);
+  delete packageData.ResourcePolicies.ApiEngines[exclusiveKey];
+}
 for (const definition of engines) {
   let engine = packageData.SysApiEngines.find(item => item.ApiEngineKey === definition.key);
   if (!engine) {
@@ -109,13 +210,13 @@ for (const definition of engines) {
       LimitMemory: 2048,
       MaxStatements: 100000000,
       Timeout: 600,
-      StopHttp: 0,
+      StopHttp: definition.stopHttp || 0,
       EnableLog: definition.enableLog,
       Category: '平台核心',
       Files: '[]',
       AllowAnonymous: definition.allowAnonymous || 0,
       ApiAddress: `/apiengine/${definition.key}`,
-      Lock: 0,
+      Lock: definition.lock || 0,
       ApiV8Code: '',
       ApiRole: '[]',
       IsEnable: 1,
@@ -128,14 +229,15 @@ for (const definition of engines) {
   engine.ApiAddress = `/apiengine/${definition.key}`;
   engine.ApiName = definition.name;
   engine.Version = definition.version || 'v1.0.0';
-  engine.StopHttp = 0;
+  engine.StopHttp = definition.stopHttp || 0;
   engine.AllowAnonymous = definition.allowAnonymous || 0;
   engine.IsEnable = 1;
   engine.EnableLog = definition.enableLog;
+  engine.Lock = definition.lock || 0;
   engine.ChangeHistory = prependOnce(engine.ChangeHistory, definition.history);
   packageData.ResourcePolicies.ApiEngines[definition.key] = {
-    Ownership: 'Platform',
-    UpgradePolicy: 'Managed'
+    Ownership: definition.ownership || 'Platform',
+    UpgradePolicy: definition.upgradePolicy || 'Managed'
   };
 }
 
@@ -292,6 +394,12 @@ for (const definition of streamSettings) {
 }
 
 const capabilities = packageData.PackageInfo.RequiredPlatformCapabilities ||= [];
+for (let index = capabilities.length - 1; index >= 0; index--) {
+  if (capabilities[index] === 'ApiEngine:platform-sys-menu'
+      || capabilities[index] === 'ApiEngine:platform-user-update-preferences') {
+    capabilities.splice(index, 1);
+  }
+}
 for (const capability of [
   'V8.Method.ManageScheduleJob',
   'V8.Method.ManageMq',
@@ -310,16 +418,36 @@ for (const capability of [
   'ApiEngine:platform-tencent-im',
   'ApiEngine:platform-sys-base-data',
   'ApiEngine:platform-sys-dept',
-  'ApiEngine:platform-sys-menu',
   'ApiEngine:platform-sys-role',
+  'V8.Method.ResolveOsClientByDomain',
+  'V8.Method.GetPublicSysConfig',
+  'V8.Method.GetLangBundle',
+  'V8.Method.GetLoginWallpapers',
+  'V8.Method.GetAuthorizedPrivateFileUrl',
+  'ApiEngine:platform-runtime-custom-hook',
+  'ApiEngine:platform-os-client-by-domain',
+  'ApiEngine:platform-sys-config',
+  'ApiEngine:platform-lang-bundle',
+  'ApiEngine:platform-current-user',
+  'ApiEngine:platform-private-file-url',
+  'ApiEngine:platform-sys-user-public-info',
+  'ApiEngine:platform-login-wallpapers',
+  'ApiEngine:microi-init',
+  'V8.Method.ProvisionCurrentUserTenant',
+  'V8.Method.RequireManagedProtocolContext',
+  'ApiEngine:platform-create-tenant',
+  'ApiEngine:platform-external-login-binding',
+  'ApiEngine:platform-wechat-user-binding',
   'ApiEngine:mci-module-presentation-stats',
   'ApiEngine:mic_home_work_todo_badge'
 ]) {
   if (!capabilities.includes(capability)) capabilities.push(capability);
 }
 
-const packageHistory = '2026-08-24 v7.5.39 内置微服务升级至 v1.8.9，补齐跨月流量明细、真实接口引擎归因、接口引擎流式响应与控制器低代码迁移；热点角标采用主动失效版本门。';
-packageData.PackageInfo.Version = 'v7.5.39';
+const packageHistory = '2026-08-25 v7.6.0 SaaS 官方接口递归深度统一收敛到运行时硬上限 5000；保留 v7.5.46 登录、Token 缓存刷新与 microi-init 敏感材料清除契约。';
+if (compareSemver(packageData.PackageInfo.Version, 'v7.6.0') < 0) {
+  packageData.PackageInfo.Version = 'v7.6.0';
+}
 packageData.PackageInfo.ApiEngineCount = packageData.SysApiEngines.length;
 packageData.PackageInfo.FieldCount = packageData.DiyFields.length;
 packageData.PackageInfo.PhysicalColumnCount = packageData.PhysicalColumns.length;
@@ -327,4 +455,9 @@ packageData.PackageInfo.DataRowCount = (packageData.DataSets || [])
   .reduce((total, dataSet) => total + (dataSet.Rows || []).length, 0);
 packageData.PackageInfo.ChangeHistory = prependOnce(packageData.PackageInfo.ChangeHistory, packageHistory);
 
-fs.writeFileSync(packagePath, `${JSON.stringify(packageData, null, 2)}\n`, 'utf8');
+normalizeOfficialApiEnginePolicies(packageData, path.basename(packagePath));
+const normalizedPackageData = JSON.parse(normalizeOfficialPackageExecutionLimits(
+  path.basename(packagePath),
+  JSON.stringify(packageData),
+));
+fs.writeFileSync(packagePath, `${JSON.stringify(normalizedPackageData, null, 2)}\n`, 'utf8');

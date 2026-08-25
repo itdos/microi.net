@@ -700,6 +700,41 @@ export const V8ServerApiDefinitions = {
                         insertText: "GetPrivateFileUrl",
                         snippet: 'GetPrivateFileUrl({\n\tFilePathName: "${1:/microi/file/xxx.doc}"\n})'
                     },
+                    ResolveOsClientByDomain: {
+                        label: "ResolveOsClientByDomain",
+                        kind: "Method",
+                        documentation: "官方平台启动可信原子：按域名返回最小 OsClient 投影。仅允许 Managed 接口 platform-os-client-by-domain 调用，其它脚本会失败关闭。",
+                        insertText: "ResolveOsClientByDomain",
+                        snippet: 'ResolveOsClientByDomain(V8.Param.Domain)'
+                    },
+                    GetPublicSysConfig: {
+                        label: "GetPublicSysConfig",
+                        kind: "Method",
+                        documentation: "官方平台启动可信原子：返回浏览器安全系统设置投影，绝不返回服务端私密设置。仅允许 Managed 接口 platform-sys-config 调用。",
+                        insertText: "GetPublicSysConfig",
+                        snippet: 'GetPublicSysConfig(V8.Param._Lang)'
+                    },
+                    GetLangBundle: {
+                        label: "GetLangBundle",
+                        kind: "Method",
+                        documentation: "官方平台启动可信原子：读取当前租户语言词条。仅允许 Managed 接口 platform-lang-bundle 调用。",
+                        insertText: "GetLangBundle",
+                        snippet: 'GetLangBundle(V8.Param._Lang, "${1:Msg.}")'
+                    },
+                    GetLoginWallpapers: {
+                        label: "GetLoginWallpapers",
+                        kind: "Method",
+                        documentation: "官方登录壁纸可信原子：只返回当前租户最多 200 条启用壁纸的 Id、Name、Category、ImgUrl 固定投影，不会开放 diy_wallpaper 通用匿名读取。仅允许 Managed 接口 platform-login-wallpapers 调用。",
+                        insertText: "GetLoginWallpapers",
+                        snippet: 'GetLoginWallpapers()'
+                    },
+                    GetAuthorizedPrivateFileUrl: {
+                        label: "GetAuthorizedPrivateFileUrl",
+                        kind: "Method",
+                        documentation: "官方私有文件可信原子：宿主重算当前租户、菜单、表、行、字段和对象引用后签发短链。仅允许 Managed 接口 platform-private-file-url 调用。",
+                        insertText: "GetAuthorizedPrivateFileUrl",
+                        snippet: 'GetAuthorizedPrivateFileUrl(V8.Param)'
+                    },
                     AddSysLog: {
                         label: "AddSysLog",
                         kind: "Method",

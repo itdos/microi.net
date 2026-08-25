@@ -25,7 +25,7 @@
                 </div>
                 <div class="vChat-sidebar flexbox flex__direction-column">
                     <div class="avator">
-                        <img class="J__avator" :src="DiyCommon.GetServerPath(GetCurrentUser.Avatar)" />
+                        <img class="J__avator" :src="getUserAvatarViewUrl(GetCurrentUser.Avatar, GetCurrentUser.Id)" />
                         <!-- <i class="status J__onlineStatus" 
                         :class="onlineStatus.status" 
                         :title="onlineStatus.text">
@@ -255,7 +255,7 @@
                                             </div>
                                         </div>
                                         <router-link v-if="chat.FromUserId == GetCurrentUser.Id" class="avatar" to="">
-                                            <img :src="DiyCommon.GetServerPath(GetCurrentUser.Avatar)" style="object-fit: cover" />
+                                            <img :src="getUserAvatarViewUrl(GetCurrentUser.Avatar, GetCurrentUser.Id)" style="object-fit: cover" />
                                         </router-link>
                                     </li>
                                 </ul>
@@ -533,7 +533,10 @@ export default {
             // AI模型选择
             aiModelList: [],
             selectedAiModel: null,
-            aiModelLoading: false
+            aiModelLoading: false,
+            // 仅保存视图层短期签名 URL；聊天记录和 SignalR 载荷始终保留原始 Avatar 路径。
+            UserAvatarViewUrls: {},
+            UserAvatarViewPending: {}
         };
     },
     watch: {
@@ -1106,11 +1109,38 @@ export default {
         },
         getChatAvatar(chat) {
             if (String(chat?.FromUserId || "") === "AI") return AI_ASSISTANT_AVATAR;
-            return this.DiyCommon.GetServerPath(chat?.FromUserAvatar || "./static/img/icon/personal.png");
+            return this.getUserAvatarViewUrl(chat?.FromUserAvatar, chat?.FromUserId);
         },
         getContactAvatar(contact) {
             if (String(contact?.ContactUserId || contact?.Id || "") === "AI") return AI_ASSISTANT_AVATAR;
-            return this.DiyCommon.GetServerPath(contact?.ContactUserAvatar || contact?.Avatar || "./static/img/icon/personal.png");
+            return this.getUserAvatarViewUrl(
+                contact?.ContactUserAvatar || contact?.Avatar,
+                contact?.ContactUserId || contact?.Id
+            );
+        },
+        getUserAvatarViewUrl(avatar, userId) {
+            var source = String(avatar || "").trim();
+            var id = String(userId || "").trim();
+            var fallback = "./static/img/icon/personal.png";
+            if (!source || !id) return fallback;
+            var cacheKey = `${id}|${source}`;
+            if (Object.prototype.hasOwnProperty.call(this.UserAvatarViewUrls, cacheKey)) {
+                return this.UserAvatarViewUrls[cacheKey] || fallback;
+            }
+            if (!this.UserAvatarViewPending[cacheKey]) {
+                this.UserAvatarViewPending[cacheKey] = true;
+                this.DiyCommon.GetUserAvatarUrl(source, id)
+                    .then((url) => {
+                        this.UserAvatarViewUrls[cacheKey] = url || fallback;
+                    })
+                    .catch(() => {
+                        this.UserAvatarViewUrls[cacheKey] = fallback;
+                    })
+                    .finally(() => {
+                        delete this.UserAvatarViewPending[cacheKey];
+                    });
+            }
+            return fallback;
         },
         prefersReducedMotion() {
             return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
@@ -1338,7 +1368,7 @@ export default {
             console.log('[获取联系人] 开始获取', { pageIndex: self.contactsPageIndex, keyword: self.kw });
             
             self.DiyCommon.Post(
-                "/api/SysUser/GetSysUserPublicInfo",
+                "/apiengine/platform-sys-user-public-info",
                 {
                     State: 1,
                     _PageIndex: self.contactsPageIndex,
@@ -1348,7 +1378,7 @@ export default {
                 function (result) {
                     self.contactsLoading = false;
                     if (self.DiyCommon.Result(result)) {
-                        console.log('[获取联系人] 成功', { count: result.Data?.length, total: result.Total });
+                        console.log('[获取联系人] 成功', { count: result.Data?.length, total: result.DataCount ?? result.Total });
                         
                         let contactsList = [];
                         if (isLoadMore) {
@@ -1377,7 +1407,10 @@ export default {
                         
                         // 判断是否还有更多数据（AI助手不计入总数）
                         const realContactsCount = self.AllContactsList.length - (self.contactsPageIndex === 1 && !self.kw ? 1 : 0);
-                        self.contactsHasMore = realContactsCount < (result.Total || 0);
+                        const total = Number(result.DataCount ?? result.Total);
+                        self.contactsHasMore = Number.isFinite(total)
+                            ? realContactsCount < total
+                            : (result.Data || []).length >= self.contactsPageSize;
                     } else {
                         console.error('[获取联系人] 失败:', result.Message);
                     }
@@ -1906,7 +1939,7 @@ export default {
                             <div class="content"> <p class="author">${self.GetCurrentUser.Name}</p>\
                                 <div class="msg">${_html}</div>\
                             </div>\
-                            <a class="avatar" href="javascript:;"><img src="${self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar)}" /></a>\
+                            <a class="avatar" href="javascript:;"><img src="${self.getUserAvatarViewUrl(self.GetCurrentUser.Avatar, self.GetCurrentUser.Id)}" /></a>\
                         </li>`
                 ].join("");
                 //发送到websocket
@@ -1928,10 +1961,10 @@ export default {
                         OsClient: self.DiyCommon.GetOsClient(),
                         ToUserId: self.GetCurrentLastContact.ContactUserId,
                         ToUserName: self.GetCurrentLastContact.ContactUserName,
-                        ToUserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentLastContact.ContactUserAvatar),
+                        ToUserAvatar: self.GetCurrentLastContact.ContactUserAvatar || self.GetCurrentLastContact.Avatar || "",
                         FromUserId: self.GetCurrentUser.Id,
                         FromUserName: self.GetCurrentUser.Name,
-                        FromUserAvatar: self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar),
+                        FromUserAvatar: self.GetCurrentUser.Avatar || "",
                         OtherInfo: self.GetCurrentLastContact.ContactUserId === 'AI' && self.selectedAiModel
                             ? JSON.stringify({
                                 AiModel: self.selectedAiModel.AiModel,

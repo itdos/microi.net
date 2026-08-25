@@ -560,7 +560,7 @@ const requestPrivateAssetUrls = async (paths) => {
 
     if (uniquePaths.length > 1) {
         try {
-            const batchResult = await DiyCommon.PostAsync('/api/HDFS/GetPrivateFileUrl', {
+            const batchResult = await DiyCommon.PostAsync('/apiengine/platform-private-file-url', {
                 FilePathNames: uniquePaths,
                 ...context
             });
@@ -578,7 +578,7 @@ const requestPrivateAssetUrls = async (paths) => {
 
     await Promise.all(uniquePaths.map(async (path) => {
         try {
-            const result = await DiyCommon.PostAsync('/api/HDFS/GetPrivateFileUrl', {
+            const result = await DiyCommon.PostAsync('/apiengine/platform-private-file-url', {
                 FilePathName: path,
                 ...context
             });

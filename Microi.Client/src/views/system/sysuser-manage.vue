@@ -857,18 +857,10 @@ export default {
             var self = this;
             try {
                 self.SaveSysUserLoding = true;
-                var realParam = {
-                    FormEngineKey: "Sys_User"
-                };
-
                 var { ...param } = self.CurrentSysUserModel;
-
-                var url = "/api/FormEngine/AddFormData"; //''/sysuser/uptsysuser'
-                if (self.CurrentSysUserModel.Id) {
-                    url = "/api/FormEngine/UptFormData"; //'/api/SysUser/addsysuser'
-                    realParam.Id = self.CurrentSysUserModel.Id;
-                } else {
-                }
+                var url = self.CurrentSysUserModel.Id
+                    ? self.DiyApi.UptSysUser()
+                    : self.DiyApi.AddSysUser();
 
                 if (!self.CurrentSysUserModel.DeptId) {
                     self.DiyCommon.Tips("组织机构必选！", false);
@@ -891,18 +883,17 @@ export default {
                 //     self.CurrentSysUserModel.DeptIds = tempDeptIds;
                 // }
                 //---------------------------------------------------
-                // param.OsClient = self.OsClient
                 param._Roles = null;
-                // param.RoleIds = _.pluck(self.CurrentSysUserRoleIds, 'Id');
-                param.DeptIds = JSON.stringify(param.DeptIds);
-                param.RoleIds = JSON.stringify(param.RoleIds);
+                param.RoleIds = (Array.isArray(param.RoleIds) ? param.RoleIds : [])
+                    .map((item) => typeof item === "string" ? item : item?.Id)
+                    .filter(Boolean);
+                param.DeptIds = Array.isArray(param.DeptIds) ? param.DeptIds : [];
                 if (!param.Pwd) {
                     delete param.Pwd;
                 }
-                realParam._FormData = param;
                 self.DiyCommon.Post(
                     url,
-                    realParam,
+                    param,
                     function (result) {
                         self.SaveSysUserLoding = false;
                         if (self.DiyCommon.Result(result)) {

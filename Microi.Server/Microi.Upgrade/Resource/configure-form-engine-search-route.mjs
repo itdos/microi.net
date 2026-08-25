@@ -6,6 +6,19 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const packagePath = path.join(root, 'app.microi.form-engine.json');
 const packageData = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
+function compareSemver(left, right) {
+  const parse = value => {
+    const match = /^v?(\d+)\.(\d+)\.(\d+)$/i.exec(String(value || '').trim());
+    return match ? match.slice(1).map(Number) : [0, 0, 0];
+  };
+  const leftParts = parse(left);
+  const rightParts = parse(right);
+  for (let index = 0; index < 3; index += 1) {
+    if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
+  }
+  return 0;
+}
+
 const scripts = {
   AsyncIndex: `V8.ApiEngine.Run('platform-search-engine', {
   Action: 'AsyncIndex',
@@ -51,7 +64,9 @@ if (!changedButtons && JSON.stringify(packageData).includes('/api/SearchEngine/'
 }
 
 const history = '2026-08-24 v7.6.4 表单设计器的 ES 结构/数据同步改为调用 Managed 接口引擎 platform-search-engine，移除对 SearchEngineController 的依赖。';
-packageData.PackageInfo.Version = 'v7.6.4';
+if (compareSemver(packageData.PackageInfo.Version, 'v7.6.4') < 0) {
+  packageData.PackageInfo.Version = 'v7.6.4';
+}
 packageData.PackageInfo.Description = '表单引擎基础资源。设计器搜索索引维护统一调用应用商城 Managed 接口引擎；导入继续支持完整预览、UTF-8/GBK CSV、错误事务策略和唯一规则新增/修改。';
 if (!String(packageData.PackageInfo.ChangeHistory || '').split(/\r?\n/).includes(history)) {
   packageData.PackageInfo.ChangeHistory = `${history}\n${packageData.PackageInfo.ChangeHistory || ''}`;

@@ -14,7 +14,7 @@ namespace Microi.net.Api;
 /// 微信小程序用户发布内容安全服务。审核记录和 access_token 均存放在租户共享 Redis，
 /// 任意 API 节点都可以提交、接收回调和完成保存前复核。
 /// </summary>
-public sealed class WeChatContentSecurityService
+public sealed class WeChatContentSecurityService : ISysUserProfileContentSecurityGateway
 {
     public const string CallbackCoreApiEngineKey = "mci-wechat-content-callback-core";
     public const string UnsafeContentMessage = "你发布的内容含违规信息，请修改后重试。";
@@ -29,10 +29,14 @@ public sealed class WeChatContentSecurityService
     };
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public WeChatContentSecurityService(IHttpClientFactory httpClientFactory)
+    public WeChatContentSecurityService(
+        IHttpClientFactory httpClientFactory,
+        IHttpContextAccessor httpContextAccessor)
     {
         _httpClientFactory = httpClientFactory;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public static bool IsWeChatMiniProgramRequest(HttpContext context, CurrentToken currentToken = null)
@@ -52,6 +56,67 @@ public sealed class WeChatContentSecurityService
         var authorization = context.Request.Headers["Authorization"].ToString();
         var activeToken = DiyToken.GetActiveCachedTokenEntry(currentToken, authorization);
         return string.Equals(activeToken?.ClientType, "WxMiniProgram", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Core 系统账号可信原子使用的最小 HTTP 协议适配。非微信小程序请求直接通过；
+    /// 小程序请求只返回头像与文本审核结论，账号写入仍由 Core 管理。
+    /// </summary>
+    public async Task<DosResult> ValidateProfileUpdateAsync(
+        string osClient,
+        JObject trustedCurrentUser,
+        SysUserParam param,
+        CancellationToken cancellationToken = default)
+    {
+        if (param == null || trustedCurrentUser == null)
+            return Failure(UnavailableContentMessage);
+
+        try
+        {
+            var context = _httpContextAccessor.HttpContext;
+            if (context == null) return Failure(UnavailableContentMessage);
+            var currentToken = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
+            var actorUserId = trustedCurrentUser["Id"]?.ToString();
+            if (currentToken?.CurrentUser == null
+                || actorUserId.DosIsNullOrWhiteSpace()
+                || !string.Equals(currentToken.OsClient, osClient, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(
+                    currentToken.CurrentUser["Id"]?.ToString(),
+                    actorUserId,
+                    StringComparison.OrdinalIgnoreCase))
+                return Failure(UnavailableContentMessage);
+            if (!IsWeChatMiniProgramRequest(context, currentToken)) return new DosResult(1);
+
+            if (param.Avatar != null)
+            {
+                var avatarResult = await ValidateAvatarAsync(
+                        osClient,
+                        actorUserId,
+                        trustedCurrentUser["Avatar"]?.ToString(),
+                        param.Avatar)
+                    .ConfigureAwait(false);
+                if (avatarResult.Code != 1) return avatarResult;
+            }
+
+            var requestCancellation = context.RequestAborted;
+            var effectiveCancellation = requestCancellation.CanBeCanceled
+                ? requestCancellation
+                : cancellationToken;
+            return await CheckProfileTextAsync(
+                    osClient,
+                    param.ContentSecurityLoginCode,
+                    new[] { param.Name, param.RealName, param.Remark },
+                    effectiveCancellation)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return Failure(UnavailableContentMessage);
+        }
+        finally
+        {
+            param.ContentSecurityLoginCode = null;
+        }
     }
 
     public async Task<DosResult> SubmitUploadedImagesAsync(

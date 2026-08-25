@@ -1,9 +1,18 @@
+/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1
+ * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】
+ * 所属官方应用：应用商城
+ * ApiEngineKey：get-microi-store-model
+ * 从可信吾码官方应用源安装、更新或重新安装“应用商城”，都会以官方源码恢复此 Managed 接口。
+ * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，
+ * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
+ */
+
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store-model
- * Version: v1.2.8
+ * Version: v1.2.9
  * Function:
- * - 按公开/私有权限读取当前或历史应用包；后台安装按期望应用版本解析并固定不可变数据版本快照；详情模式返回租户范围内的更新日志但不返回大型数据包。
+ * - 按公开/私有权限读取当前或历史应用包；新版安装端读取 HDFS 指针，旧安装端由响应期临时回填包正文且不写回数据库；后台安装固定不可变数据版本快照。
  */
 
 function text(value) { return value === null || value === undefined ? "" : String(value); }
@@ -54,6 +63,45 @@ function packageDownloadUrl(row, isPublic) {
   return typeof data === 'string'
     ? trim(data)
     : trim(data.Url || data.url || data.FileUrl || data.FullPath || data.Path);
+}
+function acceptsHdfsPointer() {
+  return trim(V8.Param.PackagePointerMode).toLowerCase() === 'hdfsv1'
+    || flag(V8.Param.AcceptHdfsPackagePointer, false);
+}
+function loadPackageBodyFromPointer(row, downloadUrl) {
+  // MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1：v2.2.x 及更早导入器只识别
+  // AppPakcet。为避免“更新器无法更新自己”的引导死锁，商城源仅在该次旧协议
+  // 响应中下载并回填正文；sys_microistore 与 mic_data_version 仍只保存 HDFS 指针。
+  var expectedSha = trim(row && row.PackageSha256).toLowerCase();
+  var expectedSize = Number(row && row.PackageSize || 0);
+  if (!/^https?:\/\//i.test(downloadUrl)
+    || !/^[a-f0-9]{64}$/.test(expectedSha)
+    || expectedSize < 1
+    || expectedSize > 256 * 1024 * 1024) {
+    throw new Error('旧版安装兼容桥缺少安全下载地址、SHA-256 或合法字节数。');
+  }
+  var response = V8.Http.GetResponse({
+    Url: downloadUrl,
+    GetParam: {},
+    Timeout: 600,
+    Headers: { Accept: 'application/json' }
+  });
+  var statusCode = Number(response && response.StatusCode || 0);
+  if (!response || statusCode < 200 || statusCode >= 300) {
+    throw new Error('旧版安装兼容桥下载应用包失败（HTTP ' + statusCode + '）。');
+  }
+  var content = response.Content;
+  if ((!content || !String(content).length) && response.RawBytes && response.RawBytes.Length > 0) {
+    content = System.Text.Encoding.UTF8.GetString(response.RawBytes);
+  }
+  content = String(content || '');
+  var actualSize = Number(System.Text.Encoding.UTF8.GetByteCount(content));
+  var actualSha = trim(V8.EncryptHelper.Sha256Hex(content)).toLowerCase();
+  if (actualSize !== expectedSize || actualSha !== expectedSha) {
+    throw new Error('旧版安装兼容桥下载校验失败：size=' + actualSize + '/' + expectedSize
+      + '，sha256=' + actualSha + '/' + expectedSha);
+  }
+  return content;
 }
 function stripPackage(row) {
   if (!row) return row;
@@ -202,6 +250,10 @@ if (!flag(V8.Param.IncludePackage, true)) {
   if (!hasInstallPackage(selected)) return { Code: 0, Msg: '应用包指针缺少 HDFS 路径、SHA-256 或字节数。' };
   try {
     selected.PackageDownloadUrl = packageDownloadUrl(selected, isPublic);
+    if (!acceptsHdfsPointer()) {
+      selected.AppPakcet = loadPackageBodyFromPointer(selected, selected.PackageDownloadUrl);
+      selected.LegacyPackageHydrated = 1;
+    }
   } catch (downloadError) {
     return { Code: 0, Msg: downloadError.message };
   }

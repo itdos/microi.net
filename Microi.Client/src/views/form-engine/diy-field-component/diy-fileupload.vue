@@ -637,21 +637,27 @@ const openCadPreview = (url, fileName, fileObj) => {
     // 优先用存储路径来计算预览文件路径
     const storagePath = fileObj ? (fileObj.Path || '') : getFileStoragePath();
     const previewStoragePath = getCadPreviewStoragePath(storagePath || url);
+    const isLimit = props.field.Config?.FileUpload?.Limit === true;
     
     if (!previewStoragePath) {
         console.warn('openCadPreview: 无法计算预览路径', { url, storagePath });
         DiyCommon.Tips('无法获取预览文件路径', false);
         return;
     }
-
-    const isLimit = props.field.Config?.FileUpload?.Limit === true;
     
     if (isLimit) {
+        if (!storagePath) {
+            console.warn('openCadPreview: 私有 CAD 预览缺少字段中保存的原文件路径');
+            DiyCommon.Tips('无法确认原始 CAD 文件，已拒绝获取私有预览', false);
+            return;
+        }
         // 私有文件：先获取预览文件的签名URL，再打开
         DiyCommon.Tips('正在获取预览文件...', true);
         DiyCommon.Post(
-            '/api/HDFS/GetPrivateFileUrl',
+            '/apiengine/platform-private-file-url',
             {
+                ResourceKind: 'FormFieldDerivedPreview',
+                OriginalFilePathName: storagePath,
                 FilePathName: previewStoragePath,
                 HDFS: SysConfig.value.HDFS || 'Aliyun',
                 FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
@@ -926,7 +932,7 @@ const setRealPath = (fileId, filePath, isLimit, uploadedPreviewUrl = '') => {
         console.log('【私有文件】设置loading状态');
         
         DiyCommon.Post(
-            '/api/HDFS/GetPrivateFileUrl',
+            '/apiengine/platform-private-file-url',
             {
                 FilePathName: filePath,
                 HDFS: SysConfig.value.HDFS || 'Aliyun',
@@ -1240,7 +1246,7 @@ const GetUploadPath = (field, file) => {
             props.FormDiyTableModel[field.Name + '_' + fileId + '_RealPath'] = './static/img/loading.gif';
             if (filePathName != './static/img/loading.gif' && filePathName != '正在上传中...') {
                 DiyCommon.Post(
-                    '/api/HDFS/GetPrivateFileUrl',
+                    '/apiengine/platform-private-file-url',
                     {
                         FilePathName: filePathName,
                         HDFS: SysConfig.value.HDFS || 'Aliyun',

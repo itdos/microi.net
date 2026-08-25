@@ -181,7 +181,7 @@ async function loadCurrentUserDefinition() {
 
 async function loadCurrentUserRecord() {
   const result = ensureSuccess(
-    await post('/api/SysUser/GetCurrentUser', {}),
+    await post('/apiengine/platform-current-user', {}),
     '当前用户资料加载失败'
   )
   const user = result.Data || {}
@@ -206,11 +206,11 @@ async function saveCurrentUserRecord(context) {
   await attachWeChatContentSecurityLoginCode(payload)
 
   const updateResult = ensureSuccess(
-    await post('/api/SysUser/UptSysUser', payload),
+    await post('/apiengine/platform-sys-user-admin?Action=UptSysUser', payload),
     '个人资料保存失败'
   )
   const refreshResult = ensureSuccess(
-    await post('/api/SysUser/RefreshLoginUser', {}),
+    await post('/apiengine/platform-sys-user-admin?Action=RefreshLoginUser', {}),
     '个人资料已保存，但登录信息刷新失败'
   )
   const refreshedUser = refreshResult.Data || updateResult.Data || {

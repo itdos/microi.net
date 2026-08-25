@@ -673,8 +673,8 @@ if(header){
   //再获取当前登陆身份信息，测试传入header
   var token = header.Value;
   var getCurrentUser = V8.Http.Post({
-    Url: 'http://192.168.0.173:1052/api/SysUser/getCurrentUser',
-    Headers: { authorization : 'Bearer ' + token}
+    Url: 'http://192.168.0.173:1052/apiengine/platform-current-user?OsClient=veken',
+    Headers: { authorization : 'Bearer ' + token, osclient: 'veken', apiengine: '1' }
   });
   return {
     Code : 0, Msg : '获取身份信息成功：' + getCurrentUser

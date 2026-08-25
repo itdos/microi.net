@@ -39,7 +39,7 @@ Token 只用于确认用户和租户。普通帐号不能因为持有 Token 就�
 
 `RichText.Limit=false` 用于官网公告、商品详情等公开正文：图片、视频和附件写入公有桶，正文保存可长期访问的公有 URL。`Limit=true` 用于内部内容：正文只保存 `/__microi_richtext_private__/...` 稳定对象标识，不保存对象存储签名 URL、审计代理 Ticket 或 DiyToken。
 
-查看或编辑已有记录时，富文本组件从真实 `img/video/source.src` 和 `a.href` 收集稳定标识，携带 `FormEngineKey + FormDataId + FieldId + SysMenuId` 调用 `/api/HDFS/GetPrivateFileUrl`。后端重新校验用户、租户、菜单、表、行、字段以及正文中的精确引用，再返回本次页面使用的短效审计代理 URL；关闭后重新打开会换取新地址，因此短效地址过期不会污染数据库内容。历史正文直接保存 FileServer URL 时，后端只对真实媒体属性中的精确同路径引用提供兼容，不把普通文字、`data-href/data-src` 或脚本标签当作授权依据。
+查看或编辑已有记录时，富文本组件从真实 `img/video/source.src` 和 `a.href` 收集稳定标识，携带 `FormEngineKey + FormDataId + FieldId + SysMenuId` 调用 `/apiengine/platform-private-file-url`。后端重新校验用户、租户、菜单、表、行、字段以及正文中的精确引用，再返回本次页面使用的短效审计代理 URL；关闭后重新打开会换取新地址，因此短效地址过期不会污染数据库内容。历史正文直接保存 FileServer URL 时，后端只对真实媒体属性中的精确同路径引用提供兼容，不把普通文字、`data-href/data-src` 或脚本标签当作授权依据。
 
 ::: warning 私有富文本不能直接匿名发布
 外部网站没有当前后台记录的菜单与行权限上下文，不能解析私有标识。需要匿名展示的文章必须由有权发布公有资产的超级管理员把 RichText 配置为公有桶；前端字段配置不能放宽普通帐号的后端上传安全策略。
@@ -215,7 +215,7 @@ latest别名：{tenant}/ai-app-publish/{appKey}/latest/index.html
 
 ### 私有文件必须绑定业务记录
 
-普通用户调用 `/api/HDFS/GetPrivateFileUrl` 时，除文件相对路径外必须提交：
+普通用户调用 `/apiengine/platform-private-file-url` 时，除文件相对路径外必须提交：
 
 | 参数 | 说明 |
 |---|---|

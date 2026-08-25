@@ -130,7 +130,7 @@ export default {
           if (!this.passwordForm.oldPassword) throw new Error('请输入当前密码')
           this.validatePassword(this.passwordForm.newPassword, this.passwordForm.confirmPassword)
           this.submitting = true
-          const result = await post('/api/SysUser/uptsysuser', {
+          const result = await post('/apiengine/platform-sys-user-admin?Action=UptSysUser', {
             Id: this.currentUser.Id,
             Pwd: utf8Base64(this.passwordForm.oldPassword),
             NewPwd: utf8Base64(this.passwordForm.newPassword)

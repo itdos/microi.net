@@ -14,6 +14,22 @@
 >* `主库`即部署平台时`环境变量`或`appsettings.json`中配置的`数据库连接字符串[OsClientDbConn]`
 >* 所有的 **SaaS 路由与部署控制面配置** 以主库 `sys_osclients` 为准，租户库不维护第二份 `sys_osclients` 数据；当前租户自己的业务设置则保存在其租户库的 `sys_config` / `mci_system_setting`，不要与控制面混为一谈
 
+## 官方应用职责边界
+
+SaaS 引擎官方应用继续负责租户发现、公开启动配置、语言包、私有文件授权和租户开通。旧版 UniApp 使用的 `microi-init` 也由该应用以 Managed 策略继续交付：匿名请求只能获得公开系统设置；只有原始 DiyToken 在后端重新验证、用户与请求租户一致后，才返回当前用户和其角色允许的菜单。菜单通过仅绑定该固定 ApiEngineKey 的 `GetLegacyInitMenuTree` 可信原子复用 `SysMenuLogic` 权威角色过滤，不能借匿名 FormEngine 直读 `sys_menu`。域名解析到其它租户时只返回目标 `OsClient` 提示客户端重新初始化，不能在当前匿名 V8 上下文中跨租户读取配置。
+
+其中 `platform-create-tenant` 属于 `app.microi.saas-engine`：接口引擎先调用 `platform-runtime-custom-hook` 的 Before 阶段，再由绑定固定 ApiEngineKey 的可信原子从当前 DiyToken 派生所有者、手机号、姓名和密码材料。租户创建成功后，即使 After Hook 或审计暂时失败，也返回成功和告警，避免客户端重复创建。
+
+系统账号与系统设置已经采用独立单一所有权：
+
+| 官方应用 | 唯一拥有的接口引擎 |
+| --- | --- |
+| `app.microi.sys_user`（系统账号） | `platform-user-update-preferences`、`platform-user-update-profile`、`platform-user-custom-hook` |
+| `app.microi.sys-config`（系统设置） | `platform-tenant-system-settings`、`platform-system-settings-custom-hook` |
+| `app.microi.saas-engine`（SaaS引擎） | `microi-init`、`platform-create-tenant`、`platform-runtime-custom-hook` 及 SaaS 启动/租户运行时能力 |
+
+基础 SaaS 空库包与独立应用可以同时交付同一能力所需的表、字段或初始化模板，以分别覆盖新租户和存量租户；同一个 Managed ApiEngineKey 则只能有一个官方包所有者。SaaS、应用商城和独立应用之间不得复制这些 Key，否则更新顺序会造成官方代码互相覆盖。旧 Controller 路由只承担旧客户端兼容转发，不再承载业务编排。
+
 ## `OsClient`
 >* OsClient 值即为 `SaaS引擎Key`，用于确定租户，值可自定义，建议使用全小写字母，例如 `tenant_a`、`tenant_demo`、`demo01`。
 
@@ -70,6 +86,20 @@
 `mci_system_setting` 只属于后端私密执行面，历史 `IsPublic` 字段已停用，普通值与 Secret 都不会下发浏览器。是否启用、是否显示等公开开关不得放入该表；历史开关仅作新版 `sys_config` 字段缺失时的兼容回退。后端接口引擎/后端 V8 事件通过 `V8.SysConfig.ServerPrivateSettings[ConfigKey]` 按当前租户读取私密参数，Secret 由可信后端解密；该独立节点避免动态 Key 覆盖 `sys_config` 实体字段。后端使用私密值时禁止整体返回节点，Secret 还禁止写入日志、审计或前端可读字段。
 
 Secret 的列表接口只返回“已配置”状态；显示原文需要租户超级管理员先完成 Passkey、Authenticator 或严格人脸二次验证，原文响应禁止缓存并在前端 30 秒后清除，审计只记录 Key/记录 Id/结果，不记录明文。登录方式的完整配置见 [登录方式、Passkey、Authenticator、第三方登录与严格人脸验证](../more/identity-verification)。
+
+### 存量协议网关的租户绑定配置
+
+畅捷通消息回调与旧微信公众号 OAuth 属于仍需 C# 完成解密、验签、一次性 State 和重定向校验的协议边界。为兼容已经存在于 SaaS 引擎【后端运行配置】Tab 的字段，它们继续按**请求对应的 `sys_osclients` 租户行**读取，不使用主租户通用 `AppSettings` / RuntimeConfigurationReader，也不会回退其它租户：
+
+| 网关 | `sys_osclients` 字段 |
+|---|---|
+| 微信 OAuth 重定向策略 | `OAuthReturnUrlOrigins` |
+| 畅捷通 OAuth / 消息回调 | `ChanjetOAuthState`、`ChanjetAesKey`、`ChanjetAppKey` |
+| 历史微信模板消息配置 | `WeChatTemplateAppId`、`WeChatTemplateAppSecret`、`WeChatTemplateId`、`WeChatMiniProgramAppId` |
+
+新登记的畅捷通回调地址应使用 `?OsClient=租户Key`；历史未带参数的单租户回调只兼容当前部署主租户。微信公众号绑定入口以 DiyToken 中的租户为权威，回调以 Redis 一次性票据内的租户为权威，参数中的 `OsClient` / `o` 不能覆盖该可信上下文。绝对返回地址必须精确命中当前租户配置的 HTTPS Origin，站内相对路由继续支持。
+
+`OAuthReturnUrlOrigins` 和 AppId/TemplateId 属于非秘密策略/标识；`OAuthState`、AES Key、AppKey、AppSecret 不会进入 `V8.OsClientModel` 或前端配置，并按 Secret 规则在审计中掩码。整组字段都按租户独立配置且不会复制给新租户。修改 SaaS 租户行后须使用平台保存/刷新链路更新共享 Redis 与本节点租户快照，协议网关每次请求读取最新快照，不保留第二份静态缓存。新的 OAuth/第三方业务集成仍应优先使用当前租户库 `mci_system_setting` 与 Managed 接口引擎，不再扩展这组兼容字段。
 
 ### 微信小程序内容安全配置
 

@@ -13,6 +13,15 @@ namespace Microi.net
     {
         OnlineAiLicenseState GetLicenseState();
 
+        /// <summary>
+        /// 修改当前 V8 租户、当前登录用户自己的对话标题。
+        /// 用户与租户只能来自 V8 执行上下文。
+        /// </summary>
+        Task<DosResult> UpdateConversationTitle(
+            string conversationId,
+            string title,
+            string source);
+
         Task<DosResult> Chat(AiParam param);
 
         Task<DosResult> ChatStream(

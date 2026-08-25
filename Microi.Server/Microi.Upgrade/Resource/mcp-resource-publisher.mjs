@@ -1,12 +1,25 @@
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { access, readFile, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, parse, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { validateOfficialPackageChangeLog } from './resource-sync-core.mjs';
 
 const officialApiBaseUrl = 'https://api.itdos.com';
 const officialOsClient = 'itdos';
 const officialEngineKey = 'get-microi-upgrade-resource';
+const officialApplicationResourceNames = Object.freeze([
+  'app.microi.form-engine.json',
+  'app.microi.module-engine.json',
+  'app.microi.saas-engine.json',
+  'app.microi.sso.json',
+  'app.microi.store.json',
+  'app.microi.sys_user.json',
+  'app.microi.sys-config.json',
+  'app.microi.message-notification.json',
+  'app.microi.ai-engine.json',
+]);
 const officialResourceNames = new Set([
   'import-package.js',
   'ai-app-publish-store.js',
@@ -16,6 +29,10 @@ const officialResourceNames = new Set([
   'app.microi.saas-engine.json',
   'app.microi.sso.json',
   'app.microi.store.json',
+  'app.microi.sys_user.json',
+  'app.microi.sys-config.json',
+  'app.microi.message-notification.json',
+  'app.microi.ai-engine.json',
 ]);
 
 function normalizeApiBaseUrl(value) {
@@ -343,10 +360,288 @@ function validatePublishChanges(changes) {
     if (typeof item.content !== 'string' || !item.content.trim()) {
       throw new Error(`MCP 发布资源内容为空：${item.name}`);
     }
+    validateOfficialPackageChangeLog(item.name, item.content);
     if (!/^[a-f0-9]{64}$/i.test(String(item.expectedRemoteSha256 || ''))) {
       throw new Error(`MCP 发布资源缺少有效的官网 SHA-256：${item.name}`);
     }
   }
+}
+
+function validateReconcileSnapshots(snapshots) {
+  if (!Array.isArray(snapshots) || snapshots.length !== officialApplicationResourceNames.length) {
+    throw new Error(`官方接口投影必须包含全部 ${officialApplicationResourceNames.length} 个应用资源快照`);
+  }
+  const expectedNames = new Set(officialApplicationResourceNames);
+  const seenNames = new Set();
+  const apiEngineKeys = new Set();
+  let managedCount = 0;
+  let createIfMissingCount = 0;
+  for (const snapshot of snapshots) {
+    if (!expectedNames.has(snapshot?.name) || seenNames.has(snapshot?.name)) {
+      throw new Error(`官方接口投影资源名称无效或重复：${snapshot?.name || '(空)'}`);
+    }
+    if (!/^[a-f0-9]{64}$/i.test(String(snapshot.sha256 || ''))) {
+      throw new Error(`官方接口投影资源缺少有效 SHA-256：${snapshot.name}`);
+    }
+    if (!Array.isArray(snapshot.apiEngineKeys)) {
+      throw new Error(`官方接口投影资源缺少 ApiEngineKey 清单：${snapshot.name}`);
+    }
+    seenNames.add(snapshot.name);
+    managedCount += Number(snapshot.managedCount || 0);
+    createIfMissingCount += Number(snapshot.createIfMissingCount || 0);
+    for (const key of snapshot.apiEngineKeys) {
+      const normalized = String(key || '').trim().toLowerCase();
+      if (!normalized || apiEngineKeys.has(normalized)) {
+        throw new Error(`官方接口投影存在跨包重复或空 Key：${key || '(空)'}`);
+      }
+      apiEngineKeys.add(normalized);
+    }
+  }
+  return {
+    packageCount: snapshots.length,
+    managedCount,
+    createIfMissingCount,
+    apiEngineKeys: [...apiEngineKeys].sort(),
+  };
+}
+
+function validateReconcileExecution(execution, expected) {
+  const data = execution?.Data;
+  if (!data || Number(data.PackageCount) !== expected.packageCount
+      || Number(data.ManagedCount) !== expected.managedCount
+      || Number(data.CreateIfMissingCount) !== expected.createIfMissingCount
+      || Number(data.VerifiedApiEngineCount) !== expected.apiEngineKeys.length
+      || !/^[a-f0-9]{64}$/i.test(String(data.ProjectionSha256 || ''))) {
+    throw new Error('官方接口投影返回的包数、策略计数、回读数或摘要不正确');
+  }
+  const actualKeys = Array.isArray(data.ApiEngineKeys)
+    ? data.ApiEngineKeys.map(key => String(key).toLowerCase()).sort()
+    : [];
+  if (JSON.stringify(actualKeys) !== JSON.stringify(expected.apiEngineKeys)) {
+    throw new Error('官方接口投影回读的 ApiEngineKey 闭包与九个已发布应用包不一致');
+  }
+  return data;
+}
+
+const liveApiEngineFields = Object.freeze([
+  'ApiName', 'ApiEngineKey', 'ApiAddress', 'IsEnable', 'ApiRole',
+  'AllowAnonymous', 'Files', 'Category', 'EnableLog', 'StopHttp', 'Timeout',
+  'MaxStatements', 'LimitMemory', 'LimitRecursion', 'Lock', 'LockKey', 'ResponseFile',
+  'ResponseType', 'TestParam', 'ApiRemark', 'V8Limit', 'V8Unlimited', 'Version',
+  'ChangeHistory',
+]);
+const liveApiEngineDefaults = Object.freeze({
+  IsEnable: 1,
+  ApiRole: '[]',
+  AllowAnonymous: 0,
+  Files: '[]',
+  Category: '',
+  EnableLog: 0,
+  StopHttp: 0,
+  Timeout: 600,
+  MaxStatements: 100000000,
+  LimitMemory: 2048,
+  LimitRecursion: 5000,
+  Lock: 0,
+  LockKey: '',
+  ResponseFile: 0,
+  ResponseType: '',
+  TestParam: '',
+  ApiRemark: '',
+  V8Limit: 0,
+  V8Unlimited: 0,
+  ChangeHistory: '',
+});
+const numericLiveApiEngineFields = new Set([
+  'IsEnable', 'AllowAnonymous', 'EnableLog', 'StopHttp', 'Timeout',
+  'MaxStatements', 'LimitMemory', 'LimitRecursion', 'Lock', 'ResponseFile',
+  'V8Limit', 'V8Unlimited', 'IsDeleted',
+]);
+
+function parseRawJsonToolResult(toolResult, operation) {
+  const output = collectText(toolResult).trim();
+  if (toolResult?.isError) {
+    throw new Error(`通过 microi_itdos MCP ${operation}失败：${output || '未知错误'}`);
+  }
+  try {
+    return JSON.parse(output);
+  } catch (error) {
+    throw new Error(`通过 microi_itdos MCP ${operation}失败：返回值不是完整 JSON`, { cause: error });
+  }
+}
+
+async function callCodexTool(client, action, params, operation, timeoutMilliseconds = 60_000) {
+  const result = await client.request('tools/call', {
+    name: 'microi_codex',
+    arguments: { action, params },
+  }, timeoutMilliseconds);
+  return { result, operation };
+}
+
+function normalizeComparableLiveValue(name, value) {
+  if (numericLiveApiEngineFields.has(name)) return Number(value || 0);
+  if (value && typeof value === 'object') return JSON.stringify(value);
+  return String(value ?? '');
+}
+
+function parseVersionFromSource(source) {
+  return String(source || '').match(/\bVersion\s*:\s*(v?\d+\.\d+\.\d+)\b/i)?.[1] || '';
+}
+
+function buildExpectedLiveEngine(source) {
+  const expected = { Id: String(source?.Id || ''), IsDeleted: 0 };
+  for (const fieldName of liveApiEngineFields) {
+    let value = source?.[fieldName];
+    if (fieldName === 'ApiName' && String(value ?? '') === '') {
+      value = source?.Name || source?.ApiEngineKey;
+    }
+    if (fieldName === 'Version' && String(value ?? '') === '') {
+      value = parseVersionFromSource(source?.ApiV8Code);
+    }
+    if (value == null && Object.hasOwn(liveApiEngineDefaults, fieldName)) {
+      value = liveApiEngineDefaults[fieldName];
+    }
+    if (value != null) expected[fieldName] = value;
+  }
+  return expected;
+}
+
+function collectExpectedProjectionEngines(snapshots) {
+  const projections = [];
+  for (const snapshot of snapshots) {
+    if (!Array.isArray(snapshot.apiEngines)
+        || snapshot.apiEngines.length !== snapshot.apiEngineKeys.length) {
+      throw new Error(`官方接口投影快照缺少可用于超时回读的完整接口模型：${snapshot.name}`);
+    }
+    for (const item of snapshot.apiEngines) {
+      const key = String(item?.engine?.ApiEngineKey || '').trim();
+      if (!key || !['Managed', 'CreateIfMissing'].includes(item?.policy)) {
+        throw new Error(`官方接口投影超时回读模型无效：${snapshot.name} -> ${key || '(空)'}`);
+      }
+      projections.push({ packageName: snapshot.name, key, ...item });
+    }
+  }
+  return projections;
+}
+
+async function readLiveEngineMetadata(client, projections) {
+  const fields = ['Id', 'IsDeleted', ...liveApiEngineFields];
+  const rows = [];
+  const batchSize = 10;
+  for (let offset = 0; offset < projections.length; offset += batchSize) {
+    const keys = projections.slice(offset, offset + batchSize).map(item => item.key);
+    const operation = `回读官网 live 接口元数据 ${offset / batchSize + 1}`;
+    const { result } = await callCodexTool(
+      client,
+      'microi_get_table_data',
+      {
+        tableName: 'sys_apiengine',
+        query: {
+          _Where: [['ApiEngineKey', 'In', keys]],
+          _SelectFields: fields,
+          _PageIndex: 1,
+          _PageSize: batchSize + 1,
+        },
+      },
+      operation,
+    );
+    const page = parseRawJsonToolResult(result, operation);
+    if (!Array.isArray(page)) throw new Error(`${operation}失败：返回值不是数组`);
+    rows.push(...page);
+  }
+  return rows;
+}
+
+function parseSourceSha256(toolResult, operation) {
+  const output = collectText(toolResult);
+  if (toolResult?.isError) {
+    throw new Error(`通过 microi_itdos MCP ${operation}失败：${output || '未知错误'}`);
+  }
+  const match = output.match(/Full source SHA-256:\s*([a-f0-9]{64})/i);
+  if (!match) throw new Error(`通过 microi_itdos MCP ${operation}失败：缺少完整源码 SHA-256`);
+  return match[1].toLowerCase();
+}
+
+async function readManagedSourceHashes(client, projections) {
+  const managed = projections.filter(item => item.policy === 'Managed');
+  const hashes = new Map();
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < managed.length) {
+      const current = managed[cursor++];
+      const operation = `回读官网 live 接口源码摘要 ${current.key}`;
+      const { result } = await callCodexTool(
+        client,
+        'microi_get_engine_code',
+        { apiEngineKey: current.key, charOffset: 0, maxChars: 1000 },
+        operation,
+      );
+      hashes.set(current.key.toLowerCase(), parseSourceSha256(result, operation));
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(6, managed.length) }, worker));
+  return hashes;
+}
+
+async function recoverReconcileAfterAmbiguousTimeout(client, snapshots, originalError) {
+  if (!/(?:HTTP\s*524|Origin Time-out|timed?\s*out|timeout)/i.test(String(originalError?.message || ''))) {
+    throw originalError;
+  }
+  const projections = collectExpectedProjectionEngines(snapshots);
+  const [rows, sourceHashes] = await Promise.all([
+    readLiveEngineMetadata(client, projections),
+    readManagedSourceHashes(client, projections),
+  ]);
+  const byKey = new Map();
+  for (const row of rows) {
+    const key = String(row?.ApiEngineKey || '').toLowerCase();
+    if (!key || byKey.has(key)) throw new Error(`官网 live 接口超时回读存在空 Key 或重复 Key：${key || '(空)'}`);
+    byKey.set(key, row);
+  }
+  const projectionRows = [];
+  for (const projection of projections) {
+    const normalizedKey = projection.key.toLowerCase();
+    const current = byKey.get(normalizedKey);
+    if (!current) throw new Error(`官网 live 接口超时回读缺少：${projection.key}`, { cause: originalError });
+    if (projection.policy === 'Managed') {
+      const expected = buildExpectedLiveEngine(projection.engine);
+      for (const fieldName of ['Id', 'IsDeleted', ...liveApiEngineFields]) {
+        if (expected[fieldName] == null) continue;
+        if (normalizeComparableLiveValue(fieldName, current[fieldName])
+            !== normalizeComparableLiveValue(fieldName, expected[fieldName])) {
+          throw new Error(`官网 Managed 接口超时回读不一致：${projection.key}.${fieldName}`, { cause: originalError });
+        }
+      }
+      const expectedSourceHash = createHash('sha256')
+        .update(String(projection.engine.ApiV8Code || ''), 'utf8').digest('hex');
+      if (sourceHashes.get(normalizedKey) !== expectedSourceHash) {
+        throw new Error(`官网 Managed 接口超时回读源码不一致：${projection.key}`, { cause: originalError });
+      }
+      projectionRows.push(
+        `${projection.key}|Managed|${expectedSourceHash}|${String(expected.Version || '')}`
+        + `|${String(expected.ApiAddress || '')}|${String(expected.Id || '')}`,
+      );
+    } else {
+      projectionRows.push(`${projection.key}|CreateIfMissing|present`);
+    }
+  }
+  projectionRows.sort();
+  const expected = validateReconcileSnapshots(snapshots);
+  return {
+    PackageCount: expected.packageCount,
+    ManagedCount: expected.managedCount,
+    CreateIfMissingCount: expected.createIfMissingCount,
+    ManagedCreated: 0,
+    ManagedUpdated: 0,
+    ManagedUnchanged: expected.managedCount,
+    TenantHookCreated: 0,
+    TenantHookPreserved: expected.createIfMissingCount,
+    VerifiedApiEngineCount: projectionRows.length,
+    ProjectionSha256: createHash('sha256').update(projectionRows.join('\n'), 'utf8').digest('hex'),
+    ApiEngineKeys: projectionRows.map(row => row.split('|')[0]),
+    PackageHashes: Object.fromEntries(snapshots.map(item => [item.name, item.sha256])),
+    RecoveredAfterAmbiguousTimeout: true,
+  };
 }
 
 function createLineJsonRpcClient(server, configPath) {
@@ -532,5 +827,28 @@ export async function publishResourcesViaConfiguredMcp(changes, options = {}) {
       })),
     }, '发布官网升级资源');
     return { configPath, resourceCount: changes.length };
+  });
+}
+
+export async function reconcilePublishedApiEnginesViaConfiguredMcp(snapshots, options = {}) {
+  const expected = validateReconcileSnapshots(snapshots);
+  return withConfiguredItDosMcp(options, async (client, configPath) => {
+    let data;
+    try {
+      const execution = await callOfficialResourceEngine(client, {
+        Action: 'ReconcilePublishedApiEngines',
+        Resources: snapshots.map(item => ({
+          Name: item.name,
+          ExpectedSha256: item.sha256,
+        })),
+      }, '投影并回读官网 live 接口引擎');
+      data = validateReconcileExecution(execution, expected);
+    } catch (error) {
+      data = await recoverReconcileAfterAmbiguousTimeout(client, snapshots, error);
+    }
+    return {
+      configPath,
+      ...data,
+    };
   });
 }

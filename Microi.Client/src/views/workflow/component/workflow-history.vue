@@ -175,50 +175,39 @@ export default {
                             }
                         });
                         //获取头像。也可以改为服务器端处理，但无法使用inner join user表解决问题，因为还有CopyUsers、Receivers等JSON里面的用户头像。
-                        self.DiyCommon.Post("/api/SysUser/GetSysUserPublicInfo", { Ids: userIds }, function (result3) {
-                            if (self.DiyCommon.Result(result3)) {
-                                result2.Data.forEach((history) => {
-                                    var searchUser = _.where(result3.Data, {
-                                        Id: history.SenderId
-                                    });
-                                    if (searchUser && searchUser.length > 0) {
-                                        if (!self.DiyCommon.IsNull(searchUser[0].Avatar)) {
-                                            history.SenderAvatar = self.DiyCommon.GetServerPath(searchUser[0].Avatar);
-                                        } else {
-                                            history.SenderAvatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
-                                        }
-                                    }
-                                    history.CopyUsers.forEach((copyUser) => {
-                                        var searchUser = _.where(result3.Data, {
-                                            Id: copyUser.Id
-                                        });
-                                        if (searchUser && searchUser.length > 0) {
-                                            if (!self.DiyCommon.IsNull(searchUser[0].Avatar)) {
-                                                copyUser.Avatar = self.DiyCommon.GetServerPath(searchUser[0].Avatar);
-                                            } else {
-                                                copyUser.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
-                                            }
-                                        }
-                                    });
-                                    history.Receivers.forEach((copyUser) => {
-                                        var searchUser = _.where(result3.Data, {
-                                            Id: copyUser.Id
-                                        });
-                                        if (searchUser && searchUser.length > 0) {
-                                            if (!self.DiyCommon.IsNull(searchUser[0].Avatar)) {
-                                                copyUser.Avatar = self.DiyCommon.GetServerPath(searchUser[0].Avatar);
-                                            } else {
-                                                copyUser.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
-                                            }
-                                        }
-                                    });
-                                });
+                        self.DiyCommon.Post("/apiengine/platform-sys-user-public-info", { Ids: userIds }, async function (result3) {
+                            try {
+                                var userList = self.DiyCommon.Result(result3) && Array.isArray(result3.Data)
+                                    ? result3.Data
+                                    : [];
+                                await Promise.all(result2.Data.map(async (history) => {
+                                    var sender = _.where(userList, { Id: history.SenderId })[0];
+                                    history.SenderAvatar = await self.ResolveWorkflowUserAvatar(sender);
+                                    await Promise.all(history.CopyUsers.map(async (copyUser) => {
+                                        var user = _.where(userList, { Id: copyUser.Id })[0];
+                                        copyUser.Avatar = await self.ResolveWorkflowUserAvatar(user || copyUser);
+                                    }));
+                                    await Promise.all(history.Receivers.map(async (copyUser) => {
+                                        var user = _.where(userList, { Id: copyUser.Id })[0];
+                                        copyUser.Avatar = await self.ResolveWorkflowUserAvatar(user || copyUser);
+                                    }));
+                                }));
                                 self.WFHistoryList = result2.Data;
+                            } finally {
                                 loadingHistoryList.close();
                             }
                         });
                     }
                 });
+            }
+        },
+        async ResolveWorkflowUserAvatar(user) {
+            var fallback = this.DiyCommon.GetServerPath("./static/img/icon/personal.png");
+            if (!user || this.DiyCommon.IsNull(user.Avatar) || this.DiyCommon.IsNull(user.Id)) return fallback;
+            try {
+                return (await this.DiyCommon.GetUserAvatarUrl(user.Avatar, user.Id)) || fallback;
+            } catch (error) {
+                return fallback;
             }
         },
         GetApprovalTypeStr(history) {

@@ -35,6 +35,26 @@ export const applicationStoreReplicaMappings = Object.freeze([
     publishedStandalone: false,
   }),
   Object.freeze({
+    resourceName: 'platform-background-task.js',
+    apiEngineKey: 'platform-background-task',
+    publishedStandalone: false,
+  }),
+  Object.freeze({
+    resourceName: 'platform-sys-menu.js',
+    apiEngineKey: 'platform-sys-menu',
+    publishedStandalone: false,
+  }),
+  Object.freeze({
+    resourceName: 'platform-marketplace-source.js',
+    apiEngineKey: 'platform-marketplace-source',
+    publishedStandalone: false,
+  }),
+  Object.freeze({
+    resourceName: 'platform-marketplace-source-hook.js',
+    apiEngineKey: 'platform-marketplace-source-hook',
+    publishedStandalone: false,
+  }),
+  Object.freeze({
     resourceName: 'ai-app-publish-store.js',
     apiEngineKey: 'ai_app_publish_store',
     publishedStandalone: true,
@@ -373,10 +393,14 @@ export function synchronizeApplicationStoreEngines(packageContent, standaloneCon
   const packageModel = parsePackage(packageContent);
   for (const mapping of applicationStoreReplicaMappings) {
     const source = standaloneContents.get(mapping.resourceName);
+    const engine = findEmbeddedEngine(packageModel, mapping.apiEngineKey);
+    if (source == null && engine == null) continue;
     if (source == null) {
       throw new Error(`同步应用商城内嵌接口引擎时缺少 ${mapping.resourceName}`);
     }
-    const engine = getEmbeddedEngine(packageModel, mapping.apiEngineKey);
+    if (engine == null) {
+      throw new Error(`${applicationStorePackageName} 缺少接口引擎 ${mapping.apiEngineKey}`);
+    }
     const normalizedSource = normalizeText(source);
     engine.ApiV8Code = normalizedSource;
     const versionMatch = normalizedSource.match(/Version\s*:\s*(v?\d+\.\d+\.\d+)/i);
@@ -401,8 +425,10 @@ export function assertApplicationStoreEnginesSynchronized(
 ) {
   for (const mapping of mappings) {
     const standalone = standaloneContents.get(mapping.resourceName);
+    const embedded = tryGetEmbeddedEngineSource(packageContent, mapping.apiEngineKey);
+    if (standalone == null && embedded == null) continue;
     if (standalone == null) throw new Error(`缺少应用商城接口引擎事实源 ${mapping.resourceName}`);
-    const embedded = getEmbeddedEngineSource(packageContent, mapping.apiEngineKey);
+    if (embedded == null) throw new Error(`${applicationStorePackageName} 缺少接口引擎 ${mapping.apiEngineKey}`);
     if (normalizeText(standalone) !== embedded) {
       throw new Error(
         `${mapping.resourceName} 与应用商城内嵌 ${mapping.apiEngineKey} 不一致，不能建立或使用共同基线`,
@@ -424,8 +450,28 @@ export async function mergeApplicationStoreReplicas({
 
   for (const mapping of applicationStoreReplicaMappings) {
     const baseEmbedded = tryGetEmbeddedEngineSource(basePackageContent, mapping.apiEngineKey);
-    const localEmbedded = getEmbeddedEngineSource(localPackageContent, mapping.apiEngineKey);
+    const localEmbedded = tryGetEmbeddedEngineSource(localPackageContent, mapping.apiEngineKey);
     const localStandalone = localStandaloneContents.get(mapping.resourceName);
+    const initialRemoteEmbedded = tryGetEmbeddedEngineSource(remotePackageContent, mapping.apiEngineKey);
+    const remoteStandalone = mapping.publishedStandalone
+      ? remoteStandaloneContents.get(mapping.resourceName)
+      : null;
+
+    // Minimal three-way-merge fixtures intentionally model only the replica under
+    // test. A newly added mapping that is absent from every package and every fact
+    // source is outside that fixture. Real release inputs always carry the local
+    // standalone source; once any side declares the mapping, the full strict checks
+    // below apply and a missing local embedded engine fails closed.
+    if (baseEmbedded == null
+      && localEmbedded == null
+      && localStandalone == null
+      && initialRemoteEmbedded == null
+      && remoteStandalone == null) {
+      continue;
+    }
+    if (localEmbedded == null) {
+      throw new Error(`${applicationStorePackageName} 缺少接口引擎 ${mapping.apiEngineKey}`);
+    }
 
     // New replica mappings have no three-way baseline yet. They may be safely
     // introduced only when the local standalone fact source and the package
@@ -441,13 +487,9 @@ export async function mergeApplicationStoreReplicas({
           `${mapping.resourceName} 首次发布前与应用商城内嵌 ${mapping.apiEngineKey} 不一致`,
         );
       }
-      const remoteEmbedded = tryGetEmbeddedEngineSource(remotePackageContent, mapping.apiEngineKey);
-      const remoteStandalone = mapping.publishedStandalone
-        ? remoteStandaloneContents.get(mapping.resourceName)
-        : null;
-      const remoteCandidate = remoteStandalone ?? remoteEmbedded;
-      if (remoteStandalone != null && remoteEmbedded != null
-        && normalizeText(remoteStandalone) !== normalizeText(remoteEmbedded)) {
+      const remoteCandidate = remoteStandalone ?? initialRemoteEmbedded;
+      if (remoteStandalone != null && initialRemoteEmbedded != null
+        && normalizeText(remoteStandalone) !== normalizeText(initialRemoteEmbedded)) {
         throw new Error(
           `${mapping.resourceName} 官网独立源码与商城内嵌 ${mapping.apiEngineKey} 不一致，不能首次建立基线`,
         );

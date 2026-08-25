@@ -133,7 +133,7 @@ var url = V8.Method.GetPrivateFileUrl({
 // 后端审计代理 URL，过期不可访问；真实对象存储签名 URL 不会返回前端
 ```
 
-- 普通客户端调用 `/api/HDFS/GetPrivateFileUrl` 时，不能只提交 `FilePathName`，必须同时提交 `FormEngineKey`、`FormDataId`、`FieldId`、`SysMenuId`。服务端校验菜单、菜单绑定表、记录数据范围、字段归属以及字段值确实引用该路径后，才签发临时票据。
+- 普通客户端调用 `/apiengine/platform-private-file-url` 时，不能只提交 `FilePathName`，必须同时提交 `FormEngineKey`、`FormDataId`、`FieldId`、`SysMenuId`。服务端校验菜单、菜单绑定表、记录数据范围、字段归属以及字段值确实引用该路径后，才签发临时票据；旧 Controller 路由仅作兼容转发，新代码禁止继续引用。
 - `FieldId` 必须属于目标表，且组件为 `FileUpload`、`ImgUpload` 或 `RichText`；`SysMenuId` 必须是当前用户真实拥有、并绑定目标表的菜单。RichText 还必须在真实 `img/video/source.src` 或 `a.href` 中精确引用请求路径，普通文字、`data-*` 和脚本标签不算授权依据。
 - 普通用户禁止通过该入口直接取得私有文件 `Byte` / `Stream`。签发失败时不能回退裸路径、真实对象存储签名地址或公有 URL。
 - 私有文件访问必须经过后端短期票据代理：签发链接时记录当前登录用户，实际 `GET/HEAD` 打开或下载时再记录一次访问行为；支持 `Range` 流式响应，并对同一次分片请求做短时去重，不能把文件完整读入内存。

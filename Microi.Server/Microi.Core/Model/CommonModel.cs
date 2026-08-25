@@ -167,6 +167,23 @@ namespace Microi.net
         public string FormDataId { get; set; }
         public string FormEngineKey { get; set; }
         /// <summary>
+        /// 私有文件的权威资源类型。空值兼容为 FormField；其它当前仅允许
+        /// UserAvatar、MenuImportTemplate、DeptImportTemplate、FileManagerObject、
+        /// FormFieldDerivedPreview。
+        /// </summary>
+        public string ResourceKind { get; set; }
+        /// <summary>
+        /// 特殊资源的权威记录 Id（sys_user/sys_menu/sys_dept.Id）；
+        /// FileManagerObject 使用文件柜列表返回的大小写原样对象 Key。
+        /// 服务端会回查记录字段或对象存储并精确匹配 FilePathName，不能只凭路径签名。
+        /// </summary>
+        public string ResourceId { get; set; }
+        /// <summary>
+        /// FormFieldDerivedPreview 的权威原文件路径。服务端先确认业务字段精确引用
+        /// 此路径，再按 CAD 转换器同源规则唯一重算 FilePathName。
+        /// </summary>
+        public string OriginalFilePathName { get; set; }
+        /// <summary>
         /// 发起文件访问的菜单上下文。非超级管理员读取私有文件时必传，
         /// 服务端会同时校验菜单授权、绑定表、业务记录和文件字段引用。
         /// </summary>

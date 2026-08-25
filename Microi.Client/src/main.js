@@ -602,7 +602,7 @@ initApp().then(async function () {
     reportApiServiceFailure(error, {
         apiBase: failedApiBase,
         osClient: failedOsClient,
-        url: error?.config?.url || (failedApiBase ? failedApiBase + "/api/FormEngine/GetSysConfig" : "")
+        url: error?.config?.url || (failedApiBase ? failedApiBase + "/apiengine/platform-sys-config" : "")
     });
     window.__MICROI_APP_BOOT_ERROR__ = error?.message || String(error || "应用初始化失败");
     dispatchMicroiBootEvent("microi:app-boot-failed", {

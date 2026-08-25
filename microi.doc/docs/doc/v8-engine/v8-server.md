@@ -439,6 +439,16 @@ var result = await V8.ApiEngine.RunAsync('ApiEngineKey', { Id: id });
 var currentTokenObj = V8.Method.GetCurrentToken(token, osClient)
 // { OsClient:'', CurrentUser:{}, Token:'不包含 Bearer ' } 或 null
 
+// 当前用户资料或权限已提交后刷新登录投影；osClient 只是当前租户一致性断言
+var refreshLogin = V8.Method.RefreshLoginUser(V8.CurrentUser.Id, V8.OsClient);
+
+// 仅兼容历史 microi-init 的 body Token：必须传原始 Token，宿主会重新权威验证
+var legacyRefresh = V8.Method.RefreshLoginUser(
+    tokenResult.CurrentUser.Id,
+    V8.OsClient,
+    V8.Param.Token
+);
+
 var id = V8.Method.NewUlid();
 var timestamp = V8.Method.GetTimestamp();
 
@@ -471,7 +481,56 @@ var plainText = V8.Method.UnprotectApiEngineSecret(cipher);
 
 `GetDirectTableGrantPolicies()` 返回平台统一维护的表直连授权模式和允许操作。它只供角色管理等可信后端表单事件校验，不能替代当前用户、菜单、表和行级权限判断，也不能直接作为匿名业务接口返回。
 
+`RefreshLoginUser(userId, osClient?, token?)` 是登录身份投影刷新原子，不是按调用方参数任意重载租户缓存的工具。有效租户只来自当前 V8 上下文、已认证 DiyToken，或宿主为可信表事件/升级任务显式建立的“用户 + 租户”作用域；`osClient` 仅作兼容一致性断言，不一致时失败关闭。
+
+普通用户只能刷新本人，同租户平台超级管理员经主库复核后才可刷新其他用户；访问密钥、匿名/空身份和跨租户调用均拒绝。宿主查询 `sys_user`、角色权限与读写登录缓存时始终使用同一个规范化租户，避免把一个租户的用户投影写入另一个租户。主写入已经提交时，刷新失败应作为 Warning 返回，不能把已完成业务伪装成失败并诱导客户端重试。
+
+第三参 `token` 只用于兼容历史 `microi-init` 把 Token 放在请求体、未发送 `Authorization` Header 的客户端。它必须是原始 Bearer 凭据；宿主会在 `RefreshLoginUser` 内重新调用 DiyToken 权威验证，并要求 Token 恢复出的租户和用户与当前 V8 租户、`osClient` 一致性断言及 `userId` 完全一致。伪造、失效、跨租户或“管理员 Token 刷新别人”均失败，且不会回退当前 ambient 身份。`V8.Method.GetCurrentToken(...)` 返回的对象不能作为第三参或认证证明。
+
 `ProtectApiEngineSecret(plainText)` / `UnprotectApiEngineSecret(cipherText)` 只允许在后端接口引擎上下文调用。宿主把密文同时绑定当前租户与当前 `ApiEngineKey`，调用方不能传入 OsClient、密钥或 Purpose，也不会获得派生密钥。适用于远程连接密码、短期刷新 Token 等“业务明确需要再次读取”的接口私有凭据；列表必须继续脱敏，读取动作仍要执行当前用户、行归属和权限校验，禁止把解密结果写日志、审计或返回无权前端。接口引擎改 Key 后旧密文不可解，因此升级已有 Managed 引擎时应保持 Key 稳定。
+
+### 平台启动与私有文件可信原子
+
+官网 PC、UniApp 与微服务的运行时启动能力已经迁入“SaaS引擎”官方应用。新客户端使用以下稳定接口引擎地址；历史 Controller 路由只作为旧客户端兼容入口，不应再被新代码引用：
+
+| 接口引擎 | 鉴权 | 返回边界 |
+|---|---|---|
+| `platform-os-client-by-domain` | 匿名 | 只返回匹配的 `OsClient` |
+| `platform-sys-config` | 匿名 | 只返回浏览器安全系统设置投影，绝不返回 `ServerPrivateSettings` 或密钥 |
+| `platform-lang-bundle` | 匿名 | 返回当前租户、指定语言和前缀的词条 |
+| `platform-login-wallpapers` | 匿名 | 最多返回 200 条启用壁纸的 `Id/Name/Category/ImgUrl` 投影 |
+| `microi-init` | 匿名启动；用户/菜单需请求体原始 DiyToken 重验 | 兼容旧 UniApp 的 `OsClient/SysConfig/DateTimeNow/CurrentUser/Token/ModuleList` 聚合；禁止匿名跨租户读配置，菜单按角色过滤 |
+| `platform-current-user` | DiyToken；访问密钥只允许自省 | 只返回宿主恢复的 `V8.CurrentUser` |
+| `platform-private-file-url` | DiyToken 或具备 `file:read` 的访问密钥 | 重算租户、菜单、表、行、字段和对象引用后签发短效代理地址 |
+| `platform-sys-user-public-info` | DiyToken | 分页返回 `Id/Name/Avatar` 最小公共投影 |
+
+`platform-private-file-url` 不接受“已登录即可签任意路径”。`FormField` 必须提交菜单、表、记录和字段四元组并命中字段原值；`FormFieldDerivedPreview` 还必须提交字段保存的原文件，宿主只重算 DWG→`_preview.dxf`、STEP/STP→`_preview.stl` 的唯一同目录派生对象；`FileManagerObject` 要求单个大小写精确对象 Key、能力探针返回的当前租户文件柜菜单、对象实际存在，并且只接受平台超级管理员 DiyToken，访问密钥即使带 `file:read` 也不能打开文件柜对象。
+
+其中涉及宿主秘密、不可伪造状态或受限匿名投影的能力分别使用 `V8.Method.ResolveOsClientByDomain`、`GetPublicSysConfig`、`GetLangBundle`、`GetLoginWallpapers`、`GetLegacyInitMenuTree` 和 `GetAuthorizedPrivateFileUrl`。这些不是通用 V8 API：宿主会同时校验当前 `OsClient` 与固定 `ApiEngineKey`，其它接口引擎、表单事件或直接调用一律失败关闭。`GetLegacyInitMenuTree(rawToken, osClient?)` 只允许 `microi-init` 调用，内部再次验证原始 DiyToken、拒绝访问密钥与跨租户请求，并用 `SysMenuLogic.GetSysMenuStep` 按权威角色权限构树；它不是通用菜单查询器。`GetLoginWallpapers` 在 Core 内固定查询启用且未删除的壁纸，只投影 `Id/Name/Category/ImgUrl` 并限制 200 条；它不会、也不要求把 `diy_wallpaper.IsAnonymousRead` 打开。公共用户目录继续由已鉴权的 Managed 接口使用 FormEngine 做固定投影与有界分页。
+
+需要鉴权且允许个性化扩展的 Managed 接口会调用 `platform-runtime-custom-hook`。匿名启动接口（包括登录壁纸和 `microi-init`）不调用租户 Hook，避免匿名请求触发写表、通知或外呼副作用；`microi-init` 即使携带有效 Token，也只执行固定兼容聚合，不把 Token、用户投影或菜单交给租户 Hook。该 Hook 以 `CreateIfMissing` 首次创建，默认只有 `return { Code : 1 };`，之后归租户维护且官方升级不会覆盖。官方 Managed 接口顶部会明确提示其所属应用；从可信官方源安装、更新或重新安装应用会恢复官方代码，因此个性化逻辑必须写入 Hook，不能直接修改 Managed 接口。Hook 只接收阶段、来源 Key、当前用户 Id 或结果数量等脱敏元数据，不得传入 DiyToken、密码、Secret、原始 SSO 断言或私有文件短链。
+
+### 系统账号与租户设置可信原子
+
+用户资料、用户偏好、租户开通和非 Secret 系统设置同样采用“Managed 编排 + 最小可信原子 + CreateIfMissing Hook”：
+
+| Managed 接口 | 官方应用 / Hook | 可信原子边界 |
+| --- | --- | --- |
+| `platform-create-tenant` | SaaS引擎 / `platform-runtime-custom-hook` | `AuthorizeCurrentUserTenantProvisioning`、`ProvisionCurrentUserTenant` 从可信当前用户派生所有者与密码材料 |
+| `platform-user-update-preferences` | 系统账号 / `platform-user-custom-hook` | 固定当前 `V8.CurrentUser.Id` 和界面偏好白名单 |
+| `platform-user-update-profile` | 系统账号 / `platform-user-custom-hook` | `PrepareCurrentUserProfileUpdate` 固定当前用户并校验租户头像目录 |
+| `platform-sys-user-admin` | 系统账号 / `platform-user-custom-hook` | `ManageSysUserAdmin` 固定租户与身份，复核表权限、角色层级、改密 step-up、内容安全和会话吊销；授权预检返回规范化 `ChangesPassword`，V8 不自行解析密码字段 |
+| `platform-tenant-system-settings` | 系统设置 / `platform-system-settings-custom-hook` | `ValidateTenantSystemSettingsOperation` 与 `GetTenantSystemSettingsSecurityProjection` 只允许超级管理员管理非 Secret 值 |
+
+这些可信方法只允许表中指定的固定 ApiEngineKey 调用，并重复校验当前租户、DiyToken 用户和访问密钥会话，不能作为普通 V8 方法复用。租户 Hook 只收到安全最小投影；Before Hook 可以阻断，主写入完成后的 After Hook、登录投影刷新或审计失败只能返回 Warning，不能把已完成结果改成失败并诱导重试。
+
+密码哈希/重置、DiyToken 签发、管理员查看历史密码、Secret/Sensitive Key 加密保存以及 `GetRevealChallenge + Reveal` 的一次性步进验证继续留在可信 C#。V8 不获得密码材料、`SecretCipher`、通用解密器或 Reveal 原子。
+
+### 官方升级资源发布可信授权
+
+`get-microi-upgrade-resource` 的固定白名单读取保持匿名兼容；只有 `Publish/PublishBatch` 写入分支调用 `V8.Method.AuthorizeOfficialResourcePublish()`。该方法不是通用管理员判断 API，只允许同名官方 Managed 接口调用，并同时固定 `iTdos` 官方租户、拒绝访问密钥会话、验证 DiyToken 身份，再从租户主库复核用户、状态和平台管理员角色仍有效。资源 JSON 校验、SHA256 乐观锁、固定顺序事务行锁、写入、精确选择元数据同步及发布后哈希回读继续由接口引擎编排。
+
+不得用 `V8.CurrentUser.Level >= 9999` 代替该控制面授权：Level 是登录投影，可能在角色降级后短暂陈旧；也不得把 `AuthorizeOfficialResourcePublish` 暴露给其它接口引擎、表单事件或租户 Hook。
 
 ### 系统日志/监控可信原子
 
@@ -1119,7 +1178,7 @@ V8.MongoDb.AddFormData({
 	}
 });
 ```
-### 修改数据 DelFormData
+### 修改数据 UptFormData
 ```javascript
 V8.MongoDb.UptFormData({
 	DbName : '', //数据库名称，如：sys_log_2024
@@ -1132,6 +1191,24 @@ V8.MongoDb.UptFormData({
 	}
 });
 ```
+
+### 按条件批量修改 UptFormDataByWhere
+
+```javascript
+var result = V8.MongoDb.UptFormDataByWhere({
+  DbName: 'diy_chat_' + V8.OsClient.toLowerCase(),
+  TableName: 'chat_' + DateNow('yyyy'),
+  _Where: [
+    ['FromUserId', '=', V8.Param.PeerUserId],
+    ['ToUserId', '=', V8.CurrentUser.Id],
+    ['IsRead', '=', false]
+  ],
+  _FormData: { IsRead: true }
+});
+```
+
+`_Where` 必须是至少包含一个有效条件的参数化数组；空条件、无效字段或操作符会失败关闭，不会退化为全集合修改。`_FormData` 不得修改 `_id` 及其子路径。成功返回 `MatchedCount` 和 `ModifiedCount`。
+
 ### 删除数据 DelFormData
 ```javascript
 V8.MongoDb.DelFormData({
@@ -1141,6 +1218,21 @@ V8.MongoDb.DelFormData({
 });
 ```
 
+### 按条件批量删除 DelFormDataByWhere
+
+```javascript
+var result = V8.MongoDb.DelFormDataByWhere({
+  DbName: 'diy_chat_' + V8.OsClient.toLowerCase(),
+  TableName: 'chat_last_contact',
+  _Where: [
+    ['UserId', '=', V8.CurrentUser.Id],
+    ['ContactUserId', '=', V8.Param.PeerUserId]
+  ]
+});
+```
+
+此方法同样强制非空 `_Where`，成功返回 `DeletedCount`。删除业务必须把当前用户、权威资源 Id 等边界写入条件，不得仅依赖前端传入的行 Id。
+
 ### 查询数据列表 GetTableData
 ```javascript
 V8.MongoDb.GetTableData({
@@ -1149,7 +1241,11 @@ V8.MongoDb.GetTableData({
   _Where : [
     ['Type', '=', '访问菜单'], 
     ['OR', 'Type', '=', '点击V8按钮']
-  ]
+  ],
+  _OrderBy: 'CreateTime',
+  _OrderByType: 'DESC',
+  _PageIndex: 1,
+  _PageSize: 20
 });
 ```
 
@@ -1161,6 +1257,10 @@ V8.MongoDb.GetFormData({
 	Id : '', //数据Id
 });
 ```
+
+`GetFormData` 和 `GetTableData` 属于 dynamic 无模式读取。服务端会在 MongoDB 投影阶段过滤 BSON 内部 `_t` CLR 类型判别字段，避免存量强类型 C# 写入留下的旧类型名称触发反序列化失败。`_t` 不是 V8 业务契约；业务需要类型标记时应使用自有字段（例如 `DocumentType`），不得读取、筛选或依赖 `_t`。强类型 C# MongoDB 模型仍按自身的多态映射处理。
+
+MongoDB 调用使用当前 V8 租户上下文；非主库租户脚本传入其它 `OsClient` 不能跨租户访问。MongoDB 不参与 `V8.DbTrans`：批量写方法返回 `Code=1` 时应视为已提交事实，后续关系库 Hook、SignalR 或外部投递失败不得伪装成“整体未发生”并盲目重试；需要重试时使用稳定业务 Id 实现幂等。
 
 ## V8.Http
 >* 对 RestSharp 的受控封装，支持 GET、POST、PATCH。前后端 V8 使用相同的 PascalCase 对象参数；后端同步方法直接返回，显式 `*Async` 方法在 Jint 中使用 `await`，前端浏览器端也需使用 `await`。
@@ -1253,7 +1353,9 @@ var result = await V8.AI.Chat({
 return result;
 ```
 
-可用方法包括 `GetLicenseState`、`Chat`、`ChatStream`、`RecognizeIntent`、`NL2SQL`、`NL2SQLStream`、`NL2V8` 和 `NL2V8Stream`。匿名接口没有可信用户上下文时返回 `Code=1001`；`NL2SQL` 始终重新按当前用户授权，`NL2V8/NL2V8Stream` 仅平台管理员可调用。
+可用方法包括 `GetLicenseState`、`UpdateConversationTitle`、`Chat`、`ChatStream`、`RecognizeIntent`、`NL2SQL`、`NL2SQLStream`、`NL2V8` 和 `NL2V8Stream`。`UpdateConversationTitle(conversationId, title, source)` 只修改当前 V8 租户、当前登录用户自己的对话。匿名接口没有可信用户上下文时返回 `Code=1001`；`NL2SQL` 始终重新按当前用户授权，`NL2V8/NL2V8Stream` 仅平台管理员可调用。
+
+官方 `app.microi.ai-engine` v6.3.6 使用 Managed `platform-ai-runtime` 编排标题修改、意图识别、非流式对话、NL2SQL 与非流式 NL2V8。租户个性化逻辑写在 CreateIfMissing `platform-ai-custom-hook`，该 Hook 只接收来源、阶段和动作，不接收问题、回答、标题、SQL、模型、附件或凭据。浏览器流式请求继续走原生 SSE 路由。
 
 后端流式回调会占用本次 Jint 请求，只适合确实需要由同一脚本消费增量的场景；面向页面的打字机效果仍优先让浏览器使用前端 `V8.AI.ChatStream`。MCP 直接使用专用 `microi_chat` 获取最终结果，不再绕到 `microi_run_engine` 包装接口。不要把 Token、完整问题或回答写入日志。完整代码与授权矩阵见 [AI 引擎与 Microi.AI 中转站](../system-engine/ai-engine.md)。
 

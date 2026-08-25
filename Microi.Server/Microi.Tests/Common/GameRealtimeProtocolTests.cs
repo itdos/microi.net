@@ -300,10 +300,22 @@ public sealed class GameRealtimeProtocolTests
             "GameRealtimeHub.cs"));
         Assert.Contains("[\"Command\"] = GameRealtimeRuntime.AuthorizeCommandName", hubSource);
         Assert.DoesNotContain("[\"Action\"] = \"AuthorizeRealtime\"", hubSource);
+        Assert.Contains("UserAccessKeySecurity.IsSession(currentToken.CurrentUser)", hubSource);
+        Assert.Contains("DiyToken.GetActiveCachedTokenEntry(currentToken, token)", hubSource);
+        Assert.Contains("DiyToken.ResolveClientTokenLifetime(clientModel, clientType)", hubSource);
     }
 
     private static string FindServerRoot()
     {
+        var workingDirectoryCandidate = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "Microi.Server");
+        if (Directory.Exists(Path.Combine(workingDirectoryCandidate, "Microi.net.Api"))
+            && Directory.Exists(Path.Combine(workingDirectoryCandidate, "Microi.Core")))
+        {
+            return workingDirectoryCandidate;
+        }
+
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current != null)
         {
@@ -311,6 +323,12 @@ public sealed class GameRealtimeProtocolTests
                 && Directory.Exists(Path.Combine(current.FullName, "Microi.Core")))
             {
                 return current.FullName;
+            }
+            var nestedServer = Path.Combine(current.FullName, "Microi.Server");
+            if (Directory.Exists(Path.Combine(nestedServer, "Microi.net.Api"))
+                && Directory.Exists(Path.Combine(nestedServer, "Microi.Core")))
+            {
+                return nestedServer;
             }
             current = current.Parent;
         }

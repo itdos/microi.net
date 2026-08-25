@@ -165,8 +165,8 @@ for (const [id, key, fileName, stopHttp] of engineFiles) {
     CreateTime: createdAt,
   });
   model.ResourcePolicies.ApiEngines[key] = {
+    Ownership: 'Platform',
     UpgradePolicy: 'Managed',
-    Owner: 'Platform',
     BaseVersion: version,
   };
 }
@@ -241,7 +241,7 @@ const capabilities = new Set((model.PackageInfo.Capabilities || []).filter(value
 for (const value of [
   'Marketplace:HdfsPackagePointerV2',
   'Marketplace:PackageCompactionV1',
-  'ApiEngine:microi-store-package-storage@v1.0.8',
+  'ApiEngine:microi-store-package-storage@v1.1.0',
   'ApiEngine:compact-microi-store-packages@v1.1.2',
   'ApiEngine:export-microi-store-package@v1.2.3',
 ]) capabilities.add(value);
@@ -252,25 +252,33 @@ model.PackageInfo.RequiredPlatformCapabilities = [
     && !String(value).startsWith('ApiEngine:ai_app_publish_store@')
     && !String(value).startsWith('ApiEngine:export-microi-store-package@')
     && !String(value).startsWith('ApiEngine:import-microi-store-package@')
+    && String(value) !== 'Installer:StartupDependencyApiFastBootstrap'
+    && String(value) !== 'Installer:StartupApiRuntimeFlagReconciliation'
   )),
-  'ApiEngine:get-microi-store-model@v1.2.8',
+  'ApiEngine:get-microi-store-model@v1.2.9',
   'ApiEngine:ai_app_publish_store@v1.9.7',
   'ApiEngine:export-microi-store-package@v1.2.3',
-  'ApiEngine:import-microi-store-package@v2.4.2',
+  'ApiEngine:import-microi-store-package@v2.4.7',
+  'Installer:StartupDependencyApiFastBootstrap',
+  'Installer:StartupApiRuntimeFlagReconciliation',
 ];
 model.PackageInfo.TableCount = model.DiyTables.length;
 model.PackageInfo.FieldCount = model.DiyFields.length;
 model.PackageInfo.DDLCount = model.DDLStatements.length;
 model.PackageInfo.PhysicalColumnCount = (model.PhysicalColumns || []).length;
 
-model.PackageInfo.Version = 'v7.5.47';
-model.PackageInfo.ChangeLog = {
-  Version: 'v7.5.47',
-  Title: '历史包扫描窗口与完成判定一致性修复',
-  ChangeType: 'Fix',
-  Content: '历史容量治理的 Jint 安全扫描窗口与完成判定统一为最多 100 条，修复请求 ScanSize 大于物理查询上限时把首批 100 条误判为全表完成；继续支持早期非标准版本包、Id 游标续跑、强回读和 CAS。',
-  ReleaseTime: '2026-08-24 17:30:00',
-};
+const semverNumber = value => String(value || '').replace(/^v/i, '').split('.')
+  .slice(0, 3).reduce((total, part, index) => total + (Number(part) || 0) * [1_000_000, 1_000, 1][index], 0);
+if (semverNumber(model.PackageInfo.Version) < semverNumber('v7.5.51')) {
+  model.PackageInfo.Version = 'v7.5.51';
+  model.PackageInfo.ChangeLog = {
+    Version: 'v7.5.51',
+    Title: '历史包扫描窗口与完成判定一致性修复',
+    ChangeType: 'Fix',
+    Content: '历史容量治理的 Jint 安全扫描窗口与完成判定统一为最多 100 条，修复请求 ScanSize 大于物理查询上限时把首批 100 条误判为全表完成；继续支持早期非标准版本包、Id 游标续跑、强回读和 CAS。',
+    ReleaseTime: '2026-08-24 17:30:00',
+  };
+}
 const storageHistoryLine = '2026-08-24 v7.5.47 修复历史扫描窗口与完成判定不一致造成的首批 100 条假完成；保留旧版本兼容、强回读与 CAS。';
 const oldHistoryLines = String(model.PackageInfo.ChangeHistory || '')
   .split(/\r?\n/)

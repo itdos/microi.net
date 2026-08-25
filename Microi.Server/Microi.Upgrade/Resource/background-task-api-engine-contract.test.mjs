@@ -11,6 +11,10 @@ function read(relativePath) {
   return fs.readFileSync(path.join(workspaceRoot, relativePath), 'utf8');
 }
 
+function normalizeSource(value) {
+  return `${String(value || '').replace(/\r\n?/g, '\n').replace(/\n*$/g, '')}\n`;
+}
+
 test('official background task engine owns action routing and calls one trusted V8 primitive', () => {
   const source = read('Microi.Server/Microi.Upgrade/Resource/platform-background-task.js');
   for (const action of [
@@ -21,6 +25,66 @@ test('official background task engine owns action routing and calls one trusted 
   }
   assert.match(source, /V8\.Method\.ManageBackgroundTask\(V8\.Param\)/);
   assert.doesNotMatch(source, /V8\.Db\.(?:FromSql|FromSqlAsync)/);
+});
+
+test('application-store package delivers every startup endpoint and managed policy atomically', () => {
+  const packageModel = JSON.parse(read('Microi.Server/Microi.Upgrade/Resource/app.microi.store.json'));
+  const dependencies = [
+    {
+      key: 'platform-background-task',
+      source: 'Microi.Server/Microi.Upgrade/Resource/platform-background-task.js',
+      address: '/apiengine/platform-background-task',
+      version: 'v1.1.0',
+      capabilities: [
+        'ServerFeature:V8.ManageBackgroundTask',
+        'ApiEngine:platform-background-task@v1.1.0',
+      ],
+    },
+    {
+      key: 'platform-sys-menu',
+      source: 'Microi.Server/Microi.Upgrade/Resource/platform-sys-menu.js',
+      address: '/apiengine/platform-sys-menu',
+      version: 'v1.0.0',
+      capabilities: [
+        'V8.Method.ManageSystemDirectory',
+        'ApiEngine:platform-sys-menu@v1.0.0',
+      ],
+    },
+  ];
+  assert.equal(packageModel.PackageInfo.Version, 'v7.6.9');
+  for (const dependency of dependencies) {
+    const matches = packageModel.SysApiEngines.filter(
+      item => item.ApiEngineKey === dependency.key,
+    );
+    assert.equal(matches.length, 1, dependency.key);
+    const engine = matches[0];
+    assert.equal(engine.ApiAddress, dependency.address);
+    assert.equal(engine.Version, dependency.version);
+    assert.equal(engine.IsEnable, 1);
+    assert.equal(engine.StopHttp, 0);
+    assert.equal(engine.AllowAnonymous, 0);
+    assert.equal(engine.ApiV8Code, normalizeSource(read(dependency.source)));
+    assert.deepEqual(packageModel.ResourcePolicies.ApiEngines[dependency.key], {
+      Ownership: 'Platform',
+      UpgradePolicy: 'Managed',
+    });
+    for (const capability of dependency.capabilities) {
+      assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(capability));
+    }
+  }
+  assert.equal(packageModel.PackageInfo.ApiEngineCount, packageModel.SysApiEngines.length);
+});
+
+test('application-store upgrade rejects packages or tenants missing any startup dependency', () => {
+  const upgrade = read('Microi.Server/Microi.Upgrade/13-UpgradeAppStore.cs');
+  assert.match(upgrade, /PlatformBackgroundTaskEngineKey\s*=\s*"platform-background-task"/);
+  assert.match(upgrade, /PlatformSysMenuEngineKey\s*=\s*"platform-sys-menu"/);
+  assert.match(upgrade, /平台后台任务接口缺失或版本过低/);
+  assert.match(upgrade, /平台菜单启动接口缺失或版本过低/);
+  assert.match(upgrade, /ValidateInstalledAppStoreRuntimeDependencies/);
+  assert.match(upgrade, /应用商城运行时依赖回读失败/);
+  assert.match(upgrade, /new System\.Version\(7, 5, 55\)/);
+  assert.match(upgrade, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
 });
 
 test('platform clients no longer depend on BackgroundTaskController routes', () => {

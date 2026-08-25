@@ -479,22 +479,6 @@ export const asyncRoutes = [
         ]
     },
     {
-        path: "/file-manage",
-        component: Layout,
-        hidden: true,
-        children: [
-            {
-                path: "/file-manage",
-                name: "file-manage",
-                component: () => import("@/views/file-manage/index.vue"),
-                meta: {
-                    title: "文件柜",
-                    icon: "el-icon-s-operation"
-                }
-            }
-        ]
-    },
-    {
         path: "/mic/cad-preview",
         name: "mic_cad_preview",
         component: () => import("@/views/cad-preview/index.vue")

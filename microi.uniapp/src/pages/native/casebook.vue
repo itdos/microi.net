@@ -18,6 +18,7 @@
           <view><text class="section-title">已收录案例</text><text class="section-count">{{ children.length }}</text></view>
           <button v-if="canEdit" class="add-case-button" @tap="openCasePicker"><text>＋</text> 添加案例</button>
         </view>
+        <view v-if="bookId && casePhotoContextError" class="private-media-notice"><text>{{ casePhotoContextError }}</text></view>
 
         <view v-if="bookId && childLoading" class="case-list"><mci-skeleton type="list" :rows="4" /></view>
         <view v-else-if="bookId && children.length" class="case-list">
@@ -66,7 +67,12 @@
 <script>
 import { themeMixin } from '@/utils/theme.js'
 import { getUser, V8 } from '@/utils/request.js'
-import { requireLogin } from '@/platform/business-runtime.js'
+import { findMenu, requireLogin } from '@/platform/business-runtime.js'
+import { loadNativeFormDefinition } from '@/platform/native-form.js'
+
+const CASE_CHILD_TABLE = 'diy_anlice_child'
+const CASE_PHOTO_FIELD = 'KehuALZP'
+const EMPTY_PRIVATE_FILE_CONTEXT = Object.freeze({ private: true, failClosed: true })
 
 function parseUpload(value) {
   if (!value) return []
@@ -85,6 +91,7 @@ export default {
     return {
       loading: true, childLoading: false, creating: false, savingName: false, addingCases: false,
       bookId: '', book: {}, bookName: '', originalName: '', currentUser: {}, children: [],
+      casePhotoContext: EMPTY_PRIVATE_FILE_CONTEXT, casePhotoContextError: '',
       casePickerVisible: false, caseKeyword: '', caseLoading: false, sourceCases: [], casePage: 1, caseCount: 0, selectedCaseIds: [], searchTimer: null
     }
   },
@@ -112,6 +119,7 @@ export default {
       try {
         if (this.bookId) {
           await this.loadBook()
+          await this.prepareCasePhotoContext()
           await this.loadChildren()
         }
       } catch (error) { uni.showToast({ title: error.message || '案例册加载失败', icon: 'none' }) }
@@ -133,10 +141,33 @@ export default {
         const rows = result && Number(result.Code) === 1 && Array.isArray(result.Data) ? result.Data : []
         this.children = await Promise.all(rows.map(async (row) => {
           const paths = parseUpload(row.KehuALZP).map((item) => typeof item === 'object' ? item.Url || item.Path || item.FilePath || item.FilePathName : item).filter(Boolean)
-          const photos = await Promise.all(paths.slice(0, 10).map((path) => V8.resolveFileUrl(path).catch(() => V8.assetUrl(path))))
+          const context = this.casePhotoFileContext(row.Id)
+          const photos = await Promise.all(paths.slice(0, 10).map((path) => V8.resolveFileUrl(path, context).catch(() => '')))
           return { ...row, _photos: photos.filter(Boolean) }
         }))
       } finally { this.childLoading = false }
+    },
+    async prepareCasePhotoContext() {
+      this.casePhotoContext = EMPTY_PRIVATE_FILE_CONTEXT
+      this.casePhotoContextError = ''
+      try {
+        const menu = await findMenu(['案例册', '客户案例'], CASE_CHILD_TABLE)
+        if (!menu || !menu.Id) throw new Error('当前账号没有案例明细菜单权限')
+        const definition = await loadNativeFormDefinition(CASE_CHILD_TABLE, false, { menuId: menu.Id })
+        const field = (definition.fields || []).find((item) => String(item.Name || '').toLowerCase() === CASE_PHOTO_FIELD.toLowerCase())
+        if (!field || !field.Id) throw new Error('案例照片字段元数据不完整')
+        this.casePhotoContext = {
+          formEngineKey: CASE_CHILD_TABLE,
+          fieldId: field.Id,
+          sysMenuId: menu.Id
+        }
+      } catch (error) {
+        this.casePhotoContextError = (error && error.message) || '案例照片授权上下文不可用，私有图片已隐藏'
+      }
+    },
+    casePhotoFileContext(formDataId) {
+      if (!formDataId || !this.casePhotoContext.fieldId || !this.casePhotoContext.sysMenuId) return EMPTY_PRIVATE_FILE_CONTEXT
+      return { ...this.casePhotoContext, formDataId }
     },
     async createBook() {
       if (!this.bookName.trim()) { uni.showToast({ title: '请输入案例册名称', icon: 'none' }); return }
@@ -248,6 +279,7 @@ export default {
 .casebook-page { height: 100vh; background: #f3f7f9; }.page-scroll { height: calc(100vh - 92rpx - var(--mci-safe-top)); }.page-content { padding: 18rpx 24rpx calc(36rpx + var(--mci-safe-bottom)); }
 .book-panel { position: relative; display: flex; align-items: center; min-height: 160rpx; overflow: hidden; border: 1rpx solid #dfe9ed; border-radius: 8rpx; background: #fff; }.book-accent { align-self: stretch; width: 7rpx; background: #0c83bd; }.book-content { min-width: 0; flex: 1; padding: 24rpx; }.book-label { display: block; color: #708791; font-size: 21rpx; }.book-input, .book-title { display: block; height: 58rpx; margin-top: 4rpx; color: #183640; font-size: 31rpx; font-weight: 700; line-height: 58rpx; }.book-meta { display: flex; flex-wrap: wrap; margin-top: 4rpx; color: #84969d; font-size: 20rpx; }.book-meta text { margin-right: 18rpx; }.save-name-button { flex: none; height: 58rpx; margin: 0 22rpx 0 0; padding: 0 18rpx; border: 1rpx solid #b9d8e4; border-radius: 6rpx; background: #f2f9fb; color: #087bac; font-size: 21rpx; line-height: 58rpx; }.save-name-button::after { border: none; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; height: 96rpx; }.section-title { color: #34525e; font-size: 27rpx; font-weight: 700; }.section-count { margin-left: 10rpx; color: #81969e; font-size: 22rpx; }.add-case-button { height: 58rpx; margin: 0; padding: 0 17rpx; border: 1rpx solid #bedce6; border-radius: 6rpx; background: #fff; color: #087fbd; font-size: 22rpx; line-height: 58rpx; }.add-case-button::after { border: none; }
+.private-media-notice { margin-bottom: 16rpx; padding: 16rpx 18rpx; border: 1rpx solid #f0d9b5; border-radius: 6rpx; color: #8b6428; background: #fff9ec; font-size: 20rpx; line-height: 1.55; }
 .case-list { display: flex; flex-direction: column; gap: 16rpx; }.case-card { padding: 22rpx 24rpx 16rpx; border: 1rpx solid #dfe9ed; border-radius: 8rpx; background: #fff; transition: background-color .16s ease; }.case-card--pressed { background: #f3f8fa; }.case-head { display: flex; align-items: center; justify-content: space-between; }.case-title { min-width: 0; overflow: hidden; color: #193844; font-size: 28rpx; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }.delete-button { flex: none; height: 48rpx; margin: 0 0 0 18rpx; padding: 0 10rpx; background: transparent; color: #c84d42; font-size: 20rpx; line-height: 48rpx; }.delete-button::after { border: none; }.customer-name { display: block; margin-top: 6rpx; color: #0c7fac; font-size: 22rpx; }
 .case-lines { margin-top: 16rpx; padding: 12rpx 16rpx; border-radius: 6rpx; background: #f5f8f9; }.case-lines view { display: grid; grid-template-columns: 116rpx minmax(0, 1fr); padding: 5rpx 0; font-size: 21rpx; line-height: 31rpx; }.case-lines view text:first-child { color: #778d95; }.case-lines view text:last-child { overflow: hidden; color: #405c66; text-overflow: ellipsis; white-space: nowrap; }
 .photo-row { position: relative; display: grid; grid-template-columns: repeat(3, 112rpx); gap: 10rpx; margin-top: 14rpx; }.photo-row image, .photo-more { width: 112rpx; height: 88rpx; border-radius: 6rpx; background: #e9eff1; }.photo-more { position: absolute; right: 0; display: flex; align-items: center; justify-content: center; background: rgba(24,54,64,.74); color: #fff; font-size: 23rpx; }.case-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 14rpx; padding-top: 13rpx; border-top: 1rpx solid #edf2f4; color: #84979e; font-size: 20rpx; }.case-foot text:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.case-foot text:last-child { margin-left: 18rpx; color: #0b82ba; font-size: 30rpx; }

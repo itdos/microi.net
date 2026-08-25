@@ -217,6 +217,23 @@ function normalizeFileUrlData(data, assetUrl, fallback = '') {
   return assetUrl(url || path || fallback);
 }
 
+function isLocalPackagedAsset(path) {
+  return /^(?:\.\/)?\/?static\//i.test(String(path || ''));
+}
+
+function hasPublicUploadFlag(value) {
+  if (!value || typeof value !== 'object') return false;
+  const raw = Array.isArray(value) ? (value[0] || {}) : value;
+  return raw.Limit === false || raw.Limit === 0 || String(raw.Limit).toLowerCase() === 'false' ||
+    raw.IsPrivate === false || raw.Private === false || raw.Public === true;
+}
+
+function isKnownPublicUploadPath(path) {
+  // Ordinary form uploads such as /xjy/img and /xjy/file are private by default.
+  // They must use the Managed signer instead of being mistaken for CDN assets.
+  return /^\/?(?:public|mci-public|xjy\/xjy\/miniapp-assets|xjy\/miniapp\/share)\//i.test(String(path || ''));
+}
+
 function getHeaderValue(headers, key) {
   if (!headers) return '';
   const lower = key.toLowerCase();
@@ -922,6 +939,7 @@ export function createMicroiV8(options = {}) {
     const picked = extractUploadPath(value);
     if (!picked || isBlockedAsset(picked)) return '';
     if (/^(https?:|data:|blob:|file:)/i.test(picked)) return picked;
+    if (isLocalPackagedAsset(picked)) return picked;
     if (/^\/?file\//i.test(picked)) return joinUrl(config.apiBase, picked);
     if (/^\//.test(picked) || /^[a-z0-9_-]+\//i.test(picked)) return joinUrl(config.fileServer || config.apiBase, picked);
     return picked;
@@ -931,14 +949,50 @@ export function createMicroiV8(options = {}) {
     return config.blockedAssetPattern ? config.blockedAssetPattern.test(String(value || '')) : false;
   }
 
-  async function resolveFileUrl(filePathName) {
+  function hasPrivateFileAccessContext(options = {}) {
+    const resourceKind = String(options.resourceKind || options.ResourceKind || 'FormField').trim();
+    const resourceId = String(options.resourceId || options.ResourceId || '').trim();
+    const formEngineKey = String(options.formEngineKey || options.FormEngineKey || '').trim();
+    const formDataId = String(options.formDataId || options.FormDataId || '').trim();
+    const fieldId = String(options.fieldId || options.FieldId || '').trim();
+    const sysMenuId = String(options.sysMenuId || options.SysMenuId || options.menuId || options.MenuId || '').trim();
+    const formFieldReady = Boolean(formEngineKey && formDataId && fieldId && sysMenuId);
+
+    if (resourceKind === 'UserAvatar' || resourceKind === 'MenuImportTemplate' || resourceKind === 'DeptImportTemplate') {
+      return Boolean(resourceId);
+    }
+    if (resourceKind === 'FileManagerObject') return Boolean(resourceId && sysMenuId);
+    if (resourceKind === 'FormFieldDerivedPreview') {
+      return formFieldReady && Boolean(options.originalFilePathName || options.OriginalFilePathName);
+    }
+    return resourceKind === 'FormField' && formFieldReady;
+  }
+
+  async function resolveFileUrl(filePathName, options = {}) {
     const path = extractUploadPath(filePathName);
     if (!path || isBlockedAsset(path)) return '';
     if (/^(https?:|blob:|data:|file:)/i.test(path)) return assetUrl(path);
+    if (isLocalPackagedAsset(path) || options.private === false || hasPublicUploadFlag(filePathName) || isKnownPublicUploadPath(path)) {
+      return assetUrl(path);
+    }
+    // 私有对象没有权威资源上下文时直接失败关闭，禁止以裸路径换取签名。
+    if (!hasPrivateFileAccessContext(options)) return '';
 
-    async function requestPrivate(action) {
+    async function requestPrivateFileUrl() {
       try {
-        const body = await post(`/api/HDFS/${action}?FilePathName=${encodeURIComponent(path)}`, { OsClient: config.osClient }, {
+        const body = await apiEngineRun('platform-private-file-url', {
+          OsClient: config.osClient,
+          FilePathName: path,
+          FormEngineKey: options.formEngineKey || options.FormEngineKey,
+          FormDataId: options.formDataId || options.FormDataId,
+          FieldId: options.fieldId || options.FieldId,
+          SysMenuId: options.sysMenuId || options.SysMenuId || options.menuId || options.MenuId,
+          ResourceKind: options.resourceKind || options.ResourceKind,
+          ResourceId: options.resourceId || options.ResourceId,
+          OriginalFilePathName: options.originalFilePathName || options.OriginalFilePathName,
+          _TableChildAuth: options.tableChildAuth || options._TableChildAuth,
+          HDFS: options.hdfs || options.HDFS
+        }, {
           checkCode: false,
           silentError: true
         });
@@ -947,7 +1001,7 @@ export function createMicroiV8(options = {}) {
       return '';
     }
 
-    return (await requestPrivate('GetPrivateFileUrl')) || (await requestPrivate('MallFileUrl')) || assetUrl(path);
+    return (await requestPrivateFileUrl()) || '';
   }
 
   // 文件上传同时支持 uni.uploadFile 与浏览器 fetch/FormData。
@@ -1237,7 +1291,7 @@ export function createMicroiV8(options = {}) {
 
   function legacyGetCurrentUser(refresh, callback) {
     if (refresh) {
-      legacyPost('/api/SysUser/getCurrentUser', {}, (result) => {
+      legacyPost('/apiengine/platform-current-user', {}, (result) => {
         if (result && result.Code) legacySetCurrentUser(result.Data || {});
         if (typeof callback === 'function') callback(result);
       });
@@ -1484,7 +1538,7 @@ export function createMicroiV8(options = {}) {
   // 旧版前端 V8 依赖的后端接口路径，保留原名称以减少迁移成本。
   const legacyApi = {
     MicroiInit: '/apiengine/microi-init',
-    GetSysConfig: '/api/DiyTable/getSysConfig',
+    GetSysConfig: '/apiengine/platform-sys-config',
     Login: '/api/SysUser/login',
     AddFormData: '/api/FormEngine/addFormData',
     AddFormDataBatch: '/api/FormEngine/addFormDataBatch',
@@ -1508,10 +1562,10 @@ export function createMicroiV8(options = {}) {
     UploadAnonymous: '/api/HDFS/uploadAnonymous',
     UniappUpload: '/api/HDFS/UniappUpload',
     UniappUploadAnonymous: '/api/HDFS/uniappUploadAnonymous',
-    GetCurrentUser: '/api/SysUser/getCurrentUser',
+    GetCurrentUser: '/apiengine/platform-current-user',
     GetDateTimeNow: '/api/os/getDateTimeNow',
     AddSysLog: '/apiengine/platform-client-log',
-    GetOsClientByDomain: '/api/Os/getOsClientByDomain',
+    GetOsClientByDomain: '/apiengine/platform-os-client-by-domain',
     ApiEngine: {}
   };
 

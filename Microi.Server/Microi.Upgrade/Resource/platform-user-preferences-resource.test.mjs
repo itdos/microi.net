@@ -11,10 +11,17 @@ const execute = new Function('V8', source);
 
 function run(param = {}, currentUser = { Id: 'user-1', Account: 'admin', Name: '管理员', DesktopBg: '' }) {
   let updateModel = null;
+  const hooks = [];
   const V8 = {
     Param: param,
     CurrentUser: currentUser,
     OsClient: 'junchi',
+    ApiEngine: {
+      Run(key, payload) {
+        hooks.push({ key, payload });
+        return { Code: 1 };
+      },
+    },
     FormEngine: {
       UptFormData(table, model) {
         assert.equal(table, 'sys_user');
@@ -30,28 +37,51 @@ function run(param = {}, currentUser = { Id: 'user-1', Account: 'admin', Name: '
       },
     },
   };
-  return { result: execute(V8), updateModel };
+  return { result: execute(V8), updateModel, hooks };
 }
 
-test('official packages carry the exact Managed current-user preference engine', () => {
+test('system-account package uniquely carries the exact Managed current-user preference engine', () => {
+  const packageName = 'app.microi.sys_user.json';
+  const pkg = JSON.parse(fs.readFileSync(path.join(resourceDir, packageName), 'utf8'));
+  const engines = (pkg.SysApiEngines || []).filter(item => item.ApiEngineKey === engineKey);
+  assert.equal(engines.length, 1, packageName);
+  assert.equal(String(engines[0].ApiV8Code || '').replaceAll('\r\n', '\n'), source, packageName);
+  assert.match(engines[0].ApiV8Code, /所属官方应用：系统账号/, packageName);
+  assert.equal(engines[0].AllowAnonymous, 0);
+  assert.equal(engines[0].StopHttp, 0);
+  assert.equal(engines[0].IsEnable, 1);
+  assert.deepEqual(pkg.ResourcePolicies.ApiEngines[engineKey], {
+    Ownership: 'Platform',
+    UpgradePolicy: 'Managed',
+  });
+  assert.ok(pkg.PackageInfo.RequiredPlatformCapabilities.some(value =>
+    value === `ApiEngine:${engineKey}` || value.startsWith(`ApiEngine:${engineKey}@`)));
+  assert.ok(!pkg.PackageInfo.RequiredPlatformCapabilities.includes('Api:SysUser.UpdateMyPreferences'));
+
   for (const packageName of ['app.microi.saas-engine.json', 'app.microi.store.json']) {
     const pkg = JSON.parse(fs.readFileSync(path.join(resourceDir, packageName), 'utf8'));
     const engines = (pkg.SysApiEngines || []).filter(item => item.ApiEngineKey === engineKey);
-    assert.equal(engines.length, 1, packageName);
-    assert.equal(String(engines[0].ApiV8Code || '').replaceAll('\r\n', '\n'), source, packageName);
-    assert.equal(engines[0].AllowAnonymous, 0);
-    assert.equal(engines[0].IsEnable, 1);
-    assert.deepEqual(pkg.ResourcePolicies.ApiEngines[engineKey], {
-      Ownership: 'Platform',
-      UpgradePolicy: 'Managed',
-    });
-    assert.ok(pkg.PackageInfo.RequiredPlatformCapabilities.includes(`ApiEngine:${engineKey}`));
-    assert.ok(!pkg.PackageInfo.RequiredPlatformCapabilities.includes('Api:SysUser.UpdateMyPreferences'));
+    assert.equal(engines.length, 0, packageName);
+    assert.equal(pkg.ResourcePolicies?.ApiEngines?.[engineKey], undefined, packageName);
+    assert.ok(!pkg.PackageInfo.RequiredPlatformCapabilities.some(value =>
+      value === `ApiEngine:${engineKey}` || value.startsWith(`ApiEngine:${engineKey}@`)), packageName);
   }
 });
 
+test('preference generator delegates to the system-account fact source and cannot rewrite the shared base', () => {
+  const generator = fs.readFileSync(
+    path.join(resourceDir, 'configure-platform-user-preferences-engine.mjs'),
+    'utf8',
+  );
+  assert.match(generator, /configureV8FirstPlatformPackages/);
+  assert.match(generator, /app\.microi\.sys_user\.json/);
+  assert.match(generator, /禁止生成器直接使用 --sync-base/);
+  assert.doesNotMatch(generator, /LimitRecursion\s*:/);
+  assert.doesNotMatch(generator, /writeFileSync/);
+});
+
 test('engine saves only its fixed whitelist against the token user', () => {
-  const { result, updateModel } = run({
+  const { result, updateModel, hooks } = run({
     DefaultIndexUrl: '#/dashboard',
     ThemeColor: '#12abef',
     ThemeMode: 'DARK',
@@ -86,6 +116,15 @@ test('engine saves only its fixed whitelist against the token user', () => {
   for (const forbidden of ['UserId', 'OsClient', 'Account', 'Level', 'RoleIds', 'DeptId']) {
     assert.ok(!(forbidden in updateModel));
   }
+  assert.equal(hooks.length, 2);
+  assert.ok(hooks.every(item => item.key === 'platform-user-custom-hook'));
+  assert.equal(hooks[0].payload.Stage, 'BeforeUpdatePreferences');
+  assert.equal(hooks[1].payload.Stage, 'AfterUpdatePreferences');
+  assert.equal(hooks[0].payload.UserId, 'user-1');
+  assert.deepEqual(hooks[0].payload.ChangedFields.sort(), Object.keys(updateModel)
+    .filter(name => name !== 'Id')
+    .sort());
+  assert.doesNotMatch(JSON.stringify(hooks), /attacker|RoleIds|DeptId|Account|Level/);
 });
 
 test('engine rejects external routes, invalid colors and cross-tenant desktop paths', () => {

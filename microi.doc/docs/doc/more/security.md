@@ -127,7 +127,7 @@ Upgrade16 会在 `sys_osclients` 增加六个可空租户字段：
 
 ### 2. 私有文件不是“知道路径即可访问”
 
-普通客户端请求 `/api/HDFS/GetPrivateFileUrl` 时，必须同时提供：
+普通客户端请求 `/apiengine/platform-private-file-url` 时，必须同时提供：
 
 - `FormEngineKey`
 - `FormDataId`

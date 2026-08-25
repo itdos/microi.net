@@ -179,14 +179,18 @@ public sealed class WeChatContentSecurityTests
         var root = FindRepositoryRoot();
         var hdfs = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers", "HDFSController.cs"));
-        var user = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.net.Api", "Controllers", "SysUserController.cs"));
+        var userFacade = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Core", "V8Engine", "Runtime", "V8Method.SysUserAdminFacade.cs"));
+        var contentGateway = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Services", "WeChatContentSecurityService.cs"));
         var sdk = File.ReadAllText(Path.Combine(
             root, "microi.uniapp", "src", "utils", "microi.v8.js"));
 
         Assert.Contains("SubmitUploadedImagesAsync", hdfs, StringComparison.Ordinal);
-        Assert.Contains("ValidateAvatarAsync", user, StringComparison.Ordinal);
-        Assert.Contains("CheckProfileTextAsync", user, StringComparison.Ordinal);
+        Assert.Contains("ISysUserProfileContentSecurityGateway", userFacade, StringComparison.Ordinal);
+        Assert.Contains("ValidateProfileUpdateAsync", userFacade, StringComparison.Ordinal);
+        Assert.Contains("ValidateAvatarAsync", contentGateway, StringComparison.Ordinal);
+        Assert.Contains("CheckProfileTextAsync", contentGateway, StringComparison.Ordinal);
         Assert.Contains("ContentSecurityReviewId", sdk, StringComparison.Ordinal);
         Assert.Contains("waitForContentSecurity", sdk, StringComparison.Ordinal);
         Assert.Contains(WeChatContentSecurityService.UnsafeContentMessage, sdk, StringComparison.Ordinal);

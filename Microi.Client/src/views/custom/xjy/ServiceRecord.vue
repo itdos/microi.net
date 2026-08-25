@@ -53,8 +53,9 @@ export default {
                 item.ShouhouSPArr.map((item1) => {
                     item1.JieguoTP = JSON.parse(item1.JieguoTP);
                     item1.JieguoTPArr = [];
+                    const privateFileContext = self.ResolvePrivateFileContext(item1);
                     item1.JieguoTP.map(async (item2) => {
-                        item2.Path = await self.GetServerPath(item2.Path);
+                        item2.Path = await self.GetServerPath(item2.Path, privateFileContext);
                         item1.JieguoTPArr.push(item2.Path);
                     });
                 });
@@ -71,19 +72,51 @@ export default {
     mounted() {},
     methods: {
         // 处理图片路径 匿名访问的
-        async GetServerPath(url) {
+        async GetServerPath(url, privateFileContext) {
             var self = this;
-            var serverPath = await self.GetPrivateFileUrl(url);
+            var serverPath = await self.GetPrivateFileUrl(url, privateFileContext);
             return serverPath;
         },
-        GetPrivateFileUrl(url) {
+        ResolvePrivateFileContext(record) {
+            const row = record && typeof record === "object" ? record : {};
+            const v8 = this.DataAppend?.V8 || {};
+            const v8TableName = String(v8.TableName || "");
+            const isTaskDeviceContext = v8TableName.toLowerCase() === "diy_shouhousp";
+            const recordContext = row._PrivateFileContext?.JieguoTP
+                || row.PrivateFileContext?.JieguoTP
+                || row._PrivateFileContext
+                || row.PrivateFileContext
+                || {};
+            return {
+                FormEngineKey: String(recordContext.FormEngineKey || (isTaskDeviceContext ? v8TableName : "diy_shouhousp")),
+                FormDataId: String(recordContext.FormDataId || row.Id || ""),
+                FieldId: String(recordContext.FieldId || (isTaskDeviceContext ? v8.Field?.JieguoTP?.Id : "") || ""),
+                SysMenuId: String(recordContext.SysMenuId || (isTaskDeviceContext ? v8.SysMenuId : "") || "")
+            };
+        },
+        GetPrivateFileUrl(url, privateFileContext) {
             return new Promise((resolve) => {
                 var self = this;
+                const context = privateFileContext || {};
+                if (!url || !context.FormEngineKey || !context.FormDataId || !context.FieldId || !context.SysMenuId) {
+                    console.warn("服务记录图片缺少受信任的表、记录、字段或菜单上下文，已拒绝签发私有地址。", {
+                        FormEngineKey: context.FormEngineKey || "",
+                        FormDataId: context.FormDataId || "",
+                        FieldId: context.FieldId || "",
+                        SysMenuId: context.SysMenuId || ""
+                    });
+                    resolve("");
+                    return;
+                }
                 self.DiyCommon.Post(
-                    "/api/HDFS/GetPrivateFileUrl",
+                    "/apiengine/platform-private-file-url",
                     {
                         FilePathName: url,
-                        HDFS: self.SysConfig?.HDFS || "Aliyun"
+                        ResourceKind: "FormField",
+                        FormEngineKey: context.FormEngineKey,
+                        FormDataId: context.FormDataId,
+                        FieldId: context.FieldId,
+                        SysMenuId: context.SysMenuId
                     },
                     (result) => {
                         if (self.DiyCommon.Result(result)) {
