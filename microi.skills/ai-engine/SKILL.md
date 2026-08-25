@@ -38,7 +38,7 @@ description: Microi AI 引擎、MiniMax 图片/音乐/视频生成与预览、�
 
 `Chat/ChatStream` 虽声明 GET/POST，含问题、附件和会话上下文的业务调用默认使用 POST，避免敏感内容进入 URL 日志。Controller 和 `V8.AI` 必须从可信执行上下文覆盖当前用户和 `OsClient`，并清除客户端提交的 `ApiKey/Endpoint`。所谓打字机效果必须来自真实 SSE 增量块；`microi_chat` 只返回最终结果，不能被描述成逐 token MCP 流。
 
-安全数据分析必须继续调用 `/api/Ai/NL2SQL`，由服务端从当前用户权限生成表白名单；通用 AI 包装接口不得接受客户端自报的表名作为授权。
+安全数据分析的新客户端调用 `/apiengine/platform-ai-runtime` 并固定 `Action=NL2SQL`；旧 `/api/Ai/NL2SQL` 只保留兼容转发。最终都由租户/用户绑定的 `V8.AI.NL2SQL` 从当前用户权限生成表白名单；任何通用包装接口都不得接受客户端自报的表名作为授权。
 
 ## 代码分层
 
@@ -48,6 +48,11 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 - “授权 + 执行”必须由领域门面原子完成，不能让接口层先生成可伪造的 `AllowedTables` 或遗漏某一步。
 - AI 的 Qdrant/Ollama/Embedding 配置、Schema 初始化和其它生命周期任务由 `AddMicroiAI()` 在模块内自注册；API 的 `Program.cs` 只负责调用模块注册。
 - `Microi.Core` 只承载跨模块契约和模型。新增入口时先扩展 AI 领域服务，再添加薄 Controller/Hub 适配，禁止复制业务流程。
+- AI 账户统一入口是 Managed 接口引擎 `/apiengine/platform-ai-account`；套餐、订阅和订单由 V8 编排。支付宝回调 C# 只做可信租户选择/归一化、该租户配置验签和一次性 Managed 调用；`CompletePayment` 在同一接口引擎事务内完成订单条件认领、金额校验、订阅续期/新建与平台/供应商 API Key 分配。供应商协议、密钥隔离、分布式额度原子、任务句柄和受控媒体落盘仍由绑定原子完成。
+- 非流式 `UpdateConversationTitle / RecognizeIntent / Chat / NL2SQL / NL2V8EngineSync` 统一进入 Managed `/apiengine/platform-ai-runtime`，旧 Controller 同名路由只做兼容转发；SSE/流式、Provider Proxy、媒体、文件和策略元数据保持原生。`platform-ai-runtime` 只调用绑定当前租户和当前用户的 `V8.AI` 原子，不接收客户端伪造的租户、用户、Endpoint、ApiKey、表白名单或管理员标记。
+- AI 官方应用只有一个应用级租户扩展点 `platform-ai-custom-hook`，策略为 `CreateIfMissing`。`mci_ai_data_assistant` 与 `platform-ai-runtime` 只传 `Stage`、`SourceApiEngineKey`、`Action`；支付动作最多增加 `EventId`、`Provider`，账户其它动作只增加白名单资源元数据。Hook 禁止接收订单号、交易号、金额、标题、SQL、模型、附件、提示词或问题原文及其摘要、回答、供应商/平台密钥、供应商任务号、文件句柄或媒体内容。匿名发现接口不调用 Hook，`/v1/usage` 继续由 C# 凭据网关直接校验，使 `Authorization` 永不进入 V8。
+- 9 张 `mic_sub_*` 订阅表与 `mci_ai_token_account`、`mci_ai_token_log` 由官方 `app.microi.ai-engine` 应用升级提供，必须同时声明 DDL、PhysicalColumns、DiyTables、DiyFields；`PromptPreview` 属于日志表正式字段。`mci_ai_token_recharge` 当前不在该运行时实体闭包内，禁止根据线上残留自行扩包。运行时发现缺失时失败关闭，禁止在请求路径自动建表、加列或修改业务 Schema。
+- `Sys_User.AiApiKey` 归官方 `app.microi.sys_user`，由系统账号包同时维护建表 DDL、PhysicalColumns 和隐藏只读 DiyField；AI助手包不得重复声明 `Sys_User`。缺列错误必须提示升级系统账号应用，不能误导用户升级 AI助手。
 
 ## 模型与密钥
 
@@ -73,6 +78,9 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 ## 跨端 AI 助手与商城交付
 
 - PC 与移动端复用 `mci_ai_data_assistant`。`Bootstrap` 返回的 `Enabled`、`Models`、`AllowedDomains` 和 `Prompts` 是跨端共同事实源；快捷问题来自启用的 `mci_ai_data_domain.PromptExamples`，前端不能维护另一套固定文案。
+- 官方 AI助手应用归 `app.microi.ai-engine`。v6.3.6 的接口引擎必须严格只有 Managed `mci_ai_data_assistant`、Managed `platform-ai-account`、Managed `platform-ai-runtime` 和 CreateIfMissing `platform-ai-custom-hook` 四项，并声明 `V8.Method.ManageAiPlatform`、`V8.Method.RequireManagedProtocolContext` 与所需 `V8.AI` 能力；后端缺少任一能力时安装预检失败关闭。
+- `ai_app_list`、`ai_app_detail`、`ai_app_get_file`、`ai_app_save_file`、`ai_app_create`、`ai_app_build`、`ai_app_preview`、`ai_app_download_source_zip`、`ai_app_download_build_zip`、`ai_app_moveobject_probe`、`ai_app_moveobject_exec_probe`、`ai_app_publish_store` 这 12 个 `ai_app_*` 归 `app.microi.store` 维护。AI助手包移除它们的资源选择和所有权声明，但不会删除目标租户既有运行时接口记录；既有记录继续由应用商城包升级。
+- v6.3.6 还必须保持 AI助手包的 DDL、PhysicalColumns、DiyTables、DiyFields、DataSets 全层不再包含重复的 `mci_ai_app_version`、`mci_ai_app_file`、`sys_microistore`，这些表交回 Store/SaaS 既有平台包维护；当前仅 AI助手包拥有的 `app_mic_aiapp`、`mci_ai_app` 继续保留。
 - 普通角色必须匹配启用的 `mci_ai_role_policy`。只有后端可信的 `V8.CurrentUser.Level >= 9999` 可以在新安装租户缺少角色策略时获得安全兜底：从目标租户动态读取已启用业务域和模型，范围为 `All`，仍保持 `AllowRawSql=false`、敏感字段默认关闭。不得相信客户端提交的 Level、角色名或账号名。
 - 当租户要求“所有角色均可使用 AI 助手”时，必须为 `sys_role` 中每个目标角色建立显式启用策略；受限角色使用 `Self`/`Department` 与最小业务域，管理角色才可使用经确认的 `All`。禁止把“人人可打开助手”实现成普通角色默认全库可读。
 - `Sys_Config.DisableAiAssistant` 是负向开关：缺失、空值或 `0/false` 都显示 AI 助手，只有显式 `1/true` 才关闭图标。商城升级应复用旧 `IsShowAiAssistant` 的字段元数据 Id 就地改名；兼容读取可以保留旧物理列，但旧字段元数据必须在 PC 与移动端隐藏，禁止同时暴露正向、负向两个开关。关闭该开关前后都要做策略覆盖验收：回读 `sys_role` 与 `mci_ai_role_policy`，断言每个目标角色都有唯一启用策略，`AllowedDomains`、`AllowedModels` 均非空且模型仍处于启用状态；再至少用超级管理员、普通员工和客户身份分别调用 `Bootstrap`，确认 `Enabled=true` 且返回范围符合角色。仅看到入口图标不算可用。

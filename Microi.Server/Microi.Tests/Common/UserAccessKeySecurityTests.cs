@@ -228,6 +228,39 @@ public class UserAccessKeySecurityTests
     }
 
     [Fact]
+    public void PlatformCurrentUser_IsARestrictedSelfIntrospectionException()
+    {
+        var user = NewScopedUser();
+        user["_AccessKeyScopes"] = new JArray("page:open");
+        user["_AccessKeyAllowedApiEngineKeys"] = new JArray();
+
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/apiengine/platform-current-user/"));
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/apiengine/platform-current-user--OsClient--iTdos--"));
+        Assert.True(UserAccessKeySecurity.IsApiEngineAllowed(
+            user,
+            "platform-current-user"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/apiengine/admin-reset-password"));
+        Assert.False(UserAccessKeySecurity.IsApiEngineAllowed(
+            user,
+            "admin-reset-password"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/apiengine/platform-current-user-extra--OsClient--iTdos--"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/apiengine/platform-current-user--OsClient--iTdos"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/apiengine/platform-current-user--OsClient--../iTdos--"));
+    }
+
+    [Fact]
     public void ApiPathScope_DeniesAccountManagementAndAllowsReadFacade()
     {
         var user = NewScopedUser();
@@ -527,6 +560,42 @@ public class UserAccessKeySecurityTests
         Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
             user,
             "/api/HDFS/SyncMinioObject"));
+    }
+
+    [Fact]
+    public void FileReadScope_AllowsOnlyTheFixedPrivateFileManagedFacade()
+    {
+        var fileReader = NewScopedUser();
+        fileReader["_AccessKeyScopes"] = new JArray("page:open", "file:read");
+        fileReader["_AccessKeyAllowedApiEngineKeys"] = new JArray();
+
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            fileReader,
+            "/apiengine/platform-private-file-url"));
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            fileReader,
+            "/apiengine/platform-private-file-url--OsClient--iTdos--"));
+        Assert.True(UserAccessKeySecurity.IsApiEngineAllowed(
+            fileReader,
+            "platform-private-file-url"));
+        Assert.False(UserAccessKeySecurity.IsApiEngineAllowed(
+            fileReader,
+            "platform-private-file-delete"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            fileReader,
+            "/apiengine/platform-private-file-url-copy--OsClient--iTdos--"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            fileReader,
+            "/apiengine/platform-private-file-url--OsClient--iTdos--extra"));
+
+        var noFileScope = NewScopedUser();
+        noFileScope["_AccessKeyScopes"] = new JArray("page:open");
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            noFileScope,
+            "/apiengine/platform-private-file-url"));
+        Assert.False(UserAccessKeySecurity.IsApiEngineAllowed(
+            noFileScope,
+            "platform-private-file-url"));
     }
 
     [Fact]

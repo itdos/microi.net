@@ -20,7 +20,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.4.6.0";
+        public static string Version = "6.4.11.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -32,7 +32,17 @@ namespace Microi.net
         private const string FormEnginePackageResourceName = "app.microi.form-engine.json";
         private const string ModuleEnginePackageResourceName = "app.microi.module-engine.json";
         private const string SaaSEnginePackageResourceName = "app.microi.saas-engine.json";
+        private const string SsoPackageResourceName = "app.microi.sso.json";
         private const string AppStorePackageResourceName = "app.microi.store.json";
+        private const string SysUserPackageResourceName = "app.microi.sys_user.json";
+        private const string SysConfigPackageResourceName = "app.microi.sys-config.json";
+        private const string MessageNotificationPackageResourceName = "app.microi.message-notification.json";
+        private const string AiEnginePackageResourceName = "app.microi.ai-engine.json";
+        private const string OfficialResourcePublisherEngineKey = "get-microi-upgrade-resource";
+        private const string PlatformBackgroundTaskEngineKey = "platform-background-task";
+        private const string PlatformBackgroundTaskApiAddress = "/apiengine/platform-background-task";
+        private const string PlatformSysMenuEngineKey = "platform-sys-menu";
+        private const string PlatformSysMenuApiAddress = "/apiengine/platform-sys-menu";
         private const string AppStoreMenuId = "61b7faee-35b2-4571-add2-5231a355f368";
         private const string PlatformMicroServiceKey = "microi-platform-service";
         private const string MarketplaceRoutePath = "/marketplace";
@@ -45,8 +55,76 @@ namespace Microi.net
         // 受信任核心导入器提升到平台既有 8GB 累计分配硬上限；进程常驻内存保护仍生效，
         // 普通接口引擎不受影响，5GB 运行资产继续走 HDFS multipart 而不进入 Jint。
         private const int ImporterLimitMemoryMb = 8192;
-        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 3, 3);
+        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 4, 4);
         private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 2, 7);
+        private static readonly System.Version MinimumPlatformBackgroundTaskVersion = new System.Version(1, 1, 0);
+        private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 0);
+        private static readonly System.Version MinimumPlatformRuntimePackageVersion = new System.Version(7, 5, 46);
+        private static readonly System.Version MinimumPlatformRuntimeEngineVersion = new System.Version(1, 0, 0);
+        private static readonly System.Version MinimumPlatformLoginWallpapersEngineVersion = new System.Version(1, 1, 0);
+        private static readonly System.Version MinimumPlatformMicroiInitEngineVersion = new System.Version(2, 0, 2);
+        private const string PlatformRuntimeCustomHookEngineKey = "platform-runtime-custom-hook";
+        private const string ManagedPlatformRuntimeNoticeMarker = "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1";
+        private const string TenantPlatformRuntimeNoticeMarker = "/* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1";
+        private const string DefaultPlatformRuntimeHookBody = "return { Code : 1 };";
+        private static readonly string[] ManagedPlatformRuntimeEngineKeys =
+        {
+            "platform-os-client-by-domain",
+            "platform-sys-config",
+            "platform-lang-bundle",
+            "platform-current-user",
+            "platform-private-file-url",
+            "platform-sys-user-public-info",
+            "platform-login-wallpapers",
+            "microi-init"
+        };
+        private static readonly string[] RequiredPlatformRuntimeEngineKeys =
+            ManagedPlatformRuntimeEngineKeys.Concat(new[] { PlatformRuntimeCustomHookEngineKey }).ToArray();
+        private static readonly HashSet<string> AnonymousPlatformRuntimeEngineKeys = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "platform-os-client-by-domain",
+            "platform-sys-config",
+            "platform-lang-bundle",
+            "platform-login-wallpapers",
+            "microi-init"
+        };
+        private static readonly System.Version MinimumSsoPackageVersion = new System.Version(7, 5, 6);
+        private static readonly System.Version MinimumSsoEngineVersion = new System.Version(1, 0, 2);
+        private const string ManagedSsoNoticeMarker = "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1";
+        private const string TenantSsoNoticeMarker = "/* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1";
+        private const string SsoSafeHookPayloadMarker = "SSO_TENANT_HOOK_SAFE_PAYLOAD_V1";
+        private const string DefaultSsoEventHookBody = "return { Code : 1 };";
+        private static readonly string[] ManagedSsoEngineKeys =
+        {
+            "sso_capabilities",
+            "sso_legacy_capabilities",
+            "sso_connection_runtime",
+            "sso_resolve_federated_identity",
+            "sso_protocol_event",
+            "sso_outbound_claims",
+            "sso_complete_login",
+            "sso_rotate_client_secret",
+            "sso_legacy_token_login",
+            "sso_user_runtime"
+        };
+        private static readonly string[] RequiredSsoEngineKeys =
+            ManagedSsoEngineKeys.Concat(new[] { "sso_event_hook" }).ToArray();
+        private static readonly HashSet<string> AnonymousSsoEngineKeys = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "sso_capabilities",
+            "sso_legacy_capabilities",
+            "sso_complete_login",
+            "sso_legacy_token_login"
+        };
+        private static readonly HashSet<string> InternalOnlySsoEngineKeys = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "sso_connection_runtime",
+            "sso_resolve_federated_identity",
+            "sso_protocol_event",
+            "sso_event_hook",
+            "sso_outbound_claims",
+            "sso_user_runtime"
+        };
 
         private static bool HasPinnedImporterCapabilities(string code, System.Version version)
         {
@@ -54,6 +132,7 @@ namespace Microi.net
                 && version >= MinimumPinnedImporterVersion
                 && !code.DosIsNullOrWhiteSpace()
                 && code.Contains("PACKAGE_REPLAY_VERSION_GUARD_V2")
+                && code.Contains("PackagePointerMode: 'HdfsV1'")
                 && code.Contains("PinCurrentVersion")
                 && code.Contains("BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1")
                 && code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1")
@@ -70,6 +149,663 @@ namespace Microi.net
                 && code.Contains("BulkAdaptiveSingleSlice: false");
         }
 
+        private static bool HasPlatformBackgroundTaskCapabilities(string code, System.Version version)
+        {
+            return version != null
+                && version >= MinimumPlatformBackgroundTaskVersion
+                && !code.DosIsNullOrWhiteSpace()
+                && code.Contains("V8.Method.ManageBackgroundTask(V8.Param)")
+                && code.Contains("WorkerStatus")
+                && code.Contains("RunApiEngine")
+                && !code.Contains("V8.Db.FromSql");
+        }
+
+        private static bool HasPlatformSysMenuCapabilities(string code, System.Version version)
+        {
+            return version != null
+                && version >= MinimumPlatformSysMenuVersion
+                && !code.DosIsNullOrWhiteSpace()
+                && code.Contains("V8.Method.ManageSystemDirectory")
+                && code.Contains("Domain: 'SysMenu'")
+                && code.Contains("GetSysMenuStep")
+                && !code.Contains("V8.Db.FromSql");
+        }
+
+        private static bool HasExpectedPlatformRuntimeEngineContract(JObject engine, bool validateTenantTemplate)
+        {
+            if (engine == null) return false;
+            var key = engine.Value<string>("ApiEngineKey") ?? string.Empty;
+
+            // CreateIfMissing Hook 首次创建后即归租户维护。已安装租户只校验记录存在；
+            // 禁用、改地址或改变内部调用策略都是租户自己的合法选择，升级器不能因为
+            // 这些可变字段进入永久重装循环。只有嵌入的官方包模板需要校验安全默认值。
+            if (string.Equals(key, PlatformRuntimeCustomHookEngineKey, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!validateTenantTemplate) return true;
+                var hookCode = engine.Value<string>("ApiV8Code") ?? string.Empty;
+                return engine.Value<int?>("IsEnable") == 1
+                    && engine.Value<int?>("StopHttp") == 1
+                    && engine.Value<int?>("AllowAnonymous") == 0
+                    && string.Equals(
+                        engine.Value<string>("ApiAddress"),
+                        "/apiengine/" + key,
+                        StringComparison.OrdinalIgnoreCase)
+                    && hookCode.TrimStart().StartsWith(TenantPlatformRuntimeNoticeMarker, StringComparison.Ordinal)
+                    && string.Equals(
+                        StripLeadingBlockComments(hookCode),
+                        DefaultPlatformRuntimeHookBody,
+                        StringComparison.Ordinal);
+            }
+
+            if (!ManagedPlatformRuntimeEngineKeys.Contains(key, StringComparer.Ordinal)) return false;
+            var code = engine.Value<string>("ApiV8Code") ?? string.Empty;
+            var metadataVersionText = engine.Value<string>("Version")?.TrimStart('v', 'V');
+            var codeVersionMatch = Regex.Match(code, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+            var minimumEngineVersion = string.Equals(
+                    key,
+                    "platform-login-wallpapers",
+                    StringComparison.Ordinal)
+                ? MinimumPlatformLoginWallpapersEngineVersion
+                : string.Equals(key, "microi-init", StringComparison.Ordinal)
+                    ? MinimumPlatformMicroiInitEngineVersion
+                    : MinimumPlatformRuntimeEngineVersion;
+            return System.Version.TryParse(metadataVersionText, out var metadataVersion)
+                && metadataVersion >= minimumEngineVersion
+                && codeVersionMatch.Success
+                && System.Version.TryParse(codeVersionMatch.Groups[1].Value, out var codeVersion)
+                && codeVersion >= minimumEngineVersion
+                && engine.Value<int?>("IsEnable") == 1
+                && engine.Value<int?>("StopHttp") == 0
+                && engine.Value<int?>("AllowAnonymous") == (AnonymousPlatformRuntimeEngineKeys.Contains(key) ? 1 : 0)
+                && string.Equals(
+                    engine.Value<string>("ApiAddress"),
+                    "/apiengine/" + key,
+                    StringComparison.OrdinalIgnoreCase)
+                && code.TrimStart().StartsWith(ManagedPlatformRuntimeNoticeMarker, StringComparison.Ordinal)
+                && (!string.Equals(key, "microi-init", StringComparison.Ordinal)
+                    || (code.Contains("GetCurrentToken(rawToken, osClient)")
+                        && code.Contains("RefreshLoginUser(")
+                        && code.Contains("GetLegacyInitMenuTree(rawToken, osClient)")
+                        && code.Contains("safeCurrentUserProjection")
+                        && code.Contains("DataAppend: { OsClient: osClient }")
+                        && !code.Contains("GetFormData({")
+                        && !code.Contains("GetTableDataTree")))
+                && (AnonymousPlatformRuntimeEngineKeys.Contains(key)
+                    ? !code.Contains("V8.ApiEngine.Run('" + PlatformRuntimeCustomHookEngineKey + "'")
+                    : code.Contains("V8.ApiEngine.Run('" + PlatformRuntimeCustomHookEngineKey + "'"));
+        }
+
+        private static bool HasPackagedPlatformRuntime(JObject package)
+        {
+            var packageVersionText = package?["PackageInfo"]?["Version"]?.ToString()?.TrimStart('v', 'V');
+            var engines = package?["SysApiEngines"] as JArray;
+            if (package == null
+                || !System.Version.TryParse(packageVersionText, out var packageVersion)
+                || packageVersion < MinimumPlatformRuntimePackageVersion
+                || engines == null
+                || package["PackageInfo"]?["ApiEngineCount"]?.Value<int?>() != engines.Count)
+            {
+                return false;
+            }
+
+            var byKey = new Dictionary<string, JObject>(StringComparer.Ordinal);
+            foreach (var engine in engines.Children<JObject>())
+            {
+                var key = engine.Value<string>("ApiEngineKey") ?? string.Empty;
+                if (key.DosIsNullOrWhiteSpace() || byKey.ContainsKey(key)) return false;
+                byKey[key] = engine;
+            }
+
+            var requiredCapabilities = package["PackageInfo"]?["RequiredPlatformCapabilities"] as JArray;
+            foreach (var key in RequiredPlatformRuntimeEngineKeys)
+            {
+                if (!byKey.TryGetValue(key, out var engine)
+                    || !HasExpectedPlatformRuntimeEngineContract(engine, validateTenantTemplate: true)
+                    || requiredCapabilities?.Any(item => string.Equals(
+                        item?.ToString(),
+                        "ApiEngine:" + key,
+                        StringComparison.Ordinal)) != true)
+                {
+                    return false;
+                }
+
+                var policy = package["ResourcePolicies"]?["ApiEngines"]?[key];
+                var isTenantHook = string.Equals(key, PlatformRuntimeCustomHookEngineKey, StringComparison.Ordinal);
+                if (!string.Equals(
+                        policy?["UpgradePolicy"]?.ToString(),
+                        isTenantHook ? "CreateIfMissing" : "Managed",
+                        StringComparison.Ordinal)
+                    || (isTenantHook && !string.Equals(
+                        policy?["Ownership"]?.ToString(),
+                        "Tenant",
+                        StringComparison.Ordinal)))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static string StripLeadingBlockComments(string source)
+        {
+            var body = (source ?? string.Empty).TrimStart();
+            while (body.StartsWith("/*", StringComparison.Ordinal))
+            {
+                var end = body.IndexOf("*/", StringComparison.Ordinal);
+                if (end < 0) break;
+                body = body.Substring(end + 2).TrimStart();
+            }
+            return body.Trim();
+        }
+
+        private static bool HasExpectedSsoEngineContract(JObject engine, bool validateTenantTemplate)
+        {
+            if (engine == null) return false;
+            var key = engine.Value<string>("ApiEngineKey") ?? string.Empty;
+            var code = engine.Value<string>("ApiV8Code") ?? string.Empty;
+            var versionText = engine.Value<string>("Version")?.TrimStart('v', 'V');
+            var codeVersionMatch = Regex.Match(code, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+            if (!System.Version.TryParse(versionText, out var metadataVersion)
+                || metadataVersion < MinimumSsoEngineVersion
+                || !codeVersionMatch.Success
+                || !System.Version.TryParse(codeVersionMatch.Groups[1].Value, out var codeVersion)
+                || codeVersion < MinimumSsoEngineVersion
+                || engine.Value<int?>("IsEnable") != 1
+                || !string.Equals(
+                    engine.Value<string>("ApiAddress"),
+                    "/apiengine/" + key,
+                    StringComparison.OrdinalIgnoreCase)
+                || engine.Value<int?>("AllowAnonymous") != (AnonymousSsoEngineKeys.Contains(key) ? 1 : 0)
+                || engine.Value<int?>("StopHttp") != (InternalOnlySsoEngineKeys.Contains(key) ? 1 : 0))
+            {
+                return false;
+            }
+
+            if (string.Equals(key, "sso_event_hook", StringComparison.Ordinal))
+            {
+                return code.TrimStart().StartsWith(TenantSsoNoticeMarker, StringComparison.Ordinal)
+                    && (!validateTenantTemplate
+                        || string.Equals(StripLeadingBlockComments(code), DefaultSsoEventHookBody, StringComparison.Ordinal));
+            }
+
+            var directlyCallsTenantHook = code.Contains("V8.ApiEngine.Run('sso_event_hook'")
+                || code.Contains("V8.ApiEngine.Run(\"sso_event_hook\"");
+            if (!code.TrimStart().StartsWith(ManagedSsoNoticeMarker, StringComparison.Ordinal)
+                || (directlyCallsTenantHook != string.Equals(key, "sso_protocol_event", StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            return !string.Equals(key, "sso_protocol_event", StringComparison.Ordinal)
+                || code.Contains(SsoSafeHookPayloadMarker);
+        }
+
+        private static bool HasPackagedSsoRuntime(JObject package)
+        {
+            var packageVersionText = package?["PackageInfo"]?["Version"]?.ToString()?.TrimStart('v', 'V');
+            if (package == null
+                || !string.Equals(package["PackageInfo"]?["AppId"]?.ToString(), "app.microi.sso", StringComparison.Ordinal)
+                || !string.Equals(package["PackageInfo"]?["ApplicationType"]?.ToString(), "Platform", StringComparison.Ordinal)
+                || !System.Version.TryParse(packageVersionText, out var packageVersion)
+                || packageVersion < MinimumSsoPackageVersion)
+            {
+                return false;
+            }
+
+            var engines = package["SysApiEngines"] as JArray;
+            if (engines == null || engines.Count != RequiredSsoEngineKeys.Length) return false;
+            var byKey = new Dictionary<string, JObject>(StringComparer.Ordinal);
+            foreach (var engine in engines.Children<JObject>())
+            {
+                var key = engine.Value<string>("ApiEngineKey") ?? string.Empty;
+                if (key.DosIsNullOrWhiteSpace() || byKey.ContainsKey(key)) return false;
+                byKey[key] = engine;
+            }
+
+            foreach (var key in RequiredSsoEngineKeys)
+            {
+                if (!byKey.TryGetValue(key, out var engine)
+                    || !HasExpectedSsoEngineContract(engine, validateTenantTemplate: true))
+                {
+                    return false;
+                }
+
+                var policy = package["ResourcePolicies"]?["ApiEngines"]?[key];
+                var isTenantHook = string.Equals(key, "sso_event_hook", StringComparison.Ordinal);
+                if (!string.Equals(
+                        policy?["Ownership"]?.ToString(),
+                        isTenantHook ? "Tenant" : "Application",
+                        StringComparison.Ordinal)
+                    || !string.Equals(
+                        policy?["UpgradePolicy"]?.ToString(),
+                        isTenantHook ? "CreateIfMissing" : "Managed",
+                        StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static readonly Dictionary<string, System.Version> V8FirstPackageMinimumVersions =
+            new Dictionary<string, System.Version>(StringComparer.Ordinal)
+            {
+                { SysUserPackageResourceName, new System.Version(6, 3, 2) },
+                { SysConfigPackageResourceName, new System.Version(6, 3, 8) },
+                { MessageNotificationPackageResourceName, new System.Version(1, 0, 9) },
+                { AiEnginePackageResourceName, new System.Version(6, 3, 6) },
+                { SaaSEnginePackageResourceName, new System.Version(7, 5, 46) },
+                { AppStorePackageResourceName, new System.Version(7, 5, 55) }
+            };
+
+        private static readonly Dictionary<string, string[]> V8FirstPackageExactEngineKeys =
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                {
+                    SysUserPackageResourceName,
+                    new[]
+                    {
+                        "platform-user-update-preferences",
+                        "user-module-table-preference",
+                        "sys-user-security-action",
+                        "platform-user-update-profile",
+                        "platform-sys-user-admin",
+                        "platform-user-custom-hook"
+                    }
+                },
+                {
+                    SysConfigPackageResourceName,
+                    new[]
+                    {
+                        "platform-tenant-system-settings",
+                        "platform-system-settings-custom-hook"
+                    }
+                },
+                {
+                    MessageNotificationPackageResourceName,
+                    new[]
+                    {
+                        "msg_event",
+                        "msg_internal_list",
+                        "msg_internal_mark_read",
+                        "platform-chat-system-message",
+                        "platform-chat-runtime",
+                        "platform-message-notification-custom-hook"
+                    }
+                },
+                {
+                    AiEnginePackageResourceName,
+                    new[]
+                    {
+                        "mci_ai_data_assistant",
+                        "platform-ai-account",
+                        "platform-ai-runtime",
+                        "platform-ai-custom-hook"
+                    }
+                }
+            };
+
+        private static readonly Dictionary<string, string> V8FirstTenantHookKeys =
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                { SysUserPackageResourceName, "platform-user-custom-hook" },
+                { SysConfigPackageResourceName, "platform-system-settings-custom-hook" },
+                { MessageNotificationPackageResourceName, "platform-message-notification-custom-hook" },
+                { AiEnginePackageResourceName, "platform-ai-custom-hook" },
+                { AppStorePackageResourceName, "platform-marketplace-source-hook" }
+            };
+
+        private static bool HasExpectedOfficialEnginePolicy(
+            JObject package,
+            JObject engine,
+            bool isTenantHook)
+        {
+            var key = engine?.Value<string>("ApiEngineKey") ?? string.Empty;
+            var code = engine?.Value<string>("ApiV8Code") ?? string.Empty;
+            var policy = package?["ResourcePolicies"]?["ApiEngines"]?[key];
+            if (key.DosIsNullOrWhiteSpace()
+                || engine?.Value<int?>("IsEnable") != 1
+                || !string.Equals(
+                    policy?["UpgradePolicy"]?.ToString(),
+                    isTenantHook ? "CreateIfMissing" : "Managed",
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (isTenantHook)
+            {
+                return engine.Value<int?>("StopHttp") == 1
+                    && string.Equals(policy?["Ownership"]?.ToString(), "Tenant", StringComparison.Ordinal)
+                    && code.TrimStart().StartsWith(TenantPlatformRuntimeNoticeMarker, StringComparison.Ordinal)
+                    && string.Equals(
+                        StripLeadingBlockComments(code),
+                        DefaultPlatformRuntimeHookBody,
+                        StringComparison.Ordinal);
+            }
+
+            var ownership = policy?["Ownership"]?.ToString();
+            return (string.Equals(ownership, "Platform", StringComparison.Ordinal)
+                    || string.Equals(ownership, "Application", StringComparison.Ordinal))
+                && code.TrimStart().StartsWith(ManagedPlatformRuntimeNoticeMarker, StringComparison.Ordinal);
+        }
+
+        private static bool HasPackagedTableClosure(
+            JObject package,
+            IEnumerable<string> requiredTableNames,
+            IEnumerable<string> forbiddenTableNames)
+        {
+            var tables = package?["DiyTables"] as JArray ?? new JArray();
+            var fields = package?["DiyFields"] as JArray ?? new JArray();
+            var ddls = package?["DDLStatements"] as JArray ?? new JArray();
+            var physicalColumns = package?["PhysicalColumns"] as JArray ?? new JArray();
+            foreach (var tableName in requiredTableNames)
+            {
+                if (tables.Children<JObject>().Count(row => string.Equals(
+                        row.Value<string>("Name"), tableName, StringComparison.OrdinalIgnoreCase)) != 1
+                    || ddls.Children<JObject>().Count(row => string.Equals(
+                        row.Value<string>("TableName"), tableName, StringComparison.OrdinalIgnoreCase)) != 1
+                    || !ddls.Children<JObject>().Any(row => string.Equals(
+                            row.Value<string>("TableName"), tableName, StringComparison.OrdinalIgnoreCase)
+                        && (row.Value<string>("DDL") ?? string.Empty).IndexOf(
+                            "CREATE TABLE IF NOT EXISTS `" + tableName + "`",
+                            StringComparison.OrdinalIgnoreCase) >= 0)
+                    || !fields.Children<JObject>().Any(row => string.Equals(
+                        row.Value<string>("TableName"), tableName, StringComparison.OrdinalIgnoreCase))
+                    || !physicalColumns.Children<JObject>().Any(row => string.Equals(
+                        row.Value<string>("TABLE_NAME"), tableName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var tableName in forbiddenTableNames)
+            {
+                if (tables.Children<JObject>().Any(row => string.Equals(
+                        row.Value<string>("Name"), tableName, StringComparison.OrdinalIgnoreCase))
+                    || fields.Children<JObject>().Any(row => string.Equals(
+                        row.Value<string>("TableName"), tableName, StringComparison.OrdinalIgnoreCase))
+                    || ddls.Children<JObject>().Any(row => string.Equals(
+                        row.Value<string>("TableName"), tableName, StringComparison.OrdinalIgnoreCase))
+                    || physicalColumns.Children<JObject>().Any(row => string.Equals(
+                        row.Value<string>("TABLE_NAME"), tableName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool HasPackagedSysUserAiApiKeySchema(JObject package)
+        {
+            var fields = package?["DiyFields"] as JArray ?? new JArray();
+            var ddls = package?["DDLStatements"] as JArray ?? new JArray();
+            var physicalColumns = package?["PhysicalColumns"] as JArray ?? new JArray();
+            var fieldRows = fields.Children<JObject>().Where(row =>
+                string.Equals(row.Value<string>("TableName"), "sys_user", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(row.Value<string>("Name"), "AiApiKey", StringComparison.OrdinalIgnoreCase)).ToArray();
+            return fieldRows.Length == 1
+                && fieldRows[0].Value<int?>("Visible") == 0
+                && fieldRows[0].Value<int?>("AppVisible") == 0
+                && fieldRows[0].Value<int?>("Readonly") == 1
+                && physicalColumns.Children<JObject>().Count(row =>
+                    string.Equals(row.Value<string>("TABLE_NAME"), "sys_user", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(row.Value<string>("COLUMN_NAME"), "AiApiKey", StringComparison.OrdinalIgnoreCase)) == 1
+                && ddls.Children<JObject>().Any(row =>
+                    string.Equals(row.Value<string>("TableName"), "sys_user", StringComparison.OrdinalIgnoreCase)
+                    && Regex.IsMatch(row.Value<string>("DDL") ?? string.Empty, @"`AiApiKey`\s+varchar\(200\)", RegexOptions.IgnoreCase));
+        }
+
+        private static bool HasPackagedV8FirstApplicationRuntime(string resourceName, JObject package)
+        {
+            if (!V8FirstPackageMinimumVersions.TryGetValue(resourceName, out var minimumVersion))
+            {
+                return true;
+            }
+            var packageVersionText = package?["PackageInfo"]?["Version"]?.ToString()?.TrimStart('v', 'V');
+            if (!System.Version.TryParse(packageVersionText, out var packageVersion)
+                || packageVersion < minimumVersion)
+            {
+                return false;
+            }
+
+            var engines = package?["SysApiEngines"] as JArray ?? new JArray();
+            var byKey = new Dictionary<string, JObject>(StringComparer.Ordinal);
+            foreach (var engine in engines.Children<JObject>())
+            {
+                var key = engine.Value<string>("ApiEngineKey") ?? string.Empty;
+                if (key.DosIsNullOrWhiteSpace() || byKey.ContainsKey(key)) return false;
+                byKey[key] = engine;
+            }
+
+            if (V8FirstPackageExactEngineKeys.TryGetValue(resourceName, out var exactKeys))
+            {
+                if (byKey.Count != exactKeys.Length) return false;
+                var tenantHookKey = V8FirstTenantHookKeys[resourceName];
+                foreach (var key in exactKeys)
+                {
+                    if (!byKey.TryGetValue(key, out var engine)
+                        || !HasExpectedOfficialEnginePolicy(
+                            package,
+                            engine,
+                            string.Equals(key, tenantHookKey, StringComparison.Ordinal)))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            if (string.Equals(resourceName, SaaSEnginePackageResourceName, StringComparison.Ordinal))
+            {
+                foreach (var key in new[]
+                {
+                    "platform-create-tenant",
+                    "platform-external-login-binding",
+                    "platform-wechat-user-binding"
+                })
+                {
+                    if (!byKey.TryGetValue(key, out var engine)
+                        || !HasExpectedOfficialEnginePolicy(package, engine, false)
+                        || !(engine.Value<string>("ApiV8Code") ?? string.Empty).Contains("platform-runtime-custom-hook")
+                        || ((string.Equals(key, "platform-external-login-binding", StringComparison.Ordinal)
+                                || string.Equals(key, "platform-wechat-user-binding", StringComparison.Ordinal))
+                            && engine.Value<int?>("Lock") != 1))
+                    {
+                        return false;
+                    }
+                }
+                if (byKey.ContainsKey("platform-user-update-preferences")
+                    || byKey.ContainsKey("platform-sys-menu"))
+                {
+                    return false;
+                }
+            }
+
+            if (string.Equals(resourceName, AppStorePackageResourceName, StringComparison.Ordinal))
+            {
+                var requiredCapabilities = package["PackageInfo"]?["RequiredPlatformCapabilities"] as JArray
+                    ?? new JArray();
+                var deliveredCapabilities = package["PackageInfo"]?["Capabilities"] as JArray
+                    ?? new JArray();
+                var hasPackageStorage = byKey.TryGetValue("microi-store-package-storage", out var packageStorageEngine);
+                var packageStorageVersionText = (packageStorageEngine?.Value<string>("Version") ?? string.Empty)
+                    .TrimStart('v', 'V');
+                var packageStorageCode = packageStorageEngine?.Value<string>("ApiV8Code") ?? string.Empty;
+                if (!byKey.TryGetValue("get-microi-upgrade-resource", out var officialResourceEngine)
+                    || !System.Version.TryParse(
+                        (officialResourceEngine.Value<string>("Version") ?? string.Empty).TrimStart('v', 'V'),
+                        out var officialResourceVersion)
+                    || officialResourceVersion < new System.Version(1, 2, 8)
+                    || officialResourceEngine.Value<int?>("AllowAnonymous") != 1
+                    || !HasExpectedOfficialEnginePolicy(package, officialResourceEngine, false)
+                    || !(officialResourceEngine.Value<string>("ApiV8Code") ?? string.Empty)
+                        .Contains("V8.Method.AuthorizeOfficialResourcePublish()")
+                    || !requiredCapabilities.Any(item => string.Equals(
+                        item?.ToString(),
+                        "V8.Method.AuthorizeOfficialResourcePublish",
+                        StringComparison.Ordinal))
+                    || !HasApiEngineCapabilityAtLeast(
+                        requiredCapabilities,
+                        OfficialResourcePublisherEngineKey,
+                        new System.Version(1, 2, 8))
+                    || !hasPackageStorage
+                    || !System.Version.TryParse(packageStorageVersionText, out var packageStorageVersion)
+                    || packageStorageVersion < new System.Version(1, 1, 0)
+                    || packageStorageEngine.Value<int?>("StopHttp") != 1
+                    || !HasExpectedOfficialEnginePolicy(package, packageStorageEngine, false)
+                    || !packageStorageCode.Contains("MARKETPLACE_PACKAGE_UPLOAD_BASE64_SINGLE_ATTEMPT_V1")
+                    || packageStorageCode.Contains("V8.Method.UploadText(")
+                    || !deliveredCapabilities.Any(item => string.Equals(
+                        item?.ToString(),
+                        "ApiEngine:microi-store-package-storage@v1.1.0",
+                        StringComparison.Ordinal))
+                    || !byKey.TryGetValue("platform-marketplace-source", out var sourceEngine)
+                    || !byKey.TryGetValue("platform-marketplace-source-hook", out var sourceHook)
+                    || !HasExpectedOfficialEnginePolicy(package, sourceEngine, false)
+                    || !HasExpectedOfficialEnginePolicy(package, sourceHook, true)
+                    || !(sourceEngine.Value<string>("ApiV8Code") ?? string.Empty).Contains("platform-marketplace-source-hook")
+                    || byKey.ContainsKey("platform-user-update-preferences"))
+                {
+                    return false;
+                }
+            }
+
+            if (string.Equals(resourceName, SysUserPackageResourceName, StringComparison.Ordinal))
+            {
+                var adminEngine = byKey["platform-sys-user-admin"];
+                var adminCode = adminEngine.Value<string>("ApiV8Code") ?? string.Empty;
+                var adminVersionText = (adminEngine.Value<string>("Version") ?? string.Empty)
+                    .TrimStart('v', 'V');
+                var capabilities = package["PackageInfo"]?["RequiredPlatformCapabilities"] as JArray
+                    ?? new JArray();
+                return System.Version.TryParse(adminVersionText, out var adminVersion)
+                    && adminVersion >= new System.Version(1, 0, 2)
+                    && capabilities.Any(item => string.Equals(
+                        item?.ToString(),
+                        "ApiEngine:platform-sys-user-admin@v1.0.2",
+                        StringComparison.Ordinal))
+                    && (byKey["platform-user-update-preferences"].Value<string>("ApiV8Code") ?? string.Empty).Contains("platform-user-custom-hook")
+                    && (byKey["platform-user-update-profile"].Value<string>("ApiV8Code") ?? string.Empty).Contains("platform-user-custom-hook")
+                    && adminCode.Contains("V8.Method.ManageSysUserAdmin")
+                    && adminCode.Contains("platform-user-custom-hook")
+                    && adminCode.Contains("authorization.DataAppend.ChangesPassword === true")
+                    && HasPackagedSysUserAiApiKeySchema(package);
+            }
+            if (string.Equals(resourceName, SysConfigPackageResourceName, StringComparison.Ordinal))
+            {
+                return (byKey["platform-tenant-system-settings"].Value<string>("ApiV8Code") ?? string.Empty).Contains("platform-system-settings-custom-hook");
+            }
+            if (string.Equals(resourceName, MessageNotificationPackageResourceName, StringComparison.Ordinal))
+            {
+                var systemCode = byKey["platform-chat-system-message"].Value<string>("ApiV8Code") ?? string.Empty;
+                var runtimeCode = byKey["platform-chat-runtime"].Value<string>("ApiV8Code") ?? string.Empty;
+                var runtimeVersionText = (byKey["platform-chat-runtime"].Value<string>("Version") ?? string.Empty)
+                    .TrimStart('v', 'V');
+                var capabilities = package["PackageInfo"]?["RequiredPlatformCapabilities"] as JArray
+                    ?? new JArray();
+                return systemCode.Contains("platform-chat-runtime")
+                    && System.Version.TryParse(runtimeVersionText, out var runtimeVersion)
+                    && runtimeVersion >= new System.Version(1, 0, 1)
+                    && capabilities.Any(item => string.Equals(
+                        item?.ToString(),
+                        "ApiEngine:platform-chat-runtime@v1.0.1",
+                        StringComparison.Ordinal))
+                    && capabilities.Any(item => string.Equals(
+                        item?.ToString(),
+                        "V8.Method.RequireManagedProtocolContext",
+                        StringComparison.Ordinal))
+                    && runtimeCode.Contains("CHAT_SIGNALR_TRUSTED_PROTOCOL_V1")
+                    && runtimeCode.Contains("RequireManagedProtocolContext")
+                    && runtimeCode.Contains("platform-message-notification-custom-hook")
+                    && runtimeCode.Contains("V8.MongoDb.UptFormDataByWhere")
+                    && runtimeCode.Contains("V8.MongoDb.DelFormDataByWhere");
+            }
+            if (string.Equals(resourceName, AiEnginePackageResourceName, StringComparison.Ordinal))
+            {
+                var assistantCode = byKey["mci_ai_data_assistant"].Value<string>("ApiV8Code") ?? string.Empty;
+                var accountCode = byKey["platform-ai-account"].Value<string>("ApiV8Code") ?? string.Empty;
+                var runtimeCode = byKey["platform-ai-runtime"].Value<string>("ApiV8Code") ?? string.Empty;
+                var accountVersionText = (byKey["platform-ai-account"].Value<string>("Version") ?? string.Empty)
+                    .TrimStart('v', 'V');
+                var runtimeVersionText = (byKey["platform-ai-runtime"].Value<string>("Version") ?? string.Empty)
+                    .TrimStart('v', 'V');
+                var aiCapabilities = package["PackageInfo"]?["RequiredPlatformCapabilities"] as JArray
+                    ?? new JArray();
+                return assistantCode.Contains("AI_DATA_ASSISTANT_SAFE_TENANT_HOOK_V1")
+                    && assistantCode.Contains("platform-ai-custom-hook")
+                    && accountCode.Contains("platform-ai-custom-hook")
+                    && accountCode.Contains("PAYMENT_COMPLETE_MANAGED_V1")
+                    && accountCode.Contains("RequireManagedProtocolContext")
+                    && runtimeCode.Contains("AI_RUNTIME_MANAGED_NON_STREAM_V1")
+                    && runtimeCode.Contains("platform-ai-custom-hook")
+                    && runtimeCode.Contains("V8.AI.Chat")
+                    && runtimeCode.Contains("V8.AI.NL2SQL")
+                    && runtimeCode.Contains("V8.AI.NL2V8")
+                    && System.Version.TryParse(accountVersionText, out var accountVersion)
+                    && accountVersion >= new System.Version(1, 1, 0)
+                    && System.Version.TryParse(runtimeVersionText, out var runtimeVersion)
+                    && runtimeVersion >= new System.Version(1, 0, 0)
+                    && new[]
+                    {
+                        "ApiEngine:platform-ai-account@v1.1.0",
+                        "ApiEngine:platform-ai-runtime@v1.0.0",
+                        "V8.Method.RequireManagedProtocolContext",
+                        "V8.AI.UpdateConversationTitle",
+                        "V8.AI.Chat",
+                        "V8.AI.RecognizeIntent",
+                        "V8.AI.NL2SQL",
+                        "V8.AI.NL2V8"
+                    }.All(required => aiCapabilities.Any(item => string.Equals(
+                        item?.ToString(),
+                        required,
+                        StringComparison.Ordinal)))
+                    && HasPackagedTableClosure(
+                        package,
+                        new[]
+                        {
+                            "mic_sub_provider", "mic_sub_model", "mic_sub_plan", "mic_sub_order",
+                            "mic_sub_user", "mic_sub_usage", "mic_sub_alipay_config", "mic_sub_apikey",
+                            "mic_sub_apikey_binduser", "mci_ai_token_account", "mci_ai_token_log"
+                        },
+                        new[] { "mci_ai_app_version", "mci_ai_app_file", "sys_microistore", "sys_user" })
+                    && (package["PhysicalColumns"] as JArray)?.Children<JObject>().Count(row =>
+                        string.Equals(row.Value<string>("TABLE_NAME"), "mci_ai_token_log", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(row.Value<string>("COLUMN_NAME"), "PromptPreview", StringComparison.OrdinalIgnoreCase)) == 1;
+            }
+
+            return true;
+        }
+
+        private static bool HasApiEngineCapabilityAtLeast(
+            JArray capabilities,
+            string apiEngineKey,
+            System.Version minimumVersion)
+        {
+            if (capabilities == null || apiEngineKey.DosIsNullOrWhiteSpace() || minimumVersion == null)
+            {
+                return false;
+            }
+
+            var prefix = "ApiEngine:" + apiEngineKey + "@";
+            foreach (var item in capabilities)
+            {
+                var capability = item?.ToString() ?? string.Empty;
+                if (!capability.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var versionText = capability.Substring(prefix.Length).TrimStart('v', 'V');
+                if (System.Version.TryParse(versionText, out var version)
+                    && version >= minimumVersion)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private static readonly string[] RequiredResourceNames =
         {
             ImportPackageResourceName,
@@ -78,7 +814,12 @@ namespace Microi.net
             FormEnginePackageResourceName,
             ModuleEnginePackageResourceName,
             SaaSEnginePackageResourceName,
-            AppStorePackageResourceName
+            SsoPackageResourceName,
+            AppStorePackageResourceName,
+            SysUserPackageResourceName,
+            SysConfigPackageResourceName,
+            MessageNotificationPackageResourceName,
+            AiEnginePackageResourceName
         };
 
         private static readonly Dictionary<string, string> ExpectedPackageNames = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -86,7 +827,12 @@ namespace Microi.net
             { FormEnginePackageResourceName, "表单引擎" },
             { ModuleEnginePackageResourceName, "模块引擎" },
             { SaaSEnginePackageResourceName, "SaaS引擎" },
-            { AppStorePackageResourceName, "应用商城" }
+            { SsoPackageResourceName, "SSO 身份联邦" },
+            { AppStorePackageResourceName, "应用商城" },
+            { SysUserPackageResourceName, "系统账号" },
+            { SysConfigPackageResourceName, "系统设置" },
+            { MessageNotificationPackageResourceName, "消息通知" },
+            { AiEnginePackageResourceName, "AI助手" }
         };
 
         /// <summary>
@@ -199,6 +945,65 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     || !bulkCode.Contains("BULK_MONOTONIC_CHILD_PROGRESS_V1"))
                 {
                     return RefreshRequired(osClient, "应用商城全部安装/更新接口缺失或版本过低");
+                }
+
+                var backgroundTaskEngineRow = client.Db.FromSql(@"SELECT ApiV8Code, ApiAddress, IsEnable, StopHttp, AllowAnonymous FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", PlatformBackgroundTaskEngineKey)
+                    .First<dynamic>();
+                var backgroundTaskEngine = backgroundTaskEngineRow == null
+                    ? null
+                    : JObject.FromObject(backgroundTaskEngineRow);
+                var backgroundTaskCode = backgroundTaskEngine?.Value<string>("ApiV8Code") ?? string.Empty;
+                var backgroundTaskVersionMatch = Regex.Match(
+                    backgroundTaskCode,
+                    @"Version\s*:\s*v?(\d+\.\d+\.\d+)",
+                    RegexOptions.IgnoreCase);
+                var backgroundTaskVersion = new System.Version(0, 0, 0);
+                if (backgroundTaskEngine == null
+                    || !backgroundTaskVersionMatch.Success
+                    || !System.Version.TryParse(backgroundTaskVersionMatch.Groups[1].Value, out backgroundTaskVersion)
+                    || !HasPlatformBackgroundTaskCapabilities(backgroundTaskCode, backgroundTaskVersion)
+                    || !string.Equals(
+                        backgroundTaskEngine.Value<string>("ApiAddress"),
+                        PlatformBackgroundTaskApiAddress,
+                        StringComparison.OrdinalIgnoreCase)
+                    || backgroundTaskEngine.Value<int?>("IsEnable") != 1
+                    || backgroundTaskEngine.Value<int?>("StopHttp") != 0
+                    || backgroundTaskEngine.Value<int?>("AllowAnonymous") != 0)
+                {
+                    return RefreshRequired(osClient, "平台后台任务接口缺失或版本过低");
+                }
+
+                // platform-sys-menu 是前端登录后构建路由的启动前置依赖。它不能继续仅由
+                // 安装顺序靠后的 SaaS 包“顺带”交付，否则旧租户先升级二进制时会在进入
+                // 应用商城之前就因接口不存在而全站不可用。
+                var sysMenuEngineRow = client.Db.FromSql(@"SELECT ApiV8Code, ApiAddress, IsEnable, StopHttp, AllowAnonymous FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", PlatformSysMenuEngineKey)
+                    .First<dynamic>();
+                var sysMenuEngine = sysMenuEngineRow == null
+                    ? null
+                    : JObject.FromObject(sysMenuEngineRow);
+                var sysMenuCode = sysMenuEngine?.Value<string>("ApiV8Code") ?? string.Empty;
+                var sysMenuVersionMatch = Regex.Match(
+                    sysMenuCode,
+                    @"Version\s*:\s*v?(\d+\.\d+\.\d+)",
+                    RegexOptions.IgnoreCase);
+                var sysMenuVersion = new System.Version(0, 0, 0);
+                if (sysMenuEngine == null
+                    || !sysMenuVersionMatch.Success
+                    || !System.Version.TryParse(sysMenuVersionMatch.Groups[1].Value, out sysMenuVersion)
+                    || !HasPlatformSysMenuCapabilities(sysMenuCode, sysMenuVersion)
+                    || !string.Equals(
+                        sysMenuEngine.Value<string>("ApiAddress"),
+                        PlatformSysMenuApiAddress,
+                        StringComparison.OrdinalIgnoreCase)
+                    || sysMenuEngine.Value<int?>("IsEnable") != 1
+                    || sysMenuEngine.Value<int?>("StopHttp") != 0
+                    || sysMenuEngine.Value<int?>("AllowAnonymous") != 0)
+                {
+                    return RefreshRequired(osClient, "平台菜单启动接口缺失或版本过低");
                 }
 
                 var storeListCode = client.Db.FromSql(@"SELECT ApiV8Code FROM sys_apiengine
@@ -468,6 +1273,24 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     .ToScalar();
                 if (!HasRows(roleLimitCount)) return RefreshRequired(osClient, "缺少应用商城超级管理员菜单权限");
 
+                var platformRuntimeReason = GetInstalledPlatformRuntimeRepairReason(client.Db);
+                if (!platformRuntimeReason.DosIsNullOrWhiteSpace())
+                {
+                    return RefreshRequired(osClient, platformRuntimeReason);
+                }
+
+                var ssoRuntimeReason = GetInstalledSsoRuntimeRepairReason(client.Db);
+                if (!ssoRuntimeReason.DosIsNullOrWhiteSpace())
+                {
+                    return RefreshRequired(osClient, ssoRuntimeReason);
+                }
+
+                var v8FirstRuntimeReason = GetInstalledV8FirstApplicationRuntimeRepairReason(client.Db);
+                if (!v8FirstRuntimeReason.DosIsNullOrWhiteSpace())
+                {
+                    return RefreshRequired(osClient, v8FirstRuntimeReason);
+                }
+
                 return Task.FromResult(false);
             }
             catch (Exception ex)
@@ -479,6 +1302,239 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
         private static bool HasRows(object value)
         {
             return long.TryParse(value?.ToString(), out var count) && count > 0;
+        }
+
+        private static string GetInstalledPlatformRuntimeRepairReason(DbSession database)
+        {
+            foreach (var key in RequiredPlatformRuntimeEngineKeys)
+            {
+                var isTenantHook = string.Equals(
+                    key,
+                    PlatformRuntimeCustomHookEngineKey,
+                    StringComparison.Ordinal);
+                var keyPredicate = isTenantHook
+                    ? "LOWER(ApiEngineKey)=LOWER(@p0)"
+                    : "ApiEngineKey=@p0";
+                var sql = @"SELECT ApiEngineKey, ApiV8Code, Version, ApiAddress,
+IsEnable, StopHttp, AllowAnonymous
+FROM sys_apiengine
+WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR IsDeleted IS NULL)");
+                var row = database.FromSql(sql)
+                    .AddInParameter("p0", key)
+                    .First<dynamic>();
+                if (row == null) return $"平台运行时接口[{key}]缺失";
+
+                // CreateIfMissing 导入器按 LOWER(ApiEngineKey) 识别既有墓碑/大小写变体；
+                // 安装回读必须使用同一语义。租户 Hook 只要记录存在即满足门禁。
+                if (isTenantHook) continue;
+
+                var engine = JObject.FromObject((object)row);
+                if (HasExpectedPlatformRuntimeEngineContract(engine, validateTenantTemplate: false)) continue;
+
+                return $"平台运行时 Managed 接口[{key}]缺失、版本过低或官方运行契约不完整";
+            }
+
+            return null;
+        }
+
+        private static string GetInstalledSsoRuntimeRepairReason(DbSession database)
+        {
+            foreach (var key in RequiredSsoEngineKeys)
+            {
+                var isTenantHook = string.Equals(key, "sso_event_hook", StringComparison.Ordinal);
+                var keyPredicate = isTenantHook
+                    ? "LOWER(ApiEngineKey)=LOWER(@p0)"
+                    : "ApiEngineKey=@p0";
+                var sql = @"SELECT ApiEngineKey, ApiV8Code, Version, ApiAddress,
+IsEnable, StopHttp, AllowAnonymous
+FROM sys_apiengine
+WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR IsDeleted IS NULL)");
+                var row = database.FromSql(sql)
+                    .AddInParameter("p0", key)
+                    .First<dynamic>();
+                if (row == null) return $"SSO 身份联邦接口[{key}]缺失";
+
+                var engine = JObject.FromObject((object)row);
+                // CreateIfMissing Hook 首次创建后归租户维护。已存在即满足升级门；源码、
+                // 版本、启用状态、地址与内部调用配置都不得成为重复安装条件。
+                if (string.Equals(key, "sso_event_hook", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!HasExpectedSsoEngineContract(engine, validateTenantTemplate: false))
+                {
+                    return $"SSO 身份联邦 Managed 接口[{key}]缺失、版本过低或资源策略提示不完整";
+                }
+            }
+            return null;
+        }
+
+        private static readonly string[] InstalledV8FirstManagedEngineKeys =
+        {
+            "platform-create-tenant",
+            "platform-external-login-binding",
+            "platform-wechat-user-binding",
+            "platform-user-update-preferences",
+            "platform-user-update-profile",
+            "platform-sys-user-admin",
+            "platform-tenant-system-settings",
+            "platform-chat-system-message",
+            "platform-chat-runtime",
+            "platform-marketplace-source",
+            "mci_ai_data_assistant",
+            "platform-ai-account",
+            "platform-ai-runtime"
+        };
+
+        private static readonly HashSet<string> InstalledV8FirstInternalEngineKeys =
+            new HashSet<string>(StringComparer.Ordinal)
+            {
+                "platform-external-login-binding",
+                "platform-wechat-user-binding",
+                "platform-chat-system-message",
+                "platform-chat-runtime",
+                "platform-marketplace-source"
+            };
+
+        private static readonly HashSet<string> InstalledV8FirstAnonymousEngineKeys =
+            new HashSet<string>(StringComparer.Ordinal)
+            {
+                "platform-ai-account"
+            };
+
+        private static readonly string[] InstalledV8FirstTenantHookKeys =
+        {
+            "platform-runtime-custom-hook",
+            "platform-user-custom-hook",
+            "platform-system-settings-custom-hook",
+            "platform-message-notification-custom-hook",
+            "platform-marketplace-source-hook",
+            "platform-ai-custom-hook"
+        };
+
+        private static string ExpectedV8FirstHookMarker(string key)
+        {
+            if (string.Equals(key, "platform-create-tenant", StringComparison.Ordinal)
+                || string.Equals(key, "platform-external-login-binding", StringComparison.Ordinal)
+                || string.Equals(key, "platform-wechat-user-binding", StringComparison.Ordinal))
+            {
+                return "platform-runtime-custom-hook";
+            }
+            if (string.Equals(key, "platform-user-update-preferences", StringComparison.Ordinal)
+                || string.Equals(key, "platform-user-update-profile", StringComparison.Ordinal)
+                || string.Equals(key, "platform-sys-user-admin", StringComparison.Ordinal))
+            {
+                return "platform-user-custom-hook";
+            }
+            if (string.Equals(key, "platform-tenant-system-settings", StringComparison.Ordinal))
+            {
+                return "platform-system-settings-custom-hook";
+            }
+            if (string.Equals(key, "platform-chat-runtime", StringComparison.Ordinal))
+            {
+                return "platform-message-notification-custom-hook";
+            }
+            if (string.Equals(key, "platform-marketplace-source", StringComparison.Ordinal))
+            {
+                return "platform-marketplace-source-hook";
+            }
+            if (string.Equals(key, "mci_ai_data_assistant", StringComparison.Ordinal)
+                || string.Equals(key, "platform-ai-account", StringComparison.Ordinal)
+                || string.Equals(key, "platform-ai-runtime", StringComparison.Ordinal))
+            {
+                return "platform-ai-custom-hook";
+            }
+            return string.Empty;
+        }
+
+        private static string GetInstalledV8FirstApplicationRuntimeRepairReason(DbSession database)
+        {
+            foreach (var key in InstalledV8FirstTenantHookKeys)
+            {
+                var hook = database.FromSql(@"SELECT ApiEngineKey FROM sys_apiengine
+WHERE LOWER(ApiEngineKey)=LOWER(@p0)")
+                    .AddInParameter("p0", key)
+                    .First<dynamic>();
+                // CreateIfMissing 资源首次创建后归租户维护。禁用、改名大小写或软删除都不触发官方覆盖。
+                if (hook == null) return $"租户个性化 Hook[{key}]尚未创建";
+            }
+
+            foreach (var key in InstalledV8FirstManagedEngineKeys)
+            {
+                var row = database.FromSql(@"SELECT ApiEngineKey, ApiV8Code, Version, ApiAddress,
+IsEnable, StopHttp, AllowAnonymous, Lock
+FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", key)
+                    .First<dynamic>();
+                if (row == null) return $"V8 引擎优先 Managed 接口[{key}]缺失";
+                var engine = JObject.FromObject((object)row);
+                var code = engine.Value<string>("ApiV8Code") ?? string.Empty;
+                var versionText = (engine.Value<string>("Version") ?? string.Empty).TrimStart('v', 'V');
+                var expectedHook = ExpectedV8FirstHookMarker(key);
+                var minimumInstalledVersion = string.Equals(
+                        key,
+                        "platform-ai-account",
+                        StringComparison.Ordinal)
+                    || string.Equals(
+                        key,
+                        "platform-chat-system-message",
+                        StringComparison.Ordinal)
+                    ? new System.Version(1, 1, 0)
+                    : new System.Version(1, 0, 0);
+                if (!System.Version.TryParse(versionText, out var version)
+                    || version < minimumInstalledVersion
+                    || !code.TrimStart().StartsWith(ManagedPlatformRuntimeNoticeMarker, StringComparison.Ordinal)
+                    || (!expectedHook.DosIsNullOrWhiteSpace() && !code.Contains(expectedHook))
+                    || engine.Value<int?>("IsEnable") != 1
+                    || engine.Value<int?>("StopHttp") != (InstalledV8FirstInternalEngineKeys.Contains(key) ? 1 : 0)
+                    || engine.Value<int?>("AllowAnonymous") != (InstalledV8FirstAnonymousEngineKeys.Contains(key) ? 1 : 0)
+                    || ((string.Equals(key, "platform-external-login-binding", StringComparison.Ordinal)
+                            || string.Equals(key, "platform-wechat-user-binding", StringComparison.Ordinal))
+                        && engine.Value<int?>("Lock") != 1)
+                    || !string.Equals(
+                        engine.Value<string>("ApiAddress"),
+                        "/apiengine/" + key,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return $"V8 引擎优先 Managed 接口[{key}]版本、路由、官方提示或 Hook 契约不完整";
+                }
+                if (string.Equals(key, "mci_ai_data_assistant", StringComparison.Ordinal)
+                    && !code.Contains("AI_DATA_ASSISTANT_SAFE_TENANT_HOOK_V1"))
+                {
+                    return "AI 数据助手缺少安全最小化租户 Hook";
+                }
+                if (string.Equals(key, "platform-ai-account", StringComparison.Ordinal)
+                    && (!code.Contains("PAYMENT_COMPLETE_MANAGED_V1")
+                        || !code.Contains("RequireManagedProtocolContext")))
+                {
+                    return "AI 账户接口缺少可信支付回调 Managed 编排";
+                }
+                if (string.Equals(key, "platform-ai-runtime", StringComparison.Ordinal)
+                    && (!code.Contains("AI_RUNTIME_MANAGED_NON_STREAM_V1")
+                        || !code.Contains("V8.AI.Chat")
+                        || !code.Contains("V8.AI.NL2SQL")
+                        || !code.Contains("V8.AI.NL2V8")))
+                {
+                    return "AI 非流式兼容运行时能力不完整";
+                }
+                if (string.Equals(key, "platform-chat-system-message", StringComparison.Ordinal)
+                    && !code.Contains("platform-chat-runtime"))
+                {
+                    return "平台系统消息尚未转发固定聊天 Managed 运行时";
+                }
+                if (string.Equals(key, "platform-chat-runtime", StringComparison.Ordinal)
+                    && (!code.Contains("V8.MongoDb.UptFormDataByWhere")
+                        || !code.Contains("V8.MongoDb.DelFormDataByWhere")
+                        || !code.Contains("CHAT_SIGNALR_TRUSTED_PROTOCOL_V1")
+                        || !code.Contains("RequireManagedProtocolContext")
+                        || !code.Contains("platform-message-notification-custom-hook")))
+                {
+                    return "平台聊天 Managed 运行时缺少 SignalR 可信协议、持久化、已读/删除或租户 Hook 契约";
+                }
+            }
+            return null;
         }
 
         private static string GetMarketplaceRuntimeRepairReason(
@@ -845,8 +1901,30 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 throw new InvalidOperationException($"升级资源[{resourceName}]数据包名称不匹配，期望[{expectedPackageName}]，实际[{actualPackageName}]。");
             }
 
+            if (!HasPackagedV8FirstApplicationRuntime(resourceName, package))
+            {
+                throw new InvalidOperationException(
+                    $"升级资源[{resourceName}]缺少当前 V8 引擎优先接口、单一官方应用所有权、醒目恢复提示或 CreateIfMissing 个性化 Hook。"
+                );
+            }
+
+            if (string.Equals(resourceName, SsoPackageResourceName, StringComparison.Ordinal)
+                && !HasPackagedSsoRuntime(package))
+            {
+                throw new InvalidOperationException(
+                    $"升级资源[{resourceName}]缺少 v7.5.6 SSO Managed 基线、醒目恢复提示、安全 Hook 白名单或 CreateIfMissing 默认模板。"
+                );
+            }
+
             if (string.Equals(resourceName, SaaSEnginePackageResourceName, StringComparison.Ordinal))
             {
+                if (!HasPackagedPlatformRuntime(package))
+                {
+                    throw new InvalidOperationException(
+                        $"升级资源[{resourceName}]缺少 v7.5.46 平台运行时 Managed 基线、CreateIfMissing Hook、安全 microi-init、登录壁纸可信原子契约或完整资源策略。"
+                    );
+                }
+
                 var bundle = (package["ApplicationBundles"] as JArray)?.FirstOrDefault() as JObject;
                 var sourceFiles = bundle?["SourceFiles"] as JArray;
                 var buildAssets = bundle?["BuildAssets"] as JArray;
@@ -886,14 +1964,98 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     .FirstOrDefault(item => string.Equals(item?["ApiEngineKey"]?.ToString(), "bulk-import-microi-store-packages", StringComparison.Ordinal));
                 var bulkEngineCode = bulkEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
                 var bulkEngineVersionText = bulkEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
+                var backgroundTaskEngine = packageEngines?
+                    .FirstOrDefault(item => string.Equals(
+                        item?["ApiEngineKey"]?.ToString(),
+                        PlatformBackgroundTaskEngineKey,
+                        StringComparison.Ordinal));
+                var backgroundTaskEngineCode = backgroundTaskEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
+                var backgroundTaskEngineVersionText = backgroundTaskEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
+                var backgroundTaskPolicy = package["ResourcePolicies"]?["ApiEngines"]?[PlatformBackgroundTaskEngineKey];
+                var sysMenuEngine = packageEngines?
+                    .FirstOrDefault(item => string.Equals(
+                        item?["ApiEngineKey"]?.ToString(),
+                        PlatformSysMenuEngineKey,
+                        StringComparison.Ordinal));
+                var sysMenuEngineCode = sysMenuEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
+                var sysMenuEngineVersionText = sysMenuEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
+                var sysMenuPolicy = package["ResourcePolicies"]?["ApiEngines"]?[PlatformSysMenuEngineKey];
+                var officialResourceEngine = packageEngines?
+                    .FirstOrDefault(item => string.Equals(
+                        item?["ApiEngineKey"]?.ToString(),
+                        OfficialResourcePublisherEngineKey,
+                        StringComparison.Ordinal));
+                var officialResourceEngineCode = officialResourceEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
+                var officialResourceEngineVersionText = officialResourceEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
+                var officialResourcePolicy = package["ResourcePolicies"]?["ApiEngines"]?[OfficialResourcePublisherEngineKey];
+                var requiredCapabilities = package["PackageInfo"]?["RequiredPlatformCapabilities"] as JArray;
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
-                    packageVersion < new System.Version(7, 5, 23) ||
+                    packageVersion < new System.Version(7, 5, 55) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
                     !HasPinnedImporterCapabilities(importerEngineCode, embeddedImporterVersion) ||
                     !System.Version.TryParse(bulkEngineVersionText, out var embeddedBulkVersion) ||
                     !HasPinnedBulkCapabilities(bulkEngineCode, embeddedBulkVersion) ||
                     bulkEngine?["IsEnable"]?.Value<int>() != 1 ||
                     bulkEngine?["StopHttp"]?.Value<int>() != 0 ||
+                    !System.Version.TryParse(backgroundTaskEngineVersionText, out var embeddedBackgroundTaskVersion) ||
+                    !HasPlatformBackgroundTaskCapabilities(backgroundTaskEngineCode, embeddedBackgroundTaskVersion) ||
+                    !string.Equals(
+                        backgroundTaskEngine?["ApiAddress"]?.ToString(),
+                        PlatformBackgroundTaskApiAddress,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    backgroundTaskEngine?["IsEnable"]?.Value<int>() != 1 ||
+                    backgroundTaskEngine?["StopHttp"]?.Value<int>() != 0 ||
+                    backgroundTaskEngine?["AllowAnonymous"]?.Value<int>() != 0 ||
+                    !string.Equals(
+                        backgroundTaskPolicy?["UpgradePolicy"]?.ToString(),
+                        "Managed",
+                        StringComparison.Ordinal) ||
+                    requiredCapabilities?.Any(item => string.Equals(
+                        item?.ToString(),
+                        "ServerFeature:V8.ManageBackgroundTask",
+                        StringComparison.Ordinal)) != true ||
+                    requiredCapabilities?.Any(item => string.Equals(
+                        item?.ToString(),
+                        "ApiEngine:platform-background-task@v1.1.0",
+                        StringComparison.Ordinal)) != true ||
+                    !System.Version.TryParse(sysMenuEngineVersionText, out var embeddedSysMenuVersion) ||
+                    !HasPlatformSysMenuCapabilities(sysMenuEngineCode, embeddedSysMenuVersion) ||
+                    !string.Equals(
+                        sysMenuEngine?["ApiAddress"]?.ToString(),
+                        PlatformSysMenuApiAddress,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    sysMenuEngine?["IsEnable"]?.Value<int>() != 1 ||
+                    sysMenuEngine?["StopHttp"]?.Value<int>() != 0 ||
+                    sysMenuEngine?["AllowAnonymous"]?.Value<int>() != 0 ||
+                    !string.Equals(
+                        sysMenuPolicy?["UpgradePolicy"]?.ToString(),
+                        "Managed",
+                        StringComparison.Ordinal) ||
+                    requiredCapabilities?.Any(item => string.Equals(
+                        item?.ToString(),
+                        "V8.Method.ManageSystemDirectory",
+                        StringComparison.Ordinal)) != true ||
+                    requiredCapabilities?.Any(item => string.Equals(
+                        item?.ToString(),
+                        "ApiEngine:platform-sys-menu@v1.0.0",
+                        StringComparison.Ordinal)) != true ||
+                    !System.Version.TryParse(officialResourceEngineVersionText, out var embeddedOfficialResourceVersion) ||
+                    embeddedOfficialResourceVersion < new System.Version(1, 2, 8) ||
+                    officialResourceEngine?["IsEnable"]?.Value<int>() != 1 ||
+                    officialResourceEngine?["AllowAnonymous"]?.Value<int>() != 1 ||
+                    !string.Equals(
+                        officialResourcePolicy?["UpgradePolicy"]?.ToString(),
+                        "Managed",
+                        StringComparison.Ordinal) ||
+                    !officialResourceEngineCode.Contains("V8.Method.AuthorizeOfficialResourcePublish()") ||
+                    requiredCapabilities?.Any(item => string.Equals(
+                        item?.ToString(),
+                        "V8.Method.AuthorizeOfficialResourcePublish",
+                        StringComparison.Ordinal)) != true ||
+                    !HasApiEngineCapabilityAtLeast(
+                        requiredCapabilities,
+                        OfficialResourcePublisherEngineKey,
+                        new System.Version(1, 2, 8)) ||
                     !content.Contains("TargetSysMenuId") ||
                     !content.Contains("01KXFSG7MZ40CY8KCWCZZZJH2M") ||
                     !content.Contains("01KXFSG8153B3VZPZ45WNCCFHR") ||
@@ -902,6 +2064,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("UploadRecoveryHint") ||
                     !content.Contains("RunBackground('bulk-import-microi-store-packages'") ||
                     !content.Contains("BULK_PLATFORM_BOOTSTRAP_ORDER_V1") ||
+                    !content.Contains("MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1") ||
                     !buildZipEngineCode.Contains("REAL_BUILD_ZIP_ASSETS_V1") ||
                     !sourceZipEngineCode.Contains("SOURCE_ONLY_ZIP_ROOT_V1") ||
                     !importerEngineCode.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
@@ -1024,6 +2187,137 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
             }
 
             Console.WriteLine($"Microi：【基础应用升级】{packageName}导入完成。");
+        }
+
+        private static void ValidateInstalledPlatformRuntimeDependencies(string osClient, List<string> msgs)
+        {
+            try
+            {
+                var client = OsClient.GetClient(osClient);
+                if (client?.Db == null)
+                {
+                    msgs.Add($"平台运行时接口回读失败：未找到租户[{osClient}]数据库连接。");
+                    return;
+                }
+
+                var reason = GetInstalledPlatformRuntimeRepairReason(client.Db);
+                if (!reason.DosIsNullOrWhiteSpace())
+                {
+                    msgs.Add("平台运行时接口回读失败：" + reason);
+                }
+            }
+            catch (Exception ex)
+            {
+                msgs.Add("平台运行时接口回读异常：" + ex.Message);
+            }
+        }
+
+        private static void ValidateInstalledSsoRuntimeDependencies(string osClient, List<string> msgs)
+        {
+            try
+            {
+                var client = OsClient.GetClient(osClient);
+                if (client?.Db == null)
+                {
+                    msgs.Add($"SSO 身份联邦运行时回读失败：未找到租户[{osClient}]数据库连接。");
+                    return;
+                }
+
+                var reason = GetInstalledSsoRuntimeRepairReason(client.Db);
+                if (!reason.DosIsNullOrWhiteSpace())
+                {
+                    msgs.Add("SSO 身份联邦运行时回读失败：" + reason);
+                }
+            }
+            catch (Exception ex)
+            {
+                msgs.Add("SSO 身份联邦运行时回读异常：" + ex.Message);
+            }
+        }
+
+        private static void ValidateInstalledV8FirstApplicationDependencies(string osClient, List<string> msgs)
+        {
+            try
+            {
+                var client = OsClient.GetClient(osClient);
+                if (client?.Db == null)
+                {
+                    msgs.Add($"V8 引擎优先官方应用回读失败：未找到租户[{osClient}]数据库连接。");
+                    return;
+                }
+
+                var reason = GetInstalledV8FirstApplicationRuntimeRepairReason(client.Db);
+                if (!reason.DosIsNullOrWhiteSpace())
+                {
+                    msgs.Add("V8 引擎优先官方应用回读失败：" + reason);
+                }
+            }
+            catch (Exception ex)
+            {
+                msgs.Add("V8 引擎优先官方应用回读异常：" + ex.Message);
+            }
+        }
+
+        private static void ValidateInstalledAppStoreRuntimeDependencies(string osClient, List<string> msgs)
+        {
+            try
+            {
+                var client = OsClient.GetClient(osClient);
+                if (client?.Db == null)
+                {
+                    msgs.Add($"应用商城运行时依赖回读失败：未找到租户[{osClient}]数据库连接。");
+                    return;
+                }
+
+                var dependencies = new[]
+                {
+                    new
+                    {
+                        Key = PlatformBackgroundTaskEngineKey,
+                        Address = PlatformBackgroundTaskApiAddress,
+                        Validator = new Func<string, System.Version, bool>(HasPlatformBackgroundTaskCapabilities)
+                    },
+                    new
+                    {
+                        Key = PlatformSysMenuEngineKey,
+                        Address = PlatformSysMenuApiAddress,
+                        Validator = new Func<string, System.Version, bool>(HasPlatformSysMenuCapabilities)
+                    }
+                };
+
+                foreach (var dependency in dependencies)
+                {
+                    var row = client.Db.FromSql(@"SELECT ApiV8Code, ApiAddress, IsEnable, StopHttp, AllowAnonymous FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                        .AddInParameter("p0", dependency.Key)
+                        .First<dynamic>();
+                    var engine = row == null ? null : JObject.FromObject(row);
+                    var code = engine?.Value<string>("ApiV8Code") ?? string.Empty;
+                    var versionMatch = Regex.Match(code, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+                    var version = new System.Version(0, 0, 0);
+                    var valid = engine != null
+                        && versionMatch.Success
+                        && System.Version.TryParse(versionMatch.Groups[1].Value, out version)
+                        && dependency.Validator(code, version)
+                        && string.Equals(
+                            engine.Value<string>("ApiAddress"),
+                            dependency.Address,
+                            StringComparison.OrdinalIgnoreCase)
+                        && engine.Value<int?>("IsEnable") == 1
+                        && engine.Value<int?>("StopHttp") == 0
+                        && engine.Value<int?>("AllowAnonymous") == 0;
+                    if (!valid)
+                    {
+                        msgs.Add(
+                            $"应用商城运行时依赖回读失败：接口引擎[{dependency.Key}]未按 Managed 包完整落库。"
+                        );
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                msgs.Add($"应用商城运行时依赖回读失败：{ex.Message}");
+            }
         }
 
         private static string FormatInstallFailureDetails(object data)
@@ -1421,6 +2715,8 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             #region 应用商城 数据包
             await InstallUpgradePackage(osClient, msgs, AppStorePackageResourceName, "应用商城数据包", resources);
             if (msgs.Count > 0) return msgs;
+            ValidateInstalledAppStoreRuntimeDependencies(osClient, msgs);
+            if (msgs.Count > 0) return msgs;
             // 尚未同步的官方在线商城包可能仍内嵌 2048MB 配置，并在导入自身时覆盖
             // 当前导入器。立即恢复受信任导入器限额，保证后续表单/模块大包继续稳定执行。
             await EnsureImporterExecutionLimitsAndInvalidateAsync(osClient);
@@ -1445,6 +2741,32 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             // 幂等补齐 Passkey/TOTP/严格人脸表、sys_osclients 配置字段和个人中心微服务；
             // 不在 .NET 中复制表/字段迁移逻辑，并保留租户后来显式关闭的 0 值。
             await InstallUpgradePackage(osClient, msgs, SaaSEnginePackageResourceName, "SaaS引擎与身份验证数据包", resources);
+            if (msgs.Count > 0) return msgs;
+            ValidateInstalledPlatformRuntimeDependencies(osClient, msgs);
+            if (msgs.Count > 0) return msgs;
+            #endregion
+
+            #region 系统账号、系统设置、消息通知与 AI助手官方应用
+            // 这些包分别拥有本领域 Managed 接口和 CreateIfMissing Hook。必须随服务端升级
+            // 安装，避免新前端已切换 /apiengine 路由而旧租户仍缺少对应接口。
+            await InstallUpgradePackage(osClient, msgs, SysUserPackageResourceName, "系统账号数据包", resources);
+            if (msgs.Count > 0) return msgs;
+            await InstallUpgradePackage(osClient, msgs, SysConfigPackageResourceName, "系统设置数据包", resources);
+            if (msgs.Count > 0) return msgs;
+            await InstallUpgradePackage(osClient, msgs, MessageNotificationPackageResourceName, "消息通知数据包", resources);
+            if (msgs.Count > 0) return msgs;
+            await InstallUpgradePackage(osClient, msgs, AiEnginePackageResourceName, "AI助手数据包", resources);
+            if (msgs.Count > 0) return msgs;
+            ValidateInstalledV8FirstApplicationDependencies(osClient, msgs);
+            if (msgs.Count > 0) return msgs;
+            #endregion
+
+            #region SSO 身份联邦官方应用
+            // SSO 依赖 SaaS/强身份验证底层能力，因此固定在 SaaS 包之后安装；业务编排、
+            // Managed 基线和 CreateIfMissing 租户 Hook 全部由应用包交付，不新增租户迁移代码。
+            await InstallUpgradePackage(osClient, msgs, SsoPackageResourceName, "SSO 身份联邦数据包", resources);
+            if (msgs.Count > 0) return msgs;
+            ValidateInstalledSsoRuntimeDependencies(osClient, msgs);
             if (msgs.Count > 0) return msgs;
             #endregion
 

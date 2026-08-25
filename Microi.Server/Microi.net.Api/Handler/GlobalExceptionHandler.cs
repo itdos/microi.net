@@ -109,7 +109,7 @@ namespace Microi.net.Api
             var exceptionContext = $"{context.Request.Method} {context.Request.Path}";
             try
             {
-                _ = MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                MicroiEngine.QueueSysLog(new SysLogParam()
                 {
                     Type = "全局异常",
                     Title = $"全局异常捕获: {exceptionContext}",

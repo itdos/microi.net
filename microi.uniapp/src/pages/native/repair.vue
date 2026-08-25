@@ -47,11 +47,11 @@
         <textarea v-model="form.reason" class="reason-input" maxlength="1000" placeholder="请描述故障现象、发生时间及当前影响" />
         <view class="upload-group">
           <view class="upload-title"><text>现场照片</text><text>最多 9 张</text></view>
-          <mci-media-uploader v-model="form.images" :max-count="9" media-type="image" upload-path="xjy/repair/images" />
+          <mci-media-uploader v-model="form.images" :max-count="9" media-type="image" upload-path="xjy/repair/images" :file-context="uncommittedFileContext" />
         </view>
         <view class="upload-group">
           <view class="upload-title"><text>故障视频</text><text>最多 3 个</text></view>
-          <mci-media-uploader v-model="form.videos" :max-count="3" media-type="video" upload-path="xjy/repair/videos" />
+          <mci-media-uploader v-model="form.videos" :max-count="3" media-type="video" upload-path="xjy/repair/videos" :file-context="uncommittedFileContext" />
         </view>
       </view>
       <view class="safe-space"></view>
@@ -81,6 +81,10 @@ function parseRegion(value) {
   return String(value).split(/[,/]/).map((item) => item.trim()).filter(Boolean)
 }
 
+// 报修附件由 shenqing_shouhou 在提交时创建新记录；提交前不存在可授权的
+// FormDataId。上传组件仅展示本地临时地址，任何意外回填的私有路径均失败关闭。
+const UNCOMMITTED_PRIVATE_FILE_CONTEXT = Object.freeze({ private: true, failClosed: true })
+
 export default {
   mixins: [themeMixin],
   data() {
@@ -92,7 +96,8 @@ export default {
       loading: true,
       submitting: false,
       error: '',
-      form: { contact: '', phone: '', region: [], address: '', types: [], otherType: '', reason: '', images: '', videos: '' }
+      form: { contact: '', phone: '', region: [], address: '', types: [], otherType: '', reason: '', images: '', videos: '' },
+      uncommittedFileContext: UNCOMMITTED_PRIVATE_FILE_CONTEXT
     }
   },
   computed: {

@@ -16,6 +16,9 @@ namespace Microi.net
     {
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates =
             new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
+        private static readonly object GateRegistryLock = new object();
+        private const int MaximumGateRegistryEntries = 4096;
+        private const int MaximumGateKeyLength = 256;
 
         public static async Task<RequestPressureLease> TryEnterAsync(
             string path,
@@ -31,8 +34,7 @@ namespace Microi.net
             var acquired = new List<SemaphoreSlim>();
             foreach (var item in BuildGateRequests(path, osClient, options))
             {
-                var gateKey = $"{item.Key}:limit:{item.Limit}";
-                var gate = Gates.GetOrAdd(gateKey, _ => new SemaphoreSlim(item.Limit, item.Limit));
+                var gate = GetOrCreateGate(item);
                 var entered = false;
                 try
                 {
@@ -56,13 +58,41 @@ namespace Microi.net
             return RequestPressureLease.Entered(acquired);
         }
 
+        private static SemaphoreSlim GetOrCreateGate(RequestPressureGate item)
+        {
+            var rawKey = $"{item.Key}:limit:{item.Limit}";
+            var gateKey = rawKey.Length <= MaximumGateKeyLength
+                ? rawKey
+                : $"invalid:{item.Type}:limit:{item.Limit}";
+            if (Gates.TryGetValue(gateKey, out var existing)) return existing;
+
+            lock (GateRegistryLock)
+            {
+                if (Gates.TryGetValue(gateKey, out existing)) return existing;
+                // 路由、ApiEngineKey 与查询租户都可能来自匿名请求。固定上限后，
+                // 新的高基数键共享按类型隔离的保守 overflow gate，避免随机路径
+                // 永久扩张静态字典；已被租约持有的 Semaphore 不做危险 Dispose。
+                if (Gates.Count >= MaximumGateRegistryEntries)
+                {
+                    gateKey = $"overflow:{item.Type}";
+                    if (Gates.TryGetValue(gateKey, out existing)) return existing;
+                    return Gates.GetOrAdd(
+                        gateKey,
+                        _ => new SemaphoreSlim(1, 1));
+                }
+                return Gates.GetOrAdd(
+                    gateKey,
+                    _ => new SemaphoreSlim(item.Limit, item.Limit));
+            }
+        }
+
         private static IEnumerable<RequestPressureGate> BuildGateRequests(
             string path,
             string osClient,
             RequestPressureGuardOptions options)
         {
-            path = path ?? "";
-            osClient = (osClient ?? "").Trim();
+            path = NormalizeRequestPath(path);
+            osClient = NormalizeKnownTenant(osClient);
             var apiEngineKey = ExtractApiEngineKey(path);
             var category = ResolveCategory(path);
             var routeKey = NormalizeRouteKey(path, category);
@@ -127,6 +157,21 @@ namespace Microi.net
             }
 
             return result.Where(item => item.Limit > 0);
+        }
+
+        private static string NormalizeKnownTenant(string osClient)
+        {
+            var candidate = (osClient ?? string.Empty).Trim();
+            if (candidate.Length == 0 || candidate.Length > 80) return string.Empty;
+            return OsClientExtend.ClientList.ContainsKey(candidate) ? candidate : string.Empty;
+        }
+
+        private static string NormalizeRequestPath(string path)
+        {
+            var candidate = (path ?? string.Empty).Trim();
+            if (candidate.Length == 0) return "/";
+            if (candidate.Length > 512 || candidate.Any(char.IsControl)) return "/_invalid";
+            return candidate;
         }
 
         private static TenantPressureOptions GetTenantPressureOptions(string osClient)
@@ -205,7 +250,9 @@ namespace Microi.net
             }
 
             var parts = value.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-            return parts.Length >= 2 ? parts[1] : "";
+            return parts.Length >= 2 && IsSafeGateSegment(parts[1], 100)
+                ? parts[1]
+                : "";
         }
 
         private static string ResolveCategory(string path)
@@ -223,10 +270,29 @@ namespace Microi.net
             var value = (path ?? "").Trim('/');
             if (string.IsNullOrWhiteSpace(value)) return "";
             var parts = value.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-            if (category == "apiengine" && parts.Length >= 2) return $"apiengine/{parts[1]}";
-            if (parts.Length >= 3 && parts[0].Equals("api", StringComparison.OrdinalIgnoreCase)) return $"{parts[0]}/{parts[1]}/{parts[2]}";
-            if (parts.Length >= 2) return $"{parts[0]}/{parts[1]}";
-            return parts[0];
+            if (category == "dynamic") return "dynamic/other";
+            if (category == "apiengine" && parts.Length >= 2)
+            {
+                return IsSafeGateSegment(parts[1], 100)
+                    ? $"apiengine/{parts[1]}"
+                    : "apiengine/_invalid";
+            }
+            if (parts.Length >= 3 && parts[0].Equals("api", StringComparison.OrdinalIgnoreCase))
+            {
+                return IsSafeGateSegment(parts[1], 80) && IsSafeGateSegment(parts[2], 120)
+                    ? $"{parts[0]}/{parts[1]}/{parts[2]}"
+                    : "api/_invalid";
+            }
+            return "route/other";
+        }
+
+        private static bool IsSafeGateSegment(string value, int maximumLength)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length > maximumLength) return false;
+            return value.All(character => char.IsLetterOrDigit(character)
+                || character == '_'
+                || character == '-'
+                || character == '.');
         }
 
         private static bool IsLongRunningRequest(string path, string category)

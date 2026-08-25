@@ -102,7 +102,7 @@
 ### 资源与隐私文件
 
 - 公开图片走 FileServer/CDN。
-- 私有图片必须先调用签名 URL，如 `/api/HDFS/GetPrivateFileUrl`。
+- 私有图片必须先通过 `/apiengine/platform-private-file-url` 携带权威资源上下文换取短期签名 URL；签发失败时禁止回退裸路径。
 - 上传接口必须通用，不能在平台 HDFS 控制器写某项目“只允许支付凭证或实名认证图片”这类硬编码。
 - iOS Safari 上传后要验证表单字段不丢失，上传组件不能重置整张表单。
 

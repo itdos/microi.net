@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ensureMinimumPackageVersion } from './resource-sync-core.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const resourcePath = path.join(directory, 'app.microi.saas-engine.json');
@@ -79,15 +80,12 @@ const specs = [
     changeHistory: '2026-08-21 15:00:00 v1.0.1 优先读取租户后端私有短信配置，旧 SaaS 凭据仅作成对兼容回退且响应不再回显 AccessKey。\n2026-07-06 16:45:45 短信发送结果按阿里云业务 Code 判断，流控等错误返回 Code=0\n'
   }
 ];
-const managedKeys = new Set(specs.map((item) => item.key));
-
-pkg.SysApiEngines = (pkg.SysApiEngines || [])
-  .filter((engine) => !managedKeys.has(engine.ApiEngineKey));
+pkg.SysApiEngines ||= [];
 for (const spec of specs) {
   const source = fs.readFileSync(path.join(spec.sourceDirectory || sourceDirectory, spec.file), 'utf8')
     .replace(/\r\n?/g, '\n')
-    .replace(/\n*$/g, '\n');
-  pkg.SysApiEngines.push({
+    .replace(/\n*$/, '\n');
+  const engine = {
     IsDeleted: 0,
     UserName: '管理员',
     UserId: 'c74d669c-a3d4-11e5-b60d-b870f43edd03',
@@ -96,7 +94,7 @@ for (const spec of specs) {
     Id: spec.id,
     ChangeHistory: spec.changeHistory || `2026-08-21 14:00:00 v1.0.1 创建接口引擎 ${spec.key}\n`,
     Version: spec.version || 'v1.0.1',
-    LimitRecursion: 10000,
+    LimitRecursion: 5000,
     LimitMemory: 2048,
     MaxStatements: 100000000,
     Timeout: spec.timeout || 120,
@@ -118,7 +116,10 @@ for (const spec of specs) {
     IsEnable: 1,
     ApiEngineKey: spec.key,
     ApiName: spec.name
-  });
+  };
+  const existingIndex = pkg.SysApiEngines.findIndex(item => item.ApiEngineKey === spec.key);
+  if (existingIndex >= 0) pkg.SysApiEngines[existingIndex] = engine;
+  else pkg.SysApiEngines.push(engine);
 }
 
 pkg.ResourcePolicies ||= {};
@@ -147,8 +148,8 @@ const uniqueHistoryLines = [...new Set(historyLines)];
 if (!uniqueHistoryLines.includes(identityLine)) uniqueHistoryLines.push(identityLine);
 if (!uniqueHistoryLines.includes(smsLine)) uniqueHistoryLines.push(smsLine);
 if (!uniqueHistoryLines.includes(releaseLine)) uniqueHistoryLines.unshift(releaseLine);
+ensureMinimumPackageVersion(pkg.PackageInfo, 'v7.5.7');
 Object.assign(pkg.PackageInfo, {
-  Version: 'v7.5.7',
   Description: 'SaaS 引擎基础资源。密码登录保留未安装应用时可用的最小后端启动内核；短信注册登录、统一登录审计与租户扩展由 Managed/CreateIfMissing 接口引擎编排。',
   ChangeHistory: `${uniqueHistoryLines.join('\n')}\n`,
   RequiredPlatformCapabilities: [...capabilities],

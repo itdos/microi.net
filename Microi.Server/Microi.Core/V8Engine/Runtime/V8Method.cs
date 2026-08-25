@@ -665,54 +665,279 @@ namespace Microi.net
         }
         //private SysUserLogic _sysUserLogic = new SysUserLogic();
         /// <summary>
-        /// 刷新登陆用户身份信息，token以旧换新
+        /// 刷新当前租户的登录身份投影。普通用户仅限本人；跨用户刷新必须由
+        /// 同租户平台管理员通过主库复核。显式 OsClient 不能选择目标租户；第三参
+        /// 只兼容携带原始 Token 的历史 microi-init，并在本方法内重新权威验证。
         /// </summary>
         /// <param name="userId"></param>
         /// <param name="osClient"></param>
         /// <returns></returns>
-        public DosResult<dynamic> RefreshLoginUser(string userId, string osClient = null)
+        public DosResult<dynamic> RefreshLoginUser(
+            string userId,
+            string osClient = null,
+            string token = null)
         {
-            //return _sysUserLogic.RefreshLoginUser(userId, osClient).Result;
-            if (userId.DosIsNullOrWhiteSpace() || osClient.DosIsNullOrWhiteSpace())
-            {
-                return new DosResult<dynamic>(0, null, "刷新用户信息参数错误！");
-            }
-            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
-
-            DosResult<dynamic> userModelResult = null;
-            CurrentToken currentToken = DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}").GetAwaiter().GetResult();
-            JObject sysUser = new JObject();
             try
             {
-                userModelResult = MicroiEngine.FormEngine.GetFormData(new
+                var explicitTokenCredential = !token.DosIsNullOrWhiteSpace();
+                var credential = ResolveLoginProjectionCredential(
+                    token,
+                    rawToken => DiyToken.GetCurrentToken(rawToken)
+                        .GetAwaiter()
+                        .GetResult(),
+                    () => DiyToken.GetCurrentToken(false)
+                        .GetAwaiter()
+                        .GetResult());
+                if (credential.Code != 1)
                 {
-                    FormEngineKey = "sys_user",
-                    Id = userId,
-                    _Where = new List<DiyWhere>() {
-                                new DiyWhere(){
-                                    Name = "State",
-                                    Value = "1",
-                                    Type = "="
-                                }
-                            },
-                });
-                if (userModelResult.Code == 1)
-                {
-                    sysUser = SetSysUserRoleInfo(userModelResult.Data, osClient);// JObject.FromObject(userModelResult.Data);
-                    //2024-02-04
-                    currentToken.CurrentUser = sysUser;// JObject.FromObject(userModelResult.Data);
-                    DiyCacheBase.Set($"Microi:{osClient}:LoginTokenSysUser:{userId}", currentToken);
-                    return new DosResult<dynamic>(1, currentToken.CurrentUser);
+                    return new DosResult<dynamic>(
+                        credential.Code,
+                        null,
+                        credential.Msg);
                 }
-                else
+
+                var authorization = AuthorizeLoginProjectionRefresh(
+                    userId,
+                    osClient,
+                    V8TenantContext.Current?.OsClient,
+                    V8TrustedExecutionContext.CurrentOsClient,
+                    V8TrustedExecutionContext.CurrentUser,
+                    credential.Data,
+                    ResolveCanonicalLoginProjectionTenant,
+                    PlatformAdministratorSecurity.IsCurrentPlatformAdministrator,
+                    explicitTokenCredential);
+                if (authorization.Code != 1)
                 {
-                    return userModelResult;
+                    return new DosResult<dynamic>(
+                        authorization.Code,
+                        null,
+                        authorization.Msg);
                 }
+
+                // SysUserLogic owns role/permission enrichment and preserves the
+                // existing cache record. It now receives and uses only the canonical,
+                // authorized tenant for both the query and the cache key.
+                return new SysUserLogic()
+                    .RefreshLoginUser(userId.Trim(), authorization.Data)
+                    .GetAwaiter()
+                    .GetResult();
             }
             catch (Exception ex)
             {
-                return new DosResult<dynamic>(0, ex.Message);
+                Console.WriteLine(
+                    $"Microi：[RefreshLoginUser] 登录投影刷新失败：{ex.GetType().Name}");
+                return new DosResult<dynamic>(0, null, "刷新登录身份失败，请稍后重试。");
             }
+        }
+
+        /// <summary>
+        /// 解析登录投影刷新凭据。显式 Token 永远在这里重新走 DiyToken 权威验证，
+        /// 验证失败时不回退 ambient 身份；无第三参时才读取当前 HTTP Token。
+        /// 返回对象只在宿主内流转，V8.GetCurrentToken 的返回值不能充当证明。
+        /// </summary>
+        internal static DosResult<CurrentToken> ResolveLoginProjectionCredential(
+            string explicitToken,
+            Func<string, CurrentToken> validateExplicitToken,
+            Func<CurrentToken> resolveAmbientToken)
+        {
+            if (!explicitToken.DosIsNullOrWhiteSpace())
+            {
+                explicitToken = explicitToken.Trim();
+                if (explicitToken.Length > 32 * 1024)
+                    return new DosResult<CurrentToken>(1001, null, "显式 Token 无效或已过期。");
+                if (validateExplicitToken == null)
+                    return new DosResult<CurrentToken>(0, null, "显式 Token 验证器不可用。");
+
+                CurrentToken validatedToken = null;
+                try
+                {
+                    validatedToken = validateExplicitToken(explicitToken);
+                }
+                catch
+                {
+                    // Do not fall back to the ambient principal. The caller explicitly
+                    // selected this bearer credential and it must stand on its own.
+                }
+                if (validatedToken?.CurrentUser == null
+                    || validatedToken.OsClient.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult<CurrentToken>(1001, null, "显式 Token 无效或已过期。");
+                }
+                return new DosResult<CurrentToken>(1, validatedToken);
+            }
+
+            CurrentToken ambientToken = null;
+            try
+            {
+                ambientToken = resolveAmbientToken?.Invoke();
+            }
+            catch
+            {
+                // Background/managed execution has no HTTP token and must use the
+                // server-only V8TrustedExecutionContext path in the authorization step.
+            }
+            return new DosResult<CurrentToken>(1, ambientToken);
+        }
+
+        /// <summary>
+        /// 为 V8 登录投影刷新解析唯一可信租户和调用者。显式 OsClient 只是兼容参数，
+        /// 不能选择租户；普通用户只能刷新本人，跨用户必须通过同租户主库管理员复核。
+        /// 可信后台/升级调用必须同时提供宿主保存的用户与租户作用域，空身份不放行。
+        /// </summary>
+        internal static DosResult<string> AuthorizeLoginProjectionRefresh(
+            string targetUserId,
+            string requestedOsClient,
+            string v8OsClient,
+            string trustedOsClient,
+            JObject trustedCurrentUser,
+            CurrentToken authenticatedToken,
+            Func<string, string> resolveCanonicalTenant,
+            Func<string, JObject, bool> isPlatformAdministrator,
+            bool explicitTokenCredential = false)
+        {
+            targetUserId = (targetUserId ?? string.Empty).Trim();
+            if (!Regex.IsMatch(targetUserId, "^[A-Za-z0-9_-]{1,100}$"))
+                return new DosResult<string>(0, null, "刷新用户标识无效。");
+            if (resolveCanonicalTenant == null || isPlatformAdministrator == null)
+                return new DosResult<string>(0, null, "登录投影安全校验不可用。");
+
+            string normalizedV8Tenant;
+            string normalizedTrustedTenant;
+            string normalizedTokenTenant;
+            string normalizedRequestedTenant;
+            try
+            {
+                normalizedV8Tenant = NormalizeOptionalLoginProjectionTenant(v8OsClient);
+                normalizedTrustedTenant = NormalizeOptionalLoginProjectionTenant(trustedOsClient);
+                normalizedTokenTenant = authenticatedToken?.CurrentUser == null
+                    ? string.Empty
+                    : NormalizeOptionalLoginProjectionTenant(authenticatedToken.OsClient);
+                normalizedRequestedTenant = NormalizeOptionalLoginProjectionTenant(requestedOsClient);
+            }
+            catch
+            {
+                return new DosResult<string>(0, null, "刷新登录身份的 OsClient 无效。");
+            }
+
+            if (trustedCurrentUser != null && normalizedTrustedTenant.DosIsNullOrWhiteSpace())
+                return new DosResult<string>(0, null, "可信登录身份缺少租户作用域。");
+            if (!normalizedV8Tenant.DosIsNullOrWhiteSpace()
+                && !normalizedTrustedTenant.DosIsNullOrWhiteSpace()
+                && !string.Equals(
+                    normalizedV8Tenant,
+                    normalizedTrustedTenant,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult<string>(0, null, "V8 与可信登录身份的租户不一致。");
+            }
+
+            var effectiveTenant = !normalizedV8Tenant.DosIsNullOrWhiteSpace()
+                ? normalizedV8Tenant
+                : trustedCurrentUser != null
+                    ? normalizedTrustedTenant
+                    : normalizedTokenTenant;
+            if (effectiveTenant.DosIsNullOrWhiteSpace())
+                return new DosResult<string>(1001, null, "登录身份已过期，无法刷新登录投影。");
+            if (!normalizedRequestedTenant.DosIsNullOrWhiteSpace()
+                && !string.Equals(
+                    normalizedRequestedTenant,
+                    effectiveTenant,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult<string>(0, null, "禁止跨租户刷新登录投影。");
+            }
+
+            string canonicalTenant;
+            try
+            {
+                canonicalTenant = resolveCanonicalTenant(effectiveTenant);
+            }
+            catch
+            {
+                canonicalTenant = null;
+            }
+            if (canonicalTenant.DosIsNullOrWhiteSpace())
+                return new DosResult<string>(0, null, "当前租户不存在或数据库不可用。");
+            try
+            {
+                canonicalTenant = TenantConfigurationSecurity.NormalizeTenantId(canonicalTenant);
+            }
+            catch
+            {
+                return new DosResult<string>(0, null, "当前租户无效。");
+            }
+            if (!string.Equals(
+                    canonicalTenant,
+                    effectiveTenant,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult<string>(0, null, "租户解析结果与当前身份不一致。");
+            }
+
+            if (authenticatedToken?.CurrentUser != null
+                && !string.Equals(
+                    normalizedTokenTenant,
+                    effectiveTenant,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult<string>(0, null, "当前 Token 与 V8 租户不一致。");
+            }
+
+            JObject tokenCurrentUser = null;
+            if (authenticatedToken?.CurrentUser != null)
+            {
+                tokenCurrentUser = authenticatedToken.CurrentUser;
+            }
+            if (trustedCurrentUser != null
+                && tokenCurrentUser != null
+                && !string.Equals(
+                    trustedCurrentUser["Id"]?.ToString(),
+                    tokenCurrentUser["Id"]?.ToString(),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult<string>(0, null, "可信身份与当前 Token 用户不一致。");
+            }
+
+            var actor = trustedCurrentUser ?? tokenCurrentUser;
+            var actorUserId = actor?["Id"]?.ToString()?.Trim();
+            if (actorUserId.DosIsNullOrWhiteSpace())
+                return new DosResult<string>(1001, null, "登录身份已过期，无法刷新登录投影。");
+            if (UserAccessKeySecurity.IsSession(actor))
+                return new DosResult<string>(0, null, "访问密钥会话不能刷新登录投影。");
+            if (explicitTokenCredential
+                && (tokenCurrentUser == null
+                    || !string.Equals(
+                        targetUserId,
+                        tokenCurrentUser["Id"]?.ToString()?.Trim(),
+                        StringComparison.OrdinalIgnoreCase)))
+            {
+                return new DosResult<string>(0, null, "显式 Token 只能刷新其所属用户的登录投影。");
+            }
+
+            if (!string.Equals(targetUserId, actorUserId, StringComparison.OrdinalIgnoreCase)
+                && !isPlatformAdministrator(canonicalTenant, actor))
+            {
+                return new DosResult<string>(0, null, "普通用户只能刷新自己的登录投影。");
+            }
+
+            return new DosResult<string>(1, canonicalTenant);
+        }
+
+        private static string NormalizeOptionalLoginProjectionTenant(string osClient)
+        {
+            return osClient.DosIsNullOrWhiteSpace()
+                ? string.Empty
+                : TenantConfigurationSecurity.NormalizeTenantId(osClient);
+        }
+
+        private static string ResolveCanonicalLoginProjectionTenant(string osClient)
+        {
+            var normalized = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            var client = OsClientExtend.GetClient(normalized);
+            return client?.Db == null
+                ? null
+                : TenantConfigurationSecurity.NormalizeTenantId(
+                    client.OsClient.DosIsNullOrWhiteSpace() ? normalized : client.OsClient);
         }
 
         /// <summary>
@@ -933,7 +1158,8 @@ namespace Microi.net
                 param.FilesByte[fileName] = bytes;
                 param.Preview = false;
                 param.Multiple = false;
-                return CreateTenantHdfs(param).Upload(param).GetAwaiter().GetResult();
+                var result = CreateTenantHdfs(param).Upload(param).GetAwaiter().GetResult();
+                return result ?? new DosResult(0, null, "UploadText HDFS 未返回结果");
             }
             catch (Exception ex)
             {
@@ -1563,7 +1789,7 @@ namespace Microi.net
 
             try
             {
-                var request = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
+                JObject request = JsonHelper.ToJObject((object)dynamicParam) ?? new JObject();
                 var action = (request["Action"]?.ToString() ?? "").Trim();
                 var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
@@ -1672,7 +1898,7 @@ namespace Microi.net
         {
             try
             {
-                var request = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
+                JObject request = JsonHelper.ToJObject((object)dynamicParam) ?? new JObject();
                 var identityDenied = ResolveBackgroundTaskIdentity(
                     out var osClient,
                     out var currentUser,
@@ -1721,7 +1947,12 @@ namespace Microi.net
         {
             try
             {
-                var request = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
+                // JsonHelper.ToJObject accepts dynamic for legacy compatibility. When its
+                // result is assigned to `var`, C# keeps the expression dynamic even though
+                // the declared return type is JObject. That made Status/Detail attempt to
+                // resolve string extension methods through the runtime binder. Pin the V8
+                // boundary to JObject so all task actions use normal static dispatch.
+                JObject request = JsonHelper.ToJObject((object)dynamicParam) ?? new JObject();
                 var identityDenied = ResolveBackgroundTaskIdentity(
                     out var osClient,
                     out var currentUser,

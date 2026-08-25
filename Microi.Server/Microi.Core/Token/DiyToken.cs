@@ -574,6 +574,7 @@ namespace Microi.net
 
             #endregion
 
+            SysUserLogic.SanitizeLoginProjection(sysUser);
             return sysUser;
         }
 
@@ -622,6 +623,7 @@ namespace Microi.net
                     // into the user's shared CurrentUser cache or a normal login on
                     // another terminal would inherit the narrowed synthetic identity.
                     JObject currentUser = UserAccessKeySecurity.StripSessionFields(param.CurrentUser);
+                    SysUserLogic.SanitizeLoginProjection(currentUser);
                     if (currentUser == null || currentUser["Id"] == null)
                     {
                         return new DosResult<CurrentToken>(0, null, "CurrentUser.Id不能为空！");
@@ -931,7 +933,8 @@ namespace Microi.net
 
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
 
-                var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
+                var userTokenCacheKey = $"Microi:{osClient}:LoginTokenSysUser:{userId}";
+                var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>(userTokenCacheKey);
                 if (tokenModel == null || tokenModel.CurrentUser == null)
                 {
                     return new CurrentToken()
@@ -947,6 +950,10 @@ namespace Microi.net
                         OsClient = osClient,
                         Token = token
                     };
+                }
+                if (SysUserLogic.SanitizeLoginProjection(tokenModel.CurrentUser))
+                {
+                    await DiyCacheBase.SetAsync(userTokenCacheKey, tokenModel);
                 }
                 var scopedUserResult = await UserAccessKeyService.ApplySessionScopeAsync(
                         tokenModel.CurrentUser,
@@ -1013,9 +1020,14 @@ namespace Microi.net
                     if (!userId.DosIsNullOrWhiteSpace() && !thisOsClient.DosIsNullOrWhiteSpace())
                     {
                         var DiyCacheBase = MicroiEngine.CacheTenant.Cache(thisOsClient);
-                        var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{thisOsClient}:LoginTokenSysUser:{userId}");
+                        var userTokenCacheKey = $"Microi:{thisOsClient}:LoginTokenSysUser:{userId}";
+                        var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>(userTokenCacheKey);
                         if (tokenModel != null && tokenModel.CurrentUser != null && IsActiveCachedToken(tokenModel, token))
                         {
+                            if (SysUserLogic.SanitizeLoginProjection(tokenModel.CurrentUser))
+                            {
+                                await DiyCacheBase.SetAsync(userTokenCacheKey, tokenModel);
+                            }
                             var scopedUserResult = await UserAccessKeyService.ApplySessionScopeAsync(
                                     tokenModel.CurrentUser,
                                     accessKeyId,
@@ -1051,6 +1063,7 @@ namespace Microi.net
             string requestToken)
         {
             if (source == null) return null;
+            SysUserLogic.SanitizeLoginProjection(currentUser);
             return new CurrentToken
             {
                 CurrentUser = currentUser,

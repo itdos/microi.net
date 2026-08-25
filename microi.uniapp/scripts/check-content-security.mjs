@@ -29,7 +29,7 @@ assert.match(sdk, /contentSecurityBatchAvailable = false/)
 assert.match(adapter, /await attachWeChatContentSecurityLoginCode\(payload\)/)
 assert.ok(
   adapter.indexOf('await attachWeChatContentSecurityLoginCode(payload)') <
-    adapter.indexOf("await post('/api/SysUser/UptSysUser'"),
+    adapter.indexOf("await post('/apiengine/platform-sys-user-admin?Action=UptSysUser'"),
   'profile text check login code must be attached before the save request'
 )
 assert.match(uploader, /await V8\.uploadFiles\(batch,/)

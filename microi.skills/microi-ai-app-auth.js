@@ -363,9 +363,9 @@ async function jsonRequest(path, options = {}) {
 
 async function loadSysConfig() {
   const resolved = runtime();
-  const result = await jsonRequest('/api/FormEngine/GetSysConfig', {
+  const result = await jsonRequest(`/apiengine/platform-sys-config?OsClient=${encodeURIComponent(resolved.osClient)}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', osclient: resolved.osClient, did: V8.getDid() },
+    headers: { 'Content-Type': 'application/json', osclient: resolved.osClient, did: V8.getDid(), apiengine: '1' },
     body: JSON.stringify({ OsClient: resolved.osClient, _SearchEqual: { IsEnable: 1 } })
   });
   if (!result.body || Number(result.body.Code) !== 1) {
@@ -475,12 +475,13 @@ async function validateCachedLogin() {
   if (validatedSessionToken === token && authenticatedIdentity()) return cachedUser;
 
   const resolved = runtime();
-  const result = await jsonRequest('/api/SysUser/GetCurrentUser', {
+  const result = await jsonRequest(`/apiengine/platform-current-user?OsClient=${encodeURIComponent(resolved.osClient)}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       osclient: resolved.osClient,
       did: V8.getDid(),
+      apiengine: '1',
       Token: token,
       Authorization: `Bearer ${token}`
     },

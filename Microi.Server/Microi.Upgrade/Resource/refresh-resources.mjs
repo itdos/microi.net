@@ -12,6 +12,7 @@ import {
   isTemporaryOfficialResourceFailure,
   mergeResource,
   normalizeOfficialPackageExecutionLimits,
+  validateOfficialPackageChangeLog,
   validateReadableOfficialResource,
   verifyOfflineReleaseSafety,
 } from './resource-sync-core.mjs';
@@ -29,6 +30,7 @@ import {
 import {
   publishResourcesViaConfiguredMcp,
   readResourcesViaConfiguredMcp,
+  reconcilePublishedApiEnginesViaConfiguredMcp,
 } from './mcp-resource-publisher.mjs';
 
 const resourceNames = [
@@ -40,7 +42,12 @@ const resourceNames = [
   'app.microi.saas-engine.json',
   'app.microi.sso.json',
   'app.microi.store.json',
+  'app.microi.sys_user.json',
+  'app.microi.sys-config.json',
+  'app.microi.message-notification.json',
+  'app.microi.ai-engine.json',
 ];
+const officialApplicationResourceNames = resourceNames.filter(name => name.endsWith('.json'));
 const endpoint = process.env.MICROI_UPGRADE_RESOURCE_API
   || 'https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos';
 const publishEndpoint = process.env.MICROI_UPGRADE_RESOURCE_PUBLISH_API
@@ -75,6 +82,7 @@ async function verifyPlatformServiceReleaseSource() {
 
 function validateReleaseCandidate(name, content) {
   if (!content.trim()) throw new Error(`${name} 内容为空`);
+  validateOfficialPackageChangeLog(name, content);
   if (name === 'import-package.js') {
     if (!content.includes('import-microi-store-package')) {
       throw new Error(`${name} 缺少 import-microi-store-package`);
@@ -160,12 +168,21 @@ function validateReleaseCandidate(name, content) {
   }
   if (name === 'official-resource-api.js') {
     if (!content.includes('ApiEngineKey: get-microi-upgrade-resource')
+      || !content.includes('Version: v1.3.1')
+      || !content.includes('V8.Method.AuthorizeOfficialResourcePublish()')
       || !content.includes('ExpectedRemoteSha256')
       || !content.includes('function lockPublishRows()')
-      || (content.match(/FOR UPDATE/g) || []).length !== 2
+      || (content.match(/FOR UPDATE/g) || []).length !== 3
+      || !content.includes('ReconcilePublishedApiEngines')
+      || !content.includes('function reconcilePublishedApiEngines()')
       || !content.includes('发布升级资源[')
-      || !content.includes('后回读内容哈希不一致')) {
-      throw new Error(`${name} 缺少固定白名单、SHA 乐观锁、事务行锁或发布后回读保护`);
+      || !content.includes('后回读内容哈希不一致')
+      || !content.includes('OFFICIAL_RESOURCE_EXACT_SELECTION_V1')
+      || !content.includes('storedSelectionEquals')
+      || !content.includes('存储接口 Code=1 但缺少 Data')
+      || !content.includes('SelectApiEngine: selectionJson(exactSelections.SelectApiEngine)')
+      || !content.includes('SelectTable: selectionJson(exactSelections.SelectTable)')) {
+      throw new Error(`${name} 缺少固定白名单、SHA 乐观锁、事务行锁、精确选择元数据或发布后回读保护`);
     }
   }
   if (name.endsWith('.json')) {
@@ -176,9 +193,159 @@ function validateReleaseCandidate(name, content) {
       'app.microi.saas-engine.json': 'SaaS引擎',
       'app.microi.sso.json': 'SSO 身份联邦',
       'app.microi.store.json': '应用商城',
+      'app.microi.sys_user.json': '系统账号',
+      'app.microi.sys-config.json': '系统设置',
+      'app.microi.message-notification.json': '消息通知',
+      'app.microi.ai-engine.json': 'AI助手',
     };
     if (packageModel?.PackageInfo?.Name !== expectedNames[name]) {
       throw new Error(`${name} 的 PackageInfo.Name 不正确`);
+    }
+    const packageEngines = Array.isArray(packageModel.SysApiEngines) ? packageModel.SysApiEngines : [];
+    const packageEngineMap = new Map(packageEngines.map(engine => [String(engine.ApiEngineKey || ''), engine]));
+    if (packageEngineMap.size !== packageEngines.length) {
+      throw new Error(`${name} 存在重复 ApiEngineKey。`);
+    }
+    const semanticNumber = value => {
+      const parts = String(value || '').replace(/^v/i, '').split('.').map(item => Number(item) || 0);
+      return (parts[0] || 0) * 1_000_000 + (parts[1] || 0) * 1_000 + (parts[2] || 0);
+    };
+    const packageContracts = {
+      'app.microi.sys_user.json': {
+        minimumVersion: 6_003_002,
+        exactKeys: ['platform-user-update-preferences', 'user-module-table-preference', 'sys-user-security-action', 'platform-user-update-profile', 'platform-sys-user-admin', 'platform-user-custom-hook'],
+        tenantHooks: ['platform-user-custom-hook'],
+      },
+      'app.microi.sys-config.json': {
+        minimumVersion: 6_003_008,
+        exactKeys: ['platform-tenant-system-settings', 'platform-system-settings-custom-hook'],
+        tenantHooks: ['platform-system-settings-custom-hook'],
+      },
+      'app.microi.message-notification.json': {
+        minimumVersion: 1_000_008,
+        exactKeys: ['msg_event', 'msg_internal_list', 'msg_internal_mark_read', 'platform-chat-system-message', 'platform-chat-runtime', 'platform-message-notification-custom-hook'],
+        tenantHooks: ['platform-message-notification-custom-hook'],
+      },
+      'app.microi.ai-engine.json': {
+        minimumVersion: 6_003_006,
+        exactKeys: ['mci_ai_data_assistant', 'platform-ai-account', 'platform-ai-runtime', 'platform-ai-custom-hook'],
+        tenantHooks: ['platform-ai-custom-hook'],
+      },
+    };
+    const packageContract = packageContracts[name];
+    if (packageContract) {
+      const actualKeys = [...packageEngineMap.keys()].sort();
+      const expectedKeys = [...packageContract.exactKeys].sort();
+      if (semanticNumber(packageModel?.PackageInfo?.Version) < packageContract.minimumVersion
+        || JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)) {
+        throw new Error(`${name} 版本或接口引擎唯一归属清单不正确。`);
+      }
+      for (const key of expectedKeys) {
+        const engine = packageEngineMap.get(key);
+        const policy = packageModel?.ResourcePolicies?.ApiEngines?.[key];
+        const isTenantHook = packageContract.tenantHooks.includes(key);
+        if (!String(engine?.ApiV8Code || '').trimStart().startsWith(
+          isTenantHook
+            ? '/* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1'
+            : '/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1',
+        ) || policy?.UpgradePolicy !== (isTenantHook ? 'CreateIfMissing' : 'Managed')
+          || (isTenantHook
+            ? policy?.Ownership !== 'Tenant'
+            : !['Platform', 'Application'].includes(policy?.Ownership))) {
+          throw new Error(`${name} 接口引擎 ${key} 缺少官方提示或正确资源策略。`);
+        }
+      }
+      if (name === 'app.microi.ai-engine.json') {
+        const dataAssistantCode = String(packageEngineMap.get('mci_ai_data_assistant')?.ApiV8Code || '');
+        const accountCode = String(packageEngineMap.get('platform-ai-account')?.ApiV8Code || '');
+        const runtimeCode = String(packageEngineMap.get('platform-ai-runtime')?.ApiV8Code || '');
+        const dataAssistantHookCode = dataAssistantCode.match(
+          /V8\.ApiEngine\.Run\('platform-ai-custom-hook',\s*\{[\s\S]*?\}\);/,
+        )?.[0] || '';
+        const accountHookCode = accountCode.match(
+          /function runTenantHook\([\s\S]*?(?=\nfunction getPlans\()/,
+        )?.[0] || '';
+        const runtimeHookCode = runtimeCode.match(
+          /V8\.ApiEngine\.Run\('platform-ai-custom-hook',\s*\{[\s\S]*?\}\);/,
+        )?.[0] || '';
+        const sensitiveHookField = /\b(?:Question|Prompt|Answer|ApiKey|TaskId|TradeNo|TotalAmount)\b/;
+        if (!dataAssistantCode.includes('AI_DATA_ASSISTANT_SAFE_TENANT_HOOK_V1')
+          || !dataAssistantCode.includes("V8.ApiEngine.Run('platform-ai-custom-hook'")
+          || !accountCode.includes("platform-ai-custom-hook")
+          || !accountCode.includes('PAYMENT_COMPLETE_MANAGED_V1')
+          || !accountCode.includes('RequireManagedProtocolContext')
+          || !runtimeCode.includes('AI_RUNTIME_MANAGED_NON_STREAM_V1')
+          || !runtimeCode.includes('V8.AI.Chat')
+          || !runtimeCode.includes('V8.AI.NL2SQL')
+          || !runtimeCode.includes('V8.AI.NL2V8')
+          || !runtimeCode.includes("V8.ApiEngine.Run('platform-ai-custom-hook'")
+          || !dataAssistantHookCode
+          || !accountHookCode
+          || !runtimeHookCode
+          || sensitiveHookField.test(dataAssistantHookCode + accountHookCode + runtimeHookCode)) {
+          throw new Error(`${name} 缺少安全最小化 AI 个性化 Hook 契约。`);
+        }
+        const capabilities = packageModel?.PackageInfo?.RequiredPlatformCapabilities || [];
+        for (const capability of [
+          'ApiEngine:platform-ai-account@v1.1.0',
+          'ApiEngine:platform-ai-runtime@v1.0.0',
+          'V8.Method.RequireManagedProtocolContext',
+          'V8.AI.UpdateConversationTitle',
+          'V8.AI.Chat',
+          'V8.AI.RecognizeIntent',
+          'V8.AI.NL2SQL',
+          'V8.AI.NL2V8',
+        ]) {
+          if (!capabilities.includes(capability)) {
+            throw new Error(`${name} 缺少能力 ${capability}。`);
+          }
+        }
+      }
+      if (name === 'app.microi.sys_user.json') {
+        const adminEngine = packageEngineMap.get('platform-sys-user-admin');
+        const adminCode = String(adminEngine?.ApiV8Code || '');
+        const capabilities = packageModel?.PackageInfo?.RequiredPlatformCapabilities || [];
+        if (semanticNumber(adminEngine?.Version) < 1_000_002
+          || !adminCode.includes('V8.Method.ManageSysUserAdmin')
+          || !adminCode.includes('platform-user-custom-hook')
+          || !adminCode.includes('authorization.DataAppend.ChangesPassword === true')
+          || !capabilities.includes('ApiEngine:platform-sys-user-admin@v1.0.2')) {
+          throw new Error(`${name} 缺少 v6.3.2 系统账号 Managed v1.0.2 改密安全契约。`);
+        }
+      }
+    }
+    if (name === 'app.microi.saas-engine.json') {
+      for (const key of ['platform-create-tenant', 'platform-external-login-binding', 'platform-wechat-user-binding', 'microi-init']) {
+        if (!packageEngineMap.has(key)) throw new Error(`${name} 缺少 ${key}。`);
+      }
+      for (const duplicateKey of ['platform-user-update-preferences', 'platform-sys-user-admin', 'platform-sys-menu']) {
+        if (packageEngineMap.has(duplicateKey)) throw new Error(`${name} 仍包含应由其他官方应用唯一交付的 ${duplicateKey}。`);
+      }
+      if (semanticNumber(packageModel?.PackageInfo?.Version) < 7_005_046) {
+        throw new Error(`${name} 低于 v7.5.46。`);
+      }
+      const legacyInit = packageEngineMap.get('microi-init');
+      const legacyInitCode = String(legacyInit?.ApiV8Code || '');
+      if (semanticNumber(legacyInit?.Version) < 2_000_002
+        || !legacyInitCode.includes('GetCurrentToken(rawToken, osClient)')
+        || !legacyInitCode.includes('RefreshLoginUser(')
+        || !legacyInitCode.includes('GetLegacyInitMenuTree(rawToken, osClient)')
+        || !legacyInitCode.includes('safeCurrentUserProjection')
+        || !legacyInitCode.includes('DataAppend: { OsClient: osClient }')
+        || legacyInitCode.includes('GetFormData({')
+        || legacyInitCode.includes('GetTableDataTree')) {
+        throw new Error(`${name} 缺少安全 microi-init v2.0.2 契约。`);
+      }
+    }
+    if (name === 'app.microi.store.json') {
+      for (const key of ['platform-marketplace-source', 'platform-marketplace-source-hook']) {
+        if (!packageEngineMap.has(key)) throw new Error(`${name} 缺少 ${key}。`);
+      }
+      for (const duplicateKey of ['platform-user-update-preferences', 'platform-sys-user-admin']) {
+        if (packageEngineMap.has(duplicateKey)) {
+          throw new Error(`${name} 仍包含系统账号应用唯一拥有的 ${duplicateKey}。`);
+        }
+      }
     }
     if (name === 'app.microi.saas-engine.json') {
       const bundle = Array.isArray(packageModel.ApplicationBundles)
@@ -270,6 +437,11 @@ function validateReleaseCandidate(name, content) {
       const importerEngine = engines.find(engine => engine.ApiEngineKey === 'import-microi-store-package');
       const publisherEngine = engines.find(engine => engine.ApiEngineKey === 'ai_app_publish_store');
       const bulkEngine = engines.find(engine => engine.ApiEngineKey === 'bulk-import-microi-store-packages');
+      const backgroundTaskEngine = engines.find(engine => engine.ApiEngineKey === 'platform-background-task');
+      const sysMenuEngine = engines.find(engine => engine.ApiEngineKey === 'platform-sys-menu');
+      const marketplaceSourceEngine = engines.find(engine => engine.ApiEngineKey === 'platform-marketplace-source');
+      const marketplaceSourceHook = engines.find(engine => engine.ApiEngineKey === 'platform-marketplace-source-hook');
+      const officialResourceEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-upgrade-resource');
       const listEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-store');
       const modelEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-store-model');
       const versionsEngine = engines.find(engine => engine.ApiEngineKey === 'get-microi-store-versions');
@@ -308,7 +480,7 @@ function validateReleaseCandidate(name, content) {
         + (importerVersionParts[1] || 0) * 1_000
         + (importerVersionParts[2] || 0);
       const importerCode = String(importerEngine?.ApiV8Code || '');
-      if (versionNumber < 7_004_002
+      if (versionNumber < 7_005_053
         || !content.includes('TargetSysMenuId')
         || !content.includes('01KXFSG7MZ40CY8KCWCZZZJH2M')
         || !content.includes('01KXFSG8153B3VZPZ45WNCCFHR')
@@ -357,6 +529,46 @@ function validateReleaseCandidate(name, content) {
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_MONOTONIC_CHILD_PROGRESS_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STRUCTURED_CHILD_ERRORS_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('prioritizeBootstrapPlan')
+        || engineVersionNumber(backgroundTaskEngine) < 1_001_000
+        || String(backgroundTaskEngine?.ApiAddress || '') !== '/apiengine/platform-background-task'
+        || Number(backgroundTaskEngine?.IsEnable) !== 1
+        || Number(backgroundTaskEngine?.StopHttp) !== 0
+        || Number(backgroundTaskEngine?.AllowAnonymous) !== 0
+        || !String(backgroundTaskEngine?.ApiV8Code || '').includes('V8.Method.ManageBackgroundTask(V8.Param)')
+        || packageModel?.ResourcePolicies?.ApiEngines?.['platform-background-task']?.UpgradePolicy !== 'Managed'
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ServerFeature:V8.ManageBackgroundTask')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ApiEngine:platform-background-task@v1.1.0')
+        || engineVersionNumber(sysMenuEngine) < 1_000_000
+        || String(sysMenuEngine?.ApiAddress || '') !== '/apiengine/platform-sys-menu'
+        || Number(sysMenuEngine?.IsEnable) !== 1
+        || Number(sysMenuEngine?.StopHttp) !== 0
+        || Number(sysMenuEngine?.AllowAnonymous) !== 0
+        || !String(sysMenuEngine?.ApiV8Code || '').includes('V8.Method.ManageSystemDirectory')
+        || !String(sysMenuEngine?.ApiV8Code || '').includes("Domain: 'SysMenu'")
+        || packageModel?.ResourcePolicies?.ApiEngines?.['platform-sys-menu']?.UpgradePolicy !== 'Managed'
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('V8.Method.ManageSystemDirectory')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ApiEngine:platform-sys-menu@v1.0.0')
+        || engineVersionNumber(marketplaceSourceEngine) < 1_000_000
+        || !String(marketplaceSourceEngine?.ApiV8Code || '').includes("V8.ApiEngine.Run('platform-marketplace-source-hook'")
+        || packageModel?.ResourcePolicies?.ApiEngines?.['platform-marketplace-source']?.UpgradePolicy !== 'Managed'
+        || engineVersionNumber(marketplaceSourceHook) < 1_000_000
+        || Number(marketplaceSourceHook?.StopHttp) !== 1
+        || !String(marketplaceSourceHook?.ApiV8Code || '').trimEnd().endsWith('return { Code : 1 };')
+        || packageModel?.ResourcePolicies?.ApiEngines?.['platform-marketplace-source-hook']?.Ownership !== 'Tenant'
+        || packageModel?.ResourcePolicies?.ApiEngines?.['platform-marketplace-source-hook']?.UpgradePolicy !== 'CreateIfMissing'
+        || engineVersionNumber(officialResourceEngine) < 1_002_008
+        || Number(officialResourceEngine?.AllowAnonymous) !== 1
+        || !String(officialResourceEngine?.ApiV8Code || '').includes('V8.Method.AuthorizeOfficialResourcePublish()')
+        || packageModel?.ResourcePolicies?.ApiEngines?.['get-microi-upgrade-resource']?.UpgradePolicy !== 'Managed'
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('V8.Method.AuthorizeOfficialResourcePublish')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ApiEngine:get-microi-upgrade-resource@v1.3.1')
+        || engines.some(engine => engine.ApiEngineKey === 'platform-user-update-preferences')
         || visibilityField?.Component !== 'Switch'
         || String(visibilityField?.DefaultValue) !== '1'
         || !deprecatedMenusValid
@@ -369,6 +581,7 @@ function validateReleaseCandidate(name, content) {
         || engineVersionNumber(modelEngine) < 1_002_000
         || !String(modelEngine?.ApiV8Code || '').includes('MARKETPLACE_PLAIN_OBJECT_STRIP_V1')
         || !String(modelEngine?.ApiV8Code || '').includes('MARKETPLACE_PINNED_INSTALL_SNAPSHOT_V1')
+        || !String(modelEngine?.ApiV8Code || '').includes('MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1')
         || engineVersionNumber(versionsEngine) < 1_000_000
         || !String(versionsEngine?.ApiV8Code || '').includes('mic_data_version')
         || !importerCode.includes('MARKETPLACE_PRIVATE_SOURCE_CREDENTIAL_V1')
@@ -392,7 +605,8 @@ function validateReleaseCandidate(name, content) {
       || !importerCode.includes('LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1')
       || !importerCode.includes('BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1')
       || !importerCode.includes('MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1')
-      || !importerCode.includes('PACKAGE_REPLAY_VERSION_GUARD_V2')
+        || !importerCode.includes('PACKAGE_REPLAY_VERSION_GUARD_V2')
+        || !importerCode.includes("PackagePointerMode: 'HdfsV1'")
       || !importerCode.includes('ADMIN_MENU_PERMISSION_V1')
       || !importerCode.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
       || !importerCode.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')) {
@@ -599,6 +813,107 @@ async function publishResources(changes) {
   if (payload?.Code !== 1) {
     throw new Error(`发布官网升级资源失败：${payload?.Msg || '未知错误'}`);
   }
+}
+
+function buildPublishedApiEngineSnapshots(resources) {
+  const seenKeys = new Set();
+  return officialApplicationResourceNames.map(name => {
+    const resource = resources.get(name);
+    const packageModel = JSON.parse(resource.content);
+    const engines = Array.isArray(packageModel.SysApiEngines) ? packageModel.SysApiEngines : [];
+    const policies = packageModel?.ResourcePolicies?.ApiEngines || {};
+    let managedCount = 0;
+    let createIfMissingCount = 0;
+    const apiEngineKeys = engines.map(engine => {
+      const key = String(engine?.ApiEngineKey || '').trim();
+      const normalized = key.toLowerCase();
+      const policy = policies[key]?.UpgradePolicy;
+      if (!normalized || seenKeys.has(normalized)) {
+        throw new Error(`官方接口投影存在跨包重复或空 Key：${key || '(空)'}`);
+      }
+      if (policy === 'Managed') managedCount += 1;
+      else if (policy === 'CreateIfMissing') createIfMissingCount += 1;
+      else throw new Error(`官方接口投影资源策略无效：${name} -> ${key}`);
+      seenKeys.add(normalized);
+      return key;
+    });
+    return {
+      name,
+      sha256: resource.sha256,
+      managedCount,
+      createIfMissingCount,
+      apiEngineKeys,
+      apiEngines: engines.map(engine => ({
+        policy: policies[String(engine?.ApiEngineKey || '').trim()]?.UpgradePolicy,
+        engine,
+      })),
+    };
+  });
+}
+
+function assertPublishedApiEngineReconcileResult(data, snapshots) {
+  const expectedKeys = snapshots.flatMap(item => item.apiEngineKeys)
+    .map(key => key.toLowerCase())
+    .sort();
+  const actualKeys = Array.isArray(data?.ApiEngineKeys)
+    ? data.ApiEngineKeys.map(key => String(key).toLowerCase()).sort()
+    : [];
+  const expectedManaged = snapshots.reduce((sum, item) => sum + item.managedCount, 0);
+  const expectedHooks = snapshots.reduce((sum, item) => sum + item.createIfMissingCount, 0);
+  if (Number(data?.PackageCount) !== snapshots.length
+      || Number(data?.ManagedCount) !== expectedManaged
+      || Number(data?.CreateIfMissingCount) !== expectedHooks
+      || Number(data?.VerifiedApiEngineCount) !== expectedKeys.length
+      || JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)
+      || !/^[a-f0-9]{64}$/i.test(String(data?.ProjectionSha256 || ''))) {
+    throw new Error('官网 live 接口投影回读与九个已发布应用包不一致');
+  }
+  return data;
+}
+
+async function reconcilePublishedApiEngines(resources) {
+  const snapshots = buildPublishedApiEngineSnapshots(resources);
+  const token = String(process.env.MICROI_UPGRADE_RESOURCE_TOKEN || '').trim();
+  let data;
+  if (!token) {
+    process.stdout.write('资源发布回读完成，使用 microi_itdos MCP 发起独立第二次 live 接口投影...\n');
+    const result = await reconcilePublishedApiEnginesViaConfiguredMcp(
+      snapshots,
+      { startDirectory: outputDirectory },
+    );
+    data = result;
+  } else {
+    const response = await fetch(publishEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Token: token,
+        OsClient: 'iTdos',
+        apiengine: '1',
+      },
+      body: JSON.stringify({
+        Action: 'ReconcilePublishedApiEngines',
+        Resources: snapshots.map(item => ({
+          Name: item.name,
+          ExpectedSha256: item.sha256,
+        })),
+      }),
+      signal: AbortSignal.timeout(180_000),
+    });
+    if (!response.ok) throw new Error(`官网 live 接口投影 HTTP ${response.status}`);
+    const payload = await response.json();
+    if (payload?.Code !== 1) {
+      throw new Error(`官网 live 接口投影失败：${payload?.Msg || '未知错误'}`);
+    }
+    data = assertPublishedApiEngineReconcileResult(payload.Data, snapshots);
+  }
+  data = assertPublishedApiEngineReconcileResult(data, snapshots);
+  process.stdout.write(
+    `官网 live 接口投影已回读：Managed=${data.ManagedCount}，CreateIfMissing=${data.CreateIfMissingCount}，`
+    + `总数=${data.VerifiedApiEngineCount}，sha256=${data.ProjectionSha256}`
+    + `${data.RecoveredAfterAmbiguousTimeout ? '（524 后经 MCP 逐项回读确认事务已提交）' : ''}\n`,
+  );
 }
 
 function printResource(name, content, direction) {
@@ -922,12 +1237,19 @@ if (process.argv.includes('--synchronize-local')) {
   if (remoteChanges.length) await publishResources(remoteChanges);
 
   const verifiedRemote = await downloadAllWithRetry('发布后回读');
+  for (const name of resourceNames) {
+    if (verifiedRemote.get(name).content !== mergedResources.get(name)) {
+      throw new Error(`${name} 发布后回读与合并结果不一致，未推进共同基线，且未执行 live 接口投影`);
+    }
+  }
+  if (publish) {
+    // 即使本次 remoteChanges=0 也必须执行：v1.3.1 首次发布新版控制面时，
+    // 正在运行的旧脚本只能写入新源码，只有资源回读后的第二次调用才会运行投影逻辑。
+    await reconcilePublishedApiEngines(verifiedRemote);
+  }
   await mkdir(baseDirectory, { recursive: true });
   for (const name of resourceNames) {
     const content = mergedResources.get(name);
-    if (verifiedRemote.get(name).content !== content) {
-      throw new Error(`${name} 发布后回读与合并结果不一致，未推进共同基线`);
-    }
     await writeFile(resolve(baseDirectory, name), content, 'utf8');
     const localChanged = localResources.get(name) !== content;
     const remoteChanged = remoteResources.get(name).content !== content;

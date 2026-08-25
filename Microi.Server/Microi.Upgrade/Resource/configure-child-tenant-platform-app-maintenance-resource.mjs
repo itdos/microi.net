@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ensureMinimumPackageVersion } from "./resource-sync-core.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const readJson = name => JSON.parse(fs.readFileSync(path.join(directory, name), "utf8"));
@@ -109,7 +110,7 @@ const orchestratorSource = fs.readFileSync(
   path.join(directory, "bulk-update-child-tenant-platform-apps.js"),
   "utf8"
 ).replace(/\r\n/g, "\n");
-saasPackage.PackageInfo.Version = "v7.5.31";
+ensureMinimumPackageVersion(saasPackage.PackageInfo, "v7.5.31");
 saasPackage.PackageInfo.Description =
   "SaaS 引擎基础资源。主租户可为全部启用子租户补齐商城工作器并创建独立的平台应用安装/更新后台任务，父任务以全部子任务真实终态为准。";
 saasPackage.PackageInfo.ChangeHistory = prependHistory(

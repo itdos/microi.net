@@ -38,7 +38,8 @@ namespace Microi.net.Api.Controllers
             // Path is a storage namespace, not a client-selectable display value.
             // Always bind it to the authenticated tenant to prevent cross-tenant
             // local/object-storage path selection through this legacy endpoint.
-            Path = currentTokenDynamic.OsClient;
+            Path = TenantConfigurationSecurity.NormalizeTenantId(
+                Convert.ToString(currentTokenDynamic.OsClient));
 
             // 只读取 ASP.NET Core 已缓存的 multipart 文件元数据，不读取文件内容。
             // 这样旧版富文本上传也能在系统日志/监控中按帐号、IP、类型和字节归因。
@@ -66,7 +67,9 @@ namespace Microi.net.Api.Controllers
             }
 
             #region 这是以前默认的百度编辑器上传
-            var response = _ueditorService.UploadAndGetResponse(HttpContext, Path);
+            var response = await _ueditorService.UploadAndGetResponseAsync(
+                HttpContext,
+                Path);
             return Content(response.Result, response.ContentType);
             #endregion
 

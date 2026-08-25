@@ -56,7 +56,7 @@
                     <div class="msg-avatar-wrap">
                         <el-avatar
                             :size="46"
-                            :src="DiyCommon.GetServerPath(msg.ContactUserAvatar)"
+                            :src="getUserAvatarViewUrl(msg.ContactUserAvatar, msg.ContactUserId)"
                             class="mci-avatar"
                         >
                             {{ displayContactName(msg).charAt(0) }}
@@ -105,7 +105,7 @@
                     :style="{ '--mci-index': Math.min(idx, 12) }"
                     @click="startNewChat(contact)"
                 >
-                    <el-avatar :size="40" :src="contact.UserImg" class="mci-avatar">
+                    <el-avatar :size="40" :src="getUserAvatarViewUrl(contact.Avatar || contact.UserImg, contact.Id)" class="mci-avatar">
                         {{ displayContactName(contact).charAt(0) }}
                     </el-avatar>
                     <div class="contact-info">
@@ -130,7 +130,7 @@
             </div>
             <div class="dialog-contact-list">
                 <div v-for="contact in dialogContactList" :key="contact.Id" class="mci-cell" @click="startDialogChat(contact)">
-                    <el-avatar :size="36" :src="contact.UserImg" class="mci-avatar">
+                    <el-avatar :size="36" :src="getUserAvatarViewUrl(contact.Avatar || contact.UserImg, contact.Id)" class="mci-avatar">
                         {{ displayContactName(contact).charAt(0) }}
                     </el-avatar>
                     <div class="contact-info">
@@ -180,6 +180,9 @@ const contactPageSize = ref(20);
 const contactHasMore = ref(true);
 const contactLoadingMore = ref(false);
 const dialogContactList = ref([]);
+// 签名地址只存在当前页面视图缓存中，不回写联系人或 SignalR 消息对象。
+const userAvatarViewUrls = ref({});
+const userAvatarViewPending = new Set();
 
 let websocket = null;
 let wsEventsRegistered = false;
@@ -198,6 +201,27 @@ const displayContactName = contact => resolveChatDisplayName(
     t('Msg.Mobile.common.unknown')
 );
 
+const getUserAvatarViewUrl = (avatar, userId) => {
+    const id = String(userId || '').trim();
+    if (id === 'AI') return '/static/mci/ai/assistant-robot.png';
+    const source = String(avatar || '').trim();
+    if (!source || !id) return '';
+    const cacheKey = `${id}|${source}`;
+    if (Object.prototype.hasOwnProperty.call(userAvatarViewUrls.value, cacheKey)) return userAvatarViewUrls.value[cacheKey];
+    if (!userAvatarViewPending.has(cacheKey)) {
+        userAvatarViewPending.add(cacheKey);
+        DiyCommon.GetUserAvatarUrl(source, id)
+            .then(url => {
+                userAvatarViewUrls.value = { ...userAvatarViewUrls.value, [cacheKey]: url || '' };
+            })
+            .catch(() => {
+                userAvatarViewUrls.value = { ...userAvatarViewUrls.value, [cacheKey]: '' };
+            })
+            .finally(() => userAvatarViewPending.delete(cacheKey));
+    }
+    return '';
+};
+
 let contactSearchTimer = null;
 const onContactSearchInput = () => {
     clearTimeout(contactSearchTimer);
@@ -210,7 +234,7 @@ const onContactSearchInput = () => {
 
 const searchContacts = () => {
     if (!contactKeyword.value) { loadContacts(); return; }
-    DiyCommon.Post('/api/SysUser/GetSysUserPublicInfo', {
+    DiyCommon.Post('/apiengine/platform-sys-user-public-info', {
         State: 1, _PageIndex: 1, _PageSize: 15, _Keyword: contactKeyword.value
     }, function(result) {
         if (DiyCommon.Result(result)) {
@@ -271,7 +295,7 @@ const loadContacts = (isLoadMore = false) => {
     if (isLoadMore) contactLoadingMore.value = true;
     else contactLoading.value = true;
 
-    DiyCommon.Post('/api/SysUser/GetSysUserPublicInfo', {
+    DiyCommon.Post('/apiengine/platform-sys-user-public-info', {
         State: 1, _PageIndex: contactPageIndex.value, _PageSize: contactPageSize.value, _Keyword: searchKeyword.value || ''
     }, function(result) {
         if (DiyCommon.Result(result)) {
@@ -288,7 +312,10 @@ const loadContacts = (isLoadMore = false) => {
             }
             const aiOffset = (!searchKeyword.value && contactPageIndex.value === 1) ? 1 : 0;
             const loadedCount = contactList.value.length - aiOffset;
-            contactHasMore.value = loadedCount < (result.Total || 0);
+            const total = Number(result.DataCount ?? result.Total);
+            contactHasMore.value = Number.isFinite(total)
+                ? loadedCount < total
+                : data.length >= contactPageSize.value;
         }
         contactLoading.value = false;
         contactLoadingMore.value = false;

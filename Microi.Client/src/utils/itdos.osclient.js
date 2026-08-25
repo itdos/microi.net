@@ -72,8 +72,14 @@ var DiyOsClient = {
 
         //预获取OsClient
         if (DiyOsClient.GetOsClientNotDomain() == "") {
-            var getOsClientByDomainResult = await DiyCommon.PostAsync("/api/Os/GetOsClientByDomain", {
-                Domain: location.host.toLocaleLowerCase()
+            var getOsClientByDomainResult = await DiyCommon.PostAsync({
+                url: "/apiengine/platform-os-client-by-domain",
+                data: {
+                    Domain: location.host.toLocaleLowerCase()
+                },
+                skipAuthorization: true,
+                suppressAuthFailure: true,
+                suppressErrorNotification: true
             });
             if (getOsClientByDomainResult.Code == 1 && getOsClientByDomainResult.Data) {
                 var osClient = getOsClientByDomainResult.Data.OsClient || getOsClientByDomainResult.Data.OSCLIENT;
@@ -101,11 +107,17 @@ var DiyOsClient = {
         var href = window.location.href.toLowerCase();
         //同步从服务器中获取配置信息，一种是使用await，一种是使用 Promise、Then里面获取
         var sysConfig = null;
-        var sysConfigResult = await DiyCommon.PostAsync("/api/FormEngine/GetSysConfig", {
-            _SearchEqual: {
-                IsEnable: 1
+        var sysConfigResult = await DiyCommon.PostAsync({
+            url: "/apiengine/platform-sys-config",
+            data: {
+                _SearchEqual: {
+                    IsEnable: 1
+                },
+                OsClient: osClient
             },
-            OsClient: osClient
+            skipAuthorization: true,
+            suppressAuthFailure: true,
+            suppressErrorNotification: true
         });
         if (sysConfigResult.Code == 1) {
             sysConfig = sysConfigResult.Data;

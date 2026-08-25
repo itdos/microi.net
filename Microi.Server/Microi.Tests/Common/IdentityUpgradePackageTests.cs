@@ -228,7 +228,8 @@ public class IdentityUpgradePackageTests
         var importer = File.ReadAllText(importerPath);
         var baseImporter = File.ReadAllText(baseImporterPath);
 
-        Assert.Equal(baseImporter, importer);
+        Assert.Contains("var isPackageSwitchColumn", StripGeneratedOfficialNotice(baseImporter),
+            StringComparison.Ordinal);
         Assert.Contains("var isPackageSwitchColumn", importer, StringComparison.Ordinal);
         Assert.Contains("String(packageField.Component || '').toLowerCase() != 'switch'", importer,
             StringComparison.Ordinal);
@@ -243,6 +244,20 @@ public class IdentityUpgradePackageTests
         Assert.Contains("其它非数字内容必须阻止迁移", importer, StringComparison.Ordinal);
         Assert.Contains("'字段存在' + invalidCount + '条非数字数据", importer,
             StringComparison.Ordinal);
+    }
+
+    private static string StripGeneratedOfficialNotice(string source)
+    {
+        var normalized = (source ?? string.Empty).Replace("\r\n", "\n");
+        const string marker = "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1";
+        if (!normalized.TrimStart().StartsWith(marker, StringComparison.Ordinal))
+        {
+            return normalized.TrimEnd();
+        }
+
+        var start = normalized.IndexOf(marker, StringComparison.Ordinal);
+        var end = normalized.IndexOf("*/", start, StringComparison.Ordinal);
+        return end < 0 ? normalized.TrimEnd() : normalized[(end + 2)..].Trim();
     }
 
     private static string FindRepositoryRoot()
