@@ -493,7 +493,7 @@ public class CacheAndUpgradeRegressionTests
             item => item == "V8.Method.ManageSystemDirectory");
         Assert.Contains(
             package["PackageInfo"]?["RequiredPlatformCapabilities"]!.Values<string>(),
-            item => item == "ApiEngine:platform-sys-menu@v1.0.0");
+            item => item == "ApiEngine:platform-sys-menu@v1.0.1");
     }
 
     [Fact]
@@ -551,11 +551,13 @@ public class CacheAndUpgradeRegressionTests
             item => item["ApiEngineKey"]?.ToString() == "platform-sys-menu");
         var sysMenuCode = sysMenu["ApiV8Code"]?.ToString() ?? string.Empty;
         Assert.True(Assert.IsType<bool>(hasSysMenu!.Invoke(null,
+            new object[] { sysMenuCode, new System.Version(1, 0, 1) })));
+        Assert.False(Assert.IsType<bool>(hasSysMenu.Invoke(null,
             new object[] { sysMenuCode, new System.Version(1, 0, 0) })));
         Assert.False(Assert.IsType<bool>(hasSysMenu.Invoke(null,
-            new object[] { sysMenuCode, new System.Version(0, 9, 9) })));
+            new object[] { sysMenuCode.Replace("V8.Method.ManageSystemDirectory", "V8.Method.LegacySysMenu"), new System.Version(1, 0, 1) })));
         Assert.False(Assert.IsType<bool>(hasSysMenu.Invoke(null,
-            new object[] { sysMenuCode.Replace("V8.Method.ManageSystemDirectory", "V8.Method.LegacySysMenu"), new System.Version(1, 0, 0) })));
+            new object[] { sysMenuCode.Replace("platform-marketplace-source-hook", "missing-menu-hook"), new System.Version(1, 0, 1) })));
     }
 
     [Fact]

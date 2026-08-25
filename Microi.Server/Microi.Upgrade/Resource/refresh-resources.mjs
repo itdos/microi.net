@@ -224,8 +224,8 @@ function validateReleaseCandidate(name, content) {
         tenantHooks: ['platform-system-settings-custom-hook'],
       },
       'app.microi.message-notification.json': {
-        minimumVersion: 1_000_008,
-        exactKeys: ['msg_event', 'msg_internal_list', 'msg_internal_mark_read', 'platform-chat-system-message', 'platform-chat-runtime', 'platform-message-notification-custom-hook'],
+        minimumVersion: 1_000_011,
+        exactKeys: ['msg_event', 'msg_internal_list', 'msg_internal_mark_read', 'platform-chat-system-message', 'platform-chat-runtime', 'platform-message-notification-custom-hook', 'wechat_send_tpl_msg'],
         tenantHooks: ['platform-message-notification-custom-hook'],
       },
       'app.microi.ai-engine.json': {
@@ -570,18 +570,19 @@ function validateReleaseCandidate(name, content) {
           .includes('ServerFeature:V8.ManageBackgroundTask')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('ApiEngine:platform-background-task@v1.1.0')
-        || engineVersionNumber(sysMenuEngine) < 1_000_000
+        || engineVersionNumber(sysMenuEngine) < 1_000_001
         || String(sysMenuEngine?.ApiAddress || '') !== '/apiengine/platform-sys-menu'
         || Number(sysMenuEngine?.IsEnable) !== 1
         || Number(sysMenuEngine?.StopHttp) !== 0
         || Number(sysMenuEngine?.AllowAnonymous) !== 0
         || !String(sysMenuEngine?.ApiV8Code || '').includes('V8.Method.ManageSystemDirectory')
         || !String(sysMenuEngine?.ApiV8Code || '').includes("Domain: 'SysMenu'")
+        || !String(sysMenuEngine?.ApiV8Code || '').includes("platform-marketplace-source-hook")
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-sys-menu']?.UpgradePolicy !== 'Managed'
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('V8.Method.ManageSystemDirectory')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
-          .includes('ApiEngine:platform-sys-menu@v1.0.0')
+          .includes('ApiEngine:platform-sys-menu@v1.0.1')
         || engineVersionNumber(marketplaceSourceEngine) < 1_000_000
         || !String(marketplaceSourceEngine?.ApiV8Code || '').includes("V8.ApiEngine.Run('platform-marketplace-source-hook'")
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-marketplace-source']?.UpgradePolicy !== 'Managed'

@@ -126,6 +126,21 @@ const engines = [
     history: '2026-08-24 v1.0.0 角色目录兼容接口迁移至接口引擎，保留权威表权限与可分配角色过滤。'
   },
   {
+    key: 'platform-online-terminal', name: '平台在线终端管理', file: 'platform-online-terminal.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000013', enableLog: 1,
+    history: '2026-08-26 v1.0.0 补齐已移除 OnlineTerminalController 对应的 Managed 接口，并在可信原子前调用租户个性化 Hook。'
+  },
+  {
+    key: 'platform-cache-manager', name: '平台缓存管理', file: 'platform-cache-manager.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000014', enableLog: 1,
+    history: '2026-08-26 v1.0.0 补齐已移除 CacheController 对应的 Managed 接口，并在可信原子前调用租户个性化 Hook。'
+  },
+  {
+    key: 'mci-system-observability-query', name: '系统日志与监控统一查询', file: 'mci-system-observability-query.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000015', enableLog: 0, version: 'v1.0.9',
+    history: '2026-08-26 v1.0.9 将主租户已有的系统观测查询正式纳入 SaaS 官方 Managed 包，并增加只暴露 Action 的租户个性化 Hook。'
+  },
+  {
     key: 'platform-runtime-custom-hook', name: '平台运行时个性化扩展', file: 'platform-runtime-custom-hook.js',
     id: '019d2a01-9d63-7f91-8c01-000000000001', enableLog: 1, stopHttp: 1,
     upgradePolicy: 'CreateIfMissing', ownership: 'Tenant',
@@ -425,6 +440,9 @@ for (const capability of [
   'V8.Method.ManageAiWorkflow',
   'V8.Method.GenerateTencentImUserSig',
   'V8.Method.ManageSystemDirectory',
+  'V8.Method.ManageOnlineTerminal',
+  'V8.Method.ManageCache',
+  'V8.Method.GetSystemObservability',
   'ServerFeature:ApiEngineStreaming',
   'ApiEngine:platform-schedule-job',
   'ApiEngine:platform-mq',
@@ -436,6 +454,9 @@ for (const capability of [
   'ApiEngine:platform-sys-base-data',
   'ApiEngine:platform-sys-dept',
   'ApiEngine:platform-sys-role',
+  'ApiEngine:platform-online-terminal',
+  'ApiEngine:platform-cache-manager',
+  'ApiEngine:mci-system-observability-query',
   'V8.Method.ResolveOsClientByDomain',
   'V8.Method.GetPublicSysConfig',
   'V8.Method.GetBackendVersion',
@@ -493,6 +514,27 @@ packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
 );
 packageData.PackageInfo.ChangeHistory = prependOnce(packageData.PackageInfo.ChangeHistory, packageHistory);
 packageData.PackageInfo.ChangeHistory = prependOnce(packageData.PackageInfo.ChangeHistory, serviceHealthHistory);
+
+const apiClosurePackageVersion = 'v7.6.21';
+const apiClosureHistory = '2026-08-26 v7.6.21 补齐在线终端、缓存管理与系统观测三个官方 Managed 接口；前端引用、Controller 迁移目标和应用包内部依赖纳入自动闭包门禁。';
+if (compareSemver(packageData.PackageInfo.Version, apiClosurePackageVersion) < 0) {
+  packageData.PackageInfo.Version = apiClosurePackageVersion;
+}
+if (packageData.PackageInfo.Version === apiClosurePackageVersion) {
+  packageData.PackageInfo.Description = 'SaaS 引擎基础资源。启动自动补齐全部官方运行时接口闭包，并保护租户 CreateIfMissing 个性化源码。';
+  packageData.PackageInfo.ChangeLog = {
+    Version: apiClosurePackageVersion,
+    Title: '官方运行时接口闭包补全',
+    ChangeType: 'Fix',
+    Content: apiClosureHistory.substring(apiClosureHistory.indexOf(' ') + 1).replace(/^v7\.6\.21\s+/, ''),
+    ReleaseTime: '2026-08-26 18:30:00'
+  };
+}
+packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
+  packageData.PackageInfo.ChangeHistory,
+  apiClosurePackageVersion,
+);
+packageData.PackageInfo.ChangeHistory = prependOnce(packageData.PackageInfo.ChangeHistory, apiClosureHistory);
 
 normalizeOfficialApiEnginePolicies(packageData, path.basename(packagePath));
 const normalizedPackageData = JSON.parse(normalizeOfficialPackageExecutionLimits(
