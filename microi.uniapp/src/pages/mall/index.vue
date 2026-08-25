@@ -261,6 +261,10 @@ export default {
     const snapshot = readMallSnapshot()
     if (snapshot) this.applyInitialSnapshot(snapshot)
     this.loadInitialSnapshot()
+	//先临时调用下面两个接口，目前不调用的话初始页面不渲染，但接口明明也调用了的
+	// this.loadCategoryTree()
+	// this.loadProducts()
+	
   },
   onUnload() {
     clearTimeout(this.searchTimer)
