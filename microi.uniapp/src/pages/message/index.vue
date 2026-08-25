@@ -696,7 +696,7 @@
 			// 搜索弹窗联系人
 			async searchDialogContacts() {
 				try {
-					const res = await post('/api/SysUser/GetSysUserPublicInfo', {
+					const res = await post('/apiengine/platform-sys-user-public-info', {
 						State: 1,
 						_PageIndex: 1,
 						_PageSize: 15,

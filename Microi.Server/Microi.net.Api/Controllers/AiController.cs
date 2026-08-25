@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -25,6 +26,8 @@ namespace Microi.net.Api
         private readonly IMicroiAI _microiAi;
         private readonly SubscriptionService _subService;
         private readonly AiProxyService _proxyService;
+        private const string AiPlatformAccountEngineKey = "platform-ai-account";
+        private const string AiPlatformRuntimeEngineKey = "platform-ai-runtime";
 
         public AiController(
             IMicroiAI microiAi,
@@ -57,6 +60,71 @@ namespace Microi.net.Api
             return (userId, userName, osClient);
         }
 
+        private async Task<JsonResult> RunAiPlatformCompatibilityAsync(
+            string action,
+            JObject request = null,
+            bool allowAnonymous = false)
+        {
+            return await RunManagedAiCompatibilityAsync(
+                AiPlatformAccountEngineKey,
+                action,
+                request,
+                allowAnonymous);
+        }
+
+        private async Task<JsonResult> RunAiRuntimeCompatibilityAsync(
+            string action,
+            JObject request = null)
+        {
+            return await RunManagedAiCompatibilityAsync(
+                AiPlatformRuntimeEngineKey,
+                action,
+                request,
+                allowAnonymous: false);
+        }
+
+        private async Task<JsonResult> RunManagedAiCompatibilityAsync(
+            string managedEngineKey,
+            string action,
+            JObject request,
+            bool allowAnonymous)
+        {
+            JObject currentUser = null;
+            var osClient = DiyToken.GetCurrentOsClient(false);
+            // 匿名套餐/模型发现仍须尊重统一解析出的 Query/Form/Header 租户；
+            // 请求没有显式租户时才回到本节点配置租户。
+            if (!allowAnonymous)
+            {
+                var token = await DiyToken.GetCurrentToken(false);
+                if (!string.IsNullOrWhiteSpace(token?.OsClient)) osClient = token.OsClient;
+                if (token?.CurrentUser != null)
+                    currentUser = JObject.FromObject(token.CurrentUser);
+            }
+
+            if (string.IsNullOrWhiteSpace(osClient))
+                osClient = OsClient.GetConfigOsClient();
+            request = request?.DeepClone() as JObject ?? new JObject();
+            foreach (var property in request.Properties()
+                         .Where(item => string.Equals(
+                             item.Name,
+                             "OsClient",
+                             StringComparison.OrdinalIgnoreCase)
+                             || string.Equals(
+                                 item.Name,
+                                 "_OsClient",
+                                 StringComparison.OrdinalIgnoreCase))
+                         .ToList())
+            {
+                property.Remove();
+            }
+            request["Action"] = action;
+            request["OsClient"] = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                managedEngineKey,
+                request,
+                currentUser));
+        }
+
         private async Task EnrichCurrentUserAsync(AiParam param)
         {
             if (param == null)
@@ -73,18 +141,6 @@ namespace Microi.net.Api
             param.Endpoint = null;
             param.ServerInternalCall = false;
             param.Source = "http-ai";
-        }
-
-        private async Task EnrichCurrentUserAsync(NL2SQLParam param)
-        {
-            if (param == null)
-            {
-                return;
-            }
-            var (userId, userName, osClient) = await GetCurrentUserContextAsync();
-            param.CurrentUserId = userId;
-            param.CurrentUserName = userName;
-            param.OsClient = osClient;
         }
 
         public class UpdateConversationTitleParam
@@ -106,14 +162,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> UpdateConversationTitle([FromBody] UpdateConversationTitleParam param)
         {
-            var (userId, _, osClient) = await GetCurrentUserContextAsync();
-            var result = await _microiAi.UpdateConversationTitleAsync(
-                userId,
-                osClient,
-                param?.ConversationId,
-                param?.Title,
-                param?.Source);
-            return Json(result);
+            return await RunAiRuntimeCompatibilityAsync(
+                "UpdateConversationTitle",
+                JObject.FromObject(param ?? new UpdateConversationTitleParam()));
         }
 
         /// <summary>
@@ -152,10 +203,9 @@ namespace Microi.net.Api
             if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
             if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
-            await EnrichCurrentUserAsync(param);
-
-            return Json(
-                await _microiAi.ResolveIntentResultAsync(param));
+            return await RunAiRuntimeCompatibilityAsync(
+                "RecognizeIntent",
+                JObject.FromObject(param));
         }
 
         /// <summary>
@@ -178,10 +228,9 @@ namespace Microi.net.Api
             if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
             if (!string.IsNullOrWhiteSpace(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
-            await EnrichCurrentUserAsync(param);
-
-            return Json(
-                await _microiAi.ChatWithContextAsync(param));
+            return await RunAiRuntimeCompatibilityAsync(
+                "Chat",
+                JObject.FromObject(param));
         }
 
         /// <summary>
@@ -259,13 +308,9 @@ namespace Microi.net.Api
             if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
             if (!string.IsNullOrWhiteSpace(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
-            await EnrichCurrentUserAsync(param);
-            var currentToken = await DiyToken.GetCurrentToken();
-            return Json(
-                await _microiAi.NL2SQLAuthorizedAsync(
-                    param,
-                    currentToken?.CurrentUser,
-                    currentToken?.OsClient));
+            return await RunAiRuntimeCompatibilityAsync(
+                "NL2SQL",
+                JObject.FromObject(param));
         }
 
         /// <summary>
@@ -278,13 +323,7 @@ namespace Microi.net.Api
             [FromQuery] string AiModelId = null,
             [FromQuery] string OsClient = null)
         {
-            var param = bodyParam ?? new AiParam();
-            if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
-            if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
-            if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
-            await EnrichCurrentUserAsync(param);
-            var result = await _microiAi.GetRelayTokenSummary(param);
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync("GetRelayTokenSummary");
         }
 
         /// <summary>
@@ -360,10 +399,9 @@ namespace Microi.net.Api
         public async Task<JsonResult> NL2V8EngineSync(NL2V8Param param)
         {
             param ??= new NL2V8Param();
-            var currentContext = await GetCurrentUserContextAsync();
-            param.OsClient = currentContext.OsClient;
-            var result = await _microiAi.NL2V8Engine(param);
-            return Json(result);
+            return await RunAiRuntimeCompatibilityAsync(
+                "NL2V8EngineSync",
+                JObject.FromObject(param));
         }
 
         // ============================================================
@@ -377,8 +415,9 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> SubGetPlans()
         {
-            var result = await _subService.GetPlans();
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync(
+                "GetPlans",
+                allowAnonymous: true);
         }
 
         /// <summary>
@@ -387,12 +426,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> SubGetInfo()
         {
-            var (userId, _) = await GetCurrentUserAsync();
-            if (string.IsNullOrEmpty(userId))
-                return Json(new DosResult(0, null, "请先登录！"));
-
-            var result = await _subService.GetUserSubscription(userId);
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync("GetSubscription");
         }
 
         /// <summary>
@@ -401,14 +435,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> GetUserAiApiKey()
         {
-            var (userId, _, osClient) = await GetCurrentUserContextAsync();
-            if (string.IsNullOrEmpty(userId))
-                return Json(new DosResult(0, null, "请先登录！"));
-            if (string.IsNullOrWhiteSpace(osClient))
-                return Json(new DosResult(0, null, "OsClient不能为空！"));
-
-            var result = await _subService.EnsureUserAiApiKey(userId, osClient);
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync("EnsureUserAiApiKey");
         }
 
         /// <summary>
@@ -417,14 +444,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> ResetUserAiApiKey()
         {
-            var (userId, _, osClient) = await GetCurrentUserContextAsync();
-            if (string.IsNullOrEmpty(userId))
-                return Json(new DosResult(0, null, "请先登录！"));
-            if (string.IsNullOrWhiteSpace(osClient))
-                return Json(new DosResult(0, null, "OsClient不能为空！"));
-
-            var result = await _subService.EnsureUserAiApiKey(userId, osClient, true);
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync("ResetUserAiApiKey");
         }
 
         /// <summary>
@@ -433,9 +453,13 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> GetUserAiUsage(int pageIndex = 1, int pageSize = 20)
         {
-            var (userId, _) = await GetCurrentUserAsync();
-            if (string.IsNullOrEmpty(userId)) return Json(new DosResult(0, null, "请先登录！"));
-            return Json(await _subService.GetRelayTokenUsage(userId, pageIndex, pageSize));
+            return await RunAiPlatformCompatibilityAsync(
+                "GetRelayTokenUsage",
+                new JObject
+                {
+                    ["PageIndex"] = pageIndex,
+                    ["PageSize"] = pageSize
+                });
         }
 
         /// <summary>
@@ -444,16 +468,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> SubCreateOrder([FromBody] CreateOrderParam param)
         {
-            var (userId, userName) = await GetCurrentUserAsync();
-            if (string.IsNullOrEmpty(userId))
-                return Json(new DosResult(0, null, "请先登录！"));
-
-            var result = await _subService.CreateOrder(
-                userId,
-                userName,
-                param?.PlanId,
-                param?.Months ?? 0);
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync(
+                "CreateOrder",
+                JObject.FromObject(param ?? new CreateOrderParam()));
         }
 
         /// <summary>
@@ -462,28 +479,32 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> SubCreateAlipay([FromBody] PayOrderParam param)
         {
-            var (userId, _, osClient) = await GetCurrentUserContextAsync();
-            if (string.IsNullOrEmpty(userId))
-                return Json(new DosResult(0, null, "请先登录！"));
-            if (string.IsNullOrWhiteSpace(param?.OrderId))
-                return Json(new DosResult(0, null, "订单Id不能为空！"));
-
-            var result = await _subService.CreateAlipayForUser(
-                param.OrderId,
-                userId,
-                osClient);
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync(
+                "CreateAlipay",
+                JObject.FromObject(param ?? new PayOrderParam()));
         }
 
         /// <summary>
         /// 支付宝异步回调通知
         /// </summary>
         [HttpPost]
+        [HttpPost("~/api/Ai/SubAlipayNotify--OsClient--{routeOsClient}--")]
         [AllowAnonymous]
-        public async Task<ContentResult> SubAlipayNotify()
+        public async Task<ContentResult> SubAlipayNotify(
+            string routeOsClient = null,
+            [FromQuery(Name = "OsClient")] string queryOsClient = null)
         {
+            string trustedOsClient = null;
             try
             {
+                if (!TryResolveAlipayCallbackTenant(
+                        routeOsClient,
+                        queryOsClient,
+                        out trustedOsClient))
+                {
+                    return Content("fail");
+                }
+
                 var form = await Request.ReadFormAsync();
                 var signParams = new Dictionary<string, string>();
                 foreach (var key in form.Keys)
@@ -491,18 +512,90 @@ namespace Microi.net.Api
                     signParams[key] = form[key];
                 }
 
-                var result =
-                    await _subService.ProcessAlipayNotify(
-                        signParams);
+                var verified = await _subService.VerifyAlipayNotifyForTenant(
+                    signParams,
+                    trustedOsClient);
+                if (verified.Code != 1 || verified.Data == null)
+                {
+                    return Content("fail");
+                }
+
+                var trustedRequest = JObject.FromObject(verified.Data);
+                trustedRequest["Action"] = "CompletePayment";
+                var result = await ManagedApiEngineCompatibility.RunTrustedProtocolAsync(
+                    AiPlatformAccountEngineKey,
+                    trustedOsClient,
+                    trustedRequest);
                 return Content(
-                    result.Code == 1
+                    IsSuccessfulDosResult(result)
                         ? "success"
                         : "fail");
             }
             catch (Exception ex)
             {
-                MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "AI", "SubscriptionPaymentCallbackFailed", "AI 订阅支付回调处理异常", ex.ToString(), 2);
+                MicroiEngine.QueueSystemLog(
+                    trustedOsClient ?? OsClientDefault.OsClient,
+                    "AI",
+                    "SubscriptionPaymentCallbackFailed",
+                    "AI 订阅支付回调处理异常",
+                    ex.GetType().Name,
+                    2);
                 return Content("fail");
+            }
+        }
+
+        internal static bool TryResolveAlipayCallbackTenant(
+            string routeOsClient,
+            string queryOsClient,
+            out string trustedOsClient)
+        {
+            trustedOsClient = null;
+            try
+            {
+                var routeTenant = string.IsNullOrWhiteSpace(routeOsClient)
+                    ? null
+                    : TenantConfigurationSecurity.NormalizeTenantId(routeOsClient);
+                var queryTenant = string.IsNullOrWhiteSpace(queryOsClient)
+                    ? null
+                    : TenantConfigurationSecurity.NormalizeTenantId(queryOsClient);
+                if (!string.IsNullOrWhiteSpace(routeTenant)
+                    && !string.IsNullOrWhiteSpace(queryTenant)
+                    && !string.Equals(
+                        routeTenant,
+                        queryTenant,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                var selected = routeTenant ?? queryTenant;
+                if (string.IsNullOrWhiteSpace(selected))
+                {
+                    // 兼容历史单租户 NotifyUrl；回退值来自节点可信配置，绝不读取
+                    // 支付宝表单或可伪造 Header 中的租户。
+                    selected = TenantConfigurationSecurity.NormalizeTenantId(
+                        OsClient.GetConfigOsClient());
+                }
+                trustedOsClient = selected;
+                return !string.IsNullOrWhiteSpace(trustedOsClient);
+            }
+            catch
+            {
+                trustedOsClient = null;
+                return false;
+            }
+        }
+
+        private static bool IsSuccessfulDosResult(object value)
+        {
+            if (value == null) return false;
+            try
+            {
+                return JObject.FromObject(value).Value<int?>("Code") == 1;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -512,12 +605,13 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> SubGetOrders(int pageIndex = 1, int pageSize = 20)
         {
-            var (userId, _) = await GetCurrentUserAsync();
-            if (string.IsNullOrEmpty(userId))
-                return Json(new DosResult(0, null, "请先登录！"));
-
-            var result = await _subService.GetUserOrders(userId, pageIndex, pageSize);
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync(
+                "GetOrders",
+                new JObject
+                {
+                    ["PageIndex"] = pageIndex,
+                    ["PageSize"] = pageSize
+                });
         }
 
         /// <summary>
@@ -526,12 +620,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> SubConsumeQuota()
         {
-            var (userId, _) = await GetCurrentUserAsync();
-            if (string.IsNullOrEmpty(userId))
-                return Json(new DosResult(0, null, "请先登录！"));
-
-            var result = await _subService.ConsumeQuota(userId);
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync("ConsumeQuota");
         }
 
         /// <summary>
@@ -540,16 +629,9 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> SubGetOrderStatus(string orderId)
         {
-            var (userId, _, osClient) = await GetCurrentUserContextAsync();
-            if (string.IsNullOrEmpty(userId))
-                return Json(new DosResult(0, null, "请先登录！"));
-            if (string.IsNullOrWhiteSpace(orderId))
-                return Json(new DosResult(0, null, "订单Id不能为空！"));
-
-            return Json(await _subService.GetOrderStatusForUser(
-                orderId,
-                userId,
-                osClient));
+            return await RunAiPlatformCompatibilityAsync(
+                "GetOrderStatus",
+                new JObject { ["OrderId"] = orderId });
         }
 
         /// <summary>
@@ -559,8 +641,7 @@ namespace Microi.net.Api
         [PlatformAdminOnly]
         public async Task<JsonResult> SubGetApiKeyList()
         {
-            var result = await _subService.GetApiKeyList();
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync("GetApiKeyList");
         }
 
         /// <summary>
@@ -570,11 +651,9 @@ namespace Microi.net.Api
         [PlatformAdminOnly]
         public async Task<JsonResult> SubGetApiKeyBindUsers(string apiKeyId)
         {
-            if (string.IsNullOrWhiteSpace(apiKeyId))
-                return Json(new DosResult(0, null, "apiKeyId不能为空！"));
-
-            var result = await _subService.GetApiKeyBindUsers(apiKeyId);
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync(
+                "GetApiKeyBindUsers",
+                new JObject { ["ApiKeyId"] = apiKeyId });
         }
 
         /// <summary>
@@ -584,8 +663,7 @@ namespace Microi.net.Api
         [PlatformAdminOnly]
         public async Task<JsonResult> SubGetApiKeyCapacity()
         {
-            var result = await _subService.GetApiKeyCapacityReport();
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync("GetApiKeyCapacity");
         }
 
         // ============================================================
@@ -657,11 +735,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> GenerateProfileAvatar([FromBody] GenerateAvatarParam param)
         {
-            var (userId, _) = await GetCurrentUserAsync();
-            return Json(await _proxyService.GenerateAuthenticatedAvatarAsync(
-                userId,
-                param?.Prompt,
-                param?.Count ?? 4));
+            return await RunAiPlatformCompatibilityAsync(
+                "GenerateProfileAvatar",
+                JObject.FromObject(param ?? new GenerateAvatarParam()));
         }
 
         /// <summary>
@@ -688,12 +764,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> CreateMiniMaxVideo([FromBody] MiniMaxVideoCreateParam param)
         {
-            var context = await GetCurrentUserContextAsync();
-            return Json(await _proxyService.CreateAuthenticatedVideoAsync(
-                context.UserId,
-                context.OsClient,
-                param,
-                HttpContext.RequestAborted));
+            return await RunAiPlatformCompatibilityAsync(
+                "CreateMiniMaxVideo",
+                JObject.FromObject(param ?? new MiniMaxVideoCreateParam()));
         }
 
         /// <summary>
@@ -720,12 +793,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> GetMiniMaxVideoTask([FromBody] MiniMaxVideoTaskParam param)
         {
-            var (userId, _, osClient) = await GetCurrentUserContextAsync();
-            return Json(await _proxyService.GetAuthenticatedVideoTaskAsync(
-                userId,
-                osClient,
-                param,
-                HttpContext.RequestAborted));
+            return await RunAiPlatformCompatibilityAsync(
+                "GetMiniMaxVideoTask",
+                JObject.FromObject(param ?? new MiniMaxVideoTaskParam()));
         }
 
         /// <summary>
@@ -734,12 +804,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> GetMiniMaxVideoFile([FromBody] MiniMaxVideoFileParam param)
         {
-            var (userId, _, osClient) = await GetCurrentUserContextAsync();
-            return Json(await _proxyService.GetAuthenticatedVideoFileAsync(
-                userId,
-                osClient,
-                param,
-                HttpContext.RequestAborted));
+            return await RunAiPlatformCompatibilityAsync(
+                "GetMiniMaxVideoFile",
+                JObject.FromObject(param ?? new MiniMaxVideoFileParam()));
         }
 
         /// <summary>
@@ -750,17 +817,9 @@ namespace Microi.net.Api
         [PlatformAdminOnly]
         public async Task<JsonResult> PersistMiniMaxVideoFile([FromBody] MiniMaxVideoFileParam param)
         {
-            var token = await DiyToken.GetCurrentToken();
-            var currentUser = token?.CurrentUser == null
-                ? null
-                : JObject.FromObject(token.CurrentUser);
-            var userId = currentUser?["Id"]?.ToString();
-            return Json(await _proxyService.PersistAuthenticatedVideoFileAsync(
-                userId,
-                token?.OsClient ?? string.Empty,
-                currentUser,
-                param,
-                HttpContext.RequestAborted));
+            return await RunAiPlatformCompatibilityAsync(
+                "PersistMiniMaxVideoFile",
+                JObject.FromObject(param ?? new MiniMaxVideoFileParam()));
         }
 
         /// <summary>
@@ -805,12 +864,7 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> ProxyGetQuotaStatus()
         {
-            var (userId, _) = await GetCurrentUserAsync();
-            if (string.IsNullOrEmpty(userId))
-                return Json(new DosResult(0, null, "请先登录！"));
-
-            var result = await _subService.GetUserSubscription(userId);
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync("GetSubscription");
         }
 
         // ============================================================
@@ -963,6 +1017,8 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> OpenAIUsage(int pageIndex = 1, int pageSize = 20)
         {
+            // Authorization 中的平台 API Key 直接进入 C# 凭据原子，不能经过
+            // V8.Param、租户 Hook 或接口引擎日志，因此保留为最小协议网关。
             return Json(
                 await _proxyService
                     .GetUsageByPlatformApiKeyAsync(
@@ -979,8 +1035,9 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> SubGetModels()
         {
-            var result = await _subService.GetModels();
-            return Json(result);
+            return await RunAiPlatformCompatibilityAsync(
+                "GetModels",
+                allowAnonymous: true);
         }
 
         // ============================================================

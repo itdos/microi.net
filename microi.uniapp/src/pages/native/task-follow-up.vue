@@ -4,8 +4,9 @@
     <scroll-view v-else class="page-scroll" scroll-y>
       <view class="page-content">
         <view class="task-band"><view class="task-mark"><text>评</text></view><view><text>{{ task.KehuMC || '售后服务' }}</text><text>{{ [task.Leixing, task.ShouhouRY, formatDate(task.FinishTime)].filter(Boolean).join(' · ') }}</text></view></view>
+        <view v-if="fileContextError" class="private-media-notice"><text>{{ fileContextError }}</text></view>
         <view class="section-title">现场照片</view>
-        <view class="upload-panel"><mci-media-uploader v-model="photos" :max-count="9" upload-path="xjy/task-follow-up" /></view>
+        <view class="upload-panel"><mci-media-uploader v-model="photos" :max-count="9" upload-path="xjy/task-follow-up" :file-context="photoFileContext" /></view>
         <view class="section-title">追加内容</view>
         <view class="text-panel"><textarea v-model="content" maxlength="500" placeholder="补充本次服务体验或意见建议" /><text>{{ content.length }}/500</text></view>
         <view class="bottom-space" />
@@ -18,11 +19,16 @@
 <script>
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
-import { requireLogin } from '@/platform/business-runtime.js'
+import { findMenu, requireLogin } from '@/platform/business-runtime.js'
+import { loadNativeFormDefinition } from '@/platform/native-form.js'
+
+const TASK_TABLE = 'Diy_ShouhouDD'
+const FOLLOW_UP_PHOTO_FIELD = 'ZhuipingT'
+const EMPTY_PRIVATE_FILE_CONTEXT = Object.freeze({ private: true, failClosed: true })
 
 export default {
   mixins: [themeMixin],
-  data() { return { id: '', task: {}, photos: '[]', content: '', loading: true, submitting: false } },
+  data() { return { id: '', task: {}, photos: '[]', content: '', loading: true, submitting: false, photoFileContext: EMPTY_PRIVATE_FILE_CONTEXT, fileContextError: '' } },
   async onLoad(options) {
     if (!requireLogin()) return
     this.id = decodeURIComponent(options.id || '')
@@ -34,10 +40,30 @@ export default {
         const result = await V8.FormEngine.GetFormData('Diy_ShouhouDD', { Id: this.id })
         if (!result || Number(result.Code) !== 1 || !result.Data) throw new Error((result && result.Msg) || '任务不存在')
         this.task = result.Data
+        await this.preparePhotoFileContext()
         this.photos = result.Data.ZhuipingT || '[]'
         this.content = result.Data.ZhuipingNR || ''
       } catch (error) { uni.showToast({ title: error.message || '任务加载失败', icon: 'none' }) }
       finally { this.loading = false }
+    },
+    async preparePhotoFileContext() {
+      this.photoFileContext = EMPTY_PRIVATE_FILE_CONTEXT
+      this.fileContextError = ''
+      try {
+        const menu = await findMenu(['售后任务', '售后订单'], TASK_TABLE)
+        if (!menu || !menu.Id) throw new Error('当前账号没有售后任务菜单权限')
+        const definition = await loadNativeFormDefinition(TASK_TABLE, false, { menuId: menu.Id })
+        const field = (definition.fields || []).find((item) => String(item.Name || '').toLowerCase() === FOLLOW_UP_PHOTO_FIELD.toLowerCase())
+        if (!field || !field.Id) throw new Error('追加评价照片字段元数据不完整')
+        this.photoFileContext = {
+          formEngineKey: TASK_TABLE,
+          formDataId: this.id,
+          fieldId: field.Id,
+          sysMenuId: menu.Id
+        }
+      } catch (error) {
+        this.fileContextError = (error && error.message) || '私有评价照片授权上下文不可用，已隐藏历史照片'
+      }
     },
     async submit() {
       if (this.submitting) return
@@ -62,6 +88,7 @@ export default {
 
 <style scoped>
 .follow-up-page { height: 100vh; background: #f3f7f9; }.page-scroll { height: calc(100vh - 92rpx - var(--mci-safe-top) - 116rpx - var(--mci-safe-bottom)); }.page-content { padding: 18rpx 24rpx 0; }
+.private-media-notice { margin-top: 16rpx; padding: 16rpx 18rpx; border: 1rpx solid #f0d9b5; border-radius: 6rpx; color: #8b6428; background: #fff9ec; font-size: 20rpx; line-height: 1.55; }
 .task-band { display: grid; grid-template-columns: 72rpx minmax(0, 1fr); gap: 17rpx; align-items: center; min-height: 120rpx; padding: 18rpx 22rpx; border: 1rpx solid #dfe9ed; border-radius: 8rpx; background: #fff; }.task-mark { display: flex; align-items: center; justify-content: center; width: 64rpx; height: 64rpx; border-radius: 50%; background: #e8f6fa; color: #087fbd; font-size: 27rpx; font-weight: 750; }.task-band > view:last-child { min-width: 0; }.task-band > view:last-child text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.task-band > view:last-child text:first-child { color: #1d3b46; font-size: 27rpx; font-weight: 700; }.task-band > view:last-child text:last-child { margin-top: 7rpx; color: #81959c; font-size: 20rpx; }
 .section-title { height: 72rpx; color: #526d78; font-size: 23rpx; font-weight: 650; line-height: 72rpx; }.upload-panel, .text-panel { padding: 22rpx; border: 1rpx solid #dfe9ed; border-radius: 8rpx; background: #fff; }.text-panel textarea { box-sizing: border-box; width: 100%; height: 250rpx; padding: 18rpx; border-radius: 6rpx; background: #f5f8f9; color: #1d3b46; font-size: 25rpx; line-height: 38rpx; }.text-panel > text { display: block; margin-top: 10rpx; color: #91a1a7; font-size: 19rpx; text-align: right; }.bottom-space { height: 30rpx; }
 .bottom-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; padding: 16rpx 24rpx calc(16rpx + var(--mci-safe-bottom)); border-top: 1rpx solid #dde7eb; background: rgba(255,255,255,.97); }.primary-button { height: 82rpx; margin: 0; border-radius: 8rpx; background: #087fbd; color: #fff; font-size: 27rpx; font-weight: 650; line-height: 82rpx; }.primary-button::after { border: none; }.primary-button[disabled] { background: #9dbbc7; color: #fff; }

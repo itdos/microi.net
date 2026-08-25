@@ -20,6 +20,12 @@ namespace Microi.net.Api
     //[IS4Authorize("Auth_SysUserController")]
     public class SysUserController : Controller
     {
+        private const string CurrentUserApiEngineKey = "platform-current-user";
+        private const string SysUserPublicInfoApiEngineKey = "platform-sys-user-public-info";
+        private const string CreateTenantApiEngineKey = "platform-create-tenant";
+        private const string UpdateCurrentProfileApiEngineKey = "platform-user-update-profile";
+        private const string UpdateUserPreferencesApiEngineKey = "platform-user-update-preferences";
+        private const string SysUserAdminApiEngineKey = "platform-sys-user-admin";
         private static SysUserLogic _sysUserLogic = new SysUserLogic();
         private readonly ICaptcha _captcha;
 
@@ -106,85 +112,31 @@ namespace Microi.net.Api
             public string DefaultIndexUrl { get; set; }
         }
 
-        private static bool TryNormalizeDefaultIndexUrl(
-            string value,
-            out string normalized,
-            out string error)
-        {
-            normalized = (value ?? string.Empty).Trim();
-            error = null;
-            if (normalized.Length == 0)
-            {
-                return true;
-            }
-            if (normalized.Length > 500 || normalized.Any(char.IsControl))
-            {
-                error = "登录后首页路由长度不能超过500个字符。";
-                return false;
-            }
-            if (normalized.StartsWith("/#/", StringComparison.Ordinal))
-            {
-                normalized = normalized.Substring(2);
-            }
-            else if (normalized.StartsWith("#/", StringComparison.Ordinal))
-            {
-                normalized = normalized.Substring(1);
-            }
-            if (!normalized.StartsWith("/", StringComparison.Ordinal))
-            {
-                normalized = "/" + normalized;
-            }
-            var routePath = normalized.Split('?', '#')[0];
-            if (normalized.StartsWith("//", StringComparison.Ordinal)
-                || normalized.Contains("\\", StringComparison.Ordinal)
-                || normalized.Contains("://", StringComparison.OrdinalIgnoreCase)
-                || routePath.Contains(":", StringComparison.Ordinal)
-                || routePath.Equals("/login", StringComparison.OrdinalIgnoreCase)
-                || routePath.StartsWith("/login/", StringComparison.OrdinalIgnoreCase)
-                || routePath.Equals("/access-login", StringComparison.OrdinalIgnoreCase)
-                || routePath.StartsWith("/access-login/", StringComparison.OrdinalIgnoreCase))
-            {
-                error = "登录后首页只能使用当前系统内的业务路由。";
-                return false;
-            }
-            return true;
-        }
-
-        private static bool TryNormalizeEmail(string value, out string normalized, out string error)
-        {
-            normalized = (value ?? string.Empty).Trim();
-            error = null;
-            if (normalized.Length == 0)
-            {
-                return true;
-            }
-            if (normalized.Length > 100 || normalized.Any(char.IsControl))
-            {
-                error = "邮箱长度不能超过 100 个字符。";
-                return false;
-            }
-            try
-            {
-                var address = new System.Net.Mail.MailAddress(normalized);
-                if (!string.Equals(address.Address, normalized, StringComparison.OrdinalIgnoreCase))
-                {
-                    error = "邮箱格式不正确。";
-                    return false;
-                }
-            }
-            catch
-            {
-                error = "邮箱格式不正确。";
-                return false;
-            }
-            return true;
-        }
-
         private static async Task DefaultParam(SysUserParam param)
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             param._CurrentUser = currentTokenDynamic?.CurrentUser;
             param.OsClient = currentTokenDynamic?.OsClient;
+        }
+
+        private async Task<JsonResult> RunSysUserAdminCompatibilityAsync(
+            string action,
+            JObject request)
+        {
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            if (currentToken?.CurrentUser == null)
+            {
+                Response.StatusCode = 401;
+                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
+            }
+
+            request ??= new JObject();
+            request["Action"] = action;
+            request["OsClient"] = currentToken.OsClient;
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                SysUserAdminApiEngineKey,
+                request,
+                currentToken.CurrentUser));
         }
 
         private void SetSensitiveCredentialResponseHeaders()
@@ -266,132 +218,6 @@ namespace Microi.net.Api
             {
                 // 审计队列异常不能把密码或内部异常写回客户端；正式日志仍不得包含明文。
             }
-        }
-
-        private static bool IsPlatformAdmin(JObject currentUser)
-        {
-            return currentUser?["_IsAdmin"]?.Val<bool>() == true
-                || currentUser?["Level"]?.Val<int>() >= DiyCommon.MaxRoleLevel;
-        }
-
-        private static bool IsCurrentPlatformAdmin(string osClient, JObject currentUser)
-        {
-            return IsPlatformAdmin(currentUser)
-                && PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(
-                    osClient,
-                    currentUser);
-        }
-
-        private static async Task<DosResult> AuthorizeSysUserTableOperationAsync(
-            SysUserParam source,
-            JObject currentUser,
-            string osClient,
-            string operation)
-        {
-            return await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(
-                new DiyTableRowParam
-                {
-                    FormEngineKey = "sys_user",
-                    Id = source?.Id,
-                    _TableRowId = source?.Id,
-                    OsClient = osClient,
-                    _CurrentUser = currentUser,
-                    _InvokeType = InvokeType.Client.ToString(),
-                    _Lang = source?._Lang,
-                    // Add/Edit authorization also runs the account hierarchy gate.
-                    // The DTO-specific role payload is validated separately below.
-                    _RowModel = string.Equals(operation, "Add", StringComparison.OrdinalIgnoreCase)
-                                || string.Equals(operation, "Edit", StringComparison.OrdinalIgnoreCase)
-                        ? new JObject { ["Id"] = source?.Id }
-                        : null
-                },
-                operation);
-        }
-
-        private static SysUserManagementDecision AuthorizeDelegatedSysUserMutation(
-            SysUserParam param,
-            JObject currentUser,
-            SysUserManagementOperation operation)
-        {
-            var roleIdsSupplied = param?.RoleIds != null;
-            var requestedRoleIds = roleIdsSupplied
-                ? JArray.FromObject(param.RoleIds)
-                : null;
-            var dbSession = OsClientExtend.GetClient(param?.OsClient)?.Db;
-            var decision = SysUserManagementSecurity.Authorize(
-                dbSession,
-                currentUser,
-                operation,
-                param?.Id,
-                requestedRoleIds,
-                roleIdsSupplied);
-            if (!decision.Allowed)
-            {
-                return decision;
-            }
-
-            // Never accept denormalized Level from an ordinary request. If the
-            // request changes RoleIds, persist only the level derived from active
-            // database role rows.
-            param.Level = roleIdsSupplied ? decision.AssignedLevel : null;
-            if (roleIdsSupplied)
-            {
-                param.RoleIds = decision.RoleIds.ToList();
-            }
-            return decision;
-        }
-
-        private static void RestrictDelegatedManagementFields(SysUserParam param)
-        {
-            // These are server-owned identity/session/audit fields. Account managers
-            // may manage ordinary profile, organization, state and role data, but an
-            // Edit permission must not become Delete, token or login-state control.
-            param.IsDeleted = null;
-            param.LastLoginIP = null;
-            param.PwdErrorCount = null;
-            param.Token = null;
-            param._token = null;
-            param.TokenName = null;
-            param._LevelLimit = null;
-            param._DevBypassPwd = false;
-        }
-
-        /// <summary>
-        /// Self-service profile updates must never reuse the administrator DTO
-        /// unchecked.  SysUserParam also contains roles, departments, account
-        /// state and server-side encoded-password fields; accepting those from a
-        /// normal user would be a direct privilege-escalation path.
-        /// </summary>
-        private static void RestrictSelfServiceUpdate(SysUserParam param, string currentUserId)
-        {
-            param.Id = currentUserId;
-            param.Account = null;
-            param.OldAccount = null;
-            param.Level = null;
-            // Phone is an authentication factor for SmsLogin and therefore
-            // cannot be changed through the generic profile endpoint.
-            param.Phone = null;
-            param.RoleIds = null;
-            param._RoleIds = null;
-            param.RoleId = null;
-            param.DeptId = null;
-            param.DeptIds = null;
-            param.DeptName = null;
-            param.GroupId = null;
-            param.GroupIds = null;
-            param.PostId = null;
-            param.PostIds = null;
-            param.State = null;
-            param.IsDeleted = null;
-            param.LastLoginIP = null;
-            param.PwdErrorCount = null;
-            param._EncodePwd = null;
-            param._EncodeNewPwd = null;
-            param._DevBypassPwd = false;
-            param.Token = null;
-            param._token = null;
-            param.TokenName = null;
-            param._LevelLimit = null;
         }
 
         /// <summary>
@@ -799,73 +625,16 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> CreateTenant(CreateTenantRequest param)
         {
-            try
-            {
-                var currentToken = await DiyToken.GetCurrentToken();
-                if (currentToken == null)
-                {
-                    return Json(new DosResult(1001, null, "请先登录！"));
-                }
-                if (!string.Equals(currentToken.OsClient, OsClientDefault.OsClient,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return Json(new DosResult(1002, null, "仅主租户允许创建SaaS租户。"));
-                }
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            if (currentToken?.CurrentUser == null)
+                return Json(new DosResult(1001, null, "请先登录！"));
 
-                var currentUser = currentToken.CurrentUser;
-                var userId = currentUser?["Id"]?.ToString();
-                if (userId.DosIsNullOrWhiteSpace())
-                {
-                    return Json(new DosResult(1002, null, "登录用户无效！"));
-                }
-
-                var phone = currentUser?["Phone"]?.ToString();
-                var userName = currentUser?["Name"]?.ToString();
-                string encryptedPwd = null;
-                try
-                {
-                    var userResult = await MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
-                    {
-                        Id = userId,
-                        OsClient = currentToken.OsClient
-                    });
-                    if (userResult.Code == 1 && userResult.Data != null)
-                    {
-                        var userObj = JObject.FromObject(userResult.Data);
-                        encryptedPwd = userObj["Pwd"]?.ToString();
-                        if (phone.DosIsNullOrWhiteSpace())
-                        {
-                            phone = userObj["Phone"]?.ToString();
-                        }
-                        if (userName.DosIsNullOrWhiteSpace())
-                        {
-                            userName = userObj["Name"]?.ToString();
-                        }
-                    }
-                }
-                catch { }
-
-                if (encryptedPwd.DosIsNullOrWhiteSpace())
-                {
-                    var seed = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-                    encryptedPwd = EncryptHelper.DESEncode(seed);
-                }
-
-                var service = new TenantProvisioningService();
-                var result = await service.ProvisionTenantAsync(
-                    param?.TenantKey,
-                    param?.SystemName,
-                    userId,
-                    phone,
-                    userName,
-                    encryptedPwd);
-
-                return Json(result);
-            }
-            catch (Exception ex)
-            {
-                return Json(new DosResult(0, null, $"创建租户异常：{ex.Message}"));
-            }
+            var request = param == null ? new JObject() : JObject.FromObject(param);
+            request["OsClient"] = currentToken.OsClient;
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                CreateTenantApiEngineKey,
+                request,
+                currentToken.CurrentUser));
         }
 
         /// <summary>
@@ -1178,16 +947,16 @@ namespace Microi.net.Api
         //[IS4Authorize("Auth_GetCurrentUser")]
         public async Task<JsonResult> GetCurrentUser(SysUserParam param)
         {
-            try
-            {
-                //包含扩展信息
-                var sysUser = (await DiyToken.GetCurrentToken(false))?.CurrentUser;
-                return Json(new DosResult(1, sysUser));
-            }
-            catch
-            {
-                return Json(new DosResult(0, null, "获取当前用户失败，请重新登录。"));
-            }
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            if (currentToken?.CurrentUser == null)
+                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
+
+            var request = param == null ? new JObject() : JObject.FromObject(param);
+            request["OsClient"] = currentToken.OsClient;
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                CurrentUserApiEngineKey,
+                request,
+                currentToken.CurrentUser));
         }
 
         /// <summary>
@@ -1198,29 +967,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> RefreshLoginUser(string userId = null, string osClient = null)
         {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            var currentUser = currentToken?.CurrentUser;
-            if (currentUser == null)
-            {
-                Response.StatusCode = 401;
-                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-            }
-
-            var currentUserId = currentUser["Id"].Val<string>();
-            if (!IsCurrentPlatformAdmin(currentToken.OsClient, currentUser))
-            {
-                // Ordinary users may only refresh their own cached identity.
-                userId = currentUserId;
-            }
-            else if (userId.DosIsNullOrWhiteSpace())
-            {
-                userId = currentUserId;
-            }
-            // Tenant identity is never accepted from request parameters.
-            osClient = currentToken.OsClient;
-
-            var result = await _sysUserLogic.RefreshLoginUser(userId, osClient);
-            return Json(result);
+            return await RunSysUserAdminCompatibilityAsync(
+                "RefreshLoginUser",
+                new JObject { ["UserId"] = userId });
         }
 
         /// <summary>
@@ -1231,137 +980,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> UptSysUser(SysUserParam param)
         {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            var currentUser = currentToken?.CurrentUser;
-            if (currentUser == null)
-            {
-                Response.StatusCode = 401;
-                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-            }
-
-            param ??= new SysUserParam();
-            param._CurrentUser = currentUser;
-            param.OsClient = currentToken.OsClient;
-
-            if (!IsCurrentPlatformAdmin(currentToken.OsClient, currentUser))
-            {
-                var currentUserId = currentUser["Id"].Val<string>();
-                if (currentUserId.DosIsNullOrWhiteSpace())
-                {
-                    Response.StatusCode = 403;
-                    return Json(new DosResult(0, null, DiyMessage.GetLang(currentToken.OsClient, "NoAuth", param._Lang)));
-                }
-
-                var isSelfUpdate = param.Id.DosIsNullOrWhiteSpace()
-                    || string.Equals(param.Id, currentUserId, StringComparison.OrdinalIgnoreCase);
-                if (isSelfUpdate)
-                {
-                    RestrictSelfServiceUpdate(param, currentUserId);
-                }
-                else
-                {
-                    RestrictDelegatedManagementFields(param);
-                    var tableAuthorization = await AuthorizeSysUserTableOperationAsync(
-                        param,
-                        currentUser,
-                        currentToken.OsClient,
-                        "Edit");
-                    if (tableAuthorization.Code != 1)
-                    {
-                        Response.StatusCode = 403;
-                        return Json(tableAuthorization);
-                    }
-                    var mutationDecision = AuthorizeDelegatedSysUserMutation(
-                        param,
-                        currentUser,
-                        SysUserManagementOperation.Edit);
-                    if (!mutationDecision.Allowed)
-                    {
-                        Console.WriteLine(
-                            $"Microi：[SysUserManagementSecurity] 拒绝普通账号编辑用户，原因={mutationDecision.Reason}");
-                        Response.StatusCode = 403;
-                        return Json(new DosResult(0, null, DiyMessage.GetLang(currentToken.OsClient, "NoAuth", param._Lang)));
-                    }
-                }
-            }
-
-            // 已登记 Passkey/严格人脸因子的用户修改自己的密码时必须进行二次认证。
-            // 该规则同样适用于平台管理员自助改密；管理员重置他人密码属于独立授权场景。
-            // 未登记任何因子的历史用户继续使用旧密码校验，避免升级后自锁。
-            var passwordActorUserId = currentUser["Id"].Val<string>();
-            var isSelfPasswordChange = !param.NewPwd.DosIsNullOrWhiteSpace()
-                && (param.Id.DosIsNullOrWhiteSpace() || string.Equals(param.Id, passwordActorUserId, StringComparison.Ordinal));
-            if (isSelfPasswordChange)
-            {
-                var identityOptions = IdentityVerificationOptions.Resolve(currentToken.OsClient);
-                if (identityOptions.Enabled
-                    && identityOptions.RequirePasswordChangeStepUp
-                    && await IdentityVerificationSecurity.UserHasStepUpFactorAsync(
-                        currentToken.OsClient,
-                        passwordActorUserId,
-                        identityOptions.PasskeyEnabled,
-                        identityOptions.TotpEnabled,
-                        identityOptions.FaceEnabled && !identityOptions.FaceApiBase.DosIsNullOrWhiteSpace()).ConfigureAwait(false))
-                {
-                    var expectedActionHash = IdentityVerificationSecurity.ComputePasswordChangeActionHash(
-                        passwordActorUserId,
-                        param.NewPwd);
-                    var ticketResult = await IdentityVerificationSecurity.ConsumeTicketAsync(
-                        currentToken.OsClient,
-                        passwordActorUserId,
-                        param._IdentityVerificationTicket,
-                        "ChangePassword",
-                        expectedActionHash).ConfigureAwait(false);
-                    if (ticketResult.Code != 1)
-                    {
-                        Response.StatusCode = 403;
-                        return Json(new DosResult(0, null, ticketResult.Msg));
-                    }
-                }
-            }
-
-            // 小程序保存个人资料前复核头像审核记录，并同步检测用户填写的文本内容。
-            if (WeChatContentSecurityService.IsWeChatMiniProgramRequest(HttpContext, currentToken))
-            {
-                var contentSecurity = HttpContext.RequestServices
-                    .GetRequiredService<WeChatContentSecurityService>();
-                var actorUserId = currentUser["Id"].Val<string>();
-                if (param.Avatar != null)
-                {
-                    var avatarResult = await contentSecurity.ValidateAvatarAsync(
-                        param.OsClient,
-                        actorUserId,
-                        currentUser["Avatar"]?.ToString(),
-                        param.Avatar);
-                    if (avatarResult.Code != 1)
-                    {
-                        param.ContentSecurityLoginCode = null;
-                        return Json(avatarResult);
-                    }
-                }
-
-                var textResult = await contentSecurity.CheckProfileTextAsync(
-                    param.OsClient,
-                    param.ContentSecurityLoginCode,
-                    new[] { param.Name, param.RealName, param.Remark },
-                    HttpContext.RequestAborted);
-                param.ContentSecurityLoginCode = null;
-                if (textResult.Code != 1) return Json(textResult);
-            }
-
-            //2022-06-27 新增密码提前加密，也可以不使用
-            //if (!param.Pwd.DosIsNullOrWhiteSpace())
-            //{
-            //    param._EncodePwd = EncryptHelper.DESEncode(param.Pwd);
-            //}
-            //2022-06-27 新增密码提前加密，也可以不使用
-            //if (!param.NewPwd.DosIsNullOrWhiteSpace())
-            //{
-            //    param._EncodeNewPwd = EncryptHelper.DESEncode(param.NewPwd);
-            //}
-
-            var result = await _sysUserLogic.UptSysUser(param);
-            return Json(result);
+            return await RunSysUserAdminCompatibilityAsync(
+                "UptSysUser",
+                param == null ? new JObject() : JObject.FromObject(param));
         }
 
         /// <summary>
@@ -1372,52 +993,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> AddSysUser(SysUserParam param)
         {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            var currentUser = currentToken?.CurrentUser;
-            if (currentUser == null)
-            {
-                Response.StatusCode = 401;
-                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-            }
-            param ??= new SysUserParam();
-            param._CurrentUser = currentUser;
-            param.OsClient = currentToken.OsClient;
-
-            var tableAuthorization = await AuthorizeSysUserTableOperationAsync(
-                param,
-                currentUser,
-                currentToken.OsClient,
-                "Add");
-            if (tableAuthorization.Code != 1)
-            {
-                Response.StatusCode = 403;
-                return Json(tableAuthorization);
-            }
-            if (!IsCurrentPlatformAdmin(currentToken.OsClient, currentUser))
-            {
-                RestrictDelegatedManagementFields(param);
-                var decision = AuthorizeDelegatedSysUserMutation(
-                    param,
-                    currentUser,
-                    SysUserManagementOperation.Add);
-                if (!decision.Allowed)
-                {
-                    Console.WriteLine(
-                        $"Microi：[SysUserManagementSecurity] 拒绝普通账号新增用户，原因={decision.Reason}");
-                    Response.StatusCode = 403;
-                    return Json(new DosResult(0, null, DiyMessage.GetLang(currentToken.OsClient, "NoAuth", param._Lang)));
-                }
-            }
-
-            //2022-06-27 新增密码提前加密，也可以不使用
-            //if (!param.Pwd.DosIsNullOrWhiteSpace())
-            //{
-            //    param._EncodePwd = EncryptHelper.DESEncode(param.Pwd);
-            //}
-
-            var result = await _sysUserLogic.AddSysUser(param);
-
-            return Json(result);
+            return await RunSysUserAdminCompatibilityAsync(
+                "AddSysUser",
+                param == null ? new JObject() : JObject.FromObject(param));
         }
 
         /// <summary>
@@ -1428,44 +1006,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> DelSysUser(SysUserParam param)
         {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            var currentUser = currentToken?.CurrentUser;
-            if (currentUser == null)
-            {
-                Response.StatusCode = 401;
-                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-            }
-            param ??= new SysUserParam();
-            param._CurrentUser = currentUser;
-            param.OsClient = currentToken.OsClient;
-
-            var tableAuthorization = await AuthorizeSysUserTableOperationAsync(
-                param,
-                currentUser,
-                currentToken.OsClient,
-                "Delete");
-            if (tableAuthorization.Code != 1)
-            {
-                Response.StatusCode = 403;
-                return Json(tableAuthorization);
-            }
-            if (!IsCurrentPlatformAdmin(currentToken.OsClient, currentUser))
-            {
-                var decision = AuthorizeDelegatedSysUserMutation(
-                    param,
-                    currentUser,
-                    SysUserManagementOperation.Delete);
-                if (!decision.Allowed)
-                {
-                    Console.WriteLine(
-                        $"Microi：[SysUserManagementSecurity] 拒绝普通账号删除用户，原因={decision.Reason}");
-                    Response.StatusCode = 403;
-                    return Json(new DosResult(0, null, DiyMessage.GetLang(currentToken.OsClient, "NoAuth", param._Lang)));
-                }
-            }
-
-            var result = await _sysUserLogic.DelSysUser(param);
-            return Json(result);
+            return await RunSysUserAdminCompatibilityAsync(
+                "DelSysUser",
+                param == null ? new JObject() : JObject.FromObject(param));
         }
 
         /// <summary>
@@ -1476,38 +1019,9 @@ namespace Microi.net.Api
         [HttpPost, HttpGet]
         public async Task<JsonResult> GetSysUser(SysUserParam param)
         {
-            var currentToken = await DiyToken.GetCurrentToken(false);
-            var currentUser = currentToken?.CurrentUser;
-            if (currentUser == null)
-            {
-                Response.StatusCode = 401;
-                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-            }
-            param ??= new SysUserParam();
-            param._CurrentUser = currentUser;
-            param.OsClient = currentToken.OsClient;
-            var tableAuthorization = await AuthorizeSysUserTableOperationAsync(
-                param,
-                currentUser,
-                currentToken.OsClient,
-                "List");
-            if (tableAuthorization.Code != 1)
-            {
-                Response.StatusCode = 403;
-                return Json(tableAuthorization);
-            }
-
-            param.IsDeleted = 0;
-            var result = await _sysUserLogic.GetSysUser(param);
-            if (result.Code == 1)
-            {
-                //去掉密码
-                foreach (var item in result.Data)
-                {
-                    item.Pwd = "";
-                }
-            }
-            return Json(result);
+            return await RunSysUserAdminCompatibilityAsync(
+                "GetSysUser",
+                param == null ? new JObject() : JObject.FromObject(param));
         }
         /// <summary>
         /// 获取所有系统用户公开信息。可传入Ids。
@@ -1518,40 +1032,16 @@ namespace Microi.net.Api
         [HttpPost, HttpGet]
         public async Task<JsonResult> GetSysUserPublicInfo(SysUserParam param)
         {
-            await DefaultParam(param);
-            param.IsDeleted = 0;
-            param._LevelLimit = false;
-            if(param._PageIndex == null)
-            {
-                param._PageIndex = 1;
-            }
-            if(param._PageSize == null || param._PageSize < 1)
-            {
-                param._PageSize = 15;
-            }
-            else if (param._PageSize > 100)
-            {
-                param._PageSize = 100;
-            }
-            if (param.Ids != null && param.Ids.Count > 100)
-            {
-                param.Ids = param.Ids.Take(100).ToList();
-            }
-            var result = await _sysUserLogic.GetSysUser(param);
-            if (result.Code == 1)
-            {
-                var newResult = new DosResult(1);
-                // Public directory data must not expose phone numbers or other
-                // account-management fields to every authenticated user.
-                newResult.Data = result.Data.Select(d => new
-                {
-                    d.Id,
-                    Name = ChatContactProjection.ResolvePublicDirectoryName(d.Name, d.Account),
-                    d.Avatar
-                }).ToList();
-                return Json(newResult);
-            }
-            return Json(result);
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            if (currentToken?.CurrentUser == null)
+                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
+
+            var request = param == null ? new JObject() : JObject.FromObject(param);
+            request["OsClient"] = currentToken.OsClient;
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                SysUserPublicInfoApiEngineKey,
+                request,
+                currentToken.CurrentUser));
         }
 
         /// <summary>
@@ -1663,30 +1153,12 @@ namespace Microi.net.Api
                 return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
             }
 
-            if (!TryNormalizeDefaultIndexUrl(param?.DefaultIndexUrl, out var defaultIndexUrl, out var error))
-            {
-                return Json(new DosResult(0, null, error));
-            }
-
-            var userId = currentUser["Id"].Val<string>();
-            var osClient = currentToken.OsClient;
-            var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
-            {
-                Id = userId,
-                DefaultIndexUrl = defaultIndexUrl,
-                OsClient = osClient
-            });
-            if (updateResult.Code != 1)
-            {
-                return Json(new DosResult(0, null, updateResult.Msg ?? "登录后首页保存失败。"));
-            }
-
-            var refreshResult = await _sysUserLogic.RefreshLoginUser(userId, osClient);
-            if (refreshResult.Code != 1)
-            {
-                return Json(new DosResult(0, null, refreshResult.Msg ?? "设置已保存，但登录信息刷新失败。"));
-            }
-            return Json(new DosResult(1, refreshResult.Data, "登录后首页已保存。"));
+            var request = param == null ? new JObject() : JObject.FromObject(param);
+            request["OsClient"] = currentToken.OsClient;
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                UpdateUserPreferencesApiEngineKey,
+                request,
+                currentUser));
         }
 
         /// <summary>
@@ -1705,108 +1177,12 @@ namespace Microi.net.Api
                 return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
             }
 
-            var userId = currentUser["Id"].Val<string>();
-            var osClient = currentToken.OsClient;
-            var name = (param?.Name ?? string.Empty).Trim();
-            if (name.Length < 1 || name.Length > 50)
-            {
-                return Json(new DosResult(0, null, "昵称需为 1 到 50 个字符。"));
-            }
-
-            var updateModel = new JObject
-            {
-                ["Id"] = userId,
-                ["Name"] = name,
-                ["OsClient"] = osClient
-            };
-
-            if (param?.Email != null)
-            {
-                if (!TryNormalizeEmail(param.Email, out var email, out var emailError))
-                {
-                    return Json(new DosResult(0, null, emailError));
-                }
-                updateModel["Email"] = email;
-            }
-            if (param?.Sex != null)
-            {
-                var sex = param.Sex.Trim();
-                if (sex.Length > 0 && sex != "男" && sex != "女" && sex != "保密")
-                {
-                    return Json(new DosResult(0, null, "性别只能选择男、女或保密。"));
-                }
-                updateModel["Sex"] = sex;
-            }
-            if (param?.Lang != null)
-            {
-                var lang = param.Lang.Trim();
-                if (lang != "zh-CN" && lang != "zh-TW" && lang != "en")
-                {
-                    return Json(new DosResult(0, null, "语言只能选择简体中文、繁体中文或 English。"));
-                }
-                updateModel["Lang"] = lang;
-            }
-
-            if (param?.Avatar != null)
-            {
-                var avatar = param.Avatar.Trim();
-                var currentAvatar = currentUser["Avatar"]?.ToString()?.Trim() ?? string.Empty;
-                if (!avatar.DosIsNullOrWhiteSpace()
-                    && !string.Equals(avatar, currentAvatar, StringComparison.Ordinal))
-                {
-                    try
-                    {
-                        avatar = TenantConfigurationSecurity.NormalizeStoragePath(osClient, avatar);
-                        var requiredPrefix = "/" + osClient.ToLowerInvariant() + "/member/avatar/";
-                        if (!avatar.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return Json(new DosResult(0, null, "私有头像文件必须来自账户头像上传目录。"));
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        return Json(new DosResult(0, null, "私有头像路径不合法：" + ex.Message));
-                    }
-                }
-                updateModel["Avatar"] = avatar;
-            }
-
-            if (param?.PublicAvatar != null)
-            {
-                var publicAvatar = param.PublicAvatar.Trim();
-                var currentPublicAvatar = currentUser["PublicAvatar"]?.ToString()?.Trim() ?? string.Empty;
-                if (!publicAvatar.DosIsNullOrWhiteSpace()
-                    && !string.Equals(publicAvatar, currentPublicAvatar, StringComparison.Ordinal))
-                {
-                    try
-                    {
-                        publicAvatar = TenantConfigurationSecurity.NormalizeStoragePath(osClient, publicAvatar);
-                        var requiredPrefix = "/" + osClient.ToLowerInvariant() + "/member/public-avatar/";
-                        if (!publicAvatar.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return Json(new DosResult(0, null, "公开头像文件必须来自公开头像上传目录。"));
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        return Json(new DosResult(0, null, "公开头像路径不合法：" + ex.Message));
-                    }
-                }
-                updateModel["PublicAvatar"] = publicAvatar;
-            }
-
-            var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", updateModel);
-            if (updateResult.Code != 1)
-            {
-                return Json(new DosResult(0, null, updateResult.Msg ?? "账户资料保存失败。"));
-            }
-
-            var refreshResult = await _sysUserLogic.RefreshLoginUser(userId, osClient);
-            if (refreshResult.Code != 1)
-            {
-                return Json(new DosResult(0, null, refreshResult.Msg ?? "账户资料已保存，但登录信息刷新失败。"));
-            }
-            return Json(new DosResult(1, refreshResult.Data, "账户资料已保存。"));
+            var request = param == null ? new JObject() : JObject.FromObject(param);
+            request["OsClient"] = currentToken.OsClient;
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                UpdateCurrentProfileApiEngineKey,
+                request,
+                currentUser));
         }
 
     }

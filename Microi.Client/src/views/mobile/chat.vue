@@ -43,7 +43,7 @@
                         <el-avatar
                             v-if="!msg.isSelf"
                             :size="36"
-                            :src="msg.avatar"
+                            :src="getUserAvatarViewUrl(msg.avatar, msg.FromUserId)"
                             class="msg-avatar mci-avatar"
                         >
                             {{ msg.senderName?.charAt(0) }}
@@ -77,7 +77,7 @@
                         <el-avatar
                             v-if="msg.isSelf"
                             :size="36"
-                            :src="currentUser.Avatar"
+                            :src="getUserAvatarViewUrl(currentUser.Avatar, currentUser.Id)"
                             class="msg-avatar mci-avatar"
                         >
                             {{ currentUser.NickName?.charAt(0) }}
@@ -215,6 +215,9 @@ const wsConnected = ref(false);
 
 const messages = ref([]);
 const currentStreamMessage = ref(null);
+// 仅缓存显示态短期签名 URL；消息记录和 SignalR 载荷继续保留原始 Avatar 路径。
+const userAvatarViewUrls = ref(Object.create(null));
+const userAvatarViewPending = new Set();
 
 const aiModelList = ref([]);
 const selectedAiModel = ref(null);
@@ -228,6 +231,35 @@ let _onReceiveSendLastContacts = null;
 let _wsCheckTimer = null;
 
 const getWebSocket = () => window.__VUE_APP__?.config?.globalProperties?.$websocket;
+
+const getUserAvatarViewUrl = (avatar, userId) => {
+    const source = String(avatar || '').trim();
+    const id = String(userId || '').trim();
+    const fallback = './static/img/icon/personal.png';
+    if (!source || !id) return fallback;
+    const cacheKey = `${id}|${source}`;
+    if (Object.prototype.hasOwnProperty.call(userAvatarViewUrls.value, cacheKey)) {
+        return userAvatarViewUrls.value[cacheKey] || fallback;
+    }
+    if (!userAvatarViewPending.has(cacheKey)) {
+        userAvatarViewPending.add(cacheKey);
+        DiyCommon.GetUserAvatarUrl(source, id)
+            .then((url) => {
+                userAvatarViewUrls.value = {
+                    ...userAvatarViewUrls.value,
+                    [cacheKey]: url || fallback
+                };
+            })
+            .catch(() => {
+                userAvatarViewUrls.value = {
+                    ...userAvatarViewUrls.value,
+                    [cacheKey]: fallback
+                };
+            })
+            .finally(() => userAvatarViewPending.delete(cacheKey));
+    }
+    return fallback;
+};
 
 const goBack = () => router.back();
 

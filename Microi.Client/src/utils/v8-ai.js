@@ -91,6 +91,11 @@ export function createV8AI(options = {}) {
         return parseJsonResult(text);
     }
 
+    function requestRuntime(action, dynamicParam, forcedMethod) {
+        var param = Object.assign({}, dynamicParam || {}, { Action: action });
+        return request("/apiengine/platform-ai-runtime", param, forcedMethod);
+    }
+
     async function stream(endpoint, dynamicParam, onChunkReceived, streamOptions) {
         if (typeof onChunkReceived !== "function") {
             throw new Error("V8.AI 流式调用必须传入 onChunkReceived 回调函数。");
@@ -174,14 +179,14 @@ export function createV8AI(options = {}) {
     }
 
     var api = {
-        Chat: function (param) { return request("/api/Ai/Chat", param); },
-        ChatGet: function (param) { return request("/api/Ai/Chat", param, "GET"); },
+        Chat: function (param) { return requestRuntime("Chat", param); },
+        ChatGet: function (param) { return requestRuntime("Chat", param, "GET"); },
         ChatStream: function (param, onChunk, callOptions) {
             return stream("/api/Ai/ChatStream", param, onChunk, callOptions);
         },
-        RecognizeIntent: function (param) { return request("/api/Ai/RecognizeIntent", param); },
-        NL2SQL: function (param) { return request("/api/Ai/NL2SQL", param); },
-        NL2V8: function (param) { return request("/api/Ai/NL2V8EngineSync", param); },
+        RecognizeIntent: function (param) { return requestRuntime("RecognizeIntent", param); },
+        NL2SQL: function (param) { return requestRuntime("NL2SQL", param); },
+        NL2V8: function (param) { return requestRuntime("NL2V8EngineSync", param); },
         NL2V8Stream: function (param, onChunk, callOptions) {
             return stream("/api/Ai/NL2V8Engine", param, onChunk, callOptions);
         },

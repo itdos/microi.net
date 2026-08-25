@@ -1,5 +1,4 @@
 using System.Net;
-using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -307,61 +306,53 @@ public class SecurityGuardAndSysUserRegressionTests
     [Fact]
     public void PlatformAdminCheck_HandlesJObjectTokensWithoutDynamicBinderFailure()
     {
-        var method = typeof(SysUserController).GetMethod(
-            "IsPlatformAdmin",
-            BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.NotNull(method);
-
         var administrator = JObject.FromObject(new
         {
+            Id = "admin-user",
             _IsAdmin = false,
             Level = DiyCommon.MaxRoleLevel
         });
         var ordinaryUser = JObject.FromObject(new
         {
+            Id = "admin-user",
             _IsAdmin = false,
             Level = 1
         });
+        var databaseUser = new SysUser
+        {
+            Id = "admin-user",
+            Account = "admin",
+            Level = DiyCommon.MaxRoleLevel,
+            State = 1,
+            IsDeleted = 0,
+            RoleIds = string.Empty
+        };
 
-        Assert.True((bool)method!.Invoke(null, new object[] { administrator })!);
-        Assert.False((bool)method.Invoke(null, new object[] { ordinaryUser })!);
-        Assert.False((bool)method.Invoke(null, new object?[] { null })!);
+        Assert.True(PlatformAdministratorSecurity.HasEffectivePlatformAdministratorLevel(
+            administrator, databaseUser, Array.Empty<SysRole>()));
+        Assert.False(PlatformAdministratorSecurity.HasEffectivePlatformAdministratorLevel(
+            ordinaryUser, databaseUser, Array.Empty<SysRole>()));
+        Assert.False(PlatformAdministratorSecurity.HasEffectivePlatformAdministratorLevel(
+            null, databaseUser, Array.Empty<SysRole>()));
     }
 
-    [Theory]
-    [InlineData("/#/microi-store", "/microi-store")]
-    [InlineData("#/mic-sys-user", "/mic-sys-user")]
-    [InlineData("workflow/todo?state=waiting", "/workflow/todo?state=waiting")]
-    [InlineData("", "")]
-    public void DefaultIndexUrl_NormalizesSupportedInternalRouteForms(string input, string expected)
+    [Fact]
+    public void DefaultIndexUrlValidation_IsOwnedByTheManagedPreferenceEngine()
     {
-        var method = typeof(SysUserController).GetMethod(
-            "TryNormalizeDefaultIndexUrl",
-            BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.NotNull(method);
-        object?[] args = { input, null, null };
+        var root = FindRepositoryRoot();
+        var controller = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "SysUserController.cs"));
+        var engine = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Resource", "platform-user-update-preferences.js"));
 
-        Assert.True((bool)method!.Invoke(null, args)!);
-        Assert.Equal(expected, args[1]);
-        Assert.Null(args[2]);
-    }
-
-    [Theory]
-    [InlineData("https://evil.example/path")]
-    [InlineData("//evil.example/path")]
-    [InlineData("/login")]
-    [InlineData("#/access-login")]
-    [InlineData("/path\\child")]
-    public void DefaultIndexUrl_RejectsExternalAndAuthenticationRoutes(string input)
-    {
-        var method = typeof(SysUserController).GetMethod(
-            "TryNormalizeDefaultIndexUrl",
-            BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.NotNull(method);
-        object?[] args = { input, null, null };
-
-        Assert.False((bool)method!.Invoke(null, args)!);
-        Assert.False(string.IsNullOrWhiteSpace(args[2]?.ToString()));
+        Assert.Contains("UpdateUserPreferencesApiEngineKey = \"platform-user-update-preferences\"", controller);
+        Assert.DoesNotContain("TryNormalizeDefaultIndexUrl", controller);
+        Assert.Contains("defaultIndexUrl.indexOf('/#/') === 0", engine);
+        Assert.Contains("defaultIndexUrl.indexOf('#/') === 0", engine);
+        Assert.Contains("defaultIndexUrl.indexOf('//') === 0", engine);
+        Assert.Contains("defaultIndexUrl.toLowerCase().indexOf('://')", engine);
+        Assert.Contains("lowerRoutePath === '/login'", engine);
+        Assert.Contains("lowerRoutePath === '/access-login'", engine);
     }
 
     [Fact]
@@ -375,5 +366,20 @@ public class SecurityGuardAndSysUserRegressionTests
         Assert.Equal("TenantFileUploadDisabled", append["ErrorType"]?.Value<string>());
         Assert.Equal("FileUploadEnabled", append["ConfigField"]?.Value<string>());
         Assert.True(append["DefaultEnabled"]?.Value<bool>());
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current != null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, "Microi.Server"))
+                && Directory.Exists(Path.Combine(current.FullName, "Microi.Client")))
+            {
+                return current.FullName;
+            }
+            current = current.Parent;
+        }
+        throw new DirectoryNotFoundException("Unable to locate the Microi repository root.");
     }
 }

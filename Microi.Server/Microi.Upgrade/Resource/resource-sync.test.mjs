@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { dirname, join, resolve } from 'node:path';
@@ -31,6 +31,7 @@ const testDirectory = dirname(fileURLToPath(import.meta.url));
 const refreshSource = await readFile(resolve(testDirectory, 'refresh-resources.mjs'), 'utf8');
 const releaseSource = await readFile(resolve(testDirectory, '../../../Microi一键编译发布.sh'), 'utf8');
 const officialEngineSource = await readFile(resolve(testDirectory, 'official-resource-api.js'), 'utf8');
+const mcpPublisherSource = await readFile(resolve(testDirectory, 'mcp-resource-publisher.mjs'), 'utf8');
 
 function engineSource(key, version, body, description = '测试接口') {
   return [
@@ -707,6 +708,43 @@ test('官方应用包候选不会持久化超过运行时硬上限的递归深�
   assert.equal(normalized.SysApiEngines[2].LimitRecursion, 0);
 });
 
+test('当前全部官方应用包都已落盘运行时允许的递归深度', async () => {
+  const packageNames = [
+    'app.microi.form-engine.json',
+    'app.microi.module-engine.json',
+    'app.microi.saas-engine.json',
+    'app.microi.sso.json',
+    'app.microi.store.json',
+    'app.microi.sys_user.json',
+    'app.microi.sys-config.json',
+    'app.microi.message-notification.json',
+    'app.microi.ai-engine.json',
+  ];
+  const offenders = [];
+  for (const packageName of packageNames) {
+    const packageModel = JSON.parse(await readFile(resolve(testDirectory, packageName), 'utf8'));
+    for (const engine of packageModel.SysApiEngines || []) {
+      if (Number(engine.LimitRecursion) > 5000) {
+        offenders.push(`${packageName}:${engine.ApiEngineKey}=${engine.LimitRecursion}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test('官方应用生成器不会重新写入超过运行时硬上限的递归深度', async () => {
+  const generatorNames = (await readdir(testDirectory))
+    .filter(name => name.startsWith('configure-') && name.endsWith('.mjs'));
+  const offenders = [];
+  for (const generatorName of generatorNames) {
+    const source = await readFile(resolve(testDirectory, generatorName), 'utf8');
+    for (const match of source.matchAll(/LimitRecursion\s*:\s*(\d+)/g)) {
+      if (Number(match[1]) > 5000) offenders.push(`${generatorName}:${match[1]}`);
+    }
+  }
+  assert.deepEqual(offenders, []);
+});
+
 test('官网临时故障识别只放行网络、限流和服务端错误', () => {
   assert.equal(isTemporaryOfficialResourceFailure(new Error('服务器内部错误，请稍后重试。')), true);
   assert.equal(isTemporaryOfficialResourceFailure(new Error('import-package.js HTTP 503')), true);
@@ -1025,9 +1063,197 @@ test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async 
 });
 
 test('官网发布接口以固定白名单、事务行锁和哈希保护多节点写入', () => {
+  assert.match(officialEngineSource, /Version: v1\.3\.1/);
+  assert.match(officialEngineSource, /V8\.Method\.AuthorizeOfficialResourcePublish\(\)/);
+  assert.doesNotMatch(officialEngineSource, /Number\(currentUser\.Level/);
   assert.match(officialEngineSource, /function lockPublishRows\(\)/);
-  assert.equal((officialEngineSource.match(/FOR UPDATE/g) || []).length, 2);
+  assert.equal((officialEngineSource.match(/FOR UPDATE/g) || []).length, 3);
   assert.match(officialEngineSource, /ExpectedRemoteSha256/);
   assert.match(officialEngineSource, /发布升级资源\[" \+ name \+ "\]后回读内容哈希不一致/);
   assert.match(officialEngineSource, /商城版本[\s\S]*?与包内版本/);
+  assert.match(officialEngineSource, /function validateOfficialApiEnginePolicies\(/);
+  assert.match(officialEngineSource, /function validateTableClosure\(/);
+  assert.match(officialEngineSource, /mci_ai_token_log[\s\S]*PromptPreview/);
+  assert.match(officialEngineSource, /Sys_User\.AiApiKey|Sys_User\s*AiApiKey/);
+  assert.match(officialEngineSource, /CreateIfMissing[\s\S]*return \{ Code : 1 \};/);
+  assert.match(officialEngineSource, /OFFICIAL_RESOURCE_EXACT_SELECTION_V1/);
+  assert.match(officialEngineSource, /SelectApiEngine:\s*selectionJson\(exactSelections\.SelectApiEngine\)/);
+  assert.match(officialEngineSource, /SelectTable:\s*selectionJson\(exactSelections\.SelectTable\)/);
+  assert.match(officialEngineSource, /storedSelectionEquals\([\s\S]*verified\.Data\.SelectApiEngine/);
+  assert.match(officialEngineSource, /storedSelectionEquals\([\s\S]*verified\.Data\.SelectTable/);
+});
+
+test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 CreateIfMissing', async () => {
+  const packageNames = [
+    'app.microi.form-engine.json', 'app.microi.module-engine.json', 'app.microi.saas-engine.json',
+    'app.microi.sso.json', 'app.microi.store.json', 'app.microi.sys_user.json',
+    'app.microi.sys-config.json', 'app.microi.message-notification.json', 'app.microi.ai-engine.json',
+  ];
+  const seenKeys = new Set();
+  let managedCount = 0;
+  let createIfMissingCount = 0;
+  for (const packageName of packageNames) {
+    const packageModel = JSON.parse(await readFile(resolve(testDirectory, packageName), 'utf8'));
+    for (const engine of packageModel.SysApiEngines || []) {
+      const key = String(engine.ApiEngineKey || '').toLowerCase();
+      assert.ok(key, `${packageName} 存在空 ApiEngineKey`);
+      assert.equal(seenKeys.has(key), false, `${key} 跨包重复`);
+      seenKeys.add(key);
+      const policy = packageModel.ResourcePolicies?.ApiEngines?.[engine.ApiEngineKey]?.UpgradePolicy;
+      if (policy === 'Managed') managedCount += 1;
+      else if (policy === 'CreateIfMissing') createIfMissingCount += 1;
+      else assert.fail(`${key} 缺少受支持的资源策略`);
+    }
+  }
+  assert.equal(seenKeys.size, 100);
+  assert.equal(managedCount, 92);
+  assert.equal(createIfMissingCount, 8);
+
+  assert.match(officialEngineSource, /action === "reconcilepublishedapiengines"/);
+  assert.match(officialEngineSource, /function preparePublishedApiEngineProjection\(\)/);
+  assert.match(officialEngineSource, /LOWER\(ApiEngineKey\)=LOWER\(@p0\)/);
+  assert.match(officialEngineSource, /WHERE Id=@p0/);
+  assert.match(officialEngineSource, /UPDATE sys_apiengine SET Id=@p0 WHERE Id=@p1/);
+  assert.doesNotMatch(officialEngineSource, /sys_apiengine[^\n]*(?:WHERE|SET)[^\n]*OsClient/);
+  assert.match(officialEngineSource, /官方 Managed 接口稳定 Id 对齐失败/);
+  assert.match(officialEngineSource, /plan\.Projection\.Policy === "CreateIfMissing" && plan\.Existing[\s\S]*TenantHookPreserved\+\+[\s\S]*continue/);
+  assert.match(officialEngineSource, /projection\.Policy === "Managed"[\s\S]*ManagedUpdated\+\+/);
+  assert.match(mcpPublisherSource, /export async function reconcilePublishedApiEnginesViaConfiguredMcp/);
+  assert.match(mcpPublisherSource, /Action: 'ReconcilePublishedApiEngines'/);
+  assert.match(mcpPublisherSource, /recoverReconcileAfterAmbiguousTimeout/);
+  assert.match(mcpPublisherSource, /HTTP\\s\*524\|Origin Time-out/);
+  assert.match(mcpPublisherSource, /'microi_get_table_data'/);
+  assert.match(mcpPublisherSource, /'microi_get_engine_code'/);
+  assert.match(mcpPublisherSource, /Full source SHA-256/);
+  assert.match(refreshSource, /apiEngines:\s*engines\.map/);
+  assert.match(refreshSource, /524 后经 MCP 逐项回读确认事务已提交/);
+
+  const readbackIndex = refreshSource.indexOf("const verifiedRemote = await downloadAllWithRetry('发布后回读')");
+  const verifiedContentIndex = refreshSource.indexOf(
+    'verifiedRemote.get(name).content !== mergedResources.get(name)',
+    readbackIndex,
+  );
+  const reconcileIndex = refreshSource.indexOf('await reconcilePublishedApiEngines(verifiedRemote)');
+  const baseAdvanceIndex = refreshSource.indexOf('await mkdir(baseDirectory', reconcileIndex);
+  assert.ok(readbackIndex >= 0 && verifiedContentIndex > readbackIndex);
+  assert.ok(reconcileIndex > verifiedContentIndex);
+  assert.ok(baseAdvanceIndex > reconcileIndex);
+  assert.match(refreshSource, /if \(publish\) \{[\s\S]*await reconcilePublishedApiEngines\(verifiedRemote\)/);
+
+  const executablePrefix = officialEngineSource.slice(0, officialEngineSource.indexOf('var action ='));
+  const helpers = new Function(
+    'V8',
+    `${executablePrefix}\nreturn { buildLiveApiEngineModel, liveManagedEngineEquals };`,
+  )({ Param: {} });
+  const expected = helpers.buildLiveApiEngineModel({
+    Id: 'source-id',
+    Name: '历史名称字段',
+    ApiEngineKey: 'test-managed',
+    ApiAddress: '/apiengine/test-managed',
+    ApiV8Code: '/* ApiEngineKey: test-managed | Version: v1.0.0 */\nreturn { Code: 1 };',
+  }, 'live-id');
+  assert.equal(expected.Id, 'live-id');
+  assert.equal(expected.ApiName, '历史名称字段');
+  assert.equal(expected.LockKey, '');
+  assert.equal(expected.ResponseFile, 0);
+  assert.equal(expected.V8Limit, 0);
+  assert.equal(expected.V8Unlimited, 0);
+  assert.equal(expected.Version, 'v1.0.0');
+  assert.equal(helpers.buildLiveApiEngineModel({ ...expected, LockKey: 'tenant-lock' }, 'live-id').LockKey, 'tenant-lock');
+  assert.equal(helpers.liveManagedEngineEquals({ ...expected, ResponseFile: 1 }, expected), false);
+  assert.equal(helpers.liveManagedEngineEquals({ ...expected, LockKey: 'tenant-lock' }, expected), false);
+  assert.equal(helpers.liveManagedEngineEquals({ ...expected, Id: 'different-id' }, expected), false);
+  assert.equal(helpers.liveManagedEngineEquals(expected, expected), true);
+});
+
+test('官网发布选择元数据精确来自已验证包并拒绝旧 Key 或旧表残留', async () => {
+  const executablePrefix = officialEngineSource.slice(0, officialEngineSource.indexOf('var action ='));
+  const helpers = new Function(
+    'V8',
+    `${executablePrefix}\nreturn { exactPackageSelections, storedSelectionEquals };`,
+  )({ Param: {} });
+  const packageModel = JSON.parse(await readFile(resolve(testDirectory, 'app.microi.sys_user.json'), 'utf8'));
+  const expected = helpers.exactPackageSelections(packageModel, 'app.microi.sys_user.json');
+
+  assert.deepEqual(
+    expected.SelectApiEngine.map(item => Object.keys(item)),
+    expected.SelectApiEngine.map(() => ['Id', 'ApiName', 'ApiEngineKey']),
+  );
+  assert.deepEqual(
+    expected.SelectApiEngine.map(item => item.ApiEngineKey),
+    packageModel.SysApiEngines.map(item => item.ApiEngineKey),
+  );
+  assert.deepEqual(
+    expected.SelectTable.map(item => Object.keys(item)),
+    expected.SelectTable.map(() => ['Id', 'Name']),
+  );
+  assert.equal(helpers.storedSelectionEquals(JSON.stringify(expected.SelectApiEngine), expected.SelectApiEngine), true);
+  assert.equal(helpers.storedSelectionEquals(JSON.stringify([
+    ...expected.SelectApiEngine,
+    { Id: 'stale-id', ApiName: '旧接口', ApiEngineKey: 'removed-old-key' },
+  ]), expected.SelectApiEngine), false);
+  assert.equal(helpers.storedSelectionEquals(JSON.stringify([
+    ...expected.SelectTable,
+    { Id: 'stale-table-id', Name: 'removed_old_table' },
+  ]), expected.SelectTable), false);
+});
+
+test('官网发布接口接受当前九个官方应用包并拒绝 AI schema 缺口', async () => {
+  const executablePrefix = officialEngineSource.slice(0, officialEngineSource.indexOf('var action ='));
+  const validatePublishResource = new Function(
+    'V8',
+    `${executablePrefix}\nreturn validatePublishResource;`,
+  )({ Param: {} });
+  const packageNames = [
+    'app.microi.form-engine.json', 'app.microi.module-engine.json', 'app.microi.saas-engine.json',
+    'app.microi.sso.json', 'app.microi.store.json', 'app.microi.sys_user.json',
+    'app.microi.sys-config.json', 'app.microi.message-notification.json', 'app.microi.ai-engine.json',
+  ];
+  for (const packageName of packageNames) {
+    const content = await readFile(resolve(testDirectory, packageName), 'utf8');
+    assert.doesNotThrow(() => validatePublishResource(packageName, content), packageName);
+  }
+
+  const ai = JSON.parse(await readFile(resolve(testDirectory, 'app.microi.ai-engine.json'), 'utf8'));
+  ai.PhysicalColumns = ai.PhysicalColumns.filter((column) => (
+    String(column.TABLE_NAME).toLowerCase() !== 'mci_ai_token_log'
+    || String(column.COLUMN_NAME).toLowerCase() !== 'promptpreview'
+  ));
+  assert.throws(
+    () => validatePublishResource('app.microi.ai-engine.json', JSON.stringify(ai)),
+    /PromptPreview|PackageInfo 计数/,
+  );
+
+  const sysUser = JSON.parse(await readFile(resolve(testDirectory, 'app.microi.sys_user.json'), 'utf8'));
+  const oldSysUser = structuredClone(sysUser);
+  oldSysUser.PackageInfo.Version = 'v6.3.1';
+  assert.throws(
+    () => validatePublishResource('app.microi.sys_user.json', JSON.stringify(oldSysUser)),
+    /v6\.3\.2|Managed v1\.0\.2/,
+  );
+
+  const oldAdmin = structuredClone(sysUser);
+  oldAdmin.SysApiEngines.find(item => item.ApiEngineKey === 'platform-sys-user-admin').Version = 'v1.0.1';
+  assert.throws(
+    () => validatePublishResource('app.microi.sys_user.json', JSON.stringify(oldAdmin)),
+    /Managed v1\.0\.2/,
+  );
+
+  const missingPasswordMarker = structuredClone(sysUser);
+  const markerAdmin = missingPasswordMarker.SysApiEngines
+    .find(item => item.ApiEngineKey === 'platform-sys-user-admin');
+  markerAdmin.ApiV8Code = markerAdmin.ApiV8Code
+    .replace('authorization.DataAppend.ChangesPassword === true', 'false');
+  assert.throws(
+    () => validatePublishResource('app.microi.sys_user.json', JSON.stringify(missingPasswordMarker)),
+    /Managed v1\.0\.2/,
+  );
+
+  const saas = JSON.parse(await readFile(resolve(testDirectory, 'app.microi.saas-engine.json'), 'utf8'));
+  const microiInit = saas.SysApiEngines.find(item => item.ApiEngineKey === 'microi-init');
+  microiInit.ApiV8Code = microiInit.ApiV8Code.replace('GetLegacyInitMenuTree(rawToken, osClient)', 'GetTableDataTree()');
+  assert.throws(
+    () => validatePublishResource('app.microi.saas-engine.json', JSON.stringify(saas)),
+    /microi-init/,
+  );
 });

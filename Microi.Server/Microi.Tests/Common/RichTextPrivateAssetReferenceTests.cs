@@ -1,4 +1,4 @@
-using Microi.net.Api;
+using Microi.net;
 
 namespace Dos.Common.Tests;
 
@@ -12,19 +12,28 @@ public class RichTextPrivateAssetReferenceTests
         var html = $"<p><img alt=\"公告\" src=\"{marker}\"></p>";
 
         Assert.True(RichTextPrivateAssetReference.ReferencesPath(html, path));
-        Assert.True(RichTextPrivateAssetReference.ReferencesPath(
+        Assert.False(RichTextPrivateAssetReference.ReferencesPath(
             html,
             "https://files.example.com/iTdos/editor/2026/%E5%85%AC%E5%91%8A%20%E5%9B%BE%E7%89%87.png?token=ignored"));
     }
 
     [Fact]
-    public void HistoricalFileServerUrl_IsAcceptedOnlyAsAnExactMediaAttribute()
+    public void UnverifiedAbsoluteFileServerUrl_CannotGrantPrivateObjectAccess()
     {
         const string path = "iTdos/editor/legacy/file.pdf";
         const string html = "<p><a href='https://files.example.com/iTdos/editor/legacy/file.pdf?old=1'>下载</a></p>";
 
-        Assert.True(RichTextPrivateAssetReference.ReferencesPath(html, path));
+        Assert.False(RichTextPrivateAssetReference.ReferencesPath(html, path));
         Assert.False(RichTextPrivateAssetReference.ReferencesPath(html, path + ".bak"));
+    }
+
+    [Fact]
+    public void ObjectKeyCase_IsOrdinalWhileTenantRootRemainsCaseInsensitive()
+    {
+        const string html = "<p><a href='iTdos/private/A.pdf'>下载</a></p>";
+
+        Assert.True(RichTextPrivateAssetReference.ReferencesPath(html, "ITDOS/private/A.pdf"));
+        Assert.False(RichTextPrivateAssetReference.ReferencesPath(html, "iTdos/private/a.pdf"));
     }
 
     [Fact]

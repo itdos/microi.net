@@ -13,6 +13,8 @@ namespace Microi.net
     /// </summary>
     public class MessageBodyDto
     {
+        public string MessageId { get; set; }
+        public string RequestId { get; set; }
         public string FromUserId { get; set; }
         public string FromUserName { get; set; }
         public string FromUserAccount { get; set; }
@@ -22,6 +24,7 @@ namespace Microi.net
         public string ToUserAccount { get; set; }
         public string ToUserAvatar { get; set; }
         public string Content { get; set; }
+        public string OtherInfo { get; set; }
         public DateTime CreateTime { get; set; }
         public string Type { get; set; }
         public bool IsRead { get; set; }
@@ -283,6 +286,14 @@ namespace Microi.net
         /// 
         /// </summary>
         public ObjectId _id { get; set; }//mongodb的主键(类似guid)，如果不需要可以删除此行(但是mongodb会自动加上_id)
+        /// <summary>
+        /// 由服务端根据 RequestId 生成的稳定消息标识；旧消息可为空。
+        /// </summary>
+        public string MessageId { get; set; }
+        /// <summary>
+        /// 客户端重试幂等键；旧客户端未传时由兼容 Hub 生成。
+        /// </summary>
+        public string RequestId { get; set; }
         /// <summary>
         /// 消息内容
         /// </summary>

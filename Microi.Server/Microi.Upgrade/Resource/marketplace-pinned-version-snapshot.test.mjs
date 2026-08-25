@@ -9,7 +9,7 @@ const modelSource = await readFile(resolve(directory, 'get-microi-store-model.js
 const listSource = await readFile(resolve(directory, 'get-microi-store-list.js'), 'utf8');
 const importerSource = await readFile(resolve(directory, 'import-package.js'), 'utf8');
 const bulkSource = await readFile(resolve(directory, 'bulk-import-packages.js'), 'utf8');
-const executeModel = new Function('V8', modelSource);
+const executeModel = new Function('V8', 'System', modelSource);
 
 function packageRow(version, extra = {}) {
   return {
@@ -27,7 +27,7 @@ function packageRow(version, extra = {}) {
   };
 }
 
-function execute(params, { current = packageRow('v7.5.18'), history = [], exact = {} } = {}) {
+function execute(params, { current = packageRow('v7.5.18'), history = [], exact = {}, v8 = {} } = {}) {
   return executeModel({
     Param: { Id: 'store-saas', ...params },
     CurrentUser: { Id: 'admin' },
@@ -45,6 +45,16 @@ function execute(params, { current = packageRow('v7.5.18'), history = [], exact 
       GetTableData(table) {
         assert.equal(table, 'mic_data_version');
         return { Code: 1, Data: history };
+      },
+    },
+    ...v8,
+  }, {
+    Text: {
+      Encoding: {
+        UTF8: {
+          GetByteCount: value => Buffer.byteLength(String(value || ''), 'utf8'),
+          GetString: value => String(value || ''),
+        },
       },
     },
   });
@@ -103,6 +113,46 @@ test('显式历史快照必须与期望应用版本一致', () => {
   assert.equal(result.Data.ErrorType, 'MARKETPLACE_VERSION_SNAPSHOT_MISMATCH');
   assert.equal(result.Data.ExpectedAppVersion, 'v7.5.17');
   assert.equal(result.Data.ActualAppVersion, 'v7.5.18');
+});
+
+test('新版导入器显式获取 HDFS 指针，旧导入器仅在响应期获得校验后的兼容包正文', () => {
+  const packageText = '{"PackageInfo":{"Version":"v7.5.50"}}';
+  const expectedSha = 'a'.repeat(64);
+  const pointerRow = packageRow('v7.5.50', {
+    AppPakcet: '',
+    PackageHdfsPath: '/itdos/microi-store/packages/store-saas/app.json',
+    PackageSha256: expectedSha,
+    PackageSize: Buffer.byteLength(packageText, 'utf8'),
+  });
+  let downloadCount = 0;
+  const v8 = {
+    SysConfig: { FileServer: 'https://file.example.com' },
+    Http: {
+      GetResponse(request) {
+        downloadCount += 1;
+        assert.equal(request.Url, 'https://file.example.com/itdos/microi-store/packages/store-saas/app.json');
+        return { StatusCode: 200, Content: packageText };
+      },
+    },
+    EncryptHelper: { Sha256Hex: () => expectedSha },
+  };
+
+  const pointerResult = execute(
+    { PackagePointerMode: 'HdfsV1' },
+    { current: pointerRow, v8 },
+  );
+  assert.equal(pointerResult.Code, 1);
+  assert.equal(pointerResult.Data.AppPakcet, '');
+  assert.equal(pointerResult.Data.PackageDownloadUrl, 'https://file.example.com/itdos/microi-store/packages/store-saas/app.json');
+  assert.equal(downloadCount, 0);
+
+  const legacyResult = execute({}, { current: { ...pointerRow }, v8 });
+  assert.equal(legacyResult.Code, 1);
+  assert.equal(legacyResult.Data.AppPakcet, packageText);
+  assert.equal(legacyResult.Data.LegacyPackageHydrated, 1);
+  assert.equal(downloadCount, 1);
+  assert.match(modelSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
+  assert.match(importerSource, /PackagePointerMode:\s*'HdfsV1'/);
 });
 
 test('批量计划先自举应用商城并把快照 Id 贯穿到子导入器', () => {

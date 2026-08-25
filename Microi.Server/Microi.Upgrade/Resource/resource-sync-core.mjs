@@ -28,7 +28,18 @@ const readablePackageNames = {
   'app.microi.saas-engine.json': 'SaaS引擎',
   'app.microi.sso.json': 'SSO 身份联邦',
   'app.microi.store.json': '应用商城',
+  'app.microi.sys_user.json': '系统账号',
+  'app.microi.sys-config.json': '系统设置',
+  'app.microi.message-notification.json': '消息通知',
+  'app.microi.ai-engine.json': 'AI助手',
 };
+
+const exactCurrentHistoryPackageNames = new Set([
+  'app.microi.form-engine.json',
+  'app.microi.module-engine.json',
+  'app.microi.saas-engine.json',
+  'app.microi.sso.json',
+]);
 
 const platformServicePackageNames = new Set([
   'app.microi.saas-engine.json',
@@ -43,6 +54,119 @@ export function canonicalizeResource(name, content) {
   const normalized = normalizeText(content);
   if (!name.endsWith('.json')) return normalized;
   return `${JSON.stringify(JSON.parse(normalized), null, 2)}\n`;
+}
+
+function semanticVersionParts(value, label, allowEmpty = false) {
+  const text = String(value || '').trim();
+  if (!text && allowEmpty) return [0, 0, 0];
+  const match = /^v?(\d+)\.(\d+)\.(\d+)$/i.exec(text);
+  if (!match) throw new Error(`${label}必须是 vX.Y.Z 语义版本，当前为 ${text || '(空)'}`);
+  return match.slice(1).map(Number);
+}
+
+export function ensureMinimumPackageVersion(packageInfo, minimumVersion) {
+  if (!packageInfo || typeof packageInfo !== 'object' || Array.isArray(packageInfo)) {
+    throw new Error('PackageInfo 必须是对象');
+  }
+  const currentVersion = String(packageInfo.Version || '').trim();
+  const currentParts = semanticVersionParts(currentVersion, 'PackageInfo.Version', true);
+  const minimumParts = semanticVersionParts(minimumVersion, '最低包版本');
+  for (let index = 0; index < minimumParts.length; index += 1) {
+    if (currentParts[index] > minimumParts[index]) return currentVersion;
+    if (currentParts[index] < minimumParts[index]) {
+      packageInfo.Version = String(minimumVersion).trim();
+      return packageInfo.Version;
+    }
+  }
+  if (!currentVersion) packageInfo.Version = String(minimumVersion).trim();
+  return packageInfo.Version;
+}
+
+function changeHistoryCoversVersion(changeHistory, version) {
+  if (typeof changeHistory === 'string') {
+    const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^0-9A-Za-z.])${escapedVersion}(?=$|[^0-9A-Za-z.])`).test(changeHistory);
+  }
+  if (Array.isArray(changeHistory)) {
+    return changeHistory.some(item => changeHistoryCoversVersion(item, version));
+  }
+  if (changeHistory && typeof changeHistory === 'object') {
+    return Object.values(changeHistory).some(item => changeHistoryCoversVersion(item, version));
+  }
+  return false;
+}
+
+function currentChangeHistoryRecords(changeHistory, version) {
+  if (typeof changeHistory === 'string') {
+    const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const linePattern = new RegExp(`^(\\d{4}-\\d{2}-\\d{2})\\s+${escapedVersion}(?:\\s+(.*))?$`);
+    return changeHistory
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .map(line => linePattern.exec(line))
+      .filter(Boolean)
+      .map(match => ({ Date: match[1], Content: String(match[2] || '').trim() }));
+  }
+  if (Array.isArray(changeHistory)) {
+    return changeHistory
+      .filter(item => item && typeof item === 'object' && String(item.Version || '').trim() === version)
+      .map(item => ({
+        Date: String(item.Date || '').trim(),
+        Content: String(item.Description ?? item.Content ?? '').trim(),
+      }));
+  }
+  if (changeHistory && typeof changeHistory === 'object'
+      && String(changeHistory.Version || '').trim() === version) {
+    return [{
+      Date: String(changeHistory.Date || '').trim(),
+      Content: String(changeHistory.Description ?? changeHistory.Content ?? '').trim(),
+    }];
+  }
+  return [];
+}
+
+export function validateOfficialPackageChangeLog(name, content) {
+  if (!Object.hasOwn(readablePackageNames, name)) return;
+
+  let packageModel;
+  try {
+    packageModel = JSON.parse(String(content ?? ''));
+  } catch (error) {
+    throw new Error(`${name} 不是有效 JSON，无法校验 PackageInfo.ChangeLog`, { cause: error });
+  }
+
+  const packageInfo = packageModel?.PackageInfo;
+  const packageVersion = packageInfo?.Version;
+  const changeLog = packageInfo?.ChangeLog;
+  if (!changeLog || typeof changeLog !== 'object' || Array.isArray(changeLog)) {
+    throw new Error(`${name} 的 PackageInfo.ChangeLog 必须是对象`);
+  }
+  if (typeof packageVersion !== 'string' || !packageVersion.trim()
+      || changeLog.Version !== packageVersion) {
+    throw new Error(`${name} 的 PackageInfo.ChangeLog.Version 必须精确等于 PackageInfo.Version`);
+  }
+  for (const fieldName of ['Title', 'ChangeType', 'Content', 'ReleaseTime']) {
+    if (typeof changeLog[fieldName] !== 'string' || !changeLog[fieldName].trim()) {
+      throw new Error(`${name} 的 PackageInfo.ChangeLog.${fieldName} 不能为空`);
+    }
+  }
+  if (!changeHistoryCoversVersion(packageInfo?.ChangeHistory, packageVersion)) {
+    throw new Error(`${name} 的 PackageInfo.ChangeHistory 未覆盖当前版本 ${packageVersion}`);
+  }
+  if (exactCurrentHistoryPackageNames.has(name)) {
+    const releaseTimeMatch = /^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2}$/.exec(changeLog.ReleaseTime.trim());
+    if (!releaseTimeMatch) {
+      throw new Error(`${name} 的 PackageInfo.ChangeLog.ReleaseTime 必须为 yyyy-MM-dd HH:mm:ss`);
+    }
+    const records = currentChangeHistoryRecords(packageInfo.ChangeHistory, packageVersion);
+    const expectedDate = releaseTimeMatch[1];
+    const expectedContent = changeLog.Content.trim();
+    if (!records.some(record => record.Date === expectedDate && record.Content === expectedContent)) {
+      throw new Error(
+        `${name} 的 PackageInfo.ChangeHistory 当前版本日期或正文与 PackageInfo.ChangeLog 不一致`,
+      );
+    }
+  }
 }
 
 function stableJsonValue(value) {

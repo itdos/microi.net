@@ -386,10 +386,17 @@ namespace Microi.net
 
         public static bool IsApiEngineAllowed(JObject currentUser, string apiEngineKey)
         {
-            return !IsSession(currentUser)
-                   || (HasScope(currentUser, "api-engine:run")
-                       && ParseStringList(currentUser["_AccessKeyAllowedApiEngineKeys"])
-                           .Contains((apiEngineKey ?? "").Trim(), StringComparer.OrdinalIgnoreCase));
+            if (!IsSession(currentUser)) return true;
+            var normalizedKey = (apiEngineKey ?? "").Trim();
+            // 两个固定平台门面不是任意接口引擎执行能力：当前用户只返回调用者
+            // 自身的已登录身份；私有文件仍由 Core 逐行、逐字段、逐路径授权。
+            if (string.Equals(normalizedKey, "platform-current-user", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (string.Equals(normalizedKey, "platform-private-file-url", StringComparison.OrdinalIgnoreCase))
+                return HasScope(currentUser, "file:read");
+            return HasScope(currentUser, "api-engine:run")
+                   && ParseStringList(currentUser["_AccessKeyAllowedApiEngineKeys"])
+                       .Contains(normalizedKey, StringComparer.OrdinalIgnoreCase);
         }
 
         public static bool IsDataSourceAllowed(JObject currentUser, string dataSourceKey)
@@ -411,6 +418,10 @@ namespace Microi.net
             {
                 return true;
             }
+            if (IsFixedApiEnginePath(path, "platform-current-user"))
+                return true;
+            if (IsFixedApiEnginePath(path, "platform-private-file-url"))
+                return HasScope(currentUser, "file:read");
             if (path.StartsWith("/apiengine/", StringComparison.Ordinal))
             {
                 // 动态自定义地址只在这里校验能力域；进入 ApiEngineController 后还会
@@ -499,6 +510,31 @@ namespace Microi.net
                 return readActions.Contains(path);
             }
             return false;
+        }
+
+        private static bool IsFixedApiEnginePath(string normalizedPath, string apiEngineKey)
+        {
+            var exactPath = "/apiengine/" + apiEngineKey.ToLowerInvariant();
+            if (string.Equals(normalizedPath, exactPath, StringComparison.Ordinal)) return true;
+
+            var tenantPrefix = exactPath + "--osclient--";
+            if (!normalizedPath.StartsWith(tenantPrefix, StringComparison.Ordinal)
+                || !normalizedPath.EndsWith("--", StringComparison.Ordinal))
+                return false;
+            var tenant = normalizedPath.Substring(
+                tenantPrefix.Length,
+                normalizedPath.Length - tenantPrefix.Length - 2);
+            try
+            {
+                return string.Equals(
+                    TenantConfigurationSecurity.NormalizeTenantId(tenant),
+                    tenant,
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static bool TryGetTableOperation(

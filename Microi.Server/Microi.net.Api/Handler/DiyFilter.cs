@@ -112,7 +112,7 @@ namespace Microi.net.Api
             {
                 try
                 {
-                    MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                    MicroiEngine.QueueSysLog(new SysLogParam()
                     {
                         Type = "接口性能监控",
                         Title = "执行时间：" + timer.ElapsedMilliseconds + "ms",
@@ -148,7 +148,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                MicroiEngine.QueueSysLog(new SysLogParam()
                 {
                     Type = "接口异常",
                     Title = "DiyFilter.GetFormValue",
@@ -617,7 +617,7 @@ namespace Microi.net.Api
         {
             var osClient = DiyToken.GetCurrentOsClient();
 
-            MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+            MicroiEngine.QueueSysLog(new SysLogParam()
             {
                 Type = "未处理的异常",
                 Title = "未处理的异常",
@@ -782,7 +782,7 @@ namespace Microi.net.Api
                         // 当前服务签发的合法 Token 也被误判为签名不匹配。
                         if (!HasValidJwtSignature(tokenString, jwtKey))
                         {
-                            MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                            MicroiEngine.QueueSysLog(new SysLogParam()
                             {
                                 Type = "Token验证警告",
                                 Title = "Token签名不匹配",
@@ -823,7 +823,7 @@ namespace Microi.net.Api
                     }
                     catch (Exception ex)
                     {
-                        MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                        MicroiEngine.QueueSysLog(new SysLogParam()
                         {
                             Type = "Token解析异常",
                             Title = "Token解析失败",
@@ -1012,7 +1012,7 @@ namespace Microi.net.Api
                 }
                 catch (Exception ex)
                 {
-                    MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                    MicroiEngine.QueueSysLog(new SysLogParam()
                     {
                         Type = "在线终端",
                         Title = "同步Token终端失败",

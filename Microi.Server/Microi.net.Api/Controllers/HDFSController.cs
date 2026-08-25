@@ -19,6 +19,8 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public partial class HDFSController : Controller
     {
+        private const string PlatformPrivateFileUrlEngineKey = "platform-private-file-url";
+
         private async Task<DosResult> DefaultParam(DiyUploadParam param)
         {
             CurrentToken currentTokenDynamic;
@@ -372,6 +374,8 @@ namespace Microi.net.Api
             if (param.FieldId.DosIsNullOrWhiteSpace()) param.FieldId = json["FieldId"]?.Val<string>();
             if (param.SysMenuId.DosIsNullOrWhiteSpace()) param.SysMenuId = json["SysMenuId"]?.Val<string>();
             if (param.MenuId.DosIsNullOrWhiteSpace()) param.MenuId = json["MenuId"]?.Val<string>();
+            if (param.ResourceKind.DosIsNullOrWhiteSpace()) param.ResourceKind = json["ResourceKind"]?.Val<string>();
+            if (param.ResourceId.DosIsNullOrWhiteSpace()) param.ResourceId = json["ResourceId"]?.Val<string>();
             if (param._TableChildAuth == null)
             {
                 param._TableChildAuth = ParseTableChildAuthorizationContext(
@@ -449,128 +453,16 @@ namespace Microi.net.Api
         /// </summary>
         private async Task<DosResult> AuthorizePrivateFileRead(DiyUploadParam param)
         {
-            if (IsPlatformAdmin(param)) return null;
-
             param.ReturnFileType = ResolveRequestValue(param.ReturnFileType, "ReturnFileType");
-            if (string.Equals(param.ReturnFileType, "Byte", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(param.ReturnFileType, "Stream", StringComparison.OrdinalIgnoreCase))
-            {
-                return new DosResult(0, null, "普通用户禁止直接读取私有文件字节或流！");
-            }
-
             param.FormEngineKey = ResolveRequestValue(param.FormEngineKey, "FormEngineKey");
             param.FormDataId = ResolveRequestValue(param.FormDataId, "FormDataId");
             param.FieldId = ResolveRequestValue(param.FieldId, "FieldId");
             param.SysMenuId = ResolveRequestValue(param.SysMenuId, "SysMenuId");
             param.MenuId = ResolveRequestValue(param.MenuId, "MenuId");
-            param._TableChildAuth = ResolveRequestTableChildAuthorizationContext(
-                param._TableChildAuth);
-            var sysMenuId = param.SysMenuId.DosIsNullOrWhiteSpace() ? param.MenuId : param.SysMenuId;
-
-            if (param.FormEngineKey.DosIsNullOrWhiteSpace()
-                || param.FormDataId.DosIsNullOrWhiteSpace()
-                || param.FieldId.DosIsNullOrWhiteSpace()
-                || sysMenuId.DosIsNullOrWhiteSpace())
-            {
-                return new DosResult(0, null,
-                    "普通用户读取私有文件必须提交FormEngineKey、FormDataId、FieldId和SysMenuId！");
-            }
-
-            // 非管理员不能通过 Limit=false 把该入口降级成无需授权的公有地址查询。
-            param.Limit = true;
-
-            try
-            {
-                // 由 FormEngine 的版本化授权快照校验真实角色、菜单与目标表绑定。
-                // 不直接读取 sys_menu，也不依赖 Token 中可选的 _RoleLimits；这样既兼容
-                // 老数据库/精简 Token，也避免在 MVC 层复制一套会漂移的菜单授权规则。
-                var menuAuthorizationParam = new DiyTableRowParam
-                {
-                    FormEngineKey = param.FormEngineKey,
-                    Id = param.FormDataId,
-                    _SysMenuId = sysMenuId,
-                    OsClient = param.OsClient,
-                    _CurrentUser = param._CurrentUser?.DeepClone() as JObject,
-                    _InvokeType = InvokeType.Client.ToString(),
-                    _TableChildAuth = param._TableChildAuth
-                };
-                var menuAuthorization = await MicroiEngine.FormEngine
-                    .AuthorizeClientTableOperationAsync(menuAuthorizationParam, "Read");
-                if (menuAuthorization?.Code != 1)
-                {
-                    return new DosResult(0, null, "当前用户无权通过该菜单访问私有文件！");
-                }
-                sysMenuId = menuAuthorizationParam._SysMenuId;
-
-                var tableModel = await ResolveDiyTableModelForFileAccess(param.OsClient, param.FormEngineKey);
-                var tableId = TokenString(tableModel?["Id"]);
-                var tableName = TokenString(tableModel?["Name"]);
-                if (tableId.DosIsNullOrWhiteSpace() || tableName.DosIsNullOrWhiteSpace())
-                {
-                    return new DosResult(0, null, "未找到私有文件所属表单！");
-                }
-
-                var fieldModel = await ResolveDiyFieldModel(param.OsClient, param.FieldId, tableName, tableId);
-                var fieldName = TokenString(fieldModel?["Name"]);
-                var fieldTableId = TokenString(fieldModel?["TableId"]);
-                var component = TokenString(fieldModel?["Component"]);
-                if (fieldName.DosIsNullOrWhiteSpace()
-                    || !string.Equals(fieldTableId, tableId, StringComparison.OrdinalIgnoreCase)
-                    || (!string.Equals(component, "FileUpload", StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(component, "ImgUpload", StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(component, "RichText", StringComparison.OrdinalIgnoreCase)))
-                {
-                    return new DosResult(0, null, "文件字段与当前表单不匹配！");
-                }
-
-                // 复用表单引擎的 Client + SysMenuId 查询上下文，使版本化授权缓存中的
-                // 角色菜单权限、SqlWhere/DataLimitV8 和后端数据过滤共同参与记录读取。
-                // 不能依赖 Token 中可选的 _RoleLimits：老 Token/精简 Token 通常不携带该
-                // 字段，但 FormEngine 的共享授权快照仍可准确判断真实菜单权限。
-                // 未能读到记录时不再退回无权限的内部查询。
-                var rowQuery = new JObject
-                {
-                    ["FormEngineKey"] = tableName,
-                    ["OsClient"] = param.OsClient,
-                    ["Id"] = param.FormDataId,
-                    ["_SysMenuId"] = sysMenuId,
-                    ["SysMenuId"] = sysMenuId,
-                    ["_CurrentUser"] = param._CurrentUser?.DeepClone(),
-                    ["_InvokeType"] = InvokeType.Client.ToString(),
-                    ["_SelectFields"] = new JArray("Id", fieldName)
-                };
-                if (param._TableChildAuth != null)
-                {
-                    rowQuery["_TableChildAuth"] = JToken.FromObject(param._TableChildAuth);
-                }
-                var rowResult = await MicroiEngine.FormEngine
-                    .GetFormDataAsync<dynamic>(tableName, rowQuery);
-                if (rowResult.Code != 1)
-                {
-                    return new DosResult(0, null, "当前菜单上下文无权读取该业务记录！");
-                }
-
-                var row = ToJObject((object)rowResult.Data);
-                var fieldValue = row?[fieldName];
-                var requestedPaths = new List<string>();
-                if (!param.FilePathName.DosIsNullOrWhiteSpace()) requestedPaths.Add(param.FilePathName);
-                if (param.FilePathNames != null) requestedPaths.AddRange(param.FilePathNames);
-                var isRichText = string.Equals(component, "RichText", StringComparison.OrdinalIgnoreCase);
-                if (requestedPaths.Count == 0
-                    || requestedPaths.Any(path => isRichText
-                        ? !RichTextPrivateAssetReference.ReferencesPath(TokenString(fieldValue), path)
-                        : !FieldValueReferencesPath(fieldValue, path)))
-                {
-                    return new DosResult(0, null, "业务记录的文件字段未引用所请求的私有文件！");
-                }
-
-                return null;
-            }
-            catch
-            {
-                // 授权依赖异常时必须失败关闭，不能退回裸路径临时签名地址。
-                return new DosResult(0, null, "私有文件授权校验暂时不可用，请稍后重试！");
-            }
+            param.ResourceKind = ResolveRequestValue(param.ResourceKind, "ResourceKind");
+            param.ResourceId = ResolveRequestValue(param.ResourceId, "ResourceId");
+            param._TableChildAuth = ResolveRequestTableChildAuthorizationContext(param._TableChildAuth);
+            return await PrivateFileAccessAuthorization.AuthorizeAsync(param);
         }
 
         private async Task<JObject> ResolveDiyTableModelForFileAccess(string osClient, string formEngineKey)
@@ -581,31 +473,9 @@ namespace Microi.net.Api
 
         private static bool FieldValueReferencesPath(JToken fieldValue, string requestedPath)
         {
-            var target = NormalizeComparePath(requestedPath);
-            if (fieldValue == null || target.DosIsNullOrWhiteSpace()) return false;
-
-            if (fieldValue.Type == JTokenType.String)
-            {
-                var text = TokenString(fieldValue);
-                if (text.DosIsNullOrWhiteSpace()) return false;
-                var trimmed = text.TrimStart();
-                if (trimmed.StartsWith("{") || trimmed.StartsWith("["))
-                {
-                    try { return FieldValueReferencesPath(JToken.Parse(text), requestedPath); }
-                    catch { return false; }
-                }
-                return string.Equals(NormalizeComparePath(text), target, StringComparison.Ordinal);
-            }
-
-            if (fieldValue is JValue value)
-            {
-                return string.Equals(
-                    NormalizeComparePath(Convert.ToString(value.Value)),
-                    target,
-                    StringComparison.Ordinal);
-            }
-
-            return fieldValue.Children().Any(child => FieldValueReferencesPath(child, requestedPath));
+            return PrivateFileAccessAuthorization.AuthoritativeValueReferencesPath(
+                fieldValue,
+                requestedPath);
         }
 
         // 上传成功后为当前上传请求补充短期预览地址，业务字段仍只持久化 Path。
@@ -753,41 +623,7 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> MallFileUrl(DiyUploadParam param)
         {
-            await LoadJsonBody(param);
-            param.FilePathName = ResolveFilePathName(param);
-
-            var currentToken = await DiyToken.GetCurrentToken();
-            if (currentToken?.CurrentUser != null)
-            {
-                var accessError = await DefaultParam(param);
-                if (accessError != null) return Json(accessError);
-                var pathError = NormalizeFilePaths(param);
-                if (pathError != null) return Json(pathError);
-                var authorizationError = await AuthorizePrivateFileRead(param);
-                if (authorizationError != null) return Json(authorizationError);
-                var platformResult = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
-                return Json(platformResult);
-            }
-
-            if (!TryResolveRequestedOsClient(param, out var osClient, out var osClientError))
-            {
-                return Json(osClientError);
-            }
-            var clientUser = await GetClientUserFromToken(osClient);
-            if (clientUser == null)
-            {
-                return Json(new DosResult(1001, null, "登录身份已过期！"));
-            }
-            param.OsClient = osClient;
-            param._CurrentUser = clientUser;
-            param._InvokeType = InvokeType.Client.ToString();
-            param.Limit = true;
-            var clientPathError = NormalizeFilePaths(param);
-            if (clientPathError != null) return Json(clientPathError);
-            var clientAuthorizationError = await AuthorizePrivateFileRead(param);
-            if (clientAuthorizationError != null) return Json(clientAuthorizationError);
-            var result = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
-            return Json(result);
+            return await GetPrivateFileUrlCompatibility(param);
         }
 
         /// <summary>
@@ -828,6 +664,16 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> GetPrivateFileUrl(DiyUploadParam param)
         {
+            return await GetPrivateFileUrlCompatibility(param);
+        }
+
+        /// <summary>
+        /// 旧 PC/UniApp 私有文件路由的共同兼容流程。仅归一化历史 Token 与请求格式；
+        /// 行、字段、菜单、组织和路径授权统一由 Core 完成。
+        /// </summary>
+        private async Task<JsonResult> GetPrivateFileUrlCompatibility(DiyUploadParam param)
+        {
+            param ??= new DiyUploadParam();
             await LoadJsonBody(param);
             param.FilePathName = ResolveFilePathName(param);
 
@@ -836,11 +682,10 @@ namespace Microi.net.Api
             {
                 var accessError = await DefaultParam(param);
                 if (accessError != null) return Json(accessError);
-                var pathError = NormalizeFilePaths(param);
-                if (pathError != null) return Json(pathError);
-                var authorizationError = await AuthorizePrivateFileRead(param);
-                if (authorizationError != null) return Json(authorizationError);
-                var platformResult = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
+                var platformResult = await ManagedApiEngineCompatibility.RunAsync(
+                    PlatformPrivateFileUrlEngineKey,
+                    JObject.FromObject(param),
+                    param._CurrentUser);
                 return Json(platformResult);
             }
 
@@ -857,11 +702,10 @@ namespace Microi.net.Api
             param._CurrentUser = clientUser;
             param._InvokeType = InvokeType.Client.ToString();
             param.Limit = true;
-            var clientPathError = NormalizeFilePaths(param);
-            if (clientPathError != null) return Json(clientPathError);
-            var clientAuthorizationError = await AuthorizePrivateFileRead(param);
-            if (clientAuthorizationError != null) return Json(clientAuthorizationError);
-            var result = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
+            var result = await ManagedApiEngineCompatibility.RunAsync(
+                PlatformPrivateFileUrlEngineKey,
+                JObject.FromObject(param),
+                clientUser);
             return Json(result);
         }
 
@@ -1624,7 +1468,7 @@ namespace Microi.net.Api
 
         private static string NormalizeComparePath(string path)
         {
-            return NormalizeStoragePath(path).ToLowerInvariant();
+            return PrivateFileAccessAuthorization.NormalizeAuthoritativeObjectPath(path);
         }
 
         private static string GetFileNameFromPath(string path)

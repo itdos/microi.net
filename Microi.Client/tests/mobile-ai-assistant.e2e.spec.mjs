@@ -90,7 +90,7 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
         }
     });
     page.on("response", (response) => {
-        if (!/\/api\//i.test(response.url())) return;
+        if (!/(\/api\/|\/apiengine\/)/i.test(response.url())) return;
         if (isAiBootstrapResponse(response)) bootstrapResponseSeen = response;
         const audit = response.json().then((json) => {
             const candidates = [json, json?.Data].filter((item) => item && typeof item === "object");
@@ -113,7 +113,7 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
 
     // 响应副本删除新字段并故意保留旧字段 0，证明缺失 DisableAiAssistant 时仍默认显示，
     // 且废弃的 IsShowAiAssistant 不再影响运行时，不改写远端 Sys_Config。
-    await page.route(/\/api\/FormEngine\/GetSysConfig(?:\?|$)/i, fulfillWithDefaultVisibleAi);
+    await page.route(/\/apiengine\/platform-sys-config(?:\?|$)/i, fulfillWithDefaultVisibleAi);
     await page.route(/\/api\/SysUser\/Login(?:\?|$)/i, fulfillWithDefaultVisibleAi);
 
     await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`, {
@@ -264,7 +264,7 @@ test("PC 顶栏机器人打开并拖动完整 AI 助手弹窗", async ({ page },
         }
     });
 
-    await page.route(/\/api\/FormEngine\/GetSysConfig(?:\?|$)/i, fulfillWithDefaultVisibleAi);
+    await page.route(/\/apiengine\/platform-sys-config(?:\?|$)/i, fulfillWithDefaultVisibleAi);
     await page.route(/\/api\/SysUser\/Login(?:\?|$)/i, fulfillWithDefaultVisibleAi);
     await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`, {
         waitUntil: "domcontentloaded"

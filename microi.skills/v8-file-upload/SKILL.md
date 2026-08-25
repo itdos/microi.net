@@ -33,11 +33,13 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 - `RichText.Limit=false` 只用于需匿名长期访问的官网公告、商品详情等公开正文；内部内容用 `true`。普通交互式帐号即使传 `false`，后端仍可按安全策略强制私有，客户端必须以上传响应的实际 `Limit` 为准。
 - RichText 分别配置 `Image`、`Video`、`File` 的 `Enabled/MaxSize/MaxCount`；图片另传 `Preview/CompressMaxSize/CompressMaxWidth`，并继续遵循“原图私有、展示图公有或私有”的压缩链路。附件类型白名单用 `File.Accept` 进一步收紧，不能放宽服务端白名单。
 - 私有正文持久化 `/__microi_richtext_private__/...` 稳定对象标识，严禁保存对象存储签名 URL、`OpenPrivateFile` Ticket、DiyToken 或其它会过期的凭据。每次打开记录时携带 `FormEngineKey/FormDataId/FieldId/SysMenuId` 批量换取短效审计代理地址。
-- 私有文件后端授权必须重新校验当前租户、菜单、表、行和 RichText 字段，并确认所请求路径精确存在于 `img/video/source.src` 或 `a.href`；正文文字、`data-src/data-href`、脚本标签和前缀相似路径都必须失败关闭。
+- 私有文件后端授权必须重新校验当前租户、菜单、表、行和 RichText 字段，并确认所请求路径精确存在于 `img/video/source.src` 或 `a.href`；普通上传字段的对象/数组只认 `Path/FilePath/FilePathName`，不得递归把 `Name/Size/Metadata` 等任意标量当作路径。未经当前租户 FileServer 主机权威校验的绝对 HTTP(S) URL 不得等价为本地对象 Key；正文文字、`data-src/data-href`、脚本标签和前缀相似路径都必须失败关闭。
 - 外部匿名页面没有后台记录权限上下文，不能解析私有标识。公开文章必须由有权发布公有资产的超级管理员显式使用公有桶，不得通过延长私有 URL 有效期模拟公开资源。
 
+官网客户端读取私有文件统一调用 `/apiengine/platform-private-file-url`，提交 `FilePathName` 或有界 `FilePathNames`，并按资源类型提供权威定位参数：普通表单字段使用 `FormEngineKey + FormDataId + FieldId + SysMenuId`；用户头像使用 `ResourceKind=UserAvatar + ResourceId=用户Id`；菜单/部门导入模板分别使用 `MenuImportTemplate`、`DeptImportTemplate` 与对应记录 Id。CAD 私有派生预览使用 `ResourceKind=FormFieldDerivedPreview`，除表单四元组外必须同时提交字段中保存的 `OriginalFilePathName` 和单个派生 `FilePathName`；后端只接受同目录同 basename 的 DWG→`_preview.dxf`、STEP/STP→`_preview.stl` 唯一映射，并在对象存在后签名。文件柜对象使用 `ResourceKind=FileManagerObject`，`ResourceId` 必须与单个 `FilePathName` 大小写精确相同，并提交能力探针返回的当前租户权威 `SysMenuId`；此类签名只允许平台超级管理员 DiyToken 会话，访问密钥和普通菜单用户一律拒绝。后端会从权威字段或对象存储重新读取并精确匹配路径；管理员也不能只传裸路径绕过对象引用，普通客户端禁止换取私有文件原始 Byte/Stream。旧 `/api/HDFS/GetPrivateFileUrl` 与 `/api/HDFS/MallFileUrl` 只保留令牌格式兼容并转发同一 Managed 接口，新代码不得继续引用。
+
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=b48ce09f93a43efd30e700af637db3881355e8d2baaf45165ea2bd0bdfda25cf -->
+<!-- microi-progressive:chunk id=v8-file-upload-000 sha256=841bb634227ea21cf97abcbee5dc6220042e73139170e6a6c304bfce83274e7a -->
 ## 核心 API
 
 | API | 说明 |
@@ -45,6 +47,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 | `V8.FilesByteBase64` | 接收上传时携带的文件字典 `{ FileName: base64 }` |
 | `V8.Method.Upload({...})` | 服务端上传文件到 HDFS（推荐） |
 | `V8.Method.GetPrivateFileUrl({FilePathName})` | 生成私有桶临时访问 URL |
+| `/apiengine/platform-private-file-url` | 官网 PC/UniApp 按菜单、记录、字段和对象引用换取私有文件短链 |
 | `V8.Http.GetResponse({Url}).RawBytes` | 下载远程文件为字节数组 |
 | 接口返回 `{ FileName, ContentType, FileByteBase64 }` | 接口直接响应文件 |
 
@@ -63,7 +66,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 可信后端 V8 可用 `V8.Http.GetResponse({ Url: url }).RawBytes` 下载，再用 `System.Convert.ToBase64String` 和 `V8.Method.Upload` 上传。该路径同样必须校验域名、大小、Content-Type、后缀和最终重定向目标。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=dc69d3bcadb1b40d98e1346a8d9d0a3599cae7f7dd6b850dd95ad054c747b2dd -->
+<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=c20863b68d13b3bd41caee90a5e12878501a35b3d9f8d40a80efe3f6b46125a9 -->
 ## 接收前端上传的文件
 
 前端发起文件上传时，平台自动把文件以 base64 形式注入到 `V8.FilesByteBase64`：
@@ -165,7 +168,7 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 生产 H5 不能只依赖 `uni.uploadFile`。页面从 `uni.chooseImage` 得到的 `tempFiles[0].file`、`tempFiles[0]`、`blob:` / `data:` 临时路径都要传给 `V8.uploadFile`，并设置 `preferFetch:true`；SDK 必须能用 `fetch + FormData` 兜底，否则线上可能报 `未找到 MicroiV8 上传适配器。`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=a31f0170454bb9e44007e24ed280873e99ae4ca4f4ecc7307ecc3e738eb51df9 -->
+<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=d02dfde4abd2349cd92de1daee129bc08ba42142b5f6229736588cb3e0dbf43c -->
 ## 跨平台文件同步登录会话
 
 文件柜、文件同步等需要连接另一套 Microi API 的工具，必须把远程平台视为独立登录会话：
@@ -175,7 +178,7 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 密码和 Token 只能由受保护的接口引擎写入、读取和清理。数据库必须保存可校验的加密密文，普通 FormEngine 列表不得返回密文字段。
 - 密码和 Token 使用 `V8.Method.ProtectApiEngineSecret/UnprotectApiEngineSecret`，由宿主把密文绑定当前 `OsClient + ApiEngineKey`；不得从已脱敏的 `V8.OsClientModel` 读取 `AuthSecret/DbConn`，也不得使用进程级临时密钥。接口引擎 Key 必须稳定，确保服务重启和应用升级后仍能解密历史连接。
 - 历史连接列表只返回脱敏元数据；一键重连时再按记录 Id 和当前用户读取凭据。删除连接必须同时清除保存的密码和 Token。
-- 远程目标登录后必须调用文件柜能力探针（如 `mci_file_sync_capability`）检查同步协议版本。接口不存在、返回 404/非标准结果或协议版本过低时，提示目标平台更新【文件柜】应用，不得继续同步。
+- 远程目标登录后必须调用文件柜能力探针 `mci_file_sync_capability` 检查同步协议版本，并使用其 `Data.FileManagerSysMenuId` 作为目标租户权威文件柜菜单；禁止硬编码发布端菜单 Id。接口不存在、未返回菜单 Id、返回 404/非标准结果或协议版本过低时，提示目标平台更新【文件柜】应用，不得继续同步。
 - 验收至少覆盖：登录成功显示身份、退出后 Token 清空、历史连接一键重连、删除连接、密文落库、服务重启后仍可解密、目标平台缺少能力接口时的升级提示。
 
 <!-- /microi-progressive:chunk -->
