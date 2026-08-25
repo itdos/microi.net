@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.4.4
+ * Version: v2.4.7
  * Function:
  * - 统一应用商城导入器；支持 HDFS 公私有包指针、大小与 SHA-256 校验、后台分片和官方受管升级。
  */
@@ -473,6 +473,14 @@ var buildPersistentCheckpoint = function (phase, index, extra) {
     if (checkpointPackageVersion) checkpoint.PackageVersion = checkpointPackageVersion;
     if (checkpointPackageIdentity) checkpoint.PackageIdentity = checkpointPackageIdentity;
     if (checkpointStoreVersionId) checkpoint.StoreVersionId = checkpointStoreVersionId;
+    if (backgroundCheckpoint.StartupApiBootstrapDone === true) {
+        checkpoint.StartupApiBootstrapDone = true;
+    }
+    if (backgroundCheckpoint.StartupApiBootstrapRevision) {
+        checkpoint.StartupApiBootstrapRevision = String(
+            backgroundCheckpoint.StartupApiBootstrapRevision
+        );
+    }
     if (backgroundCheckpoint.IdMapsPlanned === true
         || phase == 'Fields'
         || phase == 'Physical'
@@ -1384,6 +1392,189 @@ try {
         }
         return result;
     };
+
+    // STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1：子租户启动事故恢复不能等待
+    // 22 条 DDL、数百字段和全部资源分片完成后才补齐前端启动接口。只有后台
+    // 批量工作器显式请求、且包体来自固定 iTdos 官方商城并被识别为 Platform
+    // 应用时，才从不可变 SaaS 包中创建缺失的六个官方 Managed 接口。已有不同
+    // 源码、稳定 Id 或地址冲突一律保留并记录，绝不借快速恢复覆盖租户代码；
+    // 完整应用安装仍继续执行，最终由标准 Managed 所有权规则完成严格对账。
+    var startupApiBootstrapRevision = 'startup-api-runtime-flags-v3';
+    var startupApiBootstrapRequested = V8.Param.StartupDependencyRecovery === true
+        || String(V8.Param.StartupDependencyRecovery || '').toLowerCase() == 'true';
+    var startupPackageIdentity = String(
+        Package.PackageInfo.AppId || Package.PackageInfo.AppKey || V8.Param.AppId || ''
+    ).toLowerCase();
+    if (startupApiBootstrapRequested
+        && backgroundChunkingEnabled
+        && trustedOfficialPlatformPackage
+        && startupPackageIdentity == 'app.microi.saas-engine'
+        && String(backgroundCheckpoint.StartupApiBootstrapRevision || '')
+            != startupApiBootstrapRevision) {
+        var startupApiKeys = [
+            'platform-os-client-by-domain',
+            'platform-sys-config',
+            'platform-lang-bundle',
+            'platform-current-user',
+            'platform-private-file-url',
+            'platform-sys-user-public-info'
+        ];
+        var startupPackageEngineMap = {};
+        var startupPackageEngines = Package.SysApiEngines || [];
+        for (var startupPackageIndex = 0;
+            startupPackageIndex < startupPackageEngines.length;
+            startupPackageIndex++) {
+            var startupPackageEngine = startupPackageEngines[startupPackageIndex] || {};
+            var startupPackageKey = String(startupPackageEngine.ApiEngineKey || '').toLowerCase();
+            if (startupPackageKey) startupPackageEngineMap[startupPackageKey] = startupPackageEngine;
+        }
+        var startupAdded = [];
+        var startupReconciled = [];
+        var startupConflicts = [];
+        var normalizeStartupSource = function (value) {
+            return String(value || '').replace(/\r\n/g, '\n').trim();
+        };
+        var readStartupEngine = function (fieldName, value) {
+            if (!value) return null;
+            return V8.Db.FromSql(
+                'SELECT * FROM sys_apiengine WHERE LOWER(' + fieldName + ')=LOWER(@p0)'
+            ).AddInParameter('@p0', value).First();
+        };
+        var normalizeStartupFlag = function (value) {
+            if (value === true) return 1;
+            if (value === false || value === null || value === undefined || value === '') return 0;
+            var normalized = String(value).trim().toLowerCase();
+            if (normalized == 'true' || normalized == 'yes' || normalized == 'on') return 1;
+            if (normalized == 'false' || normalized == 'no' || normalized == 'off') return 0;
+            var numeric = Number(value);
+            return isNaN(numeric) ? 0 : (numeric == 0 ? 0 : 1);
+        };
+        // STARTUP_API_RUNTIME_FLAG_PHYSICAL_RECONCILIATION_V1：部分历史租户已经有
+        // AllowAnonymous 等物理列，但缺少对应 diy_field，FormEngine 会返回成功却静默
+        // 忽略匿名/启用开关。仅对上方可信官方包中“新增或源码完全相同”的接口做
+        // 参数化物理补正，租户不同源码与稳定身份冲突仍在此前失败关闭。
+        var reconcileStartupRuntimeFlags = function (incoming, id) {
+            V8.Db.FromSql(
+                // MySQL BIT(1) 会把 Jint 数字参数按字符串绑定成字节值并报
+                // Data too long；这里只拼接内部归一化后的 0/1 常量，Id 仍参数化。
+                'UPDATE sys_apiengine SET IsEnable=' + normalizeStartupFlag(incoming.IsEnable)
+                + ', StopHttp=' + normalizeStartupFlag(incoming.StopHttp)
+                + ', AllowAnonymous=' + normalizeStartupFlag(incoming.AllowAnonymous)
+                + ' WHERE Id=@p0'
+            )
+                .AddInParameter('@p0', id)
+                .ExecuteNonQuery();
+            var readback = readStartupEngine('Id', id);
+            if (!readback
+                || normalizeStartupFlag(readback.IsEnable) != normalizeStartupFlag(incoming.IsEnable)
+                || normalizeStartupFlag(readback.StopHttp) != normalizeStartupFlag(incoming.StopHttp)
+                || normalizeStartupFlag(readback.AllowAnonymous)
+                    != normalizeStartupFlag(incoming.AllowAnonymous)) {
+                throw new Error('启动接口运行标志物理补正回读不一致：'
+                    + String(incoming.ApiEngineKey || id));
+            }
+            return readback;
+        };
+        var cacheStartupEngine = function (row) {
+            if (!row) return;
+            var rowJson = JSON.stringify(row);
+            var cacheValues = [row.ApiEngineKey, row.Id, row.ApiAddress];
+            for (var cacheValueIndex = 0; cacheValueIndex < cacheValues.length; cacheValueIndex++) {
+                var cacheValue = String(cacheValues[cacheValueIndex] || '').toLowerCase();
+                if (!cacheValue) continue;
+                var cacheKey = 'Microi:' + V8.OsClient + ':FormData:sys_apiengine:' + cacheValue;
+                V8.Cache.Remove(cacheKey);
+                V8.Cache.Set(cacheKey, rowJson);
+            }
+        };
+        for (var startupKeyIndex = 0; startupKeyIndex < startupApiKeys.length; startupKeyIndex++) {
+            var startupApiKey = startupApiKeys[startupKeyIndex];
+            var incomingStartupEngine = startupPackageEngineMap[startupApiKey];
+            if (!incomingStartupEngine || !incomingStartupEngine.Id || !incomingStartupEngine.ApiAddress) {
+                throw new Error('官方 SaaS 包缺少启动接口定义：' + startupApiKey);
+            }
+            var existingStartupEngine = readStartupEngine('ApiEngineKey', startupApiKey);
+            if (existingStartupEngine && existingStartupEngine.Id) {
+                if (Number(existingStartupEngine.IsDeleted || 0) == 1
+                    || normalizeStartupSource(existingStartupEngine.ApiV8Code)
+                        != normalizeStartupSource(incomingStartupEngine.ApiV8Code)) {
+                    startupConflicts.push(startupApiKey + '：已有不同源码或处于软删除状态');
+                    continue;
+                }
+                var startupUpdateModel = {};
+                for (var startupUpdateKey in incomingStartupEngine) {
+                    if (Object.prototype.hasOwnProperty.call(incomingStartupEngine, startupUpdateKey)) {
+                        startupUpdateModel[startupUpdateKey] = incomingStartupEngine[startupUpdateKey];
+                    }
+                }
+                startupUpdateModel.Id = existingStartupEngine.Id;
+                startupUpdateModel.OsClient = V8.OsClient;
+                startupUpdateModel.IsDeleted = 0;
+                var startupUpdateResult = runWriteWithRetry(function () {
+                    return V8.FormEngine.UptFormData('sys_apiengine', startupUpdateModel);
+                }, 'startup_api_upt_' + startupApiKey);
+                if (!startupUpdateResult || startupUpdateResult.Code != 1) {
+                    throw new Error('启动接口快速补正失败：' + startupApiKey + '，'
+                        + writeResultMessage(startupUpdateResult));
+                }
+                var startupUpdatedRow = reconcileStartupRuntimeFlags(
+                    incomingStartupEngine,
+                    existingStartupEngine.Id
+                );
+                if (!startupUpdatedRow || String(startupUpdatedRow.ApiAddress || '')
+                    != String(incomingStartupEngine.ApiAddress || '')) {
+                    throw new Error('启动接口快速补正回读不一致：' + startupApiKey);
+                }
+                cacheStartupEngine(startupUpdatedRow);
+                startupReconciled.push(startupApiKey);
+                continue;
+            }
+
+            var startupIdCollision = readStartupEngine('Id', incomingStartupEngine.Id);
+            var startupAddressCollision = readStartupEngine('ApiAddress', incomingStartupEngine.ApiAddress);
+            if ((startupIdCollision && startupIdCollision.Id)
+                || (startupAddressCollision && startupAddressCollision.Id)) {
+                startupConflicts.push(startupApiKey + '：稳定 Id 或 ApiAddress 已被其它接口占用');
+                continue;
+            }
+            var startupAddModel = {};
+            for (var startupAddKey in incomingStartupEngine) {
+                if (Object.prototype.hasOwnProperty.call(incomingStartupEngine, startupAddKey)) {
+                    startupAddModel[startupAddKey] = incomingStartupEngine[startupAddKey];
+                }
+            }
+            startupAddModel.OsClient = V8.OsClient;
+            startupAddModel.IsDeleted = 0;
+            var startupAddResult = runWriteWithRetry(function () {
+                return V8.FormEngine.AddFormData('sys_apiengine', startupAddModel);
+            }, 'startup_api_add_' + startupApiKey);
+            if (!startupAddResult || startupAddResult.Code != 1) {
+                throw new Error('启动接口快速创建失败：' + startupApiKey + '，'
+                    + writeResultMessage(startupAddResult));
+            }
+            var startupAddedRow = reconcileStartupRuntimeFlags(
+                incomingStartupEngine,
+                incomingStartupEngine.Id
+            );
+            if (!startupAddedRow
+                || String(startupAddedRow.Id || '').toLowerCase()
+                    != String(incomingStartupEngine.Id || '').toLowerCase()
+                || String(startupAddedRow.ApiAddress || '') != String(incomingStartupEngine.ApiAddress || '')
+                || normalizeStartupSource(startupAddedRow.ApiV8Code)
+                    != normalizeStartupSource(incomingStartupEngine.ApiV8Code)) {
+                throw new Error('启动接口快速创建回读不一致：' + startupApiKey);
+            }
+            cacheStartupEngine(startupAddedRow);
+            startupAdded.push(startupApiKey);
+        }
+        backgroundCheckpoint.StartupApiBootstrapDone = true;
+        backgroundCheckpoint.StartupApiBootstrapRevision = startupApiBootstrapRevision;
+        debugLog.startup_api_fast_bootstrap = {
+            Added: startupAdded,
+            Reconciled: startupReconciled,
+            Conflicts: startupConflicts
+        };
+    }
 
     // Reinstalling a package must not run the expensive diy_field update path
     // for definitions that already match. Besides unnecessary DDL/cache work,

@@ -146,6 +146,10 @@ for (const capability of [
   "Installer:PackageDataTableClosure",
   "BackgroundTask:ChildTenantRuntimeReloadRecovery",
   "BackgroundTask:PartialQueueTerminalAggregation",
+  "BackgroundTask:StartupDependencyIncidentScope",
+  "BackgroundTask:StartupBootstrapRefresh",
+  "BackgroundTask:StartupBootstrapRuntimeFlagRefresh",
+  "BackgroundTask:StartupBootstrapRevisionReset",
   "V8.Method.ReloadOsClient"
 ]) addCapability(saasPackage.PackageInfo, capability);
 
@@ -156,6 +160,13 @@ const engine = {
   CreateTime: "2026-08-22 00:00:00",
   Id: "8b6ee32a-69c5-47cd-95d5-7a1342d64a87",
   ChangeHistory:
+    "2026-08-25 15:35:00 v1.2.5 提升刷新修订至 v4，触发已误标 v3 的在途父任务重新执行完整一致轮次\n" +
+    "2026-08-25 15:30:00 v1.2.4 刷新分片中途升级修订时从首租户重启同一幂等轮次，避免混合版本漏补\n" +
+    "2026-08-25 15:20:00 v1.2.3 兼容 MySQL BIT(1) 历史列绑定，再次刷新在途任务的运行标志补正器\n" +
+    "2026-08-25 15:10:00 v1.2.2 再次刷新在途任务，补正历史租户匿名启动标志并重建完整接口缓存\n" +
+    "2026-08-25 14:50:00 v1.2.1 在途事故父任务用原幂等子任务刷新官方商城工作器，优先恢复 Jhyxdkj/lsg 且不创建重复任务\n" +
+    "2026-08-25 14:10:00 v1.1.9 兼容滚动发布旧控制面：子任务入队后强制写入并回读启动依赖范围，失败即停止\n" +
+    "2026-08-25 13:50:00 v1.1.8 新增 StartupDependencies 受信事故恢复范围，仅投递 SaaS 启动依赖包\n" +
     "2026-08-23 20:20:00 v1.1.7 兼容旧控制面：目录或投递遇到未加载 OsClient 时受控重载并重试\n" +
     "2026-08-23 20:00:00 v1.1.6 子租户运行时逐个重载；单个投递失败仍持续汇总全部已投递子任务\n" +
     "2026-08-23 00:40:30 v1.1.5 安全保存后的官方实际版本；Monitor 仅汇总持久化 ChildTasks\n" +
@@ -165,7 +176,7 @@ const engine = {
     "2026-08-22 13:00:00 v1.1.1 父任务 Current/Total 改用百分比单位，避免排队数量触发 99% 假进度\n" +
     "2026-08-22 12:00:00 v1.1.0 投递前补齐子租户商城工作器，并持续汇总全部子任务真实终态\n" +
     "2026-08-22 00:00:00 v1.0.0 创建主租户批量维护子租户平台应用编排接口\n",
-  Version: "v1.1.7",
+  Version: "v1.2.5",
   LimitRecursion: 1000,
   LimitMemory: 256,
   MaxStatements: 10000000,
