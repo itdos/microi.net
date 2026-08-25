@@ -100,7 +100,7 @@ test('trusted Core atoms are ApiEngineKey-bound and do not expose a generic tena
   assert.match(coreSource, /RequireTrustedApiEngine\(PlatformLangBundleEngineKey\)/);
   assert.match(coreSource, /RequireTrustedApiEngine\(PlatformLoginWallpapersEngineKey\)/);
   assert.match(coreSource, /RequireTrustedApiEngine\(PlatformPrivateFileUrlEngineKey\)/);
-  assert.match(coreSource, /CreatePublicSysConfigProjection/);
+  assert.match(coreSource, /PlatformBootstrapCompatibilityService\s*\.GetPublicSysConfigAsync/);
   assert.match(coreSource, /PrivateFileAccessAuthorization\.AuthorizeAsync/);
   assert.doesNotMatch(coreSource, /dynamicParam[^\n]*OsClient/);
 });

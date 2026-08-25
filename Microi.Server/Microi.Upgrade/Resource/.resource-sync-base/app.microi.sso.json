@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "SSO 身份联邦",
-    "Version": "v7.5.7",
+    "Version": "v7.5.8",
     "CreateTime": "2026-08-21T12:00:00.000Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -20,6 +20,11 @@
     "Description": "Microi 吾码官方双向 SSO 应用：OIDC、SAML2、CAS 与存量 Token 兼容。连接投影、JIT/绑定、角色映射、审计与租户 Hook 均由应用接口引擎交付；C# 只保留签名验签、协议响应、一次性票据和 DiyToken 等可信原子。",
     "ChangeHistory": [
       {
+        "Version": "v7.5.8",
+        "Date": "2026-08-26",
+        "Description": "将全部官方 Managed SSO 接口固化为 Platform 所有权，CreateIfMissing 个性化 Hook 继续归租户且永不覆盖，避免 Upgrade13 重放内置包时被误判为资源降级。"
+      },
+      {
         "Version": "v7.5.7",
         "Date": "2026-08-25",
         "Description": "统一官方 Managed 接口醒目恢复提示；SSO 安全事件只通过脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 直接返回成功且后续官方升级永不覆盖，并补齐结构化更新日志硬门禁。"
@@ -27,7 +32,7 @@
       {
         "Version": "v7.5.6",
         "Date": "2026-08-25",
-        "Description": "统一官方 Managed 接口醒目恢复提示；SSO 安全事件只通过脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 直接返回成功且后续官方升级永不覆盖。"
+        "Description": "统一官方 Managed 接口醒目恢复提示；SSO 安全事件经脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 仅返回成功。"
       },
       {
         "Version": "v7.5.2",
@@ -62,11 +67,11 @@
     ],
     "ApplicationType": "Platform",
     "ChangeLog": {
-      "Version": "v7.5.7",
-      "Title": "SSO Managed 编排与租户 Hook 收口",
-      "ChangeType": "Feature",
-      "Content": "统一官方 Managed 接口醒目恢复提示；SSO 安全事件只通过脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 直接返回成功且后续官方升级永不覆盖，并补齐结构化更新日志硬门禁。",
-      "ReleaseTime": "2026-08-25 16:00:00"
+      "Version": "v7.5.8",
+      "Title": "SSO 官方资源归属重放修复",
+      "ChangeType": "Fix",
+      "Content": "将全部官方 Managed SSO 接口固化为 Platform 所有权，CreateIfMissing 个性化 Hook 继续归租户且永不覆盖，避免 Upgrade13 重放内置包时被误判为资源降级。",
+      "ReleaseTime": "2026-08-26 14:30:00"
     }
   },
   "DDLStatements": [
@@ -6807,23 +6812,23 @@
     "SchemaVersion": 1,
     "ApiEngines": {
       "sso_capabilities": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "sso_legacy_capabilities": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "sso_connection_runtime": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "sso_resolve_federated_identity": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "sso_protocol_event": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "sso_event_hook": {
@@ -6831,23 +6836,23 @@
         "UpgradePolicy": "CreateIfMissing"
       },
       "sso_outbound_claims": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "sso_complete_login": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "sso_rotate_client_secret": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "sso_legacy_token_login": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "sso_user_runtime": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       }
     }

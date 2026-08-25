@@ -22,6 +22,8 @@ namespace Microi.net
         public const int LegacyPublishProtocolVersion = 2;
         public const string LegacyPublishState = "LegacyUnverified";
         public const string LegacyPublishMode = "LegacyOpen";
+        public const string LegacyUnversionedVersionNo = "legacy-unversioned-v3";
+        public const string LegacyUnversionedStatus = "LegacyUnversioned";
 
         private const string StoreTable = "sys_microistore";
         private const string VersionTable = "mci_ai_app_version";
@@ -42,6 +44,40 @@ namespace Microi.net
             None,
             Complete,
             Partial
+        }
+
+        public sealed class LegacyFileVersionBackfillSummary
+        {
+            public int ApplicationCount { get; set; }
+            public long FileCount { get; set; }
+            public int CreatedVersionCount { get; set; }
+            public int ReusedVersionCount { get; set; }
+            public long ReassignedFileCount { get; set; }
+        }
+
+        public sealed class LegacyFileArchiveCandidate
+        {
+            public string Id { get; set; }
+            public string FilePath { get; set; }
+            public long Size { get; set; }
+            public int? CurrentLane { get; set; }
+        }
+
+        public sealed class LegacyFileArchiveAssignment
+        {
+            public string Id { get; set; }
+            public string FilePathHash { get; set; }
+            public long Size { get; set; }
+            public int Lane { get; set; }
+            public string VersionNo { get; set; }
+            public string VersionId { get; set; }
+        }
+
+        private sealed class LegacyFileArchivePlanningRow
+        {
+            public LegacyFileArchiveCandidate Candidate { get; set; }
+            public string Id { get; set; }
+            public string Hash { get; set; }
         }
 
         public static readonly IReadOnlyList<string> RequiredApplicationStoreTables = new[]
@@ -301,6 +337,19 @@ namespace Microi.net
 
                 ValidateCanonicalStates(client, dialect, StoreTable);
                 ValidateCanonicalStates(client, dialect, VersionTable);
+                var legacyVersionBackfill = BackfillLegacyFileVersionIds(
+                    osClient,
+                    client,
+                    dialect);
+                if (legacyVersionBackfill.FileCount > 0)
+                {
+                    Console.WriteLine(
+                        $"Microi：【自动升级状态】【{osClient}】【Upgrade25-历史应用文件归档】成功："
+                        + $"应用={legacyVersionBackfill.ApplicationCount}，文件={legacyVersionBackfill.FileCount}，"
+                        + $"新建历史版本={legacyVersionBackfill.CreatedVersionCount}，"
+                        + $"复用历史版本={legacyVersionBackfill.ReusedVersionCount}，"
+                        + $"无损重排文件={legacyVersionBackfill.ReassignedFileCount}。");
+                }
                 BackfillFilePathHashes(client, dialect);
 
                 foreach (var index in Indexes)
@@ -1002,6 +1051,453 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
                 throw new InvalidOperationException(
                     $"{tableName}.PublishState 存在 {invalid} 条非 canonical 状态，拒绝继续。允许值："
                     + string.Join(",", CanonicalPublishStates));
+        }
+
+        public static string ComputeLegacyUnversionedVersionId(string osClient, string appId)
+        {
+            return ComputeLegacyUnversionedVersionId(osClient, appId, 0);
+        }
+
+        public static string ComputeLegacyUnversionedVersionId(string osClient, string appId, int lane)
+        {
+            return V8McpLogic.BuildApplicationStreamRecordId(
+                "version",
+                osClient,
+                appId,
+                ComputeLegacyUnversionedVersionNo(lane));
+        }
+
+        public static string ComputeLegacyUnversionedVersionNo(int lane)
+        {
+            if (lane < 0) throw new ArgumentOutOfRangeException(nameof(lane));
+            return lane == 0
+                ? LegacyUnversionedVersionNo
+                : $"{LegacyUnversionedVersionNo}-part-{lane + 1:0000}";
+        }
+
+        public static bool TryParseLegacyUnversionedLane(string versionNo, out int lane)
+        {
+            lane = -1;
+            var normalized = versionNo?.Trim() ?? string.Empty;
+            if (string.Equals(normalized, LegacyUnversionedVersionNo, StringComparison.Ordinal))
+            {
+                lane = 0;
+                return true;
+            }
+
+            var prefix = LegacyUnversionedVersionNo + "-part-";
+            if (!normalized.StartsWith(prefix, StringComparison.Ordinal)
+                || !int.TryParse(normalized.Substring(prefix.Length), out var part)
+                || part < 2)
+            {
+                return false;
+            }
+            lane = part - 1;
+            return true;
+        }
+
+        /// <summary>
+        /// Preserves every already valid archive lane and only moves colliding or
+        /// previously unversioned rows to the lowest free lane for the same path.
+        /// This makes a partially completed migration replay-safe even when the
+        /// unique VersionId+FilePathHash index already exists.
+        /// </summary>
+        public static IReadOnlyList<LegacyFileArchiveAssignment> PlanLegacyFileArchiveAssignments(
+            string osClient,
+            string appId,
+            IEnumerable<LegacyFileArchiveCandidate> candidates)
+        {
+            if (string.IsNullOrWhiteSpace(osClient))
+                throw new ArgumentException("OsClient不能为空。", nameof(osClient));
+            if (string.IsNullOrWhiteSpace(appId))
+                throw new ArgumentException("AppId不能为空。", nameof(appId));
+            if (candidates == null) throw new ArgumentNullException(nameof(candidates));
+
+            var source = candidates.Select(item =>
+            {
+                if (item == null)
+                    throw new ArgumentException("历史文件候选项不能为空。", nameof(candidates));
+                return new LegacyFileArchivePlanningRow
+                {
+                    Candidate = item,
+                    Id = item.Id?.Trim(),
+                    Hash = ComputeFilePathHash(item.FilePath)
+                };
+            }).ToArray();
+            if (source.Any(item => string.IsNullOrWhiteSpace(item.Id)))
+                throw new ArgumentException("历史文件候选项必须具有稳定Id。", nameof(candidates));
+            if (source.Select(item => item.Id).Distinct(StringComparer.Ordinal).Count() != source.Length)
+                throw new ArgumentException("历史文件候选项Id重复。", nameof(candidates));
+            if (source.Any(item => item.Candidate.CurrentLane < 0))
+                throw new ArgumentException("历史文件候选项的当前归档分片无效。", nameof(candidates));
+
+            var assignedLanes = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var pathGroup in source.GroupBy(item => item.Hash, StringComparer.Ordinal))
+            {
+                var occupied = new HashSet<int>();
+                var remaining = new List<LegacyFileArchivePlanningRow>();
+                foreach (var laneGroup in pathGroup
+                             .Where(item => item.Candidate.CurrentLane.HasValue)
+                             .GroupBy(item => item.Candidate.CurrentLane.Value)
+                             .OrderBy(item => item.Key))
+                {
+                    var ordered = laneGroup.OrderBy(item => item.Id, StringComparer.Ordinal).ToArray();
+                    assignedLanes[ordered[0].Id] = laneGroup.Key;
+                    occupied.Add(laneGroup.Key);
+                    remaining.AddRange(ordered.Skip(1));
+                }
+                remaining.AddRange(pathGroup
+                    .Where(item => !item.Candidate.CurrentLane.HasValue));
+
+                foreach (var item in remaining.OrderBy(value => value.Id, StringComparer.Ordinal))
+                {
+                    var lane = 0;
+                    while (occupied.Contains(lane)) lane++;
+                    assignedLanes[item.Id] = lane;
+                    occupied.Add(lane);
+                }
+            }
+
+            return source
+                .OrderBy(item => item.Id, StringComparer.Ordinal)
+                .Select(item =>
+                {
+                    var lane = assignedLanes[item.Id];
+                    return new LegacyFileArchiveAssignment
+                    {
+                        Id = item.Id,
+                        FilePathHash = item.Hash,
+                        Size = item.Candidate.Size,
+                        Lane = lane,
+                        VersionNo = ComputeLegacyUnversionedVersionNo(lane),
+                        VersionId = ComputeLegacyUnversionedVersionId(osClient, appId, lane)
+                    };
+                })
+                .ToArray();
+        }
+
+        public static string BuildLegacyFileVersionGroupSql(SchemaDialect dialect)
+        {
+            var table = Quote(dialect, FileTable);
+            var versionId = Quote(dialect, "VersionId");
+            var appId = Quote(dialect, "AppId");
+            var appName = Quote(dialect, "AppName");
+            var size = Quote(dialect, "Size");
+            var missingVersion = $"({versionId} IS NULL OR {BlankStringPredicate(dialect, versionId)})";
+            var validApp = $"({appId} IS NOT NULL AND NOT ({BlankStringPredicate(dialect, appId)}))";
+            return $"SELECT {appId} AS AppId,MAX({appName}) AS AppName,COUNT(*) AS FileCount,"
+                   + $"COALESCE(SUM({size}),0) AS TotalSize FROM {table} "
+                   + $"WHERE {missingVersion} AND {validApp} GROUP BY {appId} ORDER BY {appId}";
+        }
+
+        public static string BuildLegacyFileVersionUpdateSql(SchemaDialect dialect)
+        {
+            var table = Quote(dialect, FileTable);
+            var versionId = Quote(dialect, "VersionId");
+            var appId = Quote(dialect, "AppId");
+            return $"UPDATE {table} SET {versionId}=@p0 WHERE "
+                   + $"({versionId} IS NULL OR {BlankStringPredicate(dialect, versionId)}) AND {appId}=@p1";
+        }
+
+        public static string BuildLegacyArchiveVersionRowsSql(SchemaDialect dialect)
+        {
+            var table = Quote(dialect, VersionTable);
+            var versionNo = Quote(dialect, "VersionNo");
+            return $"SELECT {Quote(dialect, "Id")},{Quote(dialect, "AppId")},{Quote(dialect, "AppName")},{versionNo} "
+                   + $"FROM {table} WHERE {versionNo}=@p0 OR {versionNo} LIKE @p1";
+        }
+
+        public static string BuildLegacyArchiveFileRowsSql(SchemaDialect dialect)
+        {
+            var file = Quote(dialect, FileTable);
+            var version = Quote(dialect, VersionTable);
+            var fileVersionId = $"f.{Quote(dialect, "VersionId")}";
+            var fileAppId = $"f.{Quote(dialect, "AppId")}";
+            var versionNo = $"v.{Quote(dialect, "VersionNo")}";
+            return $"SELECT f.{Quote(dialect, "Id")},f.{Quote(dialect, "AppId")},f.{Quote(dialect, "AppName")},"
+                   + $"f.{Quote(dialect, "VersionId")},f.{Quote(dialect, "FilePath")},"
+                   + $"f.{Quote(dialect, "FilePathHash")},f.{Quote(dialect, "Size")} FROM {file} f "
+                   + $"WHERE {fileAppId}=@p0 AND (({fileVersionId} IS NULL OR {BlankStringPredicate(dialect, fileVersionId)}) "
+                   + $"OR {fileVersionId} IN (SELECT v.{Quote(dialect, "Id")} FROM {version} v "
+                   + $"WHERE v.{Quote(dialect, "AppId")}=@p0 AND ({versionNo}=@p1 OR {versionNo} LIKE @p2))) "
+                   + $"ORDER BY f.{Quote(dialect, "Id")}";
+        }
+
+        public static string BuildLegacyFileMissingAppSampleSql(SchemaDialect dialect, int take = 5)
+        {
+            if (take <= 0) throw new ArgumentOutOfRangeException(nameof(take));
+            var table = Quote(dialect, FileTable);
+            var id = Quote(dialect, "Id");
+            var versionId = Quote(dialect, "VersionId");
+            var appId = Quote(dialect, "AppId");
+            var where = $"({versionId} IS NULL OR {BlankStringPredicate(dialect, versionId)}) AND "
+                        + $"({appId} IS NULL OR {BlankStringPredicate(dialect, appId)})";
+            if (dialect == SchemaDialect.MySql)
+                return $"SELECT {id} FROM {table} WHERE {where} ORDER BY {id} LIMIT {take}";
+            if (dialect == SchemaDialect.SqlServer)
+                return $"SELECT TOP ({take}) {id} FROM {table} WHERE {where} ORDER BY {id}";
+            return $"SELECT {id} FROM (SELECT {id} FROM {table} WHERE {where} ORDER BY {id}) WHERE ROWNUM<={take}";
+        }
+
+        private static LegacyFileVersionBackfillSummary BackfillLegacyFileVersionIds(
+            string osClient,
+            OsClientSecret client,
+            SchemaDialect dialect)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            var summary = new LegacyFileVersionBackfillSummary();
+            var fileTable = Quote(dialect, FileTable);
+            var versionTable = Quote(dialect, VersionTable);
+            var versionIdColumn = Quote(dialect, "VersionId");
+            var appIdColumn = Quote(dialect, "AppId");
+            var missingVersion = $"({versionIdColumn} IS NULL OR {BlankStringPredicate(dialect, versionIdColumn)})";
+            var missingApp = $"({appIdColumn} IS NULL OR {BlankStringPredicate(dialect, appIdColumn)})";
+            var missingAppCount = client.Db.FromSql(
+                    $"SELECT COUNT(*) FROM {fileTable} WHERE {missingVersion} AND {missingApp}")
+                .ToScalar<long>();
+            if (missingAppCount > 0)
+            {
+                var samples = client.Db.FromSql(BuildLegacyFileMissingAppSampleSql(dialect))
+                                  .ToArray()
+                                  ?.Select(raw =>
+                                  {
+                                      object rowObject = raw;
+                                      var row = rowObject as JObject ?? JObject.FromObject(rowObject);
+                                      return row.GetValue("Id", StringComparison.OrdinalIgnoreCase)?.ToString();
+                                  })
+                                  .Where(id => !string.IsNullOrWhiteSpace(id))
+                                  .ToArray()
+                              ?? Array.Empty<string>();
+                throw new InvalidOperationException(
+                    $"mci_ai_app_file 有 {missingAppCount} 条历史文件同时缺少 VersionId 与 AppId，"
+                    + "无法证明归属，拒绝猜测回填。样本Id："
+                    + (samples.Length == 0 ? "无" : string.Join(",", samples)));
+            }
+
+            var applicationNames = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            foreach (var raw in client.Db.FromSql(BuildLegacyFileVersionGroupSql(dialect)).ToArray()
+                                ?? Array.Empty<dynamic>())
+            {
+                object rowObject = raw;
+                var group = rowObject as JObject ?? JObject.FromObject(rowObject);
+                var appId = group.GetValue("AppId", StringComparison.OrdinalIgnoreCase)?.ToString()?.Trim();
+                if (string.IsNullOrWhiteSpace(appId))
+                    throw new InvalidOperationException("历史应用文件版本回填分组缺少有效 AppId。");
+                applicationNames[appId] = group.GetValue("AppName", StringComparison.OrdinalIgnoreCase)?.ToString();
+            }
+
+            var archiveVersionsByApp = new Dictionary<string, List<JObject>>(StringComparer.Ordinal);
+            var archiveVersionRows = client.Db.FromSql(BuildLegacyArchiveVersionRowsSql(dialect))
+                .AddInParameter("p0", LegacyUnversionedVersionNo)
+                .AddInParameter("p1", LegacyUnversionedVersionNo + "-part-%")
+                .ToArray() ?? Array.Empty<dynamic>();
+            foreach (var raw in archiveVersionRows)
+            {
+                object rowObject = raw;
+                var version = rowObject as JObject ?? JObject.FromObject(rowObject);
+                var appId = version.GetValue("AppId", StringComparison.OrdinalIgnoreCase)?.ToString()?.Trim();
+                var versionNo = version.GetValue("VersionNo", StringComparison.OrdinalIgnoreCase)?.ToString();
+                if (string.IsNullOrWhiteSpace(appId)
+                    || !TryParseLegacyUnversionedLane(versionNo, out _))
+                {
+                    throw new InvalidOperationException(
+                        "mci_ai_app_version 中迁移专用历史归档版本缺少有效 AppId 或 VersionNo。");
+                }
+                if (!archiveVersionsByApp.TryGetValue(appId, out var versions))
+                {
+                    versions = new List<JObject>();
+                    archiveVersionsByApp[appId] = versions;
+                }
+                versions.Add(version);
+                if (!applicationNames.ContainsKey(appId))
+                    applicationNames[appId] = version.GetValue("AppName", StringComparison.OrdinalIgnoreCase)?.ToString();
+            }
+
+            foreach (var application in applicationNames)
+            {
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                var appId = application.Key;
+                var appName = application.Value;
+                var versions = archiveVersionsByApp.TryGetValue(appId, out var existingVersions)
+                    ? existingVersions
+                    : new List<JObject>();
+                var versionByLane = new Dictionary<int, JObject>();
+                var laneByVersionId = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var version in versions)
+                {
+                    var versionNo = version.GetValue("VersionNo", StringComparison.OrdinalIgnoreCase)?.ToString();
+                    if (!TryParseLegacyUnversionedLane(versionNo, out var lane))
+                        throw new InvalidOperationException($"AppId[{appId}]历史归档版本号[{versionNo}]不合法。");
+                    if (versionByLane.ContainsKey(lane))
+                        throw new InvalidOperationException($"AppId[{appId}]历史归档分片[{lane}]存在多条版本记录。");
+                    var versionId = version.GetValue("Id", StringComparison.OrdinalIgnoreCase)?.ToString();
+                    var expectedId = ComputeLegacyUnversionedVersionId(osClient, appId, lane);
+                    if (!string.Equals(versionId, expectedId, StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException(
+                            $"AppId[{appId}]历史归档版本[{versionNo}]的Id不是确定性迁移Id，拒绝复用可能由用户创建的版本。");
+                    }
+                    versionByLane[lane] = version;
+                    laneByVersionId[versionId] = lane;
+                }
+
+                var fileRows = client.Db.FromSql(BuildLegacyArchiveFileRowsSql(dialect))
+                    .AddInParameter("p0", appId)
+                    .AddInParameter("p1", LegacyUnversionedVersionNo)
+                    .AddInParameter("p2", LegacyUnversionedVersionNo + "-part-%")
+                    .ToArray() ?? Array.Empty<dynamic>();
+                if (fileRows.Length == 0) continue;
+
+                var filesById = new Dictionary<string, JObject>(StringComparer.Ordinal);
+                var candidates = new List<LegacyFileArchiveCandidate>();
+                foreach (var raw in fileRows)
+                {
+                    object rowObject = raw;
+                    var file = rowObject as JObject ?? JObject.FromObject(rowObject);
+                    var id = file.GetValue("Id", StringComparison.OrdinalIgnoreCase)?.ToString()?.Trim();
+                    var filePath = file.GetValue("FilePath", StringComparison.OrdinalIgnoreCase)?.ToString();
+                    var currentVersionId = file.GetValue("VersionId", StringComparison.OrdinalIgnoreCase)?.ToString()?.Trim();
+                    if (string.IsNullOrWhiteSpace(id))
+                        throw new InvalidOperationException($"AppId[{appId}]历史文件缺少稳定Id。");
+                    int? currentLane = null;
+                    if (!string.IsNullOrWhiteSpace(currentVersionId))
+                    {
+                        if (!laneByVersionId.TryGetValue(currentVersionId, out var lane))
+                            throw new InvalidOperationException($"历史文件[{id}]引用了无法识别的迁移归档版本[{currentVersionId}]。");
+                        currentLane = lane;
+                    }
+                    filesById[id] = file;
+                    candidates.Add(new LegacyFileArchiveCandidate
+                    {
+                        Id = id,
+                        FilePath = filePath,
+                        Size = file.GetValue("Size", StringComparison.OrdinalIgnoreCase)?.Val<long>() ?? 0,
+                        CurrentLane = currentLane
+                    });
+                    if (string.IsNullOrWhiteSpace(appName))
+                        appName = file.GetValue("AppName", StringComparison.OrdinalIgnoreCase)?.ToString();
+                }
+
+                var assignments = PlanLegacyFileArchiveAssignments(osClient, appId, candidates);
+                var assignmentsByLane = assignments.GroupBy(item => item.Lane).OrderBy(item => item.Key).ToArray();
+                foreach (var laneGroup in assignmentsByLane)
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    var lane = laneGroup.Key;
+                    var versionNo = ComputeLegacyUnversionedVersionNo(lane);
+                    var deterministicVersionId = ComputeLegacyUnversionedVersionId(osClient, appId, lane);
+                    var fileCount = laneGroup.LongCount();
+                    var totalSize = laneGroup.Sum(item => item.Size);
+                    if (versionByLane.ContainsKey(lane))
+                    {
+                        summary.ReusedVersionCount++;
+                    }
+                    else
+                    {
+                        var idCollisionRaw = client.Db.FromSql(
+                                $"SELECT Id,AppId,VersionNo FROM {versionTable} WHERE {Quote(dialect, "Id")}=@p0")
+                            .AddInParameter("p0", deterministicVersionId)
+                            .First<dynamic>();
+                        if (idCollisionRaw != null)
+                        {
+                            var collision = JObject.FromObject((object)idCollisionRaw);
+                            throw new InvalidOperationException(
+                                $"历史应用文件确定性版本 Id[{deterministicVersionId}] 已被 AppId["
+                                + (collision.GetValue("AppId", StringComparison.OrdinalIgnoreCase)?.ToString() ?? "<null>")
+                                + "]占用，拒绝覆盖。");
+                        }
+
+                        var now = DateTime.Now;
+                        var insertSql = $"INSERT INTO {versionTable} ("
+                                        + string.Join(",", new[]
+                                        {
+                                            "Id", "AppId", "AppName", "VersionNo", "VersionName", "Status",
+                                            "PublishProtocolVersion", "PublishState", "FencingToken", "RowVersion",
+                                            "RecoveryEpoch", "FileCount", "TotalSize", "ChangeSummary", "IsDeleted",
+                                            "CreateTime", "UpdateTime"
+                                        }.Select(column => Quote(dialect, column)))
+                                        + ") VALUES (@p0,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,@p15,@p16)";
+                        var inserted = client.Db.FromSql(insertSql)
+                            .AddInParameter("p0", deterministicVersionId)
+                            .AddInParameter("p1", appId)
+                            .AddInParameter("p2", appName)
+                            .AddInParameter("p3", versionNo)
+                            .AddInParameter("p4", lane == 0 ? "历史未分版文件" : $"历史未分版文件（归档分片{lane + 1}）")
+                            .AddInParameter("p5", LegacyUnversionedStatus)
+                            .AddInParameter("p6", LegacyPublishProtocolVersion)
+                            .AddInParameter("p7", LegacyPublishState)
+                            .AddInParameter("p8", 0L)
+                            .AddInParameter("p9", 0L)
+                            .AddInParameter("p10", 0)
+                            .AddInParameter("p11", checked((int)fileCount))
+                            .AddInParameter("p12", totalSize)
+                            .AddInParameter("p13", "Upgrade25 将升级前未绑定版本或发生路径重复的文件无损分配到独立历史归档分片；不合并、不删除原文件。")
+                            .AddInParameter("p14", 0)
+                            .AddInParameter("p15", now)
+                            .AddInParameter("p16", now)
+                            .ExecuteNonQuery();
+                        if (inserted != 1)
+                            throw new InvalidOperationException($"为 AppId[{appId}]创建历史归档版本[{versionNo}]失败，影响行数={inserted}。");
+                        versionByLane[lane] = new JObject
+                        {
+                            ["Id"] = deterministicVersionId,
+                            ["VersionNo"] = versionNo
+                        };
+                        laneByVersionId[deterministicVersionId] = lane;
+                        summary.CreatedVersionCount++;
+                    }
+
+                    client.Db.FromSql(
+                            $"UPDATE {versionTable} SET {Quote(dialect, "FileCount")}=@p0,"
+                            + $"{Quote(dialect, "TotalSize")}=@p1,{Quote(dialect, "UpdateTime")}=@p2 "
+                            + $"WHERE {Quote(dialect, "Id")}=@p3 AND {appIdColumn}=@p4")
+                        .AddInParameter("p0", checked((int)fileCount))
+                        .AddInParameter("p1", totalSize)
+                        .AddInParameter("p2", DateTime.Now)
+                        .AddInParameter("p3", deterministicVersionId)
+                        .AddInParameter("p4", appId)
+                        .ExecuteNonQuery();
+                }
+
+                foreach (var assignment in assignments)
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    var file = filesById[assignment.Id];
+                    var currentVersionId = file.GetValue("VersionId", StringComparison.OrdinalIgnoreCase)?.ToString()?.Trim();
+                    var currentHash = file.GetValue("FilePathHash", StringComparison.OrdinalIgnoreCase)?.ToString()?.Trim();
+                    if (string.Equals(currentVersionId, assignment.VersionId, StringComparison.Ordinal)
+                        && string.Equals(currentHash, assignment.FilePathHash, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    var affected = client.Db.FromSql(
+                            $"UPDATE {fileTable} SET {versionIdColumn}=@p0,{Quote(dialect, "FilePathHash")}=@p1 "
+                            + $"WHERE {Quote(dialect, "Id")}=@p2 AND {appIdColumn}=@p3")
+                        .AddInParameter("p0", assignment.VersionId)
+                        .AddInParameter("p1", assignment.FilePathHash)
+                        .AddInParameter("p2", assignment.Id)
+                        .AddInParameter("p3", appId)
+                        .ExecuteNonQuery();
+                    if (affected != 1)
+                        throw new InvalidOperationException($"历史文件[{assignment.Id}]在归档重排期间发生并发变化，请重试升级。");
+                    if (!string.Equals(currentVersionId, assignment.VersionId, StringComparison.Ordinal))
+                        summary.ReassignedFileCount++;
+                }
+
+                var remaining = client.Db.FromSql(
+                        $"SELECT COUNT(*) FROM {fileTable} WHERE {missingVersion} AND {appIdColumn}=@p0")
+                    .AddInParameter("p0", appId)
+                    .ToScalar<long>();
+                if (remaining > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"AppId[{appId}]历史文件 VersionId 回填后仍有 {remaining} 条空值，拒绝继续创建唯一索引。");
+                }
+
+                summary.ApplicationCount++;
+                summary.FileCount += assignments.Count;
+            }
+            return summary;
         }
 
         private static void BackfillFilePathHashes(OsClientSecret client, SchemaDialect dialect)

@@ -23,6 +23,7 @@ const storeSourceFiles = Object.freeze({
   'import-microi-store-package': 'import-package.js',
   'bulk-import-microi-store-packages': 'bulk-import-packages.js',
   'get-microi-store': 'get-microi-store-list.js',
+  'get-microi-store-legacy-route': 'get-microi-store-legacy-route.js',
   'get-microi-store-model': 'get-microi-store-model.js',
   'get-microi-store-versions': 'get-microi-store-versions.js',
   'platform-background-task': 'platform-background-task.js',
@@ -134,13 +135,22 @@ export function normalizeOfficialApiEnginePolicies(packageModel, fileName, baseP
   packageModel.ResourcePolicies.SchemaVersion ||= 1;
   packageModel.ResourcePolicies.ApiEngines ||= {};
   const appName = applicationName(packageModel, fileName);
+  const isPlatformPackage = packageFiles.includes(fileName)
+    || String(packageModel?.PackageInfo?.ApplicationType || '')
+      .trim().toLowerCase() === 'platform';
   for (const engine of packageModel.SysApiEngines || []) {
     const key = String(engine.ApiEngineKey || '').trim();
     if (!key) throw new Error(`${fileName} 存在没有 ApiEngineKey 的接口引擎。`);
     const existing = packageModel.ResourcePolicies.ApiEngines[key] || {};
     const upgradePolicy = String(existing.UpgradePolicy || 'Managed').trim();
-    const ownership = String(existing.Ownership || '').trim()
-      || (upgradePolicy === 'CreateIfMissing' ? 'Tenant' : 'Platform');
+    // Embedded official baseline packages are installed directly by Upgrade13
+    // and therefore do not have a remote marketplace envelope available to
+    // promote Application ownership at runtime. Persist the canonical policy in
+    // the package itself so replaying the embedded package can never appear to
+    // downgrade an engine previously installed as Platform-owned.
+    const ownership = upgradePolicy === 'CreateIfMissing'
+      ? 'Tenant'
+      : (isPlatformPackage ? 'Platform' : (String(existing.Ownership || '').trim() || 'Application'));
     const baseline = basePolicies[key] || {};
     const policy = {
       ...baseline,

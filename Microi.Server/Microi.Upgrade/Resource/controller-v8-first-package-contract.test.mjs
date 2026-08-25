@@ -54,6 +54,7 @@ const STORE_SELECTED_API_ENGINE_KEYS = Object.freeze([
   'export-microi-store-package',
   'get-microi-store-model',
   'get-microi-store',
+  'get-microi-store-legacy-route',
   'bulk-import-microi-store-packages',
   'get-microi-store-versions',
   'microi-store-package-storage',
@@ -139,8 +140,8 @@ function assertOfficialPair({
 test('message-notification and Store selected ApiEngine key sets stay exact and policy-closed', () => {
   assertPackageKeyClosure(messagePackage, MESSAGE_SELECTED_API_ENGINE_KEYS);
   assertPackageKeyClosure(storePackage, STORE_SELECTED_API_ENGINE_KEYS);
-  assert.equal(messagePackage.PackageInfo.Version, 'v1.0.9');
-  assert.equal(storePackage.PackageInfo.Version, 'v7.6.12');
+  assert.equal(messagePackage.PackageInfo.Version, 'v1.0.10');
+  assert.equal(storePackage.PackageInfo.Version, 'v7.6.15');
 });
 
 test('official package ApiEngine stable identities are globally unique', () => {

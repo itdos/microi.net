@@ -43,7 +43,7 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 ## 接口引擎资源所有权（强制）
 
 - 新发布包必须声明 `ResourcePolicies.ApiEngines`，不得再依赖“同 Key 直接覆盖”。官方不可随租户修改的核心使用 `{ Ownership:'Application', UpgradePolicy:'Managed' }`；提供给租户改业务的 Hook 使用 `{ Ownership:'Tenant', UpgradePolicy:'CreateIfMissing' }`。
-- 发布器从上一版安装包正文的 `SysApiEngines` 计算 `BaseHash`；正文可能来自已验证的 HDFS 指针或旧版 `AppPakcet`。导入成功后把本版摘要写入 `sys_microistoreversion.InstallResult.ResourceState.ApiEngines`。普通/社区应用仍按 Base/Local/Incoming 三方保护：`Local == Base` 才更新，`Local != Base && Local != Incoming` 必须冲突回滚。唯一覆盖例外是从固定 `https://api.itdos.com + iTdos` 实时回读并校验为官方 `ApplicationType=Platform` 的应用：其中 `Ownership=Application + UpgradePolicy=Managed` 属于平台发行物，安装/更新按包覆盖本地差异；离线包、自报官方、非 Platform 来源都不能获得该权限。
+- 发布器从上一版安装包正文的 `SysApiEngines` 计算 `BaseHash`；正文可能来自已验证的 HDFS 指针或旧版 `AppPakcet`。导入成功后把本版摘要写入 `sys_microistoreversion.InstallResult.ResourceState.ApiEngines`。普通/社区应用仍按 Base/Local/Incoming 三方保护：`Local == Base` 才更新，`Local != Base && Local != Incoming` 必须冲突回滚。允许覆盖官方 Managed 的信任来源只有两种：一是从固定 `https://api.itdos.com + iTdos` 实时回读并校验为官方 `ApplicationType=Platform` 的应用；二是 Upgrade13 从程序集固定九包白名单读取并校验后，在绑定固定导入器 Key 与当前租户的一次性宿主上下文中调用统一导入器。第二种授权必须由宿主上下文消费一次，单独伪造 V8 参数、离线包、自报官方或非 Platform 来源都不能获得；两种路径都只能恢复 `Platform/Managed`，不得覆盖 `Tenant/CreateIfMissing`。
 - `CreateIfMissing` 只在目标 Key 不存在时创建，存在时不得对齐 Id、源码、启用状态或其它字段。扩展模板发布后即归租户维护；后续版本禁止把同一 Key 改回 `Managed` 接管，确需新的官方核心时发布新 Key 并显式迁移。
 - 官方功能采用“Managed 核心 + CreateIfMissing Hook”。核心只提供稳定协议和默认行为，并在可信官方 Platform 包更新时覆盖升级；客户日志、写表、通知和业务动作放 Hook，并以稳定 `EventId`、唯一约束或 outbox 幂等。`CreateIfMissing` 一旦交给租户维护，即使后续官方包误改为 Managed 也必须冲突回滚。
 - 每个官方包内的接口引擎源码顶部都必须有醒目所有权提示。Managed 提示必须写明所属官方应用、从可信官方源安装/更新/重新安装会恢复官方代码，并指向该应用的 CreateIfMissing Hook；CreateIfMissing 提示必须写明首次创建后归租户维护、官方升级不得覆盖。官方 SSO、登录、通知等核心在安全阶段调用 Hook 时，只传脱敏上下文，禁止传 Token、Secret、密码或原始协议断言。
@@ -164,8 +164,15 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 
 - 触发场景：租户先升级新版前后端，登录后路由初始化固定调用 `/apiengine/platform-sys-menu`；目标库此前没有该接口。应用商城包只补了 `platform-background-task`，而菜单接口仍由安装顺序靠后的 SaaS 包顺带携带；启动完整性检查也只验证后台任务接口，于是数据库版本和商城版本都显示最新，但用户在进入应用商城之前已经因 `NoExistData sys_apiengine` 全站不可用。
 - 根因：把单个已修复依赖误当成完整的启动依赖集合，包资源闭包、`NeedRefresh` 完成判定和安装后强回读没有使用同一清单；发布验收只覆盖已有目标租户，未覆盖“新版二进制 + 历史库恰好缺少某一启动接口”的升级排列。
-- 通用规则：凡是登录、菜单构建、恢复入口或应用商城打开之前必调的表、接口引擎和微服务路由，都属于启动依赖闭包。每项资源必须只有一个官方 Platform 包作为唯一所有者；需要跨包时，恢复计划必须固定列出全部所有者且按优先顺序形成不可拆分的精确闭包。当前 `platform-sys-menu` 由应用商城单一拥有，六项公开配置／用户／文件门面由 SaaS 引擎单一拥有。每项接口必须同时声明固定自定义地址、最低版本、启用/匿名/HTTP 状态、`Managed` 策略、V8 原子能力和包内能力标记；启动完整性检查与安装后回读必须遍历同一七项清单，任意一项缺失都触发修复且失败不推进任务终态。其它应用不得复制同 Key 形成竞争所有权。
-- 竞态与验收：前端可对明确的“启动 Managed 资源尚未落库”做不超过一分钟的有界退避，并在耗尽后显示精确包名和最低版本；它不能吞掉鉴权错误、普通网络错误，也不能代替服务端修复。跨大量历史租户时可由受信持久任务启用只自举模式，从两个不可变官方包补齐七项接口并做物理强回读，成功后不写应用安装版本，普通完整安装保持不变。契约测试须覆盖伪造标志、错误应用范围、每项物理缺失、租户改码和已健康零操作；真实验收先证明旧状态失败，再回读接口源码/地址/策略、执行菜单动作、刷新真实页面，最后以新幂等键做全分区零操作复跑。
+- 通用规则：凡是登录、菜单构建、恢复入口或应用商城打开之前必调的表、接口引擎和微服务路由，都属于启动依赖闭包。每项资源必须只有一个官方 Platform/Application 包作为唯一所有者。API 进程接收流量前的门禁不得维护“登录页七接口”之类手写清单；必须从九个随服务端自动安装的内置官方基础应用包读取全部 `SysApiEngines`，校验 Key/稳定 Id/自定义地址/所有权无重复，再补缺并逐项物理强回读。这样登录后的组织、角色、角标、健康、消息、SSO、AI、商城工作器及内部接口也不会在完整包后台升级完成前出现 `NoExistData`。`Managed` 资源只由所属包升级；`Tenant/CreateIfMissing` 仅在数据库中完全不存在时创建，既有大小写变体、禁用记录或墓碑都归租户维护，不得恢复或覆盖。
+- 竞态与验收：前端可对明确的“启动 Managed 资源尚未落库”做不超过一分钟的有界退避，并在耗尽后显示精确包名和最低版本；它不能吞掉鉴权错误、普通网络错误，也不能代替服务端修复。跨大量历史租户的 `StartupDependencyBootstrapOnly` 是独立的事故工具，仍可从应用商城与 SaaS 两个不可变包只补七项最小可登录接口并做物理强回读；它不是 API 进程的完整运行时就绪定义，成功后仍须执行普通完整应用更新。契约测试须枚举九个包的全部接口资源，覆盖稳定 Id/地址冲突、CreateIfMissing 墓碑保护、登录后实际路由、商城批量安装和已健康零操作。
+
+### 2026-08-26：登录成功后仍成片 `sys_apiengine NoExistData` 与 Upgrade25 历史文件阻断
+
+- 触发：新版前后端部署到历史租户后，登录页依赖已被补齐，但 `platform-service-health`、`platform-sys-dept`、`mci-module-presentation-stats`、`platform-runtime-custom-hook`、商城批量工作器等登录后接口继续缺失；与此同时 `mci_ai_app_file.VersionId` 的历史空值使 Upgrade25 在创建唯一索引前失败，后续后台升级链无法收敛。
+- 根因：把“能登录”误当成“平台运行时已就绪”，启动门禁和事故工作器长期依赖固定七项清单；历史应用文件在 V3 引入版本外键前已经存在，升级只做审计并直接失败，没有安全、确定且可重放的归档策略。旧商城工作器还可能访问已经改名的 `/apiengine/get-microi-store` 地址。
+- 通用修复：API 进程启动门禁以上述九包全部接口为事实源，缺失 Managed 资源从程序集内置官方包创建，CreateIfMissing 只补完全不存在的记录；应用商城保留独立 Managed 旧地址接口并转发到 `get-microi-store` Key 的正式 `/apiengine/get-microi-store-list` 实现。Upgrade25 必须先按 `OsClient + AppId + legacy-unversioned-v3` 生成确定性历史版本 Id，把每个应用的空 `VersionId` 文件原样归档并强回读为零，再计算路径 Hash 和创建唯一索引；文件同时缺少 `AppId`、确定性 Id 被占用或同名版本身份不一致时失败关闭，不猜测、不合并、不删除。
+- 验收：应用包测试必须证明九包接口 Key/稳定 Id 全局唯一、每项政策与醒目提示完整、旧商城地址和正式地址均存在；升级测试覆盖 MySQL/SQL Server/Oracle 的历史分组、参数化更新和样本诊断 SQL。真实启动日志必须分别显示物理字段、完整平台运行时闭包、Upgrade25 历史归档计数和每个升级步骤终态；登录后逐一调用当前用户、健康、部门、私有文件、菜单角标与商城批量计划，不能只验证匿名系统设置。
 
 ## 复盘：应用包切换 HDFS 后旧导入器无法更新自己
 

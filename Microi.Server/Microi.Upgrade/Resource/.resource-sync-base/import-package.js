@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.4.8
+ * Version: v2.4.9
  * Function:
  * - 统一应用商城导入器；支持 HDFS 公私有包指针、大小与 SHA-256 校验、后台分片和官方受管升级。
  */
@@ -922,6 +922,35 @@ if (!Package.PackageInfo) {
     };
 }
 
+// TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1：Upgrade13 只从程序集内置白名单读取、
+// 完整校验并传入九个官方基础包。可信身份保存在绑定当前租户和本导入器 Key 的
+// 宿主 AsyncLocal 中，V8.Param 只能提出消费请求，不能自行伪造授权。
+var embeddedOfficialPackageRequested = V8.Param.TrustedEmbeddedOfficialPackage === true
+    || String(V8.Param.TrustedEmbeddedOfficialPackage || '').toLowerCase() == 'true';
+var embeddedOfficialResourceName = String(V8.Param.EmbeddedOfficialPackageResourceName || '').toLowerCase();
+var embeddedOfficialResourceNames = {
+    'app.microi.form-engine.json': true,
+    'app.microi.module-engine.json': true,
+    'app.microi.saas-engine.json': true,
+    'app.microi.sso.json': true,
+    'app.microi.store.json': true,
+    'app.microi.sys_user.json': true,
+    'app.microi.sys-config.json': true,
+    'app.microi.message-notification.json': true,
+    'app.microi.ai-engine.json': true
+};
+var trustedEmbeddedOfficialPackage = false;
+if (embeddedOfficialPackageRequested) {
+    var embeddedOfficialTrust = V8.Method.RequireManagedProtocolContext();
+    if (!embeddedOfficialTrust || embeddedOfficialTrust.Code != 1) {
+        return { Code: 0, Msg: '内置官方应用包导入缺少不可伪造的宿主可信上下文。' };
+    }
+    if (!embeddedOfficialResourceNames[embeddedOfficialResourceName]) {
+        return { Code: 0, Msg: '内置官方应用包资源名不在固定白名单：' + embeddedOfficialResourceName };
+    }
+    trustedEmbeddedOfficialPackage = true;
+}
+
 // TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1：旧版官方平台应用包的资源策略都写成
 // Ownership=Application。只有从固定 iTdos 商城实时回读、且商城元数据明确为
 // 官方/平台应用时，才把它迁移为 Platform；直接传入的离线包或自定义商城源
@@ -934,6 +963,7 @@ var trustedOfficialPlatformPackage = !!authoritativeStoreModel
     && String(storeOsClient || '').toLowerCase() == 'itdos'
     && String(authoritativeStoreModel.ApplicationType || '').toLowerCase() == 'platform'
     && (officialPublisherType == '官方应用' || officialPublisherType == '平台应用');
+trustedOfficialPlatformPackage = trustedOfficialPlatformPackage || trustedEmbeddedOfficialPackage;
 
 var listSize = function (value) {
     return value && value.length !== undefined ? Number(value.length) || 0 : 0;
