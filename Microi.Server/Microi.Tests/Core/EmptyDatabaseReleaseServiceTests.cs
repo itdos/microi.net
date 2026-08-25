@@ -199,10 +199,13 @@ public sealed class EmptyDatabaseReleaseServiceTests
             item => item["ApiEngineKey"]?.Value<string>() == "admin_get_empty_database_sanitization_sql");
         var code = engine["ApiV8Code"]?.Value<string>() ?? "";
 
-        Assert.Equal("v1.3.0", engine["Version"]?.Value<string>());
+        Assert.Equal("v1.3.2", engine["Version"]?.Value<string>());
         Assert.Contains("protectedPlatformTableNames", code, StringComparison.Ordinal);
         Assert.Contains("operationalResidueTableNames", code, StringComparison.Ordinal);
         Assert.Contains("cleanupOperationalResidueSql", code, StringComparison.Ordinal);
+        Assert.Contains("EMPTY_DATABASE_AI_MENU_TREE_V1", code, StringComparison.Ordinal);
+        Assert.Contains("aiApplicationMenuValuesSql", code, StringComparison.Ordinal);
+        Assert.Contains("AiApplicationMenuCount", code, StringComparison.Ordinal);
         Assert.Contains("DELETE l FROM diy_lang l", code, StringComparison.Ordinal);
         Assert.Contains("SUBSTRING_INDEX(COALESCE(l.\\`Key\\`, '')", code, StringComparison.Ordinal);
         Assert.Contains("':', 2)", code, StringComparison.Ordinal);
@@ -293,6 +296,32 @@ public sealed class EmptyDatabaseReleaseServiceTests
     }
 
     [Fact]
+    public void BuildRemovableApplicationMenuIds_RemovesAiApplicationTreeAndOwnedDescendantsOnly()
+    {
+        var rows = new[]
+        {
+            Menu("ai-root", "", "AI 应用"),
+            Menu("ai-category", "ai-root", "企业应用"),
+            Menu("ai-app", "ai-category", "智能报价单"),
+            Menu("platform-root", "", "系统引擎"),
+            Menu("platform-ai", "platform-root", "AI助手", tableName: "mic_ai"),
+            Menu("owned", "platform-root", "商城业务", storeId: "store-regular"),
+            Menu("owned-child", "owned", "商城业务子菜单")
+        };
+
+        var result = EmptyDatabaseReleaseService.BuildRemovableApplicationMenuIds(
+            rows,
+            new HashSet<string>(new[] { "store-regular" }, StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.Equal(
+            new[] { "ai-app", "ai-category", "ai-root", "owned", "owned-child" },
+            result.OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
+        Assert.DoesNotContain("platform-root", result);
+        Assert.DoesNotContain("platform-ai", result);
+    }
+
+    [Fact]
     public void BuildDropBatchSql_QuotesEveryDatabaseObjectAndKeepsObjectKind()
     {
         var tableSql = Assert.IsType<string>(InvokePrivateStatic(
@@ -377,5 +406,24 @@ public sealed class EmptyDatabaseReleaseServiceTests
             BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
         Assert.NotNull(field);
         return Assert.IsType<int>(field!.GetRawConstantValue());
+    }
+
+    private static JObject Menu(
+        string id,
+        string parentId,
+        string name,
+        string storeId = "",
+        string tableName = "")
+    {
+        return new JObject
+        {
+            ["Id"] = id,
+            ["ParentId"] = parentId,
+            ["Name"] = name,
+            ["StoreId"] = storeId,
+            ["TableName"] = tableName,
+            ["ModuleEngineKey"] = "",
+            ["Url"] = ""
+        };
     }
 }

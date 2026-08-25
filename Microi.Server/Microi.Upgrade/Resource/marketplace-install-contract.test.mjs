@@ -167,7 +167,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.2.7");
+  assert.equal(engine.Version, "v1.3.4");
   assert.match(bulkSource, /value\.标识 \|\| value\.Identifier/);
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
@@ -176,7 +176,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.4\.4/);
+  assert.match(importerSource, /Version: v2\.4\.7/);
   assert.match(importerSource, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
   assert.match(importerSource, /storeApiBase \+ '\/apiengine\/'/);
   assert.doesNotMatch(importerSource, /\/api\/ApiEngine\/Run/);
@@ -234,12 +234,32 @@ test("package importer fails closed when an API engine is not durably persisted"
   );
   assert.match(importerSource, /managedDecision == 'PreserveNewer'/);
   assert.match(importerSource, /接口引擎升级冲突/);
+  assert.match(importerSource, /STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1/);
+  assert.match(importerSource, /trustedOfficialPlatformPackage/);
+  assert.match(importerSource, /StartupApiBootstrapDone/);
+  assert.match(importerSource, /StartupApiBootstrapRevision/);
+  assert.match(importerSource, /STARTUP_API_RUNTIME_FLAG_PHYSICAL_RECONCILIATION_V1/);
+  assert.match(importerSource, /MySQL BIT\(1\)/);
+  assert.match(importerSource, /UPDATE sys_apiengine SET IsEnable=' \+ normalizeStartupFlag/);
+  assert.doesNotMatch(importerSource, /UPDATE sys_apiengine SET IsEnable=@p0/);
+  assert.match(importerSource, /SELECT \* FROM sys_apiengine WHERE LOWER\(' \+ fieldName/);
+  assert.match(importerSource, /platform-os-client-by-domain/);
+  assert.match(importerSource, /platform-sys-config/);
+  assert.match(importerSource, /platform-lang-bundle/);
+  assert.match(importerSource, /platform-current-user/);
+  assert.match(importerSource, /platform-private-file-url/);
+  assert.match(importerSource, /platform-sys-user-public-info/);
+  assert.match(importerSource, /已有不同源码或处于软删除状态/);
+  assert.match(bulkSource, /StartupDependencyRecovery: requiredAppIds\.length == 1/);
 
   const embeddedImporter = packageModel.SysApiEngines.find(
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.4.4");
+  assert.equal(embeddedImporter.Version, "v2.4.7");
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    "Installer:StartupApiRuntimeFlagReconciliation",
+  ));
   assert.match(importerSource, /MOVE_OBJECT_UNAVAILABLE_RESUME_V1/);
   assert.match(importerSource, /PrivateSource\+PublicBuildMoveFallback/);
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
