@@ -89,19 +89,23 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(engine.ApiV8Code, /MaxItemsPerChunk|batchSize = 20/);
   assert.match(engine.ApiV8Code, /queueFailureDetail/);
   assert.match(engine.ApiV8Code, /item\.Name \|\| item\.OsClient/);
-  assert.equal(engine.Version, "v1.2.8");
+  assert.equal(engine.Version, "v1.3.1");
   assert.match(engine.ApiV8Code, /CHILD_STARTUP_DEPENDENCY_INCIDENT_SCOPE_V1/);
   assert.match(engine.ApiV8Code, /CHILD_STARTUP_SCOPE_CHILD_PARAM_PATCH_V1/);
   assert.match(engine.ApiV8Code, /enforceStartupDependencyScope/);
-  assert.match(engine.ApiV8Code, /childParam\.RequiredAppIds = \['app\.microi\.saas-engine'\]/);
+  assert.match(engine.ApiV8Code, /childParam\.RequiredAppIds = startupDependencyAppIds\.slice\(\)/);
+  assert.match(engine.ApiV8Code, /\['app\.microi\.store', 'app\.microi\.saas-engine'\]/);
   assert.match(engine.ApiV8Code, /Status='Pending' AND CancelRequested=0/);
   assert.match(engine.ApiV8Code, /cancelUnsafeChildTask/);
   assert.match(engine.ApiV8Code, /CHILD_STARTUP_NO_REQUEUE_REFRESH_V1/);
-  assert.match(engine.ApiV8Code, /startup-api-live-worker-v6-no-requeue/);
+  assert.match(engine.ApiV8Code, /startup-api-live-worker-v7-complete-closure/);
   assert.match(engine.ApiV8Code, /phase == 'RefreshBootstrap'/);
   assert.match(engine.ApiV8Code, /checkpoint\.BootstrapRevision = startupBootstrapRevision/);
   assert.match(engine.ApiV8Code, /CHILD_STARTUP_TARGET_FILTER_V1/);
-  assert.match(engine.ApiV8Code, /TargetOsClients 仅允许用于 StartupDependencies/);
+  assert.match(engine.ApiV8Code, /CHILD_TRUSTED_TARGET_FILTER_V2/);
+  assert.doesNotMatch(engine.ApiV8Code, /TargetOsClients 仅允许用于 StartupDependencies/);
+  assert.match(engine.ApiV8Code, /StartupDependencyBootstrapOnly 仅允许用于 StartupDependencies/);
+  assert.match(engine.ApiV8Code, /childParam\.StartupDependencyBootstrapOnly = true/);
   assert.match(engine.ApiV8Code, /missingRequestedTargets/);
   assert.doesNotMatch(engine.ApiV8Code, /CHILD_STARTUP_BOOTSTRAP_TASK_READBACK_V1/);
   assert.doesNotMatch(engine.ApiV8Code, /verifyRefreshedChildTask/);
@@ -158,13 +162,18 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
 test("child-tenant maintenance generator preserves newer package metadata", () => {
   assert.match(
     maintenanceGeneratorSource,
-    /ensureMinimumPackageVersion\(saasPackage\.PackageInfo, "v7\.5\.31"\)/,
+    /ensureMinimumPackageVersion\(storePackage\.PackageInfo, "v7\.6\.12"\)/,
+  );
+  assert.match(
+    maintenanceGeneratorSource,
+    /ensureMinimumPackageVersion\(saasPackage\.PackageInfo, "v7\.6\.19"\)/,
   );
   assert.doesNotMatch(
     maintenanceGeneratorSource,
-    /saasPackage\.PackageInfo\.Version\s*=\s*"v7\.5\.31"/,
+    /saasPackage\.PackageInfo\.Version\s*=\s*"v7\.6\.19"/,
   );
-  assert.doesNotMatch(maintenanceGeneratorSource, /PackageInfo\.ChangeLog\s*=/);
+  assert.match(maintenanceGeneratorSource, /storePackage\.PackageInfo\.ChangeLog\s*=/);
+  assert.match(maintenanceGeneratorSource, /saasPackage\.PackageInfo\.ChangeLog\s*=/);
 });
 
 test("legacy startup refresh checkpoint resumes monitor without requeueing child tasks", () => {
@@ -224,11 +233,81 @@ test("legacy startup refresh checkpoint resumes monitor without requeueing child
   assert.equal(result.Data.BackgroundTask.HasMore, true);
   assert.equal(
     result.Data.BackgroundTask.Checkpoint.BootstrapRevision,
-    "startup-api-live-worker-v6-no-requeue",
+    "startup-api-live-worker-v7-complete-closure",
   );
   assert.equal(result.Data.BackgroundTask.Checkpoint.Phase, "Monitor");
   assert.deepEqual(result.Data.BackgroundTask.Checkpoint.BootstrapRefreshFailures, []);
   assert.equal(queueCalls, 0);
+});
+
+test("startup dependency scope is durably patched to the complete two-package closure", () => {
+  const engine = saasPackage.SysApiEngines.find(
+    item => item.ApiEngineKey === "bulk-update-child-tenant-platform-apps",
+  );
+  const taskId = "parent-complete-closure";
+  const childTaskId = "child-a123456777";
+  const childRow = {
+    Id: childTaskId,
+    Title: "安装/更新全部平台应用",
+    Status: "Pending",
+    CancelRequested: 0,
+    ParamJson: JSON.stringify({ Existing: true }),
+  };
+  const V8 = {
+    CurrentUser: { Id: "admin", Level: 9999 },
+    Param: {
+      _BackgroundTaskId: taskId,
+      _BackgroundTask: { Id: taskId },
+      _BackgroundTaskFencingToken: 11,
+      _TrustedServerInvocation: true,
+      MaintenanceScope: "StartupDependencies",
+      StartupDependencyBootstrapOnly: true,
+      TargetOsClients: ["a123456777"],
+    },
+    Method: {
+      UpdateBackgroundTask() {},
+      GetChildTenantPlatformAppMaintenanceTargets() {
+        return {
+          Code: 1,
+          Data: { Targets: [{ OsClient: "a123456777", Name: "启动闭包回归租户" }] },
+        };
+      },
+      QueueChildTenantPlatformAppMaintenance() {
+        return { Code: 1, Data: { TaskId: childTaskId } };
+      },
+    },
+    FormEngine: {
+      GetFormData() {
+        return { Code: 1, Data: { ...childRow } };
+      },
+    },
+    Db: {
+      FromSql(sql) {
+        const parameters = {};
+        return {
+          AddInParameter(name, value) {
+            parameters[name] = value;
+            return this;
+          },
+          ExecuteNonQuery() {
+            assert.match(sql, /Status='Pending' AND CancelRequested=0/);
+            childRow.ParamJson = parameters["@p0"];
+            childRow.Title = parameters["@p1"];
+            return 1;
+          },
+        };
+      },
+    },
+  };
+
+  const result = new Function("V8", engine.ApiV8Code)(V8);
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.BackgroundTask.Checkpoint.Phase, "Monitor");
+  const patched = JSON.parse(childRow.ParamJson);
+  assert.deepEqual(patched.RequiredAppIds, ["app.microi.store", "app.microi.saas-engine"]);
+  assert.equal(patched.MaintenanceScope, "StartupDependencies");
+  assert.equal(patched.StartupDependencyBootstrapOnly, true);
+  assert.equal(childRow.Title, "快速恢复平台启动接口");
 });
 
 test("startup dependency target filter queues only the authoritative requested tenant", () => {
@@ -270,6 +349,48 @@ test("startup dependency target filter queues only the authoritative requested t
   const result = new Function("V8", engine.ApiV8Code)(V8);
   assert.equal(result.Code, 0);
   assert.deepEqual(queued, ["lxl"]);
+  assert.equal(result.Data.TargetCount, 1);
+  assert.equal(result.Data.FailedCount, 1);
+});
+
+test("trusted full maintenance can target one authoritative historical tenant", () => {
+  const engine = saasPackage.SysApiEngines.find(
+    item => item.ApiEngineKey === "bulk-update-child-tenant-platform-apps",
+  );
+  const queued = [];
+  const taskId = "targeted-full-parent";
+  const V8 = {
+    CurrentUser: { Id: "admin", Level: 9999 },
+    Param: {
+      _BackgroundTaskId: taskId,
+      _BackgroundTask: { Id: taskId },
+      _BackgroundTaskFencingToken: 17,
+      _TrustedServerInvocation: true,
+      TargetOsClients: ["lxl"],
+    },
+    Method: {
+      UpdateBackgroundTask() {},
+      GetChildTenantPlatformAppMaintenanceTargets() {
+        return {
+          Code: 1,
+          Data: {
+            Targets: [
+              { OsClient: "Jhyxdkj", Name: "test" },
+              { OsClient: "lxl", Name: "来贤聊" },
+            ],
+          },
+        };
+      },
+      QueueChildTenantPlatformAppMaintenance(param) {
+        queued.push({ target: param.TargetOsClient, scope: param.MaintenanceScope });
+        return { Code: 0, Msg: "targeted full maintenance probe" };
+      },
+    },
+  };
+
+  const result = new Function("V8", engine.ApiV8Code)(V8);
+  assert.equal(result.Code, 0);
+  assert.deepEqual(queued, [{ target: "lxl", scope: "" }]);
   assert.equal(result.Data.TargetCount, 1);
   assert.equal(result.Data.FailedCount, 1);
 });

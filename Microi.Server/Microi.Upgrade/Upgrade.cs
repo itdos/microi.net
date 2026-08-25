@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
@@ -15,6 +17,10 @@ namespace Microi.net
     /// </summary>
 	public class MicroiUpgrade : IMicroiUpgrade
     {
+        private static readonly Lazy<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>>
+            RuntimePhysicalColumnContracts = new Lazy<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>>(
+                LoadRuntimePhysicalColumnContracts);
+
         private static readonly string[] OfficialWebsiteAnonymousApiEngineKeys =
         {
             "send_sms_reg"
@@ -2000,44 +2006,49 @@ if (_microiLegacyMenuConfigChanged) {
                     EnsureColumn(osClientSecret, "diy_table", column.Key, column.Value);
                 }
             }
+
+            // RUNTIME_EMBEDDED_PHYSICAL_CONTRACT_V1：历史空库可能缺失的并不只是最近
+            // 新增列（例如曾出现 diy_table.ServerDataV8 整列缺失）。DiyTable、
+            // DiyField 与 SysApiEngine 都由生成实体一次性投影，任意旧列缺失都会让
+            // FormEngine 在应用商城安装器启动前失败。这里只消费当前程序集内已经过
+            // 发布门禁的官方包 PhysicalColumns，做 expand-only 物理兼容；表、字段和
+            // 业务资源的正式所有权仍由应用商城安装器负责。
+            foreach (var tableContract in RuntimePhysicalColumnContracts.Value)
+            {
+                if (!TableExists(osClientSecret, tableContract.Key)) continue;
+                foreach (var column in tableContract.Value)
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    EnsureColumn(
+                        osClientSecret,
+                        tableContract.Key,
+                        column.Key,
+                        NormalizeRuntimePhysicalColumnType(osClientSecret, column.Value));
+                }
+            }
         }
 
         private bool RuntimePhysicalPrerequisitesReady(OsClientSecret osClientSecret)
         {
             if (osClientSecret?.Db == null) return false;
 
-            if (TableExists(osClientSecret, "diy_table")
-                && !new[]
-                {
-                    "OsClient", "TableInEdit", "AddCallbakApi", "UptCallbakApi", "DelCallbakApi",
-                    "V8Limit", "V8Unlimited", "FormPresentation",
-                    "FormPresentationMode", "FormPresentationDensity",
-                    "FormNavigationTitle", "FormNavigationCountText",
-                    "FormSectionNavigation", "FormSectionEyebrow",
-                    "FormRequiredCountText", "FormWorkbenchEyebrow",
-                    "FormWorkbenchDescription", "FormNavigationFooterTitle",
-                    "FormNavigationFooterHtml", "FormRecordSelectorPlaceholder",
-                    "FormRecordSelectorLabelFields", "FormBannerEnabled",
-                    "FormBannerTitleField", "FormBannerSubtitleField",
-                    "FormBannerImageField", "FormBannerIcon", "FormBannerBackgroundField",
-                    "FormBannerTagFields", "FormBannerMetrics"
-                }.All(column => ColumnExists(osClientSecret, "diy_table", column)))
+            var physicalColumns = new Dictionary<string, HashSet<string>>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var tableContract in RuntimePhysicalColumnContracts.Value)
             {
-                return false;
+                var existing = ReadPhysicalColumnNames(osClientSecret, tableContract.Key);
+                physicalColumns[tableContract.Key] = existing;
+                if (existing.Count > 0
+                    && !tableContract.Value.Keys.All(existing.Contains))
+                {
+                    return false;
+                }
             }
 
-            if (!TableExists(osClientSecret, "sys_apiengine"))
+            if (!physicalColumns.TryGetValue("sys_apiengine", out var apiEngineColumns)
+                || apiEngineColumns.Count == 0)
             {
                 return true;
-            }
-
-            if (!new[]
-            {
-                "Id", "StopHttp", "Timeout", "MaxStatements", "LimitMemory",
-                "LimitRecursion", "V8Limit", "V8Unlimited", "Lock"
-            }.All(column => ColumnExists(osClientSecret, "sys_apiengine", column)))
-            {
-                return false;
             }
 
             var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
@@ -2048,6 +2059,71 @@ if (_microiLegacyMenuConfigChanged) {
                     WHERE {quoteOpen}Id{quoteClose} IS NULL
                        OR LTRIM(RTRIM({quoteOpen}Id{quoteClose}))='' ")
                 .ToScalar<int>() == 0;
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>
+            LoadRuntimePhysicalColumnContracts()
+        {
+            var mutable = new Dictionary<string, Dictionary<string, string>>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["diy_table"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                ["diy_field"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                ["sys_apiengine"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            };
+            var assembly = typeof(MicroiUpgrade).GetTypeInfo().Assembly;
+            foreach (var resourceName in new[]
+                     {
+                         "Microi.Upgrade.Resource.app.microi.form-engine.json",
+                         "Microi.Upgrade.Resource.app.microi.saas-engine.json"
+                     })
+            {
+                using var stream = assembly.GetManifestResourceStream(resourceName)
+                                   ?? throw new InvalidOperationException(
+                                       $"程序集缺少启动物理契约资源 {resourceName}。");
+                using var reader = new StreamReader(stream);
+                var physicalColumns = JObject.Parse(reader.ReadToEnd())["PhysicalColumns"] as JArray
+                                      ?? throw new InvalidOperationException(
+                                          $"启动物理契约资源 {resourceName} 缺少 PhysicalColumns。");
+                foreach (var token in physicalColumns.OfType<JObject>())
+                {
+                    var tableName = token["TABLE_NAME"]?.ToString() ?? string.Empty;
+                    if (!mutable.TryGetValue(tableName, out var tableColumns)) continue;
+                    var columnName = token["COLUMN_NAME"]?.ToString() ?? string.Empty;
+                    var columnType = token["COLUMN_TYPE"]?.ToString() ?? string.Empty;
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(
+                            columnName,
+                            @"^[A-Za-z][A-Za-z0-9_]{0,127}$")
+                        || !System.Text.RegularExpressions.Regex.IsMatch(
+                            columnType,
+                            @"^(?:bit|int|datetime|mediumtext|varchar)(?:\(\d+\))?$",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            $"启动物理契约包含不安全的列定义：{tableName}.{columnName} {columnType}");
+                    }
+                    tableColumns[columnName] = columnType;
+                }
+            }
+            return mutable.ToDictionary(
+                item => item.Key,
+                item => (IReadOnlyDictionary<string, string>)item.Value,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeRuntimePhysicalColumnType(
+            OsClientSecret osClientSecret,
+            string columnType)
+        {
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>()
+                         ?? OsClientDefault.OsClientDbType;
+            if (!string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase))
+                return columnType;
+            if (string.Equals(columnType, "mediumtext", StringComparison.OrdinalIgnoreCase))
+                return "nvarchar(max)";
+            if (columnType.StartsWith("bit", StringComparison.OrdinalIgnoreCase)) return "bit";
+            if (columnType.StartsWith("int", StringComparison.OrdinalIgnoreCase)) return "int";
+            return columnType;
         }
 
         private void BackfillApiEngineIds(OsClientSecret osClientSecret)
@@ -2688,6 +2764,41 @@ if (_microiLegacyMenuConfigChanged) {
                 : $"ALTER TABLE [{tableName}] ALTER COLUMN [{columnName}] varchar({minimumLength}) NULL";
             osClientSecret.Db.FromSql(sql).ExecuteNonQuery();
             Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【扩容表字段】{tableName}.{columnName} -> varchar({minimumLength})");
+        }
+
+        private HashSet<string> ReadPhysicalColumnNames(
+            OsClientSecret osClientSecret,
+            string tableName)
+        {
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>()
+                         ?? OsClientDefault.OsClientDbType;
+            if (dbType == "MySql")
+            {
+                return new HashSet<string>(
+                    osClientSecret.Db.FromSql(@"SELECT COLUMN_NAME AS ColumnName
+                            FROM information_schema.COLUMNS
+                            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @p0")
+                        .AddInParameter("p0", tableName)
+                        .ToArray()
+                        .Select(row => JObject.FromObject((object)row)["ColumnName"]?.ToString())
+                        .Where(name => !string.IsNullOrWhiteSpace(name)),
+                    StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (dbType == "SqlServer")
+            {
+                return new HashSet<string>(
+                    osClientSecret.Db.FromSql(@"SELECT COLUMN_NAME AS ColumnName
+                            FROM INFORMATION_SCHEMA.COLUMNS
+                            WHERE TABLE_CATALOG=DB_NAME() AND TABLE_NAME=@p0")
+                        .AddInParameter("p0", tableName)
+                        .ToArray()
+                        .Select(row => JObject.FromObject((object)row)["ColumnName"]?.ToString())
+                        .Where(name => !string.IsNullOrWhiteSpace(name)),
+                    StringComparer.OrdinalIgnoreCase);
+            }
+
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
         private bool TableExists(OsClientSecret osClientSecret, string tableName)

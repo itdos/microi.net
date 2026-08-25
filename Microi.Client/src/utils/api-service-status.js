@@ -2,7 +2,8 @@ import { reactive } from "vue";
 import { readSecurityBlockedResult, SECURITY_GUARD_DOCUMENTATION_URL } from "./security-blocked.js";
 
 const NETWORK_STATUS_CODES = [502, 503, 504];
-const HEALTH_CHECK_PATH = "/api/Diagnostics/health";
+const HEALTH_CHECK_PATH = "/apiengine/platform-service-health";
+const LEGACY_HEALTH_CHECK_PATH = "/api/Diagnostics/health";
 const HEALTH_CHECK_DELAY = 800;
 const HEALTH_CHECK_RETRY_DELAY = 1200;
 const HEALTH_CHECK_TIMEOUT = 5000;
@@ -13,6 +14,11 @@ export const apiServiceState = reactive({
     active: false,
     checking: false,
     mode: "connection",
+    frontendVersion: "未知",
+    backendVersion: "",
+    healthCheckUrl: "",
+    healthCheckMode: "fixed",
+    healthCheckedAt: "",
     clientOrigin: "",
     apiBase: "",
     osClient: "",
@@ -48,6 +54,27 @@ let securityCheckTimer = 0;
 
 function trimSlash(value) {
     return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function normalizeVersion(value) {
+    const match = String(value || "").trim().match(/v?(\d+\.\d+\.\d+)/i);
+    return match ? `v${match[1]}` : "";
+}
+
+function buildHealthUrl(apiBase, path, osClient, includeNonce = true) {
+    const resolved = new URL(`${trimSlash(apiBase || window.location.origin)}${path}`);
+    const tenant = String(osClient || "").trim();
+    if (tenant) resolved.searchParams.set("OsClient", tenant);
+    if (includeNonce) resolved.searchParams.set("_", String(Date.now()));
+    return resolved.toString();
+}
+
+function updateHealthMetadata(result) {
+    if (!result) return;
+    if (result.healthCheckUrl) apiServiceState.healthCheckUrl = result.healthCheckUrl;
+    if (result.healthCheckMode) apiServiceState.healthCheckMode = result.healthCheckMode;
+    if (result.backendVersion) apiServiceState.backendVersion = normalizeVersion(result.backendVersion);
+    if (result.checkedAt) apiServiceState.healthCheckedAt = result.checkedAt;
 }
 
 function getRequestUrl(context = {}) {
@@ -206,14 +233,11 @@ function updateDiagnostic(error, context, apiBase, requestUrl, statusCode) {
     apiServiceState.occurredAt = new Date().toLocaleString();
 }
 
-async function probeApiService(apiBase) {
-    if (typeof window.fetch !== "function") return { reachable: false, securityInfo: null };
-
+async function fetchHealthResponse(healthUrl) {
     const controller = typeof AbortController === "undefined" ? null : new AbortController();
     const timeoutId = window.setTimeout(function () {
         controller?.abort();
     }, HEALTH_CHECK_TIMEOUT);
-    const healthUrl = `${trimSlash(apiBase || window.location.origin)}${HEALTH_CHECK_PATH}?_=${Date.now()}`;
 
     try {
         const response = await window.fetch(healthUrl, {
@@ -234,16 +258,80 @@ async function probeApiService(apiBase) {
                 responseData = null;
             }
         }
-        const securityInfo = readSecurityBlockedResult(responseData);
-        // 404/401/500 等响应仍能证明 API 服务可达；只有网关级不可用才视为整体故障。
         return {
-            reachable: NETWORK_STATUS_CODES.indexOf(Number(response.status || 0)) === -1,
-            securityInfo
+            response,
+            responseData,
+            securityInfo: readSecurityBlockedResult(responseData)
         };
-    } catch (error) {
-        return { reachable: false, securityInfo: null };
     } finally {
         window.clearTimeout(timeoutId);
+    }
+}
+
+async function probeApiService(apiBase, osClient) {
+    if (typeof window.fetch !== "function") return { reachable: false, securityInfo: null };
+
+    const fixedHealthUrl = buildHealthUrl(apiBase, HEALTH_CHECK_PATH, osClient);
+    const displayHealthUrl = buildHealthUrl(apiBase, HEALTH_CHECK_PATH, osClient, false);
+    apiServiceState.healthCheckUrl = displayHealthUrl;
+
+    try {
+        const fixed = await fetchHealthResponse(fixedHealthUrl);
+        const fixedStatus = Number(fixed.response?.status || 0);
+        if (fixed.securityInfo) {
+            return {
+                reachable: false,
+                securityInfo: fixed.securityInfo,
+                healthCheckUrl: displayHealthUrl,
+                healthCheckMode: "fixed"
+            };
+        }
+
+        const fixedData = fixed.responseData?.Data;
+        if (
+            fixedStatus >= 200
+            && fixedStatus < 300
+            && Number(fixed.responseData?.Code) === 1
+            && String(fixedData?.Status || "").toLowerCase() === "healthy"
+        ) {
+            return {
+                reachable: true,
+                securityInfo: null,
+                backendVersion: fixedData?.BackendVersion,
+                checkedAt: fixedData?.CheckedAt || new Date().toISOString(),
+                healthCheckUrl: displayHealthUrl,
+                healthCheckMode: "fixed"
+            };
+        }
+
+        // 兼容尚未安装固定接口或应用包先于后端二进制滚动升级的旧节点。
+        // 网关级 502/503/504 已足以证明上游不可用，不再用旧接口覆盖该结论。
+        if (NETWORK_STATUS_CODES.indexOf(fixedStatus) > -1) {
+            return {
+                reachable: false,
+                securityInfo: null,
+                healthCheckUrl: displayHealthUrl,
+                healthCheckMode: "fixed"
+            };
+        }
+
+        const legacyHealthUrl = buildHealthUrl(apiBase, LEGACY_HEALTH_CHECK_PATH, osClient);
+        const legacy = await fetchHealthResponse(legacyHealthUrl);
+        const legacyStatus = Number(legacy.response?.status || 0);
+        return {
+            reachable: NETWORK_STATUS_CODES.indexOf(legacyStatus) === -1,
+            securityInfo: legacy.securityInfo,
+            healthCheckUrl: displayHealthUrl,
+            healthCheckMode: "legacy",
+            checkedAt: new Date().toISOString()
+        };
+    } catch (error) {
+        return {
+            reachable: false,
+            securityInfo: null,
+            healthCheckUrl: displayHealthUrl,
+            healthCheckMode: "fixed"
+        };
     }
 }
 
@@ -261,9 +349,10 @@ async function runHealthCheck(version) {
 
     const apiBase = evidenceApiBase || apiServiceState.apiBase;
     apiServiceState.checking = apiServiceState.active;
-    const currentProbe = probeApiService(apiBase);
+    const currentProbe = probeApiService(apiBase, apiServiceState.osClient);
     healthCheckPromise = currentProbe;
     const probeResult = await currentProbe;
+    updateHealthMetadata(probeResult);
     const reachable = probeResult.reachable;
     if (healthCheckPromise === currentProbe) {
         healthCheckPromise = null;
@@ -336,6 +425,31 @@ export function reportApiServiceFailure(error, context = {}) {
     return true;
 }
 
+export function setApiServiceFrontendVersion(version) {
+    apiServiceState.frontendVersion = normalizeVersion(version) || "未知";
+}
+
+export async function primeApiServiceStatus(context = {}) {
+    if (typeof window === "undefined") return false;
+    const apiBase = trimSlash(context.apiBase) || trimSlash(window.location.origin);
+    const osClient = String(context.osClient || "").trim();
+    apiServiceState.clientOrigin = trimSlash(window.location.origin);
+    apiServiceState.apiBase = apiBase;
+    if (osClient) apiServiceState.osClient = osClient;
+    const probeResult = await probeApiService(apiBase, osClient);
+    updateHealthMetadata(probeResult);
+    if (probeResult.securityInfo) {
+        activateSecurityBlock(probeResult.securityInfo, {
+            apiBase,
+            osClient,
+            url: apiServiceState.healthCheckUrl,
+            method: "GET"
+        });
+        return false;
+    }
+    return probeResult.reachable;
+}
+
 export function reportApiServiceResponse(responseData, context = {}) {
     if (typeof window === "undefined") return false;
     const securityInfo = readSecurityBlockedResult(responseData);
@@ -355,7 +469,24 @@ export function reportApiServiceRecovered(context = {}) {
     const apiBase = trimSlash(context.apiBase || apiServiceState.apiBase);
     const requestUrl = getRequestUrl(context);
     if (!isPlatformRequest(requestUrl, apiBase)) return;
-    resetOutageEvidence();
+
+    // 普通业务请求成功只能证明该请求成功，不能替代固定健康契约。全局故障证据
+    // 只由 probeApiService/checkApiServiceNow 清除，避免并发业务响应改变健康结论。
+    const requestPath = getRequestPath(sanitizeRequestUrl(requestUrl, apiBase));
+    const responseData = context.responseData;
+    if (
+        requestPath.startsWith(HEALTH_CHECK_PATH)
+        && Number(responseData?.Code) === 1
+        && String(responseData?.Data?.Status || "").toLowerCase() === "healthy"
+    ) {
+        updateHealthMetadata({
+            backendVersion: responseData.Data.BackendVersion,
+            checkedAt: responseData.Data.CheckedAt || new Date().toISOString(),
+            healthCheckUrl: buildHealthUrl(apiBase, HEALTH_CHECK_PATH, apiServiceState.osClient, false),
+            healthCheckMode: "fixed"
+        });
+        resetOutageEvidence();
+    }
 }
 
 export async function checkApiServiceNow() {
@@ -364,7 +495,8 @@ export async function checkApiServiceNow() {
     const probeBase = apiServiceState.mode === "security"
         ? (apiServiceState.requestOrigin || apiServiceState.apiBase)
         : apiServiceState.apiBase;
-    const probeResult = await probeApiService(probeBase);
+    const probeResult = await probeApiService(probeBase, apiServiceState.osClient);
+    updateHealthMetadata(probeResult);
     if (probeResult.securityInfo) {
         activateSecurityBlock(probeResult.securityInfo, {
             apiBase: apiServiceState.apiBase,
@@ -388,6 +520,10 @@ export function getApiServiceDiagnostic() {
         `当前站点: ${apiServiceState.clientOrigin || "-"}`,
         `当前租户 ApiBase: ${apiServiceState.apiBase || "-"}`,
         `OsClient: ${apiServiceState.osClient || "-"}`,
+        `前端版本: ${apiServiceState.frontendVersion || "-"}`,
+        `后端版本: ${apiServiceState.backendVersion || "未获取"}`,
+        `固定健康检查: ${apiServiceState.healthCheckUrl || "-"}`,
+        `健康检查模式: ${apiServiceState.healthCheckMode === "fixed" ? "固定接口" : "旧版兼容"}`,
         `请求方法: ${apiServiceState.requestMethod || "-"}`,
         `实际请求目标: ${apiServiceState.requestUrl || "-"}`,
         `故障原因: ${apiServiceState.reason || "-"}`,
