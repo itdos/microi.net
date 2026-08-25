@@ -4,10 +4,26 @@ import { fileURLToPath } from 'node:url';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const packagePath = resolve(directory, 'app.microi.store.json');
-const targetPackageVersion = 'v7.5.57';
-const releaseTime = '2026-08-25 11:10:00';
+const targetPackageVersion = 'v7.6.13';
+const releaseTime = '2026-08-26 13:30:00';
 
 const dependencies = Object.freeze([
+  Object.freeze({
+    key: 'get-microi-store-legacy-route',
+    name: '获取应用商城列表（旧地址兼容）',
+    source: 'get-microi-store-legacy-route.js',
+    id: '019d2f00-0000-7a01-8000-000000000001',
+    version: 'v1.0.0',
+    apiAddress: '/apiengine/get-microi-store',
+    category: '应用商城',
+    enableLog: 0,
+    lock: 0,
+    allowAnonymous: 1,
+    capabilities: [
+      'ApiEngine:get-microi-store-legacy-route@v1.0.0',
+      'Compatibility:LegacyMarketplaceListRouteV1',
+    ],
+  }),
   Object.freeze({
     key: 'get-microi-upgrade-resource',
     name: '获取与发布吾码升级资源',
@@ -198,7 +214,7 @@ for (const dependency of dependencies) {
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {});
 const protocolCapabilities = [
   'ApiEngine:get-microi-store-model@v1.2.9',
-  'ApiEngine:import-microi-store-package@v2.4.8',
+  'ApiEngine:import-microi-store-package@v2.4.9',
   'Installer:StartupDependencyApiFastBootstrap',
   'Installer:StartupDependencyPreinstallBootstrapV1',
   'Installer:StartupApiRuntimeFlagReconciliation',
@@ -224,12 +240,12 @@ info.ApiEngineCount = engines.length;
 if (info.Version === targetPackageVersion) {
   info.ChangeLog = {
     Version: targetPackageVersion,
-    Title: '官方发布源自动投影平台接口并兼容物理表结构',
+    Title: '平台接口完整启动闭包与旧商城列表地址兼容',
     ChangeType: 'Fix',
-    Content: '官方升级资源发布完成并回读后，以独立授权动作将九个官方应用包的 Managed 接口投影到 iTdos live 运行库；CreateIfMissing 个性化 Hook 仅在缺失时创建且永不覆盖。控制面自更新会清除动态路由缓存，投影按 sys_apiengine 的真实无 OsClient 物理结构运行，租户仍由受权 V8 数据库上下文隔离。',
+    Content: '后端接收流量前会从全部内置官方基础应用包补齐 101 项以上接口引擎及内部依赖；应用商城同时增加 /apiengine/get-microi-store 旧地址兼容入口，旧版批量安装器会安全转发到正式 get-microi-store-list 接口。CreateIfMissing 个性化 Hook 仅在缺失时创建且永不覆盖。',
     ReleaseTime: releaseTime,
   };
-  const historyLine = '2026-08-25 v7.5.57 官方资源控制面新增 live Managed 接口投影、自更新缓存刷新与 sys_apiengine 物理结构兼容，CreateIfMissing Hook 只补缺不覆盖。';
+  const historyLine = '2026-08-26 v7.6.13 增加旧版 /apiengine/get-microi-store 兼容入口，并配合后端以全部官方基础应用包形成启动前接口闭包。';
   const history = String(info.ChangeHistory || '');
   if (!history.includes(historyLine)) info.ChangeHistory = `${historyLine}\n${history}`;
 }

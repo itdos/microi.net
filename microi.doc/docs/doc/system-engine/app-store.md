@@ -48,6 +48,10 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 
 数据库只保留 `PackageId`、`PackageHdfsPath`、`PackageSha256`、`PackageSize`、内容类型、格式版本和校验时间。发布器先上传 UTF-8 JSON，再从 HDFS 回读并核对字节数和 SHA-256，全部一致后才更新商城指针并清空内联正文；安装器会独立下载和校验，不能只相信数据库或 Redis。历史版本继续以不可变 `StoreVersionId` 精确安装，快照保存同一组指针，不会静默换成当前版本。
 
+历史数据库若在 V3 发布协议之前已经写入 `mci_ai_app_file`，这些文件可能没有 `VersionId`。升级程序会先按租户和 `AppId` 创建确定性的 `legacy-unversioned-v3` 只读归档版本，把原文件绑定后强回读空值为零，再创建版本/路径唯一索引；不会合并或删除文件。文件同时缺少 `AppId`、确定性 Id 冲突或同名版本身份不一致时，升级会输出数量与样本 Id 后停止，避免猜错归属。
+
+应用商城列表的正式公开地址是 `/apiengine/get-microi-store-list`，接口 Key 仍为 `get-microi-store`。为兼容尚未完成应用更新的旧批量工作器，官方应用商城包同时提供 `/apiengine/get-microi-store` Managed 兼容入口，并只转发到正式列表接口；新代码不得继续使用旧地址。
+
 旧库可由超级管理员运行应用商城包提供的容量治理后台任务。任务先自愈缺失字段，再以有界 Id 游标分批外置 `sys_microistore` 和商城相关 `mic_data_version` 快照；每行都在 HDFS 校验成功后以原值 CAS 清理，因此节点重启、重试或并发修改不会误删。任务不会对数 GB 的历史 JSON 执行全表 `LIKE`，也不会自动运行可能长时间锁表的 `OPTIMIZE TABLE`。逻辑正文清空后，如需让 MySQL 物理文件立即缩小，应在完成备份的维护窗口由数据库管理员另行评估执行。
 
 ## 安装、升级与安全
@@ -62,7 +66,7 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 - 批量引擎只接受平台持久化任务 Worker 注入的可信调用标记，并同时核对任务 Id、任务信封与正数 fencing token。HTTP 控制器会主动剥离该标记，因此即使为兼容旧服务节点将引擎配置为 `StopHttp=0`，浏览器或外部请求也只能得到“必须通过持久化后台任务执行”，不能绕过后台任务直接安装。
 - 商城页面按钮及其调用的接口引擎、权限和数据结构必须由同一版本应用包交付。导入器会在接口引擎新增/更新后清除缓存并回读 Key、启用状态、HTTP 状态和完整源码；任一项失败时整次安装回滚，不会留下“按钮可见但接口不存在”的半安装状态。
 - 发布器必须把请求发布的版本精确传给资产准备器，并回读 `RequestedVersion == PackageVersion == PackageInfo.Version`；禁止资产准备器静默改用“最新版本”。菜单、表和接口引擎的发布选择必须从本次包正文持久化，不能沿用上一版选择状态。
-- 接口引擎资源必须在包内声明 `ResourcePolicies.ApiEngines`。只有从固定 `https://api.itdos.com + iTdos` 实时回读、通过权威商城模型确认的官方 `Platform` 包，才允许把 `Ownership=Application` 的 `Managed` 核心直接覆盖升级到 `Incoming`；这一规则用于保证安装最新版官方平台应用不会被租户旧副本阻断。离线包、自定义商城源、社区/普通应用和无法建立官方信任链的包继续按安装记录中的上一版 SHA-256 执行 `Base / Local / Incoming` 三方保护，`Local != Base` 时整包回滚并报告冲突，不能自报“官方”取得覆盖权限。
+- 接口引擎资源必须在包内声明 `ResourcePolicies.ApiEngines`。从固定 `https://api.itdos.com + iTdos` 实时回读并经权威商城模型确认的官方 `Platform` 包，允许把 `Platform/Managed` 核心直接覆盖升级到 `Incoming`；Upgrade13 重放程序集固定九个官方基础包时，也必须由后端建立绑定当前租户与固定导入器的一次性宿主可信上下文，导入器消费成功后才取得同等权限。V8 参数本身不能伪造该授权。两条可信路径都不得覆盖 `Tenant/CreateIfMissing`；离线包、自定义商城源、社区/普通应用和无法建立官方信任链的包继续按上一版 SHA-256 执行 `Base / Local / Incoming` 三方保护，`Local != Base` 时整包回滚并报告冲突。
 - `CreateIfMissing` 表示租户拥有的扩展 Hook：首次安装创建，后续更新永远跳过；同一 Key 一旦交给租户，后续版本也禁止改回 `Managed`，确需新官方核心时必须发布新 Key。官方应用必须采用“受管核心接口 + 租户扩展 Hook”，客户定制只写 Hook，扩展 Hook 按稳定 `EventId` 幂等。可信官方核心会在升级时被覆盖，因此不能把租户业务修改直接写进核心。
 - 商城源业务固定由 `platform-marketplace-source`（`Managed`）编排，个性化逻辑只写 `platform-marketplace-source-hook`（`CreateIfMissing`，默认正文精确为 `return { Code : 1 };`）。登录在任何远端配置读取、密码发送和凭据保存之前调用 `BeforeMarketplaceSourceLogin`；断开在删除服务端凭据之前调用 `BeforeMarketplaceSourceDisconnect`。Hook 失败会直接阻断操作，不能静默跳过。
 - 商城源 Before Hook 的安全载荷只包含 `Stage / SourceApiEngineKey / Action / SourceId`。`ApiBase`、远端 `OsClient`、账号、密码、Token、签名地址和凭据密文不得进入租户 Hook。登录协议、HTTPS/重定向限制、密码加密、Token 保护与密钥隔离继续保留在可信 C# 网关中；成功或失败后的脱敏审计再由 Managed V8 执行。

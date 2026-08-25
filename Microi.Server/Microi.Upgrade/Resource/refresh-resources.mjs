@@ -91,7 +91,7 @@ function validateReleaseCandidate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 2_002_002
+    if (versionNumber < 2_004_009
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -131,6 +131,8 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
       || !content.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
       || !content.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
+      || !content.includes('TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1')
+      || !content.includes('V8.Method.RequireManagedProtocolContext')
       || !content.includes('OFFICIAL_MANAGED_OVERWRITE_V1')
       || !content.includes('GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1')
       || !content.includes('GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1')
@@ -140,7 +142,7 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
       || !content.includes('PACKAGE_REPLAY_VERSION_GUARD_V2')
       || !content.includes('OBJECT_STORAGE_FORBIDDEN')) {
-      throw new Error(`${name} 低于 v2.2.2 或缺少生成实体物理前置列自愈、跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、可信官方平台 Managed 覆盖升级及统一应用商城能力，拒绝降级本地基线`);
+      throw new Error(`${name} 低于 v2.4.9 或缺少生成实体物理前置列自愈、跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、宿主可信内置官方包重放、官方平台 Managed 覆盖升级及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -515,7 +517,7 @@ function validateReleaseCandidate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 2_002_002
+        || importerVersionNumber < 2_004_009
         || !importerCode.includes('API_ENGINE_RESOURCE_BASELINE_V1')
         || !importerCode.includes('TENANT_API_ENGINE_POLICY_IMMUTABLE_V1')
         || !importerCode.includes('JSON_SWITCH_LITERAL_UNQUOTE_V1')
@@ -524,6 +526,8 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
         || !importerCode.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
         || !importerCode.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
+        || !importerCode.includes('TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1')
+        || !importerCode.includes('V8.Method.RequireManagedProtocolContext')
         || !importerCode.includes('OFFICIAL_MANAGED_OVERWRITE_V1')
         || !importerCode.includes('DATABASE_ONLY_BUILD_ASSETS_V1')
         || !importerCode.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')

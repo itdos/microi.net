@@ -556,11 +556,11 @@ async function main() {
   packageModel.ResourcePolicies ||= {};
   packageModel.ResourcePolicies.ApiEngines ||= {};
   packageModel.ResourcePolicies.ApiEngines['get-microi-store-model'] = {
-    Ownership: 'Application',
+    Ownership: 'Platform',
     UpgradePolicy: 'Managed',
   };
   packageModel.ResourcePolicies.ApiEngines.ai_app_publish_store = {
-    Ownership: 'Application',
+    Ownership: 'Platform',
     UpgradePolicy: 'Managed',
   };
   updatePackageInfo(packageModel);

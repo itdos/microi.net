@@ -87,12 +87,12 @@ export const packageDefinitions = Object.freeze([
   Object.freeze({
     file: 'app.microi.message-notification.json',
     name: '消息通知',
-    version: 'v1.0.9',
+    version: 'v1.0.10',
     changeType: 'Fix',
     bootstrapUrl: 'https://static.itdos.com/itdos/microi-store/packages/01kz2t8tmetfx9m815r2rxttbz/202608/app_microi_message-notification-v1_0_5-db93ddd22b5fc2fb.json',
     bootstrapSha256: 'db93ddd22b5fc2fbf21b451e50b9fd1ce78cea970a4bea0d509f4386b99b2301',
     bootstrapSize: 250807,
-    history: '2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。',
+    history: '2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。',
     capabilities: [
       'ApiEngine:platform-chat-system-message@v1.1.0',
       'ApiEngine:platform-chat-runtime@v1.0.1',

@@ -221,6 +221,29 @@ const physicalDefinitions = [
   ['FormBannerMetrics', 'mediumtext', 'mediumtext', 'Banner统计项'],
 ];
 
+// diy_table.Name has historically allowed values longer than 50 characters.
+// Keep the denormalized diy_field.TableName metadata and fresh-install DDL wide
+// enough so Upgrade13 cannot recreate the legacy truncation boundary.
+const diyFieldTableName = pkg.DiyFields.find((item) => (
+  String(item.TableName || '').toLowerCase() === 'diy_field'
+  && item.Name === 'TableName'
+));
+if (!diyFieldTableName) throw new Error('缺少 diy_field.TableName 字段元数据');
+diyFieldTableName.Type = 'varchar(255)';
+const diyFieldTableNamePhysical = pkg.PhysicalColumns.find((item) => (
+  String(item.TABLE_NAME || '').toLowerCase() === 'diy_field'
+  && item.COLUMN_NAME === 'TableName'
+));
+if (!diyFieldTableNamePhysical) throw new Error('缺少 diy_field.TableName 物理字段元数据');
+diyFieldTableNamePhysical.COLUMN_TYPE = 'varchar(255)';
+diyFieldTableNamePhysical.DATA_TYPE = 'varchar';
+const diyFieldDdl = pkg.DDLStatements.find((item) => String(item.TableName || '').toLowerCase() === 'diy_field');
+if (!diyFieldDdl) throw new Error('缺少 diy_field DDL');
+if (!/`TableName` varchar\((?:50|255)\)/.test(diyFieldDdl.DDL)) {
+  throw new Error('无法定位 diy_field.TableName DDL 类型');
+}
+diyFieldDdl.DDL = diyFieldDdl.DDL.replace(/`TableName` varchar\((?:50|255)\)/, '`TableName` varchar(255)');
+
 let nextOrdinal = Math.max(...pkg.PhysicalColumns.filter((item) => item.TABLE_NAME === 'diy_table').map((item) => Number(item.ORDINAL_POSITION || 0))) + 1;
 for (const [name, columnType, dataType, comment] of physicalDefinitions) {
   let physical = pkg.PhysicalColumns.find((item) => item.TABLE_NAME === 'diy_table' && item.COLUMN_NAME === name);
@@ -251,7 +274,7 @@ for (const [name, columnType, , comment] of physicalDefinitions) {
   ddl.DDL = `${before},\n  \`${name}\` ${ddlType} NULL COMMENT '${comment.replaceAll("'", "''")}'${after}`;
 }
 
-pkg.PackageInfo.Version = maxVersion(pkg.PackageInfo.Version, 'v7.5.6');
+pkg.PackageInfo.Version = maxVersion(pkg.PackageInfo.Version, 'v7.6.7');
 pkg.PackageInfo.Description = '表单引擎基础资源。工作台、分组与紧凑主题化 Banner 均使用 diy_table 物理属性；Banner 支持字段图片、动态标签、接口引擎统计及旧表智能默认。';
 const historyLine = '2026-08-21 v7.5.1 将表单工作台配置迁移为 diy_table 物理属性并新增两个属性 Tab；TabsPosition 默认 top；新增正向 V8Limit，隐藏旧 FormPresentation/V8Unlimited 兼容字段。';
 if (!String(pkg.PackageInfo.ChangeHistory || '').includes(historyLine)) {
@@ -265,11 +288,16 @@ const badgeProxyHistoryLine = '2026-08-22 v7.5.6 修复表单分组统计接口�
 if (!String(pkg.PackageInfo.ChangeHistory || '').includes(badgeProxyHistoryLine)) {
   pkg.PackageInfo.ChangeHistory = `${badgeProxyHistoryLine}\n${pkg.PackageInfo.ChangeHistory || ''}`.trim();
 }
+const tableNameCapacityHistoryLine = '2026-08-26 v7.6.7 将 diy_field.TableName 从 varchar(50) 扩容为 varchar(255)，兼容历史长表名并避免租户升级复制表名时中断。';
+if (!String(pkg.PackageInfo.ChangeHistory || '').includes(tableNameCapacityHistoryLine)) {
+  pkg.PackageInfo.ChangeHistory = `${tableNameCapacityHistoryLine}\n${pkg.PackageInfo.ChangeHistory || ''}`.trim();
+}
 pkg.PackageInfo.RequiredPlatformCapabilities = [...new Set([
   ...(pkg.PackageInfo.RequiredPlatformCapabilities || []),
   'ServerField:DiyTable.V8Limit',
   'ServerFeature:DiyTablePresentationPhysicalFields',
   'ServerFeature:DiyTableFormBanner',
+  'DatabaseColumn:diy_field.TableName@varchar(255)',
 ])];
 pkg.PackageInfo.FieldCount = pkg.DiyFields.length;
 pkg.PackageInfo.DDLCount = pkg.DDLStatements.length;

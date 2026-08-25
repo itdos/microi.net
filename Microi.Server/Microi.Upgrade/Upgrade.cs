@@ -103,7 +103,7 @@ namespace Microi.net
         {
             if (osClientSecret?.Db == null)
             {
-                return new DosResult(0, null, "租户数据库连接不存在，无法检查页面启动接口。");
+                return new DosResult(0, null, "租户数据库连接不存在，无法检查平台运行时接口闭包。");
             }
 
             const int maxLeaseAttempts = 30;
@@ -117,13 +117,13 @@ namespace Microi.net
                     {
                         Verified = UpgradeAppStore.RequiredStartupDependencyEngineKeys.Length,
                         Source = "EmbeddedOfficialApplicationPackages"
-                    }, "七项页面启动接口已就绪。");
+                    }, $"{UpgradeAppStore.RequiredStartupDependencyEngineKeys.Length}项平台运行时接口已就绪。");
                 }
 
                 if (attempt == 1)
                 {
                     Console.WriteLine(
-                        $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【页面启动接口闭包】待修复：{readyReason}");
+                        $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】待修复：{readyReason}");
                 }
 
                 var upgradeLease = UpgradeDistributedLease.TryAcquire(
@@ -148,7 +148,7 @@ namespace Microi.net
                                 out var finalReason))
                         {
                             return new DosResult(0, repair.Data,
-                                "页面启动接口自愈后强回读失败：" + finalReason);
+                                "平台运行时接口自愈后强回读失败：" + finalReason);
                         }
                         return repair;
                     }
@@ -168,7 +168,7 @@ namespace Microi.net
             return new DosResult(
                 0,
                 null,
-                $"页面启动接口尚未就绪，且未能取得共享升级租约：{leaseReason ?? "未知原因"}；当前状态：{unresolvedReason}");
+                $"平台运行时接口尚未就绪，且未能取得共享升级租约：{leaseReason ?? "未知原因"}；当前状态：{unresolvedReason}");
         }
 
         /// <summary>
@@ -200,7 +200,7 @@ namespace Microi.net
             {
                 // 运行时不变量不能只依赖可能被错误推进的历史版本号。
                 Console.WriteLine(
-                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【页面启动接口闭包】版本迁移链内复检开始。");
+                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】版本迁移链内复检开始。");
                 var startupDependencyResult = await UpgradeAppStore
                     .EnsureStartupDependenciesUnderLeaseAsync(osClientSecret)
                     .ConfigureAwait(false);
@@ -209,7 +209,7 @@ namespace Microi.net
                     throw new InvalidOperationException(startupDependencyResult.Msg);
                 }
                 Console.WriteLine(
-                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【页面启动接口闭包】版本迁移链内复检成功：{startupDependencyResult.Msg}");
+                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】版本迁移链内复检成功：{startupDependencyResult.Msg}");
                 EnsureAuthSecretColumns(osClientSecret);
                 EnsureMicroServiceColumns(osClientSecret);
                 EnsureSecurityLevels(osClientSecret);
@@ -2250,7 +2250,12 @@ if (_microiLegacyMenuConfigChanged) {
                 return;
             }
 
-            EnsureColumn(osClientSecret, "diy_field", "TableName", "varchar(50)");
+            // diy_table.Name has historically allowed names longer than 50
+            // characters. Widen the denormalized diy_field.TableName projection
+            // before copying it, otherwise one legacy long table name aborts the
+            // whole tenant upgrade with "Data too long".
+            EnsureColumn(osClientSecret, "diy_field", "TableName", "varchar(255)");
+            EnsureStringColumnCapacity(osClientSecret, "diy_field", "TableName", 255);
             if (!TableExists(osClientSecret, "diy_table")
                 || !ColumnExists(osClientSecret, "diy_field", "TableId")
                 || !ColumnExists(osClientSecret, "diy_table", "Id")
@@ -2845,6 +2850,15 @@ if (_microiLegacyMenuConfigChanged) {
                     .AddInParameter("p1", columnName)
                     .ToScalar<int>();
             }
+            else if (dbType == "Oracle")
+            {
+                currentLength = osClientSecret.Db.FromSql(@"SELECT COALESCE(CHAR_LENGTH, 0)
+                        FROM USER_TAB_COLUMNS
+                        WHERE TABLE_NAME = UPPER(@p0) AND COLUMN_NAME = UPPER(@p1)")
+                    .AddInParameter("p0", tableName)
+                    .AddInParameter("p1", columnName)
+                    .ToScalar<int>();
+            }
             else
             {
                 return;
@@ -2857,7 +2871,9 @@ if (_microiLegacyMenuConfigChanged) {
 
             var sql = dbType == "MySql"
                 ? $"ALTER TABLE `{tableName}` MODIFY COLUMN `{columnName}` varchar({minimumLength}) NULL"
-                : $"ALTER TABLE [{tableName}] ALTER COLUMN [{columnName}] varchar({minimumLength}) NULL";
+                : dbType == "SqlServer"
+                    ? $"ALTER TABLE [{tableName}] ALTER COLUMN [{columnName}] varchar({minimumLength}) NULL"
+                    : $"ALTER TABLE {tableName} MODIFY ({columnName} VARCHAR2({minimumLength} CHAR) NULL)";
             osClientSecret.Db.FromSql(sql).ExecuteNonQuery();
             Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【扩容表字段】{tableName}.{columnName} -> varchar({minimumLength})");
         }

@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "消息通知",
-    "Version": "v1.0.9",
+    "Version": "v1.0.10",
     "CreateTime": "2026-08-23T01:02:13.744Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -25,12 +25,12 @@
       "V8.MongoDb.UptFormDataByWhere",
       "V8.MongoDb.DelFormDataByWhere"
     ],
-    "ChangeHistory": "2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.8 修复聊天运行时与 AI 运行时跨应用稳定 Id 冲突；继续由 Managed V8 统一编排普通聊天消息、联系人、未读、历史、已读与删除。\n2026-08-25 v1.0.7 普通聊天消息、联系人、未读、历史、已读与删除业务迁入固定 Managed V8 运行时；旧 Hub/Controller 仅保留认证连接、协议与尽力投递。\n2026-08-25 v1.0.6 平台系统消息业务校验迁入 Managed V8 接口，并提供消息通知个性化 Hook。\n",
+    "ChangeHistory": "2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.8 修复聊天运行时与 AI 运行时跨应用稳定 Id 冲突；继续由 Managed V8 统一编排普通聊天消息、联系人、未读、历史、已读与删除。\n2026-08-25 v1.0.7 普通聊天消息、联系人、未读、历史、已读与删除业务迁入固定 Managed V8 运行时；旧 Hub/Controller 仅保留认证连接、协议与尽力投递。\n2026-08-25 v1.0.6 平台系统消息业务校验迁入 Managed V8 接口，并提供消息通知个性化 Hook。\n",
     "ChangeLog": {
-      "Version": "v1.0.9",
+      "Version": "v1.0.10",
       "Title": "V8 引擎优先与租户个性化扩展",
       "ChangeType": "Fix",
-      "Content": "2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。",
+      "Content": "2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。",
       "ReleaseTime": "2026-08-25 16:00:00"
     }
   },
@@ -6210,15 +6210,15 @@
     "SchemaVersion": 1,
     "ApiEngines": {
       "msg_event": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "msg_internal_list": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "msg_internal_mark_read": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "platform-chat-system-message": {
