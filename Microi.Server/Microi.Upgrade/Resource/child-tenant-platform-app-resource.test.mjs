@@ -89,7 +89,39 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(engine.ApiV8Code, /MaxItemsPerChunk|batchSize = 20/);
   assert.match(engine.ApiV8Code, /queueFailureDetail/);
   assert.match(engine.ApiV8Code, /item\.Name \|\| item\.OsClient/);
-  assert.equal(engine.Version, "v1.1.7");
+  assert.equal(engine.Version, "v1.2.5");
+  assert.match(engine.ApiV8Code, /CHILD_STARTUP_DEPENDENCY_INCIDENT_SCOPE_V1/);
+  assert.match(engine.ApiV8Code, /CHILD_STARTUP_SCOPE_CHILD_PARAM_PATCH_V1/);
+  assert.match(engine.ApiV8Code, /enforceStartupDependencyScope/);
+  assert.match(engine.ApiV8Code, /childParam\.RequiredAppIds = \['app\.microi\.saas-engine'\]/);
+  assert.match(engine.ApiV8Code, /Status='Pending' AND CancelRequested=0/);
+  assert.match(engine.ApiV8Code, /cancelUnsafeChildTask/);
+  assert.match(engine.ApiV8Code, /CHILD_STARTUP_BOOTSTRAP_REFRESH_V1/);
+  assert.match(engine.ApiV8Code, /startup-api-runtime-flags-v4/);
+  assert.match(engine.ApiV8Code, /phase = 'RefreshBootstrap'/);
+  assert.match(engine.ApiV8Code, /CHILD_STARTUP_BOOTSTRAP_REVISION_RESTART_V1/);
+  assert.match(engine.ApiV8Code, /checkpoint\.BootstrapRefreshRevision/);
+  assert.match(engine.ApiV8Code, /checkpoint\.BootstrapRefreshIndex = 0/);
+  assert.match(engine.ApiV8Code, /BootstrapRefreshRevision: startupBootstrapRevision/);
+  assert.match(engine.ApiV8Code, /refreshedTaskId != text\(refreshTask\.TaskId\)/);
+  assert.match(engine.ApiV8Code, /key == 'jhyxdkj'/);
+  assert.match(engine.ApiV8Code, /key == 'lsg'/);
+  assert.match(engine.ApiV8Code, /MaintenanceScope: maintenanceScope/);
+  assert.ok(
+    saasPackage.PackageInfo.RequiredPlatformCapabilities.includes(
+      "BackgroundTask:StartupDependencyIncidentScope",
+    ),
+  );
+  assert.ok(
+    saasPackage.PackageInfo.RequiredPlatformCapabilities.includes(
+      "BackgroundTask:StartupBootstrapRevisionReset",
+    ),
+  );
+  assert.ok(
+    saasPackage.PackageInfo.RequiredPlatformCapabilities.includes(
+      "BackgroundTask:StartupBootstrapRuntimeFlagRefresh",
+    ),
+  );
   assert.equal(
     saasPackage.ResourcePolicies.ApiEngines[key]?.UpgradePolicy,
     "Managed"
@@ -116,6 +148,66 @@ test("child-tenant maintenance generator preserves newer package metadata", () =
     /saasPackage\.PackageInfo\.Version\s*=\s*"v7\.5\.31"/,
   );
   assert.doesNotMatch(maintenanceGeneratorSource, /PackageInfo\.ChangeLog\s*=/);
+});
+
+test("startup bootstrap refresh restarts the same idempotent round when its revision changes mid-slice", () => {
+  const engine = saasPackage.SysApiEngines.find(
+    item => item.ApiEngineKey === "bulk-update-child-tenant-platform-apps",
+  );
+  assert.ok(engine);
+  const childTasks = [
+    { OsClient: "tenant-00", TaskId: "task-00" },
+    { OsClient: "Jhyxdkj", TaskId: "task-jhyx" },
+    { OsClient: "tenant-01", TaskId: "task-01" },
+    { OsClient: "lsg", TaskId: "task-lsg" },
+    ...Array.from({ length: 21 }, (_, index) => ({
+      OsClient: `tenant-${String(index + 2).padStart(2, "0")}`,
+      TaskId: `task-${String(index + 2).padStart(2, "0")}`,
+    })),
+  ];
+  const refreshed = [];
+  const taskId = "parent-task";
+  const V8 = {
+    CurrentUser: { Id: "admin", Level: 9999 },
+    Param: {
+      _BackgroundTaskId: taskId,
+      _BackgroundTask: { Id: taskId },
+      _BackgroundTaskFencingToken: 9,
+      _TrustedServerInvocation: true,
+      _BackgroundTaskCheckpoint: {
+        Version: 3,
+        TaskId: taskId,
+        Phase: "RefreshBootstrap",
+        MaintenanceScope: "StartupDependencies",
+        BootstrapRefreshIndex: 20,
+        ChildTasks: childTasks,
+        AttemptedTargets: [],
+        Failures: [],
+        BootstrapRefreshFailures: [],
+      },
+    },
+    Method: {
+      UpdateBackgroundTask() {},
+      QueueChildTenantPlatformAppMaintenance(param) {
+        const match = childTasks.find(
+          item => item.OsClient.toLowerCase() === String(param.TargetOsClient).toLowerCase(),
+        );
+        refreshed.push(param.TargetOsClient);
+        return { Code: 1, Data: { TaskId: match.TaskId } };
+      },
+    },
+  };
+
+  const result = new Function("V8", engine.ApiV8Code)(V8);
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.BackgroundTask.HasMore, true);
+  assert.equal(result.Data.BackgroundTask.Checkpoint.BootstrapRefreshIndex, 20);
+  assert.equal(
+    result.Data.BackgroundTask.Checkpoint.BootstrapRefreshRevision,
+    "startup-api-runtime-flags-v4",
+  );
+  assert.equal(refreshed.length, 20);
+  assert.deepEqual(refreshed.slice(0, 2), ["Jhyxdkj", "lsg"]);
 });
 
 test("target tenant marker is stripped from public submissions and restored after continuations", () => {

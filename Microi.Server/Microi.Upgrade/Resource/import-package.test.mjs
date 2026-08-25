@@ -232,7 +232,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.4\.4/);
+  assert.match(source, /Version: v2\.4\.7/);
 });
 
 test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {

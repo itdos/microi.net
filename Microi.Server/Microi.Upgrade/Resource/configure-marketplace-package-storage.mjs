@@ -252,11 +252,15 @@ model.PackageInfo.RequiredPlatformCapabilities = [
     && !String(value).startsWith('ApiEngine:ai_app_publish_store@')
     && !String(value).startsWith('ApiEngine:export-microi-store-package@')
     && !String(value).startsWith('ApiEngine:import-microi-store-package@')
+    && String(value) !== 'Installer:StartupDependencyApiFastBootstrap'
+    && String(value) !== 'Installer:StartupApiRuntimeFlagReconciliation'
   )),
   'ApiEngine:get-microi-store-model@v1.2.9',
   'ApiEngine:ai_app_publish_store@v1.9.7',
   'ApiEngine:export-microi-store-package@v1.2.3',
-  'ApiEngine:import-microi-store-package@v2.4.4',
+  'ApiEngine:import-microi-store-package@v2.4.7',
+  'Installer:StartupDependencyApiFastBootstrap',
+  'Installer:StartupApiRuntimeFlagReconciliation',
 ];
 model.PackageInfo.TableCount = model.DiyTables.length;
 model.PackageInfo.FieldCount = model.DiyFields.length;
