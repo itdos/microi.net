@@ -43,6 +43,20 @@ const arrayBufferToDataUrl = (buffer, contentType = 'image/png') => {
 
 const getBucketScope = (limit = true) => limit ? 'private' : 'public'
 
+const buildFileManagerPrivateUrlPayload = (filePathName, sysMenuId, limit = true) => {
+  const resourceId = String(filePathName || '')
+  const trustedSysMenuId = String(sysMenuId || '')
+  if (!resourceId) throw new Error('缺少文件管理列表返回的对象键，无法签发私有文件地址')
+  if (!trustedSysMenuId) throw new Error('当前文件柜路由缺少受信任菜单标识，已拒绝签发私有文件地址')
+  return {
+    ResourceKind: 'FileManagerObject',
+    ResourceId: resourceId,
+    FilePathName: resourceId,
+    SysMenuId: trustedSysMenuId,
+    Limit: limit
+  }
+}
+
 const getMinioConnection = (platform = {}) => ({
   Endpoint: platform.endpoint || '',
   AccessKey: platform.accessKey || '',
@@ -183,11 +197,12 @@ export const fileSyncApi = {
 
   async getRemoteLoginConfig(platform) {
     const apiBase = normalizeApiBase(platform.apiBase)
-    const resp = await fetch(`${apiBase}/api/FormEngine/GetSysConfig`, {
+    const resp = await fetch(`${apiBase}/apiengine/platform-sys-config`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        OsClient: platform.osClient || ''
+        OsClient: platform.osClient || '',
+        apiengine: '1'
       },
       body: JSON.stringify({
         _SearchEqual: { IsEnable: 1 },
@@ -356,11 +371,12 @@ export const fileSyncApi = {
     })
   },
 
-  getPrivateFileUrl(platform, filePathName, limit = true) {
-    return this.postHdfs(platform, `${API_BASE}/GetPrivateFileUrl`, {
-      FilePathName: filePathName,
-      Limit: limit
-    })
+  getPrivateFileUrl(platform, filePathName, limit = true, sysMenuId = '') {
+    return this.runApiEngine(
+      'platform-private-file-url',
+      buildFileManagerPrivateUrlPayload(filePathName, sysMenuId, limit),
+      platform
+    )
   },
 
   uploadFiles(platform, files, path, limit = true, onProgress) {
@@ -475,15 +491,11 @@ export const fileManageApi = {
    * @param {string} filePathName - 文件路径
    * @param {boolean} limit - 是否私有桶（默认true）
    */
-  getPrivateFileUrl(filePathName, limit = true) {
-    return new Promise((resolve, reject) => {
-      DiyCommon.Post(
-        `${API_BASE}/GetPrivateFileUrl`,
-        { FilePathName: filePathName, Limit: limit },
-        (result) => resolve(result),
-        (error) => reject(error)
-      )
-    })
+  getPrivateFileUrl(filePathName, limit = true, sysMenuId = '') {
+    return this.runEngine(
+      'platform-private-file-url',
+      buildFileManagerPrivateUrlPayload(filePathName, sysMenuId, limit)
+    )
   },
 
   /**

@@ -1,7 +1,16 @@
+/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1
+ * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】
+ * 所属官方应用：系统账号
+ * ApiEngineKey：platform-user-update-preferences
+ * 从可信吾码官方应用源安装、更新或重新安装“系统账号”，都会以官方源码恢复此 Managed 接口。
+ * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，
+ * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
+ */
+
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-user-update-preferences
- * Version: v1.0.2
+ * Version: v1.1.0
  * Function:
  * - 仅允许登录用户保存自己的界面偏好；目标用户和租户始终取当前 DiyToken 上下文。
  * - 固定白名单覆盖首页、主题、菜单展开和桌面外观，不接受账号、角色、组织或认证字段。
@@ -204,6 +213,22 @@ if (changedCount === 0) {
 }
 updateModel = changedModel;
 
+var changedFields = [];
+for (var changedFieldName in updateModel) {
+  if (Object.prototype.hasOwnProperty.call(updateModel, changedFieldName) && changedFieldName !== 'Id') {
+    changedFields.push(changedFieldName);
+  }
+}
+var beforeHook = V8.ApiEngine.Run('platform-user-custom-hook', {
+  Stage: 'BeforeUpdatePreferences',
+  SourceApiEngineKey: 'platform-user-update-preferences',
+  UserId: userId,
+  ChangedFields: changedFields
+});
+if (!beforeHook || beforeHook.Code !== 1) {
+  return beforeHook || fail('系统账号个性化 Hook 未返回结果。');
+}
+
 var updateResult = V8.FormEngine.UptFormData('sys_user', updateModel);
 if (!updateResult || updateResult.Code != 1) {
   return updateResult || fail('个人偏好保存失败。');
@@ -214,9 +239,19 @@ if (!refreshResult || refreshResult.Code != 1) {
   return refreshResult || fail('偏好已保存，但登录信息刷新失败。');
 }
 
+var afterHook = V8.ApiEngine.Run('platform-user-custom-hook', {
+  Stage: 'AfterUpdatePreferences',
+  SourceApiEngineKey: 'platform-user-update-preferences',
+  UserId: userId,
+  ChangedFields: changedFields
+});
+
 return {
   Code: 1,
   Data: refreshResult.Data,
   Changed: true,
+  HookWarning: (!afterHook || afterHook.Code !== 1)
+    ? ((afterHook && afterHook.Msg) || '系统账号个性化 Hook 执行失败。')
+    : '',
   Msg: '个人偏好已保存并同步到当前账号。'
 };

@@ -23,6 +23,10 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class FormEngineController : Controller
     {
+        private const string SysConfigApiEngineKey = "platform-sys-config";
+        private const string LangBundleApiEngineKey = "platform-lang-bundle";
+        private const string LoginWallpapersApiEngineKey = "platform-login-wallpapers";
+
         private string GetRequestLang()
         {
             try
@@ -67,36 +71,6 @@ namespace Microi.net.Api
             {
                 // Current user context is optional metadata for auth/V8 helpers.
             }
-        }
-
-        private static DosResult<dynamic> CreatePublicSysConfigResult(DosResult<dynamic> source, string osClient)
-        {
-            if (source == null) return null;
-
-            var publicProjection = source.Data == null
-                ? null
-                : TenantConfigurationSecurity.CreatePublicSysConfigProjection(source.Data, osClient);
-            var configuredLoginPublicKey = ConfigHelper.GetRuntimeConfigurationValue(
-                "Security:LoginRsaPublicKey");
-            if (publicProjection != null && !configuredLoginPublicKey.DosIsNullOrWhiteSpace())
-            {
-                // 公钥不是凭据，可以由匿名登录配置接口返回，以确保客户端公钥
-                // 与当前部署的私钥成对。未配置时客户端继续使用历史兼容公钥。
-                publicProjection["LoginRsaPublicKey"] = configuredLoginPublicKey
-                    .Replace("\\n", "\n")
-                    .Trim();
-            }
-
-            var result = new DosResult<dynamic>(
-                source.Code,
-                publicProjection,
-                source.Msg,
-                source.DataAppend);
-            foreach (var property in source.DynamicProperties)
-            {
-                result.DynamicProperties[property.Key] = property.Value;
-            }
-            return result;
         }
 
         private static bool IsSysOsClientsDetailRequest(JObject param)
@@ -311,34 +285,21 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetSysConfig(
             [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] DiyTableRowParam param = null)
         {
-            if (param == null)
+            var request = await MergeRequestParam(
+                param == null ? new JObject() : JObject.FromObject(param));
+            EnsureLang(request);
+            var osClient = request["OsClient"].Val<string>();
+            if (osClient.DosIsNullOrWhiteSpace())
             {
-                var requestParam = await BuildRequestParam();
-                param = new DiyTableRowParam
-                {
-                    OsClient = requestParam["OsClient"].Val<string>(),
-                    _Lang = requestParam["_Lang"].Val<string>()
-                };
+                return Json(new DosResult(0, null,
+                    DiyMessage.GetLang(osClient, "ParamError", request["_Lang"].Val<string>())));
             }
-            if (param.OsClient.DosIsNullOrWhiteSpace() && Request?.Query != null)
-            {
-                param.OsClient = Request.Query["OsClient"].ToString();
-            }
-            if (param._Lang.DosIsNullOrWhiteSpace())
-            {
-                param._Lang = GetRequestLang();
-            }
-            if (param.OsClient.DosIsNullOrWhiteSpace())
-            {
-                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
-            }
-            var result = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient, param._Lang);
-            return Json(CreatePublicSysConfigResult(result, param.OsClient));
+            return Json(await ManagedApiEngineCompatibility.RunAsync(SysConfigApiEngineKey, request));
         }
 
         /// <summary>
-        /// 获取登录页可用壁纸。该匿名接口只公开已启用壁纸的展示字段，
-        /// 避免为了登录页开放通用 FormEngine 匿名表查询权限。
+        /// 兼容旧客户端的登录页壁纸地址。展示字段、启用状态和个性化 Hook
+        /// 统一由 SaaS 引擎应用中的 Managed 接口引擎维护。
         /// </summary>
         [HttpPost, HttpGet]
         [AllowAnonymous]
@@ -346,38 +307,16 @@ namespace Microi.net.Api
             [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] JObject param = null)
         {
             param = await MergeRequestParam(param);
+            EnsureLang(param);
             var osClient = param["OsClient"].Val<string>();
             var lang = param["_Lang"].Val<string>();
-            if (lang.DosIsNullOrWhiteSpace()) lang = GetRequestLang();
             if (osClient.DosIsNullOrWhiteSpace())
             {
                 return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "ParamError", lang)));
             }
-
-            var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(osClient, lang);
-            if (sysConfigResult == null)
-            {
-                return Json(new DosResult(0, null, "无效的租户标识。"));
-            }
-            if (sysConfigResult.Code != 1)
-            {
-                return Json(sysConfigResult);
-            }
-
-            try
-            {
-                var rows = OsClient.GetClient(osClient).DbRead
-                    .FromSql(@"SELECT Id, Name, Category, ImgUrl
-                               FROM diy_wallpaper
-                               WHERE IsEnable = 1 AND (IsDeleted <> 1 OR IsDeleted IS NULL)")
-                    .ToArray();
-                return Json(new DosResult(1, rows.Take(200).ToArray()));
-            }
-            catch
-            {
-                // 兼容尚未创建壁纸表的旧安装：登录页继续使用 SysConfig.LoginBgImg。
-                return Json(new DosResult(0, null, "读取登录壁纸失败，已使用系统默认登录背景。"));
-            }
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                LoginWallpapersApiEngineKey,
+                param));
         }
 
         [HttpPost, HttpGet]
@@ -474,13 +413,7 @@ namespace Microi.net.Api
                 param["OsClient"] = OsClient.GetConfigOsClient();
             }
             EnsureLang(param);
-            var prefix = param["Prefix"].Val<string>();
-            if (prefix == null)
-            {
-                prefix = "Msg.";
-            }
-            var data = DiyMessage.GetLangBundle(param["OsClient"].Val<string>(), param["_Lang"].Val<string>(), prefix);
-            return Json(new DosResult(1, data));
+            return Json(await ManagedApiEngineCompatibility.RunAsync(LangBundleApiEngineKey, param));
         }
 
         /// <summary>
@@ -1671,10 +1604,14 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> GetSysConfig_Compat(DiyTableRowParam param)
         {
-            if (param.OsClient.DosIsNullOrWhiteSpace())
-                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
-            var result = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient);
-            return Json(CreatePublicSysConfigResult(result, param.OsClient));
+            var request = await MergeRequestParam(
+                param == null ? new JObject() : JObject.FromObject(param));
+            EnsureLang(request);
+            var osClient = request["OsClient"].Val<string>();
+            if (osClient.DosIsNullOrWhiteSpace())
+                return Json(new DosResult(0, null,
+                    DiyMessage.GetLang(osClient, "ParamError", request["_Lang"].Val<string>())));
+            return Json(await ManagedApiEngineCompatibility.RunAsync(SysConfigApiEngineKey, request));
         }
 
         /// <summary>

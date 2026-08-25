@@ -1,7 +1,16 @@
+/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1
+ * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】
+ * 所属官方应用：应用商城
+ * ApiEngineKey：import-microi-store-package
+ * 从可信吾码官方应用源安装、更新或重新安装“应用商城”，都会以官方源码恢复此 Managed 接口。
+ * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，
+ * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
+ */
+
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.4.2
+ * Version: v2.4.4
  * Function:
  * - 统一应用商城导入器；支持 HDFS 公私有包指针、大小与 SHA-256 校验、后台分片和官方受管升级。
  */
@@ -851,7 +860,8 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
             Id: storeId,
             StoreVersionId: firstTextParam([V8.Param.StoreVersionId, storeRow.StoreVersionId, storeRow.DataVersionId]),
             ExpectedAppVersion: firstTextParam([V8.Param.AppVersion, storeRow.AppVersion, storeRow.Version]),
-            PinCurrentVersion: backgroundChunkingEnabled
+            PinCurrentVersion: backgroundChunkingEnabled,
+            PackagePointerMode: 'HdfsV1'
         }),
         120
     );
@@ -6759,7 +6769,8 @@ try {
                     marketplaceEngineUrl('get-microi-store-model'),
                     marketplaceEngineParam('get-microi-store-model', {
                         Id: historicalStoreId,
-                        StoreVersionId: versionIds[historicalVersionIndex]
+                        StoreVersionId: versionIds[historicalVersionIndex],
+                        PackagePointerMode: 'HdfsV1'
                     }),
                     120
                 );
@@ -6950,6 +6961,26 @@ try {
             var existingApiEngine = null;
             var existingApiEngineById = null;
             var existingApiEngineByKey = null;
+
+            // TENANT_CREATE_IF_MISSING_TOMBSTONE_V1：CreateIfMissing 首次出现后，
+            // 活跃、禁用或软删除记录都归租户维护。软删除不是授权官方包恢复/覆盖的信号；
+            // 先从物理表按稳定 Key 读取（包括 IsDeleted=1），避免重装时以相同 Id 新增并
+            // 永久主键冲突，也避免把租户主动删除的 Hook 复活。
+            if (apiEnginePolicy.UpgradePolicy == 'CreateIfMissing' && apiEngine.ApiEngineKey) {
+                var tenantOwnedRows = V8.Db.FromSql(
+                        'SELECT * FROM sys_apiengine WHERE LOWER(ApiEngineKey)=LOWER(@p0)'
+                    )
+                    .AddInParameter('@p0', apiEngine.ApiEngineKey)
+                    .ToArray();
+                if (tenantOwnedRows && tenantOwnedRows.length > 0) {
+                    var tenantOwnedEngine = tenantOwnedRows[0];
+                    stats.ApiEngineSkipped++;
+                    debugLog['apiengine_tenant_owned_tombstone_skip_' + i] =
+                        '保留租户接口引擎（含软删除状态），不恢复、不覆盖：' + apiEngine.ApiEngineKey;
+                    recordApiEngineResourceState(tenantOwnedEngine, apiEnginePolicy);
+                    continue;
+                }
+            }
 
             if (apiEngine.Id) {
                 existsById = checkExists('sys_apiengine', apiEngine.Id);

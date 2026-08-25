@@ -1,9 +1,19 @@
+/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1
+ * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】
+ * 所属官方应用：应用商城
+ * ApiEngineKey：microi-store-package-storage
+ * 从可信吾码官方应用源安装、更新或重新安装“应用商城”，都会以官方源码恢复此 Managed 接口。
+ * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，
+ * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
+ */
+
 /*
  * V8 ApiEngine
  * ApiEngineKey: microi-store-package-storage
- * Version: v1.0.8
+ * Version: v1.1.0
  * Function:
  * - 将应用商城 JSON 安装包写入公有或私有 HDFS，完成 UTF-8 字节数与 SHA-256 回读校验，并复用已验证的内容寻址包对象。
+ * - 发布写入暂时固定使用已经过生产验证的 Base64 单次上传路径；UploadText 完成真实嵌套接口/HDFS 集成门禁前不自动切换，避免结果未知时重复写对象。
  */
 
 function text(value) { return value === null || value === undefined ? '' : String(value); }
@@ -237,25 +247,30 @@ var uploadParam = {
   Preview: false,
   Multiple: false
 };
-var uploadResult;
-if (V8.Method.UploadText) {
-  uploadResult = V8.Method.UploadText(uploadParam);
-} else {
-  uploadResult = V8.Method.Upload({
-    OsClient: uploadParam.OsClient,
-    Path: uploadParam.Path,
-    Limit: uploadParam.Limit,
-    Preview: false,
-    Multiple: false,
-    FilesByteBase64: (function () {
-      var files = {};
-      files[fileName] = V8.Base64.StringToBase64(packageText);
-      return files;
-    })()
-  });
-}
+// MARKETPLACE_PACKAGE_UPLOAD_BASE64_SINGLE_ATTEMPT_V1：UploadText 在真实
+// ApiEngine -> HDFS 链路完成非空返回契约和端到端门禁前，不做运行时自动探测，
+// 更不能在结果为空/异常后回退重传；因为第一次写入结果未知时，第二次上传可能
+// 生成孤儿对象。这里始终只执行一次已经过生产发布验证的 Base64 上传。
+var uploadFiles = {};
+uploadFiles[fileName] = V8.Base64.StringToBase64(packageText);
+var uploadResult = V8.Method.Upload({
+  OsClient: uploadParam.OsClient,
+  Path: uploadParam.Path,
+  Limit: uploadParam.Limit,
+  Preview: false,
+  Multiple: false,
+  FilesByteBase64: uploadFiles
+});
 if (!uploadResult || uploadResult.Code !== 1) {
-  return { Code: 0, Msg: '应用包上传 HDFS 失败：' + ((uploadResult && uploadResult.Msg) || '接口无返回') };
+  return {
+    Code: 0,
+    Msg: '应用包上传 HDFS 失败：' + ((uploadResult && uploadResult.Msg) || '上传原子未返回标准结果'),
+    DataAppend: {
+      UploadMode: 'Base64SingleAttempt',
+      HasResult: !!uploadResult,
+      ResultCode: uploadResult && uploadResult.Code !== undefined ? uploadResult.Code : null
+    }
+  };
 }
 var hdfsPath = firstPath(uploadResult.Data);
 if (!hdfsPath) return { Code: 0, Msg: '应用包上传成功但未返回 HDFS 路径。' };

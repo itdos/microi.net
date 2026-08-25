@@ -285,6 +285,18 @@ AI 对话中的【选择中转模型】始终显示并提交官方目录的模�
 
 PC 顶栏助手和移动端助手复用 `mci_ai_data_assistant` 的 `Bootstrap`、会话及问答协议。快捷问题由启用的 `mci_ai_data_domain.PromptExamples` 动态产生，不能在前端硬编码；应用商城的 AI助手包必须同时包含这些业务域初始化数据和最新接口引擎源码。
 
+### 官方应用包归属与兼容
+
+- 官方增量应用的事实源固定为 `app.microi.ai-engine`。从 v6.3.6 起，包内 `SysApiEngines` 是严格四项闭包：Managed `mci_ai_data_assistant`、Managed `platform-ai-account`、Managed `platform-ai-runtime`，以及租户拥有、策略为 `CreateIfMissing` 的应用级 `platform-ai-custom-hook`。三个 Managed 接口都必须带醒目的“安装、更新或重新安装会恢复官方源码”提示；租户只能在 Hook 中编写个性化逻辑。
+- `platform-ai-runtime` 统一编排 `UpdateConversationTitle / RecognizeIntent / Chat / NL2SQL / NL2V8EngineSync` 五个非流式动作，新客户端直接调用 `/apiengine/platform-ai-runtime` 并传固定 `Action`；旧 `/api/Ai/*` 同名路由只做兼容转发。`ChatStream`、流式 `NL2V8Engine`、Provider Proxy、媒体、文件和策略元数据仍保持原生传输/安全边界。
+- 支付宝回调的 C# 只选择并归一化可信租户、按该租户读取密钥验签、校验签名内 `app_id` 并形成不含签名/密钥的可信元数据，随后只调用一次 `platform-ai-account/CompletePayment`。订单条件认领、金额核对、订阅续期或新建、平台 Key 与默认供应商 Key 分配都在同一个接口引擎事务中完成；重复的同一订单/交易返回幂等成功，客户端不能直接伪造 `CompletePayment`。
+- 数据助手与非流式运行时调用 Hook 时只发送 `Stage / SourceApiEngineKey / Action`；支付动作最多增加 `EventId / Provider`，账户其它动作只发送白名单资源元数据。Hook 不接收订单号、交易号、金额、问题、提示词、回答、标题、SQL、模型、附件、平台或供应商 Key、供应商任务号、文件句柄及媒体内容。
+- 原 AI助手包夹带的 12 个 `ai_app_*` 接口——`ai_app_list`、`ai_app_detail`、`ai_app_get_file`、`ai_app_save_file`、`ai_app_create`、`ai_app_build`、`ai_app_preview`、`ai_app_download_source_zip`、`ai_app_download_build_zip`、`ai_app_moveobject_probe`、`ai_app_moveobject_exec_probe`、`ai_app_publish_store`——归 `app.microi.store` 维护。v6.3.5 只把它们从 AI助手安装包的资源选择和所有权声明中移除，不会删除目标租户已经存在的运行时接口记录；既有记录继续由应用商城包按其 Managed 策略升级，禁止用 AI助手升级执行破坏性清理。
+- AI助手包正式拥有 9 张 `mic_sub_*` 订阅表，以及 `mci_ai_token_account`、`mci_ai_token_log` 两张用量表。每张表都必须同时提供 DDL、PhysicalColumns、DiyTables、DiyFields，日志表必须包含 `PromptPreview`；`mci_ai_token_recharge` 不在当前 C# 运行时实体闭包中，不能因为某个线上库存在同名表就擅自打入应用包。
+- `Sys_User.AiApiKey` 不属于 AI助手包，而由 `app.microi.sys_user` 系统账号包统一提供建表 DDL、物理列和隐藏只读的低代码字段。AI助手运行时发现该列缺失时，会明确提示升级系统账号应用；请求路径不会自动改表。
+- v6.3.5 会从 AI助手包的 DDL、PhysicalColumns、DiyTables、DiyFields、DataSets 各层移除重复的 `mci_ai_app_version`、`mci_ai_app_file`、`sys_microistore`，由 Store/SaaS 既有平台包维护；当前仅 AI助手包拥有的 `app_mic_aiapp`、`mci_ai_app` 继续保留。
+- v6.3.6 要求后端同时提供 `V8.Method.ManageAiPlatform`、一次性 `V8.Method.RequireManagedProtocolContext` 与租户/用户绑定的 `V8.AI` 非流式原子（含 `UpdateConversationTitle`）。后端缺少任一能力时应在应用安装预检阶段失败关闭，不能只安装接口后留下运行期半可用状态。
+
 普通角色必须通过 `mci_ai_role_policy` 明确配置数据范围、业务域和模型。平台只对后端可信的 `V8.CurrentUser.Level >= 9999` 提供安装后的安全兜底：动态读取目标租户当前启用的业务域与模型，使用 `All` 范围，但仍关闭原始 SQL并默认隐藏敏感字段。禁止根据客户端参数、账号名称或前端路由判断超级管理员，也不能把发布租户的角色 Id、模型 Id 固化进安装包。
 
 商城发布后的验收至少包含：回读 `sys_microistore.AppVersion/AppPakcet`；确认包内 `mci_ai_data_assistant` 版本和快捷问题数据；再以目标租户超级管理员真实调用 `Bootstrap`，断言 `Enabled=true`、模型非空且快捷问题可见。只看到发布接口成功不算完成。

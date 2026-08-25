@@ -10,7 +10,7 @@ const tenantForm = read('src/tenants/xjy/form.js')
 const tenantBusiness = read('src/tenants/xjy/business.js')
 const businessRuntime = read('src/platform/business-runtime.js')
 const assertions = [
-  [request.includes("post('/api/SysUser/GetCurrentUser', {})"), '缓存缺少完整用户时未刷新当前用户'],
+  [request.includes("post('/apiengine/platform-current-user', {})"), '缓存缺少完整用户时未通过接口引擎刷新当前用户'],
   [request.includes('!refreshed.Id || !(refreshed.Name || refreshed.Account)'), '当前用户响应未校验 Id 和姓名/账号'],
   [checkin.includes('await getVerifiedCurrentUser()'), '拜访打卡提交前未校验当前用户'],
   [tenantForm.includes('await verifiedCurrentUserOption()'), '人员定位初始化/提交前未校验当前用户'],

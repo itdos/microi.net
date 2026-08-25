@@ -90,6 +90,25 @@ namespace Microi.net
                 "FaceApiKey"
             };
 
+        // Legacy protocol gateways still read these values from the requested
+        // sys_osclients row. They are backend-only, tenant-bound configuration and
+        // must never be copied from the main tenant or projected into V8/frontend.
+        private static readonly HashSet<string> TenantBoundProtocolFieldSet =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "OAuthReturnUrlOrigins",
+                "ChanjetOAuthState", "ChanjetAesKey", "ChanjetAppKey",
+                "WeChatTemplateAppId", "WeChatTemplateAppSecret", "WeChatTemplateId",
+                "WeChatMiniProgramAppId"
+            };
+
+        private static readonly HashSet<string> SensitiveProtocolCredentialFieldSet =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "ChanjetOAuthState", "ChanjetAesKey", "ChanjetAppKey",
+                "WeChatTemplateAppSecret"
+            };
+
         private static readonly HashSet<string> V8AlwaysHiddenFieldSet =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -100,7 +119,9 @@ namespace Microi.net
                 "WeChatMiniProgramAppSecret", "WeChatMiniProgramMessageToken",
                 "WeChatMiniProgramAESKey",
                 "WeChatMiniProgramEncodingAESKey",
-                "FaceApiKey"
+                "FaceApiKey",
+                "ChanjetOAuthState", "ChanjetAesKey", "ChanjetAppKey",
+                "WeChatTemplateAppSecret"
             };
 
         private static readonly string[] StableSigningKeyFields =
@@ -260,7 +281,8 @@ namespace Microi.net
             var name = (fieldName ?? string.Empty).Trim();
             if (name.Length == 0) return false;
 
-            return name.IndexOf("pwd", StringComparison.OrdinalIgnoreCase) >= 0
+            return SensitiveProtocolCredentialFieldSet.Contains(name)
+                   || name.IndexOf("pwd", StringComparison.OrdinalIgnoreCase) >= 0
                    || name.IndexOf("password", StringComparison.OrdinalIgnoreCase) >= 0
                    || name.IndexOf("secret", StringComparison.OrdinalIgnoreCase) >= 0
                    || name.IndexOf("token", StringComparison.OrdinalIgnoreCase) >= 0
@@ -309,6 +331,7 @@ namespace Microi.net
             if (NeverCopyIdentityFieldSet.Contains(name)
                 || SharedInfrastructureFieldSet.Contains(name)
                 || TenantServiceCredentialFieldSet.Contains(name)
+                || TenantBoundProtocolFieldSet.Contains(name)
                 || IsNonShareableTenantCredentialField(name))
             {
                 return false;
@@ -415,6 +438,7 @@ namespace Microi.net
                 if (V8AlwaysHiddenFieldSet.Contains(property.Name)
                     || SharedInfrastructureFieldSet.Contains(property.Name)
                     || TenantServiceCredentialFieldSet.Contains(property.Name)
+                    || SensitiveProtocolCredentialFieldSet.Contains(property.Name)
                     || property.Name.StartsWith("Redis", StringComparison.OrdinalIgnoreCase)
                     || property.Name.StartsWith("Sentinel", StringComparison.OrdinalIgnoreCase)
                     || property.Name.StartsWith("AliOss", StringComparison.OrdinalIgnoreCase)

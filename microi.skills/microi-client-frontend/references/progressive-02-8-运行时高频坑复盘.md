@@ -160,7 +160,7 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 
 文件同步、跨平台导入等需要登录另一套 Microi API 的前端工具，也必须复用同一验证码契约：
 
-- 用户填写远程 `ApiBase` 和 `OsClient` 后，先请求远程 `/api/FormEngine/GetSysConfig`，按 `isEnabledFlag(EnableCaptcha)` 判断是否需要验证码，不能先盲目调用登录接口。
+- 用户填写远程 `ApiBase` 和 `OsClient` 后，先请求远程 `/apiengine/platform-sys-config?OsClient=<OsClient>`，并让 Query、`osclient` Header 与 Body 三处租户一致；按 `isEnabledFlag(EnableCaptcha)` 判断是否需要验证码，不能先盲目调用登录接口。
 - 需要验证码时，自动请求远程 `/api/Captcha/GetCaptcha?OsClient=<OsClient>`，读取响应头 `captchaid` 并显示验证码图片；用户输入后，远程 `/api/SysUser/login` 必须同时提交 `_CaptchaId/_CaptchaValue`。
 - 远程地址或租户变化时清空旧验证码和 Token；登录失败时刷新验证码。未开启验证码时不得显示验证码输入，也不得提交空验证码字段。
 - 远程响应头必须通过 CORS 暴露 `captchaid` 和 `authorization`；前端还应兼容登录响应体中的 Token，避免只依赖响应头。

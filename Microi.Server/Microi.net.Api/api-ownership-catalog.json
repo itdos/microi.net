@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 1,
-  "UpdatedAt": "2026-08-24",
+  "UpdatedAt": "2026-08-25",
   "Principle": "业务编排优先由应用商城 Managed ApiEngine 交付；C# 仅保留启动前置、协议网关、可信鉴权、密钥隔离、存储网络边界和运行时内核。",
   "Dispositions": {
     "KernelRuntime": "宿主不可被应用包替代的原子运行时；保持 C#，由接口引擎调用。",
@@ -35,7 +35,7 @@
     "SsoController": { "OwnerType": "Application", "OwnerId": "app.microi.sso", "Disposition": "ProtocolGateway" },
     "SysUserAccessKeyController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
     "SysUserController": { "OwnerType": "Application", "OwnerId": "app.microi.sys_user", "Disposition": "BootstrapIdentity" },
-    "TenantSystemSettingsController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
+    "TenantSystemSettingsController": { "OwnerType": "Application", "OwnerId": "app.microi.sys-config", "Disposition": "ProtocolGateway" },
     "TranslateController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "UEditorController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "ProtocolGateway" },
     "UploadController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "ProtocolGateway" },
@@ -62,6 +62,58 @@
     "SysMenuController": { "Target": "ApiEngine:platform-sys-menu", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
     "SysRoleController": { "Target": "ApiEngine:platform-sys-role", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" }
   },
+  "SupportDirectories": {
+    "Scope": ["Middleware", "Handler", "Services", "Models"],
+    "KeepApi": [
+      "Handler/ApiEngineHttpStreamSink.cs",
+      "Handler/ApiEngineRealtimeHub.cs",
+      "Handler/CorsOptionsConfigurator.cs",
+      "Handler/DiyFilter.cs",
+      "Handler/DiyWebSocket.cs",
+      "Handler/DynamicApiEngine.cs",
+      "Handler/FormDataOrJsonModelBinder.cs",
+      "Handler/ForwardedProxyTrustPolicy.cs",
+      "Handler/GameRealtimeHub.cs",
+      "Handler/GlobalExceptionHandler.cs",
+      "Handler/JwtBearerOptionsConfigurator.cs",
+      "Handler/ManagedApiEngineCompatibility.cs",
+      "Handler/PlatformAdminOnlyAttribute.cs",
+      "Handler/RedisCacheOptionsConfigurator.cs",
+      "Handler/UEditor/AppConsts.cs",
+      "Handler/UEditor/Config.cs",
+      "Handler/UEditor/Handlers/HandelFactory.cs",
+      "Handler/UEditor/Handlers/Handler.cs",
+      "Handler/UEditor/Handlers/NotSupportedHandler.cs",
+      "Handler/UEditor/Handlers/UploadHandler.cs",
+      "Handler/UEditor/UEditorMvcExtension.cs",
+      "Handler/UEditor/UEditorResponse.cs",
+      "Handler/UEditor/UEditorResult.cs",
+      "Handler/UEditor/UEditorService.cs",
+      "Handler/V8DebugWebSocket.cs",
+      "Handler/V8McpAuthorizationAttribute.cs",
+      "Middleware/RequestPressureGuardMiddleware.cs",
+      "Middleware/SecurityGuardMiddleware.cs",
+      "Middleware/SystemObservabilityMiddleware.cs",
+      "Models/ErrorViewModel.cs",
+      "Services/ApplicationAssetAliasReconciliationWorkerService.cs",
+      "Services/BackgroundTaskWorkerService.cs",
+      "Services/PrivateFileAuditLinkService.cs",
+      "Services/ProcessMemoryGuardService.cs",
+      "Services/SysLogQueueService.cs",
+      "Services/SystemObservabilityTrafficRollupService.cs",
+      "Services/WeChatContentSecurityService.cs"
+    ],
+    "Reason": "仅保留 HTTP/MVC/SignalR 传输、宿主启动与生命周期、安全网关、存储网络边界和第三方原始协议适配；不允许新增租户可变业务编排。"
+  },
+  "MigratedSupportCode": {
+    "Services/UserBehaviorSessionTracker.cs": { "Disposition": "MovedCore", "Target": "Microi.Core/Runtime/UserBehaviorSessionTracker.cs", "RemovedAt": "2026-08-25" },
+    "Services/RichTextPrivateAssetReference.cs": { "Disposition": "MovedCore", "Target": "Microi.Core/Security/RichTextPrivateAssetReference.cs", "RemovedAt": "2026-08-25" },
+    "Handler/UEditor/Handlers/ConfigHandler.cs": { "Disposition": "Deleted", "Reason": "静态跨租户配置已改为请求级租户配置。", "RemovedAt": "2026-08-25" },
+    "Handler/UEditor/Handlers/ListFileHandler.cs": { "Disposition": "Deleted", "Reason": "禁止递归枚举宿主本地文件导致跨租户泄漏。", "RemovedAt": "2026-08-25" },
+    "Handler/UEditor/Handlers/CrawlerHandler.cs": { "Disposition": "Deleted", "Reason": "catchimage 固定返回不支持，移除无引用的 SSRF 历史实现。", "RemovedAt": "2026-08-25" },
+    "Handler/UEditor/PathFormater.cs": { "Disposition": "Deleted", "Reason": "本地存储路径拼接已由租户 HDFS 取代。", "RemovedAt": "2026-08-25" },
+    "Handler/UEditor/StringExtension.cs": { "Disposition": "Deleted", "Reason": "仅为已删除的本地文件处理代码服务。", "RemovedAt": "2026-08-25" }
+  },
   "ActionOverrides": {
     "SysUserController.Login": {
       "Disposition": "BootstrapIdentity",
@@ -75,15 +127,242 @@
     },
     "SysUserController.AddSysUser": {
       "Disposition": "ManagedBusinessFacade",
-      "Target": "FormEngine plus app.microi.saas-engine policy engine"
+      "Target": "app.microi.sys_user ApiEngine:platform-sys-user-admin",
+      "CompatibilityRoutes": ["/api/SysUser/AddSysUser"],
+      "NativeBoundary": ["trusted tenant/current-user binding", "sys_user table and role hierarchy authorization", "one-way password hashing"],
+      "TenantHook": "ApiEngine:platform-user-custom-hook",
+      "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
     "SysUserController.UptSysUser": {
       "Disposition": "ManagedBusinessFacade",
-      "Target": "FormEngine plus app.microi.saas-engine policy engine"
+      "Target": "app.microi.sys_user ApiEngine:platform-sys-user-admin",
+      "CompatibilityRoutes": ["/api/SysUser/UptSysUser"],
+      "NativeBoundary": ["trusted tenant/current-user binding", "table permission and role hierarchy authorization", "password hashing and identity step-up", "WeChat profile content review", "session revocation and login projection refresh"],
+      "TenantHook": "ApiEngine:platform-user-custom-hook",
+      "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
     "SysUserController.DelSysUser": {
       "Disposition": "ManagedBusinessFacade",
-      "Target": "FormEngine plus app.microi.saas-engine policy engine"
+      "Target": "app.microi.sys_user ApiEngine:platform-sys-user-admin",
+      "CompatibilityRoutes": ["/api/SysUser/DelSysUser"],
+      "NativeBoundary": ["trusted tenant/current-user binding", "sys_user delete permission and role hierarchy authorization", "session revocation"],
+      "TenantHook": "ApiEngine:platform-user-custom-hook",
+      "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "SysUserController.GetSysUser": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.sys_user ApiEngine:platform-sys-user-admin",
+      "CompatibilityRoutes": ["/api/SysUser/GetSysUser"],
+      "NativeBoundary": ["trusted tenant/current-user binding", "sys_user list permission", "password and credential redaction"],
+      "TenantHook": "ApiEngine:platform-user-custom-hook",
+      "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "SysUserController.RefreshLoginUser": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.sys_user ApiEngine:platform-sys-user-admin",
+      "CompatibilityRoutes": ["/api/SysUser/RefreshLoginUser"],
+      "NativeBoundary": ["trusted tenant/current-user binding", "self-only or authoritative administrator target authorization", "canonical tenant login projection cache"],
+      "TenantHook": "ApiEngine:platform-user-custom-hook",
+      "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "SysUserController.CreateTenant": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform-create-tenant",
+      "NativeBoundary": [
+        "authoritative tenant quota and identity validation",
+        "tenant database provisioning and bootstrap",
+        "password hashing and DiyToken-safe identity atoms"
+      ],
+      "TenantHook": "ApiEngine:platform-runtime-custom-hook"
+    },
+    "SysUserController.UpdateCurrentProfile": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.sys_user ApiEngine:platform-user-update-profile",
+      "NativeBoundary": [
+        "current DiyToken identity binding",
+        "allowed-field and immutable-field validation",
+        "password hashing when an authorized password change is requested"
+      ],
+      "TenantHook": "ApiEngine:platform-user-custom-hook"
+    },
+    "SysUserController.UpdateMyDefaultIndexUrl": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.sys_user ApiEngine:platform-user-update-preferences",
+      "NativeBoundary": [
+        "current DiyToken identity binding",
+        "authorized internal-route validation"
+      ],
+      "TenantHook": "ApiEngine:platform-user-custom-hook"
+    },
+    "TenantSystemSettingsController.ListSaveDelete": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.sys-config ApiEngine:platform-tenant-system-settings",
+      "NativeBoundary": [
+        "tenant-bound secret protection and unprotection",
+        "secret reveal authorization and no-store response",
+        "credential and infrastructure configuration isolation"
+      ],
+      "TenantHook": "ApiEngine:platform-system-settings-custom-hook"
+    },
+    "AiController.PlatformAccountCompatibilityActions": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.ai-engine ApiEngine:platform-ai-account",
+      "NativeBoundary": [
+        "provider credential isolation and outbound protocol",
+        "atomic quota consumption",
+        "payment callback signature verification and authoritative tenant normalization",
+        "one-shot managed payment protocol context",
+        "media task handles and trusted file persistence"
+      ],
+      "TenantHook": "ApiEngine:platform-ai-custom-hook"
+    },
+    "AiController.PlatformRuntimeCompatibilityActions": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.ai-engine ApiEngine:platform-ai-runtime",
+      "Actions": [
+        "UpdateConversationTitle",
+        "RecognizeIntent",
+        "Chat",
+        "NL2SQL",
+        "NL2V8EngineSync"
+      ],
+      "NativeBoundary": [
+        "V8.AI tenant, identity, model credential and authorization atoms",
+        "SSE and streaming response transport",
+        "provider proxy, media and file transport",
+        "policy metadata projection"
+      ],
+      "TenantHook": "ApiEngine:platform-ai-custom-hook"
+    },
+    "ExternalLoginController.BindingActions": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform-external-login-binding",
+      "NativeBoundary": [
+        "OAuth protocol redirects and callback validation",
+        "server-owned provider credentials",
+        "one-shot managed protocol context"
+      ],
+      "TenantHook": "ApiEngine:platform-runtime-custom-hook"
+    },
+    "WeChatController.BindSysUser": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform-wechat-user-binding",
+      "NativeBoundary": [
+        "WeChat OAuth protocol and credential boundary",
+        "one-shot managed protocol context"
+      ],
+      "TenantHook": "ApiEngine:platform-runtime-custom-hook"
+    },
+    "DiyChatController.SendSystemMessage": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.message-notification ApiEngine:platform-chat-system-message",
+      "NativeBoundary": [
+        "SignalR transport and authenticated connection delivery"
+      ],
+      "TenantHook": "ApiEngine:platform-message-notification-custom-hook"
+    },
+    "DiyWebSocket.OrdinaryChatActions": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.message-notification ApiEngine:platform-chat-runtime",
+      "Actions": [
+        "SendToUser",
+        "SendChatRecordToUser",
+        "SendUnreadCountToUser",
+        "SendConnectToUser",
+        "SendLastContacts",
+        "SendDelLastContact"
+      ],
+      "CompatibilityRoutes": [
+        "SignalR Hub:DiyWebSocket.SendToUser",
+        "SignalR Hub:DiyWebSocket.SendChatRecordToUser",
+        "SignalR Hub:DiyWebSocket.SendUnreadCountToUser",
+        "SignalR Hub:DiyWebSocket.SendConnectToUser",
+        "SignalR Hub:DiyWebSocket.SendLastContacts",
+        "SignalR Hub:DiyWebSocket.SendDelLastContact"
+      ],
+      "NativeBoundary": [
+        "DiyToken and tenant-bound SignalR connection authentication",
+        "WebSocket/SignalR best-effort delivery after committed storage",
+        "AI streaming protocol and provider transport"
+      ],
+      "TenantHook": "ApiEngine:platform-message-notification-custom-hook"
+    },
+    "MarketplaceSourceController.SourceActions": {
+      "Disposition": "ProtocolGateway",
+      "Target": "app.microi.store ApiEngine:platform-marketplace-source",
+      "NativeBoundary": [
+        "protected source credential storage",
+        "remote marketplace HTTP protocol",
+        "one-shot managed protocol context"
+      ],
+      "TenantHook": "ApiEngine:platform-marketplace-source-hook"
+    },
+    "OsController.GetOsClientByDomain": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform-os-client-by-domain",
+      "CompatibilityRoutes": ["/api/Os/GetOsClientByDomain"],
+      "CompatibilityExitGate": "Microi.Client、microi.uniapp 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "FormEngineController.GetSysConfig": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform-sys-config",
+      "CompatibilityRoutes": ["/api/FormEngine/GetSysConfig"],
+      "CompatibilityExitGate": "Microi.Client、microi.uniapp 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "FormEngineController.GetSysConfig_Compat": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform-sys-config",
+      "CompatibilityRoutes": ["/api/DiyTable/GetSysConfig"],
+      "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "FormEngineController.GetLangBundle": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform-lang-bundle",
+      "CompatibilityRoutes": ["/api/FormEngine/GetLangBundle"],
+      "CompatibilityExitGate": "Microi.Client、microi.uniapp 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "FormEngineController.GetLoginWallpapers": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform-login-wallpapers",
+      "CompatibilityRoutes": ["/api/FormEngine/GetLoginWallpapers"],
+      "CompatibilityExitGate": "Microi.Client 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "SysUserController.GetCurrentUser": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform-current-user",
+      "CompatibilityRoutes": ["/api/SysUser/GetCurrentUser"],
+      "AccessKeyPolicy": "固定自省门面；只返回当前已认证身份，不授予任意 api-engine:run。",
+      "CompatibilityExitGate": "Microi.Client、microi.uniapp 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "SysUserController.GetSysUserPublicInfo": {
+      "Disposition": "ManagedBusinessFacade",
+      "Target": "app.microi.saas-engine ApiEngine:platform-sys-user-public-info",
+      "CompatibilityRoutes": ["/api/SysUser/GetSysUserPublicInfo"],
+      "CompatibilityExitGate": "Microi.Client、microi.uniapp 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "HDFSController.GetPrivateFileUrl": {
+      "Disposition": "MigrationCandidate",
+      "Target": "app.microi.saas-engine ApiEngine:platform-private-file-url",
+      "CompatibilityRoutes": ["/api/HDFS/GetPrivateFileUrl"],
+      "AccessKeyScope": "file:read",
+      "NativeBoundary": [
+        "legacy DiyToken/mobile token normalization",
+        "Core menu/table/row/field/resource/path authorization",
+        "HDFS signed URL and storage boundary"
+      ],
+      "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "HDFSController.MallFileUrl": {
+      "Disposition": "MigrationCandidate",
+      "Target": "app.microi.saas-engine ApiEngine:platform-private-file-url",
+      "CompatibilityRoutes": ["/api/HDFS/MallFileUrl"],
+      "AccessKeyScope": "file:read",
+      "NativeBoundary": [
+        "legacy mobile token normalization",
+        "Core menu/table/row/field/resource/path authorization",
+        "HDFS signed URL and storage boundary"
+      ],
+      "CompatibilityExitGate": "旧版 UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
     "SsoController": {
       "Disposition": "ProtocolGateway",

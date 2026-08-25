@@ -21,6 +21,8 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     public sealed class TenantSystemSettingsController : Controller
     {
+        private const string TenantSystemSettingsApiEngineKey = "platform-tenant-system-settings";
+
         public sealed class SaveSettingRequest
         {
             public string Id { get; set; }
@@ -144,28 +146,14 @@ namespace Microi.net.Api
             var tokenResult = await RequireAdministratorAsync().ConfigureAwait(false);
             if (tokenResult.Code != 1) return Json(tokenResult);
             Response.Headers.CacheControl = "no-store";
-            var snapshot = TenantSystemSettingsSecurity.LoadSnapshot(tokenResult.Data.OsClient);
-            var rows = snapshot.Values
-                .Where(item => !TenantSystemSettingsSecurity.IsMigratedPublicSettingKey(item.Key))
-                .OrderBy(item => item.Sort)
-                .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(item => new
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                TenantSystemSettingsApiEngineKey,
+                new JObject
                 {
-                    item.Id,
-                    ConfigKey = item.Key,
-                    ConfigValue = item.IsSecret ? "" : item.Value,
-                    item.ValueType,
-                    item.Category,
-                    item.Description,
-                    item.IsPublic,
-                    item.IsSecret,
-                    item.IsEnabled,
-                    item.Sort,
-                    item.ValueSource,
-                    HasSecret = item.IsSecret && !item.SecretCipher.DosIsNullOrWhiteSpace()
-                })
-                .ToList();
-            return Json(new DosResult(1, rows));
+                    ["Action"] = "List",
+                    ["OsClient"] = tokenResult.Data.OsClient
+                },
+                tokenResult.Data.CurrentUser).ConfigureAwait(false));
         }
 
         [HttpPost]
@@ -182,12 +170,40 @@ namespace Microi.net.Api
             if (TenantSystemSettingsSecurity.IsMigratedPublicSettingKey(key))
                 return Json(new DosResult(0, null,
                     "此公开开关已迁移到“系统设置 → 登录界面与入口”，不能再作为服务端私有设置保存。"));
+            var isSecret = request.IsSecret || TenantSystemSettingsSecurity.IsSensitiveKey(key);
+            JObject existing;
+            try
+            {
+                existing = await FindSettingAsync(osClient, request.Id, key).ConfigureAwait(false);
+            }
+            catch
+            {
+                return Json(new DosResult(0, null, "租户系统设置查询失败，请稍后重试。"));
+            }
+            if (existing != null
+                && !string.Equals(existing["ConfigKey"]?.ToString(), key, StringComparison.Ordinal))
+            {
+                return Json(new DosResult(0, null,
+                    "设置 Key 不能通过保存动作重命名，请新建设置后再删除旧项。"));
+            }
+            var existingIsSecret = existing?["IsSecret"]?.Val<int>() == 1;
+            if (!isSecret && !existingIsSecret)
+            {
+                var apiRequest = JObject.FromObject(request);
+                apiRequest["Action"] = "SaveNonSecret";
+                apiRequest["ConfigKey"] = key;
+                apiRequest["OsClient"] = osClient;
+                return Json(await ManagedApiEngineCompatibility.RunAsync(
+                    TenantSystemSettingsApiEngineKey,
+                    apiRequest,
+                    tokenResult.Data.CurrentUser).ConfigureAwait(false));
+            }
+
+            // Secret/Sensitive Key（以及由 Secret 转为普通值的历史行）继续留在可信 C#：
+            // 明文在此处立即转换为认证密文，绝不进入可编辑 V8。
             var value = request.Value ?? string.Empty;
             if (value.Length > 1024 * 1024) return Json(new DosResult(0, null, "设置值不能超过 1MB。"));
-            var isSecret = request.IsSecret || TenantSystemSettingsSecurity.IsSensitiveKey(key);
             const bool isPublic = false;
-
-            var existing = await FindSettingAsync(osClient, request.Id, key).ConfigureAwait(false);
             var id = existing?["Id"]?.ToString() ?? Guid.NewGuid().ToString();
             var secretCipher = existing?["SecretCipher"]?.ToString() ?? string.Empty;
             if (isSecret)
@@ -291,18 +307,13 @@ namespace Microi.net.Api
         {
             var tokenResult = await RequireAdministratorAsync().ConfigureAwait(false);
             if (tokenResult.Code != 1) return Json(tokenResult);
-            var item = await FindSettingByIdAsync(tokenResult.Data.OsClient, request?.Id).ConfigureAwait(false);
-            if (item == null) return Json(new DosResult(0, null, "设置不存在。"));
-            if (TenantSystemSettingsSecurity.IsMigratedPublicSettingKey(item["ConfigKey"]?.ToString()))
-                return Json(new DosResult(0, null,
-                    "此公开开关已迁移到“系统设置 → 登录界面与入口”，历史兼容值不能在私有设置中删除。"));
-            var result = await MicroiEngine.FormEngine.DelFormDataAsync(TenantSystemSettingsSecurity.TableName, new
-            {
-                Id = request.Id,
-                OsClient = tokenResult.Data.OsClient
-            }).ConfigureAwait(false);
-            QueueAudit(tokenResult.Data, "DeleteTenantSystemSetting", result.Code == 1, request.Id, item["ConfigKey"]?.ToString());
-            return Json(result);
+            var apiRequest = request == null ? new JObject() : JObject.FromObject(request);
+            apiRequest["Action"] = "Delete";
+            apiRequest["OsClient"] = tokenResult.Data.OsClient;
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                TenantSystemSettingsApiEngineKey,
+                apiRequest,
+                tokenResult.Data.CurrentUser).ConfigureAwait(false));
         }
 
         private static async Task<DosResult<CurrentToken>> RequireAdministratorAsync()
@@ -344,10 +355,20 @@ namespace Microi.net.Api
 
         private static async Task<JObject> FindSettingAsync(string osClient, string id, string key)
         {
-            if (!id.DosIsNullOrWhiteSpace()) return await FindSettingByIdAsync(osClient, id).ConfigureAwait(false);
-            try
+            DosResult<dynamic> result;
+            if (!id.DosIsNullOrWhiteSpace())
             {
-                var result = await MicroiEngine.FormEngine.GetFormDataAsync(TenantSystemSettingsSecurity.TableName, new
+                result = await MicroiEngine.FormEngine.GetFormDataAsync(
+                    TenantSystemSettingsSecurity.TableName,
+                    new
+                    {
+                        Id = id,
+                        OsClient = osClient
+                    }).ConfigureAwait(false);
+            }
+            else
+            {
+                result = await MicroiEngine.FormEngine.GetFormDataAsync(TenantSystemSettingsSecurity.TableName, new
                 {
                     OsClient = osClient,
                     _Where = new List<DiyWhere>
@@ -356,9 +377,10 @@ namespace Microi.net.Api
                         new DiyWhere { Name = "IsDeleted", Type = "=", Value = 0 }
                     }
                 }).ConfigureAwait(false);
-                return result.Code == 1 && result.Data != null ? JObject.FromObject(result.Data) : null;
             }
-            catch { return null; }
+            if (result.Code == 1 && result.Data != null) return JObject.FromObject(result.Data);
+            if (result.Code == 2) return null;
+            throw new InvalidOperationException(result.Msg ?? "租户系统设置查询失败。");
         }
 
         private static async Task<JObject> FindSettingByIdAsync(string osClient, string id)

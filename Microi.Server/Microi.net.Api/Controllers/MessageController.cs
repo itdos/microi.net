@@ -11,10 +11,11 @@ namespace Microi.net.Api
     public class MessageController : ControllerBase
     {
         [HttpGet]
-        public IActionResult OAuth(string code, string state)
+        public IActionResult OAuth(string code, string state, string OsClient = null)
         {
-            var expectedState = ConfigHelper.GetRuntimeConfigurationValue(
-                "Integrations:Chanjet:OAuthState");
+            if (!TryLoadProtocolSettings(OsClient, out var protocolSettings))
+                return NotFound();
+            var expectedState = protocolSettings.OAuthState;
             if (expectedState.DosIsNullOrWhiteSpace()
                 || code.DosIsNullOrWhiteSpace()
                 || !FixedTimeEquals(expectedState, state))
@@ -28,14 +29,14 @@ namespace Microi.net.Api
         [HttpPost]
         [Route("Receive")]
         [RequestSizeLimit(512 * 1024)]
-        public IActionResult Receive([FromBody] ChanjetEncryptMsg encryptMsg)
+        public IActionResult Receive([FromBody] ChanjetEncryptMsg encryptMsg, string OsClient = null)
         {
             try
             {
-                var aesKey = ConfigHelper.GetRuntimeConfigurationValue(
-                    "Integrations:Chanjet:AesKey");
-                var expectedAppKey = ConfigHelper.GetRuntimeConfigurationValue(
-                    "Integrations:Chanjet:AppKey");
+                if (!TryLoadProtocolSettings(OsClient, out var protocolSettings))
+                    return NotFound();
+                var aesKey = protocolSettings.AesKey;
+                var expectedAppKey = protocolSettings.AppKey;
                 var enMsg = encryptMsg?.GetEncryptMsg();
                 var keyLength = Encoding.UTF8.GetByteCount(aesKey ?? "");
                 if (aesKey.DosIsNullOrWhiteSpace()
@@ -90,6 +91,21 @@ namespace Microi.net.Api
             {
                 return BadRequest(new DosResult(0, null, "消息格式无效。"));
             }
+        }
+
+        private static bool TryLoadProtocolSettings(
+            string requestedOsClient,
+            out ChanjetProtocolGatewaySettings settings)
+        {
+            var osClient = requestedOsClient;
+            if (osClient.DosIsNullOrWhiteSpace())
+            {
+                // Compatibility for the historical single-tenant callback URL. New
+                // callback registrations should always append ?OsClient={tenant}.
+                osClient = OsClientExtend.GetConfigOsClient();
+                if (osClient.DosIsNullOrWhiteSpace()) osClient = OsClientDefault.OsClient;
+            }
+            return TenantProtocolGatewaySettings.TryLoadChanjet(osClient, out settings);
         }
 
         private object DealOrderPayMsg(MessageBase message)

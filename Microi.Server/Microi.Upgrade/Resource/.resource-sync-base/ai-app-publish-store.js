@@ -1,7 +1,16 @@
+/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1
+ * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】
+ * 所属官方应用：应用商城
+ * ApiEngineKey：ai_app_publish_store
+ * 从可信吾码官方应用源安装、更新或重新安装“应用商城”，都会以官方源码恢复此 Managed 接口。
+ * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，
+ * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
+ */
+
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.9.7
+ * Version: v1.9.8
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -597,6 +606,73 @@ function apiEngineMap(engines) {
     if (key) result[key] = row;
   }
   return result;
+}
+function normalizeApiEngineKeys(values) {
+  var source = parseArray(values);
+  var result = [];
+  var seen = {};
+  for (var i = 0; i < source.length; i++) {
+    var item = source[i] || {};
+    var key = text(typeof item === 'string'
+      ? item
+      : (item.ApiEngineKey || item.Key || item.Value)).trim();
+    var normalized = key.toLowerCase();
+    if (!normalized || seen[normalized]) continue;
+    seen[normalized] = true;
+    result.push(key);
+  }
+  return result;
+}
+function validateOfficialPlatformApiEngineSelection(
+  resolvedKeys,
+  explicitSelection,
+  existingStore,
+  publicationContext,
+  confirmedRemovalKeys
+) {
+  var publication = publicationContext || {};
+  var publisherType = text(publication.PublisherType);
+  var isOfficialPlatform = text(publication.ApplicationType).toLowerCase() === 'platform'
+    && (publisherType === '官方应用' || publisherType === '平台应用');
+  if (!isOfficialPlatform || !existingStore) return ok({ RemovedApiEngineKeys: [] });
+
+  var previousPackage = readStoredPackage(existingStore);
+  var previousKeys = normalizeApiEngineKeys(previousPackage.SysApiEngines);
+  if (previousKeys.length === 0) return ok({ RemovedApiEngineKeys: [] });
+
+  var selectedKeys = normalizeApiEngineKeys(resolvedKeys);
+  var selected = {};
+  for (var selectedIndex = 0; selectedIndex < selectedKeys.length; selectedIndex++) {
+    selected[selectedKeys[selectedIndex].toLowerCase()] = true;
+  }
+  var removed = [];
+  for (var previousIndex = 0; previousIndex < previousKeys.length; previousIndex++) {
+    var previousKey = previousKeys[previousIndex];
+    if (!selected[previousKey.toLowerCase()]) removed.push(previousKey);
+  }
+  if (removed.length === 0) return ok({ RemovedApiEngineKeys: [] });
+
+  if (!explicitSelection) {
+    return fail(
+      '官方 Platform 应用的 SelectApiEngine 不完整，缺少上一版不可变包接口：'
+      + removed.join(', ')
+      + '。请先修复商城资源选择，禁止从退化持久选择重发。'
+    );
+  }
+
+  var confirmed = normalizeApiEngineKeys(confirmedRemovalKeys)
+    .map(function (key) { return key.toLowerCase(); })
+    .sort();
+  var expected = removed
+    .map(function (key) { return key.toLowerCase(); })
+    .sort();
+  if (JSON.stringify(confirmed) !== JSON.stringify(expected)) {
+    return fail(
+      '官方 Platform 应用移除接口必须显式传 ApiEngineRemovalKeys，且与上一版移除集合完全一致：'
+      + removed.join(', ')
+    );
+  }
+  return ok({ RemovedApiEngineKeys: removed });
 }
 function normalizeSha256Hashes(value) {
   var source = value;
@@ -1244,6 +1320,8 @@ var exactMenuIds = V8.Param.ExactMenuIds === true
 var tableIds = parseArray(V8.Param.TableIds);
 var flowIds = parseArray(V8.Param.FlowIds);
 var apiEngineKeys = parseArray(V8.Param.ApiEngineKeys);
+var explicitApiEngineSelection = V8.Param.ApiEngineKeys !== undefined
+  && V8.Param.ApiEngineKeys !== null;
 var scheduleJobNames = parseArray(V8.Param.ScheduleJobNames || V8.Param.JobNames);
 var requestedResourcePolicies = V8.Param.ResourcePolicies || V8.Param.ApiEnginePolicies || {};
 if (dataSelections.length === 0 && existingStore && existingStore.SelectData) {
@@ -1257,6 +1335,19 @@ if (tableIds.length === 0 && existingStore && existingStore.SelectTable) {
 }
 if (apiEngineKeys.length === 0 && existingStore && existingStore.SelectApiEngine) {
   apiEngineKeys = selectionValues(existingStore.SelectApiEngine, ['ApiEngineKey', 'Key', 'Value']);
+}
+var apiEngineSelectionValidation = validateOfficialPlatformApiEngineSelection(
+  apiEngineKeys,
+  explicitApiEngineSelection,
+  existingStore,
+  {
+    ApplicationType: appType,
+    PublisherType: text(V8.Param.PublisherType || app.PublisherType || '官方应用')
+  },
+  V8.Param.ApiEngineRemovalKeys
+);
+if (!apiEngineSelectionValidation || apiEngineSelectionValidation.Code !== 1) {
+  return apiEngineSelectionValidation || fail('官方 Platform 应用接口资源选择校验失败。');
 }
 if (scheduleJobNames.length === 0 && existingStore) {
   var previousPackageWithJobs = readStoredPackage(existingStore);

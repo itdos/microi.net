@@ -7,11 +7,37 @@ import { fileURLToPath } from 'node:url';
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const resource = JSON.parse(fs.readFileSync(path.join(directory, 'app.microi.sso.json'), 'utf8'));
 const fieldByName = new Map((resource.DiyFields || []).map((field) => [field.Name, field]));
+const managedNotice = '/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1';
+const tenantNotice = '/* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1';
+
+function versionParts(value) {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)$/i.exec(String(value || ''));
+  assert.ok(match, `invalid semantic version: ${value}`);
+  return match.slice(1).map(Number);
+}
+
+function compareVersions(left, right) {
+  const leftParts = versionParts(left);
+  const rightParts = versionParts(right);
+  for (let index = 0; index < 3; index += 1) {
+    if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
+  }
+  return 0;
+}
+
+function executableBody(source) {
+  let body = String(source || '').trimStart();
+  while (body.startsWith('/*')) {
+    body = body.replace(/^\/\*[\s\S]*?\*\/\s*/, '');
+  }
+  return body.trim();
+}
 
 test('SSO official package has stable identity and no tenant data', () => {
   assert.equal(resource.PackageInfo.Name, 'SSO 身份联邦');
   assert.equal(resource.PackageInfo.AppId, 'app.microi.sso');
-  assert.equal(resource.PackageInfo.Version, 'v7.5.5');
+  assert.equal(resource.PackageInfo.Version, 'v7.5.7');
+  assert.equal(resource.PackageInfo.ApplicationType, 'Platform');
   assert.deepEqual(resource.PackageInfo.RequiredPlatformCapabilities, [
     'POST /api/Sso/Begin',
     'POST /api/Sso/CompleteAuthorization',
@@ -66,15 +92,51 @@ test('SSO business orchestration is packaged as canonical ApiEngines', () => {
       .find((file) => file.endsWith(`(${engine.ApiEngineKey}).js`));
     assert.ok(sourceFile, `canonical source is missing for ${engine.ApiEngineKey}`);
     const source = fs.readFileSync(path.join(sourceDirectory, sourceFile), 'utf8')
-      .replace(/\r\n?/g, '\n').replace(/\n*$/g, '\n');
-    assert.equal(engine.ApiV8Code, source, `${engine.ApiEngineKey} package code drifted`);
+      .replace(/\r\n?/g, '\n').trimEnd() + '\n';
+    assert.equal(
+      engine.ApiV8Code.replace(/\r\n?/g, '\n').trimEnd(),
+      source.trimEnd(),
+      `${engine.ApiEngineKey} package code drifted`
+    );
+    assert.match(engine.ApiV8Code.replace(/\r\n?/g, '\n'), /[^\n]\n$/);
+    assert.equal(engine.Version, 'v1.0.2');
     const policy = resource.ResourcePolicies.ApiEngines[engine.ApiEngineKey];
     if (engine.ApiEngineKey === 'sso_event_hook') {
       assert.deepEqual(policy, { Ownership: 'Tenant', UpgradePolicy: 'CreateIfMissing' });
+      assert.ok(engine.ApiV8Code.startsWith(tenantNotice));
+      assert.equal(executableBody(engine.ApiV8Code), 'return { Code : 1 };');
     } else {
       assert.deepEqual(policy, { Ownership: 'Application', UpgradePolicy: 'Managed' });
+      assert.ok(engine.ApiV8Code.startsWith(managedNotice));
     }
   }
+});
+
+test('SSO Managed flow invokes the tenant Hook only through a safe event whitelist', () => {
+  const engines = new Map(resource.SysApiEngines.map((engine) => [engine.ApiEngineKey, engine]));
+  for (const [key, engine] of engines) {
+    const directHookCalls = engine.ApiV8Code.match(/V8\.ApiEngine\.Run\(['"]sso_event_hook['"]/g) || [];
+    assert.equal(directHookCalls.length, key === 'sso_protocol_event' ? 1 : 0, `${key} direct Hook call count`);
+  }
+
+  const protocolCode = engines.get('sso_protocol_event').ApiV8Code;
+  assert.match(protocolCode, /SSO_TENANT_HOOK_SAFE_PAYLOAD_V1/);
+  const eventObject = /var event = \{([\s\S]*?)\n\};/.exec(protocolCode);
+  assert.ok(eventObject, 'sso_protocol_event must build an explicit Hook event object');
+  const eventKeys = [...eventObject[1].matchAll(/^\s{2}([A-Za-z][A-Za-z0-9]*):/gm)].map((match) => match[1]);
+  assert.deepEqual(eventKeys, [
+    'EventId', 'Action', 'UserId', 'ConnectionKey',
+    'Protocol', 'Success', 'Reason', 'OccurredAt'
+  ]);
+  assert.doesNotMatch(eventObject[0], /token|secret|credential|assertion|claim|raw/i);
+});
+
+test('SSO generator preserves future package versions instead of reverting to its minimum', () => {
+  const generator = fs.readFileSync(path.join(directory, 'configure-sso-resource.mjs'), 'utf8');
+  assert.match(generator, /minimumPackageVersion = 'v7\.5\.6'/);
+  assert.match(generator, /compareSemanticVersions\(pkg\.PackageInfo\?\.Version, minimumPackageVersion\) >= 0/);
+  assert.match(generator, /normalizeOfficialApiEnginePolicies\(pkg, 'app\.microi\.sso\.json'\)/);
+  assert.ok(!generator.includes(".replace(/\\n*$/g, '\\n')"));
 });
 
 test('SSO package carries both directions and all standard web SSO protocols', () => {
@@ -143,17 +205,31 @@ test('official resource pipeline allowlists the SSO package', () => {
   assert.match(api, /"app\.microi\.sso\.json": "SSO 身份联邦"/);
 });
 
+test('backend startup embeds, checks, installs and verifies SSO after SaaS', () => {
+  const upgradeDirectory = path.resolve(directory, '..');
+  const project = fs.readFileSync(path.join(upgradeDirectory, 'Microi.Upgrade.csproj'), 'utf8');
+  const upgrade = fs.readFileSync(path.join(upgradeDirectory, '13-UpgradeAppStore.cs'), 'utf8');
+  assert.match(project, /EmbeddedResource Include="Resource\\app\.microi\.sso\.json"/);
+  assert.match(upgrade, /GetInstalledSsoRuntimeRepairReason\(client\.Db\)/);
+  assert.match(upgrade, /HasPackagedSsoRuntime\(package\)/);
+  assert.match(upgrade, /ValidateInstalledSsoRuntimeDependencies\(osClient, msgs\)/);
+  const saasInstall = upgrade.indexOf('InstallUpgradePackage(osClient, msgs, SaaSEnginePackageResourceName');
+  const ssoInstall = upgrade.indexOf('InstallUpgradePackage(osClient, msgs, SsoPackageResourceName');
+  const aiPublisher = upgrade.indexOf('#region AI应用发布到商城V8');
+  assert.ok(saasInstall >= 0 && ssoInstall > saasInstall && aiPublisher > ssoInstall);
+});
+
 test('official sync base records the published SSO contract', () => {
   const basePath = path.join(directory, '.resource-sync-base', 'app.microi.sso.json');
   assert.equal(fs.existsSync(basePath), true);
   const published = JSON.parse(fs.readFileSync(basePath, 'utf8'));
   assert.equal(published.PackageInfo.Name, resource.PackageInfo.Name);
-  assert.equal(published.PackageInfo.Version, resource.PackageInfo.Version);
+  assert.ok(compareVersions(published.PackageInfo.Version, resource.PackageInfo.Version) <= 0);
   assert.equal(published.PackageInfo.AppId, 'app.microi.sso');
   assert.equal(published.SysMenus.length, 1);
   assert.equal(published.DiyTables.length, 1);
   assert.equal(published.DiyFields.length, 64);
-  assert.deepEqual(published.ResourcePolicies, resource.ResourcePolicies);
+  assert.deepEqual(published.ResourcePolicies.ApiEngines, resource.ResourcePolicies.ApiEngines);
 
   const publishedFields = new Map(published.DiyFields.map((field) => [field.Name, field]));
   const contractProperties = [

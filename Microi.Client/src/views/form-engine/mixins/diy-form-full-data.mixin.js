@@ -373,7 +373,7 @@ export default {
                     _OrderBy: "CreateTime",
                     _OrderByType: "DESC"
                 },
-                function (result) {
+                async function (result) {
                     if (token !== self._DraftLoadToken) return;
                     try {
                         self.DraftList = result && result.Code == 1 && Array.isArray(result.Data) ? result.Data : [];
@@ -459,16 +459,16 @@ export default {
             self.DataCommentListLoading = true;
             self.GetFormRelatedData(
                 "DataComment",
-                function (result) {
+                async function (result) {
                     if (token !== self._DataCommentLoadToken) return;
                     try {
                         if (result && result.Code == 1 && Array.isArray(result.Data)) {
-                            result.Data.forEach((item) => {
-                                if (item.Avatar) {
-                                    item.Avatar = self.DiyCommon.GetServerPath(item.Avatar);
-                                } else {
-                                    item.Avatar = self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
-                                }
+                            await Promise.all(result.Data.map(async (item) => {
+                                var rawAvatar = item.Avatar;
+                                item.Avatar = rawAvatar && item.UserId
+                                    ? (await self.DiyCommon.GetUserAvatarUrl(rawAvatar, item.UserId))
+                                        || self.DiyCommon.GetServerPath("./static/img/icon/personal.png")
+                                    : self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
                                 if (item.ParentCommentId && !item.ReplyToContent) {
                                     var parentComment = result.Data.find(function (parent) {
                                         return parent && parent.Id == item.ParentCommentId;
@@ -481,7 +481,7 @@ export default {
                                 if (item.ReplyToContent) {
                                     item.ReplyToContent = self.GetCommentPlainText(item.ReplyToContent);
                                 }
-                            });
+                            }));
                             self.DataCommentList = result.Data;
                             self.FormRelatedCounts.DataComment = Number(result.DataCount ?? result.Data.length) || 0;
                         } else {

@@ -32,6 +32,22 @@ namespace Microi.net
     /// </summary>
     public partial class SysUserLogic
     {
+        private static readonly HashSet<string> LoginProjectionSensitiveFields =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Pwd",
+                "PwdEncode",
+                "AiApiKey",
+                "NewPwd",
+                "_EncodePwd",
+                "_EncodeNewPwd",
+                "_IdentityVerificationTicket",
+                "_IdentityVerificationActionHash",
+                "ContentSecurityLoginCode",
+                "Token",
+                "_token",
+                "TokenName"
+            };
         public static List<string> CantUpt = new List<string>()
         {
             //Guid.Parse("446C7239-E0D0-412D-B84C-A9C2F82AF44C"),
@@ -735,14 +751,10 @@ namespace Microi.net
             model.State = param.State ?? 1;
             //model.InitCalendar = param.InitCalendar ?? false;
             model.CreateTime = DateTime.Now;
-            if (!param._EncodePwd.DosIsNullOrWhiteSpace())
-            {
-                model.Pwd = param._EncodePwd;
-            }
-            else
-            {
-                model.Pwd = EncryptHelper.DESEncode(param.Pwd);
-            }
+            // 新建账号只写入带盐、带版本的单向密码哈希。客户端预编码字段不能
+            // 选择密码格式，也不能把可逆 DES 或任意字符串直接写进数据库。
+            model.Pwd = PasswordHashSecurity.HashPassword(param.Pwd);
+            param._EncodePwd = null;
             model.Account = param.Account.DosTrim();
             model.Sex = param.Sex;
             //model.RealName = param.Name;
@@ -1409,6 +1421,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             //}
             JObject model = JObject.FromObject(modelDynamic);
             await GetSysUserOtherInfo(model, param.OsClient);
+            SanitizeLoginProjection(model);
 
             Task.Run(() =>
             {
@@ -1533,6 +1546,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             JObject resultModel = JObject.FromObject(model);
 
             await GetSysUserOtherInfo(resultModel, param.OsClient);
+            SanitizeLoginProjection(resultModel);
 
             MicroiEngine.MongoDB.AddSysLog(new Microi.net.SysLogParam()
             {
@@ -1551,27 +1565,57 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             {
                 return new DosResult<dynamic>(0, null, "刷新用户信息参数错误！");
             }
-            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
+            string canonicalTenant;
+            string cacheKey;
+            try
+            {
+                canonicalTenant = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+                userId = userId.Trim();
+                cacheKey = BuildLoginProjectionCacheKey(canonicalTenant, userId);
+            }
+            catch
+            {
+                return new DosResult<dynamic>(0, null, "刷新用户信息参数错误！");
+            }
+
+            var DiyCacheBase = MicroiEngine.CacheTenant.Cache(canonicalTenant);
 
             DosResult<dynamic> userModelResult = null;
             try
             {
                 //包含扩展信息
-                CurrentToken currentToken = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
-                if (currentToken != null)
+                CurrentToken currentToken = await DiyCacheBase.GetAsync<CurrentToken>(cacheKey);
+                if (currentToken?.CurrentUser != null)
                 {
-                    userModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+                    var cachedUserId = currentToken.CurrentUser["Id"]?.ToString()?.Trim();
+                    if (!string.Equals(cachedUserId, userId, StringComparison.OrdinalIgnoreCase))
                     {
-                        FormEngineKey = "sys_user",
-                        Id = currentToken.CurrentUser["Id"].ToString(),
-                        _Where = new List<DiyWhere>() {
-                                        new DiyWhere(){
-                                            Name = "State",
-                                            Value = "1",
-                                            Type = "="
-                                        }
-                                    },
-                    });
+                        return new DosResult<dynamic>(
+                            0,
+                            null,
+                            "登录身份缓存与待刷新用户不一致，原登录缓存未修改。");
+                    }
+                    if (!currentToken.OsClient.DosIsNullOrWhiteSpace()
+                        && !string.Equals(
+                            currentToken.OsClient.Trim(),
+                            canonicalTenant,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new DosResult<dynamic>(
+                            0,
+                            null,
+                            "登录身份缓存与当前租户不一致，原登录缓存未修改。");
+                    }
+
+                    // 老版本可能已经把完整 sys_user 行写入共享登录缓存。先清除
+                    // 密码、AI Key 与票据等秘密并立即修复缓存，再继续刷新角色投影。
+                    if (SanitizeLoginProjection(currentToken.CurrentUser))
+                    {
+                        await DiyCacheBase.SetAsync(cacheKey, currentToken);
+                    }
+
+                    userModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(
+                        BuildLoginProjectionUserQuery(canonicalTenant, userId));
                     if (userModelResult.Code == 1)
                     {
                         #region GetSysUserOtherInfo
@@ -1612,7 +1656,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                                 {
                                     Ids = roleIds,
                                     IsDeleted = 0,
-                                    OsClient = osClient
+                                    OsClient = canonicalTenant
                                 });
                                 if (roleList.Code != 1 || roleList.Data == null)
                                 {
@@ -1631,7 +1675,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                                 var sysMenuLimits = await new SysRoleLimitLogic().GetSysRoleLimit(new SysRoleLimitParam
                                 {
                                     RoleIds = roleList.Data.Select(d => d.Id).ToList(),
-                                    OsClient = osClient
+                                    OsClient = canonicalTenant
                                 });
                                 if (sysMenuLimits == null)
                                 {
@@ -1659,8 +1703,10 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
 
                         //currentToken.CurrentUser = userModelResult.Data;
                         //2024-02-04
+                        SanitizeLoginProjection(sysUser);
                         currentToken.CurrentUser = sysUser;// JObject.FromObject(userModelResult.Data);
-                        await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", currentToken);
+                        currentToken.OsClient = canonicalTenant;
+                        await DiyCacheBase.SetAsync(cacheKey, currentToken);
                         return new DosResult<dynamic>(1, currentToken.CurrentUser, "", new
                         {
                             ErrorMsg = ""
@@ -1719,6 +1765,88 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             //     await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", sysUserToken);
 
             //     return new DosResult<dynamic>(1, sysUserToken.CurrentUser);
+        }
+
+        /// <summary>
+        /// 构造登录投影缓存键。调用方只能传入已经授权并规范化的租户；该方法再次
+        /// 校验租户格式，避免查询租户与缓存租户在后续维护中发生漂移。
+        /// </summary>
+        internal static string BuildLoginProjectionCacheKey(string osClient, string userId)
+        {
+            var canonicalTenant = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            var normalizedUserId = (userId ?? string.Empty).Trim();
+            if (normalizedUserId.DosIsNullOrWhiteSpace())
+                throw new ArgumentException("刷新用户标识不能为空。", nameof(userId));
+            return $"Microi:{canonicalTenant}:LoginTokenSysUser:{normalizedUserId}";
+        }
+
+        /// <summary>
+        /// 登录身份只承载授权与个人资料投影，绝不能携带密码材料、AI 中转密钥、
+        /// 二次认证票据或嵌套对象中的同名秘密。返回是否实际删除过字段，便于读取
+        /// 历史缓存时原位修复后再写回。
+        /// </summary>
+        internal static bool SanitizeLoginProjection(JObject projection)
+        {
+            return RemoveSensitiveLoginProjectionFields(projection);
+        }
+
+        private static bool RemoveSensitiveLoginProjectionFields(JToken token)
+        {
+            if (token == null) return false;
+            var changed = false;
+            if (token is JObject obj)
+            {
+                foreach (var property in obj.Properties().ToList())
+                {
+                    if (LoginProjectionSensitiveFields.Contains(property.Name))
+                    {
+                        property.Remove();
+                        changed = true;
+                        continue;
+                    }
+                    changed = RemoveSensitiveLoginProjectionFields(property.Value) || changed;
+                }
+            }
+            else if (token is JArray array)
+            {
+                foreach (var item in array)
+                {
+                    changed = RemoveSensitiveLoginProjectionFields(item) || changed;
+                }
+            }
+            return changed;
+        }
+
+        /// <summary>
+        /// 构造登录投影的权威用户查询。OsClient 与 Id 都来自已经授权的参数，且
+        /// 使用可信服务调用读取完整身份投影，不依赖 HTTP 请求中的租户或用户字段。
+        /// </summary>
+        internal static DiyTableRowParam BuildLoginProjectionUserQuery(
+            string osClient,
+            string userId)
+        {
+            var canonicalTenant = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            var normalizedUserId = (userId ?? string.Empty).Trim();
+            if (normalizedUserId.DosIsNullOrWhiteSpace())
+                throw new ArgumentException("刷新用户标识不能为空。", nameof(userId));
+
+            return new DiyTableRowParam
+            {
+                FormEngineKey = "sys_user",
+                Id = normalizedUserId,
+                OsClient = canonicalTenant,
+                _InvokeType = "Server",
+                _TrustedServerInvocation = true,
+                _Where = new List<DiyWhere>
+                {
+                    new DiyWhere
+                    {
+                        Name = "State",
+                        Value = "1",
+                        Type = "="
+                    }
+                }
+            };
         }
 
 
@@ -2020,6 +2148,8 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
 
 
 
+            var passwordChanged = false;
+
             //如果修改了密码（如果是用户，则需要验证旧密码）
             if (!param.Pwd.DosIsNullOrWhiteSpace() && !param.NewPwd.DosIsNullOrWhiteSpace())
             {
@@ -2036,20 +2166,12 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                     return new DosResult(0, null, checkPwdResult);
                 }
 
-                var newPwd = "";
-                if (!param._EncodeNewPwd.DosIsNullOrWhiteSpace())
-                {
-                    newPwd = param._EncodeNewPwd;
-                }
-                else
-                {
-                    //newPwd = EncryptHelper.DESEncode(param.NewPwd);
-                    //newPwd = (await GetEncodePwd(param)).EncodePwd;
-                    newPwd = (await GetEncodePwd(modelDynamic, param.OsClient, param.NewPwd, "", param._EncodeNewPwd, model.Account)).EncodePwd;
-                }
+                var newPwd = PasswordHashSecurity.HashPassword(param.NewPwd);
 
                 model.Pwd = newPwd;// EncryptHelper.DESEncode(param.NewPwd);
                 param.Pwd = model.Pwd;
+                param._EncodeNewPwd = null;
+                passwordChanged = true;
             }
             else if (!param.Pwd.DosIsNullOrWhiteSpace() && param._CurrentUser?["Account"].Val<string>().ToLower() == "admin")
             {
@@ -2059,10 +2181,11 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                     return new DosResult(0, null, checkPwdResult);
                 }
 
-                var pwd = "";
-                pwd = (await GetEncodePwd(modelDynamic, param.OsClient, param.Pwd, "", param._EncodePwd, model.Account)).EncodePwd;
+                var pwd = PasswordHashSecurity.HashPassword(param.Pwd);
                 param.Pwd = pwd;// EncryptHelper.DESEncode(param.Pwd);
                 model.Pwd = param.Pwd;
+                param._EncodePwd = null;
+                passwordChanged = true;
             }
             //如果是管理员，直接修改密码
             else if (!param.NewPwd.DosIsNullOrWhiteSpace() && param._CurrentUser?["_IsAdmin"].Val<bool>() == true)
@@ -2073,9 +2196,11 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                     return new DosResult(0, null, checkPwdResult);
                 }
 
-                var newPwd = (await GetEncodePwd(modelDynamic, param.OsClient, param.NewPwd, "", param._EncodeNewPwd, model.Account)).EncodePwd;
+                var newPwd = PasswordHashSecurity.HashPassword(param.NewPwd);
                 model.Pwd = newPwd;//EncryptHelper.DESEncode(param.NewPwd);
                 param.Pwd = model.Pwd;
+                param._EncodeNewPwd = null;
+                passwordChanged = true;
             }
             else//if (!param.Pwd.DosIsNullOrWhiteSpace())
             {
@@ -2308,11 +2433,30 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                     {
                         Api = "SysUserLogic/UptSysUser",
                         Title = param._CurrentUser?["Account"].Val<string>() + "修改了" + model.Account,
-                        Content = "修改了用户资料为：" + JsonHelper.Serialize(model),
+                        Content = "修改了用户资料：" + JsonHelper.Serialize(new
+                        {
+                            model.Id,
+                            model.Account,
+                            model.Name,
+                            model.DeptId,
+                            model.RoleIds,
+                            model.State,
+                            model.IsDeleted,
+                            PasswordChanged = passwordChanged
+                        }),
                         OsClient = param.OsClient,
                         //IP = IPHelper.GetClientIP(),//DiyHttpContext.Current
                         Level = 1,
-                        Param = JsonHelper.Serialize(param),
+                        Param = JsonHelper.Serialize(new
+                        {
+                            param.Id,
+                            param.Account,
+                            param.Name,
+                            param.DeptId,
+                            param.RoleIds,
+                            param.State,
+                            PasswordChanged = passwordChanged
+                        }),
                         Type = "修改账户信息",
                     });
                 }
@@ -2349,6 +2493,15 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                             model.IsDeleted == 1
                                 ? "账号已被删除，请重新联系管理员。"
                                 : "账号已被停用，请重新联系管理员。");
+                    }
+                    else if (passwordChanged)
+                    {
+                        // 密码变更必须吊销该账号在所有终端上的旧 DiyToken，包含
+                        // 发起本次修改的会话；调用方需使用新密码重新登录。
+                        await OnlineTerminalService.RevokeUserSessionsFromTrustedHostAsync(
+                            param.OsClient,
+                            model.Id,
+                            "密码已修改，请使用新密码重新登录。");
                     }
                     else if (roleOrLevelChanged || accountStateChanged)
                     {

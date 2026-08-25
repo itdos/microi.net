@@ -29,7 +29,10 @@ test('大包后台持久化具备管理员、精确更新日志和强回读门�
 })
 
 test('商城包正文外置到 HDFS 并以字节数与 SHA-256 回读校验', () => {
-  assert.match(storage, /V8\.Method\.UploadText/)
+  assert.match(storage, /MARKETPLACE_PACKAGE_UPLOAD_BASE64_SINGLE_ATTEMPT_V1/)
+  assert.match(storage, /V8\.Method\.Upload\(/)
+  assert.match(storage, /Base64SingleAttempt/)
+  assert.doesNotMatch(storage, /V8\.Method\.UploadText\(/)
   assert.match(storage, /verifyStoredText/)
   assert.match(storage, /PackageStorageMode/)
   assert.match(storage, /HdfsPublic/)

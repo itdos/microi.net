@@ -30,11 +30,21 @@ namespace Microi.net
         DosResult UptFormData(dynamic dynamicParam);
 
         /// <summary>
+        /// 按非空、参数化 _Where 批量更新 MongoDB 文档；不允许修改 _id。
+        /// </summary>
+        DosResult UptFormDataByWhere(dynamic dynamicParam);
+
+        /// <summary>
         /// 删除表单数据（需要传入osClient）
         /// </summary>
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>操作结果</returns>
         DosResult DelFormData(dynamic dynamicParam);
+
+        /// <summary>
+        /// 按非空、参数化 _Where 批量删除 MongoDB 文档。
+        /// </summary>
+        DosResult DelFormDataByWhere(dynamic dynamicParam);
 
         /// <summary>
         /// 获取表单数据（需要传入osClient）

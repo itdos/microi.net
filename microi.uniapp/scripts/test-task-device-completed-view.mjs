@@ -47,9 +47,38 @@ test('私有 URL 签发失败时不回退公有文件服务器', async () => {
   )
 
   assert.equal(url, '')
-  assert.equal(requests.length, 2)
+  assert.equal(requests.length, 1)
   assert.deepEqual(requests.map((item) => item.url), [
-    'https://api.example.test/api/HDFS/GetPrivateFileUrl',
-    'https://api.example.test/api/HDFS/MallFileUrl'
+    'https://api.example.test/apiengine/platform-private-file-url'
   ])
+})
+
+test('私有 URL 的 HTTP、会话与网络失败均不回退旧控制器', async () => {
+  const scenarios = [
+    async () => ({ statusCode: 403, data: { Code: 0, Msg: 'Forbidden' } }),
+    async () => ({ statusCode: 200, data: { Code: 1001, Msg: 'Token 已失效' } }),
+    async () => { throw new Error('Network Error') }
+  ]
+
+  for (const adapter of scenarios) {
+    const requests = []
+    const V8 = createMicroiV8({
+      apiBase: 'https://api.example.test',
+      fileServer: 'https://files.example.test',
+      osClient: 'demo',
+      requestAdapter: async (request) => {
+        requests.push(request)
+        return adapter(request)
+      }
+    })
+
+    const url = await V8.resolveFileUrl(
+      { Path: '/demo/img/202608/private.jpg', Limit: true },
+      { formEngineKey: 'demo_table', formDataId: 'row-1', fieldId: 'field-1', sysMenuId: 'menu-1' }
+    )
+
+    assert.equal(url, '')
+    assert.equal(requests.length, 1)
+    assert.equal(requests[0].url, 'https://api.example.test/apiengine/platform-private-file-url')
+  }
 })

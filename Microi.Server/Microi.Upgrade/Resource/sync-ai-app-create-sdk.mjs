@@ -55,7 +55,7 @@ if (updatedSource === currentSource) {
 const oldVersion = currentSource.match(/Version:\s*(v?\d+\.\d+\.\d+)/i)?.[1] || '';
 const newVersion = nextPatchVersion(oldVersion);
 const timestamp = chinaTimestamp();
-const summary = '同步维护版 Microi 前端 SDK；UniApp 脚手架改用接口引擎自定义地址，保证热点归因到真实 ApiEngineKey。';
+const summary = '同步维护版 Microi 前端 SDK；系统配置、当前用户、租户发现和私有文件统一改用 platform-* 接口引擎。';
 const headerPattern = new RegExp(`Version:\\s*${oldVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
 const versionedSource = updatedSource.replace(headerPattern, `Version: ${newVersion}`);
 if (versionedSource === updatedSource) throw new Error('ai_app_create 源码头未找到旧版本');

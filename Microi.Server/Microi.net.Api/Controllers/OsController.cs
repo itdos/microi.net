@@ -19,6 +19,8 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     public class OsController : Controller
     {
+        private const string OsClientByDomainApiEngineKey = "platform-os-client-by-domain";
+
         /// <summary>
         /// 
         /// </summary>
@@ -112,77 +114,17 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> GetOsClientByDomain(string Domain, string Lang = "")
         {
-            var param = new DiyTableRowParam();
-            param.TableName = "sys_osclients";
-            param.OsClient = OsClient.GetConfigOsClient();
-            if (Lang.DosIsNullOrWhiteSpace())
+            var request = new JObject
             {
-                Lang = DiyMessage.Lang;
-            }
-            if (Domain.DosIsNullOrWhiteSpace())
-            {
-                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
-            }
-
-            Domain = Domain.ToLower();
-
-            //2025-12-01 Anderson：增加支持http、https
-            if (Domain.Contains("http://") || Domain.Contains("https://"))
-            {
-                Domain = Domain.Replace("http://", "").Replace("https://", "");
-            }
-
-            //2026-01-01 Anderson：从内存中获取
-            var cacheResult = OsClient.ClientList.FirstOrDefault(item
-                => item.Value.OsClientModel["DomainName"].Val<string>() == Domain
-                || item.Value.OsClientModel["DomainName"].Val<string>() == "http://" + Domain
-                || item.Value.OsClientModel["DomainName"].Val<string>() == "https://" + Domain
-                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit(';').Contains(Domain)
-                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit(';').Contains("http://" + Domain)
-                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit(';').Contains("https://" + Domain)
-                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit('$').Contains(Domain)
-                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit('$').Contains("http://" + Domain)
-                || item.Value.OsClientModel["DomainName"].Val<string>().DosSplit('$').Contains("https://" + Domain)
-            );
-            if (cacheResult.Value != null)
-            {
-                return Json(new DosResult(1, new
-                {
-                    OsClient = cacheResult.Value.OsClient
-                }));
-            }
-
-            param._Where = new List<List<object>>() {
-                new List<object>{ "(", "DomainName", "=", Domain },
-                new List<object>{ "OR", "DomainName", "=", "http://" + Domain },
-                new List<object>{ "OR", "DomainName", "=", "https://" + Domain, ")"},
-                new List<object>{ "IsEnable", "=", 1 },
+                ["Domain"] = Domain ?? "",
+                ["_Lang"] = Lang.DosIsNullOrWhiteSpace() ? DiyMessage.Lang : Lang,
+                // 域名解析发生在尚未知晓目标租户的启动阶段，因此固定由配置租户
+                // 加载官方 Managed 引擎；可信原子只返回匹配租户的 OsClient。
+                ["OsClient"] = OsClient.GetConfigOsClient()
             };
-            //指定查询列
-            param._SelectFields = new List<string>() { "DomainName", "OsClient" };
-            var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(param);
-            if (result.Code != 1)
-            {
-                //等号查询没有数据时，再用like查询
-                param._Where = new List<List<object>>() {
-                    new List<object>{ "(", "DomainName", "Like", "$" + Domain + "$" },
-                    new List<object>{ "OR", "DomainName", "Like", ";" + Domain + ";" },
-                    new List<object>{ "OR", "DomainName", "Like", ";" + "http://" + Domain + ";" },
-                    new List<object>{ "OR", "DomainName", "Like", ";" + "https://" + Domain + ";" },
-                    new List<object>{ "OR", "DomainName", "Like", "$" + "http://" + Domain + "$" },
-                    new List<object>{ "OR", "DomainName", "Like", "$" + "https://" + Domain + "$", ")" },
-                    new List<object>{ "IsEnable", "=", 1 },
-                };
-                result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(param);
-                if (result.Code != 1)
-                {
-                    return Json(new DosResult(1, new
-                    {
-                        OsClient = OsClient.GetConfigOsClient(),
-                    }));
-                }
-            }
-            return Json(result);
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                OsClientByDomainApiEngineKey,
+                request));
         }
 
         /// <summary>
