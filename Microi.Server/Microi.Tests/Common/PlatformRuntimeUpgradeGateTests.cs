@@ -388,7 +388,7 @@ public class PlatformRuntimeUpgradeGateTests
 
         Assert.True(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.message-notification.json", package })));
-        Assert.Equal("v1.0.10", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.Equal("v1.0.11", package["PackageInfo"]?["Version"]?.ToString());
         Assert.Equal(string.Empty, expectedHook.Invoke(
             null, new object[] { "platform-chat-system-message" }));
         Assert.Equal("platform-message-notification-custom-hook", expectedHook.Invoke(

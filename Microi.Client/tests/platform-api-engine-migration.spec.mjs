@@ -148,6 +148,28 @@ test("SMS registration uses the managed login token contract without changing pa
     assert.match(passwordLoginSource, /loginParam\._CaptchaValue\s*=\s*self\.CaptchaValue/);
 });
 
+test("WebOS and WeChat binding no longer call tenant-only legacy ApiEngines", async function () {
+    const adapterSource = await readFile(
+        path.join(sourceRoot, "views", "webos", "utils", "v8-adapter.js"),
+        "utf8"
+    );
+    const webosFiles = await readSourceFiles(path.join(sourceRoot, "views", "webos"));
+    const webosSource = webosFiles.map(file => file.source).join("\n");
+    const loginSource = await readFile(path.join(sourceRoot, "views", "login", "index.vue"), "utf8");
+
+    assert.doesNotMatch(webosSource, /\/apiengine\/(?:get-sys-menu-tree|get-desktop-dock|upt-personal-setting)/);
+    assert.match(adapterSource, /\/apiengine\/platform-sys-menu/);
+    assert.match(adapterSource, /Action:\s*['"]GetSysMenuStep['"]/);
+    assert.match(adapterSource, /\/apiengine\/platform-user-update-preferences/);
+    assert.match(adapterSource, /\/apiengine\/platform-login-wallpapers/);
+
+    assert.doesNotMatch(loginSource, /\/apiengine\/bind-wechat/);
+    assert.match(loginSource, /DiyApi\.Login\(\)/);
+    assert.match(loginSource, /form\.method\s*=\s*["']POST["']/);
+    assert.match(loginSource, /\/api\/WeChat\/BindSysUser/);
+    assert.match(loginSource, /Token 不进入 URL、浏览器历史或 Referer/);
+});
+
 test("private resource capability requests carry explicit trusted resource kinds", async function () {
     const commonSource = await readFile(path.join(sourceRoot, "utils", "diy.common.js"), "utf8");
     const deptSource = await readFile(path.join(sourceRoot, "views", "system", "sysdept-manage.vue"), "utf8");

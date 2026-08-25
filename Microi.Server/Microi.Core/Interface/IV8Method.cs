@@ -314,6 +314,12 @@ namespace Microi.net
         /// </summary>
         DosResult ManageOnlineTerminal(dynamic dynamicParam);
 
+        /// <summary>
+        /// 仅供消息通知官方 Managed 接口发送微信公众号模板消息。
+        /// 公众号 AppId/AppSecret 固定从当前租户 wx_mp 读取，绝不接受或返回密钥参数。
+        /// </summary>
+        DosResult SendWeChatTemplateMessage(dynamic dynamicParam);
+
         /// <summary>当前租户超级管理员查询或发布 MQTT；Broker 实例不直接暴露给 V8。</summary>
         DosResult ManageMq(dynamic dynamicParam);
         DosResult ManageMqtt(dynamic dynamicParam);

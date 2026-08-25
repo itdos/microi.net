@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const packagePath = resolve(directory, 'app.microi.store.json');
-const targetPackageVersion = 'v7.6.13';
-const releaseTime = '2026-08-26 13:30:00';
+const targetPackageVersion = 'v7.6.16';
+const releaseTime = '2026-08-26 18:30:00';
 
 const dependencies = Object.freeze([
   Object.freeze({
@@ -13,7 +13,7 @@ const dependencies = Object.freeze([
     name: '获取应用商城列表（旧地址兼容）',
     source: 'get-microi-store-legacy-route.js',
     id: '019d2f00-0000-7a01-8000-000000000001',
-    version: 'v1.0.0',
+    version: 'v1.0.1',
     apiAddress: '/apiengine/get-microi-store',
     category: '应用商城',
     enableLog: 0,
@@ -67,7 +67,7 @@ const dependencies = Object.freeze([
     lock: 0,
     capabilities: [
       'V8.Method.ManageSystemDirectory',
-      'ApiEngine:platform-sys-menu@v1.0.0',
+      'ApiEngine:platform-sys-menu@v1.0.1',
     ],
   }),
   Object.freeze({
@@ -240,12 +240,12 @@ info.ApiEngineCount = engines.length;
 if (info.Version === targetPackageVersion) {
   info.ChangeLog = {
     Version: targetPackageVersion,
-    Title: '平台接口完整启动闭包与旧商城列表地址兼容',
+    Title: 'WebOS 菜单统一迁入官方接口闭包',
     ChangeType: 'Fix',
-    Content: '后端接收流量前会从全部内置官方基础应用包补齐 101 项以上接口引擎及内部依赖；应用商城同时增加 /apiengine/get-microi-store 旧地址兼容入口，旧版批量安装器会安全转发到正式 get-microi-store-list 接口。CreateIfMissing 个性化 Hook 仅在缺失时创建且永不覆盖。',
+    Content: 'WebOS 菜单统一调用 platform-sys-menu，接口在执行权威菜单原子前调用应用商城 CreateIfMissing 个性化 Hook；后端接收流量前从九个官方包补齐全部接口闭包。',
     ReleaseTime: releaseTime,
   };
-  const historyLine = '2026-08-26 v7.6.13 增加旧版 /apiengine/get-microi-store 兼容入口，并配合后端以全部官方基础应用包形成启动前接口闭包。';
+  const historyLine = '2026-08-26 v7.6.16 WebOS 菜单统一迁入 platform-sys-menu，并在权威菜单原子前调用应用商城 CreateIfMissing 个性化 Hook。';
   const history = String(info.ChangeHistory || '');
   if (!history.includes(historyLine)) info.ChangeHistory = `${historyLine}\n${history}`;
 }

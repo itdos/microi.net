@@ -1640,30 +1640,72 @@ export default {
                 }
             }
         },
-        BindWeChat() {
+        async BindWeChat() {
             var self = this;
-            // 加密密码
-            var encryptedPwd = self.encryptPassword(self.Pwd);
-            if (!encryptedPwd) {
+            if (self.LoginWaiting) return;
+            if (self.DiyCommon.IsNull(self.Account) || self.DiyCommon.IsNull(self.Pwd)) {
+                self.DiyCommon.Tips("请输入账号和密码！", false);
                 return;
             }
+            if (self.SysConfig.EnablePrivacyPolicy && !self.CheckPrivacyPolicy) {
+                self.DiyCommon.Tips(`请先勾选[${self.SysConfig.PrivacyPolicyName || "同意隐私协议"}]！`, false);
+                return;
+            }
+            var encryptedPwd = self.encryptPassword(self.Pwd);
+            if (!encryptedPwd) return;
 
-            self.DiyCommon.Post(
-                "/apiengine/bind-wechat",
-                {
+            self.LoginWaiting = true;
+            try {
+                const loginParam = {
                     Account: self.Account,
-                    Pwd: encryptedPwd, // 使用加密后的密码
+                    Pwd: encryptedPwd,
                     OsClient: self.OsClient,
-                    WxKey: self.WxKey,
-                    _CaptchaId: self.CaptchaId,
-                    _CaptchaValue: self.CaptchaValue
-                },
-                function (result) {
-                    if (self.DiyCommon.Result(result)) {
-                        window.location.href = result.Data.RedirectUrl;
-                    }
+                    _ClientType: self.diyStore.IsPhoneView ? "Mobile" : "PC"
+                };
+                if (self.EnableCaptcha) {
+                    loginParam._CaptchaId = self.CaptchaId;
+                    loginParam._CaptchaValue = self.CaptchaValue;
                 }
-            );
+                const result = await self.DiyCommon.PostAsync(self.DiyApi.Login(), loginParam);
+                if (!self.DiyCommon.Result(result)) {
+                    if (self.EnableCaptcha) {
+                        self.GetCaptcha();
+                        self.CaptchaValue = "";
+                    }
+                    return;
+                }
+
+                // 旧 bind-wechat 接口会把账号密码交给租户可编辑 V8。新版先通过
+                // 标准登录签发 DiyToken，再以 POST 表单进入最小微信 OAuth 网关；
+                // Token 不进入 URL、浏览器历史或 Referer。
+                const authorization = self.DiyCommon.getToken();
+                if (!authorization) {
+                    self.DiyCommon.Tips("登录成功但未获得会话票据，请重试。", false);
+                    return;
+                }
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = self.DiyCommon.GetApiBase() + "/api/WeChat/BindSysUser";
+                for (const [name, value] of Object.entries({
+                    authorization: /^Bearer\s+/i.test(authorization)
+                        ? authorization
+                        : "Bearer " + authorization,
+                    OsClient: self.OsClient,
+                    ReturnUrl: ""
+                })) {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = name;
+                    input.value = value || "";
+                    form.appendChild(input);
+                }
+                document.body.appendChild(form);
+                form.submit();
+            } catch (error) {
+                self.DiyCommon.Tips("微信绑定登录失败，请稍后重试。", false);
+            } finally {
+                self.LoginWaiting = false;
+            }
         },
         async SendSms() {
             var self = this;
