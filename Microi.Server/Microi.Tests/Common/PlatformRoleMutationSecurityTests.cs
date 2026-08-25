@@ -69,12 +69,12 @@ public class PlatformRoleMutationSecurityTests
     }
 
     [Theory]
-    [InlineData(nameof(SysUserController.GetSysUser))]
-    [InlineData(nameof(SysUserController.AddSysUser))]
-    [InlineData(nameof(SysUserController.DelSysUser))]
-    public void SysUserCrudEndpoints_UseGranularTableAuthorization(string actionName)
+    [InlineData(nameof(LegacyMobileCompatibilityController.GetSysUser))]
+    [InlineData(nameof(LegacyMobileCompatibilityController.AddSysUser))]
+    [InlineData(nameof(LegacyMobileCompatibilityController.DelSysUser))]
+    public void LegacySysUserCrudEndpoints_UseGranularTableAuthorization(string actionName)
     {
-        var action = typeof(SysUserController).GetMethod(actionName);
+        var action = typeof(LegacyMobileCompatibilityController).GetMethod(actionName);
         Assert.NotNull(action);
         Assert.Null(action!.GetCustomAttribute<PlatformAdminOnlyAttribute>(true));
     }

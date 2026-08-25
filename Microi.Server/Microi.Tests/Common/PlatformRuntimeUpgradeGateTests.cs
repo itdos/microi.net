@@ -95,6 +95,61 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
+    public void StartupDependencyGate_LoadsExactlySevenManagedOfficialResources()
+    {
+        var method = typeof(UpgradeAppStore).GetMethod(
+            "LoadBundledStartupDependencyEngines",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        var engines = Assert.IsAssignableFrom<IReadOnlyList<JObject>>(
+            method!.Invoke(null, null));
+        var expected = new[]
+        {
+            "platform-sys-menu",
+            "platform-os-client-by-domain",
+            "platform-sys-config",
+            "platform-lang-bundle",
+            "platform-current-user",
+            "platform-private-file-url",
+            "platform-sys-user-public-info"
+        };
+
+        Assert.Equal(
+            expected.OrderBy(value => value, StringComparer.Ordinal),
+            engines.Select(item => item["ApiEngineKey"]?.ToString())
+                .OrderBy(value => value, StringComparer.Ordinal));
+        Assert.All(engines, engine =>
+        {
+            var key = engine["ApiEngineKey"]?.ToString();
+            Assert.Equal("/apiengine/" + key, engine["ApiAddress"]?.ToString());
+            Assert.Equal(1, engine["IsEnable"]?.Value<int>());
+            Assert.Equal(0, engine["StopHttp"]?.Value<int>());
+            Assert.StartsWith(
+                "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1",
+                engine["ApiV8Code"]?.ToString()?.TrimStart());
+            Assert.False(string.IsNullOrWhiteSpace(engine["_OfficialPackageResource"]?.ToString()));
+        });
+    }
+
+    [Fact]
+    public void ApiStartup_RunsDependencyGateBeforeLicenseAndHostedUpgradeRepeatsIt()
+    {
+        var serverRoot = FindServerRoot();
+        var program = File.ReadAllText(Path.Combine(serverRoot, "Microi.net.Api", "Program.cs"));
+        var hosted = File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.Upgrade",
+            "MicroiUpgradeHostedService.cs"));
+        var gateIndex = program.IndexOf("EnsureStartupDependenciesAsync", StringComparison.Ordinal);
+        var licenseIndex = program.IndexOf("#region License 自动恢复", StringComparison.Ordinal);
+
+        Assert.True(gateIndex >= 0 && licenseIndex > gateIndex);
+        Assert.Contains("EnsureStartupDependenciesUnderLeaseAsync", hosted);
+        Assert.Contains("【自动升级状态】", program);
+        Assert.Contains("【自动升级状态】", hosted);
+    }
+
+    [Fact]
     public void PlatformRuntimeGate_RejectsManagedDrift_ButNeverComparesTenantHookSource()
     {
         var package = JObject.Parse(LoadBundledResources()["app.microi.saas-engine.json"]);

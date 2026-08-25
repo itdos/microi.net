@@ -19,8 +19,6 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public partial class HDFSController : Controller
     {
-        private const string PlatformPrivateFileUrlEngineKey = "platform-private-file-url";
-
         private async Task<DosResult> DefaultParam(DiyUploadParam param)
         {
             CurrentToken currentTokenDynamic;
@@ -617,16 +615,6 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 移动端获取私有文件临时访问地址。保留旧 action 名用于兼容已发布客户端。
-        /// </summary>
-        [HttpGet, HttpPost]
-        [AllowAnonymous]
-        public async Task<JsonResult> MallFileUrl(DiyUploadParam param)
-        {
-            return await GetPrivateFileUrlCompatibility(param);
-        }
-
-        /// <summary>
         /// 匿名上传。比如用于未登录时用户注册上传头像。此接口作废，建议在接口引擎中实现，考虑更多的安全性。
         /// </summary>
         /// <param name="param"></param>
@@ -654,60 +642,6 @@ namespace Microi.net.Api
         //     var result = await new MicroiHDFS().Upload(param);//, HttpContext
         //     return Json(result);
         // }
-
-        /// <summary>
-        /// 传入 FilePathName
-        /// </summary>
-        /// <param name="param"></param>
-        /// <returns></returns>
-        [HttpGet, HttpPost]
-        [AllowAnonymous]
-        public async Task<JsonResult> GetPrivateFileUrl(DiyUploadParam param)
-        {
-            return await GetPrivateFileUrlCompatibility(param);
-        }
-
-        /// <summary>
-        /// 旧 PC/UniApp 私有文件路由的共同兼容流程。仅归一化历史 Token 与请求格式；
-        /// 行、字段、菜单、组织和路径授权统一由 Core 完成。
-        /// </summary>
-        private async Task<JsonResult> GetPrivateFileUrlCompatibility(DiyUploadParam param)
-        {
-            param ??= new DiyUploadParam();
-            await LoadJsonBody(param);
-            param.FilePathName = ResolveFilePathName(param);
-
-            var currentToken = await DiyToken.GetCurrentToken();
-            if (currentToken?.CurrentUser != null)
-            {
-                var accessError = await DefaultParam(param);
-                if (accessError != null) return Json(accessError);
-                var platformResult = await ManagedApiEngineCompatibility.RunAsync(
-                    PlatformPrivateFileUrlEngineKey,
-                    JObject.FromObject(param),
-                    param._CurrentUser);
-                return Json(platformResult);
-            }
-
-            if (!TryResolveRequestedOsClient(param, out var osClient, out var osClientError))
-            {
-                return Json(osClientError);
-            }
-            var clientUser = await GetClientUserFromToken(osClient);
-            if (clientUser == null)
-            {
-                return Json(new DosResult(1001, null, "登录身份已过期！"));
-            }
-            param.OsClient = osClient;
-            param._CurrentUser = clientUser;
-            param._InvokeType = InvokeType.Client.ToString();
-            param.Limit = true;
-            var result = await ManagedApiEngineCompatibility.RunAsync(
-                PlatformPrivateFileUrlEngineKey,
-                JObject.FromObject(param),
-                clientUser);
-            return Json(result);
-        }
 
         [HttpPost]
         public async Task<JsonResult> GetOfficeFileMeta([FromBody] JObject param)

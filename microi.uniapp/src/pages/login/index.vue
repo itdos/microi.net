@@ -266,6 +266,7 @@ import { themeMixin } from '@/utils/theme.js'
 import {
   applyAppRuntimeEndpoint,
   applyRuntimeSysConfig,
+  getPlatformSysConfigResult,
   getToken,
   post,
   probeAppRuntimeEndpoint,
@@ -694,10 +695,10 @@ export default {
     },
     async getSysConfig() {
       try {
-        const result = await post('/apiengine/platform-sys-config', {
+        const result = await getPlatformSysConfigResult({
           _SearchEqual: { IsEnable: 1 },
           OsClient: appConfig.osClient
-        }, false)
+        })
 
         if (result.Code === 1 && result.Data) {
           this.applySysConfig(result.Data)

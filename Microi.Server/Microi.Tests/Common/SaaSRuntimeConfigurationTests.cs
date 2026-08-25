@@ -453,10 +453,13 @@ public class SaaSRuntimeConfigurationTests
         Assert.True(versionChainIndex > streamSchemaInvariantIndex,
             "Runtime application publish prerequisites must be ready before the versioned upgrade chain.");
         Assert.Matches(
-            @"upgradeLease\.ThrowIfLost\(\);\s+var applicationGateMessages\s*=\s*await new Upgrade25",
+            @"RunRuntimeInvariantAsync\(runtimeClient,\s*upgradeLease,\s*""Upgrade25-应用发布租户门禁"",\s*\(\)\s*=>\s*new Upgrade25\(\)\.EnsureTenantGateInvariant",
             source);
         Assert.Matches(
-            @"upgradeLease\.ThrowIfLost\(\);\s+var applicationStreamSchemaMessages\s*=\s*await new Upgrade25",
+            @"RunRuntimeInvariantAsync\(runtimeClient,\s*upgradeLease,\s*""Upgrade25-应用发布V3结构"",\s*\(\)\s*=>\s*new Upgrade25\(\)\.EnsureApplicationStreamV3SchemaInvariant",
+            source);
+        Assert.Matches(
+            @"private static async Task RunRuntimeInvariantAsync[\s\S]*?upgradeLease\.ThrowIfLost\(\);[\s\S]*?var messages = await action\(\)[\s\S]*?upgradeLease\.ThrowIfLost\(\);",
             source);
     }
 

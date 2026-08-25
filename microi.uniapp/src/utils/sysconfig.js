@@ -2,7 +2,7 @@
  * 系统配置缓存工具
  * 提供 SysConfig 的获取、缓存和读取
  */
-import { applyRuntimeSysConfig, post } from './request.js'
+import { applyRuntimeSysConfig, getPlatformSysConfigResult } from './request.js'
 import appConfig from '../config.js'
 import { isAiAssistantVisible, isEnabledFlag } from './feature-flags.js'
 
@@ -77,10 +77,10 @@ export async function getSysConfig(options = {}) {
   // 请求接口
   sysConfigRequest = (async () => {
     try {
-      const result = await post('/apiengine/platform-sys-config', {
+      const result = await getPlatformSysConfigResult({
         _SearchEqual: { IsEnable: 1 },
         OsClient: appConfig.osClient
-      }, false)
+      })
       if (result.Code === 1 && result.Data) {
         applyRuntimeSysConfig(result.Data)
         setCachedSysConfig(result.Data)
