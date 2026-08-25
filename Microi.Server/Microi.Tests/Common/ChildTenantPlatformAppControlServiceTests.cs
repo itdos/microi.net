@@ -131,6 +131,9 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("phase == 'RefreshBootstrap'", orchestrator, StringComparison.Ordinal);
         Assert.Contains("startup-api-live-worker-v6-no-requeue", orchestrator, StringComparison.Ordinal);
         Assert.Contains("checkpoint.BootstrapRevision = startupBootstrapRevision", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_STARTUP_TARGET_FILTER_V1", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("TargetOsClients 仅允许用于 StartupDependencies", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("missingRequestedTargets", orchestrator, StringComparison.Ordinal);
         Assert.DoesNotContain("CHILD_STARTUP_BOOTSTRAP_TASK_READBACK_V1", orchestrator, StringComparison.Ordinal);
         Assert.DoesNotContain("verifyRefreshedChildTask", orchestrator, StringComparison.Ordinal);
         var migrationStart = orchestrator.IndexOf("CHILD_STARTUP_NO_REQUEUE_REFRESH_V1", StringComparison.Ordinal);
