@@ -130,7 +130,10 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("CHILD_STARTUP_BOOTSTRAP_REFRESH_V1", orchestrator, StringComparison.Ordinal);
         Assert.Contains("phase = 'RefreshBootstrap'", orchestrator, StringComparison.Ordinal);
         Assert.Contains("CHILD_STARTUP_BOOTSTRAP_REVISION_RESTART_V1", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("startup-api-runtime-flags-v4", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("startup-api-runtime-flags-v5", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_STARTUP_BOOTSTRAP_TASK_READBACK_V1", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("verifyRefreshedChildTask", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("_BackgroundTaskTargetOsClient", orchestrator, StringComparison.Ordinal);
         Assert.Contains("checkpoint.BootstrapRefreshRevision", orchestrator, StringComparison.Ordinal);
         Assert.Contains("checkpoint.BootstrapRefreshIndex = 0", orchestrator, StringComparison.Ordinal);
         Assert.Contains("BootstrapRefreshRevision: startupBootstrapRevision", orchestrator, StringComparison.Ordinal);

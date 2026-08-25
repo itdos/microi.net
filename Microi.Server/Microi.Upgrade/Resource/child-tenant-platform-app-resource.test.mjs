@@ -89,7 +89,7 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(engine.ApiV8Code, /MaxItemsPerChunk|batchSize = 20/);
   assert.match(engine.ApiV8Code, /queueFailureDetail/);
   assert.match(engine.ApiV8Code, /item\.Name \|\| item\.OsClient/);
-  assert.equal(engine.Version, "v1.2.5");
+  assert.equal(engine.Version, "v1.2.6");
   assert.match(engine.ApiV8Code, /CHILD_STARTUP_DEPENDENCY_INCIDENT_SCOPE_V1/);
   assert.match(engine.ApiV8Code, /CHILD_STARTUP_SCOPE_CHILD_PARAM_PATCH_V1/);
   assert.match(engine.ApiV8Code, /enforceStartupDependencyScope/);
@@ -97,12 +97,15 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.match(engine.ApiV8Code, /Status='Pending' AND CancelRequested=0/);
   assert.match(engine.ApiV8Code, /cancelUnsafeChildTask/);
   assert.match(engine.ApiV8Code, /CHILD_STARTUP_BOOTSTRAP_REFRESH_V1/);
-  assert.match(engine.ApiV8Code, /startup-api-runtime-flags-v4/);
+  assert.match(engine.ApiV8Code, /startup-api-runtime-flags-v5/);
   assert.match(engine.ApiV8Code, /phase = 'RefreshBootstrap'/);
   assert.match(engine.ApiV8Code, /CHILD_STARTUP_BOOTSTRAP_REVISION_RESTART_V1/);
   assert.match(engine.ApiV8Code, /checkpoint\.BootstrapRefreshRevision/);
   assert.match(engine.ApiV8Code, /checkpoint\.BootstrapRefreshIndex = 0/);
   assert.match(engine.ApiV8Code, /BootstrapRefreshRevision: startupBootstrapRevision/);
+  assert.match(engine.ApiV8Code, /CHILD_STARTUP_BOOTSTRAP_TASK_READBACK_V1/);
+  assert.match(engine.ApiV8Code, /verifyRefreshedChildTask/);
+  assert.match(engine.ApiV8Code, /_BackgroundTaskTargetOsClient/);
   assert.match(engine.ApiV8Code, /refreshedTaskId != text\(refreshTask\.TaskId\)/);
   assert.match(engine.ApiV8Code, /key == 'jhyxdkj'/);
   assert.match(engine.ApiV8Code, /key == 'lsg'/);
@@ -115,6 +118,11 @@ test("SaaS package owns the main-tenant fan-out engine and page button", () => {
   assert.ok(
     saasPackage.PackageInfo.RequiredPlatformCapabilities.includes(
       "BackgroundTask:StartupBootstrapRevisionReset",
+    ),
+  );
+  assert.ok(
+    saasPackage.PackageInfo.RequiredPlatformCapabilities.includes(
+      "BackgroundTask:StartupBootstrapTaskReadback",
     ),
   );
   assert.ok(
@@ -193,7 +201,26 @@ test("startup bootstrap refresh restarts the same idempotent round when its revi
           item => item.OsClient.toLowerCase() === String(param.TargetOsClient).toLowerCase(),
         );
         refreshed.push(param.TargetOsClient);
-        return { Code: 1, Data: { TaskId: match.TaskId } };
+        return { Code: 1, Data: JSON.stringify({ TaskId: match.TaskId }) };
+      },
+    },
+    FormEngine: {
+      GetFormData(_tableName, query) {
+        const match = childTasks.find(item => item.TaskId === query.Id);
+        return {
+          Code: 1,
+          Data: {
+            Id: match.TaskId,
+            Status: "Retrying",
+            CancelRequested: 0,
+            IdempotencyKey: `child-platform-apps:${taskId}:${match.OsClient}:startup`.toLowerCase(),
+            ParamJson: JSON.stringify({
+              _BackgroundTaskTargetOsClient: match.OsClient,
+              MaintenanceScope: "StartupDependencies",
+              RequiredAppIds: ["app.microi.saas-engine"],
+            }),
+          },
+        };
       },
     },
   };
@@ -204,7 +231,7 @@ test("startup bootstrap refresh restarts the same idempotent round when its revi
   assert.equal(result.Data.BackgroundTask.Checkpoint.BootstrapRefreshIndex, 20);
   assert.equal(
     result.Data.BackgroundTask.Checkpoint.BootstrapRefreshRevision,
-    "startup-api-runtime-flags-v4",
+    "startup-api-runtime-flags-v5",
   );
   assert.equal(refreshed.length, 20);
   assert.deepEqual(refreshed.slice(0, 2), ["Jhyxdkj", "lsg"]);

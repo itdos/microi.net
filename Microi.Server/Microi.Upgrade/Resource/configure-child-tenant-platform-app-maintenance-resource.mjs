@@ -147,11 +147,16 @@ for (const capability of [
   "BackgroundTask:ChildTenantRuntimeReloadRecovery",
   "BackgroundTask:PartialQueueTerminalAggregation",
   "BackgroundTask:StartupDependencyIncidentScope",
-  "BackgroundTask:StartupBootstrapRefresh",
-  "BackgroundTask:StartupBootstrapRuntimeFlagRefresh",
-  "BackgroundTask:StartupBootstrapRevisionReset",
+  "BackgroundTask:StartupNoRequeueRefresh",
   "V8.Method.ReloadOsClient"
 ]) addCapability(saasPackage.PackageInfo, capability);
+saasPackage.PackageInfo.RequiredPlatformCapabilities =
+  (saasPackage.PackageInfo.RequiredPlatformCapabilities || []).filter(capability => ![
+    "BackgroundTask:StartupBootstrapRefresh",
+    "BackgroundTask:StartupBootstrapRuntimeFlagRefresh",
+    "BackgroundTask:StartupBootstrapRevisionReset",
+    "BackgroundTask:StartupBootstrapTaskReadback",
+  ].includes(capability));
 
 const engine = {
   IsDeleted: 0,
@@ -160,6 +165,8 @@ const engine = {
   CreateTime: "2026-08-22 00:00:00",
   Id: "8b6ee32a-69c5-47cd-95d5-7a1342d64a87",
   ChangeHistory:
+    "2026-08-25 16:05:00 v1.2.7 在途任务按 ApiEngineKey 自动读取最新工作器；旧刷新检查点仅迁移为 Monitor，禁止重新投递产生第二批任务\n" +
+    "2026-08-25 15:50:00 v1.2.6 归一化 DosResult.Data 并强回读原子任务 Id、幂等键、目标租户与唯一 SaaS 范围\n" +
     "2026-08-25 15:35:00 v1.2.5 提升刷新修订至 v4，触发已误标 v3 的在途父任务重新执行完整一致轮次\n" +
     "2026-08-25 15:30:00 v1.2.4 刷新分片中途升级修订时从首租户重启同一幂等轮次，避免混合版本漏补\n" +
     "2026-08-25 15:20:00 v1.2.3 兼容 MySQL BIT(1) 历史列绑定，再次刷新在途任务的运行标志补正器\n" +
@@ -176,7 +183,7 @@ const engine = {
     "2026-08-22 13:00:00 v1.1.1 父任务 Current/Total 改用百分比单位，避免排队数量触发 99% 假进度\n" +
     "2026-08-22 12:00:00 v1.1.0 投递前补齐子租户商城工作器，并持续汇总全部子任务真实终态\n" +
     "2026-08-22 00:00:00 v1.0.0 创建主租户批量维护子租户平台应用编排接口\n",
-  Version: "v1.2.5",
+  Version: "v1.2.7",
   LimitRecursion: 1000,
   LimitMemory: 256,
   MaxStatements: 10000000,
