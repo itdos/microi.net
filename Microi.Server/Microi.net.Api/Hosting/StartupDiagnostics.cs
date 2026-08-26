@@ -2,6 +2,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Diagnostics;
 
+// ASP.NET Core 启动诊断与端口占用报告。
 namespace Microi.net.Api;
 
 /// <summary>

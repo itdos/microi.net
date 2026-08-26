@@ -40,6 +40,7 @@
     <ProjectReference Include="..\Microi.Translate\Microi.Translate.csproj" />
     <ProjectReference Include="..\Microi.Office\Microi.Office.csproj" />
     <ProjectReference Include="..\Microi.Upgrade\Microi.Upgrade.csproj" />
+    <!-- HTTP 入口归属既有功能类库与 API 组合根，不再引用无业务归属的中转项目。 -->
     <ProjectReference Include="..\Microi.net.Api\Microi.net.Api.csproj"
                       Condition="Exists('..\Microi.net.Api\Microi.net.Api.csproj')" />
     <!-- 私有 Microi.net 子仓存在时启用服务端安全、FormEngine 与 ApiEngine 回归。 -->

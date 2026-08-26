@@ -84,9 +84,7 @@ LibreTranslate 是动态翻译供应商，不是 `diy_lang` 的替代品。一�
 
 ## HTTP 与 MCP
 
-已登录 HTTP 入口固定为 `/api/Translate/TranslateText|Detect|Languages|TranslateFile|Suggest|Health`。Controller 必须用验证后的 Token 覆盖请求体 `OsClient`，不得接受 endpoint/key/header。
-
-覆盖审计所用的标准路由为 `/api/translate/detect`、`/api/translate/languages`、`/api/translate/translatefile`、`/api/translate/suggest` 和 `/api/translate/health`；它们都服从同一登录与租户绑定规则。
+已登录 HTTP 入口统一为 `POST /apiengine/platform-translate-runtime`，通过请求体 `Action=TranslateText|Detect|Languages|TranslateFile|Suggest|Health` 选择能力。官方 Managed 接口使用验证后的 Token 绑定 `OsClient`，不得接受 endpoint/key/header；个性化逻辑只写入租户 `platform-runtime-custom-hook`，且原文、文件 Base64、供应商地址和密钥不会传给 Hook。
 
 MCP 固定工具：`microi_translate`、`microi_detect_language`、`microi_list_translate_languages`、`microi_translate_file`、`microi_suggest_translation`、`microi_get_translate_health`。文件翻译需要 `confirmExecution=TRANSLATE_FILE`，建议写入需要 `confirmExecution=TRANSLATE_SUGGEST`；审计只记录长度、SHA-256、语言和输出模式，不记录文本、文件内容、本机路径或凭据。大文件结果落到新的绝对路径，不允许覆盖已有文件。
 

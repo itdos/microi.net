@@ -29,6 +29,7 @@ using MongoDB.Driver;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+// ASP.NET Core 控制器过滤器适配层。
 namespace Microi.net.Api
 {
     /// <summary>
@@ -101,7 +102,7 @@ namespace Microi.net.Api
                 $"{actionDescriptor.ControllerName}.{actionDescriptor.ActionName}");
         }
         /// <summary>
-        /// 
+        /// 记录请求耗时，并将超过阈值的调用写入异步系统日志。
         /// </summary>
         /// <param name="context"></param>
         public virtual void OnActionExecuted(ActionExecutedContext context)
@@ -133,7 +134,7 @@ namespace Microi.net.Api
             // });
         }
         /// <summary>
-        /// 
+        /// 从表单集合中读取并归一化布尔值或普通文本值。
         /// </summary>
         private static object GetFormValue(IFormCollection form, string key)
         {
@@ -476,7 +477,7 @@ namespace Microi.net.Api
                 diagnostic);
         }
         /// <summary>
-        /// 
+        /// 在执行 Controller Action 前完成访问密钥、令牌和平台权限校验。
         /// </summary>
         /// <param name="context"></param>
         public virtual void OnActionExecuting(ActionExecutingContext context)
@@ -610,7 +611,7 @@ namespace Microi.net.Api
 
         }
         /// <summary>
-        /// 
+        /// 将兼容筛选器中的未处理异常转换为统一的多语言 DosResult。
         /// </summary>
         /// <param name="context"></param>
         public virtual void OnException(ExceptionContext context)

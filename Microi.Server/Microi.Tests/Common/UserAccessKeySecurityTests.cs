@@ -474,11 +474,10 @@ public class UserAccessKeySecurityTests
             "/api/SysBaseData/GetSysBaseDataStep",
             "/api/SysUserFk/GetSysUserFk",
             "/api/ApiEngine/Run",
-            "/api/DataSourceEngine/Run",
+            "/apiengine/platform-data-source-run",
             "/api/OnlineTerminal/Mine",
             "/api/Os/GetDateTimeNow",
-            "/api/UserBehavior/Signal",
-            "/api/ModuleEngine/GetTableData",
+            "/apiengine/platform-module-data",
             "/api/WorkFlow/GetWFHistory",
             "/api/WorkFlow/StartWork",
             "/api/HDFS/GetPrivateFileUrl"
@@ -502,7 +501,11 @@ public class UserAccessKeySecurityTests
             "/api/FormEngine/AddDiyField",
             "/api/OnlineTerminal/List",
             "/api/OnlineTerminal/Kick",
-            "/api/HDFS/Upload"
+            "/api/HDFS/Upload",
+            "/apiengine/platform-user-behavior-signal",
+            "/api/DataSourceEngine/Run",
+            "/api/ModuleEngine/GetTableData",
+            "/api/UserBehavior/Signal"
         };
         foreach (var path in deniedPaths)
         {
@@ -519,7 +522,7 @@ public class UserAccessKeySecurityTests
 
         Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
             selectedTableUser,
-            "/api/ModuleEngine/GetTableData"));
+            "/apiengine/platform-module-data"));
         Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
             selectedTableUser,
             "/api/WorkFlow/GetWFHistory"));
@@ -527,7 +530,7 @@ public class UserAccessKeySecurityTests
         selectedTableUser["_AccessKeyAllowedTableNames"] = new JArray("*");
         Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
             selectedTableUser,
-            "/api/ModuleEngine/GetTableData"));
+            "/apiengine/platform-module-data"));
         Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
             selectedTableUser,
             "/api/WorkFlow/GetWFHistory"));

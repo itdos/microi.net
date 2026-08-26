@@ -61,7 +61,7 @@ namespace Microi.net
         private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 3, 7);
         private static readonly System.Version MinimumPlatformBackgroundTaskVersion = new System.Version(1, 1, 0);
         private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 1);
-        private static readonly System.Version MinimumPlatformRuntimePackageVersion = new System.Version(7, 6, 21);
+        private static readonly System.Version MinimumPlatformRuntimePackageVersion = new System.Version(7, 7, 1);
         private static readonly System.Version MinimumPlatformRuntimeEngineVersion = new System.Version(1, 0, 0);
         private static readonly System.Version MinimumPlatformServiceHealthEngineVersion = new System.Version(1, 0, 1);
         private static readonly System.Version MinimumPlatformLoginWallpapersEngineVersion = new System.Version(1, 1, 0);
@@ -80,7 +80,15 @@ namespace Microi.net
             "platform-private-file-url",
             "platform-sys-user-public-info",
             "platform-login-wallpapers",
-            "microi-init"
+            "microi-init",
+            "mci-system-observability-query",
+            "mci-system-observability-action",
+            "platform-data-source-run",
+            "platform-module-data",
+            "platform-ocr-recognize",
+            "platform-office-export-word-by-template",
+            "platform-translate-runtime",
+            "platform-user-behavior-signal"
         };
         private static readonly string[] RequiredPlatformRuntimeEngineKeys =
             ManagedPlatformRuntimeEngineKeys.Concat(new[] { PlatformRuntimeCustomHookEngineKey }).ToArray();
@@ -252,6 +260,14 @@ namespace Microi.net
                     : string.Equals(key, "microi-init", StringComparison.Ordinal)
                         ? MinimumPlatformMicroiInitEngineVersion
                         : MinimumPlatformRuntimeEngineVersion;
+            // 官方资源既有单引号也有双引号写法；门禁校验调用语义，不能因
+            // JavaScript 等价引号风格把完整运行时包误判为缺失并反复重装。
+            var callsRuntimeHook = code.Contains(
+                                       "V8.ApiEngine.Run('" + PlatformRuntimeCustomHookEngineKey + "'",
+                                       StringComparison.Ordinal)
+                                   || code.Contains(
+                                       "V8.ApiEngine.Run(\"" + PlatformRuntimeCustomHookEngineKey + "\"",
+                                       StringComparison.Ordinal);
             return System.Version.TryParse(metadataVersionText, out var metadataVersion)
                 && metadataVersion >= minimumEngineVersion
                 && codeVersionMatch.Success
@@ -279,8 +295,8 @@ namespace Microi.net
                         && !code.Contains("GetFormData({")
                         && !code.Contains("GetTableDataTree")))
                 && (AnonymousPlatformRuntimeEngineKeys.Contains(key)
-                    ? !code.Contains("V8.ApiEngine.Run('" + PlatformRuntimeCustomHookEngineKey + "'")
-                    : code.Contains("V8.ApiEngine.Run('" + PlatformRuntimeCustomHookEngineKey + "'"));
+                    ? !callsRuntimeHook
+                    : callsRuntimeHook);
         }
 
         private static bool HasPackagedPlatformRuntime(JObject package)

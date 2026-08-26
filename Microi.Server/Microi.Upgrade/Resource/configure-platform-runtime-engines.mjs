@@ -141,6 +141,42 @@ const engines = [
     history: '2026-08-26 v1.0.9 将主租户已有的系统观测查询正式纳入 SaaS 官方 Managed 包，并增加只暴露 Action 的租户个性化 Hook。'
   },
   {
+    key: 'mci-system-observability-action', name: '系统日志与监控安全治理', file: 'mci-system-observability-action.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000016', enableLog: 1,
+    history: '2026-08-26 v1.0.0 IP 封禁与解封迁入官方 Managed 接口；可信原子固定管理员、租户和审计字段。'
+  },
+  {
+    key: 'platform-data-source-run', name: '平台数据源运行时', file: 'platform-data-source-run.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000017', enableLog: 0,
+    history: '2026-08-26 v1.0.0 数据源 HTTP Controller 迁入 Managed 接口，并保留访问密钥的数据源白名单校验。'
+  },
+  {
+    key: 'platform-module-data', name: '平台模块查询运行时', file: 'platform-module-data.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000018', enableLog: 0,
+    history: '2026-08-26 v1.0.0 模块查询 Controller 迁入 Managed 接口，可信原子固定 Client 权限上下文。'
+  },
+  {
+    key: 'platform-ocr-recognize', name: '平台 OCR 识别运行时', file: 'platform-ocr-recognize.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000019', enableLog: 1,
+    history: '2026-08-26 v1.0.0 OCR REST 业务入口迁入 Managed 接口，供应商密钥继续只存在于租户绑定网关。'
+  },
+  {
+    key: 'platform-office-export-word-by-template', name: '平台 Word 模板导出', file: 'platform-office-export-word-by-template.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000020', enableLog: 1,
+    responseFile: 1, responseType: 'File',
+    history: '2026-08-26 v1.0.0 Word 模板导出迁入响应文件接口引擎；宿主原子重新校验菜单、表与行读取权限。'
+  },
+  {
+    key: 'platform-translate-runtime', name: '平台翻译运行时', file: 'platform-translate-runtime.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000021', enableLog: 1,
+    history: '2026-08-26 v1.0.0 文本、检测、语言、文件、建议与健康六类翻译入口统一迁入 Managed 接口。'
+  },
+  {
+    key: 'platform-user-behavior-signal', name: '平台用户行为信号', file: 'platform-user-behavior-signal.js',
+    id: '019d2a01-9d63-7f91-8c01-000000000022', enableLog: 0,
+    history: '2026-08-26 v1.0.0 客户端行为信号迁入 Managed 接口；会话、终端和用户身份由可信 DiyToken 原子解析。'
+  },
+  {
     key: 'platform-runtime-custom-hook', name: '平台运行时个性化扩展', file: 'platform-runtime-custom-hook.js',
     id: '019d2a01-9d63-7f91-8c01-000000000001', enableLog: 1, stopHttp: 1,
     upgradePolicy: 'CreateIfMissing', ownership: 'Tenant',
@@ -249,6 +285,8 @@ for (const definition of engines) {
       AllowAnonymous: definition.allowAnonymous || 0,
       ApiAddress: `/apiengine/${definition.key}`,
       Lock: definition.lock || 0,
+      ResponseFile: definition.responseFile || 0,
+      ResponseType: definition.responseType || '',
       ApiV8Code: '',
       ApiRole: '[]',
       IsEnable: 1,
@@ -266,6 +304,8 @@ for (const definition of engines) {
   engine.IsEnable = 1;
   engine.EnableLog = definition.enableLog;
   engine.Lock = definition.lock || 0;
+  if (definition.responseFile !== undefined) engine.ResponseFile = definition.responseFile;
+  if (definition.responseType !== undefined) engine.ResponseType = definition.responseType;
   engine.ChangeHistory = prependOnce(engine.ChangeHistory, definition.history);
   packageData.ResourcePolicies.ApiEngines[definition.key] = {
     Ownership: definition.ownership || 'Platform',
@@ -443,6 +483,13 @@ for (const capability of [
   'V8.Method.ManageOnlineTerminal',
   'V8.Method.ManageCache',
   'V8.Method.GetSystemObservability',
+  'V8.Method.ManageSystemObservability',
+  'V8.Method.RunDataSourceEngine',
+  'V8.Method.RunModuleEngine',
+  'V8.Method.ExportWordByTemplate',
+  'V8.Method.TrackUserBehavior',
+  'V8.OCR.Recognize',
+  'V8.TranslateEngine.TranslateText',
   'ServerFeature:ApiEngineStreaming',
   'ApiEngine:platform-schedule-job',
   'ApiEngine:platform-mq',
@@ -457,6 +504,13 @@ for (const capability of [
   'ApiEngine:platform-online-terminal',
   'ApiEngine:platform-cache-manager',
   'ApiEngine:mci-system-observability-query',
+  'ApiEngine:mci-system-observability-action',
+  'ApiEngine:platform-data-source-run',
+  'ApiEngine:platform-module-data',
+  'ApiEngine:platform-ocr-recognize',
+  'ApiEngine:platform-office-export-word-by-template',
+  'ApiEngine:platform-translate-runtime',
+  'ApiEngine:platform-user-behavior-signal',
   'V8.Method.ResolveOsClientByDomain',
   'V8.Method.GetPublicSysConfig',
   'V8.Method.GetBackendVersion',
@@ -535,6 +589,32 @@ packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
   apiClosurePackageVersion,
 );
 packageData.PackageInfo.ChangeHistory = prependOnce(packageData.PackageInfo.ChangeHistory, apiClosureHistory);
+
+const controllerSlimPackageVersion = 'v7.7.1';
+const controllerSlimHistory = '2026-08-26 v7.7.1 数据源、模块、OCR、Office 模板导出、翻译、系统安全治理与用户行为迁入官方 Managed 接口；只保留最小可信 V8 原子和租户 CreateIfMissing Hook。';
+const emptyDatabaseRuntimeHistory = '2026-08-26 v7.6.22 空数据库制作新增清理网络流量汇总、应用流式发布门禁审计和 NuGet 日统计三类运行态数据，并把三张表纳入发布后零残留门禁；继续递归清除顶级“AI应用”菜单树且保留平台核心“AI助手”。';
+if (compareSemver(packageData.PackageInfo.Version, controllerSlimPackageVersion) < 0) {
+  packageData.PackageInfo.Version = controllerSlimPackageVersion;
+}
+if (packageData.PackageInfo.Version === controllerSlimPackageVersion) {
+  packageData.PackageInfo.Description = 'SaaS 引擎基础资源。平台业务入口优先由 Managed ApiEngine 编排，宿主仅保留启动、协议与可信安全原子。';
+  packageData.PackageInfo.ChangeLog = {
+    Version: controllerSlimPackageVersion,
+    Title: '平台业务 Controller 进一步迁入 V8',
+    ChangeType: 'Optimize',
+    Content: controllerSlimHistory.substring(controllerSlimHistory.indexOf(' ') + 1).replace(/^v7\.7\.1\s+/, ''),
+    ReleaseTime: '2026-08-26 20:30:00'
+  };
+}
+packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
+  packageData.PackageInfo.ChangeHistory,
+  controllerSlimPackageVersion,
+);
+packageData.PackageInfo.ChangeHistory = prependOnce(
+  packageData.PackageInfo.ChangeHistory,
+  emptyDatabaseRuntimeHistory,
+);
+packageData.PackageInfo.ChangeHistory = prependOnce(packageData.PackageInfo.ChangeHistory, controllerSlimHistory);
 
 normalizeOfficialApiEnginePolicies(packageData, path.basename(packagePath));
 const normalizedPackageData = JSON.parse(normalizeOfficialPackageExecutionLimits(

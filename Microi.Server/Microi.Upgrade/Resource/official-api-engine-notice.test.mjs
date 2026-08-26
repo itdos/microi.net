@@ -68,6 +68,13 @@ test('platform runtime facades are Managed and only authenticated facades call t
     'platform-create-tenant',
     'platform-external-login-binding',
     'platform-wechat-user-binding',
+    'mci-system-observability-action',
+    'platform-data-source-run',
+    'platform-module-data',
+    'platform-ocr-recognize',
+    'platform-office-export-word-by-template',
+    'platform-translate-runtime',
+    'platform-user-behavior-signal',
   ];
   const anonymousKeys = new Set([
     'platform-os-client-by-domain',
@@ -87,7 +94,7 @@ test('platform runtime facades are Managed and only authenticated facades call t
     if (anonymousKeys.has(key)) {
       assert.doesNotMatch(engine.ApiV8Code, /V8\.ApiEngine\.Run\('platform-runtime-custom-hook'/);
     } else {
-      assert.match(engine.ApiV8Code, /V8\.ApiEngine\.Run\('platform-runtime-custom-hook'/);
+      assert.match(engine.ApiV8Code, /V8\.ApiEngine\.Run\(["']platform-runtime-custom-hook["']/);
     }
   }
   const hook = packageModel.SysApiEngines.find(

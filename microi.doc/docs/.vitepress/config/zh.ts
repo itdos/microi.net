@@ -5,7 +5,7 @@ export const zh = defineConfig({
 	base: "/",
 	title: "Microi吾码",
 	lang: "zh-CN",
-	description: "Microi吾码官方文档。Microi吾码不只是开源 AI 低代码平台，更是企业级 AI 应用开发框架；融合可视化建模、V8 在线编程、.NET 10 / Vue 3 源码扩展、MCP、Skills 与 20+ 成熟引擎。",
+	description: "Microi吾码官方文档。Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、AI 低代码、微服务与 V8 引擎；在典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。",
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
 		// 百度爬虫专项

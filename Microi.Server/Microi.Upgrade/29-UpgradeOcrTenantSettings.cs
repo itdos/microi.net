@@ -46,7 +46,7 @@ namespace Microi.net
             {
                 Name = "OcrEnabled", Label = "启用OCR识别", Type = "int", Component = "Switch",
                 Sort = 13000, DefaultValue = "0", AppVisible = 0,
-                Description = "默认关闭。开启后，当前租户可通过受认证的 /api/Ocr/Recognize 或 V8.OCR 调用服务端配置的 OCR 服务。"
+                Description = "默认关闭。开启后，当前租户可通过受认证的 /apiengine/platform-ocr-recognize 或 V8.OCR 调用服务端配置的 OCR 服务。"
             },
             new FieldDefinition
             {

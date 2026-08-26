@@ -12,11 +12,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+// ASP.NET Core 原生流式、支付回调、媒体密钥与 OpenAI 协议适配器；普通 JSON 业务兼容路由已统一并入 LegacyMobileCompatibilityController。
 namespace Microi.net.Api
 {
     /// <summary>
-    /// AI 统一控制器
-    /// 包含：AI对话、NL2SQL、NL2V8Engine、AI订阅管理、AI代理转发、OpenAI兼容端点
+    /// AI 原生协议网关。这里只保留 SSE、支付验签、供应商密钥隔离与
+    /// OpenAI/MiniMax 原始协议；可由 V8 编排的 JSON 动作不得在此新增。
     /// </summary>
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     [Route("api/[controller]/[action]")]
@@ -27,7 +28,6 @@ namespace Microi.net.Api
         private readonly SubscriptionService _subService;
         private readonly AiProxyService _proxyService;
         private const string AiPlatformAccountEngineKey = "platform-ai-account";
-        private const string AiPlatformRuntimeEngineKey = "platform-ai-runtime";
 
         public AiController(
             IMicroiAI microiAi,
@@ -60,71 +60,6 @@ namespace Microi.net.Api
             return (userId, userName, osClient);
         }
 
-        private async Task<JsonResult> RunAiPlatformCompatibilityAsync(
-            string action,
-            JObject request = null,
-            bool allowAnonymous = false)
-        {
-            return await RunManagedAiCompatibilityAsync(
-                AiPlatformAccountEngineKey,
-                action,
-                request,
-                allowAnonymous);
-        }
-
-        private async Task<JsonResult> RunAiRuntimeCompatibilityAsync(
-            string action,
-            JObject request = null)
-        {
-            return await RunManagedAiCompatibilityAsync(
-                AiPlatformRuntimeEngineKey,
-                action,
-                request,
-                allowAnonymous: false);
-        }
-
-        private async Task<JsonResult> RunManagedAiCompatibilityAsync(
-            string managedEngineKey,
-            string action,
-            JObject request,
-            bool allowAnonymous)
-        {
-            JObject currentUser = null;
-            var osClient = DiyToken.GetCurrentOsClient(false);
-            // 匿名套餐/模型发现仍须尊重统一解析出的 Query/Form/Header 租户；
-            // 请求没有显式租户时才回到本节点配置租户。
-            if (!allowAnonymous)
-            {
-                var token = await DiyToken.GetCurrentToken(false);
-                if (!string.IsNullOrWhiteSpace(token?.OsClient)) osClient = token.OsClient;
-                if (token?.CurrentUser != null)
-                    currentUser = JObject.FromObject(token.CurrentUser);
-            }
-
-            if (string.IsNullOrWhiteSpace(osClient))
-                osClient = OsClient.GetConfigOsClient();
-            request = request?.DeepClone() as JObject ?? new JObject();
-            foreach (var property in request.Properties()
-                         .Where(item => string.Equals(
-                             item.Name,
-                             "OsClient",
-                             StringComparison.OrdinalIgnoreCase)
-                             || string.Equals(
-                                 item.Name,
-                                 "_OsClient",
-                                 StringComparison.OrdinalIgnoreCase))
-                         .ToList())
-            {
-                property.Remove();
-            }
-            request["Action"] = action;
-            request["OsClient"] = TenantConfigurationSecurity.NormalizeTenantId(osClient);
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                managedEngineKey,
-                request,
-                currentUser));
-        }
-
         private async Task EnrichCurrentUserAsync(AiParam param)
         {
             if (param == null)
@@ -141,30 +76,6 @@ namespace Microi.net.Api
             param.Endpoint = null;
             param.ServerInternalCall = false;
             param.Source = "http-ai";
-        }
-
-        public class UpdateConversationTitleParam
-        {
-            public string ConversationId { get; set; }
-            public string Title { get; set; }
-            public string Source { get; set; }
-        }
-
-        public class GenerateAvatarParam
-        {
-            public string Prompt { get; set; }
-            public int Count { get; set; } = 4;
-        }
-
-        /// <summary>
-        /// 修改当前用户整组 AI 对话标题。
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> UpdateConversationTitle([FromBody] UpdateConversationTitleParam param)
-        {
-            return await RunAiRuntimeCompatibilityAsync(
-                "UpdateConversationTitle",
-                JObject.FromObject(param ?? new UpdateConversationTitleParam()));
         }
 
         /// <summary>
@@ -186,52 +97,6 @@ namespace Microi.net.Api
         // ============================================================
         // region: AI 对话 / NL2SQL / NL2V8Engine（原有功能）
         // ============================================================
-
-        /// <summary>
-        /// AI语义分析：手动模式由前端指定，自动模式由后端模型先识别意图。
-        /// </summary>
-        [HttpPost, HttpGet]
-        public async Task<JsonResult> RecognizeIntent(
-            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] AiParam bodyParam,
-            [FromQuery] string UserChatMsg = null,
-            [FromQuery] string AiModel = null,
-            [FromQuery] string AiModelId = null,
-            [FromQuery] string OsClient = null)
-        {
-            var param = bodyParam ?? new AiParam();
-            if (!string.IsNullOrWhiteSpace(UserChatMsg)) param.UserChatMsg = UserChatMsg;
-            if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
-            if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
-            if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
-            return await RunAiRuntimeCompatibilityAsync(
-                "RecognizeIntent",
-                JObject.FromObject(param));
-        }
-
-        /// <summary>
-        /// AI对话
-        /// </summary>
-        [HttpPost, HttpGet]
-        public async Task<JsonResult> Chat(
-            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] AiParam bodyParam,
-            [FromQuery] string UserChatMsg = null,
-            [FromQuery] string SystemChatMsg = null,
-            [FromQuery] string AiModel = null,
-            [FromQuery] string AiModelId = null,
-            [FromQuery] string ReasoningEffort = null,
-            [FromQuery] string OsClient = null)
-        {
-            var param = bodyParam ?? new AiParam();
-            if (!string.IsNullOrWhiteSpace(UserChatMsg)) param.UserChatMsg = UserChatMsg;
-            if (!string.IsNullOrWhiteSpace(SystemChatMsg)) param.SystemChatMsg = SystemChatMsg;
-            if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
-            if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
-            if (!string.IsNullOrWhiteSpace(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
-            if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
-            return await RunAiRuntimeCompatibilityAsync(
-                "Chat",
-                JObject.FromObject(param));
-        }
 
         /// <summary>
         /// AI对话（SSE流式输出）
@@ -288,42 +153,6 @@ namespace Microi.net.Api
                 }
                 catch { }
             }
-        }
-
-        /// <summary>
-        /// 自然语言转SQL查询
-        /// </summary>
-        [HttpPost, HttpGet]
-        public async Task<JsonResult> NL2SQL(
-            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] NL2SQLParam bodyParam,
-            [FromQuery] string Question = null,
-            [FromQuery] string AiModel = null,
-            [FromQuery] string AiModelId = null,
-            [FromQuery] string ReasoningEffort = null,
-            [FromQuery] string OsClient = null)
-        {
-            var param = bodyParam ?? new NL2SQLParam();
-            if (!string.IsNullOrWhiteSpace(Question)) param.Question = Question;
-            if (!string.IsNullOrWhiteSpace(AiModel)) param.AiModel = AiModel;
-            if (!string.IsNullOrWhiteSpace(AiModelId)) param.AiModelId = AiModelId;
-            if (!string.IsNullOrWhiteSpace(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
-            if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
-            return await RunAiRuntimeCompatibilityAsync(
-                "NL2SQL",
-                JObject.FromObject(param));
-        }
-
-        /// <summary>
-        /// 获取当前用户 AI 中转站 Token 额度。
-        /// </summary>
-        [HttpPost, HttpGet]
-        public async Task<JsonResult> RelayTokenSummary(
-            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] AiParam bodyParam,
-            [FromQuery] string AiModel = null,
-            [FromQuery] string AiModelId = null,
-            [FromQuery] string OsClient = null)
-        {
-            return await RunAiPlatformCompatibilityAsync("GetRelayTokenSummary");
         }
 
         /// <summary>
@@ -391,98 +220,9 @@ namespace Microi.net.Api
             }
         }
 
-        /// <summary>
-        /// 自然语言转V8引擎代码（非流式）
-        /// </summary>
-        [HttpPost, HttpGet]
-        [PlatformAdminOnly]
-        public async Task<JsonResult> NL2V8EngineSync(NL2V8Param param)
-        {
-            param ??= new NL2V8Param();
-            return await RunAiRuntimeCompatibilityAsync(
-                "NL2V8EngineSync",
-                JObject.FromObject(param));
-        }
-
         // ============================================================
         // region: AI 订阅管理
         // ============================================================
-
-        /// <summary>
-        /// 获取所有套餐列表（无需登录）
-        /// </summary>
-        [HttpGet, HttpPost]
-        [AllowAnonymous]
-        public async Task<JsonResult> SubGetPlans()
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "GetPlans",
-                allowAnonymous: true);
-        }
-
-        /// <summary>
-        /// 获取当前用户的订阅信息及额度
-        /// </summary>
-        [HttpGet, HttpPost]
-        public async Task<JsonResult> SubGetInfo()
-        {
-            return await RunAiPlatformCompatibilityAsync("GetSubscription");
-        }
-
-        /// <summary>
-        /// 获取当前用户的 AI 中转 API Key。
-        /// </summary>
-        [HttpGet, HttpPost]
-        public async Task<JsonResult> GetUserAiApiKey()
-        {
-            return await RunAiPlatformCompatibilityAsync("EnsureUserAiApiKey");
-        }
-
-        /// <summary>
-        /// 重置当前用户的 AI 中转 API Key。
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> ResetUserAiApiKey()
-        {
-            return await RunAiPlatformCompatibilityAsync("ResetUserAiApiKey");
-        }
-
-        /// <summary>
-        /// 获取当前登录用户的中转站 Token 余额和最近扣减记录。
-        /// </summary>
-        [HttpGet, HttpPost]
-        public async Task<JsonResult> GetUserAiUsage(int pageIndex = 1, int pageSize = 20)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "GetRelayTokenUsage",
-                new JObject
-                {
-                    ["PageIndex"] = pageIndex,
-                    ["PageSize"] = pageSize
-                });
-        }
-
-        /// <summary>
-        /// 创建订阅订单
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> SubCreateOrder([FromBody] CreateOrderParam param)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "CreateOrder",
-                JObject.FromObject(param ?? new CreateOrderParam()));
-        }
-
-        /// <summary>
-        /// 获取支付宝支付链接
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> SubCreateAlipay([FromBody] PayOrderParam param)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "CreateAlipay",
-                JObject.FromObject(param ?? new PayOrderParam()));
-        }
 
         /// <summary>
         /// 支付宝异步回调通知
@@ -599,73 +339,6 @@ namespace Microi.net.Api
             }
         }
 
-        /// <summary>
-        /// 获取用户订单列表
-        /// </summary>
-        [HttpGet, HttpPost]
-        public async Task<JsonResult> SubGetOrders(int pageIndex = 1, int pageSize = 20)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "GetOrders",
-                new JObject
-                {
-                    ["PageIndex"] = pageIndex,
-                    ["PageSize"] = pageSize
-                });
-        }
-
-        /// <summary>
-        /// 消耗一次额度（供 Gateway 调用）
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> SubConsumeQuota()
-        {
-            return await RunAiPlatformCompatibilityAsync("ConsumeQuota");
-        }
-
-        /// <summary>
-        /// 查询订单支付状态
-        /// </summary>
-        [HttpGet, HttpPost]
-        public async Task<JsonResult> SubGetOrderStatus(string orderId)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "GetOrderStatus",
-                new JObject { ["OrderId"] = orderId });
-        }
-
-        /// <summary>
-        /// 获取所有APIKey列表（管理接口）
-        /// </summary>
-        [HttpGet, HttpPost]
-        [PlatformAdminOnly]
-        public async Task<JsonResult> SubGetApiKeyList()
-        {
-            return await RunAiPlatformCompatibilityAsync("GetApiKeyList");
-        }
-
-        /// <summary>
-        /// 获取指定APIKey绑定的用户列表（管理接口）
-        /// </summary>
-        [HttpGet, HttpPost]
-        [PlatformAdminOnly]
-        public async Task<JsonResult> SubGetApiKeyBindUsers(string apiKeyId)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "GetApiKeyBindUsers",
-                new JObject { ["ApiKeyId"] = apiKeyId });
-        }
-
-        /// <summary>
-        /// 获取APIKey容量预警（管理接口）
-        /// </summary>
-        [HttpGet, HttpPost]
-        [PlatformAdminOnly]
-        public async Task<JsonResult> SubGetApiKeyCapacity()
-        {
-            return await RunAiPlatformCompatibilityAsync("GetApiKeyCapacity");
-        }
-
         // ============================================================
         // region: AI 代理转发（需要登录Token鉴权）
         // ============================================================
@@ -729,18 +402,6 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 为当前登录用户生成候选头像。上游密钥只在服务端使用，返回的候选图
-        /// 仍需由用户选中后上传到本租户 HDFS 并保存为账户头像。
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> GenerateProfileAvatar([FromBody] GenerateAvatarParam param)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "GenerateProfileAvatar",
-                JObject.FromObject(param ?? new GenerateAvatarParam()));
-        }
-
-        /// <summary>
         /// 对话图片生成。MiniMax-M3 负责语义路由，image-01 负责图片输出；
         /// 供应商 Key 与 Base64 不离开后端，结果先持久化到当前租户 HDFS。
         /// </summary>
@@ -755,18 +416,6 @@ namespace Microi.net.Api
                 currentUser,
                 param,
                 HttpContext.RequestAborted));
-        }
-
-        /// <summary>
-        /// 创建 MiniMax 视频异步任务。RequestId 必须由调用方按业务槽位稳定生成；
-        /// 同一租户、用户和 RequestId 不会重复调用上游。
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> CreateMiniMaxVideo([FromBody] MiniMaxVideoCreateParam param)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "CreateMiniMaxVideo",
-                JObject.FromObject(param ?? new MiniMaxVideoCreateParam()));
         }
 
         /// <summary>
@@ -785,41 +434,6 @@ namespace Microi.net.Api
                 token?.OsClient ?? string.Empty,
                 currentUser,
                 HttpContext.RequestAborted));
-        }
-
-        /// <summary>
-        /// 查询当前用户的 MiniMax 视频任务；仅接收服务器签发的 TaskHandle。
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> GetMiniMaxVideoTask([FromBody] MiniMaxVideoTaskParam param)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "GetMiniMaxVideoTask",
-                JObject.FromObject(param ?? new MiniMaxVideoTaskParam()));
-        }
-
-        /// <summary>
-        /// 获取当前用户视频文件的临时下载地址；仅接收服务器签发的 FileHandle。
-        /// </summary>
-        [HttpPost]
-        public async Task<JsonResult> GetMiniMaxVideoFile([FromBody] MiniMaxVideoFileParam param)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "GetMiniMaxVideoFile",
-                JObject.FromObject(param ?? new MiniMaxVideoFileParam()));
-        }
-
-        /// <summary>
-        /// 将当前管理员的视频文件从 MiniMax 临时地址转存到本租户公有 HDFS，
-        /// 返回可供后台下载和发布连接器读取的持久地址。
-        /// </summary>
-        [HttpPost]
-        [PlatformAdminOnly]
-        public async Task<JsonResult> PersistMiniMaxVideoFile([FromBody] MiniMaxVideoFileParam param)
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "PersistMiniMaxVideoFile",
-                JObject.FromObject(param ?? new MiniMaxVideoFileParam()));
         }
 
         /// <summary>
@@ -856,15 +470,6 @@ namespace Microi.net.Api
                 currentUser,
                 param,
                 HttpContext.RequestAborted));
-        }
-
-        /// <summary>
-        /// 查询当前用户的额度和订阅状态（给 OpenClaw 客户端用）
-        /// </summary>
-        [HttpGet, HttpPost]
-        public async Task<JsonResult> ProxyGetQuotaStatus()
-        {
-            return await RunAiPlatformCompatibilityAsync("GetSubscription");
         }
 
         // ============================================================
@@ -1026,18 +631,6 @@ namespace Microi.net.Api
                             .ToString(),
                         pageIndex,
                         pageSize));
-        }
-
-        /// <summary>
-        /// 获取平台已上线的模型列表（前端展示用）
-        /// </summary>
-        [HttpGet, HttpPost]
-        [AllowAnonymous]
-        public async Task<JsonResult> SubGetModels()
-        {
-            return await RunAiPlatformCompatibilityAsync(
-                "GetModels",
-                allowAnonymous: true);
         }
 
         // ============================================================

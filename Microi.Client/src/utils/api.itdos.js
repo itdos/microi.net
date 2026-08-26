@@ -295,7 +295,7 @@ var DiyApi = {
     SaveBatch: "/api/FormEngine/SaveBatch",
     UptDiyDataListByWhere: "/api/FormEngine/UptDiyDataListByWhere",
     GetDiyFieldSqlData: "/api/FormEngine/GetDiyFieldSqlData", // sql数据源来源
-    GetDataSourceEngine: "/api/DataSourceEngine/Run", // 数据源引擎来源
+    GetDataSourceEngine: "/apiengine/platform-data-source-run", // 官方托管数据源接口引擎
     GetApiEngineUrl: function (apiEngineKey) {
         var key = String(apiEngineKey || "").trim();
         return key ? "/apiengine/" + encodeURIComponent(key) : "";

@@ -16,6 +16,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
 
+// ASP.NET Core WebAuthn/强身份协议适配器；可信验签边界必须留在后端。
 namespace Microi.net.Api
 {
     /// <summary>

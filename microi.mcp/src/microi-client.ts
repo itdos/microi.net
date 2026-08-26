@@ -2105,28 +2105,28 @@ export class MicroiClient {
 
   /** Calls the current authenticated tenant's server-side translation gateway. */
   async translateText(input: TranslateTextRequest): Promise<ApiResponse<TranslateTextResult>> {
-    return this.post<TranslateTextResult>(API.TRANSLATE_TEXT, input, {
+    return this.post<TranslateTextResult>(API.TRANSLATE_TEXT, { Action: 'TranslateText', ...input }, {
       timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
       operationName: 'translate text',
     });
   }
 
   async detectLanguage(sourceText: string): Promise<ApiResponse<TranslateDetection[]>> {
-    return this.post<TranslateDetection[]>(API.TRANSLATE_DETECT, { SourceText: sourceText }, {
+    return this.post<TranslateDetection[]>(API.TRANSLATE_DETECT, { Action: 'Detect', SourceText: sourceText }, {
       timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
       operationName: 'detect language',
     });
   }
 
   async listTranslateLanguages(): Promise<ApiResponse<TranslateLanguage[]>> {
-    return this.post<TranslateLanguage[]>(API.TRANSLATE_LANGUAGES, {}, {
+    return this.post<TranslateLanguage[]>(API.TRANSLATE_LANGUAGES, { Action: 'Languages' }, {
       timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
       operationName: 'list translation languages',
     });
   }
 
   async translateFile(input: TranslateFileRequest): Promise<ApiResponse<TranslateFileResult>> {
-    return this.post<TranslateFileResult>(API.TRANSLATE_FILE, input, {
+    return this.post<TranslateFileResult>(API.TRANSLATE_FILE, { Action: 'TranslateFile', ...input }, {
       timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
       operationName: `translate file ${input.FileName}`,
     });
@@ -2138,14 +2138,14 @@ export class MicroiClient {
     FromLang: string;
     Lang: string;
   }): Promise<ApiResponse<TranslateSuggestionResult>> {
-    return this.post<TranslateSuggestionResult>(API.TRANSLATE_SUGGEST, input, {
+    return this.post<TranslateSuggestionResult>(API.TRANSLATE_SUGGEST, { Action: 'Suggest', ...input }, {
       timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
       operationName: 'suggest translation',
     });
   }
 
   async getTranslateHealth(): Promise<ApiResponse<TranslateHealthResult>> {
-    return this.post<TranslateHealthResult>(API.TRANSLATE_HEALTH, {}, {
+    return this.post<TranslateHealthResult>(API.TRANSLATE_HEALTH, { Action: 'Health' }, {
       timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
       operationName: 'translation health',
     });

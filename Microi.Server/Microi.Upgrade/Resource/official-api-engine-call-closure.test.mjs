@@ -96,7 +96,7 @@ test('every ApiEngine target in the removed-controller ownership catalog is pack
     'Microi.net.Api',
     'api-ownership-catalog.json',
   ), 'utf8'));
-  const missing = Object.entries(catalog)
+  const missing = Object.entries(catalog.MigratedControllers || {})
     .filter(([, entry]) => String(entry?.Target || '').startsWith('ApiEngine:'))
     .map(([controller, entry]) => ({
       controller,
@@ -118,6 +118,13 @@ test('the incident routes and their customization hooks are immutable package co
     'platform-cache-manager',
     'mci-module-presentation-stats',
     'mci-system-observability-query',
+    'mci-system-observability-action',
+    'platform-data-source-run',
+    'platform-module-data',
+    'platform-ocr-recognize',
+    'platform-office-export-word-by-template',
+    'platform-translate-runtime',
+    'platform-user-behavior-signal',
     'get-microi-store-legacy-route',
     'wechat_send_tpl_msg',
   ]) {
@@ -128,6 +135,13 @@ test('the incident routes and their customization hooks are immutable package co
     'platform-online-terminal',
     'platform-cache-manager',
     'mci-system-observability-query',
+    'mci-system-observability-action',
+    'platform-data-source-run',
+    'platform-module-data',
+    'platform-ocr-recognize',
+    'platform-office-export-word-by-template',
+    'platform-translate-runtime',
+    'platform-user-behavior-signal',
   ]) {
     const engine = engines.find(item => item.ApiEngineKey === key);
     assert.match(String(engine.ApiV8Code), /platform-runtime-custom-hook/);
