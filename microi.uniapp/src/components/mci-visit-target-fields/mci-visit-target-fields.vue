@@ -22,10 +22,11 @@
       <view class="visit-target-fields__heading"><text>拜访对象</text></view>
       <view class="visit-target-fields__target" :class="{ 'visit-target-fields__control--active': targetOpen }" @tap.stop>
         <mci-visit-target-combobox ref="targetCombobox" :model-value="targetName" :selected-id="targetId" :readonly="readonly"
-          :module-key="moduleKey" :target-type="targetType" @update:model-value="updateTargetName"
+          :module-key="moduleKey" :target-type="targetType" :query-scope="queryScope"
+          :permission-menu-id="permissionMenuId" @update:model-value="updateTargetName"
           @select="selectTarget" @clear="clearTarget" @open-change="handleTargetOpen" />
       </view>
-      <text class="visit-target-fields__help">可检索当前账号有权查看的{{ targetType || '拜访对象' }}；未检索到时保留输入并按新对象提交</text>
+      <text class="visit-target-fields__help">{{ helpText }}</text>
     </view>
   </view>
 </template>
@@ -43,6 +44,8 @@ export default {
     targetType: { type: String, default: '客户' },
     targetName: { type: String, default: '' },
     targetId: { type: [String, Number], default: '' },
+    queryScope: { type: String, default: 'module' },
+    permissionMenuId: { type: [String, Number], default: '' },
     readonly: { type: Boolean, default: false }
   },
   emits: ['update:targetType', 'update:targetName', 'update:targetId', 'select', 'open-change'],
@@ -53,7 +56,13 @@ export default {
       const keyword = String(this.targetType || '').trim()
       return keyword ? VISIT_TARGET_TYPES.filter((item) => item.includes(keyword)) : VISIT_TARGET_TYPES
     },
-    moduleKey() { return VISIT_TARGET_MODULE_KEYS[this.targetType] || '' }
+    moduleKey() { return VISIT_TARGET_MODULE_KEYS[this.targetType] || '' },
+    helpText() {
+      const target = this.targetType || '拜访对象'
+      return this.queryScope === 'checkin'
+        ? `可检索当前系统内全部有效${target}；未检索到时保留输入并按新对象提交`
+        : `可检索当前账号有权查看的${target}；未检索到时保留输入并按新对象提交`
+    }
   },
   methods: {
     emitOpenState() { this.$emit('open-change', this.typeOpen || this.targetOpen) },

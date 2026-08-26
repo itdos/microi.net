@@ -18,6 +18,14 @@ function assertResult(result, fallback) {
   return result
 }
 
+async function settleResult(loader, fallback) {
+  try {
+    return { result: assertResult(await loader(), fallback), error: null }
+  } catch (error) {
+    return { result: null, error: error instanceof Error ? error : new Error(fallback) }
+  }
+}
+
 export function readMallSnapshot() {
   const cached = readCache(MALL_KEY, 10 * 60 * 1000)
   return cached ? cached.data : null
@@ -28,21 +36,36 @@ export async function loadMallSnapshot(options = {}) {
     return { categories: [], types: [], products: [], totalCount: 0 }
   }
   const result = await cachedRequest(MALL_KEY, async () => {
-    const [categories, types, products] = await Promise.all([
-      getProductCategories(),
-      getProductTypes(),
-      getProductList({ pageIndex: 1, pageSize: 10 })
+    const previous = readMallSnapshot() || { categories: [], types: [], products: [], totalCount: 0 }
+    const [categoryState, typeState, productState] = await Promise.all([
+      settleResult(() => getProductCategories(), '商品分类加载失败'),
+      settleResult(() => getProductTypes(), '商品类型加载失败'),
+      settleResult(() => getProductList({ pageIndex: 1, pageSize: 10 }), '商品列表加载失败')
     ])
-    assertResult(categories, '商品分类加载失败')
-    assertResult(types, '商品类型加载失败')
-    assertResult(products, '商品列表加载失败')
+
+    const failures = [
+      ['categories', categoryState.error],
+      ['types', typeState.error],
+      ['products', productState.error]
+    ].filter((item) => item[1])
+
+    failures.forEach(([name, error]) => console.warn(`[Mall] ${name} snapshot request failed:`, error))
+    if (failures.length === 3) throw failures[0][1]
+
+    const categories = categoryState.result
+    const types = typeState.result
+    const products = productState.result
     return {
-      categories: categories.Data || [],
-      types: types.Data || [],
-      products: products.Data || [],
-      totalCount: Number(products.DataCount || 0)
+      categories: categories ? (categories.Data || []) : (previous.categories || []),
+      types: types ? (types.Data || []) : (previous.types || []),
+      products: products ? (products.Data || []) : (previous.products || []),
+      totalCount: products ? Number(products.DataCount || 0) : Number(previous.totalCount || 0)
     }
-  }, { maxAge: 10 * 60 * 1000, refresh: options.refresh === true, allowStale: true })
+  }, { maxAge: 10 * 60 * 1000, refresh: options.refresh === true, allowStale: true }).catch((error) => {
+    const cached = readMallSnapshot()
+    if (cached) return { data: cached, fromCache: true, stale: true, error }
+    throw error
+  })
   return result.data
 }
 

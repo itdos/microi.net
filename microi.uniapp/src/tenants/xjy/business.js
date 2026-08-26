@@ -275,7 +275,7 @@ export const businessModules = {
     statusOptions: ['待接单', '待服务', '待商家验收', '待客户验收', '待评价', '已结束', '已取消']
   },
   devices: native({
-    title: '客户设备', table: 'Diy_KehuSB', menuAliases: ['客户设备', '我的设备', '设备管理'],
+    title: '客户设备', table: 'Diy_KehuSB', menuAliases: ['设备列表', '客户设备', '我的设备', '设备管理'],
     titleField: 'KehuMC', statusField: 'ShebeiZT', tagFields: ['ShebeiXH', 'ShebeiGZZT'],
     relatedMetrics: [
       { key: 'pending', label: '待安装', where: [{ Name: 'ShebeiZT', Type: '=', Value: '待安装' }], tone: 'warning' },
@@ -572,12 +572,22 @@ export const businessModules = {
     titleField: 'Name', statusField: 'State', tagFields: ['RoleName', 'DeptName'], phoneField: 'Phone',
     lines: [{ label: '帐号', field: 'Account' }, { label: '部门', field: 'DeptName' }, { label: '联系电话', field: 'Phone', format: 'phone' }]
   }),
-  attendance: { target: 'native-page', title: '拜访打卡', path: '/pages/native/checkin' },
+  attendance: {
+    target: 'native-page', title: '拜访打卡', path: '/pages/native/checkin',
+    menuPermission: { table: 'Diy_location', menuAliases: ['拜访打卡', '人员定位', '打卡记录'] }
+  },
   taskScan: { target: 'native-page', title: '扫码做任务', path: '/pages/task/scan' },
-  deviceMap: { target: 'native-page', title: '设备地图', path: '/pages/task/map?mode=device' },
-  customerMap: { target: 'native-page', title: '客户地图', path: '/pages/task/map?mode=customer' },
-  contactMap: { target: 'native-page', title: '联系人地图', path: '/pages/task/map?mode=contacts' },
-  visitMap: { target: 'native-page', title: '跟进地图', path: '/pages/task/map?mode=visit' },
+  // 首页地图入口必须由实际的、已授权业务菜单驱动。这样权限配置变更后无需重新发布小程序。
+  deviceMap: {
+    target: 'native-page', title: '设备地图', path: '/pages/task/map?mode=device',
+    menuPermission: { table: 'Diy_KehuSB', menuAliases: ['设备列表', '客户设备', '我的设备', '设备管理'] }
+  },
+  customerMap: {
+    target: 'native-page', title: '客户地图', path: '/pages/task/map?mode=customer',
+    menuPermission: { table: 'Diy_Kehu', menuAliases: ['客户地图', '客户管理', '我的客户', '客户'] }
+  },
+  // contactMap: { target: 'native-page', title: '联系人地图', path: '/pages/task/map?mode=contacts' },
+  // visitMap: { target: 'native-page', title: '跟进地图', path: '/pages/task/map?mode=visit' },
   afterSalesAdd: { target: 'form-add', title: '我要售后', table: 'Diy_ShouhouDD', menuAliases: ['售后订单', '售后任务'] }
 }
 
