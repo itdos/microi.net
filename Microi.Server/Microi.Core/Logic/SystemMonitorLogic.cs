@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using Newtonsoft.Json.Linq;
 
@@ -896,10 +897,26 @@ namespace Microi.net
     /// <summary>
     /// Console 输出分流器：只把影响整个平台启动、日志管道或主租户可用性的关键日志
     /// 输出到 stdout；其它历史 Console 日志统一进入 MongoDB 异步日志队列。
-    /// 在Program.cs中注册：Console.SetOut(new ConsoleLogInterceptor(Console.Out));
+    /// 由 Microi API 宿主扩展在进程最早阶段注册，保证插件初始化前的输出也统一格式。
     /// </summary>
     public class ConsoleLogInterceptor : TextWriter
     {
+        private static readonly Regex TimestampPrefix = new Regex(
+            @"^【(?<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})】",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex ZeroFailureSummary = new Regex(
+            @"(?:失败|错误|异常)\s*(?:=|:|：)\s*0|失败明细\s*(?:=|:|：)\s*(?:无|none)",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        private static readonly string[] SuccessStatusPrefixes =
+        {
+            "【✅成功】", "【成功】", "【✅成】", "【✅成】【"
+        };
+        private static readonly string[] FailureStatusPrefixes =
+        {
+            "【❌失败】", "【❌Error】", "【Error异常】", "【❌启动失败】",
+            "【⚠️警告】", "【⚠️注意】", "【警告】", "【失败】"
+        };
+
         private sealed class PendingConsoleLog
         {
             public string Value { get; set; }
@@ -986,14 +1003,74 @@ namespace Microi.net
         private void RouteLine(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return;
+            var normalized = NormalizeLine(value);
             if (IsPlatformCritical(value))
             {
-                _original.WriteLine(value);
-                SystemMonitorLogic.WriteLog(value);
+                _original.WriteLine(normalized);
+                SystemMonitorLogic.WriteLog(normalized);
                 return;
             }
 
-            QueueOrBuffer(value, ResolveLevel(value));
+            QueueOrBuffer(normalized, ResolveLevel(value));
+        }
+
+        /// <summary>
+        /// 将所有真正写入后端控制台/日志队列的单行文本统一为：
+        /// Microi：【✅成功|❌失败】【yyyy-MM-dd HH:mm:ss】内容。
+        /// 已有时间保留为事件发生时间；没有时间的宿主、插件和第三方输出补当前时间。
+        /// </summary>
+        internal static string NormalizeLine(string value)
+        {
+            var original = (value ?? string.Empty).Trim();
+            var content = original;
+            if (content.StartsWith("Microi：", StringComparison.Ordinal))
+                content = content.Substring("Microi：".Length).TrimStart();
+            else if (content.StartsWith("Microi:", StringComparison.OrdinalIgnoreCase))
+                content = content.Substring("Microi:".Length).TrimStart();
+
+            var explicitFailure = RemoveFirstPrefix(ref content, FailureStatusPrefixes);
+            var explicitSuccess = RemoveFirstPrefix(ref content, SuccessStatusPrefixes);
+            var timestamp = RemoveTimestampPrefix(ref content);
+            // 少量旧日志把时间放在状态前，兼容反向顺序后再清一次状态。
+            explicitFailure |= RemoveFirstPrefix(ref content, FailureStatusPrefixes);
+            explicitSuccess |= RemoveFirstPrefix(ref content, SuccessStatusPrefixes);
+            if (timestamp == null) timestamp = RemoveTimestampPrefix(ref content);
+
+            var failureProbe = ZeroFailureSummary.Replace(original, string.Empty);
+            var hasFailureSignal = failureProbe.IndexOf("Unhandled exception", StringComparison.OrdinalIgnoreCase) >= 0
+                                   || failureProbe.IndexOf("Fatal", StringComparison.OrdinalIgnoreCase) >= 0
+                                   || failureProbe.IndexOf("OutOfMemoryException", StringComparison.OrdinalIgnoreCase) >= 0
+                                   || failureProbe.IndexOf("StackOverflowException", StringComparison.OrdinalIgnoreCase) >= 0
+                                   || failureProbe.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0
+                                   || failureProbe.Contains("❌")
+                                   || failureProbe.Contains("异常")
+                                   || failureProbe.Contains("失败")
+                                   || failureProbe.Contains("未能")
+                                   || failureProbe.Contains("警告")
+                                   || failureProbe.Contains("注意");
+            var failed = explicitFailure || (!explicitSuccess && hasFailureSignal);
+            var status = failed ? "【❌失败】" : "【✅成功】";
+            var eventTime = timestamp ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            return $"Microi：{status}【{eventTime}】{content.Trim()}";
+        }
+
+        private static bool RemoveFirstPrefix(ref string content, IEnumerable<string> prefixes)
+        {
+            foreach (var prefix in prefixes)
+            {
+                if (!content.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                content = content.Substring(prefix.Length).TrimStart();
+                return true;
+            }
+            return false;
+        }
+
+        private static string RemoveTimestampPrefix(ref string content)
+        {
+            var match = TimestampPrefix.Match(content);
+            if (!match.Success) return null;
+            content = content.Substring(match.Length).TrimStart();
+            return match.Groups["timestamp"].Value;
         }
 
         private static bool IsPlatformCritical(string value)

@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.net.Api
@@ -65,6 +67,99 @@ namespace Microi.net.Api
         public sealed class UpdateMyDefaultIndexUrlRequest
         {
             public string DefaultIndexUrl { get; set; }
+        }
+
+        /// <summary>
+        /// 兼容最早期前端的 POST /api/Upload。实际鉴权、租户绑定、路径校验、
+        /// HDFS 上传和微信内容安全均复用当前 HDFSController.Upload，不保留第二份业务实现。
+        /// </summary>
+        [HttpPost("~/api/Upload")]
+        [Consumes("application/json", "multipart/form-data")]
+        public Task<JsonResult> Upload(DiyUploadParam param)
+        {
+            var hdfsController = new HDFSController
+            {
+                ControllerContext = ControllerContext
+            };
+            return hdfsController.Upload(param);
+        }
+
+        /// <summary>
+        /// 兼容旧短信登录地址；验证码、注册、租户开通和登录响应均由官方 SaaS
+        /// 应用的 Managed 接口引擎编排，宿主只清洗匿名请求并固定引擎 Key。
+        /// </summary>
+        [HttpPost("~/api/SysUser/SmsLogin")]
+        [AllowAnonymous]
+        public async Task<JsonResult> SmsLogin([FromBody] JObject param)
+        {
+            param = await MergeRequestParam(param);
+            var osClient = param?["OsClient"].Val<string>();
+            if (osClient.DosIsNullOrWhiteSpace())
+                return Json(new DosResult(1003, null, "OsClient不能为空！"));
+
+            param["OsClient"] = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            param["Did"] = Request.Headers["did"].ToString();
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                "platform_auth_sms_login",
+                param));
+        }
+
+        /// <summary>
+        /// 兼容旧系统消息地址。Managed 接口引擎先完成持久化和读模型更新，
+        /// 宿主只在事务完成后尽力投递 SignalR 实时通知。
+        /// </summary>
+        [HttpGet("~/api/DiyChat/SendSystemMessage")]
+        [HttpPost("~/api/DiyChat/SendSystemMessage")]
+        [PlatformAdminOnly]
+        public async Task<DosResult> SendSystemMessage(MessageBodyParam msgParam)
+        {
+            if (msgParam == null
+                || msgParam.Content.DosIsNullOrWhiteSpace()
+                || msgParam.ToUserId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null,
+                    DiyMessage.GetLang(msgParam?.OsClient, "ParamError", msgParam?._Lang));
+            }
+
+            var currentToken = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
+            if (currentToken?.CurrentUser == null)
+                return new DosResult(1001, null, "登录身份已过期，请重新登录。");
+            if (UserAccessKeySecurity.IsSession(currentToken.CurrentUser))
+                return new DosResult(1002, null, "访问密钥会话不允许发送实时聊天消息。");
+
+            var rawResult = await ManagedApiEngineCompatibility.RunAsync(
+                "platform-chat-system-message",
+                new JObject
+                {
+                    ["Action"] = "PersistSystemMessage",
+                    ["RequestId"] = msgParam.RequestId.DosIsNullOrWhiteSpace()
+                        ? Ulid.NewUlid().ToString()
+                        : msgParam.RequestId.Trim(),
+                    ["OsClient"] = currentToken.OsClient,
+                    ["ToUserId"] = msgParam.ToUserId,
+                    ["Content"] = msgParam.Content,
+                    ["OtherInfo"] = msgParam.OtherInfo,
+                    ["IsRead"] = msgParam.IsRead
+                },
+                JObject.FromObject(currentToken.CurrentUser)).ConfigureAwait(false);
+            var result = ToResultObject(rawResult);
+            if (result?["Code"].Val<int>() != 1
+                || result["Data"] is not JObject data
+                || data["Message"] is not JObject)
+            {
+                return new DosResult(
+                    result?["Code"].Val<int>() ?? 0,
+                    null,
+                    result?["Msg"]?.ToString() ?? "官方系统消息接口不可用。");
+            }
+
+            var hubContext = HttpContext.RequestServices
+                .GetRequiredService<IHubContext<DiyWebSocket>>();
+            await new DiyWebSocket(null).DeliverPreparedMessageAsync(
+                result,
+                currentToken.OsClient,
+                hubContext).ConfigureAwait(false);
+            return new DosResult(1, data["Message"]);
         }
 
         [HttpPost("~/api/Os/GetOsClientByDomain")]
@@ -562,6 +657,19 @@ namespace Microi.net.Api
                 // Preserve legacy model-binding behavior; validation happens in actions.
             }
             return result;
+        }
+
+        private static JObject ToResultObject(object result)
+        {
+            if (result == null) return null;
+            if (result is JObject model) return model;
+            if (result is string json)
+            {
+                try { return JObject.Parse(json); }
+                catch { return null; }
+            }
+            try { return JObject.FromObject(result); }
+            catch { return null; }
         }
     }
 }

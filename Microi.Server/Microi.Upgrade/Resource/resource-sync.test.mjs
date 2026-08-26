@@ -1063,7 +1063,7 @@ test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async 
 });
 
 test('官网发布接口以固定白名单、事务行锁和哈希保护多节点写入', () => {
-  assert.match(officialEngineSource, /Version: v1\.3\.1/);
+  assert.match(officialEngineSource, /Version: v1\.3\.2/);
   assert.match(officialEngineSource, /V8\.Method\.AuthorizeOfficialResourcePublish\(\)/);
   assert.doesNotMatch(officialEngineSource, /Number\(currentUser\.Level/);
   assert.match(officialEngineSource, /function lockPublishRows\(\)/);
@@ -1121,6 +1121,9 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
   assert.match(mcpPublisherSource, /export async function reconcilePublishedApiEnginesViaConfiguredMcp/);
   assert.match(mcpPublisherSource, /Action: 'ReconcilePublishedApiEngines'/);
   assert.match(mcpPublisherSource, /recoverReconcileAfterAmbiguousTimeout/);
+  assert.match(mcpPublisherSource, /return match \? match\[1\]\.toLowerCase\(\) : null/);
+  assert.match(mcpPublisherSource, /attempt <= 4/);
+  assert.match(mcpPublisherSource, /Math\.min\(3, managed\.length\)/);
   assert.match(mcpPublisherSource, /HTTP\\s\*524\|Origin Time-out/);
   assert.match(mcpPublisherSource, /'microi_get_table_data'/);
   assert.match(mcpPublisherSource, /'microi_get_engine_code'/);

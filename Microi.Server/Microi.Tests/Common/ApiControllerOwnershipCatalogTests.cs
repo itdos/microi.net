@@ -44,6 +44,22 @@ public sealed class ApiControllerOwnershipCatalogTests
                 $"已迁移 Controller 不得重新进入宿主源码：{migrated.Name}");
             Assert.False(string.IsNullOrWhiteSpace(migrated.Value["Target"]?.ToString()));
         }
+
+        var apiServicesRoot = Path.Combine(apiRoot, "Services");
+        Assert.Empty(Directory.Exists(apiServicesRoot)
+            ? Directory.GetFiles(apiServicesRoot, "*.cs", SearchOption.AllDirectories)
+            : Array.Empty<string>());
+
+        foreach (var migrated in ((JObject)catalog["MigratedSupportCode"]!).Properties()
+                     .Where(property => property.Name.StartsWith("Services/", StringComparison.Ordinal)))
+        {
+            Assert.False(File.Exists(Path.Combine(apiRoot, migrated.Name.Replace('/', Path.DirectorySeparatorChar))));
+            var target = migrated.Value["Target"]?.ToString();
+            Assert.False(string.IsNullOrWhiteSpace(target));
+            Assert.True(
+                File.Exists(Path.Combine(serverRoot, target!.Replace('/', Path.DirectorySeparatorChar))),
+                $"迁移后的宿主支持代码目标不存在：{target}");
+        }
     }
 
     [Fact]
@@ -108,6 +124,34 @@ public sealed class ApiControllerOwnershipCatalogTests
                 otherControllerSources,
                 item => item.Source.Contains(route, StringComparison.OrdinalIgnoreCase));
         }
+    }
+
+    [Fact]
+    public void Program_IsAThinPluginAndLifecycleCompositionRoot()
+    {
+        var serverRoot = FindServerRoot();
+        var source = File.ReadAllText(Path.Combine(serverRoot, "Microi.net.Api", "Program.cs"));
+        var host = File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.net.Api",
+            "Hosting",
+            "MicroiApiHostExtensions.cs"));
+        var meaningfulLines = source.Split('\n')
+            .Select(line => line.Trim())
+            .Count(line => line.Length > 0 && !line.StartsWith("//", StringComparison.Ordinal));
+
+        Assert.True(meaningfulLines <= 90, $"Program.cs 入口重新膨胀：有效行数={meaningfulLines}");
+        Assert.Contains("services.AddMicroi();", source, StringComparison.Ordinal);
+        Assert.Contains("services.AddMicroiUpgrade();", source, StringComparison.Ordinal);
+        Assert.Contains("services.AddMicroiApiTransport", source, StringComparison.Ordinal);
+        Assert.Contains("builder.RunMicroiApiAsync(host)", source, StringComparison.Ordinal);
+        Assert.Contains("EnsureConfiguredMainTenantReadyAsync", host, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureRuntimePhysicalPrerequisitesAsync", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureStartupDependenciesAsync", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("TenantJwtSigningKeyCoordinator", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("OnConnectionGuardEvent", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("UseSenparcWeixin", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Task.Run", source, StringComparison.Ordinal);
     }
 
     private static string FindServerRoot()

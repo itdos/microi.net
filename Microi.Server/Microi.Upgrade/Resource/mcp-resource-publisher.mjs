@@ -558,28 +558,45 @@ function parseSourceSha256(toolResult, operation) {
     throw new Error(`通过 microi_itdos MCP ${operation}失败：${output || '未知错误'}`);
   }
   const match = output.match(/Full source SHA-256:\s*([a-f0-9]{64})/i);
-  if (!match) throw new Error(`通过 microi_itdos MCP ${operation}失败：缺少完整源码 SHA-256`);
-  return match[1].toLowerCase();
+  // 超时恢复审计可能正好遇到“投影尚未提交”，此时读取缺失引擎会返回
+  // Code=0/NoExistData 而没有源码摘要。把它归一为未命中，交给下方完整
+  // 元数据 + 源码比较报告真实的“缺少/不一致”；不能让解析器掩盖原始投影超时。
+  return match ? match[1].toLowerCase() : null;
 }
 
 async function readManagedSourceHashes(client, projections) {
   const managed = projections.filter(item => item.policy === 'Managed');
   const hashes = new Map();
   let cursor = 0;
+  const readHash = async current => {
+    const operation = `回读官网 live 接口源码摘要 ${current.key}`;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      try {
+        const { result } = await callCodexTool(
+          client,
+          'microi_get_engine_code',
+          { apiEngineKey: current.key, charOffset: 0, maxChars: 1000 },
+          operation,
+        );
+        return parseSourceSha256(result, operation);
+      } catch (error) {
+        const transient = /(?:HTTP\s*5(?:02|03|04|20|22|24)|Origin Time-out|timed?\s*out|timeout|temporar)/i
+          .test(String(error?.message || error));
+        if (!transient || attempt === 4) throw error;
+        await new Promise(resolvePromise => setTimeout(resolvePromise, attempt * 1000));
+      }
+    }
+    return null;
+  };
   const worker = async () => {
     while (cursor < managed.length) {
       const current = managed[cursor++];
-      const operation = `回读官网 live 接口源码摘要 ${current.key}`;
-      const { result } = await callCodexTool(
-        client,
-        'microi_get_engine_code',
-        { apiEngineKey: current.key, charOffset: 0, maxChars: 1000 },
-        operation,
-      );
-      hashes.set(current.key.toLowerCase(), parseSourceSha256(result, operation));
+      hashes.set(current.key.toLowerCase(), await readHash(current));
     }
   };
-  await Promise.all(Array.from({ length: Math.min(6, managed.length) }, worker));
+  // 官方源通常经同一个网关和 Redis 集群；恢复审计降低并发并只对 5xx/超时
+  // 做有界重试，避免 106 个摘要回读反过来制造新的 524。
+  await Promise.all(Array.from({ length: Math.min(3, managed.length) }, worker));
   return hashes;
 }
 

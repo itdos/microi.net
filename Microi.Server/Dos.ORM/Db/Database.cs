@@ -1421,7 +1421,7 @@ namespace Dos.ORM
         /// <param name="value"><para>The value of the parameter.</para></param>      
         public void AddInParameter(DbCommand command, string name, object value)
         {
-            AddParameter(command, name, DbType.Object, ParameterDirection.Input, String.Empty, DataRowVersion.Default, value);
+            AddParameter(command, name, EntityUtils.InferDbType(value), ParameterDirection.Input, String.Empty, DataRowVersion.Default, value);
         }
 
         /// <summary>

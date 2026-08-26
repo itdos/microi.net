@@ -182,7 +182,7 @@ public sealed class WeChatContentSecurityTests
         var userFacade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Core", "V8Engine", "Runtime", "V8Method.SysUserAdminFacade.cs"));
         var contentGateway = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.net.Api", "Services", "WeChatContentSecurityService.cs"));
+            root, "Microi.Server", "Microi.WeChat", "Security", "WeChatContentSecurityService.cs"));
         var sdk = File.ReadAllText(Path.Combine(
             root, "microi.uniapp", "src", "utils", "microi.v8.js"));
 
@@ -203,7 +203,7 @@ public sealed class WeChatContentSecurityTests
         var controller = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers", "WeChatContentSecurityController.cs"));
         var service = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.net.Api", "Services", "WeChatContentSecurityService.cs"));
+            root, "Microi.Server", "Microi.WeChat", "Security", "WeChatContentSecurityService.cs"));
 
         Assert.Contains("Callback--OsClient--{routeOsClient}--", controller, StringComparison.Ordinal);
         Assert.Contains("FromQuery(Name = \"OsClient\")", controller, StringComparison.Ordinal);

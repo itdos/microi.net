@@ -20,11 +20,13 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.4.11.0";
+        public static string Version = "7.6.10.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
         };
+        private static readonly Lazy<Task<Dictionary<string, string>>> UpgradeResources =
+            new Lazy<Task<Dictionary<string, string>>>(LoadUpgradeResourcesCoreAsync);
         private const string OfficialResourceApiUrl = "https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos";
         private const string ImportPackageResourceName = "import-package.js";
         private const string PublishAiAppResourceName = "ai-app-publish-store.js";
@@ -449,7 +451,7 @@ namespace Microi.net
                 { MessageNotificationPackageResourceName, new System.Version(1, 0, 11) },
                 { AiEnginePackageResourceName, new System.Version(6, 3, 6) },
                 { SaaSEnginePackageResourceName, new System.Version(7, 6, 21) },
-                { AppStorePackageResourceName, new System.Version(7, 6, 16) }
+                { AppStorePackageResourceName, new System.Version(7, 6, 17) }
             };
 
         private static readonly Dictionary<string, string[]> V8FirstPackageExactEngineKeys =
@@ -2011,9 +2013,13 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             var conflicts = new List<string>();
             try
             {
+                var dependencyIndex = 0;
                 foreach (var packaged in LoadBundledStartupDependencyEngines())
                 {
-                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    if (dependencyIndex++ % 10 == 0)
+                        UpgradeExecutionLeaseContext.ConfirmOwnership();
+                    else
+                        UpgradeExecutionLeaseContext.ThrowIfLost();
                     var source = (JObject)packaged.DeepClone();
                     var key = source["ApiEngineKey"]?.ToString();
                     var isTenantHook = IsCreateIfMissingRuntimeDependency(source);
@@ -2080,13 +2086,14 @@ WHERE LOWER(ApiAddress)=LOWER(@p0) AND Id<>@p1")
                         patch["OsClient"] = client.OsClient;
                         patch["IsDeleted"] = 0;
                         patch["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                        var update = await UpgradeTrustedFormEngine
-                            .UpdateAsync("sys_apiengine", client.OsClient, patch)
-                            .ConfigureAwait(false);
-                        if (update?.Code != 1)
+                        var updateCount = PersistStartupDependencyDirect(
+                            client.Db,
+                            patch,
+                            existing["Id"]?.ToString());
+                        if (updateCount != 1)
                         {
                             return new DosResult(0, new { ApiEngineKey = key },
-                                $"平台运行时接口[{key}]补正失败：{update?.Msg ?? "无返回"}");
+                                $"平台运行时接口[{key}]补正失败：数据库影响行数={updateCount}");
                         }
                         reconciled.Add(key);
                         if (!sameOfficialSource) preservedLocalSource.Add(key);
@@ -2110,13 +2117,14 @@ WHERE Id=@p0 OR LOWER(ApiAddress)=LOWER(@p1)")
                         persistedSource["IsDeleted"] = 0;
                         persistedSource["CreateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                         persistedSource["UpdateTime"] = persistedSource["CreateTime"];
-                        var add = await UpgradeTrustedFormEngine
-                            .AddAsync("sys_apiengine", client.OsClient, persistedSource)
-                            .ConfigureAwait(false);
-                        if (add?.Code != 1)
+                        var addCount = PersistStartupDependencyDirect(
+                            client.Db,
+                            persistedSource,
+                            existingId: null);
+                        if (addCount != 1)
                         {
                             return new DosResult(0, new { ApiEngineKey = key },
-                                $"平台运行时接口[{key}]创建失败：{add?.Msg ?? "无返回"}");
+                                $"平台运行时接口[{key}]创建失败：数据库影响行数={addCount}");
                         }
                         added.Add(key);
                     }
@@ -2167,6 +2175,7 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                         && !reused.Contains(key, StringComparer.Ordinal))
                         reused.Add(key);
                 }
+                UpgradeExecutionLeaseContext.ConfirmOwnership();
                 if (!StartupDependenciesReady(client, out var finalReason))
                     return new DosResult(0, null, "平台运行时接口闭包最终回读失败：" + finalReason);
 
@@ -2227,6 +2236,81 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             result.Remove("_OfficialOwnership");
             result.Remove("_OfficialUpgradePolicy");
             return result;
+        }
+
+        /// <summary>
+        /// 启动闭包属于 API 接收流量前的物理协议门禁，不能依赖 diy_table/diy_field
+        /// 元数据。部分早期子租户只有 sys_apiengine 物理表而没有对应低代码元数据，
+        /// 继续走 FormEngine 会在修复第一个接口时反而报 diy_table NoExistData。
+        /// 这里仅对程序集内受信官方包的固定字段执行参数化 INSERT/UPDATE；业务应用
+        /// 的完整安装、资源策略与版本记录仍由应用商城导入器负责。
+        /// </summary>
+        private static int PersistStartupDependencyDirect(
+            DbSession database,
+            JObject source,
+            string existingId)
+        {
+            if (database == null) throw new ArgumentNullException(nameof(database));
+            if (source == null) throw new ArgumentNullException(nameof(source));
+
+            var persisted = (JObject)source.DeepClone();
+            persisted.Remove("OsClient");
+            persisted.Remove("_OfficialPackageResource");
+            persisted.Remove("_OfficialOwnership");
+            persisted.Remove("_OfficialUpgradePolicy");
+            var now = DateTime.Now;
+            persisted["UpdateTime"] = JToken.FromObject(now);
+            if (existingId.DosIsNullOrWhiteSpace())
+                persisted["CreateTime"] = JToken.FromObject(now);
+
+            var fields = persisted.Properties()
+                .Where(property => existingId.DosIsNullOrWhiteSpace()
+                    || (!string.Equals(property.Name, "Id", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(property.Name, "CreateTime", StringComparison.OrdinalIgnoreCase)))
+                .ToArray();
+            if (fields.Length == 0)
+                throw new InvalidOperationException("平台运行时接口没有可持久化字段。");
+
+            var section = existingId.DosIsNullOrWhiteSpace()
+                ? database.FromSql(
+                    $"INSERT INTO sys_apiengine ({string.Join(",", fields.Select(field => QuoteIdentifier(database, field.Name)))}) "
+                    + $"VALUES ({string.Join(",", fields.Select((_, index) => "@p" + index))})")
+                : database.FromSql(
+                    $"UPDATE sys_apiengine SET {string.Join(",", fields.Select((field, index) => QuoteIdentifier(database, field.Name) + "=@p" + index))} "
+                    + $"WHERE {QuoteIdentifier(database, "Id") }=@p{fields.Length}");
+
+            for (var index = 0; index < fields.Length; index++)
+                section.AddInParameter("p" + index, ReadDatabaseValue(fields[index].Value));
+            if (!existingId.DosIsNullOrWhiteSpace())
+                section.AddInParameter("p" + fields.Length, existingId);
+            return section.ExecuteNonQuery();
+        }
+
+        private static string QuoteIdentifier(DbSession database, string identifier)
+        {
+            return database.Db.DbProvider.DatabaseType switch
+            {
+                DatabaseType.SqlServer or DatabaseType.SqlServer9 => "[" + identifier + "]",
+                DatabaseType.PostgreSql or DatabaseType.KingBase
+                    or DatabaseType.Oracle or DatabaseType.DaMeng => "\"" + identifier + "\"",
+                _ => "`" + identifier + "`"
+            };
+        }
+
+        private static object ReadDatabaseValue(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+                return DBNull.Value;
+            return token.Type switch
+            {
+                JTokenType.Integer => token.Value<long>(),
+                JTokenType.Float => token.Value<decimal>(),
+                JTokenType.Boolean => token.Value<bool>() ? 1 : 0,
+                JTokenType.Date => token.Value<DateTime>(),
+                JTokenType.Bytes => token.Value<byte[]>(),
+                JTokenType.Array or JTokenType.Object => token.ToString(Formatting.None),
+                _ => token.ToString()
+            };
         }
 
         private static string GetStartupDependencyContractError(JObject row, JObject source)
@@ -2295,13 +2379,22 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             }
         }
 
-        private static async Task<Dictionary<string, string>> LoadUpgradeResourcesAsync()
+        private static Task<Dictionary<string, string>> LoadUpgradeResourcesAsync()
+        {
+            // 同一 API 进程内所有租户共享同一组受校验的官方资源。此前每个租户都
+            // 重复下载整组资源，74 个租户会产生数百次外部请求并把启动时间放大到
+            // 数十分钟。Lazy<Task<...>> 同时保证并发租户只执行一次下载或一次回退。
+            return UpgradeResources.Value;
+        }
+
+        private static async Task<Dictionary<string, string>> LoadUpgradeResourcesCoreAsync()
         {
             var bundledResources = LoadBundledResources();
             try
             {
                 var onlineResourceNames = RequiredResourceNames
                     .Where(resourceName => !string.Equals(resourceName, BuildAiAppResourceName, StringComparison.Ordinal));
+                Console.WriteLine($"Microi：【基础应用升级】开始并行读取吾码官方升级资源（共{onlineResourceNames.Count()}项，单项超时8秒）。");
                 var pairs = await Task.WhenAll(onlineResourceNames.Select(async resourceName =>
                     new KeyValuePair<string, string>(resourceName, await DownloadOfficialResourceAsync(resourceName))));
                 Console.WriteLine("Microi：【基础应用升级】官方资源整组校验成功，使用在线最新版。");
@@ -2763,6 +2856,11 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
         private static async Task InstallUpgradePackage(string osClient, List<string> msgs, string resourceName, string packageName, IReadOnlyDictionary<string, string> resources)
         {
             var packageContent = NormalizePackageExecutionLimits(resources[resourceName]);
+            if (IsPackageVersionAlreadyInstalled(osClient, packageContent, out var installedVersion))
+            {
+                Console.WriteLine($"Microi：【基础应用升级】【{osClient}】{packageName}已安装同版本[{installedVersion}]，跳过重复导入。");
+                return;
+            }
             Console.WriteLine($"Microi：【基础应用升级】开始导入{packageName}：{resourceName}");
             dynamic installResult;
             // Upgrade13 is the only caller allowed to mark a package as the
@@ -2790,6 +2888,87 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             }
 
             Console.WriteLine($"Microi：【基础应用升级】{packageName}导入完成。");
+        }
+
+        private static bool IsPackageVersionAlreadyInstalled(
+            string osClient,
+            string packageContent,
+            out string installedVersion)
+        {
+            installedVersion = string.Empty;
+            try
+            {
+                var packageInfo = JObject.Parse(packageContent)["PackageInfo"] as JObject;
+                var packageName = packageInfo?["Name"]?.ToString();
+                var incomingVersion = packageInfo?["Version"]?.ToString();
+                if (packageName.DosIsNullOrWhiteSpace() || incomingVersion.DosIsNullOrWhiteSpace())
+                    return false;
+
+                var client = OsClient.GetClient(osClient);
+                var db = client?.Db;
+                if (db == null || !db.TableExists("sys_microistoreversion")) return false;
+
+                var identityColumns = new[] { "AppName", "PackageName" }
+                    .Where(column => db.ColumnExists("sys_microistoreversion", column))
+                    .ToArray();
+                var versionColumns = new[] { "AppVersionInstall", "PackageVersion", "AppVersion" }
+                    .Where(column => db.ColumnExists("sys_microistoreversion", column))
+                    .ToArray();
+                if (identityColumns.Length == 0 || versionColumns.Length == 0) return false;
+
+                var selectColumns = versionColumns.ToList();
+                var hasStatus = db.ColumnExists("sys_microistoreversion", "InstallStatus");
+                if (hasStatus) selectColumns.Add("InstallStatus");
+                var where = "(" + string.Join(" OR ", identityColumns.Select(column => column + "=@p0")) + ")";
+                if (db.ColumnExists("sys_microistoreversion", "IsDeleted"))
+                    where += " AND (IsDeleted<>1 OR IsDeleted IS NULL)";
+                var orderBy = db.ColumnExists("sys_microistoreversion", "InstallTime")
+                    ? " ORDER BY InstallTime DESC"
+                    : string.Empty;
+                var row = db.FromSql(
+                        $"SELECT {string.Join(",", selectColumns)} FROM sys_microistoreversion WHERE {where}{orderBy}")
+                    .AddInParameter("p0", packageName)
+                    .First<dynamic>();
+                if (row == null) return false;
+
+                var model = JObject.FromObject(row);
+                if (hasStatus
+                    && !string.Equals(model["InstallStatus"]?.ToString(), "Installed", StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                installedVersion = versionColumns
+                    .Select(column => model[column]?.ToString())
+                    .FirstOrDefault(value => !value.DosIsNullOrWhiteSpace()) ?? string.Empty;
+                return PackageVersionsEquivalent(installedVersion, incomingVersion);
+            }
+            catch (Exception ex)
+            {
+                // 老库可能尚无版本表或只有部分历史字段。版本读取失败只能降级为正常
+                // 幂等导入，不能阻断升级，也不能把未知状态误判成“已安装”。
+                Console.WriteLine($"Microi：【基础应用升级】【{osClient}】读取应用包安装版本失败，将执行幂等导入：{ex.Message}");
+                installedVersion = string.Empty;
+                return false;
+            }
+        }
+
+        internal static bool PackageVersionsEquivalent(string left, string right)
+        {
+            static bool TryNormalize(string value, out System.Version version)
+            {
+                version = null;
+                var text = (value ?? string.Empty).Trim().TrimStart('v', 'V');
+                if (!System.Version.TryParse(text, out var parsed)) return false;
+                version = new System.Version(
+                    Math.Max(0, parsed.Major),
+                    Math.Max(0, parsed.Minor),
+                    Math.Max(0, parsed.Build),
+                    Math.Max(0, parsed.Revision));
+                return true;
+            }
+
+            return TryNormalize(left, out var leftVersion)
+                && TryNormalize(right, out var rightVersion)
+                && leftVersion.Equals(rightVersion);
         }
 
         private static void ValidateInstalledPlatformRuntimeDependencies(string osClient, List<string> msgs)
@@ -3228,12 +3407,18 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             // 当前程序集随版本发布的基线，确保客户更新后端即可自动获得应用商城。
             var resources = await LoadUpgradeResourcesAsync();
 
-            var nullableMessages = new List<string>();
-            EnsureCoreTableColumnsNullable(osClient, nullableMessages);
-            foreach (var nullableMessage in nullableMessages)
+            var nullableErrors = new List<string>();
+            EnsureCoreTableColumnsNullable(osClient, nullableErrors);
+            if (nullableErrors.Count > 0)
             {
-                Console.WriteLine($"Microi：【基础应用升级】{nullableMessage}");
+                foreach (var nullableError in nullableErrors)
+                {
+                    Console.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】失败：{nullableError}");
+                }
+                msgs.AddRange(nullableErrors);
+                return msgs;
             }
+            Console.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】全部检查成功。");
             
             #region 导入数据包V8
             //更新应用商城的导入数据包接口引擎
@@ -3507,14 +3692,14 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             return msgs;
         }
 
-        private static void EnsureCoreTableColumnsNullable(string osClient, List<string> msgs)
+        private static void EnsureCoreTableColumnsNullable(string osClient, List<string> errors)
         {
             try
             {
                 var osClientModel = OsClient.GetClient(osClient);
                 if (osClientModel?.Db == null)
                 {
-                    msgs.Add($"核心表字段可空升级跳过：未找到租户 {osClient} 的数据库连接。");
+                    errors.Add($"核心表字段可空升级失败：未找到租户 {osClient} 的数据库连接。");
                     return;
                 }
 
@@ -3524,6 +3709,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
 
                 foreach (var tableName in CoreNullableTables)
                 {
+                    Console.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】开始检查表：{tableName}。");
                     var columnsResult = orm.GetColumns(new DbServiceParam
                     {
                         OsClient = osClient,
@@ -3533,7 +3719,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     });
                     if (columnsResult.Code != 1 || columnsResult.Data == null)
                     {
-                        msgs.Add($"核心表 {tableName} 字段可空升级跳过：{columnsResult.Msg}");
+                        errors.Add($"读取核心表 {tableName} 字段失败：{columnsResult.Msg}");
                         continue;
                     }
 
@@ -3551,6 +3737,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                         }
                         if (columnType.DosIsNullOrWhiteSpace()) continue;
 
+                        Console.WriteLine(
+                            $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】开始调整：{tableName}.{columnName}，类型={columnType}。"
+                        );
                         var changeResult = orm.ChangeColumn(new DbServiceParam
                         {
                             OsClient = osClient,
@@ -3566,22 +3755,33 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                         if (changeResult.Code == 1)
                         {
                             changedCount++;
+                            Console.WriteLine(
+                                $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】调整成功：{tableName}.{columnName}。"
+                            );
                         }
                         else
                         {
-                            msgs.Add($"核心表 {tableName}.{columnName} 调整为允许为空失败：{changeResult.Msg}");
+                            errors.Add($"核心表 {tableName}.{columnName} 调整为允许为空失败：{changeResult.Msg}");
+                            Console.WriteLine(
+                                $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】调整失败：{tableName}.{columnName}；{changeResult.Msg}"
+                            );
                         }
                     }
 
                     if (changedCount > 0)
                     {
-                        msgs.Add($"核心表 {tableName} 已将 {changedCount} 个字段调整为允许为空。");
+                        Console.WriteLine(
+                            $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】表调整成功：{tableName}，已将{changedCount}个字段调整为允许为空。"
+                        );
                     }
+                    Console.WriteLine(
+                        $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】表检查完成：{tableName}，本次调整={changedCount}。"
+                    );
                 }
             }
             catch (Exception ex)
             {
-                msgs.Add($"核心表字段可空升级异常：{ex.Message}");
+                errors.Add($"核心表字段可空升级异常：{ex.Message}");
             }
         }
     }

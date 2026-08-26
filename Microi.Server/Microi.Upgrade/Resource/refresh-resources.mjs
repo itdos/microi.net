@@ -170,7 +170,7 @@ function validateReleaseCandidate(name, content) {
   }
   if (name === 'official-resource-api.js') {
     if (!content.includes('ApiEngineKey: get-microi-upgrade-resource')
-      || !content.includes('Version: v1.3.1')
+      || !content.includes('Version: v1.3.2')
       || !content.includes('V8.Method.AuthorizeOfficialResourcePublish()')
       || !content.includes('ExpectedRemoteSha256')
       || !content.includes('function lockPublishRows()')
@@ -598,7 +598,7 @@ function validateReleaseCandidate(name, content) {
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('V8.Method.AuthorizeOfficialResourcePublish')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
-          .includes('ApiEngine:get-microi-upgrade-resource@v1.3.1')
+          .includes('ApiEngine:get-microi-upgrade-resource@v1.3.2')
         || engines.some(engine => engine.ApiEngineKey === 'platform-user-update-preferences')
         || visibilityField?.Component !== 'Switch'
         || String(visibilityField?.DefaultValue) !== '1'
@@ -1274,7 +1274,7 @@ if (process.argv.includes('--synchronize-local')) {
     }
   }
   if (publish) {
-    // 即使本次 remoteChanges=0 也必须执行：v1.3.1 首次发布新版控制面时，
+    // 即使本次 remoteChanges=0 也必须执行：v1.3.2 首次发布新版控制面时，
     // 正在运行的旧脚本只能写入新源码，只有资源回读后的第二次调用才会运行投影逻辑。
     await reconcilePublishedApiEngines(verifiedRemote);
   }

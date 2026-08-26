@@ -4,13 +4,13 @@ using System.Threading.Tasks;
 using Dos.Common;
 using Newtonsoft.Json.Linq;
 
-namespace Microi.net.Api
+namespace Microi.net
 {
     /// <summary>
     /// 旧 Controller 路由到官方 Managed 接口引擎的最小兼容桥。
     /// 引擎 Key 只能由服务端常量传入；请求不能覆盖路由或伪造当前用户。
     /// </summary>
-    internal static class ManagedApiEngineCompatibility
+    public static class ManagedApiEngineCompatibility
     {
         private static readonly string[] UntrustedRoutingProperties =
         {
@@ -18,7 +18,7 @@ namespace Microi.net.Api
             "_TrustedExternalLoginProtocol", "_TrustedWeChatProtocol"
         };
 
-        internal static JObject PrepareRequest(JObject request, JObject trustedCurrentUser = null)
+        public static JObject PrepareRequest(JObject request, JObject trustedCurrentUser = null)
         {
             var result = request?.DeepClone() as JObject ?? new JObject();
             foreach (var propertyName in UntrustedRoutingProperties)
@@ -37,7 +37,7 @@ namespace Microi.net.Api
             return result;
         }
 
-        internal static async Task<object> RunAsync(
+        public static async Task<object> RunAsync(
             string managedApiEngineKey,
             JObject request,
             JObject trustedCurrentUser = null)
@@ -56,7 +56,7 @@ namespace Microi.net.Api
         /// 目标引擎必须调用 V8.Method.RequireManagedProtocolContext 原子消费。可选当前
         /// 用户只能传入宿主已完成 Token/会话验证的权威快照，V8.Param 中的同名字段会被移除。
         /// </summary>
-        internal static async Task<object> RunTrustedProtocolAsync(
+        public static async Task<object> RunTrustedProtocolAsync(
             string managedApiEngineKey,
             string trustedOsClient,
             JObject request,
@@ -92,7 +92,7 @@ namespace Microi.net.Api
             }
         }
 
-        internal static async Task<object> RunAsync(
+        public static async Task<object> RunAsync(
             string managedApiEngineKey,
             JObject request,
             JObject trustedCurrentUser,

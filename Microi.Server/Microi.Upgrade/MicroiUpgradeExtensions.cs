@@ -12,6 +12,7 @@ namespace Microi.net
             try
             {
                 services.AddSingleton<IMicroiUpgrade, MicroiUpgrade>();
+                services.AddSingleton<MicroiStartupGate>();
                 services.AddHostedService<MicroiUpgradeHostedService>();
                 Console.WriteLine("Microi：【成功】注入【服务器端自动升级】插件成功！");
                 return services;

@@ -199,7 +199,7 @@ public sealed class EmptyDatabaseReleaseServiceTests
             item => item["ApiEngineKey"]?.Value<string>() == "admin_get_empty_database_sanitization_sql");
         var code = engine["ApiV8Code"]?.Value<string>() ?? "";
 
-        Assert.Equal("v1.3.2", engine["Version"]?.Value<string>());
+        Assert.Equal("v1.3.5", engine["Version"]?.Value<string>());
         Assert.Contains("protectedPlatformTableNames", code, StringComparison.Ordinal);
         Assert.Contains("operationalResidueTableNames", code, StringComparison.Ordinal);
         Assert.Contains("cleanupOperationalResidueSql", code, StringComparison.Ordinal);
@@ -234,7 +234,10 @@ public sealed class EmptyDatabaseReleaseServiceTests
                      "sys_microiservice_page",
                      "mci_ai_app",
                      "mci_ai_project",
-                     "microi_job_triggers"
+                     "microi_job_triggers",
+                     "mci_network_traffic_rollup",
+                     "mci_app_stream_gate_transition",
+                     "mci_nuget_stats_daily"
                  })
         {
             Assert.Contains($"\"{table}\"", code, StringComparison.Ordinal);
@@ -275,6 +278,7 @@ public sealed class EmptyDatabaseReleaseServiceTests
                      "mci_ai_token_account", "mci_file_remote_connection", "mci_spider_account", "mci_redis_connection",
                      "sys_servernode", "sys_sourcedatatable", "microi_database", "wx_mp", "wx_menu",
                      "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
+                     "mci_network_traffic_rollup", "mci_app_stream_gate_transition", "mci_nuget_stats_daily",
                      "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
                  })
         {

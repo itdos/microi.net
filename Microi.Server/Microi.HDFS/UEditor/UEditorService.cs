@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-namespace Microi.net.Api
+namespace Microi.net
 {
     /// <summary>
     /// 百度 UEditor 旧协议适配。只保留请求分派、上传协议与安全 JSONP 响应；

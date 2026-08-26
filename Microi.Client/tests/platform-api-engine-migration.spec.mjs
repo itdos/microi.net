@@ -84,7 +84,12 @@ test("anonymous bootstrap and language requests explicitly omit Authorization", 
     assert.match(loginSource, /platform-login-wallpapers[\s\S]{0,500}skipAuthorization:\s*true/);
     assert.match(loginSource, /send_sms_reg[\s\S]{0,500}skipAuthorization:\s*true/);
     assert.match(loginSource, /platform_auth_sms_login[\s\S]{0,900}skipAuthorization:\s*true/);
-    assert.match(remoteSource, /platform-sys-config[\s\S]{0,300}apiengine:\s*['"]1['"]/);
+    assert.match(remoteSource, /requestConfig[\s\S]{0,500}apiengine:\s*['"]1['"]/);
+    assert.match(remoteSource, /platformSysConfigRoutes\.primary/);
+    assert.match(remoteSource, /platformSysConfigRoutes\.legacyFallback/);
+    assert.match(remoteSource, /shouldFallbackPlatformSysConfig/);
+    assert.match(remoteSource, /URLSearchParams\(\{\s*OsClient:\s*osClient\s*\}\)/);
+    assert.match(remoteSource, /OsClient:\s*osClient[\s\S]{0,160}body:\s*requestBody/);
 });
 
 test("SysConfig fallback is narrow and retries only missing-engine or unsupported-route failures", async function () {
