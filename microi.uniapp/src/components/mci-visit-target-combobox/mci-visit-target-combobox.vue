@@ -54,6 +54,10 @@
 <script>
 import { getBusinessModule } from '@/platform/business.js'
 import { findMenu, formatFieldValue, loadModuleRows } from '@/platform/business-runtime.js'
+import { V8 } from '@/utils/request.js'
+
+const CHECKIN_QUERY_SCOPE = 'checkin'
+const VISIT_TARGET_ENGINE_KEY = 'xjy-visit-target-options'
 
 export default {
   name: 'MciVisitTargetCombobox',
@@ -62,6 +66,8 @@ export default {
     selectedId: { type: [String, Number], default: '' },
     moduleKey: { type: String, required: true },
     targetType: { type: String, default: '' },
+    queryScope: { type: String, default: 'module' },
+    permissionMenuId: { type: [String, Number], default: '' },
     readonly: { type: Boolean, default: false }
   },
   emits: ['update:modelValue', 'select', 'clear', 'open-change'],
@@ -86,7 +92,9 @@ export default {
   },
   watch: {
     moduleKey() { this.resetDataSource() },
-    targetType() { this.resetDataSource() }
+    targetType() { this.resetDataSource() },
+    queryScope() { this.resetDataSource() },
+    permissionMenuId() { this.resetDataSource() }
   },
   beforeUnmount() {
     clearTimeout(this.searchTimer)
@@ -122,6 +130,26 @@ export default {
       if (this.moduleConfig) return this.moduleConfig
       const base = getBusinessModule(this.moduleKey)
       if (!base) throw new Error(`${this.targetLabel}模块未配置`)
+      if (this.queryScope === CHECKIN_QUERY_SCOPE) {
+        const permissionModule = getBusinessModule('attendanceRecords')
+        if (!permissionModule) throw new Error('人员定位模块未配置')
+        let menuId = String(this.permissionMenuId || '').trim()
+        if (!menuId) {
+          let menu = null
+          try {
+            menu = await findMenu(permissionModule.menuAliases || [], permissionModule.table)
+          } catch (error) {}
+          if (!menu) {
+            try {
+              menu = await findMenu(permissionModule.menuAliases || [], permissionModule.table, true)
+            } catch (error) {}
+          }
+          menuId = String(menu && menu.Id || '').trim()
+        }
+        if (!menuId) throw new Error('当前账号没有可用的拜访打卡或人员定位权限')
+        this.moduleConfig = { ...base, permissionMenuId: menuId }
+        return this.moduleConfig
+      }
       let menu = null
       try {
         menu = await findMenu(base.menuAliases || [], base.table)
@@ -136,6 +164,20 @@ export default {
       if (!menuId) throw new Error(`当前账号没有可用的${this.targetLabel}查看权限`)
       this.moduleConfig = { ...base, menuId }
       return this.moduleConfig
+    },
+    async loadCheckinRows(config, keyword) {
+      const response = await V8.ApiEngine.Run(VISIT_TARGET_ENGINE_KEY, {
+        MenuId: config.permissionMenuId,
+        TargetType: this.targetType,
+        Keyword: String(keyword || '').trim(),
+        PageIndex: this.pageIndex,
+        PageSize: this.pageSize
+      }, { checkCode: false })
+      if (!response || Number(response.Code) !== 1) {
+        throw new Error(response && response.Msg || `${this.targetLabel}加载失败`)
+      }
+      const rows = Array.isArray(response.Data) ? response.Data : []
+      return { rows, count: Number(response.DataCount || rows.length) }
     },
     openOptions() {
       if (this.readonly) return
@@ -189,12 +231,14 @@ export default {
       this.error = ''
       try {
         const config = await this.resolveModuleConfig()
-        const result = await loadModuleRows(config, {
-          pageIndex: this.pageIndex,
-          pageSize: this.pageSize,
-          keyword: String(keyword || '').trim(),
-          refresh: reset
-        })
+        const result = this.queryScope === CHECKIN_QUERY_SCOPE
+          ? await this.loadCheckinRows(config, keyword)
+          : await loadModuleRows(config, {
+            pageIndex: this.pageIndex,
+            pageSize: this.pageSize,
+            keyword: String(keyword || '').trim(),
+            refresh: reset
+          })
         if (currentRequest !== this.requestId) return
         this.rows = reset ? result.rows : this.rows.concat(result.rows)
         this.total = Number(result.count || this.rows.length)
