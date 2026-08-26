@@ -13,7 +13,7 @@ public class FileUploadSecurityTests
     };
 
     [Fact]
-    public void OrdinaryUserPolicy_ForcesPrivateAndAllowsOnlyKnownRoot()
+    public void LegacyOrdinaryUserPolicy_ForcesPrivateAndAllowsOnlyKnownRoot()
     {
         var param = new DiyUploadParam
         {
@@ -26,6 +26,134 @@ public class FileUploadSecurityTests
         Assert.Null(result);
         Assert.True(param.Limit);
         Assert.Equal("file", param.Path);
+    }
+
+    [Fact]
+    public void FormFieldPolicy_PublicImageConfigOverridesClientAndUsesImageRoot()
+    {
+        var param = new DiyUploadParam
+        {
+            Limit = true,
+            Path = "file"
+        };
+        var table = new JObject { ["Id"] = "table-1", ["Name"] = "article" };
+        var field = new JObject
+        {
+            ["Id"] = "field-1",
+            ["TableId"] = "table-1",
+            ["Component"] = "ImgUpload",
+            ["Config"] = "{\"ImgUpload\":{\"Limit\":false}}"
+        };
+
+        var result = FileUploadSecurity.ApplyAuthoritativeFormFieldPolicy(param, table, field);
+
+        Assert.Null(result);
+        Assert.False(param.Limit);
+        Assert.Equal("img", param.Path);
+    }
+
+    [Fact]
+    public void FormFieldPolicy_PrivateFileConfigOverridesForgedPublicRequest()
+    {
+        var param = new DiyUploadParam
+        {
+            Limit = false,
+            Path = "img"
+        };
+        var table = new JObject { ["Id"] = "table-1", ["Name"] = "contract" };
+        var field = new JObject
+        {
+            ["Id"] = "field-1",
+            ["TableId"] = "table-1",
+            ["Component"] = "FileUpload",
+            ["Config"] = new JObject
+            {
+                ["FileUpload"] = new JObject { ["Limit"] = true }
+            }
+        };
+
+        var result = FileUploadSecurity.ApplyAuthoritativeFormFieldPolicy(param, table, field);
+
+        Assert.Null(result);
+        Assert.True(param.Limit);
+        Assert.Equal("file", param.Path);
+    }
+
+    [Fact]
+    public void FormFieldPolicy_PreservesLegacyDefaultsByComponent()
+    {
+        var table = new JObject { ["Id"] = "table-1", ["Name"] = "article" };
+        var imageParam = new DiyUploadParam { Limit = true };
+        var richTextParam = new DiyUploadParam { Limit = false };
+        var imageField = new JObject
+        {
+            ["TableId"] = "table-1",
+            ["Component"] = "ImgUpload",
+            ["Config"] = "{}"
+        };
+        var richTextField = new JObject
+        {
+            ["TableId"] = "table-1",
+            ["Component"] = "RichText",
+            ["Config"] = "{}"
+        };
+
+        Assert.Null(FileUploadSecurity.ApplyAuthoritativeFormFieldPolicy(
+            imageParam,
+            table,
+            imageField));
+        Assert.Null(FileUploadSecurity.ApplyAuthoritativeFormFieldPolicy(
+            richTextParam,
+            table,
+            richTextField));
+        Assert.False(imageParam.Limit);
+        Assert.Equal("img", imageParam.Path);
+        Assert.True(richTextParam.Limit);
+        Assert.Equal("editor", richTextParam.Path);
+    }
+
+    [Fact]
+    public void FormFieldPolicy_WeChatReviewCannotBeRelaxedByPublicField()
+    {
+        var param = new DiyUploadParam
+        {
+            Limit = false,
+            ContentSecurityRequired = true
+        };
+        var table = new JObject { ["Id"] = "table-1", ["Name"] = "article" };
+        var field = new JObject
+        {
+            ["TableId"] = "table-1",
+            ["Component"] = "ImgUpload",
+            ["Config"] = "{\"ImgUpload\":{\"Limit\":false}}"
+        };
+
+        var result = FileUploadSecurity.ApplyAuthoritativeFormFieldPolicy(param, table, field);
+
+        Assert.Null(result);
+        Assert.True(param.Limit);
+    }
+
+    [Theory]
+    [InlineData("Text", "{}")]
+    [InlineData("ImgUpload", "{bad json")]
+    public void FormFieldPolicy_RejectsUnsupportedOrInvalidFieldConfig(
+        string component,
+        string config)
+    {
+        var param = new DiyUploadParam { Limit = false };
+        var table = new JObject { ["Id"] = "table-1", ["Name"] = "article" };
+        var field = new JObject
+        {
+            ["TableId"] = "table-1",
+            ["Component"] = component,
+            ["Config"] = config
+        };
+
+        var result = FileUploadSecurity.ApplyAuthoritativeFormFieldPolicy(param, table, field);
+
+        Assert.NotNull(result);
+        Assert.Equal(0, result.Code);
     }
 
     [Theory]

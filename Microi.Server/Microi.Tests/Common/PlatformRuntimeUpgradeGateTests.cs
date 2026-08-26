@@ -1,4 +1,5 @@
 using System.Reflection;
+using Dos.ORM;
 using Microi.net;
 using Newtonsoft.Json.Linq;
 
@@ -214,6 +215,32 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.DoesNotContain("【自动升级状态】", program);
         Assert.Contains("【自动升级状态】", startupGate);
         Assert.Contains("【自动升级状态】", hosted);
+    }
+
+    [Fact]
+    public void StartupDependencyPersistence_UsesCrossDatabaseBitAndPostgreSqlUtcDateParameters()
+    {
+        var database = new DbSession(
+            DatabaseType.PostgreSql,
+            "Host=127.0.0.1;Port=5432;Database=test;Username=test;Password=test");
+        var readDatabaseValue = GetPrivateStaticMethod("ReadDatabaseValue");
+
+        Assert.Equal((short)0, Assert.IsType<short>(readDatabaseValue.Invoke(
+            null,
+            new object[] { database, "IsDeleted", new JValue(0) })));
+        Assert.Equal((short)1, Assert.IsType<short>(readDatabaseValue.Invoke(
+            null,
+            new object[] { database, "IsEnable", new JValue(1) })));
+        Assert.Equal(
+            600,
+            Assert.IsType<int>(readDatabaseValue.Invoke(
+                null,
+                new object[] { database, "Timeout", new JValue(600) })));
+
+        var utc = Assert.IsType<DateTime>(readDatabaseValue.Invoke(
+            null,
+            new object[] { database, "CreateTime", new JValue(DateTime.Now) }));
+        Assert.Equal(DateTimeKind.Utc, utc.Kind);
     }
 
     [Fact]

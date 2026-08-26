@@ -26,7 +26,8 @@ namespace Microi.net
         {
             try
             {
-                IMicroiORM service = dbType switch
+                var serviceType = DatabaseTypeCompatibility.NormalizeOrmServiceType(dbType);
+                IMicroiORM service = serviceType switch
                 {
                     Dos.ORM.DatabaseType.MySql => _serviceProvider.GetRequiredService<MySqlService>(),
                     Dos.ORM.DatabaseType.Oracle => _serviceProvider.GetRequiredService<OracleService>(),
@@ -59,6 +60,7 @@ namespace Microi.net
             if (string.IsNullOrWhiteSpace(connectionString))
                 throw new ArgumentNullException(nameof(connectionString));
 
+            dbType = DatabaseTypeCompatibility.NormalizeSessionProviderType(dbType);
             connectionString = ConnectionStringCompatibility.Normalize(
                 dbType,
                 connectionString,

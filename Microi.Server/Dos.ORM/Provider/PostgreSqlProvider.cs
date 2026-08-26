@@ -106,6 +106,15 @@ namespace Dos.ORM.PostgreSql
                     continue;
                 }
 
+                // The legacy base provider normalizes CLR bool values to 0/1
+                // for MySQL/SQL Server compatibility. Npgsql keeps DbType.Boolean
+                // and therefore requires the value to remain a CLR bool.
+                if (param.DbType == DbType.Boolean && value is int integerBoolean)
+                {
+                    param.Value = integerBoolean != 0;
+                    value = param.Value;
+                }
+
                 Type valueType = value.GetType();
 
                 // 处理 GUID

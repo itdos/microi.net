@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-file-upload-008 sha256=73506d076e7917db846f615cd9c0d899bb8b58a3917f375bce9eff6ea903e8a0 -->
+<!-- microi-progressive:chunk id=v8-file-upload-008 sha256=5e3b59486745d3c54bd8ad25c43cbe2396e6d614394340b93d93794b6df56292 -->
 ## Office 文件在线编辑版本号规则
 
 当文件上传控件开启【Office 在线预览】、【允许在线编辑】和【开启 Office 文件版本号】时，前后端必须遵循统一版本规则：

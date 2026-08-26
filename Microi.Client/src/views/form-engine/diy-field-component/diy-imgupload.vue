@@ -345,6 +345,7 @@ import {
     resolveUploadLimit,
     sanitizeUploadMeta
 } from "@/utils/upload-response";
+import { appendFormFieldUploadContext } from "@/utils/form-field-upload-context";
 import DiyImageCropDialog from './diy-image-crop-dialog.vue';
 import DiyUploadCompactSummary from './diy-upload-compact-summary.vue';
 import {
@@ -783,6 +784,14 @@ const performImageUpload = (options) => {
     formData.append('Limit', String(limitEnabled));
     formData.append('Multiple', String(getMultipleFlag.value));
     formData.append('Preview', String(isImgCompressionEnabled(props.field.Config.ImgUpload.Preview)));
+    appendFormFieldUploadContext(formData, {
+        field: props.field,
+        diyTableModel: props.DiyTableModel,
+        formData: props.FormDiyTableModel,
+        tableRowId: props.TableRowId,
+        sysMenuId: props.SysMenuId,
+        tableChildAuth: props.TableChildAuth
+    });
 
     const xhr = new XMLHttpRequest();
     xhr.open(options.method || 'POST', options.action || GetUploadUrl(), true);

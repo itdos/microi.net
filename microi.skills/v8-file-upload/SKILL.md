@@ -11,6 +11,13 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 
 公开入口覆盖 `V8.uploadFile`、多文件 `V8.uploadFiles` 与 MCP `microi_upload_file_base64`。多文件上传必须限制并发、逐文件返回结果；Base64 工具只接受明确文件名、大小和租户内目标范围，写后回读路径、大小与哈希。
 
+## 表单字段的公有桶与私有桶（强制）
+
+- `ImgUpload`、`FileUpload`、`RichText` 的“禁止匿名访问”是字段权威策略：`Limit=false` 写公有桶，`Limit=true` 写私有桶。普通用户只要通过当前菜单/表的新增或编辑动作授权，也必须按该字段配置执行；不得按用户等级把全部非超级管理员上传统一改成私有桶。
+- 浏览器上传必须携带 `FormEngineKey + FieldId + SysMenuId`，编辑已有记录再带 `FormDataId`，TableChild 再带父子授权上下文。后端先用 FormEngine 校验动作权限，再从当前租户回读 `diy_field.Component/Config`，用权威 `Limit` 覆盖请求值，并把目录固定为 `ImgUpload→img`、`FileUpload→file`、`RichText→editor`。
+- 客户端 `Limit`、`Path`、字段 Id 和菜单 Id 都只是待验证线索。没有可验证字段上下文的普通交互式上传继续强制私有并限制到安全一级目录；不能为了恢复公有字段语义而重新信任裸 `Limit=false`。
+- 老 `ImgUpload/FileUpload` 缺失 `Limit` 时兼容为公有；老 `RichText` 缺失上传配置时默认私有。微信待审图片与裁剪/压缩 `_origin` 原图始终私有，字段公有配置不能放宽这些特殊边界。客户端保存与预览必须以上传响应的实际 `Limit` 为准。
+
 ## 交互式图片默认压缩（强制）
 
 - `ImgUpload`、PC、UniApp/H5/小程序以及 MCP 普通图片上传在未显式传 `Preview` 时，必须按 `Preview=true` 处理；字段设计器新配置默认开启。只有业务明确要求公开原始画质时才允许显式关闭，不能把“客户端漏传”解释为关闭。
@@ -30,11 +37,11 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 
 ## 富文本图片、视频与附件（强制）
 
-- `RichText.Limit=false` 只用于需匿名长期访问的官网公告、商品详情等公开正文；内部内容用 `true`。普通交互式帐号即使传 `false`，后端仍可按安全策略强制私有，客户端必须以上传响应的实际 `Limit` 为准。
+- `RichText.Limit=false` 只用于需匿名长期访问的官网公告、商品详情等公开正文；内部内容用 `true`。普通用户经表单新增/编辑授权后也按后端回读到的该字段配置选择桶；仅修改请求中的 `Limit` 不能改变策略，客户端必须以上传响应的实际 `Limit` 为准。
 - RichText 分别配置 `Image`、`Video`、`File` 的 `Enabled/MaxSize/MaxCount`；图片另传 `Preview/CompressMaxSize/CompressMaxWidth`，并继续遵循“原图私有、展示图公有或私有”的压缩链路。附件类型白名单用 `File.Accept` 进一步收紧，不能放宽服务端白名单。
 - 私有正文持久化 `/__microi_richtext_private__/...` 稳定对象标识，严禁保存对象存储签名 URL、`OpenPrivateFile` Ticket、DiyToken 或其它会过期的凭据。每次打开记录时携带 `FormEngineKey/FormDataId/FieldId/SysMenuId` 批量换取短效审计代理地址。
 - 私有文件后端授权必须重新校验当前租户、菜单、表、行和 RichText 字段，并确认所请求路径精确存在于 `img/video/source.src` 或 `a.href`；普通上传字段的对象/数组只认 `Path/FilePath/FilePathName`，不得递归把 `Name/Size/Metadata` 等任意标量当作路径。未经当前租户 FileServer 主机权威校验的绝对 HTTP(S) URL 不得等价为本地对象 Key；正文文字、`data-src/data-href`、脚本标签和前缀相似路径都必须失败关闭。
-- 外部匿名页面没有后台记录权限上下文，不能解析私有标识。公开文章必须由有权发布公有资产的超级管理员显式使用公有桶，不得通过延长私有 URL 有效期模拟公开资源。
+- 外部匿名页面没有后台记录权限上下文，不能解析私有标识。公开文章应由设计者把 RichText 字段配置为 `Limit=false`，有该表单新增/编辑权限的用户即可按权威配置发布；不得通过延长私有 URL 有效期模拟公开资源。
 
 官网客户端读取私有文件统一调用 `/apiengine/platform-private-file-url`，提交 `FilePathName` 或有界 `FilePathNames`，并按资源类型提供权威定位参数：普通表单字段使用 `FormEngineKey + FormDataId + FieldId + SysMenuId`；用户头像使用 `ResourceKind=UserAvatar + ResourceId=用户Id`；菜单/部门导入模板分别使用 `MenuImportTemplate`、`DeptImportTemplate` 与对应记录 Id。CAD 私有派生预览使用 `ResourceKind=FormFieldDerivedPreview`，除表单四元组外必须同时提交字段中保存的 `OriginalFilePathName` 和单个派生 `FilePathName`；后端只接受同目录同 basename 的 DWG→`_preview.dxf`、STEP/STP→`_preview.stl` 唯一映射，并在对象存在后签名。文件柜对象使用 `ResourceKind=FileManagerObject`，`ResourceId` 必须与单个 `FilePathName` 大小写精确相同，并提交能力探针返回的当前租户权威 `SysMenuId`；此类签名只允许平台超级管理员 DiyToken 会话，访问密钥和普通菜单用户一律拒绝。后端会从权威字段或对象存储重新读取并精确匹配路径；管理员也不能只传裸路径绕过对象引用，普通客户端禁止换取私有文件原始 Byte/Stream。旧 `/api/HDFS/GetPrivateFileUrl` 与 `/api/HDFS/MallFileUrl` 只保留令牌格式兼容并转发同一 Managed 接口，新代码不得继续引用。
 
@@ -66,7 +73,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 可信后端 V8 可用 `V8.Http.GetResponse({ Url: url }).RawBytes` 下载，再用 `System.Convert.ToBase64String` 和 `V8.Method.Upload` 上传。该路径同样必须校验域名、大小、Content-Type、后缀和最终重定向目标。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=c20863b68d13b3bd41caee90a5e12878501a35b3d9f8d40a80efe3f6b46125a9 -->
+<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=ed7e727c51bd2416ae1f38cf3c4bd09491e616df08473a610372e0ca648e1298 -->
 ## 接收前端上传的文件
 
 前端发起文件上传时，平台自动把文件以 base64 形式注入到 `V8.FilesByteBase64`：
@@ -134,7 +141,7 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 帐号与租户每日额度在共享 Redis 中用单次原子脚本预留，支持多节点；Redis 不可用时失败关闭，不能降级成无限上传。
 - 额度按 UTC 日期统计。为防并发重试绕过限制，后续对象存储失败也不退还已经预留的额度。
 - 每日额度只阻断短期滥用；对象存储必须另外配置租户/桶总容量、账单告警、生命周期与实际用量对账。Redis 计数不能作为长期容量事实源。
-- 普通交互式用户无论客户端是否传 `Limit:false`，服务端都强制使用私有桶，并只允许平台预定义安全一级目录；公有资产必须经过授权的发布流程或超级管理员。
+- 标准表单字段上传按后端回读的 `diy_field.Config` 决定桶，不能按帐号等级覆盖字段策略。没有可验证字段上下文的普通交互式上传无论是否传 `Limit:false` 都强制私有，并只允许平台预定义安全一级目录；非表单公有资产使用受控发布流程或超级管理员入口。
 - 反向代理、Ingress/IIS 的请求体上限应与进程级 HTTP 解析硬顶协调。字段自身的类型、后缀、大小和数量配置只能进一步收紧当前租户有效值，不能替代平台硬顶。
 
 ### 复盘：“当前租户已停用文件上传”

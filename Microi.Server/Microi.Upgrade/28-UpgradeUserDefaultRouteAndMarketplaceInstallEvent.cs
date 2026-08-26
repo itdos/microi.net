@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Dos.Common;
 using Dos.ORM;
 using Newtonsoft.Json.Linq;
 
@@ -338,7 +339,11 @@ namespace Microi.net
                     _PageIndex = 1,
                     _PageSize = 10
                 }).ConfigureAwait(false);
-            if (result.Code != 1 || result.Data == null) return null;
+            if (result.Code != 1)
+                throw new InvalidOperationException(
+                    $"读取 {fieldName} 字段元数据失败：{result.Msg ?? "未知错误"}；诊断："
+                    + JsonHelper.Serialize(result.DataAppend));
+            if (result.Data == null) return null;
             var rows = JArray.FromObject((object)result.Data).OfType<JObject>().ToList();
             return rows.FirstOrDefault(row => row.Value<int?>("IsDeleted") != 1)
                    ?? rows.FirstOrDefault();

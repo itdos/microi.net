@@ -13,7 +13,7 @@
 	"scripts": {
 		"generate:architecture": "node scripts/generate-ai-platform-architecture.mjs",
 		"check:links": "node scripts/check-dead-links.mjs",
-		"check:sidebar": "node scripts/check-sidebar-coverage.mjs",
+		"check:sidebar": "node scripts/check-sidebar-coverage.mjs && node --test tests/sidebar-system-engine-grouping.test.mjs",
 		"check:repositories": "node scripts/check-open-source-links.mjs",
 		"check:readability": "node scripts/check-doc-readability.mjs",
 		"audit:visual": "node scripts/check-doc-readability.mjs --report",

@@ -11,7 +11,8 @@
             :data="{
                 Path: '/file',
                 Limit: field.Config.FileUpload.Limit,
-                Preview: false
+                Preview: false,
+                ...getFormFieldUploadContext()
             }"
             :headers="GetUploadHeaders()"
             :before-upload="(file) => BeforeFileUpload(file)"
@@ -290,6 +291,7 @@ import { useDiyStore } from "@/pinia";
 import { getUploadErrorMessage } from "@/utils/upload-error";
 // zhy：统一解析上传接口返回的实际私有策略、短期预览地址和可持久化元数据。
 import { getUploadPreviewUrl, resolveUploadLimit, sanitizeUploadMeta } from "@/utils/upload-response";
+import { buildFormFieldUploadContext } from "@/utils/form-field-upload-context";
 import DiyUploadCompactSummary from './diy-upload-compact-summary.vue';
 
 // 禁用属性继承
@@ -349,6 +351,15 @@ const SysConfig = computed(() => ({
     ...(diyStore.SysConfig || {}),
     ...(props.SysConfig || {})
 }));
+
+const getFormFieldUploadContext = () => buildFormFieldUploadContext({
+    field: props.field,
+    diyTableModel: props.DiyTableModel,
+    formData: props.FormDiyTableModel,
+    tableRowId: props.TableRowId,
+    sysMenuId: props.SysMenuId,
+    tableChildAuth: props.TableChildAuth
+});
 
 // 响应式数据
 const uploadRef = ref(null);

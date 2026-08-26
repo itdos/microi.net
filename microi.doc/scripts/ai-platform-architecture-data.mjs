@@ -1,5 +1,5 @@
-export const architectureVersion = '2026.08.15'
-export const platformVersion = 'v7.3.9'
+export const architectureVersion = '2026.08.27'
+export const platformVersion = 'v7.7.2'
 
 export const valueCards = [
   ['10×+', 'Token 更省'],
@@ -14,61 +14,70 @@ export const channels = [
   ['MCP / Skills', 'Codex / OpenClaw'], ['OpenAPI / SDK', 'HTTP / JS']
 ]
 
+// 以当前中文官网的系统引擎入口为事实源，防止架构图只强调通用治理术语而漏掉真实产品能力。
+export const officialSystemEngines = [
+  'AI 引擎', 'V8引擎', '表单引擎', '模块引擎', '接口引擎', '数据源引擎', '界面引擎', '打印引擎',
+  '报表引擎', '工作流引擎 v4', 'SaaS 引擎', '缓存引擎', '搜索引擎', '采集引擎', '任务调度', 'MQ 消息队列',
+  'MQTT 引擎', '消息通知', '翻译引擎', 'OCR 引擎', '图片处理引擎', '文件柜 / HDFS', '模板引擎', 'Office 引擎',
+  '前端微服务', 'Microi.UI', '多端客户端', '3D / CAD / 数据大屏', 'Unity / WebGL', '应用商城', '系统设置',
+  '系统日志 / 监控', '扩展数据库', '蓝牙打印', 'AI 平台治理', 'AI 工作流 / 蓝图'
+]
+
 export const panels = [
   {
-    x: 40, y: 232, w: 545, h: 314, code: '01', title: 'AI 智能与设计控制面', accent: '#4de8ff',
-    subtitle: '自然语言 → 可审计系统变更',
+    x: 40, y: 232, w: 545, h: 314, code: '01', title: 'AI 开发与智能引擎', accent: '#4de8ff',
+    subtitle: '模型、Agent、知识与 AI 交付',
     items: [
-      '多模型网关', '智能模型路由', '密钥隔离', 'Token 统计',
-      '流式对话', '多模态输入', '知识库 RAG', '向量检索',
-      'NL2SQL', 'NL2V8', 'Agent', 'Tool Calling',
-      'MCP 编排', 'Skills', 'Prompt 模板', '上下文记忆',
-      'AI 应用工作台', '在线源码', '业务架构蓝图', '系统关系图谱',
-      'AI Workflow', '状态机', 'Automation Flow', '流程挖掘',
-      'Manifest 建模', '解决方案规划', '影响面分析', '代码生成',
-      '测试计划生成', 'AI 辅助调试', '根因诊断', 'Preview / Diff'
+      'AI 引擎', '多模型网关', '智能模型路由', '密钥隔离',
+      '流式对话', '多模态', 'AI 助手', 'AI 数据分析',
+      '知识库 RAG', '向量检索', 'NL2SQL', 'NL2V8',
+      'Agent', 'Tool Calling', 'Prompt 模板', '上下文记忆',
+      'AI 应用工作台', 'AI 在线编程', 'AI 本地编程', 'Microi.VSCode',
+      'MCP', 'Skills', 'CLI / Plugins', 'OpenClaw',
+      '业务架构蓝图', '系统关系图谱', 'AI 工作流 / 蓝图', '状态机',
+      'Automation Flow', '流程挖掘', 'Manifest 建模', 'Preview / Diff'
     ]
   },
   {
-    x: 40, y: 566, w: 545, h: 314, code: '02', title: '低代码与多端体验引擎', accent: '#b995ff',
-    subtitle: '表单、页面、流程、报表与微应用',
+    x: 40, y: 566, w: 545, h: 314, code: '02', title: '低代码核心业务引擎', accent: '#b995ff',
+    subtitle: '20+ 成熟引擎开箱复用',
     items: [
-      '表单引擎', '40+ 控件', 'Tabs / 分组', '栅格布局',
-      '主子表', '关联表单', '字段 V8 事件', '表单 V8 事件',
-      '数据过滤', '模块引擎', '列表 / 搜索', '统计 / 角标',
-      'PC 复合列', '移动卡片', '左右树表', '界面引擎',
-      'JSON ↔ Vue', '源码预览', 'Undo / Redo', '页面版本',
-      '语义 Diff', 'Microi.UI / 物料', '资产依赖', '打印引擎',
-      '报表引擎', '审批流 v4', '模板引擎', 'Office / 蓝牙打印',
-      '图表 / 地图 / 甘特', 'Unity / WebGL', '3D / CAD / 大屏', '前端微服务'
+      '表单引擎', '模块引擎', '接口引擎', '数据源引擎',
+      '界面引擎', '打印引擎', '报表引擎', '工作流引擎 v4',
+      'SaaS 引擎', '应用商城', '模板引擎', 'Microi.UI',
+      '40+ 表单控件', '主子表 / 关联表', '字段 / 表单 V8', '列表 / 搜索',
+      '权限 / 数据范围', '左右树表', '移动卡片', 'ECharts / 地图',
+      'Office 引擎', '蓝牙打印', '自定义导入导出', '定制组件',
+      '前端微服务', '多端客户端', 'PC / WebOS', 'UniApp / App',
+      '微信小程序', 'Unity / WebGL', '3D / CAD / 数据大屏', 'goView 数据大屏'
     ]
   },
   {
-    x: 1335, y: 232, w: 545, h: 314, code: '03', title: 'AI 平台治理中心', accent: '#48e7a6',
-    subtitle: '门户、身份、配置、发布全链路治理',
+    x: 1335, y: 232, w: 545, h: 314, code: '03', title: '集成、数据与自动化引擎', accent: '#48e7a6',
+    subtitle: '连接数据、服务、设备与内容',
     items: [
-      '门户项目', '命名插槽', '统一资产', '不可变快照',
-      '原子发布', '运行解析', '身份连接器', 'SCIM 同步',
-      '增量游标', '冲突重放', '动态用户组', '用户标签',
-      '人群圈选', '批量授权', '权限解释', '临时权限',
-      '组织快照', '配置模板', '配置继承', 'Secret 引用',
-      '配置漂移', 'Feature Flag', '稳定灰度', '发布时间窗',
-      '发布计划', '计划哈希', '不可变审批', '职责分离',
-      '自动门禁', '断点续发', '条件回滚', '跨资源变更集'
+      '缓存引擎', '扩展数据库', '搜索引擎', '采集引擎',
+      '任务调度', 'MQ 消息队列', 'MQTT 引擎', '消息通知',
+      '翻译引擎', 'OCR 引擎', '图片处理引擎', '文件柜 / HDFS',
+      'Redis / MongoDB', 'Elasticsearch', 'Dos.ORM', '多数据库',
+      'MySQL / SQL Server', 'Oracle / PostgreSQL', '达梦 / 人大金仓', 'MinIO / OSS / S3',
+      'HTTP 集成', 'TCP 原始字节', 'Webhook / 回调', 'SignalR 实时',
+      'API / JSON 数据源', 'Excel / CSV 导入', 'Word / PPT 导出', '邮件 / 短信 / 微信',
+      '地图 / 定位', '公众号 / 小程序', 'OpenAPI / SDK', 'gRPC / 多语言'
     ]
   },
   {
-    x: 1335, y: 566, w: 545, h: 314, code: '04', title: '服务、观测与可靠运行', accent: '#ffbd59',
-    subtitle: '多节点事实源、告警闭环与可恢复任务',
+    x: 1335, y: 566, w: 545, h: 314, code: '04', title: '平台治理、安全与可靠运行', accent: '#ffbd59',
+    subtitle: '设置、观测、租户与交付闭环',
     items: [
-      '服务注册', '实例心跳', '共享租约', '优雅排空',
-      '版本 / 区域', '标签 / 权重', '稳定路由', '限流许可',
-      '熔断反馈', '重试 / 降级', '服务拓扑', 'W3C Trace',
-      'Span 时间线', '日志信号', '告警规则', '窗口评估',
-      '去重 / 抑制', '自动恢复', '值班排班', '升级链',
-      'Outbox 送达', '热 / 温 / 冷', '留存 / 配额', '脱敏规则',
-      '法律保留', '归档证明', '导入预检', '暂存行修正',
-      '检查点 / 栅栏', '暂停 / 恢复', '条件回滚', '协作租约'
+      'AI 平台治理', '系统设置', '系统日志 / 监控', '服务健康',
+      'SaaS / OsClient', 'DiyToken', '角色 / 部门', '菜单 / 表权限',
+      '行 / 字段权限', 'Passkey / TOTP', 'SSO / OAuth', 'OIDC / SAML / CAS',
+      '租户 Secret', '审计 / Trace', '多节点 API', 'Worker 集群',
+      '分布式租约', 'Fencing Token', '幂等 / 唯一约束', 'Outbox / Inbox',
+      '优雅排空', '重启恢复', '限流 / 熔断 / 重试', '日志 / 告警',
+      '健康检查', 'Docker / K8s', 'Managed Core', 'CreateIfMissing Hook',
+      'Version / Hash', 'DryRun / Readback', '自动化测试', '浏览器验收'
     ]
   }
 ]
@@ -109,14 +118,14 @@ export const deliveryFlow = ['自然语言', '业务蓝图', 'Manifest', 'DryRun
 
 export const architectureLayers = [
   {
-    name: 'AI 智能与设计控制面',
+    name: 'AI 开发与智能引擎',
     responsibility: '理解需求、设计系统、生成并校验变更',
-    capabilities: ['多模型网关', 'RAG', 'NL2SQL / NL2V8', 'Agent / Tool Calling', 'MCP / Skills', '业务架构蓝图', 'AI Workflow', 'Manifest', 'Preview / Diff']
+    capabilities: ['AI 引擎', '多模型网关', 'RAG', 'NL2SQL / NL2V8', 'Agent / Tool Calling', 'MCP / Skills', '业务架构蓝图', 'AI 工作流', 'Preview / Diff']
   },
   {
-    name: '低代码与多端体验层',
-    responsibility: '建模业务并交付 PC、WebOS、移动端和微应用',
-    capabilities: ['表单', '模块', '界面', '工作流', '打印', '报表', 'Microi.UI', '前端微服务', 'UniApp / App', 'Unity / WebGL']
+    name: '低代码核心业务引擎',
+    responsibility: '以 20+ 成熟引擎建模并运行企业业务',
+    capabilities: ['表单', '模块', '接口', '数据源', '界面', '打印', '报表', '工作流', 'SaaS', '应用商城']
   },
   {
     name: 'V8 运行与集成核心',
@@ -124,19 +133,19 @@ export const architectureLayers = [
     capabilities: ['接口引擎', 'FormEngine', '数据源', 'Dos.ORM', 'HTTP', 'Redis', 'MongoDB', 'MQ / MQTT', 'Office / OCR', 'Webhook / SignalR']
   },
   {
-    name: 'AI 平台治理中心',
-    responsibility: '治理门户、身份、配置、发布和跨资源变更',
-    capabilities: ['门户项目', '身份连接器', '动态用户组', '配置模板', 'Feature Flag', '灰度发布', '不可变审批', '断点续发', '条件回滚']
+    name: '数据、集成与自动化引擎',
+    responsibility: '连接数据库、服务、文件、设备与消息通道',
+    capabilities: ['缓存', '扩展数据库', '搜索', '采集', '任务调度', 'MQ / MQTT', '通知', '翻译', 'OCR / 图片', 'HDFS']
   },
   {
-    name: '企业可靠性与安全底座',
-    responsibility: '保障多租户、多节点、安全、观测和恢复',
-    capabilities: ['OsClient 隔离', 'DiyToken', 'Passkey / TOTP', '分布式租约', '幂等', 'Outbox / Inbox', 'Trace / 日志 / 告警', '健康检查', 'Docker / K8s']
+    name: '平台治理、安全与可靠运行',
+    responsibility: '统一设置、身份、权限、观测、升级与恢复',
+    capabilities: ['AI 平台治理', '系统设置', '系统日志/监控', 'OsClient', 'DiyToken', 'SSO', '分布式租约', '幂等', 'Trace / 告警', 'Docker / K8s']
   },
   {
-    name: '工程与交付生态',
-    responsibility: '把开发、测试、升级、文档和 AI 协作连成闭环',
-    capabilities: ['Microi.VSCode', 'Codex / OpenClaw', 'MCP', 'Skills', '应用商城', 'Managed / CreateIfMissing', '自动化测试', '浏览器回读', '官方文档']
+    name: '工程与全端交付生态',
+    responsibility: '交付 PC、WebOS、移动端、微服务与 Unity 应用',
+    capabilities: ['Microi.VSCode', 'Codex / OpenClaw', 'MCP', 'Skills', 'Microi.UI', '前端微服务', 'UniApp / App', 'Unity / WebGL', '自动化测试', '浏览器回读']
   }
 ]
 
@@ -145,6 +154,7 @@ export const architectureData = {
   platformVersion,
   valueCards,
   channels,
+  officialSystemEngines,
   panels: panels.map(({ code, title, subtitle, items }) => ({ code, title, subtitle, items })),
   v8Capabilities,
   governanceLoop,
@@ -157,10 +167,11 @@ export function architectureFeatureSections() {
   return [
     ['平台价值', valueCards.flat()],
     ['全端入口', channels.flat()],
-    ['AI 智能与设计控制面', panels[0].items],
-    ['低代码与多端体验引擎', panels[1].items],
-    ['AI 平台治理中心', panels[2].items],
-    ['服务、观测与可靠运行', panels[3].items],
+    ['系统引擎总览', officialSystemEngines],
+    ['AI 开发与智能引擎', panels[0].items],
+    ['低代码核心业务引擎', panels[1].items],
+    ['集成、数据与自动化引擎', panels[2].items],
+    ['平台治理、安全与可靠运行', panels[3].items],
     ['V8 运行与集成核心', [...v8Capabilities.flat(), '事务', '权限', '多租户', '多节点']],
     ['统一治理与交付闭环', governanceLoop],
     ...foundations.map(item => [item.title, item.items]),

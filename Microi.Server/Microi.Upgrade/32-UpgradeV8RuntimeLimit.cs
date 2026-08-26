@@ -109,9 +109,10 @@ for (var i = 0; i < limitFields.length; i++) {
                 // One set-based update is intentional. Upgrade.cs advances the
                 // ServerVersion only after Run succeeds, so this reset is applied
                 // once and a user's later V8Limit=1 choice is never overwritten.
-                client.Db.FromSql(@"UPDATE sys_apiengine
-                        SET V8Limit = @p0,
-                            V8Unlimited = @p1")
+                var orm = MicroiEngine.ORM(client.Db.Db.DbProvider.DatabaseType);
+                client.Db.FromSql($@"UPDATE {orm.GetTableName("sys_apiengine")}
+                        SET {orm.GetFieldName(FieldName)} = @p0,
+                            {orm.GetFieldName(LegacyFieldName)} = @p1")
                     .AddInParameter("p0", 0)
                     .AddInParameter("p1", 1)
                     .ExecuteNonQuery();
@@ -164,6 +165,25 @@ for (var i = 0; i < limitFields.length; i++) {
             var client = OsClientExtend.GetClient(osClient);
             var existing = await GetFieldAsync(osClient, tableId, FieldName).ConfigureAwait(false);
             var physicalExists = client.Db.ColumnExists("sys_apiengine", FieldName);
+            if (!physicalExists)
+            {
+                var addPhysical = MicroiEngine.ORM(client.Db.Db.DbProvider.DatabaseType)
+                    .AddColumn(new DbServiceParam
+                    {
+                        OsClient = osClient,
+                        TableName = "sys_apiengine",
+                        FieldName = FieldName,
+                        FieldType = "int",
+                        FieldNotNull = false,
+                        DbSession = client.Db
+                    });
+                if (addPhysical.Code != 1 && !client.Db.ColumnExists("sys_apiengine", FieldName))
+                {
+                    messages.Add($"新增 sys_apiengine.{FieldName} 物理字段失败：{addPhysical.Msg}");
+                    return;
+                }
+                physicalExists = true;
+            }
             if (existing == null)
             {
                 var add = await UpgradeTrustedFormEngine.AddFieldAsync(
