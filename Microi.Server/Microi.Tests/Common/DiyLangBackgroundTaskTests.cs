@@ -155,11 +155,12 @@ public sealed class DiyLangBackgroundTaskTests
             "Microi.Core",
             "Runtime",
             "BackgroundTaskService.cs"));
-        var program = File.ReadAllText(Path.Combine(
+        var startupRuntime = File.ReadAllText(Path.Combine(
             root,
             "Microi.Server",
-            "Microi.net.Api",
-            "Program.cs"));
+            "Microi.net",
+            "Common",
+            "MicroiRuntimeInitializationHostedService.cs"));
 
         Assert.Contains(
             "DiyLangBackgroundTaskService.WorkerApiEngineKey",
@@ -170,12 +171,12 @@ public sealed class DiyLangBackgroundTaskTests
             worker,
             StringComparison.Ordinal);
         Assert.Contains(
-            "DiyLangBackgroundTaskService.QueueStartupRepair(item)",
-            program,
+            "osClients.Select(DiyLangBackgroundTaskService.QueueStartupRepair)",
+            startupRuntime,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
             "RepairMissingDiyLangTranslationsAsync(item, \"startup\")",
-            program,
+            startupRuntime,
             StringComparison.Ordinal);
     }
 

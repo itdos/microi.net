@@ -125,7 +125,7 @@ public sealed class PlatformPrivateFileCompatibilityTests
     {
         var root = FindRepositoryRoot();
         var linkSource = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.net.Api", "Services", "PrivateFileAuditLinkService.cs"));
+            root, "Microi.Server", "Microi.HDFS", "Security", "PrivateFileAuditLinkService.cs"));
         var controllerSource = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers", "HDFSController.PrivateFileAudit.cs"));
 

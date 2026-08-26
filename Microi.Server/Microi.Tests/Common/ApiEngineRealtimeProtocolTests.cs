@@ -278,14 +278,18 @@ public sealed class ApiEngineRealtimeProtocolTests
             BindingFlags.Instance | BindingFlags.Public));
 
         var serverRoot = FindServerRoot();
-        var program = File.ReadAllText(Path.Combine(serverRoot, "Microi.net.Api", "Program.cs"));
+        var realtimeHosting = File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.net.Api",
+            "Hosting",
+            "MicroiRealtimeHostingExtensions.cs"));
         Assert.Contains(
             "app.MapHub<ApiEngineRealtimeHub>(ApiEngineRealtimeRuntime.HubPath)",
-            program,
+            realtimeHosting,
             StringComparison.Ordinal);
         Assert.Contains(
             "app.MapHub<GameRealtimeHub>(GameRealtimeRuntime.HubPath)",
-            program,
+            realtimeHosting,
             StringComparison.Ordinal);
 
         var controller = File.ReadAllText(Path.Combine(

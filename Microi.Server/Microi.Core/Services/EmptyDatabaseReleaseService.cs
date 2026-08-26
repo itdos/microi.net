@@ -56,6 +56,7 @@ namespace Microi.net
                 "mci_ai_token_account", "mci_file_remote_connection", "mci_spider_account", "mci_redis_connection",
                 "sys_servernode", "sys_sourcedatatable", "microi_database", "wx_mp", "wx_menu",
                 "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
+                "mci_network_traffic_rollup", "mci_app_stream_gate_transition", "mci_nuget_stats_daily",
                 "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
             },
             StringComparer.OrdinalIgnoreCase);
@@ -69,6 +70,7 @@ namespace Microi.net
             "mci_ai_token_account", "mci_file_remote_connection", "mci_spider_account", "mci_redis_connection",
             "sys_servernode", "sys_sourcedatatable", "microi_database", "wx_mp", "wx_menu",
             "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
+            "mci_network_traffic_rollup", "mci_app_stream_gate_transition", "mci_nuget_stats_daily",
             "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
         };
 

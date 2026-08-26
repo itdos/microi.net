@@ -78,7 +78,7 @@ namespace Dos.ORM
         /// </summary>
         public SqlSection AddInParameter(string parameterName, object value)
         {
-            return AddInParameter(parameterName, DbType.String, 0, value);
+            return AddInParameter(parameterName, EntityUtils.InferDbType(value), 0, value);
         }
 
         /// <summary>
@@ -111,7 +111,7 @@ namespace Dos.ORM
         /// </summary>
         public SqlSection AddSensitiveInParameter(string parameterName, object value)
         {
-            return AddSensitiveInParameter(parameterName, DbType.String, 0, value);
+            return AddSensitiveInParameter(parameterName, EntityUtils.InferDbType(value), 0, value);
         }
 
         public SqlSection AddSensitiveInParameter(string parameterName, DbType dbType, object value)

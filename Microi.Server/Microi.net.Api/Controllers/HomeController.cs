@@ -1,56 +1,20 @@
-﻿using System.Diagnostics;
+using Dos.Common;
 using Microsoft.AspNetCore.Mvc;
 
-using Dos.Common;
-
 namespace Microi.net.Api;
+
 /// <summary>
-/// 
+/// API 根地址展示页。租户自定义 HTML 仍从 SaaS 引擎读取；异常响应由全局中间件统一处理。
 /// </summary>
-public class HomeController : Controller
+public sealed class HomeController : Controller
 {
-    private readonly ILogger<HomeController> _logger;
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="logger"></param>
-    public HomeController(ILogger<HomeController> logger)
-    {
-        _logger = logger;
-    }
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <returns></returns>
     public IActionResult Index()
     {
         var osClient = DiyToken.GetCurrentOsClient();
         var clientModel = OsClient.GetClient(osClient);
-        if (!clientModel.OsClientModel["IndexCodeApi"].Val<string>().DosIsNullOrWhiteSpace())
-        {
-            return Content(clientModel.OsClientModel["IndexCodeApi"].Val<string>(), "text/html; charset=utf-8");
-        }
-        return View();
-    }
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <returns></returns>
-    public IActionResult Privacy()
-    {
-        return View();
-    }
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <returns></returns> <summary>
-    /// 
-    /// </summary>
-    /// <returns></returns>
-    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-    public IActionResult Error()
-    {
-        return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        var indexCode = clientModel.OsClientModel["IndexCodeApi"].Val<string>();
+        return indexCode.DosIsNullOrWhiteSpace()
+            ? View()
+            : Content(indexCode, "text/html; charset=utf-8");
     }
 }
-

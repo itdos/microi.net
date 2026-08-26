@@ -9,7 +9,7 @@ using System.Text;
 using Dos.Common;
 using Newtonsoft.Json.Linq;
 
-namespace Microi.net.Api
+namespace Microi.net
 {
     public class HandelFactory
     {
