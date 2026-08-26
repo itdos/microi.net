@@ -28,6 +28,10 @@ const controller = fs.readFileSync(path.join(
   serverRoot,
   'Microi.net.Api', 'Controllers', 'AiController.cs',
 ), 'utf8');
+const compatibilityController = fs.readFileSync(path.join(
+  serverRoot,
+  'Microi.net.Api', 'Controllers', 'LegacyMobileCompatibilityController.cs',
+), 'utf8');
 
 test('AI account resources declare Managed ownership and an app-wide non-overwritten tenant hook', () => {
   assert.match(managed, /OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1/);
@@ -73,9 +77,14 @@ test('plans, subscriptions and orders are orchestrated by V8 instead of Controll
   ];
   for (const [method, action] of bridgeActions) {
     assert.match(
-      controller,
-      new RegExp(`Task<JsonResult> ${method}\\b[\\s\\S]{0,700}RunAiPlatformCompatibilityAsync\\(\\s*"${action}"`),
+      compatibilityController,
+      new RegExp(`/api/Ai/${method}`),
       `${method} must remain only a compatibility bridge to ${action}`,
+    );
+    assert.match(compatibilityController, new RegExp(`"${action}"`));
+    assert.doesNotMatch(
+      controller,
+      new RegExp(`public\\s+(?:async\\s+)?[^\\n]+\\s${method}\\s*\\(`),
     );
   }
 });
@@ -135,12 +144,12 @@ test('Core binds the atom to the exact engine, server identity and action-level 
 });
 
 test('anonymous legacy discovery preserves the server-resolved tenant and rejects payload override', () => {
-  assert.match(controller, /var osClient = DiyToken\.GetCurrentOsClient\(false\)/);
-  assert.match(controller, /if \(string\.IsNullOrWhiteSpace\(osClient\)\)[\s\S]{0,100}OsClient\.GetConfigOsClient\(\)/);
-  assert.match(controller, /request\.Properties\(\)[\s\S]{0,500}"_OsClient"[\s\S]{0,300}property\.Remove\(\)/);
-  assert.match(controller, /request\["OsClient"\] = TenantConfigurationSecurity\.NormalizeTenantId\(osClient\)/);
+  assert.match(compatibilityController, /var osClient = DiyToken\.GetCurrentOsClient\(false\)/);
+  assert.match(compatibilityController, /if \(osClient\.DosIsNullOrWhiteSpace\(\)\) osClient = OsClient\.GetConfigOsClient\(\)/);
+  assert.match(compatibilityController, /request\.Properties\(\)[\s\S]{0,500}"_OsClient"[\s\S]{0,300}property\.Remove\(\)/);
+  assert.match(compatibilityController, /request\["OsClient"\] = TenantConfigurationSecurity\.NormalizeTenantId\(osClient\)/);
   assert.doesNotMatch(
-    controller,
+    compatibilityController,
     /if \(allowAnonymous\)[\s\S]{0,120}osClient = OsClient\.GetConfigOsClient\(\)/,
   );
 });

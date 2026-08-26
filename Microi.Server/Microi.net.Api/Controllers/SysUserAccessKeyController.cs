@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 
+// ASP.NET Core 访问密钥可信协议适配器；密钥明文与签发边界不得进入可编辑 V8。
 namespace Microi.net.Api
 {
     /// <summary>

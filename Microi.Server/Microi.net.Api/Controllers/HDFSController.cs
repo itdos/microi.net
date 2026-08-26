@@ -3,6 +3,7 @@ using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System.Net.Http;
@@ -19,6 +20,50 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public partial class HDFSController : Controller
     {
+        /// <summary>
+        /// 兼容旧版百度 UEditor 的 /UEditor/Upload 地址。文件处理仍归 HDFS 插件，
+        /// 此处只负责把历史 multipart 协议收口到保留的 HDFS Controller。
+        /// </summary>
+        [HttpGet("~/UEditor/Upload")]
+        [HttpPost("~/UEditor/Upload")]
+        [HttpGet("~/UEditor/UploadAsync")]
+        [HttpPost("~/UEditor/UploadAsync")]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public async Task<ContentResult> LegacyUEditorUpload(string Path)
+        {
+            var currentToken = await DiyToken.GetCurrentToken();
+            Path = TenantConfigurationSecurity.NormalizeTenantId(
+                Convert.ToString(currentToken.OsClient));
+
+            // 观测只读取 ASP.NET Core 已缓存的 multipart 元数据；异常不会改变旧上传语义。
+            if (HttpContext.Request.HasFormContentType)
+            {
+                try
+                {
+                    var form = await HttpContext.Request.ReadFormAsync();
+                    var files = form.Files.Where(file => file != null).ToList();
+                    if (files.Count > 0)
+                    {
+                        NetworkTrafficObservabilityService.AnnotateTransfer(
+                            HttpContext,
+                            "Upload",
+                            files.Count,
+                            files.Sum(file => Math.Max(0L, file.Length)),
+                            files.Select(file => file.FileName),
+                            files.Select(file => System.IO.Path.GetExtension(file.FileName)));
+                    }
+                }
+                catch
+                {
+                    // 观测是旁路；格式错误继续交由 UEditor/HDFS 原实现返回。
+                }
+            }
+
+            var service = HttpContext.RequestServices.GetRequiredService<UEditorService>();
+            var response = await service.UploadAndGetResponseAsync(HttpContext, Path);
+            return Content(response.Result, response.ContentType);
+        }
+
         private async Task<DosResult> DefaultParam(DiyUploadParam param)
         {
             CurrentToken currentTokenDynamic;
@@ -543,6 +588,8 @@ namespace Microi.net.Api
         /// <returns></returns>
         [Consumes("application/json", "multipart/form-data")]
         [HttpPost]
+        // 仅兼容最早期移动端的 POST /api/Upload；实现仍只有这一份 HDFS 安全链路。
+        [HttpPost("~/api/Upload")]
         public async Task<JsonResult> Upload(DiyUploadParam param)
         {
             var accessError = await DefaultParam(param);

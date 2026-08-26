@@ -116,9 +116,21 @@ test('backend upgrade auto-installs the identity package while password login st
     path.join(directory, '..', '..', 'Microi.net.Api', 'Controllers', 'SysUserController.cs'),
     'utf8'
   );
-  assert.match(upgrade, /Version = "6\.4\.11\.0"/);
+  const compatibilityController = fs.readFileSync(
+    path.join(directory, '..', '..', 'Microi.net.Api', 'Controllers', 'LegacyMobileCompatibilityController.cs'),
+    'utf8'
+  );
+  const upgradeVersion = upgrade.match(/public static string Version = "(\d+)\.(\d+)\.(\d+)\.(\d+)"/);
+  assert.ok(upgradeVersion, 'UpgradeAppStore must keep a parseable four-part version gate');
+  const versionParts = upgradeVersion.slice(1).map(Number);
+  assert.ok(
+    versionParts[0] > 6
+      || (versionParts[0] === 6 && versionParts[1] > 4)
+      || (versionParts[0] === 6 && versionParts[1] === 4 && versionParts[2] >= 11),
+    `UpgradeAppStore version ${upgradeVersion[1]}.${upgradeVersion[2]}.${upgradeVersion[3]}.${upgradeVersion[4]} predates the identity package gate`,
+  );
   assert.match(upgrade, /SaaSEnginePackageResourceName/);
   assert.match(upgrade, /InstallUpgradePackage\(osClient, msgs, SaaSEnginePackageResourceName/);
   assert.match(controller, /var result = await _sysUserLogic\.Login\(param\)/);
-  assert.match(controller, /RunAsync\(\s*"platform_auth_sms_login"/);
+  assert.match(compatibilityController, /RunAsync\(\s*"platform_auth_sms_login"/);
 });

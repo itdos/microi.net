@@ -1668,8 +1668,9 @@ test("legacy databases receive application-store bootstrap columns before upgrad
   assert.match(upgradeSource, /EnsureColumn\(osClientSecret,\s*"diy_field",\s*"TableName",\s*"varchar\(255\)"\)/);
   assert.match(upgradeSource, /EnsureStringColumnCapacity\(osClientSecret,\s*"diy_field",\s*"TableName",\s*255\)/);
   assert.match(upgradeSource, /INNER JOIN `diy_table` dt ON dt\.`Id`=df\.`TableId`/);
-  assert.match(apiProgramSource, /const int maxAttempts = 3;/);
-  assert.match(apiProgramSource, /const int retrySeconds = 10;/);
+  assert.match(apiProgramSource, /services\.AddMicroiUpgrade\(\);/);
+  assert.match(apiProgramSource, /await builder\.RunMicroiApiAsync\(host\);/);
+  assert.doesNotMatch(apiProgramSource, /const int maxAttempts|const int retrySeconds/);
   assert.doesNotMatch(apiProgramSource, /License:RestoreMaxAttempts|License:RestoreRetrySeconds/);
   assert.doesNotMatch(apiProgramSource, /MICROI_LICENSE_RESTORE_/);
 });

@@ -317,14 +317,27 @@ function validateReleaseCandidate(name, content) {
       }
     }
     if (name === 'app.microi.saas-engine.json') {
-      for (const key of ['platform-create-tenant', 'platform-external-login-binding', 'platform-wechat-user-binding', 'platform-service-health', 'microi-init']) {
+      for (const key of [
+        'platform-create-tenant',
+        'platform-external-login-binding',
+        'platform-wechat-user-binding',
+        'platform-service-health',
+        'microi-init',
+        'mci-system-observability-action',
+        'platform-data-source-run',
+        'platform-module-data',
+        'platform-ocr-recognize',
+        'platform-office-export-word-by-template',
+        'platform-translate-runtime',
+        'platform-user-behavior-signal',
+      ]) {
         if (!packageEngineMap.has(key)) throw new Error(`${name} 缺少 ${key}。`);
       }
       for (const duplicateKey of ['platform-user-update-preferences', 'platform-sys-user-admin', 'platform-sys-menu']) {
         if (packageEngineMap.has(duplicateKey)) throw new Error(`${name} 仍包含应由其他官方应用唯一交付的 ${duplicateKey}。`);
       }
-      if (semanticNumber(packageModel?.PackageInfo?.Version) < 7_006_018) {
-        throw new Error(`${name} 低于 v7.6.18。`);
+      if (semanticNumber(packageModel?.PackageInfo?.Version) < 7_007_001) {
+        throw new Error(`${name} 低于 v7.7.1。`);
       }
       const serviceHealth = packageEngineMap.get('platform-service-health');
       const serviceHealthCode = String(serviceHealth?.ApiV8Code || '');
@@ -343,6 +356,31 @@ function validateReleaseCandidate(name, content) {
         || !requiredCapabilities.includes('V8.Method.GetBackendVersion')
         || !requiredCapabilities.includes('ApiEngine:platform-service-health')) {
         throw new Error(`${name} 缺少固定匿名服务健康与后端版本契约。`);
+      }
+      const controllerSlimFacades = new Map([
+        ['mci-system-observability-action', 'V8.Method.ManageSystemObservability'],
+        ['platform-data-source-run', 'V8.Method.RunDataSourceEngine'],
+        ['platform-module-data', 'V8.Method.RunModuleEngine'],
+        ['platform-ocr-recognize', 'V8.OCR.Recognize'],
+        ['platform-office-export-word-by-template', 'V8.Method.ExportWordByTemplate'],
+        ['platform-translate-runtime', 'V8.TranslateEngine'],
+        ['platform-user-behavior-signal', 'V8.Method.TrackUserBehavior'],
+      ]);
+      for (const [key, runtimeMarker] of controllerSlimFacades) {
+        const engine = packageEngineMap.get(key);
+        const source = String(engine?.ApiV8Code || '');
+        if (Number(engine?.IsEnable) !== 1
+          || Number(engine?.StopHttp) !== 0
+          || packageModel?.ResourcePolicies?.ApiEngines?.[key]?.UpgradePolicy !== 'Managed'
+          || !source.includes(runtimeMarker)
+          || !source.includes('platform-runtime-custom-hook')
+          || !requiredCapabilities.includes(`ApiEngine:${key}`)) {
+          throw new Error(`${name} 缺少 Controller 瘦身托管接口契约：${key}。`);
+        }
+      }
+      const officeFacade = packageEngineMap.get('platform-office-export-word-by-template');
+      if (Number(officeFacade?.ResponseFile) !== 1 || String(officeFacade?.ResponseType) !== 'File') {
+        throw new Error(`${name} 的 Word 模板接口必须保持文件响应契约。`);
       }
       const legacyInit = packageEngineMap.get('microi-init');
       const legacyInitCode = String(legacyInit?.ApiV8Code || '');

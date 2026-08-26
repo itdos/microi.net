@@ -1,6 +1,6 @@
 ---
 name: ocr-engine
-description: 为 Microi 吾码集成、配置、调用和验收通用 OCR 能力。处理 V8.OCR、/api/ocr、PaddleX/PaddleOCR 服务、SaaS 租户 OCR 配置、图片或 PDF 文字识别、OCR 安全边界、Docker 部署和多节点交付时使用。
+description: 为 Microi 吾码集成、配置、调用和验收通用 OCR 能力。处理 V8.OCR、/apiengine/platform-ocr-recognize、PaddleX/PaddleOCR 服务、SaaS 租户 OCR 配置、图片或 PDF 文字识别、OCR 安全边界、Docker 部署和多节点交付时使用。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -17,7 +17,7 @@ description: 为 Microi 吾码集成、配置、调用和验收通用 OCR 能力
 
 ## 固定架构
 
-Microi 后端只实现统一 OCR 网关、租户隔离、协议适配和安全治理，不在 .NET 进程内训练或维护 OCR 模型。默认提供方为独立部署的 PaddleX OCR 服务；业务代码只能调用 `IMicroiOcr`、`V8.OCR` 或 `/api/ocr/recognize`，不得直接读取 SaaS 密钥并自行拼接 HTTP 请求。
+Microi 后端只实现统一 OCR 网关、租户隔离、协议适配和安全治理，不在 .NET 进程内训练或维护 OCR 模型。默认提供方为独立部署的 PaddleX OCR 服务；业务代码只能调用 `IMicroiOcr`、`V8.OCR` 或官方 Managed 接口 `/apiengine/platform-ocr-recognize`，不得直接读取 SaaS 密钥并自行拼接 HTTP 请求。
 
 同步识别必须绑定当前请求和当前租户。批量、超大文件或长耗时 OCR 应进入共享数据库/MQ/outbox，以全局任务 Id 做幂等；不得把任务状态、队列或锁只放在单机内存中。
 
@@ -68,7 +68,7 @@ return {
 };
 ```
 
-ASP.NET 客户端调用 `POST /api/ocr/recognize`，请求体与 `V8.OCR.Recognize` 一致，并携带正常登录 Token。`OsClient` 以 Token 解析结果为准。
+已登录客户端调用 `POST /apiengine/platform-ocr-recognize`，请求体与 `V8.OCR.Recognize` 一致，并携带正常登录 Token。`OsClient` 以 Token 解析结果为准。该接口由官方应用以 `Managed` 策略恢复；个性化逻辑只能写入租户 `platform-runtime-custom-hook`，且官方接口不会把文件 Base64、识别原文或密钥传给 Hook。
 
 标准成功结果包含 `Provider`、`Text`、`Pages`、`ElapsedMilliseconds`。每页包含 `PageIndex`、`Text`、`Regions`，每个区域包含 `Text`、`Confidence` 和归一化后的 `Polygon`。
 

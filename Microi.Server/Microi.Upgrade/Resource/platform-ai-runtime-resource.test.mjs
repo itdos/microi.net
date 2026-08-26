@@ -11,9 +11,13 @@ const packageModel = JSON.parse(fs.readFileSync(
   path.join(directory, 'app.microi.ai-engine.json'),
   'utf8',
 ));
-const controller = fs.readFileSync(path.join(
+const nativeController = fs.readFileSync(path.join(
   serverRoot,
   'Microi.net.Api', 'Controllers', 'AiController.cs',
+), 'utf8');
+const compatibilityController = fs.readFileSync(path.join(
+  serverRoot,
+  'Microi.net.Api', 'Controllers', 'LegacyMobileCompatibilityController.cs',
 ), 'utf8');
 const aiInterface = fs.readFileSync(path.join(
   serverRoot,
@@ -123,7 +127,7 @@ test('all non-stream actions call only V8.AI and expose a three-field safe hook 
   }
 });
 
-test('legacy Controller methods are compatibility forwards while native boundaries remain native', () => {
+test('legacy AI JSON routes are centralized while native protocol boundaries remain in Microi.AI', () => {
   for (const action of [
     'UpdateConversationTitle',
     'RecognizeIntent',
@@ -132,15 +136,22 @@ test('legacy Controller methods are compatibility forwards while native boundari
     'NL2V8EngineSync',
   ]) {
     assert.match(
-      controller,
-      new RegExp(`Task<JsonResult> ${action}\\b[\\s\\S]{0,1300}RunAiRuntimeCompatibilityAsync\\(\\s*"${action}"`),
+      compatibilityController,
+      new RegExp(`/api/Ai/${action}`),
+      action,
+    );
+    assert.doesNotMatch(
+      nativeController,
+      new RegExp(`public\\s+(?:async\\s+)?[^\\n]+\\s${action}\\s*\\(`),
       action,
     );
   }
-  assert.match(controller, /Task ChatStream[\s\S]{0,1800}_microiAi\.ChatStreamWithContextAsync/);
-  assert.match(controller, /Task NL2V8Engine\([\s\S]{0,2200}_microiAi\.NL2V8Engine/);
-  assert.match(controller, /GetNl2SqlPolicyTableOptions[\s\S]{0,600}_microiAi\.GetNl2SqlPolicyTableOptionsAsync/);
-  assert.match(controller, /ProxyChatStream[\s\S]{0,1400}_proxyService\.ExecuteAuthenticatedStreamAsync/);
+  assert.match(compatibilityController, /AiPlatformRuntimeEngineKey\s*=\s*"platform-ai-runtime"/);
+  assert.match(compatibilityController, /RunLegacyAiCompatibilityAsync/);
+  assert.match(nativeController, /Task ChatStream[\s\S]{0,1800}_microiAi\.ChatStreamWithContextAsync/);
+  assert.match(nativeController, /Task NL2V8Engine\([\s\S]{0,2200}_microiAi\.NL2V8Engine/);
+  assert.match(nativeController, /GetNl2SqlPolicyTableOptions[\s\S]{0,600}_microiAi\.GetNl2SqlPolicyTableOptionsAsync/);
+  assert.match(nativeController, /ProxyChatStream[\s\S]{0,1400}_proxyService\.ExecuteAuthenticatedStreamAsync/);
 });
 
 test('V8.AI title atom binds current tenant and current user', () => {

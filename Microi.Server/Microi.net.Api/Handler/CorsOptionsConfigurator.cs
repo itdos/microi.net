@@ -5,6 +5,7 @@ using Microi.net;
 using Dos.Common;
 using System.Text.RegularExpressions;
 
+// ASP.NET Core CORS 宿主配置。
 namespace Microi.net.Api;
 
 public class CorsOptionsConfigurator : IConfigureNamedOptions<CorsOptions>

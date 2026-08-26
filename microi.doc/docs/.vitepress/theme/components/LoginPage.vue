@@ -43,7 +43,7 @@
             </svg>
           </div>
           <h1 class="brand-title">Micro<span class="brand-i">i</span>吾码</h1>
-          <p class="brand-subtitle">开源 AI 低代码平台</p>
+          <p class="brand-subtitle">开源 AI 开发框架</p>
           <div class="brand-features">
             <div v-for="feature in brandFeatures" :key="feature" class="feature-item">
               <span class="feature-dot"></span>
@@ -356,11 +356,11 @@ let tenantProgressTraceId = ''
 let openClawAuthBridge = null
 
 const brandFeatures = [
-  'AI 引擎 · 智能数据分析与编程',
-  'API 接口引擎 · 在线编写后端接口',
-  '工作流引擎 · 可视化流程设计',
-  '多数据库 · MySQL / SqlServer / Oracle',
-  '分布式架构 · Docker / K8S / 微服务'
+  '20+ 成熟引擎 · 开箱即用',
+  'AI 低代码 · Token 更省 10 倍+',
+  'V8 引擎 · 业务逻辑保存即生效',
+  '微服务 · .NET / Vue 深度扩展',
+  '典型场景 · 开发速度提升 10 倍+'
 ]
 
 const defaultTenantSteps = [

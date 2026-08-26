@@ -17,6 +17,7 @@ using Microsoft.OpenApi;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
+// ASP.NET Core 宿主组合与传输管线。
 namespace Microi.net.Api;
 
 /// <summary>

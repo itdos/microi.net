@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 const SITE_URL = 'https://www.microi.net'
 const SHARE_IMAGE = `${SITE_URL}/home2.jpg`
-const ZH_BASE_KEYWORDS = ['Microi吾码', '开源低代码平台', 'AI低代码', 'V8引擎', '企业应用开发', '.NET10', 'Vue3']
+const ZH_BASE_KEYWORDS = ['Microi吾码', '开源 AI 开发框架', '开源 AI 应用开发平台', 'AI低代码', '20+成熟引擎', '微服务', 'V8引擎', 'AI开发省Token', 'AI开发提速', '.NET10', 'Vue3']
 const EN_BASE_KEYWORDS = ['Microi', 'open-source low-code platform', 'AI low-code', 'V8 engine', 'enterprise application development', '.NET10', 'Vue3']
 
 function cleanText(value) {
@@ -46,9 +46,9 @@ function ensureSeoDescription(pageData, ctx) {
   const explicit = cleanText(pageData.frontmatter?.description)
   const summary = explicit || sourceSummary(pageData, ctx)
   const suffix = en
-    ? 'Microi open-source low-code platform documentation covering AI development and the V8 engine.'
-    : 'Microi吾码开源低代码平台官方资料，涵盖 AI 开发与 V8引擎实践。'
-  // 核心产品语义放在摘要前部，避免正文摘要截断后丢失低代码、AI、V8引擎关键词。
+    ? 'Microi open-source AI development framework documentation covering 20+ engines, AI low-code, microservices, and V8.'
+    : 'Microi吾码开源 AI 开发框架官方资料，聚焦 20+ 成熟引擎、AI 低代码、微服务与 V8 引擎。'
+  // 核心产品语义放在摘要前部，避免正文摘要截断后丢失框架、AI、低代码、微服务与 V8 引擎关键词。
   const combined = summary
     ? `${title} — ${suffix} ${summary}`
     : `${title} — ${suffix}`
@@ -96,6 +96,9 @@ export function createSeoHead(context) {
   const keywords = unique([title, ...headerKeywords, ...pathKeywords, ...(en ? EN_BASE_KEYWORDS : ZH_BASE_KEYWORDS)]).join(',')
   const isDoc = /(^|\/)doc\//.test(String(pageData.relativePath || ''))
   const robots = pageData.isNotFound ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
+  const about = en
+    ? ['Open-source AI development framework', 'AI low-code', 'Microservices', 'V8 Engine', '20+ mature engines']
+    : ['开源 AI 开发框架', 'AI 低代码', '微服务', 'V8 引擎', '20+ 成熟引擎']
   const structuredData = isDoc ? {
     '@context': 'https://schema.org',
     '@type': 'TechArticle',
@@ -103,7 +106,7 @@ export function createSeoHead(context) {
     description,
     url: canonical,
     inLanguage: en ? 'en-US' : 'zh-CN',
-    about: ['Low-code', 'Artificial Intelligence', 'V8 Engine'],
+    about,
     publisher: { '@type': 'Organization', name: 'Microi吾码', url: SITE_URL, logo: { '@type': 'ImageObject', url: `${SITE_URL}/icon.png` } }
   } : {
     '@context': 'https://schema.org',

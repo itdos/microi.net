@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
+using Microi.net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -16,7 +17,7 @@ using StackExchange.Redis;
 
 namespace Microi.net.Api
 {
-    public sealed partial class SsoController
+    public sealed partial class SsoProtocolGatewayController
     {
         private sealed class ValidatedProviderSession
         {

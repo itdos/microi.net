@@ -612,7 +612,7 @@ async function requestFieldOptions(field, form, options = {}) {
     return post('/api/FormEngine/GetDiyFieldSqlData', common, true)
   }
   if (dataSource === 'DataSource' && config.DataSourceId) {
-    return post('/api/DataSourceEngine/Run', { ...common, DataSourceKey: config.DataSourceId }, true)
+    return post('/apiengine/platform-data-source-run', { ...common, DataSourceKey: config.DataSourceId }, true)
   }
   if (dataSource === 'ApiEngine' && config.DataSourceApiEngineKey) {
     return V8.ApiEngine.Run(config.DataSourceApiEngineKey, common, { checkCode: false })

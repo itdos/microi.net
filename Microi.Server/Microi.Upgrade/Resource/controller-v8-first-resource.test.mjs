@@ -8,6 +8,7 @@ const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(resourceDir, '..', '..', '..');
 const serverRoot = path.join(repoRoot, 'Microi.Server');
 const apiControllerDir = path.join(serverRoot, 'Microi.net.Api', 'Controllers');
+const apiHandlerDir = path.join(serverRoot, 'Microi.net.Api', 'Handler');
 const read = (file) => fs.readFileSync(file, 'utf8').replaceAll('\r\n', '\n');
 const resources = {
   external: read(path.join(resourceDir, 'platform-external-login-binding.js')),
@@ -343,10 +344,10 @@ test('tenant hook failures are returned and block each Before stage', () => {
 test('controllers use fixed Managed keys while protocol and transport shells remain in C#', () => {
   const external = read(path.join(apiControllerDir, 'ExternalLoginController.cs'));
   const wechat = read(path.join(apiControllerDir, 'WeChatController.cs'));
-  const chat = read(path.join(apiControllerDir, 'DiyChatController.cs'));
+  const chat = read(path.join(apiControllerDir, 'LegacyMobileCompatibilityController.cs'));
   const marketplace = read(path.join(apiControllerDir, 'MarketplaceSourceController.cs'));
-  const chatHub = read(path.join(serverRoot, 'Microi.net.Api', 'Handler', 'DiyWebSocket.cs'));
-  const bridge = read(path.join(serverRoot, 'Microi.net.Api', 'Handler', 'ManagedApiEngineCompatibility.cs'));
+  const chatHub = read(path.join(apiHandlerDir, 'DiyWebSocket.cs'));
+  const bridge = read(path.join(serverRoot, 'Microi.Core', 'ApiEngine', 'ManagedApiEngineCompatibility.cs'));
   const trustedContext = read(path.join(serverRoot, 'Microi.Core', 'Runtime', 'V8TrustedExecutionContext.cs'));
   const publicApiEngine = read(path.join(serverRoot, 'Microi.Core', 'ApiEngine', 'IApiEngine.cs'));
   const hostRunner = read(path.join(serverRoot, 'Microi.Core', 'ApiEngine', 'IManagedApiEngineCompatibilityRunner.cs'));
@@ -371,7 +372,7 @@ test('controllers use fixed Managed keys while protocol and transport shells rem
 
   assert.match(chat, /SystemMessageApiEngineKey = "platform-chat-system-message"/);
   assert.match(chat, /ManagedApiEngineCompatibility\.RunAsync\(/);
-  assert.match(chat, /diyWebSocket\.DeliverPreparedMessageAsync\(/);
+  assert.match(chat, /new DiyWebSocket\(null\)\.DeliverPreparedMessageAsync\(/);
   assert.doesNotMatch(chat, /diyWebSocket\.SendToUser\(msgParam\)/);
   assert.doesNotMatch(chat, /FormEngine\.GetFormData/);
 

@@ -8,10 +8,11 @@ using Lazy.Captcha.Core;
 using System.Text;
 using System.Security.Cryptography;
 using Microi.net;
+// ASP.NET Core 登录/DiyToken 启动协议适配器；普通用户业务由官方 Managed ApiEngine 承载。
 namespace Microi.net.Api
 {
     /// <summary>
-    /// 
+    /// 兼容旧客户端的密码、验证码与 DiyToken 启动协议入口。
     /// </summary>
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]

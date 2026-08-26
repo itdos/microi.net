@@ -275,6 +275,30 @@ namespace Microi.net
         DosResult ManageSystemObservability(dynamic dynamicParam);
 
         /// <summary>
+        /// 仅供官方 Managed 接口运行数据源：固定当前租户与可信用户，
+        /// 并继续执行访问密钥的数据源白名单校验。
+        /// </summary>
+        DosResult RunDataSourceEngine(dynamic dynamicParam);
+
+        /// <summary>
+        /// 仅供官方 Managed 接口运行模块查询：动作采用白名单，身份、租户和
+        /// Client 调用标记由可信宿主写入，不能由浏览器覆盖。
+        /// </summary>
+        dynamic RunModuleEngine(dynamic dynamicParam);
+
+        /// <summary>
+        /// 仅供官方 Managed 文件响应接口按模板导出 Word；读取权限在宿主中
+        /// 重新校验，接口引擎只负责可升级编排和文件响应。
+        /// </summary>
+        DosResult ExportWordByTemplate(dynamic dynamicParam);
+
+        /// <summary>
+        /// 仅供官方 Managed 接口记录白名单内的客户端行为信号；会话、终端、
+        /// 租户与用户均从可信 DiyToken 上下文解析。
+        /// </summary>
+        DosResult TrackUserBehavior(dynamic dynamicParam);
+
+        /// <summary>
         /// 返回当前用户“我的工作”统一统计。宿主并行执行独立计数并复用强类型
         /// 抄送读取逻辑，接口引擎仅负责缓存与展示编排。
         /// </summary>

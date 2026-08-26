@@ -15,6 +15,13 @@ const requiredKeys = [
   'platform-sys-user-public-info',
   'platform-login-wallpapers',
   'microi-init',
+  'mci-system-observability-action',
+  'platform-data-source-run',
+  'platform-module-data',
+  'platform-ocr-recognize',
+  'platform-office-export-word-by-template',
+  'platform-translate-runtime',
+  'platform-user-behavior-signal',
 ];
 
 test('SaaS package carries the complete platform runtime upgrade set', async () => {
@@ -27,6 +34,12 @@ test('SaaS package carries the complete platform runtime upgrade set', async () 
     `SaaS package must be at least v7.5.46, got ${packageModel.PackageInfo.Version}`,
   );
   assert.equal(packageModel.PackageInfo.ApiEngineCount, packageModel.SysApiEngines.length);
+  assert.ok(
+    version[0] > 7
+      || (version[0] === 7 && version[1] > 6)
+      || (version[0] === 7 && version[1] === 7 && version[2] >= 1),
+    `controller slimming package must be at least v7.7.1, got ${packageModel.PackageInfo.Version}`,
+  );
 
   for (const key of requiredKeys) {
     const engines = packageModel.SysApiEngines.filter(item => item.ApiEngineKey === key);

@@ -11,11 +11,11 @@ using System;
 using System.Net.Http;
 using System.Text;
 
+// ASP.NET Core 授权协议适配器；不在宿主入口项目承载租户可变业务。
 namespace Microi.net.Api
 {
     /// <summary>
     /// License授权管理
-    /// 
     /// 同一套代码部署在两种服务器上：
     /// - License服务器（有私钥）：Apply/Issue/Check/Revoke 等数据库操作可用
     /// - 客户服务器（无私钥）：状态查询可用；申请代理、重新验证、写入文件由主租户登录态控制

@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using Dos.Common;
+using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
@@ -13,7 +14,7 @@ using StackExchange.Redis;
 
 namespace Microi.net.Api
 {
-    public sealed partial class SsoController
+    public sealed partial class SsoProtocolGatewayController
     {
         private sealed class CasTicketPayload
         {

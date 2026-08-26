@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json.Linq;
 
+// ASP.NET Core 接口引擎实时传输适配层。
 namespace Microi.net
 {
     /// <summary>

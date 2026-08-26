@@ -3,8 +3,11 @@ using Lazy.Captcha.Core;
 using Microi.net;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.IO;
 using System.Threading.Tasks;
 
+// ASP.NET Core 协议适配器；不在宿主入口项目承载租户可变业务。
 namespace Microi.net.Api
 {
     /// <summary>

@@ -5,15 +5,40 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
+const serverDirectory = path.resolve(directory, '..');
 const controllerDirectory = path.join(directory, 'Controllers');
+const legacyControllerPath = path.join(controllerDirectory, 'LegacyMobileCompatibilityController.cs');
 const catalog = JSON.parse(fs.readFileSync(path.join(directory, 'api-ownership-catalog.json'), 'utf8'));
 
-function controllerClasses() {
+function protocolSource(entry) {
+  return path.join(serverDirectory, entry.Project, ...entry.Source.split('/'));
+}
+
+function controllerClasses(root = controllerDirectory) {
   const classes = new Set();
-  for (const file of fs.readdirSync(controllerDirectory).filter((name) => name.endsWith('.cs'))) {
-    const source = fs.readFileSync(path.join(controllerDirectory, file), 'utf8');
+  for (const file of fs.readdirSync(root).filter((name) => name.endsWith('.cs'))) {
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
     for (const match of source.matchAll(/\bclass\s+([A-Za-z0-9_]+Controller)\b/g)) classes.add(match[1]);
   }
+  return [...classes].sort();
+}
+
+function allServerControllerClasses() {
+  const classes = new Set();
+  const visit = (root) => {
+    for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+      if (entry.isDirectory() && ['.git', 'bin', 'obj'].includes(entry.name)) continue;
+      const absolute = path.join(root, entry.name);
+      if (entry.isDirectory()) visit(absolute);
+      else if (entry.isFile() && entry.name.endsWith('.cs')) {
+        const source = fs.readFileSync(absolute, 'utf8');
+        for (const match of source.matchAll(/\bclass\s+([A-Za-z0-9_]+Controller)\b/g)) {
+          classes.add(match[1]);
+        }
+      }
+    }
+  };
+  visit(serverDirectory);
   return [...classes].sort();
 }
 
@@ -28,12 +53,15 @@ function supportFiles() {
       else if (entry.isFile() && entry.name.endsWith('.cs')) files.push(childRelative);
     }
   };
-  for (const root of roots) visit(path.join(directory, root), root);
+  for (const root of roots) {
+    const absolute = path.join(directory, root);
+    if (fs.existsSync(absolute)) visit(absolute, root);
+  }
   return files.sort();
 }
 
 function csharpMethodBody(source, methodName) {
-  const match = new RegExp(`public\\s+async\\s+Task<JsonResult>\\s+${methodName}\\s*\\(`).exec(source);
+  const match = new RegExp(`public\\s+(?:async\\s+)?Task<JsonResult>\\s+${methodName}\\s*\\(`).exec(source);
   assert.ok(match, `${methodName} method was not found`);
   const bodyStart = source.indexOf('{', match.index);
   assert.ok(bodyStart >= 0, `${methodName} body was not found`);
@@ -47,13 +75,72 @@ function csharpMethodBody(source, methodName) {
 
 test('every native Controller has an explicit owner and disposition', () => {
   const discovered = controllerClasses();
-  const declared = Object.keys(catalog.Controllers).sort();
+  const declared = [...Object.keys(catalog.Controllers), ...Object.keys(catalog.ProtocolGateways)].sort();
   assert.deepEqual(declared, discovered);
   const validDispositions = new Set(Object.keys(catalog.Dispositions));
-  for (const [name, entry] of Object.entries(catalog.Controllers)) {
+  for (const [name, entry] of Object.entries({ ...catalog.Controllers, ...catalog.ProtocolGateways })) {
     assert.ok(entry.OwnerId, `${name} has no owner`);
-    assert.ok(['Application', 'HostKernel'].includes(entry.OwnerType), `${name} owner type is invalid`);
+    assert.ok(['Application', 'HostKernel', 'Compatibility'].includes(entry.OwnerType), `${name} owner type is invalid`);
     assert.ok(validDispositions.has(entry.Disposition), `${name} disposition is invalid`);
+    assert.notEqual(
+      entry.Disposition,
+      'ManagedBusinessFacade',
+      `${name} 已整体迁入接口引擎时必须删除旧 Controller，不能继续留在 API 目录`,
+    );
+  }
+});
+
+test('all Controller sources stay in Microi.net.Api and class libraries keep their original target frameworks', () => {
+  assert.equal(fs.existsSync(path.join(serverDirectory, 'Microi.AspNetCore')), false);
+  assert.equal(fs.existsSync(path.join(serverDirectory, 'Microi.SSO')), false);
+  assert.deepEqual(
+    [...Object.keys(catalog.Controllers), ...Object.keys(catalog.ProtocolGateways)].sort(),
+    allServerControllerClasses(),
+    '所有 Controller 源码必须只存在于 Microi.net.Api/Controllers，并在归属清单中声明用途',
+  );
+  for (const [name, entry] of Object.entries(catalog.ProtocolGateways)) {
+    assert.equal(entry.Project, 'Microi.net.Api', `${name} Controller source must remain in Microi.net.Api`);
+    assert.match(entry.Source, /^Controllers\//, `${name} must live under the API Controllers directory`);
+    assert.ok(entry.Source, `${name} has no source path`);
+    const sourcePath = protocolSource(entry);
+    assert.equal(fs.existsSync(sourcePath), true, `${name} source is missing: ${sourcePath}`);
+    assert.match(
+      fs.readFileSync(sourcePath, 'utf8'),
+      new RegExp(`\\bclass\\s+${name}\\b`),
+      `${name} source does not declare its gateway`,
+    );
+  }
+  assert.equal(catalog.SupportDirectories.TargetProject, 'Microi.net.Api');
+  const hostSource = fs.readFileSync(path.join(directory, 'Hosting', 'MicroiApiHostExtensions.cs'), 'utf8');
+  assert.doesNotMatch(hostSource, /AddApplicationPart\(/);
+  for (const project of ['Microi.net', 'Microi.AI', 'Microi.Captcha', 'Microi.WeChat']) {
+    const projectFile = fs.readFileSync(path.join(serverDirectory, project, `${project}.csproj`), 'utf8');
+    assert.doesNotMatch(projectFile, /netstandard2\.1\s*;\s*net10\.0/);
+    assert.doesNotMatch(projectFile, /Hosting[\\/]AspNetCore/);
+  }
+  assert.doesNotMatch(
+    fs.readFileSync(path.join(serverDirectory, 'Microi.net.sln'), 'utf8')
+      + fs.readFileSync(path.join(directory, 'Microi.net.Api.csproj'), 'utf8'),
+    /Microi\.AspNetCore/,
+  );
+});
+
+test('every migrated or merged Controller remains physically deleted', () => {
+  const controllerSources = fs.readdirSync(controllerDirectory)
+    .filter((name) => name.endsWith('.cs'))
+    .map((name) => fs.readFileSync(path.join(controllerDirectory, name), 'utf8'))
+    .join('\n');
+  for (const controllerName of Object.keys(catalog.MigratedControllers)) {
+    assert.doesNotMatch(
+      controllerSources,
+      new RegExp(`\\bclass\\s+${controllerName}\\b`),
+      `${controllerName} 已迁移或合并，不得重新出现在 Microi.net.Api/Controllers`,
+    );
+    assert.equal(
+      fs.existsSync(path.join(controllerDirectory, `${controllerName}.cs`)),
+      false,
+      `${controllerName}.cs 已迁移或合并，旧文件必须物理删除`,
+    );
   }
 });
 
@@ -63,7 +150,11 @@ test('every support-directory C# file has an explicit audited API boundary', () 
     supportFiles(),
   );
   for (const [source, migration] of Object.entries(catalog.MigratedSupportCode)) {
-    assert.ok(['MovedCore', 'Deleted'].includes(migration.Disposition), `${source} disposition is invalid`);
+    assert.ok(
+      ['MovedCore', 'MovedLibrary', 'MovedPlugin', 'MovedTransport', 'MovedUpgrade', 'Deleted']
+        .includes(migration.Disposition),
+      `${source} disposition is invalid`,
+    );
     assert.equal(fs.existsSync(path.join(directory, source)), false, `${source} must not remain in API`);
     if (migration.Disposition === 'MovedCore') {
       assert.ok(migration.Target?.startsWith('Microi.Core/'), `${source} must identify its Core target`);
@@ -76,17 +167,26 @@ test('every support-directory C# file has an explicit audited API boundary', () 
   }
 });
 
-test('SSO native business actions stay deleted and the package owns orchestration', () => {
+test('SSO native business actions stay deleted while its thin protocol gateway remains in API', () => {
+  const apiSsoFiles = fs.readdirSync(controllerDirectory)
+    .filter((name) => name.startsWith('SsoController') && name.endsWith('.cs'));
+  assert.deepEqual(apiSsoFiles, [], '旧 SsoController 已拆分，不能恢复其可迁移业务动作');
+
   const ssoFiles = fs.readdirSync(controllerDirectory)
-    .filter((name) => name.startsWith('SsoController') && name.endsWith('.cs'))
+    .filter((name) => name.startsWith('SsoProtocolGatewayController') && name.endsWith('.cs'))
     .map((name) => fs.readFileSync(path.join(controllerDirectory, name), 'utf8'))
     .join('\n');
-  const userSource = fs.readFileSync(path.join(controllerDirectory, 'SysUserController.cs'), 'utf8');
+  const userSource = fs.readFileSync(protocolSource(catalog.ProtocolGateways.SysUserController), 'utf8');
+  assert.match(ssoFiles, /class\s+SsoProtocolGatewayController\s*:\s*Controller/);
+  assert.match(ssoFiles, /\[Route\("api\/Sso\/\[action\]"\)\]/);
+  assert.doesNotMatch(ssoFiles, /ServiceFilter\(typeof\(DiyFilter/);
   for (const action of ['Capabilities', 'LegacyCapabilities', 'CompleteLogin', 'RotateClientSecret']) {
     assert.doesNotMatch(ssoFiles, new RegExp(`public\\s+(?:async\\s+)?[^\\n]+\\s${action}\\s*\\(`));
   }
   assert.doesNotMatch(userSource, /\bSsoPengrui\s*\(/);
-  assert.equal(catalog.ActionOverrides.SsoController.ManagedApiEngines.length, 11);
+  assert.equal(catalog.ProtocolGateways.SsoProtocolGatewayController.Project, 'Microi.net.Api');
+  assert.equal(catalog.ActionOverrides.SsoProtocolGatewayController.ManagedApiEngines.length, 11);
+  assert.match(csharpMethodBody(ssoFiles, 'CompleteAuthorization'), /RequireUserTokenAsync\(\)/);
 });
 
 test('password login remains an application-independent bootstrap boundary', () => {
@@ -96,7 +196,10 @@ test('password login remains an application-independent bootstrap boundary', () 
 });
 
 test('five SysUser business actions are fixed Managed compatibility forwards', () => {
-  const controllerSource = fs.readFileSync(path.join(controllerDirectory, 'SysUserController.cs'), 'utf8');
+  const controllerSource = fs.readFileSync(
+    legacyControllerPath,
+    'utf8',
+  );
   const engineSource = fs.readFileSync(
     path.resolve(directory, '../Microi.Upgrade/Resource/platform-sys-user-admin.js'),
     'utf8',
@@ -105,7 +208,7 @@ test('five SysUser business actions are fixed Managed compatibility forwards', (
 
   assert.match(controllerSource, /SysUserAdminApiEngineKey\s*=\s*"platform-sys-user-admin"/);
   for (const action of actions) {
-    const entry = catalog.ActionOverrides[`SysUserController.${action}`];
+    const entry = catalog.ActionOverrides[`LegacyMobileCompatibilityController.${action}`];
     assert.ok(entry, `${action} has no action ownership entry`);
     assert.equal(entry.Target, 'app.microi.sys_user ApiEngine:platform-sys-user-admin');
     assert.equal(entry.TenantHook, 'ApiEngine:platform-user-custom-hook');
@@ -131,15 +234,13 @@ test('five SysUser business actions are fixed Managed compatibility forwards', (
 
 test('legacy platform facades have fixed Managed targets and measurable exit gates', () => {
   const expectedTargets = {
-    'OsController.GetOsClientByDomain': 'platform-os-client-by-domain',
-    'FormEngineController.GetSysConfig': 'platform-sys-config',
-    'FormEngineController.GetSysConfig_Compat': 'platform-sys-config',
-    'FormEngineController.GetLangBundle': 'platform-lang-bundle',
-    'FormEngineController.GetLoginWallpapers': 'platform-login-wallpapers',
-    'SysUserController.GetCurrentUser': 'platform-current-user',
-    'SysUserController.GetSysUserPublicInfo': 'platform-sys-user-public-info',
-    'HDFSController.GetPrivateFileUrl': 'platform-private-file-url',
-    'HDFSController.MallFileUrl': 'platform-private-file-url'
+    'LegacyMobileCompatibilityController.GetOsClientByDomain': 'platform-os-client-by-domain',
+    'LegacyMobileCompatibilityController.GetSysConfig': 'platform-sys-config',
+    'LegacyMobileCompatibilityController.GetLangBundle': 'platform-lang-bundle',
+    'LegacyMobileCompatibilityController.GetLoginWallpapers': 'platform-login-wallpapers',
+    'LegacyMobileCompatibilityController.GetCurrentUser': 'platform-current-user',
+    'LegacyMobileCompatibilityController.GetSysUserPublicInfo': 'platform-sys-user-public-info',
+    'LegacyMobileCompatibilityController.GetPrivateFileUrl': 'platform-private-file-url'
   };
   for (const [action, engineKey] of Object.entries(expectedTargets)) {
     const entry = catalog.ActionOverrides[action];
@@ -148,21 +249,27 @@ test('legacy platform facades have fixed Managed targets and measurable exit gat
     assert.match(entry.CompatibilityExitGate, /连续两个正式版本遥测为零/);
     assert.ok(entry.CompatibilityRoutes.length > 0);
   }
-  assert.equal(catalog.ActionOverrides['HDFSController.GetPrivateFileUrl'].AccessKeyScope, 'file:read');
-  assert.match(catalog.ActionOverrides['SysUserController.GetCurrentUser'].AccessKeyPolicy, /自省/);
+  assert.equal(
+    catalog.ActionOverrides['LegacyMobileCompatibilityController.GetPrivateFileUrl'].AccessKeyScope,
+    'file:read',
+  );
+  assert.match(
+    catalog.ActionOverrides['LegacyMobileCompatibilityController.GetCurrentUser'].AccessKeyPolicy,
+    /自省/,
+  );
 });
 
 test('second-stage business facades have one official owner and a tenant hook', () => {
   const expectedTargets = {
-    'SysUserController.CreateTenant': 'app.microi.saas-engine ApiEngine:platform-create-tenant',
-    'SysUserController.UpdateCurrentProfile': 'app.microi.sys_user ApiEngine:platform-user-update-profile',
-    'SysUserController.UpdateMyDefaultIndexUrl': 'app.microi.sys_user ApiEngine:platform-user-update-preferences',
-    'TenantSystemSettingsController.ListSaveDelete': 'app.microi.sys-config ApiEngine:platform-tenant-system-settings',
-    'AiController.PlatformAccountCompatibilityActions': 'app.microi.ai-engine ApiEngine:platform-ai-account',
-    'AiController.PlatformRuntimeCompatibilityActions': 'app.microi.ai-engine ApiEngine:platform-ai-runtime',
+    'LegacyMobileCompatibilityController.CreateTenant': 'app.microi.saas-engine ApiEngine:platform-create-tenant',
+    'LegacyMobileCompatibilityController.UpdateCurrentProfile': 'app.microi.sys_user ApiEngine:platform-user-update-profile',
+    'LegacyMobileCompatibilityController.UpdateMyDefaultIndexUrl': 'app.microi.sys_user ApiEngine:platform-user-update-preferences',
+    'LegacyMobileCompatibilityController.TenantSystemSettingsCompatibilityActions': 'app.microi.sys-config ApiEngine:platform-tenant-system-settings',
+    'LegacyMobileCompatibilityController.AiPlatformAccountCompatibilityActions': 'app.microi.ai-engine ApiEngine:platform-ai-account',
+    'LegacyMobileCompatibilityController.AiPlatformRuntimeCompatibilityActions': 'app.microi.ai-engine ApiEngine:platform-ai-runtime',
     'ExternalLoginController.BindingActions': 'app.microi.saas-engine ApiEngine:platform-external-login-binding',
     'WeChatController.BindSysUser': 'app.microi.saas-engine ApiEngine:platform-wechat-user-binding',
-    'DiyChatController.SendSystemMessage': 'app.microi.message-notification ApiEngine:platform-chat-system-message',
+    'LegacyMobileCompatibilityController.SendSystemMessage': 'app.microi.message-notification ApiEngine:platform-chat-system-message',
     'DiyWebSocket.OrdinaryChatActions': 'app.microi.message-notification ApiEngine:platform-chat-runtime',
     'MarketplaceSourceController.SourceActions': 'app.microi.store ApiEngine:platform-marketplace-source'
   };
@@ -175,7 +282,41 @@ test('second-stage business facades have one official owner and a tenant hook', 
     assert.ok(entry.NativeBoundary.length > 0, `${action} has no explicit native boundary`);
   }
 
-  assert.equal(catalog.Controllers.TenantSystemSettingsController.OwnerId, 'app.microi.sys-config');
+  assert.equal(catalog.ProtocolGateways.TenantSystemSettingsController.OwnerId, 'app.microi.sys-config');
+});
+
+test('migrated AI and tenant-setting JSON actions exist only in the unified compatibility Controller', () => {
+  const legacySource = fs.readFileSync(legacyControllerPath, 'utf8');
+  const aiSource = fs.readFileSync(protocolSource(catalog.ProtocolGateways.AiController), 'utf8');
+  const tenantSource = fs.readFileSync(
+    protocolSource(catalog.ProtocolGateways.TenantSystemSettingsController),
+    'utf8',
+  );
+  const groupedKeys = [
+    'LegacyMobileCompatibilityController.AiPlatformAccountCompatibilityActions',
+    'LegacyMobileCompatibilityController.AiPlatformRuntimeCompatibilityActions',
+    'LegacyMobileCompatibilityController.TenantSystemSettingsCompatibilityActions',
+  ];
+
+  for (const key of groupedKeys) {
+    for (const route of catalog.ActionOverrides[key].CompatibilityRoutes) {
+      assert.match(legacySource, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      const action = route.split('/').at(-1);
+      const oldSource = route.startsWith('/api/Ai/') ? aiSource : tenantSource;
+      assert.doesNotMatch(
+        oldSource,
+        new RegExp(`public\\s+(?:async\\s+)?[^\\n]+\\s${action}\\s*\\(`),
+        `${route} 已迁入接口引擎，只能由统一兼容 Controller 保留旧地址`,
+      );
+    }
+  }
+
+  for (const nativeAction of ['ChatStream', 'NL2V8Engine', 'SubAlipayNotify', 'OpenAIChatCompletions']) {
+    assert.match(aiSource, new RegExp(`public\\s+(?:async\\s+)?[^\\n]+\\s${nativeAction}\\s*\\(`));
+  }
+  for (const nativeAction of ['Save', 'Reveal', 'GetRevealChallenge', 'GetMapRuntime']) {
+    assert.match(tenantSource, new RegExp(`public\\s+(?:async\\s+)?[^\\n]+\\s${nativeAction}\\s*\\(`));
+  }
 });
 
 test('DiyWebSocket keeps only authenticated realtime/AI protocol boundaries', () => {

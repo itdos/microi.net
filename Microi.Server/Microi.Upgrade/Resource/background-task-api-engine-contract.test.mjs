@@ -51,7 +51,7 @@ test('application-store package delivers every startup endpoint and managed poli
       ],
     },
   ];
-  assert.equal(packageModel.PackageInfo.Version, 'v7.6.17');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.7.0');
   for (const dependency of dependencies) {
     const matches = packageModel.SysApiEngines.filter(
       item => item.ApiEngineKey === dependency.key,

@@ -9,6 +9,7 @@ using MySql.Data.MySqlClient;
 using Jint.Runtime;
 using System.IO;
 
+// ASP.NET Core 全局异常协议适配层。
 namespace Microi.net.Api
 {
     /// <summary>
