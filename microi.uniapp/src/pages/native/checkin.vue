@@ -56,7 +56,7 @@
 
         <view class="section form-section">
           <mci-visit-target-fields ref="targetFields" v-model:target-type="form.targetType"
-            v-model:target-name="form.name" v-model:target-id="targetId" />
+            v-model:target-name="form.name" v-model:target-id="targetId" query-scope="checkin" />
           <view class="field field--textarea">
             <view class="field-heading">
               <text class="field-label">现场备注</text>
