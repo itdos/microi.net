@@ -86,7 +86,7 @@
       <view class="safe-space"></view>
     </scroll-view>
 
-    <view class="floating-add" hover-class="floating-add--pressed" @tap="addTask"><text>＋</text></view>
+    <view v-if="canAddTask" class="floating-add" hover-class="floating-add--pressed" @tap="addTask"><text>＋</text></view>
 
     <view v-if="filterVisible" class="sheet-mask" @tap="filterVisible = false">
       <view class="filter-sheet" @tap.stop>
@@ -126,7 +126,8 @@
 
 <script>
 import { themeMixin } from '@/utils/theme.js'
-import { formatDateTime, openForm, scanDevice } from '@/platform/business-runtime.js'
+import { findMenu, formatDateTime, openForm, scanDevice } from '@/platform/business-runtime.js'
+import { canAddMenuRecord } from '@/platform/menu-permission.js'
 import { listReturnMixin } from '@/platform/list-return.js'
 import { getUser } from '@/utils/request.js'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
@@ -181,7 +182,10 @@ export default {
       changedListener: null,
       loadRequestId: 0,
       searchTimer: null,
-      taskListSessionKey: ''
+      taskListSessionKey: '',
+      currentUser: {},
+      taskMenuId: '',
+      taskPermissionReady: false
     }
   },
   computed: {
@@ -193,12 +197,15 @@ export default {
     typeOptions() { return Object.keys(this.typeCounts).map((name) => ({ name, count: this.typeCounts[name] })).filter((item) => item.name !== '换芯') },
     activeFilterCount() {
       return Number(Boolean(this.city)) + Number(this.dateField !== 'YujiSHSJ') + Number(this.orderType !== 'ASC') + Number(this.period === 'custom')
-    }
+    },
+    canAddTask() { return this.taskPermissionReady && canAddMenuRecord(this.taskMenuId, this.currentUser) }
   },
   onLoad(options) {
     if (options.customerId) this.customerId = decodeURIComponent(options.customerId)
     if (options.state) this.state = decodeURIComponent(options.state)
     const user = getUser() || {}
+    this.currentUser = user
+    this.loadTaskCreatePermission()
     this.taskListSessionKey = [
       'task-list:v2',
       user.Id || user.Account || 'guest',
@@ -217,6 +224,18 @@ export default {
   },
   methods: {
     taskStateClass,
+    async loadTaskCreatePermission(refresh = false) {
+      this.taskPermissionReady = false
+      this.currentUser = getUser() || {}
+      try {
+        const menu = await findMenu(['售后订单', '售后任务'], 'Diy_ShouhouDD', refresh)
+        this.taskMenuId = String(menu && menu.Id || '')
+      } catch (error) {
+        this.taskMenuId = ''
+      } finally {
+        this.taskPermissionReady = true
+      }
+    },
     shouldMciRetainListSession() { return !!this.taskListSessionKey },
     getMciListSnapshotKey() { return this.taskListSessionKey },
     getMciListAnchorConfig() { return { container: '.task-scroll', items: '.task-list-session-item' } },
@@ -424,7 +443,14 @@ export default {
       }
       this.mciNavigateToDetail(`/pages/task/map?mode=task&filters=${encodeURIComponent(JSON.stringify(filters))}`)
     },
-    addTask() { this.mciMarkDetailReturn(); openForm({ table: 'Diy_ShouhouDD', mode: 'Add', title: '新增售后任务', menuAliases: ['售后订单', '售后任务'] }) },
+    addTask() {
+      if (!this.canAddTask) {
+        uni.showToast({ title: '当前账号没有新增权限', icon: 'none' })
+        return
+      }
+      this.mciMarkDetailReturn()
+      openForm({ table: 'Diy_ShouhouDD', mode: 'Add', title: '新增售后任务', menuId: this.taskMenuId, menuAliases: ['售后订单', '售后任务'] })
+    },
     scan() { this.mciMarkDetailReturn(); scanDevice() },
     callPhone(phone) { uni.makePhoneCall({ phoneNumber: String(phone) }) },
     goBack() { uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/workspace/index' }) }) }

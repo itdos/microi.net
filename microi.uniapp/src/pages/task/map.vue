@@ -22,6 +22,7 @@
             <text>{{ item.TaskDeviceStatus || '未完成' }}</text>
           </view>
         </scroll-view>
+        <view class="entity-sheet__row"><text>客户名称</text><text>{{ selected.KehuMC || '-' }}</text></view>
         <view class="entity-sheet__row"><text>安装位置</text><text>{{ selected.AnzhuangWZ || '-' }}</text></view>
         <view v-if="taskId" class="entity-sheet__row"><text>任务状态</text><text :class="selectedTaskComplete ? 'status-complete' : 'status-unfinished'">{{ selected.TaskDeviceStatus || '未完成' }}</text></view>
         <view class="entity-sheet__row"><text>设备状态</text><text>{{ selected.ShebeiZT || '-' }}</text></view>
@@ -72,7 +73,7 @@
 <script>
 import { themeMixin } from '@/utils/theme.js'
 import { V8 } from '@/utils/request.js'
-import { callApiEngine, findMenu, loadModuleRows, openForm } from '@/platform/business-runtime.js'
+import { callApiEngine, canOpenBusinessEntry, findMenu, loadModuleRows, openForm } from '@/platform/business-runtime.js'
 import { getBusinessModule } from '@/platform/business.js'
 import { loadAllTaskDevices, loadTasks } from '@/utils/xjy-task.js'
 
@@ -167,7 +168,10 @@ export default {
     selectedTitle() { return this.mode === 'device' ? (this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 台任务设备` : (this.selected.ShebeiMC || this.selected.ShangpinMC || this.selected.KehuMC || '客户设备')) : (this.mode === 'task' ? (this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 个售后任务` : (this.selected.customer || this.selected.KehuMC || '售后任务')) : (this.mode === 'customer' && this.selectedGroup.length > 1 ? `${this.selectedGroup.length} 个客户` : (this.selected.KehuMC || '客户'))) },
     selectedSubtitle() { return this.mode === 'device' ? (this.selectedGroup.length > 1 ? '位于同一安装坐标，请选择设备' : (this.selected.ShebeiBH || this.selected.ShebeiXH || '')) : (this.mode === 'task' ? (this.selectedGroup.length > 1 ? '位于同一服务坐标，请选择任务' : ([this.selected.no, this.selected.type].filter(Boolean).join(' · '))) : (this.mode === 'customer' ? (this.selectedGroup.length > 1 ? '位于同一客户坐标，请选择客户' : (this.selected.XiangxiDZ || this.selected.LianxiR || '')) : ([this.selected.Chengshi, this.selected.XiangxiDZ].filter(Boolean).join(' ') || this.selected.LianxiR || ''))) },
     selectedGroupHeight() { return `${Math.min(this.selectedGroup.length, 3) * 82}rpx` },
-    primaryActionLabel() { return this.taskId ? (this.selectedGroup.length > 1 ? '处理选中设备' : '处理任务设备') : ((this.mode === 'task' || this.mode === 'customer') && this.selectedGroup.length > 1 ? `查看选中${this.entityLabel}` : this.meta.action) },
+    primaryActionLabel() {
+      if (this.mode === 'device' && !this.taskId && this.selected && this.selected.DeviceAccessScope !== 'staff') return '查看定位信息'
+      return this.taskId ? (this.selectedGroup.length > 1 ? '处理选中设备' : '处理任务设备') : ((this.mode === 'task' || this.mode === 'customer') && this.selectedGroup.length > 1 ? `查看选中${this.entityLabel}` : this.meta.action)
+    },
     selectedTaskComplete() { return !!(this.selected && (String(this.selected.FuwuZTZ) === '1' || this.selected.TaskDeviceStatus === '已完成')) }
   },
   onLoad(options) {
@@ -180,9 +184,28 @@ export default {
     this.deviceFilters = this.mode === 'device' ? routeFilters : {}
     this.customerFilters = this.mode === 'customer' ? routeFilters : {}
     if (this.taskFilters.customerId) this.customerId = String(this.taskFilters.customerId)
-    this.reload()
+    this.ensureMapAccessAndReload()
   },
   methods: {
+    requiresDeviceMapAccess() {
+      return this.mode === 'device' && !this.taskId
+    },
+    async ensureMapAccessAndReload() {
+      if (!this.requiresDeviceMapAccess()) {
+        this.reload()
+        return
+      }
+      try {
+        const allowed = await canOpenBusinessEntry('deviceMap')
+        if (allowed) {
+          this.reload()
+          return
+        }
+      } catch (error) {}
+      this.loading = false
+      uni.showToast({ title: '当前账号无权查看设备地图', icon: 'none' })
+      uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/workspace/index' }) })
+    },
     coordinates(item) {
       return this.mode === 'device'
         ? { latitude: Number(item.KehuSB_Lat), longitude: Number(item.KehuSB_Lng) }
@@ -248,10 +271,12 @@ export default {
     async authorizedCustomerModule(selectFields = CUSTOMER_MAP_SELECT_FIELDS, preferredMenuId = '') {
       const customerModule = getBusinessModule('customers')
       const table = customerModule.table || 'Diy_Kehu'
-      const menu = await findMenu(customerModule.menuAliases || [], table, false, preferredMenuId)
+      // preferredMenuId 为空时，自动查找当前用户有权限的客户菜单
+      const menu = await findMenu(customerModule.menuAliases || [], table, false, preferredMenuId || '')
       const menuId = String(menu && menu.Id || '').trim()
-      if (!menuId || (preferredMenuId && menuId !== String(preferredMenuId))) {
-        throw new Error('当前账号无权查看客户坐标')
+      // 找不到菜单 → 返回 null，由调用方决定如何处理（有权限的用户才能查到菜单）
+      if (!menuId) {
+        return null
       }
       return {
         ...customerModule,
@@ -294,6 +319,7 @@ export default {
 
       const customers = []
       const config = await this.authorizedCustomerModule(['Id', 'KehuDT_Lat', 'KehuDT_Lng'])
+      if (!config) return devices
       for (let index = 0; index < missingCustomerIds.length; index += 200) {
         const result = await loadModuleRows(config, {
           extraWhere: [{ Name: 'Id', Type: 'In', Value: missingCustomerIds.slice(index, index + 200) }],
@@ -358,9 +384,22 @@ export default {
     async loadCustomerDevices() {
       this.loading = true
       try {
-        const result = await V8.FormEngine.GetTableData('Diy_KehuSB', { _Where: [{ Name: 'KehuID', Type: '=', Value: this.customerId }], _PageIndex: 1, _PageSize: 500 })
-        if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '设备加载失败')
-        this.applyRows(await this.withCustomerCoordinateDefaults(result.Data))
+        const deviceModule = getBusinessModule('devices')
+        const menu = await findMenu(deviceModule.menuAliases || [], deviceModule.table || 'Diy_KehuSB', false)
+        if (!menu || !menu.Id) throw new Error('当前账号无权查看该客户设备')
+        const result = await loadModuleRows({
+          ...deviceModule,
+          ModuleEngineKey: 'Diy_KehuSB',
+          menuId: String(menu.Id),
+          requireAuthorizedMenu: true,
+          selectFields: ['Id', 'KehuID', 'KehuMC', 'ShebeiBH', 'ShebeiMC', 'ShangpinMC', 'ShebeiXH', 'AnzhuangWZ', 'KehuSB_Lat', 'KehuSB_Lng', 'ShebeiZT']
+        }, {
+          extraWhere: [{ Name: 'KehuID', Type: '=', Value: this.customerId }],
+          pageIndex: 1,
+          pageSize: 500,
+          refresh: true
+        })
+        this.applyRows(await this.withCustomerCoordinateDefaults(result.rows))
       } catch (error) { uni.showToast({ title: error.message || '设备加载失败', icon: 'none' }) }
       finally { this.loading = false }
     },
@@ -473,8 +512,6 @@ export default {
         this.latitude = Number(position.latitude)
         this.longitude = Number(position.longitude)
         const filters = this.customerFilters || {}
-        const menuId = String(filters.menuId || '').trim()
-        if (!menuId) throw new Error('当前账号无权查看客户地图')
         const radius = Number(this.radius)
         const bounds = buildMapRangeBounds(this.latitude, this.longitude, radius)
         const rangeWhere = [
@@ -483,7 +520,11 @@ export default {
           { Name: 'KehuDT_Lng', Type: '>=', Value: bounds.minLongitude },
           { Name: 'KehuDT_Lng', Type: '<=', Value: bounds.maxLongitude }
         ]
-        const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS, menuId)
+        const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS)
+        if (!config) {
+          uni.showToast({ title: '当前账号无权查看客户地图', icon: 'none' })
+          return
+        }
         const pageSize = 500
         const customers = []
         let pageIndex = 1
@@ -530,7 +571,7 @@ export default {
       if (this.customerId && this.mode === 'device') { this.loadCustomerDevices(); return }
       this.loadNearby()
     },
-    loadNearby() {
+    async loadNearby() {
       if (this.taskId && this.mode === 'device') { this.loadTaskDevices(); return }
       if (this.customerId && this.mode === 'device') { this.loadCustomerDevices(); return }
       this.loading = true
@@ -539,10 +580,45 @@ export default {
         success: async (position) => {
           this.latitude = Number(position.latitude); this.longitude = Number(position.longitude)
           try {
-            const engine = this.mode === 'device' ? 'get_location_shebei-v2' : 'get_location_kehu-v2'
-            const result = await callApiEngine(engine, { Km: Number(this.radius), Latitude: this.latitude, Longitude: this.longitude })
-            if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || `${this.entityLabel}加载失败`)
-            this.applyRows(result.Data || [])
+            if (this.mode === 'customer') {
+              // 客户地图：必须走菜单鉴权，后端根据 _SysMenuId 自动过滤数据范围
+              const config = await this.authorizedCustomerModule(CUSTOMER_MAP_SELECT_FIELDS)
+              if (!config) {
+                uni.showToast({ title: '当前账号无权查看客户地图', icon: 'none' })
+                return
+              }
+              const radius = Number(this.radius)
+              const bounds = buildMapRangeBounds(this.latitude, this.longitude, radius)
+              const rangeWhere = [
+                { Name: 'KehuDT_Lat', Type: '>=', Value: bounds.minLatitude },
+                { Name: 'KehuDT_Lat', Type: '<=', Value: bounds.maxLatitude },
+                { Name: 'KehuDT_Lng', Type: '>=', Value: bounds.minLongitude },
+                { Name: 'KehuDT_Lng', Type: '<=', Value: bounds.maxLongitude }
+              ]
+              const customers = []
+              let pageIndex = 1, count = 0
+              do {
+                const result = await loadModuleRows(config, {
+                  pageIndex, pageSize: 500, extraWhere: rangeWhere, refresh: true
+                })
+                if (!result.rows.length) break
+                customers.push(...result.rows)
+                count = result.count
+                pageIndex++
+              } while (customers.length < count)
+              this.applyRows(customers.filter(c => {
+                const lat = Number(c.KehuDT_Lat), lng = Number(c.KehuDT_Lng)
+                return Number.isFinite(lat) && lat !== 0 &&
+                  Number.isFinite(lng) && lng !== 0 &&
+                  mapDistanceKm(this.latitude, this.longitude, lat, lng) <= radius
+              }))
+            } else {
+              // 设备地图：仍走原有接口引擎
+              const engine = 'get_location_shebei-v2'
+              const result = await callApiEngine(engine, { Km: Number(this.radius), Latitude: this.latitude, Longitude: this.longitude })
+              if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || `${this.entityLabel}加载失败`)
+              this.applyRows(result.Data || [])
+            }
           } catch (error) { uni.showToast({ title: error.message || `${this.entityLabel}加载失败`, icon: 'none' }) }
         },
         fail: () => uni.showToast({ title: '请授权定位后重试', icon: 'none' }),
@@ -589,7 +665,15 @@ export default {
         uni.navigateTo({ url: `/pages/task/device?id=${encodeURIComponent(this.selected.TaskDeviceId)}&taskId=${encodeURIComponent(this.taskId)}&taskType=${encodeURIComponent(this.taskType)}` })
         return
       }
-      if (this.mode === 'device') { openForm({ table: 'Diy_KehuSB', rowId: this.selected.Id, mode: 'View', title: '设备详情', menuAliases: ['客户设备', '设备管理'] }); return }
+      if (this.mode === 'device') {
+        // 首页地图返回 customer 时仅展示本人的定位摘要，不能借地图跳转到不具行级范围的通用表单详情。
+        if (!this.taskId && this.selected.DeviceAccessScope !== 'staff') {
+          uni.showToast({ title: '地图内已展示本人设备定位，请从我的设备查看详情', icon: 'none' })
+          return
+        }
+        openForm({ table: 'Diy_KehuSB', rowId: this.selected.Id, mode: 'View', title: '设备详情', menuAliases: ['设备列表', '客户设备', '设备管理'] })
+        return
+      }
       if (this.mode === 'customer') { uni.navigateTo({ url: `/pages/business/detail?key=customers&id=${encodeURIComponent(this.selected.Id)}` }); return }
       const key = this.mode === 'visit' ? 'visits' : 'contacts'
       uni.navigateTo({ url: `/pages/business/list?key=${key}&whereField=KehuID&whereValue=${encodeURIComponent(this.selected.Id)}` })

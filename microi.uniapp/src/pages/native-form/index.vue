@@ -104,7 +104,8 @@
 						:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name, 'form-field--visit-target-member': tenantFieldPresentation(field).type === 'visit-target-member' }">
 						<mci-visit-target-fields v-if="tenantFieldPresentation(field).type === 'visit-target-fields'"
 							ref="visitTargetFields" :target-type="checkinTargetType" :target-name="checkinTargetName"
-							:target-id="checkinTargetId" :readonly="mode === 'View'" @update:target-type="updateCheckinTargetType"
+							:target-id="checkinTargetId" :readonly="mode === 'View'" :query-scope="visitTargetQueryScope"
+							:permission-menu-id="visitTargetQueryScope === 'checkin' ? menuId : ''" @update:target-type="updateCheckinTargetType"
 							@update:target-name="updateCheckinTargetName" @update:target-id="updateCheckinTargetId"
 							@select="selectVisitTarget"
 							@open-change="handleVisitTargetOpen(field, $event)" />
@@ -450,6 +451,9 @@
 				return String((isFollowup ? this.form.KehuMC : this.form.BaifangDX) || '')
 			},
 			checkinTargetId() { return String(this.form.KehuID || '') },
+			visitTargetQueryScope() {
+				return String(this.tableName || '').toLowerCase() === 'diy_location' ? 'checkin' : 'module'
+			},
 			standaloneRelatedTabs() {
 				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
 			},
