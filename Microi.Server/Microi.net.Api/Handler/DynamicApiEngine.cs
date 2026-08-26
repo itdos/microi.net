@@ -61,73 +61,7 @@ namespace Microi.net.Api
 
         public async Task<DosResult> Init(OsClientSecret clientModel)
         {
-            try
-            {
-                if (clientModel.OsClient.DosIsNullOrWhiteSpace())
-                {
-                    return new DosResult(0, null, DiyMessage.GetLang(clientModel.OsClient, "ParamError", clientModel.OsClientModel["Lang"].Val<string>()) + "。 DynamicApiEngine.Init()。");
-                }
-                // 跳过没有数据库连接的租户
-                var dbConn = clientModel.OsClientModel?["DbConn"]?.ToString();
-                if (string.IsNullOrWhiteSpace(dbConn))
-                {
-                    return new DosResult(0, null, $"DynamicApiEngine.Init() 跳过租户 {clientModel.OsClient}：DbConn未配置。");
-                }
-                //取 Sys_ApiEngine 所有 ApiAddress
-                var _where = new List<DiyWhere>() {
-                        new DiyWhere(){
-                            Name = "ApiAddress",
-                            Value = null,
-                            Type = "<>"
-                        }
-                    };
-                var sysApiEngineListResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
-                {
-                    FormEngineKey = "sys_apiengine",
-                    _Where = _where,
-                    OsClient = clientModel.OsClient
-                });
-                if (sysApiEngineListResult.Code == 1)
-                {
-                    var sysApiEngineList = sysApiEngineListResult.Data;
-                    var DiyCacheBase = MicroiEngine.CacheTenant.Cache(clientModel.OsClient);
-                    if (sysApiEngineList != null && sysApiEngineList.Any())
-                    {
-                        // 批量缓存写入（高并发优化）
-                        var tasks = new List<Task>(sysApiEngineList.Count * 2);
-                        foreach (var item in sysApiEngineList)
-                        {
-                            if (string.IsNullOrWhiteSpace((string)item.ApiAddress))
-                            {
-                                continue;
-                            }
-                            var apiEngineKey = ((string)item.ApiEngineKey).ToLower();
-                            var apiAddress = ((string)item.ApiAddress).ToLower();
-
-                            // v3 与 v6 共用这些键，旧版固定按 JSON 文本反序列化。
-                            // 显式写字符串，避免 dynamic/object 命中非 JSON 的 ToString()。
-                            var cacheJson = JsonConvert.SerializeObject(item);
-                            tasks.Add(DiyCacheBase.SetAsync(BuildCacheKey(clientModel.OsClient, apiEngineKey), cacheJson));
-                            tasks.Add(DiyCacheBase.SetAsync(BuildCacheKey(clientModel.OsClient, apiAddress), cacheJson));
-                        }
-                        // 等待所有缓存写入完成
-                        await Task.WhenAll(tasks);
-                    }
-                    var count = sysApiEngineList != null ? sysApiEngineList.Count : 0;
-                    MicroiEngine.QueueSystemLog(clientModel.OsClient, "ApiEngine", "RouteCacheInitialized", "接口引擎路由缓存初始化完成", $"共缓存 {count} 个接口。", 1, true);
-                    return new DosResult(1);
-                }
-                else
-                {
-                    MicroiEngine.QueueSystemLog(clientModel.OsClient, "ApiEngine", "RouteCacheInitializationFailed", "接口引擎路由缓存初始化失败，可能导致自定义地址 404", sysApiEngineListResult.Msg, 3);
-                }
-                return new DosResult(0, null, sysApiEngineListResult.Msg);
-            }
-            catch (System.Exception ex)
-            {
-                MicroiEngine.QueueSystemLog(clientModel.OsClient, "ApiEngine", "RouteCacheInitializationException", "接口引擎路由缓存初始化异常，可能导致自定义地址 404", ex.ToString(), 3);
-                return new DosResult(0, null, $"DynamicApiEngine.Init() {clientModel.OsClient} ERROR：" + ex.Message);
-            }
+            return await ApiEngineRouteCacheInitializer.InitializeAsync(clientModel);
         }
         /// <summary>
         /// 构建缓存键（统一管理，便于维护）

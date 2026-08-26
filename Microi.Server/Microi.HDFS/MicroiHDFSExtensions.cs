@@ -37,6 +37,7 @@ namespace Microi.net
 
                 // 注册工厂
                 services.AddSingleton<IHDFSFactory, HDFSFactory>();
+                services.AddSingleton<IPrivateFileAuditLinkService, PrivateFileAuditLinkService>();
 
                 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入【分布式存储】插件成功！");
                 return services;

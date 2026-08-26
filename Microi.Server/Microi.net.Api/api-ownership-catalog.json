@@ -16,13 +16,11 @@
     "CaptchaController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
     "DataSourceEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "DiagnosticsController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
-    "DiyChatController": { "OwnerType": "Application", "OwnerId": "app.microi.message-notification", "Disposition": "ProtocolGateway" },
     "ExternalLoginController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
     "FormEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "HDFSController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "HomeController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
     "IdentityVerificationController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
-    "iTdosHeartController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
     "LegacyMobileCompatibilityController": { "OwnerType": "Compatibility", "OwnerId": "managed-api-engine-legacy-routes", "Disposition": "MigrationCandidate" },
     "LicenseController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
     "MarketplaceSourceController": { "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "ProtocolGateway" },
@@ -39,7 +37,6 @@
     "TenantSystemSettingsController": { "OwnerType": "Application", "OwnerId": "app.microi.sys-config", "Disposition": "ProtocolGateway" },
     "TranslateController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "UEditorController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "ProtocolGateway" },
-    "UploadController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "ProtocolGateway" },
     "UserBehaviorController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.observability", "Disposition": "OperationsKernel" },
     "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "WeChatContentSecurityController": { "OwnerType": "Application", "OwnerId": "microi-wechat-content-security", "Disposition": "ProtocolGateway" },
@@ -61,10 +58,13 @@
     "SysBaseDataController": { "Target": "ApiEngine:platform-sys-base-data", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
     "SysDeptController": { "Target": "ApiEngine:platform-sys-dept", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
     "SysMenuController": { "Target": "ApiEngine:platform-sys-menu", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
-    "SysRoleController": { "Target": "ApiEngine:platform-sys-role", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" }
+    "SysRoleController": { "Target": "ApiEngine:platform-sys-role", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
+    "UploadController": { "Target": "LegacyMobileCompatibilityController.Upload -> HDFSController.Upload", "Atom": "IMicroiHDFS", "RemovedAt": "2026-08-26" },
+    "iTdosHeartController": { "Target": "DiagnosticsController.LegacyITdosHeart", "Atom": "ASP.NET Core liveness compatibility route", "RemovedAt": "2026-08-26" },
+    "DiyChatController": { "Target": "LegacyMobileCompatibilityController.SendSystemMessage", "Atom": "Managed ApiEngine plus SignalR transport", "RemovedAt": "2026-08-26" }
   },
   "SupportDirectories": {
-    "Scope": ["Middleware", "Handler", "Services", "Models"],
+    "Scope": ["Middleware", "Handler", "Hosting"],
     "KeepApi": [
       "Handler/ApiEngineHttpStreamSink.cs",
       "Handler/ApiEngineRealtimeHub.cs",
@@ -73,40 +73,37 @@
       "Handler/DiyWebSocket.cs",
       "Handler/DynamicApiEngine.cs",
       "Handler/FormDataOrJsonModelBinder.cs",
-      "Handler/ForwardedProxyTrustPolicy.cs",
       "Handler/GameRealtimeHub.cs",
       "Handler/GlobalExceptionHandler.cs",
       "Handler/JwtBearerOptionsConfigurator.cs",
-      "Handler/ManagedApiEngineCompatibility.cs",
       "Handler/PlatformAdminOnlyAttribute.cs",
-      "Handler/RedisCacheOptionsConfigurator.cs",
-      "Handler/UEditor/AppConsts.cs",
-      "Handler/UEditor/Config.cs",
-      "Handler/UEditor/Handlers/HandelFactory.cs",
-      "Handler/UEditor/Handlers/Handler.cs",
-      "Handler/UEditor/Handlers/NotSupportedHandler.cs",
-      "Handler/UEditor/Handlers/UploadHandler.cs",
-      "Handler/UEditor/UEditorMvcExtension.cs",
-      "Handler/UEditor/UEditorResponse.cs",
-      "Handler/UEditor/UEditorResult.cs",
-      "Handler/UEditor/UEditorService.cs",
       "Handler/V8DebugWebSocket.cs",
       "Handler/V8McpAuthorizationAttribute.cs",
-      "Middleware/RequestPressureGuardMiddleware.cs",
       "Middleware/SecurityGuardMiddleware.cs",
-      "Middleware/SystemObservabilityMiddleware.cs",
-      "Models/ErrorViewModel.cs",
-      "Services/ApplicationAssetAliasReconciliationWorkerService.cs",
-      "Services/BackgroundTaskWorkerService.cs",
-      "Services/PrivateFileAuditLinkService.cs",
-      "Services/ProcessMemoryGuardService.cs",
-      "Services/SysLogQueueService.cs",
-      "Services/SystemObservabilityTrafficRollupService.cs",
-      "Services/WeChatContentSecurityService.cs"
+      "Hosting/MicroiApiHostExtensions.cs",
+      "Hosting/MicroiRealtimeHostingExtensions.cs"
     ],
     "Reason": "仅保留 HTTP/MVC/SignalR 传输、宿主启动与生命周期、安全网关、存储网络边界和第三方原始协议适配；不允许新增租户可变业务编排。"
   },
   "MigratedSupportCode": {
+    "Services/ApplicationAssetAliasReconciliationWorkerService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Runtime/ApplicationAssetAliasReconciliationWorkerService.cs", "RemovedAt": "2026-08-26" },
+    "Services/BackgroundTaskWorkerService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Runtime/BackgroundTaskWorkerService.cs", "RemovedAt": "2026-08-26" },
+    "Services/ProcessMemoryGuardService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Runtime/ProcessMemoryGuardService.cs", "RemovedAt": "2026-08-26" },
+    "Services/SysLogQueueService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Runtime/SysLogQueueService.cs", "RemovedAt": "2026-08-26" },
+    "Services/SystemObservabilityTrafficRollupService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Runtime/SystemObservabilityTrafficRollupService.cs", "RemovedAt": "2026-08-26" },
+    "Services/PrivateFileAuditLinkService.cs": { "Disposition": "MovedPlugin", "Target": "Microi.HDFS/Security/PrivateFileAuditLinkService.cs", "RemovedAt": "2026-08-26" },
+    "Services/WeChatContentSecurityService.cs": { "Disposition": "MovedPlugin", "Target": "Microi.WeChat/Security/WeChatContentSecurityService.cs", "RemovedAt": "2026-08-26" },
+    "Handler/ForwardedProxyTrustPolicy.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Hosting/ForwardedProxyTrustPolicy.cs", "RemovedAt": "2026-08-26" },
+    "Middleware/RequestPressureGuardMiddleware.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Hosting/RequestPressureGuardMiddleware.cs", "RemovedAt": "2026-08-26" },
+    "Middleware/SystemObservabilityMiddleware.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Hosting/SystemObservabilityMiddleware.cs", "RemovedAt": "2026-08-26" },
+    "Models/ErrorViewModel.cs": { "Disposition": "Deleted", "Reason": "历史 /Home/Error MVC 页面已由统一 DosResult 全局异常处理中间件取代。", "RemovedAt": "2026-08-26" },
+    "Handler/ManagedApiEngineCompatibility.cs": { "Disposition": "MovedCore", "Target": "Microi.Core/ApiEngine/ManagedApiEngineCompatibility.cs", "RemovedAt": "2026-08-26" },
+    "Handler/RedisCacheOptionsConfigurator.cs": { "Disposition": "MovedPlugin", "Target": "Microi.Cache/Hosting/RedisConnBuilder.cs", "RemovedAt": "2026-08-26" },
+    "Handler/UEditor/**": { "Disposition": "MovedPlugin", "Target": "Microi.HDFS/UEditor", "Reason": "旧 UEditor HTTP 协议仍由 Controller 暴露，配置、分派与私有 HDFS 上传实现归分布式存储插件。", "RemovedAt": "2026-08-26" },
+    "Program.cs/DatabaseConnectionGuardObserver": { "Disposition": "MovedCore", "Target": "Microi.Core/MicroiEngine.cs", "RemovedAt": "2026-08-26" },
+    "Program.cs/MainTenantStartupGate": { "Disposition": "MovedUpgrade", "Target": "Microi.Upgrade/MicroiStartupGate.cs", "RemovedAt": "2026-08-26" },
+    "Program.cs/WeChatRuntimeInitialization": { "Disposition": "MovedPlugin", "Target": "Microi.WeChat/MicroiWeChatExtensions.cs", "RemovedAt": "2026-08-26" },
+    "Program.cs/AspNetLifecycleAndFailureSummary": { "Disposition": "MovedTransport", "Target": "Microi.net.Api/Hosting/MicroiApiHostExtensions.cs", "Reason": "Program 仅保留插件清单；宿主构建、主租户门禁调用、中间件管线和统一启动失败汇总由固定 ASP.NET 传输层拥有。", "RemovedAt": "2026-08-26" },
     "Services/UserBehaviorSessionTracker.cs": { "Disposition": "MovedCore", "Target": "Microi.Core/Runtime/UserBehaviorSessionTracker.cs", "RemovedAt": "2026-08-25" },
     "Services/RichTextPrivateAssetReference.cs": { "Disposition": "MovedCore", "Target": "Microi.Core/Security/RichTextPrivateAssetReference.cs", "RemovedAt": "2026-08-25" },
     "Handler/UEditor/Handlers/ConfigHandler.cs": { "Disposition": "Deleted", "Reason": "静态跨租户配置已改为请求级租户配置。", "RemovedAt": "2026-08-25" },
@@ -116,15 +113,24 @@
     "Handler/UEditor/StringExtension.cs": { "Disposition": "Deleted", "Reason": "仅为已删除的本地文件处理代码服务。", "RemovedAt": "2026-08-25" }
   },
   "ActionOverrides": {
+    "LegacyMobileCompatibilityController.Upload": {
+      "Disposition": "MigrationCandidate",
+      "Target": "HDFSController.Upload",
+      "CompatibilityRoutes": ["/api/Upload"],
+      "NativeBoundary": ["authenticated tenant binding", "upload path and file policy", "private HDFS storage", "WeChat content security"],
+      "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换到 /api/HDFS/Upload，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
     "SysUserController.Login": {
       "Disposition": "BootstrapIdentity",
       "Target": "native password/captcha/DiyToken bootstrap plus optional platform_auth_login_event",
       "Reason": "全新数据库尚未安装应用时仍必须能够使用 admin 登录并进入应用商城。"
     },
-    "SysUserController.SmsLogin": {
+    "LegacyMobileCompatibilityController.SmsLogin": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.saas-engine ApiEngine:platform_auth_sms_login",
-      "Reason": "短信注册、角色分配、租户信息与登录响应属于可升级业务编排。"
+      "CompatibilityRoutes": ["/api/SysUser/SmsLogin"],
+      "Reason": "短信注册、角色分配、租户信息与登录响应属于可升级业务编排。",
+      "CompatibilityExitGate": "已知旧客户端全部切换到 /apiengine/platform_auth_sms_login，且兼容路由连续两个正式版本遥测为零后删除。"
     },
     "LegacyMobileCompatibilityController.AddSysUser": {
       "Disposition": "ManagedBusinessFacade",
@@ -260,13 +266,15 @@
       ],
       "TenantHook": "ApiEngine:platform-runtime-custom-hook"
     },
-    "DiyChatController.SendSystemMessage": {
+    "LegacyMobileCompatibilityController.SendSystemMessage": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.message-notification ApiEngine:platform-chat-system-message",
+      "CompatibilityRoutes": ["/api/DiyChat/SendSystemMessage"],
       "NativeBoundary": [
         "SignalR transport and authenticated connection delivery"
       ],
-      "TenantHook": "ApiEngine:platform-message-notification-custom-hook"
+      "TenantHook": "ApiEngine:platform-message-notification-custom-hook",
+      "CompatibilityExitGate": "旧客户端全部切换到官方消息接口引擎，且兼容路由连续两个正式版本遥测为零后删除。"
     },
     "DiyWebSocket.OrdinaryChatActions": {
       "Disposition": "ManagedBusinessFacade",

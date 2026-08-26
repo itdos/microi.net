@@ -1,10 +1,9 @@
 using System;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
-using Microsoft.Extensions.Options;
 using Dos.Common;
 using Microi.net;
 
-namespace Microi.net.Api;
+namespace Microi.net
+{
 
 public static class RedisConnBuilder
 {
@@ -80,4 +79,5 @@ public static class RedisConnBuilder
         }
         return redisConnectionString;
     }
+}
 }

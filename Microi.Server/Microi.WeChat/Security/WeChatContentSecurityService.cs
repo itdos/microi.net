@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
 
-namespace Microi.net.Api;
+namespace Microi.net;
 
 /// <summary>
 /// 微信小程序用户发布内容安全服务。审核记录和 access_token 均存放在租户共享 Redis，
@@ -446,9 +446,9 @@ public sealed class WeChatContentSecurityService : ISysUserProfileContentSecurit
             // C# 只承担微信协议验签、AES 解密、AppId 校验和安全字段归一化。
             // 审核状态、系统日志和租户扩展逻辑全部由应用商城交付的接口引擎处理，
             // 保存即生效，无需为了业务调整重新编译发布后端。
-            var eventId = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-                    $"{osClient}|{traceId}|{completedStatus}")))
-                .ToLowerInvariant();
+            var eventId = ComputeHashHex(
+                SHA256.Create(),
+                $"{osClient}|{traceId}|{completedStatus}");
             var result = await MicroiEngine.ApiEngine.RunAsync(
                     CallbackCoreApiEngineKey,
                     new JObject
@@ -479,11 +479,19 @@ public sealed class WeChatContentSecurityService : ISysUserProfileContentSecurit
         var values = new[] { token }.Concat(parts ?? Array.Empty<string>())
             .Select(value => value ?? "")
             .OrderBy(value => value, StringComparer.Ordinal);
-        var digest = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(string.Concat(values))))
-            .ToLowerInvariant();
+        var digest = ComputeHashHex(SHA1.Create(), string.Concat(values));
         var expected = Encoding.ASCII.GetBytes(digest);
         var supplied = Encoding.ASCII.GetBytes(signature.Trim().ToLowerInvariant());
         return expected.Length == supplied.Length && CryptographicOperations.FixedTimeEquals(expected, supplied);
+    }
+
+    private static string ComputeHashHex(HashAlgorithm algorithm, string value)
+    {
+        using (algorithm)
+        {
+            var bytes = algorithm.ComputeHash(Encoding.UTF8.GetBytes(value ?? string.Empty));
+            return BitConverter.ToString(bytes).Replace("-", string.Empty).ToLowerInvariant();
+        }
     }
 
     internal static bool IsSuccessfulApiEngineResult(object result)
@@ -557,7 +565,7 @@ public sealed class WeChatContentSecurityService : ISysUserProfileContentSecurit
                     content,
                     timeout.Token)
                 .ConfigureAwait(false);
-            var json = JObject.Parse(await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false));
+            var json = JObject.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
             var errorCode = json.Value<int?>("errcode") ?? 0;
             if (errorCode == 0) return json;
             if (attempt == 0 && errorCode is 40014 or 42001)
@@ -586,7 +594,7 @@ public sealed class WeChatContentSecurityService : ISysUserProfileContentSecurit
                   + $"&js_code={Uri.EscapeDataString(loginCode.Trim())}"
                   + "&grant_type=authorization_code";
         using var response = await client.GetAsync(url, timeout.Token).ConfigureAwait(false);
-        var json = JObject.Parse(await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false));
+        var json = JObject.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
         var openId = json["openid"]?.ToString();
         if (openId.DosIsNullOrWhiteSpace())
             throw new WeChatContentSecurityException("CodeExchangeError:" + (json.Value<int?>("errcode") ?? -1));
@@ -626,7 +634,7 @@ public sealed class WeChatContentSecurityService : ISysUserProfileContentSecurit
                       + $"&appid={Uri.EscapeDataString(settings.AppId)}"
                       + $"&secret={Uri.EscapeDataString(settings.AppSecret)}";
             using var response = await client.GetAsync(url, timeout.Token).ConfigureAwait(false);
-            var json = JObject.Parse(await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false));
+            var json = JObject.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
             var token = json["access_token"]?.ToString();
             if (token.DosIsNullOrWhiteSpace())
                 throw new WeChatContentSecurityException("AccessTokenError:" + (json.Value<int?>("errcode") ?? -1));
@@ -844,11 +852,11 @@ public sealed class WeChatContentSecurityService : ISysUserProfileContentSecurit
 
     private sealed class Settings
     {
-        public string OsClient { get; init; }
-        public string AppId { get; init; }
-        public string AppSecret { get; init; }
-        public string MessageToken { get; init; }
-        public string EncodingAesKey { get; init; }
+        public string OsClient { get; set; }
+        public string AppId { get; set; }
+        public string AppSecret { get; set; }
+        public string MessageToken { get; set; }
+        public string EncodingAesKey { get; set; }
     }
 }
 

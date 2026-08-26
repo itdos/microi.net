@@ -7,7 +7,7 @@ using Dos.Common;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json.Linq;
 
-namespace Microi.net.Api
+namespace Microi.net
 {
     /// <summary>
     /// UEditor 兼容上传。multipart 文件直接以受限流进入当前租户私有 HDFS，

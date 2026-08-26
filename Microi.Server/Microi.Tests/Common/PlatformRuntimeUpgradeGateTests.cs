@@ -188,21 +188,47 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
-    public void ApiStartup_RunsDependencyGateBeforeLicenseAndHostedUpgradeRepeatsIt()
+    public void ApiStartup_DelegatesDependencyGateToUpgradeAndHostedUpgradeRepeatsIt()
     {
         var serverRoot = FindServerRoot();
         var program = File.ReadAllText(Path.Combine(serverRoot, "Microi.net.Api", "Program.cs"));
+        var apiHost = File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.net.Api",
+            "Hosting",
+            "MicroiApiHostExtensions.cs"));
+        var startupGate = File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.Upgrade",
+            "MicroiStartupGate.cs"));
         var hosted = File.ReadAllText(Path.Combine(
             serverRoot,
             "Microi.Upgrade",
             "MicroiUpgradeHostedService.cs"));
-        var gateIndex = program.IndexOf("EnsureStartupDependenciesAsync", StringComparison.Ordinal);
-        var licenseIndex = program.IndexOf("#region License 自动恢复", StringComparison.Ordinal);
 
-        Assert.True(gateIndex >= 0 && licenseIndex > gateIndex);
+        Assert.Contains("RunMicroiApiAsync", program);
+        Assert.Contains("EnsureConfiguredMainTenantReadyAsync", apiHost);
+        Assert.Contains("EnsureMainTenantReadyAsync(clientModel", startupGate);
+        Assert.Contains("EnsureStartupDependenciesAsync(mainTenant", startupGate);
         Assert.Contains("EnsureStartupDependenciesUnderLeaseAsync", hosted);
-        Assert.Contains("【自动升级状态】", program);
+        Assert.DoesNotContain("【自动升级状态】", program);
+        Assert.Contains("【自动升级状态】", startupGate);
         Assert.Contains("【自动升级状态】", hosted);
+    }
+
+    [Fact]
+    public void AppStoreUpgrade_PropagatesCoreNullableDdlFailuresAndLogsSuccessfulProgressSeparately()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindServerRoot(),
+            "Microi.Upgrade",
+            "13-UpgradeAppStore.cs"));
+
+        Assert.Contains("var nullableErrors = new List<string>();", source);
+        Assert.Contains("msgs.AddRange(nullableErrors);", source);
+        Assert.Contains("【核心字段可空兼容】全部检查成功", source);
+        Assert.Contains("errors.Add($\"核心表 {tableName}.{columnName} 调整为允许为空失败", source);
+        Assert.DoesNotContain("msgs.Add($\"核心表 {tableName} 已将", source);
     }
 
     [Fact]

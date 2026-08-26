@@ -1,8 +1,14 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
 using Dos.Common;
-using Microi.net;
+using Microsoft.AspNetCore.Http;
 
-namespace Microi.net.Api;
+namespace Microi.net
+{
 
 public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
 {
@@ -18,7 +24,7 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
         {
             var osClient = TenantConfigurationSecurity.NormalizeTenantId(param.OsClient);
             param.OsClient = osClient;
-            var urls = result.Data is IEnumerable<string> many && result.Data is not string
+            var urls = result.Data is IEnumerable<string> many && !(result.Data is string)
                 ? many.ToList()
                 : new List<string> { result.Data.ToString() };
             var paths = param.FilePathNames?.ToList() ?? new List<string>();
@@ -30,7 +36,7 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
                 if (!Uri.TryCreate(upstream, UriKind.Absolute, out var upstreamUri)
                     || (upstreamUri.Scheme != Uri.UriSchemeHttp && upstreamUri.Scheme != Uri.UriSchemeHttps))
                     continue;
-                var ticketId = Base64Url(RandomNumberGenerator.GetBytes(32));
+                var ticketId = Base64Url(CreateRandomBytes(32));
                 var path = i < paths.Count ? paths[i] : paths.FirstOrDefault();
                 var ticket = new PrivateFileAuditTicket
                 {
@@ -53,7 +59,14 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
             }
             if (wrapped.Count != urls.Count)
                 return new DosResult(0, null, "私有文件审计代理未能生成完整访问地址，请稍后重试。");
-            result.Data = result.Data is string ? wrapped[0] : wrapped;
+            if (result.Data is string)
+            {
+                result.Data = wrapped[0];
+            }
+            else
+            {
+                result.Data = wrapped;
+            }
             return result;
         }
         catch (Exception ex)
@@ -105,6 +118,16 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
     }
 
     private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static byte[] CreateRandomBytes(int length)
+    {
+        var bytes = new byte[length];
+        using (var random = RandomNumberGenerator.Create())
+        {
+            random.GetBytes(bytes);
+        }
+        return bytes;
+    }
 }
 
 public sealed class PrivateFileAuditTicket
@@ -119,4 +142,5 @@ public sealed class PrivateFileAuditTicket
     public string IssuerUserName { get; set; }
 
     public static string CacheKey(string osClient, string ticketId) => $"Microi:{osClient}:Audit:PrivateFile:{ticketId}";
+}
 }
