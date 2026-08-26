@@ -804,10 +804,10 @@ namespace Microi.net
                 return await Task.Run(() =>
                 {
                     var db = OsClientExtend.GetClient(osClient).Db;
-                    var rows = db.FromSql(@"SELECT Id, Name
-                            FROM diy_table
-                            WHERE LOWER(Name) = LOWER(@p0) AND (IsDeleted <> 1 OR IsDeleted IS NULL)
-                            ORDER BY CreateTime DESC
+                    var rows = db.FromSql(@"SELECT `Id`, `Name`
+                            FROM `diy_table`
+                            WHERE LOWER(`Name`) = LOWER(@p0) AND (`IsDeleted` <> 1 OR `IsDeleted` IS NULL)
+                            ORDER BY `CreateTime` DESC
                             LIMIT 1")
                         .AddInParameter("p0", tableName)
                         .ToList<dynamic>();
@@ -855,11 +855,11 @@ namespace Microi.net
                     EnsurePhysicalColumnExists(db, osClient, canonicalTableName, fieldName, type);
 
                     var rows = db.FromSql(@"SELECT *
-                            FROM diy_field
-                            WHERE LOWER(Name) = LOWER(@p0)
-                              AND (LOWER(TableName) = LOWER(@p1) OR (@p2 <> '' AND TableId = @p2))
-                              AND (IsDeleted <> 1 OR IsDeleted IS NULL)
-                            ORDER BY CreateTime DESC
+                            FROM `diy_field`
+                            WHERE LOWER(`Name`) = LOWER(@p0)
+                              AND (LOWER(`TableName`) = LOWER(@p1) OR (@p2 <> '' AND `TableId` = @p2))
+                              AND (`IsDeleted` <> 1 OR `IsDeleted` IS NULL)
+                            ORDER BY `CreateTime` DESC
                             LIMIT 1")
                         .AddInParameter("p0", fieldName)
                         .AddInParameter("p1", canonicalTableName)
@@ -868,21 +868,21 @@ namespace Microi.net
                     var fieldRow = ToJObjectSafe(rows?.FirstOrDefault());
                     if (fieldRow != null && !IsBlank(TokenString(fieldRow, "Id")))
                     {
-                        db.FromSql(@"UPDATE diy_field
-                                SET TableId = CASE WHEN @p0 = '' THEN TableId ELSE @p0 END,
-                                    TableName = @p1,
-                                    Label = CASE WHEN @p2 = '' THEN Label ELSE @p2 END,
-                                    Type = CASE WHEN @p3 = '' THEN Type ELSE @p3 END,
-                                    Component = CASE WHEN @p4 = '' THEN Component ELSE @p4 END,
-                                    Data = CASE WHEN @p5 = '' THEN Data ELSE @p5 END,
-                                    Config = CASE WHEN @p6 = '' THEN Config ELSE @p6 END,
-                                    DefaultValue = CASE WHEN @p7 = '' THEN DefaultValue ELSE @p7 END,
-                                    TableWidth = CASE WHEN @p8 IS NULL THEN TableWidth ELSE @p8 END,
-                                    FormWidth = CASE WHEN @p9 IS NULL THEN FormWidth ELSE @p9 END,
-                                    Visible = 1,
-                                    AppVisible = 1,
-                                    UpdateTime = @p10
-                                WHERE Id = @p11")
+                        db.FromSql(@"UPDATE `diy_field`
+                                SET `TableId` = CASE WHEN @p0 = '' THEN `TableId` ELSE @p0 END,
+                                    `TableName` = @p1,
+                                    `Label` = CASE WHEN @p2 = '' THEN `Label` ELSE @p2 END,
+                                    `Type` = CASE WHEN @p3 = '' THEN `Type` ELSE @p3 END,
+                                    `Component` = CASE WHEN @p4 = '' THEN `Component` ELSE @p4 END,
+                                    `Data` = CASE WHEN @p5 = '' THEN `Data` ELSE @p5 END,
+                                    `Config` = CASE WHEN @p6 = '' THEN `Config` ELSE @p6 END,
+                                    `DefaultValue` = CASE WHEN @p7 = '' THEN `DefaultValue` ELSE @p7 END,
+                                    `TableWidth` = CASE WHEN @p8 IS NULL THEN `TableWidth` ELSE @p8 END,
+                                    `FormWidth` = CASE WHEN @p9 IS NULL THEN `FormWidth` ELSE @p9 END,
+                                    `Visible` = 1,
+                                    `AppVisible` = 1,
+                                    `UpdateTime` = @p10
+                                WHERE `Id` = @p11")
                             .AddInParameter("p0", tableId ?? "")
                             .AddInParameter("p1", canonicalTableName)
                             .AddInParameter("p2", label ?? "")
@@ -891,28 +891,28 @@ namespace Microi.net
                             .AddInParameter("p5", data ?? "")
                             .AddInParameter("p6", config ?? "")
                             .AddInParameter("p7", defaultValue ?? "")
-                            .AddInParameter("p8", tableWidth.HasValue ? (object)tableWidth.Value : DBNull.Value)
-                            .AddInParameter("p9", formWidth.HasValue ? (object)formWidth.Value : DBNull.Value)
-                            .AddInParameter("p10", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
+                            .AddInParameter("p8", System.Data.DbType.Int32, tableWidth.HasValue ? (object)tableWidth.Value : DBNull.Value)
+                            .AddInParameter("p9", System.Data.DbType.Int32, formWidth.HasValue ? (object)formWidth.Value : DBNull.Value)
+                            .AddInParameter("p10", DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified))
                             .AddInParameter("p11", TokenString(fieldRow, "Id"))
                             .ExecuteNonQuery();
                         await ClearDiyFieldListCacheAsync(osClient, tableId, canonicalTableName);
                         return 1;
                     }
 
-                    var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    var sort = db.FromSql(@"SELECT IFNULL(MAX(Sort), 0) + 100
-                            FROM diy_field
-                            WHERE (LOWER(TableName) = LOWER(@p0) OR (@p1 <> '' AND TableId = @p1))
-                              AND (IsDeleted <> 1 OR IsDeleted IS NULL)")
+                    var now = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified);
+                    var sort = db.FromSql(@"SELECT COALESCE(MAX(`Sort`), 0) + 100
+                            FROM `diy_field`
+                            WHERE (LOWER(`TableName`) = LOWER(@p0) OR (@p1 <> '' AND `TableId` = @p1))
+                              AND (`IsDeleted` <> 1 OR `IsDeleted` IS NULL)")
                         .AddInParameter("p0", canonicalTableName)
                         .AddInParameter("p1", tableId ?? "")
                         .ToScalar<int>();
 
-                    db.FromSql(@"INSERT INTO diy_field
-                            (Id, TableId, TableName, Name, Label, Type, Component, Data, Config,
-                             DefaultValue, TableWidth, FormWidth, Visible, AppVisible, Sort,
-                             CreateTime, UpdateTime, IsDeleted, OsClient)
+                    db.FromSql(@"INSERT INTO `diy_field`
+                            (`Id`, `TableId`, `TableName`, `Name`, `Label`, `Type`, `Component`, `Data`, `Config`,
+                             `DefaultValue`, `TableWidth`, `FormWidth`, `Visible`, `AppVisible`, `Sort`,
+                             `CreateTime`, `UpdateTime`, `IsDeleted`, `OsClient`)
                             VALUES
                             (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8,
                              @p9, @p10, @p11, 1, 1, @p12, @p13, @p14, 0, @p15)")
@@ -926,8 +926,8 @@ namespace Microi.net
                         .AddInParameter("p7", data ?? "")
                         .AddInParameter("p8", config ?? "")
                         .AddInParameter("p9", defaultValue ?? "")
-                        .AddInParameter("p10", tableWidth.HasValue ? (object)tableWidth.Value : DBNull.Value)
-                        .AddInParameter("p11", formWidth.HasValue ? (object)formWidth.Value : DBNull.Value)
+                        .AddInParameter("p10", System.Data.DbType.Int32, tableWidth.HasValue ? (object)tableWidth.Value : DBNull.Value)
+                        .AddInParameter("p11", System.Data.DbType.Int32, formWidth.HasValue ? (object)formWidth.Value : DBNull.Value)
                         .AddInParameter("p12", sort)
                         .AddInParameter("p13", now)
                         .AddInParameter("p14", now)
@@ -1138,7 +1138,7 @@ namespace Microi.net
                     await RunDiyLangDbOperationAsync(osClient, () =>
                     {
                         var db = OsClientExtend.GetClient(osClient).Db;
-                        db.FromSql("UPDATE sys_config SET SysLangs = @p0, SysLang = @p1, UpdateTime = @p2 WHERE Id = @p3")
+                        db.FromSql("UPDATE `sys_config` SET `SysLangs` = @p0, `SysLang` = @p1, `UpdateTime` = @p2 WHERE `Id` = @p3")
                             .AddInParameter("p0", sysLangs)
                             .AddInParameter("p1", TokenString(configRow, "SysLang"))
                             .AddInParameter("p2", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
@@ -1168,7 +1168,7 @@ namespace Microi.net
                 var ensureResult = await RunDiyLangDbOperationAsync(osClient, () =>
                 {
                     var db = OsClientExtend.GetClient(osClient).Db;
-                    var tableRows = db.FromSql("SELECT Id FROM diy_table WHERE Name = @p0 AND (IsDeleted <> 1 OR IsDeleted IS NULL)")
+                    var tableRows = db.FromSql("SELECT `Id` FROM `diy_table` WHERE LOWER(`Name`) = LOWER(@p0) AND (`IsDeleted` <> 1 OR `IsDeleted` IS NULL)")
                         .AddInParameter("p0", "sys_config")
                         .ToList<dynamic>();
                     var tableId = TokenString(ToJObjectSafe(tableRows?.FirstOrDefault()), "Id");
@@ -1177,10 +1177,10 @@ namespace Microi.net
                         return Task.FromResult<JObject>(null);
                     }
 
-                    var menuRows = db.FromSql(@"SELECT Id, Name, DiyTableId, MoreBtns
-                            FROM sys_menu
-                            WHERE DiyTableId = @p0 AND (IsDeleted <> 1 OR IsDeleted IS NULL)
-                            ORDER BY Sort")
+                    var menuRows = db.FromSql(@"SELECT `Id`, `Name`, `DiyTableId`, `MoreBtns`
+                            FROM `sys_menu`
+                            WHERE `DiyTableId` = @p0 AND (`IsDeleted` <> 1 OR `IsDeleted` IS NULL)
+                            ORDER BY `Sort`")
                         .AddInParameter("p0", tableId)
                         .ToList<dynamic>();
                     JObject menuRow = null;
@@ -1223,7 +1223,7 @@ namespace Microi.net
 
                     if (changed)
                     {
-                        db.FromSql("UPDATE sys_menu SET MoreBtns = @p0, UpdateTime = @p1 WHERE Id = @p2")
+                        db.FromSql("UPDATE `sys_menu` SET `MoreBtns` = @p0, `UpdateTime` = @p1 WHERE `Id` = @p2")
                             .AddInParameter("p0", buttons.ToString(Newtonsoft.Json.Formatting.None))
                             .AddInParameter("p1", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
                             .AddInParameter("p2", menuId)
@@ -1324,14 +1324,14 @@ namespace Microi.net
                 await RunDiyLangDbOperationAsync(osClient, () =>
                 {
                     var db = OsClientExtend.GetClient(osClient).Db;
-                    db.FromSql(@"UPDATE diy_field
-                            SET Label = @p0, Type = @p1, Component = @p2, TableWidth = @p3, UpdateTime = @p4
-                            WHERE TableName = @p5 AND Name = @p6 AND IsDeleted = 0")
+                    db.FromSql(@"UPDATE `diy_field`
+                            SET `Label` = @p0, `Type` = @p1, `Component` = @p2, `TableWidth` = @p3, `UpdateTime` = @p4
+                            WHERE `TableName` = @p5 AND `Name` = @p6 AND `IsDeleted` = 0")
                         .AddInParameter("p0", label ?? "")
                         .AddInParameter("p1", type ?? "")
                         .AddInParameter("p2", component ?? "")
-                        .AddInParameter("p3", tableWidth)
-                        .AddInParameter("p4", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
+                        .AddInParameter("p3", System.Data.DbType.Int32, tableWidth.HasValue ? (object)tableWidth.Value : DBNull.Value)
+                        .AddInParameter("p4", DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified))
                         .AddInParameter("p5", tableName)
                         .AddInParameter("p6", fieldName)
                         .ExecuteNonQuery();
@@ -1947,9 +1947,9 @@ namespace Microi.net
                         }
                         try
                         {
-                            var rows = db.FromSql($@"SELECT `Key`, ZhCN, `{lang.Field}`
-                                    FROM diy_lang
-                                    WHERE IsDeleted <> 1 OR IsDeleted IS NULL
+                            var rows = db.FromSql($@"SELECT `Key`, `ZhCN`, `{lang.Field}`
+                                    FROM `diy_lang`
+                                    WHERE `IsDeleted` <> 1 OR `IsDeleted` IS NULL
                                     LIMIT 300000")
                                 .ToList<dynamic>()
                                 .Select(ToJObjectSafe)
@@ -2054,7 +2054,7 @@ namespace Microi.net
                     OR LOWER(TRIM({field})) LIKE 'data.%')";
             }).ToArray();
             var candidateSql = string.Join(" OR ", candidatePredicates);
-            var selectFields = string.Join(", ", new[] { "Id", "`Key`", "ZhCN" }
+            var selectFields = string.Join(", ", new[] { "`Id`", "`Key`", "`ZhCN`" }
                 .Concat(targetLangs.Select(lang => $"`{lang.Field}`")));
             List<JObject> rows;
             try
@@ -2063,9 +2063,9 @@ namespace Microi.net
                 {
                     var db = OsClientExtend.GetClient(osClient).Db;
                     var data = db.FromSql($@"SELECT {selectFields}
-                            FROM diy_lang
-                            WHERE (IsDeleted <> 1 OR IsDeleted IS NULL)
-                              AND ZhCN IS NOT NULL AND ZhCN <> ''
+                            FROM `diy_lang`
+                            WHERE (`IsDeleted` <> 1 OR `IsDeleted` IS NULL)
+                              AND `ZhCN` IS NOT NULL AND `ZhCN` <> ''
                               AND ({candidateSql})
                             LIMIT {boundedRowLimit}")
                         .ToList<dynamic>()
@@ -2376,9 +2376,9 @@ namespace Microi.net
                 var rows = await RunDiyLangDbOperationAsync(osClient, () =>
                 {
                     var db = OsClientExtend.GetClient(osClient).Db;
-                    var data = db.FromSql(@"SELECT Id, `Key`, ParentId
-                            FROM diy_lang
-                            WHERE IsDeleted <> 1 OR IsDeleted IS NULL
+                    var data = db.FromSql(@"SELECT `Id`, `Key`, `ParentId`
+                            FROM `diy_lang`
+                            WHERE `IsDeleted` <> 1 OR `IsDeleted` IS NULL
                             LIMIT 300000")
                         .ToList<dynamic>()
                         .Select(ToJObjectSafe)
@@ -2406,9 +2406,9 @@ namespace Microi.net
                     await RunDiyLangDbOperationAsync(osClient, () =>
                     {
                         var db = OsClientExtend.GetClient(osClient).Db;
-                        db.FromSql("UPDATE diy_lang SET ParentId = @p0, UpdateTime = @p1 WHERE Id = @p2")
+                        db.FromSql("UPDATE `diy_lang` SET `ParentId` = @p0, `UpdateTime` = @p1 WHERE `Id` = @p2")
                             .AddInParameter("p0", parentId)
-                            .AddInParameter("p1", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
+                            .AddInParameter("p1", DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified))
                             .AddInParameter("p2", id)
                             .ExecuteNonQuery();
                         return Task.FromResult(1);
@@ -2485,9 +2485,9 @@ namespace Microi.net
                 var tableRows = await RunDiyLangDbOperationAsync(osClient, () =>
                 {
                     var db = OsClientExtend.GetClient(osClient).Db;
-                    var data = db.FromSql(@"SELECT Id, Name, Description, Tabs, TableTabs
-                            FROM diy_table
-                            WHERE IsDeleted <> 1 OR IsDeleted IS NULL
+                    var data = db.FromSql(@"SELECT `Id`, `Name`, `Description`, `Tabs`, `TableTabs`
+                            FROM `diy_table`
+                            WHERE `IsDeleted` <> 1 OR `IsDeleted` IS NULL
                             LIMIT 100000")
                         .ToList<dynamic>()
                         .Select(ToJObjectSafe)
@@ -2537,9 +2537,9 @@ namespace Microi.net
                 var fieldRows = await RunDiyLangDbOperationAsync(osClient, () =>
                 {
                     var db = OsClientExtend.GetClient(osClient).Db;
-                    var data = db.FromSql(@"SELECT Id, Name, Label, TableName, TableId, Config
-                            FROM diy_field
-                            WHERE IsDeleted <> 1 OR IsDeleted IS NULL
+                    var data = db.FromSql(@"SELECT `Id`, `Name`, `Label`, `TableName`, `TableId`, `Config`
+                            FROM `diy_field`
+                            WHERE `IsDeleted` <> 1 OR `IsDeleted` IS NULL
                             LIMIT 200000")
                         .ToList<dynamic>()
                         .Select(ToJObjectSafe)
@@ -2587,9 +2587,9 @@ namespace Microi.net
                 var menuRows = await RunDiyLangDbOperationAsync(osClient, () =>
                 {
                     var db = OsClientExtend.GetClient(osClient).Db;
-                    var data = db.FromSql(@"SELECT Id, Name, MoreBtns, FormBtns, BatchSelectMoreBtns, PageTabs, ExportMoreBtns, PageBtns
-                            FROM sys_menu
-                            WHERE IsDeleted <> 1 OR IsDeleted IS NULL
+                    var data = db.FromSql(@"SELECT `Id`, `Name`, `MoreBtns`, `FormBtns`, `BatchSelectMoreBtns`, `PageTabs`, `ExportMoreBtns`, `PageBtns`
+                            FROM `sys_menu`
+                            WHERE `IsDeleted` <> 1 OR `IsDeleted` IS NULL
                             LIMIT 100000")
                         .ToList<dynamic>()
                         .Select(ToJObjectSafe)
@@ -2892,7 +2892,7 @@ namespace Microi.net
                     configuredSysLangs = await RunDiyLangDbOperationAsync(osClient, () =>
                     {
                         var command = db.FromSql(
-                            "SELECT SysLangs FROM `sys_config` WHERE IsEnable = @isEnable LIMIT 1");
+                            "SELECT `SysLangs` FROM `sys_config` WHERE `IsEnable` = @isEnable LIMIT 1");
                         command.SetCommandTimeout(commandTimeoutSeconds);
                         var value = command
                             .AddInParameter("@isEnable", 1)
@@ -3559,9 +3559,9 @@ namespace Microi.net
             {
                 var db = OsClientExtend.GetClient(osClient).Db;
                 var row = db.FromSql(@"SELECT *
-                        FROM diy_lang
-                        WHERE `Key` = @p0 AND (IsDeleted <> 1 OR IsDeleted IS NULL)
-                        ORDER BY CreateTime DESC
+                        FROM `diy_lang`
+                        WHERE `Key` = @p0 AND (`IsDeleted` <> 1 OR `IsDeleted` IS NULL)
+                        ORDER BY `CreateTime` DESC
                         LIMIT 1")
                     .AddInParameter("p0", key)
                     .ToList<dynamic>()
@@ -3580,7 +3580,7 @@ namespace Microi.net
             return await RunDiyLangDbOperationAsync(osClient, () =>
             {
                 var db = OsClientExtend.GetClient(osClient).Db;
-                var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                var now = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified);
                 if (isNew && IsBlank(TokenString(row, "Id")))
                 {
                     // A deterministic primary key turns the cross-node read-then-insert race into
@@ -3640,10 +3640,10 @@ namespace Microi.net
                     }
                     ThrowIfDiyLangSyncOwnershipLost();
                     var setters = updateValues.Select((prop, index) => $"`{prop.Name}` = @p{index}").ToList();
-                    var updateCommand = db.FromSql($"UPDATE diy_lang SET {string.Join(",", setters)} WHERE Id = @p{updateValues.Count}");
+                    var updateCommand = db.FromSql($"UPDATE `diy_lang` SET {string.Join(",", setters)} WHERE `Id` = @p{updateValues.Count}");
                     for (var i = 0; i < updateValues.Count; i++)
                     {
-                        updateCommand.AddInParameter($"p{i}", TokenString(updateValues[i].Value));
+                        AddDiyLangValueParameter(updateCommand, $"p{i}", updateValues[i].Name, updateValues[i].Value);
                     }
                     updateCommand.AddInParameter($"p{updateValues.Count}", id);
                     return updateCommand.ExecuteNonQuery();
@@ -3653,10 +3653,10 @@ namespace Microi.net
                 {
                     var columns = values.Select(prop => $"`{prop.Name}`").ToList();
                     var parameters = values.Select((prop, index) => $"@p{index}").ToList();
-                    var cmd = db.FromSql($"INSERT INTO diy_lang ({string.Join(",", columns)}) VALUES ({string.Join(",", parameters)})");
+                    var cmd = db.FromSql($"INSERT INTO `diy_lang` ({string.Join(",", columns)}) VALUES ({string.Join(",", parameters)})");
                     for (var i = 0; i < values.Count; i++)
                     {
-                        cmd.AddInParameter($"p{i}", TokenString(values[i].Value));
+                        AddDiyLangValueParameter(cmd, $"p{i}", values[i].Name, values[i].Value);
                     }
                     try
                     {
@@ -3670,15 +3670,15 @@ namespace Microi.net
                         // unique index) and converge by update instead of creating a duplicate.
                         ThrowIfDiyLangSyncOwnershipLost();
                         var existingSql = hasKeyHashColumn
-                            ? @"SELECT Id
-                                FROM diy_lang
-                                WHERE Id = @p0 OR KeyHash = @p1 OR `Key` = @p2
-                                ORDER BY CASE WHEN Id = @p0 THEN 0 WHEN KeyHash = @p1 THEN 1 ELSE 2 END
+                            ? @"SELECT `Id`
+                                FROM `diy_lang`
+                                WHERE `Id` = @p0 OR `KeyHash` = @p1 OR `Key` = @p2
+                                ORDER BY CASE WHEN `Id` = @p0 THEN 0 WHEN `KeyHash` = @p1 THEN 1 ELSE 2 END
                                 LIMIT 1"
-                            : @"SELECT Id
-                                FROM diy_lang
-                                WHERE Id = @p0 OR `Key` = @p1
-                                ORDER BY CASE WHEN Id = @p0 THEN 0 ELSE 1 END
+                            : @"SELECT `Id`
+                                FROM `diy_lang`
+                                WHERE `Id` = @p0 OR `Key` = @p1
+                                ORDER BY CASE WHEN `Id` = @p0 THEN 0 ELSE 1 END
                                 LIMIT 1";
                         var existingCommand = db.FromSql(existingSql)
                             .AddInParameter("p0", TokenString(row, "Id"));
@@ -3716,6 +3716,25 @@ namespace Microi.net
                 }
                 return Task.FromResult(new DosResult(1, row, isNew ? "Added." : "Updated."));
             });
+        }
+
+        private static void AddDiyLangValueParameter(
+            SqlSection command,
+            string parameterName,
+            string fieldName,
+            JToken value)
+        {
+            var text = TokenString(value);
+            if ((string.Equals(fieldName, "CreateTime", StringComparison.OrdinalIgnoreCase)
+                 || string.Equals(fieldName, "UpdateTime", StringComparison.OrdinalIgnoreCase))
+                && DateTime.TryParse(text, out var dateTime))
+            {
+                command.AddInParameter(
+                    parameterName,
+                    DateTime.SpecifyKind(dateTime, DateTimeKind.Unspecified));
+                return;
+            }
+            command.AddInParameter(parameterName, text);
         }
 
         internal static string BuildDeterministicDiyLangRowId(string osClient, string key)

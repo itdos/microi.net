@@ -71,7 +71,7 @@ export function createApp() {
 `Microi.Client` 主后台运行时已内置前后端同构的 `V8.Http.Get/Post/Patch` 及对应 Response 方法；表单事件、按钮 V8 等宿主前端新代码必须优先使用 `V8.Http`，旧 `V8.Post/Get` 仅作兼容保留，其参数和兼容规则以 `v8-http-integration/SKILL.md` 为准。独立项目使用本 SDK、且不在主后台 V8 宿主中时，才使用 SDK 自身的小写 `V8.get/post`、`ApiEngine`、`FormEngine`；不要把它们与宿主旧版大写 `V8.Post/Get` 混为一谈，也不要假设浏览器可以绕过第三方接口的 CORS。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-002 sha256=54b302bfe2a8830a3043ae7804ca775d6159453bea0cfdeac61c3b97d36466ed -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-002 sha256=b71205548e4701f8bf53e2bed3da914da4ca0f49e0cce952a1c938fc77218ed8 -->
 ## 登录与验证码封装
 
 SDK 或项目请求模块必须提供登录所需的系统配置和验证码薄封装，不要让页面散落手写。
@@ -132,7 +132,7 @@ SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业
 - 验收时检查真实网络请求：不得出现 `osclient: demo, demo`、`Authorization: Bearer xxx, Bearer xxx` 这类逗号合并值。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-frontend-sdk-004 sha256=f5644fc45280e53988d1eed432e57afc2c56fc58b1232505950359219b5220d2 -->
+<!-- microi-progressive:chunk id=microi-frontend-sdk-004 sha256=1ecb73f5b1246c7157d782b62cba59850389858baeefdc5351a255d4d04b11b6 -->
 ## 上传规则
 
 `V8.uploadFile` 是 Microi 前端唯一允许的上传入口。SDK 实现必须：
@@ -140,6 +140,7 @@ SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业
 - 使用 multipart 上传头。`uni.uploadFile` 或 `fetch(FormData)` 不得发送 `Content-Type: application/json`。
 - 租户请求头只发送一个键：`osclient`。添加配置租户前，先移除传入的 `osclient` / `OsClient` 重复键。
 - `formData` 中发送 `OsClient`；开启 `appendOsClientQuery` 时保留接口查询参数 `?OsClient=tenant`。
+- 标准表单的 `ImgUpload`、`FileUpload`、`RichText` 必须通过 `formFieldContext`（或等价 `formData`）发送 `FormEngineKey + FieldId + SysMenuId`；编辑已有记录再传 `FormDataId`，TableChild 再传 JSON 化的 `_TableChildAuth`。服务端以当前租户字段配置和 FormEngine 动作授权决定实际 `Limit/Path`，SDK 不能按帐号等级强制私有，也不能信任页面传入的 `Limit=false`。
 - 上传 `Path` 统一从 `options.path`、`formData.Path` 或 `formData.path` 归一化。
 - 移动端上传路径必须是安全相对路径，例如 `mall/pay-proof` 或 `mall/member/avatar`。不要使用 `/mall/pay-proof`、完整 URL、磁盘路径、`..`、`:`、`//` 或 `~`。
 - 项目薄封装要通过 `{ ...options, path: options.path || defaultPath }` 透传全部选项，避免丢失页面级 `headers`、`action`、`anonymous`、`file`、`formData` 和 `silentError`。

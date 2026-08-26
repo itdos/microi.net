@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-24 09:25:54
+# 版本：v2026-08-27 06:30:07
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -30,7 +30,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-24 09:25:54"
+SCRIPT_VERSION="v2026-08-27 06:30:07"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -44,12 +44,12 @@ fi
 if [ -n "${MICROI_INSTALL_CLIENT_IMAGE_OVERRIDE:-}" ]; then
   APP_CLIENT_PULL_POLICY="never"
 fi
-OCR_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/paddlex-ocr:3.6.1-paddle3.2.2-cpu"
+OCR_IMAGE="${MICROI_INSTALL_OCR_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/paddlex-ocr:3.6.1-paddle3.2.2-cpu}"
 OCR_CONTAINER_NAME="microi-install-ocr"
 OCR_INTERNAL_PORT=8080
 OCR_RUNTIME_NETWORK="microi-ocr"
 OCR_SERVICE_ENDPOINT="http://${OCR_CONTAINER_NAME}:${OCR_INTERNAL_PORT}/ocr"
-LIBRETRANSLATE_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6-microi1"
+LIBRETRANSLATE_IMAGE="${MICROI_INSTALL_LIBRETRANSLATE_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6-microi1}"
 LIBRETRANSLATE_CONTAINER_NAME="microi-install-libretranslate"
 LIBRETRANSLATE_INTERNAL_PORT=5000
 LIBRETRANSLATE_SERVICE_ENDPOINT="http://${LIBRETRANSLATE_CONTAINER_NAME}:${LIBRETRANSLATE_INTERNAL_PORT}"
@@ -287,7 +287,7 @@ repair_db_connection_has_required_shape() {
         && repair_db_connection_has_value "${db_conn}" 'Password|Pwd' \
         && repair_db_connection_has_value "${db_conn}" 'Port'
       ;;
-    SqlServer)
+    SqlServer|SqlServer9)
       repair_db_connection_has_value "${db_conn}" 'Data[[:space:]]+Source|Server' \
         && repair_db_connection_has_value "${db_conn}" 'Initial[[:space:]]+Catalog|Database' \
         && repair_db_connection_has_value "${db_conn}" 'User([[:space:]]+Id)?|Uid' \
@@ -340,7 +340,7 @@ repair_build_installer_db_connection() {
   local encoded_password=""
   case "${db_type}" in
     MySql) password_key='MYSQL_ROOT_PASSWORD' ;;
-    SqlServer) password_key='MSSQL_SA_PASSWORD' ;;
+    SqlServer|SqlServer9) password_key='MSSQL_SA_PASSWORD' ;;
     DaMeng) password_key='SYSDBA_PWD' ;;
     PostgreSql) password_key='POSTGRES_PASSWORD' ;;
     *) return 1 ;;
@@ -353,7 +353,7 @@ repair_build_installer_db_connection() {
       printf 'Data Source=%s;Database=%s;User Id=root;Password=%s;Port=%s;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;' \
         "${db_container}" "${database_name}" "${encoded_password}" "${db_internal_port}"
       ;;
-    SqlServer)
+    SqlServer|SqlServer9)
       printf 'Data Source=%s,%s;Initial Catalog=%s;User ID=sa;Password=%s;Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;' \
         "${db_container}" "${db_internal_port}" "${database_name}" "${encoded_password}"
       ;;
@@ -449,7 +449,7 @@ repair_migrate_app_to_internal_network() {
       db_candidates=(microi-install-mysql57 microi-install-mysql80)
       db_internal_port=3306
       ;;
-    SqlServer)
+    SqlServer|SqlServer9)
       db_candidates=(microi-install-sqlserver2022)
       db_internal_port=1433
       ;;
@@ -525,7 +525,7 @@ repair_migrate_app_to_internal_network() {
       db_conn=$(printf '%s' "${db_conn}" | sed -E \
         "s/((Data Source|Server|Host)=)[^;]*/\\1${db_container}/I;s/(Port=)[0-9]+/\\1${db_internal_port}/I")
       ;;
-    SqlServer)
+    SqlServer|SqlServer9)
       db_conn=$(printf '%s' "${db_conn}" | sed -E \
         "s/(Data Source=)[^;]*/\\1${db_container},${db_internal_port}/I")
       ;;
@@ -903,6 +903,7 @@ fi
 # 既保留真正的非零退出码，也避免早期输入/环境错误输出尚未生成的敏感配置。
 INSTALL_RECOVERY_SUMMARY_ENABLED=0
 INSTALL_SUMMARY_PRINTED=0
+INSTALL_CURRENT_STAGE="初始化"
 SQL_TMP_DIR=""
 SQL_ZIP_IS_TEMP=0
 SQL_ZIP_FILE=""
@@ -910,8 +911,29 @@ MYSQL_CLIENT_CONFIG_FILE=""
 MINIO_MC_CONFIG_DIR=""
 API_LIVENESS_READY=0
 API_READINESS_READY=0
+OCR_INSTALL_SUPPORTED=1
+OCR_INSTALL_STATUS="待安装"
+OCR_SERVICE_READY=0
 OCR_SAAS_CONFIG_READY=0
+LIBRETRANSLATE_INSTALL_STATUS="待选择"
+LIBRETRANSLATE_API_KEY_INITIALIZED=0
+LIBRETRANSLATE_SERVICE_READY=0
 TRANSLATE_SAAS_CONFIG_READY=0
+OPTIONAL_RUNTIME_NETWORK_READY=0
+OPTIONAL_COMPONENT_PHASE_STARTED=0
+OPTIONAL_COMPONENT_FAILURE_COUNT=0
+OPTIONAL_COMPONENT_WARNINGS=()
+
+# OCR 与 LibreTranslate 是默认安装的附加能力，但不属于 API/Web 的启动前置。
+# 失败时保留现场、记录原因并继续核心平台；不得把附加组件失败伪装成成功。
+record_optional_component_failure() {
+  local component="$1"
+  local reason="$2"
+  OPTIONAL_COMPONENT_FAILURE_COUNT=$((OPTIONAL_COMPONENT_FAILURE_COUNT + 1))
+  OPTIONAL_COMPONENT_WARNINGS+=("${component}: ${reason}")
+  echo "Microi：警告：${component}${reason}"
+  echo 'Microi：该附加组件不会被启用；数据库、Redis、MongoDB、MinIO、API 与 Web 的安装将继续。'
+}
 
 cleanup_database_import_temp() {
   if [[ "${SQL_TMP_DIR:-}" == /tmp/microi_database_* ]] && [ -d "${SQL_TMP_DIR}" ]; then
@@ -1060,8 +1082,14 @@ print_generated_install_configuration() {
     && [ -n "${QDRANT_API_KEY:-}" ]; then
     echo "Qdrant API Key: ${QDRANT_API_KEY}"
   fi
-  if [ "${summary_mode}" = "recovery" ] && [ "${INSTALL_LIBRETRANSLATE:-0}" = "1" ]; then
-    echo 'LibreTranslate API Key: 已随机生成；为避免密钥泄露，终端不输出明文。若初始化步骤已完成，密钥库位于 /microi/libretranslate/api-keys/api_keys.db。'
+  if [ "${summary_mode}" = "recovery" ] \
+    && [ "${OPTIONAL_COMPONENT_PHASE_STARTED:-0}" = "1" ] \
+    && [ "${INSTALL_LIBRETRANSLATE:-0}" = "1" ]; then
+    if [ "${LIBRETRANSLATE_API_KEY_INITIALIZED:-0}" = "1" ]; then
+      echo 'LibreTranslate API Key: 已随机生成并回读；为避免密钥泄露，终端不输出明文。密钥库位于 /microi/libretranslate/api-keys/api_keys.db。'
+    else
+      echo 'LibreTranslate API Key: 尚未完成初始化；终端没有输出或保存可用明文密钥。'
+    fi
   fi
 }
 
@@ -1072,6 +1100,7 @@ print_install_recovery_summary() {
   echo "Microi：安装未完成（退出码 ${exit_code}）"
   echo 'Microi：以下为本次已经生成的配置，便于排查和恢复；不代表所有服务均已安装或可用。'
   echo 'Microi：原始失败原因位于本汇总上方，脚本仍以非零状态退出。'
+  echo "Microi：失败时所在阶段：${INSTALL_CURRENT_STAGE:-未知阶段}"
   echo '=================================================================='
   echo ''
   print_generated_install_configuration "recovery"
@@ -1080,16 +1109,22 @@ print_install_recovery_summary() {
   echo '------------------------------------------------------------------'
   echo "API liveness: $([ "${API_LIVENESS_READY:-0}" = "1" ] && echo '已通过' || echo '未确认')"
   echo "API readiness: $([ "${API_READINESS_READY:-0}" = "1" ] && echo '已通过' || echo '未确认')"
-  if [ "${OCR_SAAS_CONFIG_READY:-0}" = "1" ]; then
-    echo 'OCR SaaS 配置: 已写入并回读；最终 API readiness 仍以上一行状态为准。'
+  if [ "${OPTIONAL_COMPONENT_PHASE_STARTED:-0}" != "1" ]; then
+    echo 'OCR / LibreTranslate: 尚未进入附加能力部署阶段，不是本次核心安装退出的直接原因。'
   else
-    echo 'OCR SaaS 配置: 未完成，安装器未把 OCR 视为已启用，也没有绕过 Upgrade29。'
-  fi
-  if [ "${INSTALL_LIBRETRANSLATE:-0}" = "1" ]; then
-    if [ "${TRANSLATE_SAAS_CONFIG_READY:-0}" = "1" ]; then
-      echo 'LibreTranslate SaaS 配置: 已写入并回读；最终 API readiness 仍以上一行状态为准。'
+    echo "OCR 安装状态: ${OCR_INSTALL_STATUS:-未开始}"
+    if [ "${OCR_SAAS_CONFIG_READY:-0}" = "1" ]; then
+      echo 'OCR SaaS 配置: 已写入并回读；最终 API readiness 仍以上一行状态为准。'
     else
-      echo 'LibreTranslate SaaS 配置: 未完成，安装器没有绕过 Upgrade31。'
+      echo 'OCR SaaS 配置: 未完成，安装器未把 OCR 视为已启用，也没有绕过 Upgrade29。'
+    fi
+    if [ "${INSTALL_LIBRETRANSLATE:-0}" = "1" ]; then
+      echo "LibreTranslate 安装状态: ${LIBRETRANSLATE_INSTALL_STATUS:-未开始}"
+      if [ "${TRANSLATE_SAAS_CONFIG_READY:-0}" = "1" ]; then
+        echo 'LibreTranslate SaaS 配置: 已写入并回读；最终 API readiness 仍以上一行状态为准。'
+      else
+        echo 'LibreTranslate SaaS 配置: 未完成，安装器没有绕过 Upgrade31。'
+      fi
     fi
   fi
   if command -v docker > /dev/null 2>&1; then
@@ -1101,7 +1136,11 @@ print_install_recovery_summary() {
     [ -n "${api_image_created}" ] && echo "当前 API 本地镜像创建时间: ${api_image_created}"
   fi
   echo ''
-  echo 'Microi：建议先查看 docker logs --tail 200 microi-install-api，并核对上方 API 镜像与 Upgrade29/Upgrade31 日志。'
+  if docker inspect microi-install-api > /dev/null 2>&1; then
+    echo 'Microi：建议先查看 docker logs --tail 200 microi-install-api，并核对上方 API 镜像和平台完整升级日志。'
+  else
+    echo 'Microi：API 容器尚未创建；请优先核对上方原始错误、失败阶段以及当前已创建容器的日志。'
+  fi
   echo 'Microi：不要删除脚本新装服务的数据目录，也不要执行 docker compose down -v。'
   if [ "${DATABASE_SERVICE_MODE:-managed}" = 'external' ] || [ "${MINIO_SERVICE_MODE:-managed}" = 'external' ]; then
     echo 'Microi：已有 MySQL/MinIO 属于客户外部服务；排障时不要删除、重建、清空或覆盖其中的数据。'
@@ -1110,7 +1149,7 @@ print_install_recovery_summary() {
   echo '------------------------------------------------------------------'
   echo '当前容器状态（仅供排查，不等同 readiness）：'
   echo '------------------------------------------------------------------'
-  docker ps --filter 'name=microi-install-' --format 'table {{.Names}}\t{{.Status}}' 2>/dev/null || true
+  docker ps -a --filter 'name=microi-install-' --format 'table {{.Names}}\t{{.Status}}' 2>/dev/null || true
   echo '=================================================================='
 }
 
@@ -1186,6 +1225,8 @@ configure_database_profile() {
       ;;
     3)
       DATABASE_DISPLAY_NAME="SQL Server 2022"
+      # 配置保持 SQL Server 平台名；后端同时接受 SqlServer/SqlServer9，
+      # 并统一使用现代 SQL Server 会话 Provider。
       DATABASE_TYPE="SqlServer"
       DATABASE_ENGINE_KEY="sqlserver2022"
       DATABASE_PORT_NAME="SQL Server"
@@ -1834,7 +1875,7 @@ detect_sql_database_name_from_archive() {
         return 1
       fi
       ;;
-    SqlServer)
+    SqlServer|SqlServer9)
       if ! candidates=$(set -o pipefail; unzip -p "${archive_path}" "${archive_entry}" \
           | tr -d '\r`"[]' \
           | sed -nE \
@@ -1870,7 +1911,7 @@ detect_sql_database_name_from_archive() {
       if (database_type == "MySql" \
         && (normalized == "mysql" || normalized == "information_schema" \
           || normalized == "performance_schema" || normalized == "sys")) next
-      if (database_type == "SqlServer" \
+      if ((database_type == "SqlServer" || database_type == "SqlServer9") \
         && (normalized == "master" || normalized == "tempdb" \
           || normalized == "model" || normalized == "msdb")) next
       if (database_type == "PostgreSql" \
@@ -2575,6 +2616,7 @@ echo ''
 # ============================================================
 echo '[步骤1/11] 环境检测与系统准备'
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤1/11 环境检测与系统准备"
 
 # === 检测操作系统类型（全局变量，后续防火墙等操作依赖此变量） ===
 detect_os() {
@@ -2593,16 +2635,17 @@ detect_os() {
 }
 detect_os
 
-# 当前发布的 PaddlePaddle CPU 固定镜像只交付 linux/amd64。显式失败，避免在
-# ARM 主机拉到错误架构后才于安装中途报 exec format error。
+# 当前发布的 PaddlePaddle CPU 固定镜像只交付 linux/amd64。其它架构只跳过
+# OCR 附加组件，不能因此阻断与 OCR 无关的 Microi 核心平台安装。
 case "$(uname -m)" in
   x86_64|amd64)
     echo 'Microi：OCR 镜像架构检查通过（linux/amd64）✓'
     ;;
   *)
-    echo "Microi：错误：当前一键安装 OCR 镜像仅支持 linux/amd64，检测到 $(uname -m)。"
-    echo 'Microi：请使用 x86_64 服务器，或按官方文档单独构建与当前架构匹配的 OCR 镜像。'
-    exit 1
+    OCR_INSTALL_SUPPORTED=0
+    OCR_INSTALL_STATUS="已跳过（架构不支持）"
+    record_optional_component_failure 'OCR：' "未安装，当前固定镜像仅支持 linux/amd64，检测到 $(uname -m)。"
+    echo 'Microi：如需 OCR，请按官方文档单独构建与当前架构匹配的镜像。'
     ;;
 esac
 
@@ -2892,6 +2935,7 @@ append_libretranslate_language() {
 
 if [ "${install_libretranslate}" == "1" ]; then
   INSTALL_LIBRETRANSLATE=1
+  LIBRETRANSLATE_INSTALL_STATUS="待安装"
   echo ''
   echo 'Microi：LibreTranslate 支持的语言（中文名 / key）：'
   echo '  简体中文 zh    繁体中文 zt    英语 en        日语 ja'
@@ -2947,6 +2991,7 @@ if [ "${install_libretranslate}" == "1" ]; then
   echo "Microi：将安装 LibreTranslate，加载语言：${LIBRETRANSLATE_LANGS_CSV} ✓"
 elif [ "${install_libretranslate}" == "0" ]; then
   INSTALL_LIBRETRANSLATE=0
+  LIBRETRANSLATE_INSTALL_STATUS="已按用户选择跳过"
   echo 'Microi：将跳过 LibreTranslate 翻译服务安装 ✓'
 else
   echo 'Microi：错误：无效的输入，脚本退出。'
@@ -2975,6 +3020,7 @@ echo '[步骤1/11] 环境检测完成 ✓'
 echo ''
 echo '[步骤2/11] Docker 环境安装与检查'
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤2/11 Docker 环境安装与检查"
 
 # === 自动安装Docker（无需确认） ===
 install_docker() {
@@ -3178,20 +3224,22 @@ ensure_ocr_runtime_network() {
   if docker network inspect "${OCR_RUNTIME_NETWORK}" > /dev/null 2>&1; then
     existing_driver=$(docker network inspect "${OCR_RUNTIME_NETWORK}" --format '{{.Driver}}')
     if [ "${existing_driver}" != "bridge" ]; then
-      echo "Microi：错误：已存在 ${OCR_RUNTIME_NETWORK} 网络，但驱动为 ${existing_driver}，不是 bridge。"
+      echo "Microi：警告：已存在 ${OCR_RUNTIME_NETWORK} 网络，但驱动为 ${existing_driver}，不是 bridge。"
       echo 'Microi：为避免影响现有容器，脚本不会自动删除或修改该网络。'
-      exit 1
+      record_optional_component_failure 'OCR/LibreTranslate 内部网络：' '不可用，两个附加组件将跳过。'
+      return 1
     fi
     echo "Microi：已复用 OCR 内部网络 ${OCR_RUNTIME_NETWORK} ✓"
   else
     echo "Microi：正在创建 OCR 内部网络 ${OCR_RUNTIME_NETWORK}..."
     if ! docker network create --driver bridge "${OCR_RUNTIME_NETWORK}" > /dev/null; then
-      echo "Microi：错误：OCR 内部网络 ${OCR_RUNTIME_NETWORK} 创建失败。"
-      exit 1
+      record_optional_component_failure 'OCR/LibreTranslate 内部网络：' "${OCR_RUNTIME_NETWORK} 创建失败，两个附加组件将跳过。"
+      return 1
     fi
     echo "Microi：OCR 内部网络 ${OCR_RUNTIME_NETWORK} 创建成功 ✓"
   fi
 
+  OPTIONAL_RUNTIME_NETWORK_READY=1
   OCR_COMPOSE_SERVICE_NETWORK=$'    networks:\n      - microi-ocr'
   OCR_COMPOSE_EXTERNAL_NETWORKS=$'networks:\n  microi-ocr:\n    external: true\n    name: microi-ocr'
   APP_API_SERVICE_NETWORK=$'    networks:\n      - microi\n      - microi-ocr'
@@ -3199,6 +3247,7 @@ ensure_ocr_runtime_network() {
 }
 
 # === 检查已有容器/编排 ===
+INSTALL_CURRENT_STAGE="检测已有或中断的一键安装容器"
 EXISTING_MICROI_CONTAINERS=$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^microi-install-' || true)
 if [ -n "${EXISTING_MICROI_CONTAINERS}" ]; then
   echo ''
@@ -3211,6 +3260,7 @@ if [ -n "${EXISTING_MICROI_CONTAINERS}" ]; then
   exit 1
 fi
 
+INSTALL_CURRENT_STAGE="步骤2/11 建立 Docker 共享资源池与网络"
 calculate_microi_resource_plan
 verify_docker_resource_limit_capabilities
 detect_microi_cgroup_runtime
@@ -3219,7 +3269,15 @@ verify_microi_shared_resource_pool
 print_microi_resource_plan
 
 ensure_microi_network
-ensure_ocr_runtime_network
+# API 始终先具备核心 microi 网络；附加组件网络失败时保持该配置，不让
+# Compose 因引用不可用的 OCR/翻译网络而阻断 API 与 Web。
+APP_API_SERVICE_NETWORK="${COMPOSE_SERVICE_NETWORK}"
+APP_COMPOSE_EXTERNAL_NETWORKS="${COMPOSE_EXTERNAL_NETWORKS}"
+OCR_COMPOSE_SERVICE_NETWORK=''
+OCR_COMPOSE_EXTERNAL_NETWORKS=''
+if [ "${OCR_INSTALL_SUPPORTED}" = "1" ] || [ "${INSTALL_LIBRETRANSLATE}" = "1" ]; then
+  ensure_ocr_runtime_network || true
+fi
 
 # === 安装依赖工具（unzip/curl/openssl） ===
 install_deps() {
@@ -3302,6 +3360,7 @@ fi
 echo ''
 echo '[步骤3/11] 端口分配与占用检测'
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤3/11 端口分配与占用检测"
 
 # 工具函数
 generate_random_password() {
@@ -3529,6 +3588,7 @@ echo '[步骤3/11] 端口分配完成 ✓'
 echo ''
 echo '[步骤4/11] 生成密码与数据目录'
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤4/11 生成密码与数据目录"
 
 if [ "${DATABASE_SERVICE_MODE}" = 'external' ]; then
   DATABASE_PASSWORD="${MYSQL_EXTERNAL_PASSWORD}"
@@ -3679,12 +3739,41 @@ compose_up() {
   fi
 }
 
+# 附加组件使用独立的非阻塞部署入口。它保留失败容器和日志供排查，返回非零
+# 交给调用方记录降级状态，但绝不退出整个安装流程或删除已经安装的核心服务。
+compose_up_optional() {
+  local project_dir="$1"
+  local project_name
+  local cname
+  project_name=$(basename "${project_dir}")
+  echo ""
+  echo "Microi：正在部署附加编排 [${project_name}]..."
+  if ! (cd "${project_dir}" && docker compose config > /dev/null); then
+    echo "Microi：警告：附加编排 [${project_name}] 静态校验失败，未启动容器。"
+    return 1
+  fi
+  if (cd "${project_dir}" && docker compose up -d); then
+    echo "Microi：附加编排 [${project_name}] 已启动 ✓"
+    return 0
+  fi
+
+  echo "Microi：警告：附加编排 [${project_name}] 部署失败。"
+  echo 'Microi：尝试输出相关容器日志：'
+  while IFS= read -r cname; do
+    [ -n "${cname}" ] || continue
+    echo "--- 容器 ${cname} 日志 ---"
+    docker logs "${cname}" 2>&1 | tail -30 || true
+  done < <(cd "${project_dir}" && docker compose ps -a --format '{{.Name}}' 2>/dev/null || true)
+  return 1
+}
+
 # ============================================================
 # 步骤5：开放防火墙端口（安装前先开放）
 # ============================================================
 echo ''
 echo '[步骤5/11] 开放防火墙端口'
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤5/11 开放防火墙端口"
 
 echo 'Microi：在部署服务前，先开放需要对外访问的端口...'
 for port in ${FIREWALL_PORTS}; do
@@ -3730,6 +3819,7 @@ echo '=================================================================='
 echo ''
 echo "[步骤6/11] 部署或连接 ${DATABASE_DISPLAY_NAME}"
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤6/11 部署或连接 ${DATABASE_DISPLAY_NAME}"
 
 prepare_external_mysql_client_config() {
   local escaped_host=""
@@ -4006,6 +4096,7 @@ esac
 chmod 600 "${DATABASE_DIR}/docker-compose.yml"
 echo "Microi：数据库编排文件已生成: ${DATABASE_DIR}/docker-compose.yml ✓"
 
+INSTALL_CURRENT_STAGE="步骤6/11 启动并验收 ${DATABASE_DISPLAY_NAME} 容器"
 compose_up "${DATABASE_DIR}"
 verify_container_shared_resource_pool "${DATABASE_CONTAINER_NAME}"
 
@@ -4069,7 +4160,7 @@ database_exec_sql() {
       run_mysql_client 1 -e "${sql}"
       ;;
     3)
-      docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d "${DATABASE_NAME}" -Q "${sql}"
+      docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d "${DATABASE_NAME}" -Q "SET ANSI_NULLS ON; SET ANSI_PADDING ON; SET ANSI_WARNINGS ON; SET ARITHABORT ON; SET CONCAT_NULL_YIELDS_NULL ON; SET QUOTED_IDENTIFIER ON; SET NUMERIC_ROUNDABORT OFF; ${sql}"
       ;;
     5)
       printf 'WHENEVER SQLERROR EXIT SQL.SQLCODE;\n%s\nCOMMIT;\nEXIT;\n' "${sql}" | docker exec -e LD_LIBRARY_PATH=/opt/dmdbms/bin -i "${DATABASE_CONTAINER_NAME}" /opt/dmdbms/bin/disql "${DATABASE_USER}/${DATABASE_PASSWORD}@127.0.0.1:${DATABASE_INTERNAL_PORT}"
@@ -4078,6 +4169,169 @@ database_exec_sql() {
       docker exec -e PGPASSWORD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U "${DATABASE_USER}" -d "${DATABASE_NAME}" -c "${sql}"
       ;;
   esac
+}
+
+# 旧版 PostgreSQL/Kingbase 空库转换器曾把 MySQL BIT 字段输出为 BOOLEAN，
+# 但 Microi 既有 FormEngine、V8 与升级 SQL 对这些开关统一使用跨库 0/1 语义。
+# 新转换器已改为 SMALLINT；这里对已发布的 PostgreSQL 空库做一次事务内兼容修复，
+# 使用户无需等待数据库包重新发布，也能直接完成一键安装。
+normalize_postgresql_bit_storage() {
+  [ "${DATABASE_CHOICE}" = "6" ] || return 0
+
+  local migration_sql=""
+  local readback=""
+  read -r -d '' migration_sql <<'MICROI_POSTGRES_BIT_SQL' || true
+DO $microi$
+DECLARE
+  item record;
+  normalized_default text;
+BEGIN
+  FOR item IN
+    SELECT table_schema, table_name, column_name, column_default
+    FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND data_type = 'boolean'
+    ORDER BY table_name, ordinal_position
+  LOOP
+    EXECUTE format(
+      'ALTER TABLE %I.%I ALTER COLUMN %I DROP DEFAULT',
+      item.table_schema, item.table_name, item.column_name);
+    EXECUTE format(
+      'ALTER TABLE %I.%I ALTER COLUMN %I TYPE SMALLINT USING CASE WHEN %I IS TRUE THEN 1 WHEN %I IS FALSE THEN 0 ELSE NULL END',
+      item.table_schema, item.table_name, item.column_name,
+      item.column_name, item.column_name);
+    IF item.column_default IS NOT NULL THEN
+      normalized_default := CASE
+        WHEN position('true' in lower(item.column_default)) > 0 THEN '1'
+        ELSE '0'
+      END;
+      EXECUTE format(
+        'ALTER TABLE %I.%I ALTER COLUMN %I SET DEFAULT %s',
+        item.table_schema, item.table_name, item.column_name, normalized_default);
+    END IF;
+  END LOOP;
+END
+$microi$;
+MICROI_POSTGRES_BIT_SQL
+
+  echo 'Microi：规范化 PostgreSQL 空库 BIT 开关字段为跨数据库 0/1 存储...'
+  if ! database_exec_sql "${migration_sql}" > /dev/null; then
+    echo 'Microi：错误：PostgreSQL BIT/BOOLEAN 兼容修复失败，已停止 API 启动。'
+    return 1
+  fi
+  readback=$(database_exec_sql "SELECT CASE WHEN COUNT(*)=0 THEN 'MICROI_POSTGRES_BIT_STORAGE_READY' ELSE 'MICROI_POSTGRES_BOOLEAN_REMAINING:' || COUNT(*)::text END AS Marker FROM information_schema.columns WHERE table_schema=current_schema() AND data_type='boolean';" 2>&1 || true)
+  if ! printf '%s\n' "${readback}" | grep -q 'MICROI_POSTGRES_BIT_STORAGE_READY'; then
+    echo 'Microi：错误：PostgreSQL BIT/BOOLEAN 兼容修复后仍存在未规范化字段。'
+    printf '%s\n' "${readback}" | tail -20
+    return 1
+  fi
+  echo 'Microi：PostgreSQL BIT 开关字段已规范化并回读一致 ✓'
+}
+
+# MySQL 允许唯一索引中任意一列为 NULL 的多行并存；SQL Server 默认会把
+# NULL 也纳入唯一性判断。新空库转换器会直接生成过滤唯一索引；这里在导入前
+# 兼容已经发布的旧 SQL Server 空库包，并且只过滤索引中实际可空的列。
+normalize_sqlserver_nullable_unique_indexes() {
+  [ "${DATABASE_CHOICE}" = "3" ] || return 0
+
+  local normalized_file="${SQL_TMP_DIR}/microi-database-init.sqlserver-normalized"
+  local report_file="${SQL_TMP_DIR}/sqlserver-nullable-unique-index.count"
+  local normalized_count=""
+
+  if ! awk -v report_file="${report_file}" '
+    BEGIN {
+      print "SET ANSI_NULLS ON;"
+      print "SET ANSI_PADDING ON;"
+      print "SET ANSI_WARNINGS ON;"
+      print "SET ARITHABORT ON;"
+      print "SET CONCAT_NULL_YIELDS_NULL ON;"
+      print "SET QUOTED_IDENTIFIER ON;"
+      print "SET NUMERIC_ROUNDABORT OFF;"
+    }
+    {
+      line = $0
+
+      if (line ~ /^CREATE TABLE \[dbo\]\.\[[^]]+\] \($/) {
+        current_table = line
+        sub(/^CREATE TABLE \[dbo\]\.\[/, "", current_table)
+        sub(/\] \($/, "", current_table)
+      } else if (current_table != "" && line ~ /^  \[[^]]+\] /) {
+        column_name = line
+        sub(/^  \[/, "", column_name)
+        sub(/\].*$/, "", column_name)
+        if (line !~ / NOT NULL/) {
+          nullable_predicate[current_table SUBSEP column_name] = column_name
+        }
+      } else if (current_table != "" && line ~ /^\);[[:space:]]*$/) {
+        current_table = ""
+      }
+
+      # Prefix indexes use a persisted computed key. When such a source column is
+      # nullable, filter by the original column because SQL Server does not allow
+      # a computed column in the filtered-index predicate.
+      if (line ~ /^ALTER TABLE \[dbo\]\.\[[^]]+\] ADD \[[^]]+\] AS LEFT\(\[[^]]+\],[0-9]+\) PERSISTED;/) {
+        alter_table = line
+        sub(/^ALTER TABLE \[dbo\]\.\[/, "", alter_table)
+        sub(/\].*$/, "", alter_table)
+        computed_column = line
+        sub(/^.* ADD \[/, "", computed_column)
+        sub(/\].*$/, "", computed_column)
+        source_column = line
+        sub(/^.* AS LEFT\(\[/, "", source_column)
+        sub(/\].*$/, "", source_column)
+        if ((alter_table SUBSEP source_column) in nullable_predicate) {
+          nullable_predicate[alter_table SUBSEP computed_column] = source_column
+        }
+      }
+
+      if (line ~ /^CREATE UNIQUE INDEX \[[^]]+\] ON \[dbo\]\.\[[^]]+\] \([^;]+\);[[:space:]]*$/) {
+        index_table = line
+        sub(/^CREATE UNIQUE INDEX \[[^]]+\] ON \[dbo\]\.\[/, "", index_table)
+        sub(/\].*$/, "", index_table)
+        index_columns = line
+        sub(/^.* ON \[dbo\]\.\[[^]]+\] \(/, "", index_columns)
+        sub(/\);[[:space:]]*$/, "", index_columns)
+        column_count = split(index_columns, columns, ",")
+        predicate = ""
+        for (column_index = 1; column_index <= column_count; column_index++) {
+          index_column = columns[column_index]
+          gsub(/^[[:space:]]*\[/, "", index_column)
+          gsub(/\][[:space:]]*$/, "", index_column)
+          predicate_key = index_table SUBSEP index_column
+          if (predicate_key in nullable_predicate) {
+            if (predicate != "") predicate = predicate " AND "
+            predicate = predicate "[" nullable_predicate[predicate_key] "] IS NOT NULL"
+          }
+        }
+        if (predicate != "") {
+          sub(/;[[:space:]]*$/, "", line)
+          print line " WHERE " predicate ";"
+          normalized_count++
+          next
+        }
+      }
+
+      print line
+    }
+    END {
+      print normalized_count + 0 > report_file
+    }
+  ' "${SQL_FILE}" > "${normalized_file}"; then
+    echo 'Microi：错误：SQL Server 可空唯一索引兼容转换失败。'
+    return 1
+  fi
+
+  if [ ! -s "${normalized_file}" ] || [ ! -s "${report_file}" ]; then
+    echo 'Microi：错误：SQL Server 可空唯一索引兼容转换没有生成完整结果。'
+    return 1
+  fi
+  normalized_count=$(tr -d '[:space:]' < "${report_file}")
+  if ! [[ "${normalized_count}" =~ ^[0-9]+$ ]]; then
+    echo 'Microi：错误：SQL Server 可空唯一索引兼容转换结果无法校验。'
+    return 1
+  fi
+  mv "${normalized_file}" "${SQL_FILE}"
+  echo "Microi：SQL Server 可空唯一索引兼容完成（转换 ${normalized_count} 个）✓"
 }
 
 version_at_least() {
@@ -4236,6 +4490,7 @@ if { [ "${DATABASE_CHOICE}" = "1" ] || [ "${DATABASE_CHOICE}" = "2" ]; } \
 fi
 
 # 获取、复核并安全展开数据库包。自定义原文件只读使用，清理时绝不删除。
+INSTALL_CURRENT_STAGE="步骤6/11 获取并校验 ${DATABASE_DISPLAY_NAME} 初始化包"
 SQL_ZIP_IS_TEMP=0
 SQL_TMP_DIR=$(mktemp -d "/tmp/microi_database_${DATABASE_ENGINE_KEY}.XXXXXX")
 SQL_FILE="${SQL_TMP_DIR}/microi-database-init.sql"
@@ -4274,7 +4529,10 @@ if [ "${SQL_EXTRACTED_BYTES}" != "${SQL_UNCOMPRESSED_BYTES}" ]; then
   exit 1
 fi
 
+normalize_sqlserver_nullable_unique_indexes
+
 echo "Microi：还原 ${DATABASE_DISPLAY_NAME} 数据库（${SQL_ARCHIVE_ENTRY}，可能需要几分钟）..."
+INSTALL_CURRENT_STAGE="步骤6/11 还原 ${DATABASE_DISPLAY_NAME} 数据库"
 case "${DATABASE_CHOICE}" in
   1|2)
     if [ "${DATABASE_SERVICE_MODE}" = 'managed' ] \
@@ -4373,9 +4631,12 @@ case "${DATABASE_CHOICE}" in
 esac
 echo 'Microi：数据库还原完成 ✓'
 
+normalize_postgresql_bit_storage
+
 # 客户库可能带有原环境的调度状态；必须在 API/Worker 启动前全部暂停，
 # 避免刚恢复就执行旧环境任务。执行失败时终止安装，不带病启动平台。
 echo 'Microi：暂停恢复库中的定时任务...'
+INSTALL_CURRENT_STAGE="步骤6/11 暂停恢复库定时任务"
 case "${DATABASE_CHOICE}" in
   1|2)
     PAUSE_SCHEDULE_SQL="UPDATE diy_schedule_job SET Status='暂停'; UPDATE microi_job_triggers SET TRIGGER_STATE='PAUSED';"
@@ -4403,6 +4664,7 @@ fi
 echo 'Microi：定时任务已全部暂停并回读一致 ✓'
 
 echo "Microi：核对并初始化 SaaS 主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK}..."
+INSTALL_CURRENT_STAGE="步骤6/11 核对并初始化 SaaS 主租户"
 ensure_runtime_main_tenant
 
 cleanup_database_import_temp
@@ -4418,6 +4680,7 @@ echo "[步骤6/11] ${DATABASE_DISPLAY_NAME} 配置/部署完成 ✓"
 echo ''
 echo '[步骤7/11] 部署 Redis'
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤7/11 部署 Redis"
 
 REDIS_DIR="${COMPOSE_BASE_DIR}/microi-install-redis"
 
@@ -4510,6 +4773,7 @@ echo '[步骤7/11] Redis 部署完成 ✓'
 echo ''
 echo '[步骤8/11] 部署 MongoDB'
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤8/11 部署 MongoDB"
 
 MONGO_DIR="${COMPOSE_BASE_DIR}/microi-install-mongodb"
 
@@ -4555,6 +4819,7 @@ echo '[步骤8/11] MongoDB 部署完成 ✓'
 echo ''
 echo '[步骤9/11] 部署或连接 MinIO'
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤9/11 部署或连接 MinIO"
 
 # MinIO 配置写入发生在 API/Upgrade 启动前，只能依赖空库与存量库共同具备的
 # 必需字段。NetworkIsInternet 是旧版可选字段，当前运行时由允许的启动项
@@ -4784,13 +5049,26 @@ echo '[步骤9/11] MinIO 配置/部署完成 ✓'
 # 步骤10：部署 OCR、可选服务与平台应用
 # ============================================================
 echo ''
-echo '[步骤10/11] 部署 OCR、可选服务与平台应用'
+echo '[步骤10/11] 部署平台应用与附加能力'
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤10/11 部署平台应用（API + Web）"
 
 # --- PaddleX / PaddleOCR ---
+deploy_optional_ocr() {
 echo ''
 echo 'Microi：部署 PaddleX/PaddleOCR CPU 文字识别服务（默认安装）'
 echo '------------------------------------------------------------------'
+
+if [ "${OCR_INSTALL_SUPPORTED}" != "1" ]; then
+  echo "Microi：OCR ${OCR_INSTALL_STATUS}，核心平台继续安装。"
+  return 0
+fi
+if [ "${OPTIONAL_RUNTIME_NETWORK_READY}" != "1" ]; then
+  OCR_INSTALL_STATUS="安装失败（内部网络不可用）"
+  echo 'Microi：警告：OCR 内部网络不可用，本次跳过 OCR 编排。'
+  return 0
+fi
+OCR_INSTALL_STATUS="安装中"
 
 OCR_DIR="${COMPOSE_BASE_DIR}/microi-install-ocr"
 echo "Microi：OCR 国内镜像: ${OCR_IMAGE}"
@@ -4798,18 +5076,24 @@ echo "Microi：OCR 本机端口: 127.0.0.1:${OCR_PORT}，Docker 内网地址: ${
 
 echo 'Microi：从吾码杭州镜像源拉取固定版本 OCR 镜像...'
 if ! docker pull "${OCR_IMAGE}"; then
-  echo 'Microi：错误：OCR 国内镜像拉取失败，安装已停止，SaaS 引擎不会启用 OCR。'
-  exit 1
+  OCR_INSTALL_STATUS="安装失败（镜像拉取失败）"
+  record_optional_component_failure 'OCR：' '国内镜像拉取失败，SaaS 引擎不会启用 OCR。'
+  return 0
 fi
 OCR_IMAGE_ARCH=$(docker image inspect "${OCR_IMAGE}" --format '{{.Architecture}}' 2>/dev/null || true)
 if [ "${OCR_IMAGE_ARCH}" != "amd64" ]; then
-  echo "Microi：错误：OCR 镜像架构应为 amd64，实际回读为 ${OCR_IMAGE_ARCH:-未知}。"
-  exit 1
+  OCR_INSTALL_STATUS="安装失败（镜像架构不匹配）"
+  record_optional_component_failure 'OCR：' "镜像架构应为 amd64，实际回读为 ${OCR_IMAGE_ARCH:-未知}。"
+  return 0
 fi
 echo 'Microi：OCR 国内镜像已拉取并回读为 linux/amd64 ✓'
 
-mkdir -p "${OCR_DIR}"
-cat > "${OCR_DIR}/docker-compose.yml" <<EOF
+if ! mkdir -p "${OCR_DIR}"; then
+  OCR_INSTALL_STATUS="安装失败（编排目录不可写）"
+  record_optional_component_failure 'OCR：' "无法创建编排目录 ${OCR_DIR}。"
+  return 0
+fi
+if ! cat > "${OCR_DIR}/docker-compose.yml" <<EOF
 services:
   microi-install-ocr:
     image: ${OCR_IMAGE}
@@ -4843,9 +5127,18 @@ volumes:
     name: microi-ocr-models
 ${OCR_COMPOSE_EXTERNAL_NETWORKS}
 EOF
+then
+  OCR_INSTALL_STATUS="安装失败（编排文件写入失败）"
+  record_optional_component_failure 'OCR：' '编排文件写入失败。'
+  return 0
+fi
 echo 'Microi：OCR 编排文件已生成 ✓'
 
-compose_up "${OCR_DIR}"
+if ! compose_up_optional "${OCR_DIR}"; then
+  OCR_INSTALL_STATUS="安装失败（容器部署失败）"
+  record_optional_component_failure 'OCR：' '容器编排部署失败，已保留现场日志。'
+  return 0
+fi
 echo 'Microi：等待 OCR 服务完成模型加载并进入 healthy（最长 20 分钟）...'
 OCR_READY=0
 for _ocr_wait in $(seq 1 120); do
@@ -4855,10 +5148,12 @@ for _ocr_wait in $(seq 1 120); do
     OCR_READY=1
     break
   fi
-  if [ "${OCR_RUNNING}" = "false" ]; then
-    echo 'Microi：错误：OCR 容器在初始化期间退出。'
+  if [ "${OCR_RUNNING}" != "true" ]; then
+    echo 'Microi：警告：OCR 容器在初始化期间退出或无法回读。'
     docker logs "${OCR_CONTAINER_NAME}" 2>&1 | tail -100 || true
-    exit 1
+    OCR_INSTALL_STATUS="安装失败（容器已退出）"
+    record_optional_component_failure 'OCR：' '容器在初始化期间退出或无法回读。'
+    return 0
   fi
   if [ $((_ocr_wait % 6)) -eq 0 ]; then
     echo "Microi：OCR 模型加载中... ($((_ocr_wait * 10))/1200 秒，状态 ${OCR_HEALTH:-未知})"
@@ -4866,11 +5161,16 @@ for _ocr_wait in $(seq 1 120); do
   sleep 10
 done
 if [ "${OCR_READY}" != "1" ]; then
-  echo 'Microi：错误：OCR 服务在 20 分钟内未进入 healthy，SaaS 引擎不会启用 OCR。'
+  echo 'Microi：警告：OCR 服务在 20 分钟内未进入 healthy，SaaS 引擎不会启用 OCR。'
   docker logs "${OCR_CONTAINER_NAME}" 2>&1 | tail -100 || true
-  exit 1
+  OCR_INSTALL_STATUS="安装失败（健康检查超时）"
+  record_optional_component_failure 'OCR：' '健康检查超时，容器与日志已保留供后续修复。'
+  return 0
 fi
+OCR_SERVICE_READY=1
+OCR_INSTALL_STATUS="已安装并健康"
 echo 'Microi：OCR 服务健康检查通过 ✓'
+}
 
 # 原 Ollama、nomic-embed-text、Qdrant 部署步骤完整保留，但固定注释，不参与一键安装。
 : <<'MICROI_DISABLED_VECTOR_DEPLOYMENT'
@@ -5011,17 +5311,29 @@ MICROI_DISABLED_VECTOR_DEPLOYMENT
 echo 'Microi：已固定跳过 Ollama、nomic-embed-text 与 Qdrant。'
 
 # --- LibreTranslate ---
+deploy_optional_libretranslate() {
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   echo ''
   echo 'Microi：部署 LibreTranslate 开源翻译服务'
   echo '------------------------------------------------------------------'
 
+  if [ "${OPTIONAL_RUNTIME_NETWORK_READY}" != "1" ]; then
+    LIBRETRANSLATE_INSTALL_STATUS="安装失败（内部网络不可用）"
+    echo 'Microi：警告：LibreTranslate 内部网络不可用，本次跳过翻译服务编排。'
+    return 0
+  fi
+  LIBRETRANSLATE_INSTALL_STATUS="安装中"
+
   LIBRETRANSLATE_DIR="${COMPOSE_BASE_DIR}/microi-install-libretranslate"
   echo "Microi：LibreTranslate 端口: ${LIBRETRANSLATE_PORT}"
   echo "Microi：LibreTranslate 加载语言: ${LIBRETRANSLATE_LANGS_CSV}"
 
-  mkdir -p "${LIBRETRANSLATE_DIR}" /microi/libretranslate/models /microi/libretranslate/api-keys
-  cat > "${LIBRETRANSLATE_DIR}/docker-compose.yml" <<EOF
+  if ! mkdir -p "${LIBRETRANSLATE_DIR}" /microi/libretranslate/models /microi/libretranslate/api-keys; then
+    LIBRETRANSLATE_INSTALL_STATUS="安装失败（目录不可写）"
+    record_optional_component_failure 'LibreTranslate：' '无法创建编排或数据目录。'
+    return 0
+  fi
+  if ! cat > "${LIBRETRANSLATE_DIR}/docker-compose.yml" <<EOF
 services:
   microi-translate:
     image: ${LIBRETRANSLATE_IMAGE}
@@ -5052,6 +5364,11 @@ ${OCR_COMPOSE_SERVICE_NETWORK}
     stdin_open: true
 ${OCR_COMPOSE_EXTERNAL_NETWORKS}
 EOF
+  then
+    LIBRETRANSLATE_INSTALL_STATUS="安装失败（编排文件写入失败）"
+    record_optional_component_failure 'LibreTranslate：' '编排文件写入失败。'
+    return 0
+  fi
   echo 'Microi：LibreTranslate 编排文件已生成 ✓'
 
   # 语言模型可能需要数小时下载，不能阻塞吾码主体安装。先独立创建 API Key
@@ -5064,22 +5381,33 @@ EOF
     "${LIBRETRANSLATE_IMAGE}" -c \
     'import sys; from libretranslate.api_keys import Database; key = sys.stdin.read(); assert key; db = Database("/app/db/api_keys.db"); db.add(1000000, key); assert db.lookup(key) is not None' \
     > /dev/null; then
-    echo 'Microi：错误：LibreTranslate 随机 API Key 初始化失败。'
-    exit 1
+    LIBRETRANSLATE_INSTALL_STATUS="安装失败（API Key 初始化失败）"
+    record_optional_component_failure 'LibreTranslate：' '随机 API Key 初始化失败。'
+    return 0
   fi
   if [ ! -s /microi/libretranslate/api-keys/api_keys.db ]; then
-    echo 'Microi：错误：LibreTranslate API Key 数据库未生成。'
-    exit 1
+    LIBRETRANSLATE_INSTALL_STATUS="安装失败（API Key 数据库未生成）"
+    record_optional_component_failure 'LibreTranslate：' 'API Key 数据库未生成。'
+    return 0
   fi
+  LIBRETRANSLATE_API_KEY_INITIALIZED=1
   echo 'Microi：LibreTranslate 随机 API Key 初始化完成 ✓'
 
-  compose_up "${LIBRETRANSLATE_DIR}"
-  if [ "$(docker inspect "${LIBRETRANSLATE_CONTAINER_NAME}" --format '{{.State.Running}}' 2>/dev/null)" != "true" ]; then
-    echo 'Microi：错误：LibreTranslate 容器启动失败。'
+  if ! compose_up_optional "${LIBRETRANSLATE_DIR}"; then
+    LIBRETRANSLATE_INSTALL_STATUS="安装失败（容器部署失败）"
+    record_optional_component_failure 'LibreTranslate：' '容器编排部署失败，已保留现场日志。'
+    return 0
+  fi
+  if [ "$(docker inspect "${LIBRETRANSLATE_CONTAINER_NAME}" --format '{{.State.Running}}' 2>/dev/null || true)" != "true" ]; then
+    echo 'Microi：警告：LibreTranslate 容器启动失败。'
     docker logs "${LIBRETRANSLATE_CONTAINER_NAME}" 2>&1 | tail -100 || true
-    exit 1
+    LIBRETRANSLATE_INSTALL_STATUS="安装失败（容器未运行）"
+    record_optional_component_failure 'LibreTranslate：' '容器未进入运行状态。'
+    return 0
   fi
 
+  LIBRETRANSLATE_SERVICE_READY=1
+  LIBRETRANSLATE_INSTALL_STATUS="已安装，模型后台初始化中"
   echo ''
   echo 'Microi：LibreTranslate 翻译服务已安装并启动 ✓'
 
@@ -5088,6 +5416,7 @@ EOF
 else
   echo 'Microi：已选择不安装 LibreTranslate，跳过翻译服务。'
 fi
+}
 
 # --- 平台应用（API + Web）---
 echo ''
@@ -5203,6 +5532,7 @@ EOF
 chmod 600 "${APP_DIR}/docker-compose.yml"
 echo "Microi：平台应用编排文件已生成 ✓"
 
+INSTALL_CURRENT_STAGE="步骤10/11 启动平台应用（API + Web）"
 compose_up "${APP_DIR}"
 verify_container_shared_resource_pool microi-install-api
 
@@ -5232,12 +5562,18 @@ wait_for_microi_api() {
   return 1
 }
 
-# Upgrade29 由 API 启动升级租约幂等创建 SaaS 引擎 OCR Tab 与 9 个字段。
-# 先等进程存活，再从共享数据库回读物理字段，绝不依据日志文案猜测迁移成功。
+# 先确认进程存活，再从共享数据库回读完整平台升级链；绝不依据日志文案猜测成功。
+INSTALL_CURRENT_STAGE="步骤10/11 验收 API liveness"
 if ! wait_for_microi_api '/api/Diagnostics/liveness' '存活' 180; then
   exit 1
 fi
 API_LIVENESS_READY=1
+
+configure_optional_ocr() {
+if [ "${OCR_SERVICE_READY}" != "1" ]; then
+  echo "Microi：OCR 服务未通过安装健康检查，跳过 SaaS 配置（${OCR_INSTALL_STATUS}）。"
+  return 0
+fi
 
 case "${DATABASE_CHOICE}" in
   1|2)
@@ -5279,32 +5615,51 @@ for _ocr_schema_wait in $(seq 1 15); do
   fi
 done
 if [ "${OCR_SCHEMA_READY}" != "1" ]; then
-  echo 'Microi：错误：API 已启动，但 15 秒内未能从数据库回读全部 9 个 OCR 字段。'
+  echo 'Microi：警告：API 已启动，但 15 秒内未能从数据库回读全部 9 个 OCR 字段。'
   echo "Microi：请确认当前 API 镜像 ${API_IMAGE} 已包含 Upgrade29；脚本不会直接绕过平台迁移修改元数据，也不会启用 OCR。"
-  exit 1
+  OCR_INSTALL_STATUS="已安装，SaaS 配置失败（Upgrade29 字段未就绪）"
+  record_optional_component_failure 'OCR：' 'SaaS 配置未写入；核心平台保持可用。'
+  return 0
 fi
 echo 'Microi：SaaS 引擎 OCR 物理字段回读通过 ✓'
 
 OCR_TENANT_READBACK=$(database_exec_sql "${OCR_TENANT_VERIFY_SQL}" 2>&1 || true)
 if ! printf '%s\n' "${OCR_TENANT_READBACK}" | grep -q 'MICROI_OCR_TENANT_OK'; then
-  echo "Microi：错误：活动 OsClient=${OS_CLIENT} 记录不是唯一一条，已停止 OCR 配置，避免误改多个租户。"
-  exit 1
+  echo "Microi：警告：活动 OsClient=${OS_CLIENT} 记录不是唯一一条，已停止 OCR 配置，避免误改多个租户。"
+  OCR_INSTALL_STATUS="已安装，SaaS 配置失败（活动租户不唯一）"
+  record_optional_component_failure 'OCR：' 'SaaS 租户配置未写入；核心平台保持可用。'
+  return 0
 fi
 
 echo 'Microi：写入当前 SaaS 租户 OCR 配置...'
 if ! database_exec_sql "${OCR_CONFIG_SQL}" > /dev/null; then
-  echo 'Microi：错误：SaaS 引擎 OCR 配置更新失败。'
-  exit 1
+  echo 'Microi：警告：SaaS 引擎 OCR 配置更新失败。'
+  OCR_INSTALL_STATUS="已安装，SaaS 配置写入失败"
+  record_optional_component_failure 'OCR：' 'SaaS 租户配置更新失败；核心平台保持可用。'
+  return 0
 fi
 OCR_CONFIG_READBACK=$(database_exec_sql "${OCR_CONFIG_VERIFY_SQL}" 2>&1 || true)
 if ! printf '%s\n' "${OCR_CONFIG_READBACK}" | grep -q 'MICROI_OCR_CONFIG_OK'; then
-  echo 'Microi：错误：SaaS 引擎 OCR 配置写入后回读不一致。'
-  exit 1
+  echo 'Microi：警告：SaaS 引擎 OCR 配置写入后回读不一致。'
+  OCR_INSTALL_STATUS="已安装，SaaS 配置回读失败"
+  record_optional_component_failure 'OCR：' 'SaaS 配置未被视为启用；核心平台保持可用。'
+  return 0
 fi
 OCR_SAAS_CONFIG_READY=1
+OCR_INSTALL_STATUS="已安装并启用"
 echo "Microi：SaaS 引擎 OCR 配置回读一致：Provider=PaddleX, Endpoint=${OCR_SERVICE_ENDPOINT} ✓"
+}
 
-if [ "${INSTALL_LIBRETRANSLATE}" = "1" ]; then
+configure_optional_libretranslate() {
+if [ "${INSTALL_LIBRETRANSLATE}" != "1" ]; then
+  echo 'Microi：LibreTranslate 已按用户选择跳过，不写入 SaaS 配置。'
+  return 0
+fi
+if [ "${LIBRETRANSLATE_SERVICE_READY}" != "1" ]; then
+  echo "Microi：LibreTranslate 服务未通过安装检查，跳过 SaaS 配置（${LIBRETRANSLATE_INSTALL_STATUS}）。"
+  return 0
+fi
+
   case "${DATABASE_CHOICE}" in
     1|2)
       TRANSLATE_SCHEMA_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_SCHEMA_OK' AS Marker FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='sys_osclients' AND column_name IN ('TranslateProvider','TranslateUrl','TranslateApiKey','TranslateTimeout') HAVING COUNT(DISTINCT column_name)=4;"
@@ -5345,33 +5700,41 @@ if [ "${INSTALL_LIBRETRANSLATE}" = "1" ]; then
     fi
   done
   if [ "${TRANSLATE_SCHEMA_READY}" != "1" ]; then
-    echo 'Microi：错误：API 已启动，但 15 秒内未能从数据库回读全部 4 个 LibreTranslate 配置字段。'
+    echo 'Microi：警告：API 已启动，但 15 秒内未能从数据库回读全部 4 个 LibreTranslate 配置字段。'
     echo 'Microi：请确认当前 microi-api 镜像已包含 Upgrade31；脚本不会绕过平台迁移直接伪造 diy_field 元数据。'
-    exit 1
+    LIBRETRANSLATE_INSTALL_STATUS="已安装，SaaS 配置失败（Upgrade31 字段未就绪）"
+    record_optional_component_failure 'LibreTranslate：' 'SaaS 配置未写入；核心平台保持可用。'
+    return 0
   fi
 
   TRANSLATE_TENANT_READBACK=$(database_exec_sql "${TRANSLATE_TENANT_VERIFY_SQL}" 2>&1 || true)
   if ! printf '%s\n' "${TRANSLATE_TENANT_READBACK}" | grep -q 'MICROI_TRANSLATE_TENANT_OK'; then
-    echo 'Microi：错误：当前活动主租户不唯一，已停止 LibreTranslate 配置写入。'
-    exit 1
+    echo 'Microi：警告：当前活动主租户不唯一，已停止 LibreTranslate 配置写入。'
+    LIBRETRANSLATE_INSTALL_STATUS="已安装，SaaS 配置失败（活动租户不唯一）"
+    record_optional_component_failure 'LibreTranslate：' 'SaaS 租户配置未写入；核心平台保持可用。'
+    return 0
   fi
   echo 'Microi：写入 SaaS 引擎 LibreTranslate 配置...'
   if ! database_exec_sql "${TRANSLATE_CONFIG_SQL}" > /dev/null; then
-    echo 'Microi：错误：SaaS 引擎 LibreTranslate 配置更新失败。'
-    exit 1
+    echo 'Microi：警告：SaaS 引擎 LibreTranslate 配置更新失败。'
+    LIBRETRANSLATE_INSTALL_STATUS="已安装，SaaS 配置写入失败"
+    record_optional_component_failure 'LibreTranslate：' 'SaaS 租户配置更新失败；核心平台保持可用。'
+    return 0
   fi
   TRANSLATE_CONFIG_READBACK=$(database_exec_sql "${TRANSLATE_CONFIG_VERIFY_SQL}" 2>&1 || true)
   if ! printf '%s\n' "${TRANSLATE_CONFIG_READBACK}" | grep -q 'MICROI_TRANSLATE_CONFIG_OK'; then
-    echo 'Microi：错误：SaaS 引擎 LibreTranslate 配置写入后回读不一致。'
-    exit 1
+    echo 'Microi：警告：SaaS 引擎 LibreTranslate 配置写入后回读不一致。'
+    LIBRETRANSLATE_INSTALL_STATUS="已安装，SaaS 配置回读失败"
+    record_optional_component_failure 'LibreTranslate：' 'SaaS 配置未被视为启用；核心平台保持可用。'
+    return 0
   fi
   TRANSLATE_SAAS_CONFIG_READY=1
+  LIBRETRANSLATE_INSTALL_STATUS="已安装并启用"
   echo "Microi：SaaS 引擎翻译配置回读一致：Provider=LibreTranslate, Url=${TRANSLATE_SERVICE_URL} ✓"
-fi
+}
 
-# Upgrade29/31 是启动前置不变量，字段先出现并不代表完整平台升级链已经成功。
-# 必须等待 ServerVersion 推进到本脚本要求的最低版本，避免应用商城等中间迁移
-# 失败时仍把安装误报为成功，也避免紧接着重启 API 打断尚未完成的升级事务。
+# ServerVersion 是核心平台安装门禁。OCR/翻译字段只是附加能力，不能代替完整
+# 升级链回读，也不能在附加能力失败时反过来阻断 API/Web 主流程。
 case "${DATABASE_CHOICE}" in
   1|2)
     PLATFORM_VERSION_READ_SQL="SELECT ServerVersion FROM sys_config WHERE IsEnable=1 ORDER BY Id LIMIT 1;"
@@ -5388,6 +5751,7 @@ case "${DATABASE_CHOICE}" in
 esac
 
 echo "Microi：等待平台完整升级链推进到 ServerVersion>=${MINIMUM_PLATFORM_SERVER_VERSION}（最长 10 分钟）..."
+INSTALL_CURRENT_STAGE="步骤10/11 等待平台完整升级链"
 PLATFORM_UPGRADE_READY=0
 PLATFORM_SERVER_VERSION=''
 for _platform_upgrade_wait in $(seq 1 120); do
@@ -5411,13 +5775,7 @@ if [ "${PLATFORM_UPGRADE_READY}" != "1" ]; then
 fi
 echo "Microi：平台完整升级链回读通过：ServerVersion=${PLATFORM_SERVER_VERSION} ✓"
 
-# SaaS 租户配置在 API 启动时加载。安全重启单个新安装节点使 OCR/翻译设置立即生效，
-# 不影响 OCR 服务；多节点既有环境仍应按官方滚动发布流程逐节点刷新。
-echo 'Microi：重启新安装 API，使已回读的 OCR/翻译租户配置立即生效...'
-if ! docker restart microi-install-api > /dev/null; then
-  echo 'Microi：错误：API 重启失败。'
-  exit 1
-fi
+INSTALL_CURRENT_STAGE="步骤10/11 验收 API readiness"
 if ! wait_for_microi_api '/api/Diagnostics/health' '就绪' 180; then
   exit 1
 fi
@@ -5425,9 +5783,35 @@ API_READINESS_READY=1
 
 echo ''
 echo 'Microi：平台应用（API + Web）部署完成 ✓'
+echo 'Microi：核心平台已经可用；下面 OCR/LibreTranslate 的任何失败只会形成附加能力警告。'
+
+INSTALL_CURRENT_STAGE="步骤10/11 部署 OCR 与 LibreTranslate 附加能力"
+OPTIONAL_COMPONENT_PHASE_STARTED=1
+deploy_optional_ocr
+deploy_optional_libretranslate
+configure_optional_ocr
+configure_optional_libretranslate
+
+# SaaS 租户配置在 API 启动时加载。只有配置已成功写入并回读时才重启 API；
+# 重启命令本身失败时先尝试恢复现有核心容器，最终仍以 API readiness 为准。
+if [ "${OCR_SAAS_CONFIG_READY}" = "1" ] || [ "${TRANSLATE_SAAS_CONFIG_READY}" = "1" ]; then
+  echo 'Microi：重启新安装 API，使已成功回读的附加能力配置立即生效...'
+  API_READINESS_READY=0
+  if ! docker restart microi-install-api > /dev/null; then
+    record_optional_component_failure '附加能力配置：' 'API 重启命令失败，正在尝试恢复核心 API。'
+    docker start microi-install-api > /dev/null 2>&1 || true
+  fi
+  if ! wait_for_microi_api '/api/Diagnostics/health' '就绪' 180; then
+    echo 'Microi：错误：附加能力配置后核心 API 未能恢复 readiness，不能把核心平台误报为安装完成。'
+    exit 1
+  fi
+  API_READINESS_READY=1
+else
+  echo 'Microi：没有附加能力配置成功写入，保持当前 API 运行状态，不执行无意义重启。'
+fi
 
 echo ''
-echo '[步骤10/11] OCR、可选服务与平台应用部署完成 ✓'
+echo '[步骤10/11] 平台应用与附加能力处理完成 ✓'
 
 
 # ============================================================
@@ -5436,6 +5820,7 @@ echo '[步骤10/11] OCR、可选服务与平台应用部署完成 ✓'
 echo ''
 echo '[步骤11/11] 部署 Watchtower 自动更新'
 echo '------------------------------------------------------------------'
+INSTALL_CURRENT_STAGE="步骤11/11 部署 Watchtower 自动更新"
 
 WATCHTOWER_DIR="${COMPOSE_BASE_DIR}/microi-install-watchtower"
 
@@ -5478,20 +5863,29 @@ echo '[步骤11/11] Watchtower 部署完成 ✓'
 # ============================================================
 # 输出所有服务信息
 # ============================================================
+INSTALL_CURRENT_STAGE="输出安装结果"
 INSTALL_SUMMARY_PRINTED=1
 echo ''
 echo ''
 echo '=================================================================='
-echo 'Microi：所有服务已成功安装或接入！'
+if [ "${OPTIONAL_COMPONENT_FAILURE_COUNT}" -gt 0 ]; then
+  echo 'Microi：核心平台已成功安装；附加能力存在警告。'
+else
+  echo 'Microi：核心平台与所选附加能力已成功安装或接入！'
+fi
 echo '=================================================================='
 echo ''
 print_generated_install_configuration "success"
-echo "OCR:         容器 ${OCR_CONTAINER_NAME}, 本机端口 127.0.0.1:${OCR_PORT}"
-echo "             国内镜像: ${OCR_IMAGE}"
-echo "             Docker内网: ${OCR_SERVICE_ENDPOINT}"
-echo "             模型卷: microi-ocr-models"
-echo "             SaaS配置: OsClient=${OS_CLIENT}, OcrEnabled=1, OcrProvider=PaddleX"
-echo "             编排目录: ${OCR_DIR}/"
+if [ "${OCR_SAAS_CONFIG_READY}" = "1" ]; then
+  echo "OCR:         容器 ${OCR_CONTAINER_NAME}, 本机端口 127.0.0.1:${OCR_PORT}"
+  echo "             国内镜像: ${OCR_IMAGE}"
+  echo "             Docker内网: ${OCR_SERVICE_ENDPOINT}"
+  echo "             模型卷: microi-ocr-models"
+  echo "             SaaS配置: OsClient=${OS_CLIENT}, OcrEnabled=1, OcrProvider=PaddleX"
+  echo "             编排目录: ${OCR_DIR}/"
+else
+  echo "OCR:         ${OCR_INSTALL_STATUS}；SaaS 未启用，不影响核心平台。"
+fi
 echo ""
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   echo "Ollama:      容器 microi-install-ollama,    端口 ${OLLAMA_PORT}"
@@ -5519,7 +5913,7 @@ else
   echo '             Ollama、nomic-embed-text 与 Qdrant 已固定跳过，不再推荐默认安装。'
   echo ""
 fi
-if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+if [ "${TRANSLATE_SAAS_CONFIG_READY}" = "1" ]; then
   echo "LibreTranslate: 容器 ${LIBRETRANSLATE_CONTAINER_NAME}, 本机端口 127.0.0.1:${LIBRETRANSLATE_PORT}"
   echo "             国内镜像: ${LIBRETRANSLATE_IMAGE}"
   echo "             Docker内网: ${LIBRETRANSLATE_SERVICE_ENDPOINT}"
@@ -5527,6 +5921,9 @@ if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   echo "             API Key: 已随机生成并写入 SaaS 租户配置（终端不输出明文）"
   echo "             数据目录: /microi/libretranslate/"
   echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-libretranslate/"
+  echo ""
+elif [ "${INSTALL_LIBRETRANSLATE}" = "1" ]; then
+  echo "LibreTranslate: ${LIBRETRANSLATE_INSTALL_STATUS}；SaaS 未启用，不影响核心平台。"
   echo ""
 else
   echo 'LibreTranslate: 已跳过；如需动态内容翻译，可重新执行脚本并选择安装。'
@@ -5562,7 +5959,11 @@ else
     echo '             MinIO 使用容器 DNS microi-install-minio:9000'
   fi
 fi
-echo "             API 同时接入 OCR/翻译内部网络 ${OCR_RUNTIME_NETWORK}"
+if [ "${OPTIONAL_RUNTIME_NETWORK_READY}" = "1" ]; then
+  echo "             API 同时接入附加能力内部网络 ${OCR_RUNTIME_NETWORK}"
+else
+  echo '             附加能力内部网络未接入；API 保持核心 microi 网络运行'
+fi
 echo ''
 echo '------------------------------------------------------------------'
 echo '已开放的防火墙端口（服务器内部防火墙）：'
@@ -5570,9 +5971,21 @@ echo '------------------------------------------------------------------'
 for port in ${FIREWALL_PORTS}; do
   echo "  ${port}/tcp"
 done
-echo "  OCR ${OCR_PORT}/tcp 未自动开放（仅绑定 127.0.0.1，API 走 ${OCR_RUNTIME_NETWORK} 内网）"
-if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+if [ "${OCR_SERVICE_READY}" = "1" ]; then
+  echo "  OCR ${OCR_PORT}/tcp 未自动开放（仅绑定 127.0.0.1，API 走 ${OCR_RUNTIME_NETWORK} 内网）"
+fi
+if [ "${LIBRETRANSLATE_SERVICE_READY}" = "1" ]; then
   echo "  LibreTranslate ${LIBRETRANSLATE_PORT}/tcp 未自动开放（仅绑定 127.0.0.1，API 走 ${OCR_RUNTIME_NETWORK} 内网）"
+fi
+if [ "${OPTIONAL_COMPONENT_FAILURE_COUNT}" -gt 0 ]; then
+  echo ''
+  echo '------------------------------------------------------------------'
+  echo '附加能力警告（核心平台已通过 liveness/readiness）：'
+  echo '------------------------------------------------------------------'
+  for optional_warning in "${OPTIONAL_COMPONENT_WARNINGS[@]}"; do
+    echo "  - ${optional_warning}"
+  done
+  echo '  可保留现有数据和核心容器，修复网络/镜像/资源问题后重新运行安装脚本；不要执行 down -v。'
 fi
 echo ''
 echo '------------------------------------------------------------------'
@@ -5586,6 +5999,10 @@ echo '------------------------------------------------------------------'
 docker ps --filter "name=microi-install-" --format "table {{.Names}}\t{{.Status}}" 2>/dev/null || true
 echo ''
 echo '=================================================================='
-echo 'Microi：安装完成！如需管理编排，可进入对应编排目录执行 docker compose 命令。'
+if [ "${OPTIONAL_COMPONENT_FAILURE_COUNT}" -gt 0 ]; then
+  echo 'Microi：核心平台安装完成，附加能力已降级处理；如需管理编排，可进入对应编排目录执行 docker compose 命令。'
+else
+  echo 'Microi：安装完成！如需管理编排，可进入对应编排目录执行 docker compose 命令。'
+fi
 echo 'Microi：提示：请及时修改默认管理员密码（admin / demo123456）。'
 echo '=================================================================='

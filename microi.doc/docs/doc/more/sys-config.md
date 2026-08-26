@@ -4,6 +4,19 @@
 
 ---
 
+## 📸 系统设置预览
+
+<div class="mci-doc-screenshot-grid">
+  <figure>
+    <img src="/images/product-screenshots/system-settings-light.jpg" alt="Microi吾码系统设置亮色主题，展示系统信息、界面风格、开发配置、密码强度与移动端配置分组" data-fancybox="sys-config-preview">
+    <figcaption>亮色主题：系统配置、上传资源、修改日志和分组导航在同一工作台集中维护。</figcaption>
+  </figure>
+  <figure>
+    <img src="/images/product-screenshots/system-settings-dark.jpg" alt="Microi吾码系统设置暗色主题，展示界面风格、主题导航、登录入口与 AI 水印配置" data-fancybox="sys-config-preview">
+    <figcaption>暗色主题：界面风格、登录入口、AI 助手与框架水印等配置按业务域清晰分组。</figcaption>
+  </figure>
+</div>
+
 ## 公开配置与服务端私密配置
 
 系统设置采用明确的双表边界：

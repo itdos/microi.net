@@ -60,6 +60,11 @@ public sealed class MySql57SeedConverterTests
         Assert.Contains("semi; &quot; &name -- text", output.ToString());
         Assert.Contains("quote'' and slash\\", output.ToString());
         Assert.Contains("TRG_seed_parent_UpdatedAt", output.ToString());
+        if (target is SeedDatabaseTarget.PostgreSql17 or SeedDatabaseTarget.KingbaseEs)
+        {
+            Assert.Contains("\"Enabled\" SMALLINT NOT NULL DEFAULT 0", output.ToString());
+            Assert.DoesNotContain("\"Enabled\" BOOLEAN", output.ToString());
+        }
     }
 
     [Fact]
@@ -162,6 +167,49 @@ public sealed class MySql57SeedConverterTests
         Assert.Equal(
             2,
             Count(output.ToString(), "INSERT INTO [dbo].[items] ([Id]) VALUES"));
+    }
+
+    [Fact]
+    public void Sql_server_filters_unique_indexes_only_by_their_nullable_columns()
+    {
+        const string dump = """
+            CREATE TABLE `unique_items` (
+              `Id` int(11) NOT NULL,
+              `Scope` varchar(50) NOT NULL,
+              `ExternalKey` varchar(50) DEFAULT NULL,
+              `OptionalKey` varchar(50) DEFAULT NULL,
+              PRIMARY KEY (`Id`),
+              UNIQUE KEY `ux_nullable` (`Scope`,`ExternalKey`,`OptionalKey`),
+              UNIQUE KEY `ux_required` (`Id`,`Scope`)
+            );
+            """;
+        var output = new StringWriter();
+
+        DatabaseSeedConverter.ConvertMySql57(
+            new StringReader(dump),
+            output,
+            SeedDatabaseTarget.SqlServer2022);
+
+        var sql = output.ToString();
+        Assert.Contains("SET ANSI_NULLS ON;", sql);
+        Assert.Contains("SET ANSI_PADDING ON;", sql);
+        Assert.Contains("SET ANSI_WARNINGS ON;", sql);
+        Assert.Contains("SET ARITHABORT ON;", sql);
+        Assert.Contains("SET CONCAT_NULL_YIELDS_NULL ON;", sql);
+        Assert.Contains("SET QUOTED_IDENTIFIER ON;", sql);
+        Assert.Contains("SET NUMERIC_ROUNDABORT OFF;", sql);
+        Assert.Contains(
+            "CREATE UNIQUE INDEX [ux_nullable] ON [dbo].[unique_items] "
+            + "([Scope],[ExternalKey],[OptionalKey]) WHERE "
+            + "[ExternalKey] IS NOT NULL AND [OptionalKey] IS NOT NULL;",
+            sql);
+        Assert.Contains(
+            "CREATE UNIQUE INDEX [ux_required] ON [dbo].[unique_items] "
+            + "([Id],[Scope]);",
+            sql);
+        Assert.DoesNotContain(
+            "[Scope] IS NOT NULL",
+            sql);
     }
 
     [Fact]

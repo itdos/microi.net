@@ -56,6 +56,20 @@ CASE WHEN Log IS NULL OR Log='' THEN 0 ELSE 1 END AS HasLog,
 CASE WHEN ResultJson IS NULL OR ResultJson='' THEN 0 ELSE 1 END AS HasResult";
         internal const string RuntimeScopePredicate = @"(RuntimeOsClientType IS NULL OR RuntimeOsClientType='' OR RuntimeOsClientType=@runtimeType)
   AND (RuntimeOsClientNetwork IS NULL OR RuntimeOsClientNetwork='' OR RuntimeOsClientNetwork=@runtimeNetwork)";
+        private static readonly HashSet<string> SqlIdentifiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            TableName,
+            "Id", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted", "OsClient", "UserKey",
+            "Title", "Type", "ApiEngineKey", "Status", "StatusText", "Progress", "ProgressMode", "WorkCurrent",
+            "WorkTotal", "Current", "Total", "Msg", "Log", "StartTime", "EndTime", "HeartbeatTime",
+            "EstimatedEndTime", "RemainingSeconds", "EstimateConfidence", "CancelRequested", "ResultJson",
+            "ParamJson", "TrustedUserJson", "IdempotencyKey", "ConcurrencyKey", "LeaseOwner", "LeaseExpiresAt",
+            "FencingToken", "AttemptCount", "MaxAttempts", "ExecutionCount", "RetryOnFailure", "NextRunTime",
+            "ProgressSampleTime", "ProgressSampleCurrent", "ThroughputPerSecond", "ProgressSampleCount",
+            "CheckpointJson", "LastError", "BusinessTable", "BusinessId", "BusinessStatusField",
+            "BusinessTaskIdField", "BusinessProgressField", "BusinessEtaField", "RuntimeOsClientType",
+            "RuntimeOsClientNetwork", "HasLog", "HasResult"
+        };
 
         public static bool IsAvailable(string osClient)
         {
@@ -87,7 +101,7 @@ CASE WHEN ResultJson IS NULL OR ResultJson='' THEN 0 ELSE 1 END AS HasResult";
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND IdempotencyKey=@p1
   AND {RuntimeScopePredicate}
 ORDER BY CreateTime DESC");
-            return Hydrate(client.Db.FromSql(sql)
+            return Hydrate(FromSql(client, sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", idempotencyKey)
                 .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
@@ -110,7 +124,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND ApiEngineKey=@p1
   AND {RuntimeScopePredicate}
   AND CancelRequested=0 AND Status IN ('Pending','Retrying','Running')
 ORDER BY CreateTime ASC");
-            return Hydrate(client.Db.FromSql(sql)
+            return Hydrate(FromSql(client, sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", apiEngineKey)
                 .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
@@ -132,7 +146,7 @@ VALUES
  0,'Indeterminate',0,0,'','',0,'',@paramJson,@trustedUserJson,@idempotencyKey,@concurrencyKey,0,0,@maxAttempts,0,
  @retryOnFailure,0,0,@businessTable,@businessId,@businessStatusField,@businessTaskIdField,
  @businessProgressField,@businessEtaField,@runtimeType,@runtimeNetwork)";
-            var command = client.Db.FromSql(sql)
+            var command = FromSql(client, sql)
                 .AddInParameter("id", item.Id)
                 .AddInParameter("now", DbTime(item.CreateTime))
                 .AddInParameter("userId", userId ?? "")
@@ -166,7 +180,7 @@ VALUES
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1
   AND {RuntimeScopePredicate}
 ORDER BY CreateTime DESC", take);
-            return client.Db.FromSql(sql)
+            return FromSql(client, sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", userKey)
                 .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
@@ -189,7 +203,7 @@ ORDER BY CreateTime DESC", take);
             pageSize = Math.Max(1, Math.Min(100, pageSize));
             var predicate = $@"(IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1
   AND {RuntimeScopePredicate}";
-            var countValue = client.Db.FromSql($"SELECT COUNT(1) FROM {TableName} WHERE {predicate}")
+            var countValue = FromSql(client, $"SELECT COUNT(1) FROM {TableName} WHERE {predicate}")
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", userKey)
                 .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
@@ -199,7 +213,7 @@ ORDER BY CreateTime DESC", take);
             var sql = PageSql(client, $@"SELECT {SummaryProjection} FROM {TableName}
 WHERE {predicate}
 ORDER BY CreateTime DESC", pageIndex, pageSize);
-            var rows = client.Db.FromSql(sql)
+            var rows = FromSql(client, sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", userKey)
                 .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
@@ -215,7 +229,7 @@ ORDER BY CreateTime DESC", pageIndex, pageSize);
             var sql = FirstSql(client, $@"SELECT {SummaryProjection} FROM {TableName}
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1 AND Id=@p2
   AND {RuntimeScopePredicate}");
-            var item = client.Db.FromSql(sql)
+            var item = FromSql(client, sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", userKey)
                 .AddInParameter("p2", taskId)
@@ -231,7 +245,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1 AND Id
             var sql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND Id=@p1
   AND {RuntimeScopePredicate}");
-            return Hydrate(client.Db.FromSql(sql)
+            return Hydrate(FromSql(client, sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", taskId)
                 .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
@@ -245,7 +259,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND Id=@p1
             var sql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1 AND Id=@p2
   AND {RuntimeScopePredicate}");
-            return Hydrate(client.Db.FromSql(sql)
+            return Hydrate(FromSql(client, sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", userKey)
                 .AddInParameter("p2", taskId)
@@ -257,7 +271,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1 AND Id
         public static int ClearSucceeded(string osClient, string userKey)
         {
             var client = GetRequiredClient(osClient);
-            return client.Db.FromSql($@"UPDATE {TableName} SET IsDeleted=1,
+            return FromSql(client, $@"UPDATE {TableName} SET IsDeleted=1,
 IdempotencyKey={ArchivedIdempotencySql(client)},UpdateTime=@p0
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Status='Succeeded'
   AND {RuntimeScopePredicate}")
@@ -272,7 +286,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND St
         public static int SoftDelete(string osClient, string userKey, string taskId)
         {
             var client = GetRequiredClient(osClient);
-            return client.Db.FromSql($@"UPDATE {TableName} SET IsDeleted=1,
+            return FromSql(client, $@"UPDATE {TableName} SET IsDeleted=1,
 IdempotencyKey={ArchivedIdempotencySql(client)},UpdateTime=@p0
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id=@p3
   AND {RuntimeScopePredicate}
@@ -290,7 +304,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
         {
             var client = GetRequiredClient(osClient);
             var now = DateTime.Now;
-            return client.Db.FromSql($@"UPDATE {TableName}
+            return FromSql(client, $@"UPDATE {TableName}
 SET CancelRequested=1,Status=CASE WHEN Status='Pending' THEN 'Canceled' ELSE Status END,
     StatusText=CASE WHEN Status='Pending' THEN '已停止' ELSE '停止中' END,
     Msg='已请求停止，正在等待当前执行点结束。',
@@ -397,7 +411,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
             // predecessor releases the distributed concurrency lease. The claim is
             // then deferred before user code starts, so it must not consume the last
             // recovery attempt and leave a resumable chunk permanently Pending.
-            client.Db.FromSql($@"UPDATE {TableName}
+            FromSql(client, $@"UPDATE {TableName}
 SET AttemptCount=CASE WHEN MaxAttempts>0 THEN MaxAttempts-1 ELSE 0 END,UpdateTime=@p0
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1
   AND {RuntimeScopePredicate}
@@ -412,7 +426,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1
             // Legacy rows and interrupted workers could leave exhausted work in an
             // active state forever. Finalize only ownerless work (or Running work
             // whose lease has expired), preserving a live owner's execution.
-            client.Db.FromSql($@"UPDATE {TableName}
+            FromSql(client, $@"UPDATE {TableName}
 SET Status='Failed',StatusText='执行失败',
     Msg='任务已耗尽重试次数，系统已自动终结；请查看错误与日志，修复原因后重新提交。',
     LastError=CASE WHEN LastError IS NULL OR LastError='' THEN '任务已耗尽重试次数。' ELSE LastError END,
@@ -431,7 +445,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=0
             // Heal cancellation races and cancellations whose owning node died.
             // A running task is finalized only after its lease expires; pending or
             // retrying work has no active owner and can be finalized immediately.
-            client.Db.FromSql($@"UPDATE {TableName}
+            FromSql(client, $@"UPDATE {TableName}
 SET Status='Canceled',StatusText='已停止',
     Msg='任务已停止；失败或取消不会伪装成 100%。',EndTime=@p0,
     EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
@@ -460,7 +474,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND CancelRequested=0
 -- oldest task reclaim every slice and can starve later tasks indefinitely.
 -- Never-run tasks use CreateTime; resumed tasks rotate by their ready time.
 ORDER BY COALESCE(NextRunTime, CreateTime) ASC, CreateTime ASC");
-            var candidateCommand = client.Db.FromSql(candidateSql)
+            var candidateCommand = FromSql(client, candidateSql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", DbTime(now))
                 .AddInParameter("runtimeType", runtimeType)
@@ -478,7 +492,7 @@ ORDER BY COALESCE(NextRunTime, CreateTime) ASC, CreateTime ASC");
             var staleRecovery = string.Equals(candidate.Status, "Running", StringComparison.OrdinalIgnoreCase);
             var leaseSeconds = ResolveLeaseSeconds(candidate.ApiEngineKey);
             var leaseExpiresAt = now.AddSeconds(leaseSeconds);
-            var affected = client.Db.FromSql($@"UPDATE {TableName}
+            var affected = FromSql(client, $@"UPDATE {TableName}
 SET Status='Running',StatusText='执行中',LeaseOwner=@p0,LeaseExpiresAt=@p1,HeartbeatTime=@p2,
     StartTime=CASE WHEN StartTime IS NULL THEN @p2 ELSE StartTime END,
     RuntimeOsClientType=CASE WHEN RuntimeOsClientType IS NULL OR RuntimeOsClientType='' THEN @runtimeType ELSE RuntimeOsClientType END,
@@ -507,7 +521,7 @@ WHERE Id=@p4 AND OsClient=@p5 AND CancelRequested=0 AND AttemptCount<MaxAttempts
             var now = DateTime.Now;
             var leaseSeconds = ResolveLeaseSeconds(item.ApiEngineKey);
             var leaseExpiresAt = now.AddSeconds(leaseSeconds);
-            var affected = client.Db.FromSql($@"UPDATE {TableName}
+            var affected = FromSql(client, $@"UPDATE {TableName}
 SET LeaseExpiresAt=@p0,HeartbeatTime=@p1,UpdateTime=@p1
 WHERE Id=@p2 AND OsClient=@p3 AND Status='Running' AND LeaseOwner=@p4 AND FencingToken=@p5")
                 .AddInParameter("p0", DbTime(leaseExpiresAt))
@@ -520,7 +534,7 @@ WHERE Id=@p2 AND OsClient=@p3 AND Status='Running' AND LeaseOwner=@p4 AND Fencin
             if (affected != 1) return false;
             item.HeartbeatTime = now;
             item.LeaseExpiresAt = leaseExpiresAt;
-            cancelRequested = client.Db.FromSql($@"SELECT CancelRequested FROM {TableName}
+            cancelRequested = FromSql(client, $@"SELECT CancelRequested FROM {TableName}
 WHERE Id=@p0 AND OsClient=@p1")
                 .AddInParameter("p0", item.Id)
                 .AddInParameter("p1", item.OsClient)
@@ -550,7 +564,7 @@ WHERE Id=@p0 AND OsClient=@p1")
                 if (client?.Db == null
                     || taskId.DosIsNullOrWhiteSpace()
                     || leaseOwner.DosIsNullOrWhiteSpace()) return false;
-                return client.Db.FromSql($@"SELECT COUNT(1) FROM {TableName}
+                return FromSql(client, $@"SELECT COUNT(1) FROM {TableName}
 WHERE Id=@p0 AND OsClient=@p1 AND Status='Running' AND CancelRequested=0
   AND LeaseOwner=@p2 AND FencingToken=@p3 AND LeaseExpiresAt>@p4")
                     .AddInParameter("p0", taskId)
@@ -570,7 +584,7 @@ WHERE Id=@p0 AND OsClient=@p1 AND Status='Running' AND CancelRequested=0
         {
             var client = GetRequiredClient(item.OsClient);
             var now = DateTime.Now;
-            var affected = client.Db.FromSql($@"UPDATE {TableName}
+            var affected = FromSql(client, $@"UPDATE {TableName}
 SET Progress=@p0,ProgressMode=@p1,WorkCurrent=@p2,WorkTotal=@p3,Msg=@p4,StatusText=@p5,
     HeartbeatTime=@p6,EstimatedEndTime=@p7,RemainingSeconds=@p8,EstimateConfidence=@p9,
     ProgressSampleTime=@p10,ProgressSampleCurrent=@p11,ThroughputPerSecond=@p12,
@@ -893,7 +907,7 @@ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
             Func<SqlSection, SqlSection> addParameters)
         {
             var client = GetRequiredClient(item.OsClient);
-            var command = client.Db.FromSql($@"UPDATE {TableName} SET {setSql}
+            var command = FromSql(client, $@"UPDATE {TableName} SET {setSql}
 WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
   AND LeaseOwner=@ownerLease AND FencingToken=@ownerFence");
             command = addParameters(command)
@@ -937,6 +951,73 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
             return client;
         }
 
+        private static SqlSection FromSql(OsClientSecret client, string sql)
+        {
+            return client.Db.FromSql(QuoteSqlIdentifiers(client, sql));
+        }
+
+        internal static string QuoteSqlIdentifiers(OsClientSecret client, string sql)
+        {
+            if (!UsesCaseSensitiveQuotedIdentifiers(client) || string.IsNullOrEmpty(sql)) return sql;
+
+            var output = new System.Text.StringBuilder(sql.Length + 128);
+            for (var index = 0; index < sql.Length;)
+            {
+                var current = sql[index];
+                if (current == '\'')
+                {
+                    var end = index + 1;
+                    while (end < sql.Length)
+                    {
+                        if (sql[end] == '\'' && end + 1 < sql.Length && sql[end + 1] == '\'')
+                        {
+                            end += 2;
+                            continue;
+                        }
+                        if (sql[end++] == '\'') break;
+                    }
+                    output.Append(sql, index, end - index);
+                    index = end;
+                    continue;
+                }
+                if (current == '"')
+                {
+                    var end = index + 1;
+                    while (end < sql.Length)
+                    {
+                        if (sql[end] == '"' && end + 1 < sql.Length && sql[end + 1] == '"')
+                        {
+                            end += 2;
+                            continue;
+                        }
+                        if (sql[end++] == '"') break;
+                    }
+                    output.Append(sql, index, end - index);
+                    index = end;
+                    continue;
+                }
+                if (char.IsLetter(current) || current == '_')
+                {
+                    var end = index + 1;
+                    while (end < sql.Length && (char.IsLetterOrDigit(sql[end]) || sql[end] == '_')) end++;
+                    var token = sql.Substring(index, end - index);
+                    if ((index == 0 || sql[index - 1] != '@') && SqlIdentifiers.Contains(token))
+                    {
+                        output.Append(QuoteIdentifier(client, token));
+                    }
+                    else
+                    {
+                        output.Append(token);
+                    }
+                    index = end;
+                    continue;
+                }
+                output.Append(current);
+                index++;
+            }
+            return output.ToString();
+        }
+
         private static bool ValidateSchema(OsClientSecret client, out string reason)
         {
             reason = "";
@@ -950,7 +1031,9 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
 
                 // WHERE 1=0 never reads business rows, but the database must still
                 // resolve every runtime column and alias used by the worker.
-                client.Db.FromSql($"SELECT {Projection} FROM {TableName} WHERE 1=0").ToArray();
+                client.Db.FromSql(
+                    $"SELECT {QuoteProjection(client, Projection)} "
+                    + $"FROM {QuoteIdentifier(client, TableName)} WHERE 1=0").ToArray();
                 return true;
             }
             catch (Exception ex)
@@ -994,6 +1077,36 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
             return sql + $" LIMIT {take}";
         }
 
+        private static string QuoteProjection(OsClientSecret client, string projection)
+        {
+            if (!UsesCaseSensitiveQuotedIdentifiers(client)) return projection;
+            return string.Join(",", projection.Split(',').Select(item =>
+            {
+                var parts = item.Trim().Split(
+                    new[] { " AS " },
+                    StringSplitOptions.None);
+                var field = QuoteIdentifier(client, parts[0].Trim());
+                return parts.Length == 2
+                    ? field + " AS " + QuoteIdentifier(client, parts[1].Trim())
+                    : field;
+            }));
+        }
+
+        private static string QuoteIdentifier(OsClientSecret client, string identifier)
+        {
+            return UsesCaseSensitiveQuotedIdentifiers(client)
+                ? "\"" + identifier.Replace("\"", "\"\"") + "\""
+                : identifier;
+        }
+
+        private static bool UsesCaseSensitiveQuotedIdentifiers(OsClientSecret client)
+        {
+            var dbType = client?.OsClientModel?["DbType"].Val<string>()
+                         ?? OsClientDefault.OsClientDbType;
+            return string.Equals(dbType, "PostgreSql", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(dbType, "KingBase", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static string PageSql(OsClientSecret client, string sql, int pageIndex, int pageSize)
         {
             var offset = Math.Max(0, pageIndex - 1) * pageSize;
@@ -1002,6 +1115,11 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
                 || string.Equals(dbType, "Oracle", StringComparison.OrdinalIgnoreCase))
             {
                 return sql + $" OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY";
+            }
+            if (string.Equals(dbType, "PostgreSql", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(dbType, "KingBase", StringComparison.OrdinalIgnoreCase))
+            {
+                return sql + $" LIMIT {pageSize} OFFSET {offset}";
             }
             return sql + $" LIMIT {offset},{pageSize}";
         }
@@ -1053,9 +1171,9 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
             return normalized.Length <= 50 ? normalized : normalized.Substring(0, 50);
         }
 
-        private static string DbTime(DateTime value)
+        private static object DbTime(DateTime value)
         {
-            return value.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+            return DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
         }
 
         private static object DbTime(DateTime? value)

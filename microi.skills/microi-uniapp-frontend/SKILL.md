@@ -13,6 +13,8 @@ description: Microi 吾码 UniApp/H5 前端通用规范。用于构建或修复�
 
 UniApp/H5/小程序必须通过项目统一 `microi.v8.js` 的 `V8.uploadFile` / `V8.uploadFiles` 上传图片。调用方省略 `options.preview` 时，SDK 必须发送 `Preview=true` 并默认使用 `img` 路径；只有显式 `preview:false` 才允许关闭。服务端仍是最终事实源：即使旧客户端完全不传该字段，也要默认压缩到约 `500 KB`、最长边约 `1920 px`，并在 HDFS 私有桶保留一份 `_origin` 原图。页面不得为了“上传成功”自行改成 `preview:false`，也不得把私有原图或临时签名地址保存进业务字段。
 
+动态表单上传还必须把控件已有的文件访问上下文透传为 `formFieldContext`：至少包含 `FormEngineKey + FieldId + SysMenuId`，编辑时再带 `FormDataId`，TableChild 再带 `_TableChildAuth`。后端回读 `diy_field.Config` 后决定“禁止匿名访问”与真实桶；普通用户不能被一刀切为私有桶，客户端自己传 `Limit=false` 也不能放宽私有字段。没有字段上下文的聊天、打卡、临时业务上传仍按普通私有上传处理。
+
 ## 平台方通用 App 登录连接器（明确例外）
 
 登录页默认不得展示 ApiBase、OsClient 或调试配置；但用户明确要求、且安装包由 Microi 平台方作为多租户聚合客户端发布时，允许仅在 `APP-PLUS` 登录页提供通用连接器。协议必须使用固定 `https://` / `http://` 下拉框，地址框禁止重复输入协议，HTTPS 默认，HTTP 显示明文风险并二次确认；H5、小程序和客户专属包不得因此自动开放。候选地址先匿名读取 `GetSysConfig`，验证成功后再持久化。真正切换时必须清除旧 DiyToken、用户、SignalR、菜单/元数据/页面缓存，按 `ApiBase + OsClient` 隔离记住的账号及 RSA 密文，并用端点代次拒绝切换前的迟到响应。支持任意 HTTP 时，最终 IPA 必须显式包含 ATS 例外，Android 安装包必须显式包含 cleartext 例外；不需要任意 HTTP 的正式包应保持平台默认安全策略，iOS ATS 例外还必须在 App Store 审核中说明。
@@ -55,7 +57,7 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 - 自动化验收必须同时使用桌面视口与移动视口截图：桌面端断言手机壳存在，移动端断言 `.phone-status` 隐藏且 `.phone` 无圆角、无边框、宽高铺满；每个底部菜单的图标元素和文字都必须可见、可点击。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-003 sha256=6ecff0f73715fd0b1e39ca8d3107582928db9cf2a20e54a2ae285983e97411fe -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-003 sha256=5cedd05cb29746019a92db56a21123718fde23d5d9df4b8064dfc260bc89ee05 -->
 ## 登录页与手机号快捷登录
 
 - 登录页必须是直接登录面，不要默认做“员工登录 / 客户登录”身份 Tab 切换，除非用户明确要求。默认展示系统账号密码登录，同时提供客户手机号快捷登录入口。

@@ -136,8 +136,8 @@ public class V8UnlimitedUpgradeTests
         var apiEngine = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.net", "ApiEngine", "ApiEngine.cs"));
 
-        Assert.Contains("UPDATE sys_apiengine", migration, StringComparison.Ordinal);
-        Assert.Contains("SET V8Limit = @p0", migration, StringComparison.Ordinal);
+        Assert.Contains("UPDATE {orm.GetTableName(\"sys_apiengine\")}", migration, StringComparison.Ordinal);
+        Assert.Contains("SET {orm.GetFieldName(FieldName)} = @p0", migration, StringComparison.Ordinal);
         Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade32.Version)", upgrade, StringComparison.Ordinal);
         Assert.Contains("UnlimitedRuntime = !DynamicHelper.GetDynamicBoolValue", apiEngine, StringComparison.Ordinal);
         Assert.Contains("\"V8Limit\"", apiEngine, StringComparison.Ordinal);
@@ -155,11 +155,11 @@ public class V8UnlimitedUpgradeTests
             root, "Microi.Server", "Microi.Upgrade", "MicroiUpgradeHostedService.cs"));
 
         Assert.Equal("6.9.8.9", Upgrade33.Version);
-        Assert.Contains("UPDATE diy_table", migration, StringComparison.Ordinal);
+        Assert.Contains("UPDATE {orm.GetTableName(\"diy_table\")}", migration, StringComparison.Ordinal);
         Assert.Contains("if (resetExistingValues)", migration, StringComparison.Ordinal);
-        Assert.Contains("SET V8Limit = @p0", migration, StringComparison.Ordinal);
-        Assert.Contains("V8Unlimited = @p1", migration, StringComparison.Ordinal);
-        Assert.Contains("WHERE V8Limit IS NULL", migration, StringComparison.Ordinal);
+        Assert.Contains("SET {orm.GetFieldName(FieldName)} = @p0", migration, StringComparison.Ordinal);
+        Assert.Contains("{orm.GetFieldName(LegacyFieldName)} = @p1", migration, StringComparison.Ordinal);
+        Assert.Contains("WHERE {orm.GetFieldName(FieldName)} IS NULL", migration, StringComparison.Ordinal);
         Assert.Contains(".AddInParameter(\"p0\", 0)", migration, StringComparison.Ordinal);
         Assert.Contains(".AddInParameter(\"p1\", 1)", migration, StringComparison.Ordinal);
         Assert.Contains("Name = FieldName", migration, StringComparison.Ordinal);
@@ -173,7 +173,9 @@ public class V8UnlimitedUpgradeTests
         var invariantIndex = hostedService.IndexOf("\"Upgrade33-表单V8限额\"", StringComparison.Ordinal);
         Assert.Contains(".Run(runtimeClient.OsClient, resetExistingValues: false)", hostedService, StringComparison.Ordinal);
         Assert.Contains("RunRuntimeInvariantAsync(runtimeClient, upgradeLease", hostedService, StringComparison.Ordinal);
-        var versionReadIndex = hostedService.IndexOf("SELECT ServerVersion FROM sys_config", StringComparison.Ordinal);
+        var versionReadIndex = hostedService.IndexOf(
+            "SELECT {runtimeOrm.GetFieldName(\"ServerVersion\")}",
+            StringComparison.Ordinal);
         var versionGateIndex = hostedService.IndexOf("_upgrade.Upgrade(currentVersion", StringComparison.Ordinal);
         Assert.True(leaseContextIndex >= 0);
         Assert.True(invariantIndex > leaseContextIndex);

@@ -28,35 +28,63 @@ namespace Microi.net
     /// </summary>
     public class WeChat
     {
+        /// <summary>
+        /// 解密微信支付 API v3 回调资源。
+        /// </summary>
+        /// <remarks>
+        /// nonce 是 12 字节 UTF-8 原文，不是 Base64；ciphertext 才是 Base64，
+        /// 其解码结果末尾包含 GCM 所需的 16 字节认证标签。
+        /// </remarks>
         public string AesGcmDecrypt(string associated_data, string nonce, string ciphertext, string AES_KEY)
         {
-            byte[] key = Encoding.UTF8.GetBytes(AES_KEY);
-            byte[] nonceBytes = Encoding.UTF8.GetBytes(nonce);
-            byte[] associatedDataBytes = associated_data == null ? null : Encoding.UTF8.GetBytes(associated_data);
-            byte[] encryptedData = Convert.FromBase64String(ciphertext);
+            if (AES_KEY == null)
+            {
+                throw new ArgumentNullException(nameof(AES_KEY));
+            }
+            if (nonce == null)
+            {
+                throw new ArgumentNullException(nameof(nonce));
+            }
+            if (ciphertext == null)
+            {
+                throw new ArgumentNullException(nameof(ciphertext));
+            }
 
-            // 分离密文和认证标签（假设标签长度为16字节）
-            int cipherTextLength = encryptedData.Length - 16;
-            byte[] cipherText = new byte[cipherTextLength];
-            byte[] tag = new byte[16];
-            Array.Copy(encryptedData, 0, cipherText, 0, cipherTextLength);
-            Array.Copy(encryptedData, cipherTextLength, tag, 0, 16);
+            byte[] key = Encoding.UTF8.GetBytes(AES_KEY);
+            if (key.Length != 32)
+            {
+                throw new ArgumentException("微信支付 APIv3 密钥必须是 32 字节 UTF-8 文本。", nameof(AES_KEY));
+            }
+
+            byte[] nonceBytes = Encoding.UTF8.GetBytes(nonce);
+            if (nonceBytes.Length != 12)
+            {
+                throw new ArgumentException("微信支付 resource.nonce 必须是 12 字节 UTF-8 文本。", nameof(nonce));
+            }
+
+            byte[] associatedDataBytes = Encoding.UTF8.GetBytes(associated_data ?? string.Empty);
+            byte[] encryptedData = Convert.FromBase64String(ciphertext);
+            const int tagLengthBytes = 16;
+            if (encryptedData.Length <= tagLengthBytes)
+            {
+                throw new ArgumentException("微信支付 resource.ciphertext 必须包含密文和 16 字节认证标签。", nameof(ciphertext));
+            }
 
             var cipher = new GcmBlockCipher(new AesEngine());
             var parameters = new AeadParameters(
                 new KeyParameter(key),
-                128, // 认证标签长度（比特）
+                tagLengthBytes * 8,
                 nonceBytes,
                 associatedDataBytes
             );
-            cipher.Init(false, parameters); // false 表示解密
+            cipher.Init(false, parameters);
 
-            // 处理密文
-            byte[] plaintext = new byte[cipher.GetOutputSize(cipherText.Length)];
-            int len = cipher.ProcessBytes(cipherText, 0, cipherText.Length, plaintext, 0);
-            cipher.DoFinal(plaintext, len); // 验证标签并完成解密
+            // BouncyCastle 解密时必须接收“密文 + 尾部认证标签”的完整字节串，否则无法校验 GCM 标签。
+            byte[] plaintext = new byte[cipher.GetOutputSize(encryptedData.Length)];
+            int plaintextLength = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, plaintext, 0);
+            plaintextLength += cipher.DoFinal(plaintext, plaintextLength);
 
-            return Encoding.UTF8.GetString(plaintext);
+            return Encoding.UTF8.GetString(plaintext, 0, plaintextLength);
         }
 
 

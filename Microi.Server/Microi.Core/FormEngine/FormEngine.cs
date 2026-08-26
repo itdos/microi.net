@@ -2387,6 +2387,25 @@ namespace Microi.net
                 // 
             });
 
+            if (result.Code != 1)
+            {
+                var client = OsClientExtend.GetClient(osClient);
+                var databaseType = client?.DbRead?.Db?.DbProvider?.DatabaseType;
+                if (databaseType == DatabaseType.PostgreSql || databaseType == DatabaseType.KingBase)
+                {
+                    var fallback = client.DbRead.FromSql(@"SELECT * FROM ""diy_table""
+WHERE ""IsDeleted"" <> 1
+  AND (""Id"" = @p0 OR LOWER(""Name"") = LOWER(@p0))
+LIMIT 1")
+                        .AddInParameter("p0", idOrName)
+                        .First<dynamic>();
+                    if (fallback != null)
+                    {
+                        result = new DosResult<dynamic>(1, fallback);
+                    }
+                }
+            }
+
             if (result.Code == 1)
             {
                 // 转换为 JObject 后再存入缓存，确保序列化后类型一致

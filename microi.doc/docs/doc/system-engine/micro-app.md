@@ -26,6 +26,27 @@
 
 吾码官网 [AI 应用广场](https://microi.net/apps.html) 中的大部分 AI 应用均采用 MicroService 实现。这样既能独立展示和访问，也能无缝嵌入吾码菜单、表单与业务弹层，而不必把每个定制页面都打进 `Microi.Client` 主包。
 
+## 真实案例：同一能力融入不同业务位置
+
+<div class="micro-app-case-grid">
+  <figure class="micro-app-case">
+    <img src="/images/product-screenshots/microservice-crm-customer-map.png" alt="威讯 CRM 客户地图微服务嵌入吾码后台菜单，展示客户分布、聚合点位与附近客户列表" data-fancybox="micro-app-cases">
+    <figcaption><span>案例 1 · 菜单路由</span><strong>CRM 客户地图</strong><small>地图、客户分类、距离检索与业务导航在同一微服务页面完成，并保留吾码菜单、页签和登录态。</small></figcaption>
+  </figure>
+  <figure class="micro-app-case">
+    <img src="/images/microservice-cases/open-app-dialog.png" alt="数据库定时备份微服务通过 V8.OpenAppDialog 在吾码 SaaS 引擎中弹层打开" data-fancybox="micro-app-cases">
+    <figcaption><span>案例 2 · 弹层</span><strong>数据库定时备份</strong><small>在 SaaS 引擎列表上方打开指定微服务路由；背景页面、菜单和登录态均保留。</small></figcaption>
+  </figure>
+  <figure class="micro-app-case">
+    <img src="/images/microservice-cases/menu-production-counter.jpg" alt="生产计数报工工作台作为吾码平台菜单中的微服务路由打开" data-fancybox="micro-app-cases">
+    <figcaption><span>案例 3 · 菜单路由</span><strong>生产计数报工工作台</strong><small>深色大屏式工作台直接占据菜单内容区，宿主导航仍可正常使用。</small></figcaption>
+  </figure>
+  <figure class="micro-app-case">
+    <img src="/images/microservice-cases/menu-packing-workbench.jpg" alt="成品打包工作台作为吾码平台菜单中的另一个微服务路由打开" data-fancybox="micro-app-cases">
+    <figcaption><span>案例 4 · 菜单路由</span><strong>成品打包工作台</strong><small>一个 MicroService 可以维护多个页面，并让不同菜单直达各自 RoutePath。</small></figcaption>
+  </figure>
+</div>
+
 ## 四种运行方式
 
 <div class="micro-app-mode-grid">
@@ -70,23 +91,6 @@
 | 复杂弹层，有联动、表格、上传或分步操作 | MicroService + `V8.OpenAppDialog` | 独立组件化开发，仍保留平台上下文。 |
 | 完整工作台或同一应用多个业务页面 | MicroService + 菜单路由 | 可让多个菜单分别打开不同内部路由。 |
 | 需要独立访问、独立版本、AI 维护与商城交付 | MicroService | 一个工程覆盖四种入口和独立发布。 |
-
-## 真实案例：同一能力融入不同业务位置
-
-<div class="micro-app-case-grid">
-  <figure class="micro-app-case is-wide">
-    <img src="/images/microservice-cases/open-app-dialog.png" alt="数据库定时备份微服务通过 V8.OpenAppDialog 在吾码 SaaS 引擎中弹层打开" data-fancybox="micro-app-cases">
-    <figcaption><span>案例 1 · 弹层</span><strong>数据库定时备份</strong><small>在 SaaS 引擎列表上方打开指定微服务路由；背景页面、菜单和登录态均保留。</small></figcaption>
-  </figure>
-  <figure class="micro-app-case">
-    <img src="/images/microservice-cases/menu-production-counter.jpg" alt="生产计数报工工作台作为吾码平台菜单中的微服务路由打开" data-fancybox="micro-app-cases">
-    <figcaption><span>案例 2 · 菜单路由</span><strong>生产计数报工工作台</strong><small>深色大屏式工作台直接占据菜单内容区，宿主导航仍可正常使用。</small></figcaption>
-  </figure>
-  <figure class="micro-app-case">
-    <img src="/images/microservice-cases/menu-packing-workbench.jpg" alt="成品打包工作台作为吾码平台菜单中的另一个微服务路由打开" data-fancybox="micro-app-cases">
-    <figcaption><span>案例 3 · 菜单路由</span><strong>成品打包工作台</strong><small>一个 MicroService 可以维护多个页面，并让不同菜单直达各自 RoutePath。</small></figcaption>
-  </figure>
-</div>
 
 ## 整体架构
 

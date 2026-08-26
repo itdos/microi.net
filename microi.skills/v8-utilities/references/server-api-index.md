@@ -120,12 +120,42 @@ MD5/SHA1 仅为兼容摘要；任何摘要都不能直接作为新密码存储�
 
 - `V8.Alipay.CreatePay(...)` 创建支付宝支付参数；
   `V8.Alipay.Test22(...)` 是历史诊断方法，不能作为生产业务接口。
-- `V8.WeChat` 当前包含签名、授权头与 AES-GCM 解密等微信支付帮助方法。
+- `V8.WeChat` 当前包含签名、授权头与 AES-GCM 解密等微信支付协议原子，
+  精确边界见下节。
 - 自定义扩展通过 `V8ExtensionRegistry.Register(name,factory)` 注册为
   `V8.<name>`；不要把某个客户的扩展名写成全平台标准能力。
 
 支付/微信/DNS 扩展必须只读取当前租户受控凭据，调用前校验权限、金额、订单状态、
 幂等键和回调签名；私钥、Secret 和原始签名材料不得进入日志或响应。
+
+### V8.WeChat 微信支付最小协议原子
+
+| API | 说明 |
+|---|---|
+| `V8.WeChat.AesGcmDecrypt(associatedData, nonce, ciphertext, apiV3Key)` | 解密微信支付 API v3 `resource`，同时认证密文尾部 GCM 标签 |
+| `V8.WeChat.GetWeChatSign(privateKeyPem, paramList)` | 按参数顺序和换行规则生成 SHA256-RSA2048 Base64 签名 |
+| `V8.WeChat.GetWeChatAuthorization(mchid, serialNo, privateKeyPem, wxApiAddress, body)` | 为 `POST` 请求生成 `WECHATPAY2-SHA256-RSA2048` Authorization 值；路径和 Query 必须与真实请求一致 |
+
+`AesGcmDecrypt` 的四个参数具有不同编码，不能统一按 Base64 处理：
+
+| 参数 | 必须采用的编码 |
+|---|---|
+| `apiV3Key` | 商户 APIv3 密钥原文的 UTF-8 字节，必须恰好 32 字节 |
+| `nonce` | `resource.nonce` 原文的 UTF-8 字节，必须恰好 12 字节；**不是 Base64** |
+| `associatedData` | `resource.associated_data` 原文的 UTF-8 字节；缺省时使用空字节串 |
+| `ciphertext` | 唯一需要 Base64 解码的参数；解码结果是“密文 + 尾部 16 字节 GCM 标签”，必须完整交给解密器 |
+
+禁止把 `nonce` 改为 Base64 解码，也不要增加“UTF-8/Base64 两种 nonce 都接受”的
+模糊兼容分支。`AesGcmDecrypt` 只完成资源解密与 GCM 完整性认证，不等于微信支付
+HTTP 回调签名验证；必须先使用原始请求体和 `Wechatpay-*` 请求头完成平台签名验证。
+
+该对象保持最小协议原子：C# 只承担路由、原始报文、可信验签、租户恢复和密钥隔离等
+V8 无法安全表达的边界；订单/退款状态、商户与金额复核、幂等、事务、日志、通知和
+outbox 编排放在接口引擎。密钥从当前租户 `V8.SysConfig.ServerPrivateSettings` 等受控
+私密配置读取，不写进 V8 源码、请求参数、日志或响应。
+
+回归测试至少覆盖：微信支付官方固定向量可解密、篡改密文或标签必然认证失败，以及
+真实 Jint 表达式 `V8.WeChat.AesGcmDecrypt(...)` 可调用；只直接测试 C# 方法不算完成。
 
 ## 其它后端扩展
 

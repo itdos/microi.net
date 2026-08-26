@@ -36,34 +36,81 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 
 [![Microi吾码 AI平台 架构图](/images/microi-ai-platform-architecture.svg)](/images/microi-ai-platform-architecture.svg)
 
-> 点击图片可在弹层中放大、缩小和拖动查看。图中治理控制面覆盖门户、身份权限、配置、功能开关、发布审批与执行、服务流量、Trace、日志生命周期、可观测告警、组件资产、页面源码桥接、协作与可恢复导入，详见 [AI 平台治理中心](/doc/system-engine/ai-platform-governance)。
+> 点击图片可在弹层中放大、缩小和拖动查看。图中以 V8 引擎为在线运行核心，优先展示 AI、低代码、数据集成、自动化、平台治理与多端交付等 20+ 成熟系统引擎；治理细节继续参见 [AI 平台治理中心](/doc/system-engine/ai-platform-governance)。
+
+## 📸 预览图
+
+<table class="mci-doc-preview-gallery">
+  <tr>
+    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%" data-fancybox="platform-preview"/></td>
+  </tr>
+  <tr>
+    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" alt="Microi吾码 AI 平台界面" style="width:100%" data-fancybox="platform-preview"/></td>
+  </tr>
+  <tr>
+    <td colspan="3" align="center"><img src="/images/product-screenshots/api-engine-ai-copilot.png" alt="Microi 接口引擎与 AI 编程助手界面" style="width:100%" data-fancybox="platform-preview"/></td>
+  </tr>
+  <tr>
+    <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png" alt="应用商城" data-fancybox="platform-preview"/></td>
+    <td><img src="/images/product-screenshots/api-engine-ai-copilot.png" alt="接口引擎与 AI 编程" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" alt="AI 应用开发" data-fancybox="platform-preview"/></td>
+  </tr>
+  <tr>
+    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" alt="V8 引擎本地 AI 编程连接配置" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" alt="V8 引擎本地 AI 编程运行调试" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程VSCode插件.png" alt="Microi VS Code 插件" data-fancybox="platform-preview"/></td>
+  </tr>
+  <tr>
+    <td><img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" alt="模块引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/表单引擎.png" alt="表单引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/界面引擎.png" alt="界面引擎" data-fancybox="platform-preview"/></td>
+  </tr>
+  <tr>
+    <td><img src="https://static.itdos.com/upload/img/csdn/数据大屏.png" alt="数据大屏" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/打印引擎.png" alt="打印引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/AI数据分析.png" alt="AI 数据分析" data-fancybox="platform-preview"/></td>
+  </tr>
+  <tr>
+    <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg" alt="工作流引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg" alt="报表引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg" alt="SaaS 引擎" data-fancybox="platform-preview"/></td>
+  </tr>
+  <tr>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-扫一扫.jpg" alt="移动端扫一扫" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印2.jpg" alt="移动端蓝牙打印结果" data-fancybox="platform-preview"/></td>
+  </tr>
+</table>
+
+---
 
 ### 架构能力全景（可检索文本）
 
 > SVG 负责展示整体关系；下面的同步索引由同一份架构能力数据自动生成，便于新用户、搜索引擎和 AI 完整识别平台边界。
 
 <!-- MICROI_ARCHITECTURE_CAPABILITIES:START -->
-<!-- capability-source-sha256:948e503e69a80ed5249356d9438cdec52564c67dff31946f34d68b1ecd15d36b -->
+<!-- capability-source-sha256:81f2499cf4d0a0e218a667372a76fe119b4d9e37182d9bb05d23cad7242cfaa9 -->
 | 架构层 | 核心职责 | 关键能力 |
 |---|---|---|
-| **AI 智能与设计控制面** | 理解需求、设计系统、生成并校验变更 | 多模型网关、RAG、NL2SQL / NL2V8、Agent / Tool Calling、MCP / Skills、业务架构蓝图、AI Workflow、Manifest、Preview / Diff |
-| **低代码与多端体验层** | 建模业务并交付 PC、WebOS、移动端和微应用 | 表单、模块、界面、工作流、打印、报表、Microi.UI、前端微服务、UniApp / App、Unity / WebGL |
+| **AI 开发与智能引擎** | 理解需求、设计系统、生成并校验变更 | AI 引擎、多模型网关、RAG、NL2SQL / NL2V8、Agent / Tool Calling、MCP / Skills、业务架构蓝图、AI 工作流、Preview / Diff |
+| **低代码核心业务引擎** | 以 20+ 成熟引擎建模并运行企业业务 | 表单、模块、接口、数据源、界面、打印、报表、工作流、SaaS、应用商城 |
 | **V8 运行与集成核心** | 在线运行可信业务逻辑并连接平台原子能力 | 接口引擎、FormEngine、数据源、Dos.ORM、HTTP、Redis、MongoDB、MQ / MQTT、Office / OCR、Webhook / SignalR |
-| **AI 平台治理中心** | 治理门户、身份、配置、发布和跨资源变更 | 门户项目、身份连接器、动态用户组、配置模板、Feature Flag、灰度发布、不可变审批、断点续发、条件回滚 |
-| **企业可靠性与安全底座** | 保障多租户、多节点、安全、观测和恢复 | OsClient 隔离、DiyToken、Passkey / TOTP、分布式租约、幂等、Outbox / Inbox、Trace / 日志 / 告警、健康检查、Docker / K8s |
-| **工程与交付生态** | 把开发、测试、升级、文档和 AI 协作连成闭环 | Microi.VSCode、Codex / OpenClaw、MCP、Skills、应用商城、Managed / CreateIfMissing、自动化测试、浏览器回读、官方文档 |
+| **数据、集成与自动化引擎** | 连接数据库、服务、文件、设备与消息通道 | 缓存、扩展数据库、搜索、采集、任务调度、MQ / MQTT、通知、翻译、OCR / 图片、HDFS |
+| **平台治理、安全与可靠运行** | 统一设置、身份、权限、观测、升级与恢复 | AI 平台治理、系统设置、系统日志/监控、OsClient、DiyToken、SSO、分布式租约、幂等、Trace / 告警、Docker / K8s |
+| **工程与全端交付生态** | 交付 PC、WebOS、移动端、微服务与 Unity 应用 | Microi.VSCode、Codex / OpenClaw、MCP、Skills、Microi.UI、前端微服务、UniApp / App、Unity / WebGL、自动化测试、浏览器回读 |
 
 **AI 交付链路：** 自然语言 → 业务蓝图 → Manifest → DryRun → 确认执行 → 自动校验 → 真实回读 → 安全回滚
 
 <details>
-<summary>查看架构图完整功能索引（253 个唯一标签）</summary>
+<summary>查看架构图完整功能索引（226 个唯一标签）</summary>
 
 - **平台价值：** 10×+、Token 更省、10×+、典型交付更快、20+、成熟引擎复用、在线生效、V8 无需编译发布
 - **全端入口：** PC 管理端、Vue 3、WebOS、桌面多任务、移动自适应、H5 / 触控、UniApp / App、Android / iOS、微信小程序、多端复用、AI 应用 / Agent、Web / UniApp、前端微服务、多页路由、Microi.VSCode、资源树 / 调试、MCP / Skills、Codex / OpenClaw、OpenAPI / SDK、HTTP / JS
-- **AI 智能与设计控制面：** 多模型网关、智能模型路由、密钥隔离、Token 统计、流式对话、多模态输入、知识库 RAG、向量检索、NL2SQL、NL2V8、Agent、Tool Calling、MCP 编排、Skills、Prompt 模板、上下文记忆、AI 应用工作台、在线源码、业务架构蓝图、系统关系图谱、AI Workflow、状态机、Automation Flow、流程挖掘、Manifest 建模、解决方案规划、影响面分析、代码生成、测试计划生成、AI 辅助调试、根因诊断、Preview / Diff
-- **低代码与多端体验引擎：** 表单引擎、40+ 控件、Tabs / 分组、栅格布局、主子表、关联表单、字段 V8 事件、表单 V8 事件、数据过滤、模块引擎、列表 / 搜索、统计 / 角标、PC 复合列、移动卡片、左右树表、界面引擎、JSON ↔ Vue、源码预览、Undo / Redo、页面版本、语义 Diff、Microi.UI / 物料、资产依赖、打印引擎、报表引擎、审批流 v4、模板引擎、Office / 蓝牙打印、图表 / 地图 / 甘特、Unity / WebGL、3D / CAD / 大屏、前端微服务
-- **AI 平台治理中心：** 门户项目、命名插槽、统一资产、不可变快照、原子发布、运行解析、身份连接器、SCIM 同步、增量游标、冲突重放、动态用户组、用户标签、人群圈选、批量授权、权限解释、临时权限、组织快照、配置模板、配置继承、Secret 引用、配置漂移、Feature Flag、稳定灰度、发布时间窗、发布计划、计划哈希、不可变审批、职责分离、自动门禁、断点续发、条件回滚、跨资源变更集
-- **服务、观测与可靠运行：** 服务注册、实例心跳、共享租约、优雅排空、版本 / 区域、标签 / 权重、稳定路由、限流许可、熔断反馈、重试 / 降级、服务拓扑、W3C Trace、Span 时间线、日志信号、告警规则、窗口评估、去重 / 抑制、自动恢复、值班排班、升级链、Outbox 送达、热 / 温 / 冷、留存 / 配额、脱敏规则、法律保留、归档证明、导入预检、暂存行修正、检查点 / 栅栏、暂停 / 恢复、条件回滚、协作租约
+- **系统引擎总览：** AI 引擎、V8引擎、表单引擎、模块引擎、接口引擎、数据源引擎、界面引擎、打印引擎、报表引擎、工作流引擎 v4、SaaS 引擎、缓存引擎、搜索引擎、采集引擎、任务调度、MQ 消息队列、MQTT 引擎、消息通知、翻译引擎、OCR 引擎、图片处理引擎、文件柜 / HDFS、模板引擎、Office 引擎、前端微服务、Microi.UI、多端客户端、3D / CAD / 数据大屏、Unity / WebGL、应用商城、系统设置、系统日志 / 监控、扩展数据库、蓝牙打印、AI 平台治理、AI 工作流 / 蓝图
+- **AI 开发与智能引擎：** AI 引擎、多模型网关、智能模型路由、密钥隔离、流式对话、多模态、AI 助手、AI 数据分析、知识库 RAG、向量检索、NL2SQL、NL2V8、Agent、Tool Calling、Prompt 模板、上下文记忆、AI 应用工作台、AI 在线编程、AI 本地编程、Microi.VSCode、MCP、Skills、CLI / Plugins、OpenClaw、业务架构蓝图、系统关系图谱、AI 工作流 / 蓝图、状态机、Automation Flow、流程挖掘、Manifest 建模、Preview / Diff
+- **低代码核心业务引擎：** 表单引擎、模块引擎、接口引擎、数据源引擎、界面引擎、打印引擎、报表引擎、工作流引擎 v4、SaaS 引擎、应用商城、模板引擎、Microi.UI、40+ 表单控件、主子表 / 关联表、字段 / 表单 V8、列表 / 搜索、权限 / 数据范围、左右树表、移动卡片、ECharts / 地图、Office 引擎、蓝牙打印、自定义导入导出、定制组件、前端微服务、多端客户端、PC / WebOS、UniApp / App、微信小程序、Unity / WebGL、3D / CAD / 数据大屏、goView 数据大屏
+- **集成、数据与自动化引擎：** 缓存引擎、扩展数据库、搜索引擎、采集引擎、任务调度、MQ 消息队列、MQTT 引擎、消息通知、翻译引擎、OCR 引擎、图片处理引擎、文件柜 / HDFS、Redis / MongoDB、Elasticsearch、Dos.ORM、多数据库、MySQL / SQL Server、Oracle / PostgreSQL、达梦 / 人大金仓、MinIO / OSS / S3、HTTP 集成、TCP 原始字节、Webhook / 回调、SignalR 实时、API / JSON 数据源、Excel / CSV 导入、Word / PPT 导出、邮件 / 短信 / 微信、地图 / 定位、公众号 / 小程序、OpenAPI / SDK、gRPC / 多语言
+- **平台治理、安全与可靠运行：** AI 平台治理、系统设置、系统日志 / 监控、服务健康、SaaS / OsClient、DiyToken、角色 / 部门、菜单 / 表权限、行 / 字段权限、Passkey / TOTP、SSO / OAuth、OIDC / SAML / CAS、租户 Secret、审计 / Trace、多节点 API、Worker 集群、分布式租约、Fencing Token、幂等 / 唯一约束、Outbox / Inbox、优雅排空、重启恢复、限流 / 熔断 / 重试、日志 / 告警、健康检查、Docker / K8s、Managed Core、CreateIfMissing Hook、Version / Hash、DryRun / Readback、自动化测试、浏览器验收
 - **V8 运行与集成核心：** 接口引擎、保存即生效、FormEngine、CRUD / _Where、DataSource、SQL / API / JSON、Db / Dos.ORM、多数据库、HTTP、GET / POST / PATCH、Redis Cache、TTL / Hash、MongoDB、文档数据、Search Engine、索引 / 检索、Job / Quartz、可靠后台任务、Spider Engine、采集 / 浏览器、MQ / RabbitMQ、Outbox / Inbox、MQTT / IoT、设备事件、Files / HDFS、流式资产、Office、Excel / Word / PPT、OCR / Image、识别 / 图像处理、Translate、翻译 / 多语言、Message Engine、站内 / 多通道、AI / Agent、模型 / 工具、Template、HTML / 文档、Webhook / SignalR、实时集成、事务、权限、多租户、多节点
 - **统一治理与交付闭环：** Plan / DryRun、Confirm / Apply、Validate / Readback、Version / Hash、Audit / Trace、Rollback / Recover、Managed Core、Tenant Hook、OsClient 隔离、共享状态、稳定幂等、失败关闭
 - **数据与存储底座：** MySQL、SQL Server、Oracle、PostgreSQL、达梦、金仓、Redis、MongoDB、Elasticsearch、MinIO / HDFS
@@ -218,52 +265,6 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 <tr><td>🦞 <strong>OpenClaw 远程 Agent</strong></td><td>通过 MCP 与 Skills 连接 Microi，支持远程集群管理、应用开发和自动化交付</td></tr>
 <tr><td>💬 <strong>腾讯 IM</strong></td><td>快速集成社交聊天、客服会话、直播弹幕</td></tr>
 </tbody>
-</table>
-
----
-
-## 📸 预览图
-
-<table class="mci-doc-preview-gallery">
-  <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%" data-fancybox="platform-preview"/></td>
-  </tr>
-  <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" alt="Microi吾码 AI 平台界面" style="width:100%" data-fancybox="platform-preview"/></td>
-  </tr>
-  <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" alt="Microi 接口引擎在线开发界面" style="width:100%" data-fancybox="platform-preview"/></td>
-  </tr>
-  <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png" alt="应用商城" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" alt="接口引擎" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" alt="AI 应用开发" data-fancybox="platform-preview"/></td>
-  </tr>
-  <tr>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" alt="V8 引擎本地 AI 编程连接配置" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" alt="V8 引擎本地 AI 编程运行调试" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程VSCode插件.png" alt="Microi VS Code 插件" data-fancybox="platform-preview"/></td>
-  </tr>
-  <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" alt="模块引擎" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/表单引擎.png" alt="表单引擎" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/界面引擎.png" alt="界面引擎" data-fancybox="platform-preview"/></td>
-  </tr>
-  <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/数据大屏.png" alt="数据大屏" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/打印引擎.png" alt="打印引擎" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/AI数据分析.png" alt="AI 数据分析" data-fancybox="platform-preview"/></td>
-  </tr>
-  <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg" alt="工作流引擎" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg" alt="报表引擎" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg" alt="SaaS 引擎" data-fancybox="platform-preview"/></td>
-  </tr>
-  <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-扫一扫.jpg" alt="移动端扫一扫" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接" data-fancybox="platform-preview"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印2.jpg" alt="移动端蓝牙打印结果" data-fancybox="platform-preview"/></td>
-  </tr>
 </table>
 
 ---

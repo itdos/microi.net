@@ -397,14 +397,54 @@ namespace Microi.net
                 client.Db.FromSql($@"UPDATE `{BackupRecordTable.Name}`
 SET `BackgroundTaskId`=NULL
 WHERE `BackgroundTaskId` IS NOT NULL AND TRIM(`BackgroundTaskId`)='';").ExecuteNonQuery();
-                client.Db.FromSql($@"UPDATE `{BackupRecordTable.Name}` older
+                var databaseType = client.Db.Db.DbProvider.DatabaseType;
+                var duplicateSql = databaseType switch
+                {
+                    DatabaseType.SqlServer or DatabaseType.SqlServer9 => $@"UPDATE older
+SET `BackgroundTaskId`=NULL
+FROM `{BackupRecordTable.Name}` older
 INNER JOIN `{BackupRecordTable.Name}` newer
  ON older.`BackgroundTaskId`=newer.`BackgroundTaskId`
  AND older.`BackgroundTaskId` IS NOT NULL
- AND (COALESCE(newer.`CreateTime`,'1970-01-01')>COALESCE(older.`CreateTime`,'1970-01-01')
-      OR (COALESCE(newer.`CreateTime`,'1970-01-01')=COALESCE(older.`CreateTime`,'1970-01-01')
+ AND ((newer.`CreateTime` IS NOT NULL AND older.`CreateTime` IS NULL)
+      OR newer.`CreateTime`>older.`CreateTime`
+      OR ((newer.`CreateTime`=older.`CreateTime`
+           OR (newer.`CreateTime` IS NULL AND older.`CreateTime` IS NULL))
+          AND newer.`Id`>older.`Id`));",
+                    DatabaseType.PostgreSql or DatabaseType.KingBase => $@"UPDATE `{BackupRecordTable.Name}` AS older
+SET `BackgroundTaskId`=NULL
+WHERE older.`BackgroundTaskId` IS NOT NULL
+  AND EXISTS (
+      SELECT 1 FROM `{BackupRecordTable.Name}` AS newer
+      WHERE newer.`BackgroundTaskId`=older.`BackgroundTaskId`
+        AND ((newer.`CreateTime` IS NOT NULL AND older.`CreateTime` IS NULL)
+             OR newer.`CreateTime`>older.`CreateTime`
+             OR ((newer.`CreateTime`=older.`CreateTime`
+                  OR (newer.`CreateTime` IS NULL AND older.`CreateTime` IS NULL))
+                 AND newer.`Id`>older.`Id`)));",
+                    DatabaseType.Oracle or DatabaseType.DaMeng => $@"UPDATE `{BackupRecordTable.Name}` older
+SET older.`BackgroundTaskId`=NULL
+WHERE older.`BackgroundTaskId` IS NOT NULL
+  AND EXISTS (
+      SELECT 1 FROM `{BackupRecordTable.Name}` newer
+      WHERE newer.`BackgroundTaskId`=older.`BackgroundTaskId`
+        AND ((newer.`CreateTime` IS NOT NULL AND older.`CreateTime` IS NULL)
+             OR newer.`CreateTime`>older.`CreateTime`
+             OR ((newer.`CreateTime`=older.`CreateTime`
+                  OR (newer.`CreateTime` IS NULL AND older.`CreateTime` IS NULL))
+                 AND newer.`Id`>older.`Id`)))",
+                    _ => $@"UPDATE `{BackupRecordTable.Name}` older
+INNER JOIN `{BackupRecordTable.Name}` newer
+ ON older.`BackgroundTaskId`=newer.`BackgroundTaskId`
+ AND older.`BackgroundTaskId` IS NOT NULL
+ AND ((newer.`CreateTime` IS NOT NULL AND older.`CreateTime` IS NULL)
+      OR newer.`CreateTime`>older.`CreateTime`
+      OR ((newer.`CreateTime`=older.`CreateTime`
+           OR (newer.`CreateTime` IS NULL AND older.`CreateTime` IS NULL))
           AND newer.`Id`>older.`Id`))
-SET older.`BackgroundTaskId`=NULL;").ExecuteNonQuery();
+SET older.`BackgroundTaskId`=NULL;"
+                };
+                client.Db.FromSql(duplicateSql).ExecuteNonQuery();
             }
             catch (Exception ex)
             {

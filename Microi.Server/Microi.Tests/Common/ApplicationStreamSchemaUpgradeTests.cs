@@ -69,7 +69,7 @@ public sealed class ApplicationStreamSchemaUpgradeTests
     }
 
     [Fact]
-    public void Upgrade25_BuildsMySqlSqlServerAndOracleDdlWithoutWeakeningTheContract()
+    public void Upgrade25_BuildsAllSupportedProviderDdlWithoutWeakeningTheContract()
     {
         var entryPath = Upgrade25.Fields.Single(field =>
             field.TableName == "mci_ai_app_version" && field.Name == "EntryPath");
@@ -90,6 +90,10 @@ public sealed class ApplicationStreamSchemaUpgradeTests
             Upgrade25.BuildAddColumnSql(Upgrade25.SchemaDialect.SqlServer, routeSnapshotHash));
         Assert.Contains("EntryPath VARCHAR2(1200 CHAR) NULL",
             Upgrade25.BuildAddColumnSql(Upgrade25.SchemaDialect.Oracle, entryPath));
+        Assert.Contains("\"EntryPath\" varchar(1200) NULL",
+            Upgrade25.BuildAddColumnSql(Upgrade25.SchemaDialect.PostgreSql, entryPath));
+        Assert.Contains("\"AssetManifestJson\" text NULL",
+            Upgrade25.BuildAddColumnSql(Upgrade25.SchemaDialect.PostgreSql, manifest));
 
         Assert.Equal(
             "ALTER TABLE `sys_microistore` MODIFY COLUMN `PublishProtocolVersion` int NOT NULL DEFAULT 2",
@@ -100,12 +104,18 @@ public sealed class ApplicationStreamSchemaUpgradeTests
         Assert.Equal(
             "ALTER TABLE sys_microistore MODIFY (PublishProtocolVersion NUMBER(10) DEFAULT 2 NOT NULL)",
             Upgrade25.BuildControlAlterSql(Upgrade25.SchemaDialect.Oracle, protocol));
+        Assert.Equal(
+            "ALTER TABLE \"sys_microistore\" ALTER COLUMN \"PublishProtocolVersion\" SET DEFAULT 2, ALTER COLUMN \"PublishProtocolVersion\" SET NOT NULL",
+            Upgrade25.BuildControlAlterSql(Upgrade25.SchemaDialect.PostgreSql, protocol));
 
         var request = Upgrade25.Indexes.Single(index => index.Name == "ux_aav_app_request");
         Assert.DoesNotContain("WHERE", Upgrade25.BuildCreateIndexSql(Upgrade25.SchemaDialect.MySql, request));
         Assert.EndsWith("WHERE [RequestId] IS NOT NULL",
             Upgrade25.BuildCreateIndexSql(Upgrade25.SchemaDialect.SqlServer, request));
         Assert.DoesNotContain("WHERE", Upgrade25.BuildCreateIndexSql(Upgrade25.SchemaDialect.Oracle, request));
+        Assert.Equal(
+            "CREATE UNIQUE INDEX \"ux_aav_app_request\" ON \"mci_ai_app_version\" (\"AppId\", \"RequestId\")",
+            Upgrade25.BuildCreateIndexSql(Upgrade25.SchemaDialect.PostgreSql, request));
 
         var fileIdentity = Upgrade25.Indexes.Single(index => index.Name == "ux_aaf_version_pathhash");
         Assert.Equal(new[] { "VersionId", "FilePathHash" }, fileIdentity.Columns);
@@ -116,7 +126,8 @@ public sealed class ApplicationStreamSchemaUpgradeTests
                  {
                      Upgrade25.SchemaDialect.MySql,
                      Upgrade25.SchemaDialect.SqlServer,
-                     Upgrade25.SchemaDialect.Oracle
+                     Upgrade25.SchemaDialect.Oracle,
+                     Upgrade25.SchemaDialect.PostgreSql
                  })
         {
             var auditDdl = Upgrade25.BuildCreateGateTransitionAuditTableSql(dialect);
@@ -133,6 +144,8 @@ public sealed class ApplicationStreamSchemaUpgradeTests
         Assert.Equal(Upgrade25.SchemaDialect.SqlServer, Upgrade25.ParseDialect(DatabaseType.SqlServer));
         Assert.Equal(Upgrade25.SchemaDialect.SqlServer, Upgrade25.ParseDialect(DatabaseType.SqlServer9));
         Assert.Equal(Upgrade25.SchemaDialect.Oracle, Upgrade25.ParseDialect(DatabaseType.Oracle));
+        Assert.Equal(Upgrade25.SchemaDialect.PostgreSql, Upgrade25.ParseDialect(DatabaseType.PostgreSql));
+        Assert.Equal(Upgrade25.SchemaDialect.PostgreSql, Upgrade25.ParseDialect("postgres"));
     }
 
     [Fact]
@@ -203,6 +216,22 @@ public sealed class ApplicationStreamSchemaUpgradeTests
 
         Assert.Equal("REQUESTIDISNOTNULL",
             Upgrade25.NormalizeSqlPredicate("(([RequestId] IS NOT NULL))"));
+        Assert.True(Upgrade25.IsCompatibleSqlServerNotNullFilter(
+            "([RequestId] IS NOT NULL)",
+            "RequestId",
+            new[] { "AppId", "RequestId" }));
+        Assert.True(Upgrade25.IsCompatibleSqlServerNotNullFilter(
+            "([AppId] IS NOT NULL AND [RequestId] IS NOT NULL)",
+            "RequestId",
+            new[] { "AppId", "RequestId" }));
+        Assert.False(Upgrade25.IsCompatibleSqlServerNotNullFilter(
+            "([AppId] IS NOT NULL)",
+            "RequestId",
+            new[] { "AppId", "RequestId" }));
+        Assert.False(Upgrade25.IsCompatibleSqlServerNotNullFilter(
+            "([RequestId] IS NOT NULL OR [AppId] IS NOT NULL)",
+            "RequestId",
+            new[] { "AppId", "RequestId" }));
         Assert.Equal("LegacyOpen", Upgrade25.NormalizeDefaultExpression("((N'LegacyOpen'))"));
         Assert.Equal("2", Upgrade25.NormalizeDefaultExpression("((2))"));
 
@@ -210,6 +239,10 @@ public sealed class ApplicationStreamSchemaUpgradeTests
         Assert.Contains("TOP (500)", Upgrade25.BuildFileHashPageSql(Upgrade25.SchemaDialect.SqlServer, false));
         Assert.Contains("ROWNUM<=500", Upgrade25.BuildFileHashPageSql(Upgrade25.SchemaDialect.Oracle, true));
         Assert.Contains("Id>@p0", Upgrade25.BuildFileHashPageSql(Upgrade25.SchemaDialect.Oracle, true));
+        var postgresPage = Upgrade25.BuildFileHashPageSql(Upgrade25.SchemaDialect.PostgreSql, true);
+        Assert.Contains("\"Id\">@p0", postgresPage);
+        Assert.Contains("LIMIT 500", postgresPage);
+        Assert.Equal("LegacyOpen", Upgrade25.NormalizeDefaultExpression("'LegacyOpen'::character varying"));
     }
 
     [Fact]

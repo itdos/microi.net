@@ -165,6 +165,7 @@ export default {
       try {
         const outcomes = await V8.uploadFiles(batch, {
           path: this.uploadPath || (this.mediaType === 'image' ? 'img' : 'file'),
+          formFieldContext: this.fileContext,
           preview: this.mediaType === 'image',
           multiple: this.maxCount > 1,
           concurrency: 3,

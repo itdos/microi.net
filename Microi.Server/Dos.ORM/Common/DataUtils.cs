@@ -57,13 +57,24 @@ namespace Dos.ORM
         /// <returns></returns>
         internal static string FormatSQL(string sql, char leftToken, char rightToken)
         {
+            return FormatSQL(sql, leftToken, rightToken, null);
+        }
+
+        internal static string FormatSQL(
+            string sql,
+            char leftToken,
+            char rightToken,
+            DatabaseType? databaseType)
+        {
             if (sql == null)
             {
                 return string.Empty;
             }
             var left = leftToken.ToString();
             var right = rightToken.ToString();
-            if (leftToken.ToString() == "\"")
+            var preserveQuotedIdentifiers = databaseType == DatabaseType.PostgreSql
+                                            || databaseType == DatabaseType.KingBase;
+            if (leftToken.ToString() == "\"" && !preserveQuotedIdentifiers)
             {
                 left = "";
                 right = "";

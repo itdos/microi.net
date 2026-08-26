@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-security-008 sha256=dfd8dabfc7d1ecdd99283c0dd5e1d5499d76f8337eff0d9cd9b0cfcac0a9dddc -->
+<!-- microi-progressive:chunk id=v8-security-008 sha256=6e0b7de3cd72cc030c93566c03ddf2191af6163d378e5ec8a40828eee9873477 -->
 ## 7. 日志记录
 
 关键操作必须记录审计日志：
@@ -43,7 +43,7 @@ if (clearResult.Code != 1) {
 - 接口引擎和底层方法都必须校验管理员权限、目标用户 Id 和租户边界，禁止跨租户吊销。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-009 sha256=c3618f2fae953f2951195d0669f51963f5dfbc96f43b4262e4234f556935e1f7 -->
+<!-- microi-progressive:chunk id=v8-security-009 sha256=b7a65ce2785a6a3d02dc1bc08c16c5ae03e38aa199d4bc204abe5978057f1ea1 -->
 ## 8. 错误处理
 
 不要把内部错误信息暴露给前端：
@@ -64,7 +64,7 @@ try {
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-010 sha256=9d8e9186a7fa3a6c85e2df8cf0d6776ca05c3eff1c97dd36424722b5880c2812 -->
+<!-- microi-progressive:chunk id=v8-security-010 sha256=4b68e2730cc6ac2ba8eeb4458c71e9ee157b9ac8054dcab364f364b2e0bd1c05 -->
 ## 9. Token、终端会话与租户隔离
 
 开发 Web、H5、UniApp、小程序、App、VS Code 或 MCP 客户端时，必须同时遵守 `microi-frontend-sdk/SKILL.md` 的 Token 协议：登录传 `_ClientType`，请求头传稳定 `did`，每次响应接收新的 `authorization`，并在浏览器/应用恢复前台时检查续签。
@@ -90,7 +90,7 @@ try {
 - 多节点封禁、解封和到期状态必须进入共享 Redis/数据库；本机静态字典只能做缓存。Redis 可用且共享 block 不存在就是权威已解封，节点必须删除本机旧 block，禁止把旧状态回写复活；Redis 不可用时才允许本机降级。验收要让同一出口分别命中至少两个 API 节点，覆盖普通阈值、受信读取、伪造 Header、手动解除和自动到期。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-011 sha256=aaf4ca37e6a03ddd3520d32559e322d0d7bbba60be8aceef03d200138df77a98 -->
+<!-- microi-progressive:chunk id=v8-security-011 sha256=78053ef853bdffb4eaad90354204555d836d67b9a18f2a6c0ac74a0142df2794 -->
 ## 10. Jint 运行时升级边界
 
 升级 Jint 时必须逐版阅读官方 release notes，并至少验证以下兼容面，不能只以编译通过作为验收：
@@ -102,7 +102,7 @@ try {
 - 引擎约束必须在平台宿主对象注入完成、用户脚本执行前 `Constraints.Reset()`；同时覆盖超时、语句数、递归、内存、Promise 取消及 CLR 宿主边界返回后的再次检查。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-012 sha256=782777ed84d4030038999d74be896385365f7f3a005332558b7f5e46b17b351b -->
+<!-- microi-progressive:chunk id=v8-security-012 sha256=f7ac9ee1702759fbf5b256ef7b7069ebce75cb845b59786d4eab928335001bf6 -->
 ## 安全检查清单
 
 - [ ] 所有数据库查询使用参数化（`_Where` 或 `@p0`）
@@ -133,7 +133,7 @@ try {
 - 自动化检查：预置缺少新字段的旧 Redis 快照后验证新版本 Key 不命中；分别覆盖管理员设计器批量字段保存/新增字段、普通用户直接写管理员专用表被拒绝、只读委托表写入被拒绝、`mic_print` 有权读取成功、升级程序可信写入成功，以及 HTTP JSON 伪造可信字段仍失败。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-013 sha256=d87a3b8c82d4eb9c88ee5214711672f9e0684895dc3f4eca32b0278587f68426 -->
+<!-- microi-progressive:chunk id=v8-security-013 sha256=809cd12c1b5fbba76a0b09ebbddf5d2e34189d26ee510c285389294c35b91176 -->
 ## 浏览器访问密钥
 
 固定看板、电视和信息屏免输入帐号密码时，使用平台 `mci_user_access_key`，禁止自行在接口引擎中保存明文 Secret，也禁止把长期登录 Token 拼进 URL。

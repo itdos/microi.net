@@ -412,7 +412,11 @@ namespace Dos.ORM
             bool isStoredProcedure = (cmd.CommandType == CommandType.StoredProcedure);
             if (!isStoredProcedure)
             {
-                cmd.CommandText = DataUtils.FormatSQL(cmd.CommandText, leftToken, rightToken);
+                cmd.CommandText = DataUtils.FormatSQL(
+                    cmd.CommandText,
+                    leftToken,
+                    rightToken,
+                    DatabaseType);
             }
 
             foreach (DbParameter p in cmd.Parameters)
