@@ -52,7 +52,8 @@
 | `GET /api/HDFS/OpenPrivateFile` | 受权打开私有文件/Office 代理 |
 | `POST /api/DiyChat/SendSystemMessage` | 发送站内消息；前端优先 `V8.SendSystemMessage` |
 | `POST /apiengine/platform-mq` | MQ 管理入口；Body 使用 `Action=Send`，仅当前租户超级管理员 |
-| `GET /api/Diagnostics/health` | 聚合健康状态 |
+| `GET /apiengine/platform-service-health?OsClient={OsClient}` | 新版客户端固定匿名健康契约；返回 `Data.Status=Healthy`，新二进制同时返回真实后端版本；应用包先发布时版本可暂时为空，但健康结论不失败；不查询业务表 |
+| `GET /api/Diagnostics/health` | 旧节点滚动升级兼容健康路由；新版客户端不以它作为主要契约 |
 | `GET /api/Diagnostics/liveness` | 进程存活检查，不代表已就绪接流量 |
 
 `/api/example`、`/api/example/1` 仅用于说明 `V8.Http` 的普通 Controller 地址，

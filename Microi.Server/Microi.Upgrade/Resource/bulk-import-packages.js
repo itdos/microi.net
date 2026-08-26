@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.3.4
+ * Version: v1.3.7
  * Function:
  * - 规划并逐个安装或更新全部官方平台应用；持久化计划、不可变商城快照标识与子检查点，并透传结构化失败详情。
  */
@@ -251,6 +251,85 @@ var requiredAppIdMap = {};
 for (var requiredIndex = 0; requiredIndex < requiredAppIds.length; requiredIndex++) {
     requiredAppIdMap[requiredAppIds[requiredIndex]] = true;
 }
+// STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2：事故恢复只能由控制面传入这个精确闭包。
+// 应用商城单一拥有 platform-sys-menu，SaaS 引擎单一拥有匿名配置等运行门面；
+// 必须先物理回读真实资源，才能决定已安装同版本的应用是否需要 Reinstall。
+var startupDependencyRecovery = requiredAppIds.length == 2
+    && requiredAppIdMap['app.microi.store'] === true
+    && requiredAppIdMap['app.microi.saas-engine'] === true;
+function normalizeRuntimeFlag(value) {
+    if (value === true) return 1;
+    if (value === false || value === null || value === undefined || value === '') return 0;
+    var raw = String(value).toLowerCase();
+    return raw == '1' || raw == 'true' || raw == 'yes' ? 1 : 0;
+}
+function versionAtLeast(value, minimum) {
+    var parse = function (input) {
+        return String(input || '').replace(/^v/i, '').split('.').slice(0, 3).map(function (item) {
+            return toInt(item, 0);
+        });
+    };
+    var left = parse(value);
+    var right = parse(minimum);
+    for (var index = 0; index < 3; index++) {
+        if ((left[index] || 0) != (right[index] || 0)) {
+            return (left[index] || 0) > (right[index] || 0);
+        }
+    }
+    return true;
+}
+var startupDependencyRequirements = [
+    { AppId: 'app.microi.store', Key: 'platform-sys-menu', Address: '/apiengine/platform-sys-menu', Version: 'v1.0.0', AllowAnonymous: 0, Markers: ['V8.Method.ManageSystemDirectory', "Domain: 'SysMenu'", 'GetSysMenuStep'] },
+    { AppId: 'app.microi.saas-engine', Key: 'platform-os-client-by-domain', Address: '/apiengine/platform-os-client-by-domain', Version: 'v1.0.0', AllowAnonymous: 1, Markers: ['V8.Method.ResolveOsClientByDomain'] },
+    { AppId: 'app.microi.saas-engine', Key: 'platform-sys-config', Address: '/apiengine/platform-sys-config', Version: 'v1.0.0', AllowAnonymous: 1, Markers: ['V8.Method.GetPublicSysConfig'] },
+    { AppId: 'app.microi.saas-engine', Key: 'platform-lang-bundle', Address: '/apiengine/platform-lang-bundle', Version: 'v1.0.0', AllowAnonymous: 1, Markers: ['V8.Method.GetLangBundle'] },
+    { AppId: 'app.microi.saas-engine', Key: 'platform-current-user', Address: '/apiengine/platform-current-user', Version: 'v1.0.0', AllowAnonymous: 0, Markers: ['V8.CurrentUser'] },
+    { AppId: 'app.microi.saas-engine', Key: 'platform-private-file-url', Address: '/apiengine/platform-private-file-url', Version: 'v1.0.0', AllowAnonymous: 0, Markers: ['V8.Method.GetAuthorizedPrivateFileUrl'] },
+    { AppId: 'app.microi.saas-engine', Key: 'platform-sys-user-public-info', Address: '/apiengine/platform-sys-user-public-info', Version: 'v1.0.0', AllowAnonymous: 0, Markers: ["GetTableData('sys_user'"] }
+];
+function readStartupDependencyEngine(key) {
+    try {
+        return V8.Db.FromSql(
+            'SELECT ApiEngineKey,ApiAddress,ApiV8Code,Version,IsEnable,StopHttp,AllowAnonymous,IsDeleted '
+            + 'FROM sys_apiengine WHERE LOWER(ApiEngineKey)=LOWER(@p0) '
+            + 'AND (IsDeleted=0 OR IsDeleted IS NULL)'
+        ).AddInParameter('@p0', key).First();
+    } catch (error) {
+        return null;
+    }
+}
+function hasStartupDependencyEngine(requirement) {
+    var row = readStartupDependencyEngine(requirement.Key);
+    var source = String(row && row.ApiV8Code || '');
+    if (!row
+        || String(row.ApiAddress || '').toLowerCase() != String(requirement.Address).toLowerCase()
+        || normalizeRuntimeFlag(row.IsEnable) != 1
+        || normalizeRuntimeFlag(row.StopHttp) != 0
+        || normalizeRuntimeFlag(row.AllowAnonymous) != requirement.AllowAnonymous
+        || !versionAtLeast(row.Version, requirement.Version)) {
+        return false;
+    }
+    for (var markerIndex = 0; markerIndex < requirement.Markers.length; markerIndex++) {
+        if (source.indexOf(requirement.Markers[markerIndex]) < 0) return false;
+    }
+    return true;
+}
+function missingStartupDependencyRequirements() {
+    if (!startupDependencyRecovery) return [];
+    return startupDependencyRequirements.filter(function (requirement) {
+        return !hasStartupDependencyEngine(requirement);
+    });
+}
+function loadStartupDependencyRepairApps() {
+    var repair = {};
+    if (!startupDependencyRecovery) return repair;
+    for (var requirementIndex = 0; requirementIndex < startupDependencyRequirements.length; requirementIndex++) {
+        var requirement = startupDependencyRequirements[requirementIndex];
+        if (!hasStartupDependencyEngine(requirement)) repair[requirement.AppId] = true;
+    }
+    return repair;
+}
+var startupDependencyRepairAppIdMap = loadStartupDependencyRepairApps();
 function planItemAllowed(item) {
     if (requiredAppIds.length <= 0) return true;
     return requiredAppIdMap[trim(item && (item.AppId || item.AppKey)).toLowerCase()] === true;
@@ -296,6 +375,20 @@ function failure(message, detail, recoveryHint) {
         Msg: message + '；解决方案：' + data.RecoveryHint
     };
 }
+var startupDependencyBootstrapOnlyRequested = normalizeRuntimeFlag(
+    checkpoint.StartupDependencyBootstrapOnly !== undefined
+        ? checkpoint.StartupDependencyBootstrapOnly
+        : V8.Param.StartupDependencyBootstrapOnly
+) == 1;
+if (startupDependencyBootstrapOnlyRequested && !startupDependencyRecovery) {
+    return failure(
+        'StartupDependencyBootstrapOnly 仅允许用于应用商城 + SaaS 引擎的精确启动依赖闭包。',
+        { FailureStage: 'BootstrapOnlyScopeValidation', RequiredAppIds: requiredAppIds },
+        '请通过主租户受信 StartupDependencies 事故恢复任务发起，禁止直接调用或扩大应用范围。'
+    );
+}
+var startupDependencyBootstrapOnly = startupDependencyBootstrapOnlyRequested
+    && startupDependencyRecovery;
 function loadInstalledVersions() {
     try {
         var result = V8.FormEngine.GetTableData('sys_microistoreversion', {
@@ -322,6 +415,7 @@ function normalizePlan(value) {
         var key = planItemKey(item);
         if (!key || seen[key]) continue;
         seen[key] = true;
+        var normalizedAction = text(item.InstallAction);
         result.push({
             StoreId: trim(item.StoreId),
             AppId: trim(item.AppId),
@@ -329,7 +423,9 @@ function normalizePlan(value) {
             AppVersion: trim(item.AppVersion || item.Version),
             StoreVersionId: trim(item.StoreVersionId || item.DataVersionId),
             ApplicationType: bulkApplicationType,
-            InstallAction: text(item.InstallAction) == 'Update' ? 'Update' : 'Install'
+            InstallAction: normalizedAction == 'Update' || normalizedAction == 'Reinstall'
+                ? normalizedAction
+                : 'Install'
         });
     }
     return result;
@@ -342,9 +438,11 @@ function appendPlanRows(plan, rows) {
         if (trim(row.ApplicationType || row.AppType) != bulkApplicationType) continue;
         if (!planItemAllowed(row)) continue;
         var status = text(row.StoreInstallStatus);
-        if (status != 'Uninstalled' && status != 'Outdated') continue;
         var storeId = trim(row.StoreId || row.Id);
         var appId = trim(row.AppId || row.AppKey || storeId);
+        var forceStartupRepair = startupDependencyRepairAppIdMap[appId.toLowerCase()] === true;
+        if (status != 'Uninstalled' && status != 'Outdated'
+            && !(forceStartupRepair && status == 'Installed')) continue;
         var key = trim(storeId || appId).toLowerCase();
         if (!key || seen[key]) continue;
         seen[key] = true;
@@ -355,9 +453,21 @@ function appendPlanRows(plan, rows) {
             AppVersion: trim(row.AppVersion || row.Version),
             StoreVersionId: trim(row.StoreVersionId || row.DataVersionId),
             ApplicationType: bulkApplicationType,
-            InstallAction: status == 'Outdated' ? 'Update' : 'Install'
+            InstallAction: status == 'Outdated'
+                ? 'Update'
+                : (forceStartupRepair && status == 'Installed' ? 'Reinstall' : 'Install')
         });
     }
+}
+function unresolvedStartupDependencyRepairApps(plan) {
+    if (!startupDependencyRecovery) return [];
+    var planned = {};
+    for (var index = 0; index < plan.length; index++) {
+        planned[trim(plan[index] && plan[index].AppId).toLowerCase()] = true;
+    }
+    return Object.keys(startupDependencyRepairAppIdMap).filter(function (appId) {
+        return startupDependencyRepairAppIdMap[appId] === true && planned[appId] !== true;
+    });
 }
 function prioritizeBootstrapPlan(plan) {
     // 只在 Discover 完整结束后排序一次；Install 恢复阶段绝不重排已有 CurrentIndex。
@@ -445,16 +555,39 @@ if (phase == 'Discover') {
             SourceApiBase: sourceApiBase,
             SourceOsClient: sourceOsClient,
             SourceCredentialKey: sourceCredentialKey,
-            RequiredAppIds: requiredAppIds
+            RequiredAppIds: requiredAppIds,
+            StartupDependencyBootstrapOnly: startupDependencyBootstrapOnly
         }, 2, pageIndex * pageSize, dataCount, '商城应用盘点已完成一页，将从后台任务检查点继续');
     }
 
     plan = prioritizeBootstrapPlan(plan);
+    var unresolvedStartupApps = unresolvedStartupDependencyRepairApps(plan);
+    if (unresolvedStartupApps.length > 0) {
+        return failure(
+            '启动依赖物理回读不完整，但商城未提供可安全安装/更新/重新安装的精确应用：'
+                + unresolvedStartupApps.join('、'),
+            {
+                FailureStage: 'StartupDependencyClosure',
+                RequiredAppIds: requiredAppIds,
+                UnresolvedAppIds: unresolvedStartupApps
+            },
+            '确认官方应用已发布且目标安装版本不高于官方版本，再以新的幂等键重新发起启动依赖恢复。'
+        );
+    }
     if (plan.length <= 0) {
         report(100, 0, 0, '所有应用均已是最新版，无需安装或更新');
         return {
             Code: 1,
-            Data: { Planned: 0, Installed: 0, Updated: 0, SkippedInstalled: dataCount },
+            Data: {
+                Planned: 0,
+                Installed: 0,
+                Updated: 0,
+                SkippedInstalled: dataCount,
+                StartupDependencyBootstrapOnly: startupDependencyBootstrapOnly,
+                StartupDependenciesVerified: startupDependencyBootstrapOnly
+                    ? startupDependencyRequirements.length
+                    : 0
+            },
             Msg: '所有应用均已是最新版，无需安装或更新。'
         };
     }
@@ -471,7 +604,8 @@ if (phase == 'Discover') {
         SourceApiBase: sourceApiBase,
         SourceOsClient: sourceOsClient,
         SourceCredentialKey: sourceCredentialKey,
-        RequiredAppIds: requiredAppIds
+        RequiredAppIds: requiredAppIds,
+        StartupDependencyBootstrapOnly: startupDependencyBootstrapOnly
     }, 3, 0, plan.length, '批量安装计划已写入后台任务检查点，开始逐个安装/更新');
 }
 
@@ -488,6 +622,120 @@ var currentIndex = Math.max(0, toInt(checkpoint.CurrentIndex, 0));
 var installedCount = Math.max(0, toInt(checkpoint.Installed, 0));
 var updatedCount = Math.max(0, toInt(checkpoint.Updated, 0));
 var total = installPlan.length;
+// STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1：旧版后端没有完整 C# 启动闭包自举时，
+// 也不能让租户等待应用商城与 SaaS 两个大包全部字段/DDL 分片完成。受信事故范围先按
+// 唯一所有权分别从两个不可变官方包补齐 platform-sys-menu 与六个 SaaS 运行门面，
+// 每包一个持久分片；随后保留原 CurrentIndex/ChildCheckpoint 继续完整安装和最终对账。
+var startupPreinstallRevision = 'startup-complete-closure-preflight-v1';
+var startupPreinstallIndex = String(checkpoint.StartupBootstrapRevision || '')
+    == startupPreinstallRevision
+    ? Math.max(0, toInt(checkpoint.StartupBootstrapIndex, 0))
+    : 0;
+var startupPreinstallPlan = [];
+for (var startupPlanIndex = 0; startupPlanIndex < installPlan.length; startupPlanIndex++) {
+    var startupPlanItem = installPlan[startupPlanIndex] || {};
+    var startupPlanAppId = trim(startupPlanItem.AppId).toLowerCase();
+    if (startupPlanAppId == 'app.microi.store' || startupPlanAppId == 'app.microi.saas-engine') {
+        startupPreinstallPlan.push(startupPlanItem);
+    }
+}
+if (startupDependencyRecovery && startupPreinstallIndex < startupPreinstallPlan.length) {
+    var startupPreinstallItem = startupPreinstallPlan[startupPreinstallIndex];
+    var startupPreinstallResult = V8.ApiEngine.Run('import-microi-store-package', {
+        StoreId: startupPreinstallItem.StoreId,
+        AppId: startupPreinstallItem.AppId,
+        AppName: startupPreinstallItem.AppName,
+        AppVersion: startupPreinstallItem.AppVersion,
+        StoreVersionId: startupPreinstallItem.StoreVersionId,
+        StoreApiBase: sourceApiBase,
+        StoreOsClient: sourceOsClient,
+        StoreCredentialKey: sourceCredentialKey,
+        ResumeInstall: true,
+        InstallAction: startupPreinstallItem.InstallAction,
+        InstallOperationId: taskId + ':startup-bootstrap:'
+            + (startupPreinstallItem.StoreId || startupPreinstallItem.AppId),
+        BulkCurrentIndex: currentIndex,
+        BulkTotal: total,
+        BulkAdaptiveSingleSlice: false,
+        StartupDependencyRecovery: true,
+        StartupDependencyBootstrapOnly: true,
+        _BackgroundTaskId: taskId,
+        _BackgroundTask: taskEnvelope,
+        _BackgroundTaskFencingToken: fencingToken,
+        _BackgroundTaskCheckpoint: {},
+        _TrustedServerInvocation: true
+    });
+    startupPreinstallResult = parseJson(startupPreinstallResult, startupPreinstallResult);
+    if (!startupPreinstallResult || startupPreinstallResult.Code != 1
+        || !startupPreinstallResult.Data
+        || startupPreinstallResult.Data.StartupDependencyBootstrapOnly !== true) {
+        return failure(
+            '应用【' + startupPreinstallItem.AppName + '】启动接口快速自举失败：'
+                + ((startupPreinstallResult && startupPreinstallResult.Msg) || '接口未返回完整自举证明'),
+            {
+                FailureStage: 'StartupDependencyPreinstallBootstrap',
+                FailedItem: startupPreinstallItem,
+                ChildData: startupPreinstallResult && startupPreinstallResult.Data
+                    ? startupPreinstallResult.Data
+                    : null
+            },
+            '检查目标租户启动接口是否存在租户改码、软删除、稳定 Id 或 ApiAddress 冲突；修复冲突后以新幂等键重新发起。'
+        );
+    }
+    var startupCurrentProgress = Math.max(3, Math.min(99,
+        Math.floor(((currentIndex + childCheckpointProgress(checkpoint.ChildCheckpoint) / 100)
+            / Math.max(1, total)) * 100)));
+    return continuation({
+        Version: 5,
+        TaskId: taskId,
+        Phase: 'Install',
+        CurrentIndex: currentIndex,
+        Installed: installedCount,
+        Updated: updatedCount,
+        ChildCheckpoint: checkpoint.ChildCheckpoint || {},
+        Plan: installPlan,
+        ApplicationType: bulkApplicationType,
+        SourceApiBase: sourceApiBase,
+        SourceOsClient: sourceOsClient,
+        SourceCredentialKey: sourceCredentialKey,
+        RequiredAppIds: requiredAppIds,
+        StartupDependencyBootstrapOnly: startupDependencyBootstrapOnly,
+        StartupBootstrapRevision: startupPreinstallRevision,
+        StartupBootstrapIndex: startupPreinstallIndex + 1
+    }, startupCurrentProgress, currentIndex, total,
+    '已快速自举【' + startupPreinstallItem.AppName + '】启动接口，继续补齐完整启动闭包');
+}
+// STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1：大范围事故恢复只补齐启动必需接口，
+// 不把 67 个历史租户串行拖入完整应用包重装。该分支只能由受信后台任务、精确两应用
+// 闭包开启；结束前重新物理读取七项接口，任何地址、开关、版本或官方标记不一致都失败关闭。
+if (startupDependencyBootstrapOnly) {
+    var missingAfterBootstrap = missingStartupDependencyRequirements();
+    if (missingAfterBootstrap.length > 0) {
+        return failure(
+            '启动依赖快速自举后强回读仍不完整：'
+                + missingAfterBootstrap.map(function (item) { return item.Key; }).join('、'),
+            {
+                FailureStage: 'BootstrapOnlyReadback',
+                MissingApiEngineKeys: missingAfterBootstrap.map(function (item) { return item.Key; })
+            },
+            '检查目标租户是否存在租户改码、软删除、稳定 Id 或 ApiAddress 冲突；修复后使用新幂等键重试。'
+        );
+    }
+    report(100, startupDependencyRequirements.length, startupDependencyRequirements.length,
+        '七项平台启动接口已完成快速自举与物理强回读');
+    return {
+        Code: 1,
+        Data: {
+            Planned: startupPreinstallPlan.length,
+            Completed: startupPreinstallPlan.length,
+            Installed: 0,
+            Updated: 0,
+            StartupDependencyBootstrapOnly: true,
+            StartupDependenciesVerified: startupDependencyRequirements.length
+        },
+        Msg: '七项平台启动接口已完成快速自举与物理强回读。'
+    };
+}
 if (currentIndex >= total) {
     report(100, total, total, '全部安装/更新任务已完成');
     return {
@@ -515,11 +763,9 @@ var childParam = {
     BulkCurrentIndex: currentIndex,
     BulkTotal: total,
     BulkAdaptiveSingleSlice: false,
-    // STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1：RequiredAppIds 被可信父任务
-    // 精确收窄为 SaaS 引擎时，允许官方导入器先补齐缺失的六个启动接口；
-    // 普通“全部安装/更新”与其它应用包永远不会进入该快速路径。
-    StartupDependencyRecovery: requiredAppIds.length == 1
-        && requiredAppIds[0] == 'app.microi.saas-engine',
+    // 完整安装仍保留快速自举请求，覆盖从非事故入口恢复旧检查点的兼容路径；
+    // Preinstall 已完成时导入器按修订标记幂等对账，不会覆盖租户不同源码。
+    StartupDependencyRecovery: startupDependencyRecovery,
     _BackgroundTaskId: taskId,
     _BackgroundTask: taskEnvelope,
     _BackgroundTaskFencingToken: fencingToken,
@@ -529,7 +775,9 @@ var childParam = {
 report(Math.max(3, Math.min(99,
     Math.floor(((currentIndex + resumedChildProgress / 100) / total) * 100))),
     currentIndex + resumedChildProgress / 100, total,
-    '[' + (currentIndex + 1) + '/' + total + '] 正在' + (item.InstallAction == 'Update' ? '更新' : '安装') + item.AppName);
+    '[' + (currentIndex + 1) + '/' + total + '] 正在'
+        + (item.InstallAction == 'Update' ? '更新' : (item.InstallAction == 'Reinstall' ? '重新安装' : '安装'))
+        + item.AppName);
 var childResult = V8.ApiEngine.Run('import-microi-store-package', childParam);
 childResult = parseJson(childResult, childResult);
 if (!childResult || childResult.Code != 1) {
@@ -556,7 +804,7 @@ if (childBackground && childBackground.HasMore === true) {
     var overallProgress = Math.max(3, Math.min(99,
         Math.floor(((currentIndex + childProgress / 100) / total) * 100)));
     return continuation({
-        Version: 4,
+        Version: 5,
         TaskId: taskId,
         Phase: 'Install',
         CurrentIndex: currentIndex,
@@ -568,16 +816,19 @@ if (childBackground && childBackground.HasMore === true) {
         SourceApiBase: sourceApiBase,
         SourceOsClient: sourceOsClient,
         SourceCredentialKey: sourceCredentialKey,
-        RequiredAppIds: requiredAppIds
+        RequiredAppIds: requiredAppIds,
+        StartupDependencyBootstrapOnly: startupDependencyBootstrapOnly,
+        StartupBootstrapRevision: startupDependencyRecovery ? startupPreinstallRevision : '',
+        StartupBootstrapIndex: startupDependencyRecovery ? startupPreinstallPlan.length : 0
     }, overallProgress, currentIndex + childProgress / 100, total,
     '[' + (currentIndex + 1) + '/' + total + '] ' + (childBackground.Msg || '应用安装分片已提交'));
 }
 
-if (item.InstallAction == 'Update') updatedCount++;
+if (item.InstallAction == 'Update' || item.InstallAction == 'Reinstall') updatedCount++;
 else installedCount++;
 currentIndex++;
 return continuation({
-    Version: 4,
+    Version: 5,
     TaskId: taskId,
     Phase: 'Install',
     CurrentIndex: currentIndex,
@@ -589,6 +840,9 @@ return continuation({
     SourceApiBase: sourceApiBase,
     SourceOsClient: sourceOsClient,
     SourceCredentialKey: sourceCredentialKey,
-    RequiredAppIds: requiredAppIds
+    RequiredAppIds: requiredAppIds,
+    StartupDependencyBootstrapOnly: startupDependencyBootstrapOnly,
+    StartupBootstrapRevision: startupDependencyRecovery ? startupPreinstallRevision : '',
+    StartupBootstrapIndex: startupDependencyRecovery ? startupPreinstallPlan.length : 0
 }, Math.min(99, Math.floor((currentIndex / total) * 100)), currentIndex, total,
 '已完成【' + item.AppName + '】，继续处理剩余应用');

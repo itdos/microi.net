@@ -29,8 +29,12 @@ test('all official application ApiEngines declare policy and carry an overwrite 
     for (const engine of packageModel.SysApiEngines || []) {
       const policy = policies[engine.ApiEngineKey];
       assert.ok(policy, `${packageName}:${engine.ApiEngineKey} missing ResourcePolicies.ApiEngines`);
-      assert.ok(['Platform', 'Application', 'Tenant'].includes(policy.Ownership));
       assert.ok(['Managed', 'CreateIfMissing'].includes(policy.UpgradePolicy));
+      assert.equal(
+        policy.Ownership,
+        policy.UpgradePolicy === 'CreateIfMissing' ? 'Tenant' : 'Platform',
+        `${packageName}:${engine.ApiEngineKey} has non-canonical official ownership`,
+      );
       const source = String(engine.ApiV8Code || '');
       if (policy.UpgradePolicy === 'CreateIfMissing') {
         assert.match(source, /^\/\* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1/);
@@ -54,6 +58,7 @@ test('platform runtime facades are Managed and only authenticated facades call t
   const managedKeys = [
     'platform-os-client-by-domain',
     'platform-sys-config',
+    'platform-service-health',
     'platform-lang-bundle',
     'platform-current-user',
     'platform-private-file-url',
@@ -67,6 +72,7 @@ test('platform runtime facades are Managed and only authenticated facades call t
   const anonymousKeys = new Set([
     'platform-os-client-by-domain',
     'platform-sys-config',
+    'platform-service-health',
     'platform-lang-bundle',
     'platform-login-wallpapers',
     'microi-init',
@@ -100,6 +106,7 @@ test('anonymous platform bootstrap facades remain minimal and public', () => {
   for (const key of [
     'platform-os-client-by-domain',
     'platform-sys-config',
+    'platform-service-health',
     'platform-lang-bundle',
     'microi-init',
   ]) {
@@ -131,5 +138,31 @@ test('notice normalization preserves Managed compatibility hashes', () => {
     UpgradePolicy: 'Managed',
     BaseHash: 'base-hash',
     CompatibleBaseHashes: ['compatible-hash'],
+  });
+});
+
+test('embedded Platform packages canonicalize legacy Application ownership before Upgrade13 replay', () => {
+  const packageModel = {
+    PackageInfo: { Name: '测试平台应用', ApplicationType: 'Platform' },
+    ResourcePolicies: {
+      SchemaVersion: 1,
+      ApiEngines: {
+        core: { Ownership: 'Application', UpgradePolicy: 'Managed' },
+        hook: { Ownership: 'Tenant', UpgradePolicy: 'CreateIfMissing' },
+      },
+    },
+    SysApiEngines: [
+      { ApiEngineKey: 'core', ApiV8Code: 'return { Code: 1 };' },
+      { ApiEngineKey: 'hook', ApiV8Code: 'return { Code : 1 };' },
+    ],
+  };
+  normalizeOfficialApiEnginePolicies(packageModel, 'platform.json');
+  assert.deepEqual(packageModel.ResourcePolicies.ApiEngines.core, {
+    Ownership: 'Platform',
+    UpgradePolicy: 'Managed',
+  });
+  assert.deepEqual(packageModel.ResourcePolicies.ApiEngines.hook, {
+    Ownership: 'Tenant',
+    UpgradePolicy: 'CreateIfMissing',
   });
 });

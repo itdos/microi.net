@@ -29,6 +29,12 @@ namespace Microi.Tests.Common
 
             interceptor.WriteLine("Microi：【❌启动失败】主租户[iTdos]SaaS配置数据库加载失败");
             Assert.Contains("SaaS配置数据库加载失败", original.ToString());
+
+            interceptor.WriteLine("Microi：【自动升级状态】【xjy】【平台运行时接口闭包】成功");
+            Assert.Contains("【自动升级状态】【xjy】", original.ToString());
+
+            interceptor.WriteLine("Microi：【成功】平台自动升级【xjy】完成！");
+            Assert.Contains("平台自动升级【xjy】完成", original.ToString());
         }
 
         [Fact]

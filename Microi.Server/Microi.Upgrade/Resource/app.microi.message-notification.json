@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "消息通知",
-    "Version": "v1.0.9",
+    "Version": "v1.0.11",
     "CreateTime": "2026-08-23T01:02:13.744Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -13,7 +13,7 @@
     "LineCount": 0,
     "DDLCount": 5,
     "PhysicalColumnCount": 387,
-    "ApiEngineCount": 6,
+    "ApiEngineCount": 7,
     "DataSetCount": 0,
     "DataRowCount": 0,
     "AiApplicationCount": 0,
@@ -21,16 +21,18 @@
       "ApiEngine:platform-chat-system-message@v1.1.0",
       "ApiEngine:platform-chat-runtime@v1.0.1",
       "ApiEngine:platform-message-notification-custom-hook@v1.0.0",
+      "ApiEngine:wechat_send_tpl_msg@v1.0.0",
+      "V8.Method.SendWeChatTemplateMessage",
       "V8.Method.RequireManagedProtocolContext",
       "V8.MongoDb.UptFormDataByWhere",
       "V8.MongoDb.DelFormDataByWhere"
     ],
-    "ChangeHistory": "2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.8 修复聊天运行时与 AI 运行时跨应用稳定 Id 冲突；继续由 Managed V8 统一编排普通聊天消息、联系人、未读、历史、已读与删除。\n2026-08-25 v1.0.7 普通聊天消息、联系人、未读、历史、已读与删除业务迁入固定 Managed V8 运行时；旧 Hub/Controller 仅保留认证连接、协议与尽力投递。\n2026-08-25 v1.0.6 平台系统消息业务校验迁入 Managed V8 接口，并提供消息通知个性化 Hook。\n",
+    "ChangeHistory": "2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.8 修复聊天运行时与 AI 运行时跨应用稳定 Id 冲突；继续由 Managed V8 统一编排普通聊天消息、联系人、未读、历史、已读与删除。\n2026-08-25 v1.0.7 普通聊天消息、联系人、未读、历史、已读与删除业务迁入固定 Managed V8 运行时；旧 Hub/Controller 仅保留认证连接、协议与尽力投递。\n2026-08-25 v1.0.6 平台系统消息业务校验迁入 Managed V8 接口，并提供消息通知个性化 Hook。\n",
     "ChangeLog": {
-      "Version": "v1.0.9",
+      "Version": "v1.0.11",
       "Title": "V8 引擎优先与租户个性化扩展",
       "ChangeType": "Fix",
-      "Content": "2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。",
+      "Content": "2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。",
       "ReleaseTime": "2026-08-25 16:00:00"
     }
   },
@@ -6204,21 +6206,50 @@
       "IsEnable": 1,
       "ApiEngineKey": "platform-chat-runtime",
       "ApiName": "平台聊天 Managed 运行时"
+    },
+    {
+      "V8Limit": 0,
+      "IsDeleted": 0,
+      "UserName": "管理员",
+      "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
+      "UpdateTime": "2026-08-25 16:00:00",
+      "CreateTime": "2026-08-25 16:00:00",
+      "Id": "019d2a01-9d63-7f91-8c02-00000000000c",
+      "V8Unlimited": 1,
+      "ChangeHistory": "",
+      "Version": "v1.0.0",
+      "LimitRecursion": 5000,
+      "LimitMemory": 2048,
+      "MaxStatements": 100000000,
+      "Timeout": 600,
+      "StopHttp": 1,
+      "EnableLog": 1,
+      "Category": "平台内置",
+      "Files": "[]",
+      "AllowAnonymous": 0,
+      "ApiAddress": "/apiengine/wechat_send_tpl_msg",
+      "ResponseFile": 0,
+      "Lock": 0,
+      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：消息通知\n * ApiEngineKey：wechat_send_tpl_msg\n * 从可信吾码官方应用源安装、更新或重新安装“消息通知”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n/*\n * V8 ApiEngine\n * ApiEngineKey: wechat_send_tpl_msg\n * Version: v1.0.0\n * Function:\n * - 消息通知应用的微信模板消息适配器；AppId/AppSecret 只在可信宿主读取。\n */\n\nvar customization = V8.ApiEngine.Run('platform-message-notification-custom-hook', {\n  Stage: 'BeforeWeChatTemplateMessage',\n  SourceApiEngineKey: 'wechat_send_tpl_msg',\n  EventId: String((V8.Param && V8.Param.EventId) || ''),\n  WxMpId: String((V8.Param && V8.Param.WxMpId) || ''),\n  TemplateId: String((V8.Param && V8.Param.TemplateId) || '')\n});\nif (!customization || customization.Code !== 1) {\n  return customization || { Code: 0, Msg: '消息通知个性化 Hook 未返回结果。' };\n}\n\nreturn V8.Method.SendWeChatTemplateMessage(V8.Param);\n",
+      "ApiRole": "[]",
+      "IsEnable": 1,
+      "ApiEngineKey": "wechat_send_tpl_msg",
+      "ApiName": "微信模板消息可信适配器"
     }
   ],
   "ResourcePolicies": {
     "SchemaVersion": 1,
     "ApiEngines": {
       "msg_event": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "msg_internal_list": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "msg_internal_mark_read": {
-        "Ownership": "Application",
+        "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       },
       "platform-chat-system-message": {
@@ -6230,6 +6261,10 @@
         "UpgradePolicy": "CreateIfMissing"
       },
       "platform-chat-runtime": {
+        "Ownership": "Platform",
+        "UpgradePolicy": "Managed"
+      },
+      "wechat_send_tpl_msg": {
         "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       }

@@ -22,6 +22,8 @@
 
 两类源码顶部都必须保留醒目的官方所有权提示。可信官方应用安装、更新或重新安装会恢复 `Managed` 核心；`CreateIfMissing` 只在首次缺失时创建，默认可执行正文必须精确为 `return { Code : 1 };`，租户后续修改、禁用或软删除均不得被官方升级覆盖。上述 Hook 固定 `StopHttp=1`、禁止匿名，并与核心共享 `V8.DbTrans`；Hook 返回失败会阻断对应业务阶段。
 
+Upgrade13 重放这九个程序集内置官方包时，先校验固定资源名和包契约，再由宿主建立绑定 `import-microi-store-package + OsClient` 的一次性可信上下文。导入器只有同时收到内置包请求并成功消费该上下文，才可恢复 `Platform/Managed` 官方源码；客户端或普通 V8 仅伪造同名参数会失败关闭，`Tenant/CreateIfMissing` 在任何情况下都不会被这条通道覆盖。
+
 商城源登录和断开必须先经过 `platform-marketplace-source` 的 `AuthorizeOperation`。其 Before Hook 只接收 `Stage / SourceApiEngineKey / Action / SourceId`，不能接收 `ApiBase`、远端 `OsClient`、账号、密码、Token 或凭据密文。SaaS 包中的 `platform-external-login-binding`、`platform-wechat-user-binding` 还必须同时保持 `StopHttp=1`、`AllowAnonymous=0`、`Lock=1`，避免普通 V8 修改或伪造协议持久化入口。
 
 定向合同测试：

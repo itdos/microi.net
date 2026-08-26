@@ -547,6 +547,86 @@ if (runtimePrerequisiteResult.Code != 1)
 }
 Console.WriteLine($"Microi：【成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{runtimePrerequisiteResult.Msg}");
 
+// The first page now uses managed ApiEngine resources. Historical deployments
+// can have a current ServerVersion while the corresponding application-package
+// import was skipped or failed, so version-gated background migration is not a
+// sufficient availability boundary. Repair the seven-resource bootstrap closure
+// from the embedded official packages before accepting traffic. The configured
+// tenant fails closed; a broken secondary tenant is reported explicitly without
+// taking every other SaaS tenant offline.
+var upgradeService = app.Services.GetRequiredService<IMicroiUpgrade>();
+var startupTenantNames = new[] { clientModel.OsClient }
+    .Concat(OsClient.ClientList.Values
+        .Where(item => item != null && !item.OsClient.DosIsNullOrWhiteSpace())
+        .Select(item => item.OsClient))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToList();
+var startupGateSucceeded = 0;
+var startupGateFailed = new List<string>();
+foreach (var tenantName in startupTenantNames)
+{
+    OsClientSecret startupTenantClient;
+    try
+    {
+        // ClientList can contain a lightweight SaaS metadata object whose Db is
+        // intentionally null. Resolve the authoritative runtime client exactly
+        // as the hosted upgrader does, otherwise child tenants would be logged
+        // as skipped and remain broken until after traffic is accepted.
+        startupTenantClient = string.Equals(
+                tenantName,
+                clientModel.OsClient,
+                StringComparison.OrdinalIgnoreCase)
+            ? clientModel
+            : OsClient.GetClient(tenantName);
+    }
+    catch (Exception ex)
+    {
+        startupGateFailed.Add(tenantName + "：租户运行时解析失败");
+        Console.WriteLine(
+            $"Microi：【自动升级状态】【{tenantName}】【启动前租户解析】失败：{ex.Message}");
+        continue;
+    }
+    Console.WriteLine(
+        $"Microi：【自动升级状态】【{tenantName}】【启动前物理字段】开始检查。");
+    var tenantPhysicalResult = string.Equals(
+            tenantName,
+            clientModel.OsClient,
+            StringComparison.OrdinalIgnoreCase)
+        ? runtimePrerequisiteResult
+        : await upgradeService.EnsureRuntimePhysicalPrerequisitesAsync(startupTenantClient);
+    if (tenantPhysicalResult.Code != 1)
+    {
+        var physicalError = $"租户[{tenantName}]启动前物理字段失败：{tenantPhysicalResult.Msg}";
+        Console.WriteLine($"Microi：【自动升级状态】【{tenantName}】【启动前物理字段】失败：{tenantPhysicalResult.Msg}");
+        if (string.Equals(tenantName, clientModel.OsClient, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(physicalError);
+        startupGateFailed.Add(tenantName + "：启动前物理字段失败");
+        continue;
+    }
+    Console.WriteLine(
+        $"Microi：【自动升级状态】【{tenantName}】【启动前物理字段】成功：{tenantPhysicalResult.Msg}");
+
+    Console.WriteLine(
+        $"Microi：【自动升级状态】【{tenantName}】【平台运行时接口闭包】开始检查。");
+    var dependencyResult = await upgradeService
+        .EnsureStartupDependenciesAsync(startupTenantClient);
+    if (dependencyResult.Code != 1)
+    {
+        var dependencyError = $"租户[{tenantName}]平台运行时接口闭包失败：{dependencyResult.Msg}";
+        Console.WriteLine(
+            $"Microi：【自动升级状态】【{tenantName}】【平台运行时接口闭包】失败：{dependencyResult.Msg}");
+        if (string.Equals(tenantName, clientModel.OsClient, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(dependencyError);
+        startupGateFailed.Add(tenantName + "：平台运行时接口闭包失败");
+        continue;
+    }
+    startupGateSucceeded++;
+    Console.WriteLine(
+        $"Microi：【自动升级状态】【{tenantName}】【平台运行时接口闭包】成功：{dependencyResult.Msg}");
+}
+Console.WriteLine(
+    $"Microi：【自动升级状态】【启动前门禁汇总】完成：租户数={startupTenantNames.Count}，成功={startupGateSucceeded}，失败={startupGateFailed.Count}，主租户={clientModel.OsClient}，失败明细={(startupGateFailed.Count == 0 ? "无" : string.Join("；", startupGateFailed))}。");
+
 #region License 自动恢复
 var scheduleLicenseRestoreRetry = false;
 try

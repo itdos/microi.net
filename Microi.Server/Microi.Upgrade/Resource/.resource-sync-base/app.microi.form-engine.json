@@ -1,12 +1,12 @@
 {
   "PackageInfo": {
     "Name": "表单引擎",
-    "Version": "v7.6.6",
+    "Version": "v7.6.7",
     "CreateTime": "2026-08-08T18:11:58.929Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
-    "Description": "表单引擎基础资源。设计器搜索索引维护统一调用应用商城 Managed 接口引擎；导入继续支持完整预览、UTF-8/GBK CSV、错误事务策略和唯一规则新增/修改。",
-    "ChangeHistory": "2026-08-25 v7.6.6 表单设计器搜索索引维护改由 Managed 接口引擎编排；copy_table 官方核心补齐醒目恢复提示和 Managed 所有权，并为当前应用版本补齐结构化更新日志与发布硬门禁。\n2026-08-25 v7.6.5 表单设计器搜索索引维护改由 Managed 接口引擎编排；copy_table 官方核心补齐醒目恢复提示和 Managed 所有权，应用更新时恢复官方源码，租户个性化逻辑继续放在独立扩展接口。\n2026-08-24 v7.6.4 表单设计器的 ES 结构/数据同步改为调用 Managed 接口引擎 platform-search-engine，移除对 SearchEngineController 的依赖。\n2026-08-23 v7.6.3 导入界面新增“整批回滚/跳过错误行继续”用户策略；展示当前表单单字段与组合唯一规则，服务端按权威规则安全定位同一 Id 后修改、未命中则新增，并拒绝跨规则冲突或宽泛多行更新；接口引擎同步获得 v2.2 策略与规则元数据。\n2026-08-23 v7.6.2 修复低匹配模板预览为空及首条数据误判；数据预览始终保留全部源列源行，未匹配列红色提示；新增完整原始工作簿预览及 UTF-8/GBK CSV 自动识别与服务端复核。\n2026-08-23 v7.6.1 通用与接口引擎自定义 Excel 导入统一升级：80% 宽弹层，自动识别工作表、单行/多级表头及数据起止行，低可信度人工校正、逐列映射、每页 15 条预览，确认后服务端按同一范围复核原文件。\n2026-08-23 v7.6.0 RichText 新增公有/私有桶、图片压缩、视频与文件附件配置；私有正文只保存稳定对象标识，每次打开按菜单、记录、字段权限换取短效审计地址，临时 Token 不落库。\n2026-08-23 v7.5.9 图片与文件上传合并拖放区和配置摘要，紧凑显示公有/私有桶、单多文件与最大数量、压缩状态、最大体积；ImgUpload 裁剪开关合并到同一面板。\n2026-08-23 v7.5.8 修复 ImgUpload 多图裁剪上传在接口返回数组时不回显；新增表单用户“上传前裁剪”开关与“不裁剪直接上传”；裁剪弹层及平台弹窗遮罩统一服从 FormMaskBlur，默认关闭毛玻璃。\n2026-08-23 v7.5.7 新增 ImgUpload 专业裁剪配置，支持自由、固定、运行时可选和自定义比例；裁剪图与未改动原图同请求上传，后端强制先将原图写入 HDFS 私有桶。\n2026-08-22 v7.5.6 修复表单分组统计接口引擎下拉的数据源字段代理，避免设计器把 BadgeApiEngineKey 当作不存在的 DiyField Id。\n2026-08-22 v7.5.5 新增表单 Banner 属性 Tab 与 8 个 diy_table 物理字段，支持标题/副标题/图片/背景/标签/接口统计配置；旧表无配置时按字段类型智能显示。\n2026-08-21 v7.5.4 将接口引擎修改历史改为 TableChild 子表；旧 ChangeHistory 按非空行幂等迁移，新版 MCP 与 VS Code 写入独立版本记录。\n2026-08-21 v7.5.1 将表单工作台配置迁移为 diy_table 物理属性并新增两个属性 Tab；TabsPosition 默认 top；新增正向 V8Limit，隐藏旧 FormPresentation/V8Unlimited 兼容字段。\n2026-08-21 v7.5.0 新增 diy_table.FormPresentation 与扩展 Tabs 配置，支持默认现代分组工作台、动态统计、必填计数、HTML 标题/说明、记录切换和移动端适配；弹层与直达页统一复用 DiyForm。\n2026-08-18 v6.9.10 新增 diy_table.DisableFormMaskBlur（关闭表单遮罩毛玻璃），默认 0；安装或升级后继续默认显示毛玻璃，仅显式开启该负向开关时关闭。\n",
+    "Description": "表单引擎基础资源。工作台、分组与紧凑主题化 Banner 均使用 diy_table 物理属性；Banner 支持字段图片、动态标签、接口引擎统计及旧表智能默认。",
+    "ChangeHistory": "2026-08-26 v7.6.7 将 diy_field.TableName 的新装结构、物理字段元数据和表单字段元数据统一扩容为 varchar(255)，兼容历史长表名并避免升级复制 diy_table.Name 时中断。\n2026-08-25 v7.6.6 表单设计器搜索索引维护改由 Managed 接口引擎编排；copy_table 官方核心补齐醒目恢复提示和 Managed 所有权，并为当前应用版本补齐结构化更新日志与发布硬门禁。\n2026-08-25 v7.6.5 表单设计器搜索索引维护改由 Managed 接口引擎编排；copy_table 官方核心补齐醒目恢复提示和 Managed 所有权，应用更新时恢复官方源码，租户个性化逻辑继续放在独立扩展接口。\n2026-08-24 v7.6.4 表单设计器的 ES 结构/数据同步改为调用 Managed 接口引擎 platform-search-engine，移除对 SearchEngineController 的依赖。\n2026-08-23 v7.6.3 导入界面新增“整批回滚/跳过错误行继续”用户策略；展示当前表单单字段与组合唯一规则，服务端按权威规则安全定位同一 Id 后修改、未命中则新增，并拒绝跨规则冲突或宽泛多行更新；接口引擎同步获得 v2.2 策略与规则元数据。\n2026-08-23 v7.6.2 修复低匹配模板预览为空及首条数据误判；数据预览始终保留全部源列源行，未匹配列红色提示；新增完整原始工作簿预览及 UTF-8/GBK CSV 自动识别与服务端复核。\n2026-08-23 v7.6.1 通用与接口引擎自定义 Excel 导入统一升级：80% 宽弹层，自动识别工作表、单行/多级表头及数据起止行，低可信度人工校正、逐列映射、每页 15 条预览，确认后服务端按同一范围复核原文件。\n2026-08-23 v7.6.0 RichText 新增公有/私有桶、图片压缩、视频与文件附件配置；私有正文只保存稳定对象标识，每次打开按菜单、记录、字段权限换取短效审计地址，临时 Token 不落库。\n2026-08-23 v7.5.9 图片与文件上传合并拖放区和配置摘要，紧凑显示公有/私有桶、单多文件与最大数量、压缩状态、最大体积；ImgUpload 裁剪开关合并到同一面板。\n2026-08-23 v7.5.8 修复 ImgUpload 多图裁剪上传在接口返回数组时不回显；新增表单用户“上传前裁剪”开关与“不裁剪直接上传”；裁剪弹层及平台弹窗遮罩统一服从 FormMaskBlur，默认关闭毛玻璃。\n2026-08-23 v7.5.7 新增 ImgUpload 专业裁剪配置，支持自由、固定、运行时可选和自定义比例；裁剪图与未改动原图同请求上传，后端强制先将原图写入 HDFS 私有桶。\n2026-08-22 v7.5.6 修复表单分组统计接口引擎下拉的数据源字段代理，避免设计器把 BadgeApiEngineKey 当作不存在的 DiyField Id。\n2026-08-22 v7.5.5 新增表单 Banner 属性 Tab 与 8 个 diy_table 物理字段，支持标题/副标题/图片/背景/标签/接口统计配置；旧表无配置时按字段类型智能显示。\n2026-08-21 v7.5.4 将接口引擎修改历史改为 TableChild 子表；旧 ChangeHistory 按非空行幂等迁移，新版 MCP 与 VS Code 写入独立版本记录。\n2026-08-21 v7.5.1 将表单工作台配置迁移为 diy_table 物理属性并新增两个属性 Tab；TabsPosition 默认 top；新增正向 V8Limit，隐藏旧 FormPresentation/V8Unlimited 兼容字段。\n2026-08-21 v7.5.0 新增 diy_table.FormPresentation 与扩展 Tabs 配置，支持默认现代分组工作台、动态统计、必填计数、HTML 标题/说明、记录切换和移动端适配；弹层与直达页统一复用 DiyForm。\n2026-08-18 v6.9.10 新增 diy_table.DisableFormMaskBlur（关闭表单遮罩毛玻璃），默认 0；安装或升级后继续默认显示毛玻璃，仅显式开启该负向开关时关闭。\n",
     "RequiredPlatformCapabilities": [
       "ClientFeature:FormPresentation",
       "ServerField:DiyTable.FormPresentation",
@@ -29,7 +29,8 @@
       "ServerFeature:CsvImportConfirmedRange",
       "ClientFeature:ImportErrorPolicy",
       "ServerFeature:ImportUpsertByUniqueRules",
-      "ApiEngine:platform-search-engine"
+      "ApiEngine:platform-search-engine",
+      "DatabaseColumn:diy_field.TableName@varchar(255)"
     ],
     "MenuCount": 4,
     "TableCount": 8,
@@ -44,11 +45,11 @@
     "DataRowCount": 0,
     "AiApplicationCount": 0,
     "ChangeLog": {
-      "Version": "v7.6.6",
-      "Title": "表单引擎接口优先交付与官方基线治理",
-      "ChangeType": "Feature",
-      "Content": "表单设计器搜索索引维护改由 Managed 接口引擎编排；copy_table 官方核心补齐醒目恢复提示和 Managed 所有权，并为当前应用版本补齐结构化更新日志与发布硬门禁。",
-      "ReleaseTime": "2026-08-25 16:00:00"
+      "Version": "v7.6.7",
+      "Title": "历史长表名升级兼容",
+      "ChangeType": "Fix",
+      "Content": "将 diy_field.TableName 的新装结构、物理字段元数据和表单字段元数据统一扩容为 varchar(255)，兼容历史长表名并避免升级复制 diy_table.Name 时中断。",
+      "ReleaseTime": "2026-08-26 14:30:00"
     }
   },
   "DDLStatements": [
@@ -75,7 +76,7 @@
     {
       "TableName": "diy_field",
       "TableId": "32c49fd3-54e9-4bb3-b9aa-cb9ea6032653",
-      "DDL": "CREATE TABLE IF NOT EXISTS `diy_field` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `V8Code` mediumtext NULL COMMENT '值变更V8事件',\n  `TableName` varchar(50) NULL COMMENT '所属表名',\n  `ComponentWidth` varchar(50) NULL COMMENT '控件宽度',\n  `IsVirtual` int NULL COMMENT '虚拟字段',\n  `FormLabelPosition` varchar(50) NULL COMMENT '标签对齐方式',\n  `AppVisible` int NULL COMMENT '移动端可见',\n  `Remark` mediumtext NULL COMMENT '备注',\n  `FormWidth` int(11) NULL COMMENT '表单占宽',\n  `Tab` varchar(255) NULL COMMENT '所属表单分组',\n  `Type` varchar(255) NULL COMMENT '字段类型',\n  `OsClient` varchar(255) NULL,\n  `Name` varchar(255) NULL COMMENT '字段名',\n  `InTableEdit` int NULL COMMENT '开启表内编辑',\n  `Unique` int NULL COMMENT '是否唯一',\n  `V8TmpEngineTable` mediumtext NULL COMMENT '模板V8引擎（表格）',\n  `Code` varchar(255) NULL,\n  `NameConfirm` int NULL COMMENT '已确认字段名',\n  `TableWidth` int(11) NULL COMMENT '表格占宽',\n  `Config` mediumtext NULL COMMENT '配置',\n  `TableId` varchar(36) NULL COMMENT '所属表Id',\n  `Readonly` int NULL COMMENT '是否只读',\n  `Encrypt` int NULL,\n  `BindRole` mediumtext NULL COMMENT '前端可见角色',\n  `Placeholder` varchar(255) NULL COMMENT '占位文字',\n  `DefaultValue` varchar(255) NULL COMMENT '默认值',\n  `Component` varchar(255) NULL COMMENT '控件类型',\n  `Description` mediumtext NULL COMMENT '字段说明',\n  `Visible` int NULL COMMENT '是否可见',\n  `IsLockField` int NULL COMMENT '是否锁定字段名称和类型',\n  `KeyupV8Code` mediumtext NULL COMMENT '键盘V8事件',\n  `DataAppend` mediumtext NULL COMMENT '附加数据',\n  `Data` mediumtext NULL COMMENT '普通数据源',\n  `V8TmpEngineForm` mediumtext NULL COMMENT '模板V8引擎（表单）',\n  `Sort` int(11) NULL COMMENT '排序',\n  `NotEmpty` int NULL COMMENT '是否必填',\n  `Label` varchar(255) NULL COMMENT '显示名称'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+      "DDL": "CREATE TABLE IF NOT EXISTS `diy_field` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `V8Code` mediumtext NULL COMMENT '值变更V8事件',\n  `TableName` varchar(255) NULL COMMENT '所属表名',\n  `ComponentWidth` varchar(50) NULL COMMENT '控件宽度',\n  `IsVirtual` int NULL COMMENT '虚拟字段',\n  `FormLabelPosition` varchar(50) NULL COMMENT '标签对齐方式',\n  `AppVisible` int NULL COMMENT '移动端可见',\n  `Remark` mediumtext NULL COMMENT '备注',\n  `FormWidth` int(11) NULL COMMENT '表单占宽',\n  `Tab` varchar(255) NULL COMMENT '所属表单分组',\n  `Type` varchar(255) NULL COMMENT '字段类型',\n  `OsClient` varchar(255) NULL,\n  `Name` varchar(255) NULL COMMENT '字段名',\n  `InTableEdit` int NULL COMMENT '开启表内编辑',\n  `Unique` int NULL COMMENT '是否唯一',\n  `V8TmpEngineTable` mediumtext NULL COMMENT '模板V8引擎（表格）',\n  `Code` varchar(255) NULL,\n  `NameConfirm` int NULL COMMENT '已确认字段名',\n  `TableWidth` int(11) NULL COMMENT '表格占宽',\n  `Config` mediumtext NULL COMMENT '配置',\n  `TableId` varchar(36) NULL COMMENT '所属表Id',\n  `Readonly` int NULL COMMENT '是否只读',\n  `Encrypt` int NULL,\n  `BindRole` mediumtext NULL COMMENT '前端可见角色',\n  `Placeholder` varchar(255) NULL COMMENT '占位文字',\n  `DefaultValue` varchar(255) NULL COMMENT '默认值',\n  `Component` varchar(255) NULL COMMENT '控件类型',\n  `Description` mediumtext NULL COMMENT '字段说明',\n  `Visible` int NULL COMMENT '是否可见',\n  `IsLockField` int NULL COMMENT '是否锁定字段名称和类型',\n  `KeyupV8Code` mediumtext NULL COMMENT '键盘V8事件',\n  `DataAppend` mediumtext NULL COMMENT '附加数据',\n  `Data` mediumtext NULL COMMENT '普通数据源',\n  `V8TmpEngineForm` mediumtext NULL COMMENT '模板V8引擎（表单）',\n  `Sort` int(11) NULL COMMENT '排序',\n  `NotEmpty` int NULL COMMENT '是否必填',\n  `Label` varchar(255) NULL COMMENT '显示名称'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     },
     {
       "TableName": "diy_table",
@@ -1098,7 +1099,7 @@
     {
       "TABLE_NAME": "diy_field",
       "COLUMN_NAME": "TableName",
-      "COLUMN_TYPE": "varchar(50)",
+      "COLUMN_TYPE": "varchar(255)",
       "DATA_TYPE": "varchar",
       "IS_NULLABLE": "YES",
       "COLUMN_DEFAULT": null,
@@ -6080,7 +6081,7 @@
       "TableName": "diy_field",
       "AppVisible": 1,
       "Tab": "0800c4d1-8eba-4c42-84d5-37964b8629d7",
-      "Type": "varchar(50)",
+      "Type": "varchar(255)",
       "Name": "TableName",
       "InTableEdit": 0,
       "Unique": 0,

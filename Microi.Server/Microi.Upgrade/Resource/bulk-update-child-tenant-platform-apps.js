@@ -9,7 +9,7 @@
 
 /*
  * ApiEngineKey: bulk-update-child-tenant-platform-apps
- * Version: v1.2.8
+ * Version: v1.3.1
  * 主租户编排器：按当前运行环境的 SaaS 目录，为每个启用的子租户创建一个
  * “安装/更新全部平台应用”持久后台任务。租户识别和目标任务投递由可信 C# 原子完成。
  */
@@ -23,9 +23,14 @@
 // CHILD_STARTUP_NO_REQUEUE_REFRESH_V1：后台任务每个分片都会按 ApiEngineKey 读取当前最新工作器源码，
 // 因此在途父任务升级后只迁移检查点并继续监控原 ChildTasks；严禁再次调用投递原子“刷新”工作器，
 // 避免历史任务幂等键格式变化时创建第二批安装任务。旧 RefreshBootstrap 检查点也只归一化回 Monitor。
-// CHILD_STARTUP_TARGET_FILTER_V1：受信 StartupDependencies 后台任务可以显式限定目标租户集合，
-// 用于只修复单个历史租户；目标必须来自当前运行环境的权威子租户目录，缺失或越界时失败关闭。
-var startupBootstrapRevision = 'startup-api-live-worker-v6-no-requeue';
+// CHILD_STARTUP_TARGET_FILTER_V1 / CHILD_TRUSTED_TARGET_FILTER_V2：受信超级管理员后台任务
+// 可以显式限定目标租户集合，既可做启动依赖事故恢复，也可对单个历史空库执行完整平台应用
+// 收敛；目标必须来自当前运行环境的权威子租户目录，缺失或越界时失败关闭。
+// CHILD_STARTUP_DEPENDENCY_CLOSURE_V2：事故恢复范围固定包含应用商城与 SaaS 引擎。
+// 前者单一拥有 platform-sys-menu，后者拥有匿名配置等运行门面；少一个都会让新版前端在
+// 用户进入商城前失败。已安装同版本但资源缺失时由子工作器按物理回读强制重新安装。
+var startupBootstrapRevision = 'startup-api-live-worker-v7-complete-closure';
+var startupDependencyAppIds = ['app.microi.store', 'app.microi.saas-engine'];
 function text(value) {
     return value === null || value === undefined ? '' : String(value).trim();
 }
@@ -120,7 +125,7 @@ function cancelUnsafeChildTask(taskIdValue, reason) {
     }
     return cancelMessage;
 }
-function enforceStartupDependencyScope(taskIdValue, targetOsClient, targetName) {
+function enforceStartupDependencyScope(taskIdValue, targetOsClient, targetName, bootstrapOnly) {
     var rowResult = V8.FormEngine.GetFormData('mci_background_task', {
         Id: taskIdValue,
         _SelectFields: ['Id', 'Title', 'Status', 'CancelRequested', 'ParamJson']
@@ -133,9 +138,11 @@ function enforceStartupDependencyScope(taskIdValue, targetOsClient, targetName) 
     }
 
     var childParam = parseObject(rowResult.Data.ParamJson);
-    childParam.RequiredAppIds = ['app.microi.saas-engine'];
+    childParam.RequiredAppIds = startupDependencyAppIds.slice();
     childParam.MaintenanceScope = 'StartupDependencies';
-    var scopedTitle = '恢复平台启动接口';
+    if (bootstrapOnly) childParam.StartupDependencyBootstrapOnly = true;
+    else delete childParam.StartupDependencyBootstrapOnly;
+    var scopedTitle = bootstrapOnly ? '快速恢复平台启动接口' : '恢复平台启动接口';
     var affected = 0;
     try {
         affected = toInt(V8.Db.FromSql(
@@ -170,8 +177,12 @@ function enforceStartupDependencyScope(taskIdValue, targetOsClient, targetName) 
         && text(verifyRow.Title) == scopedTitle
         && toInt(verifyRow.CancelRequested, 0) == 0
         && text(verifyParam.MaintenanceScope) == 'StartupDependencies'
-        && requiredAppIds.length == 1
-        && requiredAppIds[0] == 'app.microi.saas-engine';
+        && (bootstrapOnly
+            ? verifyParam.StartupDependencyBootstrapOnly === true
+            : verifyParam.StartupDependencyBootstrapOnly !== true)
+        && requiredAppIds.length == 2
+        && requiredAppIds[0] == 'app.microi.store'
+        && requiredAppIds[1] == 'app.microi.saas-engine';
     if (!verified) {
         var verifyMessage = '子任务启动依赖范围强回读不一致，拒绝继续：'
             + text(targetName || targetOsClient) + '（' + text(targetOsClient) + '）。';
@@ -203,19 +214,22 @@ if (checkpoint.TaskId && text(checkpoint.TaskId) != taskId) checkpoint = {};
 var phase = text(checkpoint.Phase || 'Queue');
 // CHILD_STARTUP_DEPENDENCY_INCIDENT_SCOPE_V1：常规按钮仍维护全部平台应用；
 // 只有受信后台任务显式传 StartupDependencies 时，才将子任务收窄到
-// SaaS 启动依赖，用于跨全部子租户的快速故障恢复。
+// 应用商城 + SaaS 启动依赖闭包，用于跨全部子租户的快速故障恢复。
 var maintenanceScope = text(checkpoint.MaintenanceScope || V8.Param.MaintenanceScope);
 if (maintenanceScope && maintenanceScope != 'StartupDependencies') {
     return { Code: 0, Msg: 'MaintenanceScope 仅支持 StartupDependencies。' };
+}
+var startupDependencyBootstrapOnly = checkpoint.StartupDependencyBootstrapOnly === true
+    || V8.Param.StartupDependencyBootstrapOnly === true
+    || text(V8.Param.StartupDependencyBootstrapOnly).toLowerCase() == 'true';
+if (startupDependencyBootstrapOnly && maintenanceScope != 'StartupDependencies') {
+    return { Code: 0, Msg: 'StartupDependencyBootstrapOnly 仅允许用于 StartupDependencies 事故恢复范围。' };
 }
 var requestedTargetOsClients = toArray(
     checkpoint.TargetOsClients || V8.Param.TargetOsClients
 ).map(function (item) {
     return text(item);
 }).filter(function (item) { return !!item; });
-if (requestedTargetOsClients.length > 0 && maintenanceScope != 'StartupDependencies') {
-    return { Code: 0, Msg: 'TargetOsClients 仅允许用于 StartupDependencies 事故恢复范围。' };
-}
 if (requestedTargetOsClients.length > 100) {
     return { Code: 0, Msg: 'TargetOsClients 最多允许 100 个目标租户。' };
 }
@@ -334,7 +348,12 @@ if (phase == 'Queue') {
         } else {
             var queuedTaskId = text(queued.Data.TaskId);
             var scopePatch = maintenanceScope == 'StartupDependencies'
-                ? enforceStartupDependencyScope(queuedTaskId, targetOsClient, targetName)
+                ? enforceStartupDependencyScope(
+                    queuedTaskId,
+                    targetOsClient,
+                    targetName,
+                    startupDependencyBootstrapOnly
+                )
                 : { Code: 1 };
             if (!scopePatch || scopePatch.Code != 1) {
                 failures.push({
@@ -374,6 +393,7 @@ if (phase == 'Queue') {
             TaskId: taskId,
             Phase: 'Queue',
             MaintenanceScope: maintenanceScope,
+            StartupDependencyBootstrapOnly: startupDependencyBootstrapOnly,
             TargetOsClients: requestedTargetOsClients,
             AttemptedTargets: attemptedTargets,
             ChildTasks: childTasks,
@@ -396,6 +416,7 @@ if (phase == 'Queue') {
                 TaskId: taskId,
                 Phase: 'Abort',
                 MaintenanceScope: maintenanceScope,
+                StartupDependencyBootstrapOnly: startupDependencyBootstrapOnly,
                 TargetOsClients: requestedTargetOsClients,
                 AttemptedTargets: attemptedTargets,
                 ChildTasks: [],
@@ -430,6 +451,7 @@ if (phase == 'Queue') {
         TaskId: taskId,
         Phase: 'Monitor',
         MaintenanceScope: maintenanceScope,
+        StartupDependencyBootstrapOnly: startupDependencyBootstrapOnly,
         TargetOsClients: requestedTargetOsClients,
         BootstrapRevision: maintenanceScope == 'StartupDependencies'
             ? startupBootstrapRevision
@@ -547,6 +569,7 @@ if (runningCount > 0) {
         TaskId: taskId,
         Phase: 'Monitor',
         MaintenanceScope: maintenanceScope,
+        StartupDependencyBootstrapOnly: startupDependencyBootstrapOnly,
         TargetOsClients: requestedTargetOsClients,
         BootstrapRevision: text(checkpoint.BootstrapRevision),
         AttemptedTargets: attemptedTargets,

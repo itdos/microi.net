@@ -36,7 +36,11 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.True(Assert.IsType<bool>(hasPackagedRuntime.Invoke(null, new object[] { package })));
         var packageVersionText = package["PackageInfo"]?["Version"]?.ToString()?.TrimStart('v', 'V');
         Assert.True(System.Version.TryParse(packageVersionText, out var packageVersion));
-        Assert.True(packageVersion >= new System.Version(7, 5, 46));
+        Assert.True(packageVersion >= new System.Version(7, 6, 20));
+        Assert.Contains(
+            "Installer:DeclaredSaaSRuntimeApiClosureV1",
+            package["PackageInfo"]?["RequiredPlatformCapabilities"]?.Values<string>()
+            ?? Enumerable.Empty<string>());
 
         foreach (var key in ManagedKeys)
         {
@@ -95,6 +99,113 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
+    public void StartupDependencyGate_LoadsEveryEngineFromAllOfficialBaselinePackages()
+    {
+        var method = typeof(UpgradeAppStore).GetMethod(
+            "LoadBundledStartupDependencyEngines",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        var engines = Assert.IsAssignableFrom<IReadOnlyList<JObject>>(
+            method!.Invoke(null, null));
+        var resources = LoadBundledResources();
+        var packageResources = new[]
+        {
+            "app.microi.form-engine.json",
+            "app.microi.module-engine.json",
+            "app.microi.saas-engine.json",
+            "app.microi.sso.json",
+            "app.microi.store.json",
+            "app.microi.sys_user.json",
+            "app.microi.sys-config.json",
+            "app.microi.message-notification.json",
+            "app.microi.ai-engine.json"
+        };
+        var expected = packageResources
+            .Select(resourceName => JObject.Parse(resources[resourceName]))
+            .SelectMany(package => package["SysApiEngines"]?.Children<JObject>()
+                ?? Enumerable.Empty<JObject>())
+            .Select(item => item["ApiEngineKey"]?.ToString())
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .ToArray();
+
+        Assert.Equal(expected.Length, expected.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(
+            expected.OrderBy(value => value, StringComparer.Ordinal),
+            engines.Select(item => item["ApiEngineKey"]?.ToString())
+                .OrderBy(value => value, StringComparer.Ordinal));
+        Assert.All(engines, engine =>
+        {
+            var key = engine["ApiEngineKey"]?.ToString();
+            Assert.False(string.IsNullOrWhiteSpace(engine["ApiAddress"]?.ToString()));
+            var policy = engine["_OfficialUpgradePolicy"]?.ToString();
+            var ownership = engine["_OfficialOwnership"]?.ToString();
+            Assert.Equal(1, engine["IsEnable"]?.Value<int>());
+            if (policy == "CreateIfMissing")
+            {
+                Assert.Equal("Tenant", ownership);
+                Assert.StartsWith(
+                    "/* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1",
+                    engine["ApiV8Code"]?.ToString()?.TrimStart());
+            }
+            else
+            {
+                Assert.Equal("Managed", policy);
+                Assert.Equal("Platform", ownership);
+                Assert.StartsWith(
+                    "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1",
+                    engine["ApiV8Code"]?.ToString()?.TrimStart());
+            }
+            Assert.False(string.IsNullOrWhiteSpace(engine["_OfficialPackageResource"]?.ToString()));
+        });
+
+        var expectedSet = expected.ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("platform-runtime-custom-hook", expectedSet);
+        Assert.Contains("platform-service-health", expectedSet);
+        Assert.Contains("platform-sys-dept", expectedSet);
+        Assert.Contains("mci-module-presentation-stats", expectedSet);
+        Assert.Contains("get-microi-store", expectedSet);
+        Assert.Contains("bulk-import-microi-store-packages", expectedSet);
+        Assert.Contains("platform-background-task", expectedSet);
+        foreach (var key in new[]
+                 {
+                     "platform-sys-menu",
+                     "platform-current-user",
+                     "platform-private-file-url",
+                     "platform-service-health",
+                     "platform-sys-dept",
+                     "mci-module-presentation-stats",
+                     "bulk-import-microi-store-packages",
+                     "platform-background-task"
+                 })
+        {
+            var engine = Assert.Single(engines, item => item["ApiEngineKey"]?.ToString() == key);
+            Assert.Equal("/apiengine/" + key, engine["ApiAddress"]?.ToString());
+        }
+        var storeList = Assert.Single(
+            engines,
+            item => item["ApiEngineKey"]?.ToString() == "get-microi-store");
+        Assert.Equal("/apiengine/get-microi-store-list", storeList["ApiAddress"]?.ToString());
+    }
+
+    [Fact]
+    public void ApiStartup_RunsDependencyGateBeforeLicenseAndHostedUpgradeRepeatsIt()
+    {
+        var serverRoot = FindServerRoot();
+        var program = File.ReadAllText(Path.Combine(serverRoot, "Microi.net.Api", "Program.cs"));
+        var hosted = File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.Upgrade",
+            "MicroiUpgradeHostedService.cs"));
+        var gateIndex = program.IndexOf("EnsureStartupDependenciesAsync", StringComparison.Ordinal);
+        var licenseIndex = program.IndexOf("#region License 自动恢复", StringComparison.Ordinal);
+
+        Assert.True(gateIndex >= 0 && licenseIndex > gateIndex);
+        Assert.Contains("EnsureStartupDependenciesUnderLeaseAsync", hosted);
+        Assert.Contains("【自动升级状态】", program);
+        Assert.Contains("【自动升级状态】", hosted);
+    }
+
+    [Fact]
     public void PlatformRuntimeGate_RejectsManagedDrift_ButNeverComparesTenantHookSource()
     {
         var package = JObject.Parse(LoadBundledResources()["app.microi.saas-engine.json"]);
@@ -126,6 +237,27 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.True(Assert.IsType<bool>(hasExpectedEngine.Invoke(null, new object[] { hook, false })));
         Assert.False(Assert.IsType<bool>(hasExpectedEngine.Invoke(null, new object[] { hook, true })));
         Assert.False(Assert.IsType<bool>(hasPackagedRuntime.Invoke(null, new object[] { tenantOwnedPackage })));
+
+        var contractError = GetPrivateStaticMethod("GetStartupDependencyContractError");
+        var bundledHook = Assert.Single(
+            Assert.IsAssignableFrom<IReadOnlyList<JObject>>(
+                GetPrivateStaticMethod("LoadBundledStartupDependencyEngines").Invoke(null, null)),
+            item => item["ApiEngineKey"]?.ToString() == "platform-runtime-custom-hook");
+        var tenantTombstone = new JObject
+        {
+            ["ApiEngineKey"] = "PLATFORM-RUNTIME-CUSTOM-HOOK",
+            ["ApiAddress"] = "/tenant-owned-hook",
+            ["ApiV8Code"] = string.Empty,
+            ["IsEnable"] = 0,
+            ["StopHttp"] = 0,
+            ["AllowAnonymous"] = 1,
+            ["IsDeleted"] = 1
+        };
+        Assert.Equal(
+            string.Empty,
+            Assert.IsType<string>(contractError.Invoke(
+                null,
+                new object[] { tenantTombstone, bundledHook })));
 
         hook["StopHttp"] = 0;
         hook["IsDeleted"] = 1;
@@ -256,7 +388,7 @@ public class PlatformRuntimeUpgradeGateTests
 
         Assert.True(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.message-notification.json", package })));
-        Assert.Equal("v1.0.9", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.Equal("v1.0.11", package["PackageInfo"]?["Version"]?.ToString());
         Assert.Equal(string.Empty, expectedHook.Invoke(
             null, new object[] { "platform-chat-system-message" }));
         Assert.Equal("platform-message-notification-custom-hook", expectedHook.Invoke(
@@ -288,6 +420,32 @@ public class PlatformRuntimeUpgradeGateTests
             .Replace("CHAT_SIGNALR_TRUSTED_PROTOCOL_V1", "missing-signalr-protocol");
         Assert.False(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.message-notification.json", missingSignalRProtocol })));
+    }
+
+    [Fact]
+    public void LegacyFieldTableNameProjection_WidensBeforeBackfillAndFreshInstallUsesSameCapacity()
+    {
+        var serverRoot = FindServerRoot();
+        var upgradeSource = File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.Upgrade",
+            "Upgrade.cs"));
+        Assert.Contains(
+            "EnsureStringColumnCapacity(osClientSecret, \"diy_field\", \"TableName\", 255)",
+            upgradeSource);
+
+        var package = JObject.Parse(File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.Upgrade",
+            "Resource",
+            "app.microi.form-engine.json")));
+        var ddl = Assert.Single(package["DDLStatements"]!.Children<JObject>(), item =>
+            string.Equals(item["TableName"]?.ToString(), "diy_field", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("`TableName` varchar(255)", ddl["DDL"]?.ToString());
+        var physical = Assert.Single(package["PhysicalColumns"]!.Children<JObject>(), item =>
+            string.Equals(item["TABLE_NAME"]?.ToString(), "diy_field", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item["COLUMN_NAME"]?.ToString(), "TableName", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("varchar(255)", physical["COLUMN_TYPE"]?.ToString());
     }
 
     private static MethodInfo GetPrivateStaticMethod(string name)
