@@ -36,7 +36,11 @@ import "./styles/itdos.diy.scss";
 import "./styles/mci-design.scss";
 import axios from "axios";
 import { DiyOsClient } from "./utils/itdos.osclient";
-import { reportApiServiceFailure } from "./utils/api-service-status.js";
+import {
+    primeApiServiceStatus,
+    reportApiServiceFailure,
+    setApiServiceFrontendVersion
+} from "./utils/api-service-status.js";
 import { syncClassicShellVisibilityFromUrl } from "./utils/classic-shell-visibility.js";
 import { isEmbeddedWebosWindowRuntime } from "./utils/webos-embedded-runtime.js";
 import { installLegacyQrCodeDownload } from "./utils/legacy-qrcode.js";
@@ -62,6 +66,7 @@ initThemeColor();
 // 前端微服务运行时。MicroApp 用于承载按租户从数据库/独立地址发布的 Vue3 定制页面。
 microApp.start();
 window.microApp = microApp;
+setApiServiceFrontendVersion(`v${packageInfo.version}`);
 
 // 创建 Vue 3 应用实例
 const app = createApp(App);
@@ -247,6 +252,13 @@ async function initApp() {
     } else {
         await DiyOsClient.OsClientInit(true);
     }
+    osClient = DiyCommon.GetOsClient();
+    void primeApiServiceStatus({
+        apiBase: DiyCommon.GetApiBase(),
+        osClient
+    }).catch(function (healthError) {
+        console.debug("[Microi] 固定健康接口预热将在业务连接异常时重试：", healthError);
+    });
 
     // 初始化主题色（兼容生产环境 CSS 顺序差异）
     const themeColor = resolveUserThemeColor(

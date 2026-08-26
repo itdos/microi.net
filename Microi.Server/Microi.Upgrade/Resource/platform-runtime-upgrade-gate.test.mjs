@@ -8,6 +8,7 @@ const requiredKeys = [
   'platform-runtime-custom-hook',
   'platform-os-client-by-domain',
   'platform-sys-config',
+  'platform-service-health',
   'platform-lang-bundle',
   'platform-current-user',
   'platform-private-file-url',

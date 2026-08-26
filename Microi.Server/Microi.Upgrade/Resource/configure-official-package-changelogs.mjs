@@ -6,11 +6,11 @@ const resourceRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export const officialPackageChangeLogDefinitions = Object.freeze({
   'app.microi.form-engine.json': Object.freeze({
-    version: 'v7.6.6',
-    title: '表单引擎接口优先交付与官方基线治理',
-    changeType: 'Feature',
-    content: '表单设计器搜索索引维护改由 Managed 接口引擎编排；copy_table 官方核心补齐醒目恢复提示和 Managed 所有权，并为当前应用版本补齐结构化更新日志与发布硬门禁。',
-    releaseTime: '2026-08-25 16:00:00',
+    version: 'v7.6.7',
+    title: '历史长表名升级兼容',
+    changeType: 'Fix',
+    content: '将 diy_field.TableName 的新装结构、物理字段元数据和表单字段元数据统一扩容为 varchar(255)，兼容历史长表名并避免升级复制 diy_table.Name 时中断。',
+    releaseTime: '2026-08-26 14:30:00',
   }),
   'app.microi.module-engine.json': Object.freeze({
     version: 'v7.6.1',
@@ -20,25 +20,25 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
     releaseTime: '2026-08-25 16:00:00',
   }),
   'app.microi.store.json': Object.freeze({
-    version: 'v7.6.9',
-    title: '兼容 MySQL BIT 启动标志补正',
+    version: 'v7.6.16',
+    title: 'WebOS 菜单统一迁入官方接口闭包',
     changeType: 'Fix',
-    content: 'IsEnable、StopHttp、AllowAnonymous 仅使用内部归一化后的 0/1 常量写入，接口 Id 继续参数化；兼容历史 MySQL BIT(1) 列，避免驱动把 Jint 数字参数按字符串绑定后报 Data too long。',
-    releaseTime: '2026-08-25 15:20:00',
+    content: 'WebOS 菜单统一调用 platform-sys-menu，接口在执行权威菜单原子前调用应用商城 CreateIfMissing 个性化 Hook；旧商城列表地址与九包可信重放兼容继续保留。',
+    releaseTime: '2026-08-26 18:30:00',
   }),
   'app.microi.saas-engine.json': Object.freeze({
-    version: 'v7.6.14',
-    title: '历史子租户支持精确定向自愈',
+    version: 'v7.6.21',
+    title: '官方运行时接口闭包补全',
     changeType: 'Fix',
-    content: 'StartupDependencies 受信后台任务新增 TargetOsClients 精确目标集；每个目标必须来自当前运行环境的权威启用子租户目录，未知、越界或非事故恢复调用均失败关闭，用于单独修复历史库而不重跑全部租户。',
-    releaseTime: '2026-08-25 16:15:00',
+    content: '补齐在线终端、缓存管理与系统观测三个官方 Managed 接口；后端启动仍从九个官方应用包计算并强回读完整接口引擎闭包，同时保护租户 CreateIfMissing 个性化源码。',
+    releaseTime: '2026-08-26 18:30:00',
   }),
   'app.microi.sso.json': Object.freeze({
-    version: 'v7.5.7',
-    title: 'SSO Managed 编排与租户 Hook 收口',
-    changeType: 'Feature',
-    content: '统一官方 Managed 接口醒目恢复提示；SSO 安全事件只通过脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 直接返回成功且后续官方升级永不覆盖，并补齐结构化更新日志硬门禁。',
-    releaseTime: '2026-08-25 16:00:00',
+    version: 'v7.5.8',
+    title: 'SSO 官方资源归属重放修复',
+    changeType: 'Fix',
+    content: '将全部官方 Managed SSO 接口固化为 Platform 所有权，CreateIfMissing 个性化 Hook 继续归租户且永不覆盖，避免 Upgrade13 重放内置包时被误判为资源降级。',
+    releaseTime: '2026-08-26 14:30:00',
   }),
 });
 
@@ -62,6 +62,12 @@ function compareSemver(left, right) {
 function ensureCurrentHistory(packageInfo, definition) {
   const existing = packageInfo.ChangeHistory;
   if (Array.isArray(existing)) {
+    const first = existing[0];
+    if (String(first?.Version || '') === definition.version
+      && String(first?.Date || '') === definition.releaseTime.substring(0, 10)
+      && String(first?.Description || '') === definition.content) {
+      return;
+    }
     const withoutCurrent = existing.filter(item => String(item?.Version || '') !== definition.version);
     packageInfo.ChangeHistory = [{
       Version: definition.version,
@@ -73,6 +79,7 @@ function ensureCurrentHistory(packageInfo, definition) {
 
   const line = historyLine(definition);
   const lines = String(existing || '').split(/\r?\n/).filter(Boolean);
+  if (lines[0] === line) return;
   const withoutCurrent = lines.filter(item => !item.includes(` ${definition.version} `));
   packageInfo.ChangeHistory = [line, ...withoutCurrent].join('\n') + '\n';
 }

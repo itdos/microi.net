@@ -452,6 +452,9 @@ var legacyRefresh = V8.Method.RefreshLoginUser(
 var id = V8.Method.NewUlid();
 var timestamp = V8.Method.GetTimestamp();
 
+// 当前运行中的 Microi.Core 文件版本，格式为 vX.Y.Z
+var backendVersion = V8.Method.GetBackendVersion();
+
 // 后端可信 V8 按租户内对象路径签发短期代理地址
 var result = V8.Method.GetPrivateFileUrl({
     FilePathName: '/microi/file/2023-08-06/xxx.doc'
@@ -476,6 +479,15 @@ var directTablePolicies = V8.Method.GetDirectTableGrantPolicies();
 var cipher = V8.Method.ProtectApiEngineSecret(secretText);
 var plainText = V8.Method.UnprotectApiEngineSecret(cipher);
 ```
+
+`GetBackendVersion()` 读取当前后端运行程序集的 `FileVersion`，只返回规范化的
+`vX.Y.Z`，不暴露程序路径、主机名或其它环境信息。官方匿名 Managed 接口
+`GET /apiengine/platform-service-health?OsClient={OsClient}` 使用它返回
+`Data.Status=Healthy` 与 `Data.BackendVersion`；客户端应以该固定接口判断整个 API
+服务是否可用，不能把任一菜单、表单或其它业务接口的失败直接升级为全局离线。
+应用包先于后端二进制滚动升级时，接口仍返回 `Healthy`，但 `BackendVersion` 可暂时为空；
+新二进制上线后会自动补齐真实版本。旧节点的 `/api/Diagnostics/health` 仅用于客户端
+滚动升级兼容，不是新版客户端的主要健康契约。
 
 `RefreshExtensionDatabases(osClient?)` 绑定当前 V8 租户。存在 `V8.DbTrans` 时只注册提交后回调：真实事务提交成功才递增共享 Redis 版本，回滚不刷新；没有事务时立即刷新。它适合“数据库扩展”应用的 `microi_database.SubmitAfterServerV8`，不应暴露成匿名或普通业务接口。
 

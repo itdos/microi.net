@@ -91,7 +91,7 @@ function validateReleaseCandidate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 2_002_002
+    if (versionNumber < 2_004_009
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -131,6 +131,8 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
       || !content.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
       || !content.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
+      || !content.includes('TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1')
+      || !content.includes('V8.Method.RequireManagedProtocolContext')
       || !content.includes('OFFICIAL_MANAGED_OVERWRITE_V1')
       || !content.includes('GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1')
       || !content.includes('GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1')
@@ -140,7 +142,7 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
       || !content.includes('PACKAGE_REPLAY_VERSION_GUARD_V2')
       || !content.includes('OBJECT_STORAGE_FORBIDDEN')) {
-      throw new Error(`${name} 低于 v2.2.2 或缺少生成实体物理前置列自愈、跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、可信官方平台 Managed 覆盖升级及统一应用商城能力，拒绝降级本地基线`);
+      throw new Error(`${name} 低于 v2.4.9 或缺少生成实体物理前置列自愈、跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、宿主可信内置官方包重放、官方平台 Managed 覆盖升级及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -222,8 +224,8 @@ function validateReleaseCandidate(name, content) {
         tenantHooks: ['platform-system-settings-custom-hook'],
       },
       'app.microi.message-notification.json': {
-        minimumVersion: 1_000_008,
-        exactKeys: ['msg_event', 'msg_internal_list', 'msg_internal_mark_read', 'platform-chat-system-message', 'platform-chat-runtime', 'platform-message-notification-custom-hook'],
+        minimumVersion: 1_000_011,
+        exactKeys: ['msg_event', 'msg_internal_list', 'msg_internal_mark_read', 'platform-chat-system-message', 'platform-chat-runtime', 'platform-message-notification-custom-hook', 'wechat_send_tpl_msg'],
         tenantHooks: ['platform-message-notification-custom-hook'],
       },
       'app.microi.ai-engine.json': {
@@ -315,14 +317,32 @@ function validateReleaseCandidate(name, content) {
       }
     }
     if (name === 'app.microi.saas-engine.json') {
-      for (const key of ['platform-create-tenant', 'platform-external-login-binding', 'platform-wechat-user-binding', 'microi-init']) {
+      for (const key of ['platform-create-tenant', 'platform-external-login-binding', 'platform-wechat-user-binding', 'platform-service-health', 'microi-init']) {
         if (!packageEngineMap.has(key)) throw new Error(`${name} 缺少 ${key}。`);
       }
       for (const duplicateKey of ['platform-user-update-preferences', 'platform-sys-user-admin', 'platform-sys-menu']) {
         if (packageEngineMap.has(duplicateKey)) throw new Error(`${name} 仍包含应由其他官方应用唯一交付的 ${duplicateKey}。`);
       }
-      if (semanticNumber(packageModel?.PackageInfo?.Version) < 7_005_046) {
-        throw new Error(`${name} 低于 v7.5.46。`);
+      if (semanticNumber(packageModel?.PackageInfo?.Version) < 7_006_018) {
+        throw new Error(`${name} 低于 v7.6.18。`);
+      }
+      const serviceHealth = packageEngineMap.get('platform-service-health');
+      const serviceHealthCode = String(serviceHealth?.ApiV8Code || '');
+      const requiredCapabilities = packageModel?.PackageInfo?.RequiredPlatformCapabilities || [];
+      if (semanticNumber(serviceHealth?.Version) < 1_000_001
+        || String(serviceHealth?.ApiAddress || '') !== '/apiengine/platform-service-health'
+        || Number(serviceHealth?.IsEnable) !== 1
+        || Number(serviceHealth?.StopHttp) !== 0
+        || Number(serviceHealth?.AllowAnonymous) !== 1
+        || !serviceHealthCode.includes("Status: 'Healthy'")
+        || !serviceHealthCode.includes('V8.Method.GetBackendVersion()')
+        || !serviceHealthCode.includes('catch (versionError)')
+        || /V8\.(?:Db|FormEngine)/.test(serviceHealthCode)
+        || serviceHealthCode.includes('platform-runtime-custom-hook')
+        || packageModel?.ResourcePolicies?.ApiEngines?.['platform-service-health']?.UpgradePolicy !== 'Managed'
+        || !requiredCapabilities.includes('V8.Method.GetBackendVersion')
+        || !requiredCapabilities.includes('ApiEngine:platform-service-health')) {
+        throw new Error(`${name} 缺少固定匿名服务健康与后端版本契约。`);
       }
       const legacyInit = packageEngineMap.get('microi-init');
       const legacyInitCode = String(legacyInit?.ApiV8Code || '');
@@ -497,7 +517,7 @@ function validateReleaseCandidate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 2_002_002
+        || importerVersionNumber < 2_004_009
         || !importerCode.includes('API_ENGINE_RESOURCE_BASELINE_V1')
         || !importerCode.includes('TENANT_API_ENGINE_POLICY_IMMUTABLE_V1')
         || !importerCode.includes('JSON_SWITCH_LITERAL_UNQUOTE_V1')
@@ -506,6 +526,8 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
         || !importerCode.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
         || !importerCode.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
+        || !importerCode.includes('TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1')
+        || !importerCode.includes('V8.Method.RequireManagedProtocolContext')
         || !importerCode.includes('OFFICIAL_MANAGED_OVERWRITE_V1')
         || !importerCode.includes('DATABASE_ONLY_BUILD_ASSETS_V1')
         || !importerCode.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')
@@ -516,7 +538,7 @@ function validateReleaseCandidate(name, content) {
         || !String(publisherEngine?.ApiV8Code || '').includes('buildApiEngineResourcePolicies')
         || !String(publisherEngine?.ApiV8Code || '').includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')
         || !String(publisherEngine?.ApiV8Code || '').includes('SharedPublicRuntime')
-        || engineVersionNumber(bulkEngine) < 1_001_006
+        || engineVersionNumber(bulkEngine) < 1_003_005
         || Number(bulkEngine?.IsEnable) !== 1
         || Number(bulkEngine?.StopHttp) !== 0
         || !String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_CHECKPOINT_PLAN_V2')
@@ -528,6 +550,14 @@ function validateReleaseCandidate(name, content) {
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STORAGE_FAILURE_RECOVERY_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_MONOTONIC_CHILD_PROGRESS_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STRUCTURED_CHILD_ERRORS_V1')
+        || !String(bulkEngine?.ApiV8Code || '').includes('STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2')
+        || !String(bulkEngine?.ApiV8Code || '').includes('STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('BackgroundTask:StartupDependencyResourceClosureV2')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ApiEngine:bulk-import-microi-store-packages@v1.3.7')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('BackgroundTask:StartupDependencyPreinstallBootstrapV1')
         || !String(bulkEngine?.ApiV8Code || '').includes('prioritizeBootstrapPlan')
         || engineVersionNumber(backgroundTaskEngine) < 1_001_000
         || String(backgroundTaskEngine?.ApiAddress || '') !== '/apiengine/platform-background-task'
@@ -540,18 +570,19 @@ function validateReleaseCandidate(name, content) {
           .includes('ServerFeature:V8.ManageBackgroundTask')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('ApiEngine:platform-background-task@v1.1.0')
-        || engineVersionNumber(sysMenuEngine) < 1_000_000
+        || engineVersionNumber(sysMenuEngine) < 1_000_001
         || String(sysMenuEngine?.ApiAddress || '') !== '/apiengine/platform-sys-menu'
         || Number(sysMenuEngine?.IsEnable) !== 1
         || Number(sysMenuEngine?.StopHttp) !== 0
         || Number(sysMenuEngine?.AllowAnonymous) !== 0
         || !String(sysMenuEngine?.ApiV8Code || '').includes('V8.Method.ManageSystemDirectory')
         || !String(sysMenuEngine?.ApiV8Code || '').includes("Domain: 'SysMenu'")
+        || !String(sysMenuEngine?.ApiV8Code || '').includes("platform-marketplace-source-hook")
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-sys-menu']?.UpgradePolicy !== 'Managed'
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('V8.Method.ManageSystemDirectory')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
-          .includes('ApiEngine:platform-sys-menu@v1.0.0')
+          .includes('ApiEngine:platform-sys-menu@v1.0.1')
         || engineVersionNumber(marketplaceSourceEngine) < 1_000_000
         || !String(marketplaceSourceEngine?.ApiV8Code || '').includes("V8.ApiEngine.Run('platform-marketplace-source-hook'")
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-marketplace-source']?.UpgradePolicy !== 'Managed'

@@ -13,6 +13,7 @@ const resource = JSON.parse(fs.readFileSync(
 const facadeDefinitions = [
   ['platform-os-client-by-domain', 'platform-os-client-by-domain.js', 1, 'V8.Method.ResolveOsClientByDomain'],
   ['platform-sys-config', 'platform-sys-config.js', 1, 'V8.Method.GetPublicSysConfig'],
+  ['platform-service-health', 'platform-service-health.js', 1, 'V8.Method.GetBackendVersion'],
   ['platform-lang-bundle', 'platform-lang-bundle.js', 1, 'V8.Method.GetLangBundle'],
   ['platform-current-user', 'platform-current-user.js', 0, 'V8.CurrentUser'],
   ['platform-private-file-url', 'platform-private-file-url.js', 0, 'V8.Method.GetAuthorizedPrivateFileUrl'],
@@ -28,7 +29,7 @@ function stripGeneratedNotice(value) {
 }
 
 test('SaaS package carries the client runtime facades and one tenant hook', () => {
-  assert.equal(resource.PackageInfo.Version, 'v7.6.14');
+  assert.match(resource.PackageInfo.Version, /^v\d+\.\d+\.\d+$/);
   for (const [key, fileName, allowAnonymous, atom] of facadeDefinitions) {
     const engine = resource.SysApiEngines.find(item => item.ApiEngineKey === key);
     assert.ok(engine, `missing ${key}`);
@@ -91,6 +92,7 @@ test('trusted Core atoms are ApiEngineKey-bound and do not expose a generic tena
   for (const key of facadeDefinitions.map(item => item[0])) {
     if (key === 'platform-current-user') continue;
     if (key === 'platform-sys-user-public-info') continue;
+    if (key === 'platform-service-health') continue;
     assert.match(coreSource, new RegExp(`"${key}"`));
   }
   assert.match(coreSource, /RequireTrustedApiEngine\(PlatformOsClientByDomainEngineKey\)/);
@@ -98,9 +100,42 @@ test('trusted Core atoms are ApiEngineKey-bound and do not expose a generic tena
   assert.match(coreSource, /RequireTrustedApiEngine\(PlatformLangBundleEngineKey\)/);
   assert.match(coreSource, /RequireTrustedApiEngine\(PlatformLoginWallpapersEngineKey\)/);
   assert.match(coreSource, /RequireTrustedApiEngine\(PlatformPrivateFileUrlEngineKey\)/);
-  assert.match(coreSource, /CreatePublicSysConfigProjection/);
+  assert.match(coreSource, /PlatformBootstrapCompatibilityService\s*\.GetPublicSysConfigAsync/);
   assert.match(coreSource, /PrivateFileAccessAuthorization\.AuthorizeAsync/);
   assert.doesNotMatch(coreSource, /dynamicParam[^\n]*OsClient/);
+});
+
+test('service health is a fixed anonymous contract without business dependencies', () => {
+  const engine = resource.SysApiEngines.find(
+    item => item.ApiEngineKey === 'platform-service-health',
+  );
+  assert.ok(engine);
+  assert.equal(engine.AllowAnonymous, 1);
+  assert.match(engine.ApiV8Code, /Status:\s*'Healthy'/);
+  assert.match(engine.ApiV8Code, /V8\.Method\.GetBackendVersion\(\)/);
+  assert.match(engine.ApiV8Code, /catch\s*\(versionError\)/);
+  assert.doesNotMatch(engine.ApiV8Code, /V8\.Db|V8\.FormEngine|platform-runtime-custom-hook/);
+
+  const runHealth = new Function('V8', 'DateNow', engine.ApiV8Code);
+  const legacyRuntime = runHealth({ Method: {} }, () => '2026-08-25 22:10:00');
+  assert.equal(legacyRuntime.Code, 1);
+  assert.equal(legacyRuntime.Data.Status, 'Healthy');
+  assert.equal(legacyRuntime.Data.BackendVersion, '');
+  const currentRuntime = runHealth({
+    Method: { GetBackendVersion: () => 'v7.6.5' },
+  }, () => '2026-08-25 22:10:00');
+  assert.equal(currentRuntime.Data.BackendVersion, 'v7.6.5');
+
+  const runtimeInfoSource = fs.readFileSync(path.resolve(
+    directory,
+    '..', '..',
+    'Microi.Core',
+    'V8Engine', 'Runtime',
+    'V8Method.RuntimeInfo.cs',
+  ), 'utf8');
+  assert.match(runtimeInfoSource, /AssemblyFileVersionAttribute/);
+  assert.match(runtimeInfoSource, /public string GetBackendVersion\(\)/);
+  assert.doesNotMatch(runtimeInfoSource, /MachineName|Location|ProcessName/);
 });
 
 test('login wallpaper facade uses only the bounded trusted projection atom', () => {

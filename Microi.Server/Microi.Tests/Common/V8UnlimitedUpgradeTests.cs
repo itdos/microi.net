@@ -161,8 +161,9 @@ public class V8UnlimitedUpgradeTests
         var leaseContextIndex = hostedService.IndexOf(
             "using (UpgradeExecutionLeaseContext.Enter(upgradeLease))",
             StringComparison.Ordinal);
-        var invariantIndex = hostedService.IndexOf("var formV8LimitMessages = await new Upgrade33()", StringComparison.Ordinal);
+        var invariantIndex = hostedService.IndexOf("\"Upgrade33-表单V8限额\"", StringComparison.Ordinal);
         Assert.Contains(".Run(runtimeClient.OsClient, resetExistingValues: false)", hostedService, StringComparison.Ordinal);
+        Assert.Contains("RunRuntimeInvariantAsync(runtimeClient, upgradeLease", hostedService, StringComparison.Ordinal);
         var versionReadIndex = hostedService.IndexOf("SELECT ServerVersion FROM sys_config", StringComparison.Ordinal);
         var versionGateIndex = hostedService.IndexOf("_upgrade.Upgrade(currentVersion", StringComparison.Ordinal);
         Assert.True(leaseContextIndex >= 0);

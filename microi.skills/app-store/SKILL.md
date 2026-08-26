@@ -43,7 +43,7 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 ## 接口引擎资源所有权（强制）
 
 - 新发布包必须声明 `ResourcePolicies.ApiEngines`，不得再依赖“同 Key 直接覆盖”。官方不可随租户修改的核心使用 `{ Ownership:'Application', UpgradePolicy:'Managed' }`；提供给租户改业务的 Hook 使用 `{ Ownership:'Tenant', UpgradePolicy:'CreateIfMissing' }`。
-- 发布器从上一版安装包正文的 `SysApiEngines` 计算 `BaseHash`；正文可能来自已验证的 HDFS 指针或旧版 `AppPakcet`。导入成功后把本版摘要写入 `sys_microistoreversion.InstallResult.ResourceState.ApiEngines`。普通/社区应用仍按 Base/Local/Incoming 三方保护：`Local == Base` 才更新，`Local != Base && Local != Incoming` 必须冲突回滚。唯一覆盖例外是从固定 `https://api.itdos.com + iTdos` 实时回读并校验为官方 `ApplicationType=Platform` 的应用：其中 `Ownership=Application + UpgradePolicy=Managed` 属于平台发行物，安装/更新按包覆盖本地差异；离线包、自报官方、非 Platform 来源都不能获得该权限。
+- 发布器从上一版安装包正文的 `SysApiEngines` 计算 `BaseHash`；正文可能来自已验证的 HDFS 指针或旧版 `AppPakcet`。导入成功后把本版摘要写入 `sys_microistoreversion.InstallResult.ResourceState.ApiEngines`。普通/社区应用仍按 Base/Local/Incoming 三方保护：`Local == Base` 才更新，`Local != Base && Local != Incoming` 必须冲突回滚。允许覆盖官方 Managed 的信任来源只有两种：一是从固定 `https://api.itdos.com + iTdos` 实时回读并校验为官方 `ApplicationType=Platform` 的应用；二是 Upgrade13 从程序集固定九包白名单读取并校验后，在绑定固定导入器 Key 与当前租户的一次性宿主上下文中调用统一导入器。第二种授权必须由宿主上下文消费一次，单独伪造 V8 参数、离线包、自报官方或非 Platform 来源都不能获得；两种路径都只能恢复 `Platform/Managed`，不得覆盖 `Tenant/CreateIfMissing`。
 - `CreateIfMissing` 只在目标 Key 不存在时创建，存在时不得对齐 Id、源码、启用状态或其它字段。扩展模板发布后即归租户维护；后续版本禁止把同一 Key 改回 `Managed` 接管，确需新的官方核心时发布新 Key 并显式迁移。
 - 官方功能采用“Managed 核心 + CreateIfMissing Hook”。核心只提供稳定协议和默认行为，并在可信官方 Platform 包更新时覆盖升级；客户日志、写表、通知和业务动作放 Hook，并以稳定 `EventId`、唯一约束或 outbox 幂等。`CreateIfMissing` 一旦交给租户维护，即使后续官方包误改为 Managed 也必须冲突回滚。
 - 每个官方包内的接口引擎源码顶部都必须有醒目所有权提示。Managed 提示必须写明所属官方应用、从可信官方源安装/更新/重新安装会恢复官方代码，并指向该应用的 CreateIfMissing Hook；CreateIfMissing 提示必须写明首次创建后归租户维护、官方升级不得覆盖。官方 SSO、登录、通知等核心在安全阶段调用 Hook 时，只传脱敏上下文，禁止传 Token、Secret、密码或原始协议断言。
@@ -75,6 +75,7 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - 安装次数回传属于非阻塞幂等遥测，不是应用导入事务的成功条件。来源节点返回旧格式 `True`、空响应、非 JSON、业务失败或请求异常时，只能写入带 `OperationId`/`InstallationKey` 的 warning 诊断，不得用 `_error_` 标记或回滚已经成功导入的应用；重试仍须复用同一幂等键。
 - “全部安装/更新”固定只处理 `ApplicationType=Platform` 的官方平台应用中未安装与存在新版本的项目，不得把 UniApp、Web、MicroService 或其它社区/AI 应用整库安装；已是最新版的应用不重新安装。批量计划、子项状态、checkpoint 和进度必须持久化到共享数据库/后台任务，支持多节点抢占、失败重试和重启恢复，不能依赖进程内集合或浏览器状态。
 - 主租户批量维护全部子租户时，前端入口和接口引擎都必须校验主租户上下文及 `Level >= 9999`，再由可信控制面为每个启用子租户创建独立持久后台任务；父任务必须按子任务真实百分比聚合进度，等全部子任务终态后才成功或失败，并在通知中心保留每个租户、阶段和原始失败原因。所有子任务可立即创建，但固定商城工作器必须通过配置租户 Redis 的集群并发租约跨租户串行执行，避免共享物理库并发 DDL/元数据写入死锁；分片幂等任务使用足以覆盖短时死锁和滚动重启的有界重试预算，禁止无限重试。`MaxAttempts` 表示连续失败预算：任一分片成功写入 checkpoint 后必须把 `AttemptCount` 与陈旧 `LastError` 清零，不能让数百个成功分片之间偶发的网络错误按任务生命周期累计并误终结。分片重新入队后必须按 `COALESCE(NextRunTime, CreateTime)` 选取最早就绪任务，禁止只按 `CreateTime` 让最早长任务重复抢占全部分片。商城包属于只读权威数据，可对空响应做有界退避重试，并优先用完整响应的 `Content`、`RawBytes`、HTTP 状态和传输错误诊断；不得把该规则扩展到安装写入请求。目标租户固定商城工作器只允许从受信任官方谱系向更高版本刷新；同版本不同源码、目标端更新版或未知谱系必须失败关闭。历史空库缺少生成实体所需物理列时，导入器须在首次 FormEngine 调用前幂等补齐并回读，不能再把真实表结构错误包装成 `Value cannot be null (source)`。
+- 批量维护的权威目录按当前节点 `OsClientType + OsClientNetwork` 隔离；同一主租户同时存在 Internal、Internet 或其它活动分区时，必须在每个分区对应的主租户节点独立发起并验收，不能用一个分区的成功任务推断全平台成功。每个分区先回读精确预期租户数与名单，等待父子任务全部终态且 `SucceededCount=ExpectedCount、FailedCount=0`，再用新幂等键立即执行一次无操作复跑并确认零安装／零更新。禁止修改 `sys_osclients` 的网络字段来把租户临时塞进另一分区，也禁止让两个分区同时维护可能指向同一物理库的重复租户记录。
 - 必须随所有后端版本自动落地的平台基础能力，仍要封装成受信任的官方 Platform 应用包，再由升级器调用统一 `import-microi-store-package` 幂等导入；禁止把表、字段、页面或微服务复制成定制 C# 迁移。`app.microi.saas-engine.json` 可携带基础空库所需的 `mci_system_setting`、`mci_user_external_identity`、默认设置和平台内置微服务；系统账号的 `platform-user-update-preferences`、`platform-user-update-profile`、`platform-user-custom-hook` 只由 `app.microi.sys_user.json` 交付，租户设置的 `platform-tenant-system-settings`、`platform-system-settings-custom-hook` 只由 `app.microi.sys-config.json` 交付。SaaS/Store 不得保留这些 Key、策略或 RequiredPlatformCapabilities。默认行必须使用 `InsertIfMissing + ConfigKey`，只补缺失，不覆盖 `ValueSource=Tenant` 的租户值或租户后来明确关闭的功能。小型平台启动微服务应以 `Source=NotIncluded + Build=DatabaseOnly + StorageMode=db` 随程序集交付并接受 256 文件/5MB、逐文件哈希和无源码门禁，使新租户在 HDFS 故障时仍能打开商城与恢复入口；普通应用安装、源码编辑和文件能力继续失败关闭，不得伪装成全平台健康。
 - 批量任务已经以“一个应用”为外层持久化恢复单元。规模可控的小型官方包应在一个事务中完成，避免对同一包体按 8 个字段反复下载、解析和重新排队；超过字段、表、DDL、流程、随包数据或资产安全阈值的大包继续使用内部 checkpoint 分片。热更新发现旧版批量计划不含 `ApplicationType` 时，必须丢弃旧计划并重新盘点，不能继续安装历史计划中的社区应用。
 - MySQL 宽表触发 65,535 字节行内上限时，只允许把不参与索引的 `varchar` 配置列无损提升为 `mediumtext`，并把类型覆盖持久化到后台任务 checkpoint；索引列和非行宽错误必须失败关闭。发布包对长连接串、密钥、回调地址、域名/白名单等字段应直接使用 `mediumtext`，同时更新 `DiyFields` 与建表 DDL，不能长期依赖安装时猜测。
@@ -163,8 +164,15 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 
 - 触发场景：租户先升级新版前后端，登录后路由初始化固定调用 `/apiengine/platform-sys-menu`；目标库此前没有该接口。应用商城包只补了 `platform-background-task`，而菜单接口仍由安装顺序靠后的 SaaS 包顺带携带；启动完整性检查也只验证后台任务接口，于是数据库版本和商城版本都显示最新，但用户在进入应用商城之前已经因 `NoExistData sys_apiengine` 全站不可用。
 - 根因：把单个已修复依赖误当成完整的启动依赖集合，包资源闭包、`NeedRefresh` 完成判定和安装后强回读没有使用同一清单；发布验收只覆盖已有目标租户，未覆盖“新版二进制 + 历史库恰好缺少某一启动接口”的升级排列。
-- 通用规则：凡是登录、菜单构建、恢复入口或应用商城打开之前必调的表、接口引擎和微服务路由，都属于启动依赖闭包，必须由安装顺序最前的同一个官方 Platform 包原子交付。每项接口必须同时声明固定自定义地址、最低版本、启用/匿名/HTTP 状态、`Managed` 策略、V8 原子能力和包内能力标记；启动完整性检查与安装后回读必须遍历同一依赖清单，任意一项缺失都触发修复且失败不推进版本。其它后置应用携带相同资源只能作兼容副本，不能成为启动正确性的唯一来源。
-- 竞态与验收：前端可对明确的“启动 Managed 资源尚未落库”做不超过一分钟的有界退避，并在耗尽后显示精确包名和最低版本；它不能吞掉鉴权错误、普通网络错误，也不能代替服务端修复。契约测试须逐项删除或降级每个启动依赖，断言包校验、租户完整性判断和安装后回读都失败；真实验收至少覆盖一个历史缺失租户，先证明旧状态会失败，再安装精确商城版本、回读接口源码/地址/策略、执行菜单动作、刷新登录后页面，最后做同版本无操作复跑。
+- 通用规则：凡是登录、菜单构建、恢复入口或应用商城打开之前必调的表、接口引擎和微服务路由，都属于启动依赖闭包。每项资源必须只有一个官方 Platform/Application 包作为唯一所有者。API 进程接收流量前的门禁不得维护“登录页七接口”之类手写清单；必须从九个随服务端自动安装的内置官方基础应用包读取全部 `SysApiEngines`，校验 Key/稳定 Id/自定义地址/所有权无重复，再补缺并逐项物理强回读。这样登录后的组织、角色、角标、健康、消息、SSO、AI、商城工作器及内部接口也不会在完整包后台升级完成前出现 `NoExistData`。`Managed` 资源只由所属包升级；`Tenant/CreateIfMissing` 仅在数据库中完全不存在时创建，既有大小写变体、禁用记录或墓碑都归租户维护，不得恢复或覆盖。
+- 竞态与验收：前端可对明确的“启动 Managed 资源尚未落库”做不超过一分钟的有界退避，并在耗尽后显示精确包名和最低版本；它不能吞掉鉴权错误、普通网络错误，也不能代替服务端修复。跨大量历史租户的 `StartupDependencyBootstrapOnly` 是独立的事故工具，仍可从应用商城与 SaaS 两个不可变包只补七项最小可登录接口并做物理强回读；它不是 API 进程的完整运行时就绪定义，成功后仍须执行普通完整应用更新。契约测试须枚举九个包的全部接口资源，覆盖稳定 Id/地址冲突、CreateIfMissing 墓碑保护、登录后实际路由、商城批量安装和已健康零操作。
+
+### 2026-08-26：登录成功后仍成片 `sys_apiengine NoExistData` 与 Upgrade25 历史文件阻断
+
+- 触发：新版前后端部署到历史租户后，登录页依赖已被补齐，但 `platform-service-health`、`platform-sys-dept`、`mci-module-presentation-stats`、`platform-runtime-custom-hook`、商城批量工作器等登录后接口继续缺失；与此同时 `mci_ai_app_file.VersionId` 的历史空值使 Upgrade25 在创建唯一索引前失败，后续后台升级链无法收敛。
+- 根因：把“能登录”误当成“平台运行时已就绪”，启动门禁和事故工作器长期依赖固定七项清单；历史应用文件在 V3 引入版本外键前已经存在，升级只做审计并直接失败，没有安全、确定且可重放的归档策略。旧商城工作器还可能访问已经改名的 `/apiengine/get-microi-store` 地址。
+- 通用修复：API 进程启动门禁以上述九包全部接口为事实源，缺失 Managed 资源从程序集内置官方包创建，CreateIfMissing 只补完全不存在的记录；应用商城保留独立 Managed 旧地址接口并转发到 `get-microi-store` Key 的正式 `/apiengine/get-microi-store-list` 实现。Upgrade25 必须先按 `OsClient + AppId + legacy-unversioned-v3` 生成确定性历史版本 Id，把每个应用的空 `VersionId` 文件原样归档并强回读为零，再计算路径 Hash 和创建唯一索引；文件同时缺少 `AppId`、确定性 Id 被占用或同名版本身份不一致时失败关闭，不猜测、不合并、不删除。
+- 验收：应用包测试必须证明九包接口 Key/稳定 Id 全局唯一、每项政策与醒目提示完整、旧商城地址和正式地址均存在；升级测试覆盖 MySQL/SQL Server/Oracle 的历史分组、参数化更新和样本诊断 SQL。真实启动日志必须分别显示物理字段、完整平台运行时闭包、Upgrade25 历史归档计数和每个升级步骤终态；登录后逐一调用当前用户、健康、部门、私有文件、菜单角标与商城批量计划，不能只验证匿名系统设置。
 
 ## 复盘：应用包切换 HDFS 后旧导入器无法更新自己
 
@@ -263,14 +271,14 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - 触发场景：父级 Monitor 已持久化全部子任务 Id，子任务仍在正常执行且 checkpoint 中没有业务失败；父任务汇总进度时偶发数据库死锁，却因调用方配置 `MaxAttempts=1` 立即进入 `Failed`，通知中心因此把仍可成功收敛的整批任务标红。
 - 根因：后台任务把数据库死锁、锁等待超时等基础设施瞬态竞争与接口返回失败共用同一业务重试预算。低业务重试次数无法覆盖工作器自身的领取、心跳、检查点或结果持久化竞争，也没有保留父子任务的真实运行语义。
 - 通用规则：后台任务存储层只对已知数据库死锁、锁等待超时、序列化竞争等稳定特征启用独立的有界基础设施重试；即使业务 `MaxAttempts=1`，也允许最多三次基础设施执行机会。重试必须保留原 TaskId、父子关系、checkpoint 和已产生的副作用，不得重新创建子任务；成功后清除瞬态错误，第三次仍竞争才按原业务规则终止。普通业务错误、数据冲突和 `Value cannot be null` 等非竞争错误不得借用该预算。
-- 自动化检查：覆盖嵌套 ProviderException 与外层包装异常、MySQL/SQL Server/PostgreSQL/Oracle 的稳定错误码或消息；断言第一次和第二次竞争回到可领取状态且不消耗业务 AttemptCount，第三次进入原终态，非竞争异常仍按 `MaxAttempts` 立即失败。真实验收必须等待原 8 个子任务全部收敛，再以 `MaxAttempts=1` 连续执行一轮完整汇总和一轮立即无操作重跑，父任务均应得到 `SucceededCount=8、FailedCount=0`。
+- 自动化检查：覆盖嵌套 ProviderException 与外层包装异常、MySQL/SQL Server/PostgreSQL/Oracle 的稳定错误码或消息；断言第一次和第二次竞争回到可领取状态且不消耗业务 AttemptCount，第三次进入原终态，非竞争异常仍按 `MaxAttempts` 立即失败。真实验收必须在每个活跃运行分区等待该分区全部子任务收敛，再以 `MaxAttempts=1` 连续执行一轮完整汇总和一轮立即无操作重跑；两轮父任务都必须得到 `SucceededCount=ExpectedCount、FailedCount=0`，且无操作轮为零安装／零更新。
 
 ## 复盘：字段分片完成后后台安装卡在缓存失效广播
 
 - 触发场景：字段分片的数据库写入和 Schema 回读已经精确完成，但 `ChildCheckpoint` 长时间停在同一字段索引；任务取消也无法及时结束，进程内存、线程数和 CPU 持续增长。
 - 根因证据：两次托管转储的调用链都停在 `V8.ApiEngine.Run -> GetApiEngineModelInternal -> MicroiTwoLevelCache.SetAsync -> PublishInvalidateAsync -> PublishWithRetryAsync`。权威 Redis 写入已经成功，随后用于通知其它节点清理一级缓存的 Pub/Sub 广播没有完成时限，因而把业务调用永久挂住；与此同时，单字段元数据更新即使只变更 Label、Remark、布局或 V8，也会重复执行物理列 DDL，放大旧租户升级成本。
 - 通用规则：Redis 权威值写入成功后，跨节点一级缓存失效广播只能是有界、尽力而为的附属动作。队列等待和实际发布都必须有独立短超时，超时后观察迟到异常并开启短暂熔断冷却，防止悬挂发布任务无界堆积；不得因此回滚已经成功的权威写入。`UptDiyField` 只有列名或物理类型变化时才允许调用 `ChangeColumn`，显示名称、说明、布局和事件代码等纯元数据变化禁止触发 DDL。
-- 自动化与真实验收：缓存测试必须覆盖发布永久不返回时的有界退出、迟到异常观察和冷却期抑制；字段测试必须断言只有 Name/Type 变化才进入物理 DDL。应用商城资源契约测试、后台任务与 SaaS 回归测试通过后，还必须在真实主租户完成 8/8 子租户收敛并立即执行一轮 8/8 无操作重跑。验收期间若官方应用发布了新版本，应以新的不可变 `StoreVersionId` 启动独立追赶批次，禁止混入已经开始的旧版本分片。
+- 自动化与真实验收：缓存测试必须覆盖发布永久不返回时的有界退出、迟到异常观察和冷却期抑制；字段测试必须断言只有 Name/Type 变化才进入物理 DDL。应用商城资源契约测试、后台任务与 SaaS 回归测试通过后，还必须在每个活跃运行分区完成 `ExpectedCount/ExpectedCount` 子租户收敛，并立即执行一轮相同数量的无操作重跑。验收期间若官方应用发布了新版本，应以新的不可变 `StoreVersionId` 启动独立追赶批次，禁止混入已经开始的旧版本分片。
 
 ## 复盘：最新版后端仍放行未锁快照的旧商城工作器
 

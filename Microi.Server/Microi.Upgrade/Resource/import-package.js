@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.4.7
+ * Version: v2.4.9
  * Function:
  * - 统一应用商城导入器；支持 HDFS 公私有包指针、大小与 SHA-256 校验、后台分片和官方受管升级。
  */
@@ -19,6 +19,8 @@
 
 var Package = V8.Param.Package;  // 应用数据包
 var InstallParentSysMenuId = V8.Param.InstallParentSysMenuId;  // 安装在哪个父级系统菜单Id下
+var startupDependencyBootstrapOnlyRequested = V8.Param.StartupDependencyBootstrapOnly === true
+    || String(V8.Param.StartupDependencyBootstrapOnly || '').toLowerCase() == 'true';
 
 // 执行日志收集（用于最终构建中文报告）
 var debugLog = {};
@@ -252,6 +254,7 @@ if (physicalBootstrapCheckpoint.TaskId
 }
 var physicalBootstrapPhase = String(physicalBootstrapCheckpoint.Phase || '');
 var physicalBootstrapOwnsSlice = physicalBootstrapChunkingEnabled
+    && !startupDependencyBootstrapOnlyRequested
     && (!physicalBootstrapPhase || physicalBootstrapPhase == 'Prerequisites');
 
 try {
@@ -919,6 +922,35 @@ if (!Package.PackageInfo) {
     };
 }
 
+// TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1：Upgrade13 只从程序集内置白名单读取、
+// 完整校验并传入九个官方基础包。可信身份保存在绑定当前租户和本导入器 Key 的
+// 宿主 AsyncLocal 中，V8.Param 只能提出消费请求，不能自行伪造授权。
+var embeddedOfficialPackageRequested = V8.Param.TrustedEmbeddedOfficialPackage === true
+    || String(V8.Param.TrustedEmbeddedOfficialPackage || '').toLowerCase() == 'true';
+var embeddedOfficialResourceName = String(V8.Param.EmbeddedOfficialPackageResourceName || '').toLowerCase();
+var embeddedOfficialResourceNames = {
+    'app.microi.form-engine.json': true,
+    'app.microi.module-engine.json': true,
+    'app.microi.saas-engine.json': true,
+    'app.microi.sso.json': true,
+    'app.microi.store.json': true,
+    'app.microi.sys_user.json': true,
+    'app.microi.sys-config.json': true,
+    'app.microi.message-notification.json': true,
+    'app.microi.ai-engine.json': true
+};
+var trustedEmbeddedOfficialPackage = false;
+if (embeddedOfficialPackageRequested) {
+    var embeddedOfficialTrust = V8.Method.RequireManagedProtocolContext();
+    if (!embeddedOfficialTrust || embeddedOfficialTrust.Code != 1) {
+        return { Code: 0, Msg: '内置官方应用包导入缺少不可伪造的宿主可信上下文。' };
+    }
+    if (!embeddedOfficialResourceNames[embeddedOfficialResourceName]) {
+        return { Code: 0, Msg: '内置官方应用包资源名不在固定白名单：' + embeddedOfficialResourceName };
+    }
+    trustedEmbeddedOfficialPackage = true;
+}
+
 // TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1：旧版官方平台应用包的资源策略都写成
 // Ownership=Application。只有从固定 iTdos 商城实时回读、且商城元数据明确为
 // 官方/平台应用时，才把它迁移为 Platform；直接传入的离线包或自定义商城源
@@ -931,6 +963,7 @@ var trustedOfficialPlatformPackage = !!authoritativeStoreModel
     && String(storeOsClient || '').toLowerCase() == 'itdos'
     && String(authoritativeStoreModel.ApplicationType || '').toLowerCase() == 'platform'
     && (officialPublisherType == '官方应用' || officialPublisherType == '平台应用');
+trustedOfficialPlatformPackage = trustedOfficialPlatformPackage || trustedEmbeddedOfficialPackage;
 
 var listSize = function (value) {
     return value && value.length !== undefined ? Number(value.length) || 0 : 0;
@@ -1396,29 +1429,35 @@ try {
     // STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1：子租户启动事故恢复不能等待
     // 22 条 DDL、数百字段和全部资源分片完成后才补齐前端启动接口。只有后台
     // 批量工作器显式请求、且包体来自固定 iTdos 官方商城并被识别为 Platform
-    // 应用时，才从不可变 SaaS 包中创建缺失的六个官方 Managed 接口。已有不同
+    // 应用时，才从不可变应用商城/SaaS 包中创建缺失的七个官方 Managed 接口。已有不同
     // 源码、稳定 Id 或地址冲突一律保留并记录，绝不借快速恢复覆盖租户代码；
     // 完整应用安装仍继续执行，最终由标准 Managed 所有权规则完成严格对账。
-    var startupApiBootstrapRevision = 'startup-api-runtime-flags-v3';
+    // STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1：BootstrapOnly 只允许受信后台工作器
+    // 在完整包安装前执行这一固定闭包；成功后立即返回，不写安装版本、不跳过后续正式导入。
+    var startupApiBootstrapRevision = 'startup-api-complete-closure-v4';
     var startupApiBootstrapRequested = V8.Param.StartupDependencyRecovery === true
         || String(V8.Param.StartupDependencyRecovery || '').toLowerCase() == 'true';
     var startupPackageIdentity = String(
         Package.PackageInfo.AppId || Package.PackageInfo.AppKey || V8.Param.AppId || ''
     ).toLowerCase();
-    if (startupApiBootstrapRequested
-        && backgroundChunkingEnabled
-        && trustedOfficialPlatformPackage
-        && startupPackageIdentity == 'app.microi.saas-engine'
-        && String(backgroundCheckpoint.StartupApiBootstrapRevision || '')
-            != startupApiBootstrapRevision) {
-        var startupApiKeys = [
+    var startupPackageApiKeys = {
+        'app.microi.store': ['platform-sys-menu'],
+        'app.microi.saas-engine': [
             'platform-os-client-by-domain',
             'platform-sys-config',
             'platform-lang-bundle',
             'platform-current-user',
             'platform-private-file-url',
             'platform-sys-user-public-info'
-        ];
+        ]
+    };
+    if (startupApiBootstrapRequested
+        && backgroundChunkingEnabled
+        && trustedOfficialPlatformPackage
+        && startupPackageApiKeys[startupPackageIdentity]
+        && String(backgroundCheckpoint.StartupApiBootstrapRevision || '')
+            != startupApiBootstrapRevision) {
+        var startupApiKeys = startupPackageApiKeys[startupPackageIdentity];
         var startupPackageEngineMap = {};
         var startupPackageEngines = Package.SysApiEngines || [];
         for (var startupPackageIndex = 0;
@@ -1491,7 +1530,7 @@ try {
             var startupApiKey = startupApiKeys[startupKeyIndex];
             var incomingStartupEngine = startupPackageEngineMap[startupApiKey];
             if (!incomingStartupEngine || !incomingStartupEngine.Id || !incomingStartupEngine.ApiAddress) {
-                throw new Error('官方 SaaS 包缺少启动接口定义：' + startupApiKey);
+                throw new Error('官方启动依赖包缺少接口定义：' + startupApiKey);
             }
             var existingStartupEngine = readStartupEngine('ApiEngineKey', startupApiKey);
             if (existingStartupEngine && existingStartupEngine.Id) {
@@ -1573,6 +1612,42 @@ try {
             Added: startupAdded,
             Reconciled: startupReconciled,
             Conflicts: startupConflicts
+        };
+        if (startupDependencyBootstrapOnlyRequested) {
+            if (startupConflicts.length > 0) {
+                return {
+                    Code: 0,
+                    Data: {
+                        PackageIdentity: startupPackageIdentity,
+                        Added: startupAdded,
+                        Reconciled: startupReconciled,
+                        Conflicts: startupConflicts
+                    },
+                    Msg: '启动接口快速自举存在冲突，已拒绝把局部成功冒充完整恢复。'
+                };
+            }
+            return {
+                Code: 1,
+                Data: {
+                    StartupDependencyBootstrapOnly: true,
+                    PackageIdentity: startupPackageIdentity,
+                    Added: startupAdded,
+                    Reconciled: startupReconciled,
+                    Conflicts: []
+                },
+                Msg: '启动依赖接口已在完整应用安装前完成快速自举。'
+            };
+        }
+    }
+    if (startupDependencyBootstrapOnlyRequested) {
+        return {
+            Code: 0,
+            Data: {
+                PackageIdentity: startupPackageIdentity,
+                TrustedOfficialPlatformPackage: trustedOfficialPlatformPackage,
+                BackgroundChunkingEnabled: backgroundChunkingEnabled
+            },
+            Msg: '启动接口快速自举只允许受信后台工作器调用固定官方应用商城/SaaS 包。'
         };
     }
 

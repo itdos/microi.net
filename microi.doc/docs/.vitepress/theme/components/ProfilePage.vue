@@ -877,7 +877,7 @@ async function saveProfile() {
   }
   isSavingProfile.value = true
   try {
-    const response = await authenticatedFetch(`${API_BASE}/api/SysUser/UpdateCurrentProfile?OsClient=${OS_CLIENT}`, {
+    const response = await authenticatedFetch(`${API_BASE}/apiengine/platform-user-update-profile?OsClient=${OS_CLIENT}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ Name: name, Avatar: profileDraftAvatar.value })
     })

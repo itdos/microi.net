@@ -226,6 +226,95 @@ public sealed class ApplicationStreamSchemaUpgradeTests
     }
 
     [Fact]
+    public void Upgrade25_BackfillsUnversionedLegacyFilesIntoDeterministicArchiveVersions()
+    {
+        var first = Upgrade25.ComputeLegacyUnversionedVersionId("xjy", "app-1");
+        var repeatedId = Upgrade25.ComputeLegacyUnversionedVersionId("xjy", "app-1");
+        var otherApp = Upgrade25.ComputeLegacyUnversionedVersionId("xjy", "app-2");
+        Assert.Equal(first, repeatedId);
+        Assert.NotEqual(first, otherApp);
+        Assert.StartsWith("mciav-", first);
+        Assert.Equal(36, first.Length);
+        Assert.Equal("legacy-unversioned-v3", Upgrade25.LegacyUnversionedVersionNo);
+        Assert.Equal("legacy-unversioned-v3-part-0002",
+            Upgrade25.ComputeLegacyUnversionedVersionNo(1));
+        Assert.True(Upgrade25.TryParseLegacyUnversionedLane(
+            "legacy-unversioned-v3-part-0002", out var parsedLane));
+        Assert.Equal(1, parsedLane);
+
+        var planned = Upgrade25.PlanLegacyFileArchiveAssignments(
+            "xjy",
+            "app-1",
+            new[]
+            {
+                new Upgrade25.LegacyFileArchiveCandidate
+                    { Id = "file-a", FilePath = "dist/app.js", Size = 10, CurrentLane = 0 },
+                new Upgrade25.LegacyFileArchiveCandidate
+                    { Id = "file-b", FilePath = "dist/app.js", Size = 20, CurrentLane = 0 },
+                new Upgrade25.LegacyFileArchiveCandidate
+                    { Id = "file-c", FilePath = "dist/app.js", Size = 30, CurrentLane = null },
+                new Upgrade25.LegacyFileArchiveCandidate
+                    { Id = "file-d", FilePath = "dist/style.css", Size = 40, CurrentLane = 0 }
+            });
+        Assert.Equal(0, planned.Single(item => item.Id == "file-a").Lane);
+        Assert.Equal(1, planned.Single(item => item.Id == "file-b").Lane);
+        Assert.Equal(2, planned.Single(item => item.Id == "file-c").Lane);
+        Assert.Equal(0, planned.Single(item => item.Id == "file-d").Lane);
+        Assert.Equal(planned.Count, planned
+            .Select(item => item.VersionId + "|" + item.FilePathHash)
+            .Distinct(StringComparer.Ordinal)
+            .Count());
+        var replayPlan = Upgrade25.PlanLegacyFileArchiveAssignments(
+            "xjy",
+            "app-1",
+            planned.Select(item => new Upgrade25.LegacyFileArchiveCandidate
+            {
+                Id = item.Id,
+                FilePath = item.Id == "file-d" ? "dist/style.css" : "dist/app.js",
+                Size = item.Size,
+                CurrentLane = item.Lane
+            }));
+        Assert.Equal(
+            planned.Select(item => (item.Id, item.Lane)),
+            replayPlan.Select(item => (item.Id, item.Lane)));
+
+        foreach (var dialect in new[]
+                 {
+                     Upgrade25.SchemaDialect.MySql,
+                     Upgrade25.SchemaDialect.SqlServer,
+                     Upgrade25.SchemaDialect.Oracle
+                 })
+        {
+            var groupSql = Upgrade25.BuildLegacyFileVersionGroupSql(dialect);
+            Assert.Contains("VersionId", groupSql);
+            Assert.Contains("AppId", groupSql);
+            Assert.Contains("GROUP BY", groupSql);
+            Assert.Contains("FileCount", groupSql);
+
+            var updateSql = Upgrade25.BuildLegacyFileVersionUpdateSql(dialect);
+            Assert.Contains("SET", updateSql);
+            Assert.Contains("VersionId", updateSql);
+            Assert.Contains("AppId=@p1", updateSql.Replace("[", string.Empty).Replace("]", string.Empty)
+                .Replace("`", string.Empty).Replace("\"", string.Empty));
+
+            var versionRowsSql = Upgrade25.BuildLegacyArchiveVersionRowsSql(dialect);
+            Assert.Contains("VersionNo", versionRowsSql);
+            Assert.Contains("LIKE @p1", versionRowsSql);
+            var fileRowsSql = Upgrade25.BuildLegacyArchiveFileRowsSql(dialect);
+            Assert.Contains("FilePathHash", fileRowsSql);
+            Assert.Contains("VersionId", fileRowsSql);
+            Assert.Contains("LIKE @p2", fileRowsSql);
+        }
+
+        Assert.Contains("LIMIT 5",
+            Upgrade25.BuildLegacyFileMissingAppSampleSql(Upgrade25.SchemaDialect.MySql));
+        Assert.Contains("TOP (5)",
+            Upgrade25.BuildLegacyFileMissingAppSampleSql(Upgrade25.SchemaDialect.SqlServer));
+        Assert.Contains("ROWNUM<=5",
+            Upgrade25.BuildLegacyFileMissingAppSampleSql(Upgrade25.SchemaDialect.Oracle));
+    }
+
+    [Fact]
     public void AppStoreFreshInstallResourceContainsEveryV3ColumnAndMetadataDefinition()
     {
         var loadResources = typeof(UpgradeAppStore).GetMethod(

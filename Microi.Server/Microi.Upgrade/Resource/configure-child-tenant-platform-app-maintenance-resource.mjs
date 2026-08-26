@@ -104,15 +104,63 @@ if (!modulePackage.DiyFields.some(item => item.Name === "MenuBadgeTooltip")) {
 refreshCounts(modulePackage);
 writeJson("app.microi.module-engine.json", modulePackage);
 
+const storePackage = readJson("app.microi.store.json");
+const childWorkerKey = "bulk-import-microi-store-packages";
+const childWorkerSource = fs.readFileSync(
+  path.join(directory, "bulk-import-packages.js"),
+  "utf8"
+).replace(/\r\n/g, "\n");
+ensureMinimumPackageVersion(storePackage.PackageInfo, "v7.6.12");
+const storeClosureChange =
+  "2026-08-25 v7.6.12 受信 StartupDependencies 任务可选择只自举：从应用商城与 SaaS 官方不可变包补齐 platform-sys-menu 和六个运行门面，物理强回读七项契约后立即成功；普通安装和既有在途任务保持完整包流程。";
+storePackage.PackageInfo.ChangeHistory = prependHistory(
+  storePackage.PackageInfo.ChangeHistory,
+  storeClosureChange
+);
+if (storePackage.PackageInfo.Version === "v7.6.12") {
+  storePackage.PackageInfo.ChangeLog = {
+    Version: "v7.6.12",
+    Title: "大范围事故恢复支持只自举启动接口",
+    ChangeType: "Fix",
+    Content:
+      "受信 StartupDependencies 任务可选择只自举：从应用商城与 SaaS 官方不可变包补齐 platform-sys-menu 和六个运行门面，物理强回读七项契约后立即成功；普通安装和既有在途任务保持完整包流程。",
+    ReleaseTime: "2026-08-25 22:00:00"
+  };
+}
+storePackage.PackageInfo.RequiredPlatformCapabilities =
+  (storePackage.PackageInfo.RequiredPlatformCapabilities || []).filter(
+    capability => !String(capability).startsWith("ApiEngine:bulk-import-microi-store-packages@")
+      && String(capability) !== "BackgroundTask:StartupDependencyPreinstallBootstrapV1"
+      && String(capability) !== "BackgroundTask:StartupDependencyBootstrapOnlyV1"
+  );
+for (const capability of [
+  "BackgroundTask:StartupDependencyResourceClosureV2",
+  "BackgroundTask:StartupDependencyPreinstallBootstrapV1",
+  "BackgroundTask:StartupDependencyBootstrapOnlyV1",
+  "ApiEngine:bulk-import-microi-store-packages@v1.3.7"
+]) addCapability(storePackage.PackageInfo, capability);
+const childWorker = (storePackage.SysApiEngines || [])
+  .find(item => item.ApiEngineKey === childWorkerKey);
+if (!childWorker) throw new Error(`${childWorkerKey} is missing from app.microi.store.json`);
+childWorker.ApiV8Code = childWorkerSource;
+childWorker.Version = "v1.3.7";
+childWorker.UpdateTime = "2026-08-25 22:00:00";
+childWorker.ChangeHistory = prependHistory(
+  childWorker.ChangeHistory,
+  "2026-08-25 22:00:00 v1.3.7 受信事故任务可只自举七项启动接口，物理强回读后结束且不写应用安装版本"
+);
+refreshCounts(storePackage);
+writeJson("app.microi.store.json", storePackage);
+
 const saasPackage = readJson("app.microi.saas-engine.json");
 const orchestratorKey = "bulk-update-child-tenant-platform-apps";
 const orchestratorSource = fs.readFileSync(
   path.join(directory, "bulk-update-child-tenant-platform-apps.js"),
   "utf8"
 ).replace(/\r\n/g, "\n");
-ensureMinimumPackageVersion(saasPackage.PackageInfo, "v7.5.31");
+ensureMinimumPackageVersion(saasPackage.PackageInfo, "v7.6.20");
 saasPackage.PackageInfo.Description =
-  "SaaS 引擎基础资源。主租户可为全部启用子租户补齐商城工作器并创建独立的平台应用安装/更新后台任务，父任务以全部子任务真实终态为准。";
+  "SaaS 引擎基础资源。提供由官方应用包声明驱动的完整平台运行时接口闭包、匿名服务健康契约与真实后端版本，并支持主租户为全部启用子租户执行可回读的平台应用维护。";
 saasPackage.PackageInfo.ChangeHistory = prependHistory(
   saasPackage.PackageInfo.ChangeHistory,
   "2026-08-22 v7.5.9 子租户任务投递前幂等补齐运行时物理前置列和固定商城工作器；父任务持续汇总每个子任务真实进度与终态，仅当全部成功时成功。"
@@ -137,6 +185,42 @@ saasPackage.PackageInfo.ChangeHistory = prependHistory(
   saasPackage.PackageInfo.ChangeHistory,
   "2026-08-23 v7.5.31 补齐 diy_LeftJoinRightView 表、字段和物理结构；子租户运行时缺失时按 sys_osclients 自动重载，单租户投递失败不再提前中止其它子任务汇总。"
 );
+saasPackage.PackageInfo.ChangeHistory = prependHistory(
+  saasPackage.PackageInfo.ChangeHistory,
+  "2026-08-25 v7.6.15 子租户事故恢复固定安装应用商城与 SaaS 引擎两个唯一资源所有者，并强回读 platform-sys-menu、platform-sys-config 等启动接口，避免只修复系统设置后仍无法登录。"
+);
+saasPackage.PackageInfo.ChangeHistory = prependHistory(
+  saasPackage.PackageInfo.ChangeHistory,
+  "2026-08-25 v7.6.16 新增 platform-service-health 匿名 Managed 接口，以固定健康契约返回 Healthy 与当前后端程序集版本；不查询业务表、不调用租户 Hook，避免单个菜单或业务接口异常被误判为整个 API 服务不可用。"
+);
+saasPackage.PackageInfo.ChangeHistory = prependHistory(
+  saasPackage.PackageInfo.ChangeHistory,
+  "2026-08-25 v7.6.17 主租户可在受信 StartupDependencies 事故任务中启用只自举模式；子任务入队后原子写入并强回读精确两应用闭包和只自举标志，失败即取消，普通平台应用维护不受影响。"
+);
+const targetedFullMaintenanceCollisionLine =
+  "2026-08-25 v7.6.18 受信超级管理员后台任务支持按权威目录定向完整维护单个历史租户；启动依赖只自举仍严格限制为两应用闭包，避免为修复极老空库重跑全部子租户。";
+saasPackage.PackageInfo.ChangeHistory = String(saasPackage.PackageInfo.ChangeHistory || "")
+  .split(/\r?\n/)
+  .filter(line => line && line !== targetedFullMaintenanceCollisionLine)
+  .join("\n") + "\n";
+saasPackage.PackageInfo.ChangeHistory = prependHistory(
+  saasPackage.PackageInfo.ChangeHistory,
+  "2026-08-25 v7.6.19 受信超级管理员后台任务支持按权威目录定向完整维护单个历史租户；启动依赖只自举仍严格限制为两应用闭包，避免为修复极老空库重跑全部子租户。"
+);
+saasPackage.PackageInfo.ChangeHistory = prependHistory(
+  saasPackage.PackageInfo.ChangeHistory,
+  "2026-08-26 v7.6.20 后端启动从官方 SaaS 应用包自动计算并强回读完整接口引擎闭包，补齐当前用户 Hook、服务健康、组织机构、菜单角标、私有文件等登录后运行时能力，同时继续保护租户 CreateIfMissing 源码。"
+);
+if (saasPackage.PackageInfo.Version === "v7.6.20") {
+  saasPackage.PackageInfo.ChangeLog = {
+    Version: "v7.6.20",
+    Title: "官方包声明驱动的平台运行时接口闭包",
+    ChangeType: "Fix",
+    Content:
+      "后端启动从官方 SaaS 应用包自动计算并强回读完整接口引擎闭包，补齐当前用户 Hook、服务健康、组织机构、菜单角标、私有文件等登录后运行时能力，同时继续保护租户 CreateIfMissing 源码。",
+    ReleaseTime: "2026-08-26 12:00:00"
+  };
+}
 for (const capability of [
   "V8.Method.GetChildTenantPlatformAppMaintenanceTargets",
   "V8.Method.QueueChildTenantPlatformAppMaintenance",
@@ -149,6 +233,10 @@ for (const capability of [
   "BackgroundTask:StartupDependencyIncidentScope",
   "BackgroundTask:StartupNoRequeueRefresh",
   "BackgroundTask:StartupTargetFilter",
+  "BackgroundTask:TargetedFullMaintenance",
+  "BackgroundTask:StartupDependencyClosureV2",
+  "Installer:DeclaredSaaSRuntimeApiClosureV1",
+  "BackgroundTask:StartupDependencyBootstrapOnlyV1",
   "V8.Method.ReloadOsClient"
 ]) addCapability(saasPackage.PackageInfo, capability);
 saasPackage.PackageInfo.RequiredPlatformCapabilities =
@@ -166,6 +254,9 @@ const engine = {
   CreateTime: "2026-08-22 00:00:00",
   Id: "8b6ee32a-69c5-47cd-95d5-7a1342d64a87",
   ChangeHistory:
+    "2026-08-25 23:00:00 v1.3.1 受信超级管理员任务允许按权威目录定向执行完整平台应用维护；StartupDependencyBootstrapOnly 仍只允许 StartupDependencies\n" +
+    "2026-08-25 22:00:00 v1.3.0 受信 StartupDependencies 新增只自举标志；子任务 Pending 阶段原子写入并强回读，失败即取消且不退化为完整重装\n" +
+    "2026-08-25 20:00:00 v1.2.9 StartupDependencies 固定为应用商城 + SaaS 引擎完整闭包，覆盖 platform-sys-menu 与 platform-sys-config\n" +
     "2026-08-25 16:15:00 v1.2.8 StartupDependencies 支持经权威子租户目录校验的 TargetOsClients 定向修复，不再为单租户事故重跑全量租户\n" +
     "2026-08-25 16:05:00 v1.2.7 在途任务按 ApiEngineKey 自动读取最新工作器；旧刷新检查点仅迁移为 Monitor，禁止重新投递产生第二批任务\n" +
     "2026-08-25 15:50:00 v1.2.6 归一化 DosResult.Data 并强回读原子任务 Id、幂等键、目标租户与唯一 SaaS 范围\n" +
@@ -185,7 +276,7 @@ const engine = {
     "2026-08-22 13:00:00 v1.1.1 父任务 Current/Total 改用百分比单位，避免排队数量触发 99% 假进度\n" +
     "2026-08-22 12:00:00 v1.1.0 投递前补齐子租户商城工作器，并持续汇总全部子任务真实终态\n" +
     "2026-08-22 00:00:00 v1.0.0 创建主租户批量维护子租户平台应用编排接口\n",
-  Version: "v1.2.8",
+  Version: "v1.3.1",
   LimitRecursion: 1000,
   LimitMemory: 256,
   MaxStatements: 10000000,

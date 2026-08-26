@@ -314,6 +314,31 @@ test('empty database SQL clears credentials and operational residue but keeps co
   assert.doesNotMatch(result.Data.Sql, /DROP TABLE IF EXISTS mci_ai_token_account/)
 })
 
+test('top-level AI application menu tree is removed recursively while AI assistant stays', () => {
+  const { result } = run([], {
+    menuPages: [[
+      // Intentionally put descendants before their parent to prove the fixed-point walk,
+      // rather than relying on database row order.
+      { Id: 'ai-app-page', ParentId: 'ai-category', Name: '合同审查助手' },
+      { Id: 'ai-category', ParentId: 'ai-app-root', Name: '办公效率' },
+      { Id: 'ai-app-root', ParentId: '', Name: 'AI 应用' },
+      { Id: 'ai-assistant', ParentId: 'system-root', Name: 'AI助手' },
+      { Id: 'nested-ai-app-name', ParentId: 'system-root', Name: 'AI应用' }
+    ]]
+  })
+
+  assert.equal(result.Code, 1)
+  assert.equal(result.Data.AiApplicationMenuCount, 3)
+  assert.deepEqual(result.Data.AiApplicationMenuIds, [
+    'ai-app-page',
+    'ai-app-root',
+    'ai-category'
+  ])
+  assert.match(result.Data.Sql, /INSERT IGNORE INTO temp_app_menu_ids \(Id\) VALUES \('ai-app-page'\),\('ai-app-root'\),\('ai-category'\);/)
+  assert.doesNotMatch(result.Data.Sql, /\('ai-assistant'\)/)
+  assert.doesNotMatch(result.Data.Sql, /\('nested-ai-app-name'\)/)
+})
+
 test('unsafe package table names never enter generated SQL', () => {
   const { result } = run([
     {

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 1,
-  "UpdatedAt": "2026-08-25",
+  "UpdatedAt": "2026-08-26",
   "Principle": "业务编排优先由应用商城 Managed ApiEngine 交付；C# 仅保留启动前置、协议网关、可信鉴权、密钥隔离、存储网络边界和运行时内核。",
   "Dispositions": {
     "KernelRuntime": "宿主不可被应用包替代的原子运行时；保持 C#，由接口引擎调用。",
@@ -23,6 +23,7 @@
     "HomeController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
     "IdentityVerificationController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
     "iTdosHeartController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
+    "LegacyMobileCompatibilityController": { "OwnerType": "Compatibility", "OwnerId": "managed-api-engine-legacy-routes", "Disposition": "MigrationCandidate" },
     "LicenseController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
     "MarketplaceSourceController": { "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "ProtocolGateway" },
     "MessageController": { "OwnerType": "Application", "OwnerId": "app.microi.message-notification", "Disposition": "ProtocolGateway" },
@@ -125,7 +126,7 @@
       "Target": "app.microi.saas-engine ApiEngine:platform_auth_sms_login",
       "Reason": "短信注册、角色分配、租户信息与登录响应属于可升级业务编排。"
     },
-    "SysUserController.AddSysUser": {
+    "LegacyMobileCompatibilityController.AddSysUser": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.sys_user ApiEngine:platform-sys-user-admin",
       "CompatibilityRoutes": ["/api/SysUser/AddSysUser"],
@@ -133,7 +134,7 @@
       "TenantHook": "ApiEngine:platform-user-custom-hook",
       "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "SysUserController.UptSysUser": {
+    "LegacyMobileCompatibilityController.UptSysUser": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.sys_user ApiEngine:platform-sys-user-admin",
       "CompatibilityRoutes": ["/api/SysUser/UptSysUser"],
@@ -141,7 +142,7 @@
       "TenantHook": "ApiEngine:platform-user-custom-hook",
       "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "SysUserController.DelSysUser": {
+    "LegacyMobileCompatibilityController.DelSysUser": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.sys_user ApiEngine:platform-sys-user-admin",
       "CompatibilityRoutes": ["/api/SysUser/DelSysUser"],
@@ -149,7 +150,7 @@
       "TenantHook": "ApiEngine:platform-user-custom-hook",
       "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "SysUserController.GetSysUser": {
+    "LegacyMobileCompatibilityController.GetSysUser": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.sys_user ApiEngine:platform-sys-user-admin",
       "CompatibilityRoutes": ["/api/SysUser/GetSysUser"],
@@ -157,7 +158,7 @@
       "TenantHook": "ApiEngine:platform-user-custom-hook",
       "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "SysUserController.RefreshLoginUser": {
+    "LegacyMobileCompatibilityController.RefreshLoginUser": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.sys_user ApiEngine:platform-sys-user-admin",
       "CompatibilityRoutes": ["/api/SysUser/RefreshLoginUser"],
@@ -165,34 +166,40 @@
       "TenantHook": "ApiEngine:platform-user-custom-hook",
       "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "SysUserController.CreateTenant": {
+    "LegacyMobileCompatibilityController.CreateTenant": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.saas-engine ApiEngine:platform-create-tenant",
+      "CompatibilityRoutes": ["/api/SysUser/CreateTenant"],
       "NativeBoundary": [
         "authoritative tenant quota and identity validation",
         "tenant database provisioning and bootstrap",
         "password hashing and DiyToken-safe identity atoms"
       ],
-      "TenantHook": "ApiEngine:platform-runtime-custom-hook"
+      "TenantHook": "ApiEngine:platform-runtime-custom-hook",
+      "CompatibilityExitGate": "旧版官网与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "SysUserController.UpdateCurrentProfile": {
+    "LegacyMobileCompatibilityController.UpdateCurrentProfile": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.sys_user ApiEngine:platform-user-update-profile",
+      "CompatibilityRoutes": ["/api/SysUser/UpdateCurrentProfile"],
       "NativeBoundary": [
         "current DiyToken identity binding",
         "allowed-field and immutable-field validation",
         "password hashing when an authorized password change is requested"
       ],
-      "TenantHook": "ApiEngine:platform-user-custom-hook"
+      "TenantHook": "ApiEngine:platform-user-custom-hook",
+      "CompatibilityExitGate": "旧版官网、PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "SysUserController.UpdateMyDefaultIndexUrl": {
+    "LegacyMobileCompatibilityController.UpdateMyDefaultIndexUrl": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.sys_user ApiEngine:platform-user-update-preferences",
+      "CompatibilityRoutes": ["/api/SysUser/UpdateMyDefaultIndexUrl"],
       "NativeBoundary": [
         "current DiyToken identity binding",
         "authorized internal-route validation"
       ],
-      "TenantHook": "ApiEngine:platform-user-custom-hook"
+      "TenantHook": "ApiEngine:platform-user-custom-hook",
+      "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
     "TenantSystemSettingsController.ListSaveDelete": {
       "Disposition": "ManagedBusinessFacade",
@@ -297,53 +304,48 @@
       ],
       "TenantHook": "ApiEngine:platform-marketplace-source-hook"
     },
-    "OsController.GetOsClientByDomain": {
+    "LegacyMobileCompatibilityController.GetOsClientByDomain": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.saas-engine ApiEngine:platform-os-client-by-domain",
       "CompatibilityRoutes": ["/api/Os/GetOsClientByDomain"],
       "CompatibilityExitGate": "Microi.Client、microi.uniapp 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "FormEngineController.GetSysConfig": {
+    "LegacyMobileCompatibilityController.GetSysConfig": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.saas-engine ApiEngine:platform-sys-config",
-      "CompatibilityRoutes": ["/api/FormEngine/GetSysConfig"],
+      "CompatibilityRoutes": ["/api/FormEngine/GetSysConfig", "/api/DiyTable/GetSysConfig"],
+      "NativeBoundary": ["independent Microi.Core public SysConfig projection used only when the Managed startup resource is absent"],
       "CompatibilityExitGate": "Microi.Client、microi.uniapp 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "FormEngineController.GetSysConfig_Compat": {
-      "Disposition": "ManagedBusinessFacade",
-      "Target": "app.microi.saas-engine ApiEngine:platform-sys-config",
-      "CompatibilityRoutes": ["/api/DiyTable/GetSysConfig"],
-      "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
-    },
-    "FormEngineController.GetLangBundle": {
+    "LegacyMobileCompatibilityController.GetLangBundle": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.saas-engine ApiEngine:platform-lang-bundle",
       "CompatibilityRoutes": ["/api/FormEngine/GetLangBundle"],
       "CompatibilityExitGate": "Microi.Client、microi.uniapp 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "FormEngineController.GetLoginWallpapers": {
+    "LegacyMobileCompatibilityController.GetLoginWallpapers": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.saas-engine ApiEngine:platform-login-wallpapers",
       "CompatibilityRoutes": ["/api/FormEngine/GetLoginWallpapers"],
       "CompatibilityExitGate": "Microi.Client 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "SysUserController.GetCurrentUser": {
+    "LegacyMobileCompatibilityController.GetCurrentUser": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.saas-engine ApiEngine:platform-current-user",
       "CompatibilityRoutes": ["/api/SysUser/GetCurrentUser"],
       "AccessKeyPolicy": "固定自省门面；只返回当前已认证身份，不授予任意 api-engine:run。",
       "CompatibilityExitGate": "Microi.Client、microi.uniapp 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "SysUserController.GetSysUserPublicInfo": {
+    "LegacyMobileCompatibilityController.GetSysUserPublicInfo": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.saas-engine ApiEngine:platform-sys-user-public-info",
       "CompatibilityRoutes": ["/api/SysUser/GetSysUserPublicInfo"],
       "CompatibilityExitGate": "Microi.Client、microi.uniapp 和已知定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "HDFSController.GetPrivateFileUrl": {
+    "LegacyMobileCompatibilityController.GetPrivateFileUrl": {
       "Disposition": "MigrationCandidate",
       "Target": "app.microi.saas-engine ApiEngine:platform-private-file-url",
-      "CompatibilityRoutes": ["/api/HDFS/GetPrivateFileUrl"],
+      "CompatibilityRoutes": ["/api/HDFS/GetPrivateFileUrl", "/api/HDFS/MallFileUrl"],
       "AccessKeyScope": "file:read",
       "NativeBoundary": [
         "legacy DiyToken/mobile token normalization",
@@ -351,18 +353,6 @@
         "HDFS signed URL and storage boundary"
       ],
       "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
-    },
-    "HDFSController.MallFileUrl": {
-      "Disposition": "MigrationCandidate",
-      "Target": "app.microi.saas-engine ApiEngine:platform-private-file-url",
-      "CompatibilityRoutes": ["/api/HDFS/MallFileUrl"],
-      "AccessKeyScope": "file:read",
-      "NativeBoundary": [
-        "legacy mobile token normalization",
-        "Core menu/table/row/field/resource/path authorization",
-        "HDFS signed URL and storage boundary"
-      ],
-      "CompatibilityExitGate": "旧版 UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
     "SsoController": {
       "Disposition": "ProtocolGateway",

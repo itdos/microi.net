@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
@@ -15,6 +17,10 @@ namespace Microi.net
     /// </summary>
 	public class MicroiUpgrade : IMicroiUpgrade
     {
+        private static readonly Lazy<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>>
+            RuntimePhysicalColumnContracts = new Lazy<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>>(
+                LoadRuntimePhysicalColumnContracts);
+
         private static readonly string[] OfficialWebsiteAnonymousApiEngineKeys =
         {
             "send_sms_reg"
@@ -86,6 +92,86 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// Repairs the managed ApiEngine closure that the anonymous login shell
+        /// and first authenticated WebOS request depend on. This deliberately
+        /// runs independently from ServerVersion: an old release may have
+        /// advanced the version while the application-package import failed.
+        /// </summary>
+        public async Task<DosResult> EnsureStartupDependenciesAsync(
+            OsClientSecret osClientSecret,
+            CancellationToken cancellationToken = default)
+        {
+            if (osClientSecret?.Db == null)
+            {
+                return new DosResult(0, null, "租户数据库连接不存在，无法检查平台运行时接口闭包。");
+            }
+
+            const int maxLeaseAttempts = 30;
+            string leaseReason = null;
+            for (var attempt = 1; attempt <= maxLeaseAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (UpgradeAppStore.StartupDependenciesReady(osClientSecret, out var readyReason))
+                {
+                    return new DosResult(1, new
+                    {
+                        Verified = UpgradeAppStore.RequiredStartupDependencyEngineKeys.Length,
+                        Source = "EmbeddedOfficialApplicationPackages"
+                    }, $"{UpgradeAppStore.RequiredStartupDependencyEngineKeys.Length}项平台运行时接口已就绪。");
+                }
+
+                if (attempt == 1)
+                {
+                    Console.WriteLine(
+                        $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】待修复：{readyReason}");
+                }
+
+                var upgradeLease = UpgradeDistributedLease.TryAcquire(
+                    osClientSecret.OsClient,
+                    out leaseReason);
+                if (upgradeLease != null)
+                {
+                    using (upgradeLease)
+                    using (UpgradeExecutionLeaseContext.Enter(upgradeLease))
+                    {
+                        upgradeLease.ThrowIfLost();
+                        var repair = await UpgradeAppStore
+                            .EnsureStartupDependenciesUnderLeaseAsync(osClientSecret)
+                            .ConfigureAwait(false);
+                        upgradeLease.ThrowIfLost();
+                        if (repair.Code != 1)
+                        {
+                            return repair;
+                        }
+                        if (!UpgradeAppStore.StartupDependenciesReady(
+                                osClientSecret,
+                                out var finalReason))
+                        {
+                            return new DosResult(0, repair.Data,
+                                "平台运行时接口自愈后强回读失败：" + finalReason);
+                        }
+                        return repair;
+                    }
+                }
+
+                // Another node can be importing the same managed resources. Poll
+                // the invariant itself and proceed as soon as the strong readback
+                // succeeds instead of waiting for the complete migration chain.
+                if (attempt < maxLeaseAttempts)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken)
+                        .ConfigureAwait(false);
+                }
+            }
+
+            UpgradeAppStore.StartupDependenciesReady(osClientSecret, out var unresolvedReason);
+            return new DosResult(
+                0,
+                null,
+                $"平台运行时接口尚未就绪，且未能取得共享升级租约：{leaseReason ?? "未知原因"}；当前状态：{unresolvedReason}");
+        }
+
+        /// <summary>
         /// 
         /// </summary>
         /// <returns></returns>
@@ -99,6 +185,7 @@ namespace Microi.net
                 Console.WriteLine($"Microi：【Error异常】租户[{osClientSecret?.OsClient}] sys_config.ServerVersion格式错误：{CurrentVersion}");
                 return new DosResultList<MicroiUpgradeResult>(0, null, "sys_config.ServerVersion格式错误，应为四段数字版本号。");
             }
+            WriteVersionedUpgradePlan(osClientSecret?.OsClient, CurrentVersion);
             var result = new List<MicroiUpgradeResult>();
             var needUptServerVersion = false;
             var uptVersion = "";
@@ -112,6 +199,17 @@ namespace Microi.net
             try
             {
                 // 运行时不变量不能只依赖可能被错误推进的历史版本号。
+                Console.WriteLine(
+                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】版本迁移链内复检开始。");
+                var startupDependencyResult = await UpgradeAppStore
+                    .EnsureStartupDependenciesUnderLeaseAsync(osClientSecret)
+                    .ConfigureAwait(false);
+                if (startupDependencyResult.Code != 1)
+                {
+                    throw new InvalidOperationException(startupDependencyResult.Msg);
+                }
+                Console.WriteLine(
+                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】版本迁移链内复检成功：{startupDependencyResult.Msg}");
                 EnsureAuthSecretColumns(osClientSecret);
                 EnsureMicroServiceColumns(osClientSecret);
                 EnsureSecurityLevels(osClientSecret);
@@ -1258,9 +1356,13 @@ namespace Microi.net
             if (migrationFailed)
             {
                 var message = string.Join("；", migrationErrors);
+                Console.WriteLine(
+                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【版本迁移最终汇总】失败：当前版本={FormatVersionForLog(CurrentVersion)}，最后成功版本={FormatVersionForLog(uptVersion)}，错误={message}");
                 Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】已停止，未推进ServerVersion：{message}");
                 return new DosResultList<MicroiUpgradeResult>(0, result, message);
             }
+            Console.WriteLine(
+                $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【版本迁移最终汇总】成功：起始版本={FormatVersionForLog(CurrentVersion)}，最终版本={(needUptServerVersion ? FormatVersionForLog(uptVersion) : FormatVersionForLog(CurrentVersion))}，历史步骤均已执行成功或因版本已覆盖而跳过。");
             return new DosResultList<MicroiUpgradeResult>(1, result);
         }
 
@@ -2000,44 +2102,49 @@ if (_microiLegacyMenuConfigChanged) {
                     EnsureColumn(osClientSecret, "diy_table", column.Key, column.Value);
                 }
             }
+
+            // RUNTIME_EMBEDDED_PHYSICAL_CONTRACT_V1：历史空库可能缺失的并不只是最近
+            // 新增列（例如曾出现 diy_table.ServerDataV8 整列缺失）。DiyTable、
+            // DiyField 与 SysApiEngine 都由生成实体一次性投影，任意旧列缺失都会让
+            // FormEngine 在应用商城安装器启动前失败。这里只消费当前程序集内已经过
+            // 发布门禁的官方包 PhysicalColumns，做 expand-only 物理兼容；表、字段和
+            // 业务资源的正式所有权仍由应用商城安装器负责。
+            foreach (var tableContract in RuntimePhysicalColumnContracts.Value)
+            {
+                if (!TableExists(osClientSecret, tableContract.Key)) continue;
+                foreach (var column in tableContract.Value)
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    EnsureColumn(
+                        osClientSecret,
+                        tableContract.Key,
+                        column.Key,
+                        NormalizeRuntimePhysicalColumnType(osClientSecret, column.Value));
+                }
+            }
         }
 
         private bool RuntimePhysicalPrerequisitesReady(OsClientSecret osClientSecret)
         {
             if (osClientSecret?.Db == null) return false;
 
-            if (TableExists(osClientSecret, "diy_table")
-                && !new[]
-                {
-                    "OsClient", "TableInEdit", "AddCallbakApi", "UptCallbakApi", "DelCallbakApi",
-                    "V8Limit", "V8Unlimited", "FormPresentation",
-                    "FormPresentationMode", "FormPresentationDensity",
-                    "FormNavigationTitle", "FormNavigationCountText",
-                    "FormSectionNavigation", "FormSectionEyebrow",
-                    "FormRequiredCountText", "FormWorkbenchEyebrow",
-                    "FormWorkbenchDescription", "FormNavigationFooterTitle",
-                    "FormNavigationFooterHtml", "FormRecordSelectorPlaceholder",
-                    "FormRecordSelectorLabelFields", "FormBannerEnabled",
-                    "FormBannerTitleField", "FormBannerSubtitleField",
-                    "FormBannerImageField", "FormBannerIcon", "FormBannerBackgroundField",
-                    "FormBannerTagFields", "FormBannerMetrics"
-                }.All(column => ColumnExists(osClientSecret, "diy_table", column)))
+            var physicalColumns = new Dictionary<string, HashSet<string>>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var tableContract in RuntimePhysicalColumnContracts.Value)
             {
-                return false;
+                var existing = ReadPhysicalColumnNames(osClientSecret, tableContract.Key);
+                physicalColumns[tableContract.Key] = existing;
+                if (existing.Count > 0
+                    && !tableContract.Value.Keys.All(existing.Contains))
+                {
+                    return false;
+                }
             }
 
-            if (!TableExists(osClientSecret, "sys_apiengine"))
+            if (!physicalColumns.TryGetValue("sys_apiengine", out var apiEngineColumns)
+                || apiEngineColumns.Count == 0)
             {
                 return true;
-            }
-
-            if (!new[]
-            {
-                "Id", "StopHttp", "Timeout", "MaxStatements", "LimitMemory",
-                "LimitRecursion", "V8Limit", "V8Unlimited", "Lock"
-            }.All(column => ColumnExists(osClientSecret, "sys_apiengine", column)))
-            {
-                return false;
             }
 
             var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
@@ -2048,6 +2155,71 @@ if (_microiLegacyMenuConfigChanged) {
                     WHERE {quoteOpen}Id{quoteClose} IS NULL
                        OR LTRIM(RTRIM({quoteOpen}Id{quoteClose}))='' ")
                 .ToScalar<int>() == 0;
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>
+            LoadRuntimePhysicalColumnContracts()
+        {
+            var mutable = new Dictionary<string, Dictionary<string, string>>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["diy_table"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                ["diy_field"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                ["sys_apiengine"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            };
+            var assembly = typeof(MicroiUpgrade).GetTypeInfo().Assembly;
+            foreach (var resourceName in new[]
+                     {
+                         "Microi.Upgrade.Resource.app.microi.form-engine.json",
+                         "Microi.Upgrade.Resource.app.microi.saas-engine.json"
+                     })
+            {
+                using var stream = assembly.GetManifestResourceStream(resourceName)
+                                   ?? throw new InvalidOperationException(
+                                       $"程序集缺少启动物理契约资源 {resourceName}。");
+                using var reader = new StreamReader(stream);
+                var physicalColumns = JObject.Parse(reader.ReadToEnd())["PhysicalColumns"] as JArray
+                                      ?? throw new InvalidOperationException(
+                                          $"启动物理契约资源 {resourceName} 缺少 PhysicalColumns。");
+                foreach (var token in physicalColumns.OfType<JObject>())
+                {
+                    var tableName = token["TABLE_NAME"]?.ToString() ?? string.Empty;
+                    if (!mutable.TryGetValue(tableName, out var tableColumns)) continue;
+                    var columnName = token["COLUMN_NAME"]?.ToString() ?? string.Empty;
+                    var columnType = token["COLUMN_TYPE"]?.ToString() ?? string.Empty;
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(
+                            columnName,
+                            @"^[A-Za-z][A-Za-z0-9_]{0,127}$")
+                        || !System.Text.RegularExpressions.Regex.IsMatch(
+                            columnType,
+                            @"^(?:bit|int|datetime|mediumtext|varchar)(?:\(\d+\))?$",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            $"启动物理契约包含不安全的列定义：{tableName}.{columnName} {columnType}");
+                    }
+                    tableColumns[columnName] = columnType;
+                }
+            }
+            return mutable.ToDictionary(
+                item => item.Key,
+                item => (IReadOnlyDictionary<string, string>)item.Value,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeRuntimePhysicalColumnType(
+            OsClientSecret osClientSecret,
+            string columnType)
+        {
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>()
+                         ?? OsClientDefault.OsClientDbType;
+            if (!string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase))
+                return columnType;
+            if (string.Equals(columnType, "mediumtext", StringComparison.OrdinalIgnoreCase))
+                return "nvarchar(max)";
+            if (columnType.StartsWith("bit", StringComparison.OrdinalIgnoreCase)) return "bit";
+            if (columnType.StartsWith("int", StringComparison.OrdinalIgnoreCase)) return "int";
+            return columnType;
         }
 
         private void BackfillApiEngineIds(OsClientSecret osClientSecret)
@@ -2078,7 +2250,12 @@ if (_microiLegacyMenuConfigChanged) {
                 return;
             }
 
-            EnsureColumn(osClientSecret, "diy_field", "TableName", "varchar(50)");
+            // diy_table.Name has historically allowed names longer than 50
+            // characters. Widen the denormalized diy_field.TableName projection
+            // before copying it, otherwise one legacy long table name aborts the
+            // whole tenant upgrade with "Data too long".
+            EnsureColumn(osClientSecret, "diy_field", "TableName", "varchar(255)");
+            EnsureStringColumnCapacity(osClientSecret, "diy_field", "TableName", 255);
             if (!TableExists(osClientSecret, "diy_table")
                 || !ColumnExists(osClientSecret, "diy_field", "TableId")
                 || !ColumnExists(osClientSecret, "diy_table", "Id")
@@ -2673,6 +2850,15 @@ if (_microiLegacyMenuConfigChanged) {
                     .AddInParameter("p1", columnName)
                     .ToScalar<int>();
             }
+            else if (dbType == "Oracle")
+            {
+                currentLength = osClientSecret.Db.FromSql(@"SELECT COALESCE(CHAR_LENGTH, 0)
+                        FROM USER_TAB_COLUMNS
+                        WHERE TABLE_NAME = UPPER(@p0) AND COLUMN_NAME = UPPER(@p1)")
+                    .AddInParameter("p0", tableName)
+                    .AddInParameter("p1", columnName)
+                    .ToScalar<int>();
+            }
             else
             {
                 return;
@@ -2685,9 +2871,46 @@ if (_microiLegacyMenuConfigChanged) {
 
             var sql = dbType == "MySql"
                 ? $"ALTER TABLE `{tableName}` MODIFY COLUMN `{columnName}` varchar({minimumLength}) NULL"
-                : $"ALTER TABLE [{tableName}] ALTER COLUMN [{columnName}] varchar({minimumLength}) NULL";
+                : dbType == "SqlServer"
+                    ? $"ALTER TABLE [{tableName}] ALTER COLUMN [{columnName}] varchar({minimumLength}) NULL"
+                    : $"ALTER TABLE {tableName} MODIFY ({columnName} VARCHAR2({minimumLength} CHAR) NULL)";
             osClientSecret.Db.FromSql(sql).ExecuteNonQuery();
             Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【扩容表字段】{tableName}.{columnName} -> varchar({minimumLength})");
+        }
+
+        private HashSet<string> ReadPhysicalColumnNames(
+            OsClientSecret osClientSecret,
+            string tableName)
+        {
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>()
+                         ?? OsClientDefault.OsClientDbType;
+            if (dbType == "MySql")
+            {
+                return new HashSet<string>(
+                    osClientSecret.Db.FromSql(@"SELECT COLUMN_NAME AS ColumnName
+                            FROM information_schema.COLUMNS
+                            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @p0")
+                        .AddInParameter("p0", tableName)
+                        .ToArray()
+                        .Select(row => JObject.FromObject((object)row)["ColumnName"]?.ToString())
+                        .Where(name => !string.IsNullOrWhiteSpace(name)),
+                    StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (dbType == "SqlServer")
+            {
+                return new HashSet<string>(
+                    osClientSecret.Db.FromSql(@"SELECT COLUMN_NAME AS ColumnName
+                            FROM INFORMATION_SCHEMA.COLUMNS
+                            WHERE TABLE_CATALOG=DB_NAME() AND TABLE_NAME=@p0")
+                        .AddInParameter("p0", tableName)
+                        .ToArray()
+                        .Select(row => JObject.FromObject((object)row)["ColumnName"]?.ToString())
+                        .Where(name => !string.IsNullOrWhiteSpace(name)),
+                    StringComparer.OrdinalIgnoreCase);
+            }
+
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
         private bool TableExists(OsClientSecret osClientSecret, string tableName)
@@ -2856,6 +3079,63 @@ if (_microiLegacyMenuConfigChanged) {
                 throw new FormatException($"{fieldName}格式错误，应为四段数字版本号：{versionText}");
             }
             return version;
+        }
+
+        private void WriteVersionedUpgradePlan(string osClient, string currentVersion)
+        {
+            foreach (var program in GetVersionedUpgradePrograms())
+            {
+                var status = NeedUpgrade(currentVersion, program.Value)
+                    ? "待执行"
+                    : string.Equals(program.Key, "Upgrade13-官方基础应用包", StringComparison.Ordinal)
+                        ? "版本已覆盖，仍检查应用资源一致性"
+                        : "版本已覆盖，跳过";
+                Console.WriteLine(
+                    $"Microi：【自动升级状态】【{osClient}】【{program.Key}】{status}；门禁版本={program.Value}。");
+            }
+        }
+
+        private static IReadOnlyList<KeyValuePair<string, string>> GetVersionedUpgradePrograms()
+        {
+            return new[]
+            {
+                new KeyValuePair<string, string>("Upgrade01-AppDisplay与AppVisible", UpgradeAppDisplay.Version),
+                new KeyValuePair<string, string>("Upgrade02-sys_config", UpgradeSysConfig.Version),
+                new KeyValuePair<string, string>("Upgrade03-多语言", UpgradeLang.Version),
+                new KeyValuePair<string, string>("Upgrade05-ApiEngine", UpgradeApiEngine.Version),
+                new KeyValuePair<string, string>("Upgrade07-DiyTable与SysMenu", Upgrade7.Version),
+                new KeyValuePair<string, string>("Upgrade08-定时任务", Upgrade8.Version),
+                new KeyValuePair<string, string>("Upgrade09-历史结构", Upgrade9.Version),
+                new KeyValuePair<string, string>("Upgrade10-历史结构", Upgrade10.Version),
+                new KeyValuePair<string, string>("Upgrade11-历史结构", Upgrade11.Version),
+                new KeyValuePair<string, string>("Upgrade12-ApiEngine字段", Upgrade12.Version),
+                new KeyValuePair<string, string>("Upgrade13-官方基础应用包", UpgradeAppStore.Version),
+                new KeyValuePair<string, string>("Upgrade14-AI引擎", Upgrade14.Version),
+                new KeyValuePair<string, string>("Upgrade15-安全权限", Upgrade15.Version),
+                new KeyValuePair<string, string>("Upgrade16-文件上传租户配置", Upgrade16.Version),
+                new KeyValuePair<string, string>("Upgrade17-AI角色策略", Upgrade17.Version),
+                new KeyValuePair<string, string>("Upgrade18-AI向量模式", Upgrade18.Version),
+                new KeyValuePair<string, string>("Upgrade19-接口引擎内存限制", Upgrade19.Version),
+                new KeyValuePair<string, string>("Upgrade20-用户访问密钥", Upgrade20.Version),
+                new KeyValuePair<string, string>("Upgrade21-持久后台任务", Upgrade21.Version),
+                new KeyValuePair<string, string>("Upgrade22-V8执行限制", Upgrade22.Version),
+                new KeyValuePair<string, string>("Upgrade23-SaaS运行时设置", Upgrade23.Version),
+                new KeyValuePair<string, string>("Upgrade24-数据库备份", Upgrade24.Version),
+                new KeyValuePair<string, string>("Upgrade25-应用发布V3", Upgrade25.Version),
+                new KeyValuePair<string, string>("Upgrade26-用户访问密钥菜单", Upgrade26.Version),
+                new KeyValuePair<string, string>("Upgrade27-V8无限制兼容", Upgrade27.Version),
+                new KeyValuePair<string, string>("Upgrade28-用户首页与商城事件", Upgrade28.Version),
+                new KeyValuePair<string, string>("Upgrade29-OCR租户设置", Upgrade29.Version),
+                new KeyValuePair<string, string>("Upgrade30-后端运行配置", Upgrade30.Version),
+                new KeyValuePair<string, string>("Upgrade31-翻译租户设置", Upgrade31.Version),
+                new KeyValuePair<string, string>("Upgrade32-V8运行限制", Upgrade32.Version),
+                new KeyValuePair<string, string>("Upgrade33-表单V8运行限制", Upgrade33.Version)
+            };
+        }
+
+        private static string FormatVersionForLog(string version)
+        {
+            return version.DosIsNullOrWhiteSpace() ? "空" : version;
         }
 
         public sealed class ServerVersionRow

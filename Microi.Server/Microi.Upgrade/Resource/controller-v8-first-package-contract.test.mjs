@@ -34,6 +34,7 @@ const MESSAGE_SELECTED_API_ENGINE_KEYS = Object.freeze([
   'platform-chat-system-message',
   'platform-chat-runtime',
   'platform-message-notification-custom-hook',
+  'wechat_send_tpl_msg',
 ]);
 
 const STORE_SELECTED_API_ENGINE_KEYS = Object.freeze([
@@ -54,6 +55,7 @@ const STORE_SELECTED_API_ENGINE_KEYS = Object.freeze([
   'export-microi-store-package',
   'get-microi-store-model',
   'get-microi-store',
+  'get-microi-store-legacy-route',
   'bulk-import-microi-store-packages',
   'get-microi-store-versions',
   'microi-store-package-storage',
@@ -139,8 +141,8 @@ function assertOfficialPair({
 test('message-notification and Store selected ApiEngine key sets stay exact and policy-closed', () => {
   assertPackageKeyClosure(messagePackage, MESSAGE_SELECTED_API_ENGINE_KEYS);
   assertPackageKeyClosure(storePackage, STORE_SELECTED_API_ENGINE_KEYS);
-  assert.equal(messagePackage.PackageInfo.Version, 'v1.0.9');
-  assert.equal(storePackage.PackageInfo.Version, 'v7.6.9');
+  assert.equal(messagePackage.PackageInfo.Version, 'v1.0.11');
+  assert.equal(storePackage.PackageInfo.Version, 'v7.6.16');
 });
 
 test('official package ApiEngine stable identities are globally unique', () => {
@@ -202,6 +204,19 @@ test('official Managed cores and CreateIfMissing hooks carry immutable package c
   ));
   assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(
     'V8.MongoDb.DelFormDataByWhere',
+  ));
+  const wechatAdapter = engine(messagePackage, 'wechat_send_tpl_msg');
+  assert.equal(wechatAdapter.Version, 'v1.0.0');
+  assert.equal(wechatAdapter.StopHttp, 1);
+  assert.equal(wechatAdapter.AllowAnonymous, 0);
+  assert.equal(wechatAdapter.ApiV8Code, normalizeSource(readResource('wechat_send_tpl_msg.js')));
+  assert.match(wechatAdapter.ApiV8Code, /platform-message-notification-custom-hook/);
+  assert.match(wechatAdapter.ApiV8Code, /V8\.Method\.SendWeChatTemplateMessage/);
+  assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(
+    'ApiEngine:wechat_send_tpl_msg@v1.0.0',
+  ));
+  assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(
+    'V8.Method.SendWeChatTemplateMessage',
   ));
   assert.match(engine(messagePackage, 'platform-chat-system-message').ApiV8Code,
     /V8\.ApiEngine\.Run\('platform-chat-runtime',[\s\S]*V8\.DbTrans\)/);

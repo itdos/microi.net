@@ -105,8 +105,22 @@ public class ChildTenantPlatformAppControlServiceTests
             "__microi_child_platform_app_install_cluster__",
             ChildTenantPlatformAppControlService.ClusterConcurrencyKey);
         Assert.Equal(
-            new[] { "import-microi-store-package", "bulk-import-microi-store-packages" },
+            new[]
+            {
+                "import-microi-store-package",
+                "bulk-import-microi-store-packages",
+                "platform-sys-menu",
+                "platform-os-client-by-domain",
+                "platform-sys-config",
+                "platform-lang-bundle",
+                "platform-current-user",
+                "platform-private-file-url",
+                "platform-sys-user-public-info"
+            },
             ChildTenantPlatformAppControlService.RequiredBootstrapApiEngineKeys);
+        Assert.Equal(
+            new[] { "app.microi.store", "app.microi.saas-engine" },
+            ChildTenantPlatformAppControlService.RequiredStartupApplicationIds);
 
         var root = FindRepositoryRoot();
         var orchestrator = File.ReadAllText(Path.Combine(
@@ -129,10 +143,14 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("CHILD_STARTUP_SCOPE_CHILD_PARAM_PATCH_V1", orchestrator, StringComparison.Ordinal);
         Assert.Contains("CHILD_STARTUP_NO_REQUEUE_REFRESH_V1", orchestrator, StringComparison.Ordinal);
         Assert.Contains("phase == 'RefreshBootstrap'", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("startup-api-live-worker-v6-no-requeue", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("startup-api-live-worker-v7-complete-closure", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_STARTUP_DEPENDENCY_CLOSURE_V2", orchestrator, StringComparison.Ordinal);
         Assert.Contains("checkpoint.BootstrapRevision = startupBootstrapRevision", orchestrator, StringComparison.Ordinal);
         Assert.Contains("CHILD_STARTUP_TARGET_FILTER_V1", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("TargetOsClients 仅允许用于 StartupDependencies", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TRUSTED_TARGET_FILTER_V2", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("TargetOsClients 最多允许 100 个目标租户", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("StartupDependencyBootstrapOnly 仅允许用于 StartupDependencies", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("childParam.StartupDependencyBootstrapOnly = true", orchestrator, StringComparison.Ordinal);
         Assert.Contains("missingRequestedTargets", orchestrator, StringComparison.Ordinal);
         Assert.DoesNotContain("CHILD_STARTUP_BOOTSTRAP_TASK_READBACK_V1", orchestrator, StringComparison.Ordinal);
         Assert.DoesNotContain("verifyRefreshedChildTask", orchestrator, StringComparison.Ordinal);
@@ -144,14 +162,54 @@ public class ChildTenantPlatformAppControlServiceTests
             orchestrator[migrationStart..queueStart],
             StringComparison.Ordinal);
         Assert.Contains("enforceStartupDependencyScope", orchestrator, StringComparison.Ordinal);
-        Assert.Contains("childParam.RequiredAppIds = ['app.microi.saas-engine']", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("childParam.RequiredAppIds = startupDependencyAppIds.slice()", orchestrator, StringComparison.Ordinal);
+        Assert.Contains("['app.microi.store', 'app.microi.saas-engine']", orchestrator, StringComparison.Ordinal);
         Assert.Contains("Status='Pending' AND CancelRequested=0", orchestrator, StringComparison.Ordinal);
         Assert.Contains("cancelUnsafeChildTask", orchestrator, StringComparison.Ordinal);
         Assert.Contains("MaintenanceScope: maintenanceScope", orchestrator, StringComparison.Ordinal);
         Assert.Contains("StartupDependencies", orchestrator, StringComparison.Ordinal);
+        var controlService = File.ReadAllText(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.Core",
+            "Services",
+            "ChildTenantPlatformAppControlService.cs"));
+        Assert.Contains("CHILD_TENANT_APIENGINE_ID_PREREQUISITE_V1", controlService, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_APIENGINE_TABLE_PREREQUISITE_V1", controlService, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_APIENGINE_AUTHORITATIVE_COLUMN_READ_V1", controlService, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_APIENGINE_BOOTSTRAP_CACHE_PROJECTION_V1", controlService, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_APIENGINE_POST_CREATE_PHYSICAL_CONTRACT_V1", controlService, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_APIENGINE_LOWCODE_METADATA_PREREQUISITE_V1", controlService, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_METADATA_BIT_LITERAL_V1", controlService, StringComparison.Ordinal);
+        Assert.Contains("\"Id\", \"Name\", \"Description\", \"CreateTime\", \"UpdateTime\", \"UserId\"", controlService, StringComparison.Ordinal);
+        Assert.Contains("\"Id\", \"TableId\", \"TableName\", \"Name\", \"Label\", \"Type\", \"Component\"", controlService, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"DataEncryptSave\"", controlService, StringComparison.Ordinal);
+        Assert.Contains("EnsureTargetApiEngineStableId(targetClient)", controlService, StringComparison.Ordinal);
+        Assert.Contains("EnsureTargetApiEngineLowCodeMetadata", controlService, StringComparison.Ordinal);
+        Assert.Contains("GetApiEnginePhysicalColumnsAuthoritative(targetClient)", controlService, StringComparison.Ordinal);
+        Assert.Contains("GetPhysicalColumnsAuthoritative(ownerClient, \"diy_table\")", controlService, StringComparison.Ordinal);
+        Assert.Contains("FROM INFORMATION_SCHEMA.COLUMNS", controlService, StringComparison.Ordinal);
+        Assert.Contains("RefreshApiEngineCache(targetOsClient, inserted, apiEngineKey)", controlService, StringComparison.Ordinal);
+        Assert.Contains("cache.SetAsync<dynamic>(cacheKey, row)", controlService, StringComparison.Ordinal);
+        Assert.Contains("FormData:diy_table_field_list", controlService, StringComparison.Ordinal);
+        Assert.Contains("CREATE TABLE IF NOT EXISTS `sys_apiengine`", controlService, StringComparison.Ordinal);
+        Assert.Contains("OBJECT_ID(N'[dbo].[sys_apiengine]'", controlService, StringComparison.Ordinal);
+        Assert.Contains("sys_apiengine 建表后物理回读不完整", controlService, StringComparison.Ordinal);
+        Assert.Contains("ALTER TABLE `sys_apiengine` ADD COLUMN `Id` varchar(36) NULL", controlService, StringComparison.Ordinal);
+        Assert.Contains("sys_apiengine.Id 扩列后物理回读仍不存在", controlService, StringComparison.Ordinal);
+        Assert.Contains("sys_apiengine.Id 回填后仍存在空值", controlService, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_STARTUP_DEPENDENCY_CLOSURE_V2", controlService, StringComparison.Ordinal);
+        Assert.Contains("CHILD_TENANT_COMPLETE_STARTUP_BOOTSTRAP_V1", controlService, StringComparison.Ordinal);
+        Assert.Contains("PlatformSysMenuApiEngineKey", controlService, StringComparison.Ordinal);
+        Assert.Contains("ReconcileTargetApiEngineRuntime", controlService, StringComparison.Ordinal);
+        Assert.Contains("GetBootstrapRuntimeContractError", controlService, StringComparison.Ordinal);
+        Assert.Contains("ApiAddress 未按官方自举契约补正", controlService, StringComparison.Ordinal);
         Assert.Equal(
             "StartupDependencies",
             ChildTenantPlatformAppControlService.StartupDependenciesMaintenanceScope);
+        Assert.Equal(
+            "app.microi.store",
+            ChildTenantPlatformAppControlService.AppStoreApplicationId);
         Assert.Equal(
             "app.microi.saas-engine",
             ChildTenantPlatformAppControlService.SaasEngineApplicationId);
@@ -168,7 +226,7 @@ public class ChildTenantPlatformAppControlServiceTests
             "Resource",
             "bulk-import-packages.js"));
 
-        Assert.Contains("Version: v1.3.4", worker, StringComparison.Ordinal);
+        Assert.Contains("Version: v1.3.7", worker, StringComparison.Ordinal);
         Assert.Contains("MARKETPLACE_LIST_CUSTOM_ADDRESS_V1", worker, StringComparison.Ordinal);
         Assert.Contains("/apiengine/get-microi-store-list?OsClient=", worker, StringComparison.Ordinal);
         Assert.DoesNotContain("/apiengine/get-microi-store?OsClient=", worker, StringComparison.Ordinal);
@@ -176,7 +234,16 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("app.microi.saas-engine", worker, StringComparison.Ordinal);
         Assert.Contains("BULK_REQUIRED_APP_SCOPE_V1", worker, StringComparison.Ordinal);
         Assert.Contains("RequiredAppIds: requiredAppIds", worker, StringComparison.Ordinal);
-        Assert.Contains("StartupDependencyRecovery: requiredAppIds.length == 1", worker, StringComparison.Ordinal);
+        Assert.Contains("STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2", worker, StringComparison.Ordinal);
+        Assert.Contains("STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1", worker, StringComparison.Ordinal);
+        Assert.Contains("STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1", worker, StringComparison.Ordinal);
+        Assert.Contains("StartupDependencyBootstrapOnly: true", worker, StringComparison.Ordinal);
+        Assert.Contains("missingStartupDependencyRequirements", worker, StringComparison.Ordinal);
+        Assert.Contains("StartupDependenciesVerified: startupDependencyRequirements.length", worker, StringComparison.Ordinal);
+        Assert.Contains("startupDependencyRepairAppIdMap", worker, StringComparison.Ordinal);
+        Assert.Contains("InstallAction: status == 'Outdated'", worker, StringComparison.Ordinal);
+        Assert.Contains("? 'Reinstall'", worker, StringComparison.Ordinal);
+        Assert.Contains("StartupDependencyRecovery: startupDependencyRecovery", worker, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -213,10 +280,14 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("GetBootstrapSourceFingerprint", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", importerSource, StringComparison.Ordinal);
-        Assert.Contains("Version: v2.4.7", importerSource, StringComparison.Ordinal);
+        Assert.Contains("Version: v2.4.9", importerSource, StringComparison.Ordinal);
+        Assert.Contains("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1", importerSource, StringComparison.Ordinal);
+        Assert.Contains("V8.Method.RequireManagedProtocolContext", importerSource, StringComparison.Ordinal);
         Assert.Contains("STARTUP_API_RUNTIME_FLAG_PHYSICAL_RECONCILIATION_V1", importerSource, StringComparison.Ordinal);
         Assert.Contains("StartupApiBootstrapRevision", importerSource, StringComparison.Ordinal);
         Assert.Contains("STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1", importerSource, StringComparison.Ordinal);
+        Assert.Contains("STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1", importerSource, StringComparison.Ordinal);
+        Assert.Contains("StartupDependencyBootstrapOnly", importerSource, StringComparison.Ordinal);
         Assert.Contains("StartupApiBootstrapDone", importerSource, StringComparison.Ordinal);
     }
 
@@ -235,6 +306,27 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("var connection = GetConnection(_osClient);", source, StringComparison.Ordinal);
         Assert.DoesNotContain("GetConnection(GetCurrentOsClient())", source, StringComparison.Ordinal);
         Assert.DoesNotContain("GetDatabase(kvp.Key).Database == _redisDb.Database", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RuntimePhysicalPrerequisites_UseEmbeddedOfficialContractsForHistoricEmptyDatabases()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.Upgrade",
+            "Upgrade.cs"));
+
+        Assert.Contains("RUNTIME_EMBEDDED_PHYSICAL_CONTRACT_V1", source, StringComparison.Ordinal);
+        Assert.Contains("app.microi.form-engine.json", source, StringComparison.Ordinal);
+        Assert.Contains("app.microi.saas-engine.json", source, StringComparison.Ordinal);
+        Assert.Contains("RuntimePhysicalColumnContracts.Value", source, StringComparison.Ordinal);
+        Assert.Contains("diy_table", source, StringComparison.Ordinal);
+        Assert.Contains("diy_field", source, StringComparison.Ordinal);
+        Assert.Contains("sys_apiengine", source, StringComparison.Ordinal);
+        Assert.Contains("NormalizeRuntimePhysicalColumnType", source, StringComparison.Ordinal);
+        Assert.Contains("启动物理契约包含不安全的列定义", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -285,6 +377,37 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.True(ChildTenantPlatformAppControlService.ShouldRefreshBootstrapEngine(
             "import-microi-store-package", "", oldImporter, "v2.2.4", newImporter, out var error));
         Assert.Equal(string.Empty, error);
+    }
+
+    [Theory]
+    [InlineData("platform-sys-menu", "V8.Method.ManageSystemDirectory Domain: 'SysMenu' GetSysMenuStep")]
+    [InlineData("platform-os-client-by-domain", "V8.Method.ResolveOsClientByDomain")]
+    [InlineData("platform-sys-config", "V8.Method.GetPublicSysConfig")]
+    [InlineData("platform-lang-bundle", "V8.Method.GetLangBundle")]
+    [InlineData("platform-current-user", "var user = V8.CurrentUser;")]
+    [InlineData("platform-private-file-url", "V8.Method.GetAuthorizedPrivateFileUrl")]
+    [InlineData("platform-sys-user-public-info", "V8.FormEngine.GetTableData('sys_user', {})")]
+    public void BootstrapStartupFacadeRefresh_AllowsOnlyRecognizedOfficialLineage(
+        string apiEngineKey,
+        string officialMarker)
+    {
+        Assert.True(ChildTenantPlatformAppControlService.ShouldRefreshBootstrapEngine(
+            apiEngineKey,
+            "v0.9.9",
+            "/* Version: v0.9.9 */ " + officialMarker,
+            "v1.0.0",
+            "/* Version: v1.0.0 */ " + officialMarker + " // managed-current",
+            out var error));
+        Assert.Equal(string.Empty, error);
+
+        Assert.False(ChildTenantPlatformAppControlService.ShouldRefreshBootstrapEngine(
+            apiEngineKey,
+            "v0.9.9",
+            "/* Version: v0.9.9 */ tenant-custom-code",
+            "v1.0.0",
+            "/* Version: v1.0.0 */ " + officialMarker,
+            out error));
+        Assert.Contains("旧源码无法识别为官方谱系", error, StringComparison.Ordinal);
     }
 
     [Fact]

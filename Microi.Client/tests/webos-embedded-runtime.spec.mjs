@@ -43,7 +43,10 @@ test('embedded runtime gates duplicate websocket, chat polling and behavior sign
     assert.match(main, /if \(!isWebosEmbeddedRuntime\) tryConnectWebSocket\(\)/);
     assert.match(main, /WebOS嵌入窗口复用父页面实时通道/);
     assert.match(main, /import\.meta\.env\.DEV && !isWebosEmbeddedRuntime/);
-    assert.match(app, /if \(!isWebosEmbeddedRuntime\) self\.\$nextTick/);
+    assert.match(
+        app,
+        /TryConnectWebSocketAfterCurrentUser\(\) \{[\s\S]*if \(isEmbeddedWebosWindowRuntime\(\)\) return;[\s\S]*self\.\$nextTick/
+    );
     assert.match(app, /if \(!isWebosEmbeddedRuntime\) \{[\s\S]*UserBehaviorSignal/);
     assert.match(app, /if \(isEmbeddedWebosWindowRuntime\(\)\) return/);
     assert.match(app, /if \(!isWebosEmbeddedRuntime\) \{[\s\S]*self\.PageInit\(\)/);

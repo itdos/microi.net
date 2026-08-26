@@ -398,6 +398,10 @@ test('tenant settings engine fails closed before CRUD for Secret requests', () =
 })
 
 test('legacy controllers delegate only the migrated actions while trusted credential paths remain native', () => {
+  const compatibility = fs.readFileSync(
+    path.resolve(resourceDir, '../../Microi.net.Api/Controllers/LegacyMobileCompatibilityController.cs'),
+    'utf8',
+  )
   const sysUser = fs.readFileSync(
     path.resolve(resourceDir, '../../Microi.net.Api/Controllers/SysUserController.cs'),
     'utf8',
@@ -406,10 +410,10 @@ test('legacy controllers delegate only the migrated actions while trusted creden
     path.resolve(resourceDir, '../../Microi.net.Api/Controllers/TenantSystemSettingsController.cs'),
     'utf8',
   )
-  assert.match(sysUser, /CreateTenantApiEngineKey\s*=\s*"platform-create-tenant"/)
-  assert.match(sysUser, /UpdateCurrentProfileApiEngineKey\s*=\s*"platform-user-update-profile"/)
-  assert.match(sysUser, /UpdateUserPreferencesApiEngineKey\s*=\s*"platform-user-update-preferences"/)
-  assert.match(sysUser, /ManagedApiEngineCompatibility\.RunAsync/)
+  assert.match(compatibility, /CreateTenantApiEngineKey\s*=\s*"platform-create-tenant"/)
+  assert.match(compatibility, /UpdateCurrentProfileApiEngineKey\s*=\s*"platform-user-update-profile"/)
+  assert.match(compatibility, /UpdateUserPreferencesApiEngineKey\s*=\s*"platform-user-update-preferences"/)
+  assert.match(compatibility, /ManagedApiEngineCompatibility\.RunAsync/)
   assert.match(sysUser, /GetOwnedTenantAdminPassword[\s\S]*?SetSensitiveCredentialResponseHeaders/)
   assert.match(sysUser, /GetSysUserPassword[\s\S]*?DecodeStoredPassword/)
   assert.match(tenantSettings, /TenantSystemSettingsApiEngineKey\s*=\s*"platform-tenant-system-settings"/)

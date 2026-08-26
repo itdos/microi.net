@@ -392,7 +392,7 @@ function validateV8FirstPackage(name, packageModel) {
     assertExactEngineKeys(packageModel, [
       "msg_event", "msg_internal_list", "msg_internal_mark_read",
       "platform-chat-system-message", "platform-chat-runtime",
-      "platform-message-notification-custom-hook"
+      "platform-message-notification-custom-hook", "wechat_send_tpl_msg"
     ], name);
   }
   if (name === "app.microi.ai-engine.json") {

@@ -21,6 +21,16 @@ namespace Microi.net
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Ensures the seven managed ApiEngine resources required by the login
+        /// and WebOS bootstrap flow exist before the API starts accepting
+        /// traffic. Executable V8 source is loaded only from the embedded
+        /// official application packages.
+        /// </summary>
+        Task<DosResult> EnsureStartupDependenciesAsync(
+            OsClientSecret osClientSecret,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// 
         /// </summary>
         /// <returns></returns>

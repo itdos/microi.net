@@ -4,10 +4,26 @@ import { fileURLToPath } from 'node:url';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const packagePath = resolve(directory, 'app.microi.store.json');
-const targetPackageVersion = 'v7.5.57';
-const releaseTime = '2026-08-25 11:10:00';
+const targetPackageVersion = 'v7.6.16';
+const releaseTime = '2026-08-26 18:30:00';
 
 const dependencies = Object.freeze([
+  Object.freeze({
+    key: 'get-microi-store-legacy-route',
+    name: '获取应用商城列表（旧地址兼容）',
+    source: 'get-microi-store-legacy-route.js',
+    id: '019d2f00-0000-7a01-8000-000000000001',
+    version: 'v1.0.1',
+    apiAddress: '/apiengine/get-microi-store',
+    category: '应用商城',
+    enableLog: 0,
+    lock: 0,
+    allowAnonymous: 1,
+    capabilities: [
+      'ApiEngine:get-microi-store-legacy-route@v1.0.0',
+      'Compatibility:LegacyMarketplaceListRouteV1',
+    ],
+  }),
   Object.freeze({
     key: 'get-microi-upgrade-resource',
     name: '获取与发布吾码升级资源',
@@ -51,7 +67,7 @@ const dependencies = Object.freeze([
     lock: 0,
     capabilities: [
       'V8.Method.ManageSystemDirectory',
-      'ApiEngine:platform-sys-menu@v1.0.0',
+      'ApiEngine:platform-sys-menu@v1.0.1',
     ],
   }),
   Object.freeze({
@@ -198,8 +214,9 @@ for (const dependency of dependencies) {
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {});
 const protocolCapabilities = [
   'ApiEngine:get-microi-store-model@v1.2.9',
-  'ApiEngine:import-microi-store-package@v2.4.7',
+  'ApiEngine:import-microi-store-package@v2.4.9',
   'Installer:StartupDependencyApiFastBootstrap',
+  'Installer:StartupDependencyPreinstallBootstrapV1',
   'Installer:StartupApiRuntimeFlagReconciliation',
   'Marketplace:HdfsLegacyImporterBridgeV1',
 ];
@@ -209,6 +226,7 @@ for (const fieldName of ['RequiredPlatformCapabilities', 'Capabilities']) {
       !String(capability).startsWith('ApiEngine:get-microi-store-model@')
       && !String(capability).startsWith('ApiEngine:import-microi-store-package@')
       && String(capability) !== 'Installer:StartupDependencyApiFastBootstrap'
+      && String(capability) !== 'Installer:StartupDependencyPreinstallBootstrapV1'
       && String(capability) !== 'Installer:StartupApiRuntimeFlagReconciliation'
       && String(capability) !== 'Marketplace:HdfsLegacyImporterBridgeV1'
       && String(capability) !== 'ApiEngine:platform-user-update-preferences'
@@ -222,12 +240,12 @@ info.ApiEngineCount = engines.length;
 if (info.Version === targetPackageVersion) {
   info.ChangeLog = {
     Version: targetPackageVersion,
-    Title: '官方发布源自动投影平台接口并兼容物理表结构',
+    Title: 'WebOS 菜单统一迁入官方接口闭包',
     ChangeType: 'Fix',
-    Content: '官方升级资源发布完成并回读后，以独立授权动作将九个官方应用包的 Managed 接口投影到 iTdos live 运行库；CreateIfMissing 个性化 Hook 仅在缺失时创建且永不覆盖。控制面自更新会清除动态路由缓存，投影按 sys_apiengine 的真实无 OsClient 物理结构运行，租户仍由受权 V8 数据库上下文隔离。',
+    Content: 'WebOS 菜单统一调用 platform-sys-menu，接口在执行权威菜单原子前调用应用商城 CreateIfMissing 个性化 Hook；后端接收流量前从九个官方包补齐全部接口闭包。',
     ReleaseTime: releaseTime,
   };
-  const historyLine = '2026-08-25 v7.5.57 官方资源控制面新增 live Managed 接口投影、自更新缓存刷新与 sys_apiengine 物理结构兼容，CreateIfMissing Hook 只补缺不覆盖。';
+  const historyLine = '2026-08-26 v7.6.16 WebOS 菜单统一迁入 platform-sys-menu，并在权威菜单原子前调用应用商城 CreateIfMissing 个性化 Hook。';
   const history = String(info.ChangeHistory || '');
   if (!history.includes(historyLine)) info.ChangeHistory = `${historyLine}\n${history}`;
 }

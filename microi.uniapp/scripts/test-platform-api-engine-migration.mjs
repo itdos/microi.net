@@ -18,10 +18,20 @@ function readSourceFiles(directory) {
   })
 }
 
-test('UniApp source no longer calls legacy platform reads or SysUser admin routes', () => {
+test('UniApp source isolates the SysConfig legacy fallback and keeps every other platform read on ApiEngine', () => {
   const files = readSourceFiles(sourceRoot)
   const legacyRoutes = /\/api\/(?:Os\/GetOsClientByDomain|(?:FormEngine|DiyTable)\/GetSysConfig|FormEngine\/GetLangBundle|SysUser\/(?:GetCurrentUser|GetSysUserPublicInfo|AddSysUser|UptSysUser|DelSysUser|GetSysUser|RefreshLoginUser)|HDFS\/GetPrivateFileUrl)/i
-  files.forEach(file => assert.doesNotMatch(file.source, legacyRoutes, file.path))
+  files.forEach(file => {
+    if (file.path.endsWith('utils\\request.js')
+      || file.path.endsWith('utils/request.js')
+      || file.path.endsWith('utils\\microi.v8.js')
+      || file.path.endsWith('utils/microi.v8.js')) {
+      assert.match(file.source, /\/api\/FormEngine\/GetSysConfig/)
+      assert.doesNotMatch(file.source.replaceAll('/api/FormEngine/GetSysConfig', ''), legacyRoutes, file.path)
+      return
+    }
+    assert.doesNotMatch(file.source, legacyRoutes, file.path)
+  })
   const source = files.map(file => file.source).join('\n')
 
   for (const [key, pattern] of [
@@ -35,6 +45,13 @@ test('UniApp source no longer calls legacy platform reads or SysUser admin route
   ]) {
     assert.match(source, pattern, key)
   }
+
+  const requestSource = readFileSync(path.join(sourceRoot, 'utils', 'request.js'), 'utf8')
+  const sdkSource = readFileSync(path.join(sourceRoot, 'utils', 'microi.v8.js'), 'utf8')
+  assert.match(requestSource, /shouldFallbackPlatformSysConfig/)
+  assert.match(requestSource, /statusCode[\s\S]{0,500}\/api\/FormEngine\/GetSysConfig/)
+  assert.match(sdkSource, /sys_apiengine[\s\S]{0,300}platform-sys-config/)
+  assert.match(sdkSource, /\[404, 405, 501\]/)
 })
 
 test('UniApp bootstrap configuration calls are anonymous ApiEngine requests', () => {
@@ -44,8 +61,10 @@ test('UniApp bootstrap configuration calls are anonymous ApiEngine requests', ()
   const sdkSource = readFileSync(path.join(sourceRoot, 'utils', 'microi.v8.js'), 'utf8')
 
   assert.match(requestSource, /platform-sys-config[\s\S]{0,400}apiengine:\s*'1'/)
-  assert.match(sysConfigSource, /post\('\/apiengine\/platform-sys-config',[\s\S]{0,200},\s*false\)/)
-  assert.match(loginSource, /post\('\/apiengine\/platform-sys-config',[\s\S]{0,200},\s*false\)/)
+  assert.match(requestSource, /getPlatformSysConfigResult[\s\S]{0,250}post\('\/apiengine\/platform-sys-config',[\s\S]{0,120},\s*false\)/)
+  assert.match(requestSource, /getPlatformSysConfigResult[\s\S]{0,500}post\('\/api\/FormEngine\/GetSysConfig',[\s\S]{0,120},\s*false\)/)
+  assert.match(sysConfigSource, /getPlatformSysConfigResult\(/)
+  assert.match(loginSource, /getPlatformSysConfigResult\(/)
   assert.match(sdkSource, /legacyApi\.GetOsClientByDomain[\s\S]{0,250}Auth:\s*false[\s\S]{0,100}IsApiEngine:\s*true/)
   assert.match(sdkSource, /legacyApi\.GetSysConfig[\s\S]{0,300}Auth:\s*false[\s\S]{0,100}IsApiEngine:\s*true/)
 })

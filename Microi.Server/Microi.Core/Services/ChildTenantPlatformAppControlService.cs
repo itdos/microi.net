@@ -21,13 +21,33 @@ namespace Microi.net
         public const string OrchestratorApiEngineKey = "bulk-update-child-tenant-platform-apps";
         public const string ChildWorkerApiEngineKey = "bulk-import-microi-store-packages";
         public const string StartupDependenciesMaintenanceScope = "StartupDependencies";
+        public const string AppStoreApplicationId = "app.microi.store";
         public const string SaasEngineApplicationId = "app.microi.saas-engine";
+        private const string PlatformSysMenuApiEngineKey = "platform-sys-menu";
+        private const string PlatformOsClientByDomainApiEngineKey = "platform-os-client-by-domain";
+        private const string PlatformSysConfigApiEngineKey = "platform-sys-config";
+        private const string PlatformLangBundleApiEngineKey = "platform-lang-bundle";
+        private const string PlatformCurrentUserApiEngineKey = "platform-current-user";
+        private const string PlatformPrivateFileUrlApiEngineKey = "platform-private-file-url";
+        private const string PlatformSysUserPublicInfoApiEngineKey = "platform-sys-user-public-info";
         public const string ClusterConcurrencyKey = "__microi_child_platform_app_install_cluster__";
         public const int ChildWorkerMaxAttempts = 8;
+        internal static readonly string[] RequiredStartupApplicationIds =
+        {
+            AppStoreApplicationId,
+            SaasEngineApplicationId
+        };
         internal static readonly string[] RequiredBootstrapApiEngineKeys =
         {
             "import-microi-store-package",
-            ChildWorkerApiEngineKey
+            ChildWorkerApiEngineKey,
+            PlatformSysMenuApiEngineKey,
+            PlatformOsClientByDomainApiEngineKey,
+            PlatformSysConfigApiEngineKey,
+            PlatformLangBundleApiEngineKey,
+            PlatformCurrentUserApiEngineKey,
+            PlatformPrivateFileUrlApiEngineKey,
+            PlatformSysUserPublicInfoApiEngineKey
         };
         private static readonly string[] ApiEngineBootstrapColumns =
         {
@@ -114,8 +134,9 @@ namespace Microi.net
                 if (targetClient?.Db == null)
                     return new DosResult(0, null, "目标租户数据库连接不可用。");
 
-                // 平台应用维护本身依赖生成实体物理列和两个商城工作接口。老空库
-                // 可能恰好缺少这些资源，不能要求它先成功安装商城来获得安装器。
+                // CHILD_TENANT_COMPLETE_STARTUP_BOOTSTRAP_V1：平台应用维护本身依赖生成实体
+                // 物理列、两个商城工作器及前端进入商城前必调的七个启动接口。老空库可能
+                // 恰好缺少这些资源，不能要求它先完整安装两个大包后才能恢复登录页面。
                 var bootstrap = EnsureTargetBootstrap(
                     context.OwnerOsClient,
                     target.OsClient,
@@ -137,10 +158,11 @@ namespace Microi.net
                 };
                 if (startupDependenciesOnly)
                 {
-                    // CHILD_TENANT_STARTUP_DEPENDENCY_SCOPE_V1：事故恢复只安装
-                    // platform-sys-config 的唯一官方归属包。商城工作器本身已经由
-                    // 上面的可信 C# 自举原子直接刷新，无需再串行安装其完整应用包。
-                    childParam["RequiredAppIds"] = new JArray(SaasEngineApplicationId);
+                    // CHILD_TENANT_STARTUP_DEPENDENCY_CLOSURE_V2：登录后的菜单路由由
+                    // app.microi.store 单一拥有，匿名配置等运行门面由 SaaS 包拥有。
+                    // 事故恢复必须按“应用商城 -> SaaS 引擎”的固定闭包执行，不能再
+                    // 只安装 SaaS 包并把 platform-sys-menu 留在不可进入商城的旧租户外。
+                    childParam["RequiredAppIds"] = new JArray(RequiredStartupApplicationIds);
                 }
 
                 var task = BackgroundTaskService.StartApiEngineForTargetTenant(
@@ -356,6 +378,35 @@ namespace Microi.net
                 if (prerequisites?.Code != 1)
                     return new DosResult(0, prerequisites?.Data, prerequisites?.Msg ?? "物理前置条件自愈无返回。");
 
+                // CHILD_TENANT_APIENGINE_ID_PREREQUISITE_V1：跨租户控制面不能只相信
+                // 通用升级服务的成功返回。极老租户可能因历史 DbType/元数据差异跳过
+                // sys_apiengine.Id；在复制官方工作器前必须在同一可信原子内物理回读、
+                // 幂等扩列和补齐稳定 Id。这里只处理固定平台表/列，不承载业务逻辑。
+                bootstrapStage = "ApiEngineStableIdPrerequisite";
+                var identityPrerequisite = EnsureTargetApiEngineStableId(targetClient);
+                if (identityPrerequisite.Code != 1) return identityPrerequisite;
+
+                // CHILD_TENANT_APIENGINE_POST_CREATE_PHYSICAL_CONTRACT_V1：极老空库可能
+                // 由上一步首次创建 sys_apiengine。首次通用前置检查当时看不到该表，
+                // 因此必须再执行一次 expand-only 物理契约，使生成实体所需完整列在
+                // FormEngine 第一次查询之前就绪。
+                bootstrapStage = "ApiEnginePostCreatePhysicalContract";
+                prerequisites = upgrade
+                    .EnsureRuntimePhysicalPrerequisitesAsync(targetClient)
+                    .GetAwaiter()
+                    .GetResult();
+                if (prerequisites?.Code != 1)
+                    return new DosResult(
+                        0,
+                        prerequisites?.Data,
+                        prerequisites?.Msg ?? "接口引擎建表后的物理契约自愈无返回。");
+
+                bootstrapStage = "ApiEngineLowCodeMetadataPrerequisite";
+                var metadataPrerequisite = EnsureTargetApiEngineLowCodeMetadata(
+                    ownerOsClient,
+                    targetOsClient);
+                if (metadataPrerequisite.Code != 1) return metadataPrerequisite;
+
                 var created = new List<string>();
                 var refreshed = new List<string>();
                 var reused = new List<string>();
@@ -391,6 +442,358 @@ namespace Microi.net
             }
         }
 
+        private static DosResult EnsureTargetApiEngineStableId(OsClientSecret targetClient)
+        {
+            var rawDbType = targetClient.OsClientModel?["DbType"].Val<string>()
+                            ?? OsClientDefault.OsClientDbType
+                            ?? string.Empty;
+            var isMySql = string.Equals(rawDbType, "MySql", StringComparison.OrdinalIgnoreCase);
+            var isSqlServer = string.Equals(rawDbType, "SqlServer", StringComparison.OrdinalIgnoreCase);
+            var columns = GetApiEnginePhysicalColumnsAuthoritative(targetClient);
+            var createdTable = false;
+
+            // CHILD_TENANT_APIENGINE_TABLE_PREREQUISITE_V1：极老的空库可能连
+            // sys_apiengine 物理表都不存在。接口引擎不可能在自身承载表不存在时
+            // 自举，因此这里只为 MySQL/SQL Server 创建固定、最小且无业务数据的
+            // 运行表；应用商城随后仍负责表单元数据和其它可演进字段。
+            if (columns.Count == 0)
+            {
+                if (!isMySql && !isSqlServer)
+                {
+                    return new DosResult(
+                        0,
+                        new { TargetOsClient = targetClient.OsClient, DbType = rawDbType },
+                        "目标租户缺少 sys_apiengine 物理表，当前数据库类型不支持可信在线建表，请先执行对应数据库升级。");
+                }
+
+                var createTableSql = isMySql
+                    ? @"CREATE TABLE IF NOT EXISTS `sys_apiengine` (
+  `Id` varchar(36) NOT NULL,
+  `CreateTime` datetime NULL,
+  `UpdateTime` datetime NULL,
+  `UserId` varchar(36) NULL,
+  `UserName` varchar(255) NULL,
+  `IsDeleted` tinyint(1) NULL DEFAULT 0,
+  `OsClient` varchar(100) NULL,
+  `ApiEngineKey` varchar(255) NOT NULL,
+  `ApiName` varchar(255) NULL,
+  `ApiAddress` varchar(500) NULL,
+  `ApiV8Code` longtext NULL,
+  `ApiRole` longtext NULL,
+  `Files` longtext NULL,
+  `Category` varchar(255) NULL,
+  `IsEnable` tinyint(1) NULL DEFAULT 1,
+  `StopHttp` tinyint(1) NULL DEFAULT 0,
+  `AllowAnonymous` tinyint(1) NULL DEFAULT 0,
+  `ResponseFile` tinyint(1) NULL DEFAULT 0,
+  `EnableLog` tinyint(1) NULL DEFAULT 0,
+  `Lock` tinyint(1) NULL DEFAULT 0,
+  `Timeout` int NULL,
+  `MaxStatements` int NULL,
+  `LimitMemory` int NULL,
+  `LimitRecursion` int NULL,
+  `V8Limit` int NULL,
+  `V8Unlimited` int NULL,
+  `Version` varchar(50) NULL,
+  PRIMARY KEY (`Id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+                    : @"IF OBJECT_ID(N'[dbo].[sys_apiengine]', N'U') IS NULL
+BEGIN
+  CREATE TABLE [dbo].[sys_apiengine] (
+    [Id] varchar(36) NOT NULL PRIMARY KEY,
+    [CreateTime] datetime NULL,
+    [UpdateTime] datetime NULL,
+    [UserId] varchar(36) NULL,
+    [UserName] nvarchar(255) NULL,
+    [IsDeleted] bit NULL DEFAULT 0,
+    [OsClient] varchar(100) NULL,
+    [ApiEngineKey] varchar(255) NOT NULL,
+    [ApiName] nvarchar(255) NULL,
+    [ApiAddress] nvarchar(500) NULL,
+    [ApiV8Code] nvarchar(max) NULL,
+    [ApiRole] nvarchar(max) NULL,
+    [Files] nvarchar(max) NULL,
+    [Category] nvarchar(255) NULL,
+    [IsEnable] bit NULL DEFAULT 1,
+    [StopHttp] bit NULL DEFAULT 0,
+    [AllowAnonymous] bit NULL DEFAULT 0,
+    [ResponseFile] bit NULL DEFAULT 0,
+    [EnableLog] bit NULL DEFAULT 0,
+    [Lock] bit NULL DEFAULT 0,
+    [Timeout] int NULL,
+    [MaxStatements] int NULL,
+    [LimitMemory] int NULL,
+    [LimitRecursion] int NULL,
+    [V8Limit] int NULL,
+    [V8Unlimited] int NULL,
+    [Version] varchar(50) NULL
+  )
+END";
+                targetClient.Db.FromSql(createTableSql).ExecuteNonQuery();
+                columns = GetApiEnginePhysicalColumnsAuthoritative(targetClient);
+                foreach (var requiredColumn in new[] { "Id", "ApiEngineKey", "ApiV8Code" })
+                {
+                    if (!columns.Contains(requiredColumn))
+                    {
+                        return new DosResult(
+                            0,
+                            new { TargetOsClient = targetClient.OsClient, MissingColumn = requiredColumn },
+                            "目标租户 sys_apiengine 建表后物理回读不完整，拒绝继续复制官方工作器。");
+                    }
+                }
+                createdTable = true;
+            }
+
+            var addedColumn = false;
+            if (!columns.Contains("Id"))
+            {
+                if (!isMySql && !isSqlServer)
+                {
+                    return new DosResult(
+                        0,
+                        new { TargetOsClient = targetClient.OsClient, DbType = rawDbType },
+                        "目标租户 sys_apiengine 缺少 Id，当前数据库类型不支持在线扩列，请先执行对应数据库升级。");
+                }
+
+                var addColumnSql = isMySql
+                    ? "ALTER TABLE `sys_apiengine` ADD COLUMN `Id` varchar(36) NULL"
+                    : "ALTER TABLE [sys_apiengine] ADD [Id] varchar(36) NULL";
+                try
+                {
+                    targetClient.Db.FromSql(addColumnSql).ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    if (ex.Message.IndexOf("Duplicate column", StringComparison.OrdinalIgnoreCase) < 0
+                        && ex.Message.IndexOf(
+                            "Column names in each table must be unique",
+                            StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        throw;
+                    }
+                }
+
+                columns = GetApiEnginePhysicalColumnsAuthoritative(targetClient);
+                if (!columns.Contains("Id"))
+                {
+                    return new DosResult(
+                        0,
+                        null,
+                        "目标租户 sys_apiengine.Id 扩列后物理回读仍不存在，拒绝继续复制官方工作器。");
+                }
+
+                addedColumn = true;
+            }
+
+            // 其它数据库沿用各自升级程序维护既有物理结构；这里只对缺列时失败关闭，
+            // 避免把 MySQL/SQL Server 的 UUID 方言误用到 Oracle、达梦等数据库。
+            if (!isMySql && !isSqlServer)
+            {
+                return new DosResult(1, new
+                {
+                    TargetOsClient = targetClient.OsClient,
+                    CreatedTable = createdTable,
+                    AddedColumn = false,
+                    BackfilledRows = 0
+                });
+            }
+
+            var backfillSql = isSqlServer
+                ? @"UPDATE [sys_apiengine]
+                    SET [Id]=CONVERT(varchar(36), NEWID())
+                    WHERE [Id] IS NULL OR LTRIM(RTRIM([Id]))=''"
+                : @"UPDATE `sys_apiengine`
+                    SET `Id`=UUID()
+                    WHERE `Id` IS NULL OR TRIM(`Id`)=''";
+            var affected = targetClient.Db.FromSql(backfillSql).ExecuteNonQuery();
+            var missingCountSql = isSqlServer
+                ? "SELECT COUNT(*) FROM [sys_apiengine] WHERE [Id] IS NULL OR LTRIM(RTRIM([Id]))=''"
+                : "SELECT COUNT(*) FROM `sys_apiengine` WHERE `Id` IS NULL OR TRIM(`Id`)=''";
+            var missingCount = targetClient.Db.FromSql(missingCountSql)
+                .ToScalar<int>();
+            if (missingCount != 0)
+            {
+                return new DosResult(
+                    0,
+                    new { TargetOsClient = targetClient.OsClient, MissingIdCount = missingCount },
+                    "目标租户 sys_apiengine.Id 回填后仍存在空值，拒绝继续复制官方工作器。");
+            }
+
+            return new DosResult(1, new
+            {
+                TargetOsClient = targetClient.OsClient,
+                CreatedTable = createdTable,
+                AddedColumn = addedColumn,
+                BackfilledRows = affected
+            });
+        }
+
+        private static DosResult EnsureTargetApiEngineLowCodeMetadata(
+            string ownerOsClient,
+            string targetOsClient)
+        {
+            // CHILD_TENANT_APIENGINE_LOWCODE_METADATA_PREREQUISITE_V1：ApiEngine 可以
+            // 通过权威物理行缓存先恢复 HTTP 路由，但完整应用安装器会用 FormEngine
+            // 查询 sys_apiengine。极老空库缺少该表的 diy_table/diy_field 自描述时，
+            // 接口自身无法自举。这里只从同一受信主租户复制缺失的固定元数据，绝不
+            // 覆盖目标租户已有表/字段定义；完整资源仍由随后执行的官方应用包收敛。
+            var ownerClient = OsClientExtend.GetClient(ownerOsClient);
+            var targetClient = ResolveTargetClientWithReload(targetOsClient, out _);
+            if (ownerClient?.Db == null || targetClient?.Db == null)
+                return new DosResult(0, null, "接口引擎元数据来源或目标数据库连接不可用。");
+
+            var ownerTableColumns = GetPhysicalColumnsAuthoritative(ownerClient, "diy_table");
+            var targetTableColumns = GetPhysicalColumnsAuthoritative(targetClient, "diy_table");
+            var ownerFieldColumns = GetPhysicalColumnsAuthoritative(ownerClient, "diy_field");
+            var targetFieldColumns = GetPhysicalColumnsAuthoritative(targetClient, "diy_field");
+            if (ownerTableColumns.Count == 0 || targetTableColumns.Count == 0
+                || ownerFieldColumns.Count == 0 || targetFieldColumns.Count == 0)
+            {
+                return new DosResult(
+                    0,
+                    new
+                    {
+                        TargetOsClient = targetOsClient,
+                        HasDiyTable = targetTableColumns.Count > 0,
+                        HasDiyField = targetFieldColumns.Count > 0
+                    },
+                    "目标租户缺少 diy_table 或 diy_field 物理表，无法建立接口引擎最小自描述元数据。");
+            }
+
+            var sourceTable = ReadDiyTableMetadataRow(
+                ownerClient,
+                ownerTableColumns,
+                "sys_apiengine");
+            if (sourceTable == null)
+                return new DosResult(0, null, "主租户缺少 sys_apiengine 的 diy_table 权威元数据。");
+
+            var targetTable = ReadDiyTableMetadataRow(
+                targetClient,
+                targetTableColumns,
+                "sys_apiengine");
+            var createdTableMetadata = false;
+            if (targetTable == null)
+            {
+                var sourceTableId = ReadText(sourceTable, "Id");
+                var idConflict = ReadMetadataRowById(
+                    targetClient,
+                    targetTableColumns,
+                    "diy_table",
+                    sourceTableId);
+                if (idConflict != null)
+                {
+                    return new DosResult(
+                        0,
+                        new { TargetOsClient = targetOsClient, TableId = sourceTableId },
+                        "目标租户 diy_table 已有其它表占用 sys_apiengine 官方稳定 Id，拒绝覆盖。");
+                }
+
+                InsertCompatibleMetadataRow(
+                    targetClient,
+                    "diy_table",
+                    ownerTableColumns,
+                    targetTableColumns,
+                    sourceTable,
+                    new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["OsClient"] = targetOsClient,
+                        ["IsDeleted"] = 0
+                    });
+                targetTable = ReadDiyTableMetadataRow(
+                    targetClient,
+                    targetTableColumns,
+                    "sys_apiengine");
+                if (targetTable == null)
+                    return new DosResult(0, null, "sys_apiengine 的 diy_table 元数据写入后强回读失败。");
+                createdTableMetadata = true;
+            }
+
+            var targetTableId = ReadText(targetTable, "Id");
+            var sourceFields = ReadDiyFieldMetadataRows(
+                ownerClient,
+                ownerFieldColumns,
+                ReadText(sourceTable, "Id"));
+            var requiredFieldNames = new HashSet<string>(
+                new[] { "Id", "ApiEngineKey", "ApiV8Code" },
+                StringComparer.OrdinalIgnoreCase);
+            if (!requiredFieldNames.All(required => sourceFields.Any(
+                    field => string.Equals(ReadText(field, "Name"), required, StringComparison.OrdinalIgnoreCase))))
+            {
+                return new DosResult(0, null, "主租户 sys_apiengine 字段元数据缺少固定启动字段。");
+            }
+
+            var createdFieldMetadata = 0;
+            foreach (var sourceField in sourceFields)
+            {
+                var fieldName = ReadText(sourceField, "Name");
+                if (string.IsNullOrWhiteSpace(fieldName)) continue;
+                var existing = ReadDiyFieldMetadataRow(
+                    targetClient,
+                    targetFieldColumns,
+                    targetTableId,
+                    fieldName);
+                if (existing != null) continue;
+
+                var sourceFieldId = ReadText(sourceField, "Id");
+                var idConflict = ReadMetadataRowById(
+                    targetClient,
+                    targetFieldColumns,
+                    "diy_field",
+                    sourceFieldId);
+                if (idConflict != null)
+                {
+                    return new DosResult(
+                        0,
+                        new
+                        {
+                            TargetOsClient = targetOsClient,
+                            FieldId = sourceFieldId,
+                            FieldName = fieldName
+                        },
+                        "目标租户 diy_field 已有其它字段占用 sys_apiengine 官方稳定字段 Id，拒绝覆盖。");
+                }
+
+                InsertCompatibleMetadataRow(
+                    targetClient,
+                    "diy_field",
+                    ownerFieldColumns,
+                    targetFieldColumns,
+                    sourceField,
+                    new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["TableId"] = targetTableId,
+                        ["TableName"] = "sys_apiengine",
+                        ["OsClient"] = targetOsClient,
+                        ["IsDeleted"] = 0
+                    });
+                createdFieldMetadata++;
+            }
+
+            foreach (var required in requiredFieldNames)
+            {
+                if (ReadDiyFieldMetadataRow(
+                        targetClient,
+                        targetFieldColumns,
+                        targetTableId,
+                        required) == null)
+                {
+                    return new DosResult(
+                        0,
+                        new { TargetOsClient = targetOsClient, MissingField = required },
+                        "sys_apiengine 最小字段元数据写入后强回读不完整。");
+                }
+            }
+
+            RefreshApiEngineLowCodeMetadataCache(targetOsClient, targetTable);
+            return new DosResult(1, new
+            {
+                TargetOsClient = targetOsClient,
+                TableId = targetTableId,
+                CreatedTableMetadata = createdTableMetadata,
+                CreatedFieldMetadata = createdFieldMetadata
+            });
+        }
+
         private static DosResult EnsureMonitorBootstrapRecovery(
             string ownerOsClient,
             string targetOsClient,
@@ -419,7 +822,7 @@ namespace Microi.net
                 var targetClient = ResolveTargetClientWithReload(targetOsClient, out _);
                 if (targetClient?.Db == null)
                     return new DosResult(0, null, "目标租户数据库连接不可用。");
-                var targetColumns = GetPhysicalColumns(targetClient, "sys_apiengine");
+                var targetColumns = GetApiEnginePhysicalColumnsAuthoritative(targetClient);
                 var importer = ReadApiEngineRow(
                     targetClient,
                     targetColumns,
@@ -456,7 +859,7 @@ namespace Microi.net
             var ownerClient = OsClientExtend.GetClient(ownerOsClient);
             if (ownerClient?.Db == null)
                 throw new InvalidOperationException("商城工作接口来源数据库连接不可用。");
-            var ownerColumns = GetPhysicalColumns(ownerClient, "sys_apiengine");
+            var ownerColumns = GetApiEnginePhysicalColumnsAuthoritative(ownerClient);
             var source = new StringBuilder();
             foreach (var apiEngineKey in RequiredBootstrapApiEngineKeys)
             {
@@ -523,8 +926,8 @@ namespace Microi.net
             if (ownerClient?.Db == null || targetClient?.Db == null)
                 return new DosResult(0, null, "商城工作接口来源或目标数据库连接不可用。");
 
-            var ownerColumns = GetPhysicalColumns(ownerClient, "sys_apiengine");
-            var targetColumns = GetPhysicalColumns(targetClient, "sys_apiengine");
+            var ownerColumns = GetApiEnginePhysicalColumnsAuthoritative(ownerClient);
+            var targetColumns = GetApiEnginePhysicalColumnsAuthoritative(targetClient);
             foreach (var required in new[] { "Id", "ApiEngineKey", "ApiV8Code" })
             {
                 if (!targetColumns.Contains(required))
@@ -565,12 +968,25 @@ namespace Microi.net
                 }
                 else
                 {
-                    ReviveTargetApiEngine(targetClient, targetColumns, targetOsClient, apiEngineKey);
+                    ReconcileTargetApiEngineRuntime(
+                        targetClient,
+                        targetColumns,
+                        targetOsClient,
+                        apiEngineKey,
+                        source);
                 }
                 var latest = ReadApiEngineRow(targetClient, targetColumns, targetOsClient, apiEngineKey);
                 if (latest == null)
                     return new DosResult(0, null, $"商城自举接口 {apiEngineKey} 刷新后回读失败。");
-                ClearApiEngineCache(targetOsClient, latest, apiEngineKey);
+                var runtimeContractError = GetBootstrapRuntimeContractError(latest, source, targetColumns);
+                if (!string.IsNullOrWhiteSpace(runtimeContractError))
+                {
+                    return new DosResult(
+                        0,
+                        new { ApiEngineKey = apiEngineKey, RuntimeContractError = runtimeContractError },
+                        $"商城自举接口 {apiEngineKey} 刷新后运行契约不一致：{runtimeContractError}");
+                }
+                RefreshApiEngineCache(targetOsClient, latest, apiEngineKey);
                 return new DosResult(1, new JObject
                 {
                     ["Created"] = false,
@@ -637,7 +1053,7 @@ namespace Microi.net
             var inserted = ReadApiEngineRow(targetClient, targetColumns, targetOsClient, apiEngineKey);
             if (inserted == null)
                 return new DosResult(0, null, $"补齐商城自举接口 {apiEngineKey} 后回读失败。");
-            ClearApiEngineCache(targetOsClient, inserted, apiEngineKey);
+            RefreshApiEngineCache(targetOsClient, inserted, apiEngineKey);
             return new DosResult(1, new JObject
             {
                 ["Created"] = true,
@@ -771,7 +1187,175 @@ namespace Microi.net
                 return code.IndexOf("import-microi-store-package", StringComparison.Ordinal) >= 0
                        && code.IndexOf("ApplicationType", StringComparison.Ordinal) >= 0;
             }
+            if (string.Equals(apiEngineKey, PlatformSysMenuApiEngineKey, StringComparison.Ordinal))
+            {
+                return code.IndexOf("V8.Method.ManageSystemDirectory", StringComparison.Ordinal) >= 0
+                       && code.IndexOf("Domain: 'SysMenu'", StringComparison.Ordinal) >= 0
+                       && code.IndexOf("GetSysMenuStep", StringComparison.Ordinal) >= 0;
+            }
+            if (string.Equals(apiEngineKey, PlatformOsClientByDomainApiEngineKey, StringComparison.Ordinal))
+                return code.IndexOf("V8.Method.ResolveOsClientByDomain", StringComparison.Ordinal) >= 0;
+            if (string.Equals(apiEngineKey, PlatformSysConfigApiEngineKey, StringComparison.Ordinal))
+                return code.IndexOf("V8.Method.GetPublicSysConfig", StringComparison.Ordinal) >= 0;
+            if (string.Equals(apiEngineKey, PlatformLangBundleApiEngineKey, StringComparison.Ordinal))
+                return code.IndexOf("V8.Method.GetLangBundle", StringComparison.Ordinal) >= 0;
+            if (string.Equals(apiEngineKey, PlatformCurrentUserApiEngineKey, StringComparison.Ordinal))
+                return code.IndexOf("V8.CurrentUser", StringComparison.Ordinal) >= 0;
+            if (string.Equals(apiEngineKey, PlatformPrivateFileUrlApiEngineKey, StringComparison.Ordinal))
+                return code.IndexOf("V8.Method.GetAuthorizedPrivateFileUrl", StringComparison.Ordinal) >= 0;
+            if (string.Equals(apiEngineKey, PlatformSysUserPublicInfoApiEngineKey, StringComparison.Ordinal))
+                return code.IndexOf("GetTableData('sys_user'", StringComparison.Ordinal) >= 0;
             return false;
+        }
+
+        private static JObject ReadDiyTableMetadataRow(
+            OsClientSecret client,
+            HashSet<string> columns,
+            string tableName)
+        {
+            if (!columns.Contains("Name")) return null;
+            var quote = IdentifierQuote(client);
+            var sql = $"SELECT * FROM {quote("diy_table")} WHERE LOWER({quote("Name")})=LOWER(@p0)";
+            if (columns.Contains("IsDeleted"))
+                sql += $" AND ({quote("IsDeleted")} IS NULL OR {quote("IsDeleted")}<>1)";
+            var row = client.Db.FromSql(sql)
+                .AddInParameter("p0", tableName)
+                .First<dynamic>();
+            return row == null ? null : JObject.FromObject((object)row);
+        }
+
+        private static List<JObject> ReadDiyFieldMetadataRows(
+            OsClientSecret client,
+            HashSet<string> columns,
+            string tableId)
+        {
+            if (!columns.Contains("TableId")) return new List<JObject>();
+            var quote = IdentifierQuote(client);
+            var sql = $"SELECT * FROM {quote("diy_field")} WHERE {quote("TableId")}=@p0";
+            if (columns.Contains("IsDeleted"))
+                sql += $" AND ({quote("IsDeleted")} IS NULL OR {quote("IsDeleted")}<>1)";
+            if (columns.Contains("Sort")) sql += $" ORDER BY {quote("Sort")} ASC";
+            return client.Db.FromSql(sql)
+                .AddInParameter("p0", tableId)
+                .ToArray()
+                .Select(item => JObject.FromObject((object)item))
+                .ToList();
+        }
+
+        private static JObject ReadDiyFieldMetadataRow(
+            OsClientSecret client,
+            HashSet<string> columns,
+            string tableId,
+            string fieldName)
+        {
+            if (!columns.Contains("TableId") || !columns.Contains("Name")) return null;
+            var quote = IdentifierQuote(client);
+            var sql = $"SELECT * FROM {quote("diy_field")} WHERE {quote("TableId")}=@p0 "
+                      + $"AND LOWER({quote("Name")})=LOWER(@p1)";
+            if (columns.Contains("IsDeleted"))
+                sql += $" AND ({quote("IsDeleted")} IS NULL OR {quote("IsDeleted")}<>1)";
+            var row = client.Db.FromSql(sql)
+                .AddInParameter("p0", tableId)
+                .AddInParameter("p1", fieldName)
+                .First<dynamic>();
+            return row == null ? null : JObject.FromObject((object)row);
+        }
+
+        private static JObject ReadMetadataRowById(
+            OsClientSecret client,
+            HashSet<string> columns,
+            string tableName,
+            string id)
+        {
+            if (string.IsNullOrWhiteSpace(id) || !columns.Contains("Id")) return null;
+            var quote = IdentifierQuote(client);
+            var row = client.Db.FromSql(
+                    $"SELECT * FROM {quote(tableName)} WHERE {quote("Id")}=@p0")
+                .AddInParameter("p0", id)
+                .First<dynamic>();
+            return row == null ? null : JObject.FromObject((object)row);
+        }
+
+        private static void InsertCompatibleMetadataRow(
+            OsClientSecret targetClient,
+            string tableName,
+            HashSet<string> ownerColumns,
+            HashSet<string> targetColumns,
+            JObject source,
+            IDictionary<string, object> overrides)
+        {
+            var quote = IdentifierQuote(targetClient);
+            var bootstrapColumns = string.Equals(tableName, "diy_table", StringComparison.OrdinalIgnoreCase)
+                ? new HashSet<string>(new[]
+                {
+                    "Id", "Name", "Description", "CreateTime", "UpdateTime", "UserId",
+                    "UserName", "IsDeleted", "OsClient"
+                }, StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(new[]
+                {
+                    "Id", "TableId", "TableName", "Name", "Label", "Type", "Component",
+                    "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted", "OsClient"
+                }, StringComparer.OrdinalIgnoreCase);
+            var columns = targetColumns
+                .Where(column => bootstrapColumns.Contains(column)
+                                 && ownerColumns.Contains(column)
+                                 && (source.GetValue(column, StringComparison.OrdinalIgnoreCase) != null
+                                     || overrides.ContainsKey(column)))
+                .OrderBy(column => column, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (!columns.Contains("Id", StringComparer.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"{tableName} 元数据源缺少稳定 Id，拒绝写入。");
+
+            var values = columns.Select(column =>
+            {
+                var value = overrides.TryGetValue(column, out var overrideValue)
+                    ? overrideValue
+                    : ToDatabaseValue(source.GetValue(column, StringComparison.OrdinalIgnoreCase));
+                return value is byte[] ? BootstrapSwitchLiteral(value) : value;
+            }).ToList();
+
+            // CHILD_TENANT_METADATA_BIT_LITERAL_V1：部分极老 MySQL 空库把固定开关列
+            // 定义为 bit(1)。Dos.ORM 参数绑定整数时，旧驱动会按二进制文本写入并报
+            // Data too long；字段名来自上方固定白名单，值只允许 0/1 常量，其它元数据
+            // 仍全部参数化。SQL Server bit 同样接受该固定字面量。
+            var sql = $"INSERT INTO {quote(tableName)} ("
+                      + string.Join(",", columns.Select(quote))
+                      + ") VALUES ("
+                      + string.Join(",", columns.Select((column, index) =>
+                          string.Equals(column, "IsDeleted", StringComparison.OrdinalIgnoreCase)
+                              ? BootstrapSwitchLiteral(values[index]).ToString()
+                              : "@m" + index))
+                      + ")";
+            var command = targetClient.Db.FromSql(sql);
+            for (var index = 0; index < columns.Count; index++)
+            {
+                var column = columns[index];
+                if (string.Equals(column, "IsDeleted", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                command.AddInParameter("m" + index, values[index] ?? DBNull.Value);
+            }
+            if (command.ExecuteNonQuery() != 1)
+                throw new InvalidOperationException($"写入 {tableName} 自举元数据时数据库受影响行数不是1。");
+        }
+
+        private static void RefreshApiEngineLowCodeMetadataCache(
+            string osClient,
+            JObject tableRow)
+        {
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            var tableId = ReadText(tableRow, "Id");
+            foreach (var key in new[] { "sys_apiengine", tableId }
+                         .Where(value => !string.IsNullOrWhiteSpace(value)))
+            {
+                var normalized = key.ToLowerInvariant();
+                var tableCacheKey = $"Microi:{osClient}:FormData:diy_table:{normalized}";
+                cache.RemoveAsync(tableCacheKey).GetAwaiter().GetResult();
+                cache.SetAsync<dynamic>(tableCacheKey, tableRow).GetAwaiter().GetResult();
+                cache.RemoveAsync(
+                        $"Microi:{osClient}:FormData:diy_table_field_list:{normalized}")
+                    .GetAwaiter()
+                    .GetResult();
+            }
         }
 
         private static void RefreshTargetApiEngine(
@@ -841,6 +1425,46 @@ namespace Microi.net
                 .Where(name => !string.IsNullOrWhiteSpace(name)), StringComparer.OrdinalIgnoreCase);
         }
 
+        private static HashSet<string> GetPhysicalColumnsAuthoritative(
+            OsClientSecret client,
+            string tableName)
+        {
+            if (string.IsNullOrWhiteSpace(tableName)
+                || !Regex.IsMatch(tableName, @"^[A-Za-z][A-Za-z0-9_]{0,127}$"))
+                throw new InvalidOperationException("物理表名不符合固定标识符白名单。");
+            var rawDbType = client.OsClientModel?["DbType"].Val<string>()
+                            ?? OsClientDefault.OsClientDbType
+                            ?? string.Empty;
+            var isMySql = string.Equals(rawDbType, "MySql", StringComparison.OrdinalIgnoreCase);
+            var isSqlServer = string.Equals(rawDbType, "SqlServer", StringComparison.OrdinalIgnoreCase);
+            if (!isMySql && !isSqlServer)
+                return GetPhysicalColumns(client, tableName);
+
+            var sql = isMySql
+                ? @"SELECT COLUMN_NAME AS ColumnName
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA=DATABASE() AND LOWER(TABLE_NAME)=LOWER(@p0)"
+                : @"SELECT COLUMN_NAME AS ColumnName
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_CATALOG=DB_NAME() AND LOWER(TABLE_NAME)=LOWER(@p0)";
+            var rows = client.Db.FromSql(sql)
+                .AddInParameter("p0", tableName)
+                .ToArray();
+            return new HashSet<string>(
+                rows.Select(item => JObject.FromObject((object)item)
+                        .GetValue("ColumnName", StringComparison.OrdinalIgnoreCase)?.ToString())
+                    .Where(name => !string.IsNullOrWhiteSpace(name)),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static HashSet<string> GetApiEnginePhysicalColumnsAuthoritative(OsClientSecret client)
+        {
+            // CHILD_TENANT_APIENGINE_AUTHORITATIVE_COLUMN_READ_V1：通用 ORM 列枚举可能在
+            // 同一进程内保留建表/扩列前快照。sys_apiengine 是启动自举的唯一固定物理
+            // 前置表，MySQL/SQL Server 必须从 INFORMATION_SCHEMA 直读并用于 DDL 后强回读。
+            return GetPhysicalColumnsAuthoritative(client, "sys_apiengine");
+        }
+
         private static JObject ReadApiEngineRow(
             OsClientSecret client,
             HashSet<string> columns,
@@ -856,27 +1480,69 @@ namespace Microi.net
             return row == null ? null : JObject.FromObject((object)row);
         }
 
-        private static void ReviveTargetApiEngine(
+        private static void ReconcileTargetApiEngineRuntime(
             OsClientSecret client,
             HashSet<string> columns,
             string osClient,
-            string apiEngineKey)
+            string apiEngineKey,
+            JObject source)
         {
             var assignments = new List<string>();
+            var parameters = new List<object>();
             var quote = IdentifierQuote(client);
             if (columns.Contains("IsDeleted")) assignments.Add($"{quote("IsDeleted")}=0");
             if (columns.Contains("IsEnable")) assignments.Add($"{quote("IsEnable")}=1");
-            if (columns.Contains("StopHttp")) assignments.Add($"{quote("StopHttp")}=0");
-            if (columns.Contains("UpdateTime")) assignments.Add($"{quote("UpdateTime")}=@p2");
+            if (columns.Contains("StopHttp"))
+                assignments.Add($"{quote("StopHttp")}={BootstrapSwitchLiteral(ToDatabaseValue(source?["StopHttp"]))}");
+            if (columns.Contains("AllowAnonymous"))
+                assignments.Add($"{quote("AllowAnonymous")}={BootstrapSwitchLiteral(ToDatabaseValue(source?["AllowAnonymous"]))}");
+            foreach (var column in new[] { "ApiAddress", "Version" })
+            {
+                if (!columns.Contains(column)) continue;
+                assignments.Add($"{quote(column)}=@u{parameters.Count}");
+                parameters.Add(ToDatabaseValue(source?[column]));
+            }
+            if (columns.Contains("UpdateTime"))
+            {
+                assignments.Add($"{quote("UpdateTime")}=@u{parameters.Count}");
+                parameters.Add(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            }
             if (assignments.Count == 0) return;
             var sql = $"UPDATE {quote("sys_apiengine")} SET {string.Join(",", assignments)} "
                       + $"WHERE {quote("ApiEngineKey")}=@p0";
             if (columns.Contains("OsClient")) sql += $" AND {quote("OsClient")}=@p1";
             var command = client.Db.FromSql(sql).AddInParameter("p0", apiEngineKey);
             if (columns.Contains("OsClient")) command.AddInParameter("p1", osClient);
-            if (columns.Contains("UpdateTime"))
-                command.AddInParameter("p2", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-            command.ExecuteNonQuery();
+            for (var index = 0; index < parameters.Count; index++)
+                command.AddInParameter("u" + index, parameters[index] ?? DBNull.Value);
+            if (command.ExecuteNonQuery() != 1)
+                throw new InvalidOperationException($"补正平台启动自举接口 {apiEngineKey} 运行契约时数据库未更新记录。");
+        }
+
+        private static string GetBootstrapRuntimeContractError(
+            JObject target,
+            JObject source,
+            HashSet<string> columns)
+        {
+            if (target == null) return "记录不存在";
+            if (columns.Contains("ApiAddress")
+                && !string.Equals(
+                    ReadText(target, "ApiAddress"),
+                    ReadText(source, "ApiAddress"),
+                    StringComparison.OrdinalIgnoreCase))
+                return "ApiAddress 未按官方自举契约补正";
+            foreach (var column in new[] { "IsDeleted", "IsEnable", "StopHttp", "AllowAnonymous" })
+            {
+                if (!columns.Contains(column)) continue;
+                var expected = column == "IsDeleted"
+                    ? 0
+                    : column == "IsEnable"
+                        ? 1
+                        : BootstrapSwitchLiteral(ToDatabaseValue(source?[column]));
+                var actual = BootstrapSwitchLiteral(ToDatabaseValue(target?[column]));
+                if (actual != expected) return column + " 未按官方自举契约补正";
+            }
+            return string.Empty;
         }
 
         private static Func<string, string> IdentifierQuote(OsClientSecret client)
@@ -912,8 +1578,12 @@ namespace Microi.net
             return long.TryParse(text, out var parsedNumber) && parsedNumber != 0 ? 1 : 0;
         }
 
-        private static void ClearApiEngineCache(string osClient, JObject row, string apiEngineKey)
+        private static void RefreshApiEngineCache(string osClient, JObject row, string apiEngineKey)
         {
+            // CHILD_TENANT_APIENGINE_BOOTSTRAP_CACHE_PROJECTION_V1：极老空库可能尚无
+            // sys_apiengine 的 diy_table/diy_field 自描述元数据，旧 ApiEngine 内核会在
+            // FormEngine 回源前失败。物理写入和强回读成功后，将同一权威行投影到平台
+            // 原有 Key/Id/ApiAddress 缓存，使安装器先启动；完整应用包随后补齐低代码元数据。
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
             var keys = new[]
             {
@@ -923,8 +1593,11 @@ namespace Microi.net
             };
             foreach (var key in keys.Where(value => !string.IsNullOrWhiteSpace(value)))
             {
-                cache.RemoveAsync(
-                        $"Microi:{osClient}:FormData:sys_apiengine:{key.ToLowerInvariant()}")
+                var cacheKey = $"Microi:{osClient}:FormData:sys_apiengine:{key.ToLowerInvariant()}";
+                cache.RemoveAsync(cacheKey)
+                    .GetAwaiter()
+                    .GetResult();
+                cache.SetAsync<dynamic>(cacheKey, row)
                     .GetAwaiter()
                     .GetResult();
             }

@@ -6,7 +6,7 @@ import { normalizeOfficialApiEnginePolicies } from './official-api-engine-notice
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const resourcePath = path.join(directory, 'app.microi.sso.json');
 const pkg = JSON.parse(fs.readFileSync(resourcePath, 'utf8'));
-const minimumPackageVersion = 'v7.5.6';
+const minimumPackageVersion = 'v7.5.8';
 
 function semanticVersionParts(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/i.exec(String(value || '').trim());
@@ -32,6 +32,7 @@ function mergeChangeHistory(existingHistory) {
     if (item?.Version) history.set(String(item.Version), item);
   }
   const requiredHistory = [
+    { Version: 'v7.5.8', Date: '2026-08-26', Description: '将所有官方 Managed SSO 接口归一为 Platform 所有权，避免 Upgrade13 重放内置包时被误判为从平台资源降级到普通应用资源。' },
     { Version: 'v7.5.6', Date: '2026-08-25', Description: '统一官方 Managed 接口醒目恢复提示；SSO 安全事件经脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 仅返回成功。' },
     { Version: 'v7.5.2', Date: '2026-08-21', Description: '把连接投影、身份解析、绑定/JIT、角色映射、Claim 投影、审计和存量 Token 登录迁入 Managed 接口引擎；新增 CreateIfMissing 租户 Hook，C# 仅保留可信协议原子。' },
     { Version: 'v7.5.1', Date: '2026-08-21', Description: '补充宿主 SSO API、协议端点和客户端能力要求，防止旧宿主静默安装不可运行的配置包。' },
@@ -345,7 +346,7 @@ pkg.PackageInfo.ApiEngineCount = pkg.SysApiEngines.length;
 pkg.ResourcePolicies = {
   SchemaVersion: 1,
   ApiEngines: Object.fromEntries(engineSpecs.map(([, key]) => [key, {
-    Ownership: key === 'sso_event_hook' ? 'Tenant' : 'Application',
+    Ownership: key === 'sso_event_hook' ? 'Tenant' : 'Platform',
     UpgradePolicy: key === 'sso_event_hook' ? 'CreateIfMissing' : 'Managed'
   }]))
 };

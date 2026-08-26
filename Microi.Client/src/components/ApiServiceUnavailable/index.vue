@@ -20,6 +20,9 @@
                         </div>
                         <strong>{{ tenantTitle }}</strong>
                         <span v-if="state.osClient">OsClient：{{ state.osClient }}</span>
+                        <span class="api-service-unavailable__versions">
+                            前端 {{ state.frontendVersion || "未知" }} · 后端 {{ state.backendVersion || "未获取" }}
+                        </span>
                     </div>
                 </div>
 
@@ -99,6 +102,14 @@
                     </dl>
                     <dl v-else class="api-service-unavailable__details">
                         <div>
+                            <dt>前端版本</dt>
+                            <dd>{{ state.frontendVersion || "未知" }}</dd>
+                        </div>
+                        <div>
+                            <dt>后端版本</dt>
+                            <dd>{{ state.backendVersion || "服务不可达，暂未获取" }}</dd>
+                        </div>
+                        <div>
                             <dt>ApiBase</dt>
                             <dd :title="state.apiBase">{{ state.apiBase || "-" }}</dd>
                         </div>
@@ -114,8 +125,12 @@
                             <dt>请求方法</dt>
                             <dd>{{ state.requestMethod || "-" }}</dd>
                         </div>
-                        <div class="api-service-unavailable__details-wide">
-                            <dt>实际请求目标（完整地址）</dt>
+                        <div class="api-service-unavailable__details-wide api-service-unavailable__request-url">
+                            <dt>固定健康检查{{ state.healthCheckMode === "legacy" ? "（旧版兼容）" : "" }}</dt>
+                            <dd>{{ state.healthCheckUrl || "-" }}</dd>
+                        </div>
+                        <div class="api-service-unavailable__details-wide api-service-unavailable__request-url">
+                            <dt>触发诊断的业务请求（不作为健康结论）</dt>
                             <dd>{{ state.requestUrl || "-" }}</dd>
                         </div>
                     </dl>
@@ -458,7 +473,7 @@ async function copyDiagnostic() {
 
 .api-service-unavailable__details dt {
     margin-bottom: 6px;
-    color: #98a2b3;
+    color: #667085;
     font-size: 12px;
 }
 
@@ -481,6 +496,12 @@ async function copyDiagnostic() {
     color: #175f70;
     font-family: Consolas, "SFMono-Regular", "Liberation Mono", monospace;
     font-size: 13px;
+}
+
+.api-service-unavailable__versions {
+    margin-top: 4px;
+    color: rgba(224, 249, 252, 0.78);
+    font-size: 12px;
 }
 
 .api-service-unavailable__content.is-security-blocked h1 {
@@ -507,7 +528,7 @@ async function copyDiagnostic() {
     align-items: center;
     gap: 8px;
     margin-top: 20px;
-    color: #98a2b3;
+    color: #667085;
     font-size: 12px;
 }
 

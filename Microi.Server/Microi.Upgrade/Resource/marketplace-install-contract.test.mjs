@@ -99,7 +99,7 @@ test("bulk install persists its plan in the shared background-task checkpoint", 
   assert.doesNotMatch(bulkSource, /\|\| \(text\(taskEnvelope\.Id\)/);
   assert.doesNotMatch(bulkSource, /mci_marketplace_bulk_install_item/);
   assert.match(bulkSource, /status != 'Uninstalled' && status != 'Outdated'/);
-  assert.match(bulkSource, /InstallAction: status == 'Outdated' \? 'Update' : 'Install'/);
+  assert.match(bulkSource, /InstallAction: status == 'Outdated'[\s\S]*?Reinstall/);
   assert.match(bulkSource, /BackgroundTask:\s*\{[\s\S]*?HasMore: true,[\s\S]*?Checkpoint:/);
   assert.match(bulkSource, /Plan: plan/);
   assert.match(bulkSource, /ChildCheckpoint/);
@@ -137,6 +137,210 @@ test("bulk install persists its plan in the shared background-task checkpoint", 
   assert.equal(fixture.result({ Phase: "Physical", Progress: 58 }), 58);
 });
 
+function startupRuntimeRow(key) {
+  const rows = {
+    "platform-sys-menu": {
+      ApiEngineKey: "platform-sys-menu",
+      ApiAddress: "/apiengine/platform-sys-menu",
+      ApiV8Code: "V8.Method.ManageSystemDirectory({ Domain: 'SysMenu', Action: 'GetSysMenuStep' });",
+      Version: "v1.0.0", IsEnable: 1, StopHttp: 0, AllowAnonymous: 0, IsDeleted: 0,
+    },
+    "platform-os-client-by-domain": {
+      ApiEngineKey: "platform-os-client-by-domain",
+      ApiAddress: "/apiengine/platform-os-client-by-domain",
+      ApiV8Code: "V8.Method.ResolveOsClientByDomain();",
+      Version: "v1.0.0", IsEnable: 1, StopHttp: 0, AllowAnonymous: 1, IsDeleted: 0,
+    },
+    "platform-sys-config": {
+      ApiEngineKey: "platform-sys-config", ApiAddress: "/apiengine/platform-sys-config",
+      ApiV8Code: "V8.Method.GetPublicSysConfig();",
+      Version: "v1.0.0", IsEnable: 1, StopHttp: 0, AllowAnonymous: 1, IsDeleted: 0,
+    },
+    "platform-lang-bundle": {
+      ApiEngineKey: "platform-lang-bundle", ApiAddress: "/apiengine/platform-lang-bundle",
+      ApiV8Code: "V8.Method.GetLangBundle();",
+      Version: "v1.0.0", IsEnable: 1, StopHttp: 0, AllowAnonymous: 1, IsDeleted: 0,
+    },
+    "platform-current-user": {
+      ApiEngineKey: "platform-current-user", ApiAddress: "/apiengine/platform-current-user",
+      ApiV8Code: "return { Code: 1, Data: V8.CurrentUser };",
+      Version: "v1.0.0", IsEnable: 1, StopHttp: 0, AllowAnonymous: 0, IsDeleted: 0,
+    },
+    "platform-private-file-url": {
+      ApiEngineKey: "platform-private-file-url", ApiAddress: "/apiengine/platform-private-file-url",
+      ApiV8Code: "V8.Method.GetAuthorizedPrivateFileUrl();",
+      Version: "v1.0.0", IsEnable: 1, StopHttp: 0, AllowAnonymous: 0, IsDeleted: 0,
+    },
+    "platform-sys-user-public-info": {
+      ApiEngineKey: "platform-sys-user-public-info", ApiAddress: "/apiengine/platform-sys-user-public-info",
+      ApiV8Code: "V8.FormEngine.GetTableData('sys_user', {});",
+      Version: "v1.0.0", IsEnable: 1, StopHttp: 0, AllowAnonymous: 0, IsDeleted: 0,
+    },
+  };
+  return rows[key] ? { ...rows[key] } : null;
+}
+
+function executeStartupClosureDiscovery({ missingKeys = [], storeStatuses = {} } = {}) {
+  const taskId = "startup-resource-closure";
+  const V8 = {
+    CurrentUser: { Id: "admin", Level: 9999 },
+    Param: {
+      _BackgroundTaskId: taskId,
+      _BackgroundTask: { Id: taskId },
+      _BackgroundTaskFencingToken: 13,
+      _TrustedServerInvocation: true,
+      RequiredAppIds: ["app.microi.store", "app.microi.saas-engine"],
+    },
+    Method: { UpdateBackgroundTask() {} },
+    SysConfig: {},
+    Db: {
+      FromSql(sql) {
+        let key = "";
+        return {
+          AddInParameter(name, value) {
+            if (name === "@p0") key = String(value || "");
+            return this;
+          },
+          First() {
+            assert.match(sql, /FROM sys_apiengine/);
+            return missingKeys.includes(key) ? null : startupRuntimeRow(key);
+          },
+        };
+      },
+    },
+    FormEngine: {
+      GetTableData(tableName) {
+        assert.equal(tableName, "sys_microistoreversion");
+        return { Code: 1, Data: [] };
+      },
+    },
+    Http: {
+      Post(request) {
+        assert.match(request.Url, /get-microi-store-list/);
+        return {
+          Code: 1,
+          DataCount: 2,
+          Data: [
+            {
+              StoreId: "store-app", AppId: "app.microi.store", AppName: "应用商城",
+              AppVersion: "v7.6.10", StoreVersionId: "store-version",
+              ApplicationType: "Platform", StoreInstallStatus: storeStatuses["app.microi.store"] || "Installed",
+            },
+            {
+              StoreId: "saas-app", AppId: "app.microi.saas-engine", AppName: "SaaS引擎",
+              AppVersion: "v7.6.15", StoreVersionId: "saas-version",
+              ApplicationType: "Platform", StoreInstallStatus: storeStatuses["app.microi.saas-engine"] || "Installed",
+            },
+          ],
+        };
+      },
+    },
+  };
+  return new Function("V8", bulkSource)(V8);
+}
+
+test("startup closure reinstalls an installed owner package when its physical API is missing", () => {
+  const result = executeStartupClosureDiscovery({ missingKeys: ["platform-sys-menu"] });
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.BackgroundTask.Checkpoint.Phase, "Install");
+  const plan = JSON.parse(JSON.stringify(result.Data.BackgroundTask.Checkpoint.Plan));
+  assert.deepEqual(plan.map(item => [item.AppId, item.InstallAction]), [
+    ["app.microi.store", "Reinstall"],
+  ]);
+});
+
+test("startup closure is a true no-op only after every physical API is healthy", () => {
+  const result = executeStartupClosureDiscovery();
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.Planned, 0);
+});
+
+test("startup closure fails closed when a missing resource has no safe marketplace plan", () => {
+  const result = executeStartupClosureDiscovery({
+    missingKeys: ["platform-sys-config"],
+    storeStatuses: { "app.microi.saas-engine": "Abnormal" },
+  });
+  assert.equal(result.Code, 0);
+  assert.equal(result.Data.FailureStage, "StartupDependencyClosure");
+  assert.match(result.Msg, /app\.microi\.saas-engine/);
+});
+
+function executeBootstrapOnlyReadback({ missingKeys = [] } = {}) {
+  const taskId = "startup-bootstrap-only";
+  let importerCalls = 0;
+  const requiredAppIds = ["app.microi.store", "app.microi.saas-engine"];
+  const V8 = {
+    CurrentUser: { Id: "admin", Level: 9999 },
+    Param: {
+      _BackgroundTaskId: taskId,
+      _BackgroundTask: { Id: taskId },
+      _BackgroundTaskFencingToken: 19,
+      _TrustedServerInvocation: true,
+      RequiredAppIds: requiredAppIds,
+      StartupDependencyBootstrapOnly: true,
+      _BackgroundTaskCheckpoint: {
+        Version: 5,
+        TaskId: taskId,
+        Phase: "Install",
+        CurrentIndex: 0,
+        Installed: 0,
+        Updated: 0,
+        RequiredAppIds: requiredAppIds,
+        StartupDependencyBootstrapOnly: true,
+        StartupBootstrapRevision: "startup-complete-closure-preflight-v1",
+        StartupBootstrapIndex: 2,
+        Plan: [
+          { StoreId: "store-app", AppId: "app.microi.store", AppName: "应用商城", AppVersion: "v7.6.12", StoreVersionId: "store-version", ApplicationType: "Platform", InstallAction: "Reinstall" },
+          { StoreId: "saas-app", AppId: "app.microi.saas-engine", AppName: "SaaS引擎", AppVersion: "v7.6.17", StoreVersionId: "saas-version", ApplicationType: "Platform", InstallAction: "Reinstall" },
+        ],
+      },
+    },
+    Method: { UpdateBackgroundTask() {} },
+    SysConfig: {},
+    Db: {
+      FromSql(sql) {
+        let key = "";
+        return {
+          AddInParameter(name, value) {
+            if (name === "@p0") key = String(value || "");
+            return this;
+          },
+          First() {
+            assert.match(sql, /FROM sys_apiengine/);
+            return missingKeys.includes(key) ? null : startupRuntimeRow(key);
+          },
+        };
+      },
+    },
+    ApiEngine: {
+      Run() {
+        importerCalls += 1;
+        throw new Error("completed bootstrap-only readback must not enter full package installation");
+      },
+    },
+  };
+  const result = new Function("V8", bulkSource)(V8);
+  return { result, importerCalls };
+}
+
+test("bootstrap-only startup recovery terminates after seven physical contracts pass", () => {
+  const { result, importerCalls } = executeBootstrapOnlyReadback();
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.StartupDependencyBootstrapOnly, true);
+  assert.equal(result.Data.StartupDependenciesVerified, 7);
+  assert.equal(importerCalls, 0);
+});
+
+test("bootstrap-only startup recovery fails closed when physical readback is incomplete", () => {
+  const { result, importerCalls } = executeBootstrapOnlyReadback({
+    missingKeys: ["platform-sys-config"],
+  });
+  assert.equal(result.Code, 0);
+  assert.equal(result.Data.FailureStage, "BootstrapOnlyReadback");
+  assert.deepEqual(JSON.parse(JSON.stringify(result.Data.MissingApiEngineKeys)), ["platform-sys-config"]);
+  assert.equal(importerCalls, 0);
+});
+
 test("every install action reports one stable operation to the authoritative counter", () => {
   assert.match(importerSource, /InstallOperationId/);
   assert.match(importerSource, /InstallAction: installAction/);
@@ -167,7 +371,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.3.4");
+  assert.equal(engine.Version, "v1.3.7");
   assert.match(bulkSource, /value\.标识 \|\| value\.Identifier/);
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
@@ -176,7 +380,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.4\.7/);
+  assert.match(importerSource, /Version: v2\.4\.9/);
   assert.match(importerSource, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
   assert.match(importerSource, /storeApiBase \+ '\/apiengine\/'/);
   assert.doesNotMatch(importerSource, /\/api\/ApiEngine\/Run/);
@@ -235,6 +439,8 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /managedDecision == 'PreserveNewer'/);
   assert.match(importerSource, /接口引擎升级冲突/);
   assert.match(importerSource, /STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1/);
+  assert.match(importerSource, /STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1/);
+  assert.match(importerSource, /StartupDependencyBootstrapOnly/);
   assert.match(importerSource, /trustedOfficialPlatformPackage/);
   assert.match(importerSource, /StartupApiBootstrapDone/);
   assert.match(importerSource, /StartupApiBootstrapRevision/);
@@ -250,13 +456,24 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /platform-private-file-url/);
   assert.match(importerSource, /platform-sys-user-public-info/);
   assert.match(importerSource, /已有不同源码或处于软删除状态/);
-  assert.match(bulkSource, /StartupDependencyRecovery: requiredAppIds\.length == 1/);
+  assert.match(bulkSource, /STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2/);
+  assert.match(bulkSource, /STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1/);
+  assert.match(bulkSource, /STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1/);
+  assert.match(bulkSource, /StartupDependencyBootstrapOnly: true/);
+  assert.match(bulkSource, /missingStartupDependencyRequirements/);
+  assert.match(bulkSource, /StartupDependenciesVerified: startupDependencyRequirements\.length/);
+  assert.match(bulkSource, /startupDependencyRecovery[\s\S]*app\.microi\.store[\s\S]*app\.microi\.saas-engine/);
+  assert.match(bulkSource, /status == 'Installed' \? 'Reinstall'/);
+  assert.match(bulkSource, /StartupDependencyRecovery: startupDependencyRecovery/);
 
   const embeddedImporter = packageModel.SysApiEngines.find(
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.4.7");
+  assert.equal(embeddedImporter.Version, "v2.4.9");
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    "Installer:StartupDependencyPreinstallBootstrapV1",
+  ));
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     "Installer:StartupApiRuntimeFlagReconciliation",
   ));
