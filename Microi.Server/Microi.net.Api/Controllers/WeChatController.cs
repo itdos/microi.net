@@ -10,6 +10,7 @@ using Senparc.Weixin.MP;
 using Senparc.Weixin.MP.AdvancedAPIs;
 using Senparc.Weixin.MP.AdvancedAPIs.OAuth;
 using Dos.Common;
+using Microi.net;
 using Microsoft.AspNetCore.Cors;
 using Senparc.Weixin.MP.Containers;
 using StackExchange.Redis;

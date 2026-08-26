@@ -459,7 +459,7 @@ public class SaaSRuntimeConfigurationTests
             @"RunRuntimeInvariantAsync\(runtimeClient,\s*upgradeLease,\s*""Upgrade25-应用发布V3结构"",\s*\(\)\s*=>\s*new Upgrade25\(\)\.EnsureApplicationStreamV3SchemaInvariant",
             source);
         Assert.Matches(
-            @"private static async Task RunRuntimeInvariantAsync[\s\S]*?upgradeLease\.ThrowIfLost\(\);[\s\S]*?var messages = await action\(\)[\s\S]*?upgradeLease\.ThrowIfLost\(\);",
+            @"private static async Task RunRuntimeInvariantAsync[\s\S]*?upgradeLease\.ConfirmOwnership\(\);[\s\S]*?var messages = await action\(\)[\s\S]*?upgradeLease\.ConfirmOwnership\(\);",
             source);
     }
 
@@ -689,9 +689,9 @@ public class SaaSRuntimeConfigurationTests
             Path.Combine(new[] { root }.Concat(segments).ToArray()));
 
         var processMemoryGuard = Read(
-            "Microi.Server", "Microi.net.Api", "Services", "ProcessMemoryGuardService.cs");
+            "Microi.Server", "Microi.net", "Runtime", "ProcessMemoryGuardService.cs");
         var sysLogQueue = Read(
-            "Microi.Server", "Microi.net.Api", "Services", "SysLogQueueService.cs");
+            "Microi.Server", "Microi.net", "Runtime", "SysLogQueueService.cs");
         var diyLangCache = Read(
             "Microi.Server", "Microi.Core", "FormEngine", "FormEngineLang.cs");
         var cache = Read(

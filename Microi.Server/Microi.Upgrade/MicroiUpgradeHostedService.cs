@@ -39,8 +39,8 @@ namespace Microi.net
                 .ToList();
             var configuredTenant = OsClient.GetConfigOsClient();
             if (configuredTenant.DosIsNullOrWhiteSpace()) configuredTenant = OsClientDefault.OsClient;
-            if (!tenantNames.Contains(configuredTenant, StringComparer.OrdinalIgnoreCase))
-                tenantNames.Insert(0, configuredTenant);
+            tenantNames.RemoveAll(item => string.Equals(item, configuredTenant, StringComparison.OrdinalIgnoreCase));
+            tenantNames.Insert(0, configuredTenant);
 
             foreach (var tenantName in tenantNames)
             {
@@ -217,13 +217,13 @@ namespace Microi.net
             string step,
             Func<Task<List<string>>> action)
         {
-            upgradeLease.ThrowIfLost();
+            upgradeLease.ConfirmOwnership();
             Console.WriteLine(
                 $"Microi：【自动升级状态】【{runtimeClient.OsClient}】【{step}】开始。");
             try
             {
                 var messages = await action().ConfigureAwait(false);
-                upgradeLease.ThrowIfLost();
+                upgradeLease.ConfirmOwnership();
                 if (messages?.Count > 0)
                 {
                     throw new InvalidOperationException(string.Join("；", messages));

@@ -678,6 +678,39 @@ namespace Dos.ORM
             FastExpandoDescriptionProvider provider = new FastExpandoDescriptionProvider();
             TypeDescriptor.AddProvider(provider, typeof(FastExpando));
         }
+
+        /// <summary>
+        /// 根据 CLR 值推断 ADO.NET 参数类型。
+        /// </summary>
+        /// <remarks>
+        /// null/DBNull 无法携带类型信息，继续按字符串处理以保持旧调用兼容；
+        /// 调用方已知列类型时应使用显式 DbType 重载。
+        /// </remarks>
+        internal static DbType InferDbType(object value)
+        {
+            if (value == null || value == DBNull.Value)
+            {
+                return DbType.String;
+            }
+
+            var valueType = value.GetType();
+            if (valueType.IsEnum)
+            {
+                valueType = Enum.GetUnderlyingType(valueType);
+            }
+
+            if (typeMap.TryGetValue(valueType, out var dbType))
+            {
+                return dbType;
+            }
+
+            if (value is TimeSpan)
+            {
+                return DbType.Time;
+            }
+
+            return DbType.String;
+        }
         private const string LinqBinary = "System.Data.Linq.Binary";
         /// <summary>
         ///// 

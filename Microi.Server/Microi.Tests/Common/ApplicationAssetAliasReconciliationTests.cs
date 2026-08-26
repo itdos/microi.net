@@ -76,6 +76,7 @@ public class ApplicationAssetAliasReconciliationTests
             "V8Engine",
             "V8McpLogic.ApplicationAliasReconciliation.cs"));
         var program = File.ReadAllText(Path.Combine(serverRoot, "Microi.net.Api", "Program.cs"));
+        var startup = File.ReadAllText(Path.Combine(serverRoot, "Microi.net", "Common", "DiyStartup.cs"));
 
         Assert.Contains("Key = BuildApplicationAssetPublishLockKey(osClient, appId)", source);
         Assert.Contains("new List<object> { \"AND\", \"BuildLog\", \"=\", oldBuildLog }", source);
@@ -84,12 +85,13 @@ public class ApplicationAssetAliasReconciliationTests
         Assert.DoesNotContain("DeleteObject", source);
         Assert.DoesNotContain("ApplicationType, \"Web\"", source);
 
-        var hdfsOffset = program.IndexOf("services.AddMicroiHDFS()", StringComparison.Ordinal);
-        var workerOffset = program.IndexOf(
+        Assert.Contains("services.AddMicroi()", program, StringComparison.Ordinal);
+        Assert.Contains("services.AddMicroiHDFS()", program, StringComparison.Ordinal);
+        Assert.Contains(
             "services.AddHostedService<ApplicationAssetAliasReconciliationWorkerService>()",
+            startup,
             StringComparison.Ordinal);
-        Assert.True(hdfsOffset >= 0);
-        Assert.True(workerOffset > hdfsOffset);
+        Assert.DoesNotContain("AddHostedService<ApplicationAssetAliasReconciliationWorkerService>", program);
     }
 
     private static (JObject App, JObject Version, JObject BuildLog) BuildState()

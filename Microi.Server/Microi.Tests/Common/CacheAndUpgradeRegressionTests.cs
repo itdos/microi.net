@@ -11,6 +11,49 @@ namespace Microi.Tests.Common;
 
 public class CacheAndUpgradeRegressionTests
 {
+    [Theory]
+    [InlineData("v7.6.0", "7.6.0", true)]
+    [InlineData("7.6.0.0", "v7.6.0", true)]
+    [InlineData("v7.6.1", "v7.6.0", false)]
+    [InlineData("legacy", "v7.6.0", false)]
+    public void UpgradeAppStore_ComparesPackageVersionsWithoutPrefixOrPartDrift(
+        string installed,
+        string incoming,
+        bool expected)
+    {
+        Assert.Equal(expected, UpgradeAppStore.PackageVersionsEquivalent(installed, incoming));
+    }
+
+    [Fact]
+    public void FormEngine_DoesNotScanRedisForDisabledSqlCountCache()
+    {
+        Assert.False(FormEngineExtend.SqlCountCacheEnabled);
+    }
+
+    [Fact]
+    public void UpgradeLease_ToleratesTransientRedisTimeoutsButStopsBeforeExpiry()
+    {
+        Assert.True(UpgradeDistributedLease.IsWithinOwnershipSafetyWindow(0));
+        Assert.True(UpgradeDistributedLease.IsWithinOwnershipSafetyWindow(
+            UpgradeDistributedLease.LeaseMilliseconds
+            - UpgradeDistributedLease.ExpirySafetyMarginMilliseconds
+            - 1));
+        Assert.False(UpgradeDistributedLease.IsWithinOwnershipSafetyWindow(
+            UpgradeDistributedLease.LeaseMilliseconds
+            - UpgradeDistributedLease.ExpirySafetyMarginMilliseconds));
+        Assert.InRange(
+            UpgradeDistributedLease.RenewRetryIntervalMilliseconds,
+            1_000,
+            UpgradeDistributedLease.RenewIntervalMilliseconds - 1);
+
+        var source = File.ReadAllText(Path.Combine(
+            FindServerRoot(),
+            "Microi.Upgrade",
+            "UpgradeExecutionSafety.cs"));
+        Assert.Contains("TaskCreationOptions.LongRunning", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("_renewTask = Task.Run", source, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void FormEngineContract_ExposesBoundedBatchCountPrimitiveToV8()
     {
@@ -927,6 +970,19 @@ public class CacheAndUpgradeRegressionTests
             version!.CompareTo(minimum) >= 0,
             $"接口引擎版本不得低于 v{minimum}，当前为 {versionText}");
         Assert.Contains($"Version: {versionText}", engine["ApiV8Code"]?.ToString());
+    }
+
+    private static string FindServerRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "Microi.Upgrade"))
+                && Directory.Exists(Path.Combine(directory.FullName, "Microi.net.Api")))
+                return directory.FullName;
+            directory = directory.Parent;
+        }
+        throw new DirectoryNotFoundException("未找到 Microi.Server 根目录。");
     }
 }
 

@@ -6,7 +6,7 @@ using Dos.Common;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace Microi.net.Api
+namespace Microi.net
 {
     /// <summary>
     /// UEditor 请求级配置。租户配置通过 FormEngine 获取，不使用跨租户静态缓存；

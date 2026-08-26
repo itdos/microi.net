@@ -729,7 +729,7 @@ namespace Microi.net
 
         private static string GetRequestIp(HttpContext context)
         {
-            // X-Forwarded-For 只允许由 Program 中 ForwardedHeadersMiddleware 在
+            // X-Forwarded-For 只允许由 API 宿主的 ForwardedHeadersMiddleware 在
             // KnownProxies/KnownNetworks 校验通过后写入 RemoteIpAddress。这里永远不
             // 直接读取请求 Header，避免伪造 127.0.0.1 绕过白名单。
             return SecurityGuardRuntimePolicy.GetConnectionIp(context);
