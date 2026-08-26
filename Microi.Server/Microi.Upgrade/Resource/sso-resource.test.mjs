@@ -36,7 +36,7 @@ function executableBody(source) {
 test('SSO official package has stable identity and no tenant data', () => {
   assert.equal(resource.PackageInfo.Name, 'SSO 身份联邦');
   assert.equal(resource.PackageInfo.AppId, 'app.microi.sso');
-  assert.equal(resource.PackageInfo.Version, 'v7.5.7');
+  assert.equal(resource.PackageInfo.Version, 'v7.5.8');
   assert.equal(resource.PackageInfo.ApplicationType, 'Platform');
   assert.deepEqual(resource.PackageInfo.RequiredPlatformCapabilities, [
     'POST /api/Sso/Begin',
@@ -106,7 +106,7 @@ test('SSO business orchestration is packaged as canonical ApiEngines', () => {
       assert.ok(engine.ApiV8Code.startsWith(tenantNotice));
       assert.equal(executableBody(engine.ApiV8Code), 'return { Code : 1 };');
     } else {
-      assert.deepEqual(policy, { Ownership: 'Application', UpgradePolicy: 'Managed' });
+      assert.deepEqual(policy, { Ownership: 'Platform', UpgradePolicy: 'Managed' });
       assert.ok(engine.ApiV8Code.startsWith(managedNotice));
     }
   }
@@ -133,7 +133,7 @@ test('SSO Managed flow invokes the tenant Hook only through a safe event whiteli
 
 test('SSO generator preserves future package versions instead of reverting to its minimum', () => {
   const generator = fs.readFileSync(path.join(directory, 'configure-sso-resource.mjs'), 'utf8');
-  assert.match(generator, /minimumPackageVersion = 'v7\.5\.6'/);
+  assert.match(generator, /minimumPackageVersion = 'v7\.5\.8'/);
   assert.match(generator, /compareSemanticVersions\(pkg\.PackageInfo\?\.Version, minimumPackageVersion\) >= 0/);
   assert.match(generator, /normalizeOfficialApiEnginePolicies\(pkg, 'app\.microi\.sso\.json'\)/);
   assert.ok(!generator.includes(".replace(/\\n*$/g, '\\n')"));

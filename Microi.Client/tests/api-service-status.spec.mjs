@@ -9,16 +9,18 @@ globalThis.window = {
     clearTimeout: globalThis.clearTimeout.bind(globalThis),
     setTimeout: globalThis.setTimeout.bind(globalThis),
     fetch: async function () {
-        return { status: 200 };
+        return healthyResponse();
     }
 };
 
 const {
     apiServiceState,
     checkApiServiceNow,
+    primeApiServiceStatus,
     reportApiServiceFailure,
     reportApiServiceRecovered,
-    reportApiServiceResponse
+    reportApiServiceResponse,
+    setApiServiceFrontendVersion
 } = await import("../src/utils/api-service-status.js");
 
 const context = {
@@ -33,6 +35,22 @@ function networkError() {
     return error;
 }
 
+function healthyResponse(version = "v7.6.5") {
+    return {
+        status: 200,
+        json: async function () {
+            return {
+                Code: 1,
+                Data: {
+                    Status: "Healthy",
+                    BackendVersion: version,
+                    CheckedAt: "2026-08-25 21:30:00"
+                }
+            };
+        }
+    };
+}
+
 function wait(milliseconds) {
     return new Promise(function (resolve) {
         setTimeout(resolve, milliseconds);
@@ -42,15 +60,22 @@ function wait(milliseconds) {
 function recover() {
     reportApiServiceRecovered({
         apiBase: context.apiBase,
-        url: "/apiengine/platform-sys-config"
+        osClient: context.osClient,
+        url: "/apiengine/platform-service-health",
+        responseData: {
+            Code: 1,
+            Data: { Status: "Healthy", BackendVersion: "v7.6.5" }
+        }
     });
 }
 
 test("a single failed endpoint does not activate the global outage screen", async function () {
     let probeCount = 0;
-    window.fetch = async function () {
+    let probeUrl = "";
+    window.fetch = async function (url) {
         probeCount += 1;
-        return { status: 200 };
+        probeUrl = url;
+        return healthyResponse();
     };
 
     reportApiServiceFailure(networkError(), context);
@@ -59,22 +84,70 @@ test("a single failed endpoint does not activate the global outage screen", asyn
     await wait(1050);
 
     assert.equal(probeCount, 1);
+    assert.match(probeUrl, /\/apiengine\/platform-service-health\?OsClient=example/);
     assert.equal(apiServiceState.active, false);
+    assert.equal(apiServiceState.backendVersion, "v7.6.5");
+    assert.equal(apiServiceState.healthCheckMode, "fixed");
 });
 
-test("a normal platform response cancels a pending outage probe", async function () {
+test("a normal platform response cannot replace the fixed health probe", async function () {
     let probeCount = 0;
     window.fetch = async function () {
         probeCount += 1;
-        return { status: 200 };
+        return healthyResponse();
     };
 
     reportApiServiceFailure(networkError(), context);
-    recover();
+    reportApiServiceRecovered({
+        apiBase: context.apiBase,
+        osClient: context.osClient,
+        url: "/apiengine/platform-sys-config",
+        responseData: { Code: 1, Data: { SysTitle: "Microi" } }
+    });
     await wait(950);
 
-    assert.equal(probeCount, 0);
+    assert.equal(probeCount, 1);
     assert.equal(apiServiceState.active, false);
+});
+
+test("an unavailable business interface stays local when the fixed health contract succeeds", async function () {
+    window.fetch = async function () {
+        return healthyResponse("7.6.6.0");
+    };
+    const error = new Error("Bad Gateway");
+    error.response = { status: 502 };
+
+    reportApiServiceFailure(error, {
+        ...context,
+        url: "/apiengine/platform-sys-menu?Action=GetSysMenuStep"
+    });
+    await wait(1050);
+
+    assert.equal(apiServiceState.active, false);
+    assert.equal(apiServiceState.backendVersion, "v7.6.6");
+});
+
+test("old servers use diagnostics only as a compatibility fallback", async function () {
+    const urls = [];
+    window.fetch = async function (url) {
+        urls.push(url);
+        if (url.includes("platform-service-health")) {
+            return {
+                status: 404,
+                json: async function () { return { Code: 0, Msg: "NoExistData" }; }
+            };
+        }
+        return { status: 200, json: async function () { return { status: "Healthy" }; } };
+    };
+
+    reportApiServiceFailure(networkError(), context);
+    await wait(1050);
+
+    assert.equal(apiServiceState.active, false);
+    assert.equal(apiServiceState.healthCheckMode, "legacy");
+    assert.equal(urls.length, 2);
+    assert.match(urls[0], /platform-service-health/);
+    assert.match(urls[1], /\/api\/Diagnostics\/health/);
 });
 
 test("the global outage screen requires two consecutive failed health probes", async function () {
@@ -139,10 +212,29 @@ test("SecurityBlocked keeps the exact backend diagnosis instead of showing API u
     assert.equal(apiServiceState.mode, "security");
 
     window.fetch = async function () {
-        return { status: 200, json: async function () { return { Code: 1 }; } };
+        return healthyResponse();
     };
     assert.equal(await checkApiServiceNow(), true);
     assert.equal(apiServiceState.active, false);
+});
+
+test("startup health priming records frontend and backend versions without activating outage", async function () {
+    window.fetch = async function () {
+        return healthyResponse("v7.6.7");
+    };
+    setApiServiceFrontendVersion("7.6.5");
+
+    assert.equal(await primeApiServiceStatus({
+        apiBase: context.apiBase,
+        osClient: context.osClient
+    }), true);
+    assert.equal(apiServiceState.active, false);
+    assert.equal(apiServiceState.frontendVersion, "v7.6.5");
+    assert.equal(apiServiceState.backendVersion, "v7.6.7");
+    assert.equal(
+        apiServiceState.healthCheckUrl,
+        "https://api.example.com/apiengine/platform-service-health?OsClient=example"
+    );
 });
 
 test("an official external API block never covers the customer tenant system", function () {
@@ -186,6 +278,10 @@ test("the security page renders complete diagnostics and current tenant branding
     assert.match(component, /state\.requestUrl/);
     assert.match(component, /state\.clientOrigin/);
     assert.match(component, /state\.apiBase/);
+    assert.match(component, /前端版本/);
+    assert.match(component, /后端版本/);
+    assert.match(component, /固定健康检查/);
+    assert.match(component, /触发诊断的业务请求（不作为健康结论）/);
     assert.match(component, /state\.reasonKey/);
     assert.match(component, /state\.securityScope/);
     assert.match(component, /SysConfig\?\.SysLogo/);

@@ -232,7 +232,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.4\.7/);
+  assert.match(source, /Version: v2\.4\.9/);
 });
 
 test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {
@@ -1380,8 +1380,17 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 4, 4\)/);
-  assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 2, 7\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 3, 7\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 4, 9\)/);
+  assert.match(appStoreUpgradeSource, /V8TrustedExecutionContext\.EnterManagedProtocol\([\s\S]*?"import-microi-store-package"/);
+  assert.match(appStoreUpgradeSource, /dynamic\s+installResult\s*;/);
+  assert.doesNotMatch(appStoreUpgradeSource, /DosResult\s+installResult\s*;/);
+  assert.doesNotMatch(appStoreUpgradeSource, /AllowAnonymous,\s*Lock\s*\r?\nFROM sys_apiengine/);
+  assert.match(appStoreUpgradeSource, /GetInstalledV8FirstApplicationRuntimeRepairReason[\s\S]*?SELECT \*[\s\S]*?FROM sys_apiengine/);
+  assert.match(appStoreUpgradeSource, /TrustedEmbeddedOfficialPackage\s*=\s*true/);
+  assert.match(source, /TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1/);
+  assert.match(source, /V8\.Method\.RequireManagedProtocolContext\(\)/);
+  assert.match(appStoreUpgradeSource, /STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1/);
   assert.equal(
     (appStoreUpgradeSource.match(/!HasPinnedImporterCapabilities\(/g) || []).length,
     3,
@@ -1434,7 +1443,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*2_002_002/);
+  assert.match(refreshSource, /versionNumber\s*<\s*2_004_009/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -1447,7 +1456,8 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /versionNumber\s*<\s*1_007_008/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_005_053/);
   assert.match(refreshSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_002_002/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_004_009/);
+  assert.match(refreshSource, /TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);
@@ -1655,7 +1665,8 @@ test("legacy databases receive application-store bootstrap columns before upgrad
   for (const columnName of ["StopHttp", "Timeout", "MaxStatements", "LimitMemory", "LimitRecursion", "Lock"]) {
     assert.match(upgradeSource, new RegExp(`\\["${columnName}"\\]\\s*=\\s*"int"`));
   }
-  assert.match(upgradeSource, /EnsureColumn\(osClientSecret,\s*"diy_field",\s*"TableName",\s*"varchar\(50\)"\)/);
+  assert.match(upgradeSource, /EnsureColumn\(osClientSecret,\s*"diy_field",\s*"TableName",\s*"varchar\(255\)"\)/);
+  assert.match(upgradeSource, /EnsureStringColumnCapacity\(osClientSecret,\s*"diy_field",\s*"TableName",\s*255\)/);
   assert.match(upgradeSource, /INNER JOIN `diy_table` dt ON dt\.`Id`=df\.`TableId`/);
   assert.match(apiProgramSource, /const int maxAttempts = 3;/);
   assert.match(apiProgramSource, /const int retrySeconds = 10;/);

@@ -226,6 +226,11 @@ namespace Microi.net
         long GetTimestamp();
 
         /// <summary>
+        /// 获取当前后端运行程序集的发行版本号。
+        /// </summary>
+        string GetBackendVersion();
+
+        /// <summary>
         /// 动态参数转换为系统日志参数
         /// </summary>
         SysLogParam DynamicToSysLogParam(dynamic dynamicParam);
@@ -308,6 +313,12 @@ namespace Microi.net
         /// SignalR/令牌运行时不直接暴露给接口引擎。
         /// </summary>
         DosResult ManageOnlineTerminal(dynamic dynamicParam);
+
+        /// <summary>
+        /// 仅供消息通知官方 Managed 接口发送微信公众号模板消息。
+        /// 公众号 AppId/AppSecret 固定从当前租户 wx_mp 读取，绝不接受或返回密钥参数。
+        /// </summary>
+        DosResult SendWeChatTemplateMessage(dynamic dynamicParam);
 
         /// <summary>当前租户超级管理员查询或发布 MQTT；Broker 实例不直接暴露给 V8。</summary>
         DosResult ManageMq(dynamic dynamicParam);

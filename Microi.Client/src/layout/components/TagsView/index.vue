@@ -1,13 +1,19 @@
 <template>
     <div id="tags-view-container-microi" class="tags-view-container-microi" :style="GetTagsViewContainerMicroiStyle()">
-        <el-tabs class="parent-tabs mci-tabs mci-tabs--workspace" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick">
-            <!-- 🔥 使用 fullPath 作为唯一标识，确保每个标签都能正确保存完整的路由信息（包括查询参数） -->
-            <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath" :name="tab.fullPath">
-                <template #label>
-                    <item v-if="tab.meta" :icon="ResolveTabIcon(tab.meta && tab.meta.icon, index)" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" @contextmenu.prevent="openMenu(tab, $event)" @dblclick="toggleFullScreenCurrentTab()" />
-                </template>
-            </el-tab-pane>
-        </el-tabs>
+        <div class="tags-view-strip">
+            <el-tabs class="parent-tabs mci-tabs mci-tabs--workspace" v-model="activeTab" closable @tab-remove="removeTab" @tab-click="handleTabClick">
+                <!-- 🔥 使用 fullPath 作为唯一标识，确保每个标签都能正确保存完整的路由信息（包括查询参数） -->
+                <el-tab-pane v-for="(tab, index) in visitedViews" :key="tab.fullPath" :name="tab.fullPath">
+                    <template #label>
+                        <item v-if="tab.meta" :icon="ResolveTabIcon(tab.meta && tab.meta.icon, index)" :title="generateTitle(tab.meta.title === undefined || tab.meta.title === '' ? tab.title : tab.meta.title)" @contextmenu.prevent="openMenu(tab, $event)" @dblclick="toggleFullScreenCurrentTab()" />
+                    </template>
+                </el-tab-pane>
+            </el-tabs>
+
+            <div class="tags-view-runtime-version" data-testid="runtime-version">
+                {{ runtimeVersionText }}
+            </div>
+        </div>
 
         <!-- 🔥 使用 keep-alive 保持页面状态，支持通过 meta.keepAlive 配置是否缓存 -->
         <div class="mci-route-view-host" v-mci-loading:page="routeLoading">
@@ -160,6 +166,8 @@ import { computed, defineAsyncComponent } from "vue";
 import { routeLoading } from "@/utils/mci-loading";
 import { resolveTabIcon } from "@/utils/tab-icon.js";
 import { getPageTabRouteViewKey } from "@/utils/page-tab-route-runtime.js";
+import { apiServiceState } from "@/utils/api-service-status.js";
+import { buildRuntimeVersionText } from "@/utils/runtime-version-text.js";
 import {
     getTabDiyTableId,
     getTabSysMenuId,
@@ -185,6 +193,10 @@ export default {
         const visitedViews = computed(() => tagsViewStore.visitedViews);
         const cachedViews = computed(() => tagsViewStore.cachedViews);
         const routes = computed(() => permissionStore.routes);
+        const runtimeVersionText = computed(() => buildRuntimeVersionText({
+            backendVersion: apiServiceState.backendVersion,
+            frontendVersion: apiServiceState.frontendVersion
+        }));
 
         return {
             diyStore,
@@ -195,7 +207,8 @@ export default {
             visitedViews,
             cachedViews,
             routeLoading,
-            routes
+            routes,
+            runtimeVersionText
         };
     },
     data() {
@@ -702,11 +715,55 @@ export default {
 
 <style lang="scss" scoped>
 .tags-view-container-microi {
+    --mci-shell-version-right: 18px;
     height: 36px;
     width: 100%;
     background: transparent;
     border: 0;
     box-shadow: none;
+
+    .tags-view-strip {
+        display: flex;
+        align-items: stretch;
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+    }
+
+    .parent-tabs {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .tags-view-runtime-version {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-self: center;
+        align-items: center;
+        height: 22px;
+        margin: 0 var(--mci-shell-version-right) 0 var(--mci-space-3, 12px);
+        padding: 0 var(--mci-space-2, 8px);
+        box-sizing: border-box;
+        border: 1px solid color-mix(
+            in srgb,
+            var(--mci-color-primary, var(--el-color-primary, #409eff)) 24%,
+            transparent
+        );
+        border-radius: var(--mci-radius-full, 999px);
+        background: color-mix(
+            in srgb,
+            var(--mci-color-primary, var(--el-color-primary, #409eff)) 10%,
+            var(--mci-bg-elevated, var(--el-bg-color, #ffffff))
+        );
+        color: var(--mci-text-secondary, var(--el-text-color-secondary, #64648c));
+        font-size: var(--mci-text-xs, 12px);
+        // font-weight: var(--mci-font-medium, 500);
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        white-space: nowrap;
+        transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+
     .tags-view-wrapper-microi {
         .tags-view-item-microi {
             display: inline-block;

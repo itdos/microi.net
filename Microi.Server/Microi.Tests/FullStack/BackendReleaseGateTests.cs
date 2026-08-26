@@ -43,10 +43,22 @@ public class BackendReleaseGateTests
             new JsonObject { ["OsClient"] = settings.OsClient });
         var publicConfigNode = Assert.IsType<JsonObject>(ReadProperty(sysConfig, "Data"));
         var publicConfig = JObject.Parse(publicConfigNode.ToJsonString());
-        var reprojected = TenantConfigurationSecurity.CreatePublicSysConfigProjection(publicConfig);
+        var projectionInput = (JObject)publicConfig.DeepClone();
+        var loginPublicKeyProperty = projectionInput.Properties().FirstOrDefault(property =>
+            string.Equals(property.Name, "LoginRsaPublicKey", StringComparison.OrdinalIgnoreCase));
+        var loginPublicKey = loginPublicKeyProperty?.Value?.ToString();
+        loginPublicKeyProperty?.Remove();
+        var reprojected = TenantConfigurationSecurity.CreatePublicSysConfigProjection(
+            projectionInput,
+            settings.OsClient);
         Assert.True(
-            JToken.DeepEquals(publicConfig, reprojected),
+            JToken.DeepEquals(projectionInput, reprojected),
             "GetSysConfig returned a field that the public security projection would remove.");
+        if (!string.IsNullOrWhiteSpace(loginPublicKey))
+        {
+            Assert.Contains("PUBLIC KEY", loginPublicKey, StringComparison.Ordinal);
+            Assert.DoesNotContain("PRIVATE KEY", loginPublicKey, StringComparison.Ordinal);
+        }
 
         var tableQuery = new JsonObject
         {

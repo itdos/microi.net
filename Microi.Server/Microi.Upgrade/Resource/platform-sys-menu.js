@@ -8,7 +8,7 @@
  */
 
 // Microi官方接口引擎：platform-sys-menu
-// Version: v1.0.0
+// Version: v1.0.1
 // 菜单与角色菜单授权编排由应用商城交付，底层原子能力保留权威缓存与租户边界。
 var action = String((V8.Param && V8.Param.Action) || '').trim();
 var allowed = {
@@ -22,6 +22,14 @@ var allowed = {
   UpdateSysRoleLimitByMenuId: 1
 };
 if (!allowed[action]) return { Code: 0, Msg: '不支持的菜单动作。' };
+var customization = V8.ApiEngine.Run('platform-marketplace-source-hook', {
+  Stage: 'BeforeSysMenuAction',
+  SourceApiEngineKey: 'platform-sys-menu',
+  Action: action
+});
+if (!customization || customization.Code !== 1) {
+  return customization || { Code: 0, Msg: '应用商城个性化 Hook 未返回结果。' };
+}
 return V8.Method.ManageSystemDirectory({
   Domain: 'SysMenu',
   Action: action,

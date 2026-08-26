@@ -65,6 +65,51 @@ public sealed class ApiControllerOwnershipCatalogTests
         }
     }
 
+    [Fact]
+    public void MigratedLegacyRoutes_AreCentralizedAndCarryRemovalWarning()
+    {
+        var serverRoot = FindServerRoot();
+        var apiRoot = Path.Combine(serverRoot, "Microi.net.Api");
+        var controllersRoot = Path.Combine(apiRoot, "Controllers");
+        var compatibilityPath = Path.Combine(
+            controllersRoot,
+            "LegacyMobileCompatibilityController.cs");
+        var compatibilitySource = File.ReadAllText(compatibilityPath);
+        var catalog = JObject.Parse(File.ReadAllText(Path.Combine(
+            apiRoot,
+            "api-ownership-catalog.json")));
+
+        Assert.Contains("仅用于兼容旧版吾码 PC / UniApp / 定制移动端", compatibilitySource);
+        Assert.Contains("本 Controller 及全部历史地址可能整体删除", compatibilitySource);
+        Assert.Contains("PlatformBootstrapCompatibilityService", compatibilitySource);
+        Assert.Equal(
+            "MigrationCandidate",
+            catalog["Controllers"]?["LegacyMobileCompatibilityController"]?["Disposition"]?.ToString());
+
+        var routes = ((JObject)catalog["ActionOverrides"]!)
+            .Properties()
+            .Where(property => property.Name.StartsWith(
+                "LegacyMobileCompatibilityController.",
+                StringComparison.Ordinal))
+            .SelectMany(property => property.Value["CompatibilityRoutes"]?.Values<string>()
+                ?? Enumerable.Empty<string>())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        Assert.NotEmpty(routes);
+
+        var otherControllerSources = Directory.GetFiles(controllersRoot, "*Controller*.cs")
+            .Where(path => !string.Equals(path, compatibilityPath, StringComparison.OrdinalIgnoreCase))
+            .Select(path => new { Path = path, Source = File.ReadAllText(path) })
+            .ToArray();
+        foreach (var route in routes)
+        {
+            Assert.Contains(route, compatibilitySource, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(
+                otherControllerSources,
+                item => item.Source.Contains(route, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
     private static string FindServerRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
