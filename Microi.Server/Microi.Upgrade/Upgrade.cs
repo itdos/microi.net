@@ -565,7 +565,7 @@ namespace Microi.net
 
             #region 升级13 --2026-02-03【必须】
             var needAppStoreVersionUpgrade = NeedUpgrade(CurrentVersion, UpgradeAppStore.Version);
-            if (!migrationFailed && (needAppStoreVersionUpgrade || await UpgradeAppStore.NeedRefreshAsync(osClientSecret.OsClient)))
+            if (!migrationFailed && needAppStoreVersionUpgrade)
             {
                 try
                 {
@@ -2998,7 +2998,7 @@ if (_microiLegacyMenuConfigChanged) {
             OsClientSecret osClientSecret,
             string targetVersionText)
         {
-            UpgradeExecutionLeaseContext.ThrowIfLost();
+            UpgradeExecutionLeaseContext.ConfirmOwnership();
             if (osClientSecret?.Db == null)
             {
                 throw new InvalidOperationException("租户数据库连接不存在。");
@@ -3087,9 +3087,7 @@ if (_microiLegacyMenuConfigChanged) {
             {
                 var status = NeedUpgrade(currentVersion, program.Value)
                     ? "待执行"
-                    : string.Equals(program.Key, "Upgrade13-官方基础应用包", StringComparison.Ordinal)
-                        ? "版本已覆盖，仍检查应用资源一致性"
-                        : "版本已覆盖，跳过";
+                    : "版本已覆盖，跳过";
                 Console.WriteLine(
                     $"Microi：【自动升级状态】【{osClient}】【{program.Key}】{status}；门禁版本={program.Value}。");
             }

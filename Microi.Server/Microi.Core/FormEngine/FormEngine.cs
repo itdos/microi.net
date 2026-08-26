@@ -17,6 +17,12 @@ namespace Microi.net
     /// </summary>
     public partial class FormEngineExtend
     {
+        // SqlCount 的缓存读取与写入当前均已关闭。保留通配符失效会让每次新增/删除
+        // 都执行 Redis SCAN；官方应用包批量导入时会放大为成千上万次无效扫描，
+        // 最终拖垮共享连接。重新启用 SqlCount 缓存前，必须改为版本号/代际 Key，
+        // 禁止恢复通配符扫描失效。
+        internal const bool SqlCountCacheEnabled = false;
+
         // 静态字段缓存，避免重复创建
         private static readonly Dos.ORM.Field[] _cachedDiyTableFields = new DiyTable().GetFields();
         private static readonly Dos.ORM.Field[] _cachedDiyFieldFields = new DiyField().GetFields();
@@ -186,8 +192,10 @@ namespace Microi.net
                     await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(cacheKey);
                 }
             }
-            //如果是给某张表【增、删】数据
-            if(formSubmitType == FormSubmitType.Add || formSubmitType == FormSubmitType.Del)
+            // 只有 SqlCount 缓存真实启用时才允许失效。当前读取/写入均关闭，执行
+            // RemoveParentAsync 只会产生无效 Redis SCAN，并在批量导入时造成超时。
+            if(SqlCountCacheEnabled
+                && (formSubmitType == FormSubmitType.Add || formSubmitType == FormSubmitType.Del))
             {
                 if (!tableId.DosIsNullOrWhiteSpace())
                 {

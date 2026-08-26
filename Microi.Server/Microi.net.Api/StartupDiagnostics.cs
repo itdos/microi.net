@@ -1,5 +1,6 @@
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Diagnostics;
 
 namespace Microi.net.Api;
 
@@ -8,6 +9,18 @@ namespace Microi.net.Api;
 /// </summary>
 public static class StartupDiagnostics
 {
+    public static void RegisterStartedReport(WebApplication app, Stopwatch timer)
+    {
+        var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+        lifetime.ApplicationStarted.Register(() =>
+        {
+            timer.Stop();
+            var addresses = GetConfiguredAddresses(app);
+            Console.WriteLine($"Microi：【成功】Microi全部启动成功！总耗时：{timer.ElapsedMilliseconds}ms");
+            Console.WriteLine($"Microi：【成功】开始访问系统吧！访问地址：【{string.Join("、", addresses)}】");
+        });
+    }
+
     public static IReadOnlyList<string> GetConfiguredAddresses(WebApplication app)
     {
         var addresses = app.Urls

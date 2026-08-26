@@ -105,13 +105,23 @@ namespace Microi.net
     /// </summary>
     internal sealed class UpgradeDistributedLease : IDisposable
     {
-        private const int LeaseMilliseconds = 120000;
-        private const int RenewIntervalMilliseconds = 30000;
+        internal const int LeaseMilliseconds = 120000;
+        internal const int RenewIntervalMilliseconds = 30000;
+        internal const int RenewRetryIntervalMilliseconds = 5000;
+        internal const int ExpirySafetyMarginMilliseconds = 15000;
         private readonly IDatabase _database;
         private readonly string _lockKey;
         private readonly CancellationTokenSource _renewCancellation = new CancellationTokenSource();
         private readonly Task _renewTask;
+        private long _lastSuccessfulExtensionTimestamp;
+        private int _consecutiveTransientRenewalFailures;
         private int _lost;
+
+        private const string RenewScript = @"
+if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('pexpire', KEYS[1], ARGV[2])
+end
+return 0";
 
         private UpgradeDistributedLease(
             IDatabase database,
@@ -123,7 +133,16 @@ namespace Microi.net
             _lockKey = lockKey;
             Owner = owner;
             FencingToken = fencingToken;
-            _renewTask = Task.Run(RenewLoopAsync);
+            _lastSuccessfulExtensionTimestamp = Stopwatch.GetTimestamp();
+            // 应用包导入会触发大量数据库与缓存工作，生产节点的普通 ThreadPool
+            // 可能短时饱和。续租若也排在同一队列中，就会出现业务仍在执行但租约
+            // 因调度饥饿过期的假丢失。使用专用后台线程承载单租户续租循环。
+            _renewTask = Task.Factory.StartNew(
+                    RenewLoopAsync,
+                    CancellationToken.None,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default)
+                .Unwrap();
         }
 
         public string Owner { get; }
@@ -203,24 +222,7 @@ return ''";
 
         public void ThrowIfLost()
         {
-            var lost = Volatile.Read(ref _lost) != 0;
-            if (!lost)
-            {
-                try
-                {
-                    lost = !string.Equals(
-                        _database.StringGet(_lockKey).ToString(),
-                        Owner,
-                        StringComparison.Ordinal);
-                }
-                catch
-                {
-                    // 无法确认所有权时必须 fail-closed，不能继续推进数据库版本。
-                    lost = true;
-                }
-            }
-
-            if (!lost)
+            if (Volatile.Read(ref _lost) == 0 && HasOwnershipSafetyWindow())
             {
                 return;
             }
@@ -229,41 +231,124 @@ return ''";
             throw new InvalidOperationException("平台升级分布式租约已丢失，已停止继续迁移和推进版本号。");
         }
 
+        /// <summary>
+        /// 在推进持久版本号或跨越迁移边界前强制向 Redis 确认 owner，
+        /// 并在确认成功时原子续租。普通迁移热路径只读取本地租约状态，
+        /// 避免每条数据都向 Redis 发起 StringGet 导致连接风暴。
+        /// </summary>
+        public void ConfirmOwnership()
+        {
+            ThrowIfLost();
+            Exception lastException = null;
+            for (var attempt = 1; attempt <= 3; attempt++)
+            {
+                try
+                {
+                    var renewed = (long)_database.ScriptEvaluate(
+                        RenewScript,
+                        new RedisKey[] { _lockKey },
+                        new RedisValue[] { Owner, LeaseMilliseconds });
+                    if (renewed == 1)
+                    {
+                        MarkExtensionSucceeded();
+                        return;
+                    }
+
+                    MarkLost();
+                    ThrowIfLost();
+                }
+                catch (InvalidOperationException) when (Volatile.Read(ref _lost) != 0)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+                    if (attempt < 3 && HasOwnershipSafetyWindow())
+                    {
+                        Thread.Sleep(250 * attempt);
+                        continue;
+                    }
+                    break;
+                }
+            }
+
+            MarkLost();
+            throw new InvalidOperationException(
+                "平台升级无法向 Redis 确认分布式租约所有权，已停止推进版本号。",
+                lastException);
+        }
+
         private async Task RenewLoopAsync()
         {
-            const string renewScript = @"
-if redis.call('get', KEYS[1]) == ARGV[1] then
-  return redis.call('pexpire', KEYS[1], ARGV[2])
-end
-return 0";
-
+            var delayMilliseconds = RenewIntervalMilliseconds;
             while (!_renewCancellation.IsCancellationRequested)
             {
                 try
                 {
                     await Task.Delay(
-                        RenewIntervalMilliseconds,
+                        delayMilliseconds,
                         _renewCancellation.Token).ConfigureAwait(false);
                     var renewed = (long)await _database.ScriptEvaluateAsync(
-                        renewScript,
+                        RenewScript,
                         new RedisKey[] { _lockKey },
                         new RedisValue[] { Owner, LeaseMilliseconds }).ConfigureAwait(false);
                     if (renewed != 1)
                     {
-                        Interlocked.Exchange(ref _lost, 1);
+                        MarkLost();
                         return;
                     }
+
+                    MarkExtensionSucceeded();
+                    delayMilliseconds = RenewIntervalMilliseconds;
                 }
                 catch (OperationCanceledException)
                 {
                     return;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    Interlocked.Exchange(ref _lost, 1);
-                    return;
+                    var failures = Interlocked.Increment(ref _consecutiveTransientRenewalFailures);
+                    if (!HasOwnershipSafetyWindow())
+                    {
+                        MarkLost();
+                        return;
+                    }
+
+                    if (failures == 1 || failures % 6 == 0)
+                    {
+                        Console.WriteLine(
+                            $"Microi：【警告】平台升级分布式租约续租暂时失败，第{failures}次，将在"
+                            + $"{RenewRetryIntervalMilliseconds / 1000}秒后重试：{ex.Message}");
+                    }
+                    delayMilliseconds = RenewRetryIntervalMilliseconds;
                 }
             }
+        }
+
+        private void MarkExtensionSucceeded()
+        {
+            Interlocked.Exchange(ref _lastSuccessfulExtensionTimestamp, Stopwatch.GetTimestamp());
+            Interlocked.Exchange(ref _consecutiveTransientRenewalFailures, 0);
+        }
+
+        private void MarkLost()
+        {
+            Interlocked.Exchange(ref _lost, 1);
+        }
+
+        private bool HasOwnershipSafetyWindow()
+        {
+            var start = Interlocked.Read(ref _lastSuccessfulExtensionTimestamp);
+            var elapsedTicks = Math.Max(0L, Stopwatch.GetTimestamp() - start);
+            var elapsedMilliseconds = elapsedTicks * 1000d / Stopwatch.Frequency;
+            return IsWithinOwnershipSafetyWindow(elapsedMilliseconds);
+        }
+
+        internal static bool IsWithinOwnershipSafetyWindow(double elapsedMilliseconds)
+        {
+            return elapsedMilliseconds
+                   < LeaseMilliseconds - ExpirySafetyMarginMilliseconds;
         }
 
         public void Dispose()
@@ -337,6 +422,11 @@ return 0";
         public static void ThrowIfLost()
         {
             CurrentLease.Value?.ThrowIfLost();
+        }
+
+        public static void ConfirmOwnership()
+        {
+            CurrentLease.Value?.ConfirmOwnership();
         }
 
         private sealed class Scope : IDisposable
