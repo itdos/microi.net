@@ -572,7 +572,10 @@ export const businessModules = {
     titleField: 'Name', statusField: 'State', tagFields: ['RoleName', 'DeptName'], phoneField: 'Phone',
     lines: [{ label: '帐号', field: 'Account' }, { label: '部门', field: 'DeptName' }, { label: '联系电话', field: 'Phone', format: 'phone' }]
   }),
-  attendance: { target: 'native-page', title: '拜访打卡', path: '/pages/native/checkin' },
+  attendance: {
+    target: 'native-page', title: '拜访打卡', path: '/pages/native/checkin',
+    menuPermission: { table: 'Diy_location', menuAliases: ['拜访打卡', '人员定位', '打卡记录'] }
+  },
   taskScan: { target: 'native-page', title: '扫码做任务', path: '/pages/task/scan' },
   // 首页地图入口必须由实际的、已授权业务菜单驱动。这样权限配置变更后无需重新发布小程序。
   deviceMap: {
