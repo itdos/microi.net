@@ -206,6 +206,21 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
+    public void AppStoreUpgrade_PropagatesCoreNullableDdlFailuresAndLogsSuccessfulProgressSeparately()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindServerRoot(),
+            "Microi.Upgrade",
+            "13-UpgradeAppStore.cs"));
+
+        Assert.Contains("var nullableErrors = new List<string>();", source);
+        Assert.Contains("msgs.AddRange(nullableErrors);", source);
+        Assert.Contains("【核心字段可空兼容】全部检查成功", source);
+        Assert.Contains("errors.Add($\"核心表 {tableName}.{columnName} 调整为允许为空失败", source);
+        Assert.DoesNotContain("msgs.Add($\"核心表 {tableName} 已将", source);
+    }
+
+    [Fact]
     public void PlatformRuntimeGate_RejectsManagedDrift_ButNeverComparesTenantHookSource()
     {
         var package = JObject.Parse(LoadBundledResources()["app.microi.saas-engine.json"]);

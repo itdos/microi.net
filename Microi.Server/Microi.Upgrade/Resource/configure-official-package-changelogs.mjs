@@ -20,11 +20,11 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
     releaseTime: '2026-08-25 16:00:00',
   }),
   'app.microi.store.json': Object.freeze({
-    version: 'v7.6.16',
-    title: 'WebOS 菜单统一迁入官方接口闭包',
+    version: 'v7.6.17',
+    title: '官方接口闭包发布控制面自举修复',
     changeType: 'Fix',
-    content: 'WebOS 菜单统一调用 platform-sys-menu，接口在执行权威菜单原子前调用应用商城 CreateIfMissing 个性化 Hook；旧商城列表地址与九包可信重放兼容继续保留。',
-    releaseTime: '2026-08-26 18:30:00',
+    content: '官方资源发布控制面先兼容消息通知新增 wechat_send_tpl_msg，再原子发布九个应用包和 106 个接口引擎投影；同时保留 WebOS 菜单统一迁移、旧商城列表地址与应用商城 CreateIfMissing 个性化 Hook。',
+    releaseTime: '2026-08-26 19:00:00',
   }),
   'app.microi.saas-engine.json': Object.freeze({
     version: 'v7.6.21',

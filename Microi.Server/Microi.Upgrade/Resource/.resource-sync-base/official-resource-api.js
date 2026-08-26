@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-upgrade-resource
- * Version: v1.3.1
+ * Version: v1.3.2
  * Function:
  * - 匿名读取固定白名单中的吾码升级资源；超级管理员可通过 SHA 乐观锁原子发布升级资源，新版应用包写入 HDFS 并仅持久化可校验指针。
  */
@@ -392,7 +392,7 @@ function validateV8FirstPackage(name, packageModel) {
     assertExactEngineKeys(packageModel, [
       "msg_event", "msg_internal_list", "msg_internal_mark_read",
       "platform-chat-system-message", "platform-chat-runtime",
-      "platform-message-notification-custom-hook"
+      "platform-message-notification-custom-hook", "wechat_send_tpl_msg"
     ], name);
   }
   if (name === "app.microi.ai-engine.json") {
@@ -480,11 +480,11 @@ function validateV8FirstPackage(name, packageModel) {
     var packageStorageCode = text(packageStorageEngine && packageStorageEngine.ApiV8Code);
     if (compareVersions(info.Version, "v7.5.57") < 0
         || !officialResourceEngine
-        || compareVersions(officialResourceEngine.Version, "v1.3.1") < 0
+        || compareVersions(officialResourceEngine.Version, "v1.3.2") < 0
         || Number(officialResourceEngine.AllowAnonymous) !== 1
         || officialResourceCode.indexOf("V8.Method.AuthorizeOfficialResourcePublish") < 0
         || storeCapabilities.indexOf("V8.Method.AuthorizeOfficialResourcePublish") < 0
-        || storeCapabilities.indexOf("ApiEngine:get-microi-upgrade-resource@v1.3.1") < 0
+        || storeCapabilities.indexOf("ApiEngine:get-microi-upgrade-resource@v1.3.2") < 0
         || !packageStorageEngine
         || compareVersions(packageStorageEngine.Version, "v1.1.0") < 0
         || Number(packageStorageEngine.StopHttp) !== 1

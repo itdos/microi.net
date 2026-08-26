@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(resourceDir, '..', '..', '..');
 const clientRoot = path.join(workspaceRoot, 'Microi.Client', 'src');
+const uniAppRoot = path.join(workspaceRoot, 'microi.uniapp', 'src');
 const packageNames = [
   'app.microi.form-engine.json',
   'app.microi.module-engine.json',
@@ -46,6 +47,24 @@ test('all relative ApiEngine routes used by the official PC client are delivered
     for (const match of source.matchAll(/\/apiengine\/[A-Za-z0-9._-]+/g)) {
       const address = match[0].replace(/--OsClient--.*$/i, '').toLowerCase();
       if (!addresses.has(address)) {
+        missing.push(`${path.relative(workspaceRoot, filePath)} -> ${match[0]}`);
+      }
+    }
+  }
+  assert.deepEqual(missing, []);
+});
+
+test('all platform runtime ApiEngine routes used by the official UniApp are delivered by the same nine-package closure', () => {
+  const missing = [];
+  for (const filePath of sourceFiles(uniAppRoot)) {
+    const source = fs.readFileSync(filePath, 'utf8')
+      .replace(/https?:\/\/[^"'\`\s)]+/gi, '');
+    for (const match of source.matchAll(/\/apiengine\/([A-Za-z0-9._-]+)/g)) {
+      const key = match[1].toLowerCase();
+      if (!key.startsWith('platform-')
+          && !key.startsWith('platform_')
+          && key !== 'microi-init') continue;
+      if (!keys.has(key)) {
         missing.push(`${path.relative(workspaceRoot, filePath)} -> ${match[0]}`);
       }
     }
