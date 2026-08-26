@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const packagePath = resolve(directory, 'app.microi.store.json');
-const targetPackageVersion = 'v7.6.16';
-const releaseTime = '2026-08-26 18:30:00';
+const targetPackageVersion = 'v7.6.17';
+const releaseTime = '2026-08-26 19:00:00';
 
 const dependencies = Object.freeze([
   Object.freeze({
@@ -29,7 +29,7 @@ const dependencies = Object.freeze([
     name: '获取与发布吾码升级资源',
     source: 'official-resource-api.js',
     id: '01KX2B5G1W8W4D4GRZHEV10H90',
-    version: 'v1.3.1',
+    version: 'v1.3.2',
     apiAddress: '/apiengine/get-microi-upgrade-resource',
     category: '应用商城',
     enableLog: 0,
@@ -37,7 +37,7 @@ const dependencies = Object.freeze([
     allowAnonymous: 1,
     capabilities: [
       'V8.Method.AuthorizeOfficialResourcePublish',
-      'ApiEngine:get-microi-upgrade-resource@v1.3.1',
+      'ApiEngine:get-microi-upgrade-resource@v1.3.2',
     ],
   }),
   Object.freeze({
@@ -240,12 +240,12 @@ info.ApiEngineCount = engines.length;
 if (info.Version === targetPackageVersion) {
   info.ChangeLog = {
     Version: targetPackageVersion,
-    Title: 'WebOS 菜单统一迁入官方接口闭包',
+    Title: '官方接口闭包发布控制面自举修复',
     ChangeType: 'Fix',
-    Content: 'WebOS 菜单统一调用 platform-sys-menu，接口在执行权威菜单原子前调用应用商城 CreateIfMissing 个性化 Hook；后端接收流量前从九个官方包补齐全部接口闭包。',
+    Content: '官方资源发布控制面先兼容消息通知新增 wechat_send_tpl_msg，再原子发布九个应用包和 106 个接口引擎投影；同时保留 WebOS 菜单统一迁移与应用商城 CreateIfMissing 个性化 Hook。',
     ReleaseTime: releaseTime,
   };
-  const historyLine = '2026-08-26 v7.6.16 WebOS 菜单统一迁入 platform-sys-menu，并在权威菜单原子前调用应用商城 CreateIfMissing 个性化 Hook。';
+  const historyLine = '2026-08-26 v7.6.17 官方资源控制面支持消息通知七接口闭包的两阶段安全自举，并保留 WebOS 菜单统一迁移与应用商城个性化 Hook。';
   const history = String(info.ChangeHistory || '');
   if (!history.includes(historyLine)) info.ChangeHistory = `${historyLine}\n${history}`;
 }
