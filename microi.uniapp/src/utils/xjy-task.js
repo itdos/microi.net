@@ -1,6 +1,10 @@
 import { V8, getUser, post } from '@/utils/request.js'
 import { PERIOD_OPTIONS, buildPeriodRange, callApiEngine, findMenu, formatFieldValue, formatRegion } from '@/platform/business-runtime.js'
 import { cachedRequest, readPageState, removeCachePrefix, writePageState } from '@/platform/cache.js'
+import { normalizeTaskFlowCapabilities } from '@/tenants/xjy/task-flow-capability.mjs'
+import {
+  resolveCustomerDeviceReference
+} from '@/tenants/xjy/task-device-reference.mjs'
 
 export const TASK_STATES = [
   { value: '', label: '全部', code: 0 },
@@ -255,6 +259,20 @@ export async function loadTask(id, refresh = false) {
   return { task: normalizeTask(result.Data), stale: cached.stale === true }
 }
 
+async function resolveCustomerDevice(taskDevice = {}) {
+  return resolveCustomerDeviceReference(taskDevice, (query) => V8.FormEngine.GetFormData('Diy_KehuSB', query))
+}
+
+export async function loadTaskFlowCapabilities(id, refresh = false) {
+  const cached = await cachedRequest(`task:flow-capability:${taskIdentity()}:${id}`, () => callApiEngine('shouhoudd_flow_capabilities', { Id: id }), {
+    maxAge: 15 * 1000,
+    refresh,
+    allowStale: false
+  })
+  const result = ensureSuccess(cached.data, '任务流程权限加载失败')
+  return { actions: normalizeTaskFlowCapabilities(result), stale: cached.stale === true }
+}
+
 function normalizeTaskDevice(row = {}) {
   return {
     ...row,
@@ -345,22 +363,16 @@ export async function loadTaskDeviceDetail(id) {
   }
 
   // 客户设备是任务设备坐标的权威来源；历史设备无坐标时再回退到客户默认位置。
-  const customerDeviceId = String(taskDevice.KehuSBID || '').trim()
   let customerDevice = null
-  if (customerDeviceId) {
-    try {
-      const result = await V8.FormEngine.GetFormData('Diy_KehuSB', {
-        Id: customerDeviceId,
-        _SelectFields: ['Id', 'KehuID', 'DingdanSPID', 'ShebeiBH', 'AnzhuangWZ', 'KehuSB_Lat', 'KehuSB_Lng']
-      })
-      if (result && Number(result.Code) === 1 && result.Data) customerDevice = result.Data
-    } catch (error) {
-      // 坐标增强读取失败时仍展示售后设备详情，避免非关键数据阻断现场处理。
-    }
+  try {
+    customerDevice = await resolveCustomerDevice(taskDevice)
+  } catch (error) {
+    // 坐标增强读取失败时仍展示售后设备详情，避免非关键数据阻断现场处理。
   }
 
   const merged = {
     ...taskDevice,
+    KehuSBID: (customerDevice && customerDevice.Id) || taskDevice.KehuSBID || '',
     KehuID: taskDevice.KehuID || (customerDevice && customerDevice.KehuID) || '',
     DingdanSPID: taskDevice.DingdanSPID || (customerDevice && customerDevice.DingdanSPID) || '',
     ShebeiBH: taskDevice.ShebeiBH || (customerDevice && customerDevice.ShebeiBH) || '',
@@ -452,7 +464,11 @@ export async function saveTaskDevice(id, taskType, values, device = {}) {
   } = values || {}
 
   // 先更新客户设备档案，再完成任务设备；失败时不会留下“任务已完成但坐标未保存”的状态。
-  const customerDeviceId = String(device.KehuSBID || taskValues.KehuSBID || '').trim()
+  const customerDevice = await resolveCustomerDevice({ ...device, ...taskValues })
+  const customerDeviceId = String(customerDevice && customerDevice.Id || '').trim()
+  if ((device.KehuSBID || taskValues.KehuSBID || device.ShebeiBH || taskValues.ShebeiBH) && !customerDeviceId) {
+    throw new Error('未找到对应的客户设备档案，请核对任务设备的客户设备Id或设备编号')
+  }
   if (customerDeviceId) {
     const customerDeviceValues = {
       Id: customerDeviceId,
@@ -573,6 +589,7 @@ export default {
   loadTaskCounts,
   loadTaskStateCounts,
   loadTask,
+  loadTaskFlowCapabilities,
   loadTaskDevices,
   loadTaskDevicesPage,
   loadTaskDeviceSummary,

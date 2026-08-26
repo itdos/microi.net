@@ -19,9 +19,9 @@ export function getProductCategories() {
 }
 
 export function getProductTypes() {
-  return post('/apiengine/getGoodsType', {
+  return V8.ApiEngine.RunLegacy('getGoodsType', {
     OsClient: appConfig.osClient
-  }, false);
+  });
 }
 
 export function getProductList({

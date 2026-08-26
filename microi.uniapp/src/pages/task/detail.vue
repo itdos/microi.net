@@ -39,14 +39,19 @@
       <view class="action-band">
         <view v-for="action in quickActions" :key="action.key" class="quick-action" hover-class="quick-action--pressed" @tap="runQuickAction(action.key)">
           <view class="quick-action__icon" :class="`tone-${action.tone || 'blue'}`"><image :src="action.icon" mode="aspectFit" /></view><text>{{ action.label }}</text>
+          <text v-if="action.key === 'devices'" class="quick-action__badge">{{ completedDeviceCount }}/{{ devices.length }}</text>
         </view>
       </view>
 
       <view v-for="(group, index) in metadataGroups" :key="`${group.name}:${index}`" class="section-band metadata-section">
-        <view class="section-heading metadata-section__heading" @tap="toggleMetadataGroup(index)">
-          <view class="section-heading__mark"></view>
-          <text>{{ group.name }}</text>
-          <text class="section-heading__hint">{{ group.fields.length }} 项</text>
+        <view class="section-heading metadata-section__heading" hover-class="section-heading--pressed" @tap="toggleMetadataGroup(index)">
+          <view class="section-heading__copy">
+            <view class="section-mark"></view>
+            <view class="section-heading__text">
+              <text>{{ group.name }}</text>
+            </view>
+            <text v-if="group.showFieldCount !== false" class="section-count">{{ group.fields.length }} 项</text>
+          </view>
           <text class="metadata-section__arrow">{{ expandedMetadata[index] ? '⌃' : '⌄' }}</text>
         </view>
         <view v-if="expandedMetadata[index]" class="metadata-section__body">
@@ -85,6 +90,7 @@ import {
   hasTaskPermission,
   loadServiceUsers,
   loadTask,
+  loadTaskFlowCapabilities,
   loadTaskDevices,
   runTaskAction,
   taskStateClass,
@@ -103,7 +109,7 @@ export default {
   mixins: [themeMixin],
   data() {
     return {
-      id: '', task: {}, devices: [], currentUser: {}, loading: true, refreshing: false,
+      id: '', task: {}, devices: [], taskCapabilities: [], currentUser: {}, loading: true, refreshing: false,
       stale: false, error: '', submitting: false, assignVisible: false, usersLoading: false, users: [],
       metadataDefinition: null, expandedMetadata: {},
       selectedUser: null, userKeyword: '', userSearchTimer: null, userLoadRequestId: 0, timeVisible: false, timeEditor: {}, editorDate: '', editorTime: '',
@@ -118,10 +124,12 @@ export default {
     isOwner() { return !!(this.currentUser.Id && String(this.currentUser.Id) === String(this.task.serviceUserId)) },
     isAdmin() { return Number(this.currentUser.Level || 0) >= 999 || /管理员/.test(this.currentUser.RoleName || '') },
     completedDeviceCount() { return this.devices.filter((item) => item.status === '已完成').length },
+    incompleteDeviceCount() { return Math.max(0, this.devices.length - this.completedDeviceCount) },
     metadataGroups() {
       const groups = this.metadataDefinition && this.metadataDefinition.groups || []
       return groups.map((group) => ({
         name: group.name || '更多业务信息',
+        showFieldCount: group.showFieldCount !== false,
         fields: (group.fields || []).filter((field) => !CUSTOM_DETAIL_FIELDS.has(field.Name))
       })).filter((group) => group.fields.length)
     },
@@ -159,9 +167,9 @@ export default {
         return actions
       }
       if (state === '待服务' && (this.isOwner || this.isAdmin)) return [{ key: 'cancel', label: '撤销接单', style: 'plain' }, { key: 'finish', label: '去完成服务', style: 'primary' }]
-      if (state === '待商家验收' && (hasTaskPermission('验收', this.currentUser) || this.isAdmin)) return [{ key: 'merchantReject', label: '退回处理', style: 'danger-plain' }, { key: 'merchantPass', label: '验收通过', style: 'success' }]
-      if (state === '待客户验收') return [{ key: 'customerReject', label: '退回处理', style: 'danger-plain' }, { key: 'customerPass', label: '确认验收', style: 'success' }]
-      if (state === '待评价') return [{ key: 'evaluate', label: '评价本次服务', style: 'primary' }]
+      if (state === '待商家验收') return [{ key: 'merchantReject', label: '退回处理', style: 'danger-plain' }, { key: 'merchantPass', label: '验收通过', style: 'success' }].filter((item) => this.canRunTaskAction(item.key))
+      if (state === '待客户验收') return [{ key: 'customerReject', label: '退回处理', style: 'danger-plain' }, { key: 'customerPass', label: '确认验收', style: 'success' }].filter((item) => this.canRunTaskAction(item.key))
+      if (state === '待评价' && this.canRunTaskAction('evaluate')) return [{ key: 'evaluate', label: '评价本次服务', style: 'primary' }]
       if (/已结束|已完成/.test(String(state)) && this.task.Pingjia && !this.task.ZhuipingNR) return [{ key: 'followUp', label: '追加评价', style: 'plain' }]
       return []
     }
@@ -175,19 +183,23 @@ export default {
   onUnload() { clearTimeout(this.userSearchTimer) },
   methods: {
     taskStateClass,
+    canRunTaskAction(action) { return this.taskCapabilities.includes(action) },
     async loadAll(refresh = false, showLoading = true) {
       if (!this.id) { this.error = '缺少任务编号'; this.loading = false; return }
       if (showLoading) this.loading = true
       this.error = ''
       try {
         const definitionRequest = loadNativeFormDefinition('Diy_ShouhouDD', refresh).catch(() => this.metadataDefinition)
-        const [taskResult, devices, definition] = await Promise.all([
+        const capabilityRequest = loadTaskFlowCapabilities(this.id, refresh).catch(() => ({ actions: [] }))
+        const [taskResult, devices, definition, capabilities] = await Promise.all([
           loadTask(this.id, refresh),
           loadTaskDevices(this.id, refresh),
-          definitionRequest
+          definitionRequest,
+          capabilityRequest
         ])
         this.task = taskResult.task
         this.devices = devices
+        this.taskCapabilities = capabilities.actions || []
         this.metadataDefinition = definition || null
         this.expandedMetadata = {}
         this.stale = taskResult.stale
@@ -235,6 +247,10 @@ export default {
     },
     async runBottomAction(key) {
       if (this.submitting) return
+      if (['merchantReject', 'merchantPass', 'customerReject', 'customerPass', 'evaluate'].includes(key) && !this.canRunTaskAction(key)) {
+        uni.showToast({ title: '当前角色无权执行该流程', icon: 'none' })
+        return
+      }
       if (key === 'assign') { this.assignVisible = true; this.loadUsers(); return }
       if (key === 'finish') {
         if (!this.task.visitTime) { uni.showToast({ title: '请先填写上门时间或完成现场打卡', icon: 'none' }); return }
@@ -285,12 +301,14 @@ export default {
       })
     },
     async submitReject() {
-      if (!this.rejectReason.trim()) { uni.showToast({ title: '请填写不通过原因', icon: 'none' }); return }
       const action = this.rejectMode === 'merchant' ? 'merchantReject' : 'customerReject'
+      if (!this.canRunTaskAction(action)) { uni.showToast({ title: '当前角色无权执行该流程', icon: 'none' }); return }
+      if (!this.rejectReason.trim()) { uni.showToast({ title: '请填写不通过原因', icon: 'none' }); return }
       await this.withSubmit(async () => { await runTaskAction(action, this.task, { reason: this.rejectReason.trim() }); this.rejectVisible = false; await this.loadAll(true, false); uni.showToast({ title: '已退回处理', icon: 'success' }) })
     },
     toggleEvaluationTag(tag) { const index = this.evaluation.tags.indexOf(tag); if (index >= 0) this.evaluation.tags.splice(index, 1); else this.evaluation.tags.push(tag) },
     async submitEvaluation() {
+      if (!this.canRunTaskAction('evaluate')) { uni.showToast({ title: '当前角色无权执行该流程', icon: 'none' }); return }
       if (!this.evaluation.rate || !this.evaluation.deviceRate || !this.evaluation.staffRate) { uni.showToast({ title: '请完成三项星级评价', icon: 'none' }); return }
       await this.withSubmit(async () => {
         const result = await callApiEngine('shouhoudd_pingjia', {
@@ -348,13 +366,20 @@ export default {
 .timeline-step__name, .timeline-step__time { display: block; }.timeline-step__name { margin-top: 10rpx; color: #66808a; font-size: 20rpx; }.timeline-step.active .timeline-step__name { color: #24505f; font-weight: 650; }.timeline-step__time { margin-top: 4rpx; color: #9aaab0; font-size: 17rpx; }
 .service-time-scroll { border-top: 10rpx solid #f1f6f8; border-bottom: 0; }.service-time-row { padding-top: 25rpx; }.service-time-step { width: 176rpx; padding: 0 4rpx 5rpx; border-radius: 8px; box-sizing: border-box; transition: background .16s ease, transform .16s ease; }.service-time-step.editable { cursor: pointer; }.service-time-step--pressed { background: #edf7fa; transform: scale(.985); }.service-time-step .timeline-step__name { white-space: nowrap; }.service-time-step .timeline-step__time { min-height: 44rpx; padding: 0 3rpx; white-space: normal; line-height: 1.35; }.timeline-divider { height: 14rpx; border-top: 1px solid #e5edef; border-bottom: 1px solid #e5edef; background: #f1f6f8; box-sizing: border-box; }
 .action-band { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 18rpx 12rpx; background: #fff; }
-.quick-action { min-width: 0; min-height: 112rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; transition: background .16s ease; }.quick-action--pressed { background: #edf5f8; }
+.quick-action { position: relative; min-width: 0; min-height: 112rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; transition: background .16s ease; }.quick-action--pressed { background: #edf5f8; }
 .quick-action__icon { width: 52rpx; height: 52rpx; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: #087da8; background: #e8f6fa; font-size: 23rpx; font-weight: 700; }.quick-action__icon image { width: 32rpx; height: 32rpx; }.quick-action__icon.tone-green { color: #167658; background: #e8f7f1; }.quick-action__icon.tone-orange { color: #bd6813; background: #fff2df; }.quick-action__icon.tone-violet { color: #6d4ba5; background: #f1ecfa; }
 .quick-action > text { max-width: 100%; margin-top: 9rpx; overflow: hidden; color: #45636e; text-overflow: ellipsis; white-space: nowrap; font-size: 21rpx; }
+.quick-action > .quick-action__badge { position: absolute; top: 1rpx; right: 8rpx; max-width: none; min-width: 90rpx; margin-top: 0; padding: 5rpx 9rpx; border-radius: 999rpx; color: #e54625;  font-size: 17rpx; font-weight: 700; line-height: 1.2; text-align: center; overflow: visible; }
 .section-band { margin-top: 14rpx; padding: 0 26rpx; background: #fff; }
-.section-heading { min-height: 82rpx; display: flex; align-items: center; border-bottom: 1px solid #edf2f4; color: #244954; font-size: 27rpx; font-weight: 700; }.section-heading__mark { width: 7rpx; height: 28rpx; margin-right: 13rpx; border-radius: 3rpx; background: #e54625; }.section-heading__hint { flex: 1; color: #8a9ca3; font-size: 20rpx; font-weight: 400; text-align: right; }
+.section-heading { min-height: 82rpx; display: flex; align-items: center; border-bottom: 1px solid #edf2f4; color: #244954; font-size: 27rpx; font-weight: 700; }
+.section-heading__copy { min-width: 0; flex: 1; display: flex; align-items: center; }
+.section-heading__text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4rpx; padding: 12rpx 0; }
+.section-heading__text > text:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.section-mark { width: 7rpx; height: 28rpx; margin-right: 13rpx; border-radius: 3rpx; background: #e54625; }
+.section-count { margin-left: 10rpx; color: #8a9ca3; font-size: 20rpx; font-weight: 400; text-align: right; }
+.section-heading--pressed { opacity: .72; background: #f5f9fa; }
 .metadata-section__heading { cursor: pointer; }
-.metadata-section__arrow { width: 38rpx; margin-left: 10rpx; color: #82969d; font-size: 24rpx; text-align: right; }
+.metadata-section__arrow { flex: none; width: 38rpx; margin-left: 10rpx; color: #82969d; font-size: 24rpx; text-align: right; }
 .metadata-section__body { padding-bottom: 4rpx; }
 .metadata-field { min-height: 84rpx; display: grid; grid-template-columns: 190rpx minmax(0, 1fr); gap: 18rpx; align-items: start; padding: 19rpx 0; border-bottom: 1px solid #edf2f4; box-sizing: border-box; }
 .metadata-field:last-child { border-bottom: 0; }

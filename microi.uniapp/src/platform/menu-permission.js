@@ -42,3 +42,7 @@ export function hasExactMenuPermission(menuId, names, user = {}) {
 export function canDeleteMenuRecord(menuId, user = {}) {
   return hasExactMenuPermission(menuId, ['Del', '删除'], user)
 }
+
+export function canAddMenuRecord(menuId, user = {}) {
+  return hasExactMenuPermission(menuId, ['Add', '新增'], user)
+}
