@@ -151,7 +151,10 @@ export async function loadTasks(options = {}) {
   const menuId = await taskMenuId(options.refresh === true)
   if (menuId) payload._SysMenuId = menuId
   const key = `task:list:${taskIdentity()}:${JSON.stringify(payload)}`
-  const cached = await cachedRequest(key, () => post('/api/ModuleEngine/GetTableData', payload, true), {
+  const cached = await cachedRequest(key, () => post('/apiengine/platform-module-data', {
+    ...payload,
+    Action: 'GetTableData'
+  }, true), {
     maxAge: pageIndex === 1 ? 30 * 1000 : 10 * 1000,
     refresh: options.refresh === true,
     allowStale: true

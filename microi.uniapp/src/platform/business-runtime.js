@@ -221,7 +221,10 @@ export async function loadModuleRows(moduleConfig, options = {}) {
     JSON.stringify(options.customRange || []), JSON.stringify(payload._Where),
     JSON.stringify(options.tableChildAuth || {})
   ].join(':')
-  const cached = await cachedRequest(requestKey, () => post('/api/ModuleEngine/GetTableData', payload, true), {
+  const cached = await cachedRequest(requestKey, () => post('/apiengine/platform-module-data', {
+    ...payload,
+    Action: 'GetTableData'
+  }, true), {
     maxAge: Number(options.cacheAge ?? (pageIndex === 1 ? 45 * 1000 : 10 * 1000)),
     refresh: options.refresh === true,
     allowStale: true

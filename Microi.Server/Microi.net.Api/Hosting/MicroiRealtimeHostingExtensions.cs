@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json.Serialization;
 using StackExchange.Redis;
 
+// ASP.NET Core 实时传输宿主组合。
 namespace Microi.net.Api;
 
 /// <summary>

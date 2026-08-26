@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Newtonsoft.Json.Linq;
 
+// ASP.NET Core MCP 授权协议适配层。
 namespace Microi.net.Api
 {
     public enum V8McpScope

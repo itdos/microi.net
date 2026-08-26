@@ -2724,7 +2724,7 @@ BOUNDARY RULES:
 - **固定看板启动 URL 规范** — 使用 Microi.Client 前端 WebBase（不是 API Server）拼接 \`/?OsClient=${ctx.osClient}#/access-login?access_key=<密钥>&redirect=<encodeURIComponent后的站内Hash路由>\`。例如 redirect 原值为 \`/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX\` 时编码为 \`%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX\`。完整自动登录链接应保存为电视/看板的启动页；兑换成功后地址栏变为不含 \`access_key\` 的目标页是安全设计，禁止给目标页再次追加密钥，也禁止新增 \`permanent=1\` 一类由客户端决定有效期的参数
 
 ## OCR 能力
-- 图片/PDF 文字识别统一调用后端 \`V8.OCR.Recognize({...})\` 或受认证的 \`POST /api/Ocr/Recognize\`；不要在接口引擎里自行读取密钥并调用 OCR endpoint。
+- 图片/PDF 文字识别统一调用后端 \`V8.OCR.Recognize({...})\` 或受认证的 \`POST /apiengine/platform-ocr-recognize\`；不要在接口引擎里自行读取密钥并调用 OCR endpoint。
 - 服务地址、API Key、固定 Header、超时和配额只从当前租户 \`sys_osclients\` 的“OCR识别”Tab 读取，调用参数不得覆盖 endpoint、密钥、Header 或 OsClient。
 - 相关实现与交付规范读取 \`microi.skills/ocr-engine/SKILL.md\`；批量或长耗时 OCR 必须使用数据库/MQ/outbox 的可恢复幂等任务，不能使用单节点内存队列。
 

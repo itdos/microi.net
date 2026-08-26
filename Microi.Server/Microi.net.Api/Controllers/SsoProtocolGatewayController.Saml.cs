@@ -9,6 +9,7 @@ using System.ServiceModel.Security;
 using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
+using Microi.net;
 using ITfoxtec.Identity.Saml2;
 using ITfoxtec.Identity.Saml2.MvcCore;
 using ITfoxtec.Identity.Saml2.Schemas;
@@ -22,7 +23,7 @@ using StackExchange.Redis;
 
 namespace Microi.net.Api
 {
-    public sealed partial class SsoController
+    public sealed partial class SsoProtocolGatewayController
     {
         private const string DefaultSamlSigningSetting = "SSO.SAML.SigningCertificate";
 

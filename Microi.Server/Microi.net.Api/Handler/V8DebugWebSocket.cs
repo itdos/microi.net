@@ -15,6 +15,7 @@ using Dos.Common;
 using Newtonsoft.Json.Linq;
 using Microsoft.AspNetCore.Http;
 
+// ASP.NET Core V8 调试 WebSocket 适配层。
 namespace Microi.net.Api
 {
     /// <summary>

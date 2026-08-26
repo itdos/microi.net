@@ -1,9 +1,11 @@
 using Dos.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 
+// ASP.NET Core 微信签名/AES 回调协议适配器；回调业务由 Managed ApiEngine 承载。
 namespace Microi.net.Api;
 
 [Route("api/[controller]/[action]")]

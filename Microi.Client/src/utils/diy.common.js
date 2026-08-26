@@ -2390,19 +2390,6 @@ var DiyCommon = {
         }
         if (method == "post") {
             axiosOption.data = param;
-            // if (paramType && paramType.toLowerCase() == "json") {
-            //     axiosOption.data = param;
-            // } else if (
-            //     url.indexOf("/api/ApiEngine/") > -1 ||
-            //     url.indexOf("/api/DataSourceEngine/") > -1 ||
-            //     url.indexOf("/api/FormEngine/") > -1 ||
-            //     url.indexOf("/api/ModuleEngine/") > -1 ||
-            //     url.indexOf("/apiengine") > -1 ||
-            // ) {
-            //     axiosOption.data = param;
-            // } else {
-            //     axiosOption.data = qs.stringify(param);
-            // }
         } else if (method == "get") {
             axiosOption.params = param;
         } else {
@@ -2524,13 +2511,6 @@ var DiyCommon = {
             };
             if (method == "post") {
                 axiosOption.data = param.Param;
-                // if (paramType && paramType.toLowerCase() == "json") {
-                //     axiosOption.data = param.Param;
-                // } else if (url.indexOf("/api/ApiEngine/") > -1 || url.indexOf("/api/DataSourceEngine/") > -1 || url.indexOf("/api/FormEngine/") > -1 || url.indexOf("/api/ModuleEngine/") > -1) {
-                //     axiosOption.data = param.Param;
-                // } else {
-                //     axiosOption.data = qs.stringify(param.Param);
-                // }
             } else if (method == "get") {
                 axiosOption.params = param.Param;
             } else {
@@ -4902,7 +4882,7 @@ var DiyCommon = {
          * @returns
          */
         async GetData(param, callback) {
-            var result = await DiyCommon.PostAsync("/api/DataSourceEngine/Run", param, null, null, "json");
+            var result = await DiyCommon.PostAsync("/apiengine/platform-data-source-run", param, null, null, "json");
             if (typeof callback === "function") {
                 callback(result);
             }
@@ -4924,14 +4904,14 @@ var DiyCommon = {
                 for (let key in param2) {
                     param[key] = param2[key];
                 }
-                var result = await DiyCommon.PostAsync("/api/DataSourceEngine/Run", param, null, null, "json");
+                var result = await DiyCommon.PostAsync("/apiengine/platform-data-source-run", param, null, null, "json");
                 if (param3) {
                     param3(result);
                 }
                 return result;
             } else {
                 //如果是这种模式：.Run({}, function(){})
-                var result = await DiyCommon.PostAsync("/api/DataSourceEngine/Run", param, null, null, "json");
+                var result = await DiyCommon.PostAsync("/apiengine/platform-data-source-run", param, null, null, "json");
                 if (param2) {
                     param2(result);
                 }
@@ -4996,14 +4976,20 @@ var DiyCommon = {
     },
     ModuleEngine: {
         async GetTableData(param, callback) {
-            var result = await DiyCommon.PostAsync("/api/ModuleEngine/GetTableData", param, null, null, "json");
+            var result = await DiyCommon.PostAsync("/apiengine/platform-module-data", {
+                ...(param || {}),
+                Action: "GetTableData"
+            }, null, null, "json");
             if (callback) {
                 callback(result);
             }
             return result;
         },
         async GetTableTree(param, callback) {
-            var result = await DiyCommon.PostAsync("/api/ModuleEngine/GetTableTree", param, null, null, "json");
+            var result = await DiyCommon.PostAsync("/apiengine/platform-module-data", {
+                ...(param || {}),
+                Action: "GetTableDataTree"
+            }, null, null, "json");
             if (callback) {
                 callback(result);
             }
@@ -5734,7 +5720,7 @@ var DiyCommon = {
         try {
             var token = DiyCommon.getToken();
             if (DiyCommon.IsNull(token)) return Promise.resolve();
-            var url = DiyCommon.GetApiBase() + "/api/UserBehavior/Signal";
+            var url = DiyCommon.GetApiBase() + "/apiengine/platform-user-behavior-signal";
             if (keepalive === true && typeof fetch === "function") {
                 return fetch(url, {
                     method: "POST",

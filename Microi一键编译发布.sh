@@ -972,6 +972,21 @@ fi
 if [ "$BUILD_BACKEND" = true ]; then
     print_phase "编译后端解决方案"
 
+    # Microi.net 是可独立发布的私有源码子仓，当它不在主解决方案项目清单中时，
+    # 只通过 ProjectReference 参与解决方案编译可能仅刷新 Debug 输出。发布和打包会读取
+    # bin/Release，所以必须先显式生成同版本 Release DLL，避免 API 引用新版本而发布物
+    # 夹带旧 DLL。这里不改变类库 TFM，仅固定发布配置。
+    _MICROI_NET_PROJECT="Microi.Server/Microi.net/Microi.net.csproj"
+    if [ -f "$_MICROI_NET_PROJECT" ]; then
+        print_step "显式编译 Microi.net Release 产物（防止子仓误用 Debug/旧版本 DLL）..."
+        echo ""
+        if ! dotnet build "$_MICROI_NET_PROJECT" -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false; then
+            print_fail "Microi.net Release 编译失败"
+        fi
+        print_success "Microi.net Release 产物已就绪"
+        echo ""
+    fi
+
     print_step "dotnet build $(basename "$SLN_FILE") -c Release --no-incremental $_BUILD_EXTRA_ARGS -p:GeneratePackageOnBuild=false"
     echo ""
     _BUILD_LOG="$(mktemp /tmp/microi-build.XXXXXX.log)"
@@ -1022,13 +1037,22 @@ if [ "$PUSH_NUGET" = true ] || [ "$HAS_ENCRYPT" = true ]; then
     print_step "dotnet pack 生成 NuGet 包（--no-build，基于已编译产物）..."
     echo ""
     _PACK_LOG="$(mktemp /tmp/microi-pack.XXXXXX.log)"
-    if ! dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS 2>&1 | tee "$_PACK_LOG"; then
+    _PACK_FAILED=0
+    if [ -f "${_MICROI_NET_PROJECT:-}" ]; then
+        dotnet pack "$_MICROI_NET_PROJECT" -c Release --no-build $_BUILD_EXTRA_ARGS 2>&1 | tee "$_PACK_LOG" || _PACK_FAILED=1
+    fi
+    dotnet pack "$SLN_FILE" -c Release --no-build $_BUILD_EXTRA_ARGS 2>&1 | tee -a "$_PACK_LOG" || _PACK_FAILED=1
+    if [ "$_PACK_FAILED" -ne 0 ]; then
         echo ""
         echo -e "  ${RED}───── Pack 错误摘要─────${NC}"
         grep -E "error |Error |FAILED" "$_PACK_LOG" 2>/dev/null | tail -20 || tail -30 "$_PACK_LOG"
         echo -e "  ${RED}────────────────────────${NC}"
         rm -f "$_PACK_LOG"
         print_fail "NuGet 包生成失败"
+    fi
+    if [ -f "${_MICROI_NET_PROJECT:-}" ] && [ ! -f "Microi.Server/Microi.net/bin/Release/Microi.net.${VERSION}.nupkg" ]; then
+        rm -f "$_PACK_LOG"
+        print_fail "Microi.net.${VERSION}.nupkg 未生成，禁止用旧版本包继续发布"
     fi
     rm -f "$_PACK_LOG"
     echo ""
@@ -1236,8 +1260,10 @@ if [ "$DLL_ENCRYPTED" = true ]; then
         local encrypted_dll="$PUBLISH_DIR/${project_name}.dll"
 
         if [ ! -d "$package_dir" ]; then print_warning "目录不存在: $package_dir"; return 1; fi
-        local latest_package=$(find "$package_dir" -name "*.nupkg" -not -name "*.symbols.nupkg" 2>/dev/null | sort -V -r | head -1)
-        if [ -z "$latest_package" ]; then print_warning "未找到包文件: $project_name"; return 1; fi
+        # 只允许修改本次版本的确定包；不得用“目录中最新包”回退，否则打包失败时
+        # 会意外改写上一个已发布版本。
+        local latest_package="$package_dir/${project_name}.${VERSION}.nupkg"
+        if [ ! -f "$latest_package" ]; then print_warning "未找到本次版本包: $latest_package"; return 1; fi
         if [ ! -f "$encrypted_dll" ]; then print_warning "未找到加密DLL: $encrypted_dll"; return 1; fi
 
         local nupkg_before_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')

@@ -5,13 +5,13 @@ using Microi.net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
+// ASP.NET Core 平台管理员协议授权适配层。
 namespace Microi.net.Api
 {
     /// <summary>
     /// Protects platform-management endpoints whose effects are not safely
     /// expressible as ordinary menu visibility (jobs, queues, search indexes,
     /// data-source execution and host diagnostics).
-    ///
     /// This is a server-side, non-overridable baseline.  Menu permissions may
     /// hide or further restrict these features, but can never grant them to a
     /// non-platform-administrator.

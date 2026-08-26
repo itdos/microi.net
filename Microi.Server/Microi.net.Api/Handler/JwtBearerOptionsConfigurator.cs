@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Dos.Common;
 
+// ASP.NET Core DiyToken/JWT 宿主配置。
 namespace Microi.net.Api;
 
 public class JwtBearerOptionsConfigurator : IConfigureNamedOptions<JwtBearerOptions>

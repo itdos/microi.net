@@ -16,6 +16,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
 
+// ASP.NET Core OAuth 协议适配器；业务编排由官方 Managed ApiEngine 承载。
 namespace Microi.net.Api
 {
     /// <summary>

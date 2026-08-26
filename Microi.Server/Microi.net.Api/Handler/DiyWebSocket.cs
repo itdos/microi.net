@@ -29,6 +29,7 @@ using Microi.net.Api;
 using MongoDB.Bson.Serialization.Attributes;
 using Newtonsoft.Json.Linq;
 
+// ASP.NET Core SignalR 兼容传输适配层。
 namespace Microi.net
 {
     /// <summary>

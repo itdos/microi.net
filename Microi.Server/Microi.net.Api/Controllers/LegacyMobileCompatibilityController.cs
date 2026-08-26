@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -15,6 +16,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 
+// 仅为旧版移动端保留的统一兼容转发网关；禁止新增业务，调用方迁完后整体删除。
 namespace Microi.net.Api
 {
     /*
@@ -47,6 +49,10 @@ namespace Microi.net.Api
         private const string CreateTenantApiEngineKey = "platform-create-tenant";
         private const string UpdateCurrentProfileApiEngineKey = "platform-user-update-profile";
         private const string UpdateUserPreferencesApiEngineKey = "platform-user-update-preferences";
+        private const string SystemMessageApiEngineKey = "platform-chat-system-message";
+        private const string AiPlatformAccountEngineKey = "platform-ai-account";
+        private const string AiPlatformRuntimeEngineKey = "platform-ai-runtime";
+        private const string TenantSystemSettingsApiEngineKey = "platform-tenant-system-settings";
 
         public sealed class CreateTenantRequest
         {
@@ -67,21 +73,6 @@ namespace Microi.net.Api
         public sealed class UpdateMyDefaultIndexUrlRequest
         {
             public string DefaultIndexUrl { get; set; }
-        }
-
-        /// <summary>
-        /// 兼容最早期前端的 POST /api/Upload。实际鉴权、租户绑定、路径校验、
-        /// HDFS 上传和微信内容安全均复用当前 HDFSController.Upload，不保留第二份业务实现。
-        /// </summary>
-        [HttpPost("~/api/Upload")]
-        [Consumes("application/json", "multipart/form-data")]
-        public Task<JsonResult> Upload(DiyUploadParam param)
-        {
-            var hdfsController = new HDFSController
-            {
-                ControllerContext = ControllerContext
-            };
-            return hdfsController.Upload(param);
         }
 
         /// <summary>
@@ -128,7 +119,7 @@ namespace Microi.net.Api
                 return new DosResult(1002, null, "访问密钥会话不允许发送实时聊天消息。");
 
             var rawResult = await ManagedApiEngineCompatibility.RunAsync(
-                "platform-chat-system-message",
+                SystemMessageApiEngineKey,
                 new JObject
                 {
                     ["Action"] = "PersistSystemMessage",
@@ -387,6 +378,245 @@ namespace Microi.net.Api
                 clientUser));
         }
 
+        /// <summary>
+        /// 兼容已经由 platform-ai-runtime / platform-ai-account 接口引擎实现的
+        /// 旧 /api/Ai/* JSON 地址。这里只做请求归一化和可信租户绑定。
+        /// </summary>
+        [HttpGet("~/api/Ai/UpdateConversationTitle")]
+        [HttpPost("~/api/Ai/UpdateConversationTitle")]
+        [HttpGet("~/api/Ai/RecognizeIntent")]
+        [HttpPost("~/api/Ai/RecognizeIntent")]
+        [HttpGet("~/api/Ai/Chat")]
+        [HttpPost("~/api/Ai/Chat")]
+        [HttpGet("~/api/Ai/NL2SQL")]
+        [HttpPost("~/api/Ai/NL2SQL")]
+        [HttpGet("~/api/Ai/RelayTokenSummary")]
+        [HttpPost("~/api/Ai/RelayTokenSummary")]
+        [HttpGet("~/api/Ai/SubGetInfo")]
+        [HttpPost("~/api/Ai/SubGetInfo")]
+        [HttpGet("~/api/Ai/GetUserAiApiKey")]
+        [HttpPost("~/api/Ai/GetUserAiApiKey")]
+        [HttpGet("~/api/Ai/ResetUserAiApiKey")]
+        [HttpPost("~/api/Ai/ResetUserAiApiKey")]
+        [HttpGet("~/api/Ai/GetUserAiUsage")]
+        [HttpPost("~/api/Ai/GetUserAiUsage")]
+        [HttpGet("~/api/Ai/SubCreateOrder")]
+        [HttpPost("~/api/Ai/SubCreateOrder")]
+        [HttpGet("~/api/Ai/SubCreateAlipay")]
+        [HttpPost("~/api/Ai/SubCreateAlipay")]
+        [HttpGet("~/api/Ai/SubGetOrders")]
+        [HttpPost("~/api/Ai/SubGetOrders")]
+        [HttpGet("~/api/Ai/SubConsumeQuota")]
+        [HttpPost("~/api/Ai/SubConsumeQuota")]
+        [HttpGet("~/api/Ai/SubGetOrderStatus")]
+        [HttpPost("~/api/Ai/SubGetOrderStatus")]
+        [HttpGet("~/api/Ai/GenerateProfileAvatar")]
+        [HttpPost("~/api/Ai/GenerateProfileAvatar")]
+        [HttpGet("~/api/Ai/CreateMiniMaxVideo")]
+        [HttpPost("~/api/Ai/CreateMiniMaxVideo")]
+        [HttpGet("~/api/Ai/GetMiniMaxVideoTask")]
+        [HttpPost("~/api/Ai/GetMiniMaxVideoTask")]
+        [HttpGet("~/api/Ai/GetMiniMaxVideoFile")]
+        [HttpPost("~/api/Ai/GetMiniMaxVideoFile")]
+        [HttpGet("~/api/Ai/ProxyGetQuotaStatus")]
+        [HttpPost("~/api/Ai/ProxyGetQuotaStatus")]
+        public Task<JsonResult> RunLegacyAiCompatibility()
+        {
+            return RunLegacyAiCompatibilityAsync(false);
+        }
+
+        /// <summary>
+        /// 兼容旧 AI 管理入口；平台管理员基线由不可覆盖的宿主过滤器校验。
+        /// </summary>
+        [HttpGet("~/api/Ai/NL2V8EngineSync")]
+        [HttpPost("~/api/Ai/NL2V8EngineSync")]
+        [HttpGet("~/api/Ai/SubGetApiKeyList")]
+        [HttpPost("~/api/Ai/SubGetApiKeyList")]
+        [HttpGet("~/api/Ai/SubGetApiKeyBindUsers")]
+        [HttpPost("~/api/Ai/SubGetApiKeyBindUsers")]
+        [HttpGet("~/api/Ai/SubGetApiKeyCapacity")]
+        [HttpPost("~/api/Ai/SubGetApiKeyCapacity")]
+        [HttpGet("~/api/Ai/PersistMiniMaxVideoFile")]
+        [HttpPost("~/api/Ai/PersistMiniMaxVideoFile")]
+        [PlatformAdminOnly]
+        public Task<JsonResult> RunLegacyAiAdminCompatibility()
+        {
+            return RunLegacyAiCompatibilityAsync(false);
+        }
+
+        /// <summary>
+        /// 兼容旧 AI 套餐和模型发现地址；仅这两个历史查询允许匿名调用。
+        /// </summary>
+        [HttpGet("~/api/Ai/SubGetPlans")]
+        [HttpPost("~/api/Ai/SubGetPlans")]
+        [HttpGet("~/api/Ai/SubGetModels")]
+        [HttpPost("~/api/Ai/SubGetModels")]
+        [AllowAnonymous]
+        public Task<JsonResult> RunLegacyAiAnonymousCompatibility()
+        {
+            return RunLegacyAiCompatibilityAsync(true);
+        }
+
+        /// <summary>
+        /// 兼容已迁入接口引擎的租户设置列表与删除动作。Secret 保存、揭示和
+        /// 身份二次校验仍由 TenantSystemSettingsController 的可信协议边界处理。
+        /// </summary>
+        [HttpGet("~/api/TenantSystemSettings/List")]
+        [HttpPost("~/api/TenantSystemSettings/List")]
+        [HttpGet("~/api/TenantSystemSettings/Delete")]
+        [HttpPost("~/api/TenantSystemSettings/Delete")]
+        [PlatformAdminOnly]
+        public async Task<JsonResult> RunLegacyTenantSystemSettingsCompatibility()
+        {
+            var action = Request.Path.Value?
+                .TrimEnd('/')
+                .Split('/')
+                .LastOrDefault();
+            if (!string.Equals(action, "List", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(action, "Delete", StringComparison.OrdinalIgnoreCase))
+            {
+                Response.StatusCode = StatusCodes.Status404NotFound;
+                return Json(new DosResult(0, null, "旧租户设置兼容地址不存在。"));
+            }
+
+            var request = await MergeRequestParam(null);
+            request["Action"] = string.Equals(action, "List", StringComparison.OrdinalIgnoreCase)
+                ? "List"
+                : "Delete";
+            return await RunAuthenticatedManagedCompatibilityAsync(
+                TenantSystemSettingsApiEngineKey,
+                request,
+                "登录身份已过期，请重新登录。",
+                true);
+        }
+
+        /// <summary>
+        /// 兼容早期移动端读取旧 OS 版本常量。新客户端不应再依赖此版本号。
+        /// </summary>
+        [HttpGet("~/api/Os/GetOsVersion")]
+        [HttpPost("~/api/Os/GetOsVersion")]
+        [AllowAnonymous]
+        public JsonResult GetOsVersion()
+        {
+            return Json(new DosResult(1, "v3.10.24"));
+        }
+
+        /// <summary>
+        /// 兼容旧二维码文本接口。该方法只保留图像编码原子，不承载业务规则。
+        /// </summary>
+        [HttpGet("~/api/Os/CreateQRCode")]
+        [HttpPost("~/api/Os/CreateQRCode")]
+        [AllowAnonymous]
+        public ActionResult CreateQRCode(string qrCodeContent)
+        {
+            if ((qrCodeContent ?? string.Empty).Length > 2048)
+                return BadRequest("二维码内容不能超过 2048 个字符。");
+
+            if (qrCodeContent.DosIsNullOrWhiteSpace()) qrCodeContent = "测试内容";
+            using var stream = ImageHelper.CreateQRCode(qrCodeContent);
+            using var reader = new BinaryReader(stream);
+            return Content(Convert.ToBase64String(
+                reader.ReadBytes(Convert.ToInt32(stream.Length))));
+        }
+
+        /// <summary>
+        /// 兼容旧 image 组件需要的二维码 PNG 响应。
+        /// </summary>
+        [HttpGet("~/api/Os/CreateQRCodeImage")]
+        [HttpPost("~/api/Os/CreateQRCodeImage")]
+        [AllowAnonymous]
+        public ActionResult CreateQRCodeImage(string qrCodeContent)
+        {
+            if ((qrCodeContent ?? string.Empty).Length > 2048)
+                return BadRequest("二维码内容不能超过 2048 个字符。");
+
+            if (qrCodeContent.DosIsNullOrWhiteSpace()) qrCodeContent = "测试内容";
+            using var stream = ImageHelper.CreateQRCode(qrCodeContent);
+            using var reader = new BinaryReader(stream);
+            return File(
+                reader.ReadBytes(Convert.ToInt32(stream.Length)),
+                "image/png");
+        }
+
+        /// <summary>
+        /// 兼容旧客户端读取 Microi.net 文件版本。
+        /// </summary>
+        [HttpGet("~/api/Os/GetMicroiNetVersion")]
+        [HttpPost("~/api/Os/GetMicroiNetVersion")]
+        [AllowAnonymous]
+        public JsonResult GetMicroiNetVersion()
+        {
+            return Json(new DosResult(
+                1,
+                FileVersionInfo.GetVersionInfo("Microi.net.dll").FileVersion));
+        }
+
+        /// <summary>
+        /// 兼容旧客户端读取宿主三项白名单启动配置。
+        /// </summary>
+        [HttpGet("~/api/Os/GetOsClient")]
+        [HttpPost("~/api/Os/GetOsClient")]
+        [AllowAnonymous]
+        public string GetOsClient()
+        {
+            var osClient = DiyToken.GetCurrentOsClient();
+            osClient = osClient.DosIsNullOrWhiteSpace()
+                ? ConfigHelper.GetAppSettings("OsClient")
+                : osClient;
+            var osClientType = Environment.GetEnvironmentVariable(
+                "OsClientType",
+                EnvironmentVariableTarget.Process);
+            osClientType = osClientType.DosIsNullOrWhiteSpace()
+                ? ConfigHelper.GetAppSettings("OsClientType")
+                : osClientType;
+            var osClientNetwork = Environment.GetEnvironmentVariable(
+                "OsClientNetwork",
+                EnvironmentVariableTarget.Process);
+            osClientNetwork = osClientNetwork.DosIsNullOrWhiteSpace()
+                ? ConfigHelper.GetAppSettings("OsClientNetwork")
+                : osClientNetwork;
+
+            return JsonHelper.Serialize(new
+            {
+                OsClient = osClient,
+                OsClientType = osClientType,
+                OsClientNetwork = osClientNetwork
+            });
+        }
+
+        /// <summary>
+        /// 兼容旧平台管理员读取硬件标识；授权仍由宿主可信边界完成。
+        /// </summary>
+        [HttpGet("~/api/Os/GetHID")]
+        [HttpPost("~/api/Os/GetHID")]
+        [PlatformAdminOnly]
+        public string GetHID()
+        {
+            return DiyLicense.GetHardwareID();
+        }
+
+        /// <summary>
+        /// 兼容旧客户端的服务端时间格式。
+        /// </summary>
+        [HttpGet("~/api/Os/GetDateTimeNow")]
+        [HttpPost("~/api/Os/GetDateTimeNow")]
+        [AllowAnonymous]
+        public JsonResult GetDateTimeNow()
+        {
+            return Json(new DosResult(1, DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss")));
+        }
+
+        /// <summary>
+        /// 兼容旧平台管理员启动检查入口。
+        /// </summary>
+        [HttpGet("~/api/Os/MicroiNetInitCheck")]
+        [HttpPost("~/api/Os/MicroiNetInitCheck")]
+        [PlatformAdminOnly]
+        public JsonResult MicroiNetInitCheck(string osClient)
+        {
+            return Json(new DosResult(1, DiyStartup.MicroiNetInitCheck()));
+        }
+
         private async Task<JsonResult> RunSysUserAdminCompatibilityAsync(
             string action,
             JObject request)
@@ -405,6 +635,106 @@ namespace Microi.net.Api
                 SysUserAdminApiEngineKey,
                 request,
                 currentToken.CurrentUser));
+        }
+
+        private async Task<JsonResult> RunLegacyAiCompatibilityAsync(bool allowAnonymous)
+        {
+            var legacyAction = Request.Path.Value?
+                .TrimEnd('/')
+                .Split('/')
+                .LastOrDefault();
+            var target = ResolveLegacyAiTarget(legacyAction);
+            if (target == null)
+            {
+                Response.StatusCode = StatusCodes.Status404NotFound;
+                return Json(new DosResult(0, null, "旧 AI 兼容地址不存在。"));
+            }
+
+            JObject currentUser = null;
+            var osClient = DiyToken.GetCurrentOsClient(false);
+            if (!allowAnonymous)
+            {
+                var currentToken = await DiyToken.GetCurrentToken(false);
+                if (currentToken?.CurrentUser == null)
+                {
+                    Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
+                }
+                osClient = currentToken.OsClient;
+                currentUser = JObject.FromObject(currentToken.CurrentUser);
+            }
+            if (osClient.DosIsNullOrWhiteSpace()) osClient = OsClient.GetConfigOsClient();
+
+            var request = await MergeRequestParam(null);
+            NormalizeLegacyAiAliases(request);
+            foreach (var property in request.Properties()
+                         .Where(item => string.Equals(
+                             item.Name,
+                             "OsClient",
+                             StringComparison.OrdinalIgnoreCase)
+                             || string.Equals(
+                                 item.Name,
+                                 "_OsClient",
+                                 StringComparison.OrdinalIgnoreCase))
+                         .ToList())
+            {
+                property.Remove();
+            }
+            request["Action"] = target.Value.ManagedAction;
+            request["OsClient"] = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                target.Value.EngineKey,
+                request,
+                currentUser));
+        }
+
+        private static (string EngineKey, string ManagedAction)? ResolveLegacyAiTarget(
+            string legacyAction)
+        {
+            return legacyAction?.ToLowerInvariant() switch
+            {
+                "updateconversationtitle" => (AiPlatformRuntimeEngineKey, "UpdateConversationTitle"),
+                "recognizeintent" => (AiPlatformRuntimeEngineKey, "RecognizeIntent"),
+                "chat" => (AiPlatformRuntimeEngineKey, "Chat"),
+                "nl2sql" => (AiPlatformRuntimeEngineKey, "NL2SQL"),
+                "nl2v8enginesync" => (AiPlatformRuntimeEngineKey, "NL2V8EngineSync"),
+                "relaytokensummary" => (AiPlatformAccountEngineKey, "GetRelayTokenSummary"),
+                "subgetplans" => (AiPlatformAccountEngineKey, "GetPlans"),
+                "subgetinfo" => (AiPlatformAccountEngineKey, "GetSubscription"),
+                "getuseraiapikey" => (AiPlatformAccountEngineKey, "EnsureUserAiApiKey"),
+                "resetuseraiapikey" => (AiPlatformAccountEngineKey, "ResetUserAiApiKey"),
+                "getuseraiusage" => (AiPlatformAccountEngineKey, "GetRelayTokenUsage"),
+                "subcreateorder" => (AiPlatformAccountEngineKey, "CreateOrder"),
+                "subcreatealipay" => (AiPlatformAccountEngineKey, "CreateAlipay"),
+                "subgetorders" => (AiPlatformAccountEngineKey, "GetOrders"),
+                "subconsumequota" => (AiPlatformAccountEngineKey, "ConsumeQuota"),
+                "subgetorderstatus" => (AiPlatformAccountEngineKey, "GetOrderStatus"),
+                "subgetapikeylist" => (AiPlatformAccountEngineKey, "GetApiKeyList"),
+                "subgetapikeybindusers" => (AiPlatformAccountEngineKey, "GetApiKeyBindUsers"),
+                "subgetapikeycapacity" => (AiPlatformAccountEngineKey, "GetApiKeyCapacity"),
+                "generateprofileavatar" => (AiPlatformAccountEngineKey, "GenerateProfileAvatar"),
+                "createminimaxvideo" => (AiPlatformAccountEngineKey, "CreateMiniMaxVideo"),
+                "getminimaxvideotask" => (AiPlatformAccountEngineKey, "GetMiniMaxVideoTask"),
+                "getminimaxvideofile" => (AiPlatformAccountEngineKey, "GetMiniMaxVideoFile"),
+                "persistminimaxvideofile" => (AiPlatformAccountEngineKey, "PersistMiniMaxVideoFile"),
+                "proxygetquotastatus" => (AiPlatformAccountEngineKey, "GetSubscription"),
+                "subgetmodels" => (AiPlatformAccountEngineKey, "GetModels"),
+                _ => null
+            };
+        }
+
+        private static void NormalizeLegacyAiAliases(JObject request)
+        {
+            CopyAlias(request, "pageIndex", "PageIndex");
+            CopyAlias(request, "pageSize", "PageSize");
+            CopyAlias(request, "orderId", "OrderId");
+            CopyAlias(request, "apiKeyId", "ApiKeyId");
+        }
+
+        private static void CopyAlias(JObject request, string source, string target)
+        {
+            if (request[target] == null && request[source] != null)
+                request[target] = request[source];
         }
 
         private async Task<JsonResult> RunAuthenticatedManagedCompatibilityAsync(

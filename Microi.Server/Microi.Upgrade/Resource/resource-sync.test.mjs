@@ -1105,8 +1105,8 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 106);
-  assert.equal(managedCount, 98);
+  assert.equal(seenKeys.size, 113);
+  assert.equal(managedCount, 105);
   assert.equal(createIfMissingCount, 8);
 
   assert.match(officialEngineSource, /action === "reconcilepublishedapiengines"/);

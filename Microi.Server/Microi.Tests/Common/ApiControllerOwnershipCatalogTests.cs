@@ -14,8 +14,8 @@ public sealed class ApiControllerOwnershipCatalogTests
         var catalog = JObject.Parse(File.ReadAllText(Path.Combine(
             apiRoot,
             "api-ownership-catalog.json")));
-        var catalogControllers = ((JObject)catalog["Controllers"]!)
-            .Properties()
+        var catalogControllers = ((JObject)catalog["Controllers"]!).Properties()
+            .Concat(((JObject)catalog["ProtocolGateways"]!).Properties())
             .Select(property => property.Name)
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
@@ -29,12 +29,44 @@ public sealed class ApiControllerOwnershipCatalogTests
             .ToArray();
 
         Assert.Equal(sourceControllers, catalogControllers);
+        Assert.Equal(
+            new[]
+            {
+                "AiController",
+                "ApiEngineController",
+                "CaptchaController",
+                "DiagnosticsController",
+                "ExternalLoginController",
+                "FormEngineController",
+                "HDFSController",
+                "IdentityVerificationController",
+                "LegacyMobileCompatibilityController",
+                "LicenseController",
+                "MarketplaceSourceController",
+                "MessageController",
+                "MicroAppController",
+                "SsoProtocolGatewayController",
+                "SysUserAccessKeyController",
+                "SysUserController",
+                "TenantSystemSettingsController",
+                "V8EngineController",
+                "WeChatContentSecurityController",
+                "WeChatController",
+                "WorkFlowController"
+            },
+            sourceControllers);
         Assert.DoesNotContain(
             ((JObject)catalog["Controllers"]!).Properties(),
             property => string.Equals(
                 property.Value["Disposition"]?.ToString(),
                 "ManagedBusinessFacade",
                 StringComparison.Ordinal));
+
+        foreach (var gateway in ((JObject)catalog["ProtocolGateways"]!).Properties())
+        {
+            Assert.Equal("Microi.net.Api", gateway.Value["Project"]?.ToString());
+            Assert.StartsWith("Controllers/", gateway.Value["Source"]?.ToString(), StringComparison.Ordinal);
+        }
 
         foreach (var migrated in ((JObject)catalog["MigratedControllers"]!).Properties())
         {
@@ -74,7 +106,10 @@ public sealed class ApiControllerOwnershipCatalogTests
         {
             "/api/aiworkflow/", "/api/backgroundtask/", "/api/cache/", "/api/im/",
             "/api/job/", "/api/mq/", "/api/mqtt/", "/api/onlineterminal/",
-            "/api/searchengine/", "/api/spider/", "/api/syslog/"
+            "/api/searchengine/", "/api/spider/", "/api/syslog/",
+            "/api/datasourceengine/", "/api/moduleengine/", "/api/ocr/",
+            "/api/office/", "/api/securityguard/", "/api/translate/",
+            "/api/userbehavior/"
         })
         {
             Assert.DoesNotContain($"\"{prefix}\"", source, StringComparison.OrdinalIgnoreCase);
@@ -113,7 +148,14 @@ public sealed class ApiControllerOwnershipCatalogTests
             .ToArray();
         Assert.NotEmpty(routes);
 
-        var otherControllerSources = Directory.GetFiles(controllersRoot, "*Controller*.cs")
+        var protocolSources = ((JObject)catalog["ProtocolGateways"]!)
+            .Properties()
+            .Select(property => Path.Combine(
+                serverRoot,
+                property.Value["Project"]!.ToString(),
+                property.Value["Source"]!.ToString().Replace('/', Path.DirectorySeparatorChar)));
+        var otherControllerSources = protocolSources
+            .Concat(Directory.GetFiles(controllersRoot, "*Controller*.cs"))
             .Where(path => !string.Equals(path, compatibilityPath, StringComparison.OrdinalIgnoreCase))
             .Select(path => new { Path = path, Source = File.ReadAllText(path) })
             .ToArray();
@@ -152,6 +194,7 @@ public sealed class ApiControllerOwnershipCatalogTests
         Assert.DoesNotContain("OnConnectionGuardEvent", source, StringComparison.Ordinal);
         Assert.DoesNotContain("UseSenparcWeixin", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Task.Run", source, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(serverRoot, "Microi.AspNetCore")));
     }
 
     private static string FindServerRoot()

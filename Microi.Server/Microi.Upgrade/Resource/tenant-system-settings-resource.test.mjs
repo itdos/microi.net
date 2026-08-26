@@ -149,7 +149,7 @@ test('disabled templates remain manageable while Managed V8 receives only a boun
   assert.doesNotMatch(secretSaveBranch, /ManagedApiEngineCompatibility\.RunAsync/)
 
   const revealBranch = controllerSource.match(
-    /public async Task<JsonResult> Reveal[\s\S]*?\n        \}\n\n        \[HttpPost\]\s*public async Task<JsonResult> Delete/,
+    /public async Task<JsonResult> Reveal[\s\S]*?\r?\n        \}\r?\n\r?\n        private static async Task<DosResult<CurrentToken>> RequireAdministratorAsync/,
   )?.[0] || ''
   assert.ok(revealBranch)
   assert.match(revealBranch, /IdentityVerificationSecurity\.ConsumeTicketAsync/)

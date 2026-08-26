@@ -907,7 +907,7 @@ export default {
             }
             //2024-04-24：如果是报表引擎，通过数据源引擎获取数据
             if (self.CurrentDiyTableModel.ReportId && self.CurrentDiyTableModel.DataSourceId) {
-                url = "/api/DataSourceEngine/Run";
+                url = "/apiengine/platform-data-source-run";
                 param.DataSourceKey = self.CurrentDiyTableModel.DataSourceId;
             }
             if (self.PropsRequestParams && typeof self.PropsRequestParams === "object") {

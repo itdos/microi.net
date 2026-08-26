@@ -1555,7 +1555,7 @@ export function createMicroiV8(options = {}) {
     GetTableDataTree: '/api/FormEngine/getTableDataTree',
     GetTableDataTreeAnonymous: '/api/FormEngine/getTableDataTreeAnonymous',
     ApiEngineRun: '/api/ApiEngine/run',
-    ModuleEngineRun: '/api/ModuleEngine/run',
+    ModuleEngineRun: '/apiengine/platform-module-data',
     RefreshToken: '/api/SysUser/refreshToken',
     RefreshLoginUser: '/api/SysUser/refreshLoginUser',
     Upload: '/api/HDFS/Upload',
@@ -1816,7 +1816,7 @@ export function createMicroiV8(options = {}) {
         ? { ModuleEngineKey: moduleKeyOrParam, ...(dataOrCallback || {}) }
         : (moduleKeyOrParam || {});
       const cb = typeof dataOrCallback === 'function' ? dataOrCallback : callback;
-      return withCallback(legacyPost(legacyApi.ModuleEngineRun, data), cb);
+      return withCallback(legacyPost(legacyApi.ModuleEngineRun, { Action: 'GetTableData', ...data }), cb);
     }
   };
 

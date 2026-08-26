@@ -5,12 +5,17 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const workspaceRoot = path.resolve(projectRoot, '..')
 
 function read(relativePath) {
   return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8')
 }
 
-test('homepage presents Microi as a continuous low-code, V8, and pro-code platform', () => {
+function readWorkspace(relativePath) {
+  return fs.readFileSync(path.join(workspaceRoot, relativePath), 'utf8')
+}
+
+test('homepage presents Microi as an open-source AI development framework', () => {
   const component = read('docs/.vitepress/theme/components/AiStudioHome.vue')
   const frontmatter = read('docs/index.md')
   const studioIndex = component.indexOf('<section class="ai-studio-stage')
@@ -19,19 +24,60 @@ test('homepage presents Microi as a continuous low-code, V8, and pro-code platfo
   assert.ok(studioIndex >= 0 && studioIndex < positioningIndex, 'AI Studio should appear before the platform-positioning hero')
   assert.match(component, /class="ai-studio-brand"/)
   assert.match(component, />Microi AI Studio<\/p>/)
-  assert.match(component, /titleLeadParts: \['不只是开源 AI', '低代码'\]/)
-  assert.match(component, /titleEmphasisLines: \['更是企业级 AI', '应用开发框架'\]/)
+  assert.match(component, /eyebrow: '开源 AI 开发框架'/)
+  assert.match(component, /titleLeadParts: \['开源 AI', '开发框架'\]/)
+  assert.match(component, /titleEmphasisLines: \['20\+ 成熟引擎'\]/)
+  assert.match(component, /AI 低代码、微服务与 V8 引擎/)
+  assert.match(component, /Token 更省 10 倍\+/)
+  assert.match(component, /速度提升 10 倍\+/)
   assert.match(component, /可视化低代码/)
   assert.match(component, /V8 在线编程/)
   assert.match(component, /专业代码/)
   assert.match(component, /\.NET · Vue · 微服务 · SDK/)
   assert.match(component, /MCP \+ Skills/)
-  assert.match(component, /chatTitle: '让 AI 站在成熟引擎上，专注业务增量'/)
-  assert.match(component, /chatDesc: '以 20\+ 成熟引擎为底座，贯通可视化低代码、V8 与 \.NET \/ Vue 源码扩展，让中大型应用快速交付，也能持续深度演进。'/)
+  assert.match(component, /chatTitle: '让 AI 站在 20\+ 成熟引擎上，更快交付'/)
+  assert.match(component, /开箱即可进入业务开发/)
   assert.match(component, /href="\/doc\/getting-started\/start-use"/)
   assert.match(component, /href="\/doc\/getting-started\/source-code-architecture"/)
-  assert.match(frontmatter, /开源 AI 应用开发平台与企业级开发框架/)
+  assert.match(frontmatter, /titleTemplate: 开源 AI 开发框架/)
+  assert.match(frontmatter, /20\+ 成熟引擎、AI 低代码、微服务与 V8 引擎/)
+  assert.doesNotMatch(frontmatter, /开源 AI 应用开发平台|企业级 AI 应用开发框架|开源 AI 低代码平台/)
   assert.doesNotMatch(frontmatter, /titleTemplate: 相比传统 AI 开发/)
+})
+
+test('current Chinese brand surfaces use one canonical positioning and keep the legacy term only as an SEO keyword', () => {
+  const surfaces = {
+    'root README': readWorkspace('README.md'),
+    'docs README': read('README.md'),
+    'docs landing page': read('docs/doc/index.md'),
+    'home frontmatter': read('docs/index.md'),
+    'Chinese site config': read('docs/.vitepress/config/zh.ts'),
+    'login frontmatter': read('docs/login.md'),
+    'login component': read('docs/.vitepress/theme/components/LoginPage.vue'),
+    'AI chat introduction': read('docs/.vitepress/theme/components/AiChat.vue'),
+    'design contract': read('MCI-DESIGN.md'),
+    'article template': read('docs/doc/about/template.md'),
+    'training syllabus': read('docs/doc/about/microi-training-syllabus.md'),
+    'package metadata': read('package.json')
+  }
+
+  for (const [name, content] of Object.entries(surfaces)) {
+    assert.match(content, /开源 AI 开发框架/, `${name} should use the canonical positioning`)
+    assert.doesNotMatch(
+      content,
+      /开源 AI 应用开发平台|企业级 AI 应用开发框架|开源 AI 低代码平台/,
+      `${name} should not use a legacy positioning as the product name`
+    )
+  }
+
+  const seo = read('docs/.vitepress/config/seo.ts')
+  assert.match(seo, /'开源 AI 开发框架'/)
+  assert.match(seo, /const ZH_BASE_KEYWORDS = \[[^\n]*'开源 AI 应用开发平台'/)
+  assert.doesNotMatch(
+    seo.replace(/^const ZH_BASE_KEYWORDS.*$/m, ''),
+    /开源 AI 应用开发平台/,
+    'the legacy term is allowed only in the SEO keyword list'
+  )
 })
 
 test('homepage visual contract covers responsive, focus, and reduced-motion states', () => {

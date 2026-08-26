@@ -97,14 +97,7 @@ LibreTranslate 的 `/frontend/settings`、API Key 管理、`/metrics` 和 Web UI
 
 ## HTTP 与 MCP 调用
 
-已登录客户端可以调用以下后端接口；请求体中的 `OsClient` 会被忽略，以验证后的 Token 租户为准：
-
-- `POST /api/Translate/TranslateText`
-- `POST /api/Translate/Detect`
-- `POST /api/Translate/Languages`
-- `POST /api/Translate/TranslateFile`
-- `POST /api/Translate/Suggest`
-- `POST /api/Translate/Health`
+已登录客户端统一调用官方 Managed 接口 `POST /apiengine/platform-translate-runtime`；请求体中的 `OsClient` 会被忽略，以验证后的 Token 租户为准。通过 `Action` 选择 `TranslateText`、`Detect`、`Languages`、`TranslateFile`、`Suggest` 或 `Health`。个性化逻辑只能写入 `platform-runtime-custom-hook`，官方接口不会向 Hook 传递原文、文件 Base64、供应商地址或密钥。
 
 吾码 MCP 提供同一套租户绑定能力：
 

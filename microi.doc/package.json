@@ -1,7 +1,7 @@
 {
 	"name": "microi-docs",
 	"version": "1.0.0",
-	"description": "Microi吾码框架文档",
+	"description": "Microi吾码开源 AI 开发框架官网与官方文档",
 	"type": "module",
 	"author": {
 		"name": "Microi风闲",

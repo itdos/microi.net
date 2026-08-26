@@ -11,37 +11,36 @@
     "OperationsKernel": "诊断、安全防护和宿主运维能力；保持 C#，不得承载租户可变业务。"
   },
   "Controllers": {
-    "AiController": { "OwnerType": "Application", "OwnerId": "app.microi.ai-engine", "Disposition": "ProtocolGateway" },
     "ApiEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "CaptchaController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
-    "DataSourceEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "DiagnosticsController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
-    "ExternalLoginController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
     "FormEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "HDFSController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "HomeController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
-    "IdentityVerificationController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
     "LegacyMobileCompatibilityController": { "OwnerType": "Compatibility", "OwnerId": "managed-api-engine-legacy-routes", "Disposition": "MigrationCandidate" },
-    "LicenseController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
-    "MarketplaceSourceController": { "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "ProtocolGateway" },
-    "MessageController": { "OwnerType": "Application", "OwnerId": "app.microi.message-notification", "Disposition": "ProtocolGateway" },
-    "MicroAppController": { "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "KernelRuntime" },
-    "ModuleEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "OcrController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "OfficeController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "OsController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
-    "SecurityGuardController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
-    "SsoController": { "OwnerType": "Application", "OwnerId": "app.microi.sso", "Disposition": "ProtocolGateway" },
-    "SysUserAccessKeyController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
-    "SysUserController": { "OwnerType": "Application", "OwnerId": "app.microi.sys_user", "Disposition": "BootstrapIdentity" },
-    "TenantSystemSettingsController": { "OwnerType": "Application", "OwnerId": "app.microi.sys-config", "Disposition": "ProtocolGateway" },
-    "TranslateController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "UEditorController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "ProtocolGateway" },
-    "UserBehaviorController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.observability", "Disposition": "OperationsKernel" },
     "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "WeChatContentSecurityController": { "OwnerType": "Application", "OwnerId": "microi-wechat-content-security", "Disposition": "ProtocolGateway" },
-    "WeChatController": { "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
     "WorkFlowController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" }
+  },
+  "ProtocolGateways": {
+    "AiController": { "Project": "Microi.net.Api", "Source": "Controllers/AiController.cs", "OwnerType": "Application", "OwnerId": "app.microi.ai-engine", "Disposition": "ProtocolGateway" },
+    "CaptchaController": { "Project": "Microi.net.Api", "Source": "Controllers/CaptchaController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
+    "DiagnosticsController": { "Project": "Microi.net.Api", "Source": "Controllers/DiagnosticsController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
+    "ExternalLoginController": { "Project": "Microi.net.Api", "Source": "Controllers/ExternalLoginController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
+    "IdentityVerificationController": { "Project": "Microi.net.Api", "Source": "Controllers/IdentityVerificationController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
+    "LicenseController": { "Project": "Microi.net.Api", "Source": "Controllers/LicenseController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
+    "MarketplaceSourceController": { "Project": "Microi.net.Api", "Source": "Controllers/MarketplaceSourceController.cs", "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "ProtocolGateway" },
+    "MessageController": { "Project": "Microi.net.Api", "Source": "Controllers/MessageController.cs", "OwnerType": "Application", "OwnerId": "app.microi.message-notification", "Disposition": "ProtocolGateway" },
+    "MicroAppController": { "Project": "Microi.net.Api", "Source": "Controllers/MicroAppController.cs", "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "KernelRuntime" },
+    "SysUserAccessKeyController": { "Project": "Microi.net.Api", "Source": "Controllers/SysUserAccessKeyController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
+    "SysUserController": { "Project": "Microi.net.Api", "Source": "Controllers/SysUserController.cs", "OwnerType": "Application", "OwnerId": "app.microi.sys_user", "Disposition": "BootstrapIdentity" },
+    "TenantSystemSettingsController": { "Project": "Microi.net.Api", "Source": "Controllers/TenantSystemSettingsController.cs", "OwnerType": "Application", "OwnerId": "app.microi.sys-config", "Disposition": "ProtocolGateway" },
+    "WeChatContentSecurityController": { "Project": "Microi.net.Api", "Source": "Controllers/WeChatContentSecurityController.cs", "OwnerType": "Application", "OwnerId": "microi-wechat-content-security", "Disposition": "ProtocolGateway" },
+    "WeChatController": { "Project": "Microi.net.Api", "Source": "Controllers/WeChatController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
+    "SsoProtocolGatewayController": {
+      "Project": "Microi.net.Api",
+      "Source": "Controllers/SsoProtocolGatewayController.cs",
+      "OwnerType": "Application",
+      "OwnerId": "app.microi.sso",
+      "Disposition": "ProtocolGateway",
+      "CompatibilityRoute": "/api/Sso/*"
+    }
   },
   "MigratedControllers": {
     "AIWorkFlowController": { "Target": "ApiEngine:platform-ai-workflow", "Atom": "V8.Method.ManageAiWorkflow", "RemovedAt": "2026-08-24" },
@@ -53,15 +52,26 @@
     "MqttController": { "Target": "ApiEngine:platform-mqtt", "Atom": "V8.Method.ManageMqtt", "RemovedAt": "2026-08-24" },
     "OnlineTerminalController": { "Target": "ApiEngine:platform-online-terminal", "Atom": "V8.Method.ManageOnlineTerminal", "RemovedAt": "2026-08-24" },
     "SearchEngineController": { "Target": "ApiEngine:platform-search-engine", "Atom": "V8.Method.ManageSearchEngine", "RemovedAt": "2026-08-24" },
+    "SsoController": { "Target": "Microi.net.Api:SsoProtocolGatewayController + app.microi.sso Managed ApiEngines", "Atom": "OIDC/SAML2/CAS trusted protocol gateway", "RemovedAt": "2026-08-26" },
     "SpiderController": { "Target": "V8.Spider（原 Controller 已长期注释，不存在活动 HTTP 兼容入口）", "Atom": "IMicroiSpider", "RemovedAt": "2026-08-24" },
     "SysLogController": { "Target": "ApiEngine:platform-client-log", "Atom": "V8.Method.AddSysLog", "RemovedAt": "2026-08-24" },
     "SysBaseDataController": { "Target": "ApiEngine:platform-sys-base-data", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
     "SysDeptController": { "Target": "ApiEngine:platform-sys-dept", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
     "SysMenuController": { "Target": "ApiEngine:platform-sys-menu", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
     "SysRoleController": { "Target": "ApiEngine:platform-sys-role", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
-    "UploadController": { "Target": "LegacyMobileCompatibilityController.Upload -> HDFSController.Upload", "Atom": "IMicroiHDFS", "RemovedAt": "2026-08-26" },
+    "UploadController": { "Target": "HDFSController.Upload（含 /api/Upload 兼容路由）", "Atom": "IMicroiHDFS", "RemovedAt": "2026-08-26" },
     "iTdosHeartController": { "Target": "DiagnosticsController.LegacyITdosHeart", "Atom": "ASP.NET Core liveness compatibility route", "RemovedAt": "2026-08-26" },
-    "DiyChatController": { "Target": "LegacyMobileCompatibilityController.SendSystemMessage", "Atom": "Managed ApiEngine plus SignalR transport", "RemovedAt": "2026-08-26" }
+    "DiyChatController": { "Target": "LegacyMobileCompatibilityController.SendSystemMessage", "Atom": "Managed ApiEngine plus SignalR transport", "RemovedAt": "2026-08-26" },
+    "HomeController": { "Target": "GlobalExceptionHandler + DiagnosticsController", "Atom": "统一 DosResult 异常与宿主诊断", "RemovedAt": "2026-08-26" },
+    "OsController": { "Target": "LegacyMobileCompatibilityController /api/Os/* routes", "Atom": "历史工具原子与启动兼容投影", "RemovedAt": "2026-08-26" },
+    "UEditorController": { "Target": "HDFSController.LegacyUEditorUpload", "Atom": "UEditorService + IMicroiHDFS", "RemovedAt": "2026-08-26" }
+    ,"DataSourceEngineController": { "Target": "ApiEngine:platform-data-source-run", "Atom": "V8.Method.RunDataSourceEngine", "RemovedAt": "2026-08-26" }
+    ,"ModuleEngineController": { "Target": "ApiEngine:platform-module-data", "Atom": "V8.Method.RunModuleEngine", "RemovedAt": "2026-08-26" }
+    ,"OcrController": { "Target": "ApiEngine:platform-ocr-recognize", "Atom": "V8.OCR.Recognize", "RemovedAt": "2026-08-26" }
+    ,"OfficeController": { "Target": "ApiEngine:platform-office-export-word-by-template", "Atom": "V8.Method.ExportWordByTemplate", "RemovedAt": "2026-08-26" }
+    ,"SecurityGuardController": { "Target": "ApiEngine:mci-system-observability-action", "Atom": "V8.Method.ManageSystemObservability", "RemovedAt": "2026-08-26" }
+    ,"TranslateController": { "Target": "ApiEngine:platform-translate-runtime", "Atom": "V8.TranslateEngine", "RemovedAt": "2026-08-26" }
+    ,"UserBehaviorController": { "Target": "ApiEngine:platform-user-behavior-signal", "Atom": "V8.Method.TrackUserBehavior", "RemovedAt": "2026-08-26" }
   },
   "SupportDirectories": {
     "Scope": ["Middleware", "Handler", "Hosting"],
@@ -79,11 +89,13 @@
       "Handler/PlatformAdminOnlyAttribute.cs",
       "Handler/V8DebugWebSocket.cs",
       "Handler/V8McpAuthorizationAttribute.cs",
-      "Middleware/SecurityGuardMiddleware.cs",
       "Hosting/MicroiApiHostExtensions.cs",
-      "Hosting/MicroiRealtimeHostingExtensions.cs"
+      "Hosting/MicroiRealtimeHostingExtensions.cs",
+      "Hosting/StartupDiagnostics.cs",
+      "Middleware/SecurityGuardMiddleware.cs"
     ],
-    "Reason": "仅保留 HTTP/MVC/SignalR 传输、宿主启动与生命周期、安全网关、存储网络边界和第三方原始协议适配；不允许新增租户可变业务编排。"
+    "TargetProject": "Microi.net.Api",
+    "Reason": "所有 ASP.NET Controller 与宿主传输代码统一留在 Microi.net.Api；V8 已完整接管的业务 Controller 物理删除，无法由 V8 承担的协议 Controller 只做薄适配，可复用实现进入对应功能类库。禁止为承载 Controller 新建中转项目或把 netstandard 类库改成 net10.0/多目标框架。"
   },
   "MigratedSupportCode": {
     "Services/ApplicationAssetAliasReconciliationWorkerService.cs": { "Disposition": "MovedLibrary", "Target": "Microi.net/Runtime/ApplicationAssetAliasReconciliationWorkerService.cs", "RemovedAt": "2026-08-26" },
@@ -103,7 +115,8 @@
     "Program.cs/DatabaseConnectionGuardObserver": { "Disposition": "MovedCore", "Target": "Microi.Core/MicroiEngine.cs", "RemovedAt": "2026-08-26" },
     "Program.cs/MainTenantStartupGate": { "Disposition": "MovedUpgrade", "Target": "Microi.Upgrade/MicroiStartupGate.cs", "RemovedAt": "2026-08-26" },
     "Program.cs/WeChatRuntimeInitialization": { "Disposition": "MovedPlugin", "Target": "Microi.WeChat/MicroiWeChatExtensions.cs", "RemovedAt": "2026-08-26" },
-    "Program.cs/AspNetLifecycleAndFailureSummary": { "Disposition": "MovedTransport", "Target": "Microi.net.Api/Hosting/MicroiApiHostExtensions.cs", "Reason": "Program 仅保留插件清单；宿主构建、主租户门禁调用、中间件管线和统一启动失败汇总由固定 ASP.NET 传输层拥有。", "RemovedAt": "2026-08-26" },
+    "Program.cs/AspNetLifecycleAndFailureSummary": { "Disposition": "MovedTransport", "Target": "Microi.net.Api/Hosting/MicroiApiHostExtensions.cs", "Reason": "Program 仅保留有注释的插件注册清单；宿主构建、主租户门禁调用、中间件管线和统一启动失败汇总进入同一 API 项目的 Hosting 组合文件。", "RemovedAt": "2026-08-26" },
+    "StartupDiagnostics.cs": { "Disposition": "MovedTransport", "Target": "Microi.net.Api/Hosting/StartupDiagnostics.cs", "RemovedAt": "2026-08-26" },
     "Services/UserBehaviorSessionTracker.cs": { "Disposition": "MovedCore", "Target": "Microi.Core/Runtime/UserBehaviorSessionTracker.cs", "RemovedAt": "2026-08-25" },
     "Services/RichTextPrivateAssetReference.cs": { "Disposition": "MovedCore", "Target": "Microi.Core/Security/RichTextPrivateAssetReference.cs", "RemovedAt": "2026-08-25" },
     "Handler/UEditor/Handlers/ConfigHandler.cs": { "Disposition": "Deleted", "Reason": "静态跨租户配置已改为请求级租户配置。", "RemovedAt": "2026-08-25" },
@@ -113,12 +126,34 @@
     "Handler/UEditor/StringExtension.cs": { "Disposition": "Deleted", "Reason": "仅为已删除的本地文件处理代码服务。", "RemovedAt": "2026-08-25" }
   },
   "ActionOverrides": {
-    "LegacyMobileCompatibilityController.Upload": {
+    "HDFSController.LegacyUpload": {
       "Disposition": "MigrationCandidate",
-      "Target": "HDFSController.Upload",
+      "Target": "HDFSController.Upload（同一方法的兼容路由）",
       "CompatibilityRoutes": ["/api/Upload"],
       "NativeBoundary": ["authenticated tenant binding", "upload path and file policy", "private HDFS storage", "WeChat content security"],
       "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换到 /api/HDFS/Upload，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "HDFSController.LegacyUEditorUpload": {
+      "Disposition": "MigrationCandidate",
+      "Target": "HDFSController.LegacyUEditorUpload -> UEditorService/IMicroiHDFS",
+      "CompatibilityRoutes": ["/UEditor/Upload", "/UEditor/UploadAsync"],
+      "NativeBoundary": ["multipart protocol", "authenticated tenant binding", "private HDFS storage"],
+      "CompatibilityExitGate": "所有富文本编辑器切换到 V8/HDFS 上传，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "LegacyMobileCompatibilityController.OsUtilityCompatibilityRoutes": {
+      "Disposition": "MigrationCandidate",
+      "Target": "统一旧客户端兼容 Controller 中的固定宿主原子",
+      "CompatibilityRoutes": [
+        "/api/Os/GetOsVersion",
+        "/api/Os/CreateQRCode",
+        "/api/Os/CreateQRCodeImage",
+        "/api/Os/GetMicroiNetVersion",
+        "/api/Os/GetOsClient",
+        "/api/Os/GetHID",
+        "/api/Os/GetDateTimeNow",
+        "/api/Os/MicroiNetInitCheck"
+      ],
+      "CompatibilityExitGate": "已知旧移动端和定制客户端不再调用，且兼容路由连续两个正式版本遥测为零后整体删除。"
     },
     "SysUserController.Login": {
       "Disposition": "BootstrapIdentity",
@@ -207,9 +242,23 @@
       "TenantHook": "ApiEngine:platform-user-custom-hook",
       "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "TenantSystemSettingsController.ListSaveDelete": {
+    "LegacyMobileCompatibilityController.TenantSystemSettingsCompatibilityActions": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.sys-config ApiEngine:platform-tenant-system-settings",
+      "CompatibilityRoutes": [
+        "/api/TenantSystemSettings/List",
+        "/api/TenantSystemSettings/Delete"
+      ],
+      "NativeBoundary": [
+        "trusted tenant/current-user binding",
+        "non-overridable platform administrator authorization"
+      ],
+      "TenantHook": "ApiEngine:platform-system-settings-custom-hook",
+      "CompatibilityExitGate": "前端与定制客户端全部切换到 /apiengine/platform-tenant-system-settings，且兼容路由连续两个正式版本遥测为零后删除。"
+    },
+    "TenantSystemSettingsController.Save": {
+      "Disposition": "ProtocolGateway",
+      "Target": "Secret 可信加密边界 + ApiEngine:platform-tenant-system-settings/SaveNonSecret",
       "NativeBoundary": [
         "tenant-bound secret protection and unprotection",
         "secret reveal authorization and no-store response",
@@ -217,9 +266,32 @@
       ],
       "TenantHook": "ApiEngine:platform-system-settings-custom-hook"
     },
-    "AiController.PlatformAccountCompatibilityActions": {
+    "LegacyMobileCompatibilityController.AiPlatformAccountCompatibilityActions": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.ai-engine ApiEngine:platform-ai-account",
+      "CompatibilityRoutes": [
+        "/api/Ai/RelayTokenSummary",
+        "/api/Ai/SubGetPlans",
+        "/api/Ai/SubGetInfo",
+        "/api/Ai/GetUserAiApiKey",
+        "/api/Ai/ResetUserAiApiKey",
+        "/api/Ai/GetUserAiUsage",
+        "/api/Ai/SubCreateOrder",
+        "/api/Ai/SubCreateAlipay",
+        "/api/Ai/SubGetOrders",
+        "/api/Ai/SubConsumeQuota",
+        "/api/Ai/SubGetOrderStatus",
+        "/api/Ai/SubGetApiKeyList",
+        "/api/Ai/SubGetApiKeyBindUsers",
+        "/api/Ai/SubGetApiKeyCapacity",
+        "/api/Ai/GenerateProfileAvatar",
+        "/api/Ai/CreateMiniMaxVideo",
+        "/api/Ai/GetMiniMaxVideoTask",
+        "/api/Ai/GetMiniMaxVideoFile",
+        "/api/Ai/PersistMiniMaxVideoFile",
+        "/api/Ai/ProxyGetQuotaStatus",
+        "/api/Ai/SubGetModels"
+      ],
       "NativeBoundary": [
         "provider credential isolation and outbound protocol",
         "atomic quota consumption",
@@ -227,9 +299,10 @@
         "one-shot managed payment protocol context",
         "media task handles and trusted file persistence"
       ],
-      "TenantHook": "ApiEngine:platform-ai-custom-hook"
+      "TenantHook": "ApiEngine:platform-ai-custom-hook",
+      "CompatibilityExitGate": "前端与定制客户端全部切换到 /apiengine/platform-ai-account，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "AiController.PlatformRuntimeCompatibilityActions": {
+    "LegacyMobileCompatibilityController.AiPlatformRuntimeCompatibilityActions": {
       "Disposition": "ManagedBusinessFacade",
       "Target": "app.microi.ai-engine ApiEngine:platform-ai-runtime",
       "Actions": [
@@ -239,13 +312,21 @@
         "NL2SQL",
         "NL2V8EngineSync"
       ],
+      "CompatibilityRoutes": [
+        "/api/Ai/UpdateConversationTitle",
+        "/api/Ai/RecognizeIntent",
+        "/api/Ai/Chat",
+        "/api/Ai/NL2SQL",
+        "/api/Ai/NL2V8EngineSync"
+      ],
       "NativeBoundary": [
         "V8.AI tenant, identity, model credential and authorization atoms",
         "SSE and streaming response transport",
         "provider proxy, media and file transport",
         "policy metadata projection"
       ],
-      "TenantHook": "ApiEngine:platform-ai-custom-hook"
+      "TenantHook": "ApiEngine:platform-ai-custom-hook",
+      "CompatibilityExitGate": "前端与定制客户端全部切换到 /apiengine/platform-ai-runtime，且兼容路由连续两个正式版本遥测为零后删除。"
     },
     "ExternalLoginController.BindingActions": {
       "Disposition": "ManagedBusinessFacade",
@@ -362,7 +443,7 @@
       ],
       "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
     },
-    "SsoController": {
+    "SsoProtocolGatewayController": {
       "Disposition": "ProtocolGateway",
       "Target": "app.microi.sso Managed ApiEngines",
       "NativeBoundary": [

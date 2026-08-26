@@ -179,6 +179,24 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - 文档改动后执行 `npm run docs:build`；验收时检查本次没有无理由新增 `.md` 页面或导航路由。
 
 <!-- /microi-progressive:chunk -->
+
+## AI 编写代码的意图注释规范（强制）
+
+- AI 新增或修改的非简单代码必须同时维护中文意图注释。注释重点解释“为什么这样设计”、安全/事务/租户/协议/兼容边界、非显然顺序和失败语义，不要逐行复述语法。
+- 插件注册、协议网关、鉴权与密钥处理、分布式锁和幂等、升级迁移、兼容转发、可覆盖 Hook、跨系统副作用等代码必须有醒目的边界注释；插件注册注释至少说明所注册能力，存在顺序或条件依赖时一并说明。
+- 公共可复用的 C# 类型和方法优先使用 XML 文档注释；复杂 V8/JavaScript、Vue/TypeScript 与脚本在关键分支前写短注释，说明输入信任边界、回滚/重试规则或特殊兼容原因。
+- 简单赋值、清晰命名的一行调用、显而易见的 CRUD 和模板样板不强制增加注释。禁止为了满足数量机械生成“给变量赋值”“调用方法”一类无信息注释。
+- 重构代码时同步迁移、修订或删除过时注释；注释与实际行为冲突视为代码缺陷。验收时抽查本次非简单变更是否能仅凭代码与注释理解其归属和约束。
+
+## ASP.NET Controller 归属与旧路由收口规范（强制）
+
+- 已由 V8 接口引擎完整实现的业务 Controller 必须物理删除，禁止为了“瘦身”再创建 `Microi.AspNetCore` 一类无业务归属的通用 .NET 项目，把原 Controller 原样搬过去。
+- 仍被旧版 PC、UniApp 或定制移动端调用的 `/api/*` 历史地址，只能集中在 `Microi.net.Api/Controllers/LegacyMobileCompatibilityController.cs`；文件顶部必须醒目标明“仅兼容、禁止新增业务、未来可能整体删除”，方法只能做参数归一化、可信租户/身份绑定和固定 Managed ApiEngine 转发。
+- 所有 ASP.NET Controller 源码必须留在 `Microi.net.Api/Controllers`。不得为了迁走 Controller 新建 `Microi.AspNetCore`、`Microi.SSO` 等中转项目，也不得把 `Microi.AI`、`Microi.net` 或其它 `netstandard` 类库改成 `net10.0`/多目标框架来承载 Controller。
+- V8 无法直接承担的 SSE/WebSocket、OIDC/SAML/CAS、第三方回调验签/解密、浏览器原生身份协议、供应商密钥隔离、文件流等最小协议边界，可以继续作为薄 Controller 留在 API 项目；Controller 只做协议解析、可信鉴权和安全归一化，可复用实现与业务原子必须进入对应功能类库，普通 CRUD、日志、通知和可升级业务编排继续由 Managed ApiEngine 承担。
+- `Microi.net.Api/Controllers` 除五个兼容内核 Controller 与统一旧客户端兼容 Controller 外，只能保留已证明接口引擎无法承担的薄协议 Controller；每个保留项必须同步登记 `api-ownership-catalog.json` 并由结构测试锁定。已完整迁入接口引擎的旧 Controller 必须继续物理删除。
+- `Program.cs` 只保留有说明的插件注册和最薄宿主入口；ASP.NET 组合代码可留在同项目 `Hosting`，可复用业务/运行时逻辑进入 `Microi.Core`、`Microi.net`、`Microi.Upgrade` 或对应插件，禁止通过新建“中转层”掩盖归属问题。
+
 <!-- microi-progressive:chunk id=workspace-conventions-009 sha256=dc7dbe2d2f60466a7170fff65a5df8769bc795b4ab23151a24b665380d7c6e37 -->
 ## 多对话共享工作区变更归属保护（强制）
 

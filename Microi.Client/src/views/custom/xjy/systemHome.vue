@@ -161,7 +161,10 @@ export default {
         },
         GetShangjiaList() {
             var self = this;
-            self.DiyCommon.Post("/api/ModuleEngine/GetTableData", { ModuleEngineKey: "Diy_Tenant" }, function (result) {
+            self.DiyCommon.Post("/apiengine/platform-module-data", {
+                Action: "GetTableData",
+                ModuleEngineKey: "Diy_Tenant"
+            }, function (result) {
                 if (self.DiyCommon.Result(result)) {
                     self.ShangjiaList = result.Data;
                 }

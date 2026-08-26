@@ -15,6 +15,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
+// ASP.NET Core 多格式请求绑定适配层。
 namespace Microi.net.Api
 {
     #region 自定义特性

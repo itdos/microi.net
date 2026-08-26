@@ -1572,7 +1572,7 @@ return {
 
 支持 PDF、PNG、JPEG、BMP、GIF、TIFF、WebP。平台会同时校验扩展名、Base64 和文件魔数；成功结果统一包含 `Provider`、`TraceId`、`FileType`、`Text`、`AverageConfidence`、`PageCount`、`ElapsedMilliseconds` 和 `Pages`。每页包含文本区域、置信度和多边形坐标。
 
-也可由已登录客户端调用 `POST /api/Ocr/Recognize`，请求体与上例参数相同。请求体中的 `OsClient` 会被忽略，以验证后的 Token 租户为准。接口不接受 endpoint、API key、任意 Header、代理地址或服务端文件路径。
+也可由已登录客户端调用官方 Managed 接口 `POST /apiengine/platform-ocr-recognize`，请求体与上例参数相同。请求体中的 `OsClient` 会被忽略，以验证后的 Token 租户为准。接口不接受 endpoint、API key、任意 Header、代理地址或服务端文件路径；个性化逻辑写入 `platform-runtime-custom-hook`，文件和识别原文不会传给 Hook。
 
 ### SaaS 引擎配置
 

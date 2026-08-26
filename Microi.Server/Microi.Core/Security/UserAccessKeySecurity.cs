@@ -90,18 +90,7 @@ namespace Microi.net
         private static readonly HashSet<string> RuntimePageSupportPaths = new HashSet<string>(
             new[]
             {
-                "/api/os/getdatetimenow",
-                "/api/userbehavior/signal"
-            },
-            StringComparer.OrdinalIgnoreCase);
-
-        private static readonly HashSet<string> ModuleRuntimeReadPaths = new HashSet<string>(
-            new[]
-            {
-                "/api/moduleengine/gettabledata",
-                "/api/moduleengine/gettabledatacount",
-                "/api/moduleengine/gettabletree",
-                "/api/moduleengine/gettabledatatree"
+                "/api/os/getdatetimenow"
             },
             StringComparer.OrdinalIgnoreCase);
 
@@ -394,6 +383,13 @@ namespace Microi.net
                 return true;
             if (string.Equals(normalizedKey, "platform-private-file-url", StringComparison.OrdinalIgnoreCase))
                 return HasScope(currentUser, "file:read");
+            if (string.Equals(normalizedKey, "platform-data-source-run", StringComparison.OrdinalIgnoreCase))
+                return HasScope(currentUser, "data-source:run");
+            if (string.Equals(normalizedKey, "platform-module-data", StringComparison.OrdinalIgnoreCase))
+                return HasScope(currentUser, "form:read") && HasAllAuthorizedData(currentUser);
+            // 行为采集会写入当前登录人的审计画像；长期 AccessKey 不得冒充交互式用户产生信号。
+            if (string.Equals(normalizedKey, "platform-user-behavior-signal", StringComparison.OrdinalIgnoreCase))
+                return false;
             return HasScope(currentUser, "api-engine:run")
                    && ParseStringList(currentUser["_AccessKeyAllowedApiEngineKeys"])
                        .Contains(normalizedKey, StringComparer.OrdinalIgnoreCase);
@@ -422,6 +418,12 @@ namespace Microi.net
                 return true;
             if (IsFixedApiEnginePath(path, "platform-private-file-url"))
                 return HasScope(currentUser, "file:read");
+            if (IsFixedApiEnginePath(path, "platform-data-source-run"))
+                return HasScope(currentUser, "data-source:run");
+            if (IsFixedApiEnginePath(path, "platform-module-data"))
+                return HasScope(currentUser, "form:read") && HasAllAuthorizedData(currentUser);
+            if (IsFixedApiEnginePath(path, "platform-user-behavior-signal"))
+                return false;
             if (path.StartsWith("/apiengine/", StringComparison.Ordinal))
             {
                 // 动态自定义地址只在这里校验能力域；进入 ApiEngineController 后还会
@@ -441,13 +443,6 @@ namespace Microi.net
             if (RuntimePageSupportPaths.Contains(path))
             {
                 return HasScope(currentUser, "page:open");
-            }
-            if (ModuleRuntimeReadPaths.Contains(path))
-            {
-                // ModuleEngine resolves its physical table after entering the
-                // controller. Only the explicit "all authorized data" mode can
-                // safely use that indirection; account/menu/row permissions still apply.
-                return HasScope(currentUser, "form:read") && HasAllAuthorizedData(currentUser);
             }
             if (WorkflowRuntimeReadPaths.Contains(path))
             {
@@ -487,11 +482,6 @@ namespace Microi.net
                 || path == "/api/apiengine/run_response_html")
             {
                 return HasScope(currentUser, "api-engine:run");
-            }
-            if (path == "/api/datasourceengine/run"
-                || path == "/api/datasourceengine/getdata")
-            {
-                return HasScope(currentUser, "data-source:run");
             }
             if (path.StartsWith("/api/hdfs/", StringComparison.Ordinal))
             {

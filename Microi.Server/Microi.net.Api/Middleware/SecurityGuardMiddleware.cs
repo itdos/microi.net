@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 
+// ASP.NET Core 安全防护中间件适配层。
 namespace Microi.net.Api
 {
     public sealed class SecurityGuardMiddleware

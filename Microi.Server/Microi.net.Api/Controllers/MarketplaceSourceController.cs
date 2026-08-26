@@ -14,11 +14,11 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+// ASP.NET Core 商城源凭据/网络协议适配器；业务编排由官方 Managed ApiEngine 承载。
 namespace Microi.net.Api
 {
     /// <summary>
     /// 应用商城上游源的最小可信协议网关。
-    ///
     /// 商城列表、版本和安装业务继续由应用包中的 V8 接口引擎负责；本控制器只处理
     /// 不能交给浏览器或租户可编辑脚本的安全边界：远端租户发现、验证码转发、MCP
     /// 长会话登录、Token 认证加密保存，以及使用后端持有 Token 的只读代理请求。

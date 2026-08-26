@@ -5,6 +5,7 @@ using Dos.Common;
 using System;
 using System.Linq;
 
+// ASP.NET Core 运维协议适配器；不在宿主入口项目承载租户可变业务。
 namespace Microi.net.Api
 {
     /// <summary>

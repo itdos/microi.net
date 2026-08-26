@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using System.Security.Cryptography;
 using System.Text;
 
+// ASP.NET Core 消息协议适配器；通知业务编排由官方 Managed ApiEngine 承载。
 namespace Microi.net.Api
 {
     [ApiController]

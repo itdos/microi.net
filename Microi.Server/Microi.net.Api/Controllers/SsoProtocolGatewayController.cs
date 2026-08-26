@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using Dos.Common;
+using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
@@ -23,15 +24,15 @@ using StackExchange.Redis;
 namespace Microi.net.Api
 {
     /// <summary>
-    /// Microi 双向 SSO 协议网关。
+    /// Microi 双向 SSO 最小协议网关。
     /// 外部 OIDC/CAS 身份只负责认证与主体映射，进入平台时仍签发 DiyToken；
     /// Microi 作为身份提供方时使用独立、短期、可撤销的协议票据，不把 DiyToken
     /// 暴露给第三方系统。
     /// </summary>
     [EnableCors("any")]
-    [ServiceFilter(typeof(DiyFilter<dynamic>))]
-    [Route("api/[controller]/[action]")]
-    public sealed partial class SsoController : Controller
+    // 固定显式路由，保证协议网关类名调整后旧版客户端和第三方回调地址完全不变。
+    [Route("api/Sso/[action]")]
+    public sealed partial class SsoProtocolGatewayController : Controller
     {
         private const string ConnectionRuntimeApiEngineKey = "sso_connection_runtime";
         private const string ResolveIdentityApiEngineKey = "sso_resolve_federated_identity";

@@ -4,7 +4,7 @@
 
 # Microi吾码
 
-<p><strong>不只是开源 AI 低代码，更是企业级 AI 应用开发框架：</strong>可视化建模、V8 在线编程、.NET / Vue 源码扩展与 AI Agent 共用一条交付链。</p>
+<p><strong>开源 AI 开发框架：</strong>20+ 成熟引擎融合 AI 低代码、微服务与 V8 引擎，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。</p>
 
 <p><a href="https://blog.csdn.net/qq973702/article/details/163763831" target="_blank" rel="noopener noreferrer">阅读门头文章：为什么 AI 开发的 Token 和交付时间，能同时降一个数量级？ →</a></p>
 
@@ -15,8 +15,8 @@
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="./microi.doc/docs/public/images/readme/qq-group-51050055.png" alt="QQ 交流群 51050055" width="126" height="20" /></a>
 </p>
 
-开源 AI 应用开发平台：`.NET 10 + Vue 3 + Redis`，以 V8 引擎连接低代码建模、专业源码扩展与企业级交付。<br>
-支持 VS Code / Codex / Copilot / Cursor / Claude + MCP + Skills，本地或在线开发，保存即生效。
+开源 AI 开发框架：`.NET 10 + Vue 3 + Redis`，融合 20+ 成熟引擎、AI 低代码、微服务与 V8 引擎。<br>
+支持 VS Code / Codex / Copilot / Cursor / Claude + MCP + Skills；在典型业务场景中，AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。
 
 [在线体验](https://microi.net/) · [快速开始](https://microi.net/doc/getting-started/start-use.html) · [完整文档](https://microi.net/doc/index.html) · [Docker 部署](https://microi.net/doc/getting-started/docker-run.html) · [Gitee](https://gitee.com/ITdos/microi.net) · [GitHub](https://github.com/itdos/microi.net)
 
@@ -82,12 +82,12 @@
 
 | 对比维度 | 传统定制代码 + AI | Microi吾码 + AI |
 |---|---|---|
-| AI 需要生成的内容 | 从数据库访问、权限、CRUD、流程、页面到部署胶水代码都要反复生成 | 复用几十+成熟引擎，AI 主要生成业务模型、配置和少量 V8 / 前端扩展 |
+| AI 需要生成的内容 | 从数据库访问、权限、CRUD、流程、页面到部署胶水代码都要反复生成 | 复用 20+ 成熟引擎，AI 主要生成业务模型、配置和少量 V8 / 前端扩展 |
 | 上下文与 Token | 每轮都可能重复解释框架、表结构、接口约定和历史代码 | Skills、V8 类型提示、实时 Schema、业务蓝图与 MCP 自动提供准确上下文 |
 | 开发与验证 | 生成大段代码后再编译、联调、补权限和部署脚本 | 建模、生成、远程执行、调试、回读与验收形成闭环，开箱即可进入业务开发 |
 | 稳定性与维护 | 项目自建的通用能力多，代码面大，后续升级和回归成本高 | 平台自 2014 年持续演进，权限、表单、工作流、SaaS、缓存和分布式能力由统一底座承载 |
 
-在表单、CRUD、权限、流程、报表、SaaS 等平台能力高度复用的典型企业应用中，相比从零生成整套定制代码，**AI Token 消耗与开发周期都有机会获得 10 倍以上的改善**。实际结果取决于需求与平台的匹配度、模型、上下文质量、团队熟练度和验收范围，不作为对所有项目的无条件工期或费用承诺。
+在表单、CRUD、权限、流程、报表、SaaS 等平台能力高度复用的典型企业应用中，相比从零生成整套定制代码，**AI 开发可实现 Token 更省 10 倍+、开发速度提升 10 倍+**。实际结果取决于需求与平台的匹配度、模型、上下文质量、团队熟练度和验收范围，不作为对所有项目的无条件工期或费用承诺。
 
 > [→ 了解 AI + 低代码为什么更快、更稳定](https://microi.net/doc/v8-engine/ai-apiengine.html#ai-efficiency)
 
@@ -111,7 +111,7 @@
 
 ## 📖 平台简介
 
-**Microi吾码** 是面向中大型企业应用的**开源 AI 应用开发平台与开发框架**。它保留低代码快速建模的效率，同时通过 V8 在线编程、前端微服务和 .NET / Vue 源码扩展覆盖差异化与深层开发；VS Code 插件、MCP 与 Skills 会把平台 API、业务代码和数据库结构交给 AI，使低代码开发者、专业开发者与 AI Agent 在同一套工程和治理体系中协作。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2025 年正式开源**。
+**Microi吾码** 是面向中大型企业应用的**开源 AI 开发框架**。它以 20+ 成熟引擎为底座，融合 AI 低代码、V8 在线编程、前端微服务与 .NET / Vue 源码扩展；VS Code 插件、MCP 与 Skills 会把平台 API、业务代码和数据库结构交给 AI，使低代码开发者、专业开发者与 AI Agent 在同一套工程和治理体系中协作。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2025 年正式开源**。
 
 强大的 [**API 接口引擎**](https://microi.net/doc/v8-engine/api-engine)，在线使用 JavaScript 编写后端 API 接口，支持[**在线 AI 编程**](https://microi.net/doc/v8-engine/ai-apiengine)与[**本地 AI 编程（VS Code 插件）**](https://microi.net/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件)。
 

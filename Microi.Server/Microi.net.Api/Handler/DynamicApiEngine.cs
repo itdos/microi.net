@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 
+// ASP.NET Core 接口引擎动态路由适配层。
 namespace Microi.net.Api
 {
     /// <summary>
@@ -26,7 +27,6 @@ namespace Microi.net.Api
             "/api/ai/",
             "/api/apiengine/",
             "/api/captcha/",
-            "/api/datasourceengine/",
             "/api/diagnostics/",
             "/api/diychat/",
             "/api/externallogin/",
@@ -38,19 +38,13 @@ namespace Microi.net.Api
             "/api/marketplacesource/",
             "/api/message/",
             "/api/microapp/",
-            "/api/moduleengine/",
-            "/api/ocr/",
-            "/api/office/",
             "/api/os/",
-            "/api/securityguard/",
             "/api/sso/",
             "/api/sysuser/",
             "/api/sysuseraccesskey/",
             "/api/tenantsystemsettings/",
-            "/api/translate/",
             "/api/ueditor/",
             "/api/upload/",
-            "/api/userbehavior/",
             "/api/v8debug/",
             "/api/v8engine/",
             "/api/wechat/",

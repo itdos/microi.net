@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+// ASP.NET Core 流式响应适配层。
 namespace Microi.net.Api
 {
     internal enum ApiEngineHttpStreamFormat

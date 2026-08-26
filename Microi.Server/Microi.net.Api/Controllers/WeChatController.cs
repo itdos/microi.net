@@ -12,11 +12,13 @@ using Senparc.Weixin.MP.AdvancedAPIs.OAuth;
 using Dos.Common;
 using Microi.net;
 using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Http;
 using Senparc.Weixin.MP.Containers;
 using StackExchange.Redis;
 
 // For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
+// ASP.NET Core 微信 OAuth/回调协议适配器；业务编排由官方 Managed ApiEngine 承载。
 namespace Microi.net.Api.Controllers
 {
     /// <summary>

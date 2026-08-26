@@ -13,6 +13,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
+// ASP.NET Core 微应用静态资源协议适配器；不在宿主入口项目承载业务编排。
 namespace Microi.net.Api
 {
     /// <summary>

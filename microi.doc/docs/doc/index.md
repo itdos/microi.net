@@ -1,10 +1,16 @@
+---
+title: Microi吾码
+titleTemplate: 开源 AI 开发框架
+description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、AI 低代码、微服务与 V8 引擎；在典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。
+---
+
 <div align="center">
 
 <img src="https://static.itdos.com/upload/img/microi-red-256.png" alt="Microi吾码" width="120" />
 
 # Microi 吾码
 
-<p class="mci-doc-home-subtitle"><strong>不只是开源 AI 低代码，更是企业级 AI 应用开发框架：</strong>可视化建模、V8 在线编程、.NET / Vue 源码扩展与 AI Agent 共用一条交付链。</p>
+<p class="mci-doc-home-subtitle"><strong>开源 AI 开发框架：</strong>20+ 成熟引擎融合 AI 低代码、微服务与 V8 引擎，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。</p>
 
 <p><a href="https://blog.csdn.net/qq973702/article/details/163763831" target="_blank" rel="noopener noreferrer">阅读门头文章：为什么 AI 开发的 Token 和交付时间，能同时降一个数量级？ →</a></p>
 
@@ -71,7 +77,7 @@
 
 ## 📖 平台简介
 
-**Microi吾码** 是面向中大型企业应用的**开源 AI 应用开发平台与开发框架**。它保留低代码快速建模的效率，同时通过 V8 在线编程、前端微服务和 .NET / Vue 源码扩展覆盖差异化与深层开发；VS Code 插件、MCP 与 Skills 会把平台 API、业务代码和数据库结构交给 AI，使低代码开发者、专业开发者与 AI Agent 在同一套工程和治理体系中协作。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2025 年正式开源**。
+**Microi吾码** 是面向中大型企业应用的**开源 AI 开发框架**。它以 20+ 成熟引擎为底座，融合 AI 低代码、V8 在线编程、前端微服务与 .NET / Vue 源码扩展；VS Code 插件、MCP 与 Skills 会把平台 API、业务代码和数据库结构交给 AI，使低代码开发者、专业开发者与 AI Agent 在同一套工程和治理体系中协作。平台始于 2014 年（基于 Avalon.js），2018 年使用 Vue 重构，历经多年打磨，于 **2025 年正式开源**。
 
 强大的 [**API 接口引擎**](https://microi.net/doc/v8-engine/api-engine)，在线使用 JavaScript 编写后端 API 接口，支持[**在线 AI 编程**](https://microi.net/doc/v8-engine/ai-apiengine)与[**本地 AI 编程（VS Code 插件）**](https://microi.net/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件)。
 
@@ -95,13 +101,13 @@
 
 | 对比维度 | 传统定制代码 + AI | Microi吾码 + AI |
 |---|---|---|
-| AI 生成范围 | 数据访问、权限、CRUD、流程、页面和部署胶水代码都要从头生成 | 复用几十+成熟引擎，AI 主要处理业务模型、配置和少量 V8 / 前端扩展 |
+| AI 生成范围 | 数据访问、权限、CRUD、流程、页面和部署胶水代码都要从头生成 | 复用 20+ 成熟引擎，AI 主要处理业务模型、配置和少量 V8 / 前端扩展 |
 | 上下文与 Token | 反复解释框架、表结构、接口规范和历史代码，长上下文随项目持续膨胀 | Skills、V8 类型提示、实时 Schema、业务蓝图与 MCP 自动提供准确上下文 |
 | 交付速度 | 先生成大量代码，再编译、联调、补权限、补部署和回归 | 建模、生成、远程执行、调试、回读与验收形成闭环，开箱即可进入业务开发 |
 | 稳定性与成熟度 | 每个项目重复实现通用底座，代码面大、差异多 | 平台自 2014 年持续演进，权限、表单、工作流、SaaS、缓存和分布式能力统一复用 |
 | 持续维护 | AI 后续仍要理解并修改整套定制工程 | AI 聚焦更小的业务增量，平台升级与业务扩展边界更清晰 |
 
-在表单、CRUD、权限、流程、报表、SaaS 等平台能力高度复用的典型企业应用中，相比从零生成整套定制代码，**AI Token 消耗与开发周期都有机会获得 10 倍以上的改善**。实际结果取决于需求与平台的匹配度、模型、上下文质量、团队熟练度和验收范围，不应理解为对所有项目的无条件工期或费用承诺。
+在表单、CRUD、权限、流程、报表、SaaS 等平台能力高度复用的典型企业应用中，相比从零生成整套定制代码，**AI 开发可实现 Token 更省 10 倍+、开发速度提升 10 倍+**。实际结果取决于需求与平台的匹配度、模型、上下文质量、团队熟练度和验收范围，不应理解为对所有项目的无条件工期或费用承诺。
 
 > [查看完整原理、开发闭环与适用边界 →](/doc/v8-engine/ai-apiengine#ai-efficiency)
 

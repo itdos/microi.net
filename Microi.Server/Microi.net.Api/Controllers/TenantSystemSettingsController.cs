@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+// ASP.NET Core 租户秘密保护/揭示协议适配器；普通设置 CRUD 已由 Managed ApiEngine 承载。
 namespace Microi.net.Api
 {
     /// <summary>
@@ -139,22 +140,6 @@ namespace Microi.net.Api
                 ServiceHost = serviceHost,
                 runtime.Source
             }));
-        }
-
-        [HttpPost]
-        public async Task<JsonResult> List()
-        {
-            var tokenResult = await RequireAdministratorAsync().ConfigureAwait(false);
-            if (tokenResult.Code != 1) return Json(tokenResult);
-            Response.Headers.CacheControl = "no-store";
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                TenantSystemSettingsApiEngineKey,
-                new JObject
-                {
-                    ["Action"] = "List",
-                    ["OsClient"] = tokenResult.Data.OsClient
-                },
-                tokenResult.Data.CurrentUser).ConfigureAwait(false));
         }
 
         [HttpPost]
@@ -301,20 +286,6 @@ namespace Microi.net.Api
                 QueueAudit(tokenResult.Data, "RevealTenantSystemSetting", false, request?.Id, item["ConfigKey"]?.ToString());
                 return Json(new DosResult(0, null, "Secret 无法解密，请重新填写并保存。"));
             }
-        }
-
-        [HttpPost]
-        public async Task<JsonResult> Delete([FromBody] SettingMutationRequest request)
-        {
-            var tokenResult = await RequireAdministratorAsync().ConfigureAwait(false);
-            if (tokenResult.Code != 1) return Json(tokenResult);
-            var apiRequest = request == null ? new JObject() : JObject.FromObject(request);
-            apiRequest["Action"] = "Delete";
-            apiRequest["OsClient"] = tokenResult.Data.OsClient;
-            return Json(await ManagedApiEngineCompatibility.RunAsync(
-                TenantSystemSettingsApiEngineKey,
-                apiRequest,
-                tokenResult.Data.CurrentUser).ConfigureAwait(false));
         }
 
         private static async Task<DosResult<CurrentToken>> RequireAdministratorAsync()
