@@ -37,7 +37,8 @@ namespace Microi.net
         {
             MySql,
             SqlServer,
-            Oracle
+            Oracle,
+            PostgreSql
         }
 
         public enum ApplicationStoreTablePresence
@@ -545,6 +546,10 @@ namespace Microi.net
                 return SchemaDialect.SqlServer;
             if (string.Equals(dbType, "Oracle", StringComparison.OrdinalIgnoreCase))
                 return SchemaDialect.Oracle;
+            if (string.Equals(dbType, "PostgreSql", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(dbType, "PostgreSQL", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(dbType, "Postgres", StringComparison.OrdinalIgnoreCase))
+                return SchemaDialect.PostgreSql;
             throw new NotSupportedException($"应用发布 v3 数据库升级暂不支持数据库类型：{dbType ?? "<null>"}。");
         }
 
@@ -556,6 +561,7 @@ namespace Microi.net
                 DatabaseType.SqlServer => SchemaDialect.SqlServer,
                 DatabaseType.SqlServer9 => SchemaDialect.SqlServer,
                 DatabaseType.Oracle => SchemaDialect.Oracle,
+                DatabaseType.PostgreSql => SchemaDialect.PostgreSql,
                 _ => throw new NotSupportedException($"应用发布 v3 数据库升级暂不支持数据库类型：{databaseType}。")
             };
         }
@@ -576,6 +582,7 @@ namespace Microi.net
                 SchemaDialect.MySql => $"ALTER TABLE `{field.TableName}` ADD COLUMN `{field.Name}` {type} NULL",
                 SchemaDialect.SqlServer => $"ALTER TABLE [{field.TableName}] ADD [{field.Name}] {type} NULL",
                 SchemaDialect.Oracle => $"ALTER TABLE {field.TableName} ADD ({field.Name} {type} NULL)",
+                SchemaDialect.PostgreSql => $"ALTER TABLE \"{field.TableName}\" ADD COLUMN \"{field.Name}\" {type} NULL",
                 _ => throw new ArgumentOutOfRangeException(nameof(dialect))
             };
         }
@@ -620,6 +627,7 @@ namespace Microi.net
                 SchemaDialect.MySql => $"ALTER TABLE `{GateTransitionAuditTable}` MODIFY COLUMN `{field.Name}` {type} NOT NULL",
                 SchemaDialect.SqlServer => $"ALTER TABLE [{GateTransitionAuditTable}] ALTER COLUMN [{field.Name}] {type} NOT NULL",
                 SchemaDialect.Oracle => $"ALTER TABLE {GateTransitionAuditTable} MODIFY ({field.Name} {type} NOT NULL)",
+                SchemaDialect.PostgreSql => $"ALTER TABLE \"{GateTransitionAuditTable}\" ALTER COLUMN \"{field.Name}\" SET NOT NULL",
                 _ => throw new ArgumentOutOfRangeException(nameof(dialect))
             };
         }
@@ -637,6 +645,8 @@ namespace Microi.net
                     $"ALTER TABLE [{field.TableName}] ALTER COLUMN [{field.Name}] {type} NOT NULL",
                 SchemaDialect.Oracle =>
                     $"ALTER TABLE {field.TableName} MODIFY ({field.Name} {type} DEFAULT {literal} NOT NULL)",
+                SchemaDialect.PostgreSql =>
+                    $"ALTER TABLE \"{field.TableName}\" ALTER COLUMN \"{field.Name}\" SET DEFAULT {literal}, ALTER COLUMN \"{field.Name}\" SET NOT NULL",
                 _ => throw new ArgumentOutOfRangeException(nameof(dialect))
             };
         }
@@ -656,6 +666,11 @@ namespace Microi.net
                     : $" WHERE [{index.SqlServerFilterColumn}] IS NOT NULL";
                 return $"CREATE {unique}NONCLUSTERED INDEX [{index.Name}] ON [{index.TableName}] "
                        + $"({string.Join(", ", index.Columns.Select(column => $"[{column}]"))}){filter}";
+            }
+            if (dialect == SchemaDialect.PostgreSql)
+            {
+                return $"CREATE {unique}INDEX \"{index.Name}\" ON \"{index.TableName}\" "
+                       + $"({string.Join(", ", index.Columns.Select(column => $"\"{column}\""))})";
             }
             return $"CREATE {unique}INDEX {index.Name} ON {index.TableName} "
                    + $"({string.Join(", ", index.Columns)})";
@@ -695,6 +710,12 @@ namespace Microi.net
             string logicalType,
             bool sqlServerUnicode = false)
         {
+            if (dialect == SchemaDialect.PostgreSql)
+            {
+                if (logicalType == "mediumtext") return "text";
+                if (logicalType == "datetime") return "timestamp without time zone";
+                return logicalType;
+            }
             if (dialect != SchemaDialect.Oracle)
             {
                 if (dialect == SchemaDialect.SqlServer && logicalType == "mediumtext") return "nvarchar(max)";
@@ -736,6 +757,7 @@ namespace Microi.net
                 SchemaDialect.MySql => $"`{identifier}`",
                 SchemaDialect.SqlServer => $"[{identifier}]",
                 SchemaDialect.Oracle => identifier,
+                SchemaDialect.PostgreSql => $"\"{identifier}\"",
                 _ => identifier
             };
         }
@@ -743,6 +765,13 @@ namespace Microi.net
         private static string SqlLiteral(string value)
         {
             return long.TryParse(value, out _) ? value : "'" + (value ?? string.Empty).Replace("'", "''") + "'";
+        }
+
+        private static DateTime DatabaseDateTime(SchemaDialect dialect, DateTime value)
+        {
+            return dialect == SchemaDialect.PostgreSql
+                ? DateTime.SpecifyKind(value, DateTimeKind.Unspecified)
+                : value;
         }
 
         private static void EnsurePhysicalColumn(OsClientSecret client, SchemaDialect dialect, SchemaField field)
@@ -978,6 +1007,10 @@ WHERE c.object_id=OBJECT_ID(@p0) AND c.name=@p1")
             var value = expression.Trim();
             while (value.Length >= 2 && value[0] == '(' && value[value.Length - 1] == ')')
                 value = value.Substring(1, value.Length - 2).Trim();
+            var postgresCast = value.IndexOf("::", StringComparison.Ordinal);
+            if (postgresCast > 0) value = value.Substring(0, postgresCast).Trim();
+            while (value.Length >= 2 && value[0] == '(' && value[value.Length - 1] == ')')
+                value = value.Substring(1, value.Length - 2).Trim();
             if (value.StartsWith("N'", StringComparison.OrdinalIgnoreCase)) value = value.Substring(1);
             if (value.Length >= 2 && value[0] == '\'' && value[value.Length - 1] == '\'')
                 value = value.Substring(1, value.Length - 2).Replace("''", "'");
@@ -1002,6 +1035,11 @@ WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=@p0 AND COLUMN_NAME=@p1";
 LEFT JOIN sys.default_constraints dc
   ON dc.parent_object_id=c.object_id AND dc.parent_column_id=c.column_id
 WHERE c.object_id=OBJECT_ID(@p0) AND c.name=@p1";
+            }
+            else if (dialect == SchemaDialect.PostgreSql)
+            {
+                sql = @"SELECT column_default FROM information_schema.columns
+WHERE table_schema=current_schema() AND lower(table_name)=lower(@p0) AND lower(column_name)=lower(@p1)";
             }
             else
             {
@@ -1030,6 +1068,11 @@ WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=@p0 AND COLUMN_NAME=@p1 AND IS_NULL
             {
                 sql = @"SELECT COUNT(*) FROM sys.columns
 WHERE object_id=OBJECT_ID(@p0) AND name=@p1 AND is_nullable=0";
+            }
+            else if (dialect == SchemaDialect.PostgreSql)
+            {
+                sql = @"SELECT COUNT(*) FROM information_schema.columns
+WHERE table_schema=current_schema() AND lower(table_name)=lower(@p0) AND lower(column_name)=lower(@p1) AND is_nullable='NO'";
             }
             else
             {
@@ -1233,7 +1276,7 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
             var appId = Quote(dialect, "AppId");
             var where = $"({versionId} IS NULL OR {BlankStringPredicate(dialect, versionId)}) AND "
                         + $"({appId} IS NULL OR {BlankStringPredicate(dialect, appId)})";
-            if (dialect == SchemaDialect.MySql)
+            if (dialect == SchemaDialect.MySql || dialect == SchemaDialect.PostgreSql)
                 return $"SELECT {id} FROM {table} WHERE {where} ORDER BY {id} LIMIT {take}";
             if (dialect == SchemaDialect.SqlServer)
                 return $"SELECT TOP ({take}) {id} FROM {table} WHERE {where} ORDER BY {id}";
@@ -1396,7 +1439,7 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
                     else
                     {
                         var idCollisionRaw = client.Db.FromSql(
-                                $"SELECT Id,AppId,VersionNo FROM {versionTable} WHERE {Quote(dialect, "Id")}=@p0")
+                                $"SELECT {Quote(dialect, "Id")},{Quote(dialect, "AppId")},{Quote(dialect, "VersionNo")} FROM {versionTable} WHERE {Quote(dialect, "Id")}=@p0")
                             .AddInParameter("p0", deterministicVersionId)
                             .First<dynamic>();
                         if (idCollisionRaw != null)
@@ -1408,7 +1451,7 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
                                 + "]占用，拒绝覆盖。");
                         }
 
-                        var now = DateTime.Now;
+                        var now = DatabaseDateTime(dialect, DateTime.Now);
                         var insertSql = $"INSERT INTO {versionTable} ("
                                         + string.Join(",", new[]
                                         {
@@ -1454,7 +1497,7 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
                             + $"WHERE {Quote(dialect, "Id")}=@p3 AND {appIdColumn}=@p4")
                         .AddInParameter("p0", checked((int)fileCount))
                         .AddInParameter("p1", totalSize)
-                        .AddInParameter("p2", DbType.DateTime, DateTime.Now)
+                        .AddInParameter("p2", DbType.DateTime, DatabaseDateTime(dialect, DateTime.Now))
                         .AddInParameter("p3", deterministicVersionId)
                         .AddInParameter("p4", appId)
                         .ExecuteNonQuery();
@@ -1561,7 +1604,7 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
             var where = hasCursor ? $" WHERE {Quote(dialect, "Id")}>@p0" : string.Empty;
             var projection = string.Join(",", new[] { "Id", "VersionId", "FilePath", "FilePathHash" }
                 .Select(column => Quote(dialect, column)));
-            if (dialect == SchemaDialect.MySql)
+            if (dialect == SchemaDialect.MySql || dialect == SchemaDialect.PostgreSql)
                 return $"SELECT {projection} FROM {Quote(dialect, FileTable)}{where} ORDER BY {Quote(dialect, "Id")} LIMIT {FileHashPageSize}";
             if (dialect == SchemaDialect.SqlServer)
                 return $"SELECT TOP ({FileHashPageSize}) {projection} FROM {Quote(dialect, FileTable)}{where} ORDER BY {Quote(dialect, "Id")}";
@@ -1694,8 +1737,31 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
                 .AddInParameter("p0", expected.TableName)
                 .AddInParameter("p1", actual.Key_name)
                 .ToScalar()?.ToString();
-            var normalized = NormalizeSqlPredicate(filter);
-            return normalized == (expected.SqlServerFilterColumn + "ISNOTNULL").ToUpperInvariant();
+            return IsCompatibleSqlServerNotNullFilter(
+                filter,
+                expected.SqlServerFilterColumn,
+                expected.Columns);
+        }
+
+        public static bool IsCompatibleSqlServerNotNullFilter(
+            string predicate,
+            string requiredColumn,
+            IReadOnlyCollection<string> indexColumns)
+        {
+            var normalized = NormalizeSqlPredicate(predicate);
+            var required = (requiredColumn + "ISNOTNULL").ToUpperInvariant();
+            if (normalized == required) return true;
+
+            // The seed converter preserves MySQL UNIQUE/NULL semantics by
+            // filtering every nullable key column. Upgrade25 historically
+            // generated the narrower RequestId-only predicate after it had
+            // backfilled AppId. Both are valid; reject any other expression.
+            var allColumns = string.Join(
+                "AND",
+                indexColumns.Select(column =>
+                    (column + "ISNOTNULL").ToUpperInvariant()));
+            return normalized == allColumns
+                   && indexColumns.Contains(requiredColumn, StringComparer.OrdinalIgnoreCase);
         }
 
         public static string NormalizeSqlPredicate(string predicate)

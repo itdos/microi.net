@@ -164,8 +164,11 @@ namespace Microi.net
                         "Upgrade33-表单V8限额",
                         () => new Upgrade33().Run(runtimeClient.OsClient, resetExistingValues: false));
                     upgradeLease.ThrowIfLost();
+                    var runtimeOrm = MicroiEngine.ORM(runtimeClient.Db.Db.DbProvider.DatabaseType);
                     var currentVersion = runtimeClient.Db
-                        .FromSql("SELECT ServerVersion FROM sys_config WHERE IsEnable = @p0")
+                        .FromSql($"SELECT {runtimeOrm.GetFieldName("ServerVersion")} " +
+                                 $"FROM {runtimeOrm.GetTableName("sys_config")} " +
+                                 $"WHERE {runtimeOrm.GetFieldName("IsEnable")} = @p0")
                         .AddInParameter("p0", 1)
                         .ToScalar<string>() ?? "";
                     Console.WriteLine(

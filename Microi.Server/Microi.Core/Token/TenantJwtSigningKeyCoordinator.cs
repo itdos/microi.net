@@ -67,7 +67,7 @@ namespace Microi.net
 
                 for (var attempt = 1; attempt <= MaxConvergenceAttempts; attempt++)
                 {
-                    var rows = ReadActiveRows(configurationDb, tableName);
+                    var rows = ReadActiveRows(configurationDb, tableName, dbInfo);
                     var groups = rows
                         .Where(row => !ReadString(row, "OsClient").DosIsNullOrWhiteSpace())
                         .GroupBy(row => ReadString(row, "OsClient"), StringComparer.OrdinalIgnoreCase)
@@ -142,7 +142,7 @@ namespace Microi.net
                         }
                     }
 
-                    var verificationRows = ReadActiveRows(configurationDb, tableName);
+                    var verificationRows = ReadActiveRows(configurationDb, tableName, dbInfo);
                     var divergentTenants = FindDivergentTenants(verificationRows);
                     if (divergentTenants.Count == 0)
                     {
@@ -373,11 +373,8 @@ WHERE {dbInfo.L}Id{dbInfo.R}=@Id
         /// </summary>
         private static bool EnsureAuthSecretStorage(DbSession configurationDb, DbInfo dbInfo)
         {
-            // SqlServer9 与 SqlServer 共用相同 DDL 方言；IDbFactory 不单独注册
-            // SqlServer9 服务，但配置库会话本身仍保留它的旧版 Provider。
-            var ddlDatabaseType = dbInfo.DbType == DatabaseType.SqlServer9
-                ? DatabaseType.SqlServer
-                : dbInfo.DbType;
+            // 会话 Provider 保留版本枚举，ORM/DDL 服务通过 Dos.ORM 的单一兼容入口归一。
+            var ddlDatabaseType = DatabaseTypeCompatibility.NormalizeOrmServiceType(dbInfo.DbType);
             var orm = MicroiEngine.ORM(ddlDatabaseType);
             var columns = ReadColumns(orm, configurationDb);
             var changed = false;
@@ -538,13 +535,20 @@ WHERE {dbInfo.L}Id{dbInfo.R}=@Id
                     StringComparison.OrdinalIgnoreCase));
         }
 
-        private static List<JObject> ReadActiveRows(DbSession configurationDb, string tableName)
+        private static List<JObject> ReadActiveRows(
+            DbSession configurationDb,
+            string tableName,
+            DbInfo dbInfo)
         {
+            // PostgreSQL 会把未引用的 Id/OsClient 折叠成小写；官方空库保留驼峰字段，
+            // 因此启动门禁中的每个受信标识符都必须使用当前数据库方言引用。
             var rows = configurationDb.FromSql($@"
-SELECT Id, OsClient, AuthSecret, AuthSecretRotateVersion,
-       OsClientType, OsClientNetwork, CreateTime, UpdateTime
+SELECT {dbInfo.L}Id{dbInfo.R}, {dbInfo.L}OsClient{dbInfo.R},
+       {dbInfo.L}AuthSecret{dbInfo.R}, {dbInfo.L}AuthSecretRotateVersion{dbInfo.R},
+       {dbInfo.L}OsClientType{dbInfo.R}, {dbInfo.L}OsClientNetwork{dbInfo.R},
+       {dbInfo.L}CreateTime{dbInfo.R}, {dbInfo.L}UpdateTime{dbInfo.R}
 FROM {tableName}
-WHERE IsDeleted=0 AND IsEnable=1")
+WHERE {dbInfo.L}IsDeleted{dbInfo.R}=0 AND {dbInfo.L}IsEnable{dbInfo.R}=1")
                 .ToList<dynamic>();
             return rows.Select(JObject.FromObject).ToList();
         }

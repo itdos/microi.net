@@ -65,7 +65,7 @@ Secret 只通过租户管理员专用端点写入租户绑定的认证密文。�
 - 多节点保存连接使用按 `OsClient + DbKey` 隔离的分布式锁，并由数据库唯一索引兜底；同步数据和附件仍必须使用业务幂等键，锁不能替代唯一约束、状态机或 inbox/outbox。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-001 sha256=9e477268919238bb6a2525116de3c8386aa439d8e93c5d66f3893cb07740b374 -->
+<!-- microi-progressive:chunk id=v8-security-001 sha256=aad35b2c3e1876d98ead7e604307bcb7d39fe8c480d72f102ae956972580a35b -->
 ## 0.5 接口引擎配置安全
 
 代码以外，接口本身的配置项也是安全防线（详见 `v8-api-config/SKILL.md`）：
@@ -77,6 +77,12 @@ Secret 只通过租户管理员专用端点写入租户绑定的认证密文。�
 | `LockKey = ...` | 写操作类接口（对账、补单）防止并发执行 |
 | `RateLimit = 60/m` | 公开接口（验证码、登录）防爬虫 |
 | `LogParam = true` | 支付/审计类接口记录请求 |
+
+### 表单上传的防篡改边界
+
+- `ImgUpload/FileUpload/RichText` 的“禁止匿名访问”属于权威业务配置，不是用户等级策略。普通用户通过当前菜单、表和新增/编辑动作授权后，后端应重新读取 `diy_field.Config` 决定公有桶或私有桶；禁止把所有非超级管理员上传一刀切为私有桶。
+- 恢复公有字段语义不能退回信任客户端 `Limit=false`。请求必须携带表、字段、菜单、记录及必要的 TableChild 上下文，后端校验字段归属、组件类型和操作权限，并固定控件对应的安全一级目录。
+- 没有可验证字段上下文的普通上传保持私有；微信待审图片、裁剪/压缩原图等更强规则继续优先。测试必须同时证明“公有字段可用”和“私有字段/伪造上下文不可绕过”。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=v8-security-002 sha256=7229e5f8d200c0dfbab08752405f5e88d7edc80e9e92b6802880c022b09ca893 -->

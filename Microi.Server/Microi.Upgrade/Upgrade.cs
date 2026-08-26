@@ -3005,8 +3005,10 @@ if (_microiLegacyMenuConfigChanged) {
             }
 
             var targetVersion = ParseFourPartVersion(targetVersionText, "目标ServerVersion");
+            var orm = MicroiEngine.ORM(osClientSecret.Db.Db.DbProvider.DatabaseType);
             var rows = osClientSecret.Db
-                .FromSql("SELECT Id, ServerVersion FROM sys_config WHERE IsEnable = @p0")
+                .FromSql($"SELECT {orm.GetFieldName("Id")}, {orm.GetFieldName("ServerVersion")} " +
+                         $"FROM {orm.GetTableName("sys_config")} WHERE {orm.GetFieldName("IsEnable")} = @p0")
                 .AddInParameter("p0", 1)
                 .ToList<ServerVersionRow>();
             if (rows.Count == 0)
@@ -3032,11 +3034,11 @@ if (_microiLegacyMenuConfigChanged) {
                 }
 
                 var affected = osClientSecret.Db
-                    .FromSql(@"UPDATE sys_config
-                        SET ServerVersion = @p0
-                        WHERE Id = @p1
-                          AND (ServerVersion = @p2
-                               OR (ServerVersion IS NULL AND @p2 = ''))")
+                    .FromSql($@"UPDATE {orm.GetTableName("sys_config")}
+                        SET {orm.GetFieldName("ServerVersion")} = @p0
+                        WHERE {orm.GetFieldName("Id")} = @p1
+                          AND ({orm.GetFieldName("ServerVersion")} = @p2
+                               OR ({orm.GetFieldName("ServerVersion")} IS NULL AND @p2 = ''))")
                     .AddInParameter("p0", targetVersionText)
                     .AddInParameter("p1", row.Id)
                     .AddInParameter("p2", actualText)
@@ -3049,7 +3051,8 @@ if (_microiLegacyMenuConfigChanged) {
 
                 UpgradeExecutionLeaseContext.ThrowIfLost();
                 var reread = osClientSecret.Db
-                    .FromSql("SELECT Id, ServerVersion FROM sys_config WHERE Id = @p0")
+                    .FromSql($"SELECT {orm.GetFieldName("Id")}, {orm.GetFieldName("ServerVersion")} " +
+                             $"FROM {orm.GetTableName("sys_config")} WHERE {orm.GetFieldName("Id")} = @p0")
                     .AddInParameter("p0", row.Id)
                     .First<ServerVersionRow>();
                 if (reread != null

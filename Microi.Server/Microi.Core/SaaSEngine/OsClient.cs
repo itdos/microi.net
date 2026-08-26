@@ -667,7 +667,11 @@ namespace Microi.net
                 var stableVersion = versionBefore;
                 for (var attempt = 0; attempt < 2; attempt++)
                 {
-                    microiDatabaseList = db.FromSql("select * from microi_database where IsEnable = 1 and IsDeleted=0")
+                    var left = db.Db.DbProvider.LeftToken;
+                    var right = db.Db.DbProvider.RightToken;
+                    var sql = $"select * from {left}microi_database{right} " +
+                              $"where {left}IsEnable{right}=1 and {left}IsDeleted{right}=0";
+                    microiDatabaseList = db.FromSql(sql)
                         .ToList<OsClientDataBase>();
                     if (!TryGetExtensionDatabaseVersion(secret.OsClient, out var versionAfter)
                         || versionAfter == versionBefore)
@@ -771,8 +775,15 @@ namespace Microi.net
         /// </summary>
         public void LoadSysConfig(OsClientSecret currentClientModel)
         {
+            var provider = currentClientModel.Db.Db.DbProvider;
+            var left = provider.LeftToken;
+            var right = provider.RightToken;
+            // PostgreSQL 对未引用标识符大小写敏感；使用实际会话 Provider 的引用符，
+            // 使 MySQL、SQL Server、Oracle、PostgreSQL 等启动路径保持同一实现。
+            var sql = $"select * from {left}sys_config{right} " +
+                      $"where {left}IsDeleted{right}<>1 and {left}IsEnable{right}=1";
             var sysConfig = currentClientModel.Db
-                .FromSql("select * from sys_config where IsDeleted<>1 and IsEnable=1")
+                .FromSql(sql)
                 .ToFirst<dynamic>();
 
             if (sysConfig != null)

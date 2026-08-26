@@ -600,6 +600,10 @@ namespace Microi.net.Api
             var fileError = LoadFormFiles(param);
             if (fileError != null) return Json(fileError);
 
+            // multipart 对象不会可靠绑定嵌套 TableChild 上下文；统一按与私有文件读取
+            // 相同的 JSON 字符串协议恢复，随后仍由 FormEngine 逐层回查授权关系。
+            param._TableChildAuth = ResolveRequestTableChildAuthorizationContext(param._TableChildAuth);
+
             // 待审图片必须留在私有桶。ContentSecurityRequired 只能收紧存储范围，
             // 不能由客户端通过 Limit=false 把尚未审核的图片暴露到公有桶。
             if (RequiresWeChatContentSecurity(param)) param.Limit = true;
@@ -648,6 +652,8 @@ namespace Microi.net.Api
             param.Preview ??= true;
             var fileError = LoadFormFiles(param);
             if (fileError != null) return Json(fileError);
+
+            param._TableChildAuth = ResolveRequestTableChildAuthorizationContext(param._TableChildAuth);
 
             if (RequiresWeChatContentSecurity(param)) param.Limit = true;
             var result = await MicroiEngine.HDFS.Upload(param);

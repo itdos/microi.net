@@ -89,8 +89,8 @@ return {
 - 发布镜像使用同目录 `publish-image.ps1`：它从根目录发布配置读取凭据，通过隔离 Docker 配置和 `--password-stdin` 登录，推送后退出并匿名回读公开摘要。不得在命令行、日志或文档中展开用户名/密码，也不得只凭 `docker push` 返回成功就宣布国内镜像可用。
 - 发布镜像时执行 `create_pipeline("OCR")` 预置默认产线模型。运行时使用 named volume 挂载 `/home/microi/.paddlex`，让 Docker 首次创建卷时从镜像复制模型；不要改成空宿主机 bind mount，否则会遮住镜像内的预置模型并触发重新下载。
 - OCR 宿主机端口只绑定 `127.0.0.1`；Docker 化 API 与 OCR 同时加入 external bridge 网络 `microi-ocr`，一键安装的内部 endpoint 固定为 `http://microi-install-ocr:8080/ocr`。不得通过公网/LAN 回环调用同机 OCR。
-- `install-microi.sh` 默认安装 OCR。必须依次满足“固定镜像拉取并回读为 amd64 → OCR healthy → API liveness → Upgrade29 的 9 个物理字段数据库回读 → 唯一活动主租户 → 配置写入后回读 → API 重启 readiness”才设置 `OcrEnabled=1`；任一步失败都保持失败关闭。API liveness 后立即回读字段，每秒一次且最多 15 秒；正常升级应首轮命中，镜像过旧或迁移失败应快速报错，禁止无意义等待 5 分钟。不要用安装脚本直接伪造 `diy_field` 元数据绕过 Upgrade29。
-- API/Web 官方浮动 `latest` 必须在 Compose 启动时强制回源拉取，避免旧本机镜像通过 liveness 却缺少 Upgrade29。字段门禁失败后可以输出已生成端口、密码、目录和容器状态供恢复，但必须明确标记“安装未完成”、保留非零退出码，并显示 OCR SaaS 配置未完成；恢复汇总不是启用 OCR 的依据。
+- `install-microi.sh` 默认尝试安装 OCR，但先部署 API/Web 并通过 liveness、完整 `ServerVersion` 升级链和 readiness。随后必须依次满足“固定镜像拉取并回读为 amd64 → OCR healthy → Upgrade29 的 9 个物理字段数据库回读 → 唯一活动主租户 → 配置写入后回读 → API 重启 readiness”才设置 `OcrEnabled=1`；任一步失败都保持 OCR 能力关闭并记录警告，但不得中断已经可用的核心平台。字段每秒回读一次且最多 15 秒；正常升级应首轮命中，镜像过旧或迁移失败应快速关闭 OCR，禁止无意义等待 5 分钟。不要用安装脚本直接伪造 `diy_field` 元数据绕过 Upgrade29。
+- API/Web 官方浮动 `latest` 必须在 Compose 启动时强制回源拉取，避免旧本机镜像缺少 Upgrade29。核心门禁失败时输出“安装未完成”恢复汇总并保留非零退出码；OCR 字段、服务或配置门禁失败时，成功汇总明确显示“OCR SaaS 未启用”和附加能力警告。两种汇总都不是启用 OCR 的依据。
 - OCR 使用固定不可变版本，不加入只跟踪 API/Web 浮动标签的 Watchtower 自动更新列表；升级镜像时先发布新 tag、匿名回读 digest/架构，再修改 Compose 与安装器。
 - 登录国内镜像源必须从本机发布配置读取凭据并走 `docker login --password-stdin`，不得输出密码。推送成功不是发布验收，必须使用隔离的匿名 Docker config 回读 manifest/digest，必要时再做匿名拉取。
 - 不要在内存不足的共享开发机上直接构建模型镜像。构建前检查物理内存、Docker 占用与同类进程；保留至少 `max(6 GB, 物理内存 20%)`，不足时延后构建而不是停止他人服务。

@@ -610,6 +610,15 @@ namespace Microi.net
 
                 default:
                     var dbType = GetDbType(fieldWhere.Type, originalValue, filedModel);
+                    if ((dbInfo.DbType == DatabaseType.PostgreSql || dbInfo.DbType == DatabaseType.KingBase)
+                        && dbType == DbType.Boolean)
+                    {
+                        // PostgreSQL/Kingbase official seed packages normalize the
+                        // platform's cross-database bit switches to SMALLINT 0/1.
+                        // Keep WHERE parameters on the same contract so Npgsql does
+                        // not generate an invalid `smallint = boolean` comparison.
+                        dbType = DbType.Int16;
+                    }
                     pushParam.DbType = dbType;
                     pushParam.Value = ConvertToDbValue(originalValue, dbType);
                     sqlParams.Add(pushParam);
@@ -806,6 +815,13 @@ namespace Microi.net
                         if (originalValue is short shortV) return (int)shortV;
                         if (originalValue is byte byteV) return (int)byteV;
                         break;
+                    case DbType.Int16:
+                        if (originalValue is bool boolV16) return (short)(boolV16 ? 1 : 0);
+                        if (originalValue is short) return originalValue;
+                        if (originalValue is int intV16) return (short)intV16;
+                        if (originalValue is long longV16) return (short)longV16;
+                        if (originalValue is byte byteV16) return (short)byteV16;
+                        break;
                     case DbType.Decimal:
                         if (originalValue is decimal) return originalValue;
                         if (originalValue is double dblV) return (decimal)dblV;
@@ -829,6 +845,10 @@ namespace Microi.net
             var strValue = originalValue.ToString();
             switch (dbType)
             {
+                case DbType.Int16:
+                    if (bool.TryParse(strValue, out var boolInt16)) return (short)(boolInt16 ? 1 : 0);
+                    if (short.TryParse(strValue, out var shortVal)) return shortVal;
+                    return strValue;
                 case DbType.Int32:
                     if (int.TryParse(strValue, out var intVal)) return intVal;
                     return strValue;

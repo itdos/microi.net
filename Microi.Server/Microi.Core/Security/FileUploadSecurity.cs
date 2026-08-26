@@ -281,8 +281,10 @@ return {1, userNext, tenantNext}";
         }
 
         /// <summary>
-        /// 交互式普通用户只能上传私有文件，并只能使用平台预定义的一级目录。
+        /// 没有可验证表单字段上下文的交互式上传采用兼容安全策略：
+        /// 普通用户只能上传私有文件，并只能使用平台预定义的一级目录；
         /// 超级管理员仍可显式选择公有桶和自定义安全子目录。
+        /// 表单字段上传必须改走 ApplyInteractivePolicyAsync，由服务端字段配置决定公私桶。
         /// </summary>
         public static DosResult ApplyInteractivePolicy(DiyUploadParam param, bool isPlatformAdmin)
         {
@@ -308,6 +310,281 @@ return {1, userNext, tenantNext}";
 
             param.Path = requestedPath.ToLowerInvariant();
             return null;
+        }
+
+        /// <summary>
+        /// 交互式上传的统一入口。标准表单上传携带 FormEngineKey + FieldId 后，
+        /// 服务端先校验当前用户对表/菜单的新增或编辑权限，再重新读取
+        /// diy_field.Config；客户端 Limit 和 Path 仅是请求提示，不能作为授权事实。
+        /// 没有字段上下文的旧上传继续执行私有桶兼容策略。
+        /// </summary>
+        public static async Task<DosResult> ApplyInteractivePolicyAsync(
+            DiyUploadParam param,
+            bool isPlatformAdmin)
+        {
+            if (param == null) return new DosResult(0, null, "上传参数不能为空！");
+
+            param.Limit ??= true;
+            var hasAnyFieldContext = !param.FormEngineKey.DosIsNullOrWhiteSpace()
+                                     || !param.FieldId.DosIsNullOrWhiteSpace()
+                                     || param._TableChildAuth != null;
+            if (!hasAnyFieldContext)
+            {
+                return ApplyInteractivePolicy(param, isPlatformAdmin);
+            }
+
+            if (param.FormEngineKey.DosIsNullOrWhiteSpace()
+                || param.FieldId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(
+                    0,
+                    null,
+                    "表单字段上传必须同时提交FormEngineKey和FieldId！");
+            }
+            if (param._CurrentUser == null)
+            {
+                return new DosResult(1001, null, "登录身份已过期，请重新登录！");
+            }
+
+            try
+            {
+                var sysMenuId = param.SysMenuId.DosIsNullOrWhiteSpace()
+                    ? param.MenuId
+                    : param.SysMenuId;
+                var operation = param.FormDataId.DosIsNullOrWhiteSpace()
+                    ? "Add"
+                    : "Edit";
+                var authorizationParam = new DiyTableRowParam
+                {
+                    FormEngineKey = param.FormEngineKey,
+                    Id = param.FormDataId,
+                    _SysMenuId = sysMenuId,
+                    OsClient = param.OsClient,
+                    _CurrentUser = param._CurrentUser.DeepClone() as JObject,
+                    _InvokeType = InvokeType.Client.ToString(),
+                    _TableChildAuth = param._TableChildAuth
+                };
+                var authorization = await MicroiEngine.FormEngine
+                    .AuthorizeClientTableOperationAsync(authorizationParam, operation)
+                    .ConfigureAwait(false);
+                if (authorization == null || authorization.Code != 1)
+                {
+                    return new DosResult(0, null, "当前用户无权通过该菜单上传到此表单字段！");
+                }
+
+                var tableResult = await MicroiEngine.FormEngine
+                    .GetDiyTable(param.FormEngineKey, param.OsClient)
+                    .ConfigureAwait(false);
+                var tableModel = tableResult != null && tableResult.Code == 1
+                    ? ToJObject((object)tableResult.Data)
+                    : null;
+                var tableId = TokenString(tableModel?["Id"]);
+                var tableName = TokenString(tableModel?["Name"]);
+                if (tableId.DosIsNullOrWhiteSpace() || tableName.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult(0, null, "未找到上传字段所属表单！");
+                }
+
+                var fieldModel = await ResolveDiyFieldModelAsync(
+                    param.OsClient,
+                    param.FieldId,
+                    tableName,
+                    tableId).ConfigureAwait(false);
+                var policyError = ApplyAuthoritativeFormFieldPolicy(
+                    param,
+                    tableModel,
+                    fieldModel);
+                if (policyError != null) return policyError;
+
+                // 保留授权器规范化后的真实菜单 Id，供后续审计与私有文件读取上下文复用。
+                param.SysMenuId = authorizationParam._SysMenuId;
+                return null;
+            }
+            catch
+            {
+                // 元数据、授权缓存或租户数据库异常时失败关闭，绝不回退信任客户端 Limit。
+                return new DosResult(0, null, "表单字段上传策略校验暂时不可用，请稍后重试！");
+            }
+        }
+
+        /// <summary>
+        /// 根据已经从当前租户读取的权威表/字段元数据应用公私桶与一级目录。
+        /// 该纯策略方法供单元测试锁定字段配置语义。
+        /// </summary>
+        internal static DosResult ApplyAuthoritativeFormFieldPolicy(
+            DiyUploadParam param,
+            JObject tableModel,
+            JObject fieldModel)
+        {
+            if (param == null || tableModel == null || fieldModel == null)
+            {
+                return new DosResult(0, null, "上传字段配置不存在！");
+            }
+
+            var tableId = TokenString(tableModel["Id"]);
+            var fieldTableId = TokenString(fieldModel["TableId"]);
+            var component = TokenString(fieldModel["Component"]);
+            if (tableId.DosIsNullOrWhiteSpace()
+                || fieldTableId.DosIsNullOrWhiteSpace()
+                || !string.Equals(tableId, fieldTableId, StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult(0, null, "上传字段与当前表单不匹配！");
+            }
+
+            string uploadRoot;
+            bool defaultLimit;
+            if (string.Equals(component, "ImgUpload", StringComparison.OrdinalIgnoreCase))
+            {
+                uploadRoot = "img";
+                defaultLimit = false;
+            }
+            else if (string.Equals(component, "FileUpload", StringComparison.OrdinalIgnoreCase))
+            {
+                uploadRoot = "file";
+                defaultLimit = false;
+            }
+            else if (string.Equals(component, "RichText", StringComparison.OrdinalIgnoreCase))
+            {
+                uploadRoot = "editor";
+                // 老富文本字段没有上传配置，继续保持私有，避免升级后意外公开历史附件。
+                defaultLimit = true;
+            }
+            else
+            {
+                return new DosResult(0, null, "当前字段不是可上传文件的表单控件！");
+            }
+
+            if (!TryReadFieldUploadLimit(
+                    fieldModel["Config"],
+                    component,
+                    defaultLimit,
+                    out var authoritativeLimit))
+            {
+                return new DosResult(0, null, "上传字段的禁止匿名访问配置无效！");
+            }
+
+            param.Path = uploadRoot;
+            param.Limit = authoritativeLimit;
+
+            // 微信内容安全审核中的图片必须先进入私有隔离区；字段公有配置不能放宽此边界。
+            if (param.ContentSecurityRequired == true
+                || string.Equals(
+                    param._ClientType,
+                    "WxMiniProgram",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                param.Limit = true;
+            }
+            return null;
+        }
+
+        private static async Task<JObject> ResolveDiyFieldModelAsync(
+            string osClient,
+            string fieldId,
+            string tableName,
+            string tableId)
+        {
+            var byId = await MicroiEngine.FormEngine.GetDiyFieldModel(new DiyFieldParam
+            {
+                OsClient = osClient,
+                Id = fieldId,
+                IsDeleted = 0
+            }).ConfigureAwait(false);
+            if (byId != null && byId.Code == 1 && byId.Data != null) return byId.Data;
+
+            var byName = await MicroiEngine.FormEngine.GetDiyFieldModel(new DiyFieldParam
+            {
+                OsClient = osClient,
+                TableId = tableId,
+                TableName = tableName,
+                Name = fieldId,
+                IsDeleted = 0
+            }).ConfigureAwait(false);
+            return byName != null && byName.Code == 1 ? byName.Data : null;
+        }
+
+        private static bool TryReadFieldUploadLimit(
+            JToken configToken,
+            string component,
+            bool defaultValue,
+            out bool limit)
+        {
+            limit = defaultValue;
+            if (configToken == null
+                || configToken.Type == JTokenType.Null
+                || configToken.Type == JTokenType.Undefined
+                || configToken.ToString().DosIsNullOrWhiteSpace())
+            {
+                return true;
+            }
+
+            JObject config;
+            try
+            {
+                config = configToken as JObject ?? JObject.Parse(configToken.ToString());
+            }
+            catch
+            {
+                return false;
+            }
+
+            var componentConfig = config.GetValue(component, StringComparison.OrdinalIgnoreCase);
+            if (componentConfig == null || componentConfig.Type == JTokenType.Null)
+            {
+                return true;
+            }
+            if (!(componentConfig is JObject componentObject))
+            {
+                try
+                {
+                    componentObject = JObject.Parse(componentConfig.ToString());
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            var limitToken = componentObject.GetValue("Limit", StringComparison.OrdinalIgnoreCase);
+            if (limitToken == null
+                || limitToken.Type == JTokenType.Null
+                || limitToken.Type == JTokenType.Undefined
+                || limitToken.ToString().DosIsNullOrWhiteSpace())
+            {
+                return true;
+            }
+
+            var text = limitToken.ToString().Trim();
+            if (string.Equals(text, "true", StringComparison.OrdinalIgnoreCase) || text == "1")
+            {
+                limit = true;
+                return true;
+            }
+            if (string.Equals(text, "false", StringComparison.OrdinalIgnoreCase) || text == "0")
+            {
+                limit = false;
+                return true;
+            }
+            return false;
+        }
+
+        private static JObject ToJObject(object value)
+        {
+            if (value == null) return null;
+            if (value is JObject obj) return obj;
+            try
+            {
+                return JObject.FromObject(value);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string TokenString(JToken token)
+        {
+            return token?.Type == JTokenType.Null ? null : token?.ToString();
         }
 
         /// <summary>

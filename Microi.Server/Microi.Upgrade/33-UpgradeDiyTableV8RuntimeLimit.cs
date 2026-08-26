@@ -57,9 +57,10 @@ namespace Microi.net
                     // Upgrade.cs advances ServerVersion only after Run succeeds.
                     // This historical correction therefore runs once and makes
                     // every pre-existing form-event runtime unrestricted.
-                    client.Db.FromSql(@"UPDATE diy_table
-                            SET V8Limit = @p0,
-                                V8Unlimited = @p1")
+                    var orm = MicroiEngine.ORM(client.Db.Db.DbProvider.DatabaseType);
+                    client.Db.FromSql($@"UPDATE {orm.GetTableName("diy_table")}
+                            SET {orm.GetFieldName(FieldName)} = @p0,
+                                {orm.GetFieldName(LegacyFieldName)} = @p1")
                         .AddInParameter("p0", 0)
                         .AddInParameter("p1", 1)
                         .ExecuteNonQuery();
@@ -69,10 +70,11 @@ namespace Microi.net
                     // Hosted startup uses this metadata invariant before reading
                     // ServerVersion. It may fill only uninitialized rows and must
                     // never undo a tenant's later explicit V8Limit choice.
-                    client.Db.FromSql(@"UPDATE diy_table
-                            SET V8Limit = @p0,
-                                V8Unlimited = @p1
-                            WHERE V8Limit IS NULL")
+                    var orm = MicroiEngine.ORM(client.Db.Db.DbProvider.DatabaseType);
+                    client.Db.FromSql($@"UPDATE {orm.GetTableName("diy_table")}
+                            SET {orm.GetFieldName(FieldName)} = @p0,
+                                {orm.GetFieldName(LegacyFieldName)} = @p1
+                            WHERE {orm.GetFieldName(FieldName)} IS NULL")
                         .AddInParameter("p0", 0)
                         .AddInParameter("p1", 1)
                         .ExecuteNonQuery();
@@ -94,6 +96,25 @@ namespace Microi.net
             var client = OsClientExtend.GetClient(osClient);
             var existing = await GetFieldAsync(osClient, tableId, FieldName).ConfigureAwait(false);
             var physicalExists = client.Db.ColumnExists("diy_table", FieldName);
+            if (!physicalExists)
+            {
+                var addPhysical = MicroiEngine.ORM(client.Db.Db.DbProvider.DatabaseType)
+                    .AddColumn(new DbServiceParam
+                    {
+                        OsClient = osClient,
+                        TableName = "diy_table",
+                        FieldName = FieldName,
+                        FieldType = "int",
+                        FieldNotNull = false,
+                        DbSession = client.Db
+                    });
+                if (addPhysical.Code != 1 && !client.Db.ColumnExists("diy_table", FieldName))
+                {
+                    messages.Add($"新增 diy_table.{FieldName} 物理字段失败：{addPhysical.Msg}");
+                    return;
+                }
+                physicalExists = true;
+            }
             if (existing == null)
             {
                 var add = await UpgradeTrustedFormEngine.AddFieldAsync(

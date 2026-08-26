@@ -248,15 +248,14 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-hero h2::before {
   box-shadow: 0 18px 46px rgba(24, 32, 48, .10);
 }
 
-.micro-app-case.is-wide { grid-column: 1 / -1; }
-
 body:has(.mci-micro-app-page) .VPDoc .micro-app-case img {
   display: block;
   width: 100%;
-  aspect-ratio: 1.95 / 1;
+  aspect-ratio: 1.8 / 1;
   margin: 0;
   border-radius: 0 !important;
-  object-fit: cover;
+  background: var(--mci-site-surface-soft);
+  object-fit: contain;
   box-shadow: none !important;
 }
 
@@ -423,7 +422,6 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-case img {
   .micro-app-hero__facts,
   .micro-app-case-grid,
   .micro-app-guard-grid { grid-template-columns: 1fr; }
-  .micro-app-case.is-wide { grid-column: auto; }
   .micro-app-hero__actions a { width: 100%; }
   .micro-app-note-strip { grid-template-columns: 1fr; }
 }

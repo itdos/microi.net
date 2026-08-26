@@ -298,19 +298,22 @@ public class SaaSRuntimeConfigurationTests
             @"TRANSLATE_CONFIG_SQL=.*OsClientType=.*RUNTIME_OS_CLIENT_TYPE.*OsClientNetwork=.*RUNTIME_OS_CLIENT_NETWORK",
             source);
 
-        var translateStarted = source.IndexOf(
-            "LibreTranslate 翻译服务已安装并启动", StringComparison.Ordinal);
         var apiLiveness = source.IndexOf(
             "wait_for_microi_api '/api/Diagnostics/liveness'", StringComparison.Ordinal);
-        var translateSchema = source.IndexOf(
-            "等待 Upgrade31 创建 SaaS 引擎翻译字段", StringComparison.Ordinal);
-        var translateConfig = source.IndexOf(
-            "写入 SaaS 引擎 LibreTranslate 配置", StringComparison.Ordinal);
-        Assert.True(translateStarted >= 0 && apiLiveness > translateStarted);
-        Assert.True(translateSchema > apiLiveness && translateConfig > translateSchema);
+        Assert.True(apiLiveness >= 0);
         Assert.Contains(
             "registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6-microi1",
             source);
+        Assert.Contains(
+            "OCR_IMAGE=\"${MICROI_INSTALL_OCR_IMAGE_OVERRIDE:-",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "LIBRETRANSLATE_IMAGE=\"${MICROI_INSTALL_LIBRETRANSLATE_IMAGE_OVERRIDE:-",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("DATABASE_TYPE=\"SqlServer\"", source, StringComparison.Ordinal);
+        Assert.Contains("SqlServer|SqlServer9)", source, StringComparison.Ordinal);
         Assert.Contains("install_libretranslate=\"${install_libretranslate:-1}\"", source);
         Assert.Contains("libretranslate_language_package=\"${libretranslate_language_package:-1}\"", source);
         Assert.Contains("默认是 1（安装）", source);
@@ -339,15 +342,90 @@ public class SaaSRuntimeConfigurationTests
         Assert.Contains("mysql --default-character-set=utf8mb4", source);
         Assert.Contains("MICROI_SCHEDULES_PAUSED", source);
         Assert.Contains("定时任务已全部暂停并回读一致", source);
+        Assert.Contains("normalize_postgresql_bit_storage()", source, StringComparison.Ordinal);
+        Assert.Contains("MICROI_POSTGRES_BIT_STORAGE_READY", source, StringComparison.Ordinal);
+        Assert.Contains("ALTER COLUMN %I TYPE SMALLINT", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "normalize_sqlserver_nullable_unique_indexes()",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "SQL Server 可空唯一索引兼容完成",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("print \"SET QUOTED_IDENTIFIER ON;\"", source, StringComparison.Ordinal);
+        Assert.Contains("print \"SET NUMERIC_ROUNDABORT OFF;\"", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "-Q \"SET ANSI_NULLS ON; SET ANSI_PADDING ON; SET ANSI_WARNINGS ON; "
+            + "SET ARITHABORT ON; SET CONCAT_NULL_YIELDS_NULL ON; "
+            + "SET QUOTED_IDENTIFIER ON; SET NUMERIC_ROUNDABORT OFF; ${sql}\"",
+            source,
+            StringComparison.Ordinal);
+        var databaseRestoreComplete = source.IndexOf("数据库还原完成 ✓", StringComparison.Ordinal);
+        var normalizeSqlServerIndexes = source.IndexOf(
+            "\nnormalize_sqlserver_nullable_unique_indexes\n",
+            StringComparison.Ordinal);
+        var databaseRestoreStart = source.IndexOf(
+            "还原 ${DATABASE_DISPLAY_NAME} 数据库（",
+            normalizeSqlServerIndexes,
+            StringComparison.Ordinal);
+        var normalizePostgreSqlBits = source.IndexOf(
+            "\nnormalize_postgresql_bit_storage\n",
+            databaseRestoreComplete,
+            StringComparison.Ordinal);
+        var pauseRestoredSchedules = source.IndexOf(
+            "暂停恢复库中的定时任务",
+            normalizePostgreSqlBits,
+            StringComparison.Ordinal);
+        Assert.True(databaseRestoreComplete >= 0);
+        Assert.True(normalizeSqlServerIndexes >= 0);
+        Assert.True(databaseRestoreStart > normalizeSqlServerIndexes);
+        Assert.True(normalizePostgreSqlBits > databaseRestoreComplete);
+        Assert.True(pauseRestoredSchedules > normalizePostgreSqlBits);
         Assert.Contains("MINIMUM_PLATFORM_SERVER_VERSION=\"6.9.8.6\"", source);
         Assert.Contains("version_at_least()", source);
         Assert.Contains("平台完整升级链回读通过", source);
         var platformUpgradeReadback = source.IndexOf(
             "等待平台完整升级链推进到 ServerVersion", StringComparison.Ordinal);
+        var coreReadiness = source.IndexOf(
+            "API_READINESS_READY=1", platformUpgradeReadback, StringComparison.Ordinal);
+        var deployOcrCall = source.IndexOf(
+            "\ndeploy_optional_ocr\n", coreReadiness, StringComparison.Ordinal);
+        var deployTranslateCall = source.IndexOf(
+            "\ndeploy_optional_libretranslate\n", deployOcrCall, StringComparison.Ordinal);
+        var configureOcrCall = source.IndexOf(
+            "\nconfigure_optional_ocr\n", deployTranslateCall, StringComparison.Ordinal);
+        var configureTranslateCall = source.IndexOf(
+            "\nconfigure_optional_libretranslate\n", configureOcrCall, StringComparison.Ordinal);
         var apiConfigurationRestart = source.IndexOf(
-            "重启新安装 API，使已回读的 OCR/翻译租户配置立即生效", StringComparison.Ordinal);
-        Assert.True(platformUpgradeReadback > translateConfig);
-        Assert.True(apiConfigurationRestart > platformUpgradeReadback);
+            "重启新安装 API，使已成功回读的附加能力配置立即生效", StringComparison.Ordinal);
+        Assert.True(platformUpgradeReadback > apiLiveness);
+        Assert.True(coreReadiness > platformUpgradeReadback);
+        Assert.True(deployOcrCall > coreReadiness);
+        Assert.True(deployTranslateCall > deployOcrCall);
+        Assert.True(configureOcrCall > deployTranslateCall);
+        Assert.True(configureTranslateCall > configureOcrCall);
+        Assert.True(apiConfigurationRestart > configureTranslateCall);
+
+        Assert.Contains("compose_up_optional()", source);
+        Assert.Contains("record_optional_component_failure()", source);
+        Assert.Contains("核心平台已经可用；下面 OCR/LibreTranslate 的任何失败只会形成附加能力警告", source);
+        Assert.Contains("没有附加能力配置成功写入，保持当前 API 运行状态，不执行无意义重启", source);
+        Assert.Contains("核心平台已成功安装；附加能力存在警告", source);
+        Assert.Contains("if [ \"${OCR_SERVICE_READY}\" != \"1\" ]", source);
+        Assert.Contains("if [ \"${LIBRETRANSLATE_SERVICE_READY}\" != \"1\" ]", source);
+
+        foreach (var functionName in new[]
+                 {
+                     "compose_up_optional", "deploy_optional_ocr", "deploy_optional_libretranslate",
+                     "configure_optional_ocr", "configure_optional_libretranslate"
+                 })
+        {
+            var function = Regex.Match(source,
+                $@"(?ms)^{Regex.Escape(functionName)}\(\) \{{\r?\n(?<body>.*?)^\}}");
+            Assert.True(function.Success, $"未找到附加能力函数 {functionName}。");
+            Assert.DoesNotContain("exit 1", function.Groups["body"].Value, StringComparison.Ordinal);
+        }
 
         var mysqlInsert = Regex.Match(source,
             @"INSERT INTO sys_osclients \((?<columns>[^)]*)\)");
@@ -421,6 +499,19 @@ public class SaaSRuntimeConfigurationTests
         Assert.Contains("容器内的 `127.0.0.1` / `localhost`", dockerDocument);
         Assert.Contains("数据库连接串被截断", dockerDocument);
         Assert.DoesNotContain("APP_DIR=/microi/compose/microi-install-app", dockerDocument);
+
+        var quickCommands = dockerDocument.IndexOf("### ⭐ 最重要的 3 条命令", StringComparison.Ordinal);
+        var installCommand = dockerDocument.IndexOf("bash install-microi.sh", quickCommands, StringComparison.Ordinal);
+        var repairCommand = dockerDocument.IndexOf("bash install-microi.sh --repair-app", installCommand, StringComparison.Ordinal);
+        var removeCommand = dockerDocument.IndexOf(
+            "grep \"^microi-install-\" | xargs -r docker rm -f", repairCommand, StringComparison.Ordinal);
+        var resourceProtection = dockerDocument.IndexOf(
+            "### 🛡️ 宿主机 CPU / 内存保护", StringComparison.Ordinal);
+        Assert.True(quickCommands >= 0);
+        Assert.True(installCommand > quickCommands);
+        Assert.True(repairCommand > installCommand);
+        Assert.True(removeCommand > repairCommand);
+        Assert.True(resourceProtection > removeCommand);
     }
 
     [Fact]
@@ -632,9 +723,43 @@ public class SaaSRuntimeConfigurationTests
         Assert.True(tenantRead > tenantBootstrap);
         Assert.Contains("AuthSecretRotateVersionFieldName", source, StringComparison.Ordinal);
         Assert.Contains("AuthSecretStorageLength = 100", source, StringComparison.Ordinal);
-        Assert.Contains("DatabaseType.SqlServer9", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "DatabaseTypeCompatibility.NormalizeOrmServiceType(dbInfo.DbType)",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ReadActiveRows(configurationDb, tableName, dbInfo)",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "SELECT {dbInfo.L}Id{dbInfo.R}, {dbInfo.L}OsClient{dbInfo.R}",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "WHERE {dbInfo.L}IsDeleted{dbInfo.R}=0 AND {dbInfo.L}IsEnable{dbInfo.R}=1",
+            source,
+            StringComparison.Ordinal);
         Assert.Contains("WHERE NOT EXISTS (SELECT 1 FROM {tableName})", source, StringComparison.Ordinal);
         Assert.Contains("ShouldBootstrapConfiguredTenant", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SaaSStartupRawSql_QuotesIdentifiersForPostgreSqlCompatibility()
+    {
+        var root = FindRepositoryRoot();
+        var runtimeSource = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net", "Common", "OsClient.cs"));
+        var coreSource = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Core", "SaaSEngine", "OsClient.cs"));
+
+        Assert.Contains("{dbInfo.L}IsDeleted{dbInfo.R}=0", runtimeSource, StringComparison.Ordinal);
+        Assert.Contains("{dbInfo.L}sys_osclients{dbInfo.R}", runtimeSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("{dbInfo.L}Sys_OsClients{dbInfo.R}", runtimeSource, StringComparison.Ordinal);
+        Assert.Contains("{dbInfo.L}OsClientType{dbInfo.R}=@OsClientType", runtimeSource, StringComparison.Ordinal);
+        Assert.Contains("{dbInfo.L}OsClientNetwork{dbInfo.R}=@OsClientNetwork", runtimeSource, StringComparison.Ordinal);
+        Assert.Contains("{left}microi_database{right}", coreSource, StringComparison.Ordinal);
+        Assert.Contains("{left}sys_config{right}", coreSource, StringComparison.Ordinal);
+        Assert.Contains("{left}IsDeleted{right}<>1", coreSource, StringComparison.Ordinal);
     }
 
     [Fact]

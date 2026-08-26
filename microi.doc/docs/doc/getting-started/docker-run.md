@@ -6,7 +6,34 @@
 
 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
 
-默认安装 **主数据库 + Redis + MinIO + MongoDB + PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）+ Watchtower + 低代码平台程序（API + Web）**。已有 MySQL 或 MinIO 的客户也可在交互中选择复用，安装器会跳过对应容器、数据目录、编排和宿主机端口。其余独立编排统一接入 `microi` Docker bridge 网络；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
+默认安装 **主数据库 + Redis + MinIO + MongoDB + 低代码平台程序（API + Web）+ Watchtower**，并默认尝试安装 **PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）** 两项附加能力。已有 MySQL 或 MinIO 的客户也可在交互中选择复用，安装器会跳过对应容器、数据目录、编排和宿主机端口。OCR 或 LibreTranslate 镜像、网络、容器健康检查、Upgrade29/Upgrade31 配置任一失败时，只会跳过对应附加能力并输出警告，不会回滚或中断已经通过 liveness/readiness 的核心平台；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
+
+### ⭐ 最重要的 3 条命令
+
+**1. CentOS 7/8/9 / Ubuntu 20/22/24 / Debian 10/11/12 一键安装**
+
+```bash
+# 官方 GitHub 镜像（源码浏览）：https://github.com/itdos/microi.net
+url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh
+```
+
+**2. 一键更新/修复 API 与 Web 前端**
+
+```bash
+# 保留数据库、Redis、MongoDB、MinIO、数据目录与 Docker volume
+# 官方 GitHub 镜像（源码浏览）：https://github.com/itdos/microi.net
+url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh --repair-app
+```
+
+**3. 强制删除所有一键安装容器/编排实例**
+
+:::: danger 执行前必须确认目标
+下面的命令会强制停止并删除名称以 `microi-install-` 开头的全部容器，服务会立即中断。它不主动删除 `/microi` 数据目录或附加 `-v` 删除卷，但仍应先完成备份并核对容器名称。
+
+```bash
+docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
+```
+::::
 
 ### 🛡️ 宿主机 CPU / 内存保护
 
@@ -133,9 +160,9 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 | 6 | 根据安装模式选择的访问 IP 和实际端点，自动把 `sys_config.ApiBase` 写为 API 地址，把 `sys_config.FileServer` 写为最终公有桶 HTTP(S) 地址 |
 | 7 | 端口从 **61600 开始顺序 +1 分配**；默认新装基础服务（含 OCR）占用 8 个连续端口，LibreTranslate 增加 1 个端口。复用已有 MySQL 时减少 1 个本机端口，复用已有 MinIO 时减少 2 个；已有服务原端口不参与分配或自动开放防火墙 |
 | 8 | 安装器始终创建/复用 `microi` 共享 Docker bridge 网络；新装依赖使用容器 DNS 和内部端口，已有 MySQL/MinIO 使用所填地址（本机默认映射为 host-gateway）。OCR 与 LibreTranslate 的诊断端口只绑定 `127.0.0.1` |
-| 9 | OCR 国内固定版本镜像会默认安装。服务健康且 API 完成 Upgrade29 后，脚本才把 `OcrEnabled`、服务地址与限额写入当前唯一的 SaaS 主租户，并以数据库回读确认；任一阶段失败都不会启用错误配置 |
+| 9 | OCR 国内固定版本镜像和 LibreTranslate 会默认尝试安装，但都属于附加能力。核心 API/Web 先完成 liveness、完整 `ServerVersion` 升级链与 readiness；随后附加服务只有在容器检查、Upgrade29/Upgrade31 字段、唯一主租户和配置回读全部通过时才启用，任一阶段失败只记录警告并跳过对应配置，不回滚或中断核心平台 |
 | 10 | API/Web 使用官方浮动标签时会在部署前强制回源拉取最新镜像，避免宿主机缓存的旧 `latest` 通过 liveness 后却缺少 Upgrade29/Upgrade31 |
-| 11 | 密码与端口准备后若任一后段门禁失败，脚本仍保持非零退出码，同时打印“安装未完成”恢复汇总；新装凭据按既有规则展示，客户已有 MySQL/MinIO 的密码和密钥只标记为已读取，绝不回显 |
+| 11 | 数据库、Redis、MongoDB、MinIO、API/Web、完整平台升级链、API liveness/readiness 等**核心门禁**失败时，脚本保持非零退出码并打印“安装未完成”恢复汇总；OCR/LibreTranslate 的镜像、网络、健康检查或 SaaS 配置失败时，核心安装继续并在成功汇总中列出附加能力警告。新装凭据按既有规则展示，客户已有 MySQL/MinIO 的密码和密钥只标记为已读取，绝不回显 |
 | 12 | 检测到已有安装或中断编排时不要直接重跑、删卷、删除数据目录或清空外部服务；先按失败汇总和 API 日志排查，确需停编排时使用对应目录的 `docker compose down`，禁止附加 `-v` |
 | 13 | 若脚本中文显示为乱码/问号，请先执行 `export LANG=en_US.UTF-8` 或 `export LANG=C.UTF-8` 后重新运行 |
 | 14 | 当前一键安装只把吾码 API 与脚本创建的主数据库加入同一个 `microi.slice`，并回读父级 CPU、内存和 Swap 合计硬上限；其它服务不加入。旧安装不会自动补写，请按“宿主机 CPU / 内存保护”一节升级 |
@@ -182,13 +209,15 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 
 ### 🗑️ 删除所有已安装容器/编排
 
-::: danger 此操作将导致所有数据丢失
-方式一（推荐）：进入各编排目录执行 `docker compose down`
+::: danger 此操作会立即中断全部一键安装服务
+方式一（推荐）：进入各编排目录执行 `docker compose down`。不要附加 `-v`，并保留 `/microi` 下的数据目录。
 
-方式二（强制删除所有容器）：
+方式二（强制删除所有 `microi-install-*` 容器）：
 ```bash
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
+
+该命令不主动删除 `/microi` 数据目录或 Docker volume，但会立即中断服务；执行前仍必须备份并核对目标容器。
 :::
 
 ### 🔌 离线安装（无互联网环境）
@@ -1316,10 +1345,10 @@ server {
 Microi API 内置统一 OCR 网关，模型推理由独立的 PaddleX 服务承载。一键安装使用吾码杭州镜像源中的固定版本 `PaddleX 3.6.1 + PaddlePaddle 3.2.2` CPU 镜像，并已在发布镜像阶段预置默认 OCR 产线模型。PaddlePaddle 3.3.0 当前存在 CPU oneDNN PIR 推理兼容问题，请勿自行替换为 3.3.0。因此服务器只需拉取一个经过固定版本验证的镜像，不再现场安装 Python 依赖或重新下载模型。
 
 :::: tip 一键安装会自动完成
-一键安装会创建 `microi-install-ocr` 独立编排和 `microi-ocr` 内部网络，等待容器进入 `healthy`，再由 API Upgrade29 创建 SaaS 引擎的“OCR识别”Tab。API/Web 的官方 `latest` 会强制回源拉取，API 存活后脚本立即回读 9 个物理字段，每秒一次、最多 15 秒；正常升级通常首轮通过，镜像过旧或迁移失败会快速报错，不再等待 5 分钟。只有数据库回读确认全部字段和唯一主租户后，才写入 `OcrEnabled=1` 与正确内网地址并重启 API 使配置生效，脚本不会绕过 Upgrade29 直接伪造元数据。若门禁失败，终端会继续打印已生成的端口、凭据、目录和容器状态，但标题明确为“安装未完成”且退出码仍非零。
+一键安装会先部署并验收数据库、Redis、MongoDB、MinIO、API 与 Web，确认 API liveness、完整 `ServerVersion` 升级链和 readiness 后，再尝试创建 `microi-install-ocr` 独立编排并等待容器进入 `healthy`。OCR 健康后，脚本回读 API Upgrade29 创建的 9 个物理字段，每秒一次、最多 15 秒；只有全部字段、唯一主租户和写入后回读都通过，才设置 `OcrEnabled=1` 与正确内网地址并重启 API 使配置生效。脚本不会绕过 Upgrade29 直接伪造元数据。OCR 镜像拉取、架构、内部网络、容器健康或 SaaS 配置失败时，会保留容器与日志、明确显示“OCR 未启用”，但核心平台继续运行，最终命令仍以核心平台安装成功结束并列出附加能力警告。
 ::::
 
-当前公开基线为 `linux/amd64`。建议整机至少 4 核 16 GB 内存，并根据真实图片尺寸、PDF 页数及并发压测调整；ARM64 或 GPU 服务器应使用仓库 Dockerfile/官方 Paddle 镜像构建对应架构版本，不要强行运行 amd64 CPU 镜像。
+当前公开基线为 `linux/amd64`。建议整机至少 4 核 16 GB 内存，并根据真实图片尺寸、PDF 页数及并发压测调整；ARM64 主机会自动跳过这项附加能力而继续安装核心平台。ARM64 或 GPU 服务器如需 OCR，应使用仓库 Dockerfile/官方 Paddle 镜像构建对应架构版本，不要强行运行 amd64 CPU 镜像。
 
 手动部署可使用以下 Compose：
 
@@ -1434,9 +1463,9 @@ LibreTranslate 用于动态内容翻译，不影响 `diy_lang` 固定界面词�
 | 意大利语 | `it` | 荷兰语 | `nl` | 土耳其语 | `tr` |
 | 波兰语 | `pl` | 乌克兰语 | `uk` |  |  |
 
-一键安装脚本默认安装 LibreTranslate：安装选择直接按 Enter 等同于 `1`，语言套餐直接按 Enter 等同于基础套餐 `1`（简体中文、繁体中文、英语）。因此用户一路按 Enter 就会使用吾码官方推荐组合；明确不安装时在第一处提示输入 `0`。选择安装后仍可改选套餐 2/3 或输入额外语言 Key。脚本会自动分配只绑定 `127.0.0.1` 的诊断端口、生成并回读随机 API Key 数据库。平台 API 启动后，脚本立即回读 Upgrade31 的 4 个翻译物理字段，每秒一次、最多 15 秒；正常升级通常首轮通过，镜像过旧或迁移失败会快速报错。字段齐全后脚本才通过内部 Docker 地址写入主租户并回读验证，兼容没有 `TranslateProvider` 等新列的旧恢复库，且不会绕过 Upgrade31 直接伪造元数据。
+一键安装脚本默认尝试安装 LibreTranslate：安装选择直接按 Enter 等同于 `1`，语言套餐直接按 Enter 等同于基础套餐 `1`（简体中文、繁体中文、英语）。因此用户一路按 Enter 就会使用吾码官方推荐组合；明确不安装时在第一处提示输入 `0`。选择安装后仍可改选套餐 2/3 或输入额外语言 Key。核心平台通过 liveness、完整升级链与 readiness 后，脚本再分配只绑定 `127.0.0.1` 的诊断端口、生成并回读随机 API Key 数据库、启动翻译容器，并回读 Upgrade31 的 4 个翻译物理字段，每秒一次、最多 15 秒。字段齐全后脚本才通过内部 Docker 地址写入唯一主租户并回读验证，兼容没有 `TranslateProvider` 等新列的旧恢复库，且不会绕过 Upgrade31 直接伪造元数据。
 
-字段前置迁移完成不等于整条平台升级链成功。一键安装还会在重启 API 前等待并回读 `sys_config.ServerVersion` 至少达到脚本要求的版本；如果应用商城、SaaS 运行字段或其它中间迁移失败，脚本会明确停止，不会把“部分字段已创建”误报为安装完成，也不会用紧接着的重启打断尚未结束的升级事务。
+字段前置迁移完成不等于整条平台升级链成功，因此一键安装会在部署 LibreTranslate 前先回读 `sys_config.ServerVersion` 至少达到脚本要求的版本。核心升级链或 API readiness 失败时仍会明确停止并返回非零；LibreTranslate 镜像、Key 初始化、容器运行、Upgrade31 字段或配置回读失败时，只会保留现场并把翻译能力标记为未启用，不会删除数据、回滚或中断已经可用的核心平台。只有至少一项附加能力配置成功回读时才重启 API；没有成功配置时保持现有 API 运行状态。
 
 手动部署时可使用项目中的 `数据库、案例、文档、资料/docker-compose.libretranslate.yml`，并根据服务器修改宿主机目录、端口、`LT_LOAD_ONLY` 和 API Key。由于 Docker Compose 可能把全中文目录名归一化为空项目名，建议复制到 ASCII 目录，并始终显式指定项目名：
 

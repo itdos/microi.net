@@ -143,7 +143,7 @@ const circuitPaths = [
 const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="architecture-title architecture-desc" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
   <title id="architecture-title">Microi吾码 AI平台 架构图</title>
-  <desc id="architecture-desc">以 V8引擎为运行核心，连接 AI、低代码、治理、服务观测、多端入口、安全、多租户和数据存储的 Microi吾码 AI 平台全景架构。</desc>
+  <desc id="architecture-desc">以 V8引擎为运行核心，醒目展示 AI、低代码、接口、数据、集成、自动化、治理、多端交付与可靠运行等全部 Microi吾码系统引擎。</desc>
   <metadata id="architecture-source">${esc(JSON.stringify({ architectureVersion, platformVersion, capabilitySourceHash: sourceHash }))}</metadata>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#020716"/><stop offset=".48" stop-color="#07152b"/><stop offset="1" stop-color="#020713"/></linearGradient>
@@ -207,7 +207,7 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <text x="40" y="55" class="title">Microi吾码 AI平台 架构图</text>
   <rect x="475" y="28" width="86" height="34" rx="17" class="version-badge"/>
   <text x="518" y="50" text-anchor="middle" class="version-text">${esc(platformVersion)}</text>
-  <text x="40" y="82" class="subtitle">AI-NATIVE LOW-CODE · DESIGN → BUILD → GOVERN → DELIVER → OBSERVE → RECOVER</text>
+  <text x="40" y="82" class="subtitle">OPEN-SOURCE AI DEVELOPMENT FRAMEWORK · 20+ SYSTEM ENGINES · BUILD → INTEGRATE → DELIVER → OBSERVE</text>
   ${valueCards.map(valueCardSvg).join('')}
 
   ${channels.map(channelSvg).join('')}

@@ -206,6 +206,30 @@ public sealed class BackgroundTaskWorkerSupervisionTests
             Microi.net.BackgroundTaskStore.ResolveLeaseSeconds(apiEngineKey));
     }
 
+    [Fact]
+    public void PostgreSqlBackgroundTaskSql_QuotesMixedCaseIdentifiersWithoutTouchingParametersOrLiterals()
+    {
+        var client = new Microi.net.OsClientSecret
+        {
+            OsClientModel = new Newtonsoft.Json.Linq.JObject
+            {
+                ["DbType"] = "PostgreSql"
+            }
+        };
+
+        var sql = Microi.net.BackgroundTaskStore.QuoteSqlIdentifiers(
+            client,
+            "UPDATE mci_background_task SET AttemptCount=0,Msg='Id Status' " +
+            "WHERE IsDeleted=0 AND RuntimeOsClientType=@runtimeType");
+
+        Assert.Contains("UPDATE \"mci_background_task\"", sql);
+        Assert.Contains("\"AttemptCount\"=0", sql);
+        Assert.Contains("\"IsDeleted\"=0", sql);
+        Assert.Contains("\"RuntimeOsClientType\"=@runtimeType", sql);
+        Assert.Contains("\"Msg\"='Id Status'", sql);
+        Assert.DoesNotContain("'\"Id\" \"Status\"'", sql);
+    }
+
     private static string FindServerRoot()
     {
         var repositoryRoot = Environment.GetEnvironmentVariable("MICROI_TEST_REPOSITORY_ROOT");

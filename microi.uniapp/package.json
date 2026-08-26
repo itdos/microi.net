@@ -27,7 +27,7 @@
     "check:controls": "node scripts/check-native-controls.js",
     "check:file-urls": "node scripts/check-file-url-resolution.mjs",
     "check:formengine-writes": "node scripts/check-formengine-write-contract.mjs",
-    "check:upload-paths": "node scripts/check-upload-path-policy.mjs && node --test scripts/test-upload-default-compression.mjs",
+    "check:upload-paths": "node scripts/check-upload-path-policy.mjs && node --test scripts/test-upload-default-compression.mjs scripts/test-upload-field-context.mjs",
     "check:content-security": "node scripts/check-content-security.mjs && node --test scripts/test-content-security-batch.mjs",
     "check:app-runtime": "node --test scripts/test-app-runtime-endpoint.mjs && node scripts/check-app-runtime-endpoint.mjs",
     "check:auth-session": "node scripts/check-auth-session-race.mjs && node --test scripts/test-login-navigation.mjs scripts/test-auth-expired-policy.mjs && npm run check:app-runtime",

@@ -17,7 +17,18 @@
 [[FormEngine 用法]](https://microi.net/doc/v8-engine/form-engine)    [[Where 条件用法]](https://microi.net/doc/v8-engine/where)
 :::
 
-![Microi 接口引擎在线开发界面](https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg)
+## 📸 接口引擎预览
+
+<div class="mci-doc-screenshot-grid">
+  <figure>
+    <img src="/images/product-screenshots/api-engine-detail.jpg" alt="Microi吾码接口引擎编辑界面，展示接口配置、响应类型、附件、超时、调用限制与修改历史" data-fancybox="api-engine-preview">
+    <figcaption>接口配置：响应类型、调用策略、附件、超时与修改历史集中在同一编辑工作台。</figcaption>
+  </figure>
+  <figure>
+    <img src="/images/product-screenshots/api-engine-ai-copilot.png" alt="Microi吾码接口引擎暗色代码编辑器与 AI 编程助手，展示平台接口列表、V8 代码和智能编程面板" data-fancybox="api-engine-preview">
+    <figcaption>AI 编程：接口定义、V8 代码、版本与 AI 编程助手同屏协作，保存后在线生效。</figcaption>
+  </figure>
+</div>
 
 ## 默认实现边界：业务逻辑优先接口引擎
 

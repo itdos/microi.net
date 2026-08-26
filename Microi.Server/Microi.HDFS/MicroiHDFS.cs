@@ -161,7 +161,9 @@ namespace Microi.net
             if (isInteractiveRequest)
             {
                 var isPlatformAdmin = currentUser?["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
-                var interactivePolicyError = FileUploadSecurity.ApplyInteractivePolicy(param, isPlatformAdmin);
+                var interactivePolicyError = await FileUploadSecurity
+                    .ApplyInteractivePolicyAsync(param, isPlatformAdmin)
+                    .ConfigureAwait(false);
                 if (interactivePolicyError != null) return interactivePolicyError;
             }
 

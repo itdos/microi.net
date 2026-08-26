@@ -4,6 +4,19 @@
 
 ---
 
+## 📸 表单与字段配置预览
+
+<div class="mci-doc-screenshot-grid">
+  <figure>
+    <img src="/images/product-screenshots/form-field-image-upload-settings.jpg" alt="Microi吾码表单设计器的图片上传字段设置弹窗，展示上传、多图、压缩、裁剪与 V8 扩展配置" data-fancybox="form-field-preview">
+    <figcaption>控件专项配置：图片上传、多图、压缩、原图保留、裁剪与 V8 扩展集中维护。</figcaption>
+  </figure>
+  <figure>
+    <img src="/images/product-screenshots/form-field-text-settings.jpg" alt="Microi吾码表单设计器的单行文本字段设置弹窗，展示图标、复合文字、插槽按钮和 V8 事件" data-fancybox="form-field-preview">
+    <figcaption>字段交互配置：显示、复合文字、插槽按钮、失焦与键盘 V8 事件在暗色主题下完整呈现。</figcaption>
+  </figure>
+</div>
+
 ## 字段说明的呈现规则
 
 字段配置了【字段说明】后，表单会按 Label 对齐方式直接呈现说明文字，不再默认只显示一个需要鼠标悬停的 `i` 图标：

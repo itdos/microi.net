@@ -120,6 +120,11 @@ namespace Microi.net
                 .ToArray();
         private static readonly Lazy<IReadOnlyList<JObject>> BundledStartupDependencyEngines =
             new Lazy<IReadOnlyList<JObject>>(BuildBundledStartupDependencyEngines);
+        private static readonly HashSet<string> ApiEngineBitColumns =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "IsDeleted", "IsEnable", "Lock", "AllowAnonymous"
+            };
         private static readonly HashSet<string> AnonymousPlatformRuntimeEngineKeys = new HashSet<string>(StringComparer.Ordinal)
         {
             "platform-os-client-by-domain",
@@ -2070,9 +2075,13 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                             continue;
                         }
 
-                        var addressCollision = client.Db.FromSql(@"SELECT Id, ApiEngineKey, ApiAddress
-FROM sys_apiengine
-WHERE LOWER(ApiAddress)=LOWER(@p0) AND Id<>@p1")
+                        var addressCollision = client.Db.FromSql($@"SELECT
+    {QuoteIdentifier(client.Db, "Id")},
+    {QuoteIdentifier(client.Db, "ApiEngineKey")},
+    {QuoteIdentifier(client.Db, "ApiAddress")}
+FROM {QuoteIdentifier(client.Db, "sys_apiengine")}
+WHERE LOWER({QuoteIdentifier(client.Db, "ApiAddress")})=LOWER(@p0)
+  AND {QuoteIdentifier(client.Db, "Id")}<>@p1")
                             .AddInParameter("p0", source["ApiAddress"]?.ToString())
                             .AddInParameter("p1", existing["Id"]?.ToString())
                             .First<dynamic>();
@@ -2116,9 +2125,13 @@ WHERE LOWER(ApiAddress)=LOWER(@p0) AND Id<>@p1")
                     }
                     else
                     {
-                        var collision = client.Db.FromSql(@"SELECT Id, ApiEngineKey, ApiAddress
-FROM sys_apiengine
-WHERE Id=@p0 OR LOWER(ApiAddress)=LOWER(@p1)")
+                        var collision = client.Db.FromSql($@"SELECT
+    {QuoteIdentifier(client.Db, "Id")},
+    {QuoteIdentifier(client.Db, "ApiEngineKey")},
+    {QuoteIdentifier(client.Db, "ApiAddress")}
+FROM {QuoteIdentifier(client.Db, "sys_apiengine")}
+WHERE {QuoteIdentifier(client.Db, "Id")}=@p0
+   OR LOWER({QuoteIdentifier(client.Db, "ApiAddress")})=LOWER(@p1)")
                             .AddInParameter("p0", source["Id"]?.ToString())
                             .AddInParameter("p1", source["ApiAddress"]?.ToString())
                             .First<dynamic>();
@@ -2152,9 +2165,13 @@ WHERE Id=@p0 OR LOWER(ApiAddress)=LOWER(@p1)")
                     var isEnable = ReadStartupSwitch(source["IsEnable"]);
                     var stopHttp = ReadStartupSwitch(source["StopHttp"]);
                     var allowAnonymous = ReadStartupSwitch(source["AllowAnonymous"]);
-                    client.Db.FromSql(@"UPDATE sys_apiengine
-SET IsEnable=" + isEnable + ", StopHttp=" + stopHttp + ", AllowAnonymous=" + allowAnonymous + @", ApiAddress=@p0
-WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    client.Db.FromSql($@"UPDATE {QuoteIdentifier(client.Db, "sys_apiengine")}
+SET {QuoteIdentifier(client.Db, "IsEnable")}={isEnable},
+    {QuoteIdentifier(client.Db, "StopHttp")}={stopHttp},
+    {QuoteIdentifier(client.Db, "AllowAnonymous")}={allowAnonymous},
+    {QuoteIdentifier(client.Db, "ApiAddress")}=@p0
+WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
+  AND ({QuoteIdentifier(client.Db, "IsDeleted")}=0 OR {QuoteIdentifier(client.Db, "IsDeleted")} IS NULL)")
                         .AddInParameter("p0", source["ApiAddress"]?.ToString())
                         .AddInParameter("p1", key)
                         .ExecuteNonQuery();
@@ -2224,10 +2241,12 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             string key,
             bool ignoreKeyCase = false)
         {
+            var apiEngineKey = QuoteIdentifier(database, "ApiEngineKey");
             var predicate = ignoreKeyCase
-                ? "LOWER(ApiEngineKey)=LOWER(@p0)"
-                : "ApiEngineKey=@p0";
-            var row = database.FromSql("SELECT * FROM sys_apiengine WHERE " + predicate)
+                ? $"LOWER({apiEngineKey})=LOWER(@p0)"
+                : $"{apiEngineKey}=@p0";
+            var row = database.FromSql(
+                    $"SELECT * FROM {QuoteIdentifier(database, "sys_apiengine")} WHERE {predicate}")
                 .AddInParameter("p0", key)
                 .First<dynamic>();
             return row == null ? null : JObject.FromObject(row);
@@ -2289,14 +2308,16 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
 
             var section = existingId.DosIsNullOrWhiteSpace()
                 ? database.FromSql(
-                    $"INSERT INTO sys_apiengine ({string.Join(",", fields.Select(field => QuoteIdentifier(database, field.Name)))}) "
+                    $"INSERT INTO {QuoteIdentifier(database, "sys_apiengine")} ({string.Join(",", fields.Select(field => QuoteIdentifier(database, field.Name)))}) "
                     + $"VALUES ({string.Join(",", fields.Select((_, index) => "@p" + index))})")
                 : database.FromSql(
-                    $"UPDATE sys_apiengine SET {string.Join(",", fields.Select((field, index) => QuoteIdentifier(database, field.Name) + "=@p" + index))} "
+                    $"UPDATE {QuoteIdentifier(database, "sys_apiengine")} SET {string.Join(",", fields.Select((field, index) => QuoteIdentifier(database, field.Name) + "=@p" + index))} "
                     + $"WHERE {QuoteIdentifier(database, "Id") }=@p{fields.Length}");
 
             for (var index = 0; index < fields.Length; index++)
-                section.AddInParameter("p" + index, ReadDatabaseValue(fields[index].Value));
+                section.AddInParameter(
+                    "p" + index,
+                    ReadDatabaseValue(database, fields[index].Name, fields[index].Value));
             if (!existingId.DosIsNullOrWhiteSpace())
                 section.AddInParameter("p" + fields.Length, existingId);
             return section.ExecuteNonQuery();
@@ -2313,20 +2334,43 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             };
         }
 
-        private static object ReadDatabaseValue(JToken token)
+        private static object ReadDatabaseValue(
+            DbSession database,
+            string fieldName,
+            JToken token)
         {
             if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
                 return DBNull.Value;
+            if (ApiEngineBitColumns.Contains(fieldName))
+                return (short)ReadStartupSwitch(token);
             return token.Type switch
             {
-                JTokenType.Integer => token.Value<long>(),
+                JTokenType.Integer => ReadDatabaseInteger(token.Value<long>()),
                 JTokenType.Float => token.Value<decimal>(),
                 JTokenType.Boolean => token.Value<bool>() ? 1 : 0,
-                JTokenType.Date => token.Value<DateTime>(),
+                JTokenType.Date => ReadDatabaseDateTime(database, token.Value<DateTime>()),
                 JTokenType.Bytes => token.Value<byte[]>(),
                 JTokenType.Array or JTokenType.Object => token.ToString(Formatting.None),
                 _ => token.ToString()
             };
+        }
+
+        private static object ReadDatabaseInteger(long value)
+        {
+            return value >= int.MinValue && value <= int.MaxValue
+                ? (object)(int)value
+                : value;
+        }
+
+        private static DateTime ReadDatabaseDateTime(DbSession database, DateTime value)
+        {
+            if (database?.Db?.DbProvider?.DatabaseType != DatabaseType.PostgreSql)
+                return value;
+            if (value.Kind == DateTimeKind.Utc)
+                return value;
+            return value.Kind == DateTimeKind.Local
+                ? value.ToUniversalTime()
+                : DateTime.SpecifyKind(value, DateTimeKind.Local).ToUniversalTime();
         }
 
         private static string GetStartupDependencyContractError(JObject row, JObject source)

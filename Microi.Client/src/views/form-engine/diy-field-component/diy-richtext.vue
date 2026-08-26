@@ -195,6 +195,7 @@ import {
     hydrateRichTextPrivateAssetUrls,
     normalizeRichTextConfig
 } from './richtext-assets';
+import { appendFormFieldUploadContext } from "@/utils/form-field-upload-context";
 
 const SOURCE_CODE_MENU_KEY = 'microiSourceCode';
 const ATTACHMENT_MENU_KEY = 'microiAttachment';
@@ -399,6 +400,15 @@ const uploadRichTextFile = async (file, options) => {
     formData.append('Limit', String(richTextConfig.value.Limit));
     formData.append('Multiple', 'false');
     formData.append('Preview', String(mediaType === 'image' && richTextConfig.value.Image.Preview));
+    appendFormFieldUploadContext(formData, {
+        field: props.field,
+        diyTableModel: props.DiyTableModel,
+        formData: props.FormDiyTableModel,
+        tableName: props.TableName,
+        tableRowId: props.TableRowId,
+        sysMenuId: props.SysMenuId,
+        tableChildAuth: props.TableChildAuth
+    });
     if (mediaType === 'image' && richTextConfig.value.Image.Preview) {
         formData.append('CompressMaxSize', String(richTextConfig.value.Image.CompressMaxSize));
         formData.append('CompressMaxWidth', String(richTextConfig.value.Image.CompressMaxWidth));

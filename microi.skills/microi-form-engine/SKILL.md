@@ -57,8 +57,11 @@ Config/Data、菜单查询列与缓存保持一致。
   图片默认压缩到约 500 KB、最长边 1920 px。
 - 私有富文本只能持久化稳定对象标识，禁止把 HDFS 签名 URL、审计代理 Ticket 或 DiyToken 写入
   HTML。每次查看/编辑按当前菜单、表、记录和字段权限换取新短效地址；外部匿名页面没有此权限
-  上下文，因此不能把私有 RichText 当作公开正文。普通交互式帐号也不能用 `Limit=false` 绕过
-  后端强制私有策略。
+  上下文，因此不能把私有 RichText 当作公开正文。普通用户通过当前表单新增/编辑授权后，后端
+  必须回读 `diy_field.Config.RichText.Limit` 决定公私桶；只改请求 `Limit=false` 不能绕过字段配置。
+- 图片、文件和富文本上传必须携带 `FormEngineKey + FieldId + SysMenuId`，编辑记录再带
+  `FormDataId`，TableChild 再带父子授权上下文。后端不得按用户等级统一覆盖字段的“禁止匿名访问”；
+  无法回查字段与动作权限的普通上传才安全降级为私有桶。
 
 新建表/模块时，除非用户显式指定或表单达到极重阈值（约 36+ 业务字段、2+ 子表或同等
 重型控件密度），默认保存 `diy_table.FormOpenType=Dialog` 与 `FormOpenWidth=80%`。

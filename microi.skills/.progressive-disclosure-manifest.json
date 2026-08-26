@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-24T23:28:15.830Z",
+  "generatedAt": "2026-08-26T19:09:39.599Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -407,11 +407,11 @@
       ]
     },
     "microi-frontend-sdk": {
-      "originalSha256": "7d244b24626787ccc88be38f5088ffcd6dbb736a8155a1ab7ae71ce134284644",
-      "originalLines": 317,
+      "originalSha256": "27802e252aa4c9d85e4e10c70baa9d05c7207dcf943c5305c24a586b17e0fac7",
+      "originalLines": 318,
       "prefixSha256": "5ee94a9174a22577011c64f29a93f6983c8450d471d26f12fa884d7c4b3a879a",
       "prefixBytes": 895,
-      "entryLines": 190,
+      "entryLines": 191,
       "chunks": [
         {
           "id": "microi-frontend-sdk-000",
@@ -433,7 +433,7 @@
           "id": "microi-frontend-sdk-002",
           "ordinal": 2,
           "destination": "microi-frontend-sdk/SKILL.md",
-          "sha256": "54b302bfe2a8830a3043ae7804ca775d6159453bea0cfdeac61c3b97d36466ed",
+          "sha256": "b71205548e4701f8bf53e2bed3da914da4ca0f49e0cce952a1c938fc77218ed8",
           "lines": 48,
           "heading": "登录与验证码封装"
         },
@@ -449,8 +449,8 @@
           "id": "microi-frontend-sdk-004",
           "ordinal": 5,
           "destination": "microi-frontend-sdk/SKILL.md",
-          "sha256": "f5644fc45280e53988d1eed432e57afc2c56fc58b1232505950359219b5220d2",
-          "lines": 17,
+          "sha256": "1ecb73f5b1246c7157d782b62cba59850389858baeefdc5351a255d4d04b11b6",
+          "lines": 18,
           "heading": "上传规则"
         },
         {
@@ -942,11 +942,11 @@
       ]
     },
     "microi-uniapp-frontend": {
-      "originalSha256": "3727756264593f239e06109dbd5d11c1f53eb576484e445f4d664303b38260c8",
-      "originalLines": 499,
-      "prefixSha256": "6b843b9a940cd2a4019b3873d72a9d346b0e6ab872afb0966f093b76dcc27131",
-      "prefixBytes": 2486,
-      "entryLines": 190,
+      "originalSha256": "a9e7ebb927e8be11a7d4d273f83b3a6f200835c2361daa944ec200d0580c3e2b",
+      "originalLines": 501,
+      "prefixSha256": "05053116f81ef9286c72590cd6c5670e3b38c594bf76fc5d41a32675f391d9a5",
+      "prefixBytes": 2988,
+      "entryLines": 192,
       "chunks": [
         {
           "id": "microi-uniapp-frontend-000",
@@ -976,7 +976,7 @@
           "id": "microi-uniapp-frontend-003",
           "ordinal": 3,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "6ecff0f73715fd0b1e39ca8d3107582928db9cf2a20e54a2ae285983e97411fe",
+          "sha256": "5cedd05cb29746019a92db56a21123718fde23d5d9df4b8064dfc260bc89ee05",
           "lines": 17,
           "heading": "登录页与手机号快捷登录"
         },
@@ -2221,11 +2221,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "c6a1d4ed64cc2abbd9c3bc42c4d9473535564b45277f4a563e1452006325eaeb",
-      "originalLines": 557,
-      "prefixSha256": "dd9e661499692931e0da053fdb6060a3ff2827eb5862d1a820f05159038ead5d",
-      "prefixBytes": 7475,
-      "entryLines": 219,
+      "originalSha256": "69f7195bfeb618f0020da92535f47c8eb183d431cf16492a12f6f61dbcc7a851",
+      "originalLines": 571,
+      "prefixSha256": "796e8308ae21c36dde1b9268ae71ccb8c2afe9f393d7f9865b6648d2f7f0f22e",
+      "prefixBytes": 8923,
+      "entryLines": 226,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -2247,7 +2247,7 @@
           "id": "v8-file-upload-002",
           "ordinal": 2,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "c20863b68d13b3bd41caee90a5e12878501a35b3d9f8d40a80efe3f6b46125a9",
+          "sha256": "ed7e727c51bd2416ae1f38cf3c4bd09491e616df08473a610372e0ca648e1298",
           "lines": 101,
           "heading": "接收前端上传的文件"
         },
@@ -2271,8 +2271,8 @@
           "id": "v8-file-upload-005",
           "ordinal": 3,
           "destination": "v8-file-upload/references/progressive-01-公有桶-vs-私有桶.md",
-          "sha256": "6136a38af209aad174ca1cacd61fcfc66e3428e1e8bf75be8a2490bcb094b71e",
-          "lines": 143,
+          "sha256": "b09a96f25aef20eb8cbb204bd785cce370dcd2c9a28563c6f6d720fbdaa5218f",
+          "lines": 150,
           "heading": "公有桶 vs 私有桶"
         },
         {
@@ -2295,7 +2295,7 @@
           "id": "v8-file-upload-008",
           "ordinal": 8,
           "destination": "v8-file-upload/references/progressive-02-office-文件在线编辑版本号规则.md",
-          "sha256": "73506d076e7917db846f615cd9c0d899bb8b58a3917f375bce9eff6ea903e8a0",
+          "sha256": "5e3b59486745d3c54bd8ad25c43cbe2396e6d614394340b93d93794b6df56292",
           "lines": 36,
           "heading": "Office 文件在线编辑版本号规则"
         },
@@ -2786,11 +2786,11 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "47f1d4392b637af2b25a658e475bdcf8ee888b6e51098b888e477ce1aa1c9985",
-      "originalLines": 497,
+      "originalSha256": "f3624718dfa642f4c3ab5d48a33022014aa467af1be756fdbc78c4bae2231d1c",
+      "originalLines": 503,
       "prefixSha256": "c3b2ae10a39461ee69fda3c7e994d072ca6d8c9dc6f2338742bc8f07e0dcffd0",
       "prefixBytes": 1648,
-      "entryLines": 184,
+      "entryLines": 190,
       "chunks": [
         {
           "id": "v8-security-000",
@@ -2804,8 +2804,8 @@
           "id": "v8-security-001",
           "ordinal": 1,
           "destination": "v8-security/SKILL.md",
-          "sha256": "9e477268919238bb6a2525116de3c8386aa439d8e93c5d66f3893cb07740b374",
-          "lines": 13,
+          "sha256": "aad35b2c3e1876d98ead7e604307bcb7d39fe8c480d72f102ae956972580a35b",
+          "lines": 19,
           "heading": "0.5 接口引擎配置安全"
         },
         {
@@ -2860,7 +2860,7 @@
           "id": "v8-security-008",
           "ordinal": 8,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "dfd8dabfc7d1ecdd99283c0dd5e1d5499d76f8337eff0d9cd9b0cfcac0a9dddc",
+          "sha256": "6e0b7de3cd72cc030c93566c03ddf2191af6163d378e5ec8a40828eee9873477",
           "lines": 40,
           "heading": "7. 日志记录"
         },
@@ -2868,7 +2868,7 @@
           "id": "v8-security-009",
           "ordinal": 9,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "c3618f2fae953f2951195d0669f51963f5dfbc96f43b4262e4234f556935e1f7",
+          "sha256": "b7a65ce2785a6a3d02dc1bc08c16c5ae03e38aa199d4bc204abe5978057f1ea1",
           "lines": 20,
           "heading": "8. 错误处理"
         },
@@ -2876,7 +2876,7 @@
           "id": "v8-security-010",
           "ordinal": 10,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "9d8e9186a7fa3a6c85e2df8cf0d6776ca05c3eff1c97dd36424722b5880c2812",
+          "sha256": "4b68e2730cc6ac2ba8eeb4458c71e9ee157b9ac8054dcab364f364b2e0bd1c05",
           "lines": 25,
           "heading": "9. Token、终端会话与租户隔离"
         },
@@ -2884,7 +2884,7 @@
           "id": "v8-security-011",
           "ordinal": 11,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "aaf4ca37e6a03ddd3520d32559e322d0d7bbba60be8aceef03d200138df77a98",
+          "sha256": "78053ef853bdffb4eaad90354204555d836d67b9a18f2a6c0ac74a0142df2794",
           "lines": 11,
           "heading": "10. Jint 运行时升级边界"
         },
@@ -2892,7 +2892,7 @@
           "id": "v8-security-012",
           "ordinal": 12,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "782777ed84d4030038999d74be896385365f7f3a005332558b7f5e46b17b351b",
+          "sha256": "f7ac9ee1702759fbf5b256ef7b7069ebce75cb845b59786d4eab928335001bf6",
           "lines": 30,
           "heading": "安全检查清单"
         },
@@ -2900,7 +2900,7 @@
           "id": "v8-security-013",
           "ordinal": 13,
           "destination": "v8-security/references/progressive-02-7-日志记录.md",
-          "sha256": "d87a3b8c82d4eb9c88ee5214711672f9e0684895dc3f4eca32b0278587f68426",
+          "sha256": "809cd12c1b5fbba76a0b09ebbddf5d2e34189d26ee510c285389294c35b91176",
           "lines": 22,
           "heading": "浏览器访问密钥"
         }

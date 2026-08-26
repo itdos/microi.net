@@ -76,7 +76,7 @@ LibreTranslate 是动态翻译供应商，不是 `diy_lang` 的替代品。一�
 
 服务端统一从 SaaS 引擎租户配置读取 `TranslateProvider`、`TranslateUrl`（兼容 `TranslateApiUrl` / `LibreTranslateUrl`）、`TranslateApiKey`（兼容 `TranslateKey`）和 `TranslateTimeout`；不要再为翻译供应商增加 API 容器环境变量。密钥不得进入前端、日志或文档示例的固定默认值。
 
-一键安装在 API Key 数据库预初始化成功、正式容器进入运行状态后，先启动平台 API，让共享升级租约中的幂等迁移补齐 `sys_osclients` 物理字段和 `diy_field` 元数据；API liveness 后立即回读 Upgrade31 的 4 个翻译物理字段，每秒一次且最多 15 秒，正常升级应首轮命中，镜像过旧或迁移失败应快速报错。只有数据库回读确认字段已存在，才能把当前 `OsClient` 的 `TranslateProvider=LibreTranslate`、Docker 内网 `TranslateUrl`、匹配的 `TranslateApiKey` 和超时写入并立即回读一致性。禁止在 API/Upgrade 启动前直接更新新字段，也禁止遇到 `Unknown column` 后由安装器伪造元数据。任一步失败都应终止安装。日志只显示 Provider 与 URL，禁止输出密钥。模型尚未完成时翻译能力可以暂时不可用，但不得拖住其它服务的安装。
+一键安装先部署平台 API/Web，并通过 liveness、完整 `ServerVersion` 升级链和 readiness；随后才预初始化并回读 API Key 数据库、启动 LibreTranslate 容器，再回读 Upgrade31 的 4 个翻译物理字段。字段每秒回读一次且最多 15 秒，正常升级应首轮命中，镜像过旧或迁移失败应快速关闭翻译能力。只有数据库回读确认字段已存在，才能把当前 `OsClient` 的 `TranslateProvider=LibreTranslate`、Docker 内网 `TranslateUrl`、匹配的 `TranslateApiKey` 和超时写入并立即回读一致性。禁止在 API/Upgrade 启动前直接更新新字段，也禁止遇到 `Unknown column` 后由安装器伪造元数据。LibreTranslate 的网络、镜像、Key、容器、字段或配置任一步失败都应保持翻译能力未启用、记录附加能力警告并继续核心安装。日志只显示 Provider 与 URL，禁止输出密钥。模型尚未完成时翻译能力可以暂时不可用，但不得拖住其它服务的安装。
 
 吾码公开镜像固定为 `registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6-microi1`。该镜像基于 1.9.6 固定摘要，仅把与 `requests 2.31.0` 不兼容的 `chardet 7.x` 固定为 `5.2.0`，构建必须同时通过 `pip check` 和将 warning 视为 error 的 `import requests`。安装脚本不得通过隐藏所有 Python warning 来掩盖依赖漂移。
 

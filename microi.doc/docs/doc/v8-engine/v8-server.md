@@ -1481,6 +1481,68 @@ return deviceResult;
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
 
+## 微信支付最小原子 V8.WeChat
+
+`V8.WeChat` 是供后端接口引擎调用的微信支付协议原子，不是订单、退款或通知业务 SDK。商户号、订单状态、金额、幂等、事务、日志和通知仍应在接口引擎中编排；只有 HTTP 路由、可信验签、租户恢复、密钥隔离等协议边界才放在最小 C# 网关中。
+
+| 函数 | 说明 |
+| --- | --- |
+| `AesGcmDecrypt(associatedData, nonce, ciphertext, apiV3Key)` | 使用 AES-256-GCM 解密微信支付 API v3 回调或平台证书资源，并验证密文尾部认证标签 |
+| `GetWeChatSign(privateKeyPem, paramList)` | 按参数顺序以换行符拼接待签名串，使用商户 RSA 私钥生成 SHA256-RSA2048 Base64 签名 |
+| `GetWeChatAuthorization(mchid, serialNo, privateKeyPem, wxApiAddress, body)` | 为 `POST` 请求生成 `WECHATPAY2-SHA256-RSA2048` Authorization 值；`wxApiAddress` 传参与签名一致的请求路径和 Query |
+
+### AesGcmDecrypt 参数编码
+
+微信支付回调中的四个参数不是全部 Base64。必须保持下列编码边界：
+
+| 参数 | 正确处理 |
+| --- | --- |
+| `apiV3Key` | 商户 APIv3 密钥原文，按 UTF-8 转为 32 字节；不要先做 Base64 解码 |
+| `nonce` | `resource.nonce` 原文，按 UTF-8 转为 12 字节随机 IV；**不是 Base64** |
+| `associatedData` | 原样使用 `resource.associated_data` 并按 UTF-8 编码；字段为空时按空字节串处理 |
+| `ciphertext` | 仅此参数执行 Base64 解码；解码后的完整字节串末尾包含 16 字节 GCM 认证标签，标签必须和密文一起交给解密器 |
+
+以下是接口引擎中的核心调用片段。`WeChatPay.ApiV3Key` 是示例系统设置 Key，应与当前租户实际配置保持一致：
+
+```javascript
+var resource = V8.Param && V8.Param.resource;
+if (!resource
+    || resource.algorithm != 'AEAD_AES_256_GCM'
+    || !resource.nonce
+    || !resource.ciphertext) {
+  return { Code: 0, Msg: '微信支付回调资源格式错误。' };
+}
+
+var privateSettings = (V8.SysConfig && V8.SysConfig.ServerPrivateSettings) || {};
+var apiV3Key = privateSettings['WeChatPay.ApiV3Key'];
+if (!apiV3Key) {
+  return { Code: 0, Msg: '当前租户未配置微信支付 APIv3 密钥。' };
+}
+
+var decryptedText;
+try {
+  decryptedText = V8.WeChat.AesGcmDecrypt(
+    resource.associated_data || '',
+    resource.nonce,
+    resource.ciphertext,
+    apiV3Key
+  );
+} catch (ex) {
+  // 不回传异常、密钥、密文或解密内容；只记录不含秘密的追踪标识。
+  var traceId = V8.Method.NewUlid();
+  console.error('微信支付回调资源解密失败，TraceId=' + traceId);
+  return { Code: 0, Msg: '微信支付回调资源解密失败。', DataAppend: { TraceId: traceId } };
+}
+
+var paymentNotice = JSON.parse(decryptedText);
+// 从这里开始仍属于接口引擎业务：从数据库重读订单，校验 appid/mchid/out_trade_no/金额，
+// 以 transaction_id 或通知 Id 做唯一幂等，按状态机更新，并通过 outbox 编排后续副作用。
+```
+
+`AesGcmDecrypt` 会校验 APIv3 密钥和 nonce 字节长度，并认证密文尾部标签；密文或标签被篡改时会抛出异常。不要把 `nonce` 改成 `Convert.FromBase64String(nonce)`，也不要为了兼容错误调用而同时接受两种 nonce 编码。该函数只完成资源解密与 GCM 完整性认证，**不等于微信支付 HTTP 回调签名验证**；正式回调必须先按 `Wechatpay-Timestamp`、`Wechatpay-Nonce`、请求原文和 `Wechatpay-Signature` 完成平台签名验证，再进入业务事务。参见[微信支付官方“如何解密回调报文和平台证书”](https://pay.wechatpay.cn/doc/v3/partner/4012082320)。
+
+APIv3 密钥、商户私钥不得写入 V8 源码、接口参数、日志或响应。后端接口引擎从当前租户 `V8.SysConfig.ServerPrivateSettings` 读取私密设置；浏览器和匿名公开配置不会获得该节点。
+
 ## 加密类 V8.EncryptHelper
 >* Dos.Common加密帮助类
 ```javascript

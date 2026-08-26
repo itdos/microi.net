@@ -1,6 +1,6 @@
 ---
 name: v8-utilities
-description: Microi V8 全局对象、上下文变量和通用函数索引。用于查询某个 V8 函数是否存在、区分前端与后端 API，或使用 V8.Method、Base64、EncryptHelper、Action、CurrentUser、SysConfig、OsClient、扫码和客户端导航工具。
+description: Microi V8 全局对象、上下文变量和通用函数索引。用于查询某个 V8 函数是否存在、区分前端与后端 API，或使用 V8.Method、Base64、EncryptHelper、V8.WeChat、Action、CurrentUser、SysConfig、OsClient、扫码和客户端导航工具。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -69,6 +69,7 @@ var clientDecoded = V8.Base64.decode(clientEncoded);
 | 文件/HDFS | `v8-file-upload` |
 | 图片 | `v8-image-processing` |
 | Excel/Word/PPT/邮件 | `v8-export-import` |
+| 微信支付签名、授权头、API v3 AES-GCM 解密 | `references/server-api-index.md`；安全边界见 `v8-security` |
 | 前端事件/打印/扫码 | `v8-frontend-events` |
 | 后端表单事件 | `v8-table-event` |
 | 接口配置/流式响应/异步/后台任务 | `v8-api-config` |

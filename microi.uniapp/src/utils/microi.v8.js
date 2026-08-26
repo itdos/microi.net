@@ -218,6 +218,46 @@ function normalizeUploadData(body) {
   return { ...raw, Path: path, Url: url };
 }
 
+function firstUploadContextValue(sources, keys) {
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue;
+    for (const key of keys) {
+      const value = source[key];
+      if (value === undefined || value === null) continue;
+      const text = String(value).trim();
+      if (text) return text;
+    }
+  }
+  return '';
+}
+
+// 标准表单字段上传必须携带可由服务端回查的字段与权限线索。
+// Limit/Path 仍会发送以兼容旧端，但绝不能作为公私桶的授权事实。
+export function buildFormFieldUploadData(options = {}) {
+  const nested = options.formFieldContext || options.fileContext || options.uploadContext || {};
+  const sources = [nested, options];
+  const result = {};
+  const formEngineKey = firstUploadContextValue(sources, ['formEngineKey', 'FormEngineKey', 'tableName', 'TableName']);
+  const fieldId = firstUploadContextValue(sources, ['fieldId', 'FieldId']);
+  const formDataId = firstUploadContextValue(sources, ['formDataId', 'FormDataId', 'rowId', 'RowId']);
+  const sysMenuId = firstUploadContextValue(sources, ['sysMenuId', 'SysMenuId', 'menuId', 'MenuId']);
+  if (formEngineKey) result.FormEngineKey = formEngineKey;
+  if (fieldId) result.FieldId = fieldId;
+  if (formDataId) result.FormDataId = formDataId;
+  if (sysMenuId) result.SysMenuId = sysMenuId;
+
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue;
+    const tableChildAuth = source.tableChildAuth || source._TableChildAuth || source.TableChildAuth;
+    if (!tableChildAuth) continue;
+    result._TableChildAuth = typeof tableChildAuth === 'string'
+      ? tableChildAuth
+      : JSON.stringify(tableChildAuth);
+    break;
+  }
+  return result;
+}
+
 function normalizeClientUploadPath(value) {
   let path = String(value || 'upload').trim().replace(/\\/g, '/');
   if (/^(https?:|data:|blob:|file:)/i.test(path)) throw new Error('上传路径不合法。');
@@ -264,8 +304,8 @@ function hasPublicUploadFlag(value) {
 }
 
 function isKnownPublicUploadPath(path) {
-  // Ordinary form uploads such as /xjy/img and /xjy/file are private by default.
-  // They must go through GetPrivateFileUrl instead of being mistaken for CDN assets.
+  // 表单字段的公私桶由服务端字段配置决定，不能仅凭 /tenant/img 等路径猜测。
+  // 这里只识别平台明确约定为公有资源的目录；其它路径结合响应 Limit 或签名上下文处理。
   return /^\/?(?:public|mci-public|xjy\/xjy\/miniapp-assets|xjy\/miniapp\/share)\//i.test(String(path || ''));
 }
 
@@ -1258,6 +1298,7 @@ export function createMicroiV8(options = {}) {
     const rawFormData = options.formData || {};
     const uploadData = {
       ...rawFormData,
+      ...buildFormFieldUploadData(options),
       OsClient: config.osClient,
       Limit: options.limit === false ? 'false' : 'true',
       Preview: options.preview === false ? 'false' : 'true',

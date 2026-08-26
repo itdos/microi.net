@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
+import { relocateSystemEngineDocs } from "./sidebar-relocation.mjs";
 // 文件根目录
 const DIR_PATH = path.resolve();
 // 映射文件路径
@@ -104,7 +105,7 @@ export const set_sidebar = (pathname, ifSort = false, collapsed = false) => {
 	const sidebars = getList(items, dirPath, pathname, ifSort, collapsed, sortOrder);
 	//输出sidebars 转为json数组字符串格式
 	// console.log(JSON.stringify(sidebars, null, 2));
-	return sidebars;
+	return relocateSystemEngineDocs(sidebars, pathname);
 };
 
 /*

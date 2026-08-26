@@ -366,6 +366,27 @@ html:lang(zh) {
     text-align: center;
   }
 
+  /* 产品实拍统一使用双列画廊；原图完整展示，窄屏再自然回落为单列。 */
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc .mci-doc-screenshot-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin: 24px 0 34px;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc .mci-doc-screenshot-grid > figure {
+    display: flex;
+    min-width: 0;
+    margin: 0;
+    flex-direction: column;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc .mci-doc-screenshot-grid > figure > img {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+  }
+
   body:not(:has(.ai-login-page)) .VPDoc .vp-doc img:not(.VPImage):not(.VPNavBarTitle .logo) {
     max-width: 100%;
     height: auto;
@@ -477,6 +498,11 @@ html:lang(zh) {
   }
 
   @media (max-width: 640px) {
+    body:not(:has(.ai-login-page)) .VPDoc .vp-doc .mci-doc-screenshot-grid {
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
     body:not(:has(.ai-login-page)) .VPDoc .vp-doc > p {
       font-size: 15.5px;
       line-height: 1.82;

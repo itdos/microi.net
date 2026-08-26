@@ -1812,7 +1812,11 @@ namespace Dos.ORM
         /// <returns></returns>
         protected string formatSql(string sql, FromSection from)
         {
-            string tempSql = DataUtils.FormatSQL(sql, from.dbProvider.LeftToken, from.dbProvider.RightToken);
+            string tempSql = DataUtils.FormatSQL(
+                sql,
+                from.dbProvider.LeftToken,
+                from.dbProvider.RightToken,
+                from.dbProvider.DatabaseType);
             List<Parameter> listPara = from.Parameters;
             foreach (Parameter p in listPara)
             {
