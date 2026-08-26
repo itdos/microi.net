@@ -7,6 +7,7 @@ const feedbackSource = fs.readFileSync(new URL('../src/pages/native/task-feedbac
 const listSource = fs.readFileSync(new URL('../src/pages/task/devices.vue', import.meta.url), 'utf8')
 const mapSource = fs.readFileSync(new URL('../src/pages/task/map.vue', import.meta.url), 'utf8')
 const taskSource = fs.readFileSync(new URL('../src/utils/xjy-task.js', import.meta.url), 'utf8')
+const taskDeviceReferenceSource = fs.readFileSync(new URL('../src/tenants/xjy/task-device-reference.mjs', import.meta.url), 'utf8')
 const tenantFormSource = fs.readFileSync(new URL('../src/tenants/xjy/form.js', import.meta.url), 'utf8')
 const saveTaskDeviceSource = taskSource.slice(
   taskSource.indexOf('export async function saveTaskDevice'),
@@ -93,7 +94,8 @@ test('任务设备现场定位同步客户设备坐标且不向售后子表提�
 })
 
 test('任务设备坐标按客户设备优先、客户默认位置兜底', () => {
-  assert.match(taskSource, /_SelectFields: \['Id', 'KehuID', 'DingdanSPID', 'ShebeiBH', 'AnzhuangWZ', 'KehuSB_Lat', 'KehuSB_Lng'\]/)
+  assert.match(taskDeviceReferenceSource, /'Id', 'KehuID', 'DingdanID', 'DingdanSPID', 'ShebeiBH', 'AnzhuangWZ',[\s\S]*'KehuSB_Lat', 'KehuSB_Lng'/)
+  assert.match(taskDeviceReferenceSource, /_SelectFields: CUSTOMER_DEVICE_SELECT_FIELDS/)
   assert.match(taskSource, /DingdanSPID: taskDevice\.DingdanSPID \|\| \(customerDevice && customerDevice\.DingdanSPID\) \|\| ''/)
   assert.match(taskSource, /customerDevice && validCoordinatePair\(customerDevice\.KehuSB_Lat, customerDevice\.KehuSB_Lng\)/)
   assert.match(taskSource, /customer\.KehuDT_Lat/)
