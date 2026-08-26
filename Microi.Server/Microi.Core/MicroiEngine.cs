@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Dos.Common;
 using Dos.ORM;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +10,7 @@ namespace Microi.net
     public static class MicroiEngine
     {
         private static IServiceProvider _serviceProvider;
+        private static int _connectionGuardObserverRegistered;
 
         public static void Init(IServiceProvider serviceProvider)
         {
@@ -23,7 +25,37 @@ namespace Microi.net
                 item.Success,
                 item.TargetId,
                 item.OtherInfo));
+            RegisterDatabaseConnectionGuardObserver();
             ConsoleLogInterceptor.FlushPendingToMongo();
+        }
+
+        private static void RegisterDatabaseConnectionGuardObserver()
+        {
+            if (Interlocked.Exchange(ref _connectionGuardObserverRegistered, 1) == 1) return;
+
+            Database.OnConnectionGuardEvent += (eventName, guardKey, message) =>
+            {
+                var succeeded = string.Equals(
+                    eventName,
+                    "MySqlHostCacheRepairSucceeded",
+                    StringComparison.Ordinal);
+                var title = succeeded
+                    ? "MySQL host_cache 自动修复成功"
+                    : "MySQL host_cache 自动修复失败";
+                var content = $"{title}，GuardKey={guardKey}，Msg={message}";
+                Console.WriteLine(succeeded
+                    ? $"Microi：【成功】【数据库连接保护】{content}"
+                    : $"Microi：【失败】【数据库连接保护】{content}");
+                QueueSystemLog(
+                    OsClientDefault.OsClient,
+                    "数据库连接保护",
+                    eventName,
+                    title,
+                    $"GuardKey={guardKey}\n{message}",
+                    succeeded ? 2 : 3,
+                    succeeded,
+                    guardKey);
+            };
         }
         public static T GetService<T>() where T : class
         {

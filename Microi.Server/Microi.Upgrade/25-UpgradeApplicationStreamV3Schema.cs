@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -1433,8 +1434,8 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
                             .AddInParameter("p12", totalSize)
                             .AddInParameter("p13", "Upgrade25 将升级前未绑定版本或发生路径重复的文件无损分配到独立历史归档分片；不合并、不删除原文件。")
                             .AddInParameter("p14", 0)
-                            .AddInParameter("p15", now)
-                            .AddInParameter("p16", now)
+                            .AddInParameter("p15", DbType.DateTime, now)
+                            .AddInParameter("p16", DbType.DateTime, now)
                             .ExecuteNonQuery();
                         if (inserted != 1)
                             throw new InvalidOperationException($"为 AppId[{appId}]创建历史归档版本[{versionNo}]失败，影响行数={inserted}。");
@@ -1453,7 +1454,7 @@ WHERE TABLE_NAME=UPPER(@p0) AND COLUMN_NAME=UPPER(@p1) AND NULLABLE='N'";
                             + $"WHERE {Quote(dialect, "Id")}=@p3 AND {appIdColumn}=@p4")
                         .AddInParameter("p0", checked((int)fileCount))
                         .AddInParameter("p1", totalSize)
-                        .AddInParameter("p2", DateTime.Now)
+                        .AddInParameter("p2", DbType.DateTime, DateTime.Now)
                         .AddInParameter("p3", deterministicVersionId)
                         .AddInParameter("p4", appId)
                         .ExecuteNonQuery();

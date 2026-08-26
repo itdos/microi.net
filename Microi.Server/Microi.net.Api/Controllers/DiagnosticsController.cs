@@ -28,6 +28,18 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 兼容历史负载均衡探针；新部署统一使用 /api/Diagnostics/health 或 liveness。
+        /// </summary>
+        [HttpGet("/itdos-heart")]
+        [HttpPost("/itdos-heart")]
+        [AllowAnonymous]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public string LegacyITdosHeart()
+        {
+            return "iTdos";
+        }
+
+        /// <summary>
         /// 健康检查端点
         /// </summary>
         [HttpGet("health")]

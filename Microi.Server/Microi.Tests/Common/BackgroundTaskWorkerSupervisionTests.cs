@@ -7,10 +7,11 @@ public sealed class BackgroundTaskWorkerSupervisionTests
     {
         var serverRoot = FindServerRoot();
         var program = File.ReadAllText(Path.Combine(serverRoot, "Microi.net.Api", "Program.cs"));
+        var startup = File.ReadAllText(Path.Combine(serverRoot, "Microi.net", "Common", "DiyStartup.cs"));
         var worker = File.ReadAllText(Path.Combine(
             serverRoot,
-            "Microi.net.Api",
-            "Services",
+            "Microi.net",
+            "Runtime",
             "BackgroundTaskWorkerService.cs"));
         var atom = File.ReadAllText(Path.Combine(
             serverRoot,
@@ -39,7 +40,8 @@ public sealed class BackgroundTaskWorkerSupervisionTests
             "Runtime",
             "BackgroundTaskStore.cs"));
 
-        Assert.Contains("services.AddHostedService<BackgroundTaskWorkerService>()", program);
+        Assert.Contains("services.AddHostedService<BackgroundTaskWorkerService>()", startup);
+        Assert.DoesNotContain("AddHostedService<BackgroundTaskWorkerService>", program);
         Assert.Contains("while (!stoppingToken.IsCancellationRequested)", worker);
         Assert.Contains("BackgroundTaskWorkerRuntime.MarkFault(ex)", worker);
         Assert.Contains("BackgroundTaskWorkerRuntime.MarkHeartbeat", worker);
