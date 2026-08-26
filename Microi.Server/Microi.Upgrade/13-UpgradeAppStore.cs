@@ -449,7 +449,7 @@ namespace Microi.net
                 { MessageNotificationPackageResourceName, new System.Version(1, 0, 11) },
                 { AiEnginePackageResourceName, new System.Version(6, 3, 6) },
                 { SaaSEnginePackageResourceName, new System.Version(7, 6, 21) },
-                { AppStorePackageResourceName, new System.Version(7, 6, 16) }
+                { AppStorePackageResourceName, new System.Version(7, 6, 17) }
             };
 
         private static readonly Dictionary<string, string[]> V8FirstPackageExactEngineKeys =
@@ -2302,6 +2302,7 @@ WHERE ApiEngineKey=@p1 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             {
                 var onlineResourceNames = RequiredResourceNames
                     .Where(resourceName => !string.Equals(resourceName, BuildAiAppResourceName, StringComparison.Ordinal));
+                Console.WriteLine($"Microi：【基础应用升级】开始并行读取吾码官方升级资源（共{onlineResourceNames.Count()}项，单项超时8秒）。");
                 var pairs = await Task.WhenAll(onlineResourceNames.Select(async resourceName =>
                     new KeyValuePair<string, string>(resourceName, await DownloadOfficialResourceAsync(resourceName))));
                 Console.WriteLine("Microi：【基础应用升级】官方资源整组校验成功，使用在线最新版。");
@@ -3228,12 +3229,18 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             // 当前程序集随版本发布的基线，确保客户更新后端即可自动获得应用商城。
             var resources = await LoadUpgradeResourcesAsync();
 
-            var nullableMessages = new List<string>();
-            EnsureCoreTableColumnsNullable(osClient, nullableMessages);
-            foreach (var nullableMessage in nullableMessages)
+            var nullableErrors = new List<string>();
+            EnsureCoreTableColumnsNullable(osClient, nullableErrors);
+            if (nullableErrors.Count > 0)
             {
-                Console.WriteLine($"Microi：【基础应用升级】{nullableMessage}");
+                foreach (var nullableError in nullableErrors)
+                {
+                    Console.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】失败：{nullableError}");
+                }
+                msgs.AddRange(nullableErrors);
+                return msgs;
             }
+            Console.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】全部检查成功。");
             
             #region 导入数据包V8
             //更新应用商城的导入数据包接口引擎
@@ -3507,14 +3514,14 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             return msgs;
         }
 
-        private static void EnsureCoreTableColumnsNullable(string osClient, List<string> msgs)
+        private static void EnsureCoreTableColumnsNullable(string osClient, List<string> errors)
         {
             try
             {
                 var osClientModel = OsClient.GetClient(osClient);
                 if (osClientModel?.Db == null)
                 {
-                    msgs.Add($"核心表字段可空升级跳过：未找到租户 {osClient} 的数据库连接。");
+                    errors.Add($"核心表字段可空升级失败：未找到租户 {osClient} 的数据库连接。");
                     return;
                 }
 
@@ -3524,6 +3531,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
 
                 foreach (var tableName in CoreNullableTables)
                 {
+                    Console.WriteLine($"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】开始检查表：{tableName}。");
                     var columnsResult = orm.GetColumns(new DbServiceParam
                     {
                         OsClient = osClient,
@@ -3533,7 +3541,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     });
                     if (columnsResult.Code != 1 || columnsResult.Data == null)
                     {
-                        msgs.Add($"核心表 {tableName} 字段可空升级跳过：{columnsResult.Msg}");
+                        errors.Add($"读取核心表 {tableName} 字段失败：{columnsResult.Msg}");
                         continue;
                     }
 
@@ -3551,6 +3559,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                         }
                         if (columnType.DosIsNullOrWhiteSpace()) continue;
 
+                        Console.WriteLine(
+                            $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】开始调整：{tableName}.{columnName}，类型={columnType}。"
+                        );
                         var changeResult = orm.ChangeColumn(new DbServiceParam
                         {
                             OsClient = osClient,
@@ -3566,22 +3577,33 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                         if (changeResult.Code == 1)
                         {
                             changedCount++;
+                            Console.WriteLine(
+                                $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】调整成功：{tableName}.{columnName}。"
+                            );
                         }
                         else
                         {
-                            msgs.Add($"核心表 {tableName}.{columnName} 调整为允许为空失败：{changeResult.Msg}");
+                            errors.Add($"核心表 {tableName}.{columnName} 调整为允许为空失败：{changeResult.Msg}");
+                            Console.WriteLine(
+                                $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】调整失败：{tableName}.{columnName}；{changeResult.Msg}"
+                            );
                         }
                     }
 
                     if (changedCount > 0)
                     {
-                        msgs.Add($"核心表 {tableName} 已将 {changedCount} 个字段调整为允许为空。");
+                        Console.WriteLine(
+                            $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】表调整成功：{tableName}，已将{changedCount}个字段调整为允许为空。"
+                        );
                     }
+                    Console.WriteLine(
+                        $"Microi：【基础应用升级】【{osClient}】【核心字段可空兼容】表检查完成：{tableName}，本次调整={changedCount}。"
+                    );
                 }
             }
             catch (Exception ex)
             {
-                msgs.Add($"核心表字段可空升级异常：{ex.Message}");
+                errors.Add($"核心表字段可空升级异常：{ex.Message}");
             }
         }
     }

@@ -68,6 +68,7 @@
 | `V8.Method.PrepareCurrentUserProfileUpdate(options)` | 仅允许官方 `platform-user-update-profile` 调用；固定当前用户并规范当前租户头像路径 |
 | `V8.Method.ManageSysUserAdmin(options)` | 仅允许官方 `platform-sys-user-admin` 调用；固定身份与租户并执行表权限、角色层级、改密 step-up、内容安全及会话安全边界；授权预检返回规范化 `DataAppend.ChangesPassword` |
 | `V8.Method.AuthorizeOfficialResourcePublish()` | 仅允许官方 `get-microi-upgrade-resource` 的发布分支调用；固定 `iTdos`、拒绝访问密钥并从主库复核平台管理员；不是通用授权 API |
+| `V8.Method.SendWeChatTemplateMessage(options)` | 仅允许消息通知官方 Managed 接口 `wechat_send_tpl_msg` 调用；公众号 AppId/AppSecret 固定从当前租户 `wx_mp` 读取且不进入 V8，脚本只编排接收人、模板、受限模板字段和跳转地址 |
 | `V8.Method.ValidateTenantSystemSettingsOperation(options)` | 仅允许官方 `platform-tenant-system-settings` 调用；拒绝访问密钥、非管理员、Secret/Sensitive Key 和已迁移公开 Key |
 | `V8.Method.GetTenantSystemSettingsSecurityProjection()` | 仅允许官方 `platform-tenant-system-settings` 调用；只返回 Secret 是否已配置与迁移 Key，不返回值或密文 |
 | `V8.Method.Upload(options)` | 受配额限制的上传 |

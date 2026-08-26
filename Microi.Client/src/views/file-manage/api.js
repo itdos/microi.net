@@ -1,4 +1,8 @@
 import { DiyCommon } from '@/utils/microi.net.import'
+import {
+  platformSysConfigRoutes,
+  shouldFallbackPlatformSysConfig
+} from '@/utils/platform-sys-config.js'
 import JSEncrypt from 'jsencrypt'
 import config from '@/config.json'
 
@@ -197,21 +201,51 @@ export const fileSyncApi = {
 
   async getRemoteLoginConfig(platform) {
     const apiBase = normalizeApiBase(platform.apiBase)
-    const resp = await fetch(`${apiBase}/apiengine/platform-sys-config`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        OsClient: platform.osClient || '',
-        apiengine: '1'
-      },
-      body: JSON.stringify({
-        _SearchEqual: { IsEnable: 1 },
-        OsClient: platform.osClient
-      })
+    const osClient = String(platform.osClient || '').trim()
+    const query = new URLSearchParams({ OsClient: osClient })
+    const requestBody = JSON.stringify({
+      _SearchEqual: { IsEnable: 1 },
+      OsClient: osClient
     })
-    const result = await responseJson(resp, '获取远程登录配置失败')
-    if (result.Code !== 1 || !result.Data) {
-      throw new Error(result.Msg || '获取远程登录配置失败')
+    const requestConfig = (route, isApiEngine) => ({
+      url: `${apiBase}${route}?${query.toString()}`,
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          OsClient: osClient,
+          ...(isApiEngine ? { apiengine: '1' } : {})
+        },
+        body: requestBody
+      }
+    })
+    const requestJson = async (route, isApiEngine) => {
+      const request = requestConfig(route, isApiEngine)
+      const response = await fetch(request.url, request.options)
+      let result = null
+      try {
+        result = await response.json()
+      } catch (_) {
+        // Missing dynamic routes can return an HTML 404 through older gateways.
+        // The status is still sufficient for the narrow compatibility retry.
+      }
+      return { response, result }
+    }
+
+    let remote = await requestJson(platformSysConfigRoutes.primary, true)
+    if (shouldFallbackPlatformSysConfig({
+      status: remote.response.status,
+      Code: remote.result?.Code,
+      Msg: remote.result?.Msg
+    })) {
+      remote = await requestJson(platformSysConfigRoutes.legacyFallback, false)
+    }
+    if (!remote.response.ok) {
+      throw new Error(remote.result?.Msg || '获取远程登录配置失败')
+    }
+    const result = remote.result
+    if (!result || result.Code !== 1 || !result.Data) {
+      throw new Error(result?.Msg || '获取远程登录配置失败')
     }
     return {
       sysConfig: result.Data,

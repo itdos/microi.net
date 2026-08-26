@@ -478,6 +478,18 @@ var directTablePolicies = V8.Method.GetDirectTableGrantPolicies();
 // 密文只允许同一 OsClient、同一 ApiEngineKey 解密。
 var cipher = V8.Method.ProtectApiEngineSecret(secretText);
 var plainText = V8.Method.UnprotectApiEngineSecret(cipher);
+
+// 仅官方消息通知应用的 Managed 接口 wechat_send_tpl_msg 可调用。
+// AppId/AppSecret 固定从当前租户 wx_mp 读取，不进入 V8 参数或返回值。
+var sendResult = V8.Method.SendWeChatTemplateMessage({
+    WxMpId: V8.Param.WxMpId,
+    OpenId: V8.Param.OpenId,
+    TemplateId: V8.Param.TemplateId,
+    TemplateData: V8.Param.TemplateData,
+    Url: V8.Param.Url,
+    MiniProgramAppId: V8.Param.MiniProgramAppId,
+    PagePath: V8.Param.PagePath
+});
 ```
 
 `GetBackendVersion()` 读取当前后端运行程序集的 `FileVersion`，只返回规范化的
@@ -500,6 +512,8 @@ var plainText = V8.Method.UnprotectApiEngineSecret(cipher);
 第三参 `token` 只用于兼容历史 `microi-init` 把 Token 放在请求体、未发送 `Authorization` Header 的客户端。它必须是原始 Bearer 凭据；宿主会在 `RefreshLoginUser` 内重新调用 DiyToken 权威验证，并要求 Token 恢复出的租户和用户与当前 V8 租户、`osClient` 一致性断言及 `userId` 完全一致。伪造、失效、跨租户或“管理员 Token 刷新别人”均失败，且不会回退当前 ambient 身份。`V8.Method.GetCurrentToken(...)` 返回的对象不能作为第三参或认证证明。
 
 `ProtectApiEngineSecret(plainText)` / `UnprotectApiEngineSecret(cipherText)` 只允许在后端接口引擎上下文调用。宿主把密文同时绑定当前租户与当前 `ApiEngineKey`，调用方不能传入 OsClient、密钥或 Purpose，也不会获得派生密钥。适用于远程连接密码、短期刷新 Token 等“业务明确需要再次读取”的接口私有凭据；列表必须继续脱敏，读取动作仍要执行当前用户、行归属和权限校验，禁止把解密结果写日志、审计或返回无权前端。接口引擎改 Key 后旧密文不可解，因此升级已有 Managed 引擎时应保持 Key 稳定。
+
+`SendWeChatTemplateMessage(options)` 不是普通业务脚本可复用的微信 SDK。宿主只允许消息通知官方应用的 Managed 接口 `wechat_send_tpl_msg` 调用，并把公众号配置固定为当前租户 `wx_mp` 记录；参数只能选择公众号、接收人、模板、受限模板字段、HTTP(S) 跳转地址和受限小程序路径，不能传入或读取 AppSecret。租户的模板选择、接收人计算、通知记录与个性化逻辑继续由 V8 接口引擎及其 `CreateIfMissing` Hook 编排。
 
 ### 平台启动与私有文件可信原子
 
