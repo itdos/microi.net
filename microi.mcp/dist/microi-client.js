@@ -1351,37 +1351,37 @@ export class MicroiClient {
     }
     /** Calls the current authenticated tenant's server-side translation gateway. */
     async translateText(input) {
-        return this.post(API.TRANSLATE_TEXT, input, {
+        return this.post(API.TRANSLATE_TEXT, { Action: 'TranslateText', ...input }, {
             timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
             operationName: 'translate text',
         });
     }
     async detectLanguage(sourceText) {
-        return this.post(API.TRANSLATE_DETECT, { SourceText: sourceText }, {
+        return this.post(API.TRANSLATE_DETECT, { Action: 'Detect', SourceText: sourceText }, {
             timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
             operationName: 'detect language',
         });
     }
     async listTranslateLanguages() {
-        return this.post(API.TRANSLATE_LANGUAGES, {}, {
+        return this.post(API.TRANSLATE_LANGUAGES, { Action: 'Languages' }, {
             timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
             operationName: 'list translation languages',
         });
     }
     async translateFile(input) {
-        return this.post(API.TRANSLATE_FILE, input, {
+        return this.post(API.TRANSLATE_FILE, { Action: 'TranslateFile', ...input }, {
             timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
             operationName: `translate file ${input.FileName}`,
         });
     }
     async suggestTranslation(input) {
-        return this.post(API.TRANSLATE_SUGGEST, input, {
+        return this.post(API.TRANSLATE_SUGGEST, { Action: 'Suggest', ...input }, {
             timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
             operationName: 'suggest translation',
         });
     }
     async getTranslateHealth() {
-        return this.post(API.TRANSLATE_HEALTH, {}, {
+        return this.post(API.TRANSLATE_HEALTH, { Action: 'Health' }, {
             timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
             operationName: 'translation health',
         });

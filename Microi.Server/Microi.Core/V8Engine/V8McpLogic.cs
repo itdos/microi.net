@@ -4925,21 +4925,45 @@ namespace Microi.net
         {
             try
             {
-                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_datasource", new
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
-                    _SelectFields = new[] { "Id", "DataSourceName", "DataSourceKey", "DataSourceType", "IsEnable", "AllowAnonymous", "UpdateTime" },
-                    _Where = BuildKeywordWhere(keyword, "DataSourceName", "DataSourceKey", "DataSourceType"),
+                    _SelectFields = new[] { "Id", "ApiName", "ApiEngineKey", "DataSourceType", "IsEnable", "AllowAnonymous", "UpdateTime" },
+                    _Where = new List<object>
+                    {
+                        new List<object> { "DataSourceType", "<>", null }
+                    },
                     _OrderBy = "UpdateTime",
                     _OrderByType = "DESC",
                     _PageSize = 500
                 });
                 if (result.Code != 1) return new DosResult<object>(result.Code, null, result.Msg);
-                return new DosResult<object>(1, new { List = result.Data, Total = result.DataCount });
+                var normalizedKeyword = (keyword ?? string.Empty).Trim();
+                var rows = JArray.FromObject((object)result.Data)
+                    .OfType<JObject>()
+                    .Where(item => normalizedKeyword.Length == 0
+                        || (item["ApiName"]?.ToString() ?? string.Empty)
+                            .IndexOf(normalizedKeyword, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (item["ApiEngineKey"]?.ToString() ?? string.Empty)
+                            .IndexOf(normalizedKeyword, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (item["DataSourceType"]?.ToString() ?? string.Empty)
+                            .IndexOf(normalizedKeyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .Select(item => new
+                    {
+                        Id = item["Id"]?.ToString(),
+                        DataSourceName = item["ApiName"]?.ToString(),
+                        DataSourceKey = item["ApiEngineKey"]?.ToString(),
+                        DataSourceType = item["DataSourceType"]?.ToString(),
+                        IsEnable = item["IsEnable"],
+                        AllowAnonymous = item["AllowAnonymous"],
+                        UpdateTime = item["UpdateTime"]
+                    })
+                    .ToList();
+                return new DosResult<object>(1, new { List = rows, Total = rows.Count });
             }
             catch (Exception ex)
             {
-                return new DosResult<object>(0, null, "获取数据源列表失败：" + ex.Message);
+                return new DosResult<object>(0, null, "获取接口引擎数据源列表失败：" + ex.Message);
             }
         }
 
@@ -4953,25 +4977,47 @@ namespace Microi.net
                 if (name.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "DataSourceName 不能为空");
 
                 var data = BuildDataFromParam(osClient, param,
-                    new[] { "DataSourceName", "DataSourceKey", "DataSourceType", "SqlDataSource", "V8DataSource", "JsonDataSource", "TestParam", "TestResult", "DataSourceRole", "AllowAnonymous", "IsEnable" },
+                    new[] { "TestParam", "TestResult", "AllowAnonymous", "IsEnable", "ApiRemark", "Category", "StopHttp", "EnableLog", "ResponseType" },
                     param["DataSourceId"].Val<string>() ?? param["Id"].Val<string>());
-                data["DataSourceName"] = name;
-                if (data["DataSourceType"] == null) data["DataSourceType"] = "V8";
-                if (data["IsEnable"] == null) data["IsEnable"] = 1;
-                if (data["AllowAnonymous"] == null) data["AllowAnonymous"] = 0;
-
-                var type = data["DataSourceType"].Val<string>() ?? "";
-                if (type.IndexOf("Json", StringComparison.OrdinalIgnoreCase) >= 0)
+                var normalizedType = ApiEngineDataSourceRuntime.NormalizeType(
+                    param["DataSourceType"].Val<string>());
+                var code = param["ApiV8Code"].Val<string>();
+                if (code == null)
                 {
-                    var check = ValidateJsonIfPresent("JsonDataSource", data["JsonDataSource"].Val<string>());
+                    code = ApiEngineDataSourceRuntime.SelectLegacyCode(
+                        param,
+                        out normalizedType,
+                        out _);
+                }
+                if (normalizedType == ApiEngineDataSourceRuntime.JsonType)
+                {
+                    var check = ValidateJsonIfPresent("ApiV8Code", code);
                     if (!check.Ok) return new DosResult<object>(0, null, check.Msg);
                 }
 
-                return await UpsertRecordByIdOrKey(osClient, "sys_datasource", data, "DataSourceKey", "数据源");
+                data["ApiName"] = name;
+                data["ApiEngineKey"] = key;
+                data["ApiAddress"] = param["ApiAddress"].Val<string>() ?? "/apiengine/" + key;
+                data["DataSourceType"] = normalizedType;
+                data["ApiV8Code"] = code ?? string.Empty;
+                data["ApiRole"] = param["ApiRole"]?.DeepClone()
+                    ?? param["DataSourceRole"]?.DeepClone()
+                    ?? "[]";
+                if (data["IsEnable"] == null) data["IsEnable"] = 1;
+                if (data["AllowAnonymous"] == null) data["AllowAnonymous"] = 0;
+                if (data["Category"] == null) data["Category"] = "数据源";
+                if (data["ResponseType"] == null) data["ResponseType"] = "JSON";
+
+                return await UpsertRecordByIdOrKey(
+                    osClient,
+                    "sys_apiengine",
+                    data,
+                    "ApiEngineKey",
+                    "接口引擎数据源");
             }
             catch (Exception ex)
             {
-                return new DosResult<object>(0, null, "保存数据源失败：" + ex.Message);
+                return new DosResult<object>(0, null, "保存接口引擎数据源失败：" + ex.Message);
             }
         }
 

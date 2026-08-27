@@ -174,12 +174,12 @@ const copy = computed(() => locale.value === 'en-US' ? {
   proofAction: 'See the reproducible 10×+ benchmark and scope', proofLabel: 'Platform facts',
   proofPoints: ['Evolving since 2014', 'MIT open source', 'AI low-code + microservices', '20+ mature engines'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: 'Use the right layer for each problem',
-  mapDesc: 'Reuse standard work, keep differentiated logic flexible, and extend the foundation in source code.',
+  mapDesc: 'Let 20+ mature engines handle standard capabilities, use the V8 engine for differentiated logic, and deliver deep customization through microservices — all on one AI-ready foundation.',
   aiLayer: 'AI collaboration', aiTools: ['Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
   developmentModes: [
-    { level: '01', label: 'Standard workflows', title: 'Visual low-code', description: 'Forms · modules · workflows · reports', note: 'FAST' },
-    { level: '02', label: 'Business differentiation', title: 'Online V8 coding', description: 'APIs · events · integrations · automation', note: 'FLEXIBLE', featured: true },
-    { level: '03', label: 'Deep extension', title: 'Professional code', description: '.NET · Vue · microservices · SDKs', note: 'DEEP' }
+    { level: '01', label: 'Standard workflows', title: 'AI low-code development', description: '20+ engines · forms · modules · workflows · reports', note: 'READY' },
+    { level: '02', label: 'Business differentiation', title: 'V8 engine AI coding', description: 'APIs · events · integrations · automation · instant activation', note: 'TOKEN-SMART', featured: true },
+    { level: '03', label: 'Deep customization', title: 'Microservice customization', description: 'Vue · UniApp · Unity · .NET extensions', note: 'DELIVER' }
   ],
   foundationTitle: 'Shared enterprise foundation', foundations: ['Tenancy & identity', 'Data & cache', 'Workflow & messaging', 'Delivery & governance'],
   outputTitle: 'Build once, deliver everywhere', outputs: ['PC / WebOS', 'H5 / UniApp', 'SaaS / on-prem', 'AI apps / agents'],
@@ -208,12 +208,12 @@ const copy = computed(() => locale.value === 'en-US' ? {
   proofAction: '查看 10 倍+ 实测与适用边界', proofLabel: '平台事实',
   proofPoints: ['始于 2014', 'MIT 开源', 'AI 低代码 + 微服务', '20+ 成熟引擎'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: '用合适的层，解决合适的问题',
-  mapDesc: '标准业务不重复写，差异逻辑不受限，底层能力可源码扩展。',
+  mapDesc: '20+ 成熟引擎承接标准能力，V8 引擎处理差异逻辑，微服务完成深度定制；让 AI 始终站在可复用底座上开发。',
   aiLayer: 'AI 协作层', aiTools: ['Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
   developmentModes: [
-    { level: '01', label: '标准业务', title: '可视化低代码', description: '表单 · 模块 · 流程 · 报表', note: '快' },
-    { level: '02', label: '差异业务', title: 'V8 在线编程', description: '接口 · 事件 · 集成 · 自动化', note: '活', featured: true },
-    { level: '03', label: '深度扩展', title: '专业代码', description: '.NET · Vue · 微服务 · SDK', note: '深' }
+    { level: '01', label: '标准业务', title: 'AI 低代码开发', description: '20+ 引擎 · 表单 · 模块 · 流程 · 报表', note: '开箱即用' },
+    { level: '02', label: '差异逻辑', title: 'V8 引擎 AI 编程', description: '接口 · 事件 · 集成 · 自动化 · 保存即生效', note: '更省 Token', featured: true },
+    { level: '03', label: '深度定制', title: '微服务定制', description: 'Vue · UniApp · Unity · .NET 扩展', note: '更快交付' }
   ],
   foundationTitle: '共享企业级底座', foundations: ['多租户与权限', '数据与缓存', '工作流与消息', '发布与治理'],
   outputTitle: '一次构建，多端交付', outputs: ['PC / WebOS', 'H5 / UniApp', 'SaaS / 私有化', 'AI 应用 / Agent'],

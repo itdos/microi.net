@@ -53,6 +53,7 @@ namespace Microi.net.Api
         private const string AiPlatformAccountEngineKey = "platform-ai-account";
         private const string AiPlatformRuntimeEngineKey = "platform-ai-runtime";
         private const string TenantSystemSettingsApiEngineKey = "platform-tenant-system-settings";
+        private const string DataSourceRuntimeApiEngineKey = "platform-data-source-run";
 
         public sealed class CreateTenantRequest
         {
@@ -73,6 +74,45 @@ namespace Microi.net.Api
         public sealed class UpdateMyDefaultIndexUrlRequest
         {
             public string DefaultIndexUrl { get; set; }
+        }
+
+        /// <summary>
+        /// 兼容旧 PC/UniApp 的数据源 Controller 地址。历史 DataSourceKey/Id
+        /// 只用于定位升级程序生成的 sys_apiengine 记录，业务源码不再由
+        /// sys_datasource 执行。GetData 是更早版本的同义入口。
+        /// </summary>
+        [HttpGet("~/api/DataSourceEngine/Run")]
+        [HttpPost("~/api/DataSourceEngine/Run")]
+        [HttpGet("~/api/DataSourceEngine/GetData")]
+        [HttpPost("~/api/DataSourceEngine/GetData")]
+        public async Task<JsonResult> RunLegacyDataSource(
+            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] JObject param = null)
+        {
+            var request = await MergeRequestParam(param);
+            var currentToken = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
+            var currentUser = currentToken?.CurrentUser as JObject;
+            if (currentToken != null)
+            {
+                request["OsClient"] = currentToken.OsClient;
+                request["_CurrentUser"] = currentUser;
+            }
+            request["_InvokeType"] = InvokeType.Client.ToString();
+
+            var dataSourceKey = request["DataSourceKey"].Val<string>();
+            if (dataSourceKey.DosIsNullOrWhiteSpace())
+                return Json(new DosResult(0, null, "DataSourceKey 不能为空。"));
+            if (!UserAccessKeySecurity.IsDataSourceAllowed(currentUser, dataSourceKey))
+            {
+                return Json(new DosResult(
+                    0,
+                    null,
+                    "当前访问密钥未授权运行此数据源引擎。"));
+            }
+
+            return Json(await ManagedApiEngineCompatibility.RunAsync(
+                DataSourceRuntimeApiEngineKey,
+                request,
+                currentUser).ConfigureAwait(false));
         }
 
         /// <summary>

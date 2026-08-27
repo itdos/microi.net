@@ -35,3 +35,19 @@ test('nested card actions do not trigger detail navigation from keyboard events'
   assert.match(source, /@keydown\.enter\.self="openDetail\(app\)"/)
   assert.match(source, /@keydown\.space\.self\.prevent="openDetail\(app\)"/)
 })
+
+test('detail page uses exact application lookup and exposes recommendation state', () => {
+  assert.match(detailSource, /JSON\.stringify\(\{ ExactAppKey: appKey, PageIndex: 1, PageSize: 1 \}\)/)
+  assert.match(detailSource, /v-if="app\.IsRecommend" class="app-detail-recommend-tag"/)
+  assert.match(detailSource, /v-if="isSuperAdmin"/)
+  assert.match(detailSource, /official_ai_app_recommend\?OsClient=/)
+  assert.match(detailSource, /Number\(currentUser\.value\?\.Level \|\| 0\) >= 9999/)
+})
+
+test('detail update log uses a clean surface without grid-line background', () => {
+  const changelogStyles = detailSource.match(/\.app-detail-changelog \{[\s\S]*?\n\}/)?.[0] || ''
+  assert.match(changelogStyles, /linear-gradient\(135deg/)
+  assert.doesNotMatch(changelogStyles, /linear-gradient\(var\(--mci-app-detail-line\) 1px/)
+  assert.doesNotMatch(changelogStyles, /background-size:/)
+  assert.doesNotMatch(detailSource, /app-detail-changelog-sweep/)
+})

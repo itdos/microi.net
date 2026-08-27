@@ -13,13 +13,13 @@ export const API = {
     // 服务器状态
     GET_STATUS: '/api/V8Engine/GetStatus',
     AI_CHAT: '/api/Ai/Chat',
-    OCR_RECOGNIZE: '/api/Ocr/Recognize',
-    TRANSLATE_TEXT: '/api/Translate/TranslateText',
-    TRANSLATE_DETECT: '/api/Translate/Detect',
-    TRANSLATE_LANGUAGES: '/api/Translate/Languages',
-    TRANSLATE_FILE: '/api/Translate/TranslateFile',
-    TRANSLATE_SUGGEST: '/api/Translate/Suggest',
-    TRANSLATE_HEALTH: '/api/Translate/Health',
+    OCR_RECOGNIZE: '/apiengine/platform-ocr-recognize',
+    TRANSLATE_TEXT: '/apiengine/platform-translate-runtime',
+    TRANSLATE_DETECT: '/apiengine/platform-translate-runtime',
+    TRANSLATE_LANGUAGES: '/apiengine/platform-translate-runtime',
+    TRANSLATE_FILE: '/apiengine/platform-translate-runtime',
+    TRANSLATE_SUGGEST: '/apiengine/platform-translate-runtime',
+    TRANSLATE_HEALTH: '/apiengine/platform-translate-runtime',
     TRANSITION_APPLICATION_STREAM_GATE: '/api/V8Engine/TransitionApplicationStreamGate',
     // Redis 管理器（默认当前租户连接，可指定已保存连接）
     REDIS_STATISTICS: '/apiengine/platform-cache-manager',
@@ -104,7 +104,7 @@ export const API = {
     QUERY_MONGODB_LOGS: '/api/V8Engine/QueryMongodbLogs',
     WRITE_MONGODB_LOG: '/api/V8Engine/WriteMongodbLog',
     // 原生引擎接口（用于验收/调试）
-    RUN_DATA_SOURCE: '/api/DataSourceEngine/Run',
+    RUN_DATA_SOURCE: '/apiengine/platform-data-source-run',
     // 通用 FormEngine 数据读写（用于租户业务数据维护）
     FORM_GET_TABLE_DATA: '/api/FormEngine/GetTableData',
     FORM_ADD_FORM_DATA: '/api/FormEngine/AddFormData',

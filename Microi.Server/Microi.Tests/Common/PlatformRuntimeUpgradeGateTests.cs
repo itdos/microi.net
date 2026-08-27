@@ -137,6 +137,8 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.All(engines, engine =>
         {
             var key = engine["ApiEngineKey"]?.ToString();
+            Assert.False(string.IsNullOrWhiteSpace(engine["ApiName"]?.ToString()));
+            Assert.Null(engine["Name"]);
             Assert.False(string.IsNullOrWhiteSpace(engine["ApiAddress"]?.ToString()));
             var policy = engine["_OfficialUpgradePolicy"]?.ToString();
             var ownership = engine["_OfficialOwnership"]?.ToString();
@@ -186,6 +188,89 @@ public class PlatformRuntimeUpgradeGateTests
             engines,
             item => item["ApiEngineKey"]?.ToString() == "get-microi-store");
         Assert.Equal("/apiengine/get-microi-store-list", storeList["ApiAddress"]?.ToString());
+    }
+
+    [Fact]
+    public void StartupDependencyPersistence_NormalizesLegacyNameAndDropsPackageOnlyMetadata()
+    {
+        var normalize = GetPrivateStaticMethod("CreatePersistableRuntimeDependencySource");
+        var source = new JObject
+        {
+            ["Id"] = "engine-id",
+            ["Name"] = "历史接口名称",
+            ["ApiEngineKey"] = "legacy-engine",
+            ["ApiAddress"] = "/apiengine/legacy-engine",
+            ["ApiV8Code"] = "return { Code: 1 };",
+            ["IsEnable"] = 1,
+            ["PackageDisplayOnly"] = "不能作为数据库列",
+            ["_OfficialPackageResource"] = "app.microi.store.json",
+            ["_OfficialOwnership"] = "Platform",
+            ["_OfficialUpgradePolicy"] = "Managed"
+        };
+
+        var persisted = Assert.IsType<JObject>(normalize.Invoke(null, new object[] { source }));
+
+        Assert.Equal("历史接口名称", persisted["ApiName"]?.ToString());
+        Assert.Null(persisted["Name"]);
+        Assert.Null(persisted["PackageDisplayOnly"]);
+        Assert.Null(persisted["_OfficialPackageResource"]);
+        Assert.Equal("legacy-engine", persisted["ApiEngineKey"]?.ToString());
+        Assert.Equal("c74d669c-a3d4-11e5-b60d-b870f43edd03", persisted["UserId"]?.ToString());
+        Assert.Equal("管理员", persisted["UserName"]?.ToString());
+        Assert.Equal(0, persisted["IsDeleted"]?.Value<int>());
+        Assert.Equal(1, persisted["IsEnable"]?.Value<int>());
+        Assert.Equal(0, persisted["StopHttp"]?.Value<int>());
+        Assert.Equal(0, persisted["AllowAnonymous"]?.Value<int>());
+        Assert.Equal(0, persisted["EnableLog"]?.Value<int>());
+        Assert.Equal(0, persisted["ResponseFile"]?.Value<int>());
+        Assert.Equal(0, persisted["Lock"]?.Value<int>());
+        Assert.Equal("[]", persisted["ApiRole"]?.ToString());
+        Assert.Equal("[]", persisted["Files"]?.ToString());
+    }
+
+    [Fact]
+    public void StartupDependencyPackages_AlwaysCarryLegacyRequiredBaseColumns()
+    {
+        var buildEngines = GetPrivateStaticMethod("BuildBundledStartupDependencyEngines");
+        var engines = Assert.IsAssignableFrom<IReadOnlyList<JObject>>(
+            buildEngines.Invoke(null, null));
+        var requiredFields = new[] { "UserId", "UserName", "IsDeleted", "IsEnable", "Lock" };
+        var invalid = engines
+            .Where(engine => requiredFields.Any(field =>
+                string.IsNullOrWhiteSpace(engine[field]?.ToString())))
+            .Select(engine => engine["_OfficialPackageResource"] + ":" + engine["ApiEngineKey"])
+            .ToArray();
+
+        Assert.Empty(invalid);
+    }
+
+    [Fact]
+    public void StartupDependencyPersistence_IntersectsEachTenantsActualLegacySchema()
+    {
+        var intersect = GetPrivateStaticMethod("IntersectStartupDependencyWithPhysicalFields");
+        var source = new JObject
+        {
+            ["Id"] = "engine-id",
+            ["ApiName"] = "旧租户接口",
+            ["ApiEngineKey"] = "legacy-engine",
+            ["ApiAddress"] = "/apiengine/legacy-engine",
+            ["ApiV8Code"] = "return { Code: 1 };",
+            ["IsEnable"] = 1,
+            ["ResponseType"] = "Json",
+            ["FuturePackageField"] = "旧库不存在"
+        };
+        var legacyPhysicalFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Id", "ApiName", "ApiEngineKey", "ApiAddress", "ApiV8Code", "IsEnable"
+        };
+
+        var persisted = Assert.IsType<JObject>(
+            intersect.Invoke(null, new object[] { source, legacyPhysicalFields }));
+
+        Assert.Equal("旧租户接口", persisted["ApiName"]?.ToString());
+        Assert.Equal(1, persisted["IsEnable"]?.Value<int>());
+        Assert.Null(persisted["ResponseType"]);
+        Assert.Null(persisted["FuturePackageField"]);
     }
 
     [Fact]
@@ -499,6 +584,23 @@ public class PlatformRuntimeUpgradeGateTests
             string.Equals(item["TABLE_NAME"]?.ToString(), "diy_field", StringComparison.OrdinalIgnoreCase)
             && string.Equals(item["COLUMN_NAME"]?.ToString(), "TableName", StringComparison.OrdinalIgnoreCase));
         Assert.Equal("varchar(255)", physical["COLUMN_TYPE"]?.ToString());
+    }
+
+    [Fact]
+    public void DiyFieldEntity_ProjectsHistoricalPhysicalV8CodeUsedByOfficialButtons()
+    {
+        Assert.NotNull(typeof(DiyField).GetProperty(nameof(DiyField.V8Code)));
+        Assert.NotNull(typeof(DiyFieldParam).GetProperty(nameof(DiyFieldParam.V8Code)));
+        Assert.Contains(DiyField._.V8Code, new DiyField().GetFields());
+
+        var package = JObject.Parse(LoadBundledResources()["app.microi.sys_user.json"]);
+        var historicalButton = Assert.Single(
+            package["DiyFields"]!.Children<JObject>(),
+            field => field["Component"]?.ToString() == "Button"
+                     && !string.IsNullOrWhiteSpace(field["V8Code"]?.ToString())
+                     && string.IsNullOrWhiteSpace(
+                         JObject.Parse(field["Config"]?.ToString() ?? "{}")["V8Code"]?.ToString()));
+        Assert.Equal("BtnDisplayPwd", historicalButton["Name"]?.ToString());
     }
 
     private static MethodInfo GetPrivateStaticMethod(string name)

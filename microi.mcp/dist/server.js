@@ -2283,14 +2283,14 @@ BOUNDARY RULES:
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
 - **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；同步写入 Version，并将本次说明追加到接口引擎修改历史子表（旧库由后端兼容旧 ChangeHistory 字段）；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
-- **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
+- **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖类型化接口引擎数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 - **microi_chat** — 使用当前 MCP 登录身份、绑定租户与服务器本机有效 License 调用 Microi.AI；工具不接受 OsClient、用户、Endpoint、ApiKey 或 Authorization 覆盖
 - **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；创建先返回规范化授权载荷的 SHA-256，再以该 SHA-256 确认；MCP 暂只开放 page:open、form:read、api-engine:run、data-source:run、file:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
 - **固定看板启动 URL 规范** — 使用 Microi.Client 前端 WebBase（不是 API Server）拼接 \`/?OsClient=${ctx.osClient}#/access-login?access_key=<密钥>&redirect=<encodeURIComponent后的站内Hash路由>\`。例如 redirect 原值为 \`/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX\` 时编码为 \`%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX\`。完整自动登录链接应保存为电视/看板的启动页；兑换成功后地址栏变为不含 \`access_key\` 的目标页是安全设计，禁止给目标页再次追加密钥，也禁止新增 \`permanent=1\` 一类由客户端决定有效期的参数
 
 ## OCR 能力
-- 图片/PDF 文字识别统一调用后端 \`V8.OCR.Recognize({...})\` 或受认证的 \`POST /api/Ocr/Recognize\`；不要在接口引擎里自行读取密钥并调用 OCR endpoint。
+- 图片/PDF 文字识别统一调用后端 \`V8.OCR.Recognize({...})\` 或受认证的 \`POST /apiengine/platform-ocr-recognize\`；不要在接口引擎里自行读取密钥并调用 OCR endpoint。
 - 服务地址、API Key、固定 Header、超时和配额只从当前租户 \`sys_osclients\` 的“OCR识别”Tab 读取，调用参数不得覆盖 endpoint、密钥、Header 或 OsClient。
 - 相关实现与交付规范读取 \`microi.skills/ocr-engine/SKILL.md\`；批量或长耗时 OCR 必须使用数据库/MQ/outbox 的可恢复幂等任务，不能使用单节点内存队列。
 

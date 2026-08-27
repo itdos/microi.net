@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Dos.Common;
+using Dos.ORM;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.net
@@ -40,7 +42,7 @@ namespace Microi.net
             };
 
         /// <inheritdoc />
-        public DosResult RunDataSourceEngine(dynamic dynamicParam)
+        public dynamic RunDataSourceEngine(dynamic dynamicParam)
         {
             try
             {
@@ -63,6 +65,23 @@ namespace Microi.net
                 request["_CurrentUser"] = currentUser;
                 request["_InvokeType"] = InvokeType.Client.ToString();
                 request["_IsAnonymous"] = false;
+                var migratedApiEngineKey = ResolveMigratedDataSourceApiEngineKey(
+                    osClient,
+                    dataSourceKey);
+                if (!migratedApiEngineKey.DosIsNullOrWhiteSpace())
+                {
+                    // 旧入口只负责解析一次历史 Id/Key；真正的权限、事务、日志、
+                    // 类型解释和业务代码均由目标 sys_apiengine 记录执行。
+                    return MicroiEngine.ApiEngine
+                        .RunAsync(migratedApiEngineKey, request)
+                        .ConfigureAwait(false)
+                        .GetAwaiter()
+                        .GetResult();
+                }
+
+                // 滚动升级期间应用包可能先于版本迁移到达。仅在尚未生成迁移接口时
+                // 临时回退旧运行时；返回类型保持 dynamic，修复 ExpandoObject 被
+                // 强制转换为 DosResult 的历史异常。迁移完成后不会再进入此分支。
                 return MicroiEngine.DataSource
                     .RunAsync(request)
                     .ConfigureAwait(false)
@@ -73,6 +92,78 @@ namespace Microi.net
             {
                 return new DosResult(0, null, "运行数据源引擎失败：" + ex.Message);
             }
+        }
+
+        private static string ResolveMigratedDataSourceApiEngineKey(
+            string osClient,
+            string dataSourceKey)
+        {
+            var client = OsClientExtend.GetClient(osClient);
+            if (client?.Db == null
+                || !client.Db.TableExists("sys_apiengine")
+                || !client.Db.ColumnExists("sys_apiengine", "DataSourceType"))
+            {
+                return null;
+            }
+
+            var orm = MicroiEngine.ORM(client.Db.Db.DbProvider.DatabaseType);
+            var apiTable = orm.GetTableName("sys_apiengine");
+            var directRows = client.Db.FromSql($@"SELECT * FROM {apiTable}
+                    WHERE ({orm.GetFieldName("ApiEngineKey")} = @p0
+                           OR {orm.GetFieldName("Id")} = @p0)
+                      AND {orm.GetFieldName("IsDeleted")} = @p1
+                      AND {orm.GetFieldName("DataSourceType")} IS NOT NULL
+                      AND {orm.GetFieldName("DataSourceType")} <> @p2")
+                .AddInParameter("p0", dataSourceKey)
+                .AddInParameter("p1", 0)
+                .AddInParameter("p2", string.Empty)
+                .ToList<dynamic>();
+            var direct = directRows
+                .Select(item => ToJObject((object)item))
+                .FirstOrDefault(item => !item["ApiEngineKey"].Val<string>().DosIsNullOrWhiteSpace());
+            if (direct != null) return direct["ApiEngineKey"].Val<string>();
+
+            if (!client.Db.TableExists("sys_datasource")) return null;
+            var sourceTable = orm.GetTableName("sys_datasource");
+            var sourceRows = client.Db.FromSql($@"SELECT * FROM {sourceTable}
+                    WHERE {orm.GetFieldName("DataSourceKey")} = @p0
+                       OR {orm.GetFieldName("Id")} = @p0")
+                .AddInParameter("p0", dataSourceKey)
+                .ToList<dynamic>();
+            var source = sourceRows
+                .Select(item => ToJObject((object)item))
+                .OrderBy(item => item["IsDeleted"].Val<int>())
+                .FirstOrDefault();
+            if (source == null) return null;
+
+            var sourceId = source["Id"].Val<string>();
+            var sourceKey = source["DataSourceKey"].Val<string>();
+            var fallbackKey = ApiEngineDataSourceRuntime.BuildFallbackApiEngineKey(sourceId);
+            var migratedRows = client.Db.FromSql($@"SELECT * FROM {apiTable}
+                    WHERE ({orm.GetFieldName("Id")} = @p0
+                           OR {orm.GetFieldName("ApiEngineKey")} = @p1
+                           OR {orm.GetFieldName("ApiEngineKey")} = @p2)
+                      AND {orm.GetFieldName("IsDeleted")} = @p3")
+                .AddInParameter("p0", sourceId)
+                .AddInParameter("p1", sourceKey)
+                .AddInParameter("p2", fallbackKey)
+                .AddInParameter("p3", 0)
+                .ToList<dynamic>()
+                .Select(item => ToJObject((object)item))
+                .Where(item => ApiEngineDataSourceRuntime.IsMigrationForSource(item, sourceId))
+                .ToList();
+            var migrated = migratedRows.FirstOrDefault(item =>
+                               string.Equals(
+                                   item["Id"].Val<string>(),
+                                   sourceId,
+                                   StringComparison.OrdinalIgnoreCase))
+                           ?? migratedRows.FirstOrDefault(item =>
+                               string.Equals(
+                                   item["ApiEngineKey"].Val<string>(),
+                                   sourceKey,
+                                   StringComparison.OrdinalIgnoreCase))
+                           ?? migratedRows.FirstOrDefault();
+            return migrated?["ApiEngineKey"].Val<string>();
         }
 
         /// <inheritdoc />

@@ -80,6 +80,7 @@ export declare function resolveManifestRelationConfig(field: JsonRecord, current
  * sys_microiservice/sys_microiservice_page ids before any system writes begin.
  */
 export declare function resolveMicroServiceModuleBinding(client: Pick<MicroiClient, 'getMicroService'>, module: JsonRecord): Promise<JsonRecord | undefined>;
+export declare function dataSourcePayload(dataSource: JsonRecord): JsonRecord;
 export declare function manifestGuide(osClient: string | undefined): JsonRecord;
 export declare function registerAdvancedTools(server: McpServer, client: MicroiClient, context: McpServerContext): void;
 export {};

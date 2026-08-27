@@ -8,6 +8,8 @@
 
 默认安装 **主数据库 + Redis + MinIO + MongoDB + 低代码平台程序（API + Web）+ Watchtower**，并默认尝试安装 **PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）** 两项附加能力。已有 MySQL 或 MinIO 的客户也可在交互中选择复用，安装器会跳过对应容器、数据目录、编排和宿主机端口。OCR 或 LibreTranslate 镜像、网络、容器健康检查、Upgrade29/Upgrade31 配置任一失败时，只会跳过对应附加能力并输出警告，不会回滚或中断已经通过 liveness/readiness 的核心平台；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
 
+> **权限说明：** 一键安装和一键更新/修复需要创建 `/microi`、数据目录、防火墙规则及宿主机资源限制。下面两条脚本命令可保持原样复制：root 帐号会直接执行；普通帐号会在步骤 1 之前请求一次 `sudo` 并以 root 重新执行，不会再到步骤 5 创建 `/microi/compose` 时才报 `mkdir: Permission denied`。精简系统没有 `sudo` 时，脚本会在任何宿主机变更前明确停止，请先执行 `su -` 切换到 root 后重试。
+
 ### ⭐ 最重要的 3 条命令
 
 **1. CentOS 7/8/9 / Ubuntu 20/22/24 / Debian 10/11/12 一键安装**

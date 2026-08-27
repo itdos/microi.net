@@ -147,8 +147,8 @@ const engines = [
   },
   {
     key: 'platform-data-source-run', name: '平台数据源运行时', file: 'platform-data-source-run.js',
-    id: '019d2a01-9d63-7f91-8c01-000000000017', enableLog: 0,
-    history: '2026-08-26 v1.0.0 数据源 HTTP Controller 迁入 Managed 接口，并保留访问密钥的数据源白名单校验。'
+    id: '019d2a01-9d63-7f91-8c01-000000000017', enableLog: 0, version: 'v1.1.0',
+    history: '2026-08-27 v1.1.0 兼容入口按历史 Id/Key 转发到带 DataSourceType 的接口引擎，修复 V8 ExpandoObject 返回值被强制转换为 DosResult 的异常。'
   },
   {
     key: 'platform-module-data', name: '平台模块查询运行时', file: 'platform-module-data.js',
@@ -306,6 +306,14 @@ for (const definition of engines) {
   engine.Lock = definition.lock || 0;
   if (definition.responseFile !== undefined) engine.ResponseFile = definition.responseFile;
   if (definition.responseType !== undefined) engine.ResponseType = definition.responseType;
+  if (definition.key === 'platform-data-source-run') {
+    engine.ChangeHistory = removeHistoryVersion(engine.ChangeHistory, 'v1.1.0');
+    engine.ChangeHistory = removeHistoryVersion(engine.ChangeHistory, 'v1.0.0');
+    engine.ChangeHistory = prependOnce(
+      engine.ChangeHistory,
+      '2026-08-26 v1.0.0 数据源 HTTP Controller 迁入 Managed 接口，并保留访问密钥的数据源白名单校验。',
+    );
+  }
   engine.ChangeHistory = prependOnce(engine.ChangeHistory, definition.history);
   packageData.ResourcePolicies.ApiEngines[definition.key] = {
     Ownership: definition.ownership || 'Platform',
@@ -430,6 +438,99 @@ Object.assign(responseTypeField, {
   Description: '默认自动识别 JSON 或字符串；File 返回文件；HTML 返回完整页面；Stream 使用 V8.Stream 以 SSE/NDJSON 输出暂态分片，并在事务完成后发送 done/error 终态。'
 });
 
+const apiEngineTableId = 'cf389aef-72cc-4980-9c5b-143123561ac0';
+const dataSourceTypeFieldId = 'fedc2eca-0eba-4581-95d8-3881f53e3cd7';
+let dataSourceTypeField = packageData.DiyFields.find(item => item.Id === dataSourceTypeFieldId)
+  || packageData.DiyFields.find(item =>
+    item.TableId === apiEngineTableId && item.Name === 'DataSourceType');
+if (!dataSourceTypeField) {
+  dataSourceTypeField = { Id: dataSourceTypeFieldId };
+  packageData.DiyFields.push(dataSourceTypeField);
+}
+Object.assign(dataSourceTypeField, {
+  TableId: apiEngineTableId,
+  TableName: 'sys_apiengine',
+  Name: 'DataSourceType',
+  Label: '数据源类型',
+  NameConfirm: 1,
+  Type: 'varchar(50)',
+  Component: 'Radio',
+  Description: '留空或 V8 按服务端 JavaScript 执行；SQL 按当前租户数据库查询；JSON 直接解析。API 仅用于标识历史待改写源码，请改写为 V8.Http 后切换为 V8。',
+  NotEmpty: 0,
+  Visible: 1,
+  Readonly: 0,
+  Sort: 2150,
+  Data: '["V8","SQL","JSON","API"]',
+  Config: JSON.stringify({
+    ParamData: {}, EnableSearch: false, DataSource: 'Data',
+    SelectSaveFormat: 'Text', Unique: { Type: 'Alone' }
+  }),
+  FormWidth: 24,
+  TableWidth: 120,
+  DefaultValue: '',
+  Unique: 0,
+  BindRole: '[]',
+  AppVisible: 1,
+  IsDeleted: 0,
+  CreateTime: dataSourceTypeField.CreateTime || now
+});
+
+const apiV8CodeFieldId = 'cfa14691-214e-4af8-9a47-ffb55fbab013';
+let apiV8CodeField = packageData.DiyFields.find(item => item.Id === apiV8CodeFieldId)
+  || packageData.DiyFields.find(item =>
+    item.TableId === apiEngineTableId && item.Name === 'ApiV8Code');
+if (!apiV8CodeField) {
+  apiV8CodeField = { Id: apiV8CodeFieldId };
+  packageData.DiyFields.push(apiV8CodeField);
+}
+Object.assign(apiV8CodeField, {
+  TableId: apiEngineTableId,
+  TableName: 'sys_apiengine',
+  Name: 'ApiV8Code',
+  Label: '接口代码',
+  NameConfirm: 1,
+  Type: 'mediumtext',
+  Component: 'CodeEditor',
+  Description: '统一源码字段。编辑器会随数据源类型切换 JavaScript、SQL、JSON 或历史 API 文本语言；普通接口留空数据源类型并继续按服务端 V8 执行。',
+  NotEmpty: 0,
+  Visible: 1,
+  Readonly: 0,
+  Sort: 2200,
+  Data: '[]',
+  Config: JSON.stringify({
+    ParamData: {},
+    EnableSearch: false,
+    DataSource: '',
+    SelectSaveFormat: 'Text',
+    CodeEditor: {
+      Height: '500',
+      Language: 'javascript',
+      LanguageField: 'DataSourceType',
+      LanguageMap: {
+        V8: 'javascript',
+        'V8数据源': 'javascript',
+        SQL: 'sql',
+        'SQL数据源': 'sql',
+        JSON: 'json',
+        'JSON数据源': 'json',
+        '普通数据源': 'json',
+        API: 'plaintext',
+        'API数据源': 'plaintext'
+      },
+      V8CodeType: 'server'
+    },
+    Unique: { Type: 'Alone' }
+  }),
+  FormWidth: 24,
+  TableWidth: 100,
+  DefaultValue: '',
+  Unique: 0,
+  BindRole: '[]',
+  AppVisible: 1,
+  IsDeleted: 0,
+  CreateTime: apiV8CodeField.CreateTime || now
+});
+
 packageData.PhysicalColumns ||= [];
 let maxOsClientOrdinal = packageData.PhysicalColumns
   .filter(item => String(item.TABLE_NAME || '').toLowerCase() === 'sys_osclients')
@@ -453,6 +554,27 @@ for (const definition of streamSettings) {
     EXTRA: ''
   });
 }
+
+let maxApiEngineOrdinal = packageData.PhysicalColumns
+  .filter(item => String(item.TABLE_NAME || '').toLowerCase() === 'sys_apiengine')
+  .reduce((maximum, item) => Math.max(maximum, Number(item.ORDINAL_POSITION || 0)), 0);
+let dataSourceTypeColumn = packageData.PhysicalColumns.find(item =>
+  String(item.TABLE_NAME || '').toLowerCase() === 'sys_apiengine'
+  && item.COLUMN_NAME === 'DataSourceType');
+if (!dataSourceTypeColumn) {
+  dataSourceTypeColumn = { TABLE_NAME: 'sys_apiengine', COLUMN_NAME: 'DataSourceType' };
+  packageData.PhysicalColumns.push(dataSourceTypeColumn);
+}
+Object.assign(dataSourceTypeColumn, {
+  ORDINAL_POSITION: dataSourceTypeColumn.ORDINAL_POSITION || ++maxApiEngineOrdinal,
+  COLUMN_TYPE: 'varchar(50)',
+  DATA_TYPE: 'varchar',
+  IS_NULLABLE: 'YES',
+  COLUMN_DEFAULT: null,
+  COLUMN_COMMENT: '数据源类型',
+  COLUMN_KEY: '',
+  EXTRA: ''
+});
 
 const osClientDdl = (packageData.DDLStatements || []).find(
   item => String(item.TableName || '').toLowerCase() === 'sys_osclients');
@@ -485,6 +607,7 @@ for (const capability of [
   'V8.Method.GetSystemObservability',
   'V8.Method.ManageSystemObservability',
   'V8.Method.RunDataSourceEngine',
+  'ServerFeature:ApiEngineDataSourceType',
   'V8.Method.RunModuleEngine',
   'V8.Method.ExportWordByTemplate',
   'V8.Method.TrackUserBehavior',
@@ -615,6 +738,30 @@ packageData.PackageInfo.ChangeHistory = prependOnce(
   emptyDatabaseRuntimeHistory,
 );
 packageData.PackageInfo.ChangeHistory = prependOnce(packageData.PackageInfo.ChangeHistory, controllerSlimHistory);
+
+const typedDataSourcePackageVersion = 'v7.7.2';
+const typedDataSourceHistory = '2026-08-27 v7.7.2 将数据源类型、统一 ApiV8Code 编辑体验和历史入口兼容迁入接口引擎；升级程序事务化复制旧数据并软删除 sys_datasource。';
+if (compareSemver(packageData.PackageInfo.Version, typedDataSourcePackageVersion) < 0) {
+  packageData.PackageInfo.Version = typedDataSourcePackageVersion;
+}
+if (packageData.PackageInfo.Version === typedDataSourcePackageVersion) {
+  packageData.PackageInfo.Description = 'SaaS 引擎基础资源。数据源统一由带类型的接口引擎承载，并兼容历史移动端数据源入口。';
+  packageData.PackageInfo.ChangeLog = {
+    Version: typedDataSourcePackageVersion,
+    Title: '数据源引擎统一迁入接口引擎',
+    ChangeType: 'Optimize',
+    Content: typedDataSourceHistory.substring(typedDataSourceHistory.indexOf(' ') + 1).replace(/^v7\.7\.2\s+/, ''),
+    ReleaseTime: '2026-08-27 12:00:00'
+  };
+}
+packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
+  packageData.PackageInfo.ChangeHistory,
+  typedDataSourcePackageVersion,
+);
+packageData.PackageInfo.ChangeHistory = prependOnce(
+  packageData.PackageInfo.ChangeHistory,
+  typedDataSourceHistory,
+);
 
 normalizeOfficialApiEnginePolicies(packageData, path.basename(packagePath));
 const normalizedPackageData = JSON.parse(normalizeOfficialPackageExecutionLimits(
