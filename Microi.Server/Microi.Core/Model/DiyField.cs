@@ -55,6 +55,7 @@ namespace Microi.net
 		private string _DataAppend;
 		private int _InTableEdit;
 		private string _KeyupV8Code;
+		private string _V8Code;
 		private int _IsLockField;
 		private int? _Encrypt;
 		private string _UserName;
@@ -503,6 +504,19 @@ namespace Microi.net
 			}
 		}
 		/// <summary>
+		/// 字段值变更/按钮点击 V8 事件。历史租户及官方应用包均直接存储在此物理列。
+		/// </summary>
+		[Field("V8Code")]
+		public string V8Code
+		{
+			get{ return _V8Code; }
+			set
+			{
+				this.OnPropertyValueChange("V8Code");
+				this._V8Code = value;
+			}
+		}
+		/// <summary>
 		/// 是否锁定字段名称和类型
 		/// </summary>
 		[Field("IsLockField")]
@@ -593,6 +607,7 @@ namespace Microi.net
 				_.DataAppend,
 				_.InTableEdit,
 				_.KeyupV8Code,
+				_.V8Code,
 				_.IsLockField,
 				_.Encrypt,
 				_.UserName,
@@ -638,6 +653,7 @@ namespace Microi.net
 				this._DataAppend,
 				this._InTableEdit,
 				this._KeyupV8Code,
+				this._V8Code,
 				this._IsLockField,
 				this._Encrypt,
 				this._UserName,
@@ -796,7 +812,11 @@ namespace Microi.net
 			/// 
 			/// </summary>
 			public readonly static Field KeyupV8Code = new Field("KeyupV8Code", "diy_field", "");
-            /// <summary>
+			/// <summary>
+			/// 字段值变更/按钮点击 V8 事件
+			/// </summary>
+			public readonly static Field V8Code = new Field("V8Code", "diy_field", "");
+			/// <summary>
 			/// 是否锁定字段名称和类型
 			/// </summary>
 			public readonly static Field IsLockField = new Field("IsLockField", "diy_field", "是否锁定字段名称和类型");

@@ -47,7 +47,7 @@ function execute(overrides = {}) {
 }
 
 test('legacy microi-init is a Managed SaaS engine shipped by the current package', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.7.1');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.7.2');
   assert.ok(engine);
   assert.equal(engine.Version, 'v2.0.2');
   assert.equal(engine.AllowAnonymous, 1);

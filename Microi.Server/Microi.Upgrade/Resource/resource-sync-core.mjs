@@ -169,6 +169,71 @@ export function validateOfficialPackageChangeLog(name, content) {
   }
 }
 
+function formatLocalReleaseTime(value) {
+  const pad = number => String(number).padStart(2, '0');
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} `
+    + `${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`;
+}
+
+/**
+ * 官网三方同步在发现本地内容变化、但包版本不高于线上版本时会自动提版。
+ * 提版必须把结构化更新日志和历史记录一起推进，否则发布门禁会留下一个
+ * PackageInfo.Version 已更新、ChangeLog 仍指向旧版的半成品候选包。
+ */
+export function advanceOfficialPackageVersion(packageInfo, nextVersion, releaseTime = formatLocalReleaseTime(new Date())) {
+  if (!packageInfo || typeof packageInfo !== 'object' || Array.isArray(packageInfo)) {
+    throw new Error('PackageInfo 必须是对象，无法自动提升官方应用包版本');
+  }
+  semanticVersionParts(nextVersion, '自动提升后的 PackageInfo.Version');
+  const previousVersion = String(packageInfo.Version || '').trim();
+  const changeLog = packageInfo.ChangeLog;
+  if (!changeLog || typeof changeLog !== 'object' || Array.isArray(changeLog)
+      || String(changeLog.Version || '').trim() !== previousVersion) {
+    throw new Error('自动提升官方应用包版本前，PackageInfo.ChangeLog 必须与当前版本一致');
+  }
+  for (const fieldName of ['Title', 'ChangeType', 'Content']) {
+    if (typeof changeLog[fieldName] !== 'string' || !changeLog[fieldName].trim()) {
+      throw new Error(`自动提升官方应用包版本前，PackageInfo.ChangeLog.${fieldName} 不能为空`);
+    }
+  }
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(releaseTime || '').trim())) {
+    throw new Error('自动提升官方应用包版本的发布时间必须为 yyyy-MM-dd HH:mm:ss');
+  }
+
+  const normalizedVersion = String(nextVersion).trim().startsWith('v')
+    ? String(nextVersion).trim()
+    : `v${String(nextVersion).trim()}`;
+  packageInfo.Version = normalizedVersion;
+  changeLog.Version = normalizedVersion;
+  changeLog.ReleaseTime = String(releaseTime).trim();
+
+  const currentRecord = {
+    Version: normalizedVersion,
+    Date: changeLog.ReleaseTime.substring(0, 10),
+    Description: changeLog.Content.trim(),
+  };
+  const history = packageInfo.ChangeHistory;
+  if (Array.isArray(history)) {
+    packageInfo.ChangeHistory = [
+      currentRecord,
+      ...history.filter(item => String(item?.Version || '').trim() !== normalizedVersion),
+    ];
+  } else if (history && typeof history === 'object') {
+    const previousRecords = String(history.Version || '').trim() === normalizedVersion ? [] : [history];
+    packageInfo.ChangeHistory = [currentRecord, ...previousRecords];
+  } else {
+    const escapedVersion = normalizedVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const versionPattern = new RegExp(`(^|[^0-9A-Za-z.])${escapedVersion}(?=$|[^0-9A-Za-z.])`);
+    const previousLines = String(history || '')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line && !versionPattern.test(line));
+    const currentLine = `${currentRecord.Date} ${currentRecord.Version} ${currentRecord.Description}`;
+    packageInfo.ChangeHistory = `${[currentLine, ...previousLines].join('\n')}\n`;
+  }
+  return normalizedVersion;
+}
+
 function stableJsonValue(value) {
   if (Array.isArray(value)) return value.map(stableJsonValue);
   if (!value || typeof value !== 'object') return value;

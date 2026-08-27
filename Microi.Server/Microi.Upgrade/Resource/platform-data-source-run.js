@@ -7,7 +7,7 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
-/* V8 ApiEngine | ApiEngineKey: platform-data-source-run | Version: v1.0.0 */
+/* V8 ApiEngine | ApiEngineKey: platform-data-source-run | Version: v1.1.0 */
 var p = V8.Param || {};
 var dataSourceKey = String(p.DataSourceKey || "").substring(0, 200);
 var beforeHook = V8.ApiEngine.Run("platform-runtime-custom-hook", {

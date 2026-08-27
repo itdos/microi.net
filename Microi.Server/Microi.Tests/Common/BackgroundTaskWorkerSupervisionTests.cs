@@ -207,6 +207,21 @@ public sealed class BackgroundTaskWorkerSupervisionTests
     }
 
     [Fact]
+    public void BackgroundTaskTimestamps_FitTheCrossDatabaseVarcharContract()
+    {
+        var value = new DateTime(2026, 8, 27, 17, 23, 45, 123, DateTimeKind.Utc)
+            .AddTicks(4567);
+
+        var serialized = Microi.net.BackgroundTaskStore.DbTime(value);
+
+        Assert.Equal("2026-08-27 17:23:45.123", serialized);
+        Assert.True(serialized.Length <= 25);
+        Assert.True(string.CompareOrdinal(
+            serialized,
+            Microi.net.BackgroundTaskStore.DbTime(value.AddMilliseconds(1))) < 0);
+    }
+
+    [Fact]
     public void PostgreSqlBackgroundTaskSql_QuotesMixedCaseIdentifiersWithoutTouchingParametersOrLiterals()
     {
         var client = new Microi.net.OsClientSecret

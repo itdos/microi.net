@@ -278,7 +278,7 @@ namespace Microi.net
         /// 仅供官方 Managed 接口运行数据源：固定当前租户与可信用户，
         /// 并继续执行访问密钥的数据源白名单校验。
         /// </summary>
-        DosResult RunDataSourceEngine(dynamic dynamicParam);
+        dynamic RunDataSourceEngine(dynamic dynamicParam);
 
         /// <summary>
         /// 仅供官方 Managed 接口运行模块查询：动作采用白名单，身份、租户和

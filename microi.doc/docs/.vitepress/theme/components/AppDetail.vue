@@ -44,7 +44,13 @@
           <section class="app-detail-hero">
             <div class="app-detail-icon" :class="`tone-${app.tone}`">{{ app.icon }}</div>
             <div class="app-detail-summary">
-              <span class="app-detail-eyebrow">{{ typeLabel(app.ApplicationType) }}</span>
+              <div class="app-detail-labels">
+                <span class="app-detail-eyebrow">{{ typeLabel(app.ApplicationType) }}</span>
+                <span v-if="app.IsRecommend" class="app-detail-recommend-tag">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.4 6.3-.9L12 2.8Z"/></svg>
+                  推荐
+                </span>
+              </div>
               <h1>{{ app.Name }}</h1>
               <p>{{ app.Description }}</p>
               <div class="app-detail-meta">
@@ -68,10 +74,22 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.8a5.5 5.5 0 0 0-7.8 0L12 5.9l-1.1-1.1a5.5 5.5 0 1 0-7.8 7.8L12 21l8.8-8.4a5.5 5.5 0 0 0 0-7.8Z"/></svg>
                 {{ isFavorite ? '已收藏' : '收藏应用' }} · {{ formatNumber(app.FavoriteCount) }}
               </button>
+              <button
+                v-if="isSuperAdmin"
+                type="button"
+                class="recommend"
+                :class="{ active: app.IsRecommend }"
+                :disabled="recommendBusy"
+                @click="setRecommend"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.4 6.3-.9L12 2.8Z"/></svg>
+                {{ app.IsRecommend ? '取消推荐应用' : '设置为推荐应用' }}
+              </button>
               <a class="secondary" href="/apps.html">浏览更多应用</a>
             </div>
           </section>
           <p v-if="favoriteMessage" class="app-detail-action-message" role="status">{{ favoriteMessage }}</p>
+          <p v-if="recommendMessage" class="app-detail-action-message" role="status">{{ recommendMessage }}</p>
 
           <section class="app-detail-facts" aria-label="应用数据">
             <article>
@@ -267,9 +285,12 @@ const loading = ref(false)
 const errorMessage = ref('')
 const authToken = ref('')
 const authDid = ref('')
+const currentUser = ref(null)
 const isFavorite = ref(false)
 const favoriteBusy = ref(false)
 const favoriteMessage = ref('')
+const recommendBusy = ref(false)
+const recommendMessage = ref('')
 const fileServer = ref('')
 const previewImageBroken = ref(false)
 const changeLogs = ref([])
@@ -279,6 +300,7 @@ const changeLogLoading = ref(false)
 const changeLogError = ref('')
 const changeLogExpanded = ref(false)
 const CHANGE_LOG_COLLAPSED_COUNT = 5
+const isSuperAdmin = computed(() => Boolean(authToken.value && currentUser.value?.Id && Number(currentUser.value?.Level || 0) >= 9999))
 
 // VitePress 的 route.path 在不同导航方式/版本中可能包含查询串；应用详情页
 // 必须只按 pathname 判断，否则 /app-detail.html?app=xxx 会整页被 v-if 隐藏。
@@ -413,7 +435,8 @@ function normalizeApp(item) {
     tone: toneMap[category] || 'blue',
     ViewCount: Number(item.ViewCount || 0),
     InstallCount: Number(item.InstallCount || 0),
-    FavoriteCount: Number(item.FavoriteCount || 0)
+    FavoriteCount: Number(item.FavoriteCount || 0),
+    IsRecommend: Number(item.IsRecommend || 0) === 1 ? 1 : 0
   }
 }
 
@@ -463,12 +486,15 @@ function isCurrentChangeLog(log) {
 
 function syncAuth() {
   if (typeof window === 'undefined') return
-  let hasUser = false
-  try { hasUser = Boolean(JSON.parse(localStorage.getItem('microi_doc_user') || 'null')?.Id) } catch (_) {}
+  try { currentUser.value = JSON.parse(localStorage.getItem('microi_doc_user') || 'null') } catch (_) { currentUser.value = null }
+  const hasUser = Boolean(currentUser.value?.Id)
   const token = normalizeSiteToken(localStorage.getItem('microi_doc_token'))
   authToken.value = token && hasUser ? token : ''
   authDid.value = getOrCreateSiteDid(localStorage, window.crypto)
-  if (!authToken.value) isFavorite.value = false
+  if (!authToken.value) {
+    currentUser.value = null
+    isFavorite.value = false
+  }
 }
 
 function authHeaders() {
@@ -485,6 +511,7 @@ function syncTokenFromResponse(response) {
 
 function expireAuth() {
   authToken.value = ''
+  currentUser.value = null
   isFavorite.value = false
   localStorage.removeItem('microi_doc_token')
   localStorage.removeItem('microi_doc_user')
@@ -548,6 +575,36 @@ async function setFavorite() {
   }
 }
 
+async function setRecommend() {
+  if (!app.value || !isSuperAdmin.value || recommendBusy.value) return
+  recommendMessage.value = ''
+  recommendBusy.value = true
+  const desired = !Boolean(app.value.IsRecommend)
+  try {
+    const response = await fetch(`${APP_API_BASE}/apiengine/official_ai_app_recommend?OsClient=${OS_CLIENT}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ AppId: app.value.Id, IsRecommend: desired })
+    })
+    syncTokenFromResponse(response)
+    const result = await response.json()
+    if (result.Code !== 1) {
+      if (isSiteSessionExpired(result, response.status)) {
+        expireAuth()
+        window.location.href = `/login.html?redirect=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`
+        return
+      }
+      throw new Error(result.Msg || '推荐状态保存失败')
+    }
+    app.value.IsRecommend = Number(result.Data?.IsRecommend || 0) === 1 ? 1 : 0
+    recommendMessage.value = result.Msg || (app.value.IsRecommend ? '已设置为推荐应用' : '已取消推荐应用')
+  } catch (error) {
+    recommendMessage.value = error?.message || '推荐状态保存失败，请稍后重试'
+  } finally {
+    recommendBusy.value = false
+  }
+}
+
 async function loadApp() {
   if (!isDetailPage.value || loading.value) return
   const appKey = queryAppKey()
@@ -563,12 +620,12 @@ async function loadApp() {
     const response = await fetch(`${APP_API_BASE}/apiengine/official_ai_apps?OsClient=${OS_CLIENT}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ OsClient: OS_CLIENT, Keyword: appKey, PageIndex: 1, PageSize: 500 })
+      body: JSON.stringify({ ExactAppKey: appKey, PageIndex: 1, PageSize: 1 })
     })
     const result = await response.json()
     if (result.Code !== 1 || !Array.isArray(result.Data)) throw new Error(result.Msg || '应用读取失败')
     fileServer.value = String(result.DataAppend?.FileServer || '').trim()
-    const matched = result.Data.find(item => String(item.AppKey || item.AppId) === appKey)
+    const matched = result.Data.find(item => String(item.AppKey || item.AppId || item.Id) === appKey)
     if (!matched) throw new Error('应用不存在或尚未发布')
     previewImageBroken.value = false
     const detailModel = await loadChangeLogs(matched.Id)
@@ -925,6 +982,40 @@ onBeforeUnmount(() => {
   letter-spacing: .13em;
 }
 
+.app-detail-labels {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.app-detail-recommend-tag {
+  display: inline-flex;
+  min-height: 26px;
+  padding: 0 10px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(217, 119, 6, .28);
+  border-radius: 999px;
+  background: rgba(245, 158, 11, .11);
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.app-detail-recommend-tag svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+:global(html.dark .app-detail-recommend-tag) {
+  border-color: rgba(251, 191, 36, .35);
+  background: rgba(245, 158, 11, .14);
+  color: #fcd34d;
+}
+
 .app-detail-summary h1 {
   margin: 7px 0 8px;
   color: inherit;
@@ -1024,7 +1115,21 @@ onBeforeUnmount(() => {
 }
 
 .app-detail-actions .favorite.active svg { fill: currentColor; }
-.app-detail-actions .favorite:disabled { opacity: .58; cursor: wait; }
+.app-detail-actions .recommend {
+  border: 1px solid rgba(217, 119, 6, .3);
+  background: rgba(245, 158, 11, .08);
+  color: #a75b06;
+}
+
+.app-detail-actions .recommend.active {
+  border-color: rgba(217, 119, 6, .42);
+  background: rgba(245, 158, 11, .16);
+  color: #92400e;
+}
+
+.app-detail-actions .recommend svg { fill: currentColor; stroke: none; }
+.app-detail-actions .favorite:disabled,
+.app-detail-actions .recommend:disabled { opacity: .58; cursor: wait; }
 
 .app-detail-action-message {
   margin: 10px 8px -8px;
@@ -1049,6 +1154,12 @@ onBeforeUnmount(() => {
   border-color: rgba(251, 113, 133, .38);
   background: rgba(244, 63, 94, .12);
   color: #fb7185;
+}
+
+:global(html.dark .app-detail-actions .recommend) {
+  border-color: rgba(251, 191, 36, .28);
+  background: rgba(245, 158, 11, .11);
+  color: #fcd34d;
 }
 
 .app-detail-facts {
@@ -1154,26 +1265,9 @@ onBeforeUnmount(() => {
   border: 1px solid var(--mci-app-detail-line);
   border-radius: 26px;
   background:
-    linear-gradient(var(--mci-app-detail-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--mci-app-detail-line) 1px, transparent 1px),
     linear-gradient(135deg, var(--mci-app-detail-primary-soft), transparent 42%),
     var(--mci-app-detail-surface);
-  background-size: 54px 54px, 54px 54px, auto, auto;
   box-shadow: var(--mci-app-detail-shadow);
-}
-
-.app-detail-changelog::after {
-  position: absolute;
-  z-index: 0;
-  top: 0;
-  left: -36%;
-  width: 30%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .22), transparent);
-  content: "";
-  pointer-events: none;
-  transform: translateX(0) skewX(-18deg);
-  animation: app-detail-changelog-sweep 8s ease-in-out infinite;
 }
 
 .app-detail-changelog > * {
@@ -1723,12 +1817,6 @@ onBeforeUnmount(() => {
   100% { background-position: -120% 0; }
 }
 
-@keyframes app-detail-changelog-sweep {
-  0%, 18% { opacity: 0; transform: translateX(0) skewX(-18deg); }
-  30% { opacity: .68; }
-  54%, 100% { opacity: 0; transform: translateX(460%) skewX(-18deg); }
-}
-
 @media (max-width: 900px) {
   .app-detail-hero {
     grid-template-columns: 100px minmax(0, 1fr);
@@ -1818,7 +1906,6 @@ onBeforeUnmount(() => {
   .app-detail-changelog {
     padding: 20px 16px;
     border-radius: 22px;
-    background-size: 42px 42px, 42px 42px, auto, auto;
   }
 
   .app-detail-changelog-header {
@@ -1863,7 +1950,6 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
   .app-detail-shell,
   .app-detail-changelog-item,
-  .app-detail-changelog::after,
   .app-detail-skeleton-block {
     animation: none !important;
     opacity: 1;

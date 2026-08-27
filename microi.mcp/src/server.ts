@@ -2717,7 +2717,7 @@ BOUNDARY RULES:
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
 - **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；同步写入 Version，并将本次说明追加到接口引擎修改历史子表（旧库由后端兼容旧 ChangeHistory 字段）；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
-- **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
+- **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖类型化接口引擎数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 - **microi_chat** — 使用当前 MCP 登录身份、绑定租户与服务器本机有效 License 调用 Microi.AI；工具不接受 OsClient、用户、Endpoint、ApiKey 或 Authorization 覆盖
 - **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；创建先返回规范化授权载荷的 SHA-256，再以该 SHA-256 确认；MCP 暂只开放 page:open、form:read、api-engine:run、data-source:run、file:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次

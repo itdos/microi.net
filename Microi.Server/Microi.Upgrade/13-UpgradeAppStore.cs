@@ -125,6 +125,25 @@ namespace Microi.net
             {
                 "IsDeleted", "IsEnable", "Lock", "AllowAnonymous"
             };
+        // 启动闭包会在 FormEngine 可用前直接写 sys_apiengine，因此只能消费该表的
+        // 物理字段。官方包历史上曾把展示名称导出为 Name；若把包对象的全部属性直接
+        // 拼成列名，旧租户会因 Unknown column 'Name' 退出，Docker 随即反复重启。
+        // 这里保留当前实体的完整物理字段白名单，包级说明等非物理元数据一律不入库。
+        private static readonly HashSet<string> StartupDependencyPhysicalFields =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Id", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted",
+                "ApiName", "ApiEngineKey", "ApiAddress", "ApiV8Code", "ApiRemark",
+                "ApiRole", "Category", "ChangeHistory", "Version", "Files", "TestParam",
+                "TestResult", "AiCheckResult", "IsEnable", "StopHttp", "AllowAnonymous",
+                "EnableLog", "ResponseFile", "ResponseType", "Lock", "LockKey", "Timeout",
+                "MaxStatements", "LimitMemory", "LimitRecursion", "V8Limit", "V8Unlimited"
+            };
+        // 启动门禁没有登录用户上下文。旧版 sys_apiengine.UserId/UserName 曾是
+        // NOT NULL 且没有默认值，因此官方包偶尔漏出审计字段时必须使用稳定的
+        // 平台系统身份补齐；该身份只用于审计兼容，不参与任何授权判断。
+        private const string StartupDependencySystemUserId = "c74d669c-a3d4-11e5-b60d-b870f43edd03";
+        private const string StartupDependencySystemUserName = "管理员";
         private static readonly HashSet<string> AnonymousPlatformRuntimeEngineKeys = new HashSet<string>(StringComparer.Ordinal)
         {
             "platform-os-client-by-domain",
@@ -2034,6 +2053,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             var conflicts = new List<string>();
             try
             {
+                // 同一租户的一轮启动闭包使用同一份物理字段快照。旧库可能一次缺少
+                // 数十个接口，逐条重复查询 information_schema 会显著拖慢容器启动。
+                var physicalFields = ReadStartupDependencyPhysicalFields(client.Db, client.OsClient);
                 var dependencyIndex = 0;
                 foreach (var packaged in LoadBundledStartupDependencyEngines())
                 {
@@ -2114,7 +2136,8 @@ WHERE LOWER({QuoteIdentifier(client.Db, "ApiAddress")})=LOWER(@p0)
                         var updateCount = PersistStartupDependencyDirect(
                             client.Db,
                             patch,
-                            existing["Id"]?.ToString());
+                            existing["Id"]?.ToString(),
+                            physicalFields);
                         if (updateCount != 1)
                         {
                             return new DosResult(0, new { ApiEngineKey = key },
@@ -2149,7 +2172,8 @@ WHERE {QuoteIdentifier(client.Db, "Id")}=@p0
                         var addCount = PersistStartupDependencyDirect(
                             client.Db,
                             persistedSource,
-                            existingId: null);
+                            existingId: null,
+                            physicalFields: physicalFields);
                         if (addCount != 1)
                         {
                             return new DosResult(0, new { ApiEngineKey = key },
@@ -2267,10 +2291,108 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
         private static JObject CreatePersistableRuntimeDependencySource(JObject source)
         {
             var result = source == null ? new JObject() : (JObject)source.DeepClone();
+
+            // 兼容 v7.7.2 及更早应用商城包的接口展示名称别名。ApiName 才是
+            // sys_apiengine 的真实物理列；已有 ApiName 时绝不让旧 Name 覆盖它。
+            if (result["ApiName"].Val<string>().DosIsNullOrWhiteSpace()
+                && !result["Name"].Val<string>().DosIsNullOrWhiteSpace())
+            {
+                result["ApiName"] = result["Name"];
+            }
+
             result.Remove("_OfficialPackageResource");
             result.Remove("_OfficialOwnership");
             result.Remove("_OfficialUpgradePolicy");
+            foreach (var property in result.Properties()
+                         .Where(property => !StartupDependencyPhysicalFields.Contains(property.Name))
+                         .ToArray())
+            {
+                property.Remove();
+            }
+
+            var key = result["ApiEngineKey"].Val<string>();
+            if (result["ApiName"].Val<string>().DosIsNullOrWhiteSpace())
+                result["ApiName"] = key;
+            if (result["UserId"].Val<string>().DosIsNullOrWhiteSpace())
+                result["UserId"] = StartupDependencySystemUserId;
+            if (result["UserName"].Val<string>().DosIsNullOrWhiteSpace())
+                result["UserName"] = StartupDependencySystemUserName;
+
+            // 早期 sys_apiengine 的多个基础列曾使用 NOT NULL 且没有数据库默认值。
+            // 包资源允许省略可推导的零值，但启动门禁必须先形成一条完整、可安全插入
+            // 的物理记录；随后还会与目标租户真实列取交集，不会向旧库写入不存在的列。
+            if (result["IsDeleted"] == null || result["IsDeleted"].Type == JTokenType.Null)
+                result["IsDeleted"] = 0;
+            if (result["IsEnable"] == null || result["IsEnable"].Type == JTokenType.Null)
+                result["IsEnable"] = 1;
+            if (result["StopHttp"] == null || result["StopHttp"].Type == JTokenType.Null)
+                result["StopHttp"] = 0;
+            if (result["AllowAnonymous"] == null || result["AllowAnonymous"].Type == JTokenType.Null)
+                result["AllowAnonymous"] = 0;
+            if (result["EnableLog"] == null || result["EnableLog"].Type == JTokenType.Null)
+                result["EnableLog"] = 0;
+            if (result["ResponseFile"] == null || result["ResponseFile"].Type == JTokenType.Null)
+                result["ResponseFile"] = 0;
+            if (result["Lock"] == null || result["Lock"].Type == JTokenType.Null)
+                result["Lock"] = 0;
+            if (result["ApiRole"].Val<string>().DosIsNullOrWhiteSpace())
+                result["ApiRole"] = "[]";
+            if (result["Files"].Val<string>().DosIsNullOrWhiteSpace())
+                result["Files"] = "[]";
+            if (key.DosIsNullOrWhiteSpace()
+                || result["Id"].Val<string>().DosIsNullOrWhiteSpace()
+                || result["ApiAddress"].Val<string>().DosIsNullOrWhiteSpace()
+                || result["ApiV8Code"].Val<string>().DosIsNullOrWhiteSpace())
+            {
+                throw new InvalidOperationException("平台运行时接口缺少 Id、ApiEngineKey、ApiAddress 或 ApiV8Code，拒绝持久化。");
+            }
             return result;
+        }
+
+        private static JObject IntersectStartupDependencyWithPhysicalFields(
+            JObject source,
+            HashSet<string> physicalFields)
+        {
+            if (physicalFields == null || physicalFields.Count == 0)
+                throw new InvalidOperationException("未读取到 sys_apiengine 物理字段，拒绝盲目写入启动接口闭包。");
+
+            var result = source == null ? new JObject() : (JObject)source.DeepClone();
+            foreach (var property in result.Properties()
+                         .Where(property => !StartupDependencyPhysicalFields.Contains(property.Name)
+                                            || !physicalFields.Contains(property.Name))
+                         .ToArray())
+            {
+                property.Remove();
+            }
+            return result;
+        }
+
+        private static HashSet<string> ReadStartupDependencyPhysicalFields(
+            DbSession database,
+            string osClient)
+        {
+            var columnResult = MicroiEngine.ORM(database.Db.DbProvider.DatabaseType).GetColumns(
+                new DbServiceParam
+                {
+                    OsClient = osClient,
+                    TableName = "sys_apiengine",
+                    DbSession = database
+                });
+            if (columnResult?.Code != 1 || columnResult.Data == null)
+                throw new InvalidOperationException(
+                    "读取 sys_apiengine 物理字段失败：" + (columnResult?.Msg ?? "接口无返回"));
+
+            var fields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var token in JArray.FromObject(columnResult.Data))
+            {
+                var row = token as JObject ?? JObject.FromObject(token);
+                var name = row.GetValue("column_name", StringComparison.OrdinalIgnoreCase)?.ToString()
+                           ?? row.GetValue("ColumnName", StringComparison.OrdinalIgnoreCase)?.ToString();
+                if (!name.DosIsNullOrWhiteSpace()) fields.Add(name);
+            }
+            if (fields.Count == 0)
+                throw new InvalidOperationException("sys_apiengine 物理字段回读为空，拒绝盲目写入启动接口闭包。");
+            return fields;
         }
 
         /// <summary>
@@ -2283,7 +2405,8 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
         private static int PersistStartupDependencyDirect(
             DbSession database,
             JObject source,
-            string existingId)
+            string existingId,
+            HashSet<string> physicalFields)
         {
             if (database == null) throw new ArgumentNullException(nameof(database));
             if (source == null) throw new ArgumentNullException(nameof(source));
@@ -2297,6 +2420,14 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
             persisted["UpdateTime"] = JToken.FromObject(now);
             if (existingId.DosIsNullOrWhiteSpace())
                 persisted["CreateTime"] = JToken.FromObject(now);
+            persisted = IntersectStartupDependencyWithPhysicalFields(persisted, physicalFields);
+
+            foreach (var requiredField in new[] { "Id", "ApiEngineKey", "ApiAddress", "ApiV8Code" })
+            {
+                if (!physicalFields.Contains(requiredField))
+                    throw new InvalidOperationException(
+                        $"sys_apiengine 缺少启动闭包必需物理字段 {requiredField}，请先完成物理字段升级。");
+            }
 
             var fields = persisted.Properties()
                 .Where(property => existingId.DosIsNullOrWhiteSpace()

@@ -1171,9 +1171,15 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
             return normalized.Length <= 50 ? normalized : normalized.Substring(0, 50);
         }
 
-        private static object DbTime(DateTime value)
+        internal static string DbTime(DateTime value)
         {
-            return DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
+            // Background-task timestamps are intentionally stored in the platform's
+            // cross-database varchar(25) DateTime format. Passing a DateTime object
+            // lets newer MySQL drivers serialize seven fractional-second digits
+            // (26 characters), which makes lease claiming fail before any task can
+            // start. Keep the value sortable, millisecond-precise and within the
+            // physical contract regardless of provider or current culture.
+            return value.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
         }
 
         private static object DbTime(DateTime? value)

@@ -2424,21 +2424,37 @@ function rolePayload(role: JsonRecord): JsonRecord {
   });
 }
 
-function dataSourcePayload(dataSource: JsonRecord): JsonRecord {
-  return compactObject({
+export function dataSourcePayload(dataSource: JsonRecord): JsonRecord {
+  const dataSourceType = getString(dataSource, 'DataSourceType', 'dataSourceType') || 'V8';
+  const normalizedType = dataSourceType.trim().toUpperCase();
+  const legacyCode = normalizedType.includes('SQL')
+    ? getString(dataSource, 'SqlDataSource', 'sqlDataSource', 'sql')
+    : (normalizedType.includes('JSON') || dataSourceType.includes('普通'))
+      ? stringifyConfig(dataSource.JsonDataSource ?? dataSource.jsonDataSource
+        ?? dataSource.NormalDataSource ?? dataSource.normalDataSource ?? dataSource.json)
+      : normalizedType.includes('API')
+        ? getString(dataSource, 'ApiDataSource', 'apiDataSource')
+        : getString(dataSource, 'V8DataSource', 'v8DataSource');
+  const payload = compactObject({
     ...dataSource,
     Id: getString(dataSource, 'Id', 'dataSourceId', 'DataSourceId') || undefined,
     DataSourceName: getString(dataSource, 'DataSourceName', 'dataSourceName', 'name', 'Name'),
     DataSourceKey: getString(dataSource, 'DataSourceKey', 'dataSourceKey'),
-    DataSourceType: getString(dataSource, 'DataSourceType', 'dataSourceType') || 'V8',
-    SqlDataSource: getString(dataSource, 'SqlDataSource', 'sqlDataSource', 'sql'),
-    V8DataSource: getString(dataSource, 'V8DataSource', 'v8DataSource', 'code'),
-    JsonDataSource: stringifyConfig(dataSource.JsonDataSource ?? dataSource.jsonDataSource ?? dataSource.json),
+    DataSourceType: dataSourceType,
+    ApiV8Code: getString(dataSource, 'ApiV8Code', 'apiV8Code', 'code') || legacyCode,
     TestParam: stringifyConfig(dataSource.TestParam ?? dataSource.testParam),
     DataSourceRole: getString(dataSource, 'DataSourceRole', 'dataSourceRole'),
     AllowAnonymous: getNumber(dataSource, 'AllowAnonymous', 'allowAnonymous'),
     IsEnable: getNumber(dataSource, 'IsEnable', 'isEnable') ?? 1,
   });
+  for (const legacyField of [
+    'SqlDataSource', 'sqlDataSource', 'sql',
+    'V8DataSource', 'v8DataSource',
+    'JsonDataSource', 'jsonDataSource', 'json',
+    'NormalDataSource', 'normalDataSource',
+    'ApiDataSource', 'apiDataSource',
+  ]) delete payload[legacyField];
+  return payload;
 }
 
 function printTemplatePayload(template: JsonRecord): JsonRecord {
@@ -3262,15 +3278,15 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
     return apiText('Upsert Engine', await upsertEngine(client, engine));
   });
 
-  server.tool('microi_list_data_sources', `List data source engines for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Data Sources', await client.listDataSources(keyword)));
-  server.tool('microi_save_data_source', `Create or update sys_datasource for SQL/V8/JSON data source engines. OsClient ${osClient}.`, { dataSource: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ dataSource, confirmExecution }) => {
+  server.tool('microi_list_data_sources', `List typed API engines that replace legacy sys_datasource rows for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Data Sources', await client.listDataSources(keyword)));
+  server.tool('microi_save_data_source', `Create or update a typed sys_apiengine data source. Put SQL, V8 JavaScript or JSON in ApiV8Code; legacy SqlDataSource/V8DataSource/JsonDataSource inputs are accepted only as compatibility aliases and are not persisted. OsClient ${osClient}.`, { dataSource: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ dataSource, confirmExecution }) => {
     const payload = dataSourcePayload(dataSource);
     const key = getString(payload, 'DataSourceKey');
     if (confirmExecution !== key && confirmExecution !== 'EXECUTE') return textResult(`写入已拦截：请传 confirmExecution="${key}" 或 "EXECUTE"。`, true);
     await audit(client, 'microi_save_data_source', key, payload);
     return apiText('Save Data Source', await client.saveDataSource(payload));
   });
-  server.tool('microi_run_data_source', `Run a sys_datasource engine for validation. May have side effects if the data source V8 writes data. OsClient ${osClient}.`, { dataSourceKey: z.string(), params: jsonRecordSchema.optional(), confirmExecution: z.string().optional() }, async ({ dataSourceKey, params, confirmExecution }) => {
+  server.tool('microi_run_data_source', `Run a typed API-engine data source through the legacy-compatible key contract. May have side effects if its V8 code writes data. OsClient ${osClient}.`, { dataSourceKey: z.string(), params: jsonRecordSchema.optional(), confirmExecution: z.string().optional() }, async ({ dataSourceKey, params, confirmExecution }) => {
     if (confirmExecution !== dataSourceKey && confirmExecution !== 'EXECUTE') return textResult(`执行已拦截：请传 confirmExecution="${dataSourceKey}" 或 "EXECUTE"。`, true);
     await audit(client, 'microi_run_data_source', dataSourceKey, params || {});
     return apiText('Run Data Source', await client.runDataSource(dataSourceKey, params));

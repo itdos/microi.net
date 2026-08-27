@@ -455,6 +455,11 @@ public class SaaSRuntimeConfigurationTests
             root, "microi.doc", "docs", "doc", "getting-started", "docker-run.md"));
 
         Assert.Contains("if [ \"${1:-}\" = '--repair-app' ]", installer);
+        Assert.Contains("ensure_privileged_execution \"$@\"", installer);
+        Assert.Contains("exec sudo -E env MICROI_INSTALL_ELEVATED=1 bash", installer);
+        Assert.Contains("exec sudo env MICROI_INSTALL_ELEVATED=1 bash", installer);
+        Assert.Contains("当前帐号不是 root，且系统未安装 sudo", installer);
+        Assert.Contains("--privilege-check-only", installer);
         Assert.Contains("repair_migrate_app_to_internal_network", installer);
         Assert.Contains("repair_extract_api_environment_block", installer);
         Assert.Contains(
@@ -498,6 +503,8 @@ public class SaaSRuntimeConfigurationTests
         Assert.Contains("microi-install-redis:6379", dockerDocument);
         Assert.Contains("容器内的 `127.0.0.1` / `localhost`", dockerDocument);
         Assert.Contains("数据库连接串被截断", dockerDocument);
+        Assert.Contains("普通帐号会在步骤 1 之前请求一次 `sudo`", dockerDocument);
+        Assert.Contains("mkdir: Permission denied", dockerDocument);
         Assert.DoesNotContain("APP_DIR=/microi/compose/microi-install-app", dockerDocument);
 
         var quickCommands = dockerDocument.IndexOf("### ⭐ 最重要的 3 条命令", StringComparison.Ordinal);
@@ -512,6 +519,27 @@ public class SaaSRuntimeConfigurationTests
         Assert.True(repairCommand > installCommand);
         Assert.True(removeCommand > repairCommand);
         Assert.True(resourceProtection > removeCommand);
+    }
+
+    [Fact]
+    public void OfficialInstaller_ElevatesBeforeHostMutationAndReportsDirectoryFailures()
+    {
+        var root = FindRepositoryRoot();
+        var installer = File.ReadAllText(Path.Combine(
+            root, "数据库、案例、文档、资料", "install-microi.sh"));
+
+        var normalPrivilegeGate = installer.IndexOf(
+            "# root。普通帐号会在步骤 1 和任何宿主机写入之前只提权一次并重新执行脚本。",
+            StringComparison.Ordinal);
+        var firstStep = installer.IndexOf("echo '[步骤1/11] 环境检测与系统准备'", StringComparison.Ordinal);
+        Assert.True(normalPrivilegeGate >= 0);
+        Assert.True(firstStep > normalPrivilegeGate);
+        Assert.Contains("if [ \"$(id -u)\" -eq 0 ]", installer);
+        Assert.Contains("if ! command -v sudo", installer);
+        Assert.Contains("sudo -v", installer);
+        Assert.Contains("INSTALL_CURRENT_STAGE=\"步骤5/11 创建编排目录\"", installer);
+        Assert.Contains("无法创建编排目录 ${COMPOSE_BASE_DIR}", installer);
+        Assert.Contains("无法创建数据目录 ${dir}", installer);
     }
 
     [Fact]

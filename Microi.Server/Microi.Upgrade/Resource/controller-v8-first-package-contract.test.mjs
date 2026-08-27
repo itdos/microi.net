@@ -142,7 +142,7 @@ test('message-notification and Store selected ApiEngine key sets stay exact and 
   assertPackageKeyClosure(messagePackage, MESSAGE_SELECTED_API_ENGINE_KEYS);
   assertPackageKeyClosure(storePackage, STORE_SELECTED_API_ENGINE_KEYS);
   assert.equal(messagePackage.PackageInfo.Version, 'v1.0.11');
-  assert.equal(storePackage.PackageInfo.Version, 'v7.7.0');
+  assert.equal(storePackage.PackageInfo.Version, 'v7.7.3');
 });
 
 test('official package ApiEngine stable identities are globally unique', () => {

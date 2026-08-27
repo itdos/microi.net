@@ -24,6 +24,7 @@ test("historical Base64 SQL and V8 values remain readable", () => {
 
 test("all historical field source slots use the safe decoder", () => {
     const model = {
+        V8Code: Base64.encode("V8.ScanCode({ Type: 'barCode' });"),
         KeyupV8Code: Base64.encode("return true;"),
         Config: {
             Sql: "SELECT * FROM 客户",
@@ -32,6 +33,7 @@ test("all historical field source slots use the safe decoder", () => {
         }
     };
     decodeLegacyDiyFieldSources(model);
+    assert.equal(model.V8Code, "V8.ScanCode({ Type: 'barCode' });");
     assert.equal(model.KeyupV8Code, "return true;");
     assert.equal(model.Config.Sql, "SELECT * FROM 客户");
     assert.equal(model.Config.V8Code, "return { Code: 1 };");
