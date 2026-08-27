@@ -1,6 +1,6 @@
 # 🔗 表单控件数据源
 
-数据源决定下拉、单选、复选等控件如何取值与回显；本页按普通数据源、数据源引擎和 SQL 数据源三种方式说明适用场景与配置入口。
+数据源决定下拉、单选、复选等控件如何取值与回显；本页按普通数据源、类型化接口引擎和 SQL 数据源三种方式说明适用场景与配置入口。
 
 > **表单控件数据源目前支持多种模式**
 
@@ -9,11 +9,14 @@
 ## 普通数据源
 >目前普通数据暂时只支持Value一种形式
 >平台正在扩展Key-Value形式的普通数据源
->这样就不需要一定用接口引擎、数据源引擎、Sql数据源来实现Key-Value的数据绑定了
+>这样就不需要一定用接口引擎、Sql数据源来实现Key-Value的数据绑定了
 
 ![普通数据源配置](https://static.itdos.com/upload/img/csdn/0083491c8cbe4bdc8fe4c6d22ce3f367.png#pic_center)
-## 数据源引擎
->这个很简单，选择相应自定义的数据源引擎即可
+## 类型化接口引擎
+
+新版本已将原数据源引擎合并到接口引擎。创建接口引擎时选择 `DataSourceType`（V8、SQL、JSON 或 API），并统一在 `ApiV8Code` 中维护内容；代码编辑器会随类型切换 JavaScript、SQL、JSON 或纯文本语言模式。
+
+表单字段继续使用原有“数据源引擎”配置入口时，平台会调用对应的类型化接口引擎。新代码也可以直接使用 `V8.ApiEngine.Run('ApiEngineKey', params)`。升级程序会迁移旧数据并保留旧调用地址，旧版移动端无需同时升级。
 
 ## Sql数据源
 >* 支持开启远程搜索功能
@@ -48,7 +51,7 @@ if(deptId){//如果选择了部门
 ```
 > * 当然以上只是基础示例，实际上还有更多玩法
 > * 比如说使用接口引擎V8.ApiEngine.Run()实现
-> * 比如说使用数据源引擎V8.DataSourceEngine.Run()实现
+> * 历史代码中的V8.DataSourceEngine.Run()仍可兼容，实际执行的是迁移后的类型化接口引擎
 > * 以上用到的相关知识点：
 > * **V8.FormEngine的使用方法**：[https://microi.blog.csdn.net/article/details/143623519](https://microi.blog.csdn.net/article/details/143623519)
 > * **Where条件的用法**：[https://microi.blog.csdn.net/article/details/143582519](https://microi.blog.csdn.net/article/details/143582519)

@@ -1439,7 +1439,8 @@ export default {
             if(field.Name == 'ShengchengZQRW'){
                 debugger;
             }
-            // V8Code 是右侧通用属性表单的编辑别名，真实持久化位置为 Config.V8Code。
+            // 历史租户使用物理列 V8Code，新版也可能镜像到 Config.V8Code；
+            // 选中字段时统一水合两处，避免任一代数据在属性面板中显示为空。
             hydrateFieldValueChangeV8(field);
 
             //是否需要解密？？

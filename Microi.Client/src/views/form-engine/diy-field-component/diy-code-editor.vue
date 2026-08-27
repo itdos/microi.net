@@ -65,6 +65,7 @@
                         <div
                             :id="'monaco-editor-' + (field && field.Id) + '-' + RandomValue"
                             class="monaco-editor"
+                            :data-code-language="resolveCodeEditorLanguage()"
                             :style="{ height: EditorHeight }"
                         ></div>
                     </div>
@@ -156,6 +157,7 @@
                 <div
                     :id="'monaco-editor-' + (field && field.Id) + '-' + RandomValue"
                     class="monaco-editor"
+                    :data-code-language="resolveCodeEditorLanguage()"
                     :style="{ height: EditorHeight }"
                 ></div>
             </div>
@@ -558,6 +560,7 @@ onBeforeUnmount(() => {
     if (stopFormModeWatch) stopFormModeWatch();
     if (stopFieldWatch) stopFieldWatch();
     if (stopModelValueWatch) stopModelValueWatch();
+    if (stopLanguageWatch) stopLanguageWatch();
     
     // 取消 AI 生成
     if (aiAbortController) {
@@ -660,6 +663,80 @@ const EditorOption = reactive({
     // 强制从左到右显示，解决 RTL 环境下光标位置错误的问题
     rtl: false,
 });
+
+const DEFAULT_CODE_EDITOR_LANGUAGE_MAP = Object.freeze({
+    V8: 'javascript',
+    'V8数据源': 'javascript',
+    V8DataSource: 'javascript',
+    SQL: 'sql',
+    'SQL数据源': 'sql',
+    SqlDataSource: 'sql',
+    JSON: 'json',
+    'JSON数据源': 'json',
+    '普通数据源': 'json',
+    NormalDataSource: 'json',
+    JsonDataSource: 'json',
+    API: 'plaintext',
+    'API数据源': 'plaintext',
+    ApiDataSource: 'plaintext'
+});
+
+const getCodeEditorConfig = () => props.field?.Config?.CodeEditor || {};
+
+const getCodeEditorLanguageField = () => {
+    const configured = String(getCodeEditorConfig().LanguageField || '').trim();
+    if (configured) return configured;
+    return props.field?.Name === 'ApiV8Code' ? 'DataSourceType' : '';
+};
+
+const getConfiguredLanguageMap = () => {
+    const configured = getCodeEditorConfig().LanguageMap;
+    if (!configured) return {};
+    if (typeof configured === 'object') return configured;
+    try {
+        const parsed = JSON.parse(configured);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+};
+
+const resolveCodeEditorLanguage = () => {
+    const config = getCodeEditorConfig();
+    const fallback = String(config.Language || EditorOption.language || 'javascript').trim() || 'javascript';
+    const languageField = getCodeEditorLanguageField();
+    if (!languageField) return fallback;
+
+    const rawType = props.FormData?.[languageField];
+    const type = String(rawType?.Value ?? rawType?.value ?? rawType ?? '').trim();
+    if (!type) return fallback;
+    const languageMap = { ...DEFAULT_CODE_EDITOR_LANGUAGE_MAP, ...getConfiguredLanguageMap() };
+    const matchedKey = Object.keys(languageMap).find(key => key.toLowerCase() === type.toLowerCase());
+    return matchedKey ? String(languageMap[matchedKey] || fallback) : fallback;
+};
+
+const applyResolvedEditorLanguage = () => {
+    const language = resolveCodeEditorLanguage();
+    EditorOption.language = language;
+    if (!monacoEditor || !monaco) return;
+    const model = monacoEditor.getModel();
+    if (model) monaco.editor.setModelLanguage(model, language);
+};
+
+const stopLanguageWatch = watch(
+    () => {
+        const config = getCodeEditorConfig();
+        const languageField = getCodeEditorLanguageField();
+        return [
+            config.Language,
+            languageField,
+            JSON.stringify(config.LanguageMap || {}),
+            languageField ? props.FormData?.[languageField] : undefined
+        ];
+    },
+    applyResolvedEditorLanguage,
+    { deep: true }
+);
 
 const LARGE_TEXT_THRESHOLD = 200 * 1024;
 
@@ -771,7 +848,7 @@ const openV8Docs = () => {
 };
 
 const openCodeDesigner = () => {
-    const language = props.field?.Config?.CodeEditor?.Language || EditorOption.language || 'javascript';
+    const language = resolveCodeEditorLanguage();
     codeDesignerRef.value?.open({
         tab: language === 'sql' ? 'sql' : 'v8',
         resetPreview: true
@@ -787,10 +864,7 @@ const Init = async () => {
     // 修复：EditorOption 是 reactive对象，不需要 .value
     // EditorOption.value = ModelValue.value;  // 这行是错误的
     EditorOption.readOnly = GetFieldReadOnly(props.field);
-    // 从配置中读取语言设置
-    if (props.field?.Config?.CodeEditor?.Language) {
-        EditorOption.language = props.field.Config.CodeEditor.Language;
-    }
+    applyResolvedEditorLanguage();
 
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
         noSemanticValidation: true,
@@ -982,21 +1056,12 @@ const UpdateInit = () => {
     // 修复：EditorOption 是 reactive对象，不需要 .value
     // EditorOption.value = ModelValue.value;  // 这行是错误的
     EditorOption.readOnly = GetFieldReadOnly(props.field);
-    // 从配置中读取语言设置
-    if (props.field?.Config?.CodeEditor?.Language) {
-        EditorOption.language = props.field.Config.CodeEditor.Language;
-    }
+    applyResolvedEditorLanguage();
     
     if (monacoEditor && monaco) {
         monacoEditor.updateOptions(EditorOption);
         applyLargeFileOptions(ModelValue.value);
-        // 更新语言
-        if (props.field?.Config?.CodeEditor?.Language) {
-            const model = monacoEditor.getModel();
-            if (model) {
-                monaco.editor.setModelLanguage(model, props.field.Config.CodeEditor.Language);
-            }
-        }
+        applyResolvedEditorLanguage();
         if (!monacoEditor.hasTextFocus || !monacoEditor.hasTextFocus()) {
             if (ModelValue.value !== monacoEditor.getValue()) {
                 monacoEditor.setValue(ModelValue.value);
@@ -1238,7 +1303,7 @@ const openCodeVersionDiff = (item) => {
 };
 
 const getCodeVersionLanguage = () => {
-    return props.field?.Config?.CodeEditor?.Language || EditorOption.language || 'javascript';
+    return resolveCodeEditorLanguage();
 };
 
 const disposeCodeVersionPreviewEditor = () => {
@@ -1339,12 +1404,9 @@ const saveConfig = () => {
     // 更新编辑器高度
     EditorHeight.value = configForm.value.Height + 'px';
     EditorHeightNum.value = parseInt(configForm.value.Height) || 500;
-    // 更新编辑器语言
+    // 更新编辑器语言；配置了 LanguageField 时继续由当前表单类型决定。
     if (monacoEditor && monaco) {
-        const model = monacoEditor.getModel();
-        if (model) {
-            monaco.editor.setModelLanguage(model, configForm.value.Language);
-        }
+        applyResolvedEditorLanguage();
         monacoEditor.layout();
     }
     nextTick(() => {

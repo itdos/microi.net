@@ -9,6 +9,8 @@ const packagePath = resolve(directory, 'app.microi.store.json');
 const storeTableId = '6cf254f1-edd0-4f04-96bc-c9ad08b5a2c1';
 const packageTableId = 'b5000100-0000-4000-8000-000000000100';
 const createdAt = '2026-08-24 16:00:00';
+const systemUserId = 'c74d669c-a3d4-11e5-b60d-b870f43edd03';
+const systemUserName = '管理员';
 
 const model = JSON.parse(await readFile(packagePath, 'utf8'));
 model.DDLStatements ||= [];
@@ -152,7 +154,10 @@ for (const [id, key, fileName, stopHttp] of engineFiles) {
   const version = source.match(/Version:\s*(v?\d+\.\d+\.\d+)/i)?.[1] || 'v1.0.0';
   upsertBy(model.SysApiEngines, item => item.ApiEngineKey === key, {
     Id: id,
-    Name: key === 'microi-store-package-storage' ? '应用商城包对象存储' : '应用商城包容量治理',
+    UserId: systemUserId,
+    UserName: systemUserName,
+    IsDeleted: 0,
+    ApiName: key === 'microi-store-package-storage' ? '应用商城包对象存储' : '应用商城包容量治理',
     ApiEngineKey: key,
     ApiAddress: `/apiengine/${key}`,
     ApiV8Code: source,
@@ -160,10 +165,20 @@ for (const [id, key, fileName, stopHttp] of engineFiles) {
     IsEnable: 1,
     StopHttp: stopHttp,
     AllowAnonymous: 0,
+    EnableLog: 0,
+    ResponseFile: 0,
+    Lock: 0,
+    ApiRole: '[]',
+    Files: '[]',
     V8Limit: 0,
     V8Unlimited: 1,
     CreateTime: createdAt,
+    UpdateTime: createdAt,
   });
+  // 早期应用包使用 Name 保存接口名称；启动闭包只能持久化 sys_apiengine
+  // 的真实物理字段，因此生成时必须移除该遗留别名，统一写入 ApiName。
+  const configuredEngine = model.SysApiEngines.find(item => item.ApiEngineKey === key);
+  delete configuredEngine.Name;
   model.ResourcePolicies.ApiEngines[key] = {
     Ownership: 'Platform',
     UpgradePolicy: 'Managed',

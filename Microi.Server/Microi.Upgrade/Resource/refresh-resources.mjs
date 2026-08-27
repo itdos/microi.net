@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import {
+  advanceOfficialPackageVersion,
   canonicalizeResource,
   hasPlatformServiceBundleChanged,
   isTemporaryOfficialResourceFailure,
@@ -1250,7 +1251,9 @@ if (process.argv.includes('--synchronize-local')) {
             `${name} 内容需要写回官网，但无法根据包版本 ${packageVersion || '(空)'}、当前发布版本 ${currentReleaseVersion || '(未找到)'} 和官网版本 ${remoteVersion} 生成更高的语义版本`,
           );
         }
-        packageModel.PackageInfo.Version = selectedVersion;
+        // 包内容需要越过官网当前版本时，版本号、结构化日志和历史记录必须
+        // 作为一个整体推进，避免生成无法通过自身发布门禁的半成品资源。
+        advanceOfficialPackageVersion(packageModel.PackageInfo, selectedVersion);
         content = canonicalizeResource(name, JSON.stringify(packageModel));
         process.stdout.write(`${name}\tPackageInfo.Version 自动提升为 ${selectedVersion}\n`);
       }

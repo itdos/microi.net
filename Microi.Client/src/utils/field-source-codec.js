@@ -45,7 +45,9 @@ export function decodeLegacyFieldSource(value) {
 export function decodeLegacyDiyFieldSources(diyFieldModel) {
     if (!diyFieldModel || typeof diyFieldModel !== "object") return diyFieldModel;
 
-    ["KeyupV8Code", "V8TmpEngineForm", "V8TmpEngineTable"].forEach((key) => {
+    // V8Code is a real diy_field physical column in historical databases and
+    // official application packages; older clients could Base64-encode it.
+    ["V8Code", "KeyupV8Code", "V8TmpEngineForm", "V8TmpEngineTable"].forEach((key) => {
         diyFieldModel[key] = decodeLegacyFieldSource(diyFieldModel[key]);
     });
 

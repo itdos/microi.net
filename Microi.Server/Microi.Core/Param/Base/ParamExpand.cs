@@ -884,6 +884,11 @@ namespace Microi.net
         public int? IsLockField { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string KeyupV8Code { get; set; }
+        /// <summary>
+        /// 字段值变更/按钮点击 V8 事件；保留物理列以兼容历史表单与移动端配置。
+        /// </summary>
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string V8Code { get; set; }
         public int? InTableEdit { get; set; }
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]

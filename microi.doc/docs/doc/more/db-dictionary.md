@@ -7,7 +7,7 @@
 - `diy_table` 是表单/表定义中心，保存表级配置、表单 V8 事件、后端提交事件、树形/缓存/匿名访问/数据日志等能力。
 - `diy_field` 是字段定义中心，保存每张表的字段名、字段类型、控件、数据源、校验、显隐、字段 V8 事件和模板 V8。
 - `sys_menu` 是模块/菜单中心，把 `diy_table` 变成可访问的页面模块，并保存列表查询、按钮、导入导出、卡片、移动端、工作流和权限配置。
-- `sys_apiengine`、`sys_datasource`、`microi_database`、`Sys_Config`、`sys_osclients` 分别支撑接口引擎、数据源引擎、扩展数据库、系统配置和 SaaS 租户配置。
+- `sys_apiengine` 同时承载接口引擎与类型化数据源；`sys_datasource` 仅保留迁移后的软删除历史数据；`microi_database`、`Sys_Config`、`sys_osclients` 分别支撑扩展数据库、系统配置和 SaaS 租户配置。
 - `wf_*` 表构成工作流引擎；`sys_user/sys_role/sys_rolelimit/sys_dept` 构成用户、角色、权限和组织体系。
 
 ## 全局约定
@@ -92,10 +92,9 @@
 | `sys_menu` | `SqlWhere` | 后端查询 | 模块级 Where 片段，可使用 CurrentUser 变量。 |
 | `sys_menu` | `ImportV8` | 导入 | 导入处理扩展。 |
 | `sys_menu` | `ExportV8` | 导出 | 导出处理扩展。 |
-| `sys_apiengine` | `ApiV8Code` | 后端 | 接口引擎服务器端 JavaScript。 |
-| `sys_datasource` | `V8DataSource` | 后端 | V8 数据源。 |
-| `sys_datasource` | `SqlDataSource` | 后端 | SQL 数据源。 |
-| `sys_datasource` | `JsonDataSource` | 配置 | 静态 JSON 数据源。 |
+| `sys_apiengine` | `DataSourceType` | 后端 | 类型化接口引擎类型：V8、SQL、JSON、API；为空时按普通 V8 接口执行。 |
+| `sys_apiengine` | `ApiV8Code` | 后端 | 接口代码或类型化数据源内容；编辑器语言由 `DataSourceType` 决定。 |
+| `sys_datasource` | `V8DataSource / SqlDataSource / JsonDataSource` | 兼容 | 已停用的旧数据源字段，仅供升级迁移读取。 |
 | `Sys_Config` | `GlobalV8Code` | 前端全局 | 前端全局 V8 初始化。 |
 | `Sys_Config` | `GlobalServerV8Code` | 后端全局 | 每次后端 V8 执行时加载的全局函数。 |
 | `wf_flowdesign` | `StartV8 / EndV8` | 工作流 | 流程开始/结束事件。 |
@@ -139,8 +138,8 @@
 
 | 表名 | 作用 | 常用字段 |
 |---|---|---|
-| `sys_apiengine` | 接口引擎定义表 | `ApiEngineKey`、`ApiV8Code`、`ApiAddress`、`StopHttp`、`AllowAnonymous`、`ResponseFile`、`Lock`、`LockKey`、`Timeout`、`MaxStatements`、`LimitMemory`、`LimitRecursion` |
-| `sys_datasource` | 数据源引擎定义表 | `DataSourceKey`、`DataSourceType`、`V8DataSource`、`SqlDataSource`、`JsonDataSource`、`AllowAnonymous`、`DataSourceRole` |
+| `sys_apiengine` | 接口引擎及类型化数据源定义表 | `ApiEngineKey`、`DataSourceType`、`ApiV8Code`、`ApiAddress`、`StopHttp`、`AllowAnonymous`、`ResponseFile`、`Lock`、`LockKey`、`Timeout`、`MaxStatements`、`LimitMemory`、`LimitRecursion` |
+| `sys_datasource` | 旧数据源引擎历史表 | 迁移后全部软删除；旧 `DataSourceKey` 继续用于兼容解析，不再新增或维护业务数据 |
 | `microi_database` | 扩展数据库连接配置 | `DbKey`、`DbType`、`DbConn`、`DbReadConn`、`DbName`、`DbVersion`、`IsEnable` |
 | `Sys_Config` | 全局系统配置 | `SysTitle`、`ApiBase`、`FileServer`、`HDFS`、`GlobalV8Code`、`GlobalServerV8Code`、`PwdV8`、`EnableSwagger`、`EnableCaptcha` |
 | `sys_osclients` | SaaS 租户/客户端配置 | `OsClient`、`ClientName`、`DbType`、`DbConn`、`DbReadConn`、`RedisHost`、`AuthSecret`、`DomainName`、`CorsAllowOrigins`、`HDFS`、`Mqtt*`、`MQ*`、`FileUpload*` |
@@ -546,7 +545,9 @@
 | `AllowAnonymous` | 允许匿名调用 | `bit` | `Switch` | 允许匿名调用 |
 | `TestParam` | 参数 | `mediumtext` | `Textarea` | 请输入标准的JSON格式参数，如：&#123; "Id" : "xxxx" &#125;，不支持单引号：&#123; 'Id' : 'xxxx' &#125; |
 
-### `sys_datasource` - 数据源引擎
+### `sys_datasource` - 旧数据源引擎（兼容历史）
+
+该表已停止承载新配置。升级程序会把有效记录复制到 `sys_apiengine`，名称添加 `【数据源引擎迁移】` 前缀，代码统一写入 `ApiV8Code`，再将原记录设置为 `IsDeleted=1`。保留下面的旧字段字典仅用于排查迁移来源与兼容旧客户端。
 
 字段数：12
 

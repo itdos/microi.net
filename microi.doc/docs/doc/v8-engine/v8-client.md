@@ -1007,7 +1007,7 @@ V8._.where(...)
 ```
 
 ## V8.ModuleEngine
->* 当前标准前端 V8 运行时没有公开挂载 `V8.ModuleEngine`。模块关联查询应配置为接口引擎/数据源引擎，或使用后端受控查询；不要仅因后端存在同名能力就在前端调用
+>* 当前标准前端 V8 运行时没有公开挂载 `V8.ModuleEngine`。模块关联查询应配置为接口引擎，或使用后端受控查询；不要仅因后端存在同名能力就在前端调用
 
 ## V8.ApiEngine
 >* 接口引擎
@@ -1049,7 +1049,8 @@ await V8.ApiEngine.RunBackground(
 预计超过 2 分钟、500 条、1000 个扇出子操作、100 次外部调用，或安装/初始化/迁移/备份类动作，应使用后台任务。未知总量不要伪造百分比；超过 10 分钟必须由后端按 checkpoint 分片。详见[任务调度与后台任务](../system-engine/job)。
 
 ## V8.DataSourceEngine
->* 数据源引擎。`Run` 返回 Promise，并兼容回调；旧 `GetData` 已弃用
+>* 历史数据源引擎兼容入口。`Run` 返回 Promise，并兼容回调；旧 `GetData` 已弃用
+>* 新版本将数据源迁移为带 `DataSourceType` 的接口引擎，推荐新代码直接使用 `V8.ApiEngine.Run`。本入口和旧 Controller 地址仍会解析旧 `DataSourceKey`，并执行迁移后的接口引擎
 ```js
 var result = await V8.DataSourceEngine.Run('DataSourceKey', {
   Keyword: '测试'

@@ -15,21 +15,24 @@ function ensureConfigObject(field) {
 }
 
 /**
- * diy_field does not have a physical V8Code column.  Historical/runtime code
- * stores the value-change handler in Config.V8Code, while the generic field
- * property form edits a temporary root-level V8Code property. API DTOs may
- * still contain a root-level empty-string placeholder, so Config.V8Code is the
- * source of truth whenever a server/list field is hydrated.
+ * Historical tenants and official application packages store field/button V8
+ * in the physical diy_field.V8Code column. Some newer clients also mirrored it
+ * into Config.V8Code. Prefer a non-empty physical value, fall back to Config,
+ * and then synchronize both slots so either storage generation remains safe.
  */
 export function hydrateFieldValueChangeV8(field) {
     const config = ensureConfigObject(field);
     if (!config) return field;
 
-    field.V8Code = config.V8Code == null ? "" : String(config.V8Code);
+    const physicalCode = field.V8Code == null ? "" : String(field.V8Code);
+    const configCode = config.V8Code == null ? "" : String(config.V8Code);
+    const resolvedCode = physicalCode || configCode;
+    field.V8Code = resolvedCode;
+    config.V8Code = resolvedCode;
     return field;
 }
 
-/** Persist the generic property-form alias into the real diy_field.Config. */
+/** Persist the editor value into both supported storage generations. */
 export function persistFieldValueChangeV8(field) {
     const config = ensureConfigObject(field);
     if (!config) return field;

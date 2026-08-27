@@ -1285,6 +1285,57 @@ test("指定表单设计器：Autocomplete43 值变更事件保存后刷新仍�
     }
 });
 
+test("历史 Button 物理 V8Code：列表、字数与编辑器均完整回读", async ({ page }) => {
+    test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    const tableId = "026be7b3-0634-416c-b462-789f0e8931b5";
+    const routeHash = `#/diy/diy-design/${tableId}?PageType=`;
+    const fieldListPromise = page
+        .waitForResponse((response) => {
+            if (!/\/api\/FormEngine\/GetDiyFieldList(?:\?|$)/i.test(response.url())) return false;
+            try {
+                return response.request().postDataJSON()?.TableId === tableId;
+            } catch (error) {
+                return false;
+            }
+        }, { timeout: 45_000 })
+        .then((response) => response.json());
+
+    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, routeHash);
+    const fieldListResult = await fieldListPromise;
+    expect(Number(fieldListResult.Code), fieldListResult.Msg || "GetDiyFieldList failed").toBe(1);
+    const buttonField = fieldListResult.Data.find((field) => field.Name === "BtnDisplayPwd");
+    expect(buttonField, "official historical Button field must exist").toBeTruthy();
+    expect(buttonField.Component).toBe("Button");
+    expect(String(buttonField.V8Code || "").length, "physical diy_field.V8Code projection").toBeGreaterThan(0);
+
+    await chooseDesignerField(page, "BtnDisplayPwd");
+    const eventItem = page.locator(".el-form-item").filter({ hasText: "值变更V8事件" }).last();
+    await expect(eventItem).toBeVisible({ timeout: 20_000 });
+    const editButton = eventItem.getByRole("button", { name: /编辑代码|代码设计器/ }).first();
+    const countMatch = (await editButton.innerText()).match(/(\d+)\s*字/);
+    expect(countMatch, "designer must render the historical V8 character count").not.toBeNull();
+    expect(Number(countMatch[1])).toBeGreaterThan(0);
+
+    await editButton.click();
+    const dialog = page.getByRole("dialog", { name: "编辑代码", exact: true })
+        .filter({ has: page.getByRole("button", { name: "取消", exact: true }) })
+        .last();
+    await expect(dialog).toBeVisible({ timeout: 20_000 });
+    await expect(dialog.locator(".monaco-editor").first()).toBeVisible({ timeout: 20_000 });
+    const editorValue = await page.evaluate(() => {
+        const models = window.__monacoEditorInstance?.editor?.getModels?.() || [];
+        return models.length ? models[models.length - 1].getValue() : "";
+    });
+    expect(editorValue.length).toBeGreaterThan(0);
+    expect(editorValue).toContain("GetSysUserPassword");
+    await page.screenshot({
+        path: path.join(SCREENSHOT_DIR, "02e-historical-button-v8code-readback.png"),
+        fullPage: false
+    });
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+});
+
 test("平台通用 Dialog：代码编辑器具备统一标题、圆角与拖动能力", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });

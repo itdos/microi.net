@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  advanceOfficialPackageVersion,
   ensureMinimumPackageVersion,
   validateOfficialPackageChangeLog,
 } from './resource-sync-core.mjs';
@@ -118,6 +119,47 @@ test('官方应用包发布门禁对缺失、错版、空字段和不一致历�
       ChangeHistory: '2026-08-25 v1.2.3 内容\n',
     },
   }));
+});
+
+test('官网三方同步自动提版时同步推进结构化日志和历史记录', () => {
+  const stringHistory = {
+    Version: 'v7.7.1',
+    ChangeLog: {
+      Version: 'v7.7.1',
+      Title: '推荐应用字段',
+      ChangeType: 'Feature',
+      Content: '交付推荐应用字段。',
+      ReleaseTime: '2026-08-27 15:50:00',
+    },
+    ChangeHistory: '2026-08-27 v7.7.1 交付推荐应用字段。\n',
+  };
+  assert.equal(
+    advanceOfficialPackageVersion(stringHistory, 'v7.7.3', '2026-08-27 21:11:50'),
+    'v7.7.3',
+  );
+  assert.equal(stringHistory.ChangeLog.Version, 'v7.7.3');
+  assert.equal(stringHistory.ChangeLog.ReleaseTime, '2026-08-27 21:11:50');
+  assert.match(stringHistory.ChangeHistory, /^2026-08-27 v7\.7\.3 交付推荐应用字段。/);
+  assert.match(stringHistory.ChangeHistory, /v7\.7\.1/);
+
+  const arrayHistory = {
+    Version: 'v1.2.3',
+    ChangeLog: {
+      Version: 'v1.2.3',
+      Title: '标题',
+      ChangeType: 'Fix',
+      Content: '修复内容。',
+      ReleaseTime: '2026-08-26 10:00:00',
+    },
+    ChangeHistory: [{ Version: 'v1.2.3', Date: '2026-08-26', Description: '修复内容。' }],
+  };
+  advanceOfficialPackageVersion(arrayHistory, '1.2.4', '2026-08-27 21:11:50');
+  assert.deepEqual(arrayHistory.ChangeHistory[0], {
+    Version: 'v1.2.4',
+    Date: '2026-08-27',
+    Description: '修复内容。',
+  });
+  assert.equal(arrayHistory.ChangeHistory[1].Version, 'v1.2.3');
 });
 
 test('旧资源生成器的最低版本门禁只提升 Version 且不修改 ChangeLog', () => {

@@ -94,17 +94,35 @@ function extractFunctionDescriptionFromHeader(header) {
     }
     return result.length ? result.join('\n') : undefined;
 }
-function stripLeadingVersionHeader(code) {
+function takeLeadingComment(source) {
+    const match = source.match(/^\s*(\/\*[\s\S]*?\*\/)\s*/);
+    return match ? { comment: match[1], rest: source.slice(match[0].length) } : null;
+}
+function isOfficialOwnershipNotice(comment) {
+    return /^\/\*\s*OFFICIAL_(?:MANAGED|CREATE_IF_MISSING)_API_ENGINE_NOTICE_V1\b/i.test(comment);
+}
+function isVersionHeader(comment) {
+    return /Microi\s+V8|V8\s+(?:ApiEngine|Event|Workflow)|Version\s*:|ChangeLog\s*:|TableKey\s*:|WorkflowKey\s*:/i.test(comment);
+}
+function splitLeadingProtectedHeaders(code) {
     const normalized = code.replace(/^\uFEFF/, '');
-    const match = normalized.match(/^\s*\/\*[\s\S]*?\*\/\s*/);
-    if (!match) {
+    const first = takeLeadingComment(normalized);
+    if (!first) {
         return { body: normalized };
     }
-    const header = match[0];
-    if (!/Microi\s+V8|Version\s*:|ChangeLog\s*:|ApiEngineKey\s*:|TableKey\s*:|WorkflowKey\s*:/i.test(header)) {
+    if (isOfficialOwnershipNotice(first.comment)) {
+        const second = takeLeadingComment(first.rest);
+        return second && isVersionHeader(second.comment)
+            ? { notice: first.comment, header: second.comment, body: second.rest }
+            : { notice: first.comment, body: first.rest };
+    }
+    if (!isVersionHeader(first.comment)) {
         return { body: normalized };
     }
-    return { header, body: normalized.slice(header.length) };
+    const second = takeLeadingComment(first.rest);
+    return second && isOfficialOwnershipNotice(second.comment)
+        ? { notice: second.comment, header: first.comment, body: second.rest }
+        : { header: first.comment, body: first.rest };
 }
 function buildHeader(options, version, previousHeader) {
     const description = options.functionDescription || extractFunctionDescriptionFromHeader(previousHeader || '');
@@ -141,8 +159,9 @@ export function prepareV8VersionedCode(options) {
     const remoteDbVersion = parseV8Version(options.remoteVersion);
     const baseVersion = maxVersion([currentVersion, remoteCodeVersion, remoteDbVersion]);
     const version = options.initial ? (baseVersion || 'v1.0.0') : incrementV8Version(baseVersion);
-    const { header, body } = stripLeadingVersionHeader(options.currentCode || '');
-    const code = `${buildHeader(options, version, header)}${body.replace(/^\s+/, '')}`;
+    const { notice, header, body } = splitLeadingProtectedHeaders(options.currentCode || '');
+    const noticePrefix = notice ? `${notice.trim()}\n\n` : '';
+    const code = `${noticePrefix}${buildHeader(options, version, header)}${body.replace(/^\s+/, '')}`;
     const summary = (options.changeSummary || '同步 V8 代码').trim();
     return {
         code,

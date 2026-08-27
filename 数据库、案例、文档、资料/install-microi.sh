@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-27 06:30:07
+# 版本：v2026-08-27 15:16:52
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -30,7 +30,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-27 06:30:07"
+SCRIPT_VERSION="v2026-08-27 15:16:52"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -55,6 +55,64 @@ LIBRETRANSLATE_INTERNAL_PORT=5000
 LIBRETRANSLATE_SERVICE_ENDPOINT="http://${LIBRETRANSLATE_CONTAINER_NAME}:${LIBRETRANSLATE_INTERNAL_PORT}"
 MYSQL_CLIENT_IMAGE="${MICROI_INSTALL_MYSQL_CLIENT_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0}"
 MINIO_MC_IMAGE="${MICROI_INSTALL_MINIO_MC_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/minio-mc:RELEASE.2025-08-13T08-35-41Z}"
+
+# 完整安装会创建 /microi、/home 数据目录、宿主机 cgroup 与防火墙规则，
+# 因此必须在任何交互或宿主机写入前统一取得 root 身份。不能等到某个 mkdir
+# 才暴露权限问题，否则用户已经完成输入并生成凭据，却只能从半程失败恢复。
+resolve_installer_path() {
+  local source_path="${BASH_SOURCE[0]:-$0}"
+  local source_dir=""
+
+  if command -v readlink > /dev/null 2>&1; then
+    readlink -f "${source_path}" 2>/dev/null && return 0
+  fi
+  source_dir=$(CDPATH= cd -- "$(dirname -- "${source_path}")" 2>/dev/null && pwd -P) || return 1
+  printf '%s/%s\n' "${source_dir}" "$(basename -- "${source_path}")"
+}
+
+ensure_privileged_execution() {
+  local script_path=""
+
+  if [ "$(id -u)" -eq 0 ]; then
+    # Debian/CentOS 精简系统可能以 root 登录但没有 sudo。保留脚本既有调用
+    # 形式，同时让这些调用直接以当前 root 身份执行。
+    if ! command -v sudo > /dev/null 2>&1; then
+      sudo() {
+        "$@"
+      }
+    fi
+    return 0
+  fi
+
+  if [ "${MICROI_INSTALL_ELEVATED:-0}" = "1" ]; then
+    echo 'Microi：错误：sudo 执行后仍未获得 root 身份，已在修改宿主机前停止。' >&2
+    return 1
+  fi
+  if ! command -v sudo > /dev/null 2>&1; then
+    echo 'Microi：错误：一键安装需要 root 权限，但当前帐号不是 root，且系统未安装 sudo。' >&2
+    echo 'Microi：请先执行 su - 切换到 root，再重新运行 bash install-microi.sh。' >&2
+    return 1
+  fi
+
+  script_path=$(resolve_installer_path) || {
+    echo 'Microi：错误：无法解析当前安装脚本的绝对路径，未执行任何宿主机变更。' >&2
+    return 1
+  }
+  echo 'Microi：检测到当前为普通帐号；一键安装需要系统级权限，正在请求 sudo 提权...'
+  if ! sudo -v; then
+    echo 'Microi：错误：sudo 身份验证失败，未执行任何宿主机变更。' >&2
+    return 1
+  fi
+
+  # 优先保留代理和官方测试镜像等调用环境；若 sudoers 禁止 -E，则退回
+  # 最小环境继续官方默认安装，避免把“不能保留环境”误判为“不能提权”。
+  if sudo -n -E true > /dev/null 2>&1; then
+    exec sudo -E env MICROI_INSTALL_ELEVATED=1 bash "${script_path}" "$@"
+  fi
+  echo 'Microi：提示：当前 sudo 策略不允许保留调用环境，将使用官方默认安装参数继续。'
+  echo 'Microi：如需传入自定义 MICROI_* 安装参数，请先切换 root 后重新执行。'
+  exec sudo env MICROI_INSTALL_ELEVATED=1 bash "${script_path}" "$@"
+}
 
 # ============================================================
 # 已安装环境的 API + Web 原地更新/修复
@@ -894,7 +952,15 @@ repair_microi_app() {
   echo '=================================================================='
 }
 
+if [ "${1:-}" = '--privilege-check-only' ]; then
+  ensure_privileged_execution "$@"
+  echo "MICROI_PRIVILEGE_CHECK=ok"
+  echo "MICROI_EFFECTIVE_UID=$(id -u)"
+  exit 0
+fi
+
 if [ "${1:-}" = '--repair-app' ]; then
+  ensure_privileged_execution "$@"
   repair_microi_app
   exit 0
 fi
@@ -2601,6 +2667,10 @@ if [ "${MICROI_INSTALL_OCR_PLAN_ONLY:-0}" = "1" ]; then
   exit 0
 fi
 
+# 维护用的无副作用规划入口在上方已经提前退出；真实安装从这里开始必须是
+# root。普通帐号会在步骤 1 和任何宿主机写入之前只提权一次并重新执行脚本。
+ensure_privileged_execution "$@"
+
 # === 修复中文显示：确保终端使用 UTF-8 编码 ===
 export LANG=en_US.UTF-8 2>/dev/null || export LANG=C.UTF-8 2>/dev/null || true
 export LC_ALL=en_US.UTF-8 2>/dev/null || export LC_ALL=C.UTF-8 2>/dev/null || true
@@ -3387,7 +3457,10 @@ generate_uuid() {
 generate_random_data_dir() {
   local container_name="$1"
   local dir="/home/data-${container_name}-$(openssl rand -hex 4)"
-  mkdir -p "${dir}"
+  if ! mkdir -p "${dir}"; then
+    echo "Microi：错误：无法创建数据目录 ${dir}，请核对宿主机文件系统是否只读或空间是否充足。" >&2
+    return 1
+  fi
   echo "${dir}"
 }
 
@@ -3805,7 +3878,11 @@ else
   COMPOSE_BASE_DIR="${DEFAULT_COMPOSE_DIR}"
   echo "Microi：使用默认编排目录: ${COMPOSE_BASE_DIR}"
 fi
-mkdir -p "${COMPOSE_BASE_DIR}"
+INSTALL_CURRENT_STAGE="步骤5/11 创建编排目录"
+if ! mkdir -p "${COMPOSE_BASE_DIR}"; then
+  echo "Microi：错误：无法创建编排目录 ${COMPOSE_BASE_DIR}。请核对宿主机文件系统、磁盘空间和目录权限。" >&2
+  exit 1
+fi
 
 echo ''
 echo '=================================================================='

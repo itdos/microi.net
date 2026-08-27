@@ -102,6 +102,10 @@
           @keydown.space.self.prevent="openDetail(app)"
         >
           <div class="ai-app-preview" :class="previewFitClass(app.ApplicationType)">
+            <span v-if="app.IsRecommend" class="ai-app-recommend-tag" :aria-label="copy.recommended">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.4 6.3-.9L12 2.8Z"/></svg>
+              {{ copy.recommended }}
+            </span>
             <img
               v-if="app.AppPreviewUrl && !brokenPreviewKeys.has(app.AppKey)"
               :src="app.AppPreviewUrl"
@@ -239,7 +243,7 @@ const copy = computed(() => isEnglish.value ? {
   relatedDescription: 'Matched by role, industry, or workflow. They may not fully satisfy your original requirement.',
   popularBadge: 'Popular suggestions', popularTitle: 'No exact match — here are popular apps to explore',
   popularDescription: 'These are clearly labeled popular suggestions, not exact search results.',
-  describeNeed: 'Describe and generate my software', tryNow: 'Try now', loadingMore: 'Loading more applications', retry: 'Loading failed, retry', loadMore: 'Load more applications', finished: 'All applications loaded'
+  describeNeed: 'Describe and generate my software', tryNow: 'Try now', recommended: 'Recommended', loadingMore: 'Loading more applications', retry: 'Loading failed, retry', loadMore: 'Load more applications', finished: 'All applications loaded'
 } : {
   apps: 'AI 应用', categories: '应用分类', sort: '排序', sortLabel: '应用排序', search: '搜索应用',
   empty: '暂时没有找到精确或相关应用。', emptyHelp: '请描述你要解决的问题；只有点击继续后，需求才会被明确提交。',
@@ -247,12 +251,14 @@ const copy = computed(() => isEnglish.value ? {
   relatedDescription: '这些候选按行业、角色或流程匹配，可能不能完整替代你原本想找的软件。',
   popularBadge: '热门推荐', popularTitle: '没有完全匹配，先看看热门软件',
   popularDescription: '以下是明确标注的热门推荐，不是对搜索词的精确命中。',
-  describeNeed: '描述并生成我要的软件', tryNow: '立即体验', loadingMore: '正在加载更多应用', retry: '加载失败，点击重试', loadMore: '加载更多应用', finished: '已加载全部应用'
+  describeNeed: '描述并生成我要的软件', tryNow: '立即体验', recommended: '推荐', loadingMore: '正在加载更多应用', retry: '加载失败，点击重试', loadMore: '加载更多应用', finished: '已加载全部应用'
 })
 
 const defaultBusinessCategories = [
   { label: '全部', value: 'all' },
   { label: '推荐', value: 'recommended' },
+  { label: '平台能力 / 平台应用', value: 'platform' },
+  { label: '游戏', value: 'game' },
   { label: '企业应用', value: 'business' },
   { label: '办公协同', value: 'office' },
   { label: '数据分析', value: 'data' },
@@ -260,14 +266,12 @@ const defaultBusinessCategories = [
   { label: '行业应用', value: 'industry' },
   { label: '教育学习', value: 'education' },
   { label: '生活服务', value: 'lifestyle' },
-  { label: '游戏', value: 'game' },
   { label: '创意设计', value: 'creative' },
   { label: '营销运营', value: 'marketing' },
-  { label: '平台能力', value: 'platform' },
   { label: '其它', value: 'other' }
 ]
 const businessCategories = ref(defaultBusinessCategories)
-const categoryEnglishLabels = { all: 'All', recommended: 'Recommended', business: 'Business', office: 'Collaboration', data: 'Analytics', tools: 'Productivity', industry: 'Industry', education: 'Education', lifestyle: 'Lifestyle', game: 'Games', creative: 'Creative', marketing: 'Marketing', platform: 'Platform', other: 'Other' }
+const categoryEnglishLabels = { all: 'All', recommended: 'Recommended', platform: 'Platform capability / app', game: 'Games', business: 'Business', office: 'Collaboration', data: 'Analytics', tools: 'Productivity', industry: 'Industry', education: 'Education', lifestyle: 'Lifestyle', creative: 'Creative', marketing: 'Marketing', other: 'Other' }
 const sortOptions = computed(() => isEnglish.value ? [
   { label: 'Recently updated', value: 'AppUpdateTime' },
   { label: 'Recently published', value: 'AppPublishTime' },
@@ -368,21 +372,30 @@ function normalizeApp(app) {
     icon: iconMap[category] || 'AI',
     ViewCount: Number(app.ViewCount || 0),
     InstallCount: Number(app.InstallCount || 0),
-    FavoriteCount: Number(app.FavoriteCount || 0)
+    FavoriteCount: Number(app.FavoriteCount || 0),
+    IsRecommend: Number(app.IsRecommend || 0) === 1 ? 1 : 0
   }
 }
 
 function keyValueOptions(value) {
-  const localize = item => isEnglish.value ? { ...item, label: categoryEnglishLabels[item.value] || item.label } : item
+  const localize = item => {
+    if (isEnglish.value) return { ...item, label: categoryEnglishLabels[item.value] || item.label }
+    if (item.value === 'platform') return { ...item, label: '平台能力 / 平台应用' }
+    return item
+  }
   if (!Array.isArray(value) || !value.length) return defaultBusinessCategories.map(localize)
   const normalized = value
     .map(item => ({ label: String(item?.Value || '').trim(), value: String(item?.Key || '').trim() }))
     .filter(item => item.label && item.value && !['all', 'recommended'].includes(item.value.toLowerCase()))
-    .map(localize)
+  const categoryPriority = ['platform', 'game', 'business']
+  const ordered = [
+    ...categoryPriority.map(key => normalized.find(item => item.value === key)).filter(Boolean),
+    ...normalized.filter(item => !categoryPriority.includes(item.value))
+  ].map(localize)
   return normalized.length ? [
     { label: isEnglish.value ? 'All' : '全部', value: 'all' },
     { label: isEnglish.value ? 'Recommended' : '推荐', value: 'recommended' },
-    ...normalized
+    ...ordered
   ] : defaultBusinessCategories.map(localize)
 }
 
@@ -778,6 +791,8 @@ onBeforeUnmount(() => {
 .ai-app-card { min-width: 0; cursor: pointer; border-radius: 12px; outline: none; }
 .ai-app-card:focus-visible { box-shadow: 0 0 0 2px #f7f7f7; }
 .ai-app-preview { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #353535; border-radius: 12px; background: #171717; }
+.ai-app-recommend-tag { position: absolute; z-index: 4; top: 10px; left: 10px; min-height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; border: 1px solid rgba(255,221,112,.5); border-radius: 999px; background: rgba(28,22,8,.9); box-shadow: 0 8px 20px rgba(0,0,0,.24); color: #ffe391; font-size: 11px; font-weight: 760; letter-spacing: .03em; }
+.ai-app-recommend-tag svg { width: 13px; height: 13px; fill: currentColor; }
 .ai-app-preview > img { width: 100%; height: 100%; display: block; transition: transform .35s ease, filter .35s ease; }
 .preview-fit-contain > img { object-fit: contain; object-position: center; }
 .preview-fit-cover > img { object-fit: cover; object-position: top center; }

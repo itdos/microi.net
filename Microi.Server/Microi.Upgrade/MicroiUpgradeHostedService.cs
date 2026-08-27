@@ -163,6 +163,12 @@ namespace Microi.net
                     await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
                         "Upgrade33-表单V8限额",
                         () => new Upgrade33().Run(runtimeClient.OsClient, resetExistingValues: false));
+                    // 新接口引擎运行时直接读取 DataSourceType；历史数据源必须先在
+                    // 同一共享租约内事务性复制并软删除，不能只依赖可能漂移的
+                    // ServerVersion，也不能让滚动升级期间旧客户端失去 Id/Key 映射。
+                    await RunRuntimeInvariantAsync(runtimeClient, upgradeLease,
+                        "Upgrade34-数据源迁移接口引擎",
+                        () => new Upgrade34().Run(runtimeClient.OsClient));
                     upgradeLease.ThrowIfLost();
                     var runtimeOrm = MicroiEngine.ORM(runtimeClient.Db.Db.DbProvider.DatabaseType);
                     var currentVersion = runtimeClient.Db

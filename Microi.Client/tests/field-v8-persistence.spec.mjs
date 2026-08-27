@@ -23,9 +23,13 @@ test("field property changes update the real reactive field array entry", () => 
 
 test("save-all synchronizes the active V8 field before cloning and encoding", () => {
     const designer = read("src/views/form-engine/diy-design.vue");
-    const syncIndex = designer.indexOf("self.$refs.fieldForm.UptDiyFieldArr(self.CurrentDiyFieldModel)", designer.indexOf("SaveAllDiyField()"));
-    const cloneIndex = designer.indexOf("lodash.cloneDeep(self.DiyFieldList)", designer.indexOf("SaveAllDiyField()"));
-    const encodeIndex = designer.indexOf("Base64EncodeDiyField(element)", designer.indexOf("SaveAllDiyField()"));
+    // Anchor to the method declaration. A preceding commented call is not the
+    // save implementation and may contain unrelated clone operations after it.
+    const saveAllIndex = designer.indexOf("        SaveAllDiyField() {");
+    const syncIndex = designer.indexOf("self.$refs.fieldForm.UptDiyFieldArr(self.CurrentDiyFieldModel)", saveAllIndex);
+    const cloneIndex = designer.indexOf("lodash.cloneDeep(self.DiyFieldList)", saveAllIndex);
+    const encodeIndex = designer.indexOf("Base64EncodeDiyField(element)", saveAllIndex);
+    assert.ok(saveAllIndex > -1, "save-all implementation must exist");
     assert.ok(syncIndex > -1, "active field must be synchronized");
     assert.ok(cloneIndex > syncIndex, "field list must be cloned only after synchronization");
     assert.ok(encodeIndex > cloneIndex, "V8 source must be encoded only after cloning the synchronized list");
@@ -60,6 +64,33 @@ test("server DTO empty V8Code placeholder cannot mask Config.V8Code", () => {
 
     hydrateFieldValueChangeV8(field);
     assert.equal(field.V8Code, "V8.Form.readback = V8.ThisValue;");
+});
+
+test("historical physical V8Code wins when Config.V8Code is empty", () => {
+    const field = {
+        Name: "MobileScanButton",
+        Component: "Button",
+        V8Code: "V8.ScanCode({ Type: 'barCode' });",
+        Config: { V8Code: "" }
+    };
+
+    hydrateFieldValueChangeV8(field);
+
+    assert.equal(field.V8Code, "V8.ScanCode({ Type: 'barCode' });");
+    assert.equal(field.Config.V8Code, field.V8Code);
+});
+
+test("non-empty physical V8Code is not hidden by a divergent Config mirror", () => {
+    const field = {
+        Name: "LegacyButton",
+        V8Code: "V8.FormSet('Source', 'physical');",
+        Config: { V8Code: "V8.FormSet('Source', 'stale-config');" }
+    };
+
+    hydrateFieldValueChangeV8(field);
+
+    assert.equal(field.V8Code, "V8.FormSet('Source', 'physical');");
+    assert.equal(field.Config.V8Code, field.V8Code);
 });
 
 test("string Config is normalized before persisting the value-change handler", () => {
