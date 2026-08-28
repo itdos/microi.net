@@ -35,6 +35,10 @@ import { registerBlueprintTools } from './blueprint-tools.js';
 import { registerDesignTools } from './design-tools.js';
 import { normalizePageJsonObj } from './design-engine.js';
 import {
+  generateMiniMaxMusic3Fallback,
+  isRetiredMiniMaxMusicApi,
+} from './minimax-music3-fallback.js';
+import {
   buildVueMicroServiceScaffoldPlan,
   resolveMicroiSdkSource,
   scaffoldVueMicroService,
@@ -214,7 +218,7 @@ const MICRO_SERVICE_SOURCE_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MICRO_SERVICE_SOURCE_MAX_TOTAL_BYTES = 100 * 1024 * 1024;
 const MICRO_SERVICE_SOURCE_MAX_FILES = 1_000;
 const MICRO_SERVICE_SOURCE_EXCLUDED_DIRECTORIES = new Set([
-  '.git', '.hg', '.svn', '.cache', '.codex-temp', '.next', '.nuxt', '.output', '.turbo', '.vite',
+  '.git', '.hg', '.svn', '.cache', '.codex-temp', '.next', '.nuxt', '.output', '.tmp', '.turbo', '.vite',
   'coverage', 'dist', 'build', 'node_modules',
 ]);
 const MICRO_SERVICE_SOURCE_EXCLUDED_FILES = new Set([
@@ -2202,6 +2206,8 @@ const CORE_TOOL_REGISTRATION_ORDER = [
   'microi_codex',
   'microi_get_status',
   'microi_chat',
+  'microi_generate_minimax_music',
+  'microi_generate_minimax_speech',
   'microi_translate',
   'microi_detect_language',
   'microi_list_translate_languages',
@@ -2263,6 +2269,8 @@ const CORE_TOOL_REGISTRATION_ORDER = [
   'microi_bulk_update_table_features',
   'microi_set_role_permission',
   'microi_set_engine_anonymous',
+  'microi_set_engine_roles',
+  'microi_clear_application_source',
 ];
 
 const CORE_TOOL_PRIORITY = new Map(CORE_TOOL_REGISTRATION_ORDER.map((name, index) => [name, index]));
@@ -3184,6 +3192,97 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           content: [{ type: 'text', text: `Microi.AI chat failed: ${e instanceof Error ? e.message : String(e)}` }],
           isError: true,
         };
+      }
+    },
+  );
+
+  // ========================
+  // Tools: MiniMax 原创音乐与短对白
+  // ========================
+  server.tool(
+    'microi_generate_minimax_music',
+    `Generate one original instrumental game-music asset through the authenticated Microi AI engine for OsClient "${osClient}". The server fixes MiniMax music-2.6, 44.1kHz, 256kbps MP3, keeps provider credentials private, persists the result to tenant HDFS, and uses RequestId for idempotency. This consumes an external AI quota, so confirmExecution must exactly equal requestId.`,
+    {
+      requestId: z.string().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/u).describe('Stable idempotency key. Reuse it for retries of the same prompt.'),
+      prompt: z.string().min(1).max(2000).describe('Original instrumental music brief. Do not request imitation of a living artist or copyrighted recording.'),
+      durationSeconds: z.number().int().min(10).max(60).optional().describe('MiniMax-Music3 fallback duration. Default 20 seconds.'),
+      confirmExecution: z.string().optional().describe('Required for generation and must exactly equal requestId; omit for a no-cost dry run.'),
+    },
+    async ({ requestId, prompt, durationSeconds, confirmExecution }) => {
+      const payload = {
+        RequestId: requestId,
+        Prompt: prompt,
+        Model: 'music-2.6',
+        IsInstrumental: true,
+        SampleRate: 44100,
+        Bitrate: 256000,
+        Format: 'mp3',
+      };
+      if (confirmExecution !== requestId) {
+        return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, payload, requiredConfirmation: requestId }, null, 2) }] };
+      }
+      try {
+        let result = await client.generateMiniMaxMusic(payload);
+        if (isRetiredMiniMaxMusicApi(result)) {
+          result = await generateMiniMaxMusic3Fallback(client, {
+            apiBaseUrl: context.apiBaseUrl,
+            osClient,
+            requestId,
+            prompt,
+            durationSeconds,
+          });
+        }
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as unknown as Record<string, unknown>,
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `MiniMax music generation failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_generate_minimax_speech',
+    `Generate one original Chinese game voice line through the authenticated Microi AI engine for OsClient "${osClient}". The server fixes MiniMax speech-2.8-hd, approved system voices and mono MP3 output, keeps provider credentials private, persists the result to tenant HDFS, and uses RequestId for idempotency. This consumes an external AI quota, so confirmExecution must exactly equal requestId.`,
+    {
+      requestId: z.string().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/u).describe('Stable idempotency key. Reuse it for retries of the same line.'),
+      text: z.string().min(1).max(800).describe('Chinese voice line, normally one short gameplay announcement.'),
+      speaker: z.enum(['female', 'male']).optional().describe('Approved system voice gender. Default female.'),
+      speed: z.number().min(0.8).max(1.2).optional(),
+      volume: z.number().min(0.8).max(1.2).optional(),
+      pitch: z.number().int().min(-2).max(2).optional(),
+      emotion: z.enum(['calm', 'happy', 'sad', 'surprised']).optional(),
+      confirmExecution: z.string().optional().describe('Required for generation and must exactly equal requestId; omit for a no-cost dry run.'),
+    },
+    async ({ requestId, text, speaker, speed, volume, pitch, emotion, confirmExecution }) => {
+      const payload = {
+        RequestId: requestId,
+        Text: text,
+        Speaker: speaker || 'female',
+        Model: 'speech-2.8-hd',
+        Speed: speed ?? 1,
+        Volume: volume ?? 1,
+        Pitch: pitch ?? 0,
+        Emotion: emotion || 'calm',
+        SampleRate: 32000,
+        Bitrate: 128000,
+        Channel: 1,
+        Format: 'mp3',
+      };
+      if (confirmExecution !== requestId) {
+        return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, payload, requiredConfirmation: requestId }, null, 2) }] };
+      }
+      try {
+        const result = await client.generateMiniMaxSpeech(payload);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as unknown as Record<string, unknown>,
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `MiniMax speech generation failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }
     },
   );
@@ -6670,6 +6769,42 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     },
   );
 
+  server.tool(
+    'microi_set_engine_roles',
+    `Set an exact sys_apiengine role allow-list for one or more API engines in OsClient "${osClient}" and verify the database/cache readback. For portable player-facing gateways, allowAuthenticatedUsers=true writes the server-resolved $authenticated marker: it permits any real logged-in tenant user, including OnlyGet roles, but never anonymous callers and never broadens FormEngine or controller permissions.`,
+    {
+      apiEngineKeys: z.array(z.string().min(1)).min(1).max(100).describe('Exact ApiEngineKey values.'),
+      roleIds: z.array(z.string().min(1)).max(100).optional().describe('Optional exact sys_role Ids. They are validated server-side.'),
+      allowAuthenticatedUsers: z.boolean().optional().describe('Add the portable $authenticated role marker for signed-in users.'),
+      confirmExecution: z.string().optional().describe('Required for real writes. Use the confirmationSha256 returned by dry run.'),
+    },
+    async ({ apiEngineKeys, roleIds, allowAuthenticatedUsers, confirmExecution }) => {
+      const normalizedKeys = Array.from(new Set(apiEngineKeys.map(item => item.trim()).filter(Boolean))).sort();
+      const normalizedRoles = Array.from(new Set((roleIds || []).map(item => item.trim()).filter(Boolean))).sort();
+      const payload = {
+        ApiEngineKeys: normalizedKeys,
+        RoleIds: normalizedRoles,
+        AllowAuthenticatedUsers: allowAuthenticatedUsers === true,
+      };
+      const confirmationSha256 = crypto.createHash('sha256')
+        .update(JSON.stringify(payload), 'utf8')
+        .digest('hex');
+      if (confirmExecution !== confirmationSha256) {
+        return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, payload, confirmationSha256 }, null, 2) }] };
+      }
+      try {
+        const result = await client.setEngineRoles(payload);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as unknown as Record<string, unknown>,
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Set engine roles failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
   // ========================
   // Tool: 创建功能模块/菜单（低代码系统设计）
   // ========================
@@ -7292,6 +7427,30 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_clear_application_source',
+    `Remove an AI application's private HDFS source objects, private mci_ai_app_file rows, public SourceZip objects and source-delivery flags while preserving compiled runtime/build assets for OsClient "${osClient}". This is intentionally destructive and two-phase: first call without confirmExecution to obtain the exact target list and confirmationSha256, then pass that hash unchanged. Keep a verified local source checkout before executing.`,
+    {
+      appIdOrKey: z.string().min(1).describe('Exact AppId or AppKey. No wildcard or bulk deletion is supported.'),
+      confirmExecution: z.string().optional().describe('Exact confirmationSha256 returned by the backend dry run.'),
+    },
+    async ({ appIdOrKey, confirmExecution }) => {
+      try {
+        const result = await client.clearApplicationSource({
+          AppIdOrKey: appIdOrKey,
+          ...(confirmExecution ? { ConfirmExecution: confirmExecution } : {}),
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as unknown as Record<string, unknown>,
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Clear application source failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }
     },
   );

@@ -400,6 +400,39 @@ namespace Microi.net.Api
                 : new DosResult(0, null, "当前访问密钥未授权运行此接口引擎。");
         }
 
+        /// <summary>
+        /// Resolve the portable $authenticated ApiRole marker against the
+        /// authoritative engine model. The cloned virtual role is scoped to this
+        /// invocation and never enters DiyToken/login caches.
+        /// </summary>
+        private static async Task ExpandAuthenticatedApiRoleAsync(JObject param)
+        {
+            var currentUser = param?["_CurrentUser"] as JObject;
+            if (currentUser == null) return;
+
+            var modelResult = await MicroiEngine.ApiEngine.GetApiEngineModel(
+                    new ApiEngineParam
+                    {
+                        ApiEngineKey = param["ApiEngineKey"]?.ToString(),
+                        ApiKey = param["ApiKey"]?.ToString(),
+                        ApiAddress = param["ApiAddress"]?.ToString(),
+                        OsClient = param["OsClient"]?.ToString(),
+                        _CurrentUser = currentUser
+                    })
+                .ConfigureAwait(false);
+            if (modelResult.Code != 1 || modelResult.Data == null) return;
+
+            var model = modelResult.Data as JObject
+                        ?? JObject.FromObject((object)modelResult.Data);
+            var invocationUser = ApiEngineRoleAuthorization.AddAuthenticatedVirtualRole(
+                currentUser,
+                model["ApiRole"]?.ToString());
+            if (!ReferenceEquals(invocationUser, currentUser))
+            {
+                param["_CurrentUser"] = invocationUser;
+            }
+        }
+
         private static void XmlToJObject(XElement element, JObject param)
         {
             foreach (var node in element.Nodes())
@@ -739,6 +772,7 @@ namespace Microi.net.Api
             try { AttachFormFilesAndAnnotateTransfer(param); } catch { }
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
+            await ExpandAuthenticatedApiRoleAsync(param);
             dynamic? result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
@@ -782,6 +816,7 @@ namespace Microi.net.Api
 
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
+            await ExpandAuthenticatedApiRoleAsync(param);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
@@ -840,6 +875,7 @@ namespace Microi.net.Api
 
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
+            await ExpandAuthenticatedApiRoleAsync(param);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
@@ -916,6 +952,7 @@ namespace Microi.net.Api
 
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
+            await ExpandAuthenticatedApiRoleAsync(param);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
@@ -1016,6 +1053,7 @@ namespace Microi.net.Api
             SystemObservabilityService.AnnotateApiEngine(HttpContext, param["ApiEngineKey"].Val<string>(), param["OsClient"].Val<string>());
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
+            await ExpandAuthenticatedApiRoleAsync(param);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
@@ -1078,6 +1116,7 @@ namespace Microi.net.Api
                 param["OsClient"].Val<string>());
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
+            await ExpandAuthenticatedApiRoleAsync(param);
 
             var osClient = param["OsClient"].Val<string>();
             if (osClient.DosIsNullOrWhiteSpace()) osClient = DiyToken.GetCurrentOsClient();

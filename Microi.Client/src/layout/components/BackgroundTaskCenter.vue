@@ -1117,6 +1117,26 @@ export default {
     line-height: 1;
 }
 
+/* 统一弹层外壳会限制最大视口高度并隐藏溢出；通知中心自身改为纵向弹性布局，
+   让标题保持固定、正文成为唯一滚动容器，低高度下仍能到达表格后的分页。 */
+:global(.el-dialog.microi-notification-dialog) {
+    display: flex;
+    flex-direction: column;
+}
+
+:global(.el-dialog.microi-notification-dialog > .el-dialog__header) {
+    flex: 0 0 auto;
+}
+
+:global(.el-dialog.microi-notification-dialog > .el-dialog__body) {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
 .notification-shell {
     min-height: 460px;
 }
