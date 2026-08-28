@@ -277,6 +277,36 @@ public class MicroiHdfsMinioEndpointTests
         })!;
     }
 
+    private static bool IsRetryableAliyunObjectExistFailure(Exception exception)
+    {
+        var method = typeof(MicroiHDFSAliyun).GetMethod(
+            "IsRetryableObjectExistFailure",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (bool)method!.Invoke(null, new object?[] { exception })!;
+    }
+
+    private static ClientConfiguration CreateAliyunObjectExistClientConfiguration(bool privateBucket)
+    {
+        var method = typeof(MicroiHDFSAliyun).GetMethod(
+            "CreateObjectExistClientConfiguration",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (ClientConfiguration)method!.Invoke(null, new object?[] { privateBucket })!;
+    }
+
+    private static async Task ExecuteAliyunOperationWithRetryAsync(
+        Action operation,
+        CancellationToken cancellationToken = default)
+    {
+        var method = typeof(MicroiHDFSAliyun).GetMethod(
+            "ExecuteOssOperationWithRetryAsync",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var task = (Task)method!.Invoke(null, new object?[] { operation, cancellationToken })!;
+        await task;
+    }
+
     private static bool IsRangeReadbackObjectPresent(
         int statusCode,
         long? contentLength,
@@ -458,6 +488,59 @@ public class MicroiHdfsMinioEndpointTests
         Assert.Contains("oss:GetObject", message, StringComparison.Ordinal);
         Assert.Contains("oss:PutObject", message, StringComparison.Ordinal);
         Assert.Contains("解决方案=", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AliyunObjectExistRetry_RetriesTransportFailuresButNeverAuthorizationOrCancellation()
+    {
+        Assert.True(IsRetryableAliyunObjectExistFailure(
+            new HttpRequestException("An error occurred while sending the request.")));
+        Assert.False(IsRetryableAliyunObjectExistFailure(
+            new InvalidOperationException("403 Forbidden: AccessDenied")));
+        Assert.False(IsRetryableAliyunObjectExistFailure(
+            new OperationCanceledException("request cancelled")));
+    }
+
+    [Fact]
+    public void AliyunObjectExistRetry_UsesBoundedProviderAndConnectionRetries()
+    {
+        var publicConfig = CreateAliyunObjectExistClientConfiguration(false);
+        var privateConfig = CreateAliyunObjectExistClientConfiguration(true);
+
+        Assert.Equal(15000, publicConfig.ConnectionTimeout);
+        Assert.Equal(30000, privateConfig.ConnectionTimeout);
+        Assert.Equal(3, publicConfig.MaxErrorRetry);
+        Assert.Equal(3, privateConfig.MaxErrorRetry);
+    }
+
+    [Fact]
+    public async Task AliyunOperationRetry_RecoversFromTransientFailuresWithinTheBound()
+    {
+        var attempts = 0;
+
+        await ExecuteAliyunOperationWithRetryAsync(() =>
+        {
+            attempts++;
+            if (attempts < 3)
+                throw new HttpRequestException("An error occurred while sending the request.");
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, attempts);
+    }
+
+    [Fact]
+    public async Task AliyunOperationRetry_FailsAuthorizationWithoutRetrying()
+    {
+        var attempts = 0;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            ExecuteAliyunOperationWithRetryAsync(() =>
+            {
+                attempts++;
+                throw new InvalidOperationException("403 Forbidden: AccessDenied");
+            }, TestContext.Current.CancellationToken));
+
+        Assert.Equal(1, attempts);
     }
 
     [Theory]

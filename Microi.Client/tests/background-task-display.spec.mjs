@@ -64,3 +64,13 @@ test("task center is event driven and shows a full creation datetime", () => {
     assert.doesNotMatch(component, /taskPollTimer|scheduleTaskPolling|shouldPollBackgroundTasks/);
     assert.doesNotMatch(component, /setInterval\([\s\S]{0,220}BackgroundTask\/List/);
 });
+
+test("notification center keeps pagination reachable in a short viewport", () => {
+    const component = readFileSync(
+        new URL("../src/layout/components/BackgroundTaskCenter.vue", import.meta.url),
+        "utf8"
+    );
+
+    assert.match(component, /:global\(\.el-dialog\.microi-notification-dialog\)\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*column;/);
+    assert.match(component, /:global\(\.el-dialog\.microi-notification-dialog > \.el-dialog__body\)\s*\{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?overflow-y:\s*auto;[\s\S]*?scrollbar-gutter:\s*stable;/);
+});

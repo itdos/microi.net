@@ -1870,6 +1870,15 @@ export class MicroiClient {
             ...data,
         });
     }
+    async clearApplicationSource(data) {
+        return this.post(API.CLEAR_APPLICATION_SOURCE, {
+            OsClient: this.config.osClient,
+            ...data,
+        }, {
+            timeoutMs: 10 * 60_000,
+            operationName: 'clear application source',
+        });
+    }
     async publishMicroService(data) {
         return this.post(API.PUBLISH_MICRO_SERVICE, {
             OsClient: this.config.osClient,
@@ -2142,6 +2151,24 @@ export class MicroiClient {
             OsClient: this.config.osClient,
             ApiEngineKeys: apiEngineKeys,
             AllowAnonymous: allowAnonymous,
+        });
+    }
+    async setEngineRoles(data) {
+        return this.post(API.SET_ENGINE_ROLES, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async generateMiniMaxMusic(data) {
+        return this.post(API.GENERATE_MINIMAX_MUSIC, data, {
+            timeoutMs: 10 * 60_000,
+            operationName: 'generate MiniMax music',
+        });
+    }
+    async generateMiniMaxSpeech(data) {
+        return this.post(API.GENERATE_MINIMAX_SPEECH, data, {
+            timeoutMs: 10 * 60_000,
+            operationName: 'generate MiniMax speech',
         });
     }
     async createModule(data) {

@@ -13,6 +13,8 @@ export const API = {
     // 服务器状态
     GET_STATUS: '/api/V8Engine/GetStatus',
     AI_CHAT: '/api/Ai/Chat',
+    GENERATE_MINIMAX_MUSIC: '/api/Ai/GenerateMiniMaxMusic',
+    GENERATE_MINIMAX_SPEECH: '/api/Ai/GenerateMiniMaxSpeech',
     OCR_RECOGNIZE: '/apiengine/platform-ocr-recognize',
     TRANSLATE_TEXT: '/apiengine/platform-translate-runtime',
     TRANSLATE_DETECT: '/apiengine/platform-translate-runtime',
@@ -65,6 +67,7 @@ export const API = {
     GET_MICRO_SERVICE: '/api/V8Engine/GetMicroService',
     CREATE_MICRO_SERVICE: '/api/V8Engine/CreateMicroService',
     SYNC_MICRO_SERVICE_SOURCE: '/api/V8Engine/SyncMicroServiceSource',
+    CLEAR_APPLICATION_SOURCE: '/api/V8Engine/ClearApplicationSource',
     PUBLISH_MICRO_SERVICE: '/api/V8Engine/PublishMicroService',
     // V8 事件
     GET_EVENT_LIST: '/api/V8Engine/GetV8EventList',
@@ -84,6 +87,7 @@ export const API = {
     UPDATE_TABLE: '/api/V8Engine/UpdateTable',
     REFRESH_SCHEMA_CACHE: '/api/V8Engine/RefreshSchemaCache',
     SET_ENGINE_ANONYMOUS: '/api/V8Engine/SetEngineAnonymous',
+    SET_ENGINE_ROLES: '/api/V8Engine/SetEngineRoles',
     CREATE_MODULE: '/api/V8Engine/CreateModule',
     SET_ROLE_PERMISSION: '/api/V8Engine/SetRolePermission',
     LIST_ROLES: '/api/V8Engine/ListRoles',

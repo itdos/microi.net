@@ -39,6 +39,81 @@ namespace Microi.net
                    + $"Bucket={bucketName}；Object={objectKey}；原始错误={original}；解决方案={solution}";
         }
 
+        private static bool IsRetryableObjectExistFailure(Exception exception)
+        {
+            if (exception is OperationCanceledException)
+            {
+                return false;
+            }
+
+            var message = exception?.GetBaseException()?.Message ?? exception?.Message ?? "";
+            return message.IndexOf("403", StringComparison.OrdinalIgnoreCase) < 0
+                   && message.IndexOf("Forbidden", StringComparison.OrdinalIgnoreCase) < 0
+                   && message.IndexOf("AccessDenied", StringComparison.OrdinalIgnoreCase) < 0
+                   && message.IndexOf("Access Denied", StringComparison.OrdinalIgnoreCase) < 0;
+        }
+
+        private static ClientConfiguration CreateObjectExistClientConfiguration(bool privateBucket)
+        {
+            return new ClientConfiguration
+            {
+                // ObjectExist is part of the immutable application-release
+                // verification path. A five-second public-bucket timeout made
+                // one transient network hiccup abort the whole promotion.
+                ConnectionTimeout = privateBucket ? 30000 : 15000,
+                MaxErrorRetry = 3
+            };
+        }
+
+        private static async Task<bool> DoesObjectExistWithRetryAsync(
+            Func<OssClient> clientFactory,
+            string bucketName,
+            string objectKey,
+            CancellationToken cancellationToken)
+        {
+            const int maxAttempts = 4;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    return clientFactory().DoesObjectExist(bucketName, objectKey);
+                }
+                catch (Exception ex) when (
+                    attempt < maxAttempts
+                    && IsRetryableObjectExistFailure(ex))
+                {
+                    await Task.Delay(250 * attempt, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            throw new InvalidOperationException("阿里云 OSS 对象存在性检查重试耗尽。");
+        }
+
+        private static async Task ExecuteOssOperationWithRetryAsync(
+            Action operation,
+            CancellationToken cancellationToken)
+        {
+            const int maxAttempts = 4;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    operation();
+                    return;
+                }
+                catch (Exception ex) when (
+                    attempt < maxAttempts
+                    && IsRetryableObjectExistFailure(ex))
+                {
+                    await Task.Delay(250 * attempt, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            throw new InvalidOperationException("阿里云 OSS 操作重试耗尽。");
+        }
+
         /// <summary>
         /// 判断是否存在此文件。传入ClientModel、Limit、FileFullPath
         /// 注意，当Limit为false时，也要判断为true时是否存在，因为原图要在私有oss存1次，原图不存公有。
@@ -51,51 +126,47 @@ namespace Microi.net
             {
                 var bucketName = "";
                 var clientModel = param.ClientModel;
-                OssClient ossClient = null;
+                var objectKey = param.FileFullPath.DosTrimStart('/');
                 //如果是直接判断私有OSS
                 if (param.Limit == true)
                 {
                     bucketName = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
-                    var config = new ClientConfiguration
-                    {
-                        ConnectionTimeout = 30000, // 连接超时：30秒
-                        MaxErrorRetry = 2 // 最大重试次数
-                    };
-                    ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
-                                        clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
-                                        clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
-                                        config);
-                    var objectExist = ossClient.DoesObjectExist(bucketName, param.FileFullPath.DosTrimStart('/'));
+                    var objectExist = await DoesObjectExistWithRetryAsync(
+                        () => new OssClient(
+                            clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
+                            clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
+                            clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
+                            CreateObjectExistClientConfiguration(true)),
+                        bucketName,
+                        objectKey,
+                        param.CancellationToken).ConfigureAwait(false);
                     return new DosResult<bool>(1, objectExist);
                 }
                 else//如果是判断公有OSS
                 {
                     bucketName = clientModel.OsClientModel["AliOssPublicBucketName"].Val<string>();
-                    var config = new ClientConfiguration
-                    {
-                        ConnectionTimeout = 5000,
-                        MaxErrorRetry = 2
-                    };
-                    ossClient = new OssClient(clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>(),
-                                        clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>(),
-                                        clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>(),
-                                        config);
-                    var objectExist = ossClient.DoesObjectExist(bucketName, param.FileFullPath.DosTrimStart('/'));
+                    var objectExist = await DoesObjectExistWithRetryAsync(
+                        () => new OssClient(
+                            clientModel.OsClientModel["AliOssPublicEndpoint"].Val<string>(),
+                            clientModel.OsClientModel["AliOssPublicAccessKeyId"].Val<string>(),
+                            clientModel.OsClientModel["AliOssPublicAccessKeySecret"].Val<string>(),
+                            CreateObjectExistClientConfiguration(false)),
+                        bucketName,
+                        objectKey,
+                        param.CancellationToken).ConfigureAwait(false);
                     //注意：当不公有OSS不存在文件时，同样也要判断私有OSS是否存在，因为原图是在私有oss存储，并不不存存公有OSS。
                     if (!objectExist)
                     {
                         bucketName = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
-                        ossClient = null;
-                        var configPrivate = new ClientConfiguration
-                        {
-                            ConnectionTimeout = 30000, // 连接超时：30秒
-                            MaxErrorRetry = 2 // 最大重试次数
-                        };
-                        ossClient = new OssClient(clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
-                                            clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
-                                            clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
-                                            configPrivate);
-                        objectExist = ossClient.DoesObjectExist(bucketName, param.FileFullPath.DosTrimStart('/'));
+                        objectExist = await DoesObjectExistWithRetryAsync(
+                            () => new OssClient(
+                                clientModel.OsClientModel["AliOssPrivateEndpoint"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeyId"].Val<string>(),
+                                clientModel.OsClientModel["AliOssPrivateAccessKeySecret"].Val<string>(),
+                                CreateObjectExistClientConfiguration(true)),
+                            bucketName,
+                            objectKey,
+                            param.CancellationToken).ConfigureAwait(false);
                     }
                     return new DosResult<bool>(1, objectExist);
                 }
@@ -866,14 +937,25 @@ namespace Microi.net
                         for (int i = 0; i < allKeys.Count; i += 1000)
                         {
                             var batch = allKeys.Skip(i).Take(1000).ToList();
-                            var deleteRequest = new DeleteObjectsRequest(bucketName, batch, false);
-                            ossClient.DeleteObjects(deleteRequest);
+                            await ExecuteOssOperationWithRetryAsync(
+                                () =>
+                                {
+                                    var deleteClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
+                                    deleteClient.DeleteObjects(new DeleteObjectsRequest(bucketName, batch, false));
+                                },
+                                param.CancellationToken).ConfigureAwait(false);
                         }
                     }
                 }
                 else
                 {
-                    ossClient.DeleteObject(bucketName, objectKey);
+                    await ExecuteOssOperationWithRetryAsync(
+                        () =>
+                        {
+                            var deleteClient = new OssClient(endpoint, accessKeyId, accessKeySecret, config);
+                            deleteClient.DeleteObject(bucketName, objectKey);
+                        },
+                        param.CancellationToken).ConfigureAwait(false);
                 }
 
                 return new DosResult(1);

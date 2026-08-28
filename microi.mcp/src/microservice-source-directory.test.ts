@@ -17,11 +17,13 @@ test('local source directory keeps one large source file intact and excludes gen
     fs.mkdirSync(path.join(directory, 'src'), { recursive: true });
     fs.mkdirSync(path.join(directory, 'node_modules', 'demo'), { recursive: true });
     fs.mkdirSync(path.join(directory, 'dist', 'assets'), { recursive: true });
+    fs.mkdirSync(path.join(directory, '.tmp', 'qa'), { recursive: true });
     fs.writeFileSync(path.join(directory, 'src', 'ReportWorkPage.vue'), '界'.repeat(48 * 1024), 'utf8');
     fs.writeFileSync(path.join(directory, 'src', 'microi.v8.js'), 'x'.repeat(93 * 1024), 'utf8');
     fs.writeFileSync(path.join(directory, 'package.json'), '{"private":true}\n', 'utf8');
     fs.writeFileSync(path.join(directory, 'node_modules', 'demo', 'index.js'), 'dependency', 'utf8');
     fs.writeFileSync(path.join(directory, 'dist', 'assets', 'index.js'), 'build', 'utf8');
+    fs.writeFileSync(path.join(directory, '.tmp', 'qa', 'empty.log'), '', 'utf8');
 
     const manifest = await buildLocalMicroServiceSourceManifest(directory);
     assert.deepEqual(
@@ -30,7 +32,7 @@ test('local source directory keeps one large source file intact and excludes gen
     );
     assert.equal(manifest.files.find(file => file.relativePath === 'src/microi.v8.js')?.size, 93 * 1024);
     assert.equal(manifest.files.some(file => file.relativePath.includes('.sync-seg-')), false);
-    assert.deepEqual(manifest.skippedDirectories.sort(), ['dist', 'node_modules']);
+    assert.deepEqual(manifest.skippedDirectories.sort(), ['.tmp', 'dist', 'node_modules']);
     assert.match(manifest.manifestHash, /^[a-f0-9]{64}$/u);
   });
 });

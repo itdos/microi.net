@@ -26,6 +26,9 @@ namespace Microi.net
     /// </summary>
     public static class MiniMaxMusicSupport
     {
+        public const string PrimaryModel = "music-2.6";
+        public const string FreeTierFallbackModel = "music-2.6-free";
+
         public static bool LooksLikeMusicGeneration(string value)
         {
             var text = CollapseWhitespace(value);
@@ -72,8 +75,8 @@ namespace Microi.net
                 error = "当前安全原子能力只允许生成无人声纯音乐；带歌词歌曲需要独立版权审核流程。";
                 return false;
             }
-            var model = (param.Model ?? "music-2.6").Trim().ToLowerInvariant();
-            if (model != "music-2.6")
+            var model = (param.Model ?? PrimaryModel).Trim().ToLowerInvariant();
+            if (model != PrimaryModel)
             {
                 error = "当前 MiniMax 官方音乐生成只允许 music-2.6。";
                 return false;
@@ -120,6 +123,30 @@ namespace Microi.net
                 Fingerprint = Sha256(body)
             };
             return true;
+        }
+
+        /// <summary>
+        /// MiniMax 对部分新账号会用 HTTP 410 明确拒绝正式 music-2.6，官方文档同时
+        /// 提供 music-2.6-free。只有收到这一确定、未生成音乐的响应时才允许在同一
+        /// 幂等请求内降级；超时、5xx、额度不足等不确定或计费相关错误一律不重试。
+        /// </summary>
+        public static bool ShouldUseFreeTierFallback(int statusCode, string responseBody)
+        {
+            if (statusCode != 410) return false;
+            var body = (responseBody ?? string.Empty).ToLowerInvariant();
+            return body.Contains("music api is no longer available to new users")
+                || body.Contains("no longer available to new users");
+        }
+
+        public static string BuildFreeTierFallbackBody(string primaryRequestBody)
+        {
+            var body = JObject.Parse(primaryRequestBody ?? "{}");
+            if (!string.Equals(body["model"]?.ToString(), PrimaryModel, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("只有标准 music-2.6 请求可以构造免费模型降级。 ");
+            }
+            body["model"] = FreeTierFallbackModel;
+            return body.ToString(Formatting.None);
         }
 
         public static string BuildIdempotencyKey(string osClient, string userId, string requestId)

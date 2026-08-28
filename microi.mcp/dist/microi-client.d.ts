@@ -621,6 +621,7 @@ export declare class MicroiClient {
     getApplicationFile(data: Record<string, unknown>): Promise<ApiResponse>;
     createMicroService(data: Record<string, unknown>): Promise<ApiResponse>;
     syncMicroServiceSource(data: Record<string, unknown>): Promise<ApiResponse>;
+    clearApplicationSource(data: Record<string, unknown>): Promise<ApiResponse>;
     publishMicroService(data: Record<string, unknown>): Promise<ApiResponse>;
     probeMicroAppEntry(msKey: string): Promise<{
         ok: boolean;
@@ -697,6 +698,9 @@ export declare class MicroiClient {
     updateTable(patch: Record<string, unknown>): Promise<ApiResponse>;
     refreshSchemaCache(tables: string[]): Promise<ApiResponse>;
     setEngineAnonymous(apiEngineKeys: string[], allowAnonymous?: number): Promise<ApiResponse>;
+    setEngineRoles(data: Record<string, unknown>): Promise<ApiResponse>;
+    generateMiniMaxMusic(data: Record<string, unknown>): Promise<ApiResponse>;
+    generateMiniMaxSpeech(data: Record<string, unknown>): Promise<ApiResponse>;
     createModule(data: {
         Name: string;
         DiyTableId?: string;

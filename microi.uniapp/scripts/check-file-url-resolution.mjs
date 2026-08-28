@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { createMicroiV8 } from '../src/utils/microi.v8.js'
+import { createMicroiV8 as createStandardMicroiV8 } from '../../microi.skills/microi.v8.js'
 
 const durablePath = '/xjy/native/diy_follow/GenjinZP/photo.jpg'
 const expiredUrl = 'https://files.example.test/photo.jpg?expires=1&signature=expired'
@@ -77,5 +78,34 @@ assert.equal(
   expiredUrl,
   'legacy URL-only upload values must remain compatible'
 )
+
+for (const [name, createClient] of [
+  ['project SDK', createMicroiV8],
+  ['standard SDK', createStandardMicroiV8]
+]) {
+  const client = createClient({
+    apiBase: 'https://api.example.test',
+    fileServer: 'https://files.example.test'
+  })
+  assert.equal(client.assetUrl('https://cdn.example.test/a.png'), 'https://cdn.example.test/a.png', `${name}: absolute string`)
+  assert.equal(client.assetUrl('/tenant/a.png'), 'https://files.example.test/tenant/a.png', `${name}: relative string`)
+  assert.equal(client.assetUrl({ FilePathName: '/tenant/b.png' }), 'https://files.example.test/tenant/b.png', `${name}: single object`)
+  assert.equal(client.assetUrl([{ Name: 'empty' }, { Src: '/tenant/c.png' }]), 'https://files.example.test/tenant/c.png', `${name}: array`)
+  assert.equal(client.assetUrl(JSON.stringify({ href: '/tenant/d.png' })), 'https://files.example.test/tenant/d.png', `${name}: JSON object`)
+  const multiValue = [{ Path: '/tenant/e.png', Name: 'e.png', Size: 12 }, { url: 'https://cdn.example.test/f.png', Id: 'file-f' }]
+  assert.deepEqual(client.normalizeUploadValue(JSON.stringify(multiValue)), [
+    '/tenant/e.png',
+    'https://cdn.example.test/f.png'
+  ], `${name}: JSON array keeps order`)
+  assert.deepEqual(client.normalizeUploadEntries(JSON.stringify(multiValue)), [
+    { item: multiValue[0], path: '/tenant/e.png' },
+    { item: multiValue[1], path: 'https://cdn.example.test/f.png' }
+  ], `${name}: normalized entries keep upload metadata`)
+  assert.equal(
+    client.assetUrl('/micro-app/v3/tenants/itdos/kinds/runtime/apps/demo/assets/cover.png'),
+    'https://api.example.test/micro-app/v3/tenants/itdos/kinds/runtime/apps/demo/assets/cover.png',
+    `${name}: v3 dynamic route must use API base`
+  )
+}
 
 console.log('File URL resolution checks passed.')

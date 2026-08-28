@@ -189,6 +189,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vitepress'
 import { resolveApplicationExperienceUrl } from '../utils/app-preview-url.js'
 import { OFFICIAL_MICROI_API_BASE } from '../utils/site-api-base.js'
+import { resolveUploadedResourceUrl } from '../utils/upload-resource-url.js'
 import { buildMarketplaceHref, readMarketplaceState } from '../utils/marketplace-query-state.js'
 import {
   buildSiteSessionHeaders,
@@ -312,37 +313,12 @@ function plainText(value) {
     .trim()
 }
 
-function normalizeUploadValue(value, depth = 0) {
-  if (depth > 5 || value === null || value === undefined) return ''
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const path = normalizeUploadValue(item, depth + 1)
-      if (path) return path
-    }
-    return ''
-  }
-  if (typeof value === 'object') {
-    for (const key of ['Path', 'FilePathName', 'FullPath', 'Url', 'url', 'src']) {
-      const path = normalizeUploadValue(value[key], depth + 1)
-      if (path) return path
-    }
-    return ''
-  }
-  const source = String(value).trim()
-  if (!source) return ''
-  if (/^[{[]/.test(source)) {
-    try { return normalizeUploadValue(JSON.parse(source), depth + 1) } catch (_) { return source }
-  }
-  return source.replace(/^['"]|['"]$/g, '')
-}
-
 function resolveAssetUrl(value) {
-  const path = normalizeUploadValue(value)
-  if (!path) return ''
-  if (/^(https?:|data:|blob:)/i.test(path)) return path
-  if (path.startsWith('/file/')) return `${API_BASE.replace(/\/+$/, '')}${path}`
-  const server = fileServer.value.replace(/\/+$/, '')
-  return server ? `${server}/${path.replace(/^\/+/, '')}` : path
+  return resolveUploadedResourceUrl(value, {
+    apiBase: API_BASE,
+    baseUrl: typeof window === 'undefined' ? 'https://microi.net' : window.location.origin,
+    fileServer: fileServer.value
+  })
 }
 
 function normalizeApp(app) {
@@ -359,7 +335,9 @@ function normalizeApp(app) {
     ApplicationType: String(app.ApplicationType || app.AppType || 'Platform'),
     ExperienceUrl: resolveApplicationExperienceUrl(app, typeof window === 'undefined' ? undefined : window, {
       baseUrl: typeof window === 'undefined' ? 'https://microi.net' : window.location.origin,
-      fileServer: fileServer.value
+      apiBase: API_BASE,
+      fileServer: fileServer.value,
+      osClient: OS_CLIENT
     }),
     Name: name,
     Description: plainText(app.Description) || '基于 Microi吾码 构建的 AI 应用。',

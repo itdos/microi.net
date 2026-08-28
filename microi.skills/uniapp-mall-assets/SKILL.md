@@ -11,13 +11,25 @@ description: Microi UniApp、H5、商城与 PC 页面中的上传图片、附件
 
 ## 先识别资源类型
 
-Microi 上传字段通常保存对象存储 Key 或相对路径，例如 `/demo/product/20260101/p1.jpg`。页面不能把相对路径直接交给 `<image>` / `<img>`，也不能一律拼接 API Base。
+Microi 上传字段存在四种必须长期兼容的存储形态，不能假设字段一定是字符串：
+
+| 存储形态 | 示例 | 兼容要求 |
+|---|---|---|
+| 旧版绝对地址字符串 | `https://cdn.example.com/a.png` | 校验协议和允许域名后原样使用，禁止再次拼接 `FileServer` |
+| 旧版相对路径字符串 | `/tenant/a.png` | 仅此类纯相对对象 Key 拼接当前租户 `FileServer` |
+| 新版单图对象 | `{ FilePathName:'/tenant/a.png', Name:'a.png' }` | 提取路径字段；保留对象的名称、大小、Id 等元数据，不得把整个对象转成字符串 |
+| 新版多图数组 | `[{ FilePathName:'/tenant/a.png' }, ...]` | 逐项解析并保持原顺序；单图展示取第一个有效路径，多图展示返回全部有效项 |
+
+数据库或接口还可能返回上述对象/数组的 JSON 字符串，解析器也必须兼容。标准路径键按以下顺序识别：`Url`、`FileUrl`、`FileURL`、`PreviewUrl`、`PreviewURL`、`FullUrl`、`Path`、`FilePathName`、`FilePath`、`FullPath`、`Src`、`Href`，并兼容相应 camelCase 键。
+
+页面不能把相对路径直接交给 `<image>` / `<img>`，也不能一律拼接 API Base。项目已使用 `microi.v8.js` 时，优先直接复用 `V8.extractUploadPath`、返回路径数组的 `V8.normalizeUploadValue`、保留 `{ item, path }` 元数据的 `V8.normalizeUploadEntries`、`V8.assetUrl` / `V8.resolveAssetUrl` 和 `V8.resolveFileUrl`，不得在业务页面另造一套不完整的解析规则。
 
 | 类型 | 处理方式 |
 |---|---|
 | 已允许的 `https://` 绝对地址 | 校验协议和允许域名后使用 |
 | 公有对象存储相对路径 | 拼接当前租户 `FileServer` |
 | `/file/...` 平台本地文件路由 | 拼接当前 API Base |
+| `/micro-app/v3/...` 应用稳定解析路由 | 拼接当前 API Base；这是动态指针路由，不是 HDFS 对象 Key，禁止拼接 `FileServer` |
 | 私有对象 | 后端鉴权后签发短期 URL，前端只使用临时 URL |
 | `blob:` | 仅用于本页创建且能及时 `revokeObjectURL` 的预览 |
 | `data:` | 仅允许经过大小和 MIME 校验的图片预览；禁止用于富文本任意 HTML |
@@ -26,15 +38,54 @@ Microi 上传字段通常保存对象存储 Key 或相对路径，例如 `/demo/
 
 ## 统一资源解析函数
 
-项目应在共享请求/资源模块中实现一个 `resolveAssetUrl`，所有页面复用同一逻辑：
+未使用 `microi.v8.js` 的项目，应在共享请求/资源模块中实现等价的“提取上传路径 + 解析资源 URL”两层函数，所有页面复用同一逻辑：
 
 ```js
+const uploadPathKeys = [
+  'Url', 'FileUrl', 'FileURL', 'PreviewUrl', 'PreviewURL', 'FullUrl',
+  'Path', 'FilePathName', 'FilePath', 'FullPath', 'Src', 'Href',
+  'url', 'fileUrl', 'previewUrl', 'fullUrl', 'path', 'filePathName', 'filePath', 'fullPath', 'src', 'href'
+];
+
+export function extractUploadPath(raw, depth = 0) {
+  if (depth > 4 || raw === null || raw === undefined) return '';
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const path = extractUploadPath(item, depth + 1);
+      if (path) return path;
+    }
+    return '';
+  }
+  if (typeof raw === 'object') {
+    for (const key of uploadPathKeys) {
+      const path = extractUploadPath(raw[key], depth + 1);
+      if (path) return path;
+    }
+    return '';
+  }
+  const value = String(raw).trim();
+  if (!value) return '';
+  if (/^[{[]/.test(value)) {
+    try { return extractUploadPath(JSON.parse(value), depth + 1); } catch (_) {}
+  }
+  return value;
+}
+
+export function normalizeUploadValue(raw) {
+  let value = raw;
+  if (typeof value === 'string' && /^[{[]/.test(value.trim())) {
+    try { value = JSON.parse(value); } catch (_) {}
+  }
+  const items = Array.isArray(value) ? value : [value];
+  return items.map(item => ({ item, path: extractUploadPath(item) })).filter(entry => entry.path);
+}
+
 export function resolveAssetUrl(raw, {
   apiBase,
   fileServer,
   allowedHosts = []
 }) {
-  const value = String(raw || '').trim();
+  const value = extractUploadPath(raw);
   if (!value) return '';
 
   if (/^https:\/\//i.test(value)) {
@@ -44,6 +95,9 @@ export function resolveAssetUrl(raw, {
   if (/^blob:/i.test(value)) return value;
   if (/^data:image\/(png|jpeg|gif|webp);base64,/i.test(value)) return value;
   if (value.startsWith('/file/')) return `${apiBase.replace(/\/$/, '')}${value}`;
+  if (/^\/?micro-app\/v3(?:\/|$)/i.test(value)) {
+    return `${apiBase.replace(/\/$/, '')}/${value.replace(/^\/+/, '')}`;
+  }
 
   const relative = value.replace(/^\/+/, '');
   return `${fileServer.replace(/\/$/, '')}/${relative}`;
@@ -103,7 +157,9 @@ function imageUrl(path) {
 
 ## 验收清单
 
-- [ ] 公有对象、本地文件、私有对象、绝对 URL 的路径分支均有测试
+- [ ] 公有对象、本地文件、`/micro-app/v3` 动态路由、私有对象、绝对 URL 的路径分支均有测试
+- [ ] 绝对地址字符串、相对路径字符串、单图对象、多图数组及其 JSON 字符串均有测试
+- [ ] 单图从数组取第一个有效路径，多图保持原顺序；解析 URL 时不丢失或改写上传对象元数据
 - [ ] 切换两个 `OsClient` 后使用各自 `FileServer`，无跨租户路径或缓存复用
 - [ ] 私有 URL 越权、过期、篡改签名和复制到其它账号均失败
 - [ ] 网络面板中没有硬编码客户域名、真实租户或永久签名 URL

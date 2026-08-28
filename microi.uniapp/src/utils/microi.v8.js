@@ -172,43 +172,60 @@ function deserializeUser(value) {
   return parseMaybeJson(value, null);
 }
 
-// 吾码文件字段可能来自上传控件、HDFS 接口、字符串或 JSON 字符串，这里统一抽取可用路径。
-function extractUploadPath(value) {
-  if (!value) return '';
+const uploadPathKeys = [
+  // Path/FilePathName are the durable value stored by the upload field. Url/PreviewUrl
+  // may be a short-lived private-file signature and must never prevent re-signing.
+  'Path', 'FilePathName', 'FilePath', 'FullPath',
+  'Url', 'FileUrl', 'FileURL', 'PreviewUrl', 'PreviewURL', 'FullUrl', 'Src', 'Href',
+  'path', 'filePathName', 'filePath', 'fullPath',
+  'url', 'fileUrl', 'previewUrl', 'fullUrl', 'src', 'href'
+];
+
+// 吾码文件字段可能是旧版绝对/相对字符串、新版单图对象、多图数组，
+// 也可能是上述结构序列化后的 JSON 字符串；这里统一抽取第一个有效路径。
+function extractUploadPath(value, depth = 0) {
+  if (depth > 6 || value === null || value === undefined) return '';
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const path = extractUploadPath(item, depth + 1);
+      if (path) return path;
+    }
+    return '';
+  }
   if (typeof value === 'object') {
-    const raw = Array.isArray(value) ? (value[0] || {}) : value;
-    if (typeof raw === 'string') return extractUploadPath(raw);
-    // Path/FilePathName are the durable value stored by the upload field. Url/PreviewUrl
-    // may be a short-lived private-file signature and must never prevent re-signing.
-    return raw.Path || raw.FilePathName || raw.FilePath || raw.FullPath ||
-      raw.Url || raw.FileUrl || raw.FileURL || raw.PreviewUrl || raw.PreviewURL || raw.FullUrl || '';
+    for (const key of uploadPathKeys) {
+      const path = extractUploadPath(value[key], depth + 1);
+      if (path) return path;
+    }
+    return '';
   }
 
   const text = String(value || '').trim();
   if (!text) return '';
   if ((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))) {
-    return extractUploadPath(parseMaybeJson(text, text));
+    return extractUploadPath(parseMaybeJson(text, text), depth + 1);
   }
   return text;
 }
 
-function normalizeUploadValue(value) {
+function normalizeUploadEntries(value) {
   if (!value) return [];
-  if (Array.isArray(value)) return value.map(extractUploadPath).filter(Boolean);
-  if (typeof value === 'object') {
-    const path = extractUploadPath(value);
-    return path ? [path] : [];
+  let parsed = value;
+  if (typeof parsed === 'string') {
+    const text = parsed.trim();
+    if (!text) return [];
+    if ((text.startsWith('[') && text.endsWith(']')) || (text.startsWith('{') && text.endsWith('}'))) {
+      parsed = parseMaybeJson(text, text);
+    }
   }
+  const items = Array.isArray(parsed) ? parsed : [parsed];
+  return items.map((item) => ({ item, path: extractUploadPath(item) })).filter((entry) => entry.path);
+}
 
-  const text = String(value || '').trim();
-  if (!text) return [];
-  if ((text.startsWith('[') && text.endsWith(']')) || (text.startsWith('{') && text.endsWith('}'))) {
-    const parsed = parseMaybeJson(text, null);
-    if (Array.isArray(parsed)) return parsed.map(extractUploadPath).filter(Boolean);
-    const path = extractUploadPath(parsed);
-    return path ? [path] : [];
-  }
-  return [text];
+// 旧调用方依赖路径数组，继续保持返回类型；需要 Name/Size/Id 等元数据时
+// 使用 normalizeUploadEntries，禁止把上传对象 String(...) 后再解析。
+function normalizeUploadValue(value) {
+  return normalizeUploadEntries(value).map((entry) => entry.path);
 }
 
 function normalizeUploadData(body) {
@@ -996,7 +1013,9 @@ export function createMicroiV8(options = {}) {
     if (!picked || isBlockedAsset(picked)) return '';
     if (/^(https?:|data:|blob:|file:)/i.test(picked)) return picked;
     if (isLocalPackagedAsset(picked)) return picked;
-    if (/^\/?file\//i.test(picked)) return joinUrl(config.apiBase, picked);
+    if (/^\/?file\//i.test(picked) || /^\/?micro-app\/v3(?:\/|$)/i.test(picked)) {
+      return joinUrl(config.apiBase, picked);
+    }
     if (/^\//.test(picked) || /^[a-z0-9_-]+\//i.test(picked)) return joinUrl(config.fileServer || config.apiBase, picked);
     return picked;
   }
@@ -1960,6 +1979,7 @@ export function createMicroiV8(options = {}) {
     isBlockedAsset,
     extractUploadPath,
     normalizeUploadValue,
+    normalizeUploadEntries,
     uploadFile,
     uploadFiles,
     waitForContentSecurity,

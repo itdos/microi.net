@@ -26,6 +26,73 @@ test('uses the stable latest entry and removes runtime/cache query parameters', 
   )
 })
 
+test('repairs the legacy toolbox root that omitted the tenant and index file', () => {
+  const actual = resolveApplicationExperienceUrl({
+    AppKey: 'microi-developer-toolbox',
+    ApplicationType: 'Web',
+    PreviewUrl: 'https://static.itdos.com/ai-app-publish/microi-developer-toolbox/'
+  }, desktopWindow, {
+    fileServer: 'https://static.itdos.com',
+    osClient: 'iTdos'
+  })
+
+  assert.equal(
+    actual,
+    'https://static.itdos.com/itdos/ai-app-publish/microi-developer-toolbox/index.html'
+  )
+})
+
+test('accepts all Microi upload field shapes when resolving an application preview', () => {
+  const expected = 'https://static.itdos.com/itdos/ai-app-publish/four-shapes/index.html'
+  const previewValues = [
+    expected,
+    '/itdos/ai-app-publish/four-shapes/index.html',
+    { FileUrl: '/itdos/ai-app-publish/four-shapes/index.html', Name: '入口', Size: 1024 },
+    [
+      { FilePathName: '', Name: '空记录' },
+      { PreviewUrl: '/itdos/ai-app-publish/four-shapes/index.html', Name: '首个有效入口' }
+    ]
+  ]
+
+  for (const PreviewUrl of previewValues) {
+    assert.equal(resolveApplicationExperienceUrl({
+      AppKey: 'four-shapes',
+      ApplicationType: 'Web',
+      PreviewUrl
+    }, desktopWindow, {
+      fileServer: 'https://static.itdos.com',
+      osClient: 'iTdos'
+    }), expected)
+  }
+})
+
+test('accepts JSON-serialized upload objects and arrays without stringifying metadata', () => {
+  assert.equal(resolveStableApplicationEntry({
+    AppKey: 'json-shape',
+    PreviewUrl: JSON.stringify([
+      { Name: '没有路径的元数据' },
+      { FullPath: '/itdos/ai-app-publish/json-shape/index.html', Size: 2048 }
+    ])
+  }, 'https://microi.net', {
+    fileServer: 'https://static.itdos.com',
+    osClient: 'iTdos'
+  }), 'https://static.itdos.com/itdos/ai-app-publish/json-shape/index.html')
+})
+
+test('routes protocol v3 stable application paths through the API instead of HDFS FileServer', () => {
+  assert.equal(resolveStableApplicationEntry({
+    AppKey: 'ocean-fishing-unity',
+    PublicPublishPath: [{
+      Path: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/ocean-fishing-unity/assets/index.html',
+      Name: '服务端稳定入口'
+    }]
+  }, 'https://microi.net', {
+    apiBase: 'https://api.itdos.com',
+    fileServer: 'https://static.itdos.com',
+    osClient: 'iTdos'
+  }), 'https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/ocean-fishing-unity/assets/index.html')
+})
+
 test('keeps unrelated query parameters while normalizing the latest entry', () => {
   assert.equal(
     withPreviewVersion('/itdos/ai-app-publish/demo/versions/2.4.1/index.html?mode=share', {}, 'https://static.itdos.com'),

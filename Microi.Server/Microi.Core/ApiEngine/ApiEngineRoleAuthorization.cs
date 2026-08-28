@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.net
@@ -11,6 +12,12 @@ namespace Microi.net
     /// </summary>
     public static class ApiEngineRoleAuthorization
     {
+        /// <summary>
+        /// Portable API-role marker for endpoints that deliberately allow every
+        /// authenticated tenant user. It is resolved only from the authoritative
+        /// sys_apiengine policy; clients cannot opt themselves into this role.
+        /// </summary>
+        public const string AuthenticatedRoleId = "$authenticated";
         public const string BackgroundAuthorizationMarker = "_RequireApiRoleAuthorization";
         public const string OnlyGetDeniedMessage = "该账户角色拥有【仅查询】权限！";
 
@@ -63,9 +70,37 @@ namespace Microi.net
                     true);
             }
 
-            return allowedRoleIds.Overlaps(userRoleIds)
+            return allowedRoleIds.Contains(AuthenticatedRoleId)
+                || allowedRoleIds.Overlaps(userRoleIds)
                 ? ApiEngineRoleAuthorizationResult.Allow(hasOnlyGet, true)
                 : ApiEngineRoleAuthorizationResult.Deny(hasOnlyGet, true, false);
+        }
+
+        /// <summary>
+        /// Adds the portable authenticated marker to a per-invocation clone of
+        /// the server-derived user. The legacy ApiEngine runtime still compares
+        /// concrete RoleIds, so this bridge lets old and new executors honor the
+        /// same policy without mutating the cached login identity.
+        /// </summary>
+        public static JObject AddAuthenticatedVirtualRole(
+            JObject currentUser,
+            string configuredApiRoles)
+        {
+            if (currentUser == null) return null;
+            if (!TryReadConfiguredRoleIds(
+                    configuredApiRoles,
+                    out var allowedRoleIds,
+                    out var hasExplicitRoles)
+                || !hasExplicitRoles
+                || !allowedRoleIds.Contains(AuthenticatedRoleId))
+            {
+                return currentUser;
+            }
+
+            var clone = (JObject)currentUser.DeepClone();
+            AddVirtualRole(clone, "RoleIds", includeBaseLimit: false);
+            AddVirtualRole(clone, "_Roles", includeBaseLimit: true);
+            return clone;
         }
 
         public static bool HasOnlyGet(JObject currentUser)
@@ -171,6 +206,36 @@ namespace Microi.net
             return roleToken?.Type == JTokenType.Object
                 ? roleToken["Id"]?.ToString()
                 : roleToken?.ToString();
+        }
+
+        private static void AddVirtualRole(
+            JObject currentUser,
+            string fieldName,
+            bool includeBaseLimit)
+        {
+            if (!TryReadArray(currentUser[fieldName], out var roles) || roles == null)
+            {
+                roles = new JArray();
+            }
+            else
+            {
+                roles = (JArray)roles.DeepClone();
+            }
+
+            if (!roles.Any(role => string.Equals(
+                    ReadRoleId(role),
+                    AuthenticatedRoleId,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                var virtualRole = new JObject
+                {
+                    ["Id"] = AuthenticatedRoleId,
+                    ["Name"] = "已登录用户"
+                };
+                if (includeBaseLimit) virtualRole["BaseLimit"] = "[]";
+                roles.Add(virtualRole);
+            }
+            currentUser[fieldName] = roles;
         }
 
         private static bool TryReadStringSet(

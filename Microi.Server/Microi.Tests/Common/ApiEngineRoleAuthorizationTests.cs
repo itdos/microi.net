@@ -42,6 +42,42 @@ public class ApiEngineRoleAuthorizationTests
     }
 
     [Fact]
+    public void AuthenticatedMarker_AllowsOnlyARealServerDerivedUser()
+    {
+        var user = NewUser(PersonalRoleId, onlyGet: true);
+        var policy = new JArray(ApiEngineRoleAuthorization.AuthenticatedRoleId).ToString();
+
+        var result = ApiEngineRoleAuthorization.Evaluate(user, policy);
+        var anonymous = ApiEngineRoleAuthorization.AddAuthenticatedVirtualRole(null, policy);
+
+        Assert.True(result.IsAllowed);
+        Assert.True(result.HasOnlyGet);
+        Assert.True(result.HasExplicitRoles);
+        Assert.Null(anonymous);
+    }
+
+    [Fact]
+    public void AuthenticatedMarker_IsAddedToAnInvocationCloneOnly()
+    {
+        var user = NewUser(PersonalRoleId, onlyGet: true);
+        var policy = new JArray(new JObject
+        {
+            ["Id"] = ApiEngineRoleAuthorization.AuthenticatedRoleId,
+            ["Name"] = "已登录用户"
+        }).ToString();
+
+        var invocationUser = ApiEngineRoleAuthorization.AddAuthenticatedVirtualRole(user, policy);
+
+        Assert.NotSame(user, invocationUser);
+        Assert.DoesNotContain(user["RoleIds"]!, role =>
+            role["Id"]?.ToString() == ApiEngineRoleAuthorization.AuthenticatedRoleId);
+        Assert.Contains(invocationUser["RoleIds"]!, role =>
+            role["Id"]?.ToString() == ApiEngineRoleAuthorization.AuthenticatedRoleId);
+        Assert.Contains(invocationUser["_Roles"]!, role =>
+            role["Id"]?.ToString() == ApiEngineRoleAuthorization.AuthenticatedRoleId);
+    }
+
+    [Fact]
     public void ExplicitRole_UsesExactIdsInsteadOfSubstringMatches()
     {
         var user = NewUser(PersonalRoleId, onlyGet: true);

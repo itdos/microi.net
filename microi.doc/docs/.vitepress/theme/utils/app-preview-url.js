@@ -1,4 +1,5 @@
 import { buildApplicationLaunchUrl } from './uniapp-preview-mode.js'
+import { normalizeUploadPath } from './upload-resource-url.js'
 
 const stableApplicationEntries = Object.freeze({
   // The fixed query key bypasses the one legacy CDN object that cached a
@@ -26,48 +27,48 @@ const immutableReleasePath = /\/(?:releases?|requests?)(?:\/|$)/i
 const immutableVersionPath = /\/versions?(?:\/|$)/i
 const legacyVersionSegment = /\/versions\/v?\d+(?:\.\d+){0,3}(?=\/)/gi
 
-function normalizeUrlValue(value, depth = 0) {
-  if (depth > 4 || value === null || value === undefined) return ''
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const normalized = normalizeUrlValue(item, depth + 1)
-      if (normalized) return normalized
-    }
-    return ''
-  }
-  if (typeof value === 'object') {
-    for (const key of ['Url', 'url', 'Href', 'href', 'Path', 'path', 'FilePathName']) {
-      const normalized = normalizeUrlValue(value[key], depth + 1)
-      if (normalized) return normalized
-    }
-    return ''
-  }
-  const source = String(value).trim()
-  if (!source) return ''
-  if (/^[{[]/.test(source)) {
-    try { return normalizeUrlValue(JSON.parse(source), depth + 1) } catch (_) {}
-  }
-  return source.replace(/^['"]|['"]$/g, '')
-}
-
 function applicationUrlCandidates(application) {
   const valuesByKey = new Map(
     Object.keys(application || {}).map(key => [String(key).toLowerCase(), application[key]])
   )
   return experienceUrlFields
-    .map(field => ({ field, value: normalizeUrlValue(valuesByKey.get(field.toLowerCase())) }))
+    .map(field => ({ field, value: normalizeUploadPath(valuesByKey.get(field.toLowerCase())) }))
     .filter(candidate => candidate.value)
 }
 
 function candidateBaseUrl(candidate, baseUrl, runtime) {
   const fileServer = String(runtime?.fileServer || '').trim()
-  if (!fileServer || /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(candidate.value)) return baseUrl
+  if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(candidate.value)) return baseUrl
+  // v3 StableResolverPath 是 API 路由，并不是对象存储中的文件键。
+  if (/^\/?micro-app\/v3(?:\/|$)/i.test(candidate.value)) {
+    return `${String(runtime?.apiBase || baseUrl).replace(/\/+$/, '')}/`
+  }
+  if (!fileServer) return baseUrl
   const isPublishedAsset = candidate.field === 'PublicPublishPath'
     || /(?:^|\/)(?:ai-app-publish|micro-app)(?:\/|$)/i.test(candidate.value)
   return isPublishedAsset ? `${fileServer.replace(/\/+$/, '')}/` : baseUrl
 }
 
-function canonicalStableUrl(candidate, baseUrl, runtime) {
+function normalizePublishedWebEntry(url, applicationKey, runtime) {
+  const match = url.pathname.match(/^\/(?:([^/]+)\/)?ai-app-publish\/([^/]+)(?:\/index\.html|\/)?$/i)
+  if (!match) return
+
+  let [, tenant, pathAppKey] = match
+  try {
+    if (applicationKey && decodeURIComponent(pathAppKey).toLowerCase() !== applicationKey) return
+  } catch (_) {
+    return
+  }
+
+  // 早期发布记录可能省略 HDFS 租户目录，并只保存目录 URL；对象存储对
+  // 目录 URL 返回的是默认彩蛋页而不是应用。官网已知当前来源租户，因此
+  // 只对 ai-app-publish 的精确应用根补齐租户段和 index.html。
+  tenant = tenant || String(runtime?.osClient || '').trim().toLowerCase()
+  const tenantPrefix = tenant ? `${encodeURIComponent(tenant)}/` : ''
+  url.pathname = `/${tenantPrefix}ai-app-publish/${pathAppKey}/index.html`
+}
+
+function canonicalStableUrl(candidate, baseUrl, runtime, applicationKey) {
   const value = candidate.value
   let url
   try {
@@ -83,6 +84,7 @@ function canonicalStableUrl(candidate, baseUrl, runtime) {
   // 固定最新版入口是去掉版本段后的同一根目录，可以安全规范化。
   url.pathname = url.pathname.replace(legacyVersionSegment, '')
   if (immutableVersionPath.test(url.pathname)) return ''
+  normalizePublishedWebEntry(url, applicationKey, runtime)
   for (const key of ['v', 'version', 'release', 'request', 'requestId', 'apiBase', 'OsClient', 'osClient']) {
     url.searchParams.delete(key)
   }
@@ -97,7 +99,7 @@ export function resolveStableApplicationEntry(application = {}, baseUrl = 'https
   ).trim().toLowerCase()
   if (stableApplicationEntries[applicationKey]) return stableApplicationEntries[applicationKey]
   for (const candidate of applicationUrlCandidates(application)) {
-    const stableUrl = canonicalStableUrl(candidate, baseUrl, runtime)
+    const stableUrl = canonicalStableUrl(candidate, baseUrl, runtime, applicationKey)
     if (stableUrl) return stableUrl
   }
   return ''

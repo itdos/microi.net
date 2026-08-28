@@ -6356,6 +6356,21 @@ namespace Microi.net
                 ?? applicationType;
         }
 
+        internal static string ResolveMicroServiceSourceCategory(JObject source, JObject existingApp)
+        {
+            var requestedCategory = source?["Category"]?.Val<string>();
+            if (!IsBlank(requestedCategory)) return requestedCategory;
+            return existingApp == null ? "tools" : SafeJString(existingApp, "Category", "tools");
+        }
+
+        internal static string ResolveNewMicroServiceSourcePublicPublishPath(JObject existingApp, string applicationType, string msKey)
+        {
+            if (existingApp != null) return null;
+            return string.Equals(applicationType, "MicroService", StringComparison.OrdinalIgnoreCase)
+                ? $"micro-app/{msKey}/"
+                : $"ai-app-publish/{msKey}/";
+        }
+
         public static async Task<DosResult<object>> SyncMicroServiceSource(string osClient, JObject param, dynamic currentToken)
         {
             try
@@ -6393,7 +6408,7 @@ namespace Microi.net
                     ["AppId"] = msKey,
                     ["AppType"] = applicationType,
                     ["ApplicationType"] = applicationType,
-                    ["Category"] = source?["Category"]?.Val<string>() ?? "tools",
+                    ["Category"] = ResolveMicroServiceSourceCategory((JObject)source, existingApp),
                     ["PublisherType"] = "官方应用",
                     ["Description"] = !IsBlank(requestedDescription) ? requestedDescription : SafeJString(existingApp, "Description"),
                     ["AppDetail"] = !IsBlank(requestedDescription) ? requestedDescription : SafeJString(existingApp, "AppDetail"),
@@ -6401,9 +6416,12 @@ namespace Microi.net
                     // 可用编译产物标成失败。是否重新编译由显式发布动作决定。
                     ["Status"] = existingApp == null ? "Draft" : SafeJString(existingApp, "Status", "Draft"),
                     ["BuildStatus"] = existingApp == null ? "Changed" : SafeJString(existingApp, "BuildStatus", "Changed"),
-                    ["PrivateSourcePath"] = $"ai-app-source/{appId}",
-                    ["PublicPublishPath"] = applicationType == "MicroService" ? $"micro-app/{msKey}/" : $"ai-app-publish/{msKey}/"
+                    ["PrivateSourcePath"] = $"ai-app-source/{appId}"
                 };
+                // 私有源码同步与公开发布是两个独立边界。现有应用的发布目录由显式
+                // 发布动作维护，源码同步不能覆写它，否则会让稳定 v3 入口退回旧目录。
+                var newPublicPublishPath = ResolveNewMicroServiceSourcePublicPublishPath(existingApp, applicationType, msKey);
+                if (!IsBlank(newPublicPublishPath)) appData["PublicPublishPath"] = newPublicPublishPath;
                 try
                 {
                     var currentUser = JObject.FromObject(currentToken.CurrentUser);

@@ -249,7 +249,7 @@ if (replay && replay.Code === 1) {
 
 ```powershell
 $unityExe = Join-Path $env:MICROI_UNITY_EDITOR_ROOT 'Unity.exe'
-$projectPath = Join-Path $env:MICROI_REPOSITORY_ROOT 'AI-Project\microi\Unity'
+$projectPath = Join-Path $env:MICROI_REPOSITORY_ROOT 'Microi-V8-Engine\Microi吾码 (api.itdos.com)\iTdos.Product.Internal\AI应用\microi-unity-taoyuan\unity-project'
 & $unityExe `
   -batchmode -nographics -quit `
   -projectPath $projectPath `

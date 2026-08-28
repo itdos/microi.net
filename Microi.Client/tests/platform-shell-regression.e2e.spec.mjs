@@ -327,6 +327,107 @@ test("通知中心：快速打开80%大圆角可拖动弹层，消息详情保�
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "07-notification-center-dialog.png"), fullPage: false });
 });
 
+test("通知中心：低高度和小分辨率保持右侧滚动并可到达后台任务分页", async ({ page }) => {
+    test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    await openRoute(page, "#/api-engine");
+    await page.setViewportSize({ width: 1366, height: 520 });
+
+    await page.locator(".task-entry").first().click();
+    const dialog = page.locator(".microi-notification-dialog.mci-unified-dialog").last();
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
+    await dialog.getByRole("tab", { name: /后台任务|Background tasks/i }).click();
+
+    const body = dialog.locator(":scope > .el-dialog__body");
+    const pagination = dialog.locator(".task-pagination");
+    await expect(pagination, "本地真实任务数据应渲染分页组件").toHaveCount(1, { timeout: 30_000 });
+
+    const before = await body.evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        scrollTop: element.scrollTop,
+        overflowY: getComputedStyle(element).overflowY,
+        scrollbarGutter: getComputedStyle(element).scrollbarGutter
+    }));
+    expect(["auto", "scroll"], JSON.stringify(before)).toContain(before.overflowY);
+    expect(before.scrollHeight, JSON.stringify(before)).toBeGreaterThan(before.clientHeight);
+    expect(before.scrollbarGutter).toContain("stable");
+
+    await pagination.evaluate((element) => element.scrollIntoView({ block: "end" }));
+    await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    const after = await body.evaluate((element) => {
+        const bodyBox = element.getBoundingClientRect();
+        const paginationBox = element.querySelector(".task-pagination")?.getBoundingClientRect();
+        return {
+            bodyTop: bodyBox.top,
+            bodyBottom: bodyBox.bottom,
+            paginationTop: paginationBox?.top || 0,
+            paginationBottom: paginationBox?.bottom || 0,
+            dialogBottom: element.parentElement?.getBoundingClientRect().bottom || 0,
+            viewportHeight: window.innerHeight
+        };
+    });
+    expect(after.paginationTop, JSON.stringify(after)).toBeGreaterThanOrEqual(after.bodyTop - 1);
+    expect(after.paginationBottom, JSON.stringify(after)).toBeLessThanOrEqual(after.bodyBottom + 1);
+    expect(after.dialogBottom, JSON.stringify(after)).toBeLessThanOrEqual(after.viewportHeight);
+
+    const lowContrast = await pagination.locator(".el-pagination__total, .el-select__selected-item, .el-pager li").evaluateAll((elements) => {
+        const parseColor = (value) => (value.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+        const luminance = (rgb) => {
+            const channels = rgb.map((value) => {
+                const normalized = value / 255;
+                return normalized <= 0.03928 ? normalized / 12.92 : Math.pow((normalized + 0.055) / 1.055, 2.4);
+            });
+            return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+        };
+        const findBackground = (element) => {
+            let current = element;
+            while (current) {
+                const background = getComputedStyle(current).backgroundColor;
+                if (background && background !== "transparent" && background !== "rgba(0, 0, 0, 0)") return background;
+                current = current.parentElement;
+            }
+            return "rgb(255, 255, 255)";
+        };
+        return elements.flatMap((element) => {
+            const text = (element.textContent || "").trim();
+            if (!text || !element.getClientRects().length) return [];
+            const foreground = getComputedStyle(element).color;
+            const background = findBackground(element);
+            const foregroundLuminance = luminance(parseColor(foreground));
+            const backgroundLuminance = luminance(parseColor(background));
+            const ratio = (Math.max(foregroundLuminance, backgroundLuminance) + 0.05)
+                / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+            return ratio < 4.5 ? [{ text, foreground, background, ratio: Number(ratio.toFixed(2)) }] : [];
+        });
+    });
+    expect(lowContrast, JSON.stringify(lowContrast)).toEqual([]);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "07b-notification-center-short-viewport-pagination.png"), fullPage: false });
+
+    await page.setViewportSize({ width: 1024, height: 600 });
+    await body.evaluate((element) => { element.scrollTop = 0; });
+    await expect.poll(() => body.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeGreaterThan(0);
+    await pagination.evaluate((element) => element.scrollIntoView({ block: "end" }));
+    const compactViewport = await body.evaluate((element) => {
+        const bodyBox = element.getBoundingClientRect();
+        const paginationBox = element.querySelector(".task-pagination")?.getBoundingClientRect();
+        return {
+            scrollTop: element.scrollTop,
+            paginationTop: paginationBox?.top || 0,
+            paginationBottom: paginationBox?.bottom || 0,
+            bodyTop: bodyBox.top,
+            bodyBottom: bodyBox.bottom,
+            dialogBottom: element.parentElement?.getBoundingClientRect().bottom || 0,
+            viewportHeight: window.innerHeight
+        };
+    });
+    expect(compactViewport.scrollTop, JSON.stringify(compactViewport)).toBeGreaterThan(0);
+    expect(compactViewport.paginationTop, JSON.stringify(compactViewport)).toBeGreaterThanOrEqual(compactViewport.bodyTop - 1);
+    expect(compactViewport.paginationBottom, JSON.stringify(compactViewport)).toBeLessThanOrEqual(compactViewport.bodyBottom + 1);
+    expect(compactViewport.dialogBottom, JSON.stringify(compactViewport)).toBeLessThanOrEqual(compactViewport.viewportHeight);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "07c-notification-center-1024x600-pagination.png"), fullPage: false });
+});
+
 test("数据库定时备份：80%大圆角、无顶部强调线、可拖动且微应用完整加载", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
