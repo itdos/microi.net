@@ -51,7 +51,12 @@ test('application-store package delivers every startup endpoint and managed poli
       ],
     },
   ];
-  assert.equal(packageModel.PackageInfo.Version, 'v7.7.3');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.7.5');
+  assert.equal(packageModel.PackageInfo.ChangeLog?.Version, 'v7.7.5');
+  assert.equal(packageModel.PackageInfo.ChangeLog?.Title, '通知中心低视口分页可达');
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    'ClientFeature:NotificationCenterScrollableViewportV1',
+  ));
   for (const dependency of dependencies) {
     const matches = packageModel.SysApiEngines.filter(
       item => item.ApiEngineKey === dependency.key,

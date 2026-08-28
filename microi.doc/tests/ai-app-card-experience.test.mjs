@@ -11,6 +11,8 @@ test('homepage, apps page, and detail page share the stable experience resolver'
   assert.match(detailSource, /import \{ resolveApplicationExperienceUrl \} from '\.\.\/utils\/app-preview-url\.js'/)
   assert.match(source, /ExperienceUrl: resolveApplicationExperienceUrl\(app,/)
   assert.match(detailSource, /ExperienceUrl: resolveApplicationExperienceUrl\(item,/)
+  assert.match(source, /osClient: OS_CLIENT/)
+  assert.match(detailSource, /osClient: OS_CLIENT/)
 })
 
 test('AI application cards expose the resolved new-window experience action', () => {

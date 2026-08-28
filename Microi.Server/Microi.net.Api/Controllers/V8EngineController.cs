@@ -760,6 +760,18 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
+        public async Task<IActionResult> ClearApplicationSource([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
+            var result = await V8McpLogic.ClearApplicationSource(osClient, param, token);
+            return Ok(result);
+        }
+
+        [HttpPost]
         [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> PublishMicroService([FromBody] JObject param)
         {
@@ -1706,6 +1718,18 @@ namespace Microi.net.Api
             var list = arr?.ToObject<List<string>>() ?? new List<string>();
             var allow = param["AllowAnonymous"]?.Val<int>() ?? 1;
             var result = await V8McpLogic.SetEngineAnonymous(osClient, list, allow);
+            return Ok(result);
+        }
+
+        [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
+        public async Task<IActionResult> SetEngineRoles([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            var result = await V8McpLogic.SetEngineRoles(osClient, param);
             return Ok(result);
         }
 

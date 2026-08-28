@@ -267,6 +267,7 @@ import {
 } from '../utils/app-changelog.js'
 import { resolveApplicationExperienceUrl } from '../utils/app-preview-url.js'
 import { OFFICIAL_MICROI_API_BASE } from '../utils/site-api-base.js'
+import { resolveUploadedResourceUrl } from '../utils/upload-resource-url.js'
 import {
   buildSiteSessionHeaders,
   getOrCreateSiteDid,
@@ -334,37 +335,12 @@ function plainText(value) {
     .trim()
 }
 
-function normalizeUploadValue(value, depth = 0) {
-  if (depth > 5 || value === null || value === undefined) return ''
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const path = normalizeUploadValue(item, depth + 1)
-      if (path) return path
-    }
-    return ''
-  }
-  if (typeof value === 'object') {
-    for (const key of ['Path', 'FilePathName', 'FullPath', 'Url', 'url', 'src']) {
-      const path = normalizeUploadValue(value[key], depth + 1)
-      if (path) return path
-    }
-    return ''
-  }
-  const source = String(value).trim()
-  if (!source) return ''
-  if (/^[{[]/.test(source)) {
-    try { return normalizeUploadValue(JSON.parse(source), depth + 1) } catch (_) { return source }
-  }
-  return source.replace(/^['"]|['"]$/g, '')
-}
-
 function resolveAssetUrl(value) {
-  const path = normalizeUploadValue(value)
-  if (!path) return ''
-  if (/^(https?:|data:image\/|blob:)/i.test(path)) return path
-  if (path.startsWith('/file/')) return `${APP_API_BASE.replace(/\/+$/, '')}${path}`
-  const server = fileServer.value.replace(/\/+$/, '')
-  return server ? `${server}/${path.replace(/^\/+/, '')}` : path
+  return resolveUploadedResourceUrl(value, {
+    apiBase: APP_API_BASE,
+    baseUrl: typeof window === 'undefined' ? 'https://microi.net' : window.location.origin,
+    fileServer: fileServer.value
+  })
 }
 
 function sanitizeRichText(value) {
@@ -428,7 +404,9 @@ function normalizeApp(item) {
     ApplicationType: applicationType,
     ExperienceUrl: resolveApplicationExperienceUrl(item, typeof window === 'undefined' ? undefined : window, {
       baseUrl: typeof window === 'undefined' ? 'https://microi.net' : window.location.origin,
-      fileServer: fileServer.value
+      apiBase: APP_API_BASE,
+      fileServer: fileServer.value,
+      osClient: OS_CLIENT
     }),
     Category: category,
     icon: iconMap[category] || 'AI',
