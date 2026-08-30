@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "系统账号",
-    "Version": "v7.6.0",
+    "Version": "v7.6.3",
     "CreateTime": "2026-08-22T20:45:27.838Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -13,7 +13,7 @@
     "LineCount": 0,
     "DDLCount": 2,
     "PhysicalColumnCount": 410,
-    "ApiEngineCount": 6,
+    "ApiEngineCount": 7,
     "DataSetCount": 0,
     "DataRowCount": 0,
     "AiApplicationCount": 0,
@@ -23,16 +23,20 @@
       "ApiEngine:platform-sys-user-admin@v1.0.2",
       "ApiEngine:platform-user-custom-hook@v1.0.0",
       "V8.Method.PrepareCurrentUserProfileUpdate",
-      "V8.Method.ManageSysUserAdmin"
+      "V8.Method.ManageSysUserAdmin",
+      "ApiEngine:platform-user-access-key@v1.0.0",
+      "V8.Method.ManageUserAccessKey",
+      "ServerField:sys_apiengine.ApiRoutes"
     ],
-    "ChangeHistory": "2026-08-25 v7.6.0 系统账号官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.2 Managed 账号管理、可信改密预检与租户 Hook 契约。\n2026-08-25 v6.3.2 系统账号管理接口升级为 v1.0.2；可信预检通过 DataAppend.ChangesPassword 标识改密，改密跳过租户 Before Hook，仅在成功后执行安全 After Hook。\n2026-08-25 v6.3.1 系统账号新增、修改、删除、查询与登录投影刷新迁入固定 Managed V8 接口，保留可信权限、密码、内容审核和会话原子，并提供永不覆盖的租户 Hook。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口；Sys_User.AiApiKey 的物理列、低代码字段与安装 DDL 统一归属系统账号应用。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口，并提供官方升级永不覆盖的系统账号个性化 Hook。\n",
+    "ChangeHistory": "2026-08-30 v7.6.3 将用户访问密钥四个旧控制器入口迁入 platform-user-access-key Managed 接口引擎，并与系统账号旧路由统一纳入多路由闭包。\n2026-08-30 v7.6.2 为系统账号管理、个人偏好和个人资料接口补齐旧 SysUser 多路由，统一由官方接口引擎处理。\n2026-08-30 v7.6.1 将 SysUserAccessKeyController 四个入口迁入 platform-user-access-key；多路由保持旧客户端地址，安全原子继续一次性签发与哈希。\n2026-08-25 v7.6.0 系统账号官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.2 Managed 账号管理、可信改密预检与租户 Hook 契约。\n2026-08-25 v6.3.2 系统账号管理接口升级为 v1.0.2；可信预检通过 DataAppend.ChangesPassword 标识改密，改密跳过租户 Before Hook，仅在成功后执行安全 After Hook。\n2026-08-25 v6.3.1 系统账号新增、修改、删除、查询与登录投影刷新迁入固定 Managed V8 接口，保留可信权限、密码、内容审核和会话原子，并提供永不覆盖的租户 Hook。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口；Sys_User.AiApiKey 的物理列、低代码字段与安装 DDL 统一归属系统账号应用。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口，并提供官方升级永不覆盖的系统账号个性化 Hook。\n",
     "ChangeLog": {
-      "Version": "v7.6.0",
-      "Title": "V8 引擎优先与租户个性化扩展",
-      "ChangeType": "Feature",
-      "Content": "2026-08-25 v7.6.0 系统账号官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.2 Managed 账号管理、可信改密预检与租户 Hook 契约。",
-      "ReleaseTime": "2026-08-25 16:00:00"
-    }
+      "Version": "v7.6.3",
+      "Title": "系统账号多路由与访问密钥闭包",
+      "ChangeType": "Optimize",
+      "Content": "将用户访问密钥四个旧控制器入口迁入 platform-user-access-key Managed 接口引擎，并与系统账号旧路由统一纳入多路由闭包。",
+      "ReleaseTime": "2026-08-30 12:00:00"
+    },
+    "Description": "系统账号、个人偏好与访问密钥的官方低代码资源；历史 HTTP 地址由接口引擎多路由兼容。"
   },
   "DDLStatements": [
     {
@@ -6966,7 +6970,8 @@
       "ApiRole": "[]",
       "IsEnable": 1,
       "ApiEngineKey": "platform-user-update-preferences",
-      "ApiName": "保存当前用户界面偏好"
+      "ApiName": "保存当前用户界面偏好",
+      "ApiRoutes": "/api/SysUser/UpdateMyDefaultIndexUrl"
     },
     {
       "V8Limit": 0,
@@ -7052,7 +7057,8 @@
       "ApiRole": "[]",
       "IsEnable": 1,
       "ApiEngineKey": "platform-user-update-profile",
-      "ApiName": "更新当前用户资料"
+      "ApiName": "更新当前用户资料",
+      "ApiRoutes": "/api/SysUser/UpdateCurrentProfile"
     },
     {
       "V8Limit": 0,
@@ -7077,11 +7083,12 @@
       "ApiAddress": "/apiengine/platform-sys-user-admin",
       "ResponseFile": 0,
       "Lock": 0,
-      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：系统账号\n * ApiEngineKey：platform-sys-user-admin\n * 从可信吾码官方应用源安装、更新或重新安装“系统账号”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n/*\n * V8 ApiEngine\n * ApiEngineKey: platform-sys-user-admin\n * Version: v1.0.2\n * Function: 系统账号新增、修改、删除、查询与登录投影刷新的官方编排入口。\n */\n\nvar PARAM = V8.Param || {};\nvar ACTIONS = {\n  AddSysUser: true,\n  UptSysUser: true,\n  DelSysUser: true,\n  GetSysUser: true,\n  RefreshLoginUser: true\n};\n\nfunction text(value) {\n  return value === null || value === undefined ? \"\" : value.toString();\n}\n\nfunction safeTargetUserId(param) {\n  return text(param.Id || param.UserId || param.userId).trim();\n}\n\nfunction runHook(stage, action, targetUserId) {\n  return V8.ApiEngine.Run(\"platform-user-custom-hook\", {\n    Stage: stage,\n    Action: action,\n    TargetUserId: targetUserId,\n    SourceApiEngineKey: \"platform-sys-user-admin\"\n  }, V8.DbTrans);\n}\n\nvar action = text(PARAM.Action).trim();\nif (!ACTIONS[action]) {\n  return { Code: 0, Msg: \"不支持的系统账号操作。\" };\n}\nif (!V8.CurrentUser || !V8.CurrentUser.Id) {\n  return { Code: 1001, Msg: \"登录身份已过期，请重新登录。\" };\n}\n\nvar targetUserId = safeTargetUserId(PARAM);\nvar authorization = V8.Method.ManageSysUserAdmin({\n  Action: action,\n  Param: PARAM,\n  AuthorizeOnly: true\n});\nif (!authorization || authorization.Code !== 1) {\n  return authorization || { Code: 0, Msg: \"系统账号可信授权预检未返回结果。\" };\n}\n\n// 密码变更必须先由可信原子消费 step-up 一次性票据。由于 Before Hook 是\n// 可由租户维护且可能产生外部副作用，敏感改密不执行 Before，只在操作真正\n// 成功后执行 After；普通资料与其它账号操作仍保留可阻断的 Before Hook。\nvar changesPassword = action === \"UptSysUser\"\n  && authorization.DataAppend\n  && authorization.DataAppend.ChangesPassword === true;\nif (!changesPassword) {\n  var beforeHook = runHook(\"Before\", action, targetUserId);\n  if (beforeHook && beforeHook.Code !== 1) {\n    return beforeHook;\n  }\n}\n\nvar managedResult = V8.Method.ManageSysUserAdmin({\n  Action: action,\n  Param: PARAM\n});\nif (!managedResult || managedResult.Code !== 1) {\n  return managedResult || { Code: 0, Msg: \"系统账号可信原子未返回结果。\" };\n}\n\nif (!targetUserId && managedResult.Data && managedResult.Data.Id) {\n  targetUserId = text(managedResult.Data.Id).trim();\n}\nvar afterHook = runHook(\"After\", action, targetUserId);\nif (afterHook && afterHook.Code !== 1) {\n  managedResult.DataAppend = managedResult.DataAppend || {};\n  managedResult.DataAppend.CustomHookWarning = afterHook.Msg || \"系统账号个性化 After Hook 执行失败。\";\n}\n\nreturn managedResult;\n",
+      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：系统账号\n * ApiEngineKey：platform-sys-user-admin\n * 从可信吾码官方应用源安装、更新或重新安装“系统账号”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n/* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */\nvar sysUserAdminRoute = String(V8.Param.ApiAddress || '').replace(/\\?.*$/, '');\nif(!V8.Param.Action && sysUserAdminRoute){\n  var sysUserAdminSegments = sysUserAdminRoute.split('/');\n  V8.Param.Action = sysUserAdminSegments[sysUserAdminSegments.length - 1] || '';\n}\n\n\n\n/*\n * V8 ApiEngine\n * ApiEngineKey: platform-sys-user-admin\n * Version: v1.0.2\n * Function: 系统账号新增、修改、删除、查询与登录投影刷新的官方编排入口。\n */\n\nvar PARAM = V8.Param || {};\nvar ACTIONS = {\n  AddSysUser: true,\n  UptSysUser: true,\n  DelSysUser: true,\n  GetSysUser: true,\n  RefreshLoginUser: true\n};\n\nfunction text(value) {\n  return value === null || value === undefined ? \"\" : value.toString();\n}\n\nfunction safeTargetUserId(param) {\n  return text(param.Id || param.UserId || param.userId).trim();\n}\n\nfunction runHook(stage, action, targetUserId) {\n  return V8.ApiEngine.Run(\"platform-user-custom-hook\", {\n    Stage: stage,\n    Action: action,\n    TargetUserId: targetUserId,\n    SourceApiEngineKey: \"platform-sys-user-admin\"\n  }, V8.DbTrans);\n}\n\nvar action = text(PARAM.Action).trim();\nif (!ACTIONS[action]) {\n  return { Code: 0, Msg: \"不支持的系统账号操作。\" };\n}\nif (!V8.CurrentUser || !V8.CurrentUser.Id) {\n  return { Code: 1001, Msg: \"登录身份已过期，请重新登录。\" };\n}\n\nvar targetUserId = safeTargetUserId(PARAM);\nvar authorization = V8.Method.ManageSysUserAdmin({\n  Action: action,\n  Param: PARAM,\n  AuthorizeOnly: true\n});\nif (!authorization || authorization.Code !== 1) {\n  return authorization || { Code: 0, Msg: \"系统账号可信授权预检未返回结果。\" };\n}\n\n// 密码变更必须先由可信原子消费 step-up 一次性票据。由于 Before Hook 是\n// 可由租户维护且可能产生外部副作用，敏感改密不执行 Before，只在操作真正\n// 成功后执行 After；普通资料与其它账号操作仍保留可阻断的 Before Hook。\nvar changesPassword = action === \"UptSysUser\"\n  && authorization.DataAppend\n  && authorization.DataAppend.ChangesPassword === true;\nif (!changesPassword) {\n  var beforeHook = runHook(\"Before\", action, targetUserId);\n  if (beforeHook && beforeHook.Code !== 1) {\n    return beforeHook;\n  }\n}\n\nvar managedResult = V8.Method.ManageSysUserAdmin({\n  Action: action,\n  Param: PARAM\n});\nif (!managedResult || managedResult.Code !== 1) {\n  return managedResult || { Code: 0, Msg: \"系统账号可信原子未返回结果。\" };\n}\n\nif (!targetUserId && managedResult.Data && managedResult.Data.Id) {\n  targetUserId = text(managedResult.Data.Id).trim();\n}\nvar afterHook = runHook(\"After\", action, targetUserId);\nif (afterHook && afterHook.Code !== 1) {\n  managedResult.DataAppend = managedResult.DataAppend || {};\n  managedResult.DataAppend.CustomHookWarning = afterHook.Msg || \"系统账号个性化 After Hook 执行失败。\";\n}\n\nreturn managedResult;\n",
       "ApiRole": "[]",
       "IsEnable": 1,
       "ApiEngineKey": "platform-sys-user-admin",
-      "ApiName": "系统账号管理"
+      "ApiName": "系统账号管理",
+      "ApiRoutes": "/api/SysUser/AddSysUser;/api/SysUser/UptSysUser;/api/SysUser/DelSysUser;/api/SysUser/GetSysUser;/api/SysUser/RefreshLoginUser"
     },
     {
       "V8Limit": 0,
@@ -7111,6 +7118,32 @@
       "IsEnable": 1,
       "ApiEngineKey": "platform-user-custom-hook",
       "ApiName": "系统账号个性化扩展"
+    },
+    {
+      "IsDeleted": 0,
+      "UserName": "管理员",
+      "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
+      "CreateTime": "2026-08-30 12:00:00",
+      "Id": "019d35f0-7b04-7b91-9801-000000000001",
+      "ChangeHistory": "2026-08-30 v1.0.0 迁移旧 Controller 路由到官方 Managed 接口引擎，并由多路由保持历史客户端兼容。\n",
+      "Version": "v1.0.0",
+      "LimitRecursion": 5000,
+      "LimitMemory": 2048,
+      "MaxStatements": 100000000,
+      "Timeout": 600,
+      "StopHttp": 0,
+      "EnableLog": 0,
+      "Category": "平台核心",
+      "Files": "[]",
+      "AllowAnonymous": 1,
+      "ApiAddress": "/apiengine/platform-user-access-key",
+      "ApiRoutes": "/api/SysUserAccessKey/Create;/api/SysUserAccessKey/List;/api/SysUserAccessKey/Revoke;/api/SysUserAccessKey/Exchange",
+      "Lock": 0,
+      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：系统账号\n * ApiEngineKey：platform-user-access-key\n * 从可信吾码官方应用源安装、更新或重新安装“系统账号”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n/* V8 ApiEngine | ApiEngineKey: platform-user-access-key | Version: v1.0.0 */\nvar route = String(V8.Param.ApiAddress || '').toLowerCase();\nvar action = String(V8.Param.Action || '');\nif (!action) {\n  if (route.indexOf('/create') >= 0) action = 'Create';\n  else if (route.indexOf('/list') >= 0) action = 'List';\n  else if (route.indexOf('/revoke') >= 0) action = 'Revoke';\n  else if (route.indexOf('/exchange') >= 0) action = 'Exchange';\n}\nif (['Create', 'List', 'Revoke', 'Exchange'].indexOf(action) < 0) {\n  return { Code: 0, Msg: '不支持的访问密钥动作。' };\n}\n\n// 个性化 Hook 永远拿不到访问密钥明文；Exchange 也不把待兑换凭据交给租户代码。\nif (action !== 'Exchange') {\n  var hook = V8.ApiEngine.Run('platform-user-custom-hook', {\n    Stage: 'BeforeUserAccessKey', Action: action,\n    TargetUserId: V8.Param.TargetUserId || '', Name: V8.Param.Name || '',\n    Scopes: V8.Param.Scopes || [], Remark: V8.Param.Remark || ''\n  });\n  if (hook && hook.Code !== 1) return hook;\n}\n\nreturn V8.Method.ManageUserAccessKey({\n  Action: action,\n  TargetUserId: V8.Param.TargetUserId || '',\n  Name: V8.Param.Name || '',\n  Scopes: V8.Param.Scopes || [],\n  AllowedRoutes: V8.Param.AllowedRoutes || [],\n  RedirectPath: V8.Param.RedirectPath || '',\n  AllowedTableNames: V8.Param.AllowedTableNames || [],\n  AllowedApiEngineKeys: V8.Param.AllowedApiEngineKeys || [],\n  AllowedDataSourceKeys: V8.Param.AllowedDataSourceKeys || [],\n  Permanent: V8.Param.Permanent === true || Number(V8.Param.Permanent || 0) === 1,\n  ExpiresAt: V8.Param.ExpiresAt || '', Remark: V8.Param.Remark || '',\n  Id: V8.Param.Id || '', AccessKey: V8.Param.AccessKey || '',\n  OsClient: V8.Param.OsClient || V8.OsClient, Did: V8.Param.Did || ''\n});\n",
+      "ApiRole": "[]",
+      "IsEnable": 1,
+      "ApiEngineKey": "platform-user-access-key",
+      "ApiName": "用户访问密钥可信管理"
     }
   ],
   "ResourcePolicies": {
@@ -7139,6 +7172,10 @@
       "platform-user-custom-hook": {
         "Ownership": "Tenant",
         "UpgradePolicy": "CreateIfMissing"
+      },
+      "platform-user-access-key": {
+        "Ownership": "Platform",
+        "UpgradePolicy": "Managed"
       }
     }
   }

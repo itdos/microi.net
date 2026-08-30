@@ -1813,6 +1813,7 @@ function buildRuntimeServerName(context) {
 const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_codex',
     'microi_get_status',
+    'microi_get_administrative_capabilities',
     'microi_chat',
     'microi_generate_minimax_music',
     'microi_generate_minimax_speech',
@@ -1858,6 +1859,7 @@ const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_get_table_data',
     'microi_add_form_data',
     'microi_update_form_data',
+    'microi_admin_table_data',
     'microi_get_manifest_schema',
     'microi_plan_system',
     'microi_generate_system',
@@ -2283,7 +2285,8 @@ BOUNDARY RULES:
 - **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
 - **microi_get_field_list / microi_update_field / microi_refresh_schema_cache** — 修改已有 diy_field 字段属性、KeyValue 数据源、Config 后必须回读并刷新缓存，避免后台字段选项与前端/接口枚举不一致
 - **microi_repair_audit_fields** — 修复指定表已存在的六个固定审计物理列对应的 diy_field 元数据；修复后它们不再出现在“异常字段修复”，表单默认显隐继续由 diy_table.DisplayDefaultField 控制
-- **microi_get_table_data / microi_add_form_data / microi_update_form_data** — 维护租户业务表数据（如商品、示例数据、配置项）时使用，写入后必须回读验证关键字段
+- **microi_get_table_data / microi_add_form_data / microi_update_form_data** — 按普通 FormEngine 菜单/表权限维护租户业务表数据；保护表或通用删除不要绕过权限，平台管理员应先调用 **microi_get_administrative_capabilities**，再使用 **microi_admin_table_data**
+- **microi_get_administrative_capabilities / microi_admin_table_data** — 仅真实登录 DiyToken、当前租户主库实时复核 Level >= 9999 且具有有效管理员角色后开放；覆盖任意已注册表的单表查询/单行新增/修改/删除。访问密钥会话被拒绝，秘密字段脱敏且只能通过专用安全端点维护
 - **sys_user.DefaultIndexUrl** — 当前用户登录后的首选站内路由，支持 /route、#/route、/#/route；留空时回退系统默认首页。客户端只采用存在且当前用户有权限的内部路由
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
 - **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；同步写入 Version，并将本次说明追加到接口引擎修改历史子表（旧库由后端兼容旧 ChangeHistory 字段）；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
@@ -2711,6 +2714,18 @@ export function createMcpServer(client, context) {
                 content: [{ type: 'text', text: `Microi.AI chat failed: ${e instanceof Error ? e.message : String(e)}` }],
                 isError: true,
             };
+        }
+    });
+    server.tool('microi_get_administrative_capabilities', `Verify the current MCP session against the current tenant database and return the authoritative Microi platform-administrator capability/catalog for OsClient "${osClient}". Requires an interactive DiyToken with Level >= 9999 and an active administrator role; access-key sessions are rejected.`, {}, async () => {
+        try {
+            const result = await client.getAdministrativeCapabilities();
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result.Data ?? result, null, 2) }],
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
         }
     });
     // ========================
@@ -3954,7 +3969,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 通用 FormEngine 数据读写
     // ========================
-    server.tool('microi_get_table_data', `Read rows from a low-code table through FormEngine.GetTableData for OsClient "${osClient}". Use this to verify business data after writes.`, {
+    server.tool('microi_get_table_data', `Read rows through the ordinary FormEngine permission boundary for OsClient "${osClient}". Use this for role-authorized business data and post-write readback. Platform administrators should use microi_admin_table_data for protected system tables.`, {
         tableName: z.string().describe('Target diy_table name, e.g. mall_product'),
         query: z.record(z.unknown()).optional().describe('FormEngine query object: _Where, _SelectFields, _PageSize, _OrderBy, etc.'),
     }, async ({ tableName, query }) => {
@@ -3968,7 +3983,7 @@ export function createMcpServer(client, context) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
         }
     });
-    server.tool('microi_add_form_data', `Add one row to a low-code table through FormEngine.AddFormData for OsClient "${osClient}". Writes to DB; confirmExecution is required.`, {
+    server.tool('microi_add_form_data', `Add one role-authorized business row through the ordinary FormEngine permission boundary for OsClient "${osClient}". Writes to DB; confirmExecution is required. For protected system tables use microi_admin_table_data after capability verification.`, {
         tableName: z.string().describe('Target diy_table name, e.g. mall_product'),
         row: z.record(z.unknown()).describe('Row object. Field names must match diy_field names.'),
         confirmExecution: z.string().optional().describe('Required. Use tableName or "EXECUTE".'),
@@ -3987,7 +4002,7 @@ export function createMcpServer(client, context) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
         }
     });
-    server.tool('microi_update_form_data', `Update one row in a low-code table through FormEngine.UptFormData for OsClient "${osClient}". The row must include Id. Writes to DB; confirmExecution is required.`, {
+    server.tool('microi_update_form_data', `Update one role-authorized business row through the ordinary FormEngine permission boundary for OsClient "${osClient}". The row must include Id. Writes to DB; confirmExecution is required. For protected system tables use microi_admin_table_data after capability verification.`, {
         tableName: z.string().describe('Target diy_table name, e.g. mall_product'),
         row: z.record(z.unknown()).describe('Patch object. Must include Id.'),
         confirmExecution: z.string().optional().describe('Required. Use tableName or "EXECUTE".'),
@@ -5948,6 +5963,66 @@ export function createMcpServer(client, context) {
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             return { content: [{ type: 'text', text: `✅ ${JSON.stringify(result.Data, null, 2)}` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_admin_table_data', `Authoritative current-tenant single-table data control for Microi platform administrators on OsClient "${osClient}". The API revalidates the interactive DiyToken, sys_user Level >= 9999 and active administrator role from the current tenant database on every request. Supports query/get/add/update/delete without weakening ordinary FormEngine permissions. Access-key sessions are rejected. Secret/password/token/key/connection fields are redacted and cannot be mutated here; use dedicated secure tools for those values. Writes require the exact operation-scoped confirmation string.`, {
+        operation: z.enum(['query', 'get', 'add', 'update', 'delete']).describe('query/get are read-only; add/update/delete are single-row writes.'),
+        tableName: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/).describe('Registered current-tenant table name.'),
+        query: z.record(z.unknown()).optional().describe('For query: _Where, _SelectFields, _SelectNotFields, _OrderBy, _OrderByType, _OrderBys, _PageIndex, _PageSize (server-capped at 200), _Top, _Keyword, supported _Search fields, Id/Ids/IsDeleted.'),
+        row: z.record(z.unknown()).optional().describe('For add/update: one row. update requires Id here or in id. Caller-supplied OsClient, identity, transport and secret fields are rejected.'),
+        id: z.string().max(256).optional().describe('Required for get/update/delete. update may alternatively provide row.Id.'),
+        confirmExecution: z.string().optional().describe('Writes only. Exact value: ADD:<tableName>, UPDATE:<tableName>:<Id>, or DELETE:<tableName>:<Id>.'),
+    }, async ({ operation, tableName, query, row, id, confirmExecution }) => {
+        try {
+            const rowId = String(id || row?.Id || '').trim();
+            if ((operation === 'get' || operation === 'update' || operation === 'delete') && !rowId) {
+                return { content: [{ type: 'text', text: `Error: ${operation} requires id or row.Id.` }], isError: true };
+            }
+            if ((operation === 'add' || operation === 'update') && !row) {
+                return { content: [{ type: 'text', text: `Error: ${operation} requires row.` }], isError: true };
+            }
+            if (operation === 'add' || operation === 'update' || operation === 'delete') {
+                const requiredConfirmation = operation === 'add'
+                    ? `ADD:${tableName}`
+                    : `${operation.toUpperCase()}:${tableName}:${rowId}`;
+                if (confirmExecution !== requiredConfirmation) {
+                    return {
+                        content: [{
+                                type: 'text',
+                                text: JSON.stringify({
+                                    dryRun: true,
+                                    operation,
+                                    tableName,
+                                    id: rowId || null,
+                                    fields: Object.keys(row || {}).sort(),
+                                    requiredConfirmation,
+                                }, null, 2),
+                            }],
+                        isError: true,
+                    };
+                }
+                await client.writeAuditLog('microi_admin_table_data', `${operation}:${tableName}:${rowId}`, JSON.stringify({
+                    operation,
+                    tableName,
+                    id: rowId || null,
+                    fields: Object.keys(row || {}).sort(),
+                }));
+            }
+            const result = await client.administerTableData({
+                operation,
+                tableName,
+                query,
+                row,
+                ...(rowId ? { id: rowId } : {}),
+                confirmExecution,
+            });
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result.Data ?? result, null, 2) }],
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };

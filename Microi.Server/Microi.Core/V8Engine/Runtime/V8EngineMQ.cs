@@ -16,7 +16,7 @@ namespace Microi.net
         {
             string json = JsonConvert.SerializeObject(dynamicParam);
             JObject jobjParam = JObject.Parse(json);
-            MicroiMQSendInfo param = jobjParam.ToObject<MicroiMQSendInfo>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            MicroiMQSendInfo param = jobjParam.ToObject<MicroiMQSendInfo>(DiyCommon.GetJsonSerializer());//这里时间格式化没有用
             return param;
         }
         public DosResult SendMsg(dynamic dynamicParam)

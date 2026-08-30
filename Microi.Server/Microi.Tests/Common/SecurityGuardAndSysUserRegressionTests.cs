@@ -340,17 +340,22 @@ public class SecurityGuardAndSysUserRegressionTests
     public void DefaultIndexUrlValidation_IsOwnedByTheManagedPreferenceEngine()
     {
         var root = FindRepositoryRoot();
-        var sysUserController = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.net.Api", "Controllers", "SysUserController.cs"));
-        var compatibilityController = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.net.Api", "Controllers", "LegacyMobileCompatibilityController.cs"));
+        var sysUserControllerPath = Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "SysUserController.cs");
+        var compatibilityControllerPath = Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "LegacyMobileCompatibilityController.cs");
         var engine = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Resource", "platform-user-update-preferences.js"));
+        var package = JObject.Parse(File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.sys_user.json")));
+        var preferenceEngine = package["SysApiEngines"]!.Values<JObject>()
+            .Single(item => item["ApiEngineKey"]?.ToString() == "platform-user-update-preferences");
 
-        Assert.Contains("UpdateUserPreferencesApiEngineKey = \"platform-user-update-preferences\"", compatibilityController);
-        Assert.Contains("~/api/SysUser/UpdateMyDefaultIndexUrl", compatibilityController);
-        Assert.DoesNotContain("UpdateMyDefaultIndexUrl", sysUserController);
-        Assert.DoesNotContain("TryNormalizeDefaultIndexUrl", compatibilityController);
+        Assert.False(File.Exists(sysUserControllerPath));
+        Assert.False(File.Exists(compatibilityControllerPath));
+        Assert.Contains(
+            "/api/SysUser/UpdateMyDefaultIndexUrl",
+            preferenceEngine["ApiRoutes"]?.ToString());
         Assert.Contains("defaultIndexUrl.indexOf('/#/') === 0", engine);
         Assert.Contains("defaultIndexUrl.indexOf('#/') === 0", engine);
         Assert.Contains("defaultIndexUrl.indexOf('//') === 0", engine);

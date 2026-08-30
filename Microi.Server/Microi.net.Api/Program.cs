@@ -13,6 +13,10 @@ if (host == null) return;
 var services = builder.Services;
 // 注册 Microi 平台内核、表单引擎、接口引擎、V8 引擎及通用运行时。
 services.AddMicroi();
+// 注册独立工作流引擎插件；实现与发布物由 Microi.WorkFlow 类库拥有。
+services.AddMicroiWorkFlow();
+// 注册独立 SSO 身份联邦插件；公开协议路由仍由官方接口引擎承接。
+services.AddMicroiSSO();
 // 注册 Dos.ORM 数据访问插件。
 services.AddMicroiORM();
 // 注册 Redis 分布式缓存插件。

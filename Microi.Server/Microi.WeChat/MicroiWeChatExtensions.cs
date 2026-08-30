@@ -26,8 +26,18 @@ namespace Microi.net
                     services.AddSenparcWeixinServices(configuration);
                 services.AddSingleton<IMicroiWeChat, MicroiWeChat>();
                 services.AddSingleton<WeChatContentSecurityService>();
+                services.AddTransient<WeChatContentSecurityRuntime>();
+                services.AddTransient<WeChatOAuthRuntime>();
                 services.AddSingleton<ISysUserProfileContentSecurityGateway>(provider =>
                     provider.GetRequiredService<WeChatContentSecurityService>());
+                PlatformApiRuntimeRegistry.RegisterFactory(
+                    "WeChatContentSecurity",
+                    () => DiyHttpContext.Current?.RequestServices
+                        ?.GetRequiredService<WeChatContentSecurityRuntime>());
+                PlatformApiRuntimeRegistry.RegisterFactory(
+                    "WeChatOAuth",
+                    () => DiyHttpContext.Current?.RequestServices
+                        ?.GetRequiredService<WeChatOAuthRuntime>());
                 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入【微信公众号平台】插件成功！");
                 return services;
             }

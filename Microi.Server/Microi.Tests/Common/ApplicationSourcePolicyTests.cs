@@ -16,6 +16,23 @@ public class ApplicationSourcePolicyTests
     }
 
     [Fact]
+    public void EngineRolePolicyUsesTenantDbWriteAndAuthoritativeReadback()
+    {
+        var sourcePath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "../../../../Microi.Core/V8Engine/V8McpLogic.ApplicationSourcePolicy.cs"));
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("PersistApiEngineRolesAuthoritatively", source);
+        Assert.Contains("UPDATE sys_apiengine", source);
+        Assert.Contains("WHERE Id=?id AND ApiEngineKey=?key", source);
+        Assert.Contains("SELECT Id, ApiEngineKey, ApiRole, UpdateTime", source);
+        Assert.Contains("affected < 0 || affected > 1", source);
+        Assert.Contains("RefreshApiEngineRouteCache(osClient, key)", source);
+        Assert.DoesNotContain("var readback = await MicroiEngine.FormEngine.GetFormDataAsync", source);
+    }
+
+    [Fact]
     public void SourceRowsQueryKeepsExactAppIdFilterAndBoundedPagination()
     {
         var query = JObject.FromObject(Invoke(

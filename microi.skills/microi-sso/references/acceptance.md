@@ -7,7 +7,7 @@
 | 源码 | 协议/安全原语测试，静态扫描无 Secret/Token 日志 |
 | 后端构建 | 隔离输出 `dotnet build` 成功，不覆盖共享运行目录 |
 | 前端构建 | 现代包和项目要求的兼容包完成 |
-| 应用包 | 可重复生成；Name/AppId/Version、DDL、字段数、菜单、空数据集、11 个接口引擎源码同源与 ResourcePolicies 校验 |
+| 应用包 | 可重复生成；Name/AppId/Version、DDL、字段数、菜单、空数据集、35 个接口引擎源码同源与 ResourcePolicies 校验 |
 | 官方商城 | `microi_itdos` 发布后回读 `sys_microistore` 与官方资源 API；状态、版本、包哈希一致 |
 | 目标租户 | 安装/升级任务终态 `Succeeded`，再读真实表、字段、菜单、安装版本 |
 | 运行时 | Capabilities、Discovery/Metadata/JWKS 和实际使用端点命中已部署程序集 |
@@ -19,9 +19,9 @@
 
 1. 使用官方 `microi_itdos`，核对绑定 `https://api.itdos.com` 与 `OsClient=iTdos`。
 2. 在发布源更新真实 `diy_sso`、字段、表单 Tabs 和菜单视图并回读。
-3. 导出精确菜单/表和 11 个接口引擎，不带连接数据、用户绑定、Secret、证书或示例账号；接口源码必须与 `Microi-V8-Engine/.../SSO身份联邦` 逐字同源。
-4. AppId 固定 `app.microi.sso`，PublisherType 为官方应用；10 个核心 Key 为 `Managed/Application`，`sso_event_hook` 为 `CreateIfMissing/Tenant`。
-5. 发布后从官方资源 API 读取 `app.microi.sso.json`，校验 SHA-256、版本、1 菜单、1 表、64 字段、11 个接口引擎及策略。
+3. 导出精确菜单/表和 35 个接口引擎，不带连接数据、用户绑定、Secret、证书或示例账号；接口源码必须与 `Microi-V8-Engine/.../SSO身份联邦` 逐字同源。
+4. AppId 固定 `app.microi.sso`，PublisherType 为官方应用；34 个核心 Key 为 `Managed/Platform`，`sso_event_hook` 为 `CreateIfMissing/Tenant`。
+5. 发布后从官方资源 API 读取 `app.microi.sso.json`，校验 SHA-256、版本、1 菜单、1 表、64 字段、35 个接口引擎及策略。
 6. 官方 iTdos 是发布源，安装任务被“发布源不允许安装”拒绝是保护性终态；不要绕过或伪装成成功。
 7. 普通目标租户才执行安装/更新，并轮询后台任务到终态。Pending/Running/入队不算成功。
 
@@ -45,5 +45,5 @@
 
 - 客户端能力发现和登录完成只允许调用 `/apiengine/{ApiEngineKey}?OsClient=`；固定业务不得新增 `/api/ApiEngine/Run` 依赖。
 - 在未安装 `app.microi.sso` 的租户调用通用入口，应返回结构化“接口引擎不存在”；不能返回 `/api/Sso/Capabilities` 路由 404。
-- 安装后回读 11 个 `sys_apiengine` 行并刷新缓存，再验证 `sso_capabilities` 为 `Code=1`。
-- `/api/Sso/Capabilities`、`LegacyCapabilities`、`CompleteLogin`、`RotateClientSecret` 与 `/api/SysUser/SsoPengrui` 必须保持删除，防止业务逻辑重新漂回 Controller。
+- 安装后回读 35 个 `sys_apiengine` 行并刷新缓存，再验证 `sso_capabilities` 为 `Code=1`，并验证 24 个 `sso_http_*` 的 `ApiAddress`、`ResponseType=HTTP` 与 Managed 策略。
+- 所有 `Sso*Controller.cs`、`/api/Sso/Capabilities`、`LegacyCapabilities`、`CompleteLogin`、`RotateClientSecret` 与 `/api/SysUser/SsoPengrui` 必须保持删除；`/api/Sso/Begin`、`CompleteAuthorization` 与回调地址只允许作为接口引擎 `ApiAddress` 存在。

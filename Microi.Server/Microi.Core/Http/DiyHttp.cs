@@ -206,7 +206,7 @@ namespace Microi.net
             //{
             //    jobjParam[item] = jobjParam[item].Val<int?>();
             //}
-            DiyHttpParam param = jobjParam.ToObject<DiyHttpParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            DiyHttpParam param = jobjParam.ToObject<DiyHttpParam>(DiyCommon.GetJsonSerializer());//这里时间格式化没有用
             return param;
         }
         public async Task<V8EngineHttpResponse> GetResponseAsync(dynamic dynamicParam)

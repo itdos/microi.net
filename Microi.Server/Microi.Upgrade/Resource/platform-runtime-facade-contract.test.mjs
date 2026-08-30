@@ -16,7 +16,8 @@ const facadeDefinitions = [
   ['platform-service-health', 'platform-service-health.js', 1, 'V8.Method.GetBackendVersion'],
   ['platform-lang-bundle', 'platform-lang-bundle.js', 1, 'V8.Method.GetLangBundle'],
   ['platform-current-user', 'platform-current-user.js', 0, 'V8.CurrentUser'],
-  ['platform-private-file-url', 'platform-private-file-url.js', 0, 'V8.Method.GetAuthorizedPrivateFileUrl'],
+  // 旧移动端 Token 需要匿名进入可信原子重新验证；接口引擎本身不放宽文件授权。
+  ['platform-private-file-url', 'platform-private-file-url.js', 1, 'V8.Method.GetAuthorizedPrivateFileUrl'],
   ['platform-sys-user-public-info', 'platform-sys-user-public-info.js', 0, "GetTableData('sys_user'"],
   ['platform-login-wallpapers', 'platform-login-wallpapers.js', 1, 'V8.Method.GetLoginWallpapers'],
 ];
@@ -42,11 +43,12 @@ test('SaaS package carries the client runtime facades and one tenant hook', () =
     });
     assert.match(engine.ApiV8Code, new RegExp(atom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     if (allowAnonymous) {
-      assert.doesNotMatch(
-        engine.ApiV8Code,
-        /platform-runtime-custom-hook/,
-        `${key} must not let anonymous callers execute tenant-owned code`,
-      );
+      const hookIndex = engine.ApiV8Code.indexOf('platform-runtime-custom-hook');
+      if (hookIndex >= 0) {
+        const identityGateIndex = engine.ApiV8Code.indexOf('!V8.CurrentUser || !V8.CurrentUser.Id');
+        assert.ok(identityGateIndex >= 0 && identityGateIndex < hookIndex,
+          `${key} must reject anonymous callers before tenant-owned code`);
+      }
     } else {
       assert.match(engine.ApiV8Code, /platform-runtime-custom-hook/);
     }

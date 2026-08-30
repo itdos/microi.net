@@ -6,7 +6,7 @@ import { normalizeOfficialApiEnginePolicies } from './official-api-engine-notice
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const resourcePath = path.join(directory, 'app.microi.sso.json');
 const pkg = JSON.parse(fs.readFileSync(resourcePath, 'utf8'));
-const minimumPackageVersion = 'v7.5.8';
+const minimumPackageVersion = 'v7.5.9';
 
 function semanticVersionParts(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/i.exec(String(value || '').trim());
@@ -32,6 +32,7 @@ function mergeChangeHistory(existingHistory) {
     if (item?.Version) history.set(String(item.Version), item);
   }
   const requiredHistory = [
+    { Version: 'v7.5.9', Date: '2026-08-30', Description: '将原 SsoProtocolGatewayController 的 24 个 OIDC、SAML2、CAS 与登录编排路由全部迁入官方 Managed 接口引擎；新增受控 HTTP 响应与 {OsClient} 路径模板能力，C# 仅保留不可由租户覆盖的协议、安全和票据原子，CreateIfMissing 个性化 Hook 继续归租户维护。' },
     { Version: 'v7.5.8', Date: '2026-08-26', Description: '将所有官方 Managed SSO 接口归一为 Platform 所有权，避免 Upgrade13 重放内置包时被误判为从平台资源降级到普通应用资源。' },
     { Version: 'v7.5.6', Date: '2026-08-25', Description: '统一官方 Managed 接口醒目恢复提示；SSO 安全事件经脱敏白名单调用 CreateIfMissing 租户 Hook，默认 Hook 仅返回成功。' },
     { Version: 'v7.5.2', Date: '2026-08-21', Description: '把连接投影、身份解析、绑定/JIT、角色映射、Claim 投影、审计和存量 Token 登录迁入 Managed 接口引擎；新增 CreateIfMissing 租户 Hook，C# 仅保留可信协议原子。' },
@@ -283,15 +284,17 @@ menu.ViewSchema = JSON.stringify({ Views: [
 Object.assign(pkg.PackageInfo, {
   AppId: 'app.microi.sso', Name: 'SSO 身份联邦', Version: packageVersion,
   ApplicationType: 'Platform', CreateTime: '2026-08-21T12:00:00.000Z',
-  Description: 'Microi 吾码官方双向 SSO 应用：OIDC、SAML2、CAS 与存量 Token 兼容。连接投影、JIT/绑定、角色映射、审计与租户 Hook 均由应用接口引擎交付；C# 只保留签名验签、协议响应、一次性票据和 DiyToken 等可信原子。',
+  Description: 'Microi 吾码官方双向 SSO 应用：OIDC、SAML2、CAS 与存量 Token 兼容。全部公开 HTTP 路由、连接投影、JIT/绑定、角色映射、审计与租户 Hook 均由应用接口引擎交付；Microi.net 只保留签名验签、协议编解码、一次性票据和 DiyToken 等不可覆盖的可信原子。',
   RequiredPlatformCapabilities: [
-    'POST /api/Sso/Begin',
-    'POST /api/Sso/CompleteAuthorization',
-    'GET /sso/{OsClient}/.well-known/openid-configuration',
-    'GET /saml/{OsClient}/metadata',
-    'GET /cas/{OsClient}/login',
     'ApiEngine:sso_capabilities',
     'ApiEngine:sso_complete_login',
+    'ApiEngine:sso_http_begin',
+    'ApiEngine:sso_http_oidc_discovery',
+    'ApiEngine:sso_http_saml_idp_metadata',
+    'ApiEngine:sso_http_cas_login',
+    'ApiEngine:ResponseType=HTTP',
+    'ApiEngine:TemplateRouteV1',
+    'V8.Method.RunSsoProtocol',
     'V8.Method.CreateFederatedUser',
     'V8.Method.CreateSsoLoginTicket',
     'V8.Method.CompleteSsoLogin',
@@ -314,16 +317,61 @@ const engineSpecs = [
   ['75000000-1000-4000-8000-000000000008', 'sso_complete_login', 'SSO 完成登录', '[SSO]完成登录(sso_complete_login).js', 1, 0],
   ['75000000-1000-4000-8000-000000000009', 'sso_rotate_client_secret', 'SSO 轮换 OIDC 客户端密钥', '[SSO]轮换客户端密钥(sso_rotate_client_secret).js', 0, 0],
   ['75000000-1000-4000-8000-000000000010', 'sso_legacy_token_login', 'SSO 存量 Token 登录', '[SSO]存量Token登录(sso_legacy_token_login).js', 1, 0],
-  ['75000000-1000-4000-8000-000000000011', 'sso_user_runtime', 'SSO 用户运行时', '[SSO]用户运行时(sso_user_runtime).js', 0, 1]
+  ['75000000-1000-4000-8000-000000000011', 'sso_user_runtime', 'SSO 用户运行时', '[SSO]用户运行时(sso_user_runtime).js', 0, 1],
+  ['75000000-2000-4000-8000-000000000001', 'sso_http_begin', 'SSO 发起登录', '[SSO]协议端点-发起登录(sso_http_begin).js', 1, 0, '/api/Sso/Begin', 'Begin'],
+  ['75000000-2000-4000-8000-000000000002', 'sso_http_complete_authorization', 'SSO 完成授权', '[SSO]协议端点-完成授权(sso_http_complete_authorization).js', 0, 0, '/api/Sso/CompleteAuthorization', 'CompleteAuthorization'],
+  ['75000000-2000-4000-8000-000000000003', 'sso_http_oidc_callback', 'OIDC 登录回调', '[SSO]协议端点-OIDC回调(sso_http_oidc_callback).js', 1, 0, '/api/Sso/OidcCallback', 'OidcCallback'],
+  ['75000000-2000-4000-8000-000000000004', 'sso_http_oidc_discovery', 'OIDC Discovery', '[SSO]协议端点-OIDC发现(sso_http_oidc_discovery).js', 1, 0, '/sso/{OsClient}/.well-known/openid-configuration', 'OidcDiscovery'],
+  ['75000000-2000-4000-8000-000000000005', 'sso_http_oidc_jwks', 'OIDC JWKS', '[SSO]协议端点-OIDCJWKS(sso_http_oidc_jwks).js', 1, 0, '/sso/{OsClient}/jwks', 'OidcJwks'],
+  ['75000000-2000-4000-8000-000000000006', 'sso_http_oidc_authorize', 'OIDC 授权', '[SSO]协议端点-OIDC授权(sso_http_oidc_authorize).js', 1, 0, '/sso/{OsClient}/authorize', 'OidcAuthorize'],
+  ['75000000-2000-4000-8000-000000000007', 'sso_http_oidc_token', 'OIDC Token', '[SSO]协议端点-OIDCToken(sso_http_oidc_token).js', 1, 0, '/sso/{OsClient}/token', 'OidcToken'],
+  ['75000000-2000-4000-8000-000000000008', 'sso_http_oidc_userinfo', 'OIDC UserInfo', '[SSO]协议端点-OIDC用户信息(sso_http_oidc_userinfo).js', 1, 0, '/sso/{OsClient}/userinfo', 'OidcUserInfo'],
+  ['75000000-2000-4000-8000-000000000009', 'sso_http_oidc_introspect', 'OIDC Token 内省', '[SSO]协议端点-OIDC内省(sso_http_oidc_introspect).js', 1, 0, '/sso/{OsClient}/introspect', 'OidcIntrospect'],
+  ['75000000-2000-4000-8000-000000000010', 'sso_http_oidc_revoke', 'OIDC Token 撤销', '[SSO]协议端点-OIDC撤销(sso_http_oidc_revoke).js', 1, 0, '/sso/{OsClient}/revoke', 'OidcRevoke'],
+  ['75000000-2000-4000-8000-000000000011', 'sso_http_oidc_logout', 'OIDC 退出', '[SSO]协议端点-OIDC退出(sso_http_oidc_logout).js', 1, 0, '/sso/{OsClient}/logout', 'OidcEndSession'],
+  ['75000000-2000-4000-8000-000000000012', 'sso_http_cas_callback', 'CAS 登录回调', '[SSO]协议端点-CAS回调(sso_http_cas_callback).js', 1, 0, '/api/Sso/CasCallback', 'CasCallback'],
+  ['75000000-2000-4000-8000-000000000013', 'sso_http_cas_login', 'CAS 登录', '[SSO]协议端点-CAS登录(sso_http_cas_login).js', 1, 0, '/cas/{OsClient}/login', 'CasLogin'],
+  ['75000000-2000-4000-8000-000000000014', 'sso_http_cas_service_validate', 'CAS 2.0 票据校验', '[SSO]协议端点-CAS2校验(sso_http_cas_service_validate).js', 1, 0, '/cas/{OsClient}/serviceValidate', 'CasServiceValidate'],
+  ['75000000-2000-4000-8000-000000000015', 'sso_http_cas_p3_service_validate', 'CAS 3.0 票据校验', '[SSO]协议端点-CAS3校验(sso_http_cas_p3_service_validate).js', 1, 0, '/cas/{OsClient}/p3/serviceValidate', 'CasServiceValidate'],
+  ['75000000-2000-4000-8000-000000000016', 'sso_http_cas_validate', 'CAS 1.0 票据校验', '[SSO]协议端点-CAS1校验(sso_http_cas_validate).js', 1, 0, '/cas/{OsClient}/validate', 'CasValidate'],
+  ['75000000-2000-4000-8000-000000000017', 'sso_http_cas_logout', 'CAS 退出', '[SSO]协议端点-CAS退出(sso_http_cas_logout).js', 1, 0, '/cas/{OsClient}/logout', 'CasLogout'],
+  ['75000000-2000-4000-8000-000000000018', 'sso_http_saml_begin', 'SAML 外部登录发起', '[SSO]协议端点-SAML发起(sso_http_saml_begin).js', 1, 0, '/api/Sso/SamlBegin', 'SamlBegin'],
+  ['75000000-2000-4000-8000-000000000019', 'sso_http_saml_acs', 'SAML 外部登录 ACS', '[SSO]协议端点-SAMLACS(sso_http_saml_acs).js', 1, 0, '/api/Sso/SamlAcs', 'SamlAcs'],
+  ['75000000-2000-4000-8000-000000000020', 'sso_http_saml_login', 'SAML IdP 登录', '[SSO]协议端点-SAML登录(sso_http_saml_login).js', 1, 0, '/saml/{OsClient}/login', 'SamlLogin'],
+  ['75000000-2000-4000-8000-000000000021', 'sso_http_saml_complete', 'SAML IdP 完成授权', '[SSO]协议端点-SAML完成(sso_http_saml_complete).js', 1, 0, '/api/Sso/SamlComplete', 'SamlComplete'],
+  ['75000000-2000-4000-8000-000000000022', 'sso_http_saml_idp_metadata', 'SAML IdP Metadata', '[SSO]协议端点-SAMLIdP元数据(sso_http_saml_idp_metadata).js', 1, 0, '/saml/{OsClient}/metadata', 'SamlIdpMetadata'],
+  ['75000000-2000-4000-8000-000000000023', 'sso_http_saml_sp_metadata', 'SAML SP Metadata', '[SSO]协议端点-SAMLSP元数据(sso_http_saml_sp_metadata).js', 1, 0, '/saml/{OsClient}/sp/{ConnectionKey}/metadata', 'SamlSpMetadata'],
+  ['75000000-2000-4000-8000-000000000024', 'sso_http_saml_logout', 'SAML 退出', '[SSO]协议端点-SAML退出(sso_http_saml_logout).js', 1, 0, '/saml/{OsClient}/logout', 'SamlLogout']
 ];
-pkg.SysApiEngines = engineSpecs.map(([id, key, name, fileName, allowAnonymous, stopHttp]) => ({
+
+// 公开协议端点的 JS 保持极薄：路径、匿名策略和版本属于应用资源；协议编解码、
+// 签名验签、一次性票据及 DiyToken 仍由不可覆盖的可信原子负责。
+for (const [, key, name, fileName, , , apiAddress, operation] of engineSpecs) {
+  if (!operation) continue;
+  const source = `/*\n * V8 ApiEngine\n * ApiEngineKey: ${key}\n * Version: v1.0.3\n * Function: ${name}；通过通用 HTTP 响应契约返回协议要求的状态码、响应头与正文。\n */\n\nreturn V8.Method.RunSsoProtocol({\n  Operation: '${operation}',\n  Param: V8.Param\n});\n`;
+  fs.writeFileSync(path.join(engineSourceDirectory, fileName), source, 'utf8');
+}
+
+// 元数据版本和源码头版本共同参与后端升级门禁。已有 11 个编排引擎也必须随本次
+// 协议路由闭包同步升级，避免出现“包版本已更新、源码仍宣称旧契约”的半升级状态。
+for (const [, key, , fileName] of engineSpecs) {
+  const sourcePath = path.join(engineSourceDirectory, fileName);
+  const source = fs.readFileSync(sourcePath, 'utf8')
+    .replace(/Version:\s*v?\d+\.\d+\.\d+/i, 'Version: v1.0.3');
+  if (!/Version:\s*v1\.0\.3/i.test(source)) {
+    throw new Error(`SSO 接口引擎源码缺少可升级的版本声明：${key} (${fileName})`);
+  }
+  fs.writeFileSync(sourcePath, source.replace(/\r\n?/g, '\n').replace(/\n*$/, '\n'), 'utf8');
+}
+
+pkg.SysApiEngines = engineSpecs.map(([id, key, name, fileName, allowAnonymous, stopHttp, apiAddress, operation]) => ({
   IsDeleted: 0,
   UserName: '管理员',
   UserId: 'c74d669c-a3d4-11e5-b60d-b870f43edd03',
   CreateTime: '2026-08-21 12:00:00',
   Id: id,
-  ChangeHistory: `2026-08-25 00:00:00 v1.0.2 增加官方资源策略提示与 SSO 租户 Hook 安全合同\n2026-08-21 12:00:00 v1.0.1 创建接口引擎 ${key}\n`,
-  Version: 'v1.0.2',
+  ChangeHistory: `2026-08-30 00:00:00 v1.0.3 将 SSO 公开协议路由全部迁入接口引擎并支持受控 HTTP 响应\n2026-08-25 00:00:00 v1.0.2 增加官方资源策略提示与 SSO 租户 Hook 安全合同\n2026-08-21 12:00:00 v1.0.1 创建接口引擎 ${key}\n`,
+  Version: 'v1.0.3',
   LimitRecursion: 5000,
   LimitMemory: 2048,
   MaxStatements: 100000000,
@@ -333,7 +381,8 @@ pkg.SysApiEngines = engineSpecs.map(([id, key, name, fileName, allowAnonymous, s
   Category: 'SSO身份联邦',
   Files: '[]',
   AllowAnonymous: allowAnonymous,
-  ApiAddress: `/apiengine/${key}`,
+  ApiAddress: apiAddress || `/apiengine/${key}`,
+  ...(operation ? { ResponseType: 'HTTP' } : {}),
   Lock: 0,
   ApiV8Code: fs.readFileSync(path.join(engineSourceDirectory, fileName), 'utf8').replace(/\r\n?/g, '\n').replace(/\n*$/, '\n'),
   ApiRole: '[]',

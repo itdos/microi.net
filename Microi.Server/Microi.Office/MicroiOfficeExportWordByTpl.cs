@@ -18,6 +18,13 @@ namespace Microi.net
 {
     public partial class MicroiOffice : IMicroiOffice
     {
+        private const long MaxTemplateImageBytes = 20L * 1024 * 1024;
+        private static readonly HttpClient TemplateImageHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(30),
+            MaxResponseContentBufferSize = MaxTemplateImageBytes
+        };
+
         public IFormEngine _formEngine;
         public MicroiOffice(IFormEngine formEngine)
         {
@@ -28,10 +35,10 @@ namespace Microi.net
         /// </summary>
         public async Task<DosResult<byte[]>> ExportWordByTpl(OfficeExportParam param)
         {
-            if (param.FormDataId.DosIsNullOrWhiteSpace() || param.FormEngineKey.DosIsNullOrWhiteSpace() ||
+            if (param == null || param.FormDataId.DosIsNullOrWhiteSpace() || param.FormEngineKey.DosIsNullOrWhiteSpace() ||
                 param.OsClient.DosIsNullOrWhiteSpace() || (param.TplFileByte == null && param.TplKey.DosIsNullOrWhiteSpace() && param.TplId.DosIsNullOrWhiteSpace()))
             {
-                return new DosResult<byte[]>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+                return new DosResult<byte[]>(0, null, DiyMessage.GetLang(param?.OsClient, "ParamError", param?._Lang));
             }
 
             try
@@ -663,10 +670,7 @@ namespace Microi.net
         {
             try
             {
-                using (var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) })
-                {
-                    return httpClient.GetByteArrayAsync(imageUrl).GetAwaiter().GetResult();
-                }
+                return TemplateImageHttpClient.GetByteArrayAsync(imageUrl).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {

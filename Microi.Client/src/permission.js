@@ -63,7 +63,7 @@ function getAccessKeyAllowedRoutes(currentUser) {
 function isAuthenticationFailure(error) {
     if (!error) return false;
     if (error.isAuthFailure === true) return true;
-    if ([1001, 1002].includes(Number(error.code))) return true;
+    if ([1001, 1002].includes(Number(error.code ?? error.Code))) return true;
     var message = String(error.message || error.Msg || "").trim().toLowerCase();
     return message === "nologin"
         || message.includes("nologin")
@@ -257,16 +257,37 @@ router.beforeEach(async (to, from, next) => {
             next();
             return;
         }
+        const userStore = useUserStore(pinia);
+        const permissionStore = usePermissionStore(pinia);
+        if (!userStore.roles || userStore.roles.length === 0) {
+            try {
+                // A browser cache only proves that a Token string exists. Resolve the
+                // authoritative user before any protected menu request so a revoked or
+                // expired session cannot be misreported as a menu-permission failure.
+                await userStore.getInfo();
+            } catch (error) {
+                console.error("[permission] 登录身份初始化失败：", error);
+                if (!DiyCommon.getToken() || isAuthenticationFailure(error)) {
+                    await userStore.resetToken();
+                    if (isAnonymousRoute) {
+                        next(createDynamicRouteRematch(to));
+                    } else {
+                        next({ path: "/login", query: { redirect: to.fullPath } });
+                    }
+                } else {
+                    next(false);
+                }
+                return;
+            }
+        }
         const accessKeyDiyStore = useDiyStore(pinia);
         const accessKeyAllowedRoutes = getAccessKeyAllowedRoutes(accessKeyDiyStore.GetCurrentUser);
         if (accessKeyAllowedRoutes.length > 0) {
             const targetPath = normalizeMenuRoutePath(to.path || "/");
             const allowAllPages = accessKeyAllowedRoutes.includes("*");
             if (allowAllPages) {
-                const accessKeyUserStore = useUserStore(pinia);
-                const permissionStore = usePermissionStore(pinia);
-                if (!accessKeyUserStore.roles || accessKeyUserStore.roles.length === 0) {
-                    accessKeyUserStore.setRoles(["access-key"]);
+                if (!userStore.roles || userStore.roles.length === 0) {
+                    userStore.setRoles(["access-key"]);
                 }
                 if (!permissionStore.addRoutes || permissionStore.addRoutes.length === 0) {
                     const accessRoutes = await permissionStore.generateRoutes(["access-key"]);
@@ -302,9 +323,8 @@ router.beforeEach(async (to, from, next) => {
                 return;
             }
             if (accessKeyAllowedRoutes.includes(targetPath)) {
-                const accessKeyUserStore = useUserStore(pinia);
-                if (!accessKeyUserStore.roles || accessKeyUserStore.roles.length === 0) {
-                    accessKeyUserStore.setRoles(["access-key"]);
+                if (!userStore.roles || userStore.roles.length === 0) {
+                    userStore.setRoles(["access-key"]);
                 }
                 next();
             } else {
@@ -315,9 +335,7 @@ router.beforeEach(async (to, from, next) => {
         if (to.path === "/login") {
             next({ path: "/" });
         } else {
-            const userStore = useUserStore(pinia);
             const hasRoles = userStore.roles && userStore.roles.length > 0;
-            const permissionStore = usePermissionStore(pinia);
             if (hasRoles && permissionStore.addRoutes && permissionStore.addRoutes.length > 0) {
                 const fallbackPath = getPermissionFallbackPath(permissionStore.addRoutes, to.path);
                 if (fallbackPath) {
@@ -327,9 +345,7 @@ router.beforeEach(async (to, from, next) => {
                 }
             } else {
                 try {
-                    // 设置角色，避免无限循环
-                    const currentRoles = hasRoles ? userStore.roles : ["admin"];
-                    if (!hasRoles) userStore.setRoles(currentRoles);
+                    const currentRoles = userStore.roles;
                     
                     const accessRoutes = await permissionStore.generateRoutes(currentRoles);
                     // Vue Router 4: addRoutes 已移除，改用 addRoute 逐个添加

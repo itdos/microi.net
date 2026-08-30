@@ -21,6 +21,7 @@ using System.Text;
 using Dos.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -66,24 +67,55 @@ namespace Microi.net.Api
         /// while preserving it for every ordinary controller write operation.
         /// </summary>
         public static bool DefersOnlyGetToApiEngineRoleAuthorization(
-            ControllerActionDescriptor actionDescriptor)
+            ActionDescriptor actionDescriptor,
+            string requestPath = null)
         {
+            // DynamicControllerRouteValueTransformer may leave both the runtime
+            // descriptor type and RouteValues without controller/action names.
+            // The public dispatcher prefix is nevertheless unambiguous and its
+            // target engine performs the authoritative ApiRole check itself.
+            if (!requestPath.DosIsNullOrWhiteSpace()
+                && (requestPath.Equals("/apiengine", StringComparison.OrdinalIgnoreCase)
+                    || requestPath.StartsWith("/apiengine/", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
             if (actionDescriptor == null) return false;
+            var controllerAction = actionDescriptor as ControllerActionDescriptor;
+            var controllerName = controllerAction?.ControllerName;
+            var actionName = controllerAction?.ActionName;
+
+            // DynamicControllerRouteValueTransformer can expose a plain
+            // ActionDescriptor to authorization filters. In that case the
+            // authoritative controller/action names still exist in RouteValues;
+            // discarding them made /apiengine/{key} look like an ordinary write
+            // and OnlyGet users were rejected before the engine's exact ApiRole
+            // policy (including $authenticated) could run.
+            if (controllerName.DosIsNullOrWhiteSpace())
+            {
+                actionDescriptor.RouteValues?.TryGetValue("controller", out controllerName);
+            }
+            if (actionName.DosIsNullOrWhiteSpace())
+            {
+                actionDescriptor.RouteValues?.TryGetValue("action", out actionName);
+            }
+
             if (string.Equals(
-                    actionDescriptor.ControllerName,
+                    controllerName,
                     "ApiEngine",
                     StringComparison.Ordinal)
-                && ApiEngineExecutionActions.Contains(actionDescriptor.ActionName))
+                && ApiEngineExecutionActions.Contains(actionName ?? string.Empty))
             {
                 return true;
             }
 
             return string.Equals(
-                       actionDescriptor.ControllerName,
+                       controllerName,
                        "BackgroundTask",
                        StringComparison.Ordinal)
                    && string.Equals(
-                       actionDescriptor.ActionName,
+                       actionName,
                        "RunApiEngine",
                        StringComparison.Ordinal);
         }
@@ -93,13 +125,27 @@ namespace Microi.net.Api
         /// API-engine execution routes remain protected by their own exact ApiRole
         /// authorization; ordinary controller writes are not included here.
         /// </summary>
-        public static bool AllowsOnlyGetAction(ControllerActionDescriptor actionDescriptor)
+        public static bool AllowsOnlyGetAction(
+            ActionDescriptor actionDescriptor,
+            string requestPath = null)
         {
             if (actionDescriptor == null) return false;
-            if (DefersOnlyGetToApiEngineRoleAuthorization(actionDescriptor)) return true;
+            if (DefersOnlyGetToApiEngineRoleAuthorization(actionDescriptor, requestPath)) return true;
+
+            var controllerAction = actionDescriptor as ControllerActionDescriptor;
+            var controllerName = controllerAction?.ControllerName;
+            var actionName = controllerAction?.ActionName;
+            if (controllerName.DosIsNullOrWhiteSpace())
+            {
+                actionDescriptor.RouteValues?.TryGetValue("controller", out controllerName);
+            }
+            if (actionName.DosIsNullOrWhiteSpace())
+            {
+                actionDescriptor.RouteValues?.TryGetValue("action", out actionName);
+            }
 
             return OnlyGetSafeActions.Contains(
-                $"{actionDescriptor.ControllerName}.{actionDescriptor.ActionName}");
+                $"{controllerName}.{actionName}");
         }
         /// <summary>
         /// 记录请求耗时，并将超过阈值的调用写入异步系统日志。
@@ -1115,7 +1161,8 @@ namespace Microi.net.Api
                                 var requestType = tArr[tArr.Length - 1].Substring(0, 3);
                                 var allowsOnlyGetAction =
                                     AllowsOnlyGetAction(
-                                        context.ActionDescriptor as ControllerActionDescriptor);
+                                        context.ActionDescriptor,
+                                        context.HttpContext.Request.Path.Value);
                                 if (requestType.ToUpper() != "GET"
                                     && baseLimit.Any(d => d == "OnlyGet")
                                     && !allowsOnlyGetAction)

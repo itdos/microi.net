@@ -84,41 +84,32 @@ namespace Microi.net
                 var updated = new JArray();
                 foreach (var key in keys)
                 {
-                    var engineResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(
-                        "sys_apiengine",
-                        new JObject
-                        {
-                            ["OsClient"] = osClient,
-                            ["_Where"] = new JArray(new JArray("ApiEngineKey", "=", key))
-                        });
+                    // Resolve the target row from the tenant's primary database.
+                    // A FormEngine model cache can still contain a historical Id
+                    // after an application package replaces an engine row.
+                    var engineResult = await RefreshApiEngineRouteCache(osClient, key);
                     if (engineResult.Code != 1 || engineResult.Data == null)
                         return new DosResult<object>(0, null, $"接口引擎不存在：{key}");
                     var engine = JObject.FromObject(engineResult.Data);
-                    var update = await MicroiEngine.FormEngine.UptFormDataAsync(
-                        "sys_apiengine",
-                        new JObject
-                        {
-                            ["OsClient"] = osClient,
-                            ["Id"] = SafeJString(engine, "Id"),
-                            ["ApiRole"] = apiRole
-                        });
+                    var engineId = SafeJString(engine, "Id");
+                    var update = PersistApiEngineRolesAuthoritatively(
+                        osClient,
+                        engineId,
+                        key,
+                        apiRole);
                     if (update.Code != 1)
                         return new DosResult<object>(update.Code, update.Data, $"更新接口引擎角色失败：{key}，{update.Msg}");
 
-                    var cache = await RefreshApiEngineRouteCache(osClient, key, SafeJString(engine, "Id"));
+                    var cache = await RefreshApiEngineRouteCache(osClient, key, engineId);
                     if (cache.Code != 1)
                         return new DosResult<object>(cache.Code, cache.Data, $"刷新接口引擎缓存失败：{key}，{cache.Msg}");
 
-                    var readback = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(
-                        "sys_apiengine",
-                        new JObject
-                        {
-                            ["OsClient"] = osClient,
-                            ["Id"] = SafeJString(engine, "Id")
-                        });
-                    var readbackRole = readback.Code == 1 && readback.Data != null
-                        ? SafeJString(JObject.FromObject(readback.Data), "ApiRole")
-                        : string.Empty;
+                    // The cache refresh also reads the authoritative tenant DB.
+                    // Its row is the final public readback; FormEngine row caches
+                    // must never be used to report a successful security-policy write.
+                    var readbackRole = cache.Data == null
+                        ? string.Empty
+                        : SafeJString(JObject.FromObject(cache.Data), "ApiRole");
                     if (!string.Equals(readbackRole, apiRole, StringComparison.Ordinal))
                         return new DosResult<object>(0, null, $"接口引擎角色回读不一致：{key}");
 
@@ -140,6 +131,67 @@ namespace Microi.net
             {
                 return new DosResult<object>(0, null, "SetEngineRoles 失败：" + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Persists the API-engine authorization policy against the tenant's
+        /// primary database and immediately reads the same row back. This MCP
+        /// operation controls executable authorization metadata, so a cached
+        /// FormEngine success result is not sufficient proof that the policy was
+        /// committed. The database session is already scoped by osClient; Id and
+        /// ApiEngineKey are both required to prevent a stale lookup from updating
+        /// a historical or duplicate row.
+        /// </summary>
+        private static DosResult<object> PersistApiEngineRolesAuthoritatively(
+            string osClient,
+            string engineId,
+            string apiEngineKey,
+            string apiRole)
+        {
+            if (IsBlank(engineId) || IsBlank(apiEngineKey))
+                return new DosResult<object>(0, null, "接口引擎 Id 和 ApiEngineKey 不能为空");
+
+            var client = OsClientExtend.GetClient(osClient);
+            if (client?.Db == null)
+                return new DosResult<object>(0, null, $"未找到租户数据库连接：{osClient}");
+
+            var update = client.Db.FromSql(
+                    "UPDATE sys_apiengine "
+                    + "SET ApiRole=?apiRole, UpdateTime=?updateTime "
+                    + "WHERE Id=?id AND ApiEngineKey=?key "
+                    + "AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                .AddInParameter("?apiRole", apiRole)
+                .AddInParameter("?updateTime", DateTime.Now)
+                .AddInParameter("?id", engineId)
+                .AddInParameter("?key", apiEngineKey);
+            update.SetCommandTimeout(10);
+            var affected = update.ExecuteNonQuery();
+            if (affected < 0 || affected > 1)
+            {
+                return new DosResult<object>(
+                    0,
+                    new { AffectedRows = affected, EngineId = engineId, ApiEngineKey = apiEngineKey },
+                    "数据库接口引擎角色更新影响行数异常");
+            }
+
+            var readback = client.Db.FromSql(
+                    "SELECT Id, ApiEngineKey, ApiRole, UpdateTime "
+                    + "FROM sys_apiengine "
+                    + "WHERE Id=?id AND ApiEngineKey=?key "
+                    + "AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                .AddInParameter("?id", engineId)
+                .AddInParameter("?key", apiEngineKey);
+            readback.SetCommandTimeout(10);
+            var rowData = readback.ToFirst<dynamic>();
+            if (rowData == null)
+                return new DosResult<object>(0, null, "接口引擎角色数据库回读失败");
+
+            var row = JObject.FromObject(rowData);
+            if (!string.Equals(SafeJString(row, "ApiRole"), apiRole, StringComparison.Ordinal))
+                return new DosResult<object>(0, row, "接口引擎角色数据库回读不一致");
+            row["Changed"] = affected == 1;
+            row["Idempotent"] = affected == 0;
+            return new DosResult<object>(1, row, "接口引擎角色已写入租户数据库并回读");
         }
 
         public static async Task<DosResult<object>> ClearApplicationSource(

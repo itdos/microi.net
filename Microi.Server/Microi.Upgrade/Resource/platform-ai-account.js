@@ -7,6 +7,41 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */
+var aiAccountRoute = String(V8.Param.ApiAddress || '').replace(/\?.*$/, '').toLowerCase();
+var aiAccountActions = {
+  '/api/ai/relaytokensummary':'GetRelayTokenSummary',
+  '/api/ai/subgetplans':'GetPlans',
+  '/api/ai/subgetinfo':'GetSubscription',
+  '/api/ai/getuseraiapikey':'EnsureUserAiApiKey',
+  '/api/ai/resetuseraiapikey':'ResetUserAiApiKey',
+  '/api/ai/getuseraiusage':'GetRelayTokenUsage',
+  '/api/ai/subcreateorder':'CreateOrder',
+  '/api/ai/subcreatealipay':'CreateAlipay',
+  '/api/ai/subgetorders':'GetOrders',
+  '/api/ai/subconsumequota':'ConsumeQuota',
+  '/api/ai/subgetorderstatus':'GetOrderStatus',
+  '/api/ai/subgetapikeylist':'GetApiKeyList',
+  '/api/ai/subgetapikeybindusers':'GetApiKeyBindUsers',
+  '/api/ai/subgetapikeycapacity':'GetApiKeyCapacity',
+  '/api/ai/generateprofileavatar':'GenerateProfileAvatar',
+  '/api/ai/createminimaxvideo':'CreateMiniMaxVideo',
+  '/api/ai/getminimaxvideotask':'GetMiniMaxVideoTask',
+  '/api/ai/getminimaxvideofile':'GetMiniMaxVideoFile',
+  '/api/ai/persistminimaxvideofile':'PersistMiniMaxVideoFile',
+  '/api/ai/proxygetquotastatus':'GetSubscription',
+  '/api/ai/subgetmodels':'GetModels'
+};
+if(aiAccountActions[aiAccountRoute]){
+  V8.Param.Action = aiAccountActions[aiAccountRoute];
+  if(V8.Param.PageIndex === undefined && V8.Param.pageIndex !== undefined) V8.Param.PageIndex = V8.Param.pageIndex;
+  if(V8.Param.PageSize === undefined && V8.Param.pageSize !== undefined) V8.Param.PageSize = V8.Param.pageSize;
+  if(V8.Param.OrderId === undefined && V8.Param.orderId !== undefined) V8.Param.OrderId = V8.Param.orderId;
+  if(V8.Param.ApiKeyId === undefined && V8.Param.apiKeyId !== undefined) V8.Param.ApiKeyId = V8.Param.apiKeyId;
+}
+
+
+
 // Microi官方接口引擎：platform-ai-account
 // Version: v1.1.0
 // 普通套餐、订阅和订单由 V8 编排；密钥、额度原子、供应商协议、任务句柄和媒体落盘进入受信插件原子。

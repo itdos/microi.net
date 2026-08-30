@@ -33,10 +33,10 @@ Microi 吾码从 `v7.5.0` 起提供双向 SSO 身份联邦：既可以让企业�
 - 应用名：`SSO 身份联邦`
 - 类型：官方平台应用
 - 配置资源：`diy_sso`、`/system/sso` 菜单、64 个字段、7 个配置分组
-- 运行资源：11 个接口引擎，其中 10 个官方 Managed 核心和 1 个租户 CreateIfMissing Hook
+- 运行资源：35 个接口引擎，其中 34 个官方 Managed 核心（含 24 个公开 HTTP 协议端点）和 1 个租户 CreateIfMissing Hook
 - 安装数据：不附带示例连接、用户绑定、Client Secret 或证书
 
-从 `v7.5.2` 起，连接白名单投影、绑定/JIT、Claim 与角色映射、登录完成、审计、存量 Token 兼容和租户扩展均随应用接口引擎交付。`Microi.Server` 只保留 OIDC/SAML/CAS 报文、签名验签、证书/Secret 隔离、一次性票据和 DiyToken 等不能安全下放给脚本的原子边界；`Microi.Client` 负责登录入口和安全弹窗恢复。因此升级时仍必须分别确认应用包、后端、前端和真实伙伴联调，但普通业务规则不再依赖一组不可随商城升级的定制 `/api/Sso/*` Controller。
+从 `v7.5.9` 起，原 SSO Controller 的 24 个公开路由也全部由 Managed 接口引擎交付。接口引擎现在支持 `{OsClient}`/`{ConnectionKey}` 路径模板，以及受控状态码、Content-Type、重定向、XML/纯文本和响应头；独立 `Microi.SSO` 类库只保留 OIDC/SAML/CAS 协议编解码、签名验签、证书/Secret 隔离、一次性票据和 DiyToken 等可信原子，不再保留任何 `Sso*Controller`。`Microi.net.Api` 仅注册 `AddMicroiSSO()`，`Microi.Client` 负责登录入口和安全弹窗恢复。
 
 ### 接口引擎合同
 
@@ -53,6 +53,7 @@ Microi 吾码从 `v7.5.0` 起提供双向 SSO 身份联邦：既可以让企业�
 | `sso_rotate_client_secret` | OIDC Client Secret 轮换编排 | Managed |
 | `sso_legacy_token_login` | 受限的存量 Token 登录 | Managed |
 | `sso_user_runtime` | 协议网关读取启用用户最小投影 | Managed / StopHttp |
+| `sso_http_*`（24 个） | `/api/Sso/Begin`、授权完成与回调，OIDC/SAML/CAS 标准公开地址 | Managed / ResponseType=HTTP |
 
 官方核心被租户修改时升级失败关闭，不自动合并可执行代码。`sso_event_hook` 首次安装后归租户所有，后续官方升级永不覆盖；需要官方新增行为时发布新的 Hook Key，不能把现有租户 Hook 改回 Managed。
 
@@ -92,7 +93,9 @@ Microi 吾码从 `v7.5.0` 起提供双向 SSO 身份联邦：既可以让企业�
 
 登录页能力发现与登录完成使用可观测的自定义入口 `POST /apiengine/sso_capabilities?OsClient={OsClient}`、`POST /apiengine/sso_complete_login?OsClient={OsClient}`。不要再调用已移除的 `/api/Sso/Capabilities`、`/api/Sso/LegacyCapabilities`、`/api/Sso/CompleteLogin`、`/api/Sso/RotateClientSecret` 或 `/api/SysUser/SsoPengrui`；新版宿主即使应用尚未安装，也会返回结构化“接口引擎不存在”，而不是路由 404。
 
-`POST /api/Sso/Begin`、`POST /api/Sso/CompleteAuthorization` 以及下列标准协议 URL 是最小协议网关，不是业务编排接口。它们验证原始协议后调用上述接口引擎；不能为了追求“零 C# 路由”把私钥、外部 Client Secret、任意重定向或 DiyToken 签发暴露给可编辑脚本。
+`POST /api/Sso/Begin`、`POST /api/Sso/CompleteAuthorization` 以及下列标准协议 URL 都是 `app.microi.sso` 中 `sso_http_*` 接口引擎的 `ApiAddress`，不属于 MVC Controller。普通 V8 决定路由、匿名策略和编排；`V8.Method.RunSsoProtocol` 只允许对应官方 Key 调用，负责协议编解码、签名验签、一次性票据和 DiyToken 等可信原子。高风险 `Set-Cookie` 只能由该原子生成进程内签名响应，租户脚本无法伪造。
+
+路径模板值是权威参数：例如 `/saml/{OsClient}/sp/{ConnectionKey}/metadata` 命中后，服务端用路径中的租户与连接覆盖同名 Query/Form/JSON 值；多个模板同时匹配会失败关闭，避免跨租户或跨连接混淆。
 
 ### 吾码作为 OIDC Provider
 
@@ -116,7 +119,7 @@ Microi 吾码从 `v7.5.0` 起提供双向 SSO 身份联邦：既可以让企业�
 | 吾码 IdP Metadata | `GET /saml/{OsClient}/metadata` |
 | 吾码 SP Metadata | `GET /saml/{OsClient}/sp/{ConnectionKey}/metadata` |
 | 吾码作为 IdP 登录 | `GET/POST /saml/{OsClient}/login` |
-| 登录回调/ACS | `/api/Sso/SamlCallback`、`/api/Sso/SamlAcs` |
+| 外部登录发起/ACS | `/api/Sso/SamlBegin`、`/api/Sso/SamlAcs` |
 | SLO | `GET/POST /saml/{OsClient}/logout` |
 
 SAML 请求与响应校验签名、Destination、Issuer、Audience、时间窗口、InResponseTo 和重放；需要时加密断言。生产环境不允许关闭签名断言校验。
@@ -153,7 +156,7 @@ Service Ticket 为一次性票据，必须与原始 service 精确绑定；校�
 
 1. **源码与单测**：安全原语、协议状态机、回调校验、重放、跨租户、失败路径通过。
 2. **构建**：后端隔离输出构建成功；PC 现代包与兼容包构建成功。
-3. **应用包**：`app.microi.sso` 可重复生成，字段数/DDL/菜单、11 个接口引擎源码同源性与 ResourcePolicies 校验通过。
+3. **应用包**：`app.microi.sso` 可重复生成，字段数/DDL/菜单、35 个接口引擎源码同源性与 ResourcePolicies 校验通过。
 4. **官方商城**：官方 `sys_microistore` 行为 `Published`，AppId、版本、包哈希和资源计数回读一致。
 5. **目标租户**：安装/更新任务到 `Succeeded`，真实表、字段、菜单和版本回读；发布源保护性拒绝不能冒充安装成功。
 6. **浏览器 UI**：登录页只显示当前租户启用的连接，管理页 7 个 Tab 与双向/协议筛选正确，秘密字段无明文。
@@ -162,7 +165,7 @@ Service Ticket 为一次性票据，必须与原始 service 精确绑定；校�
 
 ## 八、常见问题
 
-**登录页请求 `/api/Sso/Capabilities` 等旧路径 404**：先升级 `Microi.Client`；新版统一调用 `/apiengine/{ApiEngineKey}`。再升级 `Microi.Server` 和 `app.microi.sso`，并回读 11 个接口引擎。应用尚未安装时自定义入口应返回结构化缺失提示，不应直接出现路由 404。
+**登录页请求 `/api/Sso/Capabilities` 等旧路径 404**：先升级 `Microi.Client`；新版能力接口统一调用 `/apiengine/{ApiEngineKey}`。再升级 `Microi.Server` 和 `app.microi.sso`，并回读 35 个接口引擎。`/api/Sso/Begin`、授权完成与协议回调仍保留原 URL，但它们现在是 Managed 接口引擎 `ApiAddress`，不是 Controller。
 
 **商城更新后仍执行旧接口代码**：回读 `sys_apiengine.Version/ApiV8Code`，确认 Managed 基线没有租户修改冲突，刷新租户接口引擎缓存；不要用 SQL 强行覆盖或手工修改 `.resource-sync-base`。
 

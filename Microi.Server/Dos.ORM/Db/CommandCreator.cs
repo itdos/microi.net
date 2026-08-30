@@ -141,7 +141,7 @@ namespace Dos.ORM
                 colums.Append(",");
 
                 if (NeedsQuoteReservedField()
-                    && OracleDefaultFieldNames.Any(d => d.ToLower() == fields[i].FieldName.Replace("{0}", "").Replace("{1}", "").ToLower()))
+                    && OracleDefaultFieldNames.Contains(fields[i].FieldName.Replace("{0}", "").Replace("{1}", "")))
                 {
                     colums.Append("\"" + fields[i].FieldName.Replace("{0}", "").Replace("{1}", "") + "\"");
                 }
@@ -224,7 +224,8 @@ namespace Dos.ORM
 
         #region 添加
 
-        private static List<string> OracleDefaultFieldNames = new List<string>() { "Unique", "Level", "Column", "Lock" };
+        private static readonly HashSet<string> OracleDefaultFieldNames =
+            new HashSet<string>(new[] { "Unique", "Level", "Column", "Lock" }, StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// 判断当前数据库是否需要对保留字段名加双引号
@@ -298,7 +299,7 @@ namespace Dos.ORM
             foreach (var kv in insertFields)
             {
                 fs.Append(",");
-                if (NeedsQuoteReservedField() && OracleDefaultFieldNames.Any(d => d.ToLower() == kv.Key.Replace("{0}", "").Replace("{1}", "").ToLower()))
+                if (NeedsQuoteReservedField() && OracleDefaultFieldNames.Contains(kv.Key.Replace("{0}", "").Replace("{1}", "")))
                 {
                     fs.Append("\"" + kv.Key.Replace("{0}", "").Replace("{1}", "") + "\"");
                 }

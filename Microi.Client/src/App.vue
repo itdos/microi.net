@@ -119,8 +119,14 @@ export default {
        } else {
            console.log('无法获取当前URL');
        }
-        var self = this;
-        self.syncClassicShellVisibility();
+         var self = this;
+         var authFailureMessage = self.DiyCommon.ConsumeAuthFailureMessage();
+         if (authFailureMessage) {
+             window.setTimeout(function () {
+                 self.DiyCommon.Tips(authFailureMessage, false);
+             }, 0);
+         }
+         self.syncClassicShellVisibility();
         self.classicShellKeyHandler = function (event) {
             if (event.key !== "Escape" || event.defaultPrevented || self.diyStore.IsTabFullScreen) return;
             const exited = exitClassicShellUrlMode(
@@ -354,7 +360,11 @@ export default {
             // 视为匿名启动状态；登录页会自行处理 URL Token、SSO 与账号登录。
             if (self.IsAnonymousRoute() || !self.DiyCommon.getToken()) return;
             await self.RefreshTokenWithLock();
-            self.GetCurrentUserApp();
+            if (self.diyStore.GetCurrentUser && self.diyStore.GetCurrentUser.Id) {
+                self.TryConnectWebSocketAfterCurrentUser();
+            } else {
+                self.GetCurrentUserApp();
+            }
             // 保存定时器引用，防止内存泄漏
             var refreshTokenTimer = window.setInterval(self.RefreshToken, 1000 * 60);
             self.timers.push(refreshTokenTimer);

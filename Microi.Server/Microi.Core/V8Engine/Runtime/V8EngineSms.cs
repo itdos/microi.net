@@ -13,7 +13,7 @@ namespace Microi.net
         public SmsParam DynamicToParam(dynamic dynamicParam)
         {
             JObject jobjParam = JsonHelper.ToJObject(dynamicParam);
-            SmsParam param = jobjParam.ToObject<SmsParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            SmsParam param = jobjParam.ToObject<SmsParam>(DiyCommon.GetJsonSerializer());//这里时间格式化没有用
             return param;
         }
         public DosResult Send(dynamic dynamicParam)

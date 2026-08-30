@@ -7,6 +7,22 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */
+var tenantSettingsRoute = String(V8.Param.ApiAddress || '').replace(/\?.*$/, '');
+var tenantSettingsAction = String(V8.Param.Action || '').trim();
+if(!tenantSettingsAction && tenantSettingsRoute){
+  var tenantSettingsSegments = tenantSettingsRoute.split('/');
+  tenantSettingsAction = tenantSettingsSegments[tenantSettingsSegments.length - 1] || '';
+}
+if(['GetPublic','GetMapRuntime','Save','GetRevealChallenge','Reveal'].indexOf(tenantSettingsAction) >= 0){
+  return V8.Method.RunPlatformApiRuntime({
+    RuntimeKey:'TenantSystemSettings', Action:tenantSettingsAction, Param:V8.Param || {}
+  });
+}
+V8.Param.Action = tenantSettingsAction;
+
+
+
 /*
  * V8 ApiEngine | ApiEngineKey: platform-tenant-system-settings | Version: v1.0.0
  * 仅编排 List、Delete 和非 Secret Save。Secret/Sensitive Key 的写入、查看和二次认证

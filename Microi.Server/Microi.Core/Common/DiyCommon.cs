@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using Dos.Common;
 
 using Newtonsoft.Json;
@@ -137,11 +138,26 @@ namespace Microi.net
             "OpenTable", "DevComponent", "PhoneSMS", "TableChild", "Button", "Divider",
             "CollapseGroup", "Tabs", "Alert", "StaticText", "Html"
         };
-        public static JsonSerializer JsonConfig = new JsonSerializer()
+        // Historical public field retained for binary compatibility. Platform
+        // code must use GetJsonSerializer so concurrent requests never share a
+        // mutable Newtonsoft.Json serializer instance.
+        public static JsonSerializer JsonConfig = CreateJsonSerializer();
+        private static readonly ThreadLocal<JsonSerializer> JsonSerializers =
+            new ThreadLocal<JsonSerializer>(CreateJsonSerializer);
+
+        private static JsonSerializer CreateJsonSerializer()
         {
-            ContractResolver = new DefaultContractResolver(),
-            DateFormatString = "yyyy-MM-dd HH:mm:ss"
-        };
+            return new JsonSerializer
+            {
+                ContractResolver = new DefaultContractResolver(),
+                DateFormatString = "yyyy-MM-dd HH:mm:ss"
+            };
+        }
+
+        public static JsonSerializer GetJsonSerializer()
+        {
+            return JsonSerializers.Value;
+        }
 
         public static readonly List<string> NotRealField = new List<string>()
         {

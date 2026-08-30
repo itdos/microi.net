@@ -459,7 +459,7 @@ PHASE_NUM=0
 
 #
 # 【DLL加密项目列表】（仅源码作者使用，开源用户请忽略）
-ENCRYPTED_PROJECTS=("Microi.net" "Microi.AI")
+ENCRYPTED_PROJECTS=("Microi.net" "Microi.AI" "Microi.WorkFlow")
 #
 
 # ──────────────────────────────────────────────────────────────
@@ -538,10 +538,10 @@ fi
 # DLL 加密能力检测
 HAS_ENCRYPT=false
 ENCRYPT_SCRIPT="Microi.Server/Microi.net/License/scripts/encrypt-dll.sh"
-if [ -d "Microi.Server/Microi.net" ] && [ -d "Microi.Server/Microi.AI" ]; then
+if [ -d "Microi.Server/Microi.net" ] && [ -d "Microi.Server/Microi.AI" ] && [ -d "Microi.Server/Microi.WorkFlow" ]; then
     if [ -f "$ENCRYPT_SCRIPT" ]; then
         HAS_ENCRYPT=true
-        print_success "DLL 加密: 可用（检测到 Microi.net + Microi.AI 源码）"
+        print_success "DLL 加密: 可用（检测到 Microi.net + Microi.AI + Microi.WorkFlow 源码）"
     else
         print_warning "DLL 加密: 源码存在但加密脚本缺失: $ENCRYPT_SCRIPT"
     fi
@@ -1064,7 +1064,7 @@ fi
 # 已经真实完成启动验证，而不是只验证未混淆原件。
 if [ "$HAS_ENCRYPT" = true ]; then
     print_divider
-    print_step "加密 DLL（Microi.net.dll + Microi.AI.dll）..."
+    print_step "加密 DLL（Microi.net.dll + Microi.AI.dll + Microi.WorkFlow.dll）..."
     if ! bash "$ENCRYPT_SCRIPT" "$PUBLISH_DIR"; then
         print_fail "DLL 加密失败！请查看上方 Obfuscar 具体错误（工具缺失或依赖解析失败）"
     fi
@@ -1346,7 +1346,7 @@ if [ "$PUSH_NUGET" = true ]; then
 
     # 安全检查：有加密源码但未加密时禁止推送
     if [ "$HAS_ENCRYPT" = true ] && [ "$DLL_ENCRYPTED" != true ]; then
-        print_fail "检测到 Microi.net/Microi.AI 源码但 DLL 未加密，禁止推送未加密的 NuGet 包！"
+        print_fail "检测到 Microi.net/Microi.AI/Microi.WorkFlow 源码但 DLL 未加密，禁止推送未加密的 NuGet 包！"
     fi
     if [ "$HAS_ENCRYPT" = true ] && [ "$NUPKG_REPLACED" != true ]; then
         print_fail "NuGet 包中的 DLL 未被替换为加密版本，禁止推送！"
@@ -1585,7 +1585,7 @@ if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]
 
     # 安全检查：有加密源码但未加密时禁止推送后端 Docker
     if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] && [ "$HAS_ENCRYPT" = true ] && [ "$DLL_ENCRYPTED" != true ]; then
-        print_fail "检测到 Microi.net/Microi.AI 源码但 DLL 未加密，禁止推送未加密的 Docker 镜像！"
+        print_fail "检测到 Microi.net/Microi.AI/Microi.WorkFlow 源码但 DLL 未加密，禁止推送未加密的 Docker 镜像！"
     fi
 
     # 推送后端 Docker

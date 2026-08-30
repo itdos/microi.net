@@ -7,6 +7,19 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */
+var marketplaceRoute = String(V8.Param.ApiAddress || '').replace(/\?.*$/, '');
+var marketplaceAction = String(V8.Param.Action || '').trim();
+if(!marketplaceAction && marketplaceRoute){
+  var marketplaceSegments = marketplaceRoute.split('/');
+  marketplaceAction = marketplaceSegments[marketplaceSegments.length - 1] || '';
+}
+if(['Discover','Captcha','Login','Query','Disconnect'].indexOf(marketplaceAction) >= 0){
+  return V8.Method.RunPlatformApiRuntime({
+    RuntimeKey:'MarketplaceSource', Action:marketplaceAction, Param:V8.Param || {}
+  });
+}
+
 /* V8 ApiEngine | ApiEngineKey: platform-marketplace-source | Version: v1.0.0 */
 
 var param = V8.Param || {};

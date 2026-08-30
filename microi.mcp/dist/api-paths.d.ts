@@ -9,6 +9,8 @@ export declare const API: {
     readonly CREATE_USER_ACCESS_KEY: "/api/SysUserAccessKey/Create";
     readonly REVOKE_USER_ACCESS_KEY: "/api/SysUserAccessKey/Revoke";
     readonly GET_STATUS: "/api/V8Engine/GetStatus";
+    readonly GET_ADMINISTRATIVE_CAPABILITIES: "/api/V8Engine/GetAdministrativeCapabilities";
+    readonly ADMINISTER_TABLE_DATA: "/api/V8Engine/AdministerTableData";
     readonly AI_CHAT: "/api/Ai/Chat";
     readonly GENERATE_MINIMAX_MUSIC: "/api/Ai/GenerateMiniMaxMusic";
     readonly GENERATE_MINIMAX_SPEECH: "/api/Ai/GenerateMiniMaxSpeech";

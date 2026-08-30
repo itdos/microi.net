@@ -42,11 +42,12 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 
 ## 接口引擎资源所有权（强制）
 
-- 新发布包必须声明 `ResourcePolicies.ApiEngines`，不得再依赖“同 Key 直接覆盖”。官方不可随租户修改的核心使用 `{ Ownership:'Application', UpgradePolicy:'Managed' }`；提供给租户改业务的 Hook 使用 `{ Ownership:'Tenant', UpgradePolicy:'CreateIfMissing' }`。
+- 新发布包必须声明 `ResourcePolicies.ApiEngines`，不得再依赖“同 Key 直接覆盖”。官方不可随租户修改的核心使用 `{ Ownership:'Platform', UpgradePolicy:'Managed' }`；提供给租户改业务的 Hook 使用 `{ Ownership:'Tenant', UpgradePolicy:'CreateIfMissing' }`。
 - 发布器从上一版安装包正文的 `SysApiEngines` 计算 `BaseHash`；正文可能来自已验证的 HDFS 指针或旧版 `AppPakcet`。导入成功后把本版摘要写入 `sys_microistoreversion.InstallResult.ResourceState.ApiEngines`。普通/社区应用仍按 Base/Local/Incoming 三方保护：`Local == Base` 才更新，`Local != Base && Local != Incoming` 必须冲突回滚。允许覆盖官方 Managed 的信任来源只有两种：一是从固定 `https://api.itdos.com + iTdos` 实时回读并校验为官方 `ApplicationType=Platform` 的应用；二是 Upgrade13 从程序集固定九包白名单读取并校验后，在绑定固定导入器 Key 与当前租户的一次性宿主上下文中调用统一导入器。第二种授权必须由宿主上下文消费一次，单独伪造 V8 参数、离线包、自报官方或非 Platform 来源都不能获得；两种路径都只能恢复 `Platform/Managed`，不得覆盖 `Tenant/CreateIfMissing`。
 - `CreateIfMissing` 只在目标 Key 不存在时创建，存在时不得对齐 Id、源码、启用状态或其它字段。扩展模板发布后即归租户维护；后续版本禁止把同一 Key 改回 `Managed` 接管，确需新的官方核心时发布新 Key 并显式迁移。
 - 官方功能采用“Managed 核心 + CreateIfMissing Hook”。核心只提供稳定协议和默认行为，并在可信官方 Platform 包更新时覆盖升级；客户日志、写表、通知和业务动作放 Hook，并以稳定 `EventId`、唯一约束或 outbox 幂等。`CreateIfMissing` 一旦交给租户维护，即使后续官方包误改为 Managed 也必须冲突回滚。
 - 每个官方包内的接口引擎源码顶部都必须有醒目所有权提示。Managed 提示必须写明所属官方应用、从可信官方源安装/更新/重新安装会恢复官方代码，并指向该应用的 CreateIfMissing Hook；CreateIfMissing 提示必须写明首次创建后归租户维护、官方升级不得覆盖。官方 SSO、登录、通知等核心在安全阶段调用 Hook 时，只传脱敏上下文，禁止传 Token、Secret、密码或原始协议断言。
+- 兼容旧 Controller/移动端地址时，在唯一 Managed 接口的 `ApiRoutes` 中用英文分号声明全部旧路径；包导入、启动闭包和写后回读必须校验 `ApiAddress + ApiRoutes` 的全局唯一性。禁止为每个旧路径复制一条接口引擎，也禁止只更新本地 JSON 而遗漏 `.resource-sync-base`、官方商城资源和缓存别名。
 - 历史包未声明策略时只能按旧兼容流程安装；重新发布时发布器必须生成策略。验收至少覆盖首次安装、可信官方 Managed 本地有差异仍覆盖、普通应用核心差异冲突回滚、Hook 被改后保持原样、重复安装、两节点竞态，以及官方发布数据库连 `ValidateOnly` 也禁止执行安装器。
 
 ## 安装流程

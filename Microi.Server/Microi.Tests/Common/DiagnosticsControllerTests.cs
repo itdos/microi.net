@@ -1,86 +1,72 @@
-using Dos.Common;
 using Microi.net;
-using Microi.net.Api;
-using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
-using Dos.Common.Tests;
 
 namespace Microi.Tests.Common;
 
-[Collection(SaaSRuntimeConfigurationCollection.Name)]
-public class DiagnosticsControllerTests
+public sealed class DiagnosticsControllerTests
 {
     [Fact]
-    public void Diagnostics_ExposeOneStableProcessInstanceId()
+    public void DiagnosticsRoutes_AreOwnedByAnonymousManagedApiEngine()
     {
-        SaaSRuntimeConfigurationScope.Run(new JObject
-        {
-            ["Id"] = "diagnostics-tenant-row",
-            ["AuthSecret"] = "diagnostics_restart_stable_secret_0123456789"
-        }, () =>
-        {
-            var firstController = CreateController();
-            var secondController = CreateController();
+        var root = FindRepositoryRoot();
+        var controllerPath = Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "DiagnosticsController.cs");
+        var source = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Resource", "platform-service-health.js"));
+        var package = JObject.Parse(File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+        var engine = package["SysApiEngines"]!.Values<JObject>()
+            .Single(item => item.Value<string>("ApiEngineKey") == "platform-service-health");
 
-            var firstLiveness = ReadBody(firstController.Liveness());
-            var secondLiveness = ReadBody(secondController.Liveness());
-            var health = ReadBody(firstController.HealthCheck());
-
-            var firstId = firstLiveness.SelectToken("Data.InstanceId")?.Value<string>();
-            var secondId = secondLiveness.SelectToken("Data.InstanceId")?.Value<string>();
-            var healthId = health.SelectToken("Data.InstanceId")?.Value<string>();
-
-            Assert.Matches("^[a-f0-9]{32}$", firstId ?? string.Empty);
-            Assert.Equal(firstId, secondId);
-            Assert.Equal(firstId, healthId);
-            Assert.True(health.SelectToken("Data.JwtSigningKey.Ready")?.Value<bool>());
-            Assert.Contains(
-                health.SelectToken("Data.JwtSigningKey.Source")?.Value<string>(),
-                new[] { "sys_osclients", "Configuration" });
-            Assert.Matches(
-                "^[a-f0-9]{16}$",
-                health.SelectToken("Data.JwtSigningKey.Fingerprint")?.Value<string>() ?? string.Empty);
-        });
+        Assert.False(File.Exists(controllerPath));
+        Assert.Equal(1, engine.Value<int>("AllowAnonymous"));
+        Assert.Equal(0, engine.Value<int>("StopHttp"));
+        Assert.Contains("/api/Diagnostics/health", engine.Value<string>("ApiRoutes"));
+        Assert.Contains("/api/Diagnostics/liveness", engine.Value<string>("ApiRoutes"));
+        Assert.Contains("V8.Method.GetBackendVersion", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("platform-runtime-custom-hook", source, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Diagnostics_RejectsTrafficWithoutStableJwtSigningKey()
+    public void JwtSigningKeyStatus_RequiresDurableTenantIdentity()
     {
-        SaaSRuntimeConfigurationScope.Run(new JObject
-        {
-            ["AuthSecret"] = string.Empty
-        }, () =>
-        {
-            var response = CreateController().HealthCheck();
-            var unavailable = Assert.IsType<ObjectResult>(response.Result);
-            Assert.Equal(503, unavailable.StatusCode);
+        var stable = DiyToken.EvaluateJwtSigningKeyStatus(
+            new OsClientSecret
+            {
+                OsClient = "diagnostics",
+                OsClientModel = new JObject
+                {
+                    ["Id"] = "diagnostics-tenant-row",
+                    ["AuthSecret"] = "diagnostics_restart_stable_secret_0123456789"
+                }
+            },
+            string.Empty);
+        var unavailable = DiyToken.EvaluateJwtSigningKeyStatus(
+            new OsClientSecret
+            {
+                OsClient = "diagnostics",
+                OsClientModel = new JObject { ["AuthSecret"] = string.Empty }
+            },
+            string.Empty);
 
-            var body = JObject.FromObject(Assert.IsType<DosResult>(unavailable.Value));
-            Assert.Equal(0, body["Code"]?.Value<int>());
-            Assert.False(body.SelectToken("Data.JwtSigningKey.Ready")?.Value<bool>());
-            Assert.Equal(
-                "Unavailable",
-                body.SelectToken("Data.JwtSigningKey.Source")?.Value<string>());
-        });
+        Assert.True(stable.Ready);
+        Assert.True(stable.Durable);
+        Assert.Equal("sys_osclients", stable.Source);
+        Assert.Matches("^[a-f0-9]{16}$", stable.Fingerprint);
+        Assert.False(unavailable.Ready);
+        Assert.Equal("Unavailable", unavailable.Source);
     }
 
-    private static DiagnosticsController CreateController()
+    private static string FindRepositoryRoot()
     {
-        var options = new ProcessMemoryGuardOptions
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null)
         {
-            Enabled = true,
-            EffectiveMemoryBytes = 8L * 1024 * 1024 * 1024,
-            EffectiveMemorySource = "Test",
-            SoftLimitBytes = 6L * 1024 * 1024 * 1024,
-            HardLimitBytes = 7L * 1024 * 1024 * 1024
-        };
-        return new DiagnosticsController(new ProcessMemoryPressureState(options));
-    }
-
-    private static JObject ReadBody(ActionResult<DosResult> result)
-    {
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        Assert.NotNull(ok.Value);
-        return JObject.FromObject(ok.Value);
+            if (Directory.Exists(Path.Combine(directory.FullName, "Microi.Server"))
+                && Directory.Exists(Path.Combine(directory.FullName, "Microi.Client")))
+                return directory.FullName;
+            directory = directory.Parent;
+        }
+        throw new DirectoryNotFoundException("Repository root was not found.");
     }
 }

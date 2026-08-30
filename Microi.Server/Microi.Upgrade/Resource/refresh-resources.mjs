@@ -13,6 +13,8 @@ import {
   isTemporaryOfficialResourceFailure,
   mergeResource,
   normalizeOfficialPackageExecutionLimits,
+  planOfficialResourcePublishBatches,
+  selectOfficialPackageMergeBase,
   validateOfficialPackageChangeLog,
   validateReadableOfficialResource,
   verifyOfflineReleaseSafety,
@@ -171,7 +173,7 @@ function validateReleaseCandidate(name, content) {
   }
   if (name === 'official-resource-api.js') {
     if (!content.includes('ApiEngineKey: get-microi-upgrade-resource')
-      || !content.includes('Version: v1.3.2')
+      || !content.includes('Version: v1.3.4')
       || !content.includes('V8.Method.AuthorizeOfficialResourcePublish()')
       || !content.includes('ExpectedRemoteSha256')
       || !content.includes('function lockPublishRows()')
@@ -215,8 +217,8 @@ function validateReleaseCandidate(name, content) {
     };
     const packageContracts = {
       'app.microi.sys_user.json': {
-        minimumVersion: 6_003_002,
-        exactKeys: ['platform-user-update-preferences', 'user-module-table-preference', 'sys-user-security-action', 'platform-user-update-profile', 'platform-sys-user-admin', 'platform-user-custom-hook'],
+        minimumVersion: 7_006_002,
+        exactKeys: ['platform-user-update-preferences', 'user-module-table-preference', 'sys-user-security-action', 'platform-user-update-profile', 'platform-sys-user-admin', 'platform-user-access-key', 'platform-user-custom-hook'],
         tenantHooks: ['platform-user-custom-hook'],
       },
       'app.microi.sys-config.json': {
@@ -637,7 +639,9 @@ function validateReleaseCandidate(name, content) {
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('V8.Method.AuthorizeOfficialResourcePublish')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
-          .includes('ApiEngine:get-microi-upgrade-resource@v1.3.2')
+          .includes('ApiEngine:get-microi-upgrade-resource@v1.3.3')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ApiEngine:get-microi-upgrade-resource@v1.3.4')
         || engines.some(engine => engine.ApiEngineKey === 'platform-user-update-preferences')
         || visibilityField?.Component !== 'Switch'
         || String(visibilityField?.DefaultValue) !== '1'
@@ -842,20 +846,10 @@ async function readOptional(path) {
   }
 }
 
-async function publishResources(changes) {
-  const token = String(process.env.MICROI_UPGRADE_RESOURCE_TOKEN || '').trim();
+async function publishResourceBatch(changes, token) {
   if (!token) {
-    process.stdout.write('未设置 MICROI_UPGRADE_RESOURCE_TOKEN，使用已配置并登录的 microi_itdos MCP 安全发布...\n');
-    try {
-      await publishResourcesViaConfiguredMcp(changes, { startDirectory: outputDirectory });
-      return;
-    } catch (error) {
-      throw new Error(
-        `本地合并结果需要写回官网，但 microi_itdos MCP 发布失败：${error.message}。`
-        + '请登录并正确配置官方 iTdos MCP，或设置 MICROI_UPGRADE_RESOURCE_TOKEN 后重试',
-        { cause: error },
-      );
-    }
+    await publishResourcesViaConfiguredMcp(changes, { startDirectory: outputDirectory });
+    return;
   }
   const response = await fetch(publishEndpoint, {
     method: 'POST',
@@ -882,6 +876,41 @@ async function publishResources(changes) {
   const payload = await response.json();
   if (payload?.Code !== 1) {
     throw new Error(`发布官网升级资源失败：${payload?.Msg || '未知错误'}`);
+  }
+}
+
+async function publishResources(changes) {
+  const token = String(process.env.MICROI_UPGRADE_RESOURCE_TOKEN || '').trim();
+  if (!token) {
+    process.stdout.write('未设置 MICROI_UPGRADE_RESOURCE_TOKEN，使用已配置并登录的 microi_itdos MCP 安全发布...\n');
+  }
+  const batches = planOfficialResourcePublishBatches(changes);
+  try {
+    for (let index = 0; index < batches.length; index += 1) {
+      const batch = batches[index];
+      const isControlPlaneBootstrap = batches.length > 1 && index === 0;
+      if (isControlPlaneBootstrap) {
+        process.stdout.write(
+          'official-resource-api.js\t先发布独立控制面并强回读，再由新版控制面验证剩余资源\n',
+        );
+      }
+      await publishResourceBatch(batch, token);
+      if (isControlPlaneBootstrap) {
+        const expected = batch[0].content;
+        const activated = await downloadAllWithRetry('控制面滚动升级回读');
+        if (activated.get('official-resource-api.js').content !== expected) {
+          throw new Error('官网控制面独立发布后强回读不一致，已停止剩余资源发布');
+        }
+        process.stdout.write('official-resource-api.js\t新版控制面已激活并通过 SHA 强回读\n');
+      }
+    }
+  } catch (error) {
+    const transport = token ? '官网令牌接口' : 'microi_itdos MCP';
+    throw new Error(
+      `本地合并结果需要写回官网，但${transport}发布失败：${error.message}。`
+      + (!token ? '请登录并正确配置官方 iTdos MCP，或设置 MICROI_UPGRADE_RESOURCE_TOKEN 后重试' : ''),
+      { cause: error },
+    );
   }
 }
 
@@ -1161,15 +1190,35 @@ if (process.argv.includes('--synchronize-local')) {
     process.exit(0);
   }
 
-  const replicaBaseReady = baseResources.has(applicationStorePackageName)
-    && publishedApplicationStoreReplicaMappings.every(mapping => baseResources.has(mapping.resourceName));
+  // A previous publish may have written the local synchronization base before
+  // the official CAS write completed. Recover only for a provable append-only
+  // package lineage; otherwise selectOfficialPackageMergeBase fails closed.
+  const mergeBaseResources = new Map(baseResources);
+  for (const name of resourceNames) {
+    if (!name.endsWith('.json') || !baseResources.has(name)) continue;
+    const selectedBase = selectOfficialPackageMergeBase(
+      name,
+      baseResources.get(name),
+      localResources.get(name),
+      remoteResources.get(name).content,
+    );
+    mergeBaseResources.set(name, selectedBase.content);
+    if (selectedBase.recoveredFromAheadBaseline) {
+      process.stdout.write(
+        `${name}\t检测到未完成发布留下的超前共同基线：官网 ${selectedBase.remoteVersion} → 记录基线 ${selectedBase.baseVersion} → 本地候选 ${selectedBase.localVersion}；已按完整追加历史证明恢复合并基点\n`,
+      );
+    }
+  }
+
+  const replicaBaseReady = mergeBaseResources.has(applicationStorePackageName)
+    && publishedApplicationStoreReplicaMappings.every(mapping => mergeBaseResources.has(mapping.resourceName));
   let replicaMerge = null;
   if (replicaBaseReady) {
     replicaMerge = await mergeApplicationStoreReplicas({
-      basePackageContent: baseResources.get(applicationStorePackageName),
+      basePackageContent: mergeBaseResources.get(applicationStorePackageName),
       localPackageContent: localResources.get(applicationStorePackageName),
       remotePackageContent: remoteResources.get(applicationStorePackageName).content,
-      baseStandaloneContents: baseResources,
+      baseStandaloneContents: mergeBaseResources,
       localStandaloneContents,
       remoteStandaloneContents: new Map(
         publishedApplicationStoreReplicaMappings.map(mapping => [
@@ -1195,7 +1244,7 @@ if (process.argv.includes('--synchronize-local')) {
 
     const localContent = localResources.get(name);
     const remoteContent = remoteResources.get(name).content;
-    const baseContent = baseResources.get(name);
+    const baseContent = mergeBaseResources.get(name);
     if (!baseContent) {
       if (localContent !== remoteContent) {
         throw new Error(`${name} 尚无共同基线且本地与官网不同；请先完成人工首次同步，再运行 --initialize-base`);
@@ -1225,7 +1274,8 @@ if (process.argv.includes('--synchronize-local')) {
     const digest = value => createHash('sha256').update(value, 'utf8').digest('hex');
     process.stderr.write(`${JSON.stringify({
       resource: 'app.microi.store.json',
-      base: digest(baseResources.get('app.microi.store.json')),
+      recordedBase: digest(baseResources.get('app.microi.store.json')),
+      effectiveMergeBase: digest(mergeBaseResources.get('app.microi.store.json')),
       local: digest(localResources.get('app.microi.store.json')),
       remote: digest(remoteResources.get('app.microi.store.json').content),
       mergedAfterReplicaReconcile: digest(mergedResources.get(applicationStorePackageName)),
@@ -1315,7 +1365,7 @@ if (process.argv.includes('--synchronize-local')) {
     }
   }
   if (publish) {
-    // 即使本次 remoteChanges=0 也必须执行：v1.3.2 首次发布新版控制面时，
+    // 即使本次 remoteChanges=0 也必须执行：新版控制面首次发布时，
     // 正在运行的旧脚本只能写入新源码，只有资源回读后的第二次调用才会运行投影逻辑。
     await reconcilePublishedApiEngines(verifiedRemote);
   }

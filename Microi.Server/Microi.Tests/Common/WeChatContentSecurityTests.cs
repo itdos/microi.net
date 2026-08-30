@@ -200,14 +200,23 @@ public sealed class WeChatContentSecurityTests
     public void CallbackSource_DelegatesBusinessLogicToManagedApiEngine()
     {
         var root = FindRepositoryRoot();
-        var controller = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.net.Api", "Controllers", "WeChatContentSecurityController.cs"));
+        var controllerPath = Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "WeChatContentSecurityController.cs");
+        var runtime = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.WeChat", "Security", "WeChatContentSecurityRuntime.cs"));
         var service = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.WeChat", "Security", "WeChatContentSecurityService.cs"));
+        var package = JObject.Parse(File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+        var callback = package["SysApiEngines"]!.Values<JObject>()
+            .Single(item => item.Value<string>("ApiEngineKey") == "platform-wechat-content-security-callback");
 
-        Assert.Contains("Callback--OsClient--{routeOsClient}--", controller, StringComparison.Ordinal);
-        Assert.Contains("FromQuery(Name = \"OsClient\")", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("?o=", controller, StringComparison.Ordinal);
+        Assert.False(File.Exists(controllerPath));
+        Assert.Contains("/api/WeChatContentSecurity/Callback", callback.Value<string>("ApiRoutes"));
+        Assert.Contains("Callback--OsClient--{OsClient}--", callback.Value<string>("ApiRoutes"));
+        Assert.Contains("parameters[\"routeOsClient\"]", runtime, StringComparison.Ordinal);
+        Assert.Contains("parameters[\"OsClient\"]", runtime, StringComparison.Ordinal);
+        Assert.DoesNotContain("parameters[\"o\"]", runtime, StringComparison.Ordinal);
         Assert.Contains(WeChatContentSecurityService.CallbackCoreApiEngineKey, service, StringComparison.Ordinal);
         Assert.Contains("MicroiEngine.ApiEngine.RunAsync", service, StringComparison.Ordinal);
         Assert.DoesNotContain("CallbackLock", service, StringComparison.Ordinal);

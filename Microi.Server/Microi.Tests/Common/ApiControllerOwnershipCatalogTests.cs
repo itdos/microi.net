@@ -35,24 +35,12 @@ public sealed class ApiControllerOwnershipCatalogTests
                 "AiController",
                 "ApiEngineController",
                 "CaptchaController",
-                "DiagnosticsController",
-                "ExternalLoginController",
                 "FormEngineController",
                 "HDFSController",
-                "IdentityVerificationController",
-                "LegacyMobileCompatibilityController",
                 "LicenseController",
-                "MarketplaceSourceController",
                 "MessageController",
                 "MicroAppController",
-                "SsoProtocolGatewayController",
-                "SysUserAccessKeyController",
-                "SysUserController",
-                "TenantSystemSettingsController",
-                "V8EngineController",
-                "WeChatContentSecurityController",
-                "WeChatController",
-                "WorkFlowController"
+                "V8EngineController"
             },
             sourceControllers);
         Assert.DoesNotContain(
@@ -109,7 +97,7 @@ public sealed class ApiControllerOwnershipCatalogTests
             "/api/searchengine/", "/api/spider/", "/api/syslog/",
             "/api/datasourceengine/", "/api/moduleengine/", "/api/ocr/",
             "/api/office/", "/api/securityguard/", "/api/translate/",
-            "/api/userbehavior/"
+            "/api/userbehavior/", "/api/sso/"
         })
         {
             Assert.DoesNotContain($"\"{prefix}\"", source, StringComparison.OrdinalIgnoreCase);
@@ -117,7 +105,30 @@ public sealed class ApiControllerOwnershipCatalogTests
     }
 
     [Fact]
-    public void MigratedLegacyRoutes_AreCentralizedAndCarryRemovalWarning()
+    public void SsoRoutes_AreManagedApiEnginesAndNoSsoControllerRemains()
+    {
+        var serverRoot = FindServerRoot();
+        var apiControllers = Path.Combine(serverRoot, "Microi.net.Api", "Controllers");
+        Assert.Empty(Directory.GetFiles(apiControllers, "Sso*Controller*.cs", SearchOption.TopDirectoryOnly));
+
+        var runtimeRoot = Path.Combine(serverRoot, "Microi.SSO");
+        var runtimeFiles = Directory.GetFiles(runtimeRoot, "SsoProtocolRuntime*.cs");
+        Assert.NotEmpty(runtimeFiles);
+        foreach (var file in runtimeFiles)
+        {
+            var source = File.ReadAllText(file);
+            Assert.DoesNotMatch(@"\[(?:Route|HttpGet|HttpPost|HttpPut|HttpDelete)", source);
+            Assert.DoesNotMatch(@"\bclass\s+Sso[A-Za-z0-9_]*Controller\b", source);
+        }
+
+        var catalog = JObject.Parse(File.ReadAllText(Path.Combine(
+            serverRoot, "Microi.net.Api", "api-ownership-catalog.json")));
+        Assert.Null(catalog["ProtocolGateways"]?["SsoProtocolGatewayController"]);
+        Assert.NotNull(catalog["MigratedControllers"]?["SsoProtocolGatewayController"]);
+    }
+
+    [Fact]
+    public void MigratedLegacyRoutes_ArePackageDeliveredAndCompatibilityControllerIsDeleted()
     {
         var serverRoot = FindServerRoot();
         var apiRoot = Path.Combine(serverRoot, "Microi.net.Api");
@@ -125,17 +136,12 @@ public sealed class ApiControllerOwnershipCatalogTests
         var compatibilityPath = Path.Combine(
             controllersRoot,
             "LegacyMobileCompatibilityController.cs");
-        var compatibilitySource = File.ReadAllText(compatibilityPath);
         var catalog = JObject.Parse(File.ReadAllText(Path.Combine(
             apiRoot,
             "api-ownership-catalog.json")));
 
-        Assert.Contains("仅用于兼容旧版吾码 PC / UniApp / 定制移动端", compatibilitySource);
-        Assert.Contains("本 Controller 及全部历史地址可能整体删除", compatibilitySource);
-        Assert.Contains("PlatformBootstrapCompatibilityService", compatibilitySource);
-        Assert.Equal(
-            "MigrationCandidate",
-            catalog["Controllers"]?["LegacyMobileCompatibilityController"]?["Disposition"]?.ToString());
+        Assert.False(File.Exists(compatibilityPath));
+        Assert.NotNull(catalog["MigratedControllers"]?["LegacyMobileCompatibilityController"]);
 
         var routes = ((JObject)catalog["ActionOverrides"]!)
             .Properties()
@@ -147,24 +153,21 @@ public sealed class ApiControllerOwnershipCatalogTests
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         Assert.NotEmpty(routes);
-
-        var protocolSources = ((JObject)catalog["ProtocolGateways"]!)
-            .Properties()
-            .Select(property => Path.Combine(
-                serverRoot,
-                property.Value["Project"]!.ToString(),
-                property.Value["Source"]!.ToString().Replace('/', Path.DirectorySeparatorChar)));
-        var otherControllerSources = protocolSources
-            .Concat(Directory.GetFiles(controllersRoot, "*Controller*.cs"))
-            .Where(path => !string.Equals(path, compatibilityPath, StringComparison.OrdinalIgnoreCase))
-            .Select(path => new { Path = path, Source = File.ReadAllText(path) })
-            .ToArray();
+        var packageRoutes = Directory.GetFiles(
+                Path.Combine(serverRoot, "Microi.Upgrade", "Resource"),
+                "app.microi.*.json")
+            .Select(File.ReadAllText)
+            .Select(JObject.Parse)
+            .SelectMany(package => package["SysApiEngines"] as JArray ?? new JArray())
+            .OfType<JObject>()
+            .SelectMany(engine => new[] { engine["ApiAddress"]?.ToString() }
+                .Concat((engine["ApiRoutes"]?.ToString() ?? string.Empty)
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries)))
+            .Where(route => !string.IsNullOrWhiteSpace(route))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var route in routes)
         {
-            Assert.Contains(route, compatibilitySource, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain(
-                otherControllerSources,
-                item => item.Source.Contains(route, StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(route, packageRoutes);
         }
     }
 

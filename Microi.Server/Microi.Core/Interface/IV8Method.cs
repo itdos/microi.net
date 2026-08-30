@@ -90,6 +90,14 @@ namespace Microi.net
         DosResult ConsumeIdentityVerificationTicket(dynamic dynamicParam);
 
         /// <summary>
+        /// 仅供官方 Managed 访问密钥接口执行创建、列表、吊销和匿名兑换原子。
+        /// 明文密钥只在 Create 结果中返回一次；身份、租户、IP 与管理员边界由宿主重验。
+        /// </summary>
+        DosResult ManageUserAccessKey(dynamic dynamicParam);
+        /// <summary>由官方 Managed 工作流接口调用的可信动作原子。</summary>
+        DosResult ManageWorkFlow(dynamic dynamicParam);
+
+        /// <summary>
         /// 仅供 app.microi.sso 的 Managed 身份解析引擎创建最小权限 JIT 用户。
         /// 密码哈希、角色存在性与禁止创建平台管理员均由可信宿主强制执行。
         /// </summary>
@@ -109,6 +117,18 @@ namespace Microi.net
         /// 平台管理员轮换 OIDC 客户端密钥；明文只在本次结果中返回一次。
         /// </summary>
         DosResult RotateSsoClientSecret(dynamic dynamicParam);
+
+        /// <summary>
+        /// 仅供 app.microi.sso 的固定 Managed HTTP 端点调用可信 OIDC/SAML2/CAS
+        /// 协议原子；返回已签名的 DataAppend.HttpResponse，普通 V8 无法伪造 Cookie。
+        /// </summary>
+        DosResult RunSsoProtocol(dynamic dynamicParam);
+
+        /// <summary>
+        /// 执行官方 Managed 接口引擎绑定的最小插件原子；RuntimeKey 与调用方
+        /// ApiEngineKey 使用后端固定白名单校验，租户参数不能扩大调用权限。
+        /// </summary>
+        dynamic RunPlatformApiRuntime(dynamic dynamicParam);
 
         /// <summary>
         /// 仅供 SaaS 身份应用原子校验并消费短信验证码，返回短期、一次性登录证明。

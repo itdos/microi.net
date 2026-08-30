@@ -206,7 +206,7 @@ namespace Microi.net
             var value = SafeString(responseType).Trim();
             if (value.DosIsNullOrWhiteSpace())
             {
-                error = "ResponseType 不能为空；可选值：JSON、String、File、HTML、Stream";
+                error = "ResponseType 不能为空；可选值：JSON、String、File、HTML、Stream、HTTP";
                 return false;
             }
 
@@ -231,6 +231,12 @@ namespace Microi.net
                 normalized = "HTML";
                 return true;
             }
+            if (string.Equals(value, "HTTP", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "RawHttp", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = "HTTP";
+                return true;
+            }
             if (string.Equals(value, "2", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(value, "SSE", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(value, "Stream", StringComparison.OrdinalIgnoreCase))
@@ -239,8 +245,49 @@ namespace Microi.net
                 return true;
             }
 
-            error = $"不支持的 ResponseType：{value}；可选值：JSON、String、File、HTML、Stream";
+            error = $"不支持的 ResponseType：{value}；可选值：JSON、String、File、HTML、Stream、HTTP";
             return false;
+        }
+
+        /// <summary>
+        /// 对 MCP 写入执行与 sys_apiengine 表单事件相同的路由所有权校验。
+        /// MCP 使用 _InvokeType=Server，不能依赖租户可能自定义过的事件来兜底；
+        /// 因此在落库前显式拒绝主路由/多路由被两条启用记录同时占用。
+        /// </summary>
+        private static DosResult ValidateApiEngineRouteOwnership(
+            OsClientSecret client,
+            string currentId,
+            string apiAddress,
+            string apiRoutes)
+        {
+            if (!ApiEngineRouteAliases.TryValidate(apiAddress, apiRoutes, out var routeError))
+                return new DosResult(0, null, routeError);
+
+            var requested = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!apiAddress.DosIsNullOrWhiteSpace()) requested.Add(apiAddress.Trim());
+            foreach (var route in ApiEngineRouteAliases.Parse(apiRoutes)) requested.Add(route);
+            if (requested.Count == 0) return new DosResult(1);
+
+            var section = client.Db.FromSql(
+                "SELECT Id, ApiEngineKey, ApiAddress, ApiRoutes FROM sys_apiengine " +
+                "WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND (IsEnable=1 OR IsEnable IS NULL)");
+            section.SetCommandTimeout(10);
+            foreach (var raw in section.ToList<dynamic>() ?? new List<dynamic>())
+            {
+                var row = JObject.FromObject((object)raw);
+                var rowId = SafeJString(row, "Id");
+                if (!currentId.DosIsNullOrWhiteSpace()
+                    && string.Equals(rowId, currentId, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var collision = ApiEngineRouteAliases.GetConfiguredRoutes(row)
+                    .FirstOrDefault(route => requested.Contains(route));
+                if (!collision.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult(0, null,
+                        $"路由[{collision}]已由接口引擎[{SafeJString(row, "ApiEngineKey")}]占用。");
+                }
+            }
+            return new DosResult(1);
         }
 
         private static bool DiyTableHasColumn(string osClient, string columnName)
@@ -576,25 +623,16 @@ namespace Microi.net
                     return new DosResult<object>(0, null, "刷新接口引擎缓存失败：未找到最新数据");
                 }
 
-                var row = JObject.FromObject(latestData);
-                var latestId = NormalizeApiEngineCacheKeyPart(SafeJString(row, "Id"));
-                var latestKey = NormalizeApiEngineCacheKeyPart(SafeJString(row, "ApiEngineKey", apiEngineKey ?? ""));
-                var latestAddress = NormalizeApiEngineCacheKeyPart(SafeJString(row, "ApiAddress"));
+                // latestData 来自 dynamic ORM 行；先收敛为 object，避免 LINQ 在 dynamic
+                // 调度下无法把 Lambda 绑定为委托，同时保持缓存中的原始模型结构不变。
+                object latestCacheModel = latestData;
+                var row = JObject.FromObject(latestCacheModel);
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
-                var tasks = new List<Task>();
-
-                if (!IsBlank(latestKey))
-                {
-                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestKey), latestData));
-                }
-                if (!IsBlank(latestId))
-                {
-                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestId), latestData));
-                }
-                if (!IsBlank(latestAddress))
-                {
-                    tasks.Add(cache.SetAsync(BuildApiEngineCacheKey(osClient, latestAddress), latestData));
-                }
+                var tasks = ApiEngineRouteAliases.GetCacheAliases(row)
+                    .Select(alias => cache.SetAsync(
+                        BuildApiEngineCacheKey(osClient, alias),
+                        latestCacheModel))
+                    .ToList();
 
                 if (tasks.Any())
                 {
@@ -832,7 +870,7 @@ namespace Microi.net
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
                 var hasV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
-                var selectFields = new List<string> { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime" };
+                var selectFields = new List<string> { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "ApiRoutes", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime" };
                 if (hasVersionColumn) selectFields.Add("Version");
                 if (hasChangeHistoryColumn) selectFields.Add("ChangeHistory");
                 if (hasV8LimitColumn) selectFields.Add("V8Limit");
@@ -869,6 +907,7 @@ namespace Microi.net
                             ApiEngineKey = SafeJString(row, "ApiEngineKey"),
                             Category = SafeJString(row, "Category", "未分类"),
                             ApiAddress = SafeJString(row, "ApiAddress"),
+                            ApiRoutes = SafeJString(row, "ApiRoutes"),
                             IsEnable = SafeJInt(row, "IsEnable", 1),
                             ApiRemark = SafeJString(row, "ApiRemark"),
                             V8Limit = v8Limit,
@@ -940,6 +979,7 @@ namespace Microi.net
                         ApiEngineKey = SafeJString(row, "ApiEngineKey"),
                         Category = SafeJString(row, "Category", "未分类"),
                         ApiAddress = SafeJString(row, "ApiAddress"),
+                        ApiRoutes = SafeJString(row, "ApiRoutes"),
                         IsEnable = SafeJInt(row, "IsEnable", 1),
                         ApiRemark = SafeJString(row, "ApiRemark"),
                         V8Limit = v8Limit,
@@ -1043,7 +1083,7 @@ namespace Microi.net
             {
                 var hasV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
-                var selectFields = new List<string> { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime", "IsDeleted" };
+                var selectFields = new List<string> { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "ApiRoutes", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime", "IsDeleted" };
                 if (hasV8LimitColumn) selectFields.Add("V8Limit");
                 if (hasV8UnlimitedColumn) selectFields.Add("V8Unlimited");
                 var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_apiengine", new
@@ -1079,6 +1119,7 @@ namespace Microi.net
                             ApiEngineKey = SafeJString(row, "ApiEngineKey"),
                             Category = SafeJString(row, "Category", "未分类"),
                             ApiAddress = SafeJString(row, "ApiAddress"),
+                            ApiRoutes = SafeJString(row, "ApiRoutes"),
                             IsEnable = SafeJInt(row, "IsEnable", 1),
                             ApiRemark = SafeJString(row, "ApiRemark"),
                             V8Limit = v8Limit,
@@ -1120,13 +1161,14 @@ namespace Microi.net
             string changeHistory = null,
             int? v8Limit = null,
             string responseType = null,
+            string apiRoutes = null,
             bool updateCode = true)
         {
             try
             {
-                if (!updateCode && !v8Limit.HasValue && responseType == null)
+                if (!updateCode && !v8Limit.HasValue && responseType == null && apiRoutes == null)
                 {
-                    return new DosResult<object>(0, null, "没有需要更新的接口引擎代码或运行配置");
+                    return new DosResult<object>(0, null, "没有需要更新的接口引擎代码、路由或运行配置");
                 }
                 if (!TryNormalizeApiEngineResponseType(responseType, out var normalizedResponseType, out var responseTypeError))
                 {
@@ -1138,10 +1180,14 @@ namespace Microi.net
                     return new DosResult<object>(0, null, $"未找到租户数据库连接：{osClient}");
                 }
 
-                var getSection = client.Db.FromSql("SELECT Id FROM sys_apiengine WHERE ApiEngineKey=?key AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1")
+                var getSection = client.Db.FromSql("SELECT Id, ApiAddress, ApiRoutes FROM sys_apiengine WHERE ApiEngineKey=?key AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1")
                     .AddInParameter("?key", apiEngineKey);
                 getSection.SetCommandTimeout(10);
-                var id = getSection.ToScalar<string>();
+                var currentRowRaw = getSection.ToFirst<dynamic>();
+                var currentRow = currentRowRaw == null
+                    ? null
+                    : JObject.FromObject((object)currentRowRaw);
+                var id = SafeJString(currentRow, "Id");
 
                 if (id.DosIsNullOrWhiteSpace())
                 {
@@ -1160,6 +1206,7 @@ namespace Microi.net
                 var hasV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
                 var hasResponseTypeColumn = SysApiEngineHasColumn(osClient, "ResponseType");
+                var hasApiRoutesColumn = SysApiEngineHasColumn(osClient, ApiEngineRouteAliases.MultiRouteFieldName);
                 if (v8Limit.HasValue && !hasV8LimitColumn)
                 {
                     return new DosResult<object>(0, null,
@@ -1169,6 +1216,24 @@ namespace Microi.net
                 {
                     return new DosResult<object>(0, null,
                         "当前平台尚未安装 sys_apiengine.ResponseType 字段，请先升级接口引擎资源");
+                }
+                if (apiRoutes != null && !hasApiRoutesColumn)
+                {
+                    return new DosResult<object>(0, null,
+                        "当前平台尚未安装 sys_apiengine.ApiRoutes（多路由）字段，请先升级后端与接口引擎资源");
+                }
+                var normalizedApiRoutes = apiRoutes == null
+                    ? null
+                    : string.Join(ApiEngineRouteAliases.Separator.ToString(), ApiEngineRouteAliases.Parse(apiRoutes));
+                if (apiRoutes != null)
+                {
+                    var routeValidation = ValidateApiEngineRouteOwnership(
+                        client,
+                        id,
+                        SafeJString(currentRow, "ApiAddress"),
+                        normalizedApiRoutes);
+                    if (routeValidation.Code != 1)
+                        return new DosResult<object>(routeValidation.Code, routeValidation.Data, routeValidation.Msg);
                 }
                 var updateParam = new JObject
                 {
@@ -1208,6 +1273,10 @@ namespace Microi.net
                 if (responseType != null)
                 {
                     updateParam["ResponseType"] = normalizedResponseType;
+                }
+                if (apiRoutes != null)
+                {
+                    updateParam[ApiEngineRouteAliases.MultiRouteFieldName] = normalizedApiRoutes;
                 }
 
                 var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", updateParam);
@@ -1264,6 +1333,7 @@ namespace Microi.net
                     V8Limit = v8Limit.HasValue ? (v8Limit.Value == 1 ? 1 : 0) : (int?)null,
                     V8Unlimited = v8Limit.HasValue ? (v8Limit.Value == 1 ? 0 : 1) : (int?)null,
                     ResponseType = responseType != null ? normalizedResponseType : null,
+                    ApiRoutes = apiRoutes != null ? normalizedApiRoutes : null,
                     CacheRefresh = cacheRefreshStatus
                 });
             }
@@ -1282,13 +1352,20 @@ namespace Microi.net
         /// </summary>
         public static async Task<DosResult<object>> CreateApiEngine(
             string osClient, string apiName, string apiEngineKey,
-            string apiAddress, string apiRemark, int lockVal, int allowAnonymous,
+            string apiAddress, string apiRoutes, string apiRemark, int lockVal, int allowAnonymous,
             int isEnable, string category, string apiV8Code = null,
             string version = null, string changeHistory = null, int? v8Limit = null,
             string responseType = null)
         {
             try
             {
+                var normalizedApiRoutes = string.Join(
+                    ApiEngineRouteAliases.Separator.ToString(),
+                    ApiEngineRouteAliases.Parse(apiRoutes));
+                if (!ApiEngineRouteAliases.TryValidate(apiAddress, normalizedApiRoutes, out var routeError))
+                {
+                    return new DosResult<object>(0, null, routeError);
+                }
                 if (!TryNormalizeApiEngineResponseType(
                     responseType ?? "JSON",
                     out var normalizedResponseType,
@@ -1320,10 +1397,29 @@ namespace Microi.net
                 var hasV8LimitColumn = SysApiEngineHasColumn(osClient, "V8Limit");
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
                 var hasResponseTypeColumn = SysApiEngineHasColumn(osClient, "ResponseType");
+                var hasApiRoutesColumn = SysApiEngineHasColumn(osClient, ApiEngineRouteAliases.MultiRouteFieldName);
                 if (v8Limit.HasValue && !hasV8LimitColumn)
                 {
                     return new DosResult<object>(0, null,
                         "当前平台尚未安装 sys_apiengine.V8Limit 字段，请先升级后端与接口引擎资源");
+                }
+                if (!hasApiRoutesColumn && !normalizedApiRoutes.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult<object>(0, null,
+                        "当前平台尚未安装 sys_apiengine.ApiRoutes（多路由）字段，请先升级后端与接口引擎资源");
+                }
+                var client = OsClientExtend.GetClient(osClient);
+                if (client?.Db == null)
+                    return new DosResult<object>(0, null, $"未找到租户数据库连接：{osClient}");
+                if (hasApiRoutesColumn)
+                {
+                    var routeOwnership = ValidateApiEngineRouteOwnership(
+                        client,
+                        null,
+                        apiAddress,
+                        normalizedApiRoutes);
+                    if (routeOwnership.Code != 1)
+                        return new DosResult<object>(routeOwnership.Code, routeOwnership.Data, routeOwnership.Msg);
                 }
                 // Keep MCP-created engines aligned with the tenant/runtime limits.  The old
                 // literal values (notably LimitRecursion=10000) could exceed the runtime hard
@@ -1365,6 +1461,7 @@ namespace Microi.net
                 if (hasV8LimitColumn) addParam["V8Limit"] = effectiveV8Limit;
                 if (hasV8UnlimitedColumn) addParam["V8Unlimited"] = effectiveV8Limit == 1 ? 0 : 1;
                 if (hasResponseTypeColumn) addParam["ResponseType"] = normalizedResponseType;
+                if (hasApiRoutesColumn) addParam[ApiEngineRouteAliases.MultiRouteFieldName] = normalizedApiRoutes;
 
                 var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", addParam);
 
@@ -2451,7 +2548,7 @@ namespace Microi.net
                 var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
                 var engineSelectFields = new List<string>
                 {
-                    "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "ApiRemark",
+                    "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "ApiRoutes", "ApiRemark",
                     "AllowAnonymous", "StopHttp", "IsEnable", "UpdateTime"
                 };
                 if (hasV8LimitColumn) engineSelectFields.Add("V8Limit");
@@ -2496,6 +2593,7 @@ namespace Microi.net
                         ApiEngineKey = SafeJString(row, "ApiEngineKey"),
                         Category = SafeJString(row, "Category", "未分类"),
                         ApiAddress = SafeJString(row, "ApiAddress"),
+                        ApiRoutes = SafeJString(row, "ApiRoutes"),
                         ApiRemark = SafeJString(row, "ApiRemark"),
                         AllowAnonymous = allowAnonymous,
                         StopHttp = stopHttp,

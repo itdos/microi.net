@@ -212,6 +212,13 @@ public static class MicroiApiHostExtensions
             options.Level = CompressionLevel.Fastest);
         services.AddSession(options => options.IdleTimeout = TimeSpan.FromMinutes(20));
         services.AddHttpClient();
+        // WebAuthn/FIDO2 必须在 ASP.NET Core 宿主内完成可信验签；这里只注册无公开路由的
+        // 协议原子，公开地址、匿名策略与动作白名单统一由 Managed 接口引擎负责。
+        services.AddTransient<IdentityVerificationRuntime>();
+        PlatformApiRuntimeRegistry.RegisterFactory(
+            "IdentityVerification",
+            () => DiyHttpContext.Current?.RequestServices
+                ?.GetRequiredService<IdentityVerificationRuntime>());
         services.AddUEditorService("ueditor.json", true, Path.Combine(AppContext.BaseDirectory, "wwwroot"));
         services.AddControllersWithViews(options =>
             {
@@ -288,6 +295,7 @@ public static class MicroiApiHostExtensions
         app.UseRequestPressureGuard();
         app.UseAuthentication();
         app.UseAuthorization();
+        app.MapMicroiApiRootPage();
         app.MapDynamicControllerRoute<DynamicRoute>("apiengine/{*path}");
         app.MapControllerRoute("default", "{controller=Home}/{action=Index}/{id?}");
         return app;

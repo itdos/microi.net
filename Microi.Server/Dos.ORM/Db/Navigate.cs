@@ -28,6 +28,7 @@
 using Dos.ORM.Common;
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -90,6 +91,8 @@ namespace Dos.ORM
             where TSource : Entity
             where TNav : Entity, new()
         {
+            if (dbSession == null) throw new ArgumentNullException(nameof(dbSession));
+            if (navProperty == null) throw new ArgumentNullException(nameof(navProperty));
             if (sources == null) return;
             var list = sources as IList<TSource> ?? sources.ToList();
             if (list.Count == 0) return;
@@ -109,7 +112,8 @@ namespace Dos.ORM
             if (keys.Count == 0) return;
 
             var targets = LoadByKey<TNav>(dbSession, targetKeyName, keys);
-            var targetKeyProp = typeof(TNav).GetProperty(targetKeyName);
+            var targetKeyProp = typeof(TNav).GetProperty(targetKeyName)
+                ?? throw new InvalidOperationException($"目标实体未找到字段 {targetKeyName}");
             var lookup = new Dictionary<object, TNav>();
             foreach (var t in targets)
             {
@@ -133,6 +137,8 @@ namespace Dos.ORM
             where TSource : Entity
             where TNav : Entity, new()
         {
+            if (dbSession == null) throw new ArgumentNullException(nameof(dbSession));
+            if (navProperty == null) throw new ArgumentNullException(nameof(navProperty));
             if (sources == null) return;
             var list = sources as IList<TSource> ?? sources.ToList();
             if (list.Count == 0) return;
@@ -151,7 +157,8 @@ namespace Dos.ORM
             if (keys.Count == 0) return;
 
             var targets = LoadByKey<TNav>(dbSession, attr.TargetForeignKey, keys);
-            var targetKeyProp = typeof(TNav).GetProperty(attr.TargetForeignKey);
+            var targetKeyProp = typeof(TNav).GetProperty(attr.TargetForeignKey)
+                ?? throw new InvalidOperationException($"目标实体未找到字段 {attr.TargetForeignKey}");
 
             var groups = new Dictionary<object, List<TNav>>();
             foreach (var t in targets)
@@ -184,6 +191,8 @@ namespace Dos.ORM
             where TSource : Entity
             where TNav : Entity, new()
         {
+            if (dbSession == null) throw new ArgumentNullException(nameof(dbSession));
+            if (navProperty == null) throw new ArgumentNullException(nameof(navProperty));
             if (sources == null) return;
             var list = sources as IList<TSource> ?? sources.ToList();
             if (list.Count == 0) return;
@@ -252,8 +261,14 @@ namespace Dos.ORM
                 }
                 // 2) 加载目标实体
                 var targets = LoadByKey<TNav>(dbSession, targetKeyName, allTargetKeys.ToList());
-                var targetKeyProp = typeof(TNav).GetProperty(targetKeyName);
-                var byKey = targets.ToDictionary(t => targetKeyProp.GetValue(t));
+                var targetKeyProp = typeof(TNav).GetProperty(targetKeyName)
+                    ?? throw new InvalidOperationException($"目标实体未找到字段 {targetKeyName}");
+                var byKey = new Dictionary<object, TNav>();
+                foreach (var target in targets)
+                {
+                    var targetKey = targetKeyProp.GetValue(target);
+                    if (targetKey != null) byKey[targetKey] = target;
+                }
                 foreach (var s in list)
                 {
                     var sk = sourceKeyProp.GetValue(s);
@@ -271,6 +286,7 @@ namespace Dos.ORM
         private static (PropertyInfo prop, NavigateAttribute attr) ResolveNavigate<TSource, TProp>(
             Expression<Func<TSource, TProp>> expr)
         {
+            if (expr == null) throw new ArgumentNullException(nameof(expr));
             if (!(expr.Body is MemberExpression me) || !(me.Member is PropertyInfo prop))
                 throw new ArgumentException("表达式必须是属性访问 e => e.Prop", nameof(expr));
             var attr = prop.GetCustomAttribute<NavigateAttribute>();
@@ -292,6 +308,10 @@ namespace Dos.ORM
         private static List<TEntity> LoadByKey<TEntity>(DbSession dbSession, string keyField, IList<object> keys)
             where TEntity : Entity, new()
         {
+            if (dbSession == null) throw new ArgumentNullException(nameof(dbSession));
+            if (string.IsNullOrWhiteSpace(keyField)) throw new ArgumentException("关联字段不能为空。", nameof(keyField));
+            if (keys == null || keys.Count == 0) return new List<TEntity>();
+
             // 用一个 IN 查询批量加载
             var sample = new TEntity();
             var tableName = sample.GetTableName();
@@ -320,11 +340,10 @@ namespace Dos.ORM
                 using (var reader = dbSession.Db.ExecuteReader(cmd))
                 {
                     var list = new List<TEntity>();
+                    var setterMap = BuildSetterMap<TEntity>();
                     while (reader.Read())
                     {
                         var e = new TEntity();
-                        var fields = e.GetFields();
-                        var setterMap = BuildSetterMap<TEntity>();
                         for (int i = 0; i < reader.FieldCount; i++)
                         {
                             var name = reader.GetName(i);
@@ -344,22 +363,19 @@ namespace Dos.ORM
             }
         }
 
-        private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _setterCache
-            = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
-        private static readonly object _setterLock = new object();
+        private static readonly ConcurrentDictionary<Type, Dictionary<string, PropertyInfo>> _setterCache
+            = new ConcurrentDictionary<Type, Dictionary<string, PropertyInfo>>();
         private static Dictionary<string, PropertyInfo> BuildSetterMap<T>()
         {
-            var t = typeof(T);
-            if (_setterCache.TryGetValue(t, out var m)) return m;
-            lock (_setterLock)
+            return _setterCache.GetOrAdd(typeof(T), type =>
             {
-                if (_setterCache.TryGetValue(t, out m)) return m;
-                m = new Dictionary<string, PropertyInfo>(StringComparer.OrdinalIgnoreCase);
-                foreach (var p in t.GetProperties())
-                    if (p.CanWrite) m[p.Name] = p;
-                _setterCache[t] = m;
-                return m;
-            }
+                var map = new Dictionary<string, PropertyInfo>(StringComparer.OrdinalIgnoreCase);
+                foreach (var p in type.GetProperties())
+                {
+                    if (p.CanWrite) map[p.Name] = p;
+                }
+                return map;
+            });
         }
 
         private static object ConvertToPropType(object value, Type targetType)

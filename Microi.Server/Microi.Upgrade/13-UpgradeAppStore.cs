@@ -133,7 +133,7 @@ namespace Microi.net
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "Id", "CreateTime", "UpdateTime", "UserId", "UserName", "IsDeleted",
-                "ApiName", "ApiEngineKey", "ApiAddress", "ApiV8Code", "ApiRemark",
+                "ApiName", "ApiEngineKey", "ApiAddress", "ApiRoutes", "ApiV8Code", "ApiRemark",
                 "ApiRole", "Category", "ChangeHistory", "Version", "Files", "TestParam",
                 "TestResult", "AiCheckResult", "IsEnable", "StopHttp", "AllowAnonymous",
                 "EnableLog", "ResponseFile", "ResponseType", "Lock", "LockKey", "Timeout",
@@ -151,15 +151,48 @@ namespace Microi.net
             "platform-service-health",
             "platform-lang-bundle",
             "platform-login-wallpapers",
+            // 旧移动端私人文件 Token 允许匿名进入可信原子重新验权；V8 代码中的
+            // 登录用户 Hook 仍由身份门禁隔离，匿名请求绝不会执行租户代码。
+            "platform-private-file-url",
             "microi-init"
         };
-        private static readonly System.Version MinimumSsoPackageVersion = new System.Version(7, 5, 8);
-        private static readonly System.Version MinimumSsoEngineVersion = new System.Version(1, 0, 2);
+        private static readonly System.Version MinimumSsoPackageVersion = new System.Version(7, 5, 9);
+        private static readonly System.Version MinimumSsoEngineVersion = new System.Version(1, 0, 3);
         private const string ManagedSsoNoticeMarker = "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1";
         private const string TenantSsoNoticeMarker = "/* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1";
         private const string SsoSafeHookPayloadMarker = "SSO_TENANT_HOOK_SAFE_PAYLOAD_V1";
         private const string DefaultSsoEventHookBody = "return { Code : 1 };";
-        private static readonly string[] ManagedSsoEngineKeys =
+        // 原 SSO Controller 的全部公开地址均属于官方应用资源。地址表同时作为
+        // 升级门禁，防止包里只有接口 Key、却遗漏协议伙伴依赖的稳定 URL。
+        private static readonly IReadOnlyDictionary<string, string> SsoHttpEndpointAddresses =
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["sso_http_begin"] = "/api/Sso/Begin",
+                ["sso_http_complete_authorization"] = "/api/Sso/CompleteAuthorization",
+                ["sso_http_oidc_callback"] = "/api/Sso/OidcCallback",
+                ["sso_http_oidc_discovery"] = "/sso/{OsClient}/.well-known/openid-configuration",
+                ["sso_http_oidc_jwks"] = "/sso/{OsClient}/jwks",
+                ["sso_http_oidc_authorize"] = "/sso/{OsClient}/authorize",
+                ["sso_http_oidc_token"] = "/sso/{OsClient}/token",
+                ["sso_http_oidc_userinfo"] = "/sso/{OsClient}/userinfo",
+                ["sso_http_oidc_introspect"] = "/sso/{OsClient}/introspect",
+                ["sso_http_oidc_revoke"] = "/sso/{OsClient}/revoke",
+                ["sso_http_oidc_logout"] = "/sso/{OsClient}/logout",
+                ["sso_http_cas_callback"] = "/api/Sso/CasCallback",
+                ["sso_http_cas_login"] = "/cas/{OsClient}/login",
+                ["sso_http_cas_service_validate"] = "/cas/{OsClient}/serviceValidate",
+                ["sso_http_cas_p3_service_validate"] = "/cas/{OsClient}/p3/serviceValidate",
+                ["sso_http_cas_validate"] = "/cas/{OsClient}/validate",
+                ["sso_http_cas_logout"] = "/cas/{OsClient}/logout",
+                ["sso_http_saml_begin"] = "/api/Sso/SamlBegin",
+                ["sso_http_saml_acs"] = "/api/Sso/SamlAcs",
+                ["sso_http_saml_login"] = "/saml/{OsClient}/login",
+                ["sso_http_saml_complete"] = "/api/Sso/SamlComplete",
+                ["sso_http_saml_idp_metadata"] = "/saml/{OsClient}/metadata",
+                ["sso_http_saml_sp_metadata"] = "/saml/{OsClient}/sp/{ConnectionKey}/metadata",
+                ["sso_http_saml_logout"] = "/saml/{OsClient}/logout"
+            };
+        private static readonly string[] ManagedSsoEngineKeys = new[]
         {
             "sso_capabilities",
             "sso_legacy_capabilities",
@@ -171,7 +204,7 @@ namespace Microi.net
             "sso_rotate_client_secret",
             "sso_legacy_token_login",
             "sso_user_runtime"
-        };
+        }.Concat(SsoHttpEndpointAddresses.Keys).ToArray();
         private static readonly string[] RequiredSsoEngineKeys =
             ManagedSsoEngineKeys.Concat(new[] { "sso_event_hook" }).ToArray();
         private static readonly HashSet<string> AnonymousSsoEngineKeys = new HashSet<string>(StringComparer.Ordinal)
@@ -179,7 +212,30 @@ namespace Microi.net
             "sso_capabilities",
             "sso_legacy_capabilities",
             "sso_complete_login",
-            "sso_legacy_token_login"
+            "sso_legacy_token_login",
+            "sso_http_begin",
+            "sso_http_oidc_callback",
+            "sso_http_oidc_discovery",
+            "sso_http_oidc_jwks",
+            "sso_http_oidc_authorize",
+            "sso_http_oidc_token",
+            "sso_http_oidc_userinfo",
+            "sso_http_oidc_introspect",
+            "sso_http_oidc_revoke",
+            "sso_http_oidc_logout",
+            "sso_http_cas_callback",
+            "sso_http_cas_login",
+            "sso_http_cas_service_validate",
+            "sso_http_cas_p3_service_validate",
+            "sso_http_cas_validate",
+            "sso_http_cas_logout",
+            "sso_http_saml_begin",
+            "sso_http_saml_acs",
+            "sso_http_saml_login",
+            "sso_http_saml_complete",
+            "sso_http_saml_idp_metadata",
+            "sso_http_saml_sp_metadata",
+            "sso_http_saml_logout"
         };
         private static readonly HashSet<string> InternalOnlySsoEngineKeys = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -292,6 +348,14 @@ namespace Microi.net
                                    || code.Contains(
                                        "V8.ApiEngine.Run(\"" + PlatformRuntimeCustomHookEngineKey + "\"",
                                        StringComparison.Ordinal);
+            var anonymousHookIsIdentityGuarded = string.Equals(
+                    key,
+                    "platform-private-file-url",
+                    StringComparison.Ordinal)
+                && callsRuntimeHook
+                && code.IndexOf("!V8.CurrentUser || !V8.CurrentUser.Id", StringComparison.Ordinal) >= 0
+                && code.IndexOf("!V8.CurrentUser || !V8.CurrentUser.Id", StringComparison.Ordinal)
+                    < code.IndexOf(PlatformRuntimeCustomHookEngineKey, StringComparison.Ordinal);
             return System.Version.TryParse(metadataVersionText, out var metadataVersion)
                 && metadataVersion >= minimumEngineVersion
                 && codeVersionMatch.Success
@@ -319,7 +383,7 @@ namespace Microi.net
                         && !code.Contains("GetFormData({")
                         && !code.Contains("GetTableDataTree")))
                 && (AnonymousPlatformRuntimeEngineKeys.Contains(key)
-                    ? !callsRuntimeHook
+                    ? (!callsRuntimeHook || anonymousHookIsIdentityGuarded)
                     : callsRuntimeHook);
         }
 
@@ -401,6 +465,8 @@ namespace Microi.net
             var code = engine.Value<string>("ApiV8Code") ?? string.Empty;
             var versionText = engine.Value<string>("Version")?.TrimStart('v', 'V');
             var codeVersionMatch = Regex.Match(code, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+            var isHttpEndpoint = SsoHttpEndpointAddresses.TryGetValue(key, out var expectedApiAddress);
+            if (!isHttpEndpoint) expectedApiAddress = "/apiengine/" + key;
             if (!System.Version.TryParse(versionText, out var metadataVersion)
                 || metadataVersion < MinimumSsoEngineVersion
                 || !codeVersionMatch.Success
@@ -409,10 +475,13 @@ namespace Microi.net
                 || engine.Value<int?>("IsEnable") != 1
                 || !string.Equals(
                     engine.Value<string>("ApiAddress"),
-                    "/apiengine/" + key,
+                    expectedApiAddress,
                     StringComparison.OrdinalIgnoreCase)
                 || engine.Value<int?>("AllowAnonymous") != (AnonymousSsoEngineKeys.Contains(key) ? 1 : 0)
-                || engine.Value<int?>("StopHttp") != (InternalOnlySsoEngineKeys.Contains(key) ? 1 : 0))
+                || engine.Value<int?>("StopHttp") != (InternalOnlySsoEngineKeys.Contains(key) ? 1 : 0)
+                || (isHttpEndpoint && !string.Equals(
+                    engine.Value<string>("ResponseType"), "HTTP", StringComparison.OrdinalIgnoreCase))
+                || (isHttpEndpoint && !code.Contains("V8.Method.RunSsoProtocol", StringComparison.Ordinal)))
             {
                 return false;
             }
@@ -480,18 +549,30 @@ namespace Microi.net
                     return false;
                 }
             }
+            var capabilities = package["PackageInfo"]?["RequiredPlatformCapabilities"] as JArray;
+            foreach (var capability in new[]
+                     {
+                         "ApiEngine:ResponseType=HTTP",
+                         "ApiEngine:TemplateRouteV1",
+                         "V8.Method.RunSsoProtocol"
+                     })
+            {
+                if (capabilities?.Any(item => string.Equals(
+                        item?.ToString(), capability, StringComparison.Ordinal)) != true)
+                    return false;
+            }
             return true;
         }
 
         private static readonly Dictionary<string, System.Version> V8FirstPackageMinimumVersions =
             new Dictionary<string, System.Version>(StringComparer.Ordinal)
             {
-                { SysUserPackageResourceName, new System.Version(6, 3, 2) },
-                { SysConfigPackageResourceName, new System.Version(6, 3, 8) },
-                { MessageNotificationPackageResourceName, new System.Version(1, 0, 11) },
-                { AiEnginePackageResourceName, new System.Version(6, 3, 6) },
-                { SaaSEnginePackageResourceName, new System.Version(7, 6, 21) },
-                { AppStorePackageResourceName, new System.Version(7, 6, 17) }
+                { SysUserPackageResourceName, new System.Version(7, 6, 2) },
+                { SysConfigPackageResourceName, new System.Version(6, 3, 9) },
+                { MessageNotificationPackageResourceName, new System.Version(1, 0, 12) },
+                { AiEnginePackageResourceName, new System.Version(7, 6, 1) },
+                { SaaSEnginePackageResourceName, new System.Version(7, 7, 8) },
+                { AppStorePackageResourceName, new System.Version(7, 7, 15) }
             };
 
         private static readonly Dictionary<string, string[]> V8FirstPackageExactEngineKeys =
@@ -506,6 +587,7 @@ namespace Microi.net
                         "sys-user-security-action",
                         "platform-user-update-profile",
                         "platform-sys-user-admin",
+                        "platform-user-access-key",
                         "platform-user-custom-hook"
                     }
                 },
@@ -751,10 +833,10 @@ namespace Microi.net
                     || !HasExpectedOfficialEnginePolicy(package, packageStorageEngine, false)
                     || !packageStorageCode.Contains("MARKETPLACE_PACKAGE_UPLOAD_BASE64_SINGLE_ATTEMPT_V1")
                     || packageStorageCode.Contains("V8.Method.UploadText(")
-                    || !deliveredCapabilities.Any(item => string.Equals(
-                        item?.ToString(),
-                        "ApiEngine:microi-store-package-storage@v1.1.0",
-                        StringComparison.Ordinal))
+                    || !HasApiEngineCapabilityAtLeast(
+                        deliveredCapabilities,
+                        "microi-store-package-storage",
+                        new System.Version(1, 1, 0))
                     || !byKey.TryGetValue("platform-marketplace-source", out var sourceEngine)
                     || !byKey.TryGetValue("platform-marketplace-source-hook", out var sourceHook)
                     || !HasExpectedOfficialEnginePolicy(package, sourceEngine, false)
@@ -798,6 +880,10 @@ namespace Microi.net
                     && adminCode.Contains("V8.Method.ManageSysUserAdmin")
                     && adminCode.Contains("platform-user-custom-hook")
                     && adminCode.Contains("authorization.DataAppend.ChangesPassword === true")
+                    && (byKey["platform-user-access-key"].Value<string>("ApiV8Code") ?? string.Empty)
+                        .Contains("V8.Method.ManageUserAccessKey")
+                    && (byKey["platform-user-access-key"].Value<string>("ApiRoutes") ?? string.Empty)
+                        .Contains("/api/SysUserAccessKey/Create")
                     && HasPackagedSysUserAiApiKeySchema(package);
             }
             if (string.Equals(resourceName, SysConfigPackageResourceName, StringComparison.Ordinal))
@@ -1435,7 +1521,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     ? "LOWER(ApiEngineKey)=LOWER(@p0)"
                     : "ApiEngineKey=@p0";
                 var sql = @"SELECT ApiEngineKey, ApiV8Code, Version, ApiAddress,
-IsEnable, StopHttp, AllowAnonymous
+IsEnable, StopHttp, AllowAnonymous, ResponseType
 FROM sys_apiengine
 WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR IsDeleted IS NULL)");
                 var row = database.FromSql(sql)
@@ -1465,7 +1551,7 @@ WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR Is
                     ? "LOWER(ApiEngineKey)=LOWER(@p0)"
                     : "ApiEngineKey=@p0";
                 var sql = @"SELECT ApiEngineKey, ApiV8Code, Version, ApiAddress,
-IsEnable, StopHttp, AllowAnonymous
+IsEnable, StopHttp, AllowAnonymous, ResponseType
 FROM sys_apiengine
 WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR IsDeleted IS NULL)");
                 var row = database.FromSql(sql)
@@ -2554,12 +2640,7 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
             JObject row)
         {
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
-            foreach (var value in new[]
-            {
-                row?["ApiEngineKey"]?.ToString(),
-                row?["Id"]?.ToString(),
-                row?["ApiAddress"]?.ToString()
-            }.Where(value => !value.DosIsNullOrWhiteSpace()).Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (var value in ApiEngineRouteAliases.GetCacheAliases(row))
             {
                 await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{value}")
                     .ConfigureAwait(false);
@@ -2785,7 +2866,7 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                 && !HasPackagedSsoRuntime(package))
             {
                 throw new InvalidOperationException(
-                    $"升级资源[{resourceName}]缺少 v7.5.8 SSO Platform/Managed 基线、醒目恢复提示、安全 Hook 白名单或 CreateIfMissing 默认模板。"
+                    $"升级资源[{resourceName}]缺少 v7.5.9 SSO Platform/Managed HTTP 端点闭包、醒目恢复提示、安全 Hook 白名单或 CreateIfMissing 默认模板。"
                 );
             }
 
@@ -2794,7 +2875,7 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                 if (!HasPackagedPlatformRuntime(package))
                 {
                     throw new InvalidOperationException(
-                        $"升级资源[{resourceName}]缺少 v7.6.21 平台运行时 Managed 基线、完整声明闭包、CreateIfMissing Hook、安全 microi-init、登录壁纸可信原子契约或完整资源策略。"
+                        $"升级资源[{resourceName}]缺少 v7.7.8 平台运行时 Managed 基线、完整声明闭包、CreateIfMissing Hook、安全 microi-init、登录壁纸可信原子契约或完整资源策略。"
                     );
                 }
 
@@ -3498,9 +3579,9 @@ var nowText = function (format) {
                 {
                     var dbType = client.OsClientModel?["DbType"]?.Val<string>();
                     var getEngineSql = string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase)
-                        ? @"SELECT TOP 1 Id, ApiAddress, ApiV8Code FROM sys_apiengine
+                        ? @"SELECT TOP 1 Id, ApiAddress, ApiRoutes, ApiV8Code FROM sys_apiengine
 WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)"
-                        : @"SELECT Id, ApiAddress, ApiV8Code FROM sys_apiengine
+                        : @"SELECT Id, ApiAddress, ApiRoutes, ApiV8Code FROM sys_apiengine
 WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     var engine = client.Db.FromSql(getEngineSql)
                         .AddInParameter("p0", engineKey)
@@ -3510,6 +3591,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     string code = Convert.ToString(engine.ApiV8Code) ?? string.Empty;
                     string engineId = Convert.ToString(engine.Id) ?? string.Empty;
                     string engineApiAddress = Convert.ToString(engine.ApiAddress) ?? string.Empty;
+                    string engineApiRoutes = Convert.ToString(engine.ApiRoutes) ?? string.Empty;
                     if (code.DosIsNullOrWhiteSpace()) continue;
 
                     var patchedCode = code;
@@ -3537,6 +3619,10 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     if (!string.IsNullOrWhiteSpace(engineId))
                     {
                         await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{engineId}");
+                    }
+                    foreach (var routeAlias in ApiEngineRouteAliases.Parse(engineApiRoutes))
+                    {
+                        await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:{routeAlias.ToLowerInvariant()}");
                     }
                     if (!string.IsNullOrWhiteSpace(engineApiAddress))
                     {

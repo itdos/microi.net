@@ -514,6 +514,34 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
+    public void V8FirstApplicationGate_AllowsForwardCompatiblePackageStorageCapability()
+    {
+        var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");
+        var package = JObject.Parse(LoadBundledResources()["app.microi.store.json"]);
+        var capabilities = Assert.IsType<JArray>(package["PackageInfo"]?["Capabilities"]);
+
+        Assert.Contains(
+            capabilities,
+            item => item?.ToString() == "ApiEngine:microi-store-package-storage@v1.2.1");
+        Assert.DoesNotContain(
+            capabilities,
+            item => item?.ToString() == "ApiEngine:microi-store-package-storage@v1.1.0");
+        Assert.True(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.store.json", package })));
+
+        var belowMinimum = (JObject)package.DeepClone();
+        belowMinimum["PackageInfo"]!["Capabilities"] = new JArray(
+            belowMinimum["PackageInfo"]!["Capabilities"]!.Select(item =>
+                item?.ToString()?.StartsWith(
+                    "ApiEngine:microi-store-package-storage@",
+                    StringComparison.Ordinal) == true
+                    ? "ApiEngine:microi-store-package-storage@v1.0.9"
+                    : item));
+        Assert.False(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.store.json", belowMinimum })));
+    }
+
+    [Fact]
     public void MessageNotificationGate_RequiresFacadeRuntimeAndHookWithoutDirectFacadeHookCoupling()
     {
         var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");
@@ -526,7 +554,7 @@ public class PlatformRuntimeUpgradeGateTests
 
         Assert.True(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.message-notification.json", package })));
-        Assert.Equal("v1.0.11", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.Equal("v1.0.13", package["PackageInfo"]?["Version"]?.ToString());
         Assert.Equal(string.Empty, expectedHook.Invoke(
             null, new object[] { "platform-chat-system-message" }));
         Assert.Equal("platform-message-notification-custom-hook", expectedHook.Invoke(

@@ -1,4 +1,3 @@
-using System.Reflection;
 using Microi.net;
 using Microi.net.Api;
 using Newtonsoft.Json.Linq;
@@ -68,15 +67,26 @@ public class PlatformRoleMutationSecurityTests
         });
     }
 
-    [Theory]
-    [InlineData(nameof(LegacyMobileCompatibilityController.GetSysUser))]
-    [InlineData(nameof(LegacyMobileCompatibilityController.AddSysUser))]
-    [InlineData(nameof(LegacyMobileCompatibilityController.DelSysUser))]
-    public void LegacySysUserCrudEndpoints_UseGranularTableAuthorization(string actionName)
+    [Fact]
+    public void LegacySysUserCrudEndpoints_AreApiRoutesWithGranularTrustedAuthorization()
     {
-        var action = typeof(LegacyMobileCompatibilityController).GetMethod(actionName);
-        Assert.NotNull(action);
-        Assert.Null(action!.GetCustomAttribute<PlatformAdminOnlyAttribute>(true));
+        var root = FindRepositoryRoot();
+        Assert.False(File.Exists(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers",
+            "LegacyMobileCompatibilityController.cs")));
+        var package = JObject.Parse(File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.sys_user.json")));
+        var engine = package["SysApiEngines"]!.Values<JObject>()
+            .Single(item => item["ApiEngineKey"]?.ToString() == "platform-sys-user-admin");
+        foreach (var route in new[]
+                 {
+                     "/api/SysUser/GetSysUser", "/api/SysUser/AddSysUser",
+                     "/api/SysUser/DelSysUser"
+                 })
+        {
+            Assert.Contains(route, engine["ApiRoutes"]?.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+        Assert.Contains("V8.Method.ManageSysUserAdmin", engine["ApiV8Code"]?.ToString());
     }
 
     [Fact]

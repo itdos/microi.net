@@ -1145,6 +1145,20 @@ export class MicroiClient {
     async getStatus() {
         return this.get(API.GET_STATUS);
     }
+    async getAdministrativeCapabilities() {
+        return this.get(API.GET_ADMINISTRATIVE_CAPABILITIES);
+    }
+    async administerTableData(input) {
+        return this.post(API.ADMINISTER_TABLE_DATA, {
+            OsClient: this.config.osClient,
+            Operation: input.operation,
+            TableName: input.tableName,
+            ...(input.query ? { Query: input.query } : {}),
+            ...(input.row ? { Row: input.row } : {}),
+            ...(input.id ? { Id: input.id } : {}),
+            ...(input.confirmExecution ? { ConfirmExecution: input.confirmExecution } : {}),
+        });
+    }
     async transitionApplicationStreamGate(data) {
         return this.post(API.TRANSITION_APPLICATION_STREAM_GATE, data, {
             timeoutMs: this.writeRequestTimeoutMs,
