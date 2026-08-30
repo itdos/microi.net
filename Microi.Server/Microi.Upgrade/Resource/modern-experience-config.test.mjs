@@ -173,12 +173,12 @@ test('应用导入器前置校验菜单运行时并透传结构化失败详情',
 });
 
 test('私有商城源由可信后端持有凭据且过期即失效', async () => {
-  const controller = await readFile(resolve(directory, '../../Microi.net.Api/Controllers/MarketplaceSourceController.cs'), 'utf8');
-  assert.match(controller, /RequireAdministratorAsync/);
-  assert.match(controller, /TenantSystemSettingsSecurity\.ProtectSecret/);
-  assert.match(controller, /ExpiresAtUtc\.Value <= DateTime\.UtcNow/);
-  assert.match(controller, /_ClientType["']?\] = "MCP"/);
-  assert.doesNotMatch(controller, /return\s+Json\([^\n]*credential\.Token/);
+  const runtime = await readFile(resolve(directory, '../../Microi.net/Marketplace/MarketplaceSourceRuntime.cs'), 'utf8');
+  assert.match(runtime, /RequireAdministratorAsync/);
+  assert.match(runtime, /TenantSystemSettingsSecurity\.ProtectSecret/);
+  assert.match(runtime, /ExpiresAtUtc\.Value <= DateTime\.UtcNow/);
+  assert.match(runtime, /\["_ClientType"\] = "MCP"/);
+  assert.doesNotMatch(runtime, /return\s+Json\([^\n]*credential\.Token/);
 });
 
 test('负向开关就地复用旧字段身份且数据包不再暴露旧名称', async () => {

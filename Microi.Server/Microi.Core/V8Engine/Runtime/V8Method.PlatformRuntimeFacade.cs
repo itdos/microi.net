@@ -343,11 +343,19 @@ namespace Microi.net
                 else
                 {
                     var currentToken = DiyToken.GetCurrentToken(false).GetAwaiter().GetResult();
-                    if (currentToken?.CurrentUser == null)
-                        return new DosResult(1001, null, "登录身份已过期，请重新登录！");
-                    if (!string.Equals(currentToken.OsClient, osClient, StringComparison.OrdinalIgnoreCase))
-                        return new DosResult(0, null, "请求租户与当前登录租户不一致！");
-                    currentUser = currentToken.CurrentUser.DeepClone() as JObject;
+                    if (currentToken?.CurrentUser != null)
+                    {
+                        if (!string.Equals(currentToken.OsClient, osClient, StringComparison.OrdinalIgnoreCase))
+                            return new DosResult(0, null, "请求租户与当前登录租户不一致！");
+                        currentUser = currentToken.CurrentUser.DeepClone() as JObject;
+                    }
+                    else
+                    {
+                        // 极少量历史 UniApp 使用 ClientUserToken/MobileMemberToken，不能被
+                        // DiyToken 解析。兼容仅限当前租户的三类固定缓存键，原始 Token
+                        // 不进入 V8，且后续仍完整执行文件、表、行和字段授权。
+                        currentUser = ResolveLegacyPrivateFileUser(osClient);
+                    }
                 }
                 if (currentUser == null || currentUser["Id"].Val<string>().DosIsNullOrWhiteSpace())
                     return new DosResult(1001, null, "登录身份已过期，请重新登录！");
@@ -373,6 +381,54 @@ namespace Microi.net
             {
                 return new DosResult(0, null, "获取私有文件地址失败，请稍后重试。");
             }
+        }
+
+        private static JObject ResolveLegacyPrivateFileUser(string osClient)
+        {
+            var request = DiyHttpContext.Current?.Request;
+            if (request == null || osClient.DosIsNullOrWhiteSpace()) return null;
+            var token = request.Headers["Token"].ToString();
+            if (token.DosIsNullOrWhiteSpace()) token = request.Headers["Authorization"].ToString();
+            try
+            {
+                if (token.DosIsNullOrWhiteSpace() && request.HasFormContentType)
+                {
+                    var form = request.ReadFormAsync().GetAwaiter().GetResult();
+                    token = form["Token"].ToString();
+                    if (token.DosIsNullOrWhiteSpace()) token = form["authorization"].ToString();
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+            token = (token ?? string.Empty).Trim();
+            if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                token = token.Substring("Bearer ".Length).Trim();
+            if (token.DosIsNullOrWhiteSpace() || token.Length > 4096) return null;
+
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            foreach (var key in new[]
+            {
+                $"Microi:{osClient}:ClientUserToken:{token}",
+                $"Microi:{osClient}:MobileMemberToken:{token}",
+                $"Microi:{osClient}:MallMemberToken:{token}"
+            })
+            {
+                try
+                {
+                    var cached = cache.GetAsync(key).GetAwaiter().GetResult();
+                    if (cached == null) continue;
+                    if (cached is JObject model) return model.DeepClone() as JObject;
+                    var text = cached.ToString();
+                    if (!text.DosIsNullOrWhiteSpace()) return JObject.Parse(text);
+                }
+                catch
+                {
+                    // 单个历史缓存格式损坏时继续检查同租户其它兼容键。
+                }
+            }
+            return null;
         }
 
         private static IEnumerable<string> DomainList(string value)

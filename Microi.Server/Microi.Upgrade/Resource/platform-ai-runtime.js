@@ -7,6 +7,19 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */
+var aiRuntimeRoute = String(V8.Param.ApiAddress || '').replace(/\?.*$/, '').toLowerCase();
+var aiRuntimeActions = {
+  '/api/ai/updateconversationtitle':'UpdateConversationTitle',
+  '/api/ai/recognizeintent':'RecognizeIntent',
+  '/api/ai/chat':'Chat',
+  '/api/ai/nl2sql':'NL2SQL',
+  '/api/ai/nl2v8enginesync':'NL2V8EngineSync'
+};
+if(aiRuntimeActions[aiRuntimeRoute]) V8.Param.Action = aiRuntimeActions[aiRuntimeRoute];
+
+
+
 // Microi官方接口引擎：platform-ai-runtime
 // Version: v1.0.0
 // AI_RUNTIME_MANAGED_NON_STREAM_V1：非流式兼容动作由 V8 编排，身份、租户、密钥和权限由 V8.AI 绑定。

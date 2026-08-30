@@ -112,13 +112,12 @@ test('managed SMS sender uses private tenant settings without exposing or mixing
 
 test('backend upgrade auto-installs the identity package while password login stays bootstrap-native', () => {
   const upgrade = fs.readFileSync(path.join(directory, '..', '13-UpgradeAppStore.cs'), 'utf8');
-  const controller = fs.readFileSync(
-    path.join(directory, '..', '..', 'Microi.net.Api', 'Controllers', 'SysUserController.cs'),
+  const sessionRuntime = fs.readFileSync(
+    path.join(directory, '..', '..', 'Microi.net', 'Identity', 'SysUserSessionRuntime.cs'),
     'utf8'
   );
-  const compatibilityController = fs.readFileSync(
-    path.join(directory, '..', '..', 'Microi.net.Api', 'Controllers', 'LegacyMobileCompatibilityController.cs'),
-    'utf8'
+  const deletedController = path.join(
+    directory, '..', '..', 'Microi.net.Api', 'Controllers', 'SysUserController.cs'
   );
   const upgradeVersion = upgrade.match(/public static string Version = "(\d+)\.(\d+)\.(\d+)\.(\d+)"/);
   assert.ok(upgradeVersion, 'UpgradeAppStore must keep a parseable four-part version gate');
@@ -131,6 +130,9 @@ test('backend upgrade auto-installs the identity package while password login st
   );
   assert.match(upgrade, /SaaSEnginePackageResourceName/);
   assert.match(upgrade, /InstallUpgradePackage\(osClient, msgs, SaaSEnginePackageResourceName/);
-  assert.match(controller, /var result = await _sysUserLogic\.Login\(param\)/);
-  assert.match(compatibilityController, /RunAsync\(\s*"platform_auth_sms_login"/);
+  assert.equal(fs.existsSync(deletedController), false);
+  assert.match(sessionRuntime, /var result = await _sysUserLogic\.Login\(param\)/);
+  const smsLogin = resource.SysApiEngines.find(item => item.ApiEngineKey === 'platform_auth_sms_login');
+  assert.ok(smsLogin);
+  assert.match(String(smsLogin.ApiRoutes || ''), /\/api\/SysUser\/SmsLogin/i);
 });

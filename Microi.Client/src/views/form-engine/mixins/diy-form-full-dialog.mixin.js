@@ -333,6 +333,8 @@ export default {
         onDialogClosed() {
             var self = this;
             self._cancelFieldFormOpen();
+            self.WebosFormMaximized = false;
+            self.WebosFormMinimized = false;
             self.showMobileFabMenu = false;
             self.CurrentRowModel = {};
             self.CloseFormNeedConfirm = false;
@@ -425,6 +427,31 @@ export default {
 
             var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "80%" : self.CurrentDiyTableModel.FormOpenWidth;
             return result;
+        },
+        IsWebosWindowDialog() {
+            var runtime = this.$webosWindow;
+            return runtime?.active === true
+                && ["macos", "windows"].includes(String(runtime?.platform || "").toLowerCase());
+        },
+        IsWebosWindowMaximized() {
+            return this.IsWebosWindowDialog() && this.WebosFormMaximized === true;
+        },
+        WebosMinimizeFormWindow() {
+            if (!this.IsWebosWindowDialog()) return;
+            this.WebosFormMinimized = true;
+        },
+        WebosToggleMaximizeFormWindow() {
+            if (!this.IsWebosWindowDialog()) return;
+            this.WebosFormMinimized = false;
+            this.WebosFormMaximized = !this.WebosFormMaximized;
+        },
+        WebosRestoreFormWindow() {
+            if (!this.IsWebosWindowDialog()) return;
+            this.WebosFormMinimized = false;
+            this.$nextTick(() => {
+                const dialogs = document.querySelectorAll('.diy-form-modern-dialog');
+                dialogs[dialogs.length - 1]?.focus?.();
+            });
         },
         GetOpenFormStyle() {
             var self = this;

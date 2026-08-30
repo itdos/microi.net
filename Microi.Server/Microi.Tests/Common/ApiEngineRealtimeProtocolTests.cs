@@ -291,13 +291,31 @@ public sealed class ApiEngineRealtimeProtocolTests
             "app.MapHub<GameRealtimeHub>(GameRealtimeRuntime.HubPath)",
             realtimeHosting,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "RealtimeClientTimeoutInterval = TimeSpan.FromSeconds(45)",
+            realtimeHosting,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "RealtimeKeepAliveInterval = TimeSpan.FromSeconds(15)",
+            realtimeHosting,
+            StringComparison.Ordinal);
+        Assert.Equal(2, Regex.Matches(
+            realtimeHosting,
+            @"options\.ClientTimeoutInterval\s*=\s*RealtimeClientTimeoutInterval;").Count);
+        Assert.Equal(2, Regex.Matches(
+            realtimeHosting,
+            @"options\.KeepAliveInterval\s*=\s*RealtimeKeepAliveInterval;").Count);
+        Assert.DoesNotContain(
+            "options.KeepAliveInterval = TimeSpan.FromMinutes(20)",
+            realtimeHosting,
+            StringComparison.Ordinal);
 
         var controller = File.ReadAllText(Path.Combine(
             serverRoot,
             "Microi.net.Api",
             "Controllers",
             "ApiEngineController.cs"));
-        Assert.Equal(5, Regex.Matches(
+        Assert.Equal(6, Regex.Matches(
             controller,
             @"await\s+PublishApiEngineRealtimeAfterCommitAsync\(result,\s*param\);").Count);
         Assert.Contains(

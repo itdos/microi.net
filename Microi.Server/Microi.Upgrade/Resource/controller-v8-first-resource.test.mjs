@@ -341,11 +341,18 @@ test('tenant hook failures are returned and block each Before stage', () => {
   assert.equal(auditWritten, false);
 });
 
-test('controllers use fixed Managed keys while protocol and transport shells remain in C#', () => {
-  const external = read(path.join(apiControllerDir, 'ExternalLoginController.cs'));
-  const wechat = read(path.join(apiControllerDir, 'WeChatController.cs'));
-  const chat = read(path.join(apiControllerDir, 'LegacyMobileCompatibilityController.cs'));
-  const marketplace = read(path.join(apiControllerDir, 'MarketplaceSourceController.cs'));
+test('deleted controllers are replaced by fixed Managed keys and plugin trusted atoms', () => {
+  for (const deleted of [
+    'ExternalLoginController.cs',
+    'WeChatController.cs',
+    'LegacyMobileCompatibilityController.cs',
+    'MarketplaceSourceController.cs',
+  ]) assert.equal(fs.existsSync(path.join(apiControllerDir, deleted)), false);
+
+  const external = read(path.join(serverRoot, 'Microi.SSO', 'ExternalLogin', 'ExternalLoginRuntime.cs'));
+  const wechat = read(path.join(serverRoot, 'Microi.WeChat', 'OAuth', 'WeChatOAuthRuntime.cs'));
+  const chat = read(path.join(apiControllerDir, 'ApiEngineController.cs'));
+  const marketplace = read(path.join(serverRoot, 'Microi.net', 'Marketplace', 'MarketplaceSourceRuntime.cs'));
   const chatHub = read(path.join(apiHandlerDir, 'DiyWebSocket.cs'));
   const bridge = read(path.join(serverRoot, 'Microi.Core', 'ApiEngine', 'ManagedApiEngineCompatibility.cs'));
   const trustedContext = read(path.join(serverRoot, 'Microi.Core', 'Runtime', 'V8TrustedExecutionContext.cs'));
@@ -370,11 +377,10 @@ test('controllers use fixed Managed keys while protocol and transport shells rem
   assert.match(wechat, /OAuthApi\.GetAccessToken\(appId, appSecret, code\)/);
   assert.doesNotMatch(wechat, /_TrustedWeChatProtocol|UptFormDataAsync/);
 
-  assert.match(chat, /SystemMessageApiEngineKey = "platform-chat-system-message"/);
-  assert.match(chat, /ManagedApiEngineCompatibility\.RunAsync\(/);
-  assert.match(chat, /new DiyWebSocket\(null\)\.DeliverPreparedMessageAsync\(/);
-  assert.doesNotMatch(chat, /diyWebSocket\.SendToUser\(msgParam\)/);
-  assert.doesNotMatch(chat, /FormEngine\.GetFormData/);
+  assert.match(chat, /"platform-chat-system-message"/);
+  assert.match(chat, /DeliveryPending/);
+  assert.match(chat, /new DiyWebSocket\(null\)\s*\.DeliverPreparedMessageAsync\(/);
+  assert.doesNotMatch(chat, /SendToUser\(msgParam\)/);
 
   assert.match(chatHub, /ChatRuntimeApiEngineKey = "platform-chat-runtime"/);
   assert.match(chatHub, /RunTrustedProtocolAsync\([\s\S]*ChatRuntimeApiEngineKey,[\s\S]*trustedOsClient,[\s\S]*request,[\s\S]*trustedCurrentUser/);

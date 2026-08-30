@@ -126,13 +126,13 @@ public sealed class ProtocolGatewayRuntimeSettingsTests
     }
 
     [Fact]
-    public void ControllersUseTenantBoundAtom_AndUpgradePackageAlreadyOwnsFields()
+    public void ProtocolRuntimesUseTenantBoundAtom_AndUpgradePackageAlreadyOwnsFields()
     {
         var root = FindRepositoryRoot();
         var message = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers", "MessageController.cs"));
         var weChat = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.net.Api", "Controllers", "WeChatController.cs"));
+            root, "Microi.Server", "Microi.WeChat", "OAuth", "WeChatOAuthRuntime.cs"));
         var runtimeReader = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Core", "SaaSEngine", "OsClient.cs"));
 
@@ -141,6 +141,8 @@ public sealed class ProtocolGatewayRuntimeSettingsTests
         Assert.Contains("TenantProtocolGatewaySettings.TryLoadChanjet", message, StringComparison.Ordinal);
         Assert.Contains("TenantProtocolGatewaySettings.TryLoadOAuthReturnUrlPolicy", weChat, StringComparison.Ordinal);
         Assert.Contains("returnUrlPolicy.IsAllowed", weChat, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "WeChatController.cs")));
         Assert.DoesNotContain("Security:OAuthReturnUrlOrigins", runtimeReader, StringComparison.Ordinal);
         Assert.DoesNotContain("Integrations:Chanjet:", runtimeReader, StringComparison.Ordinal);
         Assert.DoesNotContain("Integrations:WeChat:", runtimeReader, StringComparison.Ordinal);

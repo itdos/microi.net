@@ -25,7 +25,7 @@ namespace Microi.net
         public V8MongoDBParam DynamicToV8MongoDBParam(dynamic dynamicParam)
         {
             JObject jobjParam = JsonHelper.ToJObject(dynamicParam);
-            V8MongoDBParam param = jobjParam.ToObject<V8MongoDBParam>(DiyCommon.JsonConfig);
+            V8MongoDBParam param = jobjParam.ToObject<V8MongoDBParam>(DiyCommon.GetJsonSerializer());
             return param;
         }
 

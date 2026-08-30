@@ -3,7 +3,10 @@ import { defineStore } from "pinia";
 import { DiyCommon } from "@/utils/diy.common.js";
 import LocalStorageManager from "@/utils/localStorage-manager.js";
 import { getLanguage, normalizeLocale, LANG_STORAGE_KEY } from "@/lang/index";
-import { normalizeCurrentUserRoleLimits } from "@/utils/current-user-state.js";
+import {
+    mergeCurrentUserWithCachedSnapshot,
+    normalizeCurrentUserRoleLimits
+} from "@/utils/current-user-state.js";
 
 const DEFAULT_THEME_COLOR = "#409eff";
 const getLocalThemeColor = () => {
@@ -237,7 +240,11 @@ export const useDiyStore = defineStore("diy", {
         setCurrentUser(obj) {
             // 登录响应通常是 JSON 字符串，偏好乐观更新时则会把已经解析的数组再次写回。
             // 统一转换必须幂等，避免无关的主题保存被二次 JSON.parse 阻断。
-            const currentUser = normalizeCurrentUserRoleLimits(obj);
+            let cachedCurrentUser = {};
+            try { cachedCurrentUser = LocalStorageManager.get("CurrentUser") || {}; } catch {}
+            const currentUser = normalizeCurrentUserRoleLimits(
+                mergeCurrentUserWithCachedSnapshot(this.CurrentUser, cachedCurrentUser, obj)
+            );
             this.CurrentUser = currentUser;
             LocalStorageManager.set("CurrentUser", currentUser);
         },

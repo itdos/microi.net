@@ -205,7 +205,11 @@ namespace Microi.net
         /// <summary>
         /// 防止缓存初始化时的无限递归标志
         /// </summary>
-        public static bool _isCacheInitializing = false;
+        // Redis connection setup calls back into tenant resolution synchronously.
+        // The recursion guard must be local to that thread; a process-wide flag
+        // made unrelated requests skip their L2 tenant cache during startup.
+        [ThreadStatic]
+        public static bool _isCacheInitializing;
 
         /// <summary>
         /// OsClientName

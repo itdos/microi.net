@@ -260,6 +260,10 @@ namespace Microi.net.Api
         /// </summary>
         private async Task DefaultParamList(List<JObject> paramList)
         {
+            if (paramList == null)
+            {
+                throw new ArgumentNullException(nameof(paramList));
+            }
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             foreach (var param in paramList)
             {
@@ -454,6 +458,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [RequiredDosBody]
         public async Task<JsonResult> UptFormDataBatch([FromBody] List<JObject> param)
         {
             await DefaultParamList(param);
@@ -461,6 +466,7 @@ namespace Microi.net.Api
             return Json(result);
         }
         [HttpPost]
+        [RequiredDosBody]
         public async Task<JsonResult> UptTableData([FromBody] List<JObject> param)
         {
             await DefaultParamList(param);
@@ -486,6 +492,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [RequiredDosBody]
         public async Task<JsonResult> AddFormDataBatch([FromBody] List<JObject> param)
         {
             await DefaultParamList(param);
@@ -493,6 +500,7 @@ namespace Microi.net.Api
             return Json(result);
         }
         [HttpPost]
+        [RequiredDosBody]
         public async Task<JsonResult> AddTableData([FromBody] List<JObject> param)
         {
             await DefaultParamList(param);
@@ -631,6 +639,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [RequiredDosBody]
         public async Task<JsonResult> DelFormDataBatch([FromBody] List<JObject> param)
         {
             await DefaultParamList(param);
@@ -638,6 +647,7 @@ namespace Microi.net.Api
             return Json(result);
         }
         [HttpPost]
+        [RequiredDosBody]
         public async Task<JsonResult> DelTableData([FromBody] List<JObject> param)
         {
             await DefaultParamList(param);
@@ -838,6 +848,7 @@ namespace Microi.net.Api
         /// <returns></returns>
         [HttpPost, HttpGet]
         [AllowAnonymous]
+        [RequiredDosBody]
         public async Task<JsonResult> GetTableDataAnonymous([FromBody] JObject param)
         {
             //if (param["OsClient"] == null)
@@ -895,6 +906,7 @@ namespace Microi.net.Api
         }
         [HttpPost, HttpGet]
         [AllowAnonymous]
+        [RequiredDosBody]
         public async Task<JsonResult> GetTableDataTreeAnonymous([FromBody] JObject param)
         {
             //if (param["OsClient"] == null)
@@ -1933,6 +1945,7 @@ namespace Microi.net.Api
 
         [HttpPost, HttpGet]
         [HttpPost("~/api/DiyTable/GetDiyFieldSqlDataFromBody"), HttpGet("~/api/DiyTable/GetDiyFieldSqlDataFromBody")]
+        [RequiredDosBody]
         public async Task<JsonResult> GetDiyFieldSqlDataFromBody([FromBody] DiyTableRowParam param)
         {
             await DefaultDiyTableRowParam(param);
@@ -1951,6 +1964,7 @@ namespace Microi.net.Api
 
         [HttpPost, HttpGet]
         [HttpPost("~/api/DiyTable/GetFieldsDataFromBody"), HttpGet("~/api/DiyTable/GetFieldsDataFromBody")]
+        [RequiredDosBody]
         public async Task<JsonResult> GetFieldsDataFromBody([FromBody] DiyTableRowParam param)
         {
             await DefaultDiyTableRowParam(param);
@@ -2028,6 +2042,7 @@ namespace Microi.net.Api
         [AllowAnonymous]
         [HttpPost, HttpGet]
         [HttpPost("~/api/DiyTable/ExportDiyTableRowFromBody"), HttpGet("~/api/DiyTable/ExportDiyTableRowFromBody")]
+        [RequiredDosBody]
         public async Task<ActionResult> ExportDiyTableRowFromBody([FromBody] DiyTableRowParam param)
         {
             return await ExportDiyTableRow(param);
@@ -2508,6 +2523,7 @@ namespace Microi.net.Api
         [HttpPost]
         [HttpPost("~/api/DiyField/UptDiyFieldListFromBody")]
         [PlatformAdminOnly]
+        [RequiredDosBody]
         public async Task<JsonResult> UptDiyFieldListFromBody([FromBody] DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);

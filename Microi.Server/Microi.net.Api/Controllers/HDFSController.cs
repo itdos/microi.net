@@ -3,11 +3,18 @@ using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using StackExchange.Redis;
+using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Security;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Microi.net.Api
@@ -18,7 +25,7 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
-    public partial class HDFSController : Controller
+    public class HDFSController : Controller
     {
         /// <summary>
         /// 兼容旧版百度 UEditor 的 /UEditor/Upload 地址。文件处理仍归 HDFS 插件，
@@ -1689,6 +1696,696 @@ namespace Microi.net.Api
             return Json(result);
         }
 
+        #endregion
+
+        #region MinioSync
+
+        [HttpPost]
+        public async Task<JsonResult> ProbeMinio(MinioProbeParam param)
+        {
+            var access = await GetMinioSyncAccess();
+            if (access.Result != null) return Json(access.Result);
+            return Json(await new ExternalMinioSyncService().Probe(param));
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> ListMinioObjects(MinioListObjectsParam param)
+        {
+            var access = await GetMinioSyncAccess();
+            if (access.Result != null) return Json(access.Result);
+            return Json(await new ExternalMinioSyncService().ListObjects(param));
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> CreateMinioFolder(MinioCreateFolderParam param)
+        {
+            var access = await GetMinioSyncAccess();
+            if (access.Result != null) return Json(access.Result);
+            return Json(await new ExternalMinioSyncService().CreateFolder(param));
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> SyncMinioObject(MinioObjectSyncParam param)
+        {
+            var access = await GetMinioSyncAccess();
+            if (access.Result != null) return Json(access.Result);
+            param ??= new MinioObjectSyncParam();
+            param.CurrentOsClient = access.OsClient;
+            return Json(await new ExternalMinioSyncService().SyncObject(param));
+        }
+
+        private static async Task<(DosResult Result, string OsClient)> GetMinioSyncAccess()
+        {
+            try
+            {
+                var currentToken = await DiyToken.GetCurrentToken().ConfigureAwait(false);
+                if (currentToken?.CurrentUser == null || currentToken.OsClient.DosIsNullOrWhiteSpace())
+                {
+                    return (new DosResult(1001, null, "登录身份已过期，请重新登录。"), "");
+                }
+                if (currentToken.CurrentUser["Level"].Val<int>() < DiyCommon.MaxRoleLevel)
+                {
+                    return (new DosResult(0, null, "只有超级管理员可以配置直连MinIO并执行文件同步。"), "");
+                }
+                return (null, currentToken.OsClient);
+            }
+            catch
+            {
+                return (new DosResult(1001, null, "登录身份无效，请重新登录。"), "");
+            }
+        }
+        #endregion
+
+
+        #region OfficePreviewSource
+
+        private const int OfficePreviewSourceMaxBytes = 50 * 1024 * 1024;
+        private static readonly TimeSpan OfficePreviewSourceCacheLifetime = TimeSpan.FromMinutes(10);
+        private static readonly HashSet<string> OfficePreviewSourceExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".xlsx", ".xls", ".docx", ".doc", ".pptx", ".ppt", ".pdf", ".csv"
+        };
+
+        /// <summary>
+        /// 将当前平台匿名接口引擎响应的 Office 文件缓存到公有对象存储，供远端 OnlyOffice 回源。
+        /// 该接口不是通用 URL 代理：仅接受当前租户、当前平台的 /apiengine/{key} 地址。
+        /// </summary>
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<JsonResult> PrepareOfficePreviewFromUrl([FromBody] JObject param)
+        {
+            var osClient = TokenString(param?["OsClient"]);
+            var sourceUrl = TokenString(param?["FileUrl"]);
+            var requestedFileName = TokenString(param?["FileName"]);
+
+            if (osClient.DosIsNullOrWhiteSpace())
+                return Json(new DosResult(0, null, "OsClient不能为空！"));
+            if (!IsSafeOsClient(osClient))
+                return Json(new DosResult(0, null, "OsClient格式不合法！"));
+            if (!Uri.TryCreate(sourceUrl, UriKind.Absolute, out var sourceUri)
+                || (sourceUri.Scheme != Uri.UriSchemeHttp && sourceUri.Scheme != Uri.UriSchemeHttps)
+                || !sourceUri.UserInfo.DosIsNullOrWhiteSpace()
+                || !sourceUri.Fragment.DosIsNullOrWhiteSpace())
+            {
+                return Json(new DosResult(0, null, "FileUrl必须是合法的HTTP或HTTPS接口引擎地址！"));
+            }
+
+            var sourceValidation = await ValidateOfficePreviewSourceUri(sourceUri, osClient);
+            if (!sourceValidation.Allowed)
+                return Json(new DosResult(0, null, sourceValidation.Message));
+
+            var cacheHash = Sha256Hex(sourceUri.AbsoluteUri + "|" + requestedFileName);
+            var cacheKey = $"Microi:{osClient}:OfficePreviewSource:{cacheHash}";
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            try
+            {
+                var cached = await cache.GetAsync<JObject>(cacheKey).ConfigureAwait(false);
+                if (cached != null && IsSafeCachedOfficePreview(cached, osClient))
+                    return Json(new DosResult(1, cached, "已使用缓存文件"));
+            }
+            catch
+            {
+                // 缓存故障不应阻止 Office 预览，继续从源接口获取。
+            }
+
+            byte[] fileBytes;
+            string responseFileName;
+            try
+            {
+                using var handler = new HttpClientHandler
+                {
+                    AllowAutoRedirect = false,
+                    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+                };
+                if (sourceValidation.IsLoopback)
+                {
+                    handler.ServerCertificateCustomValidationCallback = (message, _, _, errors) =>
+                        errors == SslPolicyErrors.None || IsLoopbackHost(message?.RequestUri?.Host);
+                }
+
+                using var httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(90) };
+                using var request = new HttpRequestMessage(HttpMethod.Get, sourceUri);
+                request.Headers.UserAgent.ParseAdd("Microi-OnlyOffice-Preview/1.0");
+                using var response = await httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    HttpContext.RequestAborted).ConfigureAwait(false);
+
+                if (!response.IsSuccessStatusCode)
+                    return Json(new DosResult(0, null, "接口引擎文件下载失败：HTTP " + (int)response.StatusCode));
+                if (response.Content.Headers.ContentLength > OfficePreviewSourceMaxBytes)
+                    return Json(new DosResult(0, null, "接口引擎文件超过50MB预览上限！"));
+
+                responseFileName = DecodeContentDispositionFileName(
+                    response.Content.Headers.ContentDisposition?.FileNameStar
+                    ?? response.Content.Headers.ContentDisposition?.FileName);
+                await using var input = await response.Content.ReadAsStreamAsync(HttpContext.RequestAborted).ConfigureAwait(false);
+                using var output = new MemoryStream();
+                var buffer = new byte[81920];
+                while (true)
+                {
+                    var read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), HttpContext.RequestAborted).ConfigureAwait(false);
+                    if (read <= 0) break;
+                    if (output.Length + read > OfficePreviewSourceMaxBytes)
+                        return Json(new DosResult(0, null, "接口引擎文件超过50MB预览上限！"));
+                    await output.WriteAsync(buffer.AsMemory(0, read), HttpContext.RequestAborted).ConfigureAwait(false);
+                }
+                fileBytes = output.ToArray();
+            }
+            catch (OperationCanceledException) when (!HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                return Json(new DosResult(0, null, "接口引擎文件下载超时！"));
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, "接口引擎文件下载异常：" + ex.Message));
+            }
+
+            if (fileBytes.Length == 0)
+                return Json(new DosResult(0, null, "接口引擎返回的文件内容为空！"));
+
+            var fileName = NormalizeOfficePreviewFileName(requestedFileName, responseFileName);
+            var extension = Path.GetExtension(fileName);
+            if (!OfficePreviewSourceExtensions.Contains(extension))
+                return Json(new DosResult(0, null, "仅支持Excel、Word、PowerPoint、PDF和CSV文件预览！"));
+            if (!HasExpectedOfficeFileSignature(extension, fileBytes))
+                return Json(new DosResult(0, null, "接口引擎返回内容与文件类型不匹配！"));
+
+            var objectPath = $"{osClient}/office-preview/{cacheHash}/{fileName}";
+            using (var stream = new MemoryStream(fileBytes, writable: false))
+            {
+                var putResult = await PutOfficeObject(osClient, false, objectPath, stream).ConfigureAwait(false);
+                if (putResult.Code != 1)
+                    return Json(new DosResult(putResult.Code, putResult.Data, "缓存预览文件失败：" + putResult.Msg));
+            }
+
+            var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(osClient).ConfigureAwait(false);
+            var sysConfig = sysConfigResult.Code == 1 && sysConfigResult.Data != null
+                ? ToJObject((object)sysConfigResult.Data)
+                : null;
+            var fileServer = TokenString(sysConfig?["FileServer"]);
+            if (!Uri.TryCreate(fileServer, UriKind.Absolute, out var fileServerUri)
+                || (fileServerUri.Scheme != Uri.UriSchemeHttp && fileServerUri.Scheme != Uri.UriSchemeHttps))
+            {
+                return Json(new DosResult(0, null, "当前租户未配置可供OnlyOffice访问的FileServer！"));
+            }
+
+            var filePathName = "/" + objectPath.TrimStart('/');
+            var resultData = new JObject
+            {
+                ["FileUrl"] = fileServer.TrimEnd('/') + filePathName,
+                ["FilePathName"] = filePathName,
+                ["FileName"] = fileName,
+                ["FileSize"] = fileBytes.Length,
+                ["FileType"] = extension.TrimStart('.').ToLowerInvariant(),
+                ["SourceUrl"] = sourceUri.AbsoluteUri
+            };
+            try
+            {
+                await cache.SetAsync(cacheKey, resultData, OfficePreviewSourceCacheLifetime).ConfigureAwait(false);
+            }
+            catch
+            {
+                // 对象已写入分布式存储；Redis故障时仍可正常预览。
+            }
+
+            return Json(new DosResult(1, resultData, "预览文件已就绪"));
+        }
+
+        private async Task<(bool Allowed, bool IsLoopback, string Message)> ValidateOfficePreviewSourceUri(Uri sourceUri, string osClient)
+        {
+            var decodedPath = Uri.UnescapeDataString(sourceUri.AbsolutePath);
+            if (!Regex.IsMatch(decodedPath, @"^/apiengine/[^/]+/?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                return (false, false, "仅允许预览当前平台的接口引擎文件地址！");
+
+            var tenantInPath = Regex.Match(decodedPath, @"--OsClient--(?<tenant>.+?)--", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var tenant = tenantInPath.Success ? tenantInPath.Groups["tenant"].Value : null;
+            if (tenant.DosIsNullOrWhiteSpace())
+            {
+                foreach (var item in QueryHelpers.ParseQuery(sourceUri.Query))
+                {
+                    if (string.Equals(item.Key, "OsClient", StringComparison.OrdinalIgnoreCase))
+                    {
+                        tenant = item.Value.FirstOrDefault();
+                        break;
+                    }
+                }
+            }
+            if (!string.Equals(tenant, osClient, StringComparison.OrdinalIgnoreCase))
+                return (false, false, "接口引擎地址必须显式指定当前OsClient！");
+
+            var sourceIsLoopback = IsLoopbackHost(sourceUri.Host);
+            if (sourceIsLoopback)
+            {
+                var requestIsLoopback = IsLoopbackHost(Request.Host.Host);
+                var requestPort = Request.Host.Port ?? (Request.IsHttps ? 443 : 80);
+                if (!requestIsLoopback || sourceUri.Port != requestPort)
+                    return (false, false, "本地接口引擎地址只允许由同端口本地服务预览！");
+                return (true, true, null);
+            }
+
+            var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(osClient).ConfigureAwait(false);
+            var apiBase = sysConfigResult.Code == 1 && sysConfigResult.Data != null
+                ? TokenString(ToJObject((object)sysConfigResult.Data)?["ApiBase"])
+                : null;
+            if (!Uri.TryCreate(apiBase, UriKind.Absolute, out var apiBaseUri)
+                || !string.Equals(sourceUri.Host, apiBaseUri.Host, StringComparison.OrdinalIgnoreCase)
+                || sourceUri.Port != apiBaseUri.Port)
+            {
+                return (false, false, "接口引擎地址不属于当前租户配置的ApiBase！");
+            }
+            return (true, false, null);
+        }
+
+        private static bool IsSafeOsClient(string osClient) =>
+            Regex.IsMatch(osClient, @"^[A-Za-z0-9_.-]{1,64}$", RegexOptions.CultureInvariant);
+
+        private static bool IsLoopbackHost(string host)
+        {
+            if (host.DosIsNullOrWhiteSpace()) return false;
+            if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)) return true;
+            return IPAddress.TryParse(host, out var address) && IPAddress.IsLoopback(address);
+        }
+
+        private static bool IsSafeCachedOfficePreview(JObject cached, string osClient)
+        {
+            var fileUrl = TokenString(cached?["FileUrl"]);
+            var filePathName = TokenString(cached?["FilePathName"]);
+            return Uri.TryCreate(fileUrl, UriKind.Absolute, out var uri)
+                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+                && !filePathName.DosIsNullOrWhiteSpace()
+                && filePathName.StartsWith("/" + osClient + "/office-preview/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeOfficePreviewFileName(string requestedFileName, string responseFileName)
+        {
+            var fileName = requestedFileName.DosIsNullOrWhiteSpace() ? responseFileName : requestedFileName;
+            fileName = Path.GetFileName((fileName ?? "office-preview.xlsx").Trim().Replace('\\', '/'));
+            fileName = Regex.Replace(fileName, "[\\x00-\\x1F<>:\\\"/\\\\|?*]", "_");
+            if (fileName.Length > 160)
+            {
+                var extension = Path.GetExtension(fileName);
+                fileName = fileName[..Math.Max(1, 160 - extension.Length)] + extension;
+            }
+            return fileName.DosIsNullOrWhiteSpace() ? "office-preview.xlsx" : fileName;
+        }
+
+        private static string DecodeContentDispositionFileName(string value)
+        {
+            if (value.DosIsNullOrWhiteSpace()) return null;
+            value = value.Trim().Trim('"');
+            try { return Uri.UnescapeDataString(value); } catch { return value; }
+        }
+
+        private static bool HasExpectedOfficeFileSignature(string extension, byte[] bytes)
+        {
+            return OfficeDocumentSecurity.HasExpectedFileSignature(extension, bytes);
+        }
+
+        private static string Sha256Hex(string value) =>
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+        #endregion
+
+
+        #region OfficeSaveLease
+
+        private static readonly TimeSpan OfficeSaveLeaseLifetime = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan OfficeSaveLeaseRenewInterval = TimeSpan.FromMinutes(1);
+        private const string OfficeSaveLeaseAcquireScript = @"
+    local acquired = redis.call('SET', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[2])
+    if not acquired then return {0, 0} end
+    local fencingToken = redis.call('INCR', KEYS[2])
+    redis.call('PEXPIRE', KEYS[2], ARGV[3])
+    return {1, fencingToken}";
+        private const string OfficeSaveLeaseRenewScript = @"
+    if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+    return redis.call('PEXPIRE', KEYS[1], ARGV[2])";
+        private const string OfficeSaveLeaseReleaseScript = @"
+    if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+    return redis.call('DEL', KEYS[1])";
+        private const string OfficeSaveLeaseOwnerScript = @"
+    if redis.call('GET', KEYS[1]) == ARGV[1] then return 1 end
+    return 0";
+
+        /// <summary>
+        /// 同一租户、业务记录和文件字段的在线保存必须串行执行。租约与 fencing
+        /// 计数器都位于共享 Redis，Key 使用同一个 hash tag，可用于 Redis Cluster。
+        /// 获取、续租、持有校验和释放均按唯一 owner token 原子执行；Redis 不可用时
+        /// 失败关闭，禁止回退到进程内锁。
+        /// </summary>
+        private static async Task<(OfficeSaveLease Lease, DosResult Error)> TryAcquireOfficeSaveLeaseAsync(
+            string osClient,
+            string tableName,
+            string formDataId,
+            string fieldName,
+            CancellationToken cancellationToken)
+        {
+            if (osClient.DosIsNullOrWhiteSpace()
+                || tableName.DosIsNullOrWhiteSpace()
+                || formDataId.DosIsNullOrWhiteSpace()
+                || fieldName.DosIsNullOrWhiteSpace())
+            {
+                return (null, new DosResult(0, null, "无法确定Office保存租约范围！"));
+            }
+
+            var scopeHash = Sha256Hex(
+                osClient.Trim().ToLowerInvariant()
+                + "|" + tableName.Trim().ToLowerInvariant()
+                + "|" + formDataId.Trim()
+                + "|" + fieldName.Trim().ToLowerInvariant());
+            var hashTag = "{OfficeSave:" + scopeHash + "}";
+            var lockKey = $"Microi:{osClient}:OfficeSave:{hashTag}:Lock";
+            var fenceKey = $"Microi:{osClient}:OfficeSave:{hashTag}:Fence";
+            var owner = Ulid.NewUlid().ToString();
+
+            try
+            {
+                var database = MicroiEngine.CacheTenant.Cache(osClient).GetIDatabase();
+                for (var attempt = 0; attempt < 30; attempt++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var result = await database.ScriptEvaluateAsync(
+                        OfficeSaveLeaseAcquireScript,
+                        new RedisKey[] { lockKey, fenceKey },
+                        new RedisValue[]
+                        {
+                            owner,
+                            (long)OfficeSaveLeaseLifetime.TotalMilliseconds,
+                            (long)TimeSpan.FromDays(7).TotalMilliseconds
+                        }).ConfigureAwait(false);
+                    var values = (RedisResult[])result;
+                    if (values != null && values.Length >= 2 && (long)values[0] == 1)
+                    {
+                        return (
+                            new OfficeSaveLease(
+                                database,
+                                lockKey,
+                                owner,
+                                (long)values[1]),
+                            null);
+                    }
+                    await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                }
+
+                return (null, new DosResult(0, null, "同一文件正在保存，请稍后重试！"));
+            }
+            catch (OperationCanceledException)
+            {
+                return (null, new DosResult(0, null, "Office保存请求已取消！"));
+            }
+            catch
+            {
+                return (null, new DosResult(0, null, "Office保存租约服务暂时不可用，请稍后重试！"));
+            }
+        }
+
+        private sealed class OfficeSaveLease : IAsyncDisposable
+        {
+            private readonly IDatabase _database;
+            private readonly RedisKey _lockKey;
+            private readonly RedisValue _owner;
+            private readonly CancellationTokenSource _renewalCancellation = new();
+            private readonly Task _renewalTask;
+            private volatile bool _lost;
+            private int _disposed;
+
+            internal OfficeSaveLease(
+                IDatabase database,
+                RedisKey lockKey,
+                RedisValue owner,
+                long fencingToken)
+            {
+                _database = database;
+                _lockKey = lockKey;
+                _owner = owner;
+                FencingToken = fencingToken;
+                _renewalTask = RenewUntilDisposedAsync();
+            }
+
+            internal long FencingToken { get; }
+
+            internal async Task<bool> IsOwnerAsync()
+            {
+                if (_lost || Volatile.Read(ref _disposed) != 0) return false;
+                try
+                {
+                    var result = await _database.ScriptEvaluateAsync(
+                        OfficeSaveLeaseOwnerScript,
+                        new RedisKey[] { _lockKey },
+                        new RedisValue[] { _owner }).ConfigureAwait(false);
+                    var isOwner = (long)result == 1;
+                    if (!isOwner) _lost = true;
+                    return isOwner;
+                }
+                catch
+                {
+                    _lost = true;
+                    return false;
+                }
+            }
+
+            private async Task RenewUntilDisposedAsync()
+            {
+                try
+                {
+                    while (true)
+                    {
+                        await Task.Delay(
+                            OfficeSaveLeaseRenewInterval,
+                            _renewalCancellation.Token).ConfigureAwait(false);
+                        var result = await _database.ScriptEvaluateAsync(
+                            OfficeSaveLeaseRenewScript,
+                            new RedisKey[] { _lockKey },
+                            new RedisValue[]
+                            {
+                                _owner,
+                                (long)OfficeSaveLeaseLifetime.TotalMilliseconds
+                            }).ConfigureAwait(false);
+                        if ((long)result != 1)
+                        {
+                            _lost = true;
+                            return;
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // 正常释放。
+                }
+                catch
+                {
+                    _lost = true;
+                }
+            }
+
+            public async ValueTask DisposeAsync()
+            {
+                if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+                _renewalCancellation.Cancel();
+                try
+                {
+                    await _renewalTask.ConfigureAwait(false);
+                }
+                catch
+                {
+                    // 续租任务的异常已转换为 lost 状态，释放仍应继续尝试。
+                }
+
+                try
+                {
+                    await _database.ScriptEvaluateAsync(
+                        OfficeSaveLeaseReleaseScript,
+                        new RedisKey[] { _lockKey },
+                        new RedisValue[] { _owner }).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // 租约有有限 TTL，Redis 暂不可用时不执行不安全的本地释放。
+                }
+                finally
+                {
+                    _renewalCancellation.Dispose();
+                }
+            }
+        }
+        #endregion
+
+
+        #region PrivateFileAudit
+
+        /// <summary>
+        /// 私有附件审计代理。Ticket只保存于Redis且30分钟过期；对象存储真实签名地址不会暴露给浏览器。
+        /// 支持匿名打开转发链接，并以流式转发避免大文件占用服务器内存。
+        /// </summary>
+        [HttpGet, HttpHead]
+        [AllowAnonymous]
+        public async Task<IActionResult> OpenPrivateFile(
+            [FromQuery(Name = "OsClient")] string osClient,
+            [FromQuery(Name = "o")] string legacyOsClient,
+            string t)
+        {
+            if (!TryResolvePrivateFileAuditTenant(osClient, legacyOsClient, out var tenant)
+                || t.DosIsNullOrWhiteSpace()
+                || t.Length > 128)
+                return NotFound();
+            PrivateFileAuditTicket ticket;
+            try
+            {
+                ticket = await MicroiEngine.CacheTenant.Cache(tenant)
+                    .GetAsync<PrivateFileAuditTicket>(PrivateFileAuditTicket.CacheKey(tenant, t)).ConfigureAwait(false);
+            }
+            catch { return StatusCode(StatusCodes.Status503ServiceUnavailable); }
+            if (ticket == null || ticket.ExpiresAt <= DateTime.Now || !string.Equals(ticket.OsClient, tenant, StringComparison.OrdinalIgnoreCase))
+            {
+                QueuePrivateFileOpen(ticket, tenant, t, false, "临时链接不存在或已过期", null, null);
+                return NotFound();
+            }
+
+            JObject currentUser = null;
+            try
+            {
+                var currentToken = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
+                if (currentToken?.CurrentUser != null && string.Equals(currentToken.OsClient, tenant, StringComparison.OrdinalIgnoreCase))
+                    currentUser = currentToken.CurrentUser;
+            }
+            catch { }
+
+            var factory = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>();
+            using var upstreamRequest = new HttpRequestMessage(HttpMethod.Get, ticket.UpstreamUrl);
+            if (Request.Headers.TryGetValue("Range", out var rangeValue)
+                && RangeHeaderValue.TryParse(rangeValue.ToString(), out var range)) upstreamRequest.Headers.Range = range;
+            try
+            {
+                using var upstream = await factory.CreateClient().SendAsync(upstreamRequest,
+                    HttpCompletionOption.ResponseHeadersRead, HttpContext.RequestAborted).ConfigureAwait(false);
+                if (!upstream.IsSuccessStatusCode && upstream.StatusCode != HttpStatusCode.PartialContent)
+                {
+                    QueuePrivateFileOpen(ticket, tenant, t, false, $"上游返回{(int)upstream.StatusCode}", currentUser, null);
+                    if (upstream.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        return NotFound(new DosResult(0, null,
+                            $"对象存储中不存在文件[{ticket.FileName}]，请从原存储或备份恢复后重试。"));
+                    }
+                    return StatusCode((int)upstream.StatusCode);
+                }
+
+                Response.StatusCode = (int)upstream.StatusCode;
+                if (upstream.Content.Headers.ContentType != null) Response.ContentType = upstream.Content.Headers.ContentType.ToString();
+                if (upstream.Content.Headers.ContentLength.HasValue) Response.ContentLength = upstream.Content.Headers.ContentLength.Value;
+                NetworkTrafficObservabilityService.AnnotateIdentity(
+                    HttpContext,
+                    currentUser?["Id"]?.ToString(),
+                    currentUser?["Account"]?.ToString(),
+                    currentUser?["Name"]?.ToString(),
+                    tenant);
+                NetworkTrafficObservabilityService.AnnotateTransfer(
+                    HttpContext,
+                    "Download",
+                    1,
+                    upstream.Content.Headers.ContentLength ?? 0,
+                    new[] { ticket.FileName },
+                    new[] { Path.GetExtension(ticket.FileName ?? "") });
+                CopyHeader(upstream, "Accept-Ranges");
+                CopyHeader(upstream, "Content-Range");
+                CopyHeader(upstream, "Content-Disposition");
+                Response.Headers["X-Content-Type-Options"] = "nosniff";
+                if (!HttpMethods.IsHead(Request.Method))
+                {
+                    QueuePrivateFileOpen(ticket, tenant, t, true, null, currentUser, upstream.Content.Headers.ContentLength);
+                    await using var stream = await upstream.Content.ReadAsStreamAsync(HttpContext.RequestAborted).ConfigureAwait(false);
+                    await stream.CopyToAsync(Response.Body, HttpContext.RequestAborted).ConfigureAwait(false);
+                }
+                return new EmptyResult();
+            }
+            catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                QueuePrivateFileOpen(ticket, tenant, t, false, "访问者取消了下载", currentUser, null);
+                return new EmptyResult();
+            }
+            catch (Exception ex)
+            {
+                QueuePrivateFileOpen(ticket, tenant, t, false, ex.Message, currentUser, null);
+                return StatusCode(StatusCodes.Status502BadGateway);
+            }
+        }
+
+        private static bool TryResolvePrivateFileAuditTenant(
+            string osClient,
+            string legacyOsClient,
+            out string tenant)
+        {
+            tenant = null;
+            try
+            {
+                var canonical = osClient.DosIsNullOrWhiteSpace()
+                    ? null
+                    : TenantConfigurationSecurity.NormalizeTenantId(osClient);
+                var legacy = legacyOsClient.DosIsNullOrWhiteSpace()
+                    ? null
+                    : TenantConfigurationSecurity.NormalizeTenantId(legacyOsClient);
+                if (!canonical.DosIsNullOrWhiteSpace()
+                    && !legacy.DosIsNullOrWhiteSpace()
+                    && !string.Equals(canonical, legacy, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+                tenant = canonical ?? legacy;
+                return !tenant.DosIsNullOrWhiteSpace();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void CopyHeader(HttpResponseMessage upstream, string name)
+        {
+            if (upstream.Headers.TryGetValues(name, out var values) || upstream.Content.Headers.TryGetValues(name, out values))
+                Response.Headers[name] = values.ToArray();
+        }
+
+        private void QueuePrivateFileOpen(PrivateFileAuditTicket ticket, string osClient, string ticketId, bool success, string error,
+            JObject currentUser, long? contentLength)
+        {
+            var ip = IPHelper.GetClientIP(HttpContext).Data;
+            var tracker = MicroiEngine.TryGetService<UserBehaviorSessionTracker>();
+            var dedupKey = success
+                ? $"private-file|{osClient}|{ticketId}|{currentUser?["Id"]}|{ip}"
+                : $"private-file-failure|{osClient}|{ip}";
+            if (tracker?.ShouldLogOnce(dedupKey, success ? TimeSpan.FromSeconds(30) : TimeSpan.FromSeconds(10)) == false)
+                return;
+            var actor = UserBehaviorAudit.FormatUser(currentUser);
+            MicroiEngine.QueueSysLog(new SysLogParam
+            {
+                EventId = UserBehaviorAudit.DeterministicEventId(dedupKey,
+                    success ? TimeSpan.FromSeconds(30) : TimeSpan.FromSeconds(10)),
+                OsClient = osClient,
+                _CurrentUser = currentUser,
+                UserId = currentUser?["Id"]?.ToString(),
+                UserName = actor,
+                Category = "File",
+                Action = "PrivateFileOpen",
+                Source = "ServerFileGateway",
+                TargetType = "PrivateFile",
+                TargetId = ticket?.FilePath,
+                Type = "私有附件",
+                Title = $"用户[{actor}]{(success ? "访问了" : "访问失败") }私有附件[{ticket?.FileName ?? "未知"}]",
+                Content = Newtonsoft.Json.JsonConvert.SerializeObject(new
+                {
+                    FilePath = ticket?.FilePath,
+                    FileName = ticket?.FileName,
+                    Issuer = ticket?.IssuerUserName,
+                    Anonymous = currentUser == null,
+                    ContentLength = contentLength,
+                    Range = Request.Headers["Range"].ToString(),
+                    Error = error
+                }),
+                IP = ip,
+                Success = success,
+                OccurredAt = DateTime.Now,
+                Level = success ? 1 : 2
+            });
+        }
         #endregion
     }
 }

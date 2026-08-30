@@ -18,6 +18,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <!-- SSO 的 SAML2/XML 签名链使用 .NET 10.0.10；显式统一测试宿主的密码学基包，避免加载 10.0.2/10.0.10 两套程序集。 -->
+    <PackageReference Include="Microsoft.Bcl.Cryptography" Version="10.0.10" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <!-- 保留 dotnet test / VS Test Explorer / 既有 CI 的 VSTest 入口。 -->
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">

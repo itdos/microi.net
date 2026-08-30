@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Microi.net
@@ -17,12 +18,14 @@ namespace Microi.net
             GroupSendHandlers = new ConcurrentDictionary<string, Func<string, string, object, Task>>(
                 StringComparer.Ordinal);
 
-        public static bool IsConfigured => _sendHandler != null;
+        public static bool IsConfigured => Volatile.Read(ref _sendHandler) != null;
         public static bool IsGroupConfigured => IsGroupConfiguredFor(DefaultGroupTransport);
 
         public static void Configure(Func<IReadOnlyCollection<string>, string, object, Task> sendHandler)
         {
-            _sendHandler = sendHandler ?? throw new ArgumentNullException(nameof(sendHandler));
+            Volatile.Write(
+                ref _sendHandler,
+                sendHandler ?? throw new ArgumentNullException(nameof(sendHandler)));
         }
 
         /// <summary>
@@ -54,7 +57,7 @@ namespace Microi.net
 
         public static Task SendAsync(IEnumerable<string> connectionIds, string eventName, object payload)
         {
-            var handler = _sendHandler;
+            var handler = Volatile.Read(ref _sendHandler);
             if (handler == null || string.IsNullOrWhiteSpace(eventName))
             {
                 return Task.CompletedTask;

@@ -21,7 +21,7 @@ namespace Microi.net
         {
             string json = JsonConvert.SerializeObject(dynamicParam);
             JObject jobjParam = JObject.Parse(json);
-            var param = jobjParam.ToObject<T>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            var param = jobjParam.ToObject<T>(DiyCommon.GetJsonSerializer());//这里时间格式化没有用
             return param;
         }
         public DosResult GetRenderHtml(dynamic dynamicParam)

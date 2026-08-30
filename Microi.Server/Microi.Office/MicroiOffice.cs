@@ -45,7 +45,7 @@ namespace Microi.net
         {
             var json = JsonHelper.Serialize(dynamicParam);
             var jobjParam = JObject.Parse(json);
-            return jobjParam.ToObject<T>(DiyCommon.JsonConfig);
+            return jobjParam.ToObject<T>(DiyCommon.GetJsonSerializer());
         }
 
         private DiyTableRowParam DynamicParam2(dynamic dynamicParam) => ConvertDynamicParam<DiyTableRowParam>(dynamicParam);
@@ -1317,9 +1317,15 @@ namespace Microi.net
             return lower.StartsWith("int") || lower.StartsWith("bigint") || lower.StartsWith("decimal");
         }
 
-        private static string ImportEscapeSql(object value)
+        private static SqlSection ImportAddParameters(
+            SqlSection section,
+            IEnumerable<KeyValuePair<string, object>> parameters)
         {
-            return value == null ? "" : value.ToString().Replace("'", "''");
+            foreach (var parameter in parameters ?? Enumerable.Empty<KeyValuePair<string, object>>())
+            {
+                section.AddInParameter(parameter.Key, parameter.Value);
+            }
+            return section;
         }
 
         private static IDictionary<string, object> ImportGetRowDictionary(object item)
@@ -1438,18 +1444,21 @@ namespace Microi.net
             return text;
         }
 
-        private static string ImportBuildSqlValue(object value, JObject field)
+        private static object ImportBuildDbValue(object value, JObject field)
         {
             var component = field?["Component"].Val<string>();
             var type = field?["Type"].Val<string>() ?? "";
             if (component == "Switch")
             {
-                return ImportNormalizeSwitch(value);
+                var switchValue = ImportNormalizeSwitch(value);
+                return int.TryParse(switchValue, out var parsedSwitch)
+                    ? (object)parsedSwitch
+                    : switchValue;
             }
             var normalized = ImportNormalizeValue(value, field);
             if (normalized.DosIsNullOrWhiteSpace())
             {
-                return ImportIsNumericType(type) ? "NULL" : "''";
+                return ImportIsNumericType(type) ? null : "";
             }
             if (ImportIsNumericType(type) && component != "Text" && component != "Textarea")
             {
@@ -1460,11 +1469,11 @@ namespace Microi.net
                 }
                 if (type.ToLowerInvariant().StartsWith("int") || type.ToLowerInvariant().StartsWith("bigint"))
                 {
-                    return decimal.Truncate(number).ToString(CultureInfo.InvariantCulture);
+                    return decimal.Truncate(number);
                 }
-                return number.ToString(CultureInfo.InvariantCulture);
+                return number;
             }
-            return $"'{ImportEscapeSql(normalized)}'";
+            return normalized;
         }
 
         private static string ImportGetUniqueType(JObject field)
@@ -1583,16 +1592,22 @@ namespace Microi.net
             {
                 if (!ImportTryBuildUniqueRuleValues(row, fixedField, rule, out var values)) continue;
                 var whereSql = " WHERE IsDeleted = 0 ";
+                var parameters = new List<KeyValuePair<string, object>>();
                 foreach (var item in values)
                 {
                     var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(item.Key["Name"].Val<string>());
-                    whereSql += $" AND {sqlFieldName}={ImportBuildSqlValue(item.Value, item.Key)} ";
+                    var parameterName = $"@unique{parameters.Count}";
+                    whereSql += $" AND {sqlFieldName}={parameterName} ";
+                    parameters.Add(new KeyValuePair<string, object>(
+                        parameterName,
+                        ImportBuildDbValue(item.Value, item.Key)));
                 }
 
                 var countSql = $"SELECT COUNT(Id) FROM {sqlTableName}{whereSql}";
                 sqlLog?.Add(countSql);
                 lastSql = countSql;
-                var count = trans.FromSql(countSql).ToScalar<int>();
+                var count = ImportAddParameters(trans.FromSql(countSql), parameters)
+                    .ToScalar<int>();
                 if (count > 1)
                 {
                     throw new Exception($"{ImportDescribeUniqueRule(rule)}在当前表中命中【{count}】条数据，无法确定要修改的记录，请先清理重复数据。");
@@ -1602,7 +1617,8 @@ namespace Microi.net
                 var idSql = $"SELECT Id FROM {sqlTableName}{whereSql}";
                 sqlLog?.Add(idSql);
                 lastSql = idSql;
-                var id = trans.FromSql(idSql).ToScalar<string>();
+                var id = ImportAddParameters(trans.FromSql(idSql), parameters)
+                    .ToScalar<string>();
                 if (id.DosIsNullOrWhiteSpace())
                 {
                     throw new Exception($"{ImportDescribeUniqueRule(rule)}已命中数据但未读取到记录 Id。");
@@ -1632,7 +1648,8 @@ namespace Microi.net
                 row, fixedField, uniqueRules, sqlTableName, trans, dbInfo, sqlLog, out var lastSql);
             if (!existingId.DosIsNullOrWhiteSpace())
             {
-                var colsSetBuilder = new System.Text.StringBuilder();
+                var assignments = new List<string>();
+                var updateParameters = new List<KeyValuePair<string, object>>();
                 foreach (var colModel in importFieldList)
                 {
                     var fieldName = colModel["Name"].Val<string>();
@@ -1644,17 +1661,22 @@ namespace Microi.net
                         continue;
                     }
                     var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(fieldName);
-                    colsSetBuilder.Append($"{sqlFieldName}={ImportBuildSqlValue(valueObj, colModel)},");
+                    var parameterName = $"@value{updateParameters.Count}";
+                    assignments.Add($"{sqlFieldName}={parameterName}");
+                    updateParameters.Add(new KeyValuePair<string, object>(
+                        parameterName,
+                        ImportBuildDbValue(valueObj, colModel)));
                 }
-                var colsSet = colsSetBuilder.ToString().TrimEnd(',');
-                if (colsSet.DosIsNullOrWhiteSpace())
+                if (assignments.Count == 0)
                 {
                     return new ImportRowWriteResult { Updated = true, Affected = 0, LastSql = lastSql };
                 }
                 var idField = MicroiEngine.ORM(dbInfo.DbType).GetFieldName("Id");
-                var updateSql = $"UPDATE {sqlTableName} SET {colsSet} WHERE IsDeleted = 0 AND {idField}='{ImportEscapeSql(existingId)}'";
+                var updateSql = $"UPDATE {sqlTableName} SET {string.Join(",", assignments)} WHERE IsDeleted = 0 AND {idField}=@existingId";
                 sqlLog?.Add(updateSql);
-                var affected = trans.FromSql(updateSql).ExecuteNonQuery();
+                var update = ImportAddParameters(trans.FromSql(updateSql), updateParameters);
+                update.AddInParameter("@existingId", existingId);
+                var affected = update.ExecuteNonQuery();
                 if (affected > 1)
                 {
                     throw new Exception($"Excel 第【{excelRow}】行按唯一规则修改了【{affected}】条记录，已终止以避免批量误改。");
@@ -1663,8 +1685,9 @@ namespace Microi.net
             }
 
             var importedFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var colNamesBuilder = new System.Text.StringBuilder();
-            var colValuesBuilder = new System.Text.StringBuilder();
+            var columnNames = new List<string>();
+            var valueParameters = new List<string>();
+            var insertParameters = new List<KeyValuePair<string, object>>();
             foreach (var colModel in importFieldList)
             {
                 var fieldName = colModel["Name"].Val<string>();
@@ -1675,29 +1698,47 @@ namespace Microi.net
                 {
                     continue;
                 }
-                colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName(fieldName)).Append(',');
-                colValuesBuilder.Append(ImportBuildSqlValue(value, colModel)).Append(',');
+                var parameterName = $"@value{insertParameters.Count}";
+                columnNames.Add(MicroiEngine.ORM(dbInfo.DbType).GetFieldName(fieldName));
+                valueParameters.Add(parameterName);
+                insertParameters.Add(new KeyValuePair<string, object>(
+                    parameterName,
+                    ImportBuildDbValue(value, colModel)));
                 importedFieldNames.Add(fieldName);
             }
             if (param._CurrentUser != null
-                && !importedFieldNames.Contains("TenantId")
                 && !param._CurrentUser["TenantId"].Val<string>().DosIsNullOrWhiteSpace())
             {
-                colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName("TenantId")).Append(',');
-                colNamesBuilder.Append(MicroiEngine.ORM(dbInfo.DbType).GetFieldName("TenantName")).Append(',');
-                colValuesBuilder.Append($"'{ImportEscapeSql(param._CurrentUser?["TenantId"].Val<string>())}','{ImportEscapeSql(param._CurrentUser?["TenantName"].Val<string>())}',");
+                if (!importedFieldNames.Contains("TenantId"))
+                {
+                    columnNames.Add(MicroiEngine.ORM(dbInfo.DbType).GetFieldName("TenantId"));
+                    valueParameters.Add("@tenantId");
+                    insertParameters.Add(new KeyValuePair<string, object>(
+                        "@tenantId",
+                        param._CurrentUser?["TenantId"].Val<string>()));
+                }
+                if (!importedFieldNames.Contains("TenantName"))
+                {
+                    columnNames.Add(MicroiEngine.ORM(dbInfo.DbType).GetFieldName("TenantName"));
+                    valueParameters.Add("@tenantName");
+                    insertParameters.Add(new KeyValuePair<string, object>(
+                        "@tenantName",
+                        param._CurrentUser?["TenantName"].Val<string>()));
+                }
             }
-            var colNames = colNamesBuilder.ToString().TrimEnd(',');
-            var colValues = colValuesBuilder.ToString().TrimEnd(',');
-            if (colNames.DosIsNullOrWhiteSpace())
+            if (columnNames.Count == 0)
             {
                 var headers = string.Join(",", row.Keys.Where(d => !string.Equals(d, "_ExcelRow", StringComparison.OrdinalIgnoreCase)));
                 throw new Exception($"Excel 第【{excelRow}】行未匹配到可导入字段，请检查表头和列映射。表头：{headers}");
             }
-            var insertSql = $@"INSERT INTO {sqlTableName} (Id,CreateTime,UpdateTime,UserId,IsDeleted,{colNames})
-                                VALUES ('{Ulid.NewUlid()}',{MicroiEngine.ORM(dbInfo.DbType).GetDatetimeFieldValue(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))},NULL,'{ImportEscapeSql(param._CurrentUser?["Id"].Val<string>())}',0,{colValues})";
+            var insertSql = $@"INSERT INTO {sqlTableName} (Id,CreateTime,UpdateTime,UserId,IsDeleted,{string.Join(",", columnNames)})
+                                VALUES (@rowId,@createTime,NULL,@userId,0,{string.Join(",", valueParameters)})";
             sqlLog?.Add(insertSql);
-            var insertAffected = trans.FromSql(insertSql).ExecuteNonQuery();
+            var insert = ImportAddParameters(trans.FromSql(insertSql), insertParameters);
+            insert.AddInParameter("@rowId", Ulid.NewUlid().ToString());
+            insert.AddInParameter("@createTime", DateTime.Now);
+            insert.AddInParameter("@userId", param._CurrentUser?["Id"].Val<string>());
+            var insertAffected = insert.ExecuteNonQuery();
             if (insertAffected != 1)
             {
                 throw new Exception($"Excel 第【{excelRow}】行新增结果异常，数据库影响行数为【{insertAffected}】。");
@@ -1988,8 +2029,10 @@ namespace Microi.net
                 var fixedParentKey = ImportGetFixedFieldString(fixedField, fkField);
                 if (!fixedParentKey.DosIsNullOrWhiteSpace() && backfills.Any())
                 {
-                    var fixedSql = $"SELECT {backfillSelectSql} FROM {sqlTableName} WHERE IsDeleted = 0 AND {sqlPkFieldName} = '{ImportEscapeSql(fixedParentKey)}'";
-                    var fixedParent = dbSession.FromSql(fixedSql).First<dynamic>();
+                    var fixedSql = $"SELECT {backfillSelectSql} FROM {sqlTableName} WHERE IsDeleted = 0 AND {sqlPkFieldName} = @fixedParentKey";
+                    var fixedParent = dbSession.FromSql(fixedSql)
+                        .AddInParameter("@fixedParentKey", fixedParentKey)
+                        .First<dynamic>();
                     if (fixedParent != null)
                     {
                         var fixedParentRow = JObject.FromObject((object)fixedParent);
@@ -2071,9 +2114,17 @@ namespace Microi.net
 
                 foreach (var chunk in firstMatchValues.Select((code, index) => new { code, index }).GroupBy(d => d.index / 500))
                 {
-                    var inValues = string.Join(",", chunk.Select(d => $"'{ImportEscapeSql(d.code)}'"));
-                    var sql = $"SELECT {sqlPkFieldName} Id,{selectSql} FROM {sqlTableName} WHERE IsDeleted = 0 AND {firstSqlMatchFieldName} IN ({inValues})";
-                    var parentRows = dbSession.FromSql(sql).ToArray();
+                    var chunkValues = chunk.Select(d => d.code).ToArray();
+                    var parameterNames = chunkValues
+                        .Select((_, index) => $"@match{index}")
+                        .ToArray();
+                    var sql = $"SELECT {sqlPkFieldName} Id,{selectSql} FROM {sqlTableName} WHERE IsDeleted = 0 AND {firstSqlMatchFieldName} IN ({string.Join(",", parameterNames)})";
+                    var parentQuery = dbSession.FromSql(sql);
+                    for (var index = 0; index < chunkValues.Length; index++)
+                    {
+                        parentQuery.AddInParameter(parameterNames[index], chunkValues[index]);
+                    }
+                    var parentRows = parentQuery.ToArray();
                     foreach (var row in parentRows)
                     {
                         var rowObj = JObject.FromObject((object)row);

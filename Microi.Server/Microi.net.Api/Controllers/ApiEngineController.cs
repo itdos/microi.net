@@ -13,6 +13,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using System.Linq;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Microi.net.Api
 {
@@ -24,11 +26,39 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class ApiEngineController : Controller
     {
+        /// <summary>
+        /// 系统消息的持久化由接口引擎事务完成；只有精确的官方 Managed 引擎在
+        /// 成功提交并声明 DeliveryPending 后，宿主才执行 best-effort SignalR 投递。
+        /// </summary>
+        private async Task PublishChatSystemMessageAfterCommitAsync(object result, JObject param)
+        {
+            if (!string.Equals(
+                    param?["ApiEngineKey"]?.ToString(),
+                    "platform-chat-system-message",
+                    StringComparison.OrdinalIgnoreCase))
+                return;
+            JObject model;
+            try { model = result as JObject ?? JObject.FromObject(result); }
+            catch { return; }
+            if (model?["Code"].Val<int>() != 1
+                || model["Data"] is not JObject
+                || model["DataAppend"]?["DeliveryPending"].Val<bool>() != true)
+                return;
+
+            var osClient = param?["OsClient"]?.ToString();
+            if (osClient.DosIsNullOrWhiteSpace()) osClient = DiyToken.GetCurrentOsClient();
+            var hubContext = HttpContext.RequestServices.GetRequiredService<IHubContext<DiyWebSocket>>();
+            await new DiyWebSocket(null)
+                .DeliverPreparedMessageAsync(model, osClient, hubContext)
+                .ConfigureAwait(false);
+        }
+
         private static async Task<JObject> DefaultParam(JObject param)
         {
             param = param ?? new JObject();
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             var currentUser = currentTokenDynamic?.CurrentUser;
+            string rawRequestBody = null;
             //2024-04-18 往V8.Param中添加Url参数
             try
             {
@@ -74,6 +104,9 @@ namespace Microi.net.Api
                     {
                         body = await reader.ReadToEndAsync();
                     }
+                    // 原始正文只由宿主写入受保护元数据，供签名/AES/XML 等协议原子使用；
+                    // 普通 JSON/XML 参数仍按下方兼容规则投影到 V8.Param。
+                    rawRequestBody = body;
 
                     if (request.Body.CanSeek)
                     {
@@ -142,6 +175,56 @@ namespace Microi.net.Api
             catch (Exception ex) { }
             // HTTP 调用者不得伪造表单引擎内部可信调用标记。
             param.Remove("_TrustedServerInvocation");
+            // DynamicRoute resolved the concrete row before controller execution.
+            // It is authoritative for this URL and must override any body value;
+            // this also prevents duplicate historical ApiAddress rows from making
+            // permission checks and execution select different engines.
+            var requestPath = DiyHttpContext.Current?.Request.Path.Value ?? string.Empty;
+            var canonicalKeyMatch = Regex.Match(
+                requestPath,
+                @"^/apiengine/([A-Za-z0-9_.:-]+)(?:--OsClient--.*--)?$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var resolvedApiEngineKey = canonicalKeyMatch.Success
+                ? canonicalKeyMatch.Groups[1].Value
+                : DiyHttpContext.Current?.Items[
+                    DynamicRoute.ResolvedApiEngineKeyItem]?.ToString();
+            if (!resolvedApiEngineKey.DosIsNullOrWhiteSpace())
+            {
+                param["ApiEngineKey"] = resolvedApiEngineKey;
+            }
+            // 模板路由参数与 HTTP 元数据必须由宿主在合并不可信输入后覆盖，避免调用者
+            // 伪造 {OsClient}/{ConnectionKey} 或请求方法。接口引擎据此可以实现标准
+            // OIDC、SAML2、CAS 等需要原始路径语义的协议端点。
+            param.Remove("_RouteValues");
+            param.Remove("_HttpMethod");
+            param.Remove("_RequestPath");
+            param.Remove("_RequestScheme");
+            param.Remove("_RequestHost");
+            param.Remove("_RequestPathBase");
+            param.Remove("_RawBody");
+            param.Remove("_ContentType");
+            var routeValues = DiyHttpContext.Current?.Items[
+                DynamicRoute.ResolvedApiRouteValuesItem] as JObject;
+            if (routeValues != null)
+            {
+                param["_RouteValues"] = routeValues.DeepClone();
+                foreach (var property in routeValues.Properties())
+                    param[property.Name] = property.Value.DeepClone();
+            }
+            var trustedHttpRequest = DiyHttpContext.Current?.Request;
+            if (trustedHttpRequest != null)
+            {
+                param["_HttpMethod"] = trustedHttpRequest.Method;
+                param["_RequestPath"] = trustedHttpRequest.Path.Value ?? string.Empty;
+                param["_RequestScheme"] = trustedHttpRequest.Scheme;
+                param["_RequestHost"] = trustedHttpRequest.Host.Value;
+                param["_RequestPathBase"] = trustedHttpRequest.PathBase.Value ?? string.Empty;
+                param["_ContentType"] = trustedHttpRequest.ContentType ?? string.Empty;
+                if (rawRequestBody != null)
+                {
+                    param["_RawBody"] = rawRequestBody;
+                }
+            }
             //调用方式 Server、Client
             param["_InvokeType"] = InvokeType.Client.ToString();
             return param;
@@ -377,7 +460,12 @@ namespace Microi.net.Api
                 return new DosResult(0, null, "访问密钥不能跨租户运行接口引擎。");
             }
 
-            var modelResult = await MicroiEngine.ApiEngine.GetApiEngineModel(
+            // Permission policy must come from the authoritative sys_apiengine
+            // row. Route/model caches are intentionally optimized for dispatch
+            // and may still contain the policy that existed before an MCP role
+            // update, which would make a newly granted $authenticated endpoint
+            // look read-only until the process cache happened to expire.
+            var modelResult = await MicroiEngine.ApiEngine.GetAuthoritativeApiEngineModel(
                     new ApiEngineParam
                     {
                         ApiEngineKey = param["ApiEngineKey"]?.ToString(),
@@ -410,7 +498,9 @@ namespace Microi.net.Api
             var currentUser = param?["_CurrentUser"] as JObject;
             if (currentUser == null) return;
 
-            var modelResult = await MicroiEngine.ApiEngine.GetApiEngineModel(
+            // Read the permission allow-list from the database-backed model so
+            // an MCP role update takes effect immediately for this request.
+            var modelResult = await MicroiEngine.ApiEngine.GetAuthoritativeApiEngineModel(
                     new ApiEngineParam
                     {
                         ApiEngineKey = param["ApiEngineKey"]?.ToString(),
@@ -420,13 +510,17 @@ namespace Microi.net.Api
                         _CurrentUser = currentUser
                     })
                 .ConfigureAwait(false);
-            if (modelResult.Code != 1 || modelResult.Data == null) return;
+            if (modelResult.Code != 1 || modelResult.Data == null)
+            {
+                return;
+            }
 
             var model = modelResult.Data as JObject
                         ?? JObject.FromObject((object)modelResult.Data);
-            var invocationUser = ApiEngineRoleAuthorization.AddAuthenticatedVirtualRole(
+            var configuredRoles = model["ApiRole"]?.ToString();
+            var invocationUser = ApiEngineRoleAuthorization.PrepareInvocationUser(
                 currentUser,
-                model["ApiRole"]?.ToString());
+                configuredRoles);
             if (!ReferenceEquals(invocationUser, currentUser))
             {
                 param["_CurrentUser"] = invocationUser;
@@ -776,6 +870,7 @@ namespace Microi.net.Api
             dynamic? result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
+            await PublishChatSystemMessageAfterCommitAsync(result, param);
             if (result != null && result?.GetType() == typeof(string))
             {
                 return Content(result, "text/plain; charset=utf-8");
@@ -820,6 +915,7 @@ namespace Microi.net.Api
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
+            await PublishChatSystemMessageAfterCommitAsync(result, param);
 
             if (result != null && result.GetType().Name == "String")
             {
@@ -879,6 +975,7 @@ namespace Microi.net.Api
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
+            await PublishChatSystemMessageAfterCommitAsync(result, param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;
@@ -956,6 +1053,7 @@ namespace Microi.net.Api
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
+            await PublishChatSystemMessageAfterCommitAsync(result, param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;
@@ -1057,6 +1155,7 @@ namespace Microi.net.Api
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             await PublishApiEngineRealtimeAfterCommitAsync(result, param);
+            await PublishChatSystemMessageAfterCommitAsync(result, param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;
@@ -1080,6 +1179,86 @@ namespace Microi.net.Api
                 return Content((string)result, "text/html; charset=utf-8");
             }
             return Json(result);
+        }
+
+        /// <summary>
+        /// 执行 ResponseType=HTTP 的接口引擎。V8 返回 DataAppend.HttpResponse，宿主
+        /// 在事务完成后统一校验并写出状态码、正文、Content-Type、重定向和响应头。
+        /// </summary>
+        [HttpPost, HttpGet, HttpHead, HttpDelete, HttpPut, HttpPatch]
+        [AllowAnonymous]
+        public async Task<IActionResult> Run_Response_Http()
+        {
+            var param = await DefaultParam(new JObject());
+            var apiPath = HttpContext.Request.Path.Value ?? string.Empty;
+            const string osClientPattern = @"--OsClient--(.*?)--$";
+            var osClientMatch = Regex.Match(apiPath, osClientPattern);
+            ApplyRouteOsClient(
+                param,
+                osClientMatch.Success ? osClientMatch.Groups[1].Value : string.Empty);
+            apiPath = Regex.Replace(apiPath, osClientPattern, string.Empty);
+            param["ApiAddress"] = apiPath;
+
+            try
+            {
+                AttachFormFilesAndAnnotateTransfer(param);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new DosResult(0, null, "读取 HTTP 接口上传文件失败：" + ex.Message));
+            }
+
+            SystemObservabilityService.AnnotateApiEngine(
+                HttpContext,
+                param["ApiEngineKey"].Val<string>(),
+                param["OsClient"].Val<string>());
+            var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
+            if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
+            await ExpandAuthenticatedApiRoleAsync(param);
+
+            var result = await MicroiEngine.ApiEngine.RunAsync(param);
+            await PublishRealtimeInvalidationAfterCommitAsync(result, param);
+            await PublishApiEngineRealtimeAfterCommitAsync(result, param);
+            await PublishChatSystemMessageAfterCommitAsync(result, param);
+            var osClient = param["OsClient"].Val<string>();
+            if (osClient.DosIsNullOrWhiteSpace()) osClient = DiyToken.GetCurrentOsClient();
+            ApiEngineHttpResponse httpResponse;
+            string error;
+            if (!ApiEngineHttpResponseContract.TryRead(
+                    (object)result,
+                    osClient,
+                    param["ApiEngineKey"].Val<string>(),
+                    out httpResponse,
+                    out error))
+            {
+                return StatusCode(500, new DosResult(0, null, error));
+            }
+
+            foreach (var header in httpResponse.Headers)
+            {
+                foreach (var value in header.Value)
+                    Response.Headers.Append(header.Key, value);
+            }
+            Response.StatusCode = httpResponse.StatusCode;
+            Response.ContentType = httpResponse.ContentType;
+            if (HttpMethods.IsHead(HttpContext.Request.Method)
+                || httpResponse.StatusCode == StatusCodes.Status204NoContent
+                || httpResponse.StatusCode == StatusCodes.Status304NotModified)
+                return new EmptyResult();
+            if (httpResponse.BodyBytes != null)
+            {
+                Response.ContentLength = httpResponse.BodyBytes.Length;
+                await Response.Body.WriteAsync(
+                    httpResponse.BodyBytes,
+                    HttpContext.RequestAborted).ConfigureAwait(false);
+                return new EmptyResult();
+            }
+            return new ContentResult
+            {
+                StatusCode = httpResponse.StatusCode,
+                ContentType = httpResponse.ContentType,
+                Content = httpResponse.Body
+            };
         }
 
         /// <summary>
@@ -1147,6 +1326,7 @@ namespace Microi.net.Api
                     var result = await MicroiEngine.ApiEngine.RunAsync(param).ConfigureAwait(false);
                     await PublishRealtimeInvalidationAfterCommitAsync(result, param).ConfigureAwait(false);
                     await PublishApiEngineRealtimeAfterCommitAsync(result, param).ConfigureAwait(false);
+                    await PublishChatSystemMessageAfterCommitAsync(result, param).ConfigureAwait(false);
                     await sink.CompleteAsync(
                             IsCommittedApiEngineResult(result),
                             result,

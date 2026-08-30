@@ -20,6 +20,43 @@ export function buildMicroAppEntryUrl({ apiBase = "", osClient, appKey, version 
     return appendMicroAppVersionQuery(`${normalizeBaseUrl(apiBase)}${path}`, version);
 }
 
+const BUNDLED_MICRO_APP_PAGES = Object.freeze({
+    "microi-platform-service": Object.freeze({
+        "/create-empty-tenant": { pageKey: "create-empty-tenant", sourceFile: "src/CreateSaasTenant.vue" },
+        "/app-store-data-selector": { pageKey: "app-store-data-selector", sourceFile: "src/AppStoreDataSelector.vue" },
+        "/app-package-selector": { pageKey: "app-package-selector", sourceFile: "src/AppPackageSelector.vue" },
+        "/offline-package-installer": { pageKey: "offline-package-installer", sourceFile: "src/OfflinePackageInstaller.vue" },
+        "/database-backup": { pageKey: "database-backup", sourceFile: "src/DatabaseBackup.vue" },
+        "/personal-settings": { pageKey: "personal-settings", sourceFile: "src/PersonalSettings.vue" },
+        "/system-settings": { pageKey: "system-settings", sourceFile: "src/SystemSettings.vue" },
+        "/system-observability": { pageKey: "system-observability", sourceFile: "src/SystemObservability.vue" },
+        "/marketplace": { pageKey: "marketplace", sourceFile: "src/Marketplace.vue" }
+    })
+});
+
+function normalizeMicroRoutePath(value) {
+    const path = String(value || "").trim().split(/[?#]/, 1)[0].replace(/\/+$/, "");
+    return path ? (path.startsWith("/") ? path : `/${path}`) : "/";
+}
+
+export function getBundledMicroAppPageFallback({ appKey, routePath, requestedVersion = "" } = {}) {
+    if (String(requestedVersion || "").trim()) return null;
+    const pages = BUNDLED_MICRO_APP_PAGES[String(appKey || "").trim().toLowerCase()];
+    return pages?.[normalizeMicroRoutePath(routePath)] || null;
+}
+
+export function shouldUseBundledMicroAppPageFallback(result, options = {}) {
+    if (!getBundledMicroAppPageFallback(options)) return false;
+    const code = Number(result?.Code);
+    if (code === 1 || code === 2 || code === 1001 || code === 1002) return false;
+    const reasonCode = String(result?.Data?.ReasonCode || result?.DataAppend?.ReasonCode || "").trim().toUpperCase();
+    return !new Set([
+        "TENANT_MISMATCH",
+        "MICRO_APP_NOT_AVAILABLE",
+        "MICRO_APP_VERSION_MISMATCH"
+    ]).has(reasonCode);
+}
+
 const RESOLVE_FALLBACK_DENY_REASONS = new Set([
     "TENANT_MISMATCH",
     "MICRO_APP_NOT_AVAILABLE",

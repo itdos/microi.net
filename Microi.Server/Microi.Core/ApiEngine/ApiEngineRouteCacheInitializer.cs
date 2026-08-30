@@ -30,8 +30,10 @@ namespace Microi.net
                     FormEngineKey = "sys_apiengine",
                     _Where = new List<DiyWhere>
                     {
-                        new DiyWhere { Name = "ApiAddress", Value = null, Type = "<>" }
+                        new DiyWhere { Name = "IsEnable", Value = 1, Type = "=" }
                     },
+                    _PageIndex = 1,
+                    _PageSize = 100000,
                     OsClient = client.OsClient
                 }).ConfigureAwait(false);
                 if (result.Code != 1)
@@ -44,22 +46,32 @@ namespace Microi.net
 
                 var rows = result.Data;
                 var cache = MicroiEngine.CacheTenant.Cache(client.OsClient);
-                var writes = new List<Task>();
+                var aliases = new Dictionary<string, (string EngineId, string EngineKey, string Json)>(
+                    StringComparer.OrdinalIgnoreCase);
                 if (rows != null)
                 {
                     foreach (var row in rows)
                     {
-                        var address = DynamicHelper.GetDynamicStringValue(row, "ApiAddress", string.Empty)
-                            .ToLowerInvariant();
-                        if (address.DosIsNullOrWhiteSpace()) continue;
-                        var key = DynamicHelper.GetDynamicStringValue(row, "ApiEngineKey", string.Empty)
-                            .ToLowerInvariant();
+                        var id = DynamicHelper.GetDynamicStringValue(row, "Id", string.Empty);
+                        var key = DynamicHelper.GetDynamicStringValue(row, "ApiEngineKey", string.Empty);
                         var json = JsonConvert.SerializeObject((object)row);
-                        if (!key.DosIsNullOrWhiteSpace())
-                            writes.Add(cache.SetAsync(BuildCacheKey(client.OsClient, key), json));
-                        writes.Add(cache.SetAsync(BuildCacheKey(client.OsClient, address), json));
+                        foreach (var alias in ApiEngineRouteAliases.GetCacheAliases((object)row))
+                        {
+                            if (aliases.TryGetValue(alias, out var owner)
+                                && !string.Equals(owner.EngineId, id, StringComparison.OrdinalIgnoreCase))
+                            {
+                                var conflict = $"路由/缓存别名[{alias}]同时属于接口引擎[{owner.EngineKey}]和[{key}]。";
+                                MicroiEngine.QueueSystemLog(client.OsClient, "ApiEngine",
+                                    "RouteAliasConflict", "接口引擎多路由存在冲突，已拒绝覆盖缓存",
+                                    conflict, 4);
+                                return new DosResult(0, null, conflict);
+                            }
+                            aliases[alias] = (id, key, json);
+                        }
                     }
                 }
+                var writes = aliases.Select(alias =>
+                    cache.SetAsync(BuildCacheKey(client.OsClient, alias.Key), alias.Value.Json)).ToList();
                 await Task.WhenAll(writes).ConfigureAwait(false);
                 MicroiEngine.QueueSystemLog(client.OsClient, "ApiEngine",
                     "RouteCacheInitialized", "接口引擎路由缓存初始化完成",

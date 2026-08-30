@@ -12,7 +12,7 @@ namespace Microi.net
         public TranslateParam DynamicToParam(dynamic dynamicParam)
         {
             JObject jobjParam = JsonHelper.ToJObject(dynamicParam);
-            TranslateParam param = jobjParam.ToObject<TranslateParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            TranslateParam param = jobjParam.ToObject<TranslateParam>(DiyCommon.GetJsonSerializer());//这里时间格式化没有用
             return param;
         }
         public DosResult Translate(dynamic dynamicParam)
@@ -125,14 +125,14 @@ namespace Microi.net
             {
                 osClient = DiyToken.GetCurrentOsClient();
             }
-            try
+            if (!osClient.DosIsNullOrWhiteSpace()
+                && DiyMessage.Msg.TryGetValue(osClient, out var clientMsg)
+                && clientMsg != null
+                && clientMsg.TryGetValue(key, out var row))
             {
-                return DiyMessage.Msg[osClient][key];
+                return row;
             }
-            catch (System.Exception)
-            {
-                return null;
-            }
+            return null;
         }
         public string GetLangCode(string key, string osClient = "")
         {
@@ -144,15 +144,14 @@ namespace Microi.net
             {
                 osClient = DiyToken.GetCurrentOsClient();
             }
-            try
+            if (!osClient.DosIsNullOrWhiteSpace()
+                && DiyMessage.Msg.TryGetValue(osClient, out var clientMsg)
+                && clientMsg != null
+                && clientMsg.TryGetValue(key, out var jObj))
             {
-                var jObj = DiyMessage.Msg[osClient][key];
                 return jObj["Code"]?.ToString() ?? key;
             }
-            catch (System.Exception)
-            {
-                return key;
-            }
+            return key;
         }
         public DosResult LoadLang(string osClient = "")
         {
@@ -176,8 +175,7 @@ namespace Microi.net
                     }
                     langLevel2[key] = itemObj;
                 }
-                DiyMessage.Msg[osClient] = langLevel2;
-                DiyMessage.ClearSourceTextCache(osClient);
+                DiyMessage.ReplaceTenantMessages(osClient, langLevel2);
                 return new DosResult(1);
             }
             catch (Exception ex)
@@ -199,7 +197,7 @@ namespace Microi.net
             #region 加载多语言
             try
             {
-                DiyMessage.Msg[osClient][key] = JObject.FromObject(value);
+                DiyMessage.UpsertTenantMessage(osClient, key, JObject.FromObject(value));
                 return new DosResult(1);
             }
             catch (Exception ex)

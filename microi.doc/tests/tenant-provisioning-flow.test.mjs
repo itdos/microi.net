@@ -31,7 +31,9 @@ test('profile submits tenant creation to the persistent background queue', () =>
 
 test('profile refreshes the authoritative identity before loading tenant actions', () => {
   const source = read(profilePath)
-  assert.match(source, /\/api\/SysUser\/RefreshLoginUser/)
+  assert.match(source, /apiEngineUrl\('platform-sys-user-admin'\)/)
+  assert.match(source, /body:\s*JSON\.stringify\(\{\s*Action:\s*'RefreshLoginUser'\s*\}\)/)
+  assert.doesNotMatch(source, /\/api\/SysUser\/RefreshLoginUser/)
   assert.match(source, /await refreshCurrentSessionIdentity\(\)[\s\S]*?const valid = await refreshCenter\(\)/)
 })
 

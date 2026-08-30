@@ -191,13 +191,13 @@
                                             </el-form-item>
                                         </el-col>
                                     </el-row>
-                                    <el-row :gutter="20">
+                                    <el-row v-if="captchaPolicyResolved && captchaRequired" :gutter="20">
                                         <el-col :span="12" :xs="24">
                                             <el-form-item label="验证码" required>
                                                 <div style="display:flex;gap:8px;align-items:center;width:100%">
                                                     <el-input v-model="applyForm.CaptchaValue" placeholder="请输入验证码计算结果" maxlength="6" clearable style="flex:1" @keyup.enter="submitApply" />
                                                     <img v-if="captchaSrc" :src="captchaSrc" class="captcha-img" @click="loadCaptcha" title="点击刷新验证码" style="height:40px;cursor:pointer;border:1px solid #dcdfe6;border-radius:4px" />
-                                                    <el-button v-else size="small" @click="loadCaptcha">获取验证码</el-button>
+                                                    <el-button v-else size="small" :loading="captchaLoading" @click="loadCaptcha">获取验证码</el-button>
                                                 </div>
                                             </el-form-item>
                                         </el-col>
@@ -348,6 +348,10 @@ export default {
             // 验证码
             captchaId: "",
             captchaSrc: "",
+            captchaRequired: false,
+            captchaPolicyResolved: false,
+            captchaLoading: false,
+            captchaRequestVersion: 0,
             // 已提交的申请记录（从License服务器查询）
             existingApp: null,
             // 检查结果
@@ -514,18 +518,51 @@ export default {
         loadCaptcha() {
             if (!this.ensureMainTenant(false)) return;
             const self = this;
-            fetch(LICENSE_API_BASE + "/api/License/GetCaptcha", { method: "GET" })
+            const requestVersion = ++self.captchaRequestVersion;
+            self.captchaLoading = true;
+            self.applyForm.CaptchaValue = "";
+            fetch(LICENSE_API_BASE + "/api/License/GetCaptcha", { method: "GET", cache: "no-store" })
                 .then(r => r.json())
                 .then(result => {
+                    if (requestVersion !== self.captchaRequestVersion) return;
                     if (result && result.Code === 1 && result.Data) {
+                        // 旧版 License 服务没有 CaptchaRequired 字段，按启用处理以保持滚动兼容。
+                        self.captchaRequired = result.Data.CaptchaRequired !== false;
+                        self.captchaPolicyResolved = true;
+                        if (!self.captchaRequired) {
+                            self.captchaId = "";
+                            self.captchaSrc = "";
+                            return;
+                        }
+
                         self.captchaId = result.Data.CaptchaId || "";
-                        self.captchaSrc = "data:image/gif;base64," + result.Data.Image;
+                        self.captchaSrc = result.Data.Image
+                            ? "data:image/gif;base64," + result.Data.Image
+                            : "";
+                        if (!self.captchaId || !self.captchaSrc) {
+                            ElMessage.warning("获取验证码失败，请重试");
+                        }
                     } else {
-                        ElMessage.warning("获取验证码失败，请重试");
+                        // 策略读取失败时按需要验证码处理，禁止匿名申请被意外放开。
+                        self.captchaRequired = true;
+                        self.captchaPolicyResolved = true;
+                        self.captchaId = "";
+                        self.captchaSrc = "";
+                        ElMessage.warning((result && result.Msg) || "获取验证码失败，请重试");
                     }
                 })
                 .catch(() => {
+                    if (requestVersion !== self.captchaRequestVersion) return;
+                    self.captchaRequired = true;
+                    self.captchaPolicyResolved = true;
+                    self.captchaId = "";
+                    self.captchaSrc = "";
                     ElMessage.error("获取验证码失败，请检查网络连接");
+                })
+                .finally(() => {
+                    if (requestVersion === self.captchaRequestVersion) {
+                        self.captchaLoading = false;
+                    }
                 });
         },
 
@@ -557,13 +594,20 @@ export default {
                 ElMessage.warning("请填写联系电话");
                 return;
             }
-            if (!self.applyForm.CaptchaValue.trim()) {
-                ElMessage.warning("请输入验证码");
+            if (!self.captchaPolicyResolved) {
+                ElMessage.warning("正在读取验证码策略，请稍后重试");
+                self.loadCaptcha();
                 return;
             }
-            if (!self.captchaId) {
-                ElMessage.warning("请先获取验证码");
-                return;
+            if (self.captchaRequired) {
+                if (!self.applyForm.CaptchaValue.trim()) {
+                    ElMessage.warning("请输入验证码");
+                    return;
+                }
+                if (!self.captchaId) {
+                    ElMessage.warning("请先获取验证码");
+                    return;
+                }
             }
 
             self.applying = true;
@@ -574,10 +618,12 @@ export default {
                 Company: self.applyForm.Company.trim(),
                 Name: self.applyForm.Name.trim(),
                 Phone: self.applyForm.Phone.trim(),
-                CaptchaId: self.captchaId,
-                CaptchaValue: self.applyForm.CaptchaValue.trim(),
                 Remark: self.applyForm.Remark.trim(),
             };
+            if (self.captchaRequired) {
+                param.CaptchaId = self.captchaId;
+                param.CaptchaValue = self.applyForm.CaptchaValue.trim();
+            }
 
             self.DiyCommon.Post("/api/License/ApplyCurrentServer", param, function (result) {
                 self.applying = false;

@@ -103,6 +103,42 @@ namespace Microi.net
             return clone;
         }
 
+        /// <summary>
+        /// Builds a per-request identity for the legacy API-engine executor after
+        /// this class has already evaluated the authoritative ApiRole policy.
+        /// OnlyGet is removed only from the clone and only for an explicitly
+        /// authorized engine; the cached/login identity and every ordinary
+        /// controller or FormEngine permission remain unchanged.
+        /// </summary>
+        public static JObject PrepareInvocationUser(
+            JObject currentUser,
+            string configuredApiRoles)
+        {
+            if (currentUser == null) return null;
+            var authorization = Evaluate(currentUser, configuredApiRoles);
+            if (!authorization.IsAllowed || !authorization.HasExplicitRoles)
+            {
+                return currentUser;
+            }
+
+            var clone = (JObject)currentUser.DeepClone();
+            if (TryReadConfiguredRoleIds(
+                    configuredApiRoles,
+                    out var allowedRoleIds,
+                    out _)
+                && allowedRoleIds.Contains(AuthenticatedRoleId))
+            {
+                AddVirtualRole(clone, "RoleIds", includeBaseLimit: false);
+                AddVirtualRole(clone, "_Roles", includeBaseLimit: true);
+            }
+
+            if (authorization.HasOnlyGet)
+            {
+                RemoveOnlyGetFromInvocationClone(clone);
+            }
+            return clone;
+        }
+
         public static bool HasOnlyGet(JObject currentUser)
         {
             return TryReadOnlyGet(currentUser, out var hasOnlyGet) && hasOnlyGet;
@@ -236,6 +272,26 @@ namespace Microi.net
                 roles.Add(virtualRole);
             }
             currentUser[fieldName] = roles;
+        }
+
+        private static void RemoveOnlyGetFromInvocationClone(JObject currentUser)
+        {
+            if (!TryReadArray(currentUser?["_Roles"], out var roles) || roles == null) return;
+            foreach (var role in roles.OfType<JObject>())
+            {
+                var original = role["BaseLimit"];
+                if (!TryReadStringSet(original, out var values)) continue;
+                values.Remove("OnlyGet");
+                var normalized = new JArray(values.OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
+                if (original is JArray)
+                {
+                    role["BaseLimit"] = normalized;
+                }
+                else
+                {
+                    role["BaseLimit"] = normalized.ToString(Newtonsoft.Json.Formatting.None);
+                }
+            }
         }
 
         private static bool TryReadStringSet(

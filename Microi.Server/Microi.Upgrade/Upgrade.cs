@@ -1442,6 +1442,7 @@ namespace Microi.net
                         {quoteOpen}Id{quoteClose},
                         {quoteOpen}ApiEngineKey{quoteClose},
                         {quoteOpen}ApiAddress{quoteClose},
+                        {quoteOpen}ApiRoutes{quoteClose},
                         {quoteOpen}AllowAnonymous{quoteClose},
                         {quoteOpen}StopHttp{quoteClose},
                         {quoteOpen}IsEnable{quoteClose}
@@ -1473,7 +1474,7 @@ namespace Microi.net
                     }
                 }
 
-                foreach (var alias in new[] { row.Id, row.ApiEngineKey, row.ApiAddress })
+                foreach (var alias in ApiEngineRouteAliases.GetCacheAliases(row))
                 {
                     if (!alias.DosIsNullOrWhiteSpace())
                     {
@@ -1495,6 +1496,7 @@ namespace Microi.net
             public string Id { get; set; }
             public string ApiEngineKey { get; set; }
             public string ApiAddress { get; set; }
+            public string ApiRoutes { get; set; }
             public int? AllowAnonymous { get; set; }
             public int? StopHttp { get; set; }
             public int? IsEnable { get; set; }
@@ -1509,6 +1511,7 @@ namespace Microi.net
                 || !TableExists(osClientSecret, "diy_table")
                 || !TableExists(osClientSecret, "sys_apiengine")
                 || !ColumnExists(osClientSecret, "diy_table", "Name")
+                || !ColumnExists(osClientSecret, "diy_table", "SubmitBeforeServerV8")
                 || !ColumnExists(osClientSecret, "diy_table", "SubmitAfterServerV8"))
             {
                 return;
@@ -1520,46 +1523,62 @@ namespace Microi.net
             var quoteClose = dbType == "SqlServer" ? "]" : "`";
             var table = osClientSecret.Db
                 .FromSql($@"SELECT {quoteOpen}Id{quoteClose}, {quoteOpen}Name{quoteClose},
+                        {quoteOpen}SubmitBeforeServerV8{quoteClose},
                         {quoteOpen}SubmitAfterServerV8{quoteClose}
                     FROM {quoteOpen}diy_table{quoteClose}
                     WHERE LOWER({quoteOpen}Name{quoteClose})=@p0")
                 .AddInParameter("p0", "sys_apiengine")
                 .First<ApiEngineDiyTableRow>();
-            if (table == null || table.Id.DosIsNullOrWhiteSpace()
-                || !ApiEngineCacheCompatibility.TryUpgradeEvent(
-                    table.SubmitAfterServerV8,
-                    out var compatibleCode))
+            if (table == null || table.Id.DosIsNullOrWhiteSpace())
             {
                 return;
             }
 
-            var oldCode = table.SubmitAfterServerV8 ?? "";
+            var beforeChanged = ApiEngineCacheCompatibility.TryUpgradeValidationEvent(
+                table.SubmitBeforeServerV8,
+                out var compatibleBeforeCode);
+            var afterChanged = ApiEngineCacheCompatibility.TryUpgradeEvent(
+                table.SubmitAfterServerV8,
+                out var compatibleAfterCode);
+            if (!beforeChanged && !afterChanged) return;
+
+            var oldBeforeCode = table.SubmitBeforeServerV8 ?? "";
+            var oldAfterCode = table.SubmitAfterServerV8 ?? "";
             var affected = osClientSecret.Db
                 .FromSql($@"UPDATE {quoteOpen}diy_table{quoteClose}
-                    SET {quoteOpen}SubmitAfterServerV8{quoteClose}=@p0
-                    WHERE {quoteOpen}Id{quoteClose}=@p1
-                      AND ({quoteOpen}SubmitAfterServerV8{quoteClose}=@p2
-                           OR ({quoteOpen}SubmitAfterServerV8{quoteClose} IS NULL AND @p2=''))")
-                .AddInParameter("p0", compatibleCode)
-                .AddInParameter("p1", table.Id)
-                .AddInParameter("p2", oldCode)
+                    SET {quoteOpen}SubmitBeforeServerV8{quoteClose}=@p0,
+                        {quoteOpen}SubmitAfterServerV8{quoteClose}=@p1
+                    WHERE {quoteOpen}Id{quoteClose}=@p2
+                      AND ({quoteOpen}SubmitBeforeServerV8{quoteClose}=@p3
+                           OR ({quoteOpen}SubmitBeforeServerV8{quoteClose} IS NULL AND @p3=''))
+                      AND ({quoteOpen}SubmitAfterServerV8{quoteClose}=@p4
+                           OR ({quoteOpen}SubmitAfterServerV8{quoteClose} IS NULL AND @p4=''))")
+                .AddInParameter("p0", compatibleBeforeCode)
+                .AddInParameter("p1", compatibleAfterCode)
+                .AddInParameter("p2", table.Id)
+                .AddInParameter("p3", oldBeforeCode)
+                .AddInParameter("p4", oldAfterCode)
                 .ExecuteNonQuery();
             if (affected == 0)
             {
                 var reread = osClientSecret.Db
                     .FromSql($@"SELECT {quoteOpen}Id{quoteClose}, {quoteOpen}Name{quoteClose},
+                            {quoteOpen}SubmitBeforeServerV8{quoteClose},
                             {quoteOpen}SubmitAfterServerV8{quoteClose}
                         FROM {quoteOpen}diy_table{quoteClose}
                         WHERE {quoteOpen}Id{quoteClose}=@p0")
                     .AddInParameter("p0", table.Id)
                     .First<ApiEngineDiyTableRow>();
                 if (reread == null
+                    || ApiEngineCacheCompatibility.TryUpgradeValidationEvent(
+                        reread.SubmitBeforeServerV8,
+                        out _)
                     || ApiEngineCacheCompatibility.TryUpgradeEvent(
                         reread.SubmitAfterServerV8,
                         out _))
                 {
                     throw new InvalidOperationException(
-                        "sys_apiengine SubmitAfterServerV8发生并发修改，请合并后重试。");
+                        "sys_apiengine 保存前/保存后 V8 事件发生并发修改，请合并后重试。");
                 }
             }
 
@@ -1572,7 +1591,7 @@ namespace Microi.net
                 osClientSecret.OsClient);
             Console.WriteLine(
                 $"Microi：【接口引擎缓存兼容修复】【{osClientSecret.OsClient}】【{stage}】" +
-                $"已恢复v3/v6共享JSON写入契约，并重建{rebuiltAliases}个缓存别名。");
+                $"已恢复多路由校验与v3/v6共享JSON写入契约，并重建{rebuiltAliases}个缓存别名。");
         }
 
         private static async Task<int> RebuildLegacyCompatibleApiEngineCacheAsync(
@@ -1600,16 +1619,17 @@ namespace Microi.net
                     UpgradeExecutionLeaseContext.ThrowIfLost();
                     var model = JObject.FromObject((object)item);
                     var json = JsonConvert.SerializeObject((object)item);
-                    foreach (var alias in new[]
-                    {
-                        model.Value<string>("ApiEngineKey"),
-                        model.Value<string>("Id"),
-                        model.Value<string>("ApiAddress")
-                    })
+                    foreach (var alias in ApiEngineRouteAliases.GetCacheAliases(model))
                     {
                         if (!alias.DosIsNullOrWhiteSpace())
                         {
-                            aliases[alias.ToLowerInvariant()] = json;
+                            if (aliases.TryGetValue(alias, out var ownerJson)
+                                && !string.Equals(ownerJson, json, StringComparison.Ordinal))
+                            {
+                                throw new InvalidOperationException(
+                                    $"接口引擎缓存别名[{alias}]存在重复归属，拒绝以启动顺序覆盖。请修复多路由冲突后重试。");
+                            }
+                            aliases[alias] = json;
                         }
                     }
                 }
@@ -1641,6 +1661,7 @@ namespace Microi.net
         {
             public string Id { get; set; }
             public string Name { get; set; }
+            public string SubmitBeforeServerV8 { get; set; }
             public string SubmitAfterServerV8 { get; set; }
         }
 
@@ -2075,7 +2096,15 @@ if (_microiLegacyMenuConfigChanged) {
                 ["LimitRecursion"] = "int",
                 ["V8Limit"] = "int",
                 ["V8Unlimited"] = "int",
-                ["Lock"] = "int"
+                ["Lock"] = "int",
+                // 接口引擎升级与应用导入都依赖该物理协议列；先补物理列，字段元数据
+                // 再由官方应用包按 Managed 策略交付，旧租户无需人工执行 SQL。
+                ["ApiRoutes"] = string.Equals(
+                    osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType,
+                    "SqlServer",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "nvarchar(max)"
+                    : "mediumtext"
             };
 
             if (TableExists(osClientSecret, "sys_apiengine"))

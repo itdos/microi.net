@@ -11,6 +11,8 @@ import {
   mergeJavascriptResource,
   mergeJsonResource,
   normalizeOfficialPackageExecutionLimits,
+  planOfficialResourcePublishBatches,
+  selectOfficialPackageMergeBase,
   validateReadableOfficialResource,
   verifyOfflineReleaseSafety,
 } from './resource-sync-core.mjs';
@@ -294,6 +296,83 @@ test('JSON 按稳定 Id 合并数组元素而不是整段覆盖', () => {
   const remote = JSON.stringify({ SysMenus: [{ Id: 'menu-1', Name: '菜单', Sort: 2 }] });
   const merged = JSON.parse(mergeJsonResource('package.json', base, local, remote));
   assert.deepEqual(merged.SysMenus, [{ Id: 'menu-1', Name: '本地菜单', Sort: 2 }]);
+});
+
+test('官方包能力集合和追加式更新日志可安全合并并保留双方内容', () => {
+  const base = JSON.stringify({ PackageInfo: {
+    RequiredPlatformCapabilities: ['Base'],
+    ChangeHistory: '2026-08-28 v1.0.0 基线。\n',
+  } });
+  const local = JSON.stringify({ PackageInfo: {
+    RequiredPlatformCapabilities: ['Base', 'Local'],
+    ChangeHistory: '2026-08-30 v1.0.2 本地更新。\n2026-08-28 v1.0.0 基线。\n',
+  } });
+  const remote = JSON.stringify({ PackageInfo: {
+    RequiredPlatformCapabilities: ['Base', 'Remote'],
+    ChangeHistory: '2026-08-29 v1.0.1 远端更新。\n2026-08-28 v1.0.0 基线。\n',
+  } });
+  const merged = JSON.parse(mergeJsonResource('package.json', base, local, remote));
+  assert.deepEqual(merged.PackageInfo.RequiredPlatformCapabilities, ['Base', 'Local', 'Remote']);
+  assert.equal(
+    merged.PackageInfo.ChangeHistory,
+    '2026-08-30 v1.0.2 本地更新。\n2026-08-29 v1.0.1 远端更新。\n2026-08-28 v1.0.0 基线。\n',
+  );
+});
+
+test('追加式更新日志仍拒绝同一版本被双方写成不同内容', () => {
+  const base = JSON.stringify({ PackageInfo: { ChangeHistory: '2026-08-28 v1.0.0 基线。\n' } });
+  const local = JSON.stringify({ PackageInfo: { ChangeHistory: '2026-08-30 v1.0.1 本地。\n2026-08-28 v1.0.0 基线。\n' } });
+  const remote = JSON.stringify({ PackageInfo: { ChangeHistory: '2026-08-30 v1.0.1 远端。\n2026-08-28 v1.0.0 基线。\n' } });
+  assert.throws(() => mergeJsonResource('package.json', base, local, remote), /版本 v1\.0\.1 被两端追加为不同内容/);
+});
+
+test('共同基线高于官网时仅沿完整追加历史恢复官网作为有效合并基点', () => {
+  const packageContent = (version, history) => JSON.stringify({
+    PackageInfo: {
+      Name: '应用商城',
+      Version: version,
+      ChangeHistory: history,
+    },
+  });
+  const remote = packageContent('v1.0.1', '2026-08-28 v1.0.1 官网祖先。\n');
+  const base = packageContent(
+    'v1.0.2',
+    '2026-08-29 v1.0.2 已记录但未完成发布。\n2026-08-28 v1.0.1 官网祖先。\n',
+  );
+  const local = packageContent(
+    'v1.0.3',
+    '2026-08-30 v1.0.3 本地候选。\n2026-08-29 v1.0.2 已记录但未完成发布。\n2026-08-28 v1.0.1 官网祖先。\n',
+  );
+
+  const selected = selectOfficialPackageMergeBase('app.microi.store.json', base, local, remote);
+  assert.equal(selected.recoveredFromAheadBaseline, true);
+  assert.equal(selected.remoteVersion, 'v1.0.1');
+  assert.equal(selected.baseVersion, 'v1.0.2');
+  assert.equal(selected.localVersion, 'v1.0.3');
+  assert.equal(selected.content, canonicalizeResource('app.microi.store.json', remote));
+});
+
+test('共同基线高于官网但官网存在候选未继承的历史时失败关闭', () => {
+  const packageContent = (version, history) => JSON.stringify({
+    PackageInfo: { Name: '应用商城', Version: version, ChangeHistory: history },
+  });
+  const remote = packageContent(
+    'v1.0.1',
+    '2026-08-28 v1.0.1 官网祖先。\n2026-08-27 v1.0.0 其他成员历史。\n',
+  );
+  const base = packageContent(
+    'v1.0.2',
+    '2026-08-29 v1.0.2 本地基线。\n2026-08-28 v1.0.1 官网祖先。\n',
+  );
+  const local = packageContent(
+    'v1.0.3',
+    '2026-08-30 v1.0.3 本地候选。\n2026-08-29 v1.0.2 本地基线。\n2026-08-28 v1.0.1 官网祖先。\n',
+  );
+
+  assert.throws(
+    () => selectOfficialPackageMergeBase('app.microi.store.json', base, local, remote),
+    /不能证明官网是共同基线的祖先/,
+  );
 });
 
 test('JSON 同一字段被两端改为不同值时阻止发布', () => {
@@ -1063,7 +1142,7 @@ test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async 
 });
 
 test('官网发布接口以固定白名单、事务行锁和哈希保护多节点写入', () => {
-  assert.match(officialEngineSource, /Version: v1\.3\.2/);
+  assert.match(officialEngineSource, /Version: v1\.3\.4/);
   assert.match(officialEngineSource, /V8\.Method\.AuthorizeOfficialResourcePublish\(\)/);
   assert.doesNotMatch(officialEngineSource, /Number\(currentUser\.Level/);
   assert.match(officialEngineSource, /function lockPublishRows\(\)/);
@@ -1081,6 +1160,35 @@ test('官网发布接口以固定白名单、事务行锁和哈希保护多节�
   assert.match(officialEngineSource, /SelectTable:\s*selectionJson\(exactSelections\.SelectTable\)/);
   assert.match(officialEngineSource, /storedSelectionEquals\([\s\S]*verified\.Data\.SelectApiEngine/);
   assert.match(officialEngineSource, /storedSelectionEquals\([\s\S]*verified\.Data\.SelectTable/);
+});
+
+test('官网控制面滚动升级同时保留当前 live 与候选版本能力标记', async () => {
+  const source = await readFile(
+    resolve(testDirectory, 'configure-platform-runtime-dependencies-resource.mjs'),
+    'utf8',
+  );
+  assert.match(source, /ApiEngine:get-microi-upgrade-resource@v1\.3\.2/);
+  assert.match(source, /ApiEngine:get-microi-upgrade-resource@v1\.3\.3/);
+});
+
+test('官网控制面变更时拆成自举与剩余资源两个 CAS 批次', () => {
+  const changes = [
+    { name: 'app.microi.store.json', content: 'package' },
+    { name: 'official-resource-api.js', content: 'control-plane' },
+    { name: 'app.microi.sys_user.json', content: 'users' },
+  ];
+  const batches = planOfficialResourcePublishBatches(changes);
+  assert.deepEqual(batches.map(batch => batch.map(item => item.name)), [
+    ['official-resource-api.js'],
+    ['app.microi.store.json', 'app.microi.sys_user.json'],
+  ]);
+});
+
+test('live 投影超时审计会重试旧源码摘要而不是只重试缺失接口', () => {
+  assert.match(
+    mcpPublisherSource,
+    /if \(sourceHash === expectedHash \|\| attempt === 6\) return sourceHash/,
+  );
 });
 
 test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 CreateIfMissing', async () => {
@@ -1105,15 +1213,17 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 113);
-  assert.equal(managedCount, 105);
-  assert.equal(createIfMissingCount, 8);
+  assert.equal(seenKeys.size, 148);
+  assert.equal(managedCount, 139);
+  assert.equal(createIfMissingCount, 9);
 
   assert.match(officialEngineSource, /action === "reconcilepublishedapiengines"/);
   assert.match(officialEngineSource, /function preparePublishedApiEngineProjection\(\)/);
   assert.match(officialEngineSource, /LOWER\(ApiEngineKey\)=LOWER\(@p0\)/);
   assert.match(officialEngineSource, /WHERE Id=@p0/);
   assert.match(officialEngineSource, /UPDATE sys_apiengine SET Id=@p0 WHERE Id=@p1/);
+  assert.match(officialEngineSource, /"ApiName", "ApiEngineKey", "ApiAddress", "ApiRoutes"/);
+  assert.match(officialEngineSource, /text\(expectedEngine\.ApiRoutes\)/);
   assert.doesNotMatch(officialEngineSource, /sys_apiengine[^\n]*(?:WHERE|SET)[^\n]*OsClient/);
   assert.match(officialEngineSource, /官方 Managed 接口稳定 Id 对齐失败/);
   assert.match(officialEngineSource, /plan\.Projection\.Policy === "CreateIfMissing" && plan\.Existing[\s\S]*TenantHookPreserved\+\+[\s\S]*continue/);
@@ -1122,11 +1232,15 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
   assert.match(mcpPublisherSource, /Action: 'ReconcilePublishedApiEngines'/);
   assert.match(mcpPublisherSource, /recoverReconcileAfterAmbiguousTimeout/);
   assert.match(mcpPublisherSource, /return match \? match\[1\]\.toLowerCase\(\) : null/);
-  assert.match(mcpPublisherSource, /attempt <= 4/);
+  assert.match(mcpPublisherSource, /attempt <= 6/);
+  assert.match(mcpPublisherSource, /只重查尚未出现的 Key/);
+  assert.match(mcpPublisherSource, /未找到接口引擎\|NoExistData\|不存在的数据/);
   assert.match(mcpPublisherSource, /Math\.min\(3, managed\.length\)/);
   assert.match(mcpPublisherSource, /HTTP\\s\*524\|Origin Time-out/);
   assert.match(mcpPublisherSource, /'microi_get_table_data'/);
   assert.match(mcpPublisherSource, /'microi_get_engine_code'/);
+  assert.match(mcpPublisherSource, /'ApiName', 'ApiEngineKey', 'ApiAddress', 'ApiRoutes'/);
+  assert.match(mcpPublisherSource, /expected\.ApiRoutes/);
   assert.match(mcpPublisherSource, /Full source SHA-256/);
   assert.match(refreshSource, /apiEngines:\s*engines\.map/);
   assert.match(refreshSource, /524 后经 MCP 逐项回读确认事务已提交/);

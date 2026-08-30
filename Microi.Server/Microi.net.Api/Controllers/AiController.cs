@@ -12,7 +12,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-// ASP.NET Core 原生流式、支付回调、媒体密钥与 OpenAI 协议适配器；普通 JSON 业务兼容路由已统一并入 LegacyMobileCompatibilityController。
+// ASP.NET Core 原生流式、支付回调、媒体密钥与 OpenAI 协议适配器；普通 JSON
+// 旧地址已进入官方 Managed 接口引擎 ApiRoutes，本 Controller 不再承载这些动作。
 namespace Microi.net.Api
 {
     /// <summary>

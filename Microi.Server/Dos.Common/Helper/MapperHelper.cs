@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,6 +9,11 @@ namespace Dos.Common
 {
     public class MapperHelper
     {
+        private static readonly ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]> WritablePropertyCache =
+            new ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]>();
+        private static readonly ConcurrentDictionary<Type, Dictionary<string, System.Reflection.PropertyInfo>> ReadablePropertyCache =
+            new ConcurrentDictionary<Type, Dictionary<string, System.Reflection.PropertyInfo>>();
+
         public static TTo Map<TFrom, TTo>(TFrom from)
         {
             //if (typeof(TFrom) == Types.Object)
@@ -100,7 +106,7 @@ namespace Dos.Common
         {
             return input.Select(entity => EntityCopy<TResult>(entity)).ToList();
         }
-        private static List<string> NotSerializeType = new List<string>{
+        private static readonly HashSet<string> NotSerializeType = new HashSet<string>(StringComparer.Ordinal){
             "String",
             "DateTime",
             "Int",
@@ -123,24 +129,29 @@ namespace Dos.Common
         /// <returns></returns>
         public static object EntityCopy(object fromInput, Type toType, bool notNull, object toInput = null, Type fromType = null)
         {
+            if (fromInput == null) throw new ArgumentNullException(nameof(fromInput));
+            if (toType == null) throw new ArgumentNullException(nameof(toType));
+
             //emitmapper
-            var objResult = Activator.CreateInstance(toType);
-            var properties = toType.GetProperties();
+            var objResult = Activator.CreateInstance(toType)
+                ?? throw new InvalidOperationException($"无法创建目标类型 {toType.FullName} 的实例。");
+            var properties = GetWritableProperties(toType);
             var type = fromInput.GetType();
+            var sourceProperties = GetReadableProperties(type);
+            var fallbackProperties = toInput == null
+                ? null
+                : GetReadableProperties(toInput.GetType());
             foreach (var info in properties)
             {
-                if (!info.CanWrite) continue;
-                var property = type.GetProperty(info.Name);
-                if (property == null) continue;
+                if (!sourceProperties.TryGetValue(info.Name, out var property)) continue;
                 var objTemp = property.GetValue(fromInput, null);
                 //如果允许空，那么就没必要判断 toInput了，因为要把空值从fromInput赋值给objResult
                 if (notNull && objTemp == null)
                 {
                     if (toInput != null)
                     {
-                        var toGetType = toInput.GetType();
-                        var toProperty = toGetType.GetProperty(info.Name);
-                        if (toProperty == null) continue;
+                        if (fallbackProperties == null
+                            || !fallbackProperties.TryGetValue(info.Name, out var toProperty)) continue;
                         var toObjTemp = toProperty.GetValue(toInput, null);
                         if (toObjTemp == null)
                         {
@@ -222,6 +233,22 @@ namespace Dos.Common
             //    }
             //}
             return objResult;
+        }
+
+        private static System.Reflection.PropertyInfo[] GetWritableProperties(Type type)
+        {
+            return WritablePropertyCache.GetOrAdd(type, value => value
+                .GetProperties()
+                .Where(property => property.CanWrite)
+                .ToArray());
+        }
+
+        private static Dictionary<string, System.Reflection.PropertyInfo> GetReadableProperties(Type type)
+        {
+            return ReadablePropertyCache.GetOrAdd(type, value => value
+                .GetProperties()
+                .Where(property => property.CanRead)
+                .ToDictionary(property => property.Name, StringComparer.Ordinal));
         }
     }
 }

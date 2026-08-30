@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.9.8
+ * Version: v1.9.13
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -578,8 +578,39 @@ function buildResourceSnapshot(appKey, appVersion, menuContract, resources, reso
   };
 }
 
+/*
+ * RESOURCE_SNAPSHOT_PERSISTED_JSON_V1
+ * V8/Jint 可能把 .NET 对象暴露成带 length 的宿主对象，Date 等值在宿主形态下
+ * 也不同于最终包体。资源快照必须先经过与 HDFS 写包完全相同的 JSON 往返，
+ * 再做 canonical/sort/hash，确保服务端回执以最终持久化 JSON 为唯一事实源。
+ */
+function persistedJsonValue(value, label) {
+  var serialized = JSON.stringify(value);
+  if (serialized === undefined) {
+    throw new Error((label || '资源') + '无法序列化为 JSON');
+  }
+  return JSON.parse(serialized);
+}
+
 function createResourceSnapshotReceipt(appKey, appVersion, menuContract, resources, resourcePolicies) {
-  var snapshot = buildResourceSnapshot(appKey, appVersion, menuContract, resources, resourcePolicies);
+  var persistedResources = persistedJsonValue(resources || {}, '应用安装资源');
+  var packageAssets = persistedResources.ApplicationBundle
+    && persistedResources.ApplicationBundle.PackageAssets
+      ? persistedResources.ApplicationBundle.PackageAssets
+      : null;
+  var persistedMenuContract = packageAssets && packageAssets.MenuContract !== undefined
+    ? packageAssets.MenuContract
+    : persistedJsonValue(menuContract || null, '菜单合同');
+  var persistedPolicies = persistedResources.ResourcePolicies !== undefined
+    ? persistedResources.ResourcePolicies
+    : persistedJsonValue(resourcePolicies || null, '资源策略');
+  var snapshot = buildResourceSnapshot(
+    appKey,
+    appVersion,
+    persistedMenuContract,
+    persistedResources,
+    persistedPolicies
+  );
   var canonical = canonicalResourceJson(snapshot);
   return {
     ResourceSnapshotSchema: RESOURCE_SNAPSHOT_SCHEMA,
@@ -596,6 +627,55 @@ function readExpectedResourceSnapshotHash(value) {
     throw new Error('ProtocolVersion=3 Publish 必须提供有效 ExpectedResourceSnapshotHash');
   }
   return hash;
+}
+
+function resourceSnapshotCasCapability() {
+  return {
+    supported: true,
+    protocolVersion: 1,
+    hashAlgorithm: 'SHA256',
+    inspectAction: 'InspectResourceSnapshot',
+    publishExpectedHashField: 'ExpectedResourceSnapshotHash',
+    receiptHashField: 'ResourceSnapshotHash'
+  };
+}
+
+/*
+ * RESOURCE_SNAPSHOT_CAS_V1
+ * Inspect 只返回同一事务中导出的完整资源快照；Publish 必须回传完全相同的
+ * SHA-256。任何资源、菜单合同或 ResourcePolicies 漂移都在 HDFS 写包前失败。
+ */
+function enforceResourceSnapshotCas(action, protocolV3, expectedHashValue, receipt) {
+  if (!protocolV3) return ok({ ShouldPublish: action === 'Publish' });
+  if (!receipt || !/^[a-f0-9]{64}$/.test(text(receipt.ResourceSnapshotHash).toLowerCase())) {
+    return fail('ProtocolVersion=3 资源快照回执不合法');
+  }
+  if (action === 'InspectResourceSnapshot') {
+    return ok({
+      ShouldPublish: false,
+      ResourceSnapshotCasCapability: resourceSnapshotCasCapability(),
+      ResourceSnapshotSchema: receipt.ResourceSnapshotSchema,
+      ResourceSnapshotSchemaVersion: receipt.ResourceSnapshotSchemaVersion,
+      ResourceSnapshot: receipt.ResourceSnapshot,
+      ResourceSnapshotCanonicalJson: receipt.ResourceSnapshotCanonicalJson,
+      ResourceSnapshotHash: receipt.ResourceSnapshotHash
+    });
+  }
+  if (action !== 'Publish') return fail('ProtocolVersion=3 资源快照 CAS 不支持 Action=' + action);
+  var expectedHash = '';
+  try { expectedHash = readExpectedResourceSnapshotHash(expectedHashValue); }
+  catch (expectedError) { return fail(expectedError.message); }
+  if (expectedHash !== text(receipt.ResourceSnapshotHash).toLowerCase()) {
+    return fail('资源快照已漂移，禁止写入安装包', {
+      ExpectedResourceSnapshotHash: expectedHash,
+      ActualResourceSnapshotHash: text(receipt.ResourceSnapshotHash).toLowerCase()
+    });
+  }
+  return ok({
+    ShouldPublish: true,
+    ResourceSnapshotCasCapability: resourceSnapshotCasCapability(),
+    ResourceSnapshotHash: receipt.ResourceSnapshotHash
+  });
 }
 function apiEngineMap(engines) {
   var result = {};
@@ -827,6 +907,108 @@ function normalizeMenuContract(value, menuIds, exactMenuIds) {
     }
   }
   return value;
+}
+
+/*
+ * EXACT_MENU_PORTABLE_CLOSURE_V1
+ * 精确菜单包必须能独立安装到其他租户。源租户中的业务根菜单通常挂在一个未随包
+ * 导出的总目录下；合同将该业务根声明为根节点时，只清空这个包外 ParentId。
+ * 包内父子关系及菜单名称/表绑定仍必须逐项匹配，禁止用“归一化”掩盖漂移。
+ */
+function normalizeExactExportedMenuClosure(value, menuContract, exactMenuIds) {
+  var menus = toArray(persistedJsonValue(value || [], '精确菜单导出'));
+  if (!exactMenuIds || !menuContract) return menus;
+
+  var contractMenus = toArray(persistedJsonValue(menuContract.Menus || [], '精确菜单合同'));
+  if (menus.length !== contractMenus.length) {
+    throw new Error('精确菜单导出数量与 MenuContract 不一致');
+  }
+
+  var selectedIdMap = {};
+  var expectedById = {};
+  var seen = {};
+  for (var contractIndex = 0; contractIndex < contractMenus.length; contractIndex++) {
+    var expected = contractMenus[contractIndex] || {};
+    var expectedId = text(expected.Id || expected.MenuId || expected.Value).replace(/^\s+|\s+$/g, '');
+    var expectedKey = expectedId.toLowerCase();
+    if (isBlank(expectedId)) throw new Error('MenuContract.Menus[' + contractIndex + '].Id 不能为空');
+    if (expectedById[expectedKey]) throw new Error('MenuContract 包含重复菜单 Id：' + expectedId);
+    expectedById[expectedKey] = expected;
+    selectedIdMap[expectedKey] = true;
+  }
+
+  var rootKeys = [];
+  for (var candidateKey in expectedById) {
+    if (!Object.prototype.hasOwnProperty.call(expectedById, candidateKey)) continue;
+    var candidateParentId = text(expectedById[candidateKey].ParentId).replace(/^\s+|\s+$/g, '');
+    if (isBlank(candidateParentId) || !selectedIdMap[candidateParentId.toLowerCase()]) {
+      rootKeys.push(candidateKey);
+    }
+  }
+  if (rootKeys.length !== 1) {
+    throw new Error('MenuContract 必须形成唯一可移植根，实际根数量：' + rootKeys.length);
+  }
+  var rootKey = rootKeys[0];
+  for (var closureKey in expectedById) {
+    if (!Object.prototype.hasOwnProperty.call(expectedById, closureKey) || closureKey === rootKey) continue;
+    var cursor = closureKey;
+    var trail = {};
+    while (cursor !== rootKey) {
+      if (trail[cursor]) throw new Error('MenuContract 包含菜单父级环：' + text(expectedById[closureKey].Id));
+      trail[cursor] = true;
+      var cursorParentId = text(expectedById[cursor].ParentId).replace(/^\s+|\s+$/g, '');
+      var cursorParentKey = cursorParentId.toLowerCase();
+      if (isBlank(cursorParentId) || !selectedIdMap[cursorParentKey]) {
+        throw new Error('MenuContract 菜单未闭合到唯一根：' + text(expectedById[closureKey].Id));
+      }
+      cursor = cursorParentKey;
+    }
+  }
+
+  var contractFields = ['Name', 'DiyTableId', 'DiyTableName'];
+  for (var menuIndex = 0; menuIndex < menus.length; menuIndex++) {
+    var menu = menus[menuIndex] || {};
+    var menuId = text(menu.Id || menu.MenuId || menu.Value).replace(/^\s+|\s+$/g, '');
+    var menuKey = menuId.toLowerCase();
+    var contractMenu = expectedById[menuKey];
+    if (!contractMenu) throw new Error('精确菜单导出包含 MenuContract 之外的菜单：' + menuId);
+    if (seen[menuKey]) throw new Error('精确菜单导出包含重复菜单 Id：' + menuId);
+    seen[menuKey] = true;
+
+    for (var fieldIndex = 0; fieldIndex < contractFields.length; fieldIndex++) {
+      var fieldName = contractFields[fieldIndex];
+      if (text(menu[fieldName]) !== text(contractMenu[fieldName])) {
+        throw new Error('精确菜单 ' + menuId + '.' + fieldName + ' 与 MenuContract 不一致');
+      }
+    }
+
+    var expectedParentId = text(contractMenu.ParentId).replace(/^\s+|\s+$/g, '');
+    var actualParentId = text(menu.ParentId).replace(/^\s+|\s+$/g, '');
+    if (menuKey === rootKey) {
+      if (!isBlank(expectedParentId) && actualParentId.toLowerCase() !== expectedParentId.toLowerCase()) {
+        throw new Error('精确菜单根 ' + menuId + '.ParentId 与 MenuContract 不一致');
+      }
+      if (isBlank(expectedParentId) && !isBlank(actualParentId) && selectedIdMap[actualParentId.toLowerCase()]) {
+        throw new Error('精确菜单根 ' + menuId + ' 意外引用了包内 ParentId：' + actualParentId);
+      }
+      menu.ParentId = null;
+    } else {
+      if (isBlank(expectedParentId) || !selectedIdMap[expectedParentId.toLowerCase()]) {
+        throw new Error('MenuContract 非根菜单 ' + menuId + ' 引用了包外 ParentId：' + expectedParentId);
+      }
+      if (actualParentId.toLowerCase() !== expectedParentId.toLowerCase()) {
+        throw new Error('精确菜单 ' + menuId + '.ParentId 与 MenuContract 不一致');
+      }
+      menu.ParentId = expectedParentId;
+    }
+  }
+
+  for (var expectedMenuKey in expectedById) {
+    if (Object.prototype.hasOwnProperty.call(expectedById, expectedMenuKey) && !seen[expectedMenuKey]) {
+      throw new Error('精确菜单导出缺少 MenuContract 菜单：' + text(expectedById[expectedMenuKey].Id));
+    }
+  }
+  return menus;
 }
 
 // MICROSERVICE_MENU_KEY_ENRICHMENT_V1：sys_menu 的历史母表可能尚未包含
@@ -1111,7 +1293,12 @@ var action = text(V8.Param.Action || 'Package');
 var protocolVersionText = text(V8.Param.ProtocolVersion);
 if (!isBlank(protocolVersionText) && protocolVersionText !== '3') return fail('ProtocolVersion 只支持显式 v3 或省略');
 var protocolV3 = protocolVersionText === '3';
-if (protocolV3 && action !== 'Publish') return fail('ProtocolVersion=3 只允许 Action=Publish');
+if (protocolV3 && action !== 'Publish' && action !== 'InspectResourceSnapshot') {
+  return fail('ProtocolVersion=3 只允许 Action=Publish 或 InspectResourceSnapshot');
+}
+if (!protocolV3 && action === 'InspectResourceSnapshot') {
+  return fail('InspectResourceSnapshot 必须显式使用 ProtocolVersion=3');
+}
 var versionsResult = getLatestVersion(app.Id);
 var latestVersion = versionsResult && versionsResult.Code === 1 && versionsResult.Data && versionsResult.Data.length ? versionsResult.Data[0] : null;
 var explicitRoutesSupplied = V8.Param.Routes !== undefined && V8.Param.Routes !== null;
@@ -1391,6 +1578,11 @@ if (dataSelections.length > 0 || menuIds.length > 0 || tableIds.length > 0 || fl
   }
   selectedExport = selectedExportResult.Data;
 }
+selectedExport.SysMenus = normalizeExactExportedMenuClosure(
+  selectedExport.SysMenus,
+  menuContract,
+  exactMenuIds
+);
 infrastructure.DDLStatements = mergeUniqueRows(infrastructure.DDLStatements, selectedExport.DDLStatements, ['TableName']);
 infrastructure.DiyTables = mergeUniqueRows(infrastructure.DiyTables, selectedExport.DiyTables, ['Id', 'Name']);
 infrastructure.DiyFields = mergeUniqueRows(infrastructure.DiyFields, selectedExport.DiyFields, ['Id']);
@@ -1543,6 +1735,50 @@ var generatedResourcePolicies = buildApiEngineResourcePolicies(
 );
 if (generatedResourcePolicies) packageModel.ResourcePolicies = generatedResourcePolicies;
 
+var resourceSnapshotReceipt = null;
+try {
+  resourceSnapshotReceipt = createResourceSnapshotReceipt(
+    text(app.AppKey || app.AppId),
+    versionNo,
+    menuContract,
+    packageModel,
+    packageModel.ResourcePolicies || null
+  );
+} catch (resourceSnapshotError) {
+  return fail('生成应用安装资源快照失败：' + resourceSnapshotError.message);
+}
+packageModel.ResourceSnapshot = {
+  Schema: resourceSnapshotReceipt.ResourceSnapshotSchema,
+  SchemaVersion: resourceSnapshotReceipt.ResourceSnapshotSchemaVersion,
+  HashAlgorithm: 'SHA256',
+  Hash: resourceSnapshotReceipt.ResourceSnapshotHash
+};
+packageModel.PackageInfo.ResourceSnapshotHash = resourceSnapshotReceipt.ResourceSnapshotHash;
+var resourceSnapshotGate = enforceResourceSnapshotCas(
+  action,
+  protocolV3,
+  V8.Param.ExpectedResourceSnapshotHash,
+  resourceSnapshotReceipt
+);
+if (!resourceSnapshotGate || resourceSnapshotGate.Code !== 1) {
+  return resourceSnapshotGate || fail('应用安装资源快照 CAS 校验失败');
+}
+if (protocolV3 && action === 'InspectResourceSnapshot') {
+  return ok({
+    Action: action,
+    ProtocolVersion: 3,
+    AppId: app.Id,
+    AppKey: text(app.AppKey || app.AppId),
+    AppVersion: versionNo,
+    ResourceSnapshotCasCapability: resourceSnapshotCasCapability(),
+    ResourceSnapshotSchema: resourceSnapshotReceipt.ResourceSnapshotSchema,
+    ResourceSnapshotSchemaVersion: resourceSnapshotReceipt.ResourceSnapshotSchemaVersion,
+    ResourceSnapshot: resourceSnapshotReceipt.ResourceSnapshot,
+    ResourceSnapshotCanonicalJson: resourceSnapshotReceipt.ResourceSnapshotCanonicalJson,
+    ResourceSnapshotHash: resourceSnapshotReceipt.ResourceSnapshotHash
+  }, '应用安装资源快照只读检查完成');
+}
+
 if (isOfflineAction) {
   // 离线包必须能在完全不通发布端/HDFS 的客户环境安装。
   // PackageAssets 仍作为来源追踪信息保留，但安装器会优先使用这里内嵌的文件。
@@ -1618,6 +1854,9 @@ if (action === 'Publish') {
   if (packageAssets.BuildZip) packageZipFiles.push(packageAssets.BuildZip);
   if (packageAssets.SourceZip) packageZipFiles.push(packageAssets.SourceZip);
   var packageJson = JSON.stringify(packageModel);
+  // MARKETPLACE_PACKAGE_UTF8_BASE64_TRANSPORT_V1：先在当前引擎内按 UTF-8
+  // 编码为纯 ASCII，再跨嵌套接口边界，防止长中文 JSON 被参数转换损坏。
+  var packageByteBase64 = String(System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(packageJson)));
   var storeVisibility = boolValue(
     V8.Param.IsPublic,
     boolValue(preservedStore.IsPublic, true)
@@ -1627,7 +1866,7 @@ if (action === 'Publish') {
     StoreId: app.Id,
     AppVersion: versionNo,
     IsPublic: storeVisibility,
-    Package: packageJson
+    PackageByteBase64: packageByteBase64
   });
   if (!storageResult || storageResult.Code !== 1 || !storageResult.Data) {
     return fail('应用包写入 HDFS 失败：' + ((storageResult && storageResult.Msg) || '接口无返回'));
@@ -1772,7 +2011,13 @@ if (action === 'Publish') {
       AppVersion: text(postPublishStore.AppVersion),
       CurrentVersion: postPublishStore.CurrentVersion,
       CommittedProof: committedProof,
-      FencedCas: true
+      FencedCas: true,
+      ResourceSnapshotCasCapability: resourceSnapshotCasCapability(),
+      ResourceSnapshotSchema: resourceSnapshotReceipt.ResourceSnapshotSchema,
+      ResourceSnapshotSchemaVersion: resourceSnapshotReceipt.ResourceSnapshotSchemaVersion,
+      ResourceSnapshot: resourceSnapshotReceipt.ResourceSnapshot,
+      ResourceSnapshotCanonicalJson: resourceSnapshotReceipt.ResourceSnapshotCanonicalJson,
+      ResourceSnapshotHash: resourceSnapshotReceipt.ResourceSnapshotHash
     }, '应用安装包已绑定到当前 committed pointer');
   }
   var publishResult = upsertStore(storeRow);
@@ -1783,7 +2028,10 @@ if (action === 'Publish') {
     PreparedAssetsReused: reusedPreparedAssets,
     PreparedTime: packageAssets.PreparedTime || '',
     AppVersion: versionNo,
-    CurrentVersion: app.CurrentVersion || 1
+    CurrentVersion: app.CurrentVersion || 1,
+    ResourceSnapshotSchema: resourceSnapshotReceipt.ResourceSnapshotSchema,
+    ResourceSnapshotSchemaVersion: resourceSnapshotReceipt.ResourceSnapshotSchemaVersion,
+    ResourceSnapshotHash: resourceSnapshotReceipt.ResourceSnapshotHash
   }, '应用已发布到应用商城');
 }
 

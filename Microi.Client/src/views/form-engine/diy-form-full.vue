@@ -384,12 +384,15 @@
             class="diy-form-container diy-form-modern-dialog"
             :class="{
                 'diy-form-fixed-height': !!Height,
-                'diy-form-print-target': IsPrinting
+                'diy-form-print-target': IsPrinting,
+                'is-webos-form-maximized': IsWebosWindowMaximized(),
+                'is-webos-form-minimized': WebosFormMinimized
             }"
-            draggable
+            :draggable="!IsWebosWindowMaximized()"
+            :fullscreen="IsWebosWindowMaximized()"
             align-center
             :width="GetOpenFormWidth()"
-            :style="GetOpenFormStyle()"
+            :style="IsWebosWindowMaximized() ? {} : GetOpenFormStyle()"
             :modal="true"
             :modal-class="GetModernOverlayClass(Height ? 'diy-form-fixed-height-overlay' : '')"
             :modal-append-to-body="true"
@@ -417,6 +420,20 @@
                     </div>
                 </div>
                 <div v-if="!diyStore.IsPhoneView" class="diy-form-dialog-actions diy-form-toolbar">
+                    <span v-if="IsWebosWindowDialog()" class="diy-form-webos-window-controls" aria-label="WebOS 表单窗口控制">
+                        <button type="button" title="最小化表单窗口" aria-label="最小化表单窗口" @pointerdown.stop @click="WebosMinimizeFormWindow">
+                            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.5h10" /></svg>
+                        </button>
+                        <button
+                            type="button"
+                            :title="IsWebosWindowMaximized() ? '还原表单窗口' : '最大化表单窗口'"
+                            :aria-label="IsWebosWindowMaximized() ? '还原表单窗口' : '最大化表单窗口'"
+                            @pointerdown.stop
+                            @click="WebosToggleMaximizeFormWindow"
+                        >
+                            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1" /></svg>
+                        </button>
+                    </span>
                     <!-- 工作流：醒目的【发起流程/处理工作】按钮（Dialog模式顶部） -->
                     <el-button v-if="ShowWfTopSubmitBtn" size="small" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
                         {{ WfTopSubmitBtnText }}
@@ -768,6 +785,20 @@
                 </div>
             </div>
         </el-dialog>
+
+        <Teleport to="body">
+            <button
+                v-if="ShowFieldForm && IsWebosWindowDialog() && WebosFormMinimized"
+                type="button"
+                class="diy-form-webos-restore"
+                title="恢复表单窗口"
+                aria-label="恢复表单窗口"
+                @click="WebosRestoreFormWindow"
+            >
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2" /><path d="M7 1.8h8.2a3 3 0 0 1 3 3V13" /></svg>
+                <span>{{ GetOpenTitle() }}</span>
+            </button>
+        </Teleport>
 
         <!--以抽屉形式打开Form-->
         <el-drawer
@@ -1724,6 +1755,8 @@ export default {
             return [
                 "diy-form-modern-overlay",
                 "mci-unified-overlay",
+                this.IsWebosWindowDialog() ? "diy-form-webos-body-overlay" : "",
+                this.IsWebosWindowDialog() && this.WebosFormMinimized ? "diy-form-webos-minimized-overlay" : "",
                 blurDisabled ? "diy-form-modern-overlay--plain mci-unified-overlay--plain" : "",
                 extraClass || ""
             ].filter(Boolean).join(" ");
@@ -1882,6 +1915,8 @@ export default {
 
             // 每次打开一条新记录都从完整字段视图开始，避免沿用上一条记录的筛选状态。
             self.FormFieldSearchKeyword = "";
+            self.WebosFormMaximized = false;
+            self.WebosFormMinimized = false;
 
             // 通过 Init 方法打开的表单，明确标记为非直接页面模式（即使在页面路由下也是弹窗/抽屉）
             self._isDirectPageMode = false;
@@ -1889,7 +1924,11 @@ export default {
             self.TableId = param.TableId;
             self.TableName = param.TableName;
             self.FormMode = param.FormMode;
-            self.DialogType = param.DialogType;
+            var isWebosDesktopWindow = self.$webosWindow?.active === true
+                && ["macos", "windows"].includes(String(self.$webosWindow?.platform || "").toLowerCase());
+            self.DialogType = isWebosDesktopWindow && param.DialogType !== "Embedded"
+                ? "Dialog"
+                : param.DialogType;
             self.SysMenuId = param.SysMenuId;
             self.TableChildAuth = param.TableChildAuth || null;
             self.PresentationMode = param.PresentationMode || "";
@@ -1992,6 +2031,12 @@ export default {
                 dialogType = "Page";
             } else {
                 // 未配置的新旧模块统一回落到 80% Dialog；只有显式配置 Drawer 的复杂表单才使用抽屉。
+                dialogType = "Dialog";
+            }
+
+            if (self.$webosWindow?.active === true
+                && ["macos", "windows"].includes(String(self.$webosWindow?.platform || "").toLowerCase())
+                && dialogType !== "Embedded") {
                 dialogType = "Dialog";
             }
 

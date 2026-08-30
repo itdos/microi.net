@@ -1517,7 +1517,8 @@ try {
         var cacheStartupEngine = function (row) {
             if (!row) return;
             var rowJson = JSON.stringify(row);
-            var cacheValues = [row.ApiEngineKey, row.Id, row.ApiAddress];
+            var cacheValues = [row.ApiEngineKey, row.Id, row.ApiAddress]
+                .concat(String(row.ApiRoutes || '').split(';'));
             for (var cacheValueIndex = 0; cacheValueIndex < cacheValues.length; cacheValueIndex++) {
                 var cacheValue = String(cacheValues[cacheValueIndex] || '').toLowerCase();
                 if (!cacheValue) continue;
@@ -6807,6 +6808,29 @@ try {
         V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(value).toLowerCase()}`);
     }
 
+    function apiEngineRouteAliases(model) {
+        model = model || {};
+        var values = [model.ApiEngineKey, model.Id, model.ApiAddress]
+            .concat(String(model.ApiRoutes || '').split(';'));
+        var aliases = [];
+        var seen = {};
+        for (var aliasIndex = 0; aliasIndex < values.length; aliasIndex++) {
+            var alias = String(values[aliasIndex] || '').trim();
+            var lower = alias.toLowerCase();
+            if (!alias || seen[lower]) continue;
+            seen[lower] = true;
+            aliases.push(alias);
+        }
+        return aliases;
+    }
+
+    function removeApiEngineCacheAliases(model) {
+        var aliases = apiEngineRouteAliases(model);
+        for (var aliasIndex = 0; aliasIndex < aliases.length; aliasIndex++) {
+            removeApiEngineCacheValue(aliases[aliasIndex]);
+        }
+    }
+
     function refreshApiEngineCache(apiEngineKey, apiEngineId, apiAddress) {
         removeApiEngineCacheValue(apiEngineKey);
         removeApiEngineCacheValue(apiEngineId);
@@ -6849,14 +6873,9 @@ try {
         // IV8Cache.Set 的 value 参数是 string。直接传 Jint/.NET 对象会被转换成
         // "System..." 类型名，污染 v3 与 v6 共用的 sys_apiengine JSON 缓存。
         var latestCacheJson = JSON.stringify(latest);
-        if (!isMissingValue(latest.ApiEngineKey)) {
-            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiEngineKey).toLowerCase()}`, latestCacheJson);
-        }
-        if (!isMissingValue(latest.Id)) {
-            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.Id).toLowerCase()}`, latestCacheJson);
-        }
-        if (!isMissingValue(latest.ApiAddress)) {
-            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiAddress).toLowerCase()}`, latestCacheJson);
+        var latestAliases = apiEngineRouteAliases(latest);
+        for (var latestAliasIndex = 0; latestAliasIndex < latestAliases.length; latestAliasIndex++) {
+            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latestAliases[latestAliasIndex]).toLowerCase()}`, latestCacheJson);
         }
         return latest;
     }
@@ -7396,13 +7415,8 @@ try {
                 } catch (idAlignmentError) { }
 
                 // 清除旧Id、旧Key的缓存（Id已被替换，旧缓存失效）
-                if (oldApiEngineId) V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(oldApiEngineId).toLowerCase()}`);
-                if (existingApiEngine && existingApiEngine.ApiEngineKey) {
-                    V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(existingApiEngine.ApiEngineKey).toLowerCase()}`);
-                }
-                if (existingApiEngine && existingApiEngine.ApiAddress) {
-                    V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(existingApiEngine.ApiAddress).toLowerCase()}`);
-                }
+                if (oldApiEngineId) removeApiEngineCacheValue(oldApiEngineId);
+                removeApiEngineCacheAliases(existingApiEngine);
                 existingId = apiEngine.Id;
             }
 
@@ -7414,6 +7428,8 @@ try {
             modelCopy.Id = apiEngine.Id;
             normalizeApiEngineModel(modelCopy);
             if (exists) {
+                // 更新前先清理旧主路由和多路由，避免别名变更后旧地址继续命中旧脚本。
+                removeApiEngineCacheAliases(existingApiEngine);
                 var uptResult = V8.FormEngine.UptFormData('sys_apiengine', modelCopy);
                 if (uptResult.Code == 1) {
                     stats.ApiEngineUpdated++;

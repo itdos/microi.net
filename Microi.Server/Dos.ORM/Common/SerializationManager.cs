@@ -17,6 +17,7 @@
 namespace Dos.ORM
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.IO;
     using System.Runtime.CompilerServices;
@@ -44,7 +45,8 @@ namespace Dos.ORM
 
         #endregion
 
-        private static Dictionary<Type, KeyValuePair<TypeSerializeHandler, TypeDeserializeHandler>> handlers = new Dictionary<Type, KeyValuePair<TypeSerializeHandler, TypeDeserializeHandler>>();
+        private static readonly ConcurrentDictionary<Type, KeyValuePair<TypeSerializeHandler, TypeDeserializeHandler>> Handlers
+            = new ConcurrentDictionary<Type, KeyValuePair<TypeSerializeHandler, TypeDeserializeHandler>>();
 
         static SerializationManager()
         {
@@ -63,9 +65,9 @@ namespace Dos.ORM
                 return null;
             }
 
-            if (handlers.ContainsKey(obj.GetType()))
+            if (Handlers.TryGetValue(obj.GetType(), out var handler))
             {
-                return handlers[obj.GetType()].Key(obj);
+                return handler.Key(obj);
             }
             else
             {
@@ -91,9 +93,9 @@ namespace Dos.ORM
                 return null;
             }
 
-            if (handlers.ContainsKey(returnType))
+            if (Handlers.TryGetValue(returnType, out var handler))
             {
-                return handlers[returnType].Value(data);
+                return handler.Value(data);
             }
             else
             {
@@ -113,17 +115,12 @@ namespace Dos.ORM
         /// <param name="deserializeHandler">The deserialize handler.</param>
         public static void RegisterSerializeHandler(Type type, TypeSerializeHandler serializeHandler, TypeDeserializeHandler deserializeHandler)
         {
-            lock (handlers)
-            {
-                if (handlers.ContainsKey(type))
-                {
-                    handlers[type] = new KeyValuePair<TypeSerializeHandler, TypeDeserializeHandler>(serializeHandler, deserializeHandler);
-                }
-                else
-                {
-                    handlers.Add(type, new KeyValuePair<TypeSerializeHandler, TypeDeserializeHandler>(serializeHandler, deserializeHandler));
-                }
-            }
+            if (type == null) throw new ArgumentNullException(nameof(type));
+            if (serializeHandler == null) throw new ArgumentNullException(nameof(serializeHandler));
+            if (deserializeHandler == null) throw new ArgumentNullException(nameof(deserializeHandler));
+            Handlers[type] = new KeyValuePair<TypeSerializeHandler, TypeDeserializeHandler>(
+                serializeHandler,
+                deserializeHandler);
         }
 
         /// <summary>
@@ -132,13 +129,8 @@ namespace Dos.ORM
         /// <param name="type">The type.</param>
         public static void UnregisterSerializeHandler(Type type)
         {
-            lock (handlers)
-            {
-                if (handlers.ContainsKey(type))
-                {
-                    handlers.Remove(type);
-                }
-            }
+            if (type == null) throw new ArgumentNullException(nameof(type));
+            Handlers.TryRemove(type, out _);
         }
 
         #region InitDefaultSerializeHandlers

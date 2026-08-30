@@ -300,6 +300,29 @@
     transition: none !important;
 }
 
+// WebOS 子表单属于桌面级窗口，不应被数据表格窗口的 overflow/层叠上下文裁切。
+.diy-form-modern-overlay.diy-form-webos-body-overlay {
+    z-index: 10030 !important;
+}
+
+.diy-form-modern-overlay.diy-form-webos-body-overlay > .el-overlay-dialog {
+    padding: 34px 8px 70px;
+    box-sizing: border-box;
+}
+
+.diy-form-modern-overlay.diy-form-webos-minimized-overlay {
+    pointer-events: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.diy-form-modern-overlay.diy-form-webos-minimized-overlay > .el-overlay-dialog,
+.diy-form-container.el-dialog.diy-form-modern-dialog.is-webos-form-minimized {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
 .diy-form-container.el-dialog.diy-form-modern-dialog {
     --diy-dialog-surface: var(--mci-bg-card, var(--el-bg-color, #fff));
     --diy-dialog-soft: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f6f8fb));
@@ -376,6 +399,93 @@
         box-shadow: 0 7px 18px color-mix(in srgb, var(--diy-dialog-accent) 24%, transparent);
     }
 }
+
+.diy-form-container.el-dialog.diy-form-modern-dialog.is-webos-form-maximized {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    border-radius: 14px;
+}
+
+.diy-form-webos-restore {
+    position: fixed;
+    right: 22px;
+    bottom: 72px;
+    z-index: 10048;
+    display: inline-flex;
+    max-width: min(320px, calc(100vw - 44px));
+    height: 42px;
+    align-items: center;
+    gap: 9px;
+    padding: 0 15px;
+    overflow: hidden;
+    color: var(--mci-text-primary, var(--el-text-color-primary, #172033));
+    background: color-mix(in srgb, var(--mci-bg-elevated, var(--el-bg-color-overlay, #fff)) 76%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mci-color-primary, #409eff) 24%, transparent);
+    border-radius: 999px;
+    box-shadow: 0 16px 42px rgba(15, 23, 42, .26);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    backdrop-filter: blur(22px) saturate(150%);
+    cursor: pointer;
+}
+
+.diy-form-webos-restore:hover,
+.diy-form-webos-restore:focus-visible {
+    border-color: color-mix(in srgb, var(--mci-color-primary, #409eff) 44%, transparent);
+    box-shadow: 0 18px 48px rgba(15, 23, 42, .30), var(--webos-focus-ring, 0 0 0 3px rgba(64, 158, 255, .24));
+    outline: none;
+}
+
+.diy-form-webos-restore svg {
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: var(--mci-color-primary, #409eff);
+    stroke-width: 1.6;
+}
+
+.diy-form-webos-restore span {
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.diy-form-webos-window-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-right: 4px;
+    margin-right: 2px;
+    border-right: 1px solid var(--diy-dialog-line);
+}
+
+.diy-form-webos-window-controls button {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 28px;
+    padding: 0;
+    color: var(--mci-text-secondary, var(--el-text-color-regular));
+    background: color-mix(in srgb, var(--mci-color-primary, #409eff) 7%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mci-color-primary, #409eff) 16%, transparent);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.diy-form-webos-window-controls button:hover,
+.diy-form-webos-window-controls button:focus-visible {
+    color: var(--mci-color-primary, #409eff);
+    background: color-mix(in srgb, var(--mci-color-primary, #409eff) 13%, transparent);
+    outline: none;
+}
+
+.diy-form-webos-window-controls button:focus-visible { box-shadow: var(--webos-focus-ring); }
+.diy-form-webos-window-controls svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; }
 
 .diy-form-container.el-drawer.diy-form-modern-drawer {
     --diy-dialog-surface: var(--mci-bg-card, var(--el-bg-color, #fff));

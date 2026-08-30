@@ -15,10 +15,6 @@ const nativeController = fs.readFileSync(path.join(
   serverRoot,
   'Microi.net.Api', 'Controllers', 'AiController.cs',
 ), 'utf8');
-const compatibilityController = fs.readFileSync(path.join(
-  serverRoot,
-  'Microi.net.Api', 'Controllers', 'LegacyMobileCompatibilityController.cs',
-), 'utf8');
 const aiInterface = fs.readFileSync(path.join(
   serverRoot,
   'Microi.Core', 'Interface', 'IV8AI.cs',
@@ -76,7 +72,7 @@ async function run(action, request = {}) {
 test('platform-ai-runtime is a fixed Managed package resource', () => {
   const engine = packageEngine('platform-ai-runtime');
   assert.ok(engine);
-  assert.equal(packageModel.PackageInfo.Version, 'v7.6.0');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.6.1');
   assert.equal(engine.Version, 'v1.0.0');
   assert.equal(engine.ApiAddress, '/apiengine/platform-ai-runtime');
   assert.equal(engine.StopHttp, 0);
@@ -128,6 +124,7 @@ test('all non-stream actions call only V8.AI and expose a three-field safe hook 
 });
 
 test('legacy AI JSON routes are centralized while native protocol boundaries remain in Microi.AI', () => {
+  const engine = packageEngine('platform-ai-runtime');
   for (const action of [
     'UpdateConversationTitle',
     'RecognizeIntent',
@@ -136,18 +133,18 @@ test('legacy AI JSON routes are centralized while native protocol boundaries rem
     'NL2V8EngineSync',
   ]) {
     assert.match(
-      compatibilityController,
-      new RegExp(`/api/Ai/${action}`),
+      engine.ApiRoutes,
+      new RegExp(`/api/Ai/${action}`, 'i'),
       action,
     );
+    assert.match(source, new RegExp(`['"]${action}['"]`));
     assert.doesNotMatch(
       nativeController,
       new RegExp(`public\\s+(?:async\\s+)?[^\\n]+\\s${action}\\s*\\(`),
       action,
     );
   }
-  assert.match(compatibilityController, /AiPlatformRuntimeEngineKey\s*=\s*"platform-ai-runtime"/);
-  assert.match(compatibilityController, /RunLegacyAiCompatibilityAsync/);
+  assert.match(source, /PLATFORM_RUNTIME_DISPATCH_MARKER_V1/);
   assert.match(nativeController, /Task ChatStream[\s\S]{0,1800}_microiAi\.ChatStreamWithContextAsync/);
   assert.match(nativeController, /Task NL2V8Engine\([\s\S]{0,2200}_microiAi\.NL2V8Engine/);
   assert.match(nativeController, /GetNl2SqlPolicyTableOptions[\s\S]{0,600}_microiAi\.GetNl2SqlPolicyTableOptionsAsync/);

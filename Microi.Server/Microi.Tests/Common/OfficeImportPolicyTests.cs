@@ -35,6 +35,37 @@ public class OfficeImportPolicyTests
     }
 
     [Fact]
+    public void Import_database_values_are_typed_parameters_not_sql_literals()
+    {
+        var textField = new JObject
+        {
+            ["Label"] = "名称",
+            ["Type"] = "varchar(200)",
+            ["Component"] = "Text"
+        };
+        var decimalField = new JObject
+        {
+            ["Label"] = "金额",
+            ["Type"] = "decimal(18,2)",
+            ["Component"] = "NumberText"
+        };
+
+        var text = PrivateStatic("ImportBuildDbValue").Invoke(
+            null,
+            new object?[] { "O'Reilly", textField });
+        var number = PrivateStatic("ImportBuildDbValue").Invoke(
+            null,
+            new object?[] { "12.50", decimalField });
+        var emptyNumber = PrivateStatic("ImportBuildDbValue").Invoke(
+            null,
+            new object?[] { "", decimalField });
+
+        Assert.Equal("O'Reilly", text);
+        Assert.Equal(12.50m, Assert.IsType<decimal>(number));
+        Assert.Null(emptyNumber);
+    }
+
+    [Fact]
     public void Every_standalone_unique_field_is_a_rule_and_all_composite_fields_share_one_rule()
     {
         var fields = new List<JObject>

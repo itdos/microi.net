@@ -46,7 +46,7 @@
 5. 重新读取 `sys_user`，确认未删除、未停用。
 6. 签发 DiyToken，写不含凭据的 SSO 审计。
 
-步骤 2–5 固定由 `sso_resolve_federated_identity` 执行；协议 Controller 只把已经验签、归一化且不含原始 Token/断言的 Claim 交给该引擎。步骤 6 由 `sso_complete_login` 编排并调用一次性票据/DiyToken 原子。不要在 OIDC、SAML、CAS 三个 Controller 中各复制一套用户查询、JIT 和角色映射。
+步骤 2–5 固定由 `sso_resolve_federated_identity` 执行；`sso_http_oidc_callback`、`sso_http_saml_acs`、`sso_http_cas_callback` 只通过 `RunSsoProtocol` 取得已经验签、归一化且不含原始 Token/断言的 Claim。步骤 6 由 `sso_complete_login` 编排并调用一次性票据/DiyToken 原子。禁止为 OIDC、SAML、CAS 恢复 Controller 或各复制一套用户查询、JIT 和角色映射。
 
 ## 浏览器回调
 

@@ -1,6 +1,6 @@
 ---
 name: v8-api-config
-description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、ApiAddress、StopHttp、AllowAnonymous、ResponseFile、锁、日志、超时和 HTTP 暴露。
+description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、ApiAddress、StopHttp、AllowAnonymous、ResponseFile、ResponseType=HTTP、锁、日志、超时和 HTTP 暴露。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -15,18 +15,34 @@ description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、Ap
 |------|------|------|
 | `ApiEngineKey` | 接口唯一标识（URL 路径） | 必填 |
 | `ApiAddress` | 自定义接口地址（覆盖默认 `/apiengine/{Key}`） | 空 |
+| `ApiRoutes`（多路由） | 同一接口的兼容地址，多个绝对路径用英文分号分隔 | 空 |
 | `RequestType` | `Get` / `Post` / `Both` | `Both` |
 | `ParamType` | `form` / `json` / `url` —— 但 V8.Param 都能统一接收 | `Both` |
 | `IsAnonymous` | 允许匿名调用（无 Token） | `false` |
 | `StopHttp` | 禁止外部 HTTP 调用（仅允许 V8.ApiEngine.Run 内部调用） | `false` |
 | `IsResponseFile` | 是否响应文件（开启后 Data 必须是文件结构） | `false` |
-| `ResponseType` | `JSON/String/File/HTML/Stream`；`Stream` 开启 SSE/NDJSON | 自动识别 |
+| `ResponseType` | `JSON/String/File/HTML/Stream/HTTP`；`HTTP` 返回受控状态码、响应头和正文 | 自动识别 |
 | `LockKey` | 分布式锁 Key（同一时刻全集群只能执行一次） | 空 |
 | `LockTimeout` | 锁超时秒数 | `30` |
 | `LockMsg` | 加锁失败时返回提示 | `操作过于频繁` |
 | `RateLimit` | 频率限制（如 `60/m` 每分钟60次） | 空 |
 | `LogParam` | 是否记录请求参数到 `sys_log` | `false` |
 | `LogResult` | 是否记录返回值到 `sys_log` | `false` |
+
+### 多路由（ApiRoutes）
+
+`ApiAddress` 是唯一主路由；`ApiRoutes` 只用于让同一接口引擎继续接收多个历史地址，例如：
+
+```text
+ApiAddress: /apiengine/platform-sys-menu
+ApiRoutes: /api/SysMenu/GetSysMenuModel;/api/SysMenu/GetSysMenuStep
+```
+
+- 多个地址必须用英文分号 `;` 分隔；每项都必须是 `/` 开头的绝对路径，保存时按不区分大小写去重，最多 128 项。
+- `Id`、`ApiEngineKey`、`ApiAddress` 与每一项 `ApiRoutes` 都会成为同一接口的缓存别名。路由只做完整路径精确匹配，不把 Query 计入地址。
+- 主路由与多路由不得重复，也不得与其它启用接口的主路由/多路由冲突；保存、启动闭包和缓存初始化都必须失败关闭并指出冲突 Key，禁止后写覆盖先写。
+- 新客户端仍使用 `/apiengine/{ApiEngineKey}` 或主 `ApiAddress`。多路由用于 Controller 迁移、旧移动端和第三方已登记回调的兼容，不得拿它复制多份相同接口代码。
+- MCP 创建接口时传 `apiRoutes: ['/api/Old/A', '/api/Old/B']`；更新时省略表示保留，传空字符串/空数组表示清空。官方应用包必须同时携带 `ApiRoutes`、醒目 Managed 提示与 `ResourcePolicies.ApiEngines`。
 
 ### 资源预算与嵌套调用（强制理解）
 
@@ -53,6 +69,30 @@ return { Code: 1, Data: { Count: rows.length } };
 - 每次写入都要检查 `Code`，客户端断开或超过大小上限后立即停止循环。请求取消会传入当前 Jint 执行链，但不能替代业务幂等和事务。
 - 当前租户在 `sys_osclients` 配置单分片、累计响应和心跳：`ApiEngineStreamMaxChunkKB` 默认 256（4–1024）、`ApiEngineStreamMaxTotalMB` 默认 16（1–256）、`ApiEngineStreamHeartbeatSeconds` 默认 15（5–60）。
 - 流式传输用于在线增量反馈；大型文件走 HDFS/文件响应，可靠长任务走后台任务 + Checkpoint，广播状态走提交后 SignalR。禁止用流式响应绕过这些边界。
+
+### 受控原始 HTTP 响应（ResponseType=HTTP）
+
+标准协议需要非 200 状态、重定向、XML/纯文本或指定 Content-Type 时，不要新建 Controller。设置 `ResponseType=HTTP`，并返回统一契约：
+
+```javascript
+return {
+  Code: 1,
+  DataAppend: { HttpResponse: {
+    StatusCode: 302,
+    ContentType: 'text/plain; charset=utf-8',
+    Body: '',
+    Headers: {
+      Location: 'https://identity.example.com/login',
+      'Cache-Control': 'no-store'
+    }
+  } }
+};
+```
+
+- 普通接口引擎可设置 `Cache-Control`、`Pragma`、`Location`、`WWW-Authenticate`、下载/语言/CSP 等安全白名单响应头；禁止 Host、Content-Length、Transfer-Encoding、Connection 等逐跳或宿主管理头。
+- `Location` 只允许站内绝对路径、HTTPS 地址或本机开发地址，禁止 CRLF、协议相对地址、非本机 HTTP 和带用户信息 URL。
+- `Set-Cookie` 等高风险头只允许由受限 `V8.Method` 可信原子生成并签名，租户 V8 无法自行伪造签名。SSO 使用 `V8.Method.RunSsoProtocol`；不要把 Secret、Cookie 值或签名密钥暴露给 V8。
+- `204/304` 不得带正文；状态码限制为 100–599，正文和响应头有大小/数量限制。HTTP 契约校验失败时宿主返回标准错误，不写出半截协议响应。
 
 ### 通用实时事件（SignalR）
 
@@ -162,6 +202,15 @@ return { Code: 1 };
 ApiAddress: /wechat/notify
 ```
 
+标准协议还可声明逐段模板，例如：
+
+```text
+ApiAddress: /sso/{OsClient}/.well-known/openid-configuration
+ApiAddress: /saml/{OsClient}/sp/{ConnectionKey}/metadata
+```
+
+模板只匹配完整路径段，不支持贪婪通配符。命中的路由值会写入 `V8.Param._RouteValues`，并以权威路径值覆盖同名 Query/Form/JSON 参数，防止调用者伪造另一租户或连接。包含 `{OsClient}` 时租户由该路径段解析；同一路径匹配多个模板视为配置冲突并拒绝执行。
+
 ## 5. 响应文件（IsResponseFile）
 
 开启后接口可直接输出二进制流：
@@ -241,7 +290,7 @@ Body: {"ApiEngineKey":"your_key","Action":"Bootstrap"}
 - `ApiAddress` 不能为空字符串；空字符串可能导致 404。
 - 响应不能是空 body、字符串 `null`、非 JSON；业务接口必须返回标准 DosResult。
 - 普通 `POST/PUT/PATCH/DELETE` 必须使用稳定路径 `/apiengine/{ApiEngineKey}`，租户放在唯一的 `osclient` Header，并可在 JSON/Form Body 中冗余传入；禁止无脑给路径追加 `--OsClient--...--`。普通 GET 优先 Header 或 `?OsClient=`。只有微信/支付等第三方回调（包括 POST）、浏览器直接下载等调用方确实无法设置 Header 或 Query 的场景，才使用 `--OsClient--{OsClient}--` 特殊路径；Query 参数名固定为 `OsClient`，禁止 `o` 等缩写。
-- 需要 C# 验签/AES 解密或隐藏 SaaS 密钥的回调，使用“最小协议网关 + `Managed` 核心接口 + `CreateIfMissing` 租户 Hook”。网关不得承载日志、写表、通知等业务逻辑；传给 V8 的事件必须脱敏，并包含稳定 `EventId` 供 Hook 幂等。
+- 需要 C# 验签/AES 解密、协议编解码或隐藏 SaaS 密钥的回调，使用“`Managed` HTTP 接口引擎 + 精确 Key 可调用的最小 `V8.Method` 可信原子 + `CreateIfMissing` 租户 Hook”。公开地址仍归接口引擎，禁止为此恢复 Controller；传给 Hook 的事件必须脱敏，并包含稳定 `EventId` 供幂等。
 - 更新接口代码时保留 HTTP 元数据，避免只覆盖 JS 代码却把匿名、启用、自定义地址等配置冲掉。
 
 ### 路由冷缓存与客户端直达头（强制）

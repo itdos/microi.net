@@ -20,7 +20,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 using Dos.Common;
@@ -325,10 +324,10 @@ namespace Microi.net
                 {
                     if (!item.Code.DosIsNullOrWhiteSpace())
                     {
-                        var tempCode = 0;
-                        Regex regex = new Regex(parentDeptModel.Code);
-                        //去掉上级前缀，然后进行取最大值
-                        if (int.TryParse(regex.Replace(item.Code, "", 1).Replace("-", ""), out tempCode))
+                        // 只解析当前父级的直接子级编码。旧实现把父级编码当作
+                        // Regex 在循环中重复编译，既有额外开销，也会把元字符误当
+                        // 正则语义并可能从编码中间位置删除。
+                        if (TryParseDirectChildSequence(item.Code, parentDeptModel.Code, out var tempCode))
                         {
                             if (tempCode > maxDeptCode)
                             {
@@ -340,6 +339,23 @@ namespace Microi.net
                 resultCode = parentDeptModel.Code + (maxDeptCode + 1) + "-";
             }
             return new DosResult<string>(1, resultCode);
+        }
+
+        internal static bool TryParseDirectChildSequence(
+            string childCode,
+            string parentCode,
+            out int sequence)
+        {
+            sequence = 0;
+            if (childCode.DosIsNullOrWhiteSpace()
+                || parentCode.DosIsNullOrWhiteSpace()
+                || !childCode.StartsWith(parentCode, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var suffix = childCode.Substring(parentCode.Length).Replace("-", "");
+            return int.TryParse(suffix, out sequence);
         }
         /// <summary>
         /// 修改。必传：Id或Account

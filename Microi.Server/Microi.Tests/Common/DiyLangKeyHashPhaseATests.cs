@@ -111,11 +111,11 @@ public sealed class DiyLangKeyHashPhaseATests
             StringComparison.Ordinal);
         Assert.Contains("allowed.Add(\"KeyHash\");", phaseASource, StringComparison.Ordinal);
         Assert.Contains(
-            "WHERE Id = @p0 OR KeyHash = @p1 OR `Key` = @p2",
+            "WHERE `Id` = @p0 OR `KeyHash` = @p1 OR `Key` = @p2",
             phaseASource,
             StringComparison.Ordinal);
         Assert.Contains(
-            "WHERE Id = @p0 OR `Key` = @p1",
+            "WHERE `Id` = @p0 OR `Key` = @p1",
             phaseASource,
             StringComparison.Ordinal);
         Assert.DoesNotContain("ALTER TABLE", phaseASource, StringComparison.OrdinalIgnoreCase);

@@ -43,14 +43,21 @@ export const useUserStore = defineStore("user", {
             return new Promise((resolve, reject) => {
                 DiyCommon.Post(DiyApi.GetCurrentUser(), {}, (result) => {
                     if (DiyCommon.Result(result)) {
-                        // 服务器端不再返回这些东西，直接写死  by itdos.com
-                        this.setRoles(["admin"]);
+                        const currentUser = result.Data || {};
+                        this.setRoles(currentUser._AccessKeySession === true ? ["access-key"] : ["admin"]);
                         this.setName("");
                         this.setAvatar("");
                         this.setIntroduction("");
-                        resolve(result.Data);
+                        useDiyStore().setCurrentUser(currentUser);
+                        resolve(currentUser);
                     } else {
-                        reject(result.Msg);
+                        const error = new Error(result?.Msg || result?.Message || "获取当前登录身份失败。");
+                        error.code = result?.Code;
+                        error.Code = result?.Code;
+                        error.Msg = result?.Msg || result?.Message || error.message;
+                        error.DataAppend = result?.DataAppend;
+                        error.isAuthFailure = [1001, 1002].includes(Number(result?.Code));
+                        reject(error);
                     }
                 });
             });

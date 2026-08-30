@@ -11,6 +11,12 @@ namespace Microi.net.Api;
 /// </summary>
 public static class MicroiRealtimeHostingExtensions
 {
+    // The browser client sends a keep-alive every 15 seconds and treats 45 seconds
+    // without a server frame as disconnected. Keep both sides aligned so the
+    // general DiyWebSocket hub does not enter a permanent reconnect loop.
+    private static readonly TimeSpan RealtimeClientTimeoutInterval = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan RealtimeKeepAliveInterval = TimeSpan.FromSeconds(15);
+
     public static IServiceCollection AddMicroiRealtimeTransport(
         this IServiceCollection services,
         string redisConnection,
@@ -19,8 +25,8 @@ public static class MicroiRealtimeHostingExtensions
         var signalR = services.AddSignalR(options =>
             {
                 options.EnableDetailedErrors = enableDetailedErrors;
-                options.ClientTimeoutInterval = TimeSpan.FromMinutes(20);
-                options.KeepAliveInterval = TimeSpan.FromMinutes(20);
+                options.ClientTimeoutInterval = RealtimeClientTimeoutInterval;
+                options.KeepAliveInterval = RealtimeKeepAliveInterval;
                 options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
             })
             .AddNewtonsoftJsonProtocol(options =>
@@ -73,8 +79,8 @@ public static class MicroiRealtimeHostingExtensions
     {
         signalR.AddHubOptions<THub>(options =>
         {
-            options.ClientTimeoutInterval = TimeSpan.FromSeconds(45);
-            options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+            options.ClientTimeoutInterval = RealtimeClientTimeoutInterval;
+            options.KeepAliveInterval = RealtimeKeepAliveInterval;
             options.MaximumReceiveMessageSize = 16 * 1024;
             options.EnableDetailedErrors = enableDetailedErrors;
         });

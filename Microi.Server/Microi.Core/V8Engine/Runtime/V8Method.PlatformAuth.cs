@@ -49,7 +49,7 @@ return 1";
                 if (status == 0) return new DosResult(0, null, "未获取短信验证码或验证码已过期！");
                 if (status != 1) return new DosResult(0, null, "短信验证码错误！");
 
-                var proof = SsoSecurity.NewOpaqueValue(32);
+                var proof = OpaqueTokenSecurity.NewOpaqueValue(32);
                 var payload = new JObject
                 {
                     ["OsClient"] = osClient,
@@ -83,7 +83,7 @@ return 1";
                 var proof = SsoAtomText(request["Proof"], 256);
                 var phone = SsoAtomText(request["Phone"], 32);
                 var proofPayload = ReadPlatformSmsProof(osClient, proof);
-                if (proofPayload == null || !SsoSecurity.FixedEquals(
+                if (proofPayload == null || !OpaqueTokenSecurity.FixedEquals(
                         SsoAtomText(proofPayload["Phone"]), phone))
                     return new DosResult(0, null, "短信登录证明不存在或已过期。");
                 if (!Regex.IsMatch(phone, "^1[0-9]{10}$"))
@@ -105,7 +105,7 @@ return 1";
                 var passwordProvided = !SsoAtomText(request["Password"]).DosIsNullOrWhiteSpace();
                 var password = passwordProvided
                     ? SsoAtomText(request["Password"], 200)
-                    : "Mi!" + SsoSecurity.NewOpaqueValue(16).Substring(0, 10) + "A7#";
+                    : "Mi!" + OpaqueTokenSecurity.NewOpaqueValue(16).Substring(0, 10) + "A7#";
                 var passwordError = new SysUserLogic().CheckPwd(password).GetAwaiter().GetResult();
                 if (!passwordError.DosIsNullOrWhiteSpace())
                     return new DosResult(0, null, passwordError);
@@ -171,8 +171,8 @@ return 1";
                         out DateTimeOffset expiresAt)
                     || expiresAt <= DateTimeOffset.UtcNow)
                     return new DosResult(0, null, "短信登录证明不存在、已过期或已使用。");
-                if (!SsoSecurity.FixedEquals(SsoAtomText(proofPayload["OsClient"]), osClient)
-                    || !SsoSecurity.FixedEquals(SsoAtomText(proofPayload["Phone"]), phone))
+                if (!OpaqueTokenSecurity.FixedEquals(SsoAtomText(proofPayload["OsClient"]), osClient)
+                    || !OpaqueTokenSecurity.FixedEquals(SsoAtomText(proofPayload["Phone"]), phone))
                     return new DosResult(0, null, "短信登录证明不存在、已过期或已使用。");
 
                 var userResult = MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
@@ -267,7 +267,7 @@ return 1";
                     .StringGet(PlatformSmsProofKey(osClient, proof));
                 if (!raw.HasValue) return null;
                 var payload = JObject.Parse(raw.ToString());
-                return SsoSecurity.FixedEquals(SsoAtomText(payload["OsClient"]), osClient)
+                return OpaqueTokenSecurity.FixedEquals(SsoAtomText(payload["OsClient"]), osClient)
                        && DateTimeOffset.TryParse(SsoAtomText(payload["ExpiresAt"]), out var expiresAt)
                        && expiresAt > DateTimeOffset.UtcNow
                     ? payload
@@ -284,6 +284,6 @@ return 1";
         }
 
         private static string PlatformSmsProofKey(string osClient, string proof) =>
-            $"Microi:{osClient}:PlatformAuth:SmsProof:{SsoSecurity.HashOpaqueToken(proof ?? string.Empty)}";
+            $"Microi:{osClient}:PlatformAuth:SmsProof:{OpaqueTokenSecurity.HashOpaqueToken(proof ?? string.Empty)}";
     }
 }

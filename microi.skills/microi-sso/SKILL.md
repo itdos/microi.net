@@ -13,7 +13,7 @@ description: 设计、实现、配置、迁移、发布和验收 Microi 吾码�
 
 - Keycloak、Entra ID、ADFS、CAS Server、企业统一身份中心登录吾码。
 - 吾码账号登录 ERP、OA、BI、门户或其它第三方系统。
-- 修改 `diy_sso`、SSO 登录页、OIDC/SAML/CAS Controller、Claim/角色映射或旧 Token SSO。
+- 修改 `diy_sso`、SSO 登录页、OIDC/SAML/CAS 接口引擎端点、Claim/角色映射或旧 Token SSO。
 - 发布、安装、升级或验收官方商城应用 `app.microi.sso`。
 
 固定 Gitee、微信、GitHub 登录与 Passkey/TOTP 仍以 `v8-security` 为主；当需求是可配置企业身份联邦时转到本 Skill。
@@ -39,7 +39,7 @@ description: 设计、实现、配置、迁移、发布和验收 Microi 吾码�
 6. Secret/私钥只存 `mci_system_setting` 的受控值；`diy_sso` 只存 Setting Key。匿名接口只返回登录入口白名单投影。
 7. 外部角色、邮箱或昵称不能直接获得管理员权限。默认 `BoundOnly`，JIT 必须显式默认角色、唯一性、回收和审计。
 8. HTTP 200、构建成功、商城任务入队或包可下载都不是完整 SSO 验收。
-9. SSO 业务逻辑必须接口引擎优先：连接投影、绑定/JIT、角色与 Claim 映射、审计、登录完成和租户扩展不得重新写进 Controller。只有协议报文、签名验签、Secret/私钥隔离、一次性票据与 DiyToken 等可信原子可以保留 C#。
+9. SSO 公开 HTTP 路由和业务逻辑都必须由接口引擎承载：连接投影、绑定/JIT、角色与 Claim 映射、审计、登录完成、租户扩展以及 OIDC/SAML/CAS 路由不得重新写进 Controller。只有协议编解码、签名验签、Secret/私钥隔离、一次性票据与 DiyToken 等可信原子可以保留在独立 `Microi.SSO` 类库，并且只能由精确官方 Managed Key 调用。
 10. 客户端调用固定应用接口必须优先使用 `/apiengine/{ApiEngineKey}?OsClient=`，让系统日志/监控按真实接口引擎归因；新版宿主即使接口尚未安装也会返回结构化缺失错误。`/api/ApiEngine/Run` 只保留给无法预知 Key 的旧版兼容调用，禁止新增固定业务依赖；同样禁止调用已删除的 `/api/Sso/Capabilities` 等定制路由。
 
 ## 标准工作流
@@ -56,8 +56,8 @@ description: 设计、实现、配置、迁移、发布和验收 Microi 吾码�
 
 - AppId：`app.microi.sso`
 - 名称：`SSO 身份联邦`
-- 资源：`diy_sso`、`/system/sso`、字段/布局/视图、10 个 Managed 核心接口引擎和 1 个 CreateIfMissing 租户 Hook；不发布用户绑定、连接实例、Secret、证书或示例账号。
-- `ResourcePolicies.ApiEngines` 必须逐 Key 显式声明。核心使用 `Managed/Application`；`sso_event_hook` 使用 `CreateIfMissing/Tenant`，安装后永不被官方覆盖。
+- 资源：`diy_sso`、`/system/sso`、字段/布局/视图、34 个 Managed 核心接口引擎和 1 个 CreateIfMissing 租户 Hook；其中 24 个 `sso_http_*` 接管原 SSO Controller 的全部公开路由，不发布用户绑定、连接实例、Secret、证书或示例账号。
+- `ResourcePolicies.ApiEngines` 必须逐 Key 显式声明。核心使用 `Managed/Platform`；`sso_event_hook` 使用 `CreateIfMissing/Tenant`，安装后永不被官方覆盖。
 - 官方 `iTdos` 是发布源，保护性拒绝安装属于正确行为；普通租户安装才必须轮询到 `Succeeded`。
 
 ## C# 与接口引擎责任线
@@ -69,15 +69,16 @@ description: 设计、实现、配置、迁移、发布和验收 Microi 吾码�
 - `sso_resolve_federated_identity` 的绑定、JIT 与角色映射；
 - `sso_outbound_claims`、`sso_protocol_event`、`sso_event_hook`；
 - `sso_complete_login`、`sso_rotate_client_secret`、`sso_legacy_token_login` 的业务编排。
+- 24 个 `sso_http_*` Managed 端点：`/api/Sso/Begin`、`/api/Sso/CompleteAuthorization`、OIDC 回调/Discovery/JWKS/Authorize/Token/UserInfo/Introspect/Revoke/Logout、CAS 回调/Login/Validate/Logout、SAML Begin/ACS/Login/Complete/Metadata/Logout。
 
 C# 只保留：
 
-- OIDC/SAML/CAS 原始 HTTP/重定向/XML/JWT 报文与签名验签；
+- `Microi.SSO` 的 `SsoProtocolRuntime` 中 OIDC/SAML/CAS 报文编解码、签名验签和协议响应构造；该类型不是 MVC Controller、没有 Route/Http 特性，不直接拥有公开地址；
 - Secret、私钥、证书和协议 Token 的可信隔离；
 - 高熵一次性 code/ticket、重放保护和 DiyToken 签发；
-- 仅允许精确 Managed Key 调用的 `CreateFederatedUser`、`CreateSsoLoginTicket`、`CompleteSsoLogin`、`RotateSsoClientSecret` 原子。
+- 仅允许精确 Managed Key 调用的 `RunSsoProtocol`、`CreateFederatedUser`、`CreateSsoLoginTicket`、`CompleteSsoLogin`、`RotateSsoClientSecret` 原子。
 
-协议网关的标准路由是 `/api/Sso/Begin`、`/api/Sso/CompleteAuthorization`、`/api/Sso/CompleteLogin`、`/api/Sso/LegacyCapabilities` 和 `/api/Sso/RotateClientSecret`（统一前缀 `/api/Sso/`）。这些路由只处理重定向、协议报文、签名/票据和可信原子；连接投影、身份解析、登录完成与密钥轮换的业务编排仍由上面的 Managed 接口引擎承担。
+公开协议路由使用 `ApiAddress`（包括 `{OsClient}`、`{ConnectionKey}` 路径模板）和 `ResponseType=HTTP`。接口引擎可以返回状态码、Content-Type、XML/纯文本、重定向和安全响应头；`Set-Cookie` 等高风险响应头只能来自 `RunSsoProtocol` 签名的可信响应。不得因为协议需要原始 HTTP 而恢复任何 `Sso*Controller`。
 
 新增 SSO 需求先判断是否只需修改上述接口引擎。只有缺少不可伪造、不可泄露的底层原子时才增加 V8 方法；增加后同时更新应用 `RequiredPlatformCapabilities`、后端文档、测试与最低版本。
 

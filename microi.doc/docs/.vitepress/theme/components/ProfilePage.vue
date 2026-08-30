@@ -1030,10 +1030,13 @@ function restoreSession() {
 async function refreshCurrentSessionIdentity() {
   if (!isAuthed.value) return false
   try {
-    const response = await authenticatedFetch(`${API_BASE}/api/SysUser/RefreshLoginUser`, {
+    // 官网属于新前端，直接调用官方 Managed 接口引擎。旧 /api/SysUser
+    // 兼容地址会在 OnlyGet 角色下被 Controller 写权限过滤提前拒绝，导致
+    // LicenseType 等刚更新的权威用户字段无法覆盖浏览器中的旧登录快照。
+    const response = await authenticatedFetch(apiEngineUrl('platform-sys-user-admin'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: '{}'
+      body: JSON.stringify({ Action: 'RefreshLoginUser' })
     })
     const result = await response.json()
     if (isSessionExpiredResult(result)) {

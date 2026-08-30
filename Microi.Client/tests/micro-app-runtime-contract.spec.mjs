@@ -42,6 +42,19 @@ test("friendly micro-app route exists before the catch-all and requires a page f
     assert.match(host, /MicroApp\/Resolve/);
     assert.match(host, /const requirePage\s*=\s*this\.ownedRouteMeta\?\.microAppFriendlyRoute\s*===\s*true/);
     assert.match(host, /RequirePage:\s*requirePage/);
+    assert.match(host, /getBundledMicroAppPageFallback/);
+    assert.match(host, /bundled-page-stable-entry/);
+});
+
+test("the page source badge is an overlay and never reserves a content column", () => {
+    const host = read("src/views/micro-app/host.vue");
+    assert.match(host, /class="micro-app-host__source-badge-layer"/);
+    const badgeLayer = host.match(/\.micro-app-host__source-badge-layer\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+    const appRule = host.match(/\.micro-app-host__app\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+    assert.match(badgeLayer, /position:\s*absolute/);
+    assert.match(badgeLayer, /pointer-events:\s*none/);
+    assert.match(appRule, /width:\s*100%/);
+    assert.match(appRule, /max-width:\s*100%/);
 });
 
 test("generated micro-app menu routes never cache a second Vue host lifecycle", () => {
