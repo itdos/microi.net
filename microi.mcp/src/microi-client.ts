@@ -520,6 +520,17 @@ function apiEngineV8LimitValue(value: ApiEngine | undefined): number {
   return 0;
 }
 
+/** Normalize sys_apiengine.ApiRoutes to its canonical semicolon-separated form. */
+function normalizeApiEngineRoutes(value: string | string[] | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const items = (Array.isArray(value) ? value : String(value).split(';'))
+    .map((route) => String(route || '').trim())
+    .filter(Boolean);
+  return Array.from(new Set(items.map((route) => route.toLowerCase())))
+    .map((normalized) => items.find((route) => route.toLowerCase() === normalized) || normalized)
+    .join(';');
+}
+
 function stripMenuRuntimeFields(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stripMenuRuntimeFields);
   if (!value || typeof value !== 'object') return value;
@@ -600,6 +611,8 @@ export interface ApiEngine {
   ApiName: string;
   ApiEngineKey: string;
   ApiAddress: string;
+  /** Semicolon-separated compatibility routes owned by the same API engine. */
+  ApiRoutes?: string;
   Category: string;
   ApiV8Code?: string;
   Code?: string;
@@ -745,6 +758,7 @@ export interface PlaywrightEngineInfo {
   ApiEngineKey: string;
   Category: string;
   ApiAddress: string;
+  ApiRoutes?: string;
   ApiRemark: string;
   AllowAnonymous: number;
   StopHttp: number;
@@ -1846,6 +1860,29 @@ export class MicroiClient {
     return this.get(API.GET_STATUS);
   }
 
+  async getAdministrativeCapabilities(): Promise<ApiResponse> {
+    return this.get(API.GET_ADMINISTRATIVE_CAPABILITIES);
+  }
+
+  async administerTableData(input: {
+    operation: 'query' | 'get' | 'add' | 'update' | 'delete';
+    tableName: string;
+    query?: Record<string, unknown>;
+    row?: Record<string, unknown>;
+    id?: string;
+    confirmExecution?: string;
+  }): Promise<ApiResponse> {
+    return this.post(API.ADMINISTER_TABLE_DATA, {
+      OsClient: this.config.osClient,
+      Operation: input.operation,
+      TableName: input.tableName,
+      ...(input.query ? { Query: input.query } : {}),
+      ...(input.row ? { Row: input.row } : {}),
+      ...(input.id ? { Id: input.id } : {}),
+      ...(input.confirmExecution ? { ConfirmExecution: input.confirmExecution } : {}),
+    });
+  }
+
   async transitionApplicationStreamGate(
     data: ApplicationStreamGateTransitionRequest,
   ): Promise<ApiResponse> {
@@ -2157,6 +2194,7 @@ export class MicroiClient {
     confirmLargeReduction?: boolean;
     v8Limit?: boolean;
     responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream';
+    apiRoutes?: string | string[];
     /** @deprecated Compatibility alias. true maps to v8Limit=false. */
     v8Unlimited?: boolean;
   }): Promise<ApiResponse> {
@@ -2190,6 +2228,7 @@ export class MicroiClient {
     const requestedV8Limit = options?.v8Limit ?? (options?.v8Unlimited === undefined
       ? undefined
       : !options.v8Unlimited);
+    const requestedApiRoutes = normalizeApiEngineRoutes(options?.apiRoutes);
     const payload = {
       OsClient: this.config.osClient,
       ApiEngineKey: apiEngineKey,
@@ -2198,6 +2237,7 @@ export class MicroiClient {
       ChangeSummary: prepared.changeHistory,
       ...(requestedV8Limit === undefined ? {} : { V8Limit: requestedV8Limit ? 1 : 0 }),
       ...(options?.responseType === undefined ? {} : { ResponseType: options.responseType }),
+      ...(requestedApiRoutes === undefined ? {} : { ApiRoutes: requestedApiRoutes }),
     };
     const matchesReadback = (data: ApiEngine | undefined) =>
       normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
@@ -2205,14 +2245,18 @@ export class MicroiClient {
       && (requestedV8Limit === undefined
         || apiEngineV8LimitValue(data) === (requestedV8Limit ? 1 : 0))
       && (options?.responseType === undefined
-        || String(data?.ResponseType || 'JSON').toLowerCase() === options.responseType.toLowerCase());
+        || String(data?.ResponseType || 'JSON').toLowerCase() === options.responseType.toLowerCase())
+      && (requestedApiRoutes === undefined
+        || normalizeApiEngineRoutes(data?.ApiRoutes || '') === requestedApiRoutes);
     try {
       const result = await this.post(API.UPDATE_ENGINE_CODE, payload, {
         timeoutMs: this.writeRequestTimeoutMs,
         operationName: `保存接口引擎 ${apiEngineKey}`,
       });
       if (result.Code !== 1
-        || (requestedV8Limit === undefined && options?.responseType === undefined)) return result;
+        || (requestedV8Limit === undefined
+          && options?.responseType === undefined
+          && requestedApiRoutes === undefined)) return result;
       const verification = await this.pollReadback(
         () => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Limit`)),
         matchesReadback,
@@ -2231,6 +2275,7 @@ export class MicroiClient {
           ApiEngineKey: apiEngineKey,
           ...(requestedV8Limit === undefined ? {} : { V8Limit: requestedV8Limit ? 1 : 0 }),
           ...(options?.responseType === undefined ? {} : { ResponseType: options.responseType }),
+          ...(requestedApiRoutes === undefined ? {} : { ApiRoutes: requestedApiRoutes }),
           Verified: true,
           Verification: 'readback',
         },
@@ -2317,6 +2362,7 @@ export class MicroiClient {
     Category?: string;
     Code?: string;
     ApiAddress?: string;
+    ApiRoutes?: string | string[];
     ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream';
     V8Limit?: number;
     /** @deprecated Compatibility alias. true maps to V8Limit=0. */
@@ -2329,6 +2375,7 @@ export class MicroiClient {
       OsClient: this.config.osClient,
       ...data,
     };
+    payload.ApiRoutes = normalizeApiEngineRoutes(payload.ApiRoutes) || '';
     if (payload.V8Limit === undefined && payload.V8Unlimited !== undefined) {
       payload.V8Limit = Number(payload.V8Unlimited) === 1 ? 0 : 1;
     }
@@ -2369,7 +2416,8 @@ export class MicroiClient {
           || apiEngineV8LimitValue(remote) === (Number(payload.V8Limit) === 1 ? 1 : 0))
         && (payload.ResponseType === undefined
           || String(remote?.ResponseType || 'JSON').toLowerCase()
-            === String(payload.ResponseType).toLowerCase()),
+            === String(payload.ResponseType).toLowerCase())
+        && normalizeApiEngineRoutes(remote?.ApiRoutes || '') === payload.ApiRoutes,
     );
 
     try {

@@ -28,10 +28,13 @@ const controller = fs.readFileSync(path.join(
   serverRoot,
   'Microi.net.Api', 'Controllers', 'AiController.cs',
 ), 'utf8');
-const compatibilityController = fs.readFileSync(path.join(
-  serverRoot,
-  'Microi.net.Api', 'Controllers', 'LegacyMobileCompatibilityController.cs',
-), 'utf8');
+const packageModel = JSON.parse(fs.readFileSync(
+  path.join(directory, 'app.microi.ai-engine.json'),
+  'utf8',
+));
+const accountEngine = packageModel.SysApiEngines.find(
+  item => item.ApiEngineKey === 'platform-ai-account',
+);
 
 test('AI account resources declare Managed ownership and an app-wide non-overwritten tenant hook', () => {
   assert.match(managed, /OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1/);
@@ -77,11 +80,11 @@ test('plans, subscriptions and orders are orchestrated by V8 instead of Controll
   ];
   for (const [method, action] of bridgeActions) {
     assert.match(
-      compatibilityController,
-      new RegExp(`/api/Ai/${method}`),
-      `${method} must remain only a compatibility bridge to ${action}`,
+      managed,
+      new RegExp(`/api/ai/${method.toLowerCase()}`, 'i'),
+      `${method} must remain an ApiRoutes action bridge to ${action}`,
     );
-    assert.match(compatibilityController, new RegExp(`"${action}"`));
+    assert.match(managed, new RegExp(`['"]${action}['"]`));
     assert.doesNotMatch(
       controller,
       new RegExp(`public\\s+(?:async\\s+)?[^\\n]+\\s${method}\\s*\\(`),
@@ -143,15 +146,13 @@ test('Core binds the atom to the exact engine, server identity and action-level 
   assert.match(managed, /Action: 'AuthorizeAction',[\s\S]*TargetAction: action/);
 });
 
-test('anonymous legacy discovery preserves the server-resolved tenant and rejects payload override', () => {
-  assert.match(compatibilityController, /var osClient = DiyToken\.GetCurrentOsClient\(false\)/);
-  assert.match(compatibilityController, /if \(osClient\.DosIsNullOrWhiteSpace\(\)\) osClient = OsClient\.GetConfigOsClient\(\)/);
-  assert.match(compatibilityController, /request\.Properties\(\)[\s\S]{0,500}"_OsClient"[\s\S]{0,300}property\.Remove\(\)/);
-  assert.match(compatibilityController, /request\["OsClient"\] = TenantConfigurationSecurity\.NormalizeTenantId\(osClient\)/);
-  assert.doesNotMatch(
-    compatibilityController,
-    /if \(allowAnonymous\)[\s\S]{0,120}osClient = OsClient\.GetConfigOsClient\(\)/,
-  );
+test('anonymous legacy discovery keeps tenant authority inside the trusted AI atom', () => {
+  assert.ok(accountEngine);
+  assert.equal(accountEngine.AllowAnonymous, 1);
+  assert.match(accountEngine.ApiRoutes, /\/api\/Ai\/SubGetPlans/);
+  assert.match(coreFacade, /RequireTrustedApiEngine\(AiPlatformAccountEngineKey\)/);
+  assert.match(coreFacade, /"OsClient", "_OsClient", "CurrentUser", "_CurrentUser"/);
+  assert.match(coreFacade, /request\.Properties\(\)[\s\S]*untrustedName[\s\S]*property\.Remove\(\)/);
 });
 
 test('Microi.AI keeps only sensitive atoms and returns safe admin and model projections', () => {

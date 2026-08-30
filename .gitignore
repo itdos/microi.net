@@ -35,6 +35,7 @@ Thumbs.db
 
 /Microi.Server/Microi.AI/
 /Microi.Server/Microi.net/
+/Microi.Server/Microi.WorkFlow/
 
 .vs/
 *.suo
@@ -158,4 +159,5 @@ tmp/
 .codex-runtime/
 artifacts/
 .codex-artifacts/
+/test-results/
 

@@ -1352,10 +1352,13 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(source, /OBJECT_STORAGE_FORBIDDEN/);
   assert.match(source, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
   assert.match(source, /var latestCacheJson = JSON\.stringify\(latest\)/);
-  assert.equal(
-    (source.match(/FormData:sys_apiengine:[^`]+`, latestCacheJson\)/g) || []).length,
-    3,
-    "all shared interface-engine cache aliases must store JSON text for v3/v6 compatibility"
+  assert.match(source, /var values = \[model\.ApiEngineKey, model\.Id, model\.ApiAddress\]/);
+  assert.match(source, /\.concat\(String\(model\.ApiRoutes \|\| ''\)\.split\(';'\)\)/);
+  assert.match(source, /var latestAliases = apiEngineRouteAliases\(latest\)/);
+  assert.match(
+    source,
+    /FormData:sys_apiengine:[^`]+`, latestCacheJson\)/,
+    "all Id/Key/ApiAddress/ApiRoutes cache aliases must store JSON text for v3/v6 compatibility"
   );
   assert.doesNotMatch(
     source,

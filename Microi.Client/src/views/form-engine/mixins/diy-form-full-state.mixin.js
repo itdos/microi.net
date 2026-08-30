@@ -158,6 +158,8 @@ export default {
             ShowFieldForm: false,
             ShowFieldFormDrawer: false,
             ShowHideField: false,
+            WebosFormMaximized: false,
+            WebosFormMinimized: false,
 
             // ========== 表单状态 ==========
             CurrentRowModel: {},

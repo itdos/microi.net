@@ -7,6 +7,13 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */
+var privateFileRoute = String(V8.Param.ApiAddress || '').replace(/\?.*$/, '').toLowerCase();
+if(privateFileRoute === '/api/hdfs/getprivatefileurl' || privateFileRoute === '/api/hdfs/mallfileurl'){
+  // 历史移动会员 Token 只在后端固定缓存键中解析，原始 Token 永不进入 V8。
+  return V8.Method.GetAuthorizedPrivateFileUrl(V8.Param || {});
+}
+
 /* V8 ApiEngine | ApiEngineKey: platform-private-file-url | Version: v1.0.0 */
 
 if (!V8.CurrentUser || !V8.CurrentUser.Id) return { Code: 1001, Msg: '登录身份已过期，请重新登录。' };

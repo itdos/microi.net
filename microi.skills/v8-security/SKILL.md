@@ -65,7 +65,7 @@ Secret 只通过租户管理员专用端点写入租户绑定的认证密文。�
 - 多节点保存连接使用按 `OsClient + DbKey` 隔离的分布式锁，并由数据库唯一索引兜底；同步数据和附件仍必须使用业务幂等键，锁不能替代唯一约束、状态机或 inbox/outbox。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-security-001 sha256=aad35b2c3e1876d98ead7e604307bcb7d39fe8c480d72f102ae956972580a35b -->
+<!-- microi-progressive:chunk id=v8-security-001 sha256=bcb95a6c33b3abb6bfce13589e21ce56ff2aea8578d05180f2f2538cc5117fb8 -->
 ## 0.5 接口引擎配置安全
 
 代码以外，接口本身的配置项也是安全防线（详见 `v8-api-config/SKILL.md`）：
@@ -77,6 +77,11 @@ Secret 只通过租户管理员专用端点写入租户绑定的认证密文。�
 | `LockKey = ...` | 写操作类接口（对账、补单）防止并发执行 |
 | `RateLimit = 60/m` | 公开接口（验证码、登录）防爬虫 |
 | `LogParam = true` | 支付/审计类接口记录请求 |
+| `ResponseType = HTTP` | 标准协议需要状态码、重定向、XML/纯文本或特定响应头 |
+
+`ResponseType=HTTP` 不是任意响应头旁路。普通 V8 只能返回安全白名单头，`Location` 经过站内/HTTPS 校验；Host、Content-Length、逐跳头始终禁止。`Set-Cookie` 等高风险头只接受平台可信原子的进程内签名结果，V8 不能获得或伪造签名密钥。需要协议编解码、签名验签或密钥隔离时，公开地址仍由 Managed 接口引擎拥有，C# 只实现精确 Key 可调用的最小 `V8.Method` 原子，禁止恢复业务 Controller。
+
+`ApiAddress` 使用 `{OsClient}`、`{ConnectionKey}` 路径模板时，模板值是权威值并覆盖同名 Query/Form/JSON 参数；多模板歧义必须失败关闭，防止跨租户或跨连接参数混淆。
 
 ### 表单上传的防篡改边界
 

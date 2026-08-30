@@ -2,7 +2,7 @@
   <PropertyGroup>
     <!-- Microi.net 项目路径和 NuGet 包版本 -->
     <MicroiNetProjectPath>$(MSBuildThisFileDirectory)Microi.net\Microi.net.csproj</MicroiNetProjectPath>
-    <MicroiNetVersion>7.7.4</MicroiNetVersion>
+    <MicroiNetVersion>7.7.6</MicroiNetVersion>
     
     <!-- 自动检测：Microi.net 项目存在则使用本地引用，否则使用 NuGet 包 -->
     <MicroiNetExists Condition="Exists('$(MicroiNetProjectPath)')">true</MicroiNetExists>
@@ -14,6 +14,14 @@
     <!-- 自动检测：Microi.AI 项目存在则使用本地引用，否则使用 NuGet 包 -->
     <MicroiAIExists Condition="Exists('$(MicroiAIProjectPath)')">true</MicroiAIExists>
     <MicroiAIExists Condition="!Exists('$(MicroiAIProjectPath)')">false</MicroiAIExists>
+
+    <!-- 独立 SSO 与工作流插件沿用平台统一版本；源码缺席时自动切换到 NuGet。 -->
+    <MicroiSSOProjectPath>$(MSBuildThisFileDirectory)Microi.SSO\Microi.SSO.csproj</MicroiSSOProjectPath>
+    <MicroiSSOExists Condition="Exists('$(MicroiSSOProjectPath)')">true</MicroiSSOExists>
+    <MicroiSSOExists Condition="!Exists('$(MicroiSSOProjectPath)')">false</MicroiSSOExists>
+    <MicroiWorkFlowProjectPath>$(MSBuildThisFileDirectory)Microi.WorkFlow\Microi.WorkFlow.csproj</MicroiWorkFlowProjectPath>
+    <MicroiWorkFlowExists Condition="Exists('$(MicroiWorkFlowProjectPath)')">true</MicroiWorkFlowExists>
+    <MicroiWorkFlowExists Condition="!Exists('$(MicroiWorkFlowProjectPath)')">false</MicroiWorkFlowExists>
   </PropertyGroup>
   
   <!-- 编译时显示引用方式 -->
@@ -22,5 +30,9 @@
     <Message Condition="'$(MicroiNetExists)' != 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.net → 📥 NuGet 包 v$(MicroiNetVersion)" Importance="high" />
     <Message Condition="'$(MicroiAIExists)' == 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.AI → ✅ 本地项目引用" Importance="high" />
     <Message Condition="'$(MicroiAIExists)' != 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.AI → 📥 NuGet 包 v$(MicroiNetVersion)" Importance="high" />
+    <Message Condition="'$(MicroiSSOExists)' == 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.SSO → ✅ 本地项目引用" Importance="high" />
+    <Message Condition="'$(MicroiSSOExists)' != 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.SSO → 📥 NuGet 包 v$(MicroiNetVersion)" Importance="high" />
+    <Message Condition="'$(MicroiWorkFlowExists)' == 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.WorkFlow → ✅ 本地项目引用" Importance="high" />
+    <Message Condition="'$(MicroiWorkFlowExists)' != 'true'" Text="[$(MSBuildProjectName)] 📦 Microi.WorkFlow → 📥 NuGet 包 v$(MicroiNetVersion)" Importance="high" />
   </Target>
 </Project>

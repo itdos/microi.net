@@ -98,6 +98,7 @@ function assertOfficialPair({
   managedKey,
   managedFile,
   managedVersion = 'v1.0.0',
+  managedStopHttp = 1,
   hookKey,
   hookFile,
 }) {
@@ -113,11 +114,12 @@ function assertOfficialPair({
     Ownership: 'Tenant',
     UpgradePolicy: 'CreateIfMissing',
   });
-  for (const item of [managed, hook]) {
-    assert.equal(item.IsEnable, 1, `${item.ApiEngineKey}:IsEnable`);
-    assert.equal(item.StopHttp, 1, `${item.ApiEngineKey}:StopHttp`);
-    assert.equal(item.AllowAnonymous, 0, `${item.ApiEngineKey}:AllowAnonymous`);
-  }
+  assert.equal(managed.IsEnable, 1, `${managed.ApiEngineKey}:IsEnable`);
+  assert.equal(managed.StopHttp, managedStopHttp, `${managed.ApiEngineKey}:StopHttp`);
+  assert.equal(managed.AllowAnonymous, 0, `${managed.ApiEngineKey}:AllowAnonymous`);
+  assert.equal(hook.IsEnable, 1, `${hook.ApiEngineKey}:IsEnable`);
+  assert.equal(hook.StopHttp, 1, `${hook.ApiEngineKey}:StopHttp`);
+  assert.equal(hook.AllowAnonymous, 0, `${hook.ApiEngineKey}:AllowAnonymous`);
 
   assert.match(managed.ApiV8Code, /^\/\* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1/);
   assert.match(managed.ApiV8Code, new RegExp(appName));
@@ -141,8 +143,8 @@ function assertOfficialPair({
 test('message-notification and Store selected ApiEngine key sets stay exact and policy-closed', () => {
   assertPackageKeyClosure(messagePackage, MESSAGE_SELECTED_API_ENGINE_KEYS);
   assertPackageKeyClosure(storePackage, STORE_SELECTED_API_ENGINE_KEYS);
-  assert.equal(messagePackage.PackageInfo.Version, 'v1.0.11');
-  assert.equal(storePackage.PackageInfo.Version, 'v7.7.5');
+  assert.equal(messagePackage.PackageInfo.Version, 'v1.0.13');
+  assert.equal(storePackage.PackageInfo.Version, 'v7.7.18');
 });
 
 test('official package ApiEngine stable identities are globally unique', () => {
@@ -172,6 +174,8 @@ test('official Managed cores and CreateIfMissing hooks carry immutable package c
     managedKey: 'platform-chat-system-message',
     managedFile: 'platform-chat-system-message.js',
     managedVersion: 'v1.1.0',
+    // 兼容旧移动端 /api/DiyChat/SendSystemMessage 路由，必须允许 HTTP 进入托管接口。
+    managedStopHttp: 0,
     hookKey: 'platform-message-notification-custom-hook',
     hookFile: 'platform-message-notification-custom-hook.js',
   });
@@ -327,36 +331,44 @@ test('Store pre-authorization hook receives only the minimal safe payload and ga
   assert.equal(auditWritten, false);
 });
 
-test('MarketplaceSourceController authorizes before remote login, credential save, or delete', () => {
-  const controller = read(path.join(
+test('MarketplaceSourceRuntime authorizes before remote login, credential save, or delete', () => {
+  const deletedController = path.join(
     workspaceRoot,
     'Microi.Server',
     'Microi.net.Api',
     'Controllers',
     'MarketplaceSourceController.cs',
+  );
+  assert.equal(fs.existsSync(deletedController), false);
+  const runtime = read(path.join(
+    workspaceRoot,
+    'Microi.Server',
+    'Microi.net',
+    'Marketplace',
+    'MarketplaceSourceRuntime.cs',
   ));
-  const loginStart = controller.indexOf('public async Task<JsonResult> Login');
-  const queryStart = controller.indexOf('public async Task<JsonResult> Query', loginStart);
-  const disconnectStart = controller.indexOf('public async Task<JsonResult> Disconnect', queryStart);
-  const readCountStart = controller.indexOf('private async Task<int> ReadApplicationCountAsync', disconnectStart);
+  const loginStart = runtime.indexOf('public async Task<object> Login');
+  const queryStart = runtime.indexOf('public async Task<object> Query', loginStart);
+  const disconnectStart = runtime.indexOf('public async Task<object> Disconnect', queryStart);
+  const readCountStart = runtime.indexOf('private async Task<int> ReadApplicationCountAsync', disconnectStart);
   assert.ok(loginStart >= 0 && queryStart > loginStart);
   assert.ok(disconnectStart > queryStart && readCountStart > disconnectStart);
 
-  const loginBody = controller.slice(loginStart, queryStart);
+  const loginBody = runtime.slice(loginStart, queryStart);
   const loginAuthorize = loginBody.indexOf('AuthorizeOperationAsync(');
   assert.ok(loginAuthorize >= 0);
   assert.ok(loginAuthorize < loginBody.indexOf('SendJsonAsync('));
   assert.ok(loginAuthorize < loginBody.indexOf('SendFormAsync('));
   assert.ok(loginAuthorize < loginBody.indexOf('SaveCredentialAsync('));
 
-  const disconnectBody = controller.slice(disconnectStart, readCountStart);
+  const disconnectBody = runtime.slice(disconnectStart, readCountStart);
   const disconnectAuthorize = disconnectBody.indexOf('AuthorizeOperationAsync(');
   assert.ok(disconnectAuthorize >= 0);
   assert.ok(disconnectAuthorize < disconnectBody.indexOf('DelFormDataAsync('));
 
-  const authorizeMethodStart = controller.indexOf('private static async Task<JObject> AuthorizeOperationAsync');
-  const recordAuditMethodStart = controller.indexOf('private static async Task<JObject> RecordAuditAsync');
-  const authorizeMethod = controller.slice(authorizeMethodStart, recordAuditMethodStart);
+  const authorizeMethodStart = runtime.indexOf('private static async Task<JObject> AuthorizeOperationAsync');
+  const recordAuditMethodStart = runtime.indexOf('private static async Task<JObject> RecordAuditAsync');
+  const authorizeMethod = runtime.slice(authorizeMethodStart, recordAuditMethodStart);
   const payloadFields = [...authorizeMethod.matchAll(/\["([^"]+)"\]\s*=/g)]
     .map((match) => match[1]);
   assert.deepEqual(payloadFields, ['Action', 'OsClient', 'AuditAction', 'SourceId']);

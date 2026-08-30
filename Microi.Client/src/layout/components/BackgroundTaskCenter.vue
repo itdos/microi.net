@@ -469,7 +469,7 @@ export default {
             return this.tasks.filter((item) => item.Status === "Failed").length;
         },
         appNoticeCount() {
-            return this.isAdmin ? this.storeNotices.length : 0;
+            return this.isAdmin && !this.isOfficialPlatform ? this.storeNotices.length : 0;
         },
         badgeCount() {
             // 顶部通知角标只代表需要用户处理的消息：未读系统消息 + 待安装/更新平台应用。
@@ -518,6 +518,16 @@ export default {
                 if (this.activeTab === "apps") {
                     this.activeTab = "tasks";
                 }
+            }
+        },
+        isOfficialPlatform(value) {
+            // 官方主租户是应用发布源，安装器在服务端也会拒绝执行；身份投影异步到达时
+            // 立即丢弃此前的安装提醒，避免短暂错误角标或继续轮询官网应用列表。
+            if (value) {
+                this.stopOfficialAppChecker();
+                this.storeNotices = [];
+            } else if (this.isAdmin) {
+                this.startOfficialAppChecker(true);
             }
         },
         isSuperAdmin(value) {
@@ -635,7 +645,10 @@ export default {
             return this.loadPlatformNotifications();
         },
         startOfficialAppChecker(force = false) {
-            if (!this.isAdmin) return;
+            if (!this.isAdmin || this.isOfficialPlatform) {
+                this.storeNotices = [];
+                return;
+            }
             this.checkOfficialApps(force);
             if (!this.storeCheckTimer) {
                 this.storeCheckTimer = window.setInterval(() => {
@@ -812,7 +825,12 @@ export default {
             return this.$t("Msg.OfficialAppOutdated");
         },
         async checkOfficialApps(force) {
-            if (!this.isAdmin) return;
+            // 官方主租户维护的是应用母版，不存在“安装/更新平台应用”的待办语义。
+            // 在任何本地安装版本读取或跨域商城请求之前退出，避免生成虚假提醒。
+            if (!this.isAdmin || this.isOfficialPlatform) {
+                this.storeNotices = [];
+                return;
+            }
             const now = Date.now();
             if (!force && this.lastStoreCheckTime && now - this.lastStoreCheckTime < STORE_CHECK_INTERVAL) {
                 return;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
 using Dos.ORM;
@@ -308,7 +309,7 @@ namespace Microi.net
         /// <summary>
         /// 获取 Where SQL 条件
         /// </summary>
-        public async Task<string> GetWhereSql(object whereParam,
+        public Task<string> GetWhereSql(object whereParam,
             List<JObject> fieldList, List<DiyTable> joinTables,
             DbInfo dbInfo, List<DbParameter> sqlParams, DbSession dbSession,
             string sqlType = "select"
@@ -318,10 +319,16 @@ namespace Microi.net
             List<DiyWhere> whereConditions = WhereParser.ParseWhere(whereParam);
 
             if (whereConditions == null || whereConditions.Count == 0)
-                return "";
+                return Task.FromResult(string.Empty);
 
-            var where = "";
+            if (dbInfo == null) throw new ArgumentNullException(nameof(dbInfo));
+            if (sqlParams == null) throw new ArgumentNullException(nameof(sqlParams));
+            if (dbSession == null) throw new ArgumentNullException(nameof(dbSession));
+            joinTables ??= new List<DiyTable>();
+
+            var where = new StringBuilder(Math.Max(64, whereConditions.Count * 48));
             var hasValidConditions = false; // 跟踪是否有有效的条件
+            var orm = MicroiEngine.ORM(dbInfo.DbType);
 
             foreach (var fieldWhere in whereConditions)
             {
@@ -330,7 +337,7 @@ namespace Microi.net
 
                 hasValidConditions = true; // 标记找到有效条件
 
-                var sqlFieldName = MicroiEngine.ORM(dbInfo.DbType).GetFieldName(fieldWhere.Name);
+                var sqlFieldName = orm.GetFieldName(fieldWhere.Name);
                 var tableAsName = GetTableAsName(fieldWhere, fieldList, joinTables, sqlType);
                 if (!tableAsName.DosIsNullOrWhiteSpace())
                 {
@@ -338,24 +345,32 @@ namespace Microi.net
                 }
 
                 JObject filedModel = null;
-                if (fieldList != null && fieldList.Any())
+                if (fieldList != null && fieldList.Count > 0)
                 {
                     if (fieldWhere.FormEngineKey.DosIsNullOrWhiteSpace())
                     {
-                        filedModel = fieldList.FirstOrDefault(f => f["Name"].Val<string>() == fieldWhere.Name);
+                        filedModel = fieldList.FirstOrDefault(f => string.Equals(
+                            f["Name"].Val<string>(),
+                            fieldWhere.Name,
+                            StringComparison.OrdinalIgnoreCase));
                     }
                     else
                     {
-                        filedModel = fieldList.FirstOrDefault(f => (f["TableId"].Val<string>() == fieldWhere.FormEngineKey || f["TableName"].Val<string>() == fieldWhere.FormEngineKey)
-                                                                    && f["Name"].Val<string>() == fieldWhere.Name);
+                        filedModel = fieldList.FirstOrDefault(f =>
+                            (string.Equals(f["TableId"].Val<string>(), fieldWhere.FormEngineKey, StringComparison.OrdinalIgnoreCase)
+                             || string.Equals(f["TableName"].Val<string>(), fieldWhere.FormEngineKey, StringComparison.OrdinalIgnoreCase))
+                            && string.Equals(f["Name"].Val<string>(), fieldWhere.Name, StringComparison.OrdinalIgnoreCase));
                         if (filedModel == null)
                         {
-                            filedModel = fieldList.FirstOrDefault(f => f["Name"].Val<string>() == fieldWhere.Name);
+                            filedModel = fieldList.FirstOrDefault(f => string.Equals(
+                                f["Name"].Val<string>(),
+                                fieldWhere.Name,
+                                StringComparison.OrdinalIgnoreCase));
                         }
                     }
                 }
 
-                var andOr = GetAndOrClause(fieldWhere, where);
+                var andOr = GetAndOrClause(fieldWhere, where.Length > 0);
 
                 // 判断是否为 NULL 值
                 bool isNullValue = fieldWhere.Value == null;
@@ -363,49 +378,41 @@ namespace Microi.net
                 // 判断是否为空字符串
                 bool isEmptyString = fieldWhere.Value is string valueStr2 && valueStr2 == "";
 
+                string condition;
                 if (isNullValue)
                 {
                     // 处理真正的 NULL 值
-                    var nullCondition = HandleNullCondition(fieldWhere, tableAsName, sqlFieldName);
-                    where += andOr +
-                            (fieldWhere.GroupStart ? " (" : "") +
-                            nullCondition +
-                            (fieldWhere.GroupEnd ? ") " : "");
+                    condition = HandleNullCondition(fieldWhere, tableAsName, sqlFieldName);
                 }
                 else if (isEmptyString)
                 {
                     // 处理空字符串
-                    var emptyStringCondition = HandleEmptyStringCondition(fieldWhere, tableAsName, sqlFieldName);
-                    where += andOr +
-                            (fieldWhere.GroupStart ? " (" : "") +
-                            emptyStringCondition +
-                            (fieldWhere.GroupEnd ? ") " : "");
+                    condition = HandleEmptyStringCondition(fieldWhere, tableAsName, sqlFieldName);
                 }
                 else
                 {
                     // 处理参数化值
-                    var (paramValue, isParameterized) = ProcessParameterValue(fieldWhere, filedModel, dbInfo, sqlParams, dbSession);
+                    var (paramValue, _) = ProcessParameterValue(fieldWhere, filedModel, dbInfo, sqlParams, dbSession);
 
                     // 构建条件语句
-                    where += andOr +
-                            (fieldWhere.GroupStart ? " (" : "") +
-                            $" {tableAsName}{sqlFieldName} {GetOperator(fieldWhere.Type)} {paramValue} " +
-                            (fieldWhere.GroupEnd ? ") " : "");
+                    condition = $" {tableAsName}{sqlFieldName} {GetOperator(fieldWhere.Type)} {paramValue} ";
                 }
+
+                where.Append(andOr);
+                if (fieldWhere.GroupStart) where.Append(" (");
+                where.Append(condition);
+                if (fieldWhere.GroupEnd) where.Append(") ");
             }
 
             // 如果没有有效条件，返回空字符串避免生成 "WHERE ()" 的 SQL 错误
             if (!hasValidConditions)
             {
-                return "";
+                return Task.FromResult(string.Empty);
             }
 
-            if (!where.DosIsNullOrWhiteSpace())
-            {
-                where = " ( " + where + " ) ";
-            }
-
-            return where;
+            return Task.FromResult(where.Length == 0
+                ? string.Empty
+                : " ( " + where + " ) ");
         }
 
         /// <summary>
@@ -485,7 +492,8 @@ namespace Microi.net
         private bool IsValidWhereCondition(DiyWhere fieldWhere, List<JObject> fieldList)
         {
             // 基本验证：Name 和 Type 必须有效
-            if (string.IsNullOrWhiteSpace(fieldWhere.Name)
+            if (fieldWhere == null
+                || string.IsNullOrWhiteSpace(fieldWhere.Name)
                 || string.IsNullOrWhiteSpace(fieldWhere.Type)
                 || !DiyCommon.FieldWhereTypes.ContainsKey(fieldWhere.Type))
             {
@@ -495,14 +503,20 @@ namespace Microi.net
             // 如果 fieldList 为 null 或空（可能是系统表未配置字段元数据）
             // 则跳过字段存在性验证，允许查询继续执行
             // 这样可以让系统表在没有配置 Diy_Field 的情况下仍然可以使用 WHERE 条件
-            if (fieldList == null || !fieldList.Any())
+            if (fieldList == null || fieldList.Count == 0)
             {
                 return true;
             }
 
             // 正常情况：验证字段是否在 fieldList 或 DefaultFields 中
-            return fieldList.Any(d => d["Name"].Val<string>()?.ToLower() == fieldWhere.Name.ToLower())
-                   || DiyCommon.DefaultFields.Any(d => d.ToLower() == fieldWhere.Name.ToLower());
+            return fieldList.Any(d => string.Equals(
+                       d["Name"].Val<string>(),
+                       fieldWhere.Name,
+                       StringComparison.OrdinalIgnoreCase))
+                   || DiyCommon.DefaultFields.Any(d => string.Equals(
+                       d,
+                       fieldWhere.Name,
+                       StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>
@@ -513,14 +527,14 @@ namespace Microi.net
             //注意：所有数据库都支持 select * from tableName A 别名，别加AS
             //sqlserver 不支持 update/delete tableName A 别名，只能是在 FROM tableName 后加别名，但是mysql又不支持
             // 所以除了 select 之外的语句都不加别名
-            if(sqlType.ToLower() != "select")
+            if (!string.Equals(sqlType, "select", StringComparison.OrdinalIgnoreCase))
             {
                 return "";
             }
             var tableAsName = "A";
             JObject fieldModel = null;
 
-            if (fieldList == null || !fieldList.Any())
+            if (fieldList == null || fieldList.Count == 0)
             {
                 return tableAsName;
             }
@@ -528,22 +542,36 @@ namespace Microi.net
             if (!string.IsNullOrWhiteSpace(fieldWhere.FormEngineKey))
             {
                 fieldModel = fieldList.FirstOrDefault(d =>
-                    (d["TableName"].Val<string>().ToLower() == fieldWhere.FormEngineKey?.ToLower() || d["TableId"].Val<string>() == fieldWhere.FormEngineKey)
-                    && d["Name"].Val<string>().ToLower() == fieldWhere.Name.ToLower());
+                    (string.Equals(d["TableName"].Val<string>(), fieldWhere.FormEngineKey, StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(d["TableId"].Val<string>(), fieldWhere.FormEngineKey, StringComparison.OrdinalIgnoreCase))
+                    && string.Equals(d["Name"].Val<string>(), fieldWhere.Name, StringComparison.OrdinalIgnoreCase));
             }
             else
             {
                 //先从主表找字段model
-                fieldModel = fieldList.FirstOrDefault(d => d["Name"].Val<string>()?.ToLower() == fieldWhere.Name.ToLower() && !joinTables.Any(o => o.Id == d["TableId"].Val<string>()));
+                fieldModel = fieldList.FirstOrDefault(d => string.Equals(
+                        d["Name"].Val<string>(),
+                        fieldWhere.Name,
+                        StringComparison.OrdinalIgnoreCase)
+                    && !joinTables.Any(o => string.Equals(
+                        o.Id,
+                        d["TableId"].Val<string>(),
+                        StringComparison.OrdinalIgnoreCase)));
                 //如果找不到再从关联表中找字段model
                 if (fieldModel == null)
                 {
-                    fieldModel = fieldList.FirstOrDefault(d => d["Name"].Val<string>()?.ToLower() == fieldWhere.Name.ToLower());
+                    fieldModel = fieldList.FirstOrDefault(d => string.Equals(
+                        d["Name"].Val<string>(),
+                        fieldWhere.Name,
+                        StringComparison.OrdinalIgnoreCase));
                 }
             }
             if (fieldModel != null)
             {
-                var tempJoinTable = joinTables.FirstOrDefault(d => d.Id == fieldModel["TableId"].Val<string>());
+                var tempJoinTable = joinTables.FirstOrDefault(d => string.Equals(
+                    d.Id,
+                    fieldModel["TableId"].Val<string>(),
+                    StringComparison.OrdinalIgnoreCase));
                 if (tempJoinTable != null && !string.IsNullOrWhiteSpace(tempJoinTable.AsName))
                 {
                     tableAsName = tempJoinTable.AsName;
@@ -729,12 +757,14 @@ namespace Microi.net
         /// <summary>
         /// 获取 AND/OR 子句
         /// </summary>
-        private string GetAndOrClause(DiyWhere fieldWhere, string currentWhere)
+        private string GetAndOrClause(DiyWhere fieldWhere, bool hasExistingCondition)
         {
-            if (string.IsNullOrWhiteSpace(currentWhere))
+            if (!hasExistingCondition)
                 return " ";
 
-            return fieldWhere.AndOr?.ToUpper() == "OR" ? " OR " : " AND ";
+            return string.Equals(fieldWhere.AndOr, "OR", StringComparison.OrdinalIgnoreCase)
+                ? " OR "
+                : " AND ";
         }
 
         /// <summary>
@@ -742,7 +772,9 @@ namespace Microi.net
         /// </summary>
         private string GetOperator(string type)
         {
-            return DiyCommon.FieldWhereTypes.ContainsKey(type) ? DiyCommon.FieldWhereTypes[type] : "=";
+            return DiyCommon.FieldWhereTypes.TryGetValue(type, out var sqlOperator)
+                ? sqlOperator
+                : "=";
         }
 
         /// <summary>
@@ -751,7 +783,8 @@ namespace Microi.net
         private DbType GetDbType(string type, object value, JObject filedModel)
         {
             // 根据类型和值判断数据类型
-            if (type.ToLower() == "in" || type.ToLower() == "notin")
+            if (string.Equals(type, "in", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(type, "notin", StringComparison.OrdinalIgnoreCase))
             {
                 return DbType.String;
             }
@@ -759,20 +792,21 @@ namespace Microi.net
             // 优先从字段模型判断类型
             if (filedModel != null && filedModel["Type"] != null)
             {
-                var fieldType = filedModel["Type"].Val<string>().ToLower();
-                if (fieldType.Contains("int"))
+                var fieldType = filedModel["Type"].Val<string>() ?? string.Empty;
+                if (fieldType.IndexOf("int", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return DbType.Int32;
                 }
-                else if (fieldType.Contains("decimal"))
+                else if (fieldType.IndexOf("decimal", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return DbType.Decimal;
                 }
-                else if (fieldType.Contains("bit"))
+                else if (fieldType.IndexOf("bit", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return DbType.Boolean;
                 }
-                else if (fieldType.Contains("date") || fieldType.Contains("time"))
+                else if (fieldType.IndexOf("date", StringComparison.OrdinalIgnoreCase) >= 0
+                         || fieldType.IndexOf("time", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return DbType.DateTime;
                 }

@@ -47,12 +47,13 @@ function copyPointer(target, pointer) {
   return target;
 }
 function storePackage(storeId, appVersion, isPublic, packageText) {
+  var packageByteBase64 = String(System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(packageText)));
   var result = V8.ApiEngine.Run('microi-store-package-storage', {
     Action: 'Store',
     StoreId: storeId,
     AppVersion: appVersion,
     IsPublic: isPublic,
-    Package: packageText,
+    PackageByteBase64: packageByteBase64,
     // 只在管理员历史容量治理中兼容早期非 SemVer 包；正常发布仍严格拒绝。
     AllowLegacyVersion: true,
     TrustContentAddressedCache: true

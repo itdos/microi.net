@@ -3356,7 +3356,11 @@ export default {
                     self.BtnLoading = false;
                 } else {
                     // 已迁移至 diy-form-full.vue，通过 refDiyTable_DiyFormDialog 统一打开
-                    var dialogType = self.CurrentDiyTableModel.FormOpenType || "Drawer";
+                    var isWebosDesktopWindow = self.$webosWindow?.active === true
+                        && ["macos", "windows"].includes(String(self.$webosWindow?.platform || "").toLowerCase());
+                    var dialogType = isWebosDesktopWindow
+                        ? "Dialog"
+                        : (self.CurrentDiyTableModel.FormOpenType || "Dialog");
                     var openFormDialogToken = (self._openFormDialogToken || 0) + 1;
                     self._openFormDialogToken = openFormDialogToken;
                     if (self._openFormDialogTimer) {
@@ -3389,7 +3393,7 @@ export default {
                             ApiReplace: self.ApiReplace,
                             EventReplace: self.EventReplace,
                             DataAppend: self.DataAppend,
-                            Width: self.CurrentDiyTableModel.FormOpenWidth || undefined,
+                            Width: self.CurrentDiyTableModel.FormOpenWidth || "80%",
                             IsDefaultOpen: isDefaultOpen,
                             IsOpenWorkFlowForm: isOpenWorkFlowForm,
                             WFParam: wfParam,

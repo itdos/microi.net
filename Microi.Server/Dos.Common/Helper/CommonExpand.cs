@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -252,8 +253,10 @@ namespace Dos.Common
         #endregion
 
         #region MemberInfo
-        private static Dictionary<MemberInfo, Object> _micache1 = new Dictionary<MemberInfo, Object>();
-        private static Dictionary<MemberInfo, Object> _micache2 = new Dictionary<MemberInfo, Object>();
+        private static readonly ConcurrentDictionary<(MemberInfo Member, Type AttributeType), object> InheritedAttributeCache
+            = new ConcurrentDictionary<(MemberInfo Member, Type AttributeType), object>();
+        private static readonly ConcurrentDictionary<(MemberInfo Member, Type AttributeType), object> DeclaredAttributeCache
+            = new ConcurrentDictionary<(MemberInfo Member, Type AttributeType), object>();
         /// <summary>
         /// 获取自定义特性，带有缓存功能，避免因.Net内部GetCustomAttributes没有缓存而带来的损耗
         /// </summary>
@@ -263,22 +266,18 @@ namespace Dos.Common
         /// <returns></returns>
         public static TAttribute[] DosGetCustomAttributes<TAttribute>(this MemberInfo member, Boolean inherit)
         {
-            if (member == null) return new TAttribute[0];
+            if (member == null) return Array.Empty<TAttribute>();
 
-            // 根据是否可继承，分属两个缓存集合
-            var cache = inherit ? _micache1 : _micache2;
-
-            object obj = null;
-            if (cache.TryGetValue(member, out obj)) return (TAttribute[])obj;
-            lock (cache)
-            {
-                if (cache.TryGetValue(member, out obj)) return (TAttribute[])obj;
-
-                var atts = member.GetCustomAttributes(typeof(TAttribute), inherit) as TAttribute[];
-                var att = atts ?? new TAttribute[0];
-                cache[member] = att;
-                return att;
-            }
+            // MemberInfo alone is not a valid cache key: the same member can be
+            // queried for several attribute types. ConcurrentDictionary also
+            // avoids racing an unlocked read against a Dictionary write.
+            var cache = inherit ? InheritedAttributeCache : DeclaredAttributeCache;
+            var key = (Member: member, AttributeType: typeof(TAttribute));
+            return (TAttribute[])cache.GetOrAdd(
+                key,
+                _ => member.GetCustomAttributes(typeof(TAttribute), inherit)
+                    .Cast<TAttribute>()
+                    .ToArray());
         }
         /// <summary>获取自定义属性</summary>
         /// <typeparam name="TAttribute"></typeparam>

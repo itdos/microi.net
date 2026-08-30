@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "消息通知",
-    "Version": "v1.0.11",
+    "Version": "v1.0.13",
     "CreateTime": "2026-08-23T01:02:13.744Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -25,16 +25,19 @@
       "V8.Method.SendWeChatTemplateMessage",
       "V8.Method.RequireManagedProtocolContext",
       "V8.MongoDb.UptFormDataByWhere",
-      "V8.MongoDb.DelFormDataByWhere"
+      "V8.MongoDb.DelFormDataByWhere",
+      "ServerField:sys_apiengine.ApiRoutes",
+      "ApiEngineChatDelivery:v1"
     ],
-    "ChangeHistory": "2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.8 修复聊天运行时与 AI 运行时跨应用稳定 Id 冲突；继续由 Managed V8 统一编排普通聊天消息、联系人、未读、历史、已读与删除。\n2026-08-25 v1.0.7 普通聊天消息、联系人、未读、历史、已读与删除业务迁入固定 Managed V8 运行时；旧 Hub/Controller 仅保留认证连接、协议与尽力投递。\n2026-08-25 v1.0.6 平台系统消息业务校验迁入 Managed V8 接口，并提供消息通知个性化 Hook。\n",
+    "ChangeHistory": "2026-08-30 v1.0.13 完成 /api/DiyChat/SendSystemMessage 多路由、事务提交后实时投递与官方包追加式发布历史闭包。\n2026-08-30 v1.0.12 将 /api/DiyChat/SendSystemMessage 收入 platform-chat-system-message 多路由，并保留提交后实时投递契约。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.8 修复聊天运行时与 AI 运行时跨应用稳定 Id 冲突；继续由 Managed V8 统一编排普通聊天消息、联系人、未读、历史、已读与删除。\n2026-08-25 v1.0.7 普通聊天消息、联系人、未读、历史、已读与删除业务迁入固定 Managed V8 运行时；旧 Hub/Controller 仅保留认证连接、协议与尽力投递。\n2026-08-25 v1.0.6 平台系统消息业务校验迁入 Managed V8 接口，并提供消息通知个性化 Hook。\n",
     "ChangeLog": {
-      "Version": "v1.0.11",
-      "Title": "V8 引擎优先与租户个性化扩展",
-      "ChangeType": "Fix",
-      "Content": "2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。",
-      "ReleaseTime": "2026-08-25 16:00:00"
-    }
+      "Version": "v1.0.13",
+      "Title": "系统消息多路由与发布历史闭包",
+      "ChangeType": "Optimize",
+      "Content": "完成 /api/DiyChat/SendSystemMessage 多路由、事务提交后实时投递与官方包追加式发布历史闭包。",
+      "ReleaseTime": "2026-08-30 12:00:00"
+    },
+    "Description": "消息通知、聊天持久化与旧移动端系统消息兼容资源。"
   },
   "DDLStatements": [
     {
@@ -6135,7 +6138,7 @@
       "LimitMemory": 2048,
       "MaxStatements": 100000000,
       "Timeout": 600,
-      "StopHttp": 1,
+      "StopHttp": 0,
       "EnableLog": 1,
       "Category": "平台内置",
       "Files": "[]",
@@ -6143,11 +6146,12 @@
       "ApiAddress": "/apiengine/platform-chat-system-message",
       "ResponseFile": 0,
       "Lock": 0,
-      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：消息通知\n * ApiEngineKey：platform-chat-system-message\n * 从可信吾码官方应用源安装、更新或重新安装“消息通知”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n/* V8 ApiEngine | ApiEngineKey: platform-chat-system-message | Version: v1.1.0 */\n\nvar param = V8.Param || {};\n\nfunction text(value, maxLength) {\n  var result = String(value === null || typeof value === 'undefined' ? '' : value).trim();\n  return result.length <= maxLength ? result : result.substring(0, maxLength);\n}\n\nfunction fail(message, code) {\n  return { Code: code || 0, Msg: message };\n}\n\nif (!V8.CurrentUser || !V8.CurrentUser.Id) return fail('登录身份已过期，请重新登录。', 1001);\nvar isAdmin = V8.CurrentUser._IsAdmin === true || Number(V8.CurrentUser.Level || 0) >= 9999;\nif (!isAdmin) return fail('只有平台超级管理员可以发送系统消息。');\nif (String(param.Action || '').trim() !== 'PersistSystemMessage') return fail('不支持的系统消息动作。');\n\nvar toUserId = text(param.ToUserId, 100);\nvar rawContent = String(param.Content === null || typeof param.Content === 'undefined' ? '' : param.Content);\nvar requestId = text(param.RequestId, 200);\nif (!requestId || !toUserId || !rawContent.trim()) return fail('RequestId、消息内容和接收用户不能为空。');\nif (rawContent.length > 200000) return fail('系统消息内容不能超过 200000 个字符。');\n\n// 系统消息策略入口不再读写聊天业务数据；所有持久化、联系人、未读和幂等\n// 统一由消息通知应用唯一拥有的固定 Managed runtime 完成。\nreturn V8.ApiEngine.Run('platform-chat-runtime', {\n  Action: 'PersistSystemMessage',\n  RequestId: requestId,\n  ToUserId: toUserId,\n  Content: rawContent,\n  OtherInfo: text(param.OtherInfo, 20000),\n  IsRead: param.IsRead === true,\n  Type: '系统消息'\n}, V8.DbTrans);\n",
+      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：消息通知\n * ApiEngineKey：platform-chat-system-message\n * 从可信吾码官方应用源安装、更新或重新安装“消息通知”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n/* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */\n// ApiRoutes 兼容旧 DiyChat 地址时，仍把动作归一为唯一的受管消息写入语义。\nvar systemMessageRoute = String(V8.Param.ApiAddress || '').replace(/\\?.*$/, '').toLowerCase();\nif (systemMessageRoute === '/api/diychat/sendsystemmessage') {\n  V8.Param.Action = 'PersistSystemMessage';\n  if (!V8.Param.RequestId) V8.Param.RequestId = V8.Method.NewUlid();\n}\n\n/* V8 ApiEngine | ApiEngineKey: platform-chat-system-message | Version: v1.1.0 */\n\nvar param = V8.Param || {};\n\nfunction text(value, maxLength) {\n  var result = String(value === null || typeof value === 'undefined' ? '' : value).trim();\n  return result.length <= maxLength ? result : result.substring(0, maxLength);\n}\n\nfunction fail(message, code) {\n  return { Code: code || 0, Msg: message };\n}\n\nif (!V8.CurrentUser || !V8.CurrentUser.Id) return fail('登录身份已过期，请重新登录。', 1001);\nvar isAdmin = V8.CurrentUser._IsAdmin === true || Number(V8.CurrentUser.Level || 0) >= 9999;\nif (!isAdmin) return fail('只有平台超级管理员可以发送系统消息。');\nif (String(param.Action || '').trim() !== 'PersistSystemMessage') return fail('不支持的系统消息动作。');\n\nvar toUserId = text(param.ToUserId, 100);\nvar rawContent = String(param.Content === null || typeof param.Content === 'undefined' ? '' : param.Content);\nvar requestId = text(param.RequestId, 200);\nif (!requestId || !toUserId || !rawContent.trim()) return fail('RequestId、消息内容和接收用户不能为空。');\nif (rawContent.length > 200000) return fail('系统消息内容不能超过 200000 个字符。');\n\n// 系统消息策略入口不再读写聊天业务数据；所有持久化、联系人、未读和幂等\n// 统一由消息通知应用唯一拥有的固定 Managed runtime 完成。\nreturn V8.ApiEngine.Run('platform-chat-runtime', {\n  Action: 'PersistSystemMessage',\n  RequestId: requestId,\n  ToUserId: toUserId,\n  Content: rawContent,\n  OtherInfo: text(param.OtherInfo, 20000),\n  IsRead: param.IsRead === true,\n  Type: '系统消息'\n}, V8.DbTrans);\n",
       "ApiRole": "[]",
       "IsEnable": 1,
       "ApiEngineKey": "platform-chat-system-message",
-      "ApiName": "平台系统消息编排"
+      "ApiName": "平台系统消息编排",
+      "ApiRoutes": "/api/DiyChat/SendSystemMessage"
     },
     {
       "V8Limit": 0,

@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-upgrade-resource
- * Version: v1.3.2
+ * Version: v1.3.4
  * Function:
  * - 匿名读取固定白名单中的吾码升级资源；超级管理员可通过 SHA 乐观锁原子发布升级资源，新版应用包写入 HDFS 并仅持久化可校验指针。
  */
@@ -354,7 +354,8 @@ function validateV8FirstPackage(name, packageModel) {
   if (name === "app.microi.sys_user.json") {
     assertExactEngineKeys(packageModel, [
       "platform-user-update-preferences", "user-module-table-preference", "sys-user-security-action",
-      "platform-user-update-profile", "platform-sys-user-admin", "platform-user-custom-hook"
+      "platform-user-update-profile", "platform-sys-user-admin", "platform-user-custom-hook",
+      "platform-user-access-key"
     ], name);
     var sysUserAdmin = findEngine(packageModel, "platform-sys-user-admin");
     var sysUserAdminCode = text(sysUserAdmin && sysUserAdmin.ApiV8Code);
@@ -367,6 +368,18 @@ function validateV8FirstPackage(name, packageModel) {
         || sysUserAdminCode.indexOf("authorization.DataAppend.ChangesPassword === true") < 0
         || sysUserCapabilities.indexOf("ApiEngine:platform-sys-user-admin@v1.0.2") < 0) {
       throw new Error("升级资源[" + name + "]缺少 v6.3.2 系统账号 Managed v1.0.2 改密安全契约");
+    }
+    var accessKeyEngine = findEngine(packageModel, "platform-user-access-key");
+    var accessKeyCode = text(accessKeyEngine && accessKeyEngine.ApiV8Code);
+    var accessKeyRoutes = text(accessKeyEngine && accessKeyEngine.ApiRoutes).toLowerCase();
+    if (compareVersions(info.Version, "v7.6.1") < 0
+        || !accessKeyEngine
+        || accessKeyCode.indexOf("V8.Method.ManageUserAccessKey") < 0
+        || accessKeyRoutes.indexOf("/api/sysuseraccesskey/create") < 0
+        || accessKeyRoutes.indexOf("/api/sysuseraccesskey/exchange") < 0
+        || sysUserCapabilities.indexOf("ApiEngine:platform-user-access-key@v1.0.0") < 0
+        || sysUserCapabilities.indexOf("ServerField:sys_apiengine.ApiRoutes") < 0) {
+      throw new Error("升级资源[" + name + "]缺少用户访问密钥 Managed 多路由契约");
     }
     if (countRows(packageModel.PhysicalColumns, "COLUMN_NAME", "AiApiKey") !== 1) {
       throw new Error("升级资源[" + name + "]缺少唯一 Sys_User.AiApiKey 物理列");
@@ -480,16 +493,16 @@ function validateV8FirstPackage(name, packageModel) {
     var packageStorageCode = text(packageStorageEngine && packageStorageEngine.ApiV8Code);
     if (compareVersions(info.Version, "v7.5.57") < 0
         || !officialResourceEngine
-        || compareVersions(officialResourceEngine.Version, "v1.3.2") < 0
+        || compareVersions(officialResourceEngine.Version, "v1.3.4") < 0
         || Number(officialResourceEngine.AllowAnonymous) !== 1
         || officialResourceCode.indexOf("V8.Method.AuthorizeOfficialResourcePublish") < 0
         || storeCapabilities.indexOf("V8.Method.AuthorizeOfficialResourcePublish") < 0
-        || storeCapabilities.indexOf("ApiEngine:get-microi-upgrade-resource@v1.3.2") < 0
+        || storeCapabilities.indexOf("ApiEngine:get-microi-upgrade-resource@v1.3.4") < 0
         || !packageStorageEngine
-        || compareVersions(packageStorageEngine.Version, "v1.1.0") < 0
+        || compareVersions(packageStorageEngine.Version, "v1.2.1") < 0
         || Number(packageStorageEngine.StopHttp) !== 1
         || packageStorageCode.indexOf("MARKETPLACE_PACKAGE_UPLOAD_BASE64_SINGLE_ATTEMPT_V1") < 0
-        || deliveredCapabilities.indexOf("ApiEngine:microi-store-package-storage@v1.1.0") < 0
+        || deliveredCapabilities.indexOf("ApiEngine:microi-store-package-storage@v1.2.1") < 0
         || !findEngine(packageModel, "platform-marketplace-source")
         || !findEngine(packageModel, "platform-marketplace-source-hook")
         || findEngine(packageModel, "platform-user-update-preferences")
@@ -542,7 +555,7 @@ function validatePublishResource(name, content) {
 }
 
 var liveApiEngineFields = [
-  "ApiName", "ApiEngineKey", "ApiAddress", "IsEnable", "ApiV8Code", "ApiRole",
+  "ApiName", "ApiEngineKey", "ApiAddress", "ApiRoutes", "IsEnable", "ApiV8Code", "ApiRole",
   "AllowAnonymous", "Files", "Category", "EnableLog", "StopHttp", "Timeout",
   "MaxStatements", "LimitMemory", "LimitRecursion", "Lock", "LockKey", "ResponseFile",
   "ResponseType", "TestParam", "ApiRemark", "V8Limit", "V8Unlimited", "Version",
@@ -552,6 +565,7 @@ var liveApiEngineFields = [
 var liveApiEngineDefaults = {
   IsEnable: 1,
   ApiRole: "[]",
+  ApiRoutes: "",
   AllowAnonymous: 0,
   Files: "[]",
   Category: "",
@@ -656,15 +670,30 @@ function removeLiveApiEngineCacheValue(value) {
   );
 }
 
+function liveApiEngineRouteAliases(model) {
+  model = model || {};
+  var values = [model.Id, model.ApiEngineKey, model.ApiAddress]
+    .concat(text(model.ApiRoutes).split(";"));
+  var aliases = [];
+  var seen = {};
+  for (var aliasIndex = 0; aliasIndex < values.length; aliasIndex++) {
+    var alias = text(values[aliasIndex]).trim();
+    var lower = alias.toLowerCase();
+    if (!alias || seen[lower]) continue;
+    seen[lower] = true;
+    aliases.push(alias);
+  }
+  return aliases;
+}
+
 function invalidateLiveApiEngineCache(previous, latest) {
   previous = previous || {};
   latest = latest || {};
-  removeLiveApiEngineCacheValue(previous.Id);
-  removeLiveApiEngineCacheValue(previous.ApiEngineKey);
-  removeLiveApiEngineCacheValue(previous.ApiAddress);
-  removeLiveApiEngineCacheValue(latest.Id);
-  removeLiveApiEngineCacheValue(latest.ApiEngineKey);
-  removeLiveApiEngineCacheValue(latest.ApiAddress);
+  var aliases = liveApiEngineRouteAliases(previous)
+    .concat(liveApiEngineRouteAliases(latest));
+  for (var aliasIndex = 0; aliasIndex < aliases.length; aliasIndex++) {
+    removeLiveApiEngineCacheValue(aliases[aliasIndex]);
+  }
 }
 
 function parseReconcileItems() {
@@ -875,7 +904,8 @@ function reconcilePublishedApiEngines() {
       expectedKey + "|" + expectedProjection.Policy + "|"
       + (expectedProjection.Policy === "Managed"
         ? sha256(expectedEngine.ApiV8Code) + "|" + text(expectedEngine.Version)
-          + "|" + text(expectedEngine.ApiAddress) + "|" + text(expectedEngine.Id)
+          + "|" + text(expectedEngine.ApiAddress) + "|" + text(expectedEngine.ApiRoutes)
+          + "|" + text(expectedEngine.Id)
         : "present")
     );
   }
@@ -905,7 +935,7 @@ function applyPublishResource(item, current) {
       Action: "Store",
       StoreId: current.Data.RowId,
       AppVersion: validated.Version,
-      Package: content
+      PackageByteBase64: String(System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(content)))
     });
     if (!storageResult) {
       throw new Error("发布升级资源[" + name + "]的 HDFS 包失败：存储接口未返回结果");

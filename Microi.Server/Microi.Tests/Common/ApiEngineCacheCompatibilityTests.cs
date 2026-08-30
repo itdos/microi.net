@@ -42,6 +42,12 @@ public class ApiEngineCacheCompatibilityTests
             BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("接口引擎兼容表事件不存在。");
 
+    private static readonly MethodInfo UpgradeValidationEventMethod =
+        UpgradeCacheCompatibilityType.GetMethod(
+            "TryUpgradeValidationEvent",
+            BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("接口引擎多路由校验事件兼容方法不存在。");
+
     [Theory]
     [InlineData("{\"ApiEngineKey\":\"get-microi-store\",\"IsEnable\":1}")]
     [InlineData("\"{\\\"ApiEngineKey\\\":\\\"get-microi-store\\\",\\\"IsEnable\\\":1}\"")]
@@ -117,9 +123,11 @@ public class ApiEngineCacheCompatibilityTests
     {
         var script = Assert.IsType<string>(CompatibleEventField.GetRawConstantValue());
 
-        Assert.Contains("MICROI_APIENGINE_CACHE_V3_COMPAT_V1", script);
+        Assert.Contains("MICROI_APIENGINE_CACHE_MULTI_ROUTE_V2", script);
         Assert.Contains("var formModel = V8.Form || {};", script);
         Assert.Contains("JSON.stringify(formModel)", script);
+        Assert.Contains("ApiRoutes", script);
+        Assert.Contains("split(';')", script);
         Assert.DoesNotContain(", formModel);", script);
     }
 
@@ -137,7 +145,7 @@ public class ApiEngineCacheCompatibilityTests
 
         Assert.True(changed);
         var upgraded = Assert.IsType<string>(arguments[1]);
-        Assert.Contains("MICROI_APIENGINE_CACHE_V3_COMPAT_V1", upgraded);
+        Assert.Contains("MICROI_APIENGINE_CACHE_MULTI_ROUTE_V2", upgraded);
         Assert.Contains("JSON.stringify(formModel)", upgraded);
         Assert.Contains(customerCode, upgraded);
         Assert.Contains("var formModel   =   V8.Form ;", upgraded);
@@ -188,5 +196,48 @@ public class ApiEngineCacheCompatibilityTests
 
         Assert.False(changed);
         Assert.Equal(script, Assert.IsType<string>(arguments[1]));
+    }
+
+    [Fact]
+    public void ValidationEventIsPrependedWithoutLosingCustomerValidation()
+    {
+        const string customerCode = "if(V8.Form.ApiName == 'blocked') return {Code:0,Msg:'blocked'};";
+        var arguments = new object?[] { customerCode, null };
+
+        var changed = Assert.IsType<bool>(UpgradeValidationEventMethod.Invoke(null, arguments));
+
+        Assert.True(changed);
+        var upgraded = Assert.IsType<string>(arguments[1]);
+        Assert.Contains("MICROI_APIENGINE_MULTI_ROUTE_VALIDATE_V1", upgraded);
+        Assert.Contains("ApiRoutes", upgraded);
+        Assert.EndsWith(customerCode, upgraded.TrimEnd());
+    }
+
+    [Fact]
+    public void MultiRoutesProvideAllCacheAliasesAndRejectMalformedRoutes()
+    {
+        var model = JObject.Parse("""
+            {
+              "Id":"engine-id",
+              "ApiEngineKey":"platform-user",
+              "ApiAddress":"/apiengine/platform-user",
+              "ApiRoutes":"/api/SysUser/GetCurrentUser; /api/SysUser/TokenLogin"
+            }
+            """);
+
+        var aliases = ApiEngineRouteAliases.GetCacheAliases(model);
+
+        Assert.Equal(5, aliases.Count);
+        Assert.Contains("/api/sysuser/getcurrentuser", aliases);
+        Assert.Contains("/api/sysuser/tokenlogin", aliases);
+        Assert.True(ApiEngineRouteAliases.TryValidate(
+            "/apiengine/platform-user",
+            "/api/SysUser/GetCurrentUser;/api/SysUser/TokenLogin",
+            out _));
+        Assert.False(ApiEngineRouteAliases.TryValidate(
+            "/apiengine/platform-user",
+            "/api/test?unsafe=1",
+            out var error));
+        Assert.Contains("不能包含", error);
     }
 }

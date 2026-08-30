@@ -7,6 +7,14 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */
+// ApiRoutes 兼容旧 DiyChat 地址时，仍把动作归一为唯一的受管消息写入语义。
+var systemMessageRoute = String(V8.Param.ApiAddress || '').replace(/\?.*$/, '').toLowerCase();
+if (systemMessageRoute === '/api/diychat/sendsystemmessage') {
+  V8.Param.Action = 'PersistSystemMessage';
+  if (!V8.Param.RequestId) V8.Param.RequestId = V8.Method.NewUlid();
+}
+
 /* V8 ApiEngine | ApiEngineKey: platform-chat-system-message | Version: v1.1.0 */
 
 var param = V8.Param || {};

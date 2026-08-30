@@ -397,26 +397,28 @@ test('tenant settings engine fails closed before CRUD for Secret requests', () =
   assert.equal(formCalls, 0)
 })
 
-test('legacy controllers delegate only the migrated actions while trusted credential paths remain native', () => {
-  const compatibility = fs.readFileSync(
-    path.resolve(resourceDir, '../../Microi.net.Api/Controllers/LegacyMobileCompatibilityController.cs'),
-    'utf8',
-  )
+test('migrated routes live in Managed engines while credential atoms stay in feature runtimes', () => {
+  for (const deleted of [
+    'LegacyMobileCompatibilityController.cs',
+    'SysUserController.cs',
+    'TenantSystemSettingsController.cs',
+  ]) {
+    assert.equal(fs.existsSync(path.resolve(resourceDir, '../../Microi.net.Api/Controllers', deleted)), false)
+  }
+
   const sysUser = fs.readFileSync(
-    path.resolve(resourceDir, '../../Microi.net.Api/Controllers/SysUserController.cs'),
+    path.resolve(resourceDir, '../../Microi.net/Identity/SysUserSessionRuntime.cs'),
     'utf8',
   )
   const tenantSettings = fs.readFileSync(
-    path.resolve(resourceDir, '../../Microi.net.Api/Controllers/TenantSystemSettingsController.cs'),
+    path.resolve(resourceDir, '../../Microi.net/SystemSettings/TenantSystemSettingsRuntime.cs'),
     'utf8',
   )
-  assert.match(compatibility, /CreateTenantApiEngineKey\s*=\s*"platform-create-tenant"/)
-  assert.match(compatibility, /UpdateCurrentProfileApiEngineKey\s*=\s*"platform-user-update-profile"/)
-  assert.match(compatibility, /UpdateUserPreferencesApiEngineKey\s*=\s*"platform-user-update-preferences"/)
-  assert.match(compatibility, /ManagedApiEngineCompatibility\.RunAsync/)
+  assert.match(loadEngine('platform-create-tenant').source, /platform-runtime-custom-hook/)
+  assert.match(loadEngine('platform-user-update-profile').source, /platform-user-custom-hook/)
+  assert.match(loadEngine('platform-tenant-system-settings').source, /platform-system-settings-custom-hook/)
   assert.match(sysUser, /GetOwnedTenantAdminPassword[\s\S]*?SetSensitiveCredentialResponseHeaders/)
   assert.match(sysUser, /GetSysUserPassword[\s\S]*?DecodeStoredPassword/)
-  assert.match(tenantSettings, /TenantSystemSettingsApiEngineKey\s*=\s*"platform-tenant-system-settings"/)
-  assert.match(tenantSettings, /Secret\/Sensitive Key[\s\S]*?ProtectSecret/)
+  assert.match(tenantSettings, /ProtectSecret/)
   assert.match(tenantSettings, /ConsumeTicketAsync/)
 })

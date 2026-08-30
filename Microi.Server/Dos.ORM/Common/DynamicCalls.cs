@@ -17,7 +17,7 @@
 namespace Dos.ORM
 {
     using System;
-    using System.Collections.Generic;
+    using System.Collections.Concurrent;
     using System.Reflection;
     using System.Reflection.Emit;
 
@@ -57,13 +57,17 @@ namespace Dos.ORM
         /// <summary>
         /// 用于存放GetMethodInvoker的Dictionary
         /// </summary>
-        private static Dictionary<MethodInfo, FastInvokeHandler> dictInvoker = new Dictionary<MethodInfo, FastInvokeHandler>();
+        private static readonly ConcurrentDictionary<MethodInfo, FastInvokeHandler> dictInvoker
+            = new ConcurrentDictionary<MethodInfo, FastInvokeHandler>();
+        private static readonly object invokerSync = new object();
 
         public static FastInvokeHandler GetMethodInvoker(MethodInfo methodInfo)
         {
-            lock (dictInvoker)
+            if (methodInfo == null) throw new ArgumentNullException(nameof(methodInfo));
+            if (dictInvoker.TryGetValue(methodInfo, out var cached)) return cached;
+            lock (invokerSync)
             {
-                if (dictInvoker.ContainsKey(methodInfo)) return (FastInvokeHandler)dictInvoker[methodInfo];
+                if (dictInvoker.TryGetValue(methodInfo, out cached)) return cached;
 
                 DynamicMethod dynamicMethod = new DynamicMethod(string.Empty, typeof(object), new Type[] { typeof(object), typeof(object[]) }, methodInfo.DeclaringType.Module);
 
@@ -100,6 +104,7 @@ namespace Dos.ORM
                 if (!methodInfo.IsStatic)
                 {
                     ilGenerator.Emit(OpCodes.Ldarg_0);
+                    EmitTarget(ilGenerator, methodInfo.DeclaringType);
                 }
 
                 for (int i = 0; i < paramTypes.Length; i++)
@@ -109,7 +114,10 @@ namespace Dos.ORM
                     else
                         ilGenerator.Emit(OpCodes.Ldloc, locals[i]);
                 }
-                ilGenerator.EmitCall(!methodInfo.IsStatic ? OpCodes.Callvirt : OpCodes.Call, methodInfo, null);
+                ilGenerator.EmitCall(
+                    methodInfo.IsStatic || methodInfo.DeclaringType.IsValueType ? OpCodes.Call : OpCodes.Callvirt,
+                    methodInfo,
+                    null);
 
                 if (methodInfo.ReturnType == typeof(void))
                 {
@@ -133,7 +141,7 @@ namespace Dos.ORM
                 }
                 ilGenerator.Emit(OpCodes.Ret);
                 FastInvokeHandler invoker = (FastInvokeHandler)dynamicMethod.CreateDelegate(typeof(FastInvokeHandler));
-                dictInvoker.Add(methodInfo, invoker);
+                dictInvoker[methodInfo] = invoker;
                 return invoker;
             }
         }
@@ -141,7 +149,9 @@ namespace Dos.ORM
         /// <summary>
         /// 用于存放GetInstanceCreator的Dictionary
         /// </summary>
-        private static Dictionary<Type, FastCreateInstanceHandler> dictCreator = new Dictionary<Type, FastCreateInstanceHandler>();
+        private static readonly ConcurrentDictionary<Type, FastCreateInstanceHandler> dictCreator
+            = new ConcurrentDictionary<Type, FastCreateInstanceHandler>();
+        private static readonly object creatorSync = new object();
 
         /// <summary>
         /// 
@@ -150,19 +160,36 @@ namespace Dos.ORM
         /// <returns></returns>
         public static FastCreateInstanceHandler GetInstanceCreator(Type type)
         {
-            lock (dictCreator)
+            if (type == null) throw new ArgumentNullException(nameof(type));
+            if (dictCreator.TryGetValue(type, out var cached)) return cached;
+            lock (creatorSync)
             {
-                if (dictCreator.ContainsKey(type)) return (FastCreateInstanceHandler)dictCreator[type];
-                DynamicMethod dynamicMethod = new DynamicMethod(string.Empty, type, new Type[0], typeof(DynamicCalls).Module);
+                if (dictCreator.TryGetValue(type, out cached)) return cached;
+                DynamicMethod dynamicMethod = new DynamicMethod(string.Empty, typeof(object), new Type[0], typeof(DynamicCalls).Module);
 
                 ILGenerator ilGenerator = dynamicMethod.GetILGenerator();
-                ilGenerator.Emit(OpCodes.Newobj, type.GetConstructor(Type.EmptyTypes));
+                if (type.IsValueType)
+                {
+                    var value = ilGenerator.DeclareLocal(type);
+                    ilGenerator.Emit(OpCodes.Ldloca_S, value);
+                    ilGenerator.Emit(OpCodes.Initobj, type);
+                    ilGenerator.Emit(OpCodes.Ldloc, value);
+                    ilGenerator.Emit(OpCodes.Box, type);
+                }
+                else
+                {
+                    if (type.IsAbstract)
+                        throw new ArgumentException("抽象类型不能创建实例。", nameof(type));
+                    var constructor = type.GetConstructor(Type.EmptyTypes)
+                        ?? throw new MissingMethodException(type.FullName, ".ctor()");
+                    ilGenerator.Emit(OpCodes.Newobj, constructor);
+                }
 
                 ilGenerator.Emit(OpCodes.Ret);
 
                 FastCreateInstanceHandler creator = (FastCreateInstanceHandler)dynamicMethod.CreateDelegate(typeof(FastCreateInstanceHandler));
 
-                dictCreator.Add(type, creator);
+                dictCreator[type] = creator;
 
                 return creator;
             }
@@ -171,21 +198,36 @@ namespace Dos.ORM
         /// <summary>
         /// 用于存放GetPropertyGetter的Dictionary
         /// </summary>
-        private static Dictionary<PropertyInfo, FastPropertyGetHandler> dictGetter = new Dictionary<PropertyInfo, FastPropertyGetHandler>();
+        private static readonly ConcurrentDictionary<PropertyInfo, FastPropertyGetHandler> dictGetter
+            = new ConcurrentDictionary<PropertyInfo, FastPropertyGetHandler>();
+        private static readonly object getterSync = new object();
 
         public static FastPropertyGetHandler GetPropertyGetter(PropertyInfo propInfo)
         {
-            lock (dictGetter)
+            if (propInfo == null) throw new ArgumentNullException(nameof(propInfo));
+            if (propInfo.GetIndexParameters().Length != 0)
+                throw new ArgumentException("索引属性不支持无参数快速读取。", nameof(propInfo));
+            var getMethod = propInfo.GetGetMethod()
+                ?? throw new ArgumentException("属性没有公共 getter。", nameof(propInfo));
+            if (dictGetter.TryGetValue(propInfo, out var cached)) return cached;
+            lock (getterSync)
             {
-                if (dictGetter.ContainsKey(propInfo)) return (FastPropertyGetHandler)dictGetter[propInfo];
+                if (dictGetter.TryGetValue(propInfo, out cached)) return cached;
 
                 DynamicMethod dynamicMethod = new DynamicMethod(string.Empty, typeof(object), new Type[] { typeof(object) }, propInfo.DeclaringType.Module);
 
                 ILGenerator ilGenerator = dynamicMethod.GetILGenerator();
 
-                ilGenerator.Emit(OpCodes.Ldarg_0);
+                if (!getMethod.IsStatic)
+                {
+                    ilGenerator.Emit(OpCodes.Ldarg_0);
+                    EmitTarget(ilGenerator, propInfo.DeclaringType);
+                }
 
-                ilGenerator.EmitCall(OpCodes.Callvirt, propInfo.GetGetMethod(), null);
+                ilGenerator.EmitCall(
+                    getMethod.IsStatic || propInfo.DeclaringType.IsValueType ? OpCodes.Call : OpCodes.Callvirt,
+                    getMethod,
+                    null);
 
                 EmitBoxIfNeeded(ilGenerator, propInfo.PropertyType);
 
@@ -193,7 +235,7 @@ namespace Dos.ORM
 
                 FastPropertyGetHandler getter = (FastPropertyGetHandler)dynamicMethod.CreateDelegate(typeof(FastPropertyGetHandler));
 
-                dictGetter.Add(propInfo, getter);
+                dictGetter[propInfo] = getter;
 
                 return getter;
             }
@@ -202,31 +244,46 @@ namespace Dos.ORM
         /// <summary>
         /// 用于存放SetPropertySetter的Dictionary
         /// </summary>
-        private static Dictionary<PropertyInfo, FastPropertySetHandler> dictSetter = new Dictionary<PropertyInfo, FastPropertySetHandler>();
+        private static readonly ConcurrentDictionary<PropertyInfo, FastPropertySetHandler> dictSetter
+            = new ConcurrentDictionary<PropertyInfo, FastPropertySetHandler>();
+        private static readonly object setterSync = new object();
 
         public static FastPropertySetHandler GetPropertySetter(PropertyInfo propInfo)
         {
-            lock (dictSetter)
+            if (propInfo == null) throw new ArgumentNullException(nameof(propInfo));
+            if (propInfo.GetIndexParameters().Length != 0)
+                throw new ArgumentException("索引属性不支持无参数快速写入。", nameof(propInfo));
+            var setMethod = propInfo.GetSetMethod()
+                ?? throw new ArgumentException("属性没有公共 setter。", nameof(propInfo));
+            if (dictSetter.TryGetValue(propInfo, out var cached)) return cached;
+            lock (setterSync)
             {
-                if (dictSetter.ContainsKey(propInfo)) return (FastPropertySetHandler)dictSetter[propInfo];
+                if (dictSetter.TryGetValue(propInfo, out cached)) return cached;
 
                 DynamicMethod dynamicMethod = new DynamicMethod(string.Empty, null, new Type[] { typeof(object), typeof(object) }, propInfo.DeclaringType.Module);
 
                 ILGenerator ilGenerator = dynamicMethod.GetILGenerator();
 
-                ilGenerator.Emit(OpCodes.Ldarg_0);
+                if (!setMethod.IsStatic)
+                {
+                    ilGenerator.Emit(OpCodes.Ldarg_0);
+                    EmitTarget(ilGenerator, propInfo.DeclaringType);
+                }
 
                 ilGenerator.Emit(OpCodes.Ldarg_1);
 
                 EmitCastToReference(ilGenerator, propInfo.PropertyType);
 
-                ilGenerator.EmitCall(OpCodes.Callvirt, propInfo.GetSetMethod(), null);
+                ilGenerator.EmitCall(
+                    setMethod.IsStatic || propInfo.DeclaringType.IsValueType ? OpCodes.Call : OpCodes.Callvirt,
+                    setMethod,
+                    null);
 
                 ilGenerator.Emit(OpCodes.Ret);
 
                 FastPropertySetHandler setter = (FastPropertySetHandler)dynamicMethod.CreateDelegate(typeof(FastPropertySetHandler));
 
-                dictSetter.Add(propInfo, setter);
+                dictSetter[propInfo] = setter;
 
                 return setter;
             }
@@ -246,6 +303,20 @@ namespace Dos.ORM
             else
             {
                 ilGenerator.Emit(OpCodes.Castclass, type);
+            }
+        }
+
+        private static void EmitTarget(ILGenerator ilGenerator, Type declaringType)
+        {
+            if (declaringType == null)
+                throw new ArgumentException("属性缺少声明类型。", nameof(declaringType));
+            if (declaringType.IsValueType)
+            {
+                ilGenerator.Emit(OpCodes.Unbox, declaringType);
+            }
+            else
+            {
+                ilGenerator.Emit(OpCodes.Castclass, declaringType);
             }
         }
 

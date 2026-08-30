@@ -50,22 +50,54 @@ namespace Dos.Common
         /// <summary>
         /// 队列参数
         /// </summary>
-        public static QueueParam Param;
+        public static QueueParam Param = CreateDefaultParam();
+
+        private const int DefaultRetryCount = 5000;
+
+        private static QueueParam CreateDefaultParam()
+        {
+            return new QueueParam
+            {
+                Pool = new ConcurrentDictionary<string, object>(),
+                QueueCount = DefaultRetryCount
+            };
+        }
+
+        private static QueueParam GetCurrentParam()
+        {
+            while (true)
+            {
+                var current = Volatile.Read(ref Param);
+                if (current?.Pool != null) return current;
+
+                var replacement = CreateDefaultParam();
+                if (ReferenceEquals(Interlocked.CompareExchange(ref Param, replacement, current), current))
+                {
+                    return replacement;
+                }
+            }
+        }
+
         /// <summary>
         /// 初始化队列
         /// </summary>
         public QueueHelper()
         {
-            Param.Pool = new ConcurrentDictionary<string, object>();
-            Param.QueueCount = 5000;
+            // 确保默认状态存在，但不能因为业务代码创建了第二个帮助器实例
+            // 就清空进程内仍被其他请求占用的队列。
+            _ = GetCurrentParam();
         }
         /// <summary>
         /// 初始化队列。可动态传入QueueCount
         /// </summary>
         public QueueHelper(QueueParam qr)
         {
-            Param.Pool = qr.Pool ?? new ConcurrentDictionary<string, object>();
-            Param.QueueCount = qr.QueueCount ?? 5000;
+            if (qr == null) throw new ArgumentNullException(nameof(qr));
+            Param = new QueueParam
+            {
+                Pool = qr.Pool ?? new ConcurrentDictionary<string, object>(),
+                QueueCount = Math.Max(0, qr.QueueCount ?? DefaultRetryCount)
+            };
         }
 
         /// <summary>
@@ -84,29 +116,16 @@ namespace Dos.Common
         /// <returns></returns>
         public static object In(string key, object obj)
         {
-            var failCount = -1;
-        Start:
-            if (TryGet(key, obj))
-                return obj;
-            failCount++;
-            if (failCount > 5000)
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            obj ??= string.Empty;
+            var current = GetCurrentParam();
+            var retryCount = Math.Max(0, current.QueueCount ?? DefaultRetryCount);
+            for (var failedAttempts = 0; ; failedAttempts++)
             {
-                return null;
+                if (current.Pool.TryAdd(key, obj)) return obj;
+                if (failedAttempts >= retryCount) return null;
+                Thread.Sleep(SleepNumber);
             }
-            goto Start;
-        }
-        /// <summary>
-        /// 抢资源
-        /// </summary>
-        /// <Param name="key"></Param>
-        /// <Param name="obj"></Param>
-        /// <returns></returns>
-        private static bool TryGet(string key, object obj)
-        {
-            if (!Param.Pool.Keys.Contains(key))
-                return Param.Pool.TryAdd(key, obj);
-            Thread.Sleep(SleepNumber);
-            return false;
         }
 
         /// <summary>
@@ -116,14 +135,14 @@ namespace Dos.Common
         public static bool Out(string key)
         {
             object s;
-            return !string.IsNullOrWhiteSpace(key) && Param.Pool.TryRemove(key, out s);
+            return !string.IsNullOrWhiteSpace(key) && GetCurrentParam().Pool.TryRemove(key, out s);
         }
         /// <summary>
         /// 退出所有队列/释放所有资源
         /// </summary>
         public static void OutAll()
         {
-            Param.Pool.Clear();
+            GetCurrentParam().Pool.Clear();
         }
         #endregion
 
@@ -131,11 +150,11 @@ namespace Dos.Common
         /// <summary>
         /// 尝试入队次数
         /// </summary>
-        private static int RetryCount = 5000;
+        private const int RetryCount = DefaultRetryCount;
         /// <summary>
         /// 静态队列池
         /// </summary>
-        private static ConcurrentDictionary<string, object> staticPool = new ConcurrentDictionary<string, object>();
+        private static readonly ConcurrentDictionary<string, object> staticPool = new ConcurrentDictionary<string, object>();
         /// <summary>
         /// 睡眠时间（毫秒）
         /// </summary>
@@ -158,29 +177,14 @@ namespace Dos.Common
         /// <returns></returns>
         public static object StaticIn(string key, object obj)
         {
-            var failCount = -1;
-        Start:
-            if (StaticTryGet(key, obj))
-                return obj;
-            failCount++;
-            if (failCount > RetryCount)
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            obj ??= string.Empty;
+            for (var failedAttempts = 0; ; failedAttempts++)
             {
-                return null;
+                if (staticPool.TryAdd(key, obj)) return obj;
+                if (failedAttempts >= RetryCount) return null;
+                Thread.Sleep(SleepNumber);
             }
-            goto Start;
-        }
-        /// <summary>
-        /// 抢资源
-        /// </summary>
-        /// <Param name="key"></Param>
-        /// <Param name="obj"></Param>
-        /// <returns></returns>
-        private static bool StaticTryGet(string key, object obj)
-        {
-            if (!staticPool.Keys.Contains(key))
-                return staticPool.TryAdd(key, obj);
-            Thread.Sleep(SleepNumber);
-            return false;
         }
 
         /// <summary>

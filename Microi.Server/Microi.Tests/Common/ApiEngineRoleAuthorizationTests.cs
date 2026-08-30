@@ -1,5 +1,6 @@
 using Microi.net;
 using Microi.net.Api;
+using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Newtonsoft.Json.Linq;
 
@@ -75,6 +76,32 @@ public class ApiEngineRoleAuthorizationTests
             role["Id"]?.ToString() == ApiEngineRoleAuthorization.AuthenticatedRoleId);
         Assert.Contains(invocationUser["_Roles"]!, role =>
             role["Id"]?.ToString() == ApiEngineRoleAuthorization.AuthenticatedRoleId);
+    }
+
+    [Fact]
+    public void ExplicitApiRole_RemovesOnlyGetFromTheInvocationCloneOnly()
+    {
+        var user = NewUser(PersonalRoleId, onlyGet: true);
+        user["_Roles"]![0]!["BaseLimit"] = new JArray("OnlyGet", "Special").ToString();
+        var policy = new JArray(PersonalRoleId).ToString();
+
+        var invocationUser = ApiEngineRoleAuthorization.PrepareInvocationUser(user, policy);
+
+        Assert.NotSame(user, invocationUser);
+        Assert.True(ApiEngineRoleAuthorization.HasOnlyGet(user));
+        Assert.False(ApiEngineRoleAuthorization.HasOnlyGet(invocationUser));
+        Assert.Contains("Special", invocationUser["_Roles"]![0]!["BaseLimit"]!.ToString());
+    }
+
+    [Fact]
+    public void MissingApiRole_DoesNotNeutralizeOnlyGet()
+    {
+        var user = NewUser(PersonalRoleId, onlyGet: true);
+
+        var invocationUser = ApiEngineRoleAuthorization.PrepareInvocationUser(user, "[]");
+
+        Assert.Same(user, invocationUser);
+        Assert.True(ApiEngineRoleAuthorization.HasOnlyGet(invocationUser));
     }
 
     [Fact]
@@ -154,6 +181,36 @@ public class ApiEngineRoleAuthorizationTests
         Assert.Equal(
             expected,
             DiyFilter<dynamic>.DefersOnlyGetToApiEngineRoleAuthorization(descriptor));
+    }
+
+    [Fact]
+    public void DynamicApiEngineRouteValues_DeferToExactEngineRoleAuthorization()
+    {
+        var descriptor = new ActionDescriptor();
+        descriptor.RouteValues["controller"] = "ApiEngine";
+        descriptor.RouteValues["action"] = "Run";
+
+        Assert.True(DiyFilter<dynamic>.DefersOnlyGetToApiEngineRoleAuthorization(descriptor));
+        Assert.True(DiyFilter<dynamic>.AllowsOnlyGetAction(descriptor));
+    }
+
+    [Fact]
+    public void DynamicApiEnginePath_DeferWhenDescriptorHasNoRouteMetadata()
+    {
+        var descriptor = new ActionDescriptor();
+
+        Assert.True(
+            DiyFilter<dynamic>.DefersOnlyGetToApiEngineRoleAuthorization(
+                descriptor,
+                "/apiengine/app_fish_gateway"));
+        Assert.True(
+            DiyFilter<dynamic>.AllowsOnlyGetAction(
+                descriptor,
+                "/apiengine/app_fish_gateway"));
+        Assert.False(
+            DiyFilter<dynamic>.AllowsOnlyGetAction(
+                descriptor,
+                "/api/FormEngine/AddFormData"));
     }
 
     [Theory]

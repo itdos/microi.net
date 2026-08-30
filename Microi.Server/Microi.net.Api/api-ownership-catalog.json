@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 1,
-  "UpdatedAt": "2026-08-26",
+  "UpdatedAt": "2026-08-30",
   "Principle": "业务编排优先由应用商城 Managed ApiEngine 交付；C# 仅保留启动前置、协议网关、可信鉴权、密钥隔离、存储网络边界和运行时内核。",
   "Dispositions": {
     "KernelRuntime": "宿主不可被应用包替代的原子运行时；保持 C#，由接口引擎调用。",
@@ -14,33 +14,14 @@
     "ApiEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "FormEngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
     "HDFSController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "LegacyMobileCompatibilityController": { "OwnerType": "Compatibility", "OwnerId": "managed-api-engine-legacy-routes", "Disposition": "MigrationCandidate" },
-    "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" },
-    "WorkFlowController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" }
+    "V8EngineController": { "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "KernelRuntime" }
   },
   "ProtocolGateways": {
     "AiController": { "Project": "Microi.net.Api", "Source": "Controllers/AiController.cs", "OwnerType": "Application", "OwnerId": "app.microi.ai-engine", "Disposition": "ProtocolGateway" },
     "CaptchaController": { "Project": "Microi.net.Api", "Source": "Controllers/CaptchaController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
-    "DiagnosticsController": { "Project": "Microi.net.Api", "Source": "Controllers/DiagnosticsController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
-    "ExternalLoginController": { "Project": "Microi.net.Api", "Source": "Controllers/ExternalLoginController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
-    "IdentityVerificationController": { "Project": "Microi.net.Api", "Source": "Controllers/IdentityVerificationController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
     "LicenseController": { "Project": "Microi.net.Api", "Source": "Controllers/LicenseController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
-    "MarketplaceSourceController": { "Project": "Microi.net.Api", "Source": "Controllers/MarketplaceSourceController.cs", "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "ProtocolGateway" },
     "MessageController": { "Project": "Microi.net.Api", "Source": "Controllers/MessageController.cs", "OwnerType": "Application", "OwnerId": "app.microi.message-notification", "Disposition": "ProtocolGateway" },
-    "MicroAppController": { "Project": "Microi.net.Api", "Source": "Controllers/MicroAppController.cs", "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "KernelRuntime" },
-    "SysUserAccessKeyController": { "Project": "Microi.net.Api", "Source": "Controllers/SysUserAccessKeyController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
-    "SysUserController": { "Project": "Microi.net.Api", "Source": "Controllers/SysUserController.cs", "OwnerType": "Application", "OwnerId": "app.microi.sys_user", "Disposition": "BootstrapIdentity" },
-    "TenantSystemSettingsController": { "Project": "Microi.net.Api", "Source": "Controllers/TenantSystemSettingsController.cs", "OwnerType": "Application", "OwnerId": "app.microi.sys-config", "Disposition": "ProtocolGateway" },
-    "WeChatContentSecurityController": { "Project": "Microi.net.Api", "Source": "Controllers/WeChatContentSecurityController.cs", "OwnerType": "Application", "OwnerId": "microi-wechat-content-security", "Disposition": "ProtocolGateway" },
-    "WeChatController": { "Project": "Microi.net.Api", "Source": "Controllers/WeChatController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "ProtocolGateway" },
-    "SsoProtocolGatewayController": {
-      "Project": "Microi.net.Api",
-      "Source": "Controllers/SsoProtocolGatewayController.cs",
-      "OwnerType": "Application",
-      "OwnerId": "app.microi.sso",
-      "Disposition": "ProtocolGateway",
-      "CompatibilityRoute": "/api/Sso/*"
-    }
+    "MicroAppController": { "Project": "Microi.net.Api", "Source": "Controllers/MicroAppController.cs", "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "KernelRuntime" }
   },
   "MigratedControllers": {
     "AIWorkFlowController": { "Target": "ApiEngine:platform-ai-workflow", "Atom": "V8.Method.ManageAiWorkflow", "RemovedAt": "2026-08-24" },
@@ -52,7 +33,19 @@
     "MqttController": { "Target": "ApiEngine:platform-mqtt", "Atom": "V8.Method.ManageMqtt", "RemovedAt": "2026-08-24" },
     "OnlineTerminalController": { "Target": "ApiEngine:platform-online-terminal", "Atom": "V8.Method.ManageOnlineTerminal", "RemovedAt": "2026-08-24" },
     "SearchEngineController": { "Target": "ApiEngine:platform-search-engine", "Atom": "V8.Method.ManageSearchEngine", "RemovedAt": "2026-08-24" },
-    "SsoController": { "Target": "Microi.net.Api:SsoProtocolGatewayController + app.microi.sso Managed ApiEngines", "Atom": "OIDC/SAML2/CAS trusted protocol gateway", "RemovedAt": "2026-08-26" },
+    "SsoController": { "Target": "app.microi.sso Managed ApiEngines", "Atom": "Microi.SSO:SsoProtocolRuntime trusted protocol atoms", "RemovedAt": "2026-08-26" },
+    "SsoProtocolGatewayController": { "Target": "app.microi.sso 24 Managed HTTP ApiEngines", "Atom": "Microi.SSO:SsoProtocolRuntime + V8.Method.RunSsoProtocol", "RemovedAt": "2026-08-30" },
+    "DiagnosticsController": { "Target": "ApiEngine:platform-service-health", "Atom": "V8.Method.GetPlatformServiceHealth", "RemovedAt": "2026-08-30" },
+    "ExternalLoginController": { "Target": "ApiEngine:platform-external-login", "Atom": "Microi.SSO:ExternalLoginRuntime", "RemovedAt": "2026-08-30" },
+    "IdentityVerificationController": { "Target": "ApiEngine:platform-identity-verification", "Atom": "Hosting/IdentityVerificationRuntime WebAuthn atom", "RemovedAt": "2026-08-30" },
+    "LegacyMobileCompatibilityController": { "Target": "57 official ApiRoutes aliases", "Atom": "Managed ApiEngines plus trusted plugin atoms", "RemovedAt": "2026-08-30" },
+    "MarketplaceSourceController": { "Target": "ApiEngine:platform-marketplace-source", "Atom": "Microi.net:MarketplaceSourceRuntime", "RemovedAt": "2026-08-30" },
+    "SysUserAccessKeyController": { "Target": "ApiEngine:platform-user-access-key", "Atom": "V8.Method.ManageUserAccessKey", "RemovedAt": "2026-08-30" },
+    "SysUserController": { "Target": "ApiEngine:platform-sys-user-session", "Atom": "Microi.net:SysUserSessionRuntime", "RemovedAt": "2026-08-30" },
+    "TenantSystemSettingsController": { "Target": "ApiEngine:platform-tenant-system-settings", "Atom": "Microi.net:TenantSystemSettingsRuntime", "RemovedAt": "2026-08-30" },
+    "WeChatContentSecurityController": { "Target": "ApiEngine:platform-wechat-content-security", "Atom": "Microi.WeChat:WeChatContentSecurityRuntime", "RemovedAt": "2026-08-30" },
+    "WeChatController": { "Target": "ApiEngine:platform-wechat-oauth", "Atom": "Microi.WeChat:WeChatOAuthRuntime", "RemovedAt": "2026-08-30" },
+    "WorkFlowController": { "Target": "ApiEngine:platform-workflow", "Atom": "Microi.WorkFlow:WorkFlowApiRuntime", "RemovedAt": "2026-08-30" },
     "SpiderController": { "Target": "V8.Spider（原 Controller 已长期注释，不存在活动 HTTP 兼容入口）", "Atom": "IMicroiSpider", "RemovedAt": "2026-08-24" },
     "SysLogController": { "Target": "ApiEngine:platform-client-log", "Atom": "V8.Method.AddSysLog", "RemovedAt": "2026-08-24" },
     "SysBaseDataController": { "Target": "ApiEngine:platform-sys-base-data", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
@@ -60,10 +53,10 @@
     "SysMenuController": { "Target": "ApiEngine:platform-sys-menu", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
     "SysRoleController": { "Target": "ApiEngine:platform-sys-role", "Atom": "V8.Method.ManageSystemDirectory", "RemovedAt": "2026-08-24" },
     "UploadController": { "Target": "HDFSController.Upload（含 /api/Upload 兼容路由）", "Atom": "IMicroiHDFS", "RemovedAt": "2026-08-26" },
-    "iTdosHeartController": { "Target": "DiagnosticsController.LegacyITdosHeart", "Atom": "ASP.NET Core liveness compatibility route", "RemovedAt": "2026-08-26" },
-    "DiyChatController": { "Target": "LegacyMobileCompatibilityController.SendSystemMessage", "Atom": "Managed ApiEngine plus SignalR transport", "RemovedAt": "2026-08-26" },
-    "HomeController": { "Target": "GlobalExceptionHandler + DiagnosticsController", "Atom": "统一 DosResult 异常与宿主诊断", "RemovedAt": "2026-08-26" },
-    "OsController": { "Target": "LegacyMobileCompatibilityController /api/Os/* routes", "Atom": "历史工具原子与启动兼容投影", "RemovedAt": "2026-08-26" },
+    "iTdosHeartController": { "Target": "ApiEngine:platform-service-health", "Atom": "fixed health projection", "RemovedAt": "2026-08-26" },
+    "DiyChatController": { "Target": "ApiEngine:platform-chat-system-message", "Atom": "Managed ApiEngine plus post-commit SignalR transport", "RemovedAt": "2026-08-26" },
+    "HomeController": { "Target": "Hosting/MicroiApiRootPageEndpoint + GlobalExceptionHandler + DiagnosticsController", "Atom": "宿主根页面、统一 DosResult 异常与宿主诊断", "RemovedAt": "2026-08-26" },
+    "OsController": { "Target": "ApiEngine:platform-os-legacy-compatibility", "Atom": "Microi.net:LegacyOsCompatibilityRuntime", "RemovedAt": "2026-08-26" },
     "UEditorController": { "Target": "HDFSController.LegacyUEditorUpload", "Atom": "UEditorService + IMicroiHDFS", "RemovedAt": "2026-08-26" }
     ,"DataSourceEngineController": { "Target": "ApiEngine:platform-data-source-run", "Atom": "V8.Method.RunDataSourceEngine", "RemovedAt": "2026-08-26" }
     ,"ModuleEngineController": { "Target": "ApiEngine:platform-module-data", "Atom": "V8.Method.RunModuleEngine", "RemovedAt": "2026-08-26" }
@@ -87,9 +80,13 @@
       "Handler/GlobalExceptionHandler.cs",
       "Handler/JwtBearerOptionsConfigurator.cs",
       "Handler/PlatformAdminOnlyAttribute.cs",
+      "Handler/RequiredDosBodyAttribute.cs",
       "Handler/V8DebugWebSocket.cs",
       "Handler/V8McpAuthorizationAttribute.cs",
+      "Handler/V8McpRequiredBodyAttribute.cs",
       "Hosting/MicroiApiHostExtensions.cs",
+      "Hosting/IdentityVerificationRuntime.cs",
+      "Hosting/MicroiApiRootPageEndpoint.cs",
       "Hosting/MicroiRealtimeHostingExtensions.cs",
       "Hosting/StartupDiagnostics.cs",
       "Middleware/SecurityGuardMiddleware.cs"
@@ -442,36 +439,6 @@
         "HDFS signed URL and storage boundary"
       ],
       "CompatibilityExitGate": "旧版 PC、UniApp 与定制客户端全部切换，且兼容路由连续两个正式版本遥测为零后删除。"
-    },
-    "SsoProtocolGatewayController": {
-      "Disposition": "ProtocolGateway",
-      "Target": "app.microi.sso Managed ApiEngines",
-      "NativeBoundary": [
-        "OIDC/SAML/CAS message parsing and signature validation",
-        "redirect and raw protocol response",
-        "opaque one-time protocol tickets",
-        "tenant signing keys and DiyToken trusted atoms"
-      ],
-      "ManagedApiEngines": [
-        "sso_capabilities",
-        "sso_legacy_capabilities",
-        "sso_connection_runtime",
-        "sso_resolve_federated_identity",
-        "sso_protocol_event",
-        "sso_event_hook",
-        "sso_outbound_claims",
-        "sso_complete_login",
-        "sso_rotate_client_secret",
-        "sso_legacy_token_login",
-        "sso_user_runtime"
-      ],
-      "RemovedNativeActions": [
-        "Capabilities",
-        "LegacyCapabilities",
-        "CompleteLogin",
-        "RotateClientSecret",
-        "SysUserController.SsoPengrui"
-      ]
     },
     "WeChatContentSecurityController.Callback": {
       "Disposition": "ProtocolGateway",

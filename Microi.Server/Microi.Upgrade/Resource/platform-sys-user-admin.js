@@ -7,6 +7,15 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
+/* PLATFORM_RUNTIME_DISPATCH_MARKER_V1 */
+var sysUserAdminRoute = String(V8.Param.ApiAddress || '').replace(/\?.*$/, '');
+if(!V8.Param.Action && sysUserAdminRoute){
+  var sysUserAdminSegments = sysUserAdminRoute.split('/');
+  V8.Param.Action = sysUserAdminSegments[sysUserAdminSegments.length - 1] || '';
+}
+
+
+
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-sys-user-admin

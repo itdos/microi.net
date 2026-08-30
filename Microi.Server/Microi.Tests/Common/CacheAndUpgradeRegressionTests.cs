@@ -697,8 +697,19 @@ public class CacheAndUpgradeRegressionTests
         Assert.Contains("app.microi.sso.json", resources.Keys);
         var package = JObject.Parse(resources["app.microi.sso.json"]);
         Assert.True(Assert.IsType<bool>(hasPackagedSsoRuntime!.Invoke(null, new object[] { package })));
-        Assert.Equal("v7.5.8", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.Equal("v7.5.9", package["PackageInfo"]?["Version"]?.ToString());
         Assert.Equal("Platform", package["PackageInfo"]?["ApplicationType"]?.ToString());
+        Assert.Equal(35, package["SysApiEngines"]?.Children<JObject>().Count());
+
+        var casLogin = Assert.Single(
+            package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "sso_http_cas_login");
+        Assert.Equal("/cas/{OsClient}/login", casLogin["ApiAddress"]?.ToString());
+        Assert.Equal("HTTP", casLogin["ResponseType"]?.ToString());
+        Assert.Contains("V8.Method.RunSsoProtocol", casLogin["ApiV8Code"]?.ToString());
+        Assert.Equal(
+            "Managed",
+            package["ResourcePolicies"]?["ApiEngines"]?["sso_http_cas_login"]?["UpgradePolicy"]?.ToString());
 
         var hook = Assert.Single(
             package["SysApiEngines"]!.Children<JObject>(),

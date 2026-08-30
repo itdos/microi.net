@@ -18,7 +18,7 @@
 
 Client Secret 轮换动作只显示一次明文，持久化 PBKDF2-SHA256 哈希。签名 Key 必须有 `kid`，轮换时保留验证重叠窗口。
 
-对外 Claim 固定由 `sso_outbound_claims` 从启用用户与连接白名单生成；OIDC/SAML/CAS 协议网关只负责把同一投影编码成对应协议。Client Secret 轮换由 `sso_rotate_client_secret` 编排，并调用精确受限的可信原子生成一次性明文与持久哈希，不能恢复为 Controller 定制动作。
+对外 Claim 固定由 `sso_outbound_claims` 从启用用户与连接白名单生成；24 个 `sso_http_*` Managed 端点通过 `RunSsoProtocol` 把同一投影编码成 OIDC/SAML/CAS 响应。Client Secret 轮换由 `sso_rotate_client_secret` 编排，并调用精确受限的可信原子生成一次性明文与持久哈希，不能恢复为 Controller 定制动作。
 
 ## SAML IdP
 

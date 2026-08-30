@@ -42,6 +42,17 @@ Content-Type: application/json
 
 新增或可修改的前端、微服务、UniApp、MCP 与外部集成必须使用动态路径或引擎配置的唯一 `ApiAddress`，不得新增 `/api/ApiEngine/Run` 依赖。这样系统日志/监控、网关限流、访问审计和流量排行才能直接显示真实接口引擎；旧地址只保留在显式 `RunLegacy` 兼容方法中。
 
+### 一个接口配置多个兼容路由
+
+`sys_apiengine.ApiAddress` 是唯一主路由；“多路由”字段 `ApiRoutes` 可让同一接口继续接收多个历史 Controller/移动端地址，多个路径用英文分号分隔：
+
+```text
+ApiAddress: /apiengine/platform-sys-menu
+ApiRoutes: /api/SysMenu/GetSysMenuModel;/api/SysMenu/GetSysMenuStep
+```
+
+接口缓存会同时按记录 Id、`ApiEngineKey`、主路由和全部多路由命中同一份代码。路由按完整路径、不区分大小写精确匹配；Query 不属于路由。主路由与多路由不得重复或与其它启用接口冲突，保存和启动缓存遇到冲突会失败关闭。新代码仍应使用稳定 Key 地址，多路由只用于旧客户端和已登记第三方回调兼容。
+
 ```javascript
 // 同步调用
 var result = V8.ApiEngine.Run('ApiEngineKey', { 
@@ -91,6 +102,29 @@ return { Code: 1, Data: { Count: 5 } };
 `ApiEngineStreamMaxChunkKB / ApiEngineStreamMaxTotalMB / ApiEngineStreamHeartbeatSeconds` 调整；宿主仍分别
 限制为 4–1024 KB、1–256 MB、5–60 秒。流式接口不能用来绕过文件响应、HDFS、大文件上传、后台任务
 或 MQ；需要可靠断点续跑的长任务仍使用后台任务并持久化 Checkpoint。
+
+### 接口引擎受控 HTTP 响应
+
+将“响应类型”设为 `HTTP` 后，接口引擎可返回标准协议需要的状态码、Content-Type、正文和安全响应头，不必创建 Controller：
+
+```javascript
+return {
+  Code: 1,
+  DataAppend: { HttpResponse: {
+    StatusCode: 302,
+    ContentType: 'text/plain; charset=utf-8',
+    Body: '',
+    Headers: {
+      Location: 'https://identity.example.com/login',
+      'Cache-Control': 'no-store'
+    }
+  } }
+};
+```
+
+普通接口引擎只能设置经过白名单和换行检查的响应头；`Location` 只允许站内地址、HTTPS 或本机开发地址。Host、Content-Length、Transfer-Encoding 等宿主/逐跳头始终禁止，`Set-Cookie` 只接受平台可信原子签名结果。状态码范围为 100–599，`204/304` 不得带正文。
+
+`ApiAddress` 与 `ApiRoutes` 都支持完整路径段模板，例如 `/sso/{OsClient}/.well-known/openid-configuration` 和 `/saml/{OsClient}/sp/{ConnectionKey}/metadata`。模板值写入 `V8.Param._RouteValues`，并覆盖同名外部参数；包含 `{OsClient}` 时租户由路径解析，歧义匹配失败关闭。
 
 ### 接口引擎通用实时事件（SignalR）
 
@@ -599,13 +633,14 @@ SSO 与平台短信登录遵循“接口引擎编排，C# 只补不可伪造的�
 | `CreateSsoLoginTicket` | 为已解析用户创建短时一次性 SSO 登录票据 | `sso_legacy_token_login` |
 | `CompleteSsoLogin` | 原子消费 SSO 票据、重读启用用户并签发 DiyToken | `sso_complete_login` |
 | `RotateSsoClientSecret` | 生成只显示一次的客户端 Secret 并持久化验证哈希 | `sso_rotate_client_secret` |
+| `RunSsoProtocol` | 执行固定 OIDC/SAML/CAS 协议原子并返回进程内签名 HTTP 契约 | 对应的 24 个 `sso_http_*` 精确 Key |
 | `CreatePlatformSmsProof` | 限频并原子消费短信验证码，签发短时证明 | `platform_auth_sms_login` |
 | `CreatePlatformSmsUser` | 在短信证明约束下创建带盐哈希用户 | `platform_auth_sms_login` |
 | `CompletePlatformSmsLogin` | 原子消费短信证明并签发 DiyToken | `platform_auth_sms_login` |
 
 接口引擎不得把这些方法包装成“通用用户创建/Token 生成”接口，也不得让客户端传入目标 `OsClient`、任意用户对象、Role Level、Secret 保存位置或回调地址。官方应用分别通过 `app.microi.sso` 与自动安装的 `app.microi.saas-engine` 交付编排代码和 ResourcePolicies；应用尚未安装时，普通账号密码登录仍由最小启动内核保证可用。
 
-SSO 的完整应用合同、协议端点和 11 个接口引擎见 [SSO 身份联邦](../more/sso)。
+SSO 的完整应用合同、协议端点和 35 个接口引擎见 [SSO 身份联邦](../more/sso)。
 
 ### V8.Method.Upload
 

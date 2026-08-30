@@ -1034,7 +1034,7 @@ namespace Microi.net
         public DiyUploadParam DynamicToDiyUploadParam(dynamic dynamicParam)
         {
             JObject jobjParam = JsonHelper.ToJObject(dynamicParam);
-            DiyUploadParam param = jobjParam.ToObject<DiyUploadParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            DiyUploadParam param = jobjParam.ToObject<DiyUploadParam>(DiyCommon.GetJsonSerializer());//这里时间格式化没有用
             return param;
         }
         /// <summary>
@@ -1373,7 +1373,7 @@ namespace Microi.net
         public DosResult<CurrentToken> GetAccessToken(dynamic dynamicParam)
         {
             JObject jobjParam = JsonHelper.ToJObject(dynamicParam);
-            DiyTokenParam param = jobjParam.ToObject<DiyTokenParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            DiyTokenParam param = jobjParam.ToObject<DiyTokenParam>(DiyCommon.GetJsonSerializer());//这里时间格式化没有用
             return new DiyToken().GetAccessToken(param).GetAwaiter().GetResult();
         }
 
@@ -1393,7 +1393,7 @@ namespace Microi.net
         public SysLogParam DynamicToSysLogParam(dynamic dynamicParam)
         {
             JObject jobjParam = JsonHelper.ToJObject(dynamicParam);
-            SysLogParam param = jobjParam.ToObject<SysLogParam>(DiyCommon.JsonConfig);//这里时间格式化没有用
+            SysLogParam param = jobjParam.ToObject<SysLogParam>(DiyCommon.GetJsonSerializer());//这里时间格式化没有用
             return param;
         }
         /// <summary>

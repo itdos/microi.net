@@ -189,15 +189,17 @@ for (const [id, key, fileName, stopHttp] of engineFiles) {
 const exporter = model.SysApiEngines.find(item => item.ApiEngineKey === 'export-microi-store-package');
 if (!exporter) throw new Error('缺少 export-microi-store-package');
 let exporterSource = String(exporter.ApiV8Code || '').replace(/\r\n/g, '\n');
-exporterSource = exporterSource.replace(/Version:\s*v?\d+\.\d+\.\d+/i, 'Version: v1.2.3');
+exporterSource = exporterSource.replace(/Version:\s*v?\d+\.\d+\.\d+/i, 'Version: v1.2.4');
 if (!exporterSource.includes('MARKETPLACE_HDFS_PACKAGE_PERSIST_V1')) {
   exporterSource = exporterSource.replace(
     "        var packageJson = JSON.stringify(packageData);\n        var updateResult = V8.FormEngine.UptFormData('sys_microistore', {",
     "        var packageJson = JSON.stringify(packageData);\n"
       + "        // MARKETPLACE_HDFS_PACKAGE_PERSIST_V1：包体先进入 HDFS 并完成大小/SHA-256 回读，\n"
       + "        // 当前行与 mic_data_version 只保存不可变小指针，避免每次版本快照复制数 MB JSON。\n"
+      + "        // MARKETPLACE_PACKAGE_UTF8_BASE64_TRANSPORT_V1：长中文 JSON 使用 UTF-8 Base64 跨接口传输。\n"
+      + "        var packageByteBase64 = String(System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(packageJson)));\n"
       + "        var packageStorageResult = V8.ApiEngine.Run('microi-store-package-storage', {\n"
-      + "            Action: 'Store', StoreId: PersistStoreId, AppVersion: exactPackageVersion, Package: packageJson\n"
+      + "            Action: 'Store', StoreId: PersistStoreId, AppVersion: exactPackageVersion, PackageByteBase64: packageByteBase64\n"
       + "        });\n"
       + "        if (!packageStorageResult || packageStorageResult.Code != 1 || !packageStorageResult.Data) {\n"
       + "            throw new Error('持久化发布 HDFS 包失败：' + ((packageStorageResult && packageStorageResult.Msg) || '接口无返回'));\n"
@@ -241,12 +243,28 @@ if (!exporterSource.includes('MARKETPLACE_HDFS_PACKAGE_PERSIST_V1')) {
 if (!exporterSource.includes('MARKETPLACE_HDFS_PACKAGE_PERSIST_V1')) {
   throw new Error('export-microi-store-package HDFS 持久化补丁未命中');
 }
+if (!exporterSource.includes('MARKETPLACE_PACKAGE_UTF8_BASE64_TRANSPORT_V1')) {
+  exporterSource = exporterSource.replace(
+    "        var packageStorageResult = V8.ApiEngine.Run('microi-store-package-storage', {\n"
+      + "            Action: 'Store', StoreId: PersistStoreId, AppVersion: exactPackageVersion, Package: packageJson\n"
+      + "        });",
+    "        // MARKETPLACE_PACKAGE_UTF8_BASE64_TRANSPORT_V1：长中文 JSON 先按 UTF-8 编码成\n"
+      + "        // 纯 ASCII Base64 再跨嵌套接口边界，存储端继续做无损往返和 HDFS 强回读。\n"
+      + "        var packageByteBase64 = String(System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(packageJson)));\n"
+      + "        var packageStorageResult = V8.ApiEngine.Run('microi-store-package-storage', {\n"
+      + "            Action: 'Store', StoreId: PersistStoreId, AppVersion: exactPackageVersion, PackageByteBase64: packageByteBase64\n"
+      + "        });",
+  );
+}
+if (!exporterSource.includes('MARKETPLACE_PACKAGE_UTF8_BASE64_TRANSPORT_V1')) {
+  throw new Error('export-microi-store-package UTF-8 Base64 传输补丁未命中');
+}
 exporter.ApiV8Code = exporterSource;
-exporter.Version = 'v1.2.3';
+exporter.Version = 'v1.2.4';
 model.ResourcePolicies.ApiEngines['export-microi-store-package'] ||= {};
 model.ResourcePolicies.ApiEngines['export-microi-store-package'].UpgradePolicy = 'Managed';
 model.ResourcePolicies.ApiEngines['export-microi-store-package'].Owner = 'Platform';
-model.ResourcePolicies.ApiEngines['export-microi-store-package'].BaseVersion = 'v1.2.3';
+model.ResourcePolicies.ApiEngines['export-microi-store-package'].BaseVersion = 'v1.2.4';
 
 const capabilities = new Set((model.PackageInfo.Capabilities || []).filter(value => (
   !String(value).startsWith('ApiEngine:microi-store-package-storage@')
@@ -256,9 +274,9 @@ const capabilities = new Set((model.PackageInfo.Capabilities || []).filter(value
 for (const value of [
   'Marketplace:HdfsPackagePointerV2',
   'Marketplace:PackageCompactionV1',
-  'ApiEngine:microi-store-package-storage@v1.1.0',
+  'ApiEngine:microi-store-package-storage@v1.2.1',
   'ApiEngine:compact-microi-store-packages@v1.1.2',
-  'ApiEngine:export-microi-store-package@v1.2.3',
+  'ApiEngine:export-microi-store-package@v1.2.4',
 ]) capabilities.add(value);
 model.PackageInfo.Capabilities = [...capabilities];
 model.PackageInfo.RequiredPlatformCapabilities = [
@@ -272,8 +290,8 @@ model.PackageInfo.RequiredPlatformCapabilities = [
     && String(value) !== 'Installer:StartupApiRuntimeFlagReconciliation'
   )),
   'ApiEngine:get-microi-store-model@v1.2.9',
-  'ApiEngine:ai_app_publish_store@v1.9.7',
-  'ApiEngine:export-microi-store-package@v1.2.3',
+  'ApiEngine:ai_app_publish_store@v1.9.13',
+  'ApiEngine:export-microi-store-package@v1.2.4',
   'ApiEngine:import-microi-store-package@v2.4.9',
   'Installer:StartupDependencyApiFastBootstrap',
   'Installer:StartupDependencyPreinstallBootstrapV1',

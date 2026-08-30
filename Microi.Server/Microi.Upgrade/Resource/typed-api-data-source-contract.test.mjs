@@ -6,7 +6,7 @@ const read = name => fs.readFileSync(new URL(name, import.meta.url), 'utf8');
 const packageModel = JSON.parse(read('./app.microi.saas-engine.json'));
 
 test('SaaS package owns DataSourceType and one shared ApiV8Code editor', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.7.2');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.7.8');
   const typeFields = packageModel.DiyFields.filter(item => (
     item.TableName === 'sys_apiengine' && item.Name === 'DataSourceType'
   ));
@@ -53,15 +53,15 @@ test('managed legacy entry is versioned and package rows never add old code colu
   }
 });
 
-test('backend keeps both historic controller aliases and delegates to the typed API runtime', () => {
-  const controller = read('../../Microi.net.Api/Controllers/LegacyMobileCompatibilityController.cs');
+test('historic data-source aliases are ApiRoutes and delegate to the typed API runtime', () => {
   const facade = read('../../Microi.Core/V8Engine/Runtime/V8Method.PlatformClientFacades.cs');
   const runtime = read('../../Microi.Core/ApiEngine/ApiEngineDataSourceRuntime.cs');
   const apiEngine = read('../../Microi.net/ApiEngine/ApiEngine.cs');
+  const engine = packageModel.SysApiEngines.find(item => item.ApiEngineKey === 'platform-data-source-run');
 
-  assert.match(controller, /~\/api\/DataSourceEngine\/Run/);
-  assert.match(controller, /~\/api\/DataSourceEngine\/GetData/);
-  assert.match(controller, /platform-data-source-run/);
+  assert.equal(fs.existsSync(new URL('../../Microi.net.Api/Controllers/LegacyMobileCompatibilityController.cs', import.meta.url)), false);
+  assert.match(engine.ApiRoutes, /\/api\/DataSourceEngine\/Run/);
+  assert.match(engine.ApiRoutes, /\/api\/DataSourceEngine\/GetData/);
   assert.match(facade, /RunDataSourceEngine\(dynamic dynamicParam\)/);
   assert.match(facade, /ResolveMigratedDataSourceApiEngineKey/);
   assert.match(runtime, /ExecuteNonV8/);

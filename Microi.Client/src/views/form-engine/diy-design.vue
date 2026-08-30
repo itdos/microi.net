@@ -1534,6 +1534,11 @@ export default {
                 return;
             }
 
+            if (self.$webosWindow?.active === true
+                && ["macos", "windows"].includes(String(self.$webosWindow?.platform || "").toLowerCase())) {
+                dialogType = "Dialog";
+            }
+
             // 新页面模式：直接路由跳转，由目标页处理表单初始化
             if (dialogType === "Page") {
                 var url = "/diy/form-page/" + self.TableId + "?FormMode=Add";

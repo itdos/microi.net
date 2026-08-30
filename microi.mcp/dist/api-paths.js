@@ -12,6 +12,8 @@ export const API = {
     REVOKE_USER_ACCESS_KEY: '/api/SysUserAccessKey/Revoke',
     // 服务器状态
     GET_STATUS: '/api/V8Engine/GetStatus',
+    GET_ADMINISTRATIVE_CAPABILITIES: '/api/V8Engine/GetAdministrativeCapabilities',
+    ADMINISTER_TABLE_DATA: '/api/V8Engine/AdministerTableData',
     AI_CHAT: '/api/Ai/Chat',
     GENERATE_MINIMAX_MUSIC: '/api/Ai/GenerateMiniMaxMusic',
     GENERATE_MINIMAX_SPEECH: '/api/Ai/GenerateMiniMaxSpeech',

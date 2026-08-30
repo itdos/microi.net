@@ -23,6 +23,11 @@ namespace Microi.net
         /// </summary>
         public string ApiAddress { get; set; }
         /// <summary>
+        /// 以英文分号分隔的兼容路由。运行时仍以 ApiAddress 为主路由，
+        /// 但模型查询、动态路由和缓存会把这里的每一项作为同一接口引擎的别名。
+        /// </summary>
+        public string ApiRoutes { get; set; }
+        /// <summary>
         /// 请使用ApiEngineKey替代ApiKey
         /// </summary>
         public string ApiKey { get; set; }

@@ -55,7 +55,6 @@ namespace Microi.net
             @"\b(api[-_ ]?key|access[-_ ]?key|secret|token|authorization)\b\s*[:=]\s*[^\s,;]+",
             RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
         private static int DiyLangAllClientSyncRunning = 0;
-        private static readonly object DiyLangCacheLock = new object();
         private const int DiyLangTranslateTimeoutSeconds = 8;
         private const int DiyLangDbBackoffMinutes = 5;
         private const int DiyLangDbOperationDelayMs = 15;
@@ -2844,15 +2843,7 @@ namespace Microi.net
             {
                 return;
             }
-            lock (DiyLangCacheLock)
-            {
-                if (!DiyMessage.Msg.ContainsKey(osClient))
-                {
-                    DiyMessage.Msg[osClient] = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
-                }
-                DiyMessage.Msg[osClient][key] = row;
-                DiyMessage.ClearSourceTextCache(osClient);
-            }
+            DiyMessage.UpsertTenantMessage(osClient, key, row);
         }
 
         /// <summary>
@@ -3085,11 +3076,7 @@ namespace Microi.net
                         rows.Count,
                         stats);
                 }
-                lock (DiyLangCacheLock)
-                {
-                    DiyMessage.Msg[osClient] = rows;
-                    DiyMessage.ClearSourceTextCache(osClient);
-                }
+                DiyMessage.ReplaceTenantMessages(osClient, rows);
                 return new DosResult(1, stats, "多语言缓存重载成功。", rows.Count, stats);
             }
             catch (Exception ex)

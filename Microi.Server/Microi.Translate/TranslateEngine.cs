@@ -64,7 +64,7 @@ namespace Microi.net
         public TranslateParam DynamicToParam(dynamic dynamicParam)
         {
             JObject jobjParam = JsonHelper.ToJObject(dynamicParam);
-            TranslateParam param = jobjParam.ToObject<TranslateParam>(DiyCommon.JsonConfig);
+            TranslateParam param = jobjParam.ToObject<TranslateParam>(DiyCommon.GetJsonSerializer());
             return param;
         }
 

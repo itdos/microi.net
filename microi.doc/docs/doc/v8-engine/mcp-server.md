@@ -6,13 +6,14 @@ Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Claude Code、Trae 等 A
 
 ## 当前能力面
 
-按 2026-08-08 当前源码扫描，`microi.mcp/src` 中可识别 **119 个 `microi_*` 工具注册项**。数量会随版本增长，运行时应以 `tools/list`，或 Codex 单入口的 `list_tools` / `describe_tool` 返回为准。
+按 2026-08-30 当前源码扫描，`microi.mcp/src` 中可识别 **140 个 `microi_*` 工具注册项**。数量会随版本增长，运行时应以 `tools/list`，或 Codex 单入口的 `list_tools` / `describe_tool` 返回为准。
 
 | 类别 | 代表工具 | 作用 |
 |---|---|---|
 | 连接与发现 | `microi_get_status`、`microi_get_db_schema`、`microi_get_field_list` | 确认服务器、租户、表与字段事实 |
 | 表与索引 | `microi_create_table`、`microi_add_field`、`microi_get_table_indexes`、`microi_create_table_index` | 建模、布局、审计字段与物理索引回读 |
-| 数据 | `microi_get_table_data`、`microi_add_form_data`、`microi_update_form_data`、`microi_seed_table_data` | 维护租户业务数据 |
+| 数据 | `microi_get_table_data`、`microi_add_form_data`、`microi_update_form_data`、`microi_seed_table_data` | 按普通 FormEngine 菜单、表、行和动作权限维护租户业务数据 |
+| 平台管理员数据控制面 | `microi_get_administrative_capabilities`、`microi_admin_table_data` | 服务端实时复核超级管理员后，在当前租户查询或单行新增、修改、删除任意已注册表数据 |
 | V8 与接口引擎 | `microi_list_engines`、`microi_get_engine_code`、`microi_save_engine_code`、`microi_run_engine` | 读取、版本化保存与远程执行 |
 | 表单事件 | `microi_list_events`、`microi_get_event_code`、`microi_save_event_code` | 维护前后端表单 V8 事件 |
 | 模块与权限 | `microi_create_module`、`microi_update_module`、`microi_set_role_permission` | 菜单、列、按钮、Tab 与角色授权 |
@@ -95,10 +96,23 @@ Manifest 支持角色、表、索引、数据源、接口引擎、事件、菜�
 
 工具返回 `Code=1` 只代表该次协议调用成功。安装、备份、文件迁移等后台任务还要读取任务状态和最终对象；前端功能还要做真实 PC/移动页面验收。
 
+### 平台管理员通用数据控制面
+
+普通的 `microi_get_table_data`、`microi_add_form_data` 和 `microi_update_form_data` 继续执行 FormEngine 的菜单、表、行和动作权限，不会因为模型声称自己是管理员而放宽。确需维护保护表或执行通用删除时，按以下顺序调用：
+
+1. `microi_get_administrative_capabilities`：服务端从 DiyToken 取身份，并同时复核当前租户 `sys_user`、用户状态和有效管理员角色；平台内置最高管理员阈值是 `Level >= 9999`。
+2. `microi_get_db_schema(tableName?)` 与专用业务工具：先理解真实表、字段、引擎及配置，已有角色、菜单、页面、工作流等专用工具时仍优先使用。
+3. `microi_admin_table_data`：支持 `query/get/add/update/delete`。查询每页最多 200 条；写入仅允许单行，并要求 `ADD:<表名>`、`UPDATE:<表名>:<Id>` 或 `DELETE:<表名>:<Id>` 精确确认。
+4. 使用同一工具回读目标行；写入审计只记录租户、操作、表、Id、字段名和结果，不记录字段值。
+
+该能力只接受真实登录的 DiyToken，会拒绝访问密钥会话，也不相信请求体中的 `Level`、`OsClient`、`_CurrentUser` 或 `_TrustedServerInvocation`。密码、Token、API Key、私钥、连接串和 `SecretCipher` 等字段在通用读取中递归脱敏，并禁止通过通用入口写入；应改用对应的专用安全端点。
+
 ## 租户与安全边界
 
 - 每次连接绑定 API URL、OsClient、用户身份和网络环境；不要跨连接复用 Token。
 - 写工具从当前 Token 解析租户，不能相信模型随意传入的另一个 OsClient。
+- 平台管理员通用数据能力使用 `Level >= 9999`，因为 9999 是吾码保留的内置最高管理员等级；使用 `> 9999` 会错误排除标准超级管理员。Token 声明还必须由当前租户主库与有效角色复核。
+- `microi_admin_table_data` 仅限当前租户和真实登录会话，不向访问密钥开放；它不提供跨租户、任意 SQL 或秘密字段明文读取能力。
 - 密码、数据库连接串、OCR/AI Key 和对象存储密钥不应出现在工具结果或审计正文。
 - `microi_execute_external_database` 等高风险工具只对后端确认的高权限用户开放。
 - MCP 的“可点击/可调用”不是最终授权边界，服务端仍执行菜单、表、行和动作权限。

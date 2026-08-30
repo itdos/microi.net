@@ -278,6 +278,13 @@ namespace Microi.net
             return string.Equals(authVersion, CurrentAuthVersion, StringComparison.Ordinal);
         }
 
+        internal static bool IsJwtExpired(JwtSecurityToken jwtToken, DateTime utcNow)
+        {
+            return jwtToken != null
+                && jwtToken.ValidTo != DateTime.MinValue
+                && jwtToken.ValidTo < utcNow;
+        }
+
         public static TokensModel GetActiveCachedTokenEntry(CurrentToken tokenModel, string requestToken)
         {
             var normalizedToken = NormalizeBearerToken(requestToken);
@@ -876,6 +883,7 @@ namespace Microi.net
                     };
                 }
                 var claims = context.User.Claims;
+                JwtSecurityToken jwtToken = null;
 
                 token = context.Request.Headers["Authorization"].ToString();
                 if (token.DosIsNullOrWhiteSpace() && context.Request?.HasFormContentType == true)
@@ -887,12 +895,21 @@ namespace Microi.net
                 {
                     try
                     {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token)?.Claims?.ToList();
+                        jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(token);
+                        claims = jwtToken?.Claims?.ToList();
                     }
                     catch (System.Exception)
                     {
 
                     }
+                }
+                if (IsJwtExpired(jwtToken, DateTime.UtcNow))
+                {
+                    return new CurrentToken()
+                    {
+                        OsClient = osClient,
+                        Token = token
+                    };
                 }
                 var tokenOsClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                 if(!tokenOsClient.DosIsNullOrWhiteSpace() && tokenOsClient != osClient)
@@ -992,14 +1009,21 @@ namespace Microi.net
                 {
                     var jwtHandler = new JwtSecurityTokenHandler();
                     var claims = new List<Claim>();
+                    JwtSecurityToken jwtToken = null;
 
                     try
                     {
-                        claims = new JwtSecurityTokenHandler().ReadJwtToken(token)?.Claims.ToList();
+                        jwtToken = jwtHandler.ReadJwtToken(token);
+                        claims = jwtToken?.Claims.ToList();
                     }
                     catch (System.Exception)
                     {
 
+                    }
+
+                    if (IsJwtExpired(jwtToken, DateTime.UtcNow))
+                    {
+                        return null;
                     }
 
                     var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;

@@ -8,7 +8,7 @@ const microserviceSource = await read(new URL('../../../AI-Project/microi/AI应�
 const microserviceStyles = await read(new URL('../../../AI-Project/microi/AI应用/microi-platform-service/src/system-settings.css', import.meta.url))
 const tenantSettingsSource = await read(new URL('../../Microi.Core/SaaSEngine/TenantSystemSettingsSecurity.cs', import.meta.url))
 const tenantSettingsFacadeSource = await read(new URL('../../Microi.Core/V8Engine/Runtime/V8Method.SysUserSettingsFacade.cs', import.meta.url))
-const controllerSource = await read(new URL('../../Microi.net.Api/Controllers/TenantSystemSettingsController.cs', import.meta.url))
+const controllerSource = await read(new URL('../../Microi.net/SystemSettings/TenantSystemSettingsRuntime.cs', import.meta.url))
 const managedTenantSettingsSource = await read(new URL('./platform-tenant-system-settings.js', import.meta.url))
 const identitySource = await read(new URL('../../Microi.Core/Security/IdentityVerificationSecurity.cs', import.meta.url))
 const externalLoginSource = await read(new URL('../../Microi.Core/Security/ExternalLoginProviderOptions.cs', import.meta.url))
@@ -141,7 +141,7 @@ test('disabled templates remain manageable while Managed V8 receives only a boun
   assert.doesNotMatch(securityProjection, /\["SecretCipher"\]|\["ConfigValue"\]|\["Value"\]/)
 
   const secretSaveBranch = controllerSource.match(
-    /\/\/ Secret\/Sensitive Key[\s\S]*?\[HttpPost\]\s*public async Task<JsonResult> GetRevealChallenge/,
+    /\/\/ Secret\/Sensitive Key[\s\S]*?public async Task<object> GetRevealChallenge/,
   )?.[0] || ''
   assert.ok(secretSaveBranch)
   assert.match(secretSaveBranch, /TenantSystemSettingsSecurity\.ProtectSecret/)
@@ -149,7 +149,7 @@ test('disabled templates remain manageable while Managed V8 receives only a boun
   assert.doesNotMatch(secretSaveBranch, /ManagedApiEngineCompatibility\.RunAsync/)
 
   const revealBranch = controllerSource.match(
-    /public async Task<JsonResult> Reveal[\s\S]*?\r?\n        \}\r?\n\r?\n        private static async Task<DosResult<CurrentToken>> RequireAdministratorAsync/,
+    /public async Task<object> Reveal[\s\S]*?\r?\n        \}\r?\n\r?\n        private static async Task<DosResult<CurrentToken>> RequireAdministratorAsync/,
   )?.[0] || ''
   assert.ok(revealBranch)
   assert.match(revealBranch, /IdentityVerificationSecurity\.ConsumeTicketAsync/)

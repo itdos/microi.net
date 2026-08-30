@@ -64,6 +64,107 @@ function semanticVersionParts(value, label, allowEmpty = false) {
   return match.slice(1).map(Number);
 }
 
+function compareSemanticVersionParts(left, right) {
+  for (let index = 0; index < 3; index += 1) {
+    const delta = Number(left[index] || 0) - Number(right[index] || 0);
+    if (delta) return delta;
+  }
+  return 0;
+}
+
+function canonicalChangeHistoryRecords(changeHistory) {
+  if (typeof changeHistory === 'string') {
+    return changeHistory
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean);
+  }
+  const records = Array.isArray(changeHistory)
+    ? changeHistory
+    : changeHistory && typeof changeHistory === 'object'
+      ? [changeHistory]
+      : [];
+  return records.map(record => (
+    typeof record === 'string'
+      ? record.trim()
+      : JSON.stringify(stableJsonValue(record))
+  )).filter(Boolean);
+}
+
+/**
+ * A failed official publication can leave the recorded local merge base ahead
+ * of the actual remote resource. Recover automatically only when the remote
+ * package is a provable older release in the same append-only history chain.
+ * Any unrecognised remote history entry fails closed so a concurrent team
+ * publication can never be silently overwritten.
+ */
+export function selectOfficialPackageMergeBase(name, baseContent, localContent, remoteContent) {
+  const canonicalBase = canonicalizeResource(name, baseContent);
+  if (!name.endsWith('.json')) {
+    return { content: canonicalBase, recoveredFromAheadBaseline: false };
+  }
+
+  const canonicalLocal = canonicalizeResource(name, localContent);
+  const canonicalRemote = canonicalizeResource(name, remoteContent);
+  const baseModel = JSON.parse(canonicalBase);
+  const localModel = JSON.parse(canonicalLocal);
+  const remoteModel = JSON.parse(canonicalRemote);
+  const baseInfo = baseModel?.PackageInfo;
+  const localInfo = localModel?.PackageInfo;
+  const remoteInfo = remoteModel?.PackageInfo;
+  if (![baseInfo, localInfo, remoteInfo].every(info => info && typeof info === 'object')) {
+    return { content: canonicalBase, recoveredFromAheadBaseline: false };
+  }
+
+  const baseVersion = String(baseInfo.Version || '').trim();
+  const localVersion = String(localInfo.Version || '').trim();
+  const remoteVersion = String(remoteInfo.Version || '').trim();
+  const baseParts = semanticVersionParts(baseVersion, `${name} 共同基线版本`);
+  const localParts = semanticVersionParts(localVersion, `${name} 本地候选版本`);
+  const remoteParts = semanticVersionParts(remoteVersion, `${name} 官网版本`);
+  if (compareSemanticVersionParts(baseParts, remoteParts) <= 0) {
+    return { content: canonicalBase, recoveredFromAheadBaseline: false };
+  }
+
+  if (compareSemanticVersionParts(localParts, baseParts) < 0) {
+    throw new Error(
+      `${name} 的共同基线 ${baseVersion} 高于官网 ${remoteVersion}，但本地候选 ${localVersion} 又低于共同基线；禁止自动修复`,
+    );
+  }
+  const packageNames = [baseInfo.Name, localInfo.Name, remoteInfo.Name]
+    .map(value => String(value || '').trim());
+  if (!packageNames[0] || new Set(packageNames).size !== 1) {
+    throw new Error(`${name} 的共同基线、本地候选与官网包名不一致；禁止自动修复超前基线`);
+  }
+
+  const baseHistory = canonicalChangeHistoryRecords(baseInfo.ChangeHistory);
+  const localHistory = new Set(canonicalChangeHistoryRecords(localInfo.ChangeHistory));
+  const remoteHistory = canonicalChangeHistoryRecords(remoteInfo.ChangeHistory);
+  const baseHistorySet = new Set(baseHistory);
+  const missingRemoteHistory = remoteHistory.filter(
+    record => !baseHistorySet.has(record) || !localHistory.has(record),
+  );
+  const missingBaseHistory = baseHistory.filter(record => !localHistory.has(record));
+  if (!remoteHistory.length
+      || !changeHistoryCoversVersion(remoteInfo.ChangeHistory, remoteVersion)
+      || !changeHistoryCoversVersion(baseInfo.ChangeHistory, baseVersion)
+      || !changeHistoryCoversVersion(localInfo.ChangeHistory, localVersion)
+      || missingRemoteHistory.length
+      || missingBaseHistory.length) {
+    throw new Error(
+      `${name} 的共同基线 ${baseVersion} 高于官网 ${remoteVersion}，但追加式更新历史不能证明官网是共同基线的祖先；禁止自动覆盖官网`,
+    );
+  }
+
+  return {
+    content: canonicalRemote,
+    recoveredFromAheadBaseline: true,
+    baseVersion,
+    localVersion,
+    remoteVersion,
+  };
+}
+
 export function ensureMinimumPackageVersion(packageInfo, minimumVersion) {
   if (!packageInfo || typeof packageInfo !== 'object' || Array.isArray(packageInfo)) {
     throw new Error('PackageInfo 必须是对象');
@@ -361,6 +462,22 @@ export function verifyOfflineReleaseSafety(resourceNames, localResources, baseRe
   }
 }
 
+/**
+ * The official resource engine validates every item before writing the batch.
+ * When that engine itself changes its package contracts, publish its standalone
+ * source first so the next CAS-protected batch is validated by the new engine.
+ */
+export function planOfficialResourcePublishBatches(changes) {
+  if (!Array.isArray(changes) || !changes.length) return [];
+  const controlPlaneName = 'official-resource-api.js';
+  const controlPlane = changes.find(item => item?.name === controlPlaneName);
+  if (!controlPlane || changes.length === 1) return [changes.slice()];
+  return [
+    [controlPlane],
+    changes.filter(item => item?.name !== controlPlaneName),
+  ];
+}
+
 function same(left, right) {
   if (left === MISSING || right === MISSING) return left === right;
   return JSON.stringify(left) === JSON.stringify(right);
@@ -386,6 +503,90 @@ function findIdentityField(...arrays) {
     ));
     return keys.every(Boolean) && new Set(keys).size === keys.length;
   })) || null;
+}
+
+const setLikeArrayPaths = new Set([
+  '$.PackageInfo.Capabilities',
+  '$.PackageInfo.RequiredPlatformCapabilities',
+]);
+
+function mergeSetLikeArray(base, local, remote, path, conflicts) {
+  const allPrimitiveStrings = [base, local, remote].every(items => (
+    items.every(item => typeof item === 'string' && item.trim())
+  ));
+  if (!allPrimitiveStrings) {
+    conflicts.push(`${path}: 集合数组只能包含非空字符串`);
+    return clone(local);
+  }
+
+  const baseSet = new Set(base);
+  const localSet = new Set(local);
+  const remoteSet = new Set(remote);
+  const order = [...new Set([...base, ...local, ...remote])];
+  return order.filter(item => {
+    const baseHas = baseSet.has(item);
+    const localHas = localSet.has(item);
+    const remoteHas = remoteSet.has(item);
+    if (localHas === remoteHas) return localHas;
+    if (localHas === baseHas) return remoteHas;
+    if (remoteHas === baseHas) return localHas;
+    conflicts.push(`${path}: 能力 ${item} 的三方集合状态无法判定`);
+    return localHas;
+  });
+}
+
+function historyLineVersion(line) {
+  return String(line).match(/(?:^|\s)(v?\d+\.\d+\.\d+)(?:\s|$)/i)?.[1]?.toLowerCase() || '';
+}
+
+function compareHistoryLines(left, right) {
+  const parse = line => {
+    const date = String(line).match(/^(\d{4}-\d{2}-\d{2})\b/)?.[1] || '';
+    const version = historyLineVersion(line).replace(/^v/i, '').split('.').map(Number);
+    return { date, version };
+  };
+  const a = parse(left);
+  const b = parse(right);
+  if (a.date !== b.date) return b.date.localeCompare(a.date);
+  for (let index = 0; index < 3; index += 1) {
+    const delta = Number(b.version[index] || 0) - Number(a.version[index] || 0);
+    if (delta) return delta;
+  }
+  return String(left).localeCompare(String(right), 'zh-CN');
+}
+
+function mergeAppendOnlyHistory(base, local, remote, path, conflicts) {
+  const lines = value => String(value || '').split(/\r?\n/).map(item => item.trim()).filter(Boolean);
+  const baseLines = lines(base);
+  const localLines = lines(local);
+  const remoteLines = lines(remote);
+  const localSet = new Set(localLines);
+  const remoteSet = new Set(remoteLines);
+  const missingLocal = baseLines.filter(line => !localSet.has(line));
+  const missingRemote = baseLines.filter(line => !remoteSet.has(line));
+  if (missingLocal.length || missingRemote.length) {
+    conflicts.push(`${path}: 更新日志只允许追加，不能删除或改写共同基线条目`);
+    return clone(local);
+  }
+
+  const baseSet = new Set(baseLines);
+  const additions = [...new Set([
+    ...localLines.filter(line => !baseSet.has(line)),
+    ...remoteLines.filter(line => !baseSet.has(line)),
+  ])];
+  const byVersion = new Map();
+  for (const line of additions) {
+    const version = historyLineVersion(line);
+    if (!version) continue;
+    const existing = byVersion.get(version);
+    if (existing && existing !== line) {
+      conflicts.push(`${path}: 版本 ${version} 被两端追加为不同内容`);
+      return clone(local);
+    }
+    byVersion.set(version, line);
+  }
+  additions.sort(compareHistoryLines);
+  return [...additions, ...baseLines].join('\n') + (additions.length || baseLines.length ? '\n' : '');
 }
 
 function mergeValue(base, local, remote, path, conflicts) {
@@ -415,6 +616,9 @@ function mergeValue(base, local, remote, path, conflicts) {
   }
 
   if (Array.isArray(base) && Array.isArray(local) && Array.isArray(remote)) {
+    if (setLikeArrayPaths.has(path)) {
+      return mergeSetLikeArray(base, local, remote, path, conflicts);
+    }
     const identityField = findIdentityField(base, local, remote);
     if (!identityField) {
       conflicts.push(`${path}: 无稳定标识的数组被两端同时修改`);
@@ -445,6 +649,11 @@ function mergeValue(base, local, remote, path, conflicts) {
       if (value !== MISSING) merged.push(value);
     }
     return merged;
+  }
+
+  if (path === '$.PackageInfo.ChangeHistory'
+      && typeof base === 'string' && typeof local === 'string' && typeof remote === 'string') {
+    return mergeAppendOnlyHistory(base, local, remote, path, conflicts);
   }
 
   conflicts.push(`${path}: 两端修改为不同值`);

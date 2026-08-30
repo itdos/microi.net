@@ -20,14 +20,15 @@
                 />
             </div>
         </teleport>
-        <MciRenderSourceBadge
-            v-if="appKey"
-            type="microservice"
-            placement="edge"
-            :instance-key="ownedRouteFullPath + ':' + appKey"
-            dismissible
-            :source-info="renderSourceInfo"
-        />
+        <div v-if="appKey" class="micro-app-host__source-badge-layer">
+            <MciRenderSourceBadge
+                type="microservice"
+                placement="inline"
+                :instance-key="ownedRouteFullPath + ':' + appKey"
+                dismissible
+                :source-info="renderSourceInfo"
+            />
+        </div>
         <micro-app-runtime-error
             v-if="error"
             :message="error"
@@ -67,7 +68,12 @@ import { DiyCommon } from "@/utils/diy.common";
 import { defineAsyncComponent } from "vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
 import { resolveUserThemeColor } from "@/utils/user-visual-preferences.js";
-import { buildMicroAppEntryUrl, shouldUseMicroAppResolveFallback } from "@/utils/microAppEntryUrl.js";
+import {
+    buildMicroAppEntryUrl,
+    getBundledMicroAppPageFallback,
+    shouldUseBundledMicroAppPageFallback,
+    shouldUseMicroAppResolveFallback
+} from "@/utils/microAppEntryUrl.js";
 import { resolveMicroAppHostViewport } from "@/utils/microAppViewport.js";
 import { isFormMaskBlurEnabled } from "@/utils/form-mask-blur.js";
 import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
@@ -901,6 +907,16 @@ export default {
         },
         async resolveManagedRuntime(config) {
             const requirePage = this.ownedRouteMeta?.microAppFriendlyRoute === true;
+            const bundledPageFallback = getBundledMicroAppPageFallback({
+                appKey: config.appKey,
+                routePath: config.microRoutePath,
+                requestedVersion: config.version
+            });
+            const canUseBundledPageFallback = result => shouldUseBundledMicroAppPageFallback(result, {
+                appKey: config.appKey,
+                routePath: config.microRoutePath,
+                requestedVersion: config.version
+            });
             let result = null;
             try {
                 result = await DiyCommon.PostAsync("/api/MicroApp/Resolve", {
@@ -916,14 +932,18 @@ export default {
                     IncludePageMetadata: !requirePage && Boolean(config.microRoutePath)
                 });
             } catch (resolveError) {
-                if (!shouldUseMicroAppResolveFallback(null, { requirePage, requestedVersion: config.version })) {
+                if (!shouldUseMicroAppResolveFallback(null, { requirePage, requestedVersion: config.version })
+                    && !canUseBundledPageFallback(null)) {
                     throw resolveError;
                 }
             }
             if (Number(result?.Code) !== 1) {
-                if (shouldUseMicroAppResolveFallback(result, { requirePage, requestedVersion: config.version })) {
+                if (shouldUseMicroAppResolveFallback(result, { requirePage, requestedVersion: config.version })
+                    || canUseBundledPageFallback(result)) {
                     this.publishStatus = "CompatibilityFallback";
-                    this.assetSource = "managed-stable-entry";
+                    this.assetSource = bundledPageFallback ? "bundled-page-stable-entry" : "managed-stable-entry";
+                    this.pageKey = bundledPageFallback?.pageKey || "";
+                    this.sourceFile = bundledPageFallback?.sourceFile || "";
                     return buildMicroAppEntryUrl({
                         apiBase: DiyCommon.GetApiBase(),
                         osClient: DiyCommon.GetOsClient(),
@@ -1321,6 +1341,24 @@ export default {
     isolation: auto;
 }
 
+.micro-app-host__source-badge-layer {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    z-index: 36;
+    display: flex;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    height: max-content;
+    justify-content: flex-end;
+    pointer-events: none;
+}
+
+.micro-app-host__source-badge-layer :deep(.mci-render-source-badge) {
+    max-width: 100%;
+    pointer-events: auto;
+}
+
 .micro-app-host__global-overlay {
     position: fixed;
     inset: 0;
@@ -1345,7 +1383,8 @@ export default {
 .micro-app-host__app {
     display: block;
     flex: 1 1 auto;
-    width: var(--micro-app-available-width);
+    width: 100%;
+    max-width: 100%;
     height: var(--micro-app-available-height);
     min-width: 0;
     min-height: var(--micro-app-available-height);
@@ -1356,6 +1395,7 @@ export default {
     box-sizing: border-box;
     contain: layout paint;
     isolation: isolate;
+    align-self: stretch;
 }
 
 .micro-app-host--modal-active .micro-app-host__app {

@@ -10,10 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: microi-store-package-storage
- * Version: v1.1.0
+ * Version: v1.2.1
  * Function:
- * - 将应用商城 JSON 安装包写入公有或私有 HDFS，完成 UTF-8 字节数与 SHA-256 回读校验，并复用已验证的内容寻址包对象。
- * - 发布写入暂时固定使用已经过生产验证的 Base64 单次上传路径；UploadText 完成真实嵌套接口/HDFS 集成门禁前不自动切换，避免结果未知时重复写对象。
+ * - 将应用商城 JSON 安装包以 UTF-8 Base64 无损传输写入公有或私有 HDFS，完成字节数与 SHA-256 回读校验，并复用已验证的内容寻址包对象。
  */
 
 function text(value) { return value === null || value === undefined ? '' : String(value); }
@@ -164,9 +163,28 @@ if (action === 'EnsureSchema') {
 if (action !== 'Store') return { Code: 0, Msg: '不支持的 Action：' + action };
 
 var storeId = trim(V8.Param.StoreId || V8.Param.Id);
-var packageText = typeof V8.Param.Package === 'string'
-  ? V8.Param.Package
-  : (typeof V8.Param.PackageJson === 'string' ? V8.Param.PackageJson : JSON.stringify(V8.Param.Package || {}));
+// MARKETPLACE_PACKAGE_UTF8_BASE64_TRANSPORT_V1：长中文 JSON 不再直接跨
+// V8.ApiEngine.Run 参数边界；调用方先编码为纯 ASCII Base64，本接口严格
+// 解码并执行 UTF-8 往返校验，随后把同一组原始字节交给 HDFS。
+var packageByteBase64 = trim(V8.Param.PackageByteBase64);
+var packageText = '';
+if (packageByteBase64) {
+  try {
+    var packageBytes = System.Convert.FromBase64String(packageByteBase64);
+    packageText = String(System.Text.Encoding.UTF8.GetString(packageBytes));
+    var roundTripBase64 = String(System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(packageText)));
+    if (roundTripBase64 !== packageByteBase64) {
+      return { Code: 0, Msg: 'PackageByteBase64 不是可无损往返的规范 UTF-8 Base64。' };
+    }
+  } catch (decodeError) {
+    return { Code: 0, Msg: 'PackageByteBase64 解码失败：' + decodeError.message };
+  }
+} else {
+  // 兼容旧发布器和历史容量治理调用；新调用必须优先使用 Base64 传输。
+  packageText = typeof V8.Param.Package === 'string'
+    ? V8.Param.Package
+    : (typeof V8.Param.PackageJson === 'string' ? V8.Param.PackageJson : JSON.stringify(V8.Param.Package || {}));
+}
 if (!storeId) return { Code: 0, Msg: 'StoreId 不能为空。' };
 if (!packageText || packageText === '{}') return { Code: 0, Msg: 'Package 不能为空。' };
 
@@ -242,7 +260,6 @@ var uploadParam = {
   OsClient: V8.OsClient,
   Path: 'microi-store/packages/' + safeSegment(storeId, 'store'),
   FileName: fileName,
-  Content: packageText,
   Limit: isPrivate,
   Preview: false,
   Multiple: false
@@ -252,7 +269,7 @@ var uploadParam = {
 // 更不能在结果为空/异常后回退重传；因为第一次写入结果未知时，第二次上传可能
 // 生成孤儿对象。这里始终只执行一次已经过生产发布验证的 Base64 上传。
 var uploadFiles = {};
-uploadFiles[fileName] = V8.Base64.StringToBase64(packageText);
+uploadFiles[fileName] = packageByteBase64 || V8.Base64.StringToBase64(packageText);
 var uploadResult = V8.Method.Upload({
   OsClient: uploadParam.OsClient,
   Path: uploadParam.Path,
@@ -266,7 +283,7 @@ if (!uploadResult || uploadResult.Code !== 1) {
     Code: 0,
     Msg: '应用包上传 HDFS 失败：' + ((uploadResult && uploadResult.Msg) || '上传原子未返回标准结果'),
     DataAppend: {
-      UploadMode: 'Base64SingleAttempt',
+      UploadMode: packageByteBase64 ? 'Utf8Base64TransportSingleAttempt' : 'LegacyStringBase64SingleAttempt',
       HasResult: !!uploadResult,
       ResultCode: uploadResult && uploadResult.Code !== undefined ? uploadResult.Code : null
     }
@@ -310,4 +327,12 @@ if (!addResult || addResult.Code !== 1) {
   return { Code: 1, Data: writePointerCache(cacheKey, concurrent.Data[0]), DataAppend: { Reused: true, Concurrent: true }, Msg: '并发发布已复用相同应用包。' };
 }
 
-return { Code: 1, Data: writePointerCache(cacheKey, packageRow), DataAppend: { Reused: false }, Msg: '应用包已上传 HDFS 并完成字节数与 SHA-256 回读校验。' };
+return {
+  Code: 1,
+  Data: writePointerCache(cacheKey, packageRow),
+  DataAppend: {
+    Reused: false,
+    InputMode: packageByteBase64 ? 'PackageByteBase64' : 'LegacyPackageString'
+  },
+  Msg: '应用包已上传 HDFS 并完成字节数与 SHA-256 回读校验。'
+};

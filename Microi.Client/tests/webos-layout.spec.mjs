@@ -169,7 +169,7 @@ test('macOS expands widget-only containers while preserving normal menu folders'
 test('Windows desktop fills vertical taskbar-style columns and has an isolated cache', () => {
     const source = read('src/views/webos/components/win/desk.vue');
     assert.match(source, /class="microi-windows-desk/);
-    assert.match(source, /grid-template-rows:\s*repeat\(auto-fill,\s*100px\)/);
+    assert.match(source, /grid-template-rows:\s*repeat\(auto-fill,\s*96px\)/);
     assert.match(source, /grid-auto-flow:\s*column/);
     assert.match(source, /SetModuleList\('windows'/);
 });
@@ -190,24 +190,26 @@ test('WebOS toolbar carries the classic-shell quick functions', () => {
     assert.match(source, /<LangSelect[^>]+compact/);
     assert.match(source, /openWebosPersonalCenter/);
     assert.match(source, /\.webos-quick-actions :deep\(\.el-icon svg\)/);
+    const avatarRule = source.match(/\.wavatar\s*\{([\s\S]*?)\n\}/)?.[1] || '';
+    assert.match(avatarRule, /background:\s*transparent/);
+    assert.match(avatarRule, /border:\s*0/);
 });
 
-test('Dock renders a menu Icon before folder thumbnails or IconClass and reserves hover headroom', () => {
+test('Dock replaces PNG menu artwork with centered theme-aware SVG and reserves hover headroom', () => {
     for (const sourcePath of [
         'src/views/webos/components/mac/dock.vue',
         'src/views/webos/components/win/dock.vue',
     ]) {
         const source = read(sourcePath);
-        const imageBranch = source.indexOf('v-if="hasImageIcon(item)"');
-        const folderBranch = source.indexOf('v-else-if="isArray(item?._Child)"');
-        const fallbackBranch = source.indexOf('has-iconclass');
-        assert.ok(imageBranch >= 0 && imageBranch < folderBranch, sourcePath);
-        assert.ok(folderBranch < fallbackBranch, sourcePath);
-        assert.match(source, /@error="handleIconError\(item\)"/);
+        assert.match(source, /import ThemeMenuIcon/);
+        assert.match(source, /<ThemeMenuIcon :item="item" mode="theme"/);
+        assert.match(source, /<ThemeMenuIcon :item="task" mode="theme"/);
+        assert.doesNotMatch(source, /GetFileServerUrl\((?:item|task)\.Icon\)/);
+        assert.doesNotMatch(source, /hasImageIcon\((?:item|task)\)/);
     }
     const macDock = read('src/views/webos/components/mac/dock.vue');
-    assert.match(macDock, /min-height:\s*68px/);
-    assert.match(macDock, /transform:\s*scale\(1\.2\) translateY\(-3px\)/);
+    assert.match(macDock, /min-height:\s*78px/);
+    assert.match(macDock, /transform:\s*scale\(1\.13\) translateY\(-3px\)/);
 });
 
 test('desktop styles use per-style persisted menus and safe external links', () => {
@@ -221,4 +223,26 @@ test('desktop styles use per-style persisted menus and safe external links', () 
     const navigation = read('src/views/webos/utils/navigation.js');
     assert.match(navigation, /\['http:', 'https:'\]/);
     assert.match(navigation, /'_blank', 'noopener,noreferrer'/);
+});
+
+test('macOS and Windows force table forms into managed dialogs with table-defined width', () => {
+    const table = read('src/views/form-engine/diy-table.vue');
+    const form = read('src/views/form-engine/diy-form-full.vue');
+    const dialogMixin = read('src/views/form-engine/mixins/diy-form-full-dialog.mixin.js');
+    const adapter = read('src/views/webos/utils/v8-adapter.js');
+    const manager = read('src/views/webos/components/WindowManager.vue');
+
+    assert.match(table, /isWebosDesktopWindow[\s\S]*?\? "Dialog"/);
+    assert.match(table, /Width:\s*self\.CurrentDiyTableModel\.FormOpenWidth \|\| "80%"/);
+    assert.match(form, /:append-to-body="true"/);
+    assert.match(form, /:modal-append-to-body="true"/);
+    assert.match(form, /:fullscreen="IsWebosWindowMaximized\(\)"/);
+    assert.match(form, /class="diy-form-webos-restore"/);
+    assert.match(form, /class="diy-form-webos-window-controls"/);
+    assert.match(dialogMixin, /WebosMinimizeFormWindow\(\)[\s\S]*?this\.WebosFormMinimized = true/);
+    assert.match(dialogMixin, /WebosToggleMaximizeFormWindow\(\)[\s\S]*?this\.WebosFormMaximized = !this\.WebosFormMaximized/);
+    assert.doesNotMatch(dialogMixin, /\$webosWindow\?\.(?:minimize|toggleMaximize)/);
+    assert.match(adapter, /_SelectFields:\s*\['Id', 'FormOpenType', 'FormOpenWidth'\]/);
+    assert.match(adapter, /menu\.FormOpenWidth = table\.FormOpenWidth \|\| '80%'/);
+    assert.match(manager, /isCurrentUserAdmin\.value && isWebosDesignerRouteForMenu/);
 });

@@ -6,11 +6,11 @@ const resourceRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export const officialPackageChangeLogDefinitions = Object.freeze({
   'app.microi.form-engine.json': Object.freeze({
-    version: 'v7.6.7',
-    title: '历史长表名升级兼容',
-    changeType: 'Fix',
-    content: '将 diy_field.TableName 的新装结构、物理字段元数据和表单字段元数据统一扩容为 varchar(255)，兼容历史长表名并避免升级复制 diy_table.Name 时中断。',
-    releaseTime: '2026-08-26 14:30:00',
+    version: 'v7.6.8',
+    title: '接口引擎多路由字段与缓存契约',
+    changeType: 'Feature',
+    content: '新增 sys_apiengine.ApiRoutes“多路由”物理列与字段元数据；英文分号分隔的旧地址与主路由共同参与精确匹配、冲突检查和缓存。',
+    releaseTime: '2026-08-30 12:00:00',
   }),
   'app.microi.module-engine.json': Object.freeze({
     version: 'v7.6.1',
@@ -20,25 +20,53 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
     releaseTime: '2026-08-25 16:00:00',
   }),
   'app.microi.store.json': Object.freeze({
-    version: 'v7.7.3',
-    title: '官网推荐应用字段交付闭环',
-    changeType: 'Feature',
-    content: '新增 sys_microistore.IsRecommend 的 DDL、物理列快照与低代码字段元数据，为官网推荐分类、推荐优先排序及超级管理员推荐操作提供可升级、可重放的应用商城基础结构。',
-    releaseTime: '2026-08-27 21:11:50',
+    version: 'v7.7.18',
+    title: '应用包长中文 UTF-8 无损传输',
+    changeType: 'Fix',
+    content: '应用包发布器 v1.9.13 与官方资源控制面 v1.3.4 在嵌套 V8 调用前统一把 JSON 编码为 UTF-8 Base64；存储端 v1.2.1 严格执行解码再编码一致性校验并上传同一原始字节，修复长中文源码在接口参数边界出现替换字符、导致资源快照与 HDFS 包正文不一致的问题。',
+    releaseTime: '2026-08-30 20:55:00',
   }),
   'app.microi.saas-engine.json': Object.freeze({
-    version: 'v7.7.2',
-    title: '数据源引擎统一迁入接口引擎',
+    version: 'v7.7.8',
+    title: '强身份验证接口引擎化与可信原子收敛',
     changeType: 'Optimize',
-    content: '将数据源类型、统一 ApiV8Code 编辑体验和历史入口兼容迁入接口引擎；升级程序事务化复制旧数据并软删除 sys_datasource。',
-    releaseTime: '2026-08-27 12:00:00',
+    content: '将 IdentityVerificationController 迁为无公开路由的 WebAuthn 可信原子，并由 platform-identity-verification 多路由兼容全部旧强身份接口。',
+    releaseTime: '2026-08-30 12:00:00',
   }),
   'app.microi.sso.json': Object.freeze({
-    version: 'v7.5.8',
-    title: 'SSO 官方资源归属重放修复',
-    changeType: 'Fix',
-    content: '将全部官方 Managed SSO 接口固化为 Platform 所有权，CreateIfMissing 个性化 Hook 继续归租户且永不覆盖，避免 Upgrade13 重放内置包时被误判为资源降级。',
-    releaseTime: '2026-08-26 14:30:00',
+    version: 'v7.5.9',
+    title: 'SSO 公开协议路由全面接口引擎化',
+    changeType: 'Optimize',
+    content: '将原 SsoProtocolGatewayController 的 24 个 OIDC、SAML2、CAS 与登录编排路由全部迁入官方 Managed 接口引擎；新增受控 HTTP 响应与 {OsClient} 路径模板能力，C# 仅保留不可由租户覆盖的协议、安全和票据原子，CreateIfMissing 个性化 Hook 继续归租户维护。',
+    releaseTime: '2026-08-30 12:00:00',
+  }),
+  'app.microi.sys_user.json': Object.freeze({
+    version: 'v7.6.3',
+    title: '系统账号多路由与访问密钥闭包',
+    changeType: 'Optimize',
+    content: '将用户访问密钥四个旧控制器入口迁入 platform-user-access-key Managed 接口引擎，并与系统账号旧路由统一纳入多路由闭包。',
+    releaseTime: '2026-08-30 12:00:00',
+  }),
+  'app.microi.sys-config.json': Object.freeze({
+    version: 'v6.3.9',
+    title: '租户系统设置接口引擎化',
+    changeType: 'Optimize',
+    content: '将 TenantSystemSettingsController 迁入 platform-tenant-system-settings；多路由统一普通 CRUD、地图运行时、Secret 保存与二次认证揭示。',
+    releaseTime: '2026-08-30 12:00:00',
+  }),
+  'app.microi.message-notification.json': Object.freeze({
+    version: 'v1.0.13',
+    title: '系统消息多路由与发布历史闭包',
+    changeType: 'Optimize',
+    content: '完成 /api/DiyChat/SendSystemMessage 多路由、事务提交后实时投递与官方包追加式发布历史闭包。',
+    releaseTime: '2026-08-30 12:00:00',
+  }),
+  'app.microi.ai-engine.json': Object.freeze({
+    version: 'v7.6.1',
+    title: 'AI 历史非流式路由接口引擎化',
+    changeType: 'Optimize',
+    content: '将旧 /api/Ai 非流式地址全部收入 platform-ai-runtime 与 platform-ai-account 多路由，动作映射和管理员复核保持不变。',
+    releaseTime: '2026-08-30 12:00:00',
   }),
 });
 
@@ -84,9 +112,11 @@ function ensureCurrentHistory(packageInfo, definition) {
   packageInfo.ChangeHistory = [line, ...withoutCurrent].join('\n') + '\n';
 }
 
-export function configureOfficialPackageChangeLogs(root = resourceRoot) {
+export function configureOfficialPackageChangeLogs(root = resourceRoot, { fileNames = null } = {}) {
   const summaries = [];
+  const requested = Array.isArray(fileNames) && fileNames.length ? new Set(fileNames) : null;
   for (const [fileName, definition] of Object.entries(officialPackageChangeLogDefinitions)) {
+    if (requested && !requested.has(fileName)) continue;
     const filePath = path.join(root, fileName);
     const packageModel = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     const packageInfo = packageModel.PackageInfo ||= {};
@@ -114,5 +144,10 @@ export function configureOfficialPackageChangeLogs(root = resourceRoot) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  process.stdout.write(`${JSON.stringify(configureOfficialPackageChangeLogs(), null, 2)}\n`);
+  const packageIndex = process.argv.indexOf('--package');
+  const requestedPackage = packageIndex >= 0 ? String(process.argv[packageIndex + 1] || '').trim() : '';
+  if (packageIndex >= 0 && !requestedPackage) throw new Error('--package 必须提供官方包文件名');
+  process.stdout.write(`${JSON.stringify(configureOfficialPackageChangeLogs(resourceRoot, {
+    fileNames: requestedPackage ? [requestedPackage] : null,
+  }), null, 2)}\n`);
 }

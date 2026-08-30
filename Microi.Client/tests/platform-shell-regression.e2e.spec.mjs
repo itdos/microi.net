@@ -327,6 +327,35 @@ test("通知中心：快速打开80%大圆角可拖动弹层，消息详情保�
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "07-notification-center-dialog.png"), fullPage: false });
 });
 
+test("通知中心：吾码官方主租户不检查或展示应用安装提醒", async ({ page }) => {
+    test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
+    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    const officialStoreRequests = [];
+    page.on("request", (request) => {
+        if (/^https:\/\/api\.itdos\.com\/apiengine\/get-microi-store-list(?:\?|$)/i.test(request.url())) {
+            officialStoreRequests.push(request.url());
+        }
+    });
+
+    await openRoute(page, "#/api-engine");
+    const entry = page.locator(".task-entry").first();
+    await expect(entry).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(3_000);
+    await entry.click();
+
+    const dialog = page.locator(".microi-notification-dialog.mci-unified-dialog").last();
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
+    const officialAppsSummary = dialog.locator(".summary-card.warning");
+    await expect(officialAppsSummary).toContainText(/官方应用|Platform apps/i);
+    await expect(officialAppsSummary.locator("strong")).toHaveText("0");
+    expect(officialStoreRequests, "官方发布源禁止安装应用，不应发起安装版本盘点请求").toEqual([]);
+
+    await page.screenshot({
+        path: path.join(SCREENSHOT_DIR, "08-official-tenant-zero-app-install-notices.png"),
+        fullPage: false
+    });
+});
+
 test("通知中心：低高度和小分辨率保持右侧滚动并可到达后台任务分页", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });

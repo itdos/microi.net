@@ -9,6 +9,14 @@ description: Microi V8 工作流事件指南。用于编写审批流条件、节
 
 你正在开发 Microi 吾码平台的工作流（审批流程）V8 事件。流程引擎基于表单引擎，通过 V8 事件控制审批逻辑。
 
+## 后端类库与接口边界
+
+- 工作流运行时固定属于独立 `Microi.WorkFlow` 类库；`Microi.net.Api` 只注册 `AddMicroiWorkFlow()`，不得恢复 `WorkFlowController` 或把流程业务写回 `Program.cs`。
+- 对外与旧移动端路由统一由官方 Managed `platform-workflow` 接口引擎承载，历史 `/api/WorkFlow/*` 地址写入同一记录的 `ApiRoutes`。租户个性化逻辑写在 CreateIfMissing `platform-workflow-custom-hook`，默认只返回 `{ Code: 1 }`。
+- `Microi.Core` 只保留避免循环引用所需的 `IWFEngine`、模型和最小运行时合同；发起、审批、撤回、移交、退回及审批人计算实现在 `Microi.WorkFlow`，并按职责拆分 partial 文件。
+- 新业务规则仍优先写工作流 V8/接口引擎。只有事务、流程状态机、可信当前用户和运行时内核缺少不可伪造的底层原子时，才扩展 `Microi.WorkFlow`。
+- 官方发布时 `Microi.WorkFlow` 必须生成 NuGet 包，并与 `Microi.AI` 使用同一 Obfuscar 配置加密后替换包内 DLL；不得推送未加密的 WorkFlow 包。开源安装只消费 NuGet，不要求存在私有源码。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=v8-workflow-000 sha256=9030cd2de9f1febfb9a749c82cf83e97ccb8fb972a3f8f0ff11067488e14cd8e -->
 ## 本地优先与版本头（必做）

@@ -1,8 +1,5 @@
-using System.Reflection;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Microi.net;
-using Microi.net.Api;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.Common;
 
@@ -28,17 +25,25 @@ public class TenantAdminCredentialSecurityTests
         }
     }
 
-    [Theory]
-    [InlineData(nameof(SysUserController.GetOwnedTenantAdminPassword))]
-    [InlineData(nameof(SysUserController.ResetOwnedTenantAdminPassword))]
-    public void OwnedTenantAdminCredentialEndpoints_ArePostOnlyAndAuthenticated(string actionName)
+    [Fact]
+    public void OwnedTenantAdminCredentialEndpoints_ArePostOnlyManagedApiRoutes()
     {
-        var action = typeof(SysUserController).GetMethod(actionName);
+        var root = FindRepositoryRoot();
+        var package = JObject.Parse(File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+        var engine = package["SysApiEngines"]!.Values<JObject>()
+            .Single(item => item.Value<string>("ApiEngineKey") == "platform-sys-user-session");
+        var runtime = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net", "Identity", "SysUserSessionRuntime.cs"));
 
-        Assert.NotNull(action);
-        Assert.NotNull(action!.GetCustomAttribute<HttpPostAttribute>());
-        Assert.Null(action.GetCustomAttribute<HttpGetAttribute>());
-        Assert.Null(action.GetCustomAttribute<AllowAnonymousAttribute>());
+        Assert.False(File.Exists(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "SysUserController.cs")));
+        Assert.Contains("/api/SysUser/GetOwnedTenantAdminPassword", engine.Value<string>("ApiRoutes"));
+        Assert.Contains("/api/SysUser/ResetOwnedTenantAdminPassword", engine.Value<string>("ApiRoutes"));
+        Assert.Contains("postOnly.indexOf(action)", engine.Value<string>("ApiV8Code"));
+        Assert.Contains("V8.Param._HttpMethod", engine.Value<string>("ApiV8Code"));
+        Assert.Contains("PostOnlyActions.Contains(action)", runtime, StringComparison.Ordinal);
+        Assert.Contains("Request?.Method", runtime, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -92,5 +97,18 @@ public class TenantAdminCredentialSecurityTests
         Assert.Equal(0, result.Code);
         Assert.Contains("单向密码哈希", result.Msg, StringComparison.Ordinal);
         Assert.Null(result.Data);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "Microi.Server"))
+                && Directory.Exists(Path.Combine(directory.FullName, "Microi.Client")))
+                return directory.FullName;
+            directory = directory.Parent;
+        }
+        throw new DirectoryNotFoundException("Repository root was not found.");
     }
 }

@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.9.8 V3 source", () => {
+test("publisher package metadata matches the v1.9.13 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.9.8");
+  assert.equal(packagedPublisher.Version, "v1.9.13");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -343,6 +343,68 @@ test("MenuContract must exactly match the opt-in MenuIds and is attached to pack
   assert.match(publisherSource, /ExactMenuIds=true 时必须提供与菜单集合一致的 MenuContract/);
 });
 
+test("exact menu export removes only package-external root parents and preserves the contracted closure", () => {
+  const context = { JSON, Object, String };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "persistedJsonValue")}
+    ${extractFunction(publisherSource, "normalizeExactExportedMenuClosure")}
+    result = normalizeExactExportedMenuClosure;
+  `, context);
+
+  const contract = {
+    Count: 2,
+    MenuIds: ["root", "child"],
+    Menus: [
+      { Id: "root", Name: "业务根", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+      { Id: "child", Name: "数据管理", ParentId: "root", DiyTableId: "table-1", DiyTableName: "app_table" },
+    ],
+  };
+  const normalized = context.result([
+    { Id: "root", Name: "业务根", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+    { Id: "child", Name: "数据管理", ParentId: "root", DiyTableId: "table-1", DiyTableName: "app_table" },
+  ], contract, true);
+  assert.equal(normalized[0].ParentId, null);
+  assert.equal(normalized[1].ParentId, "root");
+
+  assert.throws(() => context.result([
+    { Id: "root", Name: "业务根", ParentId: "child", DiyTableId: "", DiyTableName: "" },
+    { Id: "child", Name: "数据管理", ParentId: "root", DiyTableId: "table-1", DiyTableName: "app_table" },
+  ], contract, true), /精确菜单根.*ParentId 与 MenuContract 不一致/);
+  assert.throws(() => context.result([
+    { Id: "root", Name: "错误名称", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+    { Id: "child", Name: "数据管理", ParentId: "root", DiyTableId: "table-1", DiyTableName: "app_table" },
+  ], contract, true), /Name 与 MenuContract 不一致/);
+
+  assert.throws(() => context.result([
+    { Id: "root-a", Name: "根A", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+    { Id: "root-b", Name: "根B", ParentId: "another-directory", DiyTableId: "", DiyTableName: "" },
+  ], {
+    Count: 2,
+    MenuIds: ["root-a", "root-b"],
+    Menus: [
+      { Id: "root-a", Name: "根A", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+      { Id: "root-b", Name: "根B", ParentId: "another-directory", DiyTableId: "", DiyTableName: "" },
+    ],
+  }, true), /唯一可移植根/u);
+
+  assert.throws(() => context.result([
+    { Id: "root", Name: "业务根", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+    { Id: "a", Name: "A", ParentId: "b", DiyTableId: "table-a", DiyTableName: "app_a" },
+    { Id: "b", Name: "B", ParentId: "a", DiyTableId: "table-b", DiyTableName: "app_b" },
+  ], {
+    Count: 3,
+    MenuIds: ["root", "a", "b"],
+    Menus: [
+      { Id: "root", Name: "业务根", ParentId: "tenant-directory", DiyTableId: "", DiyTableName: "" },
+      { Id: "a", Name: "A", ParentId: "b", DiyTableId: "table-a", DiyTableName: "app_a" },
+      { Id: "b", Name: "B", ParentId: "a", DiyTableId: "table-b", DiyTableName: "app_b" },
+    ],
+  }, true), /菜单父级环/u);
+});
+
 test("storeRow saves explicit SelectMenu metadata and otherwise preserves the stored JSON", () => {
   const resolve = storeMenuResolver();
   const menus = [{
@@ -566,7 +628,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.9\.8/);
+  assert.match(publisherSource, /Version: v1\.9\.13/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,
@@ -587,6 +649,120 @@ test("protocol v3 package write is a committed-proof fenced CAS with pre/post re
   );
   assert.doesNotMatch(v3Branch, /upsertStore|AddFormData|UptFormData\('sys_microistore'/u);
   assert.match(v3Branch, /assertV3CommittedStore\(postPublishStore, committedProof, '写包后'\)/u);
+});
+
+function resourceSnapshotHarness() {
+  const context = {
+    V8: {
+      EncryptHelper: {
+        Sha256Hex(value) {
+          return crypto.createHash("sha256").update(String(value), "utf8").digest("hex");
+        },
+      },
+    },
+    JSON,
+    Object,
+    String,
+    isFinite,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "ok")}
+    ${extractFunction(publisherSource, "fail")}
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    ${extractFunction(publisherSource, "sha256Hex")}
+    var RESOURCE_SNAPSHOT_SCHEMA = 'Microi.ApplicationResourceSnapshot';
+    var RESOURCE_SNAPSHOT_SCHEMA_VERSION = 1;
+    ${extractFunction(publisherSource, "canonicalResourceJson")}
+    ${extractFunction(publisherSource, "sortCanonicalResourceArray")}
+    ${extractFunction(publisherSource, "normalizeSnapshotDataSets")}
+    ${extractFunction(publisherSource, "normalizeSnapshotMenuContract")}
+    ${extractFunction(publisherSource, "buildResourceSnapshot")}
+    ${extractFunction(publisherSource, "persistedJsonValue")}
+    ${extractFunction(publisherSource, "createResourceSnapshotReceipt")}
+    ${extractFunction(publisherSource, "readExpectedResourceSnapshotHash")}
+    ${extractFunction(publisherSource, "resourceSnapshotCasCapability")}
+    ${extractFunction(publisherSource, "enforceResourceSnapshotCas")}
+    result = {
+      create: createResourceSnapshotReceipt,
+      enforce: enforceResourceSnapshotCas
+    };
+  `, context);
+  return context.result;
+}
+
+test("resource snapshot is canonical across resource and dataset row order", () => {
+  const harness = resourceSnapshotHarness();
+  const resources = {
+    DiyTables: [{ Name: "z", Id: "2" }, { Id: "1", Name: "a" }],
+    DataSets: [{ TableName: "orders", Rows: [{ Id: "2" }, { Id: "1" }] }],
+    SysApiEngines: [{ ApiEngineKey: "b", ApiV8Code: "return 2" }, { ApiV8Code: "return 1", ApiEngineKey: "a" }],
+  };
+  const reversed = {
+    SysApiEngines: [...resources.SysApiEngines].reverse(),
+    DataSets: [{ Rows: [...resources.DataSets[0].Rows].reverse(), TableName: "orders" }],
+    DiyTables: [...resources.DiyTables].reverse(),
+  };
+  const contract = { MenuIds: ["menu-b", "menu-a"], Menus: [{ Id: "b" }, { Id: "a" }] };
+  const left = harness.create("sample-app", "v1.1.0", contract, resources, { ApiEngines: {} });
+  const right = harness.create("sample-app", "v1.1.0", {
+    Menus: [...contract.Menus].reverse(),
+    MenuIds: [...contract.MenuIds].reverse(),
+  }, reversed, { ApiEngines: {} });
+  assert.equal(left.ResourceSnapshotHash, right.ResourceSnapshotHash);
+  assert.equal(left.ResourceSnapshotCanonicalJson, right.ResourceSnapshotCanonicalJson);
+  assert.match(left.ResourceSnapshotHash, /^[a-f0-9]{64}$/u);
+  assert.deepEqual(Array.from(left.ResourceSnapshot.Resources.DataSets[0].Rows, row => row.Id), ["1", "2"]);
+});
+
+test("resource snapshot hashes the final persisted JSON shape instead of Jint host-object metadata", () => {
+  const harness = resourceSnapshotHarness();
+  const menuContract = {
+    Count: 2,
+    MenuIds: ["menu-b", "menu-a"],
+    Menus: [{ Id: "b" }, { Id: "a" }],
+  };
+  Object.defineProperty(menuContract, "length", { value: 0, enumerable: false });
+  const createdAt = new Date("2026-08-29T12:34:56.000Z");
+  const resources = {
+    ApplicationBundle: { PackageAssets: { MenuContract: menuContract } },
+    DiyTables: [{ Id: "table-1", CreateTime: createdAt }],
+    ResourcePolicies: { ApiEngines: {} },
+  };
+  const receipt = harness.create("sample-app", "v1.1.0", menuContract, resources, resources.ResourcePolicies);
+  assert.equal(receipt.ResourceSnapshot.MenuContract.Count, 2);
+  assert.deepEqual(Array.from(receipt.ResourceSnapshot.MenuContract.MenuIds), ["menu-a", "menu-b"]);
+  assert.equal(receipt.ResourceSnapshot.Resources.DiyTables[0].CreateTime, createdAt.toISOString());
+  assert.match(receipt.ResourceSnapshotHash, /^[a-f0-9]{64}$/u);
+});
+
+test("protocol v3 resource snapshot CAS inspects read-only and rejects missing or drifting hashes", () => {
+  const harness = resourceSnapshotHarness();
+  const receipt = harness.create("sample-app", "v1.1.0", null, { DiyTables: [{ Id: "1", Name: "one" }] }, null);
+  const inspect = harness.enforce("InspectResourceSnapshot", true, "", receipt);
+  assert.equal(inspect.Code, 1);
+  assert.equal(inspect.Data.ShouldPublish, false);
+  assert.equal(inspect.Data.ResourceSnapshotCasCapability.supported, true);
+  assert.equal(inspect.Data.ResourceSnapshotHash, receipt.ResourceSnapshotHash);
+  assert.equal(harness.enforce("Publish", true, "", receipt).Code, 0);
+  const drift = harness.enforce("Publish", true, "0".repeat(64), receipt);
+  assert.equal(drift.Code, 0);
+  assert.match(drift.Msg, /资源快照已漂移/u);
+  const matched = harness.enforce("Publish", true, receipt.ResourceSnapshotHash, receipt);
+  assert.equal(matched.Code, 1);
+  assert.equal(matched.Data.ShouldPublish, true);
+});
+
+test("resource snapshot gate and package fingerprint run before any package storage write", () => {
+  const gateIndex = publisherSource.indexOf("var resourceSnapshotGate = enforceResourceSnapshotCas(");
+  const markerIndex = publisherSource.indexOf("packageModel.ResourceSnapshot = {");
+  const storageIndex = publisherSource.indexOf("var storageResult = V8.ApiEngine.Run('microi-store-package-storage'");
+  assert.ok(markerIndex > 0 && gateIndex > markerIndex && storageIndex > gateIndex);
+  assert.match(publisherSource, /PackageInfo\.ResourceSnapshotHash = resourceSnapshotReceipt\.ResourceSnapshotHash/u);
+  assert.match(publisherSource, /ExpectedResourceSnapshotHash/u);
+  assert.match(publisherSource, /ResourceSnapshotCanonicalJson/u);
 });
 
 test("v3 route canonical JSON 固定向量与 Node/MCP 一致且拒绝非 safe integer", () => {

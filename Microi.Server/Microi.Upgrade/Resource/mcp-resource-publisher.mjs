@@ -424,7 +424,7 @@ function validateReconcileExecution(execution, expected) {
 }
 
 const liveApiEngineFields = Object.freeze([
-  'ApiName', 'ApiEngineKey', 'ApiAddress', 'IsEnable', 'ApiRole',
+  'ApiName', 'ApiEngineKey', 'ApiAddress', 'ApiRoutes', 'IsEnable', 'ApiRole',
   'AllowAnonymous', 'Files', 'Category', 'EnableLog', 'StopHttp', 'Timeout',
   'MaxStatements', 'LimitMemory', 'LimitRecursion', 'Lock', 'LockKey', 'ResponseFile',
   'ResponseType', 'TestParam', 'ApiRemark', 'V8Limit', 'V8Unlimited', 'Version',
@@ -433,6 +433,7 @@ const liveApiEngineFields = Object.freeze([
 const liveApiEngineDefaults = Object.freeze({
   IsEnable: 1,
   ApiRole: '[]',
+  ApiRoutes: '',
   AllowAnonymous: 0,
   Files: '[]',
   Category: '',
@@ -526,35 +527,49 @@ function collectExpectedProjectionEngines(snapshots) {
 
 async function readLiveEngineMetadata(client, projections) {
   const fields = ['Id', 'IsDeleted', ...liveApiEngineFields];
-  const rows = [];
+  const rowsByKey = new Map();
   const batchSize = 10;
-  for (let offset = 0; offset < projections.length; offset += batchSize) {
-    const keys = projections.slice(offset, offset + batchSize).map(item => item.key);
-    const operation = `回读官网 live 接口元数据 ${offset / batchSize + 1}`;
-    const { result } = await callCodexTool(
-      client,
-      'microi_get_table_data',
-      {
-        tableName: 'sys_apiengine',
-        query: {
-          _Where: [['ApiEngineKey', 'In', keys]],
-          _SelectFields: fields,
-          _PageIndex: 1,
-          _PageSize: batchSize + 1,
+  // 投影请求可能已在服务端提交、但网关先返回 524；数据库提交后的接口缓存与
+  // MCP 读模型存在一个很短的可见性窗口。只重查尚未出现的 Key，避免把 383 个
+  // 已确认接口反复回读，也不会把持续缺失误报为成功。
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    const remaining = projections.filter(item => !rowsByKey.has(item.key.toLowerCase()));
+    if (!remaining.length) break;
+    for (let offset = 0; offset < remaining.length; offset += batchSize) {
+      const keys = remaining.slice(offset, offset + batchSize).map(item => item.key);
+      const operation = `回读官网 live 接口元数据 ${offset / batchSize + 1}（第 ${attempt} 次）`;
+      const { result } = await callCodexTool(
+        client,
+        'microi_get_table_data',
+        {
+          tableName: 'sys_apiengine',
+          query: {
+            _Where: [['ApiEngineKey', 'In', keys]],
+            _SelectFields: fields,
+            _PageIndex: 1,
+            _PageSize: batchSize + 1,
+          },
         },
-      },
-      operation,
-    );
-    const page = parseRawJsonToolResult(result, operation);
-    if (!Array.isArray(page)) throw new Error(`${operation}失败：返回值不是数组`);
-    rows.push(...page);
+        operation,
+      );
+      const page = parseRawJsonToolResult(result, operation);
+      if (!Array.isArray(page)) throw new Error(`${operation}失败：返回值不是数组`);
+      for (const row of page) {
+        const key = String(row?.ApiEngineKey || '').trim().toLowerCase();
+        if (key) rowsByKey.set(key, row);
+      }
+    }
+    if (attempt < 6 && rowsByKey.size < projections.length) {
+      await new Promise(resolvePromise => setTimeout(resolvePromise, attempt * 1500));
+    }
   }
-  return rows;
+  return [...rowsByKey.values()];
 }
 
 function parseSourceSha256(toolResult, operation) {
   const output = collectText(toolResult);
   if (toolResult?.isError) {
+    if (/(?:未找到接口引擎|NoExistData|不存在的数据)/i.test(output)) return null;
     throw new Error(`通过 microi_itdos MCP ${operation}失败：${output || '未知错误'}`);
   }
   const match = output.match(/Full source SHA-256:\s*([a-f0-9]{64})/i);
@@ -570,7 +585,10 @@ async function readManagedSourceHashes(client, projections) {
   let cursor = 0;
   const readHash = async current => {
     const operation = `回读官网 live 接口源码摘要 ${current.key}`;
-    for (let attempt = 1; attempt <= 4; attempt++) {
+    const expectedHash = createHash('sha256')
+      .update(String(current.engine?.ApiV8Code || ''), 'utf8')
+      .digest('hex');
+    for (let attempt = 1; attempt <= 6; attempt++) {
       try {
         const { result } = await callCodexTool(
           client,
@@ -578,12 +596,18 @@ async function readManagedSourceHashes(client, projections) {
           { apiEngineKey: current.key, charOffset: 0, maxChars: 1000 },
           operation,
         );
-        return parseSourceSha256(result, operation);
+        const sourceHash = parseSourceSha256(result, operation);
+        // A 524 means the database transaction may still be running after the
+        // gateway response. Existing Managed rows can therefore expose their
+        // old, non-empty source briefly. Retry both missing and stale hashes;
+        // accepting the first non-empty hash races the eventual commit.
+        if (sourceHash === expectedHash || attempt === 6) return sourceHash;
+        await new Promise(resolvePromise => setTimeout(resolvePromise, attempt * 1500));
       } catch (error) {
         const transient = /(?:HTTP\s*5(?:02|03|04|20|22|24)|Origin Time-out|timed?\s*out|timeout|temporar)/i
           .test(String(error?.message || error));
-        if (!transient || attempt === 4) throw error;
-        await new Promise(resolvePromise => setTimeout(resolvePromise, attempt * 1000));
+        if (!transient || attempt === 6) throw error;
+        await new Promise(resolvePromise => setTimeout(resolvePromise, attempt * 1500));
       }
     }
     return null;
@@ -636,7 +660,8 @@ async function recoverReconcileAfterAmbiguousTimeout(client, snapshots, original
       }
       projectionRows.push(
         `${projection.key}|Managed|${expectedSourceHash}|${String(expected.Version || '')}`
-        + `|${String(expected.ApiAddress || '')}|${String(expected.Id || '')}`,
+        + `|${String(expected.ApiAddress || '')}|${String(expected.ApiRoutes || '')}`
+        + `|${String(expected.Id || '')}`,
       );
     } else {
       projectionRows.push(`${projection.key}|CreateIfMissing|present`);

@@ -1851,6 +1851,10 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
         /// </summary>
         private const string EmptySqlCdnUrl = "https://static.itdos.com/install/microi_empty_mysql57.sql.zip";
         private const string EmptySqlObjectPath = "/install/microi_empty_mysql57.sql.zip";
+        private static readonly HttpClient EmptySqlDownloadHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromMinutes(5)
+        };
 
         /// <summary>
         /// 导入空库SQL文件到新数据库。
@@ -1970,15 +1974,18 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
 
                 if (!downloadedFromBucket)
                 {
-                    using (var httpClient = new HttpClient())
-                    {
-                        httpClient.Timeout = TimeSpan.FromMinutes(5);
-                        Console.WriteLine($"Microi：正在从CDN下载空库SQL：{EmptySqlCdnUrl}");
+                    Console.WriteLine($"Microi：正在从CDN下载空库SQL：{EmptySqlCdnUrl}");
 
-                        var downloadUrl = EmptySqlCdnUrl + "?t=" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                        httpClient.DefaultRequestHeaders.CacheControl =
+                    var downloadUrl = EmptySqlCdnUrl + "?t=" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    using (var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl))
+                    {
+                        request.Headers.CacheControl =
                             new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, NoStore = true };
-                        var response = httpClient.GetAsync(downloadUrl).GetAwaiter().GetResult();
+                        using var response = EmptySqlDownloadHttpClient.SendAsync(
+                                request,
+                                HttpCompletionOption.ResponseHeadersRead)
+                            .GetAwaiter()
+                            .GetResult();
                         if (!response.IsSuccessStatusCode)
                         {
                             return new DosResult(0, null, $"下载空库SQL失败，HTTP {(int)response.StatusCode}");

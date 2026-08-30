@@ -27,7 +27,7 @@ function hasApiEngineCapability(packageModel, key) {
     .some(value => value === prefix || String(value).startsWith(`${prefix}@`))
 }
 
-function assertOwnedEngine(packageName, key, expectedPolicy, expectedStopHttp) {
+function assertOwnedEngine(packageName, key, expectedPolicy, expectedStopHttp, expectedAllowAnonymous = 0) {
   const packageModel = readPackage(packageName)
   const engines = (packageModel.SysApiEngines || [])
     .filter(item => item.ApiEngineKey === key)
@@ -38,7 +38,7 @@ function assertOwnedEngine(packageName, key, expectedPolicy, expectedStopHttp) {
   assert.ok(policy, `${packageName}:${key} missing policy`)
   assert.equal(policy.Ownership, expectedPolicy.Ownership, `${packageName}:${key}`)
   assert.equal(policy.UpgradePolicy, expectedPolicy.UpgradePolicy, `${packageName}:${key}`)
-  assert.equal(engine.AllowAnonymous, 0, `${packageName}:${key} must require login`)
+  assert.equal(engine.AllowAnonymous, expectedAllowAnonymous, `${packageName}:${key} anonymous policy`)
   assert.equal(engine.StopHttp, expectedStopHttp, `${packageName}:${key} StopHttp`)
   assert.equal(engine.IsEnable, 1, `${packageName}:${key} must be enabled`)
   assert.equal(normalizeSource(engine.ApiV8Code), canonicalSource(key), `${packageName}:${key} source drift`)
@@ -62,7 +62,7 @@ test('system-account package exclusively owns admin, preferences, profile and it
   const packageName = 'app.microi.sys_user.json'
   const packageModel = readPackage(packageName)
   assert.equal(packageModel.PackageInfo?.Name, '系统账号')
-  assert.equal(packageModel.PackageInfo?.Version, 'v7.6.0')
+  assert.equal(packageModel.PackageInfo?.Version, 'v7.6.3')
   assert.ok(packageModel.PackageInfo?.RequiredPlatformCapabilities
     ?.includes('ApiEngine:platform-sys-user-admin@v1.0.2'))
 
@@ -105,6 +105,14 @@ test('system-account package exclusively owns admin, preferences, profile and it
   assert.match(hook.ApiV8Code, /^\/\* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1/)
   assert.match(hook.ApiV8Code, /return \{ Code : 1 \};\s*$/)
   assertUniqueOwner('platform-user-custom-hook', packageName)
+
+  const accessKey = assertOwnedEngine(packageName, 'platform-user-access-key', {
+    Ownership: 'Platform',
+    UpgradePolicy: 'Managed',
+  }, 0, 1)
+  assert.match(accessKey.ApiV8Code, /V8\.Method\.ManageUserAccessKey/)
+  assert.match(accessKey.ApiRoutes, /\/api\/SysUserAccessKey\/Exchange/)
+  assertUniqueOwner('platform-user-access-key', packageName)
 })
 
 test('system-settings package exclusively owns non-secret tenant settings and its tenant hook', () => {
@@ -115,11 +123,11 @@ test('system-settings package exclusively owns non-secret tenant settings and it
   const engine = assertOwnedEngine(packageName, 'platform-tenant-system-settings', {
     Ownership: 'Platform',
     UpgradePolicy: 'Managed',
-  }, 0)
+  }, 0, 1)
   assert.match(engine.ApiV8Code, /所属官方应用：系统设置/)
   assert.match(engine.ApiV8Code, /platform-system-settings-custom-hook/)
   assert.match(engine.ApiV8Code, /SaveNonSecret/)
-  assert.doesNotMatch(engine.ApiV8Code, /UnprotectSecret|ConsumeIdentityVerificationTicket|GetRevealChallenge/)
+  assert.doesNotMatch(engine.ApiV8Code, /UnprotectSecret|ConsumeIdentityVerificationTicket/)
   assertUniqueOwner('platform-tenant-system-settings', packageName)
 
   const hook = assertOwnedEngine(packageName, 'platform-system-settings-custom-hook', {
@@ -154,21 +162,21 @@ test('SaaS and Store packages do not retain split ownership of account or tenant
 })
 
 test('password, Secret and reveal operations stay inside trusted C# boundaries', () => {
-  const sysUserController = fs.readFileSync(
-    path.resolve(resourceDir, '../../Microi.net.Api/Controllers/SysUserController.cs'),
+  const sysUserRuntime = fs.readFileSync(
+    path.resolve(resourceDir, '../../Microi.net/Identity/SysUserSessionRuntime.cs'),
     'utf8',
   )
-  const settingsController = fs.readFileSync(
-    path.resolve(resourceDir, '../../Microi.net.Api/Controllers/TenantSystemSettingsController.cs'),
+  const settingsRuntime = fs.readFileSync(
+    path.resolve(resourceDir, '../../Microi.net/SystemSettings/TenantSystemSettingsRuntime.cs'),
     'utf8',
   )
   const settingsEngine = canonicalSource('platform-tenant-system-settings')
 
-  assert.match(sysUserController, /SetPassword[\s\S]*?HashPassword/)
-  assert.match(sysUserController, /GetSysUserPassword[\s\S]*?DecodeStoredPassword/)
-  assert.match(settingsController, /TenantSystemSettingsSecurity\.ProtectSecret/)
-  assert.match(settingsController, /GetRevealChallenge/)
-  assert.match(settingsController, /public async Task<JsonResult> Reveal/)
-  assert.match(settingsController, /ConsumeTicketAsync/)
+  assert.match(sysUserRuntime, /SetPassword[\s\S]*?HashPassword/)
+  assert.match(sysUserRuntime, /GetSysUserPassword[\s\S]*?DecodeStoredPassword/)
+  assert.match(settingsRuntime, /TenantSystemSettingsSecurity\.ProtectSecret/)
+  assert.match(settingsRuntime, /GetRevealChallenge/)
+  assert.match(settingsRuntime, /public async Task<object> Reveal/)
+  assert.match(settingsRuntime, /ConsumeTicketAsync/)
   assert.doesNotMatch(settingsEngine, /UnprotectSecret|ConsumeTicketAsync|ConsumeIdentityVerificationTicket/)
 })

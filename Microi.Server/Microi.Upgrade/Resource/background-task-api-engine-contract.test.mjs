@@ -44,18 +44,30 @@ test('application-store package delivers every startup endpoint and managed poli
       key: 'platform-sys-menu',
       source: 'Microi.Server/Microi.Upgrade/Resource/platform-sys-menu.js',
       address: '/apiengine/platform-sys-menu',
-      version: 'v1.0.1',
+      version: 'v1.0.2',
       capabilities: [
         'V8.Method.ManageSystemDirectory',
         'ApiEngine:platform-sys-menu@v1.0.1',
       ],
     },
   ];
-  assert.equal(packageModel.PackageInfo.Version, 'v7.7.5');
-  assert.equal(packageModel.PackageInfo.ChangeLog?.Version, 'v7.7.5');
-  assert.equal(packageModel.PackageInfo.ChangeLog?.Title, '通知中心低视口分页可达');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.7.18');
+  assert.equal(packageModel.PackageInfo.ChangeLog?.Version, 'v7.7.18');
+  assert.equal(packageModel.PackageInfo.ChangeLog?.Title, '应用包长中文 UTF-8 无损传输');
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     'ClientFeature:NotificationCenterScrollableViewportV1',
+  ));
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    'ClientFeature:OfficialPlatformNoInstallNoticesV1',
+  ));
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    'ClientFeature:WebOSDirectModuleWindowHostV1',
+  ));
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    'ClientFeature:WebOSDesktopInteractionPolishV1',
+  ));
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    'ClientFeature:WebOSThemeSvgGlassV1',
   ));
   for (const dependency of dependencies) {
     const matches = packageModel.SysApiEngines.filter(

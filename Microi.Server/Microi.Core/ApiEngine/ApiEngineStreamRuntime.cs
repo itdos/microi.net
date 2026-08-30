@@ -106,7 +106,7 @@ namespace Microi.net
                     ? JValue.CreateNull()
                     : data is JToken jsonToken
                         ? jsonToken.DeepClone()
-                        : JToken.FromObject(data, DiyCommon.JsonConfig);
+                        : JToken.FromObject(data, DiyCommon.GetJsonSerializer());
             }
             catch
             {

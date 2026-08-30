@@ -27,7 +27,7 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
 ## 功能路由
 
 - 连接、登录、拉取、推送、差异和 AI 初始化：使用 bundled CLI 的 `profile`、`auth`、`pull`、`push`、`sync status`、`ai init`、`mcp init`、`doctor`。
-- 接口引擎、表单事件、模块、字段、工作流和数据库结构：先用 `action="list_tools"` / `describe_tool`，再调用对应原始 `microi_*` 工具。写工具必须保留确认口令、审计与回读。
+- 接口引擎、表单事件、模块、字段、工作流和数据库结构：先用 `action="list_tools"` / `describe_tool`，再调用对应原始 `microi_*` 工具。写工具必须保留确认口令、审计与回读。普通业务数据继续使用标准 FormEngine 工具；维护保护表或需要通用删除时，先调用 `microi_get_administrative_capabilities`，确认服务端实时复核的平台管理员身份，再使用 `microi_admin_table_data`。
 - 远程执行与调试：读取 `v8-debugging/SKILL.md`。Codex 用“获取源码 → 远程执行 → 定位堆栈/日志 → 最小补丁 → 再执行”的结构化循环代替 VS Code DAP 的可视化逐行面板；不得把未执行的源码检查称为真机调试成功。
 - 性能测试：读取 `performance-testing/SKILL.md`，限制并发并输出样本、P95/P99、错误率和停止条件。
 - 微应用：读取 `microi-microservice/SKILL.md`，使用 scaffold、source sync、stream publish 和发布回读原工具；本地构建前遵守内存保护。
@@ -41,5 +41,7 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
 - 推送前先做远端差异检查。写请求超时只表示结果不确定，使用对应 get 工具短超时回读，禁止盲目重复创建或覆盖。
 - 配置和 Token 文件使用现有原子写与锁协议；不要手工拼接或清空用户已有 MCP 配置。
 - Codex Plugin 路由器只选择连接，业务行为必须继续走原 MCP bundle。
+- 平台内置最高管理员等级是 `9999`，MCP 管理控制面必须校验 `Level >= 9999`，并同时从当前租户主库复核有效 `sys_user` 和管理员角色；不要采用会排除标准管理员的 `> 9999`，也不要相信 Header、请求体或模型自报的 Level/身份。
+- `microi_admin_table_data` 只接受真实登录 DiyToken、只操作 Token 所属租户并拒绝访问密钥会话。它支持受限分页查询及单行增改删，但密码、Token、API Key、私钥、连接串、SecretCipher 等秘密字段只能脱敏读取且不得通过通用工具写入；已有专用资源工具时仍优先使用专用工具。
 
 完整 VS Code 命令覆盖关系见插件根目录 `assets/feature-matrix.json`。

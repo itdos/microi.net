@@ -276,7 +276,7 @@ namespace Microi.net.Api
             {
                 if (value == null) return JValue.CreateNull();
                 if (value is JToken token) return token.DeepClone();
-                return JToken.FromObject(value, DiyCommon.JsonConfig);
+                return JToken.FromObject(value, DiyCommon.GetJsonSerializer());
             }
             catch
             {

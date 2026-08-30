@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import {
     appendMicroAppVersionQuery,
     buildMicroAppEntryUrl,
+    getBundledMicroAppPageFallback,
+    shouldUseBundledMicroAppPageFallback,
     shouldUseMicroAppResolveFallback
 } from "../src/utils/microAppEntryUrl.js";
 
@@ -50,4 +52,32 @@ test("host only falls back to the stable managed entry for compatible old backen
     }), false);
     assert.equal(shouldUseMicroAppResolveFallback(null, { requestedVersion: "v1.6.3" }), false);
     assert.equal(shouldUseMicroAppResolveFallback(null, { requirePage: true }), false);
+});
+
+test("official platform deep links can use their bundled page route when local page metadata lags", () => {
+    assert.deepEqual(getBundledMicroAppPageFallback({
+        appKey: "microi-platform-service",
+        routePath: "/personal-settings"
+    }), {
+        pageKey: "personal-settings",
+        sourceFile: "src/PersonalSettings.vue"
+    });
+    assert.equal(shouldUseBundledMicroAppPageFallback({
+        Code: 0,
+        Data: { ReasonCode: "MICRO_APP_PAGE_NOT_FOUND" }
+    }, {
+        appKey: "microi-platform-service",
+        routePath: "/personal-settings"
+    }), true);
+    assert.equal(shouldUseBundledMicroAppPageFallback({
+        Code: 0,
+        Data: { ReasonCode: "MICRO_APP_NOT_AVAILABLE" }
+    }, {
+        appKey: "microi-platform-service",
+        routePath: "/personal-settings"
+    }), false);
+    assert.equal(shouldUseBundledMicroAppPageFallback({ Code: 0 }, {
+        appKey: "community-app",
+        routePath: "/personal-settings"
+    }), false);
 });

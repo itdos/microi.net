@@ -523,6 +523,15 @@ export declare class MicroiClient {
     private recoveredWriteResult;
     private uncertainWriteFailure;
     getStatus(): Promise<ApiResponse>;
+    getAdministrativeCapabilities(): Promise<ApiResponse>;
+    administerTableData(input: {
+        operation: 'query' | 'get' | 'add' | 'update' | 'delete';
+        tableName: string;
+        query?: Record<string, unknown>;
+        row?: Record<string, unknown>;
+        id?: string;
+        confirmExecution?: string;
+    }): Promise<ApiResponse>;
     transitionApplicationStreamGate(data: ApplicationStreamGateTransitionRequest): Promise<ApiResponse>;
     listMyUserAccessKeys(): Promise<ApiResponse<UserAccessKeyRecord[]>>;
     createMyUserAccessKey(input: CreateUserAccessKeyInput): Promise<ApiResponse<CreateUserAccessKeyResult>>;

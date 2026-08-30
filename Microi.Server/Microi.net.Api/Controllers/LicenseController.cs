@@ -29,6 +29,7 @@ namespace Microi.net.Api
         {
             Timeout = TimeSpan.FromSeconds(30)
         };
+        private static readonly TimeSpan LicenseCaptchaLifetime = TimeSpan.FromMinutes(5);
 
         private readonly ICaptcha _captcha;
         private readonly IMicroiAI _microiAi;
@@ -40,23 +41,49 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 获取License申请验证码（匹名可访问）
+        /// 获取License申请验证码（匿名可访问）
         /// </summary>
         [HttpGet]
         [AllowAnonymous]
-        public IActionResult GetCaptcha()
+        public async Task<JsonResult> GetCaptcha()
         {
+            Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+            Response.Headers["Pragma"] = "no-cache";
             try
             {
-                var captchaId = "license:Captcha:" + Guid.NewGuid().ToString("N");
-                var info = _captcha.Generate(captchaId);
-                if (info == null)
+                var policy = await ResolveLicenseCaptchaPolicyAsync().ConfigureAwait(false);
+                var captchaId = LicenseCaptchaSecurity.CreateCaptchaId();
+                var info = _captcha.Generate(captchaId, (int)LicenseCaptchaLifetime.TotalSeconds);
+                if (info == null || info.Bytes == null || string.IsNullOrWhiteSpace(info.Code))
                     return Json(new DosResult(0, null, "获取验证码失败"));
-                return Json(new DosResult(1, new { CaptchaId = info.Id, Image = Convert.ToBase64String(info.Bytes) }));
+
+                // 关闭验证码时仍返回图片，兼容尚未升级、仍固定展示验证码的旧前端；
+                // Apply 会以服务端实时策略为准直接跳过校验。
+                if (policy.CaptchaRequired)
+                {
+                    var stored = await LicenseCaptchaSecurity.StoreAsync(
+                            MicroiEngine.CacheTenant.Cache(policy.OsClient).GetIDatabase(),
+                            policy.OsClient,
+                            info.Id,
+                            info.Code,
+                            LicenseCaptchaLifetime)
+                        .ConfigureAwait(false);
+                    if (!stored)
+                    {
+                        return Json(new DosResult(0, null, "验证码服务暂不可用，请稍后重试"));
+                    }
+                }
+
+                return Json(new DosResult(1, new
+                {
+                    CaptchaRequired = policy.CaptchaRequired,
+                    CaptchaId = info.Id,
+                    Image = Convert.ToBase64String(info.Bytes)
+                }));
             }
             catch
             {
-                return Json(new DosResult(0, null, "获取验证码失败"));
+                return Json(new DosResult(0, null, "验证码服务暂不可用，请稍后重试"));
             }
         }
 
@@ -84,13 +111,34 @@ namespace Microi.net.Api
                     return Json(new DosResult(0, null, "License申请参数无效或长度超出限制"));
                 }
 
-                // 验证码校验
-                if (string.IsNullOrWhiteSpace(request?.CaptchaId))
-                    return Json(new DosResult(0, null, "请先获取验证码"));
-                if (string.IsNullOrWhiteSpace(request?.CaptchaValue))
-                    return Json(new DosResult(0, null, "请输入验证码"));
-                if (!_captcha.Validate(request.CaptchaId, request.CaptchaValue, true, true))
-                    return Json(new DosResult(0, null, "验证码错误，请重新输入"));
+                // License 申请使用官方服务器主租户的系统配置作为唯一开关事实源。
+                // 配置缺失/读取失败时保持启用（fail closed），避免匿名申请被误放开。
+                var captchaPolicy = await ResolveLicenseCaptchaPolicyAsync().ConfigureAwait(false);
+                if (captchaPolicy.CaptchaRequired)
+                {
+                    if (string.IsNullOrWhiteSpace(request.CaptchaId))
+                        return Json(new DosResult(0, null, "请先获取验证码"));
+                    if (string.IsNullOrWhiteSpace(request.CaptchaValue))
+                        return Json(new DosResult(0, null, "请输入验证码"));
+
+                    bool captchaValid;
+                    try
+                    {
+                        captchaValid = await LicenseCaptchaSecurity.ValidateAndConsumeAsync(
+                                MicroiEngine.CacheTenant.Cache(captchaPolicy.OsClient).GetIDatabase(),
+                                captchaPolicy.OsClient,
+                                request.CaptchaId,
+                                request.CaptchaValue)
+                            .ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        return Json(new DosResult(0, null, "验证码服务暂不可用，请稍后重试"));
+                    }
+
+                    if (!captchaValid)
+                        return Json(new DosResult(0, null, "验证码错误、已过期或已使用，请重新获取"));
+                }
 
                 // Never trust a caller-supplied IP or raw forwarding header.
                 // When a reverse proxy is used, ASP.NET ForwardedHeaders must
@@ -412,6 +460,42 @@ namespace Microi.net.Api
             return data;
         }
 
+        private static async Task<LicenseCaptchaPolicy> ResolveLicenseCaptchaPolicyAsync()
+        {
+            var mainOsClient = LicenseServerStore.ResolveMainOsClient();
+            if (mainOsClient.DosIsNullOrWhiteSpace())
+            {
+                return new LicenseCaptchaPolicy
+                {
+                    OsClient = "",
+                    CaptchaRequired = true
+                };
+            }
+
+            try
+            {
+                var configResult = await MicroiEngine.FormEngine
+                    .GetSysConfig(mainOsClient, null)
+                    .ConfigureAwait(false);
+                return new LicenseCaptchaPolicy
+                {
+                    OsClient = mainOsClient,
+                    CaptchaRequired = configResult?.Code == 1
+                        && configResult.Data != null
+                        ? LicenseCaptchaSecurity.IsCaptchaRequired(configResult.Data)
+                        : true
+                };
+            }
+            catch
+            {
+                return new LicenseCaptchaPolicy
+                {
+                    OsClient = mainOsClient,
+                    CaptchaRequired = true
+                };
+            }
+        }
+
         private static async Task<LicenseTenantScope> GetTenantScopeAsync(bool requireMainTenant = false)
         {
             var token = await DiyToken.GetCurrentToken(false);
@@ -640,5 +724,11 @@ namespace Microi.net.Api
         public string MainOsClient { get; set; } = "";
         public bool IsMainTenant { get; set; }
         public DosResult Error { get; set; }
+    }
+
+    internal sealed class LicenseCaptchaPolicy
+    {
+        public string OsClient { get; set; } = "";
+        public bool CaptchaRequired { get; set; } = true;
     }
 }

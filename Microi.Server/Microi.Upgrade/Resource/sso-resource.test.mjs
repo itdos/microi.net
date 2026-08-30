@@ -36,16 +36,18 @@ function executableBody(source) {
 test('SSO official package has stable identity and no tenant data', () => {
   assert.equal(resource.PackageInfo.Name, 'SSO 身份联邦');
   assert.equal(resource.PackageInfo.AppId, 'app.microi.sso');
-  assert.equal(resource.PackageInfo.Version, 'v7.5.8');
+  assert.equal(resource.PackageInfo.Version, 'v7.5.9');
   assert.equal(resource.PackageInfo.ApplicationType, 'Platform');
   assert.deepEqual(resource.PackageInfo.RequiredPlatformCapabilities, [
-    'POST /api/Sso/Begin',
-    'POST /api/Sso/CompleteAuthorization',
-    'GET /sso/{OsClient}/.well-known/openid-configuration',
-    'GET /saml/{OsClient}/metadata',
-    'GET /cas/{OsClient}/login',
     'ApiEngine:sso_capabilities',
     'ApiEngine:sso_complete_login',
+    'ApiEngine:sso_http_begin',
+    'ApiEngine:sso_http_oidc_discovery',
+    'ApiEngine:sso_http_saml_idp_metadata',
+    'ApiEngine:sso_http_cas_login',
+    'ApiEngine:ResponseType=HTTP',
+    'ApiEngine:TemplateRouteV1',
+    'V8.Method.RunSsoProtocol',
     'V8.Method.CreateFederatedUser',
     'V8.Method.CreateSsoLoginTicket',
     'V8.Method.CompleteSsoLogin',
@@ -55,8 +57,8 @@ test('SSO official package has stable identity and no tenant data', () => {
   assert.equal(resource.SysMenus.length, 1);
   assert.equal(resource.DiyTables.length, 1);
   assert.deepEqual(resource.DataSets, []);
-  assert.equal(resource.SysApiEngines.length, 11);
-  assert.equal(Object.keys(resource.ResourcePolicies.ApiEngines).length, 11);
+  assert.equal(resource.SysApiEngines.length, 35);
+  assert.equal(Object.keys(resource.ResourcePolicies.ApiEngines).length, 35);
   assert.equal(resource.PackageInfo.FieldCount, resource.DiyFields.length);
   assert.equal(resource.PackageInfo.PhysicalColumnCount, resource.PhysicalColumns.length);
 });
@@ -73,7 +75,31 @@ test('SSO business orchestration is packaged as canonical ApiEngines', () => {
     'sso_complete_login',
     'sso_rotate_client_secret',
     'sso_legacy_token_login',
-    'sso_user_runtime'
+    'sso_user_runtime',
+    'sso_http_begin',
+    'sso_http_complete_authorization',
+    'sso_http_oidc_callback',
+    'sso_http_oidc_discovery',
+    'sso_http_oidc_jwks',
+    'sso_http_oidc_authorize',
+    'sso_http_oidc_token',
+    'sso_http_oidc_userinfo',
+    'sso_http_oidc_introspect',
+    'sso_http_oidc_revoke',
+    'sso_http_oidc_logout',
+    'sso_http_cas_callback',
+    'sso_http_cas_login',
+    'sso_http_cas_service_validate',
+    'sso_http_cas_p3_service_validate',
+    'sso_http_cas_validate',
+    'sso_http_cas_logout',
+    'sso_http_saml_begin',
+    'sso_http_saml_acs',
+    'sso_http_saml_login',
+    'sso_http_saml_complete',
+    'sso_http_saml_idp_metadata',
+    'sso_http_saml_sp_metadata',
+    'sso_http_saml_logout'
   ];
   assert.deepEqual(resource.SysApiEngines.map((engine) => engine.ApiEngineKey), expected);
   assert.equal(resource.PackageInfo.ApiEngineCount, expected.length);
@@ -99,7 +125,7 @@ test('SSO business orchestration is packaged as canonical ApiEngines', () => {
       `${engine.ApiEngineKey} package code drifted`
     );
     assert.match(engine.ApiV8Code.replace(/\r\n?/g, '\n'), /[^\n]\n$/);
-    assert.equal(engine.Version, 'v1.0.2');
+    assert.equal(engine.Version, 'v1.0.3');
     const policy = resource.ResourcePolicies.ApiEngines[engine.ApiEngineKey];
     if (engine.ApiEngineKey === 'sso_event_hook') {
       assert.deepEqual(policy, { Ownership: 'Tenant', UpgradePolicy: 'CreateIfMissing' });
@@ -109,6 +135,55 @@ test('SSO business orchestration is packaged as canonical ApiEngines', () => {
       assert.deepEqual(policy, { Ownership: 'Platform', UpgradePolicy: 'Managed' });
       assert.ok(engine.ApiV8Code.startsWith(managedNotice));
     }
+  }
+});
+
+test('all former SSO Controller routes are Managed HTTP ApiEngines', () => {
+  const routes = new Map(resource.SysApiEngines
+    .filter((engine) => engine.ApiEngineKey.startsWith('sso_http_'))
+    .map((engine) => [engine.ApiEngineKey, engine]));
+  const expectedAddresses = {
+    sso_http_begin: '/api/Sso/Begin',
+    sso_http_complete_authorization: '/api/Sso/CompleteAuthorization',
+    sso_http_oidc_callback: '/api/Sso/OidcCallback',
+    sso_http_oidc_discovery: '/sso/{OsClient}/.well-known/openid-configuration',
+    sso_http_oidc_jwks: '/sso/{OsClient}/jwks',
+    sso_http_oidc_authorize: '/sso/{OsClient}/authorize',
+    sso_http_oidc_token: '/sso/{OsClient}/token',
+    sso_http_oidc_userinfo: '/sso/{OsClient}/userinfo',
+    sso_http_oidc_introspect: '/sso/{OsClient}/introspect',
+    sso_http_oidc_revoke: '/sso/{OsClient}/revoke',
+    sso_http_oidc_logout: '/sso/{OsClient}/logout',
+    sso_http_cas_callback: '/api/Sso/CasCallback',
+    sso_http_cas_login: '/cas/{OsClient}/login',
+    sso_http_cas_service_validate: '/cas/{OsClient}/serviceValidate',
+    sso_http_cas_p3_service_validate: '/cas/{OsClient}/p3/serviceValidate',
+    sso_http_cas_validate: '/cas/{OsClient}/validate',
+    sso_http_cas_logout: '/cas/{OsClient}/logout',
+    sso_http_saml_begin: '/api/Sso/SamlBegin',
+    sso_http_saml_acs: '/api/Sso/SamlAcs',
+    sso_http_saml_login: '/saml/{OsClient}/login',
+    sso_http_saml_complete: '/api/Sso/SamlComplete',
+    sso_http_saml_idp_metadata: '/saml/{OsClient}/metadata',
+    sso_http_saml_sp_metadata: '/saml/{OsClient}/sp/{ConnectionKey}/metadata',
+    sso_http_saml_logout: '/saml/{OsClient}/logout'
+  };
+  assert.equal(routes.size, 24);
+  for (const [key, apiAddress] of Object.entries(expectedAddresses)) {
+    const engine = routes.get(key);
+    assert.ok(engine, `missing protocol endpoint ${key}`);
+    assert.equal(engine.ApiAddress, apiAddress);
+    assert.equal(engine.ResponseType, 'HTTP');
+    assert.equal(engine.StopHttp, 0);
+    assert.deepEqual(resource.ResourcePolicies.ApiEngines[key], {
+      Ownership: 'Platform', UpgradePolicy: 'Managed'
+    });
+    assert.ok(engine.ApiV8Code.startsWith(managedNotice));
+    assert.match(engine.ApiV8Code, /return V8\.Method\.RunSsoProtocol\(\{/);
+  }
+  assert.equal(routes.get('sso_http_complete_authorization').AllowAnonymous, 0);
+  for (const [key, engine] of routes) {
+    if (key !== 'sso_http_complete_authorization') assert.equal(engine.AllowAnonymous, 1);
   }
 });
 
@@ -133,7 +208,7 @@ test('SSO Managed flow invokes the tenant Hook only through a safe event whiteli
 
 test('SSO generator preserves future package versions instead of reverting to its minimum', () => {
   const generator = fs.readFileSync(path.join(directory, 'configure-sso-resource.mjs'), 'utf8');
-  assert.match(generator, /minimumPackageVersion = 'v7\.5\.8'/);
+  assert.match(generator, /minimumPackageVersion = 'v7\.5\.9'/);
   assert.match(generator, /compareSemanticVersions\(pkg\.PackageInfo\?\.Version, minimumPackageVersion\) >= 0/);
   assert.match(generator, /normalizeOfficialApiEnginePolicies\(pkg, 'app\.microi\.sso\.json'\)/);
   assert.ok(!generator.includes(".replace(/\\n*$/g, '\\n')"));
@@ -229,7 +304,10 @@ test('official sync base records the published SSO contract', () => {
   assert.equal(published.SysMenus.length, 1);
   assert.equal(published.DiyTables.length, 1);
   assert.equal(published.DiyFields.length, 64);
-  assert.deepEqual(published.ResourcePolicies.ApiEngines, resource.ResourcePolicies.ApiEngines);
+  // 发布前允许本地包新增 Managed 端点；已发布基线中的每项策略必须保持一致。
+  for (const [key, policy] of Object.entries(published.ResourcePolicies.ApiEngines || {})) {
+    assert.deepEqual(policy, resource.ResourcePolicies.ApiEngines[key], `${key} published policy drifted`);
+  }
 
   const publishedFields = new Map(published.DiyFields.map((field) => [field.Name, field]));
   const contractProperties = [

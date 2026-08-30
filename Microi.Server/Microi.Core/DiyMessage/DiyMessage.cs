@@ -24,6 +24,7 @@ namespace Microi.net
         public static ConcurrentDictionary<string, Dictionary<string, JObject>> Msg =
             new ConcurrentDictionary<string, Dictionary<string, JObject>>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, string> SourceTextLangCache = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly object MessageWriteLock = new object();
 
         private static readonly Dictionary<string, JObject> BuiltInMsg = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase)
         {
@@ -218,6 +219,56 @@ namespace Microi.net
             }
         }
 
+        /// <summary>
+        /// 原子替换租户语言快照。外层虽为 ConcurrentDictionary，内层 Dictionary
+        /// 不能一边写一边被请求线程枚举，因此所有内部写入都采用 copy-on-write。
+        /// </summary>
+        internal static void ReplaceTenantMessages(string osClient, IDictionary<string, JObject> rows)
+        {
+            if (osClient.DosIsNullOrWhiteSpace())
+            {
+                throw new ArgumentException("OsClient不能为空。", nameof(osClient));
+            }
+
+            var snapshot = rows == null
+                ? new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, JObject>(rows, StringComparer.OrdinalIgnoreCase);
+            lock (MessageWriteLock)
+            {
+                Msg[osClient] = snapshot;
+                ClearSourceTextCache(osClient);
+            }
+        }
+
+        /// <summary>
+        /// 原子更新单个语言项；租户缓存尚未加载时也可安全创建。
+        /// </summary>
+        internal static void UpsertTenantMessage(string osClient, string key, JObject row)
+        {
+            if (osClient.DosIsNullOrWhiteSpace())
+            {
+                throw new ArgumentException("OsClient不能为空。", nameof(osClient));
+            }
+            if (key.DosIsNullOrWhiteSpace())
+            {
+                throw new ArgumentException("语言Key不能为空。", nameof(key));
+            }
+            if (row == null)
+            {
+                throw new ArgumentNullException(nameof(row));
+            }
+
+            lock (MessageWriteLock)
+            {
+                var snapshot = Msg.TryGetValue(osClient, out var current) && current != null
+                    ? new Dictionary<string, JObject>(current, StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
+                snapshot[key] = row;
+                Msg[osClient] = snapshot;
+                ClearSourceTextCache(osClient);
+            }
+        }
+
         private static bool TryGetLangBySourceText(Dictionary<string, JObject> langRows, string sourceText, string lang, out string value)
         {
             value = null;
@@ -375,15 +426,14 @@ namespace Microi.net
             {
                 osClient = DiyToken.GetCurrentOsClient();
             }
-            try
+            if (!osClient.DosIsNullOrWhiteSpace()
+                && Msg.TryGetValue(osClient, out var clientMsg)
+                && clientMsg != null
+                && clientMsg.TryGetValue(key, out var jObj))
             {
-                var jObj = Msg[osClient][key];
                 return jObj["Code"]?.ToString() ?? key;
             }
-            catch (System.Exception)
-            {
-                return "0";
-            }
+            return "0";
         }
     }
 }
