@@ -59,7 +59,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 | 接口返回 `{ FileName, ContentType, FileByteBase64 }` | 接口直接响应文件 |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-001 sha256=a7572bc0fd333c8f0c240d0f62db4763225ba9f69bfd45d0e0d41ae3f4b1edd0 -->
+<!-- microi-progressive:chunk id=v8-file-upload-001 sha256=bacff382201c915334757946ee60d4a65db4e9663dd9e1f86bb68c1c16589321 -->
 ## 第三方数据库附件迁移
 
 当第三方表只保存附件路径时，先用 `microi_inspect_external_database` / `microi_query_external_database` 或 `V8.Dbs.<DbKey>` 查询记录。`microi_import_external_attachment` 允许后端已确认的 `Level >= 9999` 当前用户直接提供 HTTP/HTTPS URL、API 节点可读的本机绝对路径或 UNC 路径。
@@ -68,6 +68,9 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 - 下载与上传使用临时文件和文件流，不经过 Base64；不设固定 20/100 MB 上限，`MaxBytes=0` 或省略表示不设置 MCP 上限，可处理 200/500 MB 或更大文件。
 - 带签名参数或用户凭据的源 URL、鉴权 Header 和本机/UNC 路径不得出现在结果、日志或目标表；脱敏审计只记录来源 SHA-256、类型和字节数，目标字段只保存吾码租户内相对路径。
 - 使用第三方附件 Id/版本作为幂等键，回读目标记录后才标记成功；多节点重投不能重复产生业务附件。
+- 写入目标 `FileUpload` 字段前必须回读其权威 `diy_field.Config.FileUpload.Limit`；目标字段为 `Limit=true` 时，迁移上传也必须使用 `Limit=true` 写入私有桶，不得上传到公有桶后仅靠字段路径伪装为私有文件。
+- 源附件为空、大小为 `0` 或源对象不可读取时，不得创建目标业务记录并把上传字段保存为 `[]`、`'[]'` 或其它空占位值；应仅在迁移账本中记录为跳过或失败，保留来源 Id、原因和可重试状态。
+- 私有附件只有在目标记录回读成功，并使用该记录的权威资源上下文调用 `/apiengine/platform-private-file-url` 取得代理地址，再对该地址执行 `Range: bytes=0-0` 且确认返回 `200/206`、实际读到字节并且不是 JSON 错误后，才允许标记迁移成功；完整验收再核对总字节数或 SHA-256。
 - 批量迁移应落任务状态表并分页处理，失败可重试；不要让 MCP 一次加载整库路径或大文件集合。
 
 可信后端 V8 可用 `V8.Http.GetResponse({ Url: url }).RawBytes` 下载，再用 `System.Convert.ToBase64String` 和 `V8.Method.Upload` 上传。该路径同样必须校验域名、大小、Content-Type、后缀和最终重定向目标。

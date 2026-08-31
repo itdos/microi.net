@@ -60,10 +60,10 @@
               </div>
             </div>
             <div class="app-detail-actions">
-              <button v-if="app.ExperienceUrl" type="button" class="primary" @click="openPreview">
+              <a v-if="app.ExperienceUrl" :href="app.ExperienceUrl" target="_blank" rel="noopener noreferrer" class="primary">
                 立即体验
                 <span aria-hidden="true">↗</span>
-              </button>
+              </a>
               <button
                 type="button"
                 class="favorite"
@@ -634,11 +634,6 @@ async function recordView() {
   } catch (_) {
     // 浏览统计失败不阻断详情页。
   }
-}
-
-function openPreview() {
-  if (!app.value?.ExperienceUrl) return
-  window.open(app.value.ExperienceUrl, '_blank', 'noopener,noreferrer')
 }
 
 function typeLabel(value) {

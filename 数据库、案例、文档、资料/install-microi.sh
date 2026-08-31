@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-27 15:16:52
+# 版本：v2026-08-31 16:50:42
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -30,7 +30,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-27 15:16:52"
+SCRIPT_VERSION="v2026-08-31 16:50:42"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -55,6 +55,226 @@ LIBRETRANSLATE_INTERNAL_PORT=5000
 LIBRETRANSLATE_SERVICE_ENDPOINT="http://${LIBRETRANSLATE_CONTAINER_NAME}:${LIBRETRANSLATE_INTERNAL_PORT}"
 MYSQL_CLIENT_IMAGE="${MICROI_INSTALL_MYSQL_CLIENT_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/mysql:8.0}"
 MINIO_MC_IMAGE="${MICROI_INSTALL_MINIO_MC_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/minio-mc:RELEASE.2025-08-13T08-35-41Z}"
+
+# 本文件固定使用 UTF-8。服务器 locale 只能控制子进程输出，不能要求 SSH/宝塔
+# 终端改变解码方式；因此在任何中文提示之前先保留调用端的编码线索。明确检测到
+# GBK/GB18030/GB2312 时，用同步父进程转码整段文本；终端未如实上报编码时，用户
+# 仍可通过 MICROI_INSTALL_OUTPUT_ENCODING 显式覆盖。脚本始终保持 UTF-8 no-BOM，
+# 不为兼容旧终端改写源码编码。
+MICROI_INSTALL_ORIGINAL_LOCALE_HINT="${MICROI_INSTALL_ORIGINAL_LOCALE_HINT:-${LC_ALL:-${LC_CTYPE:-${LANG:-}}}}"
+MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE="${MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE:-}"
+MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE="${MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE:-0}"
+MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT="${MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT:-0}"
+MICROI_INSTALL_OUTPUT_BANNER_SHOWN="${MICROI_INSTALL_OUTPUT_BANNER_SHOWN:-0}"
+if [ -t 1 ]; then
+  MICROI_INSTALL_OUTPUT_WAS_TTY=1
+else
+  MICROI_INSTALL_OUTPUT_WAS_TTY="${MICROI_INSTALL_OUTPUT_WAS_TTY:-0}"
+fi
+
+normalize_installer_output_encoding() {
+  local normalized=""
+  normalized=$(printf '%s' "${1:-}" \
+    | tr '[:lower:]' '[:upper:]' \
+    | tr -cd '[:alnum:]')
+  case "${normalized}" in
+    ''|AUTO)
+      printf 'AUTO'
+      ;;
+    *GB18030*)
+      printf 'GB18030'
+      ;;
+    *GBK*|*CP936*|*MS936*)
+      printf 'GBK'
+      ;;
+    *GB2312*|*EUCCN*)
+      printf 'GB2312'
+      ;;
+    *UTF8*)
+      printf 'UTF-8'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+detect_installer_output_encoding() {
+  local charmap=""
+  local detected=""
+
+  if command -v locale > /dev/null 2>&1; then
+    charmap=$(locale charmap 2>/dev/null || true)
+    if detected=$(normalize_installer_output_encoding "${charmap}") \
+      && [ "${detected}" != "AUTO" ]; then
+      printf '%s' "${detected}"
+      return 0
+    fi
+  fi
+
+  if detected=$(normalize_installer_output_encoding "${MICROI_INSTALL_ORIGINAL_LOCALE_HINT}") \
+    && [ "${detected}" != "AUTO" ]; then
+    printf '%s' "${detected}"
+    return 0
+  fi
+
+  # C/POSIX/未知 locale 不能证明终端只支持 ASCII。现代 SSH 终端通常仍按
+  # UTF-8 解码，因此默认保留 UTF-8，并用首屏 ASCII 提示给出 GBK 恢复命令。
+  printf 'UTF-8'
+}
+
+select_installer_process_locale() {
+  local installed_locales=""
+  local candidate=""
+  local selected=""
+
+  # 先离开调用端可能不存在的 locale，避免命令替换持续打印 setlocale 警告；
+  # 原始值已在脚本最前面保存，后续编码自动识别不依赖这里的临时 C locale。
+  export LANG=C
+  export LC_ALL=C
+  if command -v locale > /dev/null 2>&1; then
+    installed_locales=$(locale -a 2>/dev/null || true)
+    for candidate in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8 zh_CN.UTF-8 zh_CN.utf8; do
+      if printf '%s\n' "${installed_locales}" | grep -Fxiq "${candidate}"; then
+        selected="${candidate}"
+        break
+      fi
+    done
+    if [ -z "${selected}" ]; then
+      selected=$(printf '%s\n' "${installed_locales}" \
+        | awk 'tolower($0) ~ /utf-?8$/ { print; exit }')
+    fi
+  fi
+
+  if [ -n "${selected}" ]; then
+    export LANG="${selected}"
+    export LC_ALL="${selected}"
+    MICROI_INSTALL_PROCESS_LOCALE="${selected}"
+  else
+    # 精简 CentOS 可能没有任何 UTF-8 locale。安装器不擅自安装语言包或修改
+    # 宿主机全局 locale；C locale 可保证外部诊断命令至少稳定输出 ASCII。
+    export LANG=C
+    export LC_ALL=C
+    MICROI_INSTALL_PROCESS_LOCALE="C"
+  fi
+  export MICROI_INSTALL_PROCESS_LOCALE
+}
+
+resolve_installer_encoding_source_path() {
+  local source_path="${BASH_SOURCE[0]:-$0}"
+  local source_dir=""
+
+  if command -v readlink > /dev/null 2>&1; then
+    readlink -f "${source_path}" 2>/dev/null && return 0
+  fi
+  source_dir=$(CDPATH= cd -- "$(dirname -- "${source_path}")" 2>/dev/null && pwd -P) || return 1
+  printf '%s/%s\n' "${source_dir}" "$(basename -- "${source_path}")"
+}
+
+run_installer_with_output_transcoding() {
+  local target_encoding="$1"
+  shift
+  local script_path=""
+  local -a pipeline_status=()
+
+  script_path=$(resolve_installer_encoding_source_path) || {
+    echo 'Microi: cannot resolve installer path; output transcoding cannot continue.' >&2
+    return 1
+  }
+
+  # 父 Bash 同步等待业务子脚本与 iconv，既保留交互 stdin，也保持原始退出码；
+  # -c 只丢弃第三方日志中偶发的非法字节，安装器自身的 UTF-8 中文会完整转码。
+  set +e
+  MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE=1 \
+  MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT="${MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT}" \
+  MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE="${target_encoding}" \
+  MICROI_INSTALL_ORIGINAL_LOCALE_HINT="${MICROI_INSTALL_ORIGINAL_LOCALE_HINT}" \
+  MICROI_INSTALL_OUTPUT_WAS_TTY="${MICROI_INSTALL_OUTPUT_WAS_TTY}" \
+  MICROI_INSTALL_OUTPUT_BANNER_SHOWN="${MICROI_INSTALL_OUTPUT_BANNER_SHOWN}" \
+    bash "${script_path}" "$@" 2>&1 | iconv -c -f UTF-8 -t "${target_encoding}"
+  pipeline_status=("${PIPESTATUS[@]}")
+  if [ "${pipeline_status[0]:-1}" -ne 0 ]; then
+    exit "${pipeline_status[0]}"
+  fi
+  if [ "${pipeline_status[1]:-1}" -ne 0 ]; then
+    echo 'Microi: terminal output transcoding failed.' >&2
+    exit "${pipeline_status[1]}"
+  fi
+  exit 0
+}
+
+configure_installer_terminal_encoding() {
+  local requested="${MICROI_INSTALL_OUTPUT_ENCODING:-AUTO}"
+  local normalized=""
+
+  if [ "${MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE}" = "1" ]; then
+    if ! normalized=$(normalize_installer_output_encoding "${MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE}") \
+      || [ "${normalized}" = "AUTO" ] \
+      || [ "${normalized}" = "UTF-8" ]; then
+      # 该标记只允许由上面的同步父转码进程设置；外部伪造或残留值不能跳过初始化。
+      MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE=0
+      normalized=''
+    fi
+  fi
+  if [ "${MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE}" != "1" ]; then
+    if ! normalized=$(normalize_installer_output_encoding "${requested}"); then
+      echo "Microi: unsupported MICROI_INSTALL_OUTPUT_ENCODING=${requested}; using UTF-8." >&2
+      normalized='UTF-8'
+      MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT=0
+    elif [ "${normalized}" = "AUTO" ]; then
+      normalized=$(detect_installer_output_encoding)
+      MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT=0
+    else
+      MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT=1
+    fi
+  fi
+
+  MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE="${normalized}"
+  export MICROI_INSTALL_ORIGINAL_LOCALE_HINT
+  export MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE
+  export MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE
+  export MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT
+  export MICROI_INSTALL_OUTPUT_WAS_TTY
+
+  if [ "${MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE}" != "1" ] \
+    && [ "${normalized}" != "UTF-8" ]; then
+    if [ "${MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT}" != "1" ] \
+      && [ "${MICROI_INSTALL_OUTPUT_WAS_TTY}" != "1" ]; then
+      # 自动模式只为真实交互终端转码；重定向文件、CI 和日志采集固定保留 UTF-8。
+      MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE='UTF-8'
+      export MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE
+    elif ! command -v iconv > /dev/null 2>&1 \
+      || ! printf '' | iconv -f UTF-8 -t "${normalized}" > /dev/null 2>&1; then
+      echo "Microi: iconv does not support ${normalized}; using UTF-8." >&2
+      MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE='UTF-8'
+      export MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE
+    else
+      run_installer_with_output_transcoding "${normalized}" "$@"
+    fi
+  fi
+
+  select_installer_process_locale
+  if [ "${MICROI_INSTALL_OUTPUT_WAS_TTY}" = "1" ] \
+    && [ "${MICROI_INSTALL_OUTPUT_BANNER_SHOWN}" != "1" ]; then
+    printf 'Microi: terminal output encoding=%s; installer source=UTF-8.\n' \
+      "${MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE}"
+    if [ "${MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE}" = "UTF-8" ]; then
+      echo 'Microi: if Chinese is garbled, rerun with MICROI_INSTALL_OUTPUT_ENCODING=GBK.'
+    fi
+    MICROI_INSTALL_OUTPUT_BANNER_SHOWN=1
+    export MICROI_INSTALL_OUTPUT_BANNER_SHOWN
+  fi
+}
+
+configure_installer_terminal_encoding "$@"
+
+# 无副作用编码验收入口：不提权、不读交互、不访问网络、不修改 Docker/宿主机。
+if [ "${1:-}" = '--encoding-check-only' ]; then
+  echo "MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE=${MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE}"
+  echo "MICROI_INSTALL_PROCESS_LOCALE=${MICROI_INSTALL_PROCESS_LOCALE}"
+  echo 'MICROI_INSTALL_UTF8_MARKER=吾码中文显示正常'
+  exit 0
+fi
 
 # 完整安装会创建 /microi、/home 数据目录、宿主机 cgroup 与防火墙规则，
 # 因此必须在任何交互或宿主机写入前统一取得 root 身份。不能等到某个 mkdir
@@ -107,11 +327,29 @@ ensure_privileged_execution() {
   # 优先保留代理和官方测试镜像等调用环境；若 sudoers 禁止 -E，则退回
   # 最小环境继续官方默认安装，避免把“不能保留环境”误判为“不能提权”。
   if sudo -n -E true > /dev/null 2>&1; then
-    exec sudo -E env MICROI_INSTALL_ELEVATED=1 bash "${script_path}" "$@"
+    exec sudo -E env \
+      MICROI_INSTALL_ELEVATED=1 \
+      MICROI_INSTALL_OUTPUT_ENCODING="${MICROI_INSTALL_OUTPUT_ENCODING:-AUTO}" \
+      MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE="${MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE}" \
+      MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE="${MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE}" \
+      MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT="${MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT}" \
+      MICROI_INSTALL_ORIGINAL_LOCALE_HINT="${MICROI_INSTALL_ORIGINAL_LOCALE_HINT}" \
+      MICROI_INSTALL_OUTPUT_WAS_TTY="${MICROI_INSTALL_OUTPUT_WAS_TTY}" \
+      MICROI_INSTALL_OUTPUT_BANNER_SHOWN="${MICROI_INSTALL_OUTPUT_BANNER_SHOWN}" \
+      bash "${script_path}" "$@"
   fi
   echo 'Microi：提示：当前 sudo 策略不允许保留调用环境，将使用官方默认安装参数继续。'
   echo 'Microi：如需传入自定义 MICROI_* 安装参数，请先切换 root 后重新执行。'
-  exec sudo env MICROI_INSTALL_ELEVATED=1 bash "${script_path}" "$@"
+  exec sudo env \
+    MICROI_INSTALL_ELEVATED=1 \
+    MICROI_INSTALL_OUTPUT_ENCODING="${MICROI_INSTALL_OUTPUT_ENCODING:-AUTO}" \
+    MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE="${MICROI_INSTALL_OUTPUT_ENCODING_ACTIVE}" \
+    MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE="${MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE}" \
+    MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT="${MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT}" \
+    MICROI_INSTALL_ORIGINAL_LOCALE_HINT="${MICROI_INSTALL_ORIGINAL_LOCALE_HINT}" \
+    MICROI_INSTALL_OUTPUT_WAS_TTY="${MICROI_INSTALL_OUTPUT_WAS_TTY}" \
+    MICROI_INSTALL_OUTPUT_BANNER_SHOWN="${MICROI_INSTALL_OUTPUT_BANNER_SHOWN}" \
+    bash "${script_path}" "$@"
 }
 
 # ============================================================
@@ -2670,10 +2908,6 @@ fi
 # 维护用的无副作用规划入口在上方已经提前退出；真实安装从这里开始必须是
 # root。普通帐号会在步骤 1 和任何宿主机写入之前只提权一次并重新执行脚本。
 ensure_privileged_execution "$@"
-
-# === 修复中文显示：确保终端使用 UTF-8 编码 ===
-export LANG=en_US.UTF-8 2>/dev/null || export LANG=C.UTF-8 2>/dev/null || true
-export LC_ALL=en_US.UTF-8 2>/dev/null || export LC_ALL=C.UTF-8 2>/dev/null || true
 
 echo ''
 echo '=================================================================='

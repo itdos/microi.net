@@ -19,6 +19,7 @@
   "ProtocolGateways": {
     "AiController": { "Project": "Microi.net.Api", "Source": "Controllers/AiController.cs", "OwnerType": "Application", "OwnerId": "app.microi.ai-engine", "Disposition": "ProtocolGateway" },
     "CaptchaController": { "Project": "Microi.net.Api", "Source": "Controllers/CaptchaController.cs", "OwnerType": "Application", "OwnerId": "app.microi.saas-engine", "Disposition": "BootstrapIdentity" },
+    "DiagnosticsController": { "Project": "Microi.net.Api", "Source": "Controllers/DiagnosticsController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
     "LicenseController": { "Project": "Microi.net.Api", "Source": "Controllers/LicenseController.cs", "OwnerType": "HostKernel", "OwnerId": "microi.server.platform-runtime", "Disposition": "OperationsKernel" },
     "MessageController": { "Project": "Microi.net.Api", "Source": "Controllers/MessageController.cs", "OwnerType": "Application", "OwnerId": "app.microi.message-notification", "Disposition": "ProtocolGateway" },
     "MicroAppController": { "Project": "Microi.net.Api", "Source": "Controllers/MicroAppController.cs", "OwnerType": "Application", "OwnerId": "app.microi.store", "Disposition": "KernelRuntime" }
@@ -35,7 +36,6 @@
     "SearchEngineController": { "Target": "ApiEngine:platform-search-engine", "Atom": "V8.Method.ManageSearchEngine", "RemovedAt": "2026-08-24" },
     "SsoController": { "Target": "app.microi.sso Managed ApiEngines", "Atom": "Microi.SSO:SsoProtocolRuntime trusted protocol atoms", "RemovedAt": "2026-08-26" },
     "SsoProtocolGatewayController": { "Target": "app.microi.sso 24 Managed HTTP ApiEngines", "Atom": "Microi.SSO:SsoProtocolRuntime + V8.Method.RunSsoProtocol", "RemovedAt": "2026-08-30" },
-    "DiagnosticsController": { "Target": "ApiEngine:platform-service-health", "Atom": "V8.Method.GetPlatformServiceHealth", "RemovedAt": "2026-08-30" },
     "ExternalLoginController": { "Target": "ApiEngine:platform-external-login", "Atom": "Microi.SSO:ExternalLoginRuntime", "RemovedAt": "2026-08-30" },
     "IdentityVerificationController": { "Target": "ApiEngine:platform-identity-verification", "Atom": "Hosting/IdentityVerificationRuntime WebAuthn atom", "RemovedAt": "2026-08-30" },
     "LegacyMobileCompatibilityController": { "Target": "57 official ApiRoutes aliases", "Atom": "Managed ApiEngines plus trusted plugin atoms", "RemovedAt": "2026-08-30" },

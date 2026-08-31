@@ -186,6 +186,78 @@ public class ApplicationAssetStreamPublishTests
         Assert.Equal("Aliyun", V8McpLogic.NormalizeApplicationAssetHdfsType(new JObject()));
     }
 
+    [Fact]
+    public void ApplicationStorageRead_UsesAuthoritativeClientAndTenantOwnedPath()
+    {
+        var authoritativeClient = new OsClientSecret
+        {
+            OsClient = "congshi",
+            OsClientModel = new JObject
+            {
+                ["HDFS"] = "MinIO",
+                ["MinIOPrivateBucketName"] = "congshi-private"
+            }
+        };
+
+        var internalRead = V8McpLogic.BuildApplicationStorageReadParam(
+            authoritativeClient,
+            "junchi",
+            "/junchi/ai-app-source/app-id/src/main.ts",
+            true,
+            false);
+        var internetRead = V8McpLogic.BuildApplicationStorageReadParam(
+            authoritativeClient,
+            "junchi",
+            "ai-app-source/app-id/src/main.ts",
+            true,
+            true);
+
+        Assert.Same(authoritativeClient, internalRead.ClientModel);
+        Assert.True(internalRead.Limit);
+        Assert.False(internalRead.NetworkIsInternet);
+        Assert.Equal("Byte", internalRead.ReturnFileType);
+        Assert.Equal("junchi/ai-app-source/app-id/src/main.ts", internalRead.FileFullPath);
+        Assert.Same(authoritativeClient, internetRead.ClientModel);
+        Assert.True(internetRead.NetworkIsInternet);
+        Assert.Equal(internalRead.FileFullPath, internetRead.FileFullPath);
+    }
+
+    [Fact]
+    public void ApplicationStorageCoordinateFingerprint_DetectsLegacyStorageWithoutIncludingCredentials()
+    {
+        var current = new OsClientSecret
+        {
+            OsClient = "junchi",
+            OsClientModel = new JObject
+            {
+                ["HDFS"] = "MinIO",
+                ["MinIOEndPoint"] = "storage-current:9000",
+                ["MinIOPrivateBucketName"] = "current-private",
+                ["MinIOAccessKey"] = "current-access",
+                ["MinIOSecretKey"] = "current-secret"
+            }
+        };
+        var legacy = new OsClientSecret
+        {
+            OsClient = "junchi",
+            OsClientModel = new JObject
+            {
+                ["HDFS"] = "MinIO",
+                ["MinIOEndPoint"] = "storage-legacy:9000",
+                ["MinIOPrivateBucketName"] = "legacy-private",
+                ["MinIOAccessKey"] = "legacy-access",
+                ["MinIOSecretKey"] = "legacy-secret"
+            }
+        };
+
+        var currentFingerprint = V8McpLogic.ApplicationStorageCoordinateFingerprint(current);
+        var legacyFingerprint = V8McpLogic.ApplicationStorageCoordinateFingerprint(legacy);
+
+        Assert.NotEqual(currentFingerprint, legacyFingerprint);
+        Assert.DoesNotContain("access", currentFingerprint, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", currentFingerprint, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData("index.html", "index.html")]
     [InlineData("assets\\app.js", "assets/app.js")]
@@ -1673,7 +1745,9 @@ public class ApplicationAssetStreamPublishTests
         Assert.Contains("Task.Run(WorkerLoop, CancellationToken.None)", publisherSource);
         Assert.Contains("ReadApplicationObjectBytes(", publisherSource);
         Assert.Contains("ReturnFileType = \"Byte\"", publisherSource);
-        Assert.Contains("NetworkIsInternet = false", publisherSource);
+        Assert.Contains("new[] { false, true }", publisherSource);
+        Assert.Contains("NetworkIsInternet = useInternetEndpoint", publisherSource);
+        Assert.Contains("ReadApplicationStorageBytes(", publisherSource);
         Assert.DoesNotContain("ReadPublishedMicroServiceAssetBytes(", publisherSource);
         Assert.Equal(2, CountOccurrences(
             publisherSource,

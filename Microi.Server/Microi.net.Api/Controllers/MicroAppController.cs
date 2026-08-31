@@ -1295,26 +1295,15 @@ namespace Microi.net.Api
                 GetText(asset, "hdfsPath", "HdfsPath"),
                 GetText(asset, "publishHdfsPath", "PublishHdfsPath"),
                 GetText(asset, "filePathName", "FilePathName", "filePath", "FilePath")
-            };
+            }
+                .Where(path => !path.DosIsNullOrWhiteSpace())
+                .Distinct(StringComparer.OrdinalIgnoreCase);
             foreach (var filePathName in filePaths)
             {
-                if (filePathName.DosIsNullOrWhiteSpace()) continue;
-                try
+                var fileBytes = await ReadManagedPublicAssetBytes(osClient, filePathName);
+                if (fileBytes != null)
                 {
-                    var fileResult = await MicroiEngine.HDFS.GetPrivateFileByte(new DiyUploadParam
-                    {
-                        OsClient = osClient,
-                        FilePathName = filePathName,
-                        Limit = false
-                    });
-                    if (fileResult.Code == 1 && fileResult.Data is byte[] fileBytes)
-                    {
-                        return fileBytes;
-                    }
-                }
-                catch
-                {
-                    // Try the next stored path before falling back to the public URL.
+                    return fileBytes;
                 }
             }
             var directFileUrl = GetText(
@@ -1341,6 +1330,157 @@ namespace Microi.net.Api
                 return await DownloadPublicFileAssetBytes(fileUrl);
             }
             return null;
+        }
+
+        /// <summary>
+        /// Published application assets live in the tenant public object-store
+        /// namespace and are part of the platform runtime protocol. Reading them
+        /// through the high-level GetPrivateFileByte facade also loads sys_config
+        /// and executes configurable file V8 hooks. During an upgrade those
+        /// optional layers may not be ready yet, which previously made every
+        /// MicroService entry return 502 even though the committed object was
+        /// healthy. Use the same low-level provider boundary as application
+        /// publishing, first through the internal endpoint and then through the
+        /// public endpoint, without invoking tenant business code.
+        /// </summary>
+        private static async Task<byte[]> ReadManagedPublicAssetBytes(
+            string osClient,
+            string filePathName)
+        {
+            if (osClient.DosIsNullOrWhiteSpace() || filePathName.DosIsNullOrWhiteSpace())
+            {
+                return null;
+            }
+
+            OsClientSecret clientModel;
+            try
+            {
+                clientModel = OsClientExtend.GetClient(osClient);
+                if (clientModel?.OsClientModel == null) return null;
+
+                var hdfsType = V8McpLogic.NormalizeApplicationAssetHdfsType(
+                    (object)clientModel.OsClientModel);
+                var hdfs = hdfsType switch
+                {
+                    "MinIO" => MicroiEngine.HDFSFactory(HDFSType.MinIO),
+                    "S3" => MicroiEngine.HDFSFactory(HDFSType.AmazonS3),
+                    _ => MicroiEngine.HDFSFactory(HDFSType.Aliyun)
+                };
+
+                foreach (var useInternetEndpoint in new[] { false, true })
+                {
+                    var result = await hdfs.GetPrivateFileUrl(
+                        BuildManagedPublicAssetReadParam(
+                            clientModel,
+                            osClient,
+                            filePathName,
+                            useInternetEndpoint));
+                    if (result.Code == 1 && result.Data is byte[] bytes)
+                    {
+                        return bytes;
+                    }
+                }
+            }
+            catch
+            {
+                clientModel = OsClientExtend.GetClient(osClient);
+            }
+
+            // Published assets are intentionally in the public bucket. Some
+            // child-tenant runtime projections do not carry object-store access
+            // keys while their inherited endpoint and bucket coordinates are
+            // already usable. Fall back to an unsigned GET built only from the
+            // trusted sys_osclients infrastructure fields; never accept an
+            // endpoint or bucket from the request or asset manifest.
+            if (clientModel?.OsClientModel != null)
+            {
+                foreach (var objectUrl in BuildManagedPublicObjectUrls(
+                             clientModel,
+                             osClient,
+                             filePathName))
+                {
+                    var bytes = await DownloadPublicFileAssetBytes(objectUrl);
+                    if (bytes != null) return bytes;
+                }
+            }
+
+            return null;
+        }
+
+        private static IReadOnlyList<string> BuildManagedPublicObjectUrls(
+            OsClientSecret clientModel,
+            string osClient,
+            string filePathName)
+        {
+            var urls = new List<string>();
+            if (clientModel?.OsClientModel == null) return urls;
+            var hdfsType = V8McpLogic.NormalizeApplicationAssetHdfsType(
+                (object)clientModel.OsClientModel);
+            if (!string.Equals(hdfsType, "MinIO", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(hdfsType, "S3", StringComparison.OrdinalIgnoreCase))
+            {
+                return urls;
+            }
+
+            var bucket = clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>();
+            if (bucket.DosIsNullOrWhiteSpace()) return urls;
+            var objectPath = TenantConfigurationSecurity.NormalizeStoragePath(
+                    osClient,
+                    filePathName)
+                .TrimStart('/');
+            var endpoints = new[]
+            {
+                new
+                {
+                    Value = clientModel.OsClientModel["MinIOEndPoint"].Val<string>(),
+                    Ssl = clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1
+                },
+                new
+                {
+                    Value = clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>(),
+                    Ssl = clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1
+                }
+            };
+            foreach (var endpoint in endpoints)
+            {
+                if (endpoint.Value.DosIsNullOrWhiteSpace()) continue;
+                try
+                {
+                    var normalized = MicroiHDFSMinIO.NormalizeEndpoint(endpoint.Value, endpoint.Ssl);
+                    var builder = new UriBuilder(
+                        normalized.UseSsl ? Uri.UriSchemeHttps : Uri.UriSchemeHttp,
+                        normalized.Host,
+                        normalized.Port,
+                        $"/{Uri.EscapeDataString(bucket)}/{string.Join("/", objectPath.Split('/').Select(Uri.EscapeDataString))}");
+                    var url = builder.Uri.AbsoluteUri;
+                    if (!urls.Contains(url, StringComparer.OrdinalIgnoreCase)) urls.Add(url);
+                }
+                catch
+                {
+                    // Invalid tenant infrastructure coordinates are ignored; the
+                    // remaining trusted endpoint and existing fail-closed 502
+                    // behavior still apply.
+                }
+            }
+            return urls;
+        }
+
+        private static HDFSParam BuildManagedPublicAssetReadParam(
+            OsClientSecret clientModel,
+            string osClient,
+            string filePathName,
+            bool useInternetEndpoint)
+        {
+            return new HDFSParam
+            {
+                ClientModel = clientModel,
+                Limit = false,
+                FileFullPath = TenantConfigurationSecurity.NormalizeStoragePath(
+                    osClient,
+                    filePathName),
+                ReturnFileType = "Byte",
+                NetworkIsInternet = useInternetEndpoint
+            };
         }
 
         private static async Task<bool> IsTrustedPublicFileUrl(string osClient, string fileUrl)

@@ -139,18 +139,20 @@
                 {{ compactNumber(app.FavoriteCount) }}
               </button>
             </div>
-            <button
+            <a
               v-if="app.ExperienceUrl"
-              type="button"
+              :href="app.ExperienceUrl"
+              target="_blank"
+              rel="noopener noreferrer"
               class="ai-app-experience"
               :aria-label="`${copy.tryNow}：${app.Name}`"
-              @click.stop="openPreview(app)"
+              @click.stop
             >
               <span>{{ copy.tryNow }}</span>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M7 17 17 7M9 7h8v8" />
               </svg>
-            </button>
+            </a>
           </div>
           <div class="ai-app-meta">
             <div class="ai-app-author-avatar" aria-hidden="true">
@@ -622,11 +624,6 @@ function openDetail(app) {
   window.open(detailUrl, '_blank', 'noopener,noreferrer')
 }
 
-function openPreview(app) {
-  if (typeof window === 'undefined' || !app?.ExperienceUrl) return
-  window.open(app.ExperienceUrl, '_blank', 'noopener,noreferrer')
-}
-
 function openDemandCenter() {
   if (typeof window === 'undefined') return
   const target = demandCenter.value?.ExperienceUrl || '/app-detail.html?app=software-demand-studio'
@@ -788,7 +785,7 @@ onBeforeUnmount(() => {
 .ai-app-favorite.active { color: #ff5c7c; }
 .ai-app-favorite.active svg { fill: currentColor; }
 .ai-app-favorite.busy { opacity: .55; cursor: wait; }
-.ai-app-experience { position: absolute; z-index: 3; right: 12px; bottom: 12px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 1px solid rgba(255,255,255,.28); border-radius: 11px; background: linear-gradient(135deg, #e52c3e 0%, var(--mci-color-primary, #b51220) 72%); box-shadow: 0 12px 28px rgba(181,18,32,.34), inset 0 1px 0 rgba(255,255,255,.22); color: #fff; cursor: pointer; font: inherit; font-size: 13px; font-weight: 750; letter-spacing: .02em; opacity: 0; pointer-events: none; transform: translateY(8px) scale(.96); transition: opacity .2s ease, transform .2s ease, filter .2s ease, box-shadow .2s ease; }
+.ai-app-experience { position: absolute; z-index: 3; right: 12px; bottom: 12px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; padding: 0 16px; border: 1px solid rgba(255,255,255,.28); border-radius: 11px; background: linear-gradient(135deg, #e52c3e 0%, var(--mci-color-primary, #b51220) 72%); box-shadow: 0 12px 28px rgba(181,18,32,.34), inset 0 1px 0 rgba(255,255,255,.22); color: #fff; cursor: pointer; font: inherit; font-size: 13px; font-weight: 750; letter-spacing: .02em; text-decoration: none; opacity: 0; pointer-events: none; transform: translateY(8px) scale(.96); transition: opacity .2s ease, transform .2s ease, filter .2s ease, box-shadow .2s ease; }
 .ai-app-experience svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s ease; }
 .ai-app-card:hover .ai-app-experience, .ai-app-card:focus-within .ai-app-experience, .ai-app-experience:focus-visible { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
 .ai-app-experience:hover { filter: brightness(1.08); box-shadow: 0 15px 34px rgba(181,18,32,.42), inset 0 1px 0 rgba(255,255,255,.28); }

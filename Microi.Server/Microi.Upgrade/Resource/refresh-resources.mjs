@@ -94,7 +94,7 @@ function validateReleaseCandidate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 2_004_009
+    if (versionNumber < 2_005_000
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -121,7 +121,6 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('DATASET_INSERT_IF_MISSING_V1')
       || !content.includes('PACKAGE_API_ENGINE_READBACK_V1')
       || !content.includes('API_ENGINE_RESOURCE_BASELINE_V1')
-      || !content.includes('TENANT_API_ENGINE_POLICY_IMMUTABLE_V1')
       || !content.includes('MARKETPLACE_INSTALL_STAT_NON_BLOCKING_V2')
       || !content.includes('SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1')
       || !content.includes('LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1')
@@ -136,7 +135,9 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
       || !content.includes('TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1')
       || !content.includes('V8.Method.RequireManagedProtocolContext')
-      || !content.includes('OFFICIAL_MANAGED_OVERWRITE_V1')
+      || !content.includes('PACKAGE_MANAGED_OVERWRITE_V2')
+      || !content.includes('PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2')
+      || !content.includes('PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1')
       || !content.includes('GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1')
       || !content.includes('GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1')
       || !content.includes('GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1')
@@ -145,7 +146,7 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
       || !content.includes('PACKAGE_REPLAY_VERSION_GUARD_V2')
       || !content.includes('OBJECT_STORAGE_FORBIDDEN')) {
-      throw new Error(`${name} 低于 v2.4.9 或缺少生成实体物理前置列自愈、跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、宿主可信内置官方包重放、官方平台 Managed 覆盖升级及统一应用商城能力，拒绝降级本地基线`);
+      throw new Error(`${name} 低于 v2.5.0 或缺少生成实体物理前置列自愈、跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、宿主可信内置官方包重放、Managed 包资源覆盖升级及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -558,9 +559,8 @@ function validateReleaseCandidate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 2_004_009
+        || importerVersionNumber < 2_005_000
         || !importerCode.includes('API_ENGINE_RESOURCE_BASELINE_V1')
-        || !importerCode.includes('TENANT_API_ENGINE_POLICY_IMMUTABLE_V1')
         || !importerCode.includes('JSON_SWITCH_LITERAL_UNQUOTE_V1')
         || !importerCode.includes('MYSQL_BIT_NUMERIC_COMPAT_V1')
         || !importerCode.includes('ADMIN_MENU_PERMISSION_V1')
@@ -569,7 +569,9 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
         || !importerCode.includes('TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1')
         || !importerCode.includes('V8.Method.RequireManagedProtocolContext')
-        || !importerCode.includes('OFFICIAL_MANAGED_OVERWRITE_V1')
+        || !importerCode.includes('PACKAGE_MANAGED_OVERWRITE_V2')
+        || !importerCode.includes('PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2')
+        || !importerCode.includes('PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1')
         || !importerCode.includes('DATABASE_ONLY_BUILD_ASSETS_V1')
         || !importerCode.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')
         || !importerCode.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
@@ -579,7 +581,7 @@ function validateReleaseCandidate(name, content) {
         || !String(publisherEngine?.ApiV8Code || '').includes('buildApiEngineResourcePolicies')
         || !String(publisherEngine?.ApiV8Code || '').includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')
         || !String(publisherEngine?.ApiV8Code || '').includes('SharedPublicRuntime')
-        || engineVersionNumber(bulkEngine) < 1_003_005
+        || engineVersionNumber(bulkEngine) < 1_003_008
         || Number(bulkEngine?.IsEnable) !== 1
         || Number(bulkEngine?.StopHttp) !== 0
         || !String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_CHECKPOINT_PLAN_V2')
@@ -591,12 +593,14 @@ function validateReleaseCandidate(name, content) {
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STORAGE_FAILURE_RECOVERY_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_MONOTONIC_CHILD_PROGRESS_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STRUCTURED_CHILD_ERRORS_V1')
+        || !String(bulkEngine?.ApiV8Code || '').includes('BULK_PACKAGE_MANAGED_OVERWRITE_RECOVERY_V1')
+        || !String(bulkEngine?.ApiV8Code || '').includes('MARKETPLACE_LIST_ROUTE_FAILOVER_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2')
         || !String(bulkEngine?.ApiV8Code || '').includes('STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('BackgroundTask:StartupDependencyResourceClosureV2')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
-          .includes('ApiEngine:bulk-import-microi-store-packages@v1.3.7')
+          .includes('ApiEngine:bulk-import-microi-store-packages@v1.3.8')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('BackgroundTask:StartupDependencyPreinstallBootstrapV1')
         || !String(bulkEngine?.ApiV8Code || '').includes('prioritizeBootstrapPlan')
@@ -624,9 +628,14 @@ function validateReleaseCandidate(name, content) {
           .includes('V8.Method.ManageSystemDirectory')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('ApiEngine:platform-sys-menu@v1.0.1')
-        || engineVersionNumber(marketplaceSourceEngine) < 1_000_000
+        || engineVersionNumber(marketplaceSourceEngine) < 1_000_004
+        || !String(marketplaceSourceEngine?.ApiV8Code || '').includes('MARKETPLACE_LIST_ROUTE_FAILOVER_V2')
+        || !String(marketplaceSourceEngine?.ApiV8Code || '').includes('MARKETPLACE_NESTED_JSON_PAYLOAD_V2')
+        || !String(marketplaceSourceEngine?.ApiV8Code || '').includes('MARKETPLACE_SOURCE_HEADER_ISOLATION_V1')
         || !String(marketplaceSourceEngine?.ApiV8Code || '').includes("V8.ApiEngine.Run('platform-marketplace-source-hook'")
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-marketplace-source']?.UpgradePolicy !== 'Managed'
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ApiEngine:platform-marketplace-source@v1.0.4')
         || engineVersionNumber(marketplaceSourceHook) < 1_000_000
         || Number(marketplaceSourceHook?.StopHttp) !== 1
         || !String(marketplaceSourceHook?.ApiV8Code || '').trimEnd().endsWith('return { Code : 1 };')
@@ -731,7 +740,9 @@ function validateReleaseCandidate(name, content) {
               'DATASET_INSERT_IF_MISSING_V1',
               'PACKAGE_API_ENGINE_READBACK_V1',
               'API_ENGINE_RESOURCE_BASELINE_V1',
-              'TENANT_API_ENGINE_POLICY_IMMUTABLE_V1',
+              'PACKAGE_MANAGED_OVERWRITE_V2',
+              'PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2',
+              'PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1',
               'BACKGROUND_TASK_MONOTONIC_PROGRESS_V1',
               'BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1',
               'ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1',
