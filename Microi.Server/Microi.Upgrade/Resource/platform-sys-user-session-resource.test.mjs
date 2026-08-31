@@ -26,7 +26,7 @@ function execute(param) {
 }
 
 test('SaaS package ships the case-insensitive user-session compatibility engine', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.7.12');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.7.13');
   assert.ok(engine);
   assert.equal(engine.Version, 'v1.0.1');
   assert.match(engine.ApiV8Code, /actionNames\[String\(action\)\.toLowerCase\(\)\]/);

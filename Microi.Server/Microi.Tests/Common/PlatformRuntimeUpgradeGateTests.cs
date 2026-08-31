@@ -330,6 +330,25 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
+    public void HostedUpgrade_SkipsLanguageCacheReloadWhenDatabasePrerequisiteFails()
+    {
+        var hosted = File.ReadAllText(Path.Combine(
+            FindServerRoot(),
+            "Microi.Upgrade",
+            "MicroiUpgradeHostedService.cs"));
+
+        Assert.Contains("var upgradeExecutionReachedSafeReloadPoint = false;", hosted);
+        Assert.Contains("upgradeExecutionReachedSafeReloadPoint = true;", hosted);
+        Assert.Contains("if (!upgradeExecutionReachedSafeReloadPoint)", hosted);
+        Assert.Contains("升级执行未到达安全缓存刷新点，跳过多语言运行时缓存刷新", hosted);
+
+        var guardIndex = hosted.IndexOf("if (!upgradeExecutionReachedSafeReloadPoint)", StringComparison.Ordinal);
+        var reloadIndex = hosted.IndexOf("ReloadDiyLangCacheAsync", StringComparison.Ordinal);
+        Assert.True(guardIndex >= 0 && reloadIndex > guardIndex,
+            "The unreachable-database guard must run before the cache reload.");
+    }
+
+    [Fact]
     public void StartupDependencyPersistence_UsesCrossDatabaseBitAndPostgreSqlUtcDateParameters()
     {
         var database = new DbSession(

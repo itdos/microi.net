@@ -30,6 +30,12 @@ public class ApiEngineCacheCompatibilityTests
             BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("接口引擎动态路由缓存别名方法不存在。");
 
+    private static readonly MethodInfo CanonicalRouteKeyMethod =
+        typeof(DynamicRoute).GetMethod(
+            "ResolveCanonicalApiEngineKey",
+            BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("接口引擎规范 Key 路由解析方法不存在。");
+
     private static readonly MethodInfo UpgradeEventMethod =
         UpgradeCacheCompatibilityType.GetMethod(
             "TryUpgradeEvent",
@@ -106,6 +112,22 @@ public class ApiEngineCacheCompatibilityTests
     }
 
     [Theory]
+    [InlineData("/apiengine/home_platform_stats", "home_platform_stats")]
+    [InlineData("/apiengine/home_platform_stats--OsClient--iTdos--", "home_platform_stats")]
+    [InlineData("/ApiEngine/Platform.Health-V2", "platform.health-v2")]
+    [InlineData("/custom/home_platform_stats", "")]
+    [InlineData("/apiengine/nested/path", "")]
+    public void CanonicalApiEngineRouteUsesKeyAsColdStartAuthority(
+        string apiPath,
+        string expectedKey)
+    {
+        var actual = Assert.IsType<string>(
+            CanonicalRouteKeyMethod.Invoke(null, new object?[] { apiPath }));
+
+        Assert.Equal(expectedKey, actual);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, true)]
     public void DurableBackgroundExecutionRequiresAuthoritativeDatabaseRead(
@@ -126,12 +148,22 @@ public class ApiEngineCacheCompatibilityTests
             serverRoot, "Microi.net", "ApiEngine", "ApiEngine.cs"));
         var dynamicRouteSource = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.net.Api", "Handler", "DynamicApiEngine.cs"));
+        var apiControllerSource = File.ReadAllText(Path.Combine(
+            serverRoot, "Microi.net.Api", "Controllers", "ApiEngineController.cs"));
         var initializerSource = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.Core", "ApiEngine", "ApiEngineRouteCacheInitializer.cs"));
         var storeSource = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.Core", "ApiEngine", "ApiEngineAuthoritativeStore.cs"));
 
-        Assert.Contains("GetAuthoritativeApiEngineModel(new ApiEngineParam", dynamicRouteSource);
+        Assert.Contains(".GetAuthoritativeApiEngineModel(authoritativeParam)", dynamicRouteSource);
+        Assert.Contains("authoritativeParam.ApiEngineKey = canonicalApiEngineKey", dynamicRouteSource);
+        Assert.Contains("authoritativeParam.ApiAddress = apiPathLower", dynamicRouteSource);
+        Assert.Contains(
+            "resolvedApiEngineKey = DynamicRoute.ResolveCanonicalApiEngineKey(requestPath)",
+            apiControllerSource);
+        Assert.DoesNotContain(
+            @"^/apiengine/([A-Za-z0-9_.:-]+)(?:--OsClient--.*--)?$",
+            apiControllerSource);
         Assert.DoesNotContain(
             "fallbackResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam",
             dynamicRouteSource);

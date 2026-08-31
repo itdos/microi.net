@@ -1634,7 +1634,10 @@ if [ "$PUBLISH_DOC" = true ]; then
     print_success "Docker 镜像构建完成"
 
     print_step "登录 registry.cn-beijing.aliyuncs.com..."
-    docker login --username=admin@itdos.com --password=iTdos#docker.publish registry.cn-beijing.aliyuncs.com
+    if ! printf '%s' 'iTdos#docker.publish' | docker login \
+        --username='admin@itdos.com' --password-stdin registry.cn-beijing.aliyuncs.com; then
+        print_fail "官方网站文档 Docker 镜像仓库登录失败"
+    fi
 
     print_step "推送到北京仓库..."
     docker tag microi.doc registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest

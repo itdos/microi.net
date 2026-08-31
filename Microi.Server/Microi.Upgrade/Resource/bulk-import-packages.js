@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.3.8
+ * Version: v1.3.9
  * Function:
  * - 规划并逐个安装或更新全部官方平台应用；持久化计划、不可变商城快照标识与子检查点，并透传结构化失败详情。
  */
@@ -392,15 +392,20 @@ if (startupDependencyBootstrapOnlyRequested && !startupDependencyRecovery) {
 }
 var startupDependencyBootstrapOnly = startupDependencyBootstrapOnlyRequested
     && startupDependencyRecovery;
+var installedVersionLoadError = '';
 function loadInstalledVersions() {
     try {
         var result = V8.FormEngine.GetTableData('sys_microistoreversion', {
-            _SelectFields: ['Id', 'StoreId', 'AppId', 'AppName', 'AppVersion', 'AppVersionInstall', 'InstallStatus'],
+            _SelectFields: ['Id', 'StoreId', 'AppId', 'AppName', 'AppVersion', 'AppVersionInstall', 'PackageVersion', 'InstallStatus', 'IsDeleted', 'InstallTime', 'UpdateTime', 'LastCheckTime', 'CreateTime'],
             _PageIndex: 1,
-            _PageSize: 5000
+            _PageSize: 5000,
+            _OrderBy: 'UpdateTime',
+            _OrderByType: 'DESC'
         });
-        return result && result.Code == 1 ? toArray(result.Data) : [];
+        if (!result || result.Code != 1) throw new Error((result && result.Msg) || '接口无返回');
+        return toArray(result.Data);
     } catch (error) {
+        installedVersionLoadError = error && error.message ? error.message : String(error);
         return [];
     }
 }
@@ -498,6 +503,13 @@ if (phase == 'Discover') {
     var pageIndex = Math.max(1, toInt(checkpoint.PageIndex, 1));
     var plan = normalizePlan(checkpoint.Plan);
     var installedVersions = loadInstalledVersions();
+    if (installedVersionLoadError) {
+        return failure(
+            '读取本地应用安装状态失败：' + installedVersionLoadError,
+            { FailureStage: 'InstalledVersionRead' },
+            '检查 sys_microistoreversion 表结构及当前管理员的数据读取权限后重新发起；失败前未开始安装任何应用。'
+        );
+    }
     report(1, pageIndex - 1, null, '正在盘点商城中未安装和可更新的应用');
     var sourceRequestHeaders = {};
     try {

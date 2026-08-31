@@ -24,10 +24,10 @@ test("background-task foundation package installs in foreground to break the boo
 test("ordinary app-store packages still use persistent background tasks", () => {
   assert.match(
     source,
-    /ApiEngine\.RunBackground\("import-microi-store-package", backgroundParam, backgroundTitle/,
+    /ApiEngine\.RunBackground\(\s*"import-microi-store-package"\s*,\s*backgroundParam\s*,\s*backgroundTitle\s*,\s*\{/,
   );
   assert.match(
     source,
-    /ApiEngine\.RunBackground\([\s\S]*?"import-microi-store-package",[\s\S]*?importParam/,
+    /ApiEngine\.RunBackground\(\s*"import-microi-store-package"\s*,\s*importParam\s*,\s*"安装离线包应用："\s*\+\s*packageName\s*,\s*\{/,
   );
 });
