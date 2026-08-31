@@ -26,7 +26,8 @@ test("menu micro-apps receive a versioned host capability contract", () => {
             "showMessage",
             "refreshCurrentUser",
             "setGlobalOverlay",
-            "openForm"
+            "openForm",
+            "openPlatformPrint"
         ],
         lifecycle: {
             cacheMode: "runtime-keep-alive",
@@ -88,6 +89,29 @@ test("tab titles and host messages remain bounded plain text", () => {
     assert.equal(bridge.normalizeHostMessage({ message: "提示", messageType: "html" }).messageType, "info");
 });
 
+test("platform print bridge is fixed to the current tenant backend and registered print component", () => {
+    const normalized = bridge.normalizeHostPlatformPrint({
+        PrintId: "01KWDMSRHGGSZNHERS0VZP88C8",
+        DataApi: "https://localhost:61501/apiengine/print_tuoma?OsClient=junchi&IdList=%5B%221%22%5D",
+        Title: "普通打印（1 条）"
+    }, { apiBase: "https://localhost:61501", osClient: "junchi" });
+    assert.equal(normalized.ComponentName, "OpenIframe");
+    assert.equal(normalized.OpenType, "Drawer");
+    assert.equal(normalized.DataAppend.PrintId, "01KWDMSRHGGSZNHERS0VZP88C8");
+    assert.match(normalized.DataAppend.DataApi, /\/apiengine\/print_tuoma\?OsClient=junchi/);
+
+    for (const DataApi of [
+        "https://evil.example/apiengine/print_tuoma?OsClient=junchi",
+        "https://localhost:61501/api/SysUser/login?OsClient=junchi",
+        "https://localhost:61501/apiengine/print_tuoma?OsClient=other"
+    ]) {
+        assert.throws(() => bridge.normalizeHostPlatformPrint({ PrintId: "print-1", DataApi }, {
+            apiBase: "https://localhost:61501",
+            osClient: "junchi"
+        }));
+    }
+});
+
 test("the page host connects dispatch actions to router and TagsView behavior", () => {
     const host = read("src/views/micro-app/host.vue");
     assert.match(host, /hostCapabilities:\s*createMicroAppHostCapabilities\(\)/);
@@ -101,6 +125,8 @@ test("the page host connects dispatch actions to router and TagsView behavior", 
     assert.match(host, /window\.addEventListener\("page-refresh"/);
     assert.match(host, /MICRO_APP_HOST_ACTION_RESULT_TYPE/);
     assert.match(host, /case "refreshCurrentUser"[\s\S]*RefreshLoginUser/);
+    assert.match(host, /case "openPlatformPrint"[\s\S]*this\.openPlatformPrint/);
+    assert.match(host, /refPlatformPrintDialog/);
     assert.match(host, /childPrelockedHtmlOnly/);
     assert.match(host, /htmlOverflow:\s*childPrelockedHtmlOnly\s*\?\s*""\s*:\s*html\.style\.overflow/);
     assert.match(host, /html\.style\.overflow\s*=\s*state\.htmlOverflow/);

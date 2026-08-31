@@ -123,6 +123,52 @@ public class TenantConfigurationSecurityTests
     }
 
     [Fact]
+    public void ChildRedisInfrastructure_AlwaysUsesCurrentMainTenantRuntime()
+    {
+        var main = new JObject
+        {
+            ["RedisHost"] = "public-or-current-node-host",
+            ["RedisPort"] = "1379",
+            ["RedisPwd"] = "current-node-secret",
+            ["RedisDataBase"] = "5"
+        };
+        var tenant = new JObject
+        {
+            ["OsClient"] = "tenant_a",
+            ["RedisHost"] = "legacy-docker-private-host",
+            ["RedisPort"] = "6379",
+            ["RedisPwd"] = "legacy-secret",
+            ["RedisDataBase"] = "9",
+            ["MinIOPublicBucketName"] = "tenant-owned-public"
+        };
+
+        TenantConfigurationSecurity.UseMainTenantRedisInfrastructure(tenant, main);
+
+        Assert.Equal("public-or-current-node-host", tenant["RedisHost"]?.ToString());
+        Assert.Equal("1379", tenant["RedisPort"]?.ToString());
+        Assert.Equal("current-node-secret", tenant["RedisPwd"]?.ToString());
+        Assert.Equal("5", tenant["RedisDataBase"]?.ToString());
+        Assert.Equal("tenant-owned-public", tenant["MinIOPublicBucketName"]?.ToString());
+    }
+
+    [Fact]
+    public void ChildRedisInfrastructure_FailsClosedWhenMainRuntimeIsMissing()
+    {
+        var tenant = new JObject
+        {
+            ["RedisHost"] = "legacy-docker-private-host",
+            ["RedisPwd"] = "legacy-secret",
+            ["ClientName"] = "Tenant A"
+        };
+
+        TenantConfigurationSecurity.UseMainTenantRedisInfrastructure(tenant, new JObject());
+
+        Assert.Null(tenant["RedisHost"]);
+        Assert.Null(tenant["RedisPwd"]);
+        Assert.Equal("Tenant A", tenant["ClientName"]?.ToString());
+    }
+
+    [Fact]
     public void ControlPlaneProjection_ShowsOnlyMissingEffectiveInfrastructureAndReturnsNoSaveFields()
     {
         var stored = new JObject
@@ -162,6 +208,36 @@ public class TenantConfigurationSecurityTests
         Assert.DoesNotContain("MinIOPublicBucketName", inheritedFields);
         Assert.DoesNotContain("DbConn", inheritedFields);
         Assert.DoesNotContain("AuthSecret", inheritedFields);
+    }
+
+    [Fact]
+    public void ChildControlPlaneProjection_ReplacesLegacyRedisAndMarksItReadOnly()
+    {
+        var stored = new JObject
+        {
+            ["OsClient"] = "tenant_a",
+            ["RedisHost"] = "legacy-docker-private-host",
+            ["RedisPwd"] = "legacy-secret",
+            ["MinIOPublicBucketName"] = "tenant-owned-public"
+        };
+        var effective = new JObject
+        {
+            ["RedisHost"] = "current-main-runtime-host",
+            ["RedisPwd"] = "current-main-runtime-secret",
+            ["MinIOPublicBucketName"] = "main-public"
+        };
+
+        var projection = TenantConfigurationSecurity.CreateControlPlaneSharedInfrastructureProjection(
+            stored,
+            effective,
+            out var inheritedFields,
+            forceMainTenantRedis: true);
+
+        Assert.Equal("current-main-runtime-host", projection["RedisHost"]?.ToString());
+        Assert.Equal("current-main-runtime-secret", projection["RedisPwd"]?.ToString());
+        Assert.Equal("tenant-owned-public", projection["MinIOPublicBucketName"]?.ToString());
+        Assert.Contains("RedisHost", inheritedFields);
+        Assert.Contains("RedisPwd", inheritedFields);
     }
 
     [Fact]

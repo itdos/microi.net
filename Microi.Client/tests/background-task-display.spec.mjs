@@ -74,3 +74,16 @@ test("notification center keeps pagination reachable in a short viewport", () =>
     assert.match(component, /:global\(\.el-dialog\.microi-notification-dialog\)\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*column;/);
     assert.match(component, /:global\(\.el-dialog\.microi-notification-dialog > \.el-dialog__body\)\s*\{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?overflow-y:\s*auto;[\s\S]*?scrollbar-gutter:\s*stable;/);
 });
+
+test("task results distinguish business navigation from downloadable artifacts", () => {
+    const component = readFileSync(
+        new URL("../src/layout/components/BackgroundTaskCenter.vue", import.meta.url),
+        "utf8"
+    );
+
+    assert.match(component, /v-if="getTaskOpenUrl\(row\)"[\s\S]*?@click\.stop="openTaskResult\(row\)"/);
+    assert.match(component, /data\.OpenUrl \|\| data\.openUrl \|\| result\.OpenUrl \|\| result\.openUrl/);
+    assert.match(component, /normalizeNotificationLink\([\s\S]*?window\.location\.origin/);
+    assert.match(component, /v-if="getTaskDownloadUrl\(row\)"[\s\S]*?downloadTaskResult\(row\)/);
+    assert.doesNotMatch(component, /row\.HasResult \|\| getTaskDownloadUrl\(row\)/);
+});

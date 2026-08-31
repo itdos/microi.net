@@ -45,23 +45,23 @@
     <!-- HTTP 入口归属既有功能类库与 API 组合根，不再引用无业务归属的中转项目。 -->
     <ProjectReference Include="..\Microi.net.Api\Microi.net.Api.csproj"
                       Condition="Exists('..\Microi.net.Api\Microi.net.Api.csproj')" />
-    <!-- 私有 Microi.net 子仓存在时启用服务端安全、FormEngine 与 ApiEngine 回归。 -->
+    <!-- 私有回归测试服从中央引用模式，公开方案即使本机存在子仓也不得传递拉入源码。 -->
     <ProjectReference Include="..\Microi.net\Microi.net.csproj"
-                      Condition="Exists('..\Microi.net\Microi.net.csproj')" />
+                      Condition="'$(MicroiNetExists)' == 'true'" />
     <ProjectReference Include="..\Microi.Spider\Microi.Spider.csproj"
-                      Condition="Exists('..\Microi.net\Microi.net.csproj')" />
-    <!-- 私有 AI 项目存在时，把其测试并入同一个 Microi.Tests 入口。 -->
+                      Condition="'$(MicroiNetExists)' == 'true'" />
+    <!-- Anderson/Auto 源码模式下，才把私有 AI 测试并入统一入口。 -->
     <ProjectReference Include="..\Microi.AI\Microi.AI.csproj"
-                      Condition="Exists('..\Microi.AI\Microi.AI.csproj')" />
+                      Condition="'$(MicroiAIExists)' == 'true'" />
   </ItemGroup>
 
-  <ItemGroup Condition="Exists('..\Microi.AI\Microi.AI.Tests')">
+  <ItemGroup Condition="'$(MicroiAIExists)' == 'true' and Exists('..\Microi.AI\Microi.AI.Tests')">
     <Compile Include="..\Microi.AI\Microi.AI.Tests\**\*.cs"
              Exclude="..\Microi.AI\Microi.AI.Tests\bin\**\*;..\Microi.AI\Microi.AI.Tests\obj\**\*"
              Link="AI\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
-  <ItemGroup Condition="!Exists('..\Microi.net\Microi.net.csproj')">
+  <ItemGroup Condition="'$(MicroiNetExists)' != 'true'">
     <Compile Remove="Common\FormEngineTenantBoundaryTests.cs" />
     <Compile Remove="Common\TokenRotationSecurityTests.cs" />
     <Compile Remove="Common\DataSourceEngineAuthorizationTests.cs" />

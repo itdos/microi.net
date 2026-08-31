@@ -144,7 +144,7 @@ test('message-notification and Store selected ApiEngine key sets stay exact and 
   assertPackageKeyClosure(messagePackage, MESSAGE_SELECTED_API_ENGINE_KEYS);
   assertPackageKeyClosure(storePackage, STORE_SELECTED_API_ENGINE_KEYS);
   assert.equal(messagePackage.PackageInfo.Version, 'v1.0.13');
-  assert.equal(storePackage.PackageInfo.Version, 'v7.7.18');
+  assert.equal(storePackage.PackageInfo.Version, 'v7.7.24');
 });
 
 test('official package ApiEngine stable identities are globally unique', () => {
@@ -184,6 +184,7 @@ test('official Managed cores and CreateIfMissing hooks carry immutable package c
     appName: '应用商城',
     managedKey: 'platform-marketplace-source',
     managedFile: 'platform-marketplace-source.js',
+    managedVersion: 'v1.0.4',
     hookKey: 'platform-marketplace-source-hook',
     hookFile: 'platform-marketplace-source-hook.js',
   });

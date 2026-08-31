@@ -32,13 +32,14 @@ test("current-user failure preserves the authentication code and authoritative m
     assert.match(source, /setCurrentUser\(currentUser\)/);
 });
 
-test("a stale request token keeps its exact login-expiry message after redirect", async () => {
+test("the login entry silently consumes expired or missing authentication", async () => {
     const source = await readSource("src/utils/diy.common.js");
     const app = await readSource("src/App.vue");
-    assert.match(source, /requestHadToken = !DiyCommon\.IsNull\(result\.__MicroiRequestToken\)/);
-    assert.match(source, /&& !requestHadToken\)\)\{/);
-    assert.match(source, /SaveAuthFailureMessage: function \(result\)/);
-    assert.match(source, /sessionStorage\.setItem\("Microi\.AuthFailureMessage"/);
-    assert.match(source, /sessionStorage\.removeItem\("Microi\.AuthFailureMessage"\)/);
-    assert.match(app, /DiyCommon\.ConsumeAuthFailureMessage\(\)/);
+    assert.match(source, /IsLoginEntryRoute: function \(\)/);
+    assert.match(source, /hashPath === "\/login"/);
+    assert.match(source, /hashPath === "\/access-login"/);
+    assert.match(source, /isAuthenticationFailure && DiyCommon\.IsLoginEntryRoute\(\)/);
+    assert.match(source, /error\.response\.status == 401 && DiyCommon\.IsLoginEntryRoute\(\)/);
+    assert.doesNotMatch(source, /Microi\.AuthFailureMessage|SaveAuthFailureMessage|ConsumeAuthFailureMessage/);
+    assert.doesNotMatch(app, /ConsumeAuthFailureMessage|authFailureMessage/);
 });

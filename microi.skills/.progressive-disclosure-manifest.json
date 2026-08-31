@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-26T19:09:39.599Z",
+  "generatedAt": "2026-08-31T08:18:54.747Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2221,11 +2221,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "69f7195bfeb618f0020da92535f47c8eb183d431cf16492a12f6f61dbcc7a851",
-      "originalLines": 571,
+      "originalSha256": "acc9619e305fbb555253598d0904a2c3da5a71e4faf23941f18ee9cca2f343ae",
+      "originalLines": 574,
       "prefixSha256": "796e8308ae21c36dde1b9268ae71ccb8c2afe9f393d7f9865b6648d2f7f0f22e",
       "prefixBytes": 8923,
-      "entryLines": 226,
+      "entryLines": 229,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -2239,8 +2239,8 @@
           "id": "v8-file-upload-001",
           "ordinal": 1,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "a7572bc0fd333c8f0c240d0f62db4763225ba9f69bfd45d0e0d41ae3f4b1edd0",
-          "lines": 13,
+          "sha256": "bacff382201c915334757946ee60d4a65db4e9663dd9e1f86bb68c1c16589321",
+          "lines": 16,
           "heading": "第三方数据库附件迁移"
         },
         {

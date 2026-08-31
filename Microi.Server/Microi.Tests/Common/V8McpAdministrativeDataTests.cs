@@ -29,6 +29,10 @@ public sealed class V8McpAdministrativeDataTests
     [InlineData("RedisPwd")]
     [InlineData("SecretCipher")]
     [InlineData("private_key")]
+    [InlineData("MinIOSecretKey")]
+    [InlineData("MinIOAccessKey")]
+    [InlineData("AliOssAccessKeyId")]
+    [InlineData("TencentSecretId")]
     public void KnownSecretFieldsAreDetected(string fieldName)
     {
         Assert.True(V8McpLogic.IsAdministrativeSensitiveField(fieldName));
@@ -47,7 +51,13 @@ public sealed class V8McpAdministrativeDataTests
             "Enabled": true
           },
           "Items": [
-            { "DbConn": "Server=db;Password=secret", "Label": "主库" }
+            {
+              "DbConn": "Server=db;Password=secret",
+              "MinIOSecretKey": "storage-secret",
+              "MinIOAccessKey": "storage-access",
+              "AliOssAccessKeyId": "oss-access-id",
+              "Label": "主库"
+            }
           ]
         }
         """);
@@ -60,6 +70,9 @@ public sealed class V8McpAdministrativeDataTests
         Assert.Equal("***REDACTED***", redacted["Nested"]?.Value<string>("ClientSecret"));
         Assert.True(redacted["Nested"]?.Value<bool>("Enabled"));
         Assert.Equal("***REDACTED***", redacted["Items"]?[0]?.Value<string>("DbConn"));
+        Assert.Equal("***REDACTED***", redacted["Items"]?[0]?.Value<string>("MinIOSecretKey"));
+        Assert.Equal("***REDACTED***", redacted["Items"]?[0]?.Value<string>("MinIOAccessKey"));
+        Assert.Equal("***REDACTED***", redacted["Items"]?[0]?.Value<string>("AliOssAccessKeyId"));
         Assert.Equal("主库", redacted["Items"]?[0]?.Value<string>("Label"));
     }
 

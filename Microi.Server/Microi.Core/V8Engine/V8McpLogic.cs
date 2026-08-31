@@ -5965,6 +5965,226 @@ namespace Microi.net
             return !IsBlank(filePath) && (syncedPaths == null || !syncedPaths.Contains(filePath));
         }
 
+        /// <summary>
+        /// AI application source/build objects are control-plane artifacts.  A
+        /// child tenant can have a business-database sys_osclients projection
+        /// whose legacy HDFS coordinates differ from the parent SaaS registry.
+        /// Reading through the high-level tenant facade would then use that
+        /// projection and fail against the parent's application bucket.  Resolve
+        /// the authoritative runtime client once and call the low-level provider
+        /// directly, matching the exact-path upload and stream-publish boundary.
+        /// </summary>
+        internal static HDFSParam BuildApplicationStorageReadParam(
+            OsClientSecret clientModel,
+            string osClient,
+            string filePathName,
+            bool limit,
+            bool useInternetEndpoint)
+        {
+            if (clientModel?.OsClientModel == null) throw new ArgumentNullException(nameof(clientModel));
+            return new HDFSParam
+            {
+                ClientModel = clientModel,
+                Limit = limit,
+                FileFullPath = TenantConfigurationSecurity.NormalizeStoragePath(
+                        osClient,
+                        filePathName)
+                    .TrimStart('/'),
+                ReturnFileType = "Byte",
+                NetworkIsInternet = useInternetEndpoint
+            };
+        }
+
+        private static OsClientSecret CreateApplicationStorageCompatibilityClient(
+            OsClientSecret authoritativeClient,
+            string osClient,
+            object row)
+        {
+            if (authoritativeClient == null || row == null || IsBlank(osClient)) return null;
+            try
+            {
+                var model = row as JObject ?? JObject.FromObject(row);
+                var rowOsClient = SafeJString(model, "OsClient");
+                if (!string.Equals(rowOsClient, osClient, StringComparison.OrdinalIgnoreCase)) return null;
+                if (SafeJInt(model, "IsDeleted", 0) == 1 || SafeJInt(model, "IsEnable", 1) == 0) return null;
+                if (IsBlank(SafeJString(model, "HDFS"))) return null;
+
+                return new OsClientSecret
+                {
+                    OsClient = osClient,
+                    OsClientModel = model,
+                    Db = authoritativeClient.Db,
+                    DbRead = authoritativeClient.DbRead
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static List<OsClientSecret> TryLoadRegistryApplicationStorageClients(
+            OsClientSecret authoritativeClient,
+            string osClient)
+        {
+            var result = new List<OsClientSecret>();
+            if (authoritativeClient == null || IsBlank(osClient)) return result;
+
+            List<dynamic> rows;
+            try
+            {
+                // A Product tenant can legitimately have Internal and Internet
+                // runtime rows in the parent SaaS registry.  Private AI source
+                // may have been uploaded by either node, especially across a
+                // storage-key rotation.  Limit compatibility reads to the exact
+                // tenant key and enabled rows; never cache or return credentials.
+                var mainOsClient = OsClientExtend.GetConfigOsClient();
+                if (IsBlank(mainOsClient)) return result;
+                var mainClient = OsClientExtend.GetClient(mainOsClient);
+                var registryDb = mainClient?.DbRead ?? mainClient?.Db;
+                if (registryDb == null) return result;
+
+                var section = registryDb.FromSql(
+                        "SELECT * FROM sys_osclients WHERE OsClient = ?OsClient " +
+                        "AND (IsDeleted = 0 OR IsDeleted IS NULL) " +
+                        "AND (IsEnable = 1 OR IsEnable IS NULL)")
+                    .AddInParameter("?OsClient", osClient);
+                section.SetCommandTimeout(10);
+                rows = section.ToList<dynamic>();
+            }
+            catch
+            {
+                return result;
+            }
+
+            var authoritativeType = SafeJString(authoritativeClient.OsClientModel, "OsClientType");
+            var authoritativeNetwork = SafeJString(authoritativeClient.OsClientModel, "OsClientNetwork");
+            foreach (var row in rows
+                         .Select(item => item as JObject ?? JObject.FromObject(item))
+                         .OrderByDescending(item => string.Equals(
+                             SafeJString(item, "OsClientType"),
+                             authoritativeType,
+                             StringComparison.OrdinalIgnoreCase))
+                         .ThenByDescending(item => string.Equals(
+                             SafeJString(item, "OsClientNetwork"),
+                             authoritativeNetwork,
+                             StringComparison.OrdinalIgnoreCase)))
+            {
+                var candidate = CreateApplicationStorageCompatibilityClient(
+                    authoritativeClient,
+                    osClient,
+                    row);
+                if (candidate != null) result.Add(candidate);
+            }
+            return result;
+        }
+
+        private static OsClientSecret TryLoadLegacyApplicationStorageClient(
+            OsClientSecret authoritativeClient,
+            string osClient)
+        {
+            if (authoritativeClient?.Db == null || IsBlank(osClient)) return null;
+            try
+            {
+                // Older child-tenant databases can retain the storage coordinates
+                // that were active when their private AI source objects were
+                // uploaded.  The authoritative SaaS registry must remain the
+                // first choice for current runtime/public assets, but a failed
+                // private-object read needs this bounded compatibility candidate
+                // so legacy source can still be exported and migrated.  Never
+                // cache the row or expose its credentials outside this method.
+                var section = authoritativeClient.Db.FromSql(
+                        "SELECT * FROM sys_osclients WHERE OsClient = ?OsClient AND (IsDeleted = 0 OR IsDeleted IS NULL) LIMIT 1")
+                    .AddInParameter("?OsClient", osClient);
+                section.SetCommandTimeout(10);
+                var row = section.First<dynamic>();
+                if (row == null) return null;
+
+                return CreateApplicationStorageCompatibilityClient(
+                    authoritativeClient,
+                    osClient,
+                    row);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        internal static string ApplicationStorageCoordinateFingerprint(OsClientSecret clientModel)
+        {
+            var model = clientModel?.OsClientModel;
+            if (model == null) return string.Empty;
+            return string.Join("|",
+                SafeJString(model, "HDFS").Trim().ToLowerInvariant(),
+                SafeJString(model, "MinIOEndPoint").Trim().ToLowerInvariant(),
+                SafeJString(model, "MinIOEndPointInternet").Trim().ToLowerInvariant(),
+                SafeJString(model, "MinIOPrivateBucketName").Trim().ToLowerInvariant(),
+                SafeJString(model, "MinIOPublicBucketName").Trim().ToLowerInvariant(),
+                SafeJString(model, "AliOssPrivateEndpoint").Trim().ToLowerInvariant(),
+                SafeJString(model, "AliOssPrivateBucketName").Trim().ToLowerInvariant());
+        }
+
+        private static async Task<DosResult> ReadApplicationStorageBytes(
+            string osClient,
+            string filePathName,
+            bool limit)
+        {
+            if (IsBlank(osClient) || IsBlank(filePathName))
+                return new DosResult(0, null, "应用存储租户或文件路径为空");
+
+            try
+            {
+                var clientModel = OsClientExtend.GetClient(osClient);
+                if (clientModel?.OsClientModel == null)
+                    return new DosResult(0, null, "未找到应用存储的权威租户配置");
+
+                DosResult lastResult = null;
+                // Child tenants can inherit the parent's object-store while their
+                // own projection intentionally omits credentials. This applies to
+                // public runtime assets as well as private application source, so
+                // always keep the authoritative child first and then try the
+                // bounded registry/legacy coordinates. `limit` still selects the
+                // public/private bucket and is never changed by this fallback.
+                var candidates = new List<OsClientSecret> { clientModel };
+                candidates.AddRange(TryLoadRegistryApplicationStorageClients(clientModel, osClient));
+                var legacyClient = TryLoadLegacyApplicationStorageClient(clientModel, osClient);
+                if (legacyClient != null) candidates.Add(legacyClient);
+
+                foreach (var candidate in candidates
+                             .Where(candidate => candidate?.OsClientModel != null)
+                             .GroupBy(candidate => SafeJString(candidate.OsClientModel, "Id") + "|" +
+                                                   ApplicationStorageCoordinateFingerprint(candidate),
+                                 StringComparer.Ordinal)
+                             .Select(group => group.First()))
+                {
+                    var hdfsType = NormalizeApplicationAssetHdfsType((object)candidate.OsClientModel);
+                    var hdfs = hdfsType switch
+                    {
+                        "MinIO" => MicroiEngine.HDFSFactory(HDFSType.MinIO),
+                        "S3" => MicroiEngine.HDFSFactory(HDFSType.AmazonS3),
+                        _ => MicroiEngine.HDFSFactory(HDFSType.Aliyun)
+                    };
+                    foreach (var useInternetEndpoint in new[] { false, true })
+                    {
+                        lastResult = await hdfs.GetPrivateFileUrl(
+                            BuildApplicationStorageReadParam(
+                                candidate,
+                                osClient,
+                                filePathName,
+                                limit,
+                                useInternetEndpoint));
+                        if (lastResult.Code == 1 && lastResult.Data != null) return lastResult;
+                    }
+                }
+                return lastResult ?? new DosResult(0, null, "应用存储读取失败");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "应用存储读取失败：" + ex.Message);
+            }
+        }
+
         private static async Task<JObject> ReadAiApplicationFile(string osClient, JObject file, bool includeContents, long maxFileBytes)
         {
             var item = (JObject)file.DeepClone();
@@ -5986,12 +6206,10 @@ namespace Microi.net
                 return item;
             }
 
-            var fileResult = await MicroiEngine.HDFS.GetPrivateFileByte(new DiyUploadParam
-            {
-                OsClient = osClient,
-                FilePathName = hdfsPath,
-                Limit = !IsPublishedAiApplicationBuildFile(item)
-            });
+            var fileResult = await ReadApplicationStorageBytes(
+                osClient,
+                hdfsPath,
+                !IsPublishedAiApplicationBuildFile(item));
             if (fileResult.Code != 1)
             {
                 item["ContentReadError"] = fileResult.Msg ?? "读取 HDFS 文件失败";
@@ -6269,12 +6487,10 @@ namespace Microi.net
 
             var filePathName = SafeJString(asset, "FilePathName", SafeJString(asset, "HdfsPath"));
             if (filePathName.DosIsNullOrWhiteSpace()) return null;
-            var readResult = await MicroiEngine.HDFS.GetPrivateFileByte(new DiyUploadParam
-            {
-                OsClient = osClient,
-                FilePathName = filePathName,
-                Limit = false
-            }).ConfigureAwait(false);
+            var readResult = await ReadApplicationStorageBytes(
+                osClient,
+                filePathName,
+                false).ConfigureAwait(false);
             if (readResult.Code != 1 || readResult.Data == null) return null;
             if (readResult.Data is byte[] bytes) return bytes;
             return Encoding.UTF8.GetBytes(Convert.ToString(readResult.Data));

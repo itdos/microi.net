@@ -64,6 +64,14 @@ namespace Microi.net
                 "SearchEngineScheme", "SearchEngineHost", "SearchEnginePort"
             };
 
+        private static readonly HashSet<string> SharedRedisInfrastructureFieldSet =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "NoSqlType", "CacheConnectionType", "RedisHost", "RedisPort", "RedisPwd",
+                "RedisDataBase", "RedisTimeout", "SentinelHost", "SentinelPort",
+                "SentinelServiceName", "SentinelPwd"
+            };
+
         private static readonly HashSet<string> TenantServiceCredentialFieldSet =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -192,6 +200,9 @@ namespace Microi.net
 
         public static IReadOnlyCollection<string> SharedInfrastructureFields =>
             SharedInfrastructureFieldSet.ToArray();
+
+        public static IReadOnlyCollection<string> SharedRedisInfrastructureFields =>
+            SharedRedisInfrastructureFieldSet.ToArray();
 
         public static IReadOnlyCollection<string> TenantServiceCredentialFields =>
             TenantServiceCredentialFieldSet.ToArray();
@@ -370,6 +381,33 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 子租户 Redis 必须始终使用当前节点主租户的运行配置。历史数据库行可能保存了
+        /// Docker 内网地址或旧密码；这些值只从运行快照移除，不回写数据库，避免本地、
+        /// 容器和多网络分区共享同一主库时互相污染基础设施路由。
+        /// </summary>
+        public static JObject UseMainTenantRedisInfrastructure(JObject tenantModel, JObject mainModel)
+        {
+            if (tenantModel == null) throw new ArgumentNullException(nameof(tenantModel));
+
+            foreach (var property in tenantModel.Properties()
+                         .Where(property => SharedRedisInfrastructureFieldSet.Contains(property.Name))
+                         .ToList())
+            {
+                property.Remove();
+            }
+
+            if (mainModel == null) return tenantModel;
+            foreach (var field in SharedRedisInfrastructureFieldSet)
+            {
+                var mainProperty = mainModel.Properties().FirstOrDefault(property =>
+                    string.Equals(property.Name, field, StringComparison.OrdinalIgnoreCase));
+                if (mainProperty == null || IsMissing(mainProperty.Value)) continue;
+                tenantModel[field] = mainProperty.Value.DeepClone();
+            }
+            return tenantModel;
+        }
+
+        /// <summary>
         /// 为主租户控制面生成“存储值 + 运行时继承值”的独立投影。
         /// 本方法只合并共享基础设施白名单，不会带入 DbConn、AuthSecret 或租户独立凭据；
         /// 调用方必须在进入本方法前完成主租户与 Level >= 9999 的授权校验。
@@ -377,14 +415,21 @@ namespace Microi.net
         public static JObject CreateControlPlaneSharedInfrastructureProjection(
             JObject storedModel,
             JObject effectiveRuntimeModel,
-            out IReadOnlyCollection<string> inheritedFields)
+            out IReadOnlyCollection<string> inheritedFields,
+            bool forceMainTenantRedis = false)
         {
             var projection = storedModel == null ? new JObject() : (JObject)storedModel.DeepClone();
             var inherited = new List<string>();
             if (effectiveRuntimeModel != null)
             {
+                if (forceMainTenantRedis)
+                {
+                    UseMainTenantRedisInfrastructure(projection, effectiveRuntimeModel);
+                    inherited.AddRange(SharedRedisInfrastructureFieldSet);
+                }
                 foreach (var field in SharedInfrastructureFieldSet.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
                 {
+                    if (forceMainTenantRedis && SharedRedisInfrastructureFieldSet.Contains(field)) continue;
                     if (!IsMissing(projection[field]) || IsMissing(effectiveRuntimeModel[field])) continue;
                     projection[field] = effectiveRuntimeModel[field].DeepClone();
                     inherited.Add(field);

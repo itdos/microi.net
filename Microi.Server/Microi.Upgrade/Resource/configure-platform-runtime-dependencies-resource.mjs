@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const packagePath = resolve(directory, 'app.microi.store.json');
-const targetPackageVersion = 'v7.6.17';
-const releaseTime = '2026-08-26 19:00:00';
+const targetPackageVersion = 'v7.7.19';
+const releaseTime = '2026-08-31 11:45:00';
 
 const dependencies = Object.freeze([
   Object.freeze({
@@ -219,7 +219,8 @@ for (const dependency of dependencies) {
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {});
 const protocolCapabilities = [
   'ApiEngine:get-microi-store-model@v1.2.9',
-  'ApiEngine:import-microi-store-package@v2.4.9',
+  'ApiEngine:import-microi-store-package@v2.5.0',
+  'InstallerFeature:PackageManagedOverwriteV2',
   'Installer:StartupDependencyApiFastBootstrap',
   'Installer:StartupDependencyPreinstallBootstrapV1',
   'Installer:StartupApiRuntimeFlagReconciliation',
@@ -230,6 +231,8 @@ for (const fieldName of ['RequiredPlatformCapabilities', 'Capabilities']) {
     ...(Array.isArray(info[fieldName]) ? info[fieldName] : []).filter(capability => (
       !String(capability).startsWith('ApiEngine:get-microi-store-model@')
       && !String(capability).startsWith('ApiEngine:import-microi-store-package@')
+      && String(capability) !== 'InstallerFeature:OfficialManagedOverwrite'
+      && String(capability) !== 'InstallerFeature:PackageManagedOverwriteV2'
       && String(capability) !== 'Installer:StartupDependencyApiFastBootstrap'
       && String(capability) !== 'Installer:StartupDependencyPreinstallBootstrapV1'
       && String(capability) !== 'Installer:StartupApiRuntimeFlagReconciliation'
@@ -245,12 +248,12 @@ info.ApiEngineCount = engines.length;
 if (info.Version === targetPackageVersion) {
   info.ChangeLog = {
     Version: targetPackageVersion,
-    Title: '官方接口闭包发布控制面自举修复',
+    Title: 'Managed 覆盖重放与商城列表路由容错',
     ChangeType: 'Fix',
-    Content: '官方资源发布控制面先兼容消息通知新增 wechat_send_tpl_msg，再原子发布九个应用包和 106 个接口引擎投影；同时保留 WebOS 菜单统一迁移与应用商城 CreateIfMissing 个性化 Hook。',
+    Content: '应用商城导入器 v2.5.0 将包内 Managed 接口作为最终事实并严格回读，自动覆盖同版本源码/版本漂移与软删除，重映射稳定 Id，并从其它接口收回包声明的主/多路由；CreateIfMissing 租户扩展继续保持现状，后端 Upgrade13 同步执行覆盖式重放。批量协调器 v1.3.8 在正式列表地址明确返回 NoExistData 或 404 时仅回退官方旧地址薄网关，认证、业务校验和网络错误仍失败关闭。',
     ReleaseTime: releaseTime,
   };
-  const historyLine = '2026-08-26 v7.6.17 官方资源控制面支持消息通知七接口闭包的两阶段安全自举，并保留 WebOS 菜单统一迁移与应用商城个性化 Hook。';
+  const historyLine = `2026-08-31 ${targetPackageVersion} ${info.ChangeLog.Content}`;
   const history = String(info.ChangeHistory || '');
   if (!history.includes(historyLine)) info.ChangeHistory = `${historyLine}\n${history}`;
 }

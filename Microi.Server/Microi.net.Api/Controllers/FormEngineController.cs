@@ -115,6 +115,10 @@ namespace Microi.net.Api
 
             var targetOsClient = storedModel["OsClient"].Val<string>();
             if (targetOsClient.DosIsNullOrWhiteSpace()) return result;
+            var isChildTenant = !string.Equals(
+                targetOsClient,
+                configOsClient,
+                StringComparison.OrdinalIgnoreCase);
 
             JObject projection;
             IReadOnlyCollection<string> inheritedFields;
@@ -127,7 +131,8 @@ namespace Microi.net.Api
                 projection = TenantConfigurationSecurity.CreateControlPlaneSharedInfrastructureProjection(
                     storedModel,
                     controlPlaneRuntimeModel,
-                    out inheritedFields);
+                    out inheritedFields,
+                    forceMainTenantRedis: isChildTenant);
             }
             catch
             {

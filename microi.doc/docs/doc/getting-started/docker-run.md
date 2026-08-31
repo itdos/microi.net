@@ -166,7 +166,7 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 | 10 | API/Web 使用官方浮动标签时会在部署前强制回源拉取最新镜像，避免宿主机缓存的旧 `latest` 通过 liveness 后却缺少 Upgrade29/Upgrade31 |
 | 11 | 数据库、Redis、MongoDB、MinIO、API/Web、完整平台升级链、API liveness/readiness 等**核心门禁**失败时，脚本保持非零退出码并打印“安装未完成”恢复汇总；OCR/LibreTranslate 的镜像、网络、健康检查或 SaaS 配置失败时，核心安装继续并在成功汇总中列出附加能力警告。新装凭据按既有规则展示，客户已有 MySQL/MinIO 的密码和密钥只标记为已读取，绝不回显 |
 | 12 | 检测到已有安装或中断编排时不要直接重跑、删卷、删除数据目录或清空外部服务；先按失败汇总和 API 日志排查，确需停编排时使用对应目录的 `docker compose down`，禁止附加 `-v` |
-| 13 | 若脚本中文显示为乱码/问号，请先执行 `export LANG=en_US.UTF-8` 或 `export LANG=C.UTF-8` 后重新运行 |
+| 13 | 安装器源码固定为 UTF-8 no-BOM，并会在任何中文提示前校验可用 UTF-8 locale；原始 locale 明确为 GBK、GB18030 或 GB2312 时自动转码输出。由于服务器无法知道 SSH/宝塔终端实际采用的字符集，如果首屏提示的编码与终端设置不一致，可先执行无副作用检查：`MICROI_INSTALL_OUTPUT_ENCODING=GBK bash install-microi.sh --encoding-check-only`；确认中文正常后用同一变量运行正式安装。可选值为 `UTF-8`、`GB18030`、`GBK`、`GB2312`，推荐优先把终端客户端直接切换为 UTF-8；Windows 旧终端通常先尝试 `GBK`。仅执行 `export LANG=...` 不能改变终端客户端的解码方式。 |
 | 14 | 当前一键安装只把吾码 API 与脚本创建的主数据库加入同一个 `microi.slice`，并回读父级 CPU、内存和 Swap 合计硬上限；其它服务不加入。旧安装不会自动补写，请按“宿主机 CPU / 内存保护”一节升级 |
 
 ### 📋 端口分配表（默认从 61600 开始）

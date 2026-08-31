@@ -6,6 +6,48 @@ using Dos.Common;
 
 namespace Microi.net
 {
+    public sealed class ApiEngineCacheAliasOwner
+    {
+        public ApiEngineCacheAliasOwner(object apiEngine, string engineId, string engineKey, int priority)
+        {
+            ApiEngine = apiEngine;
+            EngineId = engineId ?? string.Empty;
+            EngineKey = engineKey ?? string.Empty;
+            Priority = priority;
+        }
+
+        public object ApiEngine { get; }
+        public string EngineId { get; }
+        public string EngineKey { get; }
+        public int Priority { get; }
+    }
+
+    public sealed class ApiEngineCacheAliasConflict
+    {
+        public ApiEngineCacheAliasConflict(string alias, IReadOnlyList<ApiEngineCacheAliasOwner> owners)
+        {
+            Alias = alias;
+            Owners = owners;
+        }
+
+        public string Alias { get; }
+        public IReadOnlyList<ApiEngineCacheAliasOwner> Owners { get; }
+    }
+
+    public sealed class ApiEngineCacheAliasResolution
+    {
+        public ApiEngineCacheAliasResolution(
+            IReadOnlyDictionary<string, ApiEngineCacheAliasOwner> aliases,
+            IReadOnlyList<ApiEngineCacheAliasConflict> conflicts)
+        {
+            Aliases = aliases;
+            Conflicts = conflicts;
+        }
+
+        public IReadOnlyDictionary<string, ApiEngineCacheAliasOwner> Aliases { get; }
+        public IReadOnlyList<ApiEngineCacheAliasConflict> Conflicts { get; }
+    }
+
     /// <summary>
     /// 接口引擎路由别名协议。
     /// ApiAddress 是唯一主路由；ApiRoutes（界面名称“多路由”）保存以英文分号
@@ -73,6 +115,108 @@ namespace Microi.net
                 .Select(alias => alias.Trim().ToLowerInvariant())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+        }
+
+        /// <summary>
+        /// 返回同名缓存别名的确定性优先级。历史租户可能用另一条接口的 Id 作为
+        /// 兼容 ApiEngineKey；这类 Key-vs-Id 交叉别名是可判定的，显式 Key 应覆盖
+        /// 隐式 Id。相同来源类型之间的冲突必须隔离歧义别名，不能恢复为启动顺序覆盖。
+        /// </summary>
+        public static int GetCacheAliasPriority(object apiEngine, string alias)
+        {
+            if (apiEngine == null || alias.DosIsNullOrWhiteSpace()) return 0;
+            var normalized = alias.Trim();
+            var key = DynamicHelper.GetDynamicStringValue(
+                apiEngine,
+                "ApiEngineKey",
+                string.Empty)?.Trim();
+            if (string.Equals(key, normalized, StringComparison.OrdinalIgnoreCase)) return 300;
+
+            if (GetConfiguredRoutes(apiEngine).Any(route => string.Equals(
+                    route,
+                    normalized,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                return 200;
+            }
+
+            var id = DynamicHelper.GetDynamicStringValue(
+                apiEngine,
+                "Id",
+                string.Empty)?.Trim();
+            return string.Equals(id, normalized, StringComparison.OrdinalIgnoreCase) ? 100 : 0;
+        }
+
+        /// <summary>
+        /// 以与数据返回顺序无关的方式解析全部缓存别名。Key、Route、Id 的优先级
+        /// 依次降低；若最高优先级仍有多个接口归属，则仅隔离该歧义别名，保留各
+        /// 接口的其它唯一别名，避免一条租户脏数据阻断整个平台启动与升级。
+        /// </summary>
+        public static ApiEngineCacheAliasResolution ResolveCacheAliases(IEnumerable<object> apiEngines)
+        {
+            var claims = new Dictionary<string, List<ApiEngineCacheAliasOwner>>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var apiEngine in apiEngines ?? Enumerable.Empty<object>())
+            {
+                if (apiEngine == null) continue;
+                var engineId = DynamicHelper.GetDynamicStringValue(
+                    apiEngine,
+                    "Id",
+                    string.Empty)?.Trim() ?? string.Empty;
+                var engineKey = DynamicHelper.GetDynamicStringValue(
+                    apiEngine,
+                    "ApiEngineKey",
+                    string.Empty)?.Trim() ?? string.Empty;
+                foreach (var alias in GetCacheAliases(apiEngine))
+                {
+                    if (!claims.TryGetValue(alias, out var owners))
+                    {
+                        owners = new List<ApiEngineCacheAliasOwner>();
+                        claims[alias] = owners;
+                    }
+
+                    var ownerIdentity = !engineId.DosIsNullOrWhiteSpace()
+                        ? engineId
+                        : "Key:" + engineKey;
+                    if (owners.Any(owner => string.Equals(
+                            !owner.EngineId.DosIsNullOrWhiteSpace()
+                                ? owner.EngineId
+                                : "Key:" + owner.EngineKey,
+                            ownerIdentity,
+                            StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
+
+                    owners.Add(new ApiEngineCacheAliasOwner(
+                        apiEngine,
+                        engineId,
+                        engineKey,
+                        GetCacheAliasPriority(apiEngine, alias)));
+                }
+            }
+
+            var aliases = new Dictionary<string, ApiEngineCacheAliasOwner>(
+                StringComparer.OrdinalIgnoreCase);
+            var conflicts = new List<ApiEngineCacheAliasConflict>();
+            foreach (var claim in claims.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                var maxPriority = claim.Value.Max(owner => owner.Priority);
+                var highestPriorityOwners = claim.Value
+                    .Where(owner => owner.Priority == maxPriority)
+                    .OrderBy(owner => owner.EngineKey, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(owner => owner.EngineId, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                if (highestPriorityOwners.Length > 1)
+                {
+                    conflicts.Add(new ApiEngineCacheAliasConflict(claim.Key, highestPriorityOwners));
+                    continue;
+                }
+
+                aliases[claim.Key] = highestPriorityOwners[0];
+            }
+
+            return new ApiEngineCacheAliasResolution(aliases, conflicts);
         }
 
         public static bool ContainsExactRoute(object apiEngine, string route)

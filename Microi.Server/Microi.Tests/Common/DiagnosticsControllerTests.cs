@@ -1,4 +1,7 @@
 using Microi.net;
+using Microi.net.Api;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.Common;
@@ -6,25 +9,34 @@ namespace Microi.Tests.Common;
 public sealed class DiagnosticsControllerTests
 {
     [Fact]
-    public void DiagnosticsRoutes_AreOwnedByAnonymousManagedApiEngine()
+    public void DiagnosticsRoutes_AreOwnedByHostAndDoNotDependOnTenantRuntime()
     {
         var root = FindRepositoryRoot();
         var controllerPath = Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers", "DiagnosticsController.cs");
-        var source = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "platform-service-health.js"));
-        var package = JObject.Parse(File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
-        var engine = package["SysApiEngines"]!.Values<JObject>()
-            .Single(item => item.Value<string>("ApiEngineKey") == "platform-service-health");
+        var source = File.ReadAllText(controllerPath);
 
-        Assert.False(File.Exists(controllerPath));
-        Assert.Equal(1, engine.Value<int>("AllowAnonymous"));
-        Assert.Equal(0, engine.Value<int>("StopHttp"));
-        Assert.Contains("/api/Diagnostics/health", engine.Value<string>("ApiRoutes"));
-        Assert.Contains("/api/Diagnostics/liveness", engine.Value<string>("ApiRoutes"));
-        Assert.Contains("V8.Method.GetBackendVersion", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("platform-runtime-custom-hook", source, StringComparison.Ordinal);
+        Assert.Contains("[AllowAnonymous]", source, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"health\")]", source, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"liveness\")]", source, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/apiengine/platform-service-health\")]", source, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/itdos-heart\")]", source, StringComparison.Ordinal);
+        Assert.Contains("V8Method.GetCurrentBackendVersion()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("FormEngine", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ApiEngine.Run", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetSysConfig", source, StringComparison.Ordinal);
+
+        var controller = new DiagnosticsController
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        var result = controller.Health();
+        Assert.Equal(1, result.Code);
+        Assert.Equal("no-store, no-cache, must-revalidate",
+            controller.Response.Headers.CacheControl.ToString());
     }
 
     [Fact]

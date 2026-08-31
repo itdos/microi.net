@@ -481,17 +481,40 @@ namespace Microi.net
             // Until that interface gains a cancellable streaming/hash contract,
             // callers must hold the process-wide declared-byte budget for the
             // whole read/validate operation and verify bytes.Length immediately.
-            var result = await hdfs.GetPrivateFileUrl(new HDFSParam
+            foreach (var useInternetEndpoint in new[] { false, true })
             {
-                ClientModel = clientModel,
-                Limit = false,
-                FileFullPath = path,
-                ReturnFileType = "Byte",
-                NetworkIsInternet = false
-            }).ConfigureAwait(false);
-            if (result.Code != 1 || result.Data == null) return null;
-            if (result.Data is byte[] bytes) return bytes;
-            return Encoding.UTF8.GetBytes(Convert.ToString(result.Data));
+                var result = await hdfs.GetPrivateFileUrl(new HDFSParam
+                {
+                    ClientModel = clientModel,
+                    Limit = false,
+                    FileFullPath = path,
+                    ReturnFileType = "Byte",
+                    NetworkIsInternet = useInternetEndpoint
+                }).ConfigureAwait(false);
+                if (result.Code != 1 || result.Data == null) continue;
+                if (result.Data is byte[] bytes) return bytes;
+                return Encoding.UTF8.GetBytes(Convert.ToString(result.Data));
+            }
+
+            // The writer must use the frozen authoritative client, but a child
+            // tenant may omit inherited storage credentials from that projection.
+            // Reuse the bounded registry compatibility reader only after both
+            // authoritative endpoints fail; bytes are still verified by every
+            // caller before an immutable object or stable pointer is accepted.
+            var compatibilityOsClient = clientModel?.OsClient;
+            if (!compatibilityOsClient.DosIsNullOrWhiteSpace())
+            {
+                var compatibility = await ReadApplicationStorageBytes(
+                    compatibilityOsClient,
+                    path,
+                    false).ConfigureAwait(false);
+                if (compatibility.Code == 1 && compatibility.Data != null)
+                {
+                    if (compatibility.Data is byte[] bytes) return bytes;
+                    return Encoding.UTF8.GetBytes(Convert.ToString(compatibility.Data));
+                }
+            }
+            return null;
         }
 
         private static async Task<DosResult> PutApplicationObject(

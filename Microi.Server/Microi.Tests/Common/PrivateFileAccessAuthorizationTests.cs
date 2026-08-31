@@ -313,4 +313,112 @@ public sealed class PrivateFileAccessAuthorizationTests
             authoritative,
             "iTdos/private/order/forged.docx"));
     }
+
+    [Fact]
+    public void AuthorizationFailureLog_RedactsSecretsPathsUrlsAndBusinessIds()
+    {
+        const string guid = "12345678-1234-1234-1234-123456789abc";
+        const string ulid = "01KQ12PHR2FEG3BRQ1CN3ZY6B4";
+        var exception = new InvalidOperationException(
+            "Bearer bearer-secret Password=password-secret Token=token-secret " +
+            "https://files.example/private/a.pdf /huayou/file/private/a.pdf " +
+            @"C:\storage\huayou\private\a.pdf \\server\share\secret.pdf " +
+            "huayou/file/private/no-leading-slash.pdf " +
+            "{\"AccessKeyId\":\"access-secret\",\"SecretAccessKey\":\"secret-key\"}\r\nforged-log " +
+            guid + " " + ulid);
+
+        var sanitized = PrivateFileAccessAuthorization.SanitizeAuthorizationException(exception);
+
+        Assert.Contains("System.InvalidOperationException", sanitized);
+        Assert.Contains("HResult=", sanitized);
+        Assert.Matches(@"MessageSha256=[0-9a-f]{64}$", sanitized);
+        Assert.DoesNotContain("bearer-secret", sanitized);
+        Assert.DoesNotContain("password-secret", sanitized);
+        Assert.DoesNotContain("token-secret", sanitized);
+        Assert.DoesNotContain("files.example", sanitized);
+        Assert.DoesNotContain("huayou", sanitized);
+        Assert.DoesNotContain("server", sanitized);
+        Assert.DoesNotContain("access-secret", sanitized);
+        Assert.DoesNotContain("secret-key", sanitized);
+        Assert.DoesNotContain("forged-log", sanitized);
+        Assert.DoesNotContain("\r", sanitized);
+        Assert.DoesNotContain("\n", sanitized);
+        Assert.DoesNotContain(guid, sanitized);
+        Assert.DoesNotContain(ulid, sanitized);
+    }
+
+    [Fact]
+    public void AuthorizationFailureLog_RedactsDatabaseMessagesCompletely()
+    {
+        var sanitized = PrivateFileAccessAuthorization.SanitizeAuthorizationException(
+            new InvalidOperationException("SELECT Secret FROM diy_field WHERE Id = 'business-id'"));
+
+        Assert.Matches(@"MessageSha256=[0-9a-f]{64}$", sanitized);
+        Assert.DoesNotContain("Secret", sanitized);
+        Assert.DoesNotContain("business-id", sanitized);
+    }
+
+    [Fact]
+    public void FieldIdentity_ExactIdWinsOverAConflictingFieldName()
+    {
+        var idMatch = JObject.Parse("""{ "Id": "shared-key", "Name": "ActualField" }""");
+        var nameMatch = JObject.Parse("""{ "Id": "other-field", "Name": "shared-key" }""");
+
+        Assert.Same(
+            idMatch,
+            PrivateFileAccessAuthorization.PreferExactFieldIdMatch(idMatch, nameMatch));
+        Assert.Same(
+            nameMatch,
+            PrivateFileAccessAuthorization.PreferExactFieldIdMatch(null, nameMatch));
+    }
+
+    [Fact]
+    public void FieldAuthorizationSource_UsesPrimaryTenantDatabaseAndTableBoundProjection()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindServerRoot(), "Microi.Core", "Security", "PrivateFileAccessAuthorization.cs"));
+        var methodStart = source.IndexOf(
+            "private static Task<JObject> ResolveDiyFieldModelAsync",
+            StringComparison.Ordinal);
+        var nextMethod = source.IndexOf("/// <summary>", methodStart, StringComparison.Ordinal);
+        Assert.True(methodStart >= 0 && nextMethod > methodStart);
+        var method = source.Substring(methodStart, nextMethod - methodStart);
+
+        Assert.Contains("OsClientExtend.ClientList.TryGetValue", method);
+        Assert.Contains("authorizationClient?.Db == null", method);
+        Assert.Contains("authorizationClient.Db", method);
+        Assert.Contains("d.Id", method);
+        Assert.Contains("d.TableId", method);
+        Assert.Contains("d.Name", method);
+        Assert.Contains("d.Component", method);
+        Assert.Contains("d.IsDeleted", method);
+        Assert.Contains("d.IsDeleted == 0", method);
+        Assert.Contains("d.TableId == tableId", method);
+        Assert.Contains("d.Id == fieldId", method);
+        Assert.Contains("d.Name == fieldId", method);
+        Assert.True(
+            method.IndexOf("d.Id == fieldId", StringComparison.Ordinal)
+            < method.IndexOf("d.Name == fieldId", StringComparison.Ordinal));
+        Assert.DoesNotContain("d.Id == fieldId || d.Name == fieldId", method);
+        Assert.Contains("PreferExactFieldIdMatch", method);
+        Assert.DoesNotContain("OsClientExtend.GetClient", method);
+        Assert.DoesNotContain("GetDiyFieldModel", method);
+        Assert.DoesNotContain("DbRead", method);
+    }
+
+    private static string FindServerRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Microi.Core", "Microi.Core.csproj")))
+                return directory.FullName;
+            var nested = Path.Combine(directory.FullName, "Microi.Server");
+            if (File.Exists(Path.Combine(nested, "Microi.Core", "Microi.Core.csproj")))
+                return nested;
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Microi.Server root was not found.");
+    }
 }
