@@ -49,5 +49,13 @@ test('字段说明按标签方向直接呈现且不再使用信息图标提示',
   assert.match(theme, /diy-field-description-tooltip[\s\S]*?clip-path:\s*polygon/)
   assert.match(dateTime, /class="diy-datetime-control"/)
   assert.match(dateTime, /\.diy-datetime-control\s*\{[\s\S]*?display:\s*flex;[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/)
-  assert.match(styles, /\.el-input__wrapper\),[\s\S]*?\.el-select__wrapper\)\s*\{[\s\S]*?height:\s*34px;[\s\S]*?min-height:\s*34px;/)
+  const effectiveStyles = styles
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+  const presentationControlRule = effectiveStyles.match(
+    /:deep\(\.diy-presentation-field-card \.el-input__wrapper\),\s*:deep\(\.diy-presentation-field-card \.el-select__wrapper\)\s*\{([\s\S]*?)\}/
+  )?.[1] || ''
+  assert.notEqual(presentationControlRule, '')
+  assert.doesNotMatch(presentationControlRule, /(?:^|[;\r\n])\s*height\s*:/m)
+  assert.match(presentationControlRule, /min-height:\s*34px;/)
 })

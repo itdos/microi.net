@@ -34,6 +34,7 @@ import {
 } from "./auth-transition.js";
 import { isEmbeddedWebosWindowRuntime } from "./webos-embedded-runtime.js";
 import { getRuntimeEndpointQuery, getRuntimeWindowValue } from "./runtime-endpoint-query.js";
+import { buildAppStoreMap } from "./app-store-record.js";
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
 import config from "@/config.json";
@@ -479,22 +480,7 @@ var DiyCommon = {
         return DiyCommon.NormalizeApiBase(DiyCommon.GetApiBase()) + "|" + DiyCommon.NormalizeOsClient(DiyCommon.GetOsClient());
     },
     BuildAppStoreMap(rows) {
-        var map = {};
-        var addKey = function (prefix, value, row) {
-            if (DiyCommon.IsNull(value)) {
-                return;
-            }
-            map[prefix + ":" + String(value).trim().toLowerCase()] = row;
-        };
-        (rows || []).forEach(function (row) {
-            if (!row) {
-                return;
-            }
-            addKey("storeid", row.StoreId || row.StoreID, row);
-            addKey("appid", row.AppId || row.AppID || row.AppKey, row);
-            addKey("appname", row.AppName || row.Name || row.Title, row);
-        });
-        return map;
+        return buildAppStoreMap(rows);
     },
     GetAppStoreLookupKeys(row) {
         row = row || {};
@@ -554,9 +540,11 @@ var DiyCommon = {
                         "AppVersion",
                         "AppVersionInstall",
                         "InstallStatus",
+                        "IsDeleted",
                         "InstallTime",
                         "UpdateTime",
                         "LastCheckTime",
+                        "CreateTime",
                         "PackageName",
                         "PackageVersion",
                         "PackageOsClient",
@@ -642,7 +630,7 @@ var DiyCommon = {
             && DiyCommon._AppStoresCacheKey === DiyCommon.GetAppStoresCacheKey();
         if (local) {
             row._LocalAppStore = local;
-            var localVersion = local.AppVersionInstall || local.InstalledVersion || local.CurrentVersion || local.AppVersion || "";
+            var localVersion = local.AppVersionInstall || local.InstalledVersion || local.PackageVersion || local.CurrentVersion || local.AppVersion || "";
             row._LocalAppVersionInstall = localVersion;
             row._LocalStoreInstallStatus = local.InstallStatus || local.StoreInstallStatus || local.AppInstallStatus || "";
             row.AppVersionInstall = localVersion;
@@ -703,7 +691,7 @@ var DiyCommon = {
         if (local) {
             return DiyCommon.ResolveAppStoreInstallStatus(
                 latestVersion,
-                local.AppVersionInstall || local.InstalledVersion || local.CurrentVersion || local.AppVersion || "",
+                local.AppVersionInstall || local.InstalledVersion || local.PackageVersion || local.CurrentVersion || local.AppVersion || "",
                 local.InstallStatus || local.StoreInstallStatus || local.AppInstallStatus || ""
             );
         }

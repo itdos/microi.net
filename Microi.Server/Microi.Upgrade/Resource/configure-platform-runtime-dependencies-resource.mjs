@@ -219,7 +219,7 @@ for (const dependency of dependencies) {
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {});
 const protocolCapabilities = [
   'ApiEngine:get-microi-store-model@v1.2.9',
-  'ApiEngine:import-microi-store-package@v2.5.0',
+  'ApiEngine:import-microi-store-package@v2.5.1',
   'InstallerFeature:PackageManagedOverwriteV2',
   'Installer:StartupDependencyApiFastBootstrap',
   'Installer:StartupDependencyPreinstallBootstrapV1',

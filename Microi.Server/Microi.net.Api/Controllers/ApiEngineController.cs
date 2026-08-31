@@ -180,14 +180,16 @@ namespace Microi.net.Api
             // this also prevents duplicate historical ApiAddress rows from making
             // permission checks and execution select different engines.
             var requestPath = DiyHttpContext.Current?.Request.Path.Value ?? string.Empty;
-            var canonicalKeyMatch = Regex.Match(
-                requestPath,
-                @"^/apiengine/([A-Za-z0-9_.:-]+)(?:--OsClient--.*--)?$",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-            var resolvedApiEngineKey = canonicalKeyMatch.Success
-                ? canonicalKeyMatch.Groups[1].Value
-                : DiyHttpContext.Current?.Items[
-                    DynamicRoute.ResolvedApiEngineKeyItem]?.ToString();
+            // DynamicRoute 已用权威行解析真实 Key，必须优先采用该结果。缓存冷启动
+            // 或路由尚未写入 Items 时，再用同一规范解析器处理 /apiengine/{Key}。
+            // 旧正则允许 '-' 且 group 贪婪，会把 --OsClient--...-- 一并吞进 Key，
+            // 最终把存在的接口误报为 NoExistData[ApiAddress]。
+            var resolvedApiEngineKey = DiyHttpContext.Current?.Items[
+                DynamicRoute.ResolvedApiEngineKeyItem]?.ToString();
+            if (resolvedApiEngineKey.DosIsNullOrWhiteSpace())
+            {
+                resolvedApiEngineKey = DynamicRoute.ResolveCanonicalApiEngineKey(requestPath);
+            }
             if (!resolvedApiEngineKey.DosIsNullOrWhiteSpace())
             {
                 param["ApiEngineKey"] = resolvedApiEngineKey;

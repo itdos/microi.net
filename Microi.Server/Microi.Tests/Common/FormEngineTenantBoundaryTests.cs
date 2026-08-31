@@ -893,6 +893,360 @@ public class FormEngineTenantBoundaryTests
     }
 
     [Fact]
+    public void UpgradeTrustedWrite_PhysicalFallbackRejectsPartialOrUnexpectedPayloads()
+    {
+        var helperType = typeof(UpgradeAppStore).Assembly.GetType(
+            "Microi.net.UpgradeTrustedFormEngine");
+        Assert.NotNull(helperType);
+        var helper = helperType!.GetMethod(
+            "IntersectPhysicalFallbackFields",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(helper);
+
+        var row = new JObject
+        {
+            ["Id"] = "field-a",
+            ["TableId"] = "table-a",
+            ["Name"] = "OperationId",
+            ["Label"] = "安装操作Id",
+            ["OsClient"] = "legacy-tenant",
+            ["_ForceUpt"] = true
+        };
+        var physicalColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Id", "TableId", "Name", "Label"
+        };
+
+        var patch = Assert.IsType<JObject>(helper!.Invoke(
+            null,
+            new object[] { "diy_field", row, physicalColumns }));
+
+        Assert.Equal("table-a", patch.Value<string>("TableId"));
+        Assert.Equal("OperationId", patch.Value<string>("Name"));
+        Assert.Equal("安装操作Id", patch.Value<string>("Label"));
+        Assert.False(patch.ContainsKey("Id"));
+        Assert.False(patch.ContainsKey("OsClient"));
+        Assert.False(patch.ContainsKey("_ForceUpt"));
+
+        var unexpectedRow = (JObject)row.DeepClone();
+        unexpectedRow["UnexpectedPhysicalColumn"] = "must-not-pass";
+        var unexpected = Assert.Throws<TargetInvocationException>(() => helper.Invoke(
+            null,
+            new object[] { "diy_field", unexpectedRow, physicalColumns }));
+        Assert.IsType<InvalidOperationException>(unexpected.InnerException);
+        Assert.Contains("白名单外字段", unexpected.InnerException!.Message, StringComparison.Ordinal);
+
+        var missingColumn = new HashSet<string>(physicalColumns, StringComparer.OrdinalIgnoreCase);
+        missingColumn.Remove("Label");
+        var missing = Assert.Throws<TargetInvocationException>(() => helper.Invoke(
+            null,
+            new object[] { "diy_field", row, missingColumn }));
+        Assert.IsType<InvalidOperationException>(missing.InnerException);
+        Assert.Contains("目标物理列不存在", missing.InnerException!.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UpgradeTrustedWrite_PhysicalFallbackCoversExistingMenuAndApiPatches()
+    {
+        var helperType = typeof(UpgradeAppStore).Assembly.GetType(
+            "Microi.net.UpgradeTrustedFormEngine");
+        Assert.NotNull(helperType);
+        var helper = helperType!.GetMethod(
+            "IntersectPhysicalFallbackFields",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(helper);
+
+        JObject Intersect(string tableName, JObject row)
+        {
+            var physicalColumns = row.Properties()
+                .Select(property => property.Name)
+                .Append("Id")
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return Assert.IsType<JObject>(helper!.Invoke(
+                null,
+                new object[] { tableName, row, physicalColumns }));
+        }
+
+        var menuPatch = Intersect("sys_menu", new JObject
+        {
+            ["Id"] = "menu-a",
+            ["OsClient"] = "tenant-a",
+            ["Url"] = "/apps",
+            ["ParentId"] = "parent-a",
+            ["Display"] = 1,
+            ["AppDisplay"] = 0
+        });
+        Assert.Equal(
+            new[] { "OsClient", "Url", "ParentId", "Display", "AppDisplay" },
+            menuPatch.Properties().Select(property => property.Name));
+
+        var apiPatch = Intersect("sys_apiengine", new JObject
+        {
+            ["Id"] = "api-a",
+            ["OsClient"] = "tenant-a",
+            ["ApiRoutes"] = "/v1;/v2",
+            ["ResponseFile"] = 1,
+            ["EnableLog"] = 1
+        });
+        Assert.Equal(
+            new[] { "OsClient", "ApiRoutes", "ResponseFile", "EnableLog" },
+            apiPatch.Properties().Select(property => property.Name));
+    }
+
+    [Fact]
+    public void UpgradeTrustedWrite_PhysicalFallbackRequiresKnownUptFormFailure()
+    {
+        var helperType = typeof(UpgradeAppStore).Assembly.GetType(
+            "Microi.net.UpgradeTrustedFormEngine");
+        Assert.NotNull(helperType);
+        var helper = helperType!.GetMethod(
+            "ShouldUsePhysicalFallback",
+            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(helper);
+
+        bool Invoke(string table, string message) => Assert.IsType<bool>(helper!.Invoke(
+            null,
+            new object[] { table, new DosResult(0, null, message) }));
+
+        Assert.True(Invoke(
+            "diy_field",
+            "Object reference not set to an instance of an object.[UptFormData][表：diy_field]"));
+        Assert.True(Invoke(
+            "diy_field",
+            "Value cannot be null. (Parameter 'source')[UptFormData][表：diy_field]"));
+        Assert.False(Invoke(
+            "diy_field",
+            "Object reference not set to an instance of an object."));
+        Assert.False(Invoke(
+            "diy_field",
+            "Value cannot be null. (Parameter 'payload')[UptFormData][表：diy_field]"));
+        Assert.False(Invoke(
+            "sys_user",
+            "Object reference not set to an instance of an object.[UptFormData][表：sys_user]"));
+    }
+
+    [Fact]
+    public void UpgradeTrustedWrite_UsesProviderIdentifierRulesIncludingOracle()
+    {
+        var helperType = typeof(UpgradeAppStore).Assembly.GetType(
+            "Microi.net.UpgradeTrustedFormEngine");
+        Assert.NotNull(helperType);
+        var helper = helperType!.GetMethod(
+            "ResolvePhysicalFallbackIdentifier",
+            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(helper);
+
+        string Resolve(
+            Dos.ORM.IMicroiORM orm,
+            string identifier,
+            bool isTable,
+            string? tableSpace = null) => Assert.IsType<string>(helper!.Invoke(
+            null,
+            new object?[] { orm, identifier, isTable, tableSpace }));
+
+        Assert.Equal("diy_field", Resolve(new Dos.ORM.OracleService(), "diy_field", true));
+        Assert.Equal("Id", Resolve(new Dos.ORM.OracleService(), "Id", false));
+        Assert.Equal("\"Lock\"", Resolve(new Dos.ORM.OracleService(), "Lock", false));
+        Assert.Equal("TENANT_SCHEMA.diy_field", Resolve(
+            new Dos.ORM.OracleService(),
+            "diy_field",
+            true,
+            "TENANT_SCHEMA"));
+        Assert.Equal("`diy_field`", Resolve(new Dos.ORM.MySqlService(), "diy_field", true));
+        Assert.Equal("[Id]", Resolve(new Dos.ORM.SqlServerService(), "Id", false));
+        Assert.Throws<TargetInvocationException>(() => Resolve(
+            new Dos.ORM.OracleService(),
+            "diy_field",
+            true,
+            "TENANT_SCHEMA;DROP TABLE sys_user"));
+    }
+
+    [Fact]
+    public void UpgradeTrustedWrite_CacheKeysContainOldAndNewCanonicalValues()
+    {
+        var helperType = typeof(UpgradeAppStore).Assembly.GetType(
+            "Microi.net.UpgradeTrustedFormEngine");
+        Assert.NotNull(helperType);
+        var helper = helperType!.GetMethod(
+            "BuildPhysicalFallbackCacheKeys",
+            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(helper);
+
+        var oldRow = new JObject
+        {
+            ["Name"] = "OldField",
+            ["TableId"] = "01KUPPEROLD",
+            ["TableName"] = "Old_Table"
+        };
+        var patch = new JObject
+        {
+            ["Name"] = "NewField",
+            ["TableId"] = "01KUPPERNEW",
+            ["TableName"] = "New_Table"
+        };
+        var keys = Assert.IsAssignableFrom<IReadOnlyCollection<string>>(helper!.Invoke(
+            null,
+            new object[] { "diy_field", "tenant-a", "ROW-UPPER", oldRow, patch }));
+
+        Assert.Contains("Microi:tenant-a:FormData:diy_field:row-upper", keys);
+        Assert.Contains("Microi:tenant-a:FormData:diy_field:oldfield", keys);
+        Assert.Contains("Microi:tenant-a:FormData:diy_field:newfield", keys);
+        Assert.Contains("Microi:tenant-a:FormData:diy_table_field_list:01kupperold", keys);
+        Assert.Contains("Microi:tenant-a:FormData:diy_table_field_list:01kuppernew", keys);
+        Assert.Contains("Microi:tenant-a:FormData:diy_table_field_list:old_table", keys);
+        Assert.Contains("Microi:tenant-a:FormData:diy_table_field_list:new_table", keys);
+
+        var apiKeys = Assert.IsAssignableFrom<IReadOnlyCollection<string>>(helper.Invoke(
+            null,
+            new object[]
+            {
+                "sys_apiengine",
+                "tenant-a",
+                "API-UPPER",
+                new JObject
+                {
+                    ["ApiEngineKey"] = "Old-Key",
+                    ["ApiAddress"] = "/Old-Primary",
+                    ["ApiRoutes"] = "/Old-A;/Old-B"
+                },
+                new JObject
+                {
+                    ["ApiEngineKey"] = "New-Key",
+                    ["ApiAddress"] = "/New-Primary",
+                    ["ApiRoutes"] = "/New-A;/New-B"
+                }
+            }));
+        Assert.Contains("Microi:tenant-a:FormData:sys_apiengine:old-key", apiKeys);
+        Assert.Contains("Microi:tenant-a:FormData:sys_apiengine:new-key", apiKeys);
+        Assert.Contains("Microi:tenant-a:FormData:sys_apiengine:/old-primary", apiKeys);
+        Assert.Contains("Microi:tenant-a:FormData:sys_apiengine:/new-primary", apiKeys);
+        Assert.Contains("Microi:tenant-a:FormData:sys_apiengine:/old-a", apiKeys);
+        Assert.Contains("Microi:tenant-a:FormData:sys_apiengine:/old-b", apiKeys);
+        Assert.Contains("Microi:tenant-a:FormData:sys_apiengine:/new-a", apiKeys);
+        Assert.Contains("Microi:tenant-a:FormData:sys_apiengine:/new-b", apiKeys);
+    }
+
+    [Fact]
+    public void UpgradeTrustedWrite_TenantPredicateAndReadbackAreFailClosed()
+    {
+        var helperType = typeof(UpgradeAppStore).Assembly.GetType(
+            "Microi.net.UpgradeTrustedFormEngine");
+        Assert.NotNull(helperType);
+        var predicateHelper = helperType!.GetMethod(
+            "BuildPhysicalFallbackTenantPredicate",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var readbackHelper = helperType.GetMethod(
+            "FindPhysicalFallbackReadbackMismatches",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(predicateHelper);
+        Assert.NotNull(readbackHelper);
+
+        var predicate = Assert.IsType<string>(predicateHelper!.Invoke(
+            null,
+            new object[] { "[OsClient]", true, 7 }));
+        var noTenantColumn = Assert.IsType<string>(predicateHelper.Invoke(
+            null,
+            new object?[] { null, false, 7 }));
+        Assert.Equal(
+            " AND ([OsClient]=@p7 OR [OsClient] IS NULL OR [OsClient]='')",
+            predicate);
+        Assert.Equal(string.Empty, noTenantColumn);
+
+        var expected = new JObject
+        {
+            ["Name"] = "OperationId",
+            ["Visible"] = 1,
+            ["Label"] = "安装操作Id"
+        };
+        var actual = new JObject
+        {
+            ["NAME"] = "OperationId",
+            ["VISIBLE"] = true,
+            ["LABEL"] = "错误标签"
+        };
+        var mismatches = Assert.IsType<string[]>(readbackHelper!.Invoke(
+            null,
+            new object[] { expected.Properties(), actual }));
+
+        Assert.Equal(new[] { "Label" }, mismatches);
+    }
+
+    [Fact]
+    public void UpgradeTrustedWrite_DiagnosticRedactionCoversCredentialsAndAuthorization()
+    {
+        var helperType = typeof(UpgradeAppStore).Assembly.GetType(
+            "Microi.net.UpgradeTrustedFormEngine");
+        Assert.NotNull(helperType);
+        var helper = helperType!.GetMethod(
+            "SanitizePhysicalFallbackDiagnosticText",
+            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(helper);
+
+        var sanitized = Assert.IsType<string>(helper!.Invoke(
+            null,
+            new object[]
+            {
+                "Password=pwd-value; ConnectionString=conn-value; "
+                + "Authorization: Bearer abcdefghijk; https://user:url-password@example.com/path; "
+                + "\"token\":\"json-secret-value\"; Authorization=Basic YmFzaWMtdG9rZW4="
+            }));
+
+        Assert.DoesNotContain("pwd-value", sanitized, StringComparison.Ordinal);
+        Assert.DoesNotContain("conn-value", sanitized, StringComparison.Ordinal);
+        Assert.DoesNotContain("abcdefghijk", sanitized, StringComparison.Ordinal);
+        Assert.DoesNotContain("url-password", sanitized, StringComparison.Ordinal);
+        Assert.DoesNotContain("json-secret-value", sanitized, StringComparison.Ordinal);
+        Assert.DoesNotContain("YmFzaWMtdG9rZW4=", sanitized, StringComparison.Ordinal);
+        Assert.Contains("Password=***", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Authorization: Bearer ***", sanitized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void UpgradeTrustedWrite_DatabaseValuesUseProviderCompatibleTypes()
+    {
+        var helperType = typeof(UpgradeAppStore).Assembly.GetType(
+            "Microi.net.UpgradeTrustedFormEngine");
+        Assert.NotNull(helperType);
+        var helper = helperType!.GetMethod(
+            "ToDatabaseValue",
+            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(helper);
+
+        var smallInteger = helper!.Invoke(
+            null,
+            new object[] { Dos.ORM.DatabaseType.MySql, new JValue(12L) });
+        var largeInteger = helper.Invoke(
+            null,
+            new object[] { Dos.ORM.DatabaseType.MySql, new JValue((long)int.MaxValue + 1) });
+        var localTime = DateTime.SpecifyKind(new DateTime(2026, 9, 1, 1, 2, 3), DateTimeKind.Local);
+        var postgreSqlTime = Assert.IsType<DateTime>(helper.Invoke(
+            null,
+            new object[] { Dos.ORM.DatabaseType.PostgreSql, new JValue(localTime) }));
+
+        Assert.IsType<int>(smallInteger);
+        Assert.IsType<long>(largeInteger);
+        Assert.Equal(DateTimeKind.Utc, postgreSqlTime.Kind);
+    }
+
+    [Fact]
+    public void UpdateFailureDiagnostic_FallsBackToFormEngineKeyInsteadOfBlankTable()
+    {
+        var helper = typeof(FormEngine).GetMethod(
+            "ResolveUpdateTableDiagnosticName",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(helper);
+
+        var byKey = new DiyTableRowParam
+        {
+            _TableName = string.Empty,
+            FormEngineKey = "diy_field"
+        };
+
+        Assert.Equal("diy_field", helper!.Invoke(null, new object[] { byKey }));
+        Assert.Equal("未知表", helper.Invoke(null, new object?[] { null }));
+    }
+
+    [Fact]
     public void AuthorizedNestedOldRowRead_PreservesTrustedProvenanceAndUserContext()
     {
         var helper = typeof(FormEngine).GetMethod(

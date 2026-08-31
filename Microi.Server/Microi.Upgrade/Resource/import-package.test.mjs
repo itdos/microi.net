@@ -9,8 +9,13 @@ const readCanonicalText = async url => (
 ).replace(/\r\n/g, "\n");
 
 const source = await readCanonicalText(new URL("./import-package.js", import.meta.url));
+const baseSource = await readCanonicalText(new URL("./.resource-sync-base/import-package.js", import.meta.url));
 const publishSource = await readCanonicalText(new URL("./ai-app-publish-store.js", import.meta.url));
 const packageModel = JSON.parse(await readFile(new URL("./app.microi.store.json", import.meta.url), "utf8"));
+const basePackageModel = JSON.parse(await readFile(
+  new URL("./.resource-sync-base/app.microi.store.json", import.meta.url),
+  "utf8",
+));
 const saasPackageModel = JSON.parse(await readFile(new URL("./app.microi.saas-engine.json", import.meta.url), "utf8"));
 const refreshSource = await readCanonicalText(new URL("./refresh-resources.mjs", import.meta.url));
 const upgradeSource = await readCanonicalText(new URL("../Upgrade.cs", import.meta.url));
@@ -214,7 +219,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.5\.0/);
+  assert.match(source, /Version: v2\.5\.1/);
 });
 
 test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {
@@ -1282,14 +1287,29 @@ test("application-store upgrade resources carry the canonical resumable importer
   const packageImporter = packageModel.SysApiEngines.find(
     engine => engine.ApiEngineKey === "import-microi-store-package"
   );
+  const basePackageImporter = basePackageModel.SysApiEngines.find(
+    engine => engine.ApiEngineKey === "import-microi-store-package"
+  );
   assert.ok(packageImporter, "application-store package should contain its importer");
+  assert.ok(basePackageImporter, "application-store common baseline should contain its importer");
   assert.ok(
     compareSemanticVersions(packageModel.PackageInfo.Version, "v7.0.13") >= 0,
     "application-store package version must not fall below the resumable importer baseline",
   );
   const importerSourceVersion = `v${source.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
+  const baseImporterSourceVersion = `v${baseSource.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
   assert.equal(packageImporter.Version, importerSourceVersion);
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
+  assert.equal(basePackageImporter.Version, baseImporterSourceVersion);
+  assert.equal(
+    basePackageImporter.ApiV8Code,
+    baseSource,
+    "common-baseline package importer must match the common-baseline standalone source",
+  );
+  assert.ok(
+    compareSemanticVersions(importerSourceVersion, baseImporterSourceVersion) >= 0,
+    "the working importer must not be older than the established common baseline",
+  );
   assert.equal(packageImporter.LimitMemory, 8192, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
   assert.ok(compareSemanticVersions(importerSourceVersion, "v2.3.3") >= 0);
@@ -1366,7 +1386,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
   assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 3, 8\)/);
-  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 5, 0\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 5, 1\)/);
   assert.match(appStoreUpgradeSource, /V8TrustedExecutionContext\.EnterManagedProtocol\([\s\S]*?"import-microi-store-package"/);
   assert.match(appStoreUpgradeSource, /dynamic\s+installResult\s*;/);
   assert.doesNotMatch(appStoreUpgradeSource, /DosResult\s+installResult\s*;/);
@@ -1480,6 +1500,115 @@ test("API-engine readback normalizes legacy flag shapes and physically reconcile
     source.indexOf("reconcilePersistedApiEngineFlags(modelCopy, updatedEngine)")
       < source.indexOf("assertPersistedApiEngine(modelCopy, updatedEngine)"),
   );
+
+  const physicalRow = {
+    Id: "api-id-1",
+    ApiEngineKey: "managed-api",
+    ApiAddress: "/old-address",
+    ApiRoutes: "/old-route;/old-route-two",
+    ApiV8Code: "old source",
+    Version: "v1.0.0",
+    IsEnable: 1,
+    IsDeleted: 0,
+    StopHttp: 0,
+    AllowAnonymous: 0,
+  };
+  const cache = new Map();
+  const cachePrefix = "Microi:tenant-a:FormData:sys_apiengine:";
+  const behaviorFixture = {
+    String,
+    Number,
+    JSON,
+    isNaN,
+    debugLog: {},
+    V8: {
+      OsClient: "tenant-a",
+      FormEngine: {
+        GetFormData: () => ({ Code: 2 }),
+      },
+      Cache: {
+        Remove: key => cache.delete(key),
+        Set: (key, value) => cache.set(key, value),
+      },
+      Db: {
+        FromSql(sql) {
+          const parameters = new Map();
+          return {
+            AddInParameter(name, value) {
+              parameters.set(name, value);
+              return this;
+            },
+            First() {
+              return { ...physicalRow };
+            },
+            ExecuteNonQuery() {
+              const update = sql.match(/UPDATE sys_apiengine SET (.+) WHERE Id=@p0/);
+              assert.ok(update, `unexpected SQL: ${sql}`);
+              for (const assignment of update[1].split(",")) {
+                const [column, rawValue] = assignment.split("=");
+                physicalRow[column] = rawValue.startsWith("@")
+                  ? parameters.get(rawValue)
+                  : Number(rawValue);
+              }
+              return parameters.get("@p0") === physicalRow.Id ? 1 : 0;
+            },
+          };
+        },
+      },
+    },
+  };
+  vm.runInNewContext(`
+    ${extractNamedFunction(source, "isMissingValue")}
+    ${extractNamedFunction(source, "normalizeApiEngineModel")}
+    ${extractNamedFunction(source, "normalizeApiEngineFlag")}
+    ${extractNamedFunction(source, "removeApiEngineCacheValue")}
+    ${extractNamedFunction(source, "apiEngineRouteAliases")}
+    ${extractNamedFunction(source, "removeApiEngineCacheAliases")}
+    ${extractNamedFunction(source, "refreshApiEngineCache")}
+    ${extractNamedFunction(source, "reconcilePersistedApiEngineFlags")}
+    result = { refreshApiEngineCache, reconcilePersistedApiEngineFlags };
+  `, behaviorFixture);
+
+  const firstReadback = behaviorFixture.result.refreshApiEngineCache(
+    "managed-api",
+    "api-id-1",
+    "/old-address",
+  );
+  assert.equal(firstReadback.ApiAddress, "/old-address");
+  assert.equal(cache.has(`${cachePrefix}/old-address`), true);
+  assert.equal(cache.has(`${cachePrefix}/old-route`), true);
+  assert.equal(cache.has(`${cachePrefix}/old-route-two`), true);
+
+  const expected = {
+    Id: "api-id-1",
+    ApiEngineKey: "managed-api",
+    ApiAddress: "/new-address",
+    ApiRoutes: "/new-route;/new-route-two",
+    ApiV8Code: "new source",
+    Version: "v2.0.0",
+    IsEnable: 1,
+    StopHttp: 0,
+    AllowAnonymous: 0,
+  };
+  const reconciled = behaviorFixture.result.reconcilePersistedApiEngineFlags(
+    expected,
+    firstReadback,
+  );
+  assert.equal(reconciled.ApiAddress, expected.ApiAddress);
+  assert.equal(reconciled.ApiRoutes, expected.ApiRoutes);
+  assert.equal(reconciled.ApiV8Code, expected.ApiV8Code);
+  assert.equal(reconciled.Version, expected.Version);
+  assert.equal(cache.has(`${cachePrefix}/old-address`), false);
+  assert.equal(cache.has(`${cachePrefix}/old-route`), false);
+  assert.equal(cache.has(`${cachePrefix}/old-route-two`), false);
+  for (const alias of ["managed-api", "api-id-1", "/new-address", "/new-route", "/new-route-two"]) {
+    const cached = cache.get(`${cachePrefix}${alias}`);
+    assert.equal(typeof cached, "string", `${alias} should contain serialized cache JSON`);
+    const cachedModel = JSON.parse(cached);
+    assert.equal(cachedModel.ApiAddress, expected.ApiAddress);
+    assert.equal(cachedModel.ApiRoutes, expected.ApiRoutes);
+  }
+  assert.match(source, /PACKAGE_API_ENGINE_STALE_ALIAS_INVALIDATION_V1/);
 });
 
 test("existing menu URL collisions retry without overwriting an unrelated tenant route", () => {
@@ -1504,6 +1633,7 @@ test("legacy physical prerequisites commit at most one metadata table per backgr
       "formbannerenabled", "formbannertitlefield", "formbannersubtitlefield", "formbannerimagefield",
       "formbannericon", "formbannerbackgroundfield", "formbannertagfields", "formbannermetrics",
     ]),
+    diy_field: new Set(),
     sys_microistore: new Set(),
   };
   const alterSql = [];
@@ -1548,31 +1678,54 @@ test("legacy physical prerequisites commit at most one metadata table per backgr
 
   const first = fixture.result(1);
   assert.equal(first.ChangedTableCount, 1);
-  assert.equal(first.RemainingTableCount, 2);
+  assert.equal(first.RemainingTableCount, 3);
   assert.deepEqual([...first.Added], ["sys_apiengine.V8Limit"]);
   assert.equal(alterSql.length, 1);
   assert.match(alterSql[0], /^ALTER TABLE `sys_apiengine` ADD `V8Limit` int NULL$/i);
 
   const second = fixture.result(1);
   assert.equal(second.ChangedTableCount, 1);
-  assert.equal(second.RemainingTableCount, 1);
+  assert.equal(second.RemainingTableCount, 2);
   assert.deepEqual([...second.Added], ["diy_table.V8Limit"]);
   assert.equal(alterSql.length, 2);
   assert.match(alterSql[1], /^ALTER TABLE `diy_table` ADD `V8Limit` int NULL$/i);
 
   const third = fixture.result(1);
   assert.equal(third.ChangedTableCount, 1);
-  assert.equal(third.RemainingTableCount, 0);
-  assert.equal(third.Added.length, 8);
+  assert.equal(third.RemainingTableCount, 1);
+  assert.deepEqual([...third.Added], ["diy_field.OsClient"]);
   assert.equal(alterSql.length, 3);
-  assert.match(alterSql[2], /^ALTER TABLE `sys_microistore` ADD `PackageId` varchar\(50\) NULL,/i);
-  assert.match(alterSql[2], /ADD `PackageUploadedAt` varchar\(25\) NULL$/i);
+  assert.match(alterSql[2], /^ALTER TABLE `diy_field` ADD `OsClient` varchar\(255\) NULL$/i);
+
+  const fourth = fixture.result(1);
+  assert.equal(fourth.ChangedTableCount, 1);
+  assert.equal(fourth.RemainingTableCount, 0);
+  assert.equal(fourth.Added.length, 8);
+  assert.equal(alterSql.length, 4);
+  assert.match(alterSql[3], /^ALTER TABLE `sys_microistore` ADD `PackageId` varchar\(50\) NULL,/i);
+  assert.match(alterSql[3], /ADD `PackageUploadedAt` varchar\(25\) NULL$/i);
 
   const modern = fixture.result(1);
   assert.equal(modern.ChangedTableCount, 0);
   assert.equal(modern.RemainingTableCount, 0);
   assert.deepEqual([...modern.Added], []);
-  assert.equal(alterSql.length, 3, "no-op modern tenants must not receive an empty ALTER slice");
+  assert.equal(alterSql.length, 4, "no-op modern tenants must not receive an empty ALTER slice");
+});
+
+test("import failures identify the active package stage", () => {
+  assert.match(source, /var activeImportStage = '物理前置检查'/);
+  assert.match(source, /activeImportStage = '步骤2-字段定义'/);
+  assert.match(source, /Msg: '导入失败（阶段：' \+ activeImportStage/);
+  assert.match(source, /失败阶段: activeImportStage/);
+});
+
+test("legacy menu recovery never writes a non-contract physical OsClient column", () => {
+  assert.doesNotMatch(source, /UPDATE sys_menu SET OsClient\s*=/i);
+  assert.equal(
+    (source.match(/UPDATE sys_menu SET IsDeleted = 0 WHERE Id = @p0/g) || []).length,
+    2,
+  );
+  assert.match(source, /modelCopy\.OsClient = V8\.OsClient/);
 });
 
 test("reinstall DDL classifies existing indexes for idempotent skipping", () => {

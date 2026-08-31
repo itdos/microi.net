@@ -74,6 +74,7 @@ namespace Microi.net
                 return;
             }
 
+            var upgradeExecutionReachedSafeReloadPoint = false;
             try
             {
                 var prerequisiteResult = await _upgrade
@@ -194,6 +195,7 @@ namespace Microi.net
                         Console.WriteLine($"Microi：【成功】【{runtimeClient.OsClient}】平台自动升级检查完成。");
                     }
                 }
+                upgradeExecutionReachedSafeReloadPoint = true;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -202,6 +204,18 @@ namespace Microi.net
             catch (Exception ex)
             {
                 Console.WriteLine($"Microi：【Error异常】【{tenantName}】平台自动升级出现异常：{ex.Message}");
+            }
+
+            // If an upgrade exception occurred before the tenant reached the
+            // normal reload boundary, a language-cache reload can repeat the
+            // same failing connection with the much longer FormEngine timeout.
+            // Besides producing no useful cache data, that would hold the serial
+            // tenant queue for minutes and prevent healthy tenants from upgrading.
+            if (!upgradeExecutionReachedSafeReloadPoint)
+            {
+                Console.WriteLine(
+                    $"Microi：【⚠️警告】【{tenantName}】升级执行未到达安全缓存刷新点，跳过多语言运行时缓存刷新，继续处理下一租户。");
+                return;
             }
 
             try

@@ -195,10 +195,12 @@ namespace Microi.net
             var backgroundTaskRuntimeInvariantApplied = false;
             var databaseBackupRuntimeInvariantApplied = false;
             var applicationStreamV3SchemaInvariantApplied = false;
+            var runtimeInvariantStage = "初始化";
 
             try
             {
                 // 运行时不变量不能只依赖可能被错误推进的历史版本号。
+                runtimeInvariantStage = "平台运行时接口闭包";
                 Console.WriteLine(
                     $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】版本迁移链内复检开始。");
                 var startupDependencyResult = await UpgradeAppStore
@@ -210,17 +212,29 @@ namespace Microi.net
                 }
                 Console.WriteLine(
                     $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】版本迁移链内复检成功：{startupDependencyResult.Msg}");
+                runtimeInvariantStage = "AuthSecret物理列";
                 EnsureAuthSecretColumns(osClientSecret);
+                runtimeInvariantStage = "微服务物理列";
                 EnsureMicroServiceColumns(osClientSecret);
+                runtimeInvariantStage = "安全等级兼容";
                 EnsureSecurityLevels(osClientSecret);
+                runtimeInvariantStage = "移动端显隐物理列";
                 EnsureMobileVisibilityColumns(osClientSecret);
+                runtimeInvariantStage = "菜单角标物理列";
                 EnsureMenuBadgeColumns(osClientSecret);
+                runtimeInvariantStage = "模块视图结构物理列";
                 EnsureModuleViewSchemaColumns(osClientSecret);
+                runtimeInvariantStage = "接口引擎与生成实体物理列";
                 EnsureApiEngineRuntimeColumns(osClientSecret);
+                runtimeInvariantStage = "历史字段元数据";
                 EnsureLegacyFieldMetadataColumns(osClientSecret);
+                runtimeInvariantStage = "接口引擎字段元数据兼容";
                 await EnsureApiEngineFieldMetadataCompatibilityAsync(osClientSecret, "启动前");
+                runtimeInvariantStage = "接口引擎缓存写入兼容";
                 await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动前");
+                runtimeInvariantStage = "官网匿名接口契约";
                 await EnsureOfficialWebsitePublicApiEngineContractAsync(osClientSecret);
+                runtimeInvariantStage = "官网商城安装版本对齐";
                 var marketplaceVersionResult = OfficialMarketplaceInstalledVersionReconciler
                     .Reconcile(osClientSecret);
                 if (marketplaceVersionResult.IsOfficialPlatform)
@@ -238,9 +252,11 @@ namespace Microi.net
                         Console.WriteLine($"Microi：【信息】【{osClientSecret.OsClient}】官网平台应用安装版本已是商城最新版。");
                     }
                 }
+                runtimeInvariantStage = "历史菜单配置兼容";
                 await EnsureLegacyMenuDiyConfigCompatibilityAsync(osClientSecret);
                 // 持久后台任务是所有长任务的事实源。其运行环境路由字段必须在
                 // Worker 启动领取任务前存在，不能依赖可能已经错误推进的版本号。
+                runtimeInvariantStage = "Upgrade21-持久后台任务";
                 var backgroundTaskInvariantMessages = await new Upgrade21()
                     .Run(osClientSecret.OsClient).ConfigureAwait(false);
                 if (backgroundTaskInvariantMessages.Count > 0)
@@ -251,6 +267,7 @@ namespace Microi.net
                 // 数据库备份控制面是运行时基础设施，不能只依赖 ServerVersion。
                 // 历史环境可能已经推进版本号，但物理表仍缺少后续补充的字段；每次启动
                 // 都在分布式升级租约内做一次幂等回读/修复，避免业务代码先于结构上线。
+                runtimeInvariantStage = "Upgrade24-数据库备份";
                 var databaseBackupInvariantMessages = await new Upgrade24()
                     .Run(osClientSecret.OsClient).ConfigureAwait(false);
                 if (databaseBackupInvariantMessages.Count > 0)
@@ -258,13 +275,15 @@ namespace Microi.net
                     throw new InvalidOperationException(string.Join("；", databaseBackupInvariantMessages));
                 }
                 databaseBackupRuntimeInvariantApplied = true;
+                runtimeInvariantStage = "菜单AppDisplay保护快照";
                 menuAppDisplaySnapshot = CaptureMenuAppDisplaySnapshot(osClientSecret);
             }
             catch (Exception ex)
             {
                 migrationFailed = true;
-                migrationErrors.Add("修复升级运行时不变量失败：" + ex.Message);
-                Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【修复升级运行时不变量】失败：{ex.Message}");
+                var diagnostic = BuildUpgradeFailureDiagnostic(runtimeInvariantStage, ex);
+                migrationErrors.Add("修复升级运行时不变量失败：" + diagnostic);
+                Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【修复升级运行时不变量】失败：{diagnostic}");
             }
 
             #region 升级AppDisplay、AppVisible  --2024-09-19【必须】
@@ -1615,11 +1634,11 @@ namespace Microi.net
                     "读取接口引擎以重建兼容缓存失败：" + listResult.Msg);
             }
 
-            var resolution = ApiEngineRouteAliases.ResolveCacheAliases(
+            var cachePlan = BuildApiEngineCacheSnapshotPlan(
                 listResult.Data == null
                     ? Enumerable.Empty<object>()
                     : listResult.Data.Cast<object>());
-            foreach (var conflict in resolution.Conflicts)
+            foreach (var conflict in cachePlan.Resolution.Conflicts)
             {
                 var owners = string.Join("、", conflict.Owners.Select(owner =>
                     $"{owner.EngineKey}({owner.EngineId})"));
@@ -1632,12 +1651,12 @@ namespace Microi.net
             await cache.RemoveParentAsync(
                 $"Microi:{osClient}:FormData:sys_apiengine:*");
             var pending = new List<Task<bool>>(64);
-            foreach (var alias in resolution.Aliases)
+            foreach (var alias in cachePlan.Payloads)
             {
                 UpgradeExecutionLeaseContext.ThrowIfLost();
                 pending.Add(cache.SetAsync(
                     $"Microi:{osClient}:FormData:sys_apiengine:{alias.Key}",
-                    JsonConvert.SerializeObject(alias.Value.ApiEngine)));
+                    alias.Value));
                 if (pending.Count < 64) continue;
 
                 await Task.WhenAll(pending);
@@ -1647,7 +1666,103 @@ namespace Microi.net
             {
                 await Task.WhenAll(pending);
             }
-            return resolution.Aliases.Count;
+            return cachePlan.Payloads.Count;
+        }
+
+        internal sealed class ApiEngineCacheSnapshotPlan
+        {
+            internal ApiEngineCacheSnapshotPlan(
+                ApiEngineCacheAliasResolution resolution,
+                IReadOnlyDictionary<string, string> payloads)
+            {
+                Resolution = resolution;
+                Payloads = payloads;
+            }
+
+            internal ApiEngineCacheAliasResolution Resolution { get; }
+            internal IReadOnlyDictionary<string, string> Payloads { get; }
+        }
+
+        /// <summary>
+        /// Dos.ORM dynamic rows are FastExpando instances backed by a mutable
+        /// Dictionary. Alias discovery and JSON serialization must not retain that
+        /// shared backing dictionary: another projection can add a field between
+        /// ICollection.Count and CopyTo and make startup cache rebuilding fail.
+        /// Materialize one owned deep snapshot per row first, then use only those
+        /// snapshots for both alias resolution and cache payloads.
+        /// </summary>
+        internal static ApiEngineCacheSnapshotPlan BuildApiEngineCacheSnapshotPlan(
+            IEnumerable<object> apiEngines)
+        {
+            var snapshots = new List<object>();
+            foreach (var apiEngine in apiEngines ?? Enumerable.Empty<object>())
+            {
+                if (apiEngine == null) continue;
+                snapshots.Add(SnapshotApiEngineCacheRow(apiEngine));
+            }
+
+            var resolution = ApiEngineRouteAliases.ResolveCacheAliases(snapshots);
+            var payloads = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var alias in resolution.Aliases)
+            {
+                payloads[alias.Key] = JsonConvert.SerializeObject(alias.Value.ApiEngine);
+            }
+
+            return new ApiEngineCacheSnapshotPlan(resolution, payloads);
+        }
+
+        private static JObject SnapshotApiEngineCacheRow(object apiEngine)
+        {
+            if (apiEngine is JObject jObject)
+            {
+                return (JObject)jObject.DeepClone();
+            }
+
+            if (!(apiEngine is IDictionary<string, object> values))
+            {
+                return JObject.FromObject(apiEngine);
+            }
+
+            const int maxAttempts = 3;
+            Exception lastSnapshotError = null;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    // Do not use ToArray/ToList or the Dictionary copy constructor.
+                    // Their ICollection fast paths call FastExpando.CopyTo and can
+                    // reproduce the reported array-length race.
+                    var expectedCount = values.Count;
+                    var owned = new Dictionary<string, object>(
+                        expectedCount,
+                        StringComparer.Ordinal);
+                    foreach (var item in values)
+                    {
+                        owned[item.Key] = item.Value;
+                    }
+
+                    if (owned.Count == expectedCount && values.Count == expectedCount)
+                    {
+                        return JObject.FromObject(owned);
+                    }
+
+                    lastSnapshotError = new InvalidOperationException(
+                        "接口引擎动态行在创建缓存快照时发生并发修改。");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    lastSnapshotError = ex;
+                }
+
+                if (attempt < maxAttempts)
+                {
+                    Thread.Yield();
+                }
+            }
+
+            throw new InvalidOperationException(
+                "接口引擎动态行连续发生并发修改，无法创建稳定缓存快照。",
+                lastSnapshotError);
         }
 
         public sealed class ApiEngineDiyTableRow
@@ -2728,6 +2843,40 @@ if (_microiLegacyMenuConfigChanged) {
             public string TableId { get; set; }
             public string FieldName { get; set; }
             public string Config { get; set; }
+        }
+
+        internal static string BuildUpgradeFailureDiagnostic(string stage, Exception exception)
+        {
+            var safeStage = string.IsNullOrWhiteSpace(stage) ? "未知阶段" : stage.Trim();
+            var root = exception?.GetBaseException() ?? exception;
+            var exceptionType = root?.GetType().Name ?? "UnknownException";
+            var rootMessage = SanitizeUpgradeDiagnosticText(root?.Message ?? exception?.Message ?? "未知错误");
+            var outerMessage = SanitizeUpgradeDiagnosticText(exception?.Message ?? string.Empty);
+            var cause = string.Equals(rootMessage, outerMessage, StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(outerMessage)
+                ? rootMessage
+                : outerMessage + "；根因=" + rootMessage;
+            return $"阶段={safeStage}；异常类型={exceptionType}；原因={cause}；"
+                   + "恢复建议=修复该阶段后可安全重启，未成功前不会推进ServerVersion";
+        }
+
+        private static string SanitizeUpgradeDiagnosticText(string value)
+        {
+            var text = (value ?? string.Empty).Replace("\r", " ").Replace("\n", " ").Trim();
+            text = System.Text.RegularExpressions.Regex.Replace(
+                text,
+                @"(?i)(password|pwd|secret|token|api[_-]?key|access[_-]?key|connectionstring)\s*[:=]\s*([^;,\s]+)",
+                "$1=***");
+            text = System.Text.RegularExpressions.Regex.Replace(
+                text,
+                @"(?i)(authorization\s*[:=]\s*(?:bearer\s+)?)[A-Za-z0-9._~+/-]{8,}",
+                "$1***");
+            text = System.Text.RegularExpressions.Regex.Replace(
+                text,
+                @"(?i)(://[^:/\s]+:)[^@/\s]+(@)",
+                "$1***$2");
+            if (text.Length > 1200) text = text.Substring(0, 1200) + "...";
+            return string.IsNullOrWhiteSpace(text) ? "未知错误" : text;
         }
 
         private Dictionary<string, int> CaptureMenuAppDisplaySnapshot(OsClientSecret osClientSecret)
