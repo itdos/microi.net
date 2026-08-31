@@ -68,6 +68,45 @@ function normalizePublishedWebEntry(url, applicationKey, runtime) {
   url.pathname = `/${tenantPrefix}ai-app-publish/${pathAppKey}/index.html`
 }
 
+function normalizeProtocolV3ApplicationEntry(url, applicationKey, runtime) {
+  const match = url.pathname.match(
+    /^\/micro-app\/v3\/tenants\/([^/]+)\/kinds\/([^/]+)\/apps\/([^/]+)\/assets\/index\.html$/i
+  )
+  if (!match) return null
+
+  let pathAppKey
+  try {
+    pathAppKey = decodeURIComponent(match[3]).trim().toLowerCase()
+  } catch (_) {
+    return false
+  }
+  if (applicationKey && pathAppKey !== applicationKey) return false
+
+  let tenant
+  try {
+    tenant = String(runtime?.osClient || decodeURIComponent(match[1])).trim().toLowerCase()
+  } catch (_) {
+    return false
+  }
+  if (!tenant || !pathAppKey) return false
+
+  url.pathname = `/micro-app/v3/tenants/${encodeURIComponent(tenant)}/kinds/runtime/apps/${encodeURIComponent(pathAppKey)}/assets/index.html`
+  const apiBase = String(runtime?.apiBase || '').trim()
+  if (apiBase) {
+    try {
+      const apiUrl = new URL(apiBase)
+      if (!['http:', 'https:'].includes(apiUrl.protocol)) return false
+      url.protocol = apiUrl.protocol
+      url.host = apiUrl.host
+      url.username = apiUrl.username
+      url.password = apiUrl.password
+    } catch (_) {
+      return false
+    }
+  }
+  return true
+}
+
 function canonicalStableUrl(candidate, baseUrl, runtime, applicationKey) {
   const value = candidate.value
   let url
@@ -84,6 +123,8 @@ function canonicalStableUrl(candidate, baseUrl, runtime, applicationKey) {
   // 固定最新版入口是去掉版本段后的同一根目录，可以安全规范化。
   url.pathname = url.pathname.replace(legacyVersionSegment, '')
   if (immutableVersionPath.test(url.pathname)) return ''
+  const protocolV3 = normalizeProtocolV3ApplicationEntry(url, applicationKey, runtime)
+  if (protocolV3 === false) return ''
   normalizePublishedWebEntry(url, applicationKey, runtime)
   for (const key of ['v', 'version', 'release', 'request', 'requestId', 'apiBase', 'OsClient', 'osClient']) {
     url.searchParams.delete(key)

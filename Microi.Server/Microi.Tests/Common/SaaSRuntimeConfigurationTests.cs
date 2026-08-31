@@ -446,6 +446,45 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
+    public void OfficialInstaller_HandlesTerminalEncodingBeforeUserVisibleOutput()
+    {
+        var root = FindRepositoryRoot();
+        var installerPath = Path.Combine(
+            root, "数据库、案例、文档、资料", "install-microi.sh");
+        var bytes = File.ReadAllBytes(installerPath);
+
+        Assert.False(
+            bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF,
+            "一键安装脚本必须保持 UTF-8 no-BOM。");
+        var installer = new System.Text.UTF8Encoding(false, true).GetString(bytes);
+        Assert.DoesNotContain("\r", installer, StringComparison.Ordinal);
+
+        var bootstrapCall = installer.IndexOf(
+            "\nconfigure_installer_terminal_encoding \"$@\"\n",
+            StringComparison.Ordinal);
+        var privilegeFunction = installer.IndexOf(
+            "\nensure_privileged_execution()",
+            StringComparison.Ordinal);
+        Assert.True(bootstrapCall >= 0 && bootstrapCall < privilegeFunction,
+            "编码初始化必须早于权限提示、repair 分派和其它用户可见输出。");
+
+        Assert.Contains("locale charmap", installer, StringComparison.Ordinal);
+        Assert.Contains("export LC_ALL=C", installer, StringComparison.Ordinal);
+        Assert.Contains("installed_locales=$(locale -a", installer, StringComparison.Ordinal);
+        Assert.Contains("MICROI_INSTALL_OUTPUT_ENCODING", installer, StringComparison.Ordinal);
+        Assert.Contains("iconv -c -f UTF-8", installer, StringComparison.Ordinal);
+        Assert.Contains("--encoding-check-only", installer, StringComparison.Ordinal);
+        Assert.Contains("MICROI_INSTALL_UTF8_MARKER=吾码中文显示正常", installer, StringComparison.Ordinal);
+        Assert.Contains("MICROI_INSTALL_OUTPUT_TRANSCODER_ACTIVE", installer, StringComparison.Ordinal);
+        Assert.Contains("MICROI_INSTALL_OUTPUT_ENCODING_EXPLICIT", installer, StringComparison.Ordinal);
+        Assert.Contains("MICROI_INSTALL_OUTPUT_WAS_TTY", installer, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "export LANG=en_US.UTF-8 2>/dev/null || export LANG=C.UTF-8",
+            installer,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OfficialInstaller_AppRepairPreservesDataAndUsesDockerDns()
     {
         var root = FindRepositoryRoot();
@@ -456,8 +495,14 @@ public class SaaSRuntimeConfigurationTests
 
         Assert.Contains("if [ \"${1:-}\" = '--repair-app' ]", installer);
         Assert.Contains("ensure_privileged_execution \"$@\"", installer);
-        Assert.Contains("exec sudo -E env MICROI_INSTALL_ELEVATED=1 bash", installer);
-        Assert.Contains("exec sudo env MICROI_INSTALL_ELEVATED=1 bash", installer);
+        Assert.Contains(
+            "exec sudo -E env \\\n      MICROI_INSTALL_ELEVATED=1",
+            installer,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "exec sudo env \\\n    MICROI_INSTALL_ELEVATED=1",
+            installer,
+            StringComparison.Ordinal);
         Assert.Contains("当前帐号不是 root，且系统未安装 sudo", installer);
         Assert.Contains("--privilege-check-only", installer);
         Assert.Contains("repair_migrate_app_to_internal_network", installer);

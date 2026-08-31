@@ -274,6 +274,33 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
+    public void StartupDependencyGate_RequiresPackageSourceAndVersionForEveryManagedResource()
+    {
+        var contractError = GetPrivateStaticMethod("GetStartupDependencyContractError");
+        var bundledInit = Assert.Single(
+            Assert.IsAssignableFrom<IReadOnlyList<JObject>>(
+                GetPrivateStaticMethod("LoadBundledStartupDependencyEngines").Invoke(null, null)),
+            item => item["ApiEngineKey"]?.ToString() == "microi-init");
+        var importedWithoutLegacyMetadata = (JObject)bundledInit.DeepClone();
+        importedWithoutLegacyMetadata["Version"] = "";
+        importedWithoutLegacyMetadata["StopHttp"] = null;
+
+        Assert.Equal(
+            "Version与包内Managed版本不一致",
+            Assert.IsType<string>(contractError.Invoke(
+                null,
+                new object[] { importedWithoutLegacyMetadata, bundledInit })));
+
+        var tenantCustomized = (JObject)importedWithoutLegacyMetadata.DeepClone();
+        tenantCustomized["ApiV8Code"] = "return { Code: 1, Data: { TenantOwned: true } };";
+        Assert.Equal(
+            "ApiV8Code与包内Managed源码不一致",
+            Assert.IsType<string>(contractError.Invoke(
+                null,
+                new object[] { tenantCustomized, bundledInit })));
+    }
+
+    [Fact]
     public void ApiStartup_DelegatesDependencyGateToUpgradeAndHostedUpgradeRepeatsIt()
     {
         var serverRoot = FindServerRoot();
@@ -341,6 +368,10 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.Contains("【核心字段可空兼容】全部检查成功", source);
         Assert.Contains("errors.Add($\"核心表 {tableName}.{columnName} 调整为允许为空失败", source);
         Assert.DoesNotContain("msgs.Add($\"核心表 {tableName} 已将", source);
+        Assert.Contains("public static string Version = \"7.6.11.0\"", source);
+        Assert.Contains("PACKAGE_MANAGED_OVERWRITE_V2", source);
+        Assert.Contains("执行覆盖式重放以修复资源漂移", source);
+        Assert.DoesNotContain("平台运行时接口自举存在客户源码或稳定身份冲突", source);
     }
 
     [Fact]

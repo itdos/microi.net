@@ -20,7 +20,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "7.6.10.0";
+        public static string Version = "7.6.11.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -57,8 +57,8 @@ namespace Microi.net
         // 受信任核心导入器提升到平台既有 8GB 累计分配硬上限；进程常驻内存保护仍生效，
         // 普通接口引擎不受影响，5GB 运行资产继续走 HDFS multipart 而不进入 Jint。
         private const int ImporterLimitMemoryMb = 8192;
-        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 4, 9);
-        private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 3, 7);
+        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 5, 0);
+        private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 3, 8);
         private static readonly System.Version MinimumPlatformBackgroundTaskVersion = new System.Version(1, 1, 0);
         private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 1);
         private static readonly System.Version MinimumPlatformRuntimePackageVersion = new System.Version(7, 7, 1);
@@ -259,6 +259,9 @@ namespace Microi.net
                 && code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1")
                 && code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1")
                 && code.Contains("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1")
+                && code.Contains("PACKAGE_MANAGED_OVERWRITE_V2")
+                && code.Contains("PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2")
+                && code.Contains("PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1")
                 && code.Contains("V8.Method.RequireManagedProtocolContext");
         }
 
@@ -273,6 +276,8 @@ namespace Microi.net
                 && code.Contains("STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2")
                 && code.Contains("STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1")
                 && code.Contains("STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1")
+                && code.Contains("BULK_PACKAGE_MANAGED_OVERWRITE_RECOVERY_V1")
+                && code.Contains("MARKETPLACE_LIST_ROUTE_FAILOVER_V1")
                 && code.Contains("platform-sys-menu")
                 && code.Contains("platform-sys-config");
         }
@@ -1109,9 +1114,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("DATASET_INSERT_IF_MISSING_V1") ||
                     !code.Contains("PACKAGE_API_ENGINE_READBACK_V1") ||
                     !code.Contains("API_ENGINE_RESOURCE_BASELINE_V1") ||
-                    !code.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !code.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
-                    !code.Contains("OFFICIAL_MANAGED_OVERWRITE_V1") ||
+                    !code.Contains("PACKAGE_MANAGED_OVERWRITE_V2") ||
+                    !code.Contains("PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2") ||
                     !code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1") ||
                     !code.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
                     !code.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
@@ -1598,7 +1603,6 @@ WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR Is
             {
                 "platform-external-login-binding",
                 "platform-wechat-user-binding",
-                "platform-chat-system-message",
                 "platform-chat-runtime",
                 "wechat_send_tpl_msg",
                 "platform-marketplace-source"
@@ -1607,6 +1611,10 @@ WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR Is
         private static readonly HashSet<string> InstalledV8FirstAnonymousEngineKeys =
             new HashSet<string>(StringComparer.Ordinal)
             {
+                // 同一 Managed 多路由同时承载 GetPublic/GetMapRuntime 与需要内部
+                // 强鉴权的管理动作；匿名只表示允许进入 V8，敏感动作仍由
+                // ValidateTenantSystemSettingsOperation/可信运行时重新鉴权。
+                "platform-tenant-system-settings",
                 "platform-ai-account"
             };
 
@@ -2081,7 +2089,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     var row = ReadStartupDependencyEngine(
                         client.Db,
                         key,
-                        IsCreateIfMissingRuntimeDependency(source));
+                        ignoreKeyCase: true);
                     var contractError = GetStartupDependencyContractError(row, source);
                     if (!contractError.DosIsNullOrWhiteSpace())
                     {
@@ -2107,11 +2115,11 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
         }
 
         /// <summary>
-        /// Must run under UpgradeDistributedLease. Missing startup interfaces are
-        /// created from embedded official packages. Existing executable source
-        /// is never overwritten by this emergency gate: only its route/runtime
-        /// flags are reconciled, leaving Managed source reconciliation to the
-        /// complete application-package upgrade and its base/local comparison.
+        /// Must run under UpgradeDistributedLease. Package-declared Managed
+        /// startup interfaces are authoritative and are overwritten in place from
+        /// the embedded package. Existing CreateIfMissing hooks remain tenant-owned
+        /// and are reused. Physical Id/address collisions are reconciled without
+        /// turning local drift into an upgrade-blocking conflict.
         /// </summary>
         internal static async Task<DosResult> EnsureStartupDependenciesUnderLeaseAsync(
             OsClientSecret client)
@@ -2135,8 +2143,8 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             var added = new List<string>();
             var reconciled = new List<string>();
             var reused = new List<string>();
-            var preservedLocalSource = new List<string>();
-            var conflicts = new List<string>();
+            var overwritten = new List<string>();
+            var identityRemapped = new List<string>();
             try
             {
                 // 同一租户的一轮启动闭包使用同一份物理字段快照。旧库可能一次缺少
@@ -2152,7 +2160,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     var source = (JObject)packaged.DeepClone();
                     var key = source["ApiEngineKey"]?.ToString();
                     var isTenantHook = IsCreateIfMissingRuntimeDependency(source);
-                    var existing = ReadStartupDependencyEngine(client.Db, key, isTenantHook);
+                    var existing = ReadStartupDependencyEngine(client.Db, key, ignoreKeyCase: true);
                     if (existing != null)
                     {
                         // CreateIfMissing is a one-way ownership transfer. Any
@@ -2165,17 +2173,17 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                             continue;
                         }
 
-                        if (ReadStartupSwitch(existing["IsDeleted"]) == 1
-                            || string.IsNullOrWhiteSpace(existing["ApiV8Code"]?.ToString()))
-                        {
-                            conflicts.Add(key + "：已有记录处于软删除状态或缺少可执行源码");
-                            continue;
-                        }
+                        var reclaimedRoutes = await ReclaimStartupDependencyRoutesAsync(
+                                client,
+                                source,
+                                existing["Id"]?.ToString(),
+                                physicalFields)
+                            .ConfigureAwait(false);
+                        identityRemapped.AddRange(reclaimedRoutes);
 
-                        // The availability contract is already satisfied. The
-                        // full Managed package upgrade remains responsible for
-                        // source/version reconciliation, so a routine startup
-                        // must not write all seven rows twice on every node.
+                        // An exact package readback needs no write. Any Managed
+                        // drift, including local source edits and soft deletion,
+                        // is repaired from the selected embedded package.
                         if (string.IsNullOrWhiteSpace(
                                 GetStartupDependencyContractError(existing, source)))
                         {
@@ -2183,38 +2191,11 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                             continue;
                         }
 
-                        var addressCollision = client.Db.FromSql($@"SELECT
-    {QuoteIdentifier(client.Db, "Id")},
-    {QuoteIdentifier(client.Db, "ApiEngineKey")},
-    {QuoteIdentifier(client.Db, "ApiAddress")}
-FROM {QuoteIdentifier(client.Db, "sys_apiengine")}
-WHERE LOWER({QuoteIdentifier(client.Db, "ApiAddress")})=LOWER(@p0)
-  AND {QuoteIdentifier(client.Db, "Id")}<>@p1")
-                            .AddInParameter("p0", source["ApiAddress"]?.ToString())
-                            .AddInParameter("p1", existing["Id"]?.ToString())
-                            .First<dynamic>();
-                        if (addressCollision != null)
-                        {
-                            conflicts.Add(key + "：官方 ApiAddress 已被其它接口占用");
-                            continue;
-                        }
-
                         var sameOfficialSource = string.Equals(
                             NormalizeStartupDependencySource(existing["ApiV8Code"]?.ToString()),
                             NormalizeStartupDependencySource(source["ApiV8Code"]?.ToString()),
                             StringComparison.Ordinal);
-                        var patch = sameOfficialSource
-                            ? CreatePersistableRuntimeDependencySource(source)
-                            : new JObject
-                            {
-                                ["Id"] = existing["Id"]?.ToString(),
-                                ["ApiEngineKey"] = key,
-                                ["ApiAddress"] = source["ApiAddress"]?.ToString(),
-                                ["IsEnable"] = 1,
-                                ["StopHttp"] = 0,
-                                ["AllowAnonymous"] = ReadStartupSwitch(source["AllowAnonymous"]),
-                                ["IsDeleted"] = 0
-                            };
+                        var patch = CreatePersistableRuntimeDependencySource(source);
                         patch["Id"] = existing["Id"]?.ToString();
                         patch["OsClient"] = client.OsClient;
                         patch["IsDeleted"] = 0;
@@ -2230,27 +2211,36 @@ WHERE LOWER({QuoteIdentifier(client.Db, "ApiAddress")})=LOWER(@p0)
                                 $"平台运行时接口[{key}]补正失败：数据库影响行数={updateCount}");
                         }
                         reconciled.Add(key);
-                        if (!sameOfficialSource) preservedLocalSource.Add(key);
+                        if (!sameOfficialSource
+                            || ReadStartupSwitch(existing["IsDeleted"]) == 1)
+                        {
+                            overwritten.Add(key);
+                        }
                     }
                     else
                     {
-                        var collision = client.Db.FromSql($@"SELECT
+                        var reclaimedRoutes = await ReclaimStartupDependencyRoutesAsync(
+                                client,
+                                source,
+                                ownerId: null,
+                                physicalFields: physicalFields)
+                            .ConfigureAwait(false);
+                        identityRemapped.AddRange(reclaimedRoutes);
+                        var idCollision = client.Db.FromSql($@"SELECT
     {QuoteIdentifier(client.Db, "Id")},
     {QuoteIdentifier(client.Db, "ApiEngineKey")},
     {QuoteIdentifier(client.Db, "ApiAddress")}
 FROM {QuoteIdentifier(client.Db, "sys_apiengine")}
-WHERE {QuoteIdentifier(client.Db, "Id")}=@p0
-   OR LOWER({QuoteIdentifier(client.Db, "ApiAddress")})=LOWER(@p1)")
+WHERE {QuoteIdentifier(client.Db, "Id")}=@p0")
                             .AddInParameter("p0", source["Id"]?.ToString())
-                            .AddInParameter("p1", source["ApiAddress"]?.ToString())
                             .First<dynamic>();
-                        if (collision != null)
-                        {
-                            conflicts.Add(key + "：稳定 Id 或 ApiAddress 已被其它接口占用");
-                            continue;
-                        }
 
                         var persistedSource = CreatePersistableRuntimeDependencySource(source);
+                        if (idCollision != null)
+                        {
+                            persistedSource["Id"] = Guid.NewGuid().ToString();
+                            identityRemapped.Add(key + "：包内Id已占用，使用新Id");
+                        }
                         persistedSource["OsClient"] = client.OsClient;
                         persistedSource["IsDeleted"] = 0;
                         persistedSource["CreateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -2286,7 +2276,7 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                         .AddInParameter("p1", key)
                         .ExecuteNonQuery();
 
-                    var readback = ReadStartupDependencyEngine(client.Db, key, isTenantHook);
+                    var readback = ReadStartupDependencyEngine(client.Db, key, ignoreKeyCase: true);
                     var contractError = GetStartupDependencyContractError(readback, source);
                     if (!contractError.DosIsNullOrWhiteSpace())
                     {
@@ -2298,17 +2288,6 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                     }
                     await InvalidateStartupDependencyCacheAsync(client.OsClient, readback)
                         .ConfigureAwait(false);
-                }
-
-                if (conflicts.Count > 0)
-                {
-                    return new DosResult(0, new
-                    {
-                        Added = added,
-                        Reconciled = reconciled,
-                        PreservedLocalSource = preservedLocalSource,
-                        Conflicts = conflicts
-                    }, "平台运行时接口自举存在客户源码或稳定身份冲突，拒绝把局部成功冒充完整恢复。");
                 }
 
                 foreach (var key in RequiredStartupDependencyEngineKeys)
@@ -2328,7 +2307,8 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                     Added = added,
                     Reconciled = reconciled,
                     Reused = reused,
-                    PreservedLocalSource = preservedLocalSource,
+                    Overwritten = overwritten,
+                    IdentityRemapped = identityRemapped,
                     Source = "EmbeddedOfficialApplicationPackages"
                 }, added.Count > 0 || reconciled.Count > 0
                     ? $"已从内置官方应用包补齐平台运行时接口闭包（共{RequiredStartupDependencyEngineKeys.Length}项）。"
@@ -2340,8 +2320,8 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                 {
                     Added = added,
                     Reconciled = reconciled,
-                    PreservedLocalSource = preservedLocalSource,
-                    Conflicts = conflicts
+                    Overwritten = overwritten,
+                    IdentityRemapped = identityRemapped
                 }, "平台运行时接口闭包检查异常：" + ex.Message);
             }
         }
@@ -2360,6 +2340,89 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                 .AddInParameter("p0", key)
                 .First<dynamic>();
             return row == null ? null : JObject.FromObject(row);
+        }
+
+        /// <summary>
+        /// Package-declared Managed routes are authoritative for the selected
+        /// application version. Remove only colliding ApiAddress/ApiRoutes aliases
+        /// from other engines; preserve their identity, source and unrelated routes.
+        /// </summary>
+        private static async Task<IReadOnlyList<string>> ReclaimStartupDependencyRoutesAsync(
+            OsClientSecret client,
+            JObject source,
+            string ownerId,
+            HashSet<string> physicalFields)
+        {
+            var claimedRoutes = new HashSet<string>(
+                ApiEngineRouteAliases.GetConfiguredRoutes(source),
+                StringComparer.OrdinalIgnoreCase);
+            if (claimedRoutes.Count == 0) return Array.Empty<string>();
+
+            var idColumn = QuoteIdentifier(client.Db, "Id");
+            var keyColumn = QuoteIdentifier(client.Db, "ApiEngineKey");
+            var addressColumn = QuoteIdentifier(client.Db, "ApiAddress");
+            var hasApiRoutes = physicalFields.Contains("ApiRoutes");
+            var routesColumn = hasApiRoutes ? QuoteIdentifier(client.Db, "ApiRoutes") : null;
+            var rows = client.Db.FromSql($@"SELECT
+    {idColumn},
+    {keyColumn},
+    {addressColumn}{(hasApiRoutes ? "," + Environment.NewLine + "    " + routesColumn : string.Empty)}
+FROM {QuoteIdentifier(client.Db, "sys_apiengine")}").ToArray() ?? Array.Empty<dynamic>();
+            var released = new List<string>();
+            foreach (var raw in rows)
+            {
+                var row = JObject.FromObject((object)raw);
+                var rowId = row["Id"]?.ToString();
+                if (!ownerId.DosIsNullOrWhiteSpace()
+                    && string.Equals(ownerId, rowId, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var oldAddress = row["ApiAddress"]?.ToString()?.Trim() ?? string.Empty;
+                IReadOnlyList<string> oldRoutes = hasApiRoutes
+                    ? ApiEngineRouteAliases.Parse(row["ApiRoutes"]?.ToString())
+                    : Array.Empty<string>();
+                var removedRoutes = new List<string>();
+                if (!oldAddress.DosIsNullOrWhiteSpace() && claimedRoutes.Contains(oldAddress))
+                    removedRoutes.Add(oldAddress);
+                removedRoutes.AddRange(oldRoutes.Where(claimedRoutes.Contains));
+                if (removedRoutes.Count == 0) continue;
+
+                await InvalidateStartupDependencyCacheAsync(client.OsClient, row)
+                    .ConfigureAwait(false);
+                var keptRoutes = oldRoutes.Where(route => !claimedRoutes.Contains(route)).ToArray();
+                var command = hasApiRoutes
+                    ? client.Db.FromSql($@"UPDATE {QuoteIdentifier(client.Db, "sys_apiengine")}
+SET {addressColumn}=@p1,
+    {routesColumn}=@p2
+WHERE {idColumn}=@p0")
+                    : client.Db.FromSql($@"UPDATE {QuoteIdentifier(client.Db, "sys_apiengine")}
+SET {addressColumn}=@p1
+WHERE {idColumn}=@p0");
+                command.AddInParameter("p0", rowId)
+                    .AddInParameter(
+                        "p1",
+                        claimedRoutes.Contains(oldAddress) ? (object)DBNull.Value : oldAddress);
+                if (hasApiRoutes)
+                {
+                    command.AddInParameter(
+                        "p2",
+                        keptRoutes.Length > 0
+                            ? (object)string.Join(";", keptRoutes)
+                            : DBNull.Value);
+                }
+                var affected = command.ExecuteNonQuery();
+                if (affected != 1)
+                {
+                    throw new InvalidOperationException(
+                        $"平台运行时接口[{source?["ApiEngineKey"]}]收回包声明路由未命中唯一记录：{rowId}");
+                }
+                released.Add(
+                    $"{source?["ApiEngineKey"]}：收回路由[{string.Join("；", removedRoutes)}]，原接口="
+                    + (row["ApiEngineKey"]?.ToString() ?? rowId));
+            }
+            return released;
         }
 
         private static bool IsCreateIfMissingRuntimeDependency(JObject source)
@@ -2605,6 +2668,29 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                 != ReadStartupSwitch(source["AllowAnonymous"])) return "AllowAnonymous不一致";
             if (!string.Equals(row["ApiAddress"]?.ToString(), source["ApiAddress"]?.ToString(), StringComparison.Ordinal))
                 return "ApiAddress不一致";
+            if (!string.Equals(
+                NormalizeStartupDependencySource(row["ApiV8Code"]?.ToString()),
+                NormalizeStartupDependencySource(source?["ApiV8Code"]?.ToString()),
+                StringComparison.Ordinal))
+            {
+                return "ApiV8Code与包内Managed源码不一致";
+            }
+            if (!string.IsNullOrWhiteSpace(source?["Version"]?.ToString())
+                && !string.Equals(
+                    row["Version"]?.ToString(),
+                    source["Version"]?.ToString(),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "Version与包内Managed版本不一致";
+            }
+            if (source?["ApiRoutes"] != null
+                && !string.Equals(
+                    row["ApiRoutes"]?.ToString() ?? string.Empty,
+                    source["ApiRoutes"]?.ToString() ?? string.Empty,
+                    StringComparison.Ordinal))
+            {
+                return "ApiRoutes与包内Managed路由不一致";
+            }
             return string.Empty;
         }
 
@@ -2781,9 +2867,9 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                     !content.Contains("DATASET_INSERT_IF_MISSING_V1") ||
                     !content.Contains("PACKAGE_API_ENGINE_READBACK_V1") ||
                     !content.Contains("API_ENGINE_RESOURCE_BASELINE_V1") ||
-                    !content.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !content.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
-                    !content.Contains("OFFICIAL_MANAGED_OVERWRITE_V1") ||
+                    !content.Contains("PACKAGE_MANAGED_OVERWRITE_V2") ||
+                    !content.Contains("PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2") ||
                     !content.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1") ||
                     !content.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
                     !content.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
@@ -3032,9 +3118,9 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                     !importerEngineCode.Contains("DATASET_INSERT_IF_MISSING_V1") ||
                     !importerEngineCode.Contains("PACKAGE_API_ENGINE_READBACK_V1") ||
                     !importerEngineCode.Contains("API_ENGINE_RESOURCE_BASELINE_V1") ||
-                    !importerEngineCode.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
                     !importerEngineCode.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
-                    !importerEngineCode.Contains("OFFICIAL_MANAGED_OVERWRITE_V1") ||
+                    !importerEngineCode.Contains("PACKAGE_MANAGED_OVERWRITE_V2") ||
+                    !importerEngineCode.Contains("PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2") ||
                     !importerEngineCode.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1") ||
                     !importerEngineCode.Contains("DATABASE_ONLY_BUILD_ASSETS_V1") ||
                     !importerEngineCode.Contains("BACKGROUND_TASK_MONOTONIC_PROGRESS_V1") ||
@@ -3130,8 +3216,7 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
             var packageContent = NormalizePackageExecutionLimits(resources[resourceName]);
             if (IsPackageVersionAlreadyInstalled(osClient, packageContent, out var installedVersion))
             {
-                Console.WriteLine($"Microi：【基础应用升级】【{osClient}】{packageName}已安装同版本[{installedVersion}]，跳过重复导入。");
-                return;
+                Console.WriteLine($"Microi：【基础应用升级】【{osClient}】{packageName}已安装同版本[{installedVersion}]，执行覆盖式重放以修复资源漂移。");
             }
             Console.WriteLine($"Microi：【基础应用升级】开始导入{packageName}：{resourceName}");
             dynamic installResult;
@@ -3173,7 +3258,7 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                 var packageInfo = JObject.Parse(packageContent)["PackageInfo"] as JObject;
                 var packageName = packageInfo?["Name"]?.ToString();
                 var incomingVersion = packageInfo?["Version"]?.ToString();
-                if (packageName.DosIsNullOrWhiteSpace() || incomingVersion.DosIsNullOrWhiteSpace())
+                if (string.IsNullOrWhiteSpace(packageName) || string.IsNullOrWhiteSpace(incomingVersion))
                     return false;
 
                 var client = OsClient.GetClient(osClient);
@@ -3203,14 +3288,13 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                     .First<dynamic>();
                 if (row == null) return false;
 
-                var model = JObject.FromObject(row);
-                if (hasStatus
-                    && !string.Equals(model["InstallStatus"]?.ToString(), "Installed", StringComparison.OrdinalIgnoreCase))
+                installedVersion = ReadInstalledPackageVersionRow(
+                    (object)row,
+                    versionColumns,
+                    hasStatus,
+                    out var installedStatus);
+                if (!installedStatus)
                     return false;
-
-                installedVersion = versionColumns
-                    .Select(column => model[column]?.ToString())
-                    .FirstOrDefault(value => !value.DosIsNullOrWhiteSpace()) ?? string.Empty;
                 return PackageVersionsEquivalent(installedVersion, incomingVersion);
             }
             catch (Exception ex)
@@ -3221,6 +3305,32 @@ WHERE {QuoteIdentifier(client.Db, "ApiEngineKey")}=@p1
                 installedVersion = string.Empty;
                 return false;
             }
+        }
+
+        internal static string ReadInstalledPackageVersionRow(
+            object row,
+            IReadOnlyCollection<string> versionColumns,
+            bool hasStatus,
+            out bool installedStatus)
+        {
+            installedStatus = false;
+            if (row == null) return string.Empty;
+
+            // First<dynamic>() makes the local variable dynamic. Passing that value
+            // directly to JObject.FromObject would make the returned expression dynamic
+            // too, and extension methods in the following LINQ predicate would then fail
+            // at runtime. Keep this boundary strongly typed for every database provider.
+            JObject model = JObject.FromObject(row);
+            installedStatus = !hasStatus
+                || string.Equals(
+                    model["InstallStatus"]?.ToString(),
+                    "Installed",
+                    StringComparison.OrdinalIgnoreCase);
+            if (!installedStatus) return string.Empty;
+
+            return versionColumns
+                .Select(column => model[column]?.ToString())
+                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
         }
 
         internal static bool PackageVersionsEquivalent(string left, string right)
@@ -3807,6 +3917,20 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             // 不在 .NET 中复制表/字段迁移逻辑，并保留租户后来显式关闭的 0 值。
             await InstallUpgradePackage(osClient, msgs, SaaSEnginePackageResourceName, "SaaS引擎与身份验证数据包", resources);
             if (msgs.Count > 0) return msgs;
+            // The importer intentionally follows low-code field metadata. Old
+            // tenants can already have newer physical sys_apiengine columns
+            // without matching diy_field rows, so Managed source may update
+            // while Version/StopHttp stays blank/null. Re-run the fixed,
+            // parameterized startup closure after package import to reconcile
+            // those physical fields before the hard readback gate.
+            var platformRuntimeClient = OsClient.GetClient(osClient);
+            var platformRuntimeReconcile = await EnsureStartupDependenciesUnderLeaseAsync(
+                platformRuntimeClient);
+            if (platformRuntimeReconcile.Code != 1)
+            {
+                msgs.Add("平台运行时接口物理字段补正失败：" + platformRuntimeReconcile.Msg);
+                return msgs;
+            }
             ValidateInstalledPlatformRuntimeDependencies(osClient, msgs);
             if (msgs.Count > 0) return msgs;
             #endregion

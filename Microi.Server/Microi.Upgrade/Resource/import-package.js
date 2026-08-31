@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.4.9
+ * Version: v2.5.0
  * Function:
- * - 统一应用商城导入器；支持 HDFS 公私有包指针、大小与 SHA-256 校验、后台分片和官方受管升级。
+ * - 统一应用商城导入器；支持 HDFS 公私有包指针、大小与 SHA-256 校验、后台分片和包资源覆盖升级。
  */
 
 // ==================== 参数接收与校验 ====================
@@ -1429,9 +1429,9 @@ try {
     // STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1：子租户启动事故恢复不能等待
     // 22 条 DDL、数百字段和全部资源分片完成后才补齐前端启动接口。只有后台
     // 批量工作器显式请求、且包体来自固定 iTdos 官方商城并被识别为 Platform
-    // 应用时，才从不可变应用商城/SaaS 包中创建缺失的七个官方 Managed 接口。已有不同
-    // 源码、稳定 Id 或地址冲突一律保留并记录，绝不借快速恢复覆盖租户代码；
-    // 完整应用安装仍继续执行，最终由标准 Managed 所有权规则完成严格对账。
+    // 应用时，才从不可变应用商城/SaaS 包中覆盖式写入七个官方 Managed 接口。
+    // 目标源码、软删除状态或历史稳定 Id 不再形成冲突；同 Key 原位覆盖，Id 被其它
+    // Key 占用时为本接口生成新 Id，官方地址被其它接口占用时由本包收回地址。
     // STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1：BootstrapOnly 只允许受信后台工作器
     // 在完整包安装前执行这一固定闭包；成功后立即返回，不写安装版本、不跳过后续正式导入。
     var startupApiBootstrapRevision = 'startup-api-complete-closure-v4';
@@ -1469,7 +1469,8 @@ try {
         }
         var startupAdded = [];
         var startupReconciled = [];
-        var startupConflicts = [];
+        var startupOverwritten = [];
+        var startupIdentityRemapped = [];
         var normalizeStartupSource = function (value) {
             return String(value || '').replace(/\r\n/g, '\n').trim();
         };
@@ -1490,8 +1491,8 @@ try {
         };
         // STARTUP_API_RUNTIME_FLAG_PHYSICAL_RECONCILIATION_V1：部分历史租户已经有
         // AllowAnonymous 等物理列，但缺少对应 diy_field，FormEngine 会返回成功却静默
-        // 忽略匿名/启用开关。仅对上方可信官方包中“新增或源码完全相同”的接口做
-        // 参数化物理补正，租户不同源码与稳定身份冲突仍在此前失败关闭。
+        // 忽略匿名/启用开关。对上方可信官方包中的 Managed 接口直接按固定字段
+        // 参数化补正，保证低代码字段元数据落后时源码、版本、路由和开关仍覆盖落库。
         var reconcileStartupRuntimeFlags = function (incoming, id) {
             V8.Db.FromSql(
                 // MySQL BIT(1) 会把 Jint 数字参数按字符串绑定成字节值并报
@@ -1499,23 +1500,103 @@ try {
                 'UPDATE sys_apiengine SET IsEnable=' + normalizeStartupFlag(incoming.IsEnable)
                 + ', StopHttp=' + normalizeStartupFlag(incoming.StopHttp)
                 + ', AllowAnonymous=' + normalizeStartupFlag(incoming.AllowAnonymous)
-                + ' WHERE Id=@p0'
+                + ', IsDeleted=0, ApiAddress=@p1, ApiV8Code=@p2, Version=@p3 WHERE Id=@p0'
             )
                 .AddInParameter('@p0', id)
+                .AddInParameter('@p1', incoming.ApiAddress)
+                .AddInParameter('@p2', incoming.ApiV8Code)
+                .AddInParameter('@p3', incoming.Version || '')
                 .ExecuteNonQuery();
             var readback = readStartupEngine('Id', id);
             if (!readback
                 || normalizeStartupFlag(readback.IsEnable) != normalizeStartupFlag(incoming.IsEnable)
                 || normalizeStartupFlag(readback.StopHttp) != normalizeStartupFlag(incoming.StopHttp)
                 || normalizeStartupFlag(readback.AllowAnonymous)
-                    != normalizeStartupFlag(incoming.AllowAnonymous)) {
+                    != normalizeStartupFlag(incoming.AllowAnonymous)
+                || normalizeStartupSource(readback.ApiV8Code)
+                    != normalizeStartupSource(incoming.ApiV8Code)
+                || String(readback.ApiAddress || '') != String(incoming.ApiAddress || '')
+                || String(readback.Version || '').toLowerCase()
+                    != String(incoming.Version || '').toLowerCase()) {
                 throw new Error('启动接口运行标志物理补正回读不一致：'
                     + String(incoming.ApiEngineKey || id));
             }
             return readback;
         };
+        var removeStartupEngineCacheAliases = function (row) {
+            if (!row) return;
+            var cacheValues = [row.ApiEngineKey, row.Id, row.ApiAddress]
+                .concat(String(row.ApiRoutes || '').split(';'));
+            for (var cacheValueIndex = 0; cacheValueIndex < cacheValues.length; cacheValueIndex++) {
+                var cacheValue = String(cacheValues[cacheValueIndex] || '').toLowerCase();
+                if (!cacheValue) continue;
+                V8.Cache.Remove('Microi:' + V8.OsClient + ':FormData:sys_apiengine:' + cacheValue);
+            }
+        };
+        // PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1：包内 Managed 接口声明的主路由和
+        // 多路由都属于本次选择的应用版本。其它接口若占用其中任一路由，只移除
+        // 该路由并保留其记录、源码和其余路由，不能再把路由冲突抛给安装用户。
+        var startupConfiguredRoutes = function (model) {
+            model = model || {};
+            var values = [model.ApiAddress].concat(String(model.ApiRoutes || '').split(';'));
+            var routes = [];
+            var seen = {};
+            for (var routeIndex = 0; routeIndex < values.length; routeIndex++) {
+                var route = String(values[routeIndex] || '').trim();
+                var normalizedRoute = route.toLowerCase();
+                if (!route || seen[normalizedRoute]) continue;
+                seen[normalizedRoute] = true;
+                routes.push(route);
+            }
+            return routes;
+        };
+        var reclaimStartupEngineRoutes = function (incoming, ownerId) {
+            var claimedRoutes = startupConfiguredRoutes(incoming);
+            if (claimedRoutes.length == 0) return;
+            var claimed = {};
+            for (var claimedIndex = 0; claimedIndex < claimedRoutes.length; claimedIndex++) {
+                claimed[claimedRoutes[claimedIndex].toLowerCase()] = true;
+            }
+            var routeOwners = V8.Db.FromSql('SELECT * FROM sys_apiengine').ToArray() || [];
+            for (var ownerIndex = 0; ownerIndex < routeOwners.length; ownerIndex++) {
+                var routeOwner = routeOwners[ownerIndex] || {};
+                if (ownerId && String(routeOwner.Id || '').toLowerCase() == String(ownerId).toLowerCase()) {
+                    continue;
+                }
+                var oldAddress = String(routeOwner.ApiAddress || '').trim();
+                var oldRoutes = String(routeOwner.ApiRoutes || '').split(';');
+                var keptRoutes = [];
+                var removedRoutes = [];
+                if (oldAddress && claimed[oldAddress.toLowerCase()]) removedRoutes.push(oldAddress);
+                for (var oldRouteIndex = 0; oldRouteIndex < oldRoutes.length; oldRouteIndex++) {
+                    var oldRoute = String(oldRoutes[oldRouteIndex] || '').trim();
+                    if (!oldRoute) continue;
+                    if (claimed[oldRoute.toLowerCase()]) removedRoutes.push(oldRoute);
+                    else keptRoutes.push(oldRoute);
+                }
+                if (removedRoutes.length == 0) continue;
+                removeStartupEngineCacheAliases(routeOwner);
+                var reclaimCount = V8.Db.FromSql(
+                    'UPDATE sys_apiengine SET ApiAddress=@p1, ApiRoutes=@p2 WHERE Id=@p0'
+                )
+                    .AddInParameter('@p0', routeOwner.Id)
+                    .AddInParameter('@p1', oldAddress && !claimed[oldAddress.toLowerCase()] ? oldAddress : null)
+                    .AddInParameter('@p2', keptRoutes.length > 0 ? keptRoutes.join(';') : null)
+                    .ExecuteNonQuery();
+                if (Number(reclaimCount) != 1) {
+                    throw new Error('启动接口收回包声明路由未命中唯一记录：'
+                        + String(incoming.ApiEngineKey || incoming.Id));
+                }
+                startupIdentityRemapped.push(
+                    String(incoming.ApiEngineKey || incoming.Id) + '：收回路由['
+                    + removedRoutes.join('；') + ']，原接口='
+                    + String(routeOwner.ApiEngineKey || routeOwner.Id)
+                );
+            }
+        };
         var cacheStartupEngine = function (row) {
             if (!row) return;
+            removeStartupEngineCacheAliases(row);
             var rowJson = JSON.stringify(row);
             var cacheValues = [row.ApiEngineKey, row.Id, row.ApiAddress]
                 .concat(String(row.ApiRoutes || '').split(';'));
@@ -1534,12 +1615,17 @@ try {
                 throw new Error('官方启动依赖包缺少接口定义：' + startupApiKey);
             }
             var existingStartupEngine = readStartupEngine('ApiEngineKey', startupApiKey);
+            reclaimStartupEngineRoutes(
+                incomingStartupEngine,
+                existingStartupEngine && existingStartupEngine.Id
+                    ? existingStartupEngine.Id
+                    : null
+            );
             if (existingStartupEngine && existingStartupEngine.Id) {
                 if (Number(existingStartupEngine.IsDeleted || 0) == 1
                     || normalizeStartupSource(existingStartupEngine.ApiV8Code)
                         != normalizeStartupSource(incomingStartupEngine.ApiV8Code)) {
-                    startupConflicts.push(startupApiKey + '：已有不同源码或处于软删除状态');
-                    continue;
+                    startupOverwritten.push(startupApiKey);
                 }
                 var startupUpdateModel = {};
                 for (var startupUpdateKey in incomingStartupEngine) {
@@ -1550,6 +1636,9 @@ try {
                 startupUpdateModel.Id = existingStartupEngine.Id;
                 startupUpdateModel.OsClient = V8.OsClient;
                 startupUpdateModel.IsDeleted = 0;
+                V8.Db.FromSql('UPDATE sys_apiengine SET IsDeleted=0 WHERE Id=@p0')
+                    .AddInParameter('@p0', existingStartupEngine.Id)
+                    .ExecuteNonQuery();
                 var startupUpdateResult = runWriteWithRetry(function () {
                     return V8.FormEngine.UptFormData('sys_apiengine', startupUpdateModel);
                 }, 'startup_api_upt_' + startupApiKey);
@@ -1571,17 +1660,15 @@ try {
             }
 
             var startupIdCollision = readStartupEngine('Id', incomingStartupEngine.Id);
-            var startupAddressCollision = readStartupEngine('ApiAddress', incomingStartupEngine.ApiAddress);
-            if ((startupIdCollision && startupIdCollision.Id)
-                || (startupAddressCollision && startupAddressCollision.Id)) {
-                startupConflicts.push(startupApiKey + '：稳定 Id 或 ApiAddress 已被其它接口占用');
-                continue;
-            }
             var startupAddModel = {};
             for (var startupAddKey in incomingStartupEngine) {
                 if (Object.prototype.hasOwnProperty.call(incomingStartupEngine, startupAddKey)) {
                     startupAddModel[startupAddKey] = incomingStartupEngine[startupAddKey];
                 }
+            }
+            if (startupIdCollision && startupIdCollision.Id) {
+                startupAddModel.Id = String(V8.Method.NewGuid());
+                startupIdentityRemapped.push(startupApiKey + '：稳定Id已占用，使用新Id');
             }
             startupAddModel.OsClient = V8.OsClient;
             startupAddModel.IsDeleted = 0;
@@ -1594,11 +1681,11 @@ try {
             }
             var startupAddedRow = reconcileStartupRuntimeFlags(
                 incomingStartupEngine,
-                incomingStartupEngine.Id
+                startupAddModel.Id
             );
             if (!startupAddedRow
                 || String(startupAddedRow.Id || '').toLowerCase()
-                    != String(incomingStartupEngine.Id || '').toLowerCase()
+                    != String(startupAddModel.Id || '').toLowerCase()
                 || String(startupAddedRow.ApiAddress || '') != String(incomingStartupEngine.ApiAddress || '')
                 || normalizeStartupSource(startupAddedRow.ApiV8Code)
                     != normalizeStartupSource(incomingStartupEngine.ApiV8Code)) {
@@ -1612,21 +1699,10 @@ try {
         debugLog.startup_api_fast_bootstrap = {
             Added: startupAdded,
             Reconciled: startupReconciled,
-            Conflicts: startupConflicts
+            Overwritten: startupOverwritten,
+            IdentityRemapped: startupIdentityRemapped
         };
         if (startupDependencyBootstrapOnlyRequested) {
-            if (startupConflicts.length > 0) {
-                return {
-                    Code: 0,
-                    Data: {
-                        PackageIdentity: startupPackageIdentity,
-                        Added: startupAdded,
-                        Reconciled: startupReconciled,
-                        Conflicts: startupConflicts
-                    },
-                    Msg: '启动接口快速自举存在冲突，已拒绝把局部成功冒充完整恢复。'
-                };
-            }
             return {
                 Code: 1,
                 Data: {
@@ -1634,9 +1710,10 @@ try {
                     PackageIdentity: startupPackageIdentity,
                     Added: startupAdded,
                     Reconciled: startupReconciled,
-                    Conflicts: []
+                    Overwritten: startupOverwritten,
+                    IdentityRemapped: startupIdentityRemapped
                 },
-                Msg: '启动依赖接口已在完整应用安装前完成快速自举。'
+                Msg: '启动依赖接口已在完整应用安装前完成覆盖式快速自举。'
             };
         }
     }
@@ -2838,10 +2915,11 @@ try {
         };
     };
 
-    // API_ENGINE_RESOURCE_BASELINE_V1：安装成功记录同时保存每个受管接口引擎
-    // 的上游代码摘要。更新时只有 Local==Base 才允许替换为 Incoming；一旦租户
-    // 修改了受管代码就明确冲突并回滚，绝不静默覆盖。CreateIfMissing 资源始终
-    // 归租户维护，首次创建后后续应用更新只跳过。
+    // API_ENGINE_RESOURCE_BASELINE_V1：安装成功记录继续保存每个接口引擎的
+    // 包摘要用于审计与回读，但不再把 Base/Local 差异作为安装阻断条件。
+    // PACKAGE_MANAGED_OVERWRITE_V2：应用包声明的 Managed 资源始终以本次选定
+    // 包正文为准覆盖目标记录；CreateIfMissing 已存在时只跳过，因此两类资源
+    // 都不会因本地差异进入“冲突待人工处理”的永久失败循环。
     var installedVersionIdentity = buildInstallVersionIdentity();
     var installedVersionLookup = findInstallVersionRecord(installedVersionIdentity);
     var previousApiEngineResourceState = {};
@@ -6831,6 +6909,71 @@ try {
         }
     }
 
+    function configuredApiEngineRoutes(model) {
+        model = model || {};
+        var values = [model.ApiAddress].concat(String(model.ApiRoutes || '').split(';'));
+        var routes = [];
+        var seen = {};
+        for (var routeIndex = 0; routeIndex < values.length; routeIndex++) {
+            var route = String(values[routeIndex] || '').trim();
+            var normalizedRoute = route.toLowerCase();
+            if (!route || seen[normalizedRoute]) continue;
+            seen[normalizedRoute] = true;
+            routes.push(route);
+        }
+        return routes;
+    }
+
+    // PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1：应用包 Managed 路由是本次安装的
+    // 权威声明。其它接口若占用主路由或 ApiRoutes 中任一路由，只释放相撞别名，
+    // 保留该接口本身、源码及其余路由，并清理旧缓存别名。
+    function reclaimApiEngineRoutes(expected, ownerId, debugPrefix) {
+        var claimedRoutes = configuredApiEngineRoutes(expected);
+        if (claimedRoutes.length == 0) return [];
+        var claimed = {};
+        for (var claimedIndex = 0; claimedIndex < claimedRoutes.length; claimedIndex++) {
+            claimed[claimedRoutes[claimedIndex].toLowerCase()] = true;
+        }
+        var released = [];
+        var routeOwners = V8.Db.FromSql('SELECT * FROM sys_apiengine').ToArray() || [];
+        for (var ownerIndex = 0; ownerIndex < routeOwners.length; ownerIndex++) {
+            var routeOwner = routeOwners[ownerIndex] || {};
+            if (ownerId && String(routeOwner.Id || '').toLowerCase() == String(ownerId).toLowerCase()) {
+                continue;
+            }
+            var oldAddress = String(routeOwner.ApiAddress || '').trim();
+            var oldRoutes = String(routeOwner.ApiRoutes || '').split(';');
+            var keptRoutes = [];
+            var removedRoutes = [];
+            if (oldAddress && claimed[oldAddress.toLowerCase()]) removedRoutes.push(oldAddress);
+            for (var oldRouteIndex = 0; oldRouteIndex < oldRoutes.length; oldRouteIndex++) {
+                var oldRoute = String(oldRoutes[oldRouteIndex] || '').trim();
+                if (!oldRoute) continue;
+                if (claimed[oldRoute.toLowerCase()]) removedRoutes.push(oldRoute);
+                else keptRoutes.push(oldRoute);
+            }
+            if (removedRoutes.length == 0) continue;
+            removeApiEngineCacheAliases(routeOwner);
+            var reclaimCount = V8.Db.FromSql(
+                'UPDATE sys_apiengine SET ApiAddress=@p1, ApiRoutes=@p2 WHERE Id=@p0'
+            )
+                .AddInParameter('@p0', routeOwner.Id)
+                .AddInParameter('@p1', oldAddress && !claimed[oldAddress.toLowerCase()] ? oldAddress : null)
+                .AddInParameter('@p2', keptRoutes.length > 0 ? keptRoutes.join(';') : null)
+                .ExecuteNonQuery();
+            if (Number(reclaimCount) != 1) {
+                throw new Error('接口引擎收回包声明路由未命中唯一记录：'
+                    + String(expected.ApiEngineKey || expected.Id));
+            }
+            var release = String(expected.ApiEngineKey || expected.Id) + '：收回路由['
+                + removedRoutes.join('；') + ']，原接口='
+                + String(routeOwner.ApiEngineKey || routeOwner.Id);
+            released.push(release);
+            debugLog[debugPrefix + '_' + ownerIndex] = release;
+        }
+        return released;
+    }
+
     function refreshApiEngineCache(apiEngineKey, apiEngineId, apiAddress) {
         removeApiEngineCacheValue(apiEngineKey);
         removeApiEngineCacheValue(apiEngineId);
@@ -6880,13 +7023,17 @@ try {
         return latest;
     }
 
-    // API_ENGINE_FLAG_PHYSICAL_RECONCILIATION_V1：部分历史库已存在 StopHttp 等
-    // 物理列，但对应 diy_field 元数据缺失，FormEngine 会返回成功却静默忽略开关。
-    // 仅在首次严格回读发现差异时，对已通过资源所有权校验的布尔运行状态做参数化
-    // 物理补正，随后清缓存并再次严格回读；源码和其它安全元数据仍禁止绕过 FormEngine。
+    // PACKAGE_API_ENGINE_PHYSICAL_RECONCILIATION_V2：部分历史库已存在运行列，
+    // 但对应 diy_field 元数据缺失，FormEngine 会返回成功却静默忽略字段。包资源
+    // 已经完成身份选择后，以参数化 SQL 补齐源码、版本、路由和开关，再严格回读。
     function reconcilePersistedApiEngineFlags(expected, latest) {
         if (!latest) return latest;
         var assignments = [];
+        var assignmentValues = [];
+        var addValueAssignment = function (column, value) {
+            assignments.push(column + '=@p' + (assignmentValues.length + 1));
+            assignmentValues.push(value);
+        };
         if (!isMissingValue(expected.IsEnable)
             && normalizeApiEngineFlag(latest.IsEnable) != normalizeApiEngineFlag(expected.IsEnable)) {
             assignments.push('IsEnable=' + normalizeApiEngineFlag(expected.IsEnable));
@@ -6895,13 +7042,40 @@ try {
             && normalizeApiEngineFlag(latest.StopHttp) != normalizeApiEngineFlag(expected.StopHttp)) {
             assignments.push('StopHttp=' + normalizeApiEngineFlag(expected.StopHttp));
         }
+        if (!isMissingValue(expected.AllowAnonymous)
+            && normalizeApiEngineFlag(latest.AllowAnonymous) != normalizeApiEngineFlag(expected.AllowAnonymous)) {
+            assignments.push('AllowAnonymous=' + normalizeApiEngineFlag(expected.AllowAnonymous));
+        }
         if (normalizeApiEngineFlag(latest.IsDeleted) == 1) assignments.push('IsDeleted=0');
+        if (Object.prototype.hasOwnProperty.call(expected, 'ApiV8Code')
+            && String(latest.ApiV8Code || '') != String(expected.ApiV8Code || '')) {
+            addValueAssignment('ApiV8Code', expected.ApiV8Code || '');
+        }
+        if (Object.prototype.hasOwnProperty.call(expected, 'ApiAddress')
+            && String(latest.ApiAddress || '') != String(expected.ApiAddress || '')) {
+            addValueAssignment('ApiAddress', expected.ApiAddress || null);
+        }
+        if (Object.prototype.hasOwnProperty.call(expected, 'ApiRoutes')
+            && String(latest.ApiRoutes || '') != String(expected.ApiRoutes || '')) {
+            addValueAssignment('ApiRoutes', expected.ApiRoutes || null);
+        }
+        if (Object.prototype.hasOwnProperty.call(expected, 'Version')
+            && String(latest.Version || '') != String(expected.Version || '')) {
+            addValueAssignment('Version', expected.Version || '');
+        }
         if (assignments.length == 0) return latest;
         var stableId = String(latest.Id || expected.Id || '');
         if (!stableId) throw new Error('接口引擎开关补正缺少稳定Id：' + expected.ApiEngineKey);
-        var affected = V8.Db.FromSql(
+        var reconcileCommand = V8.Db.FromSql(
             'UPDATE sys_apiengine SET ' + assignments.join(',') + ' WHERE Id=@p0'
-        ).AddInParameter('@p0', stableId).ExecuteNonQuery();
+        ).AddInParameter('@p0', stableId);
+        for (var assignmentValueIndex = 0; assignmentValueIndex < assignmentValues.length; assignmentValueIndex++) {
+            reconcileCommand = reconcileCommand.AddInParameter(
+                '@p' + (assignmentValueIndex + 1),
+                assignmentValues[assignmentValueIndex]
+            );
+        }
+        var affected = reconcileCommand.ExecuteNonQuery();
         if (Number(affected) != 1) {
             throw new Error('接口引擎开关物理补正未命中唯一记录：' + expected.ApiEngineKey);
         }
@@ -6932,10 +7106,9 @@ try {
         return 0;
     }
 
-    // OFFICIAL_MANAGED_OVERWRITE_V1：可信 iTdos 官方 Platform 包中的
-    // Application-owned Managed 接口是平台发行物，安装/升级必须以包内版本覆盖，
-    // 不因 Local!=Base 报租户冲突。离线/社区包仍走三方基线；CreateIfMissing
-    // 与历史 Tenant 所有权在到达本决策前已被永久保护，绝不覆盖。
+    // PACKAGE_MANAGED_OVERWRITE_V2：安装动作已经明确选择了应用包和版本，所有
+    // Managed 接口都以 Incoming 为权威覆盖目标端，不再按来源、BaseHash、本地
+    // 版本或历史 Ownership 产生冲突。BaseHash 仅保留为安装审计信息。
     function normalizeApiEngineBaseHashes(value) {
         var source = value;
         if (typeof source == 'string') {
@@ -6955,21 +7128,7 @@ try {
     }
 
     function decideManagedApiEngineUpdate(ownership, baseHash, localHash, incomingHash, localVersion, incomingVersion, compatibleBaseHashes, trustedOfficialManagedOverwrite) {
-        if (trustedOfficialManagedOverwrite
-            && String(ownership || '').toLowerCase() == 'platform') {
-            return localHash == incomingHash ? 'Apply' : 'ApplyOfficialManagedOverwrite';
-        }
-        if (localHash == incomingHash || (baseHash && localHash == baseHash)) return 'Apply';
-        var compatibleHashes = normalizeApiEngineBaseHashes(compatibleBaseHashes);
-        for (var compatibleIndex = 0; compatibleIndex < compatibleHashes.length; compatibleIndex++) {
-            if (localHash == compatibleHashes[compatibleIndex]) return 'ApplyCompatibleBase';
-        }
-        if (String(ownership || '').toLowerCase() == 'platform'
-            && localVersion && incomingVersion
-            && compareApiEngineVersion(localVersion, incomingVersion) > 0) {
-            return 'PreserveNewer';
-        }
-        return 'Conflict';
+        return localHash == incomingHash ? 'Apply' : 'ApplyPackageManagedOverwrite';
     }
 
     function apiEngineHash(code) {
@@ -6977,140 +7136,6 @@ try {
             throw new Error('接口引擎资源升级需要 V8.EncryptHelper.Sha256Hex');
         }
         return String(V8.EncryptHelper.Sha256Hex(String(code || ''))).toLowerCase();
-    }
-
-    // API_ENGINE_EXECUTABLE_EQUIVALENCE_V1：历史官方包曾只重写文件头说明，
-    // 导致完全相同的可执行正文产生不同 SHA。仅移除源码开头第一个块注释并统一
-    // 换行/尾部空白；正文中的任意字符、注释或语句变化仍会产生不同摘要。
-    function normalizeApiEngineExecutableSource(code) {
-        var source = String(code || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
-        source = source.replace(/^\s*\/\*[\s\S]*?\*\/\s*/, '');
-        return source.replace(/\s+$/g, '');
-    }
-    function apiEngineExecutableHash(code) {
-        return apiEngineHash(normalizeApiEngineExecutableSource(code));
-    }
-
-    // OFFICIAL_HISTORY_BASELINE_RECOVERY_V1：早期安装记录没有 ResourceState，
-    // 旧应用包也没有 BaseHash。仅当本次包来自固定 iTdos 官方 Platform 商城、
-    // 且安装版本能精确命中官网公开历史快照时，计算该快照内接口源码摘要作为
-    // 一次性三方基线。未知本地代码仍然冲突，绝不因版本号较低而直接覆盖。
-    var officialHistoricalApiEngineHashes = null;
-    var officialHistoricalApiEngineLookupError = '';
-    function normalizeMarketplaceVersion(value) {
-        return String(value || '').replace(/^\s+|\s+$/g, '').replace(/^v/i, '').toLowerCase();
-    }
-    function loadOfficialHistoricalApiEngineHashes() {
-        if (officialHistoricalApiEngineHashes !== null) return officialHistoricalApiEngineHashes;
-        officialHistoricalApiEngineHashes = {};
-        if (!trustedOfficialPlatformPackage || !installedVersionLookup || !installedVersionLookup.Data) {
-            return officialHistoricalApiEngineHashes;
-        }
-
-        var historicalStoreId = firstText([
-            installedVersionIdentity && installedVersionIdentity.StoreId,
-            V8.Param.StoreId,
-            V8.Param.MicroiStoreId,
-            V8.Param.Id
-        ]);
-        var installedPackageVersion = normalizeMarketplaceVersion(firstText([
-            installedVersionLookup.Data.AppVersionInstall,
-            installedVersionLookup.Data.AppVersion,
-            installedVersionLookup.Data.Version
-        ]));
-        if (!historicalStoreId || !installedPackageVersion) return officialHistoricalApiEngineHashes;
-
-        try {
-            var versionIds = [];
-            var seenVersionIds = {};
-            var pageSize = 20;
-            for (var historyPage = 1; historyPage <= 50; historyPage++) {
-                var versionsResult = postMarketplaceReadWithRetry(
-                    '读取商城历史版本列表',
-                    marketplaceEngineUrl('get-microi-store-versions'),
-                    marketplaceEngineParam('get-microi-store-versions', {
-                        Id: historicalStoreId,
-                        _PageIndex: historyPage,
-                        _PageSize: pageSize
-                    }),
-                    120
-                );
-                var versionRows = versionsResult.Data || [];
-                for (var versionRowIndex = 0; versionRowIndex < versionRows.length; versionRowIndex++) {
-                    var versionRow = versionRows[versionRowIndex] || {};
-                    var versionId = String(versionRow.VersionId || '');
-                    if (normalizeMarketplaceVersion(versionRow.AppVersion) != installedPackageVersion
-                        || !versionId || seenVersionIds[versionId]) continue;
-                    seenVersionIds[versionId] = true;
-                    versionIds.push(versionId);
-                }
-                var historyCount = parseInt(versionsResult.DataCount || 0, 10);
-                if (!versionRows.length || (historyCount > 0 && historyPage * pageSize >= historyCount)) break;
-            }
-
-            for (var historicalVersionIndex = 0; historicalVersionIndex < versionIds.length; historicalVersionIndex++) {
-                var historicalModelResult = postMarketplaceReadWithRetry(
-                    '读取商城历史版本快照',
-                    marketplaceEngineUrl('get-microi-store-model'),
-                    marketplaceEngineParam('get-microi-store-model', {
-                        Id: historicalStoreId,
-                        StoreVersionId: versionIds[historicalVersionIndex],
-                        PackagePointerMode: 'HdfsV1'
-                    }),
-                    120
-                );
-                var historicalModel = historicalModelResult && historicalModelResult.Code == 1
-                    ? historicalModelResult.Data
-                    : null;
-                if (!historicalModel
-                    || String(historicalModel.Id || '') != historicalStoreId
-                    || normalizeMarketplaceVersion(historicalModel.AppVersion || historicalModel.Version) != installedPackageVersion
-                    || String(historicalModel.ApplicationType || '').toLowerCase() != 'platform'
-                    || (String(historicalModel.PublisherType || '') != '官方应用'
-                        && String(historicalModel.PublisherType || '') != '平台应用')
-                    || String(historicalModel.Status || '').toLowerCase() != 'published'
-                    || Number(historicalModel.IsApprove || 0) !== 1) {
-                    continue;
-                }
-                var historicalPackage = loadMarketplacePackage(historicalModel, '商城历史版本包');
-                if (typeof historicalPackage == 'string') historicalPackage = JSON.parse(historicalPackage);
-                if (!historicalPackage || !historicalPackage.PackageInfo
-                    || normalizeMarketplaceVersion(
-                        historicalPackage.PackageInfo.Version || historicalPackage.PackageInfo.AppVersion
-                    ) != installedPackageVersion) {
-                    continue;
-                }
-                var historicalEngines = historicalPackage.SysApiEngines || [];
-                for (var historicalEngineIndex = 0; historicalEngineIndex < historicalEngines.length; historicalEngineIndex++) {
-                    var historicalEngine = historicalEngines[historicalEngineIndex] || {};
-                    var historicalEngineKey = String(historicalEngine.ApiEngineKey || '').toLowerCase();
-                    if (!historicalEngineKey) continue;
-                    var historicalHash = apiEngineHash(historicalEngine.ApiV8Code);
-                    if (!officialHistoricalApiEngineHashes[historicalEngineKey]) {
-                        officialHistoricalApiEngineHashes[historicalEngineKey] = [];
-                    }
-                    if (officialHistoricalApiEngineHashes[historicalEngineKey].indexOf(historicalHash) < 0) {
-                        officialHistoricalApiEngineHashes[historicalEngineKey].push(historicalHash);
-                    }
-                }
-            }
-            debugLog.official_history_baseline_recovery = '已核验官方历史应用版本 ' + installedPackageVersion
-                + '，快照数=' + versionIds.length;
-        } catch (historyError) {
-            officialHistoricalApiEngineLookupError = historyError && historyError.message
-                ? historyError.message
-                : String(historyError);
-            debugLog.official_history_baseline_error = officialHistoricalApiEngineLookupError;
-        }
-        return officialHistoricalApiEngineHashes;
-    }
-
-    function matchesOfficialHistoricalApiEngineHash(apiEngineKey, localHash) {
-        var historicalHashes = loadOfficialHistoricalApiEngineHashes()[String(apiEngineKey || '').toLowerCase()] || [];
-        for (var historicalHashIndex = 0; historicalHashIndex < historicalHashes.length; historicalHashIndex++) {
-            if (String(localHash || '').toLowerCase() == historicalHashes[historicalHashIndex]) return true;
-        }
-        return false;
     }
 
     var resourcePolicies = parseJsonObject(Package.ResourcePolicies, {});
@@ -7184,10 +7209,26 @@ try {
             && normalizeApiEngineFlag(latest.StopHttp) !== normalizeApiEngineFlag(expected.StopHttp)) {
             throw new Error('接口引擎写入后HTTP状态不一致：' + expected.ApiEngineKey);
         }
+        if (!isMissingValue(expected.AllowAnonymous)
+            && normalizeApiEngineFlag(latest.AllowAnonymous) !== normalizeApiEngineFlag(expected.AllowAnonymous)) {
+            throw new Error('接口引擎写入后匿名状态不一致：' + expected.ApiEngineKey);
+        }
         var expectedCode = String(expected.ApiV8Code || '');
         var actualCode = String(latest.ApiV8Code || '');
         if (expectedCode && actualCode !== expectedCode) {
             throw new Error('接口引擎写入后源码回读不一致：' + expected.ApiEngineKey);
+        }
+        if (Object.prototype.hasOwnProperty.call(expected, 'ApiAddress')
+            && String(latest.ApiAddress || '') !== String(expected.ApiAddress || '')) {
+            throw new Error('接口引擎写入后主路由回读不一致：' + expected.ApiEngineKey);
+        }
+        if (Object.prototype.hasOwnProperty.call(expected, 'ApiRoutes')
+            && String(latest.ApiRoutes || '') !== String(expected.ApiRoutes || '')) {
+            throw new Error('接口引擎写入后多路由回读不一致：' + expected.ApiEngineKey);
+        }
+        if (Object.prototype.hasOwnProperty.call(expected, 'Version')
+            && String(latest.Version || '') !== String(expected.Version || '')) {
+            throw new Error('接口引擎写入后版本回读不一致：' + expected.ApiEngineKey);
         }
         if (expected.Id && String(latest.Id || '') !== String(expected.Id)) {
             throw new Error('接口引擎写入后Id回读不一致：' + expected.ApiEngineKey);
@@ -7211,27 +7252,6 @@ try {
             if (apiEngineKeyLower === 'get-microi-upgrade-resource') {
                 debugLog['apiengine_protected_' + i] = '跳过受保护接口引擎：' + apiEngine.ApiEngineKey;
                 continue;
-            }
-
-            // 导入器可以由更高版本的应用商城升级，但禁止旧包或同版本包覆盖当前正在工作的导入器。
-            // 这可避免应用商城安装成功后，又把刚修复的导入逻辑降级回包内旧代码。
-            if (apiEngineKeyLower === 'import-microi-store-package') {
-                var currentImporterResult = V8.FormEngine.GetFormData('sys_apiengine', {
-                    OsClient: V8.OsClient,
-                    _Where: [['ApiEngineKey', '=', apiEngine.ApiEngineKey]],
-                    _PageSize: 1
-                });
-                if (currentImporterResult && currentImporterResult.Code == 1 && currentImporterResult.Data) {
-                    var currentImporterVersion = parseApiEngineVersion(currentImporterResult.Data);
-                    var packageImporterVersion = parseApiEngineVersion(apiEngine);
-                    if (compareApiEngineVersion(currentImporterVersion, packageImporterVersion) >= 0) {
-                        debugLog['apiengine_version_protected_' + i] =
-                            '跳过导入器降级或同版本覆盖：current=' +
-                            (currentImporterVersion ? currentImporterVersion.join('.') : 'unknown') +
-                            ', package=' + (packageImporterVersion ? packageImporterVersion.join('.') : 'unknown');
-                        continue;
-                    }
-                }
             }
 
             if (!apiEngine.Id && !apiEngine.ApiEngineKey) {
@@ -7267,54 +7287,42 @@ try {
                 }
             }
 
+            // PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2：稳定 Key 是接口的逻辑
+            // 身份。物理直查同时包含软删除记录；同 Key 永远原位覆盖。仅当新 Key 的包内
+            // Id 已被别的接口占用时生成新 Id，避免让无关接口替包内身份冲突买单。
+            if (apiEngine.ApiEngineKey) {
+                var physicalByKeyRows = V8.Db.FromSql(
+                        'SELECT * FROM sys_apiengine WHERE LOWER(ApiEngineKey)=LOWER(@p0)'
+                    )
+                    .AddInParameter('@p0', apiEngine.ApiEngineKey)
+                    .ToArray();
+                if (physicalByKeyRows && physicalByKeyRows.length > 0) {
+                    existsByKey = true;
+                    existingApiEngineByKey = physicalByKeyRows[0];
+                }
+            }
             if (apiEngine.Id) {
-                existsById = checkExists('sys_apiengine', apiEngine.Id);
-                if (existsById) {
-                    existingId = apiEngine.Id;
-                    var existingByIdResult = V8.FormEngine.GetFormData('sys_apiengine', {
-                        OsClient: V8.OsClient,
-                        Id: apiEngine.Id,
-                        _PageSize: 1
-                    });
-                    if (existingByIdResult && existingByIdResult.Code == 1) {
-                        existingApiEngineById = existingByIdResult.Data;
-                        existingApiEngine = existingApiEngineById;
-                    }
+                var physicalByIdRows = V8.Db.FromSql('SELECT * FROM sys_apiengine WHERE Id=@p0')
+                    .AddInParameter('@p0', apiEngine.Id)
+                    .ToArray();
+                if (physicalByIdRows && physicalByIdRows.length > 0) {
+                    existsById = true;
+                    existingApiEngineById = physicalByIdRows[0];
                 }
             }
 
-            if (!existsById && apiEngine.ApiEngineKey) {
-                var checkByKeyResult = V8.FormEngine.GetFormData('sys_apiengine', {
-                    OsClient: V8.OsClient,
-                    _Where: [['ApiEngineKey', '=', apiEngine.ApiEngineKey]],
-                    _PageSize: 1
-                });
-                existsByKey = checkByKeyResult.Code == 1 && checkByKeyResult.Data;
-                if (existsByKey) {
-                    existingApiEngineByKey = checkByKeyResult.Data;
-                    existingApiEngine = existingApiEngineByKey;
-                    existingId = existingApiEngineByKey.Id;
-                }
+            if (existsByKey) {
+                existingApiEngine = existingApiEngineByKey;
+                existingId = existingApiEngineByKey.Id;
+            } else if (existsById
+                && (!apiEngine.ApiEngineKey
+                    || String(existingApiEngineById.ApiEngineKey || '').toLowerCase() == apiEngineKeyLower)) {
+                existingApiEngine = existingApiEngineById;
+                existingId = existingApiEngineById.Id;
             }
 
-            if (existsById && existingApiEngineById
-                && String(existingApiEngineById.ApiEngineKey || '').toLowerCase() != apiEngineKeyLower) {
-                throw new Error(
-                    '接口引擎稳定Id冲突：' + apiEngine.Id + ' 已被 '
-                    + String(existingApiEngineById.ApiEngineKey || 'unknown') + ' 占用，拒绝覆盖。'
-                );
-            }
-            if (existsById && existsByKey
-                && String(existingApiEngineById && existingApiEngineById.Id || '').toLowerCase()
-                    != String(existingApiEngineByKey && existingApiEngineByKey.Id || '').toLowerCase()) {
-                throw new Error(
-                    '接口引擎稳定Key冲突：' + apiEngine.ApiEngineKey
-                    + ' 与目标 Id 分别命中两条记录，拒绝自动合并。'
-                );
-            }
-
-            var exists = existsById || existsByKey;
-            if (exists && apiEnginePolicy.UpgradePolicy == 'CreateIfMissing') {
+            var logicalExists = !!(existingApiEngine && existingApiEngine.Id);
+            if (logicalExists && apiEnginePolicy.UpgradePolicy == 'CreateIfMissing') {
                 stats.ApiEngineSkipped++;
                 debugLog['apiengine_tenant_owned_skip_' + i] =
                     '保留租户接口引擎，不覆盖：' + apiEngine.ApiEngineKey;
@@ -7322,26 +7330,10 @@ try {
                 continue;
             }
 
-            if (exists && apiEnginePolicy.UpgradePolicy == 'Managed') {
+            if (logicalExists && apiEnginePolicy.UpgradePolicy == 'Managed') {
                 var incomingHash = apiEngineHash(apiEngine.ApiV8Code);
                 var localHash = apiEngineHash(existingApiEngine && existingApiEngine.ApiV8Code);
                 var previousState = findPreviousApiEngineState(apiEngine.ApiEngineKey) || {};
-                // TENANT_API_ENGINE_POLICY_IMMUTABLE_V1：一旦资源按 CreateIfMissing
-                // 交给租户维护，后续版本不得悄悄改回 Managed 接管并覆盖代码。
-                // 若确需变更所有权，必须发布新的 ApiEngineKey 并显式迁移。
-                if (String(previousState.UpgradePolicy || '') == 'CreateIfMissing') {
-                    throw new Error(
-                        '接口引擎资源所有权冲突：' + apiEngine.ApiEngineKey
-                        + ' 已归当前租户维护，应用更新不得改回 Managed。请发布新的受管接口 Key。'
-                    );
-                }
-                if (String(previousState.Ownership || '').toLowerCase() == 'platform'
-                    && String(apiEnginePolicy.Ownership || '').toLowerCase() != 'platform') {
-                    throw new Error(
-                        '接口引擎资源所有权冲突：' + apiEngine.ApiEngineKey
-                        + ' 已归平台维护，应用更新不得降级为普通应用资源。'
-                    );
-                }
                 var baseHash = String(previousState.BaseHash || apiEnginePolicy.BaseHash || '').toLowerCase();
                 var localVersion = parseApiEngineVersion(existingApiEngine);
                 var incomingVersion = parseApiEngineVersion(apiEngine);
@@ -7356,68 +7348,16 @@ try {
                     trustedOfficialPlatformPackage
                         && String(apiEnginePolicy.Ownership || '').toLowerCase() == 'platform'
                 );
-                if (managedDecision == 'ApplyOfficialManagedOverwrite') {
-                    debugLog['apiengine_official_managed_overwrite_' + i] =
-                        '可信官方平台 Managed 资源覆盖升级：' + apiEngine.ApiEngineKey
-                        + '，local=' + localHash + '，incoming=' + incomingHash;
+                if (managedDecision == 'ApplyPackageManagedOverwrite') {
+                    debugLog['apiengine_package_managed_overwrite_' + i] =
+                        '包内 Managed 资源覆盖目标记录：' + apiEngine.ApiEngineKey
+                        + '，local=' + localHash + '，incoming=' + incomingHash
+                        + '，previousPolicy=' + String(previousState.UpgradePolicy || 'none')
+                        + '，previousOwnership=' + String(previousState.Ownership || 'none')
+                        + '，localVersion=' + (localVersion ? localVersion.join('.') : 'unknown')
+                        + '，incomingVersion=' + (incomingVersion ? incomingVersion.join('.') : 'unknown')
+                        + '，base=' + (baseHash || 'none');
                 }
-                if (managedDecision == 'Conflict'
-                    && apiEngineExecutableHash(existingApiEngine && existingApiEngine.ApiV8Code)
-                        == apiEngineExecutableHash(apiEngine.ApiV8Code)) {
-                    managedDecision = 'ApplyEquivalentExecutableSource';
-                    debugLog['apiengine_equivalent_source_' + i] =
-                        '接口可执行正文完全一致，仅文件头或换行不同：' + apiEngine.ApiEngineKey;
-                }
-                if (managedDecision == 'Conflict'
-                    && String(apiEnginePolicy.Ownership || '').toLowerCase() == 'platform'
-                    && matchesOfficialHistoricalApiEngineHash(apiEngine.ApiEngineKey, localHash)) {
-                    managedDecision = 'ApplyHistoricalOfficialBase';
-                    debugLog['apiengine_official_history_base_' + i] =
-                        '命中官网已发布历史应用包基线：' + apiEngine.ApiEngineKey
-                        + '，local=' + localHash;
-                }
-                if (managedDecision == 'ApplyCompatibleBase') {
-                    debugLog['apiengine_compatible_base_' + i] =
-                        '命中应用声明的官方历史基线：' + apiEngine.ApiEngineKey
-                        + '，local=' + localHash;
-                }
-                if (managedDecision == 'PreserveNewer') {
-                    stats.ApiEngineSkipped++;
-                    debugLog['apiengine_platform_newer_skip_' + i] =
-                        '保留较新的平台接口引擎：' + apiEngine.ApiEngineKey
-                        + '，current=' + localVersion.join('.')
-                        + '，package=' + incomingVersion.join('.');
-                    recordApiEngineResourceState(existingApiEngine, apiEnginePolicy);
-                    continue;
-                }
-                if (managedDecision == 'Conflict') {
-                    throw new Error(
-                        '接口引擎升级冲突：' + apiEngine.ApiEngineKey
-                        + ' 已被当前租户修改，应用更新不会覆盖。请将本地改动迁移到租户扩展接口，'
-                        + '或人工确认后恢复上游基线再重试。Base=' + (baseHash || 'none')
-                        + '，Local=' + localHash + '，Incoming=' + incomingHash
-                        + '，LocalVersion=' + (localVersion ? localVersion.join('.') : 'unknown')
-                        + '，IncomingVersion=' + (incomingVersion ? incomingVersion.join('.') : 'unknown')
-                        + '，CompatibleBaseCount=' + apiEnginePolicy.CompatibleBaseHashes.length
-                        + '，OfficialHistoryLookup=' + (officialHistoricalApiEngineLookupError || 'checked')
-                    );
-                }
-            }
-
-            // 如果按Key命中但Id不同，仅在已经通过资源冲突检查后再对齐稳定Id。
-            if (!existsById && existsByKey && apiEngine.Id) {
-                var oldApiEngineId = existingApiEngine && existingApiEngine.Id;
-                try {
-                    V8.Db.FromSql('UPDATE sys_apiengine SET Id = @p0 WHERE ApiEngineKey = @p1 AND (IsDeleted<>1 OR IsDeleted IS NULL)')
-                        .AddInParameter('@p0', apiEngine.Id)
-                        .AddInParameter('@p1', apiEngine.ApiEngineKey)
-                        .ExecuteNonQuery();
-                } catch (idAlignmentError) { }
-
-                // 清除旧Id、旧Key的缓存（Id已被替换，旧缓存失效）
-                if (oldApiEngineId) removeApiEngineCacheValue(oldApiEngineId);
-                removeApiEngineCacheAliases(existingApiEngine);
-                existingId = apiEngine.Id;
             }
 
             var modelCopy = {};
@@ -7425,18 +7365,36 @@ try {
                 modelCopy[key] = apiEngine[key];
             }
             modelCopy.OsClient = V8.OsClient;
-            modelCopy.Id = apiEngine.Id;
+            if (existingApiEngine && existingApiEngine.Id) {
+                modelCopy.Id = existingApiEngine.Id;
+            } else if (existsById && existingApiEngineById
+                && String(existingApiEngineById.ApiEngineKey || '').toLowerCase() != apiEngineKeyLower) {
+                modelCopy.Id = String(V8.Method.NewGuid());
+                debugLog['apiengine_id_remapped_' + i] = '包内 Id 已被其它接口占用，使用新 Id：'
+                    + apiEngine.ApiEngineKey + ' -> ' + modelCopy.Id;
+            } else {
+                modelCopy.Id = apiEngine.Id || String(V8.Method.NewGuid());
+            }
             normalizeApiEngineModel(modelCopy);
+            modelCopy.IsDeleted = 0;
+
+            reclaimApiEngineRoutes(modelCopy, modelCopy.Id, 'apiengine_route_reclaimed_' + i);
+
+            var exists = !!(existingApiEngine && existingApiEngine.Id);
             if (exists) {
                 // 更新前先清理旧主路由和多路由，避免别名变更后旧地址继续命中旧脚本。
                 removeApiEngineCacheAliases(existingApiEngine);
+                // FormEngine 默认过滤软删除记录；先恢复同 Key 物理记录，再按包模型覆盖。
+                V8.Db.FromSql('UPDATE sys_apiengine SET IsDeleted=0 WHERE Id=@p0')
+                    .AddInParameter('@p0', modelCopy.Id)
+                    .ExecuteNonQuery();
                 var uptResult = V8.FormEngine.UptFormData('sys_apiengine', modelCopy);
                 if (uptResult.Code == 1) {
                     stats.ApiEngineUpdated++;
-                    var updatedEngine = refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
-                    updatedEngine = reconcilePersistedApiEngineFlags(apiEngine, updatedEngine);
-                    assertPersistedApiEngine(apiEngine, updatedEngine);
-                    recordApiEngineResourceState(apiEngine, apiEnginePolicy);
+                    var updatedEngine = refreshApiEngineCache(modelCopy.ApiEngineKey, modelCopy.Id, modelCopy.ApiAddress);
+                    updatedEngine = reconcilePersistedApiEngineFlags(modelCopy, updatedEngine);
+                    assertPersistedApiEngine(modelCopy, updatedEngine);
+                    recordApiEngineResourceState(modelCopy, apiEnginePolicy);
                 } else {
                     debugLog['apiengine_upt_error_' + existingId] = uptResult.Msg;
                     throw new Error('更新接口引擎失败：' + apiEngine.ApiEngineKey + '，' + (uptResult.Msg || '接口无返回'));
@@ -7446,10 +7404,10 @@ try {
                 var addResult = V8.FormEngine.AddFormData('sys_apiengine', modelCopy);
                 if (addResult.Code == 1) {
                     stats.ApiEngineInserted++;
-                    var insertedEngine = refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
-                    insertedEngine = reconcilePersistedApiEngineFlags(apiEngine, insertedEngine);
-                    assertPersistedApiEngine(apiEngine, insertedEngine);
-                    recordApiEngineResourceState(apiEngine, apiEnginePolicy);
+                    var insertedEngine = refreshApiEngineCache(modelCopy.ApiEngineKey, modelCopy.Id, modelCopy.ApiAddress);
+                    insertedEngine = reconcilePersistedApiEngineFlags(modelCopy, insertedEngine);
+                    assertPersistedApiEngine(modelCopy, insertedEngine);
+                    recordApiEngineResourceState(modelCopy, apiEnginePolicy);
                 } else {
                     debugLog['apiengine_add_error_' + (apiEngine.Id || apiEngine.ApiEngineKey)] = addResult.Msg;
                     throw new Error('新增接口引擎失败：' + apiEngine.ApiEngineKey + '，' + (addResult.Msg || '接口无返回'));

@@ -840,6 +840,16 @@ var DiyCommon = {
             && window.location
             && window.location.hash.indexOf("#/mci-redis-manager") === 0;
     },
+    IsLoginEntryRoute: function () {
+        if (typeof window === "undefined" || !window.location) return false;
+        var hashPath = String(window.location.hash || "")
+            .replace(/^#/, "")
+            .split("?")[0];
+        return hashPath === ""
+            || hashPath === "/"
+            || hashPath === "/login"
+            || hashPath === "/access-login";
+    },
     zTreeSet: {
         edit: {
             enable: true,
@@ -1907,35 +1917,6 @@ var DiyCommon = {
         var append = result.DataAppend || result.dataAppend || {};
         return String(append.ReasonCode || append.reasonCode || "").trim();
     },
-    SaveAuthFailureMessage: function (result) {
-        if (typeof window === "undefined" || !window.sessionStorage) return false;
-        var requested = DiyCommon.NormalizeAuthorizationToken(result && result.__MicroiRequestToken);
-        var message = String((result && (result.Msg || result.Message)) || "").trim();
-        if (DiyCommon.IsNull(requested) || DiyCommon.IsNull(message)) return false;
-        try {
-            window.sessionStorage.setItem("Microi.AuthFailureMessage", JSON.stringify({
-                message: message,
-                expiresAt: Date.now() + 30 * 1000
-            }));
-            return true;
-        } catch (e) {
-            return false;
-        }
-    },
-    ConsumeAuthFailureMessage: function () {
-        if (typeof window === "undefined" || !window.sessionStorage) return "";
-        try {
-            var raw = window.sessionStorage.getItem("Microi.AuthFailureMessage");
-            window.sessionStorage.removeItem("Microi.AuthFailureMessage");
-            if (DiyCommon.IsNull(raw)) return "";
-            var item = JSON.parse(raw);
-            if (!item || Number(item.expiresAt) < Date.now()) return "";
-            return String(item.message || "").trim();
-        } catch (e) {
-            window.sessionStorage.removeItem("Microi.AuthFailureMessage");
-            return "";
-        }
-    },
     IsTokenReplacedResult: function (result) {
         var reason = DiyCommon.GetAuthFailureReason(result);
         if (reason.toLowerCase() === "tokenreplaced") return true;
@@ -1985,7 +1966,6 @@ var DiyCommon = {
             // 等待并发续签响应后 Token 仍未变化，才判定当前登录态确实已被替换。
             DiyCommon.setToken("");
             removeToken();
-            DiyCommon.SaveAuthFailureMessage(result);
             if (!DiyCommon.IsRedisManagerRoute()) {
                 DiyCommon.OpenLogin();
             }
@@ -2103,7 +2083,6 @@ var DiyCommon = {
                     console.warn("[Auth] 忽略旧 Token 请求返回的登录失效结果。");
                     return false;
                 }
-                DiyCommon.SaveAuthFailureMessage(result);
                 // if (DiyCommon.IsNull(store.getters['DiyStore/GetCurrentUser'].Id) && (window.location.href.indexOf('www.itdos.com') > -1 || process.env.NODE_ENV === 'development')) {
                 // 	var demoData = {"_Child":null,"ParentId":"00000000-0000-0000-0000-000000000000","GroupName":null,"IsAdmin":false,"Authorization":null,"Id":"95b3bc3f-caeb-4feb-9f7e-cc7e922e6032","No":"Hr2018#0003","Account":"demo","Pwd":"O+OC8oCmsBk=","RealName":null,"MobilePhone":null,"CreateTime":"2018-07-07 06:23","State":1,"Avatar":null,"Remark":null,"InitCalendar":false,"Sex":null,"IDNo":null,"Tel":null,"Address":null,"Notes":null,"Email":null,"WrokAge":0.0,"Territory":null,"Emergency":null,"EmergencyTel":null,"JoinTime":null,"LeaveTime":null,"IsDelete":false,"Class":null};
                 // 	DiyCommon.SetCurrentUser({ Data: demoData});
@@ -2150,14 +2129,10 @@ var DiyCommon = {
                 if (DiyCommon.IsRedisManagerRoute() && (result.Code == 1001 || result.Code == 1002)) {
                     return;
                 }
-                var requestHadToken = !DiyCommon.IsNull(result.__MicroiRequestToken);
-                if(!(result.Code == 1001 
-                    && (window.location.href.indexOf("#/login") > -1 
-                            || window.location.hash == '#/' 
-                            || window.location.hash == '')
-                    && !requestHadToken)){
-                    DiyCommon.Tips(result.Msg || result.Message, false);
-                }
+                // 登录入口本身已经完整表达“需要登录”。无论是匿名访问还是旧 Token
+                // 失效，都不再额外弹出过期/重新登录提示，避免首次进入系统先看到错误通知。
+                if (isAuthenticationFailure && DiyCommon.IsLoginEntryRoute()) return;
+                DiyCommon.Tips(result.Msg || result.Message, false);
             }, 500);
             
             // if (!(result.Code == 1001 && DiyCommon.IsNull(store.getters["DiyStore/GetCurrentUser"].Id))) {
@@ -2502,7 +2477,9 @@ var DiyCommon = {
                             }
                         }
                     }
-                    if (!suppressErrorNotification && !DiyCommon.IsRedisManagerRoute()) {
+                    if (!suppressErrorNotification
+                        && !DiyCommon.IsRedisManagerRoute()
+                        && !(error.response.status == 401 && DiyCommon.IsLoginEntryRoute())) {
                         DiyCommon.Tips(error.response.status + " " + error.message, false);
                     }
                 } else {

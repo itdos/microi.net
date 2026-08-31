@@ -51,9 +51,9 @@ test('application-store package delivers every startup endpoint and managed poli
       ],
     },
   ];
-  assert.equal(packageModel.PackageInfo.Version, 'v7.7.18');
-  assert.equal(packageModel.PackageInfo.ChangeLog?.Version, 'v7.7.18');
-  assert.equal(packageModel.PackageInfo.ChangeLog?.Title, '应用包长中文 UTF-8 无损传输');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.7.24');
+  assert.equal(packageModel.PackageInfo.ChangeLog?.Version, 'v7.7.24');
+  assert.equal(packageModel.PackageInfo.ChangeLog?.Title, '官方公共商城跨运行边界容错');
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     'ClientFeature:NotificationCenterScrollableViewportV1',
   ));

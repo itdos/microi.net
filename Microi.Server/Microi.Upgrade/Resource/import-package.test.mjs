@@ -106,7 +106,7 @@ function extractAssignedFunction(sourceText, name) {
   assert.fail(`unterminated assigned function ${name}`);
 }
 
-test("trusted official Platform Managed resources overwrite while ordinary packages keep three-way protection", () => {
+test("all package Managed resources overwrite local drift regardless ownership or version", () => {
   const fixture = { String };
   vm.runInNewContext(`
     ${extractNamedFunction(source, "compareApiEngineVersion")}
@@ -116,57 +116,39 @@ test("trusted official Platform Managed resources overwrite while ordinary packa
   `, fixture);
 
   const decide = fixture.result;
-  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 6], [1, 7, 4], [], true), "ApplyOfficialManagedOverwrite");
-  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 4], [1, 7, 4], [], true), "ApplyOfficialManagedOverwrite");
-  assert.equal(decide("Application", "base", "local", "incoming", [1, 7, 6], [1, 7, 4], [], true), "Conflict");
-  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 6], [1, 7, 4]), "PreserveNewer");
-  assert.equal(decide("Application", "base", "local", "incoming", [1, 7, 6], [1, 7, 4]), "Conflict");
-  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 4], [1, 7, 4]), "Conflict");
-  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 3], [1, 7, 4]), "Conflict");
-  assert.equal(decide("Platform", "base", "base", "incoming", [1, 7, 3], [1, 7, 4]), "Apply");
+  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 6], [1, 7, 4], [], true), "ApplyPackageManagedOverwrite");
+  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 4], [1, 7, 4], [], true), "ApplyPackageManagedOverwrite");
+  assert.equal(decide("Application", "base", "local", "incoming", [1, 7, 6], [1, 7, 4], [], true), "ApplyPackageManagedOverwrite");
+  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 6], [1, 7, 4]), "ApplyPackageManagedOverwrite");
+  assert.equal(decide("Application", "base", "local", "incoming", [1, 7, 6], [1, 7, 4]), "ApplyPackageManagedOverwrite");
+  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 4], [1, 7, 4]), "ApplyPackageManagedOverwrite");
+  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 3], [1, 7, 4]), "ApplyPackageManagedOverwrite");
+  assert.equal(decide("Platform", "base", "base", "incoming", [1, 7, 3], [1, 7, 4]), "ApplyPackageManagedOverwrite");
   assert.equal(decide("Platform", "base", "incoming", "incoming", null, null), "Apply");
   const legacyOfficialHash = "3f877b2f71deb2c553ed6d3515839e307a1e82ecbf45d7bbc865ca1380cc4df0";
   assert.equal(
     decide("Platform", "", legacyOfficialHash, "incoming", [1, 1, 4], [1, 2, 8], [legacyOfficialHash]),
-    "ApplyCompatibleBase",
+    "ApplyPackageManagedOverwrite",
   );
   assert.equal(
     decide("Platform", "", "tenant-edit", "incoming", [1, 1, 4], [1, 2, 8], [legacyOfficialHash]),
-    "Conflict",
+    "ApplyPackageManagedOverwrite",
   );
 });
 
-test("managed API-engine policies preserve compatible official baseline hashes", () => {
+test("managed API-engine baseline hashes remain audit metadata without blocking overwrite", () => {
   assert.match(source, /CompatibleBaseHashes:\s*normalizeApiEngineBaseHashes/);
-  assert.match(source, /ApplyCompatibleBase/);
-  assert.match(source, /OFFICIAL_HISTORY_BASELINE_RECOVERY_V1/);
-  assert.match(source, /installedVersionLookup\.Data\.AppVersionInstall/);
-  assert.match(source, /marketplaceEngineParam\('get-microi-store-versions'/);
-  assert.match(source, /StoreVersionId: versionIds\[historicalVersionIndex\]/);
-  assert.match(source, /String\(historicalModel\.ApplicationType \|\| ''\)\.toLowerCase\(\) != 'platform'/);
-  assert.match(source, /String\(historicalModel\.Status \|\| ''\)\.toLowerCase\(\) != 'published'/);
-  assert.match(source, /Number\(historicalModel\.IsApprove \|\| 0\) !== 1/);
-  assert.match(source, /ApplyHistoricalOfficialBase/);
+  assert.match(source, /BaseHash 仅保留为安装审计信息/);
+  assert.doesNotMatch(source, /OFFICIAL_HISTORY_BASELINE_RECOVERY_V1/);
+  assert.doesNotMatch(source, /ApplyHistoricalOfficialBase/);
   assert.match(publishSource, /previousPolicy\.CompatibleBaseHashes/);
   assert.match(publishSource, /entry\.CompatibleBaseHashes = filteredCompatibleHashes/);
 });
 
-test("managed API-engine comparison ignores only generated leading headers", () => {
-  const fixture = {};
-  vm.runInNewContext(`
-    ${extractNamedFunction(source, "normalizeApiEngineExecutableSource")}
-    result = normalizeApiEngineExecutableSource;
-  `, fixture);
-
-  const normalize = fixture.result;
-  const local = "\uFEFF/* legacy generated header */\r\n\r\nvar value = 1;\r\nreturn value;\r\n";
-  const incoming = "/* current generated header\n * Ownership: Platform / Managed\n */\nvar value = 1;\nreturn value;\n\n";
-  const tenantEdit = "/* current generated header */\nvar value = 2;\nreturn value;\n";
-
-  assert.equal(normalize(local), normalize(incoming));
-  assert.notEqual(normalize(local), normalize(tenantEdit));
-  assert.match(source, /API_ENGINE_EXECUTABLE_EQUIVALENCE_V1/);
-  assert.match(source, /ApplyEquivalentExecutableSource/);
+test("managed API-engine overwrite has no executable-equivalence or version-preservation loophole", () => {
+  assert.doesNotMatch(source, /API_ENGINE_EXECUTABLE_EQUIVALENCE_V1/);
+  assert.doesNotMatch(source, /ApplyEquivalentExecutableSource/);
+  assert.doesNotMatch(source, /PreserveNewer/);
 });
 
 test("marketplace package reads retry empty transient responses without accepting failures", () => {
@@ -232,7 +214,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.4\.9/);
+  assert.match(source, /Version: v2\.5\.0/);
 });
 
 test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {
@@ -1326,18 +1308,18 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(source, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(source, /\^\(bit\|tinyint\|smallint/);
   assert.match(source, /API_ENGINE_RESOURCE_BASELINE_V1/);
-  assert.match(source, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
   assert.match(source, /TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1/);
-  assert.match(source, /OFFICIAL_MANAGED_OVERWRITE_V1/);
-  assert.match(source, /ApplyOfficialManagedOverwrite/);
-  assert.match(source, /trustedOfficialPlatformPackage[\s\S]*?apiEnginePolicy\.Ownership/);
+  assert.match(source, /PACKAGE_MANAGED_OVERWRITE_V2/);
+  assert.match(source, /PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2/);
+  assert.match(source, /PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1/);
+  assert.match(source, /ApplyPackageManagedOverwrite/);
   assert.match(source, /ADMIN_MENU_PERMISSION_V1/);
   assert.match(source, /ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/);
   assert.match(source, /ADMIN_MENU_PERMISSION_DB_TIME_V1/);
   assert.match(source, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);
-  assert.match(source, /previousState\.UpgradePolicy[\s\S]*?CreateIfMissing/);
-  assert.match(source, /接口引擎稳定Id冲突/);
-  assert.match(source, /接口引擎稳定Key冲突/);
+  assert.match(source, /包内 Id 已被其它接口占用，使用新 Id/);
+  assert.match(source, /收回路由/);
+  assert.doesNotMatch(source, /接口引擎升级冲突/);
   assert.match(source, /_OrderBy:\s*'InstallTime'[\s\S]*?_OrderByType:\s*'DESC'/);
   assert.match(source, /SCHEMA_BACKGROUND_CHUNKS_V1/);
   assert.match(source, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
@@ -1383,8 +1365,8 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 3, 7\)/);
-  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 4, 9\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 3, 8\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 5, 0\)/);
   assert.match(appStoreUpgradeSource, /V8TrustedExecutionContext\.EnterManagedProtocol\([\s\S]*?"import-microi-store-package"/);
   assert.match(appStoreUpgradeSource, /dynamic\s+installResult\s*;/);
   assert.doesNotMatch(appStoreUpgradeSource, /DosResult\s+installResult\s*;/);
@@ -1446,7 +1428,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*2_004_009/);
+  assert.match(refreshSource, /versionNumber\s*<\s*2_005_000/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -1459,16 +1441,17 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /versionNumber\s*<\s*1_007_008/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_005_053/);
   assert.match(refreshSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_004_009/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_005_000/);
   assert.match(refreshSource, /TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);
   assert.match(refreshSource, /OBJECT_STORAGE_FORBIDDEN/);
-  assert.match(refreshSource, /OFFICIAL_MANAGED_OVERWRITE_V1/);
+  assert.match(refreshSource, /PACKAGE_MANAGED_OVERWRITE_V2/);
+  assert.match(refreshSource, /PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2/);
+  assert.match(refreshSource, /PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1/);
   assert.match(refreshSource, /OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1/);
   assert.match(refreshSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
-  assert.match(refreshSource, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
   assert.match(refreshSource, /ADMIN_MENU_PERMISSION_V1/);
   assert.match(refreshSource, /ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/);
   assert.match(refreshSource, /ADMIN_MENU_PERMISSION_DB_TIME_V1/);
@@ -1491,11 +1474,11 @@ test("API-engine readback normalizes legacy flag shapes and physically reconcile
   assert.equal(normalize("False"), 0);
   assert.equal(normalize("1"), 1);
   assert.equal(normalize("0"), 0);
-  assert.match(source, /API_ENGINE_FLAG_PHYSICAL_RECONCILIATION_V1/);
+  assert.match(source, /PACKAGE_API_ENGINE_PHYSICAL_RECONCILIATION_V2/);
   assert.match(source, /UPDATE sys_apiengine SET ' \+ assignments\.join\(','\) \+ ' WHERE Id=@p0/);
   assert.ok(
-    source.indexOf("reconcilePersistedApiEngineFlags(apiEngine, updatedEngine)")
-      < source.indexOf("assertPersistedApiEngine(apiEngine, updatedEngine)"),
+    source.indexOf("reconcilePersistedApiEngineFlags(modelCopy, updatedEngine)")
+      < source.indexOf("assertPersistedApiEngine(modelCopy, updatedEngine)"),
   );
 });
 

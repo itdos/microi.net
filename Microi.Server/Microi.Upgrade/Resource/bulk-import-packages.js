@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.3.7
+ * Version: v1.3.8
  * Function:
  * - 规划并逐个安装或更新全部官方平台应用；持久化计划、不可变商城快照标识与子检查点，并透传结构化失败详情。
  */
@@ -28,6 +28,8 @@
 // 否则单次事务可能长期占用工作器且无法从中间进度恢复。
 // BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1：失败终态必须带任务、阶段、应用序号和
 // 可执行恢复建议，后台任务中心不能再只显示“接口无返回”或无法定位的笼统错误。
+// BULK_PACKAGE_MANAGED_OVERWRITE_RECOVERY_V1：子导入器已覆盖式处理 Managed
+// 源码、版本、软删除、稳定 Id 与主/多路由占用，批量任务不得再要求用户手工解冲突。
 function text(value, fallback) {
     return value === null || value === undefined ? (fallback || '') : String(value);
 }
@@ -158,7 +160,8 @@ function childRecoveryHint(message, completed) {
         return '请检查目标租户 SaaS 引擎中的 HDFS/OSS/MinIO Endpoint、网络路由、桶和凭证完整性；'
             + '修复后重新发起，前 ' + completed + ' 个应用会幂等跳过。';
     }
-    return '先按失败详情处理冲突或数据问题，再重新发起全部安装/更新；前 '
+    return '包内 Managed 资源已自动覆盖本地改码、版本漂移、软删除及 Id/路由占用；'
+        + '请按失败详情修复数据库结构、权限、存储或强回读异常后重新发起全部安装/更新；前 '
         + completed + ' 个已完成应用会幂等跳过。';
 }
 // BULK_MONOTONIC_CHILD_PROGRESS_V1：批量协调器每次恢复子导入器前，必须继承
@@ -514,28 +517,55 @@ if (phase == 'Discover') {
     // get-microi-store，但对外自定义地址固定为 get-microi-store-list。
     // 远程商城调用必须使用 ApiAddress；把 Key 当作路径会在官方源返回
     // sys_apiengine NoExistData，并让所有子租户的批量升级反复重试。
-    var listResult = V8.Http.Post({
-        Url: sourceApiBase + '/apiengine/get-microi-store-list?OsClient=' + encodeURIComponent(sourceOsClient),
-        PostParam: {
-            _PageIndex: pageIndex,
-            _PageSize: pageSize,
-            ApplicationType: bulkApplicationType,
-            BulkInstallPlan: true,
-            InstalledVersions: installedVersions
-        },
-        ParamType: 'json',
-        Headers: sourceRequestHeaders,
-        Timeout: 120
-    });
-    listResult = parseJson(listResult, listResult);
+    // MARKETPLACE_LIST_ROUTE_FAILOVER_V1：正式 ApiAddress 永远优先；只有源站明确
+    // 表示该地址尚未进入动态路由（主从延迟、冷缓存或旧节点 404）时，才调用官方
+    // 包声明的旧地址薄网关。认证、业务校验和网络错误不降级，避免掩盖真实故障。
+    var requestMarketplacePlan = function (path) {
+        var response = V8.Http.Post({
+            Url: sourceApiBase + path + '?OsClient=' + encodeURIComponent(sourceOsClient),
+            PostParam: {
+                _PageIndex: pageIndex,
+                _PageSize: pageSize,
+                ApplicationType: bulkApplicationType,
+                BulkInstallPlan: true,
+                InstalledVersions: installedVersions
+            },
+            ParamType: 'json',
+            Headers: sourceRequestHeaders,
+            Timeout: 120
+        });
+        return parseJson(response, response);
+    };
+    var marketplaceRouteUnavailable = function (result) {
+        var message = trim(result && result.Msg).toLowerCase();
+        return message.indexOf('noexistdata[apiaddress]:/apiengine/get-microi-store-list') >= 0
+            || message.indexOf('http 404') >= 0
+            || message.indexOf('statuscode: 404') >= 0
+            || message.indexOf('status code 404') >= 0;
+    };
+    var formalListPath = '/apiengine/get-microi-store-list';
+    var legacyListPath = '/apiengine/get-microi-store';
+    var listRoute = formalListPath;
+    var listResult = requestMarketplacePlan(formalListPath);
+    var formalListFailure = null;
+    if ((!listResult || listResult.Code != 1) && marketplaceRouteUnavailable(listResult)) {
+        formalListFailure = listResult;
+        listRoute = legacyListPath;
+        listResult = requestMarketplacePlan(legacyListPath);
+    }
     if (!listResult || listResult.Code != 1) {
         return failure(
-            '读取应用商城批量安装计划失败：' + ((listResult && listResult.Msg) || '接口无返回'),
+            '读取应用商城批量安装计划失败：' + ((listResult && listResult.Msg) || '接口无返回')
+                + (formalListFailure
+                    ? '；正式地址错误：' + (formalListFailure.Msg || '接口无返回')
+                    : ''),
             {
                 FailureStage: 'Discover',
                 SourceApiBase: sourceApiBase,
                 SourceOsClient: sourceOsClient,
-                PageIndex: pageIndex
+                PageIndex: pageIndex,
+                SourceListRoute: listRoute,
+                FormalRouteFallbackAttempted: !!formalListFailure
             },
             '检查商城源地址、源租户和网络连通性；修正后重新发起，盘点阶段不会写入应用资源。'
         );
@@ -679,7 +709,7 @@ if (startupDependencyRecovery && startupPreinstallIndex < startupPreinstallPlan.
                     ? startupPreinstallResult.Data
                     : null
             },
-            '检查目标租户启动接口是否存在租户改码、软删除、稳定 Id 或 ApiAddress 冲突；修复冲突后以新幂等键重新发起。'
+            'Managed 启动接口会由选定官方包自动覆盖并收回路由；请按子任务失败详情修复数据库结构、权限、存储或强回读异常后重新发起。'
         );
     }
     var startupCurrentProgress = Math.max(3, Math.min(99,
@@ -718,7 +748,7 @@ if (startupDependencyBootstrapOnly) {
                 FailureStage: 'BootstrapOnlyReadback',
                 MissingApiEngineKeys: missingAfterBootstrap.map(function (item) { return item.Key; })
             },
-            '检查目标租户是否存在租户改码、软删除、稳定 Id 或 ApiAddress 冲突；修复后使用新幂等键重试。'
+            'Managed 启动接口会自动覆盖源码、软删除状态并重映射 Id/路由；请按强回读详情修复数据库结构或权限异常后重试。'
         );
     }
     report(100, startupDependencyRequirements.length, startupDependencyRequirements.length,
@@ -764,7 +794,8 @@ var childParam = {
     BulkTotal: total,
     BulkAdaptiveSingleSlice: false,
     // 完整安装仍保留快速自举请求，覆盖从非事故入口恢复旧检查点的兼容路径；
-    // Preinstall 已完成时导入器按修订标记幂等对账，不会覆盖租户不同源码。
+    // Preinstall 已完成时导入器按修订标记幂等对账；Managed 继续按包覆盖，
+    // CreateIfMissing 租户扩展继续保持现状。
     StartupDependencyRecovery: startupDependencyRecovery,
     _BackgroundTaskId: taskId,
     _BackgroundTask: taskEnvelope,

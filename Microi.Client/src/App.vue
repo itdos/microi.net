@@ -120,12 +120,6 @@ export default {
            console.log('无法获取当前URL');
        }
          var self = this;
-         var authFailureMessage = self.DiyCommon.ConsumeAuthFailureMessage();
-         if (authFailureMessage) {
-             window.setTimeout(function () {
-                 self.DiyCommon.Tips(authFailureMessage, false);
-             }, 0);
-         }
          self.syncClassicShellVisibility();
         self.classicShellKeyHandler = function (event) {
             if (event.key !== "Escape" || event.defaultPrevented || self.diyStore.IsTabFullScreen) return;

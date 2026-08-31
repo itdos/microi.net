@@ -242,6 +242,74 @@ public class MicroAppStableEntryTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ManagedRuntimeAssetRead_UsesPublicLowLevelStorageWithoutTenantV8Hooks(
+        bool useInternetEndpoint)
+    {
+        var method = typeof(MicroAppController).GetMethod(
+            "BuildManagedPublicAssetReadParam",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var client = new OsClientSecret
+        {
+            OsClient = "junchi",
+            OsClientModel = new JObject()
+        };
+        var param = Assert.IsType<HDFSParam>(method!.Invoke(null, new object[]
+        {
+            client,
+            "junchi",
+            "junchi/micro-app/project-pack/index.html",
+            useInternetEndpoint
+        }));
+
+        Assert.Same(client, param.ClientModel);
+        Assert.False(param.Limit);
+        Assert.Equal("/junchi/micro-app/project-pack/index.html", param.FileFullPath);
+        Assert.Equal("Byte", param.ReturnFileType);
+        Assert.Equal(useInternetEndpoint, param.NetworkIsInternet);
+    }
+
+    [Fact]
+    public void ManagedRuntimeAssetRead_BuildsUnsignedFallbackOnlyFromTrustedTenantStorage()
+    {
+        var method = typeof(MicroAppController).GetMethod(
+            "BuildManagedPublicObjectUrls",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var client = new OsClientSecret
+        {
+            OsClient = "junchi",
+            OsClientModel = new JObject
+            {
+                ["HDFS"] = "MinIO",
+                ["MinIOEndPoint"] = "121.43.245.193:1010",
+                ["MinIOPrivateEndPointSSL"] = 0,
+                ["MinIOEndPointInternet"] = "https://static.chongstech.com",
+                ["MinIOEndPointSSL"] = 1,
+                ["MinIOPublicBucketName"] = "congshi-public"
+            }
+        };
+        var urls = Assert.IsAssignableFrom<IReadOnlyList<string>>(method!.Invoke(null, new object[]
+        {
+            client,
+            "junchi",
+            "junchi/micro-app/project-pack/index.html"
+        }));
+
+        Assert.Equal(2, urls.Count);
+        Assert.Equal(
+            "http://121.43.245.193:1010/congshi-public/junchi/micro-app/project-pack/index.html",
+            urls[0]);
+        Assert.Equal(
+            "https://static.chongstech.com/congshi-public/junchi/micro-app/project-pack/index.html",
+            urls[1]);
+    }
+
+    [Theory]
     [InlineData("Web")]
     [InlineData("UniApp")]
     public void LegacyMicroAppBookmark_RedirectsStandaloneApplicationsToCurrentPreview(string applicationType)

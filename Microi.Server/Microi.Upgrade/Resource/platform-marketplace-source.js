@@ -14,13 +14,125 @@ if(!marketplaceAction && marketplaceRoute){
   var marketplaceSegments = marketplaceRoute.split('/');
   marketplaceAction = marketplaceSegments[marketplaceSegments.length - 1] || '';
 }
-if(['Discover','Captcha','Login','Query','Disconnect'].indexOf(marketplaceAction) >= 0){
-  return V8.Method.RunPlatformApiRuntime({
-    RuntimeKey:'MarketplaceSource', Action:marketplaceAction, Param:V8.Param || {}
-  });
+
+// MARKETPLACE_LIST_ROUTE_FAILOVER_V2：所有请求仍先进入可信后端运行时，保留
+// 管理员、访问密钥、源地址和租户校验。只有官方公共源的正式列表地址明确缺失
+// （NoExistData / HTTP 404）时，才由 Managed 接口调用官方旧地址薄网关。
+// 认证、业务校验、超时和其它网络故障均不得降级或伪装为“0 个应用”。
+function marketplaceText(value) {
+  return String(value === null || typeof value === 'undefined' ? '' : value).trim();
 }
 
-/* V8 ApiEngine | ApiEngineKey: platform-marketplace-source | Version: v1.0.0 */
+function isOfficialPublicSource(param) {
+  return marketplaceText(param && param.SourceId).toLowerCase() === 'official'
+    && marketplaceText(param && param.ApiBase).replace(/\/+$/, '').toLowerCase() === 'https://api.itdos.com'
+    && marketplaceText(param && param.OsClient).toLowerCase() === 'itdos';
+}
+
+function marketplaceListRouteUnavailable(result) {
+  var message = marketplaceText(result && result.Msg).toLowerCase();
+  return message.indexOf('noexistdata[apiaddress]:/apiengine/get-microi-store-list') >= 0
+    || message.indexOf('http 404') >= 0
+    || message.indexOf('statuscode: 404') >= 0
+    || message.indexOf('status code 404') >= 0;
+}
+
+function parseMarketplaceResponse(value) {
+  if (!value) return value;
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(String(value)); }
+  catch (error) { return { Code: 0, Msg: '官方商城旧地址未返回有效 JSON。' }; }
+}
+
+function requestOfficialLegacyList(param, formalResult) {
+  var legacyResult;
+  try {
+    // MARKETPLACE_NESTED_JSON_PAYLOAD_V2：商城分页请求携带 InstalledVersions
+    // 等嵌套数组。目标端可能仍运行不识别 PostParamString 的旧 V8 HTTP 原子；
+    // ParamType=json 下 PostParam 会按完整对象序列化，且已由同租户批量升级链路验证。
+    legacyResult = parseMarketplaceResponse(V8.Http.Post({
+      Url: 'https://api.itdos.com/apiengine/get-microi-store?OsClient=iTdos',
+      PostParam: (param && param.Param) || {},
+      ParamType: 'json',
+      // MARKETPLACE_SOURCE_HEADER_ISOLATION_V1：显式空 Header 阻止目标租户的
+      // osclient/authorization 请求头被旧版 V8.Http 继承到官方公共商城源。
+      Headers: {},
+      Timeout: 120
+    }));
+  } catch (error) {
+    legacyResult = { Code: 0, Msg: marketplaceText(error && error.message ? error.message : error) || '官方商城旧地址请求失败。' };
+  }
+  if (!legacyResult || Number(legacyResult.Code) !== 1) return legacyResult || { Code: 0, Msg: '官方商城旧地址未返回结果。' };
+  var append = legacyResult.DataAppend && typeof legacyResult.DataAppend === 'object'
+    ? legacyResult.DataAppend
+    : {};
+  append.SourceAuthenticated = false;
+  append.CredentialKey = 'Marketplace.SourceToken.official';
+  append.SourceId = 'official';
+  append.MarketplaceListRoute = '/apiengine/get-microi-store';
+  append.MarketplaceListRouteFallback = true;
+  append.FormalRouteFailure = marketplaceText(formalResult && formalResult.Msg);
+  legacyResult.DataAppend = append;
+  return legacyResult;
+}
+
+function resolveOfficialList(param, formalResult) {
+  if (formalResult && Number(formalResult.Code) === 1) return formalResult;
+  if (!marketplaceListRouteUnavailable(formalResult)) return formalResult;
+  return requestOfficialLegacyList(param, formalResult);
+}
+
+if(['Discover','Captcha','Login','Query','Disconnect'].indexOf(marketplaceAction) >= 0){
+  var runtimeResult = V8.Method.RunPlatformApiRuntime({
+    RuntimeKey:'MarketplaceSource', Action:marketplaceAction, Param:V8.Param || {}
+  });
+  if (!isOfficialPublicSource(V8.Param || {})) return runtimeResult;
+  if (marketplaceAction === 'Query'
+      && marketplaceText(V8.Param.Operation).toLowerCase() === 'list') {
+    return resolveOfficialList(V8.Param || {}, runtimeResult);
+  }
+  if (marketplaceAction === 'Discover' && runtimeResult && Number(runtimeResult.Code) === 1) {
+    var countParam = {
+      SourceId: 'official',
+      ApiBase: 'https://api.itdos.com',
+      OsClient: 'iTdos',
+      Operation: 'List',
+      Param: { _PageIndex: 1, _PageSize: 1 }
+    };
+    var formalCountResult = V8.Method.RunPlatformApiRuntime({
+      RuntimeKey: 'MarketplaceSource', Action: 'Query', Param: countParam
+    });
+    var countResult = resolveOfficialList(countParam, formalCountResult);
+    if (!countResult || Number(countResult.Code) !== 1) {
+      return countResult || { Code: 0, Msg: '官方商城应用数量读取失败。' };
+    }
+    var discovered = runtimeResult.Data || {};
+    var count = Math.max(0, Number(countResult.DataCount || 0));
+    return {
+      Code: 1,
+      Msg: runtimeResult.Msg || '商城源识别成功。',
+      Data: {
+        SourceId: discovered.SourceId || 'official',
+        ApiBase: discovered.ApiBase || 'https://api.itdos.com',
+        OsClient: discovered.OsClient || 'iTdos',
+        SystemTitle: discovered.SystemTitle || 'Microi吾码',
+        SystemShortTitle: discovered.SystemShortTitle || '吾码',
+        RequiresCaptcha: discovered.RequiresCaptcha === true,
+        HasCredential: discovered.HasCredential === true,
+        CredentialExpired: discovered.CredentialExpired === true,
+        CredentialExpiresAt: discovered.CredentialExpiresAt || '',
+        PublicApplicationCount: count,
+        AccessibleApplicationCount: count,
+        PrivateApplicationCount: 0,
+        CredentialKey: discovered.CredentialKey || 'Marketplace.SourceToken.official',
+        MarketplaceListRouteFallback: !!(countResult.DataAppend && countResult.DataAppend.MarketplaceListRouteFallback)
+      }
+    };
+  }
+  return runtimeResult;
+}
+
+/* V8 ApiEngine | ApiEngineKey: platform-marketplace-source | Version: v1.0.4 */
 
 var param = V8.Param || {};
 

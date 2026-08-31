@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
 using Newtonsoft.Json;
@@ -75,10 +77,10 @@ namespace Microi.net
                         return await AuthorizeFormFieldAsync(param, false).ConfigureAwait(false);
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 // 授权依赖异常时失败关闭，绝不退回裸路径临时签名地址。
-                return new DosResult(0, null, "私有文件授权校验暂时不可用，请稍后重试！");
+                return AuthorizationUnavailable(param, "Dispatch:" + resourceKind, ex);
             }
         }
 
@@ -172,6 +174,7 @@ namespace Microi.net
             bool derivedCadPreview)
         {
             var sysMenuId = param.SysMenuId.DosIsNullOrWhiteSpace() ? param.MenuId : param.SysMenuId;
+            var stage = "AuthorizeMenu";
             try
             {
                 var menuAuthorizationParam = new DiyTableRowParam
@@ -191,21 +194,22 @@ namespace Microi.net
                     return new DosResult(0, null, "当前用户无权通过该菜单访问私有文件！");
                 sysMenuId = menuAuthorizationParam._SysMenuId;
 
+                stage = "ResolveTable";
                 var tableResult = await MicroiEngine.FormEngine
                     .GetDiyTable(param.FormEngineKey, param.OsClient)
                     .ConfigureAwait(false);
                 var tableModel = tableResult != null && tableResult.Code == 1
-                    ? ToJObject(tableResult.Data)
+                    ? ToJObject((object)tableResult.Data)
                     : null;
                 var tableId = TokenString(tableModel?["Id"]);
                 var tableName = TokenString(tableModel?["Name"]);
                 if (tableId.DosIsNullOrWhiteSpace() || tableName.DosIsNullOrWhiteSpace())
                     return new DosResult(0, null, "未找到私有文件所属表单！");
 
+                stage = "ResolveField";
                 var fieldModel = await ResolveDiyFieldModelAsync(
                     param.OsClient,
                     param.FieldId,
-                    tableName,
                     tableId).ConfigureAwait(false);
                 var fieldName = TokenString(fieldModel?["Name"]);
                 var fieldTableId = TokenString(fieldModel?["TableId"]);
@@ -222,6 +226,7 @@ namespace Microi.net
                     && !string.Equals(component, "FileUpload", StringComparison.OrdinalIgnoreCase))
                     return new DosResult(0, null, "CAD派生预览只允许用于FileUpload字段！");
 
+                stage = "BuildRowQuery";
                 var rowQuery = new JObject
                 {
                     ["FormEngineKey"] = tableName,
@@ -236,6 +241,7 @@ namespace Microi.net
                 if (param._TableChildAuth != null)
                     rowQuery["_TableChildAuth"] = JToken.FromObject(param._TableChildAuth);
 
+                stage = "ReadAuthorizedRow";
                 var rowResult = await MicroiEngine.FormEngine
                     .GetFormDataAsync<dynamic>(tableName, rowQuery)
                     .ConfigureAwait(false);
@@ -243,6 +249,7 @@ namespace Microi.net
                     return new DosResult(0, null, "当前菜单上下文无权读取该业务记录！");
 
                 var row = ToJObject((object)rowResult.Data);
+                stage = "VerifyFieldReference";
                 var fieldValue = row?[fieldName];
                 if (derivedCadPreview)
                 {
@@ -250,6 +257,7 @@ namespace Microi.net
                     if (!IsAuthorizedCadDerivedPreview(fieldValue, param, out derivedPath))
                         return new DosResult(0, null,
                             "业务记录未引用原CAD文件，或请求路径不是其唯一派生预览文件！");
+                    stage = "VerifyDerivedObject";
                     return await AuthorizeExistingObjectAsync(
                         param,
                         derivedPath,
@@ -269,10 +277,93 @@ namespace Microi.net
 
                 return null;
             }
+            catch (Exception ex)
+            {
+                return AuthorizationUnavailable(param, stage, ex);
+            }
+        }
+
+        private static DosResult AuthorizationUnavailable(
+            DiyUploadParam param,
+            string stage,
+            Exception exception)
+        {
+            string traceId;
+            try
+            {
+                var activity = System.Diagnostics.Activity.Current;
+                traceId = activity != null
+                          && activity.IdFormat == System.Diagnostics.ActivityIdFormat.W3C
+                          && activity.TraceId != default
+                    ? activity.TraceId.ToString()
+                    : System.Diagnostics.ActivityTraceId.CreateRandom().ToString();
+            }
             catch
             {
-                return new DosResult(0, null, "私有文件授权校验暂时不可用，请稍后重试！");
+                traceId = Guid.NewGuid().ToString("N");
             }
+            var exceptionType = exception?.GetType().FullName ?? "UnknownException";
+            string safeException;
+            try
+            {
+                safeException = SanitizeAuthorizationException(exception);
+            }
+            catch
+            {
+                safeException = $"Exception={exceptionType}: <redacted>";
+            }
+            try
+            {
+                MicroiEngine.QueueSysLog(new SysLogParam
+                {
+                    OsClient = param?.OsClient,
+                    TraceId = traceId,
+                    Category = "System",
+                    Action = "DependencyFailure",
+                    Source = "PrivateFileAuthorization",
+                    TargetType = "PrivateFileAuthorization",
+                    Success = false,
+                    OccurredAt = DateTime.Now,
+                    Type = "PrivateFileAuthorization",
+                    Title = "私有文件授权依赖异常",
+                    Content = $"Stage={stage}; {safeException}",
+                    Level = 3
+                });
+            }
+            catch
+            {
+            }
+            // AppLogs remains available even when the asynchronous system-log sink
+            // is disabled or unavailable. Never include the requested path or row id.
+            try
+            {
+                Console.Error.WriteLine(
+                    $"Microi：[PrivateFileAuthorization] TraceId={traceId}; Stage={stage}; ExceptionType={exceptionType}");
+            }
+            catch
+            {
+            }
+            return new DosResult(
+                0,
+                null,
+                $"私有文件授权校验暂时不可用，请稍后重试！（追踪编号：{traceId}）",
+                null,
+                new { TraceId = traceId });
+        }
+
+        internal static string SanitizeAuthorizationException(Exception exception)
+        {
+            var exceptionType = exception?.GetType().FullName ?? "UnknownException";
+            var message = exception?.Message ?? "Unknown authorization dependency failure";
+            byte[] messageHash;
+            using (var sha256 = SHA256.Create())
+            {
+                messageHash = sha256.ComputeHash(Encoding.UTF8.GetBytes(message));
+            }
+            var messageHashHex = BitConverter.ToString(messageHash)
+                .Replace("-", string.Empty)
+                .ToLowerInvariant();
+            return $"Exception={exceptionType}; HResult={exception?.HResult ?? 0}; MessageSha256={messageHashHex}";
         }
 
         internal static bool IsAuthorizedCadDerivedPreview(
@@ -585,29 +676,59 @@ namespace Microi.net
             return token.Children().Any(HasNonEmptyScalarValue);
         }
 
-        private static async Task<JObject> ResolveDiyFieldModelAsync(
+        private static Task<JObject> ResolveDiyFieldModelAsync(
             string osClient,
             string fieldId,
-            string tableName,
             string tableId)
         {
-            var byId = await MicroiEngine.FormEngine.GetDiyFieldModel(new DiyFieldParam
-            {
-                OsClient = osClient,
-                Id = fieldId,
-                IsDeleted = 0
-            }).ConfigureAwait(false);
-            if (byId != null && byId.Code == 1 && byId.Data != null) return byId.Data;
+            // Authorization metadata must come from the primary tenant database, not
+            // the presentation/cache-oriented read path used by the form designer.
+            // Both bounded lookups bind the field to the already-authorized table.
+            // Preserve the legacy identity rule: exact Id wins, and only an Id miss
+            // may fall back to the field name.
+            OsClientSecret authorizationClient;
+            if (osClient.DosIsNullOrWhiteSpace()
+                || !OsClientExtend.ClientList.TryGetValue(osClient.DosTrim(), out authorizationClient)
+                || authorizationClient?.Db == null)
+                throw new InvalidOperationException("当前租户授权数据库不可用");
+            var authorizationDb = authorizationClient.Db;
+            var fieldById = authorizationDb.From<DiyField>()
+                .Select(d => new
+                {
+                    d.Id,
+                    d.TableId,
+                    d.Name,
+                    d.Component,
+                    d.IsDeleted
+                })
+                .Where(d => d.IsDeleted == 0
+                            && d.TableId == tableId
+                            && d.Id == fieldId)
+                .First();
+            var idMatch = fieldById == null ? null : JObject.FromObject(fieldById);
+            if (idMatch != null)
+                return Task.FromResult(PreferExactFieldIdMatch(idMatch, null));
 
-            var byName = await MicroiEngine.FormEngine.GetDiyFieldModel(new DiyFieldParam
-            {
-                OsClient = osClient,
-                TableId = tableId,
-                TableName = tableName,
-                Name = fieldId,
-                IsDeleted = 0
-            }).ConfigureAwait(false);
-            return byName != null && byName.Code == 1 ? byName.Data : null;
+            var fieldByName = authorizationDb.From<DiyField>()
+                .Select(d => new
+                {
+                    d.Id,
+                    d.TableId,
+                    d.Name,
+                    d.Component,
+                    d.IsDeleted
+                })
+                .Where(d => d.IsDeleted == 0
+                            && d.TableId == tableId
+                            && d.Name == fieldId)
+                .First();
+            var nameMatch = fieldByName == null ? null : JObject.FromObject(fieldByName);
+            return Task.FromResult(PreferExactFieldIdMatch(null, nameMatch));
+        }
+
+        internal static JObject PreferExactFieldIdMatch(JObject idMatch, JObject nameMatch)
+        {
+            return idMatch ?? nameMatch;
         }
 
         /// <summary>

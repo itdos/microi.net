@@ -35,6 +35,7 @@ public sealed class ApiControllerOwnershipCatalogTests
                 "AiController",
                 "ApiEngineController",
                 "CaptchaController",
+                "DiagnosticsController",
                 "FormEngineController",
                 "HDFSController",
                 "LicenseController",

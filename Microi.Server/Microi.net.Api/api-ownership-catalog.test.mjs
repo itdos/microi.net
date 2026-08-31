@@ -88,8 +88,8 @@ test('every remaining Controller is declared and stays in Microi.net.Api', () =>
   const discovered = controllerClasses();
   const declared = [...Object.keys(catalog.Controllers), ...Object.keys(catalog.ProtocolGateways)].sort();
   assert.deepEqual(discovered, [
-    'AiController', 'ApiEngineController', 'CaptchaController', 'FormEngineController',
-    'HDFSController', 'LicenseController', 'MessageController', 'MicroAppController',
+    'AiController', 'ApiEngineController', 'CaptchaController', 'DiagnosticsController',
+    'FormEngineController', 'HDFSController', 'LicenseController', 'MessageController', 'MicroAppController',
     'V8EngineController',
   ]);
   assert.deepEqual(declared, discovered);
@@ -161,7 +161,6 @@ test('all removed Controller routes are delivered through ApiRoutes', () => {
   const required = [
     '/api/SysMenu/GetSysMenuModel', '/api/SysMenu/GetSysMenuStep',
     '/api/SysUserAccessKey/Create', '/api/SysUserAccessKey/List',
-    '/api/Diagnostics/health', '/itdos-heart',
     '/api/ExternalLogin/Begin', '/api/ExternalLogin/Callback',
     '/api/TenantSystemSettings/Save', '/api/WeChatContentSecurity/Callback',
     '/api/WeChat/BindSysUser', '/api/WorkFlow/StartWork',

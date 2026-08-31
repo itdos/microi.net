@@ -119,6 +119,49 @@ public class ApiEngineCacheCompatibilityTests
     }
 
     [Fact]
+    public void RouteColdMissAndStartupCacheUseAuthoritativePrimaryDatabase()
+    {
+        var serverRoot = Path.Combine(FindRepositoryRoot(), "Microi.Server");
+        var apiEngineSource = File.ReadAllText(Path.Combine(
+            serverRoot, "Microi.net", "ApiEngine", "ApiEngine.cs"));
+        var dynamicRouteSource = File.ReadAllText(Path.Combine(
+            serverRoot, "Microi.net.Api", "Handler", "DynamicApiEngine.cs"));
+        var initializerSource = File.ReadAllText(Path.Combine(
+            serverRoot, "Microi.Core", "ApiEngine", "ApiEngineRouteCacheInitializer.cs"));
+        var storeSource = File.ReadAllText(Path.Combine(
+            serverRoot, "Microi.Core", "ApiEngine", "ApiEngineAuthoritativeStore.cs"));
+
+        Assert.Contains("GetAuthoritativeApiEngineModel(new ApiEngineParam", dynamicRouteSource);
+        Assert.DoesNotContain(
+            "fallbackResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam",
+            dynamicRouteSource);
+        Assert.Contains("ApiEngineAuthoritativeStore.GetEnabledModel", apiEngineSource);
+        Assert.Contains("ApiEngineAuthoritativeStore.GetEnabledByMultiRoute", apiEngineSource);
+        Assert.Contains("ApiEngineAuthoritativeStore.GetAllEnabled(client)", initializerSource);
+        Assert.DoesNotContain("MicroiEngine.FormEngine.GetTableDataAsync", initializerSource);
+        Assert.Contains("RemoveParentAsync", initializerSource);
+        Assert.Contains("client.Db.FromSql(sql)", storeSource);
+        Assert.DoesNotContain("client.DbRead", storeSource);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        foreach (var startPath in new[]
+                 {
+                     Environment.GetEnvironmentVariable("MICROI_TEST_REPOSITORY_ROOT"),
+                     Directory.GetCurrentDirectory(),
+                     AppContext.BaseDirectory
+                 }.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            var directory = new DirectoryInfo(startPath);
+            while (directory != null && !Directory.Exists(Path.Combine(directory.FullName, "Microi.Server")))
+                directory = directory.Parent;
+            if (directory != null) return directory.FullName;
+        }
+        throw new DirectoryNotFoundException("Repository root not found.");
+    }
+
+    [Fact]
     public void UpgradeEventAlwaysWritesJsonTextForV3AndV6()
     {
         var script = Assert.IsType<string>(CompatibleEventField.GetRawConstantValue());
@@ -239,5 +282,97 @@ public class ApiEngineCacheCompatibilityTests
             "/api/test?unsafe=1",
             out var error));
         Assert.Contains("不能包含", error);
+    }
+
+    [Fact]
+    public void ExplicitCompatibilityKeyDeterministicallyOverridesAnotherEngineIdAlias()
+    {
+        var original = JObject.Parse("""
+            {
+              "Id":"legacy-runtime-id",
+              "ApiEngineKey":"current-runtime-key",
+              "ApiAddress":"/apiengine/current-runtime-key"
+            }
+            """);
+        var gateway = JObject.Parse("""
+            {
+              "Id":"gateway-row-id",
+              "ApiEngineKey":"legacy-runtime-id",
+              "ApiAddress":"/apiengine/legacy-runtime-id"
+            }
+            """);
+
+        Assert.Equal(100, ApiEngineRouteAliases.GetCacheAliasPriority(original, "legacy-runtime-id"));
+        Assert.Equal(300, ApiEngineRouteAliases.GetCacheAliasPriority(gateway, "legacy-runtime-id"));
+        Assert.Equal(200, ApiEngineRouteAliases.GetCacheAliasPriority(
+            gateway,
+            "/apiengine/legacy-runtime-id"));
+    }
+
+    [Fact]
+    public void DuplicateHighestPriorityAliasIsQuarantinedWithoutDroppingUniqueRoutes()
+    {
+        var first = JObject.Parse("""
+            {
+              "Id":"engine-a",
+              "ApiEngineKey":"duplicate-key",
+              "ApiAddress":"/api/engine-a"
+            }
+            """);
+        var second = JObject.Parse("""
+            {
+              "Id":"engine-b",
+              "ApiEngineKey":"duplicate-key",
+              "ApiAddress":"/api/engine-b"
+            }
+            """);
+
+        var forward = ApiEngineRouteAliases.ResolveCacheAliases(new object[] { first, second });
+        var reverse = ApiEngineRouteAliases.ResolveCacheAliases(new object[] { second, first });
+
+        Assert.DoesNotContain("duplicate-key", forward.Aliases.Keys);
+        Assert.DoesNotContain("duplicate-key", reverse.Aliases.Keys);
+        Assert.Contains("engine-a", forward.Aliases.Keys);
+        Assert.Contains("engine-b", forward.Aliases.Keys);
+        Assert.Contains("/api/engine-a", forward.Aliases.Keys);
+        Assert.Contains("/api/engine-b", forward.Aliases.Keys);
+        Assert.Equal(forward.Aliases.Keys.OrderBy(x => x), reverse.Aliases.Keys.OrderBy(x => x));
+        Assert.Equal("duplicate-key", Assert.Single(forward.Conflicts).Alias);
+    }
+
+    [Fact]
+    public void UniqueHigherPriorityKeyWinsOverMultipleLowerPriorityIdClaims()
+    {
+        var explicitGateway = JObject.Parse("""
+            {
+              "Id":"gateway-id",
+              "ApiEngineKey":"legacy-alias",
+              "ApiAddress":"/api/gateway"
+            }
+            """);
+        var legacyA = JObject.Parse("""
+            {
+              "Id":"legacy-alias",
+              "ApiEngineKey":"legacy-a",
+              "ApiAddress":"/api/legacy-a"
+            }
+            """);
+        var legacyB = JObject.Parse("""
+            {
+              "Id":"legacy-alias",
+              "ApiEngineKey":"legacy-b",
+              "ApiAddress":"/api/legacy-b"
+            }
+            """);
+
+        var resolution = ApiEngineRouteAliases.ResolveCacheAliases(
+            new object[] { legacyA, legacyB, explicitGateway });
+
+        Assert.Equal(
+            "gateway-id",
+            resolution.Aliases["legacy-alias"].EngineId);
+        Assert.DoesNotContain(
+            resolution.Conflicts,
+            conflict => string.Equals(conflict.Alias, "legacy-alias", StringComparison.OrdinalIgnoreCase));
     }
 }

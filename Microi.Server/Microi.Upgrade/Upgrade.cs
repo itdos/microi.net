@@ -1602,6 +1602,10 @@ namespace Microi.net
             {
                 FormEngineKey = "sys_apiengine",
                 OsClient = osClient,
+                _Where = new List<DiyWhere>
+                {
+                    new DiyWhere { Name = "IsEnable", Value = 1, Type = "=" }
+                },
                 _PageIndex = 1,
                 _PageSize = 100000
             });
@@ -1611,40 +1615,29 @@ namespace Microi.net
                     "读取接口引擎以重建兼容缓存失败：" + listResult.Msg);
             }
 
-            var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (listResult.Data != null)
+            var resolution = ApiEngineRouteAliases.ResolveCacheAliases(
+                listResult.Data == null
+                    ? Enumerable.Empty<object>()
+                    : listResult.Data.Cast<object>());
+            foreach (var conflict in resolution.Conflicts)
             {
-                foreach (var item in listResult.Data)
-                {
-                    UpgradeExecutionLeaseContext.ThrowIfLost();
-                    var model = JObject.FromObject((object)item);
-                    var json = JsonConvert.SerializeObject((object)item);
-                    foreach (var alias in ApiEngineRouteAliases.GetCacheAliases(model))
-                    {
-                        if (!alias.DosIsNullOrWhiteSpace())
-                        {
-                            if (aliases.TryGetValue(alias, out var ownerJson)
-                                && !string.Equals(ownerJson, json, StringComparison.Ordinal))
-                            {
-                                throw new InvalidOperationException(
-                                    $"接口引擎缓存别名[{alias}]存在重复归属，拒绝以启动顺序覆盖。请修复多路由冲突后重试。");
-                            }
-                            aliases[alias] = json;
-                        }
-                    }
-                }
+                var owners = string.Join("、", conflict.Owners.Select(owner =>
+                    $"{owner.EngineKey}({owner.EngineId})"));
+                Console.WriteLine(
+                    $"Microi：【接口引擎缓存兼容修复】【{osClient}】" +
+                    $"歧义别名[{conflict.Alias}]同时属于[{owners}]，已隔离该别名并继续重建其它唯一路由。");
             }
 
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
             await cache.RemoveParentAsync(
                 $"Microi:{osClient}:FormData:sys_apiengine:*");
             var pending = new List<Task<bool>>(64);
-            foreach (var alias in aliases)
+            foreach (var alias in resolution.Aliases)
             {
                 UpgradeExecutionLeaseContext.ThrowIfLost();
                 pending.Add(cache.SetAsync(
                     $"Microi:{osClient}:FormData:sys_apiengine:{alias.Key}",
-                    alias.Value));
+                    JsonConvert.SerializeObject(alias.Value.ApiEngine)));
                 if (pending.Count < 64) continue;
 
                 await Task.WhenAll(pending);
@@ -1654,7 +1647,7 @@ namespace Microi.net
             {
                 await Task.WhenAll(pending);
             }
-            return aliases.Count;
+            return resolution.Aliases.Count;
         }
 
         public sealed class ApiEngineDiyTableRow

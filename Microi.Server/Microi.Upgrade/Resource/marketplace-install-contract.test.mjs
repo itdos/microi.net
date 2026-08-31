@@ -111,6 +111,7 @@ test("bulk install persists its plan in the shared background-task checkpoint", 
   assert.match(bulkSource, /BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1/);
   assert.match(bulkSource, /BULK_STORAGE_FAILURE_RECOVERY_V1/);
   assert.match(bulkSource, /BULK_MONOTONIC_CHILD_PROGRESS_V1/);
+  assert.match(bulkSource, /BULK_PACKAGE_MANAGED_OVERWRITE_RECOVERY_V1/);
   assert.match(bulkSource, /resumedChildProgress = childCheckpointProgress\(childCheckpoint\)/);
   assert.match(bulkSource, /currentIndex \+ resumedChildProgress \/ 100/);
   assert.match(bulkSource, /object_storage_forbidden/i);
@@ -371,7 +372,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.3.7");
+  assert.equal(engine.Version, "v1.3.8");
   assert.match(bulkSource, /value\.标识 \|\| value\.Identifier/);
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
@@ -380,12 +381,14 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.4\.9/);
+  assert.match(importerSource, /Version: v2\.5\.0/);
   assert.match(importerSource, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
   assert.match(importerSource, /storeApiBase \+ '\/apiengine\/'/);
   assert.doesNotMatch(importerSource, /\/api\/ApiEngine\/Run/);
   assert.match(importerSource, /marketplaceEngineParam\('get-microi-store-model'/);
-  assert.match(bulkSource, /sourceApiBase \+ '\/apiengine\/get-microi-store/);
+  assert.match(bulkSource, /sourceApiBase \+ path \+ '\?OsClient='/);
+  assert.match(bulkSource, /formalListPath = '\/apiengine\/get-microi-store-list'/);
+  assert.match(bulkSource, /legacyListPath = '\/apiengine\/get-microi-store'/);
   assert.doesNotMatch(bulkSource, /\/api\/ApiEngine\/Run/);
   assert.match(importerSource, /PACKAGE_MENU_RUNTIME_PREFLIGHT_V1/);
   assert.match(importerSource, /REMOTE_ZIP_SINGLE_ASSET_SLICE_V1/);
@@ -405,8 +408,8 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /bulk_adaptive_single_slice_ignored/);
   assert.doesNotMatch(importerSource, /backgroundChunkingEnabled\s*=\s*false/);
   assert.match(importerSource, /PACKAGE_API_ENGINE_READBACK_V1/);
-  assert.match(importerSource, /assertPersistedApiEngine\(apiEngine, updatedEngine\)/);
-  assert.match(importerSource, /assertPersistedApiEngine\(apiEngine, insertedEngine\)/);
+  assert.match(importerSource, /assertPersistedApiEngine\(modelCopy, updatedEngine\)/);
+  assert.match(importerSource, /assertPersistedApiEngine\(modelCopy, insertedEngine\)/);
   assert.match(importerSource, /throw new Error\('更新接口引擎失败：'/);
   assert.match(importerSource, /throw new Error\('新增接口引擎失败：'/);
   assert.match(importerSource, /actualCode !== expectedCode/);
@@ -419,11 +422,12 @@ test("package importer fails closed when an API engine is not durably persisted"
   );
   assert.match(importerSource, /含软删除状态/);
   assert.match(importerSource, /TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1/);
-  assert.match(importerSource, /OFFICIAL_MANAGED_OVERWRITE_V1/);
+  assert.match(importerSource, /PACKAGE_MANAGED_OVERWRITE_V2/);
+  assert.match(importerSource, /PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2/);
   assert.match(importerSource, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_V1/);
   assert.match(importerSource, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1/);
   assert.match(importerSource, /GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1/);
-  assert.match(importerSource, /ApplyOfficialManagedOverwrite/);
+  assert.match(importerSource, /ApplyPackageManagedOverwrite/);
   assert.match(importerSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(importerSource, /OBJECT_STORAGE_FORBIDDEN/);
   assert.match(importerSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
@@ -436,8 +440,9 @@ test("package importer fails closed when an API engine is not durably persisted"
     importerSource,
     /restoreApplicationMenuBindingsFromPackage\(\);[\s\S]*?migrateLegacyMenus\(binding, 'Url'/,
   );
-  assert.match(importerSource, /managedDecision == 'PreserveNewer'/);
-  assert.match(importerSource, /接口引擎升级冲突/);
+  assert.match(importerSource, /包内 Managed 资源覆盖目标记录/);
+  assert.doesNotMatch(importerSource, /managedDecision == 'PreserveNewer'/);
+  assert.doesNotMatch(importerSource, /接口引擎升级冲突/);
   assert.match(importerSource, /STARTUP_DEPENDENCY_API_FAST_BOOTSTRAP_V1/);
   assert.match(importerSource, /STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1/);
   assert.match(importerSource, /StartupDependencyBootstrapOnly/);
@@ -455,7 +460,8 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /platform-current-user/);
   assert.match(importerSource, /platform-private-file-url/);
   assert.match(importerSource, /platform-sys-user-public-info/);
-  assert.match(importerSource, /已有不同源码或处于软删除状态/);
+  assert.match(importerSource, /startupOverwritten\.push\(startupApiKey\)/);
+  assert.match(importerSource, /startupIdentityRemapped/);
   assert.match(bulkSource, /STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2/);
   assert.match(bulkSource, /STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1/);
   assert.match(bulkSource, /STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1/);
@@ -470,7 +476,10 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.4.9");
+  assert.equal(embeddedImporter.Version, "v2.5.0");
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    "InstallerFeature:PackageManagedOverwriteV2",
+  ));
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     "Installer:StartupDependencyPreinstallBootstrapV1",
   ));

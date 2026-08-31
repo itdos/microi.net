@@ -18,7 +18,8 @@ const TAB_ACTIONS = Object.freeze([
     "showMessage",
     "refreshCurrentUser",
     "setGlobalOverlay",
-    "openForm"
+    "openForm",
+    "openPlatformPrint"
 ]);
 
 const ACTION_ALIASES = Object.freeze({
@@ -52,7 +53,10 @@ const ACTION_ALIASES = Object.freeze({
     globaloverlay: "setGlobalOverlay",
     overlay: "setGlobalOverlay",
     openform: "openForm",
-    openanyform: "openForm"
+    openanyform: "openForm",
+    openplatformprint: "openPlatformPrint",
+    platformprint: "openPlatformPrint",
+    openprint: "openPlatformPrint"
 });
 
 function isPlainObject(value) {
@@ -182,4 +186,51 @@ export function normalizeHostMessage(input) {
     const requestedType = String(data.messageType ?? data.MessageType ?? data.level ?? data.Level ?? "info").toLowerCase();
     const messageType = ["success", "warning", "error", "info"].includes(requestedType) ? requestedType : "info";
     return { message, messageType };
+}
+
+export function normalizeHostPlatformPrint(input, context = {}) {
+    const data = isPlainObject(input) ? input : {};
+    const printId = String(data.printId ?? data.PrintId ?? "").trim();
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(printId)) {
+        throw Object.assign(new Error("平台打印缺少有效模板 Id"), { code: "HOST_PRINT_TEMPLATE_INVALID" });
+    }
+
+    const rawDataApi = String(data.dataApi ?? data.DataApi ?? "").trim();
+    if (!rawDataApi || rawDataApi.length > 16000) {
+        throw Object.assign(new Error("平台打印数据地址为空或过长"), { code: "HOST_PRINT_DATA_API_INVALID" });
+    }
+    let dataApi;
+    let apiBase;
+    try {
+        dataApi = new URL(rawDataApi);
+        apiBase = new URL(String(context.apiBase || context.ApiBase || ""));
+    } catch (_) {
+        throw Object.assign(new Error("平台打印数据地址不是有效的绝对 HTTP 地址"), { code: "HOST_PRINT_DATA_API_INVALID" });
+    }
+    if (!["http:", "https:"].includes(dataApi.protocol)
+        || dataApi.username || dataApi.password || dataApi.hash
+        || dataApi.origin !== apiBase.origin
+        || !dataApi.pathname.toLowerCase().startsWith("/apiengine/")) {
+        throw Object.assign(new Error("平台打印只允许调用当前后端的接口引擎数据地址"), { code: "HOST_PRINT_DATA_API_NOT_ALLOWED" });
+    }
+
+    const osClient = String(context.osClient || context.OsClient || "").trim();
+    const requestedOsClient = String(dataApi.searchParams.get("OsClient") || "").trim();
+    if (!osClient || requestedOsClient.toLowerCase() !== osClient.toLowerCase()) {
+        throw Object.assign(new Error("平台打印数据地址的租户与当前页面不一致"), { code: "HOST_PRINT_TENANT_MISMATCH" });
+    }
+
+    const rawTitle = String(data.title ?? data.Title ?? "普通打印")
+        .replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 80);
+    return {
+        ComponentName: "OpenIframe",
+        Title: rawTitle || "普通打印",
+        TitleIcon: "fas fa-print",
+        OpenType: "Drawer",
+        Width: "min(1100px, calc(100vw - 24px))",
+        DataAppend: {
+            PrintId: printId,
+            DataApi: dataApi.toString()
+        }
+    };
 }

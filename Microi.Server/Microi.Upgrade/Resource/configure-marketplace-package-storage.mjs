@@ -285,6 +285,8 @@ model.PackageInfo.RequiredPlatformCapabilities = [
     && !String(value).startsWith('ApiEngine:ai_app_publish_store@')
     && !String(value).startsWith('ApiEngine:export-microi-store-package@')
     && !String(value).startsWith('ApiEngine:import-microi-store-package@')
+    && String(value) !== 'InstallerFeature:OfficialManagedOverwrite'
+    && String(value) !== 'InstallerFeature:PackageManagedOverwriteV2'
     && String(value) !== 'Installer:StartupDependencyApiFastBootstrap'
     && String(value) !== 'Installer:StartupDependencyPreinstallBootstrapV1'
     && String(value) !== 'Installer:StartupApiRuntimeFlagReconciliation'
@@ -292,7 +294,8 @@ model.PackageInfo.RequiredPlatformCapabilities = [
   'ApiEngine:get-microi-store-model@v1.2.9',
   'ApiEngine:ai_app_publish_store@v1.9.13',
   'ApiEngine:export-microi-store-package@v1.2.4',
-  'ApiEngine:import-microi-store-package@v2.4.9',
+  'ApiEngine:import-microi-store-package@v2.5.0',
+  'InstallerFeature:PackageManagedOverwriteV2',
   'Installer:StartupDependencyApiFastBootstrap',
   'Installer:StartupDependencyPreinstallBootstrapV1',
   'Installer:StartupApiRuntimeFlagReconciliation',

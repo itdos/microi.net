@@ -36,15 +36,19 @@ return { Code : 1 };
 `;
 }
 
-function baseEngine({ id, key, name, address, routes = '', code, allowAnonymous = 0, responseType }) {
+function baseEngine({
+  id, key, name, address, routes = '', code, allowAnonymous = 0, responseType,
+  version = 'v1.0.0', changeHistory,
+}) {
   const engine = {
     IsDeleted: 0,
     UserName: '管理员',
     UserId: 'c74d669c-a3d4-11e5-b60d-b870f43edd03',
     CreateTime: '2026-08-30 12:00:00',
     Id: id,
-    ChangeHistory: `2026-08-30 v1.0.0 迁移旧 Controller 路由到官方 Managed 接口引擎，并由多路由保持历史客户端兼容。\n`,
-    Version: 'v1.0.0',
+    ChangeHistory: changeHistory
+      || `2026-08-30 v1.0.0 迁移旧 Controller 路由到官方 Managed 接口引擎，并由多路由保持历史客户端兼容。\n`,
+    Version: version,
     LimitRecursion: 5000,
     LimitMemory: 2048,
     MaxStatements: 100000000,
@@ -80,8 +84,14 @@ const workflowRoutes = [
 ].map((action) => `/api/WorkFlow/${action}`).join(';');
 
 const workflowCode = officialNotice('SaaS引擎', 'platform-workflow', `
-/* V8 ApiEngine | ApiEngineKey: platform-workflow | Version: v1.0.0 */
-var route = String(V8.Param.ApiAddress || '').replace(/\\?.*$/, '');
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-workflow
+ * Version: v1.0.1
+ * Function:
+ * - 统一承载工作流旧 Controller 路由，并按大小写无关方式归一化历史动作名。
+ */
+var route = String(V8.Param._RequestPath || V8.Param.ApiAddress || '').replace(/\\?.*$/, '');
 var action = String(V8.Param.Action || '').trim();
 if(!action && route){
   var segments = route.split('/');
@@ -93,7 +103,12 @@ var allowed = ${JSON.stringify([
   'SendWorkWithForm', 'GetWFWork', 'GetWFFlow', 'GetWFStats', 'MarkCopyRead',
   'GetNextNodeConfirmUsers',
 ])};
-if(allowed.indexOf(action) < 0) return { Code:0, Msg:'不支持的工作流动作。' };
+var actionNames = {};
+for(var actionIndex = 0; actionIndex < allowed.length; actionIndex++){
+  actionNames[String(allowed[actionIndex]).toLowerCase()] = allowed[actionIndex];
+}
+action = actionNames[String(action).toLowerCase()] || '';
+if(!action) return { Code:0, Msg:'不支持的工作流动作。' };
 
 var hook = V8.ApiEngine.Run('platform-workflow-custom-hook', {
   Stage:'BeforeWorkFlowAction', Action:action,
@@ -182,15 +197,29 @@ V8.Param.Action = tenantSettingsAction;
 `;
 
 const sysUserSessionCode = officialNotice('SaaS引擎', 'platform-sys-user-session', `
-/* V8 ApiEngine | ApiEngineKey: platform-sys-user-session | Version: v1.0.0 */
-var route = String(V8.Param.ApiAddress || '').replace(/\\?.*$/, '');
+/*
+ * V8 ApiEngine
+ * ApiEngineKey: platform-sys-user-session
+ * Version: v1.0.1
+ * Function:
+ * - 统一承载用户登录、Token 续签、Token 登录、退出与管理员凭据会话协议；兼容历史 SysUser 多路由，并按大小写无关方式归一化动作名。
+ */
+
+var route = String(V8.Param._RequestPath || V8.Param.ApiAddress || '').replace(/\\?.*$/, '');
 var action = String(V8.Param.Action || '').trim();
 if(!action && route){
   var segments = route.split('/');
   action = segments[segments.length - 1] || '';
 }
-var allowed = ['Login','SetPassword','GetOwnedTenantAdminPassword','ResetOwnedTenantAdminPassword','RefreshToken','TokenLogin','Logout','GetSysUserPassword'];
-if(allowed.indexOf(action) < 0) return { Code:0, Msg:'不支持的用户会话动作。' };
+var actionNames = {
+  login:'Login', setpassword:'SetPassword',
+  getownedtenantadminpassword:'GetOwnedTenantAdminPassword',
+  resetownedtenantadminpassword:'ResetOwnedTenantAdminPassword',
+  refreshtoken:'RefreshToken', tokenlogin:'TokenLogin', logout:'Logout',
+  getsysuserpassword:'GetSysUserPassword'
+};
+action = actionNames[String(action).toLowerCase()] || '';
+if(!action) return { Code:0, Msg:'不支持的用户会话动作。' };
 var postOnly = ['Login','SetPassword','GetOwnedTenantAdminPassword','ResetOwnedTenantAdminPassword','RefreshToken','Logout'];
 if(postOnly.indexOf(action) >= 0 && String(V8.Param._HttpMethod || '').toUpperCase() !== 'POST'){
   return { Code:0, Msg:'该用户会话动作仅支持 POST 请求。' };
@@ -338,11 +367,11 @@ const packageUpdates = {
     })],
   },
   'app.microi.saas-engine.json': {
-    version: 'v7.7.8',
+    version: 'v7.7.10',
     description: 'SaaS 多租户平台运行时、身份能力与工作流接口引擎闭包。',
-    history: '2026-08-30 v7.7.8 将 IdentityVerificationController 迁为无公开路由的 WebAuthn 可信原子，并由 platform-identity-verification 多路由兼容全部旧强身份接口。',
+    history: '2026-08-30 v7.7.10 platform-workflow 按大小写无关方式归一化旧 WorkFlow 动作，兼容 getWFWork/getWFFlow，避免首次进入首页误报不支持的工作流动作。',
     capabilities: [
-      'ApiEngine:platform-workflow@v1.0.0',
+      'ApiEngine:platform-workflow@v1.0.1',
       'ApiEngine:platform-workflow-custom-hook@v1.0.0',
       'V8.Method.ManageWorkFlow',
       'V8.Method.RunPlatformApiRuntime:ExternalLogin',
@@ -350,6 +379,7 @@ const packageUpdates = {
       'V8.Method.RunPlatformApiRuntime:WeChatContentSecurity',
       'V8.Method.RunPlatformApiRuntime:WeChatOAuth',
       'V8.Method.RunPlatformApiRuntime:SysUserSession',
+      'ApiEngine:platform-sys-user-session@v1.0.1',
       'V8.Method.RunPlatformApiRuntime:IdentityVerification',
       'ServerField:sys_apiengine.ApiRoutes',
     ],
@@ -383,6 +413,8 @@ const packageUpdates = {
         address: '/apiengine/platform-workflow',
         routes: workflowRoutes,
         code: workflowCode,
+        version: 'v1.0.1',
+        changeHistory: '2026-08-30 v1.0.1 按大小写无关方式归一化历史 WorkFlow 动作，兼容 getWFWork 与 getWFFlow。\n2026-08-30 v1.0.0 迁移旧 Controller 路由到官方 Managed 接口引擎，并由多路由保持历史客户端兼容。\n',
       }),
       {
         ...baseEngine({
@@ -433,6 +465,8 @@ const packageUpdates = {
         routes: '/api/SysUser/Login;/api/SysUser/SetPassword;/api/SysUser/GetOwnedTenantAdminPassword;/api/SysUser/ResetOwnedTenantAdminPassword;/api/SysUser/RefreshToken;/api/SysUser/TokenLogin;/api/SysUser/Logout;/api/SysUser/GetSysUserPassword',
         code: sysUserSessionCode,
         allowAnonymous: 1,
+        version: 'v1.0.1',
+        changeHistory: '2026-08-30 v1.0.1 按大小写无关方式归一化历史 SysUser 动作，兼容 refreshToken 与 tokenlogin。\n2026-08-30 v1.0.0 迁移旧 Controller 路由到官方 Managed 接口引擎，并由多路由保持历史客户端兼容。\n',
       }),
       baseEngine({
         id: '019d35f0-7b04-7b91-9801-00000000000a',

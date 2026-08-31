@@ -288,6 +288,67 @@ test("5+App 使用真实连接标记而不是仅凭已保存设备 ID", async ()
     delete globalThis.window;
 });
 
+test("5+App 只选择真实 write 特征，并在首包 10007 时安全切换候选特征", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("microi_ble_info", JSON.stringify({
+        deviceId: "plus-printer-write-fallback",
+        deviceName: "移动标签打印机",
+        writeServiceId: "stale-service",
+        writeCharaterId: "stale-write"
+    }));
+
+    const attempts = [];
+    const plusBluetooth = {
+        onBLEConnectionStateChange() {},
+        onBluetoothDeviceFound() {},
+        openBluetoothAdapter({ success }) { success({}); },
+        createBLEConnection({ success }) { success({}); },
+        getBLEDeviceServices({ success }) {
+            success({ services: [
+                { uuid: "other-service" },
+                { uuid: "0000ff00-0000-1000-8000-00805f9b34fb" }
+            ] });
+        },
+        getBLEDeviceCharacteristics({ serviceId, success }) {
+            if (serviceId === "other-service") {
+                success({ characteristics: [
+                    { uuid: "no-response-only", properties: { writeNoResponse: true } }
+                ] });
+                return;
+            }
+            success({ characteristics: [
+                { uuid: "unsupported-write", properties: { write: true } },
+                { uuid: "printer-write", properties: { write: true } }
+            ] });
+        },
+        closeBLEConnection() {},
+        writeBLECharacteristicValue({ characteristicId, success, fail }) {
+            attempts.push(characteristicId);
+            if (characteristicId === "unsupported-write") {
+                fail({ errCode: 10007, errMsg: "property not support" });
+                return;
+            }
+            success({});
+        }
+    };
+    globalThis.window = {
+        plus: { bluetooth: plusBluetooth },
+        addEventListener() {}
+    };
+
+    const printer = createV8Print();
+    assert.equal(await printer.initializeConnection(), true);
+    await printer.prepareSend(Uint8Array.from([1, 2, 3]));
+
+    assert.deepEqual(attempts, ["unsupported-write", "printer-write"]);
+    assert.equal(printer.BLEInformation.writeCharaterId, "printer-write");
+    assert.equal(JSON.parse(localStorage.getItem("microi_ble_info")).writeCharaterId, "printer-write");
+    assert.equal(attempts.includes("no-response-only"), false, "HTML5+ 未声明支持无响应写，不能把它误当作 write 特征");
+    printer.disconnect();
+    delete globalThis.window;
+});
+
 test("5+App 中 CC4 的 BLE 不可用时可用厂家同款 RFCOMM/SPP 通道发送 CPCL", async () => {
     localStorage.clear();
     sessionStorage.clear();

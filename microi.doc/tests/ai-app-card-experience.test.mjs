@@ -17,11 +17,16 @@ test('homepage, apps page, and detail page share the stable experience resolver'
 
 test('AI application cards expose the resolved new-window experience action', () => {
   assert.match(source, /class="ai-app-experience"/)
-  assert.match(source, /@click\.stop="openPreview\(app\)"/)
   assert.match(source, /v-if="app\.ExperienceUrl"/)
-  assert.match(source, /window\.open\(app\.ExperienceUrl,\s*['_"]_blank['_"],\s*['_"]noopener,noreferrer['_"]\)/)
+  assert.match(source, /:href="app\.ExperienceUrl"/)
+  assert.match(source, /target="_blank"/)
+  assert.match(source, /rel="noopener noreferrer"/)
+  assert.doesNotMatch(source, /openPreview\(app\)|window\.open\(app\.ExperienceUrl/u)
   assert.match(detailSource, /v-if="app\.ExperienceUrl"/)
-  assert.match(detailSource, /window\.open\(app\.value\.ExperienceUrl,\s*['_"]_blank['_"],\s*['_"]noopener,noreferrer['_"]\)/)
+  assert.match(detailSource, /:href="app\.ExperienceUrl"/)
+  assert.match(detailSource, /target="_blank"/)
+  assert.match(detailSource, /rel="noopener noreferrer"/)
+  assert.doesNotMatch(detailSource, /openPreview\(\)|window\.open\(app\.value\.ExperienceUrl/u)
   assert.doesNotMatch(detailSource, /app\.value\.PreviewUrl\s*=/)
 })
 

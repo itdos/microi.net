@@ -194,9 +194,12 @@
                         <el-table-column :label="$t('Msg.Elapsed')" width="78">
                             <template #default="{ row }">{{ row.ElapsedText || "-" }}</template>
                         </el-table-column>
-                        <el-table-column :label="$t('Msg.Operation')" width="178" fixed="right">
+                        <el-table-column :label="$t('Msg.Operation')" width="220" fixed="right">
                             <template #default="{ row }">
-                                <el-button v-if="row.HasResult || getTaskDownloadUrl(row)" link size="small" type="primary" :icon="Download" @click.stop="downloadTaskResult(row)">
+                                <el-button v-if="getTaskOpenUrl(row)" link size="small" type="primary" :icon="View" @click.stop="openTaskResult(row)">
+                                    {{ getTaskOpenLabel(row) }}
+                                </el-button>
+                                <el-button v-if="getTaskDownloadUrl(row)" link size="small" type="primary" :icon="Download" @click.stop="downloadTaskResult(row)">
                                     {{ $t("Msg.DownloadArtifact") }}
                                 </el-button>
                                 <el-button v-if="canCancel(row)" link size="small" type="danger" :icon="CircleClose" @click.stop="cancelTask(row)">
@@ -368,7 +371,7 @@
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
-import { Bell, CircleClose, Delete, Download, Monitor, Refresh, SwitchButton, UserFilled } from "@element-plus/icons-vue";
+import { Bell, CircleClose, Delete, Download, Monitor, Refresh, SwitchButton, UserFilled, View } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox, ElNotification } from "element-plus";
 import { useDiyStore } from "@/pinia";
 import { useUserStore } from "@/pinia/modules/user";
@@ -1043,6 +1046,42 @@ export default {
             const result = item.Result || {};
             const data = result.Data || result.data || {};
             return data.DownloadUrl || data.downloadUrl || result.DownloadUrl || result.downloadUrl || "";
+        },
+        getTaskOpenUrl(item) {
+            if (!item || item.Status !== "Succeeded") return "";
+            const result = item.Result || {};
+            const data = result.Data || result.data || {};
+            return normalizeNotificationLink(
+                data.OpenUrl || data.openUrl || result.OpenUrl || result.openUrl || "",
+                window.location.origin
+            );
+        },
+        getTaskOpenLabel(item) {
+            const result = item?.Result || {};
+            const data = result.Data || result.data || {};
+            return data.OpenLabel || data.openLabel || result.OpenLabel || result.openLabel || this.$t("Msg.Open");
+        },
+        async openTaskResult(item) {
+            try {
+                await this.loadTaskDetail(item);
+            } catch (error) {
+                ElMessage.error(error?.message || String(error));
+                return;
+            }
+            const link = this.getTaskOpenUrl(item);
+            if (!link) {
+                ElMessage.warning(this.$t("Msg.NoData"));
+                return;
+            }
+            if (link.startsWith("#")) {
+                window.location.hash = link.replace(/^#/, "");
+                return;
+            }
+            if (link.startsWith("/") && !link.startsWith("//")) {
+                await this.$router.push(link);
+                return;
+            }
+            window.open(link, "_blank", "noopener,noreferrer");
         },
         async downloadTaskResult(item) {
             try {

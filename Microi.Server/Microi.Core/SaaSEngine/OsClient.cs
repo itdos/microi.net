@@ -211,6 +211,19 @@ namespace Microi.net
         [ThreadStatic]
         public static bool _isCacheInitializing;
 
+        internal const string SaasConfigurationCacheSchema = "microi.saas-engine.cache";
+        internal const int SaasConfigurationCacheSchemaVersion = 2;
+
+        private sealed class SaasConfigurationCacheIdentity
+        {
+            public string ConfigOsClient { get; set; }
+            public string OsClientType { get; set; }
+            public string OsClientNetwork { get; set; }
+            public string OsClient { get; set; }
+            public string LegacyConfigOsClient { get; set; }
+            public string LegacyOsClient { get; set; }
+        }
+
         /// <summary>
         /// OsClientName
         /// </summary>
@@ -233,24 +246,289 @@ namespace Microi.net
 
             EnsureMainTenantDatabaseConfig(client.OsClient, client.OsClientModel);
 
-            // 【关键】直接返回完整的 OsClientModel JObject，保留所有数据库字段
-            return client.OsClientModel;
+            // 缓存必须保存独立快照。直接缓存运行模型引用会让后续的节点基础设施
+            // 重投影写穿 ClientList，最终把某一节点的 Redis/对象存储端点传播到其它节点。
+            return client.OsClientModel == null
+                ? null
+                : (JObject)client.OsClientModel.DeepClone();
+        }
+
+        private static string NormalizeSaasCacheIdentityValue(string value)
+        {
+            return (value ?? string.Empty).Trim().ToLowerInvariant();
+        }
+
+        private static bool TryCreateSaasConfigurationCacheIdentity(
+            string osClient,
+            out SaasConfigurationCacheIdentity identity)
+        {
+            identity = null;
+            var configOsClient = GetConfigOsClient();
+            if (configOsClient.DosIsNullOrWhiteSpace())
+            {
+                configOsClient = OsClientDefault.OsClient;
+            }
+
+            var normalizedConfigOsClient = NormalizeSaasCacheIdentityValue(configOsClient);
+            var normalizedOsClientType = NormalizeSaasCacheIdentityValue(OsClientDefault.OsClientType);
+            var normalizedOsClientNetwork = NormalizeSaasCacheIdentityValue(OsClientDefault.OsClientNetwork);
+            var normalizedOsClient = NormalizeSaasCacheIdentityValue(osClient);
+            if (normalizedConfigOsClient.Length == 0
+                || normalizedOsClientType.Length == 0
+                || normalizedOsClientNetwork.Length == 0
+                || normalizedOsClient.Length == 0)
+            {
+                return false;
+            }
+
+            identity = new SaasConfigurationCacheIdentity
+            {
+                ConfigOsClient = normalizedConfigOsClient,
+                OsClientType = normalizedOsClientType,
+                OsClientNetwork = normalizedOsClientNetwork,
+                OsClient = normalizedOsClient,
+                LegacyConfigOsClient = (configOsClient ?? string.Empty).Trim(),
+                LegacyOsClient = (osClient ?? string.Empty).Trim()
+            };
+            return true;
+        }
+
+        internal static string GetSaasConfigurationCacheKey(
+            string configOsClient,
+            string osClientType,
+            string osClientNetwork,
+            string osClient)
+        {
+            var config = NormalizeSaasCacheIdentityValue(configOsClient);
+            var type = NormalizeSaasCacheIdentityValue(osClientType);
+            var network = NormalizeSaasCacheIdentityValue(osClientNetwork);
+            var tenant = NormalizeSaasCacheIdentityValue(osClient);
+            if (config.Length == 0 || type.Length == 0 || network.Length == 0 || tenant.Length == 0)
+            {
+                throw new ArgumentException("SaaS cache identity cannot contain an empty value.");
+            }
+
+            return $"Microi:{Uri.EscapeDataString(config)}:saas-engine:v2:" +
+                   $"{Uri.EscapeDataString(type)}:{Uri.EscapeDataString(network)}:" +
+                   Uri.EscapeDataString(tenant);
+        }
+
+        private static string GetSaasConfigurationCacheKey(SaasConfigurationCacheIdentity identity)
+        {
+            return GetSaasConfigurationCacheKey(
+                identity.ConfigOsClient,
+                identity.OsClientType,
+                identity.OsClientNetwork,
+                identity.OsClient);
+        }
+
+        private static IReadOnlyCollection<string> GetLegacySaasConfigurationCacheKeys(
+            string configOsClient,
+            string osClient)
+        {
+            var configValues = new[]
+            {
+                (configOsClient ?? string.Empty).Trim(),
+                NormalizeSaasCacheIdentityValue(configOsClient)
+            };
+            var tenantValues = new[]
+            {
+                (osClient ?? string.Empty).Trim(),
+                NormalizeSaasCacheIdentityValue(osClient)
+            };
+
+            return configValues
+                .Where(value => value.Length > 0)
+                .SelectMany(config => tenantValues
+                    .Where(value => value.Length > 0)
+                    .Select(tenant => $"Microi:{config}:saas-engine:{tenant}"))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static bool CacheIdentityEquals(string actual, string expected)
+        {
+            var normalizedActual = NormalizeSaasCacheIdentityValue(actual);
+            var normalizedExpected = NormalizeSaasCacheIdentityValue(expected);
+            return normalizedActual.Length > 0
+                   && normalizedExpected.Length > 0
+                   && string.Equals(
+                       normalizedActual,
+                       normalizedExpected,
+                       StringComparison.Ordinal);
+        }
+
+        private static bool ConfigurationHasIdentity(
+            JObject configuration,
+            string osClientType,
+            string osClientNetwork,
+            string osClient)
+        {
+            if (configuration == null) return false;
+            var actualOsClient = configuration["OsClient"]?.Val<string>();
+            var actualType = configuration["OsClientType"]?.Val<string>();
+            var actualNetwork = configuration["OsClientNetwork"]?.Val<string>();
+            return !actualOsClient.DosIsNullOrWhiteSpace()
+                   && !actualType.DosIsNullOrWhiteSpace()
+                   && !actualNetwork.DosIsNullOrWhiteSpace()
+                   && CacheIdentityEquals(actualOsClient, osClient)
+                   && CacheIdentityEquals(actualType, osClientType)
+                   && CacheIdentityEquals(actualNetwork, osClientNetwork);
+        }
+
+        private static bool EnsureConfigurationIdentityForWrite(
+            JObject configuration,
+            string osClientType,
+            string osClientNetwork,
+            string osClient)
+        {
+            if (configuration == null) return false;
+            var expected = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["OsClient"] = osClient,
+                ["OsClientType"] = osClientType,
+                ["OsClientNetwork"] = osClientNetwork
+            };
+            foreach (var pair in expected)
+            {
+                var current = configuration[pair.Key]?.Val<string>();
+                if (current.DosIsNullOrWhiteSpace())
+                {
+                    configuration[pair.Key] = pair.Value;
+                    continue;
+                }
+                if (!CacheIdentityEquals(current, pair.Value)) return false;
+            }
+            return true;
+        }
+
+        internal static JObject CreateSaasConfigurationCachePayload(
+            JObject configuration,
+            string configOsClient,
+            string osClientType,
+            string osClientNetwork,
+            string osClient)
+        {
+            if (NormalizeSaasCacheIdentityValue(configOsClient).Length == 0
+                || NormalizeSaasCacheIdentityValue(osClientType).Length == 0
+                || NormalizeSaasCacheIdentityValue(osClientNetwork).Length == 0
+                || NormalizeSaasCacheIdentityValue(osClient).Length == 0)
+            {
+                return null;
+            }
+
+            var config = configuration == null
+                ? null
+                : (JObject)configuration.DeepClone();
+            if (!EnsureConfigurationIdentityForWrite(
+                    config,
+                    osClientType,
+                    osClientNetwork,
+                    osClient))
+            {
+                return null;
+            }
+
+            return new JObject
+            {
+                ["Schema"] = SaasConfigurationCacheSchema,
+                ["SchemaVersion"] = SaasConfigurationCacheSchemaVersion,
+                ["Identity"] = new JObject
+                {
+                    ["ConfigOsClient"] = NormalizeSaasCacheIdentityValue(configOsClient),
+                    ["OsClientType"] = NormalizeSaasCacheIdentityValue(osClientType),
+                    ["OsClientNetwork"] = NormalizeSaasCacheIdentityValue(osClientNetwork),
+                    ["OsClient"] = NormalizeSaasCacheIdentityValue(osClient)
+                },
+                ["Configuration"] = config
+            };
+        }
+
+        internal static bool TryValidateSaasConfigurationCachePayload(
+            JObject payload,
+            string configOsClient,
+            string osClientType,
+            string osClientNetwork,
+            string osClient,
+            out JObject configuration)
+        {
+            configuration = null;
+            var hasExpectedSchemaVersion = int.TryParse(
+                payload?["SchemaVersion"]?.ToString(),
+                out var schemaVersion)
+                && schemaVersion == SaasConfigurationCacheSchemaVersion;
+            if (payload == null
+                || !string.Equals(
+                    payload["Schema"]?.Val<string>(),
+                    SaasConfigurationCacheSchema,
+                    StringComparison.Ordinal)
+                || !hasExpectedSchemaVersion
+                || !(payload["Identity"] is JObject identity)
+                || !(payload["Configuration"] is JObject cachedConfiguration))
+            {
+                return false;
+            }
+
+            if (!CacheIdentityEquals(identity["ConfigOsClient"]?.Val<string>(), configOsClient)
+                || !CacheIdentityEquals(identity["OsClientType"]?.Val<string>(), osClientType)
+                || !CacheIdentityEquals(identity["OsClientNetwork"]?.Val<string>(), osClientNetwork)
+                || !CacheIdentityEquals(identity["OsClient"]?.Val<string>(), osClient)
+                || !ConfigurationHasIdentity(
+                    cachedConfiguration,
+                    osClientType,
+                    osClientNetwork,
+                    osClient))
+            {
+                return false;
+            }
+
+            configuration = (JObject)cachedConfiguration.DeepClone();
+            return true;
+        }
+
+        internal static bool TryValidateLegacySaasConfigurationCache(
+            JObject legacyConfiguration,
+            string osClientType,
+            string osClientNetwork,
+            string osClient,
+            out JObject configuration)
+        {
+            configuration = null;
+            // v1 裸 JObject 没有独立 envelope。只有其自身携带完整且匹配的三元身份时
+            // 才允许一次性迁移；缺少身份的历史值绝不能再按请求 key 猜测租户。
+            if (!ConfigurationHasIdentity(
+                    legacyConfiguration,
+                    osClientType,
+                    osClientNetwork,
+                    osClient))
+            {
+                return false;
+            }
+
+            configuration = (JObject)legacyConfiguration.DeepClone();
+            return true;
         }
 
         /// <summary>
         /// 合并缓存中的配置与本地 ClientList 中的 DB 对象
         /// 【设计】从缓存恢复 OsClientModel（完整配置），同时保留本地的 DB 对象（Db、DbRead 等）
         /// </summary>
-        private static OsClientSecret MergeConfigWithClientObjects(dynamic config, OsClientSecret localClient)
+        private static OsClientSecret MergeConfigWithClientObjects(
+            JObject config,
+            OsClientSecret localClient,
+            JObject currentNodeLocalModel)
         {
             if (localClient == null) return null;
 
             // Redis 中保存的是 SaaS 业务配置；数据库连接属于当前进程的本地配置。
             // 主租户在 sys_osclients 中通常不填写 DbConn，不能让缓存中的空值覆盖
             // InitializeDefaultClient 从环境变量/appsettings 加载的连接字符串。
-            if (config is JObject jobj)
+            if (config != null)
             {
-                var localModel = localClient.OsClientModel;
+                // Only a model that was already present in this node's ClientList is a
+                // trustworthy current-node projection. A transient client reconstructed
+                // from L2 must not feed that same L2 snapshot back as its "local" fallback.
+                var localModel = currentNodeLocalModel;
                 var localSigningKeyStatus = DiyToken.GetJwtSigningKeyStatus(
                     localClient,
                     includeFingerprint: false);
@@ -261,7 +539,12 @@ namespace Microi.net
                 var localDbType = localModel?["DbType"]?.Val<string>();
                 var localDbReadType = localModel?["DbReadType"]?.Val<string>();
 
-                localClient.OsClientModel = (JObject)jobj.DeepClone();
+                var mergedModel = (JObject)config.DeepClone();
+                ReprojectCurrentNodeInfrastructure(
+                    localClient.OsClient,
+                    mergedModel,
+                    localModel);
+                localClient.OsClientModel = mergedModel;
                 RestoreLocalDatabaseValue(localClient.OsClientModel, "DbConn", localDbConn);
                 RestoreLocalDatabaseValue(localClient.OsClientModel, "DbReadConn", localDbReadConn);
                 RestoreLocalDatabaseValue(localClient.OsClientModel, "DbType", localDbType);
@@ -281,6 +564,116 @@ namespace Microi.net
             EnsureMainTenantDatabaseConfig(localClient.OsClient, localClient.OsClientModel);
 
             return localClient;
+        }
+
+        private static void ReprojectCurrentNodeInfrastructure(
+            string osClient,
+            JObject mergedModel,
+            JObject localModel)
+        {
+            if (mergedModel == null) return;
+
+            if (IsConfiguredMainTenant(osClient))
+            {
+                // 主租户共享基础设施以本节点已经解析的运行快照为准；先剥离 L2
+                // 端点再恢复本地投影，避免本节点未配置的字段残留为其它节点的值。
+                var restored = RestoreSharedInfrastructureFromLocal(
+                    mergedModel,
+                    localModel,
+                    removeCachedValuesFirst: true);
+                if (!restored)
+                {
+                    throw new InvalidOperationException(
+                        $"主租户[{osClient}]缺少当前节点共享基础设施投影，已拒绝使用 L2 端点。");
+                }
+                return;
+            }
+
+            var configOsClient = GetConfigOsClient();
+            if (configOsClient.DosIsNullOrWhiteSpace())
+            {
+                configOsClient = OsClientDefault.OsClient;
+            }
+            ClientList.TryGetValue(configOsClient ?? string.Empty, out var mainClient);
+            if (mainClient == null)
+            {
+                mainClient = ClientList.FirstOrDefault(pair => string.Equals(
+                    pair.Key,
+                    configOsClient,
+                    StringComparison.OrdinalIgnoreCase)).Value;
+            }
+            var mainModel = mainClient?.OsClientModel;
+
+            if (mainModel == null)
+            {
+                // Redis 初始化递归或启动早期，主租户模型可能短暂不可用。此时不能调用
+                // UseMainTenantRedisInfrastructure（它会先删除 child Redis 字段）；只允许
+                // 回退到当前节点已存在的 localModel 投影。若本节点连该投影都没有，则
+                // 失败关闭，绝不直接采用 L2 中的基础设施端点。
+                var restored = RestoreSharedInfrastructureFromLocal(
+                    mergedModel,
+                    localModel,
+                    removeCachedValuesFirst: true);
+                if (!restored)
+                {
+                    throw new InvalidOperationException(
+                        $"租户[{osClient}]无法从当前节点恢复共享基础设施投影，已拒绝使用 L2 端点。");
+                }
+                return;
+            }
+
+            // 所有共享基础设施字段先以当前 child 的本地快照重投影；Redis 再强制
+            // 使用当前节点主租户，缺失的其它共享字段最后从当前主租户补齐。
+            RestoreSharedInfrastructureFromLocal(
+                mergedModel,
+                localModel,
+                removeCachedValuesFirst: true);
+            TenantConfigurationSecurity.RemoveLegacySharedTenantCredentials(
+                mergedModel,
+                mainModel);
+            TenantConfigurationSecurity.UseMainTenantRedisInfrastructure(
+                mergedModel,
+                mainModel);
+            TenantConfigurationSecurity.InheritMissingSharedInfrastructure(
+                mergedModel,
+                mainModel);
+        }
+
+        internal static bool RestoreSharedInfrastructureFromLocal(
+            JObject target,
+            JObject localModel,
+            bool removeCachedValuesFirst)
+        {
+            if (target == null) return false;
+            var restored = false;
+            foreach (var field in TenantConfigurationSecurity.SharedInfrastructureFields)
+            {
+                if (removeCachedValuesFirst)
+                {
+                    foreach (var cachedProperty in target.Properties().Where(property =>
+                                 string.Equals(property.Name, field, StringComparison.OrdinalIgnoreCase)).ToList())
+                    {
+                        cachedProperty.Remove();
+                    }
+                }
+
+                if (localModel == null) continue;
+
+                var localProperty = localModel.Properties().FirstOrDefault(property =>
+                    string.Equals(property.Name, field, StringComparison.OrdinalIgnoreCase));
+                if (localProperty == null
+                    || localProperty.Value == null
+                    || localProperty.Value.Type == JTokenType.Null
+                    || localProperty.Value.Type == JTokenType.Undefined
+                    || (localProperty.Value.Type == JTokenType.String
+                        && localProperty.Value.ToString().DosIsNullOrWhiteSpace()))
+                {
+                    continue;
+                }
+                target[field] = localProperty.Value.DeepClone();
+                restored = true;
+            }
+            return restored;
         }
 
         private static void RestoreLocalDatabaseValue(JObject target, string fieldName, string localValue)
@@ -414,18 +807,145 @@ namespace Microi.net
         /// <summary>
         /// 保存值到缓存
         /// </summary>
-        private static void SetToCache(IMicroiCache cache, string key, JObject value, TimeSpan? expiration = null)
+        private static bool SetToCache(IMicroiCache cache, string key, JObject value, TimeSpan? expiration = null)
         {
             try
             {
-                if (cache == null) return;
-                cache.Set(key, value);
+                if (cache == null || value == null) return false;
+                return expiration.HasValue
+                    ? cache.Set(key, value, expiration.Value)
+                    : cache.Set(key, value);
             }
             catch
             {
                 // 缓存失败不影响主流程
+                return false;
             }
         }
+
+        private static void RemoveCacheKey(IMicroiCache cache, string key)
+        {
+            if (cache == null || key.DosIsNullOrWhiteSpace()) return;
+            try
+            {
+                // TwoLevelCache.Remove 会同步清理 L1/L2 并发布 Pub/Sub 失效通知。
+                cache.Remove(key);
+            }
+            catch
+            {
+                // 缓存失效失败不能中断数据库权威读取路径。
+            }
+        }
+
+        private static JObject ReadSaasConfigurationCache(
+            IMicroiCache cache,
+            SaasConfigurationCacheIdentity identity)
+        {
+            if (cache == null || identity == null) return null;
+            var cacheKey = GetSaasConfigurationCacheKey(identity);
+            var payload = GetFromCache(cache, cacheKey);
+            if (payload != null)
+            {
+                if (TryValidateSaasConfigurationCachePayload(
+                        payload,
+                        identity.ConfigOsClient,
+                        identity.OsClientType,
+                        identity.OsClientNetwork,
+                        identity.OsClient,
+                        out var configuration))
+                {
+                    return configuration;
+                }
+
+                // schema/identity 不匹配的 v2 值必须失败关闭，并通知其它节点清除 L1。
+                RemoveCacheKey(cache, cacheKey);
+            }
+
+            foreach (var legacyKey in GetLegacySaasConfigurationCacheKeys(
+                         identity.LegacyConfigOsClient,
+                         identity.LegacyOsClient))
+            {
+                var legacy = GetFromCache(cache, legacyKey);
+                if (legacy == null) continue;
+                if (!TryValidateLegacySaasConfigurationCache(
+                        legacy,
+                        identity.OsClientType,
+                        identity.OsClientNetwork,
+                        identity.OsClient,
+                        out var legacyConfiguration))
+                {
+                    // 无身份或身份不匹配的旧 payload 不得信任。
+                    RemoveCacheKey(cache, legacyKey);
+                    continue;
+                }
+
+                var migratedPayload = CreateSaasConfigurationCachePayload(
+                    legacyConfiguration,
+                    identity.ConfigOsClient,
+                    identity.OsClientType,
+                    identity.OsClientNetwork,
+                    identity.OsClient);
+                if (SetToCache(cache, cacheKey, migratedPayload))
+                {
+                    RemoveCacheKey(cache, legacyKey);
+                    return legacyConfiguration;
+                }
+            }
+            return null;
+        }
+
+        internal static JObject ReadSaasConfigurationCache(
+            IMicroiCache cache,
+            string configOsClient,
+            string osClientType,
+            string osClientNetwork,
+            string osClient)
+        {
+            var identity = new SaasConfigurationCacheIdentity
+            {
+                ConfigOsClient = NormalizeSaasCacheIdentityValue(configOsClient),
+                OsClientType = NormalizeSaasCacheIdentityValue(osClientType),
+                OsClientNetwork = NormalizeSaasCacheIdentityValue(osClientNetwork),
+                OsClient = NormalizeSaasCacheIdentityValue(osClient),
+                LegacyConfigOsClient = (configOsClient ?? string.Empty).Trim(),
+                LegacyOsClient = (osClient ?? string.Empty).Trim()
+            };
+            if (identity.ConfigOsClient.Length == 0
+                || identity.OsClientType.Length == 0
+                || identity.OsClientNetwork.Length == 0
+                || identity.OsClient.Length == 0)
+            {
+                return null;
+            }
+            return ReadSaasConfigurationCache(cache, identity);
+        }
+
+        public static void InvalidateSaasConfigurationCache(
+            string osClient,
+            IMicroiCache cache = null)
+        {
+            if (osClient.DosIsNullOrWhiteSpace()) return;
+            cache = cache ?? GetCacheInstance();
+            if (cache == null) return;
+
+            if (TryCreateSaasConfigurationCacheIdentity(osClient, out var identity))
+            {
+                RemoveCacheKey(cache, GetSaasConfigurationCacheKey(identity));
+            }
+
+            var configOsClient = GetConfigOsClient();
+            if (configOsClient.DosIsNullOrWhiteSpace())
+            {
+                configOsClient = OsClientDefault.OsClient;
+            }
+            foreach (var legacyKey in GetLegacySaasConfigurationCacheKeys(
+                         configOsClient,
+                         osClient))
+            {
+                RemoveCacheKey(cache, legacyKey);
+            }
+        }
+
         public static OsClientSecret GetClient(string osClient = "")
         {
             if (osClient.DosIsNullOrWhiteSpace())
@@ -442,33 +962,29 @@ namespace Microi.net
             // 【分布式缓存优先策略】
             // 第一步：尝试从L2缓存（Redis）获取配置
             // 【递归保护】如果正在初始化缓存，跳过缓存读取以避免无限递归
-            var cacheKey = $"Microi:{OsClientExtend.GetConfigOsClient()}:saas-engine:{osClient}";
             JObject cachedConfig = null;
-            if (!_isCacheInitializing)
+            if (!_isCacheInitializing
+                && TryCreateSaasConfigurationCacheIdentity(osClient, out var cacheIdentity))
             {
                 var cache = GetCacheInstance();
-                cachedConfig = GetFromCache(cache, cacheKey);
+                cachedConfig = ReadSaasConfigurationCache(cache, cacheIdentity);
             }
 
             // 第二步：从本地ClientList获取完整的OsClientSecret（包含DB对象）
             ClientList.TryGetValue(osClient, out var client);
 
-            // 本机尚未加载该租户时，允许从 Redis 中的 SaaS 配置恢复本机 ClientList。
-            // 这样 V8.ReloadOsClient 在多实例部署中写入 Redis 后，其他实例也能立即识别新租户。
+            var currentNodeLocalModel = client?.OsClientModel;
+
+            // 本机尚未加载该租户时，允许从 Redis 中的 SaaS 配置构造临时 Client。
+            // 必须先完成当前节点基础设施重投影，成功后才能放入 ClientList；否则失败路径
+            // 会把未经重投影的 L2 端点暴露给直接读取 ClientList 的其它运行时组件。
             if (client == null && cachedConfig != null)
             {
-                var cachedOsClient = cachedConfig["OsClient"]?.Val<string>();
-                if (cachedOsClient.DosIsNullOrWhiteSpace())
-                {
-                    cachedOsClient = osClient;
-                }
-
                 client = new OsClientSecret
                 {
-                    OsClient = cachedOsClient,
-                    OsClientModel = cachedConfig
+                    OsClient = osClient,
+                    OsClientModel = new JObject()
                 };
-                ClientList.AddOrUpdate(client.OsClient, client, (key, oldValue) => client);
             }
 
             if (client != null)
@@ -477,7 +993,11 @@ namespace Microi.net
                 // 如果有缓存配置，合并缓存配置与本地DB对象
                 if (cachedConfig != null)
                 {
-                    client = MergeConfigWithClientObjects(cachedConfig, client);
+                    client = MergeConfigWithClientObjects(
+                        cachedConfig,
+                        client,
+                        currentNodeLocalModel);
+                    ClientList.AddOrUpdate(osClient, client, (key, oldValue) => client);
                 }
 
                 EnsureMainTenantDatabaseConfig(osClient, client.OsClientModel);
@@ -586,14 +1106,45 @@ namespace Microi.net
                     }
 
                     var config = ExtractClientConfig(client);
-                    var cacheKey = $"Microi:{OsClientExtend.GetConfigOsClient()}:saas-engine:{client.OsClient}";
                     var cache = GetCacheInstance();
 
-                    if (cache != null)
+                    if (cache != null
+                        && TryCreateSaasConfigurationCacheIdentity(
+                            client.OsClient,
+                            out var cacheIdentity))
                     {
-                        // 缓存配置到Redis（此操作自动触发Pub/Sub通知所有实例）
-                        SetToCache(cache, cacheKey, config);
-                        MicroiEngine.QueueSystemLog(client.OsClient, "SaaS", "ConfigurationCached", "租户配置已缓存到 Redis", "已发布跨节点缓存失效通知。", 1, true, client.OsClient);
+                        var cacheKey = GetSaasConfigurationCacheKey(cacheIdentity);
+                        var payload = CreateSaasConfigurationCachePayload(
+                            config,
+                            cacheIdentity.ConfigOsClient,
+                            cacheIdentity.OsClientType,
+                            cacheIdentity.OsClientNetwork,
+                            cacheIdentity.OsClient);
+                        if (payload == null)
+                        {
+                            MicroiEngine.QueueSystemLog(
+                                client.OsClient,
+                                "SaaS",
+                                "ConfigurationCacheIdentityRejected",
+                                "租户配置未写入 Redis",
+                                "运行配置身份与当前节点 OsClientType/OsClientNetwork 不一致。",
+                                2,
+                                false,
+                                client.OsClient);
+                            return client;
+                        }
+
+                        // v2 envelope 写入 L2/L1，并由 TwoLevelCache 发布跨节点失效通知。
+                        if (SetToCache(cache, cacheKey, payload))
+                        {
+                            foreach (var legacyKey in GetLegacySaasConfigurationCacheKeys(
+                                         cacheIdentity.LegacyConfigOsClient,
+                                         cacheIdentity.LegacyOsClient))
+                            {
+                                RemoveCacheKey(cache, legacyKey);
+                            }
+                            MicroiEngine.QueueSystemLog(client.OsClient, "SaaS", "ConfigurationCached", "租户配置已缓存到 Redis", "已写入 cache schema v2，并发布跨节点缓存失效通知。", 1, true, client.OsClient);
+                        }
                     }
                 }
                 catch (Exception cacheEx)

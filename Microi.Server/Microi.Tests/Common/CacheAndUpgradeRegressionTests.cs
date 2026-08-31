@@ -25,6 +25,24 @@ public class CacheAndUpgradeRegressionTests
     }
 
     [Fact]
+    public void UpgradeAppStore_ReadsDynamicVersionRowsWithoutRuntimeBinderExtensions()
+    {
+        dynamic row = new System.Dynamic.ExpandoObject();
+        row.InstallStatus = "Installed";
+        row.AppVersionInstall = "";
+        row.PackageVersion = "v7.6.3";
+
+        var version = UpgradeAppStore.ReadInstalledPackageVersionRow(
+            (object)row,
+            new[] { "AppVersionInstall", "PackageVersion", "AppVersion" },
+            hasStatus: true,
+            out var installedStatus);
+
+        Assert.True(installedStatus);
+        Assert.Equal("v7.6.3", version);
+    }
+
+    [Fact]
     public void FormEngine_DoesNotScanRedisForDisabledSqlCountCache()
     {
         Assert.False(FormEngineExtend.SqlCountCacheEnabled);
@@ -457,7 +475,7 @@ public class CacheAndUpgradeRegressionTests
             item => item["ApiEngineKey"]?.ToString() == "bulk-import-microi-store-packages");
         Assert.Equal(1, bulkEngine["IsEnable"]?.Value<int>());
         Assert.Equal(0, bulkEngine["StopHttp"]?.Value<int>());
-        AssertEngineVersionAtLeast(bulkEngine, new System.Version(1, 3, 7));
+        AssertEngineVersionAtLeast(bulkEngine, new System.Version(1, 3, 8));
         Assert.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("BULK_BOUNDED_PACKAGE_SLICES_V1", bulkEngine["ApiV8Code"]?.ToString());
@@ -466,6 +484,8 @@ public class CacheAndUpgradeRegressionTests
         Assert.Contains("STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("STARTUP_DEPENDENCY_PREINSTALL_BOOTSTRAP_V1", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("BULK_PACKAGE_MANAGED_OVERWRITE_RECOVERY_V1", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("MARKETPLACE_LIST_ROUTE_FAILOVER_V1", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("platform-sys-menu", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("platform-sys-config", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains(
@@ -566,29 +586,29 @@ public class CacheAndUpgradeRegressionTests
             item => item["ApiEngineKey"]?.ToString() == "import-microi-store-package");
         var importerCode = importer["ApiV8Code"]?.ToString() ?? string.Empty;
         Assert.True(Assert.IsType<bool>(hasImporter!.Invoke(null,
+            new object[] { importerCode, new System.Version(2, 5, 0) })));
+        Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
             new object[] { importerCode, new System.Version(2, 4, 9) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode, new System.Version(2, 4, 7) })));
+            new object[] { importerCode.Replace("PACKAGE_REPLAY_VERSION_GUARD_V2", "LEGACY_REPLAY_GUARD"), new System.Version(2, 5, 0) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode.Replace("PACKAGE_REPLAY_VERSION_GUARD_V2", "LEGACY_REPLAY_GUARD"), new System.Version(2, 4, 9) })));
+            new object[] { importerCode.Replace("PackagePointerMode: 'HdfsV1'", "PackagePointerMode: 'Legacy'"), new System.Version(2, 5, 0) })));
         Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode.Replace("PackagePointerMode: 'HdfsV1'", "PackagePointerMode: 'Legacy'"), new System.Version(2, 4, 9) })));
-        Assert.False(Assert.IsType<bool>(hasImporter.Invoke(null,
-            new object[] { importerCode.Replace("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1", "LEGACY_EMBEDDED_PACKAGE_TRUST"), new System.Version(2, 4, 9) })));
+            new object[] { importerCode.Replace("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1", "LEGACY_EMBEDDED_PACKAGE_TRUST"), new System.Version(2, 5, 0) })));
 
         var bulk = Assert.Single(package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "bulk-import-microi-store-packages");
         var bulkCode = bulk["ApiV8Code"]?.ToString() ?? string.Empty;
         Assert.True(Assert.IsType<bool>(hasBulk!.Invoke(null,
+            new object[] { bulkCode, new System.Version(1, 3, 8) })));
+        Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
             new object[] { bulkCode, new System.Version(1, 3, 7) })));
         Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
-            new object[] { bulkCode, new System.Version(1, 3, 6) })));
+            new object[] { bulkCode.Replace("BulkAdaptiveSingleSlice: false", "BulkAdaptiveSingleSlice: true"), new System.Version(1, 3, 8) })));
         Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
-            new object[] { bulkCode.Replace("BulkAdaptiveSingleSlice: false", "BulkAdaptiveSingleSlice: true"), new System.Version(1, 3, 7) })));
+            new object[] { bulkCode.Replace("STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2", "STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V1"), new System.Version(1, 3, 8) })));
         Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
-            new object[] { bulkCode.Replace("STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V2", "STARTUP_DEPENDENCY_RESOURCE_CLOSURE_V1"), new System.Version(1, 3, 7) })));
-        Assert.False(Assert.IsType<bool>(hasBulk.Invoke(null,
-            new object[] { bulkCode.Replace("STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1", "LEGACY_STARTUP_BOOTSTRAP"), new System.Version(1, 3, 7) })));
+            new object[] { bulkCode.Replace("STARTUP_DEPENDENCY_BOOTSTRAP_ONLY_V1", "LEGACY_STARTUP_BOOTSTRAP"), new System.Version(1, 3, 8) })));
 
         var sysMenu = Assert.Single(package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "platform-sys-menu");
@@ -988,12 +1008,23 @@ public class CacheAndUpgradeRegressionTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory != null)
         {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Microi.Upgrade"))
-                && Directory.Exists(Path.Combine(directory.FullName, "Microi.net.Api")))
-                return directory.FullName;
+            var directCandidate = directory.FullName;
+            if (IsServerRoot(directCandidate))
+                return directCandidate;
+
+            var nestedCandidate = Path.Combine(directory.FullName, "Microi.Server");
+            if (IsServerRoot(nestedCandidate))
+                return nestedCandidate;
+
             directory = directory.Parent;
         }
         throw new DirectoryNotFoundException("未找到 Microi.Server 根目录。");
+    }
+
+    private static bool IsServerRoot(string path)
+    {
+        return File.Exists(Path.Combine(path, "Microi.Upgrade", "Microi.Upgrade.csproj"))
+            && File.Exists(Path.Combine(path, "Microi.net.Api", "Microi.net.Api.csproj"));
     }
 }
 

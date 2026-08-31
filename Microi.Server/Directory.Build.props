@@ -1,28 +1,50 @@
 <Project>
   <PropertyGroup>
+    <!--
+      两套解决方案必须代表两种真实交付拓扑：公开 Microi.net.sln 固定消费 NuGet，
+      创建人专用 Microi.Anderson.sln 固定消费三个闭源源码项目。直接构建单个项目时
+      保留原有 Auto 行为，方便完整源码工作区继续 dotnet run，也兼容普通用户缺少源码目录。
+    -->
+    <MicroiClosedSourceReferenceMode Condition="'$(MicroiClosedSourceReferenceMode)' == '' and '$(SolutionFileName)' == 'Microi.net.sln'">NuGet</MicroiClosedSourceReferenceMode>
+    <MicroiClosedSourceReferenceMode Condition="'$(MicroiClosedSourceReferenceMode)' == '' and '$(SolutionFileName)' == 'Microi.Anderson.sln'">Project</MicroiClosedSourceReferenceMode>
+    <MicroiClosedSourceReferenceMode Condition="'$(MicroiClosedSourceReferenceMode)' == ''">Auto</MicroiClosedSourceReferenceMode>
+
     <!-- Microi.net 项目路径和 NuGet 包版本 -->
     <MicroiNetProjectPath>$(MSBuildThisFileDirectory)Microi.net\Microi.net.csproj</MicroiNetProjectPath>
-    <MicroiNetVersion>7.7.6</MicroiNetVersion>
-    
-    <!-- 自动检测：Microi.net 项目存在则使用本地引用，否则使用 NuGet 包 -->
-    <MicroiNetExists Condition="Exists('$(MicroiNetProjectPath)')">true</MicroiNetExists>
-    <MicroiNetExists Condition="!Exists('$(MicroiNetProjectPath)')">false</MicroiNetExists>
+    <MicroiNetVersion>7.7.9</MicroiNetVersion>
+
+    <!-- Project 强制源码；NuGet 强制包；Auto 才按本地项目是否存在自动判断。 -->
+    <MicroiNetExists Condition="'$(MicroiClosedSourceReferenceMode)' == 'Project'">true</MicroiNetExists>
+    <MicroiNetExists Condition="'$(MicroiClosedSourceReferenceMode)' == 'Auto' and Exists('$(MicroiNetProjectPath)')">true</MicroiNetExists>
+    <MicroiNetExists Condition="'$(MicroiNetExists)' != 'true'">false</MicroiNetExists>
 
     <!-- Microi.AI 项目路径和 NuGet 包版本 -->
     <MicroiAIProjectPath>$(MSBuildThisFileDirectory)Microi.AI\Microi.AI.csproj</MicroiAIProjectPath>
     
-    <!-- 自动检测：Microi.AI 项目存在则使用本地引用，否则使用 NuGet 包 -->
-    <MicroiAIExists Condition="Exists('$(MicroiAIProjectPath)')">true</MicroiAIExists>
-    <MicroiAIExists Condition="!Exists('$(MicroiAIProjectPath)')">false</MicroiAIExists>
+    <MicroiAIExists Condition="'$(MicroiClosedSourceReferenceMode)' == 'Project'">true</MicroiAIExists>
+    <MicroiAIExists Condition="'$(MicroiClosedSourceReferenceMode)' == 'Auto' and Exists('$(MicroiAIProjectPath)')">true</MicroiAIExists>
+    <MicroiAIExists Condition="'$(MicroiAIExists)' != 'true'">false</MicroiAIExists>
 
     <!-- 独立 SSO 与工作流插件沿用平台统一版本；源码缺席时自动切换到 NuGet。 -->
     <MicroiSSOProjectPath>$(MSBuildThisFileDirectory)Microi.SSO\Microi.SSO.csproj</MicroiSSOProjectPath>
     <MicroiSSOExists Condition="Exists('$(MicroiSSOProjectPath)')">true</MicroiSSOExists>
     <MicroiSSOExists Condition="!Exists('$(MicroiSSOProjectPath)')">false</MicroiSSOExists>
     <MicroiWorkFlowProjectPath>$(MSBuildThisFileDirectory)Microi.WorkFlow\Microi.WorkFlow.csproj</MicroiWorkFlowProjectPath>
-    <MicroiWorkFlowExists Condition="Exists('$(MicroiWorkFlowProjectPath)')">true</MicroiWorkFlowExists>
-    <MicroiWorkFlowExists Condition="!Exists('$(MicroiWorkFlowProjectPath)')">false</MicroiWorkFlowExists>
+    <MicroiWorkFlowExists Condition="'$(MicroiClosedSourceReferenceMode)' == 'Project'">true</MicroiWorkFlowExists>
+    <MicroiWorkFlowExists Condition="'$(MicroiClosedSourceReferenceMode)' == 'Auto' and Exists('$(MicroiWorkFlowProjectPath)')">true</MicroiWorkFlowExists>
+    <MicroiWorkFlowExists Condition="'$(MicroiWorkFlowExists)' != 'true'">false</MicroiWorkFlowExists>
   </PropertyGroup>
+
+  <Target Name="ValidateMicroiClosedSourceReferenceMode" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(MicroiClosedSourceReferenceMode)' != 'NuGet' and '$(MicroiClosedSourceReferenceMode)' != 'Project' and '$(MicroiClosedSourceReferenceMode)' != 'Auto'"
+           Text="MicroiClosedSourceReferenceMode 只允许 NuGet、Project 或 Auto，当前值为 $(MicroiClosedSourceReferenceMode)。" />
+    <Error Condition="'$(MicroiClosedSourceReferenceMode)' == 'Project' and !Exists('$(MicroiNetProjectPath)')"
+           Text="源码引用模式缺少 Microi.net 项目：$(MicroiNetProjectPath)" />
+    <Error Condition="'$(MicroiClosedSourceReferenceMode)' == 'Project' and !Exists('$(MicroiAIProjectPath)')"
+           Text="源码引用模式缺少 Microi.AI 项目：$(MicroiAIProjectPath)" />
+    <Error Condition="'$(MicroiClosedSourceReferenceMode)' == 'Project' and !Exists('$(MicroiWorkFlowProjectPath)')"
+           Text="源码引用模式缺少 Microi.WorkFlow 项目：$(MicroiWorkFlowProjectPath)" />
+  </Target>
   
   <!-- 编译时显示引用方式 -->
   <Target Name="ShowMicroiNetReference" BeforeTargets="BeforeBuild">

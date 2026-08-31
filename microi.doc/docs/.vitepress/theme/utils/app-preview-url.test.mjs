@@ -93,6 +93,38 @@ test('routes protocol v3 stable application paths through the API instead of HDF
   }), 'https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/ocean-fishing-unity/assets/index.html')
 })
 
+test('normalizes historical Web and mixed-case v3 routes to the one runtime stable entry', () => {
+  const runtime = {
+    apiBase: 'https://api.itdos.com',
+    fileServer: 'https://static.itdos.com',
+    osClient: 'iTdos'
+  }
+  const expected = 'https://api.itdos.com/micro-app/v3/tenants/itdos/kinds/runtime/apps/canonical-office/assets/index.html'
+  const records = [
+    { StablePreviewUrl: 'https://static.itdos.com/micro-app/v3/tenants/iTdos/kinds/Web/apps/canonical-office/assets/index.html?version=9' },
+    { PublicPublishPath: '/micro-app/v3/tenants/ITDOS/kinds/UniApp/apps/canonical-office/assets/index.html' },
+    { PreviewUrl: expected }
+  ]
+
+  for (const fields of records) {
+    assert.equal(resolveApplicationExperienceUrl({
+      AppKey: 'canonical-office',
+      ApplicationType: 'Web',
+      ...fields
+    }, desktopWindow, runtime), expected)
+  }
+})
+
+test('rejects a protocol v3 candidate whose route AppKey belongs to another application', () => {
+  assert.equal(resolveStableApplicationEntry({
+    AppKey: 'expected-app',
+    StableUrl: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/another-app/assets/index.html'
+  }, 'https://microi.net', {
+    apiBase: 'https://api.itdos.com',
+    osClient: 'iTdos'
+  }), '')
+})
+
 test('keeps unrelated query parameters while normalizing the latest entry', () => {
   assert.equal(
     withPreviewVersion('/itdos/ai-app-publish/demo/versions/2.4.1/index.html?mode=share', {}, 'https://static.itdos.com'),

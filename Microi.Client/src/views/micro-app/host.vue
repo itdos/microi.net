@@ -60,6 +60,16 @@
             @error="handleMicroAppError"
         />
         <DiyFormFull v-if="formDialogVisible" ref="refMicroAppFormDialog" />
+        <DiyCustomDialog
+            v-if="platformPrintDialogVisible"
+            ref="refPlatformPrintDialog"
+            :DataAppend="platformPrintDialogConfig.DataAppend"
+            :OpenType="platformPrintDialogConfig.OpenType"
+            :title="platformPrintDialogConfig.Title"
+            :TitleIcon="platformPrintDialogConfig.TitleIcon"
+            :width="platformPrintDialogConfig.Width"
+            :ComponentName="platformPrintDialogConfig.ComponentName"
+        />
     </div>
 </template>
 
@@ -85,6 +95,7 @@ import {
     MICRO_APP_HOST_PROTOCOL,
     createMicroAppHostCapabilities,
     normalizeHostMessage,
+    normalizeHostPlatformPrint,
     normalizeHostRouteTarget,
     normalizeHostTabTitle,
     parseMicroAppHostAction
@@ -210,7 +221,8 @@ export default {
         MicroAppLoadingSkeleton,
         MicroAppRuntimeError,
         MciRenderSourceBadge,
-        DiyFormFull: defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"))
+        DiyFormFull: defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue")),
+        DiyCustomDialog: defineAsyncComponent(() => import("@/views/form-engine/diy-custom-dialog.vue"))
     },
     setup() {
         return { diyStore: useDiyStore(), tagsViewStore: useTagsViewStore() };
@@ -256,6 +268,15 @@ export default {
             globalOverlayHole: { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 },
             globalOverlayScrollState: null,
             formDialogVisible: false,
+            platformPrintDialogVisible: false,
+            platformPrintDialogConfig: {
+                ComponentName: "OpenIframe",
+                Title: "普通打印",
+                TitleIcon: "fas fa-print",
+                OpenType: "Drawer",
+                Width: "min(1100px, calc(100vw - 24px))",
+                DataAppend: {}
+            },
             ownedRoutePath: route.path || "",
             ownedRouteFullPath: route.fullPath || "",
             ownedRouteName: route.name || "",
@@ -490,6 +511,9 @@ export default {
                     case "openForm":
                         result = await this.openMarketplaceForm(request.data);
                         break;
+                    case "openPlatformPrint":
+                        result = await this.openPlatformPrint(request.data);
+                        break;
                     default:
                         throw Object.assign(new Error("宿主不支持该微服务操作"), { code: "HOST_ACTION_UNSUPPORTED" });
                 }
@@ -670,6 +694,24 @@ export default {
                 }
             });
             return { accepted: true, tableName: "sys_microistore", formMode, id: tableRowId };
+        },
+        async openPlatformPrint(input) {
+            const config = normalizeHostPlatformPrint(input, {
+                apiBase: DiyCommon.GetApiBase(),
+                osClient: DiyCommon.GetOsClient()
+            });
+            this.platformPrintDialogConfig = config;
+            this.platformPrintDialogVisible = true;
+            await this.$nextTick();
+            for (let attempt = 0; attempt < 60; attempt += 1) {
+                const dialog = this.$refs.refPlatformPrintDialog;
+                if (dialog?.Show) {
+                    dialog.Show();
+                    return { accepted: true, printId: config.DataAppend.PrintId };
+                }
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+            throw Object.assign(new Error("平台打印组件尚未就绪，请稍后重试"), { code: "HOST_PRINT_DIALOG_NOT_READY" });
         },
         getCurrentVisitedView() {
             return this.tagsViewStore?.visitedViews?.find((view) => view.fullPath === this.ownedRouteFullPath) || null;

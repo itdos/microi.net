@@ -32,6 +32,8 @@
 
             <ThemeSelect class="right-menu-item hover-effect" />
 
+            <UiDensitySelect class="right-menu-item hover-effect" />
+
             <!-- PC AI助手：与移动端、小程序复用同一机器人和同一接口能力 -->
             <DesktopAiAssistant />
 
@@ -129,6 +131,7 @@ import Hamburger from "@/components/Hamburger";
 import LangSelect from "@/components/LangSelect";
 import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
+import UiDensitySelect from "@/layout/components/UiDensitySelect.vue";
 import BackgroundTaskCenter from "@/layout/components/BackgroundTaskCenter.vue";
 import DesktopAiAssistant from "@/components/DesktopAiAssistant/index.vue";
 import BluetoothPrinterEntry from "@/components/BluetoothPrinterEntry/index.vue";
@@ -145,6 +148,7 @@ export default {
         LangSelect,
         Search,
         ThemeSelect,
+        UiDensitySelect,
         BackgroundTaskCenter,
         DesktopAiAssistant,
         BluetoothPrinterEntry

@@ -137,17 +137,17 @@ for (const capability of [
   "BackgroundTask:StartupDependencyResourceClosureV2",
   "BackgroundTask:StartupDependencyPreinstallBootstrapV1",
   "BackgroundTask:StartupDependencyBootstrapOnlyV1",
-  "ApiEngine:bulk-import-microi-store-packages@v1.3.7"
+  "ApiEngine:bulk-import-microi-store-packages@v1.3.8"
 ]) addCapability(storePackage.PackageInfo, capability);
 const childWorker = (storePackage.SysApiEngines || [])
   .find(item => item.ApiEngineKey === childWorkerKey);
 if (!childWorker) throw new Error(`${childWorkerKey} is missing from app.microi.store.json`);
 childWorker.ApiV8Code = childWorkerSource;
-childWorker.Version = "v1.3.7";
-childWorker.UpdateTime = "2026-08-25 22:00:00";
+childWorker.Version = "v1.3.8";
+childWorker.UpdateTime = "2026-08-31 11:45:00";
 childWorker.ChangeHistory = prependHistory(
   childWorker.ChangeHistory,
-  "2026-08-25 22:00:00 v1.3.7 受信事故任务可只自举七项启动接口，物理强回读后结束且不写应用安装版本"
+  "2026-08-31 11:45:00 v1.3.8 正式商城列表地址仅在明确 NoExistData 或 404 时回退官方旧地址；Managed 安装冲突由子导入器覆盖式处理"
 );
 refreshCounts(storePackage);
 writeJson("app.microi.store.json", storePackage);

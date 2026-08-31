@@ -226,10 +226,13 @@ public class ChildTenantPlatformAppControlServiceTests
             "Resource",
             "bulk-import-packages.js"));
 
-        Assert.Contains("Version: v1.3.7", worker, StringComparison.Ordinal);
+        Assert.Contains("Version: v1.3.8", worker, StringComparison.Ordinal);
         Assert.Contains("MARKETPLACE_LIST_CUSTOM_ADDRESS_V1", worker, StringComparison.Ordinal);
-        Assert.Contains("/apiengine/get-microi-store-list?OsClient=", worker, StringComparison.Ordinal);
-        Assert.DoesNotContain("/apiengine/get-microi-store?OsClient=", worker, StringComparison.Ordinal);
+        Assert.Contains("MARKETPLACE_LIST_ROUTE_FAILOVER_V1", worker, StringComparison.Ordinal);
+        Assert.Contains("formalListPath = '/apiengine/get-microi-store-list'", worker, StringComparison.Ordinal);
+        Assert.Contains("path + '?OsClient='", worker, StringComparison.Ordinal);
+        Assert.Contains("legacyListPath = '/apiengine/get-microi-store'", worker, StringComparison.Ordinal);
+        Assert.Contains("marketplaceRouteUnavailable", worker, StringComparison.Ordinal);
         Assert.Contains("PLATFORM_STARTUP_PACKAGE_PRIORITY_V1", worker, StringComparison.Ordinal);
         Assert.Contains("app.microi.saas-engine", worker, StringComparison.Ordinal);
         Assert.Contains("BULK_REQUIRED_APP_SCOPE_V1", worker, StringComparison.Ordinal);
@@ -280,7 +283,7 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("GetBootstrapSourceFingerprint", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", importerSource, StringComparison.Ordinal);
-        Assert.Contains("Version: v2.4.9", importerSource, StringComparison.Ordinal);
+        Assert.Contains("Version: v2.5.0", importerSource, StringComparison.Ordinal);
         Assert.Contains("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1", importerSource, StringComparison.Ordinal);
         Assert.Contains("V8.Method.RequireManagedProtocolContext", importerSource, StringComparison.Ordinal);
         Assert.Contains("STARTUP_API_RUNTIME_FLAG_PHYSICAL_RECONCILIATION_V1", importerSource, StringComparison.Ordinal);

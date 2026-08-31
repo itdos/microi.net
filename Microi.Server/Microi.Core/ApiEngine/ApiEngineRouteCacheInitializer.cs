@@ -25,58 +25,35 @@ namespace Microi.net
 
             try
             {
-                var result = await MicroiEngine.FormEngine.GetTableDataAsync(new
-                {
-                    FormEngineKey = "sys_apiengine",
-                    _Where = new List<DiyWhere>
-                    {
-                        new DiyWhere { Name = "IsEnable", Value = 1, Type = "=" }
-                    },
-                    _PageIndex = 1,
-                    _PageSize = 100000,
-                    OsClient = client.OsClient
-                }).ConfigureAwait(false);
-                if (result.Code != 1)
-                {
-                    MicroiEngine.QueueSystemLog(client.OsClient, "ApiEngine",
-                        "RouteCacheInitializationFailed", "接口引擎路由缓存初始化失败，可能导致自定义地址首次请求回源",
-                        result.Msg, 3);
-                    return new DosResult(0, null, result.Msg);
-                }
-
-                var rows = result.Data;
+                // 启动缓存是路由控制面事实，必须从主库生成。若使用 DbRead，
+                // 主库已发布的新 ApiAddress 会在节点重启后再次丢失，直到副本追平。
+                var rows = ApiEngineAuthoritativeStore.GetAllEnabled(client);
                 var cache = MicroiEngine.CacheTenant.Cache(client.OsClient);
-                var aliases = new Dictionary<string, (string EngineId, string EngineKey, string Json)>(
-                    StringComparer.OrdinalIgnoreCase);
-                if (rows != null)
+                var resolution = ApiEngineRouteAliases.ResolveCacheAliases(
+                    rows == null ? Enumerable.Empty<object>() : rows.Cast<object>());
+                foreach (var conflict in resolution.Conflicts)
                 {
-                    foreach (var row in rows)
-                    {
-                        var id = DynamicHelper.GetDynamicStringValue(row, "Id", string.Empty);
-                        var key = DynamicHelper.GetDynamicStringValue(row, "ApiEngineKey", string.Empty);
-                        var json = JsonConvert.SerializeObject((object)row);
-                        foreach (var alias in ApiEngineRouteAliases.GetCacheAliases((object)row))
-                        {
-                            if (aliases.TryGetValue(alias, out var owner)
-                                && !string.Equals(owner.EngineId, id, StringComparison.OrdinalIgnoreCase))
-                            {
-                                var conflict = $"路由/缓存别名[{alias}]同时属于接口引擎[{owner.EngineKey}]和[{key}]。";
-                                MicroiEngine.QueueSystemLog(client.OsClient, "ApiEngine",
-                                    "RouteAliasConflict", "接口引擎多路由存在冲突，已拒绝覆盖缓存",
-                                    conflict, 4);
-                                return new DosResult(0, null, conflict);
-                            }
-                            aliases[alias] = (id, key, json);
-                        }
-                    }
+                    var owners = string.Join("、", conflict.Owners.Select(owner =>
+                        $"{owner.EngineKey}({owner.EngineId})"));
+                    MicroiEngine.QueueSystemLog(client.OsClient, "ApiEngine",
+                        "RouteAliasConflictQuarantined", "接口引擎歧义别名已隔离，其它唯一路由继续可用",
+                        $"别名[{conflict.Alias}]同时属于[{owners}]，未写入该别名缓存。", 4);
                 }
-                var writes = aliases.Select(alias =>
-                    cache.SetAsync(BuildCacheKey(client.OsClient, alias.Key), alias.Value.Json)).ToList();
+                await cache.RemoveParentAsync(
+                    $"{CacheKeyPrefix}:{client.OsClient}:{ApiEngineCacheKey}:*").ConfigureAwait(false);
+                var writes = resolution.Aliases.Select(alias =>
+                    cache.SetAsync(
+                        BuildCacheKey(client.OsClient, alias.Key),
+                        JsonConvert.SerializeObject(alias.Value.ApiEngine))).ToList();
                 await Task.WhenAll(writes).ConfigureAwait(false);
                 MicroiEngine.QueueSystemLog(client.OsClient, "ApiEngine",
                     "RouteCacheInitialized", "接口引擎路由缓存初始化完成",
-                    $"共写入{writes.Count}个 Key。", 1, true);
-                return new DosResult(1, new { CacheKeyCount = writes.Count });
+                    $"共写入{writes.Count}个 Key，隔离{resolution.Conflicts.Count}个歧义别名。", 1, true);
+                return new DosResult(1, new
+                {
+                    CacheKeyCount = writes.Count,
+                    QuarantinedAliasCount = resolution.Conflicts.Count
+                });
             }
             catch (Exception ex)
             {

@@ -47,7 +47,7 @@ const SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB";
 const EMPTY_BLE_INFO = Object.freeze({
     platform: "", deviceId: "", deviceName: "",
     transport: "ble", profileMode: "auto", profileId: "generic-tspl", commandLanguage: "tspl",
-    writeCharaterId: "", writeServiceId: "",
+    writeCharaterId: "", writeServiceId: "", writeType: "", writeCandidates: [],
     notifyCharaterId: "", notifyServiceId: "",
     readCharaterId: "", readServiceId: "",
 });
@@ -61,6 +61,33 @@ const PRINTER_SERVICE_UUIDS = [
     "49535343-fe7d-4ae5-8fa9-9fafd205e455",
     "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
 ];
+
+function normalizeBluetoothUuid(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function isKnownPrinterService(serviceId) {
+    var normalized = normalizeBluetoothUuid(serviceId);
+    return PRINTER_SERVICE_UUIDS.some(function (known) {
+        return normalizeBluetoothUuid(known) === normalized;
+    });
+}
+
+function canUseUniWriteNoResponse() {
+    return typeof globalThis !== "undefined"
+        && globalThis.uni
+        && typeof globalThis.uni.writeBLECharacteristicValue === "function";
+}
+
+function sortPlusWriteCandidates(candidates) {
+    return normalizeWriteCandidates(candidates).sort(function (left, right) {
+        function score(candidate) {
+            return (isKnownPrinterService(candidate.serviceId) ? 1000 : 0)
+                + (candidate.writeType === "write" ? 100 : 0);
+        }
+        return score(right) - score(left);
+    });
+}
 
 // ====================== 环境检测 ======================
 
@@ -87,6 +114,14 @@ function normalizeBLEInfo(info) {
     if (!info || typeof info !== "object" || !info.deviceId) return null;
     var profileMode = normalizeProfileMode(info.profileMode || "auto");
     var profile = resolvePrinterProfile(info.deviceName, profileMode);
+    var writeCandidates = normalizeWriteCandidates(info.writeCandidates);
+    if (writeCandidates.length === 0 && info.writeServiceId && info.writeCharaterId) {
+        writeCandidates.push({
+            serviceId: String(info.writeServiceId),
+            characteristicId: String(info.writeCharaterId),
+            writeType: String(info.writeType || "write") === "writeNoResponse" ? "writeNoResponse" : "write",
+        });
+    }
     return {
         platform: String(info.platform || ""),
         deviceId: String(info.deviceId || ""),
@@ -97,11 +132,31 @@ function normalizeBLEInfo(info) {
         commandLanguage: profile.commandLanguage,
         writeCharaterId: String(info.writeCharaterId || ""),
         writeServiceId: String(info.writeServiceId || ""),
+        writeType: String(info.writeType || "write") === "writeNoResponse" ? "writeNoResponse" : "write",
+        writeCandidates: writeCandidates,
         notifyCharaterId: String(info.notifyCharaterId || ""),
         notifyServiceId: String(info.notifyServiceId || ""),
         readCharaterId: String(info.readCharaterId || ""),
         readServiceId: String(info.readServiceId || ""),
     };
+}
+
+function normalizeWriteCandidates(candidates) {
+    var normalized = [];
+    var seen = new Set();
+    (Array.isArray(candidates) ? candidates : []).forEach(function (candidate) {
+        var serviceId = String(candidate && candidate.serviceId || "");
+        var characteristicId = String(candidate && candidate.characteristicId || "");
+        if (!serviceId || !characteristicId) return;
+        var writeType = String(candidate && candidate.writeType || "write") === "writeNoResponse"
+            ? "writeNoResponse"
+            : "write";
+        var key = serviceId.toLowerCase() + "|" + characteristicId.toLowerCase() + "|" + writeType;
+        if (seen.has(key)) return;
+        seen.add(key);
+        normalized.push({ serviceId: serviceId, characteristicId: characteristicId, writeType: writeType });
+    });
+    return normalized;
 }
 
 function getStorage(name) {
@@ -215,6 +270,8 @@ function applyConnectedInfo(Print, info) {
 
 function clearLiveConnection(Print) {
     Print._plusConnected = false;
+    Print._plusWriteCandidates = [];
+    Print._plusWriteCandidateIndex = -1;
     closePlusSppConnection(Print);
     Print._webServer = null;
     Print._webWriteChar = null;
@@ -395,6 +452,8 @@ async function connectPlusSppDevice(Print, device, options) {
         android.importClass(output);
         Print._plusSppSocket = socket;
         Print._plusSppOutput = output;
+        Print._plusWriteCandidates = [];
+        Print._plusWriteCandidateIndex = -1;
 
         var info = emptyBLEInfo();
         info.deviceId = deviceId;
@@ -480,6 +539,77 @@ function createPlusConnection(deviceId) {
     });
 }
 
+function selectPlusWriteCandidate(Print, index) {
+    var candidates = normalizeWriteCandidates(Print._plusWriteCandidates);
+    var candidate = candidates[index];
+    if (!candidate) return false;
+    Print._plusWriteCandidates = candidates;
+    Print._plusWriteCandidateIndex = index;
+    var live = Object.assign({}, Print.BLEInformation, {
+        writeServiceId: candidate.serviceId,
+        writeCharaterId: candidate.characteristicId,
+        writeType: candidate.writeType,
+        writeCandidates: candidates,
+    });
+    var normalized = normalizeBLEInfo(live);
+    Print.BLEInformation = Object.assign(emptyBLEInfo(), normalized);
+    Print._rememberedInfo = Object.assign({}, normalized);
+    saveBLEInfo(normalized);
+    return true;
+}
+
+function createPlusWriteError(error) {
+    var code = Number(error && (error.errCode || error.code));
+    var message = error && error.errMsg ? error.errMsg : bleErrorTip(code);
+    var normalized = new Error(message);
+    if (Number.isFinite(code)) normalized.code = code;
+    return normalized;
+}
+
+function writePlusBleChunk(Print, chunk) {
+    var candidate = Print._plusWriteCandidates[Print._plusWriteCandidateIndex] || {
+        serviceId: Print.BLEInformation.writeServiceId,
+        characteristicId: Print.BLEInformation.writeCharaterId,
+        writeType: Print.BLEInformation.writeType || "write",
+    };
+    var writer = window.plus.bluetooth.writeBLECharacteristicValue.bind(window.plus.bluetooth);
+    var payload = {
+        deviceId: Print.BLEInformation.deviceId,
+        serviceId: candidate.serviceId,
+        characteristicId: candidate.characteristicId,
+        value: chunk.buffer,
+    };
+    if (candidate.writeType === "writeNoResponse") {
+        if (!canUseUniWriteNoResponse()) {
+            return Promise.reject(new Error("该打印机只暴露无响应写入特征；当前 5+ 蓝牙运行时不支持，请选择已配对的 SPP 设备或升级客户端"));
+        }
+        writer = globalThis.uni.writeBLECharacteristicValue.bind(globalThis.uni);
+        payload.writeType = "writeNoResponse";
+    }
+    return new Promise(function (resolve, reject) {
+        writer(Object.assign(payload, {
+            success: resolve,
+            fail: function (error) { reject(createPlusWriteError(error)); },
+        }));
+    });
+}
+
+async function writePlusBleChunkWithCandidateFallback(Print, chunk, allowFallback) {
+    while (true) {
+        try {
+            await writePlusBleChunk(Print, chunk);
+            return;
+        } catch (error) {
+            var isUnsupported = Number(error && error.code) === 10007
+                || /10007|特征值不支持|property not support/i.test(String(error && error.message || error));
+            var nextIndex = Print._plusWriteCandidateIndex + 1;
+            if (!allowFallback || !isUnsupported || nextIndex >= Print._plusWriteCandidates.length) throw error;
+            selectPlusWriteCandidate(Print, nextIndex);
+            console.warn(LOG_PREFIX + " 当前写入特征不支持打印，自动切换到下一个可写特征");
+        }
+    }
+}
+
 async function connectPlusDevice(Print, device, options) {
     options = options || {};
     if (!isPlusApp()) throw new Error("当前终端不支持 5+App 蓝牙");
@@ -517,7 +647,7 @@ async function connectPlusDevice(Print, device, options) {
         info.deviceName = deviceName;
         info.transport = "ble";
         info.profileMode = profileMode;
-        var writeFound = false;
+        var writeCandidates = [];
         for (var serviceIndex = 0; serviceIndex < services.length; serviceIndex++) {
             var serviceId = services[serviceIndex].uuid;
             var characteristics = await new Promise(function (resolve) {
@@ -535,10 +665,18 @@ async function connectPlusDevice(Print, device, options) {
                     info.notifyCharaterId = characteristic.uuid;
                     info.notifyServiceId = serviceId;
                 }
-                if (!writeFound && (properties.write || properties.writeNoResponse)) {
-                    info.writeCharaterId = characteristic.uuid;
-                    info.writeServiceId = serviceId;
-                    writeFound = true;
+                if (properties.write) {
+                    writeCandidates.push({
+                        serviceId: serviceId,
+                        characteristicId: characteristic.uuid,
+                        writeType: "write",
+                    });
+                } else if ((properties.writeNoResponse || properties.writeWithoutResponse) && canUseUniWriteNoResponse()) {
+                    writeCandidates.push({
+                        serviceId: serviceId,
+                        characteristicId: characteristic.uuid,
+                        writeType: "writeNoResponse",
+                    });
                 }
                 if (!info.readCharaterId && properties.read) {
                     info.readCharaterId = characteristic.uuid;
@@ -546,9 +684,18 @@ async function connectPlusDevice(Print, device, options) {
                 }
             }
         }
-        if (!writeFound) throw new Error("未找到打印机写入特征值，请换一个设备");
+        writeCandidates = sortPlusWriteCandidates(writeCandidates);
+        if (writeCandidates.length === 0) {
+            throw new Error("未找到 5+ 运行时可用的打印写入特征；请确认选择的是打印机，或使用已配对的 SPP 通道");
+        }
+        info.writeCandidates = writeCandidates;
+        info.writeServiceId = writeCandidates[0].serviceId;
+        info.writeCharaterId = writeCandidates[0].characteristicId;
+        info.writeType = writeCandidates[0].writeType;
 
         Print._plusConnected = true;
+        Print._plusWriteCandidates = writeCandidates;
+        Print._plusWriteCandidateIndex = 0;
         applyConnectedInfo(Print, info);
         if (typeof options.onStatus === "function") options.onStatus("已连接: " + deviceName, "connected");
         console.log(LOG_PREFIX + " [plus] 蓝牙连接成功");
@@ -1187,6 +1334,8 @@ function createV8Print(V8) {
         _plusDeviceFoundListeners: new Set(),
         _plusBridgeRegistered: false,
         _plusConnected: false,
+        _plusWriteCandidates: [],
+        _plusWriteCandidateIndex: -1,
         _plusSppSocket: null,
         _plusSppOutput: null,
         _webDevice: null,
@@ -1416,16 +1565,11 @@ function createV8Print(V8) {
                         if (isPlusApp() && Print.BLEInformation.transport === "spp") {
                             await writePlusSppChunk(Print, chunk);
                         } else if (isPlusApp()) {
-                            await new Promise(function (resolve, reject) {
-                                window.plus.bluetooth.writeBLECharacteristicValue({
-                                    deviceId: Print.BLEInformation.deviceId,
-                                    serviceId: Print.BLEInformation.writeServiceId,
-                                    characteristicId: Print.BLEInformation.writeCharaterId,
-                                    value: chunk.buffer,
-                                    success: resolve,
-                                    fail: function (error) { reject(new Error(error.errMsg || bleErrorTip(error.errCode || error.code))); }
-                                });
-                            });
+                            await writePlusBleChunkWithCandidateFallback(
+                                Print,
+                                chunk,
+                                copyIndex === 0 && packetIndex === 0
+                            );
                         } else {
                             if (!Print._webWriteChar) throw new Error("蓝牙写入特征已失效");
                             if (Print._webWriteChar.properties && Print._webWriteChar.properties.writeWithoutResponse && typeof Print._webWriteChar.writeValueWithoutResponse === "function") {

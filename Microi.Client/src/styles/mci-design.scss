@@ -1146,6 +1146,36 @@ html.dark {
     border-top: 0 !important;
 }
 
+/* 所有 Element Plus Dialog 由 mci-dialog-runtime 统一补充 mci-unified-dialog。
+   Dialog 外壳保持在视口内，标题/底部固定，中间 Body 独立纵向滚动。
+   :where() 主动降低契约的选择器优先级，允许聊天、代码编辑器等拥有内部
+   滚动容器的专用弹窗继续用组件样式覆盖 overflow。 */
+:where(
+    .el-dialog.mci-unified-dialog,
+    .el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog
+) {
+    display: flex;
+    flex-direction: column;
+}
+
+:where(
+    .el-dialog.mci-unified-dialog,
+    .el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog
+) > :where(.el-dialog__header, .el-dialog__footer) {
+    flex: 0 0 auto;
+}
+
+:where(
+    .el-dialog.mci-unified-dialog,
+    .el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog
+) > :where(.el-dialog__body) {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
 .el-dialog.mci-unified-dialog,
 .el-overlay[data-mci-dialog-contract="field"] > .el-overlay-dialog > .el-dialog {
     --mci-dialog-surface: var(--mci-bg-card, var(--el-bg-color, #fff));
@@ -1153,6 +1183,8 @@ html.dark {
     overflow: hidden;
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
+    margin: auto;
     border: 1px solid var(--mci-dialog-line);
     border-top: 0 !important;
     border-radius: 22px !important;

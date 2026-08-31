@@ -29,6 +29,7 @@ namespace Microi.net.Api
             "/api/ai/",
             "/api/apiengine/",
             "/api/captcha/",
+            "/api/diagnostics/",
             "/api/diychat/",
             "/api/formengine/",
             "/api/hdfs/",
@@ -395,7 +396,9 @@ namespace Microi.net.Api
 
                 if (apiModel == null && !osClient.DosIsNullOrWhiteSpace())
                 {
-                    var fallbackResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam
+                    // 冷缓存回退必须读取主库。保存已提交但 DbRead 尚未同步时，
+                    // 普通读取会把真实自定义路由误判为不存在并返回 404。
+                    var fallbackResult = await MicroiEngine.ApiEngine.GetAuthoritativeApiEngineModel(new ApiEngineParam
                     {
                         ApiAddress = apiPathLower,
                         OsClient = osClient,

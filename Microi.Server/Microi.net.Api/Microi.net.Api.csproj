@@ -103,7 +103,7 @@
     <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
   </ItemGroup>
   
-  <!-- 智能引用 Microi.AI：本地存在用ProjectReference，否则用PackageReference -->
+  <!-- 三个闭源库的引用模式由 Directory.Build.props 按解决方案统一决定。 -->
   <ItemGroup Condition="'$(MicroiAIExists)' == 'true'">
     <ProjectReference Include="..\Microi.AI\Microi.AI.csproj" />
   </ItemGroup>
@@ -119,7 +119,7 @@
     <PackageReference Include="Microi.SSO" Version="$(MicroiNetVersion)" />
   </ItemGroup>
 
-  <!-- 智能引用独立且受混淆保护的工作流插件。 -->
+  <!-- 工作流属于闭源库：公开方案使用 NuGet，Anderson 方案使用源码。 -->
   <ItemGroup Condition="'$(MicroiWorkFlowExists)' == 'true'">
     <ProjectReference Include="..\Microi.WorkFlow\Microi.WorkFlow.csproj" />
   </ItemGroup>
@@ -127,7 +127,7 @@
     <PackageReference Include="Microi.WorkFlow" Version="$(MicroiNetVersion)" />
   </ItemGroup>
   
-  <!-- 智能引用 Microi.net：本地存在用ProjectReference，否则用PackageReference -->
+  <!-- Microi.net 属于闭源库：公开方案使用 NuGet，Anderson 方案使用源码。 -->
   <ItemGroup Condition="'$(MicroiNetExists)' == 'true'">
     <ProjectReference Include="..\Microi.net\Microi.net.csproj" />
   </ItemGroup>

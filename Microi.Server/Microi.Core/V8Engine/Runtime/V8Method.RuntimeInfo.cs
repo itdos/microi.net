@@ -15,6 +15,14 @@ namespace Microi.net
         /// </summary>
         public string GetBackendVersion()
         {
+            return GetCurrentBackendVersion();
+        }
+
+        /// <summary>
+        /// 宿主固定健康入口复用同一版本投影，不创建 V8 上下文，也不读取租户配置。
+        /// </summary>
+        public static string GetCurrentBackendVersion()
+        {
             return BackendVersion.Value;
         }
 

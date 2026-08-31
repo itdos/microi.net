@@ -597,10 +597,8 @@ namespace Microi.net
 
                 try
                 {
-                    var configOsClient = OsClientExtend.GetConfigOsClient();
                     var defaultCache = MicroiEngine.CacheTenant.Default();
-                    defaultCache.Remove($"Microi:{configOsClient}:saas-engine:{osClient}");
-                    defaultCache.Remove($"Microi:{configOsClient}:saas-engine:{osClient.DosToLower()}");
+                    OsClientExtend.InvalidateSaasConfigurationCache(osClient, defaultCache);
                     defaultCache.Remove($"Microi:{osClient}:SysConfig");
                 }
                 catch (Exception ex)
