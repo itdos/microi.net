@@ -16,6 +16,9 @@ namespace Microi.net.Api
         public const string ResolvedApiRouteValuesItem = "__MicroiResolvedApiRouteValues";
         // 正则表达式静态编译（高并发优化）
         private static readonly Regex OsClientRegex = new Regex(@"--OsClient--(.*?)--$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex CanonicalApiEngineKeyRegex = new Regex(
+            @"^/apiengine/([A-Za-z0-9_.:-]+)$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         // 缓存键前缀常量
         private const string CacheKeyPrefix = "Microi";
@@ -80,6 +83,23 @@ namespace Microi.net.Api
         private static string BuildCacheKey(string osClient, string key)
         {
             return $"{CacheKeyPrefix}:{osClient}:{ApiEngineCacheKey}:{key}";
+        }
+
+        /// <summary>
+        /// /apiengine/{Key} 是平台稳定的接口引擎 Key 路由。控制器会把该片段
+        /// 作为 ApiEngineKey 执行，因此路由冷启动也必须按同一事实源读取；否则
+        /// 缓存为空时会错误地只按 ApiAddress 查询并把已存在的引擎报告为不存在。
+        /// 自定义地址继续返回空字符串并按 ApiAddress 解析。
+        /// </summary>
+        internal static string ResolveCanonicalApiEngineKey(string apiPath)
+        {
+            var pathWithoutTenantSuffix = OsClientRegex.Replace(
+                apiPath ?? string.Empty,
+                string.Empty);
+            var match = CanonicalApiEngineKeyRegex.Match(pathWithoutTenantSuffix);
+            return match.Success
+                ? match.Groups[1].Value.Trim().ToLowerInvariant()
+                : string.Empty;
         }
 
         // zhy 2026-08-21：数据库回源结果必须先落成 object 和强类型字符串，
@@ -342,6 +362,7 @@ namespace Microi.net.Api
                 }
 
                 var apiPathLower = apiPath.ToLowerInvariant();
+                var canonicalApiEngineKey = ResolveCanonicalApiEngineKey(apiPathLower);
 
                 // FormEngine 特殊路由快速匹配
                 if (TryMapFormEngineRoute(apiPathLower, values))
@@ -375,8 +396,12 @@ namespace Microi.net.Api
                 // 获取租户缓存
                 var cacheClient = MicroiEngine.CacheTenant.Cache(osClient);
 
-                // 从缓存查询接口配置
-                var cacheKey = BuildCacheKey(osClient, apiPathLower);
+                // 规范 /apiengine/{Key} 必须按 Key 缓存读取；自定义地址才按完整
+                // ApiAddress 读取。两者均由统一别名协议在命中后补齐其它缓存键。
+                var routeLookupKey = canonicalApiEngineKey.DosIsNullOrWhiteSpace()
+                    ? apiPathLower
+                    : canonicalApiEngineKey;
+                var cacheKey = BuildCacheKey(osClient, routeLookupKey);
                 var apiModel = await cacheClient.GetAsync<dynamic>(cacheKey);
                 if (apiModel is string cachedText)
                 {
@@ -398,12 +423,18 @@ namespace Microi.net.Api
                 {
                     // 冷缓存回退必须读取主库。保存已提交但 DbRead 尚未同步时，
                     // 普通读取会把真实自定义路由误判为不存在并返回 404。
-                    var fallbackResult = await MicroiEngine.ApiEngine.GetAuthoritativeApiEngineModel(new ApiEngineParam
+                    var authoritativeParam = new ApiEngineParam
                     {
-                        ApiAddress = apiPathLower,
                         OsClient = osClient,
                         _CurrentUser = null
-                    });
+                    };
+                    if (canonicalApiEngineKey.DosIsNullOrWhiteSpace())
+                        authoritativeParam.ApiAddress = apiPathLower;
+                    else
+                        authoritativeParam.ApiEngineKey = canonicalApiEngineKey;
+
+                    var fallbackResult = await MicroiEngine.ApiEngine
+                        .GetAuthoritativeApiEngineModel(authoritativeParam);
                     if (fallbackResult.Code == 1 && fallbackResult.Data != null)
                     {
                         apiModel = JObject.FromObject((object)fallbackResult.Data);

@@ -581,7 +581,7 @@ function validateReleaseCandidate(name, content) {
         || !String(publisherEngine?.ApiV8Code || '').includes('buildApiEngineResourcePolicies')
         || !String(publisherEngine?.ApiV8Code || '').includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')
         || !String(publisherEngine?.ApiV8Code || '').includes('SharedPublicRuntime')
-        || engineVersionNumber(bulkEngine) < 1_003_008
+        || engineVersionNumber(bulkEngine) < 1_003_009
         || Number(bulkEngine?.IsEnable) !== 1
         || Number(bulkEngine?.StopHttp) !== 0
         || !String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_CHECKPOINT_PLAN_V2')
@@ -600,7 +600,11 @@ function validateReleaseCandidate(name, content) {
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('BackgroundTask:StartupDependencyResourceClosureV2')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
-          .includes('ApiEngine:bulk-import-microi-store-packages@v1.3.8')
+          .includes('ApiEngine:bulk-import-microi-store-packages@v1.3.9')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ApiEngine:get-microi-store@v1.4.7')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('Marketplace:DeterministicInstallVersionStateV1')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('BackgroundTask:StartupDependencyPreinstallBootstrapV1')
         || !String(bulkEngine?.ApiV8Code || '').includes('prioritizeBootstrapPlan')

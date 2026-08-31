@@ -6,6 +6,8 @@ using System.Data.Common;
 using System.Dynamic;
 using System.Globalization;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dos.Common;
@@ -1452,28 +1454,128 @@ namespace Microi.net
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _indexEnsured
             = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
 
+        // 同一集合只允许一个索引初始化任务真正访问 MongoDB。Lazy<Task> 很重要：
+        // ConcurrentDictionary.GetOrAdd 的 valueFactory 可能并发执行多次，直接存 Task 仍会发起重复请求。
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Lazy<Task>> _indexInitializationFlights
+            = new System.Collections.Concurrent.ConcurrentDictionary<string, Lazy<Task>>();
+
+        // 索引初始化失败不能让每个日志批次立即重试。状态只用于单节点降载；MongoDB
+        // createIndexes 本身仍是跨节点幂等事实源，成功后会删除冷却状态。
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SysLogIndexRetryState> _indexRetryStates
+            = new System.Collections.Concurrent.ConcurrentDictionary<string, SysLogIndexRetryState>();
+
+        private const int SysLogIndexInitializationMaxAttempts = 3;
+        private static readonly int[] SysLogIndexInitializationRetryDelaysMs = { 100, 250 };
+        private const int SysLogIndexInitialCooldownSeconds = 15;
+        private const int SysLogIndexMaxCooldownSeconds = 300;
+        private static readonly TimeSpan SysLogIndexDiagnosticInterval = TimeSpan.FromMinutes(1);
+        private const int SysLogIndexSanitizerInputLimit = 4096;
+        private const string SysLogIndexSanitizerFallback = "异常摘要已隐藏（脱敏处理超时）";
+
+        private static readonly Regex SysLogServiceUriRegex = new Regex(
+            @"\b(mongodb(?:\+srv)?|redis(?:s)?|mysql|postgres(?:ql)?|sqlserver)://[^\s,;]+",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(100));
+        private static readonly Regex SysLogUriUserInfoRegex = new Regex(
+            @"\b([a-z][a-z0-9+.-]*://)(?:[^/@\s]+)@",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(100));
+        private static readonly Regex SysLogSensitiveAssignmentRegex = new Regex(
+            @"(?<prefix>(?<![A-Za-z0-9_.-])(?:""|')?(?:(?:connection(?:[_\s-]?string)?|db(?:mongo)?conn(?:ection)?|authorization|cookie)|(?:[A-Za-z0-9_.-]{0,48}(?:password|pwd|passkey|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_.-]{0,24}))(?:""|')?\s*[:=]\s*)(?:""(?:\\.|[^""\\])*""|'(?:\\.|[^'\\])*'|[^,;}\]\r\n\s]+)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(100));
+        private static readonly Regex SysLogConnectionSegmentRegex = new Regex(
+            @"(?<prefix>(?<![A-Za-z0-9_.-])(?:""|')?(?:server|host|data\s+source|database|initial\s+catalog|user\s+id|uid|username|user)(?:""|')?\s*[:=]\s*)(?:""(?:\\.|[^""\\])*""|'(?:\\.|[^'\\])*'|[^,;}\]\r\n\s]+)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(100));
+        private static readonly Regex SysLogWindowsPathRegex = new Regex(
+            @"(?<![A-Za-z0-9])(?:[A-Za-z]:\\|\\\\)[^""'<>\r\n,;]*",
+            RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(100));
+        private static readonly Regex SysLogUnixPathRegex = new Regex(
+            @"(?<![A-Za-z0-9])/(?:home|var|etc|usr|opt|tmp|root|Users)/[^""'<>\r\n,;]*",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(100));
+        private static readonly Regex SysLogWhitespaceRegex = new Regex(
+            @"\s+",
+            RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(100));
+
+        private sealed class SysLogIndexRetryState
+        {
+            internal int ConsecutiveFailures;
+            internal long RetryNotBeforeUtcTicks;
+            internal long LastDiagnosticUtcTicks;
+        }
+
+        private sealed class SysLogIndexFailureDecision
+        {
+            internal int FailureCount { get; set; }
+            internal DateTime RetryNotBeforeUtc { get; set; }
+            internal bool ShouldWriteDiagnostic { get; set; }
+        }
+
         /// <summary>
         /// 确保 SysLog 集合存在范围查询索引（CreateTime/Type/Level）。
         /// 内存缓存控制：每个集合生命周期内只创建一次，幂等安全。
         /// </summary>
         private static async Task EnsureSysLogIndexesAsync(MongodbHost host)
         {
-            var cacheKey = host.DataBase + "." + host.Table;
-            if (_indexEnsured.ContainsKey(cacheKey)) return;
+            var cacheKey = BuildSysLogIndexCacheKey(host);
+            await RunSysLogIndexSingleFlightAsync(
+                cacheKey,
+                () => EnsureSysLogIndexesCoreAsync(host, cacheKey)).ConfigureAwait(false);
+        }
 
+        private static async Task RunSysLogIndexSingleFlightAsync(string cacheKey, Func<Task> initializer)
+        {
+            if (_indexEnsured.ContainsKey(cacheKey)) return;
+            if (IsSysLogIndexRetryCoolingDown(cacheKey, DateTime.UtcNow)) return;
+
+            var candidate = new Lazy<Task>(
+                // 冷却状态可能在本调用通过首个检查后、抢到 flight 前由另一个调用写入，
+                // Lazy 内必须再次检查，避免旧竞争者绕过 retry-not-before。
+                () => IsSysLogIndexRetryCoolingDown(cacheKey, DateTime.UtcNow)
+                    ? Task.CompletedTask
+                    : initializer(),
+                System.Threading.LazyThreadSafetyMode.ExecutionAndPublication);
+            var flight = _indexInitializationFlights.GetOrAdd(cacheKey, candidate);
             try
             {
+                await flight.Value.ConfigureAwait(false);
+            }
+            finally
+            {
+                // 成功由 _indexEnsured 永久短路；失败移除 flight，让下一次日志写入重新尝试。
+                if (_indexInitializationFlights.TryGetValue(cacheKey, out var current)
+                    && ReferenceEquals(current, flight))
+                {
+                    _indexInitializationFlights.TryRemove(cacheKey, out _);
+                }
+            }
+        }
+
+        private static async Task EnsureSysLogIndexesCoreAsync(MongodbHost host, string cacheKey)
+        {
+            var stage = "创建集合客户端";
+            var attempts = 0;
+            var finalException = await RunSysLogIndexOperationWithRetryAsync(async () =>
+            {
+                attempts++;
+                stage = "创建集合客户端";
                 var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
 
+                stage = "读取现有索引";
                 var existingIndexNames = new System.Collections.Generic.HashSet<string>();
-                using (var cursor = await collection.Indexes.ListAsync())
+                using (var cursor = await collection.Indexes.ListAsync().ConfigureAwait(false))
                 {
-                    var existing = await cursor.ToListAsync();
+                    var existing = await cursor.ToListAsync().ConfigureAwait(false);
                     foreach (var idx in existing)
                         if (idx.TryGetValue("name", out var nameVal))
                             existingIndexNames.Add(nameVal.AsString);
                 }
 
+                stage = "生成缺失索引";
                 var toCreate = new System.Collections.Generic.List<CreateIndexModel<SysLog>>();
                 if (!existingIndexNames.Contains("idx_CreateTime_desc"))
                     toCreate.Add(new CreateIndexModel<SysLog>(
@@ -1512,15 +1614,207 @@ namespace Microi.net
                         Builders<SysLog>.IndexKeys.Ascending(d => d.ServiceName).Descending(d => d.CreateTime),
                         new CreateIndexOptions { Name = "idx_ServiceName_CreateTime" }));
 
+                stage = "创建缺失索引";
                 if (toCreate.Count > 0)
-                    await collection.Indexes.CreateManyAsync(toCreate);
+                    await collection.Indexes.CreateManyAsync(toCreate).ConfigureAwait(false);
+            }).ConfigureAwait(false);
 
-                _indexEnsured.TryAdd(cacheKey, true);
-            }
-            catch (Exception ex)
+            if (finalException == null)
             {
-                Console.WriteLine($"[Microi] MongoDB 创建SysLog索引失败({host.DataBase}.{host.Table}): {ex.Message}");
+                _indexEnsured.TryAdd(cacheKey, true);
+                _indexRetryStates.TryRemove(cacheKey, out _);
+                return;
             }
+
+            var failure = RegisterSysLogIndexFailure(cacheKey, DateTime.UtcNow);
+            if (failure.ShouldWriteDiagnostic)
+            {
+                Console.WriteLine(
+                    $"[Microi] MongoDB 创建SysLog索引失败({host.DataBase}.{host.Table})；" +
+                    $"阶段={stage}；尝试={attempts}/{SysLogIndexInitializationMaxAttempts}；" +
+                    $"连续失败={failure.FailureCount}；最早重试={failure.RetryNotBeforeUtc:O}；" +
+                    $"异常={BuildSafeExceptionSummary(finalException)}；" +
+                    "日志数据写入保持成功，冷却期内跳过索引初始化，避免日志队列被重复重试阻塞。");
+            }
+        }
+
+        private static string BuildSysLogIndexCacheKey(MongodbHost host)
+        {
+            // 连接字符串可能在 SaaS 配置热刷新后指向另一台 MongoDB；只用库名和集合名
+            // 会把旧端点的成功结果错误复用到新端点。缓存中仅保存不可逆指纹，不暴露凭据。
+            var connection = host?.Connection?.Trim() ?? string.Empty;
+            byte[] hash;
+            using (var sha256 = SHA256.Create())
+            {
+                hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(connection));
+            }
+            var fingerprint = BitConverter.ToString(hash, 0, 12).Replace("-", string.Empty);
+            return fingerprint + "|" + (host?.DataBase ?? string.Empty) + "|" + (host?.Table ?? string.Empty);
+        }
+
+        private static bool IsSysLogIndexRetryCoolingDown(string cacheKey, DateTime utcNow)
+        {
+            if (!_indexRetryStates.TryGetValue(cacheKey, out var state)) return false;
+            var retryTicks = System.Threading.Interlocked.Read(ref state.RetryNotBeforeUtcTicks);
+            return retryTicks > utcNow.Ticks;
+        }
+
+        private static SysLogIndexFailureDecision RegisterSysLogIndexFailure(string cacheKey, DateTime utcNow)
+        {
+            var normalizedNow = utcNow.Kind == DateTimeKind.Utc ? utcNow : utcNow.ToUniversalTime();
+            var state = _indexRetryStates.GetOrAdd(cacheKey, _ => new SysLogIndexRetryState());
+            var failures = System.Threading.Interlocked.Increment(ref state.ConsecutiveFailures);
+            var exponent = Math.Min(5, Math.Max(0, failures - 1));
+            var cooldownSeconds = Math.Min(
+                SysLogIndexMaxCooldownSeconds,
+                SysLogIndexInitialCooldownSeconds * (1 << exponent));
+            var retryNotBefore = normalizedNow.AddSeconds(cooldownSeconds);
+            System.Threading.Interlocked.Exchange(ref state.RetryNotBeforeUtcTicks, retryNotBefore.Ticks);
+
+            var shouldWriteDiagnostic = false;
+            while (true)
+            {
+                var previousTicks = System.Threading.Interlocked.Read(ref state.LastDiagnosticUtcTicks);
+                if (previousTicks > 0
+                    && normalizedNow.Ticks - previousTicks < SysLogIndexDiagnosticInterval.Ticks)
+                {
+                    break;
+                }
+                if (System.Threading.Interlocked.CompareExchange(
+                        ref state.LastDiagnosticUtcTicks,
+                        normalizedNow.Ticks,
+                        previousTicks) == previousTicks)
+                {
+                    shouldWriteDiagnostic = true;
+                    break;
+                }
+            }
+
+            return new SysLogIndexFailureDecision
+            {
+                FailureCount = failures,
+                RetryNotBeforeUtc = retryNotBefore,
+                ShouldWriteDiagnostic = shouldWriteDiagnostic
+            };
+        }
+
+        private static async Task<Exception?> RunSysLogIndexOperationWithRetryAsync(Func<Task> operation)
+        {
+            for (var attempt = 1; attempt <= SysLogIndexInitializationMaxAttempts; attempt++)
+            {
+                try
+                {
+                    await operation().ConfigureAwait(false);
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    if (!IsTransientMongoIndexException(ex) || attempt >= SysLogIndexInitializationMaxAttempts)
+                        return ex;
+
+                    await Task.Delay(SysLogIndexInitializationRetryDelaysMs[attempt - 1]).ConfigureAwait(false);
+                }
+            }
+
+            return new InvalidOperationException("MongoDB SysLog 索引初始化重试状态异常。");
+        }
+
+        private static bool IsTransientMongoIndexException(Exception exception)
+        {
+            foreach (var current in EnumerateMongoExceptionGraph(exception))
+            {
+                if (current is TimeoutException
+                    || current is System.IO.IOException
+                    || current is System.Net.Sockets.SocketException
+                    || current is MongoConnectionException)
+                    return true;
+
+                var message = current.Message ?? string.Empty;
+                if (message.IndexOf("receiving a message from the server", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("connection was closed", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("connection reset", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("network", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("timed out", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static string BuildSafeExceptionSummary(Exception exception)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            foreach (var current in EnumerateMongoExceptionGraph(exception))
+            {
+                var message = SanitizeSysLogIndexExceptionMessage(current.Message);
+                parts.Add(current.GetType().Name + (message.Length == 0 ? string.Empty : ": " + message));
+                if (parts.Count >= 8) break;
+            }
+
+            return string.Join(" -> ", parts);
+        }
+
+        private static string SanitizeSysLogIndexExceptionMessage(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return string.Empty;
+            var safe = message.Length <= SysLogIndexSanitizerInputLimit
+                ? message
+                : message.Substring(0, SysLogIndexSanitizerInputLimit);
+            try
+            {
+                var builder = new StringBuilder(safe.Length);
+                foreach (var character in safe)
+                {
+                    var category = char.GetUnicodeCategory(character);
+                    builder.Append(char.IsControl(character) || category == UnicodeCategory.Format ? ' ' : character);
+                }
+                safe = builder.ToString();
+                safe = SysLogServiceUriRegex.Replace(safe, "$1://***");
+                safe = SysLogUriUserInfoRegex.Replace(safe, "$1***@");
+                safe = SysLogSensitiveAssignmentRegex.Replace(safe, "${prefix}***");
+                safe = SysLogConnectionSegmentRegex.Replace(safe, "${prefix}***");
+                safe = SysLogWindowsPathRegex.Replace(safe, "[path]");
+                safe = SysLogUnixPathRegex.Replace(safe, "[path]");
+                safe = SysLogWhitespaceRegex.Replace(safe, " ").Trim();
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return SysLogIndexSanitizerFallback;
+            }
+
+            if (safe.Length > 300) safe = safe.Substring(0, 300) + "...";
+            return safe;
+        }
+
+        private static IReadOnlyList<Exception> EnumerateMongoExceptionGraph(Exception exception)
+        {
+            var result = new List<Exception>();
+            var seen = new HashSet<Exception>();
+            var pending = new Stack<Tuple<Exception, int>>();
+            pending.Push(Tuple.Create(exception, 0));
+            while (pending.Count > 0 && result.Count < 32)
+            {
+                var item = pending.Pop();
+                var current = item.Item1;
+                if (current == null || !seen.Add(current)) continue;
+                result.Add(current);
+                if (item.Item2 >= 12) continue;
+
+                var children = new List<Exception>();
+                if (current is AggregateException aggregate)
+                {
+                    foreach (var inner in aggregate.InnerExceptions)
+                        if (inner != null) children.Add(inner);
+                }
+                else if (current.InnerException != null)
+                {
+                    children.Add(current.InnerException);
+                }
+
+                for (var index = children.Count - 1; index >= 0; index--)
+                    pending.Push(Tuple.Create(children[index], item.Item2 + 1));
+            }
+            return result;
         }
 
         /// <summary>

@@ -6,7 +6,7 @@ const read = name => fs.readFileSync(new URL(name, import.meta.url), 'utf8');
 const packageModel = JSON.parse(read('./app.microi.saas-engine.json'));
 
 test('SaaS package owns DataSourceType and one shared ApiV8Code editor', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.7.12');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.7.13');
   const typeFields = packageModel.DiyFields.filter(item => (
     item.TableName === 'sys_apiengine' && item.Name === 'DataSourceType'
   ));

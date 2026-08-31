@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store
- * Version: v1.4.6
+ * Version: v1.4.7
  * Function:
  * - 读取统一应用商城列表并计算租户安装状态；批量平台安装时优先返回应用商城自举包。
  */
@@ -80,7 +80,38 @@ function first(row, names) {
   for (var i = 0; row && i < names.length; i++) if (row[names[i]] !== null && row[names[i]] !== undefined && row[names[i]] !== "") return row[names[i]];
   return "";
 }
-function addMap(map, key, row) { key = lower(key); if (key && !map[key]) map[key] = row; }
+function normalizedRecordTime(value) {
+  var source = trim(value), dotNet = source.match(/^\/Date\((\d+)/), calendar, milliseconds, timestamp;
+  if (!source) return "";
+  if (dotNet) return ("00000000000000000" + dotNet[1]).slice(-17);
+  calendar = source.match(/^(\d{4})[-\/]?(\d{1,2})[-\/]?(\d{1,2})(?:[T\s](\d{1,2}):?(\d{1,2})?:?(\d{1,2})?(?:\.(\d{1,3}))?)?/);
+  if (!calendar) return source.replace(/[^0-9]/g, "").substring(0, 17);
+  milliseconds = ((calendar[7] || "") + "000").substring(0, 3);
+  timestamp = Date.UTC(
+    Number(calendar[1]), Number(calendar[2]) - 1, Number(calendar[3]),
+    Number(calendar[4] || 0), Number(calendar[5] || 0), Number(calendar[6] || 0),
+    Number(milliseconds || 0)
+  );
+  return ("00000000000000000" + timestamp).slice(-17);
+}
+function installedRecordTime(row) {
+  var fields = ["UpdateTime", "InstallTime", "LastCheckTime", "CreateTime"];
+  for (var i = 0; row && i < fields.length; i++) {
+    var candidate = normalizedRecordTime(row[fields[i]]);
+    if (candidate) return candidate;
+  }
+  return "";
+}
+function isDeletedInstallRecord(row) {
+  var value = lower(first(row, ["IsDeleted"]));
+  return value === "1" || value === "true" || value === "yes";
+}
+function addMap(map, prefix, key, row) {
+  key = lower(key);
+  if (!key || isDeletedInstallRecord(row)) return;
+  var mapKey = prefix + ":" + key, existing = map[mapKey];
+  if (!existing || installedRecordTime(row) > installedRecordTime(existing)) map[mapKey] = row;
+}
 function installedMap(apps) {
   var external = V8.Param.InstalledVersions || V8.Param.InstalledApps;
   var rows = external ? toArray(external) : [];
@@ -101,9 +132,11 @@ function installedMap(apps) {
       else installedWhere.push(["AppId", "In", appIds]);
       var result = V8.FormEngine.GetTableData("sys_microistoreversion", {
         _Where: installedWhere,
-        _SelectFields: ["Id", "StoreId", "AppId", "AppName", "AppVersion", "AppVersionInstall", "InstallStatus", "InstallTime"],
+        _SelectFields: ["Id", "StoreId", "AppId", "AppName", "AppVersion", "AppVersionInstall", "PackageVersion", "InstallStatus", "IsDeleted", "InstallTime", "UpdateTime", "LastCheckTime", "CreateTime"],
         _PageIndex: 1,
-        _PageSize: Math.max(15, Math.min(1000, (storeIds.length + appIds.length) * 3))
+        _PageSize: Math.max(15, Math.min(1000, (storeIds.length + appIds.length) * 3)),
+        _OrderBy: "UpdateTime",
+        _OrderByType: "DESC"
       });
       rows = result && result.Code === 1 ? toArray(result.Data) : [];
     } catch (error) { rows = []; }
@@ -111,25 +144,46 @@ function installedMap(apps) {
   var map = {};
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i] || {};
-    addMap(map, row.StoreId, row); addMap(map, row.AppId, row); addMap(map, row.AppName, row); addMap(map, row.Id, row);
+    addMap(map, "storeid", row.StoreId, row);
+    addMap(map, "appid", row.AppId, row);
+    addMap(map, "appname", row.AppName, row);
+    addMap(map, "legacyid", row.Id, row);
   }
   return map;
 }
 function findInstalled(map, app) {
-  return map[lower(app.Id)] || map[lower(app.AppId)] || map[lower(app.AppKey)] || map[lower(app.AppName || app.Name)] || null;
+  return map["storeid:" + lower(app.Id)]
+    || map["appid:" + lower(app.AppId)]
+    || map["appid:" + lower(app.AppKey)]
+    || map["appname:" + lower(app.AppName || app.Name)]
+    || map["legacyid:" + lower(app.Id)]
+    || null;
 }
 function applyInstallState(app, installed) {
   var latest = text(app.AppVersion || app.CurrentVersion);
-  if (!installed) {
+  var local = installed ? text(first(installed, ["AppVersionInstall", "InstalledVersion", "PackageVersion", "AppVersion"])) : "";
+  var compare = latest && local ? compareVersion(latest, local) : 0;
+  var rawStatus = installed ? lower(first(installed, ["InstallStatus", "Status"])) : "";
+  var failedOrMissing = ["uninstalled", "未安装", "failed", "failure", "失败", "error"].indexOf(rawStatus) >= 0;
+  var successfulOrCompatible = !rawStatus
+    || ["installed", "success", "succeeded", "已安装", "outdated", "可更新", "更新"].indexOf(rawStatus) >= 0;
+  if (installed && !isDeletedInstallRecord(installed) && local && compare < 0) {
+    app.StoreInstallStatus = "Abnormal";
+    app.StoreInstallStatusText = "版本异常";
+    app.StoreInstallActionName = "异常";
+    app.AppVersionInstall = local;
+    app.InstalledVersion = local;
+    return app;
+  }
+  if (!installed || isDeletedInstallRecord(installed) || !local || failedOrMissing
+      || (!successfulOrCompatible && compare >= 0)) {
     app.StoreInstallStatus = "Uninstalled";
     app.StoreInstallStatusText = "未安装";
     app.StoreInstallActionName = "安装";
-    app.AppVersionInstall = "";
-    app.InstalledVersion = "";
+    app.AppVersionInstall = local;
+    app.InstalledVersion = local;
     return app;
   }
-  var local = text(first(installed, ["AppVersionInstall", "InstalledVersion", "PackageVersion", "AppVersion"]));
-  var compare = latest && local ? compareVersion(latest, local) : 0;
   app.StoreInstallStatus = compare > 0 ? "Outdated" : (compare < 0 ? "Abnormal" : "Installed");
   app.StoreInstallStatusText = compare > 0 ? "可更新" : (compare < 0 ? "版本异常" : "已安装");
   app.StoreInstallActionName = compare > 0 ? "更新" : (compare < 0 ? "异常" : "重新安装");

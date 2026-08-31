@@ -652,7 +652,9 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                throw new Exception("iTdos.DIY OnActionExecuting异常：" + ex.Message + ex.InnerException?.ToString() + ex.StackTrace);
+                // 保留真实 InnerException 供统一异常投影提取根因；禁止把堆栈拼进异常消息，
+                // 否则生产响应即使只显示 Message 也可能间接泄露源码路径和调用栈。
+                throw new InvalidOperationException("iTdos.DIY OnActionExecuting异常。", ex);
             }
 
         }
@@ -663,6 +665,9 @@ namespace Microi.net.Api
         public virtual void OnException(ExceptionContext context)
         {
             var osClient = DiyToken.GetCurrentOsClient();
+            var exception = context.Exception ?? new InvalidOperationException("未知控制器异常");
+            var diagnostic = ApiExceptionDiagnostics.Create(exception);
+            var traceId = context.HttpContext.TraceIdentifier;
 
             MicroiEngine.QueueSysLog(new SysLogParam()
             {
@@ -671,8 +676,11 @@ namespace Microi.net.Api
                 Content = "OsClient：" + osClient
                         + "Api：" + context.HttpContext.Request.Host.Value //注意在正式环境中这里获取到的是负载均衡的地址：apiaijuhomecom
                                     + context.HttpContext.Request.Path.Value //api/Aijuhome/DiyTable/GetMacEnable
-                        + "。Message：" + context.Exception?.Message
-                        + "。StackTrace：" + context.Exception?.StackTrace,
+                        + "。TraceId：" + traceId
+                        + "。ExceptionType：" + diagnostic.ExceptionType
+                        + "。RootCauseType：" + diagnostic.RootCauseType
+                        + "。RootCauseSummary：" + diagnostic.RootCauseSummary,
+                OtherInfo = exception.StackTrace,
                 OsClient = osClient
             });
 
@@ -681,16 +689,22 @@ namespace Microi.net.Api
                 "Development",
                 StringComparison.OrdinalIgnoreCase);
             var json = new DosResult(0, null,
-                isDevelopment
-                    ? "未处理的异常：" + context.Exception?.Message
-                    : "服务器内部错误，请稍后重试。",
+                ApiExceptionDiagnostics.BuildUserMessage("服务器处理失败。", diagnostic, traceId),
                 null,
                 new
             {
-                TraceId = context.HttpContext.TraceIdentifier,
-                StackTrace = isDevelopment ? context.Exception?.StackTrace : null,
-                InnerException = isDevelopment ? context.Exception?.InnerException?.Message : null,
-                OsClient = osClient
+                TraceId = traceId,
+                ErrorType = diagnostic.ErrorType,
+                Layer = "Microi.MvcFilter",
+                ExceptionType = diagnostic.ExceptionType,
+                RootCauseType = diagnostic.RootCauseType,
+                RootCauseSummary = diagnostic.RootCauseSummary,
+                Solution = diagnostic.RecoverySuggestion,
+                RecoverySuggestion = diagnostic.RecoverySuggestion,
+                DevelopmentDetail = isDevelopment ? diagnostic.DevelopmentDetail : null,
+                OsClient = osClient,
+                Path = context.HttpContext.Request.Path.Value,
+                Method = context.HttpContext.Request.Method
             });
             context.Result = new JsonResult(json);
             context.ExceptionHandled = true;

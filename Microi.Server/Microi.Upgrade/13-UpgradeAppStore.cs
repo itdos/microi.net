@@ -57,7 +57,7 @@ namespace Microi.net
         // 受信任核心导入器提升到平台既有 8GB 累计分配硬上限；进程常驻内存保护仍生效，
         // 普通接口引擎不受影响，5GB 运行资产继续走 HDFS multipart 而不进入 Jint。
         private const int ImporterLimitMemoryMb = 8192;
-        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 5, 0);
+        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 5, 1);
         private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 3, 8);
         private static readonly System.Version MinimumPlatformBackgroundTaskVersion = new System.Version(1, 1, 0);
         private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 1);
@@ -258,6 +258,10 @@ namespace Microi.net
                 && code.Contains("BACKGROUND_TASK_BOUNDED_PACKAGE_SLICES_V1")
                 && code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_BATCH_V1")
                 && code.Contains("GENERATED_ENTITY_PHYSICAL_BOOTSTRAP_CHECKPOINT_V1")
+                && code.Contains("PACKAGE_API_ENGINE_PHYSICAL_READBACK_FALLBACK_V1")
+                && code.Contains("activeImportStage = '步骤2-字段定义'")
+                && code.Contains("TableName: 'diy_field'")
+                && code.Contains("['OsClient', textType(255)]")
                 && code.Contains("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1")
                 && code.Contains("PACKAGE_MANAGED_OVERWRITE_V2")
                 && code.Contains("PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2")

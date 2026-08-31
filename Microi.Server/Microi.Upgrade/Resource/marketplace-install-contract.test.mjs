@@ -372,7 +372,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.3.8");
+  assert.equal(engine.Version, "v1.3.9");
   assert.match(bulkSource, /value\.标识 \|\| value\.Identifier/);
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
@@ -381,7 +381,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.5\.0/);
+  assert.match(importerSource, /Version: v2\.5\.1/);
   assert.match(importerSource, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
   assert.match(importerSource, /storeApiBase \+ '\/apiengine\/'/);
   assert.doesNotMatch(importerSource, /\/api\/ApiEngine\/Run/);
@@ -408,6 +408,8 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /bulk_adaptive_single_slice_ignored/);
   assert.doesNotMatch(importerSource, /backgroundChunkingEnabled\s*=\s*false/);
   assert.match(importerSource, /PACKAGE_API_ENGINE_READBACK_V1/);
+  assert.match(importerSource, /PACKAGE_API_ENGINE_PHYSICAL_READBACK_FALLBACK_V1/);
+  assert.match(importerSource, /FormEngine 回读为空，已按参数化物理事实重建接口缓存/);
   assert.match(importerSource, /assertPersistedApiEngine\(modelCopy, updatedEngine\)/);
   assert.match(importerSource, /assertPersistedApiEngine\(modelCopy, insertedEngine\)/);
   assert.match(importerSource, /throw new Error\('更新接口引擎失败：'/);
@@ -476,7 +478,7 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.5.0");
+  assert.equal(embeddedImporter.Version, "v2.5.1");
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     "InstallerFeature:PackageManagedOverwriteV2",
   ));

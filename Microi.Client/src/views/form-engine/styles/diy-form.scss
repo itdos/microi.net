@@ -271,7 +271,7 @@
     :deep(.diy-presentation-field-card .el-input__wrapper),
     :deep(.diy-presentation-field-card .el-select__wrapper) {
         box-sizing: border-box;
-        height: 34px;
+        // height: 34px; //2026-08-31 Anderson：若这里设置固定高度会导致下拉多选框选择了大量数据库下拉框并不会被撑开
         min-height: 34px;
     }
     :deep(.presentation-density-compact .diy-presentation-field-card > .container-form-item) {

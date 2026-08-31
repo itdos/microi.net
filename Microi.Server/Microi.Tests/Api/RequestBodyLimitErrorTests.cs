@@ -28,6 +28,16 @@ public class RequestBodyLimitErrorTests
     }
 
     [Fact]
+    public void DetectsPayloadLimitInNonFirstAggregateBranch()
+    {
+        var exception = new AggregateException(
+            new InvalidOperationException("first unrelated branch"),
+            new InvalidDataException("Multipart body length limit 268435456 exceeded."));
+
+        Assert.True(RequestBodyLimitError.IsRequestBodyTooLarge(exception));
+    }
+
+    [Fact]
     public void DoesNotClassifyUnrelatedInvalidDataException()
     {
         var exception = new InvalidDataException("ZIP package contains more than one SQL file.");
@@ -83,5 +93,14 @@ public class RequestBodyLimitErrorTests
         Assert.Equal(
             RequestBodyLimitError.Layer,
             payload["DataAppend"]?.Value<string>("Layer"));
+        Assert.Equal(
+            nameof(BadHttpRequestException),
+            payload["DataAppend"]?.Value<string>("ExceptionType"));
+        Assert.Contains("Request body too large", payload["DataAppend"]?.Value<string>("RootCauseSummary"));
+        Assert.Equal(
+            RequestBodyLimitError.Solution,
+            payload["DataAppend"]?.Value<string>("RecoverySuggestion"));
+        Assert.Contains(context.TraceIdentifier, payload.Value<string>("Msg"));
+        Assert.Null(payload["DataAppend"]?["StackTrace"]);
     }
 }

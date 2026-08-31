@@ -294,7 +294,7 @@ model.PackageInfo.RequiredPlatformCapabilities = [
   'ApiEngine:get-microi-store-model@v1.2.9',
   'ApiEngine:ai_app_publish_store@v1.9.13',
   'ApiEngine:export-microi-store-package@v1.2.4',
-  'ApiEngine:import-microi-store-package@v2.5.0',
+  'ApiEngine:import-microi-store-package@v2.5.1',
   'InstallerFeature:PackageManagedOverwriteV2',
   'Installer:StartupDependencyApiFastBootstrap',
   'Installer:StartupDependencyPreinstallBootstrapV1',

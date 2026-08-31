@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.5.0
+ * Version: v2.5.1
  * Function:
  * - 统一应用商城导入器；支持 HDFS 公私有包指针、大小与 SHA-256 校验、后台分片和包资源覆盖升级。
  */
@@ -202,6 +202,15 @@ function ensureGeneratedEntityPhysicalPrerequisites(maxChangedTables) {
             ]
         },
         {
+            // 早期租户已经存在 diy_field，但尚无 OsClient。字段导入阶段需要先
+            // 物理读取并恢复软删除/主键冲突记录；若等到后续 PhysicalColumns
+            // 阶段才补列，会先在 SELECT ... OsClient 处失败。
+            TableName: 'diy_field',
+            Definitions: [
+                ['OsClient', textType(255)]
+            ]
+        },
+        {
             // MARKETPLACE_HDFS_PACKAGE_POINTER_SCHEMA_V1：商城包安装前一次性补齐
             // 内容指针列；MySQL 会合并为单条 ALTER，避免大表逐列重建八次。
             TableName: 'sys_microistore',
@@ -256,6 +265,7 @@ var physicalBootstrapPhase = String(physicalBootstrapCheckpoint.Phase || '');
 var physicalBootstrapOwnsSlice = physicalBootstrapChunkingEnabled
     && !startupDependencyBootstrapOnlyRequested
     && (!physicalBootstrapPhase || physicalBootstrapPhase == 'Prerequisites');
+var activeImportStage = '物理前置检查';
 
 try {
     var generatedEntityPhysicalBootstrap = ensureGeneratedEntityPhysicalPrerequisites(
@@ -3342,6 +3352,7 @@ try {
     rebuildLegacyCheckpointIdMaps();
 
     // ==================== 步骤0：执行DDL创建表和字段 ====================
+    activeImportStage = '步骤0-物理表与DDL';
 
     reportProgress(10, '正在创建和检查物理表');
     debugLog.step0 = '开始执行DDL创建表';
@@ -4602,6 +4613,7 @@ try {
     }
 
     // ==================== 步骤1：处理diy_table数据 ====================
+    activeImportStage = '步骤1-表定义';
 
     reportProgress(25, '正在导入表单引擎表定义');
     debugLog.step1 = '开始处理diy_table数据';
@@ -4746,6 +4758,7 @@ try {
     }
 
     // ==================== 步骤2：处理diy_field数据 ====================
+    activeImportStage = '步骤2-字段定义';
 
     reportProgress(40, '正在导入字段定义');
     debugLog.step2 = '开始处理diy_field数据';
@@ -5143,6 +5156,7 @@ try {
     }
 
     // ==================== 步骤2.5：同步物理表字段（补充所有表的缺失字段） ====================
+    activeImportStage = '步骤2.5-物理字段同步';
 
     reportProgress(55, '正在同步物理表字段');
     debugLog.step2_5 = '开始同步物理表字段';
@@ -5570,6 +5584,7 @@ try {
     }
 
     // ==================== 步骤3：处理sys_menu数据 ====================
+    activeImportStage = '步骤3-菜单与权限';
 
     // 应用资产依赖 sys_microistore / mci_ai_app_file / sys_microiservice 等基础表，必须在 DDL、表定义、字段和物理列完成后再安装。
     var applicationBundles = [];
@@ -6180,9 +6195,12 @@ try {
                 // ModuleEngineKey 只允许补充识别无 Url 的旧菜单，不能把两个不同路由
                 // 的菜单合并成同一行。
                 if ((menu.Url && sameMenuByUrl) || (!menu.Url && sameMenuByKey)) {
+                    // sys_menu 的正式物理契约不包含 OsClient。V8.OsClient 只作为
+                    // FormEngine/连接路由上下文使用；旧版这里直接写物理 OsClient，
+                    // 会让早期客户库在恢复软删除菜单时因 Unknown column 中断整包。
                     execNonQuery(
-                        'UPDATE sys_menu SET OsClient = @p0, IsDeleted = 0 WHERE Id = @p1',
-                        [V8.OsClient, menu.Id]
+                        'UPDATE sys_menu SET IsDeleted = 0 WHERE Id = @p0',
+                        [menu.Id]
                     );
                     exists = checkExists('sys_menu', menu.Id);
                     revivedDeletedMenu = !!exists;
@@ -6347,8 +6365,8 @@ try {
             if (addResult.Code != 1 && isDuplicatePrimaryError(addResult)) {
                 recoveredDuplicateMenu = true;
                 execNonQuery(
-                    'UPDATE sys_menu SET OsClient = @p0, IsDeleted = 0 WHERE Id = @p1',
-                    [V8.OsClient, menu.Id]
+                    'UPDATE sys_menu SET IsDeleted = 0 WHERE Id = @p0',
+                    [menu.Id]
                 );
                 addResult = runWriteWithRetry(function () {
                     return V8.FormEngine.UptFormData('sys_menu', modelCopy);
@@ -6725,6 +6743,7 @@ try {
         + '，保留现有原生菜单' + stats.MicroServiceMenusPreserved;
 
     // ==================== 步骤4：处理wf_flowdesign数据（可选） ====================
+    activeImportStage = '步骤4-工作流设计';
 
     if (Package.WfFlowDesigns && Package.WfFlowDesigns.length > 0) {
         reportProgress(80, '正在导入工作流设计');
@@ -6769,6 +6788,7 @@ try {
     }
 
     // ==================== 步骤5：处理wf_node数据（可选） ====================
+    activeImportStage = '步骤5-工作流节点';
 
     if (Package.WfNodes && Package.WfNodes.length > 0) {
         reportProgress(85, '正在导入工作流节点');
@@ -6813,6 +6833,7 @@ try {
     }
 
     // ==================== 步骤6：处理wf_line数据（可选） ====================
+    activeImportStage = '步骤6-工作流连线';
 
     if (Package.WfLines && Package.WfLines.length > 0) {
         reportProgress(90, '正在导入工作流连线');
@@ -7011,6 +7032,40 @@ try {
             }
         }
 
+        // PACKAGE_API_ENGINE_PHYSICAL_READBACK_FALLBACK_V1：部分旧租户的
+        // sys_apiengine 物理行完整，但 diy_table/diy_field 元数据损坏或缓存仍是
+        // 旧投影，FormEngine 三种别名回读都会返回空。导入器此前已经用参数化
+        // 物理查询确定了资源身份，因此这里用同一物理事实完成强回读与缓存重建，
+        // 不能把真实存在的 Managed 接口误判成“写入后不存在”。
+        var recoveredPhysicalReadback = false;
+        if (!latest && !isMissingValue(apiEngineKey)) {
+            latest = V8.Db.FromSql(
+                    'SELECT * FROM sys_apiengine WHERE LOWER(ApiEngineKey)=LOWER(@p0)'
+                )
+                .AddInParameter('@p0', apiEngineKey)
+                .First();
+            recoveredPhysicalReadback = !!latest;
+        }
+        if (!latest && !isMissingValue(apiEngineId)) {
+            latest = V8.Db.FromSql('SELECT * FROM sys_apiengine WHERE Id=@p0')
+                .AddInParameter('@p0', apiEngineId)
+                .First();
+            recoveredPhysicalReadback = !!latest;
+        }
+        if (!latest && !isMissingValue(apiAddress)) {
+            latest = V8.Db.FromSql(
+                    'SELECT * FROM sys_apiengine WHERE LOWER(ApiAddress)=LOWER(@p0)'
+                )
+                .AddInParameter('@p0', apiAddress)
+                .First();
+            recoveredPhysicalReadback = !!latest;
+        }
+        if (recoveredPhysicalReadback) {
+            debugLog['apiengine_physical_readback_recovery_'
+                + String(apiEngineKey || apiEngineId || apiAddress)] =
+                'FormEngine 回读为空，已按参数化物理事实重建接口缓存';
+        }
+
         if (!latest) return null;
         normalizeApiEngineModel(latest);
         // IV8Cache.Set 的 value 参数是 string。直接传 Jint/.NET 对象会被转换成
@@ -7066,6 +7121,10 @@ try {
         if (assignments.length == 0) return latest;
         var stableId = String(latest.Id || expected.Id || '');
         if (!stableId) throw new Error('接口引擎开关补正缺少稳定Id：' + expected.ApiEngineKey);
+        // PACKAGE_API_ENGINE_STALE_ALIAS_INVALIDATION_V1：首次物理回读会按旧
+        // ApiAddress/ApiRoutes 重建缓存。物理补正路由前必须清除这份旧事实的
+        // 全部别名，随后 refreshApiEngineCache 只按严格回读的新事实重建。
+        removeApiEngineCacheAliases(latest);
         var reconcileCommand = V8.Db.FromSql(
             'UPDATE sys_apiengine SET ' + assignments.join(',') + ' WHERE Id=@p0'
         ).AddInParameter('@p0', stableId);
@@ -7236,6 +7295,7 @@ try {
     }
 
     // ==================== 步骤7：处理sys_apiengine数据（可选） ====================
+    activeImportStage = '步骤7-接口引擎';
 
     if (Package.SysApiEngines && Package.SysApiEngines.length > 0) {
         reportProgress(95, '正在导入接口引擎');
@@ -7420,6 +7480,7 @@ try {
     }
 
     // ==================== 步骤8：导入应用随包数据 ====================
+    activeImportStage = '步骤8-随包数据';
 
     // DATASET_INSERT_IF_MISSING_V1：配置种子可声明 InsertIfMissing，并用
     // ConflictFields 做稳定业务键存在性检查。应用更新不得覆盖客户已经修改过的
@@ -7683,6 +7744,7 @@ try {
         );
     }
 
+    activeImportStage = '最终强回读与版本记录';
     var hasInstallErrorsBeforeVersion = false;
     for (var debugKeyBeforeVersion in debugLog) {
         if (debugKeyBeforeVersion.indexOf('_error_') > -1) {
@@ -7778,8 +7840,9 @@ try {
 
     return {
         Code: 0,
-        Msg: '导入失败：' + error.message,
+        Msg: '导入失败（阶段：' + activeImportStage + '）：' + error.message,
         Data: {
+            失败阶段: activeImportStage,
             错误信息: error.message,
             错误堆栈: error.stack
         }
