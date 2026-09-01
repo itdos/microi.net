@@ -1,30 +1,77 @@
 #!/bin/sh
 set -eu
 
-repo_root=$(git rev-parse --show-toplevel)
+MICROI_PUBLIC_GUARD_VERSION=2
+export MICROI_PUBLIC_GUARD_VERSION
+GIT_NO_REPLACE_OBJECTS=1
+export GIT_NO_REPLACE_OBJECTS
+
+repo_root=$(git --no-replace-objects rev-parse --show-toplevel)
 policy_file="$repo_root/.public-repo-protected-paths"
+canonical_paths='Microi.Server/Microi.net
+Microi.Server/Microi.AI
+Microi.VSCode
+Microi.Client/src/views/webos
+Microi.Server/Microi.WorkFlow'
 
-if [ ! -f "$policy_file" ]; then
-  echo "拒绝提交：缺少根公开仓闭源路径策略 $policy_file" >&2
-  exit 1
-fi
+reject_rewrite_overlays() {
+  if git --no-replace-objects for-each-ref --format='%(refname)' refs/replace/ | grep -q .; then
+    echo "拒绝提交：检测到 refs/replace，闭源路径审计不能在替换对象下运行。" >&2
+    exit 1
+  fi
 
-set --
-while IFS= read -r protected_path || [ -n "$protected_path" ]; do
-  case "$protected_path" in
-    ''|'#'*) continue ;;
-  esac
-  set -- "$@" "$protected_path"
-done < "$policy_file"
+  grafts_file=$(git --no-replace-objects rev-parse --git-path info/grafts)
+  if [ -s "$grafts_file" ]; then
+    echo "拒绝提交：检测到非空 info/grafts，闭源路径审计不能在 grafts 下运行。" >&2
+    exit 1
+  fi
+}
 
-if [ "$#" -eq 0 ]; then
-  echo "拒绝提交：根公开仓闭源路径策略为空。" >&2
-  exit 1
-fi
+validate_policy_file() {
+  if [ ! -f "$policy_file" ]; then
+    echo "拒绝提交：缺少根公开仓闭源路径策略 $policy_file" >&2
+    exit 1
+  fi
 
-tracked=$(git ls-files -- "$@")
+  policy_paths=$(sed -e 's/\r$//' -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$policy_file")
+  if [ "$policy_paths" != "$canonical_paths" ]; then
+    echo "拒绝提交：.public-repo-protected-paths 必须完整、逐字保留五条闭源路径。" >&2
+    exit 1
+  fi
+}
+
+filter_protected_paths() {
+  LC_ALL=C perl -0ne '
+    BEGIN {
+      @protected = (
+        "microi.server/microi.net",
+        "microi.server/microi.ai",
+        "microi.vscode",
+        "microi.client/src/views/webos",
+        "microi.server/microi.workflow"
+      );
+    }
+    s/\0\z//;
+    $original = $_;
+    $candidate = lc $_;
+    for $protected (@protected) {
+      if ($candidate eq $protected || index($candidate, "$protected/") == 0) {
+        $original =~ s/\\/\\\\/g;
+        $original =~ s/\r/\\r/g;
+        $original =~ s/\n/\\n/g;
+        print "$original\n";
+        last;
+      }
+    }
+  '
+}
+
+reject_rewrite_overlays
+validate_policy_file
+
+tracked=$(git --no-replace-objects ls-files -z | filter_protected_paths)
 if [ -n "$tracked" ]; then
-  echo "拒绝提交：根仓索引包含独立闭源仓库路径：" >&2
+  echo "拒绝提交：根仓索引包含独立闭源仓库路径（大小写不敏感匹配）：" >&2
   printf '%s\n' "$tracked" >&2
   echo "请只从根仓索引移除；不要删除内部 GitLab 工作区文件，也不要使用 --no-verify。" >&2
   exit 1

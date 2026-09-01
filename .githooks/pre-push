@@ -1,84 +1,184 @@
 #!/bin/sh
 set -eu
 
+MICROI_PUBLIC_GUARD_VERSION=2
+export MICROI_PUBLIC_GUARD_VERSION
+GIT_NO_REPLACE_OBJECTS=1
+export GIT_NO_REPLACE_OBJECTS
+
 remote_name=${1:-}
 remote_url=${2:-}
-repo_root=$(git rev-parse --show-toplevel)
+repo_root=$(git --no-replace-objects rev-parse --show-toplevel)
 policy_file="$repo_root/.public-repo-protected-paths"
+canonical_paths='Microi.Server/Microi.net
+Microi.Server/Microi.AI
+Microi.VSCode
+Microi.Client/src/views/webos
+Microi.Server/Microi.WorkFlow'
 
-if [ ! -f "$policy_file" ]; then
-  echo "拒绝推送：缺少根公开仓闭源路径策略 $policy_file" >&2
-  exit 1
-fi
+reject_rewrite_overlays() {
+  if git --no-replace-objects for-each-ref --format='%(refname)' refs/replace/ | grep -q .; then
+    echo "拒绝推送：检测到 refs/replace；pack 传输会忽略替换对象，无法安全审计。" >&2
+    exit 1
+  fi
 
-protected_count=0
-while IFS= read -r protected_path || [ -n "$protected_path" ]; do
-  case "$protected_path" in
-    ''|'#'*) continue ;;
-  esac
-  protected_count=$((protected_count + 1))
-done < "$policy_file"
+  grafts_file=$(git --no-replace-objects rev-parse --git-path info/grafts)
+  if [ -s "$grafts_file" ]; then
+    echo "拒绝推送：检测到非空 info/grafts；无法安全审计真实提交历史。" >&2
+    exit 1
+  fi
 
-if [ "$protected_count" -eq 0 ]; then
-  echo "拒绝推送：根公开仓闭源路径策略为空。" >&2
-  exit 1
-fi
+  if [ "$(git --no-replace-objects rev-parse --is-shallow-repository)" = "true" ]; then
+    echo "拒绝推送：浅克隆缺少完整历史，不能用于根公开仓发布。" >&2
+    exit 1
+  fi
+}
+
+normalize_policy_file() {
+  sed -e 's/\r$//' -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$1"
+}
+
+validate_worktree_policy() {
+  if [ ! -f "$policy_file" ]; then
+    echo "拒绝推送：缺少根公开仓闭源路径策略 $policy_file" >&2
+    exit 1
+  fi
+
+  policy_paths=$(normalize_policy_file "$policy_file")
+  if [ "$policy_paths" != "$canonical_paths" ]; then
+    echo "拒绝推送：.public-repo-protected-paths 必须完整、逐字保留五条闭源路径。" >&2
+    exit 1
+  fi
+}
+
+filter_protected_paths() {
+  LC_ALL=C perl -0ne '
+    BEGIN {
+      @protected = (
+        "microi.server/microi.net",
+        "microi.server/microi.ai",
+        "microi.vscode",
+        "microi.client/src/views/webos",
+        "microi.server/microi.workflow"
+      );
+    }
+    s/\0\z//;
+    $original = $_;
+    $candidate = lc $_;
+    for $protected (@protected) {
+      if ($candidate eq $protected || index($candidate, "$protected/") == 0) {
+        $original =~ s/\\/\\\\/g;
+        $original =~ s/\r/\\r/g;
+        $original =~ s/\n/\\n/g;
+        print "$original\n";
+        last;
+      }
+    }
+  '
+}
 
 is_zero_sha() {
   stripped=$(printf '%s' "$1" | tr -d '0')
   [ -z "$stripped" ]
 }
 
+validate_tip_guard_contract() {
+  commit=$1
+  ref_label=$2
+  tip_policy_temp=$(mktemp "${TMPDIR:-/tmp}/microi-public-policy.XXXXXX")
+  trap 'rm -f "$tip_policy_temp"' EXIT HUP INT TERM
+
+  if ! git --no-replace-objects show "$commit:.public-repo-protected-paths" > "$tip_policy_temp" 2>/dev/null; then
+    echo "拒绝推送：$ref_label 的 tip 缺少 .public-repo-protected-paths。" >&2
+    exit 1
+  fi
+  tip_policy=$(normalize_policy_file "$tip_policy_temp")
+  rm -f "$tip_policy_temp"
+  trap - EXIT HUP INT TERM
+  if [ "$tip_policy" != "$canonical_paths" ]; then
+    echo "拒绝推送：$ref_label 的 tip 未完整保留五条闭源路径策略。" >&2
+    exit 1
+  fi
+
+  for hook_path in .githooks/pre-commit .githooks/pre-push; do
+    hook_mode=$(git --no-replace-objects ls-tree "$commit" -- "$hook_path" | awk 'NR == 1 { print $1 }')
+    if [ "$hook_mode" != "100755" ]; then
+      echo "拒绝推送：$ref_label 的 tip 必须以 100755 保留 $hook_path。" >&2
+      exit 1
+    fi
+    if ! git --no-replace-objects show "$commit:$hook_path" | grep -Fq 'MICROI_PUBLIC_GUARD_VERSION=2'; then
+      echo "拒绝推送：$ref_label 的 tip 未保留 v2 闭源路径门禁 $hook_path。" >&2
+      exit 1
+    fi
+  done
+
+  while IFS= read -r protected_path || [ -n "$protected_path" ]; do
+    ignore_rule="/$protected_path/"
+    if ! git --no-replace-objects show "$commit:.gitignore" | grep -Fqx "$ignore_rule"; then
+      echo "拒绝推送：$ref_label 的 tip 在 .gitignore 中缺少 $ignore_rule。" >&2
+      exit 1
+    fi
+  done <<EOF
+$canonical_paths
+EOF
+}
+
 scan_commit_tree() {
   commit=$1
   ref_label=$2
-  leaked=''
-  while IFS= read -r protected_path || [ -n "$protected_path" ]; do
-    case "$protected_path" in
-      ''|'#'*) continue ;;
-    esac
-    matches=$(git ls-tree -r --name-only "$commit" -- "$protected_path")
-    if [ -n "$matches" ]; then
-      if [ -n "$leaked" ]; then
-        leaked="$leaked
-$matches"
-      else
-        leaked=$matches
-      fi
-    fi
-  done < "$policy_file"
+  leaked=$(git --no-replace-objects ls-tree -r -z --name-only "$commit" | filter_protected_paths)
   if [ -n "$leaked" ]; then
-    echo "拒绝推送到 $remote_name ($remote_url)：$ref_label 的提交 $commit 包含独立闭源仓库路径：" >&2
+    echo "拒绝推送到 $remote_name ($remote_url)：$ref_label 的提交 $commit 包含独立闭源仓库路径（大小写不敏感匹配）：" >&2
     printf '%s\n' "$leaked" >&2
-    echo "推送前必须净化全部待上传历史；禁止使用 --no-verify、git add -f、hash-object/update-index 绕过。" >&2
+    echo "推送前必须净化全部待公开历史；禁止使用 --no-verify、git add -f、hash-object/update-index 绕过。" >&2
     exit 1
   fi
 }
+
+live_public_exclusions() {
+  live_refs=$(git --no-replace-objects ls-remote --heads --tags "$remote_url") || {
+    echo "拒绝推送：无法实时读取远端公开 heads/tags，不能安全判断新 ref 的历史增量。" >&2
+    exit 1
+  }
+
+  while IFS="	" read -r advertised_sha advertised_ref; do
+    [ -n "$advertised_sha" ] || continue
+    advertised_commit=$(git --no-replace-objects rev-parse --verify "$advertised_sha^{commit}" 2>/dev/null) || continue
+    printf '^%s\n' "$advertised_commit"
+  done <<EOF
+$live_refs
+EOF
+}
+
+reject_rewrite_overlays
+validate_worktree_policy
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   if is_zero_sha "$local_sha"; then
     continue
   fi
 
-  local_commit=$(git rev-parse --verify "$local_sha^{commit}" 2>/dev/null) || {
+  local_commit=$(git --no-replace-objects rev-parse --verify "$local_sha^{commit}" 2>/dev/null) || {
     echo "拒绝推送：$local_ref 不是可审计的 commit。" >&2
     exit 1
   }
 
+  validate_tip_guard_contract "$local_commit" "$local_ref"
   scan_commit_tree "$local_commit" "$local_ref"
 
   if is_zero_sha "$remote_sha"; then
-    if git for-each-ref --format='%(refname)' "refs/remotes/$remote_name/" | grep -q .; then
-      outgoing_commits=$(git rev-list "$local_commit" --not --remotes="$remote_name")
+    exclusions=$(live_public_exclusions)
+    if [ -n "$exclusions" ]; then
+      outgoing_commits=$(git --no-replace-objects rev-list "$local_commit" $exclusions)
     else
-      outgoing_commits=$(git rev-list "$local_commit")
+      outgoing_commits=$(git --no-replace-objects rev-list "$local_commit")
     fi
   else
-    remote_commit=$(git rev-parse --verify "$remote_sha^{commit}" 2>/dev/null) || {
+    remote_commit=$(git --no-replace-objects rev-parse --verify "$remote_sha^{commit}" 2>/dev/null) || {
       echo "拒绝推送：本地缺少远端基线 $remote_sha；请先 git fetch --prune $remote_name。" >&2
       exit 1
     }
-    outgoing_commits=$(git rev-list "$local_commit" "^$remote_commit")
+    outgoing_commits=$(git --no-replace-objects rev-list "$local_commit" "^$remote_commit")
   fi
 
   for commit in $outgoing_commits; do
