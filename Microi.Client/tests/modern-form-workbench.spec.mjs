@@ -245,7 +245,10 @@ test("micro-app hosts and platform pages keep the live theme contract", async fu
 });
 
 test("notification center opens immediately as a unified dialog and badges only actionable messages", async function () {
-    const center = await source("src/layout/components/BackgroundTaskCenter.vue");
+    const [center, noticeHelper] = await Promise.all([
+        source("src/layout/components/BackgroundTaskCenter.vue"),
+        source("src/utils/official-app-notice.js")
+    ]);
     assert.match(center, /class="microi-notification-dialog mci-unified-dialog"/);
     assert.match(center, /width="80%"/);
     assert.match(center, /\sdraggable[\s\r\n>]/);
@@ -254,14 +257,14 @@ test("notification center opens immediately as a unified dialog and badges only 
     assert.match(center, /<el-tab-pane name="tasks" lazy>/);
     assert.match(center, /return this\.notificationUnreadCount \+ this\.appNoticeCount/);
     assert.match(center, /return this\.isAdmin && !this\.isOfficialPlatform \? this\.storeNotices\.length : 0/);
-    assert.match(center, /item\.Status === "Uninstalled" \|\| item\.Status === "Outdated"/);
+    assert.match(noticeHelper, /item\.Status === "Uninstalled" \|\| item\.Status === "Outdated"/);
     assert.match(center, /installOrUpdateAllPlatformApps/);
     assert.match(center, /DiyCommon\.ApiEngine\.RunBackground\([\s\S]*?"bulk-import-microi-store-packages"/);
     assert.match(center, /ApplicationType:\s*"Platform"/);
     assert.match(center, /ConcurrencyKey:\s*"bulk-import-microi-store-packages"/);
     assert.match(center, /return this\.isSuperAdmin && !this\.isOfficialPlatform/);
-    assert.match(center, /isOfficialPlatform\(value\)[\s\S]*?this\.stopOfficialAppChecker\(\);[\s\S]*?this\.storeNotices = \[\]/);
-    assert.match(center, /async checkOfficialApps\(force\)[\s\S]*?if \(!this\.isAdmin \|\| this\.isOfficialPlatform\) \{[\s\S]*?this\.storeNotices = \[\];[\s\S]*?return;/);
+    assert.match(center, /officialAppExecutionScope\(\)[\s\S]*?this\.invalidateOfficialAppCheckWork\(\);[\s\S]*?this\.stopOfficialAppChecker\(\);[\s\S]*?this\.storeNotices = \[\]/);
+    assert.match(center, /checkOfficialApps\(force\)[\s\S]*?if \(this\.officialAppChecksDisposed \|\| !this\.isAdmin \|\| this\.isOfficialPlatform\) \{[\s\S]*?this\.storeNotices = \[\];[\s\S]*?return Promise\.resolve\(\);/);
     assert.match(center, /@row-click="openNotificationDetail"/);
     assert.match(center, /class="microi-message-detail-dialog mci-unified-dialog"/);
 });

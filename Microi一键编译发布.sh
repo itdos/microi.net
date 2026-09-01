@@ -1404,7 +1404,10 @@ ensure_docker_running() {
         fi
         if [ -n "$_docker_desktop" ]; then
             print_info "启动 Docker Desktop: $_docker_desktop"
-            "$_docker_desktop" &
+            # 发布脚本常通过 tee 记录日志；Docker Desktop 若继承标准输出会让脚本成功后仍无法收到 EOF。
+            # 使用独立标准流并从当前 Bash 作业表分离，Docker 后台生命周期不再阻塞发布退出标记。
+            nohup "$_docker_desktop" </dev/null >/dev/null 2>&1 &
+            disown "$!" 2>/dev/null || true
         else
             print_warning "未找到 Docker Desktop，请手动启动后重试"
             return 1

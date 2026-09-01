@@ -1,18 +1,19 @@
 const SSO_API_ROOT = "/api/Sso";
+const LEGACY_SSO_CAPABILITY_TIMEOUT_MS = 15000;
 
-async function postUrl(diyCommon, url, payload) {
+async function postUrl(diyCommon, url, payload, requestOptions) {
     if (!diyCommon?.PostAsync) throw new Error("DiyCommon.PostAsync 不可用。");
-    return diyCommon.PostAsync(url, payload || {}, null, null, "json");
+    return diyCommon.PostAsync(url, payload || {}, null, null, "json", requestOptions);
 }
 
 async function postGateway(diyCommon, action, payload) {
     return postUrl(diyCommon, `${SSO_API_ROOT}/${action}`, payload);
 }
 
-async function postEngine(diyCommon, key, payload) {
+async function postEngine(diyCommon, key, payload, requestOptions) {
     // 固定业务引擎统一使用自定义地址，便于日志、流量和耗时按引擎归因。
     // 宿主对未安装引擎也会返回结构化 DosResult，不再产生 404。
-    return postUrl(diyCommon, `/apiengine/${encodeURIComponent(key)}`, payload || {});
+    return postUrl(diyCommon, `/apiengine/${encodeURIComponent(key)}`, payload || {}, requestOptions);
 }
 
 function resultData(result) {
@@ -95,7 +96,13 @@ export async function getSsoCapabilities(diyCommon, osClient) {
 }
 
 export async function getLegacySsoCapabilities(diyCommon, osClient) {
-    const data = resultData(await postEngine(diyCommon, "sso_legacy_capabilities", { OsClient: osClient }));
+    // 路由守卫会等待该兼容发现请求；超时后由 permission.js 现有 catch 降级为空能力，不能阻塞导航。
+    const data = resultData(await postEngine(
+        diyCommon,
+        "sso_legacy_capabilities",
+        { OsClient: osClient },
+        { timeout: LEGACY_SSO_CAPABILITY_TIMEOUT_MS }
+    ));
     return Array.isArray(data) ? data : [];
 }
 

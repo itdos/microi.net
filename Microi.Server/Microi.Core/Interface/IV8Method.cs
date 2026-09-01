@@ -187,6 +187,9 @@ namespace Microi.net
         /// <summary>仅供官方租户开通接口按可信当前用户创建其 SaaS 租户。</summary>
         DosResult ProvisionCurrentUserTenant(dynamic dynamicParam);
 
+        /// <summary>仅供主租户超级管理员保留数据修复子租户DatabaseOnly连接。</summary>
+        DosResult RepairAdminTenantDatabaseAccess(dynamic dynamicParam);
+
         /// <summary>仅供官方个人资料接口校验可信目标用户和租户头像路径。</summary>
         DosResult PrepareCurrentUserProfileUpdate(dynamic dynamicParam);
 

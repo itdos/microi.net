@@ -14,16 +14,19 @@ namespace Microi.net
     public sealed class Upgrade21
     {
         // Must remain newer than Upgrade20 and the already deployed 6.7.6 schema.
-        public static string Version = "6.7.6.2";
+        public static string Version = "6.7.6.3";
         private const string TableName = "mci_background_task";
         internal const string ScopedIdempotencyIndexName = "ux_mci_bg_task_runtime_idem";
         internal const string ScopedClaimIndexName = "ix_mci_bg_task_runtime_claim";
+        internal const string LaneClaimIndexName = "ix_mci_bg_task_lane_claim";
         private const string LegacyIdempotencyIndexName = "ux_mci_background_task_idempotency";
         private const string LegacyClaimIndexName = "ix_mci_background_task_claim";
         internal static readonly string[] ScopedIdempotencyIndexColumns =
             { "OsClient", "RuntimeOsClientType", "RuntimeOsClientNetwork", "IdempotencyKey" };
         internal static readonly string[] ScopedClaimIndexColumns =
             { "OsClient", "RuntimeOsClientType", "RuntimeOsClientNetwork", "Status", "NextRunTime", "LeaseExpiresAt", "CreateTime" };
+        internal static readonly string[] LaneClaimIndexColumns =
+            { "OsClient", "ApiEngineKey", "RuntimeOsClientType", "RuntimeOsClientNetwork", "Status", "NextRunTime", "LeaseExpiresAt", "CreateTime" };
 
         private static readonly IReadOnlyList<FieldDefinition> Fields = new List<FieldDefinition>
         {
@@ -232,6 +235,7 @@ namespace Microi.net
                         false,
                         LegacyClaimIndexName,
                         new[] { "OsClient", "Status", "NextRunTime", "LeaseExpiresAt", "CreateTime" });
+                    EnsureIndex(messages, osClient, LaneClaimIndexName, LaneClaimIndexColumns);
                     EnsureIndex(messages, osClient, "ix_mci_background_task_user",
                         new[] { "OsClient", "UserKey", "IsDeleted", "CreateTime" });
                     EnsureIndex(messages, osClient, "ix_mci_background_task_concurrency",

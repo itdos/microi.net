@@ -19,8 +19,11 @@ namespace Microi.net
         // migration also heals already-existing backup tables, so using the old
         // 6.9.3.1 marker caused upgraded tenants to skip the newly added fencing
         // and object-attempt columns entirely.
-        public static string Version = "6.9.4.2";
+        public static string Version = "6.9.4.3";
         public const string DefaultScheduleStatus = "暂停";
+        public const string ScheduleJobNameLookupIndex = "ix_database_backup_job_name";
+        public const bool ScheduleJobNameLookupIndexUnique = false;
+        public const string LegacyGlobalScheduleJobNameUniqueIndex = "ux_database_backup_job_name";
 
         private static readonly TableDefinition ScheduleTable = new TableDefinition
         {
@@ -124,8 +127,13 @@ namespace Microi.net
                 }
                 if (messages.Count == 0)
                 {
-                    AddIndex(messages, osClient, "ux_database_backup_job_name",
-                        ScheduleTable.Name, new[] { "JobName" }, true);
+                    // diy_schedule_job 是客户历史任务的共享表，旧库可能合法保留同名任务。
+                    // 数据库备份固定任务由稳定 Id、升级分布式租约和投递幂等键保证唯一；
+                    // 这里仅创建查询索引，不能为了备份能力给整张客户任务表强加全局唯一约束。
+                    DropIndex(messages, osClient, LegacyGlobalScheduleJobNameUniqueIndex, ScheduleTable.Name);
+                    if (messages.Count > 0) return messages;
+                    AddIndex(messages, osClient, ScheduleJobNameLookupIndex,
+                        ScheduleTable.Name, new[] { "JobName" }, ScheduleJobNameLookupIndexUnique);
                     AddIndex(messages, osClient, "ix_database_backup_status_time",
                         BackupRecordTable.Name, new[] { "Status", "CreateTime" });
                     AddIndex(messages, osClient, "ux_database_backup_background_task",
@@ -549,6 +557,16 @@ SET older.`BackgroundTaskId`=NULL;"
         {
             var result = V8McpLogic.CreateTableIndex(osClient, tableName, indexName, columns, unique);
             if (result?.Code != 1) messages.Add(result?.Msg ?? $"创建索引 {indexName} 失败。");
+        }
+
+        private static void DropIndex(
+            List<string> messages,
+            string osClient,
+            string indexName,
+            string tableName)
+        {
+            var result = V8McpLogic.DropTableIndex(osClient, tableName, indexName);
+            if (result?.Code != 1) messages.Add(result?.Msg ?? $"删除索引 {indexName} 失败。");
         }
 
         private static async Task ClearMetadataCacheAsync(

@@ -1822,6 +1822,117 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 将单个 Web/UniApp/MicroService 源码文件流式写入租户私有暂存区。
+        /// 暂存不会修改当前活动源码；完整清单必须再调用
+        /// FinalizeMicroServiceSourceManifest 才会原子切换。
+        /// </summary>
+        [HttpPost]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(136314880L)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 136314880L)]
+        [V8McpCapability(V8McpScope.Write)]
+        public async Task<IActionResult> StageMicroServiceSourceFile()
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (!Request.HasFormContentType)
+                return Ok(new DosResult(0, null, "请求必须是 multipart/form-data"));
+            try
+            {
+                var form = await Request.ReadFormAsync(HttpContext.RequestAborted);
+                if (form.Files.Count != 1)
+                    return Ok(new DosResult(0, null, "每次必须且只能上传一个源码文件"));
+                var contentEncoding = form["ContentEncoding"].ToString().Trim();
+                if (!string.IsNullOrEmpty(contentEncoding))
+                    return Ok(new DosResult(0, null, "源码流式暂存暂不接受 ContentEncoding，请上传原始文件字节"));
+
+                var osClient = V8McpLogic.ResolveOsClient(form["OsClient"].ToString(), (object)token);
+                if (string.IsNullOrWhiteSpace(osClient))
+                    return Ok(new DosResult(0, null, "OsClient 不能为空"));
+                var appIdOrKey = form["AppIdOrKey"].ToString();
+                if (string.IsNullOrWhiteSpace(appIdOrKey)) appIdOrKey = form["MsKey"].ToString();
+                var file = form.Files[0];
+                var declaredSize = file.Length;
+                var expectedSizeText = form["ExpectedSize"].ToString().Trim();
+                if (!string.IsNullOrEmpty(expectedSizeText))
+                {
+                    if (!long.TryParse(
+                            expectedSizeText,
+                            NumberStyles.None,
+                            CultureInfo.InvariantCulture,
+                            out declaredSize)
+                        || declaredSize < 0
+                        || declaredSize != file.Length)
+                    {
+                        return Ok(new DosResult(0, null, "ExpectedSize 必须等于源码文件实际字节数"));
+                    }
+                }
+
+                var source = new JObject();
+                foreach (var fieldName in new[]
+                         {
+                             "MsKey", "MicroServiceKey", "AppKey", "MsName", "Name", "AppName",
+                             "ApplicationType", "AppType", "Category", "Description", "Remark"
+                         })
+                {
+                    if (form.ContainsKey(fieldName)) source[fieldName] = form[fieldName].ToString();
+                }
+                await using var stream = file.OpenReadStream();
+                var result = await V8McpLogic.StageMicroServiceSourceFile(
+                    osClient,
+                    appIdOrKey,
+                    form["RelativePath"].ToString(),
+                    form["ExpectedSha256"].ToString(),
+                    form["DeliveryBatchId"].ToString(),
+                    source,
+                    stream,
+                    declaredSize,
+                    (object)token,
+                    HttpContext.RequestAborted);
+                return Ok(result);
+            }
+            catch (OperationCanceledException)
+            {
+                return Ok(new DosResult(0, null, "源码文件流式暂存已取消"));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "源码文件流式暂存请求失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 校验租户私有暂存区的完整源码清单，并在应用分布式锁内通过
+        /// CurrentVersion/AppVersion/SourceManifestHash CAS 原子替换活动源码元数据。
+        /// 公开运行产物不参与此次切换。
+        /// </summary>
+        [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
+        public async Task<IActionResult> FinalizeMicroServiceSourceManifest([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            try
+            {
+                var osClient = V8McpLogic.ResolveOsClient(
+                    param["OsClient"]?.Val<string>(),
+                    (object)token);
+                if (string.IsNullOrWhiteSpace(osClient))
+                    return Ok(new DosResult(0, null, "OsClient 不能为空"));
+                return Ok(await V8McpLogic.FinalizeMicroServiceSourceManifest(
+                    osClient,
+                    param,
+                    (object)token,
+                    HttpContext.RequestAborted));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "私有源码清单 finalize 请求失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
         /// 获取单个蓝图详情（含 BlueprintData JSON 全文）
         /// </summary>
         [HttpGet, HttpPost]

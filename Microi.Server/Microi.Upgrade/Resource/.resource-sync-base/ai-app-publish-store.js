@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.9.13
+ * Version: v1.9.14
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -1067,7 +1067,12 @@ function selectionJson(value) {
  * 大型应用重新逐文件下载、压缩、上传 ZIP 可能耗时数分钟。仅当既有 ZIP
  * 晚于最近一次成功构建时复用，避免同步发布超过反向代理超时。
  */
-function reusablePreparedAssets(store, app, latestVersion, includeSource) {
+function packageAssetIsPrivate(asset) {
+  asset = asset || {};
+  var scope = text(asset.StorageScope || asset.StorageMode || asset.Scope).toLowerCase();
+  return boolValue(asset.Limit, false) || scope.indexOf('private') >= 0;
+}
+function reusablePreparedAssets(store, app, latestVersion, includeSource, isPublic) {
   if (!store || isBlank(store.AiAppPackageManifest)) return null;
   var manifest;
   try { manifest = parseArray(store.AiAppPackageManifest); }
@@ -1085,7 +1090,9 @@ function reusablePreparedAssets(store, app, latestVersion, includeSource) {
         ? text(item.SourceZip.Path || item.SourceZip.FullPath || item.SourceZip.FilePathName)
         : '';
       if (isBlank(sourcePath)) continue;
+      if (!packageAssetIsPrivate(item.SourceZip)) continue;
     }
+    if (packageAssetIsPrivate(item.BuildZip) === !!isPublic) continue;
     var preparedTime = text(item.PreparedTime);
     if (isBlank(preparedTime)) continue;
     if (!isBlank(latestBuildTime) && preparedTime < latestBuildTime) continue;
@@ -1315,7 +1322,6 @@ if (!protocolV3 && appType === 'MicroService' && (!runtime || !runtime.Service) 
     Pages: parseArray(V8.Param.Routes || V8.Param.Pages)
   };
 }
-var includeSource = V8.Param.IncludeSource === true || V8.Param.IncludeSource === 1 || text(V8.Param.IncludeSource).toLowerCase() === 'true';
 var requestedDatabaseOnlyBuild = V8.Param.DatabaseOnlyBuild === true
   || V8.Param.DatabaseOnlyBuild === 1
   || text(V8.Param.DatabaseOnlyBuild).toLowerCase() === 'true';
@@ -1347,6 +1353,14 @@ if (protocolV3) {
   } catch (proofReadError) { return fail(proofReadError.message); }
 }
 var existingStore = getExistingStore(app.AppKey);
+// MARKETPLACE_SOURCE_DEFAULT_PRIVATE_V1：普通 AI 应用缺省必须交付源码，
+// 特殊游戏/Unity 包由发布调用方显式传 IncludeSource=false。
+var includeSourceParamSupplied = V8.Param.IncludeSource !== undefined && V8.Param.IncludeSource !== null;
+var includeSource = includeSourceParamSupplied ? boolValue(V8.Param.IncludeSource, false) : true;
+// 历史 IsPublic=NULL 在商城一直按公开应用兼容。编译 ZIP 与商城包
+// 使用同一可见性；源码 ZIP 不受此开关影响，始终为私有。
+var visibilitySource = existingStore || app || {};
+var storeVisibility = boolValue(V8.Param.IsPublic, boolValue(visibilitySource.IsPublic, true));
 // 应用商城“开始制作”历史上调用 PackageOnly，随后再下载 AppPakcet。
 // 这个动作同样必须生成完全自包含的离线 JSON，不能只保存发布端 ZIP 地址。
 var isOfflineAction = action === 'OfflinePackage' || action === 'Download' || action === 'PackageOnly';
@@ -1391,7 +1405,7 @@ var forcePrepareAssets = V8.Param.ForcePrepareAssets === true
   || text(V8.Param.ForcePrepareAssets).toLowerCase() === 'true';
 var reusedPreparedAssets = false;
 if (!packageAssets && !isOfflineAction && !forcePrepareAssets) {
-  packageAssets = reusablePreparedAssets(existingStore, app, latestVersion, includeSource);
+  packageAssets = reusablePreparedAssets(existingStore, app, latestVersion, includeSource, storeVisibility);
   reusedPreparedAssets = !!packageAssets;
 }
 // 自包含离线包直接读取已发布运行资产，无须先生成或下载公网 ZIP。
@@ -1410,6 +1424,13 @@ if (!packageAssets && !isOfflineAction) {
 }
 if (!isOfflineAction && (!packageAssets || (!packageAssets.BuildZip && !packageAssets.SharedPublicRuntimeOnly))) {
   return fail('当前应用没有可安装的编译ZIP或已提交 SharedPublicRuntime。');
+}
+if (packageAssets && packageAssets.SourceZip && !packageAssetIsPrivate(packageAssets.SourceZip)) {
+  return fail('源码 ZIP 必须保存到官方 HDFS 私有桶，已拒绝持久公开地址。');
+}
+if (packageAssets && packageAssets.BuildZip
+    && packageAssetIsPrivate(packageAssets.BuildZip) === storeVisibility) {
+  return fail('编译 ZIP 存储范围与应用可见性不一致：公开应用必须公有，私有应用必须私有。');
 }
 var sourceFiles = [];
 var buildAssets = [];
@@ -1657,6 +1678,10 @@ var microServiceMenuBindingResult = enrichMicroServiceMenuBindings(packageModel)
 if (!microServiceMenuBindingResult || microServiceMenuBindingResult.Code !== 1) {
   return microServiceMenuBindingResult || fail('微服务菜单绑定补全失败');
 }
+packageModel.ApplicationBundle.AssetStoragePolicy = {
+  Source: includeSource ? 'PrivateHdfs' : 'NotIncluded',
+  Build: storeVisibility ? 'PublicHdfs' : 'PrivateHdfs'
+};
 if (sharedPublicRuntime) {
   packageModel.PackageInfo.SharedPublicRuntime = true;
   packageModel.ApplicationBundle.AssetStoragePolicy = {
@@ -1857,10 +1882,6 @@ if (action === 'Publish') {
   // MARKETPLACE_PACKAGE_UTF8_BASE64_TRANSPORT_V1：先在当前引擎内按 UTF-8
   // 编码为纯 ASCII，再跨嵌套接口边界，防止长中文 JSON 被参数转换损坏。
   var packageByteBase64 = String(System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(packageJson)));
-  var storeVisibility = boolValue(
-    V8.Param.IsPublic,
-    boolValue(preservedStore.IsPublic, true)
-  );
   var storageResult = V8.ApiEngine.Run('microi-store-package-storage', {
     Action: 'Store',
     StoreId: app.Id,

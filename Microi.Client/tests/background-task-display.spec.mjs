@@ -87,3 +87,28 @@ test("task results distinguish business navigation from downloadable artifacts",
     assert.match(component, /v-if="getTaskDownloadUrl\(row\)"[\s\S]*?downloadTaskResult\(row\)/);
     assert.doesNotMatch(component, /row\.HasResult \|\| getTaskDownloadUrl\(row\)/);
 });
+
+test("platform app notices fail closed and refresh only after maintenance reaches a terminal state", () => {
+    const component = readFileSync(
+        new URL("../src/layout/components/BackgroundTaskCenter.vue", import.meta.url),
+        "utf8"
+    );
+
+    assert.match(component, /Action:\s*"CheckPlatformApps"/);
+    assert.match(component, /InstalledVersions:\s*installedVersions/);
+    assert.match(component, /normalizeOfficialAppNotices\(result\)/);
+    assert.match(component, /this\.storeNotices = \[\];[\s\S]*?this\.storeLoadError = error\?\.message/);
+    assert.match(component, /v-if="!storeLoading && storeLoadError"/);
+    assert.match(component, /hasCompletedPlatformMaintenanceTransition\(rows\)/);
+    assert.match(component, /consumeCompletedPlatformMaintenanceTransitions\(\{/);
+    assert.match(component, /registeredTaskIds:\s*this\.platformMaintenanceTaskIds/);
+    assert.match(component, /await this\.checkOfficialApps\(true\)/);
+    assert.match(component, /createCoalescedTrailingRunner\([\s\S]*?runOfficialAppCheck/);
+    assert.match(component, /createCoalescedTrailingRunner\([\s\S]*?runOfficialAppsRefreshAfterMaintenance/);
+    assert.doesNotMatch(component, /this\.storeLoading\s*&&\s*attempt\s*<\s*20/);
+    assert.match(component, /beforeUnmount\(\)\s*\{[\s\S]*?invalidateOfficialAppCheckWork\(true\)/);
+    assert.match(component, /officialAppExecutionScope\(\)\s*\{[\s\S]*?invalidateOfficialAppCheckWork\(\)/);
+    assert.match(component, /invalidateOfficialAppCheckWork\(dispose = false\)[\s\S]*?this\.storeNotices = \[\];[\s\S]*?this\.lastStoreCheckTime = 0/);
+    assert.match(component, /runOfficialAppCheck\(force\)[\s\S]*?checkGeneration[\s\S]*?isOfficialAppCheckCurrent\(checkGeneration\)[\s\S]*?requestOfficialStoreList[\s\S]*?isOfficialAppCheckCurrent\(checkGeneration\)[\s\S]*?this\.storeNotices/);
+    assert.doesNotMatch(component, /handleBackgroundTaskStarted\([^)]*\)\s*\{[\s\S]{0,300}checkOfficialApps/);
+});

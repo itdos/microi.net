@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store-model
- * Version: v1.2.9
+ * Version: v1.3.0
  * Function:
- * - 按公开/私有权限读取当前或历史应用包；新版安装端读取 HDFS 指针，旧安装端由响应期临时回填包正文且不写回数据库；后台安装固定不可变数据版本快照。
+ * - 按公开/私有权限读取不可变应用包，并为私有源码/编译 ZIP 生成不落库的临时下载地址。
  */
 
 function text(value) { return value === null || value === undefined ? "" : String(value); }
@@ -119,6 +119,89 @@ function stripPackage(row) {
   delete plain.PrivateSourcePath;
   if (trim(plain.PackageStorageMode).toLowerCase() === 'hdfsprivate') delete plain.PackageHdfsPath;
   return plain;
+}
+function packageAssetList(row) {
+  var manifest = parseData(row && row.AiAppPackageManifest);
+  if (!manifest) return [];
+  if (manifest.length !== undefined && typeof manifest !== 'string') {
+    var list = [];
+    for (var index = 0; index < manifest.length; index++) list.push(manifest[index]);
+    return list;
+  }
+  return [manifest];
+}
+function privatePackageAsset(asset) {
+  asset = asset || {};
+  var scope = trim(asset.StorageScope || asset.StorageMode || asset.Scope).toLowerCase();
+  return flag(asset.Limit, false) || scope.indexOf('private') >= 0;
+}
+function normalizedAssetPath(value) {
+  var raw = trim(value);
+  if (!raw || /^https?:\/\//i.test(raw) || /[?#]/.test(raw) || /[\x00-\x1f\x7f]/.test(raw)) return '';
+  var path = raw.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  var segments = path.split('/');
+  for (var index = 0; index < segments.length; index++) {
+    if (!segments[index] || segments[index] === '.' || segments[index] === '..') return '';
+  }
+  return path;
+}
+function packageAssetBelongsToApplication(path, row, manifest) {
+  var normalized = normalizedAssetPath(path);
+  if (!normalized) return false;
+  var rowAppKey = trim(row && (row.AppKey || row.AppId)).toLowerCase();
+  var manifestAppKey = trim(manifest && (manifest.AppKey || manifest.AppId)).toLowerCase();
+  if (rowAppKey && manifestAppKey && rowAppKey !== manifestAppKey) return false;
+  var identities = {};
+  var addIdentity = function (value) {
+    var key = trim(value).toLowerCase();
+    if (key) identities[key] = true;
+  };
+  addIdentity(row && row.Id);
+  addIdentity(row && row.AppId);
+  addIdentity(row && row.AppKey);
+  var segments = normalized.toLowerCase().split('/');
+  var marker = -1;
+  for (var index = 0; index < segments.length; index++) {
+    if (segments[index] === 'ai-app-packages') marker = index;
+  }
+  if (marker < 0) return false;
+  var identityIndex = marker + 1;
+  if (segments[identityIndex] === 'v3') identityIndex++;
+  return !!identities[segments[identityIndex] || ''];
+}
+function privateApplicationAssetDownloadUrls(row) {
+  var urls = {};
+  var manifests = packageAssetList(row);
+  for (var manifestIndex = 0; manifestIndex < manifests.length; manifestIndex++) {
+    var manifest = manifests[manifestIndex] || {};
+    var assets = [manifest.SourceZip, manifest.BuildZip];
+    for (var assetIndex = 0; assetIndex < assets.length; assetIndex++) {
+      var asset = assets[assetIndex] || null;
+      if (!asset || !privatePackageAsset(asset)) continue;
+      var rawPath = trim(asset.FilePathName || asset.HdfsPath || asset.FilePath || asset.Path);
+      var normalized = normalizedAssetPath(rawPath);
+      if (!normalized || !packageAssetBelongsToApplication(rawPath, row, manifest)) {
+        throw new Error('私有 ZIP 路径不属于当前应用，已拒绝签名。');
+      }
+      var result = V8.Method.GetPrivateFileUrl({
+        OsClient: V8.OsClient,
+        FilePathName: rawPath,
+        Limit: true
+      });
+      if (!result || result.Code !== 1) {
+        throw new Error('生成私有 ZIP 临时下载地址失败：' + ((result && result.Msg) || rawPath));
+      }
+      var data = result.Data || {};
+      var url = typeof data === 'string'
+        ? trim(data)
+        : trim(data.Url || data.url || data.FileUrl || data.FullPath || data.Path);
+      if (!/^https?:\/\//i.test(url)) throw new Error('私有 ZIP 临时下载地址无效。');
+      urls[rawPath] = url;
+      urls[normalized] = url;
+      urls['/' + normalized] = url;
+    }
+  }
+  return urls;
 }
 function readChangeLogs(storeId) {
   try {
@@ -242,6 +325,13 @@ if (versionId) {
     };
   }
 }
+var applicationAssetDownloadUrls;
+try {
+  // 签名仅存在于本次响应，不改写 sys_microistore 或 mic_data_version。
+  applicationAssetDownloadUrls = privateApplicationAssetDownloadUrls(selected);
+} catch (assetUrlError) {
+  return { Code: 0, Msg: assetUrlError.message };
+}
 selected.IsPublic = isPublic ? 1 : 0;
 selected.Visibility = isPublic ? "Public" : "Private";
 if (!flag(V8.Param.IncludePackage, true)) {
@@ -266,7 +356,8 @@ return {
   DataAppend: {
     ChangeLogAvailable: changeLogs.Available,
     ChangeLogCount: changeLogs.Count,
-    ChangeLogs: changeLogs.Rows
+    ChangeLogs: changeLogs.Rows,
+    ApplicationAssetDownloadUrls: applicationAssetDownloadUrls
   },
   Msg: "成功"
 };

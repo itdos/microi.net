@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.5.1
+ * Version: v2.5.4
  * Function:
  * - 统一应用商城导入器；支持 HDFS 公私有包指针、大小与 SHA-256 校验、后台分片和包资源覆盖升级。
  */
@@ -868,6 +868,7 @@ var loadMarketplacePackage = function (storeModel, label) {
     return content;
 };
 var authoritativeStoreModel = null;
+var applicationAssetDownloadUrls = {};
 if (!Package && storeRow && storeRow.AppPakcet) {
     Package = storeRow.AppPakcet;
 }
@@ -889,6 +890,15 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
     if (storeModelResult && storeModelResult.Code == 1 && storeModelResult.Data) {
         var storeModel = storeModelResult.Data;
         authoritativeStoreModel = storeModel;
+        var storeModelAppend = storeModelResult.DataAppend || {};
+        var signedAssetUrls = storeModelAppend.ApplicationAssetDownloadUrls || {};
+        if (typeof signedAssetUrls == 'string') {
+            try { signedAssetUrls = JSON.parse(signedAssetUrls || '{}'); }
+            catch (signedAssetUrlParseError) { signedAssetUrls = {}; }
+        }
+        if (signedAssetUrls && typeof signedAssetUrls == 'object') {
+            applicationAssetDownloadUrls = signedAssetUrls;
+        }
         Package = loadMarketplacePackage(storeModel, '商城应用包');
         if (!V8.Param.AppId) V8.Param.AppId = firstTextParam([storeModel.AppId, storeModel.AppKey, storeModel.Id]);
         if (!V8.Param.AppName) V8.Param.AppName = firstTextParam([storeModel.AppName, storeModel.Name]);
@@ -930,6 +940,44 @@ if (!Package.PackageInfo) {
         Code: 0,
         Msg: '参数错误：Package.PackageInfo不能为空'
     };
+}
+
+// MARKETPLACE_PACKAGE_IDENTITY_BINDING_V1：商城行、不可变快照与包正文
+// 必须是同一 AppKey/版本。这可以直接拒绝历史选择状态把婚礼应用
+// 错绑到排班考勤 ZIP 之类的跨应用混装。
+if (authoritativeStoreModel) {
+    var packageIdentity = firstTextParam([
+        Package.PackageInfo.AppId,
+        Package.PackageInfo.AppKey,
+        Package.ApplicationBundle && Package.ApplicationBundle.Application
+            && Package.ApplicationBundle.Application.AppKey
+    ]).toLowerCase();
+    var storeIdentity = firstTextParam([
+        authoritativeStoreModel.AppKey,
+        authoritativeStoreModel.AppId
+    ]).toLowerCase();
+    var packageVersionIdentity = firstTextParam([
+        Package.PackageInfo.Version,
+        Package.PackageInfo.AppVersion
+    ]).toLowerCase();
+    var storeVersionIdentity = firstTextParam([
+        authoritativeStoreModel.AppVersion,
+        authoritativeStoreModel.Version
+    ]).toLowerCase();
+    if (packageIdentity && storeIdentity && packageIdentity != storeIdentity) {
+        return {
+            Code: 0,
+            Data: { ErrorType: 'MARKETPLACE_PACKAGE_IDENTITY_MISMATCH' },
+            Msg: '商城应用与安装包 AppKey 不一致，已停止安装。'
+        };
+    }
+    if (packageVersionIdentity && storeVersionIdentity && packageVersionIdentity != storeVersionIdentity) {
+        return {
+            Code: 0,
+            Data: { ErrorType: 'MARKETPLACE_PACKAGE_VERSION_MISMATCH' },
+            Msg: '商城应用与安装包版本不一致，已停止安装。'
+        };
+    }
 }
 
 // TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1：Upgrade13 只从程序集内置白名单读取、
@@ -1270,7 +1318,7 @@ if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase(
         if (!validationSourceNotIncluded && !/^(privatehdfs|private-hdfs|hdfs)$/i.test(validationSourcePolicy)) {
             validationErrors.push('第' + (validationIndex + 1) + '个AI应用的 AssetStoragePolicy.Source 不受支持：' + validationSourcePolicy);
         }
-        if (!validationDatabaseOnlyBuild && !validationSharedPublicBuild && !/^(publichdfs|public-hdfs|hdfs)$/i.test(validationBuildPolicy)) {
+        if (!validationDatabaseOnlyBuild && !validationSharedPublicBuild && !/^(publichdfs|public-hdfs|privatehdfs|private-hdfs|hdfs)$/i.test(validationBuildPolicy)) {
             validationErrors.push('第' + (validationIndex + 1) + '个AI应用的 AssetStoragePolicy.Build 不受支持：' + validationBuildPolicy);
         }
         if (validationSourceNotIncluded && (validationSourceExpected || sourceCount > 0)) {
@@ -2155,16 +2203,33 @@ try {
 
     var getApplicationAssetUrl = function (asset) {
         asset = asset || {};
-        var direct = firstTextParam([asset.FullPath, asset.Url, asset.url, asset.FileUrl]);
+        // 历史公开包把绝对地址写在 Path；旧导入器遗漏该字段后
+        // 误用目标租户去解析 iTdos 相对路径，导致“获取ZIP公开地址失败”。
+        var direct = firstTextParam([asset.FullPath, asset.Url, asset.url, asset.FileUrl, asset.Path]);
         if (/^https?:\/\//i.test(direct)) return direct;
         var filePathName = firstTextParam([asset.FilePathName, asset.HdfsPath, asset.FilePath, asset.Path, direct]);
-        if (!filePathName) throw new Error('ZIP资产缺少公开下载地址');
+        if (!filePathName) throw new Error('ZIP资产缺少下载地址');
+        var normalizedFilePathName = String(filePathName).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        var signedCandidates = [filePathName, normalizedFilePathName, '/' + normalizedFilePathName];
+        for (var signedIndex = 0; signedIndex < signedCandidates.length; signedIndex++) {
+            var signedCandidate = signedCandidates[signedIndex];
+            if (!Object.prototype.hasOwnProperty.call(applicationAssetDownloadUrls, signedCandidate)) continue;
+            var signedValue = applicationAssetDownloadUrls[signedCandidate] || {};
+            var signedUrl = typeof signedValue == 'string'
+                ? signedValue
+                : firstTextParam([signedValue.Url, signedValue.url, signedValue.FileUrl, signedValue.FullPath, signedValue.Path]);
+            if (/^https?:\/\//i.test(signedUrl)) return signedUrl;
+        }
+        var storageScope = String(asset.StorageScope || asset.StorageMode || asset.Scope || '').toLowerCase();
+        var privateAsset = asset.Limit === true || asset.Limit === 1
+            || String(asset.Limit || '').toLowerCase() == 'true'
+            || storageScope.indexOf('private') >= 0;
         var urlResult = V8.Method.GetPrivateFileUrl({
             OsClient: V8.OsClient,
             FilePathName: filePathName,
-            Limit: false
+            Limit: privateAsset
         });
-        if (!urlResult || urlResult.Code != 1) throw new Error('获取ZIP公开地址失败：' + filePathName);
+        if (!urlResult || urlResult.Code != 1) throw new Error('获取ZIP下载地址失败：' + filePathName);
         var data = urlResult.Data || {};
         return typeof data == 'string' ? data : firstTextParam([data.Url, data.url, data.FileUrl, data.FullPath, data.Path]);
     };
@@ -2180,7 +2245,7 @@ try {
     var downloadApplicationZip = function (asset, role) {
         if (!asset) return [];
         var url = getApplicationAssetUrl(asset);
-        if (!url) throw new Error(role + ' ZIP 未返回公开下载地址');
+        if (!url) throw new Error(role + ' ZIP 未返回下载地址');
         var response = V8.Http.GetResponse({ Url: url, Timeout: 300 });
         if (!response || !response.RawBytes) throw new Error('下载' + role + ' ZIP失败');
         var zipBase64 = System.Convert.ToBase64String(response.RawBytes);
@@ -2254,7 +2319,7 @@ try {
         if (!sourceNotIncluded && !/^(privatehdfs|private-hdfs|hdfs)$/i.test(sourceStoragePolicy)) {
             throw new Error('AssetStoragePolicy.Source 不受支持：' + sourceStoragePolicy);
         }
-        if (!databaseOnlyBuild && !sharedPublicBuild && !/^(publichdfs|public-hdfs|hdfs)$/i.test(buildStoragePolicy)) {
+        if (!databaseOnlyBuild && !sharedPublicBuild && !/^(publichdfs|public-hdfs|privatehdfs|private-hdfs|hdfs)$/i.test(buildStoragePolicy)) {
             throw new Error('AssetStoragePolicy.Build 不受支持：' + buildStoragePolicy);
         }
         if (sharedPublicBuild && !sourceNotIncluded) {
@@ -3196,6 +3261,128 @@ try {
             }
         }
         return changed;
+    };
+
+    // PAGE_ENGINE_DIYTABLE_REFERENCE_REMAP_V1：界面引擎的 diytable 组件同时保存
+    // widgetParams[0]=DiyTableId 与 widgetParams[1]=SysMenuId。跨租户安装时表和
+    // 菜单都可能按目标库自然键保留既有主键，只做普通字符串 IdMap 仍可能让页面
+    // 留下发布端旧 TableId。目标菜单的持久化 DiyTableId 才是运行时权威绑定；
+    // 因此随包 mic_page 数据写入前必须按已安装菜单重新投影并强校验目标表存在。
+    var pageEngineMenuBindingCache = {};
+    var readPageEngineMenuBinding = function (sourceMenuId) {
+        var targetMenuId = normalizeId(findMappedId(normalizeId(sourceMenuId)));
+        if (!targetMenuId) return null;
+        var cacheKey = targetMenuId.toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(pageEngineMenuBindingCache, cacheKey)) {
+            return pageEngineMenuBindingCache[cacheKey];
+        }
+
+        var menuResult = V8.FormEngine.GetFormData('sys_menu', {
+            Id: targetMenuId,
+            _SelectFields: ['Id', 'Name', 'DiyTableId', 'DiyTableName']
+        });
+        if (!menuResult || menuResult.Code != 1 || !menuResult.Data) {
+            throw new Error('界面引擎 diytable 引用修复失败：目标菜单不存在，MenuId=' + targetMenuId);
+        }
+        var targetTableId = normalizeId(findMappedId(normalizeId(menuResult.Data.DiyTableId)));
+        if (!targetTableId) {
+            throw new Error('界面引擎 diytable 引用修复失败：目标菜单未绑定DIY表，MenuId=' + targetMenuId);
+        }
+        var tableResult = V8.FormEngine.GetFormData('diy_table', {
+            Id: targetTableId,
+            _SelectFields: ['Id', 'Name']
+        });
+        if (!tableResult || tableResult.Code != 1 || !tableResult.Data) {
+            throw new Error('界面引擎 diytable 引用修复失败：目标菜单绑定的DIY表不存在，MenuId='
+                + targetMenuId + '，DiyTableId=' + targetTableId);
+        }
+
+        var binding = {
+            MenuId: targetMenuId,
+            TableId: targetTableId,
+            TableName: normalizeId(tableResult.Data.Name || menuResult.Data.DiyTableName)
+        };
+        pageEngineMenuBindingCache[cacheKey] = binding;
+        return binding;
+    };
+
+    var remapPageEngineDiyTableWidgets = function (value, state) {
+        if (value === null || value === undefined) return value;
+        if (Array.isArray(value)) {
+            for (var arrayIndex = 0; arrayIndex < value.length; arrayIndex++) {
+                value[arrayIndex] = remapPageEngineDiyTableWidgets(value[arrayIndex], state);
+            }
+            return value;
+        }
+        if (typeof value != 'object') return value;
+
+        if (String(value.type || '').toLowerCase() == 'diytable'
+            && Array.isArray(value.widgetParams)) {
+            var tableParam = value.widgetParams.length > 0 ? value.widgetParams[0] : null;
+            var menuParam = value.widgetParams.length > 1 ? value.widgetParams[1] : null;
+            if (tableParam && tableParam.value) {
+                var mappedTableId = findMappedId(normalizeId(tableParam.value));
+                if (mappedTableId !== tableParam.value) {
+                    tableParam.value = mappedTableId;
+                    state.changed = true;
+                }
+            }
+            if (menuParam && menuParam.value) {
+                var binding = readPageEngineMenuBinding(menuParam.value);
+                if (binding) {
+                    if (menuParam.value !== binding.MenuId) {
+                        menuParam.value = binding.MenuId;
+                        state.changed = true;
+                    }
+                    if (!tableParam) {
+                        throw new Error('界面引擎 diytable 引用修复失败：组件缺少 widgetParams[0] 模块Id');
+                    }
+                    if (normalizeId(tableParam.value) !== binding.TableId) {
+                        tableParam.value = binding.TableId;
+                        state.changed = true;
+                    }
+                    state.diyTableWidgetCount++;
+                }
+            }
+        }
+
+        for (var objectKey in value) {
+            if (!Object.prototype.hasOwnProperty.call(value, objectKey)) continue;
+            value[objectKey] = remapPageEngineDiyTableWidgets(value[objectKey], state);
+        }
+        return value;
+    };
+
+    var remapPackageDataRowReferences = function (dataTableName, sourceRow, rowIndex) {
+        if (String(dataTableName || '').toLowerCase() != 'mic_page'
+            || !sourceRow || sourceRow.JsonObj === undefined || sourceRow.JsonObj === null
+            || sourceRow.JsonObj === '') {
+            return sourceRow;
+        }
+        var jsonWasText = typeof sourceRow.JsonObj == 'string';
+        var pageJson;
+        try {
+            pageJson = jsonWasText ? JSON.parse(sourceRow.JsonObj) : sourceRow.JsonObj;
+        } catch (pageJsonError) {
+            throw new Error('界面引擎随包数据 JsonObj 不是有效JSON：Id=' + normalizeId(sourceRow.Id));
+        }
+
+        // 先做表/字段/菜单稳定 Id 的精确值映射，再按目标菜单的真实表绑定纠偏。
+        var genericState = { changed: false };
+        pageJson = replaceIdsDeep(pageJson, genericState);
+        var pageState = { changed: genericState.changed, diyTableWidgetCount: 0 };
+        pageJson = remapPageEngineDiyTableWidgets(pageJson, pageState);
+        if (!pageState.changed) return sourceRow;
+
+        var remappedRow = {};
+        for (var rowKey in sourceRow) {
+            if (Object.prototype.hasOwnProperty.call(sourceRow, rowKey)) remappedRow[rowKey] = sourceRow[rowKey];
+        }
+        remappedRow.JsonObj = jsonWasText ? JSON.stringify(pageJson) : pageJson;
+        stats.ReferenceRowsUpdated++;
+        debugLog['page_engine_reference_remap_' + normalizeId(sourceRow.Id || rowIndex)] =
+            '已按目标菜单重写界面引擎引用，diytable组件=' + pageState.diyTableWidgetCount;
+        return remappedRow;
     };
 
     var applyPackageIdMaps = function () {
@@ -4299,6 +4486,7 @@ try {
         var requiredIndexes = [
             { Name: 'ux_mci_bg_task_runtime_idem', Aliases: ['ux_mci_background_task_idempotency'], Columns: ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'IdempotencyKey'], Unique: true },
             { Name: 'ix_mci_bg_task_runtime_claim', Aliases: ['ix_mci_background_task_claim'], Columns: ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'Status', 'NextRunTime', 'LeaseExpiresAt', 'CreateTime'], Unique: false },
+            { Name: 'ix_mci_bg_task_lane_claim', Columns: ['OsClient', 'ApiEngineKey', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'Status', 'NextRunTime', 'LeaseExpiresAt', 'CreateTime'], Unique: false },
             { Name: 'ix_mci_background_task_user', Columns: ['OsClient', 'UserKey', 'IsDeleted', 'CreateTime'], Unique: false },
             { Name: 'ix_mci_background_task_concurrency', Columns: ['OsClient', 'ConcurrencyKey', 'Status', 'LeaseExpiresAt'], Unique: false }
         ];
@@ -7663,7 +7851,11 @@ try {
         }
 
         for (var dataRowIndex = 0; dataRowIndex < sourceRows.length; dataRowIndex++) {
-            var sourceRow = sourceRows[dataRowIndex] || {};
+            var sourceRow = remapPackageDataRowReferences(
+                dataTableName,
+                sourceRows[dataRowIndex] || {},
+                dataRowIndex
+            );
             if (!sourceRow.Id) {
                 stats.DataSkipped++;
                 throw new Error('应用数据导入失败：表 ' + dataTableName + ' 第' + (dataRowIndex + 1) + '条数据缺少Id');

@@ -19,6 +19,24 @@ public sealed class DatabaseAdministrationCompatibilityTests
     }
 
     [Fact]
+    public void MySqlTenantRotationPrincipal_IsUniqueAndWithinMySqlLimit()
+    {
+        var first = DatabaseAdministrationCompatibility.BuildTenantRotationPrincipalName(
+            DatabaseType.MySql,
+            "microi_customer_with_a_long_tenant_key",
+            "0123456789abcdef0123456789abcdef");
+        var second = DatabaseAdministrationCompatibility.BuildTenantRotationPrincipalName(
+            DatabaseType.MySql,
+            "microi_customer_with_a_long_tenant_key",
+            "fedcba9876543210fedcba9876543210");
+
+        Assert.NotEqual(first, second);
+        Assert.StartsWith("mci_r_", first, StringComparison.Ordinal);
+        Assert.Matches("^[a-zA-Z_][a-zA-Z0-9_]{0,31}$", first);
+        Assert.True(first.Length <= 32);
+    }
+
+    [Fact]
     public void MySqlPrincipalCommands_GrantOnlyTheRequestedDatabase_AndParameterizePassword()
     {
         var commands = DatabaseAdministrationCompatibility.BuildPrincipalCommands(

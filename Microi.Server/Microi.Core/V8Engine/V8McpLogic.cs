@@ -6314,6 +6314,8 @@ namespace Microi.net
                 if (app == null) return new DosResult<object>(2, null, "在线应用不存在");
 
                 var files = await GetAiApplicationFiles(osClient, SafeJString(app, "Id"));
+                var sourceManifestHash = ComputeMicroServiceSourceRowsManifestHash(
+                    files.OfType<JObject>());
                 var outputFiles = new JArray();
                 long scheduledBytes = 0;
                 var contentErrorCount = 0;
@@ -6347,6 +6349,8 @@ namespace Microi.net
                     IncludedContents = includeContents,
                     ContentsComplete = includeContents && contentErrorCount == 0,
                     ContentErrorCount = contentErrorCount,
+                    SourceManifestHash = sourceManifestHash,
+                    Capabilities = GetMicroServiceSourceStreamCapabilities(),
                     Runtime = runtime
                 }, "已获取在线应用上下文");
             }
@@ -6690,6 +6694,18 @@ namespace Microi.net
             try
             {
                 if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
+                // New clients keep the legacy JSON route for small projects but
+                // send all three Expected* values. Route those calls through the
+                // same private staging + atomic manifest switch as the streaming
+                // protocol. Old clients that do not send CAS fields keep their
+                // historical behavior for rolling-upgrade compatibility.
+                if (HasMicroServiceSourceCasPreconditions(param))
+                {
+                    return await SyncMicroServiceSourceWithCasProtocol(
+                        osClient,
+                        param,
+                        (object)currentToken).ConfigureAwait(false);
+                }
                 var source = UnwrapMicroServiceParam(param);
                 var msKey = NormalizeMicroServiceKey(source?["MsKey"]?.Val<string>() ?? source?["MicroServiceKey"]?.Val<string>() ?? source?["AppKey"]?.Val<string>());
                 if (IsBlank(msKey)) return new DosResult<object>(0, null, "MsKey 不能为空，只允许英文、数字、-、_");

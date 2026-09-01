@@ -36,11 +36,15 @@ const mysqlOffpageHelpersSource = source.match(
 const marketplaceReadRetrySource = source.match(
   /var postMarketplaceReadWithRetry = function \(label, url, postParam, timeoutSeconds\) \{[\s\S]*?\n\};/
 );
+const pageEngineReferenceRemapSource = source.match(
+  /var normalizeId = function \(id\) \{[\s\S]*?(?=\n    var applyPackageIdMaps)/
+);
 
 assert.ok(functionSource, "countPageTabs helper should exist");
 assert.ok(physicalNotNullBackfillSource, "NOT NULL physical-column backfill helper should exist");
 assert.ok(mysqlOffpageHelpersSource, "MySQL row-size fallback helpers should exist");
 assert.ok(marketplaceReadRetrySource, "marketplace read retry helper should exist");
+assert.ok(pageEngineReferenceRemapSource, "PageEngine reference remap helpers should exist");
 
 const context = {};
 vm.runInNewContext(`${functionSource[0]}\nresult = countPageTabs;`, context);
@@ -219,7 +223,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.5\.1/);
+  assert.match(source, /Version: v2\.5\.4/);
 });
 
 test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {
@@ -616,8 +620,15 @@ function runDataSetImportFixture(options = {}) {
         },
       },
     },
-    stats: { DataSetCount: 0, DataInserted: 0, DataUpdated: 0, DataSkipped: 0 },
+    stats: {
+      DataSetCount: 0,
+      DataInserted: 0,
+      DataUpdated: 0,
+      DataSkipped: 0,
+      ReferenceRowsUpdated: 0
+    },
     debugLog: {},
+    remapPackageDataRowReferences(_tableName, sourceRow) { return sourceRow; },
     reportProgress() {},
     backgroundChunkingEnabled: false,
     backgroundCheckpointPhase: "PostSchema",
@@ -1245,6 +1256,140 @@ test("field conflict maps survive retries without process memory", () => {
   assert.equal(retryMaps.Field["field-b"], "generated-b");
 });
 
+test("PageEngine diytable rows follow the installed menu table binding", () => {
+  const queries = [];
+  const remapContext = {
+    idMaps: {
+      Table: {},
+      Field: {},
+      Menu: {
+        "source-menu": "target-menu"
+      }
+    },
+    stats: {
+      TableIdRemapped: 0,
+      FieldIdRemapped: 0,
+      MenuIdRemapped: 0,
+      ReferenceRowsUpdated: 0
+    },
+    debugLog: {},
+    menuJsonFields: [],
+    fieldJsonFields: [],
+    V8: {
+      FormEngine: {
+        GetFormData(tableName, query) {
+          queries.push([tableName, query.Id]);
+          if (tableName === "sys_menu" && query.Id === "target-menu") {
+            return {
+              Code: 1,
+              Data: {
+                Id: "target-menu",
+                Name: "公告",
+                DiyTableId: "target-table",
+                DiyTableName: "diy_notice"
+              }
+            };
+          }
+          if (tableName === "diy_table" && query.Id === "target-table") {
+            return { Code: 1, Data: { Id: "target-table", Name: "diy_notice" } };
+          }
+          return { Code: 2, Msg: "NoExistData" };
+        }
+      }
+    }
+  };
+  const pageRow = {
+    Id: "PAGE3",
+    JsonObj: JSON.stringify({
+      wrapperList: [
+        {
+          widgetList: [
+            {
+              type: "diytable",
+              widgetParams: [
+                { sort: 0, label: "模块ID", value: "source-table" },
+                { sort: 1, label: "菜单ID", type: "sysmenu", value: "source-menu" }
+              ]
+            }
+          ],
+          tabWidgetMap: {
+            notice: [
+              {
+                type: "diytable",
+                widgetParams: [
+                  { sort: 0, label: "模块ID", value: "another-source-table" },
+                  { sort: 1, label: "菜单ID", type: "sysmenu", value: "source-menu" }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      unrelated: "source-table"
+    })
+  };
+
+  remapContext.inputRow = pageRow;
+  vm.runInNewContext(
+    `${pageEngineReferenceRemapSource[0]}\nresult = remapPackageDataRowReferences('mic_page', inputRow, 0);`,
+    remapContext
+  );
+  const remapped = JSON.parse(remapContext.result.JsonObj);
+  const firstWidget = remapped.wrapperList[0].widgetList[0];
+  const tabWidget = remapped.wrapperList[0].tabWidgetMap.notice[0];
+
+  assert.equal(firstWidget.widgetParams[0].value, "target-table");
+  assert.equal(firstWidget.widgetParams[1].value, "target-menu");
+  assert.equal(tabWidget.widgetParams[0].value, "target-table");
+  assert.equal(tabWidget.widgetParams[1].value, "target-menu");
+  assert.equal(remapped.unrelated, "source-table", "unmapped business values must remain unchanged");
+  assert.deepEqual(queries, [
+    ["sys_menu", "target-menu"],
+    ["diy_table", "target-table"]
+  ], "the target menu binding should be cached across widgets");
+  assert.equal(remapContext.stats.ReferenceRowsUpdated, 1);
+  assert.match(remapContext.debugLog.page_engine_reference_remap_PAGE3, /diytable组件=2/);
+});
+
+test("PageEngine diytable import fails closed when its installed menu is absent", () => {
+  const remapContext = {
+    idMaps: { Table: {}, Field: {}, Menu: {} },
+    stats: {
+      TableIdRemapped: 0,
+      FieldIdRemapped: 0,
+      MenuIdRemapped: 0,
+      ReferenceRowsUpdated: 0
+    },
+    debugLog: {},
+    menuJsonFields: [],
+    fieldJsonFields: [],
+    V8: {
+      FormEngine: {
+        GetFormData() { return { Code: 2, Msg: "NoExistData" }; }
+      }
+    },
+    inputRow: {
+      Id: "PAGE3",
+      JsonObj: {
+        wrapperList: [{
+          widgetList: [{
+            type: "diytable",
+            widgetParams: [{ value: "source-table" }, { value: "missing-menu" }]
+          }]
+        }]
+      }
+    }
+  };
+
+  assert.throws(
+    () => vm.runInNewContext(
+      `${pageEngineReferenceRemapSource[0]}\nremapPackageDataRowReferences('mic_page', inputRow, 0);`,
+      remapContext
+    ),
+    /目标菜单不存在/
+  );
+});
+
 test("only worker-owned checkpoints can skip schema phases", () => {
   const chunkHelpers = source.match(/var backgroundTaskId = [\s\S]*?(?=var installUser =)/);
   assert.ok(chunkHelpers);
@@ -1448,7 +1593,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*2_005_000/);
+  assert.match(refreshSource, /versionNumber\s*<\s*2_005_004/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -1458,10 +1603,10 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
   assert.match(refreshSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
-  assert.match(refreshSource, /versionNumber\s*<\s*1_007_008/);
-  assert.match(refreshSource, /versionNumber\s*<\s*7_005_053/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_009_014/);
+  assert.match(refreshSource, /versionNumber\s*<\s*7_007_033/);
   assert.match(refreshSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_005_000/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_005_004/);
   assert.match(refreshSource, /TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
@@ -1767,6 +1912,7 @@ test("background-task bootstrap is verified from physical columns and indexes be
   const requiredIndexes = [
     "ux_mci_bg_task_runtime_idem",
     "ix_mci_bg_task_runtime_claim",
+    "ix_mci_bg_task_lane_claim",
     "ix_mci_background_task_user",
     "ix_mci_background_task_concurrency",
   ];
@@ -1775,6 +1921,10 @@ test("background-task bootstrap is verified from physical columns and indexes be
   assert.match(source, /getTargetPhysicalColumns\(tableName\)/);
   for (const column of requiredColumns) assert.match(source, new RegExp(`'${column}'`));
   for (const index of requiredIndexes) assert.match(source, new RegExp(`'${index}'`));
+  assert.match(
+    source,
+    /Name: 'ix_mci_bg_task_lane_claim', Columns: \['OsClient', 'ApiEngineKey', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'Status', 'NextRunTime', 'LeaseExpiresAt', 'CreateTime'\]/,
+  );
   assert.match(source, /candidateNames = \[requiredIndex\.Name\]\.concat\(requiredIndex\.Aliases \|\| \[\]\)/);
   assert.ok(
     source.indexOf("validateBackgroundTaskBootstrapReadiness()")
@@ -2629,5 +2779,5 @@ test("shared public runtime is immutable, HDFS-free, and does not weaken ordinar
   assert.match(source, /var buildAssets = sharedPublicBuild[\s\S]*?\? \[\]/);
   assert.match(source, /useSharedPublicBuild[\s\S]*?SharedPublicRuntime: true/);
   assert.ok(source.includes("entryHdfsPath && !/^https?:\\/\\//i.test(entryHdfsPath) && V8.Method.GetPrivateFileUrl"));
-  assert.ok(source.includes("if (!databaseOnlyBuild && !sharedPublicBuild && !/^(publichdfs|public-hdfs|hdfs)$/i.test(buildStoragePolicy))"));
+  assert.ok(source.includes("if (!databaseOnlyBuild && !sharedPublicBuild && !/^(publichdfs|public-hdfs|privatehdfs|private-hdfs|hdfs)$/i.test(buildStoragePolicy))"));
 });

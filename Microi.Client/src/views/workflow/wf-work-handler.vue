@@ -86,6 +86,8 @@
             </template>
         </el-dialog>
 
+        <WorkflowResultDialog ref="refWorkflowResultDialog" />
+
         <template v-if="OpenWorkType == 'Recall' || OpenWorkType == 'Cancel'">
             <!--撤回、作废-->
             <div style="margin-top: 10px">
@@ -119,11 +121,12 @@ import "./css/index.css";
 import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
 import _ from "underscore";
+import WorkflowResultDialog from "./component/workflow-result-dialog.vue";
 
 export default {
     name: "wf_work_handler",
     directives: {},
-    components: {},
+    components: { WorkflowResultDialog },
     setup() {
         const diyStore = useDiyStore();
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
@@ -208,6 +211,22 @@ export default {
     methods: {
         IsTrueValue(val) {
             return val === true || val === 1 || val === "1" || val === "true" || val === "True";
+        },
+        BuildWorkflowResultPayload(resultData, action) {
+            var data = resultData || {};
+            return {
+                Action: action || "Process",
+                FlowEnd: action === "Cancel" ? true : data.FlowEnd,
+                NextNodeName: data.ToNodeName || "",
+                Receivers: Array.isArray(data.Receivers) ? data.Receivers : []
+            };
+        },
+        async ShowWorkflowResult(resultData, action) {
+            var dialog = this.$refs.refWorkflowResultDialog;
+            if (Array.isArray(dialog)) dialog = dialog[0];
+            if (!dialog || typeof dialog.open !== "function") return false;
+            // 工作流表单会在成功回调后立即卸载；等待用户确认，保证结果弹层完整可见后再关闭表单。
+            return await dialog.open(this.BuildWorkflowResultPayload(resultData, action));
         },
         AllowSelectUsers() {
             return this.IsTrueValue(this.CurrentNodeModel.AllowSelectUsers);
@@ -441,16 +460,6 @@ export default {
                 async function (result) {
                     self.BtnLoading = false;
                     if (self.DiyCommon.Result(result)) {
-                        //处理返回结果提示
-                        var receivers = "";
-                        result.Data.Receivers.forEach((user) => {
-                            receivers += user.Name + ",";
-                        });
-                        try {
-                            receivers = receivers.TrimEnd(",");
-                        } catch (error) {}
-                        self.DiyCommon.Tips("工作移交成功！<br>已移交至待办人：" + receivers + "。<br>已移交至节点：" + result.Data.ToNodeName + "。", true, 10);
-
                         if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
                             var V8 = {
                                 EventName: "WFNodeEnd"
@@ -479,6 +488,7 @@ export default {
                             }
                         }
 
+                        await self.ShowWorkflowResult(result.Data, "Handover");
                         self.$emit("CallbackWFSubmit", { Code: 1 });
                     }
                     //告诉工作流引擎核心，已经处理完表单提交和流程提交
@@ -531,22 +541,6 @@ export default {
                 async function (result) {
                     self.BtnLoading = false;
                     if (self.DiyCommon.Result(result)) {
-                        //处理返回结果提示
-                        var receivers = "";
-                        try {
-                            result.Data.Receivers.forEach((user) => {
-                                receivers += user.Name + ",";
-                            });
-                        } catch (error) {}
-                        try {
-                            receivers = receivers.TrimEnd(",");
-                        } catch (error) {}
-                        if (param.CurrentApprovalType == "Cancel") {
-                            self.DiyCommon.Tips(`流程作废成功！流程已结束！`, true, 10);
-                        } else {
-                            self.DiyCommon.Tips(`工作撤回成功！<br>已撤回至待办人：${receivers}。<br>已撤回至节点：${result.Data.ToNodeName}。`, true, 10);
-                        }
-
                         if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
                             var V8 = {
                                 EventName: "WFNodeEnd"
@@ -575,6 +569,10 @@ export default {
                             }
                         }
 
+                        await self.ShowWorkflowResult(
+                            result.Data,
+                            param.CurrentApprovalType == "Cancel" ? "Cancel" : "Recall"
+                        );
                         self.$emit("CallbackWFSubmit", { Code: 1 });
                     }
                     //告诉工作流引擎核心，已经处理完表单提交和流程提交
@@ -986,17 +984,6 @@ export default {
                 async function (result) {
                     self.BtnLoading = false;
                     if (self.DiyCommon.Result(result)) {
-                        //处理返回结果提示
-                        var receivers = "";
-                        result.Data.Receivers.forEach((user) => {
-                            receivers += user.Name + ",";
-                        });
-                        try {
-                            receivers = receivers.TrimEnd(",");
-                        } catch (error) {}
-
-                        self.DiyCommon.Tips("流程发起成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + result.Data.ToNodeName + "。", true, 10);
-
                         if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
                             var V8 = {
                                 EventName: "WFNodeEnd"
@@ -1023,6 +1010,7 @@ export default {
                                 
                             }
                         }
+                        await self.ShowWorkflowResult(result.Data, "Start");
                         self.$emit("CallbackWFSubmit", { Code: 1 });
                     } else {
                         self.$emit("CallbackWFSubmit", { Code: 0 });
@@ -1081,22 +1069,6 @@ export default {
                         async function (result) {
                         self.BtnLoading = false;
                         if (self.DiyCommon.Result(result)) {
-                            // Tips（与 StartWork 一致）
-                            var receivers = "";
-                            try {
-                                if (result.Data && result.Data.Receivers) {
-                                    result.Data.Receivers.forEach(function (user) { receivers += user.Name + ","; });
-                                    receivers = receivers.replace(/,$/, "");
-                                }
-                            } catch (error) {}
-                            try {
-                                self.DiyCommon.Tips(
-                                    "流程发起成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + (result.Data ? result.Data.ToNodeName : "") + "。",
-                                    true,
-                                    10
-                                );
-                            } catch (error) {}
-
                             // EndV8 hook（与 StartWork 一致）
                             if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
                                 var V8 = { EventName: "WFNodeEnd" };
@@ -1120,6 +1092,7 @@ export default {
                                     self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
                                 }
                             }
+                            await self.ShowWorkflowResult(result.Data, "Start");
                             self.$emit("CallbackWFSubmit", { Code: 1 });
                             // 通知 FormSubmit 表单保存"成功"（实际上整个事务已完成）
                             var savedId = (result.DataAppend && result.DataAppend.FormSavedId) || (formApiParam ? formApiParam.Id : null);
@@ -1179,21 +1152,6 @@ export default {
                         async function (result) {
                         self.BtnLoading = false;
                         if (self.DiyCommon.Result(result)) {
-                            var receivers = "";
-                            try {
-                                if (result.Data && result.Data.Receivers) {
-                                    result.Data.Receivers.forEach(function (user) { receivers += user.Name + ","; });
-                                    receivers = receivers.replace(/,$/, "");
-                                }
-                            } catch (error) {}
-                            try {
-                                if (result.Data && result.Data.FlowEnd) {
-                                    self.DiyCommon.Tips("流程处理成功！<br>流程已结束！", true, 10);
-                                } else if (self.CurrentNodeModel.NodeType != "End" || receivers) {
-                                    self.DiyCommon.Tips("流程处理成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + (result.Data ? result.Data.ToNodeName : "") + "。", true, 10);
-                                }
-                            } catch (error) {}
-
                             if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
                                 var V8 = { EventName: "WFNodeEnd" };
                                 V8.Form = workflowFormData;
@@ -1217,6 +1175,7 @@ export default {
                                     self.DiyCommon.Tips("执行节点结束V8代码出现错误：" + error.message, false);
                                 }
                             }
+                            await self.ShowWorkflowResult(result.Data, "Process");
                             self.$emit("CallbackWFSubmit", { Code: 1 });
                             var savedId = (result.DataAppend && result.DataAppend.FormSavedId) || (formApiParam ? formApiParam.Id : null);
                             cb({ Code: 1, Data: { Id: savedId }, Msg: "保存并处理流程成功", _WfMergedResult: result });
@@ -1281,21 +1240,6 @@ export default {
                 async function (result) {
                     self.BtnLoading = false;
                     if (self.DiyCommon.Result(result)) {
-                        //处理返回结果提示
-                        //处理流程发送成功后
-                        var receivers = "";
-                        result.Data.Receivers.forEach((user) => {
-                            receivers += user.Name + ",";
-                        });
-                        try {
-                            receivers = receivers.TrimEnd(",");
-                        } catch (error) {}
-                        if (result.Data.FlowEnd) {
-                            self.DiyCommon.Tips("流程处理成功！<br>流程已结束！", true, 10);
-                        } else if (self.CurrentNodeModel.NodeType != "End" || receivers) {
-                            self.DiyCommon.Tips("流程处理成功！<br>已发送至待办人：" + receivers + "。<br>已发送至节点：" + result.Data.ToNodeName + "。", true, 10);
-                        }
-
                         if (!self.DiyCommon.IsNull(self.CurrentNodeModel.EndV8)) {
                             var V8 = {
                                 EventName: "WFNodeEnd"
@@ -1324,6 +1268,7 @@ export default {
                             }
                         }
 
+                        await self.ShowWorkflowResult(result.Data, "Process");
                         self.$emit("CallbackWFSubmit", { Code: 1 });
                     } else {
                         self.$emit("CallbackWFSubmit", { Code: 0 });

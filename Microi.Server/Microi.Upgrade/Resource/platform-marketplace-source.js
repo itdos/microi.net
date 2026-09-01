@@ -132,7 +132,7 @@ if(['Discover','Captcha','Login','Query','Disconnect'].indexOf(marketplaceAction
   return runtimeResult;
 }
 
-/* V8 ApiEngine | ApiEngineKey: platform-marketplace-source | Version: v1.0.4 */
+/* V8 ApiEngine | ApiEngineKey: platform-marketplace-source | Version: v1.0.5 */
 
 var param = V8.Param || {};
 

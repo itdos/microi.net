@@ -3,6 +3,7 @@ import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import { getVisiblePageTabs, resolveInitialPageTab } from "./page-tab-runtime.js";
 import { selectTableDataSourceFields } from "./table-field-data-source.js";
 import { tableAuditPreferenceKey, tableFieldPreferenceKey } from "../utils/user-table-column-preference.js";
+import { normalizeNotShowFields } from "../utils/not-show-fields.js";
 import { resolveDevComponentRenderSource } from "@/utils/framework-presentation.js";
 
 export default {
@@ -38,8 +39,9 @@ export default {
         },
         ColIsConfigured(fieldName) {
             var self = this;
-            if (self.NotShowFields.indexOf(fieldName) > -1
-                || self.NotShowFields.findIndex(item => item.Name == fieldName || item.Id == fieldName) > -1) {
+            const notShowFields = normalizeNotShowFields(self.NotShowFields);
+            if (notShowFields.indexOf(fieldName) > -1
+                || notShowFields.findIndex(item => item && (item.Name == fieldName || item.Id == fieldName)) > -1) {
                 return false;
             }
             // if (self.TableDiyFieldIds && self.TableDiyFieldIds.find((item) => item == fieldName)) {
@@ -713,6 +715,7 @@ export default {
             if (Array.isArray(self.PropsSearchFields) && self.PropsSearchFields.length > 0) {
                 result.Data.SearchFieldIds = JSON.parse(JSON.stringify(self.PropsSearchFields));
             }
+            result.Data.NotShowFields = normalizeNotShowFields(result.Data.NotShowFields);
             //2021-09-02 提前渲染 页面更多按钮(PageBtns)、页面多Tab（PageTabs）、批量选择更多按钮BatchSelectMoreBtns、更多导出按钮(ExportMoreBtns)
             self.HandlerBtns(result.Data.PageBtns);
             //注意：表单按钮，一定要先打开表单后再进行判断IsVisible
@@ -824,7 +827,8 @@ export default {
             self.TableDiyFieldIds = self.SysMenuModel.TableDiyFieldIds || [];
             self.SearchFieldIds = self.SysMenuModel.SearchFieldIds || [];
             self.SortFieldIds = self.SysMenuModel.SortFieldIds || [];
-            self.NotShowFields = self.SysMenuModel.NotShowFields || [];
+            self.NotShowFields = normalizeNotShowFields(self.SysMenuModel.NotShowFields);
+            self.SysMenuModel.NotShowFields = self.NotShowFields;
             self.MobileListFields = self.SysMenuModel.MobileListFields || [];
             self.FixedFields = self.SysMenuModel.FixedFields || [];
             //------------------------
@@ -848,6 +852,7 @@ export default {
         // 其实这里应该改成Axios去同时请求多个接口，然后再渲染，这样性能更高！
         GetShowDiyFieldList: function () {
             var self = this;
+            self.NotShowFields = normalizeNotShowFields(self.NotShowFields);
             // TableDiyFieldIds 是指模块引擎的查询列【被SysMenuModel.SelectFields替代】
             if (self.SysMenuModel.SelectFields != null) {
                 if (self.SysMenuModel.SelectFields.length > 0 && self.DiyFieldList.length > 0) {
@@ -870,7 +875,7 @@ export default {
                             (!(self.NotShowFields.indexOf(element) > -1
                                 || self.NotShowFields.indexOf(element.Name) > -1
                                 || self.NotShowFields.indexOf(element.Id) > -1
-                                || self.NotShowFields.findIndex(item => item.Name == element.Name) > -1
+                                || self.NotShowFields.findIndex(item => item && item.Name == element.Name) > -1
                             )
                                 || self.ShowHideFieldsList.indexOf(search1.Name) > -1) &&
                             !self.DiyCommon.IsNull(search1.Id)
@@ -917,7 +922,7 @@ export default {
                             (!(self.NotShowFields.indexOf(element) > -1
                                 || self.NotShowFields.indexOf(element.Name) > -1
                                 || self.NotShowFields.indexOf(element.Id) > -1
-                                || self.NotShowFields.findIndex(item => item.Name == element.Name) > -1
+                                || self.NotShowFields.findIndex(item => item && item.Name == element.Name) > -1
                                 )
                                 || self.ShowHideFieldsList.indexOf(element.Name) > -1) &&
                             !self.DiyCommon.IsNull(element.Id)

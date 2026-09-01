@@ -381,7 +381,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.5\.1/);
+  assert.match(importerSource, /Version: v2\.5\.4/);
   assert.match(importerSource, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
   assert.match(importerSource, /storeApiBase \+ '\/apiengine\/'/);
   assert.doesNotMatch(importerSource, /\/api\/ApiEngine\/Run/);
@@ -478,7 +478,7 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.5.1");
+  assert.equal(embeddedImporter.Version, "v2.5.4");
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     "InstallerFeature:PackageManagedOverwriteV2",
   ));

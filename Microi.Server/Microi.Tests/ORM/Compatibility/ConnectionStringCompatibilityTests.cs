@@ -35,6 +35,24 @@ public sealed class ConnectionStringCompatibilityTests
         var builder = new MySqlConnectionStringBuilder(normalized);
 
         Assert.Equal(MySqlSslMode.Disabled, builder.SslMode);
+        Assert.Equal((uint)10, builder.ConnectionTimeout);
+        Assert.True(builder.AllowPublicKeyRetrieval);
+    }
+
+    [Fact]
+    public void Normalize_PreservesExplicitConnectionAndPublicKeySettings()
+    {
+        var normalized = ConnectionStringCompatibility.Normalize(
+            DatabaseType.MySql,
+            "Server=localhost;Database=microi;SslMode=Disabled;"
+            + "Connection Timeout=45;AllowPublicKeyRetrieval=False;",
+            100,
+            30);
+
+        var builder = new MySqlConnectionStringBuilder(normalized);
+
+        Assert.Equal((uint)45, builder.ConnectionTimeout);
+        Assert.False(builder.AllowPublicKeyRetrieval);
     }
 
     [Fact]
@@ -49,6 +67,35 @@ public sealed class ConnectionStringCompatibilityTests
         var builder = new MySqlConnectionStringBuilder(normalized);
 
         Assert.Equal(MySqlSslMode.Required, builder.SslMode);
+        Assert.False(builder.AllowPublicKeyRetrieval);
+    }
+
+    [Fact]
+    public void ConnectionBackoff_RejectsImmediatelyInsteadOfSleeping()
+    {
+        var started = DateTime.UtcNow;
+
+        var error = Assert.Throws<TimeoutException>(() =>
+            Database.ThrowIfConnectionBackoffActive(TimeSpan.FromSeconds(120)));
+
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(1));
+        Assert.Contains("Retry after 120 seconds", error.Message, StringComparison.Ordinal);
+        Database.ThrowIfConnectionBackoffActive(TimeSpan.Zero);
+    }
+
+    [Theory]
+    [InlineData(-1, 1)]
+    [InlineData(0, 1)]
+    [InlineData(7, 7)]
+    [InlineData(15, 15)]
+    [InlineData(600, 15)]
+    public void ConnectionOpenSlotWait_IsHardBounded(
+        int configuredSeconds,
+        int expectedSeconds)
+    {
+        Assert.Equal(
+            expectedSeconds,
+            Database.NormalizeConnectionOpenWaitSeconds(configuredSeconds));
     }
 
     [Fact]

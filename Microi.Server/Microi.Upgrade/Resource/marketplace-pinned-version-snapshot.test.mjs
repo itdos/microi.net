@@ -155,6 +155,70 @@ test('新版导入器显式获取 HDFS 指针，旧导入器仅在响应期获�
   assert.match(importerSource, /PackagePointerMode:\s*'HdfsV1'/);
 });
 
+test('商城源只在响应期为当前应用的私有 ZIP 生成临时地址', () => {
+  const sourcePath = '/itdos/ai-app-packages/v3/app.microi.saas-engine/v7.5.18/source/hash/source.zip';
+  const current = packageRow('v7.5.18', {
+    AiAppPackageManifest: JSON.stringify([{
+      AppId: 'app.microi.saas-engine',
+      AppKey: 'app.microi.saas-engine',
+      SourceZip: {
+        FilePathName: sourcePath,
+        Path: sourcePath,
+        Limit: true,
+        StorageScope: 'HdfsPrivate',
+      },
+      BuildZip: {
+        FilePathName: '/itdos/ai-app-packages/v3/app.microi.saas-engine/v7.5.18/build/hash/build.zip',
+        Path: 'https://static.example.test/build.zip',
+        Limit: false,
+        StorageScope: 'HdfsPublic',
+      },
+    }]),
+  });
+  const calls = [];
+  const result = execute({}, {
+    current,
+    v8: {
+      OsClient: 'iTdos',
+      Method: {
+        GetPrivateFileUrl(param) {
+          calls.push(param);
+          return { Code: 1, Data: { Url: 'https://signed.example.test/source.zip?token=short-lived' } };
+        },
+      },
+    },
+  });
+
+  assert.equal(result.Code, 1);
+  assert.deepEqual(calls, [{ OsClient: 'iTdos', FilePathName: sourcePath, Limit: true }]);
+  assert.equal(
+    result.DataAppend.ApplicationAssetDownloadUrls[sourcePath],
+    'https://signed.example.test/source.zip?token=short-lived',
+  );
+  assert.equal(result.Data.AiAppPackageManifest, current.AiAppPackageManifest, '不可变快照没有被签名 URL 污染');
+});
+
+test('商城源拒绝为跨应用的私有 ZIP 路径签名', () => {
+  const current = packageRow('v7.5.18', {
+    AiAppPackageManifest: JSON.stringify([{
+      AppKey: 'app.microi.saas-engine',
+      SourceZip: {
+        FilePathName: '/itdos/ai-app-packages/v3/another-app/v1.0.0/source/hash/source.zip',
+        Limit: true,
+      },
+    }]),
+  });
+  const result = execute({}, {
+    current,
+    v8: {
+      OsClient: 'iTdos',
+      Method: { GetPrivateFileUrl: () => { throw new Error('must not sign'); } },
+    },
+  });
+  assert.equal(result.Code, 0);
+  assert.match(result.Msg, /路径不属于当前应用/);
+});
+
 test('批量计划先自举应用商城并把快照 Id 贯穿到子导入器', () => {
   assert.match(listSource, /BULK_PLATFORM_BOOTSTRAP_ORDER_V1/);
   assert.match(listSource, /app\.microi\.store/);

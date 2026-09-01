@@ -10,15 +10,20 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_prepare_store_assets
- * Version: v1.1.9
+ * Version: v1.2.0
  * Function:
- * - 生成并上传应用商城源码/编译 ZIP；支持大型应用拆分上传与精确包版本绑定。
+ * - 生成并上传应用商城源码/编译 ZIP；源码固定私有，编译产物跟随应用可见性。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
 function fail(msg, data) { return { Code: 0, Data: data || null, Msg: msg || '执行失败' }; }
 function text(value, fallback) { return value === null || value === undefined ? (fallback || '') : String(value); }
 function isBlank(value) { return text(value).replace(/^\s+|\s+$/g, '') === ''; }
+function flag(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback;
+  var normalized = text(value).replace(/^\s+|\s+$/g, '').toLowerCase();
+  return value === true || value === 1 || ['1', 'true', 'yes', 'on', 'enabled'].indexOf(normalized) >= 0;
+}
 function toArray(value) {
   var list = []; if (!value || value.length === undefined) return list;
   for (var i = 0; i < value.length; i++) list.push(value[i]);
@@ -48,11 +53,14 @@ function sha256(base64) {
 }
 function uploadZip(app, role, zip) {
   if (!zip || isBlank(zip.FileByteBase64)) throw new Error(role + ' ZIP 未返回文件内容');
+  // MARKETPLACE_AI_ASSET_VISIBILITY_V1：可编辑源码始终进私有桶；
+  // 编译产物只在应用为公开（历史 IsPublic=NULL 也按公开兼容）时进公有桶。
+  var limit = role === 'Source' || !flag(app && app.IsPublic, true);
   var files = {}; files[text(zip.FileName, app.AppKey + '-' + role + '.zip')] = zip.FileByteBase64;
   var result = V8.Method.Upload({
     OsClient: V8.OsClient,
     Path: '/microi/app-store/ai-app-packages/' + text(app.AppKey || app.Id) + '/' + DateNow('yyyyMMddHHmmss'),
-    Limit: false,
+    Limit: limit,
     Preview: false,
     FilesByteBase64: files
   });
@@ -64,10 +72,13 @@ function uploadZip(app, role, zip) {
   else if (item.Count && item.Count > 0) item = item[0];
   item = item || {};
   var uploadedName = text(item.FileName || item.Name || zip.FileName);
-  var storedPath = text(item.FilePathName || item.FilePath || item.Path || item.Url || item.url || item.FileUrl);
+  var itemPath = text(item.Path);
+  var storedPath = text(item.FilePathName || item.HdfsPath || item.FilePath
+    || (!/^https?:\/\//i.test(itemPath) ? itemPath : ''));
+  if (isBlank(storedPath)) throw new Error(role + ' ZIP 上传后未返回 HDFS 对象路径');
   var returnedFullPath = text(item.FullPath || item.Url || item.url || item.FileUrl);
-  var publicPath = /^https?:\/\//i.test(returnedFullPath) ? returnedFullPath : storedPath;
-  if (!/^https?:\/\//i.test(publicPath)) {
+  var publicPath = limit ? '' : (/^https?:\/\//i.test(returnedFullPath) ? returnedFullPath : storedPath);
+  if (!limit && !/^https?:\/\//i.test(publicPath)) {
     var fileServer = text(V8.SysConfig && V8.SysConfig.FileServer).replace(/\/+$/g, '');
     if (isBlank(fileServer)) throw new Error('SysConfig.FileServer不能为空，无法生成可跨平台安装的公开ZIP地址');
     publicPath = fileServer + '/' + publicPath.replace(/^\/+/, '');
@@ -76,13 +87,14 @@ function uploadZip(app, role, zip) {
     Id: item.Id || '',
     Name: uploadedName,
     FileName: uploadedName,
-    Path: publicPath,
+    Path: limit ? storedPath : publicPath,
     FilePathName: storedPath,
-    FullPath: publicPath,
+    FullPath: limit ? '' : publicPath,
     Size: item.Size || zip.Size || System.Convert.FromBase64String(zip.FileByteBase64).Length,
     CreateTime: item.CreateTime || DateNow('yyyy-MM-dd HH:mm:ss'),
     FileRole: role,
-    Limit: false,
+    Limit: limit,
+    StorageScope: limit ? 'HdfsPrivate' : 'HdfsPublic',
     Sha256: sha256(zip.FileByteBase64),
     HashAlgorithm: 'SHA256-Base64Text'
   };
@@ -90,7 +102,7 @@ function uploadZip(app, role, zip) {
 function getApp(appId) {
   return V8.FormEngine.GetFormData('sys_microistore', {
     _Where: [['Id', '=', appId]],
-    _SelectFields: ['Id','Name','AppName','AppKey','AppType','ApplicationType','AppVersion','Description','Status','BuildStatus','CurrentVersion','PreviewUrl'],
+    _SelectFields: ['Id','Name','AppName','AppKey','AppType','ApplicationType','AppVersion','Description','Status','BuildStatus','CurrentVersion','PreviewUrl','IsPublic'],
     _PageSize: 1
   });
 }
@@ -179,7 +191,11 @@ for (var i = 0; i < requested.length; i++) {
   if (!appResult || appResult.Code !== 1 || !appResult.Data) throw new Error('AI 应用不存在：' + appId);
   var app = appResult.Data;
   var packageVersion = packageVersionOf(option.PackageVersion || V8.Param.PackageVersion, app.AppVersion);
-  var includeSource = option.IncludeSource === true || option.IncludeSource === 1 || text(option.IncludeSource).toLowerCase() === 'true';
+  // 普通 AI 应用默认交付源码；斗地主、麻将、Unity 等特殊应用由
+  // 发布编排器显式传 IncludeSource=false，不再因参数缺省意外丢失源码。
+  var includeSource = option.IncludeSource === undefined || option.IncludeSource === null
+    ? true
+    : flag(option.IncludeSource, false);
   var buildResult = V8.ApiEngine.Run('ai_app_download_build_zip', { AppId: app.Id });
   if (!buildResult || buildResult.Code !== 1 || !buildResult.Data) {
     throw new Error('生成编译 ZIP 失败（' + (app.Name || app.AppName) + '）：' + ((buildResult && buildResult.Msg) || '接口无返回'));

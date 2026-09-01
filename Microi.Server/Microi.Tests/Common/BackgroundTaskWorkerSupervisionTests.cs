@@ -53,11 +53,14 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("BackgroundTaskStore.TryGetAvailability", runtime);
         Assert.Contains("heartbeat?.Invoke()", runtime);
         Assert.Contains("RunningSlotCount", runtime);
-        Assert.Contains("ReservedConfiguredTenantSlotCount", runtime);
-        Assert.Contains("BackgroundTaskStore.TryClaimConfiguredTenant(NodeId, excludedApiEngineKey)", runtime);
-        Assert.Contains("nonConfiguredRunning >= parallelism - 1", runtime);
-        Assert.Contains("ReservedNonDiyLangSlotCount", runtime);
-        Assert.Contains("ShouldReserveNonMaintenanceSlot", runtime);
+        Assert.Contains("BackgroundTaskSchedulingPolicy.CanAdmit", runtime);
+        Assert.Contains("BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys", runtime);
+        Assert.Contains("BackgroundTaskSchedulingPolicy.LaneConcurrencyKey", runtime);
+        Assert.Contains("new List<WorkerSlot>()", runtime);
+        Assert.DoesNotContain("Dictionary<Task", runtime);
+        Assert.Contains("Task.Run(", runtime);
+        Assert.Contains("CancellationToken.None", runtime);
+        Assert.Contains("\"LaneV1\"", runtime);
         Assert.Contains("DiyLangBackgroundTaskService.ClusterConcurrencyKey", runtime);
         Assert.Contains("ChildTenantPlatformAppControlService.ClusterConcurrencyKey", runtime);
         Assert.Contains("ChildTenantPlatformAppControlService.ChildWorkerApiEngineKey", runtime);
@@ -72,11 +75,23 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("WorkerLeaseRenewalFailed", runtime);
         Assert.Contains("ShouldRetryRenewalFailure", runtime);
         Assert.Contains("PendingNotifications", runtime);
+        Assert.Contains("SignalWorker(item.OsClient, item.ApiEngineKey)", runtime);
+        Assert.Contains("WorkerWakeQueue.TryTake", runtime);
+        Assert.Contains("WorkerWakeQueue.HasPending", runtime);
+        Assert.Contains("WorkerWakeQueue.HasPendingTaskLane", runtime);
+        Assert.Contains(".Concat(OsClientExtend.ClientList.Keys)", runtime);
+        Assert.DoesNotContain("WorkerWakeQueue.HasPendingExcept", runtime);
+        Assert.Contains("hintsSinceCompletedRecovery", runtime);
+        Assert.Contains("recoveryAttemptCompleted", runtime);
+        Assert.Contains("genericRecoveryYielded", runtime);
+        Assert.Contains("tenantScanBatchSize: forceRecoveryScan", runtime);
+        Assert.Contains("ScheduleWorkerWake(item)", runtime);
         Assert.DoesNotContain("var current = BackgroundTaskStore.Get(item.OsClient, item.Id)", runtime);
         Assert.Contains("Msg='等待同一并发组的上一项任务完成'", store);
         Assert.Contains("AttemptCount>=MaxAttempts", store);
         Assert.Contains("任务已耗尽重试次数，系统已自动终结", store);
-        Assert.Contains("ApiEngineKey<>@excludedApiEngineKey", store);
+        Assert.Contains("ApiEngineKey NOT IN", store);
+        Assert.Contains("ApiEngineKey=@requiredApiEngineKey", store);
         Assert.Contains("BACKGROUND_TASK_READY_TIME_FAIR_ORDER_V1", store);
         Assert.Contains(
             "ORDER BY COALESCE(NextRunTime, CreateTime) ASC, CreateTime ASC",
@@ -85,6 +100,10 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("AttemptCount=0,LastError=''", store);
         Assert.Contains("LastError=@p9", store);
         Assert.Contains("Interlocked.Increment(ref _tenantScanCursor)", store);
+        Assert.Contains("TenantScanBatchSize = 4", store);
+        Assert.Contains("ValidateSchemaCached", store);
+        Assert.Contains("TryReadCandidate", store);
+        Assert.Contains("SetCommandTimeout(TenantScanCommandTimeoutSeconds)", store);
         Assert.Contains("item.LeaseExpiresAt = leaseExpiresAt", store);
         Assert.Contains("Math.Max(1, Math.Min(3600, delaySeconds))", store);
         Assert.Contains(
@@ -108,23 +127,123 @@ public sealed class BackgroundTaskWorkerSupervisionTests
             Microi.net.BackgroundTaskStore.RotateTenantScanOrder(tenants, 4));
     }
 
-    [Theory]
-    [InlineData(1, 1, false)]
-    [InlineData(2, 0, false)]
-    [InlineData(2, 1, true)]
-    [InlineData(3, 1, true)]
-    [InlineData(4, 1, true)]
-    [InlineData(4, 2, true)]
-    public void LanguageMaintenance_CannotConsumeEveryWorkerSlot(
-        int parallelism,
-        int runningLanguageTasks,
-        bool shouldReserve)
+    [Fact]
+    public void TenantRecoveryScan_IsBoundedAndRotatesAcrossEveryTenant()
     {
+        var tenants = Enumerable.Range(0, 10).Select(index => "tenant-" + index).ToArray();
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var cursor = 0; cursor < tenants.Length; cursor += 4)
+        {
+            var batch = Microi.net.BackgroundTaskStore.GetTenantScanBatch(tenants, cursor, 4);
+            Assert.InRange(batch.Count, 1, 4);
+            visited.UnionWith(batch);
+        }
+
+        Assert.Equal(tenants.OrderBy(value => value), visited.OrderBy(value => value));
+    }
+
+    [Fact]
+    public void Scheduler_IsolatesTenantTaskLanesAndBoundsPlatformMaintenance()
+    {
+        const int workerParallelism = 4;
+        var running = new List<Microi.net.BackgroundTaskLaneState>();
+        Assert.True(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "junchi", "junchi_material_request_approve", running, workerParallelism));
+        running.Add(new Microi.net.BackgroundTaskLaneState
+        {
+            OsClient = "junchi",
+            ApiEngineKey = "junchi_material_request_approve"
+        });
+
+        Assert.False(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "JUNCHI", "JUNCHI_MATERIAL_REQUEST_APPROVE", running, workerParallelism));
+        Assert.True(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "junchi", "junchi_material_request_generate_requisition", running, workerParallelism));
+        Assert.True(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "itdos", "junchi_material_request_approve", running, workerParallelism));
+        Assert.True(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "junchi", "import-microi-store-package", running, workerParallelism));
+
+        running.Add(new Microi.net.BackgroundTaskLaneState
+        {
+            OsClient = "junchi",
+            ApiEngineKey = "import-microi-store-package"
+        });
+        Assert.False(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "junchi", "bulk-import-microi-store-packages", running, workerParallelism));
+        Assert.True(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "itdos", "bulk-import-microi-store-packages", running, workerParallelism));
+        running.Add(new Microi.net.BackgroundTaskLaneState
+        {
+            OsClient = "itdos",
+            ApiEngineKey = "bulk-import-microi-store-packages"
+        });
+        Assert.False(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "huayou", "import-microi-store-package", running, workerParallelism));
+        Assert.True(Microi.net.BackgroundTaskSchedulingPolicy.CanAdmit(
+            "itdos", "ordinary-business-engine", running, workerParallelism));
         Assert.Equal(
-            shouldReserve,
-            Microi.net.BackgroundTaskService.ShouldReserveNonMaintenanceSlot(
-                parallelism,
-                runningLanguageTasks));
+            2,
+            Microi.net.BackgroundTaskSchedulingPolicy.MaxPlatformMaintenanceParallelism(
+                workerParallelism));
+    }
+
+    [Fact]
+    public void LaneIdentity_IsScopedByTenantAndTaskType()
+    {
+        var audit = Microi.net.BackgroundTaskWakeQueue.BuildLaneKey(" junchi ", " audit ");
+        Assert.Equal(
+            audit,
+            Microi.net.BackgroundTaskWakeQueue.BuildLaneKey("JUNCHI", "AUDIT"));
+        Assert.NotEqual(
+            audit,
+            Microi.net.BackgroundTaskWakeQueue.BuildLaneKey("itdos", "audit"));
+        Assert.NotEqual(
+            audit,
+            Microi.net.BackgroundTaskWakeQueue.BuildLaneKey("junchi", "purchase"));
+        Assert.Equal(
+            Microi.net.BackgroundTaskSchedulingPolicy.LaneConcurrencyKey(" audit "),
+            Microi.net.BackgroundTaskSchedulingPolicy.LaneConcurrencyKey("AUDIT"));
+    }
+
+    [Fact]
+    public void HotLaneHints_ForceBoundedDurableRecovery()
+    {
+        var now = DateTime.UtcNow;
+        Assert.False(Microi.net.BackgroundTaskSchedulingPolicy.ShouldForceRecoveryScan(
+            15,
+            now,
+            now.AddSeconds(1)));
+        Assert.True(Microi.net.BackgroundTaskSchedulingPolicy.ShouldForceRecoveryScan(
+            16,
+            now,
+            now.AddSeconds(1)));
+        Assert.False(Microi.net.BackgroundTaskSchedulingPolicy.ShouldForceRecoveryScan(
+            0,
+            now,
+            now));
+        Assert.True(Microi.net.BackgroundTaskSchedulingPolicy.ShouldForceRecoveryScan(
+            1,
+            now,
+            now));
+    }
+
+    [Fact]
+    public void AlternatingLaneHints_StillForceDurableRecovery()
+    {
+        var hintsSinceCompletedRecovery = 0;
+        foreach (var ignoredLane in Enumerable.Range(0, 16)
+                     .Select(index => index % 2 == 0 ? "audit" : "purchase"))
+        {
+            _ = ignoredLane;
+            hintsSinceCompletedRecovery++;
+        }
+
+        Assert.True(Microi.net.BackgroundTaskSchedulingPolicy.ShouldForceRecoveryScan(
+            hintsSinceCompletedRecovery,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(1)));
     }
 
     [Fact]
@@ -152,6 +271,38 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Equal(
             expected,
             Microi.net.BackgroundTaskService.ShouldRetryRenewalFailure(consecutiveFailures));
+    }
+
+    [Fact]
+    public async Task WorkerWakeQueue_CoalescesTenantHintsAndInterruptsTheFallbackWait()
+    {
+        var queue = new Microi.net.BackgroundTaskWakeQueue();
+        var waiting = queue.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken.None);
+
+        queue.Signal("", "ignored");
+        queue.Signal("junchi", "audit");
+        queue.Signal("JUNCHI", "AUDIT");
+        queue.Signal("junchi", "purchase");
+        queue.SignalTenantRecovery("itdos");
+
+        var completed = await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromSeconds(1)));
+        Assert.Same(waiting, completed);
+        await waiting;
+        Assert.Equal(3, queue.PendingLaneCount);
+        Assert.True(queue.HasPendingTaskLane);
+        Assert.True(queue.TryTake(out var hint));
+        Assert.Equal("junchi", hint.OsClient, ignoreCase: true);
+        Assert.Equal("audit", hint.ApiEngineKey, ignoreCase: true);
+        Assert.True(queue.HasPending);
+        Assert.True(queue.TryTake(out var secondHint));
+        Assert.Equal("purchase", secondHint.ApiEngineKey, ignoreCase: true);
+        Assert.False(queue.HasPendingTaskLane);
+        Assert.True(queue.HasPending);
+        Assert.True(queue.TryTake(out var recoveryHint));
+        Assert.True(recoveryHint.IsTenantRecovery);
+        Assert.Equal("itdos", recoveryHint.OsClient, ignoreCase: true);
+        Assert.False(queue.TryTake(out _));
+        Assert.False(queue.HasPending);
     }
 
     [Fact]
