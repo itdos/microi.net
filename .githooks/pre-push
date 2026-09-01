@@ -16,6 +16,32 @@ Microi.VSCode
 Microi.Client/src/views/webos
 Microi.Server/Microi.WorkFlow'
 
+trusted_hook_oid() {
+  case "$1" in
+    .githooks/pre-commit) config_key='microi.publicGuard.preCommitOid' ;;
+    .githooks/pre-push) config_key='microi.publicGuard.prePushOid' ;;
+    *) return 1 ;;
+  esac
+  git --no-replace-objects config --local --get "$config_key"
+}
+
+validate_worktree_hooks() {
+  for hook_path in .githooks/pre-commit .githooks/pre-push; do
+    expected_oid=$(trusted_hook_oid "$hook_path") || {
+      echo "拒绝推送：本机未钉住 $hook_path 的可信 blob OID；请先执行闭源门禁初始化。" >&2
+      exit 1
+    }
+    worktree_oid=$(git --no-replace-objects hash-object --path="$hook_path" "$repo_root/$hook_path" 2>/dev/null) || {
+      echo "拒绝推送：工作树缺少 $hook_path。" >&2
+      exit 1
+    }
+    if [ "$worktree_oid" != "$expected_oid" ]; then
+      echo "拒绝推送：$hook_path 与本机钉住的可信门禁不一致。" >&2
+      exit 1
+    fi
+  done
+}
+
 reject_rewrite_overlays() {
   if git --no-replace-objects for-each-ref --format='%(refname)' refs/replace/ | grep -q .; then
     echo "拒绝推送：检测到 refs/replace；pack 传输会忽略替换对象，无法安全审计。" >&2
@@ -101,13 +127,21 @@ validate_tip_guard_contract() {
   fi
 
   for hook_path in .githooks/pre-commit .githooks/pre-push; do
+    expected_oid=$(trusted_hook_oid "$hook_path") || {
+      echo "拒绝推送：本机未钉住 $hook_path 的可信 blob OID。" >&2
+      exit 1
+    }
     hook_mode=$(git --no-replace-objects ls-tree "$commit" -- "$hook_path" | awk 'NR == 1 { print $1 }')
     if [ "$hook_mode" != "100755" ]; then
       echo "拒绝推送：$ref_label 的 tip 必须以 100755 保留 $hook_path。" >&2
       exit 1
     fi
-    if ! git --no-replace-objects show "$commit:$hook_path" | grep -Fq 'MICROI_PUBLIC_GUARD_VERSION=2'; then
-      echo "拒绝推送：$ref_label 的 tip 未保留 v2 闭源路径门禁 $hook_path。" >&2
+    hook_oid=$(git --no-replace-objects rev-parse --verify "$commit:$hook_path" 2>/dev/null) || {
+      echo "拒绝推送：$ref_label 的 tip 缺少 $hook_path。" >&2
+      exit 1
+    }
+    if [ "$hook_oid" != "$expected_oid" ]; then
+      echo "拒绝推送：$ref_label 的 tip 未保留本机钉住的可信门禁 $hook_path。" >&2
       exit 1
     fi
   done
@@ -151,6 +185,7 @@ EOF
 }
 
 reject_rewrite_overlays
+validate_worktree_hooks
 validate_worktree_policy
 
 while read -r local_ref local_sha remote_ref remote_sha; do
