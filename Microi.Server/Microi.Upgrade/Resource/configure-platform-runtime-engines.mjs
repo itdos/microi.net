@@ -828,6 +828,30 @@ packageData.PackageInfo.ChangeHistory = prependOnce(
   tenantDatabaseRepairMcpCompatibilityHistory,
 );
 
+const tenantDatabaseStaleReadRepairPackageVersion = 'v7.7.23';
+const tenantDatabaseStaleReadRepairHistory = '2026-09-02 v7.7.23 子租户数据库连接修复增加复制残留读库的精确确认模式；仅当旧读库名与请求完全匹配且不同于目标库时，才由可信宿主原子替换读写连接，真实读副本、未知连接和并发变化继续失败关闭。';
+if (compareSemver(packageData.PackageInfo.Version, tenantDatabaseStaleReadRepairPackageVersion) < 0) {
+  packageData.PackageInfo.Version = tenantDatabaseStaleReadRepairPackageVersion;
+}
+if (packageData.PackageInfo.Version === tenantDatabaseStaleReadRepairPackageVersion) {
+  packageData.PackageInfo.Description = 'SaaS 引擎基础资源。提供租户开通、启动运行时与主租户受控的子租户数据库连接修复入口。';
+  packageData.PackageInfo.ChangeLog = {
+    Version: tenantDatabaseStaleReadRepairPackageVersion,
+    Title: '精确修复复制残留的子租户读库连接',
+    ChangeType: 'Fix',
+    Content: '子租户数据库连接修复增加复制残留读库的精确确认模式；仅当旧读库名与请求完全匹配且不同于目标库时，才由可信宿主原子替换读写连接，真实读副本、未知连接和并发变化继续失败关闭。',
+    ReleaseTime: '2026-09-02 09:30:00'
+  };
+}
+packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
+  packageData.PackageInfo.ChangeHistory,
+  tenantDatabaseStaleReadRepairPackageVersion,
+);
+packageData.PackageInfo.ChangeHistory = prependOnce(
+  packageData.PackageInfo.ChangeHistory,
+  tenantDatabaseStaleReadRepairHistory,
+);
+
 normalizeOfficialApiEnginePolicies(packageData, path.basename(packagePath));
 const normalizedPackageData = JSON.parse(normalizeOfficialPackageExecutionLimits(
   path.basename(packagePath),
