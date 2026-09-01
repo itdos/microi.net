@@ -7,6 +7,11 @@ import { useTagsViewStore } from "./tagsView";
 import { usePermissionStore } from "./permission";
 import { useDiyStore } from "./diy";
 import { clearMicroAppRuntimeCache } from "@/utils/microAppRuntimeCache.js";
+import {
+    hasCurrentUserAuthorizationSnapshot,
+    isAuthorizationResponseForActiveIdentity,
+    markCurrentUserAuthorizationRepairRequired
+} from "@/utils/current-user-state.js";
 
 export const useUserStore = defineStore("user", {
     state: () => ({
@@ -38,18 +43,82 @@ export const useUserStore = defineStore("user", {
             this.roles = roles;
         },
 
+        async ensureAuthorizationSnapshot(candidateUser) {
+            const diyStore = useDiyStore();
+            const candidate = candidateUser || {};
+            if (hasCurrentUserAuthorizationSnapshot(candidate)) return candidate;
+
+            const previous = diyStore.GetCurrentUser || {};
+            // Preserve a same-user last-known-good snapshot for rendering while keeping
+            // an explicit repair marker. The marker is cleared only by a clean full
+            // authorization response, never by a preference-only user patch.
+            diyStore.setCurrentUser(markCurrentUserAuthorizationRepairRequired(candidate));
+
+            const requestToken = DiyCommon.getToken();
+            let repairResult;
+            try {
+                repairResult = await DiyCommon.PostAsync(
+                    "/api/SysUser/refreshToken",
+                    { authorization: requestToken }
+                );
+            } catch (error) {
+                repairResult = { Code: 0, Msg: error?.message || String(error) };
+            }
+
+            if (repairResult
+                && Number(repairResult.Code) === 1
+                && hasCurrentUserAuthorizationSnapshot(repairResult.Data)
+                && isAuthorizationResponseForActiveIdentity(
+                    requestToken,
+                    DiyCommon.getToken(),
+                    repairResult.Data)) {
+                return repairResult.Data;
+            }
+
+            if ([1001, 1002].includes(Number(repairResult?.Code))) {
+                const authError = new Error(repairResult?.Msg || "登录身份已失效，请重新登录。");
+                authError.code = Number(repairResult.Code);
+                authError.Code = Number(repairResult.Code);
+                authError.Msg = authError.message;
+                authError.isAuthFailure = true;
+                throw authError;
+            }
+
+            const fallback = diyStore.GetCurrentUser || {};
+            if (hasCurrentUserAuthorizationSnapshot(previous)
+                && String(previous.Id || "") === String(candidate.Id || "")
+                && String(fallback.Id || "") === String(candidate.Id || "")) {
+                // Server-side CRUD authorization remains authoritative. Keeping the
+                // prior UI snapshot for one retry window is safer than replacing it
+                // with a known technical failure; the repair marker forces a retry.
+                return fallback;
+            }
+
+            const error = new Error(
+                repairResult?.Msg || "用户权限快照刷新失败，请稍后重试。"
+            );
+            error.code = repairResult?.Code;
+            error.Code = repairResult?.Code;
+            error.Msg = error.message;
+            throw error;
+        },
+
         // get user info
         getInfo() {
             return new Promise((resolve, reject) => {
-                DiyCommon.Post(DiyApi.GetCurrentUser(), {}, (result) => {
+                DiyCommon.Post(DiyApi.GetCurrentUser(), {}, async (result) => {
                     if (DiyCommon.Result(result)) {
-                        const currentUser = result.Data || {};
-                        this.setRoles(currentUser._AccessKeySession === true ? ["access-key"] : ["admin"]);
-                        this.setName("");
-                        this.setAvatar("");
-                        this.setIntroduction("");
-                        useDiyStore().setCurrentUser(currentUser);
-                        resolve(currentUser);
+                        try {
+                            const currentUser = await this.ensureAuthorizationSnapshot(result.Data || {});
+                            this.setRoles(currentUser._AccessKeySession === true ? ["access-key"] : ["admin"]);
+                            this.setName("");
+                            this.setAvatar("");
+                            this.setIntroduction("");
+                            useDiyStore().setCurrentUser(currentUser);
+                            resolve(currentUser);
+                        } catch (error) {
+                            reject(error);
+                        }
                     } else {
                         const error = new Error(result?.Msg || result?.Message || "获取当前登录身份失败。");
                         error.code = result?.Code;

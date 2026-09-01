@@ -3,6 +3,9 @@ import test from "node:test";
 
 import {
     hasCurrentUserAuthorizationSnapshot,
+    hasAuthorizationProjectionFailure,
+    isAuthorizationResponseForActiveIdentity,
+    markCurrentUserAuthorizationRepairRequired,
     mergeCurrentUserSnapshot,
     mergeCurrentUserWithCachedSnapshot,
     normalizeCurrentUserRoleLimits
@@ -74,6 +77,94 @@ test("explicit authorization revocation and user changes are never merged with s
     assert.equal(hasCurrentUserAuthorizationSnapshot(revoked), true);
     assert.equal("_IsAdmin" in switched, false);
     assert.equal("_RoleLimits" in switched, false);
+});
+
+test("technical authorization failures preserve same-user LKG and remain marked for repair", () => {
+    const previous = {
+        Id: "admin-id",
+        Level: 9999,
+        _IsAdmin: true,
+        _Roles: [{ Id: "role-admin" }],
+        _RoleLimits: [{ FkId: "api-engine", Permission: ["Add", "Edit"] }]
+    };
+    const merged = mergeCurrentUserSnapshot(previous, {
+        Id: "admin-id",
+        Level: 9999,
+        _IsAdmin: false,
+        _Roles: [],
+        _RoleLimits: [],
+        _RoleLimitsError5: "transient role query failure"
+    });
+
+    assert.equal(merged._IsAdmin, true);
+    assert.deepEqual(merged._RoleLimits, previous._RoleLimits);
+    assert.equal(hasAuthorizationProjectionFailure(merged), true);
+    assert.equal(hasCurrentUserAuthorizationSnapshot(merged), false);
+
+    const preferencePatch = mergeCurrentUserSnapshot(merged, {
+        Id: "admin-id",
+        ThemeMode: "dark"
+    });
+    assert.equal(preferencePatch._IsAdmin, true);
+    assert.equal(hasCurrentUserAuthorizationSnapshot(preferencePatch), false);
+});
+
+test("a contradictory platform-admin projection requires repair without treating clean revocation as failure", () => {
+    const brokenAdmin = {
+        Id: "admin-id",
+        Level: 9999,
+        _IsAdmin: false,
+        _RoleLimits: []
+    };
+    const cleanRevocation = {
+        Id: "user-id",
+        Level: 10,
+        _IsAdmin: false,
+        _RoleLimits: [],
+        _RoleLimitsError8: "!roleIds.Any()"
+    };
+    const accessKeyAdmin = {
+        Id: "admin-id",
+        Level: 9999,
+        _IsAdmin: false,
+        _RoleLimits: [],
+        _AccessKeySession: true
+    };
+
+    assert.equal(hasCurrentUserAuthorizationSnapshot(brokenAdmin), false);
+    assert.equal(hasAuthorizationProjectionFailure(brokenAdmin), true);
+    assert.equal(hasCurrentUserAuthorizationSnapshot(cleanRevocation), true);
+    assert.equal(hasCurrentUserAuthorizationSnapshot(accessKeyAdmin), true);
+    assert.equal(
+        hasCurrentUserAuthorizationSnapshot(markCurrentUserAuthorizationRepairRequired(cleanRevocation)),
+        false
+    );
+});
+
+test("refresh user data is accepted only for the currently active token identity", () => {
+    const token = (userId, osClient) => {
+        const header = Buffer.from(JSON.stringify({ alg: "none" })).toString("base64url");
+        const payload = Buffer.from(JSON.stringify({ UserId: userId, OsClient: osClient })).toString("base64url");
+        return `${header}.${payload}.signature`;
+    };
+    const oldToken = token("user-a", "tenant-a");
+    const rotatedToken = token("user-a", "tenant-a");
+    const switchedUserToken = token("user-b", "tenant-a");
+    const switchedTenantToken = token("user-a", "tenant-b");
+
+    assert.equal(
+        isAuthorizationResponseForActiveIdentity(oldToken, rotatedToken, { Id: "user-a" }),
+        true
+    );
+    assert.equal(
+        isAuthorizationResponseForActiveIdentity(oldToken, switchedUserToken, { Id: "user-a" }),
+        false
+    );
+    assert.equal(
+        isAuthorizationResponseForActiveIdentity(oldToken, switchedTenantToken, { Id: "user-a" }),
+        false
+    );
+    assert.equal(isAuthorizationResponseForActiveIdentity(oldToken, "", { Id: "user-a" }), false);
 });
 
 test("a cold Pinia state hydrates same-user authorization before a partial preference update", () => {

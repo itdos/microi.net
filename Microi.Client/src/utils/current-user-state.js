@@ -21,8 +21,45 @@ const CURRENT_USER_AUTHORIZATION_FIELDS = [
     "DeptIds"
 ];
 
+const AUTHORIZATION_PROJECTION_FAILURE_FIELDS = [
+    "_RoleLimitsError1",
+    "_RoleLimitsError2",
+    "_RoleLimitsError3",
+    "_RoleLimitsError5",
+    "_RoleLimitsError7",
+    "_RoleLimitsError9"
+];
+const AUTHORIZATION_REPAIR_REQUIRED_FIELD = "_AuthorizationProjectionRepairRequired";
+
 const isRecord = value => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+
+function readAuthorizationIdentity(token) {
+    try {
+        const normalized = String(token || "").replace(/^Bearer\s+/i, "").trim();
+        const parts = normalized.split(".");
+        if (parts.length < 2 || typeof globalThis.atob !== "function") return null;
+        let payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        while (payload.length % 4) payload += "=";
+        const claims = JSON.parse(globalThis.atob(payload));
+        return {
+            userId: String(claims.UserId || claims.userId || "").trim(),
+            osClient: String(claims.OsClient || claims.osClient || "").trim()
+        };
+    } catch {
+        return null;
+    }
+}
+
+export function isAuthorizationResponseForActiveIdentity(requestToken, activeToken, currentUser) {
+    const requested = readAuthorizationIdentity(requestToken);
+    const active = readAuthorizationIdentity(activeToken);
+    const responseUserId = String(currentUser?.Id || "").trim();
+    if (!requested?.userId || !active?.userId || !responseUserId) return false;
+    return requested.userId.toLowerCase() === active.userId.toLowerCase()
+        && requested.osClient.toLowerCase() === active.osClient.toLowerCase()
+        && responseUserId.toLowerCase() === active.userId.toLowerCase();
+}
 
 /**
  * Personal-preference endpoints are allowed to return a partial sys_user projection.
@@ -33,13 +70,31 @@ const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {},
 export function mergeCurrentUserSnapshot(previousUser, incomingUser) {
     const previous = isRecord(previousUser) ? previousUser : {};
     const incoming = isRecord(incomingUser) ? { ...incomingUser } : {};
+    const incomingProvidesAuthorization = hasOwn(incomingUser, "_IsAdmin")
+        || hasOwn(incomingUser, "_RoleLimits");
     const previousId = String(previous.Id || "").trim();
     const incomingId = String(incoming.Id || "").trim();
     if (!previousId || !incomingId || previousId !== incomingId) return incoming;
 
+    // Older refresh runtimes could serialize a transient role-query failure as a
+    // successful same-user snapshot with empty permissions. Keep the last valid
+    // authorization fields while retaining the failure marker so App.vue can force
+    // an authoritative repair. A clean explicit false/empty revocation is untouched.
+    const preserveFailedAuthorization = hasCurrentUserAuthorizationSnapshot(previous)
+        && hasAuthorizationProjectionFailure(incoming);
     CURRENT_USER_AUTHORIZATION_FIELDS.forEach(field => {
-        if (!hasOwn(incoming, field) && hasOwn(previous, field)) incoming[field] = previous[field];
+        if ((preserveFailedAuthorization || !hasOwn(incoming, field)) && hasOwn(previous, field)) {
+            incoming[field] = previous[field];
+        }
     });
+    if (preserveFailedAuthorization) {
+        incoming[AUTHORIZATION_REPAIR_REQUIRED_FIELD] = true;
+    } else if (previous[AUTHORIZATION_REPAIR_REQUIRED_FIELD] === true
+        && !incomingProvidesAuthorization) {
+        // A preference-only patch cannot certify that the failed authorization
+        // projection was repaired. Carry the marker until a clean full snapshot arrives.
+        incoming[AUTHORIZATION_REPAIR_REQUIRED_FIELD] = true;
+    }
     return incoming;
 }
 
@@ -63,10 +118,35 @@ export function mergeCurrentUserWithCachedSnapshot(stateUser, cachedUser, incomi
     return mergeCurrentUserSnapshot(baseline, incoming);
 }
 
+export function hasAuthorizationProjectionFailure(currentUser) {
+    if (!isRecord(currentUser)) return false;
+    if (currentUser[AUTHORIZATION_REPAIR_REQUIRED_FIELD] === true) return true;
+    if (AUTHORIZATION_PROJECTION_FAILURE_FIELDS.some(field => {
+        const value = currentUser[field];
+        return value !== null && typeof value !== "undefined" && String(value).trim() !== "";
+    })) return true;
+
+    // Platform super administrators are defined by Level >= 9999. A contradictory
+    // false _IsAdmin value can only be a failed/legacy projection, never a revocation.
+    const level = Number(currentUser.Level);
+    return currentUser._AccessKeySession !== true
+        && Number.isFinite(level)
+        && level >= 9999
+        && currentUser._IsAdmin !== true;
+}
+
 export function hasCurrentUserAuthorizationSnapshot(currentUser) {
-    return Boolean(currentUser?.Id)
+    return !hasAuthorizationProjectionFailure(currentUser)
+        && Boolean(currentUser?.Id)
         && hasOwn(currentUser, "_IsAdmin")
         && Array.isArray(currentUser?._RoleLimits);
+}
+
+export function markCurrentUserAuthorizationRepairRequired(currentUser) {
+    return {
+        ...(isRecord(currentUser) ? currentUser : {}),
+        [AUTHORIZATION_REPAIR_REQUIRED_FIELD]: true
+    };
 }
 
 /**

@@ -15,6 +15,10 @@ import { useDiyStore, useSettingsStore, useAppStore } from "@/pinia";
 import { getElementLocale, normalizeLocale } from "@/lang";
 import { setThemeMode as applyThemeMode } from "@/utils/theme-color.js";
 import { resolveUserThemeMode } from "@/utils/user-visual-preferences.js";
+import {
+    hasCurrentUserAuthorizationSnapshot,
+    isAuthorizationResponseForActiveIdentity
+} from "@/utils/current-user-state.js";
 import { syncApkDesktopStatusbarInset } from "@/utils/apk-statusbar-safe-area.js";
 import { getQueryObject } from "@/utils/index.js";
 import {
@@ -306,20 +310,33 @@ export default {
             }
             return result;
         },
-        async RefreshTokenWithLock() {
+        async RefreshTokenWithLock(forceAuthorizationRefresh = false) {
             if (isEmbeddedWebosWindowRuntime()) return false;
             var self = this;
             var refresh = async function () {
                 // 获得锁后必须重读共享存储；另一个标签页可能已经完成续签。
                 var authorization = self.$localStorageManager.get("Token");
                 var expires = self.$localStorageManager.get("TokenExpires");
-                if (!authorization || !expires || new Date() < new Date(expires)) return false;
+                if (!authorization
+                    || (!forceAuthorizationRefresh && (!expires || new Date() < new Date(expires)))) return false;
                 await new Promise(function (resolve) {
                     self.DiyCommon.Post(
                         "/api/SysUser/refreshToken",
                         { authorization: authorization },
                         function (result) {
-                            if (!result || result.Code !== 1) {
+                            if (result
+                                && result.Code === 1
+                                && result.Data
+                                && isAuthorizationResponseForActiveIdentity(
+                                    authorization,
+                                    self.DiyCommon.getToken(),
+                                    result.Data)) {
+                                // Token 续签同时刷新权威用户投影。必须立即同步到 Pinia/
+                                // localStorage，不能等用户重新登录才恢复管理员与按钮权限。
+                                self.diyStore.setCurrentUser(result.Data);
+                            } else if (result && result.Code === 1 && result.Data) {
+                                console.warn("[Auth] 忽略已切换登录身份的迟到续签用户投影。");
+                            } else {
                                 self.DiyCommon.Result(result);
                             }
                             resolve();
@@ -353,8 +370,12 @@ export default {
             // 首次打开根地址时 Hash 路由可能尚未完成匹配，因此无 Token 本身也必须
             // 视为匿名启动状态；登录页会自行处理 URL Token、SSO 与账号登录。
             if (self.IsAnonymousRoute() || !self.DiyCommon.getToken()) return;
-            await self.RefreshTokenWithLock();
-            if (self.diyStore.GetCurrentUser && self.diyStore.GetCurrentUser.Id) {
+            var cachedCurrentUser = self.diyStore.GetCurrentUser || {};
+            var authorizationNeedsRepair = Boolean(cachedCurrentUser.Id)
+                && !hasCurrentUserAuthorizationSnapshot(cachedCurrentUser);
+            await self.RefreshTokenWithLock(authorizationNeedsRepair);
+            var currentUser = self.diyStore.GetCurrentUser || {};
+            if (currentUser.Id && hasCurrentUserAuthorizationSnapshot(currentUser)) {
                 self.TryConnectWebSocketAfterCurrentUser();
             } else {
                 self.GetCurrentUserApp();

@@ -1353,6 +1353,7 @@ html.dark {
    自动覆盖直接 ElMessageBox/$confirm 调用，DiyCommon.OsConfirm 则首帧即带此类。 */
 .el-message-box.mci-unified-message-box {
     --mci-message-accent: var(--el-color-primary, #3478f6);
+    --mci-message-action: var(--el-color-primary, #3478f6);
     --mci-message-surface: var(--mci-bg-card, var(--el-bg-color-overlay, #fff));
     --mci-message-line: var(--mci-border-color, var(--el-border-color-lighter, #e1e8f0));
     width: min(540px, calc(100vw - 32px));
@@ -1482,8 +1483,8 @@ html.dark {
 
         .el-button--primary {
             border-color: transparent;
-            background: var(--mci-message-accent) !important;
-            box-shadow: 0 10px 24px color-mix(in srgb, var(--mci-message-accent) 28%, transparent);
+            background: var(--mci-message-action) !important;
+            box-shadow: 0 10px 24px color-mix(in srgb, var(--mci-message-action) 28%, transparent);
         }
     }
 }

@@ -36,6 +36,12 @@ public class ApiEngineCacheCompatibilityTests
             BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("接口引擎规范 Key 路由解析方法不存在。");
 
+    private static readonly MethodInfo NormalizeRouteAddressMethod =
+        typeof(DynamicRoute).GetMethod(
+            "NormalizeApiEngineRouteAddress",
+            BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("接口引擎完整地址规范化方法不存在。");
+
     private static readonly MethodInfo UpgradeEventMethod =
         UpgradeCacheCompatibilityType.GetMethod(
             "TryUpgradeEvent",
@@ -117,7 +123,7 @@ public class ApiEngineCacheCompatibilityTests
     [InlineData("/ApiEngine/Platform.Health-V2", "platform.health-v2")]
     [InlineData("/custom/home_platform_stats", "")]
     [InlineData("/apiengine/nested/path", "")]
-    public void CanonicalApiEngineRouteUsesKeyAsColdStartAuthority(
+    public void CanonicalApiEngineRouteExtractsCompatibilityFallbackKey(
         string apiPath,
         string expectedKey)
     {
@@ -125,6 +131,74 @@ public class ApiEngineCacheCompatibilityTests
             CanonicalRouteKeyMethod.Invoke(null, new object?[] { apiPath }));
 
         Assert.Equal(expectedKey, actual);
+    }
+
+    [Theory]
+    [InlineData(
+        "/apiengine/get-microi-store-list",
+        "/apiengine/get-microi-store-list")]
+    [InlineData(
+        "/apiengine/get-microi-store-list--OsClient--iTdos--",
+        "/apiengine/get-microi-store-list")]
+    [InlineData(
+        "/ApiEngine/Get-Microi-Store-List--osclient--JUNCHI--",
+        "/apiengine/get-microi-store-list")]
+    public void CompleteApiAddressRemainsStableAcrossTenantSuffixes(
+        string apiPath,
+        string expectedAddress)
+    {
+        var actual = Assert.IsType<string>(
+            NormalizeRouteAddressMethod.Invoke(null, new object?[] { apiPath }));
+
+        Assert.Equal(expectedAddress, actual);
+    }
+
+    [Theory]
+    [InlineData("/apiengine/get-microi-store-list")]
+    [InlineData("/apiengine/get-microi-store-list--OsClient--junchi--")]
+    public void CustomListAddressWinsBeforeDifferentCanonicalKey(string requestPath)
+    {
+        var model = JObject.Parse(
+            "{\"Id\":\"store-list\",\"ApiEngineKey\":\"get-microi-store\","
+            + "\"ApiAddress\":\"/apiengine/get-microi-store-list\"}");
+        var normalizedAddress = Assert.IsType<string>(
+            NormalizeRouteAddressMethod.Invoke(null, new object?[] { requestPath }));
+        var canonicalKey = Assert.IsType<string>(
+            CanonicalRouteKeyMethod.Invoke(null, new object?[] { requestPath }));
+        var routeAliases = Assert.IsType<(string ApiEngineKey, string ApiAddress)>(
+            RouteCacheAliasMethod.Invoke(null, new object?[] { model }));
+
+        var aliases = ApiEngineRouteAliases.GetCacheAliases(model);
+
+        Assert.True(ApiEngineRouteAliases.ContainsExactRoute(model, normalizedAddress));
+        Assert.Equal("get-microi-store", routeAliases.ApiEngineKey);
+        Assert.Equal("get-microi-store-list", canonicalKey);
+        Assert.NotEqual(routeAliases.ApiEngineKey, canonicalKey);
+        Assert.Contains("get-microi-store", aliases);
+        Assert.Contains("/apiengine/get-microi-store-list", aliases);
+        Assert.DoesNotContain("get-microi-store-list", aliases);
+    }
+
+    [Theory]
+    [InlineData("/apiengine/savesalesckinfoV2")]
+    [InlineData("/apiengine/savesalesckinfoV2--OsClient--myzsl--")]
+    public void ExplicitSalesAddressDoesNotBecomeItsDifferentEngineKey(string requestPath)
+    {
+        var model = JObject.Parse(
+            "{\"Id\":\"sales-route\","
+            + "\"ApiEngineKey\":\"cjt_productReceive_to_ERP_V2\","
+            + "\"ApiAddress\":\"/apiengine/savesalesckinfoV2\"}");
+        var normalizedAddress = Assert.IsType<string>(
+            NormalizeRouteAddressMethod.Invoke(null, new object?[] { requestPath }));
+        var canonicalKey = Assert.IsType<string>(
+            CanonicalRouteKeyMethod.Invoke(null, new object?[] { requestPath }));
+        var routeAliases = Assert.IsType<(string ApiEngineKey, string ApiAddress)>(
+            RouteCacheAliasMethod.Invoke(null, new object?[] { model }));
+
+        Assert.True(ApiEngineRouteAliases.ContainsExactRoute(model, normalizedAddress));
+        Assert.Equal("cjt_productreceive_to_erp_v2", routeAliases.ApiEngineKey);
+        Assert.Equal("savesalesckinfov2", canonicalKey);
+        Assert.NotEqual(routeAliases.ApiEngineKey, canonicalKey);
     }
 
     [Theory]
@@ -155,11 +229,35 @@ public class ApiEngineCacheCompatibilityTests
         var storeSource = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.Core", "ApiEngine", "ApiEngineAuthoritativeStore.cs"));
 
-        Assert.Contains(".GetAuthoritativeApiEngineModel(authoritativeParam)", dynamicRouteSource);
-        Assert.Contains("authoritativeParam.ApiEngineKey = canonicalApiEngineKey", dynamicRouteSource);
-        Assert.Contains("authoritativeParam.ApiAddress = apiPathLower", dynamicRouteSource);
+        Assert.Contains("ApiEngineAuthoritativeStore.GetEnabledModel(client, addressParam)", dynamicRouteSource);
+        Assert.Contains("ApiEngineAuthoritativeStore.GetEnabledByMultiRoute(client, apiAddress)", dynamicRouteSource);
+        Assert.Contains(".GetAuthoritativeApiEngineModel(keyParam)", dynamicRouteSource);
+        var addressAuthorityIndex = dynamicRouteSource.IndexOf(
+            "var fallbackResult = GetAuthoritativeRouteByAddress",
+            StringComparison.Ordinal);
+        var keyAuthorityIndex = dynamicRouteSource.IndexOf(
+            "ApiEngineKey = canonicalApiEngineKey",
+            StringComparison.Ordinal);
+        Assert.True(addressAuthorityIndex >= 0, "动态路由必须先按完整 ApiAddress 回源。");
+        Assert.True(keyAuthorityIndex > addressAuthorityIndex,
+            "只有完整 ApiAddress 明确未配置后才能回退 canonical Key。");
+        Assert.Contains("fallbackResult.Code == 1", dynamicRouteSource);
+        Assert.Contains("fallbackResult.Data == null", dynamicRouteSource);
+        var routeOccupancyIndex = dynamicRouteSource.IndexOf(
+            ".HasConfiguredRoute(OsClientExtend.GetClient(osClient), apiPathLower)",
+            StringComparison.Ordinal);
+        Assert.True(routeOccupancyIndex > addressAuthorityIndex,
+            "启用地址未命中后必须检查停用地址占用状态。");
+        Assert.True(keyAuthorityIndex > routeOccupancyIndex,
+            "只有地址从未配置时才能回退 canonical Key。");
         Assert.Contains(
-            "resolvedApiEngineKey = DynamicRoute.ResolveCanonicalApiEngineKey(requestPath)",
+            "DynamicRoute.NormalizeApiEngineRouteAddress(requestPath)",
+            apiControllerSource);
+        Assert.Contains("if (!resolvedApiEngineKey.DosIsNullOrWhiteSpace())", apiControllerSource);
+        Assert.Contains("param[\"ApiEngineKey\"] = resolvedApiEngineKey", apiControllerSource);
+        Assert.Contains("param[\"ApiAddress\"] = normalizedApiAddress", apiControllerSource);
+        Assert.DoesNotContain(
+            "DynamicRoute.ResolveCanonicalApiEngineKey(requestPath)",
             apiControllerSource);
         Assert.DoesNotContain(
             @"^/apiengine/([A-Za-z0-9_.:-]+)(?:--OsClient--.*--)?$",
@@ -173,6 +271,8 @@ public class ApiEngineCacheCompatibilityTests
         Assert.DoesNotContain("MicroiEngine.FormEngine.GetTableDataAsync", initializerSource);
         Assert.Contains("RemoveParentAsync", initializerSource);
         Assert.Contains("client.Db.FromSql(sql)", storeSource);
+        Assert.Contains("public static DosResult<bool> HasConfiguredRoute", storeSource);
+        Assert.Contains("bool enabledOnly = true", storeSource);
         Assert.DoesNotContain("client.DbRead", storeSource);
     }
 

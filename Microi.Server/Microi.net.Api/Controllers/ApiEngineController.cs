@@ -180,19 +180,28 @@ namespace Microi.net.Api
             // this also prevents duplicate historical ApiAddress rows from making
             // permission checks and execution select different engines.
             var requestPath = DiyHttpContext.Current?.Request.Path.Value ?? string.Empty;
-            // DynamicRoute 已用权威行解析真实 Key，必须优先采用该结果。缓存冷启动
-            // 或路由尚未写入 Items 时，再用同一规范解析器处理 /apiengine/{Key}。
-            // 旧正则允许 '-' 且 group 贪婪，会把 --OsClient--...-- 一并吞进 Key，
-            // 最终把存在的接口误报为 NoExistData[ApiAddress]。
+            var normalizedApiAddress = DynamicRoute.NormalizeApiEngineRouteAddress(requestPath);
+            // DynamicRoute 已按“完整 ApiAddress 优先、未配置才退 Key”解析真实 Key。
+            // 只有它明确写入 Items 时才能覆盖为 ApiEngineKey；若路由层未解析到行，
+            // 控制器必须保留完整 ApiAddress 语义，不能再次把自定义地址猜成 Key。
             var resolvedApiEngineKey = DiyHttpContext.Current?.Items[
                 DynamicRoute.ResolvedApiEngineKeyItem]?.ToString();
-            if (resolvedApiEngineKey.DosIsNullOrWhiteSpace())
-            {
-                resolvedApiEngineKey = DynamicRoute.ResolveCanonicalApiEngineKey(requestPath);
-            }
             if (!resolvedApiEngineKey.DosIsNullOrWhiteSpace())
             {
+                // DynamicRoute 对所有自定义地址都是权威来源，不仅限于
+                // /apiengine/*。请求体不得把已解析的自定义路由切换到另一个 Key。
+                param.Remove("ApiEngineKey");
+                param.Remove("ApiAddress");
                 param["ApiEngineKey"] = resolvedApiEngineKey;
+            }
+            else if (normalizedApiAddress.StartsWith(
+                         "/apiengine/",
+                         StringComparison.OrdinalIgnoreCase))
+            {
+                // 动态 URL 下请求体中的 ApiEngineKey/ApiAddress 都不可信。
+                param.Remove("ApiEngineKey");
+                param.Remove("ApiAddress");
+                param["ApiAddress"] = normalizedApiAddress;
             }
             // 模板路由参数与 HTTP 元数据必须由宿主在合并不可信输入后覆盖，避免调用者
             // 伪造 {OsClient}/{ConnectionKey} 或请求方法。接口引擎据此可以实现标准

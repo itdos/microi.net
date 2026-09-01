@@ -474,9 +474,22 @@ bundle.EntryPath = 'index.html';
 bundle.IncludeSource = false;
 bundle.Application.CurrentVersion = applicationVersion;
 bundle.Application.BuildVersion = version;
-bundle.PackageAssets.IncludeSource = false;
-bundle.PackageAssets.PackageVersion = version;
-bundle.PackageAssets.PreparedTime = localTime;
+if (bundle.PackageAssets !== null
+    && bundle.PackageAssets !== undefined
+    && (typeof bundle.PackageAssets !== 'object' || Array.isArray(bundle.PackageAssets))) {
+  throw new Error('SaaS 引擎包平台微服务 PackageAssets 必须是对象或 null');
+}
+bundle.PackageAssets = {
+  ...(bundle.PackageAssets || {}),
+  SchemaVersion: Number(bundle.PackageAssets?.SchemaVersion || 2),
+  AppId: String(bundle.PackageAssets?.AppId || bundle.Application?.Id || ''),
+  AppKey: String(bundle.PackageAssets?.AppKey || bundle.Application?.AppKey || releaseContract.AppKey),
+  AppName: String(bundle.PackageAssets?.AppName || bundle.Application?.AppName || bundle.Application?.Name || ''),
+  ApplicationType: String(bundle.PackageAssets?.ApplicationType || bundle.Application?.ApplicationType || bundle.Application?.AppType || 'MicroService'),
+  IncludeSource: false,
+  PackageVersion: version,
+  PreparedTime: localTime,
+};
 delete bundle.PackageAssets.SourceZip;
 delete bundle.PackageAssets.BuildZip;
 bundle.MicroService.UpdateTime = localTime;
@@ -494,6 +507,11 @@ bundle.Routes = routeDefinitions.map(routeDefinition => {
   const routePath = String(routeDefinition.path || '').trim();
   if (!routePath.startsWith('/')) throw new Error(`微服务路由必须以 / 开头：${routePath}`);
   const existing = existingRoutes.get(routePath) || {};
+  let portableRouteMeta = {};
+  try { portableRouteMeta = JSON.parse(existing.RouteMetaJson || '{}') || {}; }
+  catch { portableRouteMeta = {}; }
+  if (typeof portableRouteMeta !== 'object' || Array.isArray(portableRouteMeta)) portableRouteMeta = {};
+  delete portableRouteMeta._MicroiV3;
   return {
     Id: existing.Id || sha256(`microi-platform-service:${routePath}`).slice(0, 26).toUpperCase(),
     CreateTime: existing.CreateTime || localTime,
@@ -504,6 +522,7 @@ bundle.Routes = routeDefinitions.map(routeDefinition => {
     MicroServiceId: bundle.MicroService.Id,
     MicroServiceKey: 'microi-platform-service',
     PageKey: String(routeDefinition.name || routePath.slice(1)),
+    PageName: String(existing.PageName || routeDefinition.name || routePath.slice(1)),
     PageTitle: String(routeDefinition.title || routeDefinition.name || routePath),
     RoutePath: routePath,
     EntryPath: 'index.html',
@@ -512,7 +531,7 @@ bundle.Routes = routeDefinitions.map(routeDefinition => {
     IsHome: routeDefinition.isHome === true || Number(routeDefinition.isHome) === 1 ? 1 : 0,
     IsEnable: 1,
     BuildVersion: version,
-    RouteMetaJson: existing.RouteMetaJson || '{}',
+    RouteMetaJson: JSON.stringify(portableRouteMeta),
     SourceDirName: 'microi-platform-service',
   };
 });

@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "系统设置",
-    "Version": "v6.3.9",
+    "Version": "v6.3.11",
     "CreateTime": "2026-08-23T02:17:37.179Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -17,8 +17,9 @@
     "DataSetCount": 0,
     "DataRowCount": 0,
     "AiApplicationCount": 0,
-    "ChangeHistory": "2026-08-30 v6.3.9 将 TenantSystemSettingsController 迁入 platform-tenant-system-settings；多路由统一普通 CRUD、地图运行时、Secret 保存与二次认证揭示。\n2026-08-25 v6.3.8 非敏感租户系统设置列表、保存和删除迁入 Managed V8 接口；敏感明文仍只经过可信后端。\n2026-08-23 v6.3.7 系统设置公开开关与服务端私有凭据边界完善；开发配置默认展开折叠分组，CodeEditor 使用带字数的按钮弹层模式。\n",
+    "ChangeHistory": "2026-09-01 v6.3.11 在 v6.3.10 基础上补齐官方升级资源的结构化历史、客户端能力标记和日志类型；模块底部信息继续交付支持 {{ OsVersion }} 和 {{ YYYY }} 的默认模板，不携带 Sys_Config 租户数据。\n2026-08-30 v6.3.9 将 TenantSystemSettingsController 迁入 platform-tenant-system-settings；多路由统一普通 CRUD、地图运行时、Secret 保存与二次认证揭示。\n2026-08-25 v6.3.8 非敏感租户系统设置列表、保存和删除迁入 Managed V8 接口；敏感明文仍只经过可信后端。\n2026-08-23 v6.3.7 系统设置公开开关与服务端私有凭据边界完善；开发配置默认展开折叠分组，CodeEditor 使用带字数的按钮弹层模式。\n",
     "RequiredPlatformCapabilities": [
+      "ClientFeature:MenuBottomContentDefaultFooter",
       "ClientFeature:CodeEditorFieldDisplayMode",
       "SystemSettings:DevelopmentCollapseGroups",
       "TenantSettings:PublicPrivateBoundary",
@@ -29,11 +30,11 @@
       "V8.Method.RunPlatformApiRuntime:TenantSystemSettings"
     ],
     "ChangeLog": {
-      "Version": "v6.3.9",
-      "Title": "租户系统设置接口引擎化",
-      "ChangeType": "Optimize",
-      "Content": "将 TenantSystemSettingsController 迁入 platform-tenant-system-settings；多路由统一普通 CRUD、地图运行时、Secret 保存与二次认证揭示。",
-      "ReleaseTime": "2026-08-30 12:00:00"
+      "Version": "v6.3.11",
+      "Title": "菜单底部动态年份安装包修订",
+      "ChangeType": "Feature",
+      "Content": "在 v6.3.10 基础上补齐官方升级资源的结构化历史、客户端能力标记和日志类型；模块底部信息继续交付支持 {{ OsVersion }} 和 {{ YYYY }} 的默认模板，不携带 Sys_Config 租户数据。",
+      "ReleaseTime": "2026-09-01 08:30:15"
     },
     "Description": "吾码系统设置、租户私密配置与安全服务接入。"
   },
@@ -8655,7 +8656,8 @@
       "NotEmpty": 0,
       "Label": "模块底部信息",
       "Id": "89898852-4e10-405f-b607-89cfafa52172",
-      "CreateTime": "2022-04-11 16:07:35"
+      "CreateTime": "2022-04-11 16:07:35",
+      "DefaultValue": "<div class=\"col-md-12\">\n     {{ OsVersion }}\n</div>\n<div class=\"col-md-12\">\n     Copyright © 2009 - {{ YYYY }}\n</div>"
     },
     {
       "TableName": "Sys_Config",
