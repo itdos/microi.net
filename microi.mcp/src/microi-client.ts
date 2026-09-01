@@ -306,6 +306,28 @@ export interface ApplicationAssetStreamFinalizeRequest {
   ChangeSummary?: string;
 }
 
+export interface MicroServiceSourceStageRequest {
+  AppIdOrKey: string;
+  RelativePath: string;
+  ExpectedSha256: string;
+  ExpectedSize: number;
+  DeliveryBatchId: string;
+  FilePath: string;
+  MicroService?: Record<string, unknown>;
+  TimeoutMs?: number;
+}
+
+export interface MicroServiceSourceFinalizeRequest {
+  AppIdOrKey: string;
+  DeliveryBatchId: string;
+  ExpectedCurrentVersion: number;
+  ExpectedAppVersion: string | null;
+  ExpectedSourceManifestHash: string | null;
+  SourceManifestHash: string;
+  ReplacePrivateSourceOnly: true;
+  Manifest: Array<{ Path: string; Sha256: string; Size: number }>;
+}
+
 export function isTenantConfigurationFailureResponse(result?: Partial<ApiResponse> | null): boolean {
   const reasonCode = String(result?.DataAppend?.ReasonCode || '').trim();
   if (/^(InvalidTenant|InvalidOsClient|TenantNotFound|TenantDisabled)$/i.test(reasonCode)) {
@@ -345,6 +367,10 @@ interface RequestOptions {
    * long-running streaming operation raises this ceiling. */
   maxTimeoutMs?: number;
   operationName?: string;
+  /** Disable the automatic fetch -> node:http(s) replay for a non-idempotent
+   * whole-request operation whose uncertain result must be resolved by its
+   * caller through an authoritative readback. */
+  allowNativeFallback?: boolean;
 }
 
 type AuthRecoveryStage = 'initial' | 'replacement-token' | 'broker-token' | 'credential-token';
@@ -1232,6 +1258,19 @@ export class MicroiClient {
         );
       }
 
+      if (options.allowNativeFallback === false) {
+        throw new MicroiTransportError(
+          `${operationName} 网络请求失败：fetch=${error instanceof Error ? error.message : String(error)}；`
+          + '已禁用非幂等传输重放',
+          {
+            kind: 'network',
+            requestPath: reqPath,
+            uncertainOutcome: method === 'POST',
+            cause: error,
+          },
+        );
+      }
+
       // Undici fetch can be reset by reverse proxies for otherwise valid JSON
       // requests (notably the bounded MicroService compatibility publisher).
       // Reuse the exact serialized body through node:http(s); callers retain
@@ -1338,6 +1377,7 @@ export class MicroiClient {
     authRecoveryStage: AuthRecoveryStage = 'initial',
     timeoutMs?: number,
     contentEncoding?: 'gzip',
+    allowGzipFallback = true,
   ): Promise<ApiResponse<T>> {
     const requestToken = this.token;
     const transportFields = contentEncoding === 'gzip'
@@ -1358,6 +1398,14 @@ export class MicroiClient {
           did: this.did,
           ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
           'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          // The original-byte transport has an exact deterministic size. Some
+          // reverse proxies reset chunked multipart uploads before ASP.NET can
+          // read the form, so match the VS Code publisher and declare it.
+          // Gzip remains chunked because its compressed length is not known
+          // without buffering the complete file.
+          ...(contentEncoding === undefined
+            ? { 'Content-Length': String(multipart.contentLength) }
+            : {}),
         },
         body: multipart.body as unknown as BodyInit,
         // Node.js fetch requires duplex for a streaming request body.
@@ -1400,7 +1448,7 @@ export class MicroiClient {
       } catch (nativeError) {
         const fetchMessage = error instanceof Error ? error.message : String(error);
         const nativeMessage = nativeError instanceof Error ? nativeError.message : String(nativeError);
-        if (contentEncoding !== 'gzip') {
+        if (allowGzipFallback && contentEncoding !== 'gzip') {
           try {
             return await this.requestMultipartFile<T>(
               reqPath,
@@ -1410,6 +1458,7 @@ export class MicroiClient {
               authRecoveryStage,
               timeoutMs,
               'gzip',
+              allowGzipFallback,
             );
           } catch (gzipError) {
             const gzipMessage = gzipError instanceof Error ? gzipError.message : String(gzipError);
@@ -1425,7 +1474,7 @@ export class MicroiClient {
           }
         }
         throw new MicroiTransportError(
-          `应用资产 gzip 流式上传网络失败：fetch=${fetchMessage}；native=${nativeMessage}`,
+          `${contentEncoding === 'gzip' ? '应用资产 gzip' : '原始文件'}流式上传网络失败：fetch=${fetchMessage}；native=${nativeMessage}`,
           {
             kind: 'network',
             requestPath: reqPath,
@@ -1458,6 +1507,7 @@ export class MicroiClient {
           nextAuthRecoveryStage(authRecoveryStage),
           timeoutMs,
           contentEncoding,
+          allowGzipFallback,
         );
       }
       throw new Error(`HTTP 401 Unauthorized — token recovery failed: ${text.slice(0, 200)}`);
@@ -1485,6 +1535,7 @@ export class MicroiClient {
           nextAuthRecoveryStage(authRecoveryStage),
           timeoutMs,
           contentEncoding,
+          allowGzipFallback,
         );
       }
     }
@@ -1594,6 +1645,9 @@ export class MicroiClient {
             did: this.did,
             ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
             'Content-Type': `multipart/form-data; boundary=${boundary}`,
+            ...(contentEncoding === undefined
+              ? { 'Content-Length': String(multipart.contentLength) }
+              : {}),
           },
         }, response => {
           const chunks: Buffer[] = [];
@@ -2778,6 +2832,70 @@ export class MicroiClient {
     return this.post(API.SYNC_MICRO_SERVICE_SOURCE, {
       OsClient: this.config.osClient,
       ...data,
+    }, {
+      // This legacy endpoint switches the complete source in one request and
+      // has no idempotency key. A lost fetch response is resolved by the MCP
+      // sync helper's full source readback; requestJson must not replay it via
+      // the native transport first.
+      allowNativeFallback: false,
+      operationName: 'legacy private microservice source sync',
+    });
+  }
+
+  /**
+   * Stage one private source file as raw multipart bytes. The source endpoint
+   * deliberately rejects ContentEncoding, so gzip fallback stays disabled.
+   * DeliveryBatchId + RelativePath + ExpectedSha256 makes an exact replay
+   * idempotent after a dropped response.
+   */
+  async stageMicroServiceSourceFile(data: MicroServiceSourceStageRequest): Promise<ApiResponse> {
+    const localPath = path.resolve(data.FilePath);
+    const stat = fs.lstatSync(localPath);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new Error(`微服务源码必须是普通文件且不能是符号链接：${localPath}`);
+    }
+    if (stat.size !== data.ExpectedSize) {
+      throw new Error(`微服务源码大小在清单生成后发生变化：${data.RelativePath}`);
+    }
+
+    const source = data.MicroService || {};
+    const fields: Record<string, string> = {
+      OsClient: this.config.osClient || '',
+      AppIdOrKey: data.AppIdOrKey,
+      RelativePath: data.RelativePath,
+      ExpectedSha256: data.ExpectedSha256,
+      ExpectedSize: String(data.ExpectedSize),
+      DeliveryBatchId: data.DeliveryBatchId,
+    };
+    for (const field of [
+      'MsKey', 'MicroServiceKey', 'AppKey', 'MsName', 'Name', 'AppName',
+      'ApplicationType', 'AppType', 'Category', 'Description', 'Remark',
+    ]) {
+      const value = source[field];
+      if (value !== undefined && value !== null) fields[field] = String(value);
+    }
+
+    return this.requestMultipartFile(
+      API.STAGE_MICRO_SERVICE_SOURCE_FILE,
+      fields,
+      localPath,
+      `microi-source-${data.ExpectedSha256.slice(0, 16)}.bin`,
+      'initial',
+      data.TimeoutMs,
+      undefined,
+      false,
+    );
+  }
+
+  async finalizeMicroServiceSourceManifest(
+    data: MicroServiceSourceFinalizeRequest,
+  ): Promise<ApiResponse> {
+    return this.post(API.FINALIZE_MICRO_SERVICE_SOURCE_MANIFEST, {
+      OsClient: this.config.osClient,
+      ...data,
+    }, {
+      timeoutMs: 10 * 60_000,
+      operationName: 'finalize private microservice source manifest',
     });
   }
 

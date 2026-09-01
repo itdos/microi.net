@@ -15,6 +15,10 @@ public sealed class TenantDatabaseAccessRepairSecurityTests
             "private static string ReadConnectionStringValue(");
 
         Assert.Contains("BuildTenantRotationPrincipalName", block, StringComparison.Ordinal);
+        Assert.Contains("object row = mainClient.Db.FromSql", block, StringComparison.Ordinal);
+        Assert.Contains("JObject rowData = JObject.FromObject(row)", block, StringComparison.Ordinal);
+        Assert.Contains("object durableReadback = mainClient.Db.FromSql", block, StringComparison.Ordinal);
+        Assert.Contains("JObject durableData = durableReadback == null", block, StringComparison.Ordinal);
         Assert.Contains("CreateSql", block, StringComparison.Ordinal);
         Assert.Contains("GrantSql", block, StringComparison.Ordinal);
         Assert.Contains("DropSql", block, StringComparison.Ordinal);

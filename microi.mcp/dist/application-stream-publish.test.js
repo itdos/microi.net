@@ -290,7 +290,7 @@ test('uploadApplicationAssetStream sends raw multipart bytes without Base64 mate
             for await (const chunk of body)
                 pieces.push(Buffer.from(chunk));
             captured = Buffer.concat(pieces);
-            assert.equal(init?.headers && init.headers['Content-Length'], undefined);
+            assert.equal(init?.headers && init.headers['Content-Length'], String(captured.byteLength));
             return new Response(JSON.stringify({ Code: 1, Data: { Streamed: true }, Msg: '' }), {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
@@ -330,11 +330,12 @@ test('uploadApplicationAssetStream falls back to native HTTP with the same raw m
     let captured = Buffer.alloc(0);
     const server = http.createServer((request, response) => {
         const chunks = [];
-        assert.equal(request.headers['content-length'], undefined);
-        assert.equal(request.headers['transfer-encoding'], 'chunked');
+        assert.ok(Number(request.headers['content-length']) > raw.byteLength);
+        assert.equal(request.headers['transfer-encoding'], undefined);
         request.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
         request.on('end', () => {
             captured = Buffer.concat(chunks);
+            assert.equal(Number(request.headers['content-length']), captured.byteLength);
             response.writeHead(200, { 'Content-Type': 'application/json' });
             response.end(JSON.stringify({ Code: 1, Data: { NativeFallback: true }, Msg: '' }));
         });
@@ -388,9 +389,13 @@ test('uploadApplicationAssetStream retries through gzip multipart after raw prox
     const server = http.createServer((request, response) => {
         requestCount += 1;
         if (requestCount === 1) {
+            assert.ok(Number(request.headers['content-length']) > raw.byteLength);
+            assert.equal(request.headers['transfer-encoding'], undefined);
             request.socket.destroy();
             return;
         }
+        assert.equal(request.headers['content-length'], undefined);
+        assert.equal(request.headers['transfer-encoding'], 'chunked');
         const chunks = [];
         request.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
         request.on('end', () => {
@@ -434,6 +439,42 @@ test('uploadApplicationAssetStream retries through gzip multipart after raw prox
         globalThis.fetch = originalFetch;
         await new Promise(resolve => server.close(() => resolve()));
         fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+test('legacy microservice source sync never replays a failed fetch through native HTTP', async () => {
+    const originalFetch = globalThis.fetch;
+    let nativeRequests = 0;
+    const server = http.createServer((_request, response) => {
+        nativeRequests += 1;
+        response.writeHead(500, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ Code: 0, Data: null, Msg: 'must not be called' }));
+    });
+    try {
+        await new Promise((resolve, reject) => {
+            server.once('error', reject);
+            server.listen(0, '127.0.0.1', () => resolve());
+        });
+        const address = server.address();
+        assert.ok(address && typeof address === 'object');
+        globalThis.fetch = (async () => {
+            throw new TypeError('simulated fetch disconnect after unknown write outcome');
+        });
+        const client = new MicroiClient({
+            apiBaseUrl: `http://127.0.0.1:${address.port}`,
+            username: '',
+            password: '',
+            osClient: 'iTdos',
+            token: 'unit-test-token',
+        });
+        await assert.rejects(() => client.syncMicroServiceSource({
+            microService: { MsKey: 'legacy-no-replay' },
+            sourceFiles: [],
+        }), /已禁用非幂等传输重放/u);
+        assert.equal(nativeRequests, 0);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+        await new Promise(resolve => server.close(() => resolve()));
     }
 });
 test('protocol v3 always resumes through durable multipart and sends only the missing raw range', async () => {

@@ -38,8 +38,9 @@ test('scans nested module button payloads', () => {
 
 test('microservice source replacement never sends legacy full-table Replace=true', () => {
   const serverSource = fs.readFileSync(new URL('../src/server.ts', import.meta.url), 'utf8');
-  const syncTool = serverSource.match(/'microi_sync_microservice_source'[\s\S]*?\/\/ Tool: 流式上传单个应用资产/)?.[0] || '';
-  assert.match(syncTool, /Replace:\s*false/u);
-  assert.match(syncTool, /ReplacePrivateSourceOnly:\s*replace === true/u);
-  assert.doesNotMatch(syncTool, /Replace:\s*replace === true/u);
+  const syncImplementation = serverSource.match(/export async function runMicroServiceSourceSync[\s\S]*?const LEGACY_STREAM_COMPATIBILITY_MAX_FILES/)?.[0] || '';
+  assert.match(syncImplementation, /Replace:\s*false/u);
+  assert.match(syncImplementation, /ReplacePrivateSourceOnly:\s*input\.replace !== false/u);
+  assert.match(syncImplementation, /ReplacePrivateSourceOnly:\s*true/u);
+  assert.doesNotMatch(syncImplementation, /Replace:\s*input\.replace/u);
 });

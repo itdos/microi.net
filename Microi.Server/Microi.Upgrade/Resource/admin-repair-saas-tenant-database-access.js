@@ -7,7 +7,7 @@
  * 本接口不会调用该 Hook，禁止在 Hook 或本接口中接收、读取、记录、返回任何数据库秘密。
  */
 
-/* V8 ApiEngine | ApiEngineKey: admin_repair_saas_tenant_database_access | Version: v1.0.0 */
+/* V8 ApiEngine | ApiEngineKey: admin_repair_saas_tenant_database_access | Version: v1.0.2 */
 
 var param = V8.Param || {};
 var currentUser = V8.CurrentUser || {};
@@ -18,7 +18,16 @@ var allowedInputKeys = {
   Type: true,
   Network: true,
   ValidateOnly: true,
-  ConfirmExecution: true
+  ConfirmExecution: true,
+  // MCP/服务端接口引擎运行时会注入这些可信上下文字段。允许它们进入 Param，
+  // 但下面仍逐项校验固定租户、固定接口 Key 与 Server 调用语义，且绝不转发给修复原子。
+  OsClient: true,
+  ApiEngineKey: true,
+  _InvokeType: true,
+  _CurrentUser: true,
+  // 部分历史 MCP/接口调试运行时会追加一个短标量占位参数。它只用于调试
+  // 兼容且永远不会传给数据库修复原子；对象和超长值仍失败关闭。
+  TestParam1: true
 };
 
 function text(value) {
@@ -40,6 +49,27 @@ for (var inputIndex = 0; inputIndex < inputKeys.length; inputIndex++) {
   if (!allowedInputKeys[inputKeys[inputIndex]]) {
     return { Code: 0, Msg: '请求包含未允许的字段，已拒绝执行。' };
   }
+}
+
+var runtimeOsClient = text(param.OsClient);
+var runtimeEngineKey = text(param.ApiEngineKey);
+var runtimeInvokeType = text(param._InvokeType);
+if (runtimeOsClient && runtimeOsClient.toLowerCase() !== text(V8.OsClient).toLowerCase()) {
+  return { Code: 0, Msg: '运行租户上下文不匹配，已拒绝执行。' };
+}
+if (runtimeEngineKey && runtimeEngineKey.toLowerCase() !== 'admin_repair_saas_tenant_database_access') {
+  return { Code: 0, Msg: '运行接口上下文不匹配，已拒绝执行。' };
+}
+if (runtimeInvokeType && runtimeInvokeType.toLowerCase() !== 'server') {
+  return { Code: 0, Msg: '仅允许可信服务端调用数据库连接修复。' };
+}
+if (param.TestParam1 !== null && param.TestParam1 !== undefined
+    && typeof param.TestParam1 === 'object') {
+  return { Code: 0, Msg: '兼容占位参数类型不正确，已拒绝执行。' };
+}
+if (String(param.TestParam1 === null || param.TestParam1 === undefined
+  ? '' : param.TestParam1).length > 200) {
+  return { Code: 0, Msg: '兼容占位参数过长，已拒绝执行。' };
 }
 
 if (!currentUser.Id) {
