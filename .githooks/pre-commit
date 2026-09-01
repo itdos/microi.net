@@ -14,6 +14,36 @@ Microi.VSCode
 Microi.Client/src/views/webos
 Microi.Server/Microi.WorkFlow'
 
+trusted_hook_oid() {
+  case "$1" in
+    .githooks/pre-commit) config_key='microi.publicGuard.preCommitOid' ;;
+    .githooks/pre-push) config_key='microi.publicGuard.prePushOid' ;;
+    *) return 1 ;;
+  esac
+  git --no-replace-objects config --local --get "$config_key"
+}
+
+validate_hook_integrity() {
+  for hook_path in .githooks/pre-commit .githooks/pre-push; do
+    expected_oid=$(trusted_hook_oid "$hook_path") || {
+      echo "拒绝提交：本机未钉住 $hook_path 的可信 blob OID；请先执行闭源门禁初始化。" >&2
+      exit 1
+    }
+    staged_oid=$(git --no-replace-objects rev-parse --verify ":$hook_path" 2>/dev/null) || {
+      echo "拒绝提交：暂存区缺少 $hook_path。" >&2
+      exit 1
+    }
+    worktree_oid=$(git --no-replace-objects hash-object --path="$hook_path" "$repo_root/$hook_path" 2>/dev/null) || {
+      echo "拒绝提交：工作树缺少 $hook_path。" >&2
+      exit 1
+    }
+    if [ "$staged_oid" != "$expected_oid" ] || [ "$worktree_oid" != "$expected_oid" ]; then
+      echo "拒绝提交：$hook_path 与本机钉住的可信门禁不一致。" >&2
+      exit 1
+    fi
+  done
+}
+
 reject_rewrite_overlays() {
   if git --no-replace-objects for-each-ref --format='%(refname)' refs/replace/ | grep -q .; then
     echo "拒绝提交：检测到 refs/replace，闭源路径审计不能在替换对象下运行。" >&2
@@ -72,6 +102,7 @@ filter_protected_paths() {
 }
 
 reject_rewrite_overlays
+validate_hook_integrity
 validate_policy_file
 
 tracked=$(git --no-replace-objects ls-files -z | filter_protected_paths)
