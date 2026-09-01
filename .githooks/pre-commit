@@ -28,14 +28,19 @@ reject_rewrite_overlays() {
 }
 
 validate_policy_file() {
-  if [ ! -f "$policy_file" ]; then
-    echo "拒绝提交：缺少根公开仓闭源路径策略 $policy_file" >&2
+  staged_policy_temp=$(mktemp "${TMPDIR:-/tmp}/microi-public-policy.XXXXXX")
+  trap 'rm -f "$staged_policy_temp"' EXIT HUP INT TERM
+
+  if ! git --no-replace-objects show :.public-repo-protected-paths > "$staged_policy_temp" 2>/dev/null; then
+    echo "拒绝提交：暂存区缺少根公开仓闭源路径策略 $policy_file" >&2
     exit 1
   fi
 
-  policy_paths=$(sed -e 's/\r$//' -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$policy_file")
+  policy_paths=$(sed -e 's/\r$//' -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$staged_policy_temp")
+  rm -f "$staged_policy_temp"
+  trap - EXIT HUP INT TERM
   if [ "$policy_paths" != "$canonical_paths" ]; then
-    echo "拒绝提交：.public-repo-protected-paths 必须完整、逐字保留五条闭源路径。" >&2
+    echo "拒绝提交：暂存区的 .public-repo-protected-paths 必须完整、逐字保留五条闭源路径。" >&2
     exit 1
   fi
 }
