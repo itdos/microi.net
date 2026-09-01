@@ -215,13 +215,24 @@ function parseJsonObject(value) {
     }
 }
 
+let diyFormFullModulePromise = null;
+function loadDiyFormFullModule() {
+    if (!diyFormFullModulePromise) {
+        diyFormFullModulePromise = import("@/views/form-engine/diy-form-full.vue").catch((error) => {
+            diyFormFullModulePromise = null;
+            throw error;
+        });
+    }
+    return diyFormFullModulePromise;
+}
+
 export default {
     name: "MicroAppHost",
     components: {
         MicroAppLoadingSkeleton,
         MicroAppRuntimeError,
         MciRenderSourceBadge,
-        DiyFormFull: defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue")),
+        DiyFormFull: defineAsyncComponent(loadDiyFormFullModule),
         DiyCustomDialog: defineAsyncComponent(() => import("@/views/form-engine/diy-custom-dialog.vue"))
     },
     setup() {
@@ -268,6 +279,8 @@ export default {
             globalOverlayHole: { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 },
             globalOverlayScrollState: null,
             formDialogVisible: false,
+            marketplaceFormOpening: null,
+            marketplaceFormOpeningKey: "",
             platformPrintDialogVisible: false,
             platformPrintDialogConfig: {
                 ComponentName: "OpenIframe",
@@ -665,6 +678,28 @@ export default {
             };
         },
         async openMarketplaceForm(input) {
+            const requestKey = JSON.stringify({
+                tableName: String(input?.tableName || input?.TableName || "").trim().toLowerCase(),
+                formMode: String(input?.formMode || input?.FormMode || "View").trim().toLowerCase(),
+                id: String(input?.id || input?.Id || input?.tableRowId || input?.TableRowId || "").trim()
+            });
+            while (this.marketplaceFormOpening) {
+                if (this.marketplaceFormOpeningKey === requestKey) return this.marketplaceFormOpening;
+                try { await this.marketplaceFormOpening; } catch (error) { /* 下一请求仍应继续尝试。 */ }
+            }
+            const operation = this.openMarketplaceFormWhenReady(input);
+            this.marketplaceFormOpening = operation;
+            this.marketplaceFormOpeningKey = requestKey;
+            try {
+                return await operation;
+            } finally {
+                if (this.marketplaceFormOpening === operation) {
+                    this.marketplaceFormOpening = null;
+                    this.marketplaceFormOpeningKey = "";
+                }
+            }
+        },
+        async openMarketplaceFormWhenReady(input) {
             const tableName = String(input?.tableName || input?.TableName || "").trim();
             if (tableName.toLowerCase() !== "sys_microistore") {
                 throw Object.assign(new Error("微服务只允许打开应用商城表单"), { code: "HOST_FORM_NOT_ALLOWED" });
@@ -676,24 +711,40 @@ export default {
                 throw Object.assign(new Error("查看或编辑应用时缺少记录 Id"), { code: "HOST_FORM_ID_REQUIRED" });
             }
             this.formDialogVisible = true;
-            await this.$nextTick();
-            const dialog = this.$refs.refMicroAppFormDialog;
-            if (!dialog?.Init) throw new Error("应用表单组件尚未就绪，请稍后重试");
-            dialog.Init({
-                TableName: "sys_microistore",
-                TableRowId: tableRowId,
-                DialogType: "Dialog",
-                Width: "80%",
-                FormMode: formMode,
-                DefaultValues: input?.defaultValues || input?.DefaultValues || {},
-                SubmitEvent: () => {
-                    this.$refs.microApp?.setData?.({
-                        type: "micro-app:form-saved",
-                        data: { tableName: "sys_microistore", id: tableRowId, formMode }
-                    });
+            try {
+                await Promise.all([loadDiyFormFullModule(), this.$nextTick()]);
+                let dialog = null;
+                for (let attempt = 0; attempt < 200; attempt += 1) {
+                    if (this.cacheState === "destroyed" || this.$?.isUnmounted) {
+                        throw Object.assign(new Error("应用表单已取消打开"), { code: "HOST_FORM_DIALOG_CANCELLED" });
+                    }
+                    dialog = this.$refs.refMicroAppFormDialog;
+                    if (typeof dialog?.Init === "function") break;
+                    await new Promise((resolve) => window.setTimeout(resolve, 50));
                 }
-            });
-            return { accepted: true, tableName: "sys_microistore", formMode, id: tableRowId };
+                if (typeof dialog?.Init !== "function") {
+                    throw Object.assign(new Error("应用表单加载超时，请重试"), { code: "HOST_FORM_DIALOG_NOT_READY" });
+                }
+                dialog.Init({
+                    TableName: "sys_microistore",
+                    TableRowId: tableRowId,
+                    DialogType: "Dialog",
+                    Width: "80%",
+                    FormMode: formMode,
+                    DefaultValues: input?.defaultValues || input?.DefaultValues || {},
+                    SubmitEvent: () => {
+                        this.$refs.microApp?.setData?.({
+                            type: "micro-app:form-saved",
+                            data: { tableName: "sys_microistore", id: tableRowId, formMode }
+                        });
+                    }
+                });
+                return { accepted: true, tableName: "sys_microistore", formMode, id: tableRowId };
+            } catch (error) {
+                this.formDialogVisible = false;
+                await this.$nextTick();
+                throw error;
+            }
         },
         async openPlatformPrint(input) {
             const config = normalizeHostPlatformPrint(input, {

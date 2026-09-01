@@ -306,6 +306,13 @@ Body: {"ApiEngineKey":"your_key","Action":"Bootstrap"}
 - 通用规则：数据库/缓存的动态对象在进入路由、鉴权、缓存键和 LINQ 逻辑前必须强类型落地；稳定接口引擎路径由 SDK 自动携带 `apiengine: 1` 作为直达兜底。
 - 自动化检查：单元测试直接传入 `JObject` 验证回源别名强类型归一化；前端传输测试断言 `/apiengine/*` 自动携带 `apiengine: 1`，普通 `/api/*` 不误带；本地启动后清空专用测试别名并验证首次 HTTP 请求成功及缓存重建。
 
+### 复盘：单段自定义 ApiAddress 被误判为 ApiEngineKey
+
+- 触发场景：接口行已启用并允许匿名，显式配置了 `/apiengine/external-name`，但真实 `ApiEngineKey` 是另一个值；Query `?OsClient=` 与 `--OsClient--...--` 两种调用都返回 `NoExistData[ApiAddress]`。
+- 根因：动态路由把所有单段 `/apiengine/{value}` 先解释成 `ApiEngineKey=value`，跳过了显式 `ApiAddress`；模型未加载时匿名开关尚未进入判断，因此调整 `AllowAnonymous` 无法修复。
+- 通用规则：完整 `ApiAddress` 与 `ApiRoutes` 是路由第一事实源，只有权威主库确认该地址从未配置时，才允许把尾段作为兼容 Key 回退。停用但未软删除的地址仍占用路由，不能旁路到另一条同名 Key；Controller 只信任动态路由写入的真实 Key，未解析时保留完整地址，禁止再次猜 Key。
+- 自动化检查：至少覆盖“显式地址尾段与 Key 不同”和“ApiAddress 为空的传统 Key 路由”，并分别验证 `?OsClient=`、`--OsClient--...--`、冷缓存首次请求、停用地址阻断及匿名关闭返回鉴权错误而非不存在。
+
 ## 请求内异步与可靠后台任务
 
 接口默认同步返回。对本次请求必须完成的异步 I/O，调用真实的 `*Async` 方法并 `await`。常用入口包括 `V8.Http.*Async`、`V8.FormEngine.GetTableDataAsync` 和 `V8.ApiEngine.RunAsync`：

@@ -224,7 +224,9 @@ namespace Microi.net
             return new DosResult(1);
         }
 
-        public async Task<DosResultList<SysRole>> GetSysRole(SysRoleParam param)
+        public async Task<DosResultList<SysRole>> GetSysRole(
+            SysRoleParam param,
+            DbSession dbSessionParam = null)
         {
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
@@ -234,7 +236,7 @@ namespace Microi.net
             {
                 return new DosResultList<SysRole>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
-            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            DbSession dbRead = dbSessionParam ?? OsClientExtend.GetClient(param.OsClient).DbRead;
             var where = new Where<SysRole>();
             if (param.Ids != null && param.Ids.Any())
             {

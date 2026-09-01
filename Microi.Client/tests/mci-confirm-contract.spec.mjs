@@ -15,4 +15,7 @@ test("all confirmation message boxes receive the Microi rounded dialog contract"
     assert.match(style, /\.el-message-box\.mci-unified-message-box[\s\S]*?border-radius:\s*24px\s*!important/);
     assert.match(style, /\.el-message-box__header[\s\S]*?&::before/);
     assert.match(style, /\.el-message-box__btns[\s\S]*?height:\s*44px/);
+    assert.match(style, /--mci-message-action:\s*var\(--el-color-primary/);
+    assert.match(style, /\.el-button--primary[\s\S]*?background:\s*var\(--mci-message-action\)\s*!important/);
+    assert.match(style, /data-mci-message-type="warning"[\s\S]*?--mci-message-accent:\s*var\(--el-color-warning/);
 });

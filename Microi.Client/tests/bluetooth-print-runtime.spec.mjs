@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { encode } from "../src/utils/ble/encoding.js";
+import { adaptPrintPayload, resolvePrinterProfile } from "../src/utils/ble/printer-compatibility.js";
 
 class MemoryStorage {
     constructor() { this.values = new Map(); }
@@ -345,6 +346,441 @@ test("5+App 只选择真实 write 特征，并在首包 10007 时安全切换候
     assert.equal(printer.BLEInformation.writeCharaterId, "printer-write");
     assert.equal(JSON.parse(localStorage.getItem("microi_ble_info")).writeCharaterId, "printer-write");
     assert.equal(attempts.includes("no-response-only"), false, "HTML5+ 未声明支持无响应写，不能把它误当作 write 特征");
+    printer.disconnect();
+    delete globalThis.window;
+});
+
+test("Android 双属性特征同时保留两种写法，并优先验证 uni 无响应写入后才持久化", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("microi_ble_info", JSON.stringify({
+        deviceId: "plus-printer-dual-write",
+        deviceName: "Android 标签打印机"
+    }));
+
+    const plusAttempts = [];
+    const uniAttempts = [];
+    const plusBluetooth = {
+        onBLEConnectionStateChange() {},
+        onBluetoothDeviceFound() {},
+        openBluetoothAdapter({ success }) { success({}); },
+        createBLEConnection({ success }) { success({}); },
+        getBLEDeviceServices({ success }) {
+            success({ services: [{ uuid: "0000ff00-0000-1000-8000-00805f9b34fb" }] });
+        },
+        getBLEDeviceCharacteristics({ success }) {
+            success({ characteristics: [{
+                uuid: "dual-write",
+                properties: { write: true, writeNoResponse: true }
+            }] });
+        },
+        closeBLEConnection() {},
+        writeBLECharacteristicValue({ characteristicId, success }) {
+            plusAttempts.push(characteristicId);
+            success({});
+        }
+    };
+    globalThis.window = {
+        plus: { os: { name: "Android" }, android: {}, bluetooth: plusBluetooth },
+        addEventListener() {}
+    };
+    globalThis.uni = {
+        writeBLECharacteristicValue({ characteristicId, writeType, success }) {
+            uniAttempts.push([characteristicId, writeType]);
+            success({});
+        }
+    };
+
+    const printer = createV8Print();
+    assert.equal(await printer.initializeConnection(), true);
+    assert.equal(printer.BLEInformation.writeType, "writeNoResponse");
+    assert.deepEqual(
+        printer.BLEInformation.writeCandidates.map((candidate) => candidate.writeType).sort(),
+        ["write", "writeNoResponse"]
+    );
+    printer.setPrinterProfile("gprinter-gp-m322");
+    const localBeforeWrite = JSON.parse(localStorage.getItem("microi_ble_info"));
+    const sessionBeforeWrite = JSON.parse(sessionStorage.getItem("microi_ble_info"));
+    assert.equal(localBeforeWrite.profileMode, "gprinter-gp-m322");
+    assert.equal(localBeforeWrite.writeCharaterId, "", "切换型号也不能在首包成功前持久化候选通道");
+    assert.equal(sessionBeforeWrite.writeCharaterId, "", "会话存储也不能泄漏未验证候选通道");
+
+    await printer.prepareSend(Uint8Array.from([1, 2, 3]));
+
+    assert.deepEqual(uniAttempts, [["dual-write", "writeNoResponse"]]);
+    assert.deepEqual(plusAttempts, []);
+    const remembered = JSON.parse(localStorage.getItem("microi_ble_info"));
+    assert.equal(remembered.writeCharaterId, "dual-write");
+    assert.equal(remembered.writeType, "writeNoResponse");
+    printer.disconnect();
+    delete globalThis.uni;
+    delete globalThis.window;
+});
+
+test("iOS 双属性特征优先 write，10007 后才回退 uni writeNoResponse", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("microi_ble_info", JSON.stringify({
+        deviceId: "plus-printer-ios-dual-write",
+        deviceName: "iOS 标签打印机"
+    }));
+
+    const attempts = [];
+    const plusBluetooth = {
+        onBLEConnectionStateChange() {},
+        onBluetoothDeviceFound() {},
+        openBluetoothAdapter({ success }) { success({}); },
+        createBLEConnection({ success }) { success({}); },
+        getBLEDeviceServices({ success }) {
+            success({ services: [{ uuid: "0000ff00-0000-1000-8000-00805f9b34fb" }] });
+        },
+        getBLEDeviceCharacteristics({ success }) {
+            success({ characteristics: [{
+                uuid: "ios-dual-write",
+                properties: { write: true, writeNoResponse: true }
+            }] });
+        },
+        closeBLEConnection() {},
+        writeBLECharacteristicValue({ characteristicId, fail }) {
+            attempts.push(["plus", characteristicId, "write"]);
+            fail({ errCode: 10007, errMsg: "property not support" });
+        }
+    };
+    globalThis.window = {
+        plus: { os: { name: "iOS" }, bluetooth: plusBluetooth },
+        addEventListener() {}
+    };
+    globalThis.uni = {
+        writeBLECharacteristicValue({ characteristicId, writeType, success }) {
+            attempts.push(["uni", characteristicId, writeType]);
+            success({});
+        }
+    };
+
+    const printer = createV8Print();
+    assert.equal(await printer.initializeConnection(), true);
+    assert.equal(printer.BLEInformation.writeType, "write", "非 Android 应优先标准 write");
+    await printer.prepareSend(Uint8Array.from([1, 2, 3]));
+
+    assert.deepEqual(attempts, [
+        ["plus", "ios-dual-write", "write"],
+        ["uni", "ios-dual-write", "writeNoResponse"]
+    ]);
+    assert.equal(JSON.parse(localStorage.getItem("microi_ble_info")).writeType, "writeNoResponse");
+    printer.disconnect();
+    delete globalThis.uni;
+    delete globalThis.window;
+});
+
+test("首包所有候选均返回 10007 时不持久化失败候选且连接状态退出绿色", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("microi_ble_info", JSON.stringify({
+        deviceId: "plus-printer-all-unsupported",
+        deviceName: "不兼容标签打印机"
+    }));
+
+    const attempts = [];
+    const persistedDuringAttempts = [];
+    let sppApiCalls = 0;
+    const plusBluetooth = {
+        onBLEConnectionStateChange() {},
+        onBluetoothDeviceFound() {},
+        openBluetoothAdapter({ success }) { success({}); },
+        createBLEConnection({ success }) { success({}); },
+        getBLEDeviceServices({ success }) {
+            success({ services: [{ uuid: "0000ff00-0000-1000-8000-00805f9b34fb" }] });
+        },
+        getBLEDeviceCharacteristics({ success }) {
+            success({ characteristics: [
+                { uuid: "unsupported-a", properties: { write: true } },
+                { uuid: "unsupported-b", properties: { write: true } }
+            ] });
+        },
+        closeBLEConnection() {},
+        writeBLECharacteristicValue({ characteristicId, fail }) {
+            attempts.push(characteristicId);
+            persistedDuringAttempts.push(JSON.parse(localStorage.getItem("microi_ble_info")).writeCharaterId);
+            fail({ errCode: 10007, errMsg: "property not support" });
+        }
+    };
+    globalThis.window = {
+        plus: {
+            os: { name: "Android" },
+            android: {
+                importClass() {
+                    sppApiCalls++;
+                    throw new Error("非 CC4 不应尝试 SPP");
+                }
+            },
+            bluetooth: plusBluetooth
+        },
+        addEventListener() {}
+    };
+
+    const printer = createV8Print();
+    assert.equal(await printer.initializeConnection(), true);
+    await assert.rejects(
+        printer.prepareSend(Uint8Array.from([1, 2, 3])),
+        /property not support.*手工选择 ZICOX CC4/
+    );
+
+    assert.deepEqual(attempts, ["unsupported-a", "unsupported-b"]);
+    assert.deepEqual(persistedDuringAttempts, ["", ""]);
+    assert.equal(JSON.parse(localStorage.getItem("microi_ble_info")).writeCharaterId, "");
+    assert.equal(printer.isConnected(), false);
+    assert.equal(printer.getConnectionState().status, "disconnected");
+    assert.equal(sppApiCalls, 0, "非 CC4 不能自动猜测型号并切换 SPP");
+    delete globalThis.window;
+});
+
+test("CC4 首包 BLE 候选返回 10007 时安全切到同设备 SPP 且首包只写一次", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("microi_ble_info", JSON.stringify({
+        deviceId: "00:11:22:33:44:55",
+        deviceName: "ZICOX CC4",
+        profileMode: "auto"
+    }));
+
+    const bleAttempts = [];
+    const sppWrites = [];
+    const output = {
+        write(bytes) { sppWrites.push(Array.from(bytes)); },
+        flush() {},
+        close() {}
+    };
+    const socket = {
+        connected: false,
+        connect() { this.connected = true; },
+        isConnected() { return this.connected; },
+        getOutputStream() { return output; },
+        close() { this.connected = false; }
+    };
+    const nativeDevice = { createInsecureRfcommSocketToServiceRecord() { return socket; } };
+    const adapter = {
+        isEnabled() { return true; },
+        cancelDiscovery() {},
+        getRemoteDevice(deviceId) {
+            assert.equal(deviceId, "00:11:22:33:44:55");
+            return nativeDevice;
+        }
+    };
+    const BluetoothAdapter = { getDefaultAdapter() { return adapter; } };
+    const UUID = { fromString(value) { return value; } };
+    const plusAndroid = {
+        importClass(value) {
+            if (value === "android.bluetooth.BluetoothAdapter") return BluetoothAdapter;
+            if (value === "java.util.UUID") return UUID;
+            return value;
+        },
+        invoke(target, method, argument) {
+            if (target === nativeDevice && method === "createRfcommSocket") {
+                assert.equal(argument, 1);
+                return socket;
+            }
+            assert.equal(method, "getBytes");
+            assert.equal(argument, "ISO-8859-1");
+            return Uint8Array.from(Array.from(target, (char) => char.charCodeAt(0) & 0xff));
+        }
+    };
+    const plusBluetooth = {
+        onBLEConnectionStateChange() {},
+        onBluetoothDeviceFound() {},
+        openBluetoothAdapter({ success }) { success({}); },
+        createBLEConnection({ success }) { success({}); },
+        getBLEDeviceServices({ success }) {
+            success({ services: [{ uuid: "0000ff00-0000-1000-8000-00805f9b34fb" }] });
+        },
+        getBLEDeviceCharacteristics({ success }) {
+            success({ characteristics: [{ uuid: "cc4-unsupported-ble", properties: { write: true } }] });
+        },
+        closeBLEConnection() {},
+        writeBLECharacteristicValue({ characteristicId, fail }) {
+            bleAttempts.push(characteristicId);
+            fail({ errCode: 10007, errMsg: "property not support" });
+        }
+    };
+    globalThis.window = {
+        plus: {
+            os: { name: "Android" },
+            android: plusAndroid,
+            bluetooth: plusBluetooth
+        },
+        addEventListener() {}
+    };
+
+    const printer = createV8Print();
+    assert.equal(await printer.initializeConnection(), true);
+    printer.setOneTimeData(16);
+    printer.setPrinterNum(2);
+    const command = printer.createNew();
+    command.setSize(60, 40);
+    command.setGap(2);
+    command.setText(20, 20, "TSS24.BF2", 1, 1, "BLE TO SPP");
+    command.setPagePrint();
+    const commandData = command.getData();
+    const expectedCopy = Array.from(adaptPrintPayload(commandData, resolvePrinterProfile("ZICOX CC4", "auto")));
+    const expectedPacketsPerCopy = Math.ceil(expectedCopy.length / 16);
+    await printer.prepareSend(commandData);
+
+    assert.deepEqual(bleAttempts, ["cc4-unsupported-ble"]);
+    assert.equal(expectedPacketsPerCopy >= 3, true, "测试数据必须覆盖首包及第二、第三分包");
+    assert.equal(sppWrites.length, expectedPacketsPerCopy * 2, "BLE 首包失败后不得重复或漏发任何 SPP 分包");
+    const firstCopy = flattenWrites(sppWrites.slice(0, expectedPacketsPerCopy));
+    const secondCopy = flattenWrites(sppWrites.slice(expectedPacketsPerCopy));
+    assert.deepEqual(firstCopy, expectedCopy);
+    assert.deepEqual(secondCopy, expectedCopy, "第二份必须保持完整顺序，不能重复或漏发局部分包");
+    assert.equal(printer.getConnectionState().transport, "spp");
+    assert.match(decodeGb18030(firstCopy), /T 24 0 20 20 BLE TO SPP\r\n/);
+
+    const localRemembered = JSON.parse(localStorage.getItem("microi_ble_info"));
+    const sessionRemembered = JSON.parse(sessionStorage.getItem("microi_ble_info"));
+    assert.equal(localRemembered.transport, "spp");
+    assert.equal(sessionRemembered.transport, "spp");
+    assert.equal(localRemembered.deviceId, "00:11:22:33:44:55");
+
+    const restoredPrinter = createV8Print();
+    assert.equal(await restoredPrinter.initializeConnection(), true);
+    assert.equal(restoredPrinter.getConnectionState().transport, "spp");
+    assert.equal(restoredPrinter.isConnected(), true);
+    restoredPrinter.disconnect();
+    printer.disconnect();
+    delete globalThis.window;
+});
+
+test("CC4 首包 BLE 与 SPP 均失败时保持断开并返回两段可操作错误", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("microi_ble_info", JSON.stringify({
+        deviceId: "00:11:22:33:44:66",
+        deviceName: "ZICOX CC4",
+        profileMode: "auto"
+    }));
+
+    const failedSocket = {
+        connect() { throw new Error("socket refused"); },
+        isConnected() { return false; },
+        close() {}
+    };
+    const nativeDevice = {
+        createInsecureRfcommSocketToServiceRecord() { return failedSocket; }
+    };
+    const adapter = {
+        isEnabled() { return true; },
+        cancelDiscovery() {},
+        getRemoteDevice() { return nativeDevice; }
+    };
+    const BluetoothAdapter = { getDefaultAdapter() { return adapter; } };
+    const UUID = { fromString(value) { return value; } };
+    const plusAndroid = {
+        importClass(value) {
+            if (value === "android.bluetooth.BluetoothAdapter") return BluetoothAdapter;
+            if (value === "java.util.UUID") return UUID;
+            return value;
+        },
+        invoke(target, method) {
+            if (target === nativeDevice && method === "createRfcommSocket") return failedSocket;
+            throw new Error("unexpected Android invocation");
+        }
+    };
+    const plusBluetooth = {
+        onBLEConnectionStateChange() {},
+        onBluetoothDeviceFound() {},
+        openBluetoothAdapter({ success }) { success({}); },
+        createBLEConnection({ success }) { success({}); },
+        getBLEDeviceServices({ success }) { success({ services: [{ uuid: "cc4-service" }] }); },
+        getBLEDeviceCharacteristics({ success }) {
+            success({ characteristics: [{ uuid: "cc4-unsupported-ble", properties: { write: true } }] });
+        },
+        closeBLEConnection() {},
+        writeBLECharacteristicValue({ fail }) {
+            fail({ errCode: 10007, errMsg: "property not support" });
+        }
+    };
+    globalThis.window = {
+        plus: {
+            os: { name: "Android" },
+            android: plusAndroid,
+            bluetooth: plusBluetooth
+        },
+        addEventListener() {}
+    };
+
+    const printer = createV8Print();
+    assert.equal(await printer.initializeConnection(), true);
+    await assert.rejects(
+        printer.prepareSend(Uint8Array.from([1, 2, 3])),
+        /CC4 BLE 写入失败（property not support）；SPP 连接或写入也失败（经典蓝牙连接失败.*系统蓝牙中配对/
+    );
+    assert.equal(printer.isConnected(), false);
+    assert.equal(printer.getConnectionState().status, "disconnected");
+    delete globalThis.window;
+});
+
+test("后续分包返回 10007 时禁止切换写入特征，避免在另一通道重复半张标签", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("microi_ble_info", JSON.stringify({
+        deviceId: "plus-printer-late-failure",
+        deviceName: "ZICOX CC4",
+        profileMode: "auto"
+    }));
+
+    const attempts = [];
+    let firstCandidateWrites = 0;
+    let sppApiCalls = 0;
+    const plusBluetooth = {
+        onBLEConnectionStateChange() {},
+        onBluetoothDeviceFound() {},
+        openBluetoothAdapter({ success }) { success({}); },
+        createBLEConnection({ success }) { success({}); },
+        getBLEDeviceServices({ success }) {
+            success({ services: [{ uuid: "0000ff00-0000-1000-8000-00805f9b34fb" }] });
+        },
+        getBLEDeviceCharacteristics({ success }) {
+            success({ characteristics: [
+                { uuid: "packet-channel-a", properties: { write: true } },
+                { uuid: "packet-channel-b", properties: { write: true } }
+            ] });
+        },
+        closeBLEConnection() {},
+        writeBLECharacteristicValue({ characteristicId, success, fail }) {
+            attempts.push(characteristicId);
+            if (characteristicId === "packet-channel-a") {
+                firstCandidateWrites++;
+                if (firstCandidateWrites === 1) success({});
+                else fail({ errCode: 10007, errMsg: "property not support" });
+                return;
+            }
+            success({});
+        }
+    };
+    globalThis.window = {
+        plus: {
+            os: { name: "Android" },
+            android: {
+                importClass() {
+                    sppApiCalls++;
+                    throw new Error("后续分包不应尝试 SPP");
+                }
+            },
+            bluetooth: plusBluetooth
+        },
+        addEventListener() {}
+    };
+
+    const printer = createV8Print();
+    assert.equal(await printer.initializeConnection(), true);
+    printer.setOneTimeData(2);
+    await assert.rejects(
+        printer.prepareSend(Uint8Array.from([1, 2, 3, 4])),
+        /property not support/
+    );
+
+    assert.deepEqual(attempts, ["packet-channel-a", "packet-channel-a"]);
+    assert.equal(sppApiCalls, 0, "首包成功后发生的后续分包错误不能切换 SPP");
+    assert.equal(JSON.parse(localStorage.getItem("microi_ble_info")).writeCharaterId, "packet-channel-a");
     printer.disconnect();
     delete globalThis.window;
 });

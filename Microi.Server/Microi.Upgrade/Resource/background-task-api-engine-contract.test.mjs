@@ -51,15 +51,17 @@ test('application-store package delivers every startup endpoint and managed poli
       ],
     },
   ];
-  assert.equal(packageModel.PackageInfo.Version, 'v7.7.27');
-  assert.equal(packageModel.PackageInfo.ChangeLog?.Version, 'v7.7.27');
+  assert.equal(
+    packageModel.PackageInfo.ChangeLog?.Version,
+    packageModel.PackageInfo.Version,
+  );
+  assert.match(String(packageModel.PackageInfo.ChangeHistory || ''), /v7\.7\.27/);
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     'ClientFeature:AppStoreNewestInstallRecordV1',
   ));
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     'Marketplace:DeterministicInstallVersionStateV1',
   ));
-  assert.equal(packageModel.PackageInfo.ChangeLog?.Title, '旧租户安装自愈与平台应用默认筛选');
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     'ClientFeature:NotificationCenterScrollableViewportV1',
   ));

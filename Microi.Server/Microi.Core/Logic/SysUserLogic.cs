@@ -1607,42 +1607,34 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                             "登录身份缓存与当前租户不一致，原登录缓存未修改。");
                     }
 
-                    // 老版本可能已经把完整 sys_user 行写入共享登录缓存。先清除
-                    // 密码、AI Key 与票据等秘密并立即修复缓存，再继续刷新角色投影。
-                    if (SanitizeLoginProjection(currentToken.CurrentUser))
+                    // 身份投影必须从主库读取。角色或权限刚被修改时若继续走 DbRead，
+                    // 复制延迟会把旧权限重新写入共享登录缓存。
+                    var identityDbSession = OsClientExtend.GetClient(canonicalTenant).Db;
+                    using (var projectionRead = identityDbSession.BeginTransaction())
                     {
-                        await DiyCacheBase.SetAsync(cacheKey, currentToken);
+                        userModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(
+                            BuildLoginProjectionUserQuery(canonicalTenant, userId),
+                            projectionRead);
+                        projectionRead.Commit();
                     }
-
-                    userModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(
-                        BuildLoginProjectionUserQuery(canonicalTenant, userId));
                     if (userModelResult.Code == 1)
                     {
                         #region GetSysUserOtherInfo
                         JObject sysUser = JObject.FromObject(userModelResult.Data);
 
-                        //2022-11-17 从sys_user表的RoleIds字段中获取所有角色Id
+                        // RoleIds has two historical shapes: ["id"] and
+                        // [{"Id":"id","Name":"..."}]. Json.NET may coerce an
+                        // object element to a JSON string when deserializing directly
+                        // as List<string>, so exception-driven fallback can silently
+                        // turn the whole object into a bogus role id. Reuse the
+                        // security boundary's structural parser for both shapes.
                         var roleIds = new List<string>();
                         try
                         {
-                            try
-                            {
-                                roleIds = JsonHelper.Deserialize<List<string>>(sysUser["RoleIds"].Val<string>())
-                                    ?? new List<string>();
-                            }
-                            catch (Exception)
-                            {
-
-                                var roles = JsonHelper.Deserialize<List<SysRole>>(sysUser["RoleIds"].Val<string>());
-                                roleIds = roles?.Select(d => d.Id).ToList() ?? new List<string>();
-                            }
-                            roleIds = roleIds
-                                .Where(d => !d.DosIsNullOrWhiteSpace())
-                                .Distinct(StringComparer.OrdinalIgnoreCase)
-                                .ToList();
+                            roleIds = PlatformAdministratorSecurity.ParseRoleIds(
+                                sysUser["RoleIds"].Val<string>());
                             if (!roleIds.Any())
                             {
-                                sysUser["_IsAdmin"] = false;
                                 sysUser["_Roles"] = JTokenEx.FromObject(new List<SysRole>());
                                 sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
                             }
@@ -1652,12 +1644,13 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                                 // platform tables through FormEngine can be filtered by the caller's
                                 // role and must never turn a transient/authorization failure into an
                                 // empty role snapshot in the shared login cache.
-                                var roleList = await new SysRoleLogic().GetSysRole(new SysRoleParam
-                                {
-                                    Ids = roleIds,
-                                    IsDeleted = 0,
-                                    OsClient = canonicalTenant
-                                });
+                                var roleList = await new SysRoleLogic().GetSysRole(
+                                    new SysRoleParam
+                                    {
+                                        Ids = roleIds,
+                                        OsClient = canonicalTenant
+                                    },
+                                    identityDbSession);
                                 if (roleList.Code != 1 || roleList.Data == null)
                                 {
                                     return new DosResult<dynamic>(
@@ -1666,17 +1659,28 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                                         roleList.Msg ?? "刷新用户角色失败，原登录缓存未修改。");
                                 }
 
+                                // 历史租户的有效角色 IsDeleted 可能为 NULL；FormEngine
+                                // 登录链一直按“不是 1”视为有效，刷新链必须保持同一语义。
+                                // 先按显式 Id 从主库读取，再在内存中排除真正软删除的角色。
+                                var activeRoles = roleList.Data
+                                    .Where(d => d != null && d.IsDeleted != 1)
+                                    .ToList();
+
                                 //var sysMenuLimits = await new SysRoleLimitLogic().GetSysRoleLimit(new SysRoleLimitParam()
                                 //{
                                 //    RoleIds = roleList.Data.Select(d => d.Id).ToList(),
                                 //    OsClient = osClient
                                 //});
 
-                                var sysMenuLimits = await new SysRoleLimitLogic().GetSysRoleLimit(new SysRoleLimitParam
-                                {
-                                    RoleIds = roleList.Data.Select(d => d.Id).ToList(),
-                                    OsClient = canonicalTenant
-                                });
+                                var sysMenuLimits = activeRoles.Any()
+                                    ? await new SysRoleLimitLogic().GetSysRoleLimit(
+                                        new SysRoleLimitParam
+                                        {
+                                            RoleIds = activeRoles.Select(d => d.Id).ToList(),
+                                            OsClient = canonicalTenant
+                                        },
+                                        identityDbSession)
+                                    : new List<SysRoleLimit>();
                                 if (sysMenuLimits == null)
                                 {
                                     return new DosResult<dynamic>(
@@ -1685,10 +1689,11 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                                         "刷新用户角色权限失败，原登录缓存未修改。");
                                 }
 
-                                sysUser["_Roles"] = JTokenEx.FromObject(roleList.Data);
+                                sysUser["_Roles"] = JTokenEx.FromObject(activeRoles);
                                 sysUser["_RoleLimits"] = JTokenEx.FromObject(sysMenuLimits);
-                                sysUser["_IsAdmin"] = sysUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
                             }
+                            // 超级管理员身份由 Level 定义，与是否配置普通角色解耦。
+                            sysUser["_IsAdmin"] = sysUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
                         }
                         catch (Exception ex)
                         {
@@ -1701,13 +1706,48 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                         #endregion
 
 
-                        //currentToken.CurrentUser = userModelResult.Data;
-                        //2024-02-04
                         SanitizeLoginProjection(sysUser);
-                        currentToken.CurrentUser = sysUser;// JObject.FromObject(userModelResult.Data);
-                        currentToken.OsClient = canonicalTenant;
-                        await DiyCacheBase.SetAsync(cacheKey, currentToken);
-                        return new DosResult<dynamic>(1, currentToken.CurrentUser, "", new
+                        CurrentToken committedToken = null;
+                        var lockResult = await MicroiEngine.Lock.ActionLockAsync(new MicroiLockParam
+                        {
+                            // 与 DiyToken.GetAccessToken 使用完全相同的用户会话锁；数据库
+                            // 查询在锁外完成，锁内只重读最新会话并替换 CurrentUser，绝不
+                            // 覆盖并发续签刚写入的 Tokens/Token/AuthVersion/时间戳。
+                            Key = $"{cacheKey}:Rotate",
+                            OsClient = canonicalTenant,
+                            Expiry = TimeSpan.FromSeconds(10),
+                            RetryIntervalMs = 10,
+                            UseExponentialBackoff = true
+                        }, async () =>
+                        {
+                            var latestToken = await DiyCacheBase.GetAsync<CurrentToken>(cacheKey);
+                            var latestUserId = latestToken?.CurrentUser?["Id"]?.ToString()?.Trim();
+                            if (latestToken?.CurrentUser == null
+                                || !string.Equals(latestUserId, userId, StringComparison.OrdinalIgnoreCase)
+                                || (!latestToken.OsClient.DosIsNullOrWhiteSpace()
+                                    && !string.Equals(
+                                        latestToken.OsClient.Trim(),
+                                        canonicalTenant,
+                                        StringComparison.OrdinalIgnoreCase)))
+                            {
+                                return;
+                            }
+
+                            latestToken.CurrentUser = sysUser;
+                            latestToken.OsClient = canonicalTenant;
+                            await DiyCacheBase.SetAsync(cacheKey, latestToken);
+                            committedToken = latestToken;
+                        });
+                        if (lockResult.Code != 1 || committedToken?.CurrentUser == null)
+                        {
+                            return new DosResult<dynamic>(
+                                lockResult.Code == 1 ? 0 : lockResult.Code,
+                                null,
+                                lockResult.Msg.DosIsNullOrWhiteSpace()
+                                    ? "登录身份已变化，原登录缓存未修改。"
+                                    : lockResult.Msg);
+                        }
+                        return new DosResult<dynamic>(1, committedToken.CurrentUser, "", new
                         {
                             ErrorMsg = ""
                         });

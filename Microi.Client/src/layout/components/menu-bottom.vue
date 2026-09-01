@@ -1,5 +1,5 @@
 <template>
-    <div class="menu-bottom-bg" v-if="SysConfig && SysConfig.MenuBottomContent">
+    <div class="menu-bottom-bg" v-if="SysConfig && MenuBottomContent">
         <svg
             class="menu-bottom-wave"
             viewBox="0 0 240 162"
@@ -21,6 +21,7 @@
 <script>
 import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
+import { resolveMenuBottomContent } from "@/utils/menu-bottom-content.js";
 
 export default {
     name: "MenuBottom",
@@ -37,18 +38,12 @@ export default {
     },
     computed: {
         MenuBottomContent() {
-            var content = this.SysConfig?.MenuBottomContent || "";
-            if (!content) {
-                return "";
-            }
-            // 替换变量
-            return content
-                .replace(/\$OsVersion\$/g, this.$root?.OsVersion || "")
-                .replace(/\{{ OsVersion }}/g, this.$root?.OsVersion || "")
-                .replace(/\$CompanyName\$/g, this.SysConfig?.CompanyName || "")
-                .replace(/\{{ CompanyName }}/g, this.SysConfig?.CompanyName || "")
-                .replace(/\$SysTitle\$/g, this.SysConfig?.SysTitle || "")
-                .replace(/\{{ SysTitle }}/g, this.SysConfig?.SysTitle || "");
+            return resolveMenuBottomContent({
+                content: this.SysConfig?.MenuBottomContent,
+                osVersion: this.$root?.OsVersion || "",
+                companyName: this.SysConfig?.CompanyName || "",
+                sysTitle: this.SysConfig?.SysTitle || ""
+            });
         }
     }
 };

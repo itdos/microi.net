@@ -40,10 +40,9 @@
     <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%"/></td>
   </tr>
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" alt="Microi吾码 AI 平台界面" style="width:100%"/></td>
-  </tr>
-  <tr>
-    <td colspan="3" align="center"><img src="./microi.doc/docs/public/images/product-screenshots/api-engine-ai-copilot.png" alt="Microi 接口引擎与 AI 编程助手界面" style="width:100%"/></td>
+    <td><img src="./microi.doc/docs/public/images/product-screenshots/webos-api-engine-workspace.jpg" alt="Microi WebOS 接口引擎与主题设置界面"/></td>
+    <td><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" alt="Microi吾码 AI 平台界面"/></td>
+    <td><img src="./microi.doc/docs/public/images/product-screenshots/api-engine-ai-copilot.png" alt="Microi 接口引擎与 AI 编程助手界面"/></td>
   </tr>
   <tr>
     <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png" alt="应用商城"/></td>
@@ -67,13 +66,13 @@
   </tr>
   <tr>
     <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg" alt="工作流引擎"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg" alt="报表引擎"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg" alt="SaaS 引擎"/></td>
+    <td><img src="./microi.doc/docs/public/images/product-screenshots/mobile-bluetooth-print-specification.jpg" alt="移动端微服务蓝牙打印规格选择"/></td>
+    <td><img src="./microi.doc/docs/public/images/product-screenshots/mobile-ai-assistant.jpg" alt="移动端 AI 助手"/></td>
   </tr>
   <tr>
     <td><img src="https://static.itdos.com/upload/img/csdn/移动端-扫一扫.jpg" alt="移动端扫一扫"/></td>
     <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印2.jpg" alt="移动端蓝牙打印结果"/></td>
+    <td><img src="./microi.doc/docs/public/images/product-screenshots/mobile-workbench.jpg" alt="移动端工作台与模块菜单"/></td>
   </tr>
 </table>
 

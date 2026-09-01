@@ -131,3 +131,16 @@ test("the page host connects dispatch actions to router and TagsView behavior", 
     assert.match(host, /htmlOverflow:\s*childPrelockedHtmlOnly\s*\?\s*""\s*:\s*html\.style\.overflow/);
     assert.match(host, /html\.style\.overflow\s*=\s*state\.htmlOverflow/);
 });
+
+test("marketplace form waits for the async dialog on the first click", () => {
+    const host = read("src/views/micro-app/host.vue");
+    assert.match(host, /function loadDiyFormFullModule\(\)/);
+    assert.match(host, /DiyFormFull:\s*defineAsyncComponent\(loadDiyFormFullModule\)/);
+    assert.match(host, /while \(this\.marketplaceFormOpening\)/);
+    assert.match(host, /this\.marketplaceFormOpeningKey === requestKey/);
+    assert.match(host, /for \(let attempt = 0; attempt < 200; attempt \+= 1\)/);
+    assert.match(host, /typeof dialog\?\.Init === "function"/);
+    assert.match(host, /HOST_FORM_DIALOG_NOT_READY/);
+    assert.match(host, /catch \(error\) \{[\s\S]*this\.formDialogVisible = false;[\s\S]*throw error;/);
+    assert.doesNotMatch(host, /if \(!dialog\?\.Init\) throw new Error\("应用表单组件尚未就绪，请稍后重试"\)/);
+});

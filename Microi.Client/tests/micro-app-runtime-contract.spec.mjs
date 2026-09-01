@@ -266,6 +266,25 @@ test("page host derives height from the visible viewport instead of its collapse
     assert.match(host, /isolation:\s*isolate/);
 });
 
+test("mobile micro-app shell reserves the native safe area and shows the current module banner", async () => {
+    const appMain = read("src/layout/components/AppMain.vue");
+    const utilitySource = read("src/utils/microAppViewport.js");
+    const utility = await import(`data:text/javascript;base64,${Buffer.from(utilitySource).toString("base64")}`);
+    const viewport = utility.resolveMicroAppHostViewport(
+        { top: 84, width: 390, height: 1 },
+        { offsetTop: 0, height: 844 },
+        844
+    );
+
+    assert.deepEqual(viewport, { width: 390, height: 760, safeAreaBottom: 0 });
+    assert.match(appMain, /data-micro-app-mobile-header/);
+    assert.match(appMain, /showMobileMicroAppHeader\(\)[\s\S]*?this\.isPhoneView[\s\S]*?IsMiniProgram\s*!==\s*true[\s\S]*?microAppHost\s*===\s*true/);
+    assert.match(appMain, /mobileMicroAppTitle\(\)[\s\S]*?this\.\$route\.meta\?\.title/);
+    assert.match(appMain, /var\(--status-bar-height,\s*var\(--mci-safe-top,\s*0px\)\)/);
+    assert.match(appMain, /micro-app-mobile-header__back[\s\S]*?<ArrowLeft\s*\/>/);
+    assert.match(appMain, /window\.history\.state\?\.back[\s\S]*?this\.\$router\.back\(\)[\s\S]*?\/mobile\/workspace/);
+});
+
 test("page host automatically heals one stuck first mount and then exposes a stable diagnostic", () => {
     const host = read("src/views/micro-app/host.vue");
     const health = read("src/views/micro-app/render-health.js");

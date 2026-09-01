@@ -1999,7 +1999,11 @@ export default {
             try {
                 // 设置用户身份之前销毁登录页面视频
                 self.DiyCommon.DisposeVideoLogin();
-                self.diyStore.setCurrentUser(self.LoginResult.Data);
+                const authorizedUser = await self.userStore.ensureAuthorizationSnapshot(
+                    self.LoginResult.Data
+                );
+                self.LoginResult.Data = authorizedUser;
+                self.diyStore.setCurrentUser(authorizedUser);
 
                 // Login requests use DiyCommon's axios path, while route guards use
                 // the user Pinia store. Synchronize them before generating routes so
@@ -2032,6 +2036,9 @@ export default {
                 });
             } catch (error) {
                 console.error("GotoSystem error:", error);
+                self.userStore.setRoles([]);
+                self.DiyCommon.Tips(error?.message || "用户权限初始化失败，请重试。", false);
+                return false;
             }
 
             // 等待 DOM 更新

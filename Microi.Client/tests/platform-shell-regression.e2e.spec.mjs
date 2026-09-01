@@ -6,6 +6,8 @@ const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
 const LOCAL_PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || "";
 const API_BASE = process.env.PW_API_BASE || "";
+const MARKETPLACE_DIST = process.env.PW_MARKETPLACE_DIST || "";
+const MARKETPLACE_RUNTIME_ID = process.env.PW_MARKETPLACE_RUNTIME_ID || "01KX7M4M9F1KTKBT7YNTP4VH17";
 const SCREENSHOT_DIR = path.resolve(
     process.cwd(),
     process.env.PW_SCREENSHOT_DIR || "../.tmp/platform-shell-acceptance"
@@ -70,6 +72,35 @@ async function waitForFrame(page, selector) {
         await page.waitForTimeout(250);
     }
     throw new Error(`MicroApp selector did not mount: ${selector}; frames=${page.frames().map((frame) => frame.url()).join(", ")}`);
+}
+
+async function useLocalMarketplaceDist(page) {
+    if (!MARKETPLACE_DIST) return;
+    const distRoot = path.resolve(MARKETPLACE_DIST);
+    const escapedRuntimeId = MARKETPLACE_RUNTIME_ID.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const indexPattern = new RegExp(`/micro-app/[^/]+/${escapedRuntimeId}/(?:index\\.html)?(?:\\?.*)?$`, "i");
+    const assetPattern = new RegExp(`/micro-app/[^/]+/${escapedRuntimeId}/(?:[^/]+/)?assets/[^?]+`, "i");
+    await page.route(indexPattern, async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: "text/html; charset=utf-8",
+            body: await fs.readFile(path.join(distRoot, "index.html"))
+        });
+    });
+    await page.route(assetPattern, async route => {
+        const pathname = new URL(route.request().url()).pathname;
+        const relativeMatch = pathname.match(new RegExp(`/${escapedRuntimeId}/(?:[^/]+/)?(assets/.+)$`, "i"));
+        const relative = relativeMatch?.[1] || "";
+        const target = path.resolve(distRoot, relative);
+        if (!target.startsWith(`${distRoot}${path.sep}`)) return route.abort();
+        const extension = path.extname(target).toLowerCase();
+        const contentType = extension === ".css" ? "text/css; charset=utf-8"
+            : extension === ".js" ? "text/javascript; charset=utf-8"
+                : extension === ".jpg" || extension === ".jpeg" ? "image/jpeg"
+                    : extension === ".png" ? "image/png"
+                        : "application/octet-stream";
+        await route.fulfill({ status: 200, contentType, body: await fs.readFile(target) });
+    });
 }
 
 async function expectUnifiedDialog(dialog, page) {
@@ -477,19 +508,21 @@ test("数据库定时备份：80%大圆角、无顶部强调线、可拖动且�
 test("应用商城：官方源、同页工作区、分类分页、完整详情和可拖动源管理", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    await useLocalMarketplaceDist(page);
     await openRoute(page, "#/microi-store");
     const store = await waitForFrame(page, ".marketplace");
 
-    const sourcePicker = store.locator(".source-picker");
-    await expect(sourcePicker.getByLabel("商城来源")).toHaveValue("official", { timeout: 45_000 });
+    const sourcePicker = store.getByTestId("marketplace-source-group");
+    await expect(sourcePicker.getByRole("radio", { name: /平台官方应用源/ })).toBeChecked({ timeout: 45_000 });
     await expect(store.locator(".market-toolbar__source-context")).toContainText("平台官方应用源");
     await expect(store.getByText("吾码官方源", { exact: true })).toHaveCount(0);
-    const filterMenu = store.locator(".filter-menu");
-    await filterMenu.locator("summary").click();
-    const category = filterMenu.locator('select[aria-label="应用分类"]');
-    await expect(category).toBeVisible();
-    const categoryText = await category.locator("option").allTextContents();
-    expect(categoryText).toEqual(expect.arrayContaining(["游戏", "企业应用", "办公协同"]));
+    const categoryFilters = store.getByTestId("marketplace-filter-categories");
+    await expect(categoryFilters.getByRole("checkbox", { name: "游戏", exact: true })).toBeVisible();
+    await expect(categoryFilters.getByRole("checkbox", { name: "企业应用", exact: true })).toBeVisible();
+    await expect(categoryFilters.getByRole("checkbox", { name: "办公协同", exact: true })).toBeVisible();
+    await expect(store.getByTestId("marketplace-filter-application-types").getByRole("checkbox", { name: "平台应用", exact: true })).toBeChecked();
+    await expect(store.getByTestId("marketplace-filter-visibility").getByRole("checkbox", { name: "公开应用", exact: true })).toBeChecked();
+    await expect(store.getByTestId("marketplace-filter-visibility").getByRole("checkbox", { name: "私有应用", exact: true })).toBeChecked();
 
     const firstCard = store.locator(".app-card").first();
     await expect(firstCard).toBeVisible({ timeout: 45_000 });
@@ -515,22 +548,60 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
             visibleToolbarButtonCount: visibleToolbarButtons.length
         };
     });
-    expect(compactGeometry.heroHeight, JSON.stringify(compactGeometry)).toBeLessThanOrEqual(125);
+    expect(compactGeometry.heroHeight, JSON.stringify(compactGeometry)).toBeLessThanOrEqual(70);
     expect(compactGeometry.previewHeight, JSON.stringify(compactGeometry)).toBeLessThanOrEqual(120);
     expect(compactGeometry.visibleToolbarButtonCount, JSON.stringify(compactGeometry)).toBeLessThanOrEqual(4);
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "09-marketplace-clean-overview.png"), fullPage: false });
 
     const routeBeforeModes = page.url();
-    await store.getByRole("button", { name: /已经安装应用/ }).click();
-    await expect(store.locator(".market-tabs button.active")).toContainText("已经安装应用");
+    await store.getByRole("tab", { name: /已经安装应用/ }).click();
+    await expect(store.getByRole("tab", { name: /已经安装应用/ })).toHaveAttribute("aria-selected", "true");
     expect(page.url()).toBe(routeBeforeModes);
-    await store.getByRole("button", { name: "发布 / 制作离线包", exact: true }).first().click();
-    await expect(store.locator(".market-tabs button.active")).toContainText("发布 / 制作离线包");
+    await store.getByRole("tab", { name: "发布 / 制作离线包", exact: true }).click();
+    await expect(store.getByRole("tab", { name: "发布 / 制作离线包", exact: true })).toHaveAttribute("aria-selected", "true");
     expect(page.url()).toBe(routeBeforeModes);
-    await store.getByRole("button", { name: "安装离线包", exact: true }).first().click();
+    const publishedCard = store.locator(".app-card").first();
+    await expect(publishedCard).toBeVisible({ timeout: 45_000 });
+    await publishedCard.getByRole("button", { name: "编辑 / 制作", exact: true }).click();
+    const applicationForm = page.locator(".diy-form-container.diy-form-modern-dialog").last();
+    await expect(applicationForm).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("应用表单组件尚未就绪，请稍后重试", { exact: true })).toHaveCount(0);
+    const compatibilityName = applicationForm.getByRole("textbox", { name: "应用名称兼容字段", exact: true });
+    await expect(compatibilityName).toBeVisible();
+    const originalCompatibilityName = await compatibilityName.inputValue();
+    await compatibilityName.fill(`${originalCompatibilityName}（关闭主题测试）`);
+    const closeApplicationForm = applicationForm.getByRole("button", { name: /^(?:关闭|Close)$/i });
+    await closeApplicationForm.click();
+    const closeConfirm = page.locator(".el-message-box.mci-unified-message-box").last();
+    await expect(closeConfirm).toBeVisible();
+    const themeContract = await closeConfirm.evaluate((element) => {
+        const normalize = (value) => {
+            const probe = document.createElement("span");
+            probe.style.color = value;
+            document.body.appendChild(probe);
+            const result = getComputedStyle(probe).color;
+            probe.remove();
+            return result;
+        };
+        const root = getComputedStyle(document.documentElement);
+        const button = element.querySelector(".el-button--primary");
+        return {
+            surface: getComputedStyle(element).backgroundColor,
+            expectedSurface: normalize(root.getPropertyValue("--mci-bg-card")),
+            action: button ? getComputedStyle(button).backgroundColor : "",
+            expectedAction: normalize(root.getPropertyValue("--el-color-primary"))
+        };
+    });
+    expect(themeContract.surface, JSON.stringify(themeContract)).toBe(themeContract.expectedSurface);
+    expect(themeContract.action, JSON.stringify(themeContract)).toBe(themeContract.expectedAction);
+    await closeConfirm.getByRole("button", { name: /取消|Cancel/i }).click();
+    await closeApplicationForm.click();
+    await page.locator(".el-message-box.mci-unified-message-box").last().getByRole("button", { name: /确认|OK|Confirm/i }).click();
+    await expect(applicationForm).toHaveCount(0);
+    await store.getByRole("tab", { name: "安装离线包", exact: true }).click();
     await expect(store.locator(".offline-panel")).toBeVisible();
     expect(page.url()).toBe(routeBeforeModes);
-    await store.getByRole("button", { name: "应用市场", exact: true }).click();
+    await store.getByRole("tab", { name: "应用市场", exact: true }).click();
     await expect(firstCard).toBeVisible({ timeout: 45_000 });
 
     const beforeDetailScrollState = await page.evaluate(() => ({

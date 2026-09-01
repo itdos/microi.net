@@ -691,6 +691,7 @@ namespace Microi.net
 
                     CurrentToken tokenModel = null;
                     var rotateFromToken = NormalizeBearerToken(param.RotateFromToken);
+                    var rotationFailureMessage = "";
                     var lockResult = await MicroiEngine.Lock.ActionLockAsync(new MicroiLockParam
                     {
                         Key = $"{userTokenCacheKey}:Rotate",
@@ -707,6 +708,17 @@ namespace Microi.net
                         catch
                         {
                             tokenModel = null;
+                        }
+
+                        // 自动续签只能替换锁内仍然有效的旧 Token。数据库投影查询
+                        // 期间若用户已注销、被吊销或由其它终端清除了会话，绝不能
+                        // 因 tokenModel == null 而重建缓存、复活已结束的登录态。
+                        if (!rotateFromToken.DosIsNullOrWhiteSpace()
+                            && (tokenModel == null || !IsActiveCachedToken(tokenModel, rotateFromToken)))
+                        {
+                            rotationFailureMessage = "当前Token已失效或登录状态已变化，请重新登录。";
+                            tokenModel = null;
+                            return;
                         }
 
                         if (tokenModel == null)
@@ -802,9 +814,15 @@ namespace Microi.net
                     if (lockResult.Code != 1 || tokenModel == null)
                     {
                         return new DosResult<CurrentToken>(
-                            lockResult.Code == 1 ? 0 : lockResult.Code,
+                            !rotationFailureMessage.DosIsNullOrWhiteSpace()
+                                ? 1001
+                                : (lockResult.Code == 1 ? 0 : lockResult.Code),
                             null,
-                            lockResult.Msg.DosIsNullOrWhiteSpace() ? "Token续签繁忙，请稍后重试。" : lockResult.Msg);
+                            !rotationFailureMessage.DosIsNullOrWhiteSpace()
+                                ? rotationFailureMessage
+                                : (lockResult.Msg.DosIsNullOrWhiteSpace()
+                                    ? "Token续签繁忙，请稍后重试。"
+                                    : lockResult.Msg));
                     }
                     if (context != null && !context.Response.Headers.Any(d => d.Key.ToLower() == "authorization"))
                     {

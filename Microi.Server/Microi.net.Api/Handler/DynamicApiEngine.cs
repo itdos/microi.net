@@ -86,17 +86,27 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// /apiengine/{Key} 是平台稳定的接口引擎 Key 路由。控制器会把该片段
-        /// 作为 ApiEngineKey 执行，因此路由冷启动也必须按同一事实源读取；否则
-        /// 缓存为空时会错误地只按 ApiAddress 查询并把已存在的引擎报告为不存在。
-        /// 自定义地址继续返回空字符串并按 ApiAddress 解析。
+        /// 规范化接口引擎 HTTP 地址，并移除只用于租户选择的路径后缀。
+        /// ApiAddress 是显式路由事实源；即使地址恰好是单段 /apiengine/{value}，
+        /// 也不能据此断言 value 就是实际 ApiEngineKey。
+        /// </summary>
+        internal static string NormalizeApiEngineRouteAddress(string apiPath)
+        {
+            return OsClientRegex.Replace(
+                apiPath ?? string.Empty,
+                string.Empty)
+                .Trim()
+                .ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// 提取单段 /apiengine/{Key} 的兼容 Key 候选。它只能在完整 ApiAddress
+        /// 已经确认未配置时使用，不能覆盖显式自定义地址。
         /// </summary>
         internal static string ResolveCanonicalApiEngineKey(string apiPath)
         {
-            var pathWithoutTenantSuffix = OsClientRegex.Replace(
-                apiPath ?? string.Empty,
-                string.Empty);
-            var match = CanonicalApiEngineKeyRegex.Match(pathWithoutTenantSuffix);
+            var match = CanonicalApiEngineKeyRegex.Match(
+                NormalizeApiEngineRouteAddress(apiPath));
             return match.Success
                 ? match.Groups[1].Value.Trim().ToLowerInvariant()
                 : string.Empty;
@@ -113,6 +123,26 @@ namespace Microi.net.Api
                 .GetDynamicStringValue(apiModel, "ApiAddress", string.Empty)
                 .ToLowerInvariant();
             return (apiEngineKey, apiAddress);
+        }
+
+        /// <summary>
+        /// 从租户主库按完整 HTTP 地址读取权威路由。主 ApiAddress 未命中后继续
+        /// 检查 ApiRoutes；只有两者均返回 Code=1/Data=null 才表示地址确实未配置。
+        /// </summary>
+        private static DosResult<dynamic> GetAuthoritativeRouteByAddress(
+            string osClient,
+            string apiAddress)
+        {
+            var client = OsClientExtend.GetClient(osClient);
+            var addressParam = new ApiEngineParam
+            {
+                OsClient = osClient,
+                _CurrentUser = null,
+                ApiAddress = apiAddress
+            };
+            var result = ApiEngineAuthoritativeStore.GetEnabledModel(client, addressParam);
+            if (result.Code != 1 || result.Data != null) return result;
+            return ApiEngineAuthoritativeStore.GetEnabledByMultiRoute(client, apiAddress);
         }
 
         /// <summary>
@@ -361,7 +391,7 @@ namespace Microi.net.Api
                     osClientFromPath = httpContext.Request?.Query["OsClient"].ToString();
                 }
 
-                var apiPathLower = apiPath.ToLowerInvariant();
+                var apiPathLower = NormalizeApiEngineRouteAddress(apiPath);
                 var canonicalApiEngineKey = ResolveCanonicalApiEngineKey(apiPathLower);
 
                 // FormEngine 特殊路由快速匹配
@@ -396,45 +426,68 @@ namespace Microi.net.Api
                 // 获取租户缓存
                 var cacheClient = MicroiEngine.CacheTenant.Cache(osClient);
 
-                // 规范 /apiengine/{Key} 必须按 Key 缓存读取；自定义地址才按完整
-                // ApiAddress 读取。两者均由统一别名协议在命中后补齐其它缓存键。
-                var routeLookupKey = canonicalApiEngineKey.DosIsNullOrWhiteSpace()
-                    ? apiPathLower
-                    : canonicalApiEngineKey;
-                var cacheKey = BuildCacheKey(osClient, routeLookupKey);
-                var apiModel = await cacheClient.GetAsync<dynamic>(cacheKey);
-                if (apiModel is string cachedText)
+                // 完整 ApiAddress 是第一事实源。单段地址可能与实际 ApiEngineKey
+                // 不同（例如 /get-microi-store-list -> get-microi-store），因此不能
+                // 先用路径片段命中另一个同名 Key。只有地址明确未配置时才退回 Key。
+                var addressCacheKey = BuildCacheKey(osClient, apiPathLower);
+                var apiModel = await cacheClient.GetAsync<dynamic>(addressCacheKey);
+                if (apiModel is string addressCachedText)
                 {
                     try
                     {
-                        apiModel = JObject.Parse(cachedText);
+                        apiModel = JObject.Parse(addressCachedText);
                     }
                     catch
                     {
                         // 兼容曾由应用商城导入脚本写入的 "System..." 对象类型名。
                         // 只删除当前确定损坏的别名，随后从数据库回源并重建全部兼容别名。
-                        await cacheClient.RemoveAsync(cacheKey);
+                        await cacheClient.RemoveAsync(addressCacheKey);
                         apiModel = null;
-                        MicroiEngine.QueueSystemLog(osClient, "ApiEngine", "InvalidRouteCacheRemoved", "已移除非 JSON 接口引擎缓存", "缓存将在数据库回源后重建。", 2, true, cacheKey);
+                        MicroiEngine.QueueSystemLog(osClient, "ApiEngine", "InvalidRouteCacheRemoved", "已移除非 JSON 接口引擎缓存", "缓存将在数据库回源后重建。", 2, true, addressCacheKey);
                     }
                 }
 
                 if (apiModel == null && !osClient.DosIsNullOrWhiteSpace())
                 {
                     // 冷缓存回退必须读取主库。保存已提交但 DbRead 尚未同步时，
-                    // 普通读取会把真实自定义路由误判为不存在并返回 404。
-                    var authoritativeParam = new ApiEngineParam
-                    {
-                        OsClient = osClient,
-                        _CurrentUser = null
-                    };
-                    if (canonicalApiEngineKey.DosIsNullOrWhiteSpace())
-                        authoritativeParam.ApiAddress = apiPathLower;
-                    else
-                        authoritativeParam.ApiEngineKey = canonicalApiEngineKey;
+                    // 普通读取会把真实自定义路由误判为不存在并返回 404。先按完整
+                    // ApiAddress 权威读取；仅 Code=1 且 Data=null（明确未配置）时，
+                    // 才允许把单段路径作为兼容 ApiEngineKey 再查一次。
+                    var fallbackResult = GetAuthoritativeRouteByAddress(
+                        osClient,
+                        apiPathLower);
 
-                    var fallbackResult = await MicroiEngine.ApiEngine
-                        .GetAuthoritativeApiEngineModel(authoritativeParam);
+                    if (fallbackResult.Code == 1
+                        && fallbackResult.Data == null
+                        && !canonicalApiEngineKey.DosIsNullOrWhiteSpace())
+                    {
+                        // “启用地址未命中”不等于“地址从未配置”。显式停用的主地址
+                        // 或多路由仍占用该 URL，必须阻断路径尾部 Key 回退，否则可能
+                        // 误执行另一个恰好同名的启用接口。
+                        var configuredRouteResult = ApiEngineAuthoritativeStore
+                            .HasConfiguredRoute(OsClientExtend.GetClient(osClient), apiPathLower);
+                        if (configuredRouteResult.Code != 1)
+                        {
+                            fallbackResult = new DosResult<dynamic>(
+                                configuredRouteResult.Code,
+                                null,
+                                configuredRouteResult.Msg);
+                        }
+                        else if (!configuredRouteResult.Data)
+                        {
+                            // 已进入主库冷回源路径后，兼容 Key 也必须读取权威行，不能
+                            // 接受可能漏掉删除/停用广播的旧缓存并执行过期脚本。
+                            var keyParam = new ApiEngineParam
+                            {
+                                OsClient = osClient,
+                                _CurrentUser = null,
+                                ApiEngineKey = canonicalApiEngineKey
+                            };
+                            fallbackResult = await MicroiEngine.ApiEngine
+                                .GetAuthoritativeApiEngineModel(keyParam);
+                        }
+                    }
+
                     if (fallbackResult.Code == 1 && fallbackResult.Data != null)
                     {
                         apiModel = JObject.FromObject((object)fallbackResult.Data);
@@ -447,6 +500,16 @@ namespace Microi.net.Api
                         {
                             await Task.WhenAll(cacheTasks);
                         }
+                    }
+
+                    // Key 兼容回退命中权威行时，为当前完整地址补一个推导别名，避免
+                    // ApiAddress 未配置的传统 Key 路由在每次请求都访问主库。未来若
+                    // 保存显式 ApiAddress，表事件会用权威行覆盖同一缓存别名。
+                    if (apiModel != null
+                        && !ApiEngineRouteAliases.ContainsExactRoute((object)apiModel, apiPathLower))
+                    {
+                        var inferredCacheJson = JsonConvert.SerializeObject((object)apiModel);
+                        await cacheClient.SetAsync(addressCacheKey, inferredCacheJson);
                     }
                 }
 

@@ -98,6 +98,45 @@ namespace Microi.net
             return new DosResult<dynamic>(1, matches[0]);
         }
 
+        /// <summary>
+        /// 判断一个显式地址是否已被当前租户配置。这里故意包含停用记录：
+        /// 停用地址必须继续阻断按路径尾部 Key 的兼容回退，避免请求误执行另一个
+        /// 同名接口。软删除记录不再占用地址。
+        /// </summary>
+        public static DosResult<bool> HasConfiguredRoute(
+            OsClientSecret client,
+            string apiAddress)
+        {
+            if (client?.Db == null)
+            {
+                return new DosResult<bool>(0, false, "接口引擎路由占用检查缺少租户主库连接。");
+            }
+            if (apiAddress.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult<bool>(1, false);
+            }
+
+            var primaryRows = ReadRows(
+                client,
+                "ApiAddress = @lookup",
+                "@lookup",
+                apiAddress,
+                false);
+            if (primaryRows.Count > 0)
+            {
+                return new DosResult<bool>(1, true);
+            }
+
+            var candidates = ReadRows(
+                client,
+                $"{ApiEngineRouteAliases.MultiRouteFieldName} LIKE @route",
+                "@route",
+                "%" + apiAddress.Trim() + "%",
+                false);
+            return new DosResult<bool>(1, candidates.Any(row =>
+                ApiEngineRouteAliases.ContainsExactRoute((object)row, apiAddress)));
+        }
+
         public static List<dynamic> GetAllEnabled(OsClientSecret client)
         {
             if (client?.Db == null)
@@ -111,17 +150,25 @@ namespace Microi.net
             OsClientSecret client,
             string predicate,
             string parameterName,
-            object parameterValue)
+            object parameterValue,
+            bool enabledOnly = true)
         {
             var sql = "SELECT * FROM sys_apiengine "
-                + "WHERE IsEnable = @enabled AND (IsDeleted = 0 OR IsDeleted IS NULL)";
+                + "WHERE (IsDeleted = 0 OR IsDeleted IS NULL)";
+            if (enabledOnly)
+            {
+                sql += " AND IsEnable = @enabled";
+            }
             if (!predicate.DosIsNullOrWhiteSpace())
             {
                 sql += " AND " + predicate;
             }
 
-            var section = client.Db.FromSql(sql)
-                .AddInParameter("@enabled", 1);
+            var section = client.Db.FromSql(sql);
+            if (enabledOnly)
+            {
+                section.AddInParameter("@enabled", 1);
+            }
             if (!parameterName.DosIsNullOrWhiteSpace())
             {
                 section.AddInParameter(parameterName, parameterValue);
