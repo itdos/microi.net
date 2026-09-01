@@ -31,11 +31,15 @@ Thumbs.db
 # 保留 bin 目录中的特定文件，但忽略其他内容
 # 注意：由于 [Bb]in/ 已经在上面设置了，所以特定文件的例外必须在 [Bb]in/ 规则之前
 
-/microi.webos/
-
-/Microi.Server/Microi.AI/
+# 下列目录是独立闭源仓库，只允许推送到各自的内部 GitLab。
+# 根公开仓必须保持零跟踪；提交与推送钩子还会阻止强制暂存和底层索引绕过。
 /Microi.Server/Microi.net/
+/Microi.Server/Microi.AI/
+/Microi.VSCode/
+/Microi.Client/src/views/webos/
 /Microi.Server/Microi.WorkFlow/
+
+/microi.webos/
 
 .vs/
 *.suo
@@ -85,7 +89,6 @@ unpackage/release/
 # Python 虚拟环境
 .venv/
 
-/Microi.VSCode/
 # V8 与 AI 应用源码通过私有 HDFS / 应用商城交付，不进入公开源码仓库。
 /Microi-V8-Engine/
 /microi-v8-engine/
