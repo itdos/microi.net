@@ -75,6 +75,8 @@ export const API = {
   GET_MICRO_SERVICE: '/api/V8Engine/GetMicroService',
   CREATE_MICRO_SERVICE: '/api/V8Engine/CreateMicroService',
   SYNC_MICRO_SERVICE_SOURCE: '/api/V8Engine/SyncMicroServiceSource',
+  STAGE_MICRO_SERVICE_SOURCE_FILE: '/api/V8Debug/StageMicroServiceSourceFile',
+  FINALIZE_MICRO_SERVICE_SOURCE_MANIFEST: '/api/V8Debug/FinalizeMicroServiceSourceManifest',
   CLEAR_APPLICATION_SOURCE: '/api/V8Engine/ClearApplicationSource',
   PUBLISH_MICRO_SERVICE: '/api/V8Engine/PublishMicroService',
 

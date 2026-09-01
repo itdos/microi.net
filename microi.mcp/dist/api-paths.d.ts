@@ -62,6 +62,8 @@ export declare const API: {
     readonly GET_MICRO_SERVICE: "/api/V8Engine/GetMicroService";
     readonly CREATE_MICRO_SERVICE: "/api/V8Engine/CreateMicroService";
     readonly SYNC_MICRO_SERVICE_SOURCE: "/api/V8Engine/SyncMicroServiceSource";
+    readonly STAGE_MICRO_SERVICE_SOURCE_FILE: "/api/V8Debug/StageMicroServiceSourceFile";
+    readonly FINALIZE_MICRO_SERVICE_SOURCE_MANIFEST: "/api/V8Debug/FinalizeMicroServiceSourceManifest";
     readonly CLEAR_APPLICATION_SOURCE: "/api/V8Engine/ClearApplicationSource";
     readonly PUBLISH_MICRO_SERVICE: "/api/V8Engine/PublishMicroService";
     readonly GET_EVENT_LIST: "/api/V8Engine/GetV8EventList";

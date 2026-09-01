@@ -217,6 +217,17 @@ function apiEngineV8LimitValue(value) {
     }
     return 0;
 }
+/** Normalize sys_apiengine.ApiRoutes to its canonical semicolon-separated form. */
+function normalizeApiEngineRoutes(value) {
+    if (value === undefined)
+        return undefined;
+    const items = (Array.isArray(value) ? value : String(value).split(';'))
+        .map((route) => String(route || '').trim())
+        .filter(Boolean);
+    return Array.from(new Set(items.map((route) => route.toLowerCase())))
+        .map((normalized) => items.find((route) => route.toLowerCase() === normalized) || normalized)
+        .join(';');
+}
 function stripMenuRuntimeFields(value) {
     if (Array.isArray(value))
         return value.map(stripMenuRuntimeFields);
@@ -653,6 +664,15 @@ export class MicroiClient {
                     cause: error,
                 });
             }
+            if (options.allowNativeFallback === false) {
+                throw new MicroiTransportError(`${operationName} 网络请求失败：fetch=${error instanceof Error ? error.message : String(error)}；`
+                    + '已禁用非幂等传输重放', {
+                    kind: 'network',
+                    requestPath: reqPath,
+                    uncertainOutcome: method === 'POST',
+                    cause: error,
+                });
+            }
             // Undici fetch can be reset by reverse proxies for otherwise valid JSON
             // requests (notably the bounded MicroService compatibility publisher).
             // Reuse the exact serialized body through node:http(s); callers retain
@@ -726,7 +746,7 @@ export class MicroiClient {
      * whole-file Buffer. A retry constructs a fresh file stream, so auth recovery
      * remains safe for large immutable application assets.
      */
-    async requestMultipartFile(reqPath, fields, filePath, fileName, authRecoveryStage = 'initial', timeoutMs, contentEncoding) {
+    async requestMultipartFile(reqPath, fields, filePath, fileName, authRecoveryStage = 'initial', timeoutMs, contentEncoding, allowGzipFallback = true) {
         const requestToken = this.token;
         const transportFields = contentEncoding === 'gzip'
             ? { ...fields, ContentEncoding: 'gzip' }
@@ -746,6 +766,14 @@ export class MicroiClient {
                     did: this.did,
                     ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
                     'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                    // The original-byte transport has an exact deterministic size. Some
+                    // reverse proxies reset chunked multipart uploads before ASP.NET can
+                    // read the form, so match the VS Code publisher and declare it.
+                    // Gzip remains chunked because its compressed length is not known
+                    // without buffering the complete file.
+                    ...(contentEncoding === undefined
+                        ? { 'Content-Length': String(multipart.contentLength) }
+                        : {}),
                 },
                 body: multipart.body,
                 // Node.js fetch requires duplex for a streaming request body.
@@ -779,9 +807,9 @@ export class MicroiClient {
             catch (nativeError) {
                 const fetchMessage = error instanceof Error ? error.message : String(error);
                 const nativeMessage = nativeError instanceof Error ? nativeError.message : String(nativeError);
-                if (contentEncoding !== 'gzip') {
+                if (allowGzipFallback && contentEncoding !== 'gzip') {
                     try {
-                        return await this.requestMultipartFile(reqPath, fields, filePath, fileName, authRecoveryStage, timeoutMs, 'gzip');
+                        return await this.requestMultipartFile(reqPath, fields, filePath, fileName, authRecoveryStage, timeoutMs, 'gzip', allowGzipFallback);
                     }
                     catch (gzipError) {
                         const gzipMessage = gzipError instanceof Error ? gzipError.message : String(gzipError);
@@ -793,7 +821,7 @@ export class MicroiClient {
                         });
                     }
                 }
-                throw new MicroiTransportError(`应用资产 gzip 流式上传网络失败：fetch=${fetchMessage}；native=${nativeMessage}`, {
+                throw new MicroiTransportError(`${contentEncoding === 'gzip' ? '应用资产 gzip' : '原始文件'}流式上传网络失败：fetch=${fetchMessage}；native=${nativeMessage}`, {
                     kind: 'network',
                     requestPath: reqPath,
                     uncertainOutcome: true,
@@ -816,7 +844,7 @@ export class MicroiClient {
                 console.error('[microi-mcp] Replacement token was rejected; escalating to credential recovery');
             }
             if (await this.tryRecoverFromAuthFailure(requestToken, credentialOnly)) {
-                return this.requestMultipartFile(reqPath, fields, filePath, fileName, nextAuthRecoveryStage(authRecoveryStage), timeoutMs, contentEncoding);
+                return this.requestMultipartFile(reqPath, fields, filePath, fileName, nextAuthRecoveryStage(authRecoveryStage), timeoutMs, contentEncoding, allowGzipFallback);
             }
             throw new Error(`HTTP 401 Unauthorized — token recovery failed: ${text.slice(0, 200)}`);
         }
@@ -837,7 +865,7 @@ export class MicroiClient {
                 console.error('[microi-mcp] Replacement token was rejected; escalating to credential recovery');
             }
             if (await this.tryRecoverFromAuthFailure(requestToken, credentialOnly)) {
-                return this.requestMultipartFile(reqPath, fields, filePath, fileName, nextAuthRecoveryStage(authRecoveryStage), timeoutMs, contentEncoding);
+                return this.requestMultipartFile(reqPath, fields, filePath, fileName, nextAuthRecoveryStage(authRecoveryStage), timeoutMs, contentEncoding, allowGzipFallback);
             }
         }
         return parsed;
@@ -928,6 +956,9 @@ export class MicroiClient {
                         did: this.did,
                         ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
                         'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                        ...(contentEncoding === undefined
+                            ? { 'Content-Length': String(multipart.contentLength) }
+                            : {}),
                     },
                 }, response => {
                     const chunks = [];
@@ -1430,6 +1461,7 @@ export class MicroiClient {
         const requestedV8Limit = options?.v8Limit ?? (options?.v8Unlimited === undefined
             ? undefined
             : !options.v8Unlimited);
+        const requestedApiRoutes = normalizeApiEngineRoutes(options?.apiRoutes);
         const payload = {
             OsClient: this.config.osClient,
             ApiEngineKey: apiEngineKey,
@@ -1438,20 +1470,25 @@ export class MicroiClient {
             ChangeSummary: prepared.changeHistory,
             ...(requestedV8Limit === undefined ? {} : { V8Limit: requestedV8Limit ? 1 : 0 }),
             ...(options?.responseType === undefined ? {} : { ResponseType: options.responseType }),
+            ...(requestedApiRoutes === undefined ? {} : { ApiRoutes: requestedApiRoutes }),
         };
         const matchesReadback = (data) => normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
             === normalizeCodeForComparison(prepared.code)
             && (requestedV8Limit === undefined
                 || apiEngineV8LimitValue(data) === (requestedV8Limit ? 1 : 0))
             && (options?.responseType === undefined
-                || String(data?.ResponseType || 'JSON').toLowerCase() === options.responseType.toLowerCase());
+                || String(data?.ResponseType || 'JSON').toLowerCase() === options.responseType.toLowerCase())
+            && (requestedApiRoutes === undefined
+                || normalizeApiEngineRoutes(data?.ApiRoutes || '') === requestedApiRoutes);
         try {
             const result = await this.post(API.UPDATE_ENGINE_CODE, payload, {
                 timeoutMs: this.writeRequestTimeoutMs,
                 operationName: `保存接口引擎 ${apiEngineKey}`,
             });
             if (result.Code !== 1
-                || (requestedV8Limit === undefined && options?.responseType === undefined))
+                || (requestedV8Limit === undefined
+                    && options?.responseType === undefined
+                    && requestedApiRoutes === undefined))
                 return result;
             const verification = await this.pollReadback(() => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Limit`)), matchesReadback);
             if (!verification.matched) {
@@ -1468,6 +1505,7 @@ export class MicroiClient {
                     ApiEngineKey: apiEngineKey,
                     ...(requestedV8Limit === undefined ? {} : { V8Limit: requestedV8Limit ? 1 : 0 }),
                     ...(options?.responseType === undefined ? {} : { ResponseType: options.responseType }),
+                    ...(requestedApiRoutes === undefined ? {} : { ApiRoutes: requestedApiRoutes }),
                     Verified: true,
                     Verification: 'readback',
                 },
@@ -1544,6 +1582,7 @@ export class MicroiClient {
             OsClient: this.config.osClient,
             ...data,
         };
+        payload.ApiRoutes = normalizeApiEngineRoutes(payload.ApiRoutes) || '';
         if (payload.V8Limit === undefined && payload.V8Unlimited !== undefined) {
             payload.V8Limit = Number(payload.V8Unlimited) === 1 ? 0 : 1;
         }
@@ -1579,7 +1618,8 @@ export class MicroiClient {
                 || apiEngineV8LimitValue(remote) === (Number(payload.V8Limit) === 1 ? 1 : 0))
             && (payload.ResponseType === undefined
                 || String(remote?.ResponseType || 'JSON').toLowerCase()
-                    === String(payload.ResponseType).toLowerCase()));
+                    === String(payload.ResponseType).toLowerCase())
+            && normalizeApiEngineRoutes(remote?.ApiRoutes || '') === payload.ApiRoutes);
         try {
             const result = await this.post(API.CREATE_ENGINE, payload, {
                 timeoutMs: this.writeRequestTimeoutMs,
@@ -1882,6 +1922,56 @@ export class MicroiClient {
         return this.post(API.SYNC_MICRO_SERVICE_SOURCE, {
             OsClient: this.config.osClient,
             ...data,
+        }, {
+            // This legacy endpoint switches the complete source in one request and
+            // has no idempotency key. A lost fetch response is resolved by the MCP
+            // sync helper's full source readback; requestJson must not replay it via
+            // the native transport first.
+            allowNativeFallback: false,
+            operationName: 'legacy private microservice source sync',
+        });
+    }
+    /**
+     * Stage one private source file as raw multipart bytes. The source endpoint
+     * deliberately rejects ContentEncoding, so gzip fallback stays disabled.
+     * DeliveryBatchId + RelativePath + ExpectedSha256 makes an exact replay
+     * idempotent after a dropped response.
+     */
+    async stageMicroServiceSourceFile(data) {
+        const localPath = path.resolve(data.FilePath);
+        const stat = fs.lstatSync(localPath);
+        if (!stat.isFile() || stat.isSymbolicLink()) {
+            throw new Error(`微服务源码必须是普通文件且不能是符号链接：${localPath}`);
+        }
+        if (stat.size !== data.ExpectedSize) {
+            throw new Error(`微服务源码大小在清单生成后发生变化：${data.RelativePath}`);
+        }
+        const source = data.MicroService || {};
+        const fields = {
+            OsClient: this.config.osClient || '',
+            AppIdOrKey: data.AppIdOrKey,
+            RelativePath: data.RelativePath,
+            ExpectedSha256: data.ExpectedSha256,
+            ExpectedSize: String(data.ExpectedSize),
+            DeliveryBatchId: data.DeliveryBatchId,
+        };
+        for (const field of [
+            'MsKey', 'MicroServiceKey', 'AppKey', 'MsName', 'Name', 'AppName',
+            'ApplicationType', 'AppType', 'Category', 'Description', 'Remark',
+        ]) {
+            const value = source[field];
+            if (value !== undefined && value !== null)
+                fields[field] = String(value);
+        }
+        return this.requestMultipartFile(API.STAGE_MICRO_SERVICE_SOURCE_FILE, fields, localPath, `microi-source-${data.ExpectedSha256.slice(0, 16)}.bin`, 'initial', data.TimeoutMs, undefined, false);
+    }
+    async finalizeMicroServiceSourceManifest(data) {
+        return this.post(API.FINALIZE_MICRO_SERVICE_SOURCE_MANIFEST, {
+            OsClient: this.config.osClient,
+            ...data,
+        }, {
+            timeoutMs: 10 * 60_000,
+            operationName: 'finalize private microservice source manifest',
         });
     }
     async clearApplicationSource(data) {

@@ -41,9 +41,13 @@ const FORBIDDEN_APPLICATION_ASSET_FILES = [
     /^(?:id_rsa|id_dsa|id_ecdsa|id_ed25519)(?:\.|$)/iu,
     /\.(?:pem|key|pfx|p12|jks|keystore)$/iu,
 ];
-const MICRO_SERVICE_SOURCE_MAX_FILE_BYTES = 10 * 1024 * 1024;
-const MICRO_SERVICE_SOURCE_MAX_TOTAL_BYTES = 100 * 1024 * 1024;
-const MICRO_SERVICE_SOURCE_MAX_FILES = 1_000;
+const MICRO_SERVICE_SOURCE_MAX_FILE_BYTES = 128 * 1024 * 1024;
+const MICRO_SERVICE_SOURCE_MAX_TOTAL_BYTES = 20 * 1024 * 1024 * 1024;
+const MICRO_SERVICE_SOURCE_MAX_FILES = 5_000;
+const LEGACY_MICRO_SERVICE_SOURCE_MAX_BYTES = 8 * 1024 * 1024;
+const LEGACY_MICRO_SERVICE_SOURCE_MAX_FILES = 256;
+const LEGACY_MICRO_SERVICE_SOURCE_MAX_BASE64_CHARACTERS = 4
+    * Math.ceil(LEGACY_MICRO_SERVICE_SOURCE_MAX_BYTES / 3);
 const MICRO_SERVICE_SOURCE_EXCLUDED_DIRECTORIES = new Set([
     '.git', '.hg', '.svn', '.cache', '.codex-temp', '.next', '.nuxt', '.output', '.tmp', '.turbo', '.vite',
     'coverage', 'dist', 'build', 'node_modules',
@@ -896,6 +900,449 @@ export async function buildLocalMicroServiceSourceManifest(rootDirectory, option
         skippedDirectories: skippedDirectories.sort(),
         skippedFiles: skippedFiles.sort(),
     };
+}
+function microServiceSourceIdentity(microService) {
+    return getStringField(microService, 'MsKey', 'MicroServiceKey', 'AppKey', 'AppId');
+}
+function nullableString(value) {
+    return value === undefined || value === null || String(value).trim() === ''
+        ? null
+        : String(value);
+}
+function parseRemoteMicroServiceSourceContext(result) {
+    if (result.Code !== 1) {
+        throw new Error(`读取远端源码基线失败：${result.Msg || `Code=${result.Code}`}`);
+    }
+    const context = asJsonRecord(result.Data);
+    const application = asJsonRecord(context.Application);
+    const capabilities = asJsonRecord(context.Capabilities);
+    const currentVersion = Number(application.CurrentVersion);
+    if (!Number.isSafeInteger(currentVersion) || currentVersion < 0) {
+        throw new Error('远端应用缺少合法的 CurrentVersion，不能建立源码 CAS 基线。');
+    }
+    const sourceManifestHash = nullableString(context.SourceManifestHash);
+    if (sourceManifestHash !== null && !/^[a-f0-9]{64}$/u.test(sourceManifestHash)) {
+        throw new Error('远端 SourceManifestHash 不是合法的 SHA-256，不能建立源码 CAS 基线。');
+    }
+    const files = Array.isArray(context.Files)
+        ? context.Files.map(file => asJsonRecord(file))
+        : [];
+    return {
+        application,
+        capabilities,
+        baseline: {
+            currentVersion,
+            appVersion: nullableString(application.AppVersion),
+            sourceManifestHash,
+        },
+        files,
+    };
+}
+function sameMicroServiceSourceBaseline(left, right) {
+    return left.currentVersion === right.currentVersion
+        && left.appVersion === right.appVersion
+        && left.sourceManifestHash === right.sourceManifestHash;
+}
+function contextMatchesLocalMicroServiceSource(result, manifest) {
+    if (result.Code !== 1)
+        return false;
+    const context = asJsonRecord(result.Data);
+    if (String(context.SourceManifestHash || '') !== manifest.manifestHash)
+        return false;
+    const remoteFiles = Array.isArray(context.Files)
+        ? context.Files.map(file => asJsonRecord(file))
+        : [];
+    if (remoteFiles.length !== manifest.files.length)
+        return false;
+    const byPath = new Map(remoteFiles.map(file => [
+        getStringField(file, 'FilePath', 'Path', 'RelativePath'),
+        file,
+    ]));
+    return manifest.files.every(file => {
+        const remote = byPath.get(file.relativePath);
+        return Boolean(remote)
+            && getStringField(remote, 'ContentHash', 'Sha256', 'Hash').toLowerCase() === file.sha256
+            && Number(remote?.Size) === file.size
+            && getStringField(remote, 'StorageScope').toLowerCase() === 'private';
+    });
+}
+export function buildMicroServiceSourceDeliveryBatchId(appIdOrKey, sourceManifestHash) {
+    const digest = crypto.createHash('sha256')
+        .update(`microi-private-source-v1\n${appIdOrKey}\n${sourceManifestHash}`)
+        .digest('hex');
+    return `src-${digest.slice(0, 46)}`;
+}
+function validateMicroServiceSourceStageEvidence(result, expected) {
+    if (result.Code !== 1) {
+        throw new Error(`源码文件暂存失败 [${expected.relativePath}]：${result.Msg || `Code=${result.Code}`}`);
+    }
+    const evidence = asJsonRecord(result.Data);
+    const appId = getStringField(evidence, 'AppId');
+    const appKey = getStringField(evidence, 'AppKey');
+    if ((!appId && !appKey) || (appId !== expected.appIdOrKey && appKey !== expected.appIdOrKey)) {
+        throw new Error(`源码文件暂存证据 AppId/AppKey 不匹配：${expected.relativePath}`);
+    }
+    requireStreamEvidenceString(evidence, 'DeliveryBatchId', expected.deliveryBatchId, `源码文件 ${expected.relativePath}`);
+    requireStreamEvidenceString(evidence, 'RelativePath', expected.relativePath, `源码文件 ${expected.relativePath}`);
+    const actualHash = getStringField(evidence, 'Sha256', 'ContentHash').toLowerCase();
+    if (actualHash !== expected.sha256) {
+        throw new Error(`源码文件 ${expected.relativePath} 返回证据 SHA-256 不一致`);
+    }
+    requireStreamEvidenceNumber(evidence, 'Size', expected.size, `源码文件 ${expected.relativePath}`);
+    if (evidence.SourceReadbackVerified !== true) {
+        throw new Error(`源码文件 ${expected.relativePath} 未返回私有桶全量回读证据`);
+    }
+}
+async function readRemoteMicroServiceSourceContext(client, appIdOrKey) {
+    return client.getApplicationContext({
+        AppIdOrKey: appIdOrKey,
+        IncludeContents: false,
+        MaxFileBytes: 1,
+        MaxTotalBytes: 1,
+    });
+}
+function buildLegacyInlineSourceFiles(explicitFiles) {
+    if (explicitFiles.length > LEGACY_MICRO_SERVICE_SOURCE_MAX_FILES) {
+        throw new Error(`旧服务源码兼容通道最多允许 ${LEGACY_MICRO_SERVICE_SOURCE_MAX_FILES} 个文件；请升级后端并改传 directory。`);
+    }
+    let totalSize = 0;
+    const files = explicitFiles.map((file, index) => {
+        const rawBase64 = getStringField(file, 'FileByteBase64', 'ContentBase64', 'Base64');
+        if (!rawBase64)
+            throw new Error(`sourceFiles[${index}] 缺少 FileByteBase64`);
+        let base64 = rawBase64;
+        if (/^data:/iu.test(base64)) {
+            const dataUrl = base64.match(/^data:[^,\r\n]*;base64,([A-Za-z0-9+/=]*)$/iu);
+            if (!dataUrl)
+                throw new Error(`sourceFiles[${index}] 不是合法的 Base64 data URL`);
+            base64 = dataUrl[1];
+        }
+        if (base64.length > LEGACY_MICRO_SERVICE_SOURCE_MAX_BASE64_CHARACTERS) {
+            throw new Error(`sourceFiles[${index}] Base64 编码长度超过安全上限 `
+                + `${LEGACY_MICRO_SERVICE_SOURCE_MAX_BASE64_CHARACTERS} characters`);
+        }
+        if (base64.length % 4 !== 0
+            || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(base64)) {
+            throw new Error(`sourceFiles[${index}] 不是严格 RFC 4648 Base64（字符或填充不合法）`);
+        }
+        const bytes = Buffer.from(base64, 'base64');
+        if (bytes.toString('base64') !== base64) {
+            throw new Error(`sourceFiles[${index}] 不是 canonical Base64`);
+        }
+        totalSize += bytes.byteLength;
+        if (totalSize > LEGACY_MICRO_SERVICE_SOURCE_MAX_BYTES) {
+            throw new Error(`旧服务源码兼容通道最多允许 ${LEGACY_MICRO_SERVICE_SOURCE_MAX_BYTES} bytes；请升级后端并改传 directory。`);
+        }
+        return file;
+    });
+    return { files, totalSize };
+}
+/**
+ * Execute private-source delivery independently of MCP registration so exact
+ * stage/finalize/CAS/recovery semantics can be unit tested.
+ */
+export async function runMicroServiceSourceSync(client, input) {
+    try {
+        const explicitFiles = input.sourceFiles || [];
+        if (input.directory && explicitFiles.length > 0) {
+            throw new Error('directory 与 sourceFiles 不能同时传入；本地工程必须只传 directory。');
+        }
+        if (!input.directory && explicitFiles.length === 0) {
+            throw new Error('请传入 directory；仅兼容旧调用时才传 sourceFiles。');
+        }
+        const appIdOrKey = microServiceSourceIdentity(input.microService);
+        if (!appIdOrKey)
+            throw new Error('microService 必须包含 MsKey、MicroServiceKey 或 AppKey。');
+        const localManifest = input.directory
+            ? await buildLocalMicroServiceSourceManifest(input.directory)
+            : null;
+        const summary = localManifest
+            ? {
+                sourceMode: 'local-directory',
+                sourceDirectory: localManifest.rootDirectory,
+                sourceFileCount: localManifest.files.length,
+                totalSize: localManifest.totalSize,
+                sourceManifestHash: localManifest.manifestHash,
+                files: localManifest.files.map(file => ({ Path: file.relativePath, Size: file.size, Sha256: file.sha256 })),
+                skippedDirectories: localManifest.skippedDirectories,
+                skippedFiles: localManifest.skippedFiles,
+                aiContextFileBytes: 0,
+                manualChunking: false,
+            }
+            : {
+                sourceMode: 'legacy-inline-array',
+                sourceFileCount: explicitFiles.length,
+                aiContextFileBytes: 0,
+                manualChunking: false,
+            };
+        if (!input.confirmExecution) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            dryRun: true,
+                            microService: input.microService,
+                            replacePrivateSourceOnly: input.replace !== false,
+                            ...summary,
+                        }, null, 2) }],
+            };
+        }
+        if (input.replace === false && localManifest) {
+            throw new Error('源码流式协议提交的是完整私有源码清单，replace=false 不受支持；请省略 replace 或传 true。');
+        }
+        const initialContextResult = await readRemoteMicroServiceSourceContext(client, appIdOrKey);
+        if (initialContextResult.Code === 2) {
+            throw new Error(`在线 AI 应用不存在：${appIdOrKey}。请先调用 microi_create_microservice 创建应用，`
+                + '源码同步不会在无法建立远端基线时隐式写入。');
+        }
+        if (initialContextResult.Code !== 1) {
+            throw new Error(`读取远端源码能力/基线失败，已拒绝 legacy 写入：`
+                + `${initialContextResult.Msg || `Code=${initialContextResult.Code}`}`);
+        }
+        const rawContext = asJsonRecord(initialContextResult.Data);
+        const rawCapabilities = asJsonRecord(rawContext.Capabilities);
+        const sourceStreamFlag = rawCapabilities.SourceStreamPublish;
+        const sourceStreamProtocolVersion = Number(rawCapabilities.SourceStreamProtocolVersion);
+        if (sourceStreamFlag === true
+            && (!Number.isSafeInteger(sourceStreamProtocolVersion) || sourceStreamProtocolVersion < 1)) {
+            throw new Error('远端声明 SourceStreamPublish=true，但缺少合法的 SourceStreamProtocolVersion。');
+        }
+        const supportsSourceStream = sourceStreamFlag === true;
+        // A genuine old Context may have no CurrentVersion or CAS fields. Parse
+        // those strict invariants only after the server explicitly advertises the
+        // streaming protocol. Code=1 with no advertised capability is the sole
+        // condition eligible for the bounded legacy fallback below.
+        const remoteContext = supportsSourceStream
+            ? parseRemoteMicroServiceSourceContext(initialContextResult)
+            : null;
+        if (!localManifest || !supportsSourceStream) {
+            if (localManifest
+                && (localManifest.files.length > LEGACY_MICRO_SERVICE_SOURCE_MAX_FILES
+                    || localManifest.totalSize > LEGACY_MICRO_SERVICE_SOURCE_MAX_BYTES)) {
+                throw new Error(`远端未暴露 SourceStreamPublish，旧兼容通道仅允许 ${LEGACY_MICRO_SERVICE_SOURCE_MAX_FILES} 个文件/`
+                    + `${LEGACY_MICRO_SERVICE_SOURCE_MAX_BYTES} bytes；当前 ${localManifest.files.length} 个/`
+                    + `${localManifest.totalSize} bytes。请先升级 Microi.Server。`);
+            }
+            const uploadFiles = [];
+            if (localManifest) {
+                for (const file of localManifest.files) {
+                    const bytes = await fs.promises.readFile(file.absolutePath);
+                    const actualSha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+                    if (bytes.byteLength !== file.size || actualSha256 !== file.sha256) {
+                        throw new Error(`源码在清单生成后发生变化：${file.relativePath}`);
+                    }
+                    uploadFiles.push({
+                        Path: file.relativePath,
+                        FileName: path.posix.basename(file.relativePath),
+                        FileByteBase64: bytes.toString('base64'),
+                        Size: file.size,
+                        Sha256: file.sha256,
+                    });
+                }
+            }
+            else {
+                uploadFiles.push(...buildLegacyInlineSourceFiles(explicitFiles).files);
+            }
+            let legacyResult;
+            let recoveredAfterLegacyTransportError = false;
+            try {
+                legacyResult = await client.syncMicroServiceSource({
+                    microService: input.microService,
+                    sourceFiles: uploadFiles,
+                    Replace: false,
+                    ReplacePrivateSourceOnly: input.replace !== false,
+                });
+            }
+            catch (error) {
+                // A legacy request is one non-idempotent JSON operation. Its response
+                // may be lost after the server has already switched the source rows,
+                // so it must never be blindly replayed. Directory mode has a canonical
+                // manifest that lets us recover only from a complete active readback.
+                if (!localManifest) {
+                    throw new Error('旧服务源码整包响应中断，sourceFiles 兼容调用没有可验证的本地完整清单；'
+                        + '已停止且不会盲目重放，请改传 directory 后重试。'
+                        + `原始错误：${error instanceof Error ? error.message : String(error)}`, { cause: error });
+                }
+                const readback = await readRemoteMicroServiceSourceContext(client, appIdOrKey);
+                if (!contextMatchesLocalMicroServiceSource(readback, localManifest)) {
+                    throw new Error('旧服务源码整包响应中断，完整路径/大小/SHA-256/清单哈希回读未确认提交结果；'
+                        + '已停止且不会盲目重放。'
+                        + `原始错误：${error instanceof Error ? error.message : String(error)}`, { cause: error });
+                }
+                legacyResult = {
+                    Code: 1,
+                    Msg: '旧服务源码整包响应中断，已通过完整活动源码回读确认提交成功',
+                    Data: {
+                        FileCount: localManifest.files.length,
+                        TotalSize: localManifest.totalSize,
+                        SourceManifestHash: localManifest.manifestHash,
+                        SourceReadbackVerified: true,
+                    },
+                };
+                recoveredAfterLegacyTransportError = true;
+            }
+            if (legacyResult.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${legacyResult.Msg}` }], isError: true };
+            }
+            const evidence = asJsonRecord(legacyResult.Data);
+            if (localManifest) {
+                requireStreamEvidenceNumber(evidence, 'FileCount', localManifest.files.length, '旧服务源码兼容同步');
+                requireStreamEvidenceNumber(evidence, 'TotalSize', localManifest.totalSize, '旧服务源码兼容同步');
+                requireStreamEvidenceString(evidence, 'SourceManifestHash', localManifest.manifestHash, '旧服务源码兼容同步');
+            }
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            ...evidence,
+                            ...summary,
+                            protocol: 'legacy-bounded-json',
+                            legacySafetyLimitBytes: LEGACY_MICRO_SERVICE_SOURCE_MAX_BYTES,
+                            RecoveredAfterLegacyTransportError: recoveredAfterLegacyTransportError,
+                        }, null, 2) }],
+            };
+        }
+        if (!remoteContext) {
+            throw new Error('远端源码流协议上下文缺失，已拒绝进入 stage/finalize。');
+        }
+        const baseline = remoteContext.baseline;
+        const deliveryBatchId = buildMicroServiceSourceDeliveryBatchId(appIdOrKey, localManifest.manifestHash);
+        let stageRetryCount = 0;
+        let stageReadbackCount = 0;
+        let recoveredFinalStateDuringStage = false;
+        for (const file of localManifest.files) {
+            const actualSha256 = await sha256LocalFile(file.absolutePath);
+            const actualSize = fs.lstatSync(file.absolutePath).size;
+            if (actualSize !== file.size || actualSha256 !== file.sha256) {
+                throw new Error(`源码在 stage 前发生变化：${file.relativePath}`);
+            }
+            let staged = false;
+            for (let attempt = 0; attempt < 3 && !staged; attempt += 1) {
+                try {
+                    const result = await client.stageMicroServiceSourceFile({
+                        AppIdOrKey: appIdOrKey,
+                        RelativePath: file.relativePath,
+                        ExpectedSha256: file.sha256,
+                        ExpectedSize: file.size,
+                        DeliveryBatchId: deliveryBatchId,
+                        FilePath: file.absolutePath,
+                        MicroService: input.microService,
+                    });
+                    validateMicroServiceSourceStageEvidence(result, {
+                        appIdOrKey,
+                        deliveryBatchId,
+                        relativePath: file.relativePath,
+                        sha256: file.sha256,
+                        size: file.size,
+                    });
+                    staged = true;
+                }
+                catch (error) {
+                    stageReadbackCount += 1;
+                    const readback = await readRemoteMicroServiceSourceContext(client, appIdOrKey);
+                    if (contextMatchesLocalMicroServiceSource(readback, localManifest)) {
+                        recoveredFinalStateDuringStage = true;
+                        staged = true;
+                        break;
+                    }
+                    if (attempt >= 2)
+                        throw error;
+                    stageRetryCount += 1;
+                    await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+                }
+            }
+            if (recoveredFinalStateDuringStage)
+                break;
+        }
+        if (!recoveredFinalStateDuringStage) {
+            const beforeFinalizeResult = await readRemoteMicroServiceSourceContext(client, appIdOrKey);
+            if (contextMatchesLocalMicroServiceSource(beforeFinalizeResult, localManifest)) {
+                recoveredFinalStateDuringStage = true;
+            }
+            else {
+                const beforeFinalize = parseRemoteMicroServiceSourceContext(beforeFinalizeResult);
+                if (!sameMicroServiceSourceBaseline(beforeFinalize.baseline, baseline)) {
+                    throw new Error('源码 finalize 前检测到 CurrentVersion/AppVersion/SourceManifestHash 基线漂移，'
+                        + '已保留隔离的暂存批次并拒绝覆盖，请重新拉取远端源码完成三方合并。');
+                }
+            }
+        }
+        let finalizeEvidence = {};
+        let recoveredAfterFinalizeTransportError = false;
+        if (!recoveredFinalStateDuringStage) {
+            const finalizeRequest = {
+                AppIdOrKey: appIdOrKey,
+                DeliveryBatchId: deliveryBatchId,
+                ExpectedCurrentVersion: baseline.currentVersion,
+                ExpectedAppVersion: baseline.appVersion,
+                ExpectedSourceManifestHash: baseline.sourceManifestHash,
+                SourceManifestHash: localManifest.manifestHash,
+                ReplacePrivateSourceOnly: true,
+                Manifest: localManifest.files.map(file => ({
+                    Path: file.relativePath,
+                    Sha256: file.sha256,
+                    Size: file.size,
+                })),
+            };
+            try {
+                const finalizeResult = await client.finalizeMicroServiceSourceManifest(finalizeRequest);
+                if (finalizeResult.Code !== 1) {
+                    const readback = await readRemoteMicroServiceSourceContext(client, appIdOrKey);
+                    if (!contextMatchesLocalMicroServiceSource(readback, localManifest)) {
+                        return {
+                            content: [{ type: 'text', text: `Error: ${finalizeResult.Msg || `Code=${finalizeResult.Code}`}` }],
+                            isError: true,
+                        };
+                    }
+                    recoveredAfterFinalizeTransportError = true;
+                }
+                else {
+                    finalizeEvidence = asJsonRecord(finalizeResult.Data);
+                    requireStreamEvidenceString(finalizeEvidence, 'DeliveryBatchId', deliveryBatchId, '私有源码 finalize');
+                    requireStreamEvidenceString(finalizeEvidence, 'SourceManifestHash', localManifest.manifestHash, '私有源码 finalize');
+                    requireStreamEvidenceNumber(finalizeEvidence, 'FileCount', localManifest.files.length, '私有源码 finalize');
+                    requireStreamEvidenceNumber(finalizeEvidence, 'TotalSize', localManifest.totalSize, '私有源码 finalize');
+                    if (finalizeEvidence.SourceReadbackVerified !== true) {
+                        throw new Error('私有源码 finalize 未返回逐文件 HDFS 回读验证证据');
+                    }
+                }
+            }
+            catch (error) {
+                const readback = await readRemoteMicroServiceSourceContext(client, appIdOrKey);
+                if (!contextMatchesLocalMicroServiceSource(readback, localManifest)) {
+                    throw new Error('私有源码 finalize 响应中断，完整清单回读未确认提交结果；已停止且不会盲目重放。'
+                        + `原始错误：${error instanceof Error ? error.message : String(error)}`, { cause: error });
+                }
+                recoveredAfterFinalizeTransportError = true;
+            }
+        }
+        const finalReadback = await readRemoteMicroServiceSourceContext(client, appIdOrKey);
+        if (!contextMatchesLocalMicroServiceSource(finalReadback, localManifest)) {
+            throw new Error('私有源码 finalize 后完整路径/大小/SHA-256/清单哈希回读不一致。');
+        }
+        return {
+            content: [{ type: 'text', text: JSON.stringify({
+                        ...finalizeEvidence,
+                        ...summary,
+                        ProtocolVersion: 1,
+                        DeliveryBatchId: deliveryBatchId,
+                        SourceManifestHash: localManifest.manifestHash,
+                        FileCount: localManifest.files.length,
+                        TotalSize: localManifest.totalSize,
+                        SourceReadbackVerified: true,
+                        ExpectedCurrentVersion: baseline.currentVersion,
+                        ExpectedAppVersion: baseline.appVersion,
+                        ExpectedSourceManifestHash: baseline.sourceManifestHash,
+                        StageRetryCount: stageRetryCount,
+                        StageReadbackCount: stageReadbackCount,
+                        RecoveredFinalStateDuringStage: recoveredFinalStateDuringStage,
+                        RecoveredAfterFinalizeTransportError: recoveredAfterFinalizeTransportError,
+                        protocol: 'private-source-stream-v1',
+                    }, null, 2) }],
+        };
+    }
+    catch (error) {
+        return {
+            content: [{ type: 'text', text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+            isError: true,
+        };
+    }
 }
 const LEGACY_STREAM_COMPATIBILITY_MAX_FILES = 256;
 const LEGACY_STREAM_COMPATIBILITY_MAX_BYTES = 5 * 1024 * 1024;
@@ -3886,6 +4333,7 @@ export function createMcpServer(client, context) {
                 engine?.ApiName ? `- **Name**: ${engine.ApiName}` : '',
                 engine?.Category ? `- **Category**: ${engine.Category}` : '',
                 engine?.ApiAddress ? `- **Address**: ${engine.ApiAddress}` : '',
+                engine?.ApiRoutes ? `- **多路由**: ${engine.ApiRoutes}` : '',
                 engine?.ApiRemark ? `- **Remark**: ${engine.ApiRemark}` : '',
                 `- **V8Limit**: ${engine?.V8Limit !== undefined && engine?.V8Limit !== null
                     ? Number(engine.V8Limit || 0) === 1
@@ -4062,22 +4510,24 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 保存接口引擎代码
     // ========================
-    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, appends the change summary to the API-engine history TableChild (the server falls back to legacy ChangeHistory on old databases), and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Optional responseType=Stream enables SSE/NDJSON streaming through V8.Stream.Write/WriteAsync. Optional v8Limit uses positive semantics: false/default means no Jint per-execution budget, true enables the configured timeout/statement/recursion/allocation limits. Runtime values are verified by remote readback. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`, {
+    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, appends the change summary to the API-engine history TableChild (the server falls back to legacy ChangeHistory on old databases), and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata unless apiRoutes is explicitly supplied. Optional apiRoutes updates sys_apiengine.ApiRoutes（多路由）using semicolon-separated compatibility paths; every alias executes the same engine and is verified by readback. Optional responseType=Stream enables SSE/NDJSON streaming through V8.Stream.Write/WriteAsync. Optional v8Limit uses positive semantics: false/default means no Jint per-execution budget, true enables the configured timeout/statement/recursion/allocation limits. Runtime values are verified by remote readback. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`, {
         apiEngineKey: z.string().describe('The unique key of the API engine'),
         code: z.string().describe('The complete JavaScript source code to save'),
         functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
         changeSummary: z.string().optional().describe('One-line change summary appended to the API-engine history TableChild; old databases use the server-side legacy fallback.'),
         v8Limit: z.boolean().optional().describe('Positive switch. false/default means unrestricted Jint execution budgets; true applies this engine\'s configured timeout/statement/recursion/allocation limits. Omit to preserve the current value.'),
         responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream']).optional().describe('HTTP response mode. Use Stream for SSE/NDJSON and emit chunks with V8.Stream.Write or WriteAsync. Omit to preserve the current value.'),
+        apiRoutes: z.union([z.string(), z.array(z.string())]).optional().describe('多路由 compatibility aliases. Use a semicolon-separated string or an array of absolute paths. Omit to preserve; pass an empty string/array to clear.'),
         v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
         confirmLargeReduction: z.string().optional().describe('Required only when replacing source >=8000 chars with code shorter by more than 15%. Use apiEngineKey or EXECUTE.'),
-    }, async ({ apiEngineKey, code, functionDescription, changeSummary, v8Limit, responseType, v8Unlimited, confirmLargeReduction }) => {
+    }, async ({ apiEngineKey, code, functionDescription, changeSummary, v8Limit, responseType, apiRoutes, v8Unlimited, confirmLargeReduction }) => {
         try {
             const result = await client.saveEngineCode(apiEngineKey, code, {
                 functionDescription,
                 changeSummary,
                 v8Limit: v8Limit ?? (v8Unlimited === undefined ? undefined : !v8Unlimited),
                 responseType,
+                apiRoutes,
                 confirmLargeReduction: confirmLargeReduction === apiEngineKey || confirmLargeReduction === 'EXECUTE',
             });
             if (result.Code !== 1) {
@@ -4105,10 +4555,11 @@ export function createMcpServer(client, context) {
         functionDescription: z.string().optional().describe('Complete function description to keep in the initial code header. No change history here.'),
         changeSummary: z.string().optional().describe('One-line change summary appended to the API-engine history TableChild; old databases use the server-side legacy fallback.'),
         apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
+        apiRoutes: z.union([z.string(), z.array(z.string())]).optional().describe('多路由 compatibility aliases for the same engine. Supply absolute paths separated by English semicolons or as an array.'),
         responseType: z.enum(['JSON', 'String', 'File', 'HTML', 'Stream']).optional().describe('HTTP response mode. Default JSON; choose Stream for SSE/NDJSON incremental output.'),
         v8Limit: z.boolean().optional().describe('Default false. false means no Jint per-execution budget; true applies the configured runtime limits. Process resident-memory guard always remains active.'),
         v8Unlimited: z.boolean().optional().describe('Deprecated compatibility alias. Prefer v8Limit; true is equivalent to v8Limit=false.'),
-    }, async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress, responseType, v8Limit, v8Unlimited }) => {
+    }, async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress, apiRoutes, responseType, v8Limit, v8Unlimited }) => {
         try {
             const result = await client.createEngine({
                 ApiEngineKey: apiEngineKey,
@@ -4118,6 +4569,7 @@ export function createMcpServer(client, context) {
                 functionDescription,
                 changeSummary,
                 ApiAddress: apiAddress,
+                ApiRoutes: apiRoutes,
                 ResponseType: responseType,
                 V8Limit: (v8Limit ?? (v8Unlimited === undefined ? undefined : !v8Unlimited)) === undefined
                     ? undefined
@@ -6519,95 +6971,19 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 同步微服务源码到在线 AI 应用
     // ========================
-    server.tool('microi_sync_microservice_source', `Sync a local Web, UniApp or MicroService source directory into the online AI Application for OsClient "${osClient}". Prefer directory: MCP scans, hashes and reads the local files internally, so AI agents must never read large files into Base64, create .sync-seg-* files, create sync-source-files.json, or split one source file across tool calls. The legacy sourceFiles array remains available only for compatibility. Source files stay private and separate from published assets.`, {
+    server.tool('microi_sync_microservice_source', `Sync a local Web, UniApp or MicroService source directory into the online AI Application for OsClient "${osClient}". Prefer directory: MCP detects SourceStreamPublish, streams each original file into the private staged prefix, then atomically finalizes the complete manifest with CurrentVersion/AppVersion/SourceManifestHash CAS. Transport failures are read back before any exact replay. Old servers use bounded legacy JSON only for at most 256 files and 8MiB. AI agents must never read large files into Base64, create .sync-seg-* files, create sync-source-files.json, or split one source file across tool calls.`, {
         microService: jsonRecordSchema.describe('Microservice metadata. Required: MsKey and MsName/Name. Optional: Description and SourceDirName.'),
         directory: z.string().optional().describe('Preferred. Absolute local project directory; MCP reads it directly and excludes node_modules, dist, build, coverage, caches and VCS data.'),
         sourceFiles: z.array(jsonRecordSchema).optional().describe('Legacy compatibility only. Do not construct this array from manually split files when a local directory is available.'),
-        replace: z.boolean().optional().describe('When true, remove stale private-source metadata not present in this manifest. Public runtime/build rows are always preserved.'),
+        replace: z.boolean().optional().describe('Complete directory sync defaults to exact private-source replacement. Explicit false is rejected by the stream protocol; public runtime/build rows are always preserved.'),
         confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
-    }, async ({ microService, directory, sourceFiles, replace, confirmExecution }) => {
-        try {
-            const explicitFiles = sourceFiles || [];
-            if (directory && explicitFiles.length > 0) {
-                throw new Error('directory 与 sourceFiles 不能同时传入；本地工程必须只传 directory。');
-            }
-            if (!directory && explicitFiles.length === 0) {
-                throw new Error('请传入 directory；仅兼容旧调用时才传 sourceFiles。');
-            }
-            const localManifest = directory
-                ? await buildLocalMicroServiceSourceManifest(directory)
-                : null;
-            const summary = localManifest
-                ? {
-                    sourceMode: 'local-directory',
-                    sourceDirectory: localManifest.rootDirectory,
-                    sourceFileCount: localManifest.files.length,
-                    totalSize: localManifest.totalSize,
-                    sourceManifestHash: localManifest.manifestHash,
-                    files: localManifest.files.map(file => ({ Path: file.relativePath, Size: file.size, Sha256: file.sha256 })),
-                    skippedDirectories: localManifest.skippedDirectories,
-                    skippedFiles: localManifest.skippedFiles,
-                    aiContextFileBytes: 0,
-                    manualChunking: false,
-                }
-                : {
-                    sourceMode: 'legacy-inline-array',
-                    sourceFileCount: explicitFiles.length,
-                    manualChunking: false,
-                };
-            if (!confirmExecution) {
-                return {
-                    content: [{ type: 'text', text: JSON.stringify({ dryRun: true, microService, replace: replace === true, ...summary }, null, 2) }],
-                };
-            }
-            const uploadFiles = localManifest
-                ? await Promise.all(localManifest.files.map(async (file) => {
-                    const bytes = await fs.promises.readFile(file.absolutePath);
-                    const actualSha256 = crypto.createHash('sha256').update(bytes).digest('hex');
-                    if (bytes.byteLength !== file.size || actualSha256 !== file.sha256) {
-                        throw new Error(`源码在 dry-run/清单生成后发生变化：${file.relativePath}`);
-                    }
-                    return {
-                        Path: file.relativePath,
-                        FileName: path.posix.basename(file.relativePath),
-                        FileByteBase64: bytes.toString('base64'),
-                        Size: file.size,
-                        Sha256: file.sha256,
-                    };
-                }))
-                : explicitFiles;
-            // Replace=true on legacy servers could prune public build metadata because
-            // source and runtime rows share mci_ai_app_file. The new flag is ignored by
-            // old servers (safe/no prune) and honored by new servers (private-only prune).
-            const result = await client.syncMicroServiceSource({
-                microService,
-                sourceFiles: uploadFiles,
-                Replace: false,
-                ReplacePrivateSourceOnly: replace === true,
-            });
-            if (result.Code !== 1) {
-                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
-            }
-            const evidence = asJsonRecord(result.Data);
-            if (localManifest) {
-                requireStreamEvidenceNumber(evidence, 'FileCount', localManifest.files.length, '源码目录同步');
-                requireStreamEvidenceNumber(evidence, 'TotalSize', localManifest.totalSize, '源码目录同步');
-                requireStreamEvidenceString(evidence, 'SourceManifestHash', localManifest.manifestHash, '源码目录同步');
-            }
-            return {
-                content: [{ type: 'text', text: JSON.stringify({
-                            ...evidence,
-                            sourceMode: localManifest ? 'local-directory' : 'legacy-inline-array',
-                            sourceDirectory: localManifest?.rootDirectory,
-                            aiContextFileBytes: 0,
-                            manualChunking: false,
-                        }, null, 2) }],
-            };
-        }
-        catch (e) {
-            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
-        }
-    });
+    }, async ({ microService, directory, sourceFiles, replace, confirmExecution }) => (runMicroServiceSourceSync(client, {
+        microService,
+        directory,
+        sourceFiles,
+        replace,
+        confirmExecution,
+    })));
     server.tool('microi_clear_application_source', `Remove an AI application's private HDFS source objects, private mci_ai_app_file rows, public SourceZip objects and source-delivery flags while preserving compiled runtime/build assets for OsClient "${osClient}". This is intentionally destructive and two-phase: first call without confirmExecution to obtain the exact target list and confirmationSha256, then pass that hash unchanged. Keep a verified local source checkout before executing.`, {
         appIdOrKey: z.string().min(1).describe('Exact AppId or AppKey. No wildcard or bulk deletion is supported.'),
         confirmExecution: z.string().optional().describe('Exact confirmationSha256 returned by the backend dry run.'),

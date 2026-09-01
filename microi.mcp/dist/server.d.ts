@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type { ApiResponse, MicroiClient } from './microi-client.js';
+import type { ApiResponse, MicroiClient, MicroServiceSourceFinalizeRequest, MicroServiceSourceStageRequest } from './microi-client.js';
 export { buildMcpOcrResult, decodeMcpTranslatedFile, prepareMcpOcrInput, prepareMcpTranslateFileInput, } from './document-inputs.js';
 export type { PreparedMcpOcrInput, PreparedMcpTranslateFileInput } from './document-inputs.js';
 /** MCP Server 上下文（用于区分不同租户） */
@@ -214,6 +214,25 @@ export declare function buildLocalMicroServiceSourceManifest(rootDirectory: stri
     maxFiles?: number;
     maxTotalBytes?: number;
 }): Promise<LocalMicroServiceSourceManifest>;
+export interface MicroServiceSourceSyncClient {
+    getApplicationContext(data: Record<string, unknown>): Promise<ApiResponse>;
+    stageMicroServiceSourceFile(data: MicroServiceSourceStageRequest): Promise<ApiResponse>;
+    finalizeMicroServiceSourceManifest(data: MicroServiceSourceFinalizeRequest): Promise<ApiResponse>;
+    syncMicroServiceSource(data: Record<string, unknown>): Promise<ApiResponse>;
+}
+export interface MicroServiceSourceSyncInput {
+    microService: Record<string, unknown>;
+    directory?: string;
+    sourceFiles?: Array<Record<string, unknown>>;
+    replace?: boolean;
+    confirmExecution?: string;
+}
+export declare function buildMicroServiceSourceDeliveryBatchId(appIdOrKey: string, sourceManifestHash: string): string;
+/**
+ * Execute private-source delivery independently of MCP registration so exact
+ * stage/finalize/CAS/recovery semantics can be unit tested.
+ */
+export declare function runMicroServiceSourceSync(client: MicroServiceSourceSyncClient, input: MicroServiceSourceSyncInput): Promise<CallToolResult>;
 export interface LegacyStreamPublishFallbackResult {
     attempted: boolean;
     reason: string;

@@ -523,7 +523,7 @@ namespace Microi.net
                     return new DosResult(0, null, "该租户数据库连接正在修复，请勿重复提交。");
                 lease.ThrowIfLost();
 
-                var row = mainClient.Db.FromSql(@"SELECT Id, OsClient, OsClientType,
+                object row = mainClient.Db.FromSql(@"SELECT Id, OsClient, OsClientType,
                             OsClientNetwork, DbConn, DbReadConn, DbType, DbReadType
                         FROM sys_osclients
                         WHERE Id = @TenantId AND OsClient = @TenantKey
@@ -538,7 +538,7 @@ namespace Microi.net
                 if (row == null)
                     return new DosResult(0, null, "未找到精确匹配且已启用的租户记录。");
 
-                var rowData = JObject.FromObject(row);
+                JObject rowData = JObject.FromObject(row);
                 var oldDbConn = rowData["DbConn"].Val<string>();
                 var oldDbReadConn = rowData["DbReadConn"].Val<string>();
                 var dbTypeText = rowData["DbType"].Val<string>();
@@ -675,7 +675,7 @@ namespace Microi.net
                 durableConfigurationUpdated = true;
                 lease.ThrowIfLost();
 
-                var durableReadback = mainClient.Db.FromSql(@"SELECT DbConn, DbReadConn
+                object durableReadback = mainClient.Db.FromSql(@"SELECT DbConn, DbReadConn
                             FROM sys_osclients
                             WHERE Id = @TenantId AND OsClient = @TenantKey
                               AND OsClientType = @OsClientType
@@ -686,7 +686,7 @@ namespace Microi.net
                     .AddInParameter("OsClientType", osClientType)
                     .AddInParameter("OsClientNetwork", osClientNetwork)
                     .First<dynamic>();
-                var durableData = durableReadback == null
+                JObject durableData = durableReadback == null
                     ? null
                     : JObject.FromObject(durableReadback);
                 if (durableData == null

@@ -228,6 +228,30 @@ export interface ApplicationAssetStreamFinalizeRequest {
     Routes?: Array<Record<string, unknown>>;
     ChangeSummary?: string;
 }
+export interface MicroServiceSourceStageRequest {
+    AppIdOrKey: string;
+    RelativePath: string;
+    ExpectedSha256: string;
+    ExpectedSize: number;
+    DeliveryBatchId: string;
+    FilePath: string;
+    MicroService?: Record<string, unknown>;
+    TimeoutMs?: number;
+}
+export interface MicroServiceSourceFinalizeRequest {
+    AppIdOrKey: string;
+    DeliveryBatchId: string;
+    ExpectedCurrentVersion: number;
+    ExpectedAppVersion: string | null;
+    ExpectedSourceManifestHash: string | null;
+    SourceManifestHash: string;
+    ReplacePrivateSourceOnly: true;
+    Manifest: Array<{
+        Path: string;
+        Sha256: string;
+        Size: number;
+    }>;
+}
 export declare function isTenantConfigurationFailureResponse(result?: Partial<ApiResponse> | null): boolean;
 export declare function isAuthenticationFailureResponse(result?: Partial<ApiResponse> | null): boolean;
 export interface ListEnvelope<T> {
@@ -243,6 +267,10 @@ interface RequestOptions {
      * long-running streaming operation raises this ceiling. */
     maxTimeoutMs?: number;
     operationName?: string;
+    /** Disable the automatic fetch -> node:http(s) replay for a non-idempotent
+     * whole-request operation whose uncertain result must be resolved by its
+     * caller through an authoritative readback. */
+    allowNativeFallback?: boolean;
 }
 export declare class MicroiTransportError extends Error {
     readonly kind: 'timeout' | 'network';
@@ -288,6 +316,8 @@ export interface ApiEngine {
     ApiName: string;
     ApiEngineKey: string;
     ApiAddress: string;
+    /** Semicolon-separated compatibility routes owned by the same API engine. */
+    ApiRoutes?: string;
     Category: string;
     ApiV8Code?: string;
     Code?: string;
@@ -406,6 +436,7 @@ export interface PlaywrightEngineInfo {
     ApiEngineKey: string;
     Category: string;
     ApiAddress: string;
+    ApiRoutes?: string;
     ApiRemark: string;
     AllowAnonymous: number;
     StopHttp: number;
@@ -590,6 +621,7 @@ export declare class MicroiClient {
         confirmLargeReduction?: boolean;
         v8Limit?: boolean;
         responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream';
+        apiRoutes?: string | string[];
         /** @deprecated Compatibility alias. true maps to v8Limit=false. */
         v8Unlimited?: boolean;
     }): Promise<ApiResponse>;
@@ -602,6 +634,7 @@ export declare class MicroiClient {
         Category?: string;
         Code?: string;
         ApiAddress?: string;
+        ApiRoutes?: string | string[];
         ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream';
         V8Limit?: number;
         /** @deprecated Compatibility alias. true maps to V8Limit=0. */
@@ -630,6 +663,14 @@ export declare class MicroiClient {
     getApplicationFile(data: Record<string, unknown>): Promise<ApiResponse>;
     createMicroService(data: Record<string, unknown>): Promise<ApiResponse>;
     syncMicroServiceSource(data: Record<string, unknown>): Promise<ApiResponse>;
+    /**
+     * Stage one private source file as raw multipart bytes. The source endpoint
+     * deliberately rejects ContentEncoding, so gzip fallback stays disabled.
+     * DeliveryBatchId + RelativePath + ExpectedSha256 makes an exact replay
+     * idempotent after a dropped response.
+     */
+    stageMicroServiceSourceFile(data: MicroServiceSourceStageRequest): Promise<ApiResponse>;
+    finalizeMicroServiceSourceManifest(data: MicroServiceSourceFinalizeRequest): Promise<ApiResponse>;
     clearApplicationSource(data: Record<string, unknown>): Promise<ApiResponse>;
     publishMicroService(data: Record<string, unknown>): Promise<ApiResponse>;
     probeMicroAppEntry(msKey: string): Promise<{

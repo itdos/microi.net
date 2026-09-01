@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.9.14
+ * Version: v1.9.16
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -1221,6 +1221,189 @@ function upsertStore(row) {
   return V8.FormEngine.AddFormData('sys_microistore', row);
 }
 
+/* MARKETPLACE_CURRENT_PACKAGE_REPAIR_CAS_V1
+ * 商城发行版本允许领先于不可变运行时版本。源码迁移、包说明修正或安装快照
+ * 补齐时，只能原位修复“当前商城版本”，不得借用 committed runtime proof，
+ * 也不得触发 sys_microistore 的普通表单事件自动升版。
+ */
+function validateCurrentPackageRepair(existingStore, packageAssets, requestedVersionValue, action, protocolV3, exactPublishedVersion) {
+  if (!existingStore || isBlank(existingStore.Id)) return fail('RepairCurrentPackageVersion 要求商城当前记录已存在');
+  if (action !== 'Publish') return fail('RepairCurrentPackageVersion 只允许 Action=Publish');
+  if (protocolV3) return fail('RepairCurrentPackageVersion 不得与 ProtocolVersion=3 同时使用');
+  if (exactPublishedVersion) return fail('RepairCurrentPackageVersion 不得与 ExactPublishedVersion=true 同时使用');
+  var currentVersion = normalizeExactVersion(existingStore.AppVersion);
+  var requestedVersion = normalizeExactVersion(requestedVersionValue);
+  var preparedVersion = normalizeExactVersion(packageAssets && packageAssets.PackageVersion);
+  if (isBlank(currentVersion)
+      || currentVersion !== requestedVersion
+      || currentVersion !== preparedVersion) {
+    return fail('RepairCurrentPackageVersion 版本合同不一致：current=' + currentVersion
+      + ' requested=' + requestedVersion + ' prepared=' + preparedVersion);
+  }
+  return ok({ AppVersion: currentVersion }, '当前商城版本原位修复合同验证通过');
+}
+function appendCurrentPackageRepairStringCas(where, field, value) {
+  if (!isBlank(value)) {
+    where.push(['AND', field, '=', text(value)]);
+  } else {
+    where.push(['AND', '(', field, '=', null]);
+    where.push(['OR', field, '=', '', ')']);
+  }
+}
+function buildCurrentPackageRepairFields(storeRow, existingStore) {
+  var fields = {
+    AppName: storeRow.AppName,
+    Name: storeRow.Name,
+    AppVersion: storeRow.AppVersion,
+    AppId: storeRow.AppId,
+    AppKey: storeRow.AppKey,
+    AppType: storeRow.AppType,
+    ApplicationType: storeRow.ApplicationType,
+    Category: storeRow.Category,
+    PublisherType: storeRow.PublisherType,
+    AppAuthor: storeRow.AppAuthor,
+    OwnerUserId: storeRow.OwnerUserId,
+    OwnerName: storeRow.OwnerName,
+    AppDetail: storeRow.AppDetail,
+    Description: storeRow.Description,
+    AppPrice: storeRow.AppPrice,
+    AppOriPrice: storeRow.AppOriPrice,
+    AppRate: storeRow.AppRate,
+    AppPreview: storeRow.AppPreview,
+    IsApprove: storeRow.IsApprove,
+    Status: storeRow.Status,
+    BuildStatus: storeRow.BuildStatus,
+    AppUpdateTime: storeRow.AppUpdateTime,
+    AppPakcet: storeRow.AppPakcet,
+    PackageId: storeRow.PackageId,
+    PackageStorageMode: storeRow.PackageStorageMode,
+    PackageHdfsPath: storeRow.PackageHdfsPath,
+    PackageSha256: storeRow.PackageSha256,
+    PackageSize: storeRow.PackageSize,
+    PackageContentType: storeRow.PackageContentType,
+    PackageFormatVersion: storeRow.PackageFormatVersion,
+    PackageUploadedAt: storeRow.PackageUploadedAt,
+    SelectMenu: storeRow.SelectMenu,
+    SelectTable: storeRow.SelectTable,
+    SelectApiEngine: storeRow.SelectApiEngine,
+    SelectAiApp: storeRow.SelectAiApp,
+    AiAppZipFiles: storeRow.AiAppZipFiles,
+    AiAppPackageManifest: storeRow.AiAppPackageManifest
+  };
+  var where = [
+    ['Id', '=', existingStore.Id],
+    ['AND', 'AppVersion', '=', normalizeExactVersion(existingStore.AppVersion)]
+  ];
+  appendCurrentPackageRepairStringCas(where, 'PackageHdfsPath', existingStore.PackageHdfsPath);
+  appendCurrentPackageRepairStringCas(where, 'PackageSha256', text(existingStore.PackageSha256).toLowerCase());
+  if (Number(existingStore.PackageSize || 0) > 0) {
+    where.push(['AND', 'PackageSize', '=', Number(existingStore.PackageSize)]);
+  }
+  if (!isBlank(existingStore.AppUpdateTime)) {
+    where.push(['AND', 'AppUpdateTime', '=', existingStore.AppUpdateTime]);
+  }
+  fields._Where = where;
+  return fields;
+}
+function currentPackageRepairReadbackMatches(row, storeRow, expectedVersion) {
+  return !!row
+    && normalizeExactVersion(row.AppVersion) === normalizeExactVersion(expectedVersion)
+    && text(row.AppPakcet) === ''
+    && text(row.PackageHdfsPath) === text(storeRow.PackageHdfsPath)
+    && text(row.PackageSha256).toLowerCase() === text(storeRow.PackageSha256).toLowerCase()
+    && Number(row.PackageSize || 0) === Number(storeRow.PackageSize || 0)
+    && text(row.AiAppPackageManifest) === text(storeRow.AiAppPackageManifest)
+    && text(row.AiAppZipFiles) === text(storeRow.AiAppZipFiles);
+}
+
+/* MARKETPLACE_IMMUTABLE_INSTALL_SNAPSHOT_V1
+ * V3 写包使用 UptFormDataByWhere 保持 committed pointer 的条件更新，但该
+ * 原子路径不会触发 diy_table.EnableDataVersion 的通用版本记录。安装器又必须
+ * 钉住 mic_data_version，不能退回易变的 sys_microistore 当前行。因此发布器
+ * 在包指针完成回读后显式写一条内容寻址、可幂等复用的安装快照。
+ */
+function marketplaceStoreTableId() {
+  var table = V8.FormEngine.GetFormData('diy_table', {
+    _Where: [['Name', '=', 'sys_microistore']],
+    _SelectFields: ['Id', 'Name'],
+    _PageSize: 1
+  });
+  if (!table || table.Code !== 1 || !table.Data || isBlank(table.Data.Id)) {
+    throw new Error('sys_microistore 表定义不存在，无法生成不可变安装快照');
+  }
+  return text(table.Data.Id);
+}
+function marketplacePackageSnapshotId(storeRow) {
+  var storeId = text(storeRow && storeRow.Id).replace(/^\s+|\s+$/g, '');
+  var appVersion = normalizeExactVersion(storeRow && storeRow.AppVersion);
+  var packageSha = text(storeRow && storeRow.PackageSha256).replace(/^\s+|\s+$/g, '').toLowerCase();
+  if (isBlank(storeId) || isBlank(appVersion) || !/^[a-f0-9]{64}$/.test(packageSha)) {
+    throw new Error('商城包缺少 StoreId、精确 AppVersion 或 PackageSha256，无法生成安装快照');
+  }
+  var identity = sha256Hex([text(V8.OsClient), storeId, appVersion, packageSha].join('|'));
+  return 'mcipkg-' + identity.substring(0, 29);
+}
+function marketplacePackageSnapshotMatches(versionRow, storeRow, resourceSnapshotHash) {
+  if (!versionRow || text(versionRow.TableName) !== 'sys_microistore'
+      || text(versionRow.TableRowId) !== text(storeRow && storeRow.Id)) return false;
+  var snapshot = parseObject(versionRow.Data, {});
+  return text(snapshot.Id) === text(storeRow.Id)
+    && normalizeExactVersion(snapshot.AppVersion) === normalizeExactVersion(storeRow.AppVersion)
+    && text(snapshot.PackageHdfsPath) === text(storeRow.PackageHdfsPath)
+    && text(snapshot.PackageSha256).toLowerCase() === text(storeRow.PackageSha256).toLowerCase()
+    && Number(snapshot.PackageSize || 0) === Number(storeRow.PackageSize || 0)
+    && text(snapshot.AiAppPackageManifest) === text(storeRow.AiAppPackageManifest)
+    && text(snapshot.AiAppZipFiles) === text(storeRow.AiAppZipFiles)
+    && text(snapshot.PackageResourceSnapshotHash).toLowerCase() === text(resourceSnapshotHash).toLowerCase();
+}
+function ensureMarketplacePackageSnapshot(storeRow, resourceSnapshotHash) {
+  if (!storeRow || isBlank(storeRow.Id)
+      || isBlank(storeRow.PackageHdfsPath)
+      || Number(storeRow.PackageSize || 0) < 1
+      || !/^[a-f0-9]{64}$/.test(text(storeRow.PackageSha256).toLowerCase())
+      || !/^[a-f0-9]{64}$/.test(text(resourceSnapshotHash).toLowerCase())) {
+    throw new Error('商城包指针或资源快照哈希不完整，拒绝生成不可变安装快照');
+  }
+  var snapshotId = marketplacePackageSnapshotId(storeRow);
+  var existing = V8.FormEngine.GetFormData('mic_data_version', { Id: snapshotId });
+  if (existing && existing.Code === 1 && existing.Data) {
+    if (!marketplacePackageSnapshotMatches(existing.Data, storeRow, resourceSnapshotHash)) {
+      throw new Error('内容寻址安装快照已存在但正文不一致：' + snapshotId);
+    }
+    return { StoreVersionId: snapshotId, Created: false };
+  }
+
+  var snapshot = parseObject(JSON.stringify(storeRow), {});
+  snapshot.PackageSnapshotSchemaVersion = 1;
+  snapshot.PackageResourceSnapshotHash = text(resourceSnapshotHash).toLowerCase();
+  var addResult = V8.FormEngine.AddFormData('mic_data_version', {
+    Id: snapshotId,
+    TableId: marketplaceStoreTableId(),
+    TableName: 'sys_microistore',
+    TableRowId: text(storeRow.Id),
+    Version: ('pkg-' + normalizeExactVersion(storeRow.AppVersion)
+      + '-' + text(storeRow.PackageSha256).substring(0, 8)).substring(0, 50),
+    Action: 'MarketplacePackagePublish',
+    Data: JSON.stringify(snapshot),
+    Remark: ('应用商城不可变安装快照：' + normalizeExactVersion(storeRow.AppVersion)).substring(0, 500)
+  });
+  if (!addResult || addResult.Code !== 1) {
+    // 并发发布可能由另一事务先写入同一内容寻址 Id；只允许精确正文收敛。
+    existing = V8.FormEngine.GetFormData('mic_data_version', { Id: snapshotId });
+    if (!existing || existing.Code !== 1 || !existing.Data
+        || !marketplacePackageSnapshotMatches(existing.Data, storeRow, resourceSnapshotHash)) {
+      throw new Error('写入不可变安装快照失败：' + ((addResult && addResult.Msg) || snapshotId));
+    }
+    return { StoreVersionId: snapshotId, Created: false };
+  }
+  var verified = V8.FormEngine.GetFormData('mic_data_version', { Id: snapshotId });
+  if (!verified || verified.Code !== 1 || !verified.Data
+      || !marketplacePackageSnapshotMatches(verified.Data, storeRow, resourceSnapshotHash)) {
+    throw new Error('不可变安装快照写入后回读不一致：' + snapshotId);
+  }
+  return { StoreVersionId: snapshotId, Created: true };
+}
+
 /* 解析 v3 finalize 回执中的提交证明；bigint 必须保持十进制字符串。 */
 function readV3CommittedProof(value) {
   if (!value || typeof value !== 'object') throw new Error('ProtocolVersion=3 必须提供 CommittedProof');
@@ -1300,11 +1483,15 @@ var action = text(V8.Param.Action || 'Package');
 var protocolVersionText = text(V8.Param.ProtocolVersion);
 if (!isBlank(protocolVersionText) && protocolVersionText !== '3') return fail('ProtocolVersion 只支持显式 v3 或省略');
 var protocolV3 = protocolVersionText === '3';
+var repairCurrentPackageVersion = boolValue(V8.Param.RepairCurrentPackageVersion, false);
 if (protocolV3 && action !== 'Publish' && action !== 'InspectResourceSnapshot') {
   return fail('ProtocolVersion=3 只允许 Action=Publish 或 InspectResourceSnapshot');
 }
 if (!protocolV3 && action === 'InspectResourceSnapshot') {
   return fail('InspectResourceSnapshot 必须显式使用 ProtocolVersion=3');
+}
+if (repairCurrentPackageVersion && protocolV3) {
+  return fail('RepairCurrentPackageVersion 不得与 ProtocolVersion=3 同时使用');
 }
 var versionsResult = getLatestVersion(app.Id);
 var latestVersion = versionsResult && versionsResult.Code === 1 && versionsResult.Data && versionsResult.Data.length ? versionsResult.Data[0] : null;
@@ -1445,6 +1632,20 @@ var exactPublishedVersion = protocolV3
   || V8.Param.ExactPublishedVersion === 1
   || text(V8.Param.ExactPublishedVersion).toLowerCase() === 'true';
 var requestedPublishedVersion = '';
+var currentPackageRepairValidation = null;
+if (repairCurrentPackageVersion) {
+  currentPackageRepairValidation = validateCurrentPackageRepair(
+    existingStore,
+    packageAssets,
+    V8.Param.AppVersion,
+    action,
+    protocolV3,
+    exactPublishedVersion
+  );
+  if (!currentPackageRepairValidation || currentPackageRepairValidation.Code !== 1) {
+    return currentPackageRepairValidation || fail('当前商城版本原位修复合同验证失败');
+  }
+}
 if (exactPublishedVersion) {
   var exactVersionRow = protocolV3 ? committedVersion : latestVersion;
   var exactVersionValidation = validateExactPublishedVersion(
@@ -1471,7 +1672,9 @@ var deliveryVersions = resolveDeliveryVersions({
   ExistingPackageVersion: existingStore ? existingStore.AppVersion : ''
 });
 var runtimeVersionNo = deliveryVersions.RuntimeVersion;
-var versionNo = deliveryVersions.PackageVersion;
+var versionNo = repairCurrentPackageVersion
+  ? currentPackageRepairValidation.Data.AppVersion
+  : deliveryVersions.PackageVersion;
 var changeLogValidation = requireMarketplaceChangeLog(
   text((existingStore && existingStore.Id) || app.Id),
   versionNo
@@ -2024,6 +2227,15 @@ if (action === 'Publish') {
         || text(postPublishStore.AiAppZipFiles) !== text(packageFields.AiAppZipFiles)) {
       return fail('v3 committed-proof CAS 写包回读不一致');
     }
+    var v3InstallSnapshot;
+    try {
+      v3InstallSnapshot = ensureMarketplacePackageSnapshot(
+        postPublishStore,
+        resourceSnapshotReceipt.ResourceSnapshotHash
+      );
+    } catch (v3SnapshotError) {
+      return fail('生成 V3 不可变安装快照失败：' + v3SnapshotError.message);
+    }
     return ok({
       Store: postPublishStore,
       Package: packageModel,
@@ -2038,13 +2250,59 @@ if (action === 'Publish') {
       ResourceSnapshotSchemaVersion: resourceSnapshotReceipt.ResourceSnapshotSchemaVersion,
       ResourceSnapshot: resourceSnapshotReceipt.ResourceSnapshot,
       ResourceSnapshotCanonicalJson: resourceSnapshotReceipt.ResourceSnapshotCanonicalJson,
-      ResourceSnapshotHash: resourceSnapshotReceipt.ResourceSnapshotHash
+      ResourceSnapshotHash: resourceSnapshotReceipt.ResourceSnapshotHash,
+      StoreVersionId: v3InstallSnapshot.StoreVersionId,
+      ImmutableInstallSnapshotCreated: v3InstallSnapshot.Created
     }, '应用安装包已绑定到当前 committed pointer');
+  }
+  if (repairCurrentPackageVersion) {
+    var repairFields = buildCurrentPackageRepairFields(storeRow, existingStore);
+    var repairResult = V8.FormEngine.UptFormDataByWhere('sys_microistore', repairFields);
+    if (!repairResult || repairResult.Code !== 1) {
+      return repairResult || fail('当前商城版本原位修复 CAS 写包失败');
+    }
+    var repairedStore = getExistingStore(text(storeRow.AppKey || storeRow.AppId));
+    if (!currentPackageRepairReadbackMatches(repairedStore, storeRow, versionNo)) {
+      return fail('当前商城版本原位修复发生 CAS 冲突或写包回读不一致');
+    }
+    var repairedInstallSnapshot;
+    try {
+      repairedInstallSnapshot = ensureMarketplacePackageSnapshot(
+        repairedStore,
+        resourceSnapshotReceipt.ResourceSnapshotHash
+      );
+    } catch (repairSnapshotError) {
+      return fail('生成原位修复不可变安装快照失败：' + repairSnapshotError.message);
+    }
+    return ok({
+      Store: repairedStore,
+      Package: packageModel,
+      PreparedAssetsReused: reusedPreparedAssets,
+      PreparedTime: packageAssets.PreparedTime || '',
+      AppVersion: versionNo,
+      CurrentVersion: repairedStore.CurrentVersion,
+      CurrentPackageRepairCas: true,
+      ResourceSnapshotSchema: resourceSnapshotReceipt.ResourceSnapshotSchema,
+      ResourceSnapshotSchemaVersion: resourceSnapshotReceipt.ResourceSnapshotSchemaVersion,
+      ResourceSnapshotHash: resourceSnapshotReceipt.ResourceSnapshotHash,
+      StoreVersionId: repairedInstallSnapshot.StoreVersionId,
+      ImmutableInstallSnapshotCreated: repairedInstallSnapshot.Created
+    }, '当前商城版本安装包已原位修复，版本号保持不变');
   }
   var publishResult = upsertStore(storeRow);
   if (!publishResult || publishResult.Code !== 1) return publishResult || fail('发布到应用商城失败');
+  var legacyPublishedStore = getExistingStore(text(storeRow.AppKey || storeRow.AppId));
+  var legacyInstallSnapshot;
+  try {
+    legacyInstallSnapshot = ensureMarketplacePackageSnapshot(
+      legacyPublishedStore,
+      resourceSnapshotReceipt.ResourceSnapshotHash
+    );
+  } catch (legacySnapshotError) {
+    return fail('生成不可变安装快照失败：' + legacySnapshotError.message);
+  }
   return ok({
-    Store: publishResult.Data || storeRow,
+    Store: legacyPublishedStore || publishResult.Data || storeRow,
     Package: packageModel,
     PreparedAssetsReused: reusedPreparedAssets,
     PreparedTime: packageAssets.PreparedTime || '',
@@ -2052,7 +2310,9 @@ if (action === 'Publish') {
     CurrentVersion: app.CurrentVersion || 1,
     ResourceSnapshotSchema: resourceSnapshotReceipt.ResourceSnapshotSchema,
     ResourceSnapshotSchemaVersion: resourceSnapshotReceipt.ResourceSnapshotSchemaVersion,
-    ResourceSnapshotHash: resourceSnapshotReceipt.ResourceSnapshotHash
+    ResourceSnapshotHash: resourceSnapshotReceipt.ResourceSnapshotHash,
+    StoreVersionId: legacyInstallSnapshot.StoreVersionId,
+    ImmutableInstallSnapshotCreated: legacyInstallSnapshot.Created
   }, '应用已发布到应用商城');
 }
 
