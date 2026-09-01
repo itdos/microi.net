@@ -343,6 +343,8 @@ namespace Microi.net
                         TenantKey = GetJsonString(json, "TenantKey", "OsClient", "Key"),
                         ExpectedDatabaseName = GetJsonString(
                             json, "ExpectedDatabaseName", "DatabaseName", "DbName"),
+                        ExpectedStaleReadDatabaseName = GetJsonString(
+                            json, "ExpectedStaleReadDatabaseName"),
                         OsClientType = GetJsonString(json, "OsClientType"),
                         OsClientNetwork = GetJsonString(json, "OsClientNetwork")
                     });

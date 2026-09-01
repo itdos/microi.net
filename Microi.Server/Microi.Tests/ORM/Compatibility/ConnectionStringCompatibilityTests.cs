@@ -83,6 +83,35 @@ public sealed class ConnectionStringCompatibilityTests
         Database.ThrowIfConnectionBackoffActive(TimeSpan.Zero);
     }
 
+    [Fact]
+    public void ConnectionBackoff_PreservesSafeFailureCodeForFollowUpRequests()
+    {
+        var error = Assert.Throws<TimeoutException>(() =>
+            Database.ThrowIfConnectionBackoffActive(
+                TimeSpan.FromSeconds(85),
+                "DatabaseHostInvalid"));
+
+        Assert.Contains("Retry after 85 seconds", error.Message, StringComparison.Ordinal);
+        Assert.Contains("ErrorCode=DatabaseHostInvalid", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("The host name or IP address is invalid.", "DatabaseHostInvalid")]
+    [InlineData("Access denied for user 'tenant'", "DatabaseCredentialsRejected")]
+    [InlineData("Unknown database 'tenant_db'", "DatabaseNotFound")]
+    [InlineData("Too many connections", "DatabaseCapacityExceeded")]
+    [InlineData("Unable to connect to any of the specified MySQL hosts", "DatabaseEndpointUnreachable")]
+    public void ConnectionFailureClassification_ReturnsPublicSafeCategory(
+        string message,
+        string expectedCode)
+    {
+        var exception = new InvalidOperationException(
+            "Database open failed",
+            new InvalidOperationException(message));
+
+        Assert.Equal(expectedCode, Database.ClassifyConnectionFailure(exception));
+    }
+
     [Theory]
     [InlineData(-1, 1)]
     [InlineData(0, 1)]

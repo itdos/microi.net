@@ -906,7 +906,21 @@ if [ "$BUMP_VERSION" = true ]; then
         sed_inplace "s/<FileVersion>[0-9]*\.[0-9]*\.[0-9]*<\/FileVersion>/<FileVersion>$VERSION<\/FileVersion>/g" "$csproj_file"
         print_success "$(basename "$csproj_file")"
         ((update_count++)) || true
-    done < <(find Microi.Server -maxdepth 2 -name "*.csproj" -not -path "*/obj/*" -not -path "*/bin/*" 2>/dev/null | sort)
+    done < <(
+        {
+            find Microi.Server -maxdepth 2 -name "*.csproj" -not -path "*/obj/*" -not -path "*/bin/*" 2>/dev/null
+            # Windows 目录联接可以被 dotnet 正常编译，但 MSYS find 不会穿越联接枚举子仓项目。
+            # 闭源包必须与平台版本同步，否则 pack 会生成上一版并被发布门禁拒绝。
+            for closed_source_project in \
+                "Microi.Server/Microi.net/Microi.net.csproj" \
+                "Microi.Server/Microi.AI/Microi.AI.csproj" \
+                "Microi.Server/Microi.WorkFlow/Microi.WorkFlow.csproj"; do
+                if [ -f "$closed_source_project" ]; then
+                    printf '%s\n' "$closed_source_project"
+                fi
+            done
+        } | sort -u
+    )
 
     if [ $update_count -eq 0 ]; then
         print_fail "未找到任何 .csproj 文件"
