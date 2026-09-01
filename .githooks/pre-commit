@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+policy_file="$repo_root/.public-repo-protected-paths"
+
+if [ ! -f "$policy_file" ]; then
+  echo "拒绝提交：缺少根公开仓闭源路径策略 $policy_file" >&2
+  exit 1
+fi
+
+set --
+while IFS= read -r protected_path || [ -n "$protected_path" ]; do
+  case "$protected_path" in
+    ''|'#'*) continue ;;
+  esac
+  set -- "$@" "$protected_path"
+done < "$policy_file"
+
+if [ "$#" -eq 0 ]; then
+  echo "拒绝提交：根公开仓闭源路径策略为空。" >&2
+  exit 1
+fi
+
+tracked=$(git ls-files -- "$@")
+if [ -n "$tracked" ]; then
+  echo "拒绝提交：根仓索引包含独立闭源仓库路径：" >&2
+  printf '%s\n' "$tracked" >&2
+  echo "请只从根仓索引移除；不要删除内部 GitLab 工作区文件，也不要使用 --no-verify。" >&2
+  exit 1
+fi

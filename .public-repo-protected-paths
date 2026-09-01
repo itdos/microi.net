@@ -1,0 +1,6 @@
+# 根公开仓禁止出现以下独立闭源仓库的任何文件、目录或 gitlink。
+Microi.Server/Microi.net
+Microi.Server/Microi.AI
+Microi.VSCode
+Microi.Client/src/views/webos
+Microi.Server/Microi.WorkFlow
