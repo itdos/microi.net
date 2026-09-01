@@ -555,6 +555,13 @@ console.log('调试信息')                                  // 控制台输出�
 - `Microi.Upgrade` 只保留应用商城运行前必需的核心物理兼容/协议迁移，并要求版本门、共享租约、幂等和失败不推进版本。禁止每次启动按租户重跑不断增长的历史迁移清单。详细规则读取 `microi.skills/workspace-conventions/SKILL.md` 与 `microi.skills/app-store/SKILL.md`。
 
 
+## 根公开仓闭源代码隔离（强制）
+
+- `Microi.Server/Microi.net/`、`Microi.Server/Microi.AI/`、`Microi.VSCode/`、`Microi.Client/src/views/webos/`、`Microi.Server/Microi.WorkFlow/` 是五个独立闭源 Git 仓库，只允许从各自仓库根目录推送到公司内部 GitLab。
+- 根仓索引、commit、branch、tag 以及 Gitee/GitHub 等公开远端中不得出现上述路径的普通文件、目录或 gitlink。根仓暂存时自动忽略它们是正确结果，禁止将其误判为“遗漏文件”。
+- 根仓禁止对上述路径使用 `git add -f`、`git hash-object -w`、`git update-index --cacheinfo`、submodule/gitlink 或其它绕过 ignore 的方式；禁止用 `--no-verify` 或修改 `core.hooksPath` 绕过 `.githooks/pre-commit`、`.githooks/pre-push`。
+- 根仓提交或推送前，必须确认 `.public-repo-protected-paths` 中的五个路径在根索引和每个待推送 commit 的树中均为 0。若发现误传，只能清理公开仓的索引和可达历史，不得物理删除本地闭源工作区或改写内部 GitLab 历史。
+
 ## Microi 工作区强制规则唯一来源
 
 进度播报、分布式与重启安全、本地 OOM 保护、版本更新日志保护等规则只维护在 `microi.skills/workspace-conventions/SKILL.md`。处理 Microi 任务前必须读取该入口，并按其“详细参考路由”读取当前任务需要的参考文件；本文件不再复制规则正文。

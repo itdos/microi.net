@@ -1,0 +1,87 @@
+#!/bin/sh
+set -eu
+
+remote_name=${1:-}
+remote_url=${2:-}
+repo_root=$(git rev-parse --show-toplevel)
+policy_file="$repo_root/.public-repo-protected-paths"
+
+if [ ! -f "$policy_file" ]; then
+  echo "拒绝推送：缺少根公开仓闭源路径策略 $policy_file" >&2
+  exit 1
+fi
+
+protected_count=0
+while IFS= read -r protected_path || [ -n "$protected_path" ]; do
+  case "$protected_path" in
+    ''|'#'*) continue ;;
+  esac
+  protected_count=$((protected_count + 1))
+done < "$policy_file"
+
+if [ "$protected_count" -eq 0 ]; then
+  echo "拒绝推送：根公开仓闭源路径策略为空。" >&2
+  exit 1
+fi
+
+is_zero_sha() {
+  stripped=$(printf '%s' "$1" | tr -d '0')
+  [ -z "$stripped" ]
+}
+
+scan_commit_tree() {
+  commit=$1
+  ref_label=$2
+  leaked=''
+  while IFS= read -r protected_path || [ -n "$protected_path" ]; do
+    case "$protected_path" in
+      ''|'#'*) continue ;;
+    esac
+    matches=$(git ls-tree -r --name-only "$commit" -- "$protected_path")
+    if [ -n "$matches" ]; then
+      if [ -n "$leaked" ]; then
+        leaked="$leaked
+$matches"
+      else
+        leaked=$matches
+      fi
+    fi
+  done < "$policy_file"
+  if [ -n "$leaked" ]; then
+    echo "拒绝推送到 $remote_name ($remote_url)：$ref_label 的提交 $commit 包含独立闭源仓库路径：" >&2
+    printf '%s\n' "$leaked" >&2
+    echo "推送前必须净化全部待上传历史；禁止使用 --no-verify、git add -f、hash-object/update-index 绕过。" >&2
+    exit 1
+  fi
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if is_zero_sha "$local_sha"; then
+    continue
+  fi
+
+  local_commit=$(git rev-parse --verify "$local_sha^{commit}" 2>/dev/null) || {
+    echo "拒绝推送：$local_ref 不是可审计的 commit。" >&2
+    exit 1
+  }
+
+  scan_commit_tree "$local_commit" "$local_ref"
+
+  if is_zero_sha "$remote_sha"; then
+    if git for-each-ref --format='%(refname)' "refs/remotes/$remote_name/" | grep -q .; then
+      outgoing_commits=$(git rev-list "$local_commit" --not --remotes="$remote_name")
+    else
+      outgoing_commits=$(git rev-list "$local_commit")
+    fi
+  else
+    remote_commit=$(git rev-parse --verify "$remote_sha^{commit}" 2>/dev/null) || {
+      echo "拒绝推送：本地缺少远端基线 $remote_sha；请先 git fetch --prune $remote_name。" >&2
+      exit 1
+    }
+    outgoing_commits=$(git rev-list "$local_commit" "^$remote_commit")
+  fi
+
+  for commit in $outgoing_commits; do
+    scan_commit_tree "$commit" "$local_ref -> $remote_ref"
+  done
+done
