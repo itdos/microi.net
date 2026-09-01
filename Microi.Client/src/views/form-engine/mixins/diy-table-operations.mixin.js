@@ -1,4 +1,8 @@
 import { getTableChildFieldRelations } from "@/utils/table-child-relations.js";
+import {
+    getBoundWorkflowDesignId,
+    getWorkflowDesignPath
+} from "@/utils/workflow-menu-binding.js";
 import { getVisiblePageTabs } from "./page-tab-runtime.js";
 import { appendWhereList, buildSearchWhere, hasSearchFilterValue, whereListHasField } from "../utils/diy-table-where.js";
 
@@ -455,21 +459,28 @@ export default {
         },
         // ========== 工作流相关：通过 SysMenuModel.OpenType=='WorkFlow' && FlowDesignId 实现一键发起申请 / 一键处理工作 ==========
         IsWorkFlowMenu() {
+            return !!getBoundWorkflowDesignId(this.SysMenuModel);
+        },
+        OpenWorkFlowDesign() {
             var self = this;
-            return !!(self.SysMenuModel
-                && self.SysMenuModel.OpenType === "WorkFlow"
-                && !self.DiyCommon.IsNull(self.SysMenuModel.FlowDesignId));
+            var workflowDesignPath = getWorkflowDesignPath(self.SysMenuModel);
+            if (!workflowDesignPath) {
+                self.DiyCommon.Tips(self.$t("Msg.WorkflowDesignNotBound"), false);
+                return;
+            }
+            self.$router.push(workflowDesignPath);
         },
         // 一键发起流程：等价于 V8.OpenFormWF(V8.Form, 'Add', { WorkType:'StartWork', FlowDesignId:'xxx' })
         StartWorkFlow() {
             var self = this;
-            if (!self.IsWorkFlowMenu()) {
-                self.DiyCommon.Tips("当前菜单未配置流程引擎或缺少 FlowDesignId！", false);
+            var flowDesignId = getBoundWorkflowDesignId(self.SysMenuModel);
+            if (!flowDesignId) {
+                self.DiyCommon.Tips(self.$t("Msg.WorkflowDesignNotBound"), false);
                 return;
             }
             self.OpenDetail(null, "Add", true, true, {
                 WorkType: "StartWork",
-                FlowDesignId: self.SysMenuModel.FlowDesignId
+                FlowDesignId: flowDesignId
             });
         },
         GetNeedSaveRowList() {

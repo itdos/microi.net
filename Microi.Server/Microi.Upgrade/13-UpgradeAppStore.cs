@@ -578,7 +578,7 @@ namespace Microi.net
             {
                 { SysUserPackageResourceName, new System.Version(7, 6, 2) },
                 { SysConfigPackageResourceName, new System.Version(6, 3, 9) },
-                { MessageNotificationPackageResourceName, new System.Version(1, 0, 12) },
+                { MessageNotificationPackageResourceName, new System.Version(1, 0, 14) },
                 { AiEnginePackageResourceName, new System.Version(7, 6, 1) },
                 { SaaSEnginePackageResourceName, new System.Version(7, 7, 8) },
                 { AppStorePackageResourceName, new System.Version(7, 7, 15) }
@@ -910,16 +910,17 @@ namespace Microi.net
                     ?? new JArray();
                 return systemCode.Contains("platform-chat-runtime")
                     && System.Version.TryParse(runtimeVersionText, out var runtimeVersion)
-                    && runtimeVersion >= new System.Version(1, 0, 1)
+                    && runtimeVersion >= new System.Version(1, 0, 2)
                     && capabilities.Any(item => string.Equals(
                         item?.ToString(),
-                        "ApiEngine:platform-chat-runtime@v1.0.1",
+                        "ApiEngine:platform-chat-runtime@v1.0.2",
                         StringComparison.Ordinal))
                     && capabilities.Any(item => string.Equals(
                         item?.ToString(),
                         "V8.Method.RequireManagedProtocolContext",
                         StringComparison.Ordinal))
                     && runtimeCode.Contains("CHAT_SIGNALR_TRUSTED_PROTOCOL_V1")
+                    && runtimeCode.Contains("PLATFORM_CHAT_LOCAL_TIME_V1")
                     && runtimeCode.Contains("RequireManagedProtocolContext")
                     && runtimeCode.Contains("platform-message-notification-custom-hook")
                     && runtimeCode.Contains("V8.MongoDb.UptFormDataByWhere")
@@ -1602,14 +1603,16 @@ WHERE " + keyPredicate + (isTenantHook ? string.Empty : " AND (IsDeleted=0 OR Is
             "platform-ai-runtime"
         };
 
+        // platform-marketplace-source intentionally stays out of this set:
+        // authenticated browser clients must reach its Managed runtime, while
+        // AllowAnonymous=0 still rejects missing/expired tokens before V8 runs.
         private static readonly HashSet<string> InstalledV8FirstInternalEngineKeys =
             new HashSet<string>(StringComparer.Ordinal)
             {
                 "platform-external-login-binding",
                 "platform-wechat-user-binding",
                 "platform-chat-runtime",
-                "wechat_send_tpl_msg",
-                "platform-marketplace-source"
+                "wechat_send_tpl_msg"
             };
 
         private static readonly HashSet<string> InstalledV8FirstAnonymousEngineKeys =
@@ -1707,6 +1710,16 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                         "platform-chat-system-message",
                         StringComparison.Ordinal)
                     ? new System.Version(1, 1, 0)
+                    : string.Equals(
+                        key,
+                        "platform-chat-runtime",
+                        StringComparison.Ordinal)
+                    ? new System.Version(1, 0, 2)
+                    : string.Equals(
+                        key,
+                        "platform-marketplace-source",
+                        StringComparison.Ordinal)
+                    ? new System.Version(1, 0, 5)
                     : new System.Version(1, 0, 0);
                 if (!System.Version.TryParse(versionText, out var version)
                     || version < minimumInstalledVersion
@@ -1753,6 +1766,8 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     && (!code.Contains("V8.MongoDb.UptFormDataByWhere")
                         || !code.Contains("V8.MongoDb.DelFormDataByWhere")
                         || !code.Contains("CHAT_SIGNALR_TRUSTED_PROTOCOL_V1")
+                        || !code.Contains("PLATFORM_CHAT_LOCAL_TIME_V1")
+                        || Regex.IsMatch(code, @"\bDateNow\s*\(")
                         || !code.Contains("RequireManagedProtocolContext")
                         || !code.Contains("platform-message-notification-custom-hook")))
                 {

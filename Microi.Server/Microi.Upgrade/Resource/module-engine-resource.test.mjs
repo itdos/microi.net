@@ -8,7 +8,7 @@ const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const resource = JSON.parse(fs.readFileSync(path.join(resourceDir, "app.microi.module-engine.json"), "utf8"));
 
 test("module engine package version and physical menu badge columns are current", () => {
-    assert.equal(resource.PackageInfo.Version, "v7.6.1");
+    assert.equal(resource.PackageInfo.Version, "v7.6.2");
     assert.ok(resource.PackageInfo.RequiredPlatformCapabilities.includes("ClientFeature:TagsViewBoundFormDesign"));
     const physicalNames = new Set((resource.PhysicalColumns || []).map((item) => item.COLUMN_NAME));
     for (const name of ["MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema"]) {

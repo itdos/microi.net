@@ -114,6 +114,7 @@ namespace Microi.net
                 {
                     return new DosResult<SysMenu>(2, null, "不存在的数据Id：" + param.Id);
                 }
+                SysMenuConfigurationNormalizer.NormalizeMenuObject(model);
                 //SysMenuCache.SetSysMenuModel(model, param.OsClient);
             }
             return new DosResult<SysMenu>(1, model);
@@ -155,6 +156,7 @@ namespace Microi.net
                     where.And(a => a.Class == param.Class || a.Class == "" || a.Class == null);
                 }
                 list = dbSession.From<SysMenu>().Where(where).OrderBy(d => d.Sort).ToList();
+                foreach (var item in list) SysMenuConfigurationNormalizer.NormalizeMenuObject(item);
                 //SysMenuCache.SetSysMenuList(list, param.ParentId, param.OsClient);
             }
             return new DosResultList<SysMenu>(1, list);
@@ -198,9 +200,16 @@ namespace Microi.net
                         .ConfigureAwait(false);
                     if (cachedTree?.Data != null)
                     {
+                        var normalizedCacheRows = cachedTree.Data
+                            .Select(row => (JObject)row.DeepClone())
+                            .ToList();
+                        foreach (var row in normalizedCacheRows)
+                        {
+                            SysMenuConfigurationNormalizer.NormalizeNotShowFieldsInRow(row);
+                        }
                         return new DosResultList<dynamic>(
                             1,
-                            cachedTree.Data.Select(row => (dynamic)row.DeepClone()).ToList(),
+                            normalizedCacheRows.Select(row => (dynamic)row).ToList(),
                             "",
                             cachedTree.DataCount);
                     }
@@ -332,6 +341,10 @@ namespace Microi.net
             // LegacyMenuUrls / LegacyComponentPaths。这里仅对接口返回值做瞬时映射，
             // 不修改客户库 sys_menu，因而同一套新版服务可以直接承接多个老库。
             await ApplyLegacyMicroServiceAliases(param.OsClient, allData);
+            foreach (var row in allData)
+            {
+                SysMenuConfigurationNormalizer.NormalizeMenuObject(row);
+            }
             allData = ProjectMenuRows(allData, param._SelectFields);
 
             // 按ParentId构建字典索引，将递归子节点查找从O(n²)优化为O(n)
@@ -843,6 +856,7 @@ namespace Microi.net
             // 必须合并到数据库旧实体。若重新 new SysMenu，未传的 int? 参数会落成实体 int 的默认值 0，
             // 只改排序/父级时也会把 AppDisplay、Display 等客户配置意外清零。
             model = MapperHelper.MapNotNull<object, SysMenu>(param, model);
+            SysMenuConfigurationNormalizer.NormalizeMenuObject(model);
             #endregion end
 
             var count = dbSession.Update(model, d => d.Id == param.Id);
@@ -896,6 +910,7 @@ namespace Microi.net
                     }
                     #region  通用新增
                     var model = MapperHelper.Map<object, SysMenu>(param);
+                    SysMenuConfigurationNormalizer.NormalizeMenuObject(model);
                     model.Id = Ulid.NewUlid().ToString();
                     #endregion end
 

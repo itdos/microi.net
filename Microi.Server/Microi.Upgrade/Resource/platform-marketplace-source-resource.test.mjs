@@ -11,20 +11,22 @@ const source = fs.readFileSync(
 ).replaceAll('\r\n', '\n')
 const execute = new Function('V8', source)
 
-test('resource and package declare the v1.0.4 managed failover contract', () => {
+test('resource and package declare the v1.0.5 authenticated same-origin failover contract', () => {
   const packageModel = JSON.parse(fs.readFileSync(
     path.join(resourceDir, 'app.microi.store.json'),
     'utf8',
   ))
   const engine = packageModel.SysApiEngines.find(item => item.ApiEngineKey === 'platform-marketplace-source')
-  assert.match(source, /Version: v1\.0\.4/)
+  assert.match(source, /Version: v1\.0\.5/)
   assert.match(source, /MARKETPLACE_LIST_ROUTE_FAILOVER_V2/)
   assert.match(source, /MARKETPLACE_NESTED_JSON_PAYLOAD_V2/)
   assert.match(source, /MARKETPLACE_SOURCE_HEADER_ISOLATION_V1/)
-  assert.equal(engine.Version, 'v1.0.4')
+  assert.equal(engine.Version, 'v1.0.5')
+  assert.equal(Number(engine.StopHttp), 0)
+  assert.equal(Number(engine.AllowAnonymous), 0)
   assert.equal(engine.ApiV8Code.replaceAll('\r\n', '\n'), source)
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
-    'ApiEngine:platform-marketplace-source@v1.0.4',
+    'ApiEngine:platform-marketplace-source@v1.0.5',
   ))
 })
 

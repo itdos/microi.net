@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store
- * Version: v1.4.7
+ * Version: v1.4.8
  * Function:
  * - 读取统一应用商城列表并计算租户安装状态；批量平台安装时优先返回应用商城自举包。
  */
@@ -190,6 +190,9 @@ function applyInstallState(app, installed) {
   app.AppVersionInstall = local;
   app.InstalledVersion = local;
   return app;
+}
+function isPlatformMaintenanceNotice(status) {
+  return status === "Uninstalled" || status === "Outdated";
 }
 function publicUrl(path, fallback) {
   var filePath = trim(path);
@@ -410,8 +413,9 @@ if (checkPlatformApps) {
     var item = all[n];
     if (item.ApplicationType !== "Platform") continue;
     platformCount++;
+    // InstalledCount 表示目标租户已存在安装记录；可更新/版本异常仍属于已安装。
     if (item.StoreInstallStatus !== "Uninstalled") installedCount++;
-    if (item.StoreInstallStatus === "Uninstalled") notices.push({
+    if (isPlatformMaintenanceNotice(item.StoreInstallStatus)) notices.push({
       Status: item.StoreInstallStatus, AppId: item.AppId, StoreId: item.Id, AppName: item.AppName,
       AppVersion: item.AppVersion, InstalledVersion: item.InstalledVersion, AppAuthor: item.AppAuthor,
       AppUpdateTime: item.AppUpdateTime, AppPreview: item.AppPreview, ApplicationType: item.ApplicationType,

@@ -136,6 +136,16 @@ public sealed class DatabaseBackupControlTests
     }
 
     [Fact]
+    public void Upgrade_does_not_impose_global_job_name_uniqueness_on_customer_schedules()
+    {
+        Assert.Equal("ix_database_backup_job_name", Upgrade24.ScheduleJobNameLookupIndex);
+        Assert.False(Upgrade24.ScheduleJobNameLookupIndexUnique);
+        Assert.Equal(
+            "ux_database_backup_job_name",
+            Upgrade24.LegacyGlobalScheduleJobNameUniqueIndex);
+    }
+
+    [Fact]
     public void Backup_record_and_attempt_object_keys_are_stable_per_task_and_fence()
     {
         const string taskId = "852ae94e1be343b5868758e0a2f81178";

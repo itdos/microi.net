@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Dos.Common;
 using Dos.ORM;
@@ -36,11 +39,19 @@ namespace Microi.net
         private const int DefaultLeaseSeconds = 90;
         private const int EmptyDatabaseReleaseLeaseSeconds = 900;
         private const int InfrastructureContentionRetryLimit = 3;
+        internal const int TenantScanBatchSize = 4;
+        private const int TenantScanCommandTimeoutSeconds = 2;
+        private static readonly TimeSpan SchemaReadyCacheDuration = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan TenantMaintenanceInterval = TimeSpan.FromSeconds(30);
         private const string InfrastructureContentionRetryPrefix =
             "[InfrastructureContentionRetry:";
         private const string EmptyDatabaseReleaseApiEngineKey =
             "admin_build_sanitized_empty_database";
         private static long _tenantScanCursor;
+        private static readonly ConcurrentDictionary<string, long> SchemaReadyUntilUtcTicks =
+            new ConcurrentDictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, long> TenantMaintenanceDueUtcTicks =
+            new ConcurrentDictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         private const string Projection = @"Id,OsClient,UserKey,Title,Type,ApiEngineKey,Status,StatusText,
 Progress,ProgressMode,WorkCurrent AS Current,WorkTotal AS Total,Msg,Log,CreateTime,StartTime,EndTime,
 HeartbeatTime,EstimatedEndTime,RemainingSeconds,EstimateConfidence,CancelRequested,ResultJson,ParamJson,
@@ -90,7 +101,7 @@ CASE WHEN ResultJson IS NULL OR ResultJson='' THEN 0 ELSE 1 END AS HasResult";
                 reason = $"租户 {osClient} 的数据库连接不可用";
                 return false;
             }
-            return ValidateSchema(client, out reason);
+            return ValidateSchemaCached(osClient, client, out reason);
         }
 
         public static BackgroundTaskRecord FindByIdempotency(string osClient, string idempotencyKey)
@@ -324,32 +335,41 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
 
         public static BackgroundTaskRecord TryClaimNext(
             string nodeId,
-            string excludedApiEngineKey = null)
+            Func<string, IReadOnlyCollection<string>> excludedApiEngineKeys = null,
+            Func<bool> shouldYieldToPriorityTenant = null,
+            int tenantScanBatchSize = TenantScanBatchSize,
+            bool runMaintenance = true)
         {
             var tenantNames = OsClientExtend.ClientList.Keys
                 .Where(name => !name.DosIsNullOrWhiteSpace())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            var configuredTenant = OsClientExtend.GetConfigOsClient();
-            if (configuredTenant.DosIsNullOrWhiteSpace()) configuredTenant = OsClientDefault.OsClient;
-            tenantNames.RemoveAll(name => string.Equals(name, configuredTenant, StringComparison.OrdinalIgnoreCase));
-            tenantNames.Insert(0, configuredTenant);
-
             if (tenantNames.Count == 0) return null;
-            var scanSequence = RotateTenantScanOrder(
+            var scanSequence = GetTenantScanBatch(
                 tenantNames,
-                Interlocked.Increment(ref _tenantScanCursor) - 1);
+                Interlocked.Increment(ref _tenantScanCursor) - 1,
+                Math.Max(1, Math.Min(TenantScanBatchSize, tenantScanBatchSize)));
+            var scanned = 0;
+            BackgroundTaskRecord claimedItem = null;
             foreach (var osClient in scanSequence)
             {
+                if (shouldYieldToPriorityTenant?.Invoke() == true) break;
+                scanned++;
                 try
                 {
-                    if (!IsAvailable(osClient)) continue;
-                    var item = TryClaimNext(osClient, nodeId, excludedApiEngineKey);
-                    if (item != null) return item;
+                    claimedItem = TryClaimTenant(
+                        osClient,
+                        nodeId,
+                        excludedApiEngineKeys?.Invoke(osClient),
+                        null,
+                        runMaintenance,
+                        shouldYieldToPriorityTenant);
+                    if (claimedItem != null) break;
                 }
                 catch (Exception ex)
                 {
+                    InvalidateSchemaAvailability(osClient);
                     // One legacy tenant can still be awaiting its expand migration;
                     // it must not block healthy tenants on the same worker node.
                     try
@@ -367,17 +387,67 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
                     catch { }
                 }
             }
-            return null;
+            // Advance over every tenant actually inspected. The initial increment
+            // already moved one position; this keeps recovery scans incremental
+            // without repeatedly restarting at the same slow database.
+            if (scanned > 1) Interlocked.Add(ref _tenantScanCursor, scanned - 1);
+            return claimedItem;
+        }
+
+        public static BackgroundTaskRecord TryClaimTenant(
+            string osClient,
+            string nodeId,
+            IReadOnlyCollection<string> excludedApiEngineKeys = null,
+            string requiredApiEngineKey = null,
+            bool runMaintenance = true,
+            Func<bool> shouldYieldToPriorityTenant = null)
+        {
+            if (osClient.DosIsNullOrWhiteSpace()) return null;
+            var stopwatch = Stopwatch.StartNew();
+            var claimed = false;
+            try
+            {
+                if (!IsAvailable(osClient)) return null;
+                if (shouldYieldToPriorityTenant?.Invoke() == true) return null;
+                var item = TryClaimTenantCore(
+                    osClient,
+                    nodeId,
+                    excludedApiEngineKeys,
+                    requiredApiEngineKey,
+                    runMaintenance,
+                    shouldYieldToPriorityTenant);
+                claimed = item != null;
+                return item;
+            }
+            catch
+            {
+                InvalidateSchemaAvailability(osClient);
+                throw;
+            }
+            finally
+            {
+                stopwatch.Stop();
+                BackgroundTaskWorkerRuntime.MarkTenantScan(
+                    osClient,
+                    stopwatch.ElapsedMilliseconds,
+                    claimed);
+            }
         }
 
         public static BackgroundTaskRecord TryClaimConfiguredTenant(
             string nodeId,
-            string excludedApiEngineKey = null)
+            IReadOnlyCollection<string> excludedApiEngineKeys = null,
+            Func<bool> shouldYieldToPriorityTenant = null)
         {
             var configuredTenant = OsClientExtend.GetConfigOsClient();
             if (configuredTenant.DosIsNullOrWhiteSpace()) configuredTenant = OsClientDefault.OsClient;
-            if (configuredTenant.DosIsNullOrWhiteSpace() || !IsAvailable(configuredTenant)) return null;
-            return TryClaimNext(configuredTenant, nodeId, excludedApiEngineKey);
+            return TryClaimTenant(
+                configuredTenant,
+                nodeId,
+                excludedApiEngineKeys,
+                null,
+                true,
+                shouldYieldToPriorityTenant);
         }
 
         internal static IReadOnlyList<string> RotateTenantScanOrder(
@@ -398,20 +468,43 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
             return result;
         }
 
-        private static BackgroundTaskRecord TryClaimNext(
+        internal static IReadOnlyList<string> GetTenantScanBatch(
+            IReadOnlyList<string> tenantNames,
+            long cursor,
+            int batchSize)
+        {
+            if (batchSize <= 0) throw new ArgumentOutOfRangeException(nameof(batchSize));
+            return RotateTenantScanOrder(tenantNames, cursor)
+                .Take(batchSize)
+                .ToArray();
+        }
+
+        private static BackgroundTaskRecord TryClaimTenantCore(
             string osClient,
             string nodeId,
-            string excludedApiEngineKey)
+            IReadOnlyCollection<string> excludedApiEngineKeys,
+            string requiredApiEngineKey,
+            bool runMaintenance,
+            Func<bool> shouldYieldToPriorityTenant)
         {
             var client = GetRequiredClient(osClient);
             var now = DateTime.Now;
             var runtimeType = CurrentRuntimeOsClientType();
             var runtimeNetwork = CurrentRuntimeOsClientNetwork();
-            // A stale execution can be reclaimed just before its still-running
-            // predecessor releases the distributed concurrency lease. The claim is
-            // then deferred before user code starts, so it must not consume the last
-            // recovery attempt and leave a resumable chunk permanently Pending.
-            FromSql(client, $@"UPDATE {TableName}
+
+            // Fresh enqueue hints use a lane-specific fast path and never wait for
+            // recovery maintenance. Recovery scans run maintenance at a bounded
+            // cadence before claiming so stale/canceled rows cannot starve behind a
+            // permanently busy queue.
+            if (runMaintenance && IsTenantMaintenanceDue(osClient, DateTime.UtcNow))
+            {
+                if (shouldYieldToPriorityTenant?.Invoke() == true) return null;
+                // A stale execution can be reclaimed just before its still-running
+                // predecessor releases the distributed concurrency lease. The claim is
+                // then deferred before user code starts, so it must not consume the last
+                // recovery attempt and leave a resumable chunk permanently Pending.
+                if (shouldYieldToPriorityTenant?.Invoke() == true) return null;
+                FromSql(client, $@"UPDATE {TableName}
 SET AttemptCount=CASE WHEN MaxAttempts>0 THEN MaxAttempts-1 ELSE 0 END,UpdateTime=@p0
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1
   AND {RuntimeScopePredicate}
@@ -422,11 +515,13 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1
                 .AddInParameter("p1", osClient)
                 .AddInParameter("runtimeType", runtimeType)
                 .AddInParameter("runtimeNetwork", runtimeNetwork)
+                .SetCommandTimeout(TenantScanCommandTimeoutSeconds)
                 .ExecuteNonQuery();
-            // Legacy rows and interrupted workers could leave exhausted work in an
-            // active state forever. Finalize only ownerless work (or Running work
-            // whose lease has expired), preserving a live owner's execution.
-            FromSql(client, $@"UPDATE {TableName}
+                if (shouldYieldToPriorityTenant?.Invoke() == true) return null;
+                // Legacy rows and interrupted workers could leave exhausted work in an
+                // active state forever. Finalize only ownerless work (or Running work
+                // whose lease has expired), preserving a live owner's execution.
+                FromSql(client, $@"UPDATE {TableName}
 SET Status='Failed',StatusText='执行失败',
     Msg='任务已耗尽重试次数，系统已自动终结；请查看错误与日志，修复原因后重新提交。',
     LastError=CASE WHEN LastError IS NULL OR LastError='' THEN '任务已耗尽重试次数。' ELSE LastError END,
@@ -441,11 +536,13 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=0
                 .AddInParameter("p1", osClient)
                 .AddInParameter("runtimeType", runtimeType)
                 .AddInParameter("runtimeNetwork", runtimeNetwork)
+                .SetCommandTimeout(TenantScanCommandTimeoutSeconds)
                 .ExecuteNonQuery();
-            // Heal cancellation races and cancellations whose owning node died.
-            // A running task is finalized only after its lease expires; pending or
-            // retrying work has no active owner and can be finalized immediately.
-            FromSql(client, $@"UPDATE {TableName}
+                if (shouldYieldToPriorityTenant?.Invoke() == true) return null;
+                // Heal cancellation races and cancellations whose owning node died.
+                // A running task is finalized only after its lease expires; pending or
+                // retrying work has no active owner and can be finalized immediately.
+                FromSql(client, $@"UPDATE {TableName}
 SET Status='Canceled',StatusText='已停止',
     Msg='任务已停止；失败或取消不会伪装成 100%。',EndTime=@p0,
     EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
@@ -458,14 +555,60 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=1
                 .AddInParameter("p1", osClient)
                 .AddInParameter("runtimeType", runtimeType)
                 .AddInParameter("runtimeNetwork", runtimeNetwork)
+                .SetCommandTimeout(TenantScanCommandTimeoutSeconds)
                 .ExecuteNonQuery();
-            var excludedPredicate = excludedApiEngineKey.DosIsNullOrWhiteSpace()
+                MarkTenantMaintenanceComplete(osClient, DateTime.UtcNow);
+            }
+
+            if (shouldYieldToPriorityTenant?.Invoke() == true) return null;
+            var candidate = TryReadCandidate(
+                client,
+                osClient,
+                now,
+                runtimeType,
+                runtimeNetwork,
+                excludedApiEngineKeys,
+                requiredApiEngineKey);
+            if (shouldYieldToPriorityTenant?.Invoke() == true) return null;
+            return candidate == null
+                ? null
+                : TryClaimCandidate(
+                    client,
+                    candidate,
+                    osClient,
+                    nodeId,
+                    now,
+                    runtimeType,
+                    runtimeNetwork);
+        }
+
+        private static BackgroundTaskRecord TryReadCandidate(
+            OsClientSecret client,
+            string osClient,
+            DateTime now,
+            string runtimeType,
+            string runtimeNetwork,
+            IReadOnlyCollection<string> excludedApiEngineKeys,
+            string requiredApiEngineKey)
+        {
+            var excludedKeys = (excludedApiEngineKeys ?? Array.Empty<string>())
+                .Where(key => !key.DosIsNullOrWhiteSpace())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var excludedParameters = excludedKeys
+                .Select((_, index) => "@excludedApiEngineKey" + index)
+                .ToArray();
+            var excludedPredicate = excludedParameters.Length == 0
                 ? ""
-                : " AND (ApiEngineKey IS NULL OR ApiEngineKey<>@excludedApiEngineKey)";
+                : $" AND (ApiEngineKey IS NULL OR ApiEngineKey NOT IN ({string.Join(",", excludedParameters)}))";
+            var requiredPredicate = requiredApiEngineKey.DosIsNullOrWhiteSpace()
+                ? ""
+                : " AND ApiEngineKey=@requiredApiEngineKey";
             var candidateSql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND CancelRequested=0
   AND {RuntimeScopePredicate}
   {excludedPredicate}
+  {requiredPredicate}
   AND AttemptCount < MaxAttempts
   AND (NextRunTime IS NULL OR NextRunTime<=@p1)
   AND (Status IN ('Pending','Retrying') OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p1)))
@@ -479,15 +622,27 @@ ORDER BY COALESCE(NextRunTime, CreateTime) ASC, CreateTime ASC");
                 .AddInParameter("p1", DbTime(now))
                 .AddInParameter("runtimeType", runtimeType)
                 .AddInParameter("runtimeNetwork", runtimeNetwork);
-            if (!excludedApiEngineKey.DosIsNullOrWhiteSpace())
-            {
+            candidateCommand.SetCommandTimeout(TenantScanCommandTimeoutSeconds);
+            for (var index = 0; index < excludedKeys.Length; index++)
                 candidateCommand = candidateCommand.AddInParameter(
-                    "excludedApiEngineKey",
-                    excludedApiEngineKey);
-            }
-            var candidate = Hydrate(candidateCommand.ToFirst<BackgroundTaskRecord>());
-            if (candidate == null) return null;
+                    "excludedApiEngineKey" + index,
+                    excludedKeys[index]);
+            if (!requiredApiEngineKey.DosIsNullOrWhiteSpace())
+                candidateCommand = candidateCommand.AddInParameter(
+                    "requiredApiEngineKey",
+                    requiredApiEngineKey);
+            return Hydrate(candidateCommand.ToFirst<BackgroundTaskRecord>());
+        }
 
+        private static BackgroundTaskRecord TryClaimCandidate(
+            OsClientSecret client,
+            BackgroundTaskRecord candidate,
+            string osClient,
+            string nodeId,
+            DateTime now,
+            string runtimeType,
+            string runtimeNetwork)
+        {
             var owner = nodeId + ":" + Guid.NewGuid().ToString("N");
             var staleRecovery = string.Equals(candidate.Status, "Running", StringComparison.OrdinalIgnoreCase);
             var leaseSeconds = ResolveLeaseSeconds(candidate.ApiEngineKey);
@@ -510,8 +665,43 @@ WHERE Id=@p4 AND OsClient=@p5 AND CancelRequested=0 AND AttemptCount<MaxAttempts
                 .AddInParameter("p5", osClient)
                 .AddInParameter("runtimeType", runtimeType)
                 .AddInParameter("runtimeNetwork", runtimeNetwork)
+                .SetCommandTimeout(TenantScanCommandTimeoutSeconds)
                 .ExecuteNonQuery();
-            return affected == 1 ? Get(osClient, candidate.Id) : null;
+            if (affected != 1) return null;
+            candidate.Status = "Running";
+            candidate.StatusText = "执行中";
+            candidate.LeaseOwner = owner;
+            candidate.LeaseExpiresAt = leaseExpiresAt;
+            candidate.HeartbeatTime = now;
+            candidate.StartTime ??= now;
+            candidate.RuntimeOsClientType = candidate.RuntimeOsClientType.DosIsNullOrWhiteSpace()
+                ? runtimeType
+                : candidate.RuntimeOsClientType;
+            candidate.RuntimeOsClientNetwork = candidate.RuntimeOsClientNetwork.DosIsNullOrWhiteSpace()
+                ? runtimeNetwork
+                : candidate.RuntimeOsClientNetwork;
+            candidate.FencingToken++;
+            candidate.ExecutionCount++;
+            if (staleRecovery) candidate.AttemptCount++;
+            return candidate;
+        }
+
+        private static bool IsTenantMaintenanceDue(string osClient, DateTime utcNow)
+        {
+            var key = RuntimeCoordinateKey(osClient);
+            var nowTicks = utcNow.Ticks;
+            if (TenantMaintenanceDueUtcTicks.TryGetValue(key, out var dueTicks)
+                && nowTicks < dueTicks)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        private static void MarkTenantMaintenanceComplete(string osClient, DateTime utcNow)
+        {
+            TenantMaintenanceDueUtcTicks[RuntimeCoordinateKey(osClient)] =
+                utcNow.Add(TenantMaintenanceInterval).Ticks;
         }
 
         public static bool RenewLease(BackgroundTaskRecord item, out bool cancelRequested)
@@ -946,7 +1136,7 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
         {
             var client = GetClient(osClient);
             if (client?.Db == null) throw new InvalidOperationException($"租户 {osClient} 的数据库连接不可用。");
-            if (!ValidateSchema(client, out var reason))
+            if (!ValidateSchemaCached(osClient, client, out var reason))
                 throw new InvalidOperationException($"租户 {osClient} 的后台任务表尚未就绪：{reason}。");
             return client;
         }
@@ -1023,17 +1213,21 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
             reason = "";
             try
             {
-                if (client?.Db?.TableExists(TableName) != true)
+                if (client?.Db == null)
                 {
-                    reason = $"物理表 {TableName} 不存在";
+                    reason = "数据库连接不可用";
                     return false;
                 }
 
-                // WHERE 1=0 never reads business rows, but the database must still
-                // resolve every runtime column and alias used by the worker.
-                client.Db.FromSql(
+                // WHERE 1=0 validates the table and every runtime column without
+                // reading business rows. A separate TableExists round-trip doubled
+                // the cost of every tenant scan and could itself inherit the 600s
+                // ORM timeout, so the bounded projection query is authoritative.
+                var validation = client.Db.FromSql(
                     $"SELECT {QuoteProjection(client, Projection)} "
-                    + $"FROM {QuoteIdentifier(client, TableName)} WHERE 1=0").ToArray();
+                    + $"FROM {QuoteIdentifier(client, TableName)} WHERE 1=0");
+                validation.SetCommandTimeout(TenantScanCommandTimeoutSeconds);
+                validation.ToArray();
                 return true;
             }
             catch (Exception ex)
@@ -1041,6 +1235,51 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
                 reason = SafeSchemaError(ex);
                 return false;
             }
+        }
+
+        private static bool ValidateSchemaCached(
+            string osClient,
+            OsClientSecret client,
+            out string reason)
+        {
+            reason = "";
+            var key = SchemaCacheKey(osClient, client);
+            var nowTicks = DateTime.UtcNow.Ticks;
+            if (SchemaReadyUntilUtcTicks.TryGetValue(key, out var readyUntilTicks)
+                && nowTicks < readyUntilTicks)
+            {
+                return true;
+            }
+            if (!ValidateSchema(client, out reason))
+            {
+                SchemaReadyUntilUtcTicks.TryRemove(key, out _);
+                return false;
+            }
+            SchemaReadyUntilUtcTicks[key] = DateTime.UtcNow.Add(SchemaReadyCacheDuration).Ticks;
+            return true;
+        }
+
+        private static void InvalidateSchemaAvailability(string osClient)
+        {
+            var prefix = RuntimeCoordinateKey(osClient) + "|";
+            foreach (var key in SchemaReadyUntilUtcTicks.Keys
+                         .Where(value => value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            {
+                SchemaReadyUntilUtcTicks.TryRemove(key, out _);
+            }
+        }
+
+        private static string SchemaCacheKey(string osClient, OsClientSecret client)
+        {
+            return RuntimeCoordinateKey(osClient)
+                   + "|" + RuntimeHelpers.GetHashCode(client.Db);
+        }
+
+        private static string RuntimeCoordinateKey(string osClient)
+        {
+            return (osClient ?? "").Trim()
+                   + "|" + CurrentRuntimeOsClientType()
+                   + "|" + CurrentRuntimeOsClientNetwork();
         }
 
         private static string SafeSchemaError(Exception error)

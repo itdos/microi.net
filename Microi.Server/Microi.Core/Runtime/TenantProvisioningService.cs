@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -29,6 +30,15 @@ namespace Microi.net
         public string DomainName { get; set; }
         public string DatabaseZipPath { get; set; }
         public string DatabaseZipName { get; set; }
+    }
+
+    public sealed class AdminTenantDatabaseRepairRequest
+    {
+        public string TenantId { get; set; }
+        public string TenantKey { get; set; }
+        public string ExpectedDatabaseName { get; set; }
+        public string OsClientType { get; set; }
+        public string OsClientNetwork { get; set; }
     }
 
     /// <summary>
@@ -449,6 +459,348 @@ namespace Microi.net
             {
                 lease?.Dispose();
             }
+        }
+
+        /// <summary>
+        /// 保留现有租户数据库及全部数据，使用当前节点的主库管理连接为目标库创建
+        /// 一次性影子 DatabaseOnly 账号，并原子替换 sys_osclients 中的连接配置。
+        /// 连接串、旧密码和新密码始终停留在可信 C# 边界内，不返回 V8 或日志。
+        /// </summary>
+        public DosResult RepairAdminTenantDatabaseAccess(
+            AdminTenantDatabaseRepairRequest request)
+        {
+            request ??= new AdminTenantDatabaseRepairRequest();
+            var tenantId = (request.TenantId ?? string.Empty).Trim();
+            var tenantKey = (request.TenantKey ?? string.Empty).Trim();
+            var expectedDatabaseName = (request.ExpectedDatabaseName ?? string.Empty).Trim();
+            var osClientType = (request.OsClientType
+                                ?? OsClientDefault.OsClientType
+                                ?? "Product").Trim();
+            var osClientNetwork = (request.OsClientNetwork
+                                   ?? OsClientDefault.OsClientNetwork
+                                   ?? "Internal").Trim();
+            TenantProvisioningLease lease = null;
+            DbSession masterDb = null;
+            DatabasePrincipalAdministrationCommands principalCommands = null;
+            var principalCreated = false;
+            var durableConfigurationUpdated = false;
+            var previousPrincipal = string.Empty;
+            var principalName = string.Empty;
+
+            try
+            {
+                if (tenantId.DosIsNullOrWhiteSpace())
+                    return new DosResult(0, null, "租户记录Id不能为空。");
+                if (!Regex.IsMatch(tenantKey, @"^[A-Za-z][A-Za-z0-9_-]*$"))
+                    return new DosResult(0, null, "租户Key格式不正确。");
+                if (string.Equals(tenantKey, OsClientDefault.OsClient,
+                        StringComparison.OrdinalIgnoreCase))
+                    return new DosResult(0, null, "主租户数据库连接不允许通过子租户修复原子修改。");
+                if (!Regex.IsMatch(osClientType, @"^[A-Za-z][A-Za-z0-9_-]*$"))
+                    return new DosResult(0, null, "OsClientType格式不正确。");
+                if (!Regex.IsMatch(osClientNetwork, @"^[A-Za-z][A-Za-z0-9_.-]{0,49}$"))
+                    return new DosResult(0, null, "OsClientNetwork格式不正确。");
+
+                var legacyDatabaseName = tenantKey.Replace("-", "_");
+                var canonicalDatabaseName = "microi_" + legacyDatabaseName;
+                if (!string.Equals(expectedDatabaseName, legacyDatabaseName,
+                        StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(expectedDatabaseName, canonicalDatabaseName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return new DosResult(0, null,
+                        "目标数据库名必须与租户Key一致，或使用microi_租户Key规范名称。");
+                }
+
+                var mainClient = OsClientExtend.GetClient(OsClientDefault.OsClient);
+                if (mainClient == null)
+                    return new DosResult(0, null, "主租户OsClient未初始化。");
+
+                // 与后台开通流程使用同一租约，避免一边重建租户、一边轮换连接。
+                lease = TenantProvisioningLease.TryAcquire(
+                    "admin:" + tenantKey.ToLowerInvariant());
+                if (lease == null)
+                    return new DosResult(0, null, "该租户数据库连接正在修复，请勿重复提交。");
+                lease.ThrowIfLost();
+
+                var row = mainClient.Db.FromSql(@"SELECT Id, OsClient, OsClientType,
+                            OsClientNetwork, DbConn, DbReadConn, DbType, DbReadType
+                        FROM sys_osclients
+                        WHERE Id = @TenantId AND OsClient = @TenantKey
+                          AND OsClientType = @OsClientType
+                          AND OsClientNetwork = @OsClientNetwork
+                          AND IsDeleted = 0 AND IsEnable = 1")
+                    .AddInParameter("TenantId", tenantId)
+                    .AddInParameter("TenantKey", tenantKey)
+                    .AddInParameter("OsClientType", osClientType)
+                    .AddInParameter("OsClientNetwork", osClientNetwork)
+                    .First<dynamic>();
+                if (row == null)
+                    return new DosResult(0, null, "未找到精确匹配且已启用的租户记录。");
+
+                var rowData = JObject.FromObject(row);
+                var oldDbConn = rowData["DbConn"].Val<string>();
+                var oldDbReadConn = rowData["DbReadConn"].Val<string>();
+                var dbTypeText = rowData["DbType"].Val<string>();
+                var dbReadTypeText = rowData["DbReadType"].Val<string>();
+                if (oldDbConn.DosIsNullOrWhiteSpace())
+                    return new DosResult(0, null, "目标租户数据库连接为空，已停止修复。");
+                if (!string.Equals(dbTypeText, "MySql", StringComparison.OrdinalIgnoreCase))
+                    return new DosResult(0, null, "当前数据库连接修复原子仅支持MySql。");
+                if (!oldDbReadConn.DosIsNullOrWhiteSpace()
+                    && !string.Equals(oldDbReadConn, oldDbConn, StringComparison.Ordinal))
+                {
+                    return new DosResult(0, null,
+                        "目标租户配置了独立读库，禁止自动覆盖，请人工核查。");
+                }
+                if (!dbReadTypeText.DosIsNullOrWhiteSpace()
+                    && !string.Equals(dbReadTypeText, "MySql", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new DosResult(0, null,
+                        "目标租户读库类型与写库不一致，禁止自动覆盖。");
+                }
+
+                var parsedDatabaseName = ReadConnectionStringValue(
+                    oldDbConn, "Database", "Initial Catalog");
+                if (!string.Equals(parsedDatabaseName, expectedDatabaseName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return new DosResult(0, null,
+                        "连接串中的数据库名与本次确认目标不一致，未执行任何修改。");
+                }
+                previousPrincipal = ReadConnectionStringValue(
+                    oldDbConn, "User ID", "User Id", "UID", "User", "Username", "User Name");
+
+                const DatabaseType databaseType = DatabaseType.MySql;
+                var databaseCommands = DatabaseAdministrationCompatibility.BuildCommands(
+                    databaseType, expectedDatabaseName);
+                var masterConnection = DatabaseAdministrationCompatibility.BuildMasterConnectionString(
+                    databaseType, OsClientDefault.OsClientDbConn);
+                masterDb = MicroiORMExtensions.CreateDbSession(masterConnection, databaseType);
+
+                var databaseExists = masterDb.FromSql(databaseCommands.ExistsSql)
+                    .AddInParameter("p0", expectedDatabaseName)
+                    .ToScalar<int>();
+                if (databaseExists != 1)
+                    return new DosResult(0, null, "目标租户数据库不存在，未修改租户配置。");
+
+                // MySQL账号DDL会自动提交，不能与sys_osclients配置CAS组成同一事务。
+                // 始终创建未被活动配置引用的影子账号，CAS失败即可安全删除，旧账号不受影响。
+                for (var attempt = 0; attempt < 5; attempt++)
+                {
+                    principalName = DatabaseAdministrationCompatibility
+                        .BuildTenantRotationPrincipalName(
+                            databaseType,
+                            expectedDatabaseName,
+                            Guid.NewGuid().ToString("N"));
+                    principalCommands = DatabaseAdministrationCompatibility.BuildPrincipalCommands(
+                        databaseType, expectedDatabaseName, principalName);
+                    var principalExists = masterDb.FromSql(principalCommands.ExistsSql)
+                        .AddInParameter("p0", principalName)
+                        .AddInParameter("p1", "%")
+                        .ToScalar<int>() > 0;
+                    if (!principalExists) break;
+                    principalName = string.Empty;
+                    principalCommands = null;
+                }
+                if (principalCommands == null || principalName.DosIsNullOrWhiteSpace())
+                    throw new InvalidOperationException("无法分配唯一的租户数据库轮换账号。");
+
+                var newPassword = DatabaseAdministrationCompatibility.GenerateSecurePassword();
+                masterDb.FromSql(principalCommands.CreateSql)
+                    .AddSensitiveInParameter("p0", newPassword)
+                    .ExecuteNonQuery();
+                principalCreated = true;
+                masterDb.FromSql(principalCommands.GrantSql).ExecuteNonQuery();
+                lease.ThrowIfLost();
+
+                var newDbConn = DatabaseAdministrationCompatibility.BuildScopedConnectionString(
+                    databaseType,
+                    OsClientDefault.OsClientDbConn,
+                    expectedDatabaseName,
+                    principalName,
+                    newPassword);
+                var tenantDb = MicroiORMExtensions.CreateDbSession(newDbConn, databaseType);
+                var selectedDatabase = tenantDb.FromSql("SELECT DATABASE()")
+                    .ToScalar<string>();
+                if (!string.Equals(selectedDatabase, expectedDatabaseName,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("租户数据库连接自检未进入确认的目标库。");
+                var selectedPrincipal = tenantDb.FromSql("SELECT CURRENT_USER()")
+                    .ToScalar<string>();
+                if (selectedPrincipal.DosIsNullOrWhiteSpace()
+                    || !selectedPrincipal.StartsWith(
+                        principalName + "@", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("租户数据库连接自检账号不匹配。");
+                }
+                var requiredTableCount = tenantDb.FromSql(@"SELECT COUNT(*)
+                            FROM information_schema.tables
+                            WHERE table_schema = DATABASE()
+                              AND table_name IN ('sys_config', 'sys_user', 'sys_menu',
+                                  'sys_apiengine', 'diy_table', 'diy_field')")
+                    .ToScalar<int>();
+                if (requiredTableCount != 6)
+                    throw new InvalidOperationException("目标库缺少租户启动所需的基础表。");
+                lease.ThrowIfLost();
+
+                using (var transaction = mainClient.Db.BeginTransaction())
+                {
+                    var affected = transaction.FromSql(@"UPDATE sys_osclients
+                            SET DbConn = @NewDbConn,
+                                DbReadConn = @NewDbConn,
+                                DbType = 'MySql',
+                                DbReadType = 'MySql',
+                                UpdateTime = @UpdateTime
+                            WHERE Id = @TenantId
+                              AND OsClient = @TenantKey
+                              AND OsClientType = @OsClientType
+                              AND OsClientNetwork = @OsClientNetwork
+                              AND IsDeleted = 0 AND IsEnable = 1
+                              AND DbConn = @OldDbConn
+                              AND COALESCE(DbReadConn, '') = @OldDbReadConn")
+                        .AddSensitiveInParameter("NewDbConn", newDbConn)
+                        .AddInParameter("UpdateTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"))
+                        .AddInParameter("TenantId", tenantId)
+                        .AddInParameter("TenantKey", tenantKey)
+                        .AddInParameter("OsClientType", osClientType)
+                        .AddInParameter("OsClientNetwork", osClientNetwork)
+                        .AddSensitiveInParameter("OldDbConn", oldDbConn)
+                        .AddSensitiveInParameter("OldDbReadConn", oldDbReadConn ?? string.Empty)
+                        .ExecuteNonQuery();
+                    if (affected != 1)
+                        throw new InvalidOperationException("租户连接配置已被并发修改，已停止覆盖。");
+                    transaction.Commit();
+                }
+                durableConfigurationUpdated = true;
+                lease.ThrowIfLost();
+
+                var durableReadback = mainClient.Db.FromSql(@"SELECT DbConn, DbReadConn
+                            FROM sys_osclients
+                            WHERE Id = @TenantId AND OsClient = @TenantKey
+                              AND OsClientType = @OsClientType
+                              AND OsClientNetwork = @OsClientNetwork
+                              AND IsDeleted = 0 AND IsEnable = 1")
+                    .AddInParameter("TenantId", tenantId)
+                    .AddInParameter("TenantKey", tenantKey)
+                    .AddInParameter("OsClientType", osClientType)
+                    .AddInParameter("OsClientNetwork", osClientNetwork)
+                    .First<dynamic>();
+                var durableData = durableReadback == null
+                    ? null
+                    : JObject.FromObject(durableReadback);
+                if (durableData == null
+                    || !string.Equals(durableData["DbConn"].Val<string>(), newDbConn,
+                        StringComparison.Ordinal)
+                    || !string.Equals(durableData["DbReadConn"].Val<string>(), newDbConn,
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("租户数据库连接持久层回读不一致。");
+                }
+
+                OsClientExtend.InvalidateSaasConfigurationCache(tenantKey);
+                var reloadResult = MicroiEngine.GetService<IOsClientRuntime>()
+                    .ReloadSingleOsClient(tenantKey);
+                if (reloadResult.Code != 1)
+                {
+                    return new DosResult(0, new
+                    {
+                        TenantId = tenantId,
+                        OsClient = tenantKey,
+                        DatabaseName = expectedDatabaseName,
+                        DurableConfigurationUpdated = true,
+                        RuntimeReloaded = false
+                    }, "数据库连接已安全修复，但当前节点运行配置刷新失败，请重试刷新运行配置。");
+                }
+                var runtimeClient = OsClientExtend.GetClient(tenantKey);
+                var runtimeDatabase = runtimeClient?.Db?.FromSql("SELECT DATABASE()")
+                    .ToScalar<string>();
+                var runtimeReadDatabase = runtimeClient?.DbRead?.FromSql("SELECT DATABASE()")
+                    .ToScalar<string>();
+                if (!string.Equals(runtimeDatabase, expectedDatabaseName,
+                        StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(runtimeReadDatabase, expectedDatabaseName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return new DosResult(0, new
+                    {
+                        TenantId = tenantId,
+                        OsClient = tenantKey,
+                        DatabaseName = expectedDatabaseName,
+                        DurableConfigurationUpdated = true,
+                        RuntimeReloaded = false
+                    }, "数据库连接已安全修复，但当前节点运行连接回读未通过。");
+                }
+
+                Console.WriteLine(
+                    $"Microi: Tenant database access repaired. Tenant={tenantKey}, "
+                    + $"Type={osClientType}, Network={osClientNetwork}, Database={expectedDatabaseName}.");
+                return new DosResult(1, new
+                {
+                    TenantId = tenantId,
+                    OsClient = tenantKey,
+                    OsClientType = osClientType,
+                    OsClientNetwork = osClientNetwork,
+                    DatabaseName = expectedDatabaseName,
+                    CredentialScope = "DatabaseOnly",
+                    PreviousPrincipalPreserved = !previousPrincipal.DosIsNullOrWhiteSpace()
+                                                && !string.Equals(previousPrincipal, principalName,
+                                                    StringComparison.OrdinalIgnoreCase),
+                    DurableConfigurationUpdated = true,
+                    RuntimeReloaded = true
+                }, "租户数据库连接已修复并完成运行配置刷新。");
+            }
+            catch (Exception ex)
+            {
+                if (!durableConfigurationUpdated && principalCreated && masterDb != null
+                    && principalCommands != null)
+                {
+                    try
+                    {
+                        masterDb.FromSql(principalCommands.DropSql).ExecuteNonQuery();
+                    }
+                    catch
+                    {
+                        // 原异常仍是权威结果；补偿异常不得泄露凭据或连接信息。
+                    }
+                }
+
+                Console.WriteLine(
+                    $"Microi: Tenant database access repair failed. Tenant={tenantKey}, "
+                    + $"ErrorType={ex.GetType().Name}.");
+                return new DosResult(0, new
+                {
+                    TenantId = tenantId,
+                    OsClient = tenantKey,
+                    DatabaseName = expectedDatabaseName,
+                    DurableConfigurationUpdated = durableConfigurationUpdated
+                }, durableConfigurationUpdated
+                    ? "租户连接已写入，但运行配置刷新未完成。"
+                    : "租户数据库连接修复失败，原连接配置保持不变。");
+            }
+            finally
+            {
+                lease?.Dispose();
+            }
+        }
+
+        private static string ReadConnectionStringValue(
+            string connectionString,
+            params string[] aliases)
+        {
+            if (connectionString.DosIsNullOrWhiteSpace()) return string.Empty;
+            var normalized = ConnectionStringCompatibility.NormalizeProviderSyntax(
+                DatabaseType.MySql, connectionString);
+            var builder = new DbConnectionStringBuilder { ConnectionString = normalized };
+            foreach (var alias in aliases)
+            {
+                foreach (string key in builder.Keys)
+                {
+                    if (!string.Equals(key, alias, StringComparison.OrdinalIgnoreCase)) continue;
+                    return builder[key]?.ToString()?.Trim() ?? string.Empty;
+                }
+            }
+            return string.Empty;
         }
 
         private DosResult CompensateProvisioningFailure(DosResult failure, string osClient, string dbName)

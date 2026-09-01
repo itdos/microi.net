@@ -313,6 +313,50 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 主租户超级管理员保留现有数据库数据，旋转子租户DatabaseOnly账号并更新连接。
+        /// 连接串和凭据只在可信C#边界内处理，结果仅返回安全回读投影。
+        /// </summary>
+        public DosResult RepairAdminTenantDatabaseAccess(object param)
+        {
+            const string repairEngineKey = "admin_repair_saas_tenant_database_access";
+            var denied = ResolveTrustedManagedCurrentUser(
+                repairEngineKey,
+                true,
+                DiyCommon.MaxRoleLevel,
+                out var osClient,
+                out var currentUser);
+            if (denied != null) return denied;
+            if (!string.Equals(osClient, OsClientDefault.OsClient,
+                    StringComparison.OrdinalIgnoreCase))
+                return new DosResult(1002, null, "仅主租户允许修复子租户数据库连接。");
+            if (!PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(
+                    osClient, currentUser))
+                return new DosResult(0, null, "当前账号已不再是有效的平台超级管理员。");
+            try
+            {
+                using var allocationScope = BeginTrustedHostAllocationScope();
+                var json = ToJObject(param);
+                return new TenantProvisioningService().RepairAdminTenantDatabaseAccess(
+                    new AdminTenantDatabaseRepairRequest
+                    {
+                        TenantId = GetJsonString(json, "TenantId", "Id"),
+                        TenantKey = GetJsonString(json, "TenantKey", "OsClient", "Key"),
+                        ExpectedDatabaseName = GetJsonString(
+                            json, "ExpectedDatabaseName", "DatabaseName", "DbName"),
+                        OsClientType = GetJsonString(json, "OsClientType"),
+                        OsClientNetwork = GetJsonString(json, "OsClientNetwork")
+                    });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    "Microi: Repair tenant database access facade failed. ErrorType="
+                    + ex.GetType().Name + ".");
+                return new DosResult(0, null, "租户数据库连接修复失败。");
+            }
+        }
+
+        /// <summary>
         /// 供接口引擎做滚动发布能力探测。只有完整开通流程已由 Redis 分布式租约保护的
         /// 后端版本才返回 true；旧节点会因缺少此方法而继续使用原子分步兼容流程。
         /// </summary>

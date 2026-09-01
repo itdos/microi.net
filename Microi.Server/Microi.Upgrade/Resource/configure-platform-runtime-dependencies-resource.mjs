@@ -80,14 +80,16 @@ const dependencies = Object.freeze([
     name: '平台应用商城源审计',
     source: 'platform-marketplace-source.js',
     id: '019d2a01-9d63-7f91-8c03-000000000001',
-    version: 'v1.0.0',
+    version: 'v1.0.5',
     apiAddress: '/apiengine/platform-marketplace-source',
     category: '应用商城',
     enableLog: 1,
     lock: 0,
-    stopHttp: 1,
+    // 商城微服务通过这些受认证同源路由调用可信运行时；AllowAnonymous=0
+    // 继续阻止匿名访问。StopHttp=1 会在 V8 身份/来源校验前直接短路。
+    stopHttp: 0,
     capabilities: [
-      'ApiEngine:platform-marketplace-source@v1.0.0',
+      'ApiEngine:platform-marketplace-source@v1.0.5',
     ],
   }),
   Object.freeze({
@@ -219,7 +221,8 @@ for (const dependency of dependencies) {
 const info = packageModel.PackageInfo || (packageModel.PackageInfo = {});
 const protocolCapabilities = [
   'ApiEngine:get-microi-store-model@v1.2.9',
-  'ApiEngine:import-microi-store-package@v2.5.1',
+  'ApiEngine:import-microi-store-package@v2.5.2',
+  'Importer:PageEngineDiyTableReferenceRemapV1',
   'InstallerFeature:PackageManagedOverwriteV2',
   'Installer:StartupDependencyApiFastBootstrap',
   'Installer:StartupDependencyPreinstallBootstrapV1',

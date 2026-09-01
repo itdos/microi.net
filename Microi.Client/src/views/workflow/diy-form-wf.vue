@@ -124,7 +124,8 @@ export default {
 
                 var formParam = {
                     FormMode: "Edit", //表单加载模式，处理工作一定是修改
-                    SavedType: "Edit" //表单提交后自动刷新后的状态，变成编辑
+                    SavedType: "Edit", //表单提交后自动刷新后的状态，变成编辑
+                    SuppressSuccessTips: true
                 };
                 //-------第2步：提交表单
                 self.$refs.diyFormWfWork.FormSubmit(formParam, async function (success, formData) {
@@ -282,7 +283,8 @@ export default {
 
                 var formParam = {
                     FormMode: "Edit", //表单加载模式，处理工作一定是修改
-                    SavedType: "Edit" //表单提交后自动刷新后的状态，变成编辑
+                    SavedType: "Edit", //表单提交后自动刷新后的状态，变成编辑
+                    SuppressSuccessTips: true
                 };
                 //-------第2步：提交表单
                 self.$refs.diyFormWfWork.FormSubmit(formParam, async function (success, formData) {
@@ -388,7 +390,8 @@ export default {
                 //第一次表单提交是Add，但第二次提交一定要是Edit（有可能因为没找到审批人，导致表单提交成功，但流程提交失败，这时候重新提交，表单就需要是修改操作，不然生成重复数据）
                 var formParam = {
                     FormMode: self.StartWorkSubmited == false ? "Add" : "Edit", //表单加载模式：新增、编辑
-                    SavedType: "Edit" //表单提交后自动刷新后的状态，变成编辑
+                    SavedType: "Edit", //表单提交后自动刷新后的状态，变成编辑
+                    SuppressSuccessTips: true
                 };
                 //-------第2步：提交表单
                 self.$refs.diyFormWfWork.FormSubmit(formParam, async function (success, formData) {

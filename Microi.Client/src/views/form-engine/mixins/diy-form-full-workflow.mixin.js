@@ -117,6 +117,7 @@ export default {
                 var formParam = {
                     FormMode: formMode,
                     SavedType: "Edit",
+                    SuppressSuccessTips: true,
                     _AlternateSubmit: wfHandler.BuildStartWorkAlternateSubmit({
                         FormData: v8Result.Form,
                         OldForm: oldFormData,
@@ -170,6 +171,7 @@ export default {
                 var formParam = {
                     FormMode: "Edit",
                     SavedType: "Edit",
+                    SuppressSuccessTips: true,
                     _AlternateSubmit: wfHandler.BuildSendWorkAlternateSubmit({
                         FormData: v8Result.Form,
                         OldForm: oldFormData,

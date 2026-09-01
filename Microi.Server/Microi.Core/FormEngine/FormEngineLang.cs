@@ -56,6 +56,7 @@ namespace Microi.net
             RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
         private static int DiyLangAllClientSyncRunning = 0;
         private const int DiyLangTranslateTimeoutSeconds = 8;
+        private const int DiyLangDbSemaphoreWaitSeconds = 5;
         private const int DiyLangDbBackoffMinutes = 5;
         private const int DiyLangDbOperationDelayMs = 15;
         private const int DiyLangMetadataQueueMax = 2000;
@@ -218,10 +219,30 @@ namespace Microi.net
                 throw new Exception(backoffMessage);
             }
             var tenantSemaphore = GetDiyLangTenantDbSemaphore(osClient);
-            await DiyLangGlobalDbSemaphore.WaitAsync();
-            await tenantSemaphore.WaitAsync();
+            var tenantSemaphoreAcquired = false;
+            var globalSemaphoreAcquired = false;
             try
             {
+                // Acquire the tenant gate first. A queue behind one slow tenant must not
+                // occupy the process-wide gate and prevent healthy tenants from making
+                // progress. Both waits are bounded so a failed database cannot turn a
+                // request-time metadata check into a many-minute bootstrap stall.
+                tenantSemaphoreAcquired = await tenantSemaphore.WaitAsync(
+                    TimeSpan.FromSeconds(DiyLangDbSemaphoreWaitSeconds));
+                if (!tenantSemaphoreAcquired)
+                {
+                    throw new TimeoutException(
+                        $"Timed out waiting {DiyLangDbSemaphoreWaitSeconds} seconds for tenant language database gate [{osClient}].");
+                }
+
+                globalSemaphoreAcquired = await DiyLangGlobalDbSemaphore.WaitAsync(
+                    TimeSpan.FromSeconds(DiyLangDbSemaphoreWaitSeconds));
+                if (!globalSemaphoreAcquired)
+                {
+                    throw new TimeoutException(
+                        $"Timed out waiting {DiyLangDbSemaphoreWaitSeconds} seconds for global language database gate.");
+                }
+
                 ThrowIfDiyLangSyncOwnershipLost();
                 var result = await action();
                 ThrowIfDiyLangSyncOwnershipLost();
@@ -237,9 +258,16 @@ namespace Microi.net
             }
             finally
             {
-                tenantSemaphore.Release();
-                DiyLangGlobalDbSemaphore.Release();
-                if (DiyLangDbOperationDelayMs > 0)
+                if (globalSemaphoreAcquired)
+                {
+                    DiyLangGlobalDbSemaphore.Release();
+                }
+                if (tenantSemaphoreAcquired)
+                {
+                    tenantSemaphore.Release();
+                }
+                if ((globalSemaphoreAcquired || tenantSemaphoreAcquired)
+                    && DiyLangDbOperationDelayMs > 0)
                 {
                     await Task.Delay(DiyLangDbOperationDelayMs);
                 }

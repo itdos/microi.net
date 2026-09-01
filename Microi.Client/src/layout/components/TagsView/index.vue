@@ -61,6 +61,9 @@
             <li v-if="canShowModuleDesign(selectedTag)" @click="openModuleDesign(selectedTag)">
                 <el-icon><QuestionFilled /></el-icon> {{ $t("Msg.ModuleDesign") }}
             </li>
+            <li v-if="canShowWorkflowDesign(selectedTag)" @click="openWorkflowDesign(selectedTag)">
+                <el-icon><Connection /></el-icon> {{ $t("Msg.WorkflowDesign") }}
+            </li>
             <li v-if="canShowPageEngineDesign(selectedTag)" @click="openPageEngineDesign(selectedTag)">
                 <el-icon><EditPen /></el-icon> 界面设计
             </li>
@@ -168,6 +171,10 @@ import { resolveTabIcon } from "@/utils/tab-icon.js";
 import { getPageTabRouteViewKey } from "@/utils/page-tab-route-runtime.js";
 import { apiServiceState } from "@/utils/api-service-status.js";
 import { buildRuntimeVersionText } from "@/utils/runtime-version-text.js";
+import {
+    getBoundWorkflowDesignId,
+    getWorkflowDesignPath
+} from "@/utils/workflow-menu-binding.js";
 import {
     getTabDiyTableId,
     getTabSysMenuId,
@@ -526,6 +533,7 @@ export default {
             const menuMinWidth = 105;
             const extraMenuItems = Number(this.canShowFormDesign(tag))
                 + Number(this.canShowModuleDesign(tag))
+                + Number(this.canShowWorkflowDesign(tag))
                 + Number(this.canShowPageEngineDesign(tag));
             const menuHeight = 155 + extraMenuItems * 40; // 预估菜单高度
             const viewportWidth = window.innerWidth;
@@ -563,6 +571,18 @@ export default {
         },
         canShowModuleDesign(tag) {
             return this.isAdminUser() && !!this.getSysMenuIdFromTag(tag);
+        },
+        canShowWorkflowDesign(tag) {
+            return this.isAdminUser() && !!getBoundWorkflowDesignId((tag && tag.meta) || {});
+        },
+        openWorkflowDesign(tag) {
+            const workflowDesignPath = getWorkflowDesignPath((tag && tag.meta) || {});
+            this.closeMenu();
+            if (!workflowDesignPath) {
+                this.DiyCommon.Tips(this.$t("Msg.WorkflowDesignNotBound"), false);
+                return;
+            }
+            this.$router.push(workflowDesignPath);
         },
         getDiyTableIdFromTag(tag = {}) {
             return getTabDiyTableId(tag, this.formDesignMap);

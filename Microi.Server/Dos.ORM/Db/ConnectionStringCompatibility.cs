@@ -42,6 +42,19 @@ namespace Dos.ORM
             var normalized = NormalizeProviderSyntax(databaseType, connectionString);
             if (!ContainsOption(normalized, "sslmode"))
                 normalized = Append(normalized, "SslMode=Disabled");
+            // MySql.Data defaults to a comparatively long connect wait. A stale
+            // tenant host would otherwise occupy every request thread before the
+            // connection guard can open its circuit. Preserve an explicit caller
+            // value, but give platform-created sessions a bounded default.
+            if (!ContainsOption(normalized, "connectiontimeout", "connecttimeout"))
+                normalized = Append(normalized, "Connection Timeout=10");
+            // MySQL 8 defaults new accounts to caching_sha2_password. When the
+            // deployment explicitly disables TLS, the driver needs the server RSA
+            // key to authenticate. This option is added only for that explicit
+            // insecure mode and never overrides a caller's setting.
+            if (HasOptionValue(normalized, "sslmode", "disabled")
+                && !ContainsOption(normalized, "allowpublickeyretrieval"))
+                normalized = Append(normalized, "AllowPublicKeyRetrieval=True");
             if (!ContainsOption(normalized, "maxpoolsize", "maximumpoolsize"))
                 normalized = Append(normalized, "Max Pool Size=" + maxPoolSize);
             if (!ContainsOption(normalized, "connectionlifetime"))
@@ -156,6 +169,30 @@ namespace Dos.ORM
                     if (string.Equals(normalizedKey, NormalizeKey(optionName), StringComparison.Ordinal))
                         return true;
                 }
+            }
+            return false;
+        }
+
+        private static bool HasOptionValue(
+            string connectionString,
+            string optionName,
+            string expectedValue)
+        {
+            foreach (var segment in SplitSegments(connectionString))
+            {
+                if (!TrySplitPair(segment, out var key, out var value)) continue;
+                if (!string.Equals(
+                        NormalizeKey(key),
+                        NormalizeKey(optionName),
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                return string.Equals(
+                    (value ?? string.Empty).Trim().Trim('"', '\''),
+                    expectedValue,
+                    StringComparison.OrdinalIgnoreCase);
             }
             return false;
         }

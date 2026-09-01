@@ -1,6 +1,7 @@
 const PLATFORM_SYS_CONFIG_URL = "/apiengine/platform-sys-config";
 const LEGACY_SYS_CONFIG_URL = "/api/FormEngine/GetSysConfig";
 const FALLBACK_HTTP_STATUSES = new Set([404, 405, 501]);
+export const PLATFORM_BOOTSTRAP_REQUEST_TIMEOUT_MS = 15000;
 
 function responsePayload(value) {
     if (!value) return null;
@@ -36,6 +37,8 @@ function anonymousRequest(url, data) {
     return {
         url,
         data,
+        // 系统设置是启动硬依赖；无界等待会让启动层永久停留，因此主路由和兼容路由都必须有相同上限。
+        timeout: PLATFORM_BOOTSTRAP_REQUEST_TIMEOUT_MS,
         skipAuthorization: true,
         suppressAuthFailure: true,
         suppressErrorNotification: true
