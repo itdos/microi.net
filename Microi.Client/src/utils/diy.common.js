@@ -5238,6 +5238,16 @@ var DiyCommon = {
         }
         return qrcode;
     },
+    CreateRemovedV8Api(apiName) {
+        return function () {
+            throw new Error(
+                `V8.${apiName} 已废除：浏览器端不再允许直接执行 SQL。`
+                + "请通过 AI 或人工修改为接口引擎或 FormEngine："
+                + "复杂/跨表查询请新建接口引擎并使用 V8.ApiEngine.Run；"
+                + "普通单表查询请使用 V8.FormEngine.GetFormData/GetTableData 与 _Where 参数化条件。"
+            );
+        };
+    },
     _V8BaseInstance : null,
     _globalV8CodeExecuted: false, // 全局V8代码只执行一次的标记
     /**
@@ -5360,6 +5370,10 @@ var DiyCommon = {
                 GetAsync : DiyCommon.GetAsync,
                 Http : DiyCommon.Http,
                 AI : DiyCommon.AI,
+                // 旧版前端直连 SQL 能力已移除。保留显式失败门面，只用于给存量
+                // V8 代码返回可执行的迁移指引；绝不在浏览器静默恢复 SQL 能力。
+                RunSqlGetModel : DiyCommon.CreateRemovedV8Api("RunSqlGetModel"),
+                RunSqlGetList : DiyCommon.CreateRemovedV8Api("RunSqlGetList"),
                 Tips : DiyCommon.Tips,
                 ConfirmTips : DiyCommon.OsConfirm,
                 // 注意：CurrentUser / CurrentToken / SysConfig 不放在静态缓存里，

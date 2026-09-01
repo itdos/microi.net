@@ -15,9 +15,20 @@ namespace Microi.net
         private static long _loopStartedUtcTicks;
         private static long _lastHeartbeatUtcTicks;
         private static long _lastFaultUtcTicks;
+        private static long _lastWakeSignalUtcTicks;
+        private static long _lastTenantScanUtcTicks;
+        private static long _lastTenantScanDurationMs;
+        private static long _slowestTenantScanDurationMs;
         private static long _stoppedUtcTicks;
         private static int _restartCount;
+        private static int _wakeSignalCount;
+        private static int _pendingWakeLaneCount;
         private static string _lastError = "";
+        private static string _lastWakeTenant = "";
+        private static string _lastWakeApiEngineKey = "";
+        private static string _lastScannedTenant = "";
+        private static string _slowestScannedTenant = "";
+        private static int _lastTenantScanClaimed;
 
         public static void MarkHostStarted()
         {
@@ -34,6 +45,44 @@ namespace Microi.net
         public static void MarkHeartbeat()
         {
             Interlocked.Exchange(ref _lastHeartbeatUtcTicks, DateTime.UtcNow.Ticks);
+        }
+
+        public static void MarkWakeSignal(string osClient, string apiEngineKey, int pendingLaneCount)
+        {
+            Interlocked.Exchange(ref _lastWakeSignalUtcTicks, DateTime.UtcNow.Ticks);
+            Interlocked.Increment(ref _wakeSignalCount);
+            Interlocked.Exchange(ref _pendingWakeLaneCount, Math.Max(0, pendingLaneCount));
+            Volatile.Write(ref _lastWakeTenant, osClient ?? "");
+            Volatile.Write(ref _lastWakeApiEngineKey, apiEngineKey ?? "");
+        }
+
+        public static void MarkPendingWakeLaneCount(int pendingLaneCount)
+        {
+            Interlocked.Exchange(ref _pendingWakeLaneCount, Math.Max(0, pendingLaneCount));
+        }
+
+        public static void MarkTenantScan(string osClient, long elapsedMilliseconds, bool claimed)
+        {
+            elapsedMilliseconds = Math.Max(0, elapsedMilliseconds);
+            Interlocked.Exchange(ref _lastTenantScanUtcTicks, DateTime.UtcNow.Ticks);
+            Interlocked.Exchange(ref _lastTenantScanDurationMs, elapsedMilliseconds);
+            Interlocked.Exchange(ref _lastTenantScanClaimed, claimed ? 1 : 0);
+            Volatile.Write(ref _lastScannedTenant, osClient ?? "");
+
+            while (true)
+            {
+                var previous = Interlocked.Read(ref _slowestTenantScanDurationMs);
+                if (elapsedMilliseconds <= previous) break;
+                if (Interlocked.CompareExchange(
+                        ref _slowestTenantScanDurationMs,
+                        elapsedMilliseconds,
+                        previous) != previous)
+                {
+                    continue;
+                }
+                Volatile.Write(ref _slowestScannedTenant, osClient ?? "");
+                break;
+            }
         }
 
         public static void MarkFault(Exception error)
@@ -60,6 +109,18 @@ namespace Microi.net
                 LoopStartedUtc = Format(ReadUtc(ref _loopStartedUtcTicks)),
                 LastHeartbeatUtc = Format(heartbeat),
                 LastFaultUtc = Format(ReadUtc(ref _lastFaultUtcTicks)),
+                LastWakeSignalUtc = Format(ReadUtc(ref _lastWakeSignalUtcTicks)),
+                WakeSignalCount = Volatile.Read(ref _wakeSignalCount),
+                PendingWakeTenantCount = Volatile.Read(ref _pendingWakeLaneCount),
+                PendingWakeLaneCount = Volatile.Read(ref _pendingWakeLaneCount),
+                LastWakeTenant = Volatile.Read(ref _lastWakeTenant) ?? "",
+                LastWakeApiEngineKey = Volatile.Read(ref _lastWakeApiEngineKey) ?? "",
+                LastTenantScanUtc = Format(ReadUtc(ref _lastTenantScanUtcTicks)),
+                LastTenantScanDurationMs = Interlocked.Read(ref _lastTenantScanDurationMs),
+                LastScannedTenant = Volatile.Read(ref _lastScannedTenant) ?? "",
+                LastTenantScanClaimed = Volatile.Read(ref _lastTenantScanClaimed) == 1,
+                SlowestTenantScanDurationMs = Interlocked.Read(ref _slowestTenantScanDurationMs),
+                SlowestScannedTenant = Volatile.Read(ref _slowestScannedTenant) ?? "",
                 StoppedUtc = Format(stopped),
                 RestartCount = Volatile.Read(ref _restartCount),
                 LastError = Volatile.Read(ref _lastError) ?? "",

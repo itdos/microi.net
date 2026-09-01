@@ -33,7 +33,8 @@ const listFunctions = [
     "addMap",
     "installedMap",
     "findInstalled",
-    "applyInstallState"
+    "applyInstallState",
+    "isPlatformMaintenanceNotice"
 ].map(name => extractNamedFunction(listSource, name)).join("\n");
 
 function resolveInstallState(rows, application = {}) {
@@ -124,6 +125,25 @@ test("marketplace status distinguishes outdated, current, and higher local versi
         PackageVersion: "v7.7.26",
         InstallStatus: "Failed"
     }]).StoreInstallStatus, "Abnormal");
+});
+
+test("official platform notices include missing and outdated applications without changing installed count semantics", () => {
+    const context = { result: null };
+    vm.runInNewContext(
+        `${listFunctions}\nresult = [`
+            + `isPlatformMaintenanceNotice("Uninstalled"),`
+            + `isPlatformMaintenanceNotice("Outdated"),`
+            + `isPlatformMaintenanceNotice("Installed"),`
+            + `isPlatformMaintenanceNotice("Abnormal")];`,
+        context
+    );
+
+    assert.deepEqual(JSON.parse(JSON.stringify(context.result)), [true, true, false, false]);
+    assert.match(listSource, /Version:\s*v1\.4\.8/);
+    assert.match(listSource, /StoreInstallStatus !== "Uninstalled"\) installedCount\+\+/);
+    assert.match(listSource, /isPlatformMaintenanceNotice\(item\.StoreInstallStatus\)\) notices\.push/);
+    assert.match(bulkSource, /status != 'Uninstalled' && status != 'Outdated'/);
+    assert.match(bulkSource, /InstallAction:\s*status == 'Outdated'/);
 });
 
 test("bulk discovery projects deterministic install ordering and fails closed on read errors", () => {

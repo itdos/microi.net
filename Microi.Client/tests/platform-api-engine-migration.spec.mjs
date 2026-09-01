@@ -70,15 +70,21 @@ test("system-account management uses action-scoped Managed ApiEngine without gen
 test("anonymous bootstrap and language requests explicitly omit Authorization", async function () {
     const osClientSource = await readFile(path.join(sourceRoot, "utils", "itdos.osclient.js"), "utf8");
     const sysConfigSource = await readFile(path.join(sourceRoot, "utils", "platform-sys-config.js"), "utf8");
+    const ssoSource = await readFile(path.join(sourceRoot, "utils", "sso-federation.js"), "utf8");
+    const permissionSource = await readFile(path.join(sourceRoot, "permission.js"), "utf8");
     const commonSource = await readFile(path.join(sourceRoot, "utils", "diy.common.js"), "utf8");
     const loginSource = await readFile(path.join(sourceRoot, "views", "login", "index.vue"), "utf8");
     const remoteSource = await readFile(path.join(sourceRoot, "views", "file-manage", "api.js"), "utf8");
 
     assert.match(osClientSource, /platform-os-client-by-domain[\s\S]{0,400}skipAuthorization:\s*true/);
+    assert.match(osClientSource, /platform-os-client-by-domain[\s\S]{0,400}timeout:\s*PLATFORM_BOOTSTRAP_REQUEST_TIMEOUT_MS/);
     assert.match(osClientSource, /getPlatformSysConfig\(DiyCommon/);
     assert.match(sysConfigSource, /PLATFORM_SYS_CONFIG_URL\s*=\s*["']\/apiengine\/platform-sys-config/);
     assert.match(sysConfigSource, /LEGACY_SYS_CONFIG_URL\s*=\s*["']\/api\/FormEngine\/GetSysConfig/);
     assert.match(sysConfigSource, /function anonymousRequest[\s\S]{0,300}skipAuthorization:\s*true/);
+    assert.match(sysConfigSource, /function anonymousRequest[\s\S]{0,300}timeout:\s*PLATFORM_BOOTSTRAP_REQUEST_TIMEOUT_MS/);
+    assert.match(ssoSource, /sso_legacy_capabilities[\s\S]{0,200}timeout:\s*LEGACY_SSO_CAPABILITY_TIMEOUT_MS/);
+    assert.match(permissionSource, /await loadLegacySsoCapabilities\(\)[\s\S]{0,100}catch\s*\(_\)[\s\S]{0,80}diySsoArray\s*=\s*\[\]/);
     assert.match(commonSource, /platform-lang-bundle[\s\S]{0,500}skipAuthorization:\s*true/);
     assert.match(loginSource, /getPlatformSysConfig\(self\.DiyCommon/);
     assert.match(loginSource, /platform-login-wallpapers[\s\S]{0,500}skipAuthorization:\s*true/);
@@ -127,6 +133,36 @@ test("SysConfig fallback is narrow and retries only missing-engine or unsupporte
         "/api/FormEngine/GetSysConfig"
     ]);
     assert.ok(calls.every(item => item.skipAuthorization === true));
+    assert.ok(calls.every(item => item.timeout === 15000));
+
+    let timeoutCalls = 0;
+    await assert.rejects(
+        () => getPlatformSysConfig({
+            async PostAsync() {
+                timeoutCalls += 1;
+                throw new Error("bootstrap timeout");
+            }
+        }, { OsClient: "tenant-timeout" }),
+        /bootstrap timeout/
+    );
+    assert.equal(timeoutCalls, 1, "超时不是兼容路由缺失，不应再叠加一次无界重试");
+});
+
+test("legacy SSO discovery has a bounded request and may degrade in the route guard", async function () {
+    const modulePath = pathToFileURL(path.join(sourceRoot, "utils", "sso-federation.js")).href;
+    const { getLegacySsoCapabilities } = await import(modulePath);
+    const calls = [];
+    const diyCommon = {
+        async PostAsync(...args) {
+            calls.push(args);
+            return { Code: 1, Data: [] };
+        }
+    };
+
+    assert.deepEqual(await getLegacySsoCapabilities(diyCommon, "tenant-a"), []);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][0], "/apiengine/sso_legacy_capabilities");
+    assert.equal(calls[0][5]?.timeout, 15000);
 });
 
 test("SMS registration uses the managed login token contract without changing password login", async function () {

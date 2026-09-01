@@ -350,6 +350,7 @@ function buildMeta(item, extra = {}) {
     return appendMicroAppMeta({
         Id: item.Id,
         DiyTableId: item.DiyTableId,
+        FlowDesignId: item.FlowDesignId,
         HasPageTabs: hasConfiguredPageTabs(item.PageTabs),
         HasModuleMetrics: hasConfiguredModuleMetrics(item.ViewSchema),
         Display: item.Display,
@@ -666,7 +667,7 @@ export const usePermissionStore = defineStore("permission", {
                 var childSystemId = r190317 != null ? r190317[2] : null;
 
                 const menuRequestParam = {
-                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "ModuleEngineKey", "MicroServiceId", "MicroServiceKey", "MsKey", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
+                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "IsMicroiService", "OpenType", "FlowDesignId", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "ModuleEngineKey", "MicroServiceId", "MicroServiceKey", "MsKey", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
                         OsClient: osClient,
                         TableName: "Sys_Menu",
                         _OrderBy: "Sort",

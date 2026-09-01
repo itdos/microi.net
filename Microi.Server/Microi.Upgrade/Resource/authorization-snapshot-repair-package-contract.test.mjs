@@ -12,16 +12,18 @@ const capability = 'ClientFeature:AuthorizationSnapshotBootstrapRepairV1';
 
 test('SaaS package declares the platform authorization-snapshot repair boundary', () => {
   const info = saasPackage.PackageInfo;
-  assert.equal(info.Version, 'v7.7.18');
   assert.equal(info.ChangeLog.Version, info.Version);
   assert.equal(info.RequiredPlatformCapabilities.filter(item => item === capability).length, 1);
-  assert.match(info.ChangeLog.Content, /Microi v7\.8\.1/);
-  assert.match(info.ChangeLog.Content, /登录\/续签/);
-  assert.match(info.ChangeLog.Content, /失败不覆盖缓存/);
-  assert.match(info.ChangeLog.Content, /无需重新登录/);
-  assert.match(info.ChangeLog.Content, /\{\{ YYYY \}\}/);
-  assert.match(info.ChangeLog.Content, /不携带 Sys_Config 租户数据/);
-  assert.match(String(info.ChangeHistory || '').split(/\r?\n/)[0], /v7\.7\.18/);
+  const authorizationRepairHistory = String(info.ChangeHistory || '')
+    .split(/\r?\n/)
+    .find(line => /^2026-09-01 v7\.7\.18\s/.test(line));
+  assert.ok(authorizationRepairHistory, '缺少 v7.7.18 权限快照自愈历史');
+  assert.match(authorizationRepairHistory, /Microi v7\.8\.1/);
+  assert.match(authorizationRepairHistory, /登录\/续签/);
+  assert.match(authorizationRepairHistory, /失败不覆盖缓存/);
+  assert.match(authorizationRepairHistory, /无需重新登录/);
+  assert.match(authorizationRepairHistory, /\{\{ YYYY \}\}/);
+  assert.match(authorizationRepairHistory, /不携带 Sys_Config 租户数据/);
   assert.deepEqual(saasPackage.ResourcePolicies.ApiEngines['platform-current-user'], {
     Ownership: 'Platform',
     UpgradePolicy: 'Managed',
@@ -29,7 +31,7 @@ test('SaaS package declares the platform authorization-snapshot repair boundary'
 });
 
 test('authorization repair remains owned by SaaS rather than the marketplace package', () => {
-  assert.equal(storePackage.PackageInfo.Version, 'v7.7.28');
+  assert.equal(storePackage.PackageInfo.ChangeLog.Version, storePackage.PackageInfo.Version);
   assert.equal(
     (storePackage.PackageInfo.RequiredPlatformCapabilities || []).includes(capability),
     false,

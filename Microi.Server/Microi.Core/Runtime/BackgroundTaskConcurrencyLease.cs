@@ -6,9 +6,9 @@ using StackExchange.Redis;
 namespace Microi.net
 {
     /// <summary>
-    /// Optional cross-node serialization lease for tasks that must not overlap
-    /// (schema installation, database backup, etc.). Correctness still depends on
-    /// the task idempotency key and fencing token; this lease only limits overlap.
+    /// Cross-node serialization lease used by mandatory (tenant, task-type) lanes
+    /// and by optional stricter business concurrency groups. Correctness still
+    /// depends on the durable task lease, idempotency key and fencing token.
     /// </summary>
     internal sealed class BackgroundTaskConcurrencyLease : IDisposable
     {
@@ -50,7 +50,8 @@ namespace Microi.net
             string owner,
             string runtimeOsClientType,
             string runtimeOsClientNetwork,
-            int leaseMilliseconds = DefaultLeaseMilliseconds)
+            int leaseMilliseconds = DefaultLeaseMilliseconds,
+            string lockDomain = "")
         {
             if (string.IsNullOrWhiteSpace(concurrencyKey)) return null;
             leaseMilliseconds = Math.Max(
@@ -64,7 +65,9 @@ namespace Microi.net
                         && string.IsNullOrWhiteSpace(runtimeOsClientNetwork)
                 ? concurrencyKey
                 : $"{runtimeOsClientType ?? ""}\n{runtimeOsClientNetwork ?? ""}\n{concurrencyKey}";
-            var lockKey = $"Microi:{osClient}:BackgroundTask:Concurrency:{Hash(scope)}";
+            var lockKey = string.IsNullOrWhiteSpace(lockDomain)
+                ? $"Microi:{osClient}:BackgroundTask:Concurrency:{Hash(scope)}"
+                : $"Microi:{osClient}:BackgroundTask:Concurrency:{Hash(lockDomain)}:{Hash(scope)}";
             const string script = @"
 if redis.call('exists', KEYS[1]) == 0 then
   redis.call('psetex', KEYS[1], ARGV[2], ARGV[1])

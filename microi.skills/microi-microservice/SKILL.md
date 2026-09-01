@@ -72,6 +72,8 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 构建前遵守本地 OOM 保护；已有 dev server 可复用时不重复启动。新脚手架必须支持独立
 访问时的平台帐号登录，但独立 Vite 预览仍没有菜单/弹窗等完整宿主上下文，不能替代宿主验收。
 
+- Vite 微服务的 `package.json.scripts.dev` 必须存在且可直接启动，标准值为 `vite --host 0.0.0.0`。Microi VS Code 在创建、拉取、打开、保存项目文件、构建和推送前都要检查：缺失且能由 `vite.config.*`、Vite 依赖或既有构建脚本确认是 Vite 项目时幂等补齐；已有自定义 `dev` 命令必须原样保留；构建体系无法确认、`package.json` 非法或顶层不是对象时失败关闭，禁止猜测并改坏其它框架。
+
 ### 线上目标在本地 Microi.Client 复现（强制）
 
 - 先在一次性隔离 browser context 打开线上友好路由并读取
@@ -106,6 +108,7 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - `replace`、`ReplacePrivateSourceOnly` 和流式发布都不是覆盖他人代码的授权。发现远端版本、文件正文或哈希晚于本地基线时，禁止直接用本地目录整包覆盖；必须先完成上述合并，并让本地唯一事实源保存合并结果。
 - 合并完成后冻结 `expectedCurrentVersion`、`expectedAppVersion`、`SourceManifestHash`、`RuntimeManifestHash` 与 `DeliveryBatchId`。在源码同步、stage、finalize 任一步之前再次回读；任一版本或哈希漂移都说明期间有人发布，必须废弃当前 stage，重新拉取、三方合并、构建和预检。
 - 发布后必须逐文件回读远端私有源码与公有运行产物并核对哈希，再把该远端清单保存为下一次三方比较的共同 Base。只回读入口 `200`、只核对版本号或只保留本地构建目录，都不能证明多人协作发布没有丢代码。
+- `CurrentVersion`、`AppVersion`、文件时间和语义版本字符串都不能单独决定谁是“新代码”；它们只作为 CAS 世代的一部分。最终事实必须同时满足三方文件合并、期望远端源码清单哈希和服务端应用锁内 CAS，任何一个不一致都拒绝切换。
 
 ## 发布
 
@@ -115,6 +118,9 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 每次创建、修改、升级或重新发布微服务，必须先为目标精确 `AppVersion` 在 `sys_microistore_changelog` 写入完整日志，再同步源码、stage、finalize 或制作商城包。日志必须关联真实 `StoreId`，包含 `Title / ChangeType / Content / ReleaseTime`；流式发布显式传入与日志含义一致的非空 `changeSummary`。发布后同时回读商城日志、`mci_ai_app_version.ChangeSummary` 与包内 `PackageInfo.ChangeLog`；缺失或版本不一致必须失败关闭。
 - 发布动作必须明确区分两种模式：默认“源码+编译产物”先把完整工程同步到私有桶并逐文件回读 SHA-256，再把 `dist` 流式发布到公有桶；显式“仅编译产物”只更新公有桶，必须在界面中告知其他用户仍会拉取上一次私有源码，禁止暗示源码已同步。
 - 私有源码同步使用 `ReplacePrivateSourceOnly` 精确清理过期源码；兼容调用可以继续接受 `replace`，但实现不得用旧式全表 `Replace=true` 删除同一应用的公有运行产物元数据。
+- 私有源码正常通道使用 `StageMicroServiceSourceFile`：每个普通文件以 multipart 流从磁盘上传，同一 `DeliveryBatchId + RelativePath + SHA-256` 的暂存重试必须幂等；全部完成后由 `FinalizeMicroServiceSourceManifest` 在应用锁内核对 `ExpectedCurrentVersion / ExpectedAppVersion / ExpectedSourceManifestHash`，逐文件从私有 HDFS 回读大小与 SHA-256，再一次切换 `PrivateSourceStaged → Private` 并归档旧清单。禁止把源码复用到公有 `UploadApplicationAssetStream` 路径。
+- `write EPIPE`、超时或连接关闭发生在 stage 时，只能对上述幂等暂存单元作有界重试；发生在 legacy 整包请求或 finalize 时提交结果未知，先按完整路径集合、字节数和 SHA-256 回读，完全一致才能按成功恢复，否则停止并要求重新三方检查，禁止盲目重放非幂等请求。
+- 旧服务器没有私有源码流式能力时，只允许小于等于 8 MiB 的源码使用单 JSON Base64 兼容接口，并且 HTTP 请求体仍必须 64 KiB 分块、遵守 socket backpressure。超过上限必须明确要求升级后端，禁止为了“避免 EPIPE”人工拆源码文件、循环部分覆盖或调大代理请求体上限。
 - `mci_ai_app_file` 同时存在私有源码和公有编译产物。源码拉取/差异比较必须优先按 `StorageScope=PublicBuildStream|PublicBuildStreamArchived|PublicBuildOnly` 排除公有产物，并保留旧数据中 `HdfsPath == PublishHdfsPath` 的兼容判断；不能仅靠两个路径相等识别，否则版本路径与稳定别名不同的流式产物会被误读成私有源码。
 - 只有服务器不支持流式端点且产物很小时，才兼容 `microi_publish_microservice`。
 - 正常发布支持最多 20,000 个文件、总计 20GB；逐文件从磁盘流入 HDFS，不生成整包 Buffer/Base64。几百 MB、1GB 级项目不得自动降级到旧 Base64 发布器。

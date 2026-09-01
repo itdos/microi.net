@@ -446,6 +446,9 @@
                                     <el-dropdown-item @click="OpenMenuForm()">
                                         <el-icon><QuestionFilled /></el-icon>{{ $t('Msg.ModuleDesign') }}
                                     </el-dropdown-item>
+                                    <el-dropdown-item v-if="IsWorkFlowMenu()" @click="OpenWorkFlowDesign()">
+                                        <el-icon><Connection /></el-icon>{{ $t('Msg.WorkflowDesign') }}
+                                    </el-dropdown-item>
                                     <el-dropdown-item @click="$refs.refDiyPermissionDialog.show()">
                                         <el-icon><CircleCheck /></el-icon>{{ $t('Msg.MenuPermission') }}
                                     </el-dropdown-item>

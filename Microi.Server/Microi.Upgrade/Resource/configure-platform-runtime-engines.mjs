@@ -210,7 +210,9 @@ const engines = [
   },
   {
     key: 'platform-private-file-url', name: '平台私有文件授权地址', file: 'platform-private-file-url.js',
-    id: '019d2a01-9d63-7f91-8c01-000000000006', enableLog: 1,
+    // 历史移动会员 Token 入口必须先匿名到达可信后端再完成身份验证；
+    // 与现有正式包保持一致，避免生成器把 AllowAnonymous 从 1 意外归零。
+    id: '019d2a01-9d63-7f91-8c01-000000000006', enableLog: 1, allowAnonymous: 1,
     history: '2026-08-25 v1.0.0 将私有文件短链迁移为鉴权 Managed 接口引擎，复用 Core 菜单、行、字段与引用授权。'
   },
   {
@@ -234,6 +236,12 @@ const engines = [
     key: 'platform-create-tenant', name: '平台创建租户', file: 'platform-create-tenant.js',
     id: '019d2a01-9d63-7f91-8c01-000000000009', enableLog: 1,
     history: '2026-08-25 v1.0.0 将当前用户创建租户的业务编排迁入 Managed 接口引擎，底层只保留可信开通原子。'
+  },
+  {
+    key: 'admin_repair_saas_tenant_database_access', name: '平台修复子租户数据库连接',
+    file: 'admin-repair-saas-tenant-database-access.js',
+    id: '019e2d5f-9940-7f91-8c01-000000000001', enableLog: 0, lock: 1,
+    history: '2026-09-01 v1.0.0 新增主租户超级管理员受控修复入口；仅传递目标定位字段，后端能力缺失、预检未完成或确认串不匹配时失败关闭。'
   },
   {
     key: 'platform-external-login-binding', name: '平台外部身份绑定', file: 'platform-external-login-binding.js',
@@ -651,8 +659,10 @@ for (const capability of [
   'ApiEngine:platform-login-wallpapers',
   'ApiEngine:microi-init',
   'V8.Method.ProvisionCurrentUserTenant',
+  'V8.Method.RepairAdminTenantDatabaseAccess',
   'V8.Method.RequireManagedProtocolContext',
   'ApiEngine:platform-create-tenant',
+  'ApiEngine:admin_repair_saas_tenant_database_access',
   'ApiEngine:platform-external-login-binding',
   'ApiEngine:platform-wechat-user-binding',
   'ApiEngine:mci-module-presentation-stats',
@@ -761,6 +771,32 @@ packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
 packageData.PackageInfo.ChangeHistory = prependOnce(
   packageData.PackageInfo.ChangeHistory,
   typedDataSourceHistory,
+);
+
+// 该版本只登记受控修复入口；真正执行仍要求同版本后端提供可信原子，
+// 因而应用包可以先安装但会在旧节点上明确失败关闭，不会退回 V8 处理连接秘密。
+const tenantDatabaseRepairPackageVersion = 'v7.7.19';
+const tenantDatabaseRepairHistory = '2026-09-01 v7.7.19 新增主租户超级管理员修复子租户 DatabaseOnly 连接的 Managed 接口；仅接受目标定位字段，ValidateOnly 与精确确认串均通过后才调用可信后端原子。';
+if (compareSemver(packageData.PackageInfo.Version, tenantDatabaseRepairPackageVersion) < 0) {
+  packageData.PackageInfo.Version = tenantDatabaseRepairPackageVersion;
+}
+if (packageData.PackageInfo.Version === tenantDatabaseRepairPackageVersion) {
+  packageData.PackageInfo.Description = 'SaaS 引擎基础资源。提供租户开通、启动运行时与主租户受控的子租户数据库连接修复入口。';
+  packageData.PackageInfo.ChangeLog = {
+    Version: tenantDatabaseRepairPackageVersion,
+    Title: '子租户数据库连接安全修复入口',
+    ChangeType: 'Fix',
+    Content: '新增主租户超级管理员修复子租户 DatabaseOnly 连接的 Managed 接口；仅接受目标定位字段，ValidateOnly 与精确确认串均通过后才调用可信后端原子。',
+    ReleaseTime: '2026-09-01 11:30:00'
+  };
+}
+packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
+  packageData.PackageInfo.ChangeHistory,
+  tenantDatabaseRepairPackageVersion,
+);
+packageData.PackageInfo.ChangeHistory = prependOnce(
+  packageData.PackageInfo.ChangeHistory,
+  tenantDatabaseRepairHistory,
 );
 
 normalizeOfficialApiEnginePolicies(packageData, path.basename(packagePath));

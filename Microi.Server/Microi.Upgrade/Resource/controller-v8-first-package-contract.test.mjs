@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { selectMonotonicPackageVersion } from './package-version-monotonic.mjs';
 
 const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(resourceDir, '..', '..', '..');
@@ -143,7 +144,7 @@ function assertOfficialPair({
 test('message-notification and Store selected ApiEngine key sets stay exact and policy-closed', () => {
   assertPackageKeyClosure(messagePackage, MESSAGE_SELECTED_API_ENGINE_KEYS);
   assertPackageKeyClosure(storePackage, STORE_SELECTED_API_ENGINE_KEYS);
-  assert.equal(messagePackage.PackageInfo.Version, 'v1.0.13');
+  assert.equal(messagePackage.PackageInfo.Version, 'v1.0.14');
   assert.equal(storePackage.PackageInfo.ChangeLog?.Version, storePackage.PackageInfo.Version);
   assert.match(String(storePackage.PackageInfo.ChangeHistory || ''), /v7\.7\.27/);
 });
@@ -185,7 +186,10 @@ test('official Managed cores and CreateIfMissing hooks carry immutable package c
     appName: '应用商城',
     managedKey: 'platform-marketplace-source',
     managedFile: 'platform-marketplace-source.js',
-    managedVersion: 'v1.0.4',
+    managedVersion: 'v1.0.5',
+    // 已登录商城与通知中心需要进入 Managed 运行时；AllowAnonymous=0 继续在
+    // V8 执行前强制鉴权，StopHttp=1 会把合法客户端也提前短路。
+    managedStopHttp: 0,
     hookKey: 'platform-marketplace-source-hook',
     hookFile: 'platform-marketplace-source-hook.js',
   });
@@ -195,12 +199,12 @@ test('official Managed cores and CreateIfMissing hooks carry immutable package c
     Ownership: 'Platform',
     UpgradePolicy: 'Managed',
   });
-  assert.equal(chatRuntime.Version, 'v1.0.1');
+  assert.equal(chatRuntime.Version, 'v1.0.2');
   assert.equal(chatRuntime.StopHttp, 1);
   assert.equal(chatRuntime.AllowAnonymous, 0);
   assert.equal(chatRuntime.ApiV8Code, normalizeSource(readResource('platform-chat-runtime.js')));
   assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(
-    'ApiEngine:platform-chat-runtime@v1.0.1',
+    'ApiEngine:platform-chat-runtime@v1.0.2',
   ));
   assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(
     'V8.Method.RequireManagedProtocolContext',
@@ -232,6 +236,33 @@ test('official Managed cores and CreateIfMissing hooks carry immutable package c
   assert.match(chatRuntime.ApiV8Code, /V8\.Method\.RequireManagedProtocolContext\(\)/);
   assert.match(engine(storePackage, 'platform-marketplace-source').ApiV8Code,
     /V8\.ApiEngine\.Run\('platform-marketplace-source-hook',[\s\S]*V8\.DbTrans\)/);
+});
+
+test('historical controller migration never downgrades a newer official package', () => {
+  assert.equal(selectMonotonicPackageVersion('v7.7.31', 'v7.7.15'), 'v7.7.31');
+  assert.equal(selectMonotonicPackageVersion('v7.7.10', 'v7.7.15'), 'v7.7.15');
+  assert.equal(selectMonotonicPackageVersion('v7.7.15', 'v7.7.15'), 'v7.7.15');
+  assert.match(
+    readResource('configure-controller-api-engine-migrations.mjs'),
+    /selectMonotonicPackageVersion\(\s*pkg\.PackageInfo\.Version,\s*update\.version/,
+  );
+});
+
+test('startup integrity gate accepts the authenticated HTTP marketplace source contract', () => {
+  const source = read(path.join(
+    workspaceRoot,
+    'Microi.Server',
+    'Microi.Upgrade',
+    '13-UpgradeAppStore.cs',
+  ));
+  const internalStart = source.indexOf('InstalledV8FirstInternalEngineKeys');
+  const anonymousStart = source.indexOf('InstalledV8FirstAnonymousEngineKeys');
+  assert.ok(internalStart >= 0 && anonymousStart > internalStart);
+  assert.doesNotMatch(source.slice(internalStart, anonymousStart), /platform-marketplace-source/);
+  assert.match(
+    source,
+    /"platform-marketplace-source",\s*StringComparison\.Ordinal\)\s*\? new System\.Version\(1, 0, 5\)/,
+  );
 });
 
 test('external-login and WeChat persistence remain locked Managed SaaS engines', () => {

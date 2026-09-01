@@ -117,6 +117,7 @@ namespace Microi.net
         private const int LeaseRenewalTransientFailureLimit = 3;
         private static readonly TimeSpan RenewalShutdownTimeout = TimeSpan.FromSeconds(5);
         private static readonly TimeSpan LeaseRenewalRetryDelay = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan FailedLaneHintRetryDelay = TimeSpan.FromSeconds(1);
         private static readonly ConcurrentDictionary<string, ActiveExecution> ActiveExecutions =
             new ConcurrentDictionary<string, ActiveExecution>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, byte> ProjectionPruneInFlight =
@@ -125,6 +126,8 @@ namespace Microi.net
             new ConcurrentDictionary<string, NotificationRequest>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, byte> NotificationWorkers =
             new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        private static readonly BackgroundTaskWakeQueue WorkerWakeQueue =
+            new BackgroundTaskWakeQueue();
         private static readonly string NodeId = BuildNodeId();
         private static int _claimFailureReported;
         private static int _workerParallelism;
@@ -250,6 +253,7 @@ namespace Microi.net
                 if (existing != null)
                 {
                     CacheProjection(existing);
+                    SignalWorkerIfPending(existing);
                     return ApplyRuntimeFields(existing);
                 }
             }
@@ -318,12 +322,14 @@ namespace Microi.net
                 if (concurrent != null)
                 {
                     CacheProjection(concurrent);
+                    SignalWorkerIfPending(concurrent);
                     return ApplyRuntimeFields(concurrent);
                 }
                 throw;
             }
             CacheProjection(item);
             QueueNotification(item);
+            SignalWorker(item.OsClient, item.ApiEngineKey);
             return ApplyRuntimeFields(item);
         }
 
@@ -601,16 +607,36 @@ namespace Microi.net
             CancellationToken stoppingToken,
             Action heartbeat = null)
         {
+            var configuredParallelism = ConfigHelper.GetRuntimeConfigurationInt(
+                "BackgroundTasks:MaxParallelTasks",
+                4);
             var parallelism = Clamp(
-                ConfigHelper.GetRuntimeConfigurationInt(
-                    "BackgroundTasks:MaxParallelTasks",
-                    4),
-                1,
+                configuredParallelism,
+                BackgroundTaskSchedulingPolicy.MinimumWorkerParallelism,
                 16);
+            if (configuredParallelism < BackgroundTaskSchedulingPolicy.MinimumWorkerParallelism)
+            {
+                Console.WriteLine(
+                    $"Microi：【后台任务隔离】MaxParallelTasks={configuredParallelism} 无法同时保留业务与维护槽，"
+                    + $"当前节点已提升为最小值 {BackgroundTaskSchedulingPolicy.MinimumWorkerParallelism}。");
+            }
             Volatile.Write(ref _workerParallelism, parallelism);
             var configuredTenant = OsClientExtend.GetConfigOsClient();
             if (configuredTenant.DosIsNullOrWhiteSpace()) configuredTenant = OsClientDefault.OsClient;
-            var running = new Dictionary<Task, WorkerSlot>();
+            // A restart loses process-local hints but not durable rows. Give every
+            // loaded tenant one coalesced fast recovery turn immediately instead of
+            // making pending work wait behind fallback polling rounds.
+            foreach (var tenant in new[] { configuredTenant }
+                         .Concat(OsClientExtend.ClientList.Keys)
+                         .Where(tenant => !tenant.DosIsNullOrWhiteSpace())
+                         .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                SignalTenantRecovery(tenant);
+            }
+            var running = new List<WorkerSlot>();
+            var hintsSinceCompletedRecovery = 0;
+            var nextForcedRecoveryScanUtc = DateTime.UtcNow.Add(
+                BackgroundTaskSchedulingPolicy.ForcedRecoveryScanInterval);
             while (!stoppingToken.IsCancellationRequested)
             {
                 // This callback is diagnostic state only. The durable task table,
@@ -618,50 +644,158 @@ namespace Microi.net
                 // Never let observability code terminate the worker loop.
                 try { heartbeat?.Invoke(); } catch { }
 
-                foreach (var completed in running.Keys.Where(task => task.IsCompleted).ToList())
+                foreach (var completedSlot in running
+                             .Where(slot => slot.Execution.IsCompleted)
+                             .ToList())
                 {
-                    running.Remove(completed);
-                    try { await completed.ConfigureAwait(false); }
+                    running.Remove(completedSlot);
+                    try { await completedSlot.Execution.ConfigureAwait(false); }
                     catch (Exception ex) { LogFailure("", "WorkerTaskFailed", "后台任务工作器出现未处理异常", ex, NodeId); }
+                    finally
+                    {
+                        // One process-local hint represents one logical
+                        // (tenant, task-type) queue turn. Re-enqueue only after the
+                        // active turn ends, so a hot lane cannot occupy every slot.
+                        SignalWorker(completedSlot.OsClient, completedSlot.ApiEngineKey);
+                    }
                 }
                 Volatile.Write(ref _workerRunningCount, running.Count);
 
                 while (running.Count < parallelism && !stoppingToken.IsCancellationRequested)
                 {
                     BackgroundTaskRecord item;
-                    var nonConfiguredRunning = running.Values.Count(slot => !string.Equals(
-                        slot.OsClient,
-                        configuredTenant,
-                        StringComparison.OrdinalIgnoreCase));
-                    var reserveConfiguredSlot = parallelism > 1
-                                                 && nonConfiguredRunning >= parallelism - 1;
-                    var diyLangRunning = running.Values.Count(slot => string.Equals(
-                        slot.ApiEngineKey,
-                        DiyLangBackgroundTaskService.WorkerApiEngineKey,
-                        StringComparison.OrdinalIgnoreCase));
-                    var excludedApiEngineKey = ShouldReserveNonMaintenanceSlot(
-                        parallelism,
-                        diyLangRunning)
-                        ? DiyLangBackgroundTaskService.WorkerApiEngineKey
-                        : null;
+                    var hadQueueHint = WorkerWakeQueue.TryTake(out var queueHint);
+                    var hintAdmissible = hadQueueHint
+                                         && (queueHint.IsTenantRecovery
+                                             || BackgroundTaskSchedulingPolicy.CanAdmit(
+                                                 queueHint.OsClient,
+                                                 queueHint.ApiEngineKey,
+                                                 running,
+                                                 parallelism));
+                    var forceRecoveryScan = hintAdmissible
+                                            && !queueHint.IsTenantRecovery
+                                            && BackgroundTaskSchedulingPolicy.ShouldForceRecoveryScan(
+                                                hintsSinceCompletedRecovery,
+                                                DateTime.UtcNow,
+                                                nextForcedRecoveryScanUtc);
+                    var forceTenantRecovery = hintAdmissible
+                                              && queueHint.IsTenantRecovery
+                                              && BackgroundTaskSchedulingPolicy.ShouldForceRecoveryScan(
+                                                  hintsSinceCompletedRecovery,
+                                                  DateTime.UtcNow,
+                                                  nextForcedRecoveryScanUtc);
+                    var claimingHint = hintAdmissible && !forceRecoveryScan;
+                    if (forceRecoveryScan)
+                    {
+                        // Put the hot lane at the tail, then make one bounded DB
+                        // recovery pass while excluding that lane. This prevents
+                        // process-local hints from starving persisted work that was
+                        // recovered after a restart or inserted by another node.
+                        SignalWorker(queueHint.OsClient, queueHint.ApiEngineKey);
+                    }
+                    else if (hadQueueHint
+                             && !hintAdmissible
+                             && !queueHint.IsTenantRecovery
+                             && !BackgroundTaskSchedulingPolicy.IsLaneActive(
+                                 queueHint.OsClient,
+                                 queueHint.ApiEngineKey,
+                                 running))
+                    {
+                        // A different maintenance lane currently owns the single
+                        // maintenance slot. Preserve this hint without a busy loop.
+                        ScheduleWorkerWake(
+                            queueHint.OsClient,
+                            queueHint.ApiEngineKey,
+                            FailedLaneHintRetryDelay);
+                    }
+                    BackgroundTaskWorkerRuntime.MarkPendingWakeLaneCount(
+                        WorkerWakeQueue.PendingLaneCount);
+                    var recoveryAttemptCompleted = false;
                     try
                     {
-                        item = reserveConfiguredSlot
-                            ? BackgroundTaskStore.TryClaimConfiguredTenant(NodeId, excludedApiEngineKey)
-                            : BackgroundTaskStore.TryClaimNext(NodeId, excludedApiEngineKey);
-                        // When language maintenance already occupies its quota, a
-                        // configured-tenant reservation must not starve an ordinary
-                        // task from another tenant. Prefer the configured tenant,
-                        // then lend the slot only to non-maintenance work.
-                        if (item == null
-                            && reserveConfiguredSlot
-                            && !excludedApiEngineKey.DosIsNullOrWhiteSpace())
+                        item = null;
+                        if (claimingHint)
                         {
-                            item = BackgroundTaskStore.TryClaimNext(NodeId, excludedApiEngineKey);
+                            var recoveryYielded = false;
+                            item = BackgroundTaskStore.TryClaimTenant(
+                                queueHint.OsClient,
+                                NodeId,
+                                BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys(
+                                    queueHint.OsClient,
+                                    running,
+                                    parallelism),
+                                queueHint.IsTenantRecovery ? null : queueHint.ApiEngineKey,
+                                false,
+                                () =>
+                                {
+                                    try { heartbeat?.Invoke(); } catch { }
+                                    recoveryYielded = queueHint.IsTenantRecovery
+                                                      && !forceTenantRecovery
+                                                      && WorkerWakeQueue.HasPendingTaskLane;
+                                    return recoveryYielded;
+                                });
+                            if (recoveryYielded)
+                            {
+                                // A startup/recovery hint is lower priority than a
+                                // newly enqueued lane. Preserve it at the tail so
+                                // persisted work is still revisited after the fast path.
+                                SignalTenantRecovery(queueHint.OsClient);
+                            }
+                            else if (queueHint.IsTenantRecovery)
+                            {
+                                recoveryAttemptCompleted = true;
+                            }
+                        }
+                        else
+                        {
+                            var genericRecoveryYielded = false;
+                            item = BackgroundTaskStore.TryClaimNext(
+                                NodeId,
+                                tenant =>
+                                {
+                                    var excluded = new HashSet<string>(
+                                        BackgroundTaskSchedulingPolicy.ExcludedApiEngineKeys(
+                                            tenant,
+                                            running,
+                                            parallelism),
+                                        StringComparer.OrdinalIgnoreCase);
+                                    if (forceRecoveryScan
+                                        && string.Equals(
+                                            tenant,
+                                            queueHint.OsClient,
+                                            StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        excluded.Add(queueHint.ApiEngineKey);
+                                    }
+                                    return excluded.ToArray();
+                                },
+                                () =>
+                                {
+                                    try { heartbeat?.Invoke(); } catch { }
+                                    // Once per bounded hot-hint window, complete one
+                                    // single-tenant recovery pass even when other
+                                    // lanes keep arriving. Otherwise A/B/A/B traffic
+                                    // could starve durable rows that lost their hint.
+                                    genericRecoveryYielded = !forceRecoveryScan
+                                                             && WorkerWakeQueue.HasPendingTaskLane;
+                                    return genericRecoveryYielded;
+                                },
+                                tenantScanBatchSize: forceRecoveryScan
+                                    ? 1
+                                    : BackgroundTaskStore.TenantScanBatchSize,
+                                runMaintenance: !forceRecoveryScan);
+                            recoveryAttemptCompleted = !genericRecoveryYielded;
                         }
                     }
                     catch (Exception ex)
                     {
+                        if (claimingHint)
+                        {
+                            ScheduleWorkerWake(
+                                queueHint.OsClient,
+                                queueHint.ApiEngineKey,
+                                FailedLaneHintRetryDelay);
+                        }
                         LogFailure("", "WorkerClaimFailed", "后台任务抢占失败", ex, NodeId);
                         if (Interlocked.CompareExchange(ref _claimFailureReported, 1, 0) == 0)
                         {
@@ -670,25 +804,66 @@ namespace Microi.net
                         }
                         item = null;
                     }
+                    if (recoveryAttemptCompleted)
+                    {
+                        hintsSinceCompletedRecovery = 0;
+                        nextForcedRecoveryScanUtc =
+                            DateTime.UtcNow.Add(
+                                BackgroundTaskSchedulingPolicy.ForcedRecoveryScanInterval);
+                    }
+                    else if (claimingHint && item != null && !queueHint.IsTenantRecovery)
+                    {
+                        if (hintsSinceCompletedRecovery == 0)
+                        {
+                            nextForcedRecoveryScanUtc =
+                                DateTime.UtcNow.Add(
+                                    BackgroundTaskSchedulingPolicy.ForcedRecoveryScanInterval);
+                        }
+                        hintsSinceCompletedRecovery++;
+                    }
                     if (item == null) break;
                     Interlocked.Exchange(ref _claimFailureReported, 0);
-                    running[ProcessClaimedAsync(item, stoppingToken)] = new WorkerSlot
+                    running.Add(new WorkerSlot
                     {
+                        // Isolate the synchronous prefix as well. Some platform
+                        // maintenance handlers perform Redis/bootstrap/database work
+                        // before their first incomplete await; executing that prefix
+                        // on the dispatcher would prevent otherwise-free business
+                        // lanes from being claimed.
+                        Execution = Task.Run(
+                            () => ProcessClaimedAsync(item, stoppingToken),
+                            CancellationToken.None),
                         OsClient = item.OsClient ?? "",
                         ApiEngineKey = item.ApiEngineKey ?? ""
-                    };
+                    });
                     Volatile.Write(ref _workerRunningCount, running.Count);
                 }
 
+                if (running.Count < parallelism && WorkerWakeQueue.HasPending) continue;
                 if (running.Count == 0)
                 {
-                    try { await Task.Delay(1500, stoppingToken).ConfigureAwait(false); }
+                    hintsSinceCompletedRecovery = 0;
+                    nextForcedRecoveryScanUtc =
+                        DateTime.UtcNow.Add(
+                            BackgroundTaskSchedulingPolicy.ForcedRecoveryScanInterval);
+                    try
+                    {
+                        await WorkerWakeQueue.WaitAsync(
+                                TimeSpan.FromMilliseconds(1500),
+                                stoppingToken)
+                            .ConfigureAwait(false);
+                    }
                     catch (OperationCanceledException) { break; }
                 }
                 else
                 {
                     var delay = Task.Delay(1000, stoppingToken);
-                    try { await Task.WhenAny(running.Keys.Append(delay)).ConfigureAwait(false); }
+                    try
+                    {
+                        await Task.WhenAny(
+                                running.Select(slot => slot.Execution).Append(delay))
+                            .ConfigureAwait(false);
+                    }
                     catch (OperationCanceledException) { break; }
                 }
             }
@@ -699,20 +874,81 @@ namespace Microi.net
             }
             if (running.Count > 0)
             {
-                await Task.WhenAny(Task.WhenAll(running.Keys), Task.Delay(TimeSpan.FromSeconds(30))).ConfigureAwait(false);
+                await Task.WhenAny(
+                        Task.WhenAll(running.Select(slot => slot.Execution)),
+                        Task.Delay(TimeSpan.FromSeconds(30)))
+                    .ConfigureAwait(false);
             }
             Volatile.Write(ref _workerRunningCount, 0);
         }
 
-        internal static bool ShouldReserveNonMaintenanceSlot(
-            int parallelism,
-            int diyLangRunning)
+        private static void SignalWorker(string osClient, string apiEngineKey)
         {
-            if (parallelism <= 1) return false;
-            // Language repair is CPU and database intensive. Keep it to one local
-            // worker slot; the remaining slots stay available for user-submitted
-            // work regardless of the configured general worker parallelism.
-            return diyLangRunning >= 1;
+            WorkerWakeQueue.Signal(osClient, apiEngineKey);
+            BackgroundTaskWorkerRuntime.MarkWakeSignal(
+                osClient,
+                apiEngineKey,
+                WorkerWakeQueue.PendingLaneCount);
+        }
+
+        private static void SignalTenantRecovery(string osClient)
+        {
+            WorkerWakeQueue.SignalTenantRecovery(osClient);
+            BackgroundTaskWorkerRuntime.MarkWakeSignal(
+                osClient,
+                "",
+                WorkerWakeQueue.PendingLaneCount);
+        }
+
+        private static void SignalWorkerIfPending(BackgroundTaskRecord item)
+        {
+            if (item == null || item.CancelRequested) return;
+            if (!string.Equals(item.Status, "Pending", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(item.Status, "Retrying", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            ScheduleWorkerWake(item);
+        }
+
+        private static void ScheduleWorkerWake(BackgroundTaskRecord item)
+        {
+            if (item == null || item.CancelRequested || item.OsClient.DosIsNullOrWhiteSpace()) return;
+            var delay = item.NextRunTime.HasValue
+                ? item.NextRunTime.Value - DateTime.Now
+                : TimeSpan.Zero;
+            if (delay <= TimeSpan.FromMilliseconds(25))
+            {
+                SignalWorker(item.OsClient, item.ApiEngineKey);
+                return;
+            }
+            ScheduleWorkerWake(item.OsClient, item.ApiEngineKey, delay);
+        }
+
+        private static void ScheduleWorkerWake(
+            string osClient,
+            string apiEngineKey,
+            TimeSpan delay)
+        {
+            if (osClient.DosIsNullOrWhiteSpace()) return;
+            if (delay <= TimeSpan.FromMilliseconds(25))
+            {
+                SignalWorker(osClient, apiEngineKey);
+                return;
+            }
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(delay).ConfigureAwait(false);
+                    SignalWorker(osClient, apiEngineKey);
+                }
+                catch
+                {
+                    // This is an acceleration hint only. The durable recovery scan
+                    // remains authoritative if a process is stopping or a timer is lost.
+                }
+            });
         }
 
         /// <summary>
@@ -761,9 +997,20 @@ namespace Microi.net
                 SchemaReady = available,
                 Reason = reason ?? "",
                 MaxParallelTaskCount = Volatile.Read(ref _workerParallelism),
+                MinimumWorkerParallelism = BackgroundTaskSchedulingPolicy.MinimumWorkerParallelism,
+                LogicalQueueScope = "OsClient+ApiEngineKey",
+                MandatoryCrossNodeLaneLease = true,
+                PlatformMaintenanceParallelTaskCount =
+                    BackgroundTaskSchedulingPolicy.MaxPlatformMaintenanceParallelism(
+                        Volatile.Read(ref _workerParallelism)),
                 ConfiguredTenant = osClient ?? "",
-                ReservedConfiguredTenantSlotCount = Volatile.Read(ref _workerParallelism) > 1 ? 1 : 0,
+                ReservedConfiguredTenantSlotCount = 0,
                 ReservedNonDiyLangSlotCount = Math.Max(0, Volatile.Read(ref _workerParallelism) - 1),
+                ReservedBusinessSlotCount = Math.Max(
+                    0,
+                    Math.Min(
+                        Volatile.Read(ref _workerParallelism),
+                        BackgroundTaskSchedulingPolicy.ReservedBusinessParallelism)),
                 RunningSlotCount = Volatile.Read(ref _workerRunningCount),
                 ActiveExecutionCount = ActiveExecutions.Count,
                 ActiveTasks = activeTasks
@@ -828,12 +1075,32 @@ namespace Microi.net
             catch (Exception ex)
             {
                 BackgroundTaskStore.RetryOrFail(item, ex, false);
+                SignalWorkerIfPending(item);
                 return;
             }
+            BackgroundTaskConcurrencyLease laneLease = null;
             BackgroundTaskConcurrencyLease concurrencyLease = null;
-            if (!item.ConcurrencyKey.DosIsNullOrWhiteSpace())
+            try
             {
-                try
+                // Mandatory, server-derived lane lease: optional business
+                // ConcurrencyKey values can further serialize work, but can never
+                // split one (tenant, task-type) queue across nodes.
+                laneLease = BackgroundTaskConcurrencyLease.TryAcquire(
+                    item.OsClient,
+                    BackgroundTaskSchedulingPolicy.LaneConcurrencyKey(item.ApiEngineKey),
+                    item.LeaseOwner,
+                    item.RuntimeOsClientType,
+                    item.RuntimeOsClientNetwork,
+                    BackgroundTaskStore.ResolveLeaseSeconds(item.ApiEngineKey) * 1000,
+                    "LaneV1");
+                if (laneLease == null)
+                {
+                    BackgroundTaskStore.ReleaseToPending(item, "等待同一任务类型队列的上一项任务完成", 1);
+                    SignalWorkerIfPending(item);
+                    return;
+                }
+
+                if (!item.ConcurrencyKey.DosIsNullOrWhiteSpace())
                 {
                     var concurrencyLeaseOsClient = executionOsClient;
                     var concurrencyLeaseKey = item.ConcurrencyKey;
@@ -877,17 +1144,23 @@ namespace Microi.net
                     if (concurrencyLease == null)
                     {
                         BackgroundTaskStore.ReleaseToPending(item, "等待同一并发组的上一项任务完成", 2);
+                        SignalWorkerIfPending(item);
+                        laneLease.Dispose();
                         return;
                     }
                 }
-                catch (Exception ex)
-                {
-                    BackgroundTaskStore.ReleaseToPending(item, ex.Message, 5);
-                    LogFailure(item.OsClient, "ConcurrencyLeaseFailed", "后台任务并发租约获取失败", ex, item.Id);
-                    return;
-                }
+            }
+            catch (Exception ex)
+            {
+                try { concurrencyLease?.Dispose(); } catch { }
+                try { laneLease?.Dispose(); } catch { }
+                BackgroundTaskStore.ReleaseToPending(item, ex.Message, 5);
+                SignalWorkerIfPending(item);
+                LogFailure(item.OsClient, "ConcurrencyLeaseFailed", "后台任务队列或并发租约获取失败", ex, item.Id);
+                return;
             }
 
+            using (laneLease)
             using (concurrencyLease)
             using (var cancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken))
             {
@@ -908,7 +1181,7 @@ namespace Microi.net
                 ActiveExecutions[item.Id] = active;
                 CacheProjection(item);
                 QueueNotification(item);
-                var renewal = RenewLoopAsync(active, concurrencyLease, stoppingToken);
+                var renewal = RenewLoopAsync(active, laneLease, concurrencyLease, stoppingToken);
                 try
                 {
                     var param = ParseObject(item.ParamJson);
@@ -1106,6 +1379,7 @@ namespace Microi.net
                     // retain a global worker slot after its durable row is terminal.
                     CacheProjection(item);
                     QueueNotification(item);
+                    SignalWorkerIfPending(item);
                     activity?.Stop();
                 }
             }
@@ -1133,6 +1407,7 @@ namespace Microi.net
 
         private static async Task RenewLoopAsync(
             ActiveExecution active,
+            BackgroundTaskConcurrencyLease laneLease,
             BackgroundTaskConcurrencyLease concurrencyLease,
             CancellationToken stoppingToken)
         {
@@ -1151,8 +1426,9 @@ namespace Microi.net
                             linked.Token)
                         .ConfigureAwait(false);
                     var leaseOk = BackgroundTaskStore.RenewLease(active.Record, out var cancelRequested);
+                    var laneOk = laneLease == null || laneLease.Renew();
                     var concurrencyOk = concurrencyLease == null || concurrencyLease.Renew();
-                    if (!leaseOk || !concurrencyOk)
+                    if (!leaseOk || !laneOk || !concurrencyOk)
                     {
                         active.LeaseLost = true;
                         active.Cancellation.Cancel();
@@ -1593,10 +1869,9 @@ namespace Microi.net
             public string RuntimeOsClientNetwork { get; set; }
         }
 
-        private sealed class WorkerSlot
+        private sealed class WorkerSlot : BackgroundTaskLaneState
         {
-            public string OsClient { get; set; }
-            public string ApiEngineKey { get; set; }
+            public Task Execution { get; set; }
         }
 
         private sealed class ActiveExecution

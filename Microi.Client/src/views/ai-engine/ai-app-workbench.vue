@@ -33,7 +33,7 @@
                 >
                     <div class="app-card-top">
                         <el-tag size="small" effect="dark">{{ appTypeLabel(app.AppType || "Web") }}</el-tag>
-                        <span>{{ formatVersionNo(getAppCurrentVersion(app)) }}</span>
+                        <span>{{ formatVersionDisplay(getAppCurrentVersion(app)) }}</span>
                     </div>
                     <h4>{{ app.Name }}</h4>
                     <p>{{ app.Description || "暂无应用说明" }}</p>
@@ -378,7 +378,7 @@
                     <div v-show="activeView === 'versions'" class="version-pane">
                         <el-table :data="sortedVersions" size="small" height="100%" border @row-click="selectVersion">
                             <el-table-column label="版本" width="100">
-                                <template #default="scope">{{ formatVersionNo(getAppCurrentVersion(scope.row)) }}</template>
+                                <template #default="scope">{{ formatVersionDisplay(getAppCurrentVersion(scope.row)) }}</template>
                             </el-table-column>
                             <el-table-column prop="Status" label="状态" width="120" />
                             <el-table-column prop="PreviewUrl" label="预览地址" min-width="220" show-overflow-tooltip />
@@ -665,7 +665,7 @@ const pagedApps = computed(() => {
     return apps.value.slice(start, start + appPageSize);
 });
 const currentTreeFile = computed(() => fileTreeMode.value === "build" ? activeBuildFile.value : activeFile.value);
-const sortedVersions = computed(() => [...(versions.value || [])].sort((a, b) => versionScore(b) - versionScore(a)));
+const sortedVersions = computed(() => [...(versions.value || [])].sort(compareVersionItemsDesc));
 const currentChatModelId = computed(() => (
     /Microi(?:吾码)?\.?(?:AI)?中转站/i.test(`${currentAiModel.value?.Name || ""} ${currentAiModel.value?.AiModel || ""}`)
         ? String(props.selectedRelayModel || localRelayModel.value || "").trim()
@@ -1154,6 +1154,31 @@ function formatVersionNo(value) {
     return `v${major}.${minor}.${patch}`;
 }
 
+function isLegacyUnversionedVersion(value) {
+    return /^legacy-unversioned(?:-|$)/i.test(String(value || "").trim());
+}
+
+function formatVersionDisplay(value) {
+    return isLegacyUnversionedVersion(value)
+        ? "历史归档（未标版本）"
+        : formatVersionNo(value);
+}
+
+function compareVersionItemsDesc(a, b) {
+    const aVersion = getAppCurrentVersion(a);
+    const bVersion = getAppCurrentVersion(b);
+    const aArchive = isLegacyUnversionedVersion(aVersion);
+    const bArchive = isLegacyUnversionedVersion(bVersion);
+    if (aArchive !== bArchive) return aArchive ? 1 : -1;
+
+    const semanticOrder = compareVersionDesc(aVersion, bVersion);
+    if (semanticOrder !== 0) return semanticOrder;
+
+    const aTime = Date.parse(String(a?.UpdateTime || a?.CreateTime || "").replace(/-/g, "/")) || 0;
+    const bTime = Date.parse(String(b?.UpdateTime || b?.CreateTime || "").replace(/-/g, "/")) || 0;
+    return bTime - aTime;
+}
+
 function versionScore(item) {
     const [major, minor, patch] = parseVersionParts(getAppCurrentVersion(item));
     const time = Date.parse(String(item?.UpdateTime || item?.CreateTime || "").replace(/-/g, "/")) || 0;
@@ -1166,7 +1191,7 @@ function versionKey(item) {
 
 function versionLabel(item) {
     const status = item?.Status || item?.BuildStatus || "Success";
-    return `${formatVersionNo(getAppCurrentVersion(item))} · ${status}`;
+    return `${formatVersionDisplay(getAppCurrentVersion(item))} · ${status}`;
 }
 
 function getVersionPreviewUrl(item) {
@@ -1317,8 +1342,8 @@ async function getPublishedPreviewUrl(app) {
     const detail = await runAiAppEngine("ai_app_detail", { AppId: app.Id });
     const latestVersion = [...(detail?.Versions || [])]
         .filter((item) => /success|published|done|完成|成功/i.test(String(item?.Status || item?.BuildStatus || "Success")))
-        .sort((a, b) => versionScore(b) - versionScore(a))[0]
-        || [...(detail?.Versions || [])].sort((a, b) => versionScore(b) - versionScore(a))[0];
+        .sort(compareVersionItemsDesc)[0]
+        || [...(detail?.Versions || [])].sort(compareVersionItemsDesc)[0];
     return getVersionPreviewUrl(latestVersion)
         || normalizePreviewUrl(detail?.App?.PreviewUrl || detail?.App?.PublishUrl || detail?.App?.PublicUrl || "")
         || normalizePreviewUrl(app?.PreviewUrl || app?.PublishUrl || app?.PublicUrl || "");

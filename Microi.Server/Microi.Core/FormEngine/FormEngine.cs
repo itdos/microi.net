@@ -2304,6 +2304,7 @@ namespace Microi.net
                 var sysMenuCache = await cache.GetAsync<JObject>(cacheKey);
                 if (sysMenuCache != null)
                 {
+                    SysMenuConfigurationNormalizer.NormalizeNotShowFieldsInRow(sysMenuCache);
                     return new DosResult<dynamic>(1, TranslateSysMenuForReturn(sysMenuCache, osClient, _Lang));
                 }
 
@@ -2327,6 +2328,7 @@ namespace Microi.net
                 {
                     // 转换为 JObject 后再存入缓存，确保序列化后类型一致
                     var jObjectData = result.Data is JObject ? (JObject)result.Data : JObject.FromObject(result.Data);
+                    SysMenuConfigurationNormalizer.NormalizeNotShowFieldsInRow(jObjectData);
                     await cache.SetAsync<JObject>(cacheKey, jObjectData);
                     result.Data = TranslateSysMenuForReturn(jObjectData, osClient, _Lang);
                 }

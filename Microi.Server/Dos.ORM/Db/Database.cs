@@ -37,7 +37,12 @@ namespace Dos.ORM
     {
         private DbProvider dbProvider;
         private static int MaxConcurrentConnectionOpens => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:MaxConcurrentConnectionOpens", 64);
-        private static int ConnectionOpenWaitSeconds => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:ConnectionOpenWaitSeconds", 600);
+        // Waiting for a connection-open slot is request-path work. Keep the bound
+        // hard even when an old deployment still carries the historical 600-second
+        // value; callers may choose a smaller value but cannot restore the stall.
+        private static int ConnectionOpenWaitSeconds => NormalizeConnectionOpenWaitSeconds(
+            ConfigHelper.GetRuntimeConfigurationInt(
+                "OrmLimits:ConnectionOpenWaitSeconds", 15));
         private static int ConnectionPressureBackoffSeconds => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:ConnectionPressureBackoffSeconds", 120);
         private static bool MySqlHostCacheAutoRepairEnabled => ConfigHelper.GetRuntimeConfigurationBool("OrmLimits:MySqlHostCacheAutoRepairEnabled", true);
         private static int MySqlHostCacheRepairCooldownSeconds => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:MySqlHostCacheRepairCooldownSeconds", 300);
@@ -257,24 +262,36 @@ namespace Dos.ORM
             return TimeSpan.Zero;
         }
 
-        private void WaitIfConnectionBackoffActive(string guardKey)
+        private void FailIfConnectionBackoffActive(string guardKey)
         {
             var remaining = GetConnectionBackoffRemaining(guardKey);
-            if (remaining > TimeSpan.Zero)
-            {
-                Thread.Sleep(remaining);
-                ConnectionBackoffUntil.TryRemove(guardKey, out _);
-            }
+            ThrowIfConnectionBackoffActive(remaining);
         }
 
-        private async Task WaitIfConnectionBackoffActiveAsync(string guardKey, CancellationToken cancellationToken)
+        private Task FailIfConnectionBackoffActiveAsync(
+            string guardKey,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var remaining = GetConnectionBackoffRemaining(guardKey);
-            if (remaining > TimeSpan.Zero)
-            {
-                await Task.Delay(remaining, cancellationToken).ConfigureAwait(false);
-                ConnectionBackoffUntil.TryRemove(guardKey, out _);
-            }
+            ThrowIfConnectionBackoffActive(remaining);
+            return Task.CompletedTask;
+        }
+
+        internal static void ThrowIfConnectionBackoffActive(TimeSpan remaining)
+        {
+            if (remaining <= TimeSpan.Zero) return;
+
+            var retryAfterSeconds = Math.Max(1, (int)Math.Ceiling(remaining.TotalSeconds));
+            throw new TimeoutException(
+                "Database connection is temporarily unavailable. Retry after "
+                + retryAfterSeconds.ToString(CultureInfo.InvariantCulture)
+                + " seconds.");
+        }
+
+        internal static int NormalizeConnectionOpenWaitSeconds(int configuredSeconds)
+        {
+            return Math.Min(15, Math.Max(1, configuredSeconds));
         }
 
         private void MarkConnectionBackoff(string guardKey, Exception ex)
@@ -340,7 +357,7 @@ namespace Dos.ORM
         {
             Check.Require(connection, "connection", Check.NotNull);
             var guardKey = GetConnectionGuardKey();
-            WaitIfConnectionBackoffActive(guardKey);
+            FailIfConnectionBackoffActive(guardKey);
             var semaphore = GetConnectionOpenSemaphore(guardKey);
             var waitSeconds = ConnectionOpenWaitSeconds;
             if (!semaphore.Wait(TimeSpan.FromSeconds(waitSeconds)))
@@ -350,6 +367,10 @@ namespace Dos.ORM
 
             try
             {
+                // Another opener may have tripped the circuit while this request
+                // was queued. Re-check after entering the slot instead of starting
+                // another doomed network connection.
+                FailIfConnectionBackoffActive(guardKey);
                 connection.Open();
             }
             catch (Exception ex)
@@ -367,7 +388,7 @@ namespace Dos.ORM
         {
             Check.Require(connection, "connection", Check.NotNull);
             var guardKey = GetConnectionGuardKey();
-            await WaitIfConnectionBackoffActiveAsync(guardKey, cancellationToken).ConfigureAwait(false);
+            await FailIfConnectionBackoffActiveAsync(guardKey, cancellationToken).ConfigureAwait(false);
             var semaphore = GetConnectionOpenSemaphore(guardKey);
             var waitSeconds = ConnectionOpenWaitSeconds;
             if (!await semaphore.WaitAsync(TimeSpan.FromSeconds(waitSeconds), cancellationToken).ConfigureAwait(false))
@@ -377,6 +398,8 @@ namespace Dos.ORM
 
             try
             {
+                await FailIfConnectionBackoffActiveAsync(
+                    guardKey, cancellationToken).ConfigureAwait(false);
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)

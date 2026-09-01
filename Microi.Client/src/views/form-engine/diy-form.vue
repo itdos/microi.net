@@ -2387,7 +2387,10 @@ export default {
 
                             //--------------end
 
-                            self.DiyCommon.Tips(self.$t("Msg.Success"));
+                            // 工作流合并提交会展示包含下一节点和审批人的模态结果，避免再叠加通用右下角提示。
+                            if (formParam.SuppressSuccessTips !== true) {
+                                self.DiyCommon.Tips(self.$t("Msg.Success"));
+                            }
                             //2021-02-27新增，在下面的事件之前执行表单离开事件，否则取到的数据可能被修改掉，如Id
                             var outFormV8Result = await self.FormOutAction(actionType, formParam.SavedType, formParam.TableRowId, formParam.V8Callback);
 

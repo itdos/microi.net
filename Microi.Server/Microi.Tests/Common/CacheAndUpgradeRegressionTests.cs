@@ -156,6 +156,22 @@ public class CacheAndUpgradeRegressionTests
         {
             "OsClient", "RuntimeOsClientType", "RuntimeOsClientNetwork", "IdempotencyKey"
         }, scopedIdempotencyColumns);
+        var scopedClaimColumns = Assert.IsType<string[]>(typeof(Upgrade21).GetField(
+            "ScopedClaimIndexColumns",
+            BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null));
+        Assert.Equal(new[]
+        {
+            "OsClient", "RuntimeOsClientType", "RuntimeOsClientNetwork", "Status",
+            "NextRunTime", "LeaseExpiresAt", "CreateTime"
+        }, scopedClaimColumns);
+        var laneClaimColumns = Assert.IsType<string[]>(typeof(Upgrade21).GetField(
+            "LaneClaimIndexColumns",
+            BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null));
+        Assert.Equal(new[]
+        {
+            "OsClient", "ApiEngineKey", "RuntimeOsClientType", "RuntimeOsClientNetwork",
+            "Status", "NextRunTime", "LeaseExpiresAt", "CreateTime"
+        }, laneClaimColumns);
         Assert.NotEqual(
             BackgroundTaskService.GetScopedChatOnlineKey("iTdos", "admin", "Product", "Internet"),
             BackgroundTaskService.GetScopedChatOnlineKey("iTdos", "admin", "Product", "Internal"));

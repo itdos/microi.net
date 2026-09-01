@@ -104,6 +104,37 @@ namespace Dos.ORM
         }
 
         /// <summary>
+        /// 为凭据轮换生成一次性的影子DatabaseOnly账号。新账号与当前活动账号不同，
+        /// 因此MySQL账号DDL自动提交后即使CAS切换失败，也可以直接删除影子账号，
+        /// 不会让旧连接提前失效。
+        /// </summary>
+        public static string BuildTenantRotationPrincipalName(
+            DatabaseType databaseType,
+            string databaseName,
+            string rotationNonce)
+        {
+            EnsureDatabaseName(databaseName);
+            if (databaseType != DatabaseType.MySql)
+                throw PrincipalProvisioningRequired(databaseType);
+            if (!Regex.IsMatch(rotationNonce ?? string.Empty, "^[a-zA-Z0-9_-]{8,128}$"))
+                throw new ArgumentException("数据库账号轮换Nonce格式不正确。", nameof(rotationNonce));
+
+            var normalized = Regex.Replace(databaseName.ToLowerInvariant(), "[^a-z0-9_]", "_");
+            var prefix = normalized.Length > 10 ? normalized.Substring(0, 10) : normalized;
+            string hash;
+            using (var sha256 = SHA256.Create())
+            {
+                var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(
+                    databaseName + ":" + rotationNonce));
+                hash = BitConverter.ToString(bytes)
+                    .Replace("-", string.Empty)
+                    .ToLowerInvariant()
+                    .Substring(0, 12);
+            }
+            return "mci_r_" + prefix + "_" + hash;
+        }
+
+        /// <summary>
         /// 生成不包含连接字符串分隔符的密码，便于安全写入各数据库驱动连接串。
         /// </summary>
         public static string GenerateSecurePassword(int length = 32)

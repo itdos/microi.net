@@ -10,7 +10,10 @@ import {
     getRuntimeWindowValue,
     publishRuntimeEndpointContext
 } from "@/utils/runtime-endpoint-query.js";
-import { getPlatformSysConfig } from "@/utils/platform-sys-config.js";
+import {
+    getPlatformSysConfig,
+    PLATFORM_BOOTSTRAP_REQUEST_TIMEOUT_MS
+} from "@/utils/platform-sys-config.js";
 
 // 辅助函数：获取 DiyStore
 const getDiyStore = () => useDiyStore(pinia);
@@ -78,6 +81,8 @@ var DiyOsClient = {
                 data: {
                     Domain: location.host.toLocaleLowerCase()
                 },
+                // 域名解析是启动链第一跳，必须在后端失联时交给 main.js 的 boot-failed 收口。
+                timeout: PLATFORM_BOOTSTRAP_REQUEST_TIMEOUT_MS,
                 skipAuthorization: true,
                 suppressAuthFailure: true,
                 suppressErrorNotification: true

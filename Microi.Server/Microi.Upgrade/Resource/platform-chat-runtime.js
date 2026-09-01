@@ -7,14 +7,28 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
-/* V8 ApiEngine | ApiEngineKey: platform-chat-runtime | Version: v1.0.1 */
+/* V8 ApiEngine | ApiEngineKey: platform-chat-runtime | Version: v1.0.2 */
 
 var param = V8.Param || {};
 var RUNTIME_KEY = 'platform-chat-runtime';
 var HOOK_KEY = 'platform-message-notification-custom-hook';
 var ASSISTANT = { Id: 'AI', Name: 'AI助手', Account: 'AI', Avatar: '' };
 var DB_NAME = 'diy_chat_' + String(V8.OsClient || '').toLowerCase();
-var MESSAGE_TABLE = 'chat_' + DateNow('yyyy');
+// PLATFORM_CHAT_LOCAL_TIME_V1：官方 Managed 接口必须自包含时间能力。
+// 客户全局前端/后端 V8 都属于租户扩展，缺失或被修改不能让聊天运行时失效。
+function nowText(format) {
+  var pattern = String(format || 'yyyy-MM-dd HH:mm:ss');
+  try {
+    if (typeof System !== 'undefined' && System.DateTime && System.DateTime.Now) {
+      return String(System.DateTime.Now.ToString(pattern));
+    }
+  } catch (systemDateError) {}
+  var now = new Date();
+  if (pattern === 'yyyy') return String(now.getFullYear());
+  return now.toISOString().replace('T', ' ').substring(0, 19);
+}
+
+var MESSAGE_TABLE = 'chat_' + nowText('yyyy');
 var CONTACT_TABLE = 'chat_last_contact';
 
 function fail(message, code) {
@@ -216,7 +230,7 @@ function upsertContact(user, contact, message, updateTime) {
   var currentId = current ? text(current._id || current.Id, 100) : deterministicId;
   var unread = unreadCount(user.Id, contact.Id);
   if (!unread || unread.Code !== 1) return unread;
-  var now = DateNow('yyyy-MM-dd HH:mm:ss');
+  var now = nowText('yyyy-MM-dd HH:mm:ss');
   var model = {
     UserId: user.Id,
     UserName: user.Name,

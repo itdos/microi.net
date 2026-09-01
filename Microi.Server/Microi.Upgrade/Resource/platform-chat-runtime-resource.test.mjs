@@ -7,7 +7,16 @@ import { fileURLToPath } from 'node:url';
 
 const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(resourceDir, 'platform-chat-runtime.js'), 'utf8');
-const execute = new Function('V8', 'DateNow', source);
+const execute = new Function('V8', 'System', source);
+const deterministicSystem = {
+  DateTime: {
+    Now: {
+      ToString(format) {
+        return format === 'yyyy' ? '2026' : '2026-08-25 12:00:00';
+      },
+    },
+  },
+};
 
 function sha256(value) {
   return createHash('sha256').update(String(value)).digest('hex');
@@ -157,7 +166,7 @@ function createRuntime({
     get protocolConsumes() { return protocolConsumes; },
     run(param) {
       v8.Param = param;
-      return execute(v8, (format) => format === 'yyyy' ? '2026' : '2026-08-25 12:00:00');
+      return execute(v8, deterministicSystem);
     },
   };
 }
@@ -322,6 +331,9 @@ test('post-delete projection failure returns committed success with a warning', 
 });
 
 test('source contract uses exact deterministic ids and never trusts Param actor or tenant', () => {
+  assert.match(source, /PLATFORM_CHAT_LOCAL_TIME_V1/);
+  assert.match(source, /function nowText\(format\)/);
+  assert.doesNotMatch(source, /\bDateNow\s*\(/);
   assert.match(source, /messageIdFor\(requestId\)/);
   assert.match(source, /Sha256Hex\('chat-message\|'/);
   assert.match(source, /if \(!V8\.CurrentUser \|\| !V8\.CurrentUser\.Id \|\| !V8\.OsClient\)/);

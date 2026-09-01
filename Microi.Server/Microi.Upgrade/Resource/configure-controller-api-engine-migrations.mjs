@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyOfficialNotice } from './official-api-engine-notice.mjs';
+import { selectMonotonicPackageVersion } from './package-version-monotonic.mjs';
 
 const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const packageRoots = [resourceDir, path.join(resourceDir, '.resource-sync-base')];
@@ -562,9 +563,9 @@ const packageUpdates = {
     engines: [],
   },
   'app.microi.message-notification.json': {
-    version: 'v1.0.13',
+    version: 'v1.0.14',
     description: '消息通知、聊天持久化与旧移动端系统消息兼容资源。',
-    history: '2026-08-30 v1.0.13 完成 /api/DiyChat/SendSystemMessage 多路由、事务提交后实时投递与官方包追加式发布历史闭包。',
+    history: '2026-09-01 v1.0.14 聊天 Managed 运行时改为自包含时间能力，不再依赖租户全局 V8 中的 DateNow。',
     capabilities: [
       'ServerField:sys_apiengine.ApiRoutes',
       'ApiEngineChatDelivery:v1',
@@ -614,7 +615,12 @@ const packageUpdates = {
 function updatePackage(filePath, update) {
   const pkg = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   pkg.PackageInfo ??= {};
-  pkg.PackageInfo.Version = update.version;
+  // 该脚本保留的是历史 Controller -> ApiEngine 迁移。重跑时只能把更旧的包
+  // 提升到当时的迁移版本，绝不能把后来已经发布的正式包降回历史版本。
+  pkg.PackageInfo.Version = selectMonotonicPackageVersion(
+    pkg.PackageInfo.Version,
+    update.version,
+  );
   pkg.PackageInfo.Description = update.description;
   const oldHistory = String(pkg.PackageInfo.ChangeHistory || '');
   if (!oldHistory.includes(update.history)) {

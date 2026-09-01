@@ -247,7 +247,16 @@
                             <el-button type="primary" link size="small" @click="goAppStore">{{ $t("Msg.GoAppStore") }}</el-button>
                         </div>
                     </div>
-                    <el-empty v-if="!storeLoading && storeNotices.length === 0" :description="$t('Msg.NoOfficialAppUpdates')" />
+                    <el-alert
+                        v-if="!storeLoading && storeLoadError"
+                        class="app-panel-error"
+                        type="error"
+                        :closable="false"
+                        show-icon
+                        :title="$t('Msg.OfficialAppCheckFailed')"
+                        :description="$t('Msg.OfficialAppCheckFailedTip')"
+                    />
+                    <el-empty v-else-if="!storeLoading && storeNotices.length === 0" :description="$t('Msg.NoOfficialAppUpdates')" />
                     <el-table v-else v-mci-loading:table="storeLoading" :data="storeNotices" size="small" class="online-table notification-compact-table app-notice-table" max-height="420">
                         <el-table-column :label="$t('Msg.Name')" min-width="220" show-overflow-tooltip>
                             <template #default="{ row }">{{ row.AppName || row.AppId || $t("Msg.Unnamed") }}</template>
@@ -389,9 +398,15 @@ import {
     normalizeNotificationLink,
     normalizePlatformNotificationResult
 } from "@/utils/platform-notification";
+import {
+    OFFICIAL_APP_INSTALLED_FIELDS,
+    consumeCompletedPlatformMaintenanceTransitions,
+    createCoalescedTrailingRunner,
+    normalizeOfficialAppNotices,
+    requestOfficialStoreList
+} from "@/utils/official-app-notice";
 
 const STORE_CHECK_INTERVAL = 10 * 60 * 1000;
-const MASTER_STORE_LIST_URL = "https://api.itdos.com/apiengine/get-microi-store-list?OsClient=iTdos";
 
 export default {
     name: "BackgroundTaskCenter",
@@ -418,6 +433,7 @@ export default {
             platformNotifications: [],
             notificationUnreadCount: 0,
             storeNotices: [],
+            storeLoadError: "",
             myTerminals: [],
             onlineUsers: [],
             loading: false,
@@ -427,6 +443,12 @@ export default {
             terminalLoading: false,
             lastStoreCheckTime: 0,
             storeCheckTimer: null,
+            platformMaintenanceTaskIds: {},
+            storeRefreshAfterTaskPending: false,
+            officialAppCheckRunner: null,
+            officialAppMaintenanceRefreshRunner: null,
+            officialAppCheckGeneration: 0,
+            officialAppChecksDisposed: false,
             Delete,
             Download,
             Refresh,
@@ -462,6 +484,14 @@ export default {
                 || String(value ?? "").trim().toLowerCase() === "true"
                 || String(value ?? "").trim() === "1";
         },
+        officialAppExecutionScope() {
+            return [
+                String(this.diyStore?.OsClient || ""),
+                String(this.currentUser?.Id || ""),
+                this.isAdmin ? "admin" : "user",
+                this.isOfficialPlatform ? "official" : "tenant"
+            ].join("|");
+        },
         canBulkMaintainPlatformApps() {
             return this.isSuperAdmin && !this.isOfficialPlatform;
         },
@@ -490,6 +520,7 @@ export default {
         }
     },
     mounted() {
+        this.officialAppChecksDisposed = false;
         this.bindWebsocket();
         this.refreshTasks();
         this.loadPlatformNotifications();
@@ -499,6 +530,7 @@ export default {
         document.addEventListener("visibilitychange", this.handleTaskVisibilityChange);
     },
     beforeUnmount() {
+        this.invalidateOfficialAppCheckWork(true);
         window.removeEventListener("microi-websocket-connected", this.handleWebSocketConnected);
         window.removeEventListener("microi-background-task-started", this.handleBackgroundTaskStarted);
         document.removeEventListener("visibilitychange", this.handleTaskVisibilityChange);
@@ -512,25 +544,19 @@ export default {
         }
     },
     watch: {
-        isAdmin(value) {
-            if (value) {
+        officialAppExecutionScope() {
+            // 管理员身份、租户或“官方平台”投影变化时，让旧作用域中的在飞请求失效。
+            // 新作用域重新创建 runner，旧 promise 即使稍后完成也不能回写当前界面。
+            this.invalidateOfficialAppCheckWork();
+            if (this.isAdmin && !this.isOfficialPlatform) {
                 this.startOfficialAppChecker(true);
             } else {
                 this.stopOfficialAppChecker();
                 this.storeNotices = [];
+                this.storeLoadError = "";
                 if (this.activeTab === "apps") {
                     this.activeTab = "tasks";
                 }
-            }
-        },
-        isOfficialPlatform(value) {
-            // 官方主租户是应用发布源，安装器在服务端也会拒绝执行；身份投影异步到达时
-            // 立即丢弃此前的安装提醒，避免短暂错误角标或继续轮询官网应用列表。
-            if (value) {
-                this.stopOfficialAppChecker();
-                this.storeNotices = [];
-            } else if (this.isAdmin) {
-                this.startOfficialAppChecker(true);
             }
         },
         isSuperAdmin(value) {
@@ -544,6 +570,23 @@ export default {
         }
     },
     methods: {
+        invalidateOfficialAppCheckWork(dispose = false) {
+            this.officialAppCheckGeneration++;
+            if (dispose) this.officialAppChecksDisposed = true;
+            this.officialAppCheckRunner = null;
+            this.officialAppMaintenanceRefreshRunner = null;
+            this.storeRefreshAfterTaskPending = false;
+            this.storeLoading = false;
+            this.storeNotices = [];
+            this.storeLoadError = "";
+            this.lastStoreCheckTime = 0;
+        },
+        isOfficialAppCheckCurrent(generation) {
+            return !this.officialAppChecksDisposed
+                && generation === this.officialAppCheckGeneration
+                && this.isAdmin
+                && !this.isOfficialPlatform;
+        },
         openCenter() {
             this.visible = true;
         },
@@ -584,14 +627,18 @@ export default {
                 this.loadTerminals();
             }
         },
-        handleBackgroundTaskStarted() {
-            this.refreshTasks();
-            if (this.isAdmin) {
-                this.checkOfficialApps(true);
+        handleBackgroundTaskStarted(event) {
+            const task = event?.detail?.Data || event?.detail || {};
+            const taskId = task.Id || task.TaskId || task.BackgroundTaskId;
+            if (taskId && this.isPlatformAppMaintenanceTask(task)) {
+                this.platformMaintenanceTaskIds[String(taskId)] = true;
             }
+            this.refreshTasks();
         },
         handleTaskList(data) {
             const rows = Array.isArray(data) ? data : (Array.isArray(data?.Data) ? data.Data : []);
+            const maintenanceCompleted = this.hasCompletedPlatformMaintenanceTransition(rows);
+            if (maintenanceCompleted) void this.refreshOfficialAppsAfterMaintenance();
             if (this.taskPage !== 1) return;
             this.tasks = this.mergeTaskSummaries(rows);
             this.taskCount = Math.max(Number(data?.DataCount || 0), this.taskCount, rows.length);
@@ -650,6 +697,7 @@ export default {
         startOfficialAppChecker(force = false) {
             if (!this.isAdmin || this.isOfficialPlatform) {
                 this.storeNotices = [];
+                this.storeLoadError = "";
                 return;
             }
             this.checkOfficialApps(force);
@@ -679,9 +727,12 @@ export default {
                     _PageSize: this.taskPageSize
                 }, null, null, "json");
                 if (result && result.Code === 1) {
+                    const rows = Array.isArray(result.Data) ? result.Data : [];
+                    const maintenanceCompleted = this.hasCompletedPlatformMaintenanceTransition(rows);
                     this.taskPage = Math.max(1, Number(page) || 1);
-                    this.tasks = this.mergeTaskSummaries(Array.isArray(result.Data) ? result.Data : []);
+                    this.tasks = this.mergeTaskSummaries(rows);
                     this.taskCount = Number(result.DataCount || this.tasks.length || 0);
+                    if (maintenanceCompleted) void this.refreshOfficialAppsAfterMaintenance();
                 }
             } finally {
                 this.loading = false;
@@ -797,23 +848,17 @@ export default {
         },
         async loadInstalledVersions(force = false) {
             if (!this.isAdmin) return [];
-            try {
-                return await DiyCommon.EnsureAppStores({ force });
-            } catch (error) {
-                console.warn("[BackgroundTask] load installed app versions failed", error);
+            const result = await DiyCommon.FormEngine.GetTableData("sys_microistoreversion", {
+                _SelectFields: OFFICIAL_APP_INSTALLED_FIELDS,
+                _PageIndex: 1,
+                _PageSize: 5000,
+                _OrderBy: "UpdateTime",
+                _OrderByType: "DESC"
+            });
+            if (!result || result.Code !== 1 || !Array.isArray(result.Data)) {
+                throw new Error(result?.Msg || this.$t("Msg.OfficialAppCheckFailed"));
             }
-            return [];
-        },
-        normalizeOfficialAppNotice(row) {
-            const item = DiyCommon.ApplyAppStoreInstallState({ ...(row || {}) });
-            item.Status = item.StoreInstallStatus || item.AppInstallStatus || DiyCommon.GetAppStoreInstallStatus(item);
-            if (!item.AppVersionInstall && item._LocalAppVersionInstall) {
-                item.AppVersionInstall = item._LocalAppVersionInstall;
-            }
-            if (!item.InstalledVersion && item.AppVersionInstall) {
-                item.InstalledVersion = item.AppVersionInstall;
-            }
-            return item;
+            return result.Data;
         },
         getOfficialAppStatusType(status) {
             return status === "Outdated" ? "warning" : "danger";
@@ -827,47 +872,125 @@ export default {
             }
             return this.$t("Msg.OfficialAppOutdated");
         },
-        async checkOfficialApps(force) {
+        checkOfficialApps(force) {
             // 官方主租户维护的是应用母版，不存在“安装/更新平台应用”的待办语义。
             // 在任何本地安装版本读取或跨域商城请求之前退出，避免生成虚假提醒。
-            if (!this.isAdmin || this.isOfficialPlatform) {
+            if (this.officialAppChecksDisposed || !this.isAdmin || this.isOfficialPlatform) {
                 this.storeNotices = [];
-                return;
+                this.storeLoadError = "";
+                return Promise.resolve();
             }
+            if (!this.officialAppCheckRunner) {
+                this.officialAppCheckRunner = createCoalescedTrailingRunner(
+                    (requestedForce) => this.runOfficialAppCheck(requestedForce),
+                    (pendingForce, requestedForce) => Boolean(pendingForce || requestedForce)
+                );
+            }
+            return this.officialAppCheckRunner(Boolean(force));
+        },
+        async runOfficialAppCheck(force) {
+            const checkGeneration = this.officialAppCheckGeneration;
+            if (!this.isOfficialAppCheckCurrent(checkGeneration)) return;
             const now = Date.now();
             if (!force && this.lastStoreCheckTime && now - this.lastStoreCheckTime < STORE_CHECK_INTERVAL) {
                 return;
             }
-            if (this.storeLoading) return;
             this.storeLoading = true;
             try {
-                await this.loadInstalledVersions(force);
-                const result = await DiyCommon.PostAsync({
-                    url: MASTER_STORE_LIST_URL,
-                    data: {
-                        _PageIndex: 1,
-                        _PageSize: 5000,
-                        ApplicationTypes: ["Platform"]
-                    },
-                    dataType: "json",
-                    // 官网应用列表是匿名跨域资源，不能携带当前客户租户的登录 Token。
-                    skipAuthorization: true,
-                    // 官网不可用只影响应用商城提醒，不能弹全局错误或改动客户租户登录态。
-                    suppressAuthFailure: true,
-                    suppressErrorNotification: true
+                const installedVersions = await this.loadInstalledVersions(force);
+                if (!this.isOfficialAppCheckCurrent(checkGeneration)) return;
+                const result = await requestOfficialStoreList({
+                    Action: "CheckPlatformApps",
+                    _PageIndex: 1,
+                    _PageSize: 500,
+                    ApplicationType: "Platform",
+                    ApplicationTypes: ["Platform"],
+                    InstalledVersions: installedVersions
+                }, {
+                    // 匿名浏览器直连失败时，由当前租户的 Managed 商城接口同源代发；
+                    // 目标地址和租户固定为官网，当前租户 Token 不会发送到官网。
+                    proxyRequest: (param) => DiyCommon.PostAsync(
+                        "/apiengine/platform-marketplace-source",
+                        param,
+                        null,
+                        null,
+                        "json",
+                        {
+                            suppressAuthFailure: true,
+                            suppressErrorNotification: true,
+                            timeout: 30000
+                        }
+                    )
                 });
-                if (result && result.Code === 1) {
-                    const rows = Array.isArray(result.Data) ? result.Data : [];
-                    this.storeNotices = rows
-                        .map(this.normalizeOfficialAppNotice)
-                        .filter((item) => item.ApplicationType === "Platform"
-                            && (item.Status === "Uninstalled" || item.Status === "Outdated"));
-                    this.lastStoreCheckTime = now;
-                }
+                if (!this.isOfficialAppCheckCurrent(checkGeneration)) return;
+                this.storeNotices = normalizeOfficialAppNotices(result);
+                this.storeLoadError = "";
+                this.lastStoreCheckTime = now;
             } catch (error) {
+                if (!this.isOfficialAppCheckCurrent(checkGeneration)) return;
                 console.warn("[BackgroundTask] platform app check failed", error);
+                // 失败关闭：不保留旧角标，也不把“读取失败”伪装成“全部最新”。
+                this.storeNotices = [];
+                this.storeLoadError = error?.message || this.$t("Msg.OfficialAppCheckFailed");
+                this.lastStoreCheckTime = 0;
             } finally {
-                this.storeLoading = false;
+                if (checkGeneration === this.officialAppCheckGeneration) {
+                    this.storeLoading = false;
+                }
+            }
+        },
+        isPlatformAppMaintenanceTask(item) {
+            const key = String(
+                item?.TargetApiEngineKey
+                || item?.ApiEngineKey
+                || item?.TargetKey
+                || ""
+            ).trim().toLowerCase();
+            const title = String(item?.Title || item?.Type || "").toLowerCase();
+            const id = String(item?.Id || item?.TaskId || item?.BackgroundTaskId || "");
+            return key === "bulk-import-microi-store-packages"
+                || this.platformMaintenanceTaskIds[id] === true
+                || ((title.includes("平台应用") || title.includes("platform app"))
+                    && (title.includes("安装") || title.includes("更新")
+                        || title.includes("install") || title.includes("update")));
+        },
+        hasCompletedPlatformMaintenanceTransition(rows) {
+            return consumeCompletedPlatformMaintenanceTransitions({
+                rows,
+                previousRows: this.tasks,
+                registeredTaskIds: this.platformMaintenanceTaskIds,
+                isTerminalTask: (item) => this.isTerminalTask(item),
+                isMaintenanceTask: (item) => this.isPlatformAppMaintenanceTask(item)
+            }).length > 0;
+        },
+        refreshOfficialAppsAfterMaintenance() {
+            if (this.officialAppChecksDisposed || !this.isAdmin || this.isOfficialPlatform) {
+                return Promise.resolve();
+            }
+            if (!this.officialAppMaintenanceRefreshRunner) {
+                this.officialAppMaintenanceRefreshRunner = createCoalescedTrailingRunner(
+                    () => this.runOfficialAppsRefreshAfterMaintenance()
+                );
+            }
+            return this.officialAppMaintenanceRefreshRunner();
+        },
+        async runOfficialAppsRefreshAfterMaintenance() {
+            const checkGeneration = this.officialAppCheckGeneration;
+            if (!this.isOfficialAppCheckCurrent(checkGeneration)) return;
+            this.storeRefreshAfterTaskPending = true;
+            try {
+                await DiyCommon.RefreshAppStores();
+                if (!this.isOfficialAppCheckCurrent(checkGeneration)) return;
+                // checkOfficialApps 本身是 single-flight；若已有 25-30 秒请求，强制
+                // 检查会成为 durable trailing run，不再依赖 5 秒轮询后可能被吞掉。
+                await this.checkOfficialApps(true);
+            } catch (error) {
+                if (!this.isOfficialAppCheckCurrent(checkGeneration)) return;
+                console.warn("[BackgroundTask] refresh app state after maintenance failed", error);
+            } finally {
+                if (checkGeneration === this.officialAppCheckGeneration) {
+                    this.storeRefreshAfterTaskPending = false;
+                }
             }
         },
         async installOrUpdateAllPlatformApps() {
@@ -931,6 +1054,7 @@ export default {
 
                 const task = result.Data || {};
                 const taskId = task.Id || task.TaskId || task.BackgroundTaskId || "";
+                if (taskId) this.platformMaintenanceTaskIds[String(taskId)] = true;
                 ElMessage.success(taskId
                     ? this.$t("Msg.PlatformAppsBulkTaskQueuedWithId", { taskId })
                     : this.$t("Msg.PlatformAppsBulkTaskQueued"));

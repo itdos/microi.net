@@ -270,6 +270,8 @@ const capabilities = new Set((model.PackageInfo.Capabilities || []).filter(value
   !String(value).startsWith('ApiEngine:microi-store-package-storage@')
   && !String(value).startsWith('ApiEngine:compact-microi-store-packages@')
   && !String(value).startsWith('ApiEngine:export-microi-store-package@')
+  && !String(value).startsWith('ApiEngine:import-microi-store-package@')
+  && String(value) !== 'Importer:PageEngineDiyTableReferenceRemapV1'
 )));
 for (const value of [
   'Marketplace:HdfsPackagePointerV2',
@@ -277,6 +279,8 @@ for (const value of [
   'ApiEngine:microi-store-package-storage@v1.2.1',
   'ApiEngine:compact-microi-store-packages@v1.1.2',
   'ApiEngine:export-microi-store-package@v1.2.4',
+  'ApiEngine:import-microi-store-package@v2.5.2',
+  'Importer:PageEngineDiyTableReferenceRemapV1',
 ]) capabilities.add(value);
 model.PackageInfo.Capabilities = [...capabilities];
 model.PackageInfo.RequiredPlatformCapabilities = [
@@ -285,6 +289,7 @@ model.PackageInfo.RequiredPlatformCapabilities = [
     && !String(value).startsWith('ApiEngine:ai_app_publish_store@')
     && !String(value).startsWith('ApiEngine:export-microi-store-package@')
     && !String(value).startsWith('ApiEngine:import-microi-store-package@')
+    && String(value) !== 'Importer:PageEngineDiyTableReferenceRemapV1'
     && String(value) !== 'InstallerFeature:OfficialManagedOverwrite'
     && String(value) !== 'InstallerFeature:PackageManagedOverwriteV2'
     && String(value) !== 'Installer:StartupDependencyApiFastBootstrap'
@@ -294,7 +299,8 @@ model.PackageInfo.RequiredPlatformCapabilities = [
   'ApiEngine:get-microi-store-model@v1.2.9',
   'ApiEngine:ai_app_publish_store@v1.9.13',
   'ApiEngine:export-microi-store-package@v1.2.4',
-  'ApiEngine:import-microi-store-package@v2.5.1',
+  'ApiEngine:import-microi-store-package@v2.5.2',
+  'Importer:PageEngineDiyTableReferenceRemapV1',
   'InstallerFeature:PackageManagedOverwriteV2',
   'Installer:StartupDependencyApiFastBootstrap',
   'Installer:StartupDependencyPreinstallBootstrapV1',
