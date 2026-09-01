@@ -100,6 +100,31 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
+    public void SaasBundle_ValidationAcceptsNullPackageAssetsButRejectsScalarMetadata()
+    {
+        var package = JObject.Parse(LoadBundledResources()["app.microi.saas-engine.json"]);
+        var bundle = Assert.IsType<JObject>(
+            Assert.Single(Assert.IsType<JArray>(package["ApplicationBundles"])));
+        var validate = GetPrivateStaticMethod("ValidateResourceContent");
+
+        bundle["PackageAssets"] = JValue.CreateNull();
+        validate.Invoke(null, new object[]
+        {
+            "app.microi.saas-engine.json",
+            package.ToString(Newtonsoft.Json.Formatting.None)
+        });
+
+        bundle["PackageAssets"] = "invalid-scalar";
+        var exception = Assert.Throws<TargetInvocationException>(() => validate.Invoke(null, new object[]
+        {
+            "app.microi.saas-engine.json",
+            package.ToString(Newtonsoft.Json.Formatting.None)
+        }));
+        Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("DatabaseOnly", exception.InnerException!.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StartupDependencyGate_LoadsEveryEngineFromAllOfficialBaselinePackages()
     {
         var method = typeof(UpgradeAppStore).GetMethod(

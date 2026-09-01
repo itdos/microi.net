@@ -1848,11 +1848,10 @@ test("SaaS engine ships its built-in microservice as a bounded database-only run
   assert.equal(bundle.ApplicationType, "MicroService");
   assert.equal(bundle.MicroService?.StorageMode, "db");
   assert.equal(bundle.MicroService?.MsUrl, "db");
-  assert.deepEqual(bundle.AssetStoragePolicy, {
-    Source: "NotIncluded",
-    Build: "DatabaseOnly",
-    Reason: "平台内置微服务只交付可验证运行产物；数据库内联受 256 文件/5MB 限制，不依赖目标租户对象存储。",
-  });
+  assert.equal(bundle.AssetStoragePolicy?.Source, "NotIncluded");
+  assert.equal(bundle.AssetStoragePolicy?.Build, "DatabaseOnly");
+  assert.match(bundle.AssetStoragePolicy?.Reason || "", /数据库内联运行时/);
+  assert.match(bundle.AssetStoragePolicy?.Reason || "", /对象存储.*404/);
   const assets = bundle.BuildAssets || [];
   assert.ok(assets.length > 0 && assets.length <= 256);
   assert.ok(assets.reduce((sum, asset) => sum + Number(asset.Size || 0), 0) <= 5 * 1024 * 1024);

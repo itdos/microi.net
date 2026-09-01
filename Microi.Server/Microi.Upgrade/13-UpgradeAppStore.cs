@@ -2972,11 +2972,16 @@ WHERE {idColumn}=@p0");
                 var bundle = (package["ApplicationBundles"] as JArray)?.FirstOrDefault() as JObject;
                 var sourceFiles = bundle?["SourceFiles"] as JArray;
                 var buildAssets = bundle?["BuildAssets"] as JArray;
+                var packageAssets = bundle?["PackageAssets"];
+                var packageAssetsObject = packageAssets as JObject;
                 var buildBytes = buildAssets?.Sum(item => item?["Size"]?.Value<long?>() ?? 0L) ?? 0L;
                 if (package["PackageInfo"]?["IncludeSource"]?.Value<bool?>() != false
                     || bundle?["IncludeSource"]?.Value<bool?>() != false
                     || (sourceFiles?.Count ?? 0) != 0
-                    || bundle?["PackageAssets"]?["SourceZip"] != null
+                    || (packageAssets != null
+                        && packageAssets.Type != JTokenType.Null
+                        && packageAssetsObject == null)
+                    || packageAssetsObject?["SourceZip"] != null
                     || !string.Equals(bundle?["MicroService"]?["StorageMode"]?.ToString(), "db", StringComparison.OrdinalIgnoreCase)
                     || !string.Equals(bundle?["AssetStoragePolicy"]?["Source"]?.ToString(), "NotIncluded", StringComparison.Ordinal)
                     || !string.Equals(bundle?["AssetStoragePolicy"]?["Build"]?.ToString(), "DatabaseOnly", StringComparison.Ordinal)

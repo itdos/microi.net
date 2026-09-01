@@ -6,6 +6,27 @@
 >
 > GP-M322 继续逐字节接收原有 TSPL；CC4 会在发送前把 `createNew()` 的标准 TSC 调用安全转换为厂家 CPCL。`createNewESC()` 生成的 ESC/POS 在两条路径上都保持原样。
 
+## 📸 预览图
+
+<div class="mci-doc-screenshot-grid">
+  <figure>
+    <img src="/images/product-screenshots/bluetooth-printer-output-gp-m322.jpg" alt="蓝牙打印机输出主构件二维码标签实拍" data-fancybox="bluetooth-printer-preview">
+    <figcaption>主构件二维码标签实机打印结果。</figcaption>
+  </figure>
+  <figure>
+    <img src="/images/product-screenshots/bluetooth-printer-output-test-page.jpg" alt="蓝牙打印机输出业务标签与 Microi 测试页实拍" data-fancybox="bluetooth-printer-preview">
+    <figcaption>业务标签与 Microi 蓝牙打印测试结果。</figcaption>
+  </figure>
+  <figure>
+    <img src="/images/product-screenshots/mobile-bluetooth-settings.jpg" alt="Microi 移动端蓝牙连接入口和已连接设备状态" data-fancybox="bluetooth-printer-preview">
+    <figcaption>移动端查看当前蓝牙打印机及连接状态。</figcaption>
+  </figure>
+  <figure>
+    <img src="/images/product-screenshots/mobile-bluetooth-print-specification.jpg" alt="Microi 移动端微服务选择蓝牙打印规格" data-fancybox="bluetooth-printer-preview">
+    <figcaption>微服务内选择 75×60 mm 或 100×60 mm 打印规格。</figcaption>
+  </figure>
+</div>
+
 ## 先看结论
 
 | 打印机 | 连接页型号 | 标签指令 | 传输 | 旧 V8 是否改动 |

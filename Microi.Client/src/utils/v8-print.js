@@ -79,11 +79,18 @@ function canUseUniWriteNoResponse() {
         && typeof globalThis.uni.writeBLECharacteristicValue === "function";
 }
 
+function shouldPreferUniWriteNoResponse() {
+    if (!canUseUniWriteNoResponse() || typeof window === "undefined" || !window.plus) return false;
+    var osName = window.plus.os && window.plus.os.name;
+    return String(osName || "").toLowerCase() === "android" || (!osName && !!window.plus.android);
+}
+
 function sortPlusWriteCandidates(candidates) {
+    var preferNoResponse = shouldPreferUniWriteNoResponse();
     return normalizeWriteCandidates(candidates).sort(function (left, right) {
         function score(candidate) {
             return (isKnownPrinterService(candidate.serviceId) ? 1000 : 0)
-                + (candidate.writeType === "write" ? 100 : 0);
+                + (candidate.writeType === (preferNoResponse ? "writeNoResponse" : "write") ? 100 : 0);
         }
         return score(right) - score(left);
     });
@@ -256,15 +263,24 @@ function updateConnectionState(Print, status, detail) {
     return next;
 }
 
-function applyConnectedInfo(Print, info) {
+function applyConnectedInfo(Print, info, options) {
+    options = options || {};
     var normalized = normalizeBLEInfo(info);
     if (!normalized) throw new Error("蓝牙设备信息不完整");
     Print.BLEInformation = Object.assign(emptyBLEInfo(), normalized);
-    Print._rememberedInfo = Object.assign({}, normalized);
+    var remembered = normalized;
+    if (options.deferWriteCandidatePersistence) {
+        remembered = normalizeBLEInfo(Object.assign({}, normalized, {
+            writeCharaterId: "",
+            writeServiceId: "",
+            writeType: "",
+        }));
+    }
+    Print._rememberedInfo = Object.assign({}, remembered);
     Print._profileMode = normalized.profileMode;
     Print._manualDisconnect = false;
     Print._reconnectAttempt = 0;
-    saveBLEInfo(normalized);
+    saveBLEInfo(remembered);
     updateConnectionState(Print, "connected", { error: "" });
 }
 
@@ -272,6 +288,7 @@ function clearLiveConnection(Print) {
     Print._plusConnected = false;
     Print._plusWriteCandidates = [];
     Print._plusWriteCandidateIndex = -1;
+    Print._plusWriteCandidateValidated = false;
     closePlusSppConnection(Print);
     Print._webServer = null;
     Print._webWriteChar = null;
@@ -553,9 +570,59 @@ function selectPlusWriteCandidate(Print, index) {
     });
     var normalized = normalizeBLEInfo(live);
     Print.BLEInformation = Object.assign(emptyBLEInfo(), normalized);
+    Print._plusWriteCandidateValidated = false;
+    return true;
+}
+
+function commitPlusWriteCandidate(Print) {
+    var normalized = normalizeBLEInfo(Print.BLEInformation);
+    if (!normalized) return;
+    Print._plusWriteCandidateValidated = true;
     Print._rememberedInfo = Object.assign({}, normalized);
     saveBLEInfo(normalized);
-    return true;
+    updateConnectionState(Print, "connected", { error: "" });
+}
+
+function invalidatePlusBleConnection(Print, reason) {
+    var deviceId = Print.BLEInformation.deviceId;
+    Print._suppressDisconnectUntil = Date.now() + 1500;
+    try {
+        if (deviceId) window.plus.bluetooth.closeBLEConnection({ deviceId: deviceId });
+    } catch (e) { }
+    clearLiveConnection(Print);
+    updateConnectionState(Print, "disconnected", { error: reason || "蓝牙打印通道不可用，请重新连接打印机" });
+}
+
+function plusWriteFailureSummary(error) {
+    return String(error && error.message || error || "未知错误");
+}
+
+async function fallbackFirstPlusChunkToCc4Spp(Print, chunk, bleError) {
+    var info = normalizeBLEInfo(Print.BLEInformation);
+    var profile = currentPrinterProfile(Print, info);
+    if (!info || profile.id !== "zicox-cc4" || !isPlusAndroidSppSupported()) return false;
+
+    try {
+        await connectPlusSppDevice(Print, {
+            deviceId: info.deviceId,
+            name: info.deviceName,
+            transportHint: "spp",
+            profileMode: info.profileMode,
+        }, { profileMode: info.profileMode });
+        await writePlusSppChunk(Print, chunk);
+        console.warn(LOG_PREFIX + " CC4 的 BLE 写入通道不受支持，首包已安全切换到经典蓝牙 SPP");
+        return true;
+    } catch (sppError) {
+        invalidatePlusBleConnection(Print, "CC4 的 BLE 与经典蓝牙 SPP 通道均不可用");
+        var combined = new Error(
+            "CC4 BLE 写入失败（" + plusWriteFailureSummary(bleError)
+            + "）；SPP 连接或写入也失败（" + plusWriteFailureSummary(sppError)
+            + "）。请确认打印机已在 Android 系统蓝牙中配对后重新连接"
+        );
+        combined.code = Number(bleError && bleError.code) || 10007;
+        combined.bleCandidatesExhausted = true;
+        throw combined;
+    }
 }
 
 function createPlusWriteError(error) {
@@ -598,12 +665,25 @@ async function writePlusBleChunkWithCandidateFallback(Print, chunk, allowFallbac
     while (true) {
         try {
             await writePlusBleChunk(Print, chunk);
+            if (!Print._plusWriteCandidateValidated) commitPlusWriteCandidate(Print);
             return;
         } catch (error) {
             var isUnsupported = Number(error && error.code) === 10007
                 || /10007|特征值不支持|property not support/i.test(String(error && error.message || error));
             var nextIndex = Print._plusWriteCandidateIndex + 1;
-            if (!allowFallback || !isUnsupported || nextIndex >= Print._plusWriteCandidates.length) throw error;
+            if (!allowFallback || !isUnsupported) throw error;
+            if (nextIndex >= Print._plusWriteCandidates.length) {
+                if (await fallbackFirstPlusChunkToCc4Spp(Print, chunk, error)) return;
+                var profile = currentPrinterProfile(Print);
+                var hint = profile.id === "zicox-cc4"
+                    ? "请确认打印机已在 Android 系统蓝牙中配对后重新连接"
+                    : "若设备是以序列号作为广播名的 ZICOX CC4，请在蓝牙连接页手工选择 ZICOX CC4 后重连";
+                var unsupported = new Error("BLE 写入失败（" + plusWriteFailureSummary(error) + "）；" + hint);
+                unsupported.code = Number(error && error.code) || 10007;
+                unsupported.bleCandidatesExhausted = true;
+                invalidatePlusBleConnection(Print, unsupported.message);
+                throw unsupported;
+            }
             selectPlusWriteCandidate(Print, nextIndex);
             console.warn(LOG_PREFIX + " 当前写入特征不支持打印，自动切换到下一个可写特征");
         }
@@ -671,7 +751,8 @@ async function connectPlusDevice(Print, device, options) {
                         characteristicId: characteristic.uuid,
                         writeType: "write",
                     });
-                } else if ((properties.writeNoResponse || properties.writeWithoutResponse) && canUseUniWriteNoResponse()) {
+                }
+                if ((properties.writeNoResponse || properties.writeWithoutResponse) && canUseUniWriteNoResponse()) {
                     writeCandidates.push({
                         serviceId: serviceId,
                         characteristicId: characteristic.uuid,
@@ -696,7 +777,8 @@ async function connectPlusDevice(Print, device, options) {
         Print._plusConnected = true;
         Print._plusWriteCandidates = writeCandidates;
         Print._plusWriteCandidateIndex = 0;
-        applyConnectedInfo(Print, info);
+        Print._plusWriteCandidateValidated = false;
+        applyConnectedInfo(Print, info, { deferWriteCandidatePersistence: true });
         if (typeof options.onStatus === "function") options.onStatus("已连接: " + deviceName, "connected");
         console.log(LOG_PREFIX + " [plus] 蓝牙连接成功");
         return true;
@@ -1336,6 +1418,7 @@ function createV8Print(V8) {
         _plusConnected: false,
         _plusWriteCandidates: [],
         _plusWriteCandidateIndex: -1,
+        _plusWriteCandidateValidated: false,
         _plusSppSocket: null,
         _plusSppOutput: null,
         _webDevice: null,
@@ -1370,15 +1453,24 @@ function createV8Print(V8) {
             if (rawMode !== "auto" && !PRINTER_PROFILES[rawMode]) throw new Error("不支持的蓝牙打印机型号: " + profileMode);
             var mode = normalizeProfileMode(rawMode);
             Print._profileMode = mode;
-            var source = normalizeBLEInfo(Print.isConnected() ? Print.BLEInformation : Print._rememberedInfo);
+            var connected = Print.isConnected();
+            var source = normalizeBLEInfo(connected ? Print.BLEInformation : Print._rememberedInfo);
             if (source) {
                 source.profileMode = mode;
                 var normalized = normalizeBLEInfo(source);
-                if (Print.isConnected()) Print.BLEInformation = Object.assign(emptyBLEInfo(), normalized);
-                Print._rememberedInfo = Object.assign({}, normalized);
-                saveBLEInfo(normalized);
+                if (connected) Print.BLEInformation = Object.assign(emptyBLEInfo(), normalized);
+                var remembered = normalized;
+                if (connected && isPlusApp() && normalized.transport === "ble" && !Print._plusWriteCandidateValidated) {
+                    remembered = normalizeBLEInfo(Object.assign({}, normalized, {
+                        writeCharaterId: "",
+                        writeServiceId: "",
+                        writeType: "",
+                    }));
+                }
+                Print._rememberedInfo = Object.assign({}, remembered);
+                saveBLEInfo(remembered);
             }
-            updateConnectionState(Print, Print.isConnected() ? "connected" : undefined, { error: "" });
+            updateConnectionState(Print, connected ? "connected" : undefined, { error: "" });
             return Print.getPrinterProfile();
         },
 
@@ -1583,7 +1675,9 @@ function createV8Print(V8) {
                     if (copyIndex + 1 < Print.printerNum) await delay(100);
                 }
             } catch (error) {
-                if (Print.BLEInformation.transport === "spp" || !Print.isConnected() || /10006|断开|disconnected|GATT/i.test(String(error.message || error))) {
+                var candidatesExhausted = !!(error && error.bleCandidatesExhausted);
+                var errorMessage = String(error && error.message || error || "");
+                if (!candidatesExhausted && (Print.BLEInformation.transport === "spp" || !Print.isConnected() || /10006|断开|disconnected|GATT/i.test(errorMessage))) {
                     markUnexpectedDisconnect(Print, "蓝牙写入失败，连接已断开");
                 }
                 throw error;
