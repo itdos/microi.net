@@ -49,6 +49,7 @@ namespace Dos.ORM
         private static string MySqlHostCacheRepairConnectionString => null;
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> ConnectionOpenSemaphores = new ConcurrentDictionary<string, SemaphoreSlim>();
         private static readonly ConcurrentDictionary<string, DateTime> ConnectionBackoffUntil = new ConcurrentDictionary<string, DateTime>();
+        private static readonly ConcurrentDictionary<string, string> ConnectionBackoffFailureCodes = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, DateTime> MySqlHostCacheRepairCooldownUntil = new ConcurrentDictionary<string, DateTime>();
 
         public static event Action<string, string, string> OnConnectionGuardEvent;
@@ -214,6 +215,72 @@ namespace Dos.ORM
             return false;
         }
 
+        internal static string ClassifyConnectionFailure(Exception ex)
+        {
+            var hostInvalid = false;
+            var credentialsRejected = false;
+            var databaseNotFound = false;
+            var capacityExceeded = false;
+            var endpointUnreachable = false;
+
+            while (ex != null)
+            {
+                var number = 0;
+                var numberProperty = ex.GetType().GetProperty("Number");
+                if (numberProperty != null)
+                {
+                    try
+                    {
+                        number = Convert.ToInt32(numberProperty.GetValue(ex, null), CultureInfo.InvariantCulture);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                var message = ex.Message ?? string.Empty;
+                hostInvalid = hostInvalid
+                    || message.IndexOf("host name or IP address is invalid", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("name or service not known", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("no such host is known", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("nodename nor servname", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("getaddrinfo", StringComparison.OrdinalIgnoreCase) >= 0;
+                credentialsRejected = credentialsRejected
+                    || number == 1045
+                    || message.IndexOf("access denied for user", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("authentication failed", StringComparison.OrdinalIgnoreCase) >= 0;
+                databaseNotFound = databaseNotFound
+                    || number == 1049
+                    || message.IndexOf("unknown database", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("database does not exist", StringComparison.OrdinalIgnoreCase) >= 0;
+                capacityExceeded = capacityExceeded
+                    || number == 1040
+                    || number == 1129
+                    || number == 1203
+                    || message.IndexOf("too many connections", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("max_user_connections", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("blocked because of many connection errors", StringComparison.OrdinalIgnoreCase) >= 0;
+                endpointUnreachable = endpointUnreachable
+                    || number == 1042
+                    || number == 1043
+                    || number == 2002
+                    || number == 2003
+                    || message.IndexOf("unable to connect to any of the specified mysql hosts", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("connection refused", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("connection timed out", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("timeout expired", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                ex = ex.InnerException;
+            }
+
+            if (hostInvalid) return "DatabaseHostInvalid";
+            if (credentialsRejected) return "DatabaseCredentialsRejected";
+            if (databaseNotFound) return "DatabaseNotFound";
+            if (capacityExceeded) return "DatabaseCapacityExceeded";
+            if (endpointUnreachable) return "DatabaseEndpointUnreachable";
+            return "DatabaseConnectionUnavailable";
+        }
+
         private static bool IsMySqlHostBlockedException(Exception ex)
         {
             while (ex != null)
@@ -257,6 +324,7 @@ namespace Dos.ORM
                 }
 
                 ConnectionBackoffUntil.TryRemove(guardKey, out _);
+                ConnectionBackoffFailureCodes.TryRemove(guardKey, out _);
             }
 
             return TimeSpan.Zero;
@@ -265,7 +333,8 @@ namespace Dos.ORM
         private void FailIfConnectionBackoffActive(string guardKey)
         {
             var remaining = GetConnectionBackoffRemaining(guardKey);
-            ThrowIfConnectionBackoffActive(remaining);
+            ConnectionBackoffFailureCodes.TryGetValue(guardKey, out var failureCode);
+            ThrowIfConnectionBackoffActive(remaining, failureCode);
         }
 
         private Task FailIfConnectionBackoffActiveAsync(
@@ -274,19 +343,27 @@ namespace Dos.ORM
         {
             cancellationToken.ThrowIfCancellationRequested();
             var remaining = GetConnectionBackoffRemaining(guardKey);
-            ThrowIfConnectionBackoffActive(remaining);
+            ConnectionBackoffFailureCodes.TryGetValue(guardKey, out var failureCode);
+            ThrowIfConnectionBackoffActive(remaining, failureCode);
             return Task.CompletedTask;
         }
 
-        internal static void ThrowIfConnectionBackoffActive(TimeSpan remaining)
+        internal static void ThrowIfConnectionBackoffActive(TimeSpan remaining, string failureCode = null)
         {
             if (remaining <= TimeSpan.Zero) return;
 
             var retryAfterSeconds = Math.Max(1, (int)Math.Ceiling(remaining.TotalSeconds));
+            var safeFailureCode = failureCode == "DatabaseHostInvalid"
+                                  || failureCode == "DatabaseCredentialsRejected"
+                                  || failureCode == "DatabaseNotFound"
+                                  || failureCode == "DatabaseCapacityExceeded"
+                                  || failureCode == "DatabaseEndpointUnreachable"
+                ? failureCode
+                : "DatabaseConnectionUnavailable";
             throw new TimeoutException(
                 "Database connection is temporarily unavailable. Retry after "
                 + retryAfterSeconds.ToString(CultureInfo.InvariantCulture)
-                + " seconds.");
+                + " seconds. [ErrorCode=" + safeFailureCode + "]");
         }
 
         internal static int NormalizeConnectionOpenWaitSeconds(int configuredSeconds)
@@ -302,6 +379,7 @@ namespace Dos.ORM
             }
 
             ConnectionBackoffUntil[guardKey] = DateTime.UtcNow.AddSeconds(ConnectionPressureBackoffSeconds);
+            ConnectionBackoffFailureCodes[guardKey] = ClassifyConnectionFailure(ex);
             TryRepairMySqlHostCache(guardKey, ex);
         }
 

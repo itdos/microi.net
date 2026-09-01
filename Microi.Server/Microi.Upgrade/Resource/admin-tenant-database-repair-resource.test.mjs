@@ -35,7 +35,7 @@ function run(param, method, currentUser = { Id: 'admin', Level: 9999 }) {
 test('resource declares Managed ownership, compiles and generator owns the fixed engine', () => {
   assert.match(source, /^\/\* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1/);
   assert.match(source, new RegExp(`ApiEngineKey：${engineKey}`));
-  assert.match(source, /Version: v1\.0\.2/);
+  assert.match(source, /Version: v1\.0\.3/);
   assert.match(source, /platform-runtime-custom-hook（CreateIfMissing）/);
   assert.doesNotThrow(() => new Function('V8', source));
 
@@ -51,6 +51,7 @@ test('resource declares Managed ownership, compiles and generator owns the fixed
   assert.match(generator, new RegExp(`'ApiEngine:${engineKey}'`));
   assert.match(generator, /tenantDatabaseRepairPackageVersion = 'v7\.7\.19'/);
   assert.match(generator, /tenantDatabaseRepairMcpCompatibilityPackageVersion = 'v7\.7\.22'/);
+  assert.match(generator, /tenantDatabaseStaleReadRepairPackageVersion = 'v7\.7\.23'/);
 });
 
 test('identity and host capability gates fail closed before any repair call', () => {
@@ -114,7 +115,56 @@ test('unknown fields, malformed targets and mismatched confirmation are rejected
   assert.equal(run(validParam({ DbConn: 'must-never-enter' }), method).Code, 0);
   assert.equal(run(validParam({ Token: 'must-never-enter' }), method).Code, 0);
   assert.equal(run(validParam({ ExpectedDatabaseName: 'other_database', ValidateOnly: true }), method).Code, 0);
+  assert.equal(run(validParam({ ExpectedStaleReadDatabaseName: 'bad-name', ValidateOnly: true }), method).Code, 0);
+  assert.equal(run(validParam({ ExpectedStaleReadDatabaseName: 'jisu1', ValidateOnly: true }), method).Code, 0);
   assert.equal(run(validParam({ ConfirmExecution: 'wrong' }), method).Code, 0);
+});
+
+test('stale read replacement requires its exact database name in the confirmation and host request', () => {
+  let called = false;
+  const validateResult = run(validParam({
+    ExpectedStaleReadDatabaseName: 'wuma_beilun',
+    ValidateOnly: true,
+  }), {
+    RepairAdminTenantDatabaseAccess() {
+      called = true;
+      return { Code: 1 };
+    },
+  });
+  assert.equal(validateResult.Code, 1);
+  assert.equal(validateResult.Data.RequiredConfirmExecution,
+    '01M168BVFYYAE81T1T1RQDAR85:jisu1:jisu1:replace-stale-read:wuma_beilun');
+  assert.equal(called, false);
+
+  let hostParam;
+  const result = run(validParam({
+    ExpectedStaleReadDatabaseName: 'wuma_beilun',
+    ConfirmExecution:
+      '01M168BVFYYAE81T1T1RQDAR85:jisu1:jisu1:replace-stale-read:wuma_beilun',
+  }), {
+    RepairAdminTenantDatabaseAccess(value) {
+      hostParam = value;
+      return {
+        Code: 1,
+        Data: {
+          CredentialScope: 'DatabaseOnly',
+          DurableConfigurationUpdated: true,
+          RuntimeReloaded: true,
+          StaleReadConnectionReplaced: true,
+        },
+      };
+    },
+  });
+  assert.deepEqual(hostParam, {
+    TenantId: '01M168BVFYYAE81T1T1RQDAR85',
+    TenantKey: 'jisu1',
+    ExpectedDatabaseName: 'jisu1',
+    OsClientType: 'Product',
+    OsClientNetwork: 'Internal',
+    ExpectedStaleReadDatabaseName: 'wuma_beilun',
+  });
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.StaleReadConnectionReplaced, true);
 });
 
 test('execution forwards only the five safe locators and sanitizes host success', () => {

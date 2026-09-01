@@ -7,7 +7,7 @@
  * 本接口不会调用该 Hook，禁止在 Hook 或本接口中接收、读取、记录、返回任何数据库秘密。
  */
 
-/* V8 ApiEngine | ApiEngineKey: admin_repair_saas_tenant_database_access | Version: v1.0.2 */
+/* V8 ApiEngine | ApiEngineKey: admin_repair_saas_tenant_database_access | Version: v1.0.3 */
 
 var param = V8.Param || {};
 var currentUser = V8.CurrentUser || {};
@@ -15,6 +15,7 @@ var allowedInputKeys = {
   TenantId: true,
   TenantKey: true,
   ExpectedDatabaseName: true,
+  ExpectedStaleReadDatabaseName: true,
   Type: true,
   Network: true,
   ValidateOnly: true,
@@ -85,6 +86,7 @@ if (!V8.Method || typeof V8.Method.RepairAdminTenantDatabaseAccess !== 'function
 var tenantId = text(param.TenantId);
 var tenantKey = text(param.TenantKey);
 var expectedDatabaseName = text(param.ExpectedDatabaseName);
+var expectedStaleReadDatabaseName = text(param.ExpectedStaleReadDatabaseName);
 var type = text(param.Type);
 var network = text(param.Network);
 if (!/^[A-Za-z0-9_-]{1,80}$/.test(tenantId)) {
@@ -106,8 +108,19 @@ if (expectedDatabaseName.toLowerCase() !== legacyDatabaseName.toLowerCase()
     && expectedDatabaseName.toLowerCase() !== canonicalDatabaseName.toLowerCase()) {
   return { Code: 0, Msg: 'ExpectedDatabaseName必须与TenantKey对应。' };
 }
+if (expectedStaleReadDatabaseName
+    && !/^[A-Za-z0-9_]{1,64}$/.test(expectedStaleReadDatabaseName)) {
+  return { Code: 0, Msg: 'ExpectedStaleReadDatabaseName格式不正确。' };
+}
+if (expectedStaleReadDatabaseName
+    && expectedStaleReadDatabaseName.toLowerCase() === expectedDatabaseName.toLowerCase()) {
+  return { Code: 0, Msg: '旧读库不能与目标数据库相同。' };
+}
 
 var requiredConfirmation = tenantId + ':' + tenantKey + ':' + expectedDatabaseName;
+if (expectedStaleReadDatabaseName) {
+  requiredConfirmation += ':replace-stale-read:' + expectedStaleReadDatabaseName;
+}
 var safeTarget = {
   TenantId: tenantId,
   TenantKey: tenantKey,
@@ -115,6 +128,9 @@ var safeTarget = {
   Type: type,
   Network: network
 };
+if (expectedStaleReadDatabaseName) {
+  safeTarget.ExpectedStaleReadDatabaseName = expectedStaleReadDatabaseName;
+}
 if (isTrue(param.ValidateOnly)) {
   return {
     Code: 1,
@@ -122,6 +138,7 @@ if (isTrue(param.ValidateOnly)) {
       TenantId: tenantId,
       TenantKey: tenantKey,
       ExpectedDatabaseName: expectedDatabaseName,
+      ExpectedStaleReadDatabaseName: expectedStaleReadDatabaseName,
       Type: type,
       Network: network,
       ValidationScope: 'RequestContractOnly',
@@ -137,13 +154,17 @@ if (text(param.ConfirmExecution) !== requiredConfirmation) {
 
 // 只把固定目标定位字段交给可信宿主；Type/Network 显式映射到服务端字段，
 // V8.Param 的其余内容永远不能穿透安全边界。
-var hostResult = V8.Method.RepairAdminTenantDatabaseAccess({
+var hostRequest = {
   TenantId: tenantId,
   TenantKey: tenantKey,
   ExpectedDatabaseName: expectedDatabaseName,
   OsClientType: type,
   OsClientNetwork: network
-});
+};
+if (expectedStaleReadDatabaseName) {
+  hostRequest.ExpectedStaleReadDatabaseName = expectedStaleReadDatabaseName;
+}
+var hostResult = V8.Method.RepairAdminTenantDatabaseAccess(hostRequest);
 if (!hostResult) {
   return { Code: 0, Data: safeTarget, Msg: '租户数据库连接修复未返回结果。' };
 }
@@ -163,7 +184,8 @@ var safeResult = {
   CredentialScope: credentialScope,
   PreviousPrincipalPreserved: bool(hostData.PreviousPrincipalPreserved),
   DurableConfigurationUpdated: bool(hostData.DurableConfigurationUpdated),
-  RuntimeReloaded: bool(hostData.RuntimeReloaded)
+  RuntimeReloaded: bool(hostData.RuntimeReloaded),
+  StaleReadConnectionReplaced: bool(hostData.StaleReadConnectionReplaced)
 };
 var resultCode = Number(hostResult.Code || 0);
 if (resultCode === 1) {

@@ -686,10 +686,11 @@ function validateReleaseCandidate(name, content) {
         || !String(listEngine?.ApiV8Code || '').includes('ownedOnly')
         || !String(listEngine?.ApiV8Code || '').includes('V8.Param.Visibility')
         || !String(listEngine?.ApiV8Code || '').includes('BULK_PLATFORM_BOOTSTRAP_ORDER_V1')
-        || engineVersionNumber(modelEngine) < 1_003_000
+        || engineVersionNumber(modelEngine) < 1_003_001
         || !String(modelEngine?.ApiV8Code || '').includes('MARKETPLACE_PLAIN_OBJECT_STRIP_V1')
         || !String(modelEngine?.ApiV8Code || '').includes('MARKETPLACE_PINNED_INSTALL_SNAPSHOT_V1')
         || !String(modelEngine?.ApiV8Code || '').includes('MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1')
+        || !String(modelEngine?.ApiV8Code || '').includes('MARKETPLACE_LEGACY_PRIVATE_ASSET_URL_BRIDGE_V1')
         || !String(modelEngine?.ApiV8Code || '').includes('privateApplicationAssetDownloadUrls')
         || !String(modelEngine?.ApiV8Code || '').includes('ApplicationAssetDownloadUrls')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
@@ -700,6 +701,8 @@ function validateReleaseCandidate(name, content) {
           .includes('Marketplace:PackageIdentityBindingV1')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('Marketplace:ApplicationBuildVisibilityV1')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('Marketplace:LegacyPrivateAssetUrlBridgeV1')
         || engineVersionNumber(versionsEngine) < 1_000_000
         || !String(versionsEngine?.ApiV8Code || '').includes('mic_data_version')
         || !importerCode.includes('MARKETPLACE_PRIVATE_SOURCE_CREDENTIAL_V1')

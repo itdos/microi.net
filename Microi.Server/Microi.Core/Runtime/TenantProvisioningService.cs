@@ -37,6 +37,7 @@ namespace Microi.net
         public string TenantId { get; set; }
         public string TenantKey { get; set; }
         public string ExpectedDatabaseName { get; set; }
+        public string ExpectedStaleReadDatabaseName { get; set; }
         public string OsClientType { get; set; }
         public string OsClientNetwork { get; set; }
     }
@@ -473,6 +474,8 @@ namespace Microi.net
             var tenantId = (request.TenantId ?? string.Empty).Trim();
             var tenantKey = (request.TenantKey ?? string.Empty).Trim();
             var expectedDatabaseName = (request.ExpectedDatabaseName ?? string.Empty).Trim();
+            var expectedStaleReadDatabaseName =
+                (request.ExpectedStaleReadDatabaseName ?? string.Empty).Trim();
             var osClientType = (request.OsClientType
                                 ?? OsClientDefault.OsClientType
                                 ?? "Product").Trim();
@@ -486,6 +489,7 @@ namespace Microi.net
             var durableConfigurationUpdated = false;
             var previousPrincipal = string.Empty;
             var principalName = string.Empty;
+            var staleReadConnectionReplaced = false;
 
             try
             {
@@ -500,6 +504,11 @@ namespace Microi.net
                     return new DosResult(0, null, "OsClientType格式不正确。");
                 if (!Regex.IsMatch(osClientNetwork, @"^[A-Za-z][A-Za-z0-9_.-]{0,49}$"))
                     return new DosResult(0, null, "OsClientNetwork格式不正确。");
+                if (!expectedStaleReadDatabaseName.DosIsNullOrWhiteSpace()
+                    && !Regex.IsMatch(expectedStaleReadDatabaseName, @"^[A-Za-z0-9_]{1,64}$"))
+                {
+                    return new DosResult(0, null, "待替换旧读库名格式不正确。");
+                }
 
                 var legacyDatabaseName = tenantKey.Replace("-", "_");
                 var canonicalDatabaseName = "microi_" + legacyDatabaseName;
@@ -547,17 +556,45 @@ namespace Microi.net
                     return new DosResult(0, null, "目标租户数据库连接为空，已停止修复。");
                 if (!string.Equals(dbTypeText, "MySql", StringComparison.OrdinalIgnoreCase))
                     return new DosResult(0, null, "当前数据库连接修复原子仅支持MySql。");
-                if (!oldDbReadConn.DosIsNullOrWhiteSpace()
-                    && !string.Equals(oldDbReadConn, oldDbConn, StringComparison.Ordinal))
-                {
-                    return new DosResult(0, null,
-                        "目标租户配置了独立读库，禁止自动覆盖，请人工核查。");
-                }
                 if (!dbReadTypeText.DosIsNullOrWhiteSpace()
                     && !string.Equals(dbReadTypeText, "MySql", StringComparison.OrdinalIgnoreCase))
                 {
                     return new DosResult(0, null,
                         "目标租户读库类型与写库不一致，禁止自动覆盖。");
+                }
+
+                var hasDifferentReadConnection = !oldDbReadConn.DosIsNullOrWhiteSpace()
+                    && !string.Equals(oldDbReadConn, oldDbConn, StringComparison.Ordinal);
+                if (hasDifferentReadConnection)
+                {
+                    if (expectedStaleReadDatabaseName.DosIsNullOrWhiteSpace())
+                    {
+                        return new DosResult(0, null,
+                            "目标租户配置了独立读库，禁止自动覆盖，请人工核查。");
+                    }
+
+                    var parsedReadDatabaseName = ReadConnectionStringValue(
+                        oldDbReadConn, "Database", "Initial Catalog");
+                    if (parsedReadDatabaseName.DosIsNullOrWhiteSpace()
+                        || !string.Equals(parsedReadDatabaseName,
+                            expectedStaleReadDatabaseName,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new DosResult(0, null,
+                            "独立读库与本次确认的旧读库不一致，未执行任何修改。");
+                    }
+                    if (string.Equals(parsedReadDatabaseName, expectedDatabaseName,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new DosResult(0, null,
+                            "独立读库仍指向目标租户数据库，禁止自动覆盖真实读副本。");
+                    }
+                    staleReadConnectionReplaced = true;
+                }
+                else if (!expectedStaleReadDatabaseName.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult(0, null,
+                        "当前不存在与写库不同的旧读库连接，已停止替换。");
                 }
 
                 var parsedDatabaseName = ReadConnectionStringValue(
@@ -709,7 +746,8 @@ namespace Microi.net
                         OsClient = tenantKey,
                         DatabaseName = expectedDatabaseName,
                         DurableConfigurationUpdated = true,
-                        RuntimeReloaded = false
+                        RuntimeReloaded = false,
+                        StaleReadConnectionReplaced = staleReadConnectionReplaced
                     }, "数据库连接已安全修复，但当前节点运行配置刷新失败，请重试刷新运行配置。");
                 }
                 var runtimeClient = OsClientExtend.GetClient(tenantKey);
@@ -728,7 +766,8 @@ namespace Microi.net
                         OsClient = tenantKey,
                         DatabaseName = expectedDatabaseName,
                         DurableConfigurationUpdated = true,
-                        RuntimeReloaded = false
+                        RuntimeReloaded = false,
+                        StaleReadConnectionReplaced = staleReadConnectionReplaced
                     }, "数据库连接已安全修复，但当前节点运行连接回读未通过。");
                 }
 
@@ -747,7 +786,8 @@ namespace Microi.net
                                                 && !string.Equals(previousPrincipal, principalName,
                                                     StringComparison.OrdinalIgnoreCase),
                     DurableConfigurationUpdated = true,
-                    RuntimeReloaded = true
+                    RuntimeReloaded = true,
+                    StaleReadConnectionReplaced = staleReadConnectionReplaced
                 }, "租户数据库连接已修复并完成运行配置刷新。");
             }
             catch (Exception ex)
@@ -773,7 +813,9 @@ namespace Microi.net
                     TenantId = tenantId,
                     OsClient = tenantKey,
                     DatabaseName = expectedDatabaseName,
-                    DurableConfigurationUpdated = durableConfigurationUpdated
+                    DurableConfigurationUpdated = durableConfigurationUpdated,
+                    StaleReadConnectionReplaced = durableConfigurationUpdated
+                                                  && staleReadConnectionReplaced
                 }, durableConfigurationUpdated
                     ? "租户连接已写入，但运行配置刷新未完成。"
                     : "租户数据库连接修复失败，原连接配置保持不变。");

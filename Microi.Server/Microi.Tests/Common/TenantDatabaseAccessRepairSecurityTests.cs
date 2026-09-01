@@ -35,6 +35,11 @@ public sealed class TenantDatabaseAccessRepairSecurityTests
         Assert.Contains("ReloadSingleOsClient(tenantKey)", block, StringComparison.Ordinal);
         Assert.Contains("runtimeClient?.DbRead?.FromSql(\"SELECT DATABASE()\")", block, StringComparison.Ordinal);
         Assert.Contains("\"admin:\" + tenantKey.ToLowerInvariant()", block, StringComparison.Ordinal);
+        Assert.Contains("ExpectedStaleReadDatabaseName", block, StringComparison.Ordinal);
+        Assert.Contains("parsedReadDatabaseName", block, StringComparison.Ordinal);
+        Assert.Contains("expectedStaleReadDatabaseName", block, StringComparison.Ordinal);
+        Assert.Contains("StaleReadConnectionReplaced", block, StringComparison.Ordinal);
+        Assert.Contains("禁止自动覆盖真实读副本", block, StringComparison.Ordinal);
         Assert.DoesNotContain("DropDatabase(", block, StringComparison.Ordinal);
         Assert.DoesNotContain("ImportEmptySql(", block, StringComparison.Ordinal);
         Assert.DoesNotContain("CreateTenantDatabaseAccess(", block, StringComparison.Ordinal);
@@ -76,9 +81,27 @@ public sealed class TenantDatabaseAccessRepairSecurityTests
         return source.Substring(start, end - start);
     }
 
-    private static string FindRepositoryRoot()
+    private static string FindRepositoryRoot(
+        [System.Runtime.CompilerServices.CallerFilePath] string sourceFilePath = "")
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        if (!string.IsNullOrWhiteSpace(sourceFilePath))
+        {
+            var sourceDirectoryRoot = FindRepositoryRootFrom(
+                new DirectoryInfo(Path.GetDirectoryName(sourceFilePath)!));
+            if (sourceDirectoryRoot != null) return sourceDirectoryRoot;
+        }
+
+        var currentDirectoryRoot = FindRepositoryRootFrom(
+            new DirectoryInfo(Directory.GetCurrentDirectory()));
+        if (currentDirectoryRoot != null) return currentDirectoryRoot;
+
+        var appBaseRoot = FindRepositoryRootFrom(new DirectoryInfo(AppContext.BaseDirectory));
+        if (appBaseRoot != null) return appBaseRoot;
+        throw new DirectoryNotFoundException("Repository root was not found.");
+    }
+
+    private static string? FindRepositoryRootFrom(DirectoryInfo? directory)
+    {
         while (directory != null)
         {
             if (File.Exists(Path.Combine(directory.FullName, "Microi.Server", "Microi.net.sln")))
@@ -88,6 +111,6 @@ public sealed class TenantDatabaseAccessRepairSecurityTests
                 return directory.Parent?.FullName ?? directory.FullName;
             directory = directory.Parent;
         }
-        throw new DirectoryNotFoundException("Repository root was not found.");
+        return null;
     }
 }

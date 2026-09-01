@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store-model
- * Version: v1.3.0
+ * Version: v1.3.1
  * Function:
  * - 按公开/私有权限读取不可变应用包，并为私有源码/编译 ZIP 生成不落库的临时下载地址。
  */
@@ -203,6 +203,74 @@ function privateApplicationAssetDownloadUrls(row) {
   }
   return urls;
 }
+function decorateLegacyApplicationAssetUrls(packageBody, urls) {
+  // MARKETPLACE_LEGACY_PRIVATE_ASSET_URL_BRIDGE_V1：v2.3.x 旧导入器不会读取
+  // DataAppend.ApplicationAssetDownloadUrls，只会直接解析 AppPakcet 内 ZIP 的
+  // FullPath/Url。仅装饰本次响应中的包副本；HDFS 原文、sys_microistore 和
+  // mic_data_version 均保持不可变，且 URL 必须来自上方已校验归属的签名映射。
+  var packageModel = parseData(packageBody);
+  if (!packageModel || typeof packageModel !== 'object') return { Text: packageBody, Count: 0 };
+  var bundles = [];
+  var plural = packageModel.ApplicationBundles;
+  if (plural && plural.length !== undefined && typeof plural !== 'string') {
+    for (var pluralIndex = 0; pluralIndex < plural.length; pluralIndex++) {
+      if (plural[pluralIndex]) bundles.push(plural[pluralIndex]);
+    }
+  }
+  var singularNames = ['ApplicationBundle', 'AiApplication', 'FrontendApplication'];
+  for (var singularIndex = 0; singularIndex < singularNames.length; singularIndex++) {
+    var singular = packageModel[singularNames[singularIndex]];
+    if (singular) bundles.push(singular);
+  }
+  var count = 0;
+  var signedUrl = function (asset) {
+    if (!asset || !privatePackageAsset(asset)) return '';
+    var paths = [asset.FilePathName, asset.HdfsPath, asset.FilePath, asset.Path, asset.FullPath];
+    for (var pathIndex = 0; pathIndex < paths.length; pathIndex++) {
+      var raw = trim(paths[pathIndex]);
+      if (!raw) continue;
+      var normalized = normalizedAssetPath(raw);
+      var url = urls[raw] || (normalized && (urls[normalized] || urls['/' + normalized])) || '';
+      if (/^https?:\/\//i.test(url)) return url;
+    }
+    return '';
+  };
+  var decorateAssetSet = function (assetSet) {
+    if (!assetSet) return;
+    var sets = [];
+    if (assetSet.BuildZip || assetSet.SourceZip) sets.push(assetSet);
+    else if (assetSet.length !== undefined && typeof assetSet !== 'string') {
+      for (var setIndex = 0; setIndex < assetSet.length; setIndex++) {
+        if (assetSet[setIndex]) sets.push(assetSet[setIndex]);
+      }
+    }
+    for (var assetSetIndex = 0; assetSetIndex < sets.length; assetSetIndex++) {
+      var currentSet = sets[assetSetIndex] || {};
+      var assets = [currentSet.SourceZip, currentSet.BuildZip];
+      for (var assetIndex = 0; assetIndex < assets.length; assetIndex++) {
+        var asset = assets[assetIndex];
+        var url = signedUrl(asset);
+        if (!url) continue;
+        asset.FullPath = url;
+        asset.Url = url;
+        count++;
+      }
+    }
+  };
+  for (var bundleIndex = 0; bundleIndex < bundles.length; bundleIndex++) {
+    var bundle = bundles[bundleIndex] || {};
+    var propertyName = bundle.PackageAssets !== null && bundle.PackageAssets !== undefined
+      ? 'PackageAssets'
+      : (bundle.ZipAssets !== null && bundle.ZipAssets !== undefined ? 'ZipAssets' : '');
+    if (!propertyName) continue;
+    var originalAssets = bundle[propertyName];
+    var parsedAssets = parseData(originalAssets);
+    if (!parsedAssets) continue;
+    decorateAssetSet(parsedAssets);
+    if (typeof originalAssets === 'string') bundle[propertyName] = JSON.stringify(parsedAssets);
+  }
+  return { Text: count > 0 ? JSON.stringify(packageModel) : packageBody, Count: count };
+}
 function readChangeLogs(storeId) {
   try {
     var result = V8.FormEngine.GetTableData("sys_microistore_changelog", {
@@ -332,6 +400,8 @@ try {
 } catch (assetUrlError) {
   return { Code: 0, Msg: assetUrlError.message };
 }
+// 后续兼容字段与临时 URL 只写入普通 JS 响应副本，绝不触碰 FormEngine 行代理。
+selected = parseData(JSON.stringify(selected)) || selected;
 selected.IsPublic = isPublic ? 1 : 0;
 selected.Visibility = isPublic ? "Public" : "Private";
 if (!flag(V8.Param.IncludePackage, true)) {
@@ -348,6 +418,11 @@ if (!flag(V8.Param.IncludePackage, true)) {
     return { Code: 0, Msg: downloadError.message };
   }
   if (!selected.PackageDownloadUrl) return { Code: 0, Msg: '应用包下载地址为空。' };
+}
+if (flag(V8.Param.IncludePackage, true) && trim(selected.AppPakcet)) {
+  var legacyAssetBridge = decorateLegacyApplicationAssetUrls(selected.AppPakcet, applicationAssetDownloadUrls);
+  selected.AppPakcet = legacyAssetBridge.Text;
+  if (legacyAssetBridge.Count > 0) selected.LegacyApplicationAssetUrlsDecorated = legacyAssetBridge.Count;
 }
 var changeLogs = readChangeLogs(id);
 return {

@@ -14,6 +14,7 @@ import {
     getPlatformSysConfig,
     PLATFORM_BOOTSTRAP_REQUEST_TIMEOUT_MS
 } from "@/utils/platform-sys-config.js";
+import { formatPlatformSysConfigFailure } from "@/utils/platform-bootstrap-diagnostics.js";
 
 // 辅助函数：获取 DiyStore
 const getDiyStore = () => useDiyStore(pinia);
@@ -113,6 +114,7 @@ var DiyOsClient = {
         var href = window.location.href.toLowerCase();
         //同步从服务器中获取配置信息，一种是使用await，一种是使用 Promise、Then里面获取
         var sysConfig = null;
+        var sysConfigFailureMessage = "";
         var sysConfigResult = await getPlatformSysConfig(DiyCommon, {
             _SearchEqual: {
                 IsEnable: 1
@@ -127,7 +129,8 @@ var DiyOsClient = {
                 store.commit("DiyStore/SetSysConfig", sysConfig);
             }
         } else {
-            DiyCommon.Tips("获取系统设置信息失败：" + sysConfigResult.Msg, false);
+            sysConfigFailureMessage = formatPlatformSysConfigFailure(sysConfigResult);
+            DiyCommon.Tips("获取系统设置信息失败：" + sysConfigFailureMessage, false);
         }
 
         // 租户配置是应用进入可交互状态的必要条件。这里必须显式失败，不能让
@@ -135,9 +138,10 @@ var DiyOsClient = {
         // 否则用户只会看到没有任何解释的空白页面。
         if (DiyCommon.IsNull(sysConfig)) {
             var sysConfigError = new Error(
-                (sysConfigResult && sysConfigResult.Msg)
-                    ? "获取系统设置失败：" + sysConfigResult.Msg
-                    : "后端未返回可用的系统设置"
+                "获取系统设置失败：" + (
+                    sysConfigFailureMessage
+                    || formatPlatformSysConfigFailure(sysConfigResult)
+                )
             );
             sysConfigError.code = "MICROI_SYSCONFIG_UNAVAILABLE";
             throw sysConfigError;

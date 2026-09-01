@@ -198,6 +198,68 @@ test('商城源只在响应期为当前应用的私有 ZIP 生成临时地址', 
   assert.equal(result.Data.AiAppPackageManifest, current.AiAppPackageManifest, '不可变快照没有被签名 URL 污染');
 });
 
+test('旧导入器在响应包副本中获得私有 ZIP 签名地址且不可变快照不落签名', () => {
+  const sourcePath = '/itdos/ai-app-packages/v3/app.microi.saas-engine/v7.5.18/source/hash/source.zip';
+  const buildPath = '/itdos/ai-app-packages/v3/app.microi.saas-engine/v7.5.18/build/hash/build.zip';
+  const packageAssets = {
+    SourceZip: {
+      FilePathName: sourcePath,
+      Path: sourcePath,
+      FullPath: sourcePath,
+      Limit: true,
+      StorageScope: 'HdfsPrivate',
+    },
+    BuildZip: {
+      FilePathName: buildPath,
+      Path: buildPath,
+      FullPath: buildPath,
+      Limit: false,
+      StorageScope: 'HdfsPublic',
+    },
+  };
+  const packageText = JSON.stringify({
+    PackageInfo: { AppId: 'app.microi.saas-engine', Version: 'v7.5.18' },
+    ApplicationBundle: {
+      Application: { AppId: 'app.microi.saas-engine', AppKey: 'app.microi.saas-engine' },
+      PackageAssets: JSON.stringify(packageAssets),
+    },
+  });
+  const current = packageRow('v7.5.18', {
+    AppPakcet: packageText,
+    AiAppPackageManifest: JSON.stringify([{
+      AppId: 'app.microi.saas-engine',
+      AppKey: 'app.microi.saas-engine',
+      SourceZip: packageAssets.SourceZip,
+      BuildZip: packageAssets.BuildZip,
+    }]),
+  });
+  const signedUrl = 'https://signed.example.test/source.zip?token=short-lived';
+  const result = execute({}, {
+    current,
+    v8: {
+      OsClient: 'iTdos',
+      Method: {
+        GetPrivateFileUrl: () => ({ Code: 1, Data: { Url: signedUrl } }),
+      },
+    },
+  });
+
+  assert.equal(result.Code, 1);
+  assert.equal(result.Data.LegacyApplicationAssetUrlsDecorated, 1);
+  const responsePackage = JSON.parse(result.Data.AppPakcet);
+  const responseAssets = JSON.parse(responsePackage.ApplicationBundle.PackageAssets);
+  assert.equal(responseAssets.SourceZip.FullPath, signedUrl);
+  assert.equal(responseAssets.SourceZip.Url, signedUrl);
+  assert.equal(responseAssets.SourceZip.FilePathName, sourcePath);
+  assert.equal(responseAssets.BuildZip.FullPath, buildPath, '公有编译 ZIP 不应被私有签名桥改写');
+  assert.equal(current.AppPakcet, packageText, '数据库行中的不可变包正文没有被签名 URL 污染');
+  assert.equal(
+    JSON.parse(JSON.parse(current.AppPakcet).ApplicationBundle.PackageAssets).SourceZip.FullPath,
+    sourcePath,
+  );
+  assert.match(modelSource, /MARKETPLACE_LEGACY_PRIVATE_ASSET_URL_BRIDGE_V1/);
+});
+
 test('商城源拒绝为跨应用的私有 ZIP 路径签名', () => {
   const current = packageRow('v7.5.18', {
     AiAppPackageManifest: JSON.stringify([{

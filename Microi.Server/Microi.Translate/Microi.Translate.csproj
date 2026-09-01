@@ -11,9 +11,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,AI,Translate,LibreTranslate,Microi吾码,Microi</PackageTags>
     <PackageReleaseNotes>Microi 吾码开源翻译引擎，支持文本、批量、语种检测、文件翻译、建议与健康检查。</PackageReleaseNotes>
-    <Version>7.8.5</Version>
-    <AssemblyVersion>7.8.5</AssemblyVersion>
-    <FileVersion>7.8.5</FileVersion>
+    <Version>7.8.6</Version>
+    <AssemblyVersion>7.8.6</AssemblyVersion>
+    <FileVersion>7.8.6</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>

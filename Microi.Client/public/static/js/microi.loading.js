@@ -151,12 +151,17 @@ function showStartupFailure(kind) {
     var retryEl = document.getElementById('startupRetry');
     if (loadEl) loadEl.classList.add('startup-failed');
     var isServiceFailure = kind === 'service';
-    if (subtitleEl) subtitleEl.textContent = isServiceFailure ? '后端服务暂时不可用' : '页面脚本未能启动';
+    var isDatabaseFailure = isServiceFailure && /数据库连接失败|Database connection is temporarily unavailable|DatabaseHostInvalid|DatabaseEndpointUnreachable/i.test(appBootError || '');
+    if (subtitleEl) subtitleEl.textContent = isDatabaseFailure
+        ? '租户数据库连接失败'
+        : (isServiceFailure ? '后端服务暂时不可用' : '页面脚本未能启动');
     if (statusEl) statusEl.textContent = isServiceFailure
-        ? '系统初始化尚未完成，请检查服务后重新加载。'
+        ? (isDatabaseFailure
+            ? '系统无法读取当前租户配置，请按下方指引修复数据库连接。'
+            : '系统初始化尚未完成，请检查服务后重新加载。')
         : '页面脚本未能完成挂载，请刷新或更换浏览器后重试。';
     if (rateEl) {
-        rateEl.textContent = '连接失败';
+        rateEl.textContent = isDatabaseFailure ? '数据库连接失败' : '连接失败';
         rateEl.classList.add('is-status');
     }
     if (barEl) {
@@ -166,7 +171,9 @@ function showStartupFailure(kind) {
     if (messageEl) {
         var detail = appBootError ? '错误信息：' + appBootError + ' ' : '';
         messageEl.textContent = isServiceFailure
-            ? detail + '请检查后端服务与网络连接后重试。页面不会再停留在无提示的空白状态。'
+            ? (isDatabaseFailure
+                ? detail + '修复租户数据库配置后点击“刷新重试”。'
+                : detail + '请检查后端服务与网络连接后重试。页面不会再停留在无提示的空白状态。')
             : detail + getBrowserCoreDescription()
                 + '请先按 Ctrl+F5 强制刷新；如仍无法打开，请升级到此电脑可安装的较新 Chrome，'
                 + '或将 360 安全浏览器切换到较新的极速内核。';
