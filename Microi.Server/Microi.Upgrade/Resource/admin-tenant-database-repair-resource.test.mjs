@@ -24,13 +24,18 @@ function validParam(overrides = {}) {
 }
 
 function run(param, method, currentUser = { Id: 'admin', Level: 9999 }) {
-  return execute({ Param: param, CurrentUser: currentUser, Method: method });
+  return execute({
+    Param: param,
+    CurrentUser: currentUser,
+    Method: method,
+    OsClient: 'congshi',
+  });
 }
 
 test('resource declares Managed ownership, compiles and generator owns the fixed engine', () => {
   assert.match(source, /^\/\* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1/);
   assert.match(source, new RegExp(`ApiEngineKey：${engineKey}`));
-  assert.match(source, /Version: v1\.0\.0/);
+  assert.match(source, /Version: v1\.0\.2/);
   assert.match(source, /platform-runtime-custom-hook（CreateIfMissing）/);
   assert.doesNotThrow(() => new Function('V8', source));
 
@@ -45,6 +50,7 @@ test('resource declares Managed ownership, compiles and generator owns the fixed
   assert.match(generator, /'V8\.Method\.RepairAdminTenantDatabaseAccess'/);
   assert.match(generator, new RegExp(`'ApiEngine:${engineKey}'`));
   assert.match(generator, /tenantDatabaseRepairPackageVersion = 'v7\.7\.19'/);
+  assert.match(generator, /tenantDatabaseRepairMcpCompatibilityPackageVersion = 'v7\.7\.22'/);
 });
 
 test('identity and host capability gates fail closed before any repair call', () => {
@@ -56,6 +62,10 @@ test('identity and host capability gates fail closed before any repair call', ()
     },
   };
   assert.equal(run(validParam({ ValidateOnly: true }), method, null).Code, 1001);
+  assert.equal(run(validParam({
+    ValidateOnly: true,
+    _CurrentUser: { Id: 'forged-admin', Level: 9999 },
+  }), method, null).Code, 1001);
   assert.equal(run(validParam({ ValidateOnly: true }), method, { Id: 'user', Level: 9998 }).Code, 0);
   assert.equal(run(validParam({ ValidateOnly: true }), {}, { Id: 'admin', Level: 9999 }).Code, 0);
   assert.equal(called, false);
@@ -74,6 +84,28 @@ test('ValidateOnly is side-effect free and returns the exact confirmation contra
   assert.equal(result.Data.RequiredConfirmExecution,
     '01M168BVFYYAE81T1T1RQDAR85:jisu1:jisu1');
   assert.equal(called, false);
+});
+
+test('trusted MCP runtime fields are accepted only when their context is exact', () => {
+  const method = {
+    RepairAdminTenantDatabaseAccess() {
+      throw new Error('ValidateOnly must remain side-effect free');
+    },
+  };
+  const runtimeParam = validParam({
+    OsClient: 'congshi',
+    ApiEngineKey: engineKey,
+    _InvokeType: 'Server',
+    _CurrentUser: { Id: 'admin', Level: 9999 },
+    TestParam1: 'legacy-runtime-placeholder',
+    ValidateOnly: true,
+  });
+  assert.equal(run(runtimeParam, method).Code, 1);
+  assert.equal(run({ ...runtimeParam, OsClient: 'other' }, method).Code, 0);
+  assert.equal(run({ ...runtimeParam, ApiEngineKey: 'other-engine' }, method).Code, 0);
+  assert.equal(run({ ...runtimeParam, _InvokeType: 'Client' }, method).Code, 0);
+  assert.equal(run({ ...runtimeParam, TestParam1: { nested: true } }, method).Code, 0);
+  assert.equal(run({ ...runtimeParam, TestParam1: 'x'.repeat(201) }, method).Code, 0);
 });
 
 test('unknown fields, malformed targets and mismatched confirmation are rejected', () => {

@@ -157,7 +157,9 @@ function validateReleaseCandidate(name, content) {
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
     if (!content.includes('ai_app_publish_store')
-      || versionNumber < 1_009_014
+      || versionNumber < 1_009_016
+      || !content.includes('MARKETPLACE_IMMUTABLE_INSTALL_SNAPSHOT_V1')
+      || !content.includes('MARKETPLACE_CURRENT_PACKAGE_REPAIR_CAS_V1')
       || !content.includes('selectionValues(existingStore.SelectTable')
       || !content.includes('selectionValues(existingStore.SelectApiEngine')
       || !content.includes('IncludeSource: includeSource')
@@ -584,11 +586,13 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
         || !importerCode.includes('PACKAGE_MENU_RUNTIME_PREFLIGHT_V1')
         || !importerCode.includes('OBJECT_STORAGE_FORBIDDEN')
-        || engineVersionNumber(publisherEngine) < 1_009_014
+        || engineVersionNumber(publisherEngine) < 1_009_016
         || !String(publisherEngine?.ApiV8Code || '').includes('buildApiEngineResourcePolicies')
         || !String(publisherEngine?.ApiV8Code || '').includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')
         || !String(publisherEngine?.ApiV8Code || '').includes('SharedPublicRuntime')
         || !String(publisherEngine?.ApiV8Code || '').includes('MARKETPLACE_SOURCE_DEFAULT_PRIVATE_V1')
+        || !String(publisherEngine?.ApiV8Code || '').includes('MARKETPLACE_IMMUTABLE_INSTALL_SNAPSHOT_V1')
+        || !String(publisherEngine?.ApiV8Code || '').includes('MARKETPLACE_CURRENT_PACKAGE_REPAIR_CAS_V1')
         || !String(publisherEngine?.ApiV8Code || '').includes("Build: storeVisibility ? 'PublicHdfs' : 'PrivateHdfs'")
         || engineVersionNumber(prepareAssetsEngine) < 1_002_000
         || !String(prepareAssetsEngine?.ApiV8Code || '').includes('MARKETPLACE_AI_ASSET_VISIBILITY_V1')
@@ -616,6 +620,10 @@ function validateReleaseCandidate(name, content) {
           .includes('ApiEngine:get-microi-store@v1.4.8')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('Marketplace:DeterministicInstallVersionStateV1')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('Marketplace:ImmutableInstallSnapshotV1')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('Marketplace:CurrentPackageRepairCasV1')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('BackgroundTask:StartupDependencyPreinstallBootstrapV1')
         || !String(bulkEngine?.ApiV8Code || '').includes('prioritizeBootstrapPlan')

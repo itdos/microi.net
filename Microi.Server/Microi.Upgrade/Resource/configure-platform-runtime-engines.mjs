@@ -241,7 +241,9 @@ const engines = [
     key: 'admin_repair_saas_tenant_database_access', name: '平台修复子租户数据库连接',
     file: 'admin-repair-saas-tenant-database-access.js',
     id: '019e2d5f-9940-7f91-8c01-000000000001', enableLog: 0, lock: 1,
-    history: '2026-09-01 v1.0.0 新增主租户超级管理员受控修复入口；仅传递目标定位字段，后端能力缺失、预检未完成或确认串不匹配时失败关闭。'
+    version: 'v1.0.2',
+    replaceHistoryVersions: ['v1.0.2', 'v1.0.1', 'v1.0.0'],
+    history: '2026-09-01 v1.0.2 兼容历史 MCP/接口调试运行时自动追加的短标量 TestParam1 占位字段；该值不参与业务且绝不转发，对象、超长值、其它未知字段和连接材料继续失败关闭。\n2026-09-01 v1.0.1 兼容并严格校验 MCP/服务端自动注入的租户、接口 Key 与调用语义字段；其余未知字段继续失败关闭。\n2026-09-01 v1.0.0 新增主租户超级管理员受控修复入口；仅传递目标定位字段，后端能力缺失、预检未完成或确认串不匹配时失败关闭。'
   },
   {
     key: 'platform-external-login-binding', name: '平台外部身份绑定', file: 'platform-external-login-binding.js',
@@ -321,6 +323,9 @@ for (const definition of engines) {
       engine.ChangeHistory,
       '2026-08-26 v1.0.0 数据源 HTTP Controller 迁入 Managed 接口，并保留访问密钥的数据源白名单校验。',
     );
+  }
+  for (const historyVersion of definition.replaceHistoryVersions || []) {
+    engine.ChangeHistory = removeHistoryVersion(engine.ChangeHistory, historyVersion);
   }
   engine.ChangeHistory = prependOnce(engine.ChangeHistory, definition.history);
   packageData.ResourcePolicies.ApiEngines[definition.key] = {
@@ -797,6 +802,30 @@ packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
 packageData.PackageInfo.ChangeHistory = prependOnce(
   packageData.PackageInfo.ChangeHistory,
   tenantDatabaseRepairHistory,
+);
+
+const tenantDatabaseRepairMcpCompatibilityPackageVersion = 'v7.7.22';
+const tenantDatabaseRepairMcpCompatibilityHistory = '2026-09-01 v7.7.22 兼容历史 MCP/接口调试运行时自动追加的短标量 TestParam1 占位字段；该值完全丢弃，对象、超长值、其它未知字段和连接材料仍失败关闭；继续支持 {{ OsVersion }} 和 {{ YYYY }}，且不携带 Sys_Config 租户数据。';
+if (compareSemver(packageData.PackageInfo.Version, tenantDatabaseRepairMcpCompatibilityPackageVersion) < 0) {
+  packageData.PackageInfo.Version = tenantDatabaseRepairMcpCompatibilityPackageVersion;
+}
+if (packageData.PackageInfo.Version === tenantDatabaseRepairMcpCompatibilityPackageVersion) {
+  packageData.PackageInfo.Description = 'SaaS 引擎基础资源。提供租户开通、启动运行时与主租户受控的子租户数据库连接修复入口。';
+  packageData.PackageInfo.ChangeLog = {
+    Version: tenantDatabaseRepairMcpCompatibilityPackageVersion,
+    Title: '数据库连接修复入口兼容历史调试占位参数',
+    ChangeType: 'Fix',
+    Content: '兼容历史 MCP/接口调试运行时自动追加的短标量 TestParam1 占位字段；该值完全丢弃，对象、超长值、其它未知字段和连接材料仍失败关闭；继续支持 {{ OsVersion }} 和 {{ YYYY }}，且不携带 Sys_Config 租户数据。',
+    ReleaseTime: '2026-09-01 23:30:00'
+  };
+}
+packageData.PackageInfo.ChangeHistory = removeHistoryVersion(
+  packageData.PackageInfo.ChangeHistory,
+  tenantDatabaseRepairMcpCompatibilityPackageVersion,
+);
+packageData.PackageInfo.ChangeHistory = prependOnce(
+  packageData.PackageInfo.ChangeHistory,
+  tenantDatabaseRepairMcpCompatibilityHistory,
 );
 
 normalizeOfficialApiEnginePolicies(packageData, path.basename(packagePath));

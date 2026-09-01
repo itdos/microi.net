@@ -1603,7 +1603,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
   assert.match(refreshSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
-  assert.match(refreshSource, /versionNumber\s*<\s*1_009_014/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_009_016/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_007_033/);
   assert.match(refreshSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
   assert.match(refreshSource, /importerVersionNumber\s*<\s*2_005_004/);

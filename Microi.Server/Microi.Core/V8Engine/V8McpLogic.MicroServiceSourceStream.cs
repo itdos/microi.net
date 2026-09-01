@@ -196,6 +196,20 @@ namespace Microi.net
                 .OrderBy(file => SafeJString(file, "Path"), StringComparer.Ordinal));
         }
 
+        /// <summary>
+        /// FormEngine generic calls expose Data as dynamic. Passing that value
+        /// directly to JObject.FromObject keeps the whole invocation dynamic;
+        /// a subsequent JValue.Val&lt;T&gt; is then resolved as a nonexistent
+        /// JValue instance member instead of the Dos.Common extension method.
+        /// Cross the dynamic boundary explicitly so every downstream token
+        /// access is statically bound as JObject/JToken.
+        /// </summary>
+        internal static JObject MaterializeMicroServiceSourceRecord(object value)
+        {
+            if (value == null) return null;
+            return value as JObject ?? JObject.FromObject(value);
+        }
+
         internal static JArray BuildMicroServiceSourceManifestFromRows(IEnumerable<JObject> rows)
         {
             return new JArray((rows ?? Enumerable.Empty<JObject>())
@@ -520,11 +534,12 @@ namespace Microi.net
                         new { OsClient = osClient, Id = rowId }).ConfigureAwait(false);
                     if (existingResult.Code == 1 && existingResult.Data != null)
                     {
-                        var existing = JObject.FromObject(existingResult.Data);
+                        JObject existing = MaterializeMicroServiceSourceRecord(
+                            (object)existingResult.Data);
                         var exact = string.Equals(SafeJString(existing, "AppId"), appId, StringComparison.Ordinal)
                                     && string.Equals(SafeJString(existing, "FilePath"), relativePath, StringComparison.Ordinal)
                                     && string.Equals(SafeJString(existing, "ContentHash"), expectedSha256, StringComparison.Ordinal)
-                                    && (existing["Size"]?.Val<long?>() ?? -1L) == length
+                                    && (existing.Value<long?>("Size") ?? -1L) == length
                                     && string.Equals(
                                         NormalizeAiApplicationStoragePath(SafeJString(existing, "HdfsPath")),
                                         NormalizeAiApplicationStoragePath(hdfsPath),

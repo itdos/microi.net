@@ -12,12 +12,115 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.9.14 V3 source", () => {
+test("publisher package metadata matches the v1.9.16 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.9.14");
+  assert.equal(packagedPublisher.Version, "v1.9.16");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
+  );
+});
+
+function createImmutableSnapshotHarness() {
+  const rows = new Map();
+  const added = [];
+  const context = {
+    V8: {
+      OsClient: "iTdos",
+      EncryptHelper: {
+        Sha256Hex(value) {
+          return crypto.createHash("sha256").update(String(value)).digest("hex");
+        },
+      },
+      FormEngine: {
+        GetFormData(table, query) {
+          if (table === "diy_table") {
+            return { Code: 1, Data: { Id: "store-table-id", Name: "sys_microistore" } };
+          }
+          if (table === "mic_data_version") {
+            return rows.has(query.Id)
+              ? { Code: 1, Data: rows.get(query.Id) }
+              : { Code: 2, Data: null };
+          }
+          throw new Error(`unexpected table ${table}`);
+        },
+        AddFormData(table, row) {
+          assert.equal(table, "mic_data_version");
+          if (rows.has(row.Id)) return { Code: 0, Msg: "duplicate" };
+          const saved = { ...row };
+          rows.set(row.Id, saved);
+          added.push(saved);
+          return { Code: 1, Data: saved };
+        },
+      },
+    },
+    JSON,
+    Object,
+    String,
+    Number,
+    isFinite,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "parseObject")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    ${extractFunction(publisherSource, "sha256Hex")}
+    ${extractFunction(publisherSource, "marketplaceStoreTableId")}
+    ${extractFunction(publisherSource, "marketplacePackageSnapshotId")}
+    ${extractFunction(publisherSource, "marketplacePackageSnapshotMatches")}
+    ${extractFunction(publisherSource, "ensureMarketplacePackageSnapshot")}
+    result = ensureMarketplacePackageSnapshot;
+  `, context);
+  return { ensure: context.result, rows, added };
+}
+
+test("publisher creates and idempotently reuses a content-addressed immutable install snapshot", () => {
+  const harness = createImmutableSnapshotHarness();
+  const store = {
+    Id: "store-application-id",
+    AppVersion: "v1.2.3",
+    PackageHdfsPath: "/itdos/microi-store/packages/store/v1/package.json",
+    PackageSha256: "a".repeat(64),
+    PackageSize: 321,
+    AiAppPackageManifest: JSON.stringify([{ SourceZip: { Limit: true, StorageScope: "HdfsPrivate" } }]),
+    AiAppZipFiles: "[]",
+  };
+  const resourceHash = "b".repeat(64);
+
+  const created = harness.ensure(store, resourceHash);
+  assert.equal(created.Created, true);
+  assert.equal(created.StoreVersionId.length, 36);
+  assert.equal(harness.added.length, 1);
+  const snapshot = JSON.parse(harness.added[0].Data);
+  assert.equal(snapshot.PackageSnapshotSchemaVersion, 1);
+  assert.equal(snapshot.PackageResourceSnapshotHash, resourceHash);
+  assert.equal(snapshot.AiAppPackageManifest, store.AiAppPackageManifest);
+
+  const reused = harness.ensure({ ...store, AppUpdateTime: "later" }, resourceHash);
+  assert.equal(reused.Created, false);
+  assert.equal(reused.StoreVersionId, created.StoreVersionId);
+  assert.equal(harness.added.length, 1);
+});
+
+test("publisher fails closed when a deterministic install snapshot id has different package facts", () => {
+  const harness = createImmutableSnapshotHarness();
+  const store = {
+    Id: "store-application-id",
+    AppVersion: "v1.2.3",
+    PackageHdfsPath: "/itdos/microi-store/packages/store/v1/package.json",
+    PackageSha256: "c".repeat(64),
+    PackageSize: 321,
+    AiAppPackageManifest: "[]",
+    AiAppZipFiles: "[]",
+  };
+  const resourceHash = "d".repeat(64);
+  const created = harness.ensure(store, resourceHash);
+  const row = harness.rows.get(created.StoreVersionId);
+  row.Data = JSON.stringify({ ...JSON.parse(row.Data), PackageHdfsPath: "/different.json" });
+  assert.throws(
+    () => harness.ensure(store, resourceHash),
+    /正文不一致/,
   );
 });
 
@@ -255,7 +358,7 @@ function menuResolver() {
 
 function storeMenuResolver() {
   const expression = publisherSource.match(
-    /SelectMenu:\s*([\s\S]*?),\s*SelectTable:/,
+    /SelectMenu:\s*(V8\.Param[\s\S]*?),\s*SelectTable:/,
   );
   assert.ok(expression, "missing storeRow SelectMenu expression");
   const context = {};
@@ -594,6 +697,73 @@ test("legacy marketplace package version can advance without republishing identi
   assert.match(publisherSource, /AppVersion:\s*versionNo,/);
 });
 
+test("current marketplace package repair is exact, version preserving, and independent from runtime version", () => {
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "ok")}
+    ${extractFunction(publisherSource, "fail")}
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    ${extractFunction(publisherSource, "validateCurrentPackageRepair")}
+    result = validateCurrentPackageRepair;
+  `, context);
+  const existing = { Id: "store-id", AppVersion: "v1.1.3" };
+  const assets = { PackageVersion: "v1.1.3" };
+  assert.equal(context.result(existing, assets, "v1.1.3", "Publish", false, false).Code, 1);
+  assert.equal(context.result(existing, assets, "v1.1.2", "Publish", false, false).Code, 0);
+  assert.equal(context.result(existing, { PackageVersion: "v1.1.2" }, "v1.1.3", "Publish", false, false).Code, 0);
+  assert.equal(context.result(existing, assets, "v1.1.3", "Publish", true, false).Code, 0);
+  assert.equal(context.result(existing, assets, "v1.1.3", "Publish", false, true).Code, 0);
+  assert.equal(context.result(existing, assets, "v1.1.3", "Package", false, false).Code, 0);
+  assert.match(publisherSource, /var versionNo = repairCurrentPackageVersion[\s\S]*currentPackageRepairValidation\.Data\.AppVersion/u);
+});
+
+test("current marketplace package repair uses the old package pointer as CAS and never touches runtime pointers", () => {
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    ${extractFunction(publisherSource, "appendCurrentPackageRepairStringCas")}
+    ${extractFunction(publisherSource, "buildCurrentPackageRepairFields")}
+    result = buildCurrentPackageRepairFields;
+  `, context);
+  const fields = context.result({
+    AppName: "应用",
+    Name: "应用",
+    AppVersion: "v1.1.3",
+    AppId: "sample",
+    AppKey: "sample",
+    Status: "Published",
+    BuildStatus: "Success",
+    AppUpdateTime: "new-time",
+    PackageHdfsPath: "/new/package.json",
+    PackageSha256: "b".repeat(64),
+    PackageSize: 456,
+    AiAppPackageManifest: "[]",
+    AiAppZipFiles: "[]",
+  }, {
+    Id: "store-id",
+    AppVersion: "v1.1.3",
+    AppUpdateTime: "old-time",
+    PackageHdfsPath: "/old/package.json",
+    PackageSha256: "a".repeat(64),
+    PackageSize: 123,
+  });
+  assert.deepEqual(Array.from(fields._Where[0]), ["Id", "=", "store-id"]);
+  assert.ok(fields._Where.some(item => Array.from(item).join("|") === "AND|AppVersion|=|v1.1.3"));
+  assert.ok(fields._Where.some(item => Array.from(item).join("|") === "AND|PackageHdfsPath|=|/old/package.json"));
+  assert.ok(fields._Where.some(item => Array.from(item).join("|") === `AND|PackageSha256|=|${"a".repeat(64)}`));
+  assert.ok(fields._Where.some(item => Array.from(item).join("|") === "AND|PackageSize|=|123"));
+  assert.equal(fields.AppVersion, "v1.1.3");
+  for (const forbidden of ["CommittedPublishVersionId", "CommittedRuntimeManifestHash", "PublishFence", "PublishRowVersion", "PublishState"]) {
+    assert.equal(Object.hasOwn(fields, forbidden), false, `${forbidden} must remain runtime-owned`);
+  }
+  assert.match(publisherSource, /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', repairFields\)/u);
+  assert.match(publisherSource, /currentPackageRepairReadbackMatches\(repairedStore, storeRow, versionNo\)/u);
+});
+
 test("protocol v3 resolves the committed version by exact VersionId instead of a newer staged row", () => {
   const context = {
     V8: {
@@ -628,7 +798,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.9\.14/);
+  assert.match(publisherSource, /Version: v1\.9\.16/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

@@ -73,6 +73,25 @@ public class MicroServiceSourceStreamTests
     }
 
     [Fact]
+    public void ExistingStageRow_DynamicFormDataIsMaterializedBeforeJTokenValueRead()
+    {
+        dynamic formData = new JObject
+        {
+            ["Size"] = 12L,
+            ["StorageScope"] = V8McpLogic.StagedPrivateSourceStorageScope
+        };
+
+        JObject existing = V8McpLogic.MaterializeMicroServiceSourceRecord((object)formData);
+
+        Assert.NotNull(existing);
+        Assert.IsType<JValue>(existing["Size"]);
+        Assert.Equal(12L, existing.Value<long>("Size"));
+        Assert.Equal(
+            V8McpLogic.StagedPrivateSourceStorageScope,
+            existing.Value<string>("StorageScope"));
+    }
+
+    [Fact]
     public void ActiveManifestHash_IsDeterministicAcrossDatabaseRowOrder()
     {
         var app = SourceRow("src/App.vue", HashA, 12);
