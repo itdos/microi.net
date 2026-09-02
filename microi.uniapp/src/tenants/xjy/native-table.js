@@ -3,6 +3,14 @@ import { callApiEngine } from '@/platform/business-runtime.js'
 import { parseJson } from '@/platform/native-form.js'
 import { addTaskDevices } from '@/utils/xjy-task.js'
 
+const AFTER_SALES_PHOTO_MENU_ID = 'd9ed1fb9-1770-46e8-9662-31399aeece67'
+const AFTER_SALES_PHOTO_FIELDS = {
+  KehuSCZP: 'af3784ec-e035-429f-8593-6a37512477ae',
+  JieguoTP: '59274024-77b5-4c6e-82f3-472947321073',
+  PingjiaST: '5b372a6a-32b9-42a1-8375-be991e90d74f',
+  ZhuipingT: '9f4f1382-5a2a-44ed-893f-f18fe4dbe833'
+}
+
 function requireParentId(parentId) {
   if (parentId) return true
   uni.showToast({ title: '请先保存当前表单', icon: 'none' })
@@ -84,11 +92,26 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
 
   if (fieldName === 'XuanzeZP') {
     const images = []
-    const photoFields = ['KehuSCZP', 'JieguoTP', 'PingjiaST', 'ZhuipingT']
-    selected.forEach((row) => photoFields.forEach((name) => {
+    const previewTasks = []
+    selected.forEach((row) => Object.entries(AFTER_SALES_PHOTO_FIELDS).forEach(([name, fieldId]) => {
       const values = parseJson(row[name], [])
-      if (Array.isArray(values)) images.push(...values)
+      if (!Array.isArray(values)) return
+      values.filter(Boolean).forEach((value) => {
+        const image = typeof value === 'object' ? { ...value } : { Path: String(value) }
+        images.push(image)
+        if (!image.Id || !image.Path || !row.Id) return
+        // zhy：新增案例尚未入库，必须用照片原始售后单及原字段鉴权；临时 URL 仅写运行态 RealPath。
+        previewTasks.push(V8.resolveFileUrl(image, {
+          formEngineKey: 'Diy_ShouhouDD',
+          formDataId: row.Id,
+          fieldId,
+          sysMenuId: AFTER_SALES_PHOTO_MENU_ID
+        }).then((url) => {
+          if (url) form[`Tupian_${image.Id}_RealPath`] = url
+        }))
+      })
     }))
+    await Promise.all(previewTasks)
     form.Tupian = images
     return { matched: true, handled: true, changedField: 'Tupian' }
   }
