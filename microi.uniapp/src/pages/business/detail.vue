@@ -1797,8 +1797,7 @@
 				return this.key === 'tasks' && this.isTaskOwner && !this.isTaskTerminal
 			},
 			canCancelDeviceRepair() {
-				return this.key === 'devices' && !!this.deviceActiveTask.Id && /维修中|故障/.test(String(this.detail
-					.ShebeiGZZT || ''))
+				return this.key === 'devices' && !!this.deviceActiveTask.Id
 			},
 			showMerchantAcceptance() {
 				return this.key === 'tasks' && this.roleProfile.isInternal && /待商家验收/.test(String(this.statusText)) && !
@@ -2057,8 +2056,13 @@
 						_PageIndex: 1,
 						_PageSize: 20
 					})
-					this.deviceActiveTask = (taskResult && Array.isArray(taskResult.Data) ? taskResult.Data : []).find(
-						(item) => !/已结束|已完成|已取消|已作废/.test(String(item.Zhuangtai || ''))) || {}
+					// zhy：设备可能同时关联换芯、保养等周期任务；只有未终结的维修任务才属于“取消报修”。
+					this.deviceActiveTask = (taskResult && Array.isArray(taskResult.Data) ? taskResult.Data : []).find((item) => {
+						const isRepair = Number(item.LeixingZ || 0) === 4 || /维修/.test(String(item.Leixing || ''))
+						const isTerminal = Number(item.ZhuangtaiZ || 0) === 5 || Number(item.ZhuangtaiZ || 0) === 9 ||
+							/已结束|已完成|已取消|已作废/.test(String(item.Zhuangtai || ''))
+						return isRepair && !isTerminal
+					}) || {}
 				} catch (error) {
 					this.deviceActiveTask = {}
 				}
@@ -2326,9 +2330,14 @@
 				if (!this.deviceActiveTask.Id) return
 				const confirmed = await this.confirm('确定取消当前设备的报修任务吗？')
 				if (!confirmed) return
-				await this.runTaskEngine('repair_cancel', {
+				const cancelled = await this.runTaskEngine('repair_cancel', {
 					Id: this.deviceActiveTask.Id
-				}, '报修已取消')
+				}, '报修已取消', false)
+				if (!cancelled) return
+				// 接口成功后立即收起按钮；随后回读服务端，避免界面继续展示旧的维修状态。
+				this.deviceActiveTask = {}
+				this.detail = { ...this.detail, ShebeiGZZT: '正常' }
+				await this.loadDetail(false)
 			},
 			openOrderApproval(mode) {
 				if (!this.canApproveOrder) {
