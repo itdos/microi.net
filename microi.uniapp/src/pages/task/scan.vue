@@ -45,7 +45,7 @@
                 <view v-else class="lock-icon" aria-hidden="true"><view></view></view>
                 <text>处理设备</text>
               </view>
-              <view v-if="item.Zhuangtai === '待服务'" class="card-action finish-action" hover-class="card-action--pressed" @tap="finishTask(item)">
+              <view v-if="canSubmitTask(item)" class="card-action finish-action" hover-class="card-action--pressed" @tap="finishTask(item)">
                 <image src="/static/xjy/repair/renwu.png" mode="aspectFit" /><text>提交任务</text>
               </view>
             </view>
@@ -68,17 +68,21 @@ import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
 import { callApiEngine, formatDateTime, parseDeviceId } from '@/platform/business-runtime.js'
 import { taskStateClass } from '@/utils/xjy-task.js'
-import { taskScanProcessAccess } from '@/tenants/xjy/task-scan-permission.mjs'
+import { taskScanProcessAccess, taskScanSubmitAccess } from '@/tenants/xjy/task-scan-permission.mjs'
 
 export default {
   mixins:[themeMixin],
   data(){return{deviceId:'',tasks:[],loading:false,submitting:false,currentUser:{},searchTimer:null,loadRequestId:0}},
-  onLoad(options){this.currentUser=getUser()||{};this.deviceId=decodeURIComponent(options.deviceId||'');if(this.deviceId)this.loadTasks()},
+  onLoad(options){this.currentUser=getUser()||{};this.deviceId=decodeURIComponent(options.deviceId||'')},
+  // 设备处理页返回后重新读取服务状态和整单完成数，提交按钮不使用进入页面时的旧数据。
+  onShow(){this.currentUser=getUser()||{};if(this.deviceId.trim())this.loadTasks()},
   onUnload(){clearTimeout(this.searchTimer)},
   methods:{
     taskStateClass,formatTime:formatDateTime,
     processAccess(item){return taskScanProcessAccess(item,this.currentUser)},
     canProcessDevice(item){return this.processAccess(item).allowed},
+    submitAccess(item){return taskScanSubmitAccess(item,this.currentUser)},
+    canSubmitTask(item){return this.submitAccess(item).allowed},
     search(){clearTimeout(this.searchTimer);this.loadTasks()},
     // zhy：设备编号输入后自动防抖查询，右侧按钮重置编号和结果。
     scheduleSearch(){
@@ -90,7 +94,7 @@ export default {
     scan(){uni.scanCode({onlyFromCamera:false,success:(result)=>{const id=parseDeviceId(result.result)||String(result.result||'').trim();if(!id)return uni.showToast({title:'未识别有效设备编号',icon:'none'});this.deviceId=id;this.loadTasks()},fail:(error)=>{if(!(error&&error.errMsg&&error.errMsg.includes('cancel')))uni.showToast({title:'扫码失败，请重试',icon:'none'})}})},
     async loadTasks(){if(!this.deviceId.trim())return;const requestId=++this.loadRequestId;this.loading=true;try{const result=await callApiEngine('getrenwu-by-shebeiid',{Id:this.deviceId.trim()});if(result&&Number(result.Code)===0)throw new Error(result.Msg||'任务查询失败');const rows=Array.isArray(result)?result:(result&&Array.isArray(result.Data)?result.Data:[]);if(requestId===this.loadRequestId)this.tasks=rows}catch(error){if(requestId===this.loadRequestId){this.tasks=[];uni.showToast({title:error.message||'任务查询失败',icon:'none'})}}finally{if(requestId===this.loadRequestId)this.loading=false}},
     async openDevice(item){if(this.submitting)return;const access=this.processAccess(item);if(!access.allowed){uni.showModal({title:'暂无处理权限',content:access.reason,showCancel:false,confirmText:'我知道了'});return}this.submitting=true;uni.showLoading({title:'正在进入',mask:true});try{if(item.Zhuangtai==='待接单'){const result=await callApiEngine('automatic-order\u200c',{Id:item.BID});if(!result||Number(result.Code)!==1)throw new Error((result&&result.Msg)||'自动接单失败')}uni.navigateTo({url:`/pages/task/device?id=${encodeURIComponent(item.AID)}&taskId=${encodeURIComponent(item.BID)}&taskType=${encodeURIComponent(item.Leixing||'')}`})}catch(error){uni.showToast({title:error.message||'无法进入设备任务',icon:'none'})}finally{uni.hideLoading();this.submitting=false}},
-    async finishTask(item){if(this.submitting)return;if(String(this.currentUser.Id||'')!==String(item.ShouhouRYID||'')){uni.showToast({title:'仅当前服务人员可提交任务',icon:'none'});return}const confirmed=await new Promise((resolve)=>uni.showModal({title:'确认提交任务',content:'系统会检查此任务下所有设备是否已完成。',success:(r)=>resolve(!!r.confirm),fail:()=>resolve(false)}));if(!confirmed)return;this.submitting=true;uni.showLoading({title:'正在检查',mask:true});try{const result=await callApiEngine('scan-code-tasks',{shouhouspId:item.AID,ShouhouDDId:item.BID});if(!result||Number(result.Code)!==1)throw new Error((result&&result.Msg)||'任务提交失败');uni.showToast({title:'任务已提交',icon:'success'});await this.loadTasks()}catch(error){uni.showToast({title:error.message||'任务提交失败',icon:'none'})}finally{uni.hideLoading();this.submitting=false}},
+    async finishTask(item){if(this.submitting)return;const access=this.submitAccess(item);if(!access.allowed){uni.showModal({title:'暂不能提交任务',content:access.reason,showCancel:false});return}const confirmed=await new Promise((resolve)=>uni.showModal({title:'确认提交任务',content:'任务下所有设备均已完成，确认提交商家验收吗？',success:(r)=>resolve(!!r.confirm),fail:()=>resolve(false)}));if(!confirmed)return;this.submitting=true;uni.showLoading({title:'正在检查',mask:true});try{const result=await callApiEngine('scan-code-tasks',{ShouhouDDId:item.BID});if(!result||Number(result.Code)!==1)throw new Error((result&&result.Msg)||'任务提交失败');uni.showToast({title:'任务已提交',icon:'success'});await this.loadTasks()}catch(error){uni.showToast({title:error.message||'任务提交失败',icon:'none'})}finally{uni.hideLoading();this.submitting=false}},
     callPhone(phone){uni.makePhoneCall({phoneNumber:String(phone)})},goBack(){uni.navigateBack({fail:()=>uni.switchTab({url:'/pages/workspace/index'})})}
   }
 }
