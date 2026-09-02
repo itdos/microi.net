@@ -4,7 +4,11 @@ import { post } from '@/utils/request.js'
 import { getBusinessEntry, getBusinessModule, getRoleProfile } from '@/platform/business.js'
 import { cachedRequest } from '@/platform/cache.js'
 import { formatRegionValue, formatStructuredValue } from '@/platform/display.js'
-import { selectAuthorizedMenu } from '@/platform/menu-resolution.mjs'
+import {
+  requiresAuthorizedMenuContext,
+  resolveBusinessMenuPermission,
+  selectAuthorizedMenu
+} from '@/platform/menu-resolution.mjs'
 import { buildListApiEnginePayload, normalizeListApiEngineResponse } from '@/platform/list-api-engine.mjs'
 import tenantRuntime from '@/generated/tenant-runtime.js'
 
@@ -183,13 +187,19 @@ export async function loadModuleRows(moduleConfig, options = {}) {
       stale: cached.stale === true
     }
   }
-  const menuId = String(moduleConfig.menuId || '').trim()
-  if (moduleConfig.requireAuthorizedMenu === true && !menuId) {
+  let menuId = String(moduleConfig.menuId || '').trim()
+  let authorizedMenu = null
+  if (!menuId && requiresAuthorizedMenuContext(moduleConfig)) {
+    authorizedMenu = await findMenu(moduleConfig.menuAliases || [], moduleConfig.table || '')
+    menuId = String(authorizedMenu && authorizedMenu.Id || '').trim()
+  }
+  if (requiresAuthorizedMenuContext(moduleConfig) && !menuId) {
     throw new Error('当前账号无权查看该业务数据')
   }
   const moduleEngineKey = String(
     moduleConfig.moduleEngineKey ||
     moduleConfig.ModuleEngineKey ||
+    authorizedMenu && authorizedMenu.ModuleEngineKey ||
     moduleConfig.table ||
     ''
   ).trim()
@@ -409,7 +419,7 @@ export async function canOpenBusinessEntry(key, refresh = false) {
   if (!requireLogin()) return false
   const entry = getBusinessEntry(key) || {}
   const moduleConfig = getBusinessModule(key) || {}
-  const permission = entry.menuPermission || moduleConfig.menuPermission
+  const permission = resolveBusinessMenuPermission(entry, moduleConfig)
   if (!permission) return true
   const aliases = permission.menuAliases || moduleConfig.menuAliases || []
   const table = permission.table || moduleConfig.table || ''
