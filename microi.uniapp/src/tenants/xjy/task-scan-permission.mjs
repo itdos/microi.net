@@ -65,3 +65,30 @@ export function taskScanProcessAccess(task = {}, user = {}) {
   }
   return { allowed: true, reason: '' }
 }
+
+function deviceCount(value) {
+  const count = Number(value)
+  return Number.isFinite(count) && count >= 0 ? count : 0
+}
+
+export function taskScanSubmitAccess(task = {}, user = {}) {
+  if (!user.Id) return { allowed: false, reason: '请先登录后再提交任务' }
+  if (String(task.Zhuangtai || '') !== '待服务') {
+    return { allowed: false, reason: '当前任务状态不是待服务，不能重复提交' }
+  }
+  if (String(task.ShouhouRYID || '') !== String(user.Id || '')) {
+    return { allowed: false, reason: '仅当前服务人员可提交任务' }
+  }
+  if (String(task.FuwuZT || '') !== '已完成') {
+    return { allowed: false, reason: '请先处理当前设备并提交成功' }
+  }
+
+  const total = deviceCount(task.TaskDeviceCount)
+  const completed = deviceCount(task.TaskCompletedDeviceCount)
+  // 完成进度缺失时失败关闭，避免新前端连接旧接口后重新暴露提前提交入口。
+  if (total < 1) return { allowed: false, reason: '尚未获取到任务设备完成进度，请刷新后重试' }
+  if (completed < total) {
+    return { allowed: false, reason: `还有 ${total - completed} 台设备未完成，请先逐台处理` }
+  }
+  return { allowed: true, reason: '' }
+}
