@@ -144,6 +144,15 @@ test("native and generic field settings share the platform rounded overlay contr
     assert.match(styles, /\.mci-component-config-form[\s\S]*?border:\s*0[\s\S]*?background:\s*transparent/);
 });
 
+test("TableChild module selectors keep long menu trees scrollable inside the viewport", () => {
+    const source = fs.readFileSync(path.join(componentRoot, "diy-tablechild.vue"), "utf8");
+    const scrollContainers = source.match(/class="table-child-module-tree-scroll"/g) || [];
+
+    assert.equal(scrollContainers.length, 2, "关联模块和上级模块应共用受限高度的滚动容器");
+    assert.match(source, /\.table-child-module-tree-scroll\s*\{[\s\S]*?max-height:\s*50vh;[\s\S]*?max-height:\s*min\(420px,\s*50dvh\);/);
+    assert.match(source, /\.table-child-module-tree-scroll\s*\{[\s\S]*?overflow-y:\s*auto;[\s\S]*?overscroll-behavior:\s*contain;/);
+});
+
 test("image uploads default to compressed previews and preserve an explicit opt-out", () => {
     const source = fs.readFileSync(path.join(componentRoot, "diy-imgupload.vue"), "utf8");
     assert.match(source, /const isImgCompressionEnabled = \(value\) => !\(/);

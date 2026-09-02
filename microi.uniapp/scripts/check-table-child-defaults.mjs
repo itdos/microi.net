@@ -6,7 +6,8 @@ import {
 
 const customer = {
   Id: 'customer-1',
-  KehuMC: 'cs新版tab'
+  KehuMC: 'cs新版tab',
+  KehuLX: '政府机关'
 }
 
 // zhy：覆盖客户详情 → 联系人新增，名称应从 KehuMC 映射到 SuoshuKH。
@@ -23,6 +24,23 @@ assert.deepEqual(buildTableChildDefaultValues({
 }), {
   KehuID: 'customer-1',
   SuoshuKH: 'cs新版tab'
+})
+
+// zhy：覆盖客户详情 → 客户案例新增，客户Id、名称和类型必须同时带入。
+assert.deepEqual(buildTableChildDefaultValues({
+  fieldConfig: {
+    TableChild: {
+      PrimaryTableFieldName: 'Id',
+      FieldRelations: [['KehuMC', 'KehuMC'], ['KehuLX', 'KehuLX']]
+    }
+  },
+  parentForm: customer,
+  childFkField: 'KehuID',
+  relationValue: customer.Id
+}), {
+  KehuID: 'customer-1',
+  KehuMC: 'cs新版tab',
+  KehuLX: '政府机关'
 })
 
 // zhy：覆盖客户详情 → 跟进记录/项目合伙人跟进记录新增，Id 与客户名称必须同时带入。

@@ -2,8 +2,8 @@
     "name" : "集福鲤",
     "appid" : "__UNI__F0AFA26",
     "description" : "集福鲤客户、设备、订单与售后服务移动工作台",
-    "versionName" : "2.0.0",
-    "versionCode" : "200",
+    "versionName" : "2.0.1",
+    "versionCode" : "201",
     "transformPx" : false,
     "app-plus" : {
         "distribute" : {

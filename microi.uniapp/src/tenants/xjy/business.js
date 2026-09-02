@@ -34,7 +34,7 @@ export const businessGroups = [
       { key: 'devices', title: '我的设备', icon: asset('business/shebei.png') },
       { key: 'filters', title: '滤芯统计', icon: asset('business/lvxin.png') },
       { key: 'areas', title: '片区管理', icon: asset('business/area.png') },
-      { key: 'afterSalesAdd', title: '我要售后', icon: asset('business/sh.png') },
+      { key: 'afterSalesAdd', title: '我要报修', icon: asset('business/sh.png') },
       { key: 'serviceRecords', title: '售后服务记录', icon: asset('business/fwjllb.png') },
       { key: 'serviceForms', title: '客户服务记录表', icon: asset('business/fwjllb.png') },
       { key: 'taskScan', title: '扫码做任务', icon: appConfig.cdnAssets.scan },
@@ -465,7 +465,8 @@ export const businessModules = {
     lines: [{ label: '联系人', field: 'LianxiR' }, { label: '物品', field: 'ZengliXQ' }, { label: '总价', field: 'Zongjia', format: 'money' }]
   }),
   orderGoods: native({
-    title: '订单商品', table: 'Diy_DingdanSP', menuAliases: ['订单商品', '合同商品'],
+    title: '订单商品', table: 'Diy_DingdanSP', menuAliases: ['订单商品列表', '订单商品', '合同商品'],
+    requireAuthorizedMenu: true,
     titleField: 'ShangpinMC', statusField: 'HezuoZT', tagFields: ['HezuoFS', 'ShebeiBH'],
     lines: [{ label: '设备编号', field: 'ShebeiBH' }, { label: '数量', field: 'Shuliang' }, { label: '实际价格', field: 'ShijiJG', format: 'money' }]
   }),
@@ -588,7 +589,14 @@ export const businessModules = {
   },
   // contactMap: { target: 'native-page', title: '联系人地图', path: '/pages/task/map?mode=contacts' },
   // visitMap: { target: 'native-page', title: '跟进地图', path: '/pages/task/map?mode=visit' },
-  afterSalesAdd: { target: 'form-add', title: '我要售后', table: 'Diy_ShouhouDD', menuAliases: ['售后订单', '售后任务'] }
+  // zhy：报修必须先从当前账号有权查看的设备中选择。这里复用“我的设备”列表，
+  // 让菜单权限、SqlWhere 行级范围、卡片详情和一键报修保持同一事实源。
+  afterSalesAdd: {
+    target: 'native-page',
+    title: '我要报修',
+    path: '/pages/business/list?key=devices',
+    menuPermission: { table: 'Diy_KehuSB', menuAliases: ['设备列表', '客户设备', '我的设备', '设备管理'] }
+  }
 }
 
 export const quickActions = ['tasks', 'customers', 'orders', 'devices', 'visits', 'afterSalesAdd', 'attendance', 'directory']
@@ -622,7 +630,7 @@ export function getRoleProfile(user = {}) {
     }
   }
   const roleNames = []
-  const roleRows = [user.RoleIds, user._Roles, user.Roles, user.RoleName]
+  const roleRows = [user.RoleIds, user.RoleIdsString, user._Roles, user.Roles, user.RoleName]
     .reduce((rows, value) => rows.concat(parseRoles(value)), [])
   roleRows.forEach((role) => {
     const name = typeof role === 'string'
@@ -631,7 +639,9 @@ export function getRoleProfile(user = {}) {
     if (name && !roleNames.includes(String(name).trim())) roleNames.push(String(name).trim())
   })
   const roleText = roleNames.join('、')
-  const isCustomer = /客户（用户）|客户用户|终端客户/.test(roleText)
+  // 客户账号是明确的终端身份，不能用“包含客户”判断，否则“客户管理”等内部角色会被误判。
+  const customerRoleNames = new Set(['客户', '客户账号', '客户用户', '终端客户', '客户（用户）'])
+  const isCustomer = roleNames.some((name) => customerRoleNames.has(name))
   const isAdmin = Number(user.Level || 0) >= 998 || roleText.includes('管理员')
   const isSupport = /客服/.test(roleText)
   const isService = /售后|服务|工程|安装/.test(roleText) && !isCustomer

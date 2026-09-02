@@ -22,7 +22,7 @@
 
         <view v-if="bookId && childLoading" class="case-list"><mci-skeleton type="list" :rows="4" /></view>
         <view v-else-if="bookId && children.length" class="case-list">
-          <view v-for="item in children" :key="item.Id" class="case-card" hover-class="case-card--pressed" @tap="editChild(item)">
+          <view v-for="item in children" :key="item.Id" class="case-card" hover-class="case-card--pressed" @tap="openChildDetail(item)">
             <view class="case-head"><text class="case-title">{{ item.Biaoti || item.KehuMC || '客户案例' }}</text><button v-if="canEdit" class="delete-button" @tap.stop="removeChild(item)">删除</button></view>
             <text v-if="item.KehuMC" class="customer-name">{{ item.KehuMC }}</text>
             <view class="case-lines">
@@ -243,6 +243,8 @@ export default {
           _RowModel: {
             Biaoti: item.Biaoti || '', KehuMC: item.KehuMC || item.SuoshuKH || '', KehuID: item.KehuID || '', KehuALZP: item.Tupian || '',
             KehuGK: item.KehuGK || '', YinshuiXQ: item.YinshuiXQ || '', JiejueFA: item.JiejueFA || '', KehuPJ: item.KehuPJ || '', TuijianPY: item.TuijianPY || '',
+            Select178: item.KehuLX || '', Select224: item.ShebeiXH || '', Textarea419: item.KehuGK || '', DateTime340: item.HezuoSJ || '',
+            Text727: item.ShebeiSL || '', Textarea579: item.HezuoNR || '', Textarea619: item.KehuPJ || '', Textarea749: item.ShujuZM || '',
             AnliCID: this.bookId, TenantId: this.currentUser.TenantId || '', TenantName: this.currentUser.TenantName || ''
           }
         }))
@@ -254,8 +256,21 @@ export default {
       } catch (error) { uni.showToast({ title: error.message || '案例添加失败', icon: 'none' }) }
       finally { this.addingCases = false }
     },
-    editChild(item) {
-      uni.navigateTo({ url: `/pages/native-form/index?table=diy_anlice_child&id=${encodeURIComponent(item.Id)}&mode=${this.canEdit ? 'Edit' : 'View'}&title=${encodeURIComponent('案例详情')}` })
+    openChildDetail(item) {
+      const menuId = String(this.casePhotoContext.sysMenuId || '')
+      const params = [
+        `table=${encodeURIComponent(CASE_CHILD_TABLE)}`,
+        `id=${encodeURIComponent(item.Id)}`,
+        'mode=View',
+        `title=${encodeURIComponent('案例详情')}`
+      ]
+      // 列表缩略图与详情图必须复用同一个已授权菜单。否则详情页虽能读取记录，
+      // 私有文件解析仍会因缺少 SysMenuId 失败关闭并显示“图片暂不可用”。
+      if (menuId) {
+        params.push(`menuId=${encodeURIComponent(menuId)}`)
+        params.push(`fileMenuId=${encodeURIComponent(menuId)}`)
+      }
+      uni.navigateTo({ url: `/pages/native-form/index?${params.join('&')}` })
     },
     removeChild(item) {
       uni.showModal({ title: '移出案例册', content: `确定移出“${item.Biaoti || item.KehuMC || '该案例'}”吗？`, success: async (modal) => {

@@ -40,9 +40,9 @@
           <view v-for="item in periods" :key="item.value" class="period-chip" :class="{ active: period === item.value }" @tap="selectPeriod(item.value)"><text>{{ item.label }}</text><text class="period-chip__count">{{ periodCount(item) }}</text></view>
         </view>
       </scroll-view>
-      <view class="mine-switch" @tap="toggleMine">
+      <view v-if="showMineSwitch" class="mine-switch" @tap="toggleMine">
         <view class="mine-switch__track" :class="{ active: mineOnly }"><view class="mine-switch__thumb"></view></view>
-        <text>只看我的</text>
+        <text>只看我负责</text>
       </view>
     </view>
 
@@ -67,8 +67,15 @@
     >
       <mci-skeleton v-if="loading && pageIndex === 1" type="list" :rows="6" />
 
-      <view v-else-if="rows.length" class="task-list">
-        <view v-for="(item, index) in rows" :id="taskAnchorId(item)" :key="item.Id || index" class="task-list-session-item">
+      <view v-else-if="displayRows.length" class="task-list">
+        <view
+          v-for="(item, index) in displayRows"
+          :id="taskAnchorId(item)"
+          :key="item.Id || index"
+          class="task-list-session-item"
+          :class="{ 'task-list-session-item--focused': isFocusedTask(item) }"
+        >
+          <view v-if="isFocusedTask(item)" class="task-focus-label"><text>本次报修</text></view>
           <mci-task-card
             :item="taskCardItem(item)" :index="index"
             :state-class="taskStateClass(item.state)" @open="openTask" @phone="callPhone"
@@ -80,7 +87,7 @@
       <view v-else class="empty-state">
         <image src="/static/xjy/repair/renwu.png" mode="aspectFit" />
         <text class="empty-state__title">当前条件下没有任务</text>
-        <text class="empty-state__desc">可切换状态、时间或关闭“只看我的”</text>
+        <text class="empty-state__desc">{{ emptyStateDescription }}</text>
         <view class="empty-state__button" @tap="resetFilters"><text>重置筛选</text></view>
       </view>
       <view class="safe-space"></view>
@@ -130,6 +137,7 @@ import { findMenu, formatDateTime, openForm, scanDevice } from '@/platform/busin
 import { canAddMenuRecord } from '@/platform/menu-permission.js'
 import { listReturnMixin } from '@/platform/list-return.js'
 import { getUser } from '@/utils/request.js'
+import { getRoleProfile } from '@/tenants/xjy/business.js'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
 import {
   TASK_DATE_FIELDS,
@@ -185,7 +193,9 @@ export default {
       taskListSessionKey: '',
       currentUser: {},
       taskMenuId: '',
-      taskPermissionReady: false
+      taskPermissionReady: false,
+      focusTaskId: '',
+      focusedTask: null
     }
   },
   computed: {
@@ -198,21 +208,44 @@ export default {
     activeFilterCount() {
       return Number(Boolean(this.city)) + Number(this.dateField !== 'YujiSHSJ') + Number(this.orderType !== 'ASC') + Number(this.period === 'custom')
     },
+    roleProfile() { return getRoleProfile(this.currentUser) },
+    isCustomerAccount() { return this.roleProfile.isCustomer === true },
+    showMineSwitch() { return !this.isCustomerAccount },
+    emptyStateDescription() {
+      return this.isCustomerAccount ? '可切换状态、时间或其他筛选条件' : '可切换状态、时间或关闭“只看我负责”'
+    },
+    displayRows() {
+      const rows = this.focusedTask ? [this.focusedTask, ...this.rows] : this.rows
+      const seen = new Set()
+      return rows.filter((item) => {
+        const id = String(item && (item.Id || item.id) || '')
+        if (!id || seen.has(id)) return false
+        seen.add(id)
+        return true
+      })
+    },
     canAddTask() { return this.taskPermissionReady && canAddMenuRecord(this.taskMenuId, this.currentUser) }
   },
-  onLoad(options) {
+  onLoad(options = {}) {
     if (options.customerId) this.customerId = decodeURIComponent(options.customerId)
     if (options.state) this.state = decodeURIComponent(options.state)
     const user = getUser() || {}
     this.currentUser = user
+    this.focusTaskId = decodeURIComponent(options.focusTaskId || options.taskId || '')
+    this.mineOnly = this.isCustomerAccount ? false : options.scope !== 'all'
+    if (this.focusTaskId) {
+      this.state = ''
+      this.period = 'all'
+    }
     this.loadTaskCreatePermission()
     this.taskListSessionKey = [
-      'task-list:v2',
+      'task-list:v3',
       user.Id || user.Account || 'guest',
       this.customerId || 'all-customers',
-      options.state ? `entry-state:${this.state}` : 'default-state'
+      options.state ? `entry-state:${this.state}` : 'default-state',
+      this.isCustomerAccount ? 'customer-scope' : (this.mineOnly ? 'assigned-scope' : 'all-authorized-scope')
     ].join('|')
-    const restored = this.restoreTaskListSession()
+    const restored = this.focusTaskId ? null : this.restoreTaskListSession()
     if (!restored) this.loadData(true, true)
     else setTimeout(() => this.refreshRestoredTaskList(restored), 0)
     this.changedListener = () => { this.taskDataChanged = true }
@@ -240,6 +273,7 @@ export default {
     getMciListSnapshotKey() { return this.taskListSessionKey },
     getMciListAnchorConfig() { return { container: '.task-scroll', items: '.task-list-session-item' } },
     taskAnchorId(item = {}) { return `mci-task-${String(item.Id || item.id || '').replace(/[^A-Za-z0-9_-]/g, '')}` },
+    isFocusedTask(item = {}) { return !!this.focusTaskId && String(item.Id || item.id || '') === this.focusTaskId },
     getMciListSnapshot() {
       return {
         rows: [...this.rows],
@@ -257,7 +291,7 @@ export default {
         customStart: this.customStart,
         customEnd: this.customEnd,
         city: this.city,
-        mineOnly: this.mineOnly,
+        mineOnly: this.isCustomerAccount ? false : this.mineOnly,
         orderType: this.orderType,
         finished: this.finished,
         stale: this.stale
@@ -291,7 +325,7 @@ export default {
         customRange: this.customRange,
         dateField: this.dateField,
         city: this.city.trim(),
-        mineOnly: this.mineOnly,
+        mineOnly: this.isCustomerAccount ? false : this.mineOnly,
         orderBy: this.dateField,
         orderType: this.orderType,
         customerId: this.customerId || '',
@@ -326,8 +360,12 @@ export default {
       if (reset) this.mciRestoreListPosition(0)
       const filters = this.taskFilters({ refresh })
       try {
-        const result = await loadTasks(filters)
+        const focusPromise = reset && this.focusTaskId
+          ? this.loadFocusedTask(refresh).catch(() => null)
+          : Promise.resolve(this.focusedTask)
+        const [result, focusedTask] = await Promise.all([loadTasks(filters), focusPromise])
         if (requestId !== this.loadRequestId) return
+        if (reset) this.focusedTask = focusedTask
         this.rows = reset ? result.rows : [...this.rows, ...result.rows]
         this.count = result.count
         this.stale = result.stale
@@ -343,6 +381,23 @@ export default {
           this.refreshing = false
         }
       }
+    },
+    async loadFocusedTask(refresh = false) {
+      const result = await loadTasks(this.taskFilters({
+        pageIndex: 1,
+        pageSize: 1,
+        keyword: '',
+        state: '',
+        type: '',
+        period: 'all',
+        customRange: null,
+        city: '',
+        customerId: '',
+        mineOnly: false,
+        refresh,
+        extraWhere: [{ Name: 'Id', Type: '=', Value: this.focusTaskId }]
+      }))
+      return result.rows[0] || null
     },
     async loadAuxiliaryCounts(filters, requestId) {
       try {
@@ -397,7 +452,11 @@ export default {
     changeState(value) { if (this.state === value) return; this.state = value; this.loadData(true, true) },
     changeType(value) { if (this.type === value) return; this.type = value; this.loadData(true, true) },
     selectPeriod(value) { this.period = value; if (value === 'custom') this.filterVisible = true; else this.loadData(true, true) },
-    toggleMine() { this.mineOnly = !this.mineOnly; this.loadData(true, true) },
+    toggleMine() {
+      if (this.isCustomerAccount) return
+      this.mineOnly = !this.mineOnly
+      this.loadData(true, true)
+    },
     applyFilters() {
       if (this.period === 'custom' && !this.customRange) { uni.showToast({ title: '请选择完整时间范围', icon: 'none' }); return }
       if (this.customStart && this.customEnd && this.customStart > this.customEnd) { uni.showToast({ title: '开始日期不能晚于结束日期', icon: 'none' }); return }
@@ -406,7 +465,7 @@ export default {
     },
     resetFilters(load = true) {
       this.keyword = ''; this.state = ''; this.type = ''; this.period = 'month'; this.dateField = 'YujiSHSJ'
-      this.customStart = ''; this.customEnd = ''; this.city = ''; this.mineOnly = true; this.orderType = 'ASC'
+      this.customStart = ''; this.customEnd = ''; this.city = ''; this.mineOnly = !this.isCustomerAccount; this.orderType = 'ASC'
       this.filterVisible = false
       if (load) this.loadData(true, true)
     },
@@ -438,7 +497,7 @@ export default {
       const filters = {
         keyword: this.keyword.trim(), state: this.state, type: this.type, period: this.period,
         customRange: this.customRange, dateField: this.dateField, city: this.city.trim(),
-        mineOnly: this.mineOnly, orderBy: this.dateField, orderType: this.orderType,
+        mineOnly: this.isCustomerAccount ? false : this.mineOnly, orderBy: this.dateField, orderType: this.orderType,
         customerId: this.customerId || ''
       }
       this.mciNavigateToDetail(`/pages/task/map?mode=task&filters=${encodeURIComponent(JSON.stringify(filters))}`)
@@ -506,6 +565,9 @@ export default {
 .offline-tip { padding: 12rpx 22rpx; color: #7c5b1c; background: #fff8e6; font-size: 21rpx; }
 .task-scroll { height: calc(100vh - var(--mci-safe-top) - 448rpx); }
 .task-list { padding: 18rpx 20rpx 0; }
+.task-list-session-item { position: relative; border-radius: 9px; }
+.task-list-session-item--focused { padding: 4rpx; background: linear-gradient(135deg,rgba(229,70,37,.2),rgba(8,125,168,.16)); box-shadow: 0 0 0 2rpx rgba(229,70,37,.5),0 10rpx 26rpx rgba(28,76,94,.13); }
+.task-focus-label { position: absolute; top: -12rpx; right: 18rpx; z-index: 2; padding: 7rpx 15rpx; border-radius: 16rpx; color: #fff; background: #e54625; box-shadow: 0 5rpx 12rpx rgba(197,57,31,.24); font-size: 19rpx; font-weight: 700; line-height: 1; }
 .task-card { margin-bottom: 16rpx; border: 1px solid #e2eaed; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 5rpx 16rpx rgba(20,65,84,.055); transition: transform .16s ease; }
 .task-card--pressed { transform: scale(.988); }
 .task-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; padding: 22rpx 22rpx 16rpx; }

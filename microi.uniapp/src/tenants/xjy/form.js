@@ -25,6 +25,7 @@ import {
   CUSTOMER_FOLLOW_FIELDS,
   customerFollowScopeValues
 } from './customer-follow-scope.mjs'
+import { followupApprovalDefaultValues } from './followup-approval-defaults.mjs'
 import {
   calculateOrderProductCooperation,
   calculateOrderProductPriceBinding,
@@ -37,6 +38,8 @@ import {
 } from './order-summary.mjs'
 
 const CUSTOMER_TABLE = 'diy_kehu'
+const CUSTOMER_CASE_TABLE = 'diy_anli'
+const CASEBOOK_CASE_TABLE = 'diy_anlice_child'
 // zhy：合同订单在所有移动端入口共用同一表单钩子，避免“我的订单”和客户订单 Tab 行为不一致。
 const ORDER_TABLE = 'diy_dingdan'
 const ORDER_PRODUCT_TABLE = 'diy_dingdansp'
@@ -114,7 +117,9 @@ const FOLLOWUP_FIELDS = {
   contacts: 'BeibaiFR',
   user: 'BaifangR',
   time: 'GenjinSJ',
-  effective: 'GuanjianJCR'
+  effective: 'GuanjianJCR',
+  approvalStatus: 'ShenpiZT',
+  approvalStatusValue: 'ShenpiZTZ'
 }
 const CONTACT_FIELDS = {
   customerId: 'KehuID',
@@ -182,6 +187,41 @@ function isCustomerAdd(context) {
 
 function isCustomerForm(context) {
   return String(context.tableName || '').toLowerCase() === CUSTOMER_TABLE
+}
+
+function isCustomerCaseView(context) {
+  const tableName = String(context.tableName || '').toLowerCase()
+  return [CUSTOMER_CASE_TABLE, CASEBOOK_CASE_TABLE].includes(tableName) && context.mode === 'View'
+}
+
+function customerCasePoster(context) {
+  const isCasebookCase = String(context.tableName || '').toLowerCase() === CASEBOOK_CASE_TABLE
+  return {
+    eyebrow: 'XINJIYUAN COOPERATIVE CASE',
+    brandImage: '/static/xjy/anli/cunse.png',
+    brandSubtitle: '新纪源 · 新商净',
+    titleField: 'Biaoti',
+    // 子表已保留语义字段 KehuGK/KehuPJ，优先使用它们以兼容历史收录记录。
+    introField: 'KehuGK',
+    photoField: isCasebookCase ? 'KehuALZP' : 'Tupian',
+    merchantField: 'TenantName',
+    metaFields: [
+      { label: '客户名称', field: 'KehuMC' },
+      { label: '客户类型', field: isCasebookCase ? 'Select178' : 'KehuLX' },
+      { label: '设备型号', field: isCasebookCase ? 'Select224' : 'ShebeiXH' },
+      { label: '设备数量', field: isCasebookCase ? 'Text727' : 'ShebeiSL' }
+    ],
+    rows: [
+      { label: '合作时间', field: isCasebookCase ? 'DateTime340' : 'HezuoSJ', badge: { image: '/static/xjy/anli/oen_energy.png', icon: 'energy', text: '1级', subtext: '能效', tone: 'teal' } },
+      { label: '合作内容', field: isCasebookCase ? 'Textarea579' : 'HezuoNR', badge: { image: '/static/xjy/anli/water_energy.png', icon: 'water', text: '1级', subtext: '水效', tone: 'blue' } },
+      { label: '客户评价', field: 'KehuPJ', badge: { image: '/static/xjy/anli/save_electric.png', icon: 'saving', text: '30%~50%', subtext: '节电', tone: 'green' } },
+      { label: '数据证明', field: isCasebookCase ? 'Textarea749' : 'ShujuZM', badge: { image: '/static/xjy/anli/reverse_perco.png', icon: 'filter', text: '5级', subtext: '反渗透', tone: 'red' } }
+    ],
+    footerNote: '一站式商用饮水解决方案服务商',
+    footerTagField: isCasebookCase ? 'Select178' : 'KehuLX',
+    footerTag: '客户案例',
+    photoEmptyText: '暂未上传客户案例照片'
+  }
 }
 
 // zhy：按表名识别订单表单；联动同时适用于新增和编辑，默认值仅适用于新增。
@@ -1027,7 +1067,7 @@ async function loadFollowupContacts(context, customerId, clearSelection = false)
 }
 
 function initializeFollowup(context) {
-  // zhy：新增跟进默认填充当前用户、当前时分，并将“是否有效拜访”设为开启。
+  // zhy：新增跟进默认填充当前用户、当前时分、有效拜访及待审批状态。
   const user = currentUserOption()
   const updates = {}
   const userName = fieldName(context, FOLLOWUP_FIELDS.user, '跟进人')
@@ -1043,7 +1083,16 @@ function initializeFollowup(context) {
   if (!Object.prototype.hasOwnProperty.call(context.defaultValues || {}, effectiveName)) {
     updates[effectiveName] = true
   }
-  context.patchForm(updates)
+  context.patchForm({
+    ...updates,
+    ...followupApprovalDefaultValues({
+      form: context.form,
+      mode: context.mode,
+      rowId: context.rowId,
+      statusField: fieldName(context, FOLLOWUP_FIELDS.approvalStatus, '审批状态'),
+      statusValueField: fieldName(context, FOLLOWUP_FIELDS.approvalStatusValue, '审批状态值')
+    })
+  })
 }
 
 function initializeFollowupTarget(context) {
@@ -1668,6 +1717,12 @@ export async function handleRelatedCount(context, payload = {}) {
 }
 
 export function getPresentation(context) {
+  if (isCustomerCaseView(context)) {
+    // zhy：首页案例与案例册快照在查看态共用宣传册式编排；差异字段在租户层映射，平台仍只消费通用协议。
+    return {
+      detailPoster: customerCasePoster(context)
+    }
+  }
   if (isCheckinEditable(context)) {
     const location = context.state.checkinLocation || {}
     return {
@@ -2292,7 +2347,15 @@ export async function beforeSubmit(context) {
     return values
   }
   if (isFollowupForm(context)) {
-    // zhy：KehuID 是隐藏字段，不会进入通用 visible fields 保存列表，提交前必须显式补入。
+    // zhy：审批状态值、KehuID 等字段可能隐藏或只读，提交前必须显式补入。
+    const approvalDefaults = followupApprovalDefaultValues({
+      form: context.form,
+      mode: context.mode,
+      rowId: context.rowId,
+      statusField: fieldName(context, FOLLOWUP_FIELDS.approvalStatus, '审批状态'),
+      statusValueField: fieldName(context, FOLLOWUP_FIELDS.approvalStatusValue, '审批状态值')
+    })
+    if (Object.keys(approvalDefaults).length) context.patchForm(approvalDefaults)
     const contactField = findField(context, FOLLOWUP_FIELDS.contacts, '联系人')
     const contactRows = contactField && Array.isArray(contactField.options)
       ? contactField.options.map((option) => option.raw).filter(Boolean)
@@ -2310,6 +2373,7 @@ export async function beforeSubmit(context) {
     context.state.followupCustomerId = customer.id
     context.state.followupCustomerName = customer.name
     return {
+      ...approvalDefaults,
       [targetTypeName]: targetType,
       [targetNameField]: targetName,
       [customerIdName]: linkedCustomer.id,
