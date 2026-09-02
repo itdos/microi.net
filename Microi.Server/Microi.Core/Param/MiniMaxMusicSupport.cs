@@ -16,6 +16,7 @@ namespace Microi.net
         public int SampleRate { get; set; }
         public int Bitrate { get; set; }
         public string Format { get; set; }
+        public int DurationSeconds { get; set; }
         public string RequestBody { get; set; }
         public string Fingerprint { get; set; }
     }
@@ -26,8 +27,8 @@ namespace Microi.net
     /// </summary>
     public static class MiniMaxMusicSupport
     {
-        public const string PrimaryModel = "music-2.6";
-        public const string FreeTierFallbackModel = "music-2.6-free";
+        public const string PrimaryModel = "music-3.0";
+        public const string OpenSourceFallbackModel = "MiniMaxAI/MiniMax-Music3";
 
         public static bool LooksLikeMusicGeneration(string value)
         {
@@ -78,7 +79,7 @@ namespace Microi.net
             var model = (param.Model ?? PrimaryModel).Trim().ToLowerInvariant();
             if (model != PrimaryModel)
             {
-                error = "当前 MiniMax 官方音乐生成只允许 music-2.6。";
+                error = "当前 MiniMax 官方音乐生成只允许 music-3.0。";
                 return false;
             }
             var sampleRate = param.SampleRate == 0 ? 44100 : param.SampleRate;
@@ -97,6 +98,12 @@ namespace Microi.net
             if (format != "mp3")
             {
                 error = "当前音乐交付规范只允许 MP3。";
+                return false;
+            }
+            var durationSeconds = param.DurationSeconds == 0 ? 20 : param.DurationSeconds;
+            if (durationSeconds < 10 || durationSeconds > 60)
+            {
+                error = "开源 MiniMax-Music3 回退时长必须为 10-60 秒。";
                 return false;
             }
             var body = new JObject
@@ -119,34 +126,24 @@ namespace Microi.net
                 SampleRate = sampleRate,
                 Bitrate = bitrate,
                 Format = format,
+                DurationSeconds = durationSeconds,
                 RequestBody = body,
-                Fingerprint = Sha256(body)
+                Fingerprint = Sha256(body + "|fallback-duration:" + durationSeconds)
             };
             return true;
         }
 
         /// <summary>
-        /// MiniMax 对部分新账号会用 HTTP 410 明确拒绝正式 music-2.6，官方文档同时
-        /// 提供 music-2.6-free。只有收到这一确定、未生成音乐的响应时才允许在同一
-        /// 幂等请求内降级；超时、5xx、额度不足等不确定或计费相关错误一律不重试。
+        /// MiniMax 自 2026-08-20 起会用 HTTP 410 明确拒绝不再有权使用托管 Music API
+        /// 的账号。只有收到这一确定、未生成音乐的响应时才允许在同一幂等请求内切到
+        /// 官方开源 MiniMax-Music3；超时、5xx、额度不足等不确定或计费错误一律不重试。
         /// </summary>
-        public static bool ShouldUseFreeTierFallback(int statusCode, string responseBody)
+        public static bool ShouldUseOpenSourceFallback(int statusCode, string responseBody)
         {
             if (statusCode != 410) return false;
             var body = (responseBody ?? string.Empty).ToLowerInvariant();
             return body.Contains("music api is no longer available to new users")
                 || body.Contains("no longer available to new users");
-        }
-
-        public static string BuildFreeTierFallbackBody(string primaryRequestBody)
-        {
-            var body = JObject.Parse(primaryRequestBody ?? "{}");
-            if (!string.Equals(body["model"]?.ToString(), PrimaryModel, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException("只有标准 music-2.6 请求可以构造免费模型降级。 ");
-            }
-            body["model"] = FreeTierFallbackModel;
-            return body.ToString(Formatting.None);
         }
 
         public static string BuildIdempotencyKey(string osClient, string userId, string requestId)

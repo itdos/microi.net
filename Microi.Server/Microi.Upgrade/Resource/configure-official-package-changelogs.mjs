@@ -66,11 +66,11 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
     releaseTime: webosIconReleaseTime,
   }),
   'app.microi.ai-engine.json': Object.freeze({
-    version: 'v7.6.3',
-    title: 'AI 向量配置字段元数据修复',
-    changeType: 'Fix',
-    content: '补齐 EnableVectorDatabase、VectorScoreThreshold、VectorTopK、QdrantApiKey、QdrantPort、QdrantHost、EmbeddingApiUrl 七个字段的 Name 元数据，恢复官方包字段闭包与跨租户安装校验。',
-    releaseTime: '2026-09-02 15:00:30',
+    version: 'v7.6.4',
+    title: 'AI 图像工作台与参考图编辑',
+    changeType: 'Feature',
+    content: '重构 AI助手能力导航，新增文生图、图生图、高清重绘、消除、扩图、去水印、证件照、多图融合、抠图、上色及精确图片处理；参考图私有存储，结果写入租户 HDFS。',
+    releaseTime: '2026-09-03 12:00:00',
   }),
 });
 
