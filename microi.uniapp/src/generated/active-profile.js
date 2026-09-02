@@ -9,10 +9,10 @@ export default {
   "platformName": "集福鲤平台",
   "servicePlatformName": "集福鲤服务平台",
   "poweredBy": "集福鲤",
-  "versionName": "2.0.0",
+  "versionName": "2.0.1",
   "releaseNotes": [
-    "新增小程序版本查看与更新能力",
-    "优化版本切换后的配置缓存刷新"
+    "修复客户、订单、跟进记录等列表请求 404",
+    "模块列表请求切换至新版接口引擎"
   ],
   "appSubTitle": "让每一次服务都有迹可循",
   "workspaceSubTitle": "客户与服务工作台",
@@ -68,6 +68,9 @@ export default {
     "messages": "/pages/message/index",
     "password": "/pages/native/password",
     "profile": "/pages/profile/index",
+    "complaintCenter": "/pages/complaint/index?tab=submit",
+    "complaintPublic": "/pages/complaint/index?tab=public",
+    "complaintDetail": "/pages/complaint/detail",
     "reminders": "/pages/native/reminders",
     "workspace": "/pages/workspace/index"
   },

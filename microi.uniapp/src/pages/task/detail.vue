@@ -58,7 +58,8 @@
           <view v-for="field in group.fields" :key="field.Id || field.Name" class="metadata-field">
             <text class="metadata-field__label">{{ field.Label || field.Name }}</text>
             <view class="metadata-field__value">
-              <mci-native-field :model-value="task[field.Name]" :field="field" readonly table-name="Diy_ShouhouDD" />
+              <mci-native-field :model-value="task[field.Name]" :field="field" readonly
+                table-name="Diy_ShouhouDD" :form-data="task" :form-data-id="id" :menu-id="taskMenuId" />
             </view>
           </view>
         </view>
@@ -84,7 +85,7 @@
 <script>
 import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
-import { callApiEngine, formatDateTime, openForm } from '@/platform/business-runtime.js'
+import { callApiEngine, findMenu, formatDateTime, openForm } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition } from '@/platform/native-form.js'
 import {
   hasTaskPermission,
@@ -111,7 +112,7 @@ export default {
     return {
       id: '', task: {}, devices: [], taskCapabilities: [], currentUser: {}, loading: true, refreshing: false,
       stale: false, error: '', submitting: false, assignVisible: false, usersLoading: false, users: [],
-      metadataDefinition: null, expandedMetadata: {},
+      metadataDefinition: null, taskMenuId: '', expandedMetadata: {},
       selectedUser: null, userKeyword: '', userSearchTimer: null, userLoadRequestId: 0, timeVisible: false, timeEditor: {}, editorDate: '', editorTime: '',
       rejectVisible: false, rejectMode: 'merchant', rejectReason: '', evaluateVisible: false,
       evaluation: { rate: 5, deviceRate: 5, staffRate: 5, tags: [], content: '' },
@@ -191,16 +192,23 @@ export default {
       try {
         const definitionRequest = loadNativeFormDefinition('Diy_ShouhouDD', refresh).catch(() => this.metadataDefinition)
         const capabilityRequest = loadTaskFlowCapabilities(this.id, refresh).catch(() => ({ actions: [] }))
-        const [taskResult, devices, definition, capabilities] = await Promise.all([
+        const menuRequest = findMenu(
+          ['售后订单', '售后任务', '我的任务'],
+          'Diy_ShouhouDD',
+          refresh
+        ).catch(() => null)
+        const [taskResult, devices, definition, capabilities, menu] = await Promise.all([
           loadTask(this.id, refresh),
           loadTaskDevices(this.id, refresh),
           definitionRequest,
-          capabilityRequest
+          capabilityRequest,
+          menuRequest
         ])
         this.task = taskResult.task
         this.devices = devices
         this.taskCapabilities = capabilities.actions || []
         this.metadataDefinition = definition || null
+        this.taskMenuId = menu && menu.Id || ''
         this.expandedMetadata = {}
         this.stale = taskResult.stale
       } catch (error) {

@@ -31,6 +31,35 @@ function isBoundToRequestedTable(menu, tableName, tableId) {
   return Boolean(boundId)
 }
 
+function isConfirmedTableBinding(menu, tableName, tableId) {
+  const requestedName = normalize(tableName).toLowerCase()
+  const requestedId = normalize(tableId)
+  const boundName = menuTableName(menu).toLowerCase()
+  const boundId = normalize(menu && menu.DiyTableId)
+
+  if (requestedId) return boundId === requestedId || (!boundId && Boolean(requestedName && boundName === requestedName))
+  if (requestedName) return Boolean(boundName && boundName === requestedName)
+  return true
+}
+
+export function requiresAuthorizedMenuContext(moduleConfig = {}) {
+  if (moduleConfig.requireAuthorizedMenu === true) return true
+  return normalize(moduleConfig.target).toLowerCase() === 'native-list' &&
+    Boolean(normalize(moduleConfig.table)) &&
+    moduleConfig.skipModuleMetadata !== true &&
+    !normalize(moduleConfig.listApiEngineKey)
+}
+
+export function resolveBusinessMenuPermission(entry = {}, moduleConfig = {}) {
+  const explicit = entry.menuPermission || moduleConfig.menuPermission
+  if (explicit) return explicit
+  if (!requiresAuthorizedMenuContext(moduleConfig)) return null
+  return {
+    table: moduleConfig.table || '',
+    menuAliases: moduleConfig.menuAliases || []
+  }
+}
+
 function findByAliasOrder(menus, aliases, predicate) {
   for (const alias of aliases) {
     const result = menus.find((menu) => predicate(menu, alias))
@@ -82,7 +111,9 @@ export function selectAuthorizedMenu(menus = [], options = {}) {
 
   const partialAlias = findByAliasOrder(menus, aliases, (menu, alias) =>
     normalize(menu && menu.Name).includes(alias) &&
-    isBoundToRequestedTable(menu, tableName, tableId)
+    // 菜单树只返回 DiyTableId、没有表名时，精确别名仍可作为兼容授权依据；
+    // 模糊别名则必须已经确认表绑定，避免“客户”误命中“客户案例”。
+    isConfirmedTableBinding(menu, tableName, tableId)
   )
   if (partialAlias) return partialAlias
 

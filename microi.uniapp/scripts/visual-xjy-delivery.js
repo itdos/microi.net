@@ -183,6 +183,69 @@ const sourceCases = [
   { Id: 'case-003', Biaoti: '湖畔人才公寓饮水保障', KehuMC: '湖畔人才公寓' }
 ];
 
+const customerCaseTable = {
+  Id: 'table-customer-case', Name: 'Diy_Anli', Description: '客户案例'
+};
+
+const casebookCaseTable = {
+  Id: 'table-casebook-case', Name: 'diy_anlice_child', Description: '案例册子案例'
+};
+
+const customerCaseFields = [
+  { Id: 'case-title', TableName: 'Diy_Anli', Name: 'Biaoti', Label: '标题', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 10, Config: '{}' },
+  { Id: 'case-customer', TableName: 'Diy_Anli', Name: 'KehuMC', Label: '客户名称', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 20, Config: '{}' },
+  { Id: 'case-type', TableName: 'Diy_Anli', Name: 'KehuLX', Label: '客户类型', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 30, Config: '{}' },
+  { Id: 'case-model', TableName: 'Diy_Anli', Name: 'ShebeiXH', Label: '设备型号', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 40, Config: '{}' },
+  { Id: 'case-summary', TableName: 'Diy_Anli', Name: 'KehuGK', Label: '客户概况', Component: 'Textarea', Visible: 1, AppVisible: 1, Sort: 50, Config: '{}' },
+  { Id: 'case-time', TableName: 'Diy_Anli', Name: 'HezuoSJ', Label: '合作时间', Component: 'DateTime', Visible: 1, AppVisible: 1, Sort: 60, Config: '{}' },
+  { Id: 'case-count', TableName: 'Diy_Anli', Name: 'ShebeiSL', Label: '设备数量', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 70, Config: '{}' },
+  { Id: 'case-content', TableName: 'Diy_Anli', Name: 'HezuoNR', Label: '合作内容', Component: 'Textarea', Visible: 1, AppVisible: 1, Sort: 80, Config: '{}' },
+  { Id: 'case-review', TableName: 'Diy_Anli', Name: 'KehuPJ', Label: '客户评价', Component: 'Textarea', Visible: 1, AppVisible: 1, Sort: 90, Config: '{}' },
+  { Id: 'case-proof', TableName: 'Diy_Anli', Name: 'ShujuZM', Label: '数据证明', Component: 'Textarea', Visible: 1, AppVisible: 1, Sort: 100, Config: '{}' },
+  { Id: 'case-photo', TableName: 'Diy_Anli', Name: 'Tupian', Label: '客户案例照片', Component: 'ImgUpload', Visible: 1, AppVisible: 1, Sort: 110, Config: '{"UploadLimit":9}' },
+  { Id: 'case-picker', TableName: 'Diy_Anli', Name: 'XuanzeZP', Label: '选择照片', Component: 'OpenTable', Visible: 1, AppVisible: 1, Sort: 120, Config: '{"OpenTable":{"TableName":"diy_location","BtnName":"选择照片"}}' },
+  { Id: 'case-merchant', TableName: 'Diy_Anli', Name: 'TenantName', Label: '商家名称', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 130, Config: '{}' }
+];
+
+const customerCaseDetail = {
+  Id: 'case-001', Biaoti: '滨江区实验学校直饮水升级', KehuMC: '滨江区实验学校', KehuLX: '学校',
+  ShebeiXH: 'JFL-S600 商用直饮机', ShebeiSL: '18 台', HezuoSJ: '2025-11-01',
+  KehuGK: '覆盖教学楼、行政楼与体育馆饮水点位，为师生提供从设备建设到长期维保的全流程饮水保障。',
+  HezuoNR: '合作 18 台商用直饮机，每三个月上门换芯保养，并提供水质检测与故障响应服务。',
+  KehuPJ: '服务响应及时，工程师专业，设备运行稳定，师生饮水体验得到明显改善。',
+  ShujuZM: '设备达到一级能效、一级水效；节省用电约 30%~50%，采用五级反渗透配置。',
+  TenantName: '新纪源水科技有限公司',
+  Tupian: JSON.stringify([
+    { Path: 'https://static.jifulii.com/xjy/xjy/miniapp-assets/20260722/20260722/scan2.jpg' },
+    { Path: 'https://static.jifulii.com/xjy/xjy/miniapp-assets/20260722/20260722/product-water-purifier.jpg' }
+  ])
+};
+
+const casebookCaseFields = [
+  { Id: 'book-case-title', TableName: 'diy_anlice_child', Name: 'Biaoti', Label: '标题', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 10, Config: '{}' },
+  { Id: 'book-case-customer', TableName: 'diy_anlice_child', Name: 'KehuMC', Label: '客户名称', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 20, Config: '{}' },
+  { Id: 'book-case-type', TableName: 'diy_anlice_child', Name: 'Select178', Label: '客户类型', Component: 'Select', Visible: 1, AppVisible: 1, Sort: 30, Config: '{}' },
+  { Id: 'book-case-model', TableName: 'diy_anlice_child', Name: 'Select224', Label: '设备型号', Component: 'Select', Visible: 1, AppVisible: 1, Sort: 40, Config: '{}' },
+  { Id: 'book-case-summary', TableName: 'diy_anlice_child', Name: 'KehuGK', Label: '客户概况', Component: 'Textarea', Visible: 1, AppVisible: 1, Sort: 50, Config: '{}' },
+  { Id: 'book-case-time', TableName: 'diy_anlice_child', Name: 'DateTime340', Label: '合作时间', Component: 'DateTime', Visible: 1, AppVisible: 1, Sort: 60, Config: '{}' },
+  { Id: 'book-case-count', TableName: 'diy_anlice_child', Name: 'Text727', Label: '设备数量', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 70, Config: '{}' },
+  { Id: 'book-case-content', TableName: 'diy_anlice_child', Name: 'Textarea579', Label: '合作内容', Component: 'Textarea', Visible: 1, AppVisible: 1, Sort: 80, Config: '{}' },
+  { Id: 'book-case-review', TableName: 'diy_anlice_child', Name: 'KehuPJ', Label: '客户评价', Component: 'Textarea', Visible: 1, AppVisible: 1, Sort: 90, Config: '{}' },
+  { Id: 'book-case-proof', TableName: 'diy_anlice_child', Name: 'Textarea749', Label: '数据证明', Component: 'Textarea', Visible: 1, AppVisible: 1, Sort: 100, Config: '{}' },
+  { Id: 'book-case-photo', TableName: 'diy_anlice_child', Name: 'KehuALZP', Label: '客户案例照片', Component: 'ImgUpload', Visible: 1, AppVisible: 1, Sort: 110, Config: '{"UploadLimit":9}' },
+  { Id: 'book-case-picker', TableName: 'diy_anlice_child', Name: 'OpenTable113', Label: '选择照片', Component: 'OpenTable', Visible: 1, AppVisible: 1, Sort: 120, Config: '{"OpenTable":{"TableName":"diy_location","BtnName":"选择照片"}}' },
+  { Id: 'book-case-merchant', TableName: 'diy_anlice_child', Name: 'TenantName', Label: '商家名称', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 130, Config: '{}' }
+];
+
+const casebookCaseDetail = {
+  Id: 'book-child-001', Biaoti: customerCaseDetail.Biaoti, KehuMC: customerCaseDetail.KehuMC,
+  Select178: customerCaseDetail.KehuLX, Select224: customerCaseDetail.ShebeiXH,
+  Text727: customerCaseDetail.ShebeiSL, KehuGK: customerCaseDetail.KehuGK,
+  DateTime340: customerCaseDetail.HezuoSJ, Textarea579: customerCaseDetail.HezuoNR,
+  KehuPJ: customerCaseDetail.KehuPJ, Textarea749: customerCaseDetail.ShujuZM,
+  KehuALZP: customerCaseDetail.Tupian, TenantName: customerCaseDetail.TenantName
+};
+
 const taskDevices = [
   { Id: 'task-device-001', ShouhouDDID: 'task-001', ShebeiMC: '校园直饮机 A', ShebeiXH: 'JFL-S600', ShebeiBH: 'SB-HZ-2026-0068', AnzhuangWZ: '教学楼一层', FuwuZT: '已完成', ShebeiPX: 1 },
   { Id: 'task-device-002', ShouhouDDID: 'task-001', ShebeiMC: '校园直饮机 B', ShebeiXH: 'JFL-S600', ShebeiBH: 'SB-HZ-2026-0069', AnzhuangWZ: '教学楼三层', FuwuZT: '已完成', ShebeiPX: 2 }
@@ -362,6 +425,20 @@ const targets = [
     name: 'casebook-picker', route: '/#/pages/native/casebook?id=book-001', selector: '.casebook-page',
     clickSelector: '.add-case-button', afterSelector: '.picker-sheet',
     required: ['.book-panel', '.picker-sheet', '.source-list']
+  },
+  {
+    name: 'customer-case-detail', route: '/#/pages/native-form/index?table=Diy_Anli&id=case-001&mode=View&title=客户案例详情', selector: '.native-form-page',
+    required: ['.mci-poster-detail', '.mci-poster-detail__gallery', '.mci-poster-detail__facts', '.edit-command'],
+    forbiddenSelectors: ['.selector-field'], forbiddenText: ['选择照片'],
+    expectedText: ['滨江区实验学校直饮水升级', '合作时间', '合作内容', '客户评价', '数据证明', '一站式商用饮水解决方案服务商'],
+    requireLoadedImages: true
+  },
+  {
+    name: 'casebook-case-detail', route: '/#/pages/native-form/index?table=diy_anlice_child&id=book-child-001&mode=View&title=案例详情', selector: '.native-form-page',
+    required: ['.mci-poster-detail', '.mci-poster-detail__gallery', '.mci-poster-detail__facts', '.edit-command'],
+    forbiddenSelectors: ['.selector-field'], forbiddenText: ['选择照片'],
+    expectedText: ['滨江区实验学校直饮水升级', '合作时间', '合作内容', '客户评价', '数据证明', '一站式商用饮水解决方案服务商'],
+    requireLoadedImages: true
   },
   {
     name: 'task-follow-up', route: '/#/pages/native/task-follow-up?id=task-001', selector: '.follow-up-page',
@@ -604,10 +681,13 @@ function buildMockResponse(request) {
     return { Code: 1, Data: { SysTitle: '集福鲤', SysShortTitle: '集福鲤', CompanyName: '新纪源水科技', DisableAiAssistant: 0 } };
   }
   if (lowerUrl.includes('formengine/getdiytablemodel')) {
-    return { Code: 1, Data: sysUserTable };
+    const tableName = String(table).toLowerCase();
+    return { Code: 1, Data: tableName === 'diy_anli' ? customerCaseTable : tableName === 'diy_anlice_child' ? casebookCaseTable : sysUserTable };
   }
   if (lowerUrl.includes('formengine/getdiyfieldlist')) {
-    return { Code: 1, Data: sysUserFields, DataCount: sysUserFields.length };
+    const tableName = String(table).toLowerCase();
+    const fields = tableName === 'diy_anli' ? customerCaseFields : tableName === 'diy_anlice_child' ? casebookCaseFields : sysUserFields;
+    return { Code: 1, Data: fields, DataCount: fields.length };
   }
   if (lowerUrl.includes('moduleengine/gettabledata')) {
     const result = moduleRows[table] || { rows: [], count: 0, statistics: {} };
@@ -692,8 +772,14 @@ function buildMockResponse(request) {
   if (lowerUrl.includes('getformdata') && String(table).toLowerCase() === 'diy_needrelease') {
     return { Code: 1, Data: demandDetail };
   }
+  if (lowerUrl.includes('getformdata') && String(table).toLowerCase() === 'diy_anlice_child') {
+    return { Code: 1, Data: casebookCaseDetail };
+  }
   if (lowerUrl.includes('getformdata') && String(table).toLowerCase() === 'diy_anlice') {
     return { Code: 1, Data: casebookDetail };
+  }
+  if (lowerUrl.includes('getformdata') && String(table).toLowerCase() === 'diy_anli') {
+    return { Code: 1, Data: customerCaseDetail };
   }
   if (lowerUrl.includes('getformdata') && table === 'diy_table') {
     return { Code: 1, Data: sysUserTable };
