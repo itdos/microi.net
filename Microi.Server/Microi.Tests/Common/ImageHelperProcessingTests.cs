@@ -469,6 +469,62 @@ public class ImageHelperProcessingTests
             decoded.GetPixel(pixel % decoded.Width, pixel / decoded.Width).Alpha < 250);
     }
 
+    [Fact]
+    public void Grayscale_preserves_dimensions_and_alpha_while_removing_chroma()
+    {
+        var source = Solid(40, 30, "#ef4444cc");
+
+        var result = ImageHelper.Grayscale(new ImageGrayscaleParam
+        {
+            Bytes = source.Bytes,
+            Strength = 1,
+            OutputFormat = "png"
+        });
+
+        Assert.Equal(40, result.Width);
+        Assert.Equal(30, result.Height);
+        using var decoded = Decode(result.Bytes);
+        var pixel = decoded.GetPixel(20, 15);
+        Assert.InRange(Math.Abs(pixel.Red - pixel.Green), 0, 1);
+        Assert.InRange(Math.Abs(pixel.Green - pixel.Blue), 0, 1);
+        Assert.InRange(pixel.Alpha, 200, 206);
+    }
+
+    [Fact]
+    public void RemoveSolidBackground_makes_corner_color_transparent_and_keeps_subject()
+    {
+        var source = ImageHelper.Draw(new ImageDrawParam
+        {
+            Bytes = Solid(80, 60, "#ffffff").Bytes,
+            Elements =
+            [
+                new ImageDrawElementParam
+                {
+                    Type = "rectangle",
+                    X = 20,
+                    Y = 15,
+                    Width = 40,
+                    Height = 30,
+                    FillColor = "#2563eb"
+                }
+            ],
+            OutputFormat = "png"
+        });
+
+        var result = ImageHelper.RemoveSolidBackground(new ImageRemoveBackgroundParam
+        {
+            Bytes = source.Bytes,
+            Tolerance = 20,
+            Feather = 10,
+            FileName = "cutout.png"
+        });
+
+        Assert.Equal("png", result.Format);
+        using var decoded = Decode(result.Bytes);
+        Assert.Equal(0, decoded.GetPixel(0, 0).Alpha);
+        Assert.True(decoded.GetPixel(40, 30).Alpha > 240);
+    }
+
     private static ImageProcessResult Solid(int width, int height, string color)
     {
         return ImageHelper.Create(new ImageCreateParam

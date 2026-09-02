@@ -49,7 +49,7 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 - AI 的 Qdrant/Ollama/Embedding 配置、Schema 初始化和其它生命周期任务由 `AddMicroiAI()` 在模块内自注册；API 的 `Program.cs` 只负责调用模块注册。
 - `Microi.Core` 只承载跨模块契约和模型。新增入口时先扩展 AI 领域服务，再添加薄 Controller/Hub 适配，禁止复制业务流程。
 - AI 账户统一入口是 Managed 接口引擎 `/apiengine/platform-ai-account`；套餐、订阅和订单由 V8 编排。支付宝回调 C# 只做可信租户选择/归一化、该租户配置验签和一次性 Managed 调用；`CompletePayment` 在同一接口引擎事务内完成订单条件认领、金额校验、订阅续期/新建与平台/供应商 API Key 分配。供应商协议、密钥隔离、分布式额度原子、任务句柄和受控媒体落盘仍由绑定原子完成。
-- 非流式 `UpdateConversationTitle / RecognizeIntent / Chat / NL2SQL / NL2V8EngineSync` 统一进入 Managed `/apiengine/platform-ai-runtime`，旧 Controller 同名路由只做兼容转发；SSE/流式、Provider Proxy、媒体、文件和策略元数据保持原生。`platform-ai-runtime` 只调用绑定当前租户和当前用户的 `V8.AI` 原子，不接收客户端伪造的租户、用户、Endpoint、ApiKey、表白名单或管理员标记。
+- 非流式 `UpdateConversationTitle / RecognizeIntent / Chat / NL2SQL / NL2V8EngineSync` 与精确图片 `ProcessImage` 统一进入 Managed `/apiengine/platform-ai-runtime`，旧 Controller 同名路由只做兼容转发；SSE/流式、Provider Proxy、生成式媒体、文件和策略元数据保持原生。`platform-ai-runtime` 只调用绑定当前租户和当前用户的 `V8.AI` / `V8.Image` 原子，不接收客户端伪造的租户、用户、Endpoint、ApiKey、表白名单或管理员标记。
 - AI 官方应用只有一个应用级租户扩展点 `platform-ai-custom-hook`，策略为 `CreateIfMissing`。`mci_ai_data_assistant` 与 `platform-ai-runtime` 只传 `Stage`、`SourceApiEngineKey`、`Action`；支付动作最多增加 `EventId`、`Provider`，账户其它动作只增加白名单资源元数据。Hook 禁止接收订单号、交易号、金额、标题、SQL、模型、附件、提示词或问题原文及其摘要、回答、供应商/平台密钥、供应商任务号、文件句柄或媒体内容。匿名发现接口不调用 Hook，`/v1/usage` 继续由 C# 凭据网关直接校验，使 `Authorization` 永不进入 V8。
 - 9 张 `mic_sub_*` 订阅表与 `mci_ai_token_account`、`mci_ai_token_log` 由官方 `app.microi.ai-engine` 应用升级提供，必须同时声明 DDL、PhysicalColumns、DiyTables、DiyFields；`PromptPreview` 属于日志表正式字段。`mci_ai_token_recharge` 当前不在该运行时实体闭包内，禁止根据线上残留自行扩包。运行时发现缺失时失败关闭，禁止在请求路径自动建表、加列或修改业务 Schema。
 - `Sys_User.AiApiKey` 归官方 `app.microi.sys_user`，由系统账号包同时维护建表 DDL、PhysicalColumns 和隐藏只读 DiyField；AI助手包不得重复声明 `Sys_User`。缺列错误必须提示升级系统账号应用，不能误导用户升级 AI助手。
@@ -58,10 +58,11 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 
 - 模型 Provider、Endpoint、ApiKey、AuthPrefix 和上游模型 Id 只保存在服务端受保护配置。
 - 普通用户使用平台签发的受限 API Key/订阅身份，不能枚举或读取上游密钥。
-- MiniMax 对话媒体必须区分意图模型与生成模型：`MiniMax-M3` 只负责识别普通对话、绘图或音乐意图；图片固定走 `GenerateMiniMaxImage + image-01`，纯音乐固定走 `GenerateMiniMaxMusic + music-2.6`。不得让文本模型用说明文字冒充媒体生成，也不得声称图片/音乐是 `MiniMax-M3` 原生输出。
-- 图片请求限制为 1～4 张和受控比例，音乐当前仅向平台管理员开放且固定无人声、44.1kHz、256kbps、MP3。两者都使用稳定 `RequestId` 和共享幂等；相同参数回放、参数冲突拒绝，上游结果不确定时禁止换 Id 盲重试。成功内容由服务端校验后直接写入当前租户公有 HDFS。
+- MiniMax 对话媒体必须区分意图模型与生成模型：`MiniMax-M3` 只负责识别普通对话、绘图或音乐意图；生成式图片固定走 `GenerateMiniMaxImage + image-01`，纯音乐优先走 `GenerateMiniMaxMusic + music-3.0`。托管音乐只有明确返回 410 退役终态时才允许切到官方开源 `MiniMax-Music3`，不得把超时、5xx、额度不足等不确定状态当作回退条件。不得让文本模型用说明文字冒充媒体生成，也不得声称图片/音乐是 `MiniMax-M3` 原生输出。
+- `GenerateMiniMaxImage` 可接收最多 4 张 JPEG/PNG/WebP 主体参考图；参考图先写当前租户私有 HDFS，只将短时签名 URL 交给供应商，浏览器与响应均不得得到签名地址。图生图、重绘、扩图、消除、去水印、证件照、多图合成、上色、修复等当前属于参考图提示词重绘，不得冒充像素级蒙版工具。黑白、纯色背景抠除、缩放、裁剪、旋转、翻转、格式转换和拼图使用 `platform-ai-runtime/ProcessImage + V8.Image` 精确处理。
+- 图片与音乐都使用稳定 `RequestId` 和共享幂等；相同参数回放、参数冲突拒绝，上游结果不确定时禁止换 Id 盲重试。音乐当前仅向平台管理员开放且固定无人声；托管结果为 MP3，开源回退为 32kHz 立体声 WAV、10～60 秒。成功内容由服务端校验后直接写入当前租户公有 HDFS。
 - 聊天附件的公有媒体 URL 优先按当前运行租户 `FileServer + FilePath` 解析，禁止写死域名或沿用其它租户的前缀。图片使用 Element Plus `el-image` 的 `preview-src-list` 原页放大，不能套 `target="_blank"`；音乐使用 `<audio controls preload="metadata">` 在线播放。媒体是结构化附件，文本才走安全 Markdown 渲染，禁止拼接任意 HTML 绕过 URL/类型校验。
-- Provider/中转账号未开通音乐产品、额度不足或上游停用时必须返回可诊断失败，不生成占位音频、不伪报成功。图片、音乐和视频的真实可用性都需用目标租户登录态调用及媒体 GET/播放回读证明，源码存在或接口 HTTP 200 不能替代生成成功。
+- MiniMax 自 2026-08-20 起不再向新用户开放付费 Music/Lyrics API，并停止旧免费 Music 模型。既有 `music-3.0` 账号仍可优先直连；官方开源 `MiniMax-Music3` Space 可作为明确 410 后的回退，但公开 ZeroGPU 配额不是生产 SLA。需要专属额度时只在既有服务端 `mic_ai` 模型路由中保存官方 Space Endpoint 与受保护 Hugging Face Token，不新增 API `AppSettings`、环境变量或前端密钥。Provider/中转账号未开通、额度不足或上游停用时必须返回可诊断失败，不生成占位音频、不伪报成功。图片、音乐和视频的真实可用性都需用目标租户登录态调用及媒体 GET/播放回读证明，源码存在或接口 HTTP 200 不能替代生成成功。
 - MiniMax 视频生成属于可复用供应商原子能力，应实现在 `Microi.AI`，Controller 只读取可信用户/`OsClient`、绑定参数并传递取消信号。理由是上游密钥隔离、异步 `task_id → file_id → download_url` 协议、订阅额度和跨节点幂等都不是某个可编辑接口引擎应复制的业务逻辑；具体文章、提示词和分发编排仍可留在 Job/接口引擎/发布 Skill。
 - MiniMax Token Plan Key 与按量 API Key 是相互独立的凭据，必须复用现有服务器端 Provider/ApiKey 受保护配置，不新增 API `AppSettings`、`MICROI_*` 环境变量或浏览器可见 Key。视频创建、查询和下载仅允许官方 HTTPS Host `api.minimaxi.com`。
 - 视频创建必须要求调用方稳定 `RequestId`，先在当前租户共享 Redis 以 `OsClient + 用户 + RequestId` 原子 `NX` 占位；Redis 不可用时失败关闭。相同 RequestId/参数回放返回原任务，不同参数冲突拒绝；上游 POST 超时或结果不确定时禁止自动换 RequestId 重试。查询不再次扣生成额度。

@@ -154,6 +154,20 @@ namespace Dos.Common
         public string DataUrl { get; set; }
     }
 
+    public class ImageGrayscaleParam : ImageConvertParam
+    {
+        /// <summary>0-1；1 表示完全黑白。</summary>
+        public double Strength { get; set; } = 1D;
+    }
+
+    public class ImageRemoveBackgroundParam : ImageConvertParam
+    {
+        /// <summary>与四角背景色的 RGB 距离阈值。</summary>
+        public int Tolerance { get; set; } = 36;
+        /// <summary>阈值外的半透明羽化距离。</summary>
+        public int Feather { get; set; } = 24;
+    }
+
     public class ImageDrawParam : ImageConvertParam
     {
         public List<ImageDrawElementParam> Elements { get; set; }
@@ -573,6 +587,78 @@ namespace Dos.Common
                 return Render(bitmap.Width, bitmap.Height, format, param.Quality, param.FileName,
                     param.BackgroundColor,
                     canvas => canvas.DrawBitmap(bitmap, 0, 0));
+            }
+        }
+
+        /// <summary>跨平台黑白转换，保留原图 Alpha。</summary>
+        public static ImageProcessResult Grayscale(ImageGrayscaleParam param)
+        {
+            if (param == null) throw new ArgumentNullException(nameof(param));
+            var source = ResolveOperationSource(param.Image, param.Source, param.Bytes,
+                param.FileByteBase64, param.Base64, param.DataUrl);
+            using (var bitmap = Decode(source, new InputBudget(), out _))
+            {
+                var strength = Math.Max(0D, Math.Min(1D, param.Strength));
+                var inverse = 1D - strength;
+                var red = 0.2126D * strength;
+                var green = 0.7152D * strength;
+                var blue = 0.0722D * strength;
+                var matrix = new[]
+                {
+                    (float)(inverse + red), (float)green, (float)blue, 0F, 0F,
+                    (float)red, (float)(inverse + green), (float)blue, 0F, 0F,
+                    (float)red, (float)green, (float)(inverse + blue), 0F, 0F,
+                    0F, 0F, 0F, 1F, 0F
+                };
+                var format = ResolveFormat(param.OutputFormat, param.Format);
+                return Render(bitmap.Width, bitmap.Height, format, param.Quality, param.FileName,
+                    param.BackgroundColor,
+                    canvas =>
+                    {
+                        using (var colorFilter = SKColorFilter.CreateColorMatrix(matrix))
+                        using (var paint = new SKPaint { ColorFilter = colorFilter, IsAntialias = true })
+                            canvas.DrawBitmap(bitmap, 0, 0, paint);
+                    });
+            }
+        }
+
+        /// <summary>
+        /// 移除接近图片四角主色的纯色背景。该确定性原子能力用于 AI 先把主体
+        /// 重绘到纯色背景后的透明化收尾，不冒充通用语义分割模型。
+        /// </summary>
+        public static ImageProcessResult RemoveSolidBackground(ImageRemoveBackgroundParam param)
+        {
+            if (param == null) throw new ArgumentNullException(nameof(param));
+            var source = ResolveOperationSource(param.Image, param.Source, param.Bytes,
+                param.FileByteBase64, param.Base64, param.DataUrl);
+            using (var bitmap = Decode(source, new InputBudget(), out _))
+            {
+                if ((long)bitmap.Width * bitmap.Height > 12_000_000L)
+                    throw new ArgumentOutOfRangeException(nameof(param), "抠图输入不能超过 12,000,000 像素。");
+                var tolerance = Math.Max(0, Math.Min(255, param.Tolerance));
+                var feather = Math.Max(0, Math.Min(255, param.Feather));
+                var background = EstimateCornerBackground(bitmap);
+                var pixels = bitmap.Pixels;
+                for (var index = 0; index < pixels.Length; index++)
+                {
+                    var pixel = pixels[index];
+                    var dr = pixel.Red - background.Red;
+                    var dg = pixel.Green - background.Green;
+                    var db = pixel.Blue - background.Blue;
+                    var distance = Math.Sqrt(dr * dr + dg * dg + db * db);
+                    byte alpha;
+                    if (distance <= tolerance) alpha = 0;
+                    else if (feather > 0 && distance < tolerance + feather)
+                    {
+                        var ratio = (distance - tolerance) / feather;
+                        alpha = (byte)Math.Round(pixel.Alpha * Math.Max(0D, Math.Min(1D, ratio)));
+                    }
+                    else alpha = pixel.Alpha;
+                    pixels[index] = pixel.WithAlpha(alpha);
+                }
+                bitmap.Pixels = pixels;
+                return Render(bitmap.Width, bitmap.Height, "png", 100, param.FileName,
+                    "transparent", canvas => canvas.DrawBitmap(bitmap, 0, 0));
             }
         }
 
@@ -2035,6 +2121,27 @@ namespace Dos.Common
         {
             var multiplier = Math.Max(0D, Math.Min(1D, opacity));
             return color.WithAlpha((byte)Math.Round(color.Alpha * multiplier));
+        }
+
+        private static SKColor EstimateCornerBackground(SKBitmap bitmap)
+        {
+            var maxX = bitmap.Width - 1;
+            var maxY = bitmap.Height - 1;
+            var insetX = Math.Min(maxX, Math.Max(0, bitmap.Width / 50));
+            var insetY = Math.Min(maxY, Math.Max(0, bitmap.Height / 50));
+            var colors = new[]
+            {
+                bitmap.GetPixel(0, 0), bitmap.GetPixel(maxX, 0),
+                bitmap.GetPixel(0, maxY), bitmap.GetPixel(maxX, maxY),
+                bitmap.GetPixel(insetX, insetY), bitmap.GetPixel(maxX - insetX, insetY),
+                bitmap.GetPixel(insetX, maxY - insetY), bitmap.GetPixel(maxX - insetX, maxY - insetY)
+            };
+            byte Median(Func<SKColor, byte> selector)
+            {
+                var values = colors.Select(selector).OrderBy(value => value).ToArray();
+                return (byte)((values[3] + values[4]) / 2);
+            }
+            return new SKColor(Median(color => color.Red), Median(color => color.Green), Median(color => color.Blue));
         }
 
         private static string FirstNonEmpty(params string[] values)

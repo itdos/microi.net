@@ -21,6 +21,13 @@
   </div>
 </section>
 
+## v7.8.8 - (2026-09-03 02:57)
+
+- **AI 助手重构为一眼可发现的统一创作工作台**：左侧固定展示 AI 对话、数据分析、AI 绘图、AI 音乐与 AI 视频，首页能力目录同时提供模型管理入口；绘图页采用简化的 Stable Diffusion 式三栏工作台，把工具选择、参考图／描述／参数和 HDFS 结果放在一个页面，桌面与 390px 移动端均可用。新增 29 项图片入口，覆盖文生图、图生图、高清放大、消除、扩图、授权素材去水印、证件照、多图合成、重绘、抠图、换背景、黑白上色、老照片修复、人像精修、商品场景、裁剪／旋转／翻转／格式转换／拼图等常用场景；生成式能力明确提示会重绘，确定性像素操作不冒充模型原生能力。
+- **图片链路按“生成模型 + 精确处理”分层并完成租户安全收口**：MiniMax `image-01` 支持 0～4 张 JPEG／PNG／WebP 参考图，私有 HDFS 临时签名只发送给固定供应商且不返回浏览器，参考图摘要、操作、尺寸、后处理和稳定 RequestId 共同参与幂等指纹；供应商临时 URL 立即转存当前租户永久 HDFS。`platform-ai-runtime v1.1.0` 新增 `ProcessImage` 白名单，V8.Image 增加灰度与纯色背景抠图原子，精确 resize／crop／rotate／flip／convert／merge／grayscale／remove-solid-background 只接受内存 Data URL、限制格式／大小／像素并写后回读。官方 AI助手应用包升至 v7.6.4，四接口闭包继续严格保持三个 Managed 与一个 CreateIfMissing；官网包 SHA-256 为 `9085e8c8a737d14aaab110d8214084ad1ae95f9fbb7f50c749a475aa98a86f99`，二次发布回读“两端一致”，live 投影为 Managed 141 + CreateIfMissing 9 = 150、SHA-256 `812e27c9d007729d1ca2173bfb8cdf162f566478702b1448e68bf79ea5cac506`。
+- **AI 音乐升级为可见的 MiniMax Music 3 工作台并适配供应商退役边界**：提供品牌科技、电影叙事、东方意境、轻快日常、专注工作和运动能量预设，生成结果统一转存 HDFS 并可试听下载。正式接口使用 `music-3.0`；仅在 MiniMax 明确返回旧音乐 API 退役的 HTTP 410 时，才固定切换官方开源 `MiniMaxAI/MiniMax-Music3` Space，事件 Id、SSE 终态、下载主机、WAV 签名、大小和超时均失败关闭，支持从既有受保护 AI 配置读取可选 Hugging Face Token。当前真实付费接口已按官方策略退役，公开 Space 实机请求又明确受 ZeroGPU 当日配额阻止，因此代码、协议解析和音乐 UI 闭环已通过，但本次没有把外部配额失败包装成“真实音轨生成通过”。
+- **回归与公共制品完成分层验收**：官方资源契约／三方合并 65/65、MCP 类型检查与全量测试 160/160、图片／升级门禁 .NET 59/59、音乐适配 .NET 11/11、真实 Edge UI 2/2 通过，文生图和私有参考图图生图另有真实供应商与永久 HDFS 回读证据；现代前端完整构建成功，`Microi.Anderson.sln` Release 为 0 错误（仅 10 条既有 xUnit 分析器建议），独立 18080 liveness 返回 HTTP 200。发布按 `7.8.8、4、0、2、2、0、0` 完成 22 个 NuGet，Docker Desktop 的 Windows AF_UNIX 遗留 socket 故障按上游已知 workaround 保留原目录后，由 `7.8.8、5、2、2、0` 只恢复镜像阶段；NuGet 平坦容器 22/22 回读 HTTP 200。后端三标签统一为 `sha256:57c451253518affded92767fb9afb3e11fe8e55e4886d1f1b35b574db3021721`，现代 Web／Client 四标签统一为 `sha256:2597812ef0f5b3b1b23d3a8e8b62ac1de2dd7aa4af25aeeb31277da95d51dc42`，未生成 Chrome 49 legacy。公共包、官方应用源、源码测试、客户节点拉取部署与登录后业务验收仍是独立边界。
+
 ## v7.8.7 - (2026-09-02 22:58)
 
 - **六个 Git 边界完成 v7.8.6 之后的远端、提交、工作树与重复合并审计**：根仓、Microi.net、Microi.AI、Microi.VSCode、WebOS 与 Microi.WorkFlow 全部重新抓取 origin 后均为 0 ahead／0 behind；当前 HEAD 中根仓 `7236c47b9`、Microi.net `e13f1742d`、Microi.AI `efbb1e1c1`、Microi.VSCode `be1b5ffb1` 与 Microi.WorkFlow `5a5c9e37a` 是已由 v7.8.6 日志覆盖的同版线性封版提交，WebOS 仍停留在既有 `bcdd23e4c`，边界后没有遗漏提交／推送、英文提交说明或团队自动 merge，因此不重复包装旧变化。写入本节前共有 160 个已跟踪差异文件（6,271 行新增／1,743 行删除）和 97 个新增文件：根仓 124 个（5,615/1,435）及 69 个新增文件，Microi.net 3 个（38/5），Microi.AI 2 个（226/51），Microi.VSCode 21 个（293/220），WebOS 9 个（96/29）及 28 个新增文件，Microi.WorkFlow 1 个（3/3）；新增内容分为 23 个源码／测试／优化报告、54 个两仓同源 WebP 图标、18 个 PPT 缩略图与 2 个 PDF。长应用包 JSON、多宿主插件清单、压缩图片、PDF、`dist/bin/obj/node_modules` 和机械版本文件只核对最终版本、摘要、数量与同源性，不冒充独立功能。
