@@ -13,6 +13,9 @@ const mapSource = source('src/pages/task/map.vue')
 const businessSource = source('src/tenants/xjy/business.js')
 const runtimeSource = source('src/platform/business-runtime.js')
 const workspaceSource = source('src/pages/workspace/index.vue')
+const businessDetailSource = source('src/pages/business/detail.vue')
+const repairEngineSource = engineSource('Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/移动端-申请售后(shenqing_shouhou).js')
+const repairCancelEngineSource = engineSource('Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎/未分类/客户取消报修(repair_cancel).js')
 const deviceMapMethod = mapSource.match(/async loadCustomerDevices\(\) \{[\s\S]*?\r?\n    \},\r?\n    async loadTaskDevices/)
 
 assert.ok(deviceMapMethod, '必须能定位客户设备地图加载方法')
@@ -60,4 +63,27 @@ assert.match(deviceSqlWhere, /C\.KehuZHID = '\$CurrentUser\.Id\$'/,
 assert.doesNotMatch(deviceSqlWhere, /KehuGLZH\s+LIKE/,
   '设备列表不得按账号文本模糊匹配')
 
-console.log('设备地图行级权限检查通过')
+assert.match(businessSource, /afterSalesAdd:\s*\{[\s\S]*?path:\s*'\/pages\/business\/list\?key=devices'/,
+  '我要报修必须复用我的设备列表，不能绕过设备选择直接新增售后单')
+assert.match(businessSource, /afterSalesAdd:\s*\{[\s\S]*?menuPermission:\s*\{\s*table:\s*'Diy_KehuSB'/,
+  '我要报修入口必须复用设备菜单权限')
+assert.doesNotMatch(repairEngineSource, /V8\.Param\._RowModel\s*=/,
+  '报修接口不得向 Newtonsoft JToken 参数对象回写 JS 对象')
+assert.match(repairEngineSource, /var newId\s*=\s*V8\.Method\.NewGuid\(\)/,
+  '报修接口必须使用字符串 Guid，避免 CLR Guid 进入 JSON 提交对象')
+assert.match(repairEngineSource, /sameUser\(kehuSBModel\.KehuZHID\)\s*\|\|\s*sameUser\(kehuModel\.KehuZHID\)/,
+  '报修接口必须在服务端校验设备或客户主档的客户账号 ID')
+assert.match(repairEngineSource, /if\(addSBResult\.Code != 1\)\{\s*return addSBResult;/,
+  '售后设备子表新增失败时必须返回失败以回滚整个报修事务')
+assert.doesNotMatch(businessDetailSource, /openDeviceRepair[\s\S]{0,300}my-baoxiu\.png/,
+  '设备详情的一键报修按钮按当前产品要求不得显示图标')
+assert.match(businessDetailSource, /const isRepair = Number\(item\.LeixingZ \|\| 0\) === 4 \|\| \/维修\//,
+  '取消报修按钮只能由未终结的维修任务驱动，不能误用换芯或保养任务')
+assert.match(businessDetailSource, /this\.deviceActiveTask = \{\}[\s\S]{0,160}ShebeiGZZT: '正常'/,
+  '取消成功后必须立即清空活动报修并恢复页面设备状态')
+assert.match(repairCancelEngineSource, /FormEngineKey\s*:\s*'diy_shouhousp'[\s\S]*ShouhouDDID/,
+  '取消接口必须从售后设备关联表回查主表缺失的设备 ID')
+assert.doesNotMatch(repairCancelEngineSource, /V8\.DbTrans\.(Commit|Rollback)\(/,
+  '接口引擎事务必须由返回 Code 自动提交或回滚')
+
+console.log('设备列表、地图与报修权限检查通过')

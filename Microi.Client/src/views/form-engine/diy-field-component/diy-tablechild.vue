@@ -42,12 +42,15 @@
         <el-form label-width="180px" label-position="left" size="small" :inline="true">
             <el-form-item label="关联模块">
                 <el-popover placement="bottom" trigger="click" :width="400">
-                    <el-tree 
-                        :data="SysMenuList" 
-                        node-key="Id" 
-                        :props="{ label: 'Name', children: '_Child' }" 
-                        @node-click="handleModuleSelect" 
-                    />
+                    <!-- zhy：关联模块菜单数量不可控，独立滚动可防止 Popover 超出当前视口。 -->
+                    <div class="table-child-module-tree-scroll" role="region" aria-label="关联模块列表" tabindex="0">
+                        <el-tree
+                            :data="SysMenuList"
+                            node-key="Id"
+                            :props="{ label: 'Name', children: '_Child' }"
+                            @node-click="handleModuleSelect"
+                        />
+                    </div>
                     <template #reference>
                         <el-button style="width: 100%">
                             {{ configForm.TableChildSysMenuName || '请选择模块' }}
@@ -72,12 +75,15 @@
             
             <el-form-item label="上级模块（选填）">
                 <el-popover placement="bottom" trigger="click" :width="400">
-                    <el-tree 
-                        :data="SysMenuList" 
-                        node-key="Id" 
-                        :props="{ label: 'Name', children: '_Child' }" 
-                        @node-click="handleLastModuleSelect" 
-                    />
+                    <!-- zhy：上级模块复用同一滚动边界，避免嵌套子表配置出现相同问题。 -->
+                    <div class="table-child-module-tree-scroll" role="region" aria-label="上级模块列表" tabindex="0">
+                        <el-tree
+                            :data="SysMenuList"
+                            node-key="Id"
+                            :props="{ label: 'Name', children: '_Child' }"
+                            @node-click="handleLastModuleSelect"
+                        />
+                    </div>
                     <template #reference>
                         <el-button style="width: 100%">
                             {{ configForm.LastSysMenuName || '请选择（用于嵌套子表）' }}
@@ -425,3 +431,14 @@ defineExpose({
     }
 });
 </script>
+
+<style scoped>
+/* zhy：同时兼容传统视口和动态视口单位，确保菜单树始终可在浮层内滚动。 */
+.table-child-module-tree-scroll {
+    max-height: 50vh;
+    max-height: min(420px, 50dvh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+</style>

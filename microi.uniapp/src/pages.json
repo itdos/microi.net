@@ -95,6 +95,14 @@
       ]
     },
     {
+      "name": "complaint",
+      "root": "pages/complaint",
+      "pages": [
+        { "path": "index", "style": { "navigationBarTitleText": "投诉举报中心", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "detail", "style": { "navigationBarTitleText": "投诉处理详情", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } }
+      ]
+    },
+    {
       "name": "native",
       "root": "pages/native",
       "pages": [

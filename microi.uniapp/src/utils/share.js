@@ -20,6 +20,7 @@ const PUBLIC_POLICIES = {
   'pages/mall/detail': { title: SHARE_TITLES.mall, image: 'mall', sharePath: '/pages/mall/detail', allowedQuery: ['id'], timeline: true, pageSnapshot: true },
   'pages/news/index': { title: SHARE_TITLES.news, image: 'news', sharePath: '/pages/news/index', timeline: true },
   'pages/news/detail': { title: SHARE_TITLES.news, image: 'news', sharePath: '/pages/news/detail', allowedQuery: ['id'], timeline: true, pageSnapshot: true },
+  'pages/complaint/index': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/complaint/index', allowedQuery: ['tab'], timeline: true },
   'pages/privacy/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: '/pages/privacy/index', timeline: true },
   'pages/about/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: '/pages/about/index', timeline: true }
 }
@@ -50,6 +51,8 @@ const INTERNAL_POLICIES = {
   'pages/task/add-devices': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
   'pages/task/scan': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
   'pages/task/map': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/map', allowedQuery: ['mode', 'customerId', 'taskId', 'taskType'], timeline: true, pageSnapshot: true },
+  // 投诉详情可能包含私有证据，分享时固定回到公示中心且不携带工单 Id。
+  'pages/complaint/detail': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/complaint/index' },
   'pages/native/checkin': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
   'pages/native/repair': { title: SHARE_TITLES.service, image: 'service', sharePath: HOME_PATH },
   'pages/native/customer-share': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },

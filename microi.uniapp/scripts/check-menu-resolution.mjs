@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
-import { selectAuthorizedMenu } from '../src/platform/menu-resolution.mjs'
+import {
+  requiresAuthorizedMenuContext,
+  resolveBusinessMenuPermission,
+  selectAuthorizedMenu
+} from '../src/platform/menu-resolution.mjs'
 
 const parentMenu = {
   Id: '26011406-298b-44f8-b7c9-32975fb4d447',
@@ -79,6 +83,52 @@ assert.equal(
   })?.Id,
   locationMenu.Id,
   '文件访问菜单应能在同表多个菜单中按指定别名精确选择'
+)
+
+const customerCaseMenu = {
+  Id: 'customer-case-menu',
+  Name: '客户案例',
+  DiyTableId: 'customer-case-table'
+}
+const customerMenu = {
+  Id: 'customer-menu',
+  Name: '客户',
+  DiyTableId: 'customer-table'
+}
+
+assert.equal(
+  selectAuthorizedMenu([customerCaseMenu], {
+    aliases: ['客户', '客户管理', '我的客户'],
+    tableName: 'Diy_Kehu'
+  }),
+  null,
+  '菜单树缺少表名时，“客户”不得模糊命中“客户案例”'
+)
+
+assert.equal(
+  selectAuthorizedMenu([customerCaseMenu, customerMenu], {
+    aliases: ['客户', '客户管理', '我的客户'],
+    tableName: 'Diy_Kehu'
+  })?.Id,
+  customerMenu.Id,
+  '菜单树缺少表名时仍应允许精确别名命中真实客户菜单'
+)
+
+const nativeCustomerModule = {
+  target: 'native-list',
+  table: 'Diy_Kehu',
+  menuAliases: ['客户', '客户管理', '我的客户']
+}
+assert.equal(requiresAuthorizedMenuContext(nativeCustomerModule), true, '原生动态列表必须要求真实菜单上下文')
+assert.deepEqual(
+  resolveBusinessMenuPermission({}, nativeCustomerModule),
+  { table: 'Diy_Kehu', menuAliases: nativeCustomerModule.menuAliases },
+  '原生动态列表入口显隐必须复用表和菜单别名权限'
+)
+assert.equal(
+  requiresAuthorizedMenuContext({ ...nativeCustomerModule, listApiEngineKey: 'customer-list' }),
+  false,
+  '独立接口引擎列表不应被误判为模块引擎菜单'
 )
 
 console.log('菜单权限上下文解析检查通过')

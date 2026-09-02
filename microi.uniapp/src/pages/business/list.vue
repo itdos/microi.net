@@ -315,6 +315,7 @@ import { appendStandardDeleteAction } from '@/platform/module-delete.js'
 import { fieldDisplayValue, loadNativeFieldOptionPage, parseJson } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
 import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
+import { requiresAuthorizedMenuContext } from '@/platform/menu-resolution.mjs'
 import {
   buildListFilterWhere,
   hasListFilterValue,
@@ -547,6 +548,15 @@ export default {
             }
           }
         } catch (error) {}
+      }
+      if (requiresAuthorizedMenuContext(this.baseConfig) && !this.menuId) {
+        // 权限菜单解析失败时清掉可能由旧页面快照恢复的数据，并在任何模块请求前失败关闭。
+        this.rows = []
+        this.count = 0
+        this.dataAppend = {}
+        this.finished = true
+        uni.showToast({ title: '当前账号无权查看该业务数据', icon: 'none' })
+        return
       }
       this.baseConfig = { ...this.baseConfig, menuId: this.menuId }
       this.config = { ...this.config, menuId: this.menuId }
