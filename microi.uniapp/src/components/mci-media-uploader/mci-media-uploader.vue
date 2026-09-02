@@ -83,7 +83,9 @@ export default {
       this.syncing = true
       try {
         const rows = parseValue(this.modelValue)
-        this.items = await Promise.all(rows.filter(Boolean).map((item) => this.resolveItem(item)))
+        // 只读业务详情已经在服务端完成记录级鉴权并签发临时 URL，应直接消费该 URL；
+        // 编辑态仍按字段上下文重新取址，避免把临时能力地址写回业务字段。
+        this.items = await Promise.all(rows.filter(Boolean).map((item) => this.resolveItem(item, false, this.readonly)))
       } finally {
         this.syncing = false
       }
@@ -93,7 +95,10 @@ export default {
       const path = raw.Path || raw.FilePathName || raw.FilePath || raw.FullPath || raw.url || raw.Url || raw.src || ''
       const localPath = forceServer ? '' : (raw.localPath || '')
       const providedUrl = raw.Url || raw.FileUrl || raw.FileURL || raw.PreviewUrl || raw.PreviewURL || raw.FullUrl || ''
-      let url = localPath || (preferProvidedUrl ? providedUrl : '')
+      let url = localPath
+      if (!url && preferProvidedUrl && providedUrl) {
+        url = await V8.resolveFileUrl(providedUrl, this.fileContext)
+      }
       if (!url && path) {
         url = await V8.resolveFileUrl(
           { ...raw, Path: path, Url: '', url: '', localPath: '' },
