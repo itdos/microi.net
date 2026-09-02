@@ -873,6 +873,7 @@ export default {
         Female: "Female",
         SaveSuccess: "Save Success",
         SaveFail: "Save Fail",
+        GoViewDuplicateComponentIds: "Duplicate component IDs were detected. Saving was blocked; refresh the page and try again.",
         Chat: "Chat",
         News: "News",
         Achivements: "Achivements",

@@ -195,15 +195,15 @@ test('WebOS toolbar carries the classic-shell quick functions', () => {
     assert.match(avatarRule, /border:\s*0/);
 });
 
-test('Dock replaces PNG menu artwork with centered theme-aware SVG and reserves hover headroom', () => {
+test('Dock uses centered transparent image artwork with SVG fallback and reserves hover headroom', () => {
     for (const sourcePath of [
         'src/views/webos/components/mac/dock.vue',
         'src/views/webos/components/win/dock.vue',
     ]) {
         const source = read(sourcePath);
         assert.match(source, /import ThemeMenuIcon/);
-        assert.match(source, /<ThemeMenuIcon :item="item" mode="theme"/);
-        assert.match(source, /<ThemeMenuIcon :item="task" mode="theme"/);
+        assert.match(source, /<ThemeMenuIcon :item="item" mode="image"/);
+        assert.match(source, /<ThemeMenuIcon :item="task" mode="image"/);
         assert.doesNotMatch(source, /GetFileServerUrl\((?:item|task)\.Icon\)/);
         assert.doesNotMatch(source, /hasImageIcon\((?:item|task)\)/);
     }

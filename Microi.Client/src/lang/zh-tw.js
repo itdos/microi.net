@@ -4,6 +4,7 @@ import zh from "./zh";
 
 const Msg = {
     ...zh.Msg,
+    GoViewDuplicateComponentIds: "偵測到重複元件 Id，已阻止儲存。請重新整理頁面後再試。",
     Home: "首頁",
     CustomComponent: "定製元件",
     MicroService: "微服務",

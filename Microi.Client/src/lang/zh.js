@@ -874,6 +874,7 @@ export default {
         Female: "女",
         SaveSuccess: "保存成功",
         SaveFail: "保存失败",
+        GoViewDuplicateComponentIds: "检测到重复组件 Id，已阻止保存。请刷新页面后重试。",
         Chat: "评论",
         News: "新闻",
         Achivements: "业绩",

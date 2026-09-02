@@ -11,6 +11,7 @@ import LoginPage from "./components/LoginPage.vue";
 import ProfilePage from "./components/ProfilePage.vue";
 import ProfileLocaleSwitch from "./components/ProfileLocaleSwitch.vue";
 import MciNugetStats from "./components/MciNugetStats.vue";
+import TrainingSyllabusDeck from "./components/TrainingSyllabusDeck.vue";
 import { getDocVisualProfile } from './doc-visual-profiles.js';
 import "./styles/index.scss";
 import "./styles/home-glow.scss";
@@ -24,6 +25,7 @@ import "./styles/micro-app.scss";
 import "./styles/file-manage.scss";
 import "./styles/unity-integration.scss";
 import "./styles/update-log.scss";
+import "./styles/training-syllabus-deck.scss";
 
 const APPEARANCE_KEY = 'vitepress-theme-appearance'
 
@@ -88,5 +90,6 @@ export default {
         ctx.app.component('ProductShowcase', ProductShowcase);
         ctx.app.component('AppDetail', AppDetail);
         ctx.app.component('MciNugetStats', MciNugetStats);
+        ctx.app.component('TrainingSyllabusDeck', TrainingSyllabusDeck);
     }
 };

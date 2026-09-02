@@ -22,6 +22,7 @@
 <script>
 import { computed, watch } from "vue";
 import { useAppStore, useDiyStore, usePermissionStore } from "@/pinia";
+import { refreshDynamicMenuRoutes } from "@/utils/dynamic-menu-routes";
 import {
     setI18nLocale,
     normalizeLocale,
@@ -93,34 +94,12 @@ export default {
         },
         async reloadMenuRoutesForLang(locale) {
             try {
-                const routes = await this.permissionStore.generateRoutes(["admin"]);
-                const router = this.$router;
-                if (!router || !Array.isArray(routes)) {
-                    return;
-                }
-                const isGenerated = (route) => {
-                    const name = String(route && route.name || "");
-                    return name.startsWith("parent_menu_") || name.startsWith("menu_") || name.startsWith("menu_grid_");
-                };
-                router.getRoutes().forEach((route) => {
-                    if (route && route.name && isGenerated(route) && router.hasRoute(route.name)) {
-                        try { router.removeRoute(route.name); } catch {}
-                    }
+                await refreshDynamicMenuRoutes({
+                    permissionStore: this.permissionStore,
+                    router: this.$router,
+                    roles: ["admin"],
+                    reason: "language-change"
                 });
-                routes.forEach((route) => {
-                    if (!route || !route.name || !isGenerated(route)) {
-                        return;
-                    }
-                    try {
-                        router.addRoute(route);
-                    } catch (routeError) {
-                        console.warn("[LangSelect] reload route failed:", route && route.path, routeError);
-                    }
-                });
-                const current = router.currentRoute && router.currentRoute.value;
-                if (current && current.fullPath) {
-                    await router.replace(current.fullPath).catch(() => {});
-                }
                 try {
                     window.dispatchEvent(new CustomEvent("microi:lang-routes-reloaded", { detail: { locale } }));
                 } catch {}

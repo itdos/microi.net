@@ -130,8 +130,8 @@ public class ApiEngineDataSourceMigrationTests
             root, "Microi.Server", "Microi.Upgrade", "34-UpgradeDataSourceToApiEngine.cs"));
         var upgrade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
-        var hosted = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "MicroiUpgradeHostedService.cs"));
+        var coordinator = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
 
         Assert.Equal("6.9.9.0", Upgrade34.Version);
         Assert.Contains("BeginTransaction()", migration, StringComparison.Ordinal);
@@ -139,9 +139,9 @@ public class ApiEngineDataSourceMigrationTests
         Assert.Contains("trans.Rollback()", migration, StringComparison.Ordinal);
         Assert.Contains("SET {orm.GetFieldName(\"IsDeleted\")} = @p0", migration, StringComparison.Ordinal);
         Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade34.Version)", upgrade, StringComparison.Ordinal);
-        var invariantIndex = hosted.IndexOf("\"Upgrade34-数据源迁移接口引擎\"", StringComparison.Ordinal);
-        var versionReadIndex = hosted.IndexOf(
-            "SELECT {runtimeOrm.GetFieldName(\"ServerVersion\")}",
+        var invariantIndex = coordinator.IndexOf("RequiredRuntimeInvariantNames[11]", StringComparison.Ordinal);
+        var versionReadIndex = coordinator.IndexOf(
+            "beforeVersion = ReadServerVersion(runtimeClient)",
             StringComparison.Ordinal);
         Assert.True(invariantIndex >= 0);
         Assert.True(versionReadIndex > invariantIndex);

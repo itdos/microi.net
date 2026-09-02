@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "AI助手",
-    "Version": "v7.6.1",
+    "Version": "v7.6.3",
     "CreateTime": "2026-08-19T21:21:30.415Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -31,13 +31,13 @@
       "V8.AI.NL2V8",
       "ServerField:sys_apiengine.ApiRoutes"
     ],
-    "ChangeHistory": "2026-08-30 v7.6.1 将旧 /api/Ai 非流式地址全部收入 platform-ai-runtime 与 platform-ai-account 多路由，动作映射和管理员复核保持不变。\n2026-08-25 v7.6.0 AI助手官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.6 支付可信网关、Managed 账号编排与非流式 AI 运行时契约。\n2026-08-25 v6.3.6 支付回调仅由 C# 完成支付宝验签与可信租户归一化，订单、订阅、API Key 分配迁入 platform-ai-account；非流式 AI 兼容动作迁入 platform-ai-runtime，流式、代理、媒体、文件与策略元数据保持原生。\n2026-08-25 v6.3.5 AI 套餐、订阅、订单与媒体任务业务编排迁入 Managed V8；纳入 9 张 mic_sub_* 与 2 张用量表；移除 12 个重复 ai_app_* 接口及 3 张重复商城表。\n2026-08-25 v6.3.5 AI 套餐、订阅、订单与媒体任务业务编排迁入 Managed V8；移除由应用商城单独维护的 12 个重复 ai_app_* 接口。\n",
+    "ChangeHistory": "2026-09-02 v7.6.3 补齐 EnableVectorDatabase、VectorScoreThreshold、VectorTopK、QdrantApiKey、QdrantPort、QdrantHost、EmbeddingApiUrl 七个字段的 Name 元数据，恢复官方包字段闭包与跨租户安装校验。\n2026-09-02 v7.6.2 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-08-30 v7.6.1 将旧 /api/Ai 非流式地址全部收入 platform-ai-runtime 与 platform-ai-account 多路由，动作映射和管理员复核保持不变。\n2026-08-25 v7.6.0 AI助手官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.6 支付可信网关、Managed 账号编排与非流式 AI 运行时契约。\n2026-08-25 v6.3.6 支付回调仅由 C# 完成支付宝验签与可信租户归一化，订单、订阅、API Key 分配迁入 platform-ai-account；非流式 AI 兼容动作迁入 platform-ai-runtime，流式、代理、媒体、文件与策略元数据保持原生。\n2026-08-25 v6.3.5 AI 套餐、订阅、订单与媒体任务业务编排迁入 Managed V8；纳入 9 张 mic_sub_* 与 2 张用量表；移除 12 个重复 ai_app_* 接口及 3 张重复商城表。\n2026-08-25 v6.3.5 AI 套餐、订阅、订单与媒体任务业务编排迁入 Managed V8；移除由应用商城单独维护的 12 个重复 ai_app_* 接口。\n",
     "ChangeLog": {
-      "Version": "v7.6.1",
-      "Title": "AI 历史非流式路由接口引擎化",
-      "ChangeType": "Optimize",
-      "Content": "将旧 /api/Ai 非流式地址全部收入 platform-ai-runtime 与 platform-ai-account 多路由，动作映射和管理员复核保持不变。",
-      "ReleaseTime": "2026-08-30 12:00:00"
+      "Version": "v7.6.3",
+      "Title": "AI 向量配置字段元数据修复",
+      "ChangeType": "Fix",
+      "Content": "补齐 EnableVectorDatabase、VectorScoreThreshold、VectorTopK、QdrantApiKey、QdrantPort、QdrantHost、EmbeddingApiUrl 七个字段的 Name 元数据，恢复官方包字段闭包与跨租户安装校验。",
+      "ReleaseTime": "2026-09-02 15:00:30"
     },
     "Description": "AI 助手、模型运行时、订阅与旧 AI Controller 地址兼容资源。"
   },
@@ -7273,7 +7273,7 @@
       "DisplayMac": 0,
       "AppDisplay": 0,
       "OpenType": "Diy",
-      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-060-jxe511mw.webp",
+      "Icon": "/itdos/microi/webos-icons/ios-skeuomorphic-v2/202609/ai.webp",
       "DiyTableId": "01KJ89KEDQTBW1NS6DV17KDK3X",
       "NotShowFields": "[]",
       "StatisticsFields": "[]",
@@ -7323,7 +7323,7 @@
       "DisplayMac": 0,
       "AppDisplay": 1,
       "OpenType": "Page",
-      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-010-70d14eb4.webp",
+      "Icon": "/itdos/microi/webos-icons/ios-skeuomorphic-v2/202609/ai.webp",
       "TableDiyFieldIds": "[]",
       "PageBtns": "[{\"Id\":\"AiDataAnalysis\",\"Sort\":9100,\"Name\":\"AI数据分析\",\"Icon\":\"fas fa-chart-line\",\"BtnStyle\":\"primary\",\"IsVisible\":false,\"ShowRow\":false,\"V8CodeShow\":\"V8.Result=false;\",\"V8Code\":\"\",\"_RawName\":\"AI数据分析\"},{\"Id\":\"AiLowCodeModeling\",\"Sort\":9110,\"Name\":\"低代码建模\",\"Icon\":\"fas fa-magic\",\"BtnStyle\":\"warning\",\"IsVisible\":false,\"ShowRow\":false,\"V8CodeShow\":\"V8.Result=false;\",\"V8Code\":\"\",\"_RawName\":\"低代码建模\"}]",
       "DiyTableId": "88711c13-1e65-4ff1-9d40-0de85e551d81",
@@ -7584,6 +7584,7 @@
       "NotEmpty": 0,
       "Label": "是否启用向量数据库",
       "Id": "01KY88GQF6WNE74TMYVGH53P73",
+      "Name": "EnableVectorDatabase",
       "CreateTime": "2026-07-24 03:51:24"
     },
     {
@@ -9048,6 +9049,7 @@
       "NotEmpty": 0,
       "Label": "VectorScoreThreshold",
       "Id": "01KGGW6YH339RP8MHSWVEA2J95",
+      "Name": "VectorScoreThreshold",
       "CreateTime": "2026-02-03 12:29:44"
     },
     {
@@ -9073,6 +9075,7 @@
       "NotEmpty": 0,
       "Label": "VectorTopK",
       "Id": "01KGGW6N5V3Q0VNWWY051GWHV1",
+      "Name": "VectorTopK",
       "CreateTime": "2026-02-03 12:29:35"
     },
     {
@@ -9125,6 +9128,7 @@
       "NotEmpty": 0,
       "Label": "QdrantApiKey",
       "Id": "01KGGW5VY1FKEWVTVQS7FXDQ2T",
+      "Name": "QdrantApiKey",
       "CreateTime": "2026-02-03 12:29:09"
     },
     {
@@ -9151,6 +9155,7 @@
       "NotEmpty": 0,
       "Label": "Qdrant HTTP端口",
       "Id": "01KGGW5KQ16121XPR4EREBM50J",
+      "Name": "QdrantPort",
       "CreateTime": "2026-02-03 12:29:01"
     },
     {
@@ -9177,6 +9182,7 @@
       "NotEmpty": 0,
       "Label": "QdrantHost",
       "Id": "01KGGW583D4518HW1QZ9K3PATV",
+      "Name": "QdrantHost",
       "CreateTime": "2026-02-03 12:28:49"
     },
     {
@@ -9203,6 +9209,7 @@
       "NotEmpty": 0,
       "Label": "EmbeddingApiUrl",
       "Id": "01KGGW4J2HZW1R33EMEANDZRHB",
+      "Name": "EmbeddingApiUrl",
       "CreateTime": "2026-02-03 12:28:26"
     },
     {

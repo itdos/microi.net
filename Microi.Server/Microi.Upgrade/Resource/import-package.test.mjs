@@ -223,7 +223,117 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.5\.4/);
+  assert.match(source, /Version: v2\.6\.8/);
+});
+
+test("standalone Web and UniApp installs always expose a target-tenant launch menu", () => {
+  const fixture = {};
+  vm.runInNewContext(`
+    ${extractAssignedFunction(source, "firstTextParam")}
+    var normalizeApplicationPath = function (value) {
+      return String(firstTextParam([value]) || "")
+        .replace(/\\\\/g, "/")
+        .replace(/^\\/+|\\/+$/g, "")
+        .split("/")
+        .filter(part => part && part !== "." && part !== "..")
+        .join("/");
+    };
+    ${extractAssignedFunction(source, "normalizePublicApplicationObjectPath")}
+    ${extractAssignedFunction(source, "buildPublicApplicationAssetUrl")}
+    ${extractAssignedFunction(source, "ensureStandaloneApplicationLaunchMenus")}
+    result = ensureStandaloneApplicationLaunchMenus;
+  `, fixture);
+
+  let nextId = 1;
+  const emptyPackage = {
+    PackageInfo: { Name: "极速打字", AppId: "typing-sprint", ApplicationType: "Web" },
+    ApplicationBundle: {
+      ApplicationType: "Web",
+      EntryPath: "index.html",
+      Application: { AppKey: "typing-sprint", Name: "极速打字" },
+    },
+    SysMenus: [],
+  };
+  const generated = fixture.result(emptyPackage, {
+    OsClient: "xjy",
+    FileServer: "https://static.jifulii.com/",
+    NewId: () => `menu-${nextId++}`,
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(generated)), { Generated: 1, Rebound: 0 });
+  assert.equal(emptyPackage.SysMenus.length, 1);
+  assert.equal(emptyPackage.SysMenus[0].Name, "极速打字");
+  assert.equal(emptyPackage.SysMenus[0].OpenType, "Iframe");
+  assert.equal(
+    emptyPackage.SysMenus[0].Url,
+    "/iframe/https://static.jifulii.com/xjy/ai-app-publish/typing-sprint/index.html",
+  );
+  assert.equal(emptyPackage.SysMenus[0].Display, 1);
+  assert.equal(emptyPackage.SysMenus[0].AppDisplay, 1);
+
+  const selectedMenusPackage = {
+    PackageInfo: { Name: "极速打字", AppId: "typing-sprint", ApplicationType: "Web" },
+    ApplicationBundle: {
+      ApplicationType: "Web",
+      EntryPath: "index.html",
+      Application: { AppKey: "typing-sprint", Name: "极速打字" },
+    },
+    SysMenus: [
+      { Id: "root", Name: "极速打字", Url: "/app-typ-score", OpenType: "Diy" },
+      {
+        Id: "launch",
+        ParentId: "root",
+        Name: "在线使用",
+        Url: "/iframe/https://static.itdos.com/itdos/ai-app-publish/typing-sprint/index.html",
+        OpenType: "Iframe",
+      },
+    ],
+  };
+  const rebound = fixture.result(selectedMenusPackage, {
+    OsClient: "xjy",
+    FileServer: "https://static.jifulii.com",
+    NewId: () => "unused",
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(rebound)), { Generated: 0, Rebound: 1 });
+  assert.equal(selectedMenusPackage.SysMenus.length, 2);
+  assert.equal(
+    selectedMenusPackage.SysMenus[1].Url,
+    "/iframe/https://static.jifulii.com/xjy/ai-app-publish/typing-sprint/index.html",
+  );
+  assert.equal(selectedMenusPackage.SysMenus[1].ParentId, "root");
+});
+
+test("installed public application metadata uses FileServer plus the real object key", () => {
+  const fixture = {};
+  vm.runInNewContext(`
+    ${extractAssignedFunction(source, "firstTextParam")}
+    var normalizeApplicationPath = function (value) {
+      return String(firstTextParam([value]) || "")
+        .replace(/\\\\/g, "/")
+        .replace(/^\\/+|\\/+$/g, "")
+        .split("/")
+        .filter(part => part && part !== "." && part !== "..")
+        .join("/");
+    };
+    ${extractAssignedFunction(source, "normalizePublicApplicationObjectPath")}
+    ${extractAssignedFunction(source, "buildPublicApplicationAssetUrl")}
+    result = { normalizePublicApplicationObjectPath, buildPublicApplicationAssetUrl };
+  `, fixture);
+  assert.equal(
+    fixture.result.buildPublicApplicationAssetUrl(
+      "https://static.jifulii.com/",
+      "https://microi-public.oss-cn-hangzhou-internal.aliyuncs.com/xjy/ai-app-publish/typing-sprint/index.html?Expires=1&Signature=x",
+    ),
+    "https://static.jifulii.com/xjy/ai-app-publish/typing-sprint/index.html",
+  );
+  assert.equal(
+    fixture.result.normalizePublicApplicationObjectPath("xjy/ai-app-publish/typing-sprint/index.html"),
+    "xjy/ai-app-publish/typing-sprint/index.html",
+  );
+  assert.match(source, /var installedPublicPublishPath = useSharedPublicBuild[\s\S]*?applicationFileDir\(normalizePublicApplicationObjectPath\(entryHdfsPath\)\)/);
+  assert.match(source, /if \(!previewUrl && entryHdfsPath/);
+  assert.match(source, /var packageVersionNo = firstTextParam\(\[\s*Package\.PackageInfo\.Version/);
+  assert.match(source, /AppVersion: packageVersionNo/);
+  assert.match(source, /VersionNo: versionNo/);
 });
 
 test("legacy MicroService menus recover a missing key from a singular immutable bundle", () => {
@@ -1020,6 +1130,50 @@ test("installed application HTML receives the target tenant runtime without URL 
   assert.match(source, /data-microi-runtime-context=["']true["']/);
   assert.match(source, /base64\s*=\s*rewriteApplicationRuntimeContext\(rootPath, relativePath, base64\)/);
   assert.doesNotMatch(source, /MICROI_API_BASE\s*=\s*["']https:\/\/api\.itdos\.com/);
+});
+
+test("private source keeps original bytes while only runtime assets receive tenant context", () => {
+  assert.match(source, /uploadApplicationAsset\s*=\s*function\s*\(rootPath, file, limit, rewriteRuntimeContext\)/);
+  assert.match(source, /if\s*\(rewriteRuntimeContext\s*!==\s*false\)\s*\{\s*base64\s*=\s*rewriteApplicationRuntimeContext/);
+  assert.match(source, /uploadApplicationAsset\(sourceRoot, sourceFile, true, false\)/);
+  assert.match(source, /uploadApplicationAsset\(buildRoot, buildFile, false\)/);
+});
+
+test("duplicate ZIP paths use the final entry and legacy upload history is not restored as source", () => {
+  const fixture = { stats: {} };
+  vm.runInNewContext(`
+    var normalizeApplicationPath = function (value) {
+      return String(value || "")
+        .replace(/\\\\/g, "/")
+        .replace(/^\\/+|\\/+$/g, "")
+        .split("/")
+        .filter(function (part) { return part && part !== "." && part !== ".."; })
+        .join("/");
+    };
+    ${extractAssignedFunction(source, "normalizeApplicationArchiveFiles")}
+    result = normalizeApplicationArchiveFiles;
+  `, fixture);
+
+  const sourceFiles = fixture.result([
+    { Path: "CHANGELOG.md", Sha256: "old" },
+    { Path: "upload/v1.9.1/index.html", Sha256: "history" },
+    { Path: "changelog.md", Sha256: "new" },
+    { Path: "src/main.js", Sha256: "main" },
+  ], "Source");
+  assert.equal(sourceFiles.length, 2);
+  assert.equal(sourceFiles[0].Sha256, "new");
+  assert.equal(sourceFiles[1].Path, "src/main.js");
+  assert.equal(fixture.stats.ApplicationDuplicateAssetPathsCollapsed, 1);
+  assert.equal(fixture.stats.ApplicationSourceHistoryFilesSkipped, 1);
+
+  const buildFiles = fixture.result([
+    { Path: "upload/v1.9.1/index.html", Sha256: "runtime" },
+    { Path: "UPLOAD/v1.9.1/index.html", Sha256: "runtime-final" },
+  ], "Build");
+  assert.equal(buildFiles.length, 1);
+  assert.equal(buildFiles[0].Sha256, "runtime-final");
+  assert.equal(fixture.stats.ApplicationDuplicateAssetPathsCollapsed, 2);
+  assert.equal(fixture.stats.ApplicationSourceHistoryFilesSkipped, 1);
 });
 
 test("application-store PackageOnly output is a self-contained offline package", () => {
@@ -2395,7 +2549,8 @@ test("explicit database-only runtime never calls HDFS and keeps complete inline 
   );
   assert.ok(buildStageSource, "build asset stage should be extractable");
 
-  const calls = { upload: 0, move: 0, rows: 0, prune: 0 };
+  const rewrittenBase64 = Buffer.from("<h1>OK-TENANT</h1>").toString("base64");
+  const calls = { upload: 0, move: 0, rows: 0, prune: 0, hash: 0 };
   const buildContext = {
     appId: "app-db-only",
     appKey: "platform-service",
@@ -2424,7 +2579,6 @@ test("explicit database-only runtime never calls HDFS and keeps complete inline 
     V8: {
       OsClient: "tenant-a",
       Base64: { StringToBase64(value) { return Buffer.from(value).toString("base64"); } },
-      EncryptHelper: { Sha256Hex() { return "rewritten-hash"; } },
       Method: {
         MoveObject() {
           calls.move++;
@@ -2438,7 +2592,12 @@ test("explicit database-only runtime never calls HDFS and keeps complete inline 
     firstTextParam(values) {
       return values.find(value => value !== null && value !== undefined && String(value).trim() !== "") || "";
     },
-    rewriteApplicationRuntimeContext(_root, _path, base64) { return base64; },
+    rewriteApplicationRuntimeContext() { return rewrittenBase64; },
+    applicationFileSha256Base64(value) {
+      calls.hash++;
+      assert.equal(value, rewrittenBase64);
+      return "decoded-byte-hash";
+    },
     base64DecodedSize(value) { return Buffer.from(value, "base64").length; },
     reuseApplicationAsset() { throw new Error("database-only runtime must not inspect HDFS metadata"); },
     uploadApplicationAsset() {
@@ -2466,24 +2625,58 @@ test("explicit database-only runtime never calls HDFS and keeps complete inline 
   assert.equal(calls.move, 0);
   assert.equal(calls.rows, 0);
   assert.equal(calls.prune, 1);
+  assert.equal(calls.hash, 1, "rewritten runtime bytes must receive a decoded-byte SHA-256");
   assert.equal(buildContext.stats.ApplicationInlineBuildAssets, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(buildContext.uploadedBuild)), [{
     Path: "index.html",
     HdfsPath: "",
     FilePathName: "",
-    Size: 11,
-    Hash: "hash-index",
+    Size: 18,
+    Hash: "decoded-byte-hash",
     DatabaseInline: true
   }]);
   assert.deepEqual(JSON.parse(JSON.stringify(buildContext.runtimeDbAssets)), [{
     Path: "index.html",
     FileName: "index.html",
     ContentType: "text/html",
-    ContentBase64: "PGgxPk9LPC9oMT4=",
-    Size: 11,
-    Hash: "hash-index",
+    ContentBase64: rewrittenBase64,
+    Size: 18,
+    Hash: "decoded-byte-hash",
     IsEntry: true
   }]);
+});
+
+test("rewritten application assets hash the final decoded bytes and verify readback bytes", () => {
+  assert.match(source, /APPLICATION_FILE_SHA256_V2/);
+  assert.match(source, /System\.Convert\.FromBase64String\(normalizedBase64\)/);
+  assert.match(source, /applicationFileSha256Bytes\(bytes\)/);
+  assert.doesNotMatch(source, /System\.Security\.Cryptography\.SHA256\.Create\(\)/);
+  assert.doesNotMatch(source, /Sha256Hex\(runtimeBuildBase64\)/);
+  assert.match(source, /installedRuntimeContentHash\s*=\s*applicationFileSha256Base64\(installedRuntimeBase64\)/);
+  assert.match(source, /数据库内置微服务写后回读字节摘要不一致/);
+});
+
+test("decoded-byte SHA-256 is compatible with runtimes that expose no cryptography CLR type", () => {
+  const helperSource = source.match(
+    /var applicationFileSha256Bytes = function \(bytes\) \{[\s\S]*?var applicationFileSha256Base64 = function \(value\) \{[\s\S]*?\n    \};/
+  );
+  assert.ok(helperSource, "decoded-byte SHA-256 helper should be extractable");
+  const context = {
+    System: {
+      Convert: {
+        FromBase64String(value) { return Buffer.from(value, "base64"); }
+      }
+    }
+  };
+  vm.runInNewContext(`${helperSource[0]}; this.hashBase64 = applicationFileSha256Base64;`, context);
+  assert.equal(
+    context.hashBase64(Buffer.from("abc").toString("base64")),
+    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  );
+  assert.equal(
+    context.hashBase64(Buffer.from([0, 255, 128, 1, 2, 3]).toString("base64")),
+    "23d65ea0eba723b11cc9382350d0ab3756eedeef67957f1a341d629c58cbde77"
+  );
 });
 
 test("legacy reused microservice build with a broken key is reuploaded and repaired", () => {

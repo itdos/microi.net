@@ -26,6 +26,9 @@ ZICOX CC4、BLE/SPP 或
 
 - Print Engine 决定“页面/模板如何排版”，适合 A4、PDF、浏览器打印和统一模板。
 - `V8.Print` 生成/适配打印机原生命令并通过 BLE 或 Android SPP 写入，适合标签和热敏小票；GP-M322 保持 TSPL 原字节，CC4 可自动生成 CPCL。
+- MicroService 不能跨 iframe 访问父页面打印组件；普通打印使用 `microi.host.v1` 的
+  `openPlatformPrint`，只传当前租户 `mic_print.Id` 和同源 `/apiengine/` 数据地址。该动作
+  不是蓝牙代理，不发送 BLE/SPP 字节。详见 `../microi-microservice/references/runtime-delivery.md`。
 - 两者可以由同一个按钮按设备能力选择，但不能把 `PageObj` 直接交给
   `V8.Print.prepareSend`，也不能把 TSPL/CPCL/ESC-POS 字节当作 Print Engine JSON。
 

@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -54,6 +55,13 @@ export function canonicalizeResource(name, content) {
   const normalized = normalizeText(content);
   if (!name.endsWith('.json')) return normalized;
   return `${JSON.stringify(JSON.parse(normalized), null, 2)}\n`;
+}
+
+export function hasExactResourceContentDrift(content, reportedSha256) {
+  const expected = String(reportedSha256 || '').trim().toLowerCase();
+  if (!expected) return false;
+  const actual = createHash('sha256').update(String(content ?? ''), 'utf8').digest('hex');
+  return actual !== expected;
 }
 
 function semanticVersionParts(value, label, allowEmpty = false) {
