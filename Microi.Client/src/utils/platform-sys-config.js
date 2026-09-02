@@ -24,13 +24,20 @@ export function shouldFallbackPlatformSysConfig(value) {
     // for a missing engine.  Only this precise bootstrap absence may use the old
     // route; authorization, tenant, validation and other business failures must
     // never be hidden by a compatibility retry.
-    return message.includes("sys_apiengine")
+    const missingByApiAddress = /noexistdata\s*\[\s*apiaddress\s*\]\s*:\s*\/apiengine\/platform-sys-config(?:\b|[/?#])/i
+        .test(message);
+    const missingByEngineKey = /noexistdata\s*\[\s*apienginekey\s*\]\s*:\s*platform-sys-config(?:\b|$)/i
+        .test(message);
+    const missingByLegacyTableDiagnostic = message.includes("sys_apiengine")
         && message.includes("platform-sys-config")
         && (
             message.includes("noexistdata")
             || message.includes("不存在的数据")
             || message.includes("不存在")
         );
+    return missingByApiAddress
+        || missingByEngineKey
+        || missingByLegacyTableDiagnostic;
 }
 
 function anonymousRequest(url, data) {

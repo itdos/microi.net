@@ -266,8 +266,28 @@ namespace Microi.net
                 var userName = GetJsonString(json, "UserName", "Name", "Account");
                 var encryptedPwd = GetJsonString(json, "EncryptedPwd", "Pwd", "Password");
                 var aiApiKey = GetJsonString(json, "AiApiKey", "ApiKey", "RelayApiKey");
+                string backgroundTaskId = null;
+                if (V8TrustedExecutionContext.CurrentBackgroundTask != null
+                    || !GetJsonString(json, "_BackgroundTaskId", "BackgroundTaskId")
+                        .DosIsNullOrWhiteSpace())
+                {
+                    var taskDenied = ResolveCurrentManagedBackgroundTask(
+                        json,
+                        "official_create_tenant_worker",
+                        out var taskContext);
+                    if (taskDenied != null) return taskDenied;
+                    backgroundTaskId = taskContext.TaskId;
+                }
                 return new TenantProvisioningService()
-                    .ProvisionTenantAsync(tenantKey, systemName, userId, phone, userName, encryptedPwd, aiApiKey)
+                    .ProvisionTenantAsync(
+                        tenantKey,
+                        systemName,
+                        userId,
+                        phone,
+                        userName,
+                        encryptedPwd,
+                        aiApiKey,
+                        backgroundTaskId)
                     .GetAwaiter()
                     .GetResult();
             }
@@ -283,12 +303,29 @@ namespace Microi.net
         /// </summary>
         public DosResult ProvisionAdminTenant(object param)
         {
-            var denied = RequireMasterTenantProvisioningAdminAccess();
+            const string createEngineKey = "admin_create_empty_saas_tenant";
+            var denied = ResolveTrustedManagedCurrentUser(
+                createEngineKey,
+                true,
+                DiyCommon.MaxRoleLevel,
+                out var osClient,
+                out var currentUser);
             if (denied != null) return denied;
+            if (!string.Equals(osClient, OsClientDefault.OsClient,
+                    StringComparison.OrdinalIgnoreCase))
+                return new DosResult(1002, null, "仅主租户允许创建 SaaS 租户。");
+            if (!PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(
+                    osClient, currentUser))
+                return new DosResult(0, null, "当前账号已不再是有效的平台超级管理员。");
             try
             {
                 using var allocationScope = BeginTrustedHostAllocationScope();
                 var json = ToJObject(param);
+                var taskDenied = ResolveCurrentManagedBackgroundTask(
+                    json,
+                    createEngineKey,
+                    out var taskContext);
+                if (taskDenied != null) return taskDenied;
                 return new TenantProvisioningService()
                     .ProvisionAdminTenantAsync(new AdminTenantProvisioningRequest
                     {
@@ -301,7 +338,8 @@ namespace Microi.net
                         OsClientNetwork = GetJsonString(json, "OsClientNetwork"),
                         DomainName = GetJsonString(json, "DomainName", "Domain"),
                         DatabaseZipPath = GetJsonString(json, "DatabaseZipPath", "SqlZipPath"),
-                        DatabaseZipName = GetJsonString(json, "DatabaseZipName", "SqlZipName")
+                        DatabaseZipName = GetJsonString(json, "DatabaseZipName", "SqlZipName"),
+                        BackgroundTaskId = taskContext.TaskId
                     })
                     .GetAwaiter()
                     .GetResult();
@@ -310,6 +348,91 @@ namespace Microi.net
             {
                 return new DosResult(0, null, "创建 SaaS 租户失败：" + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// 仅供官方 Managed 后台工作器对精确选中的已启用子租户执行幂等数据库升级。
+        /// 连接串来自权威 sys_osclients，V8 只传租户身份投影。
+        /// </summary>
+        public DosResult UpgradeAdminTenantDatabase(object param)
+        {
+            const string upgradeEngineKey = "admin_upgrade_saas_tenant_database";
+            var denied = ResolveTrustedManagedCurrentUser(
+                upgradeEngineKey,
+                true,
+                DiyCommon.MaxRoleLevel,
+                out var osClient,
+                out var currentUser);
+            if (denied != null) return denied;
+            if (!string.Equals(osClient, OsClientDefault.OsClient,
+                    StringComparison.OrdinalIgnoreCase))
+                return new DosResult(1002, null, "仅主租户允许升级子租户数据库。");
+            if (!PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(
+                    osClient, currentUser))
+                return new DosResult(0, null, "当前账号已不再是有效的平台超级管理员。");
+
+            try
+            {
+                using var allocationScope = BeginTrustedHostAllocationScope();
+                var json = ToJObject(param);
+                var taskDenied = ResolveCurrentManagedBackgroundTask(
+                    json,
+                    upgradeEngineKey,
+                    out var taskContext);
+                if (taskDenied != null) return taskDenied;
+                return new TenantProvisioningService()
+                    .UpgradeAdminTenantDatabaseAsync(new AdminTenantDatabaseUpgradeRequest
+                    {
+                        TenantId = GetJsonString(json, "TenantId", "Id"),
+                        TenantKey = GetJsonString(json, "TenantKey", "OsClient", "Key"),
+                        OsClientType = GetJsonString(json, "OsClientType"),
+                        OsClientNetwork = GetJsonString(json, "OsClientNetwork"),
+                        BackgroundTaskId = taskContext.TaskId
+                    })
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    "Microi: Upgrade tenant database facade failed. ErrorType="
+                    + ex.GetType().Name + ".");
+                return new DosResult(0, null,
+                    "租户数据库升级失败。请查看后台任务日志并核对数据库连接后重试。");
+            }
+        }
+
+        private static DosResult ResolveCurrentManagedBackgroundTask(
+            JObject request,
+            string expectedApiEngineKey,
+            out TrustedBackgroundTaskExecutionContext context)
+        {
+            context = null;
+            request ??= new JObject();
+            var trustedTask = V8TrustedExecutionContext.CurrentBackgroundTask;
+            var taskId = GetJsonString(
+                request, "_BackgroundTaskId", "BackgroundTaskId", "TaskId");
+            if (taskId.DosIsNullOrWhiteSpace())
+                taskId = GetJsonString(trustedTask, "Id", "TaskId");
+            var fencingToken = request["_BackgroundTaskFencingToken"].Val<long>();
+            if (fencingToken <= 0) fencingToken = request["FencingToken"].Val<long>();
+            if (fencingToken <= 0) fencingToken = trustedTask?["FencingToken"].Val<long>() ?? 0;
+            if (!BackgroundTaskService.TryGetCurrentExecutionContext(
+                    taskId,
+                    fencingToken,
+                    expectedApiEngineKey,
+                    out context))
+            {
+                return new DosResult(0, null,
+                    "后台任务身份、接口引擎或栅栏令牌无效，拒绝执行租户数据库操作。");
+            }
+            if (!string.Equals(context.OwnerOsClient, OsClientDefault.OsClient,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                context = null;
+                return new DosResult(0, null, "只有主租户创建的后台任务可以执行此操作。");
+            }
+            return null;
         }
 
         /// <summary>

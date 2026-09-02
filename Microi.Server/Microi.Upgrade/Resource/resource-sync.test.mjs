@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
@@ -6,6 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   canonicalizeResource,
+  hasExactResourceContentDrift,
   hasPlatformServiceBundleChanged,
   isTemporaryOfficialResourceFailure,
   mergeJavascriptResource,
@@ -210,6 +212,7 @@ async function mergeReplicaFixture({
   baseBuilder,
   baseBulk = defaultBulkImporter,
   localImporter = baseImporter,
+  localEmbeddedImporter = localImporter,
   localPublisher = basePublisher,
   localBuilder = baseBuilder,
   localBulk = baseBulk,
@@ -229,7 +232,7 @@ async function mergeReplicaFixture({
       bulk: baseBulk,
     }),
     localPackageContent: applicationStorePackage({
-      importer: localImporter,
+      importer: localEmbeddedImporter,
       publisher: localEmbeddedPublisher,
       builder: localEmbeddedBuilder,
       bulk: localBulk,
@@ -769,6 +772,16 @@ test('资源规范化统一换行和 JSON 缩进', () => {
   assert.equal(canonicalizeResource('package.json', '{"a":1}'), '{\n  "a": 1\n}\n');
 });
 
+test('已发布独立控制面即使只漂移尾部换行也会触发精确字节修复', () => {
+  const canonical = 'return { Code: 1 };\n';
+  const exactSha = createHash('sha256').update(canonical, 'utf8').digest('hex');
+  const driftedSha = createHash('sha256').update(`${canonical}\r\n`, 'utf8').digest('hex');
+  assert.equal(hasExactResourceContentDrift(canonical, exactSha), false);
+  assert.equal(hasExactResourceContentDrift(canonical, driftedSha), true);
+  assert.match(refreshSource, /publishedApplicationStoreReplicaNames\.has\(name\)[\s\S]*?hasExactResourceContentDrift/);
+  assert.match(refreshSource, /发布后原始字节摘要仍与商城包内嵌副本不一致/);
+});
+
 test('官方应用包候选不会持久化超过运行时硬上限的递归深度', () => {
   const normalized = JSON.parse(normalizeOfficialPackageExecutionLimits(
     'app.microi.store.json',
@@ -1171,6 +1184,35 @@ test('官网控制面滚动升级同时保留当前 live 与候选版本能力�
   assert.match(source, /ApiEngine:get-microi-upgrade-resource@v1\.3\.3/);
 });
 
+test('共同基线修复后独立官方源码不会被旧内嵌副本反向降级', async () => {
+  const publisher = engineSource('ai_app_publish_store', 'v1.5.4', 'return { Code: 1 };');
+  const builder = engineSource('ai_app_build', 'v1.3.0', 'return { Code: 1 };');
+  const staleImporter = engineSource(
+    'import-microi-store-package',
+    'v2.6.1',
+    'var rewriteSource = true;\nreturn rewriteSource;',
+  );
+  const officialImporter = engineSource(
+    'import-microi-store-package',
+    'v2.6.3',
+    'var rewriteSource = false;\nreturn rewriteSource;',
+  );
+
+  const merged = await mergeReplicaFixture({
+    baseImporter: officialImporter,
+    basePublisher: publisher,
+    baseBuilder: builder,
+    localImporter: officialImporter,
+    localEmbeddedImporter: staleImporter,
+    remoteImporter: officialImporter,
+  });
+  assert.equal(merged.standaloneContents.get('import-package.js'), officialImporter);
+  assert.equal(
+    getEmbeddedEngineSource(merged.packageContent, 'import-microi-store-package'),
+    officialImporter,
+  );
+});
+
 test('官网控制面变更时拆成自举与剩余资源两个 CAS 批次', () => {
   const changes = [
     { name: 'app.microi.store.json', content: 'package' },
@@ -1213,8 +1255,8 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 149);
-  assert.equal(managedCount, 140);
+  assert.equal(seenKeys.size, 150);
+  assert.equal(managedCount, 141);
   assert.equal(createIfMissingCount, 9);
 
   assert.match(officialEngineSource, /action === "reconcilepublishedapiengines"/);

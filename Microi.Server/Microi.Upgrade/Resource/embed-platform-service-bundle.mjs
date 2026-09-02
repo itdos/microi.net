@@ -51,6 +51,7 @@ const storePackageVersionArgument = argumentValue('--store-package-version');
 const sourceManifestHashOverride = argumentValue('--source-manifest-hash');
 const runtimeManifestHashOverride = argumentValue('--runtime-manifest-hash');
 const verifyOnly = process.argv.includes('--verify-only');
+const refreshCandidate = process.argv.includes('--refresh-candidate');
 const requireCleanSource = process.argv.includes('--require-clean-source');
 const timestamp = new Date(argumentValue('--timestamp', new Date().toISOString()));
 if (!/^v\d+\.\d+\.\d+$/.test(version)) throw new Error(`无效微服务版本：${version}`);
@@ -218,6 +219,9 @@ for (const menu of packageModel.SysMenus || []) {
   for (const button of buttons) {
     if (button?.Id !== 'database-backup-page-btn') continue;
     button.V8Code = String(button.V8Code || '')
+      // 历史脚本先插入再匹配 Width，每次运行都会重复追加 BodyHeight。
+      // 先折叠所有旧值，再从唯一 Width 行后插入一次，使生成过程严格幂等。
+      .replace(/\n\s*BodyHeight:\s*'[^']*',?/g, '')
       .replace(/Width:\s*'[^']*'/, "Width: '80%'")
       .replace("Width: '80%',", "Width: '80%',\n  BodyHeight: 'min(820px, calc(100vh - 160px))',");
     databaseBackupDialogCount++;
@@ -296,20 +300,29 @@ if (!verifyOnly && runtimeChanged) {
       + '必须显式传 --application-version=<递增整数>',
     );
   }
-  if (applicationVersion <= embeddedApplicationVersion) {
-    throw new Error(`新运行时的应用版本号必须大于 ${embeddedApplicationVersion}`);
-  }
   if (!saasPackageVersionArgument || !storePackageVersionArgument) {
     throw new Error(
       '平台内置微服务运行时变化时，必须同时显式传 '
       + '--saas-package-version=<递增版本> 与 --store-package-version=<递增版本>',
     );
   }
-  if (compareSemanticVersion(saasPackageVersionArgument, currentSaasPackageVersion) <= 0) {
-    throw new Error(`SaaS 引擎包版本必须大于 ${currentSaasPackageVersion || '(empty)'}`);
-  }
-  if (compareSemanticVersion(storePackageVersionArgument, currentStorePackageVersion) <= 0) {
-    throw new Error(`应用商城包版本必须大于 ${currentStorePackageVersion || '(empty)'}`);
+  if (refreshCandidate) {
+    if (version !== embeddedVersion
+        || applicationVersion !== embeddedApplicationVersion
+        || saasPackageVersionArgument !== currentSaasPackageVersion
+        || storePackageVersionArgument !== currentStorePackageVersion) {
+      throw new Error('刷新未发布候选包时，微服务版本、应用整数版本和两个官方包版本必须全部保持不变');
+    }
+  } else {
+    if (applicationVersion <= embeddedApplicationVersion) {
+      throw new Error(`新运行时的应用版本号必须大于 ${embeddedApplicationVersion}`);
+    }
+    if (compareSemanticVersion(saasPackageVersionArgument, currentSaasPackageVersion) <= 0) {
+      throw new Error(`SaaS 引擎包版本必须大于 ${currentSaasPackageVersion || '(empty)'}`);
+    }
+    if (compareSemanticVersion(storePackageVersionArgument, currentStorePackageVersion) <= 0) {
+      throw new Error(`应用商城包版本必须大于 ${currentStorePackageVersion || '(empty)'}`);
+    }
   }
 }
 if (!verifyOnly && !runtimeChanged && (saasPackageVersionArgument || storePackageVersionArgument)) {
@@ -459,14 +472,30 @@ if (runtimeChanged) {
   const releaseDate = localTime.slice(0, 10);
   packageModel.PackageInfo.Version = saasPackageVersionArgument;
   storePackageModel.PackageInfo.Version = storePackageVersionArgument;
-  const saasHistoryLine = `${releaseDate} ${saasPackageVersionArgument} 重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保官方在线应用与 SaaS 离线兜底产物一致。`;
-  const storeHistoryLine = `${releaseDate} ${storePackageVersionArgument} 重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保应用商城可独立交付当前离线兜底产物。`;
+  const saasChangeContent = `重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保官方在线应用与 SaaS 离线兜底产物一致。`;
+  const storeChangeContent = `重新嵌入平台内置微服务 ${version} DatabaseOnly 运行时，确保应用商城可独立交付当前离线兜底产物。`;
+  const saasHistoryLine = `${releaseDate} ${saasPackageVersionArgument} ${saasChangeContent}`;
+  const storeHistoryLine = `${releaseDate} ${storePackageVersionArgument} ${storeChangeContent}`;
   if (!String(packageModel.PackageInfo.ChangeHistory || '').includes(saasHistoryLine)) {
     packageModel.PackageInfo.ChangeHistory = `${saasHistoryLine}\n${packageModel.PackageInfo.ChangeHistory || ''}`;
   }
   if (!String(storePackageModel.PackageInfo.ChangeHistory || '').includes(storeHistoryLine)) {
     storePackageModel.PackageInfo.ChangeHistory = `${storeHistoryLine}\n${storePackageModel.PackageInfo.ChangeHistory || ''}`;
   }
+  packageModel.PackageInfo.ChangeLog = {
+    Version: saasPackageVersionArgument,
+    Title: '平台内置微服务运行时同步',
+    ChangeType: 'Update',
+    Content: saasChangeContent,
+    ReleaseTime: localTime,
+  };
+  storePackageModel.PackageInfo.ChangeLog = {
+    Version: storePackageVersionArgument,
+    Title: '平台内置微服务运行时同步',
+    ChangeType: 'Update',
+    Content: storeChangeContent,
+    ReleaseTime: localTime,
+  };
 }
 
 bundle.VersionNo = version;

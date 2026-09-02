@@ -108,6 +108,7 @@ const ids = [
   'a1b2c3d4-2111-4a11-8111-000000000021', 'a1b2c3d4-2111-4a11-8111-000000000022',
 ];
 
+const assignedIds = new Set();
 definitions.forEach((definition, index) => {
   const [name, label, type, component, data, defaultValue, tab, sort, config, formWidth] = definition;
   const current = byName.get(name) || {};
@@ -134,7 +135,7 @@ definitions.forEach((definition, index) => {
     NotEmpty: 0,
     Label: label,
     Tab: tab,
-    Id: current.Id || ids[index],
+    Id: current.Id && !assignedIds.has(current.Id) ? current.Id : ids[index],
     CreateTime: current.CreateTime || '2026-08-21 00:00:00',
   };
   if (defaultValue !== undefined) next.DefaultValue = defaultValue;
@@ -155,6 +156,7 @@ definitions.forEach((definition, index) => {
     FormBannerMetrics: '统计项 JSON 数组。本地字段例：[{"Field":"Amount","Label":"订单金额","Prefix":"¥"}]；接口引擎例：[{"Key":"Pending","Label":"待处理","ApiEngineKey":"order-banner-metrics","ValuePath":"Data.Pending","RefreshSeconds":30,"ParamMap":{"CustomerId":"Form.CustomerId"}}]。同一 ApiEngineKey 只调用一次；显式填写 [] 表示不显示统计项。',
   };
   if (bannerDescriptions[name]) next.Description = bannerDescriptions[name];
+  assignedIds.add(next.Id);
   if (current.Name) Object.assign(current, next);
   else pkg.DiyFields.push(next);
 });

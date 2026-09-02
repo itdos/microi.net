@@ -157,6 +157,10 @@ var DiyApi = {
     GetSysMenuStep: function () {
         return "/apiengine/platform-sys-menu?Action=GetSysMenuStep";
     },
+    // 角色权限字段使用固定窄投影、授权版本缓存和线性组树。
+    GetRolePermissionTree: function () {
+        return "/apiengine/platform-sys-menu?Action=GetRolePermissionTree";
+    },
     GetSysMenuModel: "/api/FormEngine/GetSysMenuModel",
     GetLeftRightPageConfig: "/api/FormEngine/GetLeftRightPageConfig",
 

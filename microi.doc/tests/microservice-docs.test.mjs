@@ -79,6 +79,31 @@ test('MicroService guide explains all four runtime entries with real case images
   }
 });
 
+test('MicroService platform print bridge is documented for users and future AI delivery', () => {
+  const microserviceGuide = read('microi.doc/docs/doc/system-engine/micro-app.md');
+  const bluetoothGuide = read('microi.doc/docs/doc/system-engine/bluetooth-printer.md');
+  const printGuide = read('microi.doc/docs/doc/system-engine/print-engine.md');
+  const microserviceSkill = readSkill('microi-microservice');
+  const printSkill = readSkill('print-engine');
+  const bluetoothSkill = readSkill('v8-frontend-events');
+  const hostBridge = read('Microi.Client/src/views/micro-app/host-bridge.js');
+  const host = read('Microi.Client/src/views/micro-app/host.vue');
+
+  for (const source of [microserviceGuide, bluetoothGuide, microserviceSkill]) {
+    for (const token of ['openPlatformPrint', 'printId', 'dataApi', '/apiengine/', 'OsClient']) {
+      assert.ok(source.includes(token), `platform print documentation is missing ${token}`);
+    }
+  }
+  for (const source of [bluetoothGuide, printGuide, microserviceSkill, printSkill, bluetoothSkill]) {
+    assert.ok(source.includes('不是蓝牙代理') || source.includes('不发送 BLE/SPP 字节'),
+      'ordinary print and Bluetooth transport boundaries must remain explicit');
+  }
+  assert.match(hostBridge, /openPlatformPrint/);
+  assert.match(hostBridge, /dataApi\.origin !== apiBase\.origin/);
+  assert.match(hostBridge, /requestedOsClient\.toLowerCase\(\) !== osClient\.toLowerCase\(\)/);
+  assert.match(host, /case "openPlatformPrint"[\s\S]*this\.openPlatformPrint/);
+});
+
 test('FormEngine MicroService entry matches the implemented component fallback contract', () => {
   const guide = read('microi.doc/docs/doc/system-engine/micro-app.md');
   const formGuide = read('microi.doc/docs/doc/form-engine/form-custom-control.md');
@@ -235,6 +260,8 @@ test('workspace Skills and the packaged Codex plugin carry the same rules', () =
     'workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md',
     'microi-microservice/SKILL.md',
     'microi-microservice/references/runtime-delivery.md',
+    'print-engine/SKILL.md',
+    'v8-frontend-events/references/bluetooth-print.md',
     'microi-client-frontend/SKILL.md',
     'microi-client-frontend/references/progressive-03-vue3-前端微服务宿主规则.md',
     'playwright-e2e/SKILL.md',

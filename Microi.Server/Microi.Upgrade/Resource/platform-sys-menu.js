@@ -8,8 +8,8 @@
  */
 
 // Microi官方接口引擎：platform-sys-menu
-// Version: v1.0.2
-// 菜单与角色菜单授权编排由应用商城交付，底层原子能力保留权威缓存与租户边界。
+// Version: v1.0.3
+// 菜单与角色菜单授权编排由应用商城交付；角色权限树使用固定窄投影、权威缓存和线性组树。
 if (!V8.CurrentUser || !V8.CurrentUser.Id) {
   return { Code: 1001, Msg: '登录身份已过期，请重新登录。' };
 }
@@ -21,6 +21,7 @@ var allowed = {
   GetSysMenu: 1,
   GetSysMenuModel: 1,
   GetSysMenuStep: 1,
+  GetRolePermissionTree: 1,
   GetSysRoleLimitByMenuId: 1,
   UpdateSysRoleLimitByMenuId: 1
 };

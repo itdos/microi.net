@@ -31,3 +31,16 @@ test('private build distribution is supported and signed only by the authoritati
   assert.match(model, /Limit: true/u);
   assert.match(publisher, /Build: storeVisibility \? 'PublicHdfs' : 'PrivateHdfs'/u);
 });
+
+test('detail API returns a validated resource summary without leaking package bodies', () => {
+  assert.match(model, /MARKETPLACE_PACKAGE_SUMMARY_V1/u);
+  assert.match(model, /IncludePackageSummary/u);
+  assert.match(model, /RequiresInstallParent:\s*menus\.length\s*>\s*0/u);
+  assert.match(model, /MenuCount:\s*menus\.length/u);
+  assert.match(model, /ApiEngineCount:\s*apiEngines\.length/u);
+  assert.match(model, /TableCount:\s*tables\.length/u);
+  assert.match(model, /DataRowCount:\s*dataRowCount/u);
+  assert.match(model, /BuildAssetCount:\s*buildAssetCount/u);
+  assert.match(model, /delete plain\.AppPakcet/u);
+  assert.match(model, /PackageSummary:\s*packageSummary/u);
+});

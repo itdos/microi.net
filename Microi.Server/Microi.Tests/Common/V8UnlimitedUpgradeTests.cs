@@ -20,8 +20,8 @@ public class V8UnlimitedUpgradeTests
             root, "Microi.Server", "Microi.Upgrade", "MicroiStartupGate.cs"));
         var licenseHostedService = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.net", "License", "LicenseRestoreHostedService.cs"));
-        var hostedService = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "MicroiUpgradeHostedService.cs"));
+        var coordinator = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
         var upgrade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
 
@@ -43,10 +43,11 @@ public class V8UnlimitedUpgradeTests
         Assert.Contains("[\"OsClient\"] = \"varchar(255)\"", upgrade, StringComparison.Ordinal);
         Assert.Contains("[\"TableInEdit\"] = \"int\"", upgrade, StringComparison.Ordinal);
         Assert.Contains("[\"AddCallbakApi\"] = \"varchar(500)\"", upgrade, StringComparison.Ordinal);
-        Assert.Contains("EnsureRuntimePhysicalPrerequisitesAsync(runtimeClient, stoppingToken)", hostedService, StringComparison.Ordinal);
+        Assert.Contains("EnsureRuntimePhysicalPrerequisitesAsync(", coordinator, StringComparison.Ordinal);
+        Assert.Contains("runtimeClient, cancellationToken", coordinator, StringComparison.Ordinal);
         Assert.True(
-            hostedService.IndexOf("EnsureRuntimePhysicalPrerequisitesAsync", StringComparison.Ordinal)
-            < hostedService.IndexOf("new Upgrade21()", StringComparison.Ordinal));
+            coordinator.IndexOf("EnsureRuntimePhysicalPrerequisitesAsync", StringComparison.Ordinal)
+            < coordinator.IndexOf("new Upgrade21()", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -151,8 +152,8 @@ public class V8UnlimitedUpgradeTests
             root, "Microi.Server", "Microi.Upgrade", "33-UpgradeDiyTableV8RuntimeLimit.cs"));
         var upgrade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
-        var hostedService = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "MicroiUpgradeHostedService.cs"));
+        var coordinator = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
 
         Assert.Equal("6.9.8.9", Upgrade33.Version);
         Assert.Contains("UPDATE {orm.GetTableName(\"diy_table\")}", migration, StringComparison.Ordinal);
@@ -167,16 +168,16 @@ public class V8UnlimitedUpgradeTests
         Assert.Contains("[\"Visible\"] = 0", migration, StringComparison.Ordinal);
         Assert.DoesNotContain("[\"IsDeleted\"] = 1", migration, StringComparison.Ordinal);
         Assert.Contains("AdvanceSuccessfulVersion(ref uptVersion, Upgrade33.Version)", upgrade, StringComparison.Ordinal);
-        var leaseContextIndex = hostedService.IndexOf(
+        var leaseContextIndex = coordinator.IndexOf(
             "using (UpgradeExecutionLeaseContext.Enter(upgradeLease))",
             StringComparison.Ordinal);
-        var invariantIndex = hostedService.IndexOf("\"Upgrade33-表单V8限额\"", StringComparison.Ordinal);
-        Assert.Contains(".Run(runtimeClient.OsClient, resetExistingValues: false)", hostedService, StringComparison.Ordinal);
-        Assert.Contains("RunRuntimeInvariantAsync(runtimeClient, upgradeLease", hostedService, StringComparison.Ordinal);
-        var versionReadIndex = hostedService.IndexOf(
-            "SELECT {runtimeOrm.GetFieldName(\"ServerVersion\")}",
+        var invariantIndex = coordinator.IndexOf("RequiredRuntimeInvariantNames[10]", StringComparison.Ordinal);
+        Assert.Contains(".Run(runtimeClient.OsClient, false)", coordinator, StringComparison.Ordinal);
+        Assert.Contains("RunCoordinatorInvariantAsync(", coordinator, StringComparison.Ordinal);
+        var versionReadIndex = coordinator.IndexOf(
+            "beforeVersion = ReadServerVersion(runtimeClient)",
             StringComparison.Ordinal);
-        var versionGateIndex = hostedService.IndexOf("_upgrade.Upgrade(currentVersion", StringComparison.Ordinal);
+        var versionGateIndex = coordinator.IndexOf("Upgrade(beforeVersion, runtimeClient)", StringComparison.Ordinal);
         Assert.True(leaseContextIndex >= 0);
         Assert.True(invariantIndex > leaseContextIndex);
         Assert.True(versionReadIndex > invariantIndex);

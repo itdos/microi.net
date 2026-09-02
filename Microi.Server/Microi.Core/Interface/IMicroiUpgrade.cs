@@ -31,6 +31,16 @@ namespace Microi.net
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// 对一个已经加载到 SaaS 运行时的租户执行完整、幂等的升级协调流程。
+        /// 该流程与启动宿主使用同一分布式租约和 ServerVersion 门禁；backgroundTaskId
+        /// 仅用于向持久后台任务回写真实进度、日志和结果。
+        /// </summary>
+        Task<DosResult> UpgradeTenantAsync(
+            string osClient,
+            string backgroundTaskId = null,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// 
         /// </summary>
         /// <returns></returns>

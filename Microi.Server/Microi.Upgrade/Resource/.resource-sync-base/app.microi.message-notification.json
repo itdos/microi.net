@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "消息通知",
-    "Version": "v1.0.14",
+    "Version": "v1.0.15",
     "CreateTime": "2026-08-23T01:02:13.744Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -29,13 +29,13 @@
       "ServerField:sys_apiengine.ApiRoutes",
       "ApiEngineChatDelivery:v1"
     ],
-    "ChangeHistory": "2026-09-01 v1.0.14 聊天 Managed 运行时改为自包含时间能力，不再依赖租户全局 V8 中的 DateNow。\n2026-08-30 v1.0.13 完成 /api/DiyChat/SendSystemMessage 多路由、事务提交后实时投递与官方包追加式发布历史闭包。\n2026-08-30 v1.0.12 将 /api/DiyChat/SendSystemMessage 收入 platform-chat-system-message 多路由，并保留提交后实时投递契约。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.8 修复聊天运行时与 AI 运行时跨应用稳定 Id 冲突；继续由 Managed V8 统一编排普通聊天消息、联系人、未读、历史、已读与删除。\n2026-08-25 v1.0.7 普通聊天消息、联系人、未读、历史、已读与删除业务迁入固定 Managed V8 运行时；旧 Hub/Controller 仅保留认证连接、协议与尽力投递。\n2026-08-25 v1.0.6 平台系统消息业务校验迁入 Managed V8 接口，并提供消息通知个性化 Hook。\n",
+    "ChangeHistory": "2026-09-02 v1.0.15 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v1.0.14 聊天 Managed 运行时改为自包含时间能力，不再依赖租户全局 V8 中的 DateNow。\n2026-08-30 v1.0.13 完成 /api/DiyChat/SendSystemMessage 多路由、事务提交后实时投递与官方包追加式发布历史闭包。\n2026-08-30 v1.0.12 将 /api/DiyChat/SendSystemMessage 收入 platform-chat-system-message 多路由，并保留提交后实时投递契约。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.8 修复聊天运行时与 AI 运行时跨应用稳定 Id 冲突；继续由 Managed V8 统一编排普通聊天消息、联系人、未读、历史、已读与删除。\n2026-08-25 v1.0.7 普通聊天消息、联系人、未读、历史、已读与删除业务迁入固定 Managed V8 运行时；旧 Hub/Controller 仅保留认证连接、协议与尽力投递。\n2026-08-25 v1.0.6 平台系统消息业务校验迁入 Managed V8 接口，并提供消息通知个性化 Hook。\n",
     "ChangeLog": {
-      "Version": "v1.0.14",
-      "Title": "聊天运行时时间能力自包含",
-      "ChangeType": "Fix",
-      "Content": "修复历史租户未定义 DateNow 时 SignalR 聊天发送失败；官方 Managed 运行时使用本地时间回退且不覆盖租户全局 V8。",
-      "ReleaseTime": "2026-09-01 14:30:00"
+      "Version": "v1.0.15",
+      "Title": "WebOS iOS 拟物透明图标升级",
+      "ChangeType": "Optimize",
+      "Content": "将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。",
+      "ReleaseTime": "2026-09-02 12:05:00"
     },
     "Description": "消息通知、聊天持久化与旧移动端系统消息兼容资源。"
   },
@@ -4739,7 +4739,7 @@
       "DisplayMac": 0,
       "AppDisplay": 0,
       "OpenType": "Diy",
-      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-081-49284d8b.webp",
+      "Icon": "/itdos/microi/webos-icons/ios-skeuomorphic-v2/202609/messaging.webp",
       "TableDiyFieldIds": "[]",
       "PageBtns": "[]",
       "DiyTableId": "944f72ca-b9f2-48a2-9b0b-b618ed906f31",
@@ -4799,7 +4799,7 @@
       "DisplayMac": 0,
       "AppDisplay": 1,
       "OpenType": "Diy",
-      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-069-7bec9b47.webp",
+      "Icon": "/itdos/microi/webos-icons/ios-skeuomorphic-v2/202609/messaging.webp",
       "TableDiyFieldIds": "[]",
       "PageBtns": "[]",
       "DiyTableId": "5f0c644e-b379-4fd6-85d3-aaa41b4a10d2",
@@ -4846,7 +4846,7 @@
       "DisplayMac": 1,
       "AppDisplay": 1,
       "OpenType": "Diy",
-      "Icon": "/itdos/microi/menu-icons/20260808/third-party/202608/microi-webos-template-message.webp",
+      "Icon": "/itdos/microi/webos-icons/ios-skeuomorphic-v2/202609/messaging.webp",
       "TableDiyFieldIds": "[]",
       "PageBtns": "[]",
       "DiyTableId": "e9530187-b2b3-4cff-8ae0-235e64d1deb9",

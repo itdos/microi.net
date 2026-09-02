@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store
- * Version: v1.4.8
+ * Version: v1.4.9
  * Function:
  * - 读取统一应用商城列表并计算租户安装状态；批量平台安装时优先返回应用商城自举包。
  */
@@ -195,11 +195,26 @@ function isPlatformMaintenanceNotice(status) {
   return status === "Uninstalled" || status === "Outdated";
 }
 function publicUrl(path, fallback) {
-  var filePath = trim(path);
-  if (!filePath) return trim(fallback);
-  if (/^https?:\/\//i.test(filePath) || filePath.charAt(0) === "/") return filePath;
+  var fallbackValue = trim(fallback);
+  if (fallbackValue.charAt(0) === "/") return fallbackValue;
   var server = trim(V8.SysConfig && V8.SysConfig.FileServer).replace(/\/+$/, "");
-  return server ? server + "/" + filePath.replace(/^\/+/, "") : trim(fallback);
+  function publicObjectUrl(value, appendEntry) {
+    var source = trim(value), wasAbsolute = /^https?:\/\//i.test(source);
+    if (!source) return "";
+    if (wasAbsolute) source = source.replace(/^https?:\/\/[^/]+/i, "");
+    source = source.replace(/[?#][\s\S]*$/, "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    if (!source) return "";
+    if (appendEntry && !/\.html?$/i.test(source)) source += "/index.html";
+    if (server) return server + "/" + source;
+    return wasAbsolute ? trim(value).replace(/[?#][\s\S]*$/, "") : "";
+  }
+  // PreviewUrl 若已指向真实入口，保留其对象路径但始终换成当前租户 FileServer，
+  // 从而清除 OSS/S3 内网域名和临时签名。旧安装只有目录时再补 index.html。
+  if (/\.html?(?:[?#]|$)/i.test(fallbackValue)) return publicObjectUrl(fallbackValue, false);
+  var filePath = trim(path);
+  if (!filePath) return publicObjectUrl(fallbackValue, true);
+  if (filePath.charAt(0) === "/") return filePath;
+  return publicObjectUrl(filePath, true) || publicObjectUrl(fallbackValue, true);
 }
 function collectWhereFilter(fieldNames) {
   var result = [], where = toArray(V8.Param._Where);

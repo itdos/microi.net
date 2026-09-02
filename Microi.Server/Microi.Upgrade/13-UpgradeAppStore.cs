@@ -1912,6 +1912,25 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
             return Microi.License.LicenseService.IsOfficialPlatform(osClient);
         }
 
+        /// <summary>
+        /// Reads the immutable official-source fact returned by a single dependency
+        /// readback. License recovery may still be converging during early startup,
+        /// so callers must prefer this result over repeating the ambient check.
+        /// </summary>
+        internal static bool IsOfficialSourceResult(DosResult result)
+        {
+            if (result?.Data == null) return false;
+            try
+            {
+                var model = result.Data as JObject ?? JObject.FromObject(result.Data);
+                return model["OfficialSource"]?.Value<bool>() == true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static readonly string[] CoreNullableTables =
         {
             "diy_table",

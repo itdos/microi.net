@@ -14,7 +14,7 @@ export const DOC_VISUAL_PROFILES = Object.freeze({
   'case/oa/os-case1': 'showcase',
   'case/other/other-case1': 'showcase',
   'about/faq': 'guide',
-  'about/microi-training-syllabus': 'guide',
+  'about/microi-training-syllabus': 'showcase',
   'about/partner': 'overview',
   'about/template': 'reference',
   'edition-comparison': 'showcase',

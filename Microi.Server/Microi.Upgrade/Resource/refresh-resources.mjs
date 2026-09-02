@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import {
   advanceOfficialPackageVersion,
   canonicalizeResource,
+  hasExactResourceContentDrift,
   hasPlatformServiceBundleChanged,
   isTemporaryOfficialResourceFailure,
   mergeResource,
@@ -51,6 +52,9 @@ const resourceNames = [
   'app.microi.ai-engine.json',
 ];
 const officialApplicationResourceNames = resourceNames.filter(name => name.endsWith('.json'));
+const publishedApplicationStoreReplicaNames = new Set(
+  publishedApplicationStoreReplicaMappings.map(mapping => mapping.resourceName),
+);
 const endpoint = process.env.MICROI_UPGRADE_RESOURCE_API
   || 'https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos';
 const publishEndpoint = process.env.MICROI_UPGRADE_RESOURCE_PUBLISH_API
@@ -1368,7 +1372,12 @@ if (process.argv.includes('--synchronize-local')) {
     if (rawLocalResources.get(name) !== content) {
       await writeFile(resolve(outputDirectory, name), content, 'utf8');
     }
-    if (remoteResources.get(name).content !== content) {
+    // live 投影会按原始字节摘要比较商城包内嵌控制面与独立接口。即使只有
+    // CRLF 或尾部空行漂移，三方合并的规范化正文相同，也必须把独立接口
+    // 重写为同一份规范字节，避免包发布成功后第二阶段投影永久失败。
+    const exactPublishedReplicaDrift = publishedApplicationStoreReplicaNames.has(name)
+      && hasExactResourceContentDrift(content, remoteResources.get(name).sha256);
+    if (remoteResources.get(name).content !== content || exactPublishedReplicaDrift) {
       remoteChanges.push({
         name,
         content,
@@ -1411,6 +1420,10 @@ if (process.argv.includes('--synchronize-local')) {
   for (const name of resourceNames) {
     if (verifiedRemote.get(name).content !== mergedResources.get(name)) {
       throw new Error(`${name} 发布后回读与合并结果不一致，未推进共同基线，且未执行 live 接口投影`);
+    }
+    if (publishedApplicationStoreReplicaNames.has(name)
+        && hasExactResourceContentDrift(mergedResources.get(name), verifiedRemote.get(name).sha256)) {
+      throw new Error(`${name} 发布后原始字节摘要仍与商城包内嵌副本不一致，未推进共同基线，且未执行 live 接口投影`);
     }
   }
   if (publish) {

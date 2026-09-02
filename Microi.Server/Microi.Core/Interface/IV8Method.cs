@@ -190,6 +190,9 @@ namespace Microi.net
         /// <summary>仅供主租户超级管理员保留数据修复子租户DatabaseOnly连接。</summary>
         DosResult RepairAdminTenantDatabaseAccess(dynamic dynamicParam);
 
+        /// <summary>仅供官方 Managed 后台工作器幂等升级精确选中的子租户数据库。</summary>
+        DosResult UpgradeAdminTenantDatabase(dynamic dynamicParam);
+
         /// <summary>仅供官方个人资料接口校验可信目标用户和租户头像路径。</summary>
         DosResult PrepareCurrentUserProfileUpdate(dynamic dynamicParam);
 

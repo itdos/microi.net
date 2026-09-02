@@ -320,6 +320,64 @@ PC 顶栏助手和移动端助手复用 `mci_ai_data_assistant` 的 `Bootstrap`�
 
 OpenAI 兼容客户端可使用 `/v1/chat/completions`、`/v1/models`；额度查询使用 `/v1/usage`。
 
+## Schema 启动加载、租户范围与缓存位置
+
+::: tip 先看结论
+后端启动时不会扫描“主租户 + 全部子租户”的所有物理数据库表和字段。SaaS 引擎会挂载符合条件的租户运行配置，但 AI Schema 启动预热只处理当前配置主租户；子租户在第一次使用 NL2SQL、NL2V8 等 Schema 检索能力时按需加载。
+:::
+
+这三个阶段容易被混为一谈：
+
+| 阶段 | 租户范围 | 实际加载内容 | 是否属于 AI Schema |
+|---|---|---|---|
+| SaaS 引擎启动挂载 | `sys_osclients` 中启用、未删除，且 `OsClientType`、`OsClientNetwork` 匹配当前节点并成功挂载的租户 | 租户运行配置、主数据库访问对象、Redis 等基础设施配置，保存到当前进程的 `OsClientExtend.ClientList` | 否。`ClientList` 有这个租户，不代表表字段已经进入 AI 索引 |
+| AI Schema 启动预热 | 仅 `GetConfigOsClient()` 返回的配置主租户；为空时回退默认租户 | 低代码表、字段和菜单元数据的关键词索引；仅在当前节点在线 AI License 校验通过后执行 | 是 |
+| 子租户首次 AI 分析 | 当前请求经过登录态和服务端租户解析后绑定的 `OsClient` | 该子租户自己的 Schema 关键词索引；启用向量模式时再加载该租户的向量索引 | 是，按需惰性加载，不在启动时全量预热 |
+
+子租户配置异常时，SaaS 启动会记录错误并继续处理其它子租户；因此“`sys_osclients` 中存在记录”也不等于该租户一定已成功挂载。
+
+### AI 实际读取的 Schema
+
+AI 的在线 Schema 事实源不是数据库的 `INFORMATION_SCHEMA`，而是当前租户低代码元数据：
+
+- `diy_table`：未删除表的 Id、物理表名和表说明。
+- `diy_field`：未删除字段的 Id、所属表、字段名、标题、类型和备注。
+- `sys_menu`：未删除且已绑定 `DiyTableId` 的菜单名称，用于补充业务语义。
+
+当前实现单次读取每类元数据的上限是 50,000 条。只有已经登记到 `diy_table`、`diy_field` 的结构才会进入 AI Schema；仅在数据库中手工创建、但没有低代码元数据的物理表或字段不会自动出现。开发者本地的 `.microi-db-schema.md` 属于 VS Code/MCP 的本地快照，也不是在线 Microi.AI 的运行时数据源。
+
+### 加载后保存在哪里
+
+平台没有把 Schema 再复制到一张独立的 AI 业务表。关键词模式使用两级缓存，可选向量模式再增加 Qdrant：
+
+| 层级 | 保存内容 | Key、隔离与有效期 | 作用 |
+|---|---|---|---|
+| 租户数据库 | `sys_menu`、`diy_table`、`diy_field` 原始元数据 | 由当前 `OsClient` 对应数据库隔离 | 权威事实源 |
+| Redis L2 | 原始 `List<TableSchemaInfo>`，包含表、字段、菜单语义和可检索文本 | `Microi:{OsClient}:AiSchemaKeywordIndex:{FormEngineAuthzVersion}`，当前有效期 10 分钟 | 多 API 节点共享，避免重复读取全量元数据 |
+| 进程内 L1 | 基于上述列表构建的关键词倒排索引 | 同一版本化 Key，当前有效期 2 分钟 | 当前节点快速检索；可随进程退出丢失 |
+| Qdrant（可选） | Schema 文本的向量与表/字段元数据 Payload | 仅 `EnableVectorDatabase=1` 时使用；HTTP 默认 collection 为 `microi_schema_v2_http_768`，每个 point 带 `os_client`、`table_id` 等租户过滤字段 | 只补充模糊语义召回，不能替代数据库事实源或权限校验 |
+
+Qdrant 还保留 gRPC 兼容 collection `microi_schema_v2_grpc_384`。无论使用哪种向量通道，确定性 point Id 都由“租户 + 表 Id”生成，查询必须带 `os_client` 过滤。`EnableVectorDatabase` 缺失、为空或为 `0` 时，运行时不会连接、初始化或同步 Qdrant/Ollama/Embedding。
+
+::: warning Schema 缓存不是业务数据缓存
+Redis 和 Qdrant 只保存表字段说明等结构索引，不会把订单、客户、金额等业务行数据预先复制进去。真正的数据分析 SQL 仍在请求发生时查询当前租户数据库。
+:::
+
+### Microi.AI 数据分析如何使用这些信息
+
+1. 服务端从登录态和可信请求上下文确定当前 `OsClient`、用户和角色，客户端不能自行指定其它租户。
+2. 服务端根据当前租户 `diy_table`、AI 角色策略和 FormEngine 读取权限生成精确表白名单，并排除平台控制表和带通用 NL2SQL 无法安全还原的行级范围表。
+3. Schema 搜索按当前租户读取 L1/L2；没有命中时回源该租户数据库并建立缓存。子租户的第一次请求就是在此处完成惰性加载。
+4. 关键词候选和可选向量候选都再次与精确白名单取交集，只把少量相关表字段放进模型 Prompt。
+5. 模型生成 SQL 后，服务端继续校验单条只读 `SELECT`、所有 `FROM`/`JOIN` 表、危险语法、最大行数和超时。
+6. 校验通过后才在当前租户数据库实时执行；Schema 索引负责“找表和字段”，不负责保存或返回业务事实。
+
+### 结构变更何时生效
+
+关键词索引复用 Redis 中的 FormEngine 授权/结构版本 `Microi:{OsClient}:FormEngineAuthz:Version`。通过标准 FormEngine 流程修改 `sys_menu`、`diy_table`、`diy_field`、角色或用户授权时会推进版本，旧版本缓存随即不再被新请求命中，下一次请求会建立新索引。
+
+Redis 不可用或无法取得版本时，服务端直接回源当前租户数据库，不沿用版本未知的旧索引。若绕过 FormEngine 直接执行 SQL 修改元数据，版本可能不会立即变化；在 L1/L2 到期、服务重启或显式刷新前可能仍看到旧 Schema，因此平台结构维护应优先使用标准低代码/FormEngine 入口。
+
 ## NL2SQL、NL2V8 与知识库安全
 
 - 默认 Schema 检索链路是：大模型把用户问题扩展为少量关键词、同义词和业务实体；服务端只在当前用户有权访问的 Schema 中检索候选；再从权威 `diy_table` / `diy_field` 元数据精确回读字段，最后生成并校验 SQL。关键词扩展结果不是权限凭据，不能扩大服务端授权范围。

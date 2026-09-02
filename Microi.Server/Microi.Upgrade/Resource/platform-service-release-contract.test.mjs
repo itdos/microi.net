@@ -64,9 +64,11 @@ test("平台内置微服务只从显式发布契约解析正式源码根", async
   assert.match(sourcePackage.version, /^\d+\.\d+\.\d+$/);
   assert.match(script, /platform-service-release\.json/);
   assert.match(script, /--verify-only/);
+  assert.match(script, /--refresh-candidate/);
   assert.match(script, /--require-clean-source/);
   assert.match(script, /--saas-package-version/);
   assert.match(script, /--store-package-version/);
+  assert.match(script, /刷新未发布候选包时，微服务版本、应用整数版本和两个官方包版本必须全部保持不变/);
   assert.doesNotMatch(script, /AI-Project\/microi\/AI应用\/microi-platform-service/);
   assert.doesNotMatch(script, /Microi-V8-Engine\/.*microi-platform-service/);
   assert.match(resourcePublisher, /if \(publish\) \{[\s\S]*changedPlatformServicePackages[\s\S]*await verifyPlatformServiceReleaseSource\(\)/);

@@ -30,6 +30,16 @@ namespace Microi.net
         public string DomainName { get; set; }
         public string DatabaseZipPath { get; set; }
         public string DatabaseZipName { get; set; }
+        public string BackgroundTaskId { get; set; }
+    }
+
+    public sealed class AdminTenantDatabaseUpgradeRequest
+    {
+        public string TenantId { get; set; }
+        public string TenantKey { get; set; }
+        public string OsClientType { get; set; }
+        public string OsClientNetwork { get; set; }
+        public string BackgroundTaskId { get; set; }
     }
 
     public sealed class AdminTenantDatabaseRepairRequest
@@ -74,7 +84,12 @@ namespace Microi.net
         /// <param name="userName">用户名</param>
         /// <param name="encryptedPwd">加密后的密码</param>
         /// <returns>操作结果，Data中包含新OsClient值</returns>
-        public async Task<DosResult> ProvisionTenantAsync(string phone, string userId, string userName, string encryptedPwd)
+        public async Task<DosResult> ProvisionTenantAsync(
+            string phone,
+            string userId,
+            string userName,
+            string encryptedPwd,
+            string backgroundTaskId = null)
         {
             string createdOsClient = null;
             string createdDbName = null;
@@ -160,19 +175,38 @@ namespace Microi.net
                 lease.ThrowIfLost();
 
                 // Step 6: 刷新SaaS引擎内存中的租户配置
-                try
+                var reloadResult = MicroiEngine.GetService<IOsClientRuntime>()
+                    .ReloadSingleOsClient(osClient);
+                if (reloadResult.Code != 1)
                 {
-                    MicroiEngine.GetService<IOsClientRuntime>().ReloadSingleOsClient(osClient);
-                    Console.WriteLine($"Microi：【成功】租户[{osClient}]自动开通完成并已加载到内存！");
+                    return CompensateProvisioningFailure(
+                        new DosResult(0, reloadResult.Data, "刷新租户运行配置失败：" + reloadResult.Msg),
+                        osClient,
+                        dbName);
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Microi：【警告】租户[{osClient}]已创建但刷新内存失败：{ex.Message}，需重启生效。");
-                }
-
                 lease.ThrowIfLost();
 
-                var success = new DosResult(1, new { OsClient = osClient, DbName = dbName }, "租户开通成功");
+                // Step 7: 新租户不是 API 启动时枚举到的租户，必须在返回成功前显式
+                // 复用同一套后端升级协调器；否则旧空库/上传库会一直停在旧结构。
+                var upgradeResult = await UpgradeProvisionedTenantAsync(
+                        osClient, backgroundTaskId)
+                    .ConfigureAwait(false);
+                if (upgradeResult.Code != 1)
+                {
+                    return CompensateProvisioningFailure(
+                        new DosResult(0, upgradeResult.Data,
+                            "租户数据库升级失败：" + upgradeResult.Msg),
+                        osClient,
+                        dbName);
+                }
+                lease.ThrowIfLost();
+
+                var success = new DosResult(1, new
+                {
+                    OsClient = osClient,
+                    DbName = dbName,
+                    Upgrade = upgradeResult.Data
+                }, "租户开通成功，数据库升级检查已完成。");
                 success.DataAppend = addTenantResult.DataAppend;
                 return success;
             }
@@ -194,7 +228,8 @@ namespace Microi.net
         /// 创建新数据库
         /// </summary>
         public async Task<DosResult> ProvisionTenantAsync(string tenantKey, string systemName,
-            string userId, string phone, string userName, string encryptedPwd, string aiApiKey = null)
+            string userId, string phone, string userName, string encryptedPwd,
+            string aiApiKey = null, string backgroundTaskId = null)
         {
             string createdOsClient = null;
             string createdDbName = null;
@@ -298,6 +333,19 @@ namespace Microi.net
                 }
                 lease.ThrowIfLost();
 
+                var upgradeResult = await UpgradeProvisionedTenantAsync(
+                        osClient, backgroundTaskId)
+                    .ConfigureAwait(false);
+                if (upgradeResult.Code != 1)
+                {
+                    return CompensateProvisioningFailure(
+                        new DosResult(0, upgradeResult.Data,
+                            "租户数据库升级失败：" + upgradeResult.Msg),
+                        osClient,
+                        dbName);
+                }
+                lease.ThrowIfLost();
+
                 var success = new DosResult(1, new
                 {
                     OsClient = osClient,
@@ -307,8 +355,9 @@ namespace Microi.net
                     DomainName = $"{osClient}.microi.net",
                     Url = $"https://{osClient}.microi.net",
                     FreeTenantCreated = true,
-                    NextTenantPrice = 9.9M
-                }, "租户创建成功。");
+                    NextTenantPrice = 9.9M,
+                    Upgrade = upgradeResult.Data
+                }, "租户创建成功，数据库升级检查已完成。");
                 success.DataAppend = addTenantResult.DataAppend;
                 return success;
             }
@@ -430,6 +479,19 @@ namespace Microi.net
                 }
                 lease.ThrowIfLost();
 
+                var upgradeResult = await UpgradeProvisionedTenantAsync(
+                        tenantKey, request.BackgroundTaskId)
+                    .ConfigureAwait(false);
+                if (upgradeResult.Code != 1)
+                {
+                    return CompensateProvisioningFailure(
+                        new DosResult(0, upgradeResult.Data,
+                            "租户数据库升级失败：" + upgradeResult.Msg),
+                        tenantKey,
+                        dbName);
+                }
+                lease.ThrowIfLost();
+
                 var success = new DosResult(1, new
                 {
                     OsClient = tenantKey,
@@ -443,8 +505,9 @@ namespace Microi.net
                     AdminAccount = "admin",
                     DatabaseSource = databaseZipPath.DosIsNullOrWhiteSpace() ? "OfficialEmpty" : "CustomZip",
                     DatabaseZipName = databaseZipPath.DosIsNullOrWhiteSpace() ? null : databaseZipName,
-                    DatabaseImport = importResult.Data
-                }, "SaaS租户创建成功。");
+                    DatabaseImport = importResult.Data,
+                    Upgrade = upgradeResult.Data
+                }, "SaaS租户创建成功，数据库升级检查已完成。");
                 success.DataAppend = addTenantResult.DataAppend;
                 return success;
             }
@@ -460,6 +523,118 @@ namespace Microi.net
             {
                 lease?.Dispose();
             }
+        }
+
+        /// <summary>
+        /// 主租户超级管理员对精确选中的已启用子租户重新执行幂等升级检查。
+        /// 目标数据库连接只从权威 sys_osclients 读取，V8 不能传入或替换连接串。
+        /// </summary>
+        public async Task<DosResult> UpgradeAdminTenantDatabaseAsync(
+            AdminTenantDatabaseUpgradeRequest request)
+        {
+            request ??= new AdminTenantDatabaseUpgradeRequest();
+            var tenantId = (request.TenantId ?? string.Empty).Trim();
+            var tenantKey = (request.TenantKey ?? string.Empty).Trim();
+            var osClientType = (request.OsClientType
+                                ?? OsClientDefault.OsClientType
+                                ?? "Product").Trim();
+            var osClientNetwork = (request.OsClientNetwork
+                                   ?? OsClientDefault.OsClientNetwork
+                                   ?? "Internal").Trim();
+            TenantProvisioningLease lease = null;
+            try
+            {
+                if (tenantId.DosIsNullOrWhiteSpace())
+                    return new DosResult(0, null, "租户记录Id不能为空。");
+                if (!Regex.IsMatch(tenantKey, @"^[A-Za-z][A-Za-z0-9_-]*$"))
+                    return new DosResult(0, null, "租户Key格式不正确。");
+                if (string.Equals(tenantKey, OsClientDefault.OsClient,
+                        StringComparison.OrdinalIgnoreCase))
+                    return new DosResult(0, null, "请勿通过子租户行按钮升级主租户数据库。");
+                if (!Regex.IsMatch(osClientType, @"^[A-Za-z][A-Za-z0-9_-]*$"))
+                    return new DosResult(0, null, "OsClientType格式不正确。");
+                if (!Regex.IsMatch(osClientNetwork, @"^[A-Za-z][A-Za-z0-9_.-]{0,49}$"))
+                    return new DosResult(0, null, "OsClientNetwork格式不正确。");
+
+                var mainClient = OsClientExtend.GetClient(OsClientDefault.OsClient);
+                if (mainClient == null)
+                    return new DosResult(0, null, "主租户OsClient未初始化。");
+
+                lease = TenantProvisioningLease.TryAcquire(
+                    "admin:" + tenantKey.ToLowerInvariant());
+                if (lease == null)
+                    return new DosResult(0, null, "该租户正在创建、修复或升级，请勿重复提交。");
+                lease.ThrowIfLost();
+
+                object row = mainClient.Db.FromSql(@"SELECT Id, OsClient, OsClientType,
+                            OsClientNetwork
+                        FROM sys_osclients
+                        WHERE Id = @TenantId AND OsClient = @TenantKey
+                          AND OsClientType = @OsClientType
+                          AND OsClientNetwork = @OsClientNetwork
+                          AND IsDeleted = 0 AND IsEnable = 1")
+                    .AddInParameter("TenantId", tenantId)
+                    .AddInParameter("TenantKey", tenantKey)
+                    .AddInParameter("OsClientType", osClientType)
+                    .AddInParameter("OsClientNetwork", osClientNetwork)
+                    .First<dynamic>();
+                if (row == null)
+                    return new DosResult(0, null, "未找到精确匹配且已启用的租户记录。");
+
+                OsClientExtend.InvalidateSaasConfigurationCache(tenantKey);
+                var reload = MicroiEngine.GetService<IOsClientRuntime>()
+                    .ReloadSingleOsClient(tenantKey);
+                if (reload.Code != 1)
+                {
+                    return new DosResult(0, new
+                    {
+                        TenantId = tenantId,
+                        OsClient = tenantKey,
+                        RuntimeReloaded = false
+                    }, "刷新租户运行配置失败：" + reload.Msg);
+                }
+                lease.ThrowIfLost();
+
+                var upgrade = await UpgradeProvisionedTenantAsync(
+                        tenantKey, request.BackgroundTaskId)
+                    .ConfigureAwait(false);
+                var data = upgrade.Data == null
+                    ? new JObject()
+                    : JObject.FromObject(upgrade.Data);
+                data["TenantId"] = tenantId;
+                data["OsClient"] = tenantKey;
+                data["RuntimeReloaded"] = true;
+                var result = new DosResult(upgrade.Code, data, upgrade.Msg);
+                result.DataAppend = upgrade.DataAppend;
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    "Microi: Upgrade tenant database facade failed. ErrorType="
+                    + ex.GetType().Name + ".");
+                return new DosResult(0, null,
+                    "租户数据库升级失败。请检查任务日志、数据库连接和账号权限后重试。");
+            }
+            finally
+            {
+                lease?.Dispose();
+            }
+        }
+
+        private static async Task<DosResult> UpgradeProvisionedTenantAsync(
+            string osClient,
+            string backgroundTaskId)
+        {
+            var upgrade = MicroiEngine.TryGetService<IMicroiUpgrade>();
+            if (upgrade == null)
+            {
+                return new DosResult(0, null,
+                    "当前后端未加载租户数据库升级服务，不能把未升级的租户标记为创建成功。");
+            }
+            return await upgrade
+                .UpgradeTenantAsync(osClient, backgroundTaskId)
+                .ConfigureAwait(false);
         }
 
         /// <summary>

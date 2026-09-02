@@ -9,11 +9,23 @@ import {
 // zhy：静态核对角色管理界面与保存白名单，防止后续重构再次隐藏或过滤 Read。
 const rolePermissionRowSource = readFileSync(new URL("../src/views/system/components/sysrole-menu-permission-row.vue", import.meta.url), "utf8");
 const roleManageSource = readFileSync(new URL("../src/views/system/sysrole-manage.vue", import.meta.url), "utf8");
+const rolePermissionFieldSource = readFileSync(new URL("../src/views/system/components/sysrole-permission-field.vue", import.meta.url), "utf8");
+const apiSource = readFileSync(new URL("../src/utils/api.itdos.js", import.meta.url), "utf8");
 
 test("角色管理界面展示并保存 Read 权限", () => {
     assert.match(rolePermissionRowSource, /value:\s*["']Read["']/);
     assert.match(roleManageSource, /Read:\s*["']读取["']/);
     assert.match(roleManageSource, /defaultRoleTypes\s*=\s*\[[^\]]*["']Read["']/s);
+});
+
+test("新旧角色权限入口都使用专用缓存菜单树并保留滚动升级回退", () => {
+    assert.doesNotMatch(rolePermissionFieldSource, /GetDiyTableRowTree/);
+    assert.doesNotMatch(roleManageSource, /GetDiyTableRowTree/);
+    assert.match(rolePermissionFieldSource, /GetRolePermissionTree\(\)/);
+    assert.match(rolePermissionFieldSource, /GetSysMenuStep\(\)/);
+    assert.match(roleManageSource, /GetRolePermissionTree\(\)/);
+    assert.match(roleManageSource, /GetSysMenuStep\(\)/);
+    assert.match(apiSource, /Action=GetRolePermissionTree/);
 });
 
 test("勾选叶子菜单会同步保存标记和默认权限", () => {

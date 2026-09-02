@@ -226,9 +226,26 @@ namespace Microi.net
                     return menuLogic.GetSysMenuModel(param).ConfigureAwait(false).GetAwaiter().GetResult();
                 case "getsysmenustep":
                     return menuLogic.GetSysMenuStep(param).ConfigureAwait(false).GetAwaiter().GetResult();
+                case "getrolepermissiontree":
+                    // 角色权限编辑只需要菜单名称、层级和按钮定义。固定窄投影并复用
+                    // GetSysMenuStep 的授权版本缓存与 O(n) 组树，避免通用树接口在
+                    // 数千菜单下反复扫描全表。
+                    ConfigureRolePermissionTreeParam(param);
+                    return menuLogic.GetSysMenuStep(param).ConfigureAwait(false).GetAwaiter().GetResult();
                 default:
                     return new DosResult(0, null, "不支持的菜单动作。");
             }
+        }
+
+        internal static void ConfigureRolePermissionTreeParam(SysMenuParam param)
+        {
+            if (param == null) throw new ArgumentNullException(nameof(param));
+            param._All = true;
+            param._SelectFields = new List<string>
+            {
+                "Id", "Name", "IconClass", "ParentId", "Sort", "MoreBtns",
+                "FormBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs"
+            };
         }
 
         private static dynamic ExecuteSysRoleDirectory(

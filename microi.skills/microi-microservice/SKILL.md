@@ -181,6 +181,13 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 宿主桥接不授予菜单或数据权限。业务保存成功后才能关闭/跳转，不能把尽力返回的
 `micro-app:host-action-result` 当作业务持久化确认。
 
+微服务需要平台普通打印时使用 `openPlatformPrint`，并先确认它存在于
+`hostCapabilities.actions`。参数只传 `mic_print.Id`、标题和当前 `apiBase` 同源且以
+`/apiengine/` 开头的数据地址；地址必须明确携带与页面一致的 `OsClient`，不得携带 Token、
+帐号密码或其它 URL 凭据。该动作只表示 Print Engine 预览已打开，不代表浏览器已打印或
+打印机已出纸，也不是 BLE/SPP 蓝牙代理。独立运行没有宿主时应隐藏/禁用入口。可复制示例见
+[`references/runtime-delivery.md`](references/runtime-delivery.md#微服务调用平台普通打印)。
+
 微服务自己的左侧菜单、页签和详情层级属于**子应用内部路由**，必须由子应用 Vue Router、
 状态机或 iframe 内 Hash 管理；禁止为 `/overview`、`/portal` 等同一 AppKey 页面调用宿主
 `navigate/replaceTab`。吾码 TagsView 以主框架 `$route.fullPath` 作为组件 key，修改宿主路由会

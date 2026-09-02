@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.3.9
+ * Version: v1.4.1
  * Function:
  * - 规划并逐个安装或更新全部官方平台应用；持久化计划、不可变商城快照标识与子检查点，并透传结构化失败详情。
  */
@@ -287,7 +287,10 @@ var startupDependencyRequirements = [
     { AppId: 'app.microi.saas-engine', Key: 'platform-sys-config', Address: '/apiengine/platform-sys-config', Version: 'v1.0.0', AllowAnonymous: 1, Markers: ['V8.Method.GetPublicSysConfig'] },
     { AppId: 'app.microi.saas-engine', Key: 'platform-lang-bundle', Address: '/apiengine/platform-lang-bundle', Version: 'v1.0.0', AllowAnonymous: 1, Markers: ['V8.Method.GetLangBundle'] },
     { AppId: 'app.microi.saas-engine', Key: 'platform-current-user', Address: '/apiengine/platform-current-user', Version: 'v1.0.0', AllowAnonymous: 0, Markers: ['V8.CurrentUser'] },
-    { AppId: 'app.microi.saas-engine', Key: 'platform-private-file-url', Address: '/apiengine/platform-private-file-url', Version: 'v1.0.0', AllowAnonymous: 0, Markers: ['V8.Method.GetAuthorizedPrivateFileUrl'] },
+    // 历史 HDFS/MallFileUrl 路由必须先进入接口引擎，再由可信宿主校验移动端 Token；
+    // 因此该 Managed 接口的运行标志与 SaaS 官方包一致为 AllowAnonymous=1，源码本身
+    // 仍会对现代路由要求登录。强回读不得把官方声明误判为启动依赖缺失。
+    { AppId: 'app.microi.saas-engine', Key: 'platform-private-file-url', Address: '/apiengine/platform-private-file-url', Version: 'v1.0.0', AllowAnonymous: 1, Markers: ['V8.Method.GetAuthorizedPrivateFileUrl'] },
     { AppId: 'app.microi.saas-engine', Key: 'platform-sys-user-public-info', Address: '/apiengine/platform-sys-user-public-info', Version: 'v1.0.0', AllowAnonymous: 0, Markers: ["GetTableData('sys_user'"] }
 ];
 function readStartupDependencyEngine(key) {
