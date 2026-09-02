@@ -142,8 +142,8 @@ export default {
       currentUser: {},
       businessGroups,
       runtimeBusinessGroups: [],
-      mapEntryVisibility: { deviceMap: false, customerMap: false },
-      mapPermissionRequestId: 0,
+      businessEntryVisibility: {},
+      businessPermissionRequestId: 0,
       summary: { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 },
       summaryLoading: false,
       refreshing: false,
@@ -171,36 +171,37 @@ export default {
       return `${now.getMonth() + 1}月${now.getDate()}日 ${weekdays[now.getDay()]}`
     },
     metrics() {
+      let items
       if (this.roleProfile.isCustomer) {
-        return [
+        items = [
           { key: 'orders', label: '我的合同', value: this.summary.orders },
           { key: 'devices', label: '我的设备', value: this.summary.devices },
           { key: 'tasks', label: '售后进度', value: this.summary.tasks },
           { key: 'serviceRecords', label: '服务记录', value: this.summary.services }
         ]
-      }
-      if (this.roleProfile.isService) {
-        return [
+      } else if (this.roleProfile.isService) {
+        items = [
           { key: 'tasks', label: '待处理任务', value: this.summary.tasks },
           { key: 'customers', label: '服务客户', value: this.summary.customers },
           { key: 'serviceRecords', label: '服务记录', value: this.summary.services },
           { key: 'devices', label: '客户设备', value: this.summary.devices }
         ]
-      }
-      if (this.roleProfile.isSales) {
-        return [
+      } else if (this.roleProfile.isSales) {
+        items = [
           { key: 'customers', label: '我的客户', value: this.summary.customers },
           { key: 'orders', label: '我的订单', value: this.summary.orders },
           { key: 'serviceRecords', label: '服务记录', value: this.summary.services },
           { key: 'tasks', label: '协同任务', value: this.summary.tasks }
         ]
+      } else {
+        items = [
+          { key: 'tasks', label: '待处理任务', value: this.summary.tasks },
+          { key: 'customers', label: '全部客户', value: this.summary.customers },
+          { key: 'orders', label: '合同订单', value: this.summary.orders },
+          { key: 'devices', label: '客户设备', value: this.summary.devices }
+        ]
       }
-      return [
-        { key: 'tasks', label: '待处理任务', value: this.summary.tasks },
-        { key: 'customers', label: '全部客户', value: this.summary.customers },
-        { key: 'orders', label: '合同订单', value: this.summary.orders },
-        { key: 'devices', label: '客户设备', value: this.summary.devices }
-      ]
+      return items.filter((item) => this.isHomeEntryVisible(item.key))
     },
     visibleBusinessGroups() {
       const allowed = new Set(this.roleProfile.allowedGroupKeys || [])
@@ -218,7 +219,9 @@ export default {
     quickEntries() {
       const keys = [...this.roleProfile.primaryActions, ...quickActions]
       const unique = [...new Set(keys)].slice(0, 8)
-      const configured = unique.map((key) => ({ key, ...getBusinessEntry(key) })).filter((item) => item.title)
+      const configured = unique
+        .map((key) => ({ key, ...getBusinessEntry(key) }))
+        .filter((item) => item.title && this.isHomeEntryVisible(item.key))
       if (configured.length || !this.runtimeBusinessGroups.length) return configured
       return this.runtimeBusinessGroups.flatMap((group) => group.items || []).slice(0, 8)
     }
@@ -248,33 +251,39 @@ export default {
       this.summaryLoading = false
       this.summary = { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 }
       this.runtimeBusinessGroups = []
-      this.mapPermissionRequestId += 1
-      this.mapEntryVisibility = { deviceMap: false, customerMap: false }
+      this.businessPermissionRequestId += 1
+      this.businessEntryVisibility = {}
       return
     }
     if (this.featureEnabled('business')) this.loadSummary()
     if (this.featureEnabled('dynamicModules')) this.loadRuntimeModules()
-    this.loadMapEntryVisibility()
+    this.loadBusinessEntryVisibility()
   },
   methods: {
     featureEnabled(name) {
       return hasFeature(name)
     },
     isHomeEntryVisible(key) {
-      if (key !== 'deviceMap' && key !== 'customerMap') return true
-      return this.isLoggedIn && this.mapEntryVisibility[key] === true
+      if (!this.isLoggedIn) return true
+      return this.businessEntryVisibility[key] !== false
     },
-    async loadMapEntryVisibility(refresh = false) {
-      const requestId = ++this.mapPermissionRequestId
-      const entries = ['deviceMap', 'customerMap']
-      const checks = await Promise.all(entries.map(async (key) => {
-        try { return [key, await canOpenBusinessEntry(key, refresh)] } catch (error) { return [key, false] }
-      }))
-      if (requestId !== this.mapPermissionRequestId) return
-      this.mapEntryVisibility = checks.reduce((result, item) => {
-        result[item[0]] = item[1] === true
-        return result
-      }, { deviceMap: false, customerMap: false })
+    async loadBusinessEntryVisibility(refresh = false) {
+      const requestId = ++this.businessPermissionRequestId
+      const entries = [...new Set(this.businessGroups.flatMap((group) =>
+        (group.items || []).map((item) => item.key)
+      ))]
+      const visibility = {}
+      // 首个检查先完成菜单树加载，避免多个入口在冷启动时并发请求同一份权限数据。
+      for (let index = 0; index < entries.length; index += 1) {
+        const key = entries[index]
+        try {
+          visibility[key] = await canOpenBusinessEntry(key, refresh && index === 0)
+        } catch (error) {
+          visibility[key] = false
+        }
+      }
+      if (requestId !== this.businessPermissionRequestId) return
+      this.businessEntryVisibility = visibility
     },
     async loadBrand() {
       try {
@@ -342,7 +351,7 @@ export default {
           this.featureEnabled('business') ? this.loadSummary(true) : Promise.resolve(),
           this.loadBrand(),
           this.featureEnabled('dynamicModules') ? this.loadRuntimeModules(true) : Promise.resolve(),
-          this.loadMapEntryVisibility(true)
+          this.loadBusinessEntryVisibility(true)
         ])
       } finally {
         this.refreshing = false
