@@ -131,14 +131,19 @@ microi_chat({
 
 `microi_chat` 只暴露对话白名单参数，实际 `OsClient`、用户和 Token 来自当前 MCP 连接，HTTP 来源再由服务端归一；Tool 不接受 Endpoint、ApiKey、Authorization 或身份覆盖。它返回最终 `DosResult`，不冒充逐 token MCP 流。如果 Agent 本身需要模型协议流，使用 `/v1/chat/completions` 的 `stream:true`；平台事实写入仍调用对应 MCP 写工具并遵守确认与回读。
 
-## MiniMax 图片与音乐生成
+## AI 图片与音乐工作台
 
-`/#/mic-ai-engine` 的【自动识别】会先判断用户是在普通对话、绘图还是音乐创作，也可以手工选择【AI绘图】或【AI音乐】。这里必须区分“对话/意图模型”和“媒体生成模型”：`MiniMax-M3` 负责理解与路由，真正输出图片的是 `image-01`，真正输出纯音乐的是 `music-2.6`。不能因为当前聊天行选择了 `MiniMax-M3`，就把图片或音频伪装成文本模型原生输出。
+`/#/mic-ai-engine` 首屏直接展示 AI 对话、数据分析、AI 绘图、AI 音乐、AI 视频和模型管理，不再把媒体能力藏在“自动识别”里。AI 绘图采用简化的 Stable Diffusion 式工作台：左侧按创作、AI 编辑、人像/商品和精确处理选工具，中间只保留当前工具必需参数，右侧预览结果；手机端依次折叠为工具、参数、结果。
 
-| 能力 | 登录态入口 | 当前白名单 | 结果与页面呈现 |
+这里必须区分“对话/意图模型”和“媒体生成模型”：`MiniMax-M3` 负责理解与路由，图片由 `image-01` 生成；音乐优先请求 `music-3.0`，只有托管音乐接口明确返回 410 退役终态时才切到官方开源 `MiniMax-Music3`。不能让文本模型用说明文字冒充图片或音频。
+
+| 能力 | 登录态入口 | 当前边界 | 结果与页面呈现 |
 |---|---|---|---|
-| 图片 | `POST /api/Ai/GenerateMiniMaxImage` | `image-01`；1～4 张；比例为 `1:1`、`16:9`、`4:3`、`3:2`、`2:3`、`3:4`、`9:16` 或 `21:9` | 服务端解码并写入当前租户公有 HDFS；对话附件使用 Element Plus 图片查看器原页放大 |
-| 音乐 | `POST /api/Ai/GenerateMiniMaxMusic` | 当前仅管理员；`music-2.6`；无人声纯音乐；44.1kHz、256kbps、MP3 | 服务端校验 MP3 后写入当前租户 HDFS；对话附件使用 `<audio controls preload="metadata">` 在线播放 |
+| 生成式图片 | `POST /api/Ai/GenerateMiniMaxImage` | `image-01`；文生图及最多 4 张主体参考图；支持图生图、重绘、扩图、消除、去水印、证件照、多图合成、上色、修复、商品场景等受控工具意图 | 参考图先进入当前租户私有 HDFS，只把短时签名地址交给供应商；结果重新下载、校验并写入当前租户公有 HDFS |
+| 精确图片处理 | `POST /apiengine/platform-ai-runtime`，`Action=ProcessImage` | 黑白、纯色背景抠除、缩放、居中裁剪、旋转、翻转、格式转换和拼图；不消耗模型额度 | `V8.Image` 在服务端处理并写入当前租户公有 HDFS，返回可回读的尺寸、格式和永久地址 |
+| 音乐 | `POST /api/Ai/GenerateMiniMaxMusic` | 当前仅管理员；托管 `music-3.0` 或明确 410 后的官方开源 `MiniMax-Music3`；无人声，开源回退时长 10～60 秒 | 托管结果为 MP3，开源结果为 32kHz 立体声 WAV；两者均校验后写入当前租户公有 HDFS并用原生播放器预览 |
+
+生成式“消除、扩图、去水印、抠图”等目前是参考图 + 提示词重绘，不是像素级蒙版编辑；页面必须明确提示这一边界。要求确定像素结果时，应选择右侧标记为“精确”的 `V8.Image` 工具。
 
 图片请求示例：
 
@@ -149,12 +154,18 @@ Authorization: <当前吾码登录 Token>
 
 {
   "RequestId": "image:conversation-id:message-id",
+  "Operation": "image-to-image",
   "Prompt": "一张现代办公室团队协作的横版插画",
   "Model": "image-01",
   "AspectRatio": "16:9",
-  "Count": 1
+  "Count": 1,
+  "ReferenceImages": [
+    { "FileName": "subject.webp", "DataUrl": "data:image/webp;base64,..." }
+  ]
 }
 ```
+
+参考图只允许 JPEG、PNG、WebP，单张最多 10MiB、合计最多 24MiB。自定义尺寸必须在 512～2048 之间且为 8 的倍数。供应商临时图片地址不能直接作为最终结果返回。
 
 音乐请求示例：
 
@@ -166,7 +177,8 @@ Authorization: <当前吾码管理员登录 Token>
 {
   "RequestId": "music:conversation-id:message-id",
   "Prompt": "轻快、克制、适合产品演示的科技感纯音乐",
-  "Model": "music-2.6",
+  "Model": "music-3.0",
+  "DurationSeconds": 20,
   "IsInstrumental": true,
   "SampleRate": 44100,
   "Bitrate": 256000,
@@ -185,7 +197,7 @@ Authorization: <当前吾码管理员登录 Token>
 - 音频使用浏览器原生播放器并显示真实时长；加载失败应显示接口或媒体错误，不能只输出“已生成”。
 - AI 文本回答继续经过安全 Markdown 渲染；图片、音频、视频是结构化附件，不通过拼接 Markdown/HTML 来绕过 URL 与内容类型校验。
 
-音乐接口是否可用取决于当前服务端 Provider/中转账号是否已开通供应商音乐产品。上游返回未开通、停用或额度不足时，应原样形成可诊断失败，不得生成伪音频、重复扣减或把文本回答冒充音乐成功。
+MiniMax 已于 2026-08-20 停止向新用户提供付费 Music/Lyrics API，并停止原免费模型服务。吾码仍优先兼容已具备 `music-3.0` 权限的现有账号；仅在上游明确返回 410 时切换官方开源 `MiniMax-Music3` Space。公开 Space 有 ZeroGPU 配额，生产节点可在既有服务端 `mic_ai` 模型配置中增加 `MiniMax-Music3` 路由、固定官方 Space Endpoint，并把 Hugging Face Token 存入受保护 ApiKey 字段；不得新增前端 Key、Compose 环境变量或 API `AppSettings`。上游未开通、配额不足或停用时应返回可诊断失败，不得生成伪音频、重复扣减或把文本回答冒充音乐成功。
 
 ## MiniMax 视频生成
 

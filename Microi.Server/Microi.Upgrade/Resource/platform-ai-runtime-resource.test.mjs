@@ -32,6 +32,8 @@ function packageEngine(key) {
 async function run(action, request = {}) {
   const calls = [];
   const hooks = [];
+  const imageCalls = [];
+  const uploads = [];
   const ai = {
     UpdateConversationTitle: async (...args) => {
       calls.push(['UpdateConversationTitle', args]);
@@ -55,9 +57,30 @@ async function run(action, request = {}) {
     },
   };
   const execute = new AsyncFunction('V8', source);
+  const imageResult = value => ({
+    Code: 1,
+    Data: {
+      FileName: value.FileName || 'image.png',
+      ContentType: 'image/png',
+      FileByteBase64: 'iVBORw0KGgo=',
+      Width: 100,
+      Height: 80,
+      Size: 9,
+      Format: 'png',
+    },
+  });
+  const image = new Proxy({}, {
+    get: (_target, name) => value => {
+      imageCalls.push([String(name), value]);
+      if (name === 'GetInfo') return { Code: 1, Data: { Width: 100, Height: 80 } };
+      return imageResult(value || {});
+    },
+  });
   const result = await execute({
     Param: { ...request, Action: action },
     CurrentUser: { Id: 'trusted-user', Level: 999 },
+    OsClient: 'iTdos',
+    SysConfig: { FileServer: 'https://files.example/mci-public' },
     ApiEngine: {
       Run: (key, payload) => {
         hooks.push({ key, payload });
@@ -65,15 +88,31 @@ async function run(action, request = {}) {
       },
     },
     AI: ai,
+    Image: image,
+    Method: {
+      NewUlid: () => '01TESTAIIMAGE00000000000000',
+      Upload: payload => {
+        uploads.push(payload);
+        return {
+          Code: 1,
+          Data: [{
+            Name: Object.keys(payload.FilesByteBase64)[0],
+            Path: '/itdos/ai-images/result.png',
+            FullPath: 'https://files.example/mci-public/itdos/ai-images/result.png',
+            Size: 9,
+          }],
+        };
+      },
+    },
   });
-  return { result, calls, hooks };
+  return { result, calls, hooks, imageCalls, uploads };
 }
 
 test('platform-ai-runtime is a fixed Managed package resource', () => {
   const engine = packageEngine('platform-ai-runtime');
   assert.ok(engine);
-  assert.equal(packageModel.PackageInfo.Version, 'v7.6.1');
-  assert.equal(engine.Version, 'v1.0.0');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.6.4');
+  assert.equal(engine.Version, 'v1.1.0');
   assert.equal(engine.ApiAddress, '/apiengine/platform-ai-runtime');
   assert.equal(engine.StopHttp, 0);
   assert.equal(engine.AllowAnonymous, 0);
@@ -84,6 +123,47 @@ test('platform-ai-runtime is a fixed Managed package resource', () => {
   });
   assert.match(source, /^\/\* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1/);
   assert.match(source, /AI_RUNTIME_MANAGED_NON_STREAM_V1/);
+});
+
+test('ProcessImage only accepts in-memory images, calls the V8.Image whitelist and persists HDFS output', async () => {
+  const dataUrl = 'data:image/png;base64,iVBORw0KGgo=';
+  const execution = await run('ProcessImage', {
+    Operation: 'grayscale',
+    Images: [{ DataUrl: dataUrl }],
+    Options: { Strength: 1, OutputFormat: 'png' },
+    ApiKey: 'must-not-pass',
+    Endpoint: 'https://must-not-pass.example',
+  });
+  assert.equal(execution.result.Code, 1);
+  assert.equal(execution.result.Data.Operation, 'grayscale');
+  assert.equal(execution.result.Data.Permanent, true);
+  assert.equal(execution.calls.length, 0);
+  assert.equal(execution.imageCalls.length, 1);
+  assert.equal(execution.imageCalls[0][0], 'Grayscale');
+  assert.equal(execution.imageCalls[0][1].DataUrl, dataUrl);
+  assert.equal(execution.uploads.length, 1);
+  assert.equal(execution.uploads[0].Limit, false);
+  assert.equal(execution.uploads[0].OsClient, 'iTdos');
+  assert.deepEqual(execution.hooks, [{
+    key: 'platform-ai-custom-hook',
+    payload: {
+      SourceApiEngineKey: 'platform-ai-runtime',
+      Stage: 'Before',
+      Action: 'ProcessImage',
+    },
+  }]);
+  assert.doesNotMatch(JSON.stringify(execution.imageCalls), /must-not-pass/);
+});
+
+test('ProcessImage rejects URLs instead of fetching tenant-external content', async () => {
+  const execution = await run('ProcessImage', {
+    Operation: 'grayscale',
+    Images: [{ DataUrl: 'https://example.com/private.png' }],
+  });
+  assert.equal(execution.result.Code, 0);
+  assert.match(execution.result.Msg, /请上传/);
+  assert.equal(execution.imageCalls.length, 0);
+  assert.equal(execution.uploads.length, 0);
 });
 
 test('all non-stream actions call only V8.AI and expose a three-field safe hook envelope', async () => {
