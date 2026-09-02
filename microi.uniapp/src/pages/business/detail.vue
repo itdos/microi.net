@@ -1568,6 +1568,12 @@
 							key: 'cases',
 							field: 'KehuID',
 							value: this.detail.Id,
+							// zhy：从客户详情进入客户案例列表时，新增表单直接继承客户主键、名称和类型。
+							defaultValues: {
+								KehuID: this.detail.Id,
+								KehuMC: this.detail.KehuMC,
+								KehuLX: this.detail.KehuLX
+							},
 							icon: icon('business/anlice.png')
 						},
 						{

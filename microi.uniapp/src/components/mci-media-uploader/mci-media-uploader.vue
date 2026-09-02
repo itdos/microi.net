@@ -95,7 +95,9 @@ export default {
       const path = raw.Path || raw.FilePathName || raw.FilePath || raw.FullPath || raw.url || raw.Url || raw.src || ''
       const localPath = forceServer ? '' : (raw.localPath || '')
       const providedUrl = raw.Url || raw.FileUrl || raw.FileURL || raw.PreviewUrl || raw.PreviewURL || raw.FullUrl || ''
-      let url = localPath
+      const runtimeUrls = (this.fileContext && this.fileContext.runtimeUrls) || {}
+      const runtimeUrl = !forceServer && raw.Id ? runtimeUrls[String(raw.Id)] : ''
+      let url = localPath || runtimeUrl
       if (!url && preferProvidedUrl && providedUrl) {
         url = await V8.resolveFileUrl(providedUrl, this.fileContext)
       }
