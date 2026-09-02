@@ -9,6 +9,7 @@ import {
   customerDeviceMatches,
   resolveCustomerDeviceReference
 } from '../src/tenants/xjy/task-device-reference.mjs'
+import { taskScanProcessAccess } from '../src/tenants/xjy/task-scan-permission.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -52,4 +53,28 @@ test('售后任务页新增按钮和点击入口都有权限保护', () => {
   assert.match(source, /v-if="canAddTask" class="floating-add"/)
   assert.match(source, /if \(!this\.canAddTask\)[\s\S]*?当前账号没有新增权限/)
   assert.match(source, /menuId: this\.taskMenuId/)
+})
+
+test('扫码处理设备只放行指定角色与任务所属商家', () => {
+  const task = { TenantId: 'tenant-a' }
+  assert.equal(taskScanProcessAccess(task, {
+    Id: 'user-1',
+    TenantId: 'tenant-a',
+    RoleIds: JSON.stringify([{ Id: 'role-1', Name: '售后工程师' }])
+  }).allowed, true)
+  assert.equal(taskScanProcessAccess(task, {
+    Id: 'user-2', TenantId: 'tenant-b', RoleName: '客服主管'
+  }).allowed, false)
+  assert.equal(taskScanProcessAccess(task, {
+    Id: 'user-3', TenantId: 'tenant-a', RoleName: '销售主管'
+  }).allowed, false)
+  assert.equal(taskScanProcessAccess(task, {
+    Id: 'manager', TenantId: 'tenant-a', RoleName: '杭州总经理'
+  }).allowed, true)
+  assert.equal(taskScanProcessAccess(task, {
+    Id: 'admin', Level: 9999, RoleName: '超级管理员'
+  }).allowed, true)
+  assert.equal(taskScanProcessAccess({}, {
+    Id: 'user-4', TenantId: 'tenant-a', RoleName: '总经理'
+  }).allowed, false)
 })
