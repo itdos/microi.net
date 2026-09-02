@@ -52,7 +52,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/mqtt-engine.md` | v8-mq-mqtt | MQTT Broker、SaaS 认证、Topic ACL、V8 事件、设备路由、下行与生产部署 |
 | `system-engine/page-engine.md` | page-engine | 界面引擎 JSON |
 | `system-engine/print-engine.md` | print-engine, v8-frontend-events | 服务端模板打印与蓝牙直连边界 |
-| `system-engine/bluetooth-printer.md` | v8-frontend-events, print-engine, microi-client-frontend | GP-M322 与 CC4 双型号、TSPL/CPCL/ESC-POS、BLE/SPP、旧 V8 兼容及实机验收 |
+| `system-engine/bluetooth-printer.md` | v8-frontend-events, print-engine, microi-client-frontend, microi-microservice | GP-M322 与 CC4 双型号、TSPL/CPCL/ESC-POS、BLE/SPP、微服务平台普通打印桥、旧 V8 兼容及实机验收 |
 | `system-engine/report-engine.md` | report-engine | 虚拟报表和导出 |
 | `system-engine/saas-engine.md` | v8-saas-multi-tenant | 租户识别和 SaaS 配置 |
 | `system-engine/search-engine.md` | search-engine | Elasticsearch 索引和查询 |

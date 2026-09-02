@@ -326,7 +326,7 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
-    public void ApiStartup_DelegatesDependencyGateToUpgradeAndHostedUpgradeRepeatsIt()
+    public void ApiStartup_DelegatesDependencyGateToUpgradeAndTenantCoordinatorRepeatsIt()
     {
         var serverRoot = FindServerRoot();
         var program = File.ReadAllText(Path.Combine(serverRoot, "Microi.net.Api", "Program.cs"));
@@ -339,38 +339,38 @@ public class PlatformRuntimeUpgradeGateTests
             serverRoot,
             "Microi.Upgrade",
             "MicroiStartupGate.cs"));
-        var hosted = File.ReadAllText(Path.Combine(
+        var coordinator = File.ReadAllText(Path.Combine(
             serverRoot,
             "Microi.Upgrade",
-            "MicroiUpgradeHostedService.cs"));
+            "TenantUpgradeCoordinator.cs"));
 
         Assert.Contains("RunMicroiApiAsync", program);
         Assert.Contains("EnsureConfiguredMainTenantReadyAsync", apiHost);
         Assert.Contains("EnsureMainTenantReadyAsync(clientModel", startupGate);
         Assert.Contains("EnsureStartupDependenciesAsync(mainTenant", startupGate);
-        Assert.Contains("EnsureStartupDependenciesUnderLeaseAsync", hosted);
+        Assert.Contains("EnsureStartupDependenciesUnderLeaseAsync", coordinator);
         Assert.DoesNotContain("【自动升级状态】", program);
         Assert.Contains("【自动升级状态】", startupGate);
-        Assert.Contains("【自动升级状态】", hosted);
+        Assert.Contains("【自动升级状态】", coordinator);
     }
 
     [Fact]
-    public void HostedUpgrade_SkipsLanguageCacheReloadWhenDatabasePrerequisiteFails()
+    public void TenantCoordinator_SkipsLanguageCacheReloadUntilVersionChainSucceeds()
     {
-        var hosted = File.ReadAllText(Path.Combine(
+        var coordinator = File.ReadAllText(Path.Combine(
             FindServerRoot(),
             "Microi.Upgrade",
-            "MicroiUpgradeHostedService.cs"));
+            "TenantUpgradeCoordinator.cs"));
 
-        Assert.Contains("var upgradeExecutionReachedSafeReloadPoint = false;", hosted);
-        Assert.Contains("upgradeExecutionReachedSafeReloadPoint = true;", hosted);
-        Assert.Contains("if (!upgradeExecutionReachedSafeReloadPoint)", hosted);
-        Assert.Contains("升级执行未到达安全缓存刷新点，跳过多语言运行时缓存刷新", hosted);
+        Assert.Contains("var safeReloadPoint = false;", coordinator);
+        Assert.Contains("safeReloadPoint = result.Code == 1;", coordinator);
+        Assert.Contains("if (upgradeLease != null && !safeReloadPoint)", coordinator);
+        Assert.Contains("升级未到达安全缓存刷新点", coordinator);
 
-        var guardIndex = hosted.IndexOf("if (!upgradeExecutionReachedSafeReloadPoint)", StringComparison.Ordinal);
-        var reloadIndex = hosted.IndexOf("ReloadDiyLangCacheAsync", StringComparison.Ordinal);
-        Assert.True(guardIndex >= 0 && reloadIndex > guardIndex,
-            "The unreachable-database guard must run before the cache reload.");
+        var failureIndex = coordinator.IndexOf("if (result.Code != 1)", StringComparison.Ordinal);
+        var reloadIndex = coordinator.IndexOf("ReloadDiyLangCacheAsync", StringComparison.Ordinal);
+        Assert.True(failureIndex >= 0 && reloadIndex > failureIndex,
+            "The failed version chain must return before the cache reload.");
     }
 
     [Fact]
@@ -629,7 +629,7 @@ public class PlatformRuntimeUpgradeGateTests
 
         Assert.True(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.message-notification.json", package })));
-        Assert.Equal("v1.0.13", package["PackageInfo"]?["Version"]?.ToString());
+        Assert.Equal("v1.0.15", package["PackageInfo"]?["Version"]?.ToString());
         Assert.Equal(string.Empty, expectedHook.Invoke(
             null, new object[] { "platform-chat-system-message" }));
         Assert.Equal("platform-message-notification-custom-hook", expectedHook.Invoke(

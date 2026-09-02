@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "系统设置",
-    "Version": "v6.3.11",
+    "Version": "v6.3.12",
     "CreateTime": "2026-08-23T02:17:37.179Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -17,7 +17,7 @@
     "DataSetCount": 0,
     "DataRowCount": 0,
     "AiApplicationCount": 0,
-    "ChangeHistory": "2026-09-01 v6.3.11 在 v6.3.10 基础上补齐官方升级资源的结构化历史、客户端能力标记和日志类型；模块底部信息继续交付支持 {{ OsVersion }} 和 {{ YYYY }} 的默认模板，不携带 Sys_Config 租户数据。\n2026-08-30 v6.3.9 将 TenantSystemSettingsController 迁入 platform-tenant-system-settings；多路由统一普通 CRUD、地图运行时、Secret 保存与二次认证揭示。\n2026-08-25 v6.3.8 非敏感租户系统设置列表、保存和删除迁入 Managed V8 接口；敏感明文仍只经过可信后端。\n2026-08-23 v6.3.7 系统设置公开开关与服务端私有凭据边界完善；开发配置默认展开折叠分组，CodeEditor 使用带字数的按钮弹层模式。\n",
+    "ChangeHistory": "2026-09-02 v6.3.12 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v6.3.11 在 v6.3.10 基础上补齐官方升级资源的结构化历史、客户端能力标记和日志类型；模块底部信息继续交付支持 {{ OsVersion }} 和 {{ YYYY }} 的默认模板，不携带 Sys_Config 租户数据。\n2026-08-30 v6.3.9 将 TenantSystemSettingsController 迁入 platform-tenant-system-settings；多路由统一普通 CRUD、地图运行时、Secret 保存与二次认证揭示。\n2026-08-25 v6.3.8 非敏感租户系统设置列表、保存和删除迁入 Managed V8 接口；敏感明文仍只经过可信后端。\n2026-08-23 v6.3.7 系统设置公开开关与服务端私有凭据边界完善；开发配置默认展开折叠分组，CodeEditor 使用带字数的按钮弹层模式。\n",
     "RequiredPlatformCapabilities": [
       "ClientFeature:MenuBottomContentDefaultFooter",
       "ClientFeature:CodeEditorFieldDisplayMode",
@@ -30,11 +30,11 @@
       "V8.Method.RunPlatformApiRuntime:TenantSystemSettings"
     ],
     "ChangeLog": {
-      "Version": "v6.3.11",
-      "Title": "菜单底部动态年份安装包修订",
-      "ChangeType": "Feature",
-      "Content": "在 v6.3.10 基础上补齐官方升级资源的结构化历史、客户端能力标记和日志类型；模块底部信息继续交付支持 {{ OsVersion }} 和 {{ YYYY }} 的默认模板，不携带 Sys_Config 租户数据。",
-      "ReleaseTime": "2026-09-01 08:30:15"
+      "Version": "v6.3.12",
+      "Title": "WebOS iOS 拟物透明图标升级",
+      "ChangeType": "Optimize",
+      "Content": "将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。",
+      "ReleaseTime": "2026-09-02 12:05:00"
     },
     "Description": "吾码系统设置、租户私密配置与安全服务接入。"
   },
@@ -5744,7 +5744,7 @@
       "DisplayMac": 1,
       "AppDisplay": 1,
       "OpenType": "Diy",
-      "Icon": "{\"Id\":\"legacy_1787279393249\",\"Name\":\"microi-menu-076-1a3479bf.webp\",\"Size\":\"\",\"CreateTime\":\"\",\"Path\":\"/itdos/microi/menu-icons/20260808/202608/microi-menu-076-1a3479bf.webp\",\"State\":1}",
+      "Icon": "{\"Id\":\"legacy_1787279393249\",\"Name\":\"microi-menu-076-1a3479bf.webp\",\"Size\":\"\",\"CreateTime\":\"\",\"Path\":\"/itdos/microi/webos-icons/ios-skeuomorphic-v2/202609/settings.webp\",\"State\":1}",
       "TableDiyFieldIds": "[\"dbf90ced-ac94-416c-a80f-0ef7cfcb5e8c\",\"be5f13fd-27e3-452d-aeda-b042621b4813\",\"063d158a-53a3-43d5-bdc7-110b997b782d\",\"0eec55f6-f3d0-4fed-8c51-2b9ae5b2f084\",\"d6cd6f05-eda4-4a3c-aa44-51323b3fa125\",\"0c378bf1-1866-4b37-bd2f-6081c9db8a44\",\"6246b054-539d-45b6-8ffb-3fa159c7adc6\",\"60f2c2e7-ebb6-4f36-ab6e-c577bad5c82f\",\"34c60f89-34ab-4743-8c77-3e2b2d06b1cd\",\"68c5f735-78f8-4d6c-a709-cbf6e8d955ee\",\"e1685513-704f-43ea-bf42-f2a822982bb3\",\"59c57b2f-8b9e-4a67-8983-84254f08a29e\"]",
       "PageBtns": "[{\"Id\":\"mci-system-settings-identity-center\",\"Sort\":10,\"Name\":\"安全与服务接入\",\"Icon\":\"fas fa-shield-halved\",\"BtnStyle\":\"primary\",\"IsVisible\":true,\"ShowRow\":false,\"V8CodeShow\":\"V8.Result = parseInt((V8.CurrentUser && V8.CurrentUser.Level) || 0, 10) >= 999;\",\"V8Code\":\"V8.OpenAppDialog({\\n  AppKey: 'microi-platform-service',\\n  RoutePath: '/system-settings',\\n  Title: '租户系统设置 · 安全与服务接入',\\n  TitleIcon: 'fas fa-shield-halved',\\n  Width: '80%',\\n  BodyHeight: 'calc(100vh - 160px)',\\n  OpenType: 'Dialog',\\n  Data: { Section: 'login' },\\n  OnSuccess: function(){ V8.RefreshTable({ _PageIndex: -1 }); },\\n  OnCancel: function(){},\\n  OnError: function(error){ V8.Tips((error && error.message) || '系统设置页面加载失败', false); }\\n});\",\"_RawName\":\"安全与服务接入\"}]",
       "DiyTableId": "c8570fa6-c10f-4014-8cb4-4b046e7ba69c",

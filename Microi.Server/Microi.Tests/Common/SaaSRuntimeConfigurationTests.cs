@@ -588,27 +588,27 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
-    public void UpgradeHostedService_UsesTheHydratedRuntimeSessionInsteadOfPersistedDbConn()
+    public void TenantUpgradeCoordinator_UsesTheHydratedRuntimeSessionInsteadOfPersistedDbConn()
     {
         var root = FindRepositoryRoot();
         var source = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "MicroiUpgradeHostedService.cs"));
+            root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
 
-        Assert.Contains("if (runtimeClient.Db == null)", source);
+        Assert.Contains("if (runtimeClient?.Db == null)", source);
         Assert.DoesNotContain("OsClientModel?[\"DbConn\"]", source);
-        Assert.Contains("运行时数据库会话尚未初始化", source);
+        Assert.Contains("租户数据库会话尚未初始化", source);
     }
 
     [Fact]
-    public void UpgradeHostedService_MaintainsApplicationStreamV3SchemaBeforeVersionChain()
+    public void TenantUpgradeCoordinator_MaintainsApplicationStreamV3SchemaBeforeVersionChain()
     {
         var root = FindRepositoryRoot();
         var source = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "MicroiUpgradeHostedService.cs"));
+            root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
 
         var gateInvariantIndex = source.IndexOf("EnsureTenantGateInvariant", StringComparison.Ordinal);
         var streamSchemaInvariantIndex = source.IndexOf("EnsureApplicationStreamV3SchemaInvariant", StringComparison.Ordinal);
-        var versionChainIndex = source.IndexOf("_upgrade.Upgrade", StringComparison.Ordinal);
+        var versionChainIndex = source.IndexOf("Upgrade(beforeVersion, runtimeClient)", StringComparison.Ordinal);
 
         Assert.True(gateInvariantIndex >= 0,
             "The hosted prerequisite pass must maintain the tenant application gate schema.");
@@ -617,13 +617,13 @@ public class SaaSRuntimeConfigurationTests
         Assert.True(versionChainIndex > streamSchemaInvariantIndex,
             "Runtime application publish prerequisites must be ready before the versioned upgrade chain.");
         Assert.Matches(
-            @"RunRuntimeInvariantAsync\(runtimeClient,\s*upgradeLease,\s*""Upgrade25-应用发布租户门禁"",\s*\(\)\s*=>\s*new Upgrade25\(\)\.EnsureTenantGateInvariant",
+            @"RequiredRuntimeInvariantNames\[3\],\s*\(\)\s*=>\s*new Upgrade25\(\)\.EnsureTenantGateInvariant",
             source);
         Assert.Matches(
-            @"RunRuntimeInvariantAsync\(runtimeClient,\s*upgradeLease,\s*""Upgrade25-应用发布V3结构"",\s*\(\)\s*=>\s*new Upgrade25\(\)\.EnsureApplicationStreamV3SchemaInvariant",
+            @"RequiredRuntimeInvariantNames\[4\],\s*\(\)\s*=>\s*new Upgrade25\(\)\.EnsureApplicationStreamV3SchemaInvariant",
             source);
         Assert.Matches(
-            @"private static async Task RunRuntimeInvariantAsync[\s\S]*?upgradeLease\.ConfirmOwnership\(\);[\s\S]*?var messages = await action\(\)[\s\S]*?upgradeLease\.ConfirmOwnership\(\);",
+            @"private static async Task RunCoordinatorInvariantAsync[\s\S]*?upgradeLease\.ConfirmOwnership\(\);[\s\S]*?var messages = await action\(\)[\s\S]*?upgradeLease\.ConfirmOwnership\(\);",
             source);
     }
 

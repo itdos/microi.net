@@ -89,6 +89,15 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 
 ## Schema 检索双模式
 
+### 启动、租户与存储边界
+
+- SaaS 引擎启动时挂载 `sys_osclients` 中符合节点条件的租户运行配置到 `OsClientExtend.ClientList`；这是配置、数据库访问对象和基础设施运行态，不是 AI Schema 预热。不得根据 `ClientList` 数量声称主租户和全部子租户的表字段均已加载。
+- `AiSchemaInitializationHostedService` 只对 `GetConfigOsClient()` 返回的配置主租户执行启动预热，空值时回退默认租户；`InitializeSchemaCache` 还受在线 AI License 门禁。子租户必须在其首次 NL2SQL/NL2V8 Schema 请求中按可信 `OsClient` 惰性加载，禁止启动时无界遍历所有租户、所有表和字段。
+- 在线 AI Schema 的事实源是当前租户未删除的 `diy_table`、`diy_field` 及绑定表的 `sys_menu`，不是 `INFORMATION_SCHEMA`，也不是开发者本地 `.microi-db-schema.md`。只存在于物理数据库、未登记低代码元数据的表字段不能宣称已被在线 AI 发现。
+- 关键词索引的 Redis L2 Key 为 `Microi:{OsClient}:AiSchemaKeywordIndex:{FormEngineAuthzVersion}`，保存原始 `List<TableSchemaInfo>`，TTL 为 10 分钟；进程内 L1 保存预构建倒排索引，TTL 为 2 分钟。版本来自 `Microi:{OsClient}:FormEngineAuthz:Version`；无法读取 Redis 版本时必须回源租户数据库，不得沿用版本未知的旧索引。
+- 标准 FormEngine 元数据/权限变更必须推进版本或显式刷新。绕过 FormEngine 直接执行 SQL 可能不会立即失效，应明确提示缓存到期、重启或手动刷新边界。
+- Qdrant 只在 `EnableVectorDatabase=1` 时保存租户隔离的 Schema 向量和元数据 Payload，不能保存业务行数据、充当事实源或绕过表权限。NL2SQL 的业务结果始终在完成授权和只读 SQL 校验后实时查询当前租户数据库。
+
 ### 默认关键词模式
 
 `mic_ai.EnableVectorDatabase` 缺失、`null`、空值或 `0` 均表示关闭；只有显式启用才进入向量模式。旧数据库没有该字段时必须保持可用，不能因为读取不到开关而尝试连接历史向量配置。
@@ -173,6 +182,8 @@ MCP 提供实时事实和受控执行；关键词索引提供低依赖、确定�
 - [ ] 官方中转模型清单可在无 Token 下返回非空公开白名单，且不含 ApiKey、Endpoint；Bootstrap 失败不会被静默降级为空列表
 - [ ] 直接动态路由与 `/api/ApiEngine/Run` 兼容入口的 JSON Body 均能到达 `V8.Param`，HTTP 伪造可信字段仍被清除
 - [ ] Schema/向量/对话/配额按 `OsClient` 隔离
+- [ ] 启动期只预热配置主租户 Schema；子租户首次 AI Schema 请求可正确惰性加载，且未把 `ClientList` 挂载误报为全租户结构预热
+- [ ] Redis/Qdrant 中只有 Schema 索引和元数据，没有复制业务行数据；分析 SQL 始终查询当前租户数据库
 - [ ] `EnableVectorDatabase` 缺失、空值或 `0` 时不创建、连接、初始化、同步或搜索 Embedding/Ollama/Qdrant
 - [ ] 默认链路使用结构化大模型扩词；扩词失败时中文 2/3 字确定性回退仍能召回常见业务实体
 - [ ] 文档明确区分普通 Chat、NL2SQL Schema 双模式检索和 NL2V8 Skill + Schema 双模式检索

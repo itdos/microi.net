@@ -477,6 +477,11 @@ export default {
                 window.dispatchEvent(new CustomEvent("microi:close-global-overlays"));
                 return;
             }
+            if (type === "background-task:created") {
+                const data = payload?.data ?? payload?.Data ?? {};
+                window.dispatchEvent(new CustomEvent("microi-background-task-started", { detail: data }));
+                return;
+            }
             const handled = payload?.handled === true || payload?.Handled === true;
             const errorType = String(payload?.errorType || payload?.ErrorType || "business").toLowerCase();
             if ((type === "error" || type === "app:error") && !handled && ["load", "protocol", "runtime"].includes(errorType)) {

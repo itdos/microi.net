@@ -10,15 +10,17 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.5.4
+ * Version: v2.6.8
  * Function:
- * - 统一应用商城导入器；支持 HDFS 公私有包指针、大小与 SHA-256 校验、后台分片和包资源覆盖升级。
+ * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
  */
 
 // ==================== 参数接收与校验 ====================
 
 var Package = V8.Param.Package;  // 应用数据包
 var InstallParentSysMenuId = V8.Param.InstallParentSysMenuId;  // 安装在哪个父级系统菜单Id下
+var InstallParentSysMenuName = V8.Param.InstallParentSysMenuName;  // 安装时原子创建的新目录名称
+var InstallParentCreateUnderSysMenuId = V8.Param.InstallParentCreateUnderSysMenuId;  // 新目录创建在哪个现有菜单下
 var startupDependencyBootstrapOnlyRequested = V8.Param.StartupDependencyBootstrapOnly === true
     || String(V8.Param.StartupDependencyBootstrapOnly || '').toLowerCase() == 'true';
 
@@ -2033,6 +2035,131 @@ try {
         return System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(html));
     };
 
+    // PUBLIC_APPLICATION_ENTRY_URL_V1：公有运行文件不得持久化 OSS/S3 内网域名、
+    // 临时签名或仅有目录的地址。对象 Key 才是事实源，浏览地址统一由当前租户
+    // FileServer + 真实 Key 组成；这也让不同存储供应商的安装结果保持一致。
+    var normalizePublicApplicationObjectPath = function (value) {
+        var source = firstTextParam([value]).replace(/\\/g, '/');
+        if (/^https?:\/\//i.test(source)) source = source.replace(/^https?:\/\/[^/]+/i, '');
+        source = source.replace(/[?#][\s\S]*$/g, '');
+        return normalizeApplicationPath(source);
+    };
+
+    var buildPublicApplicationAssetUrl = function (fileServer, value) {
+        var objectPath = normalizePublicApplicationObjectPath(value);
+        var server = firstTextParam([fileServer]).replace(/\/+$/g, '');
+        if (!objectPath) return '';
+        if (!server) return /^https?:\/\//i.test(String(value || ''))
+            ? String(value).replace(/[?#][\s\S]*$/g, '')
+            : '';
+        return server + '/' + objectPath;
+    };
+
+    // STANDALONE_APPLICATION_LAUNCH_MENU_V1：Web/UniApp 包即使发布人漏选菜单，
+    // 安装后也必须至少得到一个可直接使用的入口。包内已有 Iframe 菜单时只把
+    // 发布端地址重绑到目标租户；没有时生成一个稳定 URL 身份的单菜单。生成 Id
+    // 可变化，导入器会按 URL 映射到已安装菜单，因此重装/升级不会制造重复项。
+    var ensureStandaloneApplicationLaunchMenus = function (packageModel, options) {
+        packageModel = packageModel || {};
+        options = options || {};
+        var menus = packageModel.SysMenus || [];
+        var bundles = [];
+        var plural = packageModel.ApplicationBundles || [];
+        for (var pluralIndex = 0; pluralIndex < plural.length; pluralIndex++) {
+            if (plural[pluralIndex]) bundles.push(plural[pluralIndex]);
+        }
+        var singular = packageModel.ApplicationBundle || packageModel.AiApplication || packageModel.FrontendApplication;
+        if (singular) bundles.push(singular);
+        var fileServer = firstTextParam([options.FileServer]);
+        var osClient = String(firstTextParam([options.OsClient])).toLowerCase();
+        var generated = 0;
+        var rebound = 0;
+
+        for (var bundleIndex = 0; bundleIndex < bundles.length; bundleIndex++) {
+            var bundle = bundles[bundleIndex] || {};
+            var app = bundle.Application || bundle.App || {};
+            var appType = firstTextParam([
+                bundle.ApplicationType,
+                app.ApplicationType,
+                app.AppType,
+                packageModel.PackageInfo && packageModel.PackageInfo.ApplicationType
+            ]).toLowerCase();
+            if (appType != 'web' && appType != 'uniapp') continue;
+            var appKey = firstTextParam([
+                app.AppKey,
+                app.AppId,
+                bundle.AppKey,
+                packageModel.PackageInfo && packageModel.PackageInfo.AppId
+            ]);
+            if (!appKey) continue;
+            var appName = firstTextParam([
+                app.Name,
+                app.AppName,
+                packageModel.PackageInfo && packageModel.PackageInfo.Name,
+                appKey
+            ]);
+            var sharedRuntime = bundle.SharedPublicRuntime || bundle.SharedRuntime || {};
+            var entryUrl = firstTextParam([sharedRuntime.EntryUrl]);
+            if (!entryUrl) {
+                var entryPath = normalizeApplicationPath(firstTextParam([bundle.EntryPath, app.EntryPath, 'index.html']));
+                var objectPath = normalizeApplicationPath(osClient + '/ai-app-publish/' + appKey + '/' + entryPath);
+                entryUrl = buildPublicApplicationAssetUrl(fileServer, objectPath);
+            }
+            if (!/^https?:\/\/[^?#]+$/i.test(entryUrl)) continue;
+            var launchUrl = '/iframe/' + entryUrl;
+            var appKeyLower = String(appKey).toLowerCase();
+            var iframeMenus = [];
+            var matchedMenu = null;
+            var namedParent = null;
+            for (var menuIndex = 0; menuIndex < menus.length; menuIndex++) {
+                var menu = menus[menuIndex] || {};
+                var menuUrl = String(menu.Url || '');
+                var isIframe = String(menu.OpenType || '').toLowerCase() == 'iframe'
+                    || String(menu.ComponentPath || '').toLowerCase().indexOf('/iframe') >= 0
+                    || menuUrl.toLowerCase().indexOf('/iframe/') == 0;
+                if (isIframe) {
+                    iframeMenus.push(menu);
+                    if (menuUrl.toLowerCase().indexOf(appKeyLower) >= 0) matchedMenu = menu;
+                } else if (!namedParent && String(menu.Name || '').toLowerCase() == String(appName).toLowerCase()) {
+                    namedParent = menu;
+                }
+            }
+            if (!matchedMenu && bundles.length == 1 && iframeMenus.length == 1) matchedMenu = iframeMenus[0];
+            if (matchedMenu) {
+                if (matchedMenu.Url != launchUrl) {
+                    matchedMenu.Url = launchUrl;
+                    rebound++;
+                }
+                matchedMenu.OpenType = 'Iframe';
+                matchedMenu.ComponentPath = '/form-engine/diy-components/iframe';
+                continue;
+            }
+
+            var newId = options.NewId ? String(options.NewId()) : '';
+            if (!newId) continue;
+            menus.push({
+                Id: newId,
+                Name: namedParent ? '在线使用' : appName,
+                ParentId: namedParent && namedParent.Id
+                    ? namedParent.Id
+                    : (firstTextParam([options.InstallParentSysMenuId]) || null),
+                Url: launchUrl,
+                OpenType: 'Iframe',
+                ComponentPath: '/form-engine/diy-components/iframe',
+                ComponentName: '{}',
+                DiyTableId: '',
+                Display: 1,
+                AppDisplay: 1,
+                Sort: 0,
+                Icon: 'fa fa-rocket',
+                IsDeleted: 0
+            });
+            generated++;
+        }
+        packageModel.SysMenus = menus;
+        return { Generated: generated, Rebound: rebound };
+    };
+
     var getUploadedHdfsPath = function (uploadResult) {
         var data = uploadResult && uploadResult.Data ? uploadResult.Data : {};
         if (data && data.length && data[0]) data = data[0];
@@ -2046,7 +2173,108 @@ try {
         return Math.max(0, Math.floor(text.length * 3 / 4) - padding);
     };
 
-    var uploadApplicationAsset = function (rootPath, file, limit) {
+    // APPLICATION_FILE_SHA256_V2：运行文件 Hash 的口径必须是 Base64 解码后的
+    // 原始字节，而不是 Base64 文本本身。部分存量服务器虽然允许 System.Convert，
+    // 却没有向 Jint 暴露 System.Security.Cryptography.SHA256；这里用兼容 ES5 的
+    // SHA-256 实现处理真实 byte[]，避免安装包反过来要求目标端先升级框架。
+    var applicationFileSha256Bytes = function (bytes) {
+        var byteLength = Number(bytes && bytes.Length !== undefined ? bytes.Length : (bytes ? bytes.length : 0));
+        var totalLength = Math.floor((byteLength + 72) / 64) * 64;
+        var bitLengthHigh = Math.floor(byteLength / 0x20000000) >>> 0;
+        var bitLengthLow = (byteLength * 8) >>> 0;
+        var constants = [
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        ];
+        var hash = [
+            0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+            0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+        ];
+        var words = new Array(64);
+        var rotateRight = function (value, amount) {
+            return (value >>> amount) | (value << (32 - amount));
+        };
+        var paddedByte = function (index) {
+            if (index < byteLength) return Number(bytes[index]) & 255;
+            if (index == byteLength) return 0x80;
+            if (index < totalLength - 8) return 0;
+            var trailerIndex = index - (totalLength - 8);
+            if (trailerIndex < 4) return (bitLengthHigh >>> ((3 - trailerIndex) * 8)) & 255;
+            return (bitLengthLow >>> ((7 - trailerIndex) * 8)) & 255;
+        };
+
+        for (var blockOffset = 0; blockOffset < totalLength; blockOffset += 64) {
+            for (var wordIndex = 0; wordIndex < 16; wordIndex++) {
+                var byteOffset = blockOffset + wordIndex * 4;
+                words[wordIndex] = (
+                    (paddedByte(byteOffset) << 24)
+                    | (paddedByte(byteOffset + 1) << 16)
+                    | (paddedByte(byteOffset + 2) << 8)
+                    | paddedByte(byteOffset + 3)
+                ) | 0;
+            }
+            for (var expandIndex = 16; expandIndex < 64; expandIndex++) {
+                var word15 = words[expandIndex - 15];
+                var word2 = words[expandIndex - 2];
+                var sigma0 = rotateRight(word15, 7) ^ rotateRight(word15, 18) ^ (word15 >>> 3);
+                var sigma1 = rotateRight(word2, 17) ^ rotateRight(word2, 19) ^ (word2 >>> 10);
+                words[expandIndex] = (words[expandIndex - 16] + sigma0 + words[expandIndex - 7] + sigma1) | 0;
+            }
+
+            var a = hash[0] | 0;
+            var b = hash[1] | 0;
+            var c = hash[2] | 0;
+            var d = hash[3] | 0;
+            var e = hash[4] | 0;
+            var f = hash[5] | 0;
+            var g = hash[6] | 0;
+            var h = hash[7] | 0;
+            for (var roundIndex = 0; roundIndex < 64; roundIndex++) {
+                var bigSigma1 = rotateRight(e, 6) ^ rotateRight(e, 11) ^ rotateRight(e, 25);
+                var choose = (e & f) ^ ((~e) & g);
+                var temp1 = (h + bigSigma1 + choose + constants[roundIndex] + words[roundIndex]) | 0;
+                var bigSigma0 = rotateRight(a, 2) ^ rotateRight(a, 13) ^ rotateRight(a, 22);
+                var majority = (a & b) ^ (a & c) ^ (b & c);
+                var temp2 = (bigSigma0 + majority) | 0;
+                h = g;
+                g = f;
+                f = e;
+                e = (d + temp1) | 0;
+                d = c;
+                c = b;
+                b = a;
+                a = (temp1 + temp2) | 0;
+            }
+            hash[0] = (hash[0] + a) | 0;
+            hash[1] = (hash[1] + b) | 0;
+            hash[2] = (hash[2] + c) | 0;
+            hash[3] = (hash[3] + d) | 0;
+            hash[4] = (hash[4] + e) | 0;
+            hash[5] = (hash[5] + f) | 0;
+            hash[6] = (hash[6] + g) | 0;
+            hash[7] = (hash[7] + h) | 0;
+        }
+
+        var result = '';
+        for (var hashIndex = 0; hashIndex < hash.length; hashIndex++) {
+            var hex = (hash[hashIndex] >>> 0).toString(16);
+            result += ('00000000' + hex).substring(hex.length);
+        }
+        return result;
+    };
+    var applicationFileSha256Base64 = function (value) {
+        var normalizedBase64 = String(value || '').replace(/^data:[^,]*,/, '').replace(/\s+/g, '');
+        var bytes = System.Convert.FromBase64String(normalizedBase64);
+        return applicationFileSha256Bytes(bytes);
+    };
+
+    var uploadApplicationAsset = function (rootPath, file, limit, rewriteRuntimeContext) {
         var relativePath = normalizeApplicationPath(file.Path || file.FilePath || file.RelativePath || file.FileName);
         if (!relativePath) throw new Error('应用资产路径不能为空');
         var base64 = firstTextParam([file.FileByteBase64, file.ContentBase64, file.Base64]);
@@ -2055,7 +2283,12 @@ try {
         }
         if (!base64) throw new Error('应用资产缺少文件内容：' + relativePath);
         var originalBase64 = base64;
-        base64 = rewriteApplicationRuntimeContext(rootPath, relativePath, base64);
+        // 源码必须逐字节保真。只有真正的运行产物才注入目标租户上下文；
+        // 否则源码 index.html 的包内摘要与落库摘要永远不同，后台分片会
+        // 在同一个 AssetIndex 上反复上传，无法完成断点续装。
+        if (rewriteRuntimeContext !== false) {
+            base64 = rewriteApplicationRuntimeContext(rootPath, relativePath, base64);
+        }
         var runtimeContextChanged = base64 !== originalBase64;
         var dir = applicationFileDir(relativePath);
         var files = {};
@@ -2096,9 +2329,7 @@ try {
             : base64DecodedSize(base64);
         var actualHash = !runtimeContextChanged && packagedHash
             ? packagedHash
-            : (V8.EncryptHelper && V8.EncryptHelper.Sha256Hex
-                ? String(V8.EncryptHelper.Sha256Hex(base64)).toLowerCase()
-                : packagedHash);
+            : applicationFileSha256Base64(base64);
         return { Path: relativePath, HdfsPath: hdfsPath, FilePathName: hdfsPath, Size: actualSize, Hash: actualHash };
     };
 
@@ -2283,6 +2514,45 @@ try {
         return value;
     };
 
+    // APPLICATION_ARCHIVE_PATH_NORMALIZATION_V1：ZIP 允许重复文件名，而应用源码表
+    // 以 AppId + FilePath 为唯一业务身份。若逐条安装同一路径的不同历史正文，后台
+    // 分片会在两个摘要之间来回覆盖，永远无法越过该索引。这里按常规解压语义保留
+    // 最后一个同名条目；同时忽略旧发布器误装入源码 ZIP 的 upload/* 发布历史。
+    var normalizeApplicationArchiveFiles = function (files, assetKind) {
+        var normalizedFiles = [];
+        var indexByPath = {};
+        var duplicateCount = 0;
+        var sourceHistoryCount = 0;
+        var input = files && files.length !== undefined ? files : [];
+        for (var archiveIndex = 0; archiveIndex < input.length; archiveIndex++) {
+            var archiveFile = input[archiveIndex] || {};
+            var archivePath = normalizeApplicationPath(
+                archiveFile.Path || archiveFile.FilePath || archiveFile.RelativePath || archiveFile.FileName
+            );
+            if (!archivePath) throw new Error((assetKind == 'Source' ? '源码' : '编译') + ' ZIP 包含空文件路径');
+            var archivePathLower = archivePath.toLowerCase();
+            if (assetKind == 'Source' && archivePathLower.indexOf('upload/') == 0) {
+                sourceHistoryCount++;
+                continue;
+            }
+            var archiveIdentity = 'path:' + archivePathLower;
+            if (indexByPath[archiveIdentity] !== undefined) {
+                normalizedFiles[indexByPath[archiveIdentity]] = archiveFile;
+                duplicateCount++;
+            } else {
+                indexByPath[archiveIdentity] = normalizedFiles.length;
+                normalizedFiles.push(archiveFile);
+            }
+        }
+        if (duplicateCount > 0) {
+            stats.ApplicationDuplicateAssetPathsCollapsed = Number(stats.ApplicationDuplicateAssetPathsCollapsed || 0) + duplicateCount;
+        }
+        if (sourceHistoryCount > 0) {
+            stats.ApplicationSourceHistoryFilesSkipped = Number(stats.ApplicationSourceHistoryFilesSkipped || 0) + sourceHistoryCount;
+        }
+        return normalizedFiles;
+    };
+
     var installApplicationBundle = function (bundle, bundleIndex) {
         if (!bundle) return;
 
@@ -2347,6 +2617,7 @@ try {
         var sourceFiles = embeddedSourceFiles && embeddedSourceFiles.length !== undefined && embeddedSourceFiles.length
             ? embeddedSourceFiles
             : (packageAssets && packageAssets.SourceZip ? downloadApplicationZip(packageAssets.SourceZip, '源码') : []);
+        sourceFiles = normalizeApplicationArchiveFiles(sourceFiles, 'Source');
         var sourceExpected = bundle.IncludeSource === true || bundle.IncludeSource === 1
             || String(bundle.IncludeSource || '').toLowerCase() == 'true'
             || Package.PackageInfo.IncludeSource === true || Package.PackageInfo.IncludeSource === 1
@@ -2369,7 +2640,7 @@ try {
                 if (shouldContinueApplicationAssets(sourceFile)) {
                     return buildApplicationAssetContinuation(bundleIndex, 'Source', i, totalBundleAssets);
                 }
-                sourceUpload = uploadApplicationAsset(sourceRoot, sourceFile, true);
+                sourceUpload = uploadApplicationAsset(sourceRoot, sourceFile, true, false);
                 markApplicationAssetUploaded(sourceFile);
             }
             uploadedSource.push(sourceUpload);
@@ -2398,7 +2669,19 @@ try {
             stats.ApplicationSourceFiles++;
         }
 
-        var versionNo = firstTextParam([bundle.VersionNo, app.BuildVersion, Package.PackageInfo.Version, 'v1.0.0']);
+        // PACKAGE_RUNTIME_VERSION_SEPARATION_V1：商城发行版可以只更新菜单、说明或
+        // 声明式资源并继续复用已经验签的运行时。sys_microistore.AppVersion 表示
+        // 本次安装包版本，用于商城更新状态；mci_ai_app_version.VersionNo 继续表示
+        // 实际运行时版本。两者只有在重新构建应用时才必然相同。
+        var packageVersionNo = firstTextParam([
+            Package.PackageInfo.Version,
+            Package.PackageInfo.AppVersion,
+            V8.Param.AppVersion,
+            bundle.VersionNo,
+            app.BuildVersion,
+            'v1.0.0'
+        ]);
+        var versionNo = firstTextParam([bundle.VersionNo, app.BuildVersion, packageVersionNo, 'v1.0.0']);
         if (versionNo.charAt(0).toLowerCase() != 'v') versionNo = 'v' + versionNo;
         var sharedEntryUrl = sharedPublicBuild ? firstTextParam([sharedRuntime.EntryUrl]) : '';
         var sharedBaseUrl = sharedPublicBuild ? firstTextParam([sharedRuntime.BaseUrl]) : '';
@@ -2429,6 +2712,7 @@ try {
             : (embeddedBuildAssets && embeddedBuildAssets.length !== undefined && embeddedBuildAssets.length
             ? embeddedBuildAssets
             : (packageAssets && packageAssets.BuildZip ? downloadApplicationZip(packageAssets.BuildZip, '编译') : []));
+        buildAssets = normalizeApplicationArchiveFiles(buildAssets, 'Build');
         if (databaseOnlyBuild) {
             if (appType != 'MicroService' || !inlineRuntimeBuild) {
                 throw new Error('AssetStoragePolicy.Build=DatabaseOnly 仅支持 StorageMode=db 的 MicroService。');
@@ -2546,8 +2830,8 @@ try {
                 }
                 var databaseRuntimeChanged = runtimeBuildBase64 != packagedBuildBase64;
                 var databaseBuildHash = firstTextParam([buildFile.Sha256, buildFile.Hash, buildFile.ContentHash]).toLowerCase();
-                if (databaseRuntimeChanged && V8.EncryptHelper && V8.EncryptHelper.Sha256Hex) {
-                    databaseBuildHash = String(V8.EncryptHelper.Sha256Hex(runtimeBuildBase64)).toLowerCase();
+                if (databaseRuntimeChanged || !databaseBuildHash) {
+                    databaseBuildHash = applicationFileSha256Base64(runtimeBuildBase64);
                 }
                 buildUpload = {
                     Path: buildRelativePath,
@@ -2659,18 +2943,25 @@ try {
             }
         }
         if (!entryHdfsPath && uploadedBuild.length) entryHdfsPath = uploadedBuild[0].HdfsPath;
-        var previewUrl = entryHdfsPath;
+        var previewUrl = useSharedPublicBuild
+            ? sharedEntryUrl
+            : buildPublicApplicationAssetUrl(V8.SysConfig && V8.SysConfig.FileServer, entryHdfsPath);
         if (useDatabaseOnlyBuild && inlineRuntimeBuild) {
             previewUrl = '/micro-app/' + encodeURIComponent(String(V8.OsClient || ''))
                 + '/' + encodeURIComponent(appKey) + '/index.html';
         }
-        if (entryHdfsPath && !/^https?:\/\//i.test(entryHdfsPath) && V8.Method.GetPrivateFileUrl) {
+        if (!previewUrl && entryHdfsPath && !/^https?:\/\//i.test(entryHdfsPath) && V8.Method.GetPrivateFileUrl) {
             var urlResult = V8.Method.GetPrivateFileUrl({ OsClient: V8.OsClient, FilePathName: entryHdfsPath, Limit: false });
             if (urlResult && urlResult.Code == 1) {
                 var urlData = urlResult.Data || {};
                 previewUrl = typeof urlData == 'string' ? urlData : firstTextParam([urlData.Url, urlData.url, urlData.FileUrl, urlData.Path, entryHdfsPath]);
             }
         }
+        var installedPublicPublishPath = useSharedPublicBuild
+            ? firstTextParam([sharedBaseUrl, sharedEntryUrl])
+            : (useDatabaseOnlyBuild
+                ? buildRoot
+                : (applicationFileDir(normalizePublicApplicationObjectPath(entryHdfsPath)) || buildRoot) + '/');
 
         var appRow = {
             Id: appId,
@@ -2691,11 +2982,11 @@ try {
             Status: uploadedBuild.length ? 'Published' : 'Draft',
             BuildStatus: uploadedBuild.length ? 'Success' : 'Changed',
             CurrentVersion: parseInt(app.CurrentVersion || 1, 10) || 1,
-            AppVersion: versionNo,
+            AppVersion: packageVersionNo,
             IsApprove: uploadedBuild.length ? 1 : 0,
             PreviewUrl: previewUrl,
             PrivateSourcePath: uploadedSource.length ? sourceRoot : firstTextParam([existingApp && existingApp.PrivateSourcePath, app.PrivateSourcePath]),
-            PublicPublishPath: useSharedPublicBuild ? firstTextParam([sharedBaseUrl, sharedEntryUrl]) : buildRoot
+            PublicPublishPath: installedPublicPublishPath
         };
         var appResult = upsertApplicationRow('sys_microistore', [['AppKey', '=', appKey]], appRow);
         if (!appResult || appResult.Code != 1) throw new Error('写入统一应用商城失败：' + ((appResult && appResult.Msg) || ''));
@@ -2718,7 +3009,7 @@ try {
                 VersionNo: versionNo,
                 VersionName: versionNo,
                 Status: 'Published',
-                PublishPath: useSharedPublicBuild ? firstTextParam([sharedBaseUrl, sharedEntryUrl]) : buildRoot,
+                PublishPath: installedPublicPublishPath,
                 PreviewUrl: previewUrl,
                 BuildLog: '',
                 ChangeSummary: '从应用商城安装',
@@ -2834,6 +3125,10 @@ try {
                         installedRuntimeAsset.Sha256,
                         installedRuntimeAsset.ContentHash
                     ]).toLowerCase();
+                    var installedRuntimeContentHash = applicationFileSha256Base64(installedRuntimeBase64);
+                    if (!installedRuntimeHash || installedRuntimeContentHash != installedRuntimeHash) {
+                        throw new Error('数据库内置微服务写后回读字节摘要不一致：' + expectedRuntimePath);
+                    }
                     if (expectedRuntimeHash && installedRuntimeHash != expectedRuntimeHash) {
                         throw new Error('数据库内置微服务写后回读摘要不一致：' + expectedRuntimePath);
                     }
@@ -5911,6 +6206,114 @@ try {
     reportProgress(70, '正在导入菜单和按钮配置');
     debugLog.step3 = '开始处理sys_menu数据';
 
+    // MARKETPLACE_INSTALL_PARENT_MENU_V1：安装任务支持选择现有目录、根目录，或在
+    // 本次事务内新建一个目录后再挂载包内根菜单。选择项必须是目标租户中真实存在
+    // 的活动菜单，且不能指向包自身菜单，避免悬空 ParentId 或自环。新目录使用稳定
+    // ModuleEngineKey 幂等复用；权限在下方 ADMIN_MENU_PERMISSION_V1 中同事务补齐。
+    var installContainerMenuModel = null;
+    var installContainerNeedsPermission = false;
+    var installParentName = String(InstallParentSysMenuName || '').replace(/^\s+|\s+$/g, '');
+    var installCreateUnderId = String(InstallParentCreateUnderSysMenuId || '').replace(/^\s+|\s+$/g, '');
+    InstallParentSysMenuId = String(InstallParentSysMenuId || '').replace(/^\s+|\s+$/g, '');
+    var isRootMenuId = function (value) {
+        var normalized = String(value || '').replace(/^\s+|\s+$/g, '');
+        return !normalized
+            || normalized == '00000000000000000000000000'
+            || normalized == '00000000-0000-0000-0000-000000000000';
+    };
+    var packageOwnsMenuId = function (menuId) {
+        var packageMenus = Package.SysMenus || [];
+        for (var packageMenuIndex = 0; packageMenuIndex < packageMenus.length; packageMenuIndex++) {
+            if (String((packageMenus[packageMenuIndex] || {}).Id || '') == String(menuId || '')) return true;
+        }
+        return false;
+    };
+    var requireExistingInstallParent = function (menuId, label) {
+        if (isRootMenuId(menuId)) return null;
+        if (packageOwnsMenuId(menuId)) throw new Error(label + '不能选择本应用包自身菜单，避免形成父级环');
+        var result = V8.FormEngine.GetFormData('sys_menu', {
+            Id: menuId,
+            _SelectFields: ['Id', 'Name', 'ParentId', 'IsDeleted']
+        });
+        if (!result || result.Code != 1 || !result.Data || Number(result.Data.IsDeleted || 0) == 1) {
+            throw new Error(label + '不存在、已删除或无权访问：' + menuId);
+        }
+        return result.Data;
+    };
+    if (installParentName) {
+        if (InstallParentSysMenuId) throw new Error('新建安装目录与选择现有安装目录不能同时提交');
+        if (installParentName.length > 80 || /[\x00-\x1f\x7f]/.test(installParentName)) {
+            throw new Error('新建安装目录名称不能为空、不能超过80个字符且不能包含控制字符');
+        }
+        requireExistingInstallParent(installCreateUnderId, '新目录的上级菜单');
+        var installContainerKeySeed = String(V8.OsClient || '').toLowerCase()
+            + '|' + String(installCreateUnderId || 'root').toLowerCase()
+            + '|' + installParentName.toLowerCase();
+        // sys_menu.ModuleEngineKey 的历史物理契约是 varchar(50)。旧前缀
+        // marketplace-folder- 与 32 位 MD5 拼接后为 51 字符，会让部分目标租户
+        // 在创建安装目录时事务回滚。固定使用 14 字符前缀，总长保持 46。
+        var installContainerModuleKey = 'market-folder-'
+            + String(V8.EncryptHelper.MD5Encrypt(installContainerKeySeed)).toLowerCase();
+        if (installContainerModuleKey.length > 50) {
+            throw new Error('新建安装目录稳定键超过 sys_menu.ModuleEngineKey 的50字符上限');
+        }
+        var existingContainerResult = V8.FormEngine.GetFormData('sys_menu', {
+            _Where: [['ModuleEngineKey', '=', installContainerModuleKey]],
+            _SelectFields: ['Id', 'Name', 'ParentId', 'ModuleEngineKey', 'IsDeleted'],
+            _PageSize: 1
+        });
+        if (existingContainerResult && existingContainerResult.Code == 1 && existingContainerResult.Data
+            && Number(existingContainerResult.Data.IsDeleted || 0) != 1) {
+            installContainerMenuModel = existingContainerResult.Data;
+            InstallParentSysMenuId = installContainerMenuModel.Id;
+            debugLog.install_parent_menu = '复用目录：' + installParentName + '（' + InstallParentSysMenuId + '）';
+        } else {
+            var installContainerId = V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid();
+            installContainerMenuModel = {
+                Id: installContainerId,
+                Name: installParentName,
+                ParentId: isRootMenuId(installCreateUnderId) ? '00000000000000000000000000' : installCreateUnderId,
+                ModuleEngineKey: installContainerModuleKey,
+                OpenType: 'SecondMenu',
+                Url: '',
+                ComponentPath: '',
+                ComponentName: '{}',
+                DiyTableId: '',
+                Display: 1,
+                AppDisplay: 1,
+                Sort: 0,
+                Icon: 'fa fa-folder-open',
+                IsDeleted: 0
+            };
+            var addInstallContainerResult = runWriteWithRetry(function () {
+                return V8.FormEngine.AddFormData('sys_menu', installContainerMenuModel);
+            }, 'install_parent_menu_add_' + installContainerId);
+            if (!addInstallContainerResult || addInstallContainerResult.Code != 1) {
+                throw new Error('新建安装目录失败：' + ((addInstallContainerResult && addInstallContainerResult.Msg) || '接口无返回'));
+            }
+            InstallParentSysMenuId = installContainerId;
+            installContainerNeedsPermission = true;
+            stats.MenuInserted++;
+            debugLog.install_parent_menu = '新建目录：' + installParentName + '（' + InstallParentSysMenuId + '）';
+        }
+    } else if (InstallParentSysMenuId) {
+        requireExistingInstallParent(InstallParentSysMenuId, '安装目标父菜单');
+    }
+
+    var standaloneLaunchMenuResult = ensureStandaloneApplicationLaunchMenus(Package, {
+        OsClient: V8.OsClient,
+        FileServer: V8.SysConfig && V8.SysConfig.FileServer,
+        InstallParentSysMenuId: InstallParentSysMenuId,
+        NewId: function () {
+            return V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid();
+        }
+    });
+    if (standaloneLaunchMenuResult.Generated || standaloneLaunchMenuResult.Rebound) {
+        debugLog.standalone_application_launch_menu = '新增'
+            + standaloneLaunchMenuResult.Generated + '个，目标租户地址重绑'
+            + standaloneLaunchMenuResult.Rebound + '个';
+    }
+
     var sysMenus = Package.SysMenus || [];
     var packageAppIdLower = firstTextParam([
         V8.Param.AppId,
@@ -6297,6 +6700,9 @@ try {
         invalidateAdministratorRoleLimitAuthorizationCache();
     };
     // ADMIN_MENU_PERMISSION_V1_END
+    if (installContainerNeedsPermission && installContainerMenuModel) {
+        grantAdministratorPermissionsForNewMenu(installContainerMenuModel);
+    }
     var syncLegacyMenuDiyConfig = function (model, existingDiyConfig, label) {
         var config = {};
         // 先保留目标库中仅旧版使用的未知配置，再合并包内显式配置。

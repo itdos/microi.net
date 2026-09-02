@@ -221,6 +221,52 @@ window.addEventListener('appstate-change', function (event) {
 子应用通过模板 SDK 调用接口，不自行发明认证协议。关闭/结果使用宿主约定的
 success、cancel、error/close 事件；业务写入成功后再报告 success。
 
+## 微服务调用平台普通打印
+
+菜单微服务需要增加“普通打印”时，使用 `microi.host.v1` 的 `openPlatformPrint` 动作打开
+吾码 Print Engine 预览。不要跨 iframe 调 `window.parent.V8`、Vue 实例或打印组件，也不要
+把平台打印弹窗复制进每个子应用。
+
+```javascript
+function openPlatformPrint(printId, businessId) {
+  const host = window.microApp?.getData?.() || {};
+  const capabilities = host.hostCapabilities;
+  if (capabilities?.protocol !== 'microi.host.v1'
+      || !capabilities?.actions?.includes('openPlatformPrint')) {
+    throw new Error('当前吾码宿主不支持平台普通打印');
+  }
+
+  const dataApi = new URL('/apiengine/get-print-data', host.apiBase);
+  dataApi.searchParams.set('OsClient', host.osClient);
+  dataApi.searchParams.set('Id', businessId);
+  const requestId = `print-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  window.microApp.dispatch({
+    type: capabilities.requestType || 'micro-app:host-action',
+    action: 'openPlatformPrint',
+    requestId,
+    data: {
+      printId, // mic_print.Id
+      dataApi: dataApi.toString(),
+      title: '普通打印'
+    }
+  });
+  return requestId;
+}
+```
+
+参数与失败语义：
+
+- `printId` 只接受 1～128 位字母、数字、下划线或连字符，对应当前租户可读的
+  `mic_print.Id`。
+- `dataApi` 必须是绝对 HTTP(S) 地址，与宿主当前 `apiBase` 同源，路径以
+  `/apiengine/` 开头，并明确携带大小写不敏感匹配的 `OsClient`；禁止 URL 凭据和片段。
+- 宿主通过 `micro-app:host-action-result` 回传同一个 `requestId`。成功数据
+  `{ accepted:true, printId }` 只说明预览弹层已打开，不证明浏览器打印或物理出纸。
+- 独立运行没有 `hostCapabilities`；应隐藏/禁用按钮或使用应用自己的独立预览方案。
+- 该动作不是蓝牙代理。平台前端 V8 的 TSPL/CPCL/ESC-POS 与 BLE/SPP 继续使用
+  `V8.Print`，不能把原生命令字节传给 `openPlatformPrint`。
+
 ## 版本与回滚
 
 - 每个发布版本保存入口、文件清单、哈希和页面清单。

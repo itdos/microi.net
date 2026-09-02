@@ -34,7 +34,6 @@ Generic reference catalog. Load it only to understand common platform tables; ne
 | `eban` | 5 | EBAN |
 | `mci_mqtt_client` | 5 | MQTT客户端 |
 | `mci_mqtt_log` | 4 | MQTT记录 |
-| `mic_3d_engine` | 0 | 3D引擎 |
 | `mic_ai` | 19 | AI模型管理 |
 | `mic_ai_record` | 5 | mic_ai_record |
 | `mic_data_dashboard` | 5 | 数据大屏 |
@@ -573,13 +572,6 @@ Generic reference catalog. Load it only to understand common platform tables; ne
 | `ClientId` | ClientId | `varchar(36)` | `Guid` | ClientId |
 | `Type` | 类型 | `varchar(50)` | `Radio` | 类型 |
 | `MqttClientId` | MqttClientId | `varchar(36)` | `Guid` | MqttClientId |
-
-### `mic_3d_engine` - 3D引擎
-
-字段数：0
-
-| 字段 | 标签 | 类型 | 控件 | 说明 |
-|---|---|---|---|---|
 
 ### `mic_ai` - AI模型管理
 

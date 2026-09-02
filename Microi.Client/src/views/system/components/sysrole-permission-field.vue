@@ -201,6 +201,29 @@ export default {
             }
             return value;
         },
+        rolePermissionMenuParam() {
+            return {
+                _SelectFields: [
+                    "Id", "Name", "IconClass", "ParentId", "Sort", "MoreBtns", "FormBtns",
+                    "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs"
+                ],
+                _All: true
+            };
+        },
+        async requestRolePermissionMenus() {
+            const param = this.rolePermissionMenuParam();
+            let result = await this.DiyCommon.PostAsync(
+                this.DiyApi.GetRolePermissionTree(),
+                param
+            );
+            // 滚动升级时可能先加载新版前端、后安装新版 Managed 接口，或反之。
+            // 只在动作确实不受支持时回退，认证、权限与网络错误继续失败关闭。
+            if (Number(result?.Code) !== 1
+                && /不支持的菜单动作|unsupported menu action/i.test(String(result?.Msg || ""))) {
+                result = await this.DiyCommon.PostAsync(this.DiyApi.GetSysMenuStep(), param);
+            }
+            return result;
+        },
         async loadPermissions() {
             const roleId = String(this.FormData?.Id || "");
             if (this.loading && this.loadedRoleId === roleId) {
@@ -216,17 +239,7 @@ export default {
             this.loadedRoleId = roleId;
             try {
                 const requests = [
-                    this.DiyCommon.PostAsync(this.DiyApi.GetDiyTableRowTree, {
-                        TableName: "Sys_Menu",
-                        _SelectFields: [
-                            "Id", "Name", "IconClass", "ParentId", "Sort", "MoreBtns", "FormBtns",
-                            "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs"
-                        ],
-                        _OrderBy: "Sort",
-                        _OrderByType: "ASC",
-                        _All: true,
-                        _TreeLazy: 0
-                    })
+                    this.requestRolePermissionMenus()
                 ];
                 if (roleId) {
                     requests.push(this.DiyCommon.FormEngine.GetTableData("sys_rolelimit", {

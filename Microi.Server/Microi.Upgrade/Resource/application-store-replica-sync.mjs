@@ -255,6 +255,13 @@ async function reconcileReplicaPair(resourceName, sideName, baseSource, standalo
   if (standaloneSource == null) {
     throw new Error(`${sideName}${resourceName} 独立源码不存在，不能与应用商城内嵌副本合并`);
   }
+  // 显式按官网回读修复共同基线后，独立官方源码可能已经是较新版本，而
+  // 本地候选包仍携带修复前的旧内嵌副本。此时独立源码与共同基线完全一致，
+  // 且内嵌版本更低，属于可证明的陈旧副本，不能反向覆盖官方事实源。
+  if (normalizeText(standaloneSource) === normalizeText(baseSource)
+      && compareSemanticVersions(engineVersion(embeddedSource), engineVersion(standaloneSource)) < 0) {
+    return normalizeText(standaloneSource);
+  }
   try {
     // 同一侧以独立源码为首选事实源；只有代码正文不同才执行真正的 JS 三方合并。
     return await mergeEngineSources(resourceName, baseSource, standaloneSource, embeddedSource, false);

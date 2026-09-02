@@ -139,15 +139,39 @@ test("official platform notices include missing and outdated applications withou
     );
 
     assert.deepEqual(JSON.parse(JSON.stringify(context.result)), [true, true, false, false]);
-    assert.match(listSource, /Version:\s*v1\.4\.8/);
+    assert.match(listSource, /Version:\s*v1\.4\.9/);
     assert.match(listSource, /StoreInstallStatus !== "Uninstalled"\) installedCount\+\+/);
     assert.match(listSource, /isPlatformMaintenanceNotice\(item\.StoreInstallStatus\)\) notices\.push/);
     assert.match(bulkSource, /status != 'Uninstalled' && status != 'Outdated'/);
     assert.match(bulkSource, /InstallAction:\s*status == 'Outdated'/);
 });
 
+test("marketplace preview resolves the installed public entry and strips private signatures", () => {
+    const context = {
+        V8: { SysConfig: { FileServer: "https://static.jifulii.com/" } },
+    };
+    vm.runInNewContext(`
+        ${extractNamedFunction(listSource, "text")}
+        ${extractNamedFunction(listSource, "trim")}
+        ${extractNamedFunction(listSource, "publicUrl")}
+        result = publicUrl;
+    `, context);
+
+    assert.equal(
+        context.result(
+            "ai-app-publish/typing-sprint/versions/v1.0.7",
+            "https://microi-public.oss-cn-hangzhou-internal.aliyuncs.com/xjy/ai-app-publish/typing-sprint/index.html?Expires=1&Signature=x",
+        ),
+        "https://static.jifulii.com/xjy/ai-app-publish/typing-sprint/index.html",
+    );
+    assert.equal(
+        context.result("xjy/ai-app-publish/typing-sprint/", ""),
+        "https://static.jifulii.com/xjy/ai-app-publish/typing-sprint/index.html",
+    );
+});
+
 test("bulk discovery projects deterministic install ordering and fails closed on read errors", () => {
-    assert.match(bulkSource, /Version:\s*v1\.3\.9/);
+    assert.match(bulkSource, /Version:\s*v1\.4\.1/);
     assert.match(bulkSource, /_OrderBy:\s*'UpdateTime'/);
     assert.match(bulkSource, /_OrderByType:\s*'DESC'/);
     assert.match(bulkSource, /installedVersionLoadError/);

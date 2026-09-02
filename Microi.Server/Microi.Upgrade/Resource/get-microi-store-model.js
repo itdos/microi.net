@@ -10,9 +10,10 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store-model
- * Version: v1.3.1
+ * Version: v1.4.0
  * Function:
  * - 按公开/私有权限读取不可变应用包，并为私有源码/编译 ZIP 生成不落库的临时下载地址。
+ * - 可选在服务端校验并解析安装包，仅向详情页返回资源数量与安全摘要，不暴露包正文或私有签名地址。
  */
 
 function text(value) { return value === null || value === undefined ? "" : String(value); }
@@ -102,6 +103,123 @@ function loadPackageBodyFromPointer(row, downloadUrl) {
       + '，sha256=' + actualSha + '/' + expectedSha);
   }
   return content;
+}
+function packageArray(value) {
+  if (!value) return [];
+  if (value.length !== undefined && typeof value !== 'string') {
+    var result = [];
+    for (var index = 0; index < value.length; index++) result.push(value[index]);
+    return result;
+  }
+  var parsed = parseData(value);
+  if (!parsed || parsed.length === undefined || typeof parsed === 'string') return [];
+  var list = [];
+  for (var parsedIndex = 0; parsedIndex < parsed.length; parsedIndex++) list.push(parsed[parsedIndex]);
+  return list;
+}
+function packageDataRowCount(dataSets) {
+  var count = 0;
+  for (var index = 0; index < dataSets.length; index++) count += packageArray((dataSets[index] || {}).Rows).length;
+  return count;
+}
+function packageSummaryItem(item, keys) {
+  var result = {};
+  for (var index = 0; index < keys.length; index++) {
+    var key = keys[index];
+    var value = item && item[key];
+    if (value !== null && value !== undefined && trim(value) !== '') result[key] = value;
+  }
+  return result;
+}
+function buildPackageSummary(packageBody) {
+  // MARKETPLACE_PACKAGE_SUMMARY_V1：详情页只能看到资源摘要；包正文、源码、构建
+  // Base64、数据行正文、密钥和 HDFS 私有签名地址均不进入该对象。
+  var packageModel = parseData(packageBody);
+  if (!packageModel || typeof packageModel !== 'object') throw new Error('应用安装包不是有效 JSON 对象。');
+  var packageInfo = packageModel.PackageInfo || {};
+  var menus = packageArray(packageModel.SysMenus);
+  var tables = packageArray(packageModel.DiyTables);
+  var fields = packageArray(packageModel.DiyFields);
+  var apiEngines = packageArray(packageModel.SysApiEngines);
+  var dataSets = packageArray(packageModel.DataSets);
+  var flows = packageArray(packageModel.WfFlowDesigns);
+  var nodes = packageArray(packageModel.WfNodes);
+  var lines = packageArray(packageModel.WfLines);
+  var ddl = packageArray(packageModel.DDLStatements);
+  var physicalColumns = packageArray(packageModel.PhysicalColumns);
+  var bundles = packageArray(packageModel.ApplicationBundles);
+  var menuIdMap = {};
+  for (var menuIdIndex = 0; menuIdIndex < menus.length; menuIdIndex++) {
+    var menuId = trim((menus[menuIdIndex] || {}).Id);
+    if (menuId) menuIdMap[menuId] = true;
+  }
+  var rootMenuCount = 0;
+  for (var rootIndex = 0; rootIndex < menus.length; rootIndex++) {
+    var parentId = trim((menus[rootIndex] || {}).ParentId);
+    if (!parentId || /^0+$/.test(parentId) || !menuIdMap[parentId]) rootMenuCount++;
+  }
+  var dataRowCount = packageDataRowCount(dataSets);
+  var buildAssetCount = 0;
+  var routeCount = 0;
+  for (var bundleIndex = 0; bundleIndex < bundles.length; bundleIndex++) {
+    buildAssetCount += packageArray((bundles[bundleIndex] || {}).BuildAssets).length;
+    routeCount += packageArray((bundles[bundleIndex] || {}).Routes).length;
+  }
+  var resources = [
+    { Key: 'Menus', Label: '菜单引擎', Count: menus.length },
+    { Key: 'ApiEngines', Label: '接口引擎', Count: apiEngines.length },
+    { Key: 'Tables', Label: '表单引擎', Count: tables.length },
+    { Key: 'Fields', Label: '表单字段', Count: fields.length },
+    { Key: 'DataSets', Label: '数据集', Count: dataSets.length },
+    { Key: 'DataRows', Label: '数据行', Count: dataRowCount },
+    { Key: 'Workflows', Label: '工作流', Count: flows.length },
+    { Key: 'WorkflowNodes', Label: '流程节点', Count: nodes.length },
+    { Key: 'WorkflowLines', Label: '流程连线', Count: lines.length },
+    { Key: 'AiApplications', Label: '在线应用', Count: bundles.length },
+    { Key: 'AiRoutes', Label: '应用路由', Count: routeCount },
+    { Key: 'AiBuildAssets', Label: '构建文件', Count: buildAssetCount },
+    { Key: 'DDL', Label: '数据库结构', Count: ddl.length },
+    { Key: 'PhysicalColumns', Label: '物理字段', Count: physicalColumns.length }
+  ];
+  var totalResources = 0;
+  for (var resourceIndex = 0; resourceIndex < resources.length; resourceIndex++) totalResources += Number(resources[resourceIndex].Count || 0);
+  return {
+    SchemaVersion: 1,
+    PackageName: trim(packageInfo.Name || packageInfo.PackageName),
+    PackageVersion: trim(packageInfo.Version),
+    RequiresInstallParent: menus.length > 0,
+    MenuCount: menus.length,
+    RootMenuCount: rootMenuCount,
+    ApiEngineCount: apiEngines.length,
+    TableCount: tables.length,
+    FieldCount: fields.length,
+    DataSetCount: dataSets.length,
+    DataRowCount: dataRowCount,
+    WorkflowCount: flows.length,
+    AiApplicationCount: bundles.length,
+    BuildAssetCount: buildAssetCount,
+    TotalResources: totalResources,
+    Resources: resources,
+    Menus: menus.map(function (item) { return packageSummaryItem(item, ['Id', 'Name', 'ParentId', 'ModuleEngineKey', 'OpenType', 'Url']); }),
+    ApiEngines: apiEngines.map(function (item) { return packageSummaryItem(item, ['ApiEngineKey', 'ApiName', 'ApiAddress', 'Version']); }),
+    Tables: tables.map(function (item) { return packageSummaryItem(item, ['Id', 'Name', 'Description']); }),
+    DataSets: dataSets.map(function (item) {
+      var summary = packageSummaryItem(item, ['TableName', 'Name', 'Mode']);
+      summary.RowCount = packageArray((item || {}).Rows).length;
+      return summary;
+    }),
+    AiApplications: bundles.map(function (item) {
+      var application = (item || {}).Application || {};
+      return {
+        AppId: trim(application.AppId || application.AppKey),
+        AppName: trim(application.AppName || application.Name),
+        ApplicationType: trim(item.ApplicationType || application.ApplicationType),
+        Version: trim(item.VersionNo || application.BuildVersion),
+        RouteCount: packageArray((item || {}).Routes).length,
+        BuildAssetCount: packageArray((item || {}).BuildAssets).length
+      };
+    })
+  };
 }
 function stripPackage(row) {
   if (!row) return row;
@@ -394,9 +512,20 @@ if (versionId) {
   }
 }
 var applicationAssetDownloadUrls;
+var packageSummary = null;
 try {
   // 签名仅存在于本次响应，不改写 sys_microistore 或 mic_data_version。
   applicationAssetDownloadUrls = privateApplicationAssetDownloadUrls(selected);
+  if (flag(V8.Param.IncludePackageSummary, false)) {
+    var summaryBody = trim(selected.AppPakcet);
+    if (!summaryBody) {
+      if (!hasInstallPackage(selected)) throw new Error('应用包指针缺少 HDFS 路径、SHA-256 或字节数。');
+      var summaryDownloadUrl = packageDownloadUrl(selected, isPublic);
+      if (!summaryDownloadUrl) throw new Error('应用包下载地址为空。');
+      summaryBody = loadPackageBodyFromPointer(selected, summaryDownloadUrl);
+    }
+    packageSummary = buildPackageSummary(summaryBody);
+  }
 } catch (assetUrlError) {
   return { Code: 0, Msg: assetUrlError.message };
 }
@@ -432,7 +561,8 @@ return {
     ChangeLogAvailable: changeLogs.Available,
     ChangeLogCount: changeLogs.Count,
     ChangeLogs: changeLogs.Rows,
-    ApplicationAssetDownloadUrls: applicationAssetDownloadUrls
+    ApplicationAssetDownloadUrls: applicationAssetDownloadUrls,
+    PackageSummary: packageSummary
   },
   Msg: "成功"
 };

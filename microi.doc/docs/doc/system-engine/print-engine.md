@@ -4,6 +4,12 @@
 
 标签机/小票机需要 TSC/TSPL、CPCL、ESC/POS、BLE 或 Android SPP 时，请使用独立的[蓝牙打印机](/doc/system-engine/bluetooth-printer)能力。它支持原有佳博 GP-M322 V8 零改动兼容 ZICOX CC4；Print Engine 的 `PageObj`/`PrintObj` 不能直接作为打印机原生命令发送。
 
+前端微服务需要打开平台普通打印预览时，通过 `microi.host.v1` 的
+`openPlatformPrint` 宿主动作传入 `mic_print.Id` 与当前租户同源的接口引擎数据地址；
+不要跨 iframe 访问父页面组件。该动作不是蓝牙代理，不发送 BLE/SPP 字节。完整参数、
+安全校验和“普通打印/蓝牙打印”选择见
+[蓝牙打印机：微服务同时提供普通打印与蓝牙打印](/doc/system-engine/bluetooth-printer#微服务同时提供普通打印与蓝牙打印)。
+
 > **在线制作打印模板，支持多种打印场景**
 
 ---

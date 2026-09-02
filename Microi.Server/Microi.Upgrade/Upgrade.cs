@@ -15,7 +15,7 @@ namespace Microi.net
     /// <summary>
     /// 
     /// </summary>
-	public class MicroiUpgrade : IMicroiUpgrade
+	public partial class MicroiUpgrade : IMicroiUpgrade
     {
         private static readonly Lazy<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>>
             RuntimePhysicalColumnContracts = new Lazy<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>>(
@@ -208,10 +208,19 @@ namespace Microi.net
                     .ConfigureAwait(false);
                 if (startupDependencyResult.Code != 1)
                 {
-                    throw new InvalidOperationException(startupDependencyResult.Msg);
+                    if (!UpgradeAppStore.IsOfficialSourceResult(startupDependencyResult)
+                        && !UpgradeAppStore.IsOfficialSourceTenant(osClientSecret.OsClient))
+                    {
+                        throw new InvalidOperationException(startupDependencyResult.Msg);
+                    }
+                    Console.WriteLine(
+                        $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】当前租户是官方应用源，差异等待签名应用源同步，版本迁移继续。");
                 }
-                Console.WriteLine(
-                    $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】版本迁移链内复检成功：{startupDependencyResult.Msg}");
+                else
+                {
+                    Console.WriteLine(
+                        $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【平台运行时接口闭包】版本迁移链内复检成功：{startupDependencyResult.Msg}");
+                }
                 runtimeInvariantStage = "AuthSecret物理列";
                 EnsureAuthSecretColumns(osClientSecret);
                 runtimeInvariantStage = "微服务物理列";

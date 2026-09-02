@@ -85,17 +85,28 @@ async function exerciseFolder(page, platform) {
     const folder = page.locator(`${desk} ${item}:has(> .thumb)`).first();
     if (!await folder.isVisible().catch(() => false)) return false;
     await folder.click();
-    const layer = page.locator('.microi-desk-thumblayer:visible').first();
+    const layer = page.locator(`.webos-desktop-folder.is-${platform}:visible`).first();
     await expect(layer).toBeVisible();
-    await expect(layer.locator('.microi-desk-thumblayer__item').first()).toBeVisible();
+    const folderItems = layer.locator('.webos-desktop-folder__item');
+    await expect(folderItems.first()).toBeVisible();
+    const itemCount = await folderItems.count();
+    expect(itemCount).toBeGreaterThan(0);
+    const imageIcons = layer.locator('.webos-theme-menu-icon img');
+    await expect(imageIcons).toHaveCount(itemCount);
+    expect(await layer.locator('.webos-theme-menu-icon svg').count()).toBe(0);
+    const imageGeometry = await imageIcons.evaluateAll(images => images.map(image => ({
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+    })));
+    expect(imageGeometry.every(icon => icon.naturalWidth > 0 && icon.naturalWidth === icon.naturalHeight), JSON.stringify(imageGeometry)).toBe(true);
     const layerBox = await layer.boundingBox();
     expect(layerBox?.width).toBeGreaterThanOrEqual(240);
     expect(layerBox?.height).toBeGreaterThanOrEqual(240);
-    await layer.locator('.microi-folder-close').click();
+    await layer.locator('.webos-desktop-folder__close').click();
     await expect(layer).toBeHidden();
     await folder.click();
     await expect(layer).toBeVisible();
-    await layer.locator('.microi-folder-close').click();
+    await layer.locator('.webos-desktop-folder__close').click();
     return true;
 }
 
@@ -237,7 +248,7 @@ test('WebOS macOS/Windows 全流程、主题、低视口与截图回归', async 
         await page.waitForTimeout(500);
         await screenshot(page, '02-macos-folder-light-1440x900.png');
         diagnostics.screenshots.push('02-macos-folder-light-1440x900.png');
-        await page.locator('.microi-desk-thumblayer:visible .microi-folder-close').click();
+        await page.locator('.webos-desktop-folder.is-macos:visible .webos-desktop-folder__close').click();
     }
     diagnostics.features.macosDockFolder = await exerciseDockFolder(page, 'macos');
 
@@ -348,7 +359,7 @@ test('WebOS macOS/Windows 全流程、主题、低视口与截图回归', async 
         await page.waitForTimeout(500);
         await screenshot(page, '06-windows-folder-dark-1440x900.png');
         diagnostics.screenshots.push('06-windows-folder-dark-1440x900.png');
-        await page.locator('.microi-desk-thumblayer:visible .microi-folder-close').click();
+        await page.locator('.webos-desktop-folder.is-windows:visible .webos-desktop-folder__close').click();
     }
     diagnostics.features.windowsDockFolder = await exerciseDockFolder(page, 'windows');
 

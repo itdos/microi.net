@@ -112,6 +112,22 @@ test("SysConfig fallback is narrow and retries only missing-engine or unsupporte
         Code: 0,
         Msg: "NoExistData 表名：sys_apiengine 条件：ApiEngineKey='platform-sys-config'"
     }), true);
+    assert.equal(shouldFallbackPlatformSysConfig({
+        Code: 0,
+        Msg: "NoExistData[ApiAddress]:/apiengine/platform-sys-config"
+    }), true);
+    assert.equal(shouldFallbackPlatformSysConfig({
+        Code: 0,
+        Msg: "NoExistData[ApiEngineKey]:platform-sys-config"
+    }), true);
+    assert.equal(shouldFallbackPlatformSysConfig({
+        Code: 0,
+        Msg: "NoExistData[ApiAddress]:/apiengine/platform-sys-menu"
+    }), false);
+    assert.equal(shouldFallbackPlatformSysConfig({
+        Code: 0,
+        Msg: "Database connection is temporarily unavailable."
+    }), false);
 
     const calls = [];
     const diyCommon = {

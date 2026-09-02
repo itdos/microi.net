@@ -41,10 +41,10 @@ test.describe('Blueprint E2E', () => {
         }, { t: token, u: userId, oc: OS_CLIENT });
     });
 
-    test('列表页加载 + 新建蓝图', async ({ page }) => {
+    test('历史列表入口已下线', async ({ page }) => {
         await page.goto(`${FRONTEND}/#/blueprint/list`);
-        await expect(page.locator('.blueprint-list')).toBeVisible({ timeout: 10000 });
-        await expect(page.locator('button:has-text("新建蓝图")')).toBeVisible();
+        await expect(page.locator('.error-page')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.blueprint-list')).toHaveCount(0);
     });
 
     test('设计器：添加节点 → 保存 → 验证', async ({ page }) => {

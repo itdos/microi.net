@@ -26,10 +26,11 @@ Microi吾码提供多条可视化路线。界面引擎、报表引擎、go-view 
 
 ## 3D 引擎
 
-源码位于 `Microi.Client/src/views/3d-engine/`，包含设计器、渲染器、场景树、属性面板、材质、灯光、后处理、模型爆炸和相机路径。
+3D 引擎以独立 AI 应用 `microi-3d-engine` 交付，应用类型为 `MicroService`。它包含设计器、渲染器、场景树、属性面板、材质、灯光、后处理、模型爆炸和相机路径；源码与编译产物分别进入私有源码区和不可变运行资产，安装包同时携带可移植菜单与运行时清单。
 
-- `/3d-engine/designer`：编辑场景；
-- `/3d-engine/renderer`：运行时渲染，可从查询参数或配置读取模型。
+官方商城当前发布版本为 `v1.0.2`。安装后的“3D引擎”菜单位于“系统引擎”，通过统一宿主页打开 `/micro-app/microi-3d-engine/designer`；渲染页 `/renderer` 标记为内部路由，由设计器或业务页面传入配置后复用，不再注册主前端 `/3d-engine/designer`、`/3d-engine/renderer` 静态路由。
+
+版本库中的 `Microi.Client/src/views/3d-engine/` 保留 Three.js 实现与回归测试来源；线上运行和跨租户安装以 AI 应用的私有源码、v3 committed runtime 与商城不可变安装快照为准。
 
 当前公开设计器的上传控件接受 `.glb` 与 `.gltf`，加载器基于 `GLTFLoader` 并支持 Draco。场景配置可以保存模型位置、旋转、缩放、材质、灯光、环境、后处理和镜头路径。若业务需要 OBJ/FBX 等格式，应先确认当前分支是否已有对应 Loader，不要仅根据旧宣传文字判断已支持。
 

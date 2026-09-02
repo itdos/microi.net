@@ -382,8 +382,9 @@
 import { DiyCommon } from "@/utils/diy.common";
 import { Bell, CircleClose, Delete, Download, Monitor, Refresh, SwitchButton, UserFilled, View } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox, ElNotification } from "element-plus";
-import { useDiyStore } from "@/pinia";
+import { useDiyStore, usePermissionStore } from "@/pinia";
 import { useUserStore } from "@/pinia/modules/user";
+import { refreshDynamicMenuRoutes } from "@/utils/dynamic-menu-routes";
 import { isFormMaskBlurDisabled } from "@/utils/form-mask-blur.js";
 import {
     getBackgroundTaskEta,
@@ -418,7 +419,8 @@ export default {
     setup() {
         const diyStore = useDiyStore();
         const userStore = useUserStore();
-        return { diyStore, userStore };
+        const permissionStore = usePermissionStore();
+        return { diyStore, userStore, permissionStore };
     },
     data() {
         return {
@@ -444,6 +446,10 @@ export default {
             lastStoreCheckTime: 0,
             storeCheckTimer: null,
             platformMaintenanceTaskIds: {},
+            marketplaceInstallTaskIds: {},
+            marketplaceInstallCompletedTaskIds: {},
+            marketplaceInstallTaskPollTimers: {},
+            marketplaceMenuRefreshRunner: null,
             storeRefreshAfterTaskPending: false,
             officialAppCheckRunner: null,
             officialAppMaintenanceRefreshRunner: null,
@@ -573,8 +579,12 @@ export default {
         invalidateOfficialAppCheckWork(dispose = false) {
             this.officialAppCheckGeneration++;
             if (dispose) this.officialAppChecksDisposed = true;
+            this.clearMarketplaceInstallTaskPollTimers();
             this.officialAppCheckRunner = null;
             this.officialAppMaintenanceRefreshRunner = null;
+            this.marketplaceMenuRefreshRunner = null;
+            this.marketplaceInstallTaskIds = {};
+            this.marketplaceInstallCompletedTaskIds = {};
             this.storeRefreshAfterTaskPending = false;
             this.storeLoading = false;
             this.storeNotices = [];
@@ -633,12 +643,18 @@ export default {
             if (taskId && this.isPlatformAppMaintenanceTask(task)) {
                 this.platformMaintenanceTaskIds[String(taskId)] = true;
             }
+            if (taskId && this.isMarketplaceInstallTask(task)) {
+                this.marketplaceInstallTaskIds[String(taskId)] = true;
+                this.scheduleMarketplaceInstallTaskPoll(String(taskId));
+            }
             this.refreshTasks();
         },
         handleTaskList(data) {
             const rows = Array.isArray(data) ? data : (Array.isArray(data?.Data) ? data.Data : []);
             const maintenanceCompleted = this.hasCompletedPlatformMaintenanceTransition(rows);
             if (maintenanceCompleted) void this.refreshOfficialAppsAfterMaintenance();
+            const marketplaceInstallsCompleted = this.consumeCompletedMarketplaceInstallTransitions(rows);
+            if (marketplaceInstallsCompleted.length) void this.refreshMenusAfterMarketplaceInstall();
             if (this.taskPage !== 1) return;
             this.tasks = this.mergeTaskSummaries(rows);
             this.taskCount = Math.max(Number(data?.DataCount || 0), this.taskCount, rows.length);
@@ -729,10 +745,12 @@ export default {
                 if (result && result.Code === 1) {
                     const rows = Array.isArray(result.Data) ? result.Data : [];
                     const maintenanceCompleted = this.hasCompletedPlatformMaintenanceTransition(rows);
+                    const marketplaceInstallsCompleted = this.consumeCompletedMarketplaceInstallTransitions(rows);
                     this.taskPage = Math.max(1, Number(page) || 1);
                     this.tasks = this.mergeTaskSummaries(rows);
                     this.taskCount = Number(result.DataCount || this.tasks.length || 0);
                     if (maintenanceCompleted) void this.refreshOfficialAppsAfterMaintenance();
+                    if (marketplaceInstallsCompleted.length) void this.refreshMenusAfterMarketplaceInstall();
                 }
             } finally {
                 this.loading = false;
@@ -953,6 +971,112 @@ export default {
                 || ((title.includes("平台应用") || title.includes("platform app"))
                     && (title.includes("安装") || title.includes("更新")
                         || title.includes("install") || title.includes("update")));
+        },
+        isMarketplaceInstallTask(item) {
+            const key = String(
+                item?.TargetApiEngineKey
+                || item?.ApiEngineKey
+                || item?.TargetKey
+                || ""
+            ).trim().toLowerCase();
+            return key === "import-microi-store-package";
+        },
+        isSuccessfulMarketplaceInstallTask(item) {
+            const status = String(item?.Status || item?.State || "").trim().toLowerCase();
+            return ["success", "succeeded", "completed", "complete"].includes(status);
+        },
+        consumeCompletedMarketplaceInstallTransitions(rows) {
+            const previousById = new Map((this.tasks || []).map((item) => [
+                String(item?.Id || item?.TaskId || item?.BackgroundTaskId || ""),
+                item
+            ]));
+            const completed = [];
+            for (const item of Array.isArray(rows) ? rows : []) {
+                const id = String(item?.Id || item?.TaskId || item?.BackgroundTaskId || "");
+                if (!id || !this.isMarketplaceInstallTask(item) || !this.isSuccessfulMarketplaceInstallTask(item)) continue;
+                const wasRegistered = this.marketplaceInstallTaskIds[id] === true;
+                const previous = previousById.get(id);
+                const wasActive = previous && isActiveBackgroundTask(previous);
+                if ((!wasRegistered && !wasActive) || this.marketplaceInstallCompletedTaskIds[id] === true) continue;
+                this.marketplaceInstallCompletedTaskIds[id] = true;
+                delete this.marketplaceInstallTaskIds[id];
+                this.clearMarketplaceInstallTaskPollTimer(id);
+                completed.push(item);
+            }
+            const completedIds = Object.keys(this.marketplaceInstallCompletedTaskIds);
+            if (completedIds.length > 200) {
+                completedIds.slice(0, completedIds.length - 200).forEach((id) => delete this.marketplaceInstallCompletedTaskIds[id]);
+            }
+            return completed;
+        },
+        clearMarketplaceInstallTaskPollTimer(taskId) {
+            const id = String(taskId || "");
+            const timer = this.marketplaceInstallTaskPollTimers[id];
+            if (timer) window.clearTimeout(timer);
+            delete this.marketplaceInstallTaskPollTimers[id];
+        },
+        clearMarketplaceInstallTaskPollTimers() {
+            Object.keys(this.marketplaceInstallTaskPollTimers || {}).forEach((taskId) => {
+                this.clearMarketplaceInstallTaskPollTimer(taskId);
+            });
+        },
+        scheduleMarketplaceInstallTaskPoll(taskId, attempt = 0) {
+            const id = String(taskId || "");
+            if (!id || this.marketplaceInstallTaskIds[id] !== true || this.officialAppChecksDisposed) return;
+            this.clearMarketplaceInstallTaskPollTimer(id);
+            const delay = attempt > 0 ? Math.min(5000, 1500 + attempt * 250) : 1200;
+            this.marketplaceInstallTaskPollTimers[id] = window.setTimeout(() => {
+                delete this.marketplaceInstallTaskPollTimers[id];
+                void this.pollMarketplaceInstallTask(id, attempt);
+            }, delay);
+        },
+        async pollMarketplaceInstallTask(taskId, attempt = 0) {
+            const id = String(taskId || "");
+            if (!id || this.marketplaceInstallTaskIds[id] !== true || this.officialAppChecksDisposed) return;
+            try {
+                const result = await DiyCommon.PostAsync("/apiengine/platform-background-task", {
+                    Action: "Status",
+                    TaskId: id
+                }, null, null, "json");
+                const task = result?.Code === 1 ? result.Data : null;
+                if (task && this.isTerminalTask(task)) {
+                    this.clearMarketplaceInstallTaskPollTimer(id);
+                    delete this.marketplaceInstallTaskIds[id];
+                    if (this.isSuccessfulMarketplaceInstallTask(task)
+                        && this.marketplaceInstallCompletedTaskIds[id] !== true) {
+                        this.marketplaceInstallCompletedTaskIds[id] = true;
+                        await this.refreshMenusAfterMarketplaceInstall();
+                    }
+                    void this.loadTasks(1);
+                    return;
+                }
+            } catch (error) {
+                console.warn("[BackgroundTask] marketplace install status check failed", error);
+            }
+            // 只跟踪当前页面主动创建的安装任务，终态后立即停止；SignalR 丢失时也能
+            // 在数秒内完成菜单刷新，不恢复全局后台任务整表轮询。
+            if (attempt < 240) this.scheduleMarketplaceInstallTaskPoll(id, attempt + 1);
+        },
+        refreshMenusAfterMarketplaceInstall() {
+            if (!this.marketplaceMenuRefreshRunner) {
+                this.marketplaceMenuRefreshRunner = createCoalescedTrailingRunner(
+                    () => this.runMenuRefreshAfterMarketplaceInstall()
+                );
+            }
+            return this.marketplaceMenuRefreshRunner();
+        },
+        async runMenuRefreshAfterMarketplaceInstall() {
+            try {
+                await DiyCommon.RefreshAppStores();
+                await refreshDynamicMenuRoutes({
+                    permissionStore: this.permissionStore,
+                    router: this.$router,
+                    roles: ["admin"],
+                    reason: "marketplace-install-completed"
+                });
+            } catch (error) {
+                console.warn("[BackgroundTask] refresh menus after marketplace install failed", error);
+            }
         },
         hasCompletedPlatformMaintenanceTransition(rows) {
             return consumeCompletedPlatformMaintenanceTransitions({

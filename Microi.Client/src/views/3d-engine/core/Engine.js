@@ -42,6 +42,8 @@ export class Engine {
     this._hdrLoader = new RGBELoader();
     this.composer = null;
     this._hdrTexture = null;
+    this.transformControls = null;
+    this.transformControlsHelper = null;
 
     this._initRenderer();
     this._initScene();
@@ -103,13 +105,14 @@ export class Engine {
 
     if (!options.readonly) {
       this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
+      this.transformControlsHelper = this.transformControls.getHelper();
       this.transformControls.addEventListener('dragging-changed', e => {
         this.orbitControls.enabled = !e.value;
       });
       this.transformControls.addEventListener('objectChange', () => {
         this._emit('objectChanged', this.selectedObject);
       });
-      this.scene.add(this.transformControls);
+      this.scene.add(this.transformControlsHelper);
     }
   }
 
@@ -867,7 +870,13 @@ export class Engine {
     this._resizeObserver.disconnect();
 
     this.orbitControls.dispose();
-    if (this.transformControls) { this.transformControls.detach(); this.transformControls.dispose(); }
+    if (this.transformControls) {
+      this.transformControls.detach();
+      if (this.transformControlsHelper) this.scene.remove(this.transformControlsHelper);
+      this.transformControls.dispose();
+      this.transformControls = null;
+      this.transformControlsHelper = null;
+    }
 
     this.cameraPath.dispose();
     this.materialManager.dispose();

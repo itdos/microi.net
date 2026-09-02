@@ -1,7 +1,7 @@
 # Microi DB Schema Overview
 
 - Source: generic reference snapshot; current tenant truth must come from `microi_get_db_schema`.
-- Tables: 75
+- Tables: 74
 - Configurable fields: 975
 
 ## Fixed Fields
@@ -166,7 +166,6 @@ DIY tables created by the platform include fixed fields even when they are not p
 | `diy_course` | 3 | 课程表 |
 | `eban` | 5 | EBAN |
 | `mic_memo` | 3 | 备忘录 |
-| `mic_3d_engine` | 0 | 3D引擎 |
 
 ## Component Counts
 

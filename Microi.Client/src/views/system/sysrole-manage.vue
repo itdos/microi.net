@@ -654,14 +654,19 @@ export default {
             self._getSysMenuPromise = (async function () {
                 // 菜单权限数据只在打开角色编辑器时加载。进入角色列表页不再
                 // 一次性下载和转换包含全部 AI 应用的整棵菜单树。
-                var result = await self.DiyCommon.PostAsync(self.DiyApi.GetDiyTableRowTree, {
+                var param = {
                     _SelectFields: ["Id", "Name", "IconClass", "ParentId", "Sort", "MoreBtns", "FormBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs"],
-                    TableName: "Sys_Menu",
-                    _OrderBy: "Sort",
-                    _OrderByType: "ASC",
-                    _All: true,
-                    _TreeLazy: 0
-                });
+                    _All: true
+                };
+                var result = await self.DiyCommon.PostAsync(
+                    self.DiyApi.GetRolePermissionTree(),
+                    param
+                );
+                // 只对滚动升级期间的“动作未支持”回退，鉴权和网络错误不降级。
+                if (Number(result?.Code) !== 1
+                    && /不支持的菜单动作|unsupported menu action/i.test(String(result?.Msg || ""))) {
+                    result = await self.DiyCommon.PostAsync(self.DiyApi.GetSysMenuStep(), param);
+                }
                 if (!self.DiyCommon.Result(result)) return false;
 
                 self.ForSysMenuList(result.Data);

@@ -1,6 +1,6 @@
 import { getUUID } from '@goview/utils'
 import { useChartEditStore } from '@goview/store/modules/chartEditStore/chartEditStore'
-import { ChartEditStoreEnum, ChartEditStorage } from '@goview/store/modules/chartEditStore/chartEditStore.d'
+import { ChartEditStorage } from '@goview/store/modules/chartEditStore/chartEditStore.d'
 import { useChartHistoryStore } from '@goview/store/modules/chartHistoryStore/chartHistoryStore'
 import { useChartLayoutStore } from '@goview/store/modules/chartLayoutStore/chartLayoutStore'
 import { ChartLayoutStoreEnum } from '@goview/store/modules/chartLayoutStore/chartLayoutStore.d'
@@ -8,7 +8,14 @@ import { fetchChartComponent, fetchConfigComponent, createComponent } from '@gov
 import { CreateComponentType, CreateComponentGroupType } from '@goview/packages/index.d'
 import { BaseEvent, EventLife } from '@goview/enums/eventEnum'
 import { PublicGroupConfigClass } from '@goview/packages/public/publicConfig'
+import { createSerialTaskQueue } from '@goview/utils/projectIntegrity.js'
 import merge from 'lodash/merge'
+import cloneDeep from 'lodash/cloneDeep'
+
+// 所有 useSync() 调用共享同一队列，避免多个入口同时恢复组件时交错写入 Pinia。
+const componentUpdateQueue = createSerialTaskQueue()
+
+export const waitForComponentUpdates = () => componentUpdateQueue.onIdle()
 
 /**
  * * 画布-版本升级对旧数据无法兼容的补丁
@@ -66,22 +73,22 @@ const componentVersionUpdatePolyfill = (newObject: any, sources: any) => {
  * @returns object
  */
 const componentMerge = (newObject: any, sources: any, notComponent = false) => {
+  // 持久化 JSON 可能还会被预览或另一次恢复复用，合并过程不能反向修改输入数据。
+  const sourceCopy = cloneDeep(sources ?? {})
   // 处理组件补丁
-  componentVersionUpdatePolyfill(newObject, sources)
+  componentVersionUpdatePolyfill(newObject, sourceCopy)
 
   // 非组件不处理
-  if (notComponent) return merge(newObject, sources)
+  if (notComponent) return merge(newObject, sourceCopy)
   // 组件排除 newObject
-  const option = sources.option
-  if (!option) return merge(newObject, sources)
+  const option = sourceCopy.option
+  if (option === undefined) return merge(newObject, sourceCopy)
 
   // 为 undefined 的 sources 来源对象属性将被跳过详见 https://www.lodashjs.com/docs/lodash.merge
-  sources.option = undefined
-  if (option) {
-    return {
-      ...merge(newObject, sources),
-      option: option
-    }
+  delete sourceCopy.option
+  return {
+    ...merge(newObject, sourceCopy),
+    option: option
   }
 }
 
@@ -96,114 +103,87 @@ export const useSync = () => {
    * @param isReplace 是否替换数据
    * @returns
    */
-  const updateComponent = async (projectData: ChartEditStorage, isReplace = false, changeId = false) => {
-    if (isReplace) {
-      // 清除列表
-      chartEditStore.componentList = []
-      // 清除历史记录
-      chartHistoryStore.clearBackStack()
-      chartHistoryStore.clearForwardStack()
-    }
-    // 画布补丁处理
-    projectData.editCanvasConfig = canvasVersionUpdatePolyfill(projectData.editCanvasConfig)
+  const updateComponent = (projectData: ChartEditStorage, isReplace = false, changeId = false) =>
+    componentUpdateQueue.run(async () => {
+      const componentList = Array.isArray(projectData?.componentList) ? projectData.componentList : []
+      const incomingCanvasConfig = canvasVersionUpdatePolyfill(cloneDeep(projectData?.editCanvasConfig ?? {}))
+      const incomingRequestConfig = cloneDeep(projectData?.requestGlobalConfig ?? {})
 
-    // 列表组件注册
-    projectData.componentList.forEach(async (e: CreateComponentType | CreateComponentGroupType) => {
-      const intComponent = (target: CreateComponentType) => {
-        if (!window['$vue'].component(target.chartConfig.chartKey)) {
-          window['$vue'].component(target.chartConfig.chartKey, fetchChartComponent(target.chartConfig))
-          window['$vue'].component(target.chartConfig.conKey, fetchConfigComponent(target.chartConfig))
+      // 列表组件注册
+      componentList.forEach((component: CreateComponentType | CreateComponentGroupType) => {
+        const initComponent = (target: CreateComponentType) => {
+          if (!window['$vue'].component(target.chartConfig.chartKey)) {
+            window['$vue'].component(target.chartConfig.chartKey, fetchChartComponent(target.chartConfig))
+            window['$vue'].component(target.chartConfig.conKey, fetchConfigComponent(target.chartConfig))
+          }
         }
-      }
 
-      if (e.isGroup) {
-        (e as CreateComponentGroupType).groupList.forEach(groupItem => {
-          intComponent(groupItem)
-        })
-      } else {
-        intComponent(e as CreateComponentType)
-      }
-    })
-
-    // 创建函数-重新创建是为了处理类种方法消失的问题
-    const create = async (
-      _componentInstance: CreateComponentType,
-      callBack?: (componentInstance: CreateComponentType) => void
-    ) => {
-      // 补充 class 上的方法
-      let newComponent: CreateComponentType = await createComponent(_componentInstance.chartConfig)
-      if (_componentInstance.chartConfig.redirectComponent) {
-        _componentInstance.chartConfig.dataset && (newComponent.option.dataset = _componentInstance.chartConfig.dataset)
-        newComponent.chartConfig.title = _componentInstance.chartConfig.title
-        newComponent.chartConfig.chartFrame = _componentInstance.chartConfig.chartFrame
-      }
-      if (callBack) {
-        if (changeId) {
-          callBack(componentMerge(newComponent, { ..._componentInstance, id: getUUID() }))
+        if (component.isGroup) {
+          (component as CreateComponentGroupType).groupList.forEach(initComponent)
         } else {
-          callBack(componentMerge(newComponent, _componentInstance))
+          initComponent(component as CreateComponentType)
         }
-      } else {
-        if (changeId) {
-          chartEditStore.addComponentList(
-            componentMerge(newComponent, { ..._componentInstance, id: getUUID() }),
-            false,
-            true
-          )
-        } else {
-          chartEditStore.addComponentList(componentMerge(newComponent, _componentInstance), false, true)
-        }
-      }
-    }
+      })
 
-    // 数据赋值
-    for (const key in projectData) {
-      // 组件
-      if (key === ChartEditStoreEnum.COMPONENT_LIST) {
-        let loadIndex = 0
-        const listLength = projectData[key].length
-        for (const comItem of projectData[key]) {
-          // 设置加载数量
-          let percentage = parseInt((parseFloat(`${++loadIndex / listLength}`) * 100).toString())
+      // 先在局部列表完整重建组件，全部成功后再一次性提交，避免失败或并发期间留下半份画布。
+      const nextComponentList: Array<CreateComponentType | CreateComponentGroupType> = []
+      const create = async (_componentInstance: CreateComponentType) => {
+        let newComponent: CreateComponentType = await createComponent(_componentInstance.chartConfig)
+        if (_componentInstance.chartConfig.redirectComponent) {
+          _componentInstance.chartConfig.dataset && (newComponent.option.dataset = _componentInstance.chartConfig.dataset)
+          newComponent.chartConfig.title = _componentInstance.chartConfig.title
+          newComponent.chartConfig.chartFrame = _componentInstance.chartConfig.chartFrame
+        }
+        const source = changeId ? { ..._componentInstance, id: getUUID() } : _componentInstance
+        return componentMerge(newComponent, source) as CreateComponentType
+      }
+
+      try {
+        const listLength = componentList.length
+        for (const [index, comItem] of componentList.entries()) {
+          const percentage = Math.trunc(((index + 1) / listLength) * 100)
           chartLayoutStore.setItemUnHandle(ChartLayoutStoreEnum.PERCENTAGE, percentage)
-          // 判断类型
-          if (comItem.isGroup) {
-            // 创建分组
-            let groupClass = new PublicGroupConfigClass()
-            if (changeId) {
-              groupClass = componentMerge(groupClass, { ...comItem, id: getUUID() })
-            } else {
-              groupClass = componentMerge(groupClass, comItem)
-            }
 
-            // 异步注册子应用
+          if (comItem.isGroup) {
+            const groupSource = changeId ? { ...comItem, id: getUUID() } : comItem
+            const groupClass = componentMerge(new PublicGroupConfigClass(), groupSource) as CreateComponentGroupType
             const targetList: CreateComponentType[] = []
             for (const groupItem of (comItem as CreateComponentGroupType).groupList) {
-              await create(groupItem, e => {
-                targetList.push(e)
-              })
+              targetList.push(await create(groupItem))
             }
             groupClass.groupList = targetList
-
-            // 分组插入到列表
-            chartEditStore.addComponentList(groupClass, false, true)
+            nextComponentList.push(groupClass)
           } else {
-            await create(comItem as CreateComponentType)
-          }
-          if (percentage === 100) {
-            // 清除历史记录
-            chartHistoryStore.clearBackStack()
-            chartHistoryStore.clearForwardStack()
+            nextComponentList.push(await create(comItem as CreateComponentType))
           }
         }
-      } else if (key === ChartEditStoreEnum.EDIT_CANVAS_CONFIG || key === ChartEditStoreEnum.REQUEST_GLOBAL_CONFIG) {
-        componentMerge(chartEditStore[key], projectData[key], true)
-      }
-    }
 
-    // 清除数量
-    chartLayoutStore.setItemUnHandle(ChartLayoutStoreEnum.PERCENTAGE, 0)
-  }
+        if (isReplace) {
+          const nextCanvasConfig = componentMerge(
+            cloneDeep(chartEditStore.editCanvasConfig),
+            incomingCanvasConfig,
+            true
+          )
+          const nextRequestConfig = componentMerge(
+            cloneDeep(chartEditStore.requestGlobalConfig),
+            incomingRequestConfig,
+            true
+          )
+
+          chartEditStore.componentList = nextComponentList
+          chartEditStore.editCanvasConfig = nextCanvasConfig
+          chartEditStore.requestGlobalConfig = nextRequestConfig
+          chartHistoryStore.clearBackStack()
+          chartHistoryStore.clearForwardStack()
+        } else {
+          componentMerge(chartEditStore.editCanvasConfig, incomingCanvasConfig, true)
+          componentMerge(chartEditStore.requestGlobalConfig, incomingRequestConfig, true)
+          nextComponentList.forEach(component => chartEditStore.addComponentList(component, false, true))
+        }
+      } finally {
+        chartLayoutStore.setItemUnHandle(ChartLayoutStoreEnum.PERCENTAGE, 0)
+      }
+    })
 
   return {
     updateComponent

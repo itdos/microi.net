@@ -1,3 +1,4 @@
 *.sh text eol=lf
 .githooks/* text eol=lf
 .public-repo-protected-paths text eol=lf
+*.pdf binary

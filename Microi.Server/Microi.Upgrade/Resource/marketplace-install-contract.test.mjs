@@ -5,6 +5,7 @@ import vm from "node:vm";
 
 const resourceUrl = new URL("./", import.meta.url);
 const packageModel = JSON.parse(await readFile(new URL("app.microi.store.json", resourceUrl), "utf8"));
+const saasPackageModel = JSON.parse(await readFile(new URL("app.microi.saas-engine.json", resourceUrl), "utf8"));
 const bulkSource = await readFile(new URL("bulk-import-packages.js", resourceUrl), "utf8");
 const importerSource = await readFile(new URL("import-package.js", resourceUrl), "utf8");
 const statSource = await readFile(new URL("official-marketplace-install-stat.js", resourceUrl), "utf8");
@@ -12,6 +13,12 @@ const apiEngineSource = await readFile(new URL("../../Microi.net/ApiEngine/ApiEn
 
 function normalizeSource(value) {
   return `${String(value || "").replace(/\r\n?/g, "\n").replace(/\n*$/g, "")}\n`;
+}
+
+function engineSourceVersion(source) {
+  const match = String(source || "").match(/Version:\s*(v\d+\.\d+\.\d+)/i);
+  assert.ok(match, "engine source version is missing");
+  return match[1];
 }
 
 function parseButtons(value) {
@@ -170,7 +177,7 @@ function startupRuntimeRow(key) {
     "platform-private-file-url": {
       ApiEngineKey: "platform-private-file-url", ApiAddress: "/apiengine/platform-private-file-url",
       ApiV8Code: "V8.Method.GetAuthorizedPrivateFileUrl();",
-      Version: "v1.0.0", IsEnable: 1, StopHttp: 0, AllowAnonymous: 0, IsDeleted: 0,
+      Version: "v1.0.0", IsEnable: 1, StopHttp: 0, AllowAnonymous: 1, IsDeleted: 0,
     },
     "platform-sys-user-public-info": {
       ApiEngineKey: "platform-sys-user-public-info", ApiAddress: "/apiengine/platform-sys-user-public-info",
@@ -372,7 +379,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.3.9");
+  assert.equal(engine.Version, engineSourceVersion(bulkSource));
   assert.match(bulkSource, /value\.标识 \|\| value\.Identifier/);
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
@@ -381,7 +388,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v2\.5\.4/);
+  assert.equal(engineSourceVersion(importerSource), "v2.6.8");
   assert.match(importerSource, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
   assert.match(importerSource, /storeApiBase \+ '\/apiengine\/'/);
   assert.doesNotMatch(importerSource, /\/api\/ApiEngine\/Run/);
@@ -471,6 +478,19 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(bulkSource, /missingStartupDependencyRequirements/);
   assert.match(bulkSource, /StartupDependenciesVerified: startupDependencyRequirements\.length/);
   assert.match(bulkSource, /startupDependencyRecovery[\s\S]*app\.microi\.store[\s\S]*app\.microi\.saas-engine/);
+  const privateFileRequirement = bulkSource.match(
+    /Key: 'platform-private-file-url'[^\n]+AllowAnonymous: (\d+)/,
+  );
+  const privateFileEngine = saasPackageModel.SysApiEngines.find(
+    (item) => item.ApiEngineKey === "platform-private-file-url",
+  );
+  assert.ok(privateFileRequirement, "private-file startup readback requirement is missing");
+  assert.ok(privateFileEngine, "SaaS package private-file engine is missing");
+  assert.equal(
+    Number(privateFileRequirement[1]),
+    Number(privateFileEngine.AllowAnonymous),
+    "startup readback must honor the official package runtime flag",
+  );
   assert.match(bulkSource, /status == 'Installed' \? 'Reinstall'/);
   assert.match(bulkSource, /StartupDependencyRecovery: startupDependencyRecovery/);
 
@@ -478,7 +498,7 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v2.5.4");
+  assert.equal(embeddedImporter.Version, engineSourceVersion(importerSource));
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     "InstallerFeature:PackageManagedOverwriteV2",
   ));
@@ -490,5 +510,20 @@ test("package importer fails closed when an API engine is not durably persisted"
   ));
   assert.match(importerSource, /MOVE_OBJECT_UNAVAILABLE_RESUME_V1/);
   assert.match(importerSource, /PrivateSource\+PublicBuildMoveFallback/);
-  assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
+  assert.equal(normalizeSource(embeddedImporter.ApiV8Code), normalizeSource(importerSource));
+});
+
+test('installer can attach package root menus to root, an existing menu, or an atomic new folder', () => {
+  assert.match(importerSource, /MARKETPLACE_INSTALL_PARENT_MENU_V1/);
+  assert.match(importerSource, /InstallParentSysMenuName/);
+  assert.match(importerSource, /InstallParentCreateUnderSysMenuId/);
+  assert.match(importerSource, /requireExistingInstallParent/);
+  assert.match(importerSource, /packageOwnsMenuId/);
+  assert.match(importerSource, /market-folder-/);
+  assert.match(importerSource, /installContainerModuleKey\.length > 50/);
+  assert.match(importerSource, /AddFormData\('sys_menu', installContainerMenuModel\)/);
+  assert.match(importerSource, /grantAdministratorPermissionsForNewMenu\(installContainerMenuModel\)/);
+  assert.match(importerSource, /GetTableData\('sys_role'[\s\S]*?\['Level', '>=', 9999\]/);
+  assert.match(importerSource, /\['Read', 'Add', 'Edit', 'Del', 'Export', 'Import'\]/);
+  assert.match(importerSource, /assertAdministratorMenuPermissionReadback/);
 });

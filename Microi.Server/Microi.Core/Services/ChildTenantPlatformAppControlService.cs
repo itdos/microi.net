@@ -1118,6 +1118,37 @@ END";
             // 比较，会把未改动的 Managed 官方源码误判为租户定制。只剥离开头
             // 且同时具备完整稳定标识的生成头，OFFICIAL_MANAGED_NOTICE 及正文
             // 内部注释均保留参与比较，不能因此放宽真实定制代码保护。
+            normalized = StripGeneratedBootstrapDescriptionHeaders(normalized);
+
+            // 实际 MCP 保存顺序是“官方 Managed 声明 → 生成说明头 → 正文”。
+            // 先暂存并保留官方声明，再剥离紧随其后的生成说明头；否则同一正文
+            // 会在同版本比较时被误判为租户定制，历史子租户无法自愈。
+            var officialNotice = string.Empty;
+            if (normalized.StartsWith("/*", StringComparison.Ordinal))
+            {
+                var commentEnd = normalized.IndexOf("*/", StringComparison.Ordinal);
+                if (commentEnd >= 0)
+                {
+                    var header = normalized.Substring(0, commentEnd + 2);
+                    if (header.IndexOf("OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1", StringComparison.Ordinal) >= 0)
+                    {
+                        officialNotice = header.TrimEnd();
+                        normalized = normalized.Substring(commentEnd + 2).TrimStart();
+                        normalized = StripGeneratedBootstrapDescriptionHeaders(normalized);
+                    }
+                }
+            }
+
+            normalized = normalized.TrimEnd();
+            if (string.IsNullOrEmpty(officialNotice)) return normalized;
+            return string.IsNullOrEmpty(normalized)
+                ? officialNotice
+                : officialNotice + "\n" + normalized;
+        }
+
+        private static string StripGeneratedBootstrapDescriptionHeaders(string source)
+        {
+            var normalized = source ?? string.Empty;
             while (normalized.StartsWith("/*", StringComparison.Ordinal))
             {
                 var commentEnd = normalized.IndexOf("*/", StringComparison.Ordinal);
@@ -1130,7 +1161,7 @@ END";
                     break;
                 normalized = normalized.Substring(commentEnd + 2).TrimStart();
             }
-            return normalized.TrimEnd();
+            return normalized;
         }
 
         private static bool TryParseBootstrapVersion(string value, out int[] parts)

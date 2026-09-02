@@ -112,3 +112,33 @@ test("platform app notices fail closed and refresh only after maintenance reache
     assert.match(component, /runOfficialAppCheck\(force\)[\s\S]*?checkGeneration[\s\S]*?isOfficialAppCheckCurrent\(checkGeneration\)[\s\S]*?requestOfficialStoreList[\s\S]*?isOfficialAppCheckCurrent\(checkGeneration\)[\s\S]*?this\.storeNotices/);
     assert.doesNotMatch(component, /handleBackgroundTaskStarted\([^)]*\)\s*\{[\s\S]{0,300}checkOfficialApps/);
 });
+
+test("marketplace install completion refreshes permissions, routes and the left menu without a page reload", () => {
+    const component = readFileSync(
+        new URL("../src/layout/components/BackgroundTaskCenter.vue", import.meta.url),
+        "utf8"
+    );
+    const host = readFileSync(
+        new URL("../src/views/micro-app/host.vue", import.meta.url),
+        "utf8"
+    );
+    const dynamicRoutes = readFileSync(
+        new URL("../src/utils/dynamic-menu-routes.js", import.meta.url),
+        "utf8"
+    );
+
+    assert.match(host, /type === "background-task:created"[\s\S]*?microi-background-task-started/);
+    assert.match(component, /isMarketplaceInstallTask\(item\)/);
+    assert.match(component, /key === "import-microi-store-package"/);
+    assert.match(component, /consumeCompletedMarketplaceInstallTransitions\(rows\)/);
+    assert.match(component, /scheduleMarketplaceInstallTaskPoll\(String\(taskId\)\)/);
+    assert.match(component, /Action:\s*"Status"[\s\S]*?TaskId:\s*id/);
+    assert.match(component, /pollMarketplaceInstallTask[\s\S]*?await this\.refreshMenusAfterMarketplaceInstall\(\)/);
+    assert.match(component, /clearMarketplaceInstallTaskPollTimers\(\)/);
+    assert.match(component, /await DiyCommon\.RefreshAppStores\(\)/);
+    assert.match(component, /await refreshDynamicMenuRoutes\(/);
+    assert.match(dynamicRoutes, /permissionStore\.generateRoutes/);
+    assert.match(dynamicRoutes, /router\.removeRoute/);
+    assert.match(dynamicRoutes, /router\.addRoute/);
+    assert.doesNotMatch(component, /location\.reload\(/);
+});

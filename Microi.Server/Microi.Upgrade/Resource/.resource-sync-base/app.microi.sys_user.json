@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "系统账号",
-    "Version": "v7.6.3",
+    "Version": "v7.6.4",
     "CreateTime": "2026-08-22T20:45:27.838Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -28,13 +28,13 @@
       "V8.Method.ManageUserAccessKey",
       "ServerField:sys_apiengine.ApiRoutes"
     ],
-    "ChangeHistory": "2026-08-30 v7.6.3 将用户访问密钥四个旧控制器入口迁入 platform-user-access-key Managed 接口引擎，并与系统账号旧路由统一纳入多路由闭包。\n2026-08-30 v7.6.2 为系统账号管理、个人偏好和个人资料接口补齐旧 SysUser 多路由，统一由官方接口引擎处理。\n2026-08-30 v7.6.1 将 SysUserAccessKeyController 四个入口迁入 platform-user-access-key；多路由保持旧客户端地址，安全原子继续一次性签发与哈希。\n2026-08-25 v7.6.0 系统账号官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.2 Managed 账号管理、可信改密预检与租户 Hook 契约。\n2026-08-25 v6.3.2 系统账号管理接口升级为 v1.0.2；可信预检通过 DataAppend.ChangesPassword 标识改密，改密跳过租户 Before Hook，仅在成功后执行安全 After Hook。\n2026-08-25 v6.3.1 系统账号新增、修改、删除、查询与登录投影刷新迁入固定 Managed V8 接口，保留可信权限、密码、内容审核和会话原子，并提供永不覆盖的租户 Hook。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口；Sys_User.AiApiKey 的物理列、低代码字段与安装 DDL 统一归属系统账号应用。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口，并提供官方升级永不覆盖的系统账号个性化 Hook。\n",
+    "ChangeHistory": "2026-09-02 v7.6.4 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-08-30 v7.6.3 将用户访问密钥四个旧控制器入口迁入 platform-user-access-key Managed 接口引擎，并与系统账号旧路由统一纳入多路由闭包。\n2026-08-30 v7.6.2 为系统账号管理、个人偏好和个人资料接口补齐旧 SysUser 多路由，统一由官方接口引擎处理。\n2026-08-30 v7.6.1 将 SysUserAccessKeyController 四个入口迁入 platform-user-access-key；多路由保持旧客户端地址，安全原子继续一次性签发与哈希。\n2026-08-25 v7.6.0 系统账号官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.2 Managed 账号管理、可信改密预检与租户 Hook 契约。\n2026-08-25 v6.3.2 系统账号管理接口升级为 v1.0.2；可信预检通过 DataAppend.ChangesPassword 标识改密，改密跳过租户 Before Hook，仅在成功后执行安全 After Hook。\n2026-08-25 v6.3.1 系统账号新增、修改、删除、查询与登录投影刷新迁入固定 Managed V8 接口，保留可信权限、密码、内容审核和会话原子，并提供永不覆盖的租户 Hook。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口；Sys_User.AiApiKey 的物理列、低代码字段与安装 DDL 统一归属系统账号应用。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口，并提供官方升级永不覆盖的系统账号个性化 Hook。\n",
     "ChangeLog": {
-      "Version": "v7.6.3",
-      "Title": "系统账号多路由与访问密钥闭包",
+      "Version": "v7.6.4",
+      "Title": "WebOS iOS 拟物透明图标升级",
       "ChangeType": "Optimize",
-      "Content": "将用户访问密钥四个旧控制器入口迁入 platform-user-access-key Managed 接口引擎，并与系统账号旧路由统一纳入多路由闭包。",
-      "ReleaseTime": "2026-08-30 12:00:00"
+      "Content": "将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。",
+      "ReleaseTime": "2026-09-02 12:05:00"
     },
     "Description": "系统账号、个人偏好与访问密钥的官方低代码资源；历史 HTTP 地址由接口引擎多路由兼容。"
   },
@@ -5010,7 +5010,7 @@
       "DisplayMac": 1,
       "AppDisplay": 1,
       "OpenType": "Diy",
-      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-070-75e1d334.webp",
+      "Icon": "/itdos/microi/webos-icons/ios-skeuomorphic-v2/202609/people.webp",
       "TableDiyFieldIds": "[\"873cc58b-cb44-4076-bc80-e1377584ac20\",\"bb6b3659-9f82-47c9-92b1-e2988a5845ae\",\"06189ac3-3332-47ae-8ef2-597be9c1928b\",\"26512e43-259d-46ba-9c30-45da856bf924\",\"6b3fa54b-e584-4a17-bdd3-8e4cbcb55e51\",\"75b00c3e-d3aa-4b52-b367-ce8870085038\",\"9cb76b97-4eef-4486-8762-2ee413e9c95c\",\"ddee1f85-237c-405b-85fb-c7fd567c3b27\",\"13f2faa0-6f99-4286-b3b5-f47b23243637\",\"73e3e25d-0569-4a77-9ad3-bfa3652825f6\",\"01KY5NNPYMYWGHM58BQNGVMG8E\"]",
       "PageBtns": "[]",
       "DiyTableId": "026be7b3-0634-416c-b462-789f0e8931b5",

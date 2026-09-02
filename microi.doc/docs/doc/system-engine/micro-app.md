@@ -765,9 +765,9 @@ window.microApp?.addDataListener?.((data) => {
 
 `hostCapabilities.lifecycle` 会声明当前契约：`cacheOwner=micro-app`、`cacheMode=runtime-keep-alive`、`maxCachedTabs=5`，以及 `beforeshow / aftershow / afterhidden` 三个状态。AI 创建或修改菜单微服务时，应自动生成上述生命周期适配；弹窗型和表单嵌入型页面仍按打开/关闭生命周期处理，不套用菜单页签缓存。
 
-## 子应用调用吾码主框架 Tab 与路由
+## 子应用调用吾码主框架能力
 
-通过后台菜单打开的微服务会收到 `hostCapabilities.protocol=microi.host.v1`。子应用不能直接访问主框架的 Pinia、Vue Router 或 DOM；应统一通过 micro-app 的 `dispatch` 发送宿主动作：
+通过后台菜单打开的微服务会收到 `hostCapabilities.protocol=microi.host.v1`。子应用不能直接访问主框架的 Pinia、Vue Router、打印组件或 DOM；路由、页签与平台普通打印等能力应统一通过 micro-app 的 `dispatch` 发送宿主动作：
 
 ```js
 function callMicroiHost(action, data = {}) {
@@ -849,6 +849,32 @@ function navigateMicroRoute(path) {
 | `reloadTab` | `{}` | 重新解析入口并重载当前微服务；顶部 Tab 右键【刷新】也会重载微服务。 |
 | `setTabTitle` | `{ title:'成品打包完成' }` | 修改当前 Tab 标题，最长 80 个字符。 |
 | `showMessage` | `{ message:'保存成功', messageType:'success' }` | 使用吾码主框架消息提示；类型支持 `success / warning / error / info`，只接受纯文本。 |
+| `openPlatformPrint` | `{ printId:'mic-print-id', dataApi:'https://api.example.com/apiengine/get-print-data?OsClient=tenant-a', title:'普通打印' }` | 打开吾码 Print Engine 普通打印预览；不发送蓝牙原生命令。 |
+
+微服务需要提供“普通打印”时，不要直接访问 `window.parent` 或复制平台打印弹窗。应先用
+宿主下发的 `apiBase/osClient` 构造同源数据地址，再调用打印桥：
+
+```js
+const host = window.microApp?.getData?.() || {};
+const dataApi = new URL('/apiengine/get-print-data', host.apiBase);
+dataApi.searchParams.set('OsClient', host.osClient);
+dataApi.searchParams.set('Id', currentBusinessId);
+
+const printRequestId = callMicroiHost('openPlatformPrint', {
+  printId: currentPrintTemplateId, // mic_print.Id
+  dataApi: dataApi.toString(),
+  title: '普通打印'
+});
+```
+
+`printId` 只接受 1～128 位字母、数字、下划线或连字符。`dataApi` 必须是绝对 HTTP(S)
+地址，和当前 `apiBase` 同源，路径以 `/apiengine/` 开头，并明确携带与当前页面一致的
+`OsClient`；禁止把 Token 或帐号密码写入 URL。宿主结果中的 `accepted:true` 只表示
+Print Engine 预览已经打开，不代表浏览器已经打印或打印机已经出纸。
+
+`openPlatformPrint` 是平台普通打印桥，不是 BLE/SPP 蓝牙代理。标签机原生命令与设备连接
+继续遵守[蓝牙打印机](/doc/system-engine/bluetooth-printer)说明；独立运行时没有宿主能力，
+应隐藏/禁用该按钮或使用应用自己的独立预览方案。
 
 常用组合示例：
 

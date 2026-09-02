@@ -102,6 +102,15 @@ namespace Microi.net
                 .ConfigureAwait(false);
             if (dependencies.Code != 1)
             {
+                if (UpgradeAppStore.IsOfficialSourceResult(dependencies)
+                    || UpgradeAppStore.IsOfficialSourceTenant(tenantName))
+                {
+                    Console.WriteLine(
+                        $"Microi：【自动升级状态】【{tenantName}】【平台运行时接口闭包】官方应用源由签名应用源同步维护；当前差异不触发程序集基线反向覆盖。详情：{dependencies.Msg}");
+                    Console.WriteLine($"Microi：【自动升级状态】【启动前门禁汇总】完成：租户数=1，成功=1，失败=0，主租户={tenantName}，官方应用源资源等待应用源同步，子租户转后台维护。");
+                    return new DosResult(1, dependencies.Data,
+                        "主租户是官方应用源，数据库物理门禁已通过；Managed 资源由官方应用源同步维护，子租户将在宿主启动后逐一维护。");
+                }
                 Console.WriteLine($"Microi：【自动升级状态】【{tenantName}】【平台运行时接口闭包】失败：{dependencies.Msg}");
                 return dependencies;
             }
