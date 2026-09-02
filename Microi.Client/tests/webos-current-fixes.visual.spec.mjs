@@ -162,7 +162,7 @@ test.beforeEach(async ({ page }) => {
     await page.goto(HARNESS_URL, { waitUntil: 'domcontentloaded' });
 });
 
-test('系统引擎图标保持正圆、箭头居中且弹窗可拖动', async ({ page }) => {
+test('系统引擎图标保持等宽透明画布、箭头居中且弹窗可拖动', async ({ page }) => {
     await fs.mkdir(OUTPUT, { recursive: true });
     const panel = page.locator('.webos-desktop-folder');
     await expect(panel).toBeVisible();
@@ -174,10 +174,14 @@ test('系统引擎图标保持正圆、箭头居中且弹窗可拖动', async ({
             width: rect.width,
             height: rect.height,
             radius: getComputedStyle(element).borderTopLeftRadius,
+            background: getComputedStyle(element).backgroundColor,
+            borderWidth: getComputedStyle(element).borderTopWidth,
         };
     }));
     expect(geometry.every(row => Math.abs(row.width - row.height) < .5), JSON.stringify(geometry)).toBe(true);
-    expect(geometry.every(row => parseFloat(row.radius) >= row.width / 2 - .5), JSON.stringify(geometry)).toBe(true);
+    expect(geometry.every(row => parseFloat(row.radius) === 0), JSON.stringify(geometry)).toBe(true);
+    expect(geometry.every(row => row.background === 'rgba(0, 0, 0, 0)'), JSON.stringify(geometry)).toBe(true);
+    expect(geometry.every(row => row.borderWidth === '0px'), JSON.stringify(geometry)).toBe(true);
 
     const nestedItem = panel.locator('.webos-desktop-folder__item.has-children').first();
     const aligned = await nestedItem.evaluate(element => {
@@ -201,10 +205,10 @@ test('系统引擎图标保持正圆、箭头居中且弹窗可拖动', async ({
     expect(after.x + after.width).toBeLessThanOrEqual(1271);
     expect(after.y + after.height).toBeLessThanOrEqual(791);
 
-    await page.screenshot({ path: path.join(OUTPUT, 'system-engine-circle-icons-dragged.png') });
+    await page.screenshot({ path: path.join(OUTPUT, 'system-engine-transparent-icons-dragged.png') });
 });
 
-test('Dock 文件夹同样保持圆形图标并支持标题栏拖动', async ({ page }) => {
+test('Dock 文件夹同样保持等宽透明图标并支持标题栏拖动', async ({ page }) => {
     await fs.mkdir(OUTPUT, { recursive: true });
     await page.evaluate(() => window.__setWebosHarnessMode('dock'));
     const panel = page.locator('.webos-dock-folder');
@@ -223,7 +227,7 @@ test('Dock 文件夹同样保持圆形图标并支持标题栏拖动', async ({ 
     expect(before.x - after.x).toBeGreaterThan(90);
     expect(before.y - after.y).toBeGreaterThan(50);
 
-    await page.screenshot({ path: path.join(OUTPUT, 'dock-folder-circle-icons-dragged.png') });
+    await page.screenshot({ path: path.join(OUTPUT, 'dock-folder-transparent-icons-dragged.png') });
 });
 
 test('WebOS 表单挂到 body，最大化与最小化都只作用于表单自身', async ({ page }) => {

@@ -43,10 +43,16 @@ export const constantRoutes = [
     },
     {
         path: "/mci-redis-manager",
-        name: "mci_redis_manager",
-        component: () => import("@/views/system/mci-redis-manager.vue"),
+        component: Layout,
         hidden: true,
-        meta: { title: "Redis 管理器", anonymous: true, keepAlive: false }
+        children: [
+            {
+                path: "",
+                name: "mci_redis_manager",
+                component: () => import("@/views/system/mci-redis-manager.vue"),
+                meta: { title: "Redis 管理器", anonymous: true, hideShellForAnonymous: true, keepAlive: false }
+            }
+        ]
     },
     {
         path: "/mic/renderer-embed/:Id",
@@ -355,20 +361,6 @@ export const asyncRoutes = [
             }
         ]
     },
-    // 业务架构蓝图（Business Blueprint）
-    {
-        path: "/blueprint/list",
-        component: Layout,
-        hidden: true,
-        children: [
-            {
-                path: "/blueprint/list",
-                name: "blueprint_list",
-                meta: { title: "业务架构蓝图", keepAlive: false },
-                component: () => import("@/views/ai-workflow/index.vue")
-            }
-        ]
-    },
     {
         path: "/blueprint/designer/:id",
         component: Layout,
@@ -379,20 +371,6 @@ export const asyncRoutes = [
                 name: "blueprint_designer",
                 meta: { title: "蓝图设计器", keepAlive: false },
                 component: () => import("@/views/blueprint/BlueprintDesigner.vue")
-            }
-        ]
-    },
-    // 状态机（State Machine）
-    {
-        path: "/state-machine/list",
-        component: Layout,
-        hidden: true,
-        children: [
-            {
-                path: "/state-machine/list",
-                name: "state_machine_list",
-                meta: { title: "状态机", keepAlive: false },
-                component: () => import("@/views/ai-workflow/index.vue")
             }
         ]
     },
@@ -409,20 +387,6 @@ export const asyncRoutes = [
             }
         ]
     },
-    // 自动化流程引擎（Flow Engine）
-    {
-        path: "/flow-engine/list",
-        component: Layout,
-        hidden: true,
-        children: [
-            {
-                path: "/flow-engine/list",
-                name: "flow_engine_list",
-                meta: { title: "自动化流程", keepAlive: false },
-                component: () => import("@/views/ai-workflow/index.vue")
-            }
-        ]
-    },
     {
         path: "/flow-engine/designer/:id",
         component: Layout,
@@ -433,20 +397,6 @@ export const asyncRoutes = [
                 name: "flow_engine_designer",
                 meta: { title: "流程设计器", keepAlive: false },
                 component: () => import("@/views/flow-engine/FlowDesigner.vue")
-            }
-        ]
-    },
-    // 过程挖掘（Process Mining）
-    {
-        path: "/process-mining",
-        component: Layout,
-        hidden: true,
-        children: [
-            {
-                path: "/process-mining",
-                name: "process_mining",
-                meta: { title: "过程挖掘", keepAlive: false },
-                component: () => import("@/views/ai-workflow/index.vue")
             }
         ]
     },
@@ -482,33 +432,6 @@ export const asyncRoutes = [
         path: "/mic/cad-preview",
         name: "mic_cad_preview",
         component: () => import("@/views/cad-preview/index.vue")
-    },
-    // 3D 引擎
-    {
-        path: "/3d-engine/designer",
-        component: Layout,
-        hidden: true,
-        children: [
-            {
-                path: "/3d-engine/designer",
-                name: "3d_engine_designer",
-                component: () => import("@/views/3d-engine/designer.vue"),
-                meta: { title: "3D引擎 设计器" }
-            }
-        ]
-    },
-    {
-        path: "/3d-engine/renderer",
-        component: Layout,
-        hidden: true,
-        children: [
-            {
-                path: "/3d-engine/renderer",
-                name: "3d_engine_renderer",
-                component: () => import("@/views/3d-engine/renderer.vue"),
-                meta: { title: "3D引擎 渲染器" }
-            }
-        ]
     },
     // License 授权管理
     {

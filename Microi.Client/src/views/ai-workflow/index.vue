@@ -37,7 +37,7 @@
                         :value="item.Id"
                     />
                 </el-select>
-                <el-button :icon="Refresh" :loading="loading" @click="loadOverview(true)">刷新</el-button>
+                <el-button :icon="Refresh" :loading="loading" @click="loadOverview(true)">{{ overview ? "刷新" : "加载概览" }}</el-button>
                 <el-button type="primary" :icon="MagicStick" @click="promptDialogVisible = true">AI描述生成</el-button>
                 <el-button :icon="DocumentChecked" :disabled="!graphData.Nodes.length" @click="openSaveDialog">保存</el-button>
             </div>
@@ -49,6 +49,15 @@
                 <strong>{{ item.value }}</strong>
             </div>
         </section>
+
+        <el-alert
+            v-if="overview?.GraphTruncated"
+            class="aiwf-limit-alert"
+            type="warning"
+            :closable="false"
+            show-icon
+            :title="`当前仅渲染 ${overview.Stats?.RenderedGraphNodeCount || graphData.Nodes.length} / ${overview.Stats?.AvailableGraphNodeCount || graphData.Nodes.length} 个节点，请输入关键词缩小范围。`"
+        />
 
         <section class="aiwf-workbench">
             <aside class="aiwf-resource-panel">
@@ -101,6 +110,11 @@
                     <el-tag size="small" effect="plain">{{ graphData.Nodes.length }} 节点 / {{ graphData.Edges.length }} 连线</el-tag>
                 </div>
                 <div ref="graphContainer" class="aiwf-graph" />
+                <div v-if="!overview && !loading" class="aiwf-empty-guide">
+                    <el-empty :image-size="92" description="为避免大租户全量图阻塞浏览器，页面不会自动加载全部资源。">
+                        <el-button type="primary" @click="loadOverview(false)">加载有界概览</el-button>
+                    </el-empty>
+                </div>
                 <div v-if="selectedNode" class="aiwf-node-bubbles" :style="actionStyle">
                     <el-tooltip content="详情" placement="top">
                         <el-button circle :icon="View" @click="showDetail('overview')" />
@@ -248,6 +262,10 @@ import {
 } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import AiWorkFlowApi from "./api";
+import {
+    createBoundedAiWorkflowOverview,
+    DEFAULT_AI_WORKFLOW_GRAPH_LIMIT
+} from "./runtime";
 
 const TYPE_STYLE = {
     menu: { fill: "#eef6ff", stroke: "#2f80ed", text: "#1b4f9c" },
@@ -307,7 +325,8 @@ export default {
                 Description: ""
             },
             savedFlows: [],
-            selectedSavedId: ""
+            selectedSavedId: "",
+            graphLimit: DEFAULT_AI_WORKFLOW_GRAPH_LIMIT
         };
     },
     computed: {
@@ -319,7 +338,13 @@ export default {
                 { key: "menus", label: "菜单", value: stats.MenuCount || 0 },
                 { key: "engines", label: "接口", value: stats.ApiEngineCount || 0 },
                 { key: "flows", label: "流程", value: stats.WorkflowCount || 0 },
-                { key: "nodes", label: "节点", value: stats.GraphNodeCount || this.graphData.Nodes.length },
+                {
+                    key: "nodes",
+                    label: "节点",
+                    value: (stats.AvailableGraphNodeCount || 0) > (stats.RenderedGraphNodeCount || this.graphData.Nodes.length)
+                        ? `${stats.RenderedGraphNodeCount || this.graphData.Nodes.length}/${stats.AvailableGraphNodeCount}`
+                        : (stats.RenderedGraphNodeCount || stats.GraphNodeCount || this.graphData.Nodes.length)
+                },
                 { key: "elapsed", label: "耗时", value: elapsed }
             ];
         },
@@ -377,7 +402,6 @@ export default {
     mounted() {
         this.initGraph();
         this.loadSavedList();
-        this.loadOverview();
     },
     beforeUnmount() {
         if (this.resizeObserver) this.resizeObserver.disconnect();
@@ -394,6 +418,8 @@ export default {
                     IncludeFieldNodes: false,
                     IncludeInventoryDetails: false,
                     IncludePeripheralNodes: false,
+                    IncludeNodeDetails: false,
+                    MaxGraphNodes: this.graphLimit,
                     Refresh: forceRefresh === true
                 });
                 if (this.isOk(result)) {
@@ -444,8 +470,9 @@ export default {
             }
         },
         applyOverview(data) {
-            this.overview = data;
-            this.graphData = data.Graph || { Nodes: [], Edges: [] };
+            const bounded = createBoundedAiWorkflowOverview(data, this.graphLimit);
+            this.overview = bounded;
+            this.graphData = bounded.Graph || { Nodes: [], Edges: [] };
             this.selectedNode = null;
             this.selectedCell = null;
             this.detailVisible = false;
@@ -687,7 +714,9 @@ export default {
                     IncludeEventNodes: this.showEventNodes,
                     IncludeFieldNodes: false,
                     IncludeInventoryDetails: false,
-                    IncludePeripheralNodes: false
+                    IncludePeripheralNodes: false,
+                    IncludeNodeDetails: false,
+                    MaxGraphNodes: this.graphLimit
                 });
                 if (this.isOk(result)) {
                     this.applyOverview(result.Data || {});
@@ -857,6 +886,10 @@ export default {
     background: #fff;
 }
 
+.aiwf-limit-alert {
+    border-radius: 0;
+}
+
 .aiwf-stat {
     height: 50px;
     display: flex;
@@ -1010,6 +1043,17 @@ export default {
 .aiwf-graph {
     width: 100%;
     height: 100%;
+}
+
+.aiwf-empty-guide {
+    position: absolute;
+    z-index: 3;
+    inset: 64px 20px 20px;
+    display: grid;
+    place-items: center;
+    border: 1px dashed #cfdae9;
+    border-radius: 8px;
+    background: rgba(251, 253, 255, 0.94);
 }
 
 .aiwf-node-bubbles {

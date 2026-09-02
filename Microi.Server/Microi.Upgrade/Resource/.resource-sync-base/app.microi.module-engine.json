@@ -1,12 +1,12 @@
 {
   "PackageInfo": {
     "Name": "模块引擎",
-    "Version": "v7.6.2",
+    "Version": "v7.6.3",
     "CreateTime": "2026-08-08T06:31:30.327Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
     "Description": "模块引擎基础资源。NotShowFields 损坏配置由新版客户端和服务端共同清洗，null、空字符串及非法对象不再中断列表或子表渲染；顶栏标签、菜单角标、记录直达与表单展示继续使用物理配置。",
-    "ChangeHistory": "2026-09-01 v7.6.2 声明 NotShowFields 前后端规范化能力：新版平台会在菜单通用读写、缓存与 SysMenuLogic 边界过滤 null、空字符串和非法对象，客户端同时保留空值防护，避免列表或子表因单条损坏配置停止渲染。\n2026-08-25 v7.6.1 补齐模块引擎官方包的 ResourcePolicies 结构并与 V8 优先应用所有权契约对齐；菜单、展示和子租户维护继续由低代码资源交付，同时增加结构化更新日志与发布硬门禁。\n2026-08-25 v7.6.0 补齐模块引擎官方包的 ResourcePolicies 结构并与 V8 优先应用所有权契约对齐；菜单、展示和子租户维护继续由低代码资源与接口引擎交付，不新增 Controller 业务。\n2026-08-23 v7.5.5 顶栏标签右键新增表单设计入口，优先读取路由 DiyTableId，缺失时按当前 sys_menu.Id 回查绑定表单并缓存结果。\n2026-08-22 v7.5.2 新增 sys_menu.MenuBadgeTooltip，左侧菜单数字角标可显示自定义悬停说明，旧菜单未配置时保持原有标题提示。\n2026-08-21 v7.5.1 将“进入模块默认打开第一条记录”迁移为 sys_menu.OpenFirstRecord 物理字段；模块设置与表单设置各归其所属引擎，旧 ViewSchema 配置继续兼容读取。\n2026-08-21 v7.5.0 移除模块侧独立表单工作台配置入口，统一使用 diy_table.FormPresentation；记录直达、表格弹层和跨模块记录页复用同一 DiyForm。\n",
+    "ChangeHistory": "2026-09-02 v7.6.3 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v7.6.2 声明 NotShowFields 前后端规范化能力：新版平台会在菜单通用读写、缓存与 SysMenuLogic 边界过滤 null、空字符串和非法对象，客户端同时保留空值防护，避免列表或子表因单条损坏配置停止渲染。\n2026-08-25 v7.6.1 补齐模块引擎官方包的 ResourcePolicies 结构并与 V8 优先应用所有权契约对齐；菜单、展示和子租户维护继续由低代码资源交付，同时增加结构化更新日志与发布硬门禁。\n2026-08-25 v7.6.0 补齐模块引擎官方包的 ResourcePolicies 结构并与 V8 优先应用所有权契约对齐；菜单、展示和子租户维护继续由低代码资源与接口引擎交付，不新增 Controller 业务。\n2026-08-23 v7.5.5 顶栏标签右键新增表单设计入口，优先读取路由 DiyTableId，缺失时按当前 sys_menu.Id 回查绑定表单并缓存结果。\n2026-08-22 v7.5.2 新增 sys_menu.MenuBadgeTooltip，左侧菜单数字角标可显示自定义悬停说明，旧菜单未配置时保持原有标题提示。\n2026-08-21 v7.5.1 将“进入模块默认打开第一条记录”迁移为 sys_menu.OpenFirstRecord 物理字段；模块设置与表单设置各归其所属引擎，旧 ViewSchema 配置继续兼容读取。\n2026-08-21 v7.5.0 移除模块侧独立表单工作台配置入口，统一使用 diy_table.FormPresentation；记录直达、表格弹层和跨模块记录页复用同一 DiyForm。\n",
     "RequiredPlatformCapabilities": [
       "ClientFeature:FormPresentation",
       "ServerField:DiyTable.FormPresentation",
@@ -29,11 +29,11 @@
     "DataRowCount": 0,
     "AiApplicationCount": 0,
     "ChangeLog": {
-      "Version": "v7.6.2",
-      "Title": "菜单隐藏字段损坏配置自愈",
-      "ChangeType": "Fix",
-      "Content": "声明 NotShowFields 前后端规范化能力：新版平台会在菜单通用读写、缓存与 SysMenuLogic 边界过滤 null、空字符串和非法对象，客户端同时保留空值防护，避免列表或子表因单条损坏配置停止渲染。",
-      "ReleaseTime": "2026-09-01 20:05:00"
+      "Version": "v7.6.3",
+      "Title": "WebOS iOS 拟物透明图标升级",
+      "ChangeType": "Optimize",
+      "Content": "将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。",
+      "ReleaseTime": "2026-09-02 12:05:00"
     }
   },
   "DDLStatements": [
@@ -3880,7 +3880,7 @@
       "DisplayMac": 1,
       "AppDisplay": 1,
       "OpenType": "Diy",
-      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-027-757ff6ce.webp",
+      "Icon": "/itdos/microi/webos-icons/ios-skeuomorphic-v2/202609/module.webp",
       "TableDiyFieldIds": "[\"3028feb7-2d2f-4b77-95b9-aa416c964356\",\"eebfbefc-7f27-44b4-831a-8419654f9671\",\"72b6db5a-f4e0-40cd-8459-235c0cfbcebe\",\"59271770-bc8f-414b-8c2c-611d628f13c7\",\"41e71493-68f6-4346-b9f4-332f80d9ef40\",\"11692047-3eed-49d3-a2cd-da418c66ccfc\",\"6832b023-b9a5-4d3b-bad6-50e8d95fd2e7\",\"bfd9a96e-9879-4ad6-a763-5104d76fa061\",\"408399d3-4b4c-449d-848e-ec8c7085fe12\",\"aee82b03-efbb-4a39-add0-7b598fe07363\",\"8c92b21a-fca9-43c9-a503-d2b29f12f9c1\",\"a2786db3-d1df-4de2-875b-63fffdc01ec9\",\"a76674b6-2793-428e-b333-691f73310140\",\"f5395e55-501a-47e0-8e1f-f29eab445139\"]",
       "PageBtns": "[]",
       "DiyTableId": "1d28e502-70ea-4a2b-9793-699b3f42234e",

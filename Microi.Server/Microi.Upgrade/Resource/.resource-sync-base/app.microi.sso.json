@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "SSO 身份联邦",
-    "Version": "v7.5.9",
+    "Version": "v7.5.10",
     "CreateTime": "2026-08-21T12:00:00.000Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -19,6 +19,11 @@
     "AiApplicationCount": 0,
     "Description": "Microi 吾码官方双向 SSO 应用：OIDC、SAML2、CAS 与存量 Token 兼容。全部公开 HTTP 路由、连接投影、JIT/绑定、角色映射、审计与租户 Hook 均由应用接口引擎交付；Microi.net 只保留签名验签、协议编解码、一次性票据和 DiyToken 等不可覆盖的可信原子。",
     "ChangeHistory": [
+      {
+        "Version": "v7.5.10",
+        "Date": "2026-09-02",
+        "Description": "将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。"
+      },
       {
         "Version": "v7.5.9",
         "Date": "2026-08-30",
@@ -74,11 +79,11 @@
     ],
     "ApplicationType": "Platform",
     "ChangeLog": {
-      "Version": "v7.5.9",
-      "Title": "SSO 公开协议路由全面接口引擎化",
+      "Version": "v7.5.10",
+      "Title": "WebOS iOS 拟物透明图标升级",
       "ChangeType": "Optimize",
-      "Content": "将原 SsoProtocolGatewayController 的 24 个 OIDC、SAML2、CAS 与登录编排路由全部迁入官方 Managed 接口引擎；新增受控 HTTP 响应与 {OsClient} 路径模板能力，C# 仅保留不可由租户覆盖的协议、安全和票据原子，CreateIfMissing 个性化 Hook 继续归租户维护。",
-      "ReleaseTime": "2026-08-30 12:00:00"
+      "Content": "将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。",
+      "ReleaseTime": "2026-09-02 12:05:00"
     }
   },
   "DDLStatements": [
@@ -4673,7 +4678,7 @@
       "DisplayMac": 1,
       "AppDisplay": 1,
       "OpenType": "Diy",
-      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-062-3dc6c975.webp",
+      "Icon": "/itdos/microi/webos-icons/ios-skeuomorphic-v2/202609/security.webp",
       "TableDiyFieldIds": "[\"75000000-0000-4000-8000-000000000002\",\"75000000-0000-4000-8000-000000000001\",\"75000000-0000-4000-8000-000000000003\",\"75000000-0000-4000-8000-000000000004\",\"75000000-0000-4000-8000-000000000009\",\"75000000-0000-4000-8000-000000000012\",\"75000000-0000-4000-8000-000000000025\",\"024145e0-851c-4c24-9817-084ae39dc2a5\",\"75000000-0000-4000-8000-000000000007\"]",
       "PageBtns": "[]",
       "DiyTableId": "a148a8e0-0a84-406c-b4e1-fdcc01273436",

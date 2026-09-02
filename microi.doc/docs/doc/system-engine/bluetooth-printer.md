@@ -37,6 +37,63 @@
 
 CC4 厂家资料声明支持 ESC/POS、CPCL、蓝牙双模及 Android/iOS 等平台。吾码只据此启用经过实现和测试的 ESC/POS、CPCL、BLE/SPP 路径，不把演示工程中出现但产品页未声明的 ZPL 当作 CC4 保证能力。型号参数以 [ZICOX CC4 官方页面](https://www.zicox.com/prod_Detail.aspx?id=73&tid=1) 与实际固件为准。
 
+## 微服务同时提供普通打印与蓝牙打印
+
+前端微服务运行在隔离的子应用中，不能直接访问父页面的 Vue 组件、Pinia、DOM 或
+`window.parent.V8`。业务页面需要增加“普通打印”时，应通过
+`microi.host.v1` 宿主动作 `openPlatformPrint` 打开吾码 Print Engine 预览；不要在
+子应用里复制平台打印弹窗，也不要跨 iframe 调父页面私有方法。
+
+| 页面选项 | 标准入口 | 适用输出 | 边界 |
+|---|---|---|---|
+| 普通打印 | `openPlatformPrint` 宿主动作 | `mic_print` 模板预览、浏览器/系统打印 | 只打开平台预览，不发送 BLE/SPP 字节 |
+| 蓝牙打印 | 平台前端 V8 中的 `V8.Print.prepareSend()` | TSPL、CPCL、ESC/POS 标签或小票 | 写入成功不等于打印机已经走纸 |
+
+微服务调用普通打印的最小示例：
+
+```javascript
+function callMicroiHost(action, data) {
+  var host = window.microApp?.getData?.() || {};
+  var capabilities = host.hostCapabilities;
+  if (capabilities?.protocol !== 'microi.host.v1'
+      || !capabilities?.actions?.includes(action)) {
+    throw new Error('当前吾码宿主不支持 ' + action);
+  }
+
+  var requestId = 'host-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  window.microApp.dispatch({
+    type: capabilities.requestType || 'micro-app:host-action',
+    action: action,
+    requestId: requestId,
+    data: data
+  });
+  return requestId;
+}
+
+function openOrdinaryPrint(printId, businessId) {
+  var host = window.microApp?.getData?.() || {};
+  var dataApi = new URL('/apiengine/get-print-data', host.apiBase);
+  dataApi.searchParams.set('OsClient', host.osClient);
+  dataApi.searchParams.set('Id', businessId);
+
+  return callMicroiHost('openPlatformPrint', {
+    printId: printId,       // mic_print.Id
+    dataApi: dataApi.toString(),
+    title: '普通打印'
+  });
+}
+```
+
+宿主会校验 `printId`，并且只接受“当前 `apiBase` 同源、路径以 `/apiengine/`
+开头、明确携带且匹配当前 `OsClient`”的绝对 `dataApi`。不要把 Token、帐号密码或其它
+凭据放进 URL。宿主返回 `{ accepted:true, printId }` 只表示平台打印预览已经打开，不等于
+浏览器已执行打印，更不等于打印机已经出纸。
+
+独立打开微服务时没有吾码宿主，`hostCapabilities` 不存在；此时应隐藏/禁用普通打印按钮，
+或使用应用自己的独立预览方案。`openPlatformPrint` 不是蓝牙代理，不能把 TSPL、CPCL、
+ESC/POS 字节作为它的参数。完整宿主动作与结果监听见
+[前端微服务：子应用调用吾码主框架能力](/doc/system-engine/micro-app#子应用调用吾码主框架能力)。
+
 ## 为什么旧 V8 可以保持不变
 
 ```mermaid

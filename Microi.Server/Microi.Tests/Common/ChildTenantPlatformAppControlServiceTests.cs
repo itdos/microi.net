@@ -226,7 +226,7 @@ public class ChildTenantPlatformAppControlServiceTests
             "Resource",
             "bulk-import-packages.js"));
 
-        Assert.Contains("Version: v1.3.8", worker, StringComparison.Ordinal);
+        Assert.Contains("Version: v1.4.1", worker, StringComparison.Ordinal);
         Assert.Contains("MARKETPLACE_LIST_CUSTOM_ADDRESS_V1", worker, StringComparison.Ordinal);
         Assert.Contains("MARKETPLACE_LIST_ROUTE_FAILOVER_V1", worker, StringComparison.Ordinal);
         Assert.Contains("formalListPath = '/apiengine/get-microi-store-list'", worker, StringComparison.Ordinal);
@@ -283,7 +283,7 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("GetBootstrapSourceFingerprint", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", importerSource, StringComparison.Ordinal);
-        Assert.Contains("Version: v2.5.1", importerSource, StringComparison.Ordinal);
+        Assert.Contains("Version: v2.6.8", importerSource, StringComparison.Ordinal);
         Assert.Contains("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1", importerSource, StringComparison.Ordinal);
         Assert.Contains("V8.Method.RequireManagedProtocolContext", importerSource, StringComparison.Ordinal);
         Assert.Contains("STARTUP_API_RUNTIME_FLAG_PHYSICAL_RECONCILIATION_V1", importerSource, StringComparison.Ordinal);
@@ -449,6 +449,33 @@ public class ChildTenantPlatformAppControlServiceTests
             generatedHeader + body,
             "v1.3.2",
             body,
+            out var error));
+        Assert.Equal(string.Empty, error);
+    }
+
+    [Fact]
+    public void BootstrapWorkerRefresh_IgnoresGeneratedHeaderAfterOfficialManagedNotice()
+    {
+        const string officialNotice = "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n"
+                                      + " * ApiEngineKey：platform-sys-menu\n"
+                                      + " */\n\n";
+        const string generatedHeader = "/*\n"
+                                       + " * V8 ApiEngine\n"
+                                       + " * ApiEngineKey: platform-sys-menu\n"
+                                       + " * Version: v1.0.3\n"
+                                       + " * Function:\n"
+                                       + " * - 官方菜单工作器\n"
+                                       + " */\n\n";
+        const string body = "// Microi官方接口引擎：platform-sys-menu\n"
+                            + "// Version: v1.0.3\n"
+                            + "return V8.Method.ManageSystemDirectory({ Domain: 'SysMenu' });\n";
+
+        Assert.False(ChildTenantPlatformAppControlService.ShouldRefreshBootstrapEngine(
+            "platform-sys-menu",
+            "v1.0.3",
+            officialNotice + generatedHeader + body,
+            "v1.0.3",
+            officialNotice + body,
             out var error));
         Assert.Equal(string.Empty, error);
     }

@@ -240,34 +240,30 @@ test('WebOS 截图 1-4 专项回归', async ({ page }) => {
     await page.screenshot({ path: path.join(OUTPUT, 'issue-03-borderless-custom-widgets.png') });
     diagnostics.screenshots.push('issue-03-borderless-custom-widgets.png');
 
-    // 问题 4：系统引擎二级菜单使用主题 SVG，并具备 iOS 风格半透明毛玻璃。
+    // 问题 4：系统引擎二级菜单使用透明图片图标，并具备 iOS 风格半透明毛玻璃。
     const folder = page.locator([
         '.microi-macos-desk .microi-desk-griditem[title="系统引擎"]',
         '.microi-macos-desk .microi-desk-griditem[title="System Engine"]',
     ].join(', ')).first();
     await expect(folder).toBeVisible();
     await folder.click();
-    const folderLayer = page.locator('.microi-desk-thumblayer:visible').first();
-    const folderWrap = page.locator('.ve__layer.microi-macos-folder-layer .ve__layer-wrap:visible').first();
+    const folderLayer = page.locator('.webos-desktop-folder:visible').first();
+    const folderWrap = page.locator('.webos-desktop-folder-backdrop:visible').first();
     await expect(folderLayer).toBeVisible();
     const material = await folderLayer.evaluate(element => {
         const style = getComputedStyle(element);
-        const wrap = element.closest('.ve__layer-wrap');
-        const wrapStyle = wrap ? getComputedStyle(wrap) : null;
         return {
             radius: parseFloat(style.borderTopLeftRadius),
             backdrop: style.backdropFilter || style.webkitBackdropFilter || '',
             backgroundImage: style.backgroundImage,
             backgroundColor: style.backgroundColor,
             borderColor: style.borderTopColor,
-            titleColor: getComputedStyle(element.querySelector('.microi-desk-thumblayer__title')).color,
-            wrapRadius: wrapStyle ? parseFloat(wrapStyle.borderTopLeftRadius) : 0,
-            wrapOverflow: wrapStyle?.overflow || '',
+            titleColor: getComputedStyle(element.querySelector('.webos-desktop-folder__heading strong')).color,
+            overflow: style.overflow,
         };
     });
     expect(material.radius).toBeGreaterThanOrEqual(24);
-    expect(material.wrapRadius).toBeGreaterThanOrEqual(24);
-    expect(material.wrapOverflow).toBe('hidden');
+    expect(material.overflow).toBe('hidden');
     expect(material.backdrop).toMatch(/blur\((?:3[8-9]|[4-9]\d)px\)/);
     expect(material.backgroundImage).toContain('linear-gradient');
     expect(material.backgroundColor).not.toBe('rgb(255, 255, 255)');
@@ -279,66 +275,46 @@ test('WebOS 截图 1-4 专项回归', async ({ page }) => {
     expect(titleRgb).not.toBeNull();
     expect(contrastRatio(titleRgb, [255, 255, 255])).toBeGreaterThanOrEqual(4.5);
     await expect(folderWrap).toBeVisible();
-    const folderItems = folderLayer.locator('.microi-desk-thumblayer__item');
+    const folderItems = folderLayer.locator('.webos-desktop-folder__item');
     expect(await folderItems.count()).toBeGreaterThanOrEqual(15);
     const iconRows = await folderItems.evaluateAll(items => items.map(item => {
         const icon = item.querySelector('.webos-theme-menu-icon');
         return {
-            label: item.querySelector('.label')?.textContent?.trim() || '',
-            glyph: icon?.getAttribute('data-theme-glyph') || '',
+            label: item.querySelector('.webos-desktop-folder__label')?.textContent?.trim() || '',
             hasSvg: Boolean(icon?.querySelector('svg')),
             hasImage: Boolean(icon?.querySelector('img')),
-            color: icon ? getComputedStyle(icon).color : '',
+            src: icon?.querySelector('img')?.src || '',
+            naturalWidth: icon?.querySelector('img')?.naturalWidth || 0,
+            naturalHeight: icon?.querySelector('img')?.naturalHeight || 0,
         };
     }));
-    expect(iconRows.every(row => row.hasSvg && !row.hasImage && row.glyph), JSON.stringify(iconRows)).toBe(true);
-    expect(new Set(iconRows.map(row => row.glyph)).size).toBeGreaterThanOrEqual(30);
-    const expectedGlyphs = new Map([
-        ['System Management', 'settings'], ['System Architecture', 'architecture'],
-        ['App Store', 'store'], ['API Engine', 'api'], ['AI Engine', 'assistant'],
-        ['Form Engine', 'form'], ['Acquisition Engine', 'spider'], ['Module Engine', 'module'],
-        ['Database Extension', 'database'], ['Page Engine', 'page'], ['Data Screen', 'dashboard'],
-        ['Multilingualism', 'language'], ['Workflow Engine', 'workflow'], ['File Cabinet', 'file'],
-        ['SaaS Engine', 'saas'], ['Report Engine', 'report'], ['Job Scheduler', 'job'],
-        ['Page Components', 'components'], ['Message Queue', 'queue'], ['MQTT', 'mqtt'],
-        ['Print Engine', 'print'], ['Single Sign-On', 'sso'], ['Tree + Table Config', 'tree-table'],
-        ['Third-Party Platform', 'third-party'], ['Report Engine Field Config', 'report-field'],
-        ['Authorization Management', 'authorization'], ['Export Template', 'export'],
-        ['AI Engine Logs', 'ai-logs'], ['Microservices', 'microservices'],
-        ['Authorization Logs', 'auth-logs'], ['Data Source Engine', 'datasource'],
-    ]);
-    for (const [label, glyph] of expectedGlyphs) {
-        expect(iconRows.find(row => row.label === label)?.glyph, label).toBe(glyph);
-    }
+    expect(iconRows.every(row => row.hasImage && !row.hasSvg && row.src), JSON.stringify(iconRows)).toBe(true);
+    expect(iconRows.every(row => row.naturalWidth === 320 && row.naturalHeight === 320), JSON.stringify(iconRows)).toBe(true);
+    expect(iconRows.every(row => /webos-icons\/ios-skeuomorphic-v2\/202609\/.+\.webp/i.test(row.src)), JSON.stringify(iconRows)).toBe(true);
+    expect(new Set(iconRows.map(row => row.src)).size).toBeGreaterThanOrEqual(15);
     const originalAccent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--mci-color-primary').trim());
-    expect(iconRows.every(row => row.color === iconRows[0].color), JSON.stringify(iconRows)).toBe(true);
     diagnostics.checks.folderMaterial = material;
-    diagnostics.checks.themeSvgIcons = iconRows;
-    await page.screenshot({ path: path.join(OUTPUT, 'issue-04-theme-svg-glass-folder.png') });
-    diagnostics.screenshots.push('issue-04-theme-svg-glass-folder.png');
-    await folderLayer.locator('.microi-folder-close').click();
+    diagnostics.checks.transparentImageIcons = iconRows;
+    await page.screenshot({ path: path.join(OUTPUT, 'issue-04-transparent-image-glass-folder.png') });
+    diagnostics.screenshots.push('issue-04-transparent-image-glass-folder.png');
+    await folderLayer.locator('.webos-desktop-folder__close').click();
 
-    // 通过产品真实主题工具切换强调色，验证所有 SVG 的 currentColor 随系统主题更新。
+    // 通过产品真实主题工具切换强调色，验证图片图标不会被主题色替换或丢失。
     const changedAccent = await page.evaluate(async () => {
         const { setThemeColor } = await import('/src/utils/theme-color.js');
         return setThemeColor('#e4572e');
     });
     expect(String(changedAccent).toLowerCase()).not.toBe(String(originalAccent).toLowerCase());
     await folder.click();
-    const recoloredLayer = page.locator('.microi-desk-thumblayer:visible').first();
+    const recoloredLayer = page.locator('.webos-desktop-folder:visible').first();
     await expect(recoloredLayer).toBeVisible();
-    const recoloredIcons = recoloredLayer.locator('.webos-theme-menu-icon.is-theme');
-    const recolored = await recoloredIcons.evaluateAll(icons => ({
-        iconColors: icons.map(icon => getComputedStyle(icon).color),
-        rootColor: getComputedStyle(document.documentElement).getPropertyValue('--mci-color-primary').trim(),
-    }));
-    expect(recolored.iconColors.length).toBeGreaterThanOrEqual(15);
-    expect(recolored.iconColors.every(color => color === recolored.iconColors[0])).toBe(true);
-    expect(recolored.iconColors[0]).not.toBe(iconRows[0].color);
-    diagnostics.checks.recoloredThemeSvgIcons = recolored;
-    await page.screenshot({ path: path.join(OUTPUT, 'issue-04-theme-svg-accent-follow.png') });
-    diagnostics.screenshots.push('issue-04-theme-svg-accent-follow.png');
-    await recoloredLayer.locator('.microi-folder-close').click();
+    const themedSources = await recoloredLayer.locator('.webos-theme-menu-icon.is-image img').evaluateAll(images => images.map(image => image.src));
+    expect(themedSources.length).toBe(iconRows.length);
+    expect(themedSources).toEqual(iconRows.map(row => row.src));
+    diagnostics.checks.themeIndependentImageIcons = themedSources;
+    await page.screenshot({ path: path.join(OUTPUT, 'issue-04-image-icons-after-accent-change.png') });
+    diagnostics.screenshots.push('issue-04-image-icons-after-accent-change.png');
+    await recoloredLayer.locator('.webos-desktop-folder__close').click();
     await page.evaluate(async color => {
         const { setThemeColor } = await import('/src/utils/theme-color.js');
         setThemeColor(color || '#409eff');

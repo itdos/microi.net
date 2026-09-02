@@ -205,7 +205,6 @@
 | `diy_course` | 3 | 课程表（示例） |
 | `eban` | 5 | EBAN（示例） |
 | `mic_memo` | 3 | 备忘录 |
-| `mic_3d_engine` | 0 | 3D 引擎 |
 
 ---
 

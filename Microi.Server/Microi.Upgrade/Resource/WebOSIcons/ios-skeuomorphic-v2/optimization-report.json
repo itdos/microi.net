@@ -1,0 +1,465 @@
+{
+  "targetSize": 320,
+  "maxBytes": 153600,
+  "files": [
+    {
+      "file": "ai-governance.webp",
+      "bytes": 28336,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 58032,
+      "partialAlphaPixels": 44368,
+      "bbox": {
+        "minX": 51.5,
+        "minY": 35,
+        "maxX": 267.5,
+        "maxY": 284
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "ai.webp",
+      "bytes": 29952,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 62760,
+      "partialAlphaPixels": 39640,
+      "bbox": {
+        "minX": 37,
+        "minY": 25.5,
+        "maxX": 282,
+        "maxY": 293.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "api.webp",
+      "bytes": 25034,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 73253,
+      "partialAlphaPixels": 29147,
+      "bbox": {
+        "minX": 10.5,
+        "minY": 42,
+        "maxX": 308.5,
+        "maxY": 277
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "architecture.webp",
+      "bytes": 28562,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 58030,
+      "partialAlphaPixels": 44370,
+      "bbox": {
+        "minX": 20.5,
+        "minY": 21.5,
+        "maxX": 298.5,
+        "maxY": 297.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "cloud-saas.webp",
+      "bytes": 35274,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 58629,
+      "partialAlphaPixels": 43771,
+      "bbox": {
+        "minX": 39,
+        "minY": 21.5,
+        "maxX": 280,
+        "maxY": 297.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "dashboard.webp",
+      "bytes": 28486,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 52060,
+      "partialAlphaPixels": 50340,
+      "bbox": {
+        "minX": 40,
+        "minY": 11.5,
+        "maxX": 279,
+        "maxY": 307.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "database.webp",
+      "bytes": 30418,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 52198,
+      "partialAlphaPixels": 50202,
+      "bbox": {
+        "minX": 40,
+        "minY": 20,
+        "maxX": 279,
+        "maxY": 299
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "document-print.webp",
+      "bytes": 29134,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 49212,
+      "partialAlphaPixels": 53188,
+      "bbox": {
+        "minX": 22.5,
+        "minY": 30,
+        "maxX": 296.5,
+        "maxY": 289
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "file.webp",
+      "bytes": 25296,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 49306,
+      "partialAlphaPixels": 53094,
+      "bbox": {
+        "minX": 34.5,
+        "minY": 17,
+        "maxX": 284.5,
+        "maxY": 302
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "form.webp",
+      "bytes": 25890,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 47706,
+      "partialAlphaPixels": 54694,
+      "bbox": {
+        "minX": 29.5,
+        "minY": 12,
+        "maxX": 289.5,
+        "maxY": 307
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "language.webp",
+      "bytes": 39024,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 43380,
+      "partialAlphaPixels": 59020,
+      "bbox": {
+        "minX": 11.5,
+        "minY": 19,
+        "maxX": 307.5,
+        "maxY": 300
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "marketplace.webp",
+      "bytes": 27800,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 45820,
+      "partialAlphaPixels": 56580,
+      "bbox": {
+        "minX": 34,
+        "minY": 13,
+        "maxX": 285,
+        "maxY": 306
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "messaging.webp",
+      "bytes": 23412,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 52638,
+      "partialAlphaPixels": 49762,
+      "bbox": {
+        "minX": 38.5,
+        "minY": 34,
+        "maxX": 280.5,
+        "maxY": 285
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "microservice.webp",
+      "bytes": 29938,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 61208,
+      "partialAlphaPixels": 41192,
+      "bbox": {
+        "minX": 17,
+        "minY": 21.5,
+        "maxX": 302,
+        "maxY": 297.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "module.webp",
+      "bytes": 33288,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 47367,
+      "partialAlphaPixels": 55033,
+      "bbox": {
+        "minX": 31,
+        "minY": 25.5,
+        "maxX": 288,
+        "maxY": 293.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "monitoring.webp",
+      "bytes": 27890,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 56349,
+      "partialAlphaPixels": 46051,
+      "bbox": {
+        "minX": 30,
+        "minY": 41.5,
+        "maxX": 289,
+        "maxY": 277.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "mqtt-network.webp",
+      "bytes": 39706,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 61444,
+      "partialAlphaPixels": 40956,
+      "bbox": {
+        "minX": 16,
+        "minY": 16.5,
+        "maxX": 303,
+        "maxY": 302.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "page.webp",
+      "bytes": 28368,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 48157,
+      "partialAlphaPixels": 54243,
+      "bbox": {
+        "minX": 27.5,
+        "minY": 22,
+        "maxX": 291.5,
+        "maxY": 297
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "people.webp",
+      "bytes": 27058,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 58154,
+      "partialAlphaPixels": 44246,
+      "bbox": {
+        "minX": 17,
+        "minY": 26.5,
+        "maxX": 302,
+        "maxY": 292.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "report.webp",
+      "bytes": 27162,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 49805,
+      "partialAlphaPixels": 52595,
+      "bbox": {
+        "minX": 28.5,
+        "minY": 5,
+        "maxX": 290.5,
+        "maxY": 314
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "schedule.webp",
+      "bytes": 27238,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 51274,
+      "partialAlphaPixels": 51126,
+      "bbox": {
+        "minX": 19.5,
+        "minY": 30.5,
+        "maxX": 299.5,
+        "maxY": 288.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "security.webp",
+      "bytes": 26018,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 57025,
+      "partialAlphaPixels": 45375,
+      "bbox": {
+        "minX": 46.5,
+        "minY": 25,
+        "maxX": 272.5,
+        "maxY": 294
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "settings.webp",
+      "bytes": 27020,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 54853,
+      "partialAlphaPixels": 47547,
+      "bbox": {
+        "minX": 32,
+        "minY": 22.5,
+        "maxX": 287,
+        "maxY": 296.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "spider.webp",
+      "bytes": 33376,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 66059,
+      "partialAlphaPixels": 36341,
+      "bbox": {
+        "minX": 39.5,
+        "minY": 19,
+        "maxX": 279.5,
+        "maxY": 300
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "system-engine.webp",
+      "bytes": 27798,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 52095,
+      "partialAlphaPixels": 50305,
+      "bbox": {
+        "minX": 21,
+        "minY": 23.5,
+        "maxX": 298,
+        "maxY": 295.5
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "third-party.webp",
+      "bytes": 29616,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 66436,
+      "partialAlphaPixels": 35964,
+      "bbox": {
+        "minX": 13,
+        "minY": 16,
+        "maxX": 306,
+        "maxY": 303
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    {
+      "file": "workflow.webp",
+      "bytes": 34686,
+      "quality": 0.9,
+      "sourceWidth": 1254,
+      "sourceHeight": 1254,
+      "transparentPixels": 54610,
+      "partialAlphaPixels": 47790,
+      "bbox": {
+        "minX": 10.5,
+        "minY": 21,
+        "maxX": 308.5,
+        "maxY": 298
+      },
+      "offsetX": 0,
+      "offsetY": 0
+    }
+  ]
+}
