@@ -137,6 +137,8 @@ export default {
         { key: 'intentions', title: '购买意向', note: '产品与服务意向记录', icon: '/static/xjy/user/my-goumaiyixiang.png', feature: 'business' },
         { key: 'favorites', title: '我的收藏', note: '已收藏商品与方案', icon: '/static/xjy/user/my-shoucang.png', feature: 'mall' },
         { key: 'members', title: '成员管理', note: '组织成员与权限入口', icon: '/static/xjy/user/my-chengyuan.jpg', feature: 'business' },
+        { key: 'complaintCenter', title: '投诉举报', note: '提交投诉、补充材料与跟踪时限', icon: '/static/xjy/business/tixing.png' },
+        { key: 'complaintPublic', title: '处理公示', note: '查看脱敏后的处理结果与响应时限', icon: '/static/xjy/user/fws.png', public: true },
         { key: 'servicePhone', title: '平台客服', note: '工作日 08:30 - 18:00', value: '400-888-5680', arrow: false, icon: '/static/xjy/user/kefu.png' },
         // zhy：关于小程序属于公开平台能力，使用纳入主包的真实品牌图标，不依赖远程资源。
         { key: 'about', title: '关于小程序', note: '版本与更新', icon: '/static/xjy/user/version.png', public: true }
@@ -178,7 +180,7 @@ export default {
           updateReady: this.updateState.updateReady
         } : item)
       if (!this.isLoggedIn || this.roleProfile.isAdmin) return available
-      const common = ['personalInfo', 'password', 'reminders', 'servicePhone', 'about']
+      const common = ['personalInfo', 'password', 'reminders', 'complaintCenter', 'complaintPublic', 'servicePhone', 'about']
       const roleKeys = this.roleProfile.isCustomer ? ['providers', 'intentions', 'favorites'] : []
       return available.filter((item) => [...common, ...roleKeys].includes(item.key))
     }
@@ -247,8 +249,9 @@ export default {
     },
     handleMenu(item) {
       // zhy：关于小程序无需登录，未登录用户也必须能够更新版本。
-      if (item.key === 'about') {
-        uni.navigateTo({ url: getProfileRoute('about', '/pages/about/index') })
+      if (item.key === 'about' || item.key === 'complaintPublic') {
+        const fallback = item.key === 'about' ? '/pages/about/index' : '/pages/complaint/index?tab=public'
+        uni.navigateTo({ url: getProfileRoute(item.key, fallback) })
         return
       }
       if (!this.isLoggedIn) { this.goLogin(); return }
@@ -256,6 +259,7 @@ export default {
       else if (item.key === 'personalInfo') this.openProfile()
       else if (item.key === 'password') uni.navigateTo({ url: getProfileRoute('password', '/pages/native/password') })
       else if (item.key === 'reminders') uni.navigateTo({ url: getProfileRoute('reminders', '/pages/native/reminders') })
+      else if (item.key === 'complaintCenter') uni.navigateTo({ url: getProfileRoute('complaintCenter', '/pages/complaint/index?tab=submit') })
       else openBusiness(item.key)
     },
     openProfile() {

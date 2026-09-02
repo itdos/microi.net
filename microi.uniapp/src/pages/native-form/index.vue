@@ -16,7 +16,7 @@
 				<text>重新加载</text></view>
 		</view>
 
-		<view v-else class="native-form" :class="{ 'native-form--standalone-list': standaloneListMode }">
+		<view v-else class="native-form" :class="{ 'native-form--standalone-list': standaloneListMode, 'native-form--poster': !!detailPosterPresentation }">
 			<view v-if="stale" class="stale-tip"><text>当前展示了缓存配置，网络恢复后将自动更新</text></view>
 
 			<view v-if="tenantFormPresentation.clock || tenantFormPresentation.location"
@@ -65,6 +65,13 @@
 				</view>
 			</view>
 
+			<mci-poster-detail v-if="detailPosterPresentation"
+				:presentation="detailPosterPresentation" :form="form" :definition="definition"
+				:brand-logo="profileAssets.logo || ''" :table-name="tableName" :form-data-id="rowId"
+				:menu-id="menuId" :file-access-menu-id="fileMenuId" :module-engine-key="moduleEngineKey"
+				:table-child-auth="tableChildAuth" />
+
+			<template v-else>
 			<mci-related-tabs v-if="formTabs.length > 1" class="form-tabs--full" :items="formTabs" :active-key="activeFormTabKey"
 				@select="selectFormTab" />
 
@@ -91,7 +98,7 @@
 				<!-- zhy: 折叠后按需移除字段控件，已填写值仍保存在 form 中。 -->
 				<view v-if="isGroupExpanded(group, groupIndex)" class="form-section__content"
 					:class="{ 'form-section__content--select-open': isSelectorGroupOpen(group) }">
-					<view v-if="embeddedOpenTableRelatedForGroup(group).length"
+					<view v-if="isEditableMode && embeddedOpenTableRelatedForGroup(group).length"
 						class="form-section__selector-grid">
 						<mci-table-selector v-for="relatedTab in embeddedOpenTableRelatedForGroup(group)"
 							:key="relatedTab.key" :field="relatedTab.field" :parent-table="tableName"
@@ -219,13 +226,14 @@
 					@data-count="handleRelatedCount" />
 				<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
 					:parent-form="form" :parent-mode="mode" :readonly="mode === 'View'" />
-				<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
+				<mci-table-selector v-else-if="relatedTab.type === 'openTable' && isEditableMode" :field="relatedTab.field"
 					:parent-table="tableName" :parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
 					:readonly="mode === 'View' || isConfiguredReadonly(relatedTab.field)"
 					@change="handleRelatedChange" />
 				<mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
 					:parent-form="form" :parent-menu-id="menuId" />
 			</view>
+			</template>
 
 			<view class="form-bottom-space"></view>
 		</view>
@@ -253,7 +261,9 @@
 			</view>
 			<view v-if="!loading && !error && mode === 'View' && rowId && !openSelectorField"
 				class="form-view-actions">
-				<button class="edit-command" hover-class="edit-command--pressed" @tap="switchToEdit">编辑</button>
+				<button class="edit-command" hover-class="edit-command--pressed" @tap="switchToEdit">
+					<view class="edit-command__icon"></view><text>编辑</text>
+				</button>
 			</view>
 			<view v-if="!loading && !error && mode !== 'View'" class="form-actions">
 				<view class="form-actions__secondary" hover-class="form-actions__pressed" @tap="goBack"><text>取消</text>
@@ -316,6 +326,7 @@
 	} from '@/platform/form-extension.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 	import MciCustomerPicker from '@/components/mci-customer-picker/mci-customer-picker.vue'
+	import MciPosterDetail from '@/components/mci-poster-detail/mci-poster-detail.vue'
 	import MciVisitTargetFields from '@/components/mci-visit-target-fields/mci-visit-target-fields.vue'
 
 	function createDraftRowId() {
@@ -332,7 +343,7 @@
 	const TENANT_FLOATING_ACTION_POSITION_VERSION = 1
 
 	export default {
-		components: { MciBusinessRelatedList, MciCustomerPicker, MciVisitTargetFields },
+		components: { MciBusinessRelatedList, MciCustomerPicker, MciPosterDetail, MciVisitTargetFields },
 		mixins: [themeMixin],
 		data() {
 			return {
@@ -381,6 +392,10 @@
 			}
 		},
 		computed: {
+			detailPosterPresentation() {
+				if (this.mode !== 'View') return null
+				return this.tenantFormPresentation.detailPoster || null
+			},
 			pageTitle() {
 				return this.title || (this.mode === 'Add' ? '新增' : this.mode === 'Edit' ? '编辑' : '详情')
 			},
@@ -1249,12 +1264,37 @@
 		padding: 0;
 		border: 0;
 		border-radius: 8rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 13rpx;
 		background: #e94b2c;
 		color: #fff;
 		font-size: 26rpx;
 		font-weight: 700;
-		line-height: 84rpx;
+		line-height: 1;
 		transition: transform .16s ease;
+	}
+
+	.edit-command__icon {
+		position: relative;
+		width: 27rpx;
+		height: 27rpx;
+		border: 3rpx solid currentColor;
+		border-radius: 4rpx;
+		box-sizing: border-box;
+	}
+
+	.edit-command__icon::before {
+		position: absolute;
+		top: -5rpx;
+		right: -5rpx;
+		width: 18rpx;
+		height: 6rpx;
+		border: 3rpx solid #e94b2c;
+		background: currentColor;
+		content: '';
+		transform: rotate(-45deg);
 	}
 
 	.edit-command::after {
