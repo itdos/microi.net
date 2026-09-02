@@ -536,6 +536,17 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.True(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.ai-engine.json", ai })));
 
+        var oldAiRuntimeCapability = (JObject)ai.DeepClone();
+        oldAiRuntimeCapability["PackageInfo"]!["RequiredPlatformCapabilities"] = new JArray(
+            oldAiRuntimeCapability["PackageInfo"]!["RequiredPlatformCapabilities"]!.Select(item =>
+                item?.ToString()?.StartsWith(
+                    "ApiEngine:platform-ai-runtime@",
+                    StringComparison.Ordinal) == true
+                    ? "ApiEngine:platform-ai-runtime@v0.9.9"
+                    : item));
+        Assert.False(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.ai-engine.json", oldAiRuntimeCapability })));
+
         var missingAiKey = (JObject)sysUser.DeepClone();
         missingAiKey["DiyFields"] = new JArray(
             missingAiKey["DiyFields"]!.Children<JObject>().Where(row =>

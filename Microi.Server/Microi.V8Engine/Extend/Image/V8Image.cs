@@ -35,6 +35,10 @@ namespace Microi.net
 
         public DosResult Convert(object param) => Execute<ImageConvertParam>(param, ImageHelper.Convert, NormalizeSingleSource);
 
+        public DosResult Grayscale(object param) => Execute<ImageGrayscaleParam>(param, ImageHelper.Grayscale, NormalizeSingleSource);
+
+        public DosResult RemoveSolidBackground(object param) => Execute<ImageRemoveBackgroundParam>(param, ImageHelper.RemoveSolidBackground, NormalizeSingleSource);
+
         public DosResult Draw(object param) => Execute<ImageDrawParam>(param, ImageHelper.Draw, NormalizeSingleSource);
 
         public DosResult Watermark(object param)

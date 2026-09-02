@@ -16,8 +16,23 @@ namespace Microi.net
         public string Model { get; set; }
         public string AspectRatio { get; set; }
         public int Count { get; set; }
+        public string Operation { get; set; }
+        public IReadOnlyList<NormalizedMiniMaxImageReference> ReferenceImages { get; set; }
+        public int? Width { get; set; }
+        public int? Height { get; set; }
+        public long? Seed { get; set; }
+        public string PostProcess { get; set; }
         public string RequestBody { get; set; }
         public string Fingerprint { get; set; }
+    }
+
+    public sealed class NormalizedMiniMaxImageReference
+    {
+        public string FileName { get; set; }
+        public byte[] Bytes { get; set; }
+        public string Extension { get; set; }
+        public string ContentType { get; set; }
+        public string Sha256 { get; set; }
     }
 
     /// <summary>MiniMax 图片生成参数白名单与确定性语义识别。</summary>
@@ -27,6 +42,24 @@ namespace Microi.net
         {
             "1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"
         };
+        private static readonly HashSet<string> AllowedOperations = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "text-to-image", "image-to-image", "upscale", "erase", "outpaint",
+            "remove-watermark", "id-photo", "multi-composite", "redraw",
+            "remove-background", "background-replace", "colorize", "restore",
+            "portrait-retouch", "product-scene", "relight", "style-transfer",
+            "poster", "avatar", "logo", "sketch-to-image"
+        };
+        private static readonly HashSet<string> ReferenceRequiredOperations = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "image-to-image", "upscale", "erase", "outpaint", "remove-watermark",
+            "id-photo", "multi-composite", "redraw", "remove-background",
+            "background-replace", "colorize", "restore", "portrait-retouch",
+            "product-scene", "relight", "style-transfer", "avatar", "sketch-to-image"
+        };
+        private const int MaxReferenceCount = 4;
+        private const int MaxReferenceBytes = 10 * 1024 * 1024;
+        private const int MaxReferenceTotalBytes = 24 * 1024 * 1024;
 
         public static bool LooksLikeImageGeneration(string value)
         {
@@ -84,6 +117,72 @@ namespace Microi.net
                 return false;
             }
 
+            var operation = (param.Operation ?? "text-to-image").Trim().ToLowerInvariant();
+            if (!AllowedOperations.Contains(operation))
+            {
+                error = "当前不支持该 AI 图片工具。";
+                return false;
+            }
+            var references = new List<NormalizedMiniMaxImageReference>();
+            var sourceReferences = param.ReferenceImages ?? new List<MiniMaxImageReferenceParam>();
+            if (sourceReferences.Count > MaxReferenceCount)
+            {
+                error = $"单次最多允许 {MaxReferenceCount} 张参考图。";
+                return false;
+            }
+            long referenceTotalBytes = 0;
+            for (var index = 0; index < sourceReferences.Count; index++)
+            {
+                var source = sourceReferences[index];
+                if (!TryDecodeReference(source, out var reference, out var referenceError))
+                {
+                    error = $"第 {index + 1} 张参考图无效：{referenceError}";
+                    return false;
+                }
+                referenceTotalBytes += reference.Bytes.LongLength;
+                if (referenceTotalBytes > MaxReferenceTotalBytes)
+                {
+                    error = $"参考图合计不能超过 {MaxReferenceTotalBytes / 1024 / 1024} MB。";
+                    return false;
+                }
+                references.Add(reference);
+            }
+            if (ReferenceRequiredOperations.Contains(operation) && references.Count == 0)
+            {
+                error = "当前图片工具至少需要上传一张参考图。";
+                return false;
+            }
+            if (operation == "text-to-image" && references.Count > 0)
+            {
+                error = "文生图不接收参考图，请切换到图生图或其它编辑工具。";
+                return false;
+            }
+            if (operation == "multi-composite" && references.Count < 2)
+            {
+                error = "多图合成至少需要两张参考图。";
+                return false;
+            }
+
+            int? width = param.Width;
+            int? height = param.Height;
+            if (width.HasValue != height.HasValue)
+            {
+                error = "自定义图片尺寸必须同时提供 Width 和 Height。";
+                return false;
+            }
+            if (width.HasValue && (width.Value < 512 || width.Value > 2048 || width.Value % 8 != 0
+                || height.Value < 512 || height.Value > 2048 || height.Value % 8 != 0))
+            {
+                error = "自定义图片宽高必须为 512-2048 之间且能被 8 整除。";
+                return false;
+            }
+            var postProcess = (param.PostProcess ?? string.Empty).Trim().ToLowerInvariant();
+            if (postProcess != string.Empty && postProcess != "remove-solid-background")
+            {
+                error = "当前不支持该图片后处理方式。";
+                return false;
+            }
+
             var body = new JObject
             {
                 ["model"] = model,
@@ -93,6 +192,21 @@ namespace Microi.net
                 ["n"] = count,
                 ["prompt_optimizer"] = true,
                 ["aigc_watermark"] = false
+            };
+            if (width.HasValue)
+            {
+                body.Remove("aspect_ratio");
+                body["width"] = width.Value;
+                body["height"] = height.Value;
+            }
+            if (param.Seed.HasValue) body["seed"] = param.Seed.Value;
+            var requestBody = body.ToString(Formatting.None);
+            var fingerprintSource = new JObject
+            {
+                ["request"] = body,
+                ["operation"] = operation,
+                ["post_process"] = postProcess,
+                ["reference_sha256"] = new JArray(references.Select(item => item.Sha256))
             }.ToString(Formatting.None);
             normalized = new NormalizedMiniMaxImageRequest
             {
@@ -101,10 +215,103 @@ namespace Microi.net
                 Model = model,
                 AspectRatio = aspectRatio,
                 Count = count,
-                RequestBody = body,
-                Fingerprint = Sha256(body)
+                Operation = operation,
+                ReferenceImages = references,
+                Width = width,
+                Height = height,
+                Seed = param.Seed,
+                PostProcess = postProcess,
+                RequestBody = requestBody,
+                Fingerprint = Sha256(fingerprintSource)
             };
             return true;
+        }
+
+        private static bool TryDecodeReference(
+            MiniMaxImageReferenceParam source,
+            out NormalizedMiniMaxImageReference reference,
+            out string error)
+        {
+            reference = null;
+            error = null;
+            if (source == null || string.IsNullOrWhiteSpace(source.DataUrl))
+            {
+                error = "图片内容不能为空。";
+                return false;
+            }
+            var value = source.DataUrl.Trim();
+            var commaIndex = value.IndexOf(',');
+            if (!value.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase) || commaIndex < 0
+                || value.Substring(0, commaIndex).IndexOf(";base64", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                error = "只允许 image Data URL。";
+                return false;
+            }
+            var encoded = value.Substring(commaIndex + 1);
+            if (encoded.Length > ((long)MaxReferenceBytes + 2L) / 3L * 4L + 4096L)
+            {
+                error = $"单张图片不能超过 {MaxReferenceBytes / 1024 / 1024} MB。";
+                return false;
+            }
+            byte[] bytes;
+            try { bytes = Convert.FromBase64String(Regex.Replace(encoded, @"\s+", string.Empty)); }
+            catch
+            {
+                error = "Base64 格式不正确。";
+                return false;
+            }
+            if (bytes.Length == 0 || bytes.Length > MaxReferenceBytes)
+            {
+                error = $"单张图片必须大于 0 且不能超过 {MaxReferenceBytes / 1024 / 1024} MB。";
+                return false;
+            }
+            if (!TryResolveImageFormat(bytes, out var extension, out var contentType))
+            {
+                error = "只允许 JPEG、PNG 或 WebP 图片。";
+                return false;
+            }
+            var safeStem = Regex.Replace(
+                System.IO.Path.GetFileNameWithoutExtension(source.FileName ?? string.Empty),
+                @"[^A-Za-z0-9._-]+",
+                "-").Trim('-', '.');
+            if (string.IsNullOrWhiteSpace(safeStem)) safeStem = "reference";
+            if (safeStem.Length > 60) safeStem = safeStem.Substring(0, 60);
+            reference = new NormalizedMiniMaxImageReference
+            {
+                FileName = $"{safeStem}.{extension}",
+                Bytes = bytes,
+                Extension = extension,
+                ContentType = contentType,
+                Sha256 = Sha256(bytes)
+            };
+            return true;
+        }
+
+        private static bool TryResolveImageFormat(byte[] bytes, out string extension, out string contentType)
+        {
+            extension = null;
+            contentType = null;
+            if (bytes == null || bytes.Length < 12) return false;
+            if (bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff)
+            {
+                extension = "jpg";
+                contentType = "image/jpeg";
+                return true;
+            }
+            if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4e && bytes[3] == 0x47)
+            {
+                extension = "png";
+                contentType = "image/png";
+                return true;
+            }
+            if (bytes[0] == (byte)'R' && bytes[1] == (byte)'I' && bytes[2] == (byte)'F' && bytes[3] == (byte)'F'
+                && bytes[8] == (byte)'W' && bytes[9] == (byte)'E' && bytes[10] == (byte)'B' && bytes[11] == (byte)'P')
+            {
+                extension = "webp";
+                contentType = "image/webp";
+                return true;
+            }
+            return false;
         }
 
         public static string BuildIdempotencyKey(string osClient, string userId, string requestId)
@@ -128,6 +335,13 @@ namespace Microi.net
         {
             using var sha = SHA256.Create();
             return string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(value ?? string.Empty))
+                .Select(item => item.ToString("x2")));
+        }
+
+        private static string Sha256(byte[] value)
+        {
+            using var sha = SHA256.Create();
+            return string.Concat(sha.ComputeHash(value ?? Array.Empty<byte>())
                 .Select(item => item.ToString("x2")));
         }
     }

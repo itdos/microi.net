@@ -304,7 +304,6 @@ function validateReleaseCandidate(name, content) {
         const capabilities = packageModel?.PackageInfo?.RequiredPlatformCapabilities || [];
         for (const capability of [
           'ApiEngine:platform-ai-account@v1.1.0',
-          'ApiEngine:platform-ai-runtime@v1.0.0',
           'V8.Method.RequireManagedProtocolContext',
           'V8.AI.UpdateConversationTitle',
           'V8.AI.Chat',
@@ -315,6 +314,12 @@ function validateReleaseCandidate(name, content) {
           if (!capabilities.includes(capability)) {
             throw new Error(`${name} 缺少能力 ${capability}。`);
           }
+        }
+        const runtimeCapability = capabilities.find(capability =>
+          String(capability || '').startsWith('ApiEngine:platform-ai-runtime@'));
+        if (!runtimeCapability
+          || semanticNumber(String(runtimeCapability).split('@').pop()) < 1_000_000) {
+          throw new Error(`${name} 缺少至少 v1.0.0 的 platform-ai-runtime 能力。`);
         }
       }
       if (name === 'app.microi.sys_user.json') {

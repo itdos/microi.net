@@ -3759,7 +3759,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_generate_minimax_music',
-    `Generate one original instrumental game-music asset through the authenticated Microi AI engine for OsClient "${osClient}". The server fixes MiniMax music-2.6, 44.1kHz, 256kbps MP3, keeps provider credentials private, persists the result to tenant HDFS, and uses RequestId for idempotency. This consumes an external AI quota, so confirmExecution must exactly equal requestId.`,
+    `Generate one original instrumental music asset through the authenticated Microi AI engine for OsClient "${osClient}". The server prefers MiniMax music-3.0 and safely falls back to the official open-source MiniMax-Music3 Space only after an explicit 410 retirement response. It keeps provider credentials private, persists the result to tenant HDFS, and uses RequestId for idempotency. This may consume external AI quota, so confirmExecution must exactly equal requestId.`,
     {
       requestId: z.string().min(8).max(160).regex(/^[A-Za-z0-9._:-]+$/u).describe('Stable idempotency key. Reuse it for retries of the same prompt.'),
       prompt: z.string().min(1).max(2000).describe('Original instrumental music brief. Do not request imitation of a living artist or copyrighted recording.'),
@@ -3770,11 +3770,12 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       const payload = {
         RequestId: requestId,
         Prompt: prompt,
-        Model: 'music-2.6',
+        Model: 'music-3.0',
         IsInstrumental: true,
         SampleRate: 44100,
         Bitrate: 256000,
         Format: 'mp3',
+        DurationSeconds: durationSeconds || 20,
       };
       if (confirmExecution !== requestId) {
         return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, payload, requiredConfirmation: requestId }, null, 2) }] };

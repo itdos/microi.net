@@ -964,7 +964,6 @@ namespace Microi.net
                     && new[]
                     {
                         "ApiEngine:platform-ai-account@v1.1.0",
-                        "ApiEngine:platform-ai-runtime@v1.0.0",
                         "V8.Method.RequireManagedProtocolContext",
                         "V8.AI.UpdateConversationTitle",
                         "V8.AI.Chat",
@@ -975,6 +974,10 @@ namespace Microi.net
                         item?.ToString(),
                         required,
                         StringComparison.Ordinal)))
+                    && HasApiEngineCapabilityAtLeast(
+                        aiCapabilities,
+                        "platform-ai-runtime",
+                        new System.Version(1, 0, 0))
                     && HasPackagedTableClosure(
                         package,
                         new[]

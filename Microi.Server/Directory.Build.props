@@ -11,7 +11,7 @@
 
     <!-- Microi.net 项目路径和 NuGet 包版本 -->
     <MicroiNetProjectPath>$(MSBuildThisFileDirectory)Microi.net\Microi.net.csproj</MicroiNetProjectPath>
-    <MicroiNetVersion>7.8.7</MicroiNetVersion>
+    <MicroiNetVersion>7.8.8</MicroiNetVersion>
 
     <!-- Project 强制源码；NuGet 强制包；Auto 才按本地项目是否存在自动判断。 -->
     <MicroiNetExists Condition="'$(MicroiClosedSourceReferenceMode)' == 'Project'">true</MicroiNetExists>

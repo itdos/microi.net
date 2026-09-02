@@ -1,29 +1,67 @@
 <template>
     <div
         class="ai-engine-page"
-        :class="{ 'is-app-workspace': activeWorkspace === 'apps', 'is-embedded': embedded, 'is-compact': compact }"
+        :class="{
+            'is-app-workspace': activeWorkspace === 'apps',
+            'is-media-workspace': ['image', 'music'].includes(activeWorkspace),
+            'is-embedded': embedded,
+            'is-compact': compact
+        }"
         data-testid="unified-ai-assistant"
     >
         <aside class="ai-engine-sidebar" data-testid="unified-ai-history">
-            <div class="workspace-tabs" :class="{ 'single-tab': !isAiAdmin }">
+            <div class="workspace-tabs capability-tabs">
                 <button
                     type="button"
                     class="workspace-tab"
-                    :class="{ active: activeWorkspace === 'chat' }"
-                    @click="activeWorkspace = 'chat'"
+                    :class="{ active: activeWorkspace === 'chat' && !['secure-data', 'data'].includes(semanticMode) }"
+                    data-testid="ai-workspace-chat"
+                    @click="openChatWorkspace('chat')"
                 >
                     <el-icon><Cpu /></el-icon>
                     <span>AI对话</span>
                 </button>
                 <button
-                    v-if="isAiAdmin"
+                    type="button"
+                    class="workspace-tab"
+                    :class="{ active: activeWorkspace === 'chat' && ['secure-data', 'data'].includes(semanticMode) }"
+                    data-testid="ai-workspace-data"
+                    @click="openChatWorkspace('data')"
+                >
+                    <el-icon><DataAnalysis /></el-icon>
+                    <span>数据分析</span>
+                </button>
+                <button
+                    type="button"
+                    class="workspace-tab"
+                    :class="{ active: activeWorkspace === 'image' }"
+                    data-testid="ai-workspace-image"
+                    @click="openImageWorkspace()"
+                >
+                    <el-icon><Picture /></el-icon>
+                    <span>AI绘图</span>
+                </button>
+                <button
+                    type="button"
+                    class="workspace-tab"
+                    :class="{ active: activeWorkspace === 'music' }"
+                    data-testid="ai-workspace-music"
+                    @click="openMusicWorkspace"
+                >
+                    <el-icon><Headset /></el-icon>
+                    <span>AI音乐</span>
+                    <small v-if="!isAiAdmin">管理员</small>
+                </button>
+                <button
                     type="button"
                     class="workspace-tab"
                     :class="{ active: activeWorkspace === 'video' }"
+                    data-testid="ai-workspace-video"
                     @click="openVideoWorkspace"
                 >
                     <el-icon><VideoPlay /></el-icon>
                     <span>AI视频</span>
+                    <small v-if="!isAiAdmin">管理员</small>
                 </button>
             </div>
 
@@ -110,6 +148,22 @@
                 </div>
             </template>
 
+            <template v-else-if="activeWorkspace === 'image'">
+                <div class="app-sidebar-intro media-sidebar-intro">
+                    <strong>AI 图像工作台</strong>
+                    <p>从文生图、图生图到证件照、多图合成和精确裁剪，先选工具再填写必要参数。</p>
+                    <span>29 个 AI 与精确工具</span>
+                </div>
+            </template>
+
+            <template v-else-if="activeWorkspace === 'music'">
+                <div class="app-sidebar-intro media-sidebar-intro">
+                    <strong>AI 音乐工作台</strong>
+                    <p>选择音乐方向并补充情绪、乐器与用途，生成结果自动保存到当前租户 HDFS。</p>
+                    <span>无人声纯音乐 · MP3</span>
+                </div>
+            </template>
+
             <template v-else-if="activeWorkspace === 'video'">
                 <div class="app-sidebar-intro">
                     <strong>MiniMax 视频中心</strong>
@@ -165,6 +219,26 @@
                         <h1>让 AI 助手直接进入你的业务现场</h1>
                         <p>描述目标即可连续对话，我会结合 Skills、MCP 建模能力和当前租户上下文，辅助你分析数据、编写 V8、创建低代码模块。</p>
                         <p class="hero-local-tip">AI 深度融合 V8 引擎，强烈建议使用本地 VS Code Codex / Copilot / Claude / Cursor + MCP + Skills，进行真正意义的零代码 AI 编程。</p>
+                    </div>
+                    <div class="capability-directory" data-testid="ai-capability-directory" aria-label="AI 能力导航">
+                        <button type="button" data-testid="ai-capability-chat" @click="openChatWorkspace('chat')">
+                            <el-icon><Cpu /></el-icon><span><strong>AI 对话</strong><small>问答、写作与 V8 编程</small></span><el-icon><ArrowRight /></el-icon>
+                        </button>
+                        <button type="button" data-testid="ai-capability-data" @click="openChatWorkspace('data')">
+                            <el-icon><DataAnalysis /></el-icon><span><strong>数据分析</strong><small>自然语言查询业务数据</small></span><el-icon><ArrowRight /></el-icon>
+                        </button>
+                        <button type="button" data-testid="ai-capability-image" @click="openImageWorkspace()">
+                            <el-icon><Picture /></el-icon><span><strong>AI 绘图</strong><small>生成、编辑、人像与精确处理</small></span><el-icon><ArrowRight /></el-icon>
+                        </button>
+                        <button type="button" data-testid="ai-capability-music" @click="openMusicWorkspace">
+                            <el-icon><Headset /></el-icon><span><strong>AI 音乐</strong><small>灵感生成可试听配乐</small></span><el-icon><ArrowRight /></el-icon>
+                        </button>
+                        <button type="button" data-testid="ai-capability-video" @click="openVideoWorkspace">
+                            <el-icon><VideoPlay /></el-icon><span><strong>AI 视频</strong><small>分镜、母版与人工验片</small></span><el-icon><ArrowRight /></el-icon>
+                        </button>
+                        <button type="button" data-testid="ai-capability-models" @click="openModelDrawer">
+                            <el-icon><Grid /></el-icon><span><strong>AI 引擎列表</strong><small>模型、密钥与能力配置</small></span><el-icon><ArrowRight /></el-icon>
+                        </button>
                     </div>
                     <div v-if="isAiAdmin" class="platform-stats" v-mci-loading:stats="statsLoading">
                         <div v-for="stat in statCards" :key="stat.key" class="platform-stat" :data-stat="stat.key">
@@ -528,6 +602,14 @@
             </footer>
             </template>
 
+            <template v-else-if="activeWorkspace === 'image'">
+                <AiImageStudio ref="imageStudioRef" />
+            </template>
+
+            <template v-else-if="activeWorkspace === 'music'">
+                <AiMusicStudio />
+            </template>
+
             <template v-else-if="activeWorkspace === 'video'">
                 <section class="video-workspace" data-testid="ai-video-workspace">
                     <div class="video-create-card">
@@ -699,11 +781,14 @@ import {
     CircleCheck,
     CopyDocument,
     Cpu,
+    DataAnalysis,
     EditPen,
     Download,
     Grid,
+    Headset,
     Operation,
     Paperclip,
+    Picture,
     RefreshLeft,
     Refresh,
     Search,
@@ -729,6 +814,8 @@ import {
 } from "@/views/mobile/ai-assistant-api.js";
 
 const DiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"));
+const AiImageStudio = defineAsyncComponent(() => import("./ai-image-studio.vue"));
+const AiMusicStudio = defineAsyncComponent(() => import("./ai-music-studio.vue"));
 const props = defineProps({
     embedded: {
         type: Boolean,
@@ -791,6 +878,8 @@ const aiModelTableId = ref("");
 const aiModelSysMenuId = ref("");
 const modelDrawerVisible = ref(false);
 const activeWorkspace = ref("chat");
+const imageStudioRef = ref(null);
+const pendingImageToolId = ref("");
 const videoLoading = ref(false);
 const videoCreateLoading = ref(false);
 const videoActionLoading = ref("");
@@ -971,6 +1060,8 @@ const isAiAdmin = computed(() => {
 });
 const workspaceTitle = computed(() => ({
     chat: "AI助手",
+    image: "AI绘图",
+    music: "AI音乐",
     video: "AI视频",
     apps: "AI应用"
 }[activeWorkspace.value] || "AI助手"));
@@ -1013,6 +1104,7 @@ const statCards = computed(() => [
 
 onMounted(async () => {
     if (await redirectLegacyAiAppWorkspace()) return;
+    applyRequestedWorkspace();
     const tasks = [loadAiModels(), loadAiEngineMeta(), loadSecureAssistantBootstrap()];
     if (isAiAdmin.value) tasks.push(loadPlatformStats());
     await Promise.all(tasks);
@@ -1034,12 +1126,20 @@ watch(
 );
 
 watch(() => [route.query.workspace, route.query.appId], () => {
-    redirectLegacyAiAppWorkspace();
+    redirectLegacyAiAppWorkspace().then((redirected) => {
+        if (!redirected) applyRequestedWorkspace();
+    });
 });
 
 watch(activeWorkspace, (workspace) => {
     if (workspace === "video") startVideoPolling();
     else stopVideoPolling();
+});
+
+watch(imageStudioRef, (studio) => {
+    if (!studio || !pendingImageToolId.value) return;
+    studio.selectTool?.(pendingImageToolId.value);
+    pendingImageToolId.value = "";
 });
 
 watch(selectedAiModel, () => {
@@ -1689,6 +1789,34 @@ function goMicroiStore() {
     proxy.$router.push({ path: "/microi-store" });
 }
 
+function openChatWorkspace(mode = "chat") {
+    activeWorkspace.value = "chat";
+    if (mode === "data") {
+        semanticMode.value = secureAssistantAvailable.value ? "secure-data" : "data";
+    } else if (mode === "chat" && ["secure-data", "data"].includes(semanticMode.value)) {
+        semanticMode.value = "chat";
+    }
+}
+
+async function openImageWorkspace(toolId = "") {
+    activeWorkspace.value = "image";
+    if (!toolId) return;
+    pendingImageToolId.value = toolId;
+    await nextTick();
+    if (imageStudioRef.value) {
+        imageStudioRef.value.selectTool?.(toolId);
+        pendingImageToolId.value = "";
+    }
+}
+
+function openMusicWorkspace() {
+    if (!isAiAdmin.value) {
+        ElMessage.warning("只有管理员可以生成 AI 音乐");
+        return;
+    }
+    activeWorkspace.value = "music";
+}
+
 async function openVideoWorkspace() {
     if (!isAiAdmin.value) {
         ElMessage.warning("只有管理员可以创建和管理 AI 视频");
@@ -2046,6 +2174,20 @@ async function redirectLegacyAiAppWorkspace() {
         return true;
     }
     return false;
+}
+
+function applyRequestedWorkspace() {
+    const workspace = String(route.query.workspace || "").trim().toLowerCase();
+    const tool = String(route.query.tool || "").trim();
+    if (workspace === "image") {
+        openImageWorkspace(tool);
+    } else if (workspace === "music") {
+        openMusicWorkspace();
+    } else if (workspace === "video") {
+        openVideoWorkspace();
+    } else if (workspace === "data") {
+        openChatWorkspace("data");
+    }
 }
 
 async function sendMessage() {
@@ -2500,7 +2642,7 @@ async function sendMusicQuestion(text, assistantMessage) {
         body: JSON.stringify({
             RequestId: requestId,
             Prompt: text,
-            Model: "music-2.6",
+            Model: "music-3.0",
             IsInstrumental: true,
             SampleRate: 44100,
             Bitrate: 256000,
@@ -2534,7 +2676,7 @@ async function sendMusicQuestion(text, assistantMessage) {
     if (!isAudioAttachment(attachment)) {
         throw new Error("音乐已生成，但没有获得可在线播放的 HDFS 地址。");
     }
-    assistantMessage.modelId = String(data.Model || "music-2.6");
+    assistantMessage.modelId = String(data.Model || "music-3.0");
     assistantMessage.thinking = "";
     assistantMessage.thinkingCollapsed = true;
     assistantMessage.attachments = [attachment];
@@ -5718,6 +5860,162 @@ body.dark .ai-engine-page,
 
     .composer-settings-trigger {
         max-width: none;
+    }
+}
+
+/* AI 能力入口：保持侧栏与首页都是轻量列表，避免把每个能力做成厚重卡片。 */
+.workspace-tabs.capability-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 12px 12px 4px;
+    padding: 3px;
+}
+
+.workspace-tabs.capability-tabs .workspace-tab {
+    width: 100%;
+    flex: 0 0 36px;
+    justify-content: flex-start;
+    padding: 0 10px;
+}
+
+.workspace-tabs.capability-tabs .workspace-tab > span {
+    flex: 1;
+    text-align: left;
+}
+
+.workspace-tabs.capability-tabs .workspace-tab > small {
+    color: var(--ai-text-tertiary);
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.media-sidebar-intro > span {
+    display: inline-flex;
+    margin-top: 10px;
+    color: var(--ai-primary);
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.capability-directory {
+    width: min(860px, 100%);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: 1px solid var(--ai-border);
+    border-bottom: 1px solid var(--ai-border);
+}
+
+.capability-directory button {
+    min-width: 0;
+    min-height: 56px;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 20px;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-bottom: 1px solid var(--ai-border);
+    background: transparent;
+    color: var(--ai-text);
+    padding: 8px 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color .16s ease, color .16s ease;
+}
+
+.capability-directory button:nth-child(odd) {
+    border-right: 1px solid var(--ai-border);
+}
+
+.capability-directory button:hover,
+.capability-directory button:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--ai-primary) 5%, transparent);
+    color: var(--ai-primary);
+}
+
+.capability-directory button > .el-icon:first-child {
+    font-size: 20px;
+}
+
+.capability-directory button > .el-icon:last-child {
+    color: var(--ai-text-tertiary);
+    font-size: 14px;
+}
+
+.capability-directory button span {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.capability-directory button strong {
+    font-size: 14px;
+    font-weight: 620;
+}
+
+.capability-directory button small {
+    overflow: hidden;
+    color: var(--ai-text-tertiary);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-engine-page.is-media-workspace .ai-engine-main {
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+.ai-engine-page.is-media-workspace :deep(.image-studio),
+.ai-engine-page.is-media-workspace :deep(.music-studio) {
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
+}
+
+@media (max-width: 760px) {
+    .ai-engine-page:not(.is-compact) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ai-engine-sidebar {
+        height: auto;
+        min-height: 0;
+        max-height: 360px;
+        overflow: auto;
+    }
+
+    .workspace-tabs.capability-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .workspace-tabs.capability-tabs .workspace-tab {
+        justify-content: center;
+    }
+
+    .workspace-tabs.capability-tabs .workspace-tab > span {
+        flex: 0 1 auto;
+        text-align: center;
+    }
+
+    .workspace-tabs.capability-tabs .workspace-tab > small {
+        display: none;
+    }
+
+    .capability-directory {
+        grid-template-columns: 1fr;
+    }
+
+    .capability-directory button:nth-child(odd) {
+        border-right: 0;
+    }
+
+    .ai-engine-page.is-media-workspace .ai-engine-main {
+        min-height: 0;
     }
 }
 </style>

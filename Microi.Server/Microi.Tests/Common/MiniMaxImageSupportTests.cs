@@ -4,6 +4,7 @@ namespace Microi.Tests.Common;
 
 public sealed class MiniMaxImageSupportTests
 {
+    private const string OnePixelPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
     [Theory]
     [InlineData("帮我副一张美女图片")]
     [InlineData("请生成一张山水插画")]
@@ -77,5 +78,62 @@ public sealed class MiniMaxImageSupportTests
         Assert.Equal(first, replay);
         Assert.NotEqual(first, otherTenant);
         Assert.DoesNotContain(userId, first, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TryNormalize_AcceptsPrivateReferencePayloadWithoutLeakingItIntoUpstreamBody()
+    {
+        var ok = MiniMaxImageSupport.TryNormalize(
+            new MiniMaxImageGenerateParam
+            {
+                RequestId = "image:reference-request-001",
+                Prompt = "保留人物身份特征，改为专业证件照",
+                Operation = "id-photo",
+                ReferenceImages =
+                [
+                    new MiniMaxImageReferenceParam { FileName = "portrait.png", DataUrl = OnePixelPng }
+                ],
+                Width = 1024,
+                Height = 1024,
+                Seed = 42
+            },
+            out var normalized,
+            out var error);
+
+        Assert.True(ok, error);
+        Assert.Single(normalized.ReferenceImages);
+        Assert.Equal("png", normalized.ReferenceImages[0].Extension);
+        Assert.Equal(64, normalized.ReferenceImages[0].Sha256.Length);
+        Assert.DoesNotContain("iVBOR", normalized.RequestBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("aspect_ratio", normalized.RequestBody, StringComparison.Ordinal);
+        Assert.Contains("\"width\":1024", normalized.RequestBody, StringComparison.Ordinal);
+        Assert.Contains("\"height\":1024", normalized.RequestBody, StringComparison.Ordinal);
+        Assert.Contains("\"seed\":42", normalized.RequestBody, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("image-to-image", null, "至少需要上传一张参考图")]
+    [InlineData("text-to-image", OnePixelPng, "文生图不接收参考图")]
+    public void TryNormalize_EnforcesReferenceRequirements(string operation, string? dataUrl, string expectedError)
+    {
+        var references = dataUrl == null
+            ? null
+            : new List<MiniMaxImageReferenceParam>
+            {
+                new MiniMaxImageReferenceParam { FileName = "source.png", DataUrl = dataUrl }
+            };
+        var ok = MiniMaxImageSupport.TryNormalize(
+            new MiniMaxImageGenerateParam
+            {
+                RequestId = "image:reference-request-002",
+                Prompt = "测试",
+                Operation = operation,
+                ReferenceImages = references
+            },
+            out _,
+            out var error);
+
+        Assert.False(ok);
+        Assert.Contains(expectedError, error, StringComparison.Ordinal);
     }
 }
