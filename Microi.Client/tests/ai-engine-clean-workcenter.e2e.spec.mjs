@@ -138,14 +138,9 @@ test("AI 对话清爽化、Markdown 安全渲染与工作中心表单模块全�
     expect(backgroundRgb).not.toBeNull();
     expect(contrastRatio(titleRgb, backgroundRgb)).toBeGreaterThanOrEqual(4.5);
 
-    const workspaceTabs = assistant.locator(".workspace-tab");
-    expect(await workspaceTabs.count()).toBeGreaterThanOrEqual(1);
-    const tabMetrics = await workspaceTabs.first().evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        return { height: box.height, shadow: style.boxShadow };
-    });
-    expect(tabMetrics.height).toBeLessThanOrEqual(36);
+    await expect(assistant.locator('.ai-engine-sidebar')).toHaveCount(0);
+    await expect(assistant.getByTestId('ai-capability-directory')).toBeVisible();
+    await expect(assistant.locator('button[data-testid^="ai-image-tool-"]')).toHaveCount(29);
 
     const composer = assistant.locator(".composer-box");
     await expect(composer).toBeVisible();
@@ -205,7 +200,7 @@ test("AI 对话清爽化、Markdown 安全渲染与工作中心表单模块全�
 
     const labels = ["我的待办", "我发起的", "我处理的", "抄送我的", "与我相关"];
     for (const label of labels) {
-        const tab = page.getByRole("tab", { name: label, exact: true });
+        const tab = page.getByRole("tab", { name: new RegExp(`^${label}(?:\\s|$)`) });
         await expect(tab).toBeVisible();
         await tab.click();
         await expect(tab).toHaveAttribute("aria-selected", "true");

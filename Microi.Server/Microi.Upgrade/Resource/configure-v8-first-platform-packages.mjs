@@ -38,15 +38,15 @@ export const packageDefinitions = Object.freeze([
   Object.freeze({
     file: 'app.microi.sys_user.json',
     name: '系统账号',
-    version: 'v7.6.4',
+    version: 'v7.6.5',
     bootstrapUrl: 'https://static.itdos.com/itdos/microi-store/packages/01kmfcf8yg0g580n111sbemdcv/202608/app_microi_sys_user-v6_2_9-d1ab1bb18468b39c.json',
     bootstrapSha256: 'd1ab1bb18468b39cde4cd9987acb226d6f32092025c729fa9f8aa2e5032f3e92',
     bootstrapSize: 255947,
-    history: '2026-09-02 v7.6.4 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。',
-    changeLogTitle: 'WebOS iOS 拟物透明图标升级',
-    changeType: 'Optimize',
-    changeLogContent: '将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。',
-    releaseTime: '2026-09-02 12:05:00',
+    history: '2026-09-03 v7.6.5 新增隐藏字段 HomeUsageStats 与 Managed 接口 platform-home-overview；访问记录只保存在当前账号，返回结果按实时菜单权限过滤，不采集路由参数或业务页面数据。',
+    changeLogTitle: '个人首页常用应用与趋势',
+    changeType: 'Feature',
+    changeLogContent: '新增隐藏字段 HomeUsageStats 与 Managed 接口 platform-home-overview；访问记录只保存在当前账号，返回结果按实时菜单权限过滤，不采集路由参数或业务页面数据。',
+    releaseTime: '2026-09-03 18:00:00',
     capabilities: [
       'ApiEngine:platform-user-update-preferences@v1.1.0',
       'ApiEngine:platform-user-update-profile@v1.0.0',
@@ -57,6 +57,8 @@ export const packageDefinitions = Object.freeze([
       'ApiEngine:platform-user-access-key@v1.0.0',
       'V8.Method.ManageUserAccessKey',
       'ServerField:sys_apiengine.ApiRoutes',
+      'ServerField:sys_user.HomeUsageStats',
+      'ApiEngine:platform-home-overview@v1.0.0',
     ],
     exactEngineKeys: [
       'platform-user-update-preferences',
@@ -66,6 +68,7 @@ export const packageDefinitions = Object.freeze([
       'platform-sys-user-admin',
       'platform-user-custom-hook',
       'platform-user-access-key',
+      'platform-home-overview',
     ],
     engines: [
       { key: 'platform-user-update-preferences', name: '保存当前用户界面偏好', source: 'platform-user-update-preferences.js', id: '01M0M5KNM0N2GH5T0CZS3JV4DV', version: 'v1.1.0', enableLog: 0 },
@@ -73,6 +76,7 @@ export const packageDefinitions = Object.freeze([
       { key: 'platform-sys-user-admin', name: '系统账号管理', source: 'platform-sys-user-admin.js', id: '019d2a01-9d63-7f91-8c02-000000000009', version: 'v1.0.2', enableLog: 1 },
       { key: 'platform-user-custom-hook', name: '系统账号个性化扩展', source: 'platform-user-custom-hook.js', id: '019d2a01-9d63-7f91-8c02-000000000002', version: 'v1.0.0', enableLog: 1, stopHttp: 1, ownership: 'Tenant', upgradePolicy: 'CreateIfMissing' },
       { key: 'platform-user-access-key', name: '用户访问密钥可信管理', source: 'platform-user-access-key.js', id: '019d35f0-7b04-7b91-9801-000000000001', version: 'v1.0.0', allowAnonymous: 1, apiRoutes: '/api/SysUserAccessKey/Create;/api/SysUserAccessKey/List;/api/SysUserAccessKey/Revoke;/api/SysUserAccessKey/Exchange' },
+      { key: 'platform-home-overview', name: '个人首页概览与常用应用', source: 'platform-home-overview.js', id: '019d3af0-9003-7b91-9801-000000000001', version: 'v1.0.0', enableLog: 0, history: '2026-09-03 v1.0.0 按当前用户菜单权限统计首页常用应用与近 7 日访问趋势。' },
     ],
   }),
   Object.freeze({
@@ -143,15 +147,15 @@ export const packageDefinitions = Object.freeze([
   Object.freeze({
     file: 'app.microi.ai-engine.json',
     name: 'AI助手',
-    version: 'v7.6.4',
+    version: 'v7.6.5',
     bootstrapUrl: 'https://static.itdos.com/itdos/microi-store/packages/01kggwkhpq6hw8axdaz4n94rq2/202608/app_microi_ai-engine-v6_3_4-efb7fcdf70c2f467.json',
     bootstrapSha256: 'efb7fcdf70c2f467ffd99b72581b15bcd8790ad977a3ba1f78b33cfd71069763',
     bootstrapSize: 732784,
-    history: '2026-09-03 v7.6.4 新增简洁 AI 图像工作台、MiniMax 私有参考图图生图、AI 抠图收尾及黑白、缩放、裁剪、旋转、翻转、格式转换、多图拼接等精确处理能力。',
-    changeLogTitle: 'AI 图像工作台与参考图编辑',
+    history: '2026-09-03 v7.6.5 AI 对话框固定出现在首屏；对话、数据分析、绘图、音乐和视频入口集中呈现，29 项图像工具全部可见并可一步直达，首页嵌入态复用同一对话组件。',
+    changeLogTitle: 'AI 首屏完整能力导航',
     changeType: 'Feature',
-    changeLogContent: '重构 AI助手能力导航，新增文生图、图生图、高清重绘、消除、扩图、去水印、证件照、多图融合、抠图、上色及精确图片处理；参考图私有存储，结果写入租户 HDFS。',
-    releaseTime: '2026-09-03 12:00:00',
+    changeLogContent: 'AI 对话框固定出现在首屏；对话、数据分析、绘图、音乐和视频入口集中呈现，29 项图像工具全部可见并可一步直达，首页嵌入态复用同一对话组件。',
+    releaseTime: '2026-09-03 18:00:00',
     capabilities: [
       'ApiEngine:mci_ai_data_assistant@v1.1.5',
       'ApiEngine:platform-ai-account@v1.1.0',
@@ -168,6 +172,7 @@ export const packageDefinitions = Object.freeze([
       'V8.Image.Grayscale',
       'V8.Image.RemoveSolidBackground',
       'ServerField:sys_apiengine.ApiRoutes',
+      'ClientFeature:AiWorkbenchDirectoryV2',
     ],
     exactEngineKeys: [
       'mci_ai_data_assistant',
@@ -521,6 +526,56 @@ export function configureSysUserAiApiKey(packageModel) {
   });
 }
 
+export function configureSysUserHomeUsageStats(packageModel) {
+  const table = (packageModel.DiyTables || [])
+    .find(row => String(row.Name || '').toLowerCase() === 'sys_user');
+  if (!table) throw new Error('app.microi.sys_user.json 缺少 sys_user 低代码表。');
+  const ddlRow = (packageModel.DDLStatements || [])
+    .find(row => String(row.TableName || '').toLowerCase() === 'sys_user');
+  if (!ddlRow) throw new Error('app.microi.sys_user.json 缺少 sys_user DDL。');
+  if (!/`HomeUsageStats`\s+/i.test(String(ddlRow.DDL || ''))) {
+    const nextDdl = String(ddlRow.DDL || '').replace(
+      /\n\)\s*ENGINE\s*=/i,
+      ",\n  `HomeUsageStats` mediumtext NULL COMMENT '个人首页菜单访问聚合'\n) ENGINE=",
+    );
+    if (nextDdl === ddlRow.DDL) throw new Error('sys_user DDL 缺少可插入 HomeUsageStats 的表尾。');
+    ddlRow.DDL = nextDdl;
+  }
+
+  packageModel.PhysicalColumns ||= [];
+  const physicalMatches = packageModel.PhysicalColumns.filter(row => (
+    String(row.TABLE_NAME || '').toLowerCase() === 'sys_user'
+    && String(row.COLUMN_NAME || '').toLowerCase() === 'homeusagestats'
+  ));
+  if (!physicalMatches.length) {
+    const ordinal = Math.max(0, ...packageModel.PhysicalColumns
+      .filter(row => String(row.TABLE_NAME || '').toLowerCase() === 'sys_user')
+      .map(row => Number(row.ORDINAL_POSITION) || 0)) + 1;
+    packageModel.PhysicalColumns.push({
+      TABLE_NAME: 'sys_user', COLUMN_NAME: 'HomeUsageStats', COLUMN_TYPE: 'mediumtext',
+      DATA_TYPE: 'mediumtext', IS_NULLABLE: 'YES', COLUMN_DEFAULT: null,
+      COLUMN_COMMENT: '个人首页菜单访问聚合', COLUMN_KEY: '', EXTRA: '', ORDINAL_POSITION: ordinal,
+    });
+  } else if (physicalMatches.length > 1) {
+    throw new Error('app.microi.sys_user.json 重复声明 sys_user.HomeUsageStats 物理列。');
+  }
+
+  packageModel.DiyFields ||= [];
+  packageModel.DiyFields = packageModel.DiyFields.filter(row => !(
+    String(row.TableName || '').toLowerCase() === 'sys_user'
+    && String(row.Name || '').toLowerCase() === 'homeusagestats'
+  ));
+  packageModel.DiyFields.push({
+    TableName: 'sys_user', AppVisible: 0, Type: 'mediumtext', Name: 'HomeUsageStats',
+    InTableEdit: 0, Unique: 0, NameConfirm: 1, TableWidth: 150, TableId: table.Id,
+    Readonly: 1, Encrypt: 0, Component: 'Textarea', Visible: 0, IsLockField: 1,
+    Data: '[]', Sort: 1560, NotEmpty: 0, Label: '个人首页菜单访问聚合',
+    Description: '仅由 platform-home-overview 写入当前账号的菜单 Id、总次数、最近时间及按日次数；不记录 URL 参数和业务数据。',
+    Id: deterministicGuid('app.microi.sys_user:field:sys_user:HomeUsageStats'),
+    CreateTime: releaseTime,
+  });
+}
+
 function refreshPackageCounts(packageModel) {
   const info = packageModel.PackageInfo;
   info.TableCount = (packageModel.DiyTables || []).length;
@@ -573,7 +628,7 @@ function newEngine(definition) {
     CreateTime: releaseTime,
     Id: definition.id,
     V8Unlimited: 1,
-    ChangeHistory: '',
+    ChangeHistory: definition.history || '',
     Version: definition.version,
     LimitRecursion: 5000,
     LimitMemory: 2048,
@@ -586,7 +641,7 @@ function newEngine(definition) {
     AllowAnonymous: definition.allowAnonymous || 0,
     ApiAddress: `/apiengine/${definition.key}`,
     ResponseFile: 0,
-    Lock: 0,
+    Lock: definition.lock || 0,
     ApiV8Code: '',
     ApiRole: '[]',
     IsEnable: 1,
@@ -615,7 +670,9 @@ function configureEngine(packageModel, definition) {
     StopHttp: definition.stopHttp || 0,
     AllowAnonymous: definition.allowAnonymous || 0,
     EnableLog: definition.enableLog || 0,
+    Lock: definition.lock || 0,
   });
+  if (definition.history) engine.ChangeHistory = prependOnce(engine.ChangeHistory, definition.history);
   packageModel.ResourcePolicies ||= { SchemaVersion: 1, ApiEngines: {} };
   packageModel.ResourcePolicies.SchemaVersion ||= 1;
   packageModel.ResourcePolicies.ApiEngines ||= {};
@@ -675,7 +732,10 @@ export function configurePackageModel(packageModel, definition) {
     configureAiDataAssistant(packageModel);
     configureAiRuntimeSchemas(packageModel);
   }
-  if (definition.file === 'app.microi.sys_user.json') configureSysUserAiApiKey(packageModel);
+  if (definition.file === 'app.microi.sys_user.json') {
+    configureSysUserAiApiKey(packageModel);
+    configureSysUserHomeUsageStats(packageModel);
+  }
 
   if (exactEngineKeys.size) {
     const actualKeys = (packageModel.SysApiEngines || [])

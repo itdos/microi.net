@@ -29,7 +29,7 @@ const dependencies = Object.freeze([
     name: '获取与发布吾码升级资源',
     source: 'official-resource-api.js',
     id: '01KX2B5G1W8W4D4GRZHEV10H90',
-    version: 'v1.3.4',
+    version: 'v1.3.5',
     apiAddress: '/apiengine/get-microi-upgrade-resource',
     category: '应用商城',
     enableLog: 0,
@@ -38,11 +38,12 @@ const dependencies = Object.freeze([
     capabilities: [
       'V8.Method.AuthorizeOfficialResourcePublish',
       // Rolling control-plane upgrades are executed by the currently live
-      // previous engine. Retain its exact capability marker until v1.3.4 has
-      // been published and projected, while also declaring the new contract.
+      // previous engine. Retain its exact capability markers while the
+      // v1.3.5 control plane is published and projected.
       'ApiEngine:get-microi-upgrade-resource@v1.3.2',
       'ApiEngine:get-microi-upgrade-resource@v1.3.3',
       'ApiEngine:get-microi-upgrade-resource@v1.3.4',
+      'ApiEngine:get-microi-upgrade-resource@v1.3.5',
     ],
   }),
   Object.freeze({
