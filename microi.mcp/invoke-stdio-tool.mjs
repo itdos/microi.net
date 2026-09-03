@@ -25,6 +25,10 @@ const forwardedMicroiEnvironmentKeys = [
   'MICROI_AUTH_RECOVERY_DIR',
   'MICROI_MCP_DID',
   'MICROI_LABEL_BASE64',
+  // 始终保持严格 TLS 校验；仅允许调用方为私有 CA 或明确固定的 CA
+  // 扩展 Node 信任库，禁止通过该包装器关闭证书验证。
+  'NODE_EXTRA_CA_CERTS',
+  'NODE_USE_SYSTEM_CA',
 ];
 
 function parseArguments(rawArguments) {
@@ -89,6 +93,8 @@ function runSelfTest() {
     MICROI_OS_CLIENT: 'fixture',
     MICROI_USERNAME: 'fixture-user',
     MICROI_PASSWORD: 'fixture-secret',
+    NODE_EXTRA_CA_CERTS: 'fixture-ca.pem',
+    NODE_USE_SYSTEM_CA: '1',
   };
   const childEnvironment = buildServerEnvironment(fixtureEnvironment);
   validateConfiguration(childEnvironment);
@@ -97,6 +103,8 @@ function runSelfTest() {
     pageSize: 3,
   });
   assert.equal(childEnvironment.MICROI_PASSWORD, 'fixture-secret');
+  assert.equal(childEnvironment.NODE_EXTRA_CA_CERTS, 'fixture-ca.pem');
+  assert.equal(childEnvironment.NODE_USE_SYSTEM_CA, '1');
   const safeSummary = JSON.stringify({
     apiUrl: childEnvironment.MICROI_API_URL,
     osClient: childEnvironment.MICROI_OS_CLIENT,

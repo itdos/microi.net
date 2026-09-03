@@ -67,10 +67,13 @@ namespace Microi.net.Api
             // stale runtime forever. Resolve the unified application record first
             // and preserve /micro-app exclusively for real MicroService runtimes.
             var standaloneApplication = await GetStandaloneApplication(osClient, appKey);
-            if (standaloneApplication?["PublishProtocolVersion"].Val<int>() == 3)
+            var service = await GetService(osClient, appKey);
+            var databaseRuntimeCanRecoverInvalidV3 = HasDatabaseManagedEntry(service);
+            if (standaloneApplication?["PublishProtocolVersion"].Val<int>() == 3
+                && !databaseRuntimeCanRecoverInvalidV3)
             {
                 // A v3 row whose authoritative snapshot fails validation must
-                // not fall back to PreviewUrl or mutable MicroService metadata.
+                // not fall back to PreviewUrl or incomplete/mutable MicroService metadata.
                 return NotFound($"Application v3 pointer is incomplete or inconsistent: {appKey}");
             }
             var standaloneRedirect = ResolveStandaloneRedirect(standaloneApplication);
@@ -79,10 +82,18 @@ namespace Microi.net.Api
                 return Redirect(standaloneRedirect);
             }
 
-            var service = await GetService(osClient, appKey);
             if (!IsUsable(service))
             {
                 return NotFound($"MicroApp is not enabled or not found: {appKey}");
+            }
+
+            if (databaseRuntimeCanRecoverInvalidV3
+                && standaloneApplication?["PublishProtocolVersion"].Val<int>() == 3)
+            {
+                // DATABASE_MANAGED_RUNTIME_INVALID_V3_RECOVERY_V1: database-only
+                // platform packages are tenant-local authoritative runtimes. A
+                // copied foreign v3 pointer must not mask a complete inline entry.
+                Response.Headers["X-Microi-MicroApp-Pointer-Recovery"] = "database-runtime";
             }
 
             var externalUrl = (service["MsUrl"].Val<string>() ?? "").Trim();
@@ -1147,6 +1158,23 @@ namespace Microi.net.Api
                 }
             }
             return false;
+        }
+
+        private static bool HasDatabaseManagedEntry(JObject service)
+        {
+            if (!IsUsable(service)) return false;
+
+            var storageMode = (service?["StorageMode"].Val<string>() ?? "").Trim();
+            var legacyUrl = (service?["MsUrl"].Val<string>() ?? "").Trim();
+            var explicitlyDatabaseManaged = storageMode.Equals("db", StringComparison.OrdinalIgnoreCase)
+                || storageMode.Equals("database", StringComparison.OrdinalIgnoreCase)
+                || legacyUrl.Equals("db", StringComparison.OrdinalIgnoreCase)
+                || legacyUrl.Equals("database", StringComparison.OrdinalIgnoreCase);
+            if (!explicitlyDatabaseManaged) return false;
+
+            var entry = FindAsset(service, ResolveEntryPath(service));
+            return entry != null
+                && !GetText(entry, "contentBase64", "ContentBase64").DosIsNullOrWhiteSpace();
         }
 
         private static bool HasFileAssetManifest(JObject service)

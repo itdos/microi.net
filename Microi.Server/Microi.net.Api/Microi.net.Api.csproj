@@ -103,7 +103,7 @@
     <ProjectReference Include="../Microi.MongoDB/Microi.MongoDB.csproj" />
   </ItemGroup>
   
-  <!-- 三个闭源库的引用模式由 Directory.Build.props 按解决方案统一决定。 -->
+  <!-- 四个闭源库的引用模式由 Directory.Build.props 按解决方案统一决定。 -->
   <ItemGroup Condition="'$(MicroiAIExists)' == 'true'">
     <ProjectReference Include="..\Microi.AI\Microi.AI.csproj" />
   </ItemGroup>
@@ -125,6 +125,14 @@
   </ItemGroup>
   <ItemGroup Condition="'$(MicroiWorkFlowExists)' != 'true'">
     <PackageReference Include="Microi.WorkFlow" Version="$(MicroiNetVersion)" />
+  </ItemGroup>
+
+  <!-- 视觉引擎属于闭源库：公开方案使用 NuGet，Anderson 方案使用源码。 -->
+  <ItemGroup Condition="'$(MicroiVisionExists)' == 'true'">
+    <ProjectReference Include="..\Microi.Vision\Microi.Vision.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MicroiVisionExists)' != 'true'">
+    <PackageReference Include="Microi.Vision" Version="$(MicroiNetVersion)" />
   </ItemGroup>
   
   <!-- Microi.net 属于闭源库：公开方案使用 NuGet，Anderson 方案使用源码。 -->

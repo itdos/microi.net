@@ -236,6 +236,46 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 从当前节点运行快照中解析唯一租户。数据库、缓存键和请求上下文对 OsClient
+        /// 采用不区分大小写的身份语义，但 ClientList 为兼容历史代码仍保留原比较器；
+        /// 因此精确键未命中时只能接受唯一的大小写变体，存在重复项则失败关闭。
+        /// </summary>
+        internal static bool TryResolveUniqueLoadedClient(
+            string requestedOsClient,
+            out string canonicalKey,
+            out OsClientSecret client,
+            out bool ambiguous)
+        {
+            canonicalKey = (requestedOsClient ?? string.Empty).Trim();
+            client = null;
+            ambiguous = false;
+            if (canonicalKey.DosIsNullOrWhiteSpace()) return false;
+
+            if (ClientList.TryGetValue(canonicalKey, out client) && client != null)
+            {
+                return true;
+            }
+
+            var requestedKey = canonicalKey;
+            var matches = ClientList
+                .Where(item => string.Equals(
+                    item.Key,
+                    requestedKey,
+                    StringComparison.OrdinalIgnoreCase))
+                .Take(2)
+                .ToArray();
+            if (matches.Length == 1 && matches[0].Value != null)
+            {
+                canonicalKey = matches[0].Key;
+                client = matches[0].Value;
+                return true;
+            }
+
+            ambiguous = matches.Length > 1;
+            return false;
+        }
+
+        /// <summary>
         /// 从 OsClientSecret 中提取可序列化的配置部分
         /// 【设计】直接返回 OsClientModel（完整的 JObject），包含所有数据库字段
         /// 这样缓存的就是完整的配置，不会丢失任何字段
@@ -971,7 +1011,32 @@ namespace Microi.net
             }
 
             // 第二步：从本地ClientList获取完整的OsClientSecret（包含DB对象）
-            ClientList.TryGetValue(osClient, out var client);
+            TryResolveUniqueLoadedClient(
+                osClient,
+                out var canonicalClientKey,
+                out var client,
+                out var ambiguousClientKey);
+            if (ambiguousClientKey)
+            {
+                var diagnostic = $"OsClient=[{osClient}]在当前节点存在多个仅大小写不同的运行快照，已停止解析。";
+                Console.WriteLine($"Microi：【Error异常】【SaaS租户解析】{diagnostic}");
+                MicroiEngine.QueueSystemLog(
+                    osClient,
+                    "SaaS",
+                    "AmbiguousRuntimeTenant",
+                    "租户运行快照存在大小写重复",
+                    diagnostic,
+                    3,
+                    false,
+                    osClient);
+                throw new InvalidOperationException(diagnostic);
+            }
+            if (client != null)
+            {
+                // 后续合并与 AddOrUpdate 必须沿用 ClientList 中的权威大小写，避免为同一
+                // 租户再创建一个仅大小写不同的本地运行快照。
+                osClient = canonicalClientKey;
+            }
 
             var currentNodeLocalModel = client?.OsClientModel;
 

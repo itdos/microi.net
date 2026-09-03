@@ -55,7 +55,7 @@
             >
               <span class="app-icon" :style="iconTone(app)">
                 <img v-if="resolveMenuIcon(app.Icon)" :src="resolveMenuIcon(app.Icon)" alt="" />
-                <i v-else-if="app.IconClass" :class="app.IconClass" aria-hidden="true"></i>
+                <i v-else-if="resolveMenuIconClass(app)" :class="resolveMenuIconClass(app)" aria-hidden="true"></i>
                 <b v-else>{{ appInitial(app.Name) }}</b>
               </span>
               <span class="app-copy"><strong>{{ app.Name }}</strong><small>{{ app.OpenCount ? `${app.OpenCount} 次访问` : '可立即打开' }}</small></span>
@@ -212,7 +212,19 @@ function openApp(app) {
 function resolveMenuIcon(icon) {
   const value = String(icon || '').trim()
   if (!value) return ''
+  if (isIconFontClass(value)) return ''
   return proxy.DiyCommon.GetServerPath ? proxy.DiyCommon.GetServerPath(value) : value
+}
+
+function resolveMenuIconClass(app) {
+  const iconClass = String(app?.IconClass || '').trim()
+  if (iconClass) return iconClass
+  const legacyIcon = String(app?.Icon || '').trim()
+  return isIconFontClass(legacyIcon) ? legacyIcon : ''
+}
+
+function isIconFontClass(value) {
+  return /^(?:fa(?:s|r|b|l|t|d)?\s+fa-|el-icon(?:\s+|-))/i.test(String(value || '').trim())
 }
 
 function appInitial(name) {

@@ -61,4 +61,6 @@ test('Page Engine registers the reusable home overview widget with resilient sta
   assert.match(widget, /data-testid="home-frequent-apps"/);
   assert.match(widget, /ApiEngine\.Run\(engineKey\.value, \{ Action: 'Dashboard' \}\)/);
   assert.match(widget, /router\.push\('\/mic-ai-engine'\)/);
+  assert.match(widget, /if \(isIconFontClass\(value\)\) return ''/);
+  assert.match(widget, /return isIconFontClass\(legacyIcon\) \? legacyIcon : ''/);
 });

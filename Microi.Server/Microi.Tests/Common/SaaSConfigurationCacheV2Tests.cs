@@ -7,6 +7,64 @@ namespace Dos.Common.Tests;
 public class SaaSConfigurationCacheV2Tests
 {
     [Fact]
+    public void LoadedClientLookup_ResolvesOneCaseVariantWithoutCreatingDuplicateSnapshot()
+    {
+        var canonicalTenant = "Case-Lookup-" + Guid.NewGuid().ToString("N");
+        var requestedTenant = canonicalTenant.ToLowerInvariant();
+        var expected = new OsClientSecret
+        {
+            OsClient = canonicalTenant,
+            OsClientModel = new JObject()
+        };
+        Assert.True(OsClientExtend.ClientList.TryAdd(canonicalTenant, expected));
+        try
+        {
+            Assert.True(OsClientExtend.TryResolveUniqueLoadedClient(
+                requestedTenant,
+                out var canonicalKey,
+                out var actual,
+                out var ambiguous));
+            Assert.False(ambiguous);
+            Assert.Equal(canonicalTenant, canonicalKey);
+            Assert.Same(expected, actual);
+            Assert.False(OsClientExtend.ClientList.ContainsKey(requestedTenant));
+        }
+        finally
+        {
+            OsClientExtend.ClientList.TryRemove(canonicalTenant, out _);
+        }
+    }
+
+    [Fact]
+    public void LoadedClientLookup_RejectsAmbiguousCaseVariants()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var lowerTenant = "ambiguous-" + suffix;
+        var upperTenant = lowerTenant.ToUpperInvariant();
+        var requestedTenant = "AmBiGuOuS-" + suffix;
+        Assert.True(OsClientExtend.ClientList.TryAdd(
+            lowerTenant,
+            new OsClientSecret { OsClient = lowerTenant, OsClientModel = new JObject() }));
+        Assert.True(OsClientExtend.ClientList.TryAdd(
+            upperTenant,
+            new OsClientSecret { OsClient = upperTenant, OsClientModel = new JObject() }));
+        try
+        {
+            Assert.False(OsClientExtend.TryResolveUniqueLoadedClient(
+                requestedTenant,
+                out _,
+                out _,
+                out var ambiguous));
+            Assert.True(ambiguous);
+        }
+        finally
+        {
+            OsClientExtend.ClientList.TryRemove(lowerTenant, out _);
+            OsClientExtend.ClientList.TryRemove(upperTenant, out _);
+        }
+    }
+
+    [Fact]
     public void CacheKey_IsScopedByControlTenantSchemaAndRuntimeIdentity()
     {
         var key = OsClientExtend.GetSaasConfigurationCacheKey(

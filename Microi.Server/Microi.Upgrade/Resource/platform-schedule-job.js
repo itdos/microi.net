@@ -8,15 +8,38 @@
  */
 
 // Microi官方接口引擎：platform-schedule-job
-// Version: v1.0.0
-// 表数据、状态合并与动作编排在接口引擎；Quartz 仅通过最小 V8 原子能力访问。
+// Version: v1.0.1
+// 表数据、状态合并与动作编排在接口引擎；七条旧 /api/Job/* 路由按可信请求路径兼容。
 
-var action = String((V8.Param && V8.Param.Action) || '').trim();
+var param = V8.Param || {};
+var action = String(param.Action || '').trim().toLowerCase();
+var requestPath = String(param._RequestPath || '')
+  .trim()
+  .replace(/--osclient--.*--$/i, '')
+  .replace(/\/+$/, '')
+  .toLowerCase();
+var legacyRouteActions = {
+  '/api/job/getalljob': 'list',
+  '/api/job/getjobdetail': 'detail',
+  '/api/job/addjob': 'save',
+  '/api/job/updatejob': 'save',
+  '/api/job/pausejob': 'pause',
+  '/api/job/resumejob': 'resume',
+  '/api/job/deletejob': 'delete'
+};
+var legacyAction = legacyRouteActions[requestPath];
+if (legacyAction) {
+  if (String(param._HttpMethod || '').toUpperCase() !== 'POST') {
+    return { Code: 0, Msg: '任务调度旧接口仅支持 POST。' };
+  }
+  // 旧路由本身是动作的权威事实源，禁止请求体 Action 把 Pause 等地址切换成其它动作。
+  action = legacyAction;
+}
 var tableName = 'diy_schedule_job';
 
-if (action === 'List') {
-  var pageIndex = Math.max(1, Number(V8.Param._PageIndex || V8.Param.PageIndex || 1));
-  var pageSize = Math.max(1, Math.min(100, Number(V8.Param._PageSize || V8.Param.PageSize || 15)));
+if (action === 'list') {
+  var pageIndex = Math.max(1, Number(param._PageIndex || param.PageIndex || 1));
+  var pageSize = Math.max(1, Math.min(100, Number(param._PageSize || param.PageSize || 15)));
   var list = V8.FormEngine.GetTableData(tableName, {
     _PageIndex: pageIndex,
     _PageSize: pageSize,
@@ -45,8 +68,8 @@ if (action === 'List') {
   return list;
 }
 
-if (action === 'Detail') {
-  var detail = V8.FormEngine.GetFormData(tableName, { Id: String(V8.Param.Id || '') });
+if (action === 'detail') {
+  var detail = V8.FormEngine.GetFormData(tableName, { Id: String(param.Id || '') });
   if (!detail || detail.Code !== 1 || !detail.Data) return detail;
   var detailRuntime = V8.Method.ManageScheduleJob({
     Action: 'GetDetail',
@@ -61,21 +84,34 @@ if (action === 'Detail') {
   return detail;
 }
 
-if (action === 'Save') {
-  return V8.Method.SaveScheduleJob(V8.Param);
+if (action === 'save') {
+  var saveResult = V8.Method.SaveScheduleJob(param);
+  if (!saveResult || saveResult.Code !== 1 || !saveResult.Data) return saveResult;
+  return {
+    Code: saveResult.Code,
+    Data: saveResult.Data,
+    DataCount: saveResult.DataCount || 0,
+    Msg: saveResult.Msg || '',
+    DataAppend: {
+      LastTime: saveResult.Data.LastTime || '',
+      NextTime: saveResult.Data.NextTime || '',
+      Status: saveResult.Data.Status || '正常'
+    }
+  };
 }
 
-if (action === 'Pause' || action === 'Resume' || action === 'Delete') {
+if (action === 'pause' || action === 'resume' || action === 'delete') {
+  var runtimeAction = action === 'pause' ? 'Pause' : (action === 'resume' ? 'Resume' : 'Delete');
   var runtimeResult = V8.Method.ManageScheduleJob({
-    Action: action,
-    Id: String(V8.Param.Id || ''),
-    JobName: String(V8.Param.JobName || V8.Param.Name || '')
+    Action: runtimeAction,
+    Id: String(param.Id || ''),
+    JobName: String(param.JobName || param.Name || '')
   });
   if (!runtimeResult || runtimeResult.Code !== 1) return runtimeResult;
-  if ((action === 'Pause' || action === 'Resume') && V8.Param.Id) {
+  if ((action === 'pause' || action === 'resume') && param.Id) {
     var updateResult = V8.FormEngine.UptFormData(tableName, {
-      Id: String(V8.Param.Id),
-      Status: action === 'Pause' ? '暂停' : '正常'
+      Id: String(param.Id),
+      Status: action === 'pause' ? '暂停' : '正常'
     });
     if (!updateResult || updateResult.Code !== 1) return updateResult;
   }

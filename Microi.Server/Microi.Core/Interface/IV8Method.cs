@@ -193,6 +193,16 @@ namespace Microi.net
         /// <summary>仅供官方 Managed 后台工作器幂等升级精确选中的子租户数据库。</summary>
         DosResult UpgradeAdminTenantDatabase(dynamic dynamicParam);
 
+        /// <summary>
+        /// 仅供官方 Managed 精确域名绑定接口校验可信主租户平台管理员。
+        /// </summary>
+        DosResult AuthorizeAdminTenantDomainBinding();
+
+        /// <summary>
+        /// 仅供 iTdos 官方运营 Managed 接口校验可信平台管理员。
+        /// </summary>
+        DosResult AuthorizeExternalSaasTenantDomainBinding();
+
         /// <summary>仅供官方个人资料接口校验可信目标用户和租户头像路径。</summary>
         DosResult PrepareCurrentUserProfileUpdate(dynamic dynamicParam);
 

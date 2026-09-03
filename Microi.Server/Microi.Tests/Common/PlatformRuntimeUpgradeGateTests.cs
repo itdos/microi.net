@@ -412,7 +412,7 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.Contains("【核心字段可空兼容】全部检查成功", source);
         Assert.Contains("errors.Add($\"核心表 {tableName}.{columnName} 调整为允许为空失败", source);
         Assert.DoesNotContain("msgs.Add($\"核心表 {tableName} 已将", source);
-        Assert.Contains("public static string Version = \"7.6.11.0\"", source);
+        Assert.Contains("public static string Version = \"7.6.12.0\"", source);
         Assert.Contains("PACKAGE_MANAGED_OVERWRITE_V2", source);
         Assert.Contains("执行覆盖式重放以修复资源漂移", source);
         Assert.DoesNotContain("平台运行时接口自举存在客户源码或稳定身份冲突", source);
@@ -556,7 +556,7 @@ public class PlatformRuntimeUpgradeGateTests
             null, new object[] { "app.microi.sys_user.json", missingAiKey })));
 
         var oldSysUserVersion = (JObject)sysUser.DeepClone();
-        oldSysUserVersion["PackageInfo"]!["Version"] = "v6.3.1";
+        oldSysUserVersion["PackageInfo"]!["Version"] = "v7.6.4";
         Assert.False(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.sys_user.json", oldSysUserVersion })));
 
@@ -589,6 +589,32 @@ public class PlatformRuntimeUpgradeGateTests
                 !string.Equals(row["ApiEngineKey"]?.ToString(), "platform-sys-user-admin", StringComparison.Ordinal)));
         Assert.False(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.sys_user.json", missingSysUserAdmin })));
+
+        var missingHomeOverview = (JObject)sysUser.DeepClone();
+        missingHomeOverview["SysApiEngines"] = new JArray(
+            missingHomeOverview["SysApiEngines"]!.Children<JObject>().Where(row =>
+                !string.Equals(row["ApiEngineKey"]?.ToString(), "platform-home-overview", StringComparison.Ordinal)));
+        Assert.False(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.sys_user.json", missingHomeOverview })));
+
+        var missingHomeUsageStats = (JObject)sysUser.DeepClone();
+        missingHomeUsageStats["DiyFields"] = new JArray(
+            missingHomeUsageStats["DiyFields"]!.Children<JObject>().Where(row =>
+                !string.Equals(row["TableName"]?.ToString(), "sys_user", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(row["Name"]?.ToString(), "HomeUsageStats", StringComparison.OrdinalIgnoreCase)));
+        Assert.False(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.sys_user.json", missingHomeUsageStats })));
+
+        var oldHomeOverviewVersion = (JObject)sysUser.DeepClone();
+        var oldHomeOverview = Assert.Single(
+            oldHomeOverviewVersion["SysApiEngines"]!.Children<JObject>(),
+            row => string.Equals(
+                row["ApiEngineKey"]?.ToString(),
+                "platform-home-overview",
+                StringComparison.Ordinal));
+        oldHomeOverview["Version"] = "v0.9.9";
+        Assert.False(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.sys_user.json", oldHomeOverviewVersion })));
 
         var missingPromptPreview = (JObject)ai.DeepClone();
         missingPromptPreview["PhysicalColumns"] = new JArray(

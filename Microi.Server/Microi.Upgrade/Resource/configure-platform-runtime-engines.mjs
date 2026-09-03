@@ -67,8 +67,8 @@ function compareSemver(left, right) {
 const engines = [
   {
     key: 'mci-module-presentation-stats', name: '模块展示动态统计', file: 'mci-module-presentation-stats.js',
-    id: '01KZ000000B4D6G8H2J5M7N9PQ', enableLog: 0, version: 'v1.0.5',
-    history: '2026-08-24 v1.0.5 批量统计配合客户端 40ms 合并窗口，并将用户级只读计数缓存调整为 10 秒；ForceRefresh 仍可立即绕过缓存。'
+    id: '01KZ000000B4D6G8H2J5M7N9PQ', enableLog: 0, version: 'v1.0.7',
+    history: '2026-09-03 v1.0.7 将任务调度“启用”指标按真实“正常”状态统计，避免英文枚举推断造成恒为 0。\n2026-08-24 v1.0.5 批量统计配合客户端 40ms 合并窗口，并将用户级只读计数缓存调整为 10 秒；ForceRefresh 仍可立即绕过缓存。'
   },
   {
     key: 'mic_home_work_todo_badge', name: '我的工作统计角标', file: 'mic_home_work_todo_badge.js',
@@ -77,8 +77,9 @@ const engines = [
   },
   {
     key: 'platform-schedule-job', name: '平台定时任务管理', file: 'platform-schedule-job.js',
-    id: '01KZ0000007M5Q3R8V2N6C4B1A', enableLog: 1,
-    history: '2026-08-24 v1.0.0 定时任务管理迁移至接口引擎，Quartz 仅保留最小可信 V8 原子能力。'
+    id: '01KZ0000007M5Q3R8V2N6C4B1A', enableLog: 1, version: 'v1.0.1',
+    apiRoutes: '/api/Job/GetAllJob;/api/Job/GetJobDetail;/api/Job/AddJob;/api/Job/UpdateJob;/api/Job/PauseJob;/api/Job/ResumeJob;/api/Job/DeleteJob',
+    history: '2026-09-03 v1.0.1 补齐七条旧 /api/Job/* 多路由，并按宿主注入的可信请求路径映射列表、详情、新增、修改、暂停、恢复与删除动作。'
   },
   {
     key: 'platform-mq', name: '平台 RabbitMQ 消息发布', file: 'platform-mq.js',
@@ -314,6 +315,7 @@ for (const definition of engines) {
   engine.IsEnable = 1;
   engine.EnableLog = definition.enableLog;
   engine.Lock = definition.lock || 0;
+  if (definition.apiRoutes !== undefined) engine.ApiRoutes = definition.apiRoutes;
   if (definition.responseFile !== undefined) engine.ResponseFile = definition.responseFile;
   if (definition.responseType !== undefined) engine.ResponseType = definition.responseType;
   if (definition.key === 'platform-data-source-run') {

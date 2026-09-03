@@ -8,7 +8,10 @@ public sealed class RepositorySecretHygieneTests
     [
         "bin",
         "obj",
-        "TestResults"
+        "TestResults",
+        // 测试辅助构建会把完整输出树写到项目内 .tmp；它与 bin/obj 同属生成物，
+        // 不应把复制进去的 appsettings.json 误判成测试源码中的凭据文件。
+        ".tmp"
     ];
 
     [Fact]

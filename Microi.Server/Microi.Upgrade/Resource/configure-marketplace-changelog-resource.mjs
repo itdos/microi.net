@@ -471,18 +471,24 @@ function configureSchema(packageModel) {
     ['Content', 'mediumtext', 'mediumtext', 'NO', null, '更新内容', '', 12],
     ['ReleaseTime', 'varchar(25)', 'varchar', 'NO', null, '发布时间', '', 13],
     ['Sort', 'int(11)', 'int', 'YES', '100', '排序', '', 14],
-  ].map(([name, columnType, dataType, nullable, defaultValue, comment, key, ordinal]) => ({
-    TABLE_NAME: 'sys_microistore_changelog',
-    COLUMN_NAME: name,
-    COLUMN_TYPE: columnType,
-    DATA_TYPE: dataType,
-    IS_NULLABLE: nullable,
-    COLUMN_DEFAULT: defaultValue,
-    COLUMN_COMMENT: comment,
-    COLUMN_KEY: key,
-    EXTRA: '',
-    ORDINAL_POSITION: ordinal,
-  }));
+  ].map(([name, columnType, dataType, nullable, defaultValue, comment, key, ordinal]) => {
+    const column = {
+      TABLE_NAME: 'sys_microistore_changelog',
+      COLUMN_NAME: name,
+      COLUMN_TYPE: columnType,
+      DATA_TYPE: dataType,
+      IS_NULLABLE: nullable,
+      COLUMN_DEFAULT: defaultValue,
+      COLUMN_COMMENT: comment,
+      COLUMN_KEY: key,
+      EXTRA: '',
+      ORDINAL_POSITION: ordinal,
+    };
+    // 旧租户的历史日志在引入 OsClient 前可能保留 NULL。发布端租户值不能作为
+    // 固定默认值进入客户库，必须由新导入器使用可信目标租户上下文参数化回填。
+    if (name === 'OsClient') column.BACKFILL_VALUE_SOURCE = 'TargetOsClient';
+    return column;
+  });
   packageModel.PhysicalColumns = packageModel.PhysicalColumns.filter(
     (item) => item.TABLE_NAME !== 'sys_microistore_changelog',
   );

@@ -1,0 +1,4 @@
+interface:
+  display_name: "视觉引擎"
+  short_description: "构建与验收数据库优先、AI回退的通用视觉识别"
+  default_prompt: "Use $vision-engine to build and validate tenant-isolated Microi.Vision workflows."
