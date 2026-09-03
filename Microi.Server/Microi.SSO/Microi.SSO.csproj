@@ -11,9 +11,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>Microi,SSO,OIDC,OAuth2,SAML2,CAS,V8,接口引擎</PackageTags>
     <PackageReleaseNotes>Microi 吾码 SSO 身份联邦可信协议插件。</PackageReleaseNotes>
-    <Version>7.8.8</Version>
-    <AssemblyVersion>7.8.8</AssemblyVersion>
-    <FileVersion>7.8.8</FileVersion>
+    <Version>7.8.9</Version>
+    <AssemblyVersion>7.8.9</AssemblyVersion>
+    <FileVersion>7.8.9</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -45,7 +45,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
     <ProjectReference Include="..\Microi.Core\Microi.Core.csproj" />
-    <None Include="..\Microi.net\Resource\microi-blue-256.png"
+    <!-- 公开方案只通过 NuGet 消费闭源 Microi.net；打包资源也必须来自公开项目。 -->
+    <None Include="..\Microi.Core\Resource\microi-blue-256.png"
           Link="Resource\microi-blue-256.png"
           Pack="true"
           PackagePath="" />
