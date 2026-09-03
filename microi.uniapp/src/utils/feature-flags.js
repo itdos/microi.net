@@ -8,3 +8,12 @@ export function isEnabledFlag(value) {
 export function isAiAssistantVisible(sysConfig) {
   return !isEnabledFlag(sysConfig && sysConfig.DisableAiAssistant)
 }
+
+// 移动端入口同样使用负向开关：旧租户尚未升级字段时保持现有入口可见。
+export function isMessageTabBarVisible(sysConfig) {
+  return !isEnabledFlag(sysConfig && sysConfig.DisableMessageTabBar)
+}
+
+export function isInviteEntryVisible(sysConfig) {
+  return !isEnabledFlag(sysConfig && sysConfig.DisableInviteEntry)
+}
