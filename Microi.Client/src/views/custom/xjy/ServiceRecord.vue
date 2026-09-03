@@ -27,6 +27,7 @@
                                             <div class="service-image__error">图片加载失败</div>
                                         </template>
                                     </el-image>
+                                    <div v-else-if="photo.Loading" class="service-image__loading">图片加载中</div>
                                     <div v-if="photo.Path" class="service-image__location">{{ device.AnzhuangWZ || "未填写安装位置" }}</div>
                                 </div>
                             </div>
@@ -88,14 +89,18 @@ export default {
         async LoadFormData() {
             const currentVersion = ++this.loadVersion;
             const source = this.NormalizeArray(this.DataAppend?.formData);
-            this.loading = source.length > 0;
+            this.loading = true;
 
             const rows = source.map((row) => {
                 const service = row && typeof row === "object" ? { ...row } : {};
                 service.ShouhouSPArr = this.NormalizeArray(service.ShouhouSPArr).map((device) => {
                     const normalizedDevice = device && typeof device === "object" ? { ...device } : {};
                     normalizedDevice.JieguoTP = this.NormalizeArray(normalizedDevice.JieguoTP).map((photo) => {
-                        return typeof photo === "string" ? { Path: photo } : { ...(photo || {}) };
+                        const normalizedPhoto = typeof photo === "string" ? { Path: photo } : { ...(photo || {}) };
+                        normalizedPhoto.SourcePath = normalizedPhoto.Path || "";
+                        normalizedPhoto.Path = "";
+                        normalizedPhoto.Loading = Boolean(normalizedPhoto.SourcePath);
+                        return normalizedPhoto;
                     });
                     normalizedDevice.JieguoTPArr = [];
                     return normalizedDevice;
@@ -103,28 +108,36 @@ export default {
                 return service;
             });
 
+            if (currentVersion !== this.loadVersion) return;
+            // 文字记录是快照的主体，不能被任意一张私有图片的网络请求阻塞。
+            this.formData = rows;
+            this.loading = false;
+            this.ResolveRowsImages(this.formData, currentVersion).catch((error) => {
+                console.warn("服务记录图片批量加载失败。", error);
+            });
+        },
+        async ResolveRowsImages(rows, currentVersion) {
             await Promise.all(
                 rows.map((service) =>
                     Promise.all(
                         service.ShouhouSPArr.map(async (device) => {
                             const privateFileContext = this.ResolvePrivateFileContext(device);
-                            const paths = await Promise.all(
-                                device.JieguoTP.map(async (photo) => {
-                                    const path = await this.GetServerPath(photo.Path, privateFileContext);
+                            const photos = device.JieguoTP.slice();
+                            await Promise.all(
+                                photos.map(async (photo) => {
+                                    const path = await this.GetServerPath(photo.SourcePath, privateFileContext);
+                                    if (currentVersion !== this.loadVersion) return;
                                     photo.Path = path;
-                                    return path;
+                                    photo.Loading = false;
+                                    device.JieguoTPArr = device.JieguoTP.map((item) => item.Path).filter(Boolean);
                                 })
                             );
-                            device.JieguoTPArr = paths.filter(Boolean);
+                            if (currentVersion !== this.loadVersion) return;
                             device.JieguoTP = device.JieguoTP.filter((photo) => Boolean(photo.Path));
                         })
                     )
                 )
             );
-
-            if (currentVersion !== this.loadVersion) return;
-            this.formData = rows;
-            this.loading = false;
         },
         HasDeviceImages(service) {
             return this.NormalizeArray(service?.ShouhouSPArr).some((device) => this.NormalizeArray(device?.JieguoTP).length > 0);
@@ -164,24 +177,35 @@ export default {
                     resolve("");
                     return;
                 }
-                this.DiyCommon.Post(
-                    "/apiengine/platform-private-file-url",
-                    {
-                        FilePathName: url,
-                        ResourceKind: "FormField",
-                        FormEngineKey: context.FormEngineKey,
-                        FormDataId: context.FormDataId,
-                        FieldId: context.FieldId,
-                        SysMenuId: context.SysMenuId
-                    },
-                    (result) => {
-                        if (this.DiyCommon.Result(result)) {
-                            resolve(result.Data);
-                        } else {
-                            resolve("");
-                        }
-                    }
-                );
+                let settled = false;
+                const finish = (path) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeoutId);
+                    resolve(path || "");
+                };
+                // DiyCommon.Post 是回调接口；网络异常或回调丢失时必须主动收口，避免图片任务永久悬挂。
+                const timeoutId = setTimeout(() => finish(""), 10000);
+                try {
+                    this.DiyCommon.Post(
+                        "/apiengine/platform-private-file-url",
+                        {
+                            FilePathName: url,
+                            ResourceKind: "FormField",
+                            FormEngineKey: context.FormEngineKey,
+                            FormDataId: context.FormDataId,
+                            FieldId: context.FieldId,
+                            SysMenuId: context.SysMenuId
+                        },
+                        (result) => {
+                            finish(this.DiyCommon.Result(result) ? result.Data : "");
+                        },
+                        () => finish("")
+                    );
+                } catch (error) {
+                    console.warn("服务记录私有图片请求发起失败。", error);
+                    finish("");
+                }
             });
         }
     }
@@ -224,12 +248,14 @@ tbody tr td {
 }
 
 .service-image__preview,
-.service-image__error {
+.service-image__error,
+.service-image__loading {
     width: 150px;
     height: 150px;
 }
 
-.service-image__error {
+.service-image__error,
+.service-image__loading {
     display: flex;
     align-items: center;
     justify-content: center;
