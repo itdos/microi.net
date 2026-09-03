@@ -1,10 +1,8 @@
 <template>
-    <el-card class="box-card" v-if="DataAppend.formData">
-        <!-- <div class="keyword-search">
-      {{ DataAppend }}
-    </div> -->
-        <div class="table-container" v-for="(item, index) in GetformData" :key="index">
-            <table style="width: 100%" border="1" cellspacing="0">
+    <el-card v-if="HasPayload" v-loading="loading" class="box-card">
+        <el-empty v-if="!loading && GetformData.length === 0" description="暂无符合条件的服务记录" :image-size="72" />
+        <div v-for="(item, index) in GetformData" :key="item.Id || index" class="table-container">
+            <table class="service-table" border="1" cellspacing="0">
                 <thead>
                     <tr>
                         <th>服务时间</th>
@@ -15,18 +13,21 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>{{ item.FinishTime }}</td>
-                        <td>{{ item.Leixing }}</td>
-                        <td>{{ item.Neirong }}</td>
-                        <td>{{ item.ShouhouRY }}</td>
+                        <td>{{ item.FinishTime || "-" }}</td>
+                        <td>{{ item.Leixing || "-" }}</td>
+                        <td>{{ item.Neirong || "-" }}</td>
+                        <td>{{ item.ShouhouRY || "-" }}</td>
                     </tr>
-                    <tr>
+                    <tr v-if="HasDeviceImages(item)">
                         <td colspan="4">
-                            <div v-for="(item1, index1) in item.ShouhouSPArr" :key="index1" class="shouhou-img-container">
-                                <div v-for="(item2, index2) in item1.JieguoTP" :key="index2" style="margin: 15px">
-                                    <!-- <img :src="item2.Path" alt=""> -->
-                                    <el-image style="width: 150px; height: 150px" :src="item2.Path" :preview-src-list="item1.JieguoTPArr"> </el-image>
-                                    <div>{{ item1.AnzhuangWZ }}</div>
+                            <div v-for="(device, deviceIndex) in item.ShouhouSPArr" :key="device.Id || deviceIndex" class="shouhou-img-container">
+                                <div v-for="(photo, photoIndex) in device.JieguoTP" :key="photo.Id || photo.Path || photoIndex" class="service-image">
+                                    <el-image v-if="photo.Path" class="service-image__preview" :src="photo.Path" :preview-src-list="device.JieguoTPArr" preview-teleported>
+                                        <template #error>
+                                            <div class="service-image__error">图片加载失败</div>
+                                        </template>
+                                    </el-image>
+                                    <div v-if="photo.Path" class="service-image__location">{{ device.AnzhuangWZ || "未填写安装位置" }}</div>
                                 </div>
                             </div>
                         </td>
@@ -45,48 +46,104 @@ export default {
             default: () => ({})
         }
     },
+    data() {
+        return {
+            formData: [],
+            loading: false,
+            loadVersion: 0
+        };
+    },
     computed: {
+        HasPayload() {
+            const value = this.DataAppend?.formData;
+            return value !== undefined && value !== null && value !== "";
+        },
         GetformData() {
-            var self = this;
-            var formData = self.DataAppend.formData ? JSON.parse(self.DataAppend.formData) : [];
-            formData.map((item) => {
-                item.ShouhouSPArr.map((item1) => {
-                    item1.JieguoTP = JSON.parse(item1.JieguoTP);
-                    item1.JieguoTPArr = [];
-                    const privateFileContext = self.ResolvePrivateFileContext(item1);
-                    item1.JieguoTP.map(async (item2) => {
-                        item2.Path = await self.GetServerPath(item2.Path, privateFileContext);
-                        item1.JieguoTPArr.push(item2.Path);
-                    });
-                });
-            });
-            this.formData = formData;
             return this.formData;
         }
     },
-    data() {
-        return {
-            formData: []
-        };
+    watch: {
+        "DataAppend.formData": {
+            immediate: true,
+            handler() {
+                this.LoadFormData();
+            }
+        }
     },
-    mounted() {},
     methods: {
-        // 处理图片路径 匿名访问的
+        NormalizeArray(value) {
+            if (value === undefined || value === null || value === "") return [];
+            if (Array.isArray(value)) return value;
+            if (typeof value === "string") {
+                try {
+                    return this.NormalizeArray(JSON.parse(value));
+                } catch (error) {
+                    console.warn("服务记录数据不是有效 JSON，已按空数据处理。", error);
+                    return [];
+                }
+            }
+            if (typeof value === "object") return [value];
+            return [];
+        },
+        async LoadFormData() {
+            const currentVersion = ++this.loadVersion;
+            const source = this.NormalizeArray(this.DataAppend?.formData);
+            this.loading = source.length > 0;
+
+            const rows = source.map((row) => {
+                const service = row && typeof row === "object" ? { ...row } : {};
+                service.ShouhouSPArr = this.NormalizeArray(service.ShouhouSPArr).map((device) => {
+                    const normalizedDevice = device && typeof device === "object" ? { ...device } : {};
+                    normalizedDevice.JieguoTP = this.NormalizeArray(normalizedDevice.JieguoTP).map((photo) => {
+                        return typeof photo === "string" ? { Path: photo } : { ...(photo || {}) };
+                    });
+                    normalizedDevice.JieguoTPArr = [];
+                    return normalizedDevice;
+                });
+                return service;
+            });
+
+            await Promise.all(
+                rows.map((service) =>
+                    Promise.all(
+                        service.ShouhouSPArr.map(async (device) => {
+                            const privateFileContext = this.ResolvePrivateFileContext(device);
+                            const paths = await Promise.all(
+                                device.JieguoTP.map(async (photo) => {
+                                    const path = await this.GetServerPath(photo.Path, privateFileContext);
+                                    photo.Path = path;
+                                    return path;
+                                })
+                            );
+                            device.JieguoTPArr = paths.filter(Boolean);
+                            device.JieguoTP = device.JieguoTP.filter((photo) => Boolean(photo.Path));
+                        })
+                    )
+                )
+            );
+
+            if (currentVersion !== this.loadVersion) return;
+            this.formData = rows;
+            this.loading = false;
+        },
+        HasDeviceImages(service) {
+            return this.NormalizeArray(service?.ShouhouSPArr).some((device) => this.NormalizeArray(device?.JieguoTP).length > 0);
+        },
         async GetServerPath(url, privateFileContext) {
-            var self = this;
-            var serverPath = await self.GetPrivateFileUrl(url, privateFileContext);
-            return serverPath;
+            if (!url) return "";
+            try {
+                return await this.GetPrivateFileUrl(url, privateFileContext);
+            } catch (error) {
+                console.warn("服务记录图片地址获取失败。", error);
+                return "";
+            }
         },
         ResolvePrivateFileContext(record) {
             const row = record && typeof record === "object" ? record : {};
             const v8 = this.DataAppend?.V8 || {};
             const v8TableName = String(v8.TableName || "");
             const isTaskDeviceContext = v8TableName.toLowerCase() === "diy_shouhousp";
-            const recordContext = row._PrivateFileContext?.JieguoTP
-                || row.PrivateFileContext?.JieguoTP
-                || row._PrivateFileContext
-                || row.PrivateFileContext
-                || {};
+            const recordContext = row._PrivateFileContext?.JieguoTP || row.PrivateFileContext?.JieguoTP || row._PrivateFileContext || row.PrivateFileContext || {};
             return {
                 FormEngineKey: String(recordContext.FormEngineKey || (isTaskDeviceContext ? v8TableName : "diy_shouhousp")),
                 FormDataId: String(recordContext.FormDataId || row.Id || ""),
@@ -96,7 +153,6 @@ export default {
         },
         GetPrivateFileUrl(url, privateFileContext) {
             return new Promise((resolve) => {
-                var self = this;
                 const context = privateFileContext || {};
                 if (!url || !context.FormEngineKey || !context.FormDataId || !context.FieldId || !context.SysMenuId) {
                     console.warn("服务记录图片缺少受信任的表、记录、字段或菜单上下文，已拒绝签发私有地址。", {
@@ -108,7 +164,7 @@ export default {
                     resolve("");
                     return;
                 }
-                self.DiyCommon.Post(
+                this.DiyCommon.Post(
                     "/apiengine/platform-private-file-url",
                     {
                         FilePathName: url,
@@ -119,7 +175,7 @@ export default {
                         SysMenuId: context.SysMenuId
                     },
                     (result) => {
-                        if (self.DiyCommon.Result(result)) {
+                        if (this.DiyCommon.Result(result)) {
                             resolve(result.Data);
                         } else {
                             resolve("");
@@ -136,19 +192,54 @@ export default {
 .table-container {
     margin-bottom: 30px;
 }
-thead tr th {
-    padding: 6px;
-    text-align: center;
+
+.table-container:last-child {
+    margin-bottom: 0;
 }
+
+.service-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead tr th,
 tbody tr td {
     padding: 6px;
     text-align: center;
+}
+
+tbody tr td {
     height: 34px;
 }
+
 .shouhou-img-container {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-start;
+    align-items: flex-start;
+}
+
+.service-image {
+    margin: 15px;
+}
+
+.service-image__preview,
+.service-image__error {
+    width: 150px;
+    height: 150px;
+}
+
+.service-image__error {
+    display: flex;
     align-items: center;
+    justify-content: center;
+    color: var(--el-text-color-secondary);
+    background: var(--el-fill-color-light);
+}
+
+.service-image__location {
+    max-width: 150px;
+    margin-top: 6px;
+    word-break: break-all;
 }
 </style>
