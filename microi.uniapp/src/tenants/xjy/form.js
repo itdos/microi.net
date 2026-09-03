@@ -39,6 +39,7 @@ import {
 
 const CUSTOMER_TABLE = 'diy_kehu'
 const CUSTOMER_CASE_TABLE = 'diy_anli'
+const CASEBOOK_TABLE = 'diy_anlice'
 const CASEBOOK_CASE_TABLE = 'diy_anlice_child'
 // zhy：合同订单在所有移动端入口共用同一表单钩子，避免“我的订单”和客户订单 Tab 行为不一致。
 const ORDER_TABLE = 'diy_dingdan'
@@ -1862,8 +1863,63 @@ export function getFieldPresentation(context, field) {
 }
 
 export function getRelatedPresentation(context, field) {
-  if (!isCustomerForm(context) || !field || !field.layoutGroupKey) return {}
+  if (!field) return {}
   const config = field.config || {}
+  const parentTable = String(context.tableName || '').toLowerCase()
+  const childFkField = String(config.TableChildFkFieldName || '').toLowerCase()
+  if (parentTable === CASEBOOK_TABLE && childFkField === 'anlicid') {
+    // zhy：案例册编辑页复用详情页的信息层级，但仍由通用子表组件负责权限、分页和写入。
+    return {
+      layout: 'collection-cards',
+      title: '已收录案例',
+      addLabel: '添加案例',
+      titleField: 'Biaoti',
+      subtitleField: 'KehuMC',
+      lineFields: [
+        { label: '饮水需求', field: 'YinshuiXQ' },
+        { label: '解决方案', field: 'JiejueFA' },
+        { label: '客户评价', field: 'KehuPJ' }
+      ],
+      imageField: 'KehuALZP',
+      footerLabel: '编辑案例详情',
+      openMode: 'Edit',
+      removePermission: 'parent-edit',
+      picker: {
+        title: '选择客户案例',
+        sourceTable: CUSTOMER_CASE_TABLE,
+        menuAliases: ['客户案例', '案例'],
+        searchPlaceholder: '搜索标题或客户',
+        emptyText: '未找到客户案例',
+        titleField: 'Biaoti',
+        subtitleFields: ['KehuMC', 'SuoshuKH'],
+        duplicateFields: [
+          { source: 'KehuID', target: 'KehuID' },
+          { source: 'Biaoti', target: 'Biaoti' }
+        ],
+        fieldMap: {
+          Biaoti: ['Biaoti'],
+          KehuMC: ['KehuMC', 'SuoshuKH'],
+          KehuID: ['KehuID'],
+          KehuALZP: ['KehuALZP', 'Tupian'],
+          KehuGK: ['KehuGK', 'Textarea419'],
+          YinshuiXQ: ['YinshuiXQ'],
+          JiejueFA: ['JiejueFA'],
+          KehuPJ: ['KehuPJ', 'Textarea619'],
+          TuijianPY: ['TuijianPY'],
+          Select178: ['Select178', 'KehuLX'],
+          Select224: ['Select224', 'ShebeiXH'],
+          Textarea419: ['Textarea419', 'KehuGK'],
+          DateTime340: ['DateTime340', 'HezuoSJ'],
+          Text727: ['Text727', 'ShebeiSL'],
+          Textarea579: ['Textarea579', 'HezuoNR'],
+          Textarea619: ['Textarea619', 'KehuPJ'],
+          Textarea749: ['Textarea749', 'ShujuZM']
+        },
+        userFields: { TenantId: 'TenantId', TenantName: 'TenantName' }
+      }
+    }
+  }
+  if (!isCustomerForm(context) || !field.layoutGroupKey) return {}
   const title = [
     field.Label,
     field.Name,
