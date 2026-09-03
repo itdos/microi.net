@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "AI助手",
-    "Version": "v7.6.4",
+    "Version": "v7.6.5",
     "CreateTime": "2026-08-19T21:21:30.415Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -32,15 +32,16 @@
       "V8.AI.NL2V8",
       "V8.Image.Grayscale",
       "V8.Image.RemoveSolidBackground",
-      "ServerField:sys_apiengine.ApiRoutes"
+      "ServerField:sys_apiengine.ApiRoutes",
+      "ClientFeature:AiWorkbenchDirectoryV2"
     ],
-    "ChangeHistory": "2026-09-03 v7.6.4 新增简洁 AI 图像工作台、MiniMax 私有参考图图生图、AI 抠图收尾及黑白、缩放、裁剪、旋转、翻转、格式转换、多图拼接等精确处理能力。\n2026-09-02 v7.6.3 补齐 EnableVectorDatabase、VectorScoreThreshold、VectorTopK、QdrantApiKey、QdrantPort、QdrantHost、EmbeddingApiUrl 七个字段的 Name 元数据，恢复官方包字段闭包与跨租户安装校验。\n2026-09-02 v7.6.2 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-08-30 v7.6.1 将旧 /api/Ai 非流式地址全部收入 platform-ai-runtime 与 platform-ai-account 多路由，动作映射和管理员复核保持不变。\n2026-08-25 v7.6.0 AI助手官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.6 支付可信网关、Managed 账号编排与非流式 AI 运行时契约。\n2026-08-25 v6.3.6 支付回调仅由 C# 完成支付宝验签与可信租户归一化，订单、订阅、API Key 分配迁入 platform-ai-account；非流式 AI 兼容动作迁入 platform-ai-runtime，流式、代理、媒体、文件与策略元数据保持原生。\n2026-08-25 v6.3.5 AI 套餐、订阅、订单与媒体任务业务编排迁入 Managed V8；纳入 9 张 mic_sub_* 与 2 张用量表；移除 12 个重复 ai_app_* 接口及 3 张重复商城表。\n2026-08-25 v6.3.5 AI 套餐、订阅、订单与媒体任务业务编排迁入 Managed V8；移除由应用商城单独维护的 12 个重复 ai_app_* 接口。",
+    "ChangeHistory": "2026-09-03 v7.6.5 AI 对话框固定出现在首屏；对话、数据分析、绘图、音乐和视频入口集中呈现，29 项图像工具全部可见并可一步直达，首页嵌入态复用同一对话组件。\n2026-09-03 v7.6.5 重构 AI助手首屏：对话输入框进入首屏核心位置，完整展示对话、数据、绘图、音乐、视频及 29 项图像生成与处理能力，移除租户名和权限状态堆叠。\n2026-09-03 v7.6.4 新增简洁 AI 图像工作台、MiniMax 私有参考图图生图、AI 抠图收尾及黑白、缩放、裁剪、旋转、翻转、格式转换、多图拼接等精确处理能力。\n2026-09-02 v7.6.3 补齐 EnableVectorDatabase、VectorScoreThreshold、VectorTopK、QdrantApiKey、QdrantPort、QdrantHost、EmbeddingApiUrl 七个字段的 Name 元数据，恢复官方包字段闭包与跨租户安装校验。\n2026-09-02 v7.6.2 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-08-30 v7.6.1 将旧 /api/Ai 非流式地址全部收入 platform-ai-runtime 与 platform-ai-account 多路由，动作映射和管理员复核保持不变。\n2026-08-25 v7.6.0 AI助手官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.6 支付可信网关、Managed 账号编排与非流式 AI 运行时契约。\n2026-08-25 v6.3.6 支付回调仅由 C# 完成支付宝验签与可信租户归一化，订单、订阅、API Key 分配迁入 platform-ai-account；非流式 AI 兼容动作迁入 platform-ai-runtime，流式、代理、媒体、文件与策略元数据保持原生。\n2026-08-25 v6.3.5 AI 套餐、订阅、订单与媒体任务业务编排迁入 Managed V8；纳入 9 张 mic_sub_* 与 2 张用量表；移除 12 个重复 ai_app_* 接口及 3 张重复商城表。\n2026-08-25 v6.3.5 AI 套餐、订阅、订单与媒体任务业务编排迁入 Managed V8；移除由应用商城单独维护的 12 个重复 ai_app_* 接口。",
     "ChangeLog": {
-      "Version": "v7.6.4",
-      "Title": "AI 图像工作台与参考图编辑",
+      "Version": "v7.6.5",
+      "Title": "AI 首屏完整能力导航",
       "ChangeType": "Feature",
-      "Content": "重构 AI助手能力导航，新增文生图、图生图、高清重绘、消除、扩图、去水印、证件照、多图融合、抠图、上色及精确图片处理；参考图私有存储，结果写入租户 HDFS。",
-      "ReleaseTime": "2026-09-03 12:00:00"
+      "Content": "AI 对话框固定出现在首屏；对话、数据分析、绘图、音乐和视频入口集中呈现，29 项图像工具全部可见并可一步直达，首页嵌入态复用同一对话组件。",
+      "ReleaseTime": "2026-09-03 18:00:00"
     },
     "Description": "AI 助手、模型运行时、订阅与旧 AI Controller 地址兼容资源。"
   },

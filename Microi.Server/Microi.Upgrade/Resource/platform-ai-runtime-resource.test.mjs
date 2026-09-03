@@ -111,7 +111,7 @@ async function run(action, request = {}) {
 test('platform-ai-runtime is a fixed Managed package resource', () => {
   const engine = packageEngine('platform-ai-runtime');
   assert.ok(engine);
-  assert.equal(packageModel.PackageInfo.Version, 'v7.6.4');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.6.5');
   assert.equal(engine.Version, 'v1.1.0');
   assert.equal(engine.ApiAddress, '/apiengine/platform-ai-runtime');
   assert.equal(engine.StopHttp, 0);
