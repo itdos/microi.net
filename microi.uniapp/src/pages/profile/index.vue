@@ -57,7 +57,7 @@
           </view>
         </view>
 
-        <view v-if="isLoggedIn && featureEnabled('invitations')" class="share-row" hover-class="menu-row--pressed" @tap="inviteVisible = true">
+        <view v-if="isLoggedIn && inviteEntryEnabled && featureEnabled('invitations')" class="share-row" hover-class="menu-row--pressed" @tap="inviteVisible = true">
           <view class="menu-icon"><image src="/static/xjy/user/users.png" mode="aspectFit" /></view>
           <view class="menu-copy">
             <text class="menu-title">{{ appConfig.inviteTitle }}</text>
@@ -73,7 +73,7 @@
       </view>
     </scroll-view>
 
-    <view v-if="inviteVisible" class="invite-mask" @tap="inviteVisible = false">
+    <view v-if="inviteEntryEnabled && inviteVisible" class="invite-mask" @tap="inviteVisible = false">
       <view class="invite-sheet" @tap.stop>
         <view class="invite-handle"></view>
         <view class="invite-head"><text>选择邀请类型</text><text @tap="inviteVisible = false">×</text></view>
@@ -101,6 +101,7 @@ import { loadSummarySnapshot, readSummarySnapshot } from '@/platform/preload.js'
 import { hasFeature, getProfileRoute } from '@/platform/profile/index.js'
 import appConfig from '@/config.js'
 import { buildInviteSharePayload } from '@/utils/share.js'
+import { getInviteEntryEnabled } from '@/utils/sysconfig.js'
 import {
   getMiniProgramUpdateState,
   initializeMiniProgramUpdate,
@@ -117,6 +118,7 @@ export default {
       currentUser: {},
       avatarUrl: '',
       inviteVisible: false,
+      inviteEntryEnabled: true,
       inviteType: 'normal',
       // zhy：我的页只订阅平台级状态，不自行创建或检查更新管理器。
       updateState: getMiniProgramUpdateState(),
@@ -211,6 +213,7 @@ export default {
       this.summaryLoading = false
     }
     this.resolveAvatar()
+    this.resolveInviteEntryVisibility()
     if (this.isLoggedIn) this.loadSummary()
   },
   onUnload() {
@@ -221,6 +224,11 @@ export default {
   methods: {
     featureEnabled(name) {
       return hasFeature(name)
+    },
+    async resolveInviteEntryVisibility() {
+      const enabled = await getInviteEntryEnabled()
+      this.inviteEntryEnabled = enabled
+      if (!enabled) this.inviteVisible = false
     },
     handleAvatarError() { this.avatarUrl = '' },
     async resolveAvatar() {

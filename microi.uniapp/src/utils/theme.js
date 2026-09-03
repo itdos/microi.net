@@ -53,7 +53,11 @@ export function syncCustomTabBarSelection() {
     const tabBar = current && typeof current.getTabBar === 'function'
       ? current.getTabBar()
       : (pageScope && typeof pageScope.getTabBar === 'function' ? pageScope.getTabBar() : null)
-    if (tabBar && typeof tabBar.setData === 'function') tabBar.setData({ selected })
+    if (tabBar && typeof tabBar.syncSelectedFromRoute === 'function') {
+      tabBar.syncSelectedFromRoute()
+    } else if (tabBar && typeof tabBar.setData === 'function') {
+      tabBar.setData({ selected })
+    }
   } catch (e) {}
 }
 
