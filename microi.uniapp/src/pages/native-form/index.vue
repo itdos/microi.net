@@ -220,6 +220,7 @@
 					:parent-table-name="tableName"
 					:parent-table-child-auth="tableChildAuth"
 					:parent-mode="mode"
+					:presentation="relatedPresentation(relatedTab.field)"
 					display-mode="full"
 					:independent-scroll="standaloneListMode"
 					:viewport-height="relatedListViewportHeight"
@@ -259,7 +260,7 @@
 				</view>
 				<text>{{ tenantFormPresentation.floatingAction.label }}</text>
 			</view>
-			<view v-if="!loading && !error && mode === 'View' && rowId && !openSelectorField"
+			<view v-if="!loading && !error && mode === 'View' && rowId && canEditRecord && !openSelectorField"
 				class="form-view-actions">
 				<button class="edit-command" hover-class="edit-command--pressed" @tap="switchToEdit">
 					<view class="edit-command__icon"></view><text>编辑</text>
@@ -283,6 +284,7 @@
 		getUser,
 		setUser
 	} from '@/utils/request.js'
+	import { canEditMenuRecord } from '@/platform/menu-permission.js'
 	import { getSafeAreaMetrics } from '@/utils/safe-area.js'
 	import {
 		defaultFormData,
@@ -312,6 +314,7 @@
 		disposeTenantForm,
 		getTenantFormFieldActions,
 		getTenantFormFieldPresentation,
+		getTenantFormRelatedPresentation,
 		getTenantFormPresentation,
 		handleTenantFormFieldSelect,
 		handleTenantFormFieldChange,
@@ -392,6 +395,9 @@
 			}
 		},
 		computed: {
+			canEditRecord() {
+				return canEditMenuRecord(this.menuId, getUser() || {})
+			},
 			detailPosterPresentation() {
 				if (this.mode !== 'View') return null
 				return this.tenantFormPresentation.detailPoster || null
@@ -923,6 +929,10 @@
 				}
 			},
 			async switchToEdit() {
+				if (!this.canEditRecord) {
+					uni.showToast({ title: '当前账号没有编辑权限', icon: 'none' })
+					return
+				}
 				this.mode = 'Edit'
 				this.ensureTenantFloatingActionPosition()
 				await this.loadForm()
@@ -958,6 +968,9 @@
 			},
 			tenantFieldPresentation(field) {
 				return getTenantFormFieldPresentation(this.tenantFormContext(), field)
+			},
+			relatedPresentation(field) {
+				return getTenantFormRelatedPresentation(this.tenantFormContext(), field)
 			},
 			tenantFieldMapMarkers(field) {
 				const presentation = this.tenantFieldPresentation(field)
