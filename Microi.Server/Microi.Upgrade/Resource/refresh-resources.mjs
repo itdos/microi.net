@@ -184,7 +184,7 @@ function validateReleaseCandidate(name, content) {
   }
   if (name === 'official-resource-api.js') {
     if (!content.includes('ApiEngineKey: get-microi-upgrade-resource')
-      || !content.includes('Version: v1.3.4')
+      || !content.includes('Version: v1.3.5')
       || !content.includes('V8.Method.AuthorizeOfficialResourcePublish()')
       || !content.includes('ExpectedRemoteSha256')
       || !content.includes('function lockPublishRows()')
@@ -194,6 +194,8 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('发布升级资源[')
       || !content.includes('后回读内容哈希不一致')
       || !content.includes('OFFICIAL_RESOURCE_EXACT_SELECTION_V1')
+      || !content.includes('platform-home-overview')
+      || !content.includes('HomeUsageStats')
       || !content.includes('storedSelectionEquals')
       || !content.includes('存储接口 Code=1 但缺少 Data')
       || !content.includes('SelectApiEngine: selectionJson(exactSelections.SelectApiEngine)')
@@ -228,8 +230,8 @@ function validateReleaseCandidate(name, content) {
     };
     const packageContracts = {
       'app.microi.sys_user.json': {
-        minimumVersion: 7_006_002,
-        exactKeys: ['platform-user-update-preferences', 'user-module-table-preference', 'sys-user-security-action', 'platform-user-update-profile', 'platform-sys-user-admin', 'platform-user-access-key', 'platform-user-custom-hook'],
+        minimumVersion: 7_006_005,
+        exactKeys: ['platform-user-update-preferences', 'user-module-table-preference', 'sys-user-security-action', 'platform-user-update-profile', 'platform-sys-user-admin', 'platform-user-access-key', 'platform-home-overview', 'platform-user-custom-hook'],
         tenantHooks: ['platform-user-custom-hook'],
       },
       'app.microi.sys-config.json': {
@@ -325,6 +327,7 @@ function validateReleaseCandidate(name, content) {
       if (name === 'app.microi.sys_user.json') {
         const adminEngine = packageEngineMap.get('platform-sys-user-admin');
         const adminCode = String(adminEngine?.ApiV8Code || '');
+        const overviewCode = String(packageEngineMap.get('platform-home-overview')?.ApiV8Code || '');
         const capabilities = packageModel?.PackageInfo?.RequiredPlatformCapabilities || [];
         if (semanticNumber(adminEngine?.Version) < 1_000_002
           || !adminCode.includes('V8.Method.ManageSysUserAdmin')
@@ -332,6 +335,12 @@ function validateReleaseCandidate(name, content) {
           || !adminCode.includes('authorization.DataAppend.ChangesPassword === true')
           || !capabilities.includes('ApiEngine:platform-sys-user-admin@v1.0.2')) {
           throw new Error(`${name} 缺少 v6.3.2 系统账号 Managed v1.0.2 改密安全契约。`);
+        }
+        if (!overviewCode.includes('HomeUsageStats')
+          || !overviewCode.includes('recordMenuOpen')
+          || !capabilities.includes('ServerField:sys_user.HomeUsageStats')
+          || !capabilities.includes('ApiEngine:platform-home-overview@v1.0.0')) {
+          throw new Error(`${name} 缺少首页真实常用应用与权限过滤契约。`);
         }
       }
     }
@@ -675,7 +684,7 @@ function validateReleaseCandidate(name, content) {
         || !String(marketplaceSourceHook?.ApiV8Code || '').trimEnd().endsWith('return { Code : 1 };')
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-marketplace-source-hook']?.Ownership !== 'Tenant'
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-marketplace-source-hook']?.UpgradePolicy !== 'CreateIfMissing'
-        || engineVersionNumber(officialResourceEngine) < 1_002_008
+        || engineVersionNumber(officialResourceEngine) < 1_003_005
         || Number(officialResourceEngine?.AllowAnonymous) !== 1
         || !String(officialResourceEngine?.ApiV8Code || '').includes('V8.Method.AuthorizeOfficialResourcePublish()')
         || packageModel?.ResourcePolicies?.ApiEngines?.['get-microi-upgrade-resource']?.UpgradePolicy !== 'Managed'
@@ -685,6 +694,8 @@ function validateReleaseCandidate(name, content) {
           .includes('ApiEngine:get-microi-upgrade-resource@v1.3.3')
         || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
           .includes('ApiEngine:get-microi-upgrade-resource@v1.3.4')
+        || !(packageModel?.PackageInfo?.RequiredPlatformCapabilities || [])
+          .includes('ApiEngine:get-microi-upgrade-resource@v1.3.5')
         || engines.some(engine => engine.ApiEngineKey === 'platform-user-update-preferences')
         || visibilityField?.Component !== 'Switch'
         || String(visibilityField?.DefaultValue) !== '1'

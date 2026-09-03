@@ -1,19 +1,19 @@
 {
   "PackageInfo": {
     "Name": "系统账号",
-    "Version": "v7.6.4",
+    "Version": "v7.6.5",
     "CreateTime": "2026-08-22T20:45:27.838Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
     "MenuCount": 1,
     "TableCount": 2,
-    "FieldCount": 79,
+    "FieldCount": 80,
     "FlowCount": 0,
     "NodeCount": 0,
     "LineCount": 0,
     "DDLCount": 2,
-    "PhysicalColumnCount": 410,
-    "ApiEngineCount": 7,
+    "PhysicalColumnCount": 411,
+    "ApiEngineCount": 8,
     "DataSetCount": 0,
     "DataRowCount": 0,
     "AiApplicationCount": 0,
@@ -26,15 +26,17 @@
       "V8.Method.ManageSysUserAdmin",
       "ApiEngine:platform-user-access-key@v1.0.0",
       "V8.Method.ManageUserAccessKey",
-      "ServerField:sys_apiengine.ApiRoutes"
+      "ServerField:sys_apiengine.ApiRoutes",
+      "ServerField:sys_user.HomeUsageStats",
+      "ApiEngine:platform-home-overview@v1.0.0"
     ],
-    "ChangeHistory": "2026-09-02 v7.6.4 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-08-30 v7.6.3 将用户访问密钥四个旧控制器入口迁入 platform-user-access-key Managed 接口引擎，并与系统账号旧路由统一纳入多路由闭包。\n2026-08-30 v7.6.2 为系统账号管理、个人偏好和个人资料接口补齐旧 SysUser 多路由，统一由官方接口引擎处理。\n2026-08-30 v7.6.1 将 SysUserAccessKeyController 四个入口迁入 platform-user-access-key；多路由保持旧客户端地址，安全原子继续一次性签发与哈希。\n2026-08-25 v7.6.0 系统账号官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.2 Managed 账号管理、可信改密预检与租户 Hook 契约。\n2026-08-25 v6.3.2 系统账号管理接口升级为 v1.0.2；可信预检通过 DataAppend.ChangesPassword 标识改密，改密跳过租户 Before Hook，仅在成功后执行安全 After Hook。\n2026-08-25 v6.3.1 系统账号新增、修改、删除、查询与登录投影刷新迁入固定 Managed V8 接口，保留可信权限、密码、内容审核和会话原子，并提供永不覆盖的租户 Hook。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口；Sys_User.AiApiKey 的物理列、低代码字段与安装 DDL 统一归属系统账号应用。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口，并提供官方升级永不覆盖的系统账号个性化 Hook。\n",
+    "ChangeHistory": "2026-09-03 v7.6.5 新增隐藏字段 HomeUsageStats 与 Managed 接口 platform-home-overview；访问记录只保存在当前账号，返回结果按实时菜单权限过滤，不采集路由参数或业务页面数据。\n2026-09-03 v7.6.5 新增个人首页菜单访问聚合与权限过滤接口，仅记录当前账号打开的菜单 Id 和按日次数，为界面引擎首页提供真实常用应用及近 7 日趋势。\n2026-09-02 v7.6.4 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-08-30 v7.6.3 将用户访问密钥四个旧控制器入口迁入 platform-user-access-key Managed 接口引擎，并与系统账号旧路由统一纳入多路由闭包。\n2026-08-30 v7.6.2 为系统账号管理、个人偏好和个人资料接口补齐旧 SysUser 多路由，统一由官方接口引擎处理。\n2026-08-30 v7.6.1 将 SysUserAccessKeyController 四个入口迁入 platform-user-access-key；多路由保持旧客户端地址，安全原子继续一次性签发与哈希。\n2026-08-25 v7.6.0 系统账号官方接口递归深度统一收敛到运行时硬上限 5000；保留 v6.3.2 Managed 账号管理、可信改密预检与租户 Hook 契约。\n2026-08-25 v6.3.2 系统账号管理接口升级为 v1.0.2；可信预检通过 DataAppend.ChangesPassword 标识改密，改密跳过租户 Before Hook，仅在成功后执行安全 After Hook。\n2026-08-25 v6.3.1 系统账号新增、修改、删除、查询与登录投影刷新迁入固定 Managed V8 接口，保留可信权限、密码、内容审核和会话原子，并提供永不覆盖的租户 Hook。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口；Sys_User.AiApiKey 的物理列、低代码字段与安装 DDL 统一归属系统账号应用。\n2026-08-25 v6.3.0 用户资料与界面偏好迁入 Managed V8 接口，并提供官方升级永不覆盖的系统账号个性化 Hook。\n",
     "ChangeLog": {
-      "Version": "v7.6.4",
-      "Title": "WebOS iOS 拟物透明图标升级",
-      "ChangeType": "Optimize",
-      "Content": "将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。",
-      "ReleaseTime": "2026-09-02 12:05:00"
+      "Version": "v7.6.5",
+      "Title": "个人首页常用应用与趋势",
+      "ChangeType": "Feature",
+      "Content": "新增隐藏字段 HomeUsageStats 与 Managed 接口 platform-home-overview；访问记录只保存在当前账号，返回结果按实时菜单权限过滤，不采集路由参数或业务页面数据。",
+      "ReleaseTime": "2026-09-03 18:00:00"
     },
     "Description": "系统账号、个人偏好与访问密钥的官方低代码资源；历史 HTTP 地址由接口引擎多路由兼容。"
   },
@@ -47,7 +49,7 @@
     {
       "TableName": "sys_user",
       "TableId": "026be7b3-0634-416c-b462-789f0e8931b5",
-      "DDL": "CREATE TABLE IF NOT EXISTS `sys_user` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `PersonalDesktopGroup` varchar(255) NULL COMMENT '桌面外观',\n  `PersonalThemeGroup` varchar(255) NULL COMMENT '主题与菜单',\n  `PersonalHomeGroup` varchar(255) NULL COMMENT '语言与首页',\n  `UserAiUsageGroup` varchar(255) NULL COMMENT 'AI 额度与记录',\n  `UserExternalIdentityGroup` varchar(255) NULL COMMENT '外部身份',\n  `UserOrganizationGroup` varchar(255) NULL COMMENT '组织与权限',\n  `UserAccountSecurityGroup` varchar(255) NULL COMMENT '账号属性与状态',\n  `UserBasicProfileGroup` varchar(255) NULL COMMENT '基本资料',\n  `MenuChildExpandMode` varchar(25) NULL COMMENT '个人菜单子级展开方式',\n  `ThemeMode` varchar(25) NULL COMMENT '个人显示模式',\n  `ThemeColor` varchar(25) NULL COMMENT '个人主题色',\n  `PublicAvatar` varchar(2000) NULL COMMENT '公开头像',\n  `DefaultIndexUrl` varchar(500) NULL COMMENT '登录后首页路由',\n  `GiteeStarRepository` varchar(200) NULL COMMENT '已验证Gitee仓库',\n  `GiteeStarVerifiedAt` varchar(25) NULL COMMENT 'Gitee Star验证时间',\n  `GiteeStarVerified` int NULL COMMENT 'Gitee Star已验证',\n  `GiteeLogin` varchar(100) NULL COMMENT 'Gitee账号',\n  `GiteeUserId` varchar(50) NULL COMMENT 'Gitee用户Id',\n  `TenantDatabaseQuota` int NULL COMMENT '租户数据库额度',\n  `AiTokenRechargeRecords` varchar(255) NULL COMMENT 'Token充值记录',\n  `AiTokenUsageRecords` varchar(255) NULL COMMENT 'Token消费记录',\n  `JobLevel` int NULL COMMENT '岗位级别',\n  `Jobs` mediumtext NULL COMMENT '岗位',\n  `BtnDisplayPwd` varchar(50) NULL COMMENT '显示密码',\n  `LastLoginTime` varchar(25) NULL COMMENT '最后登录时间',\n  `LastLoginIP` varchar(50) NULL COMMENT '最后登录IP地址',\n  `LicenseType` varchar(50) NULL,\n  `WxOpenId` varchar(50) NULL COMMENT '微信公众号OpenId',\n  `WxNickName` varchar(50) NULL COMMENT '微信昵称',\n  `WxAvatar` varchar(255) NULL COMMENT '微信头像',\n  `WxMpId` varchar(50) NULL COMMENT '绑定公众号',\n  `RandomDesktopBg` int NULL COMMENT '随机壁纸',\n  `DesktopDockMenu` mediumtext NULL COMMENT '桌面任务栏 ',\n  `OpenTreeMenu` int NULL COMMENT '是否打开菜单',\n  `PageHistory` mediumtext NULL COMMENT '访问历史',\n  `DesktopBg` varchar(200) NULL COMMENT '系统背景',\n  `DesktopType` varchar(50) NULL COMMENT '桌面模式',\n  `Lang` varchar(50) NULL COMMENT '多语言',\n  `ParentId` varchar(36) NULL,\n  `TenantName` varchar(255) NULL COMMENT '所属租户',\n  `TenantId` varchar(36) NULL,\n  `MiniProgramOpenId` varchar(100) NULL COMMENT '小程序OpenId',\n  `UserType` varchar(50) NULL COMMENT '帐号类型',\n  `FeishuUnionId` varchar(50) NULL COMMENT '飞书UnionId',\n  `DeptCode` varchar(255) NULL COMMENT '所属组织机构Code',\n  `State` int(11) NULL COMMENT '状态',\n  `DeptName` varchar(255) NULL COMMENT '部门名称',\n  `Level` int(11) NULL COMMENT '角色级别',\n  `Pwd` varchar(255) NULL COMMENT '密码',\n  `RoleIds` mediumtext NULL COMMENT '角色',\n  `Remark` varchar(255) NULL COMMENT '备注',\n  `DeptId` varchar(36) NULL COMMENT '所属组织机构',\n  `No` varchar(50) NULL COMMENT '编号',\n  `Account` varchar(255) NULL COMMENT '登陆帐号',\n  `Phone` varchar(255) NULL COMMENT '手机号',\n  `Name` varchar(255) NULL COMMENT '姓名',\n  `Email` varchar(255) NULL COMMENT '邮箱',\n  `DeptIds` mediumtext NULL COMMENT '兼职组织机构',\n  `Avatar` varchar(255) NULL COMMENT '头像',\n  `Sex` varchar(50) NULL COMMENT '性别',\n  `PwdEncode` varchar(50) NULL COMMENT '密码存储形式',\n  `AiApiKey` varchar(200) NULL COMMENT 'AI API Key'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+      "DDL": "CREATE TABLE IF NOT EXISTS `sys_user` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `PersonalDesktopGroup` varchar(255) NULL COMMENT '桌面外观',\n  `PersonalThemeGroup` varchar(255) NULL COMMENT '主题与菜单',\n  `PersonalHomeGroup` varchar(255) NULL COMMENT '语言与首页',\n  `UserAiUsageGroup` varchar(255) NULL COMMENT 'AI 额度与记录',\n  `UserExternalIdentityGroup` varchar(255) NULL COMMENT '外部身份',\n  `UserOrganizationGroup` varchar(255) NULL COMMENT '组织与权限',\n  `UserAccountSecurityGroup` varchar(255) NULL COMMENT '账号属性与状态',\n  `UserBasicProfileGroup` varchar(255) NULL COMMENT '基本资料',\n  `MenuChildExpandMode` varchar(25) NULL COMMENT '个人菜单子级展开方式',\n  `ThemeMode` varchar(25) NULL COMMENT '个人显示模式',\n  `ThemeColor` varchar(25) NULL COMMENT '个人主题色',\n  `PublicAvatar` varchar(2000) NULL COMMENT '公开头像',\n  `DefaultIndexUrl` varchar(500) NULL COMMENT '登录后首页路由',\n  `GiteeStarRepository` varchar(200) NULL COMMENT '已验证Gitee仓库',\n  `GiteeStarVerifiedAt` varchar(25) NULL COMMENT 'Gitee Star验证时间',\n  `GiteeStarVerified` int NULL COMMENT 'Gitee Star已验证',\n  `GiteeLogin` varchar(100) NULL COMMENT 'Gitee账号',\n  `GiteeUserId` varchar(50) NULL COMMENT 'Gitee用户Id',\n  `TenantDatabaseQuota` int NULL COMMENT '租户数据库额度',\n  `AiTokenRechargeRecords` varchar(255) NULL COMMENT 'Token充值记录',\n  `AiTokenUsageRecords` varchar(255) NULL COMMENT 'Token消费记录',\n  `JobLevel` int NULL COMMENT '岗位级别',\n  `Jobs` mediumtext NULL COMMENT '岗位',\n  `BtnDisplayPwd` varchar(50) NULL COMMENT '显示密码',\n  `LastLoginTime` varchar(25) NULL COMMENT '最后登录时间',\n  `LastLoginIP` varchar(50) NULL COMMENT '最后登录IP地址',\n  `LicenseType` varchar(50) NULL,\n  `WxOpenId` varchar(50) NULL COMMENT '微信公众号OpenId',\n  `WxNickName` varchar(50) NULL COMMENT '微信昵称',\n  `WxAvatar` varchar(255) NULL COMMENT '微信头像',\n  `WxMpId` varchar(50) NULL COMMENT '绑定公众号',\n  `RandomDesktopBg` int NULL COMMENT '随机壁纸',\n  `DesktopDockMenu` mediumtext NULL COMMENT '桌面任务栏 ',\n  `OpenTreeMenu` int NULL COMMENT '是否打开菜单',\n  `PageHistory` mediumtext NULL COMMENT '访问历史',\n  `DesktopBg` varchar(200) NULL COMMENT '系统背景',\n  `DesktopType` varchar(50) NULL COMMENT '桌面模式',\n  `Lang` varchar(50) NULL COMMENT '多语言',\n  `ParentId` varchar(36) NULL,\n  `TenantName` varchar(255) NULL COMMENT '所属租户',\n  `TenantId` varchar(36) NULL,\n  `MiniProgramOpenId` varchar(100) NULL COMMENT '小程序OpenId',\n  `UserType` varchar(50) NULL COMMENT '帐号类型',\n  `FeishuUnionId` varchar(50) NULL COMMENT '飞书UnionId',\n  `DeptCode` varchar(255) NULL COMMENT '所属组织机构Code',\n  `State` int(11) NULL COMMENT '状态',\n  `DeptName` varchar(255) NULL COMMENT '部门名称',\n  `Level` int(11) NULL COMMENT '角色级别',\n  `Pwd` varchar(255) NULL COMMENT '密码',\n  `RoleIds` mediumtext NULL COMMENT '角色',\n  `Remark` varchar(255) NULL COMMENT '备注',\n  `DeptId` varchar(36) NULL COMMENT '所属组织机构',\n  `No` varchar(50) NULL COMMENT '编号',\n  `Account` varchar(255) NULL COMMENT '登陆帐号',\n  `Phone` varchar(255) NULL COMMENT '手机号',\n  `Name` varchar(255) NULL COMMENT '姓名',\n  `Email` varchar(255) NULL COMMENT '邮箱',\n  `DeptIds` mediumtext NULL COMMENT '兼职组织机构',\n  `Avatar` varchar(255) NULL COMMENT '头像',\n  `Sex` varchar(50) NULL COMMENT '性别',\n  `PwdEncode` varchar(50) NULL COMMENT '密码存储形式',\n  `AiApiKey` varchar(200) NULL COMMENT 'AI API Key',\n  `HomeUsageStats` mediumtext NULL COMMENT '个人首页菜单访问聚合'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     }
   ],
   "PhysicalColumns": [
@@ -4970,6 +4972,18 @@
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 19
+    },
+    {
+      "TABLE_NAME": "sys_user",
+      "COLUMN_NAME": "HomeUsageStats",
+      "COLUMN_TYPE": "mediumtext",
+      "DATA_TYPE": "mediumtext",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": null,
+      "COLUMN_COMMENT": "个人首页菜单访问聚合",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 59
     }
   ],
   "SysMenus": [
@@ -6941,6 +6955,29 @@
       "Description": "由 AI助手可信后端签发和轮换；低代码表单只保留字段元数据，不显示或直接编辑。",
       "Id": "446c60e6-44de-42f7-884a-10942087cb30",
       "CreateTime": "2026-08-25 16:00:00"
+    },
+    {
+      "TableName": "sys_user",
+      "AppVisible": 0,
+      "Type": "mediumtext",
+      "Name": "HomeUsageStats",
+      "InTableEdit": 0,
+      "Unique": 0,
+      "NameConfirm": 1,
+      "TableWidth": 150,
+      "TableId": "026be7b3-0634-416c-b462-789f0e8931b5",
+      "Readonly": 1,
+      "Encrypt": 0,
+      "Component": "Textarea",
+      "Visible": 0,
+      "IsLockField": 1,
+      "Data": "[]",
+      "Sort": 1560,
+      "NotEmpty": 0,
+      "Label": "个人首页菜单访问聚合",
+      "Description": "仅由 platform-home-overview 写入当前账号的菜单 Id、总次数、最近时间及按日次数；不记录 URL 参数和业务数据。",
+      "Id": "37b42ece-8460-4210-8b25-91b181119189",
+      "CreateTime": "2026-08-25 16:00:00"
     }
   ],
   "DataSets": [],
@@ -7144,6 +7181,35 @@
       "IsEnable": 1,
       "ApiEngineKey": "platform-user-access-key",
       "ApiName": "用户访问密钥可信管理"
+    },
+    {
+      "V8Limit": 0,
+      "IsDeleted": 0,
+      "UserName": "管理员",
+      "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
+      "UpdateTime": "2026-08-25 16:00:00",
+      "CreateTime": "2026-08-25 16:00:00",
+      "Id": "019d3af0-9003-7b91-9801-000000000001",
+      "V8Unlimited": 1,
+      "ChangeHistory": "2026-09-03 v1.0.0 按当前用户菜单权限统计首页常用应用与近 7 日访问趋势。",
+      "Version": "v1.0.0",
+      "LimitRecursion": 5000,
+      "LimitMemory": 2048,
+      "MaxStatements": 100000000,
+      "Timeout": 600,
+      "StopHttp": 0,
+      "EnableLog": 0,
+      "Category": "平台内置",
+      "Files": "[]",
+      "AllowAnonymous": 0,
+      "ApiAddress": "/apiengine/platform-home-overview",
+      "ResponseFile": 0,
+      "Lock": 0,
+      "ApiV8Code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 【极重要：这是官方应用托管接口，禁止直接承载个性化代码】\n * 所属官方应用：系统账号\n * ApiEngineKey：platform-home-overview\n * 从可信吾码官方应用源安装、更新或重新安装“系统账号”，都会以官方源码恢复此 Managed 接口。\n * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，\n * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。\n */\n\n// platform-home-overview v1.0.0\n// 当前用户首页概览：只保存菜单 Id 与按日聚合次数，不记录参数、表单内容或页面数据。\nvar currentUser = V8.CurrentUser || {};\nif (!currentUser.Id) {\n  return { Code: 0, Msg: '请先登录。' };\n}\n\nfunction asArray(value) {\n  var result = [];\n  if (!value || typeof value.length !== 'number') return result;\n  for (var index = 0; index < value.length; index++) result.push(value[index]);\n  return result;\n}\n\nfunction parseStats(value) {\n  var parsed = null;\n  try { parsed = value ? JSON.parse(String(value)) : null; } catch (_) { parsed = null; }\n  if (!parsed || typeof parsed !== 'object') parsed = {};\n  if (!parsed.Menus || typeof parsed.Menus !== 'object') parsed.Menus = {};\n  parsed.Version = 1;\n  return parsed;\n}\n\nfunction isSuperAdmin() {\n  var adminFlag = String(currentUser._IsAdmin || '').toLowerCase();\n  return currentUser._IsAdmin === true || currentUser._IsAdmin === 1\n    || adminFlag === 'true' || adminFlag === '1' || Number(currentUser.Level || 0) >= 9999;\n}\n\nfunction permittedMenuIds() {\n  var ids = {};\n  var limits = asArray(currentUser._RoleLimits);\n  for (var index = 0; index < limits.length; index++) {\n    var limit = limits[index] || {};\n    var type = String(limit.Type || 'Menu').toLowerCase();\n    if (type === 'menu' && limit.FkId) ids[String(limit.FkId).toLowerCase()] = true;\n  }\n  return ids;\n}\n\nvar superAdmin = isSuperAdmin();\nvar permittedIds = permittedMenuIds();\n\nfunction hasMenuPermission(menuId) {\n  return superAdmin || permittedIds[String(menuId || '').toLowerCase()] === true;\n}\n\nfunction normalizeUrl(value) {\n  var url = String(value || '').trim();\n  if (!url || url.charAt(0) !== '/' || url.indexOf('//') === 0) return '';\n  var path = url.split('?')[0].split('#')[0];\n  if (path === '/' || path === '/login' || path === '/access-login') return '';\n  return url;\n}\n\nfunction isUsableMenu(menu) {\n  if (!menu || !menu.Id || Number(menu.IsDeleted || 0) === 1 || Number(menu.Display || 0) !== 1) return false;\n  return Boolean(normalizeUrl(menu.Url)) && hasMenuPermission(menu.Id);\n}\n\nfunction getMenus() {\n  var response = V8.FormEngine.GetTableData('sys_menu', {\n    _Where: [['Display', '=', 1], ['IsDeleted', '=', 0]],\n    _SelectFields: ['Id', 'Name', 'Url', 'Icon', 'IconClass', 'Description', 'Sort', 'IsDeleted', 'Display'],\n    _OrderBy: 'Sort',\n    _OrderByType: 'ASC',\n    _PageIndex: 1,\n    _PageSize: 5000\n  });\n  if (!response || response.Code !== 1) return [];\n  var rows = asArray(response.Data);\n  var result = [];\n  for (var index = 0; index < rows.length; index++) {\n    if (isUsableMenu(rows[index])) result.push(rows[index]);\n  }\n  return result;\n}\n\nfunction getOwnStats() {\n  var response = V8.FormEngine.GetFormData('sys_user', {\n    Id: currentUser.Id,\n    _SelectFields: ['Id', 'HomeUsageStats']\n  });\n  if (!response || response.Code !== 1 || !response.Data || String(response.Data.Id) !== String(currentUser.Id)) {\n    return parseStats('');\n  }\n  return parseStats(response.Data.HomeUsageStats);\n}\n\nfunction dateKey(offset) {\n  return DateAdd(new Date(), 'd', offset, 'yyyy-MM-dd');\n}\n\nfunction pruneStats(stats) {\n  var retainedDays = {};\n  for (var dayOffset = -13; dayOffset <= 0; dayOffset++) retainedDays[dateKey(dayOffset)] = true;\n  var menuKeys = Object.keys(stats.Menus || {});\n  menuKeys.sort(function (left, right) {\n    return String(stats.Menus[right].LastOpenedAt || '').localeCompare(String(stats.Menus[left].LastOpenedAt || ''));\n  });\n  var compact = {};\n  for (var index = 0; index < menuKeys.length && index < 60; index++) {\n    var key = menuKeys[index];\n    var item = stats.Menus[key] || {};\n    var daily = {};\n    var existingDays = item.Daily || {};\n    var dayKeys = Object.keys(existingDays);\n    for (var dayIndex = 0; dayIndex < dayKeys.length; dayIndex++) {\n      var day = dayKeys[dayIndex];\n      if (retainedDays[day] && Number(existingDays[day] || 0) > 0) daily[day] = Number(existingDays[day]);\n    }\n    compact[key] = {\n      Count: Math.max(0, Number(item.Count || 0)),\n      LastOpenedAt: String(item.LastOpenedAt || ''),\n      Daily: daily\n    };\n  }\n  stats.Menus = compact;\n  return stats;\n}\n\nfunction recordMenuOpen() {\n  var menuId = String(V8.Param.MenuId || '').trim();\n  if (!menuId || menuId.length > 50) return { Code: 0, Msg: 'MenuId 不正确。' };\n  if (!hasMenuPermission(menuId)) return { Code: 0, Msg: '无权访问该菜单。' };\n\n  var menuResponse = V8.FormEngine.GetFormData('sys_menu', {\n    Id: menuId,\n    _SelectFields: ['Id', 'Url', 'Display', 'IsDeleted']\n  });\n  if (!menuResponse || menuResponse.Code !== 1 || !isUsableMenu(menuResponse.Data)) {\n    return { Code: 0, Msg: '菜单不存在、已隐藏或不适合作为首页应用。' };\n  }\n\n  var stats = getOwnStats();\n  var item = stats.Menus[menuId] || { Count: 0, LastOpenedAt: '', Daily: {} };\n  var today = dateKey(0);\n  item.Count = Math.max(0, Number(item.Count || 0)) + 1;\n  item.LastOpenedAt = DateNow('yyyy-MM-dd HH:mm:ss');\n  if (!item.Daily || typeof item.Daily !== 'object') item.Daily = {};\n  item.Daily[today] = Math.max(0, Number(item.Daily[today] || 0)) + 1;\n  stats.Menus[menuId] = item;\n  stats = pruneStats(stats);\n\n  var update = V8.FormEngine.UptFormData('sys_user', {\n    Id: currentUser.Id,\n    HomeUsageStats: JSON.stringify(stats)\n  });\n  if (!update || update.Code !== 1) return update || { Code: 0, Msg: '保存访问统计失败。' };\n  return { Code: 1, Data: { MenuId: menuId, Recorded: true } };\n}\n\nfunction buildDashboard() {\n  var menus = getMenus();\n  var menuById = {};\n  for (var menuIndex = 0; menuIndex < menus.length; menuIndex++) {\n    menuById[String(menus[menuIndex].Id)] = menus[menuIndex];\n  }\n  var stats = getOwnStats();\n  var dates = [];\n  var counts = [];\n  var weekOpenCount = 0;\n  var todayOpenCount = 0;\n  for (var offset = -6; offset <= 0; offset++) {\n    var key = dateKey(offset);\n    var count = 0;\n    var statKeys = Object.keys(stats.Menus || {});\n    for (var statIndex = 0; statIndex < statKeys.length; statIndex++) {\n      var statKey = statKeys[statIndex];\n      if (!menuById[statKey]) continue;\n      var statItem = stats.Menus[statKey] || {};\n      count += Math.max(0, Number((statItem.Daily || {})[key] || 0));\n    }\n    dates.push(key.substring(5));\n    counts.push(count);\n    weekOpenCount += count;\n    if (offset === 0) todayOpenCount = count;\n  }\n\n  var ranked = [];\n  var usedAppCount = 0;\n  var usedIds = {};\n  var keys = Object.keys(stats.Menus || {});\n  for (var index = 0; index < keys.length; index++) {\n    var menuId = keys[index];\n    var menu = menuById[menuId];\n    if (!menu) continue;\n    var item = stats.Menus[menuId] || {};\n    var openCount = Math.max(0, Number(item.Count || 0));\n    if (openCount <= 0) continue;\n    usedAppCount++;\n    usedIds[menuId] = true;\n    ranked.push({ Menu: menu, OpenCount: openCount, LastOpenedAt: String(item.LastOpenedAt || '') });\n  }\n  ranked.sort(function (left, right) {\n    return right.OpenCount - left.OpenCount\n      || right.LastOpenedAt.localeCompare(left.LastOpenedAt)\n      || Number(left.Menu.Sort || 0) - Number(right.Menu.Sort || 0);\n  });\n\n  var frequentApps = [];\n  function pushApp(menu, openCount) {\n    frequentApps.push({\n      Id: String(menu.Id),\n      Name: String(menu.Name || '未命名应用'),\n      Url: normalizeUrl(menu.Url),\n      Icon: String(menu.Icon || ''),\n      IconClass: String(menu.IconClass || ''),\n      Description: String(menu.Description || ''),\n      OpenCount: Math.max(0, Number(openCount || 0))\n    });\n  }\n  for (var rankIndex = 0; rankIndex < ranked.length && frequentApps.length < 6; rankIndex++) {\n    pushApp(ranked[rankIndex].Menu, ranked[rankIndex].OpenCount);\n  }\n  for (var fillIndex = 0; fillIndex < menus.length && frequentApps.length < 6; fillIndex++) {\n    if (!usedIds[String(menus[fillIndex].Id)]) pushApp(menus[fillIndex], 0);\n  }\n\n  return {\n    Code: 1,\n    Data: {\n      TodayOpenCount: todayOpenCount,\n      WeekOpenCount: weekOpenCount,\n      UsedAppCount: usedAppCount,\n      AccessibleAppCount: menus.length,\n      AiToolCount: 29,\n      Dates: dates,\n      Counts: counts,\n      FrequentApps: frequentApps,\n      HasHistory: ranked.length > 0,\n      DataAsOf: DateNow('yyyy-MM-dd HH:mm')\n    }\n  };\n}\n\nvar action = String(V8.Param.Action || 'Dashboard').toLowerCase();\nif (action === 'recordmenuopen') return recordMenuOpen();\nif (action === 'dashboard') return buildDashboard();\nreturn { Code: 0, Msg: '不支持的 Action。' };\n",
+      "ApiRole": "[]",
+      "IsEnable": 1,
+      "ApiEngineKey": "platform-home-overview",
+      "ApiName": "个人首页概览与常用应用"
     }
   ],
   "ResourcePolicies": {
@@ -7174,6 +7240,10 @@
         "UpgradePolicy": "CreateIfMissing"
       },
       "platform-user-access-key": {
+        "Ownership": "Platform",
+        "UpgradePolicy": "Managed"
+      },
+      "platform-home-overview": {
         "Ownership": "Platform",
         "UpgradePolicy": "Managed"
       }
