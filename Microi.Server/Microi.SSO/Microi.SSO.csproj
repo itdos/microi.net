@@ -45,7 +45,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
     <ProjectReference Include="..\Microi.Core\Microi.Core.csproj" />
-    <None Include="..\Microi.net\Resource\microi-blue-256.png"
+    <!-- 公开方案只通过 NuGet 消费闭源 Microi.net；打包资源也必须来自公开项目。 -->
+    <None Include="..\Microi.Core\Resource\microi-blue-256.png"
           Link="Resource\microi-blue-256.png"
           Pack="true"
           PackagePath="" />
