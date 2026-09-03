@@ -1,6 +1,6 @@
 <template>
   <view
-    v-if="isH5Dock"
+    v-if="isCustomDock"
     class="mci-bottom-dock"
     :class="aiAssistantEnabled ? 'mci-bottom-dock--with-ai' : 'mci-bottom-dock--without-ai'"
     aria-label="底部导航"
@@ -52,23 +52,27 @@
     <text class="mci-ai-launcher__label">AI</text>
   </view>
 
-  <view v-else-if="!isH5Dock" class="mci-ai-launcher-bridge" aria-hidden="true" />
+  <view v-else-if="!isCustomDock" class="mci-ai-launcher-bridge" aria-hidden="true" />
 </template>
 
 <script>
 import activeTabBar from '@/generated/active-tabbar.js'
 import { getSafeAreaMetrics } from '@/utils/safe-area.js'
-import { getAiAssistantEnabled } from '@/utils/sysconfig.js'
+import { getAiAssistantEnabled, getMessageTabBarEnabled } from '@/utils/sysconfig.js'
 
 let runtimeTarget = 'other'
 // #ifdef H5
 runtimeTarget = 'h5'
+// #endif
+// #ifdef APP-PLUS
+runtimeTarget = 'app'
 // #endif
 // #ifdef MP-WEIXIN
 runtimeTarget = 'mp-weixin'
 // #endif
 
 const normalizeRoute = (value) => String(value || '').replace(/^\/+/, '').split('?')[0]
+const MESSAGE_TAB_ROUTE = 'pages/message/index'
 const normalizeAssetPath = (value) => {
   const path = String(value || '')
   if (!path || /^(?:https?:|data:|blob:|\/)/i.test(path)) return path
@@ -82,6 +86,7 @@ export default {
       opening: false,
       switching: false,
       aiAssistantEnabled: true,
+      messageTabBarEnabled: true,
       safeTop: 0,
       safeHeaderHeight: 44,
       safeLeft: 0,
@@ -93,7 +98,7 @@ export default {
     }
   },
   computed: {
-    tabItems() {
+    allTabItems() {
       return (activeTabBar.list || []).map((item) => ({
         ...item,
         pagePath: normalizeRoute(item.pagePath),
@@ -101,14 +106,17 @@ export default {
         selectedIconPath: normalizeAssetPath(item.selectedIconPath || item.iconPath)
       }))
     },
-    isTabBarPage() {
-      return this.activeIndex >= 0
+    tabItems() {
+      return this.allTabItems.filter((item) => this.messageTabBarEnabled || item.pagePath !== MESSAGE_TAB_ROUTE)
     },
-    isH5Dock() {
-      return activeTabBar.custom === true && runtimeTarget === 'h5' && this.isTabBarPage
+    isTabBarPage() {
+      return this.activeIndex >= 0 || this.allTabItems.some((item) => item.pagePath === this.currentRoute())
+    },
+    isCustomDock() {
+      return activeTabBar.custom === true && ['h5', 'app'].includes(runtimeTarget) && this.isTabBarPage
     },
     isFallbackLauncher() {
-      return this.aiAssistantEnabled && this.isTabBarPage && runtimeTarget !== 'mp-weixin' && !this.isH5Dock
+      return this.aiAssistantEnabled && this.isTabBarPage && runtimeTarget !== 'mp-weixin' && !this.isCustomDock
     },
     fallbackStyle() {
       return {
@@ -129,11 +137,11 @@ export default {
     this.activate()
   },
   deactivated() {
-    this.releaseH5Dock()
+    this.releaseCustomDock()
   },
   beforeUnmount() {
     this.clearRouteSyncTimers()
-    this.releaseH5Dock()
+    this.releaseCustomDock()
     try {
       if (this.resizeHandler && typeof uni.offWindowResize === 'function') {
         uni.offWindowResize(this.resizeHandler)
@@ -145,8 +153,8 @@ export default {
       this.syncActiveRoute()
       this.scheduleActiveRouteSync()
       this.refreshSafeArea()
-      if (this.isH5Dock) this.activateH5Dock()
-      else if (runtimeTarget === 'h5') this.releaseH5Dock()
+      if (this.isCustomDock) this.activateCustomDock()
+      else if (['h5', 'app'].includes(runtimeTarget)) this.releaseCustomDock()
       this.syncWeixinTabBar()
       this.resolveAssistantVisibility()
     },
@@ -183,7 +191,7 @@ export default {
         this.routeSyncTimers.push(setTimeout(() => this.syncActiveRoute(), delay))
       })
     },
-    activateH5Dock() {
+    activateCustomDock() {
       try {
         const task = uni.hideTabBar({ animation: false })
         if (task && typeof task.catch === 'function') task.catch(() => {})
@@ -193,27 +201,36 @@ export default {
         if (element) element.setAttribute('data-mci-custom-tabbar', 'true')
       })
     },
-    releaseH5Dock() {
-      if (runtimeTarget !== 'h5' || typeof document === 'undefined') return
+    releaseCustomDock() {
+      if (!['h5', 'app'].includes(runtimeTarget)) return
       setTimeout(() => {
         const route = this.currentRoute()
-        const stillOnTab = this.tabItems.some((item) => item.pagePath === route)
+        const stillOnTab = this.allTabItems.some((item) => item.pagePath === route)
         if (stillOnTab) return
+        if (typeof document === 'undefined') return
         ;[document.documentElement, document.body].forEach((element) => {
           if (element) element.removeAttribute('data-mci-custom-tabbar')
         })
       }, 0)
     },
     async resolveAssistantVisibility() {
-      const enabled = await getAiAssistantEnabled()
-      this.aiAssistantEnabled = enabled
-      this.updateGlobalAiState(enabled)
+      const [aiAssistantEnabled, messageTabBarEnabled] = await Promise.all([
+        getAiAssistantEnabled(),
+        getMessageTabBarEnabled()
+      ])
+      this.aiAssistantEnabled = aiAssistantEnabled
+      this.messageTabBarEnabled = messageTabBarEnabled
+      this.syncActiveRoute()
+      this.updateGlobalEntryState(aiAssistantEnabled, messageTabBarEnabled)
       this.syncWeixinTabBar()
     },
-    updateGlobalAiState(enabled) {
+    updateGlobalEntryState(aiAssistantEnabled, messageTabBarEnabled) {
       try {
         const app = typeof getApp === 'function' ? getApp() : null
-        if (app && app.globalData) app.globalData.mciAiAssistantEnabled = Boolean(enabled)
+        if (app && app.globalData) {
+          app.globalData.mciAiAssistantEnabled = Boolean(aiAssistantEnabled)
+          app.globalData.mciMessageTabBarEnabled = Boolean(messageTabBarEnabled)
+        }
       } catch (error) {}
     },
     syncWeixinTabBar() {
@@ -225,11 +242,12 @@ export default {
         const tabBar = page && typeof page.getTabBar === 'function' ? page.getTabBar() : null
         if (!tabBar || typeof tabBar.setData !== 'function') return
         const state = {
-          list: this.tabItems,
+          list: this.allTabItems,
           color: activeTabBar.color,
           selectedColor: activeTabBar.selectedColor,
           backgroundColor: activeTabBar.backgroundColor,
-          aiAssistantEnabled: this.aiAssistantEnabled
+          aiAssistantEnabled: this.aiAssistantEnabled,
+          messageTabBarEnabled: this.messageTabBarEnabled
         }
         if (typeof tabBar.applyExternalState === 'function') tabBar.applyExternalState(state)
         else tabBar.setData(state)

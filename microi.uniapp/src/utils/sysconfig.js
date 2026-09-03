@@ -4,9 +4,19 @@
  */
 import { applyRuntimeSysConfig, getPlatformSysConfigResult } from './request.js'
 import appConfig from '../config.js'
-import { isAiAssistantVisible, isEnabledFlag } from './feature-flags.js'
+import {
+  isAiAssistantVisible,
+  isEnabledFlag,
+  isInviteEntryVisible,
+  isMessageTabBarVisible
+} from './feature-flags.js'
 
-export { isAiAssistantVisible, isEnabledFlag } from './feature-flags.js'
+export {
+  isAiAssistantVisible,
+  isEnabledFlag,
+  isInviteEntryVisible,
+  isMessageTabBarVisible
+} from './feature-flags.js'
 
 const CACHE_KEY = 'sys_config_cache'
 const CACHE_EXPIRE = 30 * 60 * 1000 // 缓存30分钟
@@ -14,8 +24,18 @@ const AI_FLAG_EXPIRE = 60 * 1000
 
 let sysConfigRequest = null
 let aiFlagRequest = null
+let messageTabBarFlagRequest = null
+let inviteEntryFlagRequest = null
 let aiModelFlagRequest = null
 let aiFlagState = {
+  checkedAt: 0,
+  enabled: true
+}
+let messageTabBarFlagState = {
+  checkedAt: 0,
+  enabled: true
+}
+let inviteEntryFlagState = {
   checkedAt: 0,
   enabled: true
 }
@@ -27,8 +47,12 @@ let aiModelFlagState = {
 export function resetSysConfigRuntimeCache() {
   sysConfigRequest = null
   aiFlagRequest = null
+  messageTabBarFlagRequest = null
+  inviteEntryFlagRequest = null
   aiModelFlagRequest = null
   aiFlagState = { checkedAt: 0, enabled: true }
+  messageTabBarFlagState = { checkedAt: 0, enabled: true }
+  inviteEntryFlagState = { checkedAt: 0, enabled: true }
   aiModelFlagState = { checkedAt: 0, enabled: false }
   try { uni.removeStorageSync(CACHE_KEY) } catch (error) {}
 }
@@ -123,6 +147,58 @@ export async function getAiAssistantEnabled(options = {}) {
     return true
   } finally {
     aiFlagRequest = null
+  }
+}
+
+/**
+ * 消息 tabBar 采用负向开关；请求失败或字段缺失时保持显示。
+ */
+export async function getMessageTabBarEnabled(options = {}) {
+  const force = options === true || (options && options.refresh === true)
+  const fresh = messageTabBarFlagState.checkedAt && Date.now() - messageTabBarFlagState.checkedAt < AI_FLAG_EXPIRE
+  if (!force && fresh) return messageTabBarFlagState.enabled
+  if (messageTabBarFlagRequest) return messageTabBarFlagRequest
+
+  messageTabBarFlagRequest = (async () => {
+    const config = await getSysConfig({ refresh: true })
+    const enabled = isMessageTabBarVisible(config)
+    messageTabBarFlagState = { checkedAt: Date.now(), enabled }
+    return enabled
+  })()
+
+  try {
+    return await messageTabBarFlagRequest
+  } catch (error) {
+    messageTabBarFlagState = { checkedAt: Date.now(), enabled: true }
+    return true
+  } finally {
+    messageTabBarFlagRequest = null
+  }
+}
+
+/**
+ * “我的”页邀请入口采用负向开关；请求失败或字段缺失时保持显示。
+ */
+export async function getInviteEntryEnabled(options = {}) {
+  const force = options === true || (options && options.refresh === true)
+  const fresh = inviteEntryFlagState.checkedAt && Date.now() - inviteEntryFlagState.checkedAt < AI_FLAG_EXPIRE
+  if (!force && fresh) return inviteEntryFlagState.enabled
+  if (inviteEntryFlagRequest) return inviteEntryFlagRequest
+
+  inviteEntryFlagRequest = (async () => {
+    const config = await getSysConfig({ refresh: true })
+    const enabled = isInviteEntryVisible(config)
+    inviteEntryFlagState = { checkedAt: Date.now(), enabled }
+    return enabled
+  })()
+
+  try {
+    return await inviteEntryFlagRequest
+  } catch (error) {
+    inviteEntryFlagState = { checkedAt: Date.now(), enabled: true }
+    return true
+  } finally {
+    inviteEntryFlagRequest = null
   }
 }
 

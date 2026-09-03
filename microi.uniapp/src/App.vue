@@ -17,8 +17,9 @@ let versionPolicyTimer = null
 export default {
   globalData: {
     mciTabBar: activeTabBar,
-    // DisableAiAssistant 缺失时默认显示，运行时读取完成后再同步明确的关闭值。
-    mciAiAssistantEnabled: true
+    // 负向入口开关缺失时默认显示，运行时读取完成后再同步明确的关闭值。
+    mciAiAssistantEnabled: true,
+    mciMessageTabBarEnabled: true
   },
   onLaunch() {
     console.log('App Launch')
