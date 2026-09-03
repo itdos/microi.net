@@ -1,4 +1,5 @@
 const normalizeRoute = (value) => String(value || '').replace(/^\/+/, '').split('?')[0]
+const MESSAGE_TAB_ROUTE = 'pages/message/index'
 
 const normalizeAssetPath = (value) => {
   const assetPath = String(value || '')
@@ -16,12 +17,14 @@ const getCurrentRoute = () => {
   }
 }
 
-const normalizeList = (list) => (Array.isArray(list) ? list : []).map((item) => ({
-  pagePath: normalizeRoute(item.pagePath),
-  text: item.text || '',
-  iconPath: normalizeAssetPath(item.iconPath),
-  selectedIconPath: normalizeAssetPath(item.selectedIconPath || item.iconPath)
-}))
+const normalizeList = (list, messageTabBarEnabled = true) => (Array.isArray(list) ? list : [])
+  .map((item) => ({
+    pagePath: normalizeRoute(item.pagePath),
+    text: item.text || '',
+    iconPath: normalizeAssetPath(item.iconPath),
+    selectedIconPath: normalizeAssetPath(item.selectedIconPath || item.iconPath)
+  }))
+  .filter((item) => messageTabBarEnabled || item.pagePath !== MESSAGE_TAB_ROUTE)
 
 Component({
   data: {
@@ -31,6 +34,7 @@ Component({
     selectedColor: '#E54625',
     backgroundColor: '#FFFFFF',
     aiAssistantEnabled: true,
+    messageTabBarEnabled: true,
     safeTop: 0,
     safeRight: 0,
     safeBottom: 0,
@@ -90,26 +94,34 @@ Component({
       } catch (error) {}
 
       const tabBar = appState.mciTabBar || {}
-      const list = normalizeList(tabBar.list)
+      const messageTabBarEnabled = appState.mciMessageTabBarEnabled !== false
+      this.rawTabList = Array.isArray(tabBar.list) ? tabBar.list : []
+      const list = normalizeList(this.rawTabList, messageTabBarEnabled)
       this.setData({
         list,
         selected: this.selectedIndexForRoute(list),
         color: tabBar.color || '#80909A',
         selectedColor: tabBar.selectedColor || '#E54625',
         backgroundColor: tabBar.backgroundColor || '#FFFFFF',
-        aiAssistantEnabled: appState.mciAiAssistantEnabled === true
+        aiAssistantEnabled: appState.mciAiAssistantEnabled === true,
+        messageTabBarEnabled
       })
     },
 
     applyExternalState(payload) {
       const state = payload && typeof payload === 'object' ? payload : {}
       const next = {}
-      const list = Array.isArray(state.list) ? normalizeList(state.list) : this.data.list
-      if (Array.isArray(state.list)) next.list = list
+      const messageTabBarEnabled = typeof state.messageTabBarEnabled === 'boolean'
+        ? state.messageTabBarEnabled
+        : this.data.messageTabBarEnabled
+      if (Array.isArray(state.list)) this.rawTabList = state.list
+      const list = normalizeList(this.rawTabList || this.data.list, messageTabBarEnabled)
+      next.list = list
       if (typeof state.color === 'string') next.color = state.color
       if (typeof state.selectedColor === 'string') next.selectedColor = state.selectedColor
       if (typeof state.backgroundColor === 'string') next.backgroundColor = state.backgroundColor
       if (typeof state.aiAssistantEnabled === 'boolean') next.aiAssistantEnabled = state.aiAssistantEnabled
+      next.messageTabBarEnabled = messageTabBarEnabled
       next.selected = this.selectedIndexForRoute(list)
       this.setData(next)
       this.scheduleRouteSync()
