@@ -17,9 +17,9 @@ function buttons(value) {
 }
 
 test('official package owns the automatic and manual tenant upgrade lifecycle', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.8.11');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.8.12');
   assert.equal(packageModel.PackageInfo.ChangeLog.Version, packageModel.PackageInfo.Version);
-  assert.equal(storePackage.PackageInfo.Version, 'v7.9.6');
+  assert.equal(storePackage.PackageInfo.Version, 'v7.9.8');
   assert.equal(storePackage.PackageInfo.ChangeLog.Version, storePackage.PackageInfo.Version);
 
   assert.equal(engines.get('admin_create_empty_saas_tenant')?.Version, 'v1.0.5');

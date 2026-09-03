@@ -45,6 +45,17 @@ public sealed class SolutionReferenceTopologyTests
         Assert.Contains("Condition=\"'$(MicroiNetExists)' != 'true'\"", testProject, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void SsoProject_UsesNuGetFallbackAndPublicPackageAssets()
+    {
+        var serverRoot = FindServerRoot();
+        var ssoProject = File.ReadAllText(Path.Combine(serverRoot, "Microi.SSO", "Microi.SSO.csproj"));
+
+        Assert.Contains("<PackageReference Include=\"Microi.net\" Version=\"$(MicroiNetVersion)\" />", ssoProject, StringComparison.Ordinal);
+        Assert.DoesNotContain(@"..\Microi.net\Resource", ssoProject, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(@"..\Microi.Core\Resource\microi-blue-256.png", ssoProject, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string FindServerRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
