@@ -21,7 +21,9 @@ if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
 $os = Get-CimInstance Win32_OperatingSystem
 $totalBytes = [double]$os.TotalVisibleMemorySize * 1KB
 $freeBytes = [double]$os.FreePhysicalMemory * 1KB
-$reserveBytes = [Math]::Max(6GB, $totalBytes * 0.20)
+# 测试入口与工作区统一保留至少 1.5GB 或 5% 物理内存，避免旧的 6GB/20% 门槛在
+# 容器已受独立内存上限保护时误拦截可安全串行执行的验证任务。
+$reserveBytes = [Math]::Max(1.5GB, $totalBytes * 0.05)
 Write-Host ("Microi.Tests: total={0:N1}GB free={1:N1}GB reserve-target={2:N1}GB" -f
     ($totalBytes / 1GB), ($freeBytes / 1GB), ($reserveBytes / 1GB))
 if ($freeBytes -lt $reserveBytes) {

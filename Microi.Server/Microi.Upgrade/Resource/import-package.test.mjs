@@ -154,6 +154,33 @@ test("managed API-engine baseline hashes remain audit metadata without blocking 
   assert.match(publishSource, /entry\.CompatibleBaseHashes = filteredCompatibleHashes/);
 });
 
+test("package API-engine duplicate repair selects one deterministic physical identity", () => {
+  const fixture = {};
+  vm.runInNewContext(`
+    ${extractNamedFunction(source, "selectApiEngineIdentityCanonical")}
+    result = selectApiEngineIdentityCanonical;
+  `, fixture);
+
+  const selectCanonical = fixture.result;
+  assert.equal(selectCanonical([
+    { Id: "active-old", IsDeleted: 0, CreateTime: "2026-01-01 00:00:00" },
+    { Id: "package-id", IsDeleted: 1, CreateTime: "2026-02-01 00:00:00" },
+  ], "package-id").Id, "package-id", "the package identity must win even when it is tombstoned");
+  assert.equal(selectCanonical([
+    { Id: "active-new", IsDeleted: 0, CreateTime: "2026-03-01 00:00:00" },
+    { Id: "active-old", IsDeleted: false, CreateTime: "2026-01-01 00:00:00" },
+    { Id: "deleted-oldest", IsDeleted: 1, CreateTime: "2025-01-01 00:00:00" },
+  ], "").Id, "active-old", "the earliest active row must win without a package identity match");
+  assert.equal(selectCanonical([
+    { Id: "z-id", IsDeleted: true, CreateTime: "2026-01-01 00:00:00" },
+    { Id: "a-id", IsDeleted: "1", CreateTime: "2026-01-01 00:00:00" },
+  ], "").Id, "a-id", "Id must deterministically break an equal tombstone timestamp");
+
+  assert.match(source, /PACKAGE_API_ENGINE_DUPLICATE_KEY_REPAIR_V1/);
+  assert.match(source, /UPDATE sys_apiengine SET IsDeleted=1 WHERE Id=@p0 AND LOWER\(ApiEngineKey\)=LOWER\(@p1\)/);
+  assert.match(source, /activeCanonicalRows\.length != 1/);
+});
+
 test("managed API-engine overwrite has no executable-equivalence or version-preservation loophole", () => {
   assert.doesNotMatch(source, /API_ENGINE_EXECUTABLE_EQUIVALENCE_V1/);
   assert.doesNotMatch(source, /ApplyEquivalentExecutableSource/);
@@ -223,7 +250,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.6\.8/);
+  assert.match(source, /Version: v2\.7\.1/);
 });
 
 test("standalone Web and UniApp installs always expose a target-tenant launch menu", () => {
@@ -606,6 +633,7 @@ function runPhysicalNotNullBackfillFixture(sourceColumn, options = {}) {
       return Number.isNaN(value) ? 0 : value;
     },
     V8: {
+      OsClient: options.osClient === undefined ? "tenant-a" : options.osClient,
       Db: {
         FromSql(sql) {
           const call = { sql, parameters: [], executed: false };
@@ -960,6 +988,44 @@ test("physical NOT NULL backfill is idempotent and fails closed without a declar
   assert.throws(
     () => runPhysicalNotNullBackfillFixture({ ...baseColumn, COLUMN_DEFAULT: null }),
     /存在3条NULL数据.*未声明可回填的默认值/
+  );
+});
+
+test("physical NOT NULL backfill can explicitly use the authoritative target tenant", () => {
+  const tenantColumn = {
+    TABLE_NAME: "sys_microistore_changelog",
+    COLUMN_NAME: "OsClient",
+    COLUMN_TYPE: "varchar(50)",
+    IS_NULLABLE: "NO",
+    COLUMN_DEFAULT: null,
+    BACKFILL_VALUE_SOURCE: "TargetOsClient",
+  };
+  const result = runPhysicalNotNullBackfillFixture(tenantColumn, {
+    nullCount: 21,
+    osClient: "xjy",
+  });
+  assert.equal(result.count, 21);
+  assert.equal(result.calls.length, 2);
+  assert.match(result.calls[1].sql, /SET `OsClient` = @p0.*IS NULL/);
+  assert.deepEqual(result.calls[1].parameters, [["@p0", "xjy"]]);
+
+  assert.throws(
+    () => runPhysicalNotNullBackfillFixture(
+      { ...tenantColumn, COLUMN_NAME: "StoreId" },
+      { osClient: "xjy" },
+    ),
+    /TargetOsClient仅允许用于OsClient字段/,
+  );
+  assert.throws(
+    () => runPhysicalNotNullBackfillFixture(tenantColumn, { osClient: "" }),
+    /目标租户标识为空/,
+  );
+  assert.throws(
+    () => runPhysicalNotNullBackfillFixture(
+      { ...tenantColumn, BACKFILL_VALUE_SOURCE: "RequestParam" },
+      { osClient: "xjy" },
+    ),
+    /不支持的NOT NULL回填来源/,
   );
 });
 
@@ -1544,6 +1610,90 @@ test("PageEngine diytable import fails closed when its installed menu is absent"
   );
 });
 
+test("PageEngine removes only an explicitly optional missing diytable and its empty wrapper", () => {
+  const remapContext = {
+    idMaps: { Table: {}, Field: {}, Menu: {} },
+    stats: {
+      TableIdRemapped: 0,
+      FieldIdRemapped: 0,
+      MenuIdRemapped: 0,
+      ReferenceRowsUpdated: 0,
+    },
+    debugLog: {},
+    menuJsonFields: [],
+    fieldJsonFields: [],
+    V8: {
+      FormEngine: {
+        GetFormData() { return { Code: 2, Msg: "NoExistData" }; },
+      },
+    },
+    inputRow: {
+      Id: "PAGE5",
+      JsonObj: JSON.stringify({
+        wrapperList: [
+          { type: "pannel", widgetList: [{ type: "homeoverview", widgetParams: [] }] },
+          {
+            type: "pannel",
+            label: "公告",
+            widgetList: [{
+              type: "diytable",
+              referencePolicy: { onMissing: "RemoveWidget" },
+              widgetParams: [{ value: "source-table" }, { value: "missing-menu" }],
+            }],
+          },
+        ],
+      }),
+    },
+  };
+
+  vm.runInNewContext(
+    `${pageEngineReferenceRemapSource[0]}\nresult = remapPackageDataRowReferences('mic_page', inputRow, 0);`,
+    remapContext,
+  );
+  const remapped = JSON.parse(remapContext.result.JsonObj);
+  assert.equal(remapped.wrapperList.length, 1);
+  assert.equal(remapped.wrapperList[0].widgetList[0].type, "homeoverview");
+  assert.equal(remapContext.stats.ReferenceRowsUpdated, 1);
+  assert.match(remapContext.debugLog.page_engine_reference_remap_PAGE5, /可选组件移除=1/);
+  assert.match(remapContext.debugLog.page_engine_reference_remap_PAGE5, /空容器移除=1/);
+  assert.match(remapContext.debugLog.page_engine_optional_reference_PAGE5, /目标菜单不存在/);
+});
+
+test("PageEngine optional reference policy never hides a menu read failure", () => {
+  const remapContext = {
+    idMaps: { Table: {}, Field: {}, Menu: {} },
+    stats: { ReferenceRowsUpdated: 0 },
+    debugLog: {},
+    menuJsonFields: [],
+    fieldJsonFields: [],
+    V8: {
+      FormEngine: {
+        GetFormData() { return { Code: 0, Msg: "database unavailable" }; },
+      },
+    },
+    inputRow: {
+      Id: "PAGE5",
+      JsonObj: {
+        wrapperList: [{
+          widgetList: [{
+            type: "diytable",
+            referencePolicy: { onMissing: "RemoveWidget" },
+            widgetParams: [{ value: "source-table" }, { value: "menu-1" }],
+          }],
+        }],
+      },
+    },
+  };
+
+  assert.throws(
+    () => vm.runInNewContext(
+      `${pageEngineReferenceRemapSource[0]}\nremapPackageDataRowReferences('mic_page', inputRow, 0);`,
+      remapContext,
+    ),
+    /读取目标菜单失败.*database unavailable/,
+  );
+});
+
 test("only worker-owned checkpoints can skip schema phases", () => {
   const chunkHelpers = source.match(/var backgroundTaskId = [\s\S]*?(?=var installUser =)/);
   assert.ok(chunkHelpers);
@@ -1685,7 +1835,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
   assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 3, 8\)/);
-  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 5, 1\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 7, 1\)/);
   assert.match(appStoreUpgradeSource, /V8TrustedExecutionContext\.EnterManagedProtocol\([\s\S]*?"import-microi-store-package"/);
   assert.match(appStoreUpgradeSource, /dynamic\s+installResult\s*;/);
   assert.doesNotMatch(appStoreUpgradeSource, /DosResult\s+installResult\s*;/);
@@ -1747,7 +1897,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*2_005_004/);
+  assert.match(refreshSource, /versionNumber\s*<\s*2_007_001/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -1760,7 +1910,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /versionNumber\s*<\s*1_009_016/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_007_033/);
   assert.match(refreshSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_005_004/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_007_001/);
   assert.match(refreshSource, /TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
@@ -2160,6 +2310,10 @@ test("SaaS engine ships its built-in microservice as a bounded database-only run
   assert.ok(assets.length > 0 && assets.length <= 256);
   assert.ok(assets.reduce((sum, asset) => sum + Number(asset.Size || 0), 0) <= 5 * 1024 * 1024);
   assert.ok(assets.some((asset) => asset.Path === bundle.EntryPath));
+  assert.match(source, /DATABASE_ONLY_PUBLISH_POINTER_RESET_V1/);
+  assert.match(source, /PublishProtocolVersion=2, PublishState=@p0, PublishFence=0, PublishRowVersion=0/);
+  assert.match(source, /ActivePublishVersionId=NULL, CommittedPublishVersionId=NULL, CommittedRuntimeManifestHash=NULL/);
+  assert.match(source, /数据库内置微服务发布指针清理后强回读不一致/);
 });
 
 test("SaaS engine ships the complete audited Gitee binding recovery and tenant creation chain", () => {
@@ -2873,6 +3027,9 @@ test("managed micro-app assets proxy stable HDFS paths instead of cross-origin r
   assert.match(microAppControllerSource, /CurrentV3[\s\S]*?ProxyApplicationAssetV3\(/);
   assert.match(microAppControllerSource, /ProxyApplicationAssetV3[\s\S]*?HttpCompletionOption\.ResponseHeadersRead[\s\S]*?CopyToAsync\(Response\.Body/);
   assert.doesNotMatch(microAppControllerSource, /CurrentV3[\s\S]{0,5000}?return Redirect\(immutableUrl\);/);
+  assert.match(microAppControllerSource, /DATABASE_MANAGED_RUNTIME_INVALID_V3_RECOVERY_V1/);
+  assert.match(microAppControllerSource, /HasDatabaseManagedEntry\(service\)/);
+  assert.match(microAppControllerSource, /X-Microi-MicroApp-Pointer-Recovery/);
 });
 
 test("micro-app asset gateway rejects object-storage error bodies and incomplete HTML", () => {

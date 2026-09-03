@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.9.16 V3 source", () => {
+test("publisher package metadata matches the v1.9.23 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.9.16");
+  assert.equal(packagedPublisher.Version, "v1.9.23");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -134,7 +134,13 @@ test("small MicroServices can publish a verified database-only runtime without l
   assert.match(publisherSource, /DatabaseOnlyBuild 最多允许 256 个编译文件/);
   assert.match(publisherSource, /DatabaseOnlyBuild 总大小不能超过 5MB/);
   assert.match(publisherSource, /DatabaseOnlyBuild 入口未返回完整 HTML 文档/);
+  assert.match(publisherSource, /databaseOnlyHtml = text\(System\.Text\.Encoding\.UTF8\.GetString\(/);
+  assert.match(publisherSource, /databaseOnlyHtmlLower\.indexOf\('<!doctype html'\)/);
+  assert.doesNotMatch(publisherSource, /\/<!doctype\\s\+html\/i\.test\(databaseOnlyHtml\)/);
   assert.match(publisherSource, /function readRuntimeAssetBase64\(runtimeAsset, path\)/);
+  assert.match(publisherSource, /function runtimeAssetBase64MatchesManifest\(runtimeAsset, base64\)/);
+  assert.match(publisherSource, /function sha256RuntimeAssetBytes\(bytes\)/);
+  assert.match(publisherSource, /function stableApiOrigin\(value\)/);
   assert.match(publisherSource, /runtimeAsset\.StableFilePathName/);
   assert.match(publisherSource, /\/micro-app\\\/v3\\\/tenants/);
   assert.match(publisherSource, /readRuntimeAssetBase64\(runtimeAsset, path\)/);
@@ -146,6 +152,205 @@ test("small MicroServices can publish a verified database-only runtime without l
   assert.match(publisherSource, /databaseOnlyService\.StorageMode = 'db'/);
   assert.match(publisherSource, /databaseOnlyService\.MsUrl = 'db'/);
   assert.match(publisherSource, /inlineBase64 \|\| readRuntimeAssetBase64/);
+});
+
+test("database-only text assets prefer decoded HTTP content over transport raw bytes", () => {
+  const html = '<!doctype html><html><head></head><body></body></html>';
+  const context = {
+    V8: {
+      SysConfig: { ApiBase: 'https://api.example.test' },
+      Http: {
+        GetResponse() {
+          return { Content: html, RawBytes: Buffer.from('{"gateway":"frame"}') };
+        },
+      },
+      Base64: {
+        StringToBase64(value) {
+          return Buffer.from(String(value), 'utf8').toString('base64');
+        },
+      },
+    },
+    System: {
+      Convert: {
+        FromBase64String(value) {
+          return Buffer.from(value, 'base64');
+        },
+        ToBase64String(value) {
+          return Buffer.from(value).toString('base64');
+        },
+      },
+    },
+    Buffer,
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "isTextFile")}
+    ${extractFunction(publisherSource, "sha256RuntimeAssetBytes")}
+    ${extractFunction(publisherSource, "runtimeAssetBase64MatchesManifest")}
+    ${extractFunction(publisherSource, "stableApiOrigin")}
+    function readFileBase64() { throw new Error('unexpected HDFS fallback'); }
+    ${extractFunction(publisherSource, "readRuntimeAssetBase64")}
+    result = readRuntimeAssetBase64;
+  `, context);
+
+  const encoded = context.result({
+    StableFilePathName: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/app/assets/index.html',
+  }, 'index.html');
+  assert.equal(Buffer.from(encoded, 'base64').toString('utf8'), html);
+});
+
+test("database-only assets prefer the immutable HDFS object over the public resolver", () => {
+  const expected = Buffer.from('immutable-hdfs-html', 'utf8').toString('base64');
+  const context = {
+    V8: { SysConfig: { ApiBase: 'https://api.example.test' } },
+    System: {
+      Convert: {
+        FromBase64String(value) { return Buffer.from(value, 'base64'); },
+      },
+    },
+    Buffer,
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "isTextFile")}
+    ${extractFunction(publisherSource, "sha256RuntimeAssetBytes")}
+    ${extractFunction(publisherSource, "runtimeAssetBase64MatchesManifest")}
+    ${extractFunction(publisherSource, "stableApiOrigin")}
+    function readFileBase64(path) {
+      if (path !== 'immutable/runtime/index.html') throw new Error('unexpected path');
+      return '${expected}';
+    }
+    ${extractFunction(publisherSource, "readRuntimeAssetBase64")}
+    result = readRuntimeAssetBase64;
+  `, context);
+
+  assert.equal(context.result({
+    FilePathName: 'immutable/runtime/index.html',
+    StableFilePathName: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/app/assets/index.html',
+  }, 'index.html'), expected);
+});
+
+test("database-only assets reject stale HDFS bytes and resolve stable routes from an ApiBase suffix", () => {
+  const html = '<!doctype html><html><head></head><body>stable</body></html>';
+  let requestedUrl = '';
+  const context = {
+    V8: {
+      SysConfig: { ApiBase: 'https://api.example.test/api/' },
+      Http: {
+        GetResponse({ Url }) {
+          requestedUrl = Url;
+          return { Content: html, RawBytes: Buffer.from('gateway-frame') };
+        },
+      },
+      Base64: {
+        StringToBase64(value) {
+          return Buffer.from(String(value), 'utf8').toString('base64');
+        },
+      },
+    },
+    System: {
+      Convert: {
+        FromBase64String(value) { return Buffer.from(value, 'base64'); },
+        ToBase64String(value) { return Buffer.from(value).toString('base64'); },
+      },
+    },
+    Buffer,
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "isTextFile")}
+    ${extractFunction(publisherSource, "sha256RuntimeAssetBytes")}
+    ${extractFunction(publisherSource, "runtimeAssetBase64MatchesManifest")}
+    ${extractFunction(publisherSource, "stableApiOrigin")}
+    function readFileBase64() { return Buffer.from('stale').toString('base64'); }
+    ${extractFunction(publisherSource, "readRuntimeAssetBase64")}
+    result = readRuntimeAssetBase64;
+  `, context);
+
+  const encoded = context.result({
+    FilePathName: 'immutable/runtime/index.html',
+    StableFilePathName: '/micro-app/v3/tenants/itdos/kinds/runtime/apps/app/assets/index.html',
+    Size: Buffer.byteLength(html),
+  }, 'index.html');
+  assert.equal(requestedUrl, 'https://api.example.test/micro-app/v3/tenants/itdos/kinds/runtime/apps/app/assets/index.html');
+  assert.equal(Buffer.from(encoded, 'base64').toString('utf8'), html);
+});
+
+test("runtime asset manifest SHA remains mandatory without native CLR cryptography", () => {
+  const good = Buffer.from('verified bytes', 'utf8');
+  const expectedSha = crypto.createHash('sha256').update(good).digest('hex');
+  const context = {
+    System: {
+      Convert: {
+        FromBase64String(value) { return Buffer.from(value, 'base64'); },
+      },
+    },
+    Buffer,
+    Number,
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "sha256RuntimeAssetBytes")}
+    ${extractFunction(publisherSource, "runtimeAssetBase64MatchesManifest")}
+    result = runtimeAssetBase64MatchesManifest;
+  `, context);
+  assert.equal(context.result({ Size: good.length, Sha256: expectedSha }, good.toString('base64')), true);
+  assert.equal(context.result({ Size: good.length, Sha256: expectedSha }, Buffer.from('falsified byte', 'utf8').toString('base64')), false);
+});
+
+test("protocol v3 hydrates only the asset list from the exact committed runtime pointer", () => {
+  const proof = {
+    VersionId: 'version-1',
+    RuntimeManifestHash: 'a'.repeat(64),
+    PublishFence: '34',
+    RequestFingerprint: 'b'.repeat(64),
+  };
+  const context = {
+    V8: { Param: {} },
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "parseObject")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    function getMicroService() {
+      return { Service: {
+        BuildVersion: 'v1.9.14',
+        AssetsJson: '[{"Path":"index.html"}]',
+        AssetManifestJson: JSON.stringify({
+          CommittedPublishVersionId: 'version-1',
+          RuntimeManifestHash: '${'a'.repeat(64)}',
+          PublishFence: '34',
+          RequestFingerprint: '${'b'.repeat(64)}',
+          RouteSnapshotHash: '${'c'.repeat(64)}'
+        }),
+        AssetCount: 1,
+        TotalSize: '377'
+      }, Pages: [{ mutable: true }] };
+    }
+    ${extractFunction(publisherSource, "hydrateCommittedRuntimeAssets")}
+    result = hydrateCommittedRuntimeAssets;
+  `, context);
+  const runtime = {
+    Service: { MsKey: 'microi-platform-service', BuildVersion: 'v1.9.14', RouteSnapshotHash: 'c'.repeat(64) },
+    Pages: [{ committed: true }],
+  };
+  const hydrated = context.result({ AppKey: 'microi-platform-service' }, runtime, proof, 'v1.9.14');
+  assert.equal(hydrated.Service.AssetsJson, '[{"Path":"index.html"}]');
+  assert.deepEqual(hydrated.Pages, runtime.Pages);
+  assert.throws(
+    () => context.result({ AppKey: 'microi-platform-service' }, runtime, { ...proof, PublishFence: '35' }, 'v1.9.14'),
+    /CommittedProof 不一致/,
+  );
 });
 
 test("publisher enriches portable MicroService menu keys and rejects cross-app bindings", () => {
@@ -798,7 +1003,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.9\.16/);
+  assert.match(publisherSource, /Version: v1\.9\.23/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

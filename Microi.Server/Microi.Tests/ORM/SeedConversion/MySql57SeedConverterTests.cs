@@ -213,6 +213,36 @@ public sealed class MySql57SeedConverterTests
     }
 
     [Fact]
+    public void Sql_server_uses_nonclustered_primary_key_when_unicode_mapping_exceeds_900_bytes()
+    {
+        const string dump = """
+            CREATE TABLE `microi_job_triggers` (
+              `SCHED_NAME` varchar(120) NOT NULL,
+              `TRIGGER_NAME` varchar(200) NOT NULL,
+              `TRIGGER_GROUP` varchar(200) NOT NULL,
+              PRIMARY KEY (`SCHED_NAME`,`TRIGGER_NAME`,`TRIGGER_GROUP`)
+            );
+            CREATE TABLE `compact_key` (
+              `Id` varchar(36) NOT NULL,
+              PRIMARY KEY (`Id`)
+            );
+            """;
+        var output = new StringWriter();
+
+        DatabaseSeedConverter.ConvertMySql57(
+            new StringReader(dump),
+            output,
+            SeedDatabaseTarget.SqlServer2022);
+
+        var sql = output.ToString();
+        Assert.Contains(
+            "PRIMARY KEY NONCLUSTERED ([SCHED_NAME],[TRIGGER_NAME],[TRIGGER_GROUP])",
+            sql);
+        Assert.Contains("PRIMARY KEY ([Id])", sql);
+        Assert.DoesNotContain("PRIMARY KEY NONCLUSTERED ([Id])", sql);
+    }
+
+    [Fact]
     public void Unknown_statement_fails_instead_of_being_silently_dropped()
     {
         var error = Assert.Throws<SeedConversionException>(() =>

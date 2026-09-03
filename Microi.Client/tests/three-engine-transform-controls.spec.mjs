@@ -5,7 +5,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const testsDir = path.dirname(fileURLToPath(import.meta.url));
-const enginePath = path.resolve(testsDir, "../src/views/3d-engine/core/Engine.js");
+const enginePath = path.resolve(
+    testsDir,
+    "../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/microi-3d-engine/src/three-engine/core/Engine.js"
+);
 
 test("Three.js r182 TransformControls mounts its Object3D helper", async () => {
     const source = await readFile(enginePath, "utf8");

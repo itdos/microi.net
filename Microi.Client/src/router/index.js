@@ -337,16 +337,8 @@ export const asyncRoutes = [
     },
     {
         path: "/ai-workflow",
-        component: Layout,
         hidden: true,
-        children: [
-            {
-                path: "/ai-workflow",
-                name: "ai_workflow",
-                meta: { title: "AI工作流总览", keepAlive: false },
-                component: () => import("@/views/ai-workflow/index.vue")
-            }
-        ]
+        redirect: "/micro-app/microi-ai-workflow/relationship"
     },
     {
         path: "/mic-ai-app/:appId",
@@ -363,16 +355,8 @@ export const asyncRoutes = [
     },
     {
         path: "/blueprint/designer/:id",
-        component: Layout,
         hidden: true,
-        children: [
-            {
-                path: "/blueprint/designer/:id",
-                name: "blueprint_designer",
-                meta: { title: "蓝图设计器", keepAlive: false },
-                component: () => import("@/views/blueprint/BlueprintDesigner.vue")
-            }
-        ]
+        redirect: to => `/micro-app/microi-ai-workflow/designer/${encodeURIComponent(String(to.params.id || ""))}`
     },
     {
         path: "/state-machine/designer/:id",

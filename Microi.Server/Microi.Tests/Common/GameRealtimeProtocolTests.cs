@@ -286,7 +286,7 @@ public sealed class GameRealtimeProtocolTests
         var matches = Regex.Matches(
             controller,
             @"await\s+MicroiEngine\.ApiEngine\.RunAsync\(param\);\s*await\s+PublishRealtimeInvalidationAfterCommitAsync\(result,\s*param\);");
-        Assert.Equal(5, matches.Count);
+        Assert.Equal(6, matches.Count);
         Assert.Contains("GameRealtimeRuntime.PublishAfterCommitWithinBudgetAsync(", controller);
         Assert.DoesNotContain("GameRealtimeRuntime.PublishAfterCommitAsync(", controller);
         Assert.DoesNotMatch(

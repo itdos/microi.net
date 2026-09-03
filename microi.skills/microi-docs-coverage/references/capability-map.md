@@ -34,6 +34,8 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `more/sso.md` | microi-sso, v8-security, app-store | 双向 OIDC/SAML2/CAS、账号映射、协议端点、安全基线、商城发布与验收 |
 | `more/sys-config.md` | v8-utilities, microi-deployment | 系统/租户配置和敏感边界 |
 | `system-engine/ai-engine.md` | ai-engine, v8-http-integration, microi-ai-application | 模型代理、License、V8.AI、MCP 对话、跨端调用和安全 |
+| `system-engine/ai-data-analysis.md` | ai-engine, v8-security, v8-saas-multi-tenant | 权限感知 Schema、NL2SQL、实时经营分析、追问与数据边界 |
+| `system-engine/ai-creative-studio.md` | ai-engine, v8-image-processing, v8-file-upload | 图片、视频、音乐、29 项图像工具、HDFS 结果与创作安全边界 |
 | `system-engine/ai-platform-governance.md` | ai-platform-governance, app-store, business-blueprint, page-engine | 门户、身份、配置、发布、服务韧性、Trace/日志、资产协作与可恢复导入 |
 | `system-engine/ai-workflow-suite.md` | business-blueprint, v8-workflow, microi-system-delivery | AI 工作流、蓝图、状态机、自动化流和流程挖掘 |
 | `system-engine/system-observability.md` | system-observability, performance-testing, v8-debugging, microi-microservice | 系统日志、Trace、热点接口、资源监控、网络流量归因、安全治理、AI/MCP 与商城交付 |
@@ -57,6 +59,8 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/saas-engine.md` | v8-saas-multi-tenant | 租户识别和 SaaS 配置 |
 | `system-engine/search-engine.md` | search-engine | Elasticsearch 索引和查询 |
 | `system-engine/spider-engine.md` | spider-engine | 浏览器采集和 Worker |
+| `system-engine/ocr-engine.md` | ocr-engine, v8-file-upload, v8-saas-multi-tenant, v8-security | 图片/PDF 文字识别、独立模型服务、租户配置、V8/HTTP/MCP 调用、安全边界与生产验收 |
+| `system-engine/vision-engine.md` | vision-engine, ai-engine, microi-microservice, app-store, v8-security | ONNX 视觉特征、租户样本匹配、异步 AI 回退、摄像头帧、人脸治理、微服务与商城交付 |
 | `system-engine/translate-engine.md` | translate-engine | 多语言与翻译供应商 |
 | `system-engine/unity-integration.md` | unity-integration, v8-api-config, microi-client-frontend | Unity UPM、WebGL/Windows、多人租约、公屏、DiyToken 与 V8 通讯边界 |
 | `system-engine/visualization-engine.md` | page-engine, microi-ui | 3D、CAD、goView 与数据大屏能力边界 |

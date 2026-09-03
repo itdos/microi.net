@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-MICROI_PUBLIC_GUARD_VERSION=2
+MICROI_PUBLIC_GUARD_VERSION=3
 export MICROI_PUBLIC_GUARD_VERSION
 GIT_NO_REPLACE_OBJECTS=1
 export GIT_NO_REPLACE_OBJECTS
@@ -12,7 +12,8 @@ canonical_paths='Microi.Server/Microi.net
 Microi.Server/Microi.AI
 Microi.VSCode
 Microi.Client/src/views/webos
-Microi.Server/Microi.WorkFlow'
+Microi.Server/Microi.WorkFlow
+Microi.Server/Microi.Vision'
 
 trusted_hook_oid() {
   case "$1" in
@@ -70,7 +71,7 @@ validate_policy_file() {
   rm -f "$staged_policy_temp"
   trap - EXIT HUP INT TERM
   if [ "$policy_paths" != "$canonical_paths" ]; then
-    echo "拒绝提交：暂存区的 .public-repo-protected-paths 必须完整、逐字保留五条闭源路径。" >&2
+    echo "拒绝提交：暂存区的 .public-repo-protected-paths 必须完整、逐字保留六条闭源路径。" >&2
     exit 1
   fi
 }
@@ -83,7 +84,8 @@ filter_protected_paths() {
         "microi.server/microi.ai",
         "microi.vscode",
         "microi.client/src/views/webos",
-        "microi.server/microi.workflow"
+        "microi.server/microi.workflow",
+        "microi.server/microi.vision"
       );
     }
     s/\0\z//;

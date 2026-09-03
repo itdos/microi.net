@@ -19,6 +19,15 @@ public class MicroAppStableEntryTests
         return (string?)method!.Invoke(null, new object?[] { application });
     }
 
+    private static bool HasDatabaseManagedEntry(JObject service)
+    {
+        var method = typeof(MicroAppController).GetMethod(
+            "HasDatabaseManagedEntry",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (bool)method!.Invoke(null, new object?[] { service })!;
+    }
+
     private static byte[] Rewrite(string html, bool stableEntry = true)
     {
         var method = typeof(MicroAppController).GetMethod(
@@ -340,6 +349,48 @@ public class MicroAppStableEntryTests
         });
 
         Assert.Null(ResolveStandaloneRedirect(application));
+    }
+
+    [Fact]
+    public void InvalidV3Pointer_CanRecoverOnlyFromAnEnabledExplicitDatabaseEntry()
+    {
+        var service = JObject.FromObject(new
+        {
+            IsEnable = 1,
+            StorageMode = "db",
+            MsUrl = "db",
+            EntryPath = "index.html",
+            AssetsJson = new JArray
+            {
+                JObject.FromObject(new
+                {
+                    Path = "index.html",
+                    ContentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("<!doctype html><html><body></body></html>"))
+                })
+            }.ToString(Newtonsoft.Json.Formatting.None)
+        });
+
+        Assert.True(HasDatabaseManagedEntry(service));
+
+        var disabled = (JObject)service.DeepClone();
+        disabled["IsEnable"] = 0;
+        Assert.False(HasDatabaseManagedEntry(disabled));
+
+        var external = (JObject)service.DeepClone();
+        external["StorageMode"] = "cdn";
+        external["MsUrl"] = "https://static.example.test/app/index.html";
+        Assert.False(HasDatabaseManagedEntry(external));
+
+        var missingEntry = (JObject)service.DeepClone();
+        missingEntry["EntryPath"] = "missing.html";
+        Assert.False(HasDatabaseManagedEntry(missingEntry));
+
+        var emptyEntry = (JObject)service.DeepClone();
+        emptyEntry["AssetsJson"] = new JArray
+        {
+            JObject.FromObject(new { Path = "index.html", ContentBase64 = "" })
+        }.ToString(Newtonsoft.Json.Formatting.None);
+        Assert.False(HasDatabaseManagedEntry(emptyEntry));
     }
 
     [Fact]

@@ -14,16 +14,17 @@
 
 **1. CentOS 7/8/9 / Ubuntu 20/22/24 / Debian 10/11/12 一键安装**
 
+官方源码可在 [GitHub 镜像](https://github.com/itdos/microi.net) 中浏览；下面的代码块只保留可直接复制执行的命令。
+
 ```bash
-# 官方 GitHub 镜像（源码浏览）：https://github.com/itdos/microi.net
 url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh
 ```
 
 **2. 一键更新/修复 API 与 Web 前端**
 
+这条命令会保留数据库、Redis、MongoDB、MinIO、数据目录与 Docker volume；官方源码同样可在 [GitHub 镜像](https://github.com/itdos/microi.net) 中浏览。
+
 ```bash
-# 保留数据库、Redis、MongoDB、MinIO、数据目录与 Docker volume
-# 官方 GitHub 镜像（源码浏览）：https://github.com/itdos/microi.net
 url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh --repair-app
 ```
 
@@ -36,6 +37,10 @@ url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3
 docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f
 ```
 ::::
+
+### 📸 预览图
+
+![Microi吾码 Docker Compose 一键安装终端预览](/images/getting-started/docker-one-click-install-terminal.jpg)
 
 ### 🛡️ 宿主机 CPU / 内存保护
 
@@ -1304,12 +1309,12 @@ services:
 
 #### 大文件上传的 nginx 反向代理配置
 
-SaaS 引擎中的“单文件上限 MB”和“单次总量上限 MB”只在请求进入吾码 API 后生效，不能放大 nginx 的请求体上限。若 nginx 先返回 `413 Content Too Large`，请在 **API 域名对应的 `server` 块**中加入下面的配置；支持 1000 MB 文件时，需要为 multipart 封装留出余量。下列 `proxy_*` 指令可以放在 `server` 层由真实代理 `location` 继承；如果 `location` 或宝塔 `include` 中重复配置，以更近层级的值为准，必须确认没有重新开启请求缓冲或缩短超时：
+SaaS 引擎中的“单文件上限 MB”和“单次总量上限 MB”只在请求进入吾码 API 后生效，不能放大 nginx 的请求体上限。普通上传默认允许 500 MB，可在 SaaS 引擎系统设置中调整为 1024 MB 或 2048 MB；若 nginx 先返回 `413 Content Too Large`，请在 **API 域名对应的 `server` 块**中配置相匹配的请求体上限。下面示例覆盖平台 2 GB 硬顶并为 multipart 封装留出余量。`proxy_*` 指令可以放在 `server` 层由真实代理 `location` 继承；如果 `location` 或宝塔 `include` 中重复配置，以更近层级的值为准，必须确认没有重新开启请求缓冲或缩短超时：
 
 ```nginx
 server {
-  # 支持1000MB文件，并为multipart封装留出余量
-  client_max_body_size 1024m;
+  # 支持平台2GB硬顶，并为multipart封装留出余量；禁止配置为0取消保护
+  client_max_body_size 2112m;
 
   # 慢速大文件上传：这是两次读取请求体数据之间的超时，不是整个上传总时长
   client_body_timeout 600s;
@@ -1337,7 +1342,58 @@ server {
 
 吾码 API 已内置统一的 2048 MB HTTP/Multipart 接收硬顶，不需要再为上传大小增加额外环境变量；真正的单文件、单次文件数、单次总量及帐号/租户日额度统一在 SaaS 引擎中配置。`proxy_request_buffering off` 只关闭 nginx 的请求体预缓冲，不代表绕过吾码 API 的 Multipart、权限、配额和 HDFS 校验，也不能用响应方向的 `proxy_buffering off` 代替。
 
+“创建 SaaS 租户”的数据库 ZIP 使用专用断点续传协议，不再把整个文件提交给 `/api/HDFS/UniappUpload`：
+
+- 浏览器默认按 16 MB 分片上传；服务端单片最多 32 MB，请求接收上限 64 MB。每片都会校验 SHA-256 并持久记录，刷新页面或网络中断后，重新选择同一文件只补传服务器缺失分片。
+- 合并完成后再次校验整包 SHA-256，并流式解压、读取和执行 SQL，不把 2 GB ZIP 或解压后的 SQL 整体载入内存。连续 `INSERT` / `REPLACE` 按最多 500 条或 1 MB 合并为一个事务批次，避免几十万次独立往返和提交。
+- 后台任务显示 ZIP/SQL 已读取量、批次数、已执行语句数、平均吞吐和动态预计剩余时间。当前状态最多每 2 秒或每增加 16 MB 更新一次；执行记录只在阶段变化或 SQL 进度跨越 5% 时追加，并受日志总长上限约束，不会按每行数据推送到浏览器。
+
+因此，即使代理仍保留 100 MB 请求体限制，数据库 ZIP 也能上传至当前租户配置额度；CDN/WAF 仍需允许 64 MB 请求并提供足够的单片空闲超时。
+
 修改后先执行 `nginx -t`，确认成功再 reload nginx。若仍返回原生 413 HTML，请继续检查宝塔生成的全局配置和 `include` 文件中是否存在更小的 `client_max_body_size`；若大文件上传到固定时长后中断，则继续检查 CDN、WAF、负载均衡、Ingress 及宝塔上游是否还有独立的请求体或空闲超时限制。
+
+#### HTTPS 必须配置完整证书链
+
+API 域名的 nginx `ssl_certificate` 必须指向包含“站点证书 + 中间证书”的 `fullchain.pem`，不能只配置单张叶子证书。浏览器可能通过系统缓存或 AIA 自动补齐中间证书，看起来访问正常，但 Node.js、MCP、容器任务和部分移动端会严格按服务器实际发送的证书链校验，并报 `unable to verify the first certificate`。这类错误与吾码 Token、OsClient 或接口权限无关。
+
+```nginx
+server {
+  listen 443 ssl http2;
+  server_name api.example.com;
+
+  # 必须是站点证书在前、中间证书在后的完整链文件
+  ssl_certificate     /www/server/panel/vhost/cert/api.example.com/fullchain.pem;
+  ssl_certificate_key /www/server/panel/vhost/cert/api.example.com/privkey.pem;
+}
+```
+
+修改后先执行 `nginx -t`，成功后 reload，再从一台没有浏览器证书缓存的机器验证服务器确实发送完整链：
+
+```bash
+openssl s_client -connect api.example.com:443 -servername api.example.com -showcerts </dev/null
+```
+
+输出末尾应为 `Verify return code: 0 (ok)`，并能看到站点证书和中间证书；若仍为 `unable to get local issuer certificate`，应在 nginx/宝塔证书配置中修复 `fullchain.pem`，不要在吾码、MCP 或 Node.js 中关闭 TLS 校验。首次一键安装后的正式验收应同时检查 Web 与 API 域名的证书链。
+
+#### ESA 自定义域名：记录创建后还要验收真实 HTTPS
+
+SaaS 开通流程自动创建阿里云 ESA CNAME 后，控制面回读成功只表示记录和代理配置已经写入，不表示公网用户已经能够访问。安装或开库验收必须继续执行数据面检查：从源站网络之外访问租户 HTTPS 域名，确认 DNS 已进入 ESA、回源 Host/SNI 正确、证书链有效，并得到真实的非 5xx 响应；CNAME 存在、ESA 控制台显示启用、TCP 能连接或源站本机返回 200，都不能单独标记为 Ready。
+
+如果页面返回 `HTTP 522`，含义是 ESA 节点与源站建立连接超时，不是 DNS 记录创建失败。请依次检查：
+
+1. 在 ESA【安全防护 → 源站防护】分别取得当前生效和最新待启用的 IPv4/IPv6 CIDR 清单，计算 `最新 - 当前` 差集。先将差集加入所有白名单并暂时保留两份清单的并集，再在 ESA 确认启用最新清单；不要先删除当前清单，也不要在本文硬编码会变化的 IP 段。
+2. 将 ESA 回源 CIDR 加入 ECS 安全组入方向、阿里云云防火墙、宝塔/第三方安全软件和主机 `firewalld` / `nftables` / `iptables` / `ufw`。源站经 HTTP 跳转并使用 HTTPS 回源时，TCP 80、443 都要允许；若只使用一个端口，ESA 配置必须完全一致。使用云防火墙联动时开启 ESA“自动启用最新回源 IP 列表”，同时人工核对其它非联动层。
+3. 在源站执行监听检查，并用真实源站域名和 SNI 绕过 ESA 验证源站；源站地址不能再指向另一个 ESA 加速域名：
+
+```bash
+ss -lntp | grep -E ':(80|443)\b'
+curl -sS -o /dev/null -w '%{http_code}\n' --resolve origin.example.com:443:203.0.113.10 https://origin.example.com/
+```
+
+4. HTTPS 源站的 nginx 必须使用上一节所示 `fullchain.pem`。边缘证书可用不代表回源证书链完整；继续使用 `openssl s_client -connect origin.example.com:443 -servername origin.example.com -showcerts` 验证源站发送的完整链。
+5. 放行和证书修复后，从公网执行真实 GET，而不是只做 DNS/TCP 探测。仅当状态码为非 5xx、响应内容属于目标租户，且源站日志能看到 ESA 回源请求时，才将域名标记为 Ready。动态 IP 清单与错误定义以阿里云当前的 [ESA 源站防护](https://help.aliyun.com/zh/edge-security-acceleration/esa/user-guide/origin-protection) 和 [522 源站连接超时](https://help.aliyun.com/zh/edge-security-acceleration/esa/support/522-error-origin-connection-timeout) 文档为准。
+
+如果数据库导入、`sys_osclients` 唯一租户记录、按 `OsClient` 的 API 登录和系统设置回读均已成功，应保留已创建租户及其后台任务记录，只修复 DNS、ESA、防火墙、反向代理或证书链。522、证书错误和 DNS 传播中都不是删除租户、重复导入大数据库的依据。SaaS 控制面与数据面状态定义详见 [SaaS 引擎](../system-engine/saas-engine)。
 
 
 ---

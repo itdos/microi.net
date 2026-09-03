@@ -30,7 +30,10 @@ const maintenanceGeneratorSource = fs.readFileSync(
 );
 
 test("module package exposes the menu badge tooltip as a physical field", () => {
-  assert.equal(modulePackage.PackageInfo.Version, "v7.6.1");
+  assert.ok(
+    versionAtLeast(modulePackage.PackageInfo.Version, "v7.6.1"),
+    `module package must retain the menu badge tooltip baseline, current=${modulePackage.PackageInfo.Version}`,
+  );
   assert.ok(modulePackage.PackageInfo.RequiredPlatformCapabilities.includes(
     "ServerField:SysMenu.MenuBadgeTooltip"
   ));

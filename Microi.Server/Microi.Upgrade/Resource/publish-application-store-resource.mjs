@@ -13,6 +13,7 @@ const resourceNames = Object.freeze([
   'import-package.js',
   'ai-app-publish-store.js',
   'app.microi.store.json',
+  'app.microi.saas-engine.json',
 ]);
 const applicationResourceNames = Object.freeze([
   'app.microi.form-engine.json',
@@ -91,8 +92,8 @@ for (const name of resourceNames) {
 
 // The official projection endpoint intentionally validates the complete nine-package
 // ApiEngine closure. Read the other eight packages from the already-published source;
-// this scoped release only writes the application-store package and its two standalone
-// control-plane replicas.
+// this scoped release writes only the application-store control plane and the SaaS
+// package that owns tenant provisioning; unrelated official packages remain read-only.
 const projectionResources = await readResourcesViaConfiguredMcp(
   applicationResourceNames,
   { startDirectory },

@@ -283,7 +283,15 @@ public class ChildTenantPlatformAppControlServiceTests
         Assert.Contains("GetBootstrapSourceFingerprint", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", controlSource, StringComparison.Ordinal);
         Assert.Contains("BACKGROUND_TASK_IDEMPOTENCY_DUPLICATE_REPAIR_V1", importerSource, StringComparison.Ordinal);
-        Assert.Contains("Version: v2.6.8", importerSource, StringComparison.Ordinal);
+        var importerVersionMatch = System.Text.RegularExpressions.Regex.Match(
+            importerSource,
+            @"Version:\s*v(?<version>\d+\.\d+\.\d+)",
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        Assert.True(importerVersionMatch.Success, "Importer source must declare a semantic version.");
+        var importerVersion = System.Version.Parse(importerVersionMatch.Groups["version"].Value);
+        Assert.True(
+            importerVersion.CompareTo(new System.Version(2, 7, 0)) >= 0,
+            $"Importer version must be at least v2.7.0, but was v{importerVersion}.");
         Assert.Contains("TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1", importerSource, StringComparison.Ordinal);
         Assert.Contains("V8.Method.RequireManagedProtocolContext", importerSource, StringComparison.Ordinal);
         Assert.Contains("STARTUP_API_RUNTIME_FLAG_PHYSICAL_RECONCILIATION_V1", importerSource, StringComparison.Ordinal);

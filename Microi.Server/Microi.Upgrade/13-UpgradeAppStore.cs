@@ -20,7 +20,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "7.6.11.0";
+        public static string Version = "7.6.12.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -112,7 +112,7 @@ namespace Microi.net
         // 受信任核心导入器提升到平台既有 8GB 累计分配硬上限；进程常驻内存保护仍生效，
         // 普通接口引擎不受影响，5GB 运行资产继续走 HDFS multipart 而不进入 Jint。
         private const int ImporterLimitMemoryMb = 8192;
-        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 5, 1);
+        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 7, 1);
         private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 3, 8);
         private static readonly System.Version MinimumPlatformBackgroundTaskVersion = new System.Version(1, 1, 0);
         private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 1);
@@ -321,6 +321,8 @@ namespace Microi.net
                 && code.Contains("PACKAGE_MANAGED_OVERWRITE_V2")
                 && code.Contains("PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2")
                 && code.Contains("PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1")
+                && code.Contains("PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1")
+                && code.Contains("PAGE_ENGINE_OPTIONAL_REFERENCE_V1")
                 && code.Contains("V8.Method.RequireManagedProtocolContext");
         }
 
@@ -631,7 +633,7 @@ namespace Microi.net
         private static readonly Dictionary<string, System.Version> V8FirstPackageMinimumVersions =
             new Dictionary<string, System.Version>(StringComparer.Ordinal)
             {
-                { SysUserPackageResourceName, new System.Version(7, 6, 2) },
+                { SysUserPackageResourceName, new System.Version(7, 6, 5) },
                 { SysConfigPackageResourceName, new System.Version(6, 3, 9) },
                 { MessageNotificationPackageResourceName, new System.Version(1, 0, 14) },
                 { AiEnginePackageResourceName, new System.Version(7, 6, 1) },
@@ -655,6 +657,7 @@ namespace Microi.net
                         "platform-user-update-profile",
                         "platform-sys-user-admin",
                         "platform-user-access-key",
+                        "platform-home-overview",
                         "platform-user-custom-hook"
                     }
                 },
@@ -799,6 +802,28 @@ namespace Microi.net
                 && ddls.Children<JObject>().Any(row =>
                     string.Equals(row.Value<string>("TableName"), "sys_user", StringComparison.OrdinalIgnoreCase)
                     && Regex.IsMatch(row.Value<string>("DDL") ?? string.Empty, @"`AiApiKey`\s+varchar\(200\)", RegexOptions.IgnoreCase));
+        }
+
+        private static bool HasPackagedSysUserHomeUsageStatsSchema(JObject package)
+        {
+            var fields = package?["DiyFields"] as JArray ?? new JArray();
+            var ddls = package?["DDLStatements"] as JArray ?? new JArray();
+            var physicalColumns = package?["PhysicalColumns"] as JArray ?? new JArray();
+            var fieldRows = fields.Children<JObject>().Where(row =>
+                string.Equals(row.Value<string>("TableName"), "sys_user", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(row.Value<string>("Name"), "HomeUsageStats", StringComparison.OrdinalIgnoreCase)).ToArray();
+            return fieldRows.Length == 1
+                && fieldRows[0].Value<int?>("Visible") == 0
+                && fieldRows[0].Value<int?>("AppVisible") == 0
+                && fieldRows[0].Value<int?>("Readonly") == 1
+                && string.Equals(fieldRows[0].Value<string>("Type"), "mediumtext", StringComparison.OrdinalIgnoreCase)
+                && physicalColumns.Children<JObject>().Count(row =>
+                    string.Equals(row.Value<string>("TABLE_NAME"), "sys_user", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(row.Value<string>("COLUMN_NAME"), "HomeUsageStats", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(row.Value<string>("DATA_TYPE"), "mediumtext", StringComparison.OrdinalIgnoreCase)) == 1
+                && ddls.Children<JObject>().Any(row =>
+                    string.Equals(row.Value<string>("TableName"), "sys_user", StringComparison.OrdinalIgnoreCase)
+                    && Regex.IsMatch(row.Value<string>("DDL") ?? string.Empty, @"`HomeUsageStats`\s+mediumtext", RegexOptions.IgnoreCase));
         }
 
         private static bool HasPackagedV8FirstApplicationRuntime(string resourceName, JObject package)
@@ -948,13 +973,23 @@ namespace Microi.net
                 var adminCode = adminEngine.Value<string>("ApiV8Code") ?? string.Empty;
                 var adminVersionText = (adminEngine.Value<string>("Version") ?? string.Empty)
                     .TrimStart('v', 'V');
+                var homeOverviewEngine = byKey["platform-home-overview"];
+                var homeOverviewCode = homeOverviewEngine.Value<string>("ApiV8Code") ?? string.Empty;
+                var homeOverviewVersionText = (homeOverviewEngine.Value<string>("Version") ?? string.Empty)
+                    .TrimStart('v', 'V');
                 var capabilities = package["PackageInfo"]?["RequiredPlatformCapabilities"] as JArray
                     ?? new JArray();
                 return System.Version.TryParse(adminVersionText, out var adminVersion)
                     && adminVersion >= new System.Version(1, 0, 2)
+                    && System.Version.TryParse(homeOverviewVersionText, out var homeOverviewVersion)
+                    && homeOverviewVersion >= new System.Version(1, 0, 0)
                     && capabilities.Any(item => string.Equals(
                         item?.ToString(),
                         "ApiEngine:platform-sys-user-admin@v1.0.2",
+                        StringComparison.Ordinal))
+                    && capabilities.Any(item => string.Equals(
+                        item?.ToString(),
+                        "ApiEngine:platform-home-overview@v1.0.0",
                         StringComparison.Ordinal))
                     && (byKey["platform-user-update-preferences"].Value<string>("ApiV8Code") ?? string.Empty).Contains("platform-user-custom-hook")
                     && (byKey["platform-user-update-profile"].Value<string>("ApiV8Code") ?? string.Empty).Contains("platform-user-custom-hook")
@@ -965,7 +1000,10 @@ namespace Microi.net
                         .Contains("V8.Method.ManageUserAccessKey")
                     && (byKey["platform-user-access-key"].Value<string>("ApiRoutes") ?? string.Empty)
                         .Contains("/api/SysUserAccessKey/Create")
-                    && HasPackagedSysUserAiApiKeySchema(package);
+                    && homeOverviewCode.Contains("HomeUsageStats")
+                    && homeOverviewCode.Contains("recordMenuOpen")
+                    && HasPackagedSysUserAiApiKeySchema(package)
+                    && HasPackagedSysUserHomeUsageStatsSchema(package);
             }
             if (string.Equals(resourceName, SysConfigPackageResourceName, StringComparison.Ordinal))
             {
@@ -1207,7 +1245,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
                     !code.Contains("ADMIN_MENU_PERMISSION_V1") ||
                     !code.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
-                    !code.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1"))
+                    !code.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1") ||
+                    !code.Contains("PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1") ||
+                    !code.Contains("PAGE_ENGINE_OPTIONAL_REFERENCE_V1"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
                 }
@@ -1374,12 +1414,21 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     {
                         return RefreshRequired(osClient, $"AI应用打包接口[{engineKey}]仍依赖客户全局DateNow或System.IO");
                     }
+                    var buildZipVersionMatch = System.Text.RegularExpressions.Regex.Match(
+                        engineCode,
+                        @"Version:\s*v?(\d+\.\d+\.\d+)",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    var buildZipVersionValid = buildZipVersionMatch.Success
+                        && System.Version.TryParse(buildZipVersionMatch.Groups[1].Value, out var buildZipVersion)
+                        && buildZipVersion >= new System.Version(1, 2, 4);
                     if (string.Equals(engineKey, "ai_app_download_build_zip", StringComparison.Ordinal)
-                        && (!engineCode.Contains("Version: v1.2.0")
+                        && (!buildZipVersionValid
                             || !engineCode.Contains("REAL_BUILD_ZIP_ASSETS_V1")
+                            || !engineCode.Contains("STABLE_RUNTIME_ASSET_ROUTE_V1")
+                            || !engineCode.Contains("VERIFIED_RUNTIME_ASSET_BYTES_V1")
                             || !engineCode.Contains("buildArchivePath")))
                     {
-                        return RefreshRequired(osClient, "AI应用 BuildZip 仍未携带完整真实编译资产");
+                        return RefreshRequired(osClient, "AI应用 BuildZip 仍未携带稳定地址及逐文件字节验签能力");
                     }
                     if (string.Equals(engineKey, "ai_app_download_source_zip", StringComparison.Ordinal)
                         && (!engineCode.Contains("Version: v1.2.0")
@@ -3060,7 +3109,9 @@ WHERE {idColumn}=@p0");
                     !content.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
                     !content.Contains("ADMIN_MENU_PERMISSION_V1") ||
                     !content.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
-                    !content.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1"))
+                    !content.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1") ||
+                    !content.Contains("PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1") ||
+                    !content.Contains("PAGE_ENGINE_OPTIONAL_REFERENCE_V1"))
                 {
                     return $"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。";
                 }
@@ -3176,6 +3227,9 @@ WHERE {idColumn}=@p0");
                 var buildZipEngineCode = packageEngines?
                     .FirstOrDefault(item => string.Equals(item?["ApiEngineKey"]?.ToString(), "ai_app_download_build_zip", StringComparison.Ordinal))?
                     ["ApiV8Code"]?.ToString() ?? string.Empty;
+                var buildZipEngineVersionText = packageEngines?
+                    .FirstOrDefault(item => string.Equals(item?["ApiEngineKey"]?.ToString(), "ai_app_download_build_zip", StringComparison.Ordinal))?
+                    ["Version"]?.ToString()?.TrimStart('v', 'V');
                 var sourceZipEngineCode = packageEngines?
                     .FirstOrDefault(item => string.Equals(item?["ApiEngineKey"]?.ToString(), "ai_app_download_source_zip", StringComparison.Ordinal))?
                     ["ApiV8Code"]?.ToString() ?? string.Empty;
@@ -3288,7 +3342,11 @@ WHERE {idColumn}=@p0");
                     !content.Contains("RunBackground('bulk-import-microi-store-packages'") ||
                     !content.Contains("BULK_PLATFORM_BOOTSTRAP_ORDER_V1") ||
                     !content.Contains("MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1") ||
+                    !System.Version.TryParse(buildZipEngineVersionText, out var embeddedBuildZipVersion) ||
+                    embeddedBuildZipVersion < new System.Version(1, 2, 4) ||
                     !buildZipEngineCode.Contains("REAL_BUILD_ZIP_ASSETS_V1") ||
+                    !buildZipEngineCode.Contains("STABLE_RUNTIME_ASSET_ROUTE_V1") ||
+                    !buildZipEngineCode.Contains("VERIFIED_RUNTIME_ASSET_BYTES_V1") ||
                     !sourceZipEngineCode.Contains("SOURCE_ONLY_ZIP_ROOT_V1") ||
                     !importerEngineCode.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
                     !importerEngineCode.Contains("MICRO_APP_PUBLIC_HDFS_PATH_V1") ||
@@ -3315,6 +3373,8 @@ WHERE {idColumn}=@p0");
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_V1") ||
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1") ||
+                    !importerEngineCode.Contains("PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1") ||
+                    !importerEngineCode.Contains("PAGE_ENGINE_OPTIONAL_REFERENCE_V1") ||
                     !importerEngineCode.Contains("POST_SCHEMA_MICROSERVICE_BINDING_RESTORE_V1") ||
                     !importerEngineCode.Contains("PACKAGE_BOUND_MICROSERVICE_MENU_V1") ||
                     !content.Contains("OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1") ||

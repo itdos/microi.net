@@ -32,14 +32,14 @@ namespace Microi.net
                     Name = "FileUploadMaxFileMB",
                     Label = "单文件上限MB",
                     Sort = 9880,
-                    Description = "当前租户动态单文件上限；最终不能突破平台固定的1024MB单文件灾难保护上限及请求解析上限。"
+                    Description = "当前租户动态单文件上限；留空默认500MB，可配置1024MB或2048MB，最终不能突破平台固定的2048MB灾难保护上限。"
                 },
                 new FileUploadTenantField
                 {
                     Name = "FileUploadMaxRequestMB",
                     Label = "单次总量上限MB",
                     Sort = 9890,
-                    Description = "当前租户一次上传所有文件的合计大小；最终受平台固定的2048MB单次灾难保护上限及HTTP/Multipart上限约束。"
+                    Description = "当前租户一次上传所有文件的合计大小；留空默认500MB，可配置1024MB或2048MB，最终受平台固定的2048MB灾难保护上限约束。"
                 },
                 new FileUploadTenantField
                 {

@@ -109,6 +109,36 @@ public sealed class LoginSessionRefreshSourceContractTests
     }
 
     [Fact]
+    public void V8RefreshLoginUser_DefersAuthoritativeReadUntilCallerTransactionCommits()
+    {
+        var body = ReadMethod(
+            Path.Combine("Microi.Server", "Microi.Core", "V8Engine", "Runtime", "V8Method.cs"),
+            "public DosResult<dynamic> RefreshLoginUser(");
+
+        var transactionRead = body.IndexOf(
+            "var currentTrans = V8TenantContext.CurrentDbTrans;",
+            StringComparison.Ordinal);
+        var commitRegistration = body.IndexOf(
+            "currentTrans.RegisterAfterCommit",
+            transactionRead,
+            StringComparison.Ordinal);
+        var refreshInsideCallback = body.IndexOf(
+            ".RefreshLoginUser(authorizedUserId, authorizedTenant)",
+            commitRegistration,
+            StringComparison.Ordinal);
+        var scheduledResult = body.IndexOf(
+            "ScheduledAfterCommit = true",
+            refreshInsideCallback,
+            StringComparison.Ordinal);
+
+        Assert.True(transactionRead >= 0, "V8 登录投影刷新必须检测表单事件事务。");
+        Assert.True(commitRegistration > transactionRead, "事务内刷新必须登记提交后回调。");
+        Assert.True(refreshInsideCallback > commitRegistration, "权威数据库读取只能在提交后回调中执行。");
+        Assert.True(scheduledResult > refreshInsideCallback, "事务内调用必须明确返回已登记状态。");
+        Assert.Contains("!currentTrans.IsCommitOrRollback", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DiyToken_RotationCannotRecreateAnInactiveSession()
     {
         var body = ReadMethod(

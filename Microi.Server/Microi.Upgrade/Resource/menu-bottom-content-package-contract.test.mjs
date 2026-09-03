@@ -43,12 +43,15 @@ test('official packages declare the same dynamic menu footer default without ten
   }
 });
 
-test('both package changelogs describe the dynamic placeholder boundary', () => {
+test('both package histories preserve the dynamic placeholder boundary', () => {
   for (const name of packageNames) {
     const model = loadPackage(name);
-    const changeLog = model.PackageInfo.ChangeLog;
+    const history = [
+      model.PackageInfo.ChangeLog?.Content,
+      model.PackageInfo.ChangeHistory,
+    ].filter(Boolean).join('\n');
 
-    assert.match(changeLog.Content, /\{\{ YYYY \}\}/);
-    assert.match(changeLog.Content, /不携带 Sys_Config 租户数据/);
+    assert.match(history, /\{\{ YYYY \}\}/);
+    assert.match(history, /不携带 Sys_Config 租户数据/);
   }
 });

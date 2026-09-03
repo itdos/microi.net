@@ -6,6 +6,11 @@ export const SYSTEM_ENGINE_RELOCATED_LINKS = [
     "/doc/more/identity-verification"
 ];
 
+// 保留历史 URL 以兼容旧书签，但不再把已并入接口引擎的能力显示成独立引擎。
+export const SYSTEM_ENGINE_HIDDEN_LINKS = [
+    "/doc/system-engine/datasource-engine"
+];
+
 function containsLink(group, prefix) {
     return Array.isArray(group?.items)
         && group.items.some((item) => String(item?.link || "").startsWith(prefix));
@@ -28,9 +33,10 @@ export function relocateSystemEngineDocs(sidebars, pathname) {
     }
 
     const movedLinks = new Set(SYSTEM_ENGINE_RELOCATED_LINKS);
+    const hiddenLinks = new Set(SYSTEM_ENGINE_HIDDEN_LINKS);
     for (const group of sidebars) {
         if (!Array.isArray(group?.items)) continue;
-        group.items = group.items.filter((item) => !movedLinks.has(item?.link));
+        group.items = group.items.filter((item) => !movedLinks.has(item?.link) && !hiddenLinks.has(item?.link));
     }
     target.items.push(...SYSTEM_ENGINE_RELOCATED_LINKS.map((link) => itemByLink.get(link)));
     return sidebars;

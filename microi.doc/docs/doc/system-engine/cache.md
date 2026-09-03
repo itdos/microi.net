@@ -4,6 +4,10 @@ Microi.Cache 是吾码后端的租户级分布式缓存模块。它以 Redis 作
 L2 缓存，并在每个 API 进程内使用 `ConcurrentDictionary` 提供 L1 热点缓存，
 再通过 Redis Pub/Sub 通知其它节点清理旧值。
 
+::: tip 培训重点：L1 + L2 多级缓存
+L1 用进程内存换取热点数据的极低延迟，L2 用租户 Redis 保障多节点共享，再由 Pub/Sub 主动失效其它节点的 L1 副本；这不是单层 Redis 的简单封装。
+:::
+
 <div class="mci-doc-grid">
   <article class="mci-doc-card">
     <span class="mci-doc-chip">L1</span>

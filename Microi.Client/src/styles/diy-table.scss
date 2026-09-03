@@ -404,13 +404,56 @@
         padding: 0;
     }
 
-    // 横向滚动条高度减半，避免遮挡最后一行操作按钮
+    // 仅在 Element Plus 判定为真实横向溢出时常驻滑块；为加大的轨道预留独立空间，避免覆盖最后一行。
     :deep(.el-table) {
-        .el-scrollbar__bar.is-horizontal {
-            height: 5px;
+        --mci-table-horizontal-scrollbar-size: 12px;
+        --mci-table-horizontal-scrollbar-gutter: 16px;
+
+        &.el-table--scrollable-x {
+            .el-table__body-wrapper > .el-scrollbar {
+                box-sizing: border-box;
+                padding-bottom: var(--mci-table-horizontal-scrollbar-gutter);
+            }
+
+            .el-scrollbar__bar.is-horizontal {
+                display: block !important;
+                left: 8px;
+                right: 8px;
+                bottom: 2px;
+                height: var(--mci-table-horizontal-scrollbar-size);
+                padding: 2px;
+                box-sizing: border-box;
+                border-radius: var(--mci-radius-full, 999px);
+                background-color: var(--mci-bg-surface, var(--el-fill-color-dark, #e5e7eb));
+                cursor: pointer;
+                opacity: 1 !important;
+            }
+
+            .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb {
+                min-width: 48px;
+                height: 100%;
+                border-radius: var(--mci-radius-full, 999px);
+                background-color: var(--mci-text-tertiary, var(--el-text-color-secondary, #64748b));
+                cursor: grab;
+                opacity: 0.8;
+                transition: background-color 160ms ease, opacity 160ms ease;
+            }
+
+            .el-scrollbar__bar.is-horizontal:hover .el-scrollbar__thumb {
+                background-color: var(--mci-color-primary, var(--el-color-primary, #409eff));
+                opacity: 0.9;
+            }
+
+            .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb:active {
+                cursor: grabbing;
+                opacity: 1;
+            }
         }
-        .el-scrollbar__thumb {
-            border-radius: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        :deep(.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb) {
+            transition: none;
         }
     }
 

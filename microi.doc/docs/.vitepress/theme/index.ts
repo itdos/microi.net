@@ -26,6 +26,7 @@ import "./styles/file-manage.scss";
 import "./styles/unity-integration.scss";
 import "./styles/update-log.scss";
 import "./styles/training-syllabus-deck.scss";
+import "./styles/ai-capability-docs.scss";
 
 const APPEARANCE_KEY = 'vitepress-theme-appearance'
 

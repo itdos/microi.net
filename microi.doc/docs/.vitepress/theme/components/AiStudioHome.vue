@@ -75,6 +75,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z"/><path d="m4 12 8 4.5 8-4.5M4 16.5l8 4.5 8-4.5"/></svg>
             {{ copy.secondaryAction }}
           </a>
+          <a class="mci-home-action mci-home-action--secondary" :href="locale === 'en-US' ? '/en/doc/about/microi-training-syllabus' : '/doc/about/microi-training-syllabus'">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v11H5z"/><path d="M9 20h6M12 15v5M8 8h8M8 11h5"/></svg>
+            {{ copy.trainingAction }}
+          </a>
         </div>
 
         <a
@@ -170,7 +174,7 @@ const copy = computed(() => locale.value === 'en-US' ? {
   titleLeadParts: ['Open-source AI', 'development framework'],
   titleEmphasisLines: ['20+ mature engines'],
   lead: 'AI low-code, microservices, and the V8 engine share one delivery path. In high-reuse business scenarios, AI development can use 10×+ fewer tokens and move 10×+ faster.',
-  primaryAction: 'Start building', secondaryAction: 'Explore the architecture',
+  primaryAction: 'Start building', secondaryAction: 'Explore the architecture', trainingAction: 'Training syllabus',
   proofAction: 'See the reproducible 10×+ benchmark and scope', proofLabel: 'Platform facts',
   proofPoints: ['Evolving since 2014', 'MIT open source', 'AI low-code + microservices', '20+ mature engines'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: 'Use the right layer for each problem',
@@ -204,7 +208,7 @@ const copy = computed(() => locale.value === 'en-US' ? {
   titleLeadParts: ['开源 AI', '开发框架'],
   titleEmphasisLines: ['20+ 成熟引擎'],
   lead: '融合 AI 低代码、微服务与 V8 引擎；在平台能力高度复用的典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，更快交付企业应用。',
-  primaryAction: '免费开始开发', secondaryAction: '查看源码架构',
+  primaryAction: '免费开始开发', secondaryAction: '查看源码架构', trainingAction: '查看培训大纲',
   proofAction: '查看 10 倍+ 实测与适用边界', proofLabel: '平台事实',
   proofPoints: ['始于 2014', 'MIT 开源', 'AI 低代码 + 微服务', '20+ 成熟引擎'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: '用合适的层，解决合适的问题',

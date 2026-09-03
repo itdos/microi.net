@@ -2,7 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="architecture-title architecture-desc" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
   <title id="architecture-title">Microi吾码 AI平台 架构图</title>
   <desc id="architecture-desc">以 V8引擎为运行核心，醒目展示 AI、低代码、接口、数据、集成、自动化、治理、多端交付与可靠运行等全部 Microi吾码系统引擎。</desc>
-  <metadata id="architecture-source">{&quot;architectureVersion&quot;:&quot;2026.08.27&quot;,&quot;platformVersion&quot;:&quot;v7.7.2&quot;,&quot;capabilitySourceHash&quot;:&quot;81f2499cf4d0a0e218a667372a76fe119b4d9e37182d9bb05d23cad7242cfaa9&quot;}</metadata>
+  <metadata id="architecture-source">{&quot;architectureVersion&quot;:&quot;2026.09.03.2&quot;,&quot;platformVersion&quot;:&quot;v7.9.0&quot;,&quot;capabilitySourceHash&quot;:&quot;2487b9dfdb4485ab0459d5aa151f7dde83bbc1fffdda5bb561b3cb772fcd4aef&quot;}</metadata>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#020716"/><stop offset=".48" stop-color="#07152b"/><stop offset="1" stop-color="#020713"/></linearGradient>
     <linearGradient id="header-line" x1="0" x2="1"><stop stop-color="#4de8ff"/><stop offset=".5" stop-color="#b995ff"/><stop offset="1" stop-color="#48e7a6"/></linearGradient>
@@ -64,7 +64,7 @@
   <path d="M22 16H718L734 32H898" fill="none" stroke="url(#header-line)" stroke-width="2"/>
   <text x="40" y="55" class="title">Microi吾码 AI平台 架构图</text>
   <rect x="475" y="28" width="86" height="34" rx="17" class="version-badge"/>
-  <text x="518" y="50" text-anchor="middle" class="version-text">v7.7.2</text>
+  <text x="518" y="50" text-anchor="middle" class="version-text">v7.9.0</text>
   <text x="40" y="82" class="subtitle">OPEN-SOURCE AI DEVELOPMENT FRAMEWORK · 20+ SYSTEM ENGINES · BUILD → INTEGRATE → DELIVER → OBSERVE</text>
   <g transform="translate(930 20)">
     <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
@@ -296,10 +296,10 @@
     <path d="M318 624H431L436 629V645L431 650H318L313 645V629Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="322" cy="637" r="2" fill="#b995ff"/>
     <text x="378.5" y="641" text-anchor="middle" class="feature-text">接口引擎</text>
-  </g><g data-feature="数据源引擎">
+  </g><g data-feature="接口数据源">
     <path d="M448 624H561L566 629V645L561 650H448L443 645V629Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="452" cy="637" r="2" fill="#b995ff"/>
-    <text x="508.5" y="641" text-anchor="middle" class="feature-text">数据源引擎</text>
+    <text x="508.5" y="641" text-anchor="middle" class="feature-text">接口数据源</text>
   </g><g data-feature="界面引擎">
     <path d="M58 655H171L176 660V676L171 681H58L53 676V660Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="62" cy="668" r="2" fill="#b995ff"/>
@@ -344,10 +344,10 @@
     <path d="M318 717H431L436 722V738L431 743H318L313 738V722Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="322" cy="730" r="2" fill="#b995ff"/>
     <text x="378.5" y="734" text-anchor="middle" class="feature-text">字段 / 表单 V8</text>
-  </g><g data-feature="列表 / 搜索">
+  </g><g data-feature="可写报表 CRUD">
     <path d="M448 717H561L566 722V738L561 743H448L443 738V722Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="452" cy="730" r="2" fill="#b995ff"/>
-    <text x="508.5" y="734" text-anchor="middle" class="feature-text">列表 / 搜索</text>
+    <text x="508.5" y="734" text-anchor="middle" class="feature-text">可写报表 CRUD</text>
   </g><g data-feature="权限 / 数据范围">
     <path d="M58 748H171L176 753V769L171 774H58L53 769V753Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="62" cy="761" r="2" fill="#b995ff"/>
@@ -372,10 +372,10 @@
     <path d="M188 779H301L306 784V800L301 805H188L183 800V784Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="192" cy="792" r="2" fill="#b995ff"/>
     <text x="248.5" y="796" text-anchor="middle" class="feature-text">蓝牙打印</text>
-  </g><g data-feature="自定义导入导出">
+  </g><g data-feature="多表 / 多库编排">
     <path d="M318 779H431L436 784V800L431 805H318L313 800V784Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="322" cy="792" r="2" fill="#b995ff"/>
-    <text x="378.5" y="796" text-anchor="middle" class="feature-text">自定义导入导出</text>
+    <text x="378.5" y="796" text-anchor="middle" class="feature-text">多表 / 多库编排</text>
   </g><g data-feature="定制组件">
     <path d="M448 779H561L566 784V800L561 805H448L443 800V784Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="452" cy="792" r="2" fill="#b995ff"/>
@@ -452,22 +452,22 @@
     <path d="M1743 321H1856L1861 326V342L1856 347H1743L1738 342V326Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1747" cy="334" r="2" fill="#48e7a6"/>
     <text x="1803.5" y="338" text-anchor="middle" class="feature-text">消息通知</text>
-  </g><g data-feature="翻译引擎">
+  </g><g data-feature="翻译引擎（多语言）">
     <path d="M1353 352H1466L1471 357V373L1466 378H1353L1348 373V357Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1357" cy="365" r="2" fill="#48e7a6"/>
-    <text x="1413.5" y="369" text-anchor="middle" class="feature-text">翻译引擎</text>
+    <text x="1413.5" y="369" text-anchor="middle" class="feature-text">翻译引擎（多语言）</text>
   </g><g data-feature="OCR 引擎">
     <path d="M1483 352H1596L1601 357V373L1596 378H1483L1478 373V357Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1487" cy="365" r="2" fill="#48e7a6"/>
     <text x="1543.5" y="369" text-anchor="middle" class="feature-text">OCR 引擎</text>
-  </g><g data-feature="图片处理引擎">
+  </g><g data-feature="视觉引擎">
     <path d="M1613 352H1726L1731 357V373L1726 378H1613L1608 373V357Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1617" cy="365" r="2" fill="#48e7a6"/>
-    <text x="1673.5" y="369" text-anchor="middle" class="feature-text">图片处理引擎</text>
-  </g><g data-feature="文件柜 / HDFS">
+    <text x="1673.5" y="369" text-anchor="middle" class="feature-text">视觉引擎</text>
+  </g><g data-feature="图片处理引擎">
     <path d="M1743 352H1856L1861 357V373L1856 378H1743L1738 373V357Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1747" cy="365" r="2" fill="#48e7a6"/>
-    <text x="1803.5" y="369" text-anchor="middle" class="feature-text">文件柜 / HDFS</text>
+    <text x="1803.5" y="369" text-anchor="middle" class="feature-text">图片处理引擎</text>
   </g><g data-feature="Redis / MongoDB">
     <path d="M1353 383H1466L1471 388V404L1466 409H1353L1348 404V388Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1357" cy="396" r="2" fill="#48e7a6"/>
@@ -516,10 +516,10 @@
     <path d="M1743 445H1856L1861 450V466L1856 471H1743L1738 466V450Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1747" cy="458" r="2" fill="#48e7a6"/>
     <text x="1803.5" y="462" text-anchor="middle" class="feature-text">SignalR 实时</text>
-  </g><g data-feature="API / JSON 数据源">
+  </g><g data-feature="L1 / L2 多级缓存">
     <path d="M1353 476H1466L1471 481V497L1466 502H1353L1348 497V481Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1357" cy="489" r="2" fill="#48e7a6"/>
-    <text x="1413.5" y="493" text-anchor="middle" class="feature-text feature-text--compact">API / JSON 数据源</text>
+    <text x="1413.5" y="493" text-anchor="middle" class="feature-text">L1 / L2 多级缓存</text>
   </g><g data-feature="Excel / CSV 导入">
     <path d="M1483 476H1596L1601 481V497L1596 502H1483L1478 497V481Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1487" cy="489" r="2" fill="#48e7a6"/>
@@ -532,22 +532,26 @@
     <path d="M1743 476H1856L1861 481V497L1856 502H1743L1738 497V481Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1747" cy="489" r="2" fill="#48e7a6"/>
     <text x="1803.5" y="493" text-anchor="middle" class="feature-text">邮件 / 短信 / 微信</text>
-  </g><g data-feature="地图 / 定位">
+  </g><g data-feature="分布式存储 / HDFS">
     <path d="M1353 507H1466L1471 512V528L1466 533H1353L1348 528V512Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1357" cy="520" r="2" fill="#48e7a6"/>
-    <text x="1413.5" y="524" text-anchor="middle" class="feature-text">地图 / 定位</text>
-  </g><g data-feature="公众号 / 小程序">
+    <text x="1413.5" y="524" text-anchor="middle" class="feature-text">分布式存储 / HDFS</text>
+  </g><g data-feature="文件柜">
     <path d="M1483 507H1596L1601 512V528L1596 533H1483L1478 528V512Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1487" cy="520" r="2" fill="#48e7a6"/>
-    <text x="1543.5" y="524" text-anchor="middle" class="feature-text">公众号 / 小程序</text>
-  </g><g data-feature="OpenAPI / SDK">
+    <text x="1543.5" y="524" text-anchor="middle" class="feature-text">文件柜</text>
+  </g><g data-feature="公众号 / 小程序">
     <path d="M1613 507H1726L1731 512V528L1726 533H1613L1608 528V512Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1617" cy="520" r="2" fill="#48e7a6"/>
-    <text x="1673.5" y="524" text-anchor="middle" class="feature-text">OpenAPI / SDK</text>
-  </g><g data-feature="gRPC / 多语言">
+    <text x="1673.5" y="524" text-anchor="middle" class="feature-text">公众号 / 小程序</text>
+  </g><g data-feature="OpenAPI / SDK">
     <path d="M1743 507H1856L1861 512V528L1856 533H1743L1738 528V512Z" class="feature-shell" stroke="#48e7a6"/>
     <circle cx="1747" cy="520" r="2" fill="#48e7a6"/>
-    <text x="1803.5" y="524" text-anchor="middle" class="feature-text">gRPC / 多语言</text>
+    <text x="1803.5" y="524" text-anchor="middle" class="feature-text">OpenAPI / SDK</text>
+  </g><g data-feature="gRPC / 多语言">
+    <path d="M1353 538H1466L1471 543V559L1466 564H1353L1348 559V543Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1357" cy="551" r="2" fill="#48e7a6"/>
+    <text x="1413.5" y="555" text-anchor="middle" class="feature-text">gRPC / 多语言</text>
   </g>
   </g><g>
     <path d="M1351 566H1864L1880 582V864L1864 880H1351L1335 864V582Z" class="panel-shell" stroke="#ffbd59"/>
@@ -744,8 +748,8 @@
   </g><g>
     <path d="M734 410L759 410L835 452.5" class="reactor-link"/>
     <path d="M625 393H727L734 400V420L727 427H625L618 420V400Z" class="satellite-shell"/>
-    <text x="676" y="407" text-anchor="middle" class="satellite-title">DataSource</text>
-    <text x="676" y="420" text-anchor="middle" class="satellite-sub">SQL / API / JSON</text>
+    <text x="676" y="407" text-anchor="middle" class="satellite-title">接口数据源</text>
+    <text x="676" y="420" text-anchor="middle" class="satellite-sub">V8 / SQL / JSON</text>
   </g><g>
     <path d="M734 449L759 449L835 463.5" class="reactor-link"/>
     <path d="M625 432H727L734 439V459L727 466H625L618 459V439Z" class="satellite-shell"/>
@@ -760,7 +764,7 @@
     <path d="M734 527L759 527L835 485.5" class="reactor-link"/>
     <path d="M625 510H727L734 517V537L727 544H625L618 537V517Z" class="satellite-shell"/>
     <text x="676" y="524" text-anchor="middle" class="satellite-title">Redis Cache</text>
-    <text x="676" y="537" text-anchor="middle" class="satellite-sub">TTL / Hash</text>
+    <text x="676" y="537" text-anchor="middle" class="satellite-sub">L1 / L2 / TTL</text>
   </g><g>
     <path d="M734 566L759 566L835 496.5" class="reactor-link"/>
     <path d="M625 549H727L734 556V576L727 583H625L618 576V556Z" class="satellite-shell"/>
@@ -804,7 +808,7 @@
   </g><g>
     <path d="M1187 488L1162 488L1085 474.5" class="reactor-link"/>
     <path d="M1194 471H1296L1303 478V498L1296 505H1194L1187 498V478Z" class="satellite-shell"/>
-    <text x="1245" y="485" text-anchor="middle" class="satellite-title">OCR / Image</text>
+    <text x="1245" y="485" text-anchor="middle" class="satellite-title">OCR / Vision / Image</text>
     <text x="1245" y="498" text-anchor="middle" class="satellite-sub">识别 / 图像处理</text>
   </g><g>
     <path d="M1187 527L1162 527L1085 485.5" class="reactor-link"/>

@@ -472,6 +472,8 @@ namespace Microi.net
                 }
 
                 var id = param["Id"].Val<string>() ?? param["id"].Val<string>();
+                var expectedCurrentHash = param["ExpectedCurrentHash"].Val<string>() ??
+                                          param["expectedCurrentHash"].Val<string>();
 
                 // 查找已存在记录：先按 Id，再按 Name
                 string existingId = null;
@@ -488,6 +490,37 @@ namespace Microi.net
                         "SELECT `Id` FROM `sys_business_blueprint` WHERE `OsClient` = ?os AND `Name` = ?nm AND (`IsDeleted` IS NULL OR `IsDeleted` = 0) LIMIT 1")
                         .AddInParameter("?os", osClient).AddInParameter("?nm", name)
                         .ToScalar<string>();
+                }
+
+                string currentBlueprintData = null;
+                if (!string.IsNullOrWhiteSpace(existingId))
+                {
+                    currentBlueprintData = BpDbRead(osClient).FromSql(
+                            "SELECT `BlueprintData` FROM `sys_business_blueprint` " +
+                            "WHERE `OsClient`=?os AND `Id`=?id LIMIT 1")
+                        .AddInParameter("?os", osClient)
+                        .AddInParameter("?id", existingId)
+                        .ToScalar<string>();
+                    if (!BlueprintContentMatchesExpectedHash(currentBlueprintData, expectedCurrentHash))
+                    {
+                        return new DosResult<object>(0, new
+                        {
+                            Conflict = true,
+                            ExpectedCurrentHash = expectedCurrentHash,
+                            ActualCurrentHash = ComputeBlueprintContentHash(currentBlueprintData ?? ""),
+                            BlueprintId = existingId
+                        }, "蓝图已被其他用户或节点修改，请重新加载并比较版本后再保存");
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(expectedCurrentHash))
+                {
+                    return new DosResult<object>(0, new
+                    {
+                        Conflict = true,
+                        ExpectedCurrentHash = expectedCurrentHash,
+                        ActualCurrentHash = "",
+                        BlueprintId = id ?? ""
+                    }, "待更新的蓝图已不存在，请重新加载蓝图列表");
                 }
 
                 var userId = ""; var userName = "";
@@ -525,16 +558,36 @@ namespace Microi.net
                         "`RootDiagramId` = ?rdi, `BlueprintData` = ?bd, `Status` = ?st, " +
                         "`Sort` = ?sort, `Remark` = ?rmk, `UpdateTime` = NOW(), " +
                         "`UpdateUserId` = ?uid, `UpdateUserName` = ?unm " +
-                        "WHERE `Id` = ?id AND `OsClient` = ?os";
-                    BpDbWrite(osClient).FromSql(updSql)
+                        "WHERE `Id` = ?id AND `OsClient` = ?os" +
+                        (string.IsNullOrWhiteSpace(expectedCurrentHash)
+                            ? ""
+                            : " AND ((`BlueprintData` = ?expectedBody) OR (`BlueprintData` IS NULL AND ?expectedBody = ''))");
+                    var updateSection = BpDbWrite(osClient).FromSql(updSql)
                         .AddInParameter("?nm", name).AddInParameter("?code", code)
                         .AddInParameter("?desc", desc).AddInParameter("?ver", version)
                         .AddInParameter("?rdi", rootDiagramId).AddInParameter("?bd", blueprintData ?? "")
                         .AddInParameter("?st", status).AddInParameter("?sort", sort)
                         .AddInParameter("?rmk", remark).AddInParameter("?uid", userId)
                         .AddInParameter("?unm", userName).AddInParameter("?id", existingId)
-                        .AddInParameter("?os", osClient)
-                        .ExecuteNonQuery();
+                        .AddInParameter("?os", osClient);
+                    if (!string.IsNullOrWhiteSpace(expectedCurrentHash))
+                        updateSection = updateSection.AddInParameter("?expectedBody", currentBlueprintData ?? "");
+                    var affected = updateSection.ExecuteNonQuery();
+                    if (!string.IsNullOrWhiteSpace(expectedCurrentHash) && affected != 1)
+                    {
+                        var actualBody = BpDbRead(osClient).FromSql(
+                                "SELECT `BlueprintData` FROM `sys_business_blueprint` WHERE `OsClient`=?os AND `Id`=?id LIMIT 1")
+                            .AddInParameter("?os", osClient)
+                            .AddInParameter("?id", existingId)
+                            .ToScalar<string>();
+                        return new DosResult<object>(0, new
+                        {
+                            Conflict = true,
+                            ExpectedCurrentHash = expectedCurrentHash,
+                            ActualCurrentHash = ComputeBlueprintContentHash(actualBody ?? ""),
+                            BlueprintId = existingId
+                        }, "蓝图在保存过程中已发生变化，本次修改未覆盖服务器内容");
+                    }
                 }
                 else
                 {
@@ -570,7 +623,13 @@ namespace Microi.net
                     await RebuildBlueprintRelationsRaw(osClient, existingId, blueprintData);
                 }
 
-                return new DosResult<object>(1, new { Id = existingId, Name = name, Saved = true }, "蓝图已保存");
+                return new DosResult<object>(1, new
+                {
+                    Id = existingId,
+                    Name = name,
+                    Saved = true,
+                    CurrentHash = ComputeBlueprintContentHash(blueprintData ?? "")
+                }, "蓝图已保存");
             }
             catch (Exception ex)
             {
@@ -984,6 +1043,17 @@ namespace Microi.net
             var builder = new StringBuilder(bytes.Length * 2);
             foreach (var value in bytes) builder.Append(value.ToString("x2"));
             return builder.ToString();
+        }
+
+        internal static bool BlueprintContentMatchesExpectedHash(
+            string currentJson,
+            string expectedCurrentHash)
+        {
+            return string.IsNullOrWhiteSpace(expectedCurrentHash)
+                   || string.Equals(
+                       ComputeBlueprintContentHash(currentJson ?? ""),
+                       expectedCurrentHash.Trim(),
+                       StringComparison.OrdinalIgnoreCase);
         }
 
         // Dos.ORM's MySQL provider serializes LIMIT/OFFSET parameters as quoted

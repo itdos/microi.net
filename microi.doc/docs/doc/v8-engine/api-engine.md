@@ -17,6 +17,28 @@
 [[FormEngine 用法]](https://microi.net/doc/v8-engine/form-engine)    [[Where 条件用法]](https://microi.net/doc/v8-engine/where)
 :::
 
+## 类型化数据能力：V8 / SQL / JSON
+
+原独立“数据源引擎”的全部能力已并入接口引擎。现在，一个 `ApiEngineKey` 就能同时作为 API、表单选项源、报表查询源或界面数据源，并共用接口引擎已有的权限、日志、测试、启停、匿名与版本边界。
+
+| `DataSourceType` | `ApiV8Code` 内容 | 适用场景 |
+|---|---|---|
+| 留空 / `V8` | 服务端 JavaScript | 参数校验、权限过滤、组合查询、跨表逻辑与第三方集成 |
+| `SQL` | 当前租户数据库查询 SQL | 管理员审核过、边界固定的只读查询 |
+| `JSON` | 标准 JSON | 非敏感静态字典或配置 |
+| `API` | 历史迁移原文 | 仅供存量项目复核，应改写为 `V8.Http` 后切换到 V8 |
+
+`ApiV8Code` 是唯一源码字段，编辑器会随类型切换 JavaScript、SQL 或 JSON 语言模式。表单、报表和界面统一绑定稳定且租户内唯一的 `ApiEngineKey`，新代码统一通过 `V8.ApiEngine.Run` 调用：
+
+```js
+var result = V8.ApiEngine.Run('customer_options', {
+  Keyword: V8.Param.Keyword || ''
+});
+return result;
+```
+
+动态查询优先使用 V8 与参数化能力；不要把用户输入、原始 `_Where`、Token 或前端用户对象拼进 SQL。历史项目的迁移和兼容入口见[接口引擎类型化数据兼容说明](../system-engine/datasource-engine)。
+
 ## 📸 接口引擎预览
 
 <div class="mci-doc-screenshot-grid">

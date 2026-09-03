@@ -315,6 +315,7 @@ export default {
             };
             const formMaskBlur = isFormMaskBlurEnabled(this.diyStore.SysConfig);
             return {
+                webBase: window.location.origin,
                 apiBase: DiyCommon.GetApiBase(),
                 osClient: DiyCommon.GetOsClient(),
                 token: DiyCommon.getToken(),
@@ -1186,12 +1187,18 @@ export default {
         },
         forcePushRuntimeContext(type = "host:context") {
             const data = { ...this.microAppData, type };
-            if (this.microAppName && typeof window.microApp?.forceSetData === "function") {
-                window.microApp.forceSetData(this.microAppName, data);
+            // The rendered element is the authoritative instance, especially for
+            // iframe + keep-alive applications. A global name can temporarily point
+            // at a hidden cache entry, which made live theme updates miss the page
+            // that the user was actually viewing.
+            const app = this.$refs.microApp;
+            if (app && "data" in app) {
+                app.data = data;
                 return;
             }
-            const app = this.$refs.microApp;
-            if (app && typeof app.setData === "function") app.setData(data);
+            if (this.microAppName && typeof window.microApp?.forceSetData === "function") {
+                window.microApp.forceSetData(this.microAppName, data);
+            }
         },
         resolveRuntimeThemeColor() {
             const styles = getComputedStyle(document.documentElement);

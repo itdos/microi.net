@@ -278,6 +278,112 @@ export function validateOfficialPackageChangeLog(name, content) {
   }
 }
 
+/**
+ * Official packages must be independently installable. A PageEngine diytable may
+ * reference resources outside its package only when the widget explicitly opts
+ * into removal on a genuinely missing target reference. Tenant discriminator
+ * columns likewise require a target-derived backfill contract instead of a
+ * publisher-specific literal default.
+ */
+export function validateOfficialPackageInstallContracts(name, content) {
+  if (!Object.hasOwn(readablePackageNames, name)) return;
+
+  let packageModel;
+  try {
+    packageModel = JSON.parse(String(content ?? ''));
+  } catch (error) {
+    throw new Error(`${name} 不是有效 JSON，无法校验安装合同`, { cause: error });
+  }
+
+  for (const column of Array.isArray(packageModel.PhysicalColumns) ? packageModel.PhysicalColumns : []) {
+    const columnName = String(column?.COLUMN_NAME ?? column?.ColumnName ?? column?.Name ?? '').trim();
+    const nullable = String(column?.IS_NULLABLE ?? column?.IsNullable ?? '').trim().toUpperCase();
+    const backfillSource = String(
+      column?.BACKFILL_VALUE_SOURCE ?? column?.BackfillValueSource ?? '',
+    ).trim();
+    const defaultValue = column?.COLUMN_DEFAULT ?? column?.ColumnDefault ?? column?.Default;
+    if (backfillSource) {
+      if (backfillSource.toLowerCase() !== 'targetosclient'
+          || columnName.toLowerCase() !== 'osclient'
+          || nullable !== 'NO'
+          || (defaultValue !== null && defaultValue !== undefined)) {
+        throw new Error(
+          `${name} 物理字段 ${column?.TABLE_NAME || column?.TableName}.${columnName} 的 `
+          + 'BACKFILL_VALUE_SOURCE 合同无效',
+        );
+      }
+    }
+    if (columnName.toLowerCase() === 'osclient' && nullable === 'NO'
+        && (defaultValue === null || defaultValue === undefined)
+        && backfillSource.toLowerCase() !== 'targetosclient') {
+      throw new Error(
+        `${name} 物理字段 ${column?.TABLE_NAME || column?.TableName}.OsClient 要求 NOT NULL，`
+        + '必须声明 BACKFILL_VALUE_SOURCE=TargetOsClient',
+      );
+    }
+  }
+
+  const menus = new Map((Array.isArray(packageModel.SysMenus) ? packageModel.SysMenus : [])
+    .filter(menu => menu?.Id)
+    .map(menu => [String(menu.Id).toLowerCase(), menu]));
+  const tables = new Set((Array.isArray(packageModel.DiyTables) ? packageModel.DiyTables : [])
+    .filter(table => table?.Id)
+    .map(table => String(table.Id).toLowerCase()));
+
+  const inspectPageValue = (value, pageId) => {
+    if (Array.isArray(value)) {
+      for (const item of value) inspectPageValue(item, pageId);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    if (String(value.type || '').toLowerCase() === 'diytable') {
+      const tableId = String(value.widgetParams?.[0]?.value || '').trim();
+      const menuId = String(value.widgetParams?.[1]?.value || '').trim();
+      const policy = value.referencePolicy ?? value.ReferencePolicy ?? null;
+      const onMissing = String(policy?.onMissing ?? policy?.OnMissing ?? policy?.MissingBehavior ?? '').trim();
+      const reason = String(policy?.reason ?? policy?.Reason ?? '').trim();
+      if (!tableId || !menuId) {
+        throw new Error(`${name} 界面引擎页面 ${pageId} 的 diytable 缺少模块ID或菜单ID`);
+      }
+      if (onMissing && (onMissing.toLowerCase() !== 'removewidget' || !reason)) {
+        throw new Error(
+          `${name} 界面引擎页面 ${pageId} 的 diytable 可选引用必须声明 `
+          + 'onMissing=RemoveWidget 和非空 reason',
+        );
+      }
+      const menu = menus.get(menuId.toLowerCase());
+      const ownsTable = tables.has(tableId.toLowerCase());
+      const ownedBindingMatches = menu
+        && ownsTable
+        && String(menu.DiyTableId || '').toLowerCase() === tableId.toLowerCase();
+      if (!ownedBindingMatches && onMissing.toLowerCase() !== 'removewidget') {
+        throw new Error(
+          `${name} 界面引擎页面 ${pageId} 存在未闭包 diytable 引用：`
+          + `MenuId=${menuId}，DiyTableId=${tableId}；必须随包交付匹配资源或显式声明可选移除`,
+        );
+      }
+    }
+    for (const nested of Object.values(value)) inspectPageValue(nested, pageId);
+  };
+
+  for (const dataSet of Array.isArray(packageModel.DataSets) ? packageModel.DataSets : []) {
+    if (String(dataSet?.TableName || '').toLowerCase() !== 'mic_page') continue;
+    for (const row of Array.isArray(dataSet.Rows) ? dataSet.Rows : []) {
+      let pageJson = row?.JsonObj;
+      if (typeof pageJson === 'string') {
+        try {
+          pageJson = JSON.parse(pageJson);
+        } catch (error) {
+          throw new Error(`${name} 界面引擎页面 ${row?.Id || '(unknown)'} 的 JsonObj 不是有效 JSON`, {
+            cause: error,
+          });
+        }
+      }
+      inspectPageValue(pageJson, row?.Id || '(unknown)');
+    }
+  }
+}
+
 function formatLocalReleaseTime(value) {
   const pad = number => String(number).padStart(2, '0');
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} `

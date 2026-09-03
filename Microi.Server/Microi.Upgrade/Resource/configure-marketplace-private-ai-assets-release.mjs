@@ -19,7 +19,7 @@ const engineCapabilities = new Map([
   ['ApiEngine:import-microi-store-package@', 'ApiEngine:import-microi-store-package@v2.5.4'],
   ['ApiEngine:get-microi-store-model@', 'ApiEngine:get-microi-store-model@v1.3.1'],
   ['ApiEngine:ai_app_prepare_store_assets@', 'ApiEngine:ai_app_prepare_store_assets@v1.2.0'],
-  ['ApiEngine:ai_app_publish_store@', 'ApiEngine:ai_app_publish_store@v1.9.16'],
+  ['ApiEngine:ai_app_publish_store@', 'ApiEngine:ai_app_publish_store@v1.9.23'],
 ]);
 const featureCapabilities = [
   'Marketplace:PrivateApplicationSourceArchiveV1',
