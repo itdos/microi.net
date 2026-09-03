@@ -16,6 +16,28 @@ import { getLegacySsoCapabilities, readLegacySsoCredential } from "@/utils/sso-f
 const whiteList = ["/login", "/auth-redirect", "/access-login", "/mci-redis-manager"]; // no redirect whitelist
 
 let legacySsoCapabilityCache = { osClient: "", expiresAt: 0, data: [] };
+let lastRecordedMenuVisit = { menuId: "", at: 0 };
+
+function recordHomeMenuVisit(to) {
+    try {
+        if (!DiyCommon.getToken()) return;
+        const path = String(to?.path || "");
+        if (!path || ["/", "/login", "/access-login"].includes(path)) return;
+        const menuId = String(to?.meta?.SourceMenuId || to?.meta?.Id || "").trim();
+        if (!menuId) return;
+        const user = useDiyStore(pinia).GetCurrentUser || {};
+        if (user._AccessKeySession === true) return;
+        const now = Date.now();
+        if (lastRecordedMenuVisit.menuId === menuId && now - lastRecordedMenuVisit.at < 15000) return;
+        lastRecordedMenuVisit = { menuId, at: now };
+        Promise.resolve(DiyCommon.ApiEngine.Run("platform-home-overview", {
+            Action: "RecordMenuOpen",
+            MenuId: menuId
+        })).catch(() => {});
+    } catch (_) {
+        // 兼容尚未安装首页资源的旧租户；访问统计绝不能阻断路由跳转。
+    }
+}
 
 async function loadLegacySsoCapabilities() {
     const osClient = String(DiyCommon.GetOsClient() || "");
@@ -403,6 +425,7 @@ router.beforeEach(async (to, from, next) => {
 
 router.afterEach((to) => {
     finishRouteLoading();
+    recordHomeMenuVisit(to);
     // 5+App 返回键使用：路由完成后立即更新"是否在根页面"标志
     // 在根页面（Tab 首页/登录页）按返回键应双击退出，而不是继续 router.back()
     const ROOT_PATHS = [

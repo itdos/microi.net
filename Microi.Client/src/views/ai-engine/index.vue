@@ -4,67 +4,14 @@
         :class="{
             'is-app-workspace': activeWorkspace === 'apps',
             'is-media-workspace': ['image', 'music'].includes(activeWorkspace),
+            'is-empty-chat': activeWorkspace === 'chat' && messages.length === 0,
+            'is-history-open': showHistorySidebar,
             'is-embedded': embedded,
             'is-compact': compact
         }"
         data-testid="unified-ai-assistant"
     >
-        <aside class="ai-engine-sidebar" data-testid="unified-ai-history">
-            <div class="workspace-tabs capability-tabs">
-                <button
-                    type="button"
-                    class="workspace-tab"
-                    :class="{ active: activeWorkspace === 'chat' && !['secure-data', 'data'].includes(semanticMode) }"
-                    data-testid="ai-workspace-chat"
-                    @click="openChatWorkspace('chat')"
-                >
-                    <el-icon><Cpu /></el-icon>
-                    <span>AI对话</span>
-                </button>
-                <button
-                    type="button"
-                    class="workspace-tab"
-                    :class="{ active: activeWorkspace === 'chat' && ['secure-data', 'data'].includes(semanticMode) }"
-                    data-testid="ai-workspace-data"
-                    @click="openChatWorkspace('data')"
-                >
-                    <el-icon><DataAnalysis /></el-icon>
-                    <span>数据分析</span>
-                </button>
-                <button
-                    type="button"
-                    class="workspace-tab"
-                    :class="{ active: activeWorkspace === 'image' }"
-                    data-testid="ai-workspace-image"
-                    @click="openImageWorkspace()"
-                >
-                    <el-icon><Picture /></el-icon>
-                    <span>AI绘图</span>
-                </button>
-                <button
-                    type="button"
-                    class="workspace-tab"
-                    :class="{ active: activeWorkspace === 'music' }"
-                    data-testid="ai-workspace-music"
-                    @click="openMusicWorkspace"
-                >
-                    <el-icon><Headset /></el-icon>
-                    <span>AI音乐</span>
-                    <small v-if="!isAiAdmin">管理员</small>
-                </button>
-                <button
-                    type="button"
-                    class="workspace-tab"
-                    :class="{ active: activeWorkspace === 'video' }"
-                    data-testid="ai-workspace-video"
-                    @click="openVideoWorkspace"
-                >
-                    <el-icon><VideoPlay /></el-icon>
-                    <span>AI视频</span>
-                    <small v-if="!isAiAdmin">管理员</small>
-                </button>
-            </div>
-
+        <aside v-if="showHistorySidebar" class="ai-engine-sidebar" data-testid="unified-ai-history">
             <template v-if="activeWorkspace === 'chat'">
                 <div class="sidebar-actions">
                     <el-button
@@ -186,28 +133,41 @@
                         <button type="button" @click="activeWorkspace = 'chat'">AI对话</button>
                         <button type="button" class="active" @click="activeWorkspace = 'apps'">AI应用</button>
                     </div>
-                    <h2>{{ workspaceTitle }}</h2>
-                    <el-tag size="small" effect="plain">{{ osClient }}</el-tag>
-                    <el-tooltip v-if="secureAssistantAvailable" :content="secureAssistantRoleText" placement="bottom">
-                        <el-tag class="secure-scope-tag" size="small" type="success" effect="plain">
-                            {{ secureAssistantScopeLabel }} · 数据权限已校验
-                        </el-tag>
-                    </el-tooltip>
+                    <span class="workspace-mark" aria-hidden="true"><el-icon><Cpu /></el-icon></span>
+                    <div class="workspace-heading">
+                        <small>{{ isLanding ? 'CREATE WITH AI' : 'AI WORKSPACE' }}</small>
+                        <h2>{{ workspaceTitle }}</h2>
+                    </div>
                     <el-tooltip
-                        v-else-if="secureAssistantFailure"
-                        :content="secureAssistantFailure.description"
+                        v-if="activeWorkspace === 'chat' && !isLanding"
+                        :content="secureAssistantAvailable ? secureAssistantRoleText : (secureAssistantFailure?.description || '会话按当前登录账号隔离')"
                         placement="bottom"
                     >
-                        <el-tag class="secure-scope-tag" size="small" type="warning" effect="plain">
-                            {{ secureAssistantFailure.header }}
-                        </el-tag>
+                        <span class="workspace-trust" :class="{ warning: secureAssistantFailure }">
+                            <el-icon><CircleCheck /></el-icon>
+                            {{ secureAssistantAvailable ? '权限边界已就绪' : '账号隔离会话' }}
+                        </span>
                     </el-tooltip>
                 </div>
                 <div class="header-tools">
-                    <el-button class="store-link-btn" type="primary" plain :icon="ShoppingBag" @click="goMicroiStore">
+                    <el-button v-if="activeWorkspace !== 'chat'" plain :icon="ArrowLeft" @click="openChatWorkspace('chat')">
+                        返回能力首页
+                    </el-button>
+                    <el-button
+                        v-if="!embedded && activeWorkspace === 'chat'"
+                        plain
+                        :class="{ active: historyPanelVisible }"
+                        :icon="Box"
+                        data-testid="unified-ai-history-toggle"
+                        @click="historyPanelVisible = !historyPanelVisible"
+                    >历史创作</el-button>
+                    <el-button v-if="embedded" class="full-assistant-btn" plain :icon="ArrowRight" @click="goFullAiAssistant">
+                        完整AI助手
+                    </el-button>
+                    <el-button v-if="!embedded" class="store-link-btn" type="primary" plain :icon="ShoppingBag" @click="goMicroiStore">
                         应用商城
                     </el-button>
-                    <el-button v-if="isAiAdmin" :icon="Grid" @click="openModelDrawer">AI引擎列表</el-button>
+                    <el-button v-if="!embedded && isAiAdmin" :icon="Grid" @click="openModelDrawer">AI引擎列表</el-button>
                 </div>
             </header>
 
@@ -215,29 +175,78 @@
             <section ref="messageWrapRef" class="message-wrap">
                 <div v-if="messages.length === 0" class="empty-state">
                     <div class="empty-hero">
-                        <span class="hero-kicker">AI引擎</span>
-                        <h1>让 AI 助手直接进入你的业务现场</h1>
-                        <p>描述目标即可连续对话，我会结合 Skills、MCP 建模能力和当前租户上下文，辅助你分析数据、编写 V8、创建低代码模块。</p>
-                        <p class="hero-local-tip">AI 深度融合 V8 引擎，强烈建议使用本地 VS Code Codex / Copilot / Claude / Cursor + MCP + Skills，进行真正意义的零代码 AI 编程。</p>
+                        <span class="hero-kicker">AI CREATION SPACE</span>
+                        <h1>{{ embedded ? '今天，想让 AI 帮你完成什么？' : '从一个想法，开始完整创作' }}</h1>
+                        <p>描述目标、粘贴需求或上传文件；对话、数据洞察、图像、音乐与视频能力都从这里开始。</p>
                     </div>
-                    <div class="capability-directory" data-testid="ai-capability-directory" aria-label="AI 能力导航">
-                        <button type="button" data-testid="ai-capability-chat" @click="openChatWorkspace('chat')">
-                            <el-icon><Cpu /></el-icon><span><strong>AI 对话</strong><small>问答、写作与 V8 编程</small></span><el-icon><ArrowRight /></el-icon>
-                        </button>
-                        <button type="button" data-testid="ai-capability-data" @click="openChatWorkspace('data')">
-                            <el-icon><DataAnalysis /></el-icon><span><strong>数据分析</strong><small>自然语言查询业务数据</small></span><el-icon><ArrowRight /></el-icon>
-                        </button>
-                        <button type="button" data-testid="ai-capability-image" @click="openImageWorkspace()">
-                            <el-icon><Picture /></el-icon><span><strong>AI 绘图</strong><small>生成、编辑、人像与精确处理</small></span><el-icon><ArrowRight /></el-icon>
-                        </button>
-                        <button type="button" data-testid="ai-capability-music" @click="openMusicWorkspace">
-                            <el-icon><Headset /></el-icon><span><strong>AI 音乐</strong><small>灵感生成可试听配乐</small></span><el-icon><ArrowRight /></el-icon>
-                        </button>
-                        <button type="button" data-testid="ai-capability-video" @click="openVideoWorkspace">
-                            <el-icon><VideoPlay /></el-icon><span><strong>AI 视频</strong><small>分镜、母版与人工验片</small></span><el-icon><ArrowRight /></el-icon>
-                        </button>
-                        <button type="button" data-testid="ai-capability-models" @click="openModelDrawer">
-                            <el-icon><Grid /></el-icon><span><strong>AI 引擎列表</strong><small>模型、密钥与能力配置</small></span><el-icon><ArrowRight /></el-icon>
+                    <div class="creation-category-grid" data-testid="ai-capability-directory" aria-label="AI 能力大类">
+                        <section class="creation-category is-assistant">
+                            <header><span><el-icon><Cpu /></el-icon></span><div><strong>智能助手</strong><small>理解、分析与执行</small></div></header>
+                            <div>
+                                <button type="button" data-testid="ai-capability-chat" @click="openChatWorkspace('chat')">AI 对话 <el-icon><ArrowRight /></el-icon></button>
+                                <button type="button" data-testid="ai-capability-data" @click="openChatWorkspace('data')">数据分析 <el-icon><ArrowRight /></el-icon></button>
+                            </div>
+                        </section>
+                        <section class="creation-category is-visual">
+                            <header><span><el-icon><Picture /></el-icon></span><div><strong>视觉创作</strong><small>生成、编辑与视频</small></div></header>
+                            <div>
+                                <button type="button" data-testid="ai-capability-image" @click="openImageWorkspace()">AI 图像 <el-icon><ArrowRight /></el-icon></button>
+                                <button type="button" data-testid="ai-capability-video" @click="openVideoWorkspace">AI 视频 <el-icon><ArrowRight /></el-icon></button>
+                            </div>
+                        </section>
+                        <section class="creation-category is-audio">
+                            <header><span><el-icon><Headset /></el-icon></span><div><strong>声音创作</strong><small>灵感、配乐与试听</small></div></header>
+                            <div>
+                                <button type="button" data-testid="ai-capability-music" @click="openMusicWorkspace">AI 音乐 <el-icon><ArrowRight /></el-icon></button>
+                            </div>
+                        </section>
+                        <section class="creation-category is-platform">
+                            <header><span><el-icon><Grid /></el-icon></span><div><strong>模型与扩展</strong><small>引擎配置与应用</small></div></header>
+                            <div>
+                                <button type="button" data-testid="ai-capability-models" @click="openModelDrawer">AI 引擎列表 <el-icon><ArrowRight /></el-icon></button>
+                                <button type="button" @click="goMicroiStore">应用商城 <el-icon><ArrowRight /></el-icon></button>
+                            </div>
+                        </section>
+                    </div>
+                    <div v-if="!compact" class="image-tools-overview" data-testid="ai-image-tool-directory">
+                        <div class="directory-heading">
+                            <div>
+                                <span>IMAGE CREATION TOOLBOX</span>
+                                <strong>图像创作与处理 · 29 项能力全部展开</strong>
+                            </div>
+                            <button type="button" @click="openImageWorkspace()">
+                                进入图像工作台 <el-icon><ArrowRight /></el-icon>
+                            </button>
+                        </div>
+                        <div class="image-tool-groups">
+                            <section v-for="group in imageToolGroups" :key="group.key" class="image-tool-group" :data-category="group.key">
+                                <header><strong>{{ group.label }}</strong><small>{{ group.tools.length }} 项</small></header>
+                                <div class="image-tool-grid">
+                                    <button
+                                        v-for="tool in group.tools"
+                                        :key="tool.id"
+                                        type="button"
+                                        class="image-tool-link"
+                                        :data-category="tool.category"
+                                        :data-testid="`ai-image-tool-${tool.id}`"
+                                        :title="`${imageCategoryName(tool.category)} · ${tool.short}`"
+                                        @click="openImageWorkspace(tool.id)"
+                                    >
+                                        <span>{{ tool.badge }}</span>
+                                        <span><strong>{{ tool.label }}</strong><small>{{ tool.short }}</small></span>
+                                    </button>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                    <div v-else class="compact-tool-row" data-testid="ai-home-primary-tools">
+                        <button
+                            v-for="tool in primaryImageTools"
+                            :key="tool.id"
+                            type="button"
+                            @click="openImageWorkspace(tool.id)"
+                        >
+                            <span>{{ tool.badge }}</span>{{ tool.label }}
                         </button>
                     </div>
                     <div v-if="isAiAdmin" class="platform-stats" v-mci-loading:stats="statsLoading">
@@ -775,6 +784,7 @@ import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onBeforeU
 import { useRoute } from "vue-router";
 import { useDiyStore } from "@/pinia";
 import {
+    ArrowLeft,
     ArrowRight,
     Box,
     CircleClose,
@@ -799,6 +809,11 @@ import {
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { renderAiMarkdown } from "@/utils/ai-markdown.js";
+import {
+    AI_IMAGE_PRIMARY_TOOLS,
+    AI_IMAGE_TOOL_CATEGORIES,
+    AI_IMAGE_TOOL_DIRECTORY
+} from "./ai-image-tool-directory.js";
 import {
     MOBILE_AI_BOOTSTRAP_FAILURES,
     classifyMobileAiBootstrapFailure,
@@ -848,6 +863,15 @@ const ACTION_ENDPOINTS = {
     ValidateLowCodeSystem: "/api/V8Engine/ValidateLowCodeSystem",
     RefreshSchemaCache: "/api/V8Engine/RefreshSchemaCache"
 };
+const imageToolGroups = Object.entries(AI_IMAGE_TOOL_CATEGORIES).map(([key, label]) => ({
+    key,
+    label,
+    tools: AI_IMAGE_TOOL_DIRECTORY.filter((tool) => tool.category === key)
+}));
+const primaryImageTools = AI_IMAGE_PRIMARY_TOOLS
+    .map((toolId) => AI_IMAGE_TOOL_DIRECTORY.find((tool) => tool.id === toolId))
+    .filter(Boolean);
+const imageCategoryName = (category) => AI_IMAGE_TOOL_CATEGORIES[category] || "图像工具";
 
 const osClient = computed(() => DiyCommon.GetOsClient());
 const currentUser = computed(() => diyStore.GetCurrentUser || {});
@@ -878,6 +902,9 @@ const aiModelTableId = ref("");
 const aiModelSysMenuId = ref("");
 const modelDrawerVisible = ref(false);
 const activeWorkspace = ref("chat");
+const historyPanelVisible = ref(false);
+const isLanding = computed(() => activeWorkspace.value === "chat" && messages.value.length === 0);
+const showHistorySidebar = computed(() => !embedded.value && activeWorkspace.value === "chat" && historyPanelVisible.value);
 const imageStudioRef = ref(null);
 const pendingImageToolId = ref("");
 const videoLoading = ref(false);
@@ -1059,7 +1086,7 @@ const isAiAdmin = computed(() => {
     return user._IsAdmin === true || user.IsAdmin === true || Number(user.Level || 0) >= 9999;
 });
 const workspaceTitle = computed(() => ({
-    chat: "AI助手",
+    chat: isLanding.value ? "AI 创作中心" : "AI助手",
     image: "AI绘图",
     music: "AI音乐",
     video: "AI视频",
@@ -1573,6 +1600,7 @@ function newConversation() {
     selectedFiles.value = [];
     actionContext.lastTableId = "";
     actionContext.lastTableName = "";
+    historyPanelVisible.value = false;
 }
 
 function isCurrentConversation(item) {
@@ -1787,6 +1815,11 @@ async function openModelDrawer() {
 
 function goMicroiStore() {
     proxy.$router.push({ path: "/microi-store" });
+}
+
+function goFullAiAssistant() {
+    if (route.path === "/mic-ai-engine") return;
+    proxy.$router.push({ path: "/mic-ai-engine" });
 }
 
 function openChatWorkspace(mode = "chat") {
@@ -6016,6 +6049,604 @@ body.dark .ai-engine-page,
 
     .ai-engine-page.is-media-workspace .ai-engine-main {
         min-height: 0;
+    }
+}
+
+/* 2026-09 AI 工作台首屏：对话输入优先，随后完整展开能力目录。 */
+.workspace-mark {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in srgb, var(--ai-primary) 18%, var(--ai-border));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ai-primary) 7%, var(--ai-card));
+    color: var(--ai-primary);
+    font-size: 18px;
+}
+
+.workspace-heading {
+    min-width: 0;
+    display: grid;
+    gap: 1px;
+}
+
+.workspace-heading > small {
+    color: var(--ai-text-tertiary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    line-height: 1;
+}
+
+.workspace-heading h2 {
+    line-height: 1.15;
+}
+
+.workspace-trust {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-left: 1px solid var(--ai-border);
+    color: var(--ai-text-tertiary);
+    cursor: help;
+    padding-left: 12px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.workspace-trust .el-icon {
+    color: var(--el-color-success);
+    font-size: 14px;
+}
+
+.workspace-trust.warning .el-icon {
+    color: var(--el-color-warning);
+}
+
+.full-assistant-btn {
+    border-color: color-mix(in srgb, var(--ai-primary) 24%, var(--ai-border));
+    color: var(--ai-primary);
+}
+
+.ai-engine-page:not(.is-history-open) {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.header-tools .active {
+    border-color: color-mix(in srgb, var(--ai-primary) 34%, var(--ai-border));
+    background: color-mix(in srgb, var(--ai-primary) 7%, var(--ai-panel));
+    color: var(--ai-primary);
+}
+
+.ai-engine-page.is-empty-chat .ai-engine-main {
+    grid-template-rows: 58px;
+    grid-auto-rows: max-content;
+    align-content: start;
+    overflow: auto;
+    scrollbar-gutter: stable;
+}
+
+.ai-engine-page.is-empty-chat .ai-engine-header {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    min-height: 58px;
+}
+
+.ai-engine-page.is-empty-chat .message-wrap,
+.ai-engine-page.is-empty-chat .empty-state {
+    display: contents;
+}
+
+.ai-engine-page.is-empty-chat .empty-hero,
+.ai-engine-page.is-empty-chat .creation-category-grid,
+.ai-engine-page.is-empty-chat .image-tools-overview,
+.ai-engine-page.is-empty-chat .compact-tool-row,
+.ai-engine-page.is-empty-chat .platform-stats,
+.ai-engine-page.is-empty-chat .quick-prompts,
+.ai-engine-page.is-empty-chat .composer {
+    width: min(1180px, calc(100% - 40px));
+    max-width: none;
+    justify-self: center;
+    box-sizing: border-box;
+}
+
+.ai-engine-page.is-empty-chat .empty-hero {
+    grid-row: 2;
+    max-width: none;
+    justify-items: start;
+    gap: 5px;
+    padding: 24px 4px 10px;
+    text-align: left;
+}
+
+.ai-engine-page.is-empty-chat .empty-hero h1 {
+    font-size: clamp(25px, 2.25vw, 38px);
+    letter-spacing: -.025em;
+}
+
+.ai-engine-page.is-empty-chat .empty-hero p {
+    max-width: 860px;
+    color: var(--ai-text-secondary);
+    text-align: left;
+    line-height: 1.6;
+}
+
+.ai-engine-page.is-empty-chat .composer {
+    grid-row: 3;
+    border-top: 0;
+    background: transparent;
+    padding: 8px 0 18px;
+}
+
+.ai-engine-page.is-empty-chat .composer-box {
+    width: 100%;
+    max-width: none;
+    border-color: color-mix(in srgb, var(--ai-primary) 42%, var(--ai-border));
+    border-radius: 18px;
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--ai-primary) 9%, transparent);
+}
+
+.ai-engine-page.is-empty-chat .composer-box :deep(.el-textarea__inner) {
+    min-height: 58px !important;
+    padding: 17px 18px 8px;
+    font-size: 16px;
+}
+
+.ai-engine-page.is-empty-chat .capability-directory {
+    grid-row: 4;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    border: 1px solid var(--ai-border);
+    border-radius: 14px;
+    background: var(--ai-panel);
+    overflow: hidden;
+}
+
+.ai-engine-page.is-empty-chat .capability-directory button {
+    min-height: 66px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    border-right: 1px solid var(--ai-border);
+    border-bottom: 0;
+    padding: 9px 11px;
+}
+
+.ai-engine-page.is-empty-chat .capability-directory button:nth-child(odd) {
+    border-right: 1px solid var(--ai-border);
+}
+
+.ai-engine-page.is-empty-chat .capability-directory button:last-child {
+    border-right: 0;
+}
+
+.ai-engine-page.is-empty-chat .capability-directory button > .el-icon:last-child {
+    display: none;
+}
+
+.ai-engine-page.is-empty-chat .creation-category-grid {
+    grid-row: 4;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.creation-category {
+    --category-color: var(--ai-primary);
+    min-width: 0;
+    min-height: 126px;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 10px;
+    border: 1px solid var(--ai-border);
+    border-radius: 16px;
+    background: var(--ai-panel);
+    padding: 14px;
+    transition: border-color .16s ease, transform .16s ease;
+}
+
+.creation-category:hover {
+    border-color: color-mix(in srgb, var(--category-color) 30%, var(--ai-border));
+    transform: translateY(-1px);
+}
+
+.creation-category > header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.creation-category > header > span {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--category-color) 11%, var(--ai-surface));
+    color: var(--category-color);
+    font-size: 18px;
+}
+
+.creation-category > header > div {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.creation-category > header strong {
+    color: var(--ai-text);
+    font-size: 14px;
+}
+
+.creation-category > header small {
+    color: var(--ai-text-tertiary);
+    font-size: 11px;
+}
+
+.creation-category > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: end;
+    gap: 6px;
+}
+
+.creation-category button {
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--ai-surface);
+    color: var(--ai-text-secondary);
+    cursor: pointer;
+    padding: 0 9px;
+    font-size: 11px;
+}
+
+.creation-category button:hover,
+.creation-category button:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--category-color) 9%, var(--ai-surface));
+    color: var(--category-color);
+}
+
+.creation-category button .el-icon { font-size: 10px; }
+.creation-category.is-assistant { --category-color: #7c3aed; }
+.creation-category.is-visual { --category-color: #2563eb; }
+.creation-category.is-audio { --category-color: #0f9f91; }
+.creation-category.is-platform { --category-color: #d97706; }
+
+.image-tools-overview {
+    grid-row: 5;
+    margin-top: 14px;
+    border: 1px solid var(--ai-border);
+    border-radius: 16px;
+    background: var(--ai-panel);
+    overflow: hidden;
+}
+
+.directory-heading {
+    min-height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--ai-border);
+    padding: 8px 14px 8px 16px;
+}
+
+.directory-heading > div {
+    display: grid;
+    gap: 2px;
+}
+
+.directory-heading span {
+    color: var(--ai-primary);
+    font-size: 9px;
+    font-weight: 750;
+    letter-spacing: .12em;
+}
+
+.directory-heading strong {
+    color: var(--ai-text);
+    font-size: 15px;
+    font-weight: 650;
+}
+
+.directory-heading > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 0;
+    background: transparent;
+    color: var(--ai-primary);
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.image-tool-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    padding: 8px;
+}
+
+.image-tool-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.image-tool-group {
+    min-width: 0;
+    border-right: 1px solid var(--ai-border);
+    border-bottom: 1px solid var(--ai-border);
+    padding: 10px 8px 12px;
+}
+
+.image-tool-group:nth-child(2n) { border-right: 0; }
+.image-tool-group:nth-child(n+3) { border-bottom: 0; }
+
+.image-tool-group > header {
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+}
+
+.image-tool-group > header strong {
+    color: var(--ai-text);
+    font-size: 12px;
+}
+
+.image-tool-group > header small {
+    color: var(--ai-text-tertiary);
+    font-size: 10px;
+}
+
+.image-tool-group .image-tool-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    padding: 0;
+}
+
+.image-tool-link {
+    min-width: 0;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ai-text);
+    cursor: pointer;
+    padding: 6px 8px;
+    text-align: left;
+    transition: background-color .16s ease, color .16s ease;
+}
+
+.image-tool-link:hover,
+.image-tool-link:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--ai-primary) 7%, transparent);
+    color: var(--ai-primary);
+}
+
+.image-tool-link > span:first-child,
+.compact-tool-row button > span {
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ai-primary) 9%, var(--ai-surface));
+    color: var(--ai-primary);
+    font-size: 11px;
+    font-weight: 750;
+}
+
+.image-tool-link[data-category="portrait"] > span:first-child {
+    background: color-mix(in srgb, #13b8a6 10%, var(--ai-surface));
+    color: #0f9f91;
+}
+
+.image-tool-link[data-category="exact"] > span:first-child {
+    background: color-mix(in srgb, #3b82f6 10%, var(--ai-surface));
+    color: #3479df;
+}
+
+.image-tool-link strong {
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 560;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.image-tool-link > span:nth-child(2) {
+    min-width: 0;
+    display: grid;
+    gap: 1px;
+}
+
+.image-tool-link > span:nth-child(2) small {
+    overflow: hidden;
+    color: var(--ai-text-tertiary);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.compact-tool-row {
+    grid-row: 5;
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.compact-tool-row button {
+    min-width: 0;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--ai-border);
+    border-radius: 10px;
+    background: var(--ai-panel);
+    color: var(--ai-text-secondary);
+    cursor: pointer;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.compact-tool-row button:hover {
+    border-color: color-mix(in srgb, var(--ai-primary) 32%, var(--ai-border));
+    color: var(--ai-primary);
+}
+
+.compact-tool-row button > span {
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
+    border-radius: 7px;
+    font-size: 10px;
+}
+
+.ai-engine-page.is-empty-chat .platform-stats {
+    grid-row: 6;
+}
+
+.ai-engine-page.is-empty-chat .quick-prompts {
+    grid-row: 7;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-bottom: 24px;
+}
+
+.ai-engine-page.is-empty-chat .platform-stats,
+.ai-engine-page.is-empty-chat .quick-prompts {
+    display: none;
+}
+
+.ai-engine-page.is-empty-chat.is-compact .empty-hero,
+.ai-engine-page.is-empty-chat.is-compact .capability-directory,
+.ai-engine-page.is-empty-chat.is-compact .creation-category-grid,
+.ai-engine-page.is-empty-chat.is-compact .compact-tool-row,
+.ai-engine-page.is-empty-chat.is-compact .composer {
+    width: min(1120px, calc(100% - 24px));
+}
+
+.ai-engine-page.is-empty-chat.is-compact .empty-hero {
+    padding-top: 16px;
+}
+
+.ai-engine-page.is-empty-chat.is-compact .platform-stats,
+.ai-engine-page.is-empty-chat.is-compact .quick-prompts {
+    display: none;
+}
+
+@media (max-width: 1280px) {
+    .image-tool-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .ai-engine-page.is-empty-chat .capability-directory {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .ai-engine-page.is-empty-chat .capability-directory button:nth-child(3n) {
+        border-right: 0;
+    }
+
+    .ai-engine-page.is-empty-chat .capability-directory button:nth-child(-n+3) {
+        border-bottom: 1px solid var(--ai-border);
+    }
+
+    .compact-tool-row {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .ai-engine-page.is-empty-chat .creation-category-grid,
+    .image-tool-groups {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .image-tool-group .image-tool-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .workspace-trust,
+    .workspace-heading > small {
+        display: none;
+    }
+
+    .workspace-mark {
+        width: 30px;
+        height: 30px;
+        flex-basis: 30px;
+    }
+
+    .ai-engine-page.is-empty-chat .empty-hero,
+    .ai-engine-page.is-empty-chat .capability-directory,
+    .ai-engine-page.is-empty-chat .creation-category-grid,
+    .ai-engine-page.is-empty-chat .image-tools-overview,
+    .ai-engine-page.is-empty-chat .compact-tool-row,
+    .ai-engine-page.is-empty-chat .composer {
+        width: calc(100% - 20px);
+    }
+
+    .ai-engine-page.is-empty-chat .empty-hero {
+        padding-top: 16px;
+    }
+
+    .ai-engine-page.is-empty-chat .empty-hero h1 {
+        font-size: 23px;
+    }
+
+    .ai-engine-page.is-empty-chat .capability-directory,
+    .image-tool-grid,
+    .compact-tool-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ai-engine-page.is-empty-chat .creation-category-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .creation-category { min-height: 112px; }
+
+    .image-tool-groups { grid-template-columns: 1fr; }
+    .image-tool-group,
+    .image-tool-group:nth-child(2) {
+        border-right: 0;
+        border-bottom: 1px solid var(--ai-border);
+    }
+    .image-tool-group:last-child { border-bottom: 0; }
+    .image-tool-group .image-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .ai-engine-page.is-empty-chat .capability-directory button,
+    .ai-engine-page.is-empty-chat .capability-directory button:nth-child(odd),
+    .ai-engine-page.is-empty-chat .capability-directory button:nth-child(3n) {
+        border-right: 1px solid var(--ai-border);
+        border-bottom: 1px solid var(--ai-border);
+    }
+
+    .ai-engine-page.is-empty-chat .capability-directory button:nth-child(even) {
+        border-right: 0;
+    }
+
+    .directory-heading > button {
+        display: none;
     }
 }
 </style>

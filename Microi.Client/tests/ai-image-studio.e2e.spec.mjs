@@ -78,14 +78,13 @@ test("AI 助手首屏可发现全部工作台，29 个图片工具可用且精�
     const assistant = page.locator('.ai-engine-page:not(.is-compact)[data-testid="unified-ai-assistant"]:visible').last();
     await expect(assistant).toBeVisible({ timeout: 45_000 });
 
-    for (const id of ["chat", "data", "image", "music", "video"]) {
-        await expect(assistant.locator(`[data-testid="ai-workspace-${id}"]`)).toBeVisible();
-    }
     for (const id of ["chat", "data", "image", "music", "video", "models"]) {
         await expect(assistant.locator(`[data-testid="ai-capability-${id}"]`)).toBeVisible();
     }
 
-    await assistant.locator('[data-testid="ai-workspace-image"]').click();
+    await expect(assistant.locator('.ai-engine-sidebar')).toHaveCount(0);
+    await expect(assistant.locator('button[data-testid^="ai-image-tool-"]')).toHaveCount(29);
+    await assistant.locator('[data-testid="ai-capability-image"]').click();
     const studio = page.locator('[data-testid="ai-image-studio"]:visible').last();
     await expect(studio).toBeVisible({ timeout: 30_000 });
     await expect(studio.getByRole("heading", { name: "AI 图像工作台", exact: true })).toBeVisible();
