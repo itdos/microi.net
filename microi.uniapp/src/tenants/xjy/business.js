@@ -10,6 +10,7 @@ export const businessGroups = [
     accent: '#0B86D4',
     items: [
       { key: 'customers', title: '我的客户', icon: asset('business/kehu.png') },
+      { key: 'cooperativeCustomers', title: '合作客户', icon: asset('business/kehu.png') },
       { key: 'contacts', title: '联系人', icon: asset('business/lianxiren.png') },
       { key: 'visits', title: '跟进记录', icon: asset('business/baifang.png') },
       { key: 'performance', title: '业绩统计', icon: asset('business/yeji.png') },
@@ -28,7 +29,6 @@ export const businessGroups = [
     subtitle: '合同订单、设备与售后任务',
     accent: '#E94B2C',
     items: [
-      { key: 'cooperativeCustomers', title: '合作客户', icon: asset('business/kehu.png') },
       { key: 'orders', title: '我的订单', icon: asset('business/dingdan.png') },
       { key: 'tasks', title: '我的任务', icon: asset('repair/renwu.png'), badgeKey: 'task' },
       { key: 'devices', title: '我的设备', icon: asset('business/shebei.png') },
@@ -163,7 +163,7 @@ export const businessModules = {
     filterFields: customerFilterFields
   }),
   cooperativeCustomers: native({
-    title: '合作客户', table: 'Diy_Kehu', menuAliases: ['合作客户', '客户'],
+    title: '合作客户', table: 'Diy_Kehu', menuAliases: ['合作客户', '客户管理', '客户'],
     titleField: 'KehuMC', statusField: 'Zhuangtai', tagFields: ['KehuLX'],
     fixedWhere: [{ Name: 'Zhuangtai', Type: 'Like', Value: '合作' }],
     lines: [
