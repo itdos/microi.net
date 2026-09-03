@@ -377,6 +377,7 @@ namespace Microi.net
                 MicroiEngine.CacheTenant.Cache(v8EngineParam.OsClient));
             v8EngineParam.Spider = MicroiEngine.Spider;
             v8EngineParam.OCR = new V8TenantOcr(v8EngineParam.OsClient);
+            v8EngineParam.Vision = new V8TenantVision(v8EngineParam.OsClient);
             v8EngineParam.AI = MicroiEngine
                 .GetService<IV8TenantAiFactory>()
                 .Create(v8EngineParam.OsClient, v8EngineParam.CurrentUser);

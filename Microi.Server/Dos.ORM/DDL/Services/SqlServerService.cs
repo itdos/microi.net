@@ -1,13 +1,24 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Threading;
 using Dos.Common;
 
 namespace Dos.ORM
 {
     public class SqlServerService : IMicroiORM
     {
+        private static readonly ConcurrentDictionary<string, SemaphoreSlim> TableDdlGates =
+            new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
+
+        private static int DdlLockWaitSeconds =>
+            ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:DdlLockWaitSeconds", 8);
+
+        private static int DdlQueueWaitSeconds =>
+            ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:DdlQueueWaitSeconds", 600);
+
         public bool NeedsExplicitSelectAlias => false;
         public bool UsesRowNumberPagination => true;
 
@@ -90,34 +101,55 @@ namespace Dos.ORM
         /// <returns></returns>
         public DosResult AddColumn(DbServiceParam param, DbTrans _trans = null)
         {
-            if (param.TableName.DosIsNullOrWhiteSpace() ||
-                param.FieldName.DosIsNullOrWhiteSpace() ||
-                param.FieldType.DosIsNullOrWhiteSpace() ||
-                (param.DbSession == null && _trans == null))
-                return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
-
-            // SQL注入防护
-            if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.FieldName))
-                return new DosResult(0, null, "表名或字段名不合法");
-
-            param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
-            var sql = $"ALTER TABLE [{param.TableName}] ADD [{param.FieldName}] {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")}";
-
-            if (!param.FieldLabel.DosIsNullOrWhiteSpace())
-            {
-                // 转义单引号防止SQL注入
-                var label = param.FieldLabel.Replace("'", "''");
-                sql += $";EXEC sp_addextendedproperty 'MS_Description', N'{label}','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'{param.FieldName}'";
-            }
-
+            SemaphoreSlim ddlGate = null;
             try
             {
+                if (param.TableName.DosIsNullOrWhiteSpace() ||
+                    param.FieldName.DosIsNullOrWhiteSpace() ||
+                    param.FieldType.DosIsNullOrWhiteSpace() ||
+                    (param.DbSession == null && _trans == null))
+                    return new DosResult(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
+
+                // SQL注入防护
+                if (!IsValidIdentifier(param.TableName) || !IsValidIdentifier(param.FieldName))
+                    return new DosResult(0, null, "表名或字段名不合法");
+
+                ddlGate = EnterTableDdlGate(param, out var gateError);
+                if (ddlGate == null)
+                    return new DosResult(0, null, gateError);
+
                 dynamic session = (object)_trans ?? param.DbSession;
+                PrepareDdlSession(session);
+                if (ColumnExists(session, param.TableName, param.FieldName))
+                {
+                    ddlGate.Release();
+                    ddlGate = null;
+                    return new DosResult(1, null, "字段已存在，已跳过物理列创建。");
+                }
+
+                param.FieldType = param.FieldType.Contains("text") ? "text" : param.FieldType;
+                var sql = $"ALTER TABLE [{param.TableName}] ADD [{param.FieldName}] {param.FieldType} {(param.FieldNotNull ? "NOT NULL" : "NULL")}";
+
+                if (!param.FieldLabel.DosIsNullOrWhiteSpace())
+                {
+                    // 转义单引号防止SQL注入
+                    var label = param.FieldLabel.Replace("'", "''");
+                    sql += $";EXEC sp_addextendedproperty 'MS_Description', N'{label}','SCHEMA', N'dbo','TABLE', N'{param.TableName}','COLUMN', N'{param.FieldName}'";
+                }
+
                 session.FromSql(sql).ExecuteNonQuery();
+                ddlGate.Release();
+                ddlGate = null;
                 return new DosResult(1);
             }
             catch (Exception ex)
             {
+                ddlGate?.Release();
+                ddlGate = null;
+                if (IsDuplicateColumnException(ex))
+                    return new DosResult(1, null, "字段已存在，已跳过物理列创建。");
+                if (IsMetadataLockException(ex))
+                    return new DosResult(0, null, $"表结构正在被其它操作占用，请稍后重试。{ex.Message}");
                 return new DosResult(0, null, $"添加字段失败: {ex.Message}");
             }
         }
@@ -274,6 +306,62 @@ namespace Dos.ORM
             if (string.IsNullOrWhiteSpace(identifier))
                 return false;
             return System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[a-zA-Z_][a-zA-Z0-9_]*$");
+        }
+
+        private static SemaphoreSlim EnterTableDdlGate(DbServiceParam param, out string error)
+        {
+            error = "";
+            var waitSeconds = Math.Max(1, DdlQueueWaitSeconds);
+            var key = $"{param?.OsClient ?? ""}|{param?.DataBaseId ?? ""}|{param?.TableName ?? ""}";
+            var gate = TableDdlGates.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+            if (gate.Wait(TimeSpan.FromSeconds(waitSeconds)))
+                return gate;
+
+            error = $"表结构变更正在排队中，已等待 {waitSeconds} 秒，请稍后重试。";
+            return null;
+        }
+
+        private static void PrepareDdlSession(dynamic session)
+        {
+            var milliseconds = Math.Max(1, DdlLockWaitSeconds) * 1000;
+            session.FromSql($"SET LOCK_TIMEOUT {milliseconds}").ExecuteNonQuery();
+        }
+
+        private static bool ColumnExists(dynamic session, string tableName, string fieldName)
+        {
+            var count = session.FromSql(@"SELECT COUNT(1)
+FROM information_schema.columns
+WHERE table_schema = SCHEMA_NAME()
+AND table_name = @tableName
+AND column_name = @fieldName")
+                .AddInParameter("@tableName", tableName)
+                .AddInParameter("@fieldName", fieldName)
+                .ToScalar();
+            return Convert.ToInt32(count) > 0;
+        }
+
+        private static bool IsDuplicateColumnException(Exception ex)
+        {
+            var message = GetExceptionMessage(ex);
+            return message.IndexOf("specified more than once", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("must be unique", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("2705", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsMetadataLockException(Exception ex)
+        {
+            var message = GetExceptionMessage(ex);
+            return message.IndexOf("Lock request time out period exceeded", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("1222", StringComparison.OrdinalIgnoreCase) >= 0
+                || message.IndexOf("1205", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string GetExceptionMessage(Exception ex)
+        {
+            if (ex == null)
+                return "";
+            var baseException = ex.GetBaseException();
+            return $"{ex.Message} {baseException?.Message}";
         }
 
         public DosResult GetTableIndexes(DbServiceParam param)

@@ -110,6 +110,10 @@ function nav(): DefaultTheme.NavItem[] {
 					link: "https://www.nuget.org/profiles/ITdos",
 				},
 				{
+					text: "吾码培训大纲",
+					link: "/doc/about/microi-training-syllabus",
+				},
+				{
 					text: "更新日志",
 					link: "/doc/about/update-log",
 				}

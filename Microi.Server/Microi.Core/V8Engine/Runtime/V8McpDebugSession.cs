@@ -502,6 +502,7 @@ namespace Microi.net
             param.Cache = new V8TenantCache(param.OsClient, MicroiEngine.CacheTenant.Cache(param.OsClient));
             param.Spider = MicroiEngine.Spider;
             param.OCR = new V8TenantOcr(param.OsClient);
+            param.Vision = new V8TenantVision(param.OsClient);
             param.Office = MicroiEngine.Office;
             param.MongoDb = MicroiEngine.MongoDB;
             param.MQ = MicroiEngine.MQ;

@@ -382,6 +382,7 @@ namespace Microi.net
         public async Task<DosResult> ProvisionAdminTenantAsync(AdminTenantProvisioningRequest request)
         {
             request ??= new AdminTenantProvisioningRequest();
+            var progress = new TenantProvisioningProgressReporter(request.BackgroundTaskId);
             var tenantKey = (request.TenantKey ?? "").Trim();
             var systemName = (request.SystemName ?? "").Trim();
             var ownerPhone = (request.OwnerPhone ?? "").Trim();
@@ -422,11 +423,13 @@ namespace Microi.net
                 if (mainClient == null)
                     return new DosResult(0, null, "主租户OsClient未初始化。");
 
+                progress.Milestone(17, 2, "租户参数与主租户运行配置校验通过");
                 EnsureProvisioningColumns(mainClient);
                 lease = TenantProvisioningLease.TryAcquire("admin:" + tenantKey.ToLowerInvariant());
                 if (lease == null)
                     return new DosResult(0, null, "该租户的开通任务正在其它节点执行，请勿重复提交。");
                 lease.ThrowIfLost();
+                progress.Milestone(18, 2, "已取得租户开通分布式租约，正在检查重复租户");
 
                 var existCheck = mainClient.Db.FromSql(
                         "SELECT COUNT(*) FROM sys_osclients WHERE OsClient = @p0 AND IsDeleted = 0")
@@ -436,6 +439,7 @@ namespace Microi.net
                     return new DosResult(0, new { OsClient = tenantKey, DomainName = domainName },
                         "租户Key已存在，请更换后重试。");
 
+                progress.Milestone(19, 2, "租户Key未占用，正在创建隔离数据库与专用账号");
                 var databaseAccess = CreateTenantDatabaseAccess(dbName);
                 databaseCreated = true;
                 var newDbConn = databaseAccess.ConnectionString;
@@ -443,47 +447,71 @@ namespace Microi.net
 
                 var importResult = databaseZipPath.DosIsNullOrWhiteSpace()
                     ? ImportEmptySql(newDbConn, OsClientDefault.OsClientDbType)
-                    : ImportTenantSqlZip(mainClient, databaseZipPath, databaseZipName,
-                        newDbConn, OsClientDefault.OsClientDbType);
+                    : await ImportTenantSqlZipAsync(
+                            mainClient,
+                            databaseZipPath,
+                            databaseZipName,
+                            newDbConn,
+                            OsClientDefault.OsClientDbType,
+                            progress)
+                        .ConfigureAwait(false);
                 if (importResult.Code != 1)
+                {
+                    progress.Failure("数据库初始化失败：" + importResult.Msg);
                     return CompensateProvisioningFailure(importResult, tenantKey, dbName);
+                }
+                if (databaseZipPath.DosIsNullOrWhiteSpace())
+                    progress.Milestone(76, 3, "官方标准空库导入成功");
                 lease.ThrowIfLost();
 
+                progress.Milestone(80, 5, "数据库校验通过，正在登记 SaaS 租户运行配置");
                 var addTenantResult = AddOsClientRecord(mainClient, tenantKey, dbName, newDbConn,
                     ownerPhone, systemName, osClientType, osClientNetwork, domainName);
                 if (addTenantResult.Code != 1)
+                {
+                    progress.Failure("登记 SaaS 租户失败：" + addTenantResult.Msg);
                     return CompensateProvisioningFailure(addTenantResult, tenantKey, dbName);
+                }
                 lease.ThrowIfLost();
 
+                progress.Milestone(84, 6, "租户运行配置已登记，正在初始化 admin 账号");
                 var adminName = (request.UserName ?? "").Trim();
                 if (adminName.DosIsNullOrWhiteSpace()) adminName = "管理员";
                 var initResult = InitNewTenantData(newDbConn, OsClientDefault.OsClientDbType,
                     ownerPhone, adminName,
                     (request.EncryptedPwd ?? "").Trim(), tenantKey);
                 if (initResult.Code != 1)
+                {
+                    progress.Failure("初始化 admin 账号失败：" + initResult.Msg);
                     return CompensateProvisioningFailure(initResult, tenantKey, dbName);
+                }
 
+                progress.Milestone(88, 7, "admin 账号初始化成功，正在写入系统名称并暂停恢复库定时任务");
                 UpdateTenantSysConfig(mainClient, newDbConn, OsClientDefault.OsClientDbType,
                     tenantKey, systemName);
                 if (!databaseZipPath.DosIsNullOrWhiteSpace())
                     PauseRestoredTenantSchedules(newDbConn, OsClientDefault.OsClientDbType);
                 lease.ThrowIfLost();
 
+                progress.Milestone(91, 8, "租户基础数据已就绪，正在刷新 SaaS 运行时配置");
                 var reloadResult = MicroiEngine.GetService<IOsClientRuntime>()
                     .ReloadSingleOsClient(tenantKey);
                 if (reloadResult.Code != 1)
                 {
+                    progress.Failure("刷新租户运行配置失败：" + reloadResult.Msg);
                     return CompensateProvisioningFailure(
                         new DosResult(0, reloadResult.Data, "刷新租户运行配置失败：" + reloadResult.Msg),
                         tenantKey, dbName);
                 }
                 lease.ThrowIfLost();
 
+                progress.Milestone(94, 9, "租户运行时配置已刷新，正在执行数据库版本升级检查");
                 var upgradeResult = await UpgradeProvisionedTenantAsync(
                         tenantKey, request.BackgroundTaskId)
                     .ConfigureAwait(false);
                 if (upgradeResult.Code != 1)
                 {
+                    progress.Failure("租户数据库升级失败：" + upgradeResult.Msg);
                     return CompensateProvisioningFailure(
                         new DosResult(0, upgradeResult.Data,
                             "租户数据库升级失败：" + upgradeResult.Msg),
@@ -491,6 +519,10 @@ namespace Microi.net
                         dbName);
                 }
                 lease.ThrowIfLost();
+                progress.Milestone(
+                    99,
+                    TenantProvisioningProgressContract.HostProvisioningCompletedStep,
+                    "数据库升级检查完成，正在提交租户创建结果");
 
                 var success = new DosResult(1, new
                 {
@@ -514,6 +546,7 @@ namespace Microi.net
             catch (Exception ex)
             {
                 Console.WriteLine("Microi: Admin tenant provisioning failed: " + ex.Message);
+                progress.Failure("SaaS 租户创建失败：" + ex.Message);
                 var failure = new DosResult(0, null, "SaaS租户创建失败：" + ex.Message);
                 return databaseCreated
                     ? CompensateProvisioningFailure(failure, tenantKey, dbName)
@@ -2632,8 +2665,8 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
             }
         }
 
-        private const long MaxTenantSqlZipBytes = 256L * 1024 * 1024;
-        private const long MaxTenantSqlBytes = 512L * 1024 * 1024;
+        private const long MaxTenantSqlZipBytes = 2048L * 1024 * 1024;
+        private const long MaxTenantSqlBytes = 8L * 1024 * 1024 * 1024;
         private const long MaxTenantSqlCompressionRatio = 250;
 
         private sealed class TenantSqlZipPackage
@@ -2642,6 +2675,142 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
             public long CompressedBytes { get; set; }
             public long UncompressedBytes { get; set; }
             public string Sql { get; set; }
+        }
+
+        /// <summary>
+        /// 只向后台任务写入低频状态和百分比跨档里程碑。任务列表继续保持小投影，
+        /// 详细日志最多约二十余条，不会随 SQL 行数或语句数线性增长。
+        /// </summary>
+        private sealed class TenantProvisioningProgressReporter
+        {
+            private const long StatusByteInterval = 16L * 1024 * 1024;
+            private static readonly TimeSpan StatusTimeInterval = TimeSpan.FromSeconds(2);
+            private readonly string _taskId;
+            private readonly DateTime _startedAtUtc = DateTime.UtcNow;
+            private DateTime _lastStatusAtUtc = DateTime.MinValue;
+            private long _lastStatusBytes;
+            private int _lastSqlLogBucket = -1;
+
+            public TenantProvisioningProgressReporter(string taskId)
+            {
+                _taskId = (taskId ?? "").Trim();
+            }
+
+            public void Milestone(int percent, int currentStep, string message)
+            {
+                if (_taskId.DosIsNullOrWhiteSpace() || message.DosIsNullOrWhiteSpace()) return;
+                BackgroundTaskRuntime.TryUpdateProgress(
+                    _taskId,
+                    Math.Max(0, Math.Min(99, percent)),
+                    message,
+                    Math.Max(0, currentStep),
+                    TenantProvisioningProgressContract.TotalSteps);
+                BackgroundTaskRuntime.TryAppendLog(_taskId, message);
+            }
+
+            public void ReportZipDownload(long bytes)
+            {
+                if (_taskId.DosIsNullOrWhiteSpace() || bytes <= 0) return;
+                var now = DateTime.UtcNow;
+                if (_lastStatusAtUtc != DateTime.MinValue
+                    && now - _lastStatusAtUtc < StatusTimeInterval
+                    && bytes - _lastStatusBytes < StatusByteInterval)
+                {
+                    return;
+                }
+                _lastStatusAtUtc = now;
+                _lastStatusBytes = bytes;
+                BackgroundTaskRuntime.TryUpdateProgress(
+                    _taskId,
+                    19,
+                    "正在从私有存储读取数据库 ZIP，已读取 " + FormatBytes(bytes),
+                    2,
+                    TenantProvisioningProgressContract.TotalSteps);
+            }
+
+            public void ReportSqlImport(
+                SeedImportProgress importProgress,
+                long bytesRead,
+                long totalBytes)
+            {
+                if (_taskId.DosIsNullOrWhiteSpace() || importProgress == null) return;
+                var safeTotal = Math.Max(1L, totalBytes);
+                var safeRead = Math.Max(0L, Math.Min(bytesRead, safeTotal));
+                var sqlPercent = (int)Math.Min(100L, safeRead * 100L / safeTotal);
+                var overallPercent = Math.Min(75, 20 + sqlPercent * 55 / 100);
+                var now = DateTime.UtcNow;
+                var elapsedSeconds = Math.Max(0.001d, (now - _startedAtUtc).TotalSeconds);
+                var bytesPerSecond = safeRead / elapsedSeconds;
+                var remainingSeconds = bytesPerSecond > 0 && safeRead < safeTotal
+                    ? (long)Math.Ceiling((safeTotal - safeRead) / bytesPerSecond)
+                    : 0L;
+                var phase = string.Equals(importProgress.Phase, "Executing", StringComparison.Ordinal)
+                    ? "正在执行"
+                    : "已完成";
+                var message = "正在导入 SQL：已读取 " + FormatBytes(safeRead)
+                              + " / " + FormatBytes(safeTotal)
+                              + "（" + sqlPercent + "%），已执行 "
+                              + importProgress.ExecutedStatementCount.ToString("N0") + " 条；"
+                              + phase + "第 " + importProgress.BatchNumber.ToString("N0")
+                              + " 批（" + importProgress.BatchStatementCount.ToString("N0")
+                              + " 条 " + importProgress.StatementKind + "）"
+                              + "，平均吞吐 " + FormatBytes((long)bytesPerSecond) + "/s"
+                              + (remainingSeconds > 0
+                                  ? "，按当前读取速度预计剩余 " + FormatDuration(remainingSeconds)
+                                  : "");
+
+                var statusDue = _lastStatusAtUtc == DateTime.MinValue
+                                || now - _lastStatusAtUtc >= StatusTimeInterval
+                                || safeRead - _lastStatusBytes >= StatusByteInterval;
+                if (statusDue)
+                {
+                    _lastStatusAtUtc = now;
+                    _lastStatusBytes = safeRead;
+                    BackgroundTaskRuntime.TryUpdateProgress(
+                        _taskId,
+                        overallPercent,
+                        message,
+                        2,
+                        TenantProvisioningProgressContract.TotalSteps);
+                }
+
+                var logBucket = sqlPercent / 5;
+                if (logBucket > _lastSqlLogBucket)
+                {
+                    _lastSqlLogBucket = logBucket;
+                    BackgroundTaskRuntime.TryAppendLog(_taskId, message);
+                }
+            }
+
+            public void Failure(string message)
+            {
+                if (_taskId.DosIsNullOrWhiteSpace() || message.DosIsNullOrWhiteSpace()) return;
+                BackgroundTaskRuntime.TryAppendLog(_taskId, message);
+            }
+
+            public bool IsCancellationRequested()
+            {
+                return !_taskId.DosIsNullOrWhiteSpace()
+                       && BackgroundTaskRuntime.IsCancellationRequested(_taskId);
+            }
+
+            public static string FormatBytes(long bytes)
+            {
+                var value = Math.Max(0L, bytes);
+                if (value < 1024) return value + " B";
+                if (value < 1024L * 1024) return (value / 1024d).ToString("0.0") + " KB";
+                if (value < 1024L * 1024 * 1024)
+                    return (value / 1024d / 1024d).ToString("0.0") + " MB";
+                return (value / 1024d / 1024d / 1024d).ToString("0.00") + " GB";
+            }
+
+            private static string FormatDuration(long seconds)
+            {
+                seconds = Math.Max(0L, seconds);
+                if (seconds < 60) return seconds + " 秒";
+                if (seconds < 3600) return seconds / 60 + " 分 " + seconds % 60 + " 秒";
+                return seconds / 3600 + " 小时 " + seconds % 3600 / 60 + " 分";
+            }
         }
 
         /// <summary>
@@ -2665,17 +2834,90 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
             }
         }
 
-        private DosResult ImportTenantSqlZip(OsClientSecret mainClient, string databaseZipPath,
-            string databaseZipName, string newDbConn, string dbType)
+        private async Task<DosResult> ImportTenantSqlZipAsync(OsClientSecret mainClient, string databaseZipPath,
+            string databaseZipName, string newDbConn, string dbType,
+            TenantProvisioningProgressReporter progress)
         {
+            string tempDirectory = null;
+            string tempZipPath = null;
             try
             {
-                var zipBytes = ReadPrivateTenantSqlZip(mainClient, databaseZipPath);
-                var package = ExtractTenantSqlZipPackage(zipBytes);
+                // Microi.Core cannot reference Microi.HDFS (the HDFS project already
+                // depends on Core). Load the same tenant upload policy directly from
+                // the main tenant snapshot and keep the dependency graph acyclic.
+                var policy = FileUploadSecurityOptions.Load(mainClient?.OsClientModel);
+                var zipLimit = Math.Min(MaxTenantSqlZipBytes, policy.MaxFileBytes);
+                tempDirectory = Path.Combine(
+                    Path.GetTempPath(),
+                    "microi-tenant-database",
+                    Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(tempDirectory);
+                tempZipPath = Path.Combine(tempDirectory, "database.zip");
+                progress?.Milestone(19, 2, "隔离数据库已创建，正在从私有存储读取数据库 ZIP");
+                var zipBytes = await ReadPrivateTenantSqlZipToFileAsync(
+                        mainClient,
+                        databaseZipPath,
+                        tempZipPath,
+                        zipLimit,
+                        progress == null
+                            ? null
+                            : new Action<long>(progress.ReportZipDownload))
+                    .ConfigureAwait(false);
+                progress?.Milestone(20, 2,
+                    "数据库 ZIP 读取完成（" + TenantProvisioningProgressReporter.FormatBytes(zipBytes)
+                    + "），正在校验压缩包目录和安全上限");
+
                 var databaseType = DiyCommon.GetDbInfo(dbType).DbType;
                 var newDb = MicroiORMExtensions.CreateDbSession(newDbConn, databaseType);
-                var importResult = DatabaseSeedImporter.ImportMySql57(newDb, package.Sql);
+                TenantSqlZipPackage package;
+                SeedImportResult importResult;
+                using (var zipStream = new FileStream(
+                           tempZipPath,
+                           FileMode.Open,
+                           FileAccess.Read,
+                           FileShare.Read,
+                           1024 * 1024,
+                           FileOptions.SequentialScan))
+                using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false))
+                {
+                    var entry = ValidateTenantSqlZipArchive(archive);
+                    package = new TenantSqlZipPackage
+                    {
+                        EntryName = entry.Name,
+                        CompressedBytes = entry.CompressedLength,
+                        UncompressedBytes = entry.Length
+                    };
+                    progress?.Milestone(21, 2,
+                        "ZIP 校验通过：压缩后 "
+                        + TenantProvisioningProgressReporter.FormatBytes(entry.CompressedLength)
+                        + "，SQL 解压后 "
+                        + TenantProvisioningProgressReporter.FormatBytes(entry.Length)
+                        + "；开始流式分批导入");
+                    using var entryStream = entry.Open();
+                    using var countedStream = new TenantSqlLimitedReadStream(
+                        entryStream,
+                        MaxTenantSqlBytes);
+                    using var sqlReader = new StreamReader(
+                        countedStream,
+                        new UTF8Encoding(false, true),
+                        detectEncodingFromByteOrderMarks: true,
+                        bufferSize: 1024 * 1024,
+                        leaveOpen: false);
+                    importResult = DatabaseSeedImporter.ImportMySql57(
+                        newDb,
+                        sqlReader,
+                        item => progress?.ReportSqlImport(item, countedStream.BytesRead, entry.Length),
+                        () => progress?.IsCancellationRequested() == true);
+                    if (countedStream.BytesRead != entry.Length)
+                    {
+                        throw new InvalidDataException(
+                            $"SQL 解压后的实际大小与 ZIP 元数据不一致：Expected={entry.Length},Actual={countedStream.BytesRead}。");
+                    }
+                }
                 ValidateImportedTenantDatabase(newDb);
+                progress?.Milestone(78, 4,
+                    "SQL 流式导入完成，共执行 " + importResult.BatchCount.ToString("N0")
+                    + " 条；核心表和默认 admin 校验通过");
 
                 Console.WriteLine($"Microi：自定义数据库包[{databaseZipName}]导入成功，SQL={package.EntryName}。");
                 return new DosResult(1, new
@@ -2686,8 +2928,10 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     importResult.RowCount,
                     importResult.Converted,
                     package.EntryName,
+                    ZipBytes = zipBytes,
                     package.CompressedBytes,
                     package.UncompressedBytes,
+                    Streaming = true,
                     AdminValidated = true
                 }, importResult.Summary + "，核心表和默认 admin 校验成功。");
             }
@@ -2695,9 +2939,28 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
             {
                 return new DosResult(0, null, "导入自定义数据库 ZIP 失败：" + ex.Message);
             }
+            finally
+            {
+                try
+                {
+                    if (!tempZipPath.DosIsNullOrWhiteSpace() && File.Exists(tempZipPath))
+                        File.Delete(tempZipPath);
+                    if (!tempDirectory.DosIsNullOrWhiteSpace() && Directory.Exists(tempDirectory))
+                        Directory.Delete(tempDirectory, recursive: false);
+                }
+                catch
+                {
+                    // 临时文件清理失败不覆盖数据库导入的权威结果；系统临时目录清理器可后续回收。
+                }
+            }
         }
 
-        private static byte[] ReadPrivateTenantSqlZip(OsClientSecret mainClient, string databaseZipPath)
+        private static async Task<long> ReadPrivateTenantSqlZipToFileAsync(
+            OsClientSecret mainClient,
+            string databaseZipPath,
+            string targetPath,
+            long maxBytes,
+            Action<long> reportBytes = null)
         {
             var path = (databaseZipPath ?? "").Trim().Replace('\\', '/').TrimStart('/');
             if (path.DosIsNullOrWhiteSpace() || path.Contains("..") || path.Contains(":")
@@ -2717,18 +2980,54 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                     || string.Equals(hdfsName, "AmazonS3", StringComparison.OrdinalIgnoreCase)
                     ? MicroiEngine.HDFSFactory(HDFSType.AmazonS3)
                     : MicroiEngine.HDFSFactory(HDFSType.Aliyun);
-            var result = hdfs.GetPrivateFileUrl(new HDFSParam
+            await using var target = new FileStream(
+                targetPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                1024 * 1024,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            await using var limitedTarget = new TenantSqlLimitedWriteStream(
+                target, maxBytes, reportBytes);
+            var result = await hdfs.CopyObjectToStream(new HDFSParam
             {
                 ClientModel = mainClient,
                 Limit = true,
                 FileFullPath = path,
-                ReturnFileType = "Byte"
-            }).GetAwaiter().GetResult();
-            if (result?.Code != 1 || !(result.Data is byte[] bytes) || bytes.Length == 0)
+                FileStream = limitedTarget,
+                NetworkIsInternet = false,
+                TimeoutSeconds = 7200,
+                CancellationToken = CancellationToken.None
+            }).ConfigureAwait(false);
+            await limitedTarget.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+            if (result?.Code != 1 || limitedTarget.BytesWritten == 0)
                 throw new InvalidOperationException(result?.Msg ?? "无法读取数据库 ZIP 私有文件。");
-            if (bytes.LongLength > MaxTenantSqlZipBytes)
-                throw new InvalidOperationException("数据库 ZIP 不能超过 256MB。");
-            return bytes;
+            return limitedTarget.BytesWritten;
+        }
+
+        private static ZipArchiveEntry ValidateTenantSqlZipArchive(ZipArchive archive)
+        {
+            if (archive == null) throw new ArgumentNullException(nameof(archive));
+            if (archive.Entries.Count != 1)
+                throw new InvalidOperationException(
+                    $"ZIP 内必须且只能有一个 .sql 文件，当前检测到 {archive.Entries.Count} 个条目。");
+
+            var entry = archive.Entries[0];
+            var fullName = (entry.FullName ?? "").Replace('\\', '/');
+            if (fullName.DosIsNullOrWhiteSpace() || fullName.EndsWith("/")
+                || !string.Equals(fullName, entry.Name, StringComparison.Ordinal)
+                || fullName == "." || fullName == ".." || fullName.Contains("../")
+                || fullName.Contains(":") || !fullName.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("ZIP 内必须且只能包含根目录下的一个普通 .sql 文件。");
+            if (entry.Length <= 0)
+                throw new InvalidOperationException("ZIP 内的 SQL 文件不能为空。");
+            if (entry.Length > MaxTenantSqlBytes)
+                throw new InvalidOperationException("SQL 解压后不能超过 8GB。");
+            if (entry.Length > 10L * 1024 * 1024
+                && (entry.CompressedLength <= 0
+                    || entry.Length / Math.Max(entry.CompressedLength, 1) > MaxTenantSqlCompressionRatio))
+                throw new InvalidOperationException("数据库 ZIP 压缩比异常，已按解压炸弹风险拒绝。");
+            return entry;
         }
 
         private static TenantSqlZipPackage ExtractTenantSqlZipPackage(byte[] zipBytes)
@@ -2741,25 +3040,7 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
             using (var zipStream = new MemoryStream(zipBytes, writable: false))
             using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false))
             {
-                if (archive.Entries.Count != 1)
-                    throw new InvalidOperationException(
-                        $"ZIP 内必须且只能有一个 .sql 文件，当前检测到 {archive.Entries.Count} 个条目。");
-
-                var entry = archive.Entries[0];
-                var fullName = (entry.FullName ?? "").Replace('\\', '/');
-                if (fullName.DosIsNullOrWhiteSpace() || fullName.EndsWith("/")
-                    || !string.Equals(fullName, entry.Name, StringComparison.Ordinal)
-                    || fullName == "." || fullName == ".." || fullName.Contains("../")
-                    || fullName.Contains(":") || !fullName.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("ZIP 内必须且只能包含根目录下的一个普通 .sql 文件。");
-                if (entry.Length <= 0)
-                    throw new InvalidOperationException("ZIP 内的 SQL 文件不能为空。");
-                if (entry.Length > MaxTenantSqlBytes)
-                    throw new InvalidOperationException("SQL 解压后不能超过 512MB。");
-                if (entry.Length > 10L * 1024 * 1024
-                    && (entry.CompressedLength <= 0
-                        || entry.Length / Math.Max(entry.CompressedLength, 1) > MaxTenantSqlCompressionRatio))
-                    throw new InvalidOperationException("数据库 ZIP 压缩比异常，已按解压炸弹风险拒绝。");
+                var entry = ValidateTenantSqlZipArchive(archive);
 
                 using (var entryStream = entry.Open())
                 using (var output = new MemoryStream())
@@ -2796,6 +3077,128 @@ VALUES(@p0,@p1,@p1,@p2,@p2,@p3,@p4,1,@p5,@p6,0)")
                         Sql = sql
                     };
                 }
+            }
+        }
+
+        private sealed class TenantSqlLimitedWriteStream : Stream
+        {
+            private readonly Stream _target;
+            private readonly long _maximumBytes;
+            private readonly Action<long> _reportBytes;
+
+            public TenantSqlLimitedWriteStream(
+                Stream target,
+                long maximumBytes,
+                Action<long> reportBytes = null)
+            {
+                _target = target ?? throw new ArgumentNullException(nameof(target));
+                _maximumBytes = maximumBytes > 0
+                    ? maximumBytes
+                    : throw new ArgumentOutOfRangeException(nameof(maximumBytes));
+                _reportBytes = reportBytes;
+            }
+
+            public long BytesWritten { get; private set; }
+            public override bool CanRead => false;
+            public override bool CanSeek => false;
+            public override bool CanWrite => true;
+            public override long Length => BytesWritten;
+            public override long Position { get => BytesWritten; set => throw new NotSupportedException(); }
+            public override void Flush() => _target.Flush();
+            public override Task FlushAsync(CancellationToken cancellationToken) =>
+                _target.FlushAsync(cancellationToken);
+            public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                EnsureCapacity(count);
+                _target.Write(buffer, offset, count);
+                BytesWritten += count;
+                _reportBytes?.Invoke(BytesWritten);
+            }
+
+            public override async Task WriteAsync(
+                byte[] buffer,
+                int offset,
+                int count,
+                CancellationToken cancellationToken)
+            {
+                EnsureCapacity(count);
+                await _target.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+                BytesWritten += count;
+                _reportBytes?.Invoke(BytesWritten);
+            }
+
+            private void EnsureCapacity(int count)
+            {
+                if (count < 0 || BytesWritten > _maximumBytes - count)
+                    throw new InvalidDataException(
+                        $"数据库 ZIP 超过当前租户单文件上限 {_maximumBytes / 1024 / 1024}MB。");
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                // 外层 FileStream 负责生命周期，避免包装流提前关闭后无法 FlushAsync。
+                base.Dispose(disposing);
+            }
+
+            public override ValueTask DisposeAsync()
+            {
+                GC.SuppressFinalize(this);
+                // ValueTask.CompletedTask is not available on the netstandard2.1
+                // target used by Microi.Core; a default ValueTask is already complete.
+                return default;
+            }
+        }
+
+        private sealed class TenantSqlLimitedReadStream : Stream
+        {
+            private readonly Stream _source;
+            private readonly long _maximumBytes;
+
+            public TenantSqlLimitedReadStream(Stream source, long maximumBytes)
+            {
+                _source = source ?? throw new ArgumentNullException(nameof(source));
+                _maximumBytes = maximumBytes;
+            }
+
+            public long BytesRead { get; private set; }
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => throw new NotSupportedException();
+            public override long Position { get => BytesRead; set => throw new NotSupportedException(); }
+            public override void Flush() { }
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                var read = _source.Read(buffer, offset, count);
+                Observe(read);
+                return read;
+            }
+
+            public override async Task<int> ReadAsync(
+                byte[] buffer,
+                int offset,
+                int count,
+                CancellationToken cancellationToken)
+            {
+                var read = await _source.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+                Observe(read);
+                return read;
+            }
+
+            private void Observe(int count)
+            {
+                if (count <= 0) return;
+                if (BytesRead > _maximumBytes - count)
+                    throw new InvalidDataException("SQL 解压后的实际大小超过 8GB 安全上限。");
+                BytesRead += count;
             }
         }
 

@@ -58,7 +58,7 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 
 - 模型 Provider、Endpoint、ApiKey、AuthPrefix 和上游模型 Id 只保存在服务端受保护配置。
 - 普通用户使用平台签发的受限 API Key/订阅身份，不能枚举或读取上游密钥。
-- MiniMax 对话媒体必须区分意图模型与生成模型：`MiniMax-M3` 只负责识别普通对话、绘图或音乐意图；生成式图片固定走 `GenerateMiniMaxImage + image-01`，纯音乐优先走 `GenerateMiniMaxMusic + music-3.0`。托管音乐只有明确返回 410 退役终态时才允许切到官方开源 `MiniMax-Music3`，不得把超时、5xx、额度不足等不确定状态当作回退条件。不得让文本模型用说明文字冒充媒体生成，也不得声称图片/音乐是 `MiniMax-M3` 原生输出。
+- MiniMax 对话媒体必须区分意图模型与生成模型：`MiniMax-M3` 只负责识别普通对话、绘图或音乐意图；生成式图片固定走 `GenerateMiniMaxImage + image-01`，纯音乐新路由优先走 `GenerateMiniMaxMusic + music-3.0`，并继续兼容已有供应商配置的 `GenerateMiniMaxMusic + music-2.6`。托管音乐只有明确返回 410 退役终态时才允许切到官方开源 `MiniMax-Music3`，不得把超时、5xx、额度不足等不确定状态当作回退条件；目标账号支持的实际模型必须在线校准。不得让文本模型用说明文字冒充媒体生成，也不得声称图片/音乐是 `MiniMax-M3` 原生输出。
 - `GenerateMiniMaxImage` 可接收最多 4 张 JPEG/PNG/WebP 主体参考图；参考图先写当前租户私有 HDFS，只将短时签名 URL 交给供应商，浏览器与响应均不得得到签名地址。图生图、重绘、扩图、消除、去水印、证件照、多图合成、上色、修复等当前属于参考图提示词重绘，不得冒充像素级蒙版工具。黑白、纯色背景抠除、缩放、裁剪、旋转、翻转、格式转换和拼图使用 `platform-ai-runtime/ProcessImage + V8.Image` 精确处理。
 - 图片与音乐都使用稳定 `RequestId` 和共享幂等；相同参数回放、参数冲突拒绝，上游结果不确定时禁止换 Id 盲重试。音乐当前仅向平台管理员开放且固定无人声；托管结果为 MP3，开源回退为 32kHz 立体声 WAV、10～60 秒。成功内容由服务端校验后直接写入当前租户公有 HDFS。
 - 聊天附件的公有媒体 URL 优先按当前运行租户 `FileServer + FilePath` 解析，禁止写死域名或沿用其它租户的前缀。图片使用 Element Plus `el-image` 的 `preview-src-list` 原页放大，不能套 `target="_blank"`；音乐使用 `<audio controls preload="metadata">` 在线播放。媒体是结构化附件，文本才走安全 Markdown 渲染，禁止拼接任意 HTML 绕过 URL/类型校验。

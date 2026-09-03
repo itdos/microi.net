@@ -1641,6 +1641,8 @@ var health = V8.TranslateEngine.Health();
 
 `V8.OCR` 是图片/PDF 文字识别的统一租户网关。Microi API 负责鉴权、租户隔离、文件校验、大小/超时/页数限制和统一结果；OCR 模型由独立的 PaddleX 服务承载，避免在每个 .NET API 节点重复加载模型。
 
+本节保留后端 V8 方法签名和返回协议；方案选型、部署、SaaS 配置、HTTP/MCP 调用、生产模式与故障排查见 [OCR 识别引擎](../system-engine/ocr-engine.md)。
+
 ```javascript
 var result = await V8.OCR.Recognize({
   FileByteBase64: V8.FilesByteBase64.invoice,
@@ -1707,6 +1709,59 @@ docker compose -f compose.cpu.yml ps
 Compose 的 CPU/内存限制是安全基线，应按真实图片尺寸、页数和并发压测后调整。GPU 环境必须按显卡驱动选择官方 CUDA 11.8/12.6 镜像与对应 PaddlePaddle wheel，不应直接复用 CPU Dockerfile 或使用浮动 `latest`。
 
 当前入口是请求内同步识别。批量、超大文件或长耗时 OCR 必须建立共享数据库/MQ/outbox 任务，以全局任务 Id、唯一约束和状态机保证幂等恢复；进程内队列、`static` 字典或本地文件不能作为任务完成事实源。
+
+## V8.Vision
+
+`V8.Vision` 是绑定当前租户的通用视觉原子能力。它负责有界图片解码、宿主已安装 ONNX 流水线的检测/分割、人脸对齐、对象级特征、HNSW 近邻检索、IoU 跟踪和连续帧投票；对象/商品/人员表、匹配状态、AI 回退和业务 Hook 均由接口引擎编排。完整架构、后台资源、模型与人脸治理见[视觉引擎](../system-engine/vision-engine.md)。
+
+```javascript
+var analyzed = await V8.Vision.Analyze({
+  FileByteBase64: V8.FilesByteBase64['frame'],
+  FileName: 'camera-frame.jpg',
+  PipelineKey: 'general-yolox-dinov2-v1',
+  Mode: 'General',
+  FrameId: 'scale-01-000123',
+  StreamSessionId: 'scale-01-session-42',
+  FrameSequence: 123
+});
+
+if (!analyzed || analyzed.Code !== 1) return analyzed;
+
+var ranked = await V8.Vision.Search({
+  QueryEmbeddingBase64: analyzed.Data.Detections[0].EmbeddingBase64,
+  Candidates: [
+    { Key: 'sample-id', Name: '鲤鱼', EmbeddingBase64: '...' }
+  ],
+  Threshold: 0.82,
+  TopK: 5,
+  EfSearch: 80,
+  IndexKey: 'ready-general-samples'
+});
+
+var stable = await V8.Vision.Stabilize({
+  StreamSessionId: 'scale-01-session-42',
+  FrameId: 'scale-01-000123',
+  Key: ranked.Data.Matches.length ? ranked.Data.Matches[0].Key : '__unmatched__',
+  Confidence: ranked.Data.Matches.length ? ranked.Data.Matches[0].Similarity : 0,
+  WindowSize: 5,
+  MinimumVotes: 3
+});
+```
+
+| 方法 | 返回 | 说明 |
+|---|---|---|
+| `Analyze(param)` | `Promise<DosResult<MicroiVisionAnalyzeResult>>` | 检测/分割、逐目标嵌入、Face 五点对齐与 TrackId；返回对象框而不暴露模型路径 |
+| `Search(param)` | `Promise<DosResult<MicroiVisionSearchResult>>` | HNSW Top-K 检索，索引按租户和候选指纹缓存，小集合精确回退 |
+| `Stabilize(param)` | `Promise<DosResult<MicroiVisionStabilizeResult>>` | 按租户、StreamSessionId 与 TrackId 执行有界连续帧投票 |
+| `Extract(param)` | `Promise<DosResult<MicroiVisionExtractResult>>` | 单张 JPEG/PNG/WebP 特征；包含模型、尺寸、质量、耗时、向量和警告 |
+| `ExtractBatch(param)` | `Promise<DosResult<MicroiVisionFrameBatchResult>>` | 有界帧批次；宿主默认最多 12 帧 |
+| `Compare(param)` | `Promise<DosResult<MicroiVisionCompareResult>>` | 两个同维向量的余弦相似度与是否达阈值 |
+| `CompareBatch(param)` | `Promise<DosResult<MicroiVisionCompareBatchResult>>` | 候选集排序、TopK 与命中标记 |
+| `GetCapabilities()` | `DosResult<MicroiVisionCapabilitiesResult>` | 模型 Key、版本、任务类型、许可证、就绪状态与硬上限 |
+
+调用方不能传模型文件路径、模型目录、执行提供程序、网络地址或 `OsClient`。`ModelKey/PipelineKey` 只能解析到可信宿主模型目录中的单层安全名称，并校验 `model.json` 与每个 ONNX 文件 SHA-256。执行提供程序由宿主已安装运行时与受控描述符决定，支持 CPU、CUDA、TensorRT、OpenVINO、DirectML 的安全回退；调用方不能覆盖。`Face` 模式必须使用 FaceDetection + FaceEmbedding 流水线；内置指纹仅保留联调能力，不能用于生产身份判断。
+
+一般业务不要直接把公开向量发到浏览器，而应调用官方 `platform-vision-runtime`：它从当前租户样本库读取候选，在数据库未命中时先返回 `AiPending`，再通过持久后台任务调用 Microi.AI。特征向量使用接口引擎绑定的保护能力保存，公开响应和租户 Hook 不包含向量、图片或 AI 提示词。
 
 ## V8.Office
 

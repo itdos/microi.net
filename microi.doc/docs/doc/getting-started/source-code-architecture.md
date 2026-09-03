@@ -95,7 +95,8 @@ platform-service-release.json 指定的独立 Git 源码根
 | `Microi.SearchEngine` | Elasticsearch 查询、排序、索引帮助器 | [搜索引擎](/doc/system-engine/search-engine) |
 | `Microi.Spider` | 采集任务与浏览器 Worker 的后端协调 | [采集引擎](/doc/system-engine/spider-engine) |
 | `Microi.Office` | Excel、Word、PowerPoint、邮件与模板导出 | [Office](/doc/more/office) |
-| `Microi.OCR` | 租户绑定的 OCR 网关，模型服务地址与密钥保留在可信后端 | [OCR 与 V8.OCR](/doc/v8-engine/v8-server#v8-ocr) |
+| `Microi.OCR` | 租户绑定的 OCR 网关，模型服务地址与密钥保留在可信后端 | [OCR 识别引擎](/doc/system-engine/ocr-engine) |
+| `Microi.Vision` | ONNX Runtime 通用视觉特征、连续帧与向量比较原子能力 | [视觉引擎](/doc/system-engine/vision-engine) |
 | `Microi.Captcha` | 登录验证码生成与可选识别适配 | [安全基线](/doc/more/security) |
 | `Microi.WeChat` | 公众号、小程序、模板消息等微信能力 | [消息通知](/doc/system-engine/message-notification) |
 | `Microi.Upgrade` | 应用商城运行前必需的物理兼容、协议与核心种子升级 | [应用商城](/doc/system-engine/app-store) |

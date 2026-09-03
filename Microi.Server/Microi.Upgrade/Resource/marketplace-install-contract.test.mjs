@@ -388,7 +388,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.equal(engineSourceVersion(importerSource), "v2.6.8");
+  assert.equal(engineSourceVersion(importerSource), "v2.7.1");
   assert.match(importerSource, /MARKETPLACE_CUSTOM_ENGINE_ROUTE_V2/);
   assert.match(importerSource, /storeApiBase \+ '\/apiengine\/'/);
   assert.doesNotMatch(importerSource, /\/api\/ApiEngine\/Run/);

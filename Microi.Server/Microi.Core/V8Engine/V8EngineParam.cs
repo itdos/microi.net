@@ -156,6 +156,12 @@ namespace Microi.net
         public IV8Ocr OCR { get; set; }
 
         /// <summary>
+        /// 当前租户绑定的通用视觉推理原子能力。业务表匹配、AI 回退、状态机与 Hook
+        /// 由接口引擎编排，V8 不能提交模型文件路径或执行提供程序。
+        /// </summary>
+        public IV8Vision Vision { get; set; }
+
+        /// <summary>
         /// 当前 V8 执行租户和登录用户绑定的 AI 能力。脚本只能选择当前租户已启用的
         /// 模型，不能覆盖 OsClient、CurrentUser、Endpoint 或 ApiKey。
         /// </summary>

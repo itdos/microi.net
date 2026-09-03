@@ -17,12 +17,12 @@ namespace Microi.net
     /// </summary>
     public sealed class FileUploadSecurityOptions
     {
-        public const int DefaultMaxFileMegabytes = 100;
-        public const int DefaultMaxTotalMegabytes = 200;
+        public const int DefaultMaxFileMegabytes = 500;
+        public const int DefaultMaxTotalMegabytes = 500;
         public const int DefaultMaxFileCount = 10;
         public const int DefaultDailyUserQuotaMegabytes = 2048;
         public const int DefaultDailyTenantQuotaMegabytes = 20480;
-        public const int DefaultAbsoluteMaxFileMegabytes = 1024;
+        public const int DefaultAbsoluteMaxFileMegabytes = 2048;
         public const int DefaultAbsoluteMaxTotalMegabytes = 2048;
         public const int DefaultAbsoluteMaxFileCount = 100;
         public const int DefaultAbsoluteDailyQuotaMegabytes =

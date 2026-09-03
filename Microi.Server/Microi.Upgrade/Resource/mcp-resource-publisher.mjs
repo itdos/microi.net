@@ -624,6 +624,64 @@ async function readManagedSourceHashes(client, projections) {
   return hashes;
 }
 
+function getManagedProjectionMismatch(projection, current, sourceHash) {
+  if (!current) return { kind: 'missing' };
+  const expected = buildExpectedLiveEngine(projection.engine);
+  for (const fieldName of ['Id', 'IsDeleted', ...liveApiEngineFields]) {
+    if (expected[fieldName] == null) continue;
+    if (normalizeComparableLiveValue(fieldName, current[fieldName])
+        !== normalizeComparableLiveValue(fieldName, expected[fieldName])) {
+      return { kind: 'field', fieldName };
+    }
+  }
+  const expectedSourceHash = createHash('sha256')
+    .update(String(projection.engine?.ApiV8Code || ''), 'utf8')
+    .digest('hex');
+  if (sourceHash !== expectedSourceHash) return { kind: 'source', expectedSourceHash };
+  return null;
+}
+
+function getMismatchedManagedProjections(projections, byKey, sourceHashes) {
+  return projections.filter(projection => projection.policy === 'Managed'
+    && getManagedProjectionMismatch(
+      projection,
+      byKey.get(projection.key.toLowerCase()),
+      sourceHashes.get(projection.key.toLowerCase()),
+    ));
+}
+
+async function recheckMismatchedManagedProjections(client, projections, byKey, sourceHashes) {
+  let remaining = getMismatchedManagedProjections(projections, byKey, sourceHashes);
+  const maxRounds = 2;
+  // 全量摘要扫描可能持续数分钟：排在前面的 Key 会先读到事务提交前的旧缓存，
+  // 而投影事务在扫描末尾才变得可见。最终阶段只复核仍不一致的 Managed Key，
+  // 每轮仍执行完整字段与源码 SHA 比较；有界复核耗尽后继续严格失败关闭。
+  for (let round = 1; round <= maxRounds && remaining.length; round++) {
+    const refreshedHashes = await readManagedSourceHashes(client, remaining);
+    for (const [key, hash] of refreshedHashes) sourceHashes.set(key, hash);
+
+    // 源码摘要已等待到期望值后再读元数据，可避免同一轮内先缓存旧字段、
+    // 后观察到新源码所造成的交叉时点假不一致。
+    const refreshedRows = await readLiveEngineMetadata(client, remaining);
+    const expectedKeys = new Set(remaining.map(item => item.key.toLowerCase()));
+    const refreshedKeys = new Set();
+    for (const row of refreshedRows) {
+      const key = String(row?.ApiEngineKey || '').trim().toLowerCase();
+      if (!key || !expectedKeys.has(key) || refreshedKeys.has(key)) {
+        throw new Error(`官网 live 接口最终复核存在空 Key、越界 Key 或重复 Key：${key || '(空)'}`);
+      }
+      refreshedKeys.add(key);
+      byKey.set(key, row);
+    }
+
+    remaining = getMismatchedManagedProjections(remaining, byKey, sourceHashes);
+    if (round < maxRounds && remaining.length) {
+      await new Promise(resolvePromise => setTimeout(resolvePromise, round * 1500));
+    }
+  }
+  return remaining;
+}
+
 async function recoverReconcileAfterAmbiguousTimeout(client, snapshots, originalError) {
   if (!/(?:HTTP\s*524|Origin Time-out|timed?\s*out|timeout)/i.test(String(originalError?.message || ''))) {
     throw originalError;
@@ -639,6 +697,7 @@ async function recoverReconcileAfterAmbiguousTimeout(client, snapshots, original
     if (!key || byKey.has(key)) throw new Error(`官网 live 接口超时回读存在空 Key 或重复 Key：${key || '(空)'}`);
     byKey.set(key, row);
   }
+  await recheckMismatchedManagedProjections(client, projections, byKey, sourceHashes);
   const projectionRows = [];
   for (const projection of projections) {
     const normalizedKey = projection.key.toLowerCase();
@@ -646,16 +705,17 @@ async function recoverReconcileAfterAmbiguousTimeout(client, snapshots, original
     if (!current) throw new Error(`官网 live 接口超时回读缺少：${projection.key}`, { cause: originalError });
     if (projection.policy === 'Managed') {
       const expected = buildExpectedLiveEngine(projection.engine);
-      for (const fieldName of ['Id', 'IsDeleted', ...liveApiEngineFields]) {
-        if (expected[fieldName] == null) continue;
-        if (normalizeComparableLiveValue(fieldName, current[fieldName])
-            !== normalizeComparableLiveValue(fieldName, expected[fieldName])) {
-          throw new Error(`官网 Managed 接口超时回读不一致：${projection.key}.${fieldName}`, { cause: originalError });
-        }
-      }
       const expectedSourceHash = createHash('sha256')
         .update(String(projection.engine.ApiV8Code || ''), 'utf8').digest('hex');
-      if (sourceHashes.get(normalizedKey) !== expectedSourceHash) {
+      const mismatch = getManagedProjectionMismatch(
+        projection,
+        current,
+        sourceHashes.get(normalizedKey),
+      );
+      if (mismatch?.kind === 'field') {
+        throw new Error(`官网 Managed 接口超时回读不一致：${projection.key}.${mismatch.fieldName}`, { cause: originalError });
+      }
+      if (mismatch?.kind === 'source') {
         throw new Error(`官网 Managed 接口超时回读源码不一致：${projection.key}`, { cause: originalError });
       }
       projectionRows.push(

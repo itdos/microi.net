@@ -432,13 +432,68 @@ namespace Dos.ORM.SeedConversion
             }
             if (table.PrimaryKey.Count > 0)
             {
-                Output.Write("  PRIMARY KEY (");
+                Output.Write("  PRIMARY KEY ");
+                if (RequiresNonClusteredPrimaryKey(table))
+                {
+                    Output.Write("NONCLUSTERED ");
+                }
+                Output.Write('(');
                 WriteColumnList(table.PrimaryKey);
                 Output.WriteLine(")");
             }
             Output.WriteLine(");");
             Output.WriteLine("GO");
             Output.WriteLine();
+        }
+
+        private static bool RequiresNonClusteredPrimaryKey(SeedTable table)
+        {
+            long maximumBytes = 0;
+            foreach (var keyColumn in table.PrimaryKey)
+            {
+                if (!table.ColumnsByName.TryGetValue(keyColumn.Name, out var column))
+                {
+                    throw new InvalidDataException(
+                        "Primary-key column '" + keyColumn.Name + "' does not exist on table '"
+                        + table.Name + "'.");
+                }
+                maximumBytes += SqlServerMaximumKeyBytes(column.Type);
+            }
+
+            // SQL Server 2022 permits at most 900 bytes for a clustered index key and
+            // 1700 bytes for a nonclustered index key. MySQL varchar columns are mapped
+            // to NVARCHAR to preserve Unicode, which doubles their declared key width.
+            // Keep ordinary compact primary keys clustered, but use a nonclustered PK
+            // for valid wider keys (notably the standard Quartz composite identities).
+            if (maximumBytes > 1700)
+            {
+                throw new InvalidDataException(
+                    "SQL Server primary key on table '" + table.Name
+                    + "' can require " + maximumBytes.ToString(CultureInfo.InvariantCulture)
+                    + " bytes, exceeding the 1700-byte nonclustered-index limit.");
+            }
+            return maximumBytes > 900;
+        }
+
+        private static int SqlServerMaximumKeyBytes(SeedColumnType type)
+        {
+            switch (type.Name)
+            {
+                case "char":
+                case "varchar":
+                    return checked(type.Arguments[0] * 2);
+                case "tinyint":
+                case "smallint": return 2;
+                case "int": return 4;
+                case "bigint":
+                case "datetime": return 8;
+                case "bit": return 1;
+                case "decimal":
+                    var precision = type.Arguments[0];
+                    return precision <= 9 ? 5 : precision <= 19 ? 9 : precision <= 28 ? 13 : 17;
+                default:
+                    throw UnsupportedType(type);
+            }
         }
 
         protected override void WriteInsert(SeedInsert insert)

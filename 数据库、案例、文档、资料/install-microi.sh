@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-31 16:50:42
+# 版本：v2026-09-03 16:20:00
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -30,7 +30,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-31 16:50:42"
+SCRIPT_VERSION="v2026-09-03 16:20:00"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -4719,7 +4719,12 @@ ensure_runtime_main_tenant() {
   local insert_sql=""
   local update_sql=""
   local verify_sql=""
+  local official_template_state_sql=""
+  local official_template_claim_sql=""
+  local official_template_disable_sql=""
+  local official_template_verify_sql=""
   local state_readback=""
+  local official_template_readback=""
   local tenant_id=""
 
   ensure_runtime_auth_secret_schema || return 1
@@ -4729,20 +4734,62 @@ ensure_runtime_main_tenant() {
       state_sql="SELECT CASE COUNT(*) WHEN 0 THEN 'MICROI_MAIN_TENANT_MISSING' WHEN 1 THEN 'MICROI_MAIN_TENANT_UNIQUE' ELSE CONCAT('MICROI_MAIN_TENANT_DUPLICATE:', COUNT(*)) END AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
       update_sql="UPDATE sys_osclients SET ClientName='${OS_CLIENT}', AuthSecret=CASE WHEN AuthSecret IS NULL OR CHAR_LENGTH(TRIM(AuthSecret))<32 OR LOWER(TRIM(AuthSecret))=LOWER('${OS_CLIENT}') THEN '${AUTH_SECRET}' ELSE AuthSecret END WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
       verify_sql="SELECT 'MICROI_MAIN_TENANT_READY' AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND ClientName='${OS_CLIENT}' AND CHAR_LENGTH(TRIM(AuthSecret))>=32 AND LOWER(TRIM(AuthSecret))<>LOWER('${OS_CLIENT}') AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 GROUP BY OsClient,ClientName,OsClientType,OsClientNetwork HAVING COUNT(*)=1;"
+      official_template_state_sql="SELECT CASE COUNT(*) WHEN 0 THEN 'MICROI_OFFICIAL_TEMPLATE_MISSING' WHEN 1 THEN 'MICROI_OFFICIAL_TEMPLATE_UNIQUE' ELSE CONCAT('MICROI_OFFICIAL_TEMPLATE_DUPLICATE:', COUNT(*)) END AS Marker FROM sys_osclients WHERE LOWER(COALESCE(OsClient,''))='itdos' AND UPPER(COALESCE(OsClientType,''))='PRODUCT' AND UPPER(COALESCE(OsClientNetwork,''))='INTERNAL' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
+      official_template_claim_sql="UPDATE sys_osclients SET OsClient='${OS_CLIENT}',ClientName='${OS_CLIENT}',OsClientType='${RUNTIME_OS_CLIENT_TYPE}',OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}',IsEnable=1,IsDeleted=0 WHERE LOWER(COALESCE(OsClient,''))='itdos' AND UPPER(COALESCE(OsClientType,''))='PRODUCT' AND UPPER(COALESCE(OsClientNetwork,''))='INTERNAL' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
+      official_template_disable_sql="UPDATE sys_osclients SET IsEnable=0 WHERE LOWER(COALESCE(OsClient,''))='itdos' AND IFNULL(IsDeleted,0)=0 AND NOT (LOWER(COALESCE(OsClient,''))=LOWER('${OS_CLIENT}') AND UPPER(COALESCE(OsClientType,''))='PRODUCT' AND UPPER(COALESCE(OsClientNetwork,''))='INTERNAL');"
+      official_template_verify_sql="SELECT CASE COUNT(*) WHEN 0 THEN 'MICROI_OFFICIAL_TEMPLATE_RESIDUE_ZERO' ELSE CONCAT('MICROI_OFFICIAL_TEMPLATE_RESIDUE:', COUNT(*)) END AS Marker FROM sys_osclients WHERE LOWER(COALESCE(OsClient,''))='itdos' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 AND NOT (LOWER(COALESCE(OsClient,''))=LOWER('${OS_CLIENT}') AND UPPER(COALESCE(OsClientType,''))='PRODUCT' AND UPPER(COALESCE(OsClientNetwork,''))='INTERNAL');"
       ;;
     3)
       state_sql="SELECT CASE COUNT(*) WHEN 0 THEN N'MICROI_MAIN_TENANT_MISSING' WHEN 1 THEN N'MICROI_MAIN_TENANT_UNIQUE' ELSE N'MICROI_MAIN_TENANT_DUPLICATE:' + CONVERT(nvarchar(20), COUNT(*)) END AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
       update_sql="UPDATE [dbo].[sys_osclients] SET [ClientName]=N'${OS_CLIENT}', [AuthSecret]=CASE WHEN [AuthSecret] IS NULL OR LEN(LTRIM(RTRIM([AuthSecret])))<32 OR LOWER(LTRIM(RTRIM([AuthSecret])))=LOWER(N'${OS_CLIENT}') THEN N'${AUTH_SECRET}' ELSE [AuthSecret] END WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
       verify_sql="SELECT N'MICROI_MAIN_TENANT_READY' AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [ClientName]=N'${OS_CLIENT}' AND LEN(LTRIM(RTRIM([AuthSecret])))>=32 AND LOWER(LTRIM(RTRIM([AuthSecret])))<>LOWER(N'${OS_CLIENT}') AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 GROUP BY [OsClient],[ClientName],[OsClientType],[OsClientNetwork] HAVING COUNT(*)=1;"
+      official_template_state_sql="SELECT CASE COUNT(*) WHEN 0 THEN N'MICROI_OFFICIAL_TEMPLATE_MISSING' WHEN 1 THEN N'MICROI_OFFICIAL_TEMPLATE_UNIQUE' ELSE N'MICROI_OFFICIAL_TEMPLATE_DUPLICATE:' + CONVERT(nvarchar(20), COUNT(*)) END AS Marker FROM [dbo].[sys_osclients] WHERE LOWER(COALESCE([OsClient],N''))=N'itdos' AND UPPER(COALESCE([OsClientType],N''))=N'PRODUCT' AND UPPER(COALESCE([OsClientNetwork],N''))=N'INTERNAL' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
+      official_template_claim_sql="UPDATE [dbo].[sys_osclients] SET [OsClient]=N'${OS_CLIENT}',[ClientName]=N'${OS_CLIENT}',[OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}',[OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}',[IsEnable]=1,[IsDeleted]=0 WHERE LOWER(COALESCE([OsClient],N''))=N'itdos' AND UPPER(COALESCE([OsClientType],N''))=N'PRODUCT' AND UPPER(COALESCE([OsClientNetwork],N''))=N'INTERNAL' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
+      official_template_disable_sql="UPDATE [dbo].[sys_osclients] SET [IsEnable]=0 WHERE LOWER(COALESCE([OsClient],N''))=N'itdos' AND COALESCE([IsDeleted],0)=0 AND NOT (LOWER(COALESCE([OsClient],N''))=LOWER(N'${OS_CLIENT}') AND UPPER(COALESCE([OsClientType],N''))=N'PRODUCT' AND UPPER(COALESCE([OsClientNetwork],N''))=N'INTERNAL');"
+      official_template_verify_sql="SELECT CASE COUNT(*) WHEN 0 THEN N'MICROI_OFFICIAL_TEMPLATE_RESIDUE_ZERO' ELSE N'MICROI_OFFICIAL_TEMPLATE_RESIDUE:' + CONVERT(nvarchar(20), COUNT(*)) END AS Marker FROM [dbo].[sys_osclients] WHERE LOWER(COALESCE([OsClient],N''))=N'itdos' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 AND NOT (LOWER(COALESCE([OsClient],N''))=LOWER(N'${OS_CLIENT}') AND UPPER(COALESCE([OsClientType],N''))=N'PRODUCT' AND UPPER(COALESCE([OsClientNetwork],N''))=N'INTERNAL');"
       ;;
     5|6)
       state_sql="SELECT CASE COUNT(*) WHEN 0 THEN 'MICROI_MAIN_TENANT_MISSING' WHEN 1 THEN 'MICROI_MAIN_TENANT_UNIQUE' ELSE 'MICROI_MAIN_TENANT_DUPLICATE:' || CAST(COUNT(*) AS varchar(20)) END AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
       update_sql="UPDATE \"sys_osclients\" SET \"ClientName\"='${OS_CLIENT}', \"AuthSecret\"=CASE WHEN \"AuthSecret\" IS NULL OR LENGTH(TRIM(\"AuthSecret\"))<32 OR LOWER(TRIM(\"AuthSecret\"))=LOWER('${OS_CLIENT}') THEN '${AUTH_SECRET}' ELSE \"AuthSecret\" END WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
       verify_sql="SELECT 'MICROI_MAIN_TENANT_READY' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"ClientName\"='${OS_CLIENT}' AND LENGTH(TRIM(\"AuthSecret\"))>=32 AND LOWER(TRIM(\"AuthSecret\"))<>LOWER('${OS_CLIENT}') AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"ClientName\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+      official_template_state_sql="SELECT CASE COUNT(*) WHEN 0 THEN 'MICROI_OFFICIAL_TEMPLATE_MISSING' WHEN 1 THEN 'MICROI_OFFICIAL_TEMPLATE_UNIQUE' ELSE 'MICROI_OFFICIAL_TEMPLATE_DUPLICATE:' || CAST(COUNT(*) AS varchar(20)) END AS Marker FROM \"sys_osclients\" WHERE LOWER(COALESCE(\"OsClient\",''))='itdos' AND UPPER(COALESCE(\"OsClientType\",''))='PRODUCT' AND UPPER(COALESCE(\"OsClientNetwork\",''))='INTERNAL' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
+      official_template_claim_sql="UPDATE \"sys_osclients\" SET \"OsClient\"='${OS_CLIENT}',\"ClientName\"='${OS_CLIENT}',\"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}',\"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}',\"IsEnable\"=1,\"IsDeleted\"=0 WHERE LOWER(COALESCE(\"OsClient\",''))='itdos' AND UPPER(COALESCE(\"OsClientType\",''))='PRODUCT' AND UPPER(COALESCE(\"OsClientNetwork\",''))='INTERNAL' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
+      official_template_disable_sql="UPDATE \"sys_osclients\" SET \"IsEnable\"=0 WHERE LOWER(COALESCE(\"OsClient\",''))='itdos' AND COALESCE(\"IsDeleted\",0)=0 AND NOT (LOWER(COALESCE(\"OsClient\",''))=LOWER('${OS_CLIENT}') AND UPPER(COALESCE(\"OsClientType\",''))='PRODUCT' AND UPPER(COALESCE(\"OsClientNetwork\",''))='INTERNAL');"
+      official_template_verify_sql="SELECT CASE COUNT(*) WHEN 0 THEN 'MICROI_OFFICIAL_TEMPLATE_RESIDUE_ZERO' ELSE 'MICROI_OFFICIAL_TEMPLATE_RESIDUE:' || CAST(COUNT(*) AS varchar(20)) END AS Marker FROM \"sys_osclients\" WHERE LOWER(COALESCE(\"OsClient\",''))='itdos' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 AND NOT (LOWER(COALESCE(\"OsClient\",''))=LOWER('${OS_CLIENT}') AND UPPER(COALESCE(\"OsClientType\",''))='PRODUCT' AND UPPER(COALESCE(\"OsClientNetwork\",''))='INTERNAL');"
       ;;
   esac
 
   state_readback=$(database_exec_sql "${state_sql}" 2>&1 || true)
+  if [ "${SQL_SOURCE_MODE}" = 'official' ] \
+    && printf '%s\n' "${state_readback}" | grep -q 'MICROI_MAIN_TENANT_MISSING'; then
+    official_template_readback=$(database_exec_sql "${official_template_state_sql}" 2>&1 || true)
+    if ! printf '%s\n' "${official_template_readback}" | grep -q 'MICROI_OFFICIAL_TEMPLATE_UNIQUE'; then
+      echo 'Microi：错误：官方空数据库缺少唯一的 iTdos/Product/Internal 主租户模板，已停止安装。'
+      printf '%s\n' "${official_template_readback}" | tail -20
+      return 1
+    fi
+    if ! database_exec_sql "${official_template_claim_sql}" > /dev/null; then
+      echo "Microi：错误：无法把官方空数据库模板认领为 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK}。"
+      return 1
+    fi
+    echo "Microi：已把官方空数据库主租户模板原位认领为 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} ✓"
+  fi
+
+  if [ "${SQL_SOURCE_MODE}" = 'official' ]; then
+    if ! database_exec_sql "${official_template_disable_sql}" > /dev/null; then
+      echo 'Microi：错误：停用旧版官方空数据库遗留的其它空租户模板失败。'
+      return 1
+    fi
+    official_template_readback=$(database_exec_sql "${official_template_verify_sql}" 2>&1 || true)
+    if ! printf '%s\n' "${official_template_readback}" | grep -q 'MICROI_OFFICIAL_TEMPLATE_RESIDUE_ZERO'; then
+      echo 'Microi：错误：官方空数据库仍存在启用但未被认领的 iTdos 空租户模板。'
+      printf '%s\n' "${official_template_readback}" | tail -20
+      return 1
+    fi
+    echo 'Microi：旧版官方包中的其它 iTdos 空租户模板已停用并回读为零 ✓'
+    state_readback=$(database_exec_sql "${state_sql}" 2>&1 || true)
+  fi
+
   if printf '%s\n' "${state_readback}" | grep -q 'MICROI_MAIN_TENANT_DUPLICATE:'; then
     echo "Microi：错误：活动主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} 存在多条，无法安全选择。"
     echo 'Microi：请先恢复原始数据库备份或人工合并重复主租户；安装器不会删除或覆盖不明确的数据。'
@@ -4785,7 +4832,7 @@ ensure_runtime_main_tenant() {
     echo 'Microi：错误：主租户创建/更新后回读不唯一，已停止后续安装。'
     return 1
   fi
-  echo "Microi：主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} 已唯一就绪，JWT AuthSecret 已持久化且原有子租户保持不变 ✓"
+  echo "Microi：主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} 已唯一就绪，JWT AuthSecret 已持久化；自定义恢复库中的原有子租户保持不变 ✓"
 }
 
 if { [ "${DATABASE_CHOICE}" = "1" ] || [ "${DATABASE_CHOICE}" = "2" ]; } \

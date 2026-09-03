@@ -13,6 +13,22 @@ public class FileUploadSecurityTests
     };
 
     [Fact]
+    public void PlatformDefaults_AllowFiveHundredMegabytes_AndTenantCanRaiseToTwoGigabytes()
+    {
+        var defaults = FileUploadSecurityOptions.Load();
+        Assert.Equal(500L * 1024 * 1024, defaults.MaxFileBytes);
+        Assert.Equal(500L * 1024 * 1024, defaults.MaxTotalBytes);
+
+        var twoGigabytes = FileUploadSecurityOptions.Load(new JObject
+        {
+            ["FileUploadMaxFileMB"] = 2048,
+            ["FileUploadMaxRequestMB"] = 2048
+        });
+        Assert.Equal(2048L * 1024 * 1024, twoGigabytes.MaxFileBytes);
+        Assert.Equal(2048L * 1024 * 1024, twoGigabytes.MaxTotalBytes);
+    }
+
+    [Fact]
     public void LegacyOrdinaryUserPolicy_ForcesPrivateAndAllowsOnlyKnownRoot()
     {
         var param = new DiyUploadParam

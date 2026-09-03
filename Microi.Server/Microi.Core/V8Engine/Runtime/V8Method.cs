@@ -881,11 +881,54 @@ namespace Microi.net
                         authorization.Msg);
                 }
 
+                var authorizedUserId = userId.Trim();
+                var authorizedTenant = authorization.Data;
+                var currentTrans = V8TenantContext.CurrentDbTrans;
+                if (currentTrans != null && !currentTrans.IsCommitOrRollback)
+                {
+                    // SubmitAfterServerV8 is still inside the caller-owned transaction.
+                    // RefreshLoginUser opens an authoritative primary-database session to
+                    // rebuild role limits. On SQL Server that second session must not read
+                    // sys_rolelimit while the first session still owns its insert/update
+                    // locks, otherwise the request waits until the command timeout. Run the
+                    // already-authorized refresh only after a successful commit; rollback
+                    // intentionally discards the callback.
+                    currentTrans.RegisterAfterCommit(() =>
+                    {
+                        try
+                        {
+                            var refreshResult = new SysUserLogic()
+                                .RefreshLoginUser(authorizedUserId, authorizedTenant)
+                                .GetAwaiter()
+                                .GetResult();
+                            if (refreshResult.Code != 1)
+                            {
+                                Console.WriteLine(
+                                    $"Microi：【Warning】租户[{authorizedTenant}]提交后刷新登录身份失败：{refreshResult.Msg}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(
+                                $"Microi：【Warning】租户[{authorizedTenant}]提交后刷新登录身份异常：{ex.GetType().Name}");
+                        }
+                    });
+                    return new DosResult<dynamic>(
+                        1,
+                        new
+                        {
+                            OsClient = authorizedTenant,
+                            UserId = authorizedUserId,
+                            ScheduledAfterCommit = true
+                        },
+                        "登录身份刷新已登记，将在事务提交成功后生效。");
+                }
+
                 // SysUserLogic owns role/permission enrichment and preserves the
                 // existing cache record. It now receives and uses only the canonical,
                 // authorized tenant for both the query and the cache key.
                 return new SysUserLogic()
-                    .RefreshLoginUser(userId.Trim(), authorization.Data)
+                    .RefreshLoginUser(authorizedUserId, authorizedTenant)
                     .GetAwaiter()
                     .GetResult();
             }

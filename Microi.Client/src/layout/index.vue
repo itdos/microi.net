@@ -38,6 +38,7 @@ import { useDiyStore, useAppStore, useSettingsStore, usePermissionStore } from "
 import { computed, shallowRef, markRaw } from "vue";
 import { loadAppContainer, getAppContainerSync } from "@/utils/webos-detect.js";
 import { isEmbeddedWebosWindowRuntime } from "@/utils/webos-embedded-runtime.js";
+import { DiyCommon } from "@/utils/microi.net.import";
 
 export default {
     name: "Layout",
@@ -113,7 +114,7 @@ export default {
         hideShellForAnonymous() {
             const routeRequiresHiddenShell = this.$route?.matched?.some((record) => record.meta?.hideShellForAnonymous === true);
             if (!routeRequiresHiddenShell) return false;
-            const token = this.diyStore.Token || "";
+            const token = DiyCommon.getToken();
             const user = this.diyStore.GetCurrentUser || {};
             return !token || !user.Id;
         }

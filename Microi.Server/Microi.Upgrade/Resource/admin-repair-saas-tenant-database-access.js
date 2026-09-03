@@ -3,8 +3,8 @@
  * 所属官方应用：SaaS引擎
  * ApiEngineKey：admin_repair_saas_tenant_database_access
  * 从可信吾码官方应用源安装、更新或重新安装“SaaS引擎”，都会以官方源码恢复此 Managed 接口。
- * 可维护扩展为 platform-runtime-custom-hook（CreateIfMissing）；数据库连接修复属于可信安全边界，
- * 本接口不会调用该 Hook，禁止在 Hook 或本接口中接收、读取、记录、返回任何数据库秘密。
+ * 强烈建议仅修改该应用声明的 CreateIfMissing 个性化 Hook；若当前阶段没有 Hook，
+ * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
 /* V8 ApiEngine | ApiEngineKey: admin_repair_saas_tenant_database_access | Version: v1.0.3 */

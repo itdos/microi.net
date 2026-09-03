@@ -271,7 +271,7 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
-    public void OfficialInstaller_CreatesOnlyTheMissingExactMainTenant()
+    public void OfficialInstaller_ClaimsCanonicalTemplateAndPreservesCustomRestoreTenants()
     {
         var root = FindRepositoryRoot();
         var source = File.ReadAllText(Path.Combine(
@@ -285,8 +285,16 @@ public class SaaSRuntimeConfigurationTests
         Assert.Contains("generate_random_auth_secret", source);
         Assert.Contains("AuthSecret=CASE WHEN", source);
         Assert.Contains("JWT AuthSecret 已持久化", source);
-        Assert.DoesNotContain(
-            "UPDATE sys_osclients SET OsClient='${OS_CLIENT}'",
+        Assert.Contains("MICROI_OFFICIAL_TEMPLATE_UNIQUE", source);
+        Assert.Contains("MICROI_OFFICIAL_TEMPLATE_RESIDUE_ZERO", source);
+        Assert.Contains("[ \"${SQL_SOURCE_MODE}\" = 'official' ]", source);
+        Assert.Contains("已把官方空数据库主租户模板原位认领", source);
+        Assert.Contains("自定义恢复库中的原有子租户保持不变", source);
+        Assert.Matches(
+            @"official_template_claim_sql=.*OsClient=.*OS_CLIENT.*OsClientType=.*RUNTIME_OS_CLIENT_TYPE.*OsClientNetwork=.*RUNTIME_OS_CLIENT_NETWORK",
+            source);
+        Assert.Matches(
+            @"official_template_disable_sql=.*IsEnable=0.*OsClient.*itdos",
             source);
         Assert.Matches(
             @"INSERT INTO sys_osclients \(Id,OsClient,ClientName,OsClientType,OsClientNetwork,IsEnable,IsDeleted\)",
@@ -644,6 +652,92 @@ public class SaaSRuntimeConfigurationTests
         Assert.Contains("_TrustedServerInvocation = true", upgradeSafetySource);
         Assert.Contains("new DiyTableParam", upgradeSafetySource);
         Assert.Contains("DiyFieldParam param", upgradeSafetySource);
+    }
+
+    [Fact]
+    public void AddDiyTable_InternalMetadataWritesDoNotReenterClientFormEvents()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Core", "FormEngine", "FormEngine.cs"));
+        var start = source.IndexOf(
+            "public async Task<DosResult> AddDiyTable",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            "public async Task<DosResult> DelDiyTable",
+            start,
+            StringComparison.Ordinal);
+
+        Assert.True(start >= 0 && end > start, "AddDiyTable source boundary was not found.");
+        var method = source[start..end];
+        Assert.Matches(
+            "FormEngineKey = \"diy_table\"[\\s\\S]*?_InvokeType = InvokeType\\.Server\\.ToString\\(\\)",
+            method);
+        Assert.Matches(
+            "FormEngineKey = \"diy_field\"[\\s\\S]*?_InvokeType = InvokeType\\.Server\\.ToString\\(\\)",
+            method);
+        Assert.Equal(2, Regex.Matches(
+            method,
+            @"AddFormDataAsync\([\s\S]*?_skipCacheClear:\s*true\)").Count);
+        Assert.Contains(
+            "await InvalidateCreatedDiyTableCaches(osClient, tableId, tableName)",
+            method,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddDiyField_OwnedDdlDoesNotReenterMetadataV8()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Core", "FormEngine", "FormEngine.cs"));
+        var start = source.IndexOf(
+            "public async Task<DosResult> AddDiyField",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            "public async Task<DosResult> UptDiyField",
+            start,
+            StringComparison.Ordinal);
+
+        Assert.True(start >= 0 && end > start, "AddDiyField source boundary was not found.");
+        var method = source[start..end];
+        Assert.Contains("_RunV8Event = \"0\"", method, StringComparison.Ordinal);
+        Assert.Contains("MicroiEngine.ORM(dbInfo.DbType).AddColumn", method, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SqlServerAddColumn_IsIdempotentAndUsesBoundedDdlWaits()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Dos.ORM", "DDL", "Services", "SqlServerService.cs"));
+
+        Assert.Contains("EnterTableDdlGate(param", source, StringComparison.Ordinal);
+        Assert.Contains("PrepareDdlSession(session)", source, StringComparison.Ordinal);
+        Assert.Contains("ColumnExists(session, param.TableName, param.FieldName)", source, StringComparison.Ordinal);
+        Assert.Contains("SET LOCK_TIMEOUT", source, StringComparison.Ordinal);
+        Assert.Contains("IsDuplicateColumnException(ex)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BatchDelete_ReadsEachRowThroughTheCallerOwnedTransaction()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net", "FormEngine", "FormEngineDel.cs"));
+        var start = source.IndexOf(
+            "public async Task<DosResult> DelDiyTableRow",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            "public async Task<DosResult> DelDiyTableRowBatch",
+            start,
+            StringComparison.Ordinal);
+
+        Assert.True(start >= 0 && end > start, "DelDiyTableRow source boundary was not found.");
+        var method = source[start..end];
+        Assert.Matches(
+            @"GetFormDataAsync\(new[\s\S]*?OsClient\s*=\s*param\.OsClient,[\s\S]*?\},\s*trans\)",
+            method);
     }
 
     [Fact]

@@ -25,7 +25,7 @@ namespace Microi.net.Api
     [Route("api/[controller]/[action]")]
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
-    public class HDFSController : Controller
+    public partial class HDFSController : Controller
     {
         /// <summary>
         /// 兼容旧版百度 UEditor 的 /UEditor/Upload 地址。文件处理仍归 HDFS 插件，

@@ -175,7 +175,10 @@ namespace Microi.net
         /// <summary>
         /// 新增一条数据
         /// </summary>
-        Task<DosResult> AddFormDataAsync(dynamic dynamicParam, DbTrans _trans = null);
+        Task<DosResult> AddFormDataAsync(
+            dynamic dynamicParam,
+            DbTrans _trans = null,
+            bool _skipCacheClear = false);
 
         /// <summary>
         /// 新增一条数据（指定表单引擎Key）

@@ -35,6 +35,8 @@ services.AddMicroiOffice();
 services.AddMicroiSpider();
 // 注册 OCR 识别插件。
 services.AddMicroiOCR();
+// 注册通用视觉特征、ONNX 模型与实时帧流识别插件；业务编排仍由接口引擎负责。
+services.AddMicroiVision();
 // 注册 MQ 消息队列插件。
 services.AddMicroiMQ();
 // 注册全文搜索引擎插件。

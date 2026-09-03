@@ -27,11 +27,16 @@ test('PAGE5 starts with the shared AI composer and contains the complete operati
     widgets(page.JsonObj).map(widget => widget.type),
     ['aiengine', 'homeoverview', 'workcenter', 'diycalendar', 'diytable'],
   );
+  const noticeWidget = widgets(page.JsonObj).find(widget => widget.type === 'diytable');
+  assert.deepEqual(noticeWidget.referencePolicy, {
+    onMissing: 'RemoveWidget',
+    reason: '公告模块属于可选首页扩展；目标租户未安装公告表和菜单时移除本组件及空容器',
+  });
   assert.doesNotMatch(JSON.stringify(page.JsonObj), /Microi吾码|吾码平台/);
 });
 
 test('SaaS package delivers PAGE5 by stable-id upsert and declares its client/runtime dependencies', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.8.12');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.8.18');
   const dataSets = packageModel.DataSets.filter(item => (
     String(item.TableName || '').toLowerCase() === 'mic_page'
   ));

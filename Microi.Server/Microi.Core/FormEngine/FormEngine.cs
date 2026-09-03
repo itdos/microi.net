@@ -277,10 +277,7 @@ namespace Microi.net
         public async Task<DosResult> AddDiyTable(dynamic dynamicParam, DbTrans _trans = null)
         {
             var sourceBaseParam = dynamicParam as BaseParam;
-            var sourceWasExternalJson = dynamicParam is JToken;
             JObject param = await DefaultParam(JsonHelper.ToJObject(dynamicParam));
-            var sourceInvokeType = sourceBaseParam?._InvokeType
-                                   ?? param["_InvokeType"].Val<string>();
             var sourceCurrentUser = sourceBaseParam?._CurrentUser
                                     ?? param["_CurrentUser"] as JObject;
             if (param["_Lang"] == null || param["_Lang"].Val<string>().DosIsNullOrWhiteSpace())
@@ -389,18 +386,26 @@ namespace Microi.net
                             Id = tableId,
                             OsClient = osClient,
                             _CurrentUser = sourceCurrentUser,
-                            _InvokeType = sourceWasExternalJson
-                                ? InvokeType.Client.ToString()
-                                : (sourceInvokeType.DosIsNullOrWhiteSpace()
-                                    ? InvokeType.Server.ToString()
-                                    : sourceInvokeType),
+                            // AddDiyTable already owns physical-table creation. This
+                            // nested metadata insert is framework orchestration, not a
+                            // second browser submission. Marking it as Client executes
+                            // diy_table.SubmitAfterServerV8, which calls AddTable again;
+                            // on SQL Server that second transaction blocks while reading
+                            // the uncommitted diy_table row held by this transaction.
+                            _InvokeType = InvokeType.Server.ToString(),
                             _TrustedServerInvocation =
                                 sourceBaseParam?._TrustedServerInvocation == true,
                             _RowModel = (JObject)param.DeepClone()
                         };
+                        // Keep metadata writes inside the caller-owned transaction, but
+                        // defer cache invalidation until all rows are committed.  The
+                        // generic wrapper clears diy_field caches by resolving the parent
+                        // diy_table through a separate connection; SQL Server correctly
+                        // blocks that read behind this transaction's uncommitted row.
                         var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(
                             nestedTableAdd,
-                            trans);
+                            trans,
+                            _skipCacheClear: true);
                         if (addResult.Code != 1)
                         {
                             if (_trans == null)
@@ -430,17 +435,18 @@ namespace Microi.net
                                 FormEngineKey = "diy_field",
                                 OsClient = osClient,
                                 _CurrentUser = sourceCurrentUser,
-                                _InvokeType = sourceWasExternalJson
-                                    ? InvokeType.Client.ToString()
-                                    : (sourceInvokeType.DosIsNullOrWhiteSpace()
-                                        ? InvokeType.Server.ToString()
-                                        : sourceInvokeType),
+                                // Fixed fields are part of the same internal table
+                                // provisioning transaction and must not run client-side
+                                // metadata form events a second time.
+                                _InvokeType = InvokeType.Server.ToString(),
                                 _TrustedServerInvocation =
                                     sourceBaseParam?._TrustedServerInvocation == true,
                                 _RowModel = fixedFieldModel
                             };
-                            var addFixedFieldResult = await MicroiEngine.FormEngine
-                                .AddFormDataAsync(nestedFixedFieldAdd, trans);
+                            var addFixedFieldResult = await MicroiEngine.FormEngine.AddFormDataAsync(
+                                nestedFixedFieldAdd,
+                                trans,
+                                _skipCacheClear: true);
                             if (addFixedFieldResult.Code != 1)
                             {
                                 if (_trans == null)
@@ -450,6 +456,7 @@ namespace Microi.net
                         }
                         if (_trans == null)
                             trans.Commit();
+                        await InvalidateCreatedDiyTableCaches(osClient, tableId, tableName);
                         QueueDiyTableLangSync(osClient, tableName, param["Description"].Val<string>());
                         return new DosResult(1);
                     }
@@ -1058,6 +1065,11 @@ namespace Microi.net
                                 : (sourceInvokeType.DosIsNullOrWhiteSpace()
                                     ? InvokeType.Server.ToString()
                                     : sourceInvokeType),
+                            // AddDiyField itself owns the physical DDL below.  Running
+                            // diy_field.SubmitBeforeServerV8 here calls AddField a second
+                            // time; MySQL happened to tolerate that duplicate, whereas
+                            // SQL Server correctly rejects the repeated ALTER TABLE.
+                            _RunV8Event = "0",
                             _TrustedServerInvocation =
                                 sourceBaseParam?._TrustedServerInvocation == true,
                             _RowModel = (JObject)param.DeepClone()
@@ -1653,6 +1665,37 @@ namespace Microi.net
                     Param = param,
                     StackTrace = ex.StackTrace
                 });
+            }
+        }
+
+        private static async Task InvalidateCreatedDiyTableCaches(
+            string osClient,
+            string tableId,
+            string tableName)
+        {
+            await FormEngineAuthorizationCache.InvalidateAsync(osClient);
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            if (!tableId.DosIsNullOrWhiteSpace())
+            {
+                await cache.RemoveAsync(BuildCacheKey(
+                    osClient,
+                    ":FormData:diy_table:",
+                    tableId));
+                await cache.RemoveAsync(BuildCacheKey(
+                    osClient,
+                    ":FormData:diy_table_field_list:",
+                    tableId));
+            }
+            if (!tableName.DosIsNullOrWhiteSpace())
+            {
+                await cache.RemoveAsync(BuildCacheKey(
+                    osClient,
+                    ":FormData:diy_table:",
+                    tableName));
+                await cache.RemoveAsync(BuildCacheKey(
+                    osClient,
+                    ":FormData:diy_table_field_list:",
+                    tableName));
             }
         }
 

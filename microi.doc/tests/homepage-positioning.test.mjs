@@ -41,10 +41,26 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.match(component, /开箱即可进入业务开发/)
   assert.match(component, /href="\/doc\/getting-started\/start-use"/)
   assert.match(component, /href="\/doc\/getting-started\/source-code-architecture"/)
+  assert.match(component, /\/doc\/about\/microi-training-syllabus/)
+  assert.match(component, /trainingAction: '查看培训大纲'/)
+  assert.ok(
+    component.indexOf('href="/doc/getting-started/source-code-architecture"') < component.indexOf("'/doc/about/microi-training-syllabus'"),
+    'the training syllabus action should render immediately after the source architecture action'
+  )
   assert.match(frontmatter, /titleTemplate: 开源 AI 开发框架/)
   assert.match(frontmatter, /20\+ 成熟引擎、AI 低代码、微服务与 V8 引擎/)
   assert.doesNotMatch(frontmatter, /开源 AI 应用开发平台|企业级 AI 应用开发框架|开源 AI 低代码平台/)
   assert.doesNotMatch(frontmatter, /titleTemplate: 相比传统 AI 开发/)
+})
+
+test('the related-links menu exposes the training syllabus immediately before the update log', () => {
+  const config = read('docs/.vitepress/config/zh.ts')
+  const trainingIndex = config.indexOf('text: "吾码培训大纲"')
+  const updateLogIndex = config.indexOf('text: "更新日志"')
+
+  assert.ok(trainingIndex >= 0)
+  assert.match(config, /吾码培训大纲[\s\S]*\/doc\/about\/microi-training-syllabus/u)
+  assert.ok(trainingIndex < updateLogIndex, 'the training syllabus should appear above the update log')
 })
 
 test('current Chinese brand surfaces use one canonical positioning and keep the legacy term only as an SEO keyword', () => {

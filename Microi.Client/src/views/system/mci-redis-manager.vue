@@ -328,15 +328,14 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
     CircleCheck, Coin, Connection, DataAnalysis, Delete, EditPen, FolderOpened,
     Key, Link, Plus, Refresh, Search, Timer, WarningFilled
 } from '@element-plus/icons-vue';
-import { DiyCommon } from '@/utils/microi.net.import';
-import { getToken } from '@/utils/auth.js';
+import { DiyApi, DiyCommon } from '@/utils/microi.net.import';
 import { useDiyStore } from '@/pinia';
 
 const DiyCodeEditor = defineAsyncComponent(() => import('@/views/form-engine/diy-field-component/diy-code-editor.vue'));
@@ -354,6 +353,9 @@ const connectionSaving = ref(false);
 const createSaving = ref(false);
 const statisticsLoading = ref(false);
 const isLoggedIn = ref(false);
+let platformConnectionsLoaded = false;
+let stopAuthWatch = null;
+let authBootstrapPromise = null;
 const connections = ref([]);
 const temporaryConnections = reactive({});
 const activeConnection = ref(null);
@@ -428,7 +430,38 @@ function resetConnectionForm(data) {
 function currentUserLooksValid() {
     let user = null;
     try { user = diyStore.GetCurrentUser; } catch (_) { user = null; }
-    return !!(getToken() && user && user.Id);
+    return !!(DiyCommon.getToken() && user && user.Id);
+}
+
+async function hydrateAuthenticatedUser() {
+    const token = DiyCommon.getToken();
+    if (!token) return false;
+    if (currentUserLooksValid()) return true;
+    if (authBootstrapPromise) return authBootstrapPromise;
+    authBootstrapPromise = (async () => {
+        try {
+            const response = await fetch(DiyCommon.GetApiBase() + DiyApi.GetCurrentUser(), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    authorization: `Bearer ${token}`,
+                    token,
+                    osclient: DiyCommon.GetOsClient()
+                },
+                body: JSON.stringify({ OsClient: DiyCommon.GetOsClient() })
+            });
+            if (!response.ok) return false;
+            const result = await response.json();
+            if (Number(result?.Code) !== 1 || !result?.Data?.Id) return false;
+            diyStore.setCurrentUser(result.Data);
+            return true;
+        } catch (_) {
+            return false;
+        } finally {
+            authBootstrapPromise = null;
+        }
+    })();
+    return authBootstrapPromise;
 }
 
 async function apiPost(action, data) {
@@ -436,8 +469,21 @@ async function apiPost(action, data) {
         Action: action,
         ...(data || {})
     }, null, null, 'json');
-    if (!result || result.Code !== 1) throw new Error(result?.Msg || result?.Message || '请求失败');
+    if (!result || result.Code !== 1) {
+        const error = new Error(result?.Msg || result?.Message || '请求失败');
+        error.code = Number(result?.Code);
+        error.reasonCode = result?.DataAppend?.ReasonCode || result?.DataAppend?.reasonCode || '';
+        throw error;
+    }
     return result.Data;
+}
+
+function isAuthenticationFailure(error) {
+    const responseCode = Number(error?.response?.data?.Code);
+    const status = Number(error?.response?.status);
+    return [1001, 1002].includes(Number(error?.code))
+        || [1001, 1002].includes(responseCode)
+        || status === 401;
 }
 
 function contextPayload(extra = {}) {
@@ -460,10 +506,13 @@ async function loadConnections() {
         const first = connections.value.find(item => item.Mode === 'tenant') || connections.value.find(item => item.Mode === 'saved');
         if (first) await selectConnection(first, Number(first.Database || 0));
     } catch (error) {
-        isLoggedIn.value = false;
-        connections.value = connections.value.filter(item => item.Mode === 'temporary');
-        ElMessage.warning(error.message + '，已切换为匿名应急模式。');
-        nextTick(() => openConnectionDialog());
+        if (isAuthenticationFailure(error)) {
+            onAuthExpired();
+            ElMessage.warning((error.message || '登录状态已失效') + '，已切换为匿名应急模式。');
+            nextTick(() => openConnectionDialog());
+        } else {
+            ElMessage.error(error.message || 'Redis 连接加载失败');
+        }
     } finally {
         connectionLoading.value = false;
     }
@@ -822,6 +871,7 @@ function formatBytes(value) {
 function goLogin() { router.push({ path: '/login', query: { redirect: '/mci-redis-manager' } }); }
 
 function onAuthExpired() {
+    platformConnectionsLoaded = false;
     isLoggedIn.value = false;
     connections.value = connections.value.filter(item => item.Mode === 'temporary');
     if (activeConnection.value && activeConnection.value.Mode !== 'temporary') {
@@ -831,13 +881,30 @@ function onAuthExpired() {
     }
 }
 
+async function syncAuthenticationState() {
+    let authenticated = currentUserLooksValid();
+    if (!authenticated && DiyCommon.getToken()) authenticated = await hydrateAuthenticatedUser();
+    isLoggedIn.value = authenticated;
+    if (authenticated && !platformConnectionsLoaded) {
+        platformConnectionsLoaded = true;
+        await loadConnections();
+    }
+}
+
 onMounted(async () => {
     window.addEventListener('microi-redis-auth-expired', onAuthExpired);
-    isLoggedIn.value = currentUserLooksValid();
-    if (isLoggedIn.value) await loadConnections();
-    else nextTick(() => openConnectionDialog());
+    stopAuthWatch = watch(
+        () => [diyStore.Token, diyStore.GetCurrentUser?.Id],
+        () => syncAuthenticationState(),
+        { flush: 'post' }
+    );
+    await syncAuthenticationState();
+    if (!isLoggedIn.value) nextTick(() => openConnectionDialog());
 });
-onBeforeUnmount(() => window.removeEventListener('microi-redis-auth-expired', onAuthExpired));
+onBeforeUnmount(() => {
+    window.removeEventListener('microi-redis-auth-expired', onAuthExpired);
+    if (stopAuthWatch) stopAuthWatch();
+});
 </script>
 
 <style scoped lang="scss">
