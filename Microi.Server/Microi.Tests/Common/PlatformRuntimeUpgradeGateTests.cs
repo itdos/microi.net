@@ -600,6 +600,50 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
+    public void V8FirstApplicationGate_AllowsNewManagedEngineAndRejectsUnownedExtension()
+    {
+        var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");
+        var package = JObject.Parse(LoadBundledResources()["app.microi.sys_user.json"]);
+        var engines = Assert.IsType<JArray>(package["SysApiEngines"]);
+        var policies = Assert.IsType<JObject>(package["ResourcePolicies"]?["ApiEngines"]);
+        const string futureKey = "platform-future-managed-regression";
+
+        engines.Add(new JObject
+        {
+            ["Id"] = "90ff30a8-058b-4cbb-8a5c-59c96886dad7",
+            ["ApiEngineKey"] = futureKey,
+            ["ApiAddress"] = "/apiengine/" + futureKey,
+            ["ApiV8Code"] = "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n"
+                            + " * 所属官方应用：系统账号\n */\nreturn { Code : 1 };",
+            ["IsEnable"] = 1,
+            ["StopHttp"] = 1,
+            ["AllowAnonymous"] = 0
+        });
+        policies[futureKey] = new JObject
+        {
+            ["Ownership"] = "Platform",
+            ["UpgradePolicy"] = "Managed"
+        };
+
+        Assert.True(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.sys_user.json", package })));
+
+        var missingPolicy = (JObject)package.DeepClone();
+        ((JObject)missingPolicy["ResourcePolicies"]!["ApiEngines"]!).Remove(futureKey);
+        Assert.False(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.sys_user.json", missingPolicy })));
+
+        var unexpectedTenantHook = (JObject)package.DeepClone();
+        unexpectedTenantHook["ResourcePolicies"]!["ApiEngines"]![futureKey] = new JObject
+        {
+            ["Ownership"] = "Tenant",
+            ["UpgradePolicy"] = "CreateIfMissing"
+        };
+        Assert.False(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.sys_user.json", unexpectedTenantHook })));
+    }
+
+    [Fact]
     public void V8FirstApplicationGate_AllowsForwardCompatiblePackageStorageCapability()
     {
         var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");

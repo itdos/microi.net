@@ -27,6 +27,61 @@ namespace Microi.net
         };
         private static readonly Lazy<Task<Dictionary<string, string>>> UpgradeResources =
             new Lazy<Task<Dictionary<string, string>>>(LoadUpgradeResourcesCoreAsync);
+
+        /// <summary>
+        /// 官网升级资源属于可降级的远程输入。网络波动、发布窗口内的版本差异或
+        /// 远端包契约暂未追平时，返回失败结果并整组回退程序集内置资源，不能通过
+        /// 抛异常来驱动正常回退，否则 Visual Studio 会把已处理异常显示给普通用户。
+        /// </summary>
+        private sealed class OfficialResourceDownloadResult
+        {
+            private OfficialResourceDownloadResult(string resourceName, string content, string error)
+            {
+                ResourceName = resourceName;
+                Content = content;
+                Error = error;
+            }
+
+            public string ResourceName { get; }
+            public string Content { get; }
+            public string Error { get; }
+            public bool Succeeded => string.IsNullOrWhiteSpace(Error) && !string.IsNullOrWhiteSpace(Content);
+
+            public static OfficialResourceDownloadResult Success(string resourceName, string content)
+            {
+                return new OfficialResourceDownloadResult(resourceName, content, string.Empty);
+            }
+
+            public static OfficialResourceDownloadResult Failure(string resourceName, string error)
+            {
+                return new OfficialResourceDownloadResult(resourceName, string.Empty, error);
+            }
+        }
+
+        private static void WriteUpgradeResourceDiagnostic(
+            string action,
+            string title,
+            string content,
+            int level,
+            bool success,
+            string resourceName = null)
+        {
+            var status = success
+                ? "【成功】"
+                : level >= 3
+                    ? "【Error异常】"
+                    : "【Warning警告】";
+            Console.WriteLine($"Microi：{status}平台自动升级【升级13资源】【{title}】{content}");
+            MicroiEngine.QueueSystemLog(
+                null,
+                "PlatformUpgrade",
+                action,
+                title,
+                content,
+                level,
+                success,
+                resourceName);
+        }
         private const string OfficialResourceApiUrl = "https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos";
         private const string ImportPackageResourceName = "import-package.js";
         private const string PublishAiAppResourceName = "ai-app-publish-store.js";
@@ -584,7 +639,10 @@ namespace Microi.net
                 { AppStorePackageResourceName, new System.Version(7, 7, 15) }
             };
 
-        private static readonly Dictionary<string, string[]> V8FirstPackageExactEngineKeys =
+        // 这里只声明每个包必须保留的基础接口，不再把接口总数写死。官方包新增
+        // Managed 接口属于向前兼容扩展；若继续要求“恰好等于”这份清单，发布包
+        // 与校验器只要有一次提交不同步，就会让全新数据库在写入前直接退出。
+        private static readonly Dictionary<string, string[]> V8FirstPackageRequiredEngineKeys =
             new Dictionary<string, string[]>(StringComparer.Ordinal)
             {
                 {
@@ -765,17 +823,31 @@ namespace Microi.net
                 byKey[key] = engine;
             }
 
-            if (V8FirstPackageExactEngineKeys.TryGetValue(resourceName, out var exactKeys))
+            if (V8FirstPackageRequiredEngineKeys.TryGetValue(resourceName, out var requiredKeys))
             {
-                if (byKey.Count != exactKeys.Length) return false;
                 var tenantHookKey = V8FirstTenantHookKeys[resourceName];
-                foreach (var key in exactKeys)
+                foreach (var key in requiredKeys)
                 {
                     if (!byKey.TryGetValue(key, out var engine)
                         || !HasExpectedOfficialEnginePolicy(
                             package,
                             engine,
                             string.Equals(key, tenantHookKey, StringComparison.Ordinal)))
+                    {
+                        return false;
+                    }
+                }
+
+                // 新增接口可以超过最低清单，但仍必须逐项声明唯一官方所有权并带
+                // 醒目恢复提示。除固定租户 Hook 外，任何额外 CreateIfMissing 或
+                // 未声明策略的接口都会在这里失败关闭，不能借“向前兼容”绕过审计。
+                foreach (var pair in byKey)
+                {
+                    var isTenantHook = string.Equals(
+                        pair.Key,
+                        tenantHookKey,
+                        StringComparison.Ordinal);
+                    if (!HasExpectedOfficialEnginePolicy(package, pair.Value, isTenantHook))
                     {
                         return false;
                     }
@@ -2789,50 +2861,94 @@ WHERE {idColumn}=@p0");
         private static async Task<Dictionary<string, string>> LoadUpgradeResourcesCoreAsync()
         {
             var bundledResources = LoadBundledResources();
+            var onlineResourceNames = RequiredResourceNames
+                .Where(resourceName => !string.Equals(resourceName, BuildAiAppResourceName, StringComparison.Ordinal))
+                .ToArray();
+            Console.WriteLine($"Microi：【基础应用升级】开始并行读取吾码官方升级资源（共{onlineResourceNames.Length}项，单项超时8秒）。");
+            var downloads = await Task.WhenAll(onlineResourceNames.Select(DownloadOfficialResourceAsync));
+            var failures = downloads.Where(item => !item.Succeeded).ToArray();
+            if (failures.Length > 0)
+            {
+                foreach (var failure in failures)
+                {
+                    WriteUpgradeResourceDiagnostic(
+                        "OfficialResourceRejected",
+                        "官网升级资源不可用",
+                        $"资源[{failure.ResourceName}]未通过读取或契约校验：{failure.Error}",
+                        2,
+                        false,
+                        failure.ResourceName);
+                }
+                WriteUpgradeResourceDiagnostic(
+                    "OfficialResourceGroupFallback",
+                    "已回退程序集内置资源",
+                    $"官网资源整组未通过，失败{failures.Length}项；为避免混用不同版本，当前进程统一使用随本次后端发布的内置基线。",
+                    2,
+                    false,
+                    string.Join(",", failures.Select(item => item.ResourceName)));
+                return bundledResources;
+            }
+
+            Console.WriteLine("Microi：【基础应用升级】官方资源整组校验成功，使用在线最新版。");
+            var resources = downloads.ToDictionary(item => item.ResourceName, item => item.Content, StringComparer.Ordinal);
+            // 构建器随当前服务器版本发布，确保客户即使连接到较旧的官方资源服务，
+            // 也不会再次安装缺少租户 ApiBase/OsClient 上下文的旧入口发布逻辑。
+            resources[BuildAiAppResourceName] = bundledResources[BuildAiAppResourceName];
+            return resources;
+        }
+
+        private static async Task<OfficialResourceDownloadResult> DownloadOfficialResourceAsync(string resourceName)
+        {
+            var url = OfficialResourceApiUrl + "&Name=" + Uri.EscapeDataString(resourceName);
             try
             {
-                var onlineResourceNames = RequiredResourceNames
-                    .Where(resourceName => !string.Equals(resourceName, BuildAiAppResourceName, StringComparison.Ordinal));
-                Console.WriteLine($"Microi：【基础应用升级】开始并行读取吾码官方升级资源（共{onlineResourceNames.Count()}项，单项超时8秒）。");
-                var pairs = await Task.WhenAll(onlineResourceNames.Select(async resourceName =>
-                    new KeyValuePair<string, string>(resourceName, await DownloadOfficialResourceAsync(resourceName))));
-                Console.WriteLine("Microi：【基础应用升级】官方资源整组校验成功，使用在线最新版。");
-                var resources = pairs.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
-                // 构建器随当前服务器版本发布，确保客户即使连接到较旧的官方资源服务，
-                // 也不会再次安装缺少租户 ApiBase/OsClient 上下文的旧入口发布逻辑。
-                resources[BuildAiAppResourceName] = bundledResources[BuildAiAppResourceName];
-                return resources;
+                using (var response = await ResourceHttpClient.GetAsync(url))
+                {
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        return OfficialResourceDownloadResult.Failure(
+                            resourceName,
+                            $"HTTP状态码={(int)response.StatusCode}");
+                    }
+
+                    var body = await response.Content.ReadAsStringAsync();
+                    if (!TryParseOfficialResourceResponse(resourceName, body, out var content, out var parseError))
+                    {
+                        return OfficialResourceDownloadResult.Failure(resourceName, parseError);
+                    }
+
+                    var validationError = GetResourceContentValidationError(resourceName, content);
+                    if (!string.IsNullOrWhiteSpace(validationError))
+                    {
+                        return OfficialResourceDownloadResult.Failure(resourceName, validationError);
+                    }
+
+                    Console.WriteLine($"Microi：【基础应用升级】已从吾码官方数据库获取并校验升级资源：{resourceName}");
+                    return OfficialResourceDownloadResult.Success(resourceName, content);
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【基础应用升级】官方资源不可用，整组回退到程序集内置资源：{ex.Message}");
-                return bundledResources;
+                // HttpClient、TLS 与响应流仍可能由框架抛出异常；在最靠近远程边界的位置
+                // 转换为普通失败结果，避免异常越过异步 Task 边界后被调试器标成用户未处理。
+                return OfficialResourceDownloadResult.Failure(
+                    resourceName,
+                    $"{ex.GetType().Name}: {ex.Message}");
             }
         }
 
-        private static async Task<string> DownloadOfficialResourceAsync(string resourceName)
+        private static bool TryParseOfficialResourceResponse(
+            string resourceName,
+            string body,
+            out string content,
+            out string error)
         {
-            var url = OfficialResourceApiUrl + "&Name=" + Uri.EscapeDataString(resourceName);
-            using (var response = await ResourceHttpClient.GetAsync(url))
-            {
-                var body = await response.Content.ReadAsStringAsync();
-                if (!response.IsSuccessStatusCode)
-                {
-                    throw new InvalidOperationException($"从吾码官方数据库获取升级资源[{resourceName}]失败，HTTP状态码：{(int)response.StatusCode}");
-                }
-
-                var content = ParseOfficialResourceResponse(resourceName, body);
-                ValidateResourceContent(resourceName, content);
-                Console.WriteLine($"Microi：【基础应用升级】已从吾码官方数据库获取并校验升级资源：{resourceName}");
-                return content;
-            }
-        }
-
-        private static string ParseOfficialResourceResponse(string resourceName, string body)
-        {
+            content = string.Empty;
+            error = string.Empty;
             if (body.DosIsNullOrWhiteSpace())
             {
-                throw new InvalidOperationException($"吾码官方数据库返回的升级资源[{resourceName}]为空。");
+                error = $"吾码官方数据库返回的升级资源[{resourceName}]为空。";
+                return false;
             }
 
             JObject response;
@@ -2842,43 +2958,66 @@ WHERE {idColumn}=@p0");
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"吾码官方数据库返回的升级资源[{resourceName}]不是标准JSON响应。", ex);
+                error = $"吾码官方数据库返回的升级资源[{resourceName}]不是标准JSON响应：{ex.Message}";
+                return false;
             }
 
-            if (response["Code"]?.Value<int>() != 1)
+            if (!int.TryParse(response["Code"]?.ToString(), out var responseCode)
+                || responseCode != 1)
             {
-                throw new InvalidOperationException($"吾码官方数据库返回升级资源[{resourceName}]失败：{response["Msg"]}");
+                error = $"吾码官方数据库返回升级资源[{resourceName}]失败：{response["Msg"]}";
+                return false;
             }
 
-            var returnedResourceName = response["Data"]?["ResourceName"]?.ToString();
+            if (!(response["Data"] is JObject data))
+            {
+                error = $"吾码官方数据库返回的升级资源[{resourceName}]缺少标准Data对象。";
+                return false;
+            }
+
+            var returnedResourceName = data["ResourceName"]?.ToString();
             if (!string.Equals(returnedResourceName, resourceName, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException($"吾码官方数据库返回的资源名不匹配，期望[{resourceName}]，实际[{returnedResourceName}]。");
+                error = $"吾码官方数据库返回的资源名不匹配，期望[{resourceName}]，实际[{returnedResourceName}]。";
+                return false;
             }
 
-            var contentToken = response["Data"]?["Content"];
+            var contentToken = data["Content"];
             if (contentToken == null)
             {
-                throw new InvalidOperationException($"吾码官方数据库返回的升级资源[{resourceName}]缺少Data.Content。");
+                error = $"吾码官方数据库返回的升级资源[{resourceName}]缺少Data.Content。";
+                return false;
             }
 
-            return contentToken.Type == JTokenType.String
+            content = contentToken.Type == JTokenType.String
                 ? contentToken.ToString()
                 : contentToken.ToString(Formatting.None);
+            return true;
         }
 
         private static void ValidateResourceContent(string resourceName, string content)
         {
+            var error = GetResourceContentValidationError(resourceName, content);
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                // 程序集内置资源是当前后端发布物的一部分，损坏时必须失败关闭；
+                // 官网远程资源使用下面的非抛异常校验方法并安全回退，不会走到这里。
+                throw new InvalidOperationException(error);
+            }
+        }
+
+        private static string GetResourceContentValidationError(string resourceName, string content)
+        {
             if (content.DosIsNullOrWhiteSpace())
             {
-                throw new InvalidOperationException($"吾码官方数据库返回的升级资源[{resourceName}]内容为空。");
+                return $"升级资源[{resourceName}]内容为空。";
             }
 
             if (string.Equals(resourceName, ImportPackageResourceName, StringComparison.Ordinal))
             {
                 if (!content.Contains("import-microi-store-package"))
                 {
-                    throw new InvalidOperationException($"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。");
+                    return $"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。";
                 }
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
@@ -2923,9 +3062,9 @@ WHERE {idColumn}=@p0");
                     !content.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
                     !content.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1"))
                 {
-                    throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
+                    return $"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。";
                 }
-                return;
+                return string.Empty;
             }
 
             if (string.Equals(resourceName, PublishAiAppResourceName, StringComparison.Ordinal))
@@ -2943,9 +3082,9 @@ WHERE {idColumn}=@p0");
                     !content.Contains("OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1") ||
                     !content.Contains("SOURCE_BUILD_ARCHIVE_ROOTS_V1"))
                 {
-                    throw new InvalidOperationException($"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。");
+                    return $"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。";
                 }
-                return;
+                return string.Empty;
             }
 
             if (string.Equals(resourceName, BuildAiAppResourceName, StringComparison.Ordinal))
@@ -2960,9 +3099,9 @@ WHERE {idColumn}=@p0");
                     !content.Contains("injectRuntimeContext") ||
                     !content.Contains("V8.SysConfig && V8.SysConfig.ApiBase"))
                 {
-                    throw new InvalidOperationException($"升级资源[{resourceName}]缺少当前租户运行时上下文注入能力。");
+                    return $"升级资源[{resourceName}]缺少当前租户运行时上下文注入能力。";
                 }
-                return;
+                return string.Empty;
             }
 
             JObject package;
@@ -2972,38 +3111,38 @@ WHERE {idColumn}=@p0");
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"升级资源[{resourceName}]不是有效的应用数据包JSON。", ex);
+                return $"升级资源[{resourceName}]不是有效的应用数据包JSON：{ex.Message}";
             }
 
-            var expectedPackageName = ExpectedPackageNames[resourceName];
+            if (!ExpectedPackageNames.TryGetValue(resourceName, out var expectedPackageName))
+            {
+                return $"升级资源[{resourceName}]不在受信任应用数据包白名单中。";
+            }
             var actualPackageName = package["PackageInfo"]?["Name"]?.ToString();
             if (!string.Equals(actualPackageName, expectedPackageName, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException($"升级资源[{resourceName}]数据包名称不匹配，期望[{expectedPackageName}]，实际[{actualPackageName}]。");
+                return $"升级资源[{resourceName}]数据包名称不匹配，期望[{expectedPackageName}]，实际[{actualPackageName}]。";
             }
 
             if (!HasPackagedV8FirstApplicationRuntime(resourceName, package))
             {
-                throw new InvalidOperationException(
-                    $"升级资源[{resourceName}]缺少当前 V8 引擎优先接口、单一官方应用所有权、醒目恢复提示或 CreateIfMissing 个性化 Hook。"
-                );
+                var packageVersion = package["PackageInfo"]?["Version"]?.ToString() ?? "<missing>";
+                var engineCount = (package["SysApiEngines"] as JArray)?.Count ?? 0;
+                return $"升级资源[{resourceName}]缺少当前 V8 引擎优先接口、单一官方应用所有权、醒目恢复提示或 CreateIfMissing 个性化 Hook。"
+                    + $" PackageInfo.Version=[{packageVersion}]，SysApiEngines={engineCount}。";
             }
 
             if (string.Equals(resourceName, SsoPackageResourceName, StringComparison.Ordinal)
                 && !HasPackagedSsoRuntime(package))
             {
-                throw new InvalidOperationException(
-                    $"升级资源[{resourceName}]缺少 v7.5.9 SSO Platform/Managed HTTP 端点闭包、醒目恢复提示、安全 Hook 白名单或 CreateIfMissing 默认模板。"
-                );
+                return $"升级资源[{resourceName}]缺少 v7.5.9 SSO Platform/Managed HTTP 端点闭包、醒目恢复提示、安全 Hook 白名单或 CreateIfMissing 默认模板。";
             }
 
             if (string.Equals(resourceName, SaaSEnginePackageResourceName, StringComparison.Ordinal))
             {
                 if (!HasPackagedPlatformRuntime(package))
                 {
-                    throw new InvalidOperationException(
-                        $"升级资源[{resourceName}]缺少 v7.7.8 平台运行时 Managed 基线、完整声明闭包、CreateIfMissing Hook、安全 microi-init、登录壁纸可信原子契约或完整资源策略。"
-                    );
+                    return $"升级资源[{resourceName}]缺少 v7.7.8 平台运行时 Managed 基线、完整声明闭包、CreateIfMissing Hook、安全 microi-init、登录壁纸可信原子契约或完整资源策略。";
                 }
 
                 var bundle = (package["ApplicationBundles"] as JArray)?.FirstOrDefault() as JObject;
@@ -3026,9 +3165,7 @@ WHERE {idColumn}=@p0");
                     || buildAssets.Count > 256
                     || buildBytes > 5L * 1024 * 1024)
                 {
-                    throw new InvalidOperationException(
-                        $"升级资源[{resourceName}]必须以无伪源码、256 文件/5MB 内的 DatabaseOnly 平台内置微服务发布。"
-                    );
+                    return $"升级资源[{resourceName}]必须以无伪源码、256 文件/5MB 内的 DatabaseOnly 平台内置微服务发布。";
                 }
             }
 
@@ -3187,9 +3324,10 @@ WHERE {idColumn}=@p0");
                     !bulkEngineCode.Contains("BULK_MONOTONIC_CHILD_PROGRESS_V1") ||
                     !HasPackagedMarketplaceRuntime(package))
                 {
-                    throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧，或缺少商城微服务运行时、页面绑定及批量安装能力，拒绝覆盖客户数据库。");
+                    return $"升级资源[{resourceName}]版本过旧，或缺少商城微服务运行时、页面绑定及批量安装能力，拒绝覆盖客户数据库。";
                 }
             }
+            return string.Empty;
         }
 
         private static bool HasPackagedMarketplaceRuntime(JObject package)

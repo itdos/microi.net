@@ -1415,9 +1415,29 @@ namespace Microi.net
             if (migrationFailed)
             {
                 var message = string.Join("；", migrationErrors);
+                var systemLogContent =
+                    $"当前版本={FormatVersionForLog(CurrentVersion)}；最后成功版本={FormatVersionForLog(uptVersion)}；错误={message}";
+                if (systemLogContent.Length > 32000)
+                {
+                    systemLogContent = systemLogContent.Substring(0, 32000);
+                }
                 Console.WriteLine(
                     $"Microi：【自动升级状态】【{osClientSecret.OsClient}】【版本迁移最终汇总】失败：当前版本={FormatVersionForLog(CurrentVersion)}，最后成功版本={FormatVersionForLog(uptVersion)}，错误={message}");
                 Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】已停止，未推进ServerVersion：{message}");
+                var queued = MicroiEngine.QueueSystemLog(
+                    osClientSecret.OsClient,
+                    "PlatformUpgrade",
+                    "TenantMigrationFailed",
+                    "平台自动升级失败，ServerVersion未推进",
+                    systemLogContent,
+                    3,
+                    false,
+                    UpgradeAppStore.Version);
+                if (!queued)
+                {
+                    Console.WriteLine(
+                        $"Microi：【Warning警告】平台自动升级【{osClientSecret.OsClient}】系统日志队列暂不可用，失败详情已保留在控制台日志。");
+                }
                 return new DosResultList<MicroiUpgradeResult>(0, result, message);
             }
             Console.WriteLine(
