@@ -29,5 +29,6 @@ export { areamap } from './areamap';
 export { html } from './html';
 export { descriptions } from './descriptions';
 export { aiengine } from './aiengine';
+export { homeoverview } from './homeoverview';
 export { pageengine } from './pageengine';
 export { workcenter } from './workcenter';

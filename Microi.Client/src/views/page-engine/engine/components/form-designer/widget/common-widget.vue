@@ -218,9 +218,10 @@ const autoContentWidgetTypes = new Set([
   'workcenter',
   'diytable',
   'diycalendar',
+  'homeoverview',
 ])
 
-const chartWidgetTypes = new Set(['bar', 'line', 'linebar', 'pie', 'funnel', 'map', 'areamap'])
+const chartWidgetTypes = new Set(['bar', 'line', 'linebar', 'pie', 'funnel', 'map', 'areamap', 'homeoverview'])
 const tableWidgetTypes = new Set(['tabel', 'gantt', 'diytable'])
 const mediaWidgetTypes = new Set(['image', 'video', 'browser', 'office', 'webgl', 'carousel', 'aiengine', 'pageengine'])
 
