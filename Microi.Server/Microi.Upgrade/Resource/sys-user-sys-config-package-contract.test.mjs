@@ -62,7 +62,7 @@ test('system-account package exclusively owns admin, preferences, profile and it
   const packageName = 'app.microi.sys_user.json'
   const packageModel = readPackage(packageName)
   assert.equal(packageModel.PackageInfo?.Name, '系统账号')
-  assert.equal(packageModel.PackageInfo?.Version, 'v7.6.3')
+  assert.equal(packageModel.PackageInfo?.Version, 'v7.6.5')
   assert.ok(packageModel.PackageInfo?.RequiredPlatformCapabilities
     ?.includes('ApiEngine:platform-sys-user-admin@v1.0.2'))
 
@@ -113,6 +113,14 @@ test('system-account package exclusively owns admin, preferences, profile and it
   assert.match(accessKey.ApiV8Code, /V8\.Method\.ManageUserAccessKey/)
   assert.match(accessKey.ApiRoutes, /\/api\/SysUserAccessKey\/Exchange/)
   assertUniqueOwner('platform-user-access-key', packageName)
+
+  const homeOverview = assertOwnedEngine(packageName, 'platform-home-overview', {
+    Ownership: 'Platform',
+    UpgradePolicy: 'Managed',
+  }, 0)
+  assert.match(homeOverview.ApiV8Code, /HomeUsageStats/)
+  assert.match(homeOverview.ApiV8Code, /recordMenuOpen/)
+  assertUniqueOwner('platform-home-overview', packageName)
 })
 
 test('system-settings package exclusively owns non-secret tenant settings and its tenant hook', () => {

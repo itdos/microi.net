@@ -30,6 +30,7 @@ import {
   html,
   descriptions,
   aiengine,
+  homeoverview,
   pageengine,
   workcenter
 } from './builtWidget/index.js';
@@ -72,6 +73,7 @@ export const widgetList = [
   html,
   descriptions,
   aiengine,
+  homeoverview,
   pageengine,
   workcenter
 ]

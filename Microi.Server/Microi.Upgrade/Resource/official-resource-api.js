@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-upgrade-resource
- * Version: v1.3.4
+ * Version: v1.3.5
  * Function:
  * - 匿名读取固定白名单中的吾码升级资源；超级管理员可通过 SHA 乐观锁原子发布升级资源，新版应用包写入 HDFS 并仅持久化可校验指针。
  */
@@ -355,7 +355,7 @@ function validateV8FirstPackage(name, packageModel) {
     assertExactEngineKeys(packageModel, [
       "platform-user-update-preferences", "user-module-table-preference", "sys-user-security-action",
       "platform-user-update-profile", "platform-sys-user-admin", "platform-user-custom-hook",
-      "platform-user-access-key"
+      "platform-user-access-key", "platform-home-overview"
     ], name);
     var sysUserAdmin = findEngine(packageModel, "platform-sys-user-admin");
     var sysUserAdminCode = text(sysUserAdmin && sysUserAdmin.ApiV8Code);
@@ -394,6 +394,37 @@ function validateV8FirstPackage(name, packageModel) {
       }
     }
     if (!validAiKeyField) throw new Error("升级资源[" + name + "]缺少隐藏只读 AiApiKey 字段元数据");
+
+    var homeOverviewEngine = findEngine(packageModel, "platform-home-overview");
+    var homeOverviewCode = text(homeOverviewEngine && homeOverviewEngine.ApiV8Code);
+    if (compareVersions(info.Version, "v7.6.5") < 0
+        || !homeOverviewEngine
+        || compareVersions(homeOverviewEngine.Version, "v1.0.0") < 0
+        || Number(homeOverviewEngine.StopHttp) !== 0
+        || Number(homeOverviewEngine.AllowAnonymous) !== 0
+        || homeOverviewCode.indexOf("HomeUsageStats") < 0
+        || homeOverviewCode.indexOf("recordMenuOpen") < 0
+        || homeOverviewCode.indexOf("V8.CurrentUser") < 0
+        || sysUserCapabilities.indexOf("ApiEngine:platform-home-overview@v1.0.0") < 0
+        || sysUserCapabilities.indexOf("ServerField:sys_user.HomeUsageStats") < 0) {
+      throw new Error("升级资源[" + name + "]缺少 v7.6.5 当前用户首页统计 Managed 契约");
+    }
+    if (countRows(packageModel.PhysicalColumns, "COLUMN_NAME", "HomeUsageStats") !== 1) {
+      throw new Error("升级资源[" + name + "]缺少唯一 Sys_User.HomeUsageStats 物理列");
+    }
+    var validHomeUsageField = false;
+    for (var homeFieldIndex = 0; homeFieldIndex < aiKeyFields.length; homeFieldIndex++) {
+      var homeField = aiKeyFields[homeFieldIndex] || {};
+      if (rowName(homeField, "TableName") === "sys_user" && rowName(homeField, "Name") === "homeusagestats"
+          && rowName(homeField, "Type") === "mediumtext"
+          && Number(homeField.Visible) === 0 && Number(homeField.AppVisible) === 0
+          && Number(homeField.Readonly) === 1) {
+        validHomeUsageField = true;
+      }
+    }
+    if (!validHomeUsageField) {
+      throw new Error("升级资源[" + name + "]缺少隐藏只读 HomeUsageStats 字段元数据");
+    }
   }
 
   if (name === "app.microi.sys-config.json") {
@@ -493,11 +524,11 @@ function validateV8FirstPackage(name, packageModel) {
     var packageStorageCode = text(packageStorageEngine && packageStorageEngine.ApiV8Code);
     if (compareVersions(info.Version, "v7.5.57") < 0
         || !officialResourceEngine
-        || compareVersions(officialResourceEngine.Version, "v1.3.4") < 0
+        || compareVersions(officialResourceEngine.Version, "v1.3.5") < 0
         || Number(officialResourceEngine.AllowAnonymous) !== 1
         || officialResourceCode.indexOf("V8.Method.AuthorizeOfficialResourcePublish") < 0
         || storeCapabilities.indexOf("V8.Method.AuthorizeOfficialResourcePublish") < 0
-        || storeCapabilities.indexOf("ApiEngine:get-microi-upgrade-resource@v1.3.4") < 0
+        || storeCapabilities.indexOf("ApiEngine:get-microi-upgrade-resource@v1.3.5") < 0
         || !packageStorageEngine
         || compareVersions(packageStorageEngine.Version, "v1.2.1") < 0
         || Number(packageStorageEngine.StopHttp) !== 1
@@ -507,7 +538,7 @@ function validateV8FirstPackage(name, packageModel) {
         || !findEngine(packageModel, "platform-marketplace-source-hook")
         || findEngine(packageModel, "platform-user-update-preferences")
         || findEngine(packageModel, "platform-sys-user-admin")) {
-      throw new Error("升级资源[" + name + "]缺少 v7.5.57 官方 live 接口投影、缓存自更新、物理表兼容、单次 HDFS 写入、发布授权或商城接口所有权闭包不正确");
+      throw new Error("升级资源[" + name + "]缺少 v1.3.5 首页资源闭包验证、官方 live 接口投影、缓存自更新、物理表兼容、单次 HDFS 写入、发布授权或商城接口所有权闭包不正确");
     }
   }
 }

@@ -1155,7 +1155,7 @@ test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async 
 });
 
 test('官网发布接口以固定白名单、事务行锁和哈希保护多节点写入', () => {
-  assert.match(officialEngineSource, /Version: v1\.3\.4/);
+  assert.match(officialEngineSource, /Version: v1\.3\.5/);
   assert.match(officialEngineSource, /V8\.Method\.AuthorizeOfficialResourcePublish\(\)/);
   assert.doesNotMatch(officialEngineSource, /Number\(currentUser\.Level/);
   assert.match(officialEngineSource, /function lockPublishRows\(\)/);
@@ -1167,6 +1167,7 @@ test('官网发布接口以固定白名单、事务行锁和哈希保护多节�
   assert.match(officialEngineSource, /function validateTableClosure\(/);
   assert.match(officialEngineSource, /mci_ai_token_log[\s\S]*PromptPreview/);
   assert.match(officialEngineSource, /Sys_User\.AiApiKey|Sys_User\s*AiApiKey/);
+  assert.match(officialEngineSource, /platform-home-overview[\s\S]*HomeUsageStats/);
   assert.match(officialEngineSource, /CreateIfMissing[\s\S]*return \{ Code : 1 \};/);
   assert.match(officialEngineSource, /OFFICIAL_RESOURCE_EXACT_SELECTION_V1/);
   assert.match(officialEngineSource, /SelectApiEngine:\s*selectionJson\(exactSelections\.SelectApiEngine\)/);
@@ -1182,6 +1183,8 @@ test('官网控制面滚动升级同时保留当前 live 与候选版本能力�
   );
   assert.match(source, /ApiEngine:get-microi-upgrade-resource@v1\.3\.2/);
   assert.match(source, /ApiEngine:get-microi-upgrade-resource@v1\.3\.3/);
+  assert.match(source, /ApiEngine:get-microi-upgrade-resource@v1\.3\.4/);
+  assert.match(source, /ApiEngine:get-microi-upgrade-resource@v1\.3\.5/);
 });
 
 test('共同基线修复后独立官方源码不会被旧内嵌副本反向降级', async () => {
@@ -1255,8 +1258,8 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 150);
-  assert.equal(managedCount, 141);
+  assert.equal(seenKeys.size, 151);
+  assert.equal(managedCount, 142);
   assert.equal(createIfMissingCount, 9);
 
   assert.match(officialEngineSource, /action === "reconcilepublishedapiengines"/);
@@ -1357,7 +1360,7 @@ test('官网发布选择元数据精确来自已验证包并拒绝旧 Key 或旧
   ]), expected.SelectTable), false);
 });
 
-test('官网发布接口接受当前九个官方应用包并拒绝 AI schema 缺口', async () => {
+test('官网发布接口接受当前九个官方应用包并拒绝 AI 与首页资源闭包缺口', async () => {
   const executablePrefix = officialEngineSource.slice(0, officialEngineSource.indexOf('var action ='));
   const validatePublishResource = new Function(
     'V8',
@@ -1406,6 +1409,26 @@ test('官网发布接口接受当前九个官方应用包并拒绝 AI schema 缺
   assert.throws(
     () => validatePublishResource('app.microi.sys_user.json', JSON.stringify(missingPasswordMarker)),
     /Managed v1\.0\.2/,
+  );
+
+  const missingHomeEngine = structuredClone(sysUser);
+  missingHomeEngine.SysApiEngines = missingHomeEngine.SysApiEngines
+    .filter(item => item.ApiEngineKey !== 'platform-home-overview');
+  missingHomeEngine.PackageInfo.ApiEngineCount = missingHomeEngine.SysApiEngines.length;
+  assert.throws(
+    () => validatePublishResource('app.microi.sys_user.json', JSON.stringify(missingHomeEngine)),
+    /唯一所有权闭包|platform-home-overview/,
+  );
+
+  const missingHomeUsageColumn = structuredClone(sysUser);
+  missingHomeUsageColumn.PhysicalColumns = missingHomeUsageColumn.PhysicalColumns.filter(column => (
+    String(column.TABLE_NAME).toLowerCase() !== 'sys_user'
+    || String(column.COLUMN_NAME).toLowerCase() !== 'homeusagestats'
+  ));
+  missingHomeUsageColumn.PackageInfo.PhysicalColumnCount = missingHomeUsageColumn.PhysicalColumns.length;
+  assert.throws(
+    () => validatePublishResource('app.microi.sys_user.json', JSON.stringify(missingHomeUsageColumn)),
+    /HomeUsageStats/,
   );
 
   const saas = JSON.parse(await readFile(resolve(testDirectory, 'app.microi.saas-engine.json'), 'utf8'));
