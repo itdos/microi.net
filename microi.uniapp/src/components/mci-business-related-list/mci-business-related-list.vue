@@ -2,7 +2,8 @@
   <view class="related-business-list" :class="{
     'related-business-list--preview': isPreview,
     'related-business-list--section': isPreview && showPreviewHeader,
-    'related-business-list--independent-scroll': independentScroll && !isPreview
+    'related-business-list--independent-scroll': independentScroll && !isPreview,
+    'related-business-list--collection': isCollectionCardLayout
   }" :style="independentRootStyle">
     <view v-if="isPreview && showPreviewHeader" class="preview-section-header"
       hover-class="preview-section-header--pressed" @tap="previewExpanded = !previewExpanded">
@@ -13,6 +14,13 @@
       </view>
       <!-- zhy：关联区折叠图标与详情“基本信息”分组统一，避免使用字形不稳定的上下箭头。 -->
       <text class="preview-section-header__arrow" :class="{ expanded: previewExpanded }">›</text>
+    </view>
+
+    <view v-if="isCollectionCardLayout" class="collection-heading">
+      <view class="collection-heading__title"><text>{{ presentation.title || sectionTitle }}</text><text>{{ count }}</text></view>
+      <button v-if="canAdd" class="collection-heading__add" hover-class="collection-heading__add--pressed" @tap="openAdd">
+        <text>＋</text><text>{{ presentation.addLabel || '添加' }}</text>
+      </button>
     </view>
 
     <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
@@ -99,7 +107,35 @@
     </view>
 
     <view v-else-if="previewContentVisible && rows.length" class="related-data-list">
-      <template v-if="isProposalInstallationQuickMode">
+      <template v-if="isCollectionCardLayout">
+        <view v-for="(row, index) in displayedRows" :key="row.Id || index" class="collection-card"
+          hover-class="collection-card--pressed" @tap="openDetail(row)">
+          <view class="collection-card__head">
+            <text class="collection-card__title">{{ collectionTitle(row) }}</text>
+            <button v-if="collectionCanRemove(row)" class="collection-card__delete"
+              :loading="collectionDeletingId === String(row.Id)"
+              :disabled="Boolean(collectionDeletingId)"
+              @tap.stop="removeCollectionRow(row)">删除</button>
+          </view>
+          <text v-if="collectionSubtitle(row)" class="collection-card__subtitle">{{ collectionSubtitle(row) }}</text>
+          <view v-if="collectionLines(row).length" class="collection-card__lines">
+            <view v-for="line in collectionLines(row)" :key="line.field">
+              <text>{{ line.label }}</text><text>{{ line.value }}</text>
+            </view>
+          </view>
+          <view v-if="collectionPhotos(row).length" class="collection-card__photos">
+            <image v-for="(photo, photoIndex) in collectionPhotos(row).slice(0, 3)" :key="photo"
+              :src="photo" mode="aspectFill" @tap.stop="previewCollectionPhotos(row, photoIndex)" />
+            <view v-if="collectionPhotos(row).length > 3" class="collection-card__photo-more">
+              <text>+{{ collectionPhotos(row).length - 3 }}</text>
+            </view>
+          </view>
+          <view class="collection-card__foot">
+            <text>{{ collectionFooterLabel }}</text><text>›</text>
+          </view>
+        </view>
+      </template>
+      <template v-else-if="isProposalInstallationQuickMode">
         <view v-for="(row, index) in displayedRows" :key="row.Id" class="proposal-point-card">
           <view class="proposal-point-card__title">
             <text>点位{{ index + 1 }}</text>
@@ -178,10 +214,12 @@
             @open="openDetail" @phone="callPhone" @action="triggerRowAction" />
         </view>
       </template>
-      <view v-if="!isPreview && !finished" class="load-more" hover-class="load-more--pressed" @tap="loadMore">
-        <text>{{ loading ? '正在加载' : '加载更多' }}</text>
-      </view>
-      <view v-else-if="!isPreview" class="load-finished"><text>共 {{ count }} 条</text></view>
+      <block v-if="!isCollectionCardLayout">
+        <view v-if="!isPreview && !finished" class="load-more" hover-class="load-more--pressed" @tap="loadMore">
+          <text>{{ loading ? '正在加载' : '加载更多' }}</text>
+        </view>
+        <view v-else-if="!isPreview" class="load-finished"><text>共 {{ count }} 条</text></view>
+      </block>
     </view>
 
     <view v-else-if="previewContentVisible && error" class="related-empty">
@@ -195,13 +233,13 @@
       </template>
       <template v-else>
         <text>暂无{{ config.title || sectionTitle }}</text>
-        <text v-if="canAdd && !isPreview">点击右下角加号新增</text>
+        <text v-if="canAdd && !isPreview && !isCollectionCardLayout">点击右下角加号新增</text>
       </template>
     </view>
     </view>
     </scroll-view>
 
-    <view v-if="showFloatingAdd && canAdd && !isPreview && !proposalBatchSelecting" class="floating-add" :style="floatingStyle"
+    <view v-if="showFloatingAdd && canAdd && !isPreview && !isCollectionCardLayout && !proposalBatchSelecting" class="floating-add" :style="floatingStyle"
       hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
 
     <view v-if="previewContentVisible && isPreview && !waitingForParentSave" class="preview-actions"
@@ -220,6 +258,57 @@
         <text class="preview-action__icon">＋</text><text>新增</text>
       </view>
     </view>
+
+    <root-portal v-if="collectionPickerOpen">
+      <view class="collection-picker-mask" @tap="closeCollectionPicker" @touchmove.stop.prevent="noop">
+        <view class="collection-picker-sheet" @tap.stop @touchmove.stop>
+          <view class="collection-picker-handle"></view>
+          <view class="collection-picker-head">
+            <view>
+              <text>{{ collectionPickerConfig.title || '选择记录' }}</text>
+              <text v-if="collectionSelectedIds.length">已选 {{ collectionSelectedIds.length }}</text>
+            </view>
+            <button class="collection-picker-close" @tap="closeCollectionPicker">×</button>
+          </view>
+          <view class="collection-picker-search">
+            <text>⌕</text>
+            <input v-model="collectionSourceKeyword" confirm-type="search"
+              :placeholder="collectionPickerConfig.searchPlaceholder || '搜索记录'"
+              @confirm="searchCollectionSources" />
+            <button v-if="collectionSourceKeyword" @tap="clearCollectionSourceKeyword">×</button>
+          </view>
+          <scroll-view class="collection-picker-list" scroll-y :show-scrollbar="false"
+            :lower-threshold="100" @scrolltolower="loadMoreCollectionSources">
+            <view v-if="collectionSourceLoading && !collectionSourceRows.length" class="collection-picker-loading">
+              <view v-for="item in 5" :key="item"><view></view><view></view></view>
+            </view>
+            <button v-for="item in collectionSourceRows" :key="item.Id" class="collection-picker-row"
+              :class="{
+                'collection-picker-row--selected': collectionSourceSelected(item),
+                'collection-picker-row--added': collectionSourceAlreadyAdded(item)
+              }"
+              :disabled="collectionSourceAlreadyAdded(item)"
+              @tap="toggleCollectionSource(item)">
+              <view class="collection-picker-check"><text>{{ collectionSourceAlreadyAdded(item) || collectionSourceSelected(item) ? '✓' : '' }}</text></view>
+              <view class="collection-picker-main">
+                <text>{{ collectionSourceTitle(item) }}</text>
+                <text>{{ collectionSourceSubtitle(item) }}{{ collectionSourceAlreadyAdded(item) ? ' · 已收录' : '' }}</text>
+              </view>
+            </button>
+            <view v-if="!collectionSourceLoading && !collectionSourceRows.length" class="collection-picker-empty">
+              <text>{{ collectionPickerConfig.emptyText || '未找到可选记录' }}</text>
+            </view>
+            <view v-if="collectionSourceLoading && collectionSourceRows.length" class="collection-picker-more"><text>加载中…</text></view>
+          </scroll-view>
+          <view class="collection-picker-submit">
+            <button :loading="collectionAdding" :disabled="!collectionSelectedIds.length || collectionAdding"
+              @tap="addSelectedCollectionSources">
+              <text>＋</text><text>{{ collectionAdding ? '正在添加' : `添加${collectionSelectedIds.length ? ` ${collectionSelectedIds.length}` : ''}` }}</text>
+            </button>
+          </view>
+        </view>
+      </view>
+    </root-portal>
 
     <!-- zhy：筛选弹窗必须脱离详情页 scroll-view，否则微信端上滑时 fixed 遮罩会被滚动容器裁剪。 -->
     <root-portal v-if="filterOpen && !isPreview">
@@ -529,6 +618,7 @@ export default {
     previewLimit: { type: Number, default: 2 },
     showPreviewHeader: { type: Boolean, default: false },
     relationValueOverride: { type: [String, Number], default: '' },
+    presentation: { type: Object, default: () => ({}) },
     showFloatingAdd: { type: Boolean, default: true },
     independentScroll: { type: Boolean, default: false },
     viewportHeight: { type: Number, default: 0 },
@@ -586,7 +676,17 @@ export default {
       proposalBatchActiveSelector: '',
       proposalBatchSubmitting: false,
       proposalBatchOptionsLoading: false,
-      proposalBatchRequestId: ''
+      proposalBatchRequestId: '',
+      collectionPickerOpen: false,
+      collectionSourceRows: [],
+      collectionSourceCount: 0,
+      collectionSourcePage: 1,
+      collectionSourceKeyword: '',
+      collectionSourceLoading: false,
+      collectionSourceMenuId: '',
+      collectionSelectedIds: [],
+      collectionAdding: false,
+      collectionDeletingId: ''
     }
   },
   computed: {
@@ -597,6 +697,15 @@ export default {
     childFkField() { return this.fieldConfig.TableChildFkFieldName || '' },
     sectionTitle() {
       return this.field.Label || this.fieldConfig.TableChildSysMenuName || this.table?.Description || this.field.Name || '关联数据'
+    },
+    isCollectionCardLayout() { return String(this.presentation.layout || '').toLowerCase() === 'collection-cards' },
+    collectionFooterLabel() { return this.presentation.footerLabel || '查看详情' },
+    collectionPickerConfig() {
+      const picker = this.presentation && this.presentation.picker
+      return picker && typeof picker === 'object' ? picker : {}
+    },
+    collectionPickerEnabled() {
+      return this.isCollectionCardLayout && Boolean(this.collectionPickerConfig.sourceTable)
     },
     isPreview() { return String(this.displayMode || '').toLowerCase() === 'preview' },
     previewContentVisible() { return !this.isPreview || !this.showPreviewHeader || this.previewExpanded },
@@ -1492,6 +1601,12 @@ export default {
       // 卡片实际引用的字段，避免服务端按 SelectFields 裁剪掉 MobileListFields 中的列。
       return [...new Set([
         ...(this.config.selectFields || []),
+        ...(this.isCollectionCardLayout ? [
+          this.presentation.titleField,
+          this.presentation.subtitleField,
+          this.presentation.imageField,
+          ...(this.presentation.lineFields || []).map((item) => item && item.field)
+        ] : []),
         this.childFkField,
         'Id',
         'CreateTime',
@@ -1556,6 +1671,7 @@ export default {
           ? await hydrateInstallationPositionRows(rawIncomingRows)
           : rawIncomingRows
         incomingRows = await this.hydrateProposalInstallationPointRows(incomingRows)
+        incomingRows = await this.hydrateCollectionRows(incomingRows)
         // Keep the newest completed response. A later request starting must not discard every
         // usable response and leave the related tab permanently displaying its skeleton.
         if (requestId < this.appliedRequestId) return
@@ -1916,6 +2032,246 @@ export default {
         ? ''
         : this.formatCreateTime(row.CreateTime || row.UpdateTime)
     },
+    collectionTitle(row) {
+      return this.configuredFieldValue(row, this.presentation.titleField) || '客户案例'
+    },
+    collectionSubtitle(row) {
+      return this.configuredFieldValue(row, this.presentation.subtitleField)
+    },
+    collectionLines(row) {
+      return (this.presentation.lineFields || []).map((item) => ({
+        ...item,
+        value: this.configuredFieldValue(row, item.field, item.format)
+      })).filter((item) => item.field && item.value && item.value !== '-')
+    },
+    collectionPhotos(row) {
+      return Array.isArray(row && row._collectionPhotos) ? row._collectionPhotos : []
+    },
+    async hydrateCollectionRows(rows = []) {
+      if (!this.isCollectionCardLayout || !this.presentation.imageField) return rows
+      const imageFieldName = String(this.presentation.imageField)
+      const field = (this.definition?.fields || []).find((item) =>
+        String(item.Name || '').toLowerCase() === imageFieldName.toLowerCase()
+      )
+      const sysMenuId = this.menuId || this.childMenuId
+      if (!field?.Id || !sysMenuId) return rows.map((row) => ({ ...row, _collectionPhotos: [] }))
+      return Promise.all(rows.map(async (row) => {
+        const paths = V8.normalizeUploadValue(row[imageFieldName])
+        const context = {
+          formEngineKey: this.config.table,
+          formDataId: row.Id,
+          fieldId: field.Id,
+          sysMenuId,
+          tableChildAuth: this.tableChildAuth
+        }
+        const photos = await Promise.all(paths.slice(0, 10).map((path) =>
+          V8.resolveFileUrl(path, context).catch(() => '')
+        ))
+        return { ...row, _collectionPhotos: photos.filter(Boolean) }
+      }))
+    },
+    collectionCanRemove(row) {
+      if (!row?.Id || String(this.parentMode || '').toLowerCase() === 'view') return false
+      const policy = String(this.presentation.removePermission || 'child-delete').toLowerCase()
+      if (policy === 'parent-edit') {
+        return Boolean(canEditMenuRecord(this.parentMenuId, this.currentUser))
+      }
+      return Boolean(canDeleteMenuRecord(this.menuId || this.childMenuId, this.currentUser))
+    },
+    async removeCollectionRow(row) {
+      if (!this.collectionCanRemove(row) || this.collectionDeletingId) {
+        if (!this.collectionCanRemove(row)) uni.showToast({ title: '当前账号没有移除权限', icon: 'none' })
+        return
+      }
+      const title = this.collectionTitle(row)
+      if (!(await this.confirmAction(`确定将“${title}”移出${this.presentation.title || this.sectionTitle}吗？`))) return
+      this.collectionDeletingId = String(row.Id)
+      uni.showLoading({ title: '正在移除', mask: true })
+      try {
+        const policy = String(this.presentation.removePermission || 'child-delete').toLowerCase()
+        const payload = {
+          FormEngineKey: this.config.table,
+          Id: row.Id,
+          ...(this.tableChildAuth ? { _TableChildAuth: this.tableChildAuth } : {}),
+          ...(policy !== 'parent-edit' && (this.menuId || this.childMenuId)
+            ? { _SysMenuId: this.menuId || this.childMenuId }
+            : {}),
+          _InvokeType: 'Client'
+        }
+        const result = await V8.FormEngine.DelFormData(payload)
+        if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '移除失败')
+        await Promise.all([this.loadData(true, true, true), this.loadRelatedMetrics(true)])
+        uni.showToast({ title: '已移出', icon: 'success' })
+      } catch (error) {
+        uni.showToast({ title: error.message || error.Msg || '移除失败', icon: 'none' })
+      } finally {
+        uni.hideLoading()
+        this.collectionDeletingId = ''
+      }
+    },
+    collectionSourceId(item) {
+      return String(item && item.Id || '')
+    },
+    collectionSourceSelected(item) {
+      const id = this.collectionSourceId(item)
+      return Boolean(id) && this.collectionSelectedIds.includes(id)
+    },
+    collectionSourceTitle(item) {
+      const field = this.collectionPickerConfig.titleField || 'Name'
+      return this.configuredFieldValue(item, field) || '未命名记录'
+    },
+    collectionSourceSubtitle(item) {
+      const fields = this.collectionPickerConfig.subtitleFields || []
+      for (const field of (Array.isArray(fields) ? fields : [fields])) {
+        const value = this.configuredFieldValue(item, field)
+        if (value && value !== '-') return value
+      }
+      return this.collectionPickerConfig.emptySubtitle || '未关联客户'
+    },
+    collectionSourceAlreadyAdded(item) {
+      const pairs = Array.isArray(this.collectionPickerConfig.duplicateFields)
+        ? this.collectionPickerConfig.duplicateFields
+        : []
+      if (!pairs.length) return false
+      return this.rows.some((row) => pairs.every((pair) => {
+        const sourceValue = item && item[pair.source]
+        const targetValue = row && row[pair.target]
+        return String(targetValue ?? '').trim() === String(sourceValue ?? '').trim()
+      }))
+    },
+    toggleCollectionSource(item) {
+      if (this.collectionSourceAlreadyAdded(item)) return
+      const id = this.collectionSourceId(item)
+      if (!id) return
+      const index = this.collectionSelectedIds.indexOf(id)
+      if (index >= 0) this.collectionSelectedIds.splice(index, 1)
+      else this.collectionSelectedIds.push(id)
+    },
+    collectionMappedValue(item, sourceFields) {
+      const fields = Array.isArray(sourceFields) ? sourceFields : [sourceFields]
+      for (const field of fields) {
+        const value = item && item[field]
+        if (value !== undefined && value !== null && value !== '') return value
+      }
+      return ''
+    },
+    collectionSourceSelectFields() {
+      const picker = this.collectionPickerConfig
+      return [...new Set([
+        'Id',
+        picker.titleField,
+        ...(Array.isArray(picker.subtitleFields) ? picker.subtitleFields : [picker.subtitleFields]),
+        ...(picker.duplicateFields || []).map((item) => item && item.source),
+        ...Object.values(picker.fieldMap || {}).flatMap((fields) => Array.isArray(fields) ? fields : [fields])
+      ].filter(Boolean))]
+    },
+    collectionSourceSnapshot(item) {
+      const result = {}
+      Object.entries(this.collectionPickerConfig.fieldMap || {}).forEach(([target, sourceFields]) => {
+        result[target] = this.collectionMappedValue(item, sourceFields)
+      })
+      Object.entries(this.collectionPickerConfig.userFields || {}).forEach(([target, sourceField]) => {
+        result[target] = this.currentUser && this.currentUser[sourceField] || ''
+      })
+      return {
+        ...result,
+        ...this.callbackDefaults(),
+        [this.childFkField]: this.relationValue
+      }
+    },
+    openCollectionPicker() {
+      this.collectionPickerOpen = true
+      this.collectionSelectedIds = []
+      if (!this.collectionSourceRows.length) this.searchCollectionSources()
+    },
+    closeCollectionPicker() {
+      if (this.collectionAdding) return
+      this.collectionPickerOpen = false
+      this.collectionSelectedIds = []
+    },
+    clearCollectionSourceKeyword() {
+      this.collectionSourceKeyword = ''
+      this.searchCollectionSources()
+    },
+    async searchCollectionSources() {
+      this.collectionSourcePage = 1
+      this.collectionSourceRows = []
+      await this.loadCollectionSources()
+    },
+    async loadMoreCollectionSources() {
+      if (this.collectionSourceLoading || this.collectionSourceRows.length >= this.collectionSourceCount) return
+      this.collectionSourcePage += 1
+      await this.loadCollectionSources()
+    },
+    async loadCollectionSources() {
+      if (this.collectionSourceLoading || !this.collectionPickerConfig.sourceTable) return
+      this.collectionSourceLoading = true
+      try {
+        if (!this.collectionSourceMenuId) {
+          const sourceMenu = await findMenu(
+            this.collectionPickerConfig.menuAliases || [],
+            this.collectionPickerConfig.sourceTable
+          )
+          this.collectionSourceMenuId = String(sourceMenu && sourceMenu.Id || '')
+        }
+        const result = await V8.FormEngine.GetTableData(this.collectionPickerConfig.sourceTable, {
+          _Keyword: this.collectionSourceKeyword.trim(),
+          _OrderBy: this.collectionPickerConfig.orderBy || 'UpdateTime',
+          _OrderByType: this.collectionPickerConfig.orderByType || 'DESC',
+          _PageIndex: this.collectionSourcePage,
+          _PageSize: Number(this.collectionPickerConfig.pageSize || 20),
+          _SelectFields: this.collectionSourceSelectFields(),
+          ...(this.collectionSourceMenuId ? { _SysMenuId: this.collectionSourceMenuId } : {})
+        })
+        if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '可选记录加载失败')
+        const incoming = Array.isArray(result.Data) ? result.Data : []
+        this.collectionSourceRows = this.collectionSourcePage === 1
+          ? incoming
+          : uniqueRowsById(this.collectionSourceRows.concat(incoming))
+        this.collectionSourceCount = Number(result.DataCount || this.collectionSourceRows.length)
+      } catch (error) {
+        if (this.collectionSourcePage > 1) this.collectionSourcePage -= 1
+        uni.showToast({ title: error.message || error.Msg || '可选记录加载失败', icon: 'none' })
+      } finally {
+        this.collectionSourceLoading = false
+      }
+    },
+    async addSelectedCollectionSources() {
+      if (!this.collectionSelectedIds.length || this.collectionAdding) return
+      const selected = this.collectionSourceRows.filter((item) =>
+        this.collectionSelectedIds.includes(this.collectionSourceId(item)) && !this.collectionSourceAlreadyAdded(item)
+      )
+      if (!selected.length) {
+        this.collectionSelectedIds = []
+        uni.showToast({ title: '所选记录已收录', icon: 'none' })
+        return
+      }
+      this.collectionAdding = true
+      try {
+        const batch = selected.map((item) => ({
+          FormEngineKey: this.config.table,
+          ...(this.menuId || this.childMenuId ? { _SysMenuId: this.menuId || this.childMenuId } : {}),
+          ...(this.tableChildAuth ? { _TableChildAuth: this.tableChildAuth } : {}),
+          _InvokeType: 'Client',
+          _RowModel: this.collectionSourceSnapshot(item)
+        }))
+        const result = await V8.FormEngine.AddTableData(batch)
+        if (!result || Number(result.Code) !== 1) throw new Error(result?.Msg || '添加失败')
+        this.collectionPickerOpen = false
+        this.collectionSelectedIds = []
+        await Promise.all([this.loadData(true, true, true), this.loadRelatedMetrics(true)])
+        uni.showToast({ title: `已添加 ${selected.length} 个案例`, icon: 'success' })
+      } catch (error) {
+        uni.showToast({ title: error.message || error.Msg || '添加失败', icon: 'none' })
+      } finally {
+        this.collectionAdding = false
+      }
+    },
+    previewCollectionPhotos(row, index) {
+      const urls = this.collectionPhotos(row)
+      if (!urls.length) return
+      uni.previewImage({ current: urls[index] || urls[0], urls })
+    },
     formatCreateTime(value) { return formatDateTime(value) },
     taskCardRow(row) {
       return {
@@ -2116,6 +2472,10 @@ export default {
         uni.showToast({ title: '当前账号没有新增权限', icon: 'none' })
         return
       }
+      if (this.collectionPickerEnabled) {
+        this.openCollectionPicker()
+        return
+      }
       if (this.isProposalInstallationQuickMode) {
         const id = createProposalInstallationId()
         const source = proposalInstallationDraft(id)
@@ -2202,11 +2562,15 @@ export default {
         })
         return
       }
+      const requestedMode = String(this.presentation.openMode || 'View')
+      const mode = requestedMode === 'Edit' && canEditMenuRecord(this.menuId || this.childMenuId, this.currentUser)
+        ? 'Edit'
+        : 'View'
       openForm({
         table: this.config.table,
         rowId: row.Id,
-        mode: 'View',
-        title: `${this.config.title || this.sectionTitle}详情`,
+        mode,
+        title: `${mode === 'Edit' ? '编辑' : ''}${this.config.title || this.sectionTitle}${mode === 'View' ? '详情' : ''}`,
         menuId: this.menuId,
         menuAliases: this.config.menuAliases || [],
         tableChildAuth: this.tableChildAuth,
@@ -2263,6 +2627,67 @@ export default {
 .related-business-list--preview { min-height: 0; padding: 10rpx 0 0; background: transparent; }
 .related-business-list--section { padding-top: 0; }
 .related-business-list--independent-scroll { box-sizing: border-box; display: flex; flex-direction: column; height: 100%; padding-bottom: 0; overflow: hidden; }
+.related-business-list--collection { padding: 0 22rpx; }
+.related-business-list--collection.related-business-list--independent-scroll { padding-bottom: 0; }
+.related-business-list--collection .search-row,
+.related-business-list--collection .related-metrics { display: none; }
+.collection-heading { display: flex; flex: none; align-items: center; justify-content: space-between; min-height: 96rpx; }
+.collection-heading__title { display: flex; align-items: baseline; min-width: 0; }
+.collection-heading__title text:first-child { overflow: hidden; color: #34525e; font-size: 27rpx; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.collection-heading__title text:last-child { margin-left: 10rpx; color: #81969e; font-size: 22rpx; }
+.collection-heading__add { display: flex; align-items: center; justify-content: center; gap: 5rpx; min-width: 150rpx; height: 72rpx; margin: 0; padding: 0 16rpx; border: 1rpx solid #bedce6; border-radius: 6rpx; color: #087fbd; background: #fff; font-size: 22rpx; line-height: 72rpx; transition: transform 150ms ease, background-color 150ms ease; }
+.collection-heading__add::after, .collection-card__delete::after { border: none; }
+.collection-heading__add--pressed { background: #f0f8fb; transform: scale(.97); }
+.collection-card { margin-bottom: 16rpx; padding: 22rpx 24rpx 16rpx; border: 1rpx solid #dfe9ed; border-radius: 8rpx; background: #fff; transition: background-color 160ms ease; }
+.collection-card--pressed { background: #f3f8fa; }
+.collection-card__head { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; }
+.collection-card__title { min-width: 0; overflow: hidden; color: #193844; font-size: 28rpx; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.collection-card__delete { flex: none; height: 56rpx; margin: -4rpx -6rpx -4rpx 0; padding: 0 10rpx; color: #c84d42; background: transparent; font-size: 20rpx; line-height: 56rpx; }
+.collection-card__subtitle { display: block; margin-top: 6rpx; color: #0c7fac; font-size: 22rpx; }
+.collection-card__lines { margin-top: 16rpx; padding: 12rpx 16rpx; border-radius: 6rpx; background: #f5f8f9; }
+.collection-card__lines view { display: grid; grid-template-columns: 116rpx minmax(0, 1fr); padding: 5rpx 0; font-size: 21rpx; line-height: 31rpx; }
+.collection-card__lines view text:first-child { color: #778d95; }
+.collection-card__lines view text:last-child { overflow: hidden; color: #405c66; text-overflow: ellipsis; white-space: nowrap; }
+.collection-card__photos { position: relative; display: grid; grid-template-columns: repeat(3, 112rpx); gap: 10rpx; margin-top: 14rpx; }
+.collection-card__photos image, .collection-card__photo-more { width: 112rpx; height: 88rpx; border-radius: 6rpx; background: #e9eff1; }
+.collection-card__photo-more { position: absolute; right: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(24,54,64,.74); font-size: 23rpx; }
+.collection-card__foot { display: flex; align-items: center; justify-content: space-between; margin-top: 14rpx; padding-top: 13rpx; border-top: 1rpx solid #edf2f4; color: #84979e; font-size: 20rpx; }
+.collection-card__foot text:last-child { margin-left: 18rpx; color: #0b82ba; font-size: 30rpx; }
+.collection-picker-mask { position: fixed; inset: 0; z-index: 10020; display: flex; align-items: flex-end; width: 100vw; height: 100vh; overflow: hidden; background: rgba(16,35,43,.44); }
+.collection-picker-sheet { box-sizing: border-box; width: 100%; height: min(78vh, 1120rpx); display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; overflow: hidden; border-radius: 16rpx 16rpx 0 0; background: #fff; animation: collection-sheet-up 180ms ease-out; }
+.collection-picker-handle { width: 72rpx; height: 7rpx; margin: 12rpx auto 2rpx; border-radius: 4rpx; background: #d6e1e5; }
+.collection-picker-head { min-height: 84rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; padding: 0 24rpx; }
+.collection-picker-head > view { min-width: 0; display: flex; align-items: baseline; }
+.collection-picker-head > view text:first-child { color: #183640; font-size: 28rpx; font-weight: 750; }
+.collection-picker-head > view text:last-child { margin-left: 14rpx; color: #087fbd; font-size: 21rpx; }
+.collection-picker-close { flex: none; width: 64rpx; height: 64rpx; margin: 0; padding: 0; border: none; color: #78909a; background: transparent; font-size: 38rpx; line-height: 64rpx; }
+.collection-picker-close::after, .collection-picker-search button::after, .collection-picker-row::after, .collection-picker-submit button::after { border: none; }
+.collection-picker-search { box-sizing: border-box; height: 72rpx; display: grid; grid-template-columns: 36rpx minmax(0, 1fr) 48rpx; align-items: center; margin: 0 24rpx 10rpx; padding: 0 14rpx; border: 1rpx solid #dce7eb; border-radius: 8rpx; background: #f5f8f9; }
+.collection-picker-search > text { color: #78919a; font-size: 28rpx; }
+.collection-picker-search input { min-width: 0; height: 70rpx; color: #203c46; font-size: 24rpx; }
+.collection-picker-search button { width: 48rpx; height: 56rpx; margin: 0; padding: 0; color: #78909a; background: transparent; font-size: 30rpx; line-height: 56rpx; }
+.collection-picker-list { height: 100%; padding: 0 24rpx; box-sizing: border-box; }
+.collection-picker-row { box-sizing: border-box; width: 100%; min-height: 112rpx; display: grid; grid-template-columns: 48rpx minmax(0, 1fr); gap: 14rpx; align-items: center; margin: 0; padding: 14rpx 2rpx; border-bottom: 1rpx solid #edf2f4; border-radius: 0; color: inherit; background: #fff; line-height: normal; text-align: left; }
+.collection-picker-row--selected { background: #f5fbfd; }
+.collection-picker-row--added { opacity: .56; }
+.collection-picker-check { box-sizing: border-box; width: 34rpx; height: 34rpx; display: flex; align-items: center; justify-content: center; border: 2rpx solid #b7cbd3; border-radius: 5rpx; color: transparent; font-size: 22rpx; }
+.collection-picker-row--selected .collection-picker-check { border-color: #0b86d4; color: #fff; background: #0b86d4; }
+.collection-picker-row--added .collection-picker-check { border-color: #8fbecf; color: #fff; background: #8fbecf; }
+.collection-picker-main { min-width: 0; }
+.collection-picker-main text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.collection-picker-main text:first-child { color: #264651; font-size: 25rpx; font-weight: 700; }
+.collection-picker-main text:last-child { margin-top: 8rpx; color: #82969e; font-size: 20rpx; }
+.collection-picker-empty, .collection-picker-more { min-height: 160rpx; display: flex; align-items: center; justify-content: center; color: #8ca0a8; font-size: 23rpx; }
+.collection-picker-more { min-height: 64rpx; }
+.collection-picker-loading { padding: 2rpx 0; }
+.collection-picker-loading > view { min-height: 104rpx; padding: 18rpx 4rpx; border-bottom: 1rpx solid #edf2f4; }
+.collection-picker-loading > view > view { height: 20rpx; margin: 8rpx 0; border-radius: 5rpx; background: linear-gradient(90deg, #edf3f5 25%, #f8fafb 50%, #edf3f5 75%); background-size: 300% 100%; animation: shimmer 1.4s infinite; }
+.collection-picker-loading > view > view:first-child { width: 62%; height: 25rpx; }
+.collection-picker-loading > view > view:last-child { width: 38%; }
+.collection-picker-submit { padding: 14rpx max(24rpx, var(--mci-safe-right)) calc(14rpx + var(--mci-safe-bottom)) max(24rpx, var(--mci-safe-left)); border-top: 1rpx solid #e1eaed; background: #fff; }
+.collection-picker-submit button { height: 82rpx; display: flex; align-items: center; justify-content: center; gap: 8rpx; margin: 0; border-radius: 8rpx; color: #fff; background: #087fbd; font-size: 27rpx; font-weight: 700; line-height: 82rpx; }
+.collection-picker-submit button[disabled] { color: #fff; background: #a8c6d1; opacity: 1; }
+@keyframes collection-sheet-up { from { transform: translateY(18rpx); opacity: .4; } to { transform: translateY(0); opacity: 1; } }
 .related-list-body { width: 100%; }
 .related-list-body--scroll { flex: 1; min-height: 0; height: 100%; box-sizing: border-box; }
 .related-list-body--scroll .related-list-scroll-content { min-height: 100%; padding-bottom: calc(138rpx + var(--mci-safe-bottom)); box-sizing: border-box; }
