@@ -425,6 +425,30 @@ namespace Microi.net
                 backgroundTaskId, null, publicMessage, null, null);
             Console.WriteLine(
                 $"Microi：【Error异常】【{osClient}】租户数据库升级失败：{publicMessage}");
+            var systemLogContent =
+                $"BeforeVersion={beforeVersion ?? string.Empty}; " +
+                $"TargetVersion={targetVersion ?? string.Empty}; " +
+                $"AfterVersion={afterVersion ?? string.Empty}; " +
+                $"ErrorType={errorType ?? "TenantUpgradeFailed"}; " +
+                $"Message={publicMessage}";
+            if (systemLogContent.Length > 32000)
+            {
+                systemLogContent = systemLogContent.Substring(0, 32000);
+            }
+            var queued = MicroiEngine.QueueSystemLog(
+                osClient,
+                "PlatformUpgrade",
+                "TenantUpgradeFailed",
+                "租户数据库升级失败",
+                systemLogContent,
+                3,
+                false,
+                backgroundTaskId);
+            if (!queued)
+            {
+                Console.WriteLine(
+                    $"Microi：【Warning警告】平台自动升级【{osClient}】系统日志队列暂不可用，协调器失败详情已保留在控制台日志。");
+            }
             return new DosResult(0, new
             {
                 OsClient = osClient,
