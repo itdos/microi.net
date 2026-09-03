@@ -4,6 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 
 const publisherSource = await readFile(new URL("./ai-app-publish-store.js", import.meta.url), "utf8");
+const buildZipSource = await readFile(new URL("./ai-app-download-build-zip.js", import.meta.url), "utf8");
 const packageModel = JSON.parse(await readFile(new URL("./app.microi.store.json", import.meta.url), "utf8"));
 const upgradeSource = await readFile(new URL("../13-UpgradeAppStore.cs", import.meta.url), "utf8");
 
@@ -99,12 +100,17 @@ test("source ZIP contains only root-level compilable source and preserves binary
 
 test("build ZIP reads every real compiled file and strips only its build root", () => {
   const buildZip = engineCode("ai_app_download_build_zip");
+  assert.equal(buildZip.replace(/\r\n/g, "\n"), buildZipSource.replace(/\r\n/g, "\n"));
   const buildArchivePath = createPathClassifier(buildZip, "buildArchivePath");
   assert.equal(buildArchivePath("build/index.html"), "index.html");
   assert.equal(buildArchivePath("build/static/js/app.js"), "static/js/app.js");
   assert.equal(buildArchivePath("source/index.html"), "");
   assert.match(buildZip, /getFiles\(appId\)/);
   assert.match(buildZip, /entries\.push\(\{\s*Path:\s*buildPath,\s*FileByteBase64:\s*readAssetBase64\(compiledFile\)/);
+  assert.match(buildZip, /STABLE_RUNTIME_ASSET_ROUTE_V1/);
+  assert.match(buildZip, /VERIFIED_RUNTIME_ASSET_BYTES_V1/);
+  assert.match(buildZip, /actualSize !== expectedSize/);
+  assert.match(buildZip, /actualSha !== expectedSha/);
   assert.doesNotMatch(buildZip, /else\s*\{\s*var html = text\(version && version\.BuildLog\)/);
 });
 
@@ -112,5 +118,8 @@ test("upgrade rejects stale publisher and stale source/build ZIP engines", () =>
   assert.match(upgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 7, 7\)/);
   assert.match(upgradeSource, /SOURCE_BUILD_ARCHIVE_ROOTS_V1/);
   assert.match(upgradeSource, /ai_app_download_build_zip[\s\S]*?REAL_BUILD_ZIP_ASSETS_V1/);
+  assert.match(upgradeSource, /buildZipVersion\s*>=\s*new System\.Version\(1, 2, 4\)/);
+  assert.match(upgradeSource, /STABLE_RUNTIME_ASSET_ROUTE_V1/);
+  assert.match(upgradeSource, /VERIFIED_RUNTIME_ASSET_BYTES_V1/);
   assert.match(upgradeSource, /ai_app_download_source_zip[\s\S]*?SOURCE_ONLY_ZIP_ROOT_V1/);
 });

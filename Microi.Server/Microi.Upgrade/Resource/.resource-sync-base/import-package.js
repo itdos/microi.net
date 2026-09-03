@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.6.8
+ * Version: v2.7.1
  * Function:
  * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员权限安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
  */
@@ -1844,6 +1844,7 @@ try {
         ApiEngineInserted: 0,
         ApiEngineUpdated: 0,
         ApiEngineSkipped: 0,
+        ApiEngineDuplicatesRetired: 0,
         ApiEngineHistoryMigrated: 0,
         ApiEngineHistorySkipped: 0,
         VersionRecordUpdated: 0,
@@ -1898,7 +1899,7 @@ try {
         'AdminRoleLimitInserted', 'AdminRoleLimitUpdated', 'AdminRoleLimitSkipped',
         'ReferenceRowsUpdated', 'FlowInserted', 'FlowUpdated',
         'NodeInserted', 'NodeUpdated', 'LineInserted', 'LineUpdated',
-        'ApiEngineInserted', 'ApiEngineUpdated', 'ApiEngineSkipped',
+        'ApiEngineInserted', 'ApiEngineUpdated', 'ApiEngineSkipped', 'ApiEngineDuplicatesRetired',
         'ApiEngineHistoryMigrated', 'ApiEngineHistorySkipped',
         'DataSetCount', 'DataInserted', 'DataUpdated', 'DataSkipped',
         'ScheduleJobSaved', 'VersionRecordUpdated'
@@ -2988,8 +2989,54 @@ try {
             PrivateSourcePath: uploadedSource.length ? sourceRoot : firstTextParam([existingApp && existingApp.PrivateSourcePath, app.PrivateSourcePath]),
             PublicPublishPath: installedPublicPublishPath
         };
+        // DATABASE_ONLY_PUBLISH_POINTER_RESET_V1：数据库内联运行时属于目标租户
+        // 本地投影。空库从官方种子复制时可能带入另一租户的 v3 committed pointer；
+        // 若继续保留，稳定入口会在读取 sys_microiservice 前按错误指针失败关闭。
+        // DatabaseOnly 安装必须显式降回本租户可验证的 v2 管理入口，并清空全部
+        // committed pointer 字段；历史版本行保留作审计，不参与当前入口解析。
+        if (useDatabaseOnlyBuild) {
+            appRow.PublishProtocolVersion = 2;
+            appRow.PublishState = 'LegacyUnverified';
+            appRow.PublishFence = 0;
+            appRow.PublishRowVersion = 0;
+            appRow.ActivePublishVersionId = null;
+            appRow.CommittedPublishVersionId = null;
+            appRow.CommittedRuntimeManifestHash = null;
+        }
         var appResult = upsertApplicationRow('sys_microistore', [['AppKey', '=', appKey]], appRow);
         if (!appResult || appResult.Code != 1) throw new Error('写入统一应用商城失败：' + ((appResult && appResult.Msg) || ''));
+        if (useDatabaseOnlyBuild) {
+            var pointerResetCount = V8.Db.FromSql(
+                    'UPDATE sys_microistore SET PublishProtocolVersion=2, PublishState=@p0, PublishFence=0, PublishRowVersion=0, ActivePublishVersionId=NULL, CommittedPublishVersionId=NULL, CommittedRuntimeManifestHash=NULL WHERE Id=@p1 AND LOWER(AppKey)=LOWER(@p2)'
+                )
+                .AddInParameter('@p0', 'LegacyUnverified')
+                .AddInParameter('@p1', appId)
+                .AddInParameter('@p2', appKey)
+                .ExecuteNonQuery();
+            if (Number(pointerResetCount) != 1) {
+                throw new Error('数据库内置微服务发布指针清理未命中唯一应用：' + appKey);
+            }
+            var pointerRows = V8.Db.FromSql(
+                    'SELECT PublishProtocolVersion, PublishState, PublishFence, PublishRowVersion, ActivePublishVersionId, CommittedPublishVersionId, CommittedRuntimeManifestHash FROM sys_microistore WHERE Id=@p0 AND LOWER(AppKey)=LOWER(@p1)'
+                )
+                .AddInParameter('@p0', appId)
+                .AddInParameter('@p1', appKey)
+                .ToArray();
+            var pointerRow = pointerRows && pointerRows.length == 1 ? pointerRows[0] : null;
+            if (!pointerRow
+                || Number(pointerRow.PublishProtocolVersion) != 2
+                || String(pointerRow.PublishState || '') != 'LegacyUnverified'
+                || Number(pointerRow.PublishFence || 0) != 0
+                || Number(pointerRow.PublishRowVersion || 0) != 0
+                || firstTextParam([
+                    pointerRow.ActivePublishVersionId,
+                    pointerRow.CommittedPublishVersionId,
+                    pointerRow.CommittedRuntimeManifestHash
+                ])) {
+                throw new Error('数据库内置微服务发布指针清理后强回读不一致：' + appKey);
+            }
+            debugLog['database_only_pointer_reset_' + appKey] = '已清理跨租户 v3 pointer，并切换为本租户数据库运行时';
+        }
         if (sourceExpected) {
             var installedSources = V8.FormEngine.GetTableData('mci_ai_app_file', {
                 _Where: [['AppId', '=', appId], ['AND', 'StorageScope', '=', 'Private']],
@@ -3350,6 +3397,7 @@ try {
                     ApiEngineInserted: stats.ApiEngineInserted,
                     ApiEngineUpdated: stats.ApiEngineUpdated,
                     ApiEngineSkipped: stats.ApiEngineSkipped,
+                    ApiEngineDuplicatesRetired: stats.ApiEngineDuplicatesRetired,
                     ApiEngineHistoryMigrated: stats.ApiEngineHistoryMigrated,
                     ApiEngineHistorySkipped: stats.ApiEngineHistorySkipped,
                     ApplicationSourceFiles: stats.ApplicationSourceFiles,
@@ -3563,7 +3611,22 @@ try {
     // 菜单都可能按目标库自然键保留既有主键，只做普通字符串 IdMap 仍可能让页面
     // 留下发布端旧 TableId。目标菜单的持久化 DiyTableId 才是运行时权威绑定；
     // 因此随包 mic_page 数据写入前必须按已安装菜单重新投影并强校验目标表存在。
+    // PAGE_ENGINE_OPTIONAL_REFERENCE_V1：普通引用继续严格失败；只有组件自身显式声明
+    // referencePolicy.onMissing=RemoveWidget 时，才允许在目标租户确实缺少菜单/表后
+    // 移除该可选组件。数据库读取异常绝不能被当成“缺少资源”吞掉。
+    var pageEngineRemovedReferenceNode = {};
     var pageEngineMenuBindingCache = {};
+    var pageEngineMissingReferenceError = function (message) {
+        var error = new Error(message);
+        error.IsPageEngineMissingReference = true;
+        return error;
+    };
+    var pageEngineMissingReferenceAction = function (widget) {
+        var policy = widget && (widget.referencePolicy || widget.ReferencePolicy) || {};
+        return String(policy.onMissing || policy.OnMissing || policy.MissingBehavior || '')
+            .replace(/^\s+|\s+$/g, '')
+            .toLowerCase();
+    };
     var readPageEngineMenuBinding = function (sourceMenuId) {
         var targetMenuId = normalizeId(findMappedId(normalizeId(sourceMenuId)));
         if (!targetMenuId) return null;
@@ -3576,20 +3639,35 @@ try {
             Id: targetMenuId,
             _SelectFields: ['Id', 'Name', 'DiyTableId', 'DiyTableName']
         });
+        if (menuResult && menuResult.Code == 2) {
+            throw pageEngineMissingReferenceError(
+                '界面引擎 diytable 引用修复失败：目标菜单不存在，MenuId=' + targetMenuId
+            );
+        }
         if (!menuResult || menuResult.Code != 1 || !menuResult.Data) {
-            throw new Error('界面引擎 diytable 引用修复失败：目标菜单不存在，MenuId=' + targetMenuId);
+            throw new Error('界面引擎 diytable 引用修复失败：读取目标菜单失败，MenuId='
+                + targetMenuId + '，' + ((menuResult && menuResult.Msg) || '接口无返回'));
         }
         var targetTableId = normalizeId(findMappedId(normalizeId(menuResult.Data.DiyTableId)));
         if (!targetTableId) {
-            throw new Error('界面引擎 diytable 引用修复失败：目标菜单未绑定DIY表，MenuId=' + targetMenuId);
+            throw pageEngineMissingReferenceError(
+                '界面引擎 diytable 引用修复失败：目标菜单未绑定DIY表，MenuId=' + targetMenuId
+            );
         }
         var tableResult = V8.FormEngine.GetFormData('diy_table', {
             Id: targetTableId,
             _SelectFields: ['Id', 'Name']
         });
+        if (tableResult && tableResult.Code == 2) {
+            throw pageEngineMissingReferenceError(
+                '界面引擎 diytable 引用修复失败：目标菜单绑定的DIY表不存在，MenuId='
+                + targetMenuId + '，DiyTableId=' + targetTableId
+            );
+        }
         if (!tableResult || tableResult.Code != 1 || !tableResult.Data) {
-            throw new Error('界面引擎 diytable 引用修复失败：目标菜单绑定的DIY表不存在，MenuId='
-                + targetMenuId + '，DiyTableId=' + targetTableId);
+            throw new Error('界面引擎 diytable 引用修复失败：读取目标DIY表失败，MenuId='
+                + targetMenuId + '，DiyTableId=' + targetTableId + '，'
+                + ((tableResult && tableResult.Msg) || '接口无返回'));
         }
 
         var binding = {
@@ -3604,12 +3682,16 @@ try {
     var remapPageEngineDiyTableWidgets = function (value, state) {
         if (value === null || value === undefined) return value;
         if (Array.isArray(value)) {
+            var remappedArray = [];
             for (var arrayIndex = 0; arrayIndex < value.length; arrayIndex++) {
-                value[arrayIndex] = remapPageEngineDiyTableWidgets(value[arrayIndex], state);
+                var remappedItem = remapPageEngineDiyTableWidgets(value[arrayIndex], state);
+                if (remappedItem !== pageEngineRemovedReferenceNode) remappedArray.push(remappedItem);
             }
-            return value;
+            return remappedArray;
         }
         if (typeof value != 'object') return value;
+
+        var hadWidgetList = Array.isArray(value.widgetList) && value.widgetList.length > 0;
 
         if (String(value.type || '').toLowerCase() == 'diytable'
             && Array.isArray(value.widgetParams)) {
@@ -3623,7 +3705,20 @@ try {
                 }
             }
             if (menuParam && menuParam.value) {
-                var binding = readPageEngineMenuBinding(menuParam.value);
+                var binding;
+                try {
+                    binding = readPageEngineMenuBinding(menuParam.value);
+                } catch (referenceError) {
+                    if (referenceError
+                        && referenceError.IsPageEngineMissingReference === true
+                        && pageEngineMissingReferenceAction(value) == 'removewidget') {
+                        state.changed = true;
+                        state.optionalWidgetsRemoved++;
+                        state.optionalReferenceMessages.push(referenceError.message);
+                        return pageEngineRemovedReferenceNode;
+                    }
+                    throw referenceError;
+                }
                 if (binding) {
                     if (menuParam.value !== binding.MenuId) {
                         menuParam.value = binding.MenuId;
@@ -3643,7 +3738,16 @@ try {
 
         for (var objectKey in value) {
             if (!Object.prototype.hasOwnProperty.call(value, objectKey)) continue;
-            value[objectKey] = remapPageEngineDiyTableWidgets(value[objectKey], state);
+            var remappedValue = remapPageEngineDiyTableWidgets(value[objectKey], state);
+            if (remappedValue === pageEngineRemovedReferenceNode) {
+                delete value[objectKey];
+            } else {
+                value[objectKey] = remappedValue;
+            }
+        }
+        if (hadWidgetList && Array.isArray(value.widgetList) && value.widgetList.length == 0) {
+            state.optionalWrappersRemoved++;
+            return pageEngineRemovedReferenceNode;
         }
         return value;
     };
@@ -3665,7 +3769,13 @@ try {
         // 先做表/字段/菜单稳定 Id 的精确值映射，再按目标菜单的真实表绑定纠偏。
         var genericState = { changed: false };
         pageJson = replaceIdsDeep(pageJson, genericState);
-        var pageState = { changed: genericState.changed, diyTableWidgetCount: 0 };
+        var pageState = {
+            changed: genericState.changed,
+            diyTableWidgetCount: 0,
+            optionalWidgetsRemoved: 0,
+            optionalWrappersRemoved: 0,
+            optionalReferenceMessages: []
+        };
         pageJson = remapPageEngineDiyTableWidgets(pageJson, pageState);
         if (!pageState.changed) return sourceRow;
 
@@ -3676,7 +3786,13 @@ try {
         remappedRow.JsonObj = jsonWasText ? JSON.stringify(pageJson) : pageJson;
         stats.ReferenceRowsUpdated++;
         debugLog['page_engine_reference_remap_' + normalizeId(sourceRow.Id || rowIndex)] =
-            '已按目标菜单重写界面引擎引用，diytable组件=' + pageState.diyTableWidgetCount;
+            '已按目标菜单重写界面引擎引用，diytable组件=' + pageState.diyTableWidgetCount
+            + '，可选组件移除=' + pageState.optionalWidgetsRemoved
+            + '，空容器移除=' + pageState.optionalWrappersRemoved;
+        if (pageState.optionalReferenceMessages.length > 0) {
+            debugLog['page_engine_optional_reference_' + normalizeId(sourceRow.Id || rowIndex)] =
+                pageState.optionalReferenceMessages.join('；');
+        }
         return remappedRow;
     };
 
@@ -4367,6 +4483,8 @@ try {
     // PHYSICAL_NOT_NULL_BACKFILL_V1：老租户可能已经创建了新字段，但历史行仍为
     // NULL。MySQL 会在 MODIFY ... NOT NULL 之前校验既有数据，因此必须先使用包内
     // 明确声明的默认值做参数化回填，再收紧列约束。没有默认值时失败关闭，不能猜值。
+    // PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1：租户字段不能把发布端 iTdos 写成固定默认值；
+    // 包可显式声明 BACKFILL_VALUE_SOURCE=TargetOsClient，由可信 V8.OsClient 参数化回填。
     var prepareNotNullColumnData = function (tableName, columnName, sourceColumn, targetColumn) {
         if (!isSafeIdentifier(tableName) || !isSafeIdentifier(columnName)) return 0;
 
@@ -4383,6 +4501,25 @@ try {
         if (nullCount == 0) return 0;
 
         var sourceDefault = getPhysicalValue(sourceColumn, ['COLUMN_DEFAULT', 'ColumnDefault', 'Default']);
+        var backfillValueSource = String(getPhysicalValue(sourceColumn, [
+            'BACKFILL_VALUE_SOURCE',
+            'BackfillValueSource'
+        ]) || '').replace(/^\s+|\s+$/g, '');
+        if (backfillValueSource) {
+            if (sourceDefault !== null && sourceDefault !== undefined) {
+                throw new Error('NOT NULL回填契约不能同时声明数据库默认值和BACKFILL_VALUE_SOURCE');
+            }
+            if (backfillValueSource.toLowerCase() != 'targetosclient') {
+                throw new Error('不支持的NOT NULL回填来源：' + backfillValueSource);
+            }
+            if (String(columnName || '').toLowerCase() != 'osclient') {
+                throw new Error('TargetOsClient仅允许用于OsClient字段，当前字段=' + columnName);
+            }
+            sourceDefault = String(V8.OsClient || '').replace(/^\s+|\s+$/g, '');
+            if (!sourceDefault) {
+                throw new Error('目标租户标识为空，无法回填OsClient历史NULL数据');
+            }
+        }
         if (sourceDefault === null || sourceDefault === undefined) {
             throw new Error(
                 '字段存在' + nullCount + '条NULL数据，但应用包要求NOT NULL且未声明可回填的默认值，已阻止修改'
@@ -4544,8 +4681,15 @@ try {
                             targetColumn
                         );
                         if (backfilledNullCount > 0) {
+                            var backfillValueSource = String(getPhysicalValue(sourceColumn, [
+                                'BACKFILL_VALUE_SOURCE',
+                                'BackfillValueSource'
+                            ]) || '').toLowerCase();
                             debugLog['physical_schema_backfilled_' + tableName + '_' + columnName] =
-                                '已按应用包默认值回填' + backfilledNullCount + '条历史NULL数据';
+                                '已按' + (backfillValueSource == 'targetosclient'
+                                    ? '目标租户标识'
+                                    : '应用包默认值')
+                                + '回填' + backfilledNullCount + '条历史NULL数据';
                         }
                         var definition = buildPhysicalColumnDefinition(sourceColumn, false, effectiveColumnType);
                         if (!definition) continue;
@@ -7759,6 +7903,31 @@ try {
         return 0;
     }
 
+    // PACKAGE_API_ENGINE_DUPLICATE_KEY_REPAIR_V1：历史并发安装或旧版写入可能让
+    // 同一逻辑 Key 留下多条物理记录。包内 Id 是最强身份；否则优先最早的活跃
+    // 记录，再选最早软删除记录，最后以 Id 打破时间并列，保证每次恢复结果稳定。
+    function selectApiEngineIdentityCanonical(rows, incomingId) {
+        var selected = null;
+        var selectedRank = null;
+        var expectedId = String(incomingId || '').toLowerCase();
+        for (var rowIndex = 0; rows && rowIndex < rows.length; rowIndex++) {
+            var row = rows[rowIndex] || {};
+            var rowId = String(row.Id || '');
+            if (!rowId) continue;
+            var deletedText = String(row.IsDeleted === null || row.IsDeleted === undefined ? '' : row.IsDeleted).toLowerCase();
+            var isDeleted = row.IsDeleted === true || row.IsDeleted === 1
+                || deletedText == '1' || deletedText == 'true';
+            var identityRank = expectedId && rowId.toLowerCase() == expectedId ? 0 : (isDeleted ? 2 : 1);
+            var createRank = String(row.CreateTime || '9999-12-31 23:59:59');
+            var rank = String(identityRank) + '|' + createRank + '|' + rowId.toLowerCase();
+            if (selectedRank === null || rank < selectedRank) {
+                selected = row;
+                selectedRank = rank;
+            }
+        }
+        return selected;
+    }
+
     // PACKAGE_MANAGED_OVERWRITE_V2：安装动作已经明确选择了应用包和版本，所有
     // Managed 接口都以 Incoming 为权威覆盖目标端，不再按来源、BaseHash、本地
     // 版本或历史 Ownership 产生冲突。BaseHash 仅保留为安装审计信息。
@@ -7951,8 +8120,51 @@ try {
                     .AddInParameter('@p0', apiEngine.ApiEngineKey)
                     .ToArray();
                 if (physicalByKeyRows && physicalByKeyRows.length > 0) {
+                    var canonicalApiEngine = selectApiEngineIdentityCanonical(physicalByKeyRows, apiEngine.Id);
+                    if (!canonicalApiEngine || !canonicalApiEngine.Id) {
+                        throw new Error('接口引擎重复 Key 恢复无法选择稳定记录：' + apiEngine.ApiEngineKey);
+                    }
+                    if (physicalByKeyRows.length > 1) {
+                        var retiredForKey = 0;
+                        for (var duplicateIndex = 0; duplicateIndex < physicalByKeyRows.length; duplicateIndex++) {
+                            var duplicateApiEngine = physicalByKeyRows[duplicateIndex] || {};
+                            if (!duplicateApiEngine.Id
+                                || String(duplicateApiEngine.Id) == String(canonicalApiEngine.Id)) continue;
+                            removeApiEngineCacheAliases(duplicateApiEngine);
+                            var retiredCount = V8.Db.FromSql(
+                                    'UPDATE sys_apiengine SET IsDeleted=1 WHERE Id=@p0 AND LOWER(ApiEngineKey)=LOWER(@p1) AND (IsDeleted=0 OR IsDeleted IS NULL)'
+                                )
+                                .AddInParameter('@p0', duplicateApiEngine.Id)
+                                .AddInParameter('@p1', apiEngine.ApiEngineKey)
+                                .ExecuteNonQuery();
+                            retiredForKey += Number(retiredCount || 0);
+                            stats.ApiEngineDuplicatesRetired += Number(retiredCount || 0);
+                        }
+                        var canonicalRevivedCount = V8.Db.FromSql(
+                                'UPDATE sys_apiengine SET IsDeleted=0 WHERE Id=@p0 AND LOWER(ApiEngineKey)=LOWER(@p1)'
+                            )
+                            .AddInParameter('@p0', canonicalApiEngine.Id)
+                            .AddInParameter('@p1', apiEngine.ApiEngineKey)
+                            .ExecuteNonQuery();
+                        if (Number(canonicalRevivedCount) != 1) {
+                            throw new Error('接口引擎重复 Key 恢复未命中稳定记录：' + apiEngine.ApiEngineKey);
+                        }
+                        var activeCanonicalRows = V8.Db.FromSql(
+                                'SELECT * FROM sys_apiengine WHERE LOWER(ApiEngineKey)=LOWER(@p0) AND (IsDeleted=0 OR IsDeleted IS NULL)'
+                            )
+                            .AddInParameter('@p0', apiEngine.ApiEngineKey)
+                            .ToArray();
+                        if (!activeCanonicalRows || activeCanonicalRows.length != 1
+                            || String(activeCanonicalRows[0].Id) != String(canonicalApiEngine.Id)) {
+                            throw new Error('接口引擎重复 Key 恢复后强回读不唯一：' + apiEngine.ApiEngineKey);
+                        }
+                        canonicalApiEngine = activeCanonicalRows[0];
+                        debugLog['apiengine_duplicate_key_repaired_' + i] = '保留稳定Id='
+                            + canonicalApiEngine.Id + '，退役活跃重复记录'
+                            + retiredForKey + '条：' + apiEngine.ApiEngineKey;
+                    }
                     existsByKey = true;
-                    existingApiEngineByKey = physicalByKeyRows[0];
+                    existingApiEngineByKey = canonicalApiEngine;
                 }
             }
             if (apiEngine.Id) {
@@ -8070,7 +8282,8 @@ try {
         }
 
         debugLog.step7Result = '接口引擎数据处理完成：新增' + stats.ApiEngineInserted
-            + '，修改' + stats.ApiEngineUpdated + '，保留租户扩展' + stats.ApiEngineSkipped;
+            + '，修改' + stats.ApiEngineUpdated + '，退役重复记录' + stats.ApiEngineDuplicatesRetired
+            + '，保留租户扩展' + stats.ApiEngineSkipped;
     }
 
     // ==================== 步骤8：导入应用随包数据 ====================
@@ -8402,6 +8615,7 @@ try {
             工作流节点: '新增' + stats.NodeInserted + '条，修改' + stats.NodeUpdated + '条',
             工作流连线: '新增' + stats.LineInserted + '条，修改' + stats.LineUpdated + '条',
             接口引擎: '新增' + stats.ApiEngineInserted + '条，修改' + stats.ApiEngineUpdated
+                + '条，退役重复记录' + stats.ApiEngineDuplicatesRetired
                 + '条，保留租户扩展' + stats.ApiEngineSkipped + '条',
             接口引擎修改历史: '迁移' + stats.ApiEngineHistoryMigrated
                 + '条，幂等跳过' + stats.ApiEngineHistorySkipped + '条，旧文本保留',

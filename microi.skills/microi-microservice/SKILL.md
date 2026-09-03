@@ -195,6 +195,22 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 放在右侧内容容器内，使微服务导航栏和顶部栏保持挂载；浏览器 `popstate/hashchange` 要能恢复
 内部路由。只有确实要离开当前微服务、打开另一个吾码后台菜单或替换顶部 Tab 时才调用宿主路由动作。
 
+### 页面打开与路由切换骨架屏（强制）
+
+所有新建或修改的 MicroService，在首次打开、内部路由切换、菜单页签冷启动以及影响主要内容几何的
+异步数据读取期间，都必须先同步呈现骨架屏；禁止只显示转圈图标、纯文字“加载中”、整页
+`v-loading` 遮罩、空白画布或等待接口结束后才补 Loading。顶部栏、子应用导航和不依赖新数据的
+操作保持挂载，骨架只接管正在变化的内容容器。
+
+- 路由组件使用 `defineAsyncComponent + Suspense fallback`；已缓存组件再次切换也要有短暂且可观测的路由骨架，组件挂载后的接口加载继续使用页面内骨架，避免两者之间闪白。
+- 骨架必须复刻最终页面的主要几何：列表保留工具栏、行和分页轮廓，表单保留分组与字段轮廓，设计器保留节点库/画布/属性栏，3D、图表和大屏保留画布边界、图例及主体轮廓。不能用一组与最终布局无关的灰条冒充。
+- 加载容器必须设置 `aria-busy="true"` 并提供可读状态文本；`prefers-reduced-motion: reduce` 时停用 shimmer。成功、空数据、失败和无权限是四种独立终态，失败不得永久停留在骨架。
+- 骨架必须在 import/fetch 之前进入 DOM，切换期间不销毁宿主导航；真实浏览器验收要用网络节流或可控延迟分别截取首次打开和至少一次内部路由切换的骨架，再确认最终页面、前进/后退与错误重试均正常。
+
+复盘：AI 工作流业务蓝图曾在路由切换后先显示空白/转圈，根因是只给异步组件配置了加载逻辑，
+没有把路由加载、页面数据加载和最终几何统一成状态协议。通用规则是“路由 fallback + 页面内骨架 +
+明确终态”三层同时存在，并以真实浏览器慢网截图作为交付门禁。
+
 ### 菜单页签缓存与子应用生命周期（强制）
 
 - 菜单微服务只有一个缓存所有者：Vue 路由宿主固定 `meta.keepAlive=false`，`<micro-app keep-alive>` 独占子应用状态。禁止把外层 Vue `KeepAlive` 打开，也禁止子应用通过随机实例名规避运行时缓存；双层缓存会产生旧宿主与当前路由竞争、无数据、永久骨架屏和白屏。
@@ -220,6 +236,20 @@ window.addEventListener('appstate-change', (event) => {
 `position:fixed; inset:0` 越界覆盖吾码 Logo 与主菜单。宿主使用 `contain: layout paint` 和
 `isolation:isolate` 作为第二道边界，但不能代替子应用命名空间。验收需检查宿主 Logo/菜单样式、
 内部导航不重挂微服务、内容区局部骨架屏，以及前进/后退恢复。
+
+### 平台主题、明暗模式与租户主色（强制）
+
+所有新建或修改的 MicroService 都必须跟随宿主平台主题，不能交付只适配固定白底、固定深色或
+单一品牌色的页面。宿主下发的 `themeMode`、`themeColor`、`themePalette`、`themeOnPrimary`、
+`themePrimaryText`、`themeColorStrong` 与 `themeTokens` 是嵌入运行时的主题事实源；首次挂载、
+`addDataListener` 收到 `host:theme`，以及 `appstate-change=aftershow` 时都要重新应用。嵌入态以
+宿主值优先，独立预览才允许使用已保存偏好或 `prefers-color-scheme` 作为回退。
+
+- 唯一根容器必须同时写入 `data-mci-ui-root="{AppKey}"`、`data-theme`、`data-mci-palette`，并把宿主字段映射为本应用的语义 Token；禁止把宿主页面的 `html/body` 当作子应用样式开关。
+- 主操作色优先使用 `--mci-color-primary` / `--el-color-primary` 或宿主 `themeColor`；表面、文字、边框分别使用 `themeTokens.surface/surfaceSoft/textPrimary/textSecondary/border`。成功、警告、错误色可以保持语义独立，但必须分别提供浅色与深色可读状态。
+- 表格、表单、弹窗、上传、骨架屏、空状态、错误态、禁用态、悬停和焦点环都必须覆盖浅色与深色；大面积背景不能直接写死 `#fff` 或某个深色，主题色不能只改按钮而其它视觉仍留在旧配色。
+- 主题切换必须即时生效且不重挂应用、不丢失表单/筛选/内部路由；卸载时清理本应用创建的媒体查询、数据与生命周期监听器。
+- 自动化验收至少覆盖“浅色 + 深色 + 一个非默认租户主题色”，同时断言根属性、计算后的主色/表面/文字、基本对比度和宿主 Logo/菜单未被污染，并各保留一张真实宿主截图。只测独立 Vite 预览、只检查 CSS 文本或只显示切换按钮均不算完成。
 
 `closeTab` 与 TagsView 当前页签关闭语义一致，固定页签和最后一个页签拒绝关闭；顶部 Tab
 右键刷新与 `reloadTab` 都应重载当前微服务。`OpenAppDialog` 页面不使用 Tab 动作，继续发送

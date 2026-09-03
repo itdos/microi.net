@@ -88,13 +88,13 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 > SVG 负责展示整体关系；下面的同步索引由同一份架构能力数据自动生成，便于新用户、搜索引擎和 AI 完整识别平台边界。
 
 <!-- MICROI_ARCHITECTURE_CAPABILITIES:START -->
-<!-- capability-source-sha256:81f2499cf4d0a0e218a667372a76fe119b4d9e37182d9bb05d23cad7242cfaa9 -->
+<!-- capability-source-sha256:2487b9dfdb4485ab0459d5aa151f7dde83bbc1fffdda5bb561b3cb772fcd4aef -->
 | 架构层 | 核心职责 | 关键能力 |
 |---|---|---|
 | **AI 开发与智能引擎** | 理解需求、设计系统、生成并校验变更 | AI 引擎、多模型网关、RAG、NL2SQL / NL2V8、Agent / Tool Calling、MCP / Skills、业务架构蓝图、AI 工作流、Preview / Diff |
-| **低代码核心业务引擎** | 以 20+ 成熟引擎建模并运行企业业务 | 表单、模块、接口、数据源、界面、打印、报表、工作流、SaaS、应用商城 |
-| **V8 运行与集成核心** | 在线运行可信业务逻辑并连接平台原子能力 | 接口引擎、FormEngine、数据源、Dos.ORM、HTTP、Redis、MongoDB、MQ / MQTT、Office / OCR、Webhook / SignalR |
-| **数据、集成与自动化引擎** | 连接数据库、服务、文件、设备与消息通道 | 缓存、扩展数据库、搜索、采集、任务调度、MQ / MQTT、通知、翻译、OCR / 图片、HDFS |
+| **低代码核心业务引擎** | 以 20+ 成熟引擎建模并运行企业业务 | 表单、模块、接口 / 类型化数据、界面、打印、可写报表、工作流、SaaS、应用商城 |
+| **V8 运行与集成核心** | 在线运行可信业务逻辑并连接平台原子能力 | 接口引擎、FormEngine、V8 / SQL / JSON、Dos.ORM、HTTP、Redis、MongoDB、MQ / MQTT、Office / OCR、Webhook / SignalR |
+| **数据、集成与自动化引擎** | 连接数据库、服务、文件、设备与消息通道 | 缓存、扩展数据库、搜索、采集、任务调度、MQ / MQTT、通知、翻译引擎（多语言）、OCR / 视觉 / 图片、分布式存储 / HDFS、文件柜 |
 | **平台治理、安全与可靠运行** | 统一设置、身份、权限、观测、升级与恢复 | AI 平台治理、系统设置、系统日志/监控、OsClient、DiyToken、SSO、分布式租约、幂等、Trace / 告警、Docker / K8s |
 | **工程与全端交付生态** | 交付 PC、WebOS、移动端、微服务与 Unity 应用 | Microi.VSCode、Codex / OpenClaw、MCP、Skills、Microi.UI、前端微服务、UniApp / App、Unity / WebGL、自动化测试、浏览器回读 |
 
@@ -105,12 +105,12 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 
 - **平台价值：** 10×+、Token 更省、10×+、典型交付更快、20+、成熟引擎复用、在线生效、V8 无需编译发布
 - **全端入口：** PC 管理端、Vue 3、WebOS、桌面多任务、移动自适应、H5 / 触控、UniApp / App、Android / iOS、微信小程序、多端复用、AI 应用 / Agent、Web / UniApp、前端微服务、多页路由、Microi.VSCode、资源树 / 调试、MCP / Skills、Codex / OpenClaw、OpenAPI / SDK、HTTP / JS
-- **系统引擎总览：** AI 引擎、V8引擎、表单引擎、模块引擎、接口引擎、数据源引擎、界面引擎、打印引擎、报表引擎、工作流引擎 v4、SaaS 引擎、缓存引擎、搜索引擎、采集引擎、任务调度、MQ 消息队列、MQTT 引擎、消息通知、翻译引擎、OCR 引擎、图片处理引擎、文件柜 / HDFS、模板引擎、Office 引擎、前端微服务、Microi.UI、多端客户端、3D / CAD / 数据大屏、Unity / WebGL、应用商城、系统设置、系统日志 / 监控、扩展数据库、蓝牙打印、AI 平台治理、AI 工作流 / 蓝图
+- **系统引擎总览：** AI 引擎、V8引擎、表单引擎、模块引擎、接口引擎、界面引擎、打印引擎、报表引擎、工作流引擎 v4、SaaS 引擎、缓存引擎、搜索引擎、采集引擎、任务调度、MQ 消息队列、MQTT 引擎、消息通知、翻译引擎（多语言）、OCR 引擎、视觉引擎、图片处理引擎、分布式存储 / HDFS、文件柜、模板引擎、Office 引擎、前端微服务、Microi.UI、多端客户端、3D / CAD / 数据大屏、Unity / WebGL、应用商城、系统设置、系统日志 / 监控、扩展数据库、蓝牙打印、AI 平台治理、AI 工作流 / 蓝图
 - **AI 开发与智能引擎：** AI 引擎、多模型网关、智能模型路由、密钥隔离、流式对话、多模态、AI 助手、AI 数据分析、知识库 RAG、向量检索、NL2SQL、NL2V8、Agent、Tool Calling、Prompt 模板、上下文记忆、AI 应用工作台、AI 在线编程、AI 本地编程、Microi.VSCode、MCP、Skills、CLI / Plugins、OpenClaw、业务架构蓝图、系统关系图谱、AI 工作流 / 蓝图、状态机、Automation Flow、流程挖掘、Manifest 建模、Preview / Diff
-- **低代码核心业务引擎：** 表单引擎、模块引擎、接口引擎、数据源引擎、界面引擎、打印引擎、报表引擎、工作流引擎 v4、SaaS 引擎、应用商城、模板引擎、Microi.UI、40+ 表单控件、主子表 / 关联表、字段 / 表单 V8、列表 / 搜索、权限 / 数据范围、左右树表、移动卡片、ECharts / 地图、Office 引擎、蓝牙打印、自定义导入导出、定制组件、前端微服务、多端客户端、PC / WebOS、UniApp / App、微信小程序、Unity / WebGL、3D / CAD / 数据大屏、goView 数据大屏
-- **集成、数据与自动化引擎：** 缓存引擎、扩展数据库、搜索引擎、采集引擎、任务调度、MQ 消息队列、MQTT 引擎、消息通知、翻译引擎、OCR 引擎、图片处理引擎、文件柜 / HDFS、Redis / MongoDB、Elasticsearch、Dos.ORM、多数据库、MySQL / SQL Server、Oracle / PostgreSQL、达梦 / 人大金仓、MinIO / OSS / S3、HTTP 集成、TCP 原始字节、Webhook / 回调、SignalR 实时、API / JSON 数据源、Excel / CSV 导入、Word / PPT 导出、邮件 / 短信 / 微信、地图 / 定位、公众号 / 小程序、OpenAPI / SDK、gRPC / 多语言
+- **低代码核心业务引擎：** 表单引擎、模块引擎、接口引擎、接口数据源、界面引擎、打印引擎、报表引擎、工作流引擎 v4、SaaS 引擎、应用商城、模板引擎、Microi.UI、40+ 表单控件、主子表 / 关联表、字段 / 表单 V8、可写报表 CRUD、权限 / 数据范围、左右树表、移动卡片、ECharts / 地图、Office 引擎、蓝牙打印、多表 / 多库编排、定制组件、前端微服务、多端客户端、PC / WebOS、UniApp / App、微信小程序、Unity / WebGL、3D / CAD / 数据大屏、goView 数据大屏
+- **集成、数据与自动化引擎：** 缓存引擎、扩展数据库、搜索引擎、采集引擎、任务调度、MQ 消息队列、MQTT 引擎、消息通知、翻译引擎（多语言）、OCR 引擎、视觉引擎、图片处理引擎、Redis / MongoDB、Elasticsearch、Dos.ORM、多数据库、MySQL / SQL Server、Oracle / PostgreSQL、达梦 / 人大金仓、MinIO / OSS / S3、HTTP 集成、TCP 原始字节、Webhook / 回调、SignalR 实时、L1 / L2 多级缓存、Excel / CSV 导入、Word / PPT 导出、邮件 / 短信 / 微信、分布式存储 / HDFS、文件柜、公众号 / 小程序、OpenAPI / SDK、gRPC / 多语言
 - **平台治理、安全与可靠运行：** AI 平台治理、系统设置、系统日志 / 监控、服务健康、SaaS / OsClient、DiyToken、角色 / 部门、菜单 / 表权限、行 / 字段权限、Passkey / TOTP、SSO / OAuth、OIDC / SAML / CAS、租户 Secret、审计 / Trace、多节点 API、Worker 集群、分布式租约、Fencing Token、幂等 / 唯一约束、Outbox / Inbox、优雅排空、重启恢复、限流 / 熔断 / 重试、日志 / 告警、健康检查、Docker / K8s、Managed Core、CreateIfMissing Hook、Version / Hash、DryRun / Readback、自动化测试、浏览器验收
-- **V8 运行与集成核心：** 接口引擎、保存即生效、FormEngine、CRUD / _Where、DataSource、SQL / API / JSON、Db / Dos.ORM、多数据库、HTTP、GET / POST / PATCH、Redis Cache、TTL / Hash、MongoDB、文档数据、Search Engine、索引 / 检索、Job / Quartz、可靠后台任务、Spider Engine、采集 / 浏览器、MQ / RabbitMQ、Outbox / Inbox、MQTT / IoT、设备事件、Files / HDFS、流式资产、Office、Excel / Word / PPT、OCR / Image、识别 / 图像处理、Translate、翻译 / 多语言、Message Engine、站内 / 多通道、AI / Agent、模型 / 工具、Template、HTML / 文档、Webhook / SignalR、实时集成、事务、权限、多租户、多节点
+- **V8 运行与集成核心：** 接口引擎、保存即生效、FormEngine、CRUD / _Where、接口数据源、V8 / SQL / JSON、Db / Dos.ORM、多数据库、HTTP、GET / POST / PATCH、Redis Cache、L1 / L2 / TTL、MongoDB、文档数据、Search Engine、索引 / 检索、Job / Quartz、可靠后台任务、Spider Engine、采集 / 浏览器、MQ / RabbitMQ、Outbox / Inbox、MQTT / IoT、设备事件、Files / HDFS、流式资产、Office、Excel / Word / PPT、OCR / Vision / Image、识别 / 图像处理、Translate、翻译 / 多语言、Message Engine、站内 / 多通道、AI / Agent、模型 / 工具、Template、HTML / 文档、Webhook / SignalR、实时集成、事务、权限、多租户、多节点
 - **统一治理与交付闭环：** Plan / DryRun、Confirm / Apply、Validate / Readback、Version / Hash、Audit / Trace、Rollback / Recover、Managed Core、Tenant Hook、OsClient 隔离、共享状态、稳定幂等、失败关闭
 - **数据与存储底座：** MySQL、SQL Server、Oracle、PostgreSQL、达梦、金仓、Redis、MongoDB、Elasticsearch、MinIO / HDFS
 - **身份、安全与多租户：** SaaS / OsClient、DiyToken、角色 / 部门、菜单 / 表权限、行 / 字段权限、Access Key、Passkey / TOTP、SSO / OAuth、强身份票据、认证加密
@@ -197,6 +197,8 @@ description: Microi吾码是开源 AI 开发框架，融合 20+ 成熟引擎、A
 <tr><td>🔄 <strong><a href="/doc/system-engine/wf-engine">工作流引擎 v4</a></strong></td><td>完全自主研发，由表单引擎 + 接口引擎驱动</td></tr>
 <tr><td>🎨 <strong><a href="/doc/system-engine/page-engine">界面引擎</a></strong></td><td>可视化界面自定义设计，支持 ECharts 图表</td></tr>
 <tr><td>🖨️ <strong><a href="/doc/system-engine/print-engine">打印引擎</a></strong></td><td>在线制作打印模板，无需导出即可打印</td></tr>
+<tr><td>📄 <strong><a href="/doc/system-engine/ocr-engine">OCR 识别引擎</a></strong></td><td>统一识别图片与 PDF 文本，支持文档方向、展平、文本行方向、置信度、分页区域和坐标结果，并提供 V8、HTTP 与 MCP 三种租户绑定入口</td></tr>
+<tr><td>👁️ <strong><a href="/doc/system-engine/vision-engine">视觉引擎</a></strong></td><td>基于 ONNX Runtime 的图片/视频帧特征、租户样本库优先匹配、异步 AI 回退与合规人脸模式</td></tr>
 <tr><td>🧾 <strong><a href="/doc/system-engine/bluetooth-printer">蓝牙打印机</a></strong></td><td>一份 V8 同时兼容佳博 GP-M322 与 ZICOX CC4，支持 TSPL、CPCL、ESC/POS、BLE 与 Android SPP</td></tr>
 <tr><td>📊 <strong><a href="/doc/system-engine/report-engine">报表引擎</a></strong></td><td>虚拟表格、ECharts 报表，支持自定义增删改</td></tr>
 <tr><td>☁️ <strong><a href="/doc/system-engine/saas-engine">SaaS 引擎</a></strong></td><td>三种模式：数据库隔离多租户、TenantId 租户隔离、独立组织机构隔离</td></tr>

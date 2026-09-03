@@ -55,6 +55,13 @@
                       Condition="'$(MicroiAIExists)' == 'true'" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(MicroiVisionExists)' == 'true'">
+    <ProjectReference Include="..\Microi.Vision\Microi.Vision.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MicroiVisionExists)' != 'true'">
+    <PackageReference Include="Microi.Vision" Version="$(MicroiNetVersion)" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(MicroiAIExists)' == 'true' and Exists('..\Microi.AI\Microi.AI.Tests')">
     <Compile Include="..\Microi.AI\Microi.AI.Tests\**\*.cs"
              Exclude="..\Microi.AI\Microi.AI.Tests\bin\**\*;..\Microi.AI\Microi.AI.Tests\obj\**\*"

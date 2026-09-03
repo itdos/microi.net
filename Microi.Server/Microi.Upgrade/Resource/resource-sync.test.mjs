@@ -1236,6 +1236,36 @@ test('live 投影超时审计会重试旧源码摘要而不是只重试缺失接
   );
 });
 
+test('live 投影超时全量扫描结束后只对不一致 Managed Key 做有界严格复核', () => {
+  const start = mcpPublisherSource.indexOf('async function recheckMismatchedManagedProjections');
+  const end = mcpPublisherSource.indexOf(
+    'async function recoverReconcileAfterAmbiguousTimeout',
+    start,
+  );
+  assert.ok(start >= 0 && end > start, '缺少 Managed mismatch-only 最终复核函数');
+  const recheckSource = mcpPublisherSource.slice(start, end);
+  assert.match(recheckSource, /let remaining = getMismatchedManagedProjections\(projections, byKey, sourceHashes\)/);
+  assert.match(recheckSource, /const maxRounds = 2/);
+  assert.match(recheckSource, /readManagedSourceHashes\(client, remaining\)/);
+  assert.match(recheckSource, /readLiveEngineMetadata\(client, remaining\)/);
+  assert.match(recheckSource, /remaining = getMismatchedManagedProjections\(remaining, byKey, sourceHashes\)/);
+  assert.doesNotMatch(recheckSource, /readManagedSourceHashes\(client, projections\)/);
+  assert.doesNotMatch(recheckSource, /readLiveEngineMetadata\(client, projections\)/);
+
+  const mismatchFilterStart = mcpPublisherSource.indexOf('function getMismatchedManagedProjections');
+  const mismatchFilterEnd = mcpPublisherSource.indexOf(
+    'async function recheckMismatchedManagedProjections',
+    mismatchFilterStart,
+  );
+  const mismatchFilterSource = mcpPublisherSource.slice(mismatchFilterStart, mismatchFilterEnd);
+  assert.match(mismatchFilterSource, /projection\.policy === 'Managed'/);
+  assert.match(mcpPublisherSource, /if \(sourceHash !== expectedSourceHash\) return \{ kind: 'source', expectedSourceHash \}/);
+  assert.match(
+    mcpPublisherSource,
+    /await recheckMismatchedManagedProjections\(client, projections, byKey, sourceHashes\)/,
+  );
+});
+
 test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 CreateIfMissing', async () => {
   const packageNames = [
     'app.microi.form-engine.json', 'app.microi.module-engine.json', 'app.microi.saas-engine.json',
@@ -1258,8 +1288,8 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 151);
-  assert.equal(managedCount, 142);
+  assert.equal(seenKeys.size, 153);
+  assert.equal(managedCount, 144);
   assert.equal(createIfMissingCount, 9);
 
   assert.match(officialEngineSource, /action === "reconcilepublishedapiengines"/);

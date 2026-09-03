@@ -114,6 +114,7 @@ test("platform print bridge is fixed to the current tenant backend and registere
 
 test("the page host connects dispatch actions to router and TagsView behavior", () => {
     const host = read("src/views/micro-app/host.vue");
+    assert.match(host, /webBase:\s*window\.location\.origin/);
     assert.match(host, /hostCapabilities:\s*createMicroAppHostCapabilities\(\)/);
     assert.match(host, /parseMicroAppHostAction\(payload\)/);
     assert.match(host, /case "closeTab"/);

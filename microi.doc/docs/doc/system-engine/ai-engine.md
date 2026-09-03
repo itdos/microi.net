@@ -6,6 +6,11 @@ Microi 吾码在线 AI 引擎已内置“**大模型关键词扩展 → 当前�
 `Ollama + nomic-embed-text + Qdrant` 继续作为可选的模糊语义召回增强。只有确实需要处理大量别名、行业术语或描述非常模糊的问题时才建议启用。未启用时平台绝不连接、初始化、同步或搜索向量库；显式启用但连接失败时，平台会安全回退到关键词 Schema 检索。
 :::
 
+::: tip 两个独立培训专题
+- [AI 数据分析](./ai-data-analysis)：自然语言提问、权限感知 Schema、NL2SQL、经营结论与真实移动端预览。
+- [AI 创作中心](./ai-creative-studio)：AI 图片、视频、声音与音乐创作，以及完整 29 项图像工具。
+:::
+
 ## 后端代码分层
 
 AI 相关业务实现统一归属 `Microi.Server/Microi.AI`，`Microi.Server/Microi.net.Api` 只是 ASP.NET Core 的 HTTP、SSE 与 SignalR 接口层：
@@ -135,13 +140,13 @@ microi_chat({
 
 `/#/mic-ai-engine` 首屏直接展示 AI 对话、数据分析、AI 绘图、AI 音乐、AI 视频和模型管理，不再把媒体能力藏在“自动识别”里。AI 绘图采用简化的 Stable Diffusion 式工作台：左侧按创作、AI 编辑、人像/商品和精确处理选工具，中间只保留当前工具必需参数，右侧预览结果；手机端依次折叠为工具、参数、结果。
 
-这里必须区分“对话/意图模型”和“媒体生成模型”：`MiniMax-M3` 负责理解与路由，图片由 `image-01` 生成；音乐优先请求 `music-3.0`，只有托管音乐接口明确返回 410 退役终态时才切到官方开源 `MiniMax-Music3`。不能让文本模型用说明文字冒充图片或音频。
+这里必须区分“对话/意图模型”和“媒体生成模型”：`MiniMax-M3` 负责理解与路由，图片由 `image-01` 生成；音乐新路由优先请求 `music-3.0`，已有供应商配置继续兼容 `music-2.6`，只有托管音乐接口明确返回 410 退役终态时才切到官方开源 `MiniMax-Music3`。部署时必须以目标账号实时可用的模型清单为准，不能让文本模型用说明文字冒充图片或音频。
 
 | 能力 | 登录态入口 | 当前边界 | 结果与页面呈现 |
 |---|---|---|---|
 | 生成式图片 | `POST /api/Ai/GenerateMiniMaxImage` | `image-01`；文生图及最多 4 张主体参考图；支持图生图、重绘、扩图、消除、去水印、证件照、多图合成、上色、修复、商品场景等受控工具意图 | 参考图先进入当前租户私有 HDFS，只把短时签名地址交给供应商；结果重新下载、校验并写入当前租户公有 HDFS |
 | 精确图片处理 | `POST /apiengine/platform-ai-runtime`，`Action=ProcessImage` | 黑白、纯色背景抠除、缩放、居中裁剪、旋转、翻转、格式转换和拼图；不消耗模型额度 | `V8.Image` 在服务端处理并写入当前租户公有 HDFS，返回可回读的尺寸、格式和永久地址 |
-| 音乐 | `POST /api/Ai/GenerateMiniMaxMusic` | 当前仅管理员；托管 `music-3.0` 或明确 410 后的官方开源 `MiniMax-Music3`；无人声，开源回退时长 10～60 秒 | 托管结果为 MP3，开源结果为 32kHz 立体声 WAV；两者均校验后写入当前租户公有 HDFS并用原生播放器预览 |
+| 音乐 | `POST /api/Ai/GenerateMiniMaxMusic` | 当前仅管理员；托管新路由 `music-3.0`，兼容既有 `music-2.6` 配置，或明确 410 后的官方开源 `MiniMax-Music3`；无人声，开源回退时长 10～60 秒 | 托管结果为 MP3，开源结果为 32kHz 立体声 WAV；两者均校验后写入当前租户公有 HDFS并用原生播放器预览 |
 
 生成式“消除、扩图、去水印、抠图”等目前是参考图 + 提示词重绘，不是像素级蒙版编辑；页面必须明确提示这一边界。要求确定像素结果时，应选择右侧标记为“精确”的 `V8.Image` 工具。
 
@@ -194,7 +199,7 @@ Authorization: <当前吾码管理员登录 Token>
 
 - 公有 HDFS 附件优先使用**当前运行租户**的 `sys_config.FileServer + FilePath` 生成最终 URL。不能写死官网域名，也不能继续沿用另一个租户或旧环境返回 URL 的域名前缀。
 - 图片使用 `<el-image :preview-src-list="[url]" preview-teleported>` 在当前页面放大、缩放和关闭；图片卡片不能再套 `target="_blank"` 跳到新浏览器页面。
-- 音频使用浏览器原生播放器并显示真实时长；加载失败应显示接口或媒体错误，不能只输出“已生成”。
+- 音频使用 `<audio controls preload="metadata">` 原页播放并显示真实时长，同时提供读取同一已校验 HDFS 地址的明确下载按钮；加载失败应显示接口或媒体错误，不能只输出“已生成”。
 - AI 文本回答继续经过安全 Markdown 渲染；图片、音频、视频是结构化附件，不通过拼接 Markdown/HTML 来绕过 URL 与内容类型校验。
 
 MiniMax 已于 2026-08-20 停止向新用户提供付费 Music/Lyrics API，并停止原免费模型服务。吾码仍优先兼容已具备 `music-3.0` 权限的现有账号；仅在上游明确返回 410 时切换官方开源 `MiniMax-Music3` Space。公开 Space 有 ZeroGPU 配额，生产节点可在既有服务端 `mic_ai` 模型配置中增加 `MiniMax-Music3` 路由、固定官方 Space Endpoint，并把 Hugging Face Token 存入受保护 ApiKey 字段；不得新增前端 Key、Compose 环境变量或 API `AppSettings`。上游未开通、配额不足或停用时应返回可诊断失败，不得生成伪音频、重复扣减或把文本回答冒充音乐成功。

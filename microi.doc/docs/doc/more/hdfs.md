@@ -103,13 +103,13 @@ https://<API公网域名>/api/WeChatContentSecurity/Callback--OsClient--<OsClien
 | SaaS 引擎字段 | 代码默认值 |
 |---|---:|
 | `FileUploadEnabled` | `true` |
-| `FileUploadMaxFileMB` | 100 MB |
-| `FileUploadMaxRequestMB` | 200 MB |
+| `FileUploadMaxFileMB` | 500 MB |
+| `FileUploadMaxRequestMB` | 500 MB |
 | `FileUploadMaxCount` | 10 |
 | `FileUploadDailyUserQuotaMB` | 2048 MB |
 | `FileUploadDailyTenantQuotaMB` | 20480 MB |
 
-业务值最终再与平台代码中的固定灾难保护上限取较小值：单文件 1024 MB、单次总量 2048 MB、单次 100 个文件、帐号和租户日额度各 10 TB。这些硬上限不是安装配置项，普通租户不能放大。
+业务值最终再与平台代码中的固定灾难保护上限取较小值：单文件 2048 MB、单次总量 2048 MB、单次 100 个文件、帐号和租户日额度各 10 TB。这些硬上限不是安装配置项，普通租户不能放大。管理员可以把单文件与单次总量配置为 1024 MB 或 2048 MB；空值使用 500 MB 默认值。
 
 Kestrel HTTP 正文和 Multipart 接收硬顶统一为 2048 MB，普通表单单值硬顶为 128 MB；它们是所有租户共享的安全边界，不要求安装者再配置环境变量。租户业务配置仍负责其自身的最终额度，反向代理还必须允许请求进入 API。
 
@@ -117,11 +117,11 @@ Kestrel HTTP 正文和 Multipart 接收硬顶统一为 2048 MB，普通表单单
 
 `413 Content Too Large` 如果响应正文是 nginx 的 HTML，表示请求尚未进入吾码 API，SaaS 引擎缓存、HDFS Controller 和全局异常处理都没有机会执行。实际可上传大小是“nginx → Kestrel HTTP → Multipart → 租户单文件/单次额度 → Absolute 灾难保护”各层上限的最小值。禁止只提高 `sys_osclients.FileUploadMaxFileMB`，也禁止用 `client_max_body_size 0` 关闭网关保护。
 
-例如需要支持 1000 MB 文件，应在 **API 域名的 nginx `server` 块**中至少配置：
+例如需要让普通 multipart 上传覆盖平台 2 GB 硬顶，应在 **API 域名的 nginx `server` 块**中配置：
 
 ```nginx
-# 支持1000MB文件，并为multipart封装留出余量
-client_max_body_size 1024m;
+# 支持平台2GB硬顶，并为multipart封装留出余量；禁止配置为0取消保护
+client_max_body_size 2112m;
 
 # 慢速大文件上传的请求体读取空闲超时
 client_body_timeout 600s;
@@ -148,7 +148,16 @@ location @microi_upload_too_large {
 
 这些 `proxy_*` 指令可放在 API 域名的 `server` 层供代理 `location` 继承，也可合并进现有的 `location ^~ /`；不要新建第二个重复 location。`proxy_request_buffering off` 只关闭 nginx 预缓冲，不能用响应方向的 `proxy_buffering off` 代替，也不会绕过 API/HDFS 校验。
 
-修改 nginx 后先执行 `nginx -t`，成功后再 reload。吾码普通上传 API 已内置 2048 MB HTTP/Multipart 接收硬顶；无需增加上传相关环境变量。普通单请求仍不能突破平台固定的单文件 1024 MB、单次总量 2048 MB 灾难保护上限。AI 应用资产协议 v3 每次只发送一个有界原始分片，不继承整文件单请求上限。若前面还有 CDN、WAF、负载均衡或 Ingress，还要同步检查这些上游的请求体和空闲超时限制。
+修改 nginx 后先执行 `nginx -t`，成功后再 reload。吾码普通上传 API 已内置 2048 MB HTTP/Multipart 接收硬顶；无需增加上传相关环境变量。普通单请求仍不能突破平台固定的单文件 2048 MB、单次总量 2048 MB 灾难保护上限。AI 应用资产协议 v3 与 SaaS 租户数据库 ZIP 协议每次只发送一个有界原始分片，不继承整文件单请求上限。若前面还有 CDN、WAF、负载均衡或 Ingress，还要同步检查这些上游的请求体和空闲超时限制。
+
+##### 创建租户数据库 ZIP
+
+创建 SaaS 租户时，数据库 ZIP 不再走整包 `/api/HDFS/UniappUpload`：
+
+- 平台先创建与租户、用户、文件大小和摘要绑定的上传会话，再以默认 16 MB（服务端允许 1–32 MB）原始分片上传；每片与整包都做 SHA-256 强回读。
+- 刷新页面、网络断开或浏览器重开后，重新选择同一文件会读取服务器状态并只补传缺失分片。单片接口接收上限为 64 MB，所以常见 100 MB 代理上限不会阻断 500 MB、1 GB 或 2 GB 的逻辑文件。
+- 完成合并后，租户开通服务从私有 HDFS 临时文件流式解压并执行 SQL，避免 ZIP 与解压后的脚本同时驻留内存；连续 `INSERT` / `REPLACE` 按最多 500 条或 1 MB 使用有界事务批次执行。
+- 通知中心不会按数据行写日志，而是限频更新读取量、批次、语句数、吞吐和预计剩余时间，并仅在阶段变化或每 5% 进度追加一条有界执行记录。
 
 请求进入吾码 API 后，如果 Kestrel 或 Multipart 再触发超限，全局异常处理会返回 HTTP 200、`Code=0`、`DataAppend.ErrorType=UploadRequestTooLarge`，并在响应头给出 `X-Microi-Upload-Max-Request-MB` 与 `X-Microi-Upload-Max-Multipart-MB`，方便定位实际生效的 API 启动配置。
 

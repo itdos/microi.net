@@ -199,10 +199,14 @@ public sealed class EmptyDatabaseReleaseServiceTests
             item => item["ApiEngineKey"]?.Value<string>() == "admin_get_empty_database_sanitization_sql");
         var code = engine["ApiV8Code"]?.Value<string>() ?? "";
 
-        Assert.Equal("v1.3.5", engine["Version"]?.Value<string>());
+        Assert.Equal("v1.3.6", engine["Version"]?.Value<string>());
         Assert.Contains("protectedPlatformTableNames", code, StringComparison.Ordinal);
         Assert.Contains("operationalResidueTableNames", code, StringComparison.Ordinal);
         Assert.Contains("cleanupOperationalResidueSql", code, StringComparison.Ordinal);
+        Assert.Contains("EMPTY_DATABASE_CANONICAL_TENANT_TEMPLATE_V1", code, StringComparison.Ordinal);
+        Assert.Contains("UPPER(COALESCE(OsClientType, '')) <> 'PRODUCT'", code, StringComparison.Ordinal);
+        Assert.Contains("UPPER(COALESCE(OsClientNetwork, '')) <> 'INTERNAL'", code, StringComparison.Ordinal);
+        Assert.Contains("OsClient='iTdos',OsClientType='Product',OsClientNetwork='Internal',IsEnable=1,IsDeleted=0", code, StringComparison.Ordinal);
         Assert.Contains("EMPTY_DATABASE_AI_MENU_TREE_V1", code, StringComparison.Ordinal);
         Assert.Contains("aiApplicationMenuValuesSql", code, StringComparison.Ordinal);
         Assert.Contains("AiApplicationMenuCount", code, StringComparison.Ordinal);
@@ -264,6 +268,13 @@ public sealed class EmptyDatabaseReleaseServiceTests
         Assert.NotNull(clearOperationalResidue);
         Assert.NotNull(protectedTablesField);
         Assert.NotNull(operationalTablesField);
+        var validationType = typeof(EmptyDatabaseReleaseService).GetNestedType(
+            "SanitizationValidation",
+            BindingFlags.NonPublic);
+        Assert.NotNull(validationType);
+        Assert.NotNull(validationType!.GetProperty("CanonicalTemplateTenantCount"));
+        Assert.NotNull(validationType.GetProperty("RemainingNonCanonicalTenants"));
+        Assert.NotNull(validationType.GetProperty("RemainingTenantRuntimeConnectionResidue"));
         var protectedTables = Assert.IsAssignableFrom<ISet<string>>(protectedTablesField!.GetValue(null));
         var operationalTables = Assert.IsType<string[]>(operationalTablesField!.GetValue(null));
         Assert.Contains("sys_microistore", protectedTables);

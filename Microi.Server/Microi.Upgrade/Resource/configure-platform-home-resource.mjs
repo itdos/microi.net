@@ -7,14 +7,16 @@ const directory = path.dirname(fileURLToPath(import.meta.url));
 const packagePath = path.join(directory, 'app.microi.saas-engine.json');
 const storePackagePath = path.join(directory, 'app.microi.store.json');
 const officialResourcePath = path.join(directory, 'official-resource-api.js');
+const importerPath = path.join(directory, 'import-package.js');
 const pagePath = path.join(directory, 'platform-home-page.json');
-const packageVersion = 'v7.8.12';
-const storePackageVersion = 'v7.9.8';
+const packageVersion = 'v7.8.16';
+const storePackageVersion = 'v7.9.18';
 const officialResourceVersion = 'v1.3.5';
-const releaseTime = '2026-09-03 18:00:00';
-const changeLogContent = '首页首屏复用完整 AI 对话代码；新增 homeoverview 组件，以当前账号真实菜单访问聚合展示常用应用、趋势和个人指标，保留工作中心、日历与公告并适配明暗主题。';
+const importerVersion = 'v2.7.1';
+const releaseTime = '2026-09-03 22:00:00';
+const changeLogContent = '首页公告 diytable 明确声明为可选引用；目标租户未安装公告表或菜单时，导入器只移除公告组件与空容器，其余智能首页继续完整安装，数据库读取异常仍严格失败。';
 const history = `2026-09-03 ${packageVersion} ${changeLogContent}`;
-const storeChangeLogContent = '修复应用商城包内嵌控制面末尾多余空行，使其与已发布的 v1.3.5 独立控制面保持精确字节一致；保留系统账号首页统计资源闭包校验并恢复发布后的 live 接口投影。';
+const storeChangeLogContent = '导入器 v2.7.1 新增目标租户 OsClient 参数化回填合同和 PageEngine 可选引用合同；保留无声明时失败关闭，并增加官方包发布前闭包门禁，阻止缺失页面依赖再次进入商城。';
 const storeHistory = `2026-09-03 ${storePackageVersion} ${storeChangeLogContent}`;
 
 function prependOnce(value, line) {
@@ -33,6 +35,12 @@ const widgets = (pageResource.JsonObj?.wrapperList || [])
   .map(widget => String(widget.type || ''));
 for (const required of ['aiengine', 'homeoverview', 'workcenter', 'diycalendar', 'diytable']) {
   if (!widgets.includes(required)) throw new Error(`platform-home-page.json 缺少 ${required}。`);
+}
+const noticeWidget = (pageResource.JsonObj?.wrapperList || [])
+  .flatMap(wrapper => wrapper.widgetList || [])
+  .find(widget => String(widget.type || '').toLowerCase() === 'diytable');
+if (noticeWidget?.referencePolicy?.onMissing !== 'RemoveWidget') {
+  throw new Error('platform-home-page.json 公告组件必须显式声明 referencePolicy.onMissing=RemoveWidget。');
 }
 
 let packageModel = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
@@ -83,15 +91,17 @@ const capabilities = Array.isArray(info.RequiredPlatformCapabilities)
 const names = new Set([
   'ClientFeature:PageEngineHomeOverviewV1',
   'PageEngineWidget:homeoverview',
-  'ApiEngine:platform-home-overview',
-  'PageEngineResource:PAGE5',
+    'ApiEngine:platform-home-overview',
+    'PageEngineResource:PAGE5',
+    'Importer:PageEngineOptionalReferenceV1',
 ]);
 info.RequiredPlatformCapabilities = Array.from(new Set([
   ...capabilities.filter(value => !names.has(String(value || '').split('@')[0])),
   'ClientFeature:PageEngineHomeOverviewV1',
   'PageEngineWidget:homeoverview',
-  'ApiEngine:platform-home-overview@v1.0.0',
-  'PageEngineResource:PAGE5@v2.0.0',
+    'ApiEngine:platform-home-overview@v1.0.0',
+    'PageEngineResource:PAGE5@v2.0.0',
+    'Importer:PageEngineOptionalReferenceV1',
 ]));
 info.DataSetCount = packageModel.DataSets.length;
 info.DataRowCount = packageModel.DataSets.reduce(
@@ -117,12 +127,43 @@ if (!officialResourceSource.includes(`Version: ${officialResourceVersion}`)
 let storePackageModel = JSON.parse(fs.readFileSync(storePackagePath, 'utf8'));
 const storeInfo = storePackageModel.PackageInfo || (storePackageModel.PackageInfo = {});
 if (storeInfo.Name !== '应用商城') throw new Error('应用商城官方包身份不正确。');
-if (![storePackageVersion, 'v7.9.7'].includes(String(storeInfo.Version || ''))) {
-  throw new Error(`app.microi.store.json 当前版本为 ${storeInfo.Version || '(空)'}，只允许从 v7.9.7 幂等生成 ${storePackageVersion}。`);
+if (![storePackageVersion, 'v7.9.17'].includes(String(storeInfo.Version || ''))) {
+  throw new Error(`app.microi.store.json 当前版本为 ${storeInfo.Version || '(空)'}，只允许从 v7.9.17 幂等生成 ${storePackageVersion}。`);
 }
+const changelogTenantColumn = (storePackageModel.PhysicalColumns || []).find(column => (
+  String(column.TABLE_NAME || '').toLowerCase() === 'sys_microistore_changelog'
+  && String(column.COLUMN_NAME || '').toLowerCase() === 'osclient'
+));
+if (!changelogTenantColumn || String(changelogTenantColumn.IS_NULLABLE || '').toUpperCase() !== 'NO') {
+  throw new Error('应用商城包缺少 sys_microistore_changelog.OsClient NOT NULL 物理字段合同。');
+}
+if (changelogTenantColumn.COLUMN_DEFAULT !== null
+    && changelogTenantColumn.COLUMN_DEFAULT !== undefined) {
+  throw new Error('sys_microistore_changelog.OsClient 不得固化发布端租户默认值。');
+}
+changelogTenantColumn.BACKFILL_VALUE_SOURCE = 'TargetOsClient';
 const storeEngines = Array.isArray(storePackageModel.SysApiEngines)
   ? storePackageModel.SysApiEngines
   : [];
+const importerSource = fs.readFileSync(importerPath, 'utf8')
+  .replace(/\r\n?/g, '\n')
+  .replace(/\n*$/, '\n');
+if (!importerSource.includes(`Version: ${importerVersion}`)
+    || !importerSource.includes('PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1')
+    || !importerSource.includes('PAGE_ENGINE_OPTIONAL_REFERENCE_V1')) {
+  throw new Error(`import-package.js 尚未同步到 ${importerVersion} 安装加固合同。`);
+}
+const importerEngine = storeEngines.find(
+  engine => engine.ApiEngineKey === 'import-microi-store-package',
+);
+if (!importerEngine) throw new Error('应用商城包缺少 import-microi-store-package。');
+importerEngine.ApiV8Code = importerSource;
+importerEngine.Version = importerVersion;
+importerEngine.UpdateTime = releaseTime;
+importerEngine.ChangeHistory = prependOnce(
+  importerEngine.ChangeHistory,
+  `${releaseTime} ${importerVersion} 新增目标租户NOT NULL回填与PageEngine显式可选引用合同`,
+);
 const officialResourceEngine = storeEngines.find(
   engine => engine.ApiEngineKey === 'get-microi-upgrade-resource',
 );
@@ -145,8 +186,12 @@ storeInfo.ChangeLog = {
 };
 for (const fieldName of ['RequiredPlatformCapabilities', 'Capabilities']) {
   storeInfo[fieldName] = Array.from(new Set([
-    ...(Array.isArray(storeInfo[fieldName]) ? storeInfo[fieldName] : []),
+    ...(Array.isArray(storeInfo[fieldName]) ? storeInfo[fieldName] : [])
+      .filter(value => !String(value || '').startsWith('ApiEngine:import-microi-store-package@')),
+    `ApiEngine:import-microi-store-package@${importerVersion}`,
     `ApiEngine:get-microi-upgrade-resource@${officialResourceVersion}`,
+    'Importer:PhysicalNotNullTenantBackfillV1',
+    'Importer:PageEngineOptionalReferenceV1',
   ]));
 }
 storeInfo.ApiEngineCount = storeEngines.length;

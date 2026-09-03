@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.9.16
+ * Version: v1.9.23
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -244,35 +244,135 @@ function readFileBase64(filePathName, isText, limit) {
   if (!response || !response.RawBytes) throw new Error('下载 HDFS 文件失败：' + filePathName);
   return System.Convert.ToBase64String(response.RawBytes);
 }
+function sha256RuntimeAssetBytes(bytes) {
+  try {
+    var nativeSha = System.Security.Cryptography.SHA256.Create();
+    var nativeDigest = nativeSha.ComputeHash(bytes);
+    var nativeResult = text(System.BitConverter.ToString(nativeDigest)).replace(/-/g, '').toLowerCase();
+    try { nativeSha.Dispose(); } catch (disposeError) {}
+    return nativeResult;
+  } catch (nativeHashError) {}
+  // Some installed servers intentionally do not expose cryptography CLR types
+  // to Jint. Keep byte-level verification mandatory with an ES5 implementation
+  // instead of weakening a manifest SHA-256 to a same-length check.
+  var byteLength = Number(bytes && bytes.Length !== undefined ? bytes.Length : (bytes ? bytes.length : 0));
+  var totalLength = Math.floor((byteLength + 72) / 64) * 64;
+  var bitLengthHigh = Math.floor(byteLength / 0x20000000) >>> 0;
+  var bitLengthLow = (byteLength * 8) >>> 0;
+  var constants = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ];
+  var hash = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  var words = new Array(64);
+  function rotateRight(value, amount) { return (value >>> amount) | (value << (32 - amount)); }
+  function paddedByte(index) {
+    if (index < byteLength) return Number(bytes[index]) & 255;
+    if (index === byteLength) return 0x80;
+    if (index < totalLength - 8) return 0;
+    var trailerIndex = index - (totalLength - 8);
+    if (trailerIndex < 4) return (bitLengthHigh >>> ((3 - trailerIndex) * 8)) & 255;
+    return (bitLengthLow >>> ((7 - trailerIndex) * 8)) & 255;
+  }
+  for (var blockOffset = 0; blockOffset < totalLength; blockOffset += 64) {
+    for (var wordIndex = 0; wordIndex < 16; wordIndex++) {
+      var byteOffset = blockOffset + wordIndex * 4;
+      words[wordIndex] = ((paddedByte(byteOffset) << 24) | (paddedByte(byteOffset + 1) << 16)
+        | (paddedByte(byteOffset + 2) << 8) | paddedByte(byteOffset + 3)) | 0;
+    }
+    for (var expandIndex = 16; expandIndex < 64; expandIndex++) {
+      var word15 = words[expandIndex - 15]; var word2 = words[expandIndex - 2];
+      var sigma0 = rotateRight(word15, 7) ^ rotateRight(word15, 18) ^ (word15 >>> 3);
+      var sigma1 = rotateRight(word2, 17) ^ rotateRight(word2, 19) ^ (word2 >>> 10);
+      words[expandIndex] = (words[expandIndex - 16] + sigma0 + words[expandIndex - 7] + sigma1) | 0;
+    }
+    var a=hash[0]|0,b=hash[1]|0,c=hash[2]|0,d=hash[3]|0,e=hash[4]|0,f=hash[5]|0,g=hash[6]|0,h=hash[7]|0;
+    for (var roundIndex = 0; roundIndex < 64; roundIndex++) {
+      var bigSigma1 = rotateRight(e,6) ^ rotateRight(e,11) ^ rotateRight(e,25);
+      var choose = (e & f) ^ ((~e) & g);
+      var temp1 = (h + bigSigma1 + choose + constants[roundIndex] + words[roundIndex]) | 0;
+      var bigSigma0 = rotateRight(a,2) ^ rotateRight(a,13) ^ rotateRight(a,22);
+      var majority = (a & b) ^ (a & c) ^ (b & c);
+      var temp2 = (bigSigma0 + majority) | 0;
+      h=g; g=f; f=e; e=(d+temp1)|0; d=c; c=b; b=a; a=(temp1+temp2)|0;
+    }
+    hash[0]=(hash[0]+a)|0; hash[1]=(hash[1]+b)|0; hash[2]=(hash[2]+c)|0; hash[3]=(hash[3]+d)|0;
+    hash[4]=(hash[4]+e)|0; hash[5]=(hash[5]+f)|0; hash[6]=(hash[6]+g)|0; hash[7]=(hash[7]+h)|0;
+  }
+  var result = '';
+  for (var hashIndex = 0; hashIndex < hash.length; hashIndex++) {
+    var hex = (hash[hashIndex] >>> 0).toString(16);
+    result += ('00000000' + hex).substring(hex.length);
+  }
+  return result;
+}
+function runtimeAssetBase64MatchesManifest(runtimeAsset, base64) {
+  if (isBlank(base64)) return false;
+  var bytes;
+  try { bytes = System.Convert.FromBase64String(base64); }
+  catch (decodeError) { return false; }
+  var byteLength = Number(bytes && bytes.Length !== undefined ? bytes.Length : (bytes ? bytes.length : 0));
+  var expectedSize = Number(runtimeAsset && runtimeAsset.Size || 0);
+  if (expectedSize > 0 && byteLength !== expectedSize) return false;
+  var expectedSha = text(runtimeAsset && (runtimeAsset.Sha256 || runtimeAsset.Hash)).toLowerCase();
+  if (isBlank(expectedSha)) return byteLength > 0;
+  return sha256RuntimeAssetBytes(bytes) === expectedSha;
+}
+function stableApiOrigin(value) {
+  var match = /^(https?:\/\/[^\/?#]+)/i.exec(text(value).replace(/^\s+|\s+$/g, ''));
+  return match ? match[1] : '';
+}
 function readRuntimeAssetBase64(runtimeAsset, path) {
+  var hdfsPath = text(runtimeAsset && (runtimeAsset.FilePathName || runtimeAsset.HdfsPath || runtimeAsset.PathName));
+  if (!isBlank(hdfsPath)) {
+    try {
+      var authoritativeBase64 = readFileBase64(hdfsPath, isTextFile(path), false);
+      if (runtimeAssetBase64MatchesManifest(runtimeAsset, authoritativeBase64)) return authoritativeBase64;
+    } catch (authoritativeReadError) {
+      // Keep the immutable stable resolver as a bounded compatibility fallback
+      // for legacy runtimes whose original object path is no longer readable.
+    }
+  }
   var stablePath = text(runtimeAsset && runtimeAsset.StableFilePathName);
   var normalizedStablePath = stablePath.replace(/\\/g, '/');
   var safeStablePath = /^\/micro-app\/v3\/tenants\/[a-z0-9_-]+\/kinds\/runtime\/apps\/[a-z0-9_-]+\/assets\//i.test(normalizedStablePath)
     && normalizedStablePath.indexOf('..') < 0
     && normalizedStablePath.indexOf('?') < 0
     && normalizedStablePath.indexOf('#') < 0;
-  var apiBase = text(V8.SysConfig && V8.SysConfig.ApiBase).replace(/\/+$/, '');
-  if (safeStablePath && /^https?:\/\//i.test(apiBase)) {
+  // ApiBase deployments may be configured either as an origin or with an
+  // /api suffix. Stable micro-app routes always live at the trusted origin.
+  var apiOrigin = stableApiOrigin(V8.SysConfig && V8.SysConfig.ApiBase);
+  if (safeStablePath && !isBlank(apiOrigin)) {
     try {
       var stableResponse = V8.Http.GetResponse({
-        Url: apiBase + normalizedStablePath,
+        Url: apiOrigin + normalizedStablePath,
         Timeout: 120
       });
+      // V8.Http may expose transport RawBytes before the HTTP bridge has applied
+      // content decoding. For text assets the decoded Content is authoritative;
+      // otherwise a valid HTML entry can be mistaken for compressed or
+      // gateway-framed bytes and DatabaseOnlyBuild fails its document check.
+      if (isTextFile(path) && stableResponse && !isBlank(stableResponse.Content)) {
+        var decodedContentBase64 = V8.Base64.StringToBase64(text(stableResponse.Content));
+        if (runtimeAssetBase64MatchesManifest(runtimeAsset, decodedContentBase64)) return decodedContentBase64;
+      }
       if (stableResponse && stableResponse.RawBytes) {
         try {
           var stableRawBase64 = System.Convert.ToBase64String(stableResponse.RawBytes);
-          if (!isBlank(stableRawBase64)) return stableRawBase64;
+          if (runtimeAssetBase64MatchesManifest(runtimeAsset, stableRawBase64)) return stableRawBase64;
         } catch (stableRawError) {}
-      }
-      if (isTextFile(path) && stableResponse && !isBlank(stableResponse.Content)) {
-        return V8.Base64.StringToBase64(text(stableResponse.Content));
       }
     } catch (stableReadError) {
       // 稳定地址暂不可用时继续走租户 HDFS 原子能力，不能因一次网络抖动中断制包。
     }
   }
-  var hdfsPath = text(runtimeAsset && (runtimeAsset.FilePathName || runtimeAsset.HdfsPath || runtimeAsset.PathName));
-  return readFileBase64(hdfsPath, isTextFile(path), false);
+  throw new Error('运行资产读取结果与已提交清单不一致：' + normalizePath(path));
 }
 function isTextFile(path) {
   var lower = text(path).toLowerCase();
@@ -299,6 +399,40 @@ function getMicroService(appKey) {
     _PageSize: 500
   });
   return { Service: service.Data, Pages: pages && pages.Code === 1 ? toArray(pages.Data) : [] };
+}
+function hydrateCommittedRuntimeAssets(app, runtime, committedProof, expectedVersion) {
+  if (!runtime || !runtime.Service) throw new Error('协议 v3 缺少已提交微服务元数据快照');
+  if (!isBlank(runtime.Service.AssetsJson)) return runtime;
+  var liveRuntime = getMicroService(text(app && (app.AppKey || app.AppId)));
+  var liveService = liveRuntime && liveRuntime.Service;
+  if (!liveService || isBlank(liveService.AssetsJson) || isBlank(liveService.AssetManifestJson)) {
+    throw new Error('协议 v3 当前已提交运行指针缺少资产清单');
+  }
+  var manifest = parseObject(liveService.AssetManifestJson, {});
+  var proof = committedProof || {};
+  var requestedVersion = normalizeExactVersion(expectedVersion);
+  var liveVersion = normalizeExactVersion(liveService.BuildVersion);
+  if (isBlank(requestedVersion) || liveVersion !== requestedVersion) {
+    throw new Error('协议 v3 当前运行版本与发布请求不一致');
+  }
+  if (text(manifest.CommittedPublishVersionId) !== text(proof.VersionId)
+      || text(manifest.RuntimeManifestHash).toLowerCase() !== text(proof.RuntimeManifestHash).toLowerCase()
+      || text(manifest.PublishFence) !== text(proof.PublishFence)
+      || text(manifest.RequestFingerprint).toLowerCase() !== text(proof.RequestFingerprint).toLowerCase()) {
+    throw new Error('协议 v3 当前运行资产清单与 CommittedProof 不一致');
+  }
+  var snapshotRouteHash = text(runtime.Service.RouteSnapshotHash || V8.Param.RouteSnapshotHash).toLowerCase();
+  if (!isBlank(snapshotRouteHash)
+      && text(manifest.RouteSnapshotHash).toLowerCase() !== snapshotRouteHash) {
+    throw new Error('协议 v3 当前运行资产路由摘要与提交快照不一致');
+  }
+  var hydratedService = {};
+  for (var key in runtime.Service) hydratedService[key] = runtime.Service[key];
+  hydratedService.AssetsJson = liveService.AssetsJson;
+  hydratedService.AssetManifestJson = liveService.AssetManifestJson;
+  hydratedService.AssetCount = liveService.AssetCount;
+  hydratedService.TotalSize = liveService.TotalSize;
+  return { Service: hydratedService, Pages: runtime.Pages };
 }
 function getApplicationInfrastructure() {
   var tableNames = ['sys_microistore', 'sys_microistore_changelog', 'mci_ai_app_file', 'mci_ai_app_version', 'sys_microiservice', 'sys_microiservice_page'];
@@ -400,7 +534,8 @@ function getExistingStore(appKey) {
   return result && result.Code === 1 && result.Data ? result.Data : null;
 }
 /* MARKETPLACE_CHANGELOG_REQUIRED_V1：制包与发布都必须绑定当前商城版本的一条完整日志。 */
-function requireMarketplaceChangeLog(storeId, versionValue) {
+/* MARKETPLACE_CHANGELOG_LEGACY_TENANT_V1：唯一的历史空租户日志可预检，且只在正式发布时回填。 */
+function requireMarketplaceChangeLog(storeId, versionValue, repairLegacyTenant) {
   var version = normalizeExactVersion(versionValue);
   if (isBlank(storeId) || isBlank(version)) {
     return fail('请先保存商城应用，并提供合法的精确 AppVersion（例如 v1.2.3）。');
@@ -410,6 +545,50 @@ function requireMarketplaceChangeLog(storeId, versionValue) {
     _SelectFields: ['Id', 'OsClient', 'StoreId', 'Version', 'Title', 'ChangeType', 'Content', 'ReleaseTime', 'Sort', 'IsDeleted']
   });
   var row = result && result.Code === 1 ? result.Data : null;
+  if (!row) {
+    var legacyRows = [];
+    var legacyIds = {};
+    var legacyTenantValues = [null, ''];
+    for (var legacyIndex = 0; legacyIndex < legacyTenantValues.length; legacyIndex++) {
+      var legacyResult = V8.FormEngine.GetTableData('sys_microistore_changelog', {
+        _Where: [['StoreId', '=', storeId], ['AND', 'Version', '=', version], ['AND', 'OsClient', '=', legacyTenantValues[legacyIndex]]],
+        _SelectFields: ['Id', 'OsClient', 'StoreId', 'Version', 'Title', 'ChangeType', 'Content', 'ReleaseTime', 'Sort', 'IsDeleted'],
+        _PageIndex: 1,
+        _PageSize: 2
+      });
+      var candidates = legacyResult && legacyResult.Code === 1 ? toArray(legacyResult.Data) : [];
+      for (var candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {
+        var candidate = candidates[candidateIndex];
+        var candidateId = text(candidate && candidate.Id);
+        if (!candidate || !isBlank(candidate.OsClient) || isBlank(candidateId) || legacyIds[candidateId]) continue;
+        legacyIds[candidateId] = true;
+        legacyRows.push(candidate);
+      }
+    }
+    if (legacyRows.length > 1) {
+      return fail('应用 ' + version + ' 存在多条历史空租户更新日志，无法安全自动修复。');
+    }
+    if (legacyRows.length === 1) {
+      row = legacyRows[0];
+      if (repairLegacyTenant === true) {
+        var repairResult = V8.FormEngine.UptFormData('sys_microistore_changelog', {
+          Id: row.Id,
+          OsClient: V8.OsClient
+        });
+        if (!repairResult || repairResult.Code !== 1) {
+          return fail('更新日志历史租户字段回填失败：' + ((repairResult && repairResult.Msg) || '接口无返回'));
+        }
+        var repairedReadback = V8.FormEngine.GetFormData('sys_microistore_changelog', {
+          _Where: [['OsClient', '=', V8.OsClient], ['AND', 'Id', '=', row.Id], ['AND', 'StoreId', '=', storeId], ['AND', 'Version', '=', version]],
+          _SelectFields: ['Id', 'OsClient', 'StoreId', 'Version', 'Title', 'ChangeType', 'Content', 'ReleaseTime', 'Sort', 'IsDeleted']
+        });
+        row = repairedReadback && repairedReadback.Code === 1 ? repairedReadback.Data : null;
+        if (!row || text(row.OsClient) !== text(V8.OsClient)) {
+          return fail('更新日志历史租户字段回读失败。');
+        }
+      }
+    }
+  }
   if (!row || row.IsDeleted === 1 || row.IsDeleted === true
       || isBlank(row.Title) || isBlank(row.ChangeType) || isBlank(row.Content) || isBlank(row.ReleaseTime)) {
     return fail('应用 ' + version + ' 缺少完整更新日志。请先在商城应用的【更新日志】页签补齐标题、类型、内容和发布时间。');
@@ -1512,6 +1691,13 @@ if (!protocolV3 && appType === 'MicroService' && (!runtime || !runtime.Service) 
 var requestedDatabaseOnlyBuild = V8.Param.DatabaseOnlyBuild === true
   || V8.Param.DatabaseOnlyBuild === 1
   || text(V8.Param.DatabaseOnlyBuild).toLowerCase() === 'true';
+if (protocolV3 && appType === 'MicroService' && requestedDatabaseOnlyBuild) {
+  try {
+    runtime = hydrateCommittedRuntimeAssets(app, runtime, V8.Param.CommittedProof, V8.Param.AppVersion);
+  } catch (runtimeAssetHydrationError) {
+    return fail(runtimeAssetHydrationError.message);
+  }
+}
 var returnPackageModel = V8.Param.ReturnPackageModel === true || V8.Param.ReturnPackageModel === 1 || text(V8.Param.ReturnPackageModel).toLowerCase() === 'true';
 // 组合型应用商城导出器只需要 Package 对象继续合并资源。此模式禁止再生成
 // 内容完全重复的 FileByteBase64，避免大型源码包在 Jint/JSON 中占用双份内存。
@@ -1677,7 +1863,8 @@ var versionNo = repairCurrentPackageVersion
   : deliveryVersions.PackageVersion;
 var changeLogValidation = requireMarketplaceChangeLog(
   text((existingStore && existingStore.Id) || app.Id),
-  versionNo
+  versionNo,
+  action === 'Publish'
 );
 if (!changeLogValidation || changeLogValidation.Code !== 1) return changeLogValidation;
 var releaseChangeLog = changeLogValidation.Data;
@@ -1915,16 +2102,31 @@ if (requestedDatabaseOnlyBuild) {
     if (databaseOnlyPath.toLowerCase() === normalizePath(entryPath).toLowerCase()) {
       var databaseOnlyHtml = '';
       try {
-        databaseOnlyHtml = System.Text.Encoding.UTF8.GetString(
+        // Jint may expose Encoding.GetString(byte[]) as a CLR System.String
+        // host object. Normalize it to a native JavaScript string before using
+        // RegExp.test; otherwise a byte-identical complete HTML document can
+        // fail every structural check on production hosts.
+        databaseOnlyHtml = text(System.Text.Encoding.UTF8.GetString(
           System.Convert.FromBase64String(databaseOnlyBase64)
-        );
+        ));
       } catch (databaseOnlyHtmlError) { return fail('DatabaseOnlyBuild 入口不是有效 UTF-8 HTML。'); }
-      if (!/<!doctype\s+html/i.test(databaseOnlyHtml)
-          || !/<html\b/i.test(databaseOnlyHtml)
-          || !/<head\b/i.test(databaseOnlyHtml)
-          || !/<body\b/i.test(databaseOnlyHtml)
-          || !/<\/html\s*>/i.test(databaseOnlyHtml)) {
-        return fail('DatabaseOnlyBuild 入口未返回完整 HTML 文档。');
+      var databaseOnlyHtmlLower = text(databaseOnlyHtml).toLowerCase();
+      var databaseOnlyEntryChecks = {
+        Path: databaseOnlyPath,
+        ByteLength: databaseOnlyBytes,
+        Sha256: sha256RuntimeAssetBytes(System.Convert.FromBase64String(databaseOnlyBase64)),
+        HasDoctype: databaseOnlyHtmlLower.indexOf('<!doctype html') >= 0,
+        HasHtml: databaseOnlyHtmlLower.indexOf('<html') >= 0,
+        HasHead: databaseOnlyHtmlLower.indexOf('<head') >= 0,
+        HasBody: databaseOnlyHtmlLower.indexOf('<body') >= 0,
+        HasCloseHtml: databaseOnlyHtmlLower.indexOf('</html>') >= 0
+      };
+      if (!databaseOnlyEntryChecks.HasDoctype
+          || !databaseOnlyEntryChecks.HasHtml
+          || !databaseOnlyEntryChecks.HasHead
+          || !databaseOnlyEntryChecks.HasBody
+          || !databaseOnlyEntryChecks.HasCloseHtml) {
+        return fail('DatabaseOnlyBuild 入口未返回完整 HTML 文档。', databaseOnlyEntryChecks);
       }
       databaseOnlyAsset.IsEntry = true;
       databaseOnlyEntryVerified = true;

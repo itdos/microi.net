@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
     relocateSystemEngineDocs,
-    SYSTEM_ENGINE_RELOCATED_LINKS
+    SYSTEM_ENGINE_RELOCATED_LINKS,
+    SYSTEM_ENGINE_HIDDEN_LINKS
 } from "../docs/guide/sidebar-relocation.mjs";
 
 const makeSidebar = () => [
     {
         text: "系统引擎",
-        items: [{ text: "文件柜", link: "/doc/system-engine/file-manage" }]
+        items: [
+            { text: "文件柜", link: "/doc/system-engine/file-manage" },
+            { text: "接口引擎数据能力（兼容）", link: "/doc/system-engine/datasource-engine" }
+        ]
     },
     {
         text: "更多文档",
@@ -29,6 +33,7 @@ test("selected documents move under system engine without changing their URLs", 
     const moreLinks = sidebar[1].items.map((item) => item.link);
 
     assert.deepEqual(systemLinks.slice(-5), SYSTEM_ENGINE_RELOCATED_LINKS);
+    assert.ok(SYSTEM_ENGINE_HIDDEN_LINKS.every((link) => !systemLinks.includes(link)));
     assert.deepEqual(moreLinks, ["/doc/more/security"]);
 });
 

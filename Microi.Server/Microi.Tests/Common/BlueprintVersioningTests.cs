@@ -17,6 +17,18 @@ public class BlueprintVersioningTests
     }
 
     [Fact]
+    public void SaveConcurrencyHash_AllowsLegacyCallsAndRejectsStaleContent()
+    {
+        const string current = "{\"diagrams\":[{\"id\":\"main\"}],\"metadata\":{\"b\":2,\"a\":1}}";
+        const string equivalent = "{\"metadata\":{\"a\":1,\"b\":2},\"diagrams\":[{\"id\":\"main\"}]}";
+        var expected = V8McpLogic.ComputeBlueprintContentHash(equivalent);
+
+        Assert.True(V8McpLogic.BlueprintContentMatchesExpectedHash(current, null));
+        Assert.True(V8McpLogic.BlueprintContentMatchesExpectedHash(current, expected.ToUpperInvariant()));
+        Assert.False(V8McpLogic.BlueprintContentMatchesExpectedHash(current, new string('0', 64)));
+    }
+
+    [Fact]
     public void SemanticDiff_MatchesBlueprintNodesByStableIdentity()
     {
         const string left = """

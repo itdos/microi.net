@@ -75,8 +75,12 @@ test('making or publishing an app requires the exact version changelog', () => {
   assert.match(button.V8Code, /Version.*releaseVersion/);
   assert.match(button.V8Code, /\['OsClient', '=', V8\.OsClient\]/);
   assert.match(publisherSource, /MARKETPLACE_CHANGELOG_REQUIRED_V1/);
+  assert.match(publisherSource, /MARKETPLACE_CHANGELOG_LEGACY_TENANT_V1/);
   assert.match(publisherSource, /requireMarketplaceChangeLog/);
   assert.match(publisherSource, /\['OsClient', '=', V8\.OsClient\]/);
+  assert.match(publisherSource, /repairLegacyTenant === true/);
+  assert.match(publisherSource, /action === 'Publish'/);
+  assert.match(publisherSource, /UptFormData\('sys_microistore_changelog'/);
   assert.match(modelSource, /ChangeLogAvailable/);
   assert.match(modelSource, /ChangeLogs/);
   assert.match(modelSource, /\["OsClient", "=", V8\.OsClient\]/);

@@ -195,6 +195,9 @@ namespace Microi.net
             return new DosResult(1, new
             {
                 validation.RemainingNonTemplateUsers,
+                validation.CanonicalTemplateTenantCount,
+                validation.RemainingNonCanonicalTenants,
+                validation.RemainingTenantRuntimeConnectionResidue,
                 validation.RemainingAppPhysicalTables,
                 validation.RemainingApplicationPhysicalTables,
                 validation.RemainingApplicationTableDefinitions,
@@ -284,6 +287,9 @@ namespace Microi.net
                         .Select(item => new { TableName = item.Key, RowCount = item.Value })
                         .ToList(),
                     RemainingNonTemplateUsers = validation.RemainingNonTemplateUsers,
+                    CanonicalTemplateTenantCount = validation.CanonicalTemplateTenantCount,
+                    RemainingNonCanonicalTenants = validation.RemainingNonCanonicalTenants,
+                    RemainingTenantRuntimeConnectionResidue = validation.RemainingTenantRuntimeConnectionResidue,
                     RemainingAppArtifacts = validation.RemainingAppArtifacts,
                     RemainingOperationalResidueRows = validation.RemainingOperationalResidueRows,
                     RemainingOperationalResidue = validation.RemainingOperationalResidue,
@@ -1011,7 +1017,7 @@ DROP TEMPORARY TABLE IF EXISTS temp_backend_app_owned_tables;");
             var removableApplicationTables = removableApplicationResources.TableNames;
             var requiredTables = new[]
             {
-                "sys_user", "sys_menu", "sys_apiengine", "diy_table", "diy_field", "sys_microistore"
+                "sys_user", "sys_osclients", "sys_menu", "sys_apiengine", "diy_table", "diy_field", "sys_microistore"
             };
             var missing = requiredTables.Where(required => !tables.Contains(required, StringComparer.OrdinalIgnoreCase)).ToList();
             if (missing.Count > 0)
@@ -1051,6 +1057,32 @@ DROP TEMPORARY TABLE IF EXISTS temp_backend_app_owned_tables;");
             {
                 RemainingNonTemplateUsers = ExecuteScalarCount(connection,
                     "SELECT COUNT(*) FROM `sys_user` WHERE LOWER(IFNULL(`Account`,'')) NOT IN ('admin','demo');"),
+                CanonicalTemplateTenantCount = ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `sys_osclients`
+WHERE LOWER(COALESCE(`OsClient`, '')) = 'itdos'
+  AND UPPER(COALESCE(`OsClientType`, '')) = 'PRODUCT'
+  AND UPPER(COALESCE(`OsClientNetwork`, '')) = 'INTERNAL'
+  AND COALESCE(`IsEnable`, 0) = 1
+  AND COALESCE(`IsDeleted`, 0) = 0;"),
+                RemainingNonCanonicalTenants = ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `sys_osclients`
+WHERE NOT (
+  LOWER(COALESCE(`OsClient`, '')) = 'itdos'
+  AND UPPER(COALESCE(`OsClientType`, '')) = 'PRODUCT'
+  AND UPPER(COALESCE(`OsClientNetwork`, '')) = 'INTERNAL'
+  AND COALESCE(`IsEnable`, 0) = 1
+  AND COALESCE(`IsDeleted`, 0) = 0
+);"),
+                RemainingTenantRuntimeConnectionResidue = ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `sys_osclients`
+WHERE COALESCE(TRIM(`DbConn`), '') <> ''
+   OR COALESCE(TRIM(`RedisHost`), '') <> ''
+   OR COALESCE(TRIM(`RedisPort`), '') <> ''
+   OR COALESCE(TRIM(`RedisPwd`), '') <> ''
+   OR COALESCE(TRIM(`RedisDataBase`), '') <> ''
+   OR COALESCE(TRIM(`SentinelPwd`), '') <> ''
+   OR COALESCE(TRIM(`SentinelHost`), '') <> ''
+   OR COALESCE(TRIM(`DbMongoConnection`), '') <> '';"),
                 RemainingAppPhysicalTables = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM information_schema.TABLES
 WHERE TABLE_SCHEMA = DATABASE()
@@ -1168,6 +1200,18 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             if (validation.RemainingNonTemplateUsers > 0)
             {
                 violations.Add($"sys_user 非模板账号={validation.RemainingNonTemplateUsers}");
+            }
+            if (validation.CanonicalTemplateTenantCount != 1)
+            {
+                violations.Add($"规范主租户模板={validation.CanonicalTemplateTenantCount}（应为 1）");
+            }
+            if (validation.RemainingNonCanonicalTenants > 0)
+            {
+                violations.Add($"非规范租户模板={validation.RemainingNonCanonicalTenants}");
+            }
+            if (validation.RemainingTenantRuntimeConnectionResidue > 0)
+            {
+                violations.Add($"租户运行时连接残留={validation.RemainingTenantRuntimeConnectionResidue}");
             }
             if (validation.RemainingAppPhysicalTables > 0)
             {
@@ -2508,6 +2552,9 @@ return 0";
         private sealed class SanitizationValidation
         {
             public long RemainingNonTemplateUsers { get; set; }
+            public long CanonicalTemplateTenantCount { get; set; }
+            public long RemainingNonCanonicalTenants { get; set; }
+            public long RemainingTenantRuntimeConnectionResidue { get; set; }
             public long RemainingAppPhysicalTables { get; set; }
             public long RemainingApplicationPhysicalTables { get; set; }
             public List<string> RemainingApplicationPhysicalTableNames { get; set; } = new List<string>();
