@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { canAddMenuRecord } from '../src/platform/menu-permission.js'
+import { canAddMenuRecord, canEditMenuRecord } from '../src/platform/menu-permission.js'
 import {
   customerDeviceLookupCandidates,
   customerDeviceMatches,
@@ -19,6 +19,14 @@ test('售后任务新增入口精确服从当前菜单新增权限', () => {
   assert.equal(canAddMenuRecord(menuId, { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Add' }] }] }), true)
   assert.equal(canAddMenuRecord(menuId, { _RoleLimits: JSON.stringify([{ FkId: menuId, Permission: [{ Name: '新增' }] }]) }), true)
   assert.equal(canAddMenuRecord('other-menu', { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Add' }] }] }), false)
+})
+
+test('表单编辑入口精确服从当前菜单编辑权限', () => {
+  const menuId = 'casebook-menu'
+  assert.equal(canEditMenuRecord(menuId, { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Read' }] }] }), false)
+  assert.equal(canEditMenuRecord(menuId, { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Edit' }] }] }), true)
+  assert.equal(canEditMenuRecord(menuId, { _RoleLimits: JSON.stringify([{ FkId: menuId, Permission: [{ Name: '编辑' }] }]) }), true)
+  assert.equal(canEditMenuRecord('other-menu', { _RoleLimits: [{ FkId: menuId, Permission: [{ Name: 'Edit' }] }] }), false)
 })
 
 test('历史错误客户设备Id会回退到设备业务键', () => {
