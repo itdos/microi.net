@@ -262,6 +262,19 @@ test("file manager and XJY service records fail closed without authoritative res
     assert.match(serviceRecordSource, /resolve\(""\);[\s\S]{0,80}return;/);
 });
 
+test("XJY service records render text before private image URLs finish", async function () {
+    const serviceRecordSource = await readFile(path.join(sourceRoot, "views", "custom", "xjy", "ServiceRecord.vue"), "utf8");
+
+    assert.match(serviceRecordSource, /NormalizeArray\(value\)/);
+    assert.match(serviceRecordSource, /value === undefined \|\| value === null \|\| value === ""/);
+    assert.match(serviceRecordSource, /this\.NormalizeArray\(normalizedDevice\.JieguoTP\)/);
+    assert.match(serviceRecordSource, /this\.formData = rows;[\s\S]{0,160}this\.ResolveRowsImages\(this\.formData, currentVersion\)/);
+    assert.match(serviceRecordSource, /const timeoutId = setTimeout\(\(\) => finish\(""\), 10000\)/);
+    assert.match(serviceRecordSource, /\(\) => finish\(""\)/);
+    assert.match(serviceRecordSource, /暂无符合条件的服务记录/);
+    assert.doesNotMatch(serviceRecordSource, /JSON\.parse\(item1\.JieguoTP\)/);
+});
+
 test("file manager route is supplied only by the authoritative dynamic menu", async function () {
     const routerSource = await readFile(path.join(sourceRoot, "router", "index.js"), "utf8");
     assert.doesNotMatch(routerSource, /path:\s*["']\/file-manage["'][\s\S]{0,300}name:\s*["']file-manage["']/);
