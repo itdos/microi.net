@@ -54,6 +54,11 @@ namespace Microi.net
         DosResult RequireManagedProtocolContext();
 
         /// <summary>
+        /// 仅供畅捷通 V2 官方 Managed 接口引擎调用的租户绑定解密校验原子。
+        /// </summary>
+        DosResult DecodeChanjetCallbackV2(dynamic dynamicParam);
+
+        /// <summary>
         /// 解析查询条件
         /// </summary>
         List<DiyWhere> ParseWhere(object whereParam);

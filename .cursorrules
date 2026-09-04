@@ -537,7 +537,7 @@ console.log('调试信息')                                  // 控制台输出�
 ## 接口引擎与应用商城优先规范（强制）
 
 - 新增业务逻辑先判断现有低代码 CRUD/表单事件能否完成；其次使用接口引擎。只有缺少可复用底层原子能力时才扩展 V8，并继续由接口引擎编排；平台协议、可信鉴权、密钥隔离、存储/网络边界和运行时内核才允许直接写 C# Controller/Service。
-- 修改 `Microi.Server` 前必须说明为什么不能使用接口引擎。第三方 HTTP 集成默认使用 `V8.Http`；密钥不能暴露给可编辑 V8 时，只在 C# 提供最小、租户隔离且不可覆盖密钥的安全原子方法。第三方回调采用“C# 最小协议网关 + `Managed` 核心接口引擎 + `CreateIfMissing` 租户 Hook”，C# 不承载日志、写表、通知等业务。
+- 修改 `Microi.Server` 前必须说明为什么不能使用接口引擎。第三方 HTTP 集成默认使用 `V8.Http`；密钥不能暴露给可编辑 V8 时，只在 C# 提供最小、租户隔离且不可覆盖密钥的安全原子方法。普通第三方 HTTP 回调（含签名、AES 和隐藏密钥）采用“公开 `Managed` HTTP 接口引擎 + 固定 Key/当前租户的最小 V8 原子 + `CreateIfMissing` 租户 Hook”；公开路由、HTTP 响应、日志、写表、通知与业务编排均不新增 Controller。
 - 第三方不支持 QueryString 时使用 `/path--OsClient--{OsClient}--`；支持 Query 时固定使用 `?OsClient=`，禁止 `?o=`。路径与 Query 同时出现时必须一致。
 - 表、字段、Tab、菜单、权限、接口引擎、事件、数据源、页面、打印、工作流、任务和可幂等种子数据必须优先通过应用商城升级，不得为这些资源在 `Microi.Server/Microi.Upgrade/` 新增定制 .NET 迁移。
 - 应用包接口引擎必须声明 `ResourcePolicies.ApiEngines`。官方核心使用 `Managed`，仅当目标端 `Local == Base` 才更新；租户扩展使用 `CreateIfMissing`，首次创建后永不覆盖，同一 Key 后续也禁止改回 `Managed`，确需官方接管时发布新 Key。发现核心被客户修改时整包冲突回滚，不自动合并可执行代码。

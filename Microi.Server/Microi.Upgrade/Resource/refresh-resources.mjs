@@ -404,19 +404,29 @@ function validateReleaseCandidate(name, content) {
       const chanjetEnabledSetting = systemSettingRows.get('Integration.Chanjet.CallbackV2.Enabled');
       const chanjetAesSetting = systemSettingRows.get('Integration.Chanjet.CallbackV2.AesKey');
       const chanjetAppKeysSetting = systemSettingRows.get('Integration.Chanjet.CallbackV2.AppKeys');
-      if (semanticNumber(chanjetCallback?.Version) < 1_000_000
+      if (semanticNumber(chanjetCallback?.Version) < 1_000_001
         || Number(chanjetCallback?.IsEnable) !== 1
-        || Number(chanjetCallback?.StopHttp) !== 1
-        || Number(chanjetCallback?.AllowAnonymous) !== 0
+        || Number(chanjetCallback?.StopHttp) !== 0
+        || Number(chanjetCallback?.AllowAnonymous) !== 1
         || Number(chanjetCallback?.EnableLog) !== 0
-        || !chanjetCallbackCode.includes('RequireManagedProtocolContext')
+        || String(chanjetCallback?.ApiAddress || '') !== '/apiengine/platform-chanjet-callback-v2'
+        || !String(chanjetCallback?.ApiRoutes || '').split(';').includes('/api/Message/ReceiveV2')
+        || String(chanjetCallback?.ResponseType || '').toUpperCase() !== 'HTTP'
+        || !chanjetCallbackCode.includes('V8.Method.DecodeChanjetCallbackV2')
+        || !chanjetCallbackCode.includes('DataAppend')
+        || !chanjetCallbackCode.includes('HttpResponse')
+        || !chanjetCallbackCode.includes("param._HttpMethod")
+        || chanjetCallbackCode.includes('RequireManagedProtocolContext')
         || !chanjetCallbackCode.includes('platform-chanjet-callback-v2-hook')
         || Number(chanjetHook?.StopHttp) !== 1
         || Number(chanjetHook?.AllowAnonymous) !== 0
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-chanjet-callback-v2']?.UpgradePolicy !== 'Managed'
         || packageModel?.ResourcePolicies?.ApiEngines?.['platform-chanjet-callback-v2-hook']?.UpgradePolicy !== 'CreateIfMissing'
-        || !requiredCapabilities.includes('ApiEngine:platform-chanjet-callback-v2@v1.0.0')) {
-        throw new Error(`${name} 缺少畅捷通 V2 可信回调与租户 Hook 契约。`);
+        || !requiredCapabilities.includes('V8.Method.DecodeChanjetCallbackV2')
+        || !requiredCapabilities.includes('ApiEngine:platform-chanjet-callback-v2@v1.0.1')
+        || !requiredCapabilities.includes('ServerField:sys_apiengine.ApiRoutes')
+        || !requiredCapabilities.includes('ApiEngineHttpResponseContract:v1')) {
+        throw new Error(`${name} 缺少畅捷通 V2 Managed HTTP 回调、最小原子与租户 Hook 契约。`);
       }
       if (String(systemSettingsDataSet?.ConflictPolicy || '') !== 'InsertIfMissing'
         || String(chanjetEnabledSetting?.ConfigValue || '') !== 'false'
