@@ -56,12 +56,14 @@ test("SaaS engine delivers role and department management as low-code tree-table
   assert.ok(roleTable);
   assert.ok(departmentTable);
   assert.ok(roleLimitTable);
-  assert.match(roleTable.SubmitBeforeServerV8, /Version: v1\.0\.5/u);
+  assert.match(roleTable.SubmitBeforeServerV8, /Version: v1\.0\.6/u);
   assert.match(roleTable.SubmitAfterServerV8, /Version: v1\.0\.3/u);
   assert.match(roleTable.SubmitBeforeServerV8, /GetDirectTableGrantPolicies/u);
   assert.match(roleTable.SubmitBeforeServerV8, /parentLimit = \{ Id: parentId, Permission: '\["Read"\]' \}/u);
   assert.match(roleTable.SubmitBeforeServerV8, /isRootMenuParentId/u);
   assert.match(roleTable.SubmitBeforeServerV8, /00000000-0000-0000-0000-000000000000/u);
+  assert.match(roleTable.SubmitBeforeServerV8, /ROLE_REQUIRED_HOME_READ_V1/u);
+  assert.match(roleTable.SubmitBeforeServerV8, /mustLoadRequiredHomeMenus/u);
   assert.match(roleTable.SubmitAfterServerV8, /Type: 'Table'/u);
   assert.match(roleTable.SubmitAfterServerV8, /\['Type', '=', 'Table'\]/u);
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(

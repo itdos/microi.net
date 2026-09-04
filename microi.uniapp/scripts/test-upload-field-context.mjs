@@ -68,10 +68,11 @@ test('uploadFile sends authoritative lookup clues while leaving bucket choice to
   }
 })
 
-test('dynamic form uploader forwards its existing file context into the upload SDK', async () => {
+test('dynamic form uploader forwards the explicit upload context and defaults to its file context', async () => {
   const source = await readFile(
     new URL('../src/components/mci-media-uploader/mci-media-uploader.vue', import.meta.url),
     'utf8'
   )
-  assert.match(source, /formFieldContext:\s*this\.fileContext/)
+  assert.match(source, /formFieldContext:\s*this\.effectiveUploadContext/)
+  assert.match(source, /this\.uploadContext === null \? this\.fileContext : this\.uploadContext/)
 })

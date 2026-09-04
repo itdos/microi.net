@@ -9,7 +9,8 @@
         <view v-if="item.uploadState && item.uploadState !== 'passed'" class="mci-media-uploader__status" :class="'mci-media-uploader__status--' + item.uploadState">
           <text>{{ uploadStatusText(item) }}</text>
         </view>
-        <view v-if="!readonly" class="mci-media-uploader__remove" @tap.stop="remove(index)"><text>×</text></view>
+        <view v-if="!readonly && !uploading && replaceable && mediaType === 'image'" class="mci-media-uploader__replace" @tap.stop="chooseReplacement(index)"><text>换</text></view>
+        <view v-if="!readonly && !uploading" class="mci-media-uploader__remove" @tap.stop="remove(index)"><text>{{ removeText }}</text></view>
       </view>
       <view v-if="!readonly && items.length < maxCount" class="mci-media-uploader__add" :class="{ 'mci-media-uploader__add--circle': shape === 'circle' }" hover-class="mci-media-uploader__add--pressed" @tap="choose">
         <text class="mci-media-uploader__plus">＋</text>
@@ -37,8 +38,11 @@ export default {
     mediaType: { type: String, default: 'image' },
     uploadPath: { type: String, default: '' },
     fileContext: { type: Object, default: () => ({}) },
+    uploadContext: { type: Object, default: null },
     readonly: { type: Boolean, default: false },
-    shape: { type: String, default: 'square' }
+    shape: { type: String, default: 'square' },
+    replaceable: { type: Boolean, default: false },
+    removeText: { type: String, default: '×' }
   },
   emits: ['update:modelValue', 'change', 'upload-state'],
   data() {
@@ -65,6 +69,9 @@ export default {
     }
   },
   computed: {
+    effectiveUploadContext() {
+      return this.uploadContext === null ? this.fileContext : this.uploadContext
+    },
     uploadSummary() {
       const state = this.currentUploadState()
       if (state.pendingCount > 0) return `已通过 ${state.passedCount}/${state.totalCount}，${state.pendingCount} 张处理中`
@@ -96,7 +103,7 @@ export default {
       const localPath = forceServer ? '' : (raw.localPath || '')
       const providedUrl = raw.Url || raw.FileUrl || raw.FileURL || raw.PreviewUrl || raw.PreviewURL || raw.FullUrl || ''
       const runtimeUrls = (this.fileContext && this.fileContext.runtimeUrls) || {}
-      const runtimeUrl = !forceServer && raw.Id ? runtimeUrls[String(raw.Id)] : ''
+      const runtimeUrl = !forceServer && (runtimeUrls[String(raw.Id || '')] || runtimeUrls[String(path || '')]) || ''
       let url = localPath || runtimeUrl
       if (!url && preferProvidedUrl && providedUrl) {
         url = await V8.resolveFileUrl(providedUrl, this.fileContext)
@@ -143,18 +150,34 @@ export default {
         uni.chooseImage({ count: remaining, sourceType: ['camera', 'album'], success: (result) => this.uploadFiles((result.tempFilePaths || []).map((path) => ({ tempFilePath: path }))) })
       }
     },
-    async uploadFiles(files) {
+    chooseReplacement(index) {
+      if (this.uploading || this.mediaType !== 'image' || !this.items[index]) return
+      const done = (result) => {
+        const files = result.tempFiles || []
+        const paths = result.tempFilePaths || []
+        const file = files[0] || (paths[0] ? { tempFilePath: paths[0] } : null)
+        if (file) this.uploadFiles([file], index)
+      }
+      if (typeof uni.chooseMedia === 'function') {
+        uni.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['camera', 'album'], success: done })
+      } else {
+        uni.chooseImage({ count: 1, sourceType: ['camera', 'album'], success: done })
+      }
+    },
+    async uploadFiles(files, replaceIndex = -1) {
       if (this.uploading) return
-      if (this.maxCount === 1) this.items = []
-      const capacity = Math.max(0, this.maxCount - this.items.length)
+      const replacing = Number.isInteger(replaceIndex) && replaceIndex >= 0 && replaceIndex < this.items.length
+      const replacementOriginal = replacing ? { ...this.items[replaceIndex] } : null
+      if (!replacing && this.maxCount === 1) this.items = []
+      const capacity = replacing ? 1 : Math.max(0, this.maxCount - this.items.length)
       const selected = (files || []).filter(Boolean).slice(0, capacity)
       if (!selected.length) return
 
       const generation = ++this.uploadGeneration
-      const batch = selected.map((file) => {
+      const batch = selected.map((file, selectedIndex) => {
         const filePath = file.tempFilePath || file.path || ''
         const clientId = `upload-${Date.now()}-${++this.uploadSequence}`
-        this.items.push({
+        const pendingItem = {
           clientId,
           Path: '',
           Name: file.name || this.fileName(filePath),
@@ -162,7 +185,9 @@ export default {
           url: filePath,
           uploadState: 'queued',
           uploadError: ''
-        })
+        }
+        if (replacing && selectedIndex === 0) this.items.splice(replaceIndex, 1, pendingItem)
+        else this.items.push(pendingItem)
         return { ...file, filePath, clientId }
       })
 
@@ -172,7 +197,7 @@ export default {
       try {
         const outcomes = await V8.uploadFiles(batch, {
           path: this.uploadPath || (this.mediaType === 'image' ? 'img' : 'file'),
-          formFieldContext: this.fileContext,
+          formFieldContext: this.effectiveUploadContext,
           preview: this.mediaType === 'image',
           multiple: this.maxCount > 1,
           concurrency: 3,
@@ -222,6 +247,11 @@ export default {
         }
       } finally {
         if (generation === this.uploadGeneration) {
+          if (replacing) {
+            const replacementIndex = findItemIndex(batch[0].clientId)
+            const replacement = replacementIndex >= 0 ? this.items[replacementIndex] : null
+            if (replacement && replacement.uploadState !== 'passed') this.items.splice(replacementIndex, 1, replacementOriginal)
+          }
           this.uploading = false
           this.emitValue()
           this.emitUploadState()
@@ -339,6 +369,7 @@ export default {
 .mci-media-uploader__status--timeout { background: rgba(151,48,31,.76); }
 .mci-media-uploader__status--cancelled { background: rgba(72,82,87,.7); }
 .mci-media-uploader__remove { position: absolute; right: 6rpx; top: 6rpx; z-index: 2; width: 42rpx; height: 42rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; background: rgba(17,35,42,.72); font-size: 32rpx; line-height: 1; }
+.mci-media-uploader__replace { position: absolute; left: 6rpx; bottom: 6rpx; z-index: 2; display: flex; align-items: center; justify-content: center; min-width: 58rpx; height: 42rpx; padding: 0 10rpx; box-sizing: border-box; border-radius: 21rpx; color: #fff; background: rgba(8,127,189,.9); font-size: 21rpx; font-weight: 700; line-height: 1; }
 .mci-media-uploader__item--circle .mci-media-uploader__remove { right: -10rpx; top: -10rpx; z-index: 2; width: 40rpx; height: 40rpx; border: 3rpx solid #fff; box-sizing: border-box; background: rgba(38, 56, 64, .88); font-size: 28rpx; box-shadow: 0 3rpx 10rpx rgba(17, 35, 42, .24); }
 .mci-media-uploader__add { min-height: 176rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8rpx; border: 1px dashed #9cb8c2; color: #607b85; background: #f7fafb; font-size: 23rpx; transition: transform .18s ease, background-color .18s ease; }
 .mci-media-uploader__add--pressed { transform: scale(.97); background: #edf6f8; }

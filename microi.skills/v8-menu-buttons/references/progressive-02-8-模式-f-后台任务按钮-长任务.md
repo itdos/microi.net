@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-menu-buttons-008 sha256=dd53500e57af81daec15456a538ac36b2c965faca61ba99de46c7ba0e3b4bbaa -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-008 sha256=495161c95d321f2937486db3fecc4e27d2e38c6d7a21587b5028d04ea6491b90 -->
 ## 8. 模式 F：后台任务按钮（长任务）
 
 应用安装、初始化多语言、批量导入、批量修复、跨系统同步等可能超过浏览器或网关等待时间的操作，必须优先设计为后台任务。判断阈值：预计超过 2 分钟、500 条以上、1000 个以上扇出子操作、100 次以上外部调用，或总量未知且可能持续运行。前端按钮只负责提交任务，后台任务列表通过 WebSocket/SignalR 推送并以轮询兜底。
@@ -100,6 +100,10 @@ reportProgress(2, 5, '正在写入表结构');
 
 预计超过 10 分钟的任务必须分页/分片。每片只处理可在较短事务内提交的一批，仍有后续时返回 `Data.BackgroundTask.HasMore=true + Checkpoint + Current/Total`，平台持久化检查点并重新入队；最后一片返回普通 `Code:1`。重试副作用必须用稳定幂等键、数据库唯一约束和 `_BackgroundTaskFencingToken` 条件写入，不能依赖锁本身。
 
+后台接口同时启用 `LockKey` 时，平台可信持久后台上下文会把接口 `Timeout` 作为单次 Redis 租期并按唯一持有者令牌自动续租；当前默认最长续租边界为 12 小时，显式配置得更长的单次租期不会被缩短。客户端自行传入 `_BackgroundTaskId`、`_TrustedServerInvocation` 或用户对象不能取得该能力。自动续租只防止正常长任务因短 TTL 自然过期，不能取消本节的检查点、幂等和 fencing token 要求。
+
+持有者令牌不匹配、锁已过期、Redis 所有权/续租确认失败或达到最长租约时，任务必须失败关闭并保留最后真实进度与原始错误。V8 代码不得捕获“分布式锁租约已丢失”后返回 `Code:1`；旧执行者后续的业务条件写入必须因 `_BackgroundTaskFencingToken` 过期而被拒绝。完整配置语义见 `../../v8-api-config/SKILL.md`。
+
 ### 复盘：主租户默认值误清空子租户后台任务身份
 
 - 触发场景：同一套前后端中，独立部署的主租户可正常执行后台安装，挂在平台主库下的子租户却间歇性提示“只有超级管理员才能安装”；数据库中的 admin 实际已经是最高等级。
@@ -110,7 +114,7 @@ reportProgress(2, 5, '正在写入表结构');
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-009 sha256=84f41fd0ea02234d3d883ba73e894393a4f2a57c5f4fc51a985145f658dd3a8c -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-009 sha256=8cb7f4d399068549be662cc47bd4add8b3d3bbdb6e7a74832e4c63b7768e136b -->
 ## 9. 通过 MCP 创建菜单 + 按钮（一次到位）
 
 > AI 在 `microi_create_module` 调用时，把按钮 JSON **作为字符串** 传入对应字段。
@@ -167,7 +171,7 @@ var modulePayload = {
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-menu-buttons-011 sha256=e2d7fb49de3af1ef244df5027086674b10d18ec830e765adbe252d094aa14490 -->
+<!-- microi-progressive:chunk id=v8-menu-buttons-011 sha256=16414969be47116a51bab1c6a7e1482bb987b278430e0fb8daaf7d6ecf41bf94 -->
 ## 10. 与接口引擎配套的工作流
 
 业务按钮通常与接口引擎配套：
