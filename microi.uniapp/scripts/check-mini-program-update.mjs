@@ -21,7 +21,9 @@ const profiles = ['xjy', 'standard']
 
 expect(app.includes('initializeMiniProgramUpdate({ promptOnReady: true })'), 'App.onLaunch 必须初始化全局更新管理器')
 expect(profilePage.includes("key: 'about'"), '我的页必须声明关于小程序入口')
-expect(profilePage.includes("if (item.key === 'about') {\n        uni.navigateTo"), '关于小程序入口必须在登录守卫前独立处理')
+const publicEntryIndex = profilePage.indexOf("if (item.key === 'about' || item.key === 'complaintPublic')")
+const loginGuardIndex = profilePage.indexOf('if (!this.isLoggedIn) { this.goLogin(); return }', publicEntryIndex)
+expect(publicEntryIndex >= 0 && loginGuardIndex > publicEntryIndex, '关于小程序入口必须在登录守卫前独立处理')
 expect(aboutPage.includes('checkMiniProgramUpdate()'), '关于页必须提供手动更新状态入口')
 expect(aboutPage.includes('update-button-icon'), '更新主按钮必须包含真实图形图标')
 expect(updateService.includes('uni.getUpdateManager()'), '平台服务必须使用小程序 UpdateManager')

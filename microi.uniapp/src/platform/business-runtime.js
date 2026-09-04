@@ -159,6 +159,20 @@ export function buildPeriodRange(period, customRange = null) {
   return [format(start), format(end)]
 }
 
+// 列表数据与 Hero 统计共用同一份筛选负载，确保关键词、状态、时间和高级筛选口径一致。
+export function buildModuleFilterPayload(moduleConfig, options = {}) {
+  const payload = {
+    _Keyword: options.keyword || '',
+    _Where: [...(moduleConfig.fixedWhere || []), ...(options.extraWhere || [])]
+  }
+  if (options.status && moduleConfig.statusField) {
+    payload._Where.push({ Name: moduleConfig.statusField, Type: '=', Value: options.status })
+  }
+  const range = buildPeriodRange(options.period, options.customRange)
+  if (range) payload._SearchDateTime = { [moduleConfig.periodField || 'CreateTime']: range }
+  return payload
+}
+
 export async function loadModuleRows(moduleConfig, options = {}) {
   const pageIndex = Number(options.pageIndex || 1)
   const pageSize = Number(options.pageSize || moduleConfig.pageSize || 15)
@@ -205,24 +219,18 @@ export async function loadModuleRows(moduleConfig, options = {}) {
   ).trim()
   if (!moduleEngineKey) throw new Error('业务模块未配置菜单标识')
   const payload = {
+    ...buildModuleFilterPayload(moduleConfig, options),
     ModuleEngineKey: moduleEngineKey,
     _PageIndex: pageIndex,
     _PageSize: pageSize,
-    _Keyword: options.keyword || '',
     _OrderBy: options.orderBy || moduleConfig.defaultOrderBy || 'CreateTime',
-    _OrderByType: options.orderType || moduleConfig.defaultOrderType || 'DESC',
-    _Where: [...(moduleConfig.fixedWhere || []), ...(options.extraWhere || [])]
+    _OrderByType: options.orderType || moduleConfig.defaultOrderType || 'DESC'
   }
   if (menuId) payload._SysMenuId = menuId
   if (Array.isArray(moduleConfig.selectFields) && moduleConfig.selectFields.length) {
     payload._SelectFields = moduleConfig.selectFields
   }
   if (options.tableChildAuth) payload._TableChildAuth = options.tableChildAuth
-  if (options.status && moduleConfig.statusField) {
-    payload._Where.push({ Name: moduleConfig.statusField, Type: '=', Value: options.status })
-  }
-  const range = buildPeriodRange(options.period, options.customRange)
-  if (range) payload._SearchDateTime = { [moduleConfig.periodField || 'CreateTime']: range }
   const requestKey = [
     'module', currentIdentityKey(), moduleEngineKey, moduleConfig.menuId || '', moduleConfig.table,
     pageIndex, pageSize, options.keyword || '', options.status || '',

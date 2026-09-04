@@ -191,7 +191,7 @@ function createModuleDefinition(module, definition) {
   const configuredBottom = configuredBottomFields.map((item) => item.field)
   const configuredSearch = configuredFieldNames(module.menu.SearchFieldIds, fields)
   const filterFields = compileModuleFilterFields(module.menu.SearchFieldIds, appendSystemAuditFields(fields))
-  const configuredStatistics = configuredFieldNames(module.menu.StatisticsFields, fields)
+  const configuredStatistics = configuredFields(module.menu.StatisticsFields, fields)
   // 后台已配置“移动端/卡片显示列”时必须严格使用该顺序；
   // SelectFields 只在未配置移动端列时作为兼容回退，不能混入卡片造成展示漂移。
   const preferredNames = configuredMobile.length ? configuredMobile : configuredList
@@ -219,8 +219,16 @@ function createModuleDefinition(module, definition) {
     })
   }
   const statisticField = configuredStatistics
-    .map((name) => fields.find((field) => field.Name === name))
+    .map((item) => fields.find((field) => field.Name === item.queryField))
     .find(Boolean)
+  const statisticsMetrics = configuredStatistics.map((item, index) => ({
+    key: `field:${item.queryField || index}`,
+    label: item.label || item.queryField,
+    source: 'Field',
+    field: item.queryField,
+    format: item.format || (/金额|价格|总价|费用|余额|成本|收入|支出|佣金/.test(item.label || '') ? 'currency' : 'number'),
+    tone: 'primary'
+  }))
   const periodField = preferredField(fields, [/时间|日期|date|time/i], new Set(), false) ||
     fields.find((field) => field.Name === 'CreateTime')
   const configuredMobileByName = new Map(configuredMobileFields.map((item) => [item.queryField.toLowerCase(), item]))
@@ -264,6 +272,7 @@ function createModuleDefinition(module, definition) {
     })),
     statisticsField: statisticField && statisticField.Name || '',
     statisticsLabel: statisticField && (statisticField.Label || statisticField.Name) || '',
+    statisticsMetrics,
     periodField: periodField && periodField.Name || 'CreateTime'
   }
 }
