@@ -41,7 +41,10 @@
       </view>
     </scroll-view>
 
-    <view v-if="!loading && !casePickerVisible && canEdit" class="bottom-bar" slot="fixed"><button class="primary-button" :loading="savingBook" :disabled="savingBook" @tap="saveBook">{{ bookActionLabel }}</button></view>
+    <view v-if="!loading && !casePickerVisible && (canEdit || canExportPdf)" class="bottom-bar" slot="fixed">
+      <button v-if="canExportPdf" class="secondary-button" :loading="exportingPdf" :disabled="exportingPdf" @tap="exportPdf">▣ 导出并分享 PDF</button>
+      <button v-if="canEdit" class="primary-button" :loading="savingBook" :disabled="savingBook" @tap="saveBook">{{ bookActionLabel }}</button>
+    </view>
 
     <view v-if="casePickerVisible" class="picker-mask" @tap="closeCasePicker">
       <view class="picker-sheet" @tap.stop>
@@ -66,6 +69,8 @@
 <script>
 import { themeMixin } from '@/utils/theme.js'
 import { getUser, V8 } from '@/utils/request.js'
+import { exportCasebookPdf } from '@/utils/api.js'
+import appConfig from '@/config.js'
 import { findMenu, openForm, requireLogin } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition } from '@/platform/native-form.js'
 import { canEditMenuRecord } from '@/platform/menu-permission.js'
@@ -105,6 +110,7 @@ export default {
   data() {
     return {
       loading: true, childLoading: false, creating: false, addingCases: false,
+      exportingPdf: false,
       bookId: '', book: {}, bookName: '', bookMenuId: '', currentUser: {}, children: [],
       casePhotoContext: EMPTY_PRIVATE_FILE_CONTEXT, casePhotoContextError: '',
       casePickerVisible: false, caseKeyword: '', caseLoading: false, sourceCases: [], casePage: 1, caseCount: 0, selectedCaseIds: [], searchTimer: null
@@ -116,6 +122,7 @@ export default {
       return canEditMenuRecord(this.bookMenuId, this.currentUser)
     },
     canEditCase() { return canEditMenuRecord(this.casePhotoContext.sysMenuId, this.currentUser) },
+    canExportPdf() { return Boolean(this.bookId && appConfig.features && appConfig.features.casebookPdf) },
     hasPendingChildren() { return this.children.some((item) => item._pending) },
     savingBook() { return this.creating || this.addingCases },
     bookActionLabel() {
@@ -351,6 +358,62 @@ export default {
         this.addingCases = false
       }
     },
+    async exportPdf() {
+      if (!this.canExportPdf || this.exportingPdf) return
+      this.exportingPdf = true
+      uni.showLoading({ title: '正在生成 PDF', mask: true })
+      try {
+        const result = await exportCasebookPdf(this.bookId)
+        if (!result || Number(result.Code) !== 1 || !result.Data || !result.Data.FileByteBase64) {
+          throw new Error((result && result.Msg) || 'PDF 生成失败')
+        }
+        await this.openPdf(result.Data)
+      } catch (error) {
+        uni.showToast({ title: error.message || 'PDF 导出失败', icon: 'none' })
+      } finally {
+        uni.hideLoading()
+        this.exportingPdf = false
+      }
+    },
+    async openPdf(file) {
+      const fileName = String(file.FileName || `${this.bookName || '案例册'}.pdf`).replace(/[\\/:*?"<>|]/g, '_')
+      const base64 = String(file.FileByteBase64 || '').replace(/^data:application\/pdf;base64,/i, '')
+      if (!base64 || !/^JVBER/i.test(base64)) throw new Error('PDF 文件内容无效')
+
+      // #ifdef MP-WEIXIN
+      const filePath = `${wx.env.USER_DATA_PATH}/${Date.now()}-${fileName}`
+      await new Promise((resolve, reject) => wx.getFileSystemManager().writeFile({
+        filePath,
+        data: base64,
+        encoding: 'base64',
+        success: resolve,
+        fail: (error) => reject(new Error(error.errMsg || 'PDF 保存失败'))
+      }))
+      await new Promise((resolve, reject) => uni.openDocument({
+        filePath,
+        fileType: 'pdf',
+        showMenu: true,
+        success: resolve,
+        fail: (error) => reject(new Error(error.errMsg || 'PDF 打开失败'))
+      }))
+      return
+      // #endif
+
+      // #ifdef H5
+      const binary = atob(base64)
+      const bytes = new Uint8Array(binary.length)
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = fileName
+      anchor.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      return
+      // #endif
+
+      throw new Error('当前平台暂不支持 PDF 文档分享')
+    },
     openChildDetail(item) {
       if (item._pending) {
         uni.showToast({ title: '保存案例册后可查看详情', icon: 'none' })
@@ -403,7 +466,7 @@ export default {
 .case-lines { margin-top: 16rpx; padding: 12rpx 16rpx; border-radius: 6rpx; background: #f5f8f9; }.case-lines view { display: grid; grid-template-columns: 116rpx minmax(0, 1fr); padding: 5rpx 0; font-size: 21rpx; line-height: 31rpx; }.case-lines view text:first-child { color: #778d95; }.case-lines view text:last-child { overflow: hidden; color: #405c66; text-overflow: ellipsis; white-space: nowrap; }
 .photo-row { position: relative; display: grid; grid-template-columns: repeat(3, 112rpx); gap: 10rpx; margin-top: 14rpx; }.photo-row image, .photo-more { width: 112rpx; height: 88rpx; border-radius: 6rpx; background: #e9eff1; }.photo-more { position: absolute; right: 0; display: flex; align-items: center; justify-content: center; background: rgba(24,54,64,.74); color: #fff; font-size: 23rpx; }.case-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 14rpx; padding-top: 13rpx; border-top: 1rpx solid #edf2f4; color: #84979e; font-size: 20rpx; }.case-foot text:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.case-foot text:last-child { margin-left: 18rpx; color: #0b82ba; font-size: 30rpx; }
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 420rpx; }.empty-mark { display: flex; align-items: center; justify-content: center; width: 82rpx; height: 82rpx; border: 1rpx solid #c9dce3; border-radius: 50%; background: #fff; color: #5b8799; font-size: 30rpx; }.empty-title { margin-top: 18rpx; color: #84979e; font-size: 23rpx; }.bottom-space { height: 124rpx; }
-.bottom-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; padding: 16rpx 24rpx calc(16rpx + var(--mci-safe-bottom)); border-top: 1rpx solid #dde7eb; background: rgba(255,255,255,.97); }.primary-button { height: 82rpx; margin: 0; border-radius: 8rpx; background: #087fbd; color: #fff; font-size: 27rpx; font-weight: 650; line-height: 82rpx; }.primary-button::after { border: none; }
+.bottom-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; gap: 14rpx; padding: 16rpx 24rpx calc(16rpx + var(--mci-safe-bottom)); border-top: 1rpx solid #dde7eb; background: rgba(255,255,255,.97); }.primary-button, .secondary-button { flex: 1; height: 82rpx; margin: 0; border-radius: 8rpx; font-size: 25rpx; font-weight: 650; line-height: 82rpx; }.primary-button { background: #087fbd; color: #fff; }.secondary-button { border: 1rpx solid #8bc5da; background: #eef9fc; color: #0876a7; }.primary-button::after, .secondary-button::after { border: none; }
 .picker-mask { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; background: rgba(16,35,43,.42); }.picker-sheet { width: 100%; padding-bottom: var(--mci-safe-bottom); border-radius: 12rpx 12rpx 0 0; background: #fff; animation: sheet-up .2s ease-out; }.picker-handle { width: 74rpx; height: 7rpx; margin: 12rpx auto 4rpx; border-radius: 4rpx; background: #d7e1e5; }.picker-header { display: flex; align-items: center; justify-content: space-between; min-height: 76rpx; padding: 0 26rpx; color: #183640; font-size: 27rpx; font-weight: 700; }.picker-header > view { display: flex; align-items: baseline; }.selected-count { margin-left: 14rpx; color: #0781b7; font-size: 21rpx; font-weight: 500; }.close-button, .clear-button { margin: 0; padding: 0; border: none; background: transparent; color: #78909a; }.close-button::after, .clear-button::after { border: none; }.close-button { width: 58rpx; height: 58rpx; font-size: 38rpx; line-height: 58rpx; }
 .search-box { display: grid; grid-template-columns: 36rpx minmax(0, 1fr) 42rpx; align-items: center; height: 72rpx; margin: 0 24rpx 12rpx; padding: 0 16rpx; border: 1rpx solid #dce7eb; border-radius: 8rpx; background: #f5f8f9; }.search-box input { height: 70rpx; color: #203c46; font-size: 24rpx; }.search-icon { color: #78919a; font-size: 29rpx; }.clear-button { width: 42rpx; height: 42rpx; font-size: 28rpx; line-height: 42rpx; }
 .source-list { height: min(610rpx, 53vh); }.source-row { display: grid; grid-template-columns: 44rpx minmax(0, 1fr); align-items: center; width: auto; min-height: 94rpx; margin: 0 24rpx; padding: 12rpx 4rpx; border-bottom: 1rpx solid #edf2f4; border-radius: 0; background: #fff; text-align: left; }.source-row::after { border: none; }.source-row--selected { background: #f0f9fc; }.source-row--added { opacity: .58; }.source-check { display: flex; align-items: center; justify-content: center; width: 28rpx; height: 28rpx; border: 1rpx solid #afc3ca; border-radius: 4rpx; color: #087fbd; font-size: 20rpx; }.source-row--selected .source-check, .source-row--added .source-check { border-color: #48a9c9; background: #e5f5fa; }.source-main { display: flex; min-width: 0; flex-direction: column; }.source-main text:first-child { overflow: hidden; color: #1b3944; font-size: 25rpx; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }.source-main text:last-child { margin-top: 5rpx; color: #81949c; font-size: 20rpx; }.empty-list, .loading-more { padding: 50rpx 20rpx; color: #8ba0a8; font-size: 22rpx; text-align: center; }

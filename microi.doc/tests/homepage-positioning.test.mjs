@@ -39,13 +39,18 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.match(component, /MCP \+ Skills/)
   assert.match(component, /chatTitle: '让 AI 站在 20\+ 成熟引擎上，更快交付'/)
   assert.match(component, /开箱即可进入业务开发/)
-  assert.match(component, /href="\/doc\/getting-started\/start-use"/)
+  const actions = component.match(/<div class="mci-home-actions">([\s\S]*?)<\/div>/)?.[1] || ''
+  assert.equal((actions.match(/<a\b/g) || []).length, 2)
+  assert.match(actions, /mci-home-action--primary[^>]*microi-training-syllabus/)
+  assert.equal((actions.match(/microi-training-syllabus/g) || []).length, 2)
+  assert.doesNotMatch(component, /href="\/doc\/getting-started\/start-use"/)
   assert.match(component, /href="\/doc\/getting-started\/source-code-architecture"/)
-  assert.match(component, /\/doc\/about\/microi-training-syllabus/)
-  assert.match(component, /trainingAction: '查看培训大纲'/)
+  assert.match(component, /primaryAction: '查看培训大纲'/)
+  assert.match(component, /primaryAction: 'Training syllabus'/)
+  assert.doesNotMatch(component, /trainingAction:/)
   assert.ok(
-    component.indexOf('href="/doc/getting-started/source-code-architecture"') < component.indexOf("'/doc/about/microi-training-syllabus'"),
-    'the training syllabus action should render immediately after the source architecture action'
+    actions.indexOf('microi-training-syllabus') < actions.indexOf('href="/doc/getting-started/source-code-architecture"'),
+    'the primary training syllabus action should render before the source architecture action'
   )
   assert.match(frontmatter, /titleTemplate: 开源 AI 开发框架/)
   assert.match(frontmatter, /20\+ 成熟引擎、AI 低代码、微服务与 V8 引擎/)

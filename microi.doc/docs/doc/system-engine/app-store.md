@@ -2,6 +2,15 @@
 
 > **平台从 v4.7.2 开始自动安装应用商城模块，用户可通过应用商城安装和管理各种应用**
 
+## 📸 预览图
+
+<div class="mci-doc-screenshot-grid mci-doc-screenshot-grid--single">
+  <figure>
+    <img src="/images/product-screenshots/app-store-marketplace.jpg" alt="Microi吾码应用商城，展示商城来源、应用筛选、安装状态和平台应用卡片" data-fancybox="app-store-preview">
+    <figcaption>应用市场：统一筛选平台应用、微服务、Web 与 UniApp，并查看安装和更新状态。</figcaption>
+  </figure>
+</div>
+
 ## 数据来源
 
 AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯一应用主表。商城入口在同一个页面保留四个业务页签：

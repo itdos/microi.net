@@ -102,7 +102,7 @@ https://<API公网域名>/api/WeChatContentSecurity/Callback--OsClient--<OsClien
 
 | SaaS 引擎字段 | 代码默认值 |
 |---|---:|
-| `FileUploadEnabled` | `true` |
+| `DisableFileUpload` | `false`（关闭，即允许上传） |
 | `FileUploadMaxFileMB` | 500 MB |
 | `FileUploadMaxRequestMB` | 500 MB |
 | `FileUploadMaxCount` | 10 |
@@ -161,27 +161,27 @@ location @microi_upload_too_large {
 
 请求进入吾码 API 后，如果 Kestrel 或 Multipart 再触发超限，全局异常处理会返回 HTTP 200、`Code=0`、`DataAppend.ErrorType=UploadRequestTooLarge`，并在响应头给出 `X-Microi-Upload-Max-Request-MB` 与 `X-Microi-Upload-Max-Multipart-MB`，方便定位实际生效的 API 启动配置。
 
-Upgrade16 会在 `sys_osclients` 为每个租户补齐下列可空字段：
+Upgrade16/Upgrade35 会在 `sys_osclients` 为每个租户补齐下列现行可空字段：
 
 | SaaS 引擎字段 | 作用 | 空值行为 |
 |---|---|---|
-| `FileUploadEnabled` | 是否允许当前租户交互式上传 | 使用代码默认值 |
+| `DisableFileUpload` | 是否关闭当前租户交互式上传 | 空值/无效值/`0` 均为不关闭，即允许上传 |
 | `FileUploadMaxFileMB` | 单文件大小 | 使用代码默认值 |
 | `FileUploadMaxRequestMB` | 单次全部文件大小 | 使用代码默认值 |
 | `FileUploadMaxCount` | 单次文件数量 | 使用代码默认值 |
 | `FileUploadDailyUserQuotaMB` | 单帐号每日额度 | 使用平台默认额度 |
 | `FileUploadDailyTenantQuotaMB` | 单租户每日额度 | 使用平台默认额度 |
 
-租户配置可以高于代码业务默认值，但普通上传不能突破平台固定灾难保护、HTTP/Multipart/Form 解析上限以及反向代理限制。`FileUploadEnabled=0` 会停止该租户普通上传和应用资产断点续传，而不是关闭安全检查；协议 v3 只移除产品级字节上限，不绕过身份、能力、版本、哈希和审计。修改 SaaS 引擎配置后应通过平台现有的租户重载流程刷新共享 Redis 配置，使所有 API 节点生效。
+租户配置可以高于代码业务默认值，但普通上传不能突破平台固定灾难保护、HTTP/Multipart/Form 解析上限以及反向代理限制。`DisableFileUpload=1` 会停止该租户普通上传和应用资产断点续传，而不是关闭安全检查；协议 v3 只移除产品级字节上限，不绕过身份、能力、版本、哈希和审计。修改 SaaS 引擎配置后应通过平台现有的租户重载流程刷新共享 Redis 配置，使所有 API 节点生效。
 
 #### “当前租户已停用文件上传”如何处理
 
-`FileUploadEnabled` 缺列、为空或无法解析时，平台默认按 `true` 处理；新租户的字段默认值也是 `1`。因此看到“当前租户已停用文件上传”时，不是 MinIO/HDFS 地址或桶权限故障，而是当前 API 运行环境实际命中的 `sys_osclients` 记录把 `FileUploadEnabled` 明确设成了 `0/false`。
+新版以 `DisableFileUpload` 为事实源：缺列以外的空值、无法解析或 `0/false` 都表示允许上传，只有 `1/true` 才禁止。仅当运行节点尚未升级、物理表没有新字段时，才回退读取旧 `FileUploadEnabled`。因此看到“当前租户已关闭文件上传”时，先检查实际生效记录的负向开关，不要先把问题归因于 MinIO/HDFS。
 
 1. 在 SaaS 引擎查询目标 `OsClient`，同时核对当前后端进程的 `OsClientType`、`OsClientNetwork`。同一租户存在内网、外网或开发/生产多条记录时，只修改当前服务器实际命中的启用记录，不能凭租户名称批量覆盖其它环境。
-2. 将该记录的 `FileUploadEnabled` 改为 `1` 并保存。返回结果中的 `DataAppend.ConfigField=FileUploadEnabled`、`DataAppend.OsClient` 可用于确认目标。
+2. 将该记录的 `DisableFileUpload` 关闭为 `0` 并保存。返回结果中的 `DataAppend.ConfigField=DisableFileUpload`、`DataAppend.ExpectedValue=0`、`DataAppend.OsClient` 可用于确认目标。
 3. 等待 SaaS 配置重载和共享 Redis 发布订阅完成；多 API 节点应全部收到同一版本，不能只清某个节点的进程内缓存。
-4. 分别用一个很小的公有图片和一个私有文件做真实上传、读取测试。若错误变成 endpoint、bucket、签名或 `Invalid URI`，再按 MinIO/HDFS 配置排查；不要继续修改 `FileUploadEnabled`，也不要删除每日配额 Redis Key。
+4. 分别用一个很小的公有图片和一个私有文件做真实上传、读取测试。若错误变成 endpoint、bucket、签名或 `Invalid URI`，再按 MinIO/HDFS 配置排查；不要继续修改开关，也不要删除每日配额 Redis Key。
 
 平台超级管理员也可按下文 MCP 流程精确更新，但写入前后都要回读同一组 `OsClient + OsClientType + OsClientNetwork` 数据。禁止为了消除提示而把所有租户、所有网络环境无差别改为允许。
 

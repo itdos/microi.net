@@ -7,8 +7,8 @@
  */
 
 // Microi 官方接口引擎：platform-vision-runtime
-// Version: v1.1.0
-// VISION_DETECT_TRACK_SEARCH_VOTE_ASYNC_AI_FALLBACK_V2
+// Version: v1.1.2
+// VISION_DETECT_TRACK_SEARCH_VOTE_ASYNC_AI_FALLBACK_V4
 var visionParam = V8.Param || {};
 var visionAction = text(visionParam.Action || 'Bootstrap').toLowerCase();
 var visionUser = V8.CurrentUser || {};
@@ -252,7 +252,10 @@ async function recognize(param) {
   }
 
   if (isMatched) {
-    var retainedPath = shouldRetainInput(profile, mode) ? uploadPrivateImage(image, requestNo, 'requests') : '';
+    var retainedUpload = shouldRetainInput(profile, mode)
+      ? uploadPrivateImage(image, requestNo, 'requests')
+      : { Ok: true, Path: '' };
+    var retainedPath = retainedUpload.Ok ? retainedUpload.Path : '';
     var localRow = attachAnalysis({
       RequestNo: requestNo,
       FrameId: frameId,
@@ -276,7 +279,8 @@ async function recognize(param) {
       QualityScore: Number(vector.QualityScore || 0),
       RequestedAt: DateNow('yyyy-MM-dd HH:mm:ss'),
       CompletedAt: DateNow('yyyy-MM-dd HH:mm:ss'),
-      ElapsedMs: new Date().getTime() - started
+      ElapsedMs: new Date().getTime() - started,
+      ErrorMessage: retainedUpload.Ok ? '' : retainedUpload.Message
     }, analysisMeta);
     var localAdded = addRequest(localRow);
     if (!localAdded || Number(localAdded.Code) !== 1) return localAdded;
@@ -339,8 +343,19 @@ async function recognize(param) {
     };
   }
 
-  var pendingPath = uploadPrivateImage(image, requestNo, 'pending');
-  if (!pendingPath) return { Code: 0, Msg: '样本库未匹配，但私有图片暂存失败，未提交 AI。' };
+  var pendingUpload = uploadPrivateImage(image, requestNo, 'pending');
+  if (!pendingUpload.Ok) {
+    return {
+      Code: 0,
+      Msg: pendingUpload.Message,
+      Data: {
+        ErrorCode: pendingUpload.ErrorCode,
+        Retryable: true,
+        Stage: 'PrivateImageUpload'
+      }
+    };
+  }
+  var pendingPath = pendingUpload.Path;
   var pendingRow = attachAnalysis({
     RequestNo: requestNo,
     FrameId: frameId,
@@ -462,8 +477,19 @@ async function enroll(param) {
   };
   var protectedEmbedding = protectEmbedding(vector.EmbeddingBase64);
   if (!protectedEmbedding) return { Code: 0, Msg: '视觉特征向量保护失败，样本未写入。' };
-  var privatePath = uploadPrivateImage(image, sampleNo, 'samples/' + mode.toLowerCase());
-  if (!privatePath) return { Code: 0, Msg: '样本图片写入租户私有存储失败。' };
+  var privateUpload = uploadPrivateImage(image, sampleNo, 'samples/' + mode.toLowerCase());
+  if (!privateUpload.Ok) {
+    return {
+      Code: 0,
+      Msg: privateUpload.Message,
+      Data: {
+        ErrorCode: privateUpload.ErrorCode,
+        Retryable: true,
+        Stage: 'PrivateSampleUpload'
+      }
+    };
+  }
+  var privatePath = privateUpload.Path;
   var added = V8.FormEngine.AddFormData('mci_vision_sample', {
     SampleNo: sampleNo,
     SubjectId: text(subject.Id),
@@ -770,7 +796,34 @@ async function stabilizeContinuousFrame(param, profile, streamSessionId, frameId
   if (!voted || Number(voted.Code) !== 1 || !voted.Data) {
     throw new Error(text(voted && voted.Msg) || '连续帧投票失败。');
   }
-  return voted.Data;
+  var data = voted.Data || {};
+  var voteCount = clampInteger(
+    data.Votes != null ? data.Votes : data.VoteCount,
+    0,
+    windowSize,
+    0);
+  var windowCount = clampInteger(
+    data.WindowSize != null ? data.WindowSize : data.WindowCount,
+    0,
+    windowSize,
+    observations.length);
+  var confidence = round6(clampNumber(
+    data.Confidence != null ? data.Confidence : data.AverageConfidence,
+    0,
+    1,
+    0));
+  return {
+    Stable: flag(data.Stable, false),
+    Key: text(data.Key),
+    Name: text(data.Name),
+    Votes: voteCount,
+    RequiredVotes: minimumVotes,
+    WindowSize: windowCount,
+    Confidence: confidence,
+    VoteCount: voteCount,
+    WindowCount: windowCount,
+    AverageConfidence: confidence
+  };
 }
 
 // v1.1.0 应用可以先于平台 NuGet 运行时发布。以下三层兼容只在旧宿主缺少新增原子
@@ -1011,17 +1064,56 @@ function uploadPrivateImage(image, key, scope) {
   var files = {};
   var fileName = safeKey(key, 80) + '-' + safeFileName(image.FileName);
   files[fileName] = image.Base64;
-  var result = V8.Method.Upload({
-    FilesByteBase64: files,
-    Limit: true,
-    Preview: false,
-    Multiple: false,
-    Path: '/vision/' + scope + '/' + DateNow('yyyyMMdd'),
-    OsClient: V8.OsClient
-  });
-  if (!result || Number(result.Code) !== 1 || !result.Data) return '';
+  var result = null;
+  try {
+    result = V8.Method.Upload({
+      FilesByteBase64: files,
+      Limit: true,
+      Preview: false,
+      Multiple: false,
+      Path: '/vision/' + scope + '/' + DateNow('yyyyMMdd'),
+      OsClient: V8.OsClient
+    });
+  } catch (error) {
+    return privateUploadFailure(text(error && error.message));
+  }
+  if (!result || Number(result.Code) !== 1 || !result.Data) {
+    return privateUploadFailure(text(result && result.Msg));
+  }
   var uploaded = firstRow(result.Data) || result.Data;
-  return text(uploaded.FullPath || uploaded.Path || uploaded.FilePath || uploaded.FilePathName);
+  var path = text(uploaded.FullPath || uploaded.Path || uploaded.FilePath || uploaded.FilePathName);
+  if (!path) return privateUploadFailure('MissingPath');
+  return { Ok: true, Path: path, ErrorCode: '', Message: '' };
+}
+
+function privateUploadFailure(rawMessage) {
+  var raw = text(rawMessage);
+  var lower = raw.toLowerCase();
+  if (raw.indexOf('关闭文件上传') >= 0
+      || raw.indexOf('停用文件上传') >= 0
+      || lower.indexOf('disablefileupload') >= 0
+      || lower.indexOf('fileuploadenabled') >= 0) {
+    return {
+      Ok: false,
+      Path: '',
+      ErrorCode: 'VISION_PRIVATE_UPLOAD_DISABLED',
+      Message: '当前租户已关闭文件上传。请管理员在 SaaS 引擎关闭“关闭文件上传”开关（DisableFileUpload=0），保存并重载租户配置后再次识别。'
+    };
+  }
+  if (raw.indexOf('额度') >= 0 || raw.indexOf('配额') >= 0 || lower.indexOf('quota') >= 0) {
+    return {
+      Ok: false,
+      Path: '',
+      ErrorCode: 'VISION_PRIVATE_UPLOAD_QUOTA_EXCEEDED',
+      Message: '租户私有文件额度不足，图片未提交 AI。请管理员检查文件上传额度后再次识别。'
+    };
+  }
+  return {
+    Ok: false,
+    Path: '',
+    ErrorCode: 'VISION_PRIVATE_UPLOAD_FAILED',
+    Message: '租户私有图片暂存失败，图片未提交 AI。请管理员检查对象存储与文件上传配置后再次识别。'
+  };
 }
 
 function protectEmbedding(value) {

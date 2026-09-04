@@ -118,7 +118,11 @@ var voted = await V8.Vision.Stabilize({
 
 前端使用 `getUserMedia` 并按 `FrameIntervalMs` 取帧，必须提供开启、暂停、继续、再次识别和关闭操作；每次打开摄像头生成新的 `StreamSessionId`，每帧递增 `FrameSequence`。可信边缘宿主将 RTSP/WebRTC 解码为 `IAsyncEnumerable<MicroiVisionExtractParam>` 后调用 `RecognizeFramesAsync`。Microi.Vision 不直接连接调用方提交的 RTSP URL，不保存摄像头账号，不承担流媒体服务器职责。
 
-连续帧必须有：最大图片大小、最小间隔、单客户端串行、取消/停止、RequestId 幂等、网络退避和后台任务去重。不能每个视频帧都无界调用大模型。
+连续帧必须有：最大图片大小、最小间隔、单客户端串行、取消/停止、RequestId 幂等、网络退避和后台任务去重。不能每个视频帧都无界调用大模型。接口返回 `AiPending` 后，前端必须进入 single-flight 状态：暂停提交新帧，只轮询当前 `RequestId`，直到 `AiMatched/AiFailed/Unmatched`、超时或用户取消后才允许下一帧；禁止并行创建多个 AI 任务。
+
+跨版本接口字段必须在协议边界归一化。连续稳定结果至少兼容 `.NET` 原子常用的 `VoteCount/WindowCount/AverageConfidence` 与历史接口的 `Votes/WindowSize/Confidence`，前端只读取归一化 DTO，任何真实响应都不得展示 `undefined/undefined`。
+
+手机收银/巡检工作台属于高频全屏操作面：在宿主提供的可用高度内同时露出取景区、主要识别按钮、当前状态和核心结果，不依赖纵向滚动才能完成一次识别；竖屏上下分区、短横屏左右分区，且不得改变已验收的桌面布局。相机权限拒绝、AI 等待、终态结果和重试操作都要在当前视口可见。
 
 ## 交付顺序
 

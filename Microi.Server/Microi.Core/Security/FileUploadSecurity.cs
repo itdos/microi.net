@@ -88,11 +88,24 @@ namespace Microi.net
             };
             if (tenantConfig != null)
             {
-                if (TryReadBoolean(
-                        tenantConfig["FileUploadEnabled"],
-                        out var uploadEnabled))
+                // 新版使用负向开关：字段存在时，空值/0 都表示“不关闭”，因此
+                // 新租户和升级后的历史租户默认允许上传。只有滚动升级期间旧物理
+                // 字段仍未创建时，才回退读取 FileUploadEnabled，兼容旧节点。
+                var disableUploadProperty = tenantConfig.Property(
+                    "DisableFileUpload",
+                    StringComparison.OrdinalIgnoreCase);
+                if (disableUploadProperty != null)
                 {
-                    result.UploadEnabled = uploadEnabled;
+                    result.UploadEnabled = !TryReadBoolean(
+                        disableUploadProperty.Value,
+                        out var uploadDisabled)
+                        || !uploadDisabled;
+                }
+                else if (TryReadBoolean(
+                             tenantConfig["FileUploadEnabled"],
+                             out var legacyUploadEnabled))
+                {
+                    result.UploadEnabled = legacyUploadEnabled;
                 }
 
                 result.MaxFileBytes = ReadTenantMegabytes(
@@ -259,22 +272,24 @@ return {1, userNext, tenantNext}";
             };
 
         /// <summary>
-        /// 返回可直接定位 SaaS 配置的停用提示。FileUploadEnabled 未配置或为空时
-        /// 默认允许上传；只有显式配置为 0/false 或平台全局强制关闭才会进入这里。
+        /// 返回可直接定位 SaaS 配置的停用提示。DisableFileUpload 未配置、为空或
+        /// 为 0/false 时默认允许上传；只有显式配置为 1/true 或平台全局强制关闭
+        /// 才会进入这里。FileUploadEnabled 仅用于旧物理字段尚未升级时的兼容回退。
         /// </summary>
         public static DosResult CreateTenantUploadDisabledResult(string osClient)
         {
             return new DosResult(
                 0,
                 null,
-                "当前租户已停用文件上传！请在 SaaS 引擎中将 FileUploadEnabled 设为 1，保存并等待租户配置重载后重试。",
+                "当前租户已关闭文件上传！请在 SaaS 引擎中关闭“关闭文件上传”开关（DisableFileUpload=0），保存并等待租户配置重载后重试。",
                 0,
                 new
                 {
                     ErrorType = "TenantFileUploadDisabled",
                     OsClient = osClient ?? "",
-                    ConfigField = "FileUploadEnabled",
-                    ExpectedValue = 1,
+                    ConfigField = "DisableFileUpload",
+                    ExpectedValue = 0,
+                    LegacyConfigField = "FileUploadEnabled",
                     DefaultEnabled = true,
                     DocumentationUrl = "https://microi.net/doc/more/hdfs"
                 });

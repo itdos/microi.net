@@ -644,7 +644,7 @@ SSO 的完整应用合同、协议端点和 35 个接口引擎见 [SSO 身份联
 
 ### V8.Method.Upload
 
-`V8.Method.Upload` 使用当前租户文件配置，并执行平台上传上限与租户动态配额。默认上限为：单文件 100 MB、单请求 200 MB、最多 10 个文件、每用户每天 2 GB、每租户每天 20 GB；`sys_osclients` 的 `FileUploadEnabled`、`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB` 可按租户进一步收紧。HTTP 上传会在 Base64 解码前预检体积，日配额用 Redis Lua 原子计数；配额服务不可用时失败关闭。
+`V8.Method.Upload` 使用当前租户文件配置，并执行平台上传上限与租户动态配额。默认上限为：单文件 500 MB、单请求 500 MB、最多 10 个文件、每用户每天 2 GB、每租户每天 20 GB；`sys_osclients.DisableFileUpload` 默认关闭（即允许上传），只有显式开启才禁止当前租户上传。`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB` 可按租户调整；旧 `FileUploadEnabled` 仅供未升级节点兼容。HTTP 上传会在 Base64 解码前预检体积，日配额用 Redis Lua 原子计数；配额服务不可用时失败关闭。
 
 ```javascript
 var uploadResult = V8.Method.Upload({

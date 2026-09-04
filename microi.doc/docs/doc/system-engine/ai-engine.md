@@ -11,6 +11,15 @@ Microi 吾码在线 AI 引擎已内置“**大模型关键词扩展 → 当前�
 - [AI 创作中心](./ai-creative-studio)：AI 图片、视频、声音与音乐创作，以及完整 29 项图像工具。
 :::
 
+## 📸 预览图
+
+<div class="mci-doc-screenshot-grid mci-doc-screenshot-grid--single">
+  <figure>
+    <img src="/images/product-screenshots/ai-engine-creation-center.jpg" alt="Microi吾码 AI 创作中心，展示智能助手、视觉创作、声音创作及完整图像工具目录" data-fancybox="ai-engine-preview">
+    <figcaption>AI 创作中心：从自然语言想法出发，统一进入对话、图像、视频、声音与模型能力。</figcaption>
+  </figure>
+</div>
+
 ## 后端代码分层
 
 AI 相关业务实现统一归属 `Microi.Server/Microi.AI`，`Microi.Server/Microi.net.Api` 只是 ASP.NET Core 的 HTTP、SSE 与 SignalR 接口层：
