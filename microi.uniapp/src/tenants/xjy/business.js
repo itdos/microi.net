@@ -564,7 +564,7 @@ export const businessModules = {
     lines: [{ label: '收藏用户', field: 'YonghuMC' }, { label: '收藏时间', field: 'CreateTime', format: 'datetime' }]
   }),
   points: native({
-    title: '我的积分', table: 'diy_integralRecord', menuAliases: ['我的积分', '积分记录', '积分管理'],
+    title: '我的积分', table: 'diy_integral_ledger', menuAliases: ['我的积分', '积分记录', '积分管理'],
     titleField: 'JifenDesc', statusField: 'Leixing', tagFields: ['Leixing'],
     lines: [{ label: '积分变动', field: 'Jifen' }, { label: '用户', field: 'YonghuMC' }, { label: '时间', field: 'CreateTime', format: 'datetime' }]
   }),

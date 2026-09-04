@@ -2,6 +2,23 @@
 
 Microi吾码 AI 平台治理中心把门户、身份、权限、配置、功能开关、发布、服务、可观测、日志、资产、协作和可恢复导入收敛为一套官方应用。它继续使用吾码现有的 `DiyToken`、`OsClient`、菜单/表/行权限、FormEngine、V8引擎、Redis、MongoDB、关系数据库、微服务和应用商城，不建立第二套用户、权限或发布内核。
 
+## 📸 预览图
+
+<div class="mci-doc-screenshot-grid">
+  <figure>
+    <img src="/images/product-screenshots/ai-platform-governance-observability.jpg" alt="Microi吾码 AI 平台治理中心可观测与告警页面，展示活动告警、Trace 时间线和日志生命周期策略" data-fancybox="ai-platform-governance-preview">
+    <figcaption>可观测与告警：统一查看活动告警、W3C Trace 与日志生命周期。</figcaption>
+  </figure>
+  <figure>
+    <img src="/images/product-screenshots/ai-platform-governance-health.jpg" alt="Microi吾码 AI 平台治理中心运行快照，展示治理闭环、待关注事项和 AI 调用记录" data-fancybox="ai-platform-governance-preview">
+    <figcaption>运行快照：汇总治理闭环、待关注资产与最近 AI 调用证据。</figcaption>
+  </figure>
+  <figure>
+    <img src="/images/product-screenshots/ai-platform-governance-overview.jpg" alt="Microi吾码 AI 平台治理中心治理总览，展示正式 AI 资产、治理覆盖率和纳管列表" data-fancybox="ai-platform-governance-preview">
+    <figcaption>治理总览：从正式资产发现、覆盖率评估到预览并纳管形成控制闭环。</figcaption>
+  </figure>
+</div>
+
 ## 先说人话：它到底是干什么的
 
 **AI 平台治理不是用来“再做一个 AI 对话框”，也不是用来训练模型。它是 AI 能力进入正式业务后的控制塔。**

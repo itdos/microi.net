@@ -374,6 +374,10 @@ html:lang(zh) {
     margin: 24px 0 34px;
   }
 
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc .mci-doc-screenshot-grid--single {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   body:not(:has(.ai-login-page)) .VPDoc .vp-doc .mci-doc-screenshot-grid > figure {
     display: flex;
     min-width: 0;

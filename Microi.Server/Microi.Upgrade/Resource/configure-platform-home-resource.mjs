@@ -9,14 +9,14 @@ const storePackagePath = path.join(directory, 'app.microi.store.json');
 const officialResourcePath = path.join(directory, 'official-resource-api.js');
 const importerPath = path.join(directory, 'import-package.js');
 const pagePath = path.join(directory, 'platform-home-page.json');
-const packageVersion = 'v7.8.24';
-const storePackageVersion = 'v7.9.20';
+const packageVersion = 'v7.8.26';
+const storePackageVersion = 'v7.9.21';
 const officialResourceVersion = 'v1.3.5';
-const importerVersion = 'v2.7.2';
+const importerVersion = 'v2.7.3';
 const releaseTime = '2026-09-04 18:00:00';
 const changeLogContent = '智能首页菜单绑定界面引擎并固定 PAGE5 身份；为所有有效角色幂等补齐首页及组件菜单 Read 权限，新建或重存角色自动保留首页只读基线，日历与公告查询显式携带菜单上下文。';
 const history = `2026-09-04 ${packageVersion} ${changeLogContent}`;
-const storeChangeLogContent = '导入器 v2.7.2 新增受信官方包 MenuReadGrants 合同，只允许为全部有效角色幂等补 Read，保留既有权限并强回读、失效授权缓存。';
+const storeChangeLogContent = '导入器 v2.7.3 新增受信官方包 MenuReadGrants 合同，只允许为全部有效角色幂等补 Read，保留既有权限并强回读、失效授权缓存；同时保留 v2.7.2 的更新日志租户回填唯一键冲突修复。';
 const storeHistory = `2026-09-04 ${storePackageVersion} ${storeChangeLogContent}`;
 const homePageId = 'd50ea9ce-c4d1-445f-b1f6-1e456bd4cd90';
 const homeMenuId = 'daa16941-afa8-4263-a77d-26a14b679bbd';
@@ -240,8 +240,8 @@ if (!officialResourceSource.includes(`Version: ${officialResourceVersion}`)
 let storePackageModel = JSON.parse(fs.readFileSync(storePackagePath, 'utf8'));
 const storeInfo = storePackageModel.PackageInfo || (storePackageModel.PackageInfo = {});
 if (storeInfo.Name !== '应用商城') throw new Error('应用商城官方包身份不正确。');
-if (![storePackageVersion, 'v7.9.19'].includes(String(storeInfo.Version || ''))) {
-  throw new Error(`app.microi.store.json 当前版本为 ${storeInfo.Version || '(空)'}，只允许从 v7.9.19 幂等生成 ${storePackageVersion}。`);
+if (![storePackageVersion, 'v7.9.20'].includes(String(storeInfo.Version || ''))) {
+  throw new Error(`app.microi.store.json 当前版本为 ${storeInfo.Version || '(空)'}，只允许从 v7.9.20 幂等生成 ${storePackageVersion}。`);
 }
 const changelogTenantColumn = (storePackageModel.PhysicalColumns || []).find(column => (
   String(column.TABLE_NAME || '').toLowerCase() === 'sys_microistore_changelog'
@@ -263,6 +263,7 @@ const importerSource = fs.readFileSync(importerPath, 'utf8')
   .replace(/\n*$/, '\n');
 if (!importerSource.includes(`Version: ${importerVersion}`)
     || !importerSource.includes('PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1')
+    || !importerSource.includes('MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1')
     || !importerSource.includes('PAGE_ENGINE_OPTIONAL_REFERENCE_V1')
     || !importerSource.includes('ALL_ROLE_MENU_READ_GRANT_V1')) {
   throw new Error(`import-package.js 尚未同步到 ${importerVersion} 安装加固合同。`);

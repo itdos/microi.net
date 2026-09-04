@@ -31,7 +31,8 @@ export function getProductList({
   keyword,
   types,
   priceMin,
-  priceMax
+  priceMax,
+  pointsOnly = false
 } = {}) {
   const data = {
     FormEngineKey: 'Diy_Shangpin',
@@ -45,6 +46,15 @@ export function getProductList({
   };
 
   if (categoryId) data._Search = { PingtaiFL: categoryId };
+
+  if (pointsOnly) {
+    data._Where.push({
+      AndOr: 'AND',
+      Name: 'JifenDH',
+      Value: 0,
+      Type: '>'
+    });
+  }
 
   if (keyword) {
     data._Where.push(
@@ -162,4 +172,19 @@ export function reserveProduct(params) {
     ...params,
     OsClient: appConfig.osClient
   }, true);
+}
+
+export function getPointsBalance() {
+  return V8.ApiEngine.Run('xjy-integral-mall', { Action: 'balance' }, { checkCode: false });
+}
+
+export function redeemPointsProduct(params) {
+  return V8.ApiEngine.Run('xjy-integral-mall', {
+    Action: 'redeem',
+    ...params
+  }, { checkCode: false });
+}
+
+export function exportCasebookPdf(bookId) {
+  return V8.ApiEngine.Run('xjy-casebook-export-pdf', { BookId: bookId }, { checkCode: false });
 }

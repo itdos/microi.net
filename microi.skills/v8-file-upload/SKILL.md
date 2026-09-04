@@ -115,7 +115,7 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 服务端逐片写入 HDFS 后重新流式回读校验；完成时按顺序合并、再次核对整文件 SHA-256，再生成不可变版本完整性标记。
 - 会话 Id 由租户、应用、版本、路径和文件摘要确定。网络中断或进程重启后先读取远端状态，只续传缺失分片；已成功的相同摘要请求直接幂等返回。
 - 吾码不为协议 v3 设置业务文件/目录字节上限，状态中的 `ApplicationAssetResumableProductSizeLimitBytes=0` 表示没有产品配置上限。每个对象仍受协议技术边界（最多 10000 片、单片最多 1 GiB）、JavaScript 安全整数、对象存储、磁盘、网关和网络条件约束。
-- 该链路只允许通过能力鉴权的当前租户超级管理员，并继续受 `FileUploadEnabled` 总开关控制；它不是普通用户上传或任意 HDFS 路径写入接口。
+- 该链路只允许通过能力鉴权的当前租户超级管理员，并继续受 `DisableFileUpload` 负向总开关控制；它不是普通用户上传或任意 HDFS 路径写入接口。
 - 每个会话都在 `mci_ai_app_file` 保留审计记录，`StorageScope=ApplicationAssetMultipartSession`。管理员在 **系统引擎 → 超大文件上传记录** 查看状态、阶段、已传字节/分片、进度、心跳、错误和恢复建议；成功、失败和取消记录都不静默删除。
 
 ### 普通业务上传的分层限制
@@ -131,16 +131,16 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 
 | `sys_osclients` 字段 | 代码默认值 | 平台固定边界 |
 |---|---:|---:|
-| `FileUploadEnabled` | `true` | — |
+| `DisableFileUpload` | `false`（关闭，即允许上传） | — |
 | `FileUploadMaxFileMB` | 100 MB | 1024 MB |
 | `FileUploadMaxRequestMB` | 200 MB | 2048 MB |
 | `FileUploadMaxCount` | 10 | 100 |
 | `FileUploadDailyUserQuotaMB` | 2048 MB | 10 TB |
 | `FileUploadDailyTenantQuotaMB` | 20480 MB | 10 TB |
 
-- `sys_osclients` 六个字段全部可空；空值、无效值或老数据库缺列时使用代码默认值，不会因升级自动停用上传。`FileUploadMaxRequestMB` 指一次上传所有文件的业务合计大小，不等于 Kestrel HTTP 请求正文上限。
+- `sys_osclients` 六个现行字段全部可空；`DisableFileUpload` 空值、无效值或 `0/false` 均表示允许上传，只有 `1/true` 才禁止。旧数据库尚未创建新物理字段时才回退读取 `FileUploadEnabled`，升级后旧正向字段即使为 `0` 也不得覆盖新字段的默认允许语义。`FileUploadMaxRequestMB` 指一次上传所有文件的业务合计大小，不等于 Kestrel HTTP 请求正文上限。
 - 固定灾难保护和 HTTP/Multipart/Form 解析上限不属于安装配置；租户值即使更大也会被这些边界截断。最终单次总量还不能超过帐号或租户的有效日额度，单文件不能超过最终单次总量。
-- `FileUploadEnabled=0` 表示禁用当前租户上传，也会阻止 AI 应用资产断点续传；不能把内部发布协议当成绕过开关的后门。普通单请求继续受全局大小硬上限，v3 只移除产品级字节上限；租户配置刷新应走现有 SaaS 引擎重载和共享 Redis 发布订阅，不能依赖单节点内存。
+- `DisableFileUpload=1` 表示禁用当前租户上传，也会阻止 AI 应用资产断点续传；不能把内部发布协议当成绕过开关的后门。普通单请求继续受全局大小硬上限，v3 只移除产品级字节上限；租户配置刷新应走现有 SaaS 引擎重载和共享 Redis 发布订阅，不能依赖单节点内存。
 - 帐号与租户每日额度在共享 Redis 中用单次原子脚本预留，支持多节点；Redis 不可用时失败关闭，不能降级成无限上传。
 - 额度按 UTC 日期统计。为防并发重试绕过限制，后续对象存储失败也不退还已经预留的额度。
 - 每日额度只阻断短期滥用；对象存储必须另外配置租户/桶总容量、账单告警、生命周期与实际用量对账。Redis 计数不能作为长期容量事实源。
@@ -149,9 +149,9 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 
 ### 复盘：“当前租户已停用文件上传”
 
-- 该提示只表示当前运行环境命中的 `sys_osclients.FileUploadEnabled` 被明确设置为 `0/false`。缺列、空值、无效值和新租户都按默认 `true`，不要先把问题归因于 MinIO/HDFS。
-- 新版响应同时返回 `DataAppend.ErrorType=TenantFileUploadDisabled`、`OsClient`、`ConfigField=FileUploadEnabled` 和文档地址；客户端必须保留后端 `Msg/DataAppend`，不能只显示“上传失败”。
-- 处理时先读取当前 API 进程的 `OsClient + OsClientType + OsClientNetwork`，再精确回读同三元组的启用记录并把 `FileUploadEnabled` 改为 `1`。不能仅按租户名批量覆盖其它网络或环境记录。
+- 该提示只表示当前运行环境命中的 `sys_osclients.DisableFileUpload` 被明确设置为 `1/true`（或仍在旧库兼容期且 `FileUploadEnabled=0`）。新字段缺列以外的空值、无效值和新租户都按默认允许，不能先把问题归因于 MinIO/HDFS。
+- 新版响应同时返回 `DataAppend.ErrorType=TenantFileUploadDisabled`、`OsClient`、`ConfigField=DisableFileUpload`、`ExpectedValue=0` 和文档地址；客户端必须保留后端 `Msg/DataAppend`，不能只显示“上传失败”。
+- 处理时先读取当前 API 进程的 `OsClient + OsClientType + OsClientNetwork`，再精确回读同三元组的启用记录并把 `DisableFileUpload` 关闭为 `0`。不能仅按租户名批量覆盖其它网络或环境记录。
 - 保存后等待 SaaS 共享配置重载，再分别验证一个小公有图片和一个小私有文件。只有错误转为 endpoint、bucket、签名或 `Invalid URI` 后，才进入对象存储配置排查。
 - 不要通过删除 Redis 日额度 Key、扩大文件大小上限或改成公有桶来解除租户停用；这些动作与开关无关，还会扩大安全风险。
 
@@ -159,9 +159,9 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 
 用户明确授权修改某个租户的上传额度时，AI 可以直接使用标准 MCP 完成，不要把应用层提示误判成阿里云 OSS、MinIO 或 S3 的存储配额，也不要先清 Redis：
 
-1. `microi_get_table_data(tableName: "sys_osclients")` 按 `OsClient`、`IsEnable=1` 查询，选择 `Id/OsClientType/OsClientNetwork` 和六个 `FileUpload*` 配额字段。
+1. `microi_get_table_data(tableName: "sys_osclients")` 按 `OsClient`、`IsEnable=1` 查询，选择 `Id/OsClientType/OsClientNetwork`、`DisableFileUpload` 和五个现行 `FileUpload*` 配额字段；`FileUploadEnabled` 只用于诊断未升级旧节点。
 2. 先以当前服务器的 `OsClientType + OsClientNetwork` 收窄到实际生效记录；只有用户明确要求多个环境保持一致时才扩展范围。逐条调用 `microi_update_form_data`，`row` 必须包含 `Id`，并传 `confirmExecution: "sys_osclients"`。
-3. MB 是存储单位：`20 GB = 20480 MB`。可修改字段为 `FileUploadEnabled`、`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB`。
+3. MB 是存储单位：`20 GB = 20480 MB`。可修改字段为 `DisableFileUpload`、`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB`；不要再写旧 `FileUploadEnabled`。
 4. 保存后逐条远程回读；FormEngine 会排队重载 SaaS 运行配置，再用真实小文件上传做生效冒烟。只看到 MCP 返回“更新成功”不算验收。
 5. 提高每日配额保留当天已用计数，剩余额度为新上限减已用量。计数按 UTC 日期，失败上传不退款；除非用户明确授权事故处置，不得删除 Redis 配额 Key。
 

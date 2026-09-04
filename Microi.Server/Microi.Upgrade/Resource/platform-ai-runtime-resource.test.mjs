@@ -111,8 +111,8 @@ async function run(action, request = {}) {
 test('platform-ai-runtime is a fixed Managed package resource', () => {
   const engine = packageEngine('platform-ai-runtime');
   assert.ok(engine);
-  assert.equal(packageModel.PackageInfo.Version, 'v7.6.5');
-  assert.equal(engine.Version, 'v1.1.0');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.6.6');
+  assert.equal(engine.Version, 'v1.1.1');
   assert.equal(engine.ApiAddress, '/apiengine/platform-ai-runtime');
   assert.equal(engine.StopHttp, 0);
   assert.equal(engine.AllowAnonymous, 0);
@@ -201,6 +201,40 @@ test('all non-stream actions call only V8.AI and expose a three-field safe hook 
     const serializedCall = JSON.stringify(execution.calls[0]);
     assert.doesNotMatch(serializedCall, /must-not-pass|forged/);
   }
+});
+
+test('chat parameter bridge converts empty HTTP arrays to null before .NET binding', async () => {
+  const execution = await run('RecognizeIntent', {
+    UserChatMsg: '当前系统有多少用户',
+    AiModel: 'model-a',
+    Attachments: [],
+    ChatHistory: [],
+  });
+  assert.equal(execution.result.Code, 1);
+  assert.equal(execution.calls.length, 1);
+  const payload = execution.calls[0][1];
+  assert.equal(payload.Attachments, null);
+  assert.equal(payload.ChatHistory, null);
+});
+
+test('intent bridge keeps a bounded attachment summary out of .NET collection binding', async () => {
+  const execution = await run('RecognizeIntent', {
+    UserChatMsg: '请分析附件',
+    AiModel: 'model-a',
+    Attachments: [{
+      FileName: 'report.txt',
+      ContentType: 'text/plain',
+      Size: 12,
+      Text: 'attachment excerpt',
+    }],
+    ChatHistory: [{ Role: 'user', Content: 'old message' }],
+  });
+  const payload = execution.calls[0][1];
+  assert.equal(payload.Attachments, null);
+  assert.equal(payload.ChatHistory, null);
+  assert.match(payload.UserChatMsg, /附件摘要/);
+  assert.match(payload.UserChatMsg, /report\.txt/);
+  assert.doesNotMatch(payload.UserChatMsg, /old message/);
 });
 
 test('legacy AI JSON routes are centralized while native protocol boundaries remain in Microi.AI', () => {

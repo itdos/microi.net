@@ -147,6 +147,22 @@ const deviceDetail = {
   Beizhu: '设备运行正常，下次保养前检查滤芯余量。', CreateTime: '2026-01-08 11:30:00'
 };
 
+const deviceIotTable = {
+  Id: 'table-device-iot',
+  Name: 'Diy_KehuSB',
+  Description: '客户设备',
+  Tabs: JSON.stringify([
+    { Id: 'device-basic', Name: '基本信息', Sort: 10, Display: true },
+    { Id: 'device-iot', Name: 'IoT物联网', Sort: 20, Display: true }
+  ])
+};
+
+const deviceIotFields = [
+  { Id: 'device-no', TableName: 'Diy_KehuSB', Name: 'ShebeiBH', Label: '设备编号', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 10, Tab: 'device-basic', Config: '{}' },
+  { Id: 'device-name', TableName: 'Diy_KehuSB', Name: 'ShangpinMC', Label: '设备名称', Component: 'Text', Visible: 1, AppVisible: 1, Sort: 20, Tab: 'device-basic', Config: '{}' },
+  { Id: 'device-iot-join', TableName: 'Diy_KehuSB', Name: 'JoinForm184', Label: 'IoT物联网', Component: 'JoinForm', Visible: 1, AppVisible: 1, Sort: 100, Tab: 'device-iot', Config: JSON.stringify({ JoinForm: { TableId: 'table-yuelong-device', TableName: 'diy_yuelong_device', TableLabel: '跃龙物联网设备', JoinFieldName: 'Id', FormMode: 'View', SnapshotApiEngineKey: 'xjy-device-iot-snapshot' } }) }
+];
+
 const recruitmentDetail = {
   Id: 'recruit-001', Xingming: '周明', ShoujiH: '13500001234', Xingbie: '男', Nianling: 29,
   YingpinGW: '售后服务工程师', Xueli: '本科', KexiZY: '环境工程', GongzuoNX: 6,
@@ -254,7 +270,7 @@ const taskDevices = [
 const products = [
   { Id: 'product-001', ShangpinMC: '校园直饮水一体机', ShangpinBH: 'JFL-S600', ShangpinLX: '设备', Xianjia: 12800, ZulinXJ: 3980, TenantName: '集福鲤杭州运营中心', ShangpinZTZ: 1 },
   { Id: 'product-002', ShangpinMC: '商务净饮水机', ShangpinBH: 'JFL-B320', ShangpinLX: '设备', Xianjia: 8600, ZulinXJ: 2680, TenantName: '集福鲤企业服务中心', ShangpinZTZ: 1 },
-  { Id: 'product-003', ShangpinMC: '复合净化滤芯套装', ShangpinBH: 'LX-4PRO', ShangpinLX: '耗材', Xianjia: 680, TenantName: '集福鲤供应链', ShangpinZTZ: 1 }
+  { Id: 'product-003', ShangpinMC: '复合净化滤芯套装', ShangpinBH: 'LX-4PRO', ShangpinLX: '耗材', Xianjia: 680, JifenDH: 680, TenantName: '集福鲤供应链', ShangpinZTZ: 1 }
 ];
 
 const productCategories = [
@@ -401,6 +417,12 @@ const targets = [
     required: ['.hero-band', '.info-band', '.bottom-actions']
   },
   {
+    name: 'device-iot', route: '/#/pages/native-form/index?table=Diy_KehuSB&id=device-001&mode=View&title=设备详情', selector: '.native-form-page',
+    clickSelector: '.related-tabs__item:nth-child(2)', afterSelector: '.join-form__snapshot',
+    required: ['.related-tabs', '.join-form__snapshot', '.join-form__section', '.join-form__metric'],
+    expectedText: ['IoT物联网', '设备已绑定，以下为最近一次物联网快照', '在线', '纯水 TDS', '滤芯 1 剩余']
+  },
+  {
     name: 'recruitment-detail', route: '/#/pages/business/detail?key=recruitment&id=recruit-001', selector: '.detail-page',
     required: ['.hero-band', '.relation-panel', '.info-band']
   },
@@ -419,7 +441,8 @@ const targets = [
   },
   {
     name: 'casebook', route: '/#/pages/native/casebook?id=book-001', selector: '.casebook-page',
-    required: ['.book-panel', '.case-list', '.add-case-button']
+    required: ['.book-panel', '.case-list', '.secondary-button'],
+    expectedText: ['导出并分享 PDF']
   },
   {
     name: 'casebook-picker', route: '/#/pages/native/casebook?id=book-001', selector: '.casebook-page',
@@ -455,6 +478,12 @@ const targets = [
   {
     name: 'mall', route: '/#/pages/mall/index', selector: '.mall-container',
     required: ['.search-header', '.category-sidebar', '.product-card']
+  },
+  {
+    name: 'mall-points', route: '/#/pages/mall/index', selector: '.mall-container',
+    clickSelector: '.cat-item--points', afterSelector: '.points-price',
+    required: ['.search-header', '.category-sidebar', '.cat-item--points', '.points-price'],
+    expectedText: ['积分商城', '680', '积分兑换']
   },
   {
     name: 'news', route: '/#/pages/news/index', selector: '.news-container',
@@ -671,7 +700,7 @@ function buildMockResponse(request) {
   const url = String(request.url || '');
   const lowerUrl = url.toLowerCase();
   const body = parsePostData(request.postData);
-  const table = body.ModuleEngineKey || body.FormEngineKey || '';
+  const table = body.ModuleEngineKey || body.FormEngineKey || body.TableName || body.Name || '';
   const apiEngineMatch = lowerUrl.match(/\/apiengine\/([^?/#]+)/);
   const apiEngineKey = String(body.ApiEngineKey || (apiEngineMatch && apiEngineMatch[1]) || '').toLowerCase();
   mockRequestLog.push({ url, body, table, time: Date.now() });
@@ -682,11 +711,11 @@ function buildMockResponse(request) {
   }
   if (lowerUrl.includes('formengine/getdiytablemodel')) {
     const tableName = String(table).toLowerCase();
-    return { Code: 1, Data: tableName === 'diy_anli' ? customerCaseTable : tableName === 'diy_anlice_child' ? casebookCaseTable : sysUserTable };
+    return { Code: 1, Data: tableName === 'diy_anli' ? customerCaseTable : tableName === 'diy_anlice_child' ? casebookCaseTable : tableName === 'diy_kehusb' ? deviceIotTable : sysUserTable };
   }
   if (lowerUrl.includes('formengine/getdiyfieldlist')) {
     const tableName = String(table).toLowerCase();
-    const fields = tableName === 'diy_anli' ? customerCaseFields : tableName === 'diy_anlice_child' ? casebookCaseFields : sysUserFields;
+    const fields = tableName === 'diy_anli' ? customerCaseFields : tableName === 'diy_anlice_child' ? casebookCaseFields : tableName === 'diy_kehusb' ? deviceIotFields : sysUserFields;
     return { Code: 1, Data: fields, DataCount: fields.length };
   }
   if (lowerUrl.includes('moduleengine/gettabledata')) {
@@ -701,7 +730,10 @@ function buildMockResponse(request) {
     return { Code: 1, Data: productCategories, DataCount: productCategories.length };
   }
   if (lowerUrl.includes('gettabledataanonymous') && table === 'Diy_Shangpin') {
-    return { Code: 1, Data: products, DataCount: products.length };
+    const pointsOnly = (Array.isArray(body._Where) ? body._Where : [])
+      .some((item) => item && item.Name === 'JifenDH' && item.Type === '>');
+    const rows = pointsOnly ? products.filter((item) => Number(item.JifenDH || 0) > 0) : products;
+    return { Code: 1, Data: rows, DataCount: rows.length };
   }
   if (lowerUrl.includes('gettabledataanonymous') && table === 'Diy_Zixun') {
     return { Code: 1, Data: news, DataCount: news.length };
@@ -797,6 +829,33 @@ function buildMockResponse(request) {
   }
   if (apiEngineKey === 'service_statusstatistics') {
     return { Code: 1, Data: { pending: 1, TodoCount: 2, acceptance: 1, cacceptance: 1, evaluated: 1, FinishCount: 1, cancel: 0, suspend: 0 } };
+  }
+  if (apiEngineKey === 'xjy-device-iot-snapshot') {
+    return {
+      Code: 1,
+      Data: {
+        DataStatus: 'bound',
+        Message: '设备已绑定，以下为最近一次物联网快照',
+        Sections: [
+          { Name: '连接与状态', Fields: [
+            { Label: '在线状态', Value: '在线', Tone: 'success' },
+            { Label: '设备状态', Value: '正常制水', Tone: 'success' },
+            { Label: '最后推送', Value: '2026-09-04 10:42' },
+            { Label: '信号强度', Value: '26', Unit: ' dBm' }
+          ] },
+          { Name: '水质与用量', Fields: [
+            { Label: '纯水 TDS', Value: '8', Unit: ' ppm', Tone: 'success' },
+            { Label: '原水 TDS', Value: '126', Unit: ' ppm' },
+            { Label: '累计用水', Value: '3580', Unit: ' L' },
+            { Label: '剩余流量', Value: '6420', Unit: ' L' }
+          ] },
+          { Name: '滤芯寿命', Fields: [
+            { Label: '滤芯 1 剩余', Value: '82', Unit: '%', Tone: 'success' },
+            { Label: '滤芯 2 剩余', Value: '64', Unit: '%' }
+          ] }
+        ]
+      }
+    };
   }
   if (apiEngineKey === 'mci_ai_data_assistant') {
     const action = String(body.Action || '').toLowerCase();
@@ -1354,10 +1413,15 @@ async function main() {
       }
     }
 
-    currentContext = 'business-list-return';
-    await testBusinessListReturn(cdp, appPort);
-    currentContext = 'period-filter-refresh';
-    await testPeriodFiltersAndRefresh(cdp, appPort);
+    // Targeted visual runs are intentionally isolated from the unrelated
+    // catalogue/list navigation scenarios. The full suite still exercises
+    // these cross-page checks when no target filter is supplied.
+    if (!process.env.XJY_VISUAL_TARGET) {
+      currentContext = 'business-list-return';
+      await testBusinessListReturn(cdp, appPort);
+      currentContext = 'period-filter-refresh';
+      await testPeriodFiltersAndRefresh(cdp, appPort);
+    }
 
     fs.writeFileSync(path.join(outputRoot, 'report.json'), JSON.stringify({ generatedAt: new Date().toISOString(), report }, null, 2));
     console.log(`Visual delivery check passed: ${report.length} screenshots.`);

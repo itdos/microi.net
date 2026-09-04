@@ -21,7 +21,7 @@ if(aiRuntimeActions[aiRuntimeRoute]) V8.Param.Action = aiRuntimeActions[aiRuntim
 
 
 // Microi官方接口引擎：platform-ai-runtime
-// Version: v1.1.0
+// Version: v1.1.1
 // AI_RUNTIME_MANAGED_NON_STREAM_V1：非流式兼容动作由 V8 编排，身份、租户、密钥和权限由 V8.AI 绑定。
 var param = V8.Param || {};
 var action = text(param.Action);
@@ -56,7 +56,7 @@ if (action === 'UpdateConversationTitle') {
     text(param.Source));
 }
 if (action === 'RecognizeIntent') {
-  return await V8.AI.RecognizeIntent(copyChatParam(param));
+  return await V8.AI.RecognizeIntent(copyIntentParam(param));
 }
 if (action === 'Chat') {
   return await V8.AI.Chat(copyChatParam(param));
@@ -84,9 +84,41 @@ function copyChatParam(source) {
     ConversationId: text(source.ConversationId),
     Mode: text(source.Mode),
     ReasoningEffort: text(source.ReasoningEffort),
-    Attachments: source.Attachments || null,
-    ChatHistory: source.ChatHistory || null
+    Attachments: nonEmptyList(source.Attachments),
+    ChatHistory: nonEmptyList(source.ChatHistory)
   };
+}
+
+function copyIntentParam(source) {
+  var result = copyChatParam(source);
+  var attachments = source.Attachments;
+  if (attachments && typeof attachments !== 'string' && typeof attachments.length === 'number') {
+    var summaries = [];
+    for (var i = 0; i < Math.min(Number(attachments.length || 0), 10); i++) {
+      var item = attachments[i] || {};
+      summaries.push({
+        FileName: text(item.FileName).slice(0, 200),
+        ContentType: text(item.ContentType).slice(0, 100),
+        Size: Number(item.Size || 0),
+        Text: text(item.Text).slice(0, 1000)
+      });
+    }
+    if (summaries.length) {
+      result.UserChatMsg += '\n附件摘要：' + JSON.stringify(summaries);
+    }
+  }
+  // 意图识别只需要问题和受限附件摘要，不需要把 JS 集合绑定到 .NET List<T>。
+  result.Attachments = null;
+  result.ChatHistory = null;
+  return result;
+}
+
+// Jint cannot bind an empty JavaScript array to List<T>; it throws
+// "Object must implement IConvertible" before V8.AI is entered. Preserve
+// non-empty payloads, but represent an empty optional collection as null.
+function nonEmptyList(value) {
+  if (!value) return null;
+  return Number(value.length || 0) > 0 ? value : null;
 }
 
 function copyNl2SqlParam(source) {
@@ -105,7 +137,7 @@ function copyNl2V8Param(source) {
     AiModel: text(source.AiModel),
     CurrentCode: text(source.CurrentCode),
     ReasoningEffort: text(source.ReasoningEffort),
-    ChatHistory: source.ChatHistory || null
+    ChatHistory: nonEmptyList(source.ChatHistory)
   };
 }
 

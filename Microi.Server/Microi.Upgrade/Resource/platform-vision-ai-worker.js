@@ -6,8 +6,8 @@
  */
 
 // Microi 官方接口引擎：platform-vision-ai-worker
-// Version: v1.0.0
-// VISION_AI_WORKER_PRIVATE_IMAGE_CLEANUP_V1
+// Version: v1.0.3
+// VISION_AI_WORKER_RESILIENT_MODEL_RETRY_V3
 var workerParam = V8.Param || {};
 var requestNo = safeKey(workerParam.RequestId || workerParam.RequestNo, 80);
 if (!requestNo) return { Code: 0, Msg: 'RequestId 不能为空。' };
@@ -54,19 +54,17 @@ try {
   var mode = text(request.Mode) === 'Face' ? 'Face' : 'General';
   var systemPrompt = mode === 'Face'
     ? '你是合规的视觉分类器。数据库人脸样本已经匹配失败。禁止猜测、确认或暗示现实身份、姓名、犯罪记录、种族、健康、政治等敏感属性；只能返回“未识别人员”以及中性、可见的服饰或场景描述。只输出一个 JSON 对象，不要 Markdown。'
-    : '你是零售与通用物体视觉分类器。识别画面中心、秤台或主要区域内最可能的商品、物体、动物、植物或建筑。若有多个同类物品，名称仍返回品类并在描述中说明数量不确定。只输出一个 JSON 对象，不要 Markdown。';
-  var defaultPrompt = 'JSON 必须严格使用：{"label":"具体中文名称","category":"中文类别","description":"不超过80字的可见事实","confidence":0.0,"candidates":[{"label":"候选名称","confidence":0.0}]}。confidence 范围 0 到 1，候选最多3个；看不清时 label 写“无法判断”且置信度低。';
+    : '你是零售与通用物体视觉分类器。识别画面中心、秤台或主要区域内最可能的商品、物体、动物、植物或建筑。先确保大类判断正确，再给出能可靠确认的具体品种；例如能看出是鱼但无法可靠区分鱼种时，label 必须返回“鱼”、category 返回“水产鱼类”，不能因为鱼种不确定而返回“无法判断”。若有多个同类物品，名称仍返回品类并在描述中说明可见数量。只输出一个 JSON 对象，不要 Markdown。';
+  var defaultPrompt = 'JSON 必须严格使用：{"label":"具体中文名称或可靠大类","category":"中文类别","description":"不超过80字的可见事实","confidence":0.0,"candidates":[{"label":"候选名称","confidence":0.0}]}。confidence 范围 0 到 1，候选最多3个；只有连物体大类也看不清时 label 才写“无法判断”且置信度低。';
   var customPrompt = text(profile.AiPrompt);
   if (customPrompt.length > 1200) customPrompt = customPrompt.substring(0, 1200);
-  var aiModel = resolveAiModel(profile);
-  if (!aiModel) {
+  var aiModels = resolveAiModels(profile);
+  if (!aiModels.length) {
     return await finish(request, 'Failed', 'None', null,
       '当前租户没有可用的 Microi.AI 模型，请先在 AI 引擎中启用模型或在识别配置中指定模型。');
   }
   progress(45, '调用 Microi.AI 视觉模型');
-  var ai = await V8.AI.Chat({
-    AiModelId: text(aiModel.Id),
-    AiModel: text(aiModel.AiModel || aiModel.Name),
+  var aiCall = await callVisionAi(aiModels, {
     UserChatMsg: defaultPrompt + (customPrompt ? '\n业务补充：' + customPrompt : ''),
     SystemChatMsg: systemPrompt,
     Mode: 'vision-recognition',
@@ -78,8 +76,11 @@ try {
       Size: Number(bytesResult.Data.Length || 0)
     }]
   });
+  var ai = aiCall && aiCall.Result;
+  var aiModel = aiCall && aiCall.Model;
   if (!ai || Number(ai.Code) !== 1 || !text(ai.Data)) {
-    return await finish(request, 'Failed', 'None', null, text(ai && ai.Msg) || 'AI 模型没有返回有效结果。');
+    return await finish(request, 'Failed', 'None', null,
+      cleanText(aiCall && aiCall.Message, 400) || text(ai && ai.Msg) || 'AI 模型多次调用后仍没有返回有效结果。');
   }
   var parsed = parseAiJson(text(ai.Data));
   if (!parsed || !text(parsed.label)) {
@@ -210,7 +211,7 @@ function getProfile(profileKey) {
   };
 }
 
-function resolveAiModel(profile) {
+function resolveAiModels(profile) {
   var where = [['IsEnable', '=', 1]];
   if (text(profile && profile.AiModelId)) {
     where.push(['AND', 'Id', '=', text(profile.AiModelId)]);
@@ -221,12 +222,69 @@ function resolveAiModel(profile) {
     _OrderBy: 'CreateTime',
     _OrderByType: 'DESC',
     _PageIndex: 1,
-    _PageSize: 1
+    _PageSize: text(profile && profile.AiModelId) ? 1 : 3
   });
-  if (!result || Number(result.Code) !== 1 || !result.Data) return null;
-  var data = result.Data;
-  var model = typeof data.length === 'number' ? data[0] : data;
-  return model && text(model.Id) && text(model.AiModel || model.Name) ? model : null;
+  if (!result || Number(result.Code) !== 1 || !result.Data) return [];
+  var data = result.Data.List || result.Data;
+  if (typeof data.length !== 'number') data = [data];
+  var models = [];
+  for (var i = 0; i < data.length && models.length < 3; i++) {
+    var model = data[i] || {};
+    if (text(model.Id) && text(model.AiModel || model.Name)) models.push(model);
+  }
+  return models;
+}
+
+async function callVisionAi(models, payload) {
+  var modelCount = models && typeof models.length === 'number' ? models.length : 0;
+  if (!modelCount) return { Result: null, Model: null, Message: '没有可用的视觉模型。' };
+  var maximumAttempts = modelCount === 1 ? 3 : Math.min(5, modelCount * 2);
+  var lastMessage = '';
+  var lastResult = null;
+  var lastModel = null;
+  for (var attempt = 0; attempt < maximumAttempts; attempt++) {
+    var model = models[attempt % modelCount];
+    lastModel = model;
+    progress(Math.min(75, 45 + attempt * 7),
+      '调用 Microi.AI 视觉模型（第 ' + (attempt + 1) + '/' + maximumAttempts + ' 次）');
+    try {
+      var requestPayload = {
+        AiModelId: text(model.Id),
+        AiModel: text(model.AiModel || model.Name),
+        UserChatMsg: payload.UserChatMsg,
+        SystemChatMsg: payload.SystemChatMsg,
+        Mode: payload.Mode,
+        ReasoningEffort: payload.ReasoningEffort,
+        Attachments: payload.Attachments
+      };
+      lastResult = await V8.AI.Chat(requestPayload);
+      if (lastResult && Number(lastResult.Code) === 1 && text(lastResult.Data)) {
+        return { Result: lastResult, Model: model, Message: '' };
+      }
+      lastMessage = text(lastResult && lastResult.Msg) || 'AI 模型没有返回有效结果。';
+    } catch (error) {
+      lastMessage = text(error && error.message ? error.message : error) || 'AI 模型调用异常。';
+      lastResult = null;
+    }
+    if (attempt + 1 >= maximumAttempts) break;
+    var recoverable = isRecoverableAiError(lastMessage);
+    if (!recoverable && modelCount === 1) break;
+    var delay = recoverable ? Math.min(6000, 1000 * Math.pow(2, attempt)) : 500;
+    progress(Math.min(78, 48 + attempt * 7),
+      recoverable ? 'AI 服务繁忙，正在自动重试' : '当前模型不可用，尝试下一个已启用模型');
+    V8.Action.Sleep(delay);
+  }
+  return {
+    Result: lastResult,
+    Model: lastModel,
+    Message: 'AI 模型多次调用失败：' + cleanText(lastMessage, 320)
+  };
+}
+
+function isRecoverableAiError(value) {
+  var message = text(value).toLowerCase();
+  return /(^|\D)(408|409|425|429|500|502|503|504|529)(\D|$)/.test(message)
+    || /overload|overloaded|rate.?limit|too many requests|temporar|timeout|timed out|busy|try again|负载|繁忙|限流|超时|稍后重试|服务不可用/.test(message);
 }
 
 function findSubjectByName(name) {

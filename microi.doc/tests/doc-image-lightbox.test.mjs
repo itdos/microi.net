@@ -86,6 +86,36 @@ test('Bluetooth printer previews use the shared two-column gallery before the co
   for (const file of expected) assert.match(gallery, new RegExp(`/images/product-screenshots/${file.replace('.', '\\.')}`))
 })
 
+test('system engine preview nodes keep the requested screenshot mapping and order', () => {
+  const styles = read('docs/.vitepress/theme/styles/doc-readable.scss')
+  const pages = [
+    ['docs/doc/system-engine/ai-workflow-suite.md', 'ai-workflow-suite-preview', ['ai-workflow-relationship-graph.jpg', 'ai-workflow-designer.jpg']],
+    ['docs/doc/system-engine/vision-engine.md', 'vision-engine-preview', ['vision-engine-workbench.jpg']],
+    ['docs/doc/system-engine/ai-platform-governance.md', 'ai-platform-governance-preview', ['ai-platform-governance-observability.jpg', 'ai-platform-governance-health.jpg', 'ai-platform-governance-overview.jpg']],
+    ['docs/doc/system-engine/ai-engine.md', 'ai-engine-preview', ['ai-engine-creation-center.jpg']],
+    ['docs/doc/system-engine/file-manage.md', 'file-manage-preview', ['file-manage-sync-dialog.jpg']],
+    ['docs/doc/system-engine/app-store.md', 'app-store-preview', ['app-store-marketplace.jpg']],
+    ['docs/doc/system-engine/visualization-engine.md', 'visualization-engine-preview', ['visualization-engine-unity-dashboard.jpg']]
+  ]
+
+  assert.match(styles, /\.mci-doc-screenshot-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/)
+  assert.match(styles, /\.mci-doc-screenshot-grid--single\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/)
+  for (const [file, group, images] of pages) {
+    const content = read(file)
+    const preview = content.indexOf('## 📸 预览图')
+    const nextHeading = content.indexOf('\n## ', preview + 4)
+    const section = content.slice(preview, nextHeading < 0 ? content.length : nextHeading)
+    assert.ok(preview > 0, `${file} preview heading is missing`)
+    assert.equal((section.match(new RegExp(`data-fancybox="${group}"`, 'g')) || []).length, images.length)
+    let previous = -1
+    for (const image of images) {
+      const position = section.indexOf(`/images/product-screenshots/${image}`)
+      assert.ok(position > previous, `${file} should keep ${image} in the requested order`)
+      previous = position
+    }
+  }
+})
+
 test('copied product screenshots preserve the exact original bytes supplied for documentation', () => {
   const expected = new Map([
     ['microservice-crm-customer-map.png', 'dcf2f6a25884c9c032ccb5439a7fa7d0c2f6c52b7960adc9cc2afc03658a4bc4'],
@@ -101,7 +131,17 @@ test('copied product screenshots preserve the exact original bytes supplied for 
     ['mobile-bluetooth-print-specification.jpg', '1bbb036c8314f5e0eed1d68ae0278d6d4dc355809f30f7db0880558495a43ec1'],
     ['webos-api-engine-workspace.jpg', '2ea4a3c6b6d192f427a934b5d0abfe0ab07e472e154473785165212d3b2d2ad0'],
     ['mobile-ai-assistant.jpg', 'fdf568794496b20e5549fd927dda701b04fbfd7b44f9ccfe622dc11775288609'],
-    ['mobile-workbench.jpg', 'b9c76a2b9f2c811cc19e8ce302ae1e5df9a6583ee54660880229212fbe532e94']
+    ['mobile-workbench.jpg', 'b9c76a2b9f2c811cc19e8ce302ae1e5df9a6583ee54660880229212fbe532e94'],
+    ['ai-workflow-relationship-graph.jpg', '4a380f5ec34ce68a55f3fe19310f00cd9e10e64fd11570cddd42122b350480db'],
+    ['ai-workflow-designer.jpg', 'e16b76fa6657da10f3a14ec5abe8a847f2bc7e4cc6777168829931a87ae9d181'],
+    ['vision-engine-workbench.jpg', '6c9157277957b8f66ea9ed3975e331263750d33ab38fb5195469c20783bd742a'],
+    ['ai-platform-governance-observability.jpg', '24a426757a9d5c3fc496d259ca08f2affc45e0af38475b6eee6203e545676650'],
+    ['ai-platform-governance-health.jpg', '25f53ad2e5ef659d3eefdabf2120fb1c58aa17906061a406014b10230b427014'],
+    ['ai-platform-governance-overview.jpg', '8a2b446d0f0d1b7ef4eb40f7f79dd1658207376a9d45a7b61c4111ef9a428c4f'],
+    ['ai-engine-creation-center.jpg', '5c936f0ef9f2166a2ef26d37b31fc65f2b943117959c2cc0d6b6845eeec8461d'],
+    ['file-manage-sync-dialog.jpg', '0559d12ec7b6a679d7fee17492e8587da04f92d4c9e507f23715927370851267'],
+    ['app-store-marketplace.jpg', '05e5376bd878b6029a55a6b23fe394531c14364e9dee033a06019e70c1e7ea3a'],
+    ['visualization-engine-unity-dashboard.jpg', '1843f6986d6a275fb12e1213e5c31740dbfe874a186e1d00d46cd77abfa11679']
   ])
   for (const [file, digest] of expected) {
     const image = fs.readFileSync(path.join(projectRoot, 'docs/public/images/product-screenshots', file))

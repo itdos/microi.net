@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v2.7.2
+ * Version: v2.7.3
  * Function:
  * - 统一应用商城导入器；支持可信包读取、断点续装、菜单与管理员/全角色只读基线安装、在线应用资产迁移、数据库内联运行时，以及安装后资源和字节完整性强回读。
  */
@@ -4484,6 +4484,150 @@ try {
         return normalized;
     };
 
+    // MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1：早期更新日志表允许
+    // OsClient=NULL，MySQL 唯一键也允许同一 StoreId+Version 存在多条 NULL。
+    // 当新包把 OsClient 收紧为 NOT NULL 时，直接批量回填会在
+    // ux_microistore_changelog_store_version 上产生冲突。这里只处理固定平台表、
+    // 固定租户列和明确缺失租户的历史行；其它表、其它租户及其它唯一键一律不碰。
+    // 重复状态本身已经违反“一应用版本一条日志”的业务合同，因此确定性保留
+    // 未删除、已属于目标租户、Id 字典序更小的主记录，并对删除数量做强校验。
+    var repairMarketplaceChangeLogTenantBackfillCollisions = function (targetOsClient) {
+        var repair = { CollisionGroups: 0, RemovedRows: 0 };
+        var targetTenant = String(targetOsClient || '').replace(/^\s+|\s+$/g, '');
+        if (!targetTenant) return repair;
+
+        var candidates = V8.Db.FromSql(
+            "SELECT c.`Id`, c.`OsClient`, c.`StoreId`, c.`Version`, c.`IsDeleted` " +
+            "FROM `sys_microistore_changelog` c " +
+            "WHERE (c.`OsClient` IS NULL OR TRIM(CAST(c.`OsClient` AS CHAR)) = '' OR c.`OsClient` = @p0) " +
+            "AND c.`StoreId` IS NOT NULL AND c.`Version` IS NOT NULL " +
+            "AND EXISTS (SELECT 1 FROM `sys_microistore_changelog` legacy " +
+            "WHERE legacy.`StoreId` = c.`StoreId` AND legacy.`Version` = c.`Version` " +
+            "AND (legacy.`OsClient` IS NULL OR TRIM(CAST(legacy.`OsClient` AS CHAR)) = '')) " +
+            "ORDER BY c.`StoreId`, c.`Version`, c.`Id` LIMIT 5001"
+        ).AddInParameter('@p0', targetTenant).ToArray();
+        if (!candidates || candidates.length < 2) return repair;
+        if (candidates.length > 5000) {
+            throw new Error(
+                'sys_microistore_changelog 待修复候选超过5000条，已阻止无界自动清理；' +
+                '请先备份并分批清理历史空租户重复日志'
+            );
+        }
+
+        var isMissingTenant = function (value) {
+            return value === null || value === undefined || String(value).replace(/^\s+|\s+$/g, '') === '';
+        };
+        var isDeletedRow = function (row) {
+            var value = String(getPhysicalValue(row || {}, ['IsDeleted', 'ISDELETED', 'isdeleted']) || '')
+                .toLowerCase();
+            return value == '1' || value == 'true';
+        };
+        var groups = {};
+        var groupKeys = [];
+        for (var candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {
+            var candidate = candidates[candidateIndex] || {};
+            var candidateId = String(getPhysicalValue(candidate, ['Id', 'ID', 'id']) || '');
+            var storeId = String(getPhysicalValue(candidate, ['StoreId', 'STOREID', 'storeid']) || '')
+                .replace(/^\s+|\s+$/g, '');
+            var version = String(getPhysicalValue(candidate, ['Version', 'VERSION', 'version']) || '')
+                .replace(/^\s+|\s+$/g, '');
+            if (!candidateId || !storeId || !version) {
+                throw new Error('更新日志租户回填候选缺少 Id、StoreId 或 Version，已阻止自动修复');
+            }
+            var groupKey = storeId.toLowerCase() + '\u001f' + version.toLowerCase();
+            if (!groups[groupKey]) {
+                groups[groupKey] = [];
+                groupKeys.push(groupKey);
+            }
+            groups[groupKey].push({
+                Id: candidateId,
+                OsClient: getPhysicalValue(candidate, ['OsClient', 'OSCLIENT', 'osclient']),
+                StoreId: storeId,
+                Version: version,
+                IsDeleted: isDeletedRow(candidate)
+            });
+        }
+
+        var loserIds = [];
+        var repairDetails = [];
+        for (var groupIndex = 0; groupIndex < groupKeys.length; groupIndex++) {
+            var rows = groups[groupKeys[groupIndex]];
+            if (!rows || rows.length < 2) continue;
+            var winner = rows[0];
+            for (var rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+                var candidateRow = rows[rowIndex];
+                var winnerScore = (winner.IsDeleted ? 0 : 100)
+                    + (isMissingTenant(winner.OsClient) ? 0 : 10);
+                var candidateScore = (candidateRow.IsDeleted ? 0 : 100)
+                    + (isMissingTenant(candidateRow.OsClient) ? 0 : 10);
+                if (candidateScore > winnerScore
+                    || (candidateScore == winnerScore && candidateRow.Id < winner.Id)) {
+                    winner = candidateRow;
+                }
+            }
+            for (var loserIndex = 0; loserIndex < rows.length; loserIndex++) {
+                if (rows[loserIndex].Id != winner.Id) loserIds.push(rows[loserIndex].Id);
+            }
+            repair.CollisionGroups++;
+            if (repairDetails.length < 20) {
+                repairDetails.push(
+                    winner.StoreId + '@' + winner.Version + '保留' + winner.Id + '，移除' + (rows.length - 1) + '条'
+                );
+            }
+        }
+        if (loserIds.length == 0) return repair;
+
+        for (var batchStart = 0; batchStart < loserIds.length; batchStart += 200) {
+            var batch = loserIds.slice(batchStart, batchStart + 200);
+            var placeholders = [];
+            var deleteSql = "DELETE FROM `sys_microistore_changelog` " +
+                "WHERE (`OsClient` IS NULL OR TRIM(CAST(`OsClient` AS CHAR)) = '' OR `OsClient` = @p0) " +
+                "AND `Id` IN (";
+            var deleteCommand = null;
+            for (var parameterIndex = 0; parameterIndex < batch.length; parameterIndex++) {
+                placeholders.push('@p' + (parameterIndex + 1));
+            }
+            deleteSql += placeholders.join(',') + ')';
+            deleteCommand = V8.Db.FromSql(deleteSql).AddInParameter('@p0', targetTenant);
+            for (var bindIndex = 0; bindIndex < batch.length; bindIndex++) {
+                deleteCommand = deleteCommand.AddInParameter('@p' + (bindIndex + 1), batch[bindIndex]);
+            }
+            var deleted = deleteCommand.ExecuteNonQuery();
+            if (Number(deleted) != batch.length) {
+                throw new Error(
+                    '更新日志历史重复项发生并发变化：计划移除' + batch.length + '条，实际移除' + deleted + '条；' +
+                    '事务已阻止提交，请重试'
+                );
+            }
+            repair.RemovedRows += Number(deleted);
+        }
+
+        var remainingCollisionRows = V8.Db.FromSql(
+            "SELECT COUNT(1) AS CollisionGroupCount FROM (" +
+            "SELECT `StoreId`, `Version` FROM `sys_microistore_changelog` " +
+            "WHERE (`OsClient` IS NULL OR TRIM(CAST(`OsClient` AS CHAR)) = '' OR `OsClient` = @p0) " +
+            "AND `StoreId` IS NOT NULL AND `Version` IS NOT NULL " +
+            "GROUP BY `StoreId`, `Version` " +
+            "HAVING COUNT(1) > 1 AND SUM(CASE WHEN `OsClient` IS NULL " +
+            "OR TRIM(CAST(`OsClient` AS CHAR)) = '' THEN 1 ELSE 0 END) > 0" +
+            ") collision_groups"
+        ).AddInParameter('@p0', targetTenant).ToArray();
+        var remainingCollisionCount = remainingCollisionRows && remainingCollisionRows.length > 0
+            ? getScalarCount(remainingCollisionRows[0], [
+                'CollisionGroupCount', 'COLLISIONGROUPCOUNT', 'collisiongroupcount'
+            ])
+            : 0;
+        if (remainingCollisionCount > 0) {
+            throw new Error(
+                '更新日志历史重复项清理后仍有' + remainingCollisionCount + '个冲突组，已阻止租户回填'
+            );
+        }
+        debugLog.physical_schema_changelog_tenant_collision_repair =
+            '冲突组' + repair.CollisionGroups + '个，移除无效重复记录' + repair.RemovedRows + '条；' +
+            repairDetails.join('；') + (repair.CollisionGroups > repairDetails.length ? '；其余已省略' : '');
+        return repair;
+    };
+
     // PHYSICAL_NOT_NULL_BACKFILL_V1：老租户可能已经创建了新字段，但历史行仍为
     // NULL。MySQL 会在 MODIFY ... NOT NULL 之前校验既有数据，因此必须先使用包内
     // 明确声明的默认值做参数化回填，再收紧列约束。没有默认值时失败关闭，不能猜值。
@@ -4496,19 +4640,12 @@ try {
         var targetNullable = String(getPhysicalValue(targetColumn, ['IS_NULLABLE', 'IsNullable']) || '').toUpperCase();
         if (sourceNullable != 'NO' || targetNullable == 'NO') return 0;
 
-        var nullRows = V8.Db.FromSql(
-            "SELECT COUNT(1) AS NullCount FROM `" + tableName + "` WHERE `" + columnName + "` IS NULL"
-        ).ToArray();
-        var nullCount = nullRows && nullRows.length > 0
-            ? getScalarCount(nullRows[0], ['NullCount', 'NULLCOUNT', 'nullcount'])
-            : 0;
-        if (nullCount == 0) return 0;
-
         var sourceDefault = getPhysicalValue(sourceColumn, ['COLUMN_DEFAULT', 'ColumnDefault', 'Default']);
         var backfillValueSource = String(getPhysicalValue(sourceColumn, [
             'BACKFILL_VALUE_SOURCE',
             'BackfillValueSource'
         ]) || '').replace(/^\s+|\s+$/g, '');
+        var missingValueWhere = "`" + columnName + "` IS NULL";
         if (backfillValueSource) {
             if (sourceDefault !== null && sourceDefault !== undefined) {
                 throw new Error('NOT NULL回填契约不能同时声明数据库默认值和BACKFILL_VALUE_SOURCE');
@@ -4523,7 +4660,18 @@ try {
             if (!sourceDefault) {
                 throw new Error('目标租户标识为空，无法回填OsClient历史NULL数据');
             }
+            missingValueWhere = "(`" + columnName + "` IS NULL OR " +
+                "TRIM(CAST(`" + columnName + "` AS CHAR)) = '')";
         }
+
+        var nullRows = V8.Db.FromSql(
+            "SELECT COUNT(1) AS NullCount FROM `" + tableName + "` WHERE " + missingValueWhere
+        ).ToArray();
+        var nullCount = nullRows && nullRows.length > 0
+            ? getScalarCount(nullRows[0], ['NullCount', 'NULLCOUNT', 'nullcount'])
+            : 0;
+        if (nullCount == 0) return 0;
+
         if (sourceDefault === null || sourceDefault === undefined) {
             throw new Error(
                 '字段存在' + nullCount + '条NULL数据，但应用包要求NOT NULL且未声明可回填的默认值，已阻止修改'
@@ -4532,22 +4680,39 @@ try {
 
         var columnType = String(getPhysicalValue(sourceColumn, ['COLUMN_TYPE', 'ColumnType', 'Type']) || '');
         var defaultText = String(sourceDefault);
-        var updateSql = "UPDATE `" + tableName + "` SET `" + columnName + "` = @p0 WHERE `" + columnName + "` IS NULL";
+        if (backfillValueSource.toLowerCase() == 'targetosclient'
+            && String(tableName || '').toLowerCase() == 'sys_microistore_changelog') {
+            repairMarketplaceChangeLogTenantBackfillCollisions(sourceDefault);
+        }
+
+        var updateSql = "UPDATE `" + tableName + "` SET `" + columnName + "` = @p0 WHERE " + missingValueWhere;
         var isCurrentTimestamp = /^(?:CURRENT_TIMESTAMP)(?:\(\d*\))?$/i.test(defaultText)
             && /^(?:datetime|timestamp)(?:\(|$)/i.test(normalizeSqlType(columnType));
         var isBitLiteral = /^b'[01]+'$/i.test(defaultText)
             && /^bit(?:\(|$)/i.test(normalizeSqlType(columnType));
 
+        var updatedCount = 0;
         if (isCurrentTimestamp || isBitLiteral) {
             updateSql = "UPDATE `" + tableName + "` SET `" + columnName + "` = " + defaultText
-                + " WHERE `" + columnName + "` IS NULL";
-            V8.Db.FromSql(updateSql).ExecuteNonQuery();
+                + " WHERE " + missingValueWhere;
+            updatedCount = V8.Db.FromSql(updateSql).ExecuteNonQuery();
         } else {
-            V8.Db.FromSql(updateSql)
+            updatedCount = V8.Db.FromSql(updateSql)
                 .AddInParameter('@p0', sourceDefault)
                 .ExecuteNonQuery();
         }
-        return nullCount;
+        var remainingRows = V8.Db.FromSql(
+            "SELECT COUNT(1) AS NullCount FROM `" + tableName + "` WHERE " + missingValueWhere
+        ).ToArray();
+        var remainingCount = remainingRows && remainingRows.length > 0
+            ? getScalarCount(remainingRows[0], ['NullCount', 'NULLCOUNT', 'nullcount'])
+            : 0;
+        if (remainingCount > 0) {
+            throw new Error(
+                '字段回填后仍有' + remainingCount + '条缺失数据，已阻止收紧NOT NULL约束；请检查并发写入'
+            );
+        }
+        return Number(updatedCount || 0);
     };
 
     var getTargetPhysicalColumns = function (tableName) {

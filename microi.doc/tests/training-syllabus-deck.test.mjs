@@ -35,9 +35,9 @@ test('training syllabus route mounts the dedicated HTML presentation', () => {
 
 test('presentation covers the complete technical learning path', () => {
   const component = read('docs/.vitepress/theme/components/TrainingSyllabusDeck.vue')
-  const engineBlock = /const engineSlides: EngineSlide\[\] = \[([\s\S]*?)\n\]\n\n\/\/ 这些是官网左侧导航中的关键交付入口/u.exec(component)?.[1] || ''
+  const engineBlock = /const engineSlides: EngineSlide\[\] = \[([\s\S]*?)\r?\n\]\r?\n\r?\n\/\/ 这些是官网左侧导航中的关键交付入口/u.exec(component)?.[1] || ''
   const engineCount = [...engineBlock.matchAll(/^\s+id: '[^']+'/gmu)].length
-  const supplementalBlock = /const atlasSupplementalEntries: AtlasEntry\[\] = \[([\s\S]*?)\n\]/u.exec(component)?.[1] || ''
+  const supplementalBlock = /const atlasSupplementalEntries: AtlasEntry\[\] = \[([\s\S]*?)\r?\n\]/u.exec(component)?.[1] || ''
   const supplementalCount = [...supplementalBlock.matchAll(/^\s+\{ id: '[^']+'/gmu)].length
 
   assert.equal(engineCount, 36)
@@ -49,7 +49,7 @@ test('presentation covers the complete technical learning path', () => {
     'Token 更省*',
     'AI 开发更快*',
     '企业研发，为什么要先选一套开源 AI 开发框架？',
-    '为什么选择 Microi吾码 AI 开发框架？',
+    '为什么选择吾码？',
     '三种方式开始使用，再让 AI 接管开发环境',
     'Docker 一键安装',
     '官网注册并开通免费 SaaS 租户',
@@ -110,6 +110,35 @@ test('presentation covers the complete technical learning path', () => {
   assert.match(component, /href="\/case\/case-index\.html" target="_blank"/)
   assert.doesNotMatch(engineBlock, /id: 'datasource-engine'/u)
   assert.doesNotMatch(component, /https?:\/\//u, 'the deck should not depend on remote media')
+})
+
+test('slide 03 presents a compact, persuasive Microi enterprise advantage matrix', () => {
+  const component = read('docs/.vitepress/theme/components/TrainingSyllabusDeck.vue')
+  const advantageBlock = /const whyAdvantages: WhyAdvantage\[\] = \[([\s\S]*?)\r?\n\]/u.exec(component)?.[1] || ''
+  const advantageCount = [...advantageBlock.matchAll(/^\s+no: '\d{2}'/gmu)].length
+
+  assert.equal(advantageCount, 8)
+  for (const phrase of [
+    "nav: '为什么选择吾码？'",
+    "title: '为什么选择吾码？'",
+    '一句话，<em>开发大型企业应用</em>',
+    '零代码 AI 对话',
+    '跨平台全端',
+    '高性能底座',
+    '分布式原生',
+    '插件化引擎',
+    '微服务扩展',
+    '全自动化测试',
+    '企业级治理',
+    "['AI 对话建模', '自动实现', '全自动测试', '受控发布', '运行治理']",
+    "['开源可控', 'SaaS 多租户', '多数据库', '全端统一']",
+    '零代码提速，工程化不设上限',
+  ]) assert.ok(component.includes(phrase), `missing slide 03 advantage: ${phrase}`)
+
+  assert.match(component, /whyAdvantagesOn\('left'\)/u)
+  assert.match(component, /whyAdvantagesOn\('right'\)/u)
+  assert.match(component, /aria-label="从需求到运行治理的五步闭环"/u)
+  assert.doesNotMatch(component, /吾码绝对优势/u)
 })
 
 test('presentation supports mouse, keyboard, fullscreen, thumbnail navigation, and direct PDF download', () => {

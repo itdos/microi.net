@@ -2,6 +2,15 @@
 
 视觉引擎的可信 .NET 技术组件名为 `Microi.Vision`。它接收 JPEG、PNG、WebP 图片或已经取出的连续视频帧，使用受控 ONNX 模型生成视觉特征；接口引擎再优先与当前租户的样本库匹配，未命中时立即返回“未匹配 / AI 识别中”，并按租户策略异步调用平台 AI 引擎。后台应用、菜单和工作台统一显示中性名称“视觉引擎”，不会强制显示 Microi 或吾码品牌。
 
+## 📸 预览图
+
+<div class="mci-doc-screenshot-grid mci-doc-screenshot-grid--single">
+  <figure>
+    <img src="/images/product-screenshots/vision-engine-workbench.jpg" alt="Microi吾码视觉引擎识别工作台，展示图片与摄像头输入、识别结果和最近识别记录" data-fancybox="vision-engine-preview">
+    <figcaption>识别工作台：支持图片上传、摄像头取帧、样本匹配、AI 回退与结果追踪。</figcaption>
+  </figure>
+</div>
+
 :::: tip 先看结论
 商品、鱼类、蔬菜、建筑和经合法授权的人脸都使用同一条“样本录入 → 特征提取 → 数据库匹配 → 可选 AI 回退”链路。默认内置模型只是零部署近似图片指纹，适合联调和相同/近似样图；生产语义识别或人脸比对应安装经过许可证与数据集评估的 ONNX 模型包。
 ::::

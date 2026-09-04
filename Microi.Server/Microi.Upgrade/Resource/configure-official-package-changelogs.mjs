@@ -24,14 +24,14 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
     releaseTime: webosIconReleaseTime,
   }),
   'app.microi.store.json': Object.freeze({
-    version: 'v7.9.20',
-    title: '全角色首页只读授权合同',
+    version: 'v7.9.21',
+    title: '首页资源闭包发布控制面',
     changeType: 'Fix',
-    content: '导入器 v2.7.2 新增受信官方包 MenuReadGrants 合同，只允许为全部有效角色幂等补 Read，保留既有权限并强回读、失效授权缓存。',
+    content: '导入器 v2.7.3 新增受信官方包 MenuReadGrants 合同，只允许为全部有效角色幂等补 Read，保留既有权限并强回读、失效授权缓存；同时保留 v2.7.2 的更新日志租户回填唯一键冲突修复。',
     releaseTime: '2026-09-04 18:00:00',
   }),
   'app.microi.saas-engine.json': Object.freeze({
-    version: 'v7.8.24',
+    version: 'v7.8.26',
     title: '智能首页全账号只读可见',
     changeType: 'Feature',
     content: '智能首页菜单绑定界面引擎并固定 PAGE5 身份；为所有有效角色幂等补齐首页及组件菜单 Read 权限，新建或重存角色自动保留首页只读基线，日历与公告查询显式携带菜单上下文。',
