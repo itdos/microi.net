@@ -1,5 +1,7 @@
 using Microi.net;
 using Newtonsoft.Json.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Dos.Common.Tests;
 
@@ -207,13 +209,15 @@ public sealed class ProtocolGatewayRuntimeSettingsTests
     }
 
     [Fact]
-    public void ChanjetV2Callback_IsAdditiveTenantBoundAndManaged()
+    public void ChanjetV2Callback_IsApiEngineOwnedTenantBoundAndManaged()
     {
         var root = FindRepositoryRoot();
         var message = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.net.Api", "Controllers", "MessageController.cs"));
         var settings = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Core", "SaaSEngine", "ChanjetV2ProtocolGatewaySettings.cs"));
+        var atom = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Core", "V8Engine", "Runtime", "V8Method.Chanjet.cs"));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
         var systemSettings = Assert.Single(
@@ -226,10 +230,15 @@ public sealed class ProtocolGatewayRuntimeSettingsTests
             .Children<JObject>()
             .ToDictionary(row => row.Value<string>("ConfigKey")!, StringComparer.Ordinal);
 
-        Assert.Contains("Route(\"ReceiveV2\")", message, StringComparison.Ordinal);
-        Assert.Contains("OsClient.DosIsNullOrWhiteSpace()", message, StringComparison.Ordinal);
-        Assert.Contains("RunTrustedProtocolAsync(", message, StringComparison.Ordinal);
-        Assert.Contains("ChanjetCallbackV2EngineKey", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Route(\"ReceiveV2\")", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("RunTrustedProtocolAsync(", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ChanjetCallbackV2EngineKey", message, StringComparison.Ordinal);
+        Assert.Contains(
+            "RequireTrustedApiEngine(ChanjetCallbackV2ApiEngineKey)",
+            atom,
+            StringComparison.Ordinal);
+        Assert.Contains("V8TenantContext.Current?.OsClient", atom, StringComparison.Ordinal);
+        Assert.DoesNotContain("requestedOsClient", atom, StringComparison.Ordinal);
         Assert.DoesNotContain("GetConfigOsClient", settings, StringComparison.Ordinal);
         Assert.Contains("TenantSystemSettingsSecurity.LoadSnapshot", settings, StringComparison.Ordinal);
         Assert.Contains("Integration.Chanjet.CallbackV2.Enabled", settings, StringComparison.Ordinal);
@@ -251,6 +260,75 @@ public sealed class ProtocolGatewayRuntimeSettingsTests
             Assert.Equal(0, settingRows[key].Value<int>("IsPublic"));
             Assert.Equal(1, settingRows[key].Value<int>("IsSecret"));
             Assert.Equal(0, settingRows[key].Value<int>("IsEnabled"));
+        }
+
+        var managed = Assert.Single(
+            package["SysApiEngines"]!.Children<JObject>(),
+            item => string.Equals(
+                item.Value<string>("ApiEngineKey"),
+                "platform-chanjet-callback-v2",
+                StringComparison.Ordinal));
+        Assert.Equal(0, managed.Value<int>("StopHttp"));
+        Assert.Equal(1, managed.Value<int>("AllowAnonymous"));
+        Assert.Equal("HTTP", managed.Value<string>("ResponseType"));
+        Assert.Equal("/api/Message/ReceiveV2", managed.Value<string>("ApiRoutes"));
+        Assert.Contains(
+            "V8.Method.DecodeChanjetCallbackV2",
+            managed.Value<string>("ApiV8Code"),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ChanjetV2CallbackProtocol_DecryptsValidPayloadAndReturnsSafeProjection()
+    {
+        Assert.True(ChanjetV2ProtocolGatewaySettings.TryCreate(
+            "tenant-v2",
+            "1234567890123456",
+            "app-a",
+            out var settings));
+        var encrypted = EncryptCallback(
+            "{\"id\":\"message-1\",\"appKey\":\"app-a\",\"msgType\":\"APP_TICKET\"," +
+            "\"time\":\"2026-09-04T19:48:00+08:00\",\"bizContent\":{\"appTicket\":\"ticket\"}," +
+            "\"untrustedExtra\":\"discard-me\"}",
+            settings.AesKey);
+
+        Assert.True(ChanjetV2CallbackProtocol.TryDecode(encrypted, settings, out var decoded));
+        Assert.Equal("message-1", decoded.Value<string>("MessageId"));
+        Assert.Equal("app-a", decoded.Value<string>("AppKey"));
+        Assert.Equal("APP_TICKET", decoded.Value<string>("MessageType"));
+        Assert.Equal("ticket", decoded["BizContent"]?.Value<string>("appTicket"));
+        Assert.Null(decoded["untrustedExtra"]);
+    }
+
+    [Theory]
+    [InlineData("{\"id\":\"one\",\"id\":\"two\",\"appKey\":\"app-a\",\"msgType\":\"APP_TEST\"}")]
+    [InlineData("{\"id\":\"one\",\"appKey\":\"wrong-app\",\"msgType\":\"APP_TEST\"}")]
+    [InlineData("{\"id\":\"one\",\"appKey\":\"app-a\",\"msgType\":\"lower-case\"}")]
+    public void ChanjetV2CallbackProtocol_RejectsAmbiguousOrUnauthorizedPayload(string json)
+    {
+        Assert.True(ChanjetV2ProtocolGatewaySettings.TryCreate(
+            "tenant-v2",
+            "1234567890123456",
+            "app-a",
+            out var settings));
+
+        Assert.False(ChanjetV2CallbackProtocol.TryDecode(
+            EncryptCallback(json, settings.AesKey),
+            settings,
+            out _));
+    }
+
+    [Fact]
+    public void ChanjetV2CallbackAtom_RejectsEveryNonOwnedEngine()
+    {
+        using (V8TenantContext.Enter("tenant-v2", "tenant-custom-engine"))
+        {
+            var result = new V8Method().DecodeChanjetCallbackV2(new
+            {
+                EncryptedMessage = "not-a-cipher"
+            });
+            Assert.Equal(0, result.Code);
+            Assert.Contains("无权", result.Msg, StringComparison.Ordinal);
         }
     }
 
@@ -275,6 +353,20 @@ public sealed class ProtocolGatewayRuntimeSettingsTests
     private static OsClientSecret Secret(string osClient, JObject model)
     {
         return new OsClientSecret { OsClient = osClient, OsClientModel = model };
+    }
+
+    private static string EncryptCallback(string plainText, string key)
+    {
+        using var aes = Aes.Create();
+        aes.Key = Encoding.UTF8.GetBytes(key);
+        aes.Mode = CipherMode.ECB;
+        aes.Padding = PaddingMode.PKCS7;
+        using var encryptor = aes.CreateEncryptor();
+        var plainBytes = Encoding.UTF8.GetBytes(plainText);
+        return Convert.ToBase64String(encryptor.TransformFinalBlock(
+            plainBytes,
+            0,
+            plainBytes.Length));
     }
 
     private static void WithTenants(
