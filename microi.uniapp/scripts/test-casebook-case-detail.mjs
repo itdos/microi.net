@@ -54,13 +54,13 @@ test('案例册保存后发送列表页实际监听的数据变更事件', async
   assert.doesNotMatch(source, /xjy-business-refresh/)
 })
 
-test('案例册内案例按真实菜单权限进入编辑或只读详情', async () => {
+test('案例册内案例始终先进入只读详情', async () => {
   const source = await readFile(casebookUrl, 'utf8')
   const method = caseDetailMethod(source)
   assert.match(method, /`table=\$\{encodeURIComponent\(CASE_CHILD_TABLE\)\}`/)
-  assert.match(method, /const mode = this\.canEditCase \? 'Edit' : 'View'/)
-  assert.match(method, /`mode=\$\{encodeURIComponent\(mode\)\}`/)
-  assert.doesNotMatch(method, /['"]mode=View['"]/)
+  assert.match(method, /`mode=\$\{encodeURIComponent\('View'\)\}`/)
+  assert.doesNotMatch(method, /canEditCase|\?\s*'Edit'\s*:\s*'View'/)
+  assert.match(source, /item\._pending \? '保存案例册时一并添加' : '查看案例详情'/)
 })
 
 test('选择案例弹窗打开时隐藏外层固定保存栏', async () => {
@@ -75,7 +75,6 @@ test('案例册详情及原生表单编辑入口服从菜单编辑权限', async
     readFile(nativeFormUrl, 'utf8')
   ])
   assert.match(casebookSource, /return canEditMenuRecord\(this\.bookMenuId, this\.currentUser\)/)
-  assert.match(casebookSource, /canEditCase\(\) \{ return canEditMenuRecord\(this\.casePhotoContext\.sysMenuId, this\.currentUser\) \}/)
   assert.match(nativeFormSource, /mode === 'View' && rowId && canEditRecord && !openSelectorField/)
   assert.match(nativeFormSource, /if \(!this\.canEditRecord\)[\s\S]*?当前账号没有编辑权限/)
 })
