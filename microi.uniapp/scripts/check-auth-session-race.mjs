@@ -62,16 +62,24 @@ async function verifySdk(name, createMicroiV8) {
   await staleRotation
   assert.equal(V8.getToken(), 'newer-token', `${name}: 旧响应不得覆盖更新后的 Token`)
 
+  const businessFailure = V8.get('/protected-business', {}, { silentError: true })
+  await Promise.resolve()
+  pending[2].task.resolve({ data: { Code: -1, Msg: '普通业务校验失败' }, statusCode: 200, header: {} })
+  const businessResult = await businessFailure
+  assert.equal(businessResult.Code, -1, `${name}: 普通 Code=-1 应原样返回给业务层`)
+  assert.equal(V8.getToken(), 'newer-token', `${name}: 普通 Code=-1 不得清理当前 Token`)
+  assert.equal(authExpiredCount, 0, `${name}: 普通 Code=-1 不得触发登录失效提示`)
+
   const currentExpired = V8.get('/protected', {}, { silentError: true })
   await Promise.resolve()
-  pending[2].task.resolve({ data: { Code: 1001, Msg: '当前会话已失效' }, statusCode: 200, header: {} })
+  pending[3].task.resolve({ data: { Code: 1001, Msg: '当前会话已失效' }, statusCode: 200, header: {} })
   await expectRejected(currentExpired)
   assert.equal(V8.getToken(), '', `${name}: 当前会话真实失效时应清理 Token`)
   assert.equal(authExpiredCount, 1, `${name}: 当前会话真实失效时应提示一次`)
 
   const login = V8.post('/api/SysUser/Login', {}, { auth: false, silentError: true })
   await Promise.resolve()
-  pending[3].task.resolve({ data: { Code: 1, Data: { Id: 'user-1' } }, statusCode: 200, header: { authorization: 'Bearer login-token' } })
+  pending[4].task.resolve({ data: { Code: 1, Data: { Id: 'user-1' } }, statusCode: 200, header: { authorization: 'Bearer login-token' } })
   await login
   assert.equal(V8.getToken(), 'login-token', `${name}: 匿名登录响应应建立新会话`)
 }
