@@ -250,7 +250,7 @@ test("background-task unique-index recovery preserves the authoritative row and 
   assert.match(source, /archived-duplicate:/);
   assert.match(source, /WHERE Id=@p1 AND IdempotencyKey=@p2/);
   assert.match(source, /recoveredFromIdempotencyDuplicate/);
-  assert.match(source, /Version: v2\.7\.2/);
+  assert.match(source, /Version: v2\.7\.4/);
 });
 
 test("standalone Web and UniApp installs always expose a target-tenant launch menu", () => {
@@ -1958,7 +1958,13 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
   assert.match(appStoreUpgradeSource, /MinimumPinnedBulkVersion\s*=\s*new System\.Version\(1, 3, 8\)/);
-  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 7, 2\)/);
+  assert.match(appStoreUpgradeSource, /MinimumPinnedImporterVersion\s*=\s*new System\.Version\(2, 7, 4\)/);
+  assert.match(source, /SQLSERVER_PHYSICAL_SCHEMA_DIALECT_V1/);
+  assert.match(source, /SQLSERVER_PHYSICAL_FIELD_CHANGE_V1/);
+  assert.match(source, /FROM sys\.default_constraints dc/);
+  assert.match(source, /DROP CONSTRAINT/);
+  assert.match(source, /ADD CONSTRAINT[\s\S]*?DEFAULT[\s\S]*?FOR/);
+  assert.match(source, /i\.is_primary_key = 0 AND i\.is_unique_constraint = 0/);
   assert.match(appStoreUpgradeSource, /MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1/);
   assert.match(appStoreUpgradeSource, /V8TrustedExecutionContext\.EnterManagedProtocol\([\s\S]*?"import-microi-store-package"/);
   assert.match(appStoreUpgradeSource, /dynamic\s+installResult\s*;/);
@@ -2021,7 +2027,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*2_007_002/);
+  assert.match(refreshSource, /versionNumber\s*<\s*2_007_004/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -2034,7 +2040,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /versionNumber\s*<\s*1_009_016/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_007_033/);
   assert.match(refreshSource, /MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_007_002/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*2_007_004/);
   assert.match(refreshSource, /TRUSTED_EMBEDDED_OFFICIAL_PACKAGE_V1/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);

@@ -171,7 +171,11 @@ public sealed class DiyLangBackgroundTaskTests
             worker,
             StringComparison.Ordinal);
         Assert.Contains(
-            "osClients.Select(DiyLangBackgroundTaskService.QueueStartupRepair)",
+            "DiyLangBackgroundTaskService.QueueStartupRepair(osClient)",
+            startupRuntime,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "启动修复任务投递部分失败",
             startupRuntime,
             StringComparison.Ordinal);
         Assert.DoesNotContain(

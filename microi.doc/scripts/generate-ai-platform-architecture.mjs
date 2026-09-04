@@ -5,6 +5,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import {
   architectureData,
+  architectureAssetBaseName,
   architectureFeatureLabels,
   architectureVersion,
   platformVersion,
@@ -25,6 +26,9 @@ const outputDir = path.join(repoRoot, 'docs', 'public', 'images')
 const svgPath = path.join(outputDir, 'microi-ai-platform-architecture.svg')
 const pngPath = path.join(outputDir, 'microi-ai-platform-architecture-1920x1080.png')
 const png4kPath = path.join(outputDir, 'microi-ai-platform-architecture-3840x2160.png')
+const versionedSvgPath = path.join(outputDir, `${architectureAssetBaseName}.svg`)
+const versionedPngPath = path.join(outputDir, `${architectureAssetBaseName}-1920x1080.png`)
+const versionedPng4kPath = path.join(outputDir, `${architectureAssetBaseName}-3840x2160.png`)
 const manifestPath = path.join(outputDir, 'microi-ai-platform-architecture.manifest.json')
 const readmePath = path.join(workspaceRoot, 'README.md')
 const indexPath = path.join(repoRoot, 'docs', 'doc', 'index.md')
@@ -207,7 +211,7 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <text x="40" y="55" class="title">Microi吾码 AI平台 架构图</text>
   <rect x="475" y="28" width="86" height="34" rx="17" class="version-badge"/>
   <text x="518" y="50" text-anchor="middle" class="version-text">${esc(platformVersion)}</text>
-  <text x="40" y="82" class="subtitle">OPEN-SOURCE AI DEVELOPMENT FRAMEWORK · 20+ SYSTEM ENGINES · BUILD → INTEGRATE → DELIVER → OBSERVE</text>
+  <text x="40" y="82" class="subtitle">OPEN-SOURCE AI DEVELOPMENT FRAMEWORK · 30+ SYSTEM ENGINES · BUILD → INTEGRATE → DELIVER → OBSERVE</text>
   ${valueCards.map(valueCardSvg).join('')}
 
   ${channels.map(channelSvg).join('')}
@@ -259,6 +263,9 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
 fs.mkdirSync(outputDir, { recursive: true })
 fs.writeFileSync(svgPath, svg, 'utf8')
 
+// 官网 CDN 对旧静态路径使用一年 immutable 缓存：页面引用版本化文件避开旧对象，原文件名继续保留给历史链接。
+fs.copyFileSync(svgPath, versionedSvgPath)
+
 const require = createRequire(import.meta.url)
 const configuredModules = process.env.MICROI_WORKSPACE_NODE_MODULES
 let sharp
@@ -277,6 +284,9 @@ await sharp(Buffer.from(svg), { density: 144 })
   .png({ compressionLevel: 9, adaptiveFiltering: true })
   .toFile(png4kPath)
 
+fs.copyFileSync(pngPath, versionedPngPath)
+fs.copyFileSync(png4kPath, versionedPng4kPath)
+
 const [png, png4k] = await Promise.all([sharp(pngPath).metadata(), sharp(png4kPath).metadata()])
 if (png.width !== width || png.height !== height) throw new Error(`1080P PNG 尺寸错误：${png.width}x${png.height}`)
 if (png4k.width !== width * 2 || png4k.height !== height * 2) throw new Error(`4K PNG 尺寸错误：${png4k.width}x${png4k.height}`)
@@ -285,6 +295,9 @@ if (fs.statSync(png4kPath).size > 2 * 1024 * 1024) throw new Error('4K PNG 超�
 
 const fileDigest = filePath => createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
 const outputs = [
+  { path: versionedSvgPath, width, height, format: 'svg' },
+  { path: versionedPngPath, width: png.width, height: png.height, format: 'png' },
+  { path: versionedPng4kPath, width: png4k.width, height: png4k.height, format: 'png' },
   { path: svgPath, width, height, format: 'svg' },
   { path: pngPath, width: png.width, height: png.height, format: 'png' },
   { path: png4kPath, width: png4k.width, height: png4k.height, format: 'png' }

@@ -35,7 +35,7 @@
             <el-radio-group
                 v-model="errorPolicy"
                 class="mci-import-dialog__policy-grid"
-                :disabled="submitting || isTaskActive"
+                :disabled="submitting || isTaskActive || requiresAtomicImport"
             >
                 <div
                     class="mci-import-dialog__policy-card"
@@ -414,6 +414,7 @@ export default {
             visible: false,
             dialogOptions: {},
             errorPolicy: IMPORT_ERROR_POLICY.ROLLBACK_ALL,
+            importIdempotencyKey: "",
             importStepList: [],
             selectedFile: null,
             parsedImport: null,
@@ -493,12 +494,16 @@ export default {
                 uniqueRules: this.uniqueRules
             });
         },
+        requiresAtomicImport() {
+            return /^ApiEngine:/i.test(String(this.sysMenuModel?.ImportV8 || "").trim());
+        },
         uploadData() {
             const result = {
                 Limit: true,
                 TableId: this.tableId,
                 UserId: this.$store?.getters?.GetCurrentUser?.Id || ""
             };
+            if (this.importIdempotencyKey) result._ImportIdempotencyKey = this.importIdempotencyKey;
             this.appendMenuContext(result);
             const fixedFormData = this.buildChildImportFixedData();
             if (Object.keys(fixedFormData).length > 0) result._FieldId = JSON.stringify(fixedFormData);
@@ -689,6 +694,7 @@ export default {
         clearImportState(clearSelectedFile = true) {
             this.stopBackgroundTaskPolling();
             if (clearSelectedFile) this.selectedFile = null;
+            if (clearSelectedFile) this.importIdempotencyKey = "";
             this.parsedImport = null;
             this.parsing = false;
             this.submitting = false;
@@ -714,7 +720,9 @@ export default {
         show(options) {
             this.dialogOptions = options && typeof options === "object" ? { ...options } : {};
             this.clearImportState(true);
-            this.errorPolicy = normalizeImportErrorPolicy(this.dialogOptions.ErrorPolicy);
+            this.errorPolicy = this.requiresAtomicImport
+                ? IMPORT_ERROR_POLICY.ROLLBACK_ALL
+                : normalizeImportErrorPolicy(this.dialogOptions.ErrorPolicy);
             this.visible = true;
         },
         hide() {
@@ -731,6 +739,7 @@ export default {
             if (!file) return;
             this.clearImportState(false);
             this.selectedFile = file;
+            this.importIdempotencyKey = this.DiyCommon.NewGuid();
             this.parsing = true;
             try {
                 this.validateExcelFile(file);

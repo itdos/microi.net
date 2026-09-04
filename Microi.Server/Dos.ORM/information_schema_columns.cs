@@ -14,5 +14,8 @@ namespace Dos.ORM
         /// 字符列的最大长度；非字符列或数据库未提供时为 null。
         /// </summary>
         public long? character_maximum_length { get; set; }
+        public int? numeric_precision { get; set; }
+        public int? numeric_scale { get; set; }
+        public int? datetime_precision { get; set; }
     }
 }

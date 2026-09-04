@@ -388,14 +388,14 @@ public class SecurityGuardAndSysUserRegressionTests
             root, "Microi.Server", "Microi.Upgrade", "35-UpgradeFileUploadDisableSwitch.cs"));
         var upgrade = File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
-        var coordinator = File.ReadAllText(Path.Combine(
-            root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
+        var baseline = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "36-UpgradeRuntimeInvariantBaseline.cs"));
         var package = JObject.Parse(File.ReadAllText(Path.Combine(
             root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
 
         Assert.Contains("public static string Version = \"6.9.9.1\"", migration);
         Assert.Contains("new Upgrade35().Run", upgrade);
-        Assert.Contains("Upgrade35-文件上传负向开关", coordinator);
+        Assert.Contains("Upgrade35-文件上传负向开关", baseline);
         Assert.DoesNotContain("UPDATE sys_osclients SET FileUploadEnabled", migration);
         Assert.DoesNotContain("UPDATE sys_osclients SET DisableFileUpload", migration);
 
