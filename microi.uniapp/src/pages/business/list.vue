@@ -67,15 +67,24 @@
     </view>
 
     <view class="summary-strip">
-      <view class="summary-main">
-        <text class="summary-value">{{ loading && pageIndex === 1 ? '--' : count }}</text>
-        <text class="summary-label">{{ periodLabel }}记录</text>
-      </view>
-      <view v-if="config.statisticsField" class="summary-side">
-        <text class="summary-side-value">{{ statisticsValue }}</text>
-        <text class="summary-label">{{ config.statisticsLabel }}</text>
-      </view>
       <image class="summary-icon" :src="entry.icon" mode="aspectFit" />
+      <view
+        class="summary-metrics"
+        :class="`summary-metrics--${Math.min(4, displayStatisticsMetrics.length)}`"
+      >
+        <view
+          v-for="metric in displayStatisticsMetrics"
+          :key="metric.key"
+          class="summary-metric"
+          :class="`summary-metric--${metric.tone}`"
+        >
+          <text class="summary-metric__value">{{ metric.displayValue }}</text>
+          <view class="summary-metric__label-row">
+            <view class="summary-metric__dot"></view>
+            <text class="summary-metric__label">{{ metric.label }}</text>
+          </view>
+        </view>
+      </view>
     </view>
 
     <view v-if="key === 'proposals'" class="proposal-compare-tools">
@@ -311,6 +320,7 @@ import {
   loadModuleViewManifest
 } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
+import { loadListMetricValues } from '@/platform/view-metrics.js'
 import { appendStandardDeleteAction } from '@/platform/module-delete.js'
 import { fieldDisplayValue, loadNativeFieldOptionPage, parseJson } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
@@ -326,8 +336,8 @@ import MciRestrictedRecordCard from '@/components/mci-restricted-record-card/mci
 import {
   formatDateTime,
   formatFieldValue,
-  formatMoney,
   PERIOD_OPTIONS,
+  buildModuleFilterPayload,
   loadModulePeriodCounts,
   loadModuleRows,
   loadRestrictedLookup,
@@ -344,6 +354,29 @@ function createRelationshipId() {
     seed = Math.floor(seed / 16)
     return (token === 'x' ? value : (value & 0x3) | 0x8).toString(16)
   })
+}
+
+const METRIC_TONES = new Set(['primary', 'info', 'success', 'warning', 'danger'])
+
+function formatCompactMetricNumber(value, maximumFractionDigits = 2) {
+  const number = Number(String(value ?? '').replace(/,/g, ''))
+  if (!Number.isFinite(number)) return value === undefined || value === null || value === '' ? '-' : String(value)
+  const absolute = Math.abs(number)
+  if (absolute >= 100000000) return `${(number / 100000000).toFixed(2).replace(/\.00$/, '')}亿`
+  if (absolute >= 10000) return `${(number / 10000).toFixed(2).replace(/\.00$/, '')}万`
+  return number.toLocaleString('zh-CN', { maximumFractionDigits })
+}
+
+function formatMetricValue(value, metric = {}) {
+  if (value === '-' || value === '--') return value
+  const format = String(metric.format || '').toLowerCase()
+  const currency = ['currency', 'money', 'compactmoney'].includes(format)
+  let formatted = value
+  if (currency || ['number', 'integer', 'decimal'].includes(format) || Number.isFinite(Number(value))) {
+    formatted = formatCompactMetricNumber(value, currency ? 2 : 2)
+  }
+  const prefix = metric.prefix || (currency ? '¥' : '')
+  return `${prefix}${formatted}${metric.suffix || ''}`
 }
 
 export default {
@@ -367,6 +400,8 @@ export default {
       rows: [],
       count: 0,
       dataAppend: {},
+      metricValues: {},
+      metricLoading: false,
       pageIndex: 1,
       loading: false,
       refreshing: false,
@@ -429,9 +464,55 @@ export default {
         return count + (hasListFilterValue(this.filterValues[field.key]) ? 1 : 0)
       }, 0)
     },
-    statisticsValue() {
-      const value = statisticsFieldValue(this.dataAppend, this.config.statisticsField, 0)
-      return formatMoney(value || 0)
+    displayStatisticsMetrics() {
+      let metrics = (this.config.statisticsMetrics || []).slice(0, 4)
+      if (!metrics.length) {
+        metrics = [{
+          key: 'total',
+          label: `${this.periodLabel}记录`,
+          source: 'DataCount',
+          suffix: '条',
+          tone: 'primary'
+        }]
+        if (this.config.statisticsField) {
+          metrics.push({
+            key: `field:${this.config.statisticsField}`,
+            label: this.config.statisticsLabel || this.config.statisticsField,
+            source: 'Field',
+            field: this.config.statisticsField,
+            format: this.config.statisticsFormat || 'currency',
+            tone: 'success'
+          })
+        }
+      }
+      return metrics.map((metric, index) => {
+        const source = String(metric.source || (metric.apiEngineKey ? 'ApiEngine' : metric.field ? 'Field' : 'DataCount')).toLowerCase()
+        const key = metric.key || metric.field || `metric:${index}`
+        let value
+        if (this.loading && this.pageIndex === 1) {
+          value = '--'
+        } else if (source === 'datacount') {
+          value = this.count
+        } else if (source === 'pagecount') {
+          value = this.rows.length
+        } else if (source === 'field') {
+          value = statisticsFieldValue(this.dataAppend, metric.field, metric.defaultValue ?? 0)
+        } else if (source === 'apiengine') {
+          value = this.metricValues[key]
+          if (value === undefined) value = this.metricLoading ? '--' : (metric.defaultValue ?? '-')
+        } else {
+          value = metric.defaultValue ?? '-'
+        }
+        return {
+          ...metric,
+          key,
+          label: metric.label || '统计',
+          tone: METRIC_TONES.has(String(metric.tone || '').toLowerCase())
+            ? String(metric.tone).toLowerCase()
+            : 'info',
+          displayValue: formatMetricValue(value, metric)
+        }
+      })
     },
     areAllProposalsSelected() {
       return this.key === 'proposals' && this.rows.length > 0 && this.rows.every((row) => this.isProposalSelected(row))
@@ -561,7 +642,11 @@ export default {
       this.baseConfig = { ...this.baseConfig, menuId: this.menuId }
       this.config = { ...this.config, menuId: this.menuId }
       await this.loadViewConfig(refresh)
-      if (!restored || !this.rowsContainConfiguredCardFields()) await this.loadData(true, refresh)
+      if (!restored || !this.rowsContainConfiguredCardFields()) {
+        await this.loadData(true, refresh)
+      } else {
+        this.loadPlatformStatistics(this.buildCurrentListOptions(refresh), this.loadRequestId)
+      }
       if (restored && this.keyword.trim()) await this.loadRestrictedRows(refresh)
     },
     getMciListSnapshotKey() {
@@ -578,6 +663,7 @@ export default {
         rows: [...this.rows],
         count: this.count,
         dataAppend: { ...this.dataAppend },
+        metricValues: { ...this.metricValues },
         pageIndex: this.pageIndex,
         finished: this.finished,
         filterValues: { ...this.filterValues },
@@ -608,14 +694,14 @@ export default {
             merged.filterFields = mergeModuleFilterFields(menuConfig.filterFields, localFilterFields)
           } catch (error) {}
         }
-        let manifest = await loadModuleViewManifest(this.baseConfig, {
+        let manifest = await loadModuleViewManifest(merged, {
           scene: 'Card',
           device: 'Mobile',
           user: this.currentUser,
           refresh
         })
         if (!manifest) {
-          manifest = await loadModuleViewManifest(this.baseConfig, {
+          manifest = await loadModuleViewManifest(merged, {
             scene: 'List',
             device: 'Mobile',
             user: this.currentUser,
@@ -623,6 +709,41 @@ export default {
           })
         }
         const dynamic = compileListConfig(manifest, merged.definition?.fields || [])
+        let platformMetrics = dynamic && dynamic.metrics || []
+        if (!platformMetrics.length) {
+          const mobileListManifest = await loadModuleViewManifest(merged, {
+            scene: 'List',
+            device: 'Mobile',
+            user: this.currentUser,
+            refresh
+          })
+          platformMetrics = compileListConfig(mobileListManifest, merged.definition?.fields || [])?.metrics || []
+        }
+        if (!platformMetrics.length) {
+          // PC 模块顶部 Hero 是平台列表统计的既有事实源；移动端没有单独配置时直接复用。
+          const pcListManifest = await loadModuleViewManifest(merged, {
+            scene: 'List',
+            device: 'PC',
+            user: this.currentUser,
+            refresh
+          })
+          platformMetrics = compileListConfig(pcListManifest, merged.definition?.fields || [])?.metrics || []
+        }
+        if (platformMetrics.length) {
+          merged.statisticsMetrics = platformMetrics.slice(0, 4)
+        } else if (merged.statisticsMetrics?.length) {
+          // 尚未设计 Hero 的旧模块仍读取 sys_menu.StatisticsFields，并保留列表总量。
+          merged.statisticsMetrics = [
+            ...merged.statisticsMetrics.slice(0, 3),
+            {
+              key: 'total',
+              label: `${merged.title || '数据'}总量`,
+              source: 'DataCount',
+              suffix: '条',
+              tone: 'info'
+            }
+          ].slice(0, 4)
+        }
         if (!dynamic) {
           this.config = merged
           return
@@ -662,18 +783,10 @@ export default {
         this.config = merged
       } catch (error) {}
     },
-    async loadData(reset = false, refresh = false) {
-      if (this.loading && !reset) return
-      if (!reset && this.finished) return
-      const requestId = ++this.loadRequestId
-      if (reset) {
-        this.pageIndex = 1
-        this.finished = false
-      }
-      this.loading = true
+    buildCurrentListOptions(refresh = false) {
       const sort = this.selectedSort()
       const customRange = this.customStart && this.customEnd ? [`${this.customStart} 00:00:00`, `${this.customEnd} 23:59:59`] : null
-      const options = {
+      return {
         pageIndex: this.pageIndex,
         keyword: this.keyword.trim(),
         period: this.period,
@@ -684,6 +797,51 @@ export default {
         orderType: sort.order,
         extraWhere: this.buildFilterWhere()
       }
+    },
+    async loadPlatformStatistics(options, requestId) {
+      const metrics = this.config.statisticsMetrics || []
+      const hasRemoteMetrics = metrics.some((metric) => {
+        return String(metric.source || '').toLowerCase() === 'apiengine' && metric.apiEngineKey
+      })
+      if (!hasRemoteMetrics) {
+        this.metricLoading = false
+        this.metricValues = {}
+        return
+      }
+      this.metricLoading = true
+      try {
+        const values = await loadListMetricValues(metrics, {
+          menu: this.config.menu || this.baseConfig.menu || { Id: this.menuId },
+          menuId: this.menuId,
+          moduleEngineKey: this.config.moduleEngineKey || this.config.ModuleEngineKey || this.config.table,
+          user: this.currentUser,
+          filters: buildModuleFilterPayload(this.config, options)
+        })
+        if (requestId === this.loadRequestId) this.metricValues = values
+      } catch (error) {
+        if (requestId === this.loadRequestId) {
+          this.metricValues = Object.fromEntries(metrics
+            .filter((metric) => String(metric.source || '').toLowerCase() === 'apiengine')
+            .map((metric) => [metric.key, '-']))
+        }
+      } finally {
+        if (requestId === this.loadRequestId) this.metricLoading = false
+      }
+    },
+    async loadData(reset = false, refresh = false) {
+      if (this.loading && !reset) return
+      if (!reset && this.finished) return
+      const requestId = ++this.loadRequestId
+      if (reset) {
+        this.pageIndex = 1
+        this.finished = false
+        this.metricValues = {}
+        this.metricLoading = false
+      }
+      this.loading = true
+      const options = this.buildCurrentListOptions(refresh)
+      options.pageIndex = this.pageIndex
+      const customRange = options.customRange
       try {
         const result = await loadModuleRows(this.config, options)
         if (requestId !== this.loadRequestId) return
@@ -698,6 +856,7 @@ export default {
         if (!this.finished) this.pageIndex += 1
         this.loading = false
         if (reset) {
+          this.loadPlatformStatistics(options, requestId)
           loadModulePeriodCounts(this.config, {
             keyword: options.keyword,
             customRange,
@@ -1581,7 +1740,7 @@ export default {
   align-items: center;
   min-height: 118rpx;
   margin: 18rpx 24rpx;
-  padding: 18rpx 120rpx 18rpx 24rpx;
+  padding: 12rpx;
   border-radius: 16rpx;
   overflow: hidden;
   background: linear-gradient(110deg, #0b86d4, #16a3ad 62%, #2aaf80);
@@ -1589,45 +1748,77 @@ export default {
   box-shadow: 0 10rpx 26rpx rgba(11, 134, 212, 0.16);
 }
 
-.summary-main,
-.summary-side {
-  display: flex;
-  flex-direction: column;
+.summary-metrics {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8rpx;
+  width: 100%;
+}
+
+.summary-metrics--1 { grid-template-columns: minmax(0, 1fr); }
+.summary-metrics--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.summary-metrics--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.summary-metric {
   min-width: 0;
+  padding: 14rpx 10rpx 12rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  border-radius: 12rpx;
+  background: rgba(255, 255, 255, 0.1);
+  text-align: center;
 }
 
-.summary-side {
-  margin-left: 46rpx;
-}
-
-.summary-value {
-  font-size: 42rpx;
-  line-height: 48rpx;
-  font-weight: 700;
-}
-
-.summary-side-value {
-  max-width: 240rpx;
+.summary-metric__value {
+  display: block;
   overflow: hidden;
-  font-size: 28rpx;
-  line-height: 42rpx;
-  font-weight: 650;
+  font-size: 29rpx;
+  line-height: 38rpx;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.summary-label {
-  margin-top: 4rpx;
+.summary-metric__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  margin-top: 5rpx;
+}
+
+.summary-metric__dot {
+  flex: none;
+  width: 8rpx;
+  height: 8rpx;
+  margin-right: 6rpx;
+  border-radius: 50%;
+  background: #bfe7ff;
+}
+
+.summary-metric--success .summary-metric__dot { background: #9ff3cc; }
+.summary-metric--warning .summary-metric__dot { background: #ffd18a; }
+.summary-metric--danger .summary-metric__dot { background: #ffaaa0; }
+.summary-metric--info .summary-metric__dot { background: #d6e3ea; }
+
+.summary-metric__label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
   color: rgba(255, 255, 255, 0.78);
-  font-size: 21rpx;
+  font-size: 19rpx;
+  line-height: 28rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .summary-icon {
   position: absolute;
-  right: 24rpx;
-  width: 74rpx;
-  height: 74rpx;
-  opacity: 0.9;
+  right: 18rpx;
+  width: 96rpx;
+  height: 96rpx;
+  opacity: 0.1;
 }
 
 .data-scroll {

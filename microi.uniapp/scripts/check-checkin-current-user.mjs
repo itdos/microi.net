@@ -16,7 +16,7 @@ const assertions = [
   [tenantForm.includes('await verifiedCurrentUserOption()'), '人员定位初始化/提交前未校验当前用户'],
   [tenantForm.includes("throw new Error('打卡人获取失败，请重新登录后再试')"), '人员定位未阻止空打卡人提交'],
   [/attendanceRecords:\s*native\(\{[\s\S]*?requireAuthorizedMenu:\s*true/.test(tenantBusiness), 'attendance records must require an authorized menu'],
-  [businessRuntime.includes("moduleConfig.requireAuthorizedMenu === true && !menuId"), 'protected lists must fail closed without an authorized menu'],
+  [businessRuntime.includes('requiresAuthorizedMenuContext(moduleConfig) && !menuId'), 'protected lists must fail closed without an authorized menu'],
   [businessRuntime.includes("payload._SysMenuId = menuId"), 'protected list requests must send the authorized menu id']
 ]
 const failures = assertions.filter(([passed]) => !passed).map(([, message]) => message)
