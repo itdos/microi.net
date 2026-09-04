@@ -403,6 +403,7 @@ import {
     OFFICIAL_APP_INSTALLED_FIELDS,
     consumeCompletedPlatformMaintenanceTransitions,
     createCoalescedTrailingRunner,
+    normalizeInstalledVersionsForOfficialCheck,
     normalizeOfficialAppNotices,
     requestOfficialStoreList
 } from "@/utils/official-app-notice";
@@ -876,7 +877,7 @@ export default {
             if (!result || result.Code !== 1 || !Array.isArray(result.Data)) {
                 throw new Error(result?.Msg || this.$t("Msg.OfficialAppCheckFailed"));
             }
-            return result.Data;
+            return normalizeInstalledVersionsForOfficialCheck(result.Data);
         },
         getOfficialAppStatusType(status) {
             return status === "Outdated" ? "warning" : "danger";

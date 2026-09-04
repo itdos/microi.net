@@ -49,8 +49,8 @@ services.AddMicroiMQTT();
 services.AddMicroiHDFS();
 // 注册验证码插件。
 services.AddMicroiCaptcha();
-// 注册分布式任务调度插件，并复用宿主已验证的数据库连接。
-services.AddMicroiJob(host.DatabaseConnection);
+// 注册分布式任务调度插件，并复用宿主已验证的数据库类型与连接。
+services.AddMicroiJob(host.DatabaseConnection, host.DatabaseTypeName);
 // 注册 API 宿主传输层、MVC、鉴权、实时通信、压缩与 Swagger。
 services.AddMicroiApiTransport(builder, host.RedisConnection, host.ServerVersion);
 

@@ -168,16 +168,16 @@ const locale = computed(() => /^\/en(?:\/|$)/.test(route.path || '') ? 'en-US' :
 const copy = computed(() => locale.value === 'en-US' ? {
   eyebrow: 'Open-source AI development framework',
   titleLeadParts: ['Open-source AI', 'development framework'],
-  titleEmphasisLines: ['20+ mature engines'],
+  titleEmphasisLines: ['30+ mature engines'],
   lead: 'AI low-code, microservices, and the V8 engine share one delivery path. In high-reuse business scenarios, AI development can use 10×+ fewer tokens and move 10×+ faster.',
   primaryAction: 'Training syllabus', secondaryAction: 'Explore the architecture',
   proofAction: 'See the reproducible 10×+ benchmark and scope', proofLabel: 'Platform facts',
-  proofPoints: ['Evolving since 2014', 'MIT open source', 'AI low-code + microservices', '20+ mature engines'],
+  proofPoints: ['Evolving since 2014', 'MIT open source', 'AI low-code + microservices', '30+ mature engines'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: 'Use the right layer for each problem',
-  mapDesc: 'Let 20+ mature engines handle standard capabilities, use the V8 engine for differentiated logic, and deliver deep customization through microservices — all on one AI-ready foundation.',
+  mapDesc: 'Let 30+ mature engines handle standard capabilities, use the V8 engine for differentiated logic, and deliver deep customization through microservices — all on one AI-ready foundation.',
   aiLayer: 'AI collaboration', aiTools: ['Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
   developmentModes: [
-    { level: '01', label: 'Standard workflows', title: 'AI low-code development', description: '20+ engines · forms · modules · workflows · reports', note: 'READY' },
+    { level: '01', label: 'Standard workflows', title: 'AI low-code development', description: '30+ engines · forms · modules · workflows · reports', note: 'READY' },
     { level: '02', label: 'Business differentiation', title: 'V8 engine AI coding', description: 'APIs · events · integrations · automation · instant activation', note: 'TOKEN-SMART', featured: true },
     { level: '03', label: 'Deep customization', title: 'Microservice customization', description: 'Vue · UniApp · Unity · .NET extensions', note: 'DELIVER' }
   ],
@@ -185,11 +185,11 @@ const copy = computed(() => locale.value === 'en-US' ? {
   outputTitle: 'Build once, deliver everywhere', outputs: ['PC / WebOS', 'H5 / UniApp', 'SaaS / on-prem', 'AI apps / agents'],
   valueLabel: 'Why teams choose Microi',
   values: [
-    { kicker: 'Ready out of the box', title: 'Reuse 20+ mature engines', description: 'AI low-code, identity, workflow, data, integration, and delivery capabilities start from a proven foundation.' },
+    { kicker: 'Ready out of the box', title: 'Reuse 30+ mature engines', description: 'AI low-code, identity, workflow, data, integration, and delivery capabilities start from a proven foundation.' },
     { kicker: 'Use 10×+ fewer tokens', title: 'Let AI focus on business change', description: 'MCP, Skills, schemas, and V8 reduce repeated framework and boilerplate generation.' },
     { kicker: 'Develop 10×+ faster', title: 'Deliver working applications sooner', description: 'Visual modeling, V8, microservices, and source extensions form one continuous delivery path.' }
   ],
-  chatTitle: 'Let AI build on 20+ mature engines and deliver faster',
+  chatTitle: 'Let AI build on 30+ mature engines and deliver faster',
   chatDesc: 'Microi combines AI low-code, microservices, and the V8 engine. In high-reuse business scenarios, it can use 10×+ fewer tokens and move 10×+ faster than building from scratch.',
   placeholder: 'Describe what you want to create, understand, analyze, or accomplish...',
   chatLabel: 'Chat with Microi AI', quickLabel: 'Quick questions', sendLabel: 'Send',
@@ -202,16 +202,16 @@ const copy = computed(() => locale.value === 'en-US' ? {
 } : {
   eyebrow: '开源 AI 开发框架',
   titleLeadParts: ['开源 AI', '开发框架'],
-  titleEmphasisLines: ['20+ 成熟引擎'],
+  titleEmphasisLines: ['30+ 成熟引擎'],
   lead: '融合 AI 低代码、微服务与 V8 引擎；在平台能力高度复用的典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，更快交付企业应用。',
   primaryAction: '查看培训大纲', secondaryAction: '查看源码架构',
   proofAction: '查看 10 倍+ 实测与适用边界', proofLabel: '平台事实',
-  proofPoints: ['始于 2014', 'MIT 开源', 'AI 低代码 + 微服务', '20+ 成熟引擎'],
+  proofPoints: ['始于 2014', 'MIT 开源', 'AI 低代码 + 微服务', '30+ 成熟引擎'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: '用合适的层，解决合适的问题',
-  mapDesc: '20+ 成熟引擎承接标准能力，V8 引擎处理差异逻辑，微服务完成深度定制；让 AI 始终站在可复用底座上开发。',
+  mapDesc: '30+ 成熟引擎承接标准能力，V8 引擎处理差异逻辑，微服务完成深度定制；让 AI 始终站在可复用底座上开发。',
   aiLayer: 'AI 协作层', aiTools: ['Codex', 'Copilot', 'Cursor', 'Claude', 'MCP + Skills'],
   developmentModes: [
-    { level: '01', label: '标准业务', title: 'AI 低代码开发', description: '20+ 引擎 · 表单 · 模块 · 流程 · 报表', note: '开箱即用' },
+    { level: '01', label: '标准业务', title: 'AI 低代码开发', description: '30+ 引擎 · 表单 · 模块 · 流程 · 报表', note: '开箱即用' },
     { level: '02', label: '差异逻辑', title: 'V8 引擎 AI 编程', description: '接口 · 事件 · 集成 · 自动化 · 保存即生效', note: '更省 Token', featured: true },
     { level: '03', label: '深度定制', title: '微服务定制', description: 'Vue · UniApp · Unity · .NET 扩展', note: '更快交付' }
   ],
@@ -219,11 +219,11 @@ const copy = computed(() => locale.value === 'en-US' ? {
   outputTitle: '一次构建，多端交付', outputs: ['PC / WebOS', 'H5 / UniApp', 'SaaS / 私有化', 'AI 应用 / Agent'],
   valueLabel: '选择 Microi吾码的核心理由',
   values: [
-    { kicker: '开箱即用', title: '复用 20+ 成熟引擎', description: 'AI 低代码、权限、流程、数据、集成与交付能力从成熟底座起步，不再重复造轮子。' },
+    { kicker: '开箱即用', title: '复用 30+ 成熟引擎', description: 'AI 低代码、权限、流程、数据、集成与交付能力从成熟底座起步，不再重复造轮子。' },
     { kicker: 'Token 更省 10 倍+', title: '让 AI 聚焦业务增量', description: 'MCP、Skills、实时 Schema 与 V8 减少框架解释、胶水代码和重复生成。' },
     { kicker: '速度提升 10 倍+', title: '更快交付可运行应用', description: '可视化建模、V8、微服务与源码扩展贯通一条连续开发和验收链。' }
   ],
-  chatTitle: '让 AI 站在 20+ 成熟引擎上，更快交付',
+  chatTitle: '让 AI 站在 30+ 成熟引擎上，更快交付',
   chatDesc: 'Microi吾码融合 AI 低代码、微服务与 V8 引擎；典型业务场景下，相比从零定制开发，Token 更省 10 倍+、开发速度提升 10 倍+，开箱即可进入业务开发。',
   placeholder: '描述你想创造、了解、分析或完成的任何事情...',
   chatLabel: '与 Microi AI 对话', quickLabel: '快捷问题', sendLabel: '发送',

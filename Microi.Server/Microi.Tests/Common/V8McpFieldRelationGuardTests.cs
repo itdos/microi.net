@@ -5,6 +5,22 @@ namespace Dos.Common.Tests;
 
 public class V8McpFieldRelationGuardTests
 {
+    [Fact]
+    public void ReadMcpPatchValue_HandlesJValueScalarsAndMissingValues()
+    {
+        var patch = new JObject
+        {
+            ["Id"] = "field-1",
+            ["Visible"] = 1,
+            ["FormWidth"] = null
+        };
+
+        Assert.Equal("field-1", V8McpLogic.ReadMcpPatchValue<string>(patch, "Id"));
+        Assert.Equal(1, V8McpLogic.ReadMcpPatchValue<int?>(patch, "Visible"));
+        Assert.Null(V8McpLogic.ReadMcpPatchValue<int?>(patch, "FormWidth"));
+        Assert.Null(V8McpLogic.ReadMcpPatchValue<string>(patch, "Missing"));
+    }
+
     private static readonly JArray ParentFields = JArray.Parse("""
         [{"Name":"Id"},{"Name":"CustomerId"},{"Name":"CustomerProfile"},{"Name":"Items"}]
         """);
@@ -90,5 +106,60 @@ public class V8McpFieldRelationGuardTests
             "parent-id", "Biz_Order", "Items", "TableChild", config,
             targetTable, ParentFields, childFields, hiddenMenu);
         Assert.Empty(valid);
+    }
+
+    [Fact]
+    public void TableChildAcceptsForeignKeyIndexWhenPhysicalTableHasNoOsClient()
+    {
+        var indexes = new[]
+        {
+            new V8McpLogic.TableIndexInfo
+            {
+                Key_name = "idx_project",
+                Columns = new List<string> { "XiangmuID" }
+            }
+        };
+
+        Assert.True(V8McpLogic.HasTableChildRequiredIndexForTest(
+            indexes,
+            new[] { "Id", "XiangmuID", "GoujianBH" },
+            "XiangmuID"));
+        Assert.Equal(
+            new[] { "XiangmuID" },
+            V8McpLogic.BuildTableChildRequiredIndexPrefixForTest(
+                new[] { "Id", "XiangmuID" },
+                "XiangmuID"));
+    }
+
+    [Fact]
+    public void TableChildRequiresOsClientThenForeignKeyWhenPhysicalTableIsShared()
+    {
+        var wrongOrder = new[]
+        {
+            new V8McpLogic.TableIndexInfo
+            {
+                Key_name = "idx_wrong",
+                Columns = new List<string> { "XiangmuID", "OsClient" }
+            }
+        };
+        var correct = new[]
+        {
+            new V8McpLogic.TableIndexInfo
+            {
+                Key_name = "idx_tenant_project",
+                Columns = new List<string> { "OsClient", "XiangmuID", "CreateTime" }
+            }
+        };
+
+        var physicalColumns = new[] { "Id", "OsClient", "XiangmuID" };
+        Assert.False(V8McpLogic.HasTableChildRequiredIndexForTest(
+            wrongOrder, physicalColumns, "XiangmuID"));
+        Assert.True(V8McpLogic.HasTableChildRequiredIndexForTest(
+            correct, physicalColumns, "XiangmuID"));
+        Assert.Equal(
+            new[] { "OsClient", "XiangmuID" },
+            V8McpLogic.BuildTableChildRequiredIndexPrefixForTest(
+                physicalColumns,
+                "XiangmuID"));
     }
 }

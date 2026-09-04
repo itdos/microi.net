@@ -356,7 +356,7 @@ let tenantProgressTraceId = ''
 let openClawAuthBridge = null
 
 const brandFeatures = [
-  '20+ 成熟引擎 · 开箱即用',
+  '30+ 成熟引擎 · 开箱即用',
   'AI 低代码 · Token 更省 10 倍+',
   'V8 引擎 · 业务逻辑保存即生效',
   '微服务 · .NET / Vue 深度扩展',

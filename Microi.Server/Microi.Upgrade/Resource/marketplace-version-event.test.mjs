@@ -32,7 +32,7 @@ const storeTable = packageModel.DiyTables.find((item) => item.Name === 'sys_micr
 assert.ok(storeTable, 'app.microi.store.json must contain sys_microistore');
 const eventCode = String(storeTable.SubmitBeforeServerV8 || '').replace(/\r\n/gu, '\n');
 
-function executeEvent({
+function runEvent({
   action = 'Update',
   form = {},
   oldForm = {},
@@ -47,27 +47,58 @@ function executeEvent({
   };
   if (notSaveField !== undefined) V8.NotSaveField = notSaveField;
   const result = vm.runInNewContext(`(function () {\n${eventCode}\n})()`, { V8 });
+  return { form: V8.Form, result };
+}
+
+function executeEvent(input = {}) {
+  const action = String(input.action || 'Update').toLowerCase();
+  const form = input.form || {};
+  const oldForm = input.oldForm || {};
+  const needsDefaultIdentity = action !== 'add' && action !== 'insert'
+    && !['AppId', 'AppKey'].some(field => Object.prototype.hasOwnProperty.call(form, field)
+      || Object.prototype.hasOwnProperty.call(oldForm, field));
+  const executionInput = needsDefaultIdentity
+    ? { ...input, form, oldForm: { AppId: 'app.test', AppKey: 'app.test', ...oldForm } }
+    : input;
+  const { form: executedForm, result } = runEvent(executionInput);
   assert.equal(result.Code, 1);
-  return V8.Form;
+  return executedForm;
 }
 
 test('marketplace package carries the explicit-version contract and release metadata', () => {
   assert.ok(versionAtLeast(packageModel.PackageInfo.Version, 'v7.5.31'));
   assert.match(packageModel.PackageInfo.ChangeHistory, /(?:^|\n)2026-08-21 v7\.5\.4 /u);
-  assert.match(eventCode, /Version: v1\.1\.3/u);
+  assert.match(eventCode, /Version: v1\.1\.4/u);
   assert.match(eventCode, /MARKETPLACE_EXPLICIT_VERSION_V1/u);
+  assert.match(eventCode, /MARKETPLACE_STABLE_APPLICATION_IDENTITY_V1/u);
 });
 
 test('add and legacy blank versions receive a normalized default', () => {
-  const added = executeEvent({ action: 'Add' });
+  const added = executeEvent({ action: 'Add', form: { AppKey: 'app.example' } });
   assert.equal(added.AppVersion, 'v1.0.0');
   assert.equal(added.IsPublic, 1);
+  assert.equal(added.AppId, 'app.example');
 
   const legacyUpdate = executeEvent({
     form: { Name: 'legacy metadata' },
-    oldForm: { AppVersion: '' },
+    oldForm: { AppVersion: '', AppId: 'app.legacy', AppKey: 'app.legacy' },
   });
   assert.equal(legacyUpdate.AppVersion, 'v1.0.0');
+});
+
+test('stable marketplace identity is backfilled and missing identity fails closed', () => {
+  const appIdOnly = executeEvent({ action: 'Add', form: { AppId: 'app.id-only' } });
+  assert.equal(appIdOnly.AppKey, 'app.id-only');
+
+  const repaired = executeEvent({
+    form: { Name: 'repair legacy row' },
+    oldForm: { AppKey: 'app.legacy-key', AppVersion: 'v1.0.0' },
+  });
+  assert.equal(repaired.AppId, 'app.legacy-key');
+
+  const rejected = runEvent({ action: 'Add', form: {} });
+  assert.equal(rejected.result.Code, 0);
+  assert.match(rejected.result.Msg, /AppId|AppKey/u);
 });
 
 test('sparse metadata updates preserve the stored version without synthesizing a version field', () => {

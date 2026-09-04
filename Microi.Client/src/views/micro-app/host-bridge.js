@@ -7,6 +7,45 @@ export const MICRO_APP_HOST_PROTOCOL = "microi.host.v1";
 export const MICRO_APP_HOST_ACTION_TYPE = "micro-app:host-action";
 export const MICRO_APP_HOST_ACTION_RESULT_TYPE = "micro-app:host-action-result";
 
+const HOST_ACTION_ERROR_DEFAULTS = Object.freeze({
+    HOST_ACTION_UNSUPPORTED: {
+        cause: "当前平台版本没有注册这项宿主能力。",
+        solution: "请刷新页面；若仍失败，请联系管理员升级平台前端。",
+        retryable: false,
+        resultUnknown: false
+    },
+    HOST_PRINT_DIALOG_NOT_READY: {
+        cause: "平台打印组件在等待时间内没有完成初始化。",
+        solution: "请关闭其它打印窗口后刷新页面再试；若持续出现，请联系管理员检查平台打印组件。",
+        retryable: true,
+        resultUnknown: false
+    },
+    HOST_PRINT_TEMPLATE_INVALID: {
+        cause: "页面提交的打印模板标识为空或格式不正确。",
+        solution: "请联系管理员检查当前模块绑定的打印模板。",
+        retryable: false,
+        resultUnknown: false
+    },
+    HOST_PRINT_DATA_API_INVALID: {
+        cause: "打印数据接口地址为空、过长或格式不正确。",
+        solution: "请刷新页面；若仍失败，请联系管理员检查打印数据接口配置。",
+        retryable: false,
+        resultUnknown: false
+    },
+    HOST_PRINT_DATA_API_NOT_ALLOWED: {
+        cause: "打印数据地址不属于当前平台允许的接口引擎范围。",
+        solution: "请联系管理员核对当前环境的后端地址和打印接口配置。",
+        retryable: false,
+        resultUnknown: false
+    },
+    HOST_PRINT_TENANT_MISMATCH: {
+        cause: "打印请求中的租户与当前登录租户不一致。",
+        solution: "请刷新页面并重新进入当前租户；若仍失败，请联系管理员检查环境配置。",
+        retryable: false,
+        resultUnknown: false
+    }
+});
+
 const TAB_ACTIONS = Object.freeze([
     "closeTab",
     "navigate",
@@ -61,6 +100,55 @@ const ACTION_ALIASES = Object.freeze({
 
 function isPlainObject(value) {
     return Boolean(value) && Object.prototype.toString.call(value) === "[object Object]";
+}
+
+function boundedPlainText(value, fallback = "", maxLength = 1000) {
+    const text = String(value ?? fallback).replace(/[\u0000-\u001f\u007f]/g, " ").trim();
+    return (text || fallback).slice(0, maxLength);
+}
+
+export function normalizeMicroAppHostActionError(error, action = "") {
+    const source = error && (typeof error === "object" || typeof error === "function") ? error : {};
+    const code = boundedPlainText(source.code || source.Code, "HOST_ACTION_FAILED", 80)
+        .replace(/[^A-Za-z0-9_-]/g, "_") || "HOST_ACTION_FAILED";
+    const defaults = HOST_ACTION_ERROR_DEFAULTS[code] || {};
+    const message = boundedPlainText(source.message || source.Message || error, "平台宿主操作失败。", 500);
+    const actionName = boundedPlainText(action, "宿主操作", 80);
+    return {
+        code,
+        message,
+        cause: boundedPlainText(
+            source.causeText || source.CauseText || source.reason || source.Reason,
+            defaults.cause || `平台执行 ${actionName} 时返回异常。`,
+            500
+        ),
+        solution: boundedPlainText(
+            source.solution || source.Solution || source.recoveryHint || source.RecoveryHint,
+            defaults.solution || "请刷新页面后重试；若持续失败，请将错误码提供给管理员排查。",
+            700
+        ),
+        retryable: typeof source.retryable === "boolean" ? source.retryable : defaults.retryable !== false,
+        resultUnknown: typeof source.resultUnknown === "boolean" ? source.resultUnknown : defaults.resultUnknown === true
+    };
+}
+
+export function createMicroAppHostActionResult(request, success, data = null, error = null) {
+    const result = {
+        type: MICRO_APP_HOST_ACTION_RESULT_TYPE,
+        protocol: MICRO_APP_HOST_PROTOCOL,
+        requestId: boundedPlainText(request?.requestId, "", 128),
+        action: boundedPlainText(request?.action, "", 80),
+        success: success === true,
+        data,
+        error: success === true ? null : normalizeMicroAppHostActionError(error, request?.action)
+    };
+    return {
+        ...result,
+        // micro-app batches host data in one microtask. A later host:resize or
+        // host:theme message can replace the top-level type, so keep the control
+        // response under a stable key as well.
+        hostActionResult: result
+    };
 }
 
 function normalizeAction(value) {

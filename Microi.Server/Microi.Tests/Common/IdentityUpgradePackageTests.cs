@@ -168,14 +168,14 @@ public class IdentityUpgradePackageTests
 
         var bundle = Assert.Single(package["ApplicationBundles"]?.Children<JObject>()
             .Where(item => item["Application"]?["AppKey"]?.Value<string>() == "microi-platform-service") ?? []);
-        Assert.Equal("v1.9.14", bundle["VersionNo"]?.Value<string>());
+        Assert.Equal("v1.9.16", bundle["VersionNo"]?.Value<string>());
         Assert.False(bundle["IncludeSource"]?.Value<bool>());
-        Assert.Equal(56, bundle["Application"]?["CurrentVersion"]?.Value<int>());
-        Assert.Equal("v1.9.14", bundle["Application"]?["BuildVersion"]?.Value<string>());
-        Assert.Equal("v1.9.14", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal(58, bundle["Application"]?["CurrentVersion"]?.Value<int>());
+        Assert.Equal("v1.9.16", bundle["Application"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal("v1.9.16", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
         Assert.Equal("db", bundle["MicroService"]?["StorageMode"]?.Value<string>());
         Assert.All(bundle["Routes"]?.Children<JObject>() ?? [], route =>
-            Assert.Equal("v1.9.14", route["BuildVersion"]?.Value<string>()));
+            Assert.Equal("v1.9.16", route["BuildVersion"]?.Value<string>()));
         Assert.False(bundle["PackageAssets"]?["IncludeSource"]?.Value<bool>());
         Assert.Null(bundle["PackageAssets"]?["SourceZip"]);
         Assert.Null(bundle["PackageAssets"]?["BuildZip"]);

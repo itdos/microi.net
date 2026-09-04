@@ -734,8 +734,7 @@ namespace Microi.net
 
             var dbConn = GetConfiguredDbConnectionValue(OsClientDefault.OsClientDbConn);
             string currentDbConn = osClientModel["DbConn"]?.Val<string>() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(currentDbConn)
-                && !string.IsNullOrWhiteSpace(dbConn))
+            if (!string.IsNullOrWhiteSpace(dbConn))
             {
                 osClientModel["DbConn"] = dbConn;
                 currentDbConn = dbConn;
@@ -743,8 +742,7 @@ namespace Microi.net
 
             var dbType = GetConfiguredDbTypeValue(OsClientDefault.OsClientDbType);
             string currentDbType = osClientModel["DbType"]?.Val<string>() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(currentDbType)
-                && !string.IsNullOrWhiteSpace(dbType))
+            if (!string.IsNullOrWhiteSpace(dbType))
             {
                 osClientModel["DbType"] = dbType;
                 currentDbType = dbType;
@@ -755,6 +753,8 @@ namespace Microi.net
                 && !string.IsNullOrWhiteSpace(currentDbConn))
             {
                 osClientModel["DbReadConn"] = currentDbConn;
+                osClientModel["DbReadType"] = currentDbType;
+                currentDbReadConn = currentDbConn;
             }
             string currentDbReadType = osClientModel["DbReadType"]?.Val<string>() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(currentDbReadType)

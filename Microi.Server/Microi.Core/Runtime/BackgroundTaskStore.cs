@@ -1148,7 +1148,7 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
 
         internal static string QuoteSqlIdentifiers(OsClientSecret client, string sql)
         {
-            if (!UsesCaseSensitiveQuotedIdentifiers(client) || string.IsNullOrEmpty(sql)) return sql;
+            if (!RequiresIdentifierQuoting(client) || string.IsNullOrEmpty(sql)) return sql;
 
             var output = new System.Text.StringBuilder(sql.Length + 128);
             for (var index = 0; index < sql.Length;)
@@ -1318,7 +1318,7 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
 
         private static string QuoteProjection(OsClientSecret client, string projection)
         {
-            if (!UsesCaseSensitiveQuotedIdentifiers(client)) return projection;
+            if (!RequiresIdentifierQuoting(client)) return projection;
             return string.Join(",", projection.Split(',').Select(item =>
             {
                 var parts = item.Trim().Split(
@@ -1333,9 +1333,23 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
 
         private static string QuoteIdentifier(OsClientSecret client, string identifier)
         {
+            if (IsSqlServer(client))
+                return "[" + identifier.Replace("]", "]]") + "]";
             return UsesCaseSensitiveQuotedIdentifiers(client)
                 ? "\"" + identifier.Replace("\"", "\"\"") + "\""
                 : identifier;
+        }
+
+        private static bool RequiresIdentifierQuoting(OsClientSecret client)
+        {
+            return IsSqlServer(client) || UsesCaseSensitiveQuotedIdentifiers(client);
+        }
+
+        private static bool IsSqlServer(OsClientSecret client)
+        {
+            var dbType = client?.OsClientModel?["DbType"].Val<string>()
+                         ?? OsClientDefault.OsClientDbType;
+            return string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool UsesCaseSensitiveQuotedIdentifiers(OsClientSecret client)

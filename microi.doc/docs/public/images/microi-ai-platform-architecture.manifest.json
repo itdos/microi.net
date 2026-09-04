@@ -1,33 +1,57 @@
 {
   "schemaVersion": 1,
-  "architectureVersion": "2026.09.03.2",
+  "architectureVersion": "2026.09.04.1",
   "platformVersion": "v7.9.0",
-  "capabilitySourceHash": "2487b9dfdb4485ab0459d5aa151f7dde83bbc1fffdda5bb561b3cb772fcd4aef",
+  "capabilitySourceHash": "22658bafc091427ad63131407d374059cec4c68be21bdd8f542a3af7c2034683",
   "uniqueFeatureLabels": 226,
   "outputs": [
+    {
+      "file": "microi-ai-platform-architecture-2026.09.04.1.svg",
+      "format": "svg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 81641,
+      "sha256": "2629f1c262ab3af2a37e7baf5465d5a29c6d0aeab5fee5ccd6e0e4c96eb24331"
+    },
+    {
+      "file": "microi-ai-platform-architecture-2026.09.04.1-1920x1080.png",
+      "format": "png",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 260728,
+      "sha256": "5ceca956fedc912c70b555c0033c059fdeabd88f375ab6a5b491226aca7b1310"
+    },
+    {
+      "file": "microi-ai-platform-architecture-2026.09.04.1-3840x2160.png",
+      "format": "png",
+      "width": 3840,
+      "height": 2160,
+      "bytes": 1516315,
+      "sha256": "0610d33887144182315054855a00cb24894e5fe3df7a852fd374de67391fa755"
+    },
     {
       "file": "microi-ai-platform-architecture.svg",
       "format": "svg",
       "width": 1920,
       "height": 1080,
       "bytes": 81641,
-      "sha256": "61663bc4f3eb21b7986263ed46e4cfbce85556b40b752c58eb9140e3ddb68d1a"
+      "sha256": "2629f1c262ab3af2a37e7baf5465d5a29c6d0aeab5fee5ccd6e0e4c96eb24331"
     },
     {
       "file": "microi-ai-platform-architecture-1920x1080.png",
       "format": "png",
       "width": 1920,
       "height": 1080,
-      "bytes": 260106,
-      "sha256": "cbf190207df415d5fa0ba0b3ba51f44cf1e448f0c33dc565f511cb16e48a5afc"
+      "bytes": 260728,
+      "sha256": "5ceca956fedc912c70b555c0033c059fdeabd88f375ab6a5b491226aca7b1310"
     },
     {
       "file": "microi-ai-platform-architecture-3840x2160.png",
       "format": "png",
       "width": 3840,
       "height": 2160,
-      "bytes": 1515816,
-      "sha256": "1820903769a2fbfa4c99c94bb1886ca333ba32b7c0d74134e939a811e31ba695"
+      "bytes": 1516315,
+      "sha256": "0610d33887144182315054855a00cb24894e5fe3df7a852fd374de67391fa755"
     }
   ]
 }

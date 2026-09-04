@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-09-03 16:20:00
+# 版本：v2026-09-04 14:07:31
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -30,7 +30,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-09-03 16:20:00"
+SCRIPT_VERSION="v2026-09-04 14:07:31"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -4960,7 +4960,7 @@ case "${DATABASE_CHOICE}" in
     fi
     ;;
   3)
-    docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -Q "IF DB_ID(N'${DATABASE_NAME}') IS NULL CREATE DATABASE [${DATABASE_NAME}] COLLATE Chinese_PRC_CI_AS; ALTER DATABASE [${DATABASE_NAME}] SET COMPATIBILITY_LEVEL = 160;"
+    docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -Q "DECLARE @major int = TRY_CONVERT(int, SERVERPROPERTY('ProductMajorVersion')); IF @major < 13 THROW 50000, 'Microi requires SQL Server 2016 or later', 1; DECLARE @compat int = CASE WHEN @major >= 16 THEN 160 WHEN @major = 15 THEN 150 WHEN @major = 14 THEN 140 ELSE 130 END; IF DB_ID(N'${DATABASE_NAME}') IS NULL EXEC(N'CREATE DATABASE [${DATABASE_NAME}] COLLATE Chinese_PRC_CI_AS'); DECLARE @compatSql nvarchar(4000) = N'ALTER DATABASE [${DATABASE_NAME}] SET COMPATIBILITY_LEVEL = ' + CONVERT(nvarchar(3), @compat); EXEC sys.sp_executesql @compatSql; SELECT @major AS ProductMajorVersion, @compat AS CompatibilityLevel;"
     docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d "${DATABASE_NAME}" < "${SQL_FILE}"
     ;;
   5)

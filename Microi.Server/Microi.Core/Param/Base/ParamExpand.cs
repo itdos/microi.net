@@ -544,6 +544,12 @@ namespace Microi.net
         public string _ImportEncoding { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _ImportDelimiter { get; set; }
+        /// <summary>
+        /// 客户端为一次“选择文件并提交”的逻辑请求生成的稳定键。
+        /// HTTP 重试沿用该值；重新选择文件必须生成新值。
+        /// </summary>
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string _ImportIdempotencyKey { get; set; }
         public int? _TreeLazy { get; set; }
         /// <summary>
         /// 动态加载时传入的父级值，用于加载指定父节点的子级数据

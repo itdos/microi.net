@@ -203,3 +203,11 @@ return { Code: 1, Data: dataList, DataCount: dataList.length };
 - [references/progressive-02-powerpoint-导出.md](references/progressive-02-powerpoint-导出.md)：PowerPoint 导出；完整导入模式（含进度跟踪）；接收并下载文件（HTTP 链接转 Excel）；子表导入自动关联主表
 - [references/progressive-03-安全-性能注意.md](references/progressive-03-安全-性能注意.md)：安全 / 性能注意
 <!-- microi-progressive:end -->
+
+## 复盘：通用导入需要事务内整批业务校验
+
+- 触发场景：业务要求按整批汇总校验额度，并在并发导入时锁定稳定的主记录；完全替换导入接口会重复实现文件解析、字段映射、权限、进度和错误报告。
+- 通用规则：模块 `ImportV8` 显式配置为 `ApiEngine:<ApiEngineKey>` 时，平台标准导入器在 `RollbackAll` 的同一数据库事务内，把服务端重新解析并应用固定父表值后的全部行传给接口引擎；接口只负责校验和加锁，不自行写入或提交事务。其它历史 `ImportV8` 文本保持原兼容行为。
+- 父子表边界：固定父记录外键优先于 Excel 同名列；接口引擎仍须核对目标表、项目/主记录存在性、业务状态和额度。需要整批钩子的模块禁止 `ContinueOnError`。
+- 重复提交：客户端每次重新选择文件生成新的 `_ImportIdempotencyKey`，同一 HTTP 重试沿用该键；服务端按租户、表、菜单、用户和请求键保存状态，`Pending/Running/Succeeded` 均不得重复创建写入任务。该机制不等同于“相同文件作为新请求再次上传”的内容判重。
+- 自动化检查：至少覆盖同批汇总超量、稳定行锁先于累计回查、整批回滚、父外键不可被 Excel 覆盖、同一请求重试只写一次，以及错误中包含行号和业务上限明细。

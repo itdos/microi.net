@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.9.23
+ * Version: v1.9.24
  * Function:
  * - 统一应用商城发布器；支持不可变发布证明、精确版本更新日志、HDFS 内容寻址包与源码/编译资产边界。
  */
@@ -22,6 +22,7 @@ function text(value, fallback) {
   return String(value);
 }
 function isBlank(value) { return text(value).replace(/^\s+|\s+$/g, '') === ''; }
+function trimText(value) { return text(value).replace(/^\s+|\s+$/g, ''); }
 function nowText(format) {
   var valueFormat = text(format, 'yyyy-MM-dd HH:mm:ss');
   try { if (typeof DateNow === 'function') return DateNow(valueFormat); } catch (error) {}
@@ -532,6 +533,11 @@ function getExistingStore(appKey) {
     _PageSize: 1
   });
   return result && result.Code === 1 && result.Data ? result.Data : null;
+}
+function marketplaceIdentityReadbackMatches(row, expectedAppId, expectedAppKey) {
+  return !!row
+    && trimText(row.AppId) === trimText(expectedAppId)
+    && trimText(row.AppKey) === trimText(expectedAppKey);
 }
 /* MARKETPLACE_CHANGELOG_REQUIRED_V1：制包与发布都必须绑定当前商城版本的一条完整日志。 */
 /* MARKETPLACE_CHANGELOG_LEGACY_TENANT_V1：唯一的历史空租户日志可预检，且只在正式发布时回填。 */
@@ -1486,6 +1492,7 @@ function buildCurrentPackageRepairFields(storeRow, existingStore) {
 }
 function currentPackageRepairReadbackMatches(row, storeRow, expectedVersion) {
   return !!row
+    && marketplaceIdentityReadbackMatches(row, storeRow.AppId, storeRow.AppKey)
     && normalizeExactVersion(row.AppVersion) === normalizeExactVersion(expectedVersion)
     && text(row.AppPakcet) === ''
     && text(row.PackageHdfsPath) === text(storeRow.PackageHdfsPath)
@@ -1656,6 +1663,13 @@ if (isBlank(appIdOrKey)) return fail('AppId 或 AppKey 不能为空');
 var appResult = getApp(appIdOrKey);
 if (!appResult || appResult.Code !== 1 || !appResult.Data) return { Code: 2, Data: null, Msg: 'AI应用不存在' };
 var app = appResult.Data;
+// MARKETPLACE_STABLE_APPLICATION_IDENTITY_V1：发布前必须从权威商城行得到
+// 可持久化的稳定标识；只存在一侧时对称补齐，禁止再发布 AppId=NULL 的记录。
+var marketplaceAppId = trimText(app.AppId || app.AppKey);
+var marketplaceAppKey = trimText(app.AppKey || app.AppId);
+if (isBlank(marketplaceAppId) || isBlank(marketplaceAppKey)) {
+  return fail('商城应用缺少稳定 AppId/AppKey，请先修复应用标识后再发布。');
+}
 var appType = text(app.ApplicationType || app.AppType, 'Web');
 if (['Web', 'UniApp', 'MicroService'].indexOf(appType) < 0) return fail('不支持的应用类型：' + appType);
 var action = text(V8.Param.Action || 'Package');
@@ -1725,7 +1739,7 @@ if (protocolV3) {
     }
   } catch (proofReadError) { return fail(proofReadError.message); }
 }
-var existingStore = getExistingStore(app.AppKey);
+var existingStore = getExistingStore(marketplaceAppKey);
 // MARKETPLACE_SOURCE_DEFAULT_PRIVATE_V1：普通 AI 应用缺省必须交付源码，
 // 特殊游戏/Unity 包由发布调用方显式传 IncludeSource=false。
 var includeSourceParamSupplied = V8.Param.IncludeSource !== undefined && V8.Param.IncludeSource !== null;
@@ -2301,8 +2315,8 @@ if (action === 'Publish') {
   var storeRow = {
     AppName: packageModel.PackageInfo.Name,
     Name: packageModel.PackageInfo.Name,
-    AppId: text(app.AppId || app.AppKey),
-    AppKey: text(app.AppKey || app.AppId),
+    AppId: marketplaceAppId,
+    AppKey: marketplaceAppKey,
     AppVersion: versionNo,
     AppType: appType,
     ApplicationType: appType,
@@ -2421,6 +2435,7 @@ if (action === 'Publish') {
       }
     } catch (postVersionProofError) { return fail(postVersionProofError.message); }
     if (!postPublishStore
+        || !marketplaceIdentityReadbackMatches(postPublishStore, storeRow.AppId, storeRow.AppKey)
         || text(postPublishStore.AppPakcet) !== ''
         || text(postPublishStore.PackageHdfsPath) !== text(packageFields.PackageHdfsPath)
         || text(postPublishStore.PackageSha256).toLowerCase() !== text(packageFields.PackageSha256).toLowerCase()
@@ -2494,6 +2509,9 @@ if (action === 'Publish') {
   var publishResult = upsertStore(storeRow);
   if (!publishResult || publishResult.Code !== 1) return publishResult || fail('发布到应用商城失败');
   var legacyPublishedStore = getExistingStore(text(storeRow.AppKey || storeRow.AppId));
+  if (!marketplaceIdentityReadbackMatches(legacyPublishedStore, storeRow.AppId, storeRow.AppKey)) {
+    return fail('发布到应用商城后的 AppId/AppKey 强回读不一致');
+  }
   var legacyInstallSnapshot;
   try {
     legacyInstallSnapshot = ensureMarketplacePackageSnapshot(

@@ -3101,7 +3101,7 @@ namespace Microi.net
                     if (!configCheck.Ok) return new DosResult<object>(0, null, configCheck.Msg);
                 }
 
-                var relationCheck = await ValidateMcpFieldRelationAsync(
+                (bool Ok, string Msg) relationCheck = await ValidateMcpFieldRelationAsync(
                     osClient, tableId, name, componentName, effectiveConfig);
                 if (!relationCheck.Ok) return new DosResult<object>(0, null, relationCheck.Msg);
 
@@ -4862,6 +4862,7 @@ namespace Microi.net
                         "Id", "Name", "ParentId", "DiyTableId", "DiyTableName", "Url", "ComponentName", "ComponentPath",
                         "OpenType", "Display", "AppDisplay", "Sort", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds",
                         "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns",
+                        "ImportApi", "ImportV8", "ImportProgressApi",
                         "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema", "UpdateTime"
                     },
                     _Where = BuildKeywordWhere(keyword, "Name", "Url", "DiyTableName"),
@@ -4911,7 +4912,7 @@ namespace Microi.net
                     "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "MenuBadgeTooltip", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema",
                     "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns", "SortFieldIds", "NotShowFields",
                     "SqlJoin", "JoinTables", "SelectFields", "StatisticsFields", "InTableEdit", "InTableEditFields", "MobileListFields",
-                    "CardTitleTagFields", "CardBottomTagFields", "SelectApi", "ImportApi", "ExportApi", "AddBtnText", "SaveBtnText",
+                    "CardTitleTagFields", "CardBottomTagFields", "SelectApi", "ImportApi", "ImportV8", "ImportProgressApi", "ExportApi", "AddBtnText", "SaveBtnText",
                     "DefaultPageSize", "TableCardCol", "TableCardImgField", "TableCardImgStyle", "TableCardImgPosition", "GeneralSeaarch", "HiddenIndex",
                     "IsMicroiService", "MicroServiceId", "MicroServicePageId", "MicroServiceRoutePath",
                     "AddCodeShowV8", "EditCodeShowV8", "DelCodeShowV8", "DetailPageV8"
@@ -5464,7 +5465,7 @@ namespace Microi.net
                         if (!string.Equals(component, "JoinForm", StringComparison.OrdinalIgnoreCase)
                             && !string.Equals(component, "TableChild", StringComparison.OrdinalIgnoreCase)) continue;
                         string relationFieldName = SafeJString(relationField, "Name");
-                        var relationCheck = await ValidateMcpFieldRelationAsync(
+                        (bool Ok, string Msg) relationCheck = await ValidateMcpFieldRelationAsync(
                             osClient,
                             tableId,
                             relationFieldName,
@@ -7398,29 +7399,29 @@ namespace Microi.net
                 var p = new DiyFieldParam
                 {
                     OsClient = osClient,
-                    Id = patch["Id"].Val<string>(),
-                    TableId = patch["TableId"].Val<string>(),
-                    TableName = patch["TableName"].Val<string>(),
-                    Name = patch["Name"].Val<string>(),
-                    Label = patch["Label"].Val<string>(),
-                    Type = patch["Type"].Val<string>(),
-                    Component = patch["Component"].Val<string>(),
-                    Visible = patch["Visible"]?.Val<int>(),
-                    AppVisible = patch["AppVisible"]?.Val<int>(),
-                    Readonly = patch["Readonly"]?.Val<int>(),
-                    NotEmpty = patch["NotEmpty"]?.Val<int>(),
-                    Unique = patch["Unique"]?.Val<int>(),
-                    Encrypt = patch["Encrypt"]?.Val<int>(),
-                    Sort = patch["Sort"]?.Val<int>(),
-                    FormWidth = patch["FormWidth"]?.Val<int?>(),
-                    TableWidth = patch["TableWidth"]?.Val<int>(),
-                    Placeholder = patch["Placeholder"].Val<string>(),
-                    DefaultValue = patch["DefaultValue"].Val<string>(),
-                    Tab = patch["Tab"].Val<string>(),
-                    Data = patch["Data"].Val<string>(),
-                    Config = patch["Config"].Val<string>(),
-                    Description = patch["Description"].Val<string>(),
-                    InTableEdit = patch["InTableEdit"]?.Val<int>(),
+                    Id = ReadMcpPatchValue<string>(patch, "Id"),
+                    TableId = ReadMcpPatchValue<string>(patch, "TableId"),
+                    TableName = ReadMcpPatchValue<string>(patch, "TableName"),
+                    Name = ReadMcpPatchValue<string>(patch, "Name"),
+                    Label = ReadMcpPatchValue<string>(patch, "Label"),
+                    Type = ReadMcpPatchValue<string>(patch, "Type"),
+                    Component = ReadMcpPatchValue<string>(patch, "Component"),
+                    Visible = ReadMcpPatchValue<int?>(patch, "Visible"),
+                    AppVisible = ReadMcpPatchValue<int?>(patch, "AppVisible"),
+                    Readonly = ReadMcpPatchValue<int?>(patch, "Readonly"),
+                    NotEmpty = ReadMcpPatchValue<int?>(patch, "NotEmpty"),
+                    Unique = ReadMcpPatchValue<int?>(patch, "Unique"),
+                    Encrypt = ReadMcpPatchValue<int?>(patch, "Encrypt"),
+                    Sort = ReadMcpPatchValue<int?>(patch, "Sort"),
+                    FormWidth = ReadMcpPatchValue<int?>(patch, "FormWidth"),
+                    TableWidth = ReadMcpPatchValue<int?>(patch, "TableWidth"),
+                    Placeholder = ReadMcpPatchValue<string>(patch, "Placeholder"),
+                    DefaultValue = ReadMcpPatchValue<string>(patch, "DefaultValue"),
+                    Tab = ReadMcpPatchValue<string>(patch, "Tab"),
+                    Data = ReadMcpPatchValue<string>(patch, "Data"),
+                    Config = ReadMcpPatchValue<string>(patch, "Config"),
+                    Description = ReadMcpPatchValue<string>(patch, "Description"),
+                    InTableEdit = ReadMcpPatchValue<int?>(patch, "InTableEdit"),
                     _InvokeType = InvokeType.Server.ToString()
                 };
 
@@ -7506,17 +7507,20 @@ namespace Microi.net
                     });
                     if (relationFieldResult.Code != 1 || relationFieldResult.Data == null)
                         return new DosResult<object>(0, null, "未找到字段，无法校验关系组件配置");
-                    var relationField = JObject.FromObject(relationFieldResult.Data);
+                    // Data is declared as dynamic.  Without the object cast this call itself is
+                    // dynamically dispatched, which then taints the following tuple result and
+                    // makes the runtime binder look for a non-existent ValueTuple.Ok member.
+                    JObject relationField = JObject.FromObject((object)relationFieldResult.Data);
                     var effectiveComponent = patch["Component"] != null
-                        ? patch["Component"].Val<string>()
-                        : relationField["Component"].Val<string>();
+                        ? ReadMcpPatchValue<string>(patch, "Component")
+                        : ReadMcpPatchValue<string>(relationField, "Component");
                     var effectiveConfig = patch["Config"] != null
-                        ? patch["Config"].Val<string>()
-                        : relationField["Config"].Val<string>();
-                    var relationCheck = await ValidateMcpFieldRelationAsync(
+                        ? ReadMcpPatchValue<string>(patch, "Config")
+                        : ReadMcpPatchValue<string>(relationField, "Config");
+                    (bool Ok, string Msg) relationCheck = await ValidateMcpFieldRelationAsync(
                         osClient,
-                        relationField["TableId"].Val<string>(),
-                        relationField["Name"].Val<string>(),
+                        ReadMcpPatchValue<string>(relationField, "TableId"),
+                        ReadMcpPatchValue<string>(relationField, "Name"),
                         effectiveComponent,
                         effectiveConfig);
                     if (!relationCheck.Ok) return new DosResult<object>(0, null, relationCheck.Msg);
@@ -7542,35 +7546,37 @@ namespace Microi.net
                         OsClient = osClient,
                         Id = fieldId
                     });
-                    return fieldLookup.Code == 1 && fieldLookup.Data != null ? JObject.FromObject(fieldLookup.Data) : null;
+                    return fieldLookup.Code == 1 && fieldLookup.Data != null
+                        ? JObject.FromObject((object)fieldLookup.Data)
+                        : null;
                 }
 
                 var existingField = await ResolveFieldModelAsync();
                 if (existingField == null) return new DosResult<object>(0, null, "未找到字段，无法更新字段属性");
-                p.Id = existingField["Id"].Val<string>();
-                p.TableId = existingField["TableId"].Val<string>();
-                p.Name = patch["Name"] != null ? p.Name : existingField["Name"].Val<string>();
-                p.Label = patch["Label"] != null ? p.Label : existingField["Label"].Val<string>();
-                p.Type = patch["Type"] != null ? p.Type : existingField["Type"].Val<string>();
-                p.Component = patch["Component"] != null ? p.Component : existingField["Component"].Val<string>();
-                p.Visible = patch["Visible"] != null ? p.Visible : existingField["Visible"]?.Val<int>();
-                p.AppVisible = patch["AppVisible"] != null ? p.AppVisible : existingField["AppVisible"]?.Val<int>();
-                p.Readonly = patch["Readonly"] != null ? p.Readonly : existingField["Readonly"]?.Val<int>();
-                p.NotEmpty = patch["NotEmpty"] != null ? p.NotEmpty : existingField["NotEmpty"]?.Val<int>();
-                p.Unique = patch["Unique"] != null ? p.Unique : existingField["Unique"]?.Val<int>();
-                p.Encrypt = patch["Encrypt"] != null ? p.Encrypt : existingField["Encrypt"]?.Val<int>();
-                p.Sort = patch["Sort"] != null ? p.Sort : existingField["Sort"]?.Val<int>();
-                p.FormWidth = patch["FormWidth"] != null ? p.FormWidth : existingField["FormWidth"]?.Val<int?>();
-                p.TableWidth = patch["TableWidth"] != null ? p.TableWidth : existingField["TableWidth"]?.Val<int>();
-                p.Placeholder = patch["Placeholder"] != null ? p.Placeholder : existingField["Placeholder"].Val<string>();
-                p.DefaultValue = patch["DefaultValue"] != null ? p.DefaultValue : existingField["DefaultValue"].Val<string>();
-                p.Tab = patch["Tab"] != null ? p.Tab : existingField["Tab"].Val<string>();
-                p.Data = patch["Data"] != null ? p.Data : existingField["Data"].Val<string>();
-                p.Config = patch["Config"] != null ? p.Config : existingField["Config"].Val<string>();
-                p.Description = patch["Description"] != null ? p.Description : existingField["Description"].Val<string>();
-                p.InTableEdit = patch["InTableEdit"] != null ? p.InTableEdit : existingField["InTableEdit"]?.Val<int>();
+                p.Id = ReadMcpPatchValue<string>(existingField, "Id");
+                p.TableId = ReadMcpPatchValue<string>(existingField, "TableId");
+                p.Name = patch["Name"] != null ? p.Name : ReadMcpPatchValue<string>(existingField, "Name");
+                p.Label = patch["Label"] != null ? p.Label : ReadMcpPatchValue<string>(existingField, "Label");
+                p.Type = patch["Type"] != null ? p.Type : ReadMcpPatchValue<string>(existingField, "Type");
+                p.Component = patch["Component"] != null ? p.Component : ReadMcpPatchValue<string>(existingField, "Component");
+                p.Visible = patch["Visible"] != null ? p.Visible : ReadMcpPatchValue<int?>(existingField, "Visible");
+                p.AppVisible = patch["AppVisible"] != null ? p.AppVisible : ReadMcpPatchValue<int?>(existingField, "AppVisible");
+                p.Readonly = patch["Readonly"] != null ? p.Readonly : ReadMcpPatchValue<int?>(existingField, "Readonly");
+                p.NotEmpty = patch["NotEmpty"] != null ? p.NotEmpty : ReadMcpPatchValue<int?>(existingField, "NotEmpty");
+                p.Unique = patch["Unique"] != null ? p.Unique : ReadMcpPatchValue<int?>(existingField, "Unique");
+                p.Encrypt = patch["Encrypt"] != null ? p.Encrypt : ReadMcpPatchValue<int?>(existingField, "Encrypt");
+                p.Sort = patch["Sort"] != null ? p.Sort : ReadMcpPatchValue<int?>(existingField, "Sort");
+                p.FormWidth = patch["FormWidth"] != null ? p.FormWidth : ReadMcpPatchValue<int?>(existingField, "FormWidth");
+                p.TableWidth = patch["TableWidth"] != null ? p.TableWidth : ReadMcpPatchValue<int?>(existingField, "TableWidth");
+                p.Placeholder = patch["Placeholder"] != null ? p.Placeholder : ReadMcpPatchValue<string>(existingField, "Placeholder");
+                p.DefaultValue = patch["DefaultValue"] != null ? p.DefaultValue : ReadMcpPatchValue<string>(existingField, "DefaultValue");
+                p.Tab = patch["Tab"] != null ? p.Tab : ReadMcpPatchValue<string>(existingField, "Tab");
+                p.Data = patch["Data"] != null ? p.Data : ReadMcpPatchValue<string>(existingField, "Data");
+                p.Config = patch["Config"] != null ? p.Config : ReadMcpPatchValue<string>(existingField, "Config");
+                p.Description = patch["Description"] != null ? p.Description : ReadMcpPatchValue<string>(existingField, "Description");
+                p.InTableEdit = patch["InTableEdit"] != null ? p.InTableEdit : ReadMcpPatchValue<int?>(existingField, "InTableEdit");
 
-                var relationUpdateCheck = await ValidateMcpFieldRelationAsync(
+                (bool Ok, string Msg) relationUpdateCheck = await ValidateMcpFieldRelationAsync(
                     osClient, p.TableId, p.Name, p.Component, p.Config);
                 if (!relationUpdateCheck.Ok) return new DosResult<object>(0, null, relationUpdateCheck.Msg);
 
@@ -7613,7 +7619,7 @@ namespace Microi.net
             try
             {
                 if (patch == null) return new DosResult<object>(0, null, "patch 不能为空");
-                if (string.IsNullOrWhiteSpace(patch["TableId"]?.Val<string>()))
+                if (string.IsNullOrWhiteSpace(ReadMcpPatchValue<string>(patch, "TableId")))
                 {
                     return new DosResult<object>(0, null, "TableId 不能为空");
                 }
@@ -7657,7 +7663,7 @@ namespace Microi.net
                     var componentToken = item["Component"] ?? item["component"];
                     var configToken = item["Config"] ?? item["config"];
                     if (componentToken == null && configToken == null) continue;
-                    var fieldId = item["Id"].Val<string>() ?? item["id"].Val<string>();
+                    var fieldId = ReadMcpPatchValue<string>(item, "Id") ?? ReadMcpPatchValue<string>(item, "id");
                     if (fieldId.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "FieldList 每项必须包含 Id");
                     var existingRelationFieldResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_field", new
                     {
@@ -7667,17 +7673,17 @@ namespace Microi.net
                     });
                     if (existingRelationFieldResult.Code != 1 || existingRelationFieldResult.Data == null)
                         return new DosResult<object>(0, null, $"未找到字段 {fieldId}，无法校验关系组件配置");
-                    var existingRelationField = JObject.FromObject(existingRelationFieldResult.Data);
+                    JObject existingRelationField = JObject.FromObject((object)existingRelationFieldResult.Data);
                     var effectiveComponent = componentToken != null
-                        ? componentToken.Val<string>()
-                        : existingRelationField["Component"].Val<string>();
+                        ? componentToken.ToObject<string>()
+                        : ReadMcpPatchValue<string>(existingRelationField, "Component");
                     var effectiveConfig = configToken != null
-                        ? configToken.Val<string>()
-                        : existingRelationField["Config"].Val<string>();
-                    var relationCheck = await ValidateMcpFieldRelationAsync(
+                        ? configToken.ToObject<string>()
+                        : ReadMcpPatchValue<string>(existingRelationField, "Config");
+                    (bool Ok, string Msg) relationCheck = await ValidateMcpFieldRelationAsync(
                         osClient,
-                        existingRelationField["TableId"].Val<string>(),
-                        existingRelationField["Name"].Val<string>(),
+                        ReadMcpPatchValue<string>(existingRelationField, "TableId"),
+                        ReadMcpPatchValue<string>(existingRelationField, "Name"),
                         effectiveComponent,
                         effectiveConfig);
                     if (!relationCheck.Ok) return new DosResult<object>(0, null, relationCheck.Msg);
@@ -7713,7 +7719,7 @@ namespace Microi.net
                     var updateCount = 0;
                     foreach (var item in fieldList)
                     {
-                        var fieldId = item["Id"].Val<string>() ?? item["id"].Val<string>();
+                        var fieldId = ReadMcpPatchValue<string>(item, "Id") ?? ReadMcpPatchValue<string>(item, "id");
                         if (fieldId.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "FieldList 每项必须包含 Id");
                         var directPatch = new JObject
                         {
