@@ -48,3 +48,28 @@ test('Chanjet callback resource policies prevent managed drift and preserve tena
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
     'ApiEngine:platform-chanjet-callback-v2@v1.0.0'));
 });
+
+test('Chanjet callback settings are tenant-private and disabled by default', () => {
+  const settingsDataSet = packageModel.DataSets.find(
+    item => String(item.TableName).toLowerCase() === 'mci_system_setting');
+  assert.ok(settingsDataSet);
+  assert.equal(settingsDataSet.ConflictPolicy, 'InsertIfMissing');
+  const rows = new Map(settingsDataSet.Rows.map(row => [row.ConfigKey, row]));
+  const enabled = rows.get('Integration.Chanjet.CallbackV2.Enabled');
+  assert.equal(enabled.ConfigValue, 'false');
+  assert.equal(enabled.IsPublic, 0);
+  assert.equal(enabled.IsSecret, 0);
+  assert.equal(enabled.IsEnabled, 0);
+  for (const key of [
+    'Integration.Chanjet.CallbackV2.AesKey',
+    'Integration.Chanjet.CallbackV2.AppKeys',
+  ]) {
+    const setting = rows.get(key);
+    assert.ok(setting);
+    assert.equal(setting.ConfigValue, '');
+    assert.equal(setting.SecretCipher, '');
+    assert.equal(setting.IsPublic, 0);
+    assert.equal(setting.IsSecret, 1);
+    assert.equal(setting.IsEnabled, 0);
+  }
+});
