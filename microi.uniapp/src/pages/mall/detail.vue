@@ -38,8 +38,18 @@
         </view>
       </view>
 
+      <view class="points-section" v-if="isPointsProduct">
+        <view class="points-main"><text class="points-big">{{ pointsPrice }}</text><text class="points-unit">积分</text></view>
+        <text class="points-caption">积分兑换价</text>
+        <view class="points-balance">
+          <text>我的可用积分</text>
+          <text v-if="pointsBalanceLoading">查询中...</text>
+          <text v-else>{{ pointsBalance }} 积分</text>
+        </view>
+      </view>
+
       <!-- 价格信息 - 买断/滤芯价格 -->
-      <view class="price-section">
+      <view class="price-section" v-else>
         <view class="price-main-row">
           <text class="price-type-label" v-if="product.ShangpinLX === '设备'">{{ t('mall.purchasePrice') }}</text>
           <text class="price-type-label" v-else>{{ t('mall.replaceFilter') }}</text>
@@ -73,7 +83,7 @@
       </view>
 
       <!-- 租赁价格卡片 -->
-      <view class="lease-card" v-if="product.ZulinXJ">
+      <view class="lease-card" v-if="!isPointsProduct && product.ZulinXJ">
         <view class="lease-title-row">
           <text class="lease-title">{{ t('mall.leasePrice') }}</text>
         </view>
@@ -191,8 +201,8 @@
         <text class="bar-icon">{{ isFavorited ? '★' : '☆' }}</text>
         <text class="bar-label">{{ isFavorited ? t('mall.favorited') : t('mall.favorite') }}</text>
       </view>
-      <view class="bar-btn" :style="{ background: themeGradient }" @tap="handleReserve">
-        <text>{{ t('mall.bookNow') }}</text>
+      <view class="bar-btn" :style="{ background: themeGradient }" @tap="handlePrimaryAction">
+        <text>{{ isPointsProduct ? '立即兑换' : t('mall.bookNow') }}</text>
       </view>
     </view>
 
@@ -200,7 +210,7 @@
     <view class="popup-mask" v-if="showReservePopup" @tap="showReservePopup = false">
       <view class="popup-content" @tap.stop>
         <view class="popup-header">
-          <text class="popup-title">{{ t('mall.bookProduct') }}</text>
+          <text class="popup-title">{{ isPointsProduct ? '确认积分兑换' : t('mall.bookProduct') }}</text>
           <text class="popup-close" @tap="showReservePopup = false">✕</text>
         </view>
         <view class="popup-body">
@@ -220,10 +230,18 @@
             <text class="form-label">{{ t('mall.phone') }}</text>
             <input class="form-input" v-model="reserveForm.phone" :placeholder="t('mall.enterPhone')" type="number" maxlength="11" />
           </view>
+          <view class="form-item form-item--textarea" v-if="isPointsProduct">
+            <text class="form-label">收货地址</text>
+            <textarea class="form-textarea" v-model="reserveForm.address" placeholder="请输入完整收货地址" maxlength="500" />
+          </view>
+          <view class="form-item form-item--textarea" v-if="isPointsProduct">
+            <text class="form-label">兑换备注</text>
+            <textarea class="form-textarea" v-model="reserveForm.remark" placeholder="选填，如颜色、规格等" maxlength="500" />
+          </view>
         </view>
         <view class="popup-footer">
           <view class="popup-submit-btn" :style="{ background: themeGradient }" @tap="submitReserve">
-            <text>{{ t('mall.confirmBook') }}</text>
+            <text>{{ submitting ? '提交中...' : isPointsProduct ? `确认使用 ${redeemTotal} 积分` : t('mall.confirmBook') }}</text>
           </view>
         </view>
       </view>
@@ -249,8 +267,9 @@
 </template>
 
 <script>
-import { getProductDetail, getProductDynamicInfo, parseImages, getImageUrl, checkFavorite, toggleFavorite, reserveProduct } from '@/utils/api.js'
-import { getToken } from '@/utils/request.js'
+import { getProductDetail, getProductDynamicInfo, parseImages, getImageUrl, checkFavorite, toggleFavorite, reserveProduct, getPointsBalance, redeemPointsProduct } from '@/utils/api.js'
+import { getToken, getUser } from '@/utils/request.js'
+import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { filterProductParameterFields, formatProductParameterValue } from './product-params.mjs'
 
@@ -272,9 +291,26 @@ export default {
       reserveForm: {
         num: 1,
         name: '',
-        phone: ''
+        phone: '',
+        address: '',
+        remark: ''
       },
-      submitting: false
+      submitting: false,
+      pointsBalance: 0,
+      pointsBalanceLoading: false,
+      redeemRequestId: ''
+    }
+  },
+
+  computed: {
+    isPointsProduct() {
+      return Boolean(appConfig.features && appConfig.features.pointsMall) && Number(this.product && this.product.JifenDH || 0) > 0
+    },
+    pointsPrice() {
+      return Math.max(0, Math.floor(Number(this.product && this.product.JifenDH || 0)))
+    },
+    redeemTotal() {
+      return this.pointsPrice * Math.max(1, Math.floor(Number(this.reserveForm.num || 1)))
     }
   },
 
@@ -312,6 +348,7 @@ export default {
           this.product = res.Data
           this.images = parseImages(res.Data.Tupian)
           this.caseImages = parseImages(res.Data.Anli)
+          if (Number(res.Data.JifenDH || 0) > 0 && getToken()) this.loadPointsBalance()
         }
       } catch (e) {
         console.error('[Mall Detail] loadDetail error:', e)
@@ -401,7 +438,35 @@ export default {
     // 预约
     handleReserve() {
       if (!this.checkLogin()) return
+      const user = getUser() || {}
+      if (!this.reserveForm.name) this.reserveForm.name = user.Name || user.Account || ''
+      if (!this.reserveForm.phone) this.reserveForm.phone = user.Phone || ''
       this.showReservePopup = true
+    },
+
+    handlePrimaryAction() {
+      if (this.isPointsProduct) return this.handleRedeem()
+      return this.handleReserve()
+    },
+
+    async loadPointsBalance() {
+      if (!getToken() || this.pointsBalanceLoading) return
+      this.pointsBalanceLoading = true
+      try {
+        const result = await getPointsBalance()
+        if (result && Number(result.Code) === 1) this.pointsBalance = Number(result.Data && result.Data.Balance || 0)
+      } catch (error) {
+        console.log('[Points Mall] balance:', error.message)
+      } finally {
+        this.pointsBalanceLoading = false
+      }
+    },
+
+    handleRedeem() {
+      if (!this.checkLogin()) return
+      if (!this.redeemRequestId) this.redeemRequestId = `mp:${Date.now()}:${Math.random().toString(36).slice(2, 12)}`
+      this.handleReserve()
+      this.loadPointsBalance()
     },
 
     // 提交预约
@@ -414,24 +479,56 @@ export default {
         uni.showToast({ title: this.t('mall.enterCorrectPhone'), icon: 'none' })
         return
       }
+      if (this.isPointsProduct && (!this.reserveForm.address || this.reserveForm.address.trim().length < 5)) {
+        uni.showToast({ title: '请输入完整收货地址', icon: 'none' })
+        return
+      }
       if (this.submitting) return
+      if (this.isPointsProduct) {
+        if (this.redeemTotal > this.pointsBalance) {
+          uni.showToast({ title: `积分不足，当前可用 ${this.pointsBalance} 积分`, icon: 'none' })
+          return
+        }
+        const confirmed = await new Promise((resolve) => uni.showModal({
+          title: '确认兑换',
+          content: `本次将使用 ${this.redeemTotal} 积分兑换 ${this.reserveForm.num} 件商品，提交后由工作人员处理。`,
+          confirmText: '确认兑换',
+          success: (result) => resolve(Boolean(result.confirm)),
+          fail: () => resolve(false)
+        }))
+        if (!confirmed) return
+      }
       this.submitting = true
       try {
-        const res = await reserveProduct({
-          ShangpinID: this.productId,
-          Xingming: this.reserveForm.name,
-          Dianhua: this.reserveForm.phone,
-          Shuliang: this.reserveForm.num
-        })
+        const res = this.isPointsProduct
+          ? await redeemPointsProduct({
+            ProductId: this.productId,
+            Quantity: this.reserveForm.num,
+            RecipientName: this.reserveForm.name.trim(),
+            RecipientPhone: this.reserveForm.phone,
+            Address: this.reserveForm.address.trim(),
+            Remark: this.reserveForm.remark.trim(),
+            RequestId: this.redeemRequestId
+          })
+          : await reserveProduct({
+            ShangpinID: this.productId,
+            Xingming: this.reserveForm.name,
+            Dianhua: this.reserveForm.phone,
+            Shuliang: this.reserveForm.num
+          })
         if (res.Code === 1) {
-          uni.showToast({ title: '预约成功', icon: 'success' })
+          uni.showToast({ title: this.isPointsProduct ? '兑换成功' : '预约成功', icon: 'success' })
           this.showReservePopup = false
-          this.reserveForm = { num: 1, name: '', phone: '' }
+          this.reserveForm = { num: 1, name: '', phone: '', address: '', remark: '' }
+          if (this.isPointsProduct) {
+            this.pointsBalance = Number(res.Data && res.Data.Balance || 0)
+            this.redeemRequestId = ''
+          }
         } else {
-          uni.showToast({ title: res.Msg || '预约失败', icon: 'none' })
+          uni.showToast({ title: res.Msg || (this.isPointsProduct ? '兑换失败' : '预约失败'), icon: 'none' })
         }
       } catch (e) {
-        uni.showToast({ title: '预约失败', icon: 'none' })
+        uni.showToast({ title: this.isPointsProduct ? '兑换提交失败，请重试' : '预约失败', icon: 'none' })
       } finally {
         this.submitting = false
       }
@@ -580,6 +677,23 @@ export default {
 }
 
 /* 价格区域 */
+.points-section {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx 18rpx;
+  padding: 28rpx 30rpx;
+  margin-bottom: 2rpx;
+  background: linear-gradient(135deg, #fff8e8, #fff);
+}
+
+.points-main { display: flex; align-items: baseline; color: #b85f00; }
+.points-big { font-size: 58rpx; font-weight: 750; }
+.points-unit { margin-left: 6rpx; font-size: 25rpx; font-weight: 650; }
+.points-caption { color: #936b37; font-size: 23rpx; }
+.points-balance { display: flex; justify-content: space-between; width: 100%; padding-top: 16rpx; border-top: 1rpx dashed #edd5a9; color: #6f604a; font-size: 24rpx; }
+.points-balance text:last-child { color: #a75600; font-weight: 700; }
+
 .price-section {
   background: linear-gradient(135deg, #fff5f5, #fff);
   padding: 28rpx 30rpx;
@@ -1047,6 +1161,21 @@ export default {
   &:last-child {
     border-bottom: none;
   }
+}
+
+.form-item--textarea {
+  align-items: flex-start;
+}
+
+.form-textarea {
+  flex: 1;
+  min-height: 112rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 10rpx;
+  background: #f6f8f9;
+  color: #333;
+  font-size: 26rpx;
+  box-sizing: border-box;
 }
 
 .form-label {

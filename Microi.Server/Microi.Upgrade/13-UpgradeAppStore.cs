@@ -20,7 +20,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "7.6.12.0";
+        public static string Version = "7.6.13.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -112,7 +112,7 @@ namespace Microi.net
         // 受信任核心导入器提升到平台既有 8GB 累计分配硬上限；进程常驻内存保护仍生效，
         // 普通接口引擎不受影响，5GB 运行资产继续走 HDFS multipart 而不进入 Jint。
         private const int ImporterLimitMemoryMb = 8192;
-        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 7, 1);
+        private static readonly System.Version MinimumPinnedImporterVersion = new System.Version(2, 7, 2);
         private static readonly System.Version MinimumPinnedBulkVersion = new System.Version(1, 3, 8);
         private static readonly System.Version MinimumPlatformBackgroundTaskVersion = new System.Version(1, 1, 0);
         private static readonly System.Version MinimumPlatformSysMenuVersion = new System.Version(1, 0, 1);
@@ -322,6 +322,7 @@ namespace Microi.net
                 && code.Contains("PACKAGE_API_ENGINE_IDENTITY_RECONCILIATION_V2")
                 && code.Contains("PACKAGE_API_ENGINE_ROUTE_RECLAIM_V1")
                 && code.Contains("PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1")
+                && code.Contains("MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1")
                 && code.Contains("PAGE_ENGINE_OPTIONAL_REFERENCE_V1")
                 && code.Contains("V8.Method.RequireManagedProtocolContext");
         }
@@ -1247,6 +1248,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
                     !code.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1") ||
                     !code.Contains("PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1") ||
+                    !code.Contains("MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1") ||
                     !code.Contains("PAGE_ENGINE_OPTIONAL_REFERENCE_V1"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
@@ -3111,6 +3113,7 @@ WHERE {idColumn}=@p0");
                     !content.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
                     !content.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1") ||
                     !content.Contains("PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1") ||
+                    !content.Contains("MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1") ||
                     !content.Contains("PAGE_ENGINE_OPTIONAL_REFERENCE_V1"))
                 {
                     return $"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。";
@@ -3374,6 +3377,7 @@ WHERE {idColumn}=@p0");
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1") ||
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_DB_TIME_V1") ||
                     !importerEngineCode.Contains("PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1") ||
+                    !importerEngineCode.Contains("MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1") ||
                     !importerEngineCode.Contains("PAGE_ENGINE_OPTIONAL_REFERENCE_V1") ||
                     !importerEngineCode.Contains("POST_SCHEMA_MICROSERVICE_BINDING_RESTORE_V1") ||
                     !importerEngineCode.Contains("PACKAGE_BOUND_MICROSERVICE_MENU_V1") ||

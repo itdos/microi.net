@@ -62,7 +62,7 @@ V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
 - API 启动配置只有十项白名单：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。除这十项外，部署/节点级运行参数与基础设施秘密从主控 `sys_osclients` 读取；允许子租户自行维护且需要浏览器判断的业务开关、入口显示和公开交互配置使用该租户 `sys_config` 实体字段，OAuth/第三方集成的凭据、RP/Origin/Issuer/Scope 与仅后端参数使用 `mci_system_setting`，未配置时使用代码安全默认值。官方 License 恢复次数/间隔与固定私钥挂载 `/app/microi_private.pem` 是信任链例外。禁止再增加 `MICROI_*`、`DOS_ORM_*`、自定义 `AppSettings` 节点或动态名称的环境变量读取。节点身份由平台自动生成。
 - 存量畅捷通/微信 OAuth C# 协议网关有一组已发布到 SaaS 引擎的兼容字段：`OAuthReturnUrlOrigins`、`ChanjetOAuthState`、`ChanjetAesKey`、`ChanjetAppKey`、`WeChatTemplateAppId`、`WeChatTemplateAppSecret`、`WeChatTemplateId`、`WeChatMiniProgramAppId`。只能通过 Core 的租户绑定协议设置原子按请求权威 `OsClient` 读取，禁止使用主租户 `ConfigHelper` RuntimeConfigurationReader；整组字段不得复制给新租户，其中 OAuthState/AES Key/AppKey/AppSecret 不得进入 `V8.OsClientModel` 或前端投影且必须在审计中掩码。新集成不得继续扩展该兼容集合，仍使用当前租户 `mci_system_setting` + Managed ApiEngine。
 - `ASPNETCORE_*`、`DOTNET_*` 仅用于 .NET 宿主；构建、安装、测试、MCP、发布脚本可使用自身进程变量，但 API 生产代码不得把它们当业务配置。新增 SaaS 运行字段必须配套独立或既有 Tab、幂等升级、缓存刷新、敏感字段脱敏、子租户不继承和源码扫描测试。
-- 文件上传的租户业务开关与额度按“当前租户 `sys_osclients` → 代码默认值”解析；平台固定灾难保护、HTTP/Multipart/Form 和反向代理上限不可由租户覆盖，也不要求安装者维护额外上传环境变量。
+- 文件上传的租户业务开关与额度按“当前租户 `sys_osclients` → 代码默认值”解析；现行负向字段 `DisableFileUpload` 默认关闭/空值即允许上传，只有 `1/true` 才禁止。旧 `FileUploadEnabled` 只在新物理字段尚不存在的滚动升级节点回退读取，并须在新版 SaaS 表单隐藏。平台固定灾难保护、HTTP/Multipart/Form 和反向代理上限不可由租户覆盖，也不要求安装者维护额外上传环境变量。
 - 类似 MQTT 端口、PressureGuard、V8Limits、OrmLimits、StartupLimits、SecurityGuard 这类影响整进程资源的配置，不能让每个子租户各自抬高全局上限。子租户同名隔离字段只能降低自己的并发、等待时间或资源额度，用于隔离弱租户、试用租户或异常租户。
 - 修改 `sys_osclients` 的表、字段、数据源或配置值后，必须刷新 SaaS 引擎运行缓存，并回读验证字段 `Component`、`Data`、`Config`、实际数据值和前端真实消费结果。不要只看 MCP 写入成功。
 - SaaS 配置只在启动、管理员保存 `sys_osclients` 或显式租户刷新时发布到共享 Redis。初始化数据库会话、创建 `V8.Dbs` 运行态对象、普通 FormEngine 请求和表单设计器保存不得冒充配置变更反复发布。
@@ -110,6 +110,20 @@ GET /apiengine/get-products--OsClient--tenant_demo--OsClientType--App--
 - 不把数据库、认证、Redis、存储、MQ/MQTT、搜索等连接与密钥投影进 V8；
 - 每次操作写安全审计、幂等键和补偿状态，并对目标租户回读验收；
 - 多节点部署使用共享租约和业务幂等，不能依赖进程静态锁。
+
+### SaaS 数据库 ZIP 开库的进度与租约
+
+通过 SaaS 引擎上传数据库 ZIP 创建租户时，必须把上传和还原建模为两个独立阶段：
+
+- 上传使用分片会话并显示真实字节进度；暂停或网络中断后复用同一文件指纹续传，不能把上传百分比冒充数据库导入进度。
+- 上传完成后提交平台持久后台任务。租户开通进度总数使用后端共享契约的固定 13 步，接口引擎、可信宿主原子和前端不得各自维护不同分母。
+- 第 2 步是数据库 ZIP 校验与还原。该阶段应按真实 SQL 读取量推进总百分比，并显示已读取/总字节、SQL 百分比、已执行语句数、当前批次与语句类型、平均吞吐和动态预计剩余时间；不能长时间只显示静态的 `2 / 13`。
+- 进度状态仅在距上次更新约 2 秒或新增约 16MB 数据时刷新；执行日志只记录阶段里程碑和 SQL 每跨过约 5% 的进度，前端只渲染最近 200 条。禁止按 SQL 行或每条语句推送日志，避免几十万条数据把共享任务表、SignalR 或浏览器 DOM 拖垮。
+- 页面同时显示服务端心跳。单个百分比短时不变不等于卡死，应综合心跳、字节、语句数、批次和消息判断；失败、取消或中断必须保留最后真实进度和错误原因，只有成功终态才算开库完成。
+
+租户开库使用平台可信后台上下文中的可续租共享锁：`Timeout` 是单次 Redis 租期，当前开库最长保护边界为 12 小时。普通 HTTP/V8 请求传入 `_BackgroundTaskId`、`_TrustedServerInvocation` 或伪造用户对象不能开启续租。持有者令牌不匹配、锁过期、Redis 所有权/续租确认失败或达到最长租约都必须失败关闭并停止推进；不能为了避免报错而把真实锁丢失降级成成功或 Warning。
+
+自动续租只解决“正常长任务不因短 TTL 自然过期”，不能代替业务幂等、检查点、补偿状态和 fencing token。大库导入完成但域名绑定未完成时，应保留已经成功创建的租户和数据库，进入明确的域名补偿状态；不能因数据面域名失败重新导入整个数据库。接口引擎的通用锁配置读取 `../v8-api-config/SKILL.md`，长任务按钮和检查点读取 `../v8-menu-buttons/references/progressive-02-8-模式-f-后台任务按钮-长任务.md`。
 
 ## 缓存按租户隔离
 
@@ -195,6 +209,8 @@ SELECT * FROM Contact WHERE OwnerId = $CurrentUser.Id$ AND Spouse = $CurrentUser
 - [ ] 子租户数据库账号只授权本租户库，MQ/MQTT/Search 独立凭据已真实创建
 - [ ] 文件、队列、Topic、索引均由服务端规范为当前租户命名空间
 - [ ] 无扩展库租户重复执行 V8 时不会重复刷新 SaaS 配置；真实 `sys_osclients` 保存后各节点能按租户失效并回源
+- [ ] ZIP 开库区分上传与还原进度，使用固定 13 步、低频明细、服务端心跳和有界日志
+- [ ] 开库锁只由可信持久后台任务自动续租；真实租约丢失失败关闭，所有副作用仍具备幂等、检查点和 fencing token
 
 ## Microi.AI 中转站租户凭据
 

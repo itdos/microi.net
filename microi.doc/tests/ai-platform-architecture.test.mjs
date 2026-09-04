@@ -22,6 +22,7 @@ const manifestPath = resolve(imagesRoot, 'microi-ai-platform-architecture.manife
 const sourceHash = createHash('sha256').update(JSON.stringify(architectureData)).digest('hex')
 
 const sha256 = buffer => createHash('sha256').update(buffer).digest('hex')
+const normalizeTextEol = text => text.replace(/\r\n/gu, '\n')
 
 test('架构图以 V8引擎为唯一运行核心并覆盖平台关键能力', async () => {
   const [generator, dataSource, svg] = await Promise.all([
@@ -72,8 +73,11 @@ test('资产清单锁定数据源哈希、尺寸和每个输出文件内容', as
   assert.equal(manifest.outputs.length, 3)
   for (const output of manifest.outputs) {
     const file = await readFile(resolve(imagesRoot, output.file))
-    assert.equal(output.bytes, file.length)
-    assert.equal(output.sha256, sha256(file))
+    const canonicalFile = output.format === 'svg'
+      ? Buffer.from(normalizeTextEol(file.toString('utf8')), 'utf8')
+      : file
+    assert.equal(output.bytes, canonicalFile.length)
+    assert.equal(output.sha256, sha256(canonicalFile))
   }
 })
 
@@ -82,9 +86,9 @@ test('README 与官网首页共享同一份机器可读能力索引和架构图�
     readFile(resolve(docsRoot, 'docs/doc/index.md'), 'utf8'),
     readFile(resolve(workspaceRoot, 'README.md'), 'utf8')
   ])
-  const generatedMarkdown = buildArchitectureMarkdown(sourceHash)
-  assert.ok(index.includes(generatedMarkdown))
-  assert.ok(readme.includes(generatedMarkdown))
+  const generatedMarkdown = normalizeTextEol(buildArchitectureMarkdown(sourceHash))
+  assert.ok(normalizeTextEol(index).includes(generatedMarkdown))
+  assert.ok(normalizeTextEol(readme).includes(generatedMarkdown))
   assert.equal((index.match(/MICROI_ARCHITECTURE_CAPABILITIES:START/g) || []).length, 1)
   assert.equal((readme.match(/MICROI_ARCHITECTURE_CAPABILITIES:START/g) || []).length, 1)
   assert.match(index, /!\[[^\]]*架构图[^\]]*\]\(\/images\/microi-ai-platform-architecture\.svg\)/)
