@@ -198,9 +198,9 @@ function externalDomainBindingFixture(options = {}) {
 
 test('official package owns the automatic and manual tenant upgrade lifecycle', () => {
   assert.equal(tenantProvisioningTotalSteps, 13);
-  assert.equal(packageModel.PackageInfo.Version, 'v7.8.23');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.8.26');
   assert.equal(packageModel.PackageInfo.ChangeLog.Version, packageModel.PackageInfo.Version);
-  assert.equal(storePackage.PackageInfo.Version, 'v7.9.19');
+  assert.equal(storePackage.PackageInfo.Version, 'v7.9.21');
   assert.equal(storePackage.PackageInfo.ChangeLog.Version, storePackage.PackageInfo.Version);
   assert.equal(packageModel.PackageInfo.ApiEngineCount, 70);
   assert.equal(engines.size, 70);

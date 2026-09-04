@@ -2,6 +2,19 @@
 
 Microi吾码当前有多种“流程”能力。它们解决的问题不同，不能都当作审批流使用。
 
+## 📸 预览图
+
+<div class="mci-doc-screenshot-grid">
+  <figure>
+    <img src="/images/product-screenshots/ai-workflow-relationship-graph.jpg" alt="Microi吾码 AI 工作流系统关系图，展示菜单、数据表、接口和流程之间的关联" data-fancybox="ai-workflow-suite-preview">
+    <figcaption>系统关系图：按资源类型探索当前租户的菜单、数据表、接口与流程依赖。</figcaption>
+  </figure>
+  <figure>
+    <img src="/images/product-screenshots/ai-workflow-designer.jpg" alt="Microi吾码 AI 工作流设计器，展示业务节点、数据表、接口引擎和质量门禁编排" data-fancybox="ai-workflow-suite-preview">
+    <figcaption>业务流程设计：通过可视化节点编排数据、AI 生成、质量门禁与发布步骤。</figcaption>
+  </figure>
+</div>
+
 | 能力 | 解决的问题 | 核心数据/源码 |
 |---|---|---|
 | 审批工作流 v4 | 人员审批、会签、退回、抄送、条件路线 | `wf_flowdesign`、`wf_node`、`wf_line`；`Microi.Client/src/views/workflow/` |

@@ -371,10 +371,56 @@ public class SecurityGuardAndSysUserRegressionTests
         var append = JObject.FromObject(result.DataAppend);
 
         Assert.Equal(0, result.Code);
-        Assert.Contains("FileUploadEnabled", result.Msg);
+        Assert.Contains("关闭文件上传", result.Msg);
+        Assert.Contains("DisableFileUpload", result.Msg);
         Assert.Equal("TenantFileUploadDisabled", append["ErrorType"]?.Value<string>());
-        Assert.Equal("FileUploadEnabled", append["ConfigField"]?.Value<string>());
+        Assert.Equal("DisableFileUpload", append["ConfigField"]?.Value<string>());
+        Assert.Equal(0, append["ExpectedValue"]?.Value<int>());
+        Assert.Equal("FileUploadEnabled", append["LegacyConfigField"]?.Value<string>());
         Assert.True(append["DefaultEnabled"]?.Value<bool>());
+    }
+
+    [Fact]
+    public void FileUploadDisableSwitch_IsVersionedNullableAndMarketplaceAligned()
+    {
+        var root = FindRepositoryRoot();
+        var migration = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "35-UpgradeFileUploadDisableSwitch.cs"));
+        var upgrade = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
+        var coordinator = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "TenantUpgradeCoordinator.cs"));
+        var package = JObject.Parse(File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Resource", "app.microi.saas-engine.json")));
+
+        Assert.Contains("public static string Version = \"6.9.9.1\"", migration);
+        Assert.Contains("new Upgrade35().Run", upgrade);
+        Assert.Contains("Upgrade35-文件上传负向开关", coordinator);
+        Assert.DoesNotContain("UPDATE sys_osclients SET FileUploadEnabled", migration);
+        Assert.DoesNotContain("UPDATE sys_osclients SET DisableFileUpload", migration);
+
+        Assert.Equal("v7.8.26", package["PackageInfo"]?["Version"]?.Value<string>());
+        var fields = package["DiyFields"]!.Values<JObject>().ToList();
+        var disableField = fields.Single(item =>
+            item["TableName"]?.Value<string>() == "sys_osclients"
+            && item["Name"]?.Value<string>() == "DisableFileUpload");
+        var legacyField = fields.Single(item =>
+            item["TableName"]?.Value<string>() == "sys_osclients"
+            && item["Name"]?.Value<string>() == "FileUploadEnabled");
+        Assert.Equal("关闭文件上传", disableField["Label"]?.Value<string>());
+        Assert.Equal(1, disableField["Visible"]?.Value<int>());
+        Assert.Null(disableField["DefaultValue"]);
+        Assert.Equal(0, legacyField["Visible"]?.Value<int>());
+        Assert.Equal(0, legacyField["AppVisible"]?.Value<int>());
+        Assert.Equal(1, legacyField["Readonly"]?.Value<int>());
+
+        var columns = package["PhysicalColumns"]!.Values<JObject>().ToList();
+        Assert.Single(columns, item =>
+            item["TABLE_NAME"]?.Value<string>() == "sys_osclients"
+            && item["COLUMN_NAME"]?.Value<string>() == "DisableFileUpload");
+        var ddl = package["DDLStatements"]!.Values<JObject>().Single(item =>
+            item["TableName"]?.Value<string>() == "sys_osclients")["DDL"]?.Value<string>();
+        Assert.Contains("`DisableFileUpload` int NULL COMMENT '关闭文件上传'", ddl);
     }
 
     private static string FindRepositoryRoot()

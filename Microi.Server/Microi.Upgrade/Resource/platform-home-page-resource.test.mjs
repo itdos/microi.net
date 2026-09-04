@@ -41,7 +41,7 @@ test('PAGE5 starts with the shared AI composer and contains the complete operati
 });
 
 test('SaaS package delivers PAGE5 by stable-id upsert and declares its client/runtime dependencies', () => {
-  assert.equal(packageModel.PackageInfo.Version, 'v7.8.24');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.8.26');
   const dataSets = packageModel.DataSets.filter(item => (
     String(item.TableName || '').toLowerCase() === 'mic_page'
   ));

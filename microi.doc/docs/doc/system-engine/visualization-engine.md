@@ -2,6 +2,15 @@
 
 Microi吾码提供多条可视化路线。界面引擎、报表引擎、go-view 大屏、Three.js 3D 场景和 CAD 预览各有边界，不需要把所有需求都做成一套重型设计器。
 
+## 📸 预览图
+
+<div class="mci-doc-screenshot-grid mci-doc-screenshot-grid--single">
+  <figure>
+    <img src="/images/product-screenshots/visualization-engine-unity-dashboard.jpg" alt="Microi吾码数据大屏设计器，展示可视化组件库、图层、Unity 3D 场景和属性配置" data-fancybox="visualization-engine-preview">
+    <figcaption>数据大屏设计器：将图表、图片、数据组件与 Unity WebGL 场景组合到同一块可视化画布。</figcaption>
+  </figure>
+</div>
+
 ## 能力选择
 
 | 需求 | 推荐能力 | 数据来源 |

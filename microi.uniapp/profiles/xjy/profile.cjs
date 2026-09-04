@@ -57,6 +57,8 @@ module.exports = {
       dynamicModules: false,
       invitations: true,
       mall: true,
+      pointsMall: true,
+      casebookPdf: true,
       messages: true,
       news: true,
       scan: true,

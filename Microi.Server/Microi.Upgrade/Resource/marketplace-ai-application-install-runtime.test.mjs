@@ -17,14 +17,16 @@ test('application-store package embeds package-aware installation and immediate 
 
   const importerEngine = engines.get('import-microi-store-package');
   const listEngine = engines.get('get-microi-store');
-  assert.equal(importerEngine?.Version, 'v2.7.2');
+  assert.equal(importerEngine?.Version, 'v2.7.3');
   assert.equal(listEngine?.Version, 'v1.4.9');
   assert.equal(normalize(importerEngine?.ApiV8Code), normalize(importer));
   assert.equal(normalize(listEngine?.ApiV8Code), normalize(storeList));
 
   for (const fieldName of ['RequiredPlatformCapabilities', 'Capabilities']) {
     const capabilities = packageModel.PackageInfo[fieldName] || [];
-    assert.ok(capabilities.includes('ApiEngine:import-microi-store-package@v2.7.2'));
+    assert.ok(capabilities.includes('ApiEngine:import-microi-store-package@v2.7.3'));
+    assert.ok(capabilities.includes('Importer:AllRoleMenuReadGrantV1'));
+    assert.ok(capabilities.includes('Importer:MarketplaceChangelogTenantCollisionRepairV1'));
     assert.ok(capabilities.includes('ApiEngine:get-microi-store-model@v1.4.0'));
     assert.ok(capabilities.includes('ApiEngine:get-microi-store@v1.4.9'));
     assert.ok(capabilities.includes('ApiEngine:get-microi-store@v1.4.8'));
@@ -38,7 +40,7 @@ test('application-store package embeds package-aware installation and immediate 
     assert.ok(capabilities.includes('ClientFeature:MarketplaceMenuRefreshV1'));
     assert.ok(capabilities.includes('Importer:PhysicalNotNullTenantBackfillV1'));
     assert.ok(capabilities.includes('Importer:PageEngineOptionalReferenceV1'));
-    assert.ok(!capabilities.some(item => /^ApiEngine:import-microi-store-package@(?!v2\.7\.2$)/.test(item)));
+    assert.ok(!capabilities.some(item => /^ApiEngine:import-microi-store-package@(?!v2\.7\.3$)/.test(item)));
     assert.ok(!capabilities.some(item => /^ApiEngine:get-microi-store@(?!v1\.4\.(?:8|9)$)/.test(item)));
   }
 });
@@ -46,6 +48,7 @@ test('application-store package embeds package-aware installation and immediate 
 test('installer and list engines carry executable repair markers', () => {
   assert.match(importer, /PUBLIC_APPLICATION_ENTRY_URL_V1/);
   assert.match(importer, /PHYSICAL_NOT_NULL_TENANT_BACKFILL_V1/);
+  assert.match(importer, /MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1/);
   assert.match(importer, /PAGE_ENGINE_OPTIONAL_REFERENCE_V1/);
   assert.match(importer, /STANDALONE_APPLICATION_LAUNCH_MENU_V1/);
   assert.match(importer, /PACKAGE_RUNTIME_VERSION_SEPARATION_V1/);

@@ -412,7 +412,8 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.Contains("【核心字段可空兼容】全部检查成功", source);
         Assert.Contains("errors.Add($\"核心表 {tableName}.{columnName} 调整为允许为空失败", source);
         Assert.DoesNotContain("msgs.Add($\"核心表 {tableName} 已将", source);
-        Assert.Contains("public static string Version = \"7.6.12.0\"", source);
+        Assert.Contains("public static string Version = \"7.6.13.0\"", source);
+        Assert.Contains("MARKETPLACE_CHANGELOG_TENANT_COLLISION_REPAIR_V1", source);
         Assert.Contains("PACKAGE_MANAGED_OVERWRITE_V2", source);
         Assert.Contains("执行覆盖式重放以修复资源漂移", source);
         Assert.DoesNotContain("平台运行时接口自举存在客户源码或稳定身份冲突", source);
