@@ -547,7 +547,7 @@ console.log('调试信息')                                  // 控制台输出�
 - Windows Hello、Touch ID、Face ID 和 Android 设备验证优先采用 WebAuthn/Passkey，不增加模型 Docker；只有服务端严格人脸与活体检测才接入独立 `Microi Face Gateway v1` 云服务或 Docker/集群。详细规则读取 `microi.skills/v8-security/SKILL.md`。
 
 - 新增业务逻辑先判断现有低代码 CRUD/表单事件能否完成；其次使用接口引擎。只有缺少可复用底层原子能力时才扩展 V8，并继续由接口引擎编排；平台协议、可信鉴权、密钥隔离、存储/网络边界和运行时内核才允许直接写 C# Controller/Service。
-- 修改 `Microi.Server` 前必须说明为什么不能使用接口引擎。第三方 HTTP 集成默认使用 `V8.Http`；密钥不能暴露给可编辑 V8 时，只在 C# 提供最小、租户隔离且不可覆盖密钥的安全原子方法。第三方回调采用“C# 最小协议网关 + `Managed` 核心接口引擎 + `CreateIfMissing` 租户 Hook”，C# 不承载日志、写表、通知等业务。
+- 修改 `Microi.Server` 前必须说明为什么不能使用接口引擎。第三方 HTTP 集成默认使用 `V8.Http`；密钥不能暴露给可编辑 V8 时，只在 C# 提供最小、租户隔离且不可覆盖密钥的安全原子方法。普通第三方 HTTP 回调（含签名、AES 和隐藏密钥）采用“公开 `Managed` HTTP 接口引擎 + 固定 Key/当前租户的最小 V8 原子 + `CreateIfMissing` 租户 Hook”；公开路由、HTTP 响应、日志、写表、通知与业务编排均不新增 Controller。
 - 第三方不支持 QueryString 时使用 `/path--OsClient--{OsClient}--`；支持 Query 时固定使用 `?OsClient=`，禁止 `?o=`。路径与 Query 同时出现时必须一致。
 - 表、字段、Tab、菜单、权限、接口引擎、事件、数据源、页面、打印、工作流、任务和可幂等种子数据必须优先通过应用商城升级，不得为这些资源在 `Microi.Server/Microi.Upgrade/` 新增定制 .NET 迁移。
 - 应用包接口引擎必须声明 `ResourcePolicies.ApiEngines`。当前包声明为 `Managed` 的资源以本次选定且已校验的包正文为最终事实：同版本重装、目标端源码/版本差异、软删除、稳定 Id 或路由占用都自动覆盖或重映射，不再因 `Base/Local/Incoming`、历史所有权或本地改动整包冲突回滚。当前包声明为 `CreateIfMissing` 的租户扩展只在 Key 完全不存在时创建，既有记录（含禁用或软删除）保持原样。覆盖仅限包拥有的声明式资源，不得整表清空业务数据或覆盖租户配置值。

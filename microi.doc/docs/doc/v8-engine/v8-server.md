@@ -126,6 +126,24 @@ return {
 
 `ApiAddress` 与 `ApiRoutes` 都支持完整路径段模板，例如 `/sso/{OsClient}/.well-known/openid-configuration` 和 `/saml/{OsClient}/sp/{ConnectionKey}/metadata`。模板值写入 `V8.Param._RouteValues`，并覆盖同名外部参数；包含 `{OsClient}` 时租户由路径解析，歧义匹配失败关闭。
 
+普通第三方 HTTP 回调即使包含验签、AES 或服务端隐藏密钥，也应把公开地址放在 `Managed` 接口引擎的 `ApiAddress / ApiRoutes`，由接口引擎返回 `DataAppend.HttpResponse` 并调度 `CreateIfMissing` 租户 Hook。C# 只扩展接口引擎缺失的最小安全原子，例如畅捷通 V2：
+
+```javascript
+var decoded = V8.Method.DecodeChanjetCallbackV2({
+  EncryptedMessage: V8.Param.encryptMsg
+});
+if (!decoded || Number(decoded.Code) !== 1) {
+  return { Code: 0, DataAppend: { HttpResponse: {
+    StatusCode: 400,
+    ContentType: 'application/json; charset=utf-8',
+    Body: '{"result":"fail"}',
+    Headers: { 'Cache-Control': 'no-store' }
+  } } };
+}
+```
+
+该原子只允许 `platform-chanjet-callback-v2` 调用，租户从当前 V8 执行上下文取得，AES Key 与 AppKey 白名单不会进入脚本；接口引擎不能传入或覆盖租户、密钥。其它回调应沿用同一模式，不要把公开路由和业务流程重新写入 Controller。
+
 ### 接口引擎通用实时事件（SignalR）
 
 接口引擎负责业务命令、权限、事务和权威状态，SignalR 负责把事务成功后的服务端事件低延迟推送给已授权订阅者。该能力不是游戏专用：订单进度、协同编辑、设备状态、审批提醒和多人房间都使用同一个通用 Hub。共享数据库、Redis 或业务状态机仍是事实源，不能把业务完成与否只保存在 Hub、进程内字典或 SignalR 消息中。
