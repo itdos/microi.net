@@ -19,20 +19,26 @@ function engine(key) {
   return packageModel.SysApiEngines.find(item => item.ApiEngineKey === key);
 }
 
-test('Chanjet V2 callback is an internal Managed engine with a tenant hook', () => {
+test('Chanjet V2 callback is a public Managed HTTP engine with a tenant hook', () => {
   const managed = engine('platform-chanjet-callback-v2');
   const hook = engine('platform-chanjet-callback-v2-hook');
   assert.ok(managed);
   assert.ok(hook);
-  assert.equal(managed.StopHttp, 1);
-  assert.equal(managed.AllowAnonymous, 0);
+  assert.equal(managed.StopHttp, 0);
+  assert.equal(managed.AllowAnonymous, 1);
   assert.equal(managed.EnableLog, 0);
-  assert.equal(managed.Version, 'v1.0.0');
+  assert.equal(managed.Version, 'v1.0.1');
+  assert.equal(managed.ApiAddress, '/apiengine/platform-chanjet-callback-v2');
+  assert.equal(managed.ApiRoutes, '/api/Message/ReceiveV2');
+  assert.equal(managed.ResponseType, 'HTTP');
   assert.equal(hook.StopHttp, 1);
   assert.equal(hook.AllowAnonymous, 0);
   assert.equal(managed.ApiV8Code, managedSource);
   assert.equal(hook.ApiV8Code, hookSource);
-  assert.match(managedSource, /RequireManagedProtocolContext\(\)/);
+  assert.match(managedSource, /V8\.Method\.DecodeChanjetCallbackV2/);
+  assert.match(managedSource, /HttpResponse/);
+  assert.match(managedSource, /param\._HttpMethod/);
+  assert.doesNotMatch(managedSource, /RequireManagedProtocolContext/);
   assert.match(managedSource, /platform-chanjet-callback-v2-hook/);
   assert.match(hookSource, /^\/\* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1/);
   assert.equal(hookSource.replace(/^\/\*[\s\S]*?\*\/\s*/, '').trim(), 'return { Code : 1 };');
@@ -46,7 +52,13 @@ test('Chanjet callback resource policies prevent managed drift and preserve tena
     packageModel.ResourcePolicies.ApiEngines['platform-chanjet-callback-v2-hook'],
     { Ownership: 'Tenant', UpgradePolicy: 'CreateIfMissing' });
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
-    'ApiEngine:platform-chanjet-callback-v2@v1.0.0'));
+    'V8.Method.DecodeChanjetCallbackV2'));
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    'ApiEngine:platform-chanjet-callback-v2@v1.0.1'));
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    'ServerField:sys_apiengine.ApiRoutes'));
+  assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes(
+    'ApiEngineHttpResponseContract:v1'));
 });
 
 test('Chanjet callback settings are tenant-private and disabled by default', () => {
