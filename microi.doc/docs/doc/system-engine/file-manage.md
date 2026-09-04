@@ -42,6 +42,15 @@
   </div>
 </section>
 
+## 📸 预览图
+
+<div class="mci-doc-screenshot-grid mci-doc-screenshot-grid--single">
+  <figure>
+    <img src="/images/product-screenshots/file-manage-sync-dialog.jpg" alt="Microi吾码文件柜文件同步弹窗，展示源与目标文件系统、桶类型、路径和双侧文件树" data-fancybox="file-manage-preview">
+    <figcaption>文件同步：在当前平台、远程平台或 MinIO 之间选择源与目标，并按文件树执行可审计同步。</figcaption>
+  </figure>
+</div>
+
 ::: tip 入口与定位
 登录吾码后台后，通过系统菜单进入 `/#/mci-file-manage`。源码内置组件路由为 `/#/file-manage`；实际项目应以管理员配置并授权的“文件柜”菜单为准。
 :::

@@ -22,8 +22,8 @@ description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、Ap
 | `StopHttp` | 禁止外部 HTTP 调用（仅允许 V8.ApiEngine.Run 内部调用） | `false` |
 | `IsResponseFile` | 是否响应文件（开启后 Data 必须是文件结构） | `false` |
 | `ResponseType` | `JSON/String/File/HTML/Stream/HTTP`；`HTTP` 返回受控状态码、响应头和正文 | 自动识别 |
-| `LockKey` | 分布式锁 Key（同一时刻全集群只能执行一次） | 空 |
-| `LockTimeout` | 锁超时秒数 | `30` |
+| `LockKey` | 用作分布式锁值的请求参数字段名；为空时按接口 Key 串行 | 空 |
+| `Timeout` | 接口执行预算；开启锁时也作为单次 Redis 租期（秒） | 租户运行配置 |
 | `LockMsg` | 加锁失败时返回提示 | `操作过于频繁` |
 | `RateLimit` | 频率限制（如 `60/m` 每分钟60次） | 空 |
 | `LogParam` | 是否记录请求参数到 `sys_log` | `false` |
@@ -181,18 +181,28 @@ return { Code: 1 };
 集群部署时可用接口引擎 `LockKey` 减少同一任务的并发执行（如：每月对账、自动补单）：
 
 ```javascript
-// 配置：LockKey = month_settlement，LockTimeout = 600
-// 平台使用共享锁协调多节点；锁超时、节点暂停和网络分区仍可能触发重试
-var month = DateNow('yyyy-MM');
+// 配置：LockKey = Month，Timeout = 600
+// 调用方传入 Month；平台使用共享锁协调多节点
+var month = String(V8.Param.Month || '');
+if (!/^\d{4}-\d{2}$/.test(month)) return { Code: 0, Msg: 'Month 格式不正确' };
 V8.Db.FromSql('INSERT INTO MonthSettle SELECT ... WHERE Month = @p0')
   .AddInParameter("@p0", month)
   .ExecuteNonQuery();
 return { Code: 1 };
 ```
 
-`LockKey` 可包含 `${V8.OsClient}` 实现按租户独立锁。
+`LockKey` 填写请求参数字段名；上例调用方应传入 `Month`，平台使用其值区分不同月份。未填写时按 `ApiEngineKey` 串行。平台自动把锁放入当前 `OsClient` 命名空间，不需要也不应让客户端自行拼接其它租户前缀。缺少已配置的参数字段时会退回使用字段名本身，虽然仍能互斥，但会让所有请求共享一把锁，因此保存与 HTTP 复测必须覆盖实际参数。
+
+### 普通调用与可信后台任务的租约差异
+
+- 普通 HTTP 或普通 V8 调用保持固定租期：`Timeout` 是锁成功获取后的 Redis TTL，不会自动延长。它必须大于正常执行时间，但不能靠设置超大数值代替可靠后台任务。
+- 通过平台 `RunBackground`/后台任务服务进入的可信持久执行，会在回调期间按持有者令牌自动续租。当前默认最长续租边界为 12 小时；若接口显式配置的单次租期本身更长，平台不会把它缩短到 12 小时。
+- 可信身份由服务端建立，并同时校验任务 Id、后台任务信封和正数 fencing token。客户端或普通 V8 自行传入 `_BackgroundTaskId`、`_BackgroundTask`、`_BackgroundTaskFencingToken`、`_TrustedServerInvocation` 或 `_CurrentUser`，不能开启自动续租。
+- 续租和释放都以唯一持有者令牌做 Redis 原子比较；锁每次成功获取还会产生单调递增 fencing token。持有者不匹配、锁已过期、Redis 所有权/续租确认失败或达到最长租约时，执行必须失败关闭，旧持有者不得继续提交副作用。
 
 分布式锁不是“业务只执行一次”的最终保证。扣款、库存、积分、流水、对账等副作用还必须使用稳定幂等键、数据库唯一约束/条件更新、状态机或 outbox/inbox；锁 Key 至少包含 `OsClient + 业务唯一标识`，超时必须大于正常执行时间。所需唯一索引必须写入 Manifest `tables[].indexes` 并通过 `microi_create_table_index` 创建、`microi_get_table_indexes` 回读，接口引擎本身禁止执行索引 DDL。
+
+预计超过 10 分钟的任务即使具备自动续租，也必须使用 `HasMore + Checkpoint` 分片并持久化真实进度。每个业务条件写入使用 `_BackgroundTaskFencingToken` 拒绝租约过期的旧执行者；错误信息包含“分布式锁租约已丢失”时不得捕获后返回成功，任务应保留最后进度与原始原因，交由后台任务的幂等恢复或人工诊断处理。
 
 ## 4. 自定义路径（ApiAddress）
 
@@ -347,7 +357,9 @@ return { Code: 1, Data: { Upstream: resp.Content, Summary: summary.Data } };
 - [ ] 公开接口是否仅开启 `IsAnonymous`，敏感接口是否关闭？
 - [ ] 内部接口是否开启 `StopHttp`？
 - [ ] 写操作（扣款、对账、补单）是否配置 `LockKey`？
+- [ ] `LockKey` 是否指向真实存在的请求参数，`Timeout` 是否是合理的单次租期？
 - [ ] 锁之外是否还有幂等键、唯一约束/条件更新或状态机？
+- [ ] 长任务是否只由平台可信后台上下文自动续租，并在租约丢失时失败关闭？
 - [ ] 频率敏感接口是否配置 `RateLimit`？
 - [ ] 审计需求接口是否开启 `LogParam`？
 - [ ] 文件响应接口是否开启 `IsResponseFile`？

@@ -24,11 +24,11 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
     releaseTime: webosIconReleaseTime,
   }),
   'app.microi.store.json': Object.freeze({
-    version: 'v7.9.18',
-    title: '安装迁移与页面引用双重加固',
+    version: 'v7.9.20',
+    title: '升级日志租户回填唯一键冲突修复',
     changeType: 'Fix',
-    content: '导入器 v2.7.1 新增目标租户 OsClient 参数化回填合同和 PageEngine 可选引用合同；保留无声明时失败关闭，并增加官方包发布前闭包门禁，阻止缺失页面依赖再次进入商城。',
-    releaseTime: '2026-09-03 22:00:00',
+    content: '导入器 v2.7.2 在 sys_microistore_changelog.OsClient 收紧为非空前，按目标租户与 StoreId、Version 确定性归并历史空租户重复记录，再参数化回填并强回读；修复 ux_microistore_changelog_store_version 重复键导致升级13整包回滚，并增加5000条上限、并发删除计数和幂等复跑门禁。',
+    releaseTime: '2026-09-04 09:00:00',
   }),
   'app.microi.saas-engine.json': Object.freeze({
     version: 'v7.8.16',

@@ -65,7 +65,8 @@ test('案例册内案例按真实菜单权限进入编辑或只读详情', async
 
 test('选择案例弹窗打开时隐藏外层固定保存栏', async () => {
   const source = await readFile(casebookUrl, 'utf8')
-  assert.match(source, /v-if="!loading && !casePickerVisible && canEdit" class="bottom-bar"/)
+  assert.match(source, /v-if="!loading && !casePickerVisible && \(canEdit \|\| canExportPdf\)" class="bottom-bar"/)
+  assert.match(source, /<button v-if="canExportPdf"[\s\S]*?@tap="exportPdf">▣ 导出并分享 PDF<\/button>/)
   assert.match(source, /<view class="picker-submit"><button[\s\S]*?@tap="addSelectedCases"/)
 })
 

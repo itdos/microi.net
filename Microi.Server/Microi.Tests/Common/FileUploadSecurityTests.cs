@@ -491,11 +491,11 @@ public class FileUploadSecurityTests
     }
 
     [Theory]
-    [InlineData("0", false)]
-    [InlineData("false", false)]
-    [InlineData("1", true)]
-    [InlineData("true", true)]
-    public void TenantUploadSwitch_IsExplicitAndBlankKeepsCompatibility(
+    [InlineData("0", true)]
+    [InlineData("false", true)]
+    [InlineData("1", false)]
+    [InlineData("true", false)]
+    public void DisableFileUpload_IsNegativeAndBlankDefaultsToAllowed(
         string configuredValue,
         bool expected)
     {
@@ -510,13 +510,47 @@ public class FileUploadSecurityTests
 
         var result = FileUploadSecurityOptions.ApplyTenantOverrides(
             hardLimits,
-            new JObject { ["FileUploadEnabled"] = configuredValue });
+            new JObject { ["DisableFileUpload"] = configuredValue });
         var blank = FileUploadSecurityOptions.ApplyTenantOverrides(
             hardLimits,
-            new JObject { ["FileUploadEnabled"] = "" });
+            new JObject { ["DisableFileUpload"] = "" });
 
         Assert.Equal(expected, result.UploadEnabled);
         Assert.True(blank.UploadEnabled);
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("false", false)]
+    [InlineData("1", true)]
+    [InlineData("true", true)]
+    public void LegacyPositiveSwitch_IsUsedOnlyBeforeNewColumnExists(
+        string configuredValue,
+        bool expected)
+    {
+        var fallback = new FileUploadSecurityOptions
+        {
+            MaxFileBytes = 100,
+            MaxTotalBytes = 200,
+            MaxFileCount = 10,
+            DailyUserQuotaBytes = 1000,
+            DailyTenantQuotaBytes = 2000,
+            UploadEnabled = true
+        };
+
+        var legacyOnly = FileUploadSecurityOptions.ApplyTenantOverrides(
+            fallback,
+            new JObject { ["FileUploadEnabled"] = configuredValue });
+        var upgradedBlank = FileUploadSecurityOptions.ApplyTenantOverrides(
+            fallback,
+            new JObject
+            {
+                ["DisableFileUpload"] = JValue.CreateNull(),
+                ["FileUploadEnabled"] = configuredValue
+            });
+
+        Assert.Equal(expected, legacyOnly.UploadEnabled);
+        Assert.True(upgradedBlank.UploadEnabled);
     }
 
     [Fact]
@@ -543,7 +577,7 @@ public class FileUploadSecurityTests
 
         var result = FileUploadSecurityOptions.ApplyTenantOverrides(
             hardLimits,
-            new JObject { ["FileUploadEnabled"] = 1 },
+            new JObject { ["DisableFileUpload"] = 0 },
             absoluteCaps);
 
         Assert.False(result.UploadEnabled);

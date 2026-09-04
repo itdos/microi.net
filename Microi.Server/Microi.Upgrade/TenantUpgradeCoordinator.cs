@@ -22,7 +22,8 @@ namespace Microi.net
             "Upgrade30-后端运行配置",
             "Upgrade31-翻译引擎配置",
             "Upgrade33-表单V8限额",
-            "Upgrade34-数据源迁移接口引擎"
+            "Upgrade34-数据源迁移接口引擎",
+            "Upgrade35-文件上传负向开关"
         };
 
         /// <summary>
@@ -188,7 +189,9 @@ namespace Microi.net
                         new KeyValuePair<string, Func<Task<List<string>>>>(
                             RequiredRuntimeInvariantNames[10], () => new Upgrade33().Run(runtimeClient.OsClient, false)),
                         new KeyValuePair<string, Func<Task<List<string>>>>(
-                            RequiredRuntimeInvariantNames[11], () => new Upgrade34().Run(runtimeClient.OsClient))
+                            RequiredRuntimeInvariantNames[11], () => new Upgrade34().Run(runtimeClient.OsClient)),
+                        new KeyValuePair<string, Func<Task<List<string>>>>(
+                            RequiredRuntimeInvariantNames[12], () => new Upgrade35().Run(runtimeClient.OsClient))
                     };
 
                     foreach (var invariant in invariants)
